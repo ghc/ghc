@@ -545,24 +545,14 @@ mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkTopClosedFamEqFDs ax work_args work_rhs
   = do { let branches = fromBranches (coAxiomBranches ax)
        ; traceTcS "mkTopClosed" (ppr branches $$ ppr work_args $$ ppr work_rhs)
-       ; return (go branches) }
+       ; case filter relevant_branch branches of
+           [CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys }]
+              -> return [FDEqns { fd_qtvs = qtvs
+                                , fd_eqs = zipWith Pair lhs_tys work_args }]
+           _  -> return [] }
   where
-    go :: [CoAxBranch] -> [FunDepEqns]
-    go [] = []
-
-    go (branch : later_branches)
-      | CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys
-                   , cab_rhs = rhs_ty, cab_incomps = incomps } <- branch
-      , not (eqnIsIrrelevant lhs_tys rhs_ty work_args work_rhs)
-      , all irrelevant_branch incomps
-      , all irrelevant_branch later_branches
-      = [FDEqns { fd_qtvs = qtvs, fd_eqs = zipWith Pair lhs_tys work_args }]
-
-      | otherwise
-      = go later_branches
-
-    irrelevant_branch (CoAxBranch { cab_lhs = lhs_tys, cab_rhs = rhs_ty })
-      = eqnIsIrrelevant lhs_tys rhs_ty work_args work_rhs
+    relevant_branch (CoAxBranch { cab_lhs = lhs_tys, cab_rhs = rhs_ty })
+      = eqnIsRelevant lhs_tys rhs_ty work_args work_rhs
 
 mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
 -- Implements (INJFAM:Wanted/top)
@@ -738,13 +728,13 @@ getInertFamEqsFor fam_tc work_args work_rhs
                                             , eq_rhs = inert_rhs })
                                  <- equal_ct_list
                            , NomEq == eq_rel
-                           , not (eqnIsIrrelevant inert_args inert_rhs work_args work_rhs) ] }
+                           , eqnIsRelevant inert_args inert_rhs work_args work_rhs ] }
 
-eqnIsIrrelevant :: [TcType] -> TcType
+eqnIsRelevant :: [TcType] -> TcType
                 -> [TcType] -> TcType
                 -> Bool
-eqnIsIrrelevant lhs_tys1 rhs_ty1 lhs_tys2 rhs_ty2
-  = (rhs_ty1:lhs_tys1) `typeListsAreApart` (rhs_ty2:lhs_tys2)
+eqnIsRelevant lhs_tys1 rhs_ty1 lhs_tys2 rhs_ty2
+  = not ((rhs_ty1:lhs_tys1) `typeListsAreApart` (rhs_ty2:lhs_tys2))
 
 
 {- Note [Type inference for type families with injectivity]
