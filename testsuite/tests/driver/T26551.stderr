@@ -1,0 +1,11 @@
+T26551.hs:3:8: [GHC-87110]
+    Could not find module ‘Foo’.
+    Use -v to see a list of the files searched for.
+
+T26551.hs:4:8: [GHC-87110]
+    Could not find module ‘Bar’.
+    Use -v to see a list of the files searched for.
+
+T26551.hs:5:8: [GHC-87110]
+    Could not find module ‘Baz’.
+    Use -v to see a list of the files searched for.

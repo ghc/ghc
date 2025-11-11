@@ -415,6 +415,10 @@ test200:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -M -dep-suffix "" -dep-makefile $(DEPFILE200) D200.hs B200/C.hs A200.hs
 	test -f $(DEPFILE200)
 
+# Test that we produce "could not find module" errors for _all_ missing imports.
+T26551:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -M T26551.hs || true
+
 # -----------------------------------------------------------------------------
 
 T2566::

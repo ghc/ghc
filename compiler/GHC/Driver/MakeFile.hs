@@ -55,6 +55,7 @@ import Data.IORef
 import qualified Data.Set as Set
 import GHC.Iface.Errors.Types
 import Data.Either
+import GHC.Data.Bag (listToBag)
 
 -----------------------------------------------------------------
 --
@@ -237,19 +238,6 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ (ModuleN
               obj_file  = msObjFilePath node
               obj_files = insertSuffixes obj_file extra_suffixes
 
-              do_imp loc is_boot pkg_qual imp_mod
-                = do { mb_hi <- findDependency hsc_env loc pkg_qual imp_mod
-                                               is_boot include_pkg_deps
-                     ; case mb_hi of {
-                           Nothing      -> return () ;
-                           Just hi_file -> do
-                     { let hi_files = insertSuffixes hi_file extra_suffixes
-                           write_dep (obj,hi) = writeDependency root hdl [obj] hi
-
-                        -- Add one dependency for each suffix;
-                        -- e.g.         A.o   : B.hi
-                        --              A.x_o : B.x_hi
-                     ; mapM_ write_dep (obj_files `zip` hi_files) }}}
 
 
                 -- Emit std dependency of the object(s) on the source file
@@ -280,15 +268,33 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ (ModuleN
 
                 -- Emit a dependency for each import
 
-        ; let do_imps is_boot idecls = sequence_
-                    [ do_imp loc is_boot mb_pkg mod
+        ; let find_dep loc is_boot pkg_qual imp_mod = findDependency hsc_env loc pkg_qual imp_mod is_boot include_pkg_deps
+
+              find_deps is_boot idecls = sequence
+                    [ find_dep loc is_boot mb_pkg mod
                     | (_lvl, mb_pkg, L loc mod) <- idecls,
                       mod `notElem` excl_mods ]
 
-        ; do_imps IsBoot (map ((,,) NormalLevel NoPkgQual) (ms_srcimps node))
-        ; do_imps NotBoot (ms_imps node)
-        }
+              do_imp hi_file = do
+                let hi_files = insertSuffixes hi_file extra_suffixes
+                    write_dep (obj,hi) = writeDependency root hdl [obj] hi
 
+                 -- Add one dependency for each suffix;
+                 -- e.g.         A.o   : B.hi
+                 --              A.x_o : B.x_hi
+                mapM_ write_dep (obj_files `zip` hi_files)
+
+        ; (missing_boot_dep_errs, boot_deps) <- partitionEithers <$> find_deps IsBoot (map ((,,) NormalLevel NoPkgQual) (ms_srcimps node))
+        ; (missing_not_boot_dep_errs, not_boot_deps) <- partitionEithers <$> find_deps NotBoot (ms_imps node)
+
+        ; let all_missing_errors = missing_boot_dep_errs ++ missing_not_boot_dep_errs
+
+        ; if null all_missing_errors
+            then mapM_ (mapM_ do_imp) (boot_deps ++ not_boot_deps)
+            else do
+              let sec = initSourceErrorContext (hsc_dflags hsc_env)
+              throwErrors sec (mkMessages (listToBag all_missing_errors))
+        }
 
 findDependency  :: HscEnv
                 -> SrcSpan
@@ -296,7 +302,7 @@ findDependency  :: HscEnv
                 -> ModuleName           -- Imported module
                 -> IsBootInterface      -- Source import
                 -> Bool                 -- Record dependency on package modules
-                -> IO (Maybe FilePath)  -- Interface file
+                -> IO (Either (MsgEnvelope GhcMessage) (Maybe FilePath))  -- Interface file
 findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
   -- Find the module; this will be fast because
   -- we've done it once during downsweep
@@ -305,16 +311,15 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file
         | isJust (ml_hs_file loc) || include_pkg_deps
-        -> return (Just (ml_hi_file loc))
+        -> return (Right (Just (ml_hi_file loc)))
 
         -- Not in this package: we don't need a dependency
         | otherwise
-        -> return Nothing
+        -> return (Right Nothing)
 
     fail ->
-      let sec = initSourceErrorContext (hsc_dflags hsc_env)
-      in
-        throwOneError sec $
+      return $
+        Left $
           mkPlainErrorMsgEnvelope srcloc $
           GhcDriverMessage $ DriverInterfaceError $
              (Can'tFindInterface (cannotFindModule hsc_env imp fail) (LookingForModule imp is_boot))
