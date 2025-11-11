@@ -44,6 +44,7 @@ import GHC.ResponseFile
 import GHC.Toolchain (Target(..))
 import qualified GHC.Toolchain as Toolchain
 import GHC.Toolchain.Program
+import Debug.Trace
 
 -- | C compiler can be used in two different modes:
 -- * Compile or preprocess a source file.
@@ -399,9 +400,17 @@ runHaddock haddockPath flagArgs fileInputs = withTempFile $ \tmp -> do
 
 runGhcWithResponse :: FilePath -> [String] -> [FilePath] -> Action ()
 runGhcWithResponse ghcPath flagArgs fileInputs = withTempFile $ \tmp -> do
+
+    let (hs_files, normal_args) = partition (isSuffixOf ".hs") flagArgs
     writeFile' tmp $ escapeArgs (fileInputs)
 
-    cmd [ghcPath] flagArgs ('@' : tmp)
+    traceM (unlines $ hs_files)
+    traceM (unlines $ fileInputs)
+
+    writeFile' tmp $ escapeArgs fileInputs
+
+    -- Cannot put everything into a response file due to #26560
+    cmd [ghcPath] normal_args ('@' : tmp)
 
 
 -- TODO: Some builders are required only on certain platforms. For example,
