@@ -25,7 +25,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Core.Predicate( EqRel(..) )
 import GHC.Core.TyCon
-import GHC.Core.Unify( tcUnifyTyForInjectivity, typeListsAreApart, typesAreApart, tcUnifyTy )
+import GHC.Core.Unify( tcUnifyTyForInjectivity, typeListsAreApart, typesAreApart )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Subst( elemSubst )
 
@@ -38,7 +38,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Data.Pair
-import Data.Maybe( mapMaybe, isJust )
+import Data.Maybe( mapMaybe )
 
 
 {- Note [Overview of functional dependencies in type inference]
@@ -500,7 +500,8 @@ tryFamEqFunDeps fam_tc args work_item@(EqCt { eq_ev = ev, eq_rhs = rhs })
   | Just ax <- isClosedFamilyTyCon_maybe fam_tc
   = -- Closed type families
     do { -- Note [Do local fundeps before top-level instances]
-         case tyConInjectivityInfo fam_tc of
+         simpleStage $ traceTcS "fundep closed" (ppr fam_tc)
+       ; case tyConInjectivityInfo fam_tc of
            NotInjective  -> nopStage()
            Injective inj -> tryFDEqns fam_tc args work_item $
                             mkLocalUserFamEqFDs fam_tc inj args rhs
@@ -531,7 +532,9 @@ tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eq
 -----------------------------------------
 mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkTopClosedFamEqFDs ax work_args work_rhs
-  = return (go (fromBranches (coAxiomBranches ax)))
+  = do { let branches = fromBranches (coAxiomBranches ax)
+       ; traceTcS "mkTopClosed" (ppr branches $$ ppr work_args $$ ppr work_rhs)
+       ; return (go branches) }
   where
     go :: [CoAxBranch] -> [FunDepEqns]
     go [] = []
@@ -539,18 +542,19 @@ mkTopClosedFamEqFDs ax work_args work_rhs
     go (branch : later_branches)
       | CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys
                    , cab_rhs = rhs_ty, cab_incomps = incomps } <- branch
-      , not (work_args `typeListsAreApart` lhs_tys)
-      , isJust (tcUnifyTy work_rhs rhs_ty)
-      = if all ok incomps && all ok later_branches
+      , not (no_match lhs_tys rhs_ty)
+      = if all no_match_branch incomps && all no_match_branch later_branches
         then [FDEqns { fd_qtvs = qtvs, fd_eqs = zipWith Pair lhs_tys work_args }]
         else []
 
       | otherwise
       = go later_branches
 
-    ok (CoAxBranch { cab_lhs = lhs_tys, cab_rhs = rhs_ty })
-      = work_args `typeListsAreApart` lhs_tys ||
-        work_rhs  `typesAreApart`     rhs_ty
+    no_match_branch (CoAxBranch { cab_lhs = lhs_tys, cab_rhs = rhs_ty })
+      = no_match lhs_tys rhs_ty
+
+    no_match lhs_tys rhs_ty = work_args `typeListsAreApart` lhs_tys ||
+                              work_rhs  `typesAreApart`     rhs_ty
 
 mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
 -- Implements (INJFAM:Wanted/top)
