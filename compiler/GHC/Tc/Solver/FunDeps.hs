@@ -553,16 +553,16 @@ mkTopClosedFamEqFDs ax work_args work_rhs
     go (branch : later_branches)
       | CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys
                    , cab_rhs = rhs_ty, cab_incomps = incomps } <- branch
-      , not (eqnIsApart lhs_tys rhs_ty work_args work_rhs)
-      = if all no_match_branch incomps && all no_match_branch later_branches
-        then [FDEqns { fd_qtvs = qtvs, fd_eqs = zipWith Pair lhs_tys work_args }]
-        else []
+      , not (eqnIsIrrelevant lhs_tys rhs_ty work_args work_rhs)
+      , all irrelevant_branch incomps
+      , all irrelevant_branch later_branches
+      = [FDEqns { fd_qtvs = qtvs, fd_eqs = zipWith Pair lhs_tys work_args }]
 
       | otherwise
       = go later_branches
 
-    no_match_branch (CoAxBranch { cab_lhs = lhs_tys, cab_rhs = rhs_ty })
-      = eqnIsApart lhs_tys rhs_ty work_args work_rhs
+    irrelevant_branch (CoAxBranch { cab_lhs = lhs_tys, cab_rhs = rhs_ty })
+      = eqnIsIrrelevant lhs_tys rhs_ty work_args work_rhs
 
 mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
 -- Implements (INJFAM:Wanted/top)
@@ -738,12 +738,12 @@ getInertFamEqsFor fam_tc work_args work_rhs
                                             , eq_rhs = inert_rhs })
                                  <- equal_ct_list
                            , NomEq == eq_rel
-                           , not (eqnIsApart inert_args inert_rhs work_args work_rhs) ] }
+                           , not (eqnIsIrrelevant inert_args inert_rhs work_args work_rhs) ] }
 
-eqnIsApart :: [TcType] -> TcType
-           -> [TcType] -> TcType
-           -> Bool
-eqnIsApart lhs_tys1 rhs_ty1 lhs_tys2 rhs_ty2
+eqnIsIrrelevant :: [TcType] -> TcType
+                -> [TcType] -> TcType
+                -> Bool
+eqnIsIrrelevant lhs_tys1 rhs_ty1 lhs_tys2 rhs_ty2
   = (rhs_ty1:lhs_tys1) `typeListsAreApart` (rhs_ty2:lhs_tys2)
 
 
