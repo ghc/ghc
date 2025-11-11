@@ -139,6 +139,19 @@ struct Capability_ {
     // See Note [allocation accounting] in Storage.c
     uint64_t total_allocated;
 
+    // I/O manager data structures for this capability
+    CapIOManager *iomgr;
+
+    // Per-capability STM-related data
+    StgTVarWatchQueue *free_tvar_watch_queues;
+    StgTRecChunk *free_trec_chunks;
+    StgTRecHeader *free_trec_headers;
+    uint32_t transaction_tokens;
+
+    // WARNING: unconditional struct members must come before ones
+    // conditional on THREADED_RTS. Otherwise the CMM Capability_*
+    // accessor macros would have the wrong offsets.
+
 #if defined(THREADED_RTS)
     // Worker Tasks waiting in the wings.  Singly-linked.
     Task *spare_workers;
@@ -175,14 +188,9 @@ struct Capability_ {
     SparkCounters spark_stats;
 #endif
 
-    // I/O manager data structures for this capability
-    CapIOManager *iomgr;
+    // WARNING: No more unconditional struct members here, or they will
+    // have inconsistent CMM offset macros.
 
-    // Per-capability STM-related data
-    StgTVarWatchQueue *free_tvar_watch_queues;
-    StgTRecChunk *free_trec_chunks;
-    StgTRecHeader *free_trec_headers;
-    uint32_t transaction_tokens;
 } // typedef Capability is defined in RtsAPI.h
   ATTRIBUTE_ALIGNED(CAPABILITY_ALIGNMENT)
 ;
