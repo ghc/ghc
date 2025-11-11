@@ -414,6 +414,7 @@ wanteds os = concat
           ,structField C    "Capability" "weak_ptr_list_hd"
           ,structField C    "Capability" "weak_ptr_list_tl"
           ,structField C    "Capability" "n_run_queue"
+          ,structField C    "Capability" "iomgr"
 
           ,structField Both "bdescr" "start"
           ,structField Both "bdescr" "free"
