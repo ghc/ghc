@@ -311,7 +311,7 @@ schedule (Capability *initialCapability, Task *task)
      * is nothing to do now, we block and wait for I/O, timeouts or signals.
      * Importantly, we only block /after/ checking for deadlocks. See #26408.
      */
-    if (emptyRunQueue(cap) && anyPendingTimeoutsOrIO(cap->iomgr)) {
+    if (emptyRunQueue(cap)) {
         awaitCompletedTimeoutsOrIO(cap->iomgr);
     }
 #endif
@@ -630,9 +630,7 @@ scheduleFindWork (Capability **pcap)
     Capability *cap = *pcap;
 
 #if !defined(THREADED_RTS)
-    if (anyPendingTimeoutsOrIO(cap->iomgr)) {
-        pollCompletedTimeoutsOrIO(cap->iomgr);
-    }
+    pollCompletedTimeoutsOrIO(cap->iomgr);
 #endif
 
 #if defined(THREADED_RTS)
