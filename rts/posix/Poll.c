@@ -437,6 +437,10 @@ void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
             reportPollError(res, nfds);
         }
     }
+
+#if defined(RTS_USER_SIGNALS)
+    startPendingSignalHandlers(iomgr->cap);
+#endif
 }
 
 
@@ -513,14 +517,13 @@ void awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
             wakeup = processIOCompletions(iomgr, ncompletions);
 
         } else if (errno == EINTR) {
-            /* We got interrupted by a signal. In the non-threaded RTS, if the
-             * signal is one of ours we need to return to the scheduler to let
-             * it handle it. Otherwise we would loop and keep waiting for I/O
-             * or timeouts, meaning we would block for a long time before the
-             * signal is serviced.
-             */
+            /* We got interrupted by a signal. */
+
 #if defined(RTS_USER_SIGNALS)
-            if (startPendingSignalHandlers(iomgr->cap)) break;
+            /* Start any corresponding user signal handlers. If any, the run
+             * queue will become non-empty and we will drop out of the loop.
+             */
+            startPendingSignalHandlers(iomgr->cap);
 #endif
 
             /* We can also be interrupted by the shutdown signal handler, which
