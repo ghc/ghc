@@ -14,6 +14,7 @@
  *
  */
 #include "Rts.h"
+#include "RtsSignals.h"
 #include "RtsFlags.h"
 #include "Schedule.h"
 #include "IOManager.h"
@@ -45,15 +46,9 @@ awaitCompletedTimeoutsOrIOWin32(Capability *cap, bool wait)
       interrupt = !awaitRequests(wait);
     workerWaitingForRequests = false;
 
-    // If a signal was raised, we need to service it
-    // XXX the scheduler loop really should be calling
-    // startSignalHandlers(), but this is the way that posix/Select.c
-    // does it and I'm feeling too paranoid to refactor it today --SDM
-    if (stg_pending_events != 0) {
-        startSignalHandlers(cap);
-        // This will normally cause emptyRunQueue to become false and
-        // thus we will drop out of the loop.
-    }
+    // If a signal was raised, we need to service it. This will typically
+    // start a thread, which will cause us to drop out of the loop.
+    startPendingSignalHandlers(cap);
 
     // The return value from awaitRequests() reports if it was interrupted by
     // abandonRequestWait(). Return to the scheduler if !wait, or
