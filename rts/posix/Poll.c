@@ -457,9 +457,10 @@ void awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr)
      * that select() supports.
      */
     do {
-        /* There is either pending I/O or pending timers. */
-        ASSERT(!isEmptyTimeoutQueue(iomgr->timeout_queue) ||
-               !isEmptyClosureTable(&iomgr->aiop_table));
+        /* We do /not/ require that there be pending I/O or pending timers.
+         * If there is neither, it's because the scheduler wants us to wait
+         * on signals only.
+         */
 
         Time now = getProcessElapsedTime();
         processTimeoutCompletions(iomgr, now);
