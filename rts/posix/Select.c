@@ -12,7 +12,7 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
-#include "Signals.h"
+#include "RtsSignals.h"
 #include "Schedule.h"
 #include "Prelude.h"
 #include "RaiseAsync.h"
@@ -276,8 +276,16 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
     do {
 
       now = getLowResTimeOfDay();
-      if (wakeUpSleepingThreads(iomgr, now)) {
-          return true;
+      wakeUpSleepingThreads(iomgr, now);
+#if defined(RTS_USER_SIGNALS)
+      startPendingSignalHandlers(iomgr->cap);
+#endif
+      /* If either of the above (checking for timers or signal) caused threads
+       * to be started (or if the run queue was non-empty in the first place),
+       * then poll for I/O but don't block waiting.
+       */
+      if (!emptyRunQueue(iomgr->cap)) {
+          wait = false;
       }
 
       /*
@@ -390,16 +398,11 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
             }
           }
 
-          /* We got a signal; could be one of ours.  If so, we need
-           * to start up the signal handler straight away, otherwise
-           * we could block for a long time before the signal is
-           * serviced.
-           */
 #if defined(RTS_USER_SIGNALS)
-          if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
-              startSignalHandlers(iomgr->cap);
-              return true; /* still hold the lock */
-          }
+          /* Start any corresponding user signal handlers. If any, the run
+           * queue will become non-empty and we will drop out of the loop.
+           */
+          startPendingSignalHandlers(iomgr->cap);
 #endif
 
           /* we were interrupted, return to the scheduler immediately.
