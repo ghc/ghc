@@ -24,36 +24,6 @@
  */
 
 /*
- * Function: signals_pending()
- *
- * Used by the RTS to check whether new signals have been 'recently' reported.
- * If so, the RTS arranges for the delivered signals to be handled by
- * de-queueing them from their table, running the associated Haskell
- * signal handler.
- */
-extern StgInt stg_pending_events;
-
-#define signals_pending() ( stg_pending_events > 0)
-
-/*
- * Function: anyUserHandlers()
- *
- * Used by the Scheduler to decide whether its worth its while to stick
- * around waiting for an external signal when there are no threads
- * runnable. A console handler is used to handle termination events (Ctrl+C)
- * and isn't considered a 'user handler'.
- */
-#define anyUserHandlers() (false)
-
-/*
- * Function: startSignalHandlers()
- *
- * Run the handlers associated with the queued up console events. Console
- * event delivery is blocked for the duration of this call.
- */
-extern void startSignalHandlers(Capability *cap);
-
-/*
  * Function: rts_waitConsoleHandlerCompletion()
  *
  * Esoteric entry point used by worker thread that got woken
@@ -62,10 +32,3 @@ extern void startSignalHandlers(Capability *cap);
 extern int rts_waitConsoleHandlerCompletion(void);
 
 #endif /* THREADED_RTS */
-
-/*
- * Function: finiUserSignals()
- *
- * Tear down and shut down user signal processing.
- */
-extern void finiUserSignals(void);
