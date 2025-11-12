@@ -154,29 +154,18 @@ unblockUserSignals(void)
 }
 
 
-/*
- * Function: awaitUserSignals()
- *
- * Wait for the next console event. Currently a NOP (returns immediately.)
- */
-void awaitUserSignals(void)
-{
-    return;
-}
-
-
 #if !defined(THREADED_RTS)
 /*
- * Function: startSignalHandlers()
+ * Function: startPendingSignalHandlers()
  *
- * Run the handlers associated with the stacked up console events. Console
- * event delivery is blocked for the duration of this call.
+ * If there are any queued up console events, run the handlers associated with
+ * them. Console event delivery is blocked for the duration of this call.
  */
-void startSignalHandlers(Capability *cap)
+void startPendingSignalHandlers(Capability *cap)
 {
     StgStablePtr handler;
 
-    if (console_handler < 0) {
+    if (stg_pending_events <= 0 || console_handler < 0) {
         return;
     }
 
