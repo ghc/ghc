@@ -90,6 +90,11 @@ freeSignalHandlers(void) {
 #endif
 }
 
+void finiUserSignals(void)
+{
+    /* nothing */
+};
+
 /* -----------------------------------------------------------------------------
  * Allocate/resize the table of signal handlers.
  * -------------------------------------------------------------------------- */
@@ -123,6 +128,10 @@ more_handlers(int sig)
 
 siginfo_t pending_handler_buf[N_PENDING_HANDLERS];
 siginfo_t *next_pending_handler = pending_handler_buf;
+
+static inline bool signals_pending(void) {
+    return (next_pending_handler != pending_handler_buf);
+}
 
 #endif /* THREADED_RTS */
 
@@ -202,22 +211,6 @@ unblockUserSignals(void)
 {
     sigprocmask(SIG_SETMASK, &savedSignals, NULL);
 }
-
-bool
-anyUserHandlers(void)
-{
-    return n_haskell_handlers != 0;
-}
-
-#if !defined(THREADED_RTS)
-void
-awaitUserSignals(void)
-{
-    while (!signals_pending() && getSchedState() == SCHED_RUNNING) {
-        pause();
-    }
-}
-#endif
 
 /* -----------------------------------------------------------------------------
  * Install a Haskell signal handler.
@@ -325,10 +318,12 @@ stg_sig_install(int sig, int spi, void *mask)
 
 #if !defined(THREADED_RTS)
 void
-startSignalHandlers(Capability *cap)
+startPendingSignalHandlers(Capability *cap)
 {
   siginfo_t *info;
   int sig;
+
+  if (!signals_pending()) return;
 
   blockUserSignals();
 
@@ -341,9 +336,12 @@ startSignalHandlers(Capability *cap)
         continue; // handler has been changed.
     }
 
-    info = stgMallocBytes(sizeof(siginfo_t), "startSignalHandlers");
+    info = stgMallocBytes(sizeof(siginfo_t), "startPendingSignalHandlers");
            // freed by runHandler
     memcpy(info, next_pending_handler, sizeof(siginfo_t));
+
+    debugTrace(DEBUG_iomanager,
+               "Handling pending signal, no %d", info->si_signo);
 
     StgTSO *t =
         createIOThread(cap,

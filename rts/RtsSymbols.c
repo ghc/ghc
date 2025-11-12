@@ -21,10 +21,6 @@
 #include "Arena.h"
 #include <stdbool.h>
 
-#if !defined(mingw32_HOST_OS) && defined(HAVE_SIGNAL_H)
-#include "posix/Signals.h"
-#endif
-
 #if defined(mingw32_HOST_OS)
 #include <sys/stat.h>
 #include <io.h>
@@ -88,7 +84,6 @@ extern char **environ;
       SymI_HasProto(__hscore_get_saved_termios) \
       SymI_HasProto(__hscore_set_saved_termios) \
       SymI_HasProto(shutdownHaskellAndSignal)   \
-      SymI_HasProto(signal_handlers)            \
       SymI_HasProto(stg_sig_install)            \
       SymI_HasProto(rtsTimerSignal)             \
       SymI_NeedsDataProto(nocldstop)
