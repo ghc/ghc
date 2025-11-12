@@ -41,6 +41,7 @@
 #include "RaiseAsync.h"
 #include "Threads.h"
 #include "Timer.h"
+#include "Ticker.h"
 #include "ThreadPaused.h"
 #include "ThreadLabels.h"
 #include "Messages.h"

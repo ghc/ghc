@@ -30,7 +30,6 @@
 #if defined(IOMGR_ENABLED_SELECT)
 #include "Threads.h"
 #include "posix/Select.h"
-#include "posix/Signals.h"
 #endif
 
 #if defined(IOMGR_ENABLED_POLL)
