@@ -21,7 +21,12 @@ main = do
     -- Get rid of the src file path since it makes test output difficult to diff
     -- on Windows
     printIp = print . stripIpSrc
-    stripIpSrc (Just ip) = ip { ipSrcFile = "" }
+    stripIpSrc (Just ip) = ip
+      { -- get rid of the id, it is not stable across GHC versions or guaranteed to be stable
+        -- across platforms or compilations.
+        ipId = 0
+      , ipSrcFile = ""
+      }
 
 data A = ACon ()
 data B = BCon A

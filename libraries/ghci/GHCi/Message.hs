@@ -545,7 +545,11 @@ instance Binary Heap.ClosureType
 instance Binary Heap.PrimType
 instance Binary a => Binary (Heap.GenClosure a)
 instance Binary InfoProv where
-#if MIN_VERSION_base(4,20,0)
+#if MIN_VERSION_base(4,22,0)
+  get = InfoProv <$> get <*> get <*> get <*> get <*> get <*> get <*> get <*> get <*> get
+  put (InfoProv x1 x2 x3 x4 x5 x6 x7 x8 x9)
+    = put x1 >> put x2 >> put x3 >> put x4 >> put x5 >> put x6 >> put x7 >> put x8 >> put x9
+#elif MIN_VERSION_base(4,20,0)
   get = InfoProv <$> get <*> get <*> get <*> get <*> get <*> get <*> get <*> get
   put (InfoProv x1 x2 x3 x4 x5 x6 x7 x8)
     = put x1 >> put x2 >> put x3 >> put x4 >> put x5 >> put x6 >> put x7 >> put x8
