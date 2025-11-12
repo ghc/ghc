@@ -12,7 +12,7 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
-#include "Signals.h"
+#include "RtsSignals.h"
 #include "Schedule.h"
 #include "Prelude.h"
 #include "RaiseAsync.h"
@@ -374,16 +374,11 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
             }
           }
 
-          /* We got a signal; could be one of ours.  If so, we need
-           * to start up the signal handler straight away, otherwise
-           * we could block for a long time before the signal is
-           * serviced.
-           */
 #if defined(RTS_USER_SIGNALS)
-          if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
-              startSignalHandlers(iomgr->cap);
-              return; /* still hold the lock */
-          }
+          /* Start any corresponding user signal handlers. If any, the run
+           * queue will become non-empty and we will drop out of the loop.
+           */
+          startPendingSignalHandlers(iomgr->cap);
 #endif
 
           /* we were interrupted, return to the scheduler immediately.

@@ -15,6 +15,11 @@
  * subsystem implementations are centralised here. Not all implementations use
  * all hooks.
  *
+ * I/O manager are responsible for:
+ * - threads waiting on I/O
+ * - threads waiting on timeouts
+ * - signals (unix, and win32 console) starting handlers
+ *
  * -------------------------------------------------------------------------*/
 
 #pragma once
@@ -367,18 +372,21 @@ void appendToIOBlockedQueue(CapIOManager *iomgr, StgTSO *tso);
  */
 bool anyPendingTimeoutsOrIO(CapIOManager *iomgr);
 
-/* If there are any completed I/O operations or expired timers, process the
- * completions as appropriate (which will typically unblock some waiting
- * threads, but no guarantee). If there are none, return without waiting.
+/* Poll for any completed I/O operations, expired timers or pending signals
+ * with handlers. If there are any, process the completions as appropriate
+ * (which will typically unblock some waiting threads).
+ *
+ * This polls, but does not block.
+ *
+ * No post-condition. It does not guarantee anything such as there being
+ * runnable threads, since this does not wait.
  *
  * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
  */
 void pollCompletedTimeoutsOrIO(CapIOManager *iomgr);
 
- /* If there are any completed I/O operations or expired timers, process the
- * completions as appropriate. If there are none, wait until I/O or a timer
- * does complete (or we get a signal with a handler) and process the
- * completions as appropriate.
+/* Wait for completed I/O operations, expired timers or signals and process
+ * the completions as appropriate.
  *
  * Upon return this guarantees that the scheduler run queue is non-empty or
  * that the scheduler is no longer in the running state. Succinctly, the
