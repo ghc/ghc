@@ -607,10 +607,6 @@ scheduleFindWork (Capability **pcap)
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
     queueIOThread();
 #endif
-#if defined(RTS_USER_SIGNALS)
-    startPendingSignalHandlers(*pcap);
-#endif
-
     scheduleProcessInbox(pcap);
 
     scheduleCheckBlockedThreads(*pcap);
@@ -946,30 +942,6 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
         // when force_major == true. scheduleDoGC sets
         // recent_activity to ACTIVITY_DONE_GC and turns off the timer
         // signal.
-
-        if ( !emptyRunQueue(cap) ) return;
-
-#if defined(RTS_USER_SIGNALS) && !defined(THREADED_RTS)
-        /* If we have user-installed signal handlers, then wait
-         * for signals to arrive rather then bombing out with a
-         * deadlock.
-         */
-        if ( RtsFlags.MiscFlags.install_signal_handlers && anyUserHandlers() ) {
-            debugTrace(DEBUG_sched,
-                       "still deadlocked, waiting for signals...");
-
-            awaitUserSignals();
-
-            if (signals_pending()) {
-                startSignalHandlers(cap);
-            }
-
-            // either we have threads to run, or we were interrupted:
-            ASSERT(!emptyRunQueue(cap) || getSchedState() >= SCHED_INTERRUPTING);
-
-            return;
-        }
-#endif
     }
 }
 
