@@ -2,25 +2,14 @@
  *
  * (c) The GHC Team, 1998-2005
  *
- * Signal processing / handling.
+ * Signal processing / handling. This is the shared API to the subsystems for
+ * POSIX signals and Win32 console events.
+ *
+ * Platform specific APIs live in posix/Signals.h and win32/ConsoleHandler.h
  *
  * ---------------------------------------------------------------------------*/
 
 #pragma once
-
-#if !defined(mingw32_HOST_OS) && defined(HAVE_SIGNAL_H)
-
-#include "posix/Signals.h"
-
-#elif defined(mingw32_HOST_OS)
-
-#include "win32/ConsoleHandler.h"
-
-#else
-
-#define signals_pending() (false)
-
-#endif
 
 #if defined(RTS_USER_SIGNALS)
 
@@ -44,39 +33,20 @@ void resetDefaultHandlers(void);
 
 void freeSignalHandlers(void);
 
-/*
- * Function: awaitUserSignals()
- *
- * Wait for the next console event. Currently a NOP (returns immediately.)
+/* Tear down and shut down user signal processing.
+ * This is called *after* freeSignalHandlers, but unconditionally!
+ * TODO: unify this and freeSignalHandlers together, and make them make sense!
  */
-void awaitUserSignals(void);
+void finiUserSignals(void);
 
 /*
  * Function: startPendingSignalHandlers()
  *
- * Start any pending signal handlers. This is used by the scheduler and some
- * in-RTS I/O managers. It does nothing (returns false) in the threaded RTS.
- *
- * Returns true if any signal handlers were pending and thus started.
+ * If there are any queued up posix signals or win32 console events, run the
+ * handlers associated with them. This is used by some in-RTS I/O managers.
  */
-INLINE_HEADER bool startPendingSignalHandlers(Capability *cap);
-
 #if !defined(THREADED_RTS)
-INLINE_HEADER bool startPendingSignalHandlers(Capability *cap)
-{
-    if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
-        // safe outside the lock
-        startSignalHandlers(cap);
-        return true;
-    } else {
-        return false;
-    }
-}
-#else
-INLINE_HEADER bool startPendingSignalHandlers(Capability *cap STG_UNUSED)
-{
-    return false;
-}
+void startPendingSignalHandlers(Capability *cap);
 #endif
 
 #include "EndPrivate.h"
