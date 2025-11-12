@@ -70,6 +70,10 @@
 #include <locale.h>
 #endif
 
+#if !defined(mingw32_HOST_OS) && defined(HAVE_SIGNAL_H)
+#include <signal.h>
+#endif
+
 // Count of how many outstanding hs_init()s there have been.
 static StgWord hs_init_count = 0;
 static bool rts_shutdown = false;
@@ -619,10 +623,9 @@ hs_exit_(bool wait_foreign)
 #if defined(mingw32_HOST_OS)
    if (is_io_mng_native_p())
       hs_restoreConsoleCP();
-
-   /* Disable console signal handlers, we're going down!.  */
-   finiUserSignals ();
 #endif
+
+   finiUserSignals();
 
     /* tear down statistics subsystem */
     stat_exit();
