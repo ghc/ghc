@@ -298,7 +298,9 @@ schedule (Capability *initialCapability, Task *task)
        (pushes threads, wakes up idle capabilities for stealing) */
     schedulePushWork(cap,task);
 
-    scheduleDetectDeadlock(&cap,task);
+    if (emptyRunQueue(cap)) {
+        scheduleDetectDeadlock(&cap,task);
+    }
 
 #if !defined(THREADED_RTS)
     /* scheduleFindWork checks for completed I/O but does not block. If there
@@ -863,15 +865,12 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 static void
 scheduleDetectDeadlock (Capability **pcap, Task *task)
 {
-    Capability *cap = *pcap;
     /*
      * Detect deadlock: when we have no threads to run, there are no
      * threads blocked, waiting for I/O, or sleeping, and all the
      * other tasks are waiting for work, we must have a deadlock of
      * some description.
      */
-    if (emptyRunQueue(cap))
-    {
 #if defined(THREADED_RTS)
         /*
          * In the threaded RTS, we only check for deadlock if there
@@ -879,21 +878,28 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
          * we won't eagerly start a full GC just because we don't have
          * any threads to run currently.
          */
-        if (getRecentActivity() != ACTIVITY_INACTIVE) return;
+    if (getRecentActivity() == ACTIVITY_INACTIVE) {
+#else
+    {
 #endif
 
-        debugTrace(DEBUG_sched, "deadlocked, forcing major GC...");
+        debugTrace(DEBUG_sched, "maybe deadlocked, forcing major GC...");
 
-        // Garbage collection can release some new threads due to
-        // either (a) finalizers or (b) threads resurrected because
-        // they are unreachable and will therefore be sent an
-        // exception.  Any threads thus released will be immediately
-        // runnable.
-        scheduleDoGC (pcap, task, true/*force major GC*/, false /* Whether it is an overflow GC */, true/*deadlock detection*/, false/*nonconcurrent*/);
-        cap = *pcap;
-        // when force_major == true. scheduleDoGC sets
-        // recent_activity to ACTIVITY_DONE_GC and turns off the timer
-        // signal.
+        /* Garbage collection can release some new threads due to
+         * either (a) finalizers or (b) threads resurrected because
+         * they are unreachable and will therefore be sent an
+         * exception.  Any threads thus released will be immediately
+         * runnable.
+         */
+        scheduleDoGC (pcap, task,
+                      true  /* force major GC */,
+                      false /* Whether it is an overflow GC */,
+                      true  /* deadlock detection */,
+                      false /* nonconcurrent */);
+        /* When force_major == true, scheduleDoGC sets recent activity to
+         * getRecentActivity() == ACTIVITY_DONE_GC and turns off the timer
+         * signal.
+         */
     }
 }
 
