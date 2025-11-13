@@ -51,7 +51,6 @@ IOSubmitResult asyncIOWaitReadySelectBis(CapIOManager *iomgr,
 void asyncIOCancelSelectBis(CapIOManager *iomgr, StgAsyncIOOp *aiop);
 
 /* Scheduler operations */
-bool anyPendingTimeoutsOrIOSelectBis(CapIOManager *iomgr);
 void pollCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr);
 bool awaitCompletedTimeoutsOrIOSelectBis(CapIOManager *iomgr);
 void interruptIOManagerSelectBis(CapIOManager *iomgr);
