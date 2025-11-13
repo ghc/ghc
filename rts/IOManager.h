@@ -373,7 +373,7 @@ void appendToIOBlockedQueue(CapIOManager *iomgr, StgTSO *tso);
  * No post-condition. It does not guarantee anything such as there being
  * runnable threads, since this does not wait.
  *
- * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
+ * Called from schedule() before scheduleDetectDeadlock().
  */
 void pollCompletedTimeoutsOrIO(CapIOManager *iomgr);
 
@@ -384,7 +384,7 @@ void pollCompletedTimeoutsOrIO(CapIOManager *iomgr);
  * that the scheduler is no longer in the running state. Succinctly, the
  * post-condition is (!emptyRunQueue(cap) || getSchedState() != SCHED_RUNNING).
  *
- * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
+ * Called from schedule() after scheduleDetectDeadlock().
  */
 void awaitCompletedTimeoutsOrIO(CapIOManager *iomgr);
 
