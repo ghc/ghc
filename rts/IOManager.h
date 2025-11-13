@@ -354,14 +354,6 @@ void syncDelayCancel(CapIOManager *iomgr, StgTSO *tso);
 void appendToIOBlockedQueue(CapIOManager *iomgr, StgTSO *tso);
 #endif
 
-/* Check to see if there are any pending timeouts or I/O operations
- * in progress with the I/O manager.
- *
- * This is used by the scheduler as part of deadlock-detection, and the
- * "context switch as often as possible" test.
- */
-bool anyPendingTimeoutsOrIO(CapIOManager *iomgr);
-
 /* Poll for any completed I/O operations, expired timers or pending signals.
  * If there are any, process the completions as appropriate (which will
  * typically unblock some waiting threads).
@@ -384,9 +376,6 @@ void pollCompletedTimeoutsOrIO(CapIOManager *iomgr);
  * (!emptyRunQueue(cap) || getSchedState() != SCHED_RUNNING).
  * A false result means the wait was interrupted by interruptIOManager, and
  * there is no post-condition in this case.
- *
- * This is only expected to be called if anyPendingTimeoutsOrIO() returns true,
- * i.e. there actually is something to wait for.
  *
  * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
  */
