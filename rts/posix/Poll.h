@@ -30,7 +30,6 @@ bool asyncIOWaitReadyPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop,
 void asyncIOCancelPoll(CapIOManager *iomgr, StgAsyncIOOp *aiop);
 
 /* Scheduler operations */
-bool anyPendingTimeoutsOrIOPoll(CapIOManager *iomgr);
 void pollCompletedTimeoutsOrIOPoll(CapIOManager *iomgr);
 bool awaitCompletedTimeoutsOrIOPoll(CapIOManager *iomgr);
 void interruptIOManagerPoll(CapIOManager *iomgr);
