@@ -261,13 +261,6 @@ static void ioCancel(CapIOManager *iomgr, StgAsyncIOOp *aiop)
 }
 
 
-bool anyPendingTimeoutsOrIOPoll(CapIOManager *iomgr)
-{
-    return !isEmptyTimeoutQueue(iomgr->timeout_queue)
-        || !isEmptyClosureTable(&iomgr->aiop_table);
-}
-
-
 static void notifyIOCompletion(CapIOManager *iomgr, StgAsyncIOOp *aiop)
 {
     ASSERT(aiop->outcome != IOOpOutcomeInFlight);
