@@ -331,22 +331,6 @@ schedule (Capability *initialCapability, Task *task)
     if (emptyRunQueue(cap)) continue; // look for work again
 #endif
 
-#if !defined(THREADED_RTS)
-    if ( emptyRunQueue(cap) ) {
-#if defined(mingw32_HOST_OS)
-        /* Notify the I/O manager that we have nothing to do.  If there are
-           any outstanding I/O requests we'll block here.  If there are not
-           then this is a user error and we will abort soon.  */
-        /* TODO: see if we can rationalise these two awaitCompletedTimeoutsOrIO
-         *       calls before and after scheduleDetectDeadlock().
-         */
-        awaitCompletedTimeoutsOrIO(cap);
-#else
-        ASSERT(getSchedState() >= SCHED_INTERRUPTING);
-#endif
-    }
-#endif
-
     //
     // Get a thread to run
     //
