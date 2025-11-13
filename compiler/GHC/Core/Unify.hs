@@ -12,7 +12,7 @@ module GHC.Core.Unify (
 
         -- Side-effect free unification
         tcUnifyTy, tcUnifyTys, tcUnifyFunDeps, tcUnifyDebugger,
-        tcUnifyTysFG, tcUnifyTyForInjectivity,
+        tcUnifyTysFG, tcUnifyTysForInjectivity,
         BindTvFun, BindFamFun, BindFlag(..),
         matchBindTv, alwaysBindTv, alwaysBindFam, dontCareBindFam,
         UnifyResult, UnifyResultM(..), MaybeApartReason(..),
@@ -381,7 +381,7 @@ Wrinkles
 
 (ATF7) There is one other, very special case of matching where we /do/ want to
    bind type families in `um_fam_env`, namely in GHC.Tc.Solver.Equality, the call
-   to `tcUnifyTyForInjectivity False` in `improve_injective_wanted_top`.
+   to `tcUnifyTysForInjectivity False` in `improve_injective_wanted_top`.
    Consider
    of a match. Consider
       type family G6 a = r | r -> a
@@ -814,25 +814,25 @@ tcUnifyFunDeps qtvs tys1 tys2
 
 -- | Unify or match a type-family RHS with a type (possibly another type-family RHS)
 -- Precondition: kinds are the same
-tcUnifyTyForInjectivity
+tcUnifyTysForInjectivity
     :: AmIUnifying  -- ^ True <=> do two-way unification;
                     --   False <=> do one-way matching.
                     --   See end of sec 5.2 from the paper
     -> InScopeSet     -- Should include the free tyvars of both Type args
-    -> Type -> Type   -- Types to unify
+    -> [Type] -> [Type]   -- Types to unify
     -> Maybe Subst
 -- This algorithm is an implementation of the "Algorithm U" presented in
 -- the paper "Injective type families for Haskell", Figures 2 and 3.
 -- The code is incorporated with the standard unifier for convenience, but
 -- its operation should match the specification in the paper.
-tcUnifyTyForInjectivity unif in_scope t1 t2
+tcUnifyTysForInjectivity unif in_scope tys1 tys2
   = case tc_unify_tys alwaysBindFam alwaysBindTv
                        unif   -- Am I unifying?
                        True   -- Do injectivity checks
                        False  -- Don't check outermost kinds
                        RespectMultiplicities
                        rn_env emptyTvSubstEnv emptyCvSubstEnv
-                       [t1] [t2] of
+                       tys1 tys2 of
       Unifiable          (tv_subst, _cv_subst) -> Just $ maybe_fix tv_subst
       MaybeApart _reason (tv_subst, _cv_subst) -> Just $ maybe_fix tv_subst
                  -- We want to *succeed* in questionable cases.

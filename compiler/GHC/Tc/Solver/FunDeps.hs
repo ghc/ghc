@@ -25,7 +25,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Core.Predicate( EqRel(..) )
 import GHC.Core.TyCon
-import GHC.Core.Unify( tcUnifyTyForInjectivity, typeListsAreApart )
+import GHC.Core.Unify( tcUnifyTysForInjectivity, typeListsAreApart )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Subst( elemSubst )
 
@@ -545,14 +545,35 @@ mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkTopClosedFamEqFDs ax work_args work_rhs
   = do { let branches = fromBranches (coAxiomBranches ax)
        ; traceTcS "mkTopClosed" (ppr branches $$ ppr work_args $$ ppr work_rhs)
-       ; case filter relevant_branch branches of
-           [CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys }]
+       ; case getRelevantBranches ax work_args work_rhs of
+            [CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys }]
               -> return [FDEqns { fd_qtvs = qtvs
                                 , fd_eqs = zipWith Pair lhs_tys work_args }]
            _  -> return [] }
+
+getRelevantBranches ax work_args work_rhs
+  = go [] (fromBranches (coAxiomBranches ax))
   where
-    relevant_branch (CoAxBranch { cab_lhs = lhs_tys, cab_rhs = rhs_ty })
-      = eqnIsRelevant lhs_tys rhs_ty work_args work_rhs
+    work_tys = work_rhs : work_args
+    work_fvs = tyCoVarsOfTypes work_tys
+
+    go preceding [] = []
+    go preceding (CoAxBranch { cab_qtvs = qtvs, cab_lhs = lhs_tys, cab_rhs = rhs_ty } : rest)
+       | is_relevant = br : go (br:preceding) rest
+       | otherwise   =      go (br:preceding) rest
+       where
+         is_relevant = case tcUnifyTysForInjectivity True branch_fvs work_tys (rhs_ty:lhs_tys) of
+                          Nothing    -> False
+                          Just subst -> no_match (substTy subst lhs_tys) preceding
+
+         branch_fvs = extendVarSetList work_fvs qtvs
+
+         no_match lhs_tys [] = True
+         no_match lhs_tys (CoAxBranch { cab_qtvs = qtvs1, cab_lhs = lhs_tys1 })
+            = isNothing (tcUnifyTysForInjectivity False lhs_tys1 lhs_tys)
+            where
+              all_fvs = branch_fvs `extendVarSetList` qtvs1
+
 
 mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
 -- Implements (INJFAM:Wanted/top)
