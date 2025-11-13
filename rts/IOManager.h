@@ -358,7 +358,7 @@ void appendToIOBlockedQueue(CapIOManager *iomgr, StgTSO *tso);
  * No post-condition. It does not guarantee anything such as there being
  * runnable threads, since this does not wait.
  *
- * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
+ * Called from schedule() before scheduleDetectDeadlock().
  */
 void pollCompletedTimeoutsOrIO(CapIOManager *iomgr);
 
@@ -372,7 +372,7 @@ void pollCompletedTimeoutsOrIO(CapIOManager *iomgr);
  * A false result means the wait was interrupted by interruptIOManager, and
  * there is no post-condition in this case.
  *
- * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
+ * Called from schedule() after scheduleDetectDeadlock().
  */
 bool awaitCompletedTimeoutsOrIO(CapIOManager *iomgr);
 
