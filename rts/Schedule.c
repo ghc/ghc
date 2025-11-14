@@ -300,6 +300,7 @@ schedule (Capability *initialCapability, Task *task)
     schedulePushWork(cap,task);
 
     if (emptyRunQueue(cap)) {
+        /* When we have no threads to run, we *might* have a deadlock. */
         scheduleDetectDeadlock(&cap,task);
     }
 
@@ -850,15 +851,135 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
  * Detect deadlock conditions and attempt to resolve them.
  * ------------------------------------------------------------------------- */
 
+/* Note [Deadlock detection]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For the purpose of this explanation we define:
+ * a /partial deadlock/ to be a set of threads that are deadlocked; and
+ * a /system deadlock/ is when all threads are deadlocked.
+
+Obviously, we can have a partial deadlock without having a system
+deadlock. The design goal of deadlock detection is to guarantee to
+detect (and resolve) system deadlock, but to also try to detect (and
+resolve) partial deadlocks.
+
+There are two designs that the RTS has used for deadlock detection: a
+simple historical design originally used in the non-threaded RTS and a
+modern design for the threaded RTS. These days we use the modern design
+in both the threaded and non-threaded RTS.
+
+A high level way to think about the two designs is as follows:
+ 1. the historical design looks for situations in which there *must* be
+    a system deadlock; whereas
+ 2. the modern design looks for partial deadlocks opportunistically,
+    with the guarantee that if the overall system is deadlocked that we
+    will *eventually* detect this.
+
+An advantage of the historical design is that it will detect system
+deadlock promptly. A disadvantage is that it will never detect a
+partial deadlock (that isn't also a system deadlock).
+
+The modern design can detect partial deadlock, but it is not guaranteed
+to detect system deadlock promptly, just eventually.
+
+The mechanism for deadlock detection is garbage collection. GC can be
+instructed to look for deadlocked threads and if it finds them to throw
+exceptions to one or more threads involved in the deadlock. This
+mechanism can find partial deadlocks. It is however expensive -- more
+expensive than a normal major GC. So the difference in the historical
+and modern designs is in when we do this expensive GC check.
+
+The historical design
+---------------------
+
+When there was just one capability, as in the single threaded RTS, it
+is possible to follow a very simple design. When there are no runnable
+threads, and no threads blocked on pending I/O or on timers then there
+*must* be a deadlock. And thus running deadlock detection promptly in
+this situation is guaranteed to find the deadlock and wake up one or
+more threads. Thus we can guarantee afterwards that there are runnable
+threads.
+
+There are a couple problems with this design, but the biggest problem
+is that it cannot be extended to multiple capabilities. When there are
+multiple capabilities then the fact that there are no runnable threads
+on the current capability says nothing about runnable threads on other
+capabilities. Runnable threads elsewhere might wake up threads on this
+capability, and so there is no implication that there is a deadlock.
+
+The other problems with this design are:
+ 1. it cannot find genuine deadlocks when there are any unrelated
+    threads blocked on I/O or timers (see issue #26408); and
+ 2. it requires treating signals specially.
+
+The problem with signals is that they're a weird kind of I/O. Threads
+do not block waiting on signals. Rather signals can have handlers such
+that when a signal arrives, a new thread is started to execute the
+handler. This means it doesn't neatly fit into the condition "no
+threads blocked on pending I/O or on timers". And if we did shoehorn it
+into that definition then we would not look for deadlocks if there were
+any signal handlers registered, and we would still end up with no
+runnable threads after skipping deadlock detection, which violates the
+post-condition that there be runnable threads. So the solution was that
+after deadlock detection, if there are still no runnable threads and
+there are registered signal handlers then we conclude we must wait for
+a signal to be received -- which will start a thread and thus we will
+end up with runnable threads. But of course this is horrible: we have
+entangled two features far too tightly: deadlock detection with a weird
+-- and platform specific -- kind of I/O.
+
+The modern design
+-----------------
+
+A change of perspective is required. Instead of thinking of conditions
+in which there must be a deadlock, we simply look for deadlocks in such
+a way in which we will eventually find deadlocks if they exist. A
+benefit of this approach is that we can find deadlocks that the simple
+approach cannot. For example we can find deadlocks when there unrelated
+threads blocked on I/O or timers (see issue #26408).
+
+The question is when to run GC it its more expensive deadlock detection
+mode. We obviously do not want to do it too frequently. The design
+choice is to do it during idle GC, at least sometimes. Idle GC is only
+run some time after a capability goes idle. This is a good opportunity.
+We know there are no runnable threads on the capability, so there
+*might* be a deadlock, and when there's nothing else to do is also a
+good moment to do a more expensive GC.
+
+The idle GC is controlled by the RecentActivity status, which
+progresses through 4 stages: yes, maybe_no, inactive, done_gc. We only
+invoke a deadlock-detecting major GC in the inactive state. We get into
+the inactive state when:
+ * the timer tick goes off
+ * we were already in the maybe_no state (which itself requires no
+   activity on any capability for a whole timer tick)
+ * idle GC is enabled
+ * it's been long enough since the most recent idle GC.
+This timer tick also wakes up the I/O manager to ensue we get back to
+the scheduler, and thus to scheduleDetectDeadlock.
+
+Note that this means that deadlock detection is disabled if users
+disable idle GC (by setting +RTS -I0). Historically, idle GC was not
+used by default in the non-threaded RTS, but the modern design relies
+on it, so it is enabled by default in all cases.
+
+But if idle GC is enabled, then if there is a full system deadlock then
+eventually we will run a major GC with deadlock detection and detect
+and resolve the deadlock. It is not prompt. It must wait at least for
+an idle GC, which by default is 0.3s after all capabilities go idle.
+
+Furthermore, there is no post-condition for scheduleDetectDeadlock,
+because of the non-prompt "eventually" nature of the deadlock detection
+design. In particular there can still be no runnable threads. In the
+threaded RTS if there's no runnable threads after this we will yield the
+capability, while in the non-threaded we will ask the I/O manager to
+block and wait for I/O, timers or signals.
+*/
+
 static void
 scheduleDetectDeadlock (Capability **pcap, Task *task)
 {
-    /*
-     * Detect deadlock: when we have no threads to run, there are no
-     * threads blocked, waiting for I/O, or sleeping, and all the
-     * other tasks are waiting for work, we must have a deadlock of
-     * some description.
-     */
+    /* See Note [Deadlock detection] */
     if (getRecentActivity() == ACTIVITY_INACTIVE) {
 
         debugTrace(DEBUG_sched, "maybe deadlocked, forcing major GC...");
