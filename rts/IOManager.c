@@ -568,8 +568,7 @@ exitIOManager(bool wait_threads)
     }
 }
 
-/* Wakeup hook: called from the scheduler's wakeUpRts (currently only in
- * threaded mode).
+/* Wakeup hook: called from the scheduler's wakeUpRts
  */
 void wakeupIOManager(void)
 {
