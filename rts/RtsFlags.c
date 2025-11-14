@@ -173,11 +173,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.sweep              = false;
     RtsFlags.GcFlags.idleGCDelayTime    = USToTime(300000); // 300ms
     RtsFlags.GcFlags.interIdleGCWait    = 0;
-#if defined(THREADED_RTS)
     RtsFlags.GcFlags.doIdleGC           = true;
-#else
-    RtsFlags.GcFlags.doIdleGC           = false;
-#endif
     RtsFlags.GcFlags.heapBase           = 0;   /* means don't care */
     RtsFlags.GcFlags.allocLimitGrace    = (100*1024) / BLOCK_SIZE;
     RtsFlags.GcFlags.numa               = false;
@@ -365,10 +361,8 @@ usage_text[] = {
 "  -c        Use in-place compaction for all oldest generation collections",
 "            (the default is to use copying)",
 "  -w        Use mark-region for the oldest generation (experimental)",
-#if defined(THREADED_RTS)
 "  -I<sec>   Perform full GC after <sec> idle time (default: 0.3, 0 == off)",
 "  -Iw<sec>  Minimum wait time between idle GC runs (default: 0, 0 == no min wait time)",
-#endif
 "",
 "  -T         Collect GC statistics (useful for in-program statistics access)",
 "  -t[<file>] One-line GC statistics (if <file> omitted, uses stderr)",
