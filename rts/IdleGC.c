@@ -142,11 +142,9 @@ void handleIdleGcTick(void)
               setRecentActivity(ACTIVITY_INACTIVE);
               inter_gc_ticks_to_gc = RtsFlags.GcFlags.interIdleGCWait /
                                      RtsFlags.MiscFlags.tickInterval;
-#if defined(THREADED_RTS)
               wakeUpRts();
               // The scheduler will call pauseTimer() when it has done
               // the GC.
-#endif
           } else {
               setRecentActivity(ACTIVITY_DONE_GC);
               // disable timer signals (see #1623, #5991, #9105)
