@@ -1971,7 +1971,7 @@ async def do_compile(name: TestName,
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    expected_stderr_file = find_expected_file(name, 'stderr')
+    expected_stderr_file = find_expected_file(name, 'stderr', way)
     actual_stderr_file = add_suffix(name, 'comp.stderr')
     diff_file_name = in_testdir(add_suffix(name, 'comp.diff'))
 
@@ -2012,7 +2012,7 @@ async def compile_cmp_asm(name: TestName,
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    expected_asm_file = find_expected_file(name, 'asm')
+    expected_asm_file = find_expected_file(name, 'asm', way)
     actual_asm_file = add_suffix(name, 's')
 
     if not await compare_outputs(way, 'asm',
@@ -2036,7 +2036,7 @@ async def compile_grep_asm(name: TestName,
     if badResult(result):
         return result
 
-    expected_pat_file = find_expected_file(name, 'asm')
+    expected_pat_file = find_expected_file(name, 'asm', way)
     actual_asm_file = add_suffix(name, 's')
 
     if not grep_output(join_normalisers(normalise_errmsg),
@@ -2058,7 +2058,7 @@ async def compile_grep_core(name: TestName,
     if badResult(result):
         return result
 
-    expected_pat_file = find_expected_file(name, 'substr-simpl')
+    expected_pat_file = find_expected_file(name, 'substr-simpl', way)
     actual_core_file = add_suffix(name, 'dump-simpl')
 
     if not grep_output(join_normalisers(normalise_errmsg),
@@ -2097,7 +2097,7 @@ async def compile_and_run__(name: TestName,
             return result
 
         if compile_stderr:
-            expected_stderr_file = find_expected_file(name, 'ghc.stderr')
+            expected_stderr_file = find_expected_file(name, 'ghc.stderr', way)
             actual_stderr_file = add_suffix(name, 'comp.stderr')
             diff_file_name = in_testdir(add_suffix(name, 'comp.diff'))
 
@@ -2556,7 +2556,7 @@ def get_compiler_flags() -> List[str]:
 
 async def stdout_ok(name: TestName, way: WayName) -> bool:
    actual_stdout_file = add_suffix(name, 'run.stdout')
-   expected_stdout_file = find_expected_file(name, 'stdout')
+   expected_stdout_file = find_expected_file(name, 'stdout', way)
 
    extra_norm = join_normalisers(normalise_output, getTestOpts().extra_normaliser)
 
@@ -2583,7 +2583,7 @@ def dump_stdout( name: TestName ) -> None:
 
 async def stderr_ok(name: TestName, way: WayName) -> bool:
    actual_stderr_file = add_suffix(name, 'run.stderr')
-   expected_stderr_file = find_expected_file(name, 'stderr')
+   expected_stderr_file = find_expected_file(name, 'stderr', way)
 
    return await compare_outputs(way, 'stderr',
                           join_normalisers(normalise_errmsg, getTestOpts().extra_errmsg_normaliser), \
@@ -2688,7 +2688,7 @@ async def check_hp_ok(name: TestName) -> bool:
         return False
 
 async def check_prof_ok(name: TestName, way: WayName) -> bool:
-    expected_prof_file = find_expected_file(name, 'prof.sample')
+    expected_prof_file = find_expected_file(name, 'prof.sample', way)
     expected_prof_path = in_testdir(expected_prof_file)
 
     # Check actual prof file only if we have an expected prof file to
@@ -3368,18 +3368,19 @@ def in_statsdir(name: Union[Path, str], suffix: str='') -> Path:
 
 # Finding the sample output.  The filename is of the form
 #
-#   <test>.stdout[-ws-<wordsize>][-<platform>|-<os>]
+#   <test>.stdout[-ws-<wordsize>][-<platform>|-<os>][-<way>]
 #
-def find_expected_file(name: TestName, suff: str) -> Path:
+def find_expected_file(name: TestName, suff: str, way: WayName) -> Path:
     basename = add_suffix(name, suff)
     # Override the basename if the user has specified one, this will then be
     # subjected to the same name mangling scheme as normal to allow platform
     # specific overrides to work.
     basename = getTestOpts().use_specs.get(suff, basename)
 
-    files = [str(basename) + ws + plat
+    files = [str(basename) + ws + plat + way_ext
              for plat in ['-' + config.platform, '-' + config.os, '']
-             for ws in ['-ws-' + config.wordsize, '']]
+             for ws in ['-ws-' + config.wordsize, '']
+             for way_ext in ['-' + way, '']]
 
     for f in files:
         if in_srcdir(f).exists():
