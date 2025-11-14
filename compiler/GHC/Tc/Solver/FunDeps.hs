@@ -31,14 +31,13 @@ import GHC.Core.TyCo.Subst( elemSubst )
 
 import GHC.Builtin.Types.Literals( tryInteractTopFam, tryInteractInertFam )
 
-import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Data.Pair
-import Data.Maybe( mapMaybe )
+import Data.Maybe( isNothing, mapMaybe )
 
 
 {- Note [Overview of functional dependencies in type inference]
@@ -546,34 +545,30 @@ mkTopClosedFamEqFDs ax work_args work_rhs
   = do { let branches = fromBranches (coAxiomBranches ax)
        ; traceTcS "mkTopClosed" (ppr branches $$ ppr work_args $$ ppr work_rhs)
        ; case getRelevantBranches ax work_args work_rhs of
-            [CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys }]
+           [CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys, cab_rhs = rhs_ty }]
               -> return [FDEqns { fd_qtvs = qtvs
-                                , fd_eqs = zipWith Pair lhs_tys work_args }]
+                                , fd_eqs = zipWith Pair (rhs_ty:lhs_tys) (work_rhs:work_args) }]
            _  -> return [] }
 
+
+getRelevantBranches :: CoAxiom Branched -> [TcType] -> Xi -> [CoAxBranch]
 getRelevantBranches ax work_args work_rhs
   = go [] (fromBranches (coAxiomBranches ax))
   where
     work_tys = work_rhs : work_args
-    work_fvs = tyCoVarsOfTypes work_tys
 
-    go preceding [] = []
-    go preceding (CoAxBranch { cab_qtvs = qtvs, cab_lhs = lhs_tys, cab_rhs = rhs_ty } : rest)
-       | is_relevant = br : go (br:preceding) rest
-       | otherwise   =      go (br:preceding) rest
-       where
-         is_relevant = case tcUnifyTysForInjectivity True branch_fvs work_tys (rhs_ty:lhs_tys) of
-                          Nothing    -> False
-                          Just subst -> no_match (substTy subst lhs_tys) preceding
+    go _ [] = []
+    go preceding (branch:branches)
+      | is_relevant branch = branch : go (branch:preceding) branches
+      | otherwise          =          go (branch:preceding) branches
+      where
+         is_relevant (CoAxBranch { cab_lhs = lhs_tys, cab_rhs = rhs_ty })
+            = case tcUnifyTysForInjectivity True work_tys (rhs_ty:lhs_tys) of
+                     Nothing    -> False
+                     Just subst -> all (no_match (substTys subst lhs_tys)) preceding
 
-         branch_fvs = extendVarSetList work_fvs qtvs
-
-         no_match lhs_tys [] = True
-         no_match lhs_tys (CoAxBranch { cab_qtvs = qtvs1, cab_lhs = lhs_tys1 })
+         no_match lhs_tys (CoAxBranch { cab_lhs = lhs_tys1 })
             = isNothing (tcUnifyTysForInjectivity False lhs_tys1 lhs_tys)
-            where
-              all_fvs = branch_fvs `extendVarSetList` qtvs1
-
 
 mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
 -- Implements (INJFAM:Wanted/top)
@@ -588,8 +583,7 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
     do_one branch@(CoAxBranch { cab_tvs = branch_tvs
                               , cab_lhs = branch_lhs_tys
                               , cab_rhs = branch_rhs })
-      | let in_scope1 = in_scope `extendInScopeSetList` branch_tvs
-      , Just subst <- tcUnifyTyForInjectivity False in_scope1 branch_rhs work_rhs
+      | Just subst <- tcUnifyTysForInjectivity False [branch_rhs] [work_rhs]
                       -- False: matching, not unifying
       , let (subst', qtvs) = trim_qtvs subst branch_tvs
             branch_lhs_tys' = substTys subst' branch_lhs_tys
@@ -598,8 +592,6 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
 
       | otherwise
       = Nothing
-
-    in_scope = mkInScopeSet (tyCoVarsOfType work_rhs)
 
     trim_qtvs :: Subst -> [TcTyVar] -> (Subst,[TcTyVar])
     -- Tricky stuff: see (TIF1) in
