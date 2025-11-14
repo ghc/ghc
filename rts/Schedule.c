@@ -312,22 +312,9 @@ schedule (Capability *initialCapability, Task *task)
      */
     if (emptyRunQueue(cap)) {
         awaitCompletedTimeoutsOrIO(cap->iomgr);
+        if (emptyRunQueue(cap)) continue; // look for work again
     }
 #endif
-
-    // Normally, the only way we can get here with no threads to
-    // run is if a keyboard interrupt received during
-    // scheduleFindWork() or scheduleDetectDeadlock().
-    // Additionally, it is not fatal for the
-    // threaded RTS to reach here with no threads to run.
-    //
-    // Since IOPorts have no deadlock avoidance guarantees you may also reach
-    // this point when blocked on an IO Port.  If this is the case the only
-    // thing that could unblock it is an I/O event.
-    //
-    // win32: might be here due to awaitCompletedTimeoutsOrIO() being abandoned
-    // as a result of a console event having been delivered or as a result of
-    // waiting on an async I/O to complete with WinIO.
 
 #if defined(THREADED_RTS)
     scheduleYield(&cap,task);
@@ -874,17 +861,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
      * other tasks are waiting for work, we must have a deadlock of
      * some description.
      */
-#if defined(THREADED_RTS)
-        /*
-         * In the threaded RTS, we only check for deadlock if there
-         * has been no activity in a complete timeslice.  This means
-         * we won't eagerly start a full GC just because we don't have
-         * any threads to run currently.
-         */
     if (getRecentActivity() == ACTIVITY_INACTIVE) {
-#else
-    {
-#endif
 
         debugTrace(DEBUG_sched, "maybe deadlocked, forcing major GC...");
 
