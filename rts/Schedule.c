@@ -298,6 +298,7 @@ schedule (Capability *initialCapability, Task *task)
     schedulePushWork(cap,task);
 
     if (emptyRunQueue(cap)) {
+        /* When we have no threads to run, we *might* have a deadlock. */
         scheduleDetectDeadlock(&cap,task);
     }
 
@@ -825,18 +826,19 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 }
 
 /* ----------------------------------------------------------------------------
- * Detect deadlock conditions and attempt to resolve them.
+ * Perform idle GC and deadlock detection.
+ *
+ * We don't make any decisions right here, we just invoke GC with deadlock
+ * detection if the idle GC tracking subsystem has decided that we're in
+ * a state where we should (via isIdleGcPending).
+ *
+ * See Note [Deadlock detection].
+ *
  * ------------------------------------------------------------------------- */
 
 static void
 scheduleDetectDeadlock (Capability **pcap, Task *task)
 {
-    /*
-     * Detect deadlock: when we have no threads to run, there are no
-     * threads blocked, waiting for I/O, or sleeping, and all the
-     * other tasks are waiting for work, we must have a deadlock of
-     * some description.
-     */
     if (isIdleGcPending()) {
 
         debugTrace(DEBUG_sched, "maybe deadlocked, forcing major GC...");
