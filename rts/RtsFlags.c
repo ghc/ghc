@@ -173,11 +173,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.sweep              = false;
     RtsFlags.GcFlags.idleGCDelayTime    = USToTime(300000); // 300ms
     RtsFlags.GcFlags.interIdleGCWait    = 0;
-#if defined(THREADED_RTS)
     RtsFlags.GcFlags.doIdleGC           = true;
-#else
-    RtsFlags.GcFlags.doIdleGC           = false;
-#endif
     RtsFlags.GcFlags.heapBase           = 0;   /* means don't care */
     RtsFlags.GcFlags.allocLimitGrace    = (100*1024) / BLOCK_SIZE;
     RtsFlags.GcFlags.numa               = false;
