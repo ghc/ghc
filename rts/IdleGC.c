@@ -26,16 +26,15 @@
  There are two runtime RTS options to control idle time GC timing.  The primary
  control is set by `-I<n>`, which specifies the minimum period of time the
  process must be idle before a GC is automatically triggered.  It defaults to
- 0.3 seconds for the threaded runtime and 0 (which disables idle GC entirely)
- for the non-threaded runtime.  For certain workflows, the 0.3 second delay for
- the threaded RTS may be too small.  If an application must process an extended
- burst of short-lived requests occurring a couple of times a second, it may go
- idle for >0.3 seconds frequently, resulting in potentially dozens of major
- GCs triggered every minute (and resulting heavy CPU load) while the burst
- lasts.  Setting the `-I<n>` value higher will prevent this flurry of major GCs,
- though there is a danger that setting the value too high will prevent automatic
- GCs entirely, if the process never gets a chance to go idle for long enough to
- meet the larger threshold.
+ 0.3 seconds.  For certain workflows, the 0.3 second delay may be too small.
+ If an application must process an extended burst of short-lived requests
+ occurring a couple of times a second, it may go idle for >0.3 seconds
+ frequently, resulting in potentially dozens of major GCs triggered every
+ minute (and resulting heavy CPU load) while the burst lasts.  Setting the
+ `-I<n>` value higher will prevent this flurry of major GCs, though there is a
+ danger that setting the value too high will prevent automatic GCs entirely,
+ if the process never gets a chance to go idle for long enough to meet the
+ larger threshold.
 
  In this case, the second control, set by `-Iw<n>` may be helpful.  For example,
  setting `-I0.3 -Iw30` triggers automatic GCs after only 0.3 seconds of idle

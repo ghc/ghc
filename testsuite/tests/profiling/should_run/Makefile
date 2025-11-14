@@ -7,10 +7,13 @@ DECIMAL_REGEXP = [0-9]\+.[0-9]\+
 .PHONY: T7275
 T7275:
 	"$(TEST_HC)" -prof -v0 -rtsopts T7275.hs
-	./T7275 +RTS -hc -i0
+	./T7275 +RTS -hc -i0 -I0
 	# Suzanne should appear here, despite having produced only pinned
 	# allocations. Strip off the actual amounts and cost-center numbers since
 	# they will be non-determinstic.
+	# Note also that this test is sensitive to the number of major GC's
+	# performed. The use of -i0 and -I0 above are intended to make this
+	# deterministic, but it is still sensitive to implementation changes.
 	grep suzanne T7275.hp | cut -f1 -d'	' | sed -re 's/\([0-9]+\)//'
 
 .PHONY: T11489
