@@ -691,11 +691,13 @@ enclosed between ``+RTS ... -RTS`` as usual):
     order to increase the resolution of the time profiler.
 
     Using a value of zero disables the RTS clock completely, and has the
-    effect of disabling timers that depend on it: the context switch
-    timer and the heap profiling timer. Context switches will still
-    happen, but deterministically and at a rate much faster than normal.
-    Disabling the interval timer is useful for debugging, because it
-    eliminates a source of non-determinism at runtime.
+    effect of disabling the timers and features that depend on it: the context
+    switch timer, the heap profiling timer, the eventlog flush timer, and the
+    idle GC timer. Context switches will still happen, but deterministically
+    and at a rate much faster than normal. Disabling the interval timer is
+    useful for debugging, because it eliminates a source of non-determinism at
+    runtime. Note however that disabling the idle GC timer not only disables
+    idle GC but also deadlock detection (see rts-flag:`-I`).
 
 
 .. rts-flag:: -xc

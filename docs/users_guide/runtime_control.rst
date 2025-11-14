@@ -731,61 +731,6 @@ performance.
     the default small ``-A`` value is suboptimal, as it can be in
     programs that create large amounts of long-lived data.
 
-.. rts-flag:: -I ⟨seconds⟩
-
-    :default: 0.3 seconds in the threaded runtime, 0 in the non-threaded runtime
-
-    .. index::
-       single: idle GC
-
-    Set the amount of idle time which must pass before a idle GC is
-    performed. Setting ``-I0`` disables the idle GC.
-
-    In the threaded and SMP versions of the RTS (see :ghc-flag:`-threaded`,
-    :ref:`options-linker`), a major GC is automatically performed if the
-    runtime has been idle (no Haskell computation has been running) for a
-    period of time.
-
-    For an interactive application, it is probably a good idea to use
-    the idle GC, because this will allow finalizers to run and
-    deadlocked threads to be detected in the idle time when no Haskell
-    computation is happening. Also, it will mean that a GC is less
-    likely to happen when the application is busy, and so responsiveness
-    may be improved. However, if the amount of live data in the heap is
-    particularly large, then the idle GC can cause a significant delay,
-    and too small an interval could adversely affect interactive
-    responsiveness.
-
-    The idle period timer only resets after some activity
-    by a Haskell thread. If your program is doing literally nothing then
-    after the first idle collection is triggered then no more future collections
-    will be scheduled until more work is performed.
-
-    This is an experimental feature, please let us know if it causes
-    problems and/or could benefit from further tuning.
-
-.. rts-flag:: -Iw ⟨seconds⟩
-
-    :default: 0 seconds
-
-    .. index::
-       single: idle GC
-
-    Set the minimum wait time between runs of the idle GC.
-
-    By default, if idle GC is enabled in the threaded runtime, a major
-    GC will be performed every time the process goes idle for a
-    sufficiently long duration (see :rts-flag:`-I ⟨seconds⟩`).  For
-    large server processes accepting regular but infrequent requests
-    (e.g., once per second), an expensive, major GC may run after
-    every request.  As an alternative to shutting off idle GC entirely
-    (with ``-I0``), a minimum wait time between idle GCs can be
-    specified with this flag.  For example, ``-Iw60`` will ensure that
-    an idle GC runs at most once per minute.
-
-    This is an experimental feature, please let us know if it causes
-    problems and/or could benefit from further tuning.
-
 .. rts-flag:: -ki ⟨size⟩
 
     :default: 1k
@@ -1010,6 +955,116 @@ performance.
     calling the ``getRTSStats()`` function from C, or
     ``GHC.Stats.getRTSStats`` from Haskell.
 
+
+Idle GC and deadlock detection
+------------------------------
+
+The RTS performs idle GC and deadlock detection. These features are more
+closely related and dependent than one might expect. In particular, deadlock
+detection relies on idle GC.
+
+The primary purpose of idle GC is to reclaim memory and return it to the system
+when the application has been idle for a short time. It also gives an
+opportunity for finalisers to run more promptly. See :rts-flag:`-I ⟨seconds⟩`.
+
+Deadlock detection is a debugging feature to try to discover when some or all
+Haskell threads are deadlocked. For the purpose of this explanation we define:
+
+ * a "partial deadlock" to be a set of threads that are deadlocked; and
+ * a "system deadlock" is when all threads are deadlocked.
+
+The deadlock detection is implemented by the GC, and it is capable of detecting
+partial deadlocks. If a deadlock is discovered, the RTS will throw an
+asynchronous exception to (some or all of) the blocked threads to enable
+progress and enable better reporting of the problem. In particular it throws
+the async exceptions ``BlockedIndefinitelyOnMVar`` or
+``BlockedIndefinitelyOnSTM``, as appropriate.
+
+The deadlock detection can be run during a major GC, but it is more expensive
+than a normal major GC so it is not run during normal major GCs. The deadlock
+detection mode of GC is run by the idle GC. This is on the basis that when the
+application is idle is when we are most likely to find a deadlock, and also
+that the extra time cost is unlikely to be a problem because the application is
+already idle.
+
+There are a few consequence of this:
+
+ * Deadlock detection relies on idle GC and will not run if idle GC is disabled
+   with ``-I0``.
+ * Deadlock detection will not run if the application remains busy, and thus
+   idle GC is not invoked.
+ * Deadlock detection is not prompt: it will only occur after the idle GC
+   delay, depending on both :rts-flag:`-I ⟨seconds⟩` and
+   :rts-flag:`-Iw ⟨seconds⟩`.
+
+In the non-threaded RTS there is additional behaviour: system deadlocks will be
+detected promptly, and this works even if idle GC is otherwise disabled.
+
+One cannot rely on deadlock detection as part of the normal program behaviour.
+It should only be used for debugging. Firstly, deadlock detection can be
+disabled or indefinately deferred due to activity. Secondly, the set of threads
+that deadlock detection throws exceptions to is not guaranteed to be minimal:
+a thread waiting on a deadlocked thread may also have an exception thrown to it
+even if it could make progress after the deadlocked thread is terminated.
+
+Deadlock detection can be invoked manually using ``performDeadlockDetection``
+from ``System.Mem.Experimental``.
+
+
+.. rts-flag:: -I ⟨seconds⟩
+
+    :default: 0.3 seconds
+
+    .. index::
+       single: idle GC
+
+    A major GC is automatically performed if the runtime has been idle (no
+    Haskell computation has been running) for a period of time. Set the amount
+    of idle time which must pass before a idle GC is performed.
+
+    Setting ``-I0`` disables the idle GC. This also has the unfortunate side
+    effect of disabling thread deadlock detection (the implementation of which
+    uses the idle GC).
+
+    For an interactive application, it is probably a good idea to use
+    the idle GC, because this will allow finalizers to run and
+    deadlocked threads to be detected in the idle time when no Haskell
+    computation is happening. Also, it will mean that a GC is less
+    likely to happen when the application is busy, and so responsiveness
+    may be improved. However, if the amount of live data in the heap is
+    particularly large, then the idle GC can cause a significant delay,
+    and too small an interval could adversely affect interactive
+    responsiveness.
+
+    The idle period timer only resets after some activity
+    by a Haskell thread. If your program is doing literally nothing then
+    after the first idle collection is triggered then no more future collections
+    will be scheduled until more work is performed.
+
+    Please let us know if it causes problems and/or could benefit from further
+    tuning.
+
+.. rts-flag:: -Iw ⟨seconds⟩
+
+    :default: 0 seconds
+
+    .. index::
+       single: idle GC
+
+    Set the minimum wait time between runs of the idle GC.
+
+    By default (and if idle GC is not disabled) a major
+    GC will be performed every time the process goes idle for a
+    sufficiently long duration (see :rts-flag:`-I ⟨seconds⟩`).  For
+    large server processes accepting regular but infrequent requests
+    (e.g., once per second), an expensive, major GC may run after
+    every request.  As an alternative to shutting off idle GC entirely
+    (with ``-I0``), a minimum wait time between idle GCs can be
+    specified with this flag.  For example, ``-Iw60`` will ensure that
+    an idle GC runs at most once per minute.
+
+    This is an experimental feature, please let us know if it causes
+    problems and/or could benefit from further tuning.
 
 
 .. _rts-options-statistics:
