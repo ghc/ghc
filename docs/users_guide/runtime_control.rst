@@ -739,18 +739,18 @@ performance.
 
 .. rts-flag:: -I ⟨seconds⟩
 
-    :default: 0.3 seconds in the threaded runtime, 0 in the non-threaded runtime
+    :default: 0.3 seconds
 
     .. index::
        single: idle GC
 
-    Set the amount of idle time which must pass before a idle GC is
-    performed. Setting ``-I0`` disables the idle GC.
+    A major GC is automatically performed if the runtime has been idle (no
+    Haskell computation has been running) for a period of time. Set the amount
+    of idle time which must pass before a idle GC is performed.
 
-    In the threaded and SMP versions of the RTS (see :ghc-flag:`-threaded`,
-    :ref:`options-linker`), a major GC is automatically performed if the
-    runtime has been idle (no Haskell computation has been running) for a
-    period of time.
+    Setting ``-I0`` disables the idle GC. This also has the unfortunate side
+    effect of disabling thread deadlock detection (the implementation of which
+    uses the idle GC).
 
     For an interactive application, it is probably a good idea to use
     the idle GC, because this will allow finalizers to run and
@@ -767,8 +767,8 @@ performance.
     after the first idle collection is triggered then no more future collections
     will be scheduled until more work is performed.
 
-    This is an experimental feature, please let us know if it causes
-    problems and/or could benefit from further tuning.
+    Please let us know if it causes problems and/or could benefit from further
+    tuning.
 
 .. rts-flag:: -Iw ⟨seconds⟩
 
@@ -779,7 +779,7 @@ performance.
 
     Set the minimum wait time between runs of the idle GC.
 
-    By default, if idle GC is enabled in the threaded runtime, a major
+    By default (and if idle GC is not disabled) a major
     GC will be performed every time the process goes idle for a
     sufficiently long duration (see :rts-flag:`-I ⟨seconds⟩`).  For
     large server processes accepting regular but infrequent requests
