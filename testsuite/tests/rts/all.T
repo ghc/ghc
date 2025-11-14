@@ -2,6 +2,11 @@ test('testblockalloc',
      [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0')],
      compile_and_run, [''])
 
+test('numeric_version_eventlog_flush',
+     [ignore_stdout, req_ghc_with_threaded_rts],
+     run_command,
+     ['{compiler} --numeric-version +RTS -l --eventlog-flush-interval=1 -RTS'])
+
 test('testmblockalloc',
      [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0 -xr0.125T'),
       when(arch('wasm32'), skip)], # MBlocks can't be freed on wasm32, see Note [Megablock allocator on wasm] in rts
