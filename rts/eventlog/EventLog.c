@@ -491,13 +491,7 @@ endEventLogging(void)
 
     eventlog_enabled = false;
 
-    // Flush all events remaining in the buffers.
-    //
-    // N.B. Don't flush if shutting down: this was done in
-    // finishCapEventLogging and the capabilities have already been freed.
-    if (getSchedState() != SCHED_SHUTTING_DOWN) {
-        flushEventLog(NULL);
-    }
+    flushEventLog(NULL);
 
     ACQUIRE_LOCK(&eventBufMutex);
 
@@ -1626,15 +1620,24 @@ void flushEventLog(Capability **cap USED_IF_THREADS)
         return;
     }
 
+    // N.B. Don't flush if shutting down: this was done in
+    // finishCapEventLogging and the capabilities have already been freed.
+    // This can also race against the shutdown if the flush is triggered by the
+    // ticker thread. (#26573)
+    if (getSchedState() == SCHED_SHUTTING_DOWN) {
+      return;
+    }
+
     ACQUIRE_LOCK(&eventBufMutex);
     printAndClearEventBuf(&eventBuf);
     RELEASE_LOCK(&eventBufMutex);
 
 #if defined(THREADED_RTS)
-    Task *task = getMyTask();
+    Task *task = newBoundTask();
     stopAllCapabilitiesWith(cap, task, SYNC_FLUSH_EVENT_LOG);
     flushAllCapsEventsBufs();
     releaseAllCapabilities(getNumCapabilities(), cap ? *cap : NULL, task);
+    exitMyTask();
 #else
     flushLocalEventsBuf(getCapability(0));
 #endif
