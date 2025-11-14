@@ -815,14 +815,13 @@ tcUnifyTysForInjectivity
     :: AmIUnifying  -- ^ True <=> do two-way unification;
                     --   False <=> do one-way matching.
                     --   See end of sec 5.2 from the paper
-    -> InScopeSet     -- Should include the free tyvars of both Type args
     -> [Type] -> [Type]   -- Types to unify
     -> Maybe Subst
 -- This algorithm is an implementation of the "Algorithm U" presented in
 -- the paper "Injective type families for Haskell", Figures 2 and 3.
 -- The code is incorporated with the standard unifier for convenience, but
 -- its operation should match the specification in the paper.
-tcUnifyTysForInjectivity unif in_scope tys1 tys2
+tcUnifyTysForInjectivity unif tys1 tys2
   = case tc_unify_tys alwaysBindFam alwaysBindTv
                        unif   -- Am I unifying?
                        True   -- Do injectivity checks
@@ -837,6 +836,10 @@ tcUnifyTysForInjectivity unif in_scope tys1 tys2
       SurelyApart      -> Nothing
   where
     rn_env   = mkRnEnv2 in_scope
+    in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
+               -- The types we are unifying never contain foralls, so the
+               -- in-scope set is never looked at, so this free-var stuff
+               -- should never actually be done
 
     maybe_fix | unif      = niFixSubst in_scope
               | otherwise = mkTvSubst in_scope -- when matching, don't confuse

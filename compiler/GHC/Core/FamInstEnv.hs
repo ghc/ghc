@@ -609,9 +609,7 @@ injectiveBranches injectivity
                   ax1@(CoAxBranch { cab_tvs = tvs1, cab_lhs = lhs1, cab_rhs = rhs1 })
                   ax2@(CoAxBranch { cab_tvs = tvs2, cab_lhs = lhs2, cab_rhs = rhs2 })
   -- See Note [Verifying injectivity annotation], case 1.
-  = let getInjArgs  = filterByList injectivity
-        in_scope    = mkInScopeSetList (tvs1 ++ tvs2)
-    in case tcUnifyTysForInjectivity True in_scope [rhs1] [rhs2] of
+  = case tcUnifyTysForInjectivity True [rhs1] [rhs2] of
              -- True = two-way pre-unification
        Nothing -> InjectivityAccepted
          -- RHS are different, so equations are injective.
@@ -633,6 +631,7 @@ injectiveBranches injectivity
                   -- Payload of InjectivityUnified used only for check 1B2, only
                   -- for closed type families
         where
+          getInjArgs  = filterByList injectivity
           lhs1Subst = Type.substTys subst (getInjArgs lhs1)
           lhs2Subst = Type.substTys subst (getInjArgs lhs2)
 
