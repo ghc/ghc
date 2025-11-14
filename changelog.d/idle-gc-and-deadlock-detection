@@ -1,0 +1,31 @@
+section: rts
+issues: #27040 #26408
+mrs: !14820
+synopsis: Idle GC and deadlock detection in the non-threaded RTS now behave the same as in the threaded RTS
+description: {
+Idle GC now works in the non-threaded RTS and is enabled by default.
+
+Deadlock detection in the non-threaded RTS can now detect partial
+deadlocks where some but not all threads are deadlocked, whereas
+previously it could only detect system deadlocks where all threads
+were deadlocked.
+
+Because (partial) deadlock detection runs as part of idle GC, this
+change also enables the idle GC by default in the non-threaded RTS.
+It was already enabled by default in the threaded RTS.
+
+In addition, the non-threaded RTS can still detect system deadlocks
+without relying on idle GC. Thus there is no regression in deadlock
+detection behaviour for the non-threaded RTS.
+
+The user guide now documents that deadlock detection relies on idle GC,
+and thus turning off idle GC disables deadlock detection (except for
+system deadlock detection in the non-threaded RTS). This was true of
+the threaded RTS in previous GHC releases but it was not previously
+documented behaviour.
+
+Internally, the idle GC and deadlock detection now follow the same
+design and use mostly the same code between the non-threaded and
+threaded RTS. Having a single design improves the comprehension and
+maintainability of the RTS code.
+}
