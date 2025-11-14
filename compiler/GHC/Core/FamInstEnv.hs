@@ -606,8 +606,8 @@ data InjectivityCheckResult
 injectiveBranches :: [Bool] -> CoAxBranch -> CoAxBranch
                   -> InjectivityCheckResult
 injectiveBranches injectivity
-                  ax1@(CoAxBranch { cab_tvs = tvs1, cab_lhs = lhs1, cab_rhs = rhs1 })
-                  ax2@(CoAxBranch { cab_tvs = tvs2, cab_lhs = lhs2, cab_rhs = rhs2 })
+                  ax1@(CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
+                  ax2@(CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
   -- See Note [Verifying injectivity annotation], case 1.
   = case tcUnifyTysForInjectivity True [rhs1] [rhs2] of
              -- True = two-way pre-unification
