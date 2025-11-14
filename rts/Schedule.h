@@ -39,9 +39,7 @@ void scheduleThreadOn(Capability *cap, StgWord cpu, StgTSO *tso);
  *
  * Causes an OS thread to wake up and run the scheduler, if necessary.
  */
-#if defined(THREADED_RTS)
 void wakeUpRts(void);
-#endif
 
 /* raiseExceptionHelper */
 StgWord raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception);
