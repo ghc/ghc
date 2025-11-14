@@ -558,8 +558,6 @@ hs_exit_(bool wait_foreign)
      * scheduler */
     finishCapEventLogging();
 
-    /* free the tasks */
-    freeScheduler();
 
     /* free shared Typeable store */
     exitGlobalStore();
@@ -605,6 +603,11 @@ hs_exit_(bool wait_foreign)
     endTracing();
     freeTracing();
 #endif
+
+    /* free the tasks
+     * This must happen after endTracing, since the eventlogFlush thread takes the sched_mutex.
+    */
+    freeScheduler();
 
 #if defined(TICKY_TICKY)
     if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();

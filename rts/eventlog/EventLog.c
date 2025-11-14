@@ -493,11 +493,7 @@ endEventLogging(void)
 
     // Flush all events remaining in the buffers.
     //
-    // N.B. Don't flush if shutting down: this was done in
-    // finishCapEventLogging and the capabilities have already been freed.
-    if (getSchedState() != SCHED_SHUTTING_DOWN) {
-        flushEventLog(NULL);
-    }
+    flushEventLog(NULL);
 
     ACQUIRE_LOCK(&eventBufMutex);
 
@@ -1631,10 +1627,25 @@ void flushEventLog(Capability **cap USED_IF_THREADS)
     RELEASE_LOCK(&eventBufMutex);
 
 #if defined(THREADED_RTS)
-    Task *task = getMyTask();
-    stopAllCapabilitiesWith(cap, task, SYNC_FLUSH_EVENT_LOG);
-    flushAllCapsEventsBufs();
-    releaseAllCapabilities(getNumCapabilities(), cap ? *cap : NULL, task);
+    // N.B. Don't flush if shutting down: this was done in
+    // finishCapEventLogging and the capabilities have already been freed.
+    // This can also race against the shutdown if the flush is triggered by the
+    // ticker thread. (#26573)
+
+    // Acquire the sched_mutex for the duration of the flush, since if the scheduler
+    // starts to shut down after we have checked the status, then stopAllCapabilitiesWith will
+    // block.
+
+    // Also if the scheduler is shutting down, then the rts_shutdown will perform a final flush of
+    // all the buffers, so we don't also need to flush here.
+    ACQUIRE_LOCK(&sched_mutex);
+    if (getSchedState() != SCHED_SHUTTING_DOWN) {
+        Task *task = getMyTask();
+        stopAllCapabilitiesWith(cap, task, SYNC_FLUSH_EVENT_LOG);
+        flushAllCapsEventsBufs();
+        releaseAllCapabilities(getNumCapabilities(), cap ? *cap : NULL, task);
+    }
+    RELEASE_LOCK(&sched_mutex);
 #else
     flushLocalEventsBuf(getCapability(0));
 #endif
