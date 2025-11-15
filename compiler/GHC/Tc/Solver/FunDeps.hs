@@ -25,6 +25,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Core.Predicate( EqRel(..) )
 import GHC.Core.TyCon
+import GHC.Core.Type( tyConAppTyCon_maybe )
 import GHC.Core.Unify( tcUnifyTysForInjectivity, typeListsAreApart )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Subst( elemSubst )
@@ -467,7 +468,8 @@ tryEqFunDeps work_item@(EqCt { eq_lhs = work_lhs
                              , eq_eq_rel = eq_rel })
   | NomEq <- eq_rel
   , TyFamLHS fam_tc work_args <- work_lhs     -- We have F args ~N# rhs
-  = do { eqs_for_me <- simpleStage$ getInertFamEqsFor fam_tc work_args work_rhs
+  = do { simpleStage $ traceTcS "tryEqFunDeps" (ppr work_item)
+       ; eqs_for_me <- simpleStage $ getInertFamEqsFor fam_tc work_args work_rhs
        ; tryFamEqFunDeps eqs_for_me fam_tc work_args work_item }
   | otherwise
   = nopStage ()
@@ -482,7 +484,7 @@ tryFamEqFunDeps eqs_for_me fam_tc work_args
     else do { -- Note [Do local fundeps before top-level instances]
               tryFDEqns fam_tc work_args work_item $
               mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
-            ; if null eqs_for_me
+            ; if all (isWanted . eqCtEvidence) eqs_for_me
               then tryFDEqns fam_tc work_args work_item $
                    mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
               else nopStage () }
@@ -492,38 +494,37 @@ tryFamEqFunDeps eqs_for_me fam_tc work_args
 
   -- Only Wanted constraints below here
 
-  | isOpenTypeFamilyTyCon fam_tc
-  , Injective inj_flags <- tyConInjectivityInfo fam_tc
-  = -- Open, injective type families
-    do { -- Note [Do local fundeps before top-level instances]
-         tryFDEqns fam_tc work_args work_item $
-         mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
-
-       ; if null eqs_for_me
-         then tryFDEqns fam_tc work_args work_item $
-              mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
-         else nopStage () }
-
-  | Just ax <- isClosedFamilyTyCon_maybe fam_tc
-  = -- Closed type families
-    do { -- Note [Do local fundeps before top-level instances]
-         simpleStage $ traceTcS "fundep closed" (ppr fam_tc)
-
-       ; case tyConInjectivityInfo fam_tc of
+  | otherwise   -- Wanted, user-defined type families
+  = do { -- Note [Do local fundeps before top-level instances]
+         case tyConInjectivityInfo fam_tc of
            NotInjective  -> nopStage()
            Injective inj -> tryFDEqns fam_tc work_args work_item $
                             mkLocalFamEqFDs eqs_for_me fam_tc inj work_args work_rhs
 
-       -- Now look at the top-level axioms; we effectively infer injectivity,
-       -- so we don't need tyConInjectivtyInfo.  This works fine for closed
-       -- type families without injectivity info
-       ; if null eqs_for_me
+       ; if all (isWanted . eqCtEvidence) eqs_for_me
          then tryFDEqns fam_tc work_args work_item $
-              mkTopClosedFamEqFDs ax work_args work_rhs
+              mkTopFamEqFDs fam_tc work_args work_rhs
          else nopStage () }
 
-  | otherwise -- Data families, abstract families
-  = nopStage ()
+mkTopFamEqFDs :: TyCon -> [TcType] -> Xi -> TcS [FunDepEqns]
+mkTopFamEqFDs fam_tc work_args work_rhs
+  | isOpenTypeFamilyTyCon fam_tc
+  , Injective inj_flags <- tyConInjectivityInfo fam_tc
+  = -- Open, injective type families
+    mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
+
+  | Just ax <- isClosedFamilyTyCon_maybe fam_tc
+  = -- Closed type families
+    -- Look at the top-level axioms; we effectively infer injectivity,
+    -- so we don't need tyConInjectivtyInfo.  This works fine for closed
+    -- type families without injectivity info
+    mkTopClosedFamEqFDs ax work_args work_rhs
+
+  | otherwise
+  = -- Data families, abstract families,
+    -- open families that are not injective,
+    -- closed type families with no equations (isClosedFamilyTyCon_maybe returns Nothing)
+    return []
 
 tryFDEqns :: TyCon -> [TcType] -> EqCt -> TcS [FunDepEqns] -> SolverStage ()
 tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eqns
@@ -542,6 +543,8 @@ tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eq
 -----------------------------------------
 mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkTopClosedFamEqFDs ax work_args work_rhs
+  | Just tc <- tyConAppTyCon_maybe work_rhs   -- Does RHS have anything useful to say?
+  , isGenerativeTyCon tc Nominal
   = do { let branches = fromBranches (coAxiomBranches ax)
        ; traceTcS "mkTopClosed" (ppr branches $$ ppr work_args $$ ppr work_rhs)
        ; case getRelevantBranches ax work_args work_rhs of
@@ -549,6 +552,8 @@ mkTopClosedFamEqFDs ax work_args work_rhs
               -> return [FDEqns { fd_qtvs = qtvs
                                 , fd_eqs = zipWith Pair (rhs_ty:lhs_tys) (work_rhs:work_args) }]
            _  -> return [] }
+   | otherwise
+   = return []
 
 
 getRelevantBranches :: CoAxiom Branched -> [TcType] -> Xi -> [CoAxBranch]
@@ -727,12 +732,14 @@ mkInjectivityFDEqn inj_args qtvs lhs_args rhs_args
           | (True, lhs_arg, rhs_arg) <- zip3 inj_args lhs_args rhs_args ]
 
 getInertFamEqsFor :: TyCon -> [TcType] -> Xi -> TcS [EqCt]
--- Returns a mixture of Given and Wanted
 -- Look in the InertSet, and return all inert equalities
 --    F tys ~N# rhs
 --    where F is the specified TyCon
--- But filter out ones that can't possibly help, is apart from the Wanted
--- Representational equalities don't interact with type family dependencies
+-- But filter out ones that can't possibly help;
+--    that is, ones that are "apart" from the Wanted
+-- Returns a mixture of Given and Wanted
+-- Nominal only, becaues Representational equalities don't interact
+--    with type family dependencies
 getInertFamEqsFor fam_tc work_args work_rhs
   = do { IC {inert_funeqs = funeqs } <- getInertCans
        ; return [ funeq_ct | equal_ct_list <- findFunEqsByTyCon funeqs fam_tc

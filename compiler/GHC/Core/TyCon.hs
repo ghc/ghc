@@ -2448,8 +2448,9 @@ isOpenTypeFamilyTyCon (TyCon { tyConDetails = details })
   | FamilyTyCon {famTcFlav = OpenSynFamilyTyCon } <- details = True
   | otherwise                                                = False
 
--- | Is this a non-empty closed type family? Returns 'Nothing' for
--- abstract or empty closed families.
+-- | Is this a /non-empty/ closed type family?
+--   Returns 'Nothing' for closed type family with no equations, as well
+--      as for open families, data famlilies, abstract families
 isClosedFamilyTyCon_maybe :: TyCon -> Maybe (CoAxiom Branched)
 isClosedFamilyTyCon_maybe (TyCon { tyConDetails = details })
   | FamilyTyCon {famTcFlav = ClosedSynFamilyTyCon mb} <- details = mb
