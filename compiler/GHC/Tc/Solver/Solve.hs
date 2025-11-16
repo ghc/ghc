@@ -118,28 +118,34 @@ simplify_loop n limit definitely_redo_implications
                             , int (lengthBag simples) <+> text "simples to solve" ])
        ; traceTcS "simplify_loop: wc =" (ppr wc)
 
-       ; (simple_unif_happened, wc1)
+       ; ambient_lvl <- getTcLevel
+       ; (simple_unif_lvl, wc1)
              <- reportCoarseGrainUnifications $  -- See Note [Superclass iteration]
                 solveSimpleWanteds simples
                 -- Any insoluble constraints are in 'simples' and so get rewritten
                 -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
 
        -- Next, solve implications from wc_impl
-       ; (impl_unif_happened, implics')
+       ; let simple_unif_happened = ambient_lvl `deeperThanOrSame` simple_unif_lvl
+       ; (implic_unif_lvl, implics')
              <- if not (definitely_redo_implications   -- See Note [Superclass iteration]
                         || simple_unif_happened)       -- for this conditional
-                then return (False, implics)
+                then return (infiniteTcLevel, implics)
                 else reportCoarseGrainUnifications $
                      solveNestedImplications implics
 
        ; let wc' = wc1 { wc_impl = wc_impl wc1 `unionBags` implics' }
 
-       ; csTraceTcS $ text "unif_happened" <+> ppr impl_unif_happened
-
          -- We iterate the loop only if the /implications/ did some relevant
-         -- unification.  Even if the /simples/ did unifications we don't need
-         -- to re-do them.
-       ; maybe_simplify_again (n+1) limit impl_unif_happened wc' }
+         -- unification, hence looking only at `implic_unif_lvl`.  (Even if the
+         -- /simples/ did unifications we don't need to re-do them.)
+         -- Also note that we only iterate if `implic_unify_lvl` is /equal to/
+         -- the current level; if it is less , we'll iterate some outer level,
+         -- which will bring us back here anyway.
+         -- See Note [When to iterate the solver: unifications]
+       ; let implic_unif_happened = implic_unif_lvl `sameDepthAs` ambient_lvl
+       ; csTraceTcS $ text "implic_unif_happened" <+> ppr implic_unif_happened
+       ; maybe_simplify_again (n+1) limit implic_unif_happened wc' }
 
 data NextAction
   = NA_Stop                 -- Just return the WantedConstraints
@@ -148,7 +154,9 @@ data NextAction
         Bool                -- See `definitely_redo_implications` in the comment
                             --    for `simplify_loop`
 
-maybe_simplify_again :: Int -> IntWithInf -> Bool
+maybe_simplify_again :: Int -> IntWithInf
+                     -> Bool   -- True <=> Solving the implications did some unifications
+                               --          at the current level; so iterate
                      -> WantedConstraints -> TcS WantedConstraints
 maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
   = do { -- Look for reasons to stop or continue
@@ -222,10 +230,10 @@ and if so it seems a pity to waste time iterating the implications (forall b. bl
 (If we add new Given superclasses it's a different matter: it's really worth looking
 at the implications.)
 
-Hence the definitely_redo_implications flag to simplify_loop.  It's usually
-True, but False in the case where the only reason to iterate is new Wanted
-superclasses.  In that case we check whether the new Wanteds actually led to
-any new unifications, and iterate the implications only if so.
+Hence the `definitely_redo_implications` flag to `simplify_loop`.  It's usually True,
+but False in the case where the only reason to iterate is new Wanted superclasses.
+In that case we check whether the new Wanteds actually led to any new unifications
+(at all), and iterate the implications only if so.
 
 Note [When to iterate the solver: unifications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1877,18 +1877,18 @@ reportFineGrainUnifications (TcS thing_inside)
        ; recordUnifications outer_wu unif_tvs
        ; return (unif_tvs, res) }
 
-reportCoarseGrainUnifications :: TcS a -> TcS (Bool, a)
+reportCoarseGrainUnifications :: TcS a -> TcS (TcLevel, a)
 -- Record whether any useful unifications are done by thing_inside
+-- Specifically: return the TcLevel of the outermost (smallest level)
+--   unification variable that has been unified, or infiniteTcLevel if none
 -- Remember to propagate the information to the enclosing context
 reportCoarseGrainUnifications (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_what = outer_what }) ->
     case outer_what of
-      WU_None
-        -> do { (unif_happened, _, res) <- report_coarse_grain_unifs env thing_inside
-              ; return (unif_happened, res) }
+      WU_None -> report_coarse_grain_unifs env thing_inside
 
       WU_Coarse outer_ul_ref
-        -> do { (unif_happened, inner_ul, res) <- report_coarse_grain_unifs env thing_inside
+        -> do { (inner_ul, res) <- report_coarse_grain_unifs env thing_inside
 
               -- Propagate to outer_ul_ref
               ; outer_ul <- TcM.readTcRef outer_ul_ref
@@ -1897,31 +1897,32 @@ reportCoarseGrainUnifications (TcS thing_inside)
 
               ; TcM.traceTc "reportCoarse(Coarse)" $
                 vcat [ text "outer_ul" <+> ppr outer_ul
-                     , text "inner_ul" <+> ppr inner_ul
-                     , text "unif_happened" <+> ppr unif_happened ]
-              ; return (unif_happened, res) }
+                     , text "inner_ul" <+> ppr inner_ul]
+              ; return (inner_ul, res) }
 
       WU_Fine outer_tvs_ref
         -> do { (unif_tvs,res) <- report_fine_grain_unifs env thing_inside
-              ; let unif_happened = not (isEmptyVarSet unif_tvs)
-              ; when unif_happened $
-                TcM.updTcRef outer_tvs_ref (`unionVarSet` unif_tvs)
+
+              -- Propagate to outer_tvs_rev
+              ; TcM.updTcRef outer_tvs_ref (`unionVarSet` unif_tvs)
+
+              ; let outermost_unif_lvl = minTcTyVarSetLevel unif_tvs
               ; TcM.traceTc "reportCoarse(Fine)" $
                 vcat [ text "unif_tvs" <+> ppr unif_tvs
-                     , text "unif_happened" <+> ppr unif_happened ]
-              ; return (unif_happened, res) }
+                     , text "unif_happened" <+> ppr outermost_unif_lvl ]
+              ; return (outermost_unif_lvl, res) }
 
 report_coarse_grain_unifs :: TcSEnv -> (TcSEnv -> TcM a)
-                          -> TcM (Bool, TcLevel, a)
--- Returns (unif_happened, coarse_inner_ul, res)
+                          -> TcM (TcLevel, a)
+-- Returns the level number of the outermost
+-- unification variable that is unified
 report_coarse_grain_unifs env thing_inside
   = do { inner_ul_ref <- TcM.newTcRef infiniteTcLevel
        ; res <- thing_inside (env { tcs_what = WU_Coarse inner_ul_ref })
-       ; inner_ul    <- TcM.readTcRef inner_ul_ref
-       ; ambient_lvl <- TcM.getTcLevel
-       ; let unif_happened = ambient_lvl `deeperThanOrSame` inner_ul
-       ; return (unif_happened, inner_ul, res) }
-
+       ; inner_ul <- TcM.readTcRef inner_ul_ref
+       ; TcM.traceTc "report_coarse" $
+         text "inner_lvl ="   <+> ppr inner_ul
+       ; return (inner_ul, res) }
 
 report_fine_grain_unifs :: TcSEnv -> (TcSEnv -> TcM a)
                         -> TcM (TcTyVarSet, a)

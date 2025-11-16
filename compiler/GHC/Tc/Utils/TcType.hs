@@ -45,7 +45,7 @@ module GHC.Tc.Utils.TcType (
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
   strictlyDeeperThan, deeperThanOrSame, sameDepthAs,
   tcTypeLevel, tcTyVarLevel, maxTcLevel, minTcLevel,
-  infiniteTcLevel,
+  infiniteTcLevel, isInfiniteTcLevel,
 
   --------------------------------
   -- MetaDetails
@@ -878,6 +878,10 @@ topTcLevel = TcLevel 0   -- 0 = outermost level
 isTopTcLevel :: TcLevel -> Bool
 isTopTcLevel (TcLevel 0) = True
 isTopTcLevel _            = False
+
+isInfiniteTcLevel :: TcLevel -> Bool
+isInfiniteTcLevel QLInstVar = True
+isInfiniteTcLevel _         = False
 
 pushTcLevel :: TcLevel -> TcLevel
 -- See Note [TcLevel assignment]

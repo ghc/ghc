@@ -395,9 +395,11 @@ tryConstraintDefaulting wc
   | isEmptyWC wc
   = return wc
   | otherwise
-  = do { (unif_happened, better_wc) <- reportCoarseGrainUnifications $
-                                       go_wc False wc
-         -- We may have done unifications; so solve again
+  = do { (outermost_unif_lvl, better_wc) <- reportCoarseGrainUnifications $
+                                            go_wc False wc
+
+       -- We may have done unifications; if so, solve again
+       ; let unif_happened = not (isInfiniteTcLevel outermost_unif_lvl)
        ; solveAgainIf unif_happened better_wc }
   where
     go_wc :: Bool -> WantedConstraints -> TcS WantedConstraints
@@ -414,14 +416,17 @@ tryConstraintDefaulting wc
                        else return (Just ct) }
 
     go_implic :: Bool -> Implication -> TcS Implication
-    go_implic encl_eqs implic@(Implic { ic_status = status, ic_wanted = wanteds
-                                       , ic_given_eqs = given_eqs, ic_binds = binds })
+    go_implic encl_eqs implic@(Implic { ic_tclvl = tclvl
+                                      , ic_status = status, ic_wanted = wanteds
+                                      , ic_given_eqs = given_eqs, ic_binds = binds })
       | isSolvedStatus status
       = return implic  -- Nothing to solve inside here
       | otherwise
       = do { let encl_eqs' = encl_eqs || given_eqs /= NoGivenEqs
 
-           ; wanteds' <- setEvBindsTcS binds $
+           ; wanteds' <- setTcLevelTcS tclvl $
+                         -- Set the levels so that reportCoarseGrainUnifications works
+                         setEvBindsTcS binds $
                          -- defaultCallStack sets a binding, so
                          -- we must set the correct binding group
                          go_wc encl_eqs' wanteds
@@ -660,7 +665,9 @@ Wrinkles:
      f x = case x of T1 -> True
 
   Should we infer f :: T a -> Bool, or f :: T a -> a.  Both are valid, but
-  neither is more general than the other.
+  neither is more general than the other.   But by the time defaulting takes
+  place all let-bound variables have got their final types; defaulting won't
+  affect let-generalisation.
 
 (DE2) We still can't unify if there is a skolem-escape check, or an occurs check,
   or it it'd mean unifying a TyVarTv with a non-tyvar.  It's only the
