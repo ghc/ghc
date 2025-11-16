@@ -28,7 +28,7 @@ module GHC.Cmm.Info (
   conInfoTableSizeB,
   stdSrtBitmapOffset,
   stdClosureTypeOffset,
-  stdPtrsOffset, stdNonPtrsOffset,
+  stdPtrsOffset, stdNonPtrsOffset
 ) where
 
 import GHC.Prelude
@@ -194,7 +194,7 @@ mkInfoTableContents profile
        ; let (srt_label, srt_bitmap) = mkSRTLit platform info_lbl srt
        ; (liveness_lit, liveness_data) <- mkLivenessBits platform frame
        ; let
-             std_info = mkStdInfoTable profile prof_lits rts_tag srt_bitmap liveness_lit
+             std_info = mkStdInfoTable profile prof_lits rts_tag srt_bitmap [liveness_lit]
              rts_tag | Just tag <- mb_rts_tag = tag
                      | null liveness_data     = rET_SMALL -- Fits in extra_bits
                      | otherwise              = rET_BIG   -- Does not; extra_bits is
@@ -202,7 +202,8 @@ mkInfoTableContents profile
        ; return (prof_data ++ liveness_data, (std_info, srt_label)) }
 
   | HeapRep _ ptrs nonptrs closure_type <- smrep
-  = do { let layout  = packIntsCLit platform ptrs nonptrs
+  = do { let layout  = [ mkStgHalfWordCLit platform ptrs,
+                         mkStgHalfWordCLit platform nonptrs]
        ; (prof_lits, prof_data) <- mkProfLits platform prof
        ; let (srt_label, srt_bitmap) = mkSRTLit platform info_lbl srt
        ; (mb_srt_field, mb_layout, extra_bits, ct_data)
@@ -214,11 +215,23 @@ mkInfoTableContents profile
        ; return (prof_data ++ ct_data, (std_info, extra_bits)) }
   where
     platform = profilePlatform profile
+    mk_extra_bits :: Int -> Int -> [CmmLit]
+    mk_extra_bits low high
+      = if platformTablesNextToCode platform
+           -- In mkInfoTable do_one_info extra bits are reversed for TNTC
+           -- so we must generate the high address halfword before
+           -- the low address halfword.
+        then [ mkStgHalfWordCLit platform high
+             , mkStgHalfWordCLit platform low
+             ]
+        else [ mkStgHalfWordCLit platform low
+             , mkStgHalfWordCLit platform high
+             ]
     mk_pieces :: ClosureTypeInfo -> [CmmLit]
-              -> UniqDSM ( Maybe CmmLit  -- Override the SRT field with this
-                         , Maybe CmmLit  -- Override the layout field with this
-                         , [CmmLit]           -- "Extra bits" for info table
-                         , [RawCmmDecl])      -- Auxiliary data decls
+              -> UniqDSM ( Maybe CmmLit   -- Override the SRT field with this
+                         , Maybe [CmmLit] -- Override the layout field with this
+                         , [CmmLit]       -- "Extra bits" for info table
+                         , [RawCmmDecl])  -- Auxiliary data decls
     mk_pieces (Constr con_tag con_descr) _no_srt    -- A data constructor
       = do { (descr_lit, decl) <- newStringLit con_descr
            ; return ( Just (CmmInt (fromIntegral con_tag)
@@ -230,18 +243,19 @@ mkInfoTableContents profile
 
     mk_pieces (ThunkSelector offset) _no_srt
       = return (Just (CmmInt 0 (halfWordWidth platform)),
-                Just (mkWordCLit platform (fromIntegral offset)), [], [])
+                Just [(mkWordCLit platform (fromIntegral offset))], [], [])
          -- Layout known (one free var); we use the layout field for offset
 
     mk_pieces (Fun arity (ArgSpec fun_type)) srt_label
-      = do { let extra_bits = packIntsCLit platform fun_type arity : srt_label
+      = do { let extra_bits = mk_extra_bits fun_type arity
+                           ++ srt_label
            ; return (Nothing, Nothing,  extra_bits, []) }
 
     mk_pieces (Fun arity (ArgGen arg_bits)) srt_label
       = do { (liveness_lit, liveness_data) <- mkLivenessBits platform arg_bits
            ; let fun_type | null liveness_data = aRG_GEN
                           | otherwise          = aRG_GEN_BIG
-                 extra_bits = [ packIntsCLit platform fun_type arity ]
+                 extra_bits = mk_extra_bits fun_type arity
                            ++ (if inlineSRT platform then [] else [ srt_lit ])
                            ++ [ liveness_lit, slow_entry ]
            ; return (Nothing, Nothing, extra_bits, liveness_data) }
@@ -255,11 +269,13 @@ mkInfoTableContents profile
 
 mkInfoTableContents _ _ _ = panic "mkInfoTableContents"   -- NonInfoTable dealt with earlier
 
-packIntsCLit :: Platform -> Int -> Int -> CmmLit
-packIntsCLit platform a b = packHalfWordsCLit platform
-                           (toStgHalfWord platform (fromIntegral a))
-                           (toStgHalfWord platform (fromIntegral b))
+mkStgWordCLit :: Platform -> StgWord -> CmmLit
+mkStgWordCLit platform wd = CmmInt (fromStgWord wd) (wordWidth platform)
 
+mkStgHalfWordCLit :: Platform -> Int -> CmmLit
+mkStgHalfWordCLit platform hwd
+  = CmmInt (fromStgHalfWord (toStgHalfWord platform (fromIntegral hwd)))
+           (halfWordWidth platform)
 
 mkSRTLit :: Platform
          -> CLabel
@@ -385,15 +401,15 @@ mkStdInfoTable
    -> (CmmLit,CmmLit)   -- Closure type descr and closure descr  (profiling)
    -> Int               -- Closure RTS tag
    -> CmmLit            -- SRT length
-   -> CmmLit            -- layout field
+   -> [CmmLit]          -- layout field
    -> [CmmLit]
 
-mkStdInfoTable profile (type_descr, closure_descr) cl_type srt layout_lit
+mkStdInfoTable profile (type_descr, closure_descr) cl_type srt layout_lits
  =      -- Parallel revertible-black hole field
     prof_info
         -- Ticky info (none at present)
         -- Debug info (none at present)
- ++ [layout_lit, tag, srt]
+ ++ layout_lits ++ [tag, srt]
 
  where
     platform = profilePlatform profile

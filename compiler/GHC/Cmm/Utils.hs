@@ -13,10 +13,9 @@ module GHC.Cmm.Utils(
 
         -- CmmLit
         zeroCLit, mkIntCLit,
-        mkWordCLit, packHalfWordsCLit,
+        mkWordCLit,
         mkByteStringCLit, mkFileEmbedLit,
         mkDataLits, mkRODataLits,
-        mkStgWordCLit,
 
         -- CmmExpr
         mkIntExpr, zeroExpr,
@@ -210,22 +209,6 @@ mkRODataLits lbl lits
     needsRelocation (CmmLabel _)      = True
     needsRelocation (CmmLabelOff _ _) = True
     needsRelocation _                 = False
-
-mkStgWordCLit :: Platform -> StgWord -> CmmLit
-mkStgWordCLit platform wd = CmmInt (fromStgWord wd) (wordWidth platform)
-
-packHalfWordsCLit :: Platform -> StgHalfWord -> StgHalfWord -> CmmLit
--- Make a single word literal in which the lower_half_word is
--- at the lower address, and the upper_half_word is at the
--- higher address
--- ToDo: consider using half-word lits instead
---       but be careful: that's vulnerable when reversed
-packHalfWordsCLit platform lower_half_word upper_half_word
-   = case platformByteOrder platform of
-       BigEndian    -> mkWordCLit platform ((l `shiftL` halfWordSizeInBits platform) .|. u)
-       LittleEndian -> mkWordCLit platform (l .|. (u `shiftL` halfWordSizeInBits platform))
-    where l = fromStgHalfWord lower_half_word
-          u = fromStgHalfWord upper_half_word
 
 ---------------------------------------------------
 --
