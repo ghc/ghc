@@ -63,6 +63,7 @@ data TestCompilerArgs = TestCompilerArgs{
  ,   leadingUnderscore :: Bool
  ,   withNativeCodeGen :: Bool
  ,   withInterpreter   :: Bool
+ ,   cross             :: Bool
  ,   interpForceDyn    :: Bool
  ,   unregisterised    :: Bool
  ,   tables_next_to_code :: Bool
@@ -97,9 +98,9 @@ allowHaveLLVM = not . (`elem` ["wasm32", "javascript"])
 --
 inTreeCompilerArgs :: Stage -> Action TestCompilerArgs
 inTreeCompilerArgs stg = do
-    isCrossStage <- crossStage stg
+    cross <- crossStage stg
     let ghcStage = succStage stg
-        pkgCacheStage = if isCrossStage then ghcStage else stg
+        pkgCacheStage = if cross then ghcStage else stg
     (hasDynamicRts, hasThreadedRts) <- do
       ways <- interpretInContext (vanillaContext ghcStage rts) getRtsWays
       return (dynamic `elem` ways, threaded `elem` ways)
@@ -159,11 +160,11 @@ outOfTreeCompilerArgs = do
     leadingUnderscore   <- getBooleanSetting TestLeadingUnderscore
     withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
+    cross               <- getBooleanSetting TestGhcCrossCompiling
     interpForceDyn      <- getBooleanSetting TestRTSLinkerForceDyn
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
     tables_next_to_code <- getBooleanSetting TestGhcTablesNextToCode
     targetWithSMP       <- getBooleanSetting TestGhcWithSMP
-
     debugAssertions     <- getBooleanSetting TestGhcDebugAssertions
 
     os          <- getTestSetting TestHostOS
@@ -280,6 +281,7 @@ runTestBuilderArgs = builder Testsuite ? do
 
 
             , arg "-e", arg $ "config.have_interp=" ++ show withInterpreter
+            , arg "-e", arg $ "config.cross=" ++ show cross
             , arg "-e", arg $ "config.interp_force_dyn=" ++ show interpForceDyn
             , arg "-e", arg $ "config.unregisterised=" ++ show unregisterised
             , arg "-e", arg $ "config.tables_next_to_code=" ++ show tables_next_to_code
