@@ -8,6 +8,7 @@ import Oracles.Flag
 import Packages
 import Settings
 import Settings.Builders.Common (wayCcArgs)
+import Settings.Program (ghcWithInterpreter)
 
 import qualified GHC.Toolchain.Library as Lib
 import GHC.Toolchain.Target
@@ -24,7 +25,6 @@ packageArgs = do
         -- immediately and may lead to cyclic dependencies.
         -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
         cross = flag CrossCompiling
-        isCrossStage = crossStage stage
         haveCurses = any (/= "") <$> traverse (flip buildSetting stage) [ CursesIncludeDir, CursesLibDir ]
 
         -- Check if the bootstrap compiler has the same version as the one we
@@ -82,16 +82,18 @@ packageArgs = do
             ]
 
           , builder (Cabal Flags) ? mconcat
-            -- For the ghc library, internal-interpreter only makes
-            -- sense when we're not cross compiling. For cross GHC,
-            -- external interpreter is used for loading target code
-            -- and internal interpreter is supposed to load native
-            -- code for plugins (!7377), however it's unfinished work
-            -- (#14335) and completely untested in CI for cross
-            -- backends at the moment, so we might as well disable it
-            -- for cross GHC.
-            -- TODO: MP
-            [ andM [ghcWithInterpreter stage, notM  isCrossStage] `cabalFlag` "internal-interpreter"
+            -- In order to enable internal-interpreter for the ghc
+            -- library:
+            --
+            -- 1. ghcWithInterpreter must be True ("Use interpreter" =
+            --    "YES")
+            -- 2. For non-cross case it can be enabled
+            -- 3. For cross case, disable for stage0 since that runs
+            --    on the host and must rely on external interpreter to
+            --    load target code, otherwise enable for stage1 since
+            --    that runs on the target and can use target's own
+            --    ghci object linker
+            [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage2]] `cabalFlag` "internal-interpreter"
             , orM [ notM cross, haveCurses ]  `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
             , staged (buildFlag UseLibzstd) `cabalFlag` "with-libzstd"
@@ -113,7 +115,7 @@ packageArgs = do
              , compilerStageOption ghcDebugAssertions ? arg "-DDEBUG" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ andM [ghcWithInterpreter stage, notM isCrossStage] `cabalFlag` "internal-interpreter"
+            [ (expr (ghcWithInterpreter stage)) `cabalFlag` "internal-interpreter"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.

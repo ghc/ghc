@@ -12,6 +12,7 @@ import Hadrian.Oracles.TextFile (lookupStageBuildConfig)
 import Oracles.Flag hiding (arSupportsAtFile, arSupportsDashL)
 import Oracles.ModuleFiles
 import Oracles.Setting
+import Settings.Program (ghcWithInterpreter)
 import Hadrian.Haskell.Cabal.Type (PackageData(version))
 import Hadrian.Haskell.Cabal
 import Hadrian.Oracles.Cabal (readPackageData)
@@ -489,7 +490,7 @@ generateSettings settingsFile = do
     -- ROMES:TODO: WHERE HAS CROSS COMPILING GONE?
     -- ("cross compiling", expr $ yesNo <$> crossStage (predStage stage))
         [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit, Context.stage = predStage stage })))
-        , ("Use interpreter", expr $ yesNo <$> Oracles.Setting.ghcWithInterpreter stage)
+        , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
         -- Hard-coded as Cabal queries these to determine way support and we
         -- need to always advertise all ways when bootstrapping.
         -- The settings file is generated at install time when installing a bindist.

@@ -7,7 +7,7 @@ module Oracles.Setting (
     -- * Helpers
     ghcCanonVersion, cmdLineLengthLimit, targetSupportsRPaths, topDirectory,
     libsuf, ghcVersionStage, bashPath, targetStage, crossStage, queryTarget, queryTargetTarget,
-    ghcWithInterpreter, isHostStage,
+    isHostStage,
 
     -- ** Target platform things
     anyTargetOs, anyTargetArch, anyHostOs,
@@ -180,22 +180,6 @@ targetSupportsRPaths :: Stage -> Action Bool
 targetSupportsRPaths stage = queryTargetTarget stage
                                 (\t -> let os = archOS_OS (tgtArchOs t)
                                        in osElfTarget os || osMachOTarget os)
-
--- | Check whether the target supports GHCi.
-ghcWithInterpreter :: Stage -> Action Bool
-ghcWithInterpreter stage = do
-    goodOs <- anyTargetOs stage [ OSMinGW32, OSLinux, OSSolaris2 -- TODO "cygwin32"?,
-                          , OSFreeBSD, OSDragonFly, OSNetBSD, OSOpenBSD
-                          , OSDarwin, OSKFreeBSD
-                          , OSWasi ]
-    goodArch <- (||) <$>
-                anyTargetArch stage [ ArchX86, ArchX86_64, ArchPPC
-                              , ArchAArch64, ArchS390X
-                              , ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2
-                              , ArchRISCV64, ArchLoongArch64
-                              , ArchWasm32 ]
-                              <*> isArmTarget stage
-    return $ goodOs && goodArch && (stage >= Stage1)
 
 -- | Which variant of the ARM architecture is the target (or 'Nothing' if not
 -- ARM)?

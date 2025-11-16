@@ -15,6 +15,7 @@ import CommandLine
 import Oracles.TestSettings
 import Packages
 import Settings.Builders.Common
+import Settings.Program (ghcWithInterpreter)
 import qualified Data.Set    as Set
 import Flavour
 import qualified Context.Type as C
