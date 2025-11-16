@@ -214,6 +214,14 @@ fixST m = ST (\ s ->
 instance MonadFix (ST s) where
         mfix = fixST
 
+-- | @since base-4.23.0.0
+instance Semigroup a => Semigroup (ST s a) where
+    (<>) = liftA2 (<>)
+
+-- | @since base-4.23.0.0
+instance Monoid a => Monoid (ST s a) where
+    mempty = pure mempty
+
 -- ---------------------------------------------------------------------------
 -- Strict <--> Lazy
 

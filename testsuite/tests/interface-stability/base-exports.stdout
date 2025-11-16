@@ -11318,6 +11318,7 @@ instance forall a k (b :: k). GHC.Internal.Base.Monoid a => GHC.Internal.Base.Mo
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Conc.Sync.STM a) -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Base.Monoid GHC.Internal.Exception.Context.ExceptionContext -- Defined in ‘GHC.Internal.Exception.Context’
 instance forall a s. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.ST.ST s a) -- Defined in ‘GHC.Internal.ST’
+instance forall a s. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s a) -- Defined in ‘GHC.Internal.Control.Monad.ST.Lazy.Imp’
 instance GHC.Internal.Base.Monoid Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
 instance forall a. GHC.Internal.Bits.FiniteBits a => GHC.Internal.Base.Monoid (GHC.Internal.Data.Bits.And a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance forall a. GHC.Internal.Bits.FiniteBits a => GHC.Internal.Base.Monoid (GHC.Internal.Data.Bits.Iff a) -- Defined in ‘GHC.Internal.Data.Bits’
@@ -11372,6 +11373,7 @@ instance forall a k (b :: k). GHC.Internal.Base.Semigroup a => GHC.Internal.Base
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Conc.Sync.STM a) -- Defined in ‘GHC.Internal.Conc.Sync’
 instance GHC.Internal.Base.Semigroup GHC.Internal.Exception.Context.ExceptionContext -- Defined in ‘GHC.Internal.Exception.Context’
 instance forall a s. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.ST.ST s a) -- Defined in ‘GHC.Internal.ST’
+instance forall a s. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s a) -- Defined in ‘GHC.Internal.Control.Monad.ST.Lazy.Imp’
 instance GHC.Internal.Base.Semigroup Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
 instance forall a. GHC.Internal.Bits.Bits a => GHC.Internal.Base.Semigroup (GHC.Internal.Data.Bits.And a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance forall a. GHC.Internal.Bits.FiniteBits a => GHC.Internal.Base.Semigroup (GHC.Internal.Data.Bits.Iff a) -- Defined in ‘GHC.Internal.Data.Bits’
