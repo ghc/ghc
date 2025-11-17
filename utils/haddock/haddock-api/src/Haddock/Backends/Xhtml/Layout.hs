@@ -63,6 +63,7 @@ import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
 import Haddock.Types
 import Haddock.Utils (makeAnchorId, nameAnchorId)
+import qualified Data.Text.Lazy as LText
 
 --------------------------------------------------------------------------------
 
@@ -73,7 +74,7 @@ import Haddock.Utils (makeAnchorId, nameAnchorId)
 miniBody :: Html -> Html
 miniBody = body ! [identifier "mini"]
 
-sectionDiv :: String -> Html -> Html
+sectionDiv :: LText -> Html -> Html
 sectionDiv i = thediv ! [identifier i]
 
 sectionName :: Html -> Html
@@ -138,11 +139,11 @@ divTopDecl = thediv ! [theclass "top"]
 
 type SubDecl = (Html, Maybe (MDoc DocName), [Html])
 
-divSubDecls :: HTML a => String -> a -> Maybe Html -> Html
+divSubDecls :: LText -> LText -> Maybe Html -> Html
 divSubDecls cssClass captionName = maybe noHtml wrap
   where
     wrap = (subSection <<) . (subCaption +++)
-    subSection = thediv ! [theclass $ unwords ["subs", cssClass]]
+    subSection = thediv ! [theclass $ LText.unwords ["subs", cssClass]]
     subCaption = paragraph ! [theclass "caption"] << captionName
 
 subDlist :: Maybe Package -> Qualification -> [SubDecl] -> Maybe Html
@@ -232,9 +233,9 @@ subInstances pkg qual nm lnks splice = maybe noHtml wrap . instTable
     wrap contents = subSection (hdr +++ collapseDetails id_ DetailsOpen (summary +++ contents))
     instTable = subTableSrc pkg qual lnks splice
     subSection = thediv ! [theclass "subs instances"]
-    hdr = h4 ! collapseControl id_ "instances" << "Instances"
-    summary = thesummary ! [theclass "hide-when-js-enabled"] << "Instances details"
-    id_ = makeAnchorId $ "i:" ++ nm
+    hdr = h4 ! collapseControl id_ "instances" << ("Instances" :: LText)
+    summary = thesummary ! [theclass "hide-when-js-enabled"] << ("Instances details" :: LText)
+    id_ = makeAnchorId $ "i:" <> (LText.pack nm)
 
 subOrphanInstances
   :: Maybe Package
@@ -245,12 +246,12 @@ subOrphanInstances
   -> Html
 subOrphanInstances pkg qual lnks splice = maybe noHtml wrap . instTable
   where
-    wrap = ((h1 << "Orphan instances") +++)
-    instTable = fmap (thediv ! [identifier ("section." ++ id_)] <<) . subTableSrc pkg qual lnks splice
+    wrap = ((h1 << ("Orphan instances" :: LText)) +++)
+    instTable = fmap (thediv ! [identifier ("section." <> id_)] <<) . subTableSrc pkg qual lnks splice
     id_ = makeAnchorId "orphans"
 
 subInstHead
-  :: String
+  :: LText
   -- ^ Instance unique id (for anchor generation)
   -> Html
   -- ^ Header content (instance name and type)
@@ -261,7 +262,7 @@ subInstHead iid hdr =
     expander = thespan ! collapseControl (instAnchorId iid) "instance"
 
 subInstDetails
-  :: String
+  :: LText
   -- ^ Instance unique id (for anchor generation)
   -> [Html]
   -- ^ Associated type contents
@@ -274,7 +275,7 @@ subInstDetails iid ats mets mdl =
   subInstSection iid << (p mdl <+> subAssociatedTypes ats <+> subMethods mets)
 
 subFamInstDetails
-  :: String
+  :: LText
   -- ^ Instance unique id (for anchor generation)
   -> Html
   -- ^ Type or data family instance
@@ -285,16 +286,16 @@ subFamInstDetails iid fi mdl =
   subInstSection iid << (p mdl <+> (thediv ! [theclass "src"] << fi))
 
 subInstSection
-  :: String
+  :: LText
   -- ^ Instance unique id (for anchor generation)
   -> Html
   -> Html
 subInstSection iid contents = collapseDetails (instAnchorId iid) DetailsClosed (summary +++ contents)
   where
-    summary = thesummary ! [theclass "hide-when-js-enabled"] << "Instance details"
+    summary = thesummary ! [theclass "hide-when-js-enabled"] << ("Instance details" :: LText)
 
-instAnchorId :: String -> String
-instAnchorId iid = makeAnchorId $ "i:" ++ iid
+instAnchorId :: LText -> LText
+instAnchorId iid = makeAnchorId $ "i:" <> iid
 
 subMethods :: [Html] -> Html
 subMethods = divSubDecls "methods" "Methods" . subBlock
@@ -321,7 +322,7 @@ topDeclElem lnks loc splice name html =
 -- Name must be documented, otherwise we wouldn't get here.
 links :: LinksInfo -> SrcSpan -> Bool -> Maybe Module -> DocName -> Html
 links ((_, _, sourceMap, lineMap), (_, _, maybe_wiki_url)) loc splice mdl' docName@(Documented n mdl) =
-  srcLink <+> wikiLink <+> (selfLink ! [theclass "selflink"] << "#")
+  srcLink <+> wikiLink <+> (selfLink ! [theclass "selflink"] << ("#" :: LText))
   where
     selfLink = linkedAnchor (nameAnchorId (nameOccName (getName docName)))
 
@@ -335,15 +336,15 @@ links ((_, _, sourceMap, lineMap), (_, _, maybe_wiki_url)) loc splice mdl' docNa
        in case mUrl of
             Nothing -> noHtml
             Just url ->
-              let url' = spliceURL (Just origMod) (Just n) (Just loc) url
-               in anchor ! [href url', theclass "link"] << "Source"
+              let url' = LText.pack $ spliceURL (Just origMod) (Just n) (Just loc) url
+               in anchor ! [href url', theclass "link"] << ("Source" :: LText)
 
     wikiLink =
       case maybe_wiki_url of
         Nothing -> noHtml
         Just url ->
-          let url' = spliceURL (Just mdl) (Just n) (Just loc) url
-           in anchor ! [href url', theclass "link"] << "Comments"
+          let url' = LText.pack $ spliceURL (Just mdl) (Just n) (Just loc) url
+           in anchor ! [href url', theclass "link"] << ("Comments" :: LText)
 
     -- For source links, we want to point to the original module,
     -- because only that will have the source.

@@ -134,7 +134,7 @@ out :: Outputable a => SDocContext -> a -> String
 out sDocContext = outWith $ Outputable.renderWithContext sDocContext
 
 operator :: String -> String
-operator (x : xs) | not (isAlphaNum x) && x `notElem` "_' ([{" = '(' : x : xs ++ ")"
+operator (x : xs) | not (isAlphaNum x) && x `notElem` ("_' ([{" :: String) = '(' : x : xs ++ ")"
 operator x = x
 
 commaSeparate :: Outputable a => SDocContext -> [a] -> String

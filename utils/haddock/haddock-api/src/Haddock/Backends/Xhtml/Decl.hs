@@ -45,6 +45,7 @@ import Haddock.Backends.Xhtml.Utils
 import Haddock.Doc (combineDocumentation)
 import Haddock.GhcUtils
 import Haddock.Types
+import qualified Data.Text.Lazy as LText
 
 -- | Pretty print a declaration
 ppDecl
@@ -352,9 +353,9 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_sig_args 0 sep
     -- We need 'gadtComma' and 'gadtEnd' to line up with the `{` from
     -- 'gadtOpen', so we add 3 spaces to cover for `-> `/`:: ` (3 in unicode
     -- mode since `->` and `::` are rendered as single characters.
-    gadtComma = concatHtml (replicate (if unicode then 2 else 3) spaceHtml) <> toHtml ","
-    gadtEnd = concatHtml (replicate (if unicode then 2 else 3) spaceHtml) <> toHtml "}"
-    gadtOpen = toHtml "{"
+    gadtComma = concatHtml (replicate (if unicode then 2 else 3) spaceHtml) <> toHtml ("," :: LText)
+    gadtEnd = concatHtml (replicate (if unicode then 2 else 3) spaceHtml) <> toHtml ("}" :: LText)
+    gadtOpen = toHtml ("{" :: LText)
 
 ppFixities :: [(DocName, Fixity)] -> Qualification -> Html
 ppFixities [] _ = noHtml
@@ -365,7 +366,7 @@ ppFixities fs qual = foldr1 (+++) (map ppFix uniq_fs) +++ rightEdge
         ! [theclass "fixity"]
         << (toHtml d <+> toHtml (show p) <+> ppNames ns)
 
-    ppDir InfixR = "infixr"
+    ppDir InfixR = ("infixr" :: LText)
     ppDir InfixL = "infixl"
     ppDir InfixN = "infix"
 
@@ -730,7 +731,7 @@ ppContextNoLocsMaybe :: [HsType DocNameI] -> Unicode -> Qualification -> HideEmp
 ppContextNoLocsMaybe [] _ _ emptyCtxts =
   case emptyCtxts of
     HideEmptyContexts -> Nothing
-    ShowEmptyToplevelContexts -> Just (toHtml "()")
+    ShowEmptyToplevelContexts -> Just (toHtml ("()" :: LText))
 ppContextNoLocsMaybe cxt unicode qual _ = Just $ ppHsContext cxt unicode qual
 
 ppContext :: HsContext DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
@@ -1006,13 +1007,13 @@ ppClassDecl
               == [getName n' | ClassOpSig _ _ ns _ <- sigs, L _ n' <- ns] ->
               noHtml
         -- Minimal complete definition = nothing
-        And [] : _ -> subMinimal $ toHtml "Nothing"
+        And [] : _ -> subMinimal $ toHtml ("Nothing" :: LText)
         m : _ -> subMinimal $ ppMinimal False m
         _ -> noHtml
 
       ppMinimal _ (Var (L _ n)) = ppDocName qual Prefix True n
-      ppMinimal _ (And fs) = foldr1 (\a b -> a +++ ", " +++ b) $ map (ppMinimal True . unLoc) fs
-      ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a +++ " | " +++ b) $ map (ppMinimal False . unLoc) fs
+      ppMinimal _ (And fs) = foldr1 (\a b -> a +++ (", " :: LText) +++ b) $ map (ppMinimal True . unLoc) fs
+      ppMinimal p (Or fs) = wrap $ foldr1 (\a b -> a +++ (" | " :: LText) +++ b) $ map (ppMinimal False . unLoc) fs
         where
           wrap | p = parens | otherwise = id
       ppMinimal p (Parens x) = ppMinimal p (unLoc x)
@@ -1115,7 +1116,7 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead{..}) md
         pdecl = pdata <+> ppShortDataDecl False True dd [] unicode qual
     DataInst {} -> error "ppInstHead"
   where
-    mname = maybe noHtml (\m -> toHtml "Defined in" <+> ppModule m) mdl
+    mname = maybe noHtml (\m -> toHtml ("Defined in" :: LText) <+> ppModule m) mdl
     iid = instanceId origin no orphan ihd
     typ = ppAppNameTypes ihdClsName ihdTypes unicode qual
 
@@ -1163,9 +1164,9 @@ ppInstanceSigs links splice unicode qual sigs = do
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
 lookupAnySubdoc n = Maybe.fromMaybe noDocForDecl . lookup n
 
-instanceId :: InstOrigin DocName -> Int -> Bool -> InstHead DocNameI -> String
+instanceId :: InstOrigin DocName -> Int -> Bool -> InstHead DocNameI -> LText
 instanceId origin no orphan ihd =
-  concat $
+  LText.pack $ concat $
     ["o:" | orphan]
       ++ [ qual origin
          , ":" ++ getOccString origin
@@ -1529,7 +1530,7 @@ ppConstrHdr forall_ tvs ctxt unicode qual = ppForall +++ ppCtxt
       | otherwise =
           ppContextNoArrow ctxt unicode qual HideEmptyContexts
             <+> darrow unicode
-            +++ toHtml " "
+            +++ toHtml (" " :: LText)
 
 -- | Pretty-print a record field
 ppSideBySideField
@@ -1564,7 +1565,7 @@ ppSideBySideField subdocs unicode qual (HsConDeclRecField _ names ltype) =
 ppRecFieldMultAnn :: Unicode -> Qualification -> HsConDeclField DocNameI -> Html
 ppRecFieldMultAnn unicode qual (CDF { cdf_multiplicity = ann }) = case ann of
   HsUnannotated _ -> noHtml
-  HsLinearAnn _ -> toHtml "%1"
+  HsLinearAnn _ -> toHtml ("%1" :: LText)
   HsExplicitMult _ mult -> multAnnotation <> ppr_mono_lty mult unicode qual HideEmptyContexts
 
 ppShortField :: Bool -> Unicode -> Qualification -> HsConDeclRecField DocNameI -> Html
@@ -1668,8 +1669,8 @@ ppDataHeader _ _ _ _ = error "ppDataHeader: illegal argument"
 --------------------------------------------------------------------------------
 
 ppBang :: HsSrcBang -> Html
-ppBang (HsSrcBang _ _ SrcStrict) = toHtml "!"
-ppBang (HsSrcBang _ _ SrcLazy) = toHtml "~"
+ppBang (HsSrcBang _ _ SrcStrict) = toHtml ("!" :: LText)
+ppBang (HsSrcBang _ _ SrcLazy) = toHtml ("~" :: LText)
 ppBang _ = noHtml
 
 tupleParens :: HsTupleSort -> [Html] -> Html
@@ -1707,7 +1708,7 @@ ppSigType unicode qual emptyCtxts sig_ty = ppr_sig_ty (reparenSigType sig_ty) un
 ppLHsTypeArg :: Unicode -> Qualification -> HideEmptyContexts -> LHsTypeArg DocNameI -> Html
 ppLHsTypeArg unicode qual emptyCtxts (HsValArg _ ty) = ppLParendType unicode qual emptyCtxts ty
 ppLHsTypeArg unicode qual emptyCtxts (HsTypeArg _ ki) = atSign <> ppLParendType unicode qual emptyCtxts ki
-ppLHsTypeArg _ _ _ (HsArgPar _) = toHtml ""
+ppLHsTypeArg _ _ _ (HsArgPar _) = toHtml ("" :: LText)
 
 class RenderableBndrFlag flag where
   ppHsTyVarBndr :: Unicode -> Qualification -> HsTyVarBndr flag DocNameI -> Html
@@ -1814,12 +1815,12 @@ ppr_mono_ty (HsQualTy _ ctxt ty) unicode qual emptyCtxts =
   ppLContext (Just ctxt) unicode qual emptyCtxts <+> ppr_mono_lty ty unicode qual emptyCtxts
 -- UnicodeSyntax alternatives
 ppr_mono_ty (HsTyVar _ _ (L _ name)) True _ _
-  | getOccString (getName name) == "(->)" = toHtml "(→)"
+  | getOccString (getName name) == "(->)" = toHtml ("(→)" :: LText)
 ppr_mono_ty (HsTyVar _ prom (L _ name)) _ q _
   | isPromoted prom = promoQuote (ppDocName q Prefix True name)
   | otherwise = ppDocName q Prefix True name
 ppr_mono_ty (HsStarTy _ isUni) u _ _ =
-  toHtml (if u || isUni then "★" else "*")
+  toHtml (if u || isUni then "★" else "*" :: LText)
 ppr_mono_ty (HsFunTy _ mult ty1 ty2) u q e =
   hsep
     [ ppr_mono_lty ty1 u q HideEmptyContexts
@@ -1842,7 +1843,7 @@ ppr_mono_ty (HsIParamTy _ (L _ n) ty) u q _ =
 ppr_mono_ty (HsSpliceTy v _) _ _ _ = dataConCantHappen v
 ppr_mono_ty (XHsType (HsBangTy b ty)) u q _ =
   ppBang b +++ ppLParendType u q HideEmptyContexts ty
-ppr_mono_ty (XHsType (HsRecTy{})) _ _ _ = toHtml "{..}"
+ppr_mono_ty (XHsType (HsRecTy{})) _ _ _ = toHtml ("{..}" :: LText)
 -- Can now legally occur in ConDeclGADT, the output here is to provide a
 -- placeholder in the signature, which is followed by the field
 -- declarations.

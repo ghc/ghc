@@ -51,6 +51,10 @@ import qualified System.IO as IO
 import Text.XHtml hiding (name, p, quote, title)
 import qualified Text.XHtml as XHtml
 import Prelude hiding (div)
+import qualified Data.Text.Lazy as LText
+import qualified Data.Text.Encoding as Text
+import qualified Data.Text as Text
+import qualified Data.ByteString.Lazy as LBS
 
 import Haddock.Backends.Xhtml.Decl
 import Haddock.Backends.Xhtml.DocMarkup
@@ -221,7 +225,7 @@ copyHtmlBits odir libdir themes withQuickjump = do
 headHtml :: String -> Themes -> Maybe String -> Maybe String -> Html
 headHtml docTitle themes mathjax_url base_url =
   header
-    ! (maybe [] (\url -> [identifier "head", strAttr "data-base-url" url]) base_url)
+    ! (maybe [] (\url -> [identifier "head", strAttr "data-base-url" url]) (LText.pack <$> base_url))
     << [ meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"]
        , meta ! [XHtml.name "viewport", content "width=device-width, initial-scale=1"]
        , thetitle << docTitle
@@ -229,18 +233,18 @@ headHtml docTitle themes mathjax_url base_url =
        , thelink
           ! [ rel "stylesheet"
             , thetype "text/css"
-            , href (withBaseURL base_url quickJumpCssFile)
+            , href (LText.pack $ withBaseURL base_url quickJumpCssFile)
             ]
           << noHtml
        , thelink ! [rel "stylesheet", thetype "text/css", href fontUrl] << noHtml
        , script
-          ! [ src (withBaseURL base_url haddockJsFile)
+          ! [ src (LText.pack $ withBaseURL base_url haddockJsFile)
             , emptyAttr "async"
             , thetype "text/javascript"
             ]
           << noHtml
        , script ! [thetype "text/x-mathjax-config"] << primHtml mjConf
-       , script ! [src mjUrl, thetype "text/javascript"] << noHtml
+       , script ! [src (LText.pack mjUrl), thetype "text/javascript"] << noHtml
        ]
   where
     fontUrl = "https://fonts.googleapis.com/css?family=PT+Sans:400,400i,700"
@@ -257,31 +261,31 @@ headHtml docTitle themes mathjax_url base_url =
 
 srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
 srcButton (Just src_base_url, _, _, _) Nothing =
-  Just (anchor ! [href src_base_url] << "Source")
+  Just (anchor ! [href (LText.pack src_base_url)] << ("Source" :: LText))
 srcButton (_, Just src_module_url, _, _) (Just iface) =
   let url = spliceURL (Just $ ifaceMod iface) Nothing Nothing src_module_url
-   in Just (anchor ! [href url] << "Source")
+   in Just (anchor ! [href (LText.pack url)] << ("Source" :: LText))
 srcButton _ _ =
   Nothing
 
 wikiButton :: WikiURLs -> Maybe Module -> Maybe Html
 wikiButton (Just wiki_base_url, _, _) Nothing =
-  Just (anchor ! [href wiki_base_url] << "User Comments")
+  Just (anchor ! [href (LText.pack wiki_base_url)] << ("User Comments" :: LText))
 wikiButton (_, Just wiki_module_url, _) (Just mdl) =
   let url = spliceURL (Just mdl) Nothing Nothing wiki_module_url
-   in Just (anchor ! [href url] << "User Comments")
+   in Just (anchor ! [href (LText.pack url)] << ("User Comments" :: LText))
 wikiButton _ _ =
   Nothing
 
 contentsButton :: Maybe String -> Maybe Html
 contentsButton maybe_contents_url =
-  Just (anchor ! [href url] << "Contents")
+  Just (anchor ! [href (LText.pack url)] << ("Contents" :: LText))
   where
     url = fromMaybe contentsHtmlFile maybe_contents_url
 
 indexButton :: Maybe String -> Maybe Html
 indexButton maybe_index_url =
-  Just (anchor ! [href url] << "Index")
+  Just (anchor ! [href (LText.pack url)] << ("Index" :: LText))
   where
     url = fromMaybe indexHtmlFile maybe_index_url
 
@@ -318,8 +322,8 @@ bodyHtml
          , divContent << pageContent
          , divFooter
             << paragraph
-            << ( "Produced by "
-                  +++ (anchor ! [href projectUrl] << toHtml projectName)
+            << ( ("Produced by " :: LText)
+                  +++ (anchor ! [href (LText.pack projectUrl)] << toHtml projectName)
                   +++ (" version " ++ projectVersion)
                )
          ]
@@ -368,7 +372,7 @@ moduleInfo iface =
                     xs -> extField $ unordList xs ! [theclass "extension-list"]
           | otherwise = []
           where
-            extField x = return $ th << "Extensions" <-> td << x
+            extField x = return $ th << ("Extensions" :: LText) <-> td << x
             dropOpt x = if "Opt_" `isPrefixOf` x then drop 4 x else x
    in
     case entries of
@@ -454,7 +458,7 @@ ppHtmlContents
                , ppModuleTrees pkg qual trees
                ]
     createDirectoryIfMissing True odir
-    writeUtf8File (joinPath [odir, contentsHtmlFile]) (renderToString debug html)
+    Builder.writeFile (joinPath [odir, contentsHtmlFile]) (renderToBuilder debug html)
     where
       -- Extract a module's short description.
       toInstalledDescription :: InstalledInterface -> Maybe (MDoc Name)
@@ -472,11 +476,11 @@ ppPrologue pkg qual title (Just doc) =
 ppSignatureTrees :: Maybe Package -> Qualification -> [(PackageInfo, [ModuleTree])] -> Html
 ppSignatureTrees _ _ tss | all (null . snd) tss = mempty
 ppSignatureTrees pkg qual [(info, ts)] =
-  divPackageList << (sectionName << "Signatures" +++ ppSignatureTree pkg qual "n" info ts)
+  divPackageList << (sectionName << ("Signatures" :: LText) +++ ppSignatureTree pkg qual "n" info ts)
 ppSignatureTrees pkg qual tss =
   divModuleList
     << ( sectionName
-          << "Signatures"
+          << ("Signatures" :: LText)
           +++ concatHtml
             [ ppSignatureTree pkg qual ("n." ++ show i ++ ".") info ts
             | (i, (info, ts)) <- zip [(1 :: Int) ..] tss
@@ -491,11 +495,11 @@ ppSignatureTree pkg qual p info ts =
 ppModuleTrees :: Maybe Package -> Qualification -> [(PackageInfo, [ModuleTree])] -> Html
 ppModuleTrees _ _ tss | all (null . snd) tss = mempty
 ppModuleTrees pkg qual [(info, ts)] =
-  divModuleList << (sectionName << "Modules" +++ ppModuleTree pkg qual "n" info ts)
+  divModuleList << (sectionName << ("Modules" :: LText) +++ ppModuleTree pkg qual "n" info ts)
 ppModuleTrees pkg qual tss =
   divPackageList
     << ( sectionName
-          << "Packages"
+          << ("Packages" :: LText)
           +++ concatHtml
             [ ppModuleTree pkg qual ("n." ++ show i ++ ".") info ts
             | (i, (info, ts)) <- zip [(1 :: Int) ..] tss
@@ -519,11 +523,11 @@ mkNode pkg qual ss p (Node s leaf _pkg srcPkg short ts) =
   htmlModule <+> shortDescr +++ htmlPkg +++ subtree
   where
     modAttrs = case (ts, leaf) of
-      (_ : _, Nothing) -> collapseControl p "module"
+      (_ : _, Nothing) -> collapseControl (LText.pack p) "module"
       (_, _) -> [theclass "module"]
 
     cBtn = case (ts, leaf) of
-      (_ : _, Just _) -> thespan ! collapseControl p "" << spaceHtml
+      (_ : _, Just _) -> thespan ! collapseControl (LText.pack p) "" << spaceHtml
       ([], Just _) -> thespan ! [theclass "noexpander"] << spaceHtml
       (_, _) -> noHtml
     -- We only need an explicit collapser button when the module name
@@ -547,11 +551,11 @@ mkNode pkg qual ss p (Node s leaf _pkg srcPkg short ts) =
         then noHtml
         else
           collapseDetails
-            p
+            (LText.pack p)
             DetailsOpen
             ( thesummary
                 ! [theclass "hide-when-js-enabled"]
-                << "Submodules"
+                << ("Submodules" :: LText)
                 +++ mkNodeList pkg qual (s : ss) p ts
             )
 
@@ -650,10 +654,10 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces ins
       | Just item_html <- processExport True links_info unicode pkg qual item =
           Just
             JsonIndexEntry
-              { jieHtmlFragment = showHtmlFragment item_html
+              { jieHtmlFragment = Text.unpack (Text.decodeUtf8Lenient (LBS.toStrict (Builder.toLazyByteString (showHtmlFragment item_html))))
               , jieName = unwords (map getOccString names)
               , jieModule = moduleString mdl
-              , jieLink = fromMaybe "" (listToMaybe (map (nameLink mdl) names))
+              , jieLink = LText.unpack $ fromMaybe "" (listToMaybe (map (nameLink mdl) names))
               }
       | otherwise = Nothing
       where
@@ -668,7 +672,7 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces ins
     exportName ExportNoDecl{expItemName} = [expItemName]
     exportName _ = []
 
-    nameLink :: NamedThing name => Module -> name -> String
+    nameLink :: NamedThing name => Module -> name -> LText
     nameLink mdl = moduleNameUrl' (moduleName mdl) . nameOccName . getName
 
     links_info = (maybe_source_url, maybe_wiki_url)
@@ -720,9 +724,9 @@ ppHtmlIndex
       mapM_ (do_sub_index index) initialChars
       -- Let's add a single large index as well for those who don't know exactly what they're looking for:
       let mergedhtml = indexPage False Nothing index
-      writeUtf8File (joinPath [odir, subIndexHtmlFile merged_name]) (renderToString debug mergedhtml)
+      Builder.writeFile (joinPath [odir, subIndexHtmlFile merged_name]) (renderToBuilder debug mergedhtml)
 
-    writeUtf8File (joinPath [odir, indexHtmlFile]) (renderToString debug html)
+    Builder.writeFile (joinPath [odir, indexHtmlFile]) (renderToBuilder debug html)
     where
       indexPage showLetters ch items =
         headHtml (doctitle ++ " (" ++ indexName ch ++ ")") themes maybe_mathjax_url Nothing
@@ -754,7 +758,7 @@ ppHtmlIndex
       indexInitialLetterLinks =
         divAlphabet
           << unordList
-            ( map (\str -> anchor ! [href (subIndexHtmlFile str)] << str) $
+            ( map (\str -> anchor ! [href (LText.pack $ subIndexHtmlFile str)] << str) $
                 [ [c] | c <- initialChars, any (indexStartsWith c) index
                 ]
                   ++ [merged_name]
@@ -773,7 +777,7 @@ ppHtmlIndex
 
       do_sub_index this_ix c =
         unless (null index_part) $
-          writeUtf8File (joinPath [odir, subIndexHtmlFile [c]]) (renderToString debug html)
+          Builder.writeFile (joinPath [odir, subIndexHtmlFile [c]]) (renderToBuilder debug html)
         where
           html = indexPage True (Just c) index_part
           index_part = [(n, stuff) | (n@(headN : _), stuff) <- this_ix, toUpper headN == c]
@@ -844,9 +848,9 @@ ppHtmlIndex
           <-> indexLinks nm entries
 
       ppAnnot n
-        | not (isValOcc n) = toHtml "Type/Class"
-        | isDataOcc n = toHtml "Data Constructor"
-        | otherwise = toHtml "Function"
+        | not (isValOcc n) = toHtml ("Type/Class" :: LText)
+        | isDataOcc n = toHtml ("Data Constructor" :: LText)
+        | otherwise = toHtml ("Function" :: LText)
 
       indexLinks nm entries =
         td
@@ -909,10 +913,10 @@ ppHtmlModule
       mdl_str_linked
         | ifaceIsSig iface =
             mdl_str
-              +++ " (signature"
+              +++ (" (signature" :: LText)
               +++ sup
-              << ("[" +++ anchor ! [href signatureDocURL] << "?" +++ "]")
-              +++ ")"
+              << (("[" :: LText) +++ anchor ! [href (LText.pack signatureDocURL)] << ("?" :: LText) +++ ("]" :: LText))
+              +++ (")" :: LText)
         | otherwise =
             toHtml mdl_str
       real_qual = makeModuleQual qual mdl
@@ -930,7 +934,7 @@ ppHtmlModule
              ]
 
     createDirectoryIfMissing True odir
-    writeUtf8File (joinPath [odir, moduleHtmlFile mdl]) (renderToString debug html)
+    Builder.writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToBuilder debug html)
 
 signatureDocURL :: String
 signatureDocURL = "https://wiki.haskell.org/Module_signature"
@@ -965,7 +969,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode pkg qual =
 
     description
       | isNoHtml doc = doc
-      | otherwise = divDescription $ sectionName << "Description" +++ doc
+      | otherwise = divDescription $ sectionName << ("Description" :: LText) +++ doc
       where
         doc = docSection Nothing pkg qual (ifaceRnDoc iface)
 
@@ -978,7 +982,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode pkg qual =
               "syn"
               DetailsClosed
               ( thesummary
-                  << "Synopsis"
+                  << ("Synopsis" :: LText)
                   +++ shortDeclList
                     ( mapMaybe (processExport True linksInfo unicode pkg qual) exports
                     )
@@ -991,7 +995,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode pkg qual =
       case exports of
         [] -> noHtml
         ExportGroup{} : _ -> noHtml
-        _ -> h1 << "Documentation"
+        _ -> h1 << ("Documentation" :: LText)
 
     bdy =
       foldr (+++) noHtml $
@@ -1017,7 +1021,7 @@ ppModuleContents pkg qual exports orphan
     contentsDiv =
       divTableOfContents
         << ( divContentsList
-              << ( (sectionName << "Contents")
+              << ( (sectionName << ("Contents" :: LText))
                     ! [strAttr "onclick" "window.scrollTo(0,0)"]
                     +++ unordList (sections ++ orphanSection)
                  )
@@ -1025,7 +1029,7 @@ ppModuleContents pkg qual exports orphan
 
     (sections, _leftovers {-should be []-}) = process 0 exports
     orphanSection
-      | orphan = [linkedAnchor "section.orphans" << "Orphan instances"]
+      | orphan = [linkedAnchor "section.orphans" << ("Orphan instances" :: LText)]
       | otherwise = []
 
     process :: Int -> [ExportItem DocNameI] -> ([Html], [ExportItem DocNameI])
@@ -1035,7 +1039,7 @@ ppModuleContents pkg qual exports orphan
       | otherwise = (html : secs, rest2)
       where
         html =
-          linkedAnchor (groupId id0)
+          linkedAnchor (groupId (LText.pack id0))
             << docToHtmlNoAnchors (Just id0) pkg qual (mkMeta doc)
             +++ mk_subsections ssecs
         (ssecs, rest1) = process lev rest
@@ -1103,7 +1107,7 @@ processExport
     ) =
     processDecl summary $ ppDecl summary links decl pats doc insts fixities subdocs splice unicode pkg qual
 processExport summary _ _ pkg qual (ExportGroup lev id0 doc) =
-  nothingIf summary $ groupHeading lev id0 << docToHtmlNoAnchors (Just id0) pkg qual (mkMeta doc)
+  nothingIf summary $ groupHeading lev (LText.pack id0) << docToHtmlNoAnchors (Just id0) pkg qual (mkMeta doc)
 processExport summary _ _ _ qual (ExportNoDecl y []) =
   processDeclOneLiner summary $ ppDocName qual Prefix True y
 processExport summary _ _ _ qual (ExportNoDecl y subs) =
@@ -1113,7 +1117,7 @@ processExport summary _ _ _ qual (ExportNoDecl y subs) =
 processExport summary _ _ pkg qual (ExportDoc doc) =
   nothingIf summary $ docSection_ Nothing pkg qual doc
 processExport summary _ _ _ _ (ExportModule mdl) =
-  processDeclOneLiner summary $ toHtml "module" <+> ppModule mdl
+  processDeclOneLiner summary $ toHtml ("module" :: LText) <+> ppModule mdl
 
 nothingIf :: Bool -> a -> Maybe a
 nothingIf True _ = Nothing
@@ -1132,7 +1136,7 @@ processDeclOneLiner :: Bool -> Html -> Maybe Html
 processDeclOneLiner True = Just
 processDeclOneLiner False = Just . divTopDecl . declElem
 
-groupHeading :: Int -> String -> Html -> Html
+groupHeading :: Int -> LText -> Html -> Html
 groupHeading lev id0 = linkedAnchor grpId . groupTag lev ! [identifier grpId]
   where
     grpId = groupId id0

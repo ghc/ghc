@@ -83,6 +83,8 @@ import System.IO.Unsafe (unsafePerformIO)
 
 import Documentation.Haddock.Doc (emptyMetaDoc)
 import Haddock.Types
+import Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as LText
 
 --------------------------------------------------------------------------------
 
@@ -184,35 +186,43 @@ subIndexHtmlFile ls = "doc-index-" ++ b ++ ".html"
 -- before being matched with IDs in the target document.
 -------------------------------------------------------------------------------
 
-moduleUrl :: Module -> String
-moduleUrl = moduleHtmlFile
+moduleUrl :: Module -> Text
+moduleUrl module_ = LText.pack (moduleHtmlFile module_)
 
-moduleNameUrl :: Module -> OccName -> String
-moduleNameUrl mdl n = moduleUrl mdl ++ '#' : nameAnchorId n
+moduleNameUrl :: Module -> OccName -> Text
+moduleNameUrl mdl n = moduleUrl mdl <> "#" <> nameAnchorId n
 
-moduleNameUrl' :: ModuleName -> OccName -> String
-moduleNameUrl' mdl n = moduleHtmlFile' mdl ++ '#' : nameAnchorId n
+moduleNameUrl' :: ModuleName -> OccName -> Text
+moduleNameUrl' mdl n = LText.pack (moduleHtmlFile' mdl) <> "#" <> nameAnchorId n
 
-nameAnchorId :: OccName -> String
-nameAnchorId name = makeAnchorId (prefix : ':' : occNameString name)
+nameAnchorId :: OccName -> Text
+nameAnchorId name = makeAnchorId (prefix <> ":" <> LText.pack (occNameString name))
   where
     prefix
-      | isValOcc name = 'v'
-      | otherwise = 't'
+      | isValOcc name = "v"
+      | otherwise = "t"
 
 -- | Takes an arbitrary string and makes it a valid anchor ID. The mapping is
 -- identity preserving.
-makeAnchorId :: String -> String
-makeAnchorId [] = []
-makeAnchorId (f : r) = escape isAlpha f ++ concatMap (escape isLegal) r
+makeAnchorId :: Text -> Text
+makeAnchorId input =
+    case LText.uncons input of
+        Nothing        -> LText.empty
+        Just (f, rest) ->
+            escape isAlpha f <> LText.concatMap (escape isLegal) rest
   where
+    escape :: (Char -> Bool) -> Char -> Text
     escape p c
-      | p c = [c]
-      | otherwise = '-' : show (ord c) ++ "-"
+        | p c       = LText.singleton c
+        | otherwise =
+            -- "-" <> show (ord c) <> "-"
+            LText.cons '-' (LText.pack (show (ord c) <> "-"))
+
+    isLegal :: Char -> Bool
     isLegal ':' = True
     isLegal '_' = True
     isLegal '.' = True
-    isLegal c = isAscii c && isAlphaNum c
+    isLegal c   = isAscii c && isAlphaNum c
 
 -- NB: '-' is legal in IDs, but we use it as the escape char
 
@@ -272,7 +282,7 @@ escapeURIString :: (Char -> Bool) -> String -> String
 escapeURIString = concatMap . escapeURIChar
 
 isUnreserved :: Char -> Bool
-isUnreserved c = isAlphaNumChar c || (c `elem` "-_.~")
+isUnreserved c = isAlphaNumChar c || (c `elem` ("-_.~" :: String))
 
 isAlphaChar, isDigitChar, isAlphaNumChar :: Char -> Bool
 isAlphaChar c = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
