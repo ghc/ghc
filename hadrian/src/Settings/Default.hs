@@ -109,6 +109,7 @@ stage0Packages = do
              , thLift -- new library not yet present for boot compilers
              , thQuasiquoter -- new library not yet present for boot compilers
              , unlit
+             , xhtml -- new version is not backwards compat with latest
              , if windowsHost then win32 else unix
              -- We must use the in-tree `Win32` as the version
              -- bundled with GHC 9.6 is too old for `semaphore-compat`.

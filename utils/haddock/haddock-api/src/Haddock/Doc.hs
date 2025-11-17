@@ -32,7 +32,7 @@ combineDocumentation (Documentation mDoc mWarning) =
 --
 docCodeBlock :: DocH mod id -> DocH mod id
 docCodeBlock (DocString s) =
-  DocString (reverse $ dropWhile (`elem` " \t") $ reverse s)
+  DocString (reverse $ dropWhile (`elem` (" \t" :: String)) $ reverse s)
 docCodeBlock (DocAppend l r) =
   DocAppend l (docCodeBlock r)
 docCodeBlock d = d

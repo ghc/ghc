@@ -41,6 +41,7 @@ import Haddock.Backends.Xhtml.Utils
 import Haddock.GhcUtils
 import Haddock.Types
 import Haddock.Utils
+import qualified Data.Text.Lazy as LText
 
 -- | Indicator of how to render a 'DocName' into 'Html'
 data Notation
@@ -171,7 +172,7 @@ linkIdOcc mdl mbName insertAnchors =
     then anchor ! [href url, title ttl]
     else id
   where
-    ttl = moduleNameString (moduleName mdl)
+    ttl = LText.pack (moduleNameString (moduleName mdl))
     url = case mbName of
       Nothing -> moduleUrl mdl
       Just name -> moduleNameUrl mdl name
@@ -179,9 +180,9 @@ linkIdOcc mdl mbName insertAnchors =
 linkIdOcc' :: ModuleName -> Maybe OccName -> Html -> Html
 linkIdOcc' mdl mbName = anchor ! [href url, title ttl]
   where
-    ttl = moduleNameString mdl
+    ttl = LText.pack (moduleNameString mdl)
     url = case mbName of
-      Nothing -> moduleHtmlFile' mdl
+      Nothing -> LText.pack (moduleHtmlFile' mdl)
       Just name -> moduleNameUrl' mdl name
 
 ppModule :: Module -> Html
@@ -190,14 +191,14 @@ ppModule mdl =
     ! [href (moduleUrl mdl)]
     << toHtml (moduleString mdl)
 
-ppModuleRef :: Maybe Html -> ModuleName -> String -> Html
+ppModuleRef :: Maybe Html -> ModuleName -> LText -> Html
 ppModuleRef Nothing mdl ref =
   anchor
-    ! [href (moduleHtmlFile' mdl ++ ref)]
+    ! [href (LText.pack (moduleHtmlFile' mdl) <> ref)]
     << toHtml (moduleNameString mdl)
 ppModuleRef (Just lbl) mdl ref =
   anchor
-    ! [href (moduleHtmlFile' mdl ++ ref)]
+    ! [href (LText.pack (moduleHtmlFile' mdl) <> ref)]
     << lbl
 
 -- NB: The ref parameter already includes the '#'.

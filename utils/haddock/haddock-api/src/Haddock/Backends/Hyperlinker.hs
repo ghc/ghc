@@ -28,10 +28,11 @@ import Haddock.Backends.Hyperlinker.Parser
 import Haddock.Backends.Hyperlinker.Renderer
 import Haddock.Backends.Hyperlinker.Types
 import Haddock.Backends.Hyperlinker.Utils
-import Haddock.Backends.Xhtml.Utils (renderToString)
+import Haddock.Backends.Xhtml.Utils (renderToBuilder)
 import Haddock.InterfaceFile
 import Haddock.Types
-import Haddock.Utils (Verbosity, out, verbose, writeUtf8File)
+import Haddock.Utils (Verbosity, out, verbose)
+import qualified Data.ByteString.Builder as Builder
 
 -- | Generate hyperlinked source for given interfaces.
 --
@@ -117,7 +118,7 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
   let tokens = fmap (\tk -> tk{tkSpan = (tkSpan tk){srcSpanFile = srcSpanFile $ nodeSpan fullAst}}) tokens'
 
   -- Produce and write out the hyperlinked sources
-  writeUtf8File path . renderToString pretty . render' thisModule fullAst $ tokens
+  Builder.writeFile path . renderToBuilder pretty . render' thisModule fullAst $ tokens
   where
     dflags = ifaceDynFlags iface
     sDocContext = DynFlags.initSDocContext dflags Outputable.defaultUserStyle

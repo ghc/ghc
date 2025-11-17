@@ -39,6 +39,7 @@ import Haddock.Doc
   )
 import Haddock.Types
 import Haddock.Utils
+import qualified Data.Text.Lazy as LText
 
 parHtmlMarkup
   :: Qualification
@@ -60,7 +61,7 @@ parHtmlMarkup qual insertAnchors ppId =
             mdl' = case reverse mdl of
               '\\' : _ -> init mdl
               _ -> mdl
-         in ppModuleRef lbl (mkModuleName mdl') ref
+         in ppModuleRef lbl (mkModuleName mdl') (LText.pack ref)
     , markupWarning = thediv ! [theclass "warning"]
     , markupEmphasis = emphasize
     , markupBold = strong
@@ -73,14 +74,14 @@ parHtmlMarkup qual insertAnchors ppId =
         if insertAnchors
           then
             anchor
-              ! [href url]
+              ! [href (LText.pack url)]
               << fromMaybe (toHtml url) mLabel
           else fromMaybe (toHtml url) mLabel
     , markupAName = \aname ->
         if insertAnchors
-          then namedAnchor aname << ""
+          then namedAnchor (LText.pack aname) << ("" :: LText.Text)
           else noHtml
-    , markupPic = \(Picture uri t) -> image ! ([src uri] ++ fromMaybe [] (return . title <$> t))
+    , markupPic = \(Picture uri t) -> image ! ([src (LText.pack uri)] ++ fromMaybe [] (return . title <$> (LText.pack <$> t)))
     , markupMathInline = \mathjax -> thespan ! [theclass "mathjax"] << toHtml ("\\(" ++ mathjax ++ "\\)")
     , markupMathDisplay = \mathjax -> thespan ! [theclass "mathjax"] << toHtml ("\\[" ++ mathjax ++ "\\]")
     , markupProperty = pre . toHtml
@@ -121,7 +122,7 @@ parHtmlMarkup qual insertAnchors ppId =
     exampleToHtml (Example expression result) = htmlExample
       where
         htmlExample = htmlPrompt +++ htmlExpression +++ toHtml (unlines result)
-        htmlPrompt = (thecode . toHtml $ ">>> ") ! [theclass "prompt"]
+        htmlPrompt = (thecode . toHtml $ (">>> " :: LText.Text)) ! [theclass "prompt"]
         htmlExpression = (strong . thecode . toHtml $ expression ++ "\n") ! [theclass "userinput"]
 
     makeOrdList :: HTML a => [(Int, a)] -> Html
@@ -204,9 +205,9 @@ hackMarkup fmt' currPkg h' =
     hackMarkup' fmt h = case h of
       UntouchedDoc d -> (markup fmt $ _doc d, [_meta d])
       CollapsingHeader (Header lvl titl) par n nm ->
-        let id_ = makeAnchorId $ "ch:" ++ fromMaybe "noid:" nm ++ show n
+        let id_ = makeAnchorId $ "ch:" <> fromMaybe "noid:" (LText.pack <$> nm) <> LText.pack (show n)
             col' = collapseControl id_ "subheading"
-            summary = thesummary ! [theclass "hide-when-js-enabled"] << "Expand"
+            summary = thesummary ! [theclass "hide-when-js-enabled"] << ("Expand" :: LText.Text)
             instTable contents = collapseDetails id_ DetailsClosed (summary +++ contents)
             lvs = zip [1 ..] [h1, h2, h3, h4, h5, h6]
             getHeader = fromMaybe caption (lookup lvl lvs)

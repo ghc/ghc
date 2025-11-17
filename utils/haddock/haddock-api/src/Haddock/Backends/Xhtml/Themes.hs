@@ -27,6 +27,7 @@ import System.Directory
 import System.FilePath
 import Text.XHtml hiding (name, p, quote, title, (</>))
 import qualified Text.XHtml as XHtml
+import qualified Data.Text.Lazy as LText
 
 import Haddock.Backends.Xhtml.Types (BaseURL, withBaseURL)
 import Haddock.Options
@@ -185,10 +186,10 @@ styleSheet base_url ts = toHtml $ zipWith mkLink rels ts
     rels = "stylesheet" : repeat "alternate stylesheet"
     mkLink aRel t =
       thelink
-        ! [ href (withBaseURL base_url (themeHref t))
+        ! [ href (LText.pack (withBaseURL base_url (themeHref t)))
           , rel aRel
           , thetype "text/css"
-          , XHtml.title (themeName t)
+          , XHtml.title (LText.pack (themeName t))
           ]
         << noHtml
 

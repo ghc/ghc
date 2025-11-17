@@ -172,6 +172,7 @@ toolTargets = [ cabalSyntax
               , time
               , semaphoreCompat
               , unlit  -- # executable
+              , xhtml
               ] ++ if windowsHost then [ win32 ] else [ unix ]
 
 -- | Create a mapping from files to which component it belongs to.

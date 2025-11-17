@@ -51,6 +51,7 @@ common extensions
     StrictData
     TypeApplications
     TypeOperators
+    OverloadedStrings
 
   default-language:   Haskell2010
 
@@ -81,7 +82,7 @@ library
   build-depends: base             >= 4.16 && < 4.23
                , ghc             ^>= 9.15
                , haddock-library ^>= 1.11
-               , xhtml           ^>= 3000.2.2
+               , xhtml           ^>= 3000.4.0.0
                , parsec          ^>= 3.1.13.0
 
   -- Versions for the dependencies below are transitively pinned by
@@ -97,6 +98,7 @@ library
                , ghc-boot
                , mtl
                , transformers
+               , text
 
   hs-source-dirs: src
 
@@ -212,7 +214,7 @@ test-suite spec
   build-depends: ghc             ^>= 9.7
                , ghc-paths       ^>= 0.1.0.12
                , haddock-library ^>= 1.11
-               , xhtml           ^>= 3000.2.2
+               , xhtml           ^>= 3000.4.0.0
                , hspec           ^>= 2.9
                , parsec          ^>= 3.1.13.0
                , QuickCheck      >= 2.11  && ^>= 2.14

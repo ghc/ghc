@@ -12,4 +12,4 @@ package haddock-api
   tests: False
 
 -- Pinning the index-state helps to make reasonably CI deterministic
-index-state: 2024-06-18T11:54:44Z
+index-state: 2025-11-17T03:30:46Z
