@@ -127,6 +127,7 @@ test('T17536b', normal, compile, [''])                                       ##
 test('T21650_a', js_broken(26578), compile, ['-Wno-deprecated-flags'])       ##
 test('T21650_b', js_broken(26578), compile, ['-Wno-deprecated-flags'])       ##
 test('T26072', js_broken(26578), compile, [''])                              ##
+test('T26072b', js_broken(26578), compile, [''])                             ##
 test('RepPolyArgument2', normal, compile, [''])                              ##
 test('RepPolyCase2', js_broken(26578), compile, [''])                        ##
 test('RepPolyRule3', normal, compile, [''])                                  ##
