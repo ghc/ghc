@@ -400,10 +400,10 @@ simple_app env e0@(Lam {}) as0@(_:_)
       = do_beta (soeZapSubst env) (Lam b' body') rest
         -- soeZapSubst: pushCoercionIntoLambda applies the substitution
       | otherwise
-      = rebuild_app env (simple_opt_expr env e) as
+      = rebuild_app env e as
 
-    do_beta env (Cast e co) as =
-      do_beta env e (add_cast env co as)
+    do_beta env (Cast e co) as
+      = do_beta env e (add_cast env co as)
 
     do_beta env body as
       = simple_app env body as
@@ -441,20 +441,19 @@ simple_app env (Tick t e) as
 --   (#13208)
 -- However, do /not/ do this transformation for join points
 --    See Note [simple_app and join points]
-simple_app env (Let bind body) args
+simple_app env fun@(Let bind body) args
+  | isJoinBind bind
+  = rebuild_app env fun args
+  | otherwise
   = case simple_opt_bind env bind NotTopLevel of
-      (env', Nothing)   -> simple_app env' body args
-      (env', Just bind')
-        | isJoinBind bind' -> rebuild_app env expr' args
-        | otherwise        -> Let bind' (simple_app env' body args)
-        where
-          expr' = Let bind' (simple_opt_expr env' body)
+      (env', Nothing)    ->            simple_app env' body args
+      (env', Just bind') -> Let bind' (simple_app env' body args)
 
 simple_app env (Cast e co) as
   = simple_app env e (add_cast env co as)
 
 simple_app env e as
-  = rebuild_app env (simple_opt_expr env e) as
+  = rebuild_app env e as
 
 add_cast :: SimpleOptEnv -> InCoercion -> [SimpleContItem] -> [SimpleContItem]
 add_cast env co1 as
@@ -468,8 +467,9 @@ add_cast env co1 as
     co1' = optCoercion (so_co_opts (soe_opts env)) (soe_subst env) co1
 
 rebuild_app :: HasDebugCallStack
-            => SimpleOptEnv -> OutExpr -> [SimpleContItem] -> OutExpr
-rebuild_app env fun args = foldl mk_app fun args
+            => SimpleOptEnv -> InExpr -> [SimpleContItem] -> OutExpr
+rebuild_app env fun args
+  = foldl mk_app (simple_opt_expr env fun) args
   where
     in_scope = soeInScope env
     mk_app out_fun = \case
