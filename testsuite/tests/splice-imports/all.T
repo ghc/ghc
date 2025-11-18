@@ -9,7 +9,7 @@ test('SI03', [extra_files(["SI01A.hs"])], multimod_compile_fail, ['SI03', '-v0']
 test('SI04', [extra_files(["SI01A.hs"])], multimod_compile, ['SI04', '-v0'])
 test('SI05', [extra_files(["SI01A.hs"])], multimod_compile_fail, ['SI05', '-v0'])
 test('SI06', [extra_files(["SI01A.hs"])], multimod_compile, ['SI06', '-v0'])
-test('SI07', [expect_broken_for(26552, ['ext-interp']), unless(ghc_dynamic(), skip), extra_files(["SI05A.hs"])], multimod_compile, ['SI07', '-fwrite-interface -fno-code'])
+test('SI07', [unless(ghc_dynamic(), skip), extra_files(["SI05A.hs"])], multimod_compile, ['SI07', '-fwrite-interface -fno-code'])
 # Instance tests
 test('SI08', [extra_files(["ClassA.hs", "InstanceA.hs"])], multimod_compile_fail, ['SI08', '-v0'])
 test('SI09', [extra_files(["ClassA.hs", "InstanceA.hs"])], multimod_compile, ['SI09', '-v0'])
