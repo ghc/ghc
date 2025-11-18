@@ -13,11 +13,11 @@ import {-# SOURCE #-} GHC.Tc.Solver.Solve( solveSimpleWanteds )
 
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Solver.InertSet
-import GHC.Tc.Solver.Monad
 import GHC.Tc.Solver.Types
+import GHC.Tc.Solver.Monad   as TcS
+import GHC.Tc.Utils.Monad    as TcM
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify( UnifyEnv(..) )
-import GHC.Tc.Utils.Monad    as TcM
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 
@@ -39,7 +39,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc( lengthExceeds )
 
 import GHC.Data.Pair
-import Data.Maybe( isNothing, mapMaybe )
+import Data.Maybe( isNothing, isJust, mapMaybe )
 
 
 {- Note [Overview of functional dependencies in type inference]
@@ -469,8 +469,8 @@ tryEqFunDeps work_item@(EqCt { eq_lhs = work_lhs
                              , eq_eq_rel = eq_rel })
   | NomEq <- eq_rel
   , TyFamLHS fam_tc work_args <- work_lhs     -- We have F args ~N# rhs
-  = do { simpleStage $ traceTcS "tryEqFunDeps" (ppr work_item)
-       ; eqs_for_me <- simpleStage $ getInertFamEqsFor fam_tc work_args work_rhs
+  = do { eqs_for_me <- simpleStage $ getInertFamEqsFor fam_tc work_args work_rhs
+       ; simpleStage $ traceTcS "tryEqFunDeps" (ppr work_item $$ ppr eqs_for_me)
        ; tryFamEqFunDeps eqs_for_me fam_tc work_args work_item }
   | otherwise
   = nopStage ()
@@ -485,10 +485,11 @@ tryFamEqFunDeps eqs_for_me fam_tc work_args
     else do { -- Note [Do local fundeps before top-level instances]
               tryFDEqns fam_tc work_args work_item $
               mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
-            ; if all (isWanted . eqCtEvidence) eqs_for_me
-              then tryFDEqns fam_tc work_args work_item $
-                   mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
-              else nopStage () }
+
+            ; if hasRelevantGiven eqs_for_me work_args work_item
+            ; then nopStage ()
+              else tryFDEqns fam_tc work_args work_item $
+                   mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs }
 
   | isGiven ev    -- See (INJFAM:Given)
   = nopStage ()
@@ -502,10 +503,10 @@ tryFamEqFunDeps eqs_for_me fam_tc work_args
            Injective inj -> tryFDEqns fam_tc work_args work_item $
                             mkLocalFamEqFDs eqs_for_me fam_tc inj work_args work_rhs
 
-       ; if all (isWanted . eqCtEvidence) eqs_for_me
-         then tryFDEqns fam_tc work_args work_item $
-              mkTopFamEqFDs fam_tc work_args work_rhs
-         else nopStage () }
+       ; if hasRelevantGiven eqs_for_me work_args work_item
+         then nopStage ()
+         else tryFDEqns fam_tc work_args work_item $
+              mkTopFamEqFDs fam_tc work_args work_rhs }
 
 mkTopFamEqFDs :: TyCon -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkTopFamEqFDs fam_tc work_args work_rhs
@@ -548,10 +549,8 @@ mkTopClosedFamEqFDs ax work_args work_rhs
   = do { let branches = fromBranches (coAxiomBranches ax)
        ; traceTcS "mkTopClosed" (ppr branches $$ ppr work_args $$ ppr work_rhs)
        ; case getRelevantBranches ax work_args work_rhs of
-           [CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys, cab_rhs = rhs_ty }]
-              -> return [FDEqns { fd_qtvs = qtvs
-                                , fd_eqs = zipWith Pair (rhs_ty:lhs_tys) (work_rhs:work_args) }]
-           _  -> return [] }
+           [eqn] -> return [eqn]
+           _     -> return [] }
    | otherwise
    = return []
 
@@ -566,7 +565,21 @@ isInformativeType (TyConApp tc tys)            = isGenerativeTyCon tc Nominal ||
                                                  tys `lengthExceeds` tyConArity tc
 isInformativeType _ = True  -- AppTy, ForAllTy, FunTy, LitTy
 
-getRelevantBranches :: CoAxiom Branched -> [TcType] -> Xi -> [CoAxBranch]
+hasRelevantGiven :: [EqCt] -> [TcType] -> EqCt -> Bool
+-- A Given is relevant if it is not apart from the Wanted
+hasRelevantGiven eqs_for_me work_args (EqCt { eq_rhs = work_rhs })
+  = any relevant eqs_for_me
+  where
+    work_tys = work_rhs : work_args
+
+    relevant (EqCt { eq_ev = ev, eq_lhs = lhs, eq_rhs = rhs_ty })
+       | isGiven ev
+       , TyFamLHS _ lhs_tys <- lhs
+       = isJust (tcUnifyTysForInjectivity True work_tys (rhs_ty:lhs_tys))
+       | otherwise
+       = False
+
+getRelevantBranches :: CoAxiom Branched -> [TcType] -> Xi -> [FunDepEqns]
 getRelevantBranches ax work_args work_rhs
   = go [] (fromBranches (coAxiomBranches ax))
   where
@@ -574,13 +587,21 @@ getRelevantBranches ax work_args work_rhs
 
     go _ [] = []
     go preceding (branch:branches)
-      | is_relevant branch = branch : go (branch:preceding) branches
-      | otherwise          =          go (branch:preceding) branches
+      = case is_relevant branch of
+          Just eqn -> eqn : go (branch:preceding) branches
+          Nothing  ->       go (branch:preceding) branches
       where
-         is_relevant (CoAxBranch { cab_lhs = lhs_tys, cab_rhs = rhs_ty })
-            = case tcUnifyTysForInjectivity True work_tys (rhs_ty:lhs_tys) of
-                     Nothing    -> False
-                     Just subst -> all (no_match (substTys subst lhs_tys)) preceding
+         is_relevant (CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys, cab_rhs = rhs_ty })
+            | Just subst <- tcUnifyTysForInjectivity True work_tys (rhs_ty:lhs_tys)
+            , let (subst', qtvs') = trim_qtvs subst qtvs
+                  lhs_tys' = substTys subst' lhs_tys
+                  rhs_ty'  = substTy  subst' rhs_ty
+            , all (no_match lhs_tys') preceding
+            = pprTrace "grb" (ppr qtvs $$ ppr subst $$ ppr qtvs' $$ ppr subst' $$ ppr lhs_tys $$ ppr lhs_tys') $
+              Just (FDEqns { fd_qtvs = qtvs'
+                           , fd_eqs = zipWith Pair (rhs_ty':lhs_tys') work_tys })
+            | otherwise
+            = Nothing
 
          no_match lhs_tys (CoAxBranch { cab_lhs = lhs_tys1 })
             = isNothing (tcUnifyTysForInjectivity False lhs_tys1 lhs_tys)
@@ -608,15 +629,15 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
       | otherwise
       = Nothing
 
-    trim_qtvs :: Subst -> [TcTyVar] -> (Subst,[TcTyVar])
-    -- Tricky stuff: see (TIF1) in
-    -- Note [Type inference for type families with injectivity]
-    trim_qtvs subst []       = (subst, [])
-    trim_qtvs subst (tv:tvs)
-      | tv `elemSubst` subst = trim_qtvs subst tvs
-      | otherwise            = let !(subst1, tv')  = substTyVarBndr subst tv
-                                   !(subst', tvs') = trim_qtvs subst1 tvs
-                               in (subst', tv':tvs')
+trim_qtvs :: Subst -> [TcTyVar] -> (Subst,[TcTyVar])
+-- Tricky stuff: see (TIF1) in
+-- Note [Type inference for type families with injectivity]
+trim_qtvs subst []       = (subst, [])
+trim_qtvs subst (tv:tvs)
+  | tv `elemSubst` subst = trim_qtvs subst tvs
+  | otherwise            = let !(subst1, tv')  = substTyVarBndr subst tv
+                               !(subst', tvs') = trim_qtvs subst1 tvs
+                           in (subst', tv':tvs')
 
 mkLocalFamEqFDs :: [EqCt] -> TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
@@ -823,7 +844,7 @@ For /built-in/ type families, it's pretty similar, except that
     FDEqn { fd_qtvs = [b:kappa], fd_eqs = [ beta ~ Proxy @kappa b ] }
   Notice that
     * we must quantify the FunDepEqns over `b`, which is not matched; for this
-      we will generate a fresh unfication variable in `instantiateFunDepEqn`.
+      we will generate a fresh unification variable in `instantiateFunDepEqn`.
     * we must substitute `k:->kappa` in the kind of `b`.
   This fancy footwork for `fd_qtvs` is done by `trim_qtvs` in
   `mkInjWantedFamEqTopEqns`.
@@ -889,6 +910,10 @@ solveFunDeps work_ev fd_eqns
   = do { (unifs, _res)
              <- reportFineGrainUnifications $
                 nestFunDepsTcS              $
+                TcS.pushTcLevelM_           $
+                   -- pushTcLevelTcM: increase the level so that unification variables
+                   -- allocated by the fundep-creation itself don't count as useful unifications
+                   -- See Note [Deeper TcLevel for partial improvement unification variables]
                 do { (_, eqs) <- wrapUnifier work_ev Nominal do_fundeps
                    ; solveSimpleWanteds eqs }
     -- Why solveSimpleWanteds?  Answer

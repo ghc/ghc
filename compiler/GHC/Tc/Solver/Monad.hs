@@ -25,7 +25,7 @@ module GHC.Tc.Solver.Monad (
     selectNextWorkItem,
     getWorkList,
     updWorkListTcS,
-    pushLevelNoWorkList,
+    pushLevelNoWorkList, pushTcLevelM_,
 
     runTcPluginTcS, recordUsedGREs,
     matchGlobalInst, TcM.ClsInstResult(..),
@@ -1320,11 +1320,6 @@ nestImplicTcS skol_info ev_binds_var inner_tclvl (TcS thing_inside)
 nestFunDepsTcS :: TcS a -> TcS a
 nestFunDepsTcS (TcS thing_inside)
   = TcS $ \ env@(TcSEnv { tcs_inerts = inerts_var }) ->
-    TcM.pushTcLevelM_  $
-         -- pushTcLevelTcM: increase the level so that unification variables
-         -- allocated by the fundep-creation itself don't count as useful unifications
-         -- See Note [Deeper TcLevel for partial improvement unification variables]
-         --     in GHC.Tc.Solver.FunDeps
     do { inerts <- TcM.readTcRef inerts_var
        ; let nest_inerts = resetInertCans inerts
                  -- resetInertCans: like nestImplicTcS
@@ -1833,6 +1828,10 @@ selectNextWorkItem
                | otherwise            = return Nothing
      } }
 
+
+pushTcLevelM_ :: TcS a -> TcS a
+pushTcLevelM_ (TcS thing_inside)
+  = TcS (\env -> TcM.pushTcLevelM_ (thing_inside env))
 
 pushLevelNoWorkList :: SDoc -> TcS a -> TcS (TcLevel, a)
 -- Push the level and run thing_inside
