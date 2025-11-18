@@ -1,0 +1,3 @@
+:l T26565
+Ur y = (\x -> Ur $ replicate 5 'a') 3
+y
