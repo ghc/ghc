@@ -78,7 +78,7 @@ import GHC.Core.Type as Type
 import GHC.Core.Predicate( isEqPred )
 import GHC.Core.Predicate( isUnaryClass )
 import GHC.Core.FamInstEnv
-import GHC.Core.TyCo.Compare( eqType, eqTypeX )
+import GHC.Core.TyCo.Compare( eqType, eqTypeX, eqTypeIgnoringMultiplicity )
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.TyCon
@@ -275,7 +275,7 @@ mkCast expr co
   = assertPpr (coercionRole co == Representational)
               (text "coercion" <+> ppr co <+> text "passed to mkCast"
                <+> ppr expr <+> text "has wrong role" <+> ppr (coercionRole co)) $
-    warnPprTrace (not (coercionLKind co `eqType` exprType expr)) "Bad cast"
+    warnPprTrace (not (coercionLKind co `eqTypeIgnoringMultiplicity` exprType expr)) "Bad cast"
       (vcat [ text "Coercion LHS kind does not match enclosed expression type"
             , text "co:" <+> ppr co
             , text "coercionLKind:" <+> ppr (coercionLKind co)
