@@ -8,7 +8,6 @@ module Test.Haddock
   ) where
 
 import Control.Monad
-import qualified Data.ByteString.Char8 as BS
 import qualified Data.Map.Strict as Map
 import Data.Foldable (for_)
 import Data.Maybe
@@ -211,7 +210,7 @@ checkFile cfg file = do
     ccfg = cfgCheckConfig cfg
     dcfg = cfgDirConfig cfg
 
--- We use ByteString here to ensure that no lazy I/O is performed.
+-- We use readFile' here to ensure that no lazy I/O is performed.
 -- This way to ensure that the reference file isn't held open in
 -- case after `diffFile` (which is problematic if we need to rewrite
 -- the reference file in `maybeAcceptFile`)
@@ -219,8 +218,8 @@ checkFile cfg file = do
 -- | Read the reference artifact for a test
 readRef :: Config c -> FilePath -> IO (Maybe c)
 readRef cfg file =
-  ccfgRead ccfg . BS.unpack
-    <$> BS.readFile (refFile dcfg file)
+  ccfgRead ccfg
+    <$> readFile' (refFile dcfg file)
   where
     ccfg = cfgCheckConfig cfg
     dcfg = cfgDirConfig cfg
@@ -228,8 +227,8 @@ readRef cfg file =
 -- | Read (and clean) the test output artifact for a test
 readOut :: Config c -> (DirConfig -> FilePath) -> FilePath -> IO c
 readOut cfg dcfgDir file = do
-  res <- fmap (ccfgClean ccfg file) . ccfgRead ccfg . BS.unpack
-    <$> BS.readFile outFile
+  res <- fmap (ccfgClean ccfg file) . ccfgRead ccfg
+    <$> readFile' outFile
   case res of
     Just out -> return out
     Nothing -> error $ "Failed to parse output file: " ++ outFile
