@@ -3326,7 +3326,7 @@ mkPolyAbsLams (getter,setter) bndrs body
 
       | isId var, change_ty || change_unf
       , let binds' | isDeadBinder var = binds
-                   | otherwise        = NonRec bndr (Var id2) : binds
+                   | otherwise        = NonRec bndr (varToCoreExpr id2) : binds
       = Lam (setter id2 bndr) (go unf_tvs binds' bndrs)
 
       | otherwise
