@@ -841,9 +841,10 @@ tcUnifyTysForInjectivity unif tys1 tys2
                -- in-scope set is never looked at, so this free-var stuff
                -- should never actually be done
 
-    maybe_fix | unif      = niFixSubst in_scope
-              | otherwise = mkTvSubst in_scope -- when matching, don't confuse
-                                               -- domain with range
+    maybe_fix tv_subst
+      | unif      = niFixSubst in_scope tv_subst
+      | otherwise = mkTvSubst  in_scope tv_subst
+      -- When matching, don't confuse domain with range; no fixpoint!
 
 -----------------
 tcUnifyTys :: BindTvFun
@@ -1116,10 +1117,10 @@ So, we work as follows:
        , rest :-> rest :: G b (z :: b) ]
     Note that rest now has the right kind
 
- 7. Apply this extended substitution (once) to the range of
-    the /original/ substitution.  (Note that we do the
-    extended substitution would go on forever if you tried
-    to find its fixpoint, because it maps z to z.)
+ 7. Apply this extended substitution (once) to the range of the
+    /original/ substitution.  (Note that the extended substitution
+    would go on forever if you tried to find its fixpoint, because it
+    maps z to z.)
 
  8. And go back to step 1
 
@@ -1138,8 +1139,10 @@ niFixSubst :: InScopeSet -> TvSubstEnv -> Subst
 -- ToDo: use laziness instead of iteration?
 niFixSubst in_scope tenv
   | not_fixpoint = niFixSubst in_scope (mapVarEnv (substTy subst) tenv)
-  | otherwise    = subst
+  | otherwise    = tenv_subst
   where
+    tenv_subst = mkTvSubst in_scope tenv   -- This is our starting point
+
     range_fvs :: FV
     range_fvs = tyCoFVsOfTypes (nonDetEltsUFM tenv)
           -- It's OK to use nonDetEltsUFM here because the
@@ -1154,9 +1157,7 @@ niFixSubst in_scope tenv
     free_tvs = scopedSort (filterOut in_domain range_tvs)
 
     -- See Note [Finding the substitution fixpoint], Step 6
-    subst = foldl' add_free_tv
-                  (mkTvSubst in_scope tenv)
-                  free_tvs
+    subst = foldl' add_free_tv tenv_subst free_tvs
 
     add_free_tv :: Subst -> TyVar -> Subst
     add_free_tv subst tv

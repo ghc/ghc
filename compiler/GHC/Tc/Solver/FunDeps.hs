@@ -592,13 +592,12 @@ getRelevantBranches ax work_args work_rhs
           Nothing  ->       go (branch:preceding) branches
       where
          is_relevant (CoAxBranch { cab_tvs = qtvs, cab_lhs = lhs_tys, cab_rhs = rhs_ty })
-            | Just subst <- tcUnifyTysForInjectivity True work_tys (rhs_ty:lhs_tys)
+            | Just subst <- tcUnifyTysForInjectivity True (rhs_ty:lhs_tys) work_tys
             , let (subst', qtvs') = trim_qtvs subst qtvs
                   lhs_tys' = substTys subst' lhs_tys
                   rhs_ty'  = substTy  subst' rhs_ty
             , all (no_match lhs_tys') preceding
-            = pprTrace "grb" (ppr qtvs $$ ppr subst $$ ppr qtvs' $$ ppr subst' $$ ppr lhs_tys $$ ppr lhs_tys') $
-              Just (FDEqns { fd_qtvs = qtvs'
+            = Just (FDEqns { fd_qtvs = qtvs'
                            , fd_eqs = zipWith Pair (rhs_ty':lhs_tys') work_tys })
             | otherwise
             = Nothing
