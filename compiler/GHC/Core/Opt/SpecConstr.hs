@@ -1970,7 +1970,7 @@ spec_one :: ScEnv
 
 spec_one env fn arg_bndrs body (call_pat, rule_number)
   | CP { cp_qvars = qvars, cp_args = pats, cp_strict_args = cbv_args } <- call_pat
-  = do  { pprTraceM "spec_one {" (ppr fn <+> (ppr qvars $$ ppr pats))
+  = do  { -- pprTraceM "spec_one {" (ppr fn <+> (ppr qvars $$ ppr pats))
 
         ; spec_uniq <- getUniqueM
         ; let env1 = extendScSubstList (extendScInScope env qvars)
