@@ -549,7 +549,7 @@ mkTopClosedFamEqFDs ax work_args work_rhs
   = do { let branches = fromBranches (coAxiomBranches ax)
        ; traceTcS "mkTopClosed" (ppr branches $$ ppr work_args $$ ppr work_rhs)
        ; case getRelevantBranches ax work_args work_rhs of
-           [eqn] -> return [eqn]
+           [eqn] -> return [eqn]  -- If there is just one relevant equation, use it
            _     -> return [] }
    | otherwise
    = return []
@@ -580,6 +580,7 @@ hasRelevantGiven eqs_for_me work_args (EqCt { eq_rhs = work_rhs })
        = False
 
 getRelevantBranches :: CoAxiom Branched -> [TcType] -> Xi -> [FunDepEqns]
+-- Return the FunDepEqns that arise from each relevant branch
 getRelevantBranches ax work_args work_rhs
   = go [] (fromBranches (coAxiomBranches ax))
   where
@@ -628,16 +629,6 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
       | otherwise
       = Nothing
 
-trim_qtvs :: Subst -> [TcTyVar] -> (Subst,[TcTyVar])
--- Tricky stuff: see (TIF1) in
--- Note [Type inference for type families with injectivity]
-trim_qtvs subst []       = (subst, [])
-trim_qtvs subst (tv:tvs)
-  | tv `elemSubst` subst = trim_qtvs subst tvs
-  | otherwise            = let !(subst1, tv')  = substTyVarBndr subst tv
-                               !(subst', tvs') = trim_qtvs subst1 tvs
-                           in (subst', tv':tvs')
-
 mkLocalFamEqFDs :: [EqCt] -> TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
   = do { let -- eqns_from_inerts: see (INJFAM:Wanted/other)
@@ -656,6 +647,16 @@ mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
     do_one _ = pprPanic "interactFunEq 2" (ppr fam_tc)  -- TyVarLHS
 
     mk_eqn iargs = mkInjectivityFDEqn inj_flags [] work_args iargs
+
+trim_qtvs :: Subst -> [TcTyVar] -> (Subst,[TcTyVar])
+-- Tricky stuff: see (TIF1) in
+-- Note [Type inference for type families with injectivity]
+trim_qtvs subst []       = (subst, [])
+trim_qtvs subst (tv:tvs)
+  | tv `elemSubst` subst = trim_qtvs subst tvs
+  | otherwise            = let !(subst1, tv')  = substTyVarBndr subst tv
+                               !(subst', tvs') = trim_qtvs subst1 tvs
+                           in (subst', tv':tvs')
 
 -----------------------------------------
 --  Built-in type families
