@@ -27,6 +27,11 @@ Flag threaded
     Default: True
     Manual: True
 
+Flag debug
+    Description: Link the ghc executable against the debug RTS
+    Default: True
+    Manual: True
+
 Executable ghc
     Default-Language: GHC2021
 
@@ -50,9 +55,15 @@ Executable ghc
         -- final GHC against.
         -- TODO: add debug flag and extend those extra cases.
         if flag(threaded)
-            Build-Depends: rts:threaded-nodebug
+            if flag(debug)
+                Build-Depends: rts:threaded-debug
+            else
+                Build-Depends: rts:threaded-nodebug
         else
-            Build-Depends: rts:nonthreaded-nodebug
+            if flag(debug)
+                Build-Depends: rts:nonthreaded-debug
+            else
+                Build-Depends: rts:nonthreaded-nodebug
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.15

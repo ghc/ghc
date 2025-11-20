@@ -30,6 +30,7 @@
 #include <shfolder.h> /* SHGetFolderPathW */
 #include "IOManager.h"
 #include "win32/AsyncWinIO.h"
+#include "fs.h"
 #endif
 
 #if defined(openbsd_HOST_OS)
@@ -157,6 +158,9 @@ extern char **environ;
  * https://docs.microsoft.com/en-us/cpp/porting/visual-cpp-change-history-2003-2015?view=vs-2017#stdioh-and-conioh
  */
 #define RTS_MINGW_ONLY_SYMBOLS                           \
+      SymI_HasProto(_assert)                             \
+      SymI_HasProto(__rts_swopen)                        \
+      SymI_HasProto(__rts_create_device_name)            \
       SymI_HasProto(stg_asyncReadzh)                     \
       SymI_HasProto(stg_asyncWritezh)                    \
       SymI_HasProto(stg_asyncDoProczh)                   \

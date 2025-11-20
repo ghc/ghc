@@ -125,13 +125,7 @@ expandToolDir
   :: Bool -- ^ whether we use the ambient mingw toolchain
   -> Maybe FilePath -- ^ tooldir
   -> String -> String
-#if defined(mingw32_HOST_OS)
-expandToolDir False (Just tool_dir) s = expandPathVar "tooldir" tool_dir s
-expandToolDir False Nothing         _ = panic "Could not determine $tooldir"
-expandToolDir True  _               s = s
-#else
 expandToolDir _ _ s = s
-#endif
 
 -- | Returns a Unix-format path pointing to TopDir.
 findTopDir :: Maybe String -- Maybe TopDir path (without the '-B' prefix).
@@ -169,21 +163,4 @@ findToolDir
   :: Bool -- ^ whether we use the ambient mingw toolchain
   -> FilePath -- ^ topdir
   -> IO (Maybe FilePath)
-#if defined(mingw32_HOST_OS)
-findToolDir False top_dir = go 0 (top_dir </> "..") []
-  where maxDepth = 3
-        go :: Int -> FilePath -> [FilePath] -> IO (Maybe FilePath)
-        go k path tried
-          | k == maxDepth = throwGhcExceptionIO $
-              InstallationError $ "could not detect mingw toolchain in the following paths: " ++ show tried
-          | otherwise = do
-              let try = path </> "mingw"
-              let tried' = tried ++ [try]
-              oneLevel <- doesDirectoryExist try
-              if oneLevel
-                then return (Just path)
-                else go (k+1) (path </> "..") tried'
-findToolDir True _ = return Nothing
-#else
 findToolDir _ _ = return Nothing
-#endif

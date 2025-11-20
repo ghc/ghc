@@ -44,6 +44,13 @@ if os(wasi)
     ghc-options: -optc-fvisibility=default
     ghc-options: -optc-fvisibility-inlines-hidden
 
+if os(windows)
+  package rts
+    ghc-options: "-optc-DHostArch=\"x86_64\""
+    ghc-options: "-optc-DHostOS=\"mingw32\""
+    ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-mingw32\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+
 package rts-headers
   ghc-options: -no-rts
 

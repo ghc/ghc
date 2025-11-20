@@ -17,9 +17,6 @@ on:
       cabal:
         type: string
         default: 3.14.2.0
-      dynamic:
-        type: string
-        default: 1
       test:
         type: boolean
         default: true
@@ -42,8 +39,6 @@ env:
   GHCUP_MSYS2_ENV: CLANG64
   MSYSTEM: CLANG64
   CHERE_INVOKING: 1
-  # dynamic
-  DYNAMIC: ${{ inputs.dynamic }}
 
 jobs:
   tool-output:
@@ -95,12 +90,6 @@ jobs:
     container:
       image: ${{ matrix.platform.image }}
     steps:
-      # needed for patchelf
-      - if: matrix.platform.image == 'rockylinux:8'
-        name: Install EPEL
-        run: |
-          dnf install -y epel-release
-
       - name: Install requirements
         shell: sh
         run: |
@@ -274,7 +263,7 @@ jobs:
 
   build-mac-x86_64:
     name: Build binary (Mac x86_64)
-    runs-on: macOS-15-intel
+    runs-on: macOS-13
     env:
       ARTIFACT: "x86_64-apple-darwin"
       MACOSX_DEPLOYMENT_TARGET: 10.13
@@ -353,6 +342,9 @@ jobs:
           echo "/opt/homebrew/opt/make/libexec/gnubin" >> $GITHUB_PATH
           echo "/opt/homebrew/opt/libtool/libexec/gnubin" >> $GITHUB_PATH
 
+      - name: Install emscripten
+        run : *emscripten
+
       - name: Run build
         run: *build
 
@@ -405,7 +397,6 @@ jobs:
         run: *build
         env:
           MAKE: make
-          DYNAMIC: 0
 
       - if: always()
         name: Upload artifact
@@ -677,7 +668,7 @@ jobs:
 
   test-mac-x86_64:
     name: Test binary (Mac x86_64)
-    runs-on: macOS-15-intel
+    runs-on: macOS-13
     needs: ["build-mac-x86_64"]
     if: ${{ inputs.test }}
     env:

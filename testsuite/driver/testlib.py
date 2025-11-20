@@ -3296,7 +3296,7 @@ async def runCmd(cmd: str,
         # to invoke the Bourne shell
 
         proc = await asyncio.create_subprocess_exec(timeout_prog, timeout, cmd,
-                                                   stdin=stdin_file,
+                                                   stdin=stdin_file if stdin_file else asyncio.subprocess.PIPE,
                                                    stdout=asyncio.subprocess.PIPE,
                                                    stderr=hStdErr,
                                                    env=ghc_env

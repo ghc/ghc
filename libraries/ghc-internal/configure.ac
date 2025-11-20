@@ -11,9 +11,10 @@ CPPFLAGS="-I$srcdir $CPPFLAGS"
 AC_PROG_CC
 dnl make extensions visible to allow feature-tests to detect them later on
 AC_USE_SYSTEM_EXTENSIONS
+AC_CANONICAL_HOST
 
 AC_MSG_CHECKING(for WINDOWS platform)
-case $host_alias in
+case $host in
     *mingw32*|*mingw64*|*cygwin*|*msys*|*windows*)
         WINDOWS=YES;;
     *)
