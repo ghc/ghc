@@ -175,6 +175,7 @@ test('T26410_ffi'
     , [ only_ways(llvm_ways) # SIMD NCG TODO: support 512-bit wide vectors
       , unless(arch('x86_64') and have_cpu_feature('avx512f'), skip)
       , extra_hc_opts('-mavx512f -optc -mavx512f -optlc -mcpu=penryn')
+      , when(opsys('mingw32'), fragile(26595))
       ]
     , compile_and_run if have_cpu_feature('avx512f') else compile
     , ['T26410_ffi_c.c'])
