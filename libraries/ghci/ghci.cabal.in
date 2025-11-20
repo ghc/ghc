@@ -93,7 +93,6 @@ library
         deepseq          >= 1.4 && < 1.6,
         filepath         >= 1.4 && < 1.6,
         ghc-boot         == @ProjectVersionMunged@,
-        ghc-heap         >= 9.10.1 && <=@ProjectVersionMunged@,
         transformers     >= 0.5 && < 0.7
 
     -- libffi is not available on JS (no native RTS) or WASM/WASI (libffi's
@@ -121,11 +120,13 @@ library
         CPP-Options:          -DHAVE_GHC_INTERNAL
 
     if flag(bootstrap)
+      CPP-Options: -DBOOTSTRAPPING
       build-depends:
             ghc-boot-th-next  == @ProjectVersionMunged@
     else
       build-depends:
-            ghc-boot-th       == @ProjectVersionMunged@
+            ghc-boot-th       == @ProjectVersionMunged@,
+            ghc-heap          >= 9.10.1 && <=@ProjectVersionMunged@
 
     if !os(windows)
         Build-Depends: unix >= 2.7 && < 2.9

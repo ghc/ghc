@@ -49,7 +49,9 @@ import GHCi.ResolvedBCO ( BCOByteArray(..), mkBCOByteArray )
 
 import Foreign
 import Data.ByteString (ByteString)
+#ifndef BOOTSTRAPPING
 import qualified GHC.Exts.Heap as Heap
+#endif
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.Unit.Module
 
@@ -166,8 +168,13 @@ type AddrEnv = NameEnv (Name, AddrPtr)
         -- We need the Name in the range so we know which
         -- elements to filter out when unloading a module
 
+#ifndef BOOTSTRAPPING
 newtype ItblPtr = ItblPtr (RemotePtr Heap.StgInfoTable)
   deriving (Show, NFData)
+#else
+newtype ItblPtr = ItblPtr (RemotePtr ())
+  deriving (Show, NFData)
+#endif
 newtype AddrPtr = AddrPtr (RemotePtr ())
   deriving (NFData)
 

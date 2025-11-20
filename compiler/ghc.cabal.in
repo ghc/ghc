@@ -113,16 +113,17 @@ Library
                    rts,
                    rts-headers,
                    ghc-boot   == @ProjectVersionMunged@,
-                   ghc-heap   >=9.10.1 && <=@ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
 
     if flag(bootstrap)
+      CPP-Options: -DBOOTSTRAPPING
       Build-Depends:
         ghc-boot-th-next     == @ProjectVersionMunged@
     else
       Build-Depends:
         ghc-boot-th          == @ProjectVersionMunged@,
         ghc-internal         == @ProjectVersionForLib@.0,
+        ghc-heap             >= 9.10.1 && <=@ProjectVersionMunged@,
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.15

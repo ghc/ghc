@@ -34,6 +34,7 @@ module GHC.Runtime.Heap.Inspect(
      constrClosToName -- exported to use in test T4891
  ) where
 
+#ifndef BOOTSTRAPPING
 import GHC.Prelude hiding (head, init, last, tail)
 import GHC.Platform
 
@@ -1474,3 +1475,91 @@ quantifyType ty = ( filter isTyVar $
                   , ty)
   where
     (_tvs, _, rho) = tcSplitNestedSigmaTys ty
+
+#else
+import GHC.Prelude
+import GHC.Types.Name
+import GHC.Core.DataCon
+import GHC.Core.Type
+import GHC.Utils.Outputable
+import GHC.Types.Var.Set
+import GHC.Driver.Env
+import GHCi.RemoteTypes
+import GHC.InfoProv
+import GHC.Types.Basic (Boxity)
+import GHC.Utils.Panic
+
+-- Dummy types
+data ClosureType = DummyClosureType
+data GenClosure a = DummyGenClosure
+
+type RttiType = Type
+
+data Term = Term { ty        :: RttiType
+                 , dc        :: Either String DataCon
+                 , val       :: ForeignHValue
+                 , subTerms  :: [Term] }
+          | Prim { ty        :: RttiType
+                 , valRaw    :: [Word] }
+          | Suspension { ctype    :: ClosureType
+                       , ty       :: RttiType
+                       , val      :: ForeignHValue
+                       , bound_to :: Maybe Name
+                       , infoprov :: Maybe InfoProv
+                       }
+          | NewtypeWrap{ ty           :: RttiType
+                       , dc           :: Either String DataCon
+                       , wrapped_term :: Term }
+          | RefWrap    { ty           :: RttiType
+                       , wrapped_term :: Term }
+
+-- Dummy functions
+cvObtainTerm :: HscEnv -> Int -> Bool -> RttiType -> ForeignHValue -> IO Term
+cvObtainTerm _ _ _ ty _ = return (Prim ty []) -- Dummy return
+
+cvReconstructType :: HscEnv -> Int -> RttiType -> ForeignHValue -> IO (Maybe RttiType)
+cvReconstructType _ _ _ _ = return Nothing
+
+improveRTTIType :: HscEnv -> RttiType -> RttiType -> Maybe Subst
+improveRTTIType _ _ _ = Nothing
+
+isFullyEvaluatedTerm :: Term -> Bool
+isFullyEvaluatedTerm _ = False
+
+termType :: Term -> RttiType
+termType t = ty t
+
+mapTermType :: (RttiType -> Type) -> Term -> Term
+mapTermType _ t = t
+
+termTyCoVars :: Term -> TyCoVarSet
+termTyCoVars _ = emptyVarSet
+
+type TermProcessor a b = RttiType -> Either String DataCon -> ForeignHValue -> [a] -> b
+
+data TermFold a = TermFold { fTerm        :: TermProcessor a a
+                           , fPrim        :: RttiType -> [Word] -> a
+                           , fSuspension  :: ClosureType -> RttiType -> ForeignHValue
+                                            -> Maybe Name -> Maybe InfoProv -> a
+                           , fNewtypeWrap :: RttiType -> Either String DataCon
+                                            -> a -> a
+                           , fRefWrap     :: RttiType -> a -> a
+                           }
+
+foldTerm :: TermFold a -> Term -> a
+foldTerm _ _ = panic "foldTerm: bootstrapping"
+
+type Precedence = Int
+type TermPrinterM m = Precedence -> Term -> m SDoc
+type CustomTermPrinter m = TermPrinterM m -> [Precedence -> Term -> m (Maybe SDoc)]
+
+cPprTerm :: Monad m => CustomTermPrinter m -> Term -> m SDoc
+cPprTerm _ _ = return (text "Bootstrapping Term")
+
+cPprTermBase :: Monad m => CustomTermPrinter m
+cPprTermBase _ = []
+
+constrClosToName :: HscEnv -> GenClosure a -> IO (Either String Name)
+constrClosToName _ _ = return (Left "Bootstrapping")
+
+#endif

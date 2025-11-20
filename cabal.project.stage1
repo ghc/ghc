@@ -39,6 +39,11 @@ packages:
   libraries/directory
   libraries/file-io
   libraries/filepath
+  libraries/ghc-platform
+  libraries/ghc-boot
+  libraries/ghc-boot-th-next
+  libraries/ghci
+  libraries/libffi-clib
   libraries/os-string
   libraries/process
   libraries/semaphore-compat

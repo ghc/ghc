@@ -37,7 +37,9 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Short as BS
 import qualified Data.ByteString.Unsafe as B
 import GHC.Exts
+#ifndef BOOTSTRAPPING
 import qualified GHC.Exts.Heap as Heap
+#endif
 import GHC.Stack
 import Foreign hiding (void)
 import Foreign.C
@@ -114,9 +116,11 @@ run m = case m of
   PrepFFI args res -> toRemotePtr <$> prepForeignCall args res
   FreeFFI p -> freeForeignCallInfo (fromRemotePtr p)
   StartTH -> startTH
+#ifndef BOOTSTRAPPING
   GetClosure ref -> do
     clos <- Heap.getClosureData =<< localRef ref
     mapM (\(Heap.Box x) -> mkRemoteRef (HValue x)) clos
+#endif
   WhereFrom ref ->
     InfoProv.whereFrom =<< localRef ref
   Seq ref -> doSeq ref
