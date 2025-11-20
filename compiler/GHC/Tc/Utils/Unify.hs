@@ -3076,15 +3076,16 @@ lhsPriority tv
       RuntimeUnk  -> 0
       SkolemTv {} -> 0
       MetaTv { mtv_info = info, mtv_tclvl = lvl }
-        | QLInstVar <- lvl
-        -> 5  -- Eliminate instantiation variables first
-        | otherwise
         -> case info of
              CycleBreakerTv -> 0
              TyVarTv        -> 1
-             ConcreteTv {}  -> 2
-             TauTv          -> 3
-             RuntimeUnkTv   -> 4
+             ConcreteTv {}  -> qli 2  -- 2,3
+             TauTv          -> qli 4  -- 4,5
+             RuntimeUnkTv   -> 6
+        where
+          qli n = case lvl of
+                    QLInstVar -> n+1  -- Eliminate instantiation variables first
+                    _         -> n
 
 {- Note [Unification preconditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
