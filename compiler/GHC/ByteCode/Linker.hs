@@ -59,15 +59,16 @@ linkBCO
   -> PkgsLoaded
   -> LinkerEnv
   -> LinkedBreaks
-  -> NameEnv Int
+  -> NameEnv Int -- Named UDCs
+  -> NameEnv Int -- Named BCOs
   -> UnlinkedBCO
   -> IO ResolvedBCO
-linkBCO interp pkgs_loaded le lb bco_ix
+linkBCO interp pkgs_loaded le lb udc_ix bco_ix
            (UnlinkedBCO _ arity insns bitmap lits0 ptrs0) = do
   -- fromIntegral Word -> Word64 should be a no op if Word is Word64
   -- otherwise it will result in a cast to longlong on 32bit systems.
   (lits :: [Word]) <- mapM (fmap fromIntegral . lookupLiteral interp pkgs_loaded le lb) (elemsFlatBag lits0)
-  ptrs <- mapM (resolvePtr interp pkgs_loaded le lb bco_ix) (elemsFlatBag ptrs0)
+  ptrs <- mapM (resolvePtr interp pkgs_loaded le lb udc_ix bco_ix) (elemsFlatBag ptrs0)
   let lits' = listArray (0 :: Int, fromIntegral (sizeFlatBag lits0)-1) lits
   return $ ResolvedBCO { resolvedBCOIsLE   = isLittleEndian
                        , resolvedBCOArity  = arity
@@ -160,13 +161,17 @@ resolvePtr
   -> PkgsLoaded
   -> LinkerEnv
   -> LinkedBreaks
-  -> NameEnv Int
+  -> NameEnv Int -- Named UDCs
+  -> NameEnv Int -- Named BCOs
   -> BCOPtr
   -> IO ResolvedBCOPtr
-resolvePtr interp pkgs_loaded le lb bco_ix ptr = case ptr of
+resolvePtr interp pkgs_loaded le lb udc_ix bco_ix ptr = case ptr of
   BCOPtrName nm
-    | Just ix <- lookupNameEnv bco_ix nm
-    -> return (ResolvedBCORef ix) -- ref to another BCO in this group
+    | Just ix <- lookupNameEnv udc_ix nm -- ref to another UDC in this group
+    -> return (ResolvedBCORefUnlifted ix)
+
+    | Just ix <- lookupNameEnv bco_ix nm -- ref to another BCO in this group
+    -> return (ResolvedBCORef ix)
 
     | Just (_, rhv) <- lookupNameEnv (closure_env le) nm
     -> return (ResolvedBCOPtr (unsafeForeignRefToRemoteRef rhv))
@@ -184,7 +189,7 @@ resolvePtr interp pkgs_loaded le lb bco_ix ptr = case ptr of
     -> ResolvedBCOStaticPtr <$> lookupPrimOp interp pkgs_loaded op
 
   BCOPtrBCO bco
-    -> ResolvedBCOPtrBCO <$> linkBCO interp pkgs_loaded le lb bco_ix bco
+    -> ResolvedBCOPtrBCO <$> linkBCO interp pkgs_loaded le lb udc_ix bco_ix bco
 
   BCOPtrBreakArray tick_mod ->
     withForeignRef (expectJust (lookupModuleEnv (breakarray_env lb) tick_mod)) $

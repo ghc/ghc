@@ -32,6 +32,7 @@ import GHC.Platform
 import GHC.Platform.Profile
 
 import GHCi.FFI
+import GHCi.Message ( ConInfoTable(..) )
 import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Types.Name
@@ -42,7 +43,7 @@ import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Core.Type
-import GHC.Core.Predicate( tyCoVarsOfTypesWellScoped )
+import GHC.Core.Predicate ( tyCoVarsOfTypesWellScoped )
 import GHC.Core.TyCo.Compare (eqType)
 import GHC.Types.RepType
 import GHC.Core.DataCon
@@ -51,6 +52,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
+import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
 import GHC.Builtin.Uniques
@@ -59,7 +61,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Exception (evaluate)
 import GHC.CmmToAsm.Config (platformWordWidth)
 import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, idPrimRepU,
-                              addIdReps, addArgReps,
+                              tagForCon, addIdReps, addArgReps,
                               assertNonVoidIds, assertNonVoidStgArgs )
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
@@ -101,6 +103,9 @@ import Control.Monad.Trans.Reader (ReaderT(..))
 import Control.Monad.Trans.State  (StateT(..))
 import Data.Bifunctor (Bifunctor(..))
 
+import GHCi.ResolvedBCO (ResolvedUDC(..))
+
+
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
 
@@ -125,10 +130,11 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
             flattenBind (StgNonRec b e) = [(b,e)]
             flattenBind (StgRec bs)     = bs
 
-        (proto_bcos, BcM_State{..}) <-
-           runBc hsc_env this_mod mb_modBreaks $ do
+        ((data_con_apps, proto_bcos), BcM_State{..}) <-
+             runBc hsc_env this_mod mb_modBreaks $ do
              let flattened_binds = concatMap flattenBind (reverse lifted_binds)
-             FlatBag.fromList (fromIntegral $ length flattened_binds) <$> mapM schemeTopBind flattened_binds
+                 buildBag x = FlatBag.fromList (fromIntegral $ length x) x
+             bimap buildBag buildBag . partitionEithers <$> mapM schemeTopBind flattened_binds
 
         putDumpFileMaybe logger Opt_D_dump_BCOs
            "Proto-BCOs" FormatByteCode
@@ -137,7 +143,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
         let mod_breaks = case mb_modBreaks of
              Nothing -> Nothing
              Just mb -> Just $ mkInternalModBreaks this_mod breakInfo mb
-        cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries
+        cbc <- assembleBCOs profile proto_bcos data_con_apps tycs strings mod_breaks spt_entries
 
         -- Squash space leaks in the CompiledByteCode.  This is really
         -- important, because when loading a set of modules into GHCi
@@ -304,8 +310,41 @@ argBits platform (rep : args)
 
 -- Compile code for the right-hand side of a top-level binding
 
-schemeTopBind :: (Id, CgStgRhs) -> BcM (ProtoBCO Name)
+schemeTopBind :: (Id, CgStgRhs) -> BcM (Either UnlinkedUDC (ProtoBCO Name))
 schemeTopBind (id, rhs)
+  | isUnliftedType (varType id), StgRhsCon _ dCon conNo _ _ _ <- rhs = do
+        profile <- getProfile
+        let rep_args =
+              [ prim_rep
+              | arg <- dataConRepArgTys dCon
+              , prim_rep <- typePrimRep (scaledThing arg) ]
+            (tot_wds, ptr_wds) = mkVirtConstrSizes profile rep_args
+            ptrs'  = ptr_wds
+            nptrs' = tot_wds - ptr_wds
+            nptrs_really
+               | ptrs' + nptrs' >= pc_MIN_PAYLOAD_SIZE constants = nptrs'
+               | otherwise = pc_MIN_PAYLOAD_SIZE constants - ptrs'
+
+            platform = profilePlatform profile
+            constants = platformConstants platform
+            tables_next_to_code = platformTablesNextToCode platform
+            descr = dataConIdentity dCon
+
+            conInt = case conNo of
+              Numbered i -> i
+              NoNumber   -> 0 -- This defaulting seems unsafe?
+
+            finalizer :: ConInfoTable -> Either UnlinkedUDC a
+            finalizer = Left . UnlinkedUDC (getName id)
+
+        pure . finalizer $ ConInfoTable
+            tables_next_to_code
+            ptrs'
+            nptrs_really
+            conInt
+            (tagForCon platform dCon)
+            descr
+
   | Just data_con <- isDataConWorkId_maybe id,
     isNullaryRepDataCon data_con = do
     platform <- profilePlatform <$> getProfile
@@ -318,12 +357,12 @@ schemeTopBind (id, rhs)
         -- by just re-using the single top-level definition.  So
         -- for the worker itself, we must allocate it directly.
     -- liftIO (putStrLn $ "top level BCO")
-    pure (mkProtoBCO platform add_bco_name
-                       (getName id) (toOL [PACK data_con 0, RETURN P])
-                       (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
+    pure . Right $ mkProtoBCO platform add_bco_name
+      (getName id) (toOL [PACK data_con 0, RETURN P])
+      (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-}
 
   | otherwise
-  = schemeR [{- No free variables -}] (getName id, rhs)
+  = Right <$> schemeR [{- No free variables -}] (getName id, rhs)
 
 
 -- -----------------------------------------------------------------------------
@@ -454,12 +493,12 @@ returnUnliftedAtom
     -> Sequel
     -> BCEnv
     -> StgArg
-    -> BcM BCInstrList
+    -> BcM (BCInstrList, ByteOff)
 returnUnliftedAtom d s p e = do
     let reps = stgArgRep e
     (push, szb) <- pushAtom d p e
     ret <- returnUnliftedReps d s szb reps
-    return (push `appOL` ret)
+    return (push `appOL` ret, szb)
 
 -- return an unlifted value from the top of the stack
 returnUnliftedReps
@@ -515,9 +554,9 @@ returnUnboxedTuple d s p es = do
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
 schemeE :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
-schemeE d s p (StgLit lit) = returnUnliftedAtom d s p (StgLitArg lit)
+schemeE d s p (StgLit lit) = fst <$> returnUnliftedAtom d s p (StgLitArg lit)
 schemeE d s p (StgApp x [])
-   | isUnliftedType (idType x) = returnUnliftedAtom d s p (StgVarArg x)
+   | isUnliftedType (idType x) = fst <$> returnUnliftedAtom d s p (StgVarArg x)
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(StgApp {}) = schemeT d s p e
 schemeE d s p e@(StgConApp {}) = schemeT d s p e
@@ -706,7 +745,7 @@ mkConAppCode
     -> DataCon                  -- The data constructor
     -> [StgArg]                 -- Args, in *reverse* order
     -> BcM BCInstrList
-mkConAppCode orig_d _ p con args = app_code
+mkConAppCode orig_d s p con args = app_code
   where
     app_code = do
         profile <- getProfile
@@ -720,7 +759,8 @@ mkConAppCode orig_d _ p con args = app_code
             do_pushery !d (arg : args) = do
                 (push, arg_bytes) <- case arg of
                     (Padding l _) -> return $! pushPadding (ByteOff l)
-                    (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
+                    (FieldOff a _) -> pushConstrAtom d s p (fromNonVoid a)
+                    -- returnUnliftedAtom
                 more_push_code <- do_pushery (d + arg_bytes) args
                 return (push `appOL` more_push_code)
             do_pushery !d [] = do
@@ -2415,10 +2455,10 @@ pushLiteral padded lit =
 -- This is slightly different to @pushAtom@ due to the fact that we allow
 -- packing constructor fields. See also @mkConAppCode@ and @pushPadding@.
 pushConstrAtom
-    :: StackDepth -> BCEnv -> StgArg -> BcM (BCInstrList, ByteOff)
-pushConstrAtom _ _ (StgLitArg lit) = pushLiteral False lit
+    :: StackDepth -> Sequel -> BCEnv -> StgArg -> BcM (BCInstrList, ByteOff)
+pushConstrAtom _ _ _ (StgLitArg lit) = pushLiteral False lit
 
-pushConstrAtom d p va@(StgVarArg v)
+pushConstrAtom d _ p va@(StgVarArg v)
     | Just d_v <- lookupBCEnv_maybe v p = do  -- v is a local variable
         platform <- targetPlatform <$> getDynFlags
         let !szb = idSizeCon platform v
@@ -2431,7 +2471,7 @@ pushConstrAtom d p va@(StgVarArg v)
             4 -> done PUSH32
             _ -> pushAtom d p va
 
-pushConstrAtom d p expr = pushAtom d p expr
+pushConstrAtom d _ p expr = pushAtom d p expr
 
 pushPadding :: ByteOff -> (BCInstrList, ByteOff)
 pushPadding (ByteOff n) = go n (nilOL, 0)

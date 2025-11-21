@@ -2143,7 +2143,17 @@ stg_deRefStablePtrzh ( P_ sp )
 /* -----------------------------------------------------------------------------
    Bytecode object primitives
    -------------------------------------------------------------------------  */
-
+/*
+stg_newUDHzh ( P_ datacon_itbl )
+{
+    W_ p;
+    ALLOC_PRIM(SIZEOF_StgClosure)
+    p = Hp - SIZEOF_StgClosure + WDS(1);
+    // No memory barrier necessary as this is a new allocation.
+    SET_HDR(p, datacon_itbl, CCS_MAIN);
+    return (p);
+}
+*/
 stg_newBCOzh ( P_ instrs,
                P_ literals,
                P_ ptrs,

@@ -106,6 +106,8 @@ data Message a where
   -- see Note [Parallelize CreateBCOs serialization]
   CreateBCOs :: [ResolvedBCO] -> Message [HValueRef]
 
+  CreateUDCs :: [ResolvedUDC] -> Message [HValueRef]
+
   -- | Release 'HValueRef's
   FreeHValueRefs :: [HValueRef] -> Message ()
 
@@ -247,22 +249,6 @@ data Message a where
     -> Message (EvalStatus ())
 
 deriving instance Show (Message a)
-
--- | Used to dynamically create a data constructor's info table at
--- run-time.
-data ConInfoTable = ConInfoTable {
-  conItblTablesNextToCode :: !Bool, -- ^ TABLES_NEXT_TO_CODE
-  conItblPtrs :: !Int,              -- ^ ptr words
-  conItblNPtrs :: !Int,             -- ^ non-ptr words
-  conItblConTag :: !Int,            -- ^ constr tag
-  conItblPtrTag :: !Int,            -- ^ pointer tag
-  conItblDescr :: !ByteString       -- ^ constructor desccription
-}
-  deriving (Generic, Show)
-
-instance Binary ConInfoTable
-
-instance NFData ConInfoTable
 
 -- | Template Haskell return values
 data QResult a
@@ -602,6 +588,7 @@ getMessage = do
       38 -> Msg <$> (ResumeSeq <$> get)
       39 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
       40 -> Msg <$> (WhereFrom <$> get)
+      41 -> Msg <$> (CreateUDCs <$> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -648,6 +635,7 @@ putMessage m = case m of
   ResumeSeq a                 -> putWord8 38 >> put a
   LookupSymbolInDLL dll str   -> putWord8 39 >> put dll >> put str
   WhereFrom a                 -> putWord8 40 >> put a
+  CreateUDCs ptr              -> putWord8 41 >> put ptr
 
 {-
 Note [Parallelize CreateBCOs serialization]

@@ -107,18 +107,20 @@ bcoFreeNames bco
 assembleBCOs
   :: Profile
   -> FlatBag (ProtoBCO Name)
+  -> FlatBag UnlinkedUDC
   -> [TyCon]
   -> [(Name, ByteString)]
   -> Maybe InternalModBreaks
   -> [SptEntry]
   -> IO CompiledByteCode
-assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
+assembleBCOs profile proto_bcos udcs tycons top_strs modbreaks spt_entries = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   let itbls = mkITbls profile tycons
   bcos    <- mapM (assembleBCO (profilePlatform profile)) proto_bcos
   return CompiledByteCode
     { bc_bcos = bcos
+    , bc_udcs = udcs
     , bc_itbls = itbls
     , bc_strs = top_strs
     , bc_breaks = modbreaks

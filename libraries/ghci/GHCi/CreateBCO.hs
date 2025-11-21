@@ -1,4 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE UnliftedDatatypes #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BangPatterns #-}
@@ -11,13 +13,13 @@
 --  (c) The University of Glasgow 2002-2006
 --
 
--- | Create real byte-code objects from 'ResolvedBCO's.
-module GHCi.CreateBCO (createBCOs) where
+-- | Create real byte-code objects from 'ResolvedBCO's and 'NullaryDataConApp's.
+module GHCi.CreateBCO (createBCOs, createUDCs) where
 
 import Prelude -- See note [Why do we import Prelude here?]
+import GHCi.BreakArray
 import GHCi.ResolvedBCO
 import GHCi.RemoteTypes
-import GHCi.BreakArray
 import GHC.Data.SizedSeq
 
 import System.IO (fixIO)
@@ -26,14 +28,24 @@ import Data.Array.Base
 import Foreign hiding (newArray)
 import Unsafe.Coerce (unsafeCoerce)
 import GHC.Arr          ( Array(..) )
-import GHC.Exts   hiding ( BCO, mkApUpd0#, newBCO# )
-import GHC.Internal.Base ( BCO, mkApUpd0#, newBCO# )
+import GHC.Exts   hiding ( BCO, mkApUpd0#, newBCO#, newUDC# )
+import GHC.Internal.Base ( BCO, mkApUpd0#, newBCO#, newUDC# )
 import GHC.IO
+import GHC.Exts.Heap ( StgInfoTable )
 import Control.Exception ( ErrorCall(..) )
+
+createUDCs :: [RemotePtr StgInfoTable] -> IO [HValueRef]
+createUDCs dcas = do
+  mapM createUnliftedDataConstructor dcas
+
+createUnliftedDataConstructor :: RemotePtr StgInfoTable -> IO HValueRef
+createUnliftedDataConstructor infoTablePtr =
+  let !(Ptr !addr#) = fromRemotePtr infoTablePtr
+  in  IO $ \s -> newUDC# addr# s
 
 createBCOs :: [ResolvedBCO] -> IO [HValueRef]
 createBCOs bcos = do
-  let n_bcos = length bcos
+  let !n_bcos = length bcos
   hvals <- fixIO $ \hvs -> do
      let arr = listArray (0, n_bcos-1) hvs
      mapM (createBCO arr) bcos
@@ -97,7 +109,26 @@ mkPtrsArray arr n_ptrs ptrs = do
   marr <- newPtrsArray (fromIntegral n_ptrs)
   let
     fill (ResolvedBCORef n) i =
-      writePtrsArrayHValue i (arr ! n) marr  -- must be lazy!
+      -- This MUST be /lazy!/
+      -- Strict evaluation of (arr ! n) will cause an infinite loop.
+      writePtrsArrayHValue i (arr ! n) marr
+    fill (ResolvedBCORefUnlifted n) i = do
+      -- This MUST be /strict!/
+      -- Lazy evaluation will cause interpreter panics (at best).
+      -- Used to refer to unlifted data constructor applications.
+--      let !x = arr ! n
+      let x@(HValue !a) = arr ! n
+      a `seq` writePtrsArrayHValue i x marr
+{-
+      let (HValue !a) = arr ! n
+      let uVal :: IO (Any UnliftedType)
+          !uVal = unsafeCoerce# a
+      aVal <- evaluate uVal
+      let !hVal = unsafeCoerce aVal
+      hVal `seq` writePtrsArrayHValue i hVal marr
+--      let x@(HValue !a) = arr ! n
+--      in  a `seq` writePtrsArrayHValue i x' marr
+-}
     fill (ResolvedBCOPtr r) i = do
       hv <- localRef r
       writePtrsArrayHValue i hv marr

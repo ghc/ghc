@@ -3937,6 +3937,14 @@ primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
    with
    out_of_line = True
 
+primop  NewUDCOp "newUDC#" GenPrimOp
+   Addr# -> State# s -> (# State# s, a #)
+   { @newUDC#@ allocates a new application of an
+     unlifted data constructor (identified by its info table). }
+   with
+   effect = ReadWriteEffect
+   out_of_line = True
+
 primop  NewBCOOp "newBCO#" GenPrimOp
    ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO #)
    { @'newBCO#' instrs lits ptrs arity bitmap@ creates a new bytecode object. The

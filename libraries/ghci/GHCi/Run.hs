@@ -25,6 +25,7 @@ import GHCi.FFI
 import GHCi.Message
 import GHCi.ObjLink
 import GHCi.RemoteTypes
+import GHCi.ResolvedBCO
 import GHCi.TH
 import GHCi.BreakArray
 import GHCi.StaticPtrTable
@@ -75,10 +76,11 @@ run m = case m of
   UnloadObj str -> unloadObj str
   AddLibrarySearchPath str -> toRemotePtr <$> addLibrarySearchPath str
   RemoveLibrarySearchPath ptr -> removeLibrarySearchPath (fromRemotePtr ptr)
-  MkConInfoTable (ConInfoTable tc ptrs nptrs tag ptrtag desc) ->
-    toRemotePtr <$> mkConInfoTable tc ptrs nptrs tag ptrtag desc
+  MkConInfoTable infoTable -> convertInfoTable infoTable
   ResolveObjs -> resolveObjs
   FindSystemLibrary str -> findSystemLibrary str
+  CreateUDCs dcas ->
+    traverse (convertInfoTable . unliftedDataConInfo) dcas >>= createUDCs
   CreateBCOs bcos -> createBCOs bcos
   LookupClosure str -> lookupClosure str
 #endif
@@ -432,6 +434,10 @@ mkString0 bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
   copyBytes ptr cstr len
   pokeElemOff (ptr :: Ptr CChar) len 0
   return (castRemotePtr (toRemotePtr ptr))
+
+convertInfoTable :: ConInfoTable -> IO (RemotePtr Heap.StgInfoTable)
+convertInfoTable (ConInfoTable tc ptrs nptrs tag ptrtag desc) =
+    toRemotePtr <$> mkConInfoTable tc ptrs nptrs tag ptrtag desc
 
 mkCostCentres :: String -> [(String,String)] -> IO [RemotePtr CostCentre]
 #if defined(PROFILING)

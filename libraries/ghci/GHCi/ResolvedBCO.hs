@@ -4,17 +4,21 @@
 module GHCi.ResolvedBCO
   ( ResolvedBCO(..)
   , ResolvedBCOPtr(..)
+  , ResolvedUDC(..)
   , isLittleEndian
   , BCOByteArray(..)
   , mkBCOByteArray
+  , ConInfoTable(..)
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
+import Control.DeepSeq
 import GHC.Data.SizedSeq
-import GHCi.RemoteTypes
 import GHCi.BreakArray
+import GHCi.RemoteTypes
 
 import Data.Binary
+import Data.ByteString (ByteString)
 import GHC.Generics
 
 import Foreign.Storable
@@ -31,8 +35,24 @@ isLittleEndian = False
 isLittleEndian = True
 #endif
 
+-- | Used to dynamically create a data constructor's info table at
+-- run-time.
+data ConInfoTable = ConInfoTable {
+  conItblTablesNextToCode :: !Bool, -- ^ TABLES_NEXT_TO_CODE
+  conItblPtrs :: !Int,              -- ^ ptr words
+  conItblNPtrs :: !Int,             -- ^ non-ptr words
+  conItblConTag :: !Int,            -- ^ constr tag
+  conItblPtrTag :: !Int,            -- ^ pointer tag
+  conItblDescr :: !ByteString       -- ^ constructor desccription
+}
+  deriving (Generic, Show)
+
+instance Binary ConInfoTable
+
+instance NFData ConInfoTable
+
 -- -----------------------------------------------------------------------------
--- ResolvedBCO
+-- ResolvedUDC
 
 -- | A 'ResolvedBCO' is one in which all the 'Name' references have been
 -- resolved to actual addresses or 'RemoteHValues'.
@@ -48,6 +68,17 @@ data ResolvedBCO
         resolvedBCOPtrs   :: (SizedSeq ResolvedBCOPtr)  -- ^ ptrs
    }
    deriving (Generic, Show)
+
+-- | A 'ResolvedUDC' is one in which all arguments have been applied to
+-- a (potentially unlifted) data constructor.
+newtype ResolvedUDC
+   = ResolvedUDC {
+        unliftedDataConInfo :: ConInfoTable -- RemotePtr StgInfoTable
+   }
+   deriving (Binary, Generic, NFData, Show)
+
+-- -----------------------------------------------------------------------------
+-- ResolvedBCO
 
 -- | Wrapper for a 'ByteArray#'.
 -- The phantom type tells what elements are stored in the 'ByteArray#'.
@@ -97,6 +128,8 @@ instance (Binary a, Storable a, IArray UArray a) => Binary (BCOByteArray a) wher
 data ResolvedBCOPtr
   = ResolvedBCORef {-# UNPACK #-} !Int
       -- ^ reference to the Nth BCO in the current set
+  | ResolvedBCORefUnlifted {-# UNPACK #-} !Int
+      -- ^ reference to the Nth BCO in the current set whose value is unlifted and fully evaluated
   | ResolvedBCOPtr {-# UNPACK #-} !(RemoteRef HValue)
       -- ^ reference to a previously created BCO
   | ResolvedBCOStaticPtr {-# UNPACK #-} !(RemotePtr ())
