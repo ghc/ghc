@@ -31,8 +31,8 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Make ( FloatBind(..), mkWildValBinder )
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
-import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
-import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
+import GHC.Core.Coercion.Opt ( optCoercion, optCastCoercion, OptCoercionOpts (..) )
+import GHC.Core.Type hiding ( extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
@@ -213,11 +213,11 @@ simpleOptPgm opts this_mod binds rules =
 ----------------------
 type SimpleClo = (SimpleOptEnv, InExpr)
 
-data SimpleContItem = ApplyToArg SimpleClo | CastIt OutCoercion
+data SimpleContItem = ApplyToArg SimpleClo | CastIt OutType OutCastCoercion
 
 instance Outputable SimpleContItem where
   ppr (ApplyToArg (_, arg)) = text "ARG" <+> ppr arg
-  ppr (CastIt co) = text "CAST" <+> ppr co
+  ppr (CastIt _ co) = text "CAST" <+> ppr co
 
 data SimpleOptEnv
   = SOE { soe_opts :: {-# UNPACK #-} !SimpleOpts
@@ -393,7 +393,7 @@ simple_app env e0@(Lam {}) as0@(_:_)
       where (env', b') = subst_opt_bndr env b
 
     -- See Note [Eliminate casts in function position]
-    do_beta env e@(Lam b _) as@(CastIt out_co:rest)
+    do_beta env e@(Lam b _) as@(CastIt ty out_co:rest)
       | isNonCoVarId b
       -- Optimise the inner lambda to make it an 'OutExpr', which makes it
       -- possible to call 'pushCoercionIntoLambda' with the 'OutCoercion' 'co'.
@@ -402,14 +402,14 @@ simple_app env e0@(Lam {}) as0@(_:_)
       -- we need to do this to avoid mixing 'InExpr' and 'OutExpr', or two
       -- 'InExpr' with different environments (getting this wrong caused #26588 & #26589.)
       , Lam out_b out_body <- simple_app env e []
-      , Just (b', body') <- pushCoercionIntoLambda (soeInScope env) out_b out_body out_co
+      , Just (b', body') <- pushCoercionIntoLambda (soeInScope env) out_b out_body ty out_co
       = do_beta (soeZapSubst env) (Lam b' body') rest
         -- soeZapSubst: we've already optimised everything (the lambda and 'rest') by now.
       | otherwise
       = rebuild_app env (simple_opt_expr env e) as
 
     do_beta env (Cast e co) as =
-      do_beta env e (add_cast env (castCoToCo (exprType e) co) as)  -- TODO eliminate castCoToCo?
+      do_beta env e (add_cast env (exprType e) co as)
 
     do_beta env body as
       = simple_app env body as
@@ -457,21 +457,21 @@ simple_app env (Let bind body) args
           expr' = Let bind' (simple_opt_expr env' body)
 
 simple_app env (Cast e co) as
-  = simple_app env e (add_cast env (castCoToCo (exprType e) co) as) -- TODO eliminate castCoToCo?
+  = simple_app env e (add_cast env (exprType e) co as)
 
 simple_app env e as
   = rebuild_app env (simple_opt_expr env e) as
 
-add_cast :: SimpleOptEnv -> InCoercion -> [SimpleContItem] -> [SimpleContItem]
-add_cast env co1 as
-  | isReflCo co1'
+add_cast :: SimpleOptEnv -> InType -> InCastCoercion -> [SimpleContItem] -> [SimpleContItem]
+add_cast env tyL co1 as
+  | isReflCastCo co1'
   = as
   | otherwise
   = case as of
-      CastIt co2:rest -> CastIt (co1' `mkTransCo` co2):rest
-      _               -> CastIt co1':as
+      CastIt _ co2:rest -> CastIt ty (co1' `mkTransCastCo` co2):rest
+      _                 -> CastIt ty co1':as
   where
-    co1' = optCoercion (so_co_opts (soe_opts env)) (soe_subst env) co1
+    (ty, co1') = optCastCoercion (so_co_opts (soe_opts env)) (soe_subst env) tyL co1
 
 rebuild_app :: HasDebugCallStack
             => SimpleOptEnv -> OutExpr -> [SimpleContItem] -> OutExpr
@@ -480,7 +480,7 @@ rebuild_app env fun args = foldl mk_app fun args
     in_scope = soeInScope env
     mk_app out_fun = \case
       ApplyToArg arg -> App out_fun (simple_opt_clo in_scope arg)
-      CastIt co      -> mk_cast out_fun (CCoercion co)
+      CastIt _ co    -> mk_cast out_fun co
 
 {- Note [Desugaring unlifted newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1370,7 +1370,7 @@ data-con wrappers, and that cure would be worse than the disease.
 This Note exists solely to document the problem.
 -}
 
-data ConCont = CC [CoreExpr] MCoercion
+data ConCont = CC [CoreExpr] CastCoercion
                   -- Substitution already applied
 
 -- | Returns @Just ([b1..bp], dc, [t1..tk], [x1..xn])@ if the argument
@@ -1392,7 +1392,7 @@ exprIsConApp_maybe :: HasDebugCallStack
                    => InScopeEnv -> CoreExpr
                    -> Maybe (InScopeSet, [FloatBind], DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
-  = go (Left in_scope) [] expr (CC [] MRefl)
+  = go (Left in_scope) [] expr (CC [] ReflCastCo)
   where
     go :: Either InScopeSet Subst
              -- Left in-scope  means "empty substitution"
@@ -1405,10 +1405,10 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     go subst floats (Tick t expr) cont
        | not (tickishIsCode t) = go subst floats expr cont
 
-    go subst floats (Cast expr co1) (CC args m_co2)
-       | Just (args', m_co1') <- pushCoArgs (subst_co subst (castCoToCo (exprType expr) co1)) args
+    go subst floats (Cast expr co1) (CC args m_co2) -- TODO: is the subst_ty below needed?
+       | Just (args', _, m_co1') <- pushCoArgs (subst_ty subst (exprType expr)) (subst_cast_co subst co1) args
             -- See Note [Push coercions in exprIsConApp_maybe]
-       = go subst floats expr (CC args' (m_co1' `mkTransMCo` m_co2))
+       = go subst floats expr (CC args' (m_co1' `mkTransCastCo` m_co2))
 
     go subst floats (App fun arg) (CC args mco)
        | let arg_type = exprType arg
@@ -1542,8 +1542,11 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     subst_extend_in_scope (Left in_scope) v = Left (in_scope `extendInScopeSet` v)
     subst_extend_in_scope (Right s) v = Right (s `extendSubstInScope` v)
 
-    subst_co (Left {}) co = co
-    subst_co (Right s) co = GHC.Core.Subst.substCo s co
+    subst_cast_co (Left {}) co = co
+    subst_cast_co (Right s) co = substCastCo s co
+
+    subst_ty (Left {}) ty = ty
+    subst_ty (Right s) ty = substTy s ty
 
     subst_expr (Left {}) e = e
     subst_expr (Right s) e = substExpr s e
@@ -1595,7 +1598,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
                  (right, _, _) -> pprPanic "case_bind did not preserve Left" (ppr in_scope $$ ppr arg $$ ppr right)
 
 -- See Note [exprIsConApp_maybe on literal strings]
-dealWithStringLiteral :: Var -> BS.ByteString -> MCoercion
+dealWithStringLiteral :: Var -> BS.ByteString -> CastCoercion
                       -> Maybe (DataCon, [Type], [CoreExpr])
 
 -- This is not possible with user-supplied empty literals, GHC.Core.Make.mkStringExprFS
@@ -1696,14 +1699,13 @@ exprIsLambda_maybe ise (Tick t e)
     = Just (x, e, t:ts)
 
 -- Also possible: A casted lambda. Push the coercion inside
-exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e cco)
+exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e co)
     | Just (x, e,ts) <- exprIsLambda_maybe ise casted_e
     -- Only do value lambdas.
     -- this implies that x is not in scope in gamma (makes this code simpler)
     , not (isTyVar x) && not (isCoVar x)
-    , let co = castCoToCo (exprType casted_e) cco
-    , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
-    , Just (x',e') <- pushCoercionIntoLambda in_scope_set x e co
+    , assert (not $ x `elemVarSet` tyCoVarsOfCastCo co) True
+    , Just (x',e') <- pushCoercionIntoLambda in_scope_set x e (exprType casted_e) co
     , let res = Just (x',e',ts)
     = --pprTrace "exprIsLambda_maybe:Cast" (vcat [ppr casted_e,ppr co,ppr res)])
       res

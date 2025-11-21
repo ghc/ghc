@@ -36,11 +36,11 @@ import GHC.Prelude hiding ( head, init, last, tail )
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
-                          mkCastMCo, mkTicks )
+                          mkCastCo, mkTicks )
 import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
 import GHC.Core.Type
-import GHC.Core.TyCo.FVs    ( tyCoVarsOfMCo, coVarsOfCastCo )
+import GHC.Core.TyCo.FVs    ( coVarsOfCastCo )
 
 import GHC.Data.Maybe( orElse )
 import GHC.Data.Graph.Directed ( SCC(..), Node(..)
@@ -2934,7 +2934,7 @@ data OccEnv
            -- If  x :-> (y, co)  is in the env,
            -- then please replace x by (y |> mco)
            -- Invariant of course: idType x = exprType (y |> mco)
-           , occ_bs_env  :: !(IdEnv (OutId, MCoercion))
+           , occ_bs_env  :: !(IdEnv (OutId, CastCoercion))
               -- Domain is Global and Local Ids
               -- Range is just Local Ids
            , occ_bs_rng  :: !VarSet
@@ -3544,7 +3544,7 @@ addBndrSwap scrut case_bndr
       -- Do not add [x :-> x] to occ_bs_env, else lookupBndrSwap will loop
   = env { occ_bs_env = extendVarEnv swap_env scrut_var (case_bndr', mco)
         , occ_bs_rng = rng_vars `extendVarSet` case_bndr'
-                       `unionVarSet` tyCoVarsOfMCo mco }
+                       `unionVarSet` tyCoVarsOfCastCo mco }
 
   | otherwise
   = env
@@ -3555,7 +3555,7 @@ addBndrSwap scrut case_bndr
 -- | See bBinderSwaOk.
 data BinderSwapDecision
   = NoBinderSwap
-  | DoBinderSwap OutVar MCoercion
+  | DoBinderSwap OutVar CastCoercion
 
 scrutOkForBinderSwap :: OutExpr -> BinderSwapDecision
 -- If (scrutOkForBinderSwap e = DoBinderSwap v mco, then
@@ -3568,8 +3568,8 @@ scrutOkForBinderSwap :: OutExpr -> BinderSwapDecision
 scrutOkForBinderSwap e
   = case e of
       Tick _ e        -> scrutOkForBinderSwap e  -- Drop ticks
-      Var v           -> DoBinderSwap v MRefl
-      Cast (Var v) co -> DoBinderSwap v (MCo (mkSymCo (castCoToCo (idType v) co))) -- TODO: can we do better?
+      Var v           -> DoBinderSwap v ReflCastCo
+      Cast (Var v) co -> DoBinderSwap v (mkSymCastCo (idType v) co)
                          -- Cast: see Note [Case of cast]
       _               -> NoBinderSwap
 
@@ -3584,7 +3584,7 @@ lookupBndrSwap env@(OccEnv { occ_bs_env = bs_env })  bndr
     -- Why do we iterate here?
     -- See (BS2) in Note [The binder-swap substitution]
     case lookupBndrSwap env bndr1 of
-      (fun, fun_id) -> (mkCastMCo fun mco, fun_id) }
+      (fun, fun_id) -> (mkCastCo fun mco, fun_id) }
 
 {- Historical note [Proxy let-bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

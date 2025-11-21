@@ -52,13 +52,14 @@ import GHC.Core.FVs       ( exprFreeVars, bindFreeVars
                           , rulesFreeVarsDSet, orphNamesOfExprs )
 import GHC.Core.Utils     ( exprType, mkTick, mkTicks
                           , stripTicksTopT, stripTicksTopE
-                          , isJoinBind, mkCastMCo )
+                          , isJoinBind, mkCastCo )
 import GHC.Core.Ppr       ( pprRules )
 import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Core.Type as Type
    ( Type, extendTvSubst, extendCvSubst
    , substTy, getTyVar_maybe )
 import GHC.Core.TyCo.Ppr( pprParendType )
+import GHC.Core.TyCo.FVs ( tyCoFVsOfCastCoercion )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
 import GHC.Core.Map.Expr ( eqCoreExpr )
@@ -815,7 +816,7 @@ match_exprs :: HasDebugCallStack
 match_exprs _ subst [] _
   = Just subst
 match_exprs renv subst (e1:es1) (e2:es2)
-  = do { subst' <- match renv subst e1 e2 MRefl
+  = do { subst' <- match renv subst e1 e2 ReflCastCo
        ; match_exprs renv subst' es1 es2 }
 match_exprs _ _ _ _ = Nothing
 
@@ -1065,7 +1066,7 @@ match :: HasDebugCallStack
       -> RuleSubst              -- Substitution applies to template only
       -> CoreExpr               -- Template
       -> CoreExpr               -- Target
-      -> MCoercion
+      -> CastCoercion
       -> Maybe RuleSubst
 
 -- Postcondition (TypeInv): if matching succeeds, then
@@ -1102,8 +1103,8 @@ match renv subst (Type ty1) (Type ty2) _mco
 
 ------------------------ Coercions ---------------------
 -- See Note [Coercion arguments] for why this isn't really right
-match renv subst (Coercion co1) (Coercion co2) MRefl
-  = match_co renv subst co1 co2
+match renv subst (Coercion co1) (Coercion co2) ReflCastCo
+  = match_co renv subst (CCoercion co1) (CCoercion co2) -- TODO should probably have match_cast_co and match_co separately?
   -- The MCo case corresponds to matching  co ~ (co2 |> co3)
   -- and I have no idea what to do there -- or even if it can occur
   -- Failing seems the simplest thing to do; it's certainly safe.
@@ -1114,23 +1115,23 @@ match renv subst (Coercion co1) (Coercion co2) MRefl
 --     Note [Cancel reflexive casts]
 
 match renv subst e1 (Cast e2 co2) mco
-  = match renv subst e1 e2 (checkReflexiveMCo (mkTransMCoR (castCoToCo (exprType e2) co2) mco))
+  = match renv subst e1 e2 (checkReflexiveCastCo (exprType e2) (mkTransCastCo co2 mco))
     -- checkReflexiveMCo: cancel casts if possible
     -- This is important: see Note [Cancel reflexive casts]
 
 match renv subst (Cast e1 co1) e2 mco
-  = matchTemplateCast renv subst e1 (castCoToCo (exprType e1) co1) e2 mco
+  = matchTemplateCast renv subst e1 co1 e2 mco
 
 ------------------------ Literals ---------------------
 match _ subst (Lit lit1) (Lit lit2) mco
   | lit1 == lit2
-  = assertPpr (isReflMCo mco) (ppr mco) $
+  = assertPpr (isReflCastCo mco) (ppr mco) $
     Just subst
 
 ------------------------ Variables ---------------------
 -- The Var case follows closely what happens in GHC.Core.Unify.match
 match renv subst (Var v1) e2 mco
-  = match_var renv subst v1 (mkCastMCo e2 mco)
+  = match_var renv subst v1 (mkCastCo e2 mco)
 
 match renv subst e1 (Var v2) mco  -- Note [Expanding variables]
   | not (inRnEnvR rn_env v2)      -- Note [Do not expand locally-bound variables]
@@ -1148,7 +1149,7 @@ match renv subst e1 (Var v2) mco  -- Note [Expanding variables]
 -- See Note [Matching higher order patterns]
 match renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env })
       subst  e1@App{} e2
-      MRefl               -- Like the App case we insist on Refl here
+      ReflCastCo          -- Like the App case we insist on Refl here
                           -- See Note [Casts in the target]
   | (Var f, args) <- collectArgs e1
   , let f' = rnOccL rn_env f   -- See similar rnOccL in match_var
@@ -1308,9 +1309,9 @@ Two wrinkles:
 --     (e1 e2) ~ (d1 d2) |> co
 -- See Note [Cancel reflexive casts]: in the Cast equations for 'match'
 -- we aggressively ensure that if MCo is reflective, it really is MRefl.
-match renv subst (App f1 a1) (App f2 a2) MRefl
-  = do  { subst' <- match renv subst f1 f2 MRefl
-        ; match renv subst' a1 a2 MRefl }
+match renv subst (App f1 a1) (App f2 a2) ReflCastCo
+  = do  { subst' <- match renv subst f1 f2 ReflCastCo
+        ; match renv subst' a1 a2 ReflCastCo }
 
 ------------------------ Float lets ---------------------
 match renv subst e1 (Let bind e2) mco
@@ -1336,7 +1337,7 @@ match renv subst e1 (Let bind e2) mco
 
 ------------------------  Lambdas ---------------------
 match renv subst (Lam x1 e1) e2 mco
-  | let casted_e2 = mkCastMCo e2 mco
+  | let casted_e2 = mkCastCo e2 mco
         in_scope = extendInScopeSetSet (rnInScopeSet (rv_lcl renv))
                                        (exprFreeVars casted_e2)
         in_scope_env = ISE in_scope (rv_unf renv)
@@ -1349,7 +1350,7 @@ match renv subst (Lam x1 e1) e2 mco
     -- See Note [Lambdas in the template]
   = let renv'  = rnMatchBndr2 renv x1 x2
         subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
-    in  match renv' subst' e1 e2' MRefl
+    in  match renv' subst' e1 e2' ReflCastCo
 
 match renv subst e1 e2@(Lam {}) mco
   | Just (renv', e2') <- eta_reduce renv e2  -- See Note [Eta reduction in the target]
@@ -1400,7 +1401,7 @@ match renv (tv_subst, id_subst, binds) e1
 
 match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2) mco
   = do  { subst1 <- match_ty renv subst ty1 ty2
-        ; subst2 <- match renv subst1 e1 e2 MRefl
+        ; subst2 <- match renv subst1 e1 e2 ReflCastCo
         ; let renv' = rnMatchBndr2 renv x1 x2
         ; match_alts renv' subst2 alts1 alts2 mco   -- Alts are both sorted
         }
@@ -1503,29 +1504,29 @@ Hence
 -------------
 matchTemplateCast
     :: RuleMatchEnv -> RuleSubst
-    -> CoreExpr -> Coercion
-    -> CoreExpr -> MCoercion
+    -> CoreExpr -> CastCoercion
+    -> CoreExpr -> CastCoercion
     -> Maybe RuleSubst
 matchTemplateCast renv subst e1 co1 e2 mco
   | isEmptyVarSet $ fvVarSet $
     filterFV (`elemVarSet` rv_tmpls renv) $    -- Check that the coercion does not
-    tyCoFVsOfCo substed_co                     -- mention any of the template variables
+    tyCoFVsOfCastCoercion substed_co                     -- mention any of the template variables
   = -- This is the good path
     -- See Note [Casts in the template] wrinkle (CT0)
-    match renv subst e1 e2 (checkReflexiveMCo (mkTransMCoL mco (mkSymCo substed_co)))
+    match renv subst e1 e2 (checkReflexiveCastCo substed_ty (mkTransCastCo mco (mkSymCastCo substed_ty substed_co)))
+    -- AMG TODO: should be able to make checkReflexiveCastCo cheaper here?
 
   | otherwise
   = -- This is the Deeply Suspicious Path
     -- See Note [Casts in the template]
-    do { let co2 = case mco of
-                     MRefl   -> mkRepReflCo (exprType e2)
-                     MCo co2 -> co2
+    do { let co2 = mco
        ; subst1 <- match_co renv subst co1 co2
          -- If match_co succeeds, then (exprType e1) = (exprType e2)
-         -- Hence the MRefl in the next line
-       ; match renv subst1 e1 e2 MRefl }
+         -- Hence the ReflCastCo in the next line
+       ; match renv subst1 e1 e2 ReflCastCo }
   where
-    substed_co = substCo current_subst co1
+    substed_ty = substTy current_subst (exprType e1)
+    substed_co = substCastCo current_subst co1
 
     current_subst :: Subst
     current_subst = mkTCvSubst (rnInScopeSet (rv_lcl renv))
@@ -1538,8 +1539,8 @@ matchTemplateCast renv subst e1 co1 e2 mco
 
 match_co :: RuleMatchEnv
          -> RuleSubst
-         -> Coercion
-         -> Coercion
+         -> CastCoercion
+         -> CastCoercion
          -> Maybe RuleSubst
 -- We only match if the template is a coercion variable or Refl:
 --   see Note [Casts in the template]
@@ -1548,7 +1549,7 @@ match_co :: RuleMatchEnv
 -- But if match_co succeeds, it /is/ guaranteed that
 --     coercionKind (subst template) = coercionKind target
 
-match_co renv subst co1 co2
+match_co renv subst (CCoercion co1) (CCoercion co2)
   | Just cv <- getCoVar_maybe co1
   = match_var renv subst cv (Coercion co2)
 
@@ -1563,6 +1564,7 @@ match_co renv subst co1 co2
 
   | otherwise
   = Nothing
+match_co _renv _subst _ _ = Nothing -- TODO: support non-CCoercions in rule matcher
 
 -------------
 rnMatchBndr2 :: RuleMatchEnv -> Var -> Var -> RuleMatchEnv
@@ -1575,7 +1577,7 @@ rnMatchBndr2 renv x1 x2
 match_alts :: RuleMatchEnv
            -> RuleSubst
            -> [CoreAlt]                 -- Template
-           -> [CoreAlt] -> MCoercion    -- Target
+           -> [CoreAlt] -> CastCoercion    -- Target
            -> Maybe RuleSubst
 match_alts _ subst [] [] _
   = return subst
@@ -2018,7 +2020,7 @@ ruleAppCheck_help env fn args rules
           mismatches   = [i | (rule_arg, (arg,i)) <- rule_args `zip` i_args,
                               not (isJust (match_fn rule_arg arg))]
 
-          match_fn rule_arg arg = match renv emptyRuleSubst rule_arg arg MRefl
+          match_fn rule_arg arg = match renv emptyRuleSubst rule_arg arg ReflCastCo
                 where
                   renv = RV { rv_lcl   = mkRnEnv2 in_scope
                             , rv_tmpls = mkVarSet rule_bndrs

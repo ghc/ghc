@@ -1120,7 +1120,7 @@ extendCaseBndrs env scrut case_bndr con alt_bndrs
  where
    live_case_bndr = not (isDeadBinder case_bndr)
    env1 | DoBinderSwap v mco <- scrutOkForBinderSwap scrut
-        , isReflMCo mco  = extendValEnv env v cval
+        , isReflCastCo mco = extendValEnv env v cval
         | otherwise      = env  -- See Note [Add scrutinee to ValueEnv too]
    env2 | live_case_bndr = extendValEnv env1 case_bndr cval
         | otherwise      = env1

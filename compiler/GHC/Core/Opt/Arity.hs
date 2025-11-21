@@ -42,7 +42,7 @@ module GHC.Core.Opt.Arity
    , etaExpandToJoinPoint, etaExpandToJoinPointRule
 
    -- ** Coercions and casts
-   , pushCoArg, pushCoArgs, pushCoValArg, pushCoTyArg
+   , pushCoArg, pushCoArgs, pushCastCoValArg, pushCastCoTyArg
    , pushCoercionIntoLambda, pushCoDataCon, collectBindersPushingCo
    )
 where
@@ -56,6 +56,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon     ( TyCon, tyConArity, isInjectiveTyCon )
 import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
 import GHC.Core.Predicate ( isDictTy, isEvId, isCallStackPredTy, isCallStackTy )
+import GHC.Core.Make
 import GHC.Core.Multiplicity
 
 -- We have two sorts of substitution:
@@ -2195,7 +2196,7 @@ Now, when we push that eta_co inward in etaInfoApp:
 -}
 
 --------------
-data EtaInfo = EI [Var] MCoercionR
+data EtaInfo = EI [Var] CastCoercion
      -- See Note [The EtaInfo mechanism]
 
 instance Outputable EtaInfo where
@@ -2221,11 +2222,10 @@ etaInfoApp in_scope expr eis
     go subst (Tick t e) eis
       = Tick (substTickish subst t) (go subst e eis)
 
-    go subst (Cast e cco) (EI bs mco)
+    go subst (Cast e co) (EI bs mco)
       = go subst e (EI bs mco')
       where
-        co = castCoToCo (exprType e) cco -- TODO: can we avoid this?
-        mco' = checkReflexiveMCo (Core.substCo subst co `mkTransMCoR` mco)
+        mco' = checkReflexiveCastCo (exprType (Core.substExpr subst e)) (Core.substCastCo subst co `mkTransCastCo` mco)
                -- See Note [Check for reflexive casts in eta expansion]
 
     go subst (Case e b ty alts) eis
@@ -2247,13 +2247,13 @@ etaInfoApp in_scope expr eis
     -- Beta-reduction if possible, pushing any intervening casts past
     -- the argument. See Note [The EtaInfo mechanism]
     go subst (Lam v e) (EI (b:bs) mco)
-      | Just (arg,mco') <- pushMCoArg mco (varToCoreExpr b)
+      | Just (arg,_, mco') <- pushCoArg (exprType (Lam v e)) mco (varToCoreExpr b)
       = go (Core.extendSubst subst v arg) e (EI bs mco')
 
     -- Stop pushing down; just wrap the expression up
     -- See Note [Check for reflexive casts in eta expansion]
     go subst e (EI bs mco) = Core.substExprSC subst e
-                             `mkCastMCo` checkReflexiveMCo mco
+                             `mkCastCo` checkReflexiveCastCo (exprType e) mco
                              `mkVarApps` bs
 
 --------------
@@ -2263,14 +2263,12 @@ etaInfoAppTy :: Type -> EtaInfo -> Type
 etaInfoAppTy ty (EI bs mco)
   = applyTypeToArgs ty1 (map varToCoreExpr bs)
   where
-    ty1 = case mco of
-             MRefl  -> ty
-             MCo co -> coercionRKind co
+    ty1 = castCoercionRKind ty mco
 
 --------------
 etaInfoAbs :: EtaInfo -> CoreExpr -> CoreExpr
 -- See Note [The EtaInfo mechanism]
-etaInfoAbs (EI bs mco) expr = (mkLams bs expr) `mkCastMCo` mkSymMCo mco
+etaInfoAbs (EI bs mco) expr = (mkLams bs expr) `mkCastCo` mkSymCastCo (error "AMG TODO: etaInfoAbs") mco
 
 --------------
 -- | @mkEtaWW n _ fvs ty@ will compute the 'EtaInfo' necessary for eta-expanding
@@ -2307,7 +2305,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
 
     go _ [] subst _
        ----------- Done!  No more expansion needed
-       = (substInScopeSet subst, EI [] MRefl)
+       = (substInScopeSet subst, EI [] ReflCastCo)
 
     go n oss@(one_shot:oss1) subst ty
        ----------- Forall types  (forall a. ty)
@@ -2348,27 +2346,28 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
              --  we'd have had to zap it for the recursive call)
        , (in_scope, EI bs mco) <- go n oss subst ty'
          -- mco :: subst(ty') ~ b1_ty -> ... -> bn_ty -> tr
-       = (in_scope, EI bs (mkTransMCoR co' mco))
+       = (in_scope, EI bs (mkTransCoCastCo co' mco))
 
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function, or a binder
                          -- does not have a fixed runtime representation
        = warnPprTrace True "mkEtaWW" ((ppr orig_oss <+> ppr orig_ty) $$ ppr_orig_expr)
-         (substInScopeSet subst, EI [] MRefl)
+         (substInScopeSet subst, EI [] ReflCastCo)
         -- This *can* legitimately happen:
         -- e.g.  coerce Int (\x. x) Essentially the programmer is
         -- playing fast and loose with types (Happy does this a lot).
         -- So we simply decline to eta-expand.  Otherwise we'd end up
         -- with an explicit lambda having a non-function type
 
-mkEtaForAllMCo :: ForAllTyBinder -> Type -> MCoercion -> MCoercion
+mkEtaForAllMCo :: ForAllTyBinder -> Type -> CastCoercion -> CastCoercion
 mkEtaForAllMCo (Bndr tcv vis) ty mco
   = case mco of
-      MRefl | vis == coreTyLamForAllTyFlag -> MRefl
-            | otherwise                    -> mk_fco (mkRepReflCo ty)
-      MCo co                               -> mk_fco co
+      ReflCastCo | vis == coreTyLamForAllTyFlag -> ReflCastCo
+                 | otherwise                    -> mk_fco (mkRepReflCo ty)
+      CCoercion co                              -> mk_fco co
+      ZCoercion tyR cos                         -> ZCoercion (mkTyCoForAllTy tcv coreTyLamForAllTyFlag tyR) cos
   where
-    mk_fco co = MCo (mkForAllCo tcv vis coreTyLamForAllTyFlag MRefl co)
+    mk_fco co = CCoercion (mkForAllCo tcv vis coreTyLamForAllTyFlag MRefl co)
     -- coreTyLamForAllTyFlag: See Note [The EtaInfo mechanism], particularly
     -- the (EtaInfo Invariant).  (sym co) wraps a lambda that always has
     -- a ForAllTyFlag of coreTyLamForAllTyFlag; see Note [Required foralls in Core]
@@ -2701,13 +2700,13 @@ same fix.
 tryEtaReduce :: UnVarSet -> [Var] -> CoreExpr -> SubDemand -> Maybe CoreExpr
 -- Return an expression equal to (\bndrs. body)
 tryEtaReduce rec_ids bndrs body eval_sd
-  = go (reverse bndrs) body (mkRepReflCo (exprType body))
+  = go (reverse bndrs) body ReflCastCo
   where
     incoming_arity = count isId bndrs -- See Note [Eta reduction makes sense], point (2)
 
     go :: [Var]            -- Binders, innermost first, types [a3,a2,a1]
        -> CoreExpr         -- Of type tr
-       -> Coercion         -- Of type tr ~ ts
+       -> CastCoercion     -- Of type tr ~ ts
        -> Maybe CoreExpr   -- Of type a1 -> a2 -> a3 -> ts
     -- See Note [Eta reduction with casted arguments]
     -- for why we have an accumulating coercion
@@ -2717,7 +2716,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
 
     -- See Note [Eta reduction with casted function]
     go bs (Cast e co1) co2
-      = go bs e (castCoToCo (exprType e) co1 `mkTransCo` co2)
+      = go bs e (co1 `mkTransCastCo` co2)
 
     go bs (Tick t e) co
       | tickishFloatable t
@@ -2725,7 +2724,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
       -- Float app ticks: \x -> Tick t (e x) ==> Tick t e
 
     go (b : bs) (App fun arg) co
-      | Just (co', ticks) <- ok_arg b arg co (exprType fun)
+      | Just (co', ticks) <- ok_arg b arg co (exprType fun) (exprType (App fun arg))
       = fmap (flip (foldr mkTick) ticks) $ go bs fun co'
             -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
 
@@ -2740,7 +2739,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
       , remaining_bndrs `ltLength` bndrs
             -- Only reply Just if /something/ has happened
       , ok_fun fun
-      , let used_vars     = exprFreeVars fun `unionVarSet` tyCoVarsOfCo co
+      , let used_vars     = exprFreeVars fun `unionVarSet` tyCoVarsOfCastCo co
             reduced_bndrs = mkVarSet (dropList remaining_bndrs bndrs)
             -- reduced_bndrs are the ones we are eta-reducing away
       , used_vars `disjointVarSet` reduced_bndrs
@@ -2749,7 +2748,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
           -- See Note [Eta reduction makes sense], intro and point (1)
           -- NB: don't compute used_vars from exprFreeVars (mkCast fun co)
           --     because the latter may be ill formed if the guard fails (#21801)
-      = Just (mkLams (reverse remaining_bndrs) (mkCast fun co))
+      = Just (mkLams (reverse remaining_bndrs) (mkCastCo fun co))
 
     go _remaining_bndrs _fun  _  = -- pprTrace "tER fail" (ppr _fun $$ ppr _remaining_bndrs) $
                                    Nothing
@@ -2797,18 +2796,19 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ---------------
     ok_arg :: Var              -- Of type bndr_t
            -> CoreExpr         -- Of type arg_t
-           -> Coercion         -- Of kind (t1~t2)
+           -> CastCoercion     -- Of kind (t1~t2)
            -> Type             -- Type (arg_t -> t1) of the function
                                --      to which the argument is supplied
-           -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
+           -> Type             -- Type t1 of the result (AMG TODO: avoid needing to pass this?)
+           -> Maybe (CastCoercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
                                --   (and similarly for tyvars, coercion args)
                     , [CoreTickish])
     -- See Note [Eta reduction with casted arguments]
-    ok_arg bndr (Type arg_ty) co fun_ty
+    ok_arg bndr (Type arg_ty) co fun_ty res_ty
        | Just tv <- getTyVar_maybe arg_ty
        , bndr == tv  = case splitForAllForAllTyBinder_maybe fun_ty of
            Just (Bndr _ vis, _) -> Just (fco, [])
-             where !fco = mkForAllCo tv vis coreTyLamForAllTyFlag MRefl co
+             where !fco = mkForAllCastCo Representational tv vis coreTyLamForAllTyFlag res_ty co
                    -- The lambda we are eta-reducing always has visibility
                    -- 'coreTyLamForAllTyFlag' which may or may not match
                    -- the visibility on the inner function (#24014)
@@ -2816,24 +2816,24 @@ tryEtaReduce rec_ids bndrs body eval_sd
                                (text "fun:" <+> ppr bndr
                                 $$ text "arg:" <+> ppr arg_ty
                                 $$ text "fun_ty:" <+> ppr fun_ty)
-    ok_arg bndr (Var v) co fun_ty
+    ok_arg bndr (Var v) co fun_ty _
        | bndr == v
        , let mult = idMult bndr
        , Just (_af, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
-       = Just (mkFunResCo Representational bndr co, [])
-    ok_arg bndr (Cast e co_arg) co fun_ty
+       = Just (mkFunResCastCo Representational bndr co, [])
+    ok_arg bndr (Cast e co_arg) co fun_ty _
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (_, fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , Just (_, fun_mult, _, res_ty) <- splitFunTy_maybe fun_ty
        , bndr == v
        , fun_mult `eqType` idMult bndr
-       = Just (mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCo (castCoToCo (exprType e) co_arg)) co, ticks)
+       = Just (mkFunCastCoNoFTF Representational fun_mult (castCoercionRKind (exprType e) co_arg) (mkSymCastCo (exprType e) co_arg) res_ty co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
-    ok_arg bndr (Tick t arg) co fun_ty
-       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty
+    ok_arg bndr (Tick t arg) co fun_ty res_ty
+       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty res_ty
        = Just (co', t:ticks)
-    ok_arg _ _ _ _ = Nothing
+    ok_arg _ _ _ _ _ = Nothing
 
 -- | Can we eta-reduce the given function
 -- See Note [Eta reduction soundness], criteria (B), (J), and (W).
@@ -2873,43 +2873,47 @@ Here we implement the "push rules" from FC papers:
   by pushing the coercion into the arguments
 -}
 
-pushCoArgs :: CoercionR -> [CoreArg] -> Maybe ([CoreArg], MCoercion)
-pushCoArgs co []         = return ([], MCo co)
-pushCoArgs co (arg:args) = do { (arg',  m_co1) <- pushCoArg  co  arg
-                              ; case m_co1 of
-                                  MCo co1 -> do { (args', m_co2) <- pushCoArgs co1 args
-                                                 ; return (arg':args', m_co2) }
-                                  MRefl  -> return (arg':args, MRefl) }
+pushCoArgs :: Type -> CastCoercion -> [CoreArg] -> Maybe ([CoreArg], Type, CastCoercion)
+pushCoArgs fun_ty co []         = return ([], fun_ty, co)
+pushCoArgs fun_ty co (arg:args) = do
+    { (arg', ty, m_co1) <- pushCoArg fun_ty co arg
+    ; if isReflCastCo m_co1
+        then return (arg':args, ty, ReflCastCo)
+        else do { (args', ty', m_co2) <- pushCoArgs ty m_co1 args
+                ; return (arg':args', ty', m_co2) }
+    }
 
-pushMCoArg :: MCoercionR -> CoreArg -> Maybe (CoreArg, MCoercion)
-pushMCoArg MRefl    arg = Just (arg, MRefl)
-pushMCoArg (MCo co) arg = pushCoArg co arg
-
-pushCoArg :: CoercionR -> CoreArg -> Maybe (CoreArg, MCoercion)
+pushCoArg :: Type -> CastCoercion -> CoreArg -> Maybe (CoreArg, Type, CastCoercion)
 -- We have (fun |> co) arg, and we want to transform it to
 --         (fun arg) |> co
 -- This may fail, e.g. if (fun :: N) where N is a newtype
 -- C.f. simplCast in GHC.Core.Opt.Simplify
 -- 'co' is always Representational
-pushCoArg co arg
+pushCoArg fun_ty co arg
   | Type ty <- arg
-  = do { (ty', m_co') <- pushCoTyArg co ty
-       ; return (Type ty', m_co') }
+  = do { (ty', ty, m_co') <- pushCastCoTyArg fun_ty co ty
+       ; return (Type ty', ty, m_co') }
   | otherwise
-  = do { (arg_mco, m_co') <- pushCoValArg co
-       ; let arg_mco' = checkReflexiveMCo arg_mco
-             -- checkReflexiveMCo: see Note [Check for reflexive casts in eta expansion]
+  = do { (arg_ty, arg_mco, res_ty, m_co') <- pushCastCoValArg fun_ty co
+       ; let arg_mco' = checkReflexiveCastCo arg_ty arg_mco
+             -- checkReflexiveCastCo: see Note [Check for reflexive casts in eta expansion]
              -- The coercion is very often (arg_co -> res_co), but without
              -- the argument coercion actually being ReflCo
-       ; return (arg `mkCastMCo` arg_mco', m_co') }
+       ; return (arg `mkCastCo` arg_mco', res_ty, m_co') }
 
-pushCoTyArg :: CoercionR -> Type -> Maybe (Type, MCoercionR)
+pushCastCoTyArg :: Type -> CastCoercion -> Type -> Maybe (Type, Type, CastCoercion)
+pushCastCoTyArg tyL ReflCastCo      arg = Just (arg, applyForAllTy tyL arg, ReflCastCo)
+pushCastCoTyArg _   (CCoercion co)  arg = pushCoTyArg co arg
+pushCastCoTyArg tyL cco@ZCoercion{} arg = pushCoTyArg co arg
+  where
+    co = castCoToCo tyL cco
+
+
+pushCoTyArg :: CoercionR -> Type -> Maybe (Type, Type, CastCoercion)
 -- We have (fun |> co) @ty
 -- Push the coercion through to return
 --         (fun @ty') |> co'
 -- 'co' is always Representational
--- If the returned coercion is Nothing, then it would have been reflexive;
--- it's faster not to compute it, though.
 pushCoTyArg co ty
   -- The following is inefficient - don't do `eqType` here, the coercion
   -- optimizer will take care of it. See #14737.
@@ -2917,11 +2921,11 @@ pushCoTyArg co ty
   -- -- = Just (ty, Nothing)
 
   | isReflCo co
-  = Just (ty, MRefl)
+  = Just (ty, coercionLKind co2, ReflCastCo)
 
   | isForAllTy_ty tyL
   = assertPpr (isForAllTy_ty tyR) (ppr co $$ ppr ty) $
-    Just (ty `mkCastTy` co1, MCo co2)
+    Just (ty `mkCastTy` co1, coercionLKind co2, CCoercion co2)
 
   | otherwise
   = Nothing
@@ -2941,6 +2945,19 @@ pushCoTyArg co ty
         -- co2 :: ty1[ (ty|>co1)/a1 ] ~R ty2[ ty/a2 ]
         -- Arg of mkInstCo is always nominal, hence Nominal
 
+pushCastCoValArg :: Type -> CastCoercion -> Maybe (Type, CastCoercion, Type, CastCoercion)
+pushCastCoValArg tyL ReflCastCo       = Just (funArgTy tyL, ReflCastCo, funResultTy tyL, ReflCastCo)
+pushCastCoValArg _ (CCoercion co)     = pushCoValArg co
+pushCastCoValArg tyL (ZCoercion tyR cos)
+  | isFunTy tyL  -- TODO: do we need to check this or can we assume it?
+  , isFunTy tyR
+  , typeHasFixedRuntimeRep new_arg_ty
+              = Just (old_arg_ty, ZCoercion new_arg_ty cos, funResultTy tyL, ZCoercion (funResultTy tyR) cos)
+  | otherwise = Nothing
+  where
+    old_arg_ty = funArgTy tyR
+    new_arg_ty = funArgTy tyL
+
 -- | If @pushCoValArg co = Just (co_arg, co_res)@, then
 --
 -- > (\x.body) |> co  =  (\y. let { x = y |> co_arg } in body) |> co_res)
@@ -2952,7 +2969,7 @@ pushCoTyArg co ty
 -- If the LHS is well-typed, then so is the RHS. In particular, the argument
 -- @arg |> co_arg@ is guaranteed to have a fixed 'RuntimeRep', in the sense of
 -- Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
-pushCoValArg :: CoercionR -> Maybe (MCoercionR, MCoercionR)
+pushCoValArg :: CoercionR -> Maybe (Type, CastCoercion, Type, CastCoercion)
 pushCoValArg co
   -- The following is inefficient - don't do `eqType` here, the coercion
   -- optimizer will take care of it. See #14737.
@@ -2960,7 +2977,7 @@ pushCoValArg co
   -- -- = Just (mkRepReflCo arg, Nothing)
 
   | isReflCo co
-  = Just (MRefl, MRefl)
+  = Just (old_arg_ty, ReflCastCo, funResultTy tyL, ReflCastCo)
 
   | isFunTy tyL
   , (_, co1, co2) <- decomposeFunCo co
@@ -2979,8 +2996,8 @@ pushCoValArg co
      (vcat [ text "co:" <+> ppr co
            , text "old_arg_ty:" <+> ppr old_arg_ty
            , text "new_arg_ty:" <+> ppr new_arg_ty ]) $
-    Just (coToMCo (mkSymCo co1), coToMCo co2)
-    -- Critically, coToMCo to checks for ReflCo; the whole coercion may not
+    Just (old_arg_ty, coToCastCo (mkSymCo co1), funResultTy tyL, coToCastCo co2)
+    -- Critically, coToCastCo to checks for ReflCo; the whole coercion may not
     -- be reflexive, but either of its components might be
     -- We could use isReflexiveCo, but it's not clear if the benefit
     -- is worth the cost, and it makes no difference in #18223
@@ -2993,17 +3010,18 @@ pushCoValArg co
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
-    :: HasDebugCallStack => InScopeSet -> Var -> CoreExpr -> CoercionR -> Maybe (Var, CoreExpr)
+    :: HasDebugCallStack => InScopeSet -> Var -> CoreExpr -> Type -> CastCoercion -> Maybe (Var, CoreExpr)
 -- This implements the Push rule from the paper on coercions
 --    (\x. e) |> co
 -- ===>
 --    (\x'. e |> co')
-pushCoercionIntoLambda in_scope x e co
+pushCoercionIntoLambda in_scope x e ty co
     | assert (not (isTyVar x) && not (isCoVar x)) True
-    , Pair s1s2 t1t2 <- coercionKind co
-    , Just {}              <- splitFunTy_maybe s1s2
+    , let s1s2 = castCoercionLKind ty co
+    , let t1t2 = castCoercionRKind ty co
+    , Just (_, _, s1, _)   <- splitFunTy_maybe s1s2
     , Just (_, w1, t1,_t2) <- splitFunTy_maybe t1t2
-    , (_, co1, co2)  <- decomposeFunCo co
+    , (co1, co2)  <- decomposeFunCastCo co
     , typeHasFixedRuntimeRep t1
       -- We can't push the coercion into the lambda if it would create
       -- a representation-polymorphic binder.
@@ -3015,16 +3033,16 @@ pushCoercionIntoLambda in_scope x e co
           subst' =
             extendIdSubst (setInScope emptySubst in_scope')
               x
-              (mkCast (Var x') (mkSymCo co1))
+              (mkCastCo (Var x') (mkSymCastCo s1 co1))
             -- We substitute x' for x, except we need to preserve types.
             -- The types are as follows:
             --   x :: s1,  x' :: t1,  co1 :: s1 ~# t1,
             -- so we extend the substitution with x |-> (x' |> sym co1).
-      in Just (x', substExpr subst' e `mkCast` co2)
+      in Just (x', substExpr subst' e `mkCastCo` co2)
     | otherwise
     = Nothing
 
-pushCoDataCon :: DataCon -> [CoreExpr] -> MCoercionR
+pushCoDataCon :: DataCon -> [CoreExpr] -> CastCoercion
               -> Maybe (DataCon
                        , [Type]      -- Universal type args
                        , [CoreExpr]) -- All other args incl existentials
@@ -3034,8 +3052,15 @@ pushCoDataCon :: DataCon -> [CoreExpr] -> MCoercionR
 -- where co :: (T t1 .. tn) ~ (T s1 .. sn)
 -- The left-hand one must be a T, because exprIsConApp returned True
 -- but the right-hand one might not be.  (Though it usually will.)
-pushCoDataCon dc dc_args MRefl    = Just $! (push_dc_refl dc dc_args)
-pushCoDataCon dc dc_args (MCo co) = push_dc_gen  dc dc_args co (coercionKind co)
+pushCoDataCon dc dc_args ReflCastCo = Just $! (push_dc_refl dc dc_args)
+pushCoDataCon dc dc_args (CCoercion co) = push_dc_gen  dc dc_args co (coercionKind co)
+pushCoDataCon dc dc_args cco@(ZCoercion to_ty _) =
+    -- Generalising push_data_con to work for a CastCoercion instead of a
+    -- Coercion seems pretty difficult, so instead we fall back on castCoToCo.
+    push_dc_gen dc dc_args (castCoToCo from_ty cco) (Pair from_ty to_ty)
+  where
+    from_ty = exprType (mkCoreConApps dc dc_args) -- TODO: can we calculate from_ty more efficiently?
+
 
 push_dc_refl :: DataCon -> [CoreExpr] -> (DataCon, [Type], [CoreExpr])
 push_dc_refl dc dc_args
@@ -3119,27 +3144,28 @@ collectBindersPushingCo e
     go :: [Var] -> CoreExpr -> ([Var], CoreExpr)
     -- The accumulator is in reverse order
     go bs (Lam b e)   = go (b:bs) e
-    go bs (Cast e co) = go_c bs e (castCoToCo (exprType e) co) -- TODO: can we do better?
+    go bs (Cast e co) = go_c bs e co
     go bs e           = (reverse bs, e)
 
     -- We are in a cast; peel off casts until we hit a lambda.
-    go_c :: [Var] -> CoreExpr -> Coercion -> ([Var], CoreExpr)
+    go_c :: [Var] -> CoreExpr -> CastCoercion -> ([Var], CoreExpr)
     -- (go_c bs e c) is same as (go bs e (e |> c))
-    go_c bs (Cast e co1) co2 = go_c bs e (castCoToCo (exprType e) co1 `mkTransCo` co2) -- TODO: can we do better?
+    go_c bs (Cast e co1) co2 = go_c bs e (co1 `mkTransCastCo` co2)
     go_c bs (Lam b e)    co  = go_lam bs b e co
-    go_c bs e            co  = (reverse bs, mkCast e co)
+    go_c bs e            co  = (reverse bs, mkCastCo e co)
 
     -- We are in a lambda under a cast; peel off lambdas and build a
     -- new coercion for the body.
-    go_lam :: [Var] -> Var -> CoreExpr -> CoercionR -> ([Var], CoreExpr)
+    go_lam :: [Var] -> Var -> CoreExpr -> CastCoercion -> ([Var], CoreExpr)
     -- (go_lam bs b e c) is same as (go_c bs (\b.e) c)
-    go_lam bs b e co
+    -- TODO: does it matter that ZCoercion will not do any of this?
+    go_lam bs b e (CCoercion co)
       | isTyVar b
       , let Pair tyL tyR = coercionKind co
       , assert (isForAllTy_ty tyL) $
         isForAllTy_ty tyR
       , isReflCo (mkSelCo SelForAll co)  -- See Note [collectBindersPushingCo]
-      = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkTyVarTy b)))
+      = go_c (b:bs) e (CCoercion (mkInstCo co (mkNomReflCo (mkTyVarTy b))))
 
       | isCoVar b
       , let Pair tyL tyR = coercionKind co
@@ -3147,7 +3173,7 @@ collectBindersPushingCo e
         isForAllTy_co tyR
       , isReflCo (mkSelCo SelForAll co)  -- See Note [collectBindersPushingCo]
       , let cov = mkCoVarCo b
-      = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkCoercionTy cov)))
+      = go_c (b:bs) e (CCoercion (mkInstCo co (mkNomReflCo (mkCoercionTy cov))))
 
       | isId b
       , let Pair tyL tyR = coercionKind co
@@ -3155,9 +3181,9 @@ collectBindersPushingCo e
       , (co_mult, co_arg, co_res) <- decomposeFunCo co
       , isReflCo co_mult -- See Note [collectBindersPushingCo]
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]
-      = go_c (b:bs) e co_res
+      = go_c (b:bs) e (CCoercion co_res)
 
-      | otherwise = (reverse bs, mkCast (Lam b e) co)
+    go_lam bs b e cco = (reverse bs, mkCastCo (Lam b e) cco)
 
 {- Note [collectBindersPushingCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

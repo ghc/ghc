@@ -52,7 +52,7 @@ import GHC.Core.Opt.Simplify.Inline( smallEnoughToInline )
 import GHC.Core.Opt.Stats ( Tick(..) )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
-import GHC.Core.TyCo.Ppr ( pprParendType )
+import GHC.Core.TyCo.Ppr ( pprParendType, pprCastCo )
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
@@ -162,8 +162,9 @@ data SimplCont
 
 
   | CastIt              -- (CastIt co K)[e] = K[ e `cast` co ]
-      { sc_co   :: OutCoercion  -- The coercion simplified
+      { sc_co   :: OutCastCoercion  -- The coercion simplified
                                 -- Invariant: never an identity coercion
+      , sc_hole_ty :: OutType   -- LHS kind of sc_co
       , sc_opt  :: Bool         -- True <=> sc_co has had optCoercion applied to it
                                 --      See Note [Avoid re-simplifying coercions]
                                 --      in GHC.Core.Opt.Simplify.Iteration
@@ -277,7 +278,7 @@ instance Outputable SimplCont where
     where
       pps = [ppr interesting] ++ [ppr eval_sd | eval_sd /= topSubDmd]
   ppr (CastIt { sc_co = co, sc_cont = cont })
-    = (text "CastIt" <+> pprOptCo co) $$ ppr cont
+    = (text "CastIt" <+> pprCastCo co) $$ ppr cont
   ppr (TickIt t cont)
     = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
@@ -474,7 +475,7 @@ contResultType (TickIt _ k)                 = contResultType k
 contHoleType :: SimplCont -> OutType
 contHoleType (Stop ty _ _)                    = ty
 contHoleType (TickIt _ k)                     = contHoleType k
-contHoleType (CastIt { sc_co = co })          = coercionLKind co
+contHoleType (CastIt { sc_hole_ty = ty })     = ty
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
 contHoleType (StrictArg  { sc_fun_ty = ty })  = funArgTy ty
@@ -1896,7 +1897,7 @@ rebuildLam env bndrs@(bndr:_) body cont
       | -- Note [Casts and lambdas]
         seCastSwizzle env
       , not (any bad bndrs)
-      = mkCast (mk_lams bndrs body) (mkPiCos Representational bndrs (castCoToCo (exprType body) co))
+      = mkCastCo (mk_lams bndrs body) (mkPiCastCos Representational bndrs co)
       where
         co_vars  = tyCoVarsOfCastCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars

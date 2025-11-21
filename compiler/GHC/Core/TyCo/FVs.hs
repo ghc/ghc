@@ -21,7 +21,7 @@ module GHC.Core.TyCo.FVs
         shallowCoVarsOfCo, shallowCoVarsOfCos, shallowCoVarsOfCastCo,
         tyCoVarsOfCastCoercionDSet,
         tyCoVarsOfCoDSet,
-        tyCoFVsOfCo, tyCoFVsOfCos, tyCoFVsOfCoVarSet,
+        tyCoFVsOfCo, tyCoFVsOfCos, tyCoFVsOfCoVarSet, tyCoFVsOfCastCoercion,
         tyCoVarsOfCoList,
         coVarsOfCoDSet, coVarsOfCosDSet,
 

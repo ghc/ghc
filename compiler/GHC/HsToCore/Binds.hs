@@ -1166,9 +1166,9 @@ getRenamings orig_bndrs binds rule_bndrs
     go [] = init_renamings
     go (bind : binds)
        | NonRec b rhs <- bind
-       , Just (v, mco) <- getCastedVar rhs
+       , Just (v, co) <- getCastedVar rhs
        , Just e <- lookupVarEnv renamings b
-       = extendVarEnv renamings v (mkCastMCo e (mkSymMCo mco))
+       = extendVarEnv renamings v (mkCastCo e co)
        | otherwise
        = renamings
        where
@@ -1186,9 +1186,9 @@ pickSpecBinds is_local known_bndrs (bind:binds)
         keep_me rhs = isEmptyVarSet (exprSomeFreeVars bad_var rhs)
         bad_var v = is_local v && not (v `elemVarSet` known_bndrs)
 
-getCastedVar :: CoreExpr -> Maybe (Var, MCoercionR)
-getCastedVar (Var v)           = Just (v, MRefl)
-getCastedVar (Cast (Var v) (CCoercion co)) = Just (v, MCo co) -- TODO what about ZCoercion case?
+getCastedVar :: CoreExpr -> Maybe (Var, CastCoercion)
+getCastedVar (Var v)           = Just (v, ReflCastCo)
+getCastedVar (Cast (Var v) co) = Just (v, mkSymCastCo (varType v) co)
 getCastedVar _                 = Nothing
 
 specFunInlinePrag :: Id -> InlinePragma

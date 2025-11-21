@@ -4,6 +4,7 @@
 
 module GHC.Core.Coercion.Opt
    ( optCoercion
+   , optCastCoercion
    , OptCoercionOpts (..)
    )
 where
@@ -168,6 +169,15 @@ We use the following invariants:
 newtype OptCoercionOpts = OptCoercionOpts
    { optCoercionEnabled :: Bool  -- ^ Enable coercion optimisation (reduce its size)
    }
+
+-- AMG TODO: not clear if coercionLKind or substTy is better choice here
+optCastCoercion :: OptCoercionOpts -> Subst -> Type -> CastCoercion -> (Type, CastCoercion)
+optCastCoercion _    env   tyL ReflCastCo = (substTy env tyL, ReflCastCo)
+optCastCoercion opts env _ (CCoercion co) = let co' = optCoercion opts env co
+                                            in (coercionLKind co', CCoercion co')
+optCastCoercion _ env tyL (ZCoercion tyR cos)
+  | tyL `eqTypeIgnoringMultiplicity` tyR = (substTy env tyL, ReflCastCo)
+  | otherwise        = (substTy env tyL, ZCoercion (substTy env tyR) (substCoVarSet env cos))
 
 optCoercion :: OptCoercionOpts -> Subst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,

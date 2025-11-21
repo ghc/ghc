@@ -22,7 +22,7 @@ module GHC.Core.Utils (
 
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType,
-        mkLamType, mkLamTypes,
+        mkLamType, mkLamTypes, mkPiMCos,
         mkFunctionType,
         exprIsTrivial, getIdFromTrivialExpr, getIdFromTrivialExpr_maybe,
         trivial_expr_fold,
@@ -186,6 +186,12 @@ mkLamType v body_ty
    = mkFunctionType (idMult v) (idType v) body_ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
+
+mkPiMCos :: [Var] -> CastCoercion -> CastCoercion
+mkPiMCos _ ReflCastCo = ReflCastCo
+mkPiMCos vs (CCoercion co) = CCoercion (mkPiCos Representational vs co)
+mkPiMCos vs (ZCoercion ty cos) = ZCoercion (mkLamTypes vs ty) cos
+
 
 {-
 Note [Type bindings]

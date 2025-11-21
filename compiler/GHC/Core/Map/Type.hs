@@ -139,6 +139,7 @@ xtC (D env co) f (CoercionMapX m)
 
 -- We should really never care about the contents of a cast coercion. Instead,
 -- just look up the coercion's RHS type.
+-- TODO: do we need this type, or can we just use TypeMap?
 newtype CastCoercionMap a = CastCoercionMap (CastCoercionMapG a)
 
 -- TODO(22292): derive
