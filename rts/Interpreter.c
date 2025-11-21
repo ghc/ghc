@@ -3130,7 +3130,7 @@ run_BCO:
             StgPtr p;
             W_ ret[2];                  // max needed
             W_ *arguments[stk_offset];  // max needed
-            void *argptrs[nargs];
+            void *argptrs[nargs > 0 ? nargs : 1]; // the size of a variable length array must be positive
             void (*fn)(void);
 
             if (cif->rtype == &ffi_type_void) {
