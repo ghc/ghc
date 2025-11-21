@@ -664,7 +664,7 @@ dsWasmJSExport' sync m_fn_id co ext_name = do
         -- again here.
         Sync -> [finally_id, flushStdHandles_id]
         Async -> [top_handler_id, promiseRes_id]
-      extern_closure_decls = vcat $ map mk_extern_closure_decl gc_root_closures
+      extern_closure_decls = vcat $ map mk_extern_closure_decl $ top_handler_id : gc_root_closures
       cstub_attr =
         text "__attribute__"
           <> parens

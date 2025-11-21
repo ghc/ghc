@@ -840,5 +840,6 @@ if (isMain()) {
   dyld.addLibrarySearchPath(libdir);
   await dyld.loadDLL(ghci_so_path);
 
+  dyld.exportFuncs.__ghc_wasm_jsffi_init();
   await dyld.exportFuncs.defaultServer();
 }
