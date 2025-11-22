@@ -28,7 +28,7 @@ module GHC.Cmm.Info (
   conInfoTableSizeB,
   stdSrtBitmapOffset,
   stdClosureTypeOffset,
-  stdPtrsOffset, stdNonPtrsOffset,
+  stdPtrsOffset, stdNonPtrsOffset
 ) where
 
 import GHC.Prelude
@@ -215,6 +215,15 @@ mkInfoTableContents profile
        ; return (prof_data ++ ct_data, (std_info, extra_bits)) }
   where
     platform = profilePlatform profile
+    mk_extra_bits :: Int -> Int -> [CmmLit]
+    mk_extra_bits low high
+      = if platformTablesNextToCode platform
+        then [ mkStgHalfWordCLit platform high
+             , mkStgHalfWordCLit platform low
+             ]
+        else [ mkStgHalfWordCLit platform low
+             , mkStgHalfWordCLit platform high
+             ]
     mk_pieces :: ClosureTypeInfo -> [CmmLit]
               -> UniqDSM ( Maybe CmmLit   -- Override the SRT field with this
                          , Maybe [CmmLit] -- Override the layout field with this
@@ -235,18 +244,16 @@ mkInfoTableContents profile
          -- Layout known (one free var); we use the layout field for offset
 
     mk_pieces (Fun arity (ArgSpec fun_type)) srt_label
-      = do { let extra_bits = mkStgHalfWordCLit platform fun_type
-                            : mkStgHalfWordCLit platform arity
-                            : srt_label
+      = do { let extra_bits = mk_extra_bits fun_type arity
+                           ++ srt_label
            ; return (Nothing, Nothing,  extra_bits, []) }
 
     mk_pieces (Fun arity (ArgGen arg_bits)) srt_label
       = do { (liveness_lit, liveness_data) <- mkLivenessBits platform arg_bits
            ; let fun_type | null liveness_data = aRG_GEN
                           | otherwise          = aRG_GEN_BIG
-                 extra_bits = mkStgHalfWordCLit platform fun_type
-                            : mkStgHalfWordCLit platform arity
-                            : (if inlineSRT platform then [] else [ srt_lit ])
+                 extra_bits = mk_extra_bits fun_type arity
+                           ++ (if inlineSRT platform then [] else [ srt_lit ])
                            ++ [ liveness_lit, slow_entry ]
            ; return (Nothing, Nothing, extra_bits, liveness_data) }
       where
