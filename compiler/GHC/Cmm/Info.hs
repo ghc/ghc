@@ -274,25 +274,6 @@ mkStgHalfWordCLit :: Platform -> Int -> CmmLit
 mkStgHalfWordCLit platform hwd = CmmInt (fromStgHalfWord (toStgHalfWord platform (fromIntegral hwd)))
                                         (halfWordWidth platform)
 
--- packHalfWordsCLit :: Platform -> StgHalfWord -> StgHalfWord -> CmmLit
---   -- Make a single word literal in which the lower_half_word is
---   -- at the lower address, and the upper_half_word is at the
---   -- higher address
---   -- ToDo: consider using half-word lits instead
---   --       but be careful: that's vulnerable when reversed
--- packHalfWordsCLit platform lower_half_word upper_half_word
---   = let l = fromStgHalfWord lower_half_word
---         u = fromStgHalfWord upper_half_word
---     in
---       case platformByteOrder platform of
---         BigEndian    -> mkWordCLit platform ((l `shiftL` halfWordSizeInBits platform) .|. u)
---         LittleEndian -> mkWordCLit platform (l .|. (u `shiftL` halfWordSizeInBits platform))
-
--- packIntsCLit :: Platform -> Int -> Int -> CmmLit
--- packIntsCLit platform a b = packHalfWordsCLit platform
---                            (toStgHalfWord platform (fromIntegral a))
---                            (toStgHalfWord platform (fromIntegral b))
-
 mkSRTLit :: Platform
          -> CLabel
          -> Maybe CLabel
