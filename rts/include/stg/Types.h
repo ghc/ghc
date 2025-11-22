@@ -147,6 +147,8 @@ typedef uint16_t           StgHalfWord;
 #error GHC untested on this architecture: sizeof(void *) != 4 or 8
 #endif
 
+typedef StgWord StgUnalignedWord __attribute__((aligned(1)));
+
 #define W_MASK  (sizeof(W_)-1)
 
 /*

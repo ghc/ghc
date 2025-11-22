@@ -274,12 +274,21 @@ See also Note [Width of parameters] for some more motivation.
 
 #define W64_TO_WDS(n) ((n * sizeof(StgWord64) / sizeof(StgWord)))
 
+// Returns a pointer to the stack location.
+#define SafeSpWP(n)      \
+  ( ((WITHIN_CAP_CHUNK_BOUNDS_W(n)) ? Sp_plusW(n) : slow_spw(Sp, cap->r.rCurrentTSO->stackobj, n)))
+#define SafeSpBP(off_w)      \
+  ( (WITHIN_CAP_CHUNK_BOUNDS_W((1+(off_w))/sizeof(StgWord))) ? \
+        Sp_plusB(off_w) : \
+        (void*)((ptrdiff_t)((ptrdiff_t)(off_w) % (ptrdiff_t)sizeof(StgWord)) + (StgWord8*)slow_spw(Sp, cap->r.rCurrentTSO->stackobj, (off_w)/sizeof(StgWord))) \
+    )
+
 // Always safe to use - Return the value at the address
 #define ReadSpW(n)       (*((StgWord*)   SafeSpWP(n)))
 //Argument is offset in multiples of word64
 #define ReadSpW64(n)     (*((StgWord64*) SafeSpWP(W64_TO_WDS(n))))
 // Perhaps confusingly this still reads a full word, merely the offset is in bytes.
-#define ReadSpB(n)       (*((StgWord*)   SafeSpBP(n)))
+#define ReadSpB(n)       (*((StgUnalignedWord*)   SafeSpBP(n)))
 
 /* Note [PUSH_L underflow]
    ~~~~~~~~~~~~~~~~~~~~~~~
@@ -325,15 +334,6 @@ omit the stack bounds check.
 See ticket #25750
 
 */
-
-// Returns a pointer to the stack location.
-#define SafeSpWP(n)      \
-  ( ((WITHIN_CAP_CHUNK_BOUNDS_W(n)) ? Sp_plusW(n) : slow_spw(Sp, cap->r.rCurrentTSO->stackobj, n)))
-#define SafeSpBP(off_w)      \
-  ( (WITHIN_CAP_CHUNK_BOUNDS_W((1+(off_w))/sizeof(StgWord))) ? \
-        Sp_plusB(off_w) : \
-        (void*)((ptrdiff_t)((ptrdiff_t)(off_w) % (ptrdiff_t)sizeof(StgWord)) + (StgWord8*)slow_spw(Sp, cap->r.rCurrentTSO->stackobj, (off_w)/sizeof(StgWord))) \
-    )
 
 
 
