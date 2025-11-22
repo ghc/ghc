@@ -205,7 +205,7 @@ ocInit_ELF(ObjectCode * oc)
     oc->info->sectionHeader = (Elf_Shdr *) ((uint8_t*)oc->image
                                             + oc->info->elfHeader->e_shoff);
     oc->info->sectionHeaderStrtab = (char*)((uint8_t*)oc->image +
-            oc->info->sectionHeader[oc->info->elfHeader->e_shstrndx].sh_offset);
+            oc->info->sectionHeader[elf_shstrndx(oc->info->elfHeader)].sh_offset);
 
     oc->n_sections = elf_shnum(oc->info->elfHeader);
 
