@@ -273,6 +273,7 @@ toIfaceTyLit (CharTyLit x) = IfaceCharTyLit x
 toIfaceCastCoercion :: CastCoercion -> IfaceCastCoercion
 toIfaceCastCoercion (CCoercion co) = IfaceCCoercion (toIfaceCoercion co)
 toIfaceCastCoercion (ZCoercion ty cos) = IfaceZCoercion (toIfaceType ty) (map (toIfaceCoercion . CoVarCo) (nonDetEltsUniqSet cos)) -- TODO determinism
+toIfaceCastCoercion ReflCastCo         = IfaceReflCastCo
 
 toIfaceCoercion :: Coercion -> IfaceCoercion
 toIfaceCoercion = toIfaceCoercionX emptyVarSet

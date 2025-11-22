@@ -2075,8 +2075,9 @@ freeNamesIfMCoercion IfaceMRefl    = emptyNameSet
 freeNamesIfMCoercion (IfaceMCo co) = freeNamesIfCoercion co
 
 freeNamesIfCastCoercion :: IfaceCastCoercion -> NameSet
-freeNamesIfCastCoercion (IfaceCCoercion co) = freeNamesIfCoercion co
+freeNamesIfCastCoercion (IfaceCCoercion co)     = freeNamesIfCoercion co
 freeNamesIfCastCoercion (IfaceZCoercion ty cos) = freeNamesIfType ty &&& fnList freeNamesIfCoercion cos
+freeNamesIfCastCoercion IfaceReflCastCo         = emptyNameSet
 
 freeNamesIfCoercion :: IfaceCoercion -> NameSet
 freeNamesIfCoercion (IfaceReflCo t) = freeNamesIfType t

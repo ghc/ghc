@@ -480,6 +480,7 @@ data IfaceMCoercion
 data IfaceCastCoercion
   = IfaceCCoercion IfaceCoercion
   | IfaceZCoercion IfaceType [IfaceCoercion]
+  | IfaceReflCastCo
   deriving (Eq, Ord)
 
 data IfaceCoercion
@@ -2040,10 +2041,12 @@ pprIfaceTyLit (IfaceCharTyLit c) = text (show c)
 pprIfaceCastCoercion :: IfaceCastCoercion -> SDoc
 pprIfaceCastCoercion (IfaceCCoercion co) = pprIfaceCoercion co
 pprIfaceCastCoercion (IfaceZCoercion ty cos) = text "Zap" <+> pprParendIfaceType ty <+> ppr cos
+pprIfaceCastCoercion IfaceReflCastCo = text "ReflCastCo"
 
 pprParendIfaceCastCoercion :: IfaceCastCoercion -> SDoc
 pprParendIfaceCastCoercion (IfaceCCoercion co) = pprParendIfaceCoercion co
 pprParendIfaceCastCoercion (IfaceZCoercion ty cos) = parens (pprIfaceCastCoercion (IfaceZCoercion ty cos))
+pprParendIfaceCastCoercion IfaceReflCastCo = text "ReflCastCo"
 
 pprIfaceCoercion, pprParendIfaceCoercion :: IfaceCoercion -> SDoc
 pprIfaceCoercion = ppr_co topPrec
@@ -2447,6 +2450,7 @@ instance Binary IfaceCastCoercion where
           putByte bh 2
           put_ bh a
           put_ bh b
+  put_ bh IfaceReflCastCo = putByte bh 3
 
   get bh = do
     tag <- getByte bh
@@ -2456,6 +2460,7 @@ instance Binary IfaceCastCoercion where
          2 -> do a <- get bh
                  b <- get bh
                  return $ IfaceZCoercion a b
+         3 -> return IfaceReflCastCo
          _ -> panic ("get IfaceCastCoercion " ++ show tag)
 
 
@@ -2643,6 +2648,7 @@ instance NFData IfaceCastCoercion where
   rnf = \case
     IfaceCCoercion f1 -> rnf f1
     IfaceZCoercion f1 f2 -> rnf f1 `seq` rnf f2
+    IfaceReflCastCo -> ()
 
 instance NFData IfaceCoercion where
   rnf = \case

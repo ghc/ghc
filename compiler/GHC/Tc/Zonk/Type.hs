@@ -551,6 +551,7 @@ _zonkCosToCos        :: [Coercion] -> ZonkTcM [Coercion]
 zonkCastCo :: CastCoercion -> ZonkTcM CastCoercion
 zonkCastCo (CCoercion co) = CCoercion <$> zonkCoToCo co
 zonkCastCo (ZCoercion ty cos) = ZCoercion <$> zonkTcTypeToTypeX ty <*> zonkCoVarSet cos
+zonkCastCo ReflCastCo = pure ReflCastCo
 
 zonkCoVarSet :: CoVarSet -> ZonkTcM CoVarSet
 zonkCoVarSet = fmap shallowCoVarsOfCos . mapM zonkCoVarOcc . nonDetEltsUniqSet
@@ -1868,6 +1869,8 @@ zonkEvTerm (EvCastExpr e (CCoercion co) co_res_ty)
        }
 zonkEvTerm ev@(EvCastExpr _ (ZCoercion{}) _)
   = pprPanic "zonkEvTerm: ZCoercion" (ppr ev)
+zonkEvTerm (EvCastExpr e ReflCastCo _)
+  = EvExpr <$> zonkCoreExpr e
 zonkEvTerm (EvTypeable ty ev)
   = EvTypeable <$> zonkTcTypeToTypeX ty <*> zonkEvTypeable ev
 zonkEvTerm (EvFun { et_tvs = tvs, et_given = evs

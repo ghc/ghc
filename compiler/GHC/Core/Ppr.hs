@@ -173,6 +173,7 @@ noParens pp = pp
 pprOptCastCoercion :: CastCoercion -> SDoc
 pprOptCastCoercion (CCoercion co) = pprOptCo co
 pprOptCastCoercion (ZCoercion ty cos) = pprOptZappedCo ty cos
+pprOptCastCoercion ReflCastCo         = text "ReflCastCo"
 
 pprOptZappedCo :: Type -> CoVarSet -> SDoc
 pprOptZappedCo ty cos = sdocOption sdocSuppressCoercions $ \case

@@ -142,6 +142,7 @@ pprCastCo co = getPprStyle $ \ sty -> pprIfaceCastCoercion (tidyToIfaceCastCoSty
 tidyToIfaceCastCoSty :: CastCoercion -> PprStyle -> IfaceCastCoercion
 tidyToIfaceCastCoSty (CCoercion co)     sty = IfaceCCoercion (tidyToIfaceCoSty co sty)
 tidyToIfaceCastCoSty (ZCoercion ty cos) sty = IfaceZCoercion (tidyToIfaceType ty) (map (flip tidyToIfaceCoSty sty . CoVarCo) (nonDetEltsUniqSet cos)) -- TODO
+tidyToIfaceCastCoSty ReflCastCo         _   = IfaceReflCastCo
 
 tidyToIfaceCoSty :: Coercion -> PprStyle -> IfaceCoercion
 tidyToIfaceCoSty co sty

@@ -366,5 +366,6 @@ tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = strictMap (tidyCo env)
 
 tidyCastCo :: TidyEnv -> CastCoercion -> CastCoercion
-tidyCastCo env (CCoercion co) = CCoercion (tidyCo env co)
+tidyCastCo env (CCoercion co)     = CCoercion (tidyCo env co)
 tidyCastCo env (ZCoercion ty cos) = ZCoercion (tidyType env ty) (mapVarSet (tidyTyCoVarOcc env) cos)
+tidyCastCo _   ReflCastCo         = ReflCastCo

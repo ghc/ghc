@@ -270,6 +270,7 @@ mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
 mkCastCo :: HasDebugCallStack => CoreExpr -> CastCoercion -> CoreExpr
 mkCastCo expr (CCoercion co)     = mkCast expr co
 mkCastCo expr (ZCoercion ty cos) = mkCastZ expr ty cos
+mkCastCo expr ReflCastCo         = expr
 
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions

@@ -1582,6 +1582,7 @@ tcIfaceTyLit (IfaceCharTyLit n) = return (CharTyLit n)
 tcIfaceCastCoercion :: IfaceCastCoercion -> IfL CastCoercion
 tcIfaceCastCoercion (IfaceCCoercion co)     = CCoercion <$> tcIfaceCo co
 tcIfaceCastCoercion (IfaceZCoercion ty cos) = ZCoercion <$> tcIfaceType ty <*> (shallowCoVarsOfCos <$> mapM tcIfaceCo cos)
+tcIfaceCastCoercion IfaceReflCastCo         = pure ReflCastCo
 
 tcIfaceCo :: IfaceCoercion -> IfL Coercion
 tcIfaceCo = go

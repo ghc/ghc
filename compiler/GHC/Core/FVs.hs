@@ -280,6 +280,7 @@ exprFVs (Let (Rec pairs) body) fv_cand in_scope acc
 cast_co_fvs :: CastCoercion -> FV
 cast_co_fvs (CCoercion co)     fv_cand in_scope acc = (tyCoFVsOfCo co) fv_cand in_scope acc
 cast_co_fvs (ZCoercion ty cos) fv_cand in_scope acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCoVarSet cos) fv_cand in_scope acc
+cast_co_fvs ReflCastCo         _       _        acc = acc
 
 ---------
 rhs_fvs :: (Id, CoreExpr) -> FV

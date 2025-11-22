@@ -888,8 +888,9 @@ rnIfaceMCo IfaceMRefl    = pure IfaceMRefl
 rnIfaceMCo (IfaceMCo co) = IfaceMCo <$> rnIfaceCo co
 
 rnIfaceCastCo :: Rename IfaceCastCoercion
-rnIfaceCastCo (IfaceCCoercion co) = IfaceCCoercion <$> rnIfaceCo co
+rnIfaceCastCo (IfaceCCoercion co)     = IfaceCCoercion <$> rnIfaceCo co
 rnIfaceCastCo (IfaceZCoercion ty cos) = IfaceZCoercion <$> rnIfaceType ty <*> mapM rnIfaceCo cos
+rnIfaceCastCo IfaceReflCastCo         = pure IfaceReflCastCo
 
 rnIfaceCo :: Rename IfaceCoercion
 rnIfaceCo (IfaceReflCo ty)              = IfaceReflCo <$> rnIfaceType ty

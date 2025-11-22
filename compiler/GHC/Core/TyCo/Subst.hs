@@ -837,6 +837,7 @@ lookupTyVar (Subst _ _ tenv _) tv
 substCastCo :: HasDebugCallStack => Subst -> CastCoercion -> CastCoercion
 substCastCo subst (CCoercion co)     = CCoercion (substCo subst co)
 substCastCo subst (ZCoercion ty cos) = ZCoercion (substTy subst ty) (substCoVarSet subst cos)
+substCastCo _     ReflCastCo         = ReflCastCo
 
 substCoVarSet :: HasDebugCallStack => Subst -> CoVarSet -> CoVarSet
 substCoVarSet subst = nonDetStrictFoldVarSet (unionVarSet . shallowCoVarsOfCo . substCoVar subst) emptyVarSet -- TODO better impl; determinism?

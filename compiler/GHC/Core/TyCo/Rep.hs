@@ -904,7 +904,7 @@ type KindMCoercion = MCoercionN   -- See Note [KindCoercion]
 data CastCoercion
   = CCoercion CoercionR        -- Not zapped; the Coercion has Representational role
   | ZCoercion Type CoVarSet    -- Zapped; stores only the RHS type and free CoVars
-  -- | ReflCastCo -- TODO
+  | ReflCastCo
   deriving Data.Data
 
 -- | A 'Coercion' is concrete evidence of the equality/convertibility
@@ -2143,6 +2143,7 @@ typesSize tys = foldr ((+) . typeSize) 0 tys
 castCoercionSize :: CastCoercion -> Int
 castCoercionSize (CCoercion co) = coercionSize co
 castCoercionSize (ZCoercion ty cos) = typeSize ty + sizeVarSet cos
+castCoercionSize ReflCastCo = 1
 
 coercionSize :: Coercion -> Int
 coercionSize (Refl ty)             = typeSize ty

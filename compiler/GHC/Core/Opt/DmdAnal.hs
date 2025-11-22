@@ -2331,6 +2331,7 @@ coercionDmdEnv co = coercionsDmdEnv [co]
 castCoercionDmdEnv :: CastCoercion -> DmdEnv
 castCoercionDmdEnv (CCoercion co)    = coercionDmdEnv co
 castCoercionDmdEnv (ZCoercion _ cos) = coVarSetDmdEnv cos
+castCoercionDmdEnv ReflCastCo        = nopDmdEnv
 
 coercionsDmdEnv :: [Coercion] -> DmdEnv
 coercionsDmdEnv cos

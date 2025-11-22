@@ -649,6 +649,7 @@ optSubTypeHsWrapper wrap
       CCoercion co     -> not (anyFreeVarsOfCo (== v) co)
       ZCoercion ty cvs -> not (anyFreeVarsOfType (== v) ty)
                        && not (v `elemVarSet` cvs)
+      ReflCastCo       -> True
 
     not_in_submult :: TyVar -> SubMultCo -> Bool
     not_in_submult v = \case

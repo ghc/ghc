@@ -2452,6 +2452,7 @@ seqMCo (MCo co) = seqCo co
 seqCastCoercion :: CastCoercion -> ()
 seqCastCoercion (CCoercion co) = seqCo co
 seqCastCoercion (ZCoercion ty cos) = seqType ty `seq` seqVarSet cos
+seqCastCoercion ReflCastCo = ()
 
 seqCo :: Coercion -> ()
 seqCo (Refl ty)             = seqType ty
@@ -2874,6 +2875,7 @@ See Note [Zapped casts] in GHC.Core.TyCo.Rep.
 castCoercionLKind :: HasDebugCallStack => Type -> CastCoercion -> Type
 castCoercionLKind _ (CCoercion co) = coercionLKind co
 castCoercionLKind lhs_ty (ZCoercion _ _) = lhs_ty
+castCoercionLKind lhs_ty ReflCastCo = lhs_ty
 
 -- | Compute the right type of a 'CastCoercion', like 'coercionRKind'.
 -- Corresponds to 'coercionRKind', but requires the type to be supplied by the
@@ -2881,13 +2883,16 @@ castCoercionLKind lhs_ty (ZCoercion _ _) = lhs_ty
 castCoercionRKind :: HasDebugCallStack => Type -> CastCoercion -> Type
 castCoercionRKind _ (CCoercion co) = coercionRKind co
 castCoercionRKind _ (ZCoercion rhs_ty _) = rhs_ty
+castCoercionRKind lhs_ty ReflCastCo = lhs_ty
 
 -- | Equality test on 'CastCoercion', where the LHS type is the same for both
 -- coercions, so we merely need to compare the RHS types.
 eqCastCoercion :: Type -> CastCoercion -> CastCoercion -> Bool
+eqCastCoercion _ ReflCastCo ReflCastCo = True
 eqCastCoercion lhs_ty cco1 cco2 = castCoercionRKind lhs_ty cco1 `eqType` castCoercionRKind lhs_ty cco2
 
 eqCastCoercionX :: RnEnv2 -> Type -> CastCoercion -> Type -> CastCoercion -> Bool
+eqCastCoercionX _ _ ReflCastCo _ ReflCastCo = True
 eqCastCoercionX env ty1 co1 ty2 co2 = eqTypeX env ty1 ty2
                                    && eqTypeX env (castCoercionRKind ty1 co1) (castCoercionRKind ty2 co2)
 
@@ -2896,26 +2901,30 @@ eqCastCoercionX env ty1 co1 ty2 co2 = eqTypeX env ty1 ty2
 castCoToCo :: Type -> CastCoercion -> CoercionR
 castCoToCo _      (CCoercion co)         = co
 castCoToCo lhs_ty (ZCoercion rhs_ty cos) = mkUnivCo ZCoercionProv (map CoVarCo (nonDetEltsUniqSet cos)) Representational lhs_ty rhs_ty
+castCoToCo lhs_ty ReflCastCo             = mkRepReflCo lhs_ty
 
 -- | Compose two 'CastCoercion's transitively, like 'mkTransCo'.  If either is
 -- zapped the whole result will be zapped.
 mkTransCastCo :: HasDebugCallStack => CastCoercion -> CastCoercion -> CastCoercion
 mkTransCastCo cco (CCoercion co)     = mkTransCastCoCo cco co
 mkTransCastCo cco (ZCoercion ty cos) = ZCoercion ty (shallowCoVarsOfCastCo cco `unionVarSet` cos)
+mkTransCastCo cco ReflCastCo         = cco
 
 -- | Transitively compose a 'CastCoercion' followed by a 'Coercion'.
 mkTransCastCoCo :: HasDebugCallStack => CastCoercion -> Coercion -> CastCoercion
 mkTransCastCoCo (CCoercion co1)   co2 = CCoercion (mkTransCo co1 co2)
 mkTransCastCoCo (ZCoercion _ cos) co2 = ZCoercion (coercionRKind co2) (shallowCoVarsOfCo co2 `unionVarSet` cos)
+mkTransCastCoCo ReflCastCo        co2 = CCoercion co2
 
 -- | Transitively compose a 'Coercion' followed by a 'CastCoercion'.
 mkTransCoCastCo :: HasDebugCallStack => Coercion -> CastCoercion -> CastCoercion
 mkTransCoCastCo co1 (CCoercion co2)    = CCoercion (mkTransCo co1 co2)
 mkTransCoCastCo co1 (ZCoercion ty cos) = ZCoercion ty (shallowCoVarsOfCo co1 `unionVarSet` cos)
+mkTransCoCastCo co1 ReflCastCo         = CCoercion co1
 
 -- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
 -- as it walks over the entire coercion.
 isReflexiveCastCo :: Type -> CastCoercion -> Bool
 isReflexiveCastCo _      (CCoercion co) = isReflexiveCo co
 isReflexiveCastCo lhs_ty (ZCoercion rhs_ty _) = lhs_ty `eqType` rhs_ty
-
+isReflexiveCastCo _      ReflCastCo           = True

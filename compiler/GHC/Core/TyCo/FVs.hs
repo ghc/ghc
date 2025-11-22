@@ -316,6 +316,7 @@ runTyCoVars f = appEndoOS f emptyVarSet
 tyCoVarsOfCastCo :: CastCoercion -> TyCoVarSet
 tyCoVarsOfCastCo (CCoercion co)     = coVarsOfCo co
 tyCoVarsOfCastCo (ZCoercion ty cos) = tyCoVarsOfType ty `unionVarSet` cos
+tyCoVarsOfCastCo ReflCastCo         = emptyVarSet
 
 tyCoVarsOfType :: Type -> TyCoVarSet
 -- The "deep" TyCoVars of the the type
@@ -441,6 +442,7 @@ shallowCoVarsOfType ty = filterVarSet isCoVar $ shallowTyCoVarsOfType ty
 shallowCoVarsOfCastCo :: CastCoercion -> CoVarSet
 shallowCoVarsOfCastCo (CCoercion co) = shallowCoVarsOfCo co
 shallowCoVarsOfCastCo (ZCoercion ty cos) = shallowCoVarsOfType ty `unionVarSet` cos
+shallowCoVarsOfCastCo ReflCastCo = emptyVarSet
 
 
 {- *********************************************************************
@@ -468,6 +470,7 @@ See #14880.
 coVarsOfCastCo :: CastCoercion -> CoVarSet
 coVarsOfCastCo (CCoercion co) = coVarsOfCo co
 coVarsOfCastCo (ZCoercion ty cos) = coVarsOfType ty `unionVarSet` cos -- TODO cos doesn't include deep, this isn't enough?
+coVarsOfCastCo ReflCastCo = emptyVarSet
 
 -- See Note [Finding free coercion variables]
 coVarsOfType  :: Type       -> CoVarSet
@@ -705,6 +708,7 @@ tyCoFVsOfMCo mco fv_cand in_scope acc
 tyCoFVsOfCastCoercion :: CastCoercion -> FV
 tyCoFVsOfCastCoercion (CCoercion co) = tyCoFVsOfCo co
 tyCoFVsOfCastCoercion (ZCoercion ty cos) = tyCoFVsOfType ty `unionFV` tyCoFVsOfCoVarSet cos
+tyCoFVsOfCastCoercion ReflCastCo = mempty
 
 tyCoFVsOfCoVarSet :: CoVarSet -> FV
 tyCoFVsOfCoVarSet = nonDetStrictFoldVarSet (unionFV . tyCoFVsOfCoVar) emptyFV -- TODO better way? Nondeterminism?
