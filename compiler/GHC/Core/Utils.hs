@@ -140,7 +140,7 @@ exprType (Let bind body)
   , Type ty <- rhs           = substTyWithUnchecked [tv] [ty] (exprType body)
   | otherwise                = exprType body
 exprType (Case _ _ ty _)     = ty
-exprType (Cast _ co)         = castCoercionRKind co
+exprType (Cast e co)         = castCoercionRKind (exprType e) co
 exprType (Tick _ e)          = exprType e
 exprType (Lam binder expr)   = mkLamType binder (exprType expr)
 exprType e@(App _ _)
@@ -2511,11 +2511,11 @@ c.f. add_evals in GHC.Core.Opt.Simplify.simplAlt
 -- | A cheap equality test which bales out fast!
 --      If it returns @True@ the arguments are definitely equal,
 --      otherwise, they may or may not be equal.
-cheapEqExpr :: Expr b -> Expr b -> Bool
+cheapEqExpr :: CoreExpr -> CoreExpr -> Bool
 cheapEqExpr = cheapEqExpr' (const False)
 
 -- | Cheap expression equality test, can ignore ticks by type.
-cheapEqExpr' :: (CoreTickish -> Bool) -> Expr b -> Expr b -> Bool
+cheapEqExpr' :: (CoreTickish -> Bool) -> CoreExpr -> CoreExpr -> Bool
 {-# INLINE cheapEqExpr' #-}
 cheapEqExpr' ignoreTick e1 e2
   = go e1 e2
@@ -2525,7 +2525,7 @@ cheapEqExpr' ignoreTick e1 e2
     go (Type t1)  (Type t2)        = t1 `eqType` t2
     go (Coercion c1) (Coercion c2) = c1 `eqCoercion` c2
     go (App f1 a1) (App f2 a2)     = f1 `go` f2 && a1 `go` a2
-    go (Cast e1 co1) (Cast e2 co2) = e1 `go` e2 && eqCastCoercion co1 co2
+    go (Cast e1 co1) (Cast e2 co2) = e1 `go` e2 && eqCastCoercion (exprType e1) co1 co2
 
     go (Tick t1 e1) e2 | ignoreTick t1 = go e1 e2
     go e1 (Tick t2 e2) | ignoreTick t2 = go e1 e2
@@ -2621,7 +2621,7 @@ diffExpr _   env (Type t1)  (Type t2)  | eqTypeX env t1 t2              = []
 diffExpr _   env (Coercion co1) (Coercion co2)
                                        | eqCoercionX env co1 co2        = []
 diffExpr top env (Cast e1 co1)  (Cast e2 co2)
-  | eqCastCoercionX env co1 co2            = diffExpr top env e1 e2
+  | eqCastCoercionX env (exprType e1) co1 (exprType e2) co2 = diffExpr top env e1 e2
 diffExpr top env (Tick n1 e1)   e2
   | not (tickishIsCode n1)                 = diffExpr top env e1 e2
 diffExpr top env e1             (Tick n2 e2)

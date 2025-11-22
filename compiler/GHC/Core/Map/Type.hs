@@ -147,7 +147,7 @@ instance Functor CastCoercionMap where
     {-# INLINE fmap #-}
 
 instance TrieMap CastCoercionMap where
-   type Key CastCoercionMap = CastCoercion
+   type Key CastCoercionMap = Type
    emptyTM                     = CastCoercionMap emptyTM
    lookupTM k   (CastCoercionMap m) = lookupTM (deBruijnize k) m
    alterTM k f  (CastCoercionMap m) = CastCoercionMap (alterTM (deBruijnize k) f m)
@@ -164,7 +164,7 @@ instance Functor CastCoercionMapX where
     {-# INLINE fmap #-}
 
 instance TrieMap CastCoercionMapX where
-  type Key CastCoercionMapX = DeBruijn CastCoercion
+  type Key CastCoercionMapX = DeBruijn Type
   emptyTM = CastCoercionMapX emptyTM
   lookupTM = lkX
   alterTM  = xtX
@@ -172,18 +172,12 @@ instance TrieMap CastCoercionMapX where
   filterTM f (CastCoercionMapX core_tm) = CastCoercionMapX (filterTM f core_tm)
   mapMaybeTM f (CastCoercionMapX core_tm) = CastCoercionMapX (mapMaybeTM f core_tm)
 
-instance Eq (DeBruijn CastCoercion) where
-  D env1 co1 == D env2 co2
-    = D env1 (castCoercionRKind co1) ==
-      D env2 (castCoercionRKind co2)
+lkX :: DeBruijn Type -> CastCoercionMapX a -> Maybe a
+lkX (D env co_ty) (CastCoercionMapX core_tm) = lkT (D env co_ty) core_tm
 
-lkX :: DeBruijn CastCoercion -> CastCoercionMapX a -> Maybe a
-lkX (D env co) (CastCoercionMapX core_tm) = lkT (D env $ castCoercionRKind co)
-                                        core_tm
-
-xtX :: DeBruijn CastCoercion -> XT a -> CastCoercionMapX a -> CastCoercionMapX a
-xtX (D env co) f (CastCoercionMapX m)
-  = CastCoercionMapX (xtT (D env $ castCoercionRKind co) f m)
+xtX :: DeBruijn Type -> XT a -> CastCoercionMapX a -> CastCoercionMapX a
+xtX (D env co_ty) f (CastCoercionMapX m)
+  = CastCoercionMapX (xtT (D env co_ty) f m)
 
 
 {-

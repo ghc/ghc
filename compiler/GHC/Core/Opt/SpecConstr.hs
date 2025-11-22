@@ -2693,7 +2693,7 @@ argToPat1 env in_scope val_env (Cast arg co) arg_occ arg_str
           else
                 return (interesting, Cast arg' co, strict_args) }
   where
-    ty2 = castCoercionRKind co
+    ty2 = castCoercionRKind (exprType arg) co
 
   -- Check for a constructor application
   -- NB: this *precedes* the Var case, so that we catch nullary constrs

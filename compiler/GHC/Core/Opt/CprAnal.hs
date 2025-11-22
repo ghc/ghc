@@ -224,9 +224,9 @@ cprAnal' env (Cast e co)
   where
     (cpr_ty, e') = cprAnal env e
     cpr_ty'
-      | cpr_ty == topCprType                        = topCprType -- cheap case first
-      | isRecNewTyConApp env (castCoercionRKind co) = topCprType -- See Note [CPR for recursive data constructors]
-      | otherwise                                   = cpr_ty
+      | cpr_ty == topCprType                                     = topCprType -- cheap case first
+      | isRecNewTyConApp env (castCoercionRKind (exprType e) co) = topCprType -- See Note [CPR for recursive data constructors]
+      | otherwise                                                = cpr_ty
 
 cprAnal' env (Tick t e)
   = (cpr_ty, Tick t e')

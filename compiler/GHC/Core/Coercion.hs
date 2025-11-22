@@ -2876,17 +2876,20 @@ castCoercionLKind _ (CCoercion co) = coercionLKind co
 castCoercionLKind lhs_ty (ZCoercion _ _) = lhs_ty
 
 -- | Compute the right type of a 'CastCoercion', like 'coercionRKind'.
-castCoercionRKind :: HasDebugCallStack => CastCoercion -> Type
-castCoercionRKind (CCoercion co) = coercionRKind co
-castCoercionRKind (ZCoercion ty _) = ty
+-- Corresponds to 'coercionRKind', but requires the type to be supplied by the
+-- caller because it cannot be recovered in the 'ReflCastCo' case.
+castCoercionRKind :: HasDebugCallStack => Type -> CastCoercion -> Type
+castCoercionRKind _ (CCoercion co) = coercionRKind co
+castCoercionRKind _ (ZCoercion rhs_ty _) = rhs_ty
 
 -- | Equality test on 'CastCoercion', where the LHS type is the same for both
 -- coercions, so we merely need to compare the RHS types.
-eqCastCoercion :: CastCoercion -> CastCoercion -> Bool
-eqCastCoercion cco1 cco2 = castCoercionRKind cco1 `eqType` castCoercionRKind cco2
+eqCastCoercion :: Type -> CastCoercion -> CastCoercion -> Bool
+eqCastCoercion lhs_ty cco1 cco2 = castCoercionRKind lhs_ty cco1 `eqType` castCoercionRKind lhs_ty cco2
 
-eqCastCoercionX :: RnEnv2 -> CastCoercion -> CastCoercion -> Bool
-eqCastCoercionX env = eqTypeX env `on` castCoercionRKind
+eqCastCoercionX :: RnEnv2 -> Type -> CastCoercion -> Type -> CastCoercion -> Bool
+eqCastCoercionX env ty1 co1 ty2 co2 = eqTypeX env ty1 ty2
+                                   && eqTypeX env (castCoercionRKind ty1 co1) (castCoercionRKind ty2 co2)
 
 -- | Convert a 'CastCoercion' back into a 'Coercion', using a 'UnivCo' if we
 -- have discarded the original 'Coercion'.
