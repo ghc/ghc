@@ -664,7 +664,7 @@ type instance XXExpr GhcTc = XXExprGhcTc
 data SrcCodeOrigin
   = OrigExpr (HsExpr GhcRn)                -- ^ The source, user written, expression
   | OrigStmt (ExprLStmt GhcRn) HsDoFlavour -- ^ which kind of do-block did this statement come from
-  | OrigPat  (Pat GhcRn)                   -- ^ Used for failable patterns that trigger MonadFail constraints
+  | OrigPat  (ExprLStmt GhcRn) (Pat GhcRn) -- ^ Used for failable patterns that trigger MonadFail constraints
 
 data XXExprGhcRn
   = ExpandedThingRn { xrn_orig     :: SrcCodeOrigin   -- The original source thing to be used for error messages
@@ -886,9 +886,9 @@ ppr_expr (NegApp _ e _) = char '-' <+> pprDebugParendExpr appPrec e
 
 ppr_expr (SectionL _ expr op)
   | Just pp_op <- ppr_infix_expr (unLoc op)
-  = text "<SectionL>" <+> pp_infixly pp_op
+  = pp_infixly pp_op
   | otherwise
-  = text "<SectionL>" <+> pp_prefixly
+  = pp_prefixly
   where
     pp_expr = pprDebugParendExpr opPrec expr
 
@@ -899,9 +899,9 @@ ppr_expr (SectionL _ expr op)
 
 ppr_expr (SectionR _ op expr)
   | Just pp_op <- ppr_infix_expr (unLoc op)
-  = text "<SectionR>" <+> pp_infixly pp_op
+  = pp_infixly pp_op
   | otherwise
-  = text "<SectionR>" <+> pp_prefixly
+  = pp_prefixly
   where
     pp_expr = pprDebugParendExpr opPrec expr
 
@@ -1065,7 +1065,7 @@ instance Outputable SrcCodeOrigin where
     = case thing of
         OrigExpr x    -> ppr_builder "<OrigExpr>:" x
         OrigStmt x _  -> ppr_builder "<OrigStmt>:" x
-        OrigPat  x    -> ppr_builder "<OrigPat>:" x
+        OrigPat  _ x  -> ppr_builder "<OrigPat>:" x
     where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
 
 instance Outputable XXExprGhcRn where

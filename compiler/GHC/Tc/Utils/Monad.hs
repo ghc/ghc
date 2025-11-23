@@ -1089,19 +1089,8 @@ getSrcCodeOrigin =
        then getLclEnvSrcCodeOrigin <$> getLclEnv
        else return Nothing
 
-
--- | Mark the inner computation as being done inside generated code.
---
--- See Note [Error contexts in generated code]
--- See Note [Error Context Stack]
--- setInGeneratedCode :: SrcCodeOrigin -> TcRn a -> TcRn a
--- setInGeneratedCode sco thing_inside =
---   -- updLclCtxt setLclCtxtInGenCode $
---   updLclCtxt (setLclCtxtSrcCodeOrigin sco) thing_inside
-
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
-
 
 addLocM :: (HasLoc t) => (a -> TcM b) -> GenLocated t a -> TcM b
 addLocM fn (L loc a) = setSrcSpan (getHasLoc loc) $ fn a
@@ -1327,7 +1316,7 @@ So, it's better to do a `setSrcSpan` /before/ `addErrCtxt`.
 more discussion of this fancy footwork
 - See Note [Generated code and pattern-match checking] in `GHC.Types.Basic` for the
 relation with pattern-match checks
-- See Note [Error Context Stack] in `GHC.Tc.Types.LclEnv` for info about `ErrCtxtStack`
+- See Note [ErrCtxtStack Manipulation] in `GHC.Tc.Types.LclEnv` for info about `ErrCtxtStack`
 -}
 
 getErrCtxt :: TcM [ErrCtxt]
@@ -1845,12 +1834,9 @@ mkErrCtxt env ctxts
    go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
    go _ _ _   [] = return []
    go dbg n env (MkErrCtxt LandmarkUserSrcCode ctxt : ctxts)
-     | n < mAX_CONTEXTS -- Too verbose || dbg
      = do { (env', msg) <- liftZonkM $ ctxt env
           ; rest <- go dbg n env' ctxts
           ; return (msg : rest) }
-     | otherwise
-     = go dbg n env ctxts
    go dbg n env (MkErrCtxt _ ctxt : ctxts)
      | n < mAX_CONTEXTS -- Too verbose || dbg
      = do { (env', msg) <- liftZonkM $ ctxt env
