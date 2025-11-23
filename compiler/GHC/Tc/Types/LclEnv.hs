@@ -112,7 +112,7 @@ This data structure keeps track of two things:
 -}
 
 
--- See Note [Error Context Stack]
+-- See Note [ErrCtxtStack Manipulation]
 type ErrCtxtStack = [ErrCtxt]
 
 -- | Get the original source code
@@ -125,7 +125,7 @@ get_src_code_origin _ = Nothing
 data TcLclCtxt
   = TcLclCtxt {
         tcl_loc         :: RealSrcSpan,     -- Source span
-        tcl_err_ctxt    :: ErrCtxtStack,    -- See Note [Error Context Stack]
+        tcl_err_ctxt    :: ErrCtxtStack,    -- See Note [ErrCtxtStack Manipulation]
         tcl_tclvl       :: TcLevel,
         tcl_bndrs       :: TcBinderStack,   -- Used for reporting relevant bindings,
                                             -- and for tidying type
@@ -204,7 +204,7 @@ getLclEnvSrcCodeOrigin = get_src_code_origin . tcl_err_ctxt . tcl_lcl_ctxt
 setLclEnvSrcCodeOrigin :: ErrCtxt -> TcLclEnv -> TcLclEnv
 setLclEnvSrcCodeOrigin ec = modifyLclCtxt (setLclCtxtSrcCodeOrigin ec)
 
--- See Note [ErrCtxt Stack Manipulation]
+-- See Note [ErrCtxtStack Manipulation]
 setLclCtxtSrcCodeOrigin :: ErrCtxt -> TcLclCtxt -> TcLclCtxt
 setLclCtxtSrcCodeOrigin ec lclCtxt
   | MkErrCtxt (ExpansionCodeCtxt _) _ : ecs <- tcl_err_ctxt lclCtxt

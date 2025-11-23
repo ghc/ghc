@@ -106,7 +106,7 @@ expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
 --    -------------------------------------------------------
 --       pat <- e ; stmts   ~~> (>>=) e f
   = do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
-       failable_expr <- mk_failable_expr doFlavour pat expand_stmts_expr fail_op
+       failable_expr <- mk_failable_expr doFlavour pat stmt expand_stmts_expr fail_op
        let expansion = genHsExpApps bind_op  -- (>>=)
                        [ e
                        , failable_expr ]
@@ -177,8 +177,9 @@ expand_do_stmts doFlavour
 expand_do_stmts _ stmts = pprPanic "expand_do_stmts: impossible happened" $ (ppr stmts)
 
 -- checks the pattern `pat` for irrefutability which decides if we need to wrap it with a fail block
-mk_failable_expr :: HsDoFlavour -> LPat GhcRn -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (LHsExpr GhcRn)
-mk_failable_expr doFlav lpat expr@(L _exprloc _) fail_op =
+mk_failable_expr :: HsDoFlavour -> LPat GhcRn -> ExprLStmt GhcRn -> LHsExpr GhcRn
+                 -> FailOperator GhcRn -> TcM (LHsExpr GhcRn)
+mk_failable_expr doFlav lpat stmt expr fail_op =
   do { is_strict <- xoptM LangExt.Strict
      ; hscEnv <- getTopEnv
      ; rdrEnv <- getGlobalRdrEnv
@@ -190,15 +191,16 @@ mk_failable_expr doFlav lpat expr@(L _exprloc _) fail_op =
      ; if irrf_pat -- don't wrap with fail block if
                    -- the pattern is irrefutable
        then return $ genHsLamDoExp doFlav [lpat] expr
-       else wrapGenSpan <$> mk_fail_block doFlav lpat expr fail_op
+       else wrapGenSpan <$> mk_fail_block doFlav lpat stmt expr fail_op
      }
 
 -- | Makes the fail block with a given fail_op
 -- mk_fail_block pat rhs fail builds
 -- \x. case x of {pat -> rhs; _ -> fail "Pattern match failure..."}
 mk_fail_block :: HsDoFlavour
-              -> LPat GhcRn -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (HsExpr GhcRn)
-mk_fail_block doFlav pat e (Just (SyntaxExprRn fail_op)) =
+              -> LPat GhcRn -> ExprLStmt GhcRn
+              -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (HsExpr GhcRn)
+mk_fail_block doFlav pat stmt e (Just (SyntaxExprRn fail_op)) =
   do  dflags <- getDynFlags
       return $ HsLam noAnn LamCases $ mkMatchGroup (doExpansionOrigin doFlav) -- \
                 (wrapGenSpan [ genHsCaseAltDoExp doFlav pat e                 --  pat -> expr
@@ -207,11 +209,11 @@ mk_fail_block doFlav pat e (Just (SyntaxExprRn fail_op)) =
         where
           fail_alt_case :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> LMatch GhcRn (LHsExpr GhcRn)
           fail_alt_case dflags pat fail_op = genHsCaseAltDoExp doFlav genWildPat $
-                                             wrapGenSpan (fail_op_expr dflags pat fail_op)
+                                                  fail_op_expr dflags pat fail_op
 
-          fail_op_expr :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
-          fail_op_expr dflags pat fail_op
-            = mkExpandedPatRn (unLoc pat) $ genHsApp fail_op (mk_fail_msg_expr dflags pat)
+          fail_op_expr :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> LHsExpr GhcRn
+          fail_op_expr dflags pat@(L pat_lspan _) fail_op
+            = L pat_lspan $ mkExpandedPatRn (unLoc pat) stmt $ genHsApp fail_op (mk_fail_msg_expr dflags pat)
 
           mk_fail_msg_expr :: DynFlags -> LPat GhcRn -> LHsExpr GhcRn
           mk_fail_msg_expr dflags pat
@@ -219,8 +221,7 @@ mk_fail_block doFlav pat e (Just (SyntaxExprRn fail_op)) =
               text "Pattern match failure in" <+> pprHsDoFlavour (DoExpr Nothing)
                    <+> text "at" <+> ppr (getLocA pat)
 
-
-mk_fail_block _ _ _ _ = pprPanic "mk_fail_block: impossible happened" empty
+mk_fail_block _ _ _ _ _ = pprPanic "mk_fail_block: impossible happened" empty
 
 
 {- Note [Expanding HsDo with XXExprGhcRn]
@@ -441,7 +442,7 @@ It stores the original statement (with location) and the expanded expression
     as precise as possible, and not just blame the complete `do`-block.
     Thus, when we typecheck the application `(>>) e1`, we push the "In the stmt of do block e1" with
     the source location of `e1` in the error context stack as we walk inside an `ExpandedThingRn`.
-    See also Note [splitHsApps] and Note [Error Context Stack]
+    See also Note [splitHsApps]
 
   * After the expanded expression of a `do`-statement is typechecked
     and before moving to the next statement of the `do`-block, we need to first pop the top
@@ -480,5 +481,5 @@ It stores the original statement (with location) and the expanded expression
 -}
 
 
-mkExpandedPatRn :: Pat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
-mkExpandedPatRn pat e = XExpr (ExpandedThingRn (OrigPat pat) e)
+mkExpandedPatRn :: Pat GhcRn -> ExprLStmt GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
+mkExpandedPatRn pat stmt e = XExpr (ExpandedThingRn (OrigPat stmt pat) e)

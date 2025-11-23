@@ -1084,19 +1084,30 @@ add_expr_ctxt e thing_inside
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
-      HsPar{} -> thing_inside
-      -- We don't want to say 'In the expression (e)',
-      -- we just want to say 'In the expression, 'e'
-      -- which will be handeled by the recursive call in thing_inside
+
+      HsPar _ e -> add_expr_ctxt (unLoc e) thing_inside
+   -- We don't want to say 'In the expression (e)',
+   -- we just want to say 'In the expression, 'e'
+   -- which will be handeled by the recursive call in thing_inside
+   -- This may be a little inefficient with nested parens exprs, eg. (((e)))
+   -- But it should be okay as I do not expect too many parens to be nested consecutively
+
+      ExprWithTySig _ (L _ e') _
+        | XExpr (ExpandedThingRn o _) <- e' -> addExpansionErrCtxt o (ExprCtxt e)
+                                                  thing_inside
+   -- There is a special case for expressions with signatures to avoid having too verbose
+   -- error context. So here we flip the ErrCtxt state to expanded if the expression is expanded.
+   -- c.f. RecordDotSyntaxFail9
+
       XExpr (ExpandedThingRn o _) -> addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) thing_inside
-      _ -> addErrCtxt (ExprCtxt e) thing_inside -- no op in generated code
+   -- Flip error ctxt into expansion mode
+
+      _ -> addErrCtxt (ExprCtxt e) thing_inside
+  -- no op in generated code
 
 
 addLExprCtxt :: SrcSpan -> HsExpr GhcRn -> TcRn a -> TcRn a
 addLExprCtxt lspan e thing_inside
-  | not (isGeneratedSrcSpan lspan)
-  , (HsPar _ e') <- e
-  = setSrcSpan lspan $ add_expr_ctxt (unLoc e') thing_inside
   | not (isGeneratedSrcSpan lspan)
   = setSrcSpan lspan $ add_expr_ctxt e thing_inside
   | otherwise

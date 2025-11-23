@@ -180,7 +180,7 @@ Note [Instantiation variables are short lived]
 tcExprSigma :: Bool -> HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
 tcExprSigma inst rn_expr
   = do { (fun@(rn_fun,fun_lspan), rn_args) <- splitHsApps rn_expr
-       ; ds_flag <- getDeepSubsumptionFlag_DataConHead rn_fun
+       -- ; ds_flag <- getDeepSubsumptionFlag_DataConHead rn_fun
        -- ; do_ql <- wantQuickLook rn_fun
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; code_orig <- getSrcCodeOrigin
@@ -420,7 +420,6 @@ tcApp rn_expr exp_res_ty
        -- If it is generated code location span, blame it on the
        -- source code origin stored in the lclEnv.
        -- See Note [Error contexts in generated code]
-       -- See Note [Error Context Stack]
        ; code_orig <- getSrcCodeOrigin
        ; let fun_orig | not (isGeneratedSrcSpan fun_lspan)
                       = exprCtOrigin rn_fun

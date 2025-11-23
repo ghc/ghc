@@ -871,7 +871,7 @@ pprCtOrigin (ExpansionOrigin o)
       what = case o of
         OrigStmt{} ->
           text "a do statement"
-        OrigPat p ->
+        OrigPat _ p ->
           text "a do statement" $$
              text "with the failable pattern" <+> quotes (ppr p)
         OrigExpr (HsGetField _ _ (L _ f)) ->

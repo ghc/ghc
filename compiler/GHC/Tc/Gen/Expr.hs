@@ -330,7 +330,7 @@ tcExpr e@(HsLit x lit) res_ty
        ; tcWrapResult e (HsLit x (convertLit lit)) lit_ty res_ty }
 
 tcExpr (HsPar x expr) res_ty
-  = do { expr' <- tcMonoLExprNC expr res_ty
+  = do { expr' <- tcMonoLExpr expr res_ty
        ; return (HsPar x expr') }
 
 tcExpr (HsPragE x prag expr) res_ty
