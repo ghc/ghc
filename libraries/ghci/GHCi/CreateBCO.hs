@@ -116,19 +116,9 @@ mkPtrsArray arr n_ptrs ptrs = do
       -- This MUST be /strict!/
       -- Lazy evaluation will cause interpreter panics (at best).
       -- Used to refer to unlifted data constructor applications.
---      let !x = arr ! n
       let x@(HValue !a) = arr ! n
       a `seq` writePtrsArrayHValue i x marr
-{-
-      let (HValue !a) = arr ! n
-      let uVal :: IO (Any UnliftedType)
-          !uVal = unsafeCoerce# a
-      aVal <- evaluate uVal
-      let !hVal = unsafeCoerce aVal
-      hVal `seq` writePtrsArrayHValue i hVal marr
---      let x@(HValue !a) = arr ! n
---      in  a `seq` writePtrsArrayHValue i x' marr
--}
+--      writePtrsArrayHValue i (arr ! n) marr
     fill (ResolvedBCOPtr r) i = do
       hv <- localRef r
       writePtrsArrayHValue i hv marr
