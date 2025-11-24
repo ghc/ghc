@@ -93,7 +93,7 @@ packageArgs = do
             --    load target code, otherwise enable for stage1 since
             --    that runs on the target and can use target's own
             --    ghci object linker
-            [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage2]] `cabalFlag` "internal-interpreter"
+            [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage1, stage2]] `cabalFlag` "internal-interpreter"
             , orM [ notM cross, haveCurses ]  `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
             , staged (buildFlag UseLibzstd) `cabalFlag` "with-libzstd"
