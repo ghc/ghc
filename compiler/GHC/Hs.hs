@@ -36,8 +36,7 @@ module GHC.Hs (
         module GHC.Parser.Annotation,
 
         HsModule(..), AnnsModule(..),
-        HsParsedModule(..), XModulePs(..),
-
+        HsParsedModule(..), XModulePs(..)
 ) where
 
 -- friends:
