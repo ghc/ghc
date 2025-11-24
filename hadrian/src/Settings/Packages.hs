@@ -88,11 +88,10 @@ packageArgs = do
             -- 1. ghcWithInterpreter must be True ("Use interpreter" =
             --    "YES")
             -- 2. For non-cross case it can be enabled
-            -- 3. For cross case, disable for stage0 since that runs
-            --    on the host and must rely on external interpreter to
-            --    load target code, otherwise enable for stage1 since
-            --    that runs on the target and can use target's own
-            --    ghci object linker
+            -- 3. For cross case, disable for stage0 and stage1 since these run
+            --    on the host and must rely on external interpreter to load
+            --    target code, otherwise enable for stage2 since that runs on
+            --    the target and can use target's own ghci object linker
             [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage2]] `cabalFlag` "internal-interpreter"
             , orM [ notM cross, haveCurses ]  `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
@@ -115,7 +114,8 @@ packageArgs = do
              , compilerStageOption ghcDebugAssertions ? arg "-DDEBUG" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ (expr (ghcWithInterpreter stage)) `cabalFlag` "internal-interpreter"
+            [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage1]] `cabalFlag` "interpreter"
+            , andM [expr (ghcWithInterpreter stage), notM (expr cross)] `cabalFlag` "internal-interpreter"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.

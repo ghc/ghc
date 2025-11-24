@@ -35,7 +35,7 @@ import GHC.Driver.Config.Diagnostic
 import GHC.Platform
 import GHC.Platform.Host
 
-#if defined(HAVE_INTERNAL_INTERPRETER)
+#if defined(HAVE_INTERPRETER)
 import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
@@ -287,7 +287,7 @@ doRun units srcs args = do
     args' = drop 1 $ dropWhile (/= "--") $ map unLoc args
 
 ghciUI :: [String] -> [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
-#if !defined(HAVE_INTERNAL_INTERPRETER)
+#if !defined(HAVE_INTERPRETER)
 ghciUI _ _ _ =
   throwGhcException (CmdLineError "not built for interactive use")
 #else
@@ -331,7 +331,7 @@ showBanner :: PostLoadMode -> DynFlags -> IO ()
 showBanner _postLoadMode dflags = do
    let verb = verbosity dflags
 
-#if defined(HAVE_INTERNAL_INTERPRETER)
+#if defined(HAVE_INTERPRETER)
    -- Show the GHCi banner
    when (isInteractiveMode _postLoadMode && verb >= 1) $ putStrLn ghciWelcomeMsg
 #endif
