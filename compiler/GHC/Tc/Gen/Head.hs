@@ -1,3 +1,12 @@
+<<<<<<< HEAD
+=======
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
+>>>>>>> 5bb1ccc6365 (- `getDeepSubsumptionFlag_DataConHead` performs a non-trivial traversal if the expression passed to it is complex.)
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
 {-# LANGUAGE ViewPatterns        #-}
@@ -12,7 +21,7 @@ module GHC.Tc.Gen.Head
        ( HsExprArg(..), TcPass(..), QLFlag(..), EWrap(..)
        , splitHsApps, rebuildHsApps
        , addArgWrap, isHsValArg
-       , leadingValArgs, isVisibleArg
+       , leadingValArgs, isVisibleArg, getDeepSubsumptionFlag_DataConHead
 
        , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId, tcInferConLike, obviousSig
@@ -75,6 +84,7 @@ import GHC.Utils.Panic
 
 import GHC.Data.Maybe
 
+import qualified GHC.LanguageExtensions as LangExt
 
 
 {- *********************************************************************
@@ -169,6 +179,7 @@ data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
                                                      -- location and error msgs
                , eaql_rn_fun  :: HsExpr GhcRn  -- Head of the argument if it is an application
                , eaql_tc_fun  :: (HsExpr GhcTc, SrcSpan) -- Typechecked head and its location span
+               , eaql_ds_flag :: DeepSubsumptionFlag     -- Was deepsubsumption enabled for this argument?
                , eaql_fun_ue  :: UsageEnv -- Usage environment of the typechecked head (QLA5)
                , eaql_args    :: [HsExprArg 'TcpInst]    -- Args: instantiated, not typechecked
                , eaql_wanted  :: WantedConstraints
@@ -263,8 +274,6 @@ splitHsApps e = go e noSrcSpan []
                     -- and its hard to say exactly what that is
                : EWrap (EExpand e)
                : args )
-      -- look through PopErrCtxt (cf. T17594f) we do not want to lose the opportunity of calling tcEValArgQL
-      -- unlike HsPar, it is okay to forget about the PopErrCtxts as it does not persist over in GhcTc land
 
     go e lspan args = pure ((e, lspan), args)
 
@@ -427,7 +436,7 @@ Wrinkle (UTS1):
 ********************************************************************* -}
 
 tcInferAppHead :: (HsExpr GhcRn, SrcSpan)
-               -> TcM (HsExpr GhcTc, TcSigmaType)
+               -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
 -- Infer type of the head of an application
 --   i.e. the 'f' in (f e1 ... en)
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
@@ -448,25 +457,74 @@ tcInferAppHead (fun,fun_lspan)
   = setSrcSpan fun_lspan $
     do { mb_tc_fun <- tcInferAppHead_maybe fun
        ; case mb_tc_fun of
-            Just (fun', fun_sigma) -> return (fun', fun_sigma)
-            Nothing -> runInferRho (tcExpr fun) }
+            Just (fun', ds_flag, fun_sigma) -> return (fun', ds_flag, fun_sigma)
+            Nothing -> with_get_ds $ runInferRho (tcExpr fun)
+
+       }
 
 tcInferAppHead_maybe :: HsExpr GhcRn
-                     -> TcM (Maybe (HsExpr GhcTc, TcSigmaType))
+                     -> TcM (Maybe (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType))
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- Returns Nothing for a complicated head
-tcInferAppHead_maybe fun =
-    case fun of
-      HsVar _ nm                  -> Just <$> tcInferId nm
-      XExpr (HsRecSelRn f)        -> Just <$> tcInferRecSelId f
-      XExpr (ExpandedThingRn o e) -> Just <$> (addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) $ -- ANI: TODO this is fishy..
-                                              -- We do not want to instantiate c.f. T19167
-                                              tcExprSigma False e
+tcInferAppHead_maybe fun = case fun of
+      HsVar _ nm                  -> Just <$> with_get_ds (tcInferId nm)
+      ExprWithTySig _ e hs_ty     -> Just <$> with_get_ds (tcExprWithSig e hs_ty)
+      HsOverLit _ lit             -> Just <$> with_get_ds (tcInferOverLit lit)
+      XExpr (HsRecSelRn f)        -> Just <$> with_get_ds (tcInferRecSelId f)
+      XExpr (ExpandedThingRn o e) -> Just <$> (addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) $
+                                              -- We do not want to instantiate the type of the head as there may be
+                                              -- visible type applications in the argument.
+                                              -- c.f. T19167
+                                              (\ (e, ds_flag, ty) -> (mkExpandedTc o e, ds_flag, ty)) <$>
+                                                 tcExprSigma False (ExpansionOrigin o) e
                                               )
-      ExprWithTySig _ e hs_ty     -> Just <$> tcExprWithSig e hs_ty
-      HsOverLit _ lit             -> Just <$> tcInferOverLit lit
       _                           -> return Nothing
 
+
+
+with_get_ds :: TcM (HsExpr GhcTc, TcSigmaType) -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
+with_get_ds mthing =
+  do { (expr_tc, sig_ty) <- mthing
+     ; ds_flag <- getDeepSubsumptionFlag_DataConHead expr_tc
+     ; return (expr_tc, ds_flag, sig_ty)
+     }
+
+
+
+-- | Variant of 'getDeepSubsumptionFlag' which enables a top-level subsumption
+-- in order to implement the plan of Note [Typechecking data constructors].
+getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
+getDeepSubsumptionFlag_DataConHead app_head =
+  do { user_ds <- xoptM LangExt.DeepSubsumption
+     ; traceTc "getDeepSubsumptionFlag_DataConHead" (ppr app_head)
+     ; return $
+         if | user_ds
+            -> Deep DeepSub
+            | otherwise
+            -> go app_head
+     }
+  where
+    go :: HsExpr GhcTc -> DeepSubsumptionFlag
+    go app_head
+     | XExpr (ConLikeTc (RealDataCon {})) <- app_head
+     = Deep TopSub
+     | XExpr (ExpandedThingTc _ f) <- app_head
+     = go f
+     | XExpr (WrapExpr _ f) <- app_head
+     = go f
+     | HsVar _ f <- app_head
+     , isDataConId (unLoc f)
+     = Deep TopSub
+     | HsApp _ f _ <- app_head
+     = go (unLoc f)
+     | HsAppType _ f _ <- app_head
+     = go (unLoc f)
+     | OpApp _ _ f _ <- app_head
+     = go (unLoc f)
+     | HsPar _ f <- app_head
+     = go (unLoc f)
+     | otherwise
+     = Shallow
 
 {- *********************************************************************
 *                                                                      *
@@ -1079,22 +1137,14 @@ mis-match in the number of value arguments.
 add_expr_ctxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 add_expr_ctxt e thing_inside
   = case e of
-      HsHole _ -> thing_inside
+      HsHole{} -> thing_inside
    -- The HsHole special case addresses situations like
    --    f x = _
    -- when we don't want to say "In the expression: _",
    -- because it is mentioned in the error message itself
 
-      HsPar _ e -> add_expr_ctxt (unLoc e) thing_inside
-   -- We don't want to say 'In the expression (e)',
-   -- we just want to say 'In the expression, 'e'
-   -- which will be handeled by the recursive call in thing_inside
-   -- This may be a little inefficient with nested parens exprs, eg. (((e)))
-   -- But it should be okay as I do not expect too many parens to be nested consecutively
-
       ExprWithTySig _ (L _ e') _
-        | XExpr (ExpandedThingRn o _) <- e' -> addExpansionErrCtxt o (ExprCtxt e)
-                                                  thing_inside
+        | XExpr (ExpandedThingRn o _) <- e' -> addExpansionErrCtxt o (ExprCtxt e) thing_inside
    -- There is a special case for expressions with signatures to avoid having too verbose
    -- error context. So here we flip the ErrCtxt state to expanded if the expression is expanded.
    -- c.f. RecordDotSyntaxFail9
@@ -1103,12 +1153,11 @@ add_expr_ctxt e thing_inside
    -- Flip error ctxt into expansion mode
 
       _ -> addErrCtxt (ExprCtxt e) thing_inside
-  -- no op in generated code
 
 
 addLExprCtxt :: SrcSpan -> HsExpr GhcRn -> TcRn a -> TcRn a
 addLExprCtxt lspan e thing_inside
   | not (isGeneratedSrcSpan lspan)
   = setSrcSpan lspan $ add_expr_ctxt e thing_inside
-  | otherwise
+  | otherwise   -- no op in generated code
   = thing_inside

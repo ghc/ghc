@@ -52,7 +52,6 @@ import GHC.Tc.Gen.Bind
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Types.Origin
-import GHC.Tc.Types.ErrCtxt ( srcCodeOriginErrCtxMsg )
 import GHC.Tc.Types.Evidence
 import GHC.Rename.Env ( irrefutableConLikeTc )
 
@@ -400,10 +399,14 @@ tcDoStmts doExpr@(DoExpr _) ss@(L l stmts) res_ty
                   ; res_ty <- readExpType res_ty
                   ; return (HsDo res_ty doExpr (L l stmts')) }
           else do { expanded_expr <- expandDoStmts doExpr stmts -- Do expansion on the fly
+                  ; traceTc "tcDoStmts" (ppr expanded_expr)
                   ; let orig = HsDo noExtField doExpr ss
-                  ; addExpansionErrCtxt (OrigExpr orig) (srcCodeOriginErrCtxMsg (OrigExpr orig)) $
-                    do { e' <- tcMonoLExpr expanded_expr res_ty
-                       ; return (mkExpandedExprTc orig (unLoc e'))}
+                  ; mkExpandedExprTc orig <$> (
+                       -- We lose the location on the first statement location in GhcTc, unfortunately.
+                       -- It is needed for get the pattern match warnings right cf. T14546d
+                       -- That location is currently recovered from the location stored in OrigStmt
+                       -- in dsExpr of ExpandedThingTc
+                        unLoc <$> tcMonoLExpr expanded_expr res_ty)
                   }
         }
 
