@@ -1148,7 +1148,8 @@ the typechecker:
   * HsDo, where we give the SrcSpan of the entire do block to each
     ApplicativeStmt.
   * Expanded (via ExpandedThingRn) ExplicitList{}, where we give the SrcSpan of the original
-    list expression to the 'fromListN' call.
+    list expression to the expanded expression. The 'fromListN' is assigned
+    a generated location span
 
 In order for the implicit function calls to not be confused for actual
 occurrences of functions in the source code, most of this extra information

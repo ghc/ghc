@@ -2478,7 +2478,7 @@ unifyTypeAndEmit t_or_k orig ty1 ty2
                       , u_given_eq_lvl = cur_lvl
                       , u_rewriters = emptyCoHoleSet  -- ToDo: check this
                       , u_defer = ref, u_what = WU_None }
-
+       ; traceTc "unifyTypeAndEmit" (ppr t_or_k)
        -- The hard work happens here
        ; co <- uType env ty1 ty2
 

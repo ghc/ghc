@@ -17,7 +17,8 @@ module GHC.Tc.Gen.Expr
          tcInferRho, tcInferRhoNC,
          tcMonoLExpr, tcMonoLExprNC,
          tcInferRhoFRR, tcInferRhoFRRNC,
-         tcPolyLExpr, tcPolyExpr, tcExpr, tcPolyLExprSig,
+         tcPolyLExpr,  tcPolyLExprSig, tcPolyLExprNC,
+         tcPolyExpr, tcExpr,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
          ) where
@@ -116,7 +117,7 @@ tcCheckPolyExprNC expr res_ty = tcPolyLExprNC expr (mkCheckExpType res_ty)
 -----------------
 -- These versions take an ExpType
 tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
-                           -> TcM (LHsExpr GhcTc)
+                            -> TcM (LHsExpr GhcTc)
 
 tcPolyLExpr (L loc expr) res_ty
   = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
@@ -330,7 +331,7 @@ tcExpr e@(HsLit x lit) res_ty
        ; tcWrapResult e (HsLit x (convertLit lit)) lit_ty res_ty }
 
 tcExpr (HsPar x expr) res_ty
-  = do { expr' <- tcMonoLExpr expr res_ty
+  = do { expr' <- tcMonoLExprNC expr res_ty
        ; return (HsPar x expr') }
 
 tcExpr (HsPragE x prag expr) res_ty
@@ -763,6 +764,8 @@ tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
 tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcXExpr (ExpandedThingRn o e) res_ty
    = mkExpandedTc o <$> -- necessary for hpc ticks
+         -- Need to call tcExpr and not tcApp
+         -- as e can be let statements which tcApp cannot gracefully handle
          tcExpr e res_ty
 
 -- For record selection, same as HsVar case
@@ -907,7 +910,7 @@ tcSyntaxOpGen :: CtOrigin
               -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExprTc)
 tcSyntaxOpGen orig (SyntaxExprRn op) arg_tys res_ty thing_inside
-  = do { (expr, sigma) <- tcInferAppHead (op, noSrcSpan)
+  = do { (expr, _, sigma) <- tcInferAppHead (op, noSrcSpan)
              -- Ugh!! But all this code is scheduled for demolition anyway
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)
