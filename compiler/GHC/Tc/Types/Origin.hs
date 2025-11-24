@@ -835,7 +835,7 @@ exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel 
 
 srcCodeOriginCtOrigin :: HsExpr GhcRn -> Maybe SrcCodeOrigin -> CtOrigin
 srcCodeOriginCtOrigin e Nothing = exprCtOrigin e
-srcCodeOriginCtOrigin _ (Just e) = ExpansionOrigin e
+srcCodeOriginCtOrigin _ (Just o) = ExpansionOrigin o
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin

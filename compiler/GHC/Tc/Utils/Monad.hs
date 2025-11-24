@@ -63,7 +63,7 @@ module GHC.Tc.Utils.Monad(
   -- * Error management
   getSrcCodeOrigin,
   getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
-  inGeneratedCode, -- setInGeneratedCode,
+  inGeneratedCode,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,
@@ -1328,7 +1328,6 @@ setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 
 -- | Add a fixed message to the error context. This message should not
 -- do any tidying.
--- NB. No op in generated code
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 addErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
@@ -1339,7 +1338,6 @@ addExpansionErrCtxt :: SrcCodeOrigin -> ErrCtxtMsg -> TcM a -> TcM a
 addExpansionErrCtxt o msg = addExpansionErrCtxtM o (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
---   NB. No op in generated code
 --   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
@@ -1363,16 +1361,10 @@ addLandmarkErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM 
 {-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxtM ctxt = pushCtxt (MkErrCtxt LandmarkUserSrcCode ctxt)
 
--- | NB. no op in generated code
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 pushCtxt :: ErrCtxt -> TcM a -> TcM a
 {-# INLINE pushCtxt #-} -- Note [Inlining addErrCtxt]
-pushCtxt ctxt = updLclEnv (updCtxt ctxt)
-
-updCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
--- Do not update the context if we are in generated code
--- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
-updCtxt ctxt env = addLclEnvErrCtxt ctxt env
+pushCtxt ctxt = updLclEnv (addLclEnvErrCtxt ctxt)
 
 popErrCtxt :: TcM a -> TcM a
 popErrCtxt thing_inside = updLclEnv (\env -> setLclEnvErrCtxt (pop $ getLclEnvErrCtxt env) env) $
@@ -1843,7 +1835,7 @@ mkErrCtxt env ctxts
           ; rest <- go dbg (n+1) env' ctxts
           ; return (msg : rest) }
      | otherwise
-     = go dbg n env ctxts
+     = go dbg n env ctxts -- need to compute this for zonking
 
 
 mAX_CONTEXTS :: Int     -- No more than this number of non-landmark contexts

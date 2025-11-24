@@ -5,7 +5,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DeepSubsumption #-}
 module GHC.Driver.Downsweep
   ( downsweep
   , downsweepThunk

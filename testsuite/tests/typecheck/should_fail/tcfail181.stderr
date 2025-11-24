@@ -1,5 +1,5 @@
 tcfail181.hs:17:9: error: [GHC-39999]
-    • Could not deduce ‘Monad m0’ arising from a record update
+    • Could not deduce ‘Monad m0’ arising from a use of ‘foo’
       from the context: Monad m
         bound by the inferred type of
                    wog :: Monad m => p -> Something (m Bool) e
