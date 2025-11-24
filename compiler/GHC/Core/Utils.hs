@@ -2169,20 +2169,24 @@ it doesn't have the trickiness of the let-can-float invariant to worry about.
 -- Suppose @f x@ diverges; then @C (f x)@ is not a value.
 -- We check for this using needsCaseBinding below
 exprIsHNF :: CoreExpr -> Bool           -- True => Value-lambda, constructor, PAP
-exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding
+exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding True
 
 -- | Similar to 'exprIsHNF' but includes CONLIKE functions as well as
 -- data constructors. Conlike arguments are considered interesting by the
 -- inliner.
 exprIsConLike :: CoreExpr -> Bool       -- True => lambda, conlike, PAP
-exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
+exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding False
 
 -- | Returns true for values or value-like expressions. These are lambdas,
 -- constructors / CONLIKE functions (as determined by the function argument)
 -- or PAPs.
 --
-exprIsHNFlike :: HasDebugCallStack => (Var -> Bool) -> (Unfolding -> Bool) -> CoreExpr -> Bool
-exprIsHNFlike is_con is_con_unf e
+exprIsHNFlike :: HasDebugCallStack => (Var -> Bool)
+                                   -> (Unfolding -> Bool)
+                                   -> Bool
+                                   -> CoreExpr -> Bool
+{-# INLINE exprIsHNFlike #-}   -- Specialise at its two call sites
+exprIsHNFlike is_con is_con_unf rubbish_lit_result e
   = -- pprTraceWith "hnf" (\r -> ppr r <+> ppr e) $
     is_hnf_like e
   where
@@ -2201,9 +2205,12 @@ exprIsHNFlike is_con is_con_unf e
       || definitelyUnliftedType (idType v)
         -- Unlifted binders are always evaluated (#20140)
 
-    is_hnf_like (Lit l)          = not (isLitRubbish l)
+    is_hnf_like (Lit lit)
+      | isLitRubbish lit = rubbish_lit_result
+      | otherwise        = True
         -- Regarding a LitRubbish as ConLike leads to unproductive inlining in
         -- WWRec, see #20035
+
     is_hnf_like (Type _)         = True       -- Types are honorary Values;
                                               -- we don't mind copying them
     is_hnf_like (Coercion _)     = True       -- Same for coercions
@@ -2284,7 +2291,6 @@ exprIsHNFlike is_con is_con_unf e
           | otherwise
           = Nothing
 
-{-# INLINE exprIsHNFlike #-}
 
 {-
 Note [exprIsHNF Tick]

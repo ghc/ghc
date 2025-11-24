@@ -109,6 +109,7 @@ import GHC.Core.Lint        ( lintMessage )
 import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel, isMarkedCbv )
 import GHC.Types.CostCentre ( isCurrentCCS )
 import GHC.Types.Id
+import GHC.Types.Literal    ( isLitRubbish )
 import GHC.Types.Var.Set
 import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
 import GHC.Types.RepType
@@ -274,7 +275,9 @@ lintStgRhs rhs@(StgRhsCon _ con _ _ args _) = do
 
 lintStgExpr :: (OutputablePass a, BinderP a ~ Id) => GenStgExpr a -> LintM ()
 
-lintStgExpr (StgLit _) = return ()
+lintStgExpr (StgLit lit)
+  | isLitRubbish lit = addErrL (hang (text "Found rubbish literal:") 2 (ppr lit))
+  | otherwise        = return ()
 
 lintStgExpr e@(StgApp fun args) = do
   lintStgVar fun
