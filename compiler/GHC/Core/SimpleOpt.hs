@@ -393,12 +393,19 @@ simple_app env e0@(Lam {}) as0@(_:_)
       = wrapLet mb_pr $ do_beta env'' body as
       where (env', b') = subst_opt_bndr env b
 
-    do_beta env e@(Lam b body) as@(CastIt co:rest)
-      -- See Note [Desugaring unlifted newtypes]
+    -- See Note [Eliminate casts in function position]
+    do_beta env e@(Lam b _) as@(CastIt out_co:rest)
       | isNonCoVarId b
-      , Just (b', body') <- pushCoercionIntoLambda (soe_subst env) b body co
+      -- Optimise the inner lambda to make it an 'OutExpr', which makes it
+      -- possible to call 'pushCoercionIntoLambda' with the 'OutCoercion' 'co'.
+      -- This is kind of horrible, as for nested casted lambdas with a big body,
+      -- we will repeatedly optimise the body (once for each binder). However,
+      -- we need to do this to avoid mixing 'InExpr' and 'OutExpr', or two
+      -- 'InExpr' with different environments (getting this wrong caused #26588 & #26589.)
+      , Lam out_b out_body <- simple_app env e []
+      , Just (b', body') <- pushCoercionIntoLambda (soeInScope env) out_b out_body out_co
       = do_beta (soeZapSubst env) (Lam b' body') rest
-        -- soeZapSubst: pushCoercionIntoLambda applies the substitution
+        -- soeZapSubst: we've already optimised everything (the lambda and 'rest') by now.
       | otherwise
       = rebuild_app env (simple_opt_expr env e) as
 
@@ -511,7 +518,31 @@ TL;DR: To avoid the rest of the compiler pipeline seeing these bad lambas, we
 rely on the simple optimiser to both inline the newtype unfolding and
 subsequently deal with the resulting lambdas (either beta-reducing them
 altogether or pushing coercions into them so that they satisfy the
-representation-polymorphism invariants).
+representation-polymorphism invariants). See Note [Eliminate casts in function position].
+
+[Alternative approach] (GHC ticket #26608)
+
+  We could instead, in the typechecker, emit a special form (a new constructor
+  of XXExprGhcTc) for instantiations of representation-polymorphic unlifted
+  newtypes (whether applied to a value argument or not):
+
+    UnliftedNT :: DataCon -> [Type] -> Coercion -> XXExprGhcTc
+
+  where "UnliftedNT nt_con [ty1, ...] co" represents the expression:
+
+    ( nt_con @ty1 ... ) |> co
+
+  The desugarer would then turn these AST nodes into appropriate Core, doing
+  what the simple optimiser does today:
+    - inline the compulsory unfolding of the newtype constructor
+    - apply it to its type arguments and beta reduce
+    - push the coercion into the resulting lambda
+
+  This would have several advantages:
+    - the desugarer would never produce "invalid" Core that needs to be
+      tidied up by the simple optimiser,
+    - the ugly and inefficient implementation described in
+      Note [Eliminate casts in function position] could be removed.
 
 Wrinkle [Unlifted newtypes with wrappers]
 
@@ -717,50 +748,49 @@ rhss here.
 
 Note [Eliminate casts in function position]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider the following program:
+Due to the current implementation strategy for representation-polymorphic
+unlifted newtypes, as described in Note [Desugaring unlifted newtypes], we rely
+on the simple optimiser to push coercions into lambdas, such as in the following
+example:
 
   type R :: Type -> RuntimeRep
-  type family R a where { R Float = FloatRep; R Double = DoubleRep }
-  type F :: forall (a :: Type) -> TYPE (R a)
-  type family F a where { F Float = Float#  ; F Double = Double# }
+  type family R a where { R Int = IntRep }
+  type F :: forall a -> TYPE (R a)
+  type family F a where { F Int = Int# }
 
-  type N :: forall (a :: Type) -> TYPE (R a)
   newtype N a = MkN (F a)
 
-As MkN is a newtype, its unfolding is a lambda which wraps its argument
-in a cast:
+Now, an instantiated occurrence of 'MkN', such as 'MkN @Int' (whether applied
+to a value argument or not) will lead, after inlining the compulsory unfolding
+of 'MkN', to a lambda fo the form:
 
-  MkN :: forall (a :: Type). F a -> N a
-  MkN = /\a \(x::F a). x |> co_ax
-    -- recall that F a :: TYPE (R a)
+  ( \ ( x :: F Int ) -> body ) |> co
 
-This is a representation-polymorphic lambda, in which the binder has an unknown
-representation (R a). We can't compile such a lambda on its own, but we can
-compile instantiations, such as `MkN @Float` or `MkN @Double`.
+    where
+      co :: ( F Int -> res ) ~# ( Int# -> res )
 
-Our strategy to avoid running afoul of the representation-polymorphism
-invariants of Note [Representation polymorphism invariants] in GHC.Core is thus:
+The problem is that we now have a lambda abstraction whose binder does not have a
+fixed RuntimeRep in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 
-  1. Give the newtype a compulsory unfolding (it has no binding, as we can't
-     define lambdas with representation-polymorphic value binders in source Haskell).
-  2. Rely on the optimiser to beta-reduce away any representation-polymorphic
-     value binders.
+However, if we use 'pushCoercionIntoLambda', we end up with:
 
-For example, consider the application
+  ( \ ( x' :: Int# ) -> body' )
 
-    MkN @Float 34.0#
+which satisfies the representation-polymorphism invariants of
+Note [Representation polymorphism invariants] in GHC.Core.
 
-After inlining MkN we'll get
+In conclusion:
 
-   ((/\a \(x:F a). x |> co_ax) @Float) |> co 34#
+  1. The simple optimiser must push casts into lambdas.
+  2. It must also deal with a situation such as (MkN @Int) |> co, where we first
+     inline the compulsory unfolding of N. This means the simple optimiser must
+     "peel off" the casts and optimise the inner expression first, to determine
+     whether it is a lambda abstraction or not.
 
-where co :: (F Float -> N Float) ~ (Float# ~ N Float)
-
-But to actually beta-reduce that lambda, we need to push the 'co'
-inside the `\x` with pushCoercionIntoLambda.  Hence the extra
-equation for Cast-of-Lam in simple_app.
-
-This is regrettably delicate.
+This is regrettably delicate. If we could make sure the typechecker/desugarer
+did not produce these bad lambdas in the first place (as described in
+[Alternative approach] in Note [Desugaring unlifted newtypes]), we could
+get rid of this ugly logic.
 
 Note [Preserve join-binding arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1673,7 +1703,7 @@ exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e co)
     -- this implies that x is not in scope in gamma (makes this code simpler)
     , not (isTyVar x) && not (isCoVar x)
     , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
-    , Just (x',e') <- pushCoercionIntoLambda (mkEmptySubst in_scope_set) x e co
+    , Just (x',e') <- pushCoercionIntoLambda in_scope_set x e co
     , let res = Just (x',e',ts)
     = --pprTrace "exprIsLambda_maybe:Cast" (vcat [ppr casted_e,ppr co,ppr res)])
       res

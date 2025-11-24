@@ -749,13 +749,13 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
     go1 _pos acc fun_ty []
        | XExpr (ConLikeTc (RealDataCon dc)) <- tc_fun
        , isNewDataCon dc
-       , [Scaled _ arg_ty] <- dataConOrigArgTys dc
+       , [Scaled _ orig_arg_ty] <- dataConOrigArgTys dc
        , n_val_args == 0
        -- If we're dealing with an unsaturated representation-polymorphic
        -- UnliftedNewype, then perform a representation-polymorphism check.
        -- See Note [Representation-polymorphism checks for unsaturated unlifted newtypes]
        -- in GHC.Tc.Utils.Concrete.
-       , not $ typeHasFixedRuntimeRep arg_ty
+       , not $ typeHasFixedRuntimeRep orig_arg_ty
        = do { (wrap_co, arg_ty, res_ty) <-
                   matchActualFunTy (FRRRepPolyUnliftedNewtype dc)
                     (Just $ HsExprTcThing tc_fun)

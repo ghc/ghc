@@ -2993,12 +2993,12 @@ pushCoValArg co
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
-    :: HasDebugCallStack => Subst -> InVar -> InExpr -> OutCoercionR -> Maybe (OutVar, OutExpr)
+    :: HasDebugCallStack => InScopeSet -> Var -> CoreExpr -> CoercionR -> Maybe (Var, CoreExpr)
 -- This implements the Push rule from the paper on coercions
 --    (\x. e) |> co
 -- ===>
 --    (\x'. e |> co')
-pushCoercionIntoLambda subst x e co
+pushCoercionIntoLambda in_scope x e co
     | assert (not (isTyVar x) && not (isCoVar x)) True
     , Pair s1s2 t1t2 <- coercionKind co
     , Just {}              <- splitFunTy_maybe s1s2
@@ -3011,9 +3011,9 @@ pushCoercionIntoLambda subst x e co
           -- Should we optimize the coercions here?
           -- Otherwise they might not match too well
           x' = x `setIdType` t1 `setIdMult` w1
-          in_scope' = substInScopeSet subst `extendInScopeSet` x'
+          in_scope' = in_scope `extendInScopeSet` x'
           subst' =
-            extendIdSubst (setInScope subst in_scope')
+            extendIdSubst (setInScope emptySubst in_scope')
               x
               (mkCast (Var x') (mkSymCo co1))
             -- We substitute x' for x, except we need to preserve types.

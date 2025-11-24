@@ -544,6 +544,9 @@ test('T25883b', normal, compile_grep_core, [''])
 test('T25883c', normal, compile_grep_core, [''])
 test('T25883d', [extra_files(['T25883d_import.hs'])], multimod_compile_filter, ['T25883d', '-O -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques', r'grep -e "y ="'])
 
+test('T26588', normal, compile, ['-package containers -O'])
+test('T26589', normal, compile, ['-O'])
+
 test('T25976', [grep_errmsg('Dead Code')], compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
 
 test('T25965', normal, compile, ['-O'])
