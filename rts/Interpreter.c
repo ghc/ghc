@@ -2904,6 +2904,8 @@ run_BCO:
         NEXT_INSTRUCTION;                                              \
     }
 
+#define TYPE_IS_SIGNED(ty) ((ty)-1 < (ty)1)
+
 // op :: ty -> ty -> ty
 #define SIZED_BIN_OP(op,ty)                                                     \
         {                                                                       \
@@ -2911,8 +2913,12 @@ run_BCO:
                 ty r = ((ty) ReadSpW64(0)) op ((ty) ReadSpW64(1));                  \
                 Sp_addW64(1);                                                   \
                 SpW64(0) = (StgWord64) r;                                       \
+            } else if (TYPE_IS_SIGNED(ty)) {                                    \
+                ty r = ((StgInt)(ty)ReadSpW(0)) op ((StgInt)(ty)ReadSpW(1));    \
+                Sp_addW(1);                                                     \
+                SpW(0) = (StgWord) r;                                           \
             } else {                                                            \
-                ty r = ((ty) ReadSpW(0)) op ((ty) ReadSpW(1));                  \
+                ty r = ((StgWord)(ty)ReadSpW(0)) op ((StgWord)(ty)ReadSpW(1));  \
                 Sp_addW(1);                                                     \
                 SpW(0) = (StgWord) r;                                           \
             };                                                                  \
@@ -2949,12 +2955,12 @@ run_BCO:
     NEXT_INSTRUCTION;                                                      \
 }
 
-        INSTRUCTION(bci_OP_ADD_64): SIZED_BIN_OP(+, StgInt64)
-        INSTRUCTION(bci_OP_SUB_64): SIZED_BIN_OP(-, StgInt64)
-        INSTRUCTION(bci_OP_AND_64): SIZED_BIN_OP(&, StgInt64)
-        INSTRUCTION(bci_OP_XOR_64): SIZED_BIN_OP(^, StgInt64)
-        INSTRUCTION(bci_OP_OR_64):  SIZED_BIN_OP(|, StgInt64)
-        INSTRUCTION(bci_OP_MUL_64): SIZED_BIN_OP(*, StgInt64)
+        INSTRUCTION(bci_OP_ADD_64): SIZED_BIN_OP(+, StgWord64)
+        INSTRUCTION(bci_OP_SUB_64): SIZED_BIN_OP(-, StgWord64)
+        INSTRUCTION(bci_OP_AND_64): SIZED_BIN_OP(&, StgWord64)
+        INSTRUCTION(bci_OP_XOR_64): SIZED_BIN_OP(^, StgWord64)
+        INSTRUCTION(bci_OP_OR_64):  SIZED_BIN_OP(|, StgWord64)
+        INSTRUCTION(bci_OP_MUL_64): SIZED_BIN_OP(*, StgWord64)
         INSTRUCTION(bci_OP_SHL_64): SIZED_BIN_OP_TY_INT(<<, StgWord64)
         INSTRUCTION(bci_OP_LSR_64): SIZED_BIN_OP_TY_INT(>>, StgWord64)
         INSTRUCTION(bci_OP_ASR_64): SIZED_BIN_OP_TY_INT(>>, StgInt64)
@@ -2972,15 +2978,15 @@ run_BCO:
         INSTRUCTION(bci_OP_S_LE_64): SIZED_BIN_OP_TY_TY_INT(<=, StgInt64)
 
         INSTRUCTION(bci_OP_NOT_64): UN_SIZED_OP(~, StgWord64)
-        INSTRUCTION(bci_OP_NEG_64): UN_SIZED_OP(-, StgInt64)
+        INSTRUCTION(bci_OP_NEG_64): UN_SIZED_OP(-, StgWord64)
 
 
-        INSTRUCTION(bci_OP_ADD_32): SIZED_BIN_OP(+, StgInt32)
-        INSTRUCTION(bci_OP_SUB_32): SIZED_BIN_OP(-, StgInt32)
-        INSTRUCTION(bci_OP_AND_32): SIZED_BIN_OP(&, StgInt32)
-        INSTRUCTION(bci_OP_XOR_32): SIZED_BIN_OP(^, StgInt32)
-        INSTRUCTION(bci_OP_OR_32):  SIZED_BIN_OP(|, StgInt32)
-        INSTRUCTION(bci_OP_MUL_32): SIZED_BIN_OP(*, StgInt32)
+        INSTRUCTION(bci_OP_ADD_32): SIZED_BIN_OP(+, StgWord32)
+        INSTRUCTION(bci_OP_SUB_32): SIZED_BIN_OP(-, StgWord32)
+        INSTRUCTION(bci_OP_AND_32): SIZED_BIN_OP(&, StgWord32)
+        INSTRUCTION(bci_OP_XOR_32): SIZED_BIN_OP(^, StgWord32)
+        INSTRUCTION(bci_OP_OR_32):  SIZED_BIN_OP(|, StgWord32)
+        INSTRUCTION(bci_OP_MUL_32): SIZED_BIN_OP(*, StgWord32)
         INSTRUCTION(bci_OP_SHL_32): SIZED_BIN_OP_TY_INT(<<, StgWord32)
         INSTRUCTION(bci_OP_LSR_32): SIZED_BIN_OP_TY_INT(>>, StgWord32)
         INSTRUCTION(bci_OP_ASR_32): SIZED_BIN_OP_TY_INT(>>, StgInt32)
@@ -2998,15 +3004,15 @@ run_BCO:
         INSTRUCTION(bci_OP_S_LE_32): SIZED_BIN_OP_TY_TY_INT(<=, StgInt32)
 
         INSTRUCTION(bci_OP_NOT_32): UN_SIZED_OP(~, StgWord32)
-        INSTRUCTION(bci_OP_NEG_32): UN_SIZED_OP(-, StgInt32)
+        INSTRUCTION(bci_OP_NEG_32): UN_SIZED_OP(-, StgWord32)
 
 
-        INSTRUCTION(bci_OP_ADD_16): SIZED_BIN_OP(+, StgInt16)
-        INSTRUCTION(bci_OP_SUB_16): SIZED_BIN_OP(-, StgInt16)
-        INSTRUCTION(bci_OP_AND_16): SIZED_BIN_OP(&, StgInt16)
-        INSTRUCTION(bci_OP_XOR_16): SIZED_BIN_OP(^, StgInt16)
-        INSTRUCTION(bci_OP_OR_16):  SIZED_BIN_OP(|, StgInt16)
-        INSTRUCTION(bci_OP_MUL_16): SIZED_BIN_OP(*, StgInt16)
+        INSTRUCTION(bci_OP_ADD_16): SIZED_BIN_OP(+, StgWord16)
+        INSTRUCTION(bci_OP_SUB_16): SIZED_BIN_OP(-, StgWord16)
+        INSTRUCTION(bci_OP_AND_16): SIZED_BIN_OP(&, StgWord16)
+        INSTRUCTION(bci_OP_XOR_16): SIZED_BIN_OP(^, StgWord16)
+        INSTRUCTION(bci_OP_OR_16):  SIZED_BIN_OP(|, StgWord16)
+        INSTRUCTION(bci_OP_MUL_16): SIZED_BIN_OP(*, StgWord16)
         INSTRUCTION(bci_OP_SHL_16): SIZED_BIN_OP_TY_INT(<<, StgWord16)
         INSTRUCTION(bci_OP_LSR_16): SIZED_BIN_OP_TY_INT(>>, StgWord16)
         INSTRUCTION(bci_OP_ASR_16): SIZED_BIN_OP_TY_INT(>>, StgInt16)
@@ -3024,15 +3030,15 @@ run_BCO:
         INSTRUCTION(bci_OP_S_LE_16): SIZED_BIN_OP(<=, StgInt16)
 
         INSTRUCTION(bci_OP_NOT_16): UN_SIZED_OP(~, StgWord16)
-        INSTRUCTION(bci_OP_NEG_16): UN_SIZED_OP(-, StgInt16)
+        INSTRUCTION(bci_OP_NEG_16): UN_SIZED_OP(-, StgWord16)
 
 
-        INSTRUCTION(bci_OP_ADD_08): SIZED_BIN_OP(+, StgInt8)
-        INSTRUCTION(bci_OP_SUB_08): SIZED_BIN_OP(-, StgInt8)
-        INSTRUCTION(bci_OP_AND_08): SIZED_BIN_OP(&, StgInt8)
-        INSTRUCTION(bci_OP_XOR_08): SIZED_BIN_OP(^, StgInt8)
-        INSTRUCTION(bci_OP_OR_08):  SIZED_BIN_OP(|, StgInt8)
-        INSTRUCTION(bci_OP_MUL_08): SIZED_BIN_OP(*, StgInt8)
+        INSTRUCTION(bci_OP_ADD_08): SIZED_BIN_OP(+, StgWord8)
+        INSTRUCTION(bci_OP_SUB_08): SIZED_BIN_OP(-, StgWord8)
+        INSTRUCTION(bci_OP_AND_08): SIZED_BIN_OP(&, StgWord8)
+        INSTRUCTION(bci_OP_XOR_08): SIZED_BIN_OP(^, StgWord8)
+        INSTRUCTION(bci_OP_OR_08):  SIZED_BIN_OP(|, StgWord8)
+        INSTRUCTION(bci_OP_MUL_08): SIZED_BIN_OP(*, StgWord8)
         INSTRUCTION(bci_OP_SHL_08): SIZED_BIN_OP_TY_INT(<<, StgWord8)
         INSTRUCTION(bci_OP_LSR_08): SIZED_BIN_OP_TY_INT(>>, StgWord8)
         INSTRUCTION(bci_OP_ASR_08): SIZED_BIN_OP_TY_INT(>>, StgInt8)
@@ -3050,7 +3056,7 @@ run_BCO:
         INSTRUCTION(bci_OP_S_LE_08): SIZED_BIN_OP_TY_TY_INT(<=, StgInt8)
 
         INSTRUCTION(bci_OP_NOT_08): UN_SIZED_OP(~, StgWord8)
-        INSTRUCTION(bci_OP_NEG_08): UN_SIZED_OP(-, StgInt8)
+        INSTRUCTION(bci_OP_NEG_08): UN_SIZED_OP(-, StgWord8)
 
         INSTRUCTION(bci_OP_INDEX_ADDR_64):
         {
