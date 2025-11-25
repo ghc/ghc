@@ -109,7 +109,7 @@ import GHC.Core.Lint        ( lintMessage )
 import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel, isMarkedCbv )
 import GHC.Types.CostCentre ( isCurrentCCS )
 import GHC.Types.Id
-import GHC.Types.Literal    ( isLitRubbish )
+import GHC.Types.Literal    ( Literal, isLitRubbish )
 import GHC.Types.Var.Set
 import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
 import GHC.Types.RepType
@@ -186,7 +186,7 @@ lintStgConArg arg = do
       text "Its PrimReps are: " <> ppr badRep
 
   case arg of
-    StgLitArg _ -> pure ()
+    StgLitArg l -> lintStgLit l
     StgVarArg v -> lintStgVar v
 
 lintStgFunArg :: StgArg -> LintM ()
@@ -201,7 +201,7 @@ lintStgFunArg arg = do
       text "Its PrimReps are: " <> ppr badRep
 
   case arg of
-    StgLitArg _ -> pure ()
+    StgLitArg l -> lintStgLit l
     StgVarArg v -> lintStgVar v
 
 lintStgVar :: Id -> LintM ()
@@ -275,17 +275,13 @@ lintStgRhs rhs@(StgRhsCon _ con _ _ args _) = do
 
 lintStgExpr :: (OutputablePass a, BinderP a ~ Id) => GenStgExpr a -> LintM ()
 
-lintStgExpr (StgLit lit)
-  | isLitRubbish lit = addErrL (hang (text "Found rubbish literal:") 2 (ppr lit))
-  | otherwise        = return ()
+lintStgExpr (StgLit lit) = lintStgLit lit
 
 lintStgExpr e@(StgApp fun args) = do
   lintStgVar fun
   mapM_ lintStgFunArg args
   lintAppCbvMarks e
   lintStgAppReps fun args
-
-
 
 lintStgExpr app@(StgConApp con _n args _arg_tys) = do
     -- unboxed sums should vanish during unarise
@@ -323,6 +319,11 @@ lintStgExpr (StgCase scrut bndr alts_type alts) = do
     let in_scope = stgCaseBndrInScope alts_type (lf_unarised lf)
 
     addInScopeVars [bndr | in_scope] (mapM_ lintAlt alts)
+
+lintStgLit :: Literal -> LintM ()
+lintStgLit lit
+  | isLitRubbish lit = addErrL (hang (text "Found rubbish literal:") 2 (ppr lit))
+  | otherwise        = return ()
 
 lintAlt
     :: (OutputablePass a, BinderP a ~ Id)
