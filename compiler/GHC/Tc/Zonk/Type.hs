@@ -1862,9 +1862,10 @@ zonkEvTerm (EvExpr e)
   = EvExpr <$> zonkCoreExpr e
 zonkEvTerm (EvCastExpr e (CCoercion co) co_res_ty)
   = do { zap_casts <- hasZapCasts <$> lift getDynFlags
-       ; co_res_ty' <- zonkTcTypeToTypeX co_res_ty
-       ; if zap_casts
-         then EvCastExpr <$> zonkCoreExpr e <*> (ZCoercion co_res_ty' <$> zonkShallowCoVarsOfCo co) <*> pure co_res_ty'
+       ; if zap_casts && coercionSize co > typeSize co_res_ty -- AMG TODO: experimental heuristic
+         then do { co_res_ty' <- zonkTcTypeToTypeX co_res_ty
+                 ; EvCastExpr <$> zonkCoreExpr e <*> (ZCoercion co_res_ty' <$> zonkShallowCoVarsOfCo co) <*> pure co_res_ty'
+                 }
          else EvExpr <$> zonkCoreExpr (Cast e (CCoercion co))
        }
 zonkEvTerm ev@(EvCastExpr _ (ZCoercion{}) _)
