@@ -31,6 +31,7 @@ Compiler
 - Fixed GHC settings to always unescape escaped spaces (:ghc-ticket:`25204`)
 - Fixed issue with HasCallStack constraint caching (:ghc-ticket:`25529`)
 - Fixed archive member size writing logic in ``GHC.SysTools.Ar`` (:ghc-ticket:`26120`, :ghc-ticket:`22586`)
+- Added support for synchronous JSFFI exports for the wasm backend (:ref:`wasm-jsffi`)
 
 Runtime System
 ~~~~~~~~~~~~~~
@@ -46,6 +47,7 @@ Runtime System
 - Improved documentation of SLIDE and PACK bytecode instructions
 - Eliminated redundant ``SLIDE x 0`` bytecode instructions
 - Fixed compile issues on powerpc64 ELF v1
+- Various fixes of wasm-specific logic in the RTS
 
 Code Generation
 ~~~~~~~~~~~~~~~
@@ -142,5 +144,3 @@ for further change information.
     libraries/xhtml/xhtml.cabal:                         Dependency of ``haddock`` executable
     utils/haddock/haddock-api/haddock-api.cabal:         Dependency of ``haddock`` executable
     utils/haddock/haddock-library/haddock-library.cabal: Dependency of ``haddock`` executable
-
-
