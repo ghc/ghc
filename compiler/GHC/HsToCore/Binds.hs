@@ -1620,7 +1620,7 @@ ds_hs_wrapper hs_wrap
                               do { x <- newSysLocalDs (mkScaled (subMultCoRKind w_co) t)
                                  ; go c1 $ \w1 ->
                                    go c2 $ \w2 ->
-                                   let app f a = mkCoreApp (text "dsHsWrapper") f a
+                                   let app f a = mkCoreApp f a
                                        arg     = w1 (Var x)
                                    in k (\e -> (Lam x (w2 (app e arg)))) }
 

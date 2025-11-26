@@ -133,6 +133,124 @@ data U_E1 = U_E1 {-# UNPACK #-} !E1
                  {-# UNPACK #-} !Int8
     deriving (Show)
 
+{- In `data U_E`, the {-# UNPACK #-} !E1 gives rise to a pretty clumsy expression
+   for the wrapper for U_E1. Here is what it looks like when ther are only 16
+   data constructors in E1, and we have just
+       data U_E1 = U_E1 {-# UNPACK #-} !E1
+   Blimey!
+
+Main.$WU_E1
+  = \ (conrep_t1N4 [Occ=Once1!] :: Main.E1) ->
+      case case conrep_t1N4 of {
+             Main.E1_1 ->
+               GHC.Internal.Types.(# _| | | | | | | | | | | | | | | #)
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 GHC.Internal.Types.(##);
+             Main.E1_2 ->
+               GHC.Internal.Types.(# |_| | | | | | | | | | | | | | #)
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 GHC.Internal.Types.(##);
+             Main.E1_3 ->
+               GHC.Internal.Types.(# | |_| | | | | | | | | | | | | #)
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @GHC.Internal.Types.ZeroBitRep
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 @(# #)
+                 GHC.Internal.Types.(##);
+
+       ... etc ....
+-}
+
 data U_E2 = U_E2 {-# UNPACK #-} !E2
                  {-# UNPACK #-} !Int8
                  {-# UNPACK #-} !Int8

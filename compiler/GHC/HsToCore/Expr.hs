@@ -877,8 +877,7 @@ dsHsConLike (PatSynCon ps)
   | Just (builder_name, _, add_void) <- patSynBuilder ps
   = do { builder_id <- dsLookupGlobalId builder_name
        ; return (if add_void
-                 then mkCoreApp (text "dsConLike" <+> ppr ps)
-                                (Var builder_id) unboxedUnitExpr
+                 then mkCoreApp (Var builder_id) unboxedUnitExpr
                  else Var builder_id) }
   | otherwise
   = pprPanic "dsConLike" (ppr ps)

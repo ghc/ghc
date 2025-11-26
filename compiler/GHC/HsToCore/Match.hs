@@ -301,7 +301,7 @@ matchView (var :| vars) ty eqns@(eqn1 :| _)
          -- compile the view expressions
         ; viewExpr' <- dsExpr viewExpr
         ; return (mkViewMatchResult var'
-                    (mkCoreApp (text "matchView") viewExpr' (Var var))
+                    (mkCoreApp viewExpr' (Var var))
                     match_result) }
 
 -- decompose the first pattern and leave the rest alone

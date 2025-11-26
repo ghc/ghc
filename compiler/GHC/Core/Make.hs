@@ -151,37 +151,28 @@ mkCoreConWrapApps con args = mkCoreApps (Var (dataConWrapId con)) args
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to another. The leftmost expression in the list is applied first
-mkCoreApps :: CoreExpr -- ^ function
+-- See Note [Assertion checking in mkCoreApp]
+mkCoreApps :: CoreExpr   -- ^ function
            -> [CoreExpr] -- ^ arguments
            -> CoreExpr
-mkCoreApps fun args
-  = fst $
-    foldl' (mkCoreAppTyped doc_string) (fun, fun_ty) args
-  where
-    doc_string = ppr fun_ty $$ ppr fun $$ ppr args
-    fun_ty = exprType fun
+mkCoreApps fun args = foldl' mkCoreApp fun args
 
 -- | Construct an expression which represents the application of one expression
 -- to the other
-mkCoreApp :: SDoc
-          -> CoreExpr -- ^ function
+-- See Note [Assertion checking in mkCoreApp]
+mkCoreApp :: CoreExpr -- ^ function
           -> CoreExpr -- ^ argument
           -> CoreExpr
-mkCoreApp s fun arg
-  = fst $ mkCoreAppTyped s (fun, exprType fun) arg
+mkCoreApp fun arg = App fun arg
 
--- | Construct an expression which represents the application of one expression
--- paired with its type to an argument. The result is paired with its type. This
--- function is not exported and used in the definition of 'mkCoreApp' and
--- 'mkCoreApps'.
-mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
-mkCoreAppTyped _ (fun, fun_ty) (Type ty)
-  = (App fun (Type ty), piResultTy fun_ty ty)
-mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
-  = (App fun (Coercion co), funResultTy fun_ty)
-mkCoreAppTyped d (fun, fun_ty) arg
-  = assertPpr (isFunTy fun_ty) (ppr fun $$ ppr arg $$ d)
-    (App fun arg, funResultTy fun_ty)
+{- Note [Assertion checking in mkCoreApp]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At one time we had an assertion to check that the function and argument type match up,
+but that turned out to take 90% of all compile time (!) when compiling test
+`unboxedsums/UbxSumUnpackedSize.hs`. The reason was an unboxed sum constructor with
+hundreds of foralls.   It's most straightforward just to remove the assert, and
+rely on Lint to discover any mis-constructed terms.
+-}
 
 {- *********************************************************************
 *                                                                      *
