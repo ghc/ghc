@@ -17,6 +17,7 @@ where
 import GHC.Prelude
 
 import qualified GHC
+import GHC.Data.Bag (listToBag)
 import GHC.Data.Maybe
 import GHC.Driver.Make
 import GHC.Driver.Monad
@@ -58,6 +59,7 @@ import System.FilePath
 import System.IO
 import System.IO.Error  ( isEOFError )
 import Control.Monad    ( when )
+import Data.Either (partitionEithers)
 import Data.Foldable (traverse_)
 import Data.IORef
 import qualified Data.Set as Set
@@ -235,11 +237,15 @@ processDeps _dflags_ _ _ _ _ _ (AcyclicSCC (LinkNode {})) = return ()
 
 processDeps dflags hsc_env excl_mods root hdl m_dep_json (AcyclicSCC (ModuleNode _ node)) = do
   pp <- preprocessor
-  deps <- fmap concat $ sequence $
-    [cpp_deps | depIncludeCppDeps dflags] ++ [
-      import_deps IsBoot (ms_srcimps node),
-      import_deps NotBoot (ms_imps node)
-    ]
+  cpp_deps_all <- fmap concat $ sequence [cpp_deps | depIncludeCppDeps dflags]
+  (missing_boot_dep_errs, boot_deps) <- import_deps IsBoot (ms_srcimps node)
+  (missing_not_boot_dep_errs, not_boot_deps) <- import_deps NotBoot (ms_imps node)
+  let all_missing_errors = missing_boot_dep_errs ++ missing_not_boot_dep_errs
+  hs_deps_all <-
+    if null all_missing_errors
+      then pure (boot_deps ++ not_boot_deps)
+      else throwErrors (mkMessages (listToBag all_missing_errors))
+  let deps = cpp_deps_all ++ hs_deps_all
   updateJson m_dep_json (updateDepJSON include_pkg_deps pp dep_node deps)
   writeDependencies include_pkg_deps root hdl extra_suffixes dep_node deps
   where
@@ -288,7 +294,7 @@ processDeps dflags hsc_env excl_mods root hdl m_dep_json (AcyclicSCC (ModuleNode
       pure (DepCpp <$> GHC.pm_extra_src_files parsedMod)
 
     -- Emit a dependency for each import
-    import_deps is_boot idecls =
+    import_deps is_boot idecls = partitionEithers <$>
       sequence [
         findDependency hsc_env loc mb_pkg mod is_boot
         | (mb_pkg, L loc mod) <- idecls
@@ -301,29 +307,29 @@ findDependency  :: HscEnv
                 -> PkgQual              -- package qualifier, if any
                 -> ModuleName           -- Imported module
                 -> IsBootInterface      -- Source import
-                -> IO Dep
+                -> IO (Either (MsgEnvelope GhcMessage) Dep)
 findDependency hsc_env srcloc pkg imp dep_boot = do
   -- Find the module; this will be fast because
   -- we've done it once during downsweep
   findImportedModule hsc_env imp pkg >>= \case
     Found loc dep_mod ->
-      pure DepHi {
+      pure $ Right (DepHi {
         dep_mod,
         dep_path = ml_hi_file loc,
         dep_unit = lookupUnitId (hsc_units hsc_env) (moduleUnitId dep_mod),
         dep_local,
         dep_boot
-      }
+      })
       where
         dep_local = isJust (ml_hs_file loc)
 
     fail ->
-      throwOneError $
-      mkPlainErrorMsgEnvelope srcloc $
-      GhcDriverMessage $
-      DriverInterfaceError $
-      Can'tFindInterface (cannotFindModule hsc_env imp fail) $
-      LookingForModule imp dep_boot
+      pure $ Left $
+        mkPlainErrorMsgEnvelope srcloc $
+        GhcDriverMessage $
+        DriverInterfaceError $
+        Can'tFindInterface (cannotFindModule hsc_env imp fail) $
+        LookingForModule imp dep_boot
 
 writeDependencies ::
   Bool ->
