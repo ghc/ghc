@@ -19,6 +19,13 @@
 {-# LANGUAGE UndecidableInstances  #-} -- For the (StmtLR GhcPs GhcPs (LocatedA (body GhcPs))) ExactPrint instance
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-incomplete-record-updates #-}
 
+-- We switch off specialisation in this module. Otherwise we get lots of functions
+-- specialised on lots of (GHC syntax tree) data types.  Compilation time allocation
+-- (at least with -fpolymorphic-specialisation; see !15058) blows up from 17G to 108G.
+-- Bad! ExactPrint is not a performance-critical module so it's not worth taking the
+-- largely-fruitless hit in compile time.
+{-# OPTIONS_GHC -fno-specialise #-}
+
 module ExactPrint
   (
     ExactPrint(..)
