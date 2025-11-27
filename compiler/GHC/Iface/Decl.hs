@@ -40,6 +40,7 @@ import GHC.Types.TyThing
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Panic( pprPanic )
 
 import GHC.Data.Maybe
 import Data.List ( findIndex, mapAccumL )
