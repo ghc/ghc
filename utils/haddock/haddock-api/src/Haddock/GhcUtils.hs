@@ -856,8 +856,8 @@ tyCoFVsOfType' (TyConApp _ tys) a b c = tyCoFVsOfTypes' tys a b c
 tyCoFVsOfType' (LitTy{}) a b c = emptyFV a b c
 tyCoFVsOfType' (AppTy fun arg) a b c = (tyCoFVsOfType' arg `unionFV` tyCoFVsOfType' fun) a b c
 tyCoFVsOfType' (FunTy _ w arg res) a b c =
-  ( tyCoFVsOfType' w
-      `unionFV` tyCoFVsOfType' res
+  ( tyCoFVsOfType' res
+      `unionFV` tyCoFVsOfType' w
       `unionFV` tyCoFVsOfType' arg
   )
     a

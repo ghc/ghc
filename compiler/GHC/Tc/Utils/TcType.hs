@@ -1009,8 +1009,8 @@ tcTyFamInstsAndVisX = go
     go _            (LitTy {})         = []
     go is_invis_arg (ForAllTy bndr ty) = go is_invis_arg (binderType bndr)
                                          ++ go is_invis_arg ty
-    go is_invis_arg (FunTy _ w ty1 ty2)  = go is_invis_arg w
-                                         ++ go is_invis_arg ty1
+    go is_invis_arg (FunTy _ w ty1 ty2)  =  go is_invis_arg ty1
+                                         ++ go is_invis_arg w
                                          ++ go is_invis_arg ty2
     go is_invis_arg ty@(AppTy _ _)     =
       let (ty_head, ty_args) = splitAppTys ty

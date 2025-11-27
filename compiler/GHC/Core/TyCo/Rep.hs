@@ -1984,7 +1984,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty _   (LitTy {})        = mempty
     go_ty env (CastTy ty co)    = go_ty env ty `mappend` go_co env co
     go_ty env (CoercionTy co)   = go_co env co
-    go_ty env (FunTy _ w arg res) = go_ty env w `mappend` go_ty env arg `mappend` go_ty env res
+    go_ty env (FunTy _ w arg res) =
+      -- As per #23764, ordering is [arg, w, res].
+      go_ty env arg `mappend` go_ty env w `mappend` go_ty env res
     go_ty env (TyConApp _ tys)  = go_tys env tys
     go_ty env (ForAllTy (Bndr tv vis) inner)
       = let !env' = tycobinder env tv vis  -- Avoid building a thunk here

@@ -635,7 +635,9 @@ tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_v
                                                     -- See Note [Free vars and synonyms]
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
 tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
-tyCoFVsOfType (FunTy _ w arg res)  f bound_vars acc = (tyCoFVsOfType w `unionFV` tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
+tyCoFVsOfType (FunTy _ w arg res)  f bound_vars acc =
+  -- As per #23764, if we have 'a %m -> b', quantification order should be [a,m,b] not [m,a,b].
+  (tyCoFVsOfType arg `unionFV` tyCoFVsOfType w `unionFV` tyCoFVsOfType res) f bound_vars acc
 tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
 tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
 tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
@@ -958,7 +960,9 @@ invisibleVarsOfType = go
                           = go ty'
     go (TyVarTy v)        = go (tyVarKind v)
     go (AppTy f a)        = go f `unionFV` go a
-    go (FunTy _ w ty1 ty2) = go w `unionFV` go ty1 `unionFV` go ty2
+    go (FunTy _ w ty1 ty2) =
+      -- As per #23764, order is: arg, mult, res.
+      go ty1 `unionFV` go w `unionFV` go ty2
     go (TyConApp tc tys)  = tyCoFVsOfTypes invisibles `unionFV`
                             invisibleVarsOfTypes visibles
       where (invisibles, visibles) = partitionInvisibleTypes tc tys
