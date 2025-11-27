@@ -194,8 +194,7 @@ type family XETAType (p :: TcPass) where  -- Type arguments
   XETAType _      = Type
 
 type family XEVAType (p :: TcPass) where   -- Value arguments
-  XEVAType 'TcpInst = (Bool, Scaled TcSigmaTypeFRR)
-                      -- True <=> the type is guarded
+  XEVAType 'TcpInst = Scaled TcSigmaTypeFRR
   XEVAType _        = NoExtField
 
 data QLFlag = DoQL | NoQL

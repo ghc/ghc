@@ -415,7 +415,7 @@ tcApp rn_expr exp_res_ty
                        ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
 
                          -- Step 5.4: subsumption check against the expected type
-                       ; res_wrap <- checkResultTy rn_expr tc_head inst_args
+                       ; res_wrap <- checkResultTy rn_expr tc_head inst_args_ql
                                                     app_res_rho exp_res_ty
 
                          -- Step 5.2: typecheck the arguments, and monomorphise
@@ -530,7 +530,7 @@ tcValArg _     (EWrap ew)          = return (EWrap ew)
 
 tcValArg do_ql (EValArg { ea_ctxt   = ctxt
                         , ea_arg    = larg@(L arg_loc arg)
-                        , ea_arg_ty = (_guarded, sc_arg_ty) })
+                        , ea_arg_ty = sc_arg_ty })
   = addArgCtxt ctxt larg $
     do { traceTc "tcValArg" $
          vcat [ ppr ctxt
@@ -841,7 +841,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
 
            ; let arg' = EValArg { ea_ctxt   = ctxt
                                 , ea_arg    = arg
-                                , ea_arg_ty = (isGuardedTy arg_ty, arg_ty) }
+                                , ea_arg_ty = arg_ty }
                  acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
 
            ; go (pos+1) acc' res_ty rest_args }
@@ -1846,7 +1846,7 @@ quickLookArg :: HsExprArg 'TcpInst -> TcM (HsExprArg 'TcpInst)
 -- See Note [Quick Look at value arguments]
 quickLookArg e_arg@(EValArg { ea_ctxt   = ctxt
                             , ea_arg    = larg@(L _ arg)
-                            , ea_arg_ty = (arg_has_guarded_ty, orig_arg_ty) })
+                            , ea_arg_ty = orig_arg_ty })
   = do { let !(Scaled _ orig_arg_rho) = orig_arg_ty
              -- NB: orig_arg_rho may not be zonked, but that's ok
        ; is_rho <- tcIsDeepRho orig_arg_rho
@@ -1905,7 +1905,7 @@ quickLookArg e_arg@(EValArg { ea_ctxt   = ctxt
        --     In contrast, we must do the `anyFreeKappa` test /after/ tcInstFun; see (QLA3).
 
        ; (arg_influences_call, inst_args_ql)
-            <- if arg_has_guarded_ty                                     -- (A)
+            <- if isGuardedTy orig_arg_rho                                -- (A)
                then do { qlUnify app_res_rho orig_arg_rho
                        ; inst_args_with_guards  <- mapM reGuardArg   inst_args
                        ; inst_args_ql <- mapM quickLookArg inst_args_with_guards
@@ -1930,13 +1930,6 @@ quickLookArg e_arg@(EValArg { ea_ctxt   = ctxt
                            , eaql_res_rho = app_res_rho }) }}}}
 
 quickLookArg other_arg = return other_arg
-
-reGuardArg :: HsExprArg 'TcpInst -> TcM (HsExprArg 'TcpInst)
-reGuardArg arg@(EValArg { ea_arg_ty = (_, arg_ty) })
-  = do { arg_ty' <- liftZonkM $ zonkScaledTcType arg_ty
-       ; return (arg { ea_arg_ty = (isGuardedTy arg_ty', arg_ty') }) }
-reGuardArg arg
-  = return arg
 
 whenQL :: QLFlag -> ZonkM () -> TcM ()
 whenQL DoQL thing_inside = liftZonkM thing_inside
@@ -1968,8 +1961,17 @@ tcIsDeepRho ty
       | otherwise
       = return True
 
-isGuardedTy :: Scaled TcType -> Bool
-isGuardedTy (Scaled _ ty)
+reGuardArg :: HsExprArg 'TcpInst -> TcM (HsExprArg 'TcpInst)
+-- Zonk the result type of an EValArg, so that a subseqent
+-- call to isGuardedTy will see the unifications so far
+reGuardArg arg@(EValArg { ea_arg_ty = arg_ty })
+  = do { arg_ty' <- liftZonkM $ zonkScaledTcType arg_ty
+       ; return (arg { ea_arg_ty = arg_ty' }) }
+reGuardArg arg
+  = return arg
+
+isGuardedTy :: TcType -> Bool
+isGuardedTy ty
   | Just (tc,_) <- tcSplitTyConApp_maybe ty = isGenerativeTyCon tc Nominal
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | otherwise                               = False
