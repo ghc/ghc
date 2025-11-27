@@ -910,7 +910,7 @@ interestingCallContext env cont
         -- in GHC.Core.Unfold
 
     interesting (StrictArg { sc_fun = fun }) = strictArgContext fun
-    interesting (StrictBind {})              = BoringCtxt
+    interesting (StrictBind {})              = RhsCtxt NonRecursive
     interesting (Stop _ cci _)               = cci
     interesting (TickIt _ k)                 = interesting k
     interesting (ApplyToTy { sc_cont = k })  = interesting k
@@ -1032,7 +1032,7 @@ interestingArg env e = go env 0 e
        | n > 0         = NonTrivArg -- Saturated or unknown call
        | otherwise  -- n==0, no value arguments; look for an interesting unfolding
        = case idUnfolding v of
-           OtherCon [] -> TrivArg      -- It's evaluated, but that's all we know
+--           OtherCon [] -> NonTrivArg   -- It's evaluated, but that's all we know
            OtherCon _  -> NonTrivArg   -- Evaluated and we know it isn't these constructors
               -- See Note [OtherCon and interestingArg]
            DFunUnfolding {} -> ValueArg   -- We konw that idArity=0
