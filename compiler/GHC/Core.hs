@@ -18,8 +18,7 @@ module GHC.Core (
                InCastCoercion,
         OutId, OutBind, OutExpr, OutAlt, OutArg, OutType, OutKind,
                OutBndr, OutVar, OutCoercion, OutCoercionR, OutTyVar, OutCoVar,
-               OutTyCoVar, MOutCoercion,
-               OutCastCoercion,
+               OutTyCoVar, OutCastCoercion,
 
         -- ** 'Expr' construction
         mkLet, mkLets, mkLetNonRec, mkLetRec, mkLams,
@@ -1133,7 +1132,6 @@ type OutBind      = CoreBind
 type OutExpr      = CoreExpr
 type OutAlt       = CoreAlt
 type OutArg       = CoreArg
-type MOutCoercion = MCoercion
 type OutCastCoercion = CastCoercion
 
 
