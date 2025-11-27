@@ -552,7 +552,12 @@ static int compare_path(StgWord key1, StgWord key2)
 
 static void addLoadedDll(LoadedDllCache *cache, const pathchar *dll_name, HINSTANCE instance)
 {
-    insertHashTable_(cache->hash, (StgWord) dll_name, instance, hash_path);
+    // dll_name might be deallocated, we need to copy it to have a stable reference to the contents
+    // See #26613
+    size_t size = wcslen(dll_name) + 1;
+    pathchar* dll_name_copy = stgMallocBytes(size * sizeof(pathchar), "addLoadedDll");
+    wcsncpy(dll_name_copy, dll_name, size);
+    insertHashTable_(cache->hash, (StgWord) dll_name_copy, instance, hash_path);
 }
 
 static HINSTANCE isDllLoaded(const LoadedDllCache *cache, const pathchar *dll_name)
