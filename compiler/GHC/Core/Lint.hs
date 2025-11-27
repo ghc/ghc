@@ -2233,6 +2233,7 @@ lintApp msg lint_forall_arg lint_arrow_arg !orig_fun_ty all_args acc
                         lint_app_fail_msg msg orig_fun_ty all_args
                             (hang (text "Fun:" <+> ppr fun_ty)
                                 2 (vcat [ text "exp_arg_ty:" <+> ppr exp_arg_ty
+                                        , text "subst_exp_arg_ty:" <+> ppr (substTy subst exp_arg_ty)
                                         , text "arg:" <+> ppr arg <+> dcolon <+> ppr arg_ty ]))
                       ; go subst res_ty acc' args }
 
