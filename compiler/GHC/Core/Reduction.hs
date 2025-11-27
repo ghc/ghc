@@ -94,7 +94,7 @@ but in fact `reductionOriginalType` is very seldom used, so it's not worth it.
 -- See Note [The Reduction type].
 data Reduction =
   Reduction
-    { reductionCoercion    :: !Coercion
+    { reductionCoercion    :: Coercion
     , reductionReducedType :: !Type
     }
 -- N.B. the 'Coercion' field must be lazy: see for instance GHC.Tc.Solver.Rewrite.rewrite_tyvar2
