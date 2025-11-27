@@ -496,7 +496,7 @@ rnIfaceDecl' (fp, decl) = (,) fp <$> rnIfaceDecl decl
 
 rnIfaceDecl :: Rename IfaceDecl
 rnIfaceDecl = \case
-  IfaceTv { ifName = name, ifTvKind = kind, ifTvUnf = unf })
+  IfaceTv { ifName = name, ifTvKind = kind, ifTvUnf = unf }
     -> do { name' <- rnIfaceGlobal name
           ; kind' <- rnIfaceType kind
           ; unf'  <- rnIfaceType unf
