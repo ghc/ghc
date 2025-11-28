@@ -1,192 +1,216 @@
 
 ==================== SpecConstr ====================
 Result size of SpecConstr
-  = {terms: 179, types: 124, coercions: 0, joins: 0/0}
+  = {terms: 192, types: 134, coercions: 0, joins: 3/3}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$trModule_sF4 :: Addr#
+$trModule_sGe :: Addr#
 [LclId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 20 0}]
-$trModule_sF4 = "main"#
+$trModule_sGe = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$trModule_sF5 :: GHC.Types.TrName
+$trModule_sGf :: GHC.Internal.Types.TrName
 [LclId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-$trModule_sF5 = GHC.Types.TrNameS $trModule_sF4
+$trModule_sGf = GHC.Internal.Types.TrNameS $trModule_sGe
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-$trModule_sF6 :: Addr#
+$trModule_sGg :: Addr#
 [LclId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 30 0}]
-$trModule_sF6 = "T14003"#
+$trModule_sGg = "T14003"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-$trModule_sF7 :: GHC.Types.TrName
+$trModule_sGh :: GHC.Internal.Types.TrName
 [LclId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-$trModule_sF7 = GHC.Types.TrNameS $trModule_sF6
+$trModule_sGh = GHC.Internal.Types.TrNameS $trModule_sGg
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T14003.$trModule :: GHC.Types.Module
+T14003.$trModule :: GHC.Internal.Types.Module
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-T14003.$trModule = GHC.Types.Module $trModule_sF5 $trModule_sF7
+T14003.$trModule
+  = GHC.Internal.Types.Module $trModule_sGf $trModule_sGh
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-lvl_sFY :: Addr#
+lvl_sHe :: Addr#
 [LclId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 100 0}]
-lvl_sFY = "T14003.hs:(14,1)-(16,39)|function hi"#
+lvl_sHe = "T14003.hs:(14,1)-(16,39)|function hi"#
 
 -- RHS size: {terms: 2, types: 2, coercions: 0, joins: 0/0}
-lvl_sFp :: ()
+lvl_sGA :: ()
 [LclId,
  Str=b,
  Cpr=b,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=False, ConLike=False, WorkFree=False, Expandable=False,
          Guidance=NEVER}]
-lvl_sFp = Control.Exception.Base.patError @LiftedRep @() lvl_sFY
+lvl_sGA
+  = GHC.Internal.Control.Exception.Base.patError
+      @LiftedRep @() lvl_sHe
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-lvl_sFm :: Int
+lvl_sGx :: Int
 [LclId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-lvl_sFm = GHC.Types.I# 42#
+lvl_sGx = GHC.Internal.Types.I# 42#
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
-lvl_sFn :: Maybe Int
+lvl_sGy :: Maybe Int
 [LclId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-lvl_sFn = GHC.Maybe.Just @Int lvl_sFm
+lvl_sGy = GHC.Internal.Maybe.Just @Int lvl_sGx
 
 Rec {
--- RHS size: {terms: 8, types: 4, coercions: 0, joins: 0/0}
-$s$whi_sGi :: Int# -> Int -> Int#
+-- RHS size: {terms: 12, types: 7, coercions: 0, joins: 1/1}
+$s$whi_sHB [InlPrag=[2]] :: Int# -> Int -> Int#
 [LclId[StrictWorker([])], Arity=2, Str=<L><L>]
-$s$whi_sGi
-  = \ (sc_sGf :: Int#) (sc_sGe :: Int) ->
-      $whi_sFB
-        GHC.Types.SPEC
-        (GHC.Maybe.Just @Int sc_sGe)
-        lvl_sFn
-        (GHC.Maybe.Nothing @Int)
-
--- RHS size: {terms: 11, types: 5, coercions: 0, joins: 0/0}
-$s$whi_sGa :: Int# -> Int# -> Int -> Int#
-[LclId[StrictWorker([])], Arity=3, Str=<L><L><L>]
-$s$whi_sGa
-  = \ (sc_sG5 :: Int#) (sc_sG4 :: Int#) (sc_sG3 :: Int) ->
-      case sc_sG3 of { I# x_aFe -> +# (+# x_aFe sc_sG4) sc_sG5 }
-
--- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
-$s$whi_sGb :: Int -> Int#
-[LclId[StrictWorker([])], Arity=1, Str=<L>]
-$s$whi_sGb = \ (sc_sG6 :: Int) -> 42#
-
--- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
-$s$whi_sGc :: Int -> Int#
-[LclId[StrictWorker([])], Arity=1, Str=<L>]
-$s$whi_sGc = \ (sc_sG7 :: Int) -> 42#
+$s$whi_sHB
+  = \ (sc_sHy :: Int#) (sc_sHx :: Int) ->
+      join {
+        fail_sGv [Dmd=LC(1,!P(L))] :: (# #) -> Int#
+        [LclId[JoinId(1)(Nothing)], Arity=1, Str=<A>]
+        fail_sGv _ [Occ=Dead, Dmd=A, OS=OneShot]
+          = $whi_sGQ
+              GHC.Internal.Types.SPEC
+              (GHC.Internal.Maybe.Just @Int sc_sHx)
+              lvl_sGy
+              (GHC.Internal.Maybe.Nothing @Int) } in
+      jump fail_sGv GHC.Internal.Types.(##)
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-$s$whi_sGd :: Int -> Int -> Int#
+$s$whi_sHt [InlPrag=[2]] :: Int -> Int -> Int#
 [LclId[StrictWorker([])], Arity=2, Str=<L><L>]
-$s$whi_sGd = \ (sc_sG9 :: Int) (sc_sG8 :: Int) -> 42#
+$s$whi_sHt = \ (sc_sHs :: Int) (sc_sHr :: Int) -> 42#
 
--- RHS size: {terms: 47, types: 26, coercions: 0, joins: 0/0}
-$whi_sFB [InlPrag=[2], Occ=LoopBreaker]
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+$s$whi_sHu [InlPrag=[2]] :: Int -> Int#
+[LclId[StrictWorker([])], Arity=1, Str=<L>]
+$s$whi_sHu = \ (sc_sHq :: Int) -> 42#
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+$s$whi_sHv [InlPrag=[2]] :: Int -> Int#
+[LclId[StrictWorker([])], Arity=1, Str=<L>]
+$s$whi_sHv = \ (sc_sHp :: Int) -> 42#
+
+-- RHS size: {terms: 19, types: 10, coercions: 0, joins: 1/1}
+$s$whi_sHw [InlPrag=[2]] :: Int# -> Int# -> Int -> Int#
+[LclId[StrictWorker([])], Arity=3, Str=<L><L><L>]
+$s$whi_sHw
+  = \ (sc_sHo :: Int#) (sc_sHn :: Int#) (sc_sHm :: Int) ->
+      join {
+        fail_sGv [Dmd=LC(1,!P(L))] :: (# #) -> Int#
+        [LclId[JoinId(1)(Nothing)], Arity=1, Str=<A>]
+        fail_sGv _ [Occ=Dead, Dmd=A, OS=OneShot]
+          = $whi_sGQ
+              GHC.Internal.Types.SPEC
+              (GHC.Internal.Maybe.Just @Int sc_sHm)
+              lvl_sGy
+              (GHC.Internal.Maybe.Nothing @Int) } in
+      case sc_sHm of { I# x_aGo -> +# (+# x_aGo sc_sHn) sc_sHo }
+
+-- RHS size: {terms: 48, types: 28, coercions: 0, joins: 1/1}
+$whi_sGQ [InlPrag=[2], Occ=LoopBreaker]
   :: SPEC -> Maybe Int -> Maybe Int -> Maybe Int -> Int#
 [LclId[StrictWorker([])],
  Arity=4,
  Str=<SL><SL><L><L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [30 30 80 62] 212 0},
- RULES: "SC:$whi4" [2]
-            forall (sc_sGf :: Int#) (sc_sGe :: Int).
-              $whi_sFB GHC.Types.SPEC
-                       (GHC.Maybe.Just @Int sc_sGe)
-                       (GHC.Maybe.Just @Int (GHC.Types.I# sc_sGf))
-                       (GHC.Maybe.Nothing @Int)
-              = $s$whi_sGi sc_sGf sc_sGe
-        "SC:$whi0" [2]
-            forall (sc_sG5 :: Int#) (sc_sG4 :: Int#) (sc_sG3 :: Int).
-              $whi_sFB GHC.Types.SPEC
-                       (GHC.Maybe.Just @Int sc_sG3)
-                       (GHC.Maybe.Just @Int (GHC.Types.I# sc_sG4))
-                       (GHC.Maybe.Just @Int (GHC.Types.I# sc_sG5))
-              = $s$whi_sGa sc_sG5 sc_sG4 sc_sG3
-        "SC:$whi1" [2]
-            forall (sc_sG6 :: Int).
-              $whi_sFB GHC.Types.SPEC
-                       (GHC.Maybe.Nothing @Int)
-                       (GHC.Maybe.Just @Int sc_sG6)
-                       (GHC.Maybe.Nothing @Int)
-              = $s$whi_sGb sc_sG6
-        "SC:$whi2" [2]
-            forall (sc_sG7 :: Int).
-              $whi_sFB GHC.Types.SPEC
-                       (GHC.Maybe.Nothing @Int)
-                       (GHC.Maybe.Nothing @Int)
-                       (GHC.Maybe.Just @Int sc_sG7)
-              = $s$whi_sGc sc_sG7
-        "SC:$whi3" [2]
-            forall (sc_sG9 :: Int) (sc_sG8 :: Int).
-              $whi_sFB GHC.Types.SPEC
-                       (GHC.Maybe.Nothing @Int)
-                       (GHC.Maybe.Just @Int sc_sG8)
-                       (GHC.Maybe.Just @Int sc_sG9)
-              = $s$whi_sGd sc_sG9 sc_sG8]
-$whi_sFB
-  = \ (ds_sFv [Dmd=SL] :: SPEC)
-      (ds_sFw [Dmd=SL] :: Maybe Int)
-      (ds_sFx :: Maybe Int)
-      (ds_sFy :: Maybe Int) ->
-      case ds_sFv of {
+         Guidance=IF_ARGS [30 30 30 30] 162 0},
+ RULES: "SC:$whi4" [1]
+            forall (sc_sHy :: Int#) (sc_sHx :: Int).
+              $whi_sGQ GHC.Internal.Types.SPEC
+                       (GHC.Internal.Maybe.Just @Int sc_sHx)
+                       (GHC.Internal.Maybe.Just @Int (GHC.Internal.Types.I# sc_sHy))
+                       (GHC.Internal.Maybe.Nothing @Int)
+              = $s$whi_sHB sc_sHy sc_sHx
+        "SC:$whi0" [1]
+            forall (sc_sHs :: Int) (sc_sHr :: Int).
+              $whi_sGQ GHC.Internal.Types.SPEC
+                       (GHC.Internal.Maybe.Nothing @Int)
+                       (GHC.Internal.Maybe.Just @Int sc_sHr)
+                       (GHC.Internal.Maybe.Just @Int sc_sHs)
+              = $s$whi_sHt sc_sHs sc_sHr
+        "SC:$whi1" [1]
+            forall (sc_sHq :: Int).
+              $whi_sGQ GHC.Internal.Types.SPEC
+                       (GHC.Internal.Maybe.Nothing @Int)
+                       (GHC.Internal.Maybe.Nothing @Int)
+                       (GHC.Internal.Maybe.Just @Int sc_sHq)
+              = $s$whi_sHu sc_sHq
+        "SC:$whi2" [1]
+            forall (sc_sHp :: Int).
+              $whi_sGQ GHC.Internal.Types.SPEC
+                       (GHC.Internal.Maybe.Nothing @Int)
+                       (GHC.Internal.Maybe.Just @Int sc_sHp)
+                       (GHC.Internal.Maybe.Nothing @Int)
+              = $s$whi_sHv sc_sHp
+        "SC:$whi3" [1]
+            forall (sc_sHo :: Int#) (sc_sHn :: Int#) (sc_sHm :: Int).
+              $whi_sGQ GHC.Internal.Types.SPEC
+                       (GHC.Internal.Maybe.Just @Int sc_sHm)
+                       (GHC.Internal.Maybe.Just @Int (GHC.Internal.Types.I# sc_sHn))
+                       (GHC.Internal.Maybe.Just @Int (GHC.Internal.Types.I# sc_sHo))
+              = $s$whi_sHw sc_sHo sc_sHn sc_sHm]
+$whi_sGQ
+  = \ (ds_sGL [Dmd=SL] :: SPEC)
+      (ds_sGM [Dmd=SL] :: Maybe Int)
+      (ds_sGN :: Maybe Int)
+      (ds_sGO :: Maybe Int) ->
+      case ds_sGL of {
         SPEC ->
-          case ds_sFw of wild_X2 [Dmd=A] {
+          case ds_sGM of wild_XGa [Dmd=A] {
             Nothing -> 42#;
-            Just x_ayD [Dmd=S] ->
-              case ds_sFx of {
-                Nothing ->
-                  $whi_sFB GHC.Types.SPEC wild_X2 lvl_sFn (GHC.Maybe.Nothing @Int);
-                Just y_ayE [Dmd=S!P(S)] ->
-                  case ds_sFy of {
-                    Nothing ->
-                      $whi_sFB GHC.Types.SPEC wild_X2 lvl_sFn (GHC.Maybe.Nothing @Int);
-                    Just z_ayF [Dmd=S!P(S)] ->
-                      case x_ayD of { I# x_aFe ->
-                      case y_ayE of { I# y_aFh ->
-                      case z_ayF of { I# y_X7 -> +# (+# x_aFe y_aFh) y_X7 }
+            Just x_axO [Dmd=S] ->
+              join {
+                fail_sGv [Dmd=LC(1,!P(L))] :: (# #) -> Int#
+                [LclId[JoinId(1)(Nothing)], Arity=1, Str=<A>]
+                fail_sGv _ [Occ=Dead, Dmd=A, OS=OneShot]
+                  = $whi_sGQ
+                      GHC.Internal.Types.SPEC
+                      wild_XGa
+                      lvl_sGy
+                      (GHC.Internal.Maybe.Nothing @Int) } in
+              case ds_sGN of {
+                Nothing -> jump fail_sGv GHC.Internal.Types.(##);
+                Just y_axP [Dmd=S!P(S)] ->
+                  case ds_sGO of {
+                    Nothing -> jump fail_sGv GHC.Internal.Types.(##);
+                    Just z_axQ [Dmd=S!P(S)] ->
+                      case x_axO of { I# x_aGo ->
+                      case y_axP of { I# y_aGr ->
+                      case z_axQ of { I# y_XGe -> +# (+# x_aGo y_aGr) y_XGe }
                       }
                       }
                   }
               }
           };
-        SPEC2 -> case lvl_sFp of {}
+        SPEC2 -> case lvl_sGA of {}
       }
 end Rec }
 
 -- RHS size: {terms: 13, types: 8, coercions: 0, joins: 0/0}
-hi [InlPrag=[2]]
+hi [InlPrag=[2], Dmd=LC(L,C(S,C(S,C(S,!P(L)))))]
   :: SPEC -> Maybe Int -> Maybe Int -> Maybe Int -> Int
 [LclId,
  Arity=4,
@@ -195,54 +219,54 @@ hi [InlPrag=[2]]
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (ds_sFv [Occ=Once1, Dmd=SL] :: SPEC)
-                 (ds_sFw [Occ=Once1, Dmd=SL] :: Maybe Int)
-                 (ds_sFx [Occ=Once1] :: Maybe Int)
-                 (ds_sFy [Occ=Once1] :: Maybe Int) ->
-                 case $whi_sFB ds_sFv ds_sFw ds_sFx ds_sFy of ww_sFS [Occ=Once1]
+         Tmpl= \ (ds_sGL [Occ=Once1, Dmd=SL] :: SPEC)
+                 (ds_sGM [Occ=Once1, Dmd=SL] :: Maybe Int)
+                 (ds_sGN [Occ=Once1] :: Maybe Int)
+                 (ds_sGO [Occ=Once1] :: Maybe Int) ->
+                 case $whi_sGQ ds_sGL ds_sGM ds_sGN ds_sGO of ww_sH8 [Occ=Once1]
                  { __DEFAULT ->
-                 GHC.Types.I# ww_sFS
+                 GHC.Internal.Types.I# ww_sH8
                  }}]
 hi
-  = \ (ds_sFv [Dmd=SL] :: SPEC)
-      (ds_sFw [Dmd=SL] :: Maybe Int)
-      (ds_sFx :: Maybe Int)
-      (ds_sFy :: Maybe Int) ->
-      case $whi_sFB ds_sFv ds_sFw ds_sFx ds_sFy of ww_sFS { __DEFAULT ->
-      GHC.Types.I# ww_sFS
+  = \ (ds_sGL [Dmd=SL] :: SPEC)
+      (ds_sGM [Dmd=SL, OS=OneShot] :: Maybe Int)
+      (ds_sGN [OS=OneShot] :: Maybe Int)
+      (ds_sGO [OS=OneShot] :: Maybe Int) ->
+      case $whi_sGQ ds_sGL ds_sGM ds_sGN ds_sGO of ww_sH8 { __DEFAULT ->
+      GHC.Internal.Types.I# ww_sH8
       }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-lvl_sFq :: Int
+lvl_sGB :: Int
 [LclId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-lvl_sFq = GHC.Types.I# 4#
+lvl_sGB = GHC.Internal.Types.I# 4#
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
-lvl_sFr :: Maybe Int
+lvl_sGC :: Maybe Int
 [LclId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-lvl_sFr = GHC.Maybe.Just @Int lvl_sFq
+lvl_sGC = GHC.Internal.Maybe.Just @Int lvl_sGB
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-lvl_sFs :: Int
+lvl_sGD :: Int
 [LclId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-lvl_sFs = GHC.Types.I# 0#
+lvl_sGD = GHC.Internal.Types.I# 0#
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
-lvl_sFt :: Maybe Int
+lvl_sGE :: Maybe Int
 [LclId,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [] 10 10}]
-lvl_sFt = GHC.Maybe.Just @Int lvl_sFs
+lvl_sGE = GHC.Internal.Maybe.Just @Int lvl_sGD
 
 -- RHS size: {terms: 11, types: 3, coercions: 0, joins: 0/0}
 pat1 :: Int -> Int
@@ -253,15 +277,22 @@ pat1 :: Int -> Int
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (n_aBn [Occ=Once1] :: Int) ->
-                 hi GHC.Types.SPEC (GHC.Maybe.Just @Int n_aBn) lvl_sFr lvl_sFt}]
+         Tmpl= \ (n_aAH [Occ=Once1] :: Int) ->
+                 hi
+                   GHC.Internal.Types.SPEC
+                   (GHC.Internal.Maybe.Just @Int n_aAH)
+                   lvl_sGC
+                   lvl_sGE}]
 pat1
-  = \ (n_aBn :: Int) ->
-      case $whi_sFB
-             GHC.Types.SPEC (GHC.Maybe.Just @Int n_aBn) lvl_sFr lvl_sFt
-      of ww_sFS
+  = \ (n_aAH :: Int) ->
+      case $whi_sGQ
+             GHC.Internal.Types.SPEC
+             (GHC.Internal.Maybe.Just @Int n_aAH)
+             lvl_sGC
+             lvl_sGE
+      of ww_sH8
       { __DEFAULT ->
-      GHC.Types.I# ww_sFS
+      GHC.Internal.Types.I# ww_sH8
       }
 
 -- RHS size: {terms: 11, types: 5, coercions: 0, joins: 0/0}
@@ -273,22 +304,22 @@ pat2 :: Int -> Int
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (n_aBo [Occ=Once1] :: Int) ->
+         Tmpl= \ (n_aAI [Occ=Once1] :: Int) ->
                  hi
-                   GHC.Types.SPEC
-                   (GHC.Maybe.Nothing @Int)
-                   (GHC.Maybe.Just @Int n_aBo)
-                   (GHC.Maybe.Nothing @Int)}]
+                   GHC.Internal.Types.SPEC
+                   (GHC.Internal.Maybe.Nothing @Int)
+                   (GHC.Internal.Maybe.Just @Int n_aAI)
+                   (GHC.Internal.Maybe.Nothing @Int)}]
 pat2
-  = \ (n_aBo :: Int) ->
-      case $whi_sFB
-             GHC.Types.SPEC
-             (GHC.Maybe.Nothing @Int)
-             (GHC.Maybe.Just @Int n_aBo)
-             (GHC.Maybe.Nothing @Int)
-      of ww_sFS
+  = \ (n_aAI :: Int) ->
+      case $whi_sGQ
+             GHC.Internal.Types.SPEC
+             (GHC.Internal.Maybe.Nothing @Int)
+             (GHC.Internal.Maybe.Just @Int n_aAI)
+             (GHC.Internal.Maybe.Nothing @Int)
+      of ww_sH8
       { __DEFAULT ->
-      GHC.Types.I# ww_sFS
+      GHC.Internal.Types.I# ww_sH8
       }
 
 -- RHS size: {terms: 11, types: 5, coercions: 0, joins: 0/0}
@@ -300,22 +331,22 @@ pat3 :: Int -> Int
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (n_aBp [Occ=Once1] :: Int) ->
+         Tmpl= \ (n_aAJ [Occ=Once1] :: Int) ->
                  hi
-                   GHC.Types.SPEC
-                   (GHC.Maybe.Nothing @Int)
-                   (GHC.Maybe.Nothing @Int)
-                   (GHC.Maybe.Just @Int n_aBp)}]
+                   GHC.Internal.Types.SPEC
+                   (GHC.Internal.Maybe.Nothing @Int)
+                   (GHC.Internal.Maybe.Nothing @Int)
+                   (GHC.Internal.Maybe.Just @Int n_aAJ)}]
 pat3
-  = \ (n_aBp :: Int) ->
-      case $whi_sFB
-             GHC.Types.SPEC
-             (GHC.Maybe.Nothing @Int)
-             (GHC.Maybe.Nothing @Int)
-             (GHC.Maybe.Just @Int n_aBp)
-      of ww_sFS
+  = \ (n_aAJ :: Int) ->
+      case $whi_sGQ
+             GHC.Internal.Types.SPEC
+             (GHC.Internal.Maybe.Nothing @Int)
+             (GHC.Internal.Maybe.Nothing @Int)
+             (GHC.Internal.Maybe.Just @Int n_aAJ)
+      of ww_sH8
       { __DEFAULT ->
-      GHC.Types.I# ww_sFS
+      GHC.Internal.Types.I# ww_sH8
       }
 
 -- RHS size: {terms: 12, types: 5, coercions: 0, joins: 0/0}
@@ -327,22 +358,22 @@ pat4 :: Int -> Int
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (n_aBq :: Int) ->
+         Tmpl= \ (n_aAK :: Int) ->
                  hi
-                   GHC.Types.SPEC
-                   (GHC.Maybe.Nothing @Int)
-                   (GHC.Maybe.Just @Int n_aBq)
-                   (GHC.Maybe.Just @Int n_aBq)}]
+                   GHC.Internal.Types.SPEC
+                   (GHC.Internal.Maybe.Nothing @Int)
+                   (GHC.Internal.Maybe.Just @Int n_aAK)
+                   (GHC.Internal.Maybe.Just @Int n_aAK)}]
 pat4
-  = \ (n_aBq :: Int) ->
-      case $whi_sFB
-             GHC.Types.SPEC
-             (GHC.Maybe.Nothing @Int)
-             (GHC.Maybe.Just @Int n_aBq)
-             (GHC.Maybe.Just @Int n_aBq)
-      of ww_sFS
+  = \ (n_aAK :: Int) ->
+      case $whi_sGQ
+             GHC.Internal.Types.SPEC
+             (GHC.Internal.Maybe.Nothing @Int)
+             (GHC.Internal.Maybe.Just @Int n_aAK)
+             (GHC.Internal.Maybe.Just @Int n_aAK)
+      of ww_sH8
       { __DEFAULT ->
-      GHC.Types.I# ww_sFS
+      GHC.Internal.Types.I# ww_sH8
       }
 
 

@@ -571,4 +571,7 @@ test('T26709', [grep_errmsg(r'case')],
        ['T26709', '-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
 test('T26682',  normal, multimod_compile, ['T26682', '-O -v0'])
 
-
+# T26615: we expect NO calls to overloaded functions in T26615.hs
+# In the bug report #26615, the overloaded calls were signalled by a dictionary
+#    argument like fEqList_xxxx, so we grep for that. Not a very robust test
+test('T26615',  [grep_errmsg(r'fEqList')], multimod_compile, ['T26615', '-O -fspec-constr -ddump-simpl -dsuppress-uniques'])

@@ -479,15 +479,16 @@ When should the wrapper inlining be active?
            f n x = f (n+n) (x-1)
 
            g :: Int -> Int
-           g x = f x x            -- Provokes a specialisation for f
-
+           g x = f x x    -- Provokes a specialisation for f
+                          -- but not for $wf because w/w happens
+                          -- after specialisation
          module Bar where
            import Foo
 
            h :: Int -> Int
            h x = f 3 x
 
-   In module Bar we want to give specialisations a chance to fire
+   In module Bar we want to give f's specialisation a chance to fire
    before inlining f's wrapper.
 
    (Historical note: At one stage I tried making the wrapper inlining
@@ -498,7 +499,7 @@ When should the wrapper inlining be active?
       {-# SPECIALISE foo :: (Int,Int) -> Bool -> Int #-}
       {-# NOINLINE [n] foo #-}
     then specialisation will generate a SPEC rule active from Phase n.
-    See Note [Auto-specialisation and RULES] in GHC.Core.Opt.Specialise
+    See Note [Specialise: rule activation] in GHC.Core.Opt.Specialise
     This SPEC specialisation rule will compete with inlining, but we don't
     mind that, because if inlining succeeds, it should be better.
 

@@ -1,6 +1,6 @@
 
 ==================== Tidy Core rules ====================
-"SC:wimwam0"
+"SC:wimwam0" [2]
     forall (sc :: Bool) (sc1 :: [Bool]).
       wimwam @Bool (: @Bool sc sc1)
       = bar_$swimwam sc sc1

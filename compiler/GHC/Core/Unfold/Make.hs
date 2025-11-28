@@ -248,12 +248,11 @@ specUnfolding to specialise its unfolding.  Some important points:
     f_spec :: [Int] -> Int
     f_spec xs = case wgo xs of { r -> I# r }
 
-  and we clearly want to inline f_spec at call sites.  But if we still
-  have the big, un-optimised of f (albeit specialised) captured in the
-  stable unfolding for f_spec, we won't get that optimisation.
-
-  This happens with Control.Monad.liftM3, and can cause a lot more
-  allocation as a result (nofib n-body shows this).
+  If we keep the big, un-optimised of f (albeit specialised) captured in the
+  stable unfolding for f_spec, it probably won't inline.  But if we use the
+  now-tiny RHS of `f_spec`, it probably will.  This actually happened with
+  Control.Monad.liftM3, and can cause a lot more allocation as a result (nofib
+  n-body shows this).
 
   Moreover, keeping the stable unfolding isn't much help, because
   the specialised function (probably) isn't overloaded any more.

@@ -69,7 +69,6 @@ import GHC.Unit.Module.ModGuts
 import GHC.Core.Unfold
 
 import Data.List( partition )
--- import Data.List.NonEmpty ( NonEmpty (..) )
 
 {-
 ************************************************************************
@@ -1598,7 +1597,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
   |  notNull calls_for_me               -- And there are some calls to specialise
   && not (isNeverActive (idInlineActivation fn))
         -- Don't specialise NOINLINE things
-        -- See Note [Auto-specialisation and RULES]
+        -- See (SRA1) in Note [Specialise: rule activation]
         --
         -- Don't specialise OPAQUE things, see Note [OPAQUE pragma].
         -- Since OPAQUE things are always never-active (see
@@ -1627,11 +1626,12 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     fn_type   = idType fn
     fn_arity  = idArity fn
     fn_unf    = realIdUnfolding fn  -- Ignore loop-breaker-ness here
-    inl_prag  = idInlinePragma fn
-    inl_act   = inlinePragmaActivation inl_prag
+    fn_prag   = idInlinePragma fn
+    rule_act  = inlinePragmaActivation fn_prag
+                -- rule_act: see Note [Specialise: rule activation]
     is_active :: ActivationGhc -> Bool
-    is_active = isActive (SimplPhaseRange (beginPhase inl_act) (endPhase inl_act))
-         -- is_active: inl_act is the activation we are going to put in the new
+    is_active = isActive (SimplPhaseRange (beginPhase rule_act) (endPhase rule_act))
+         -- is_active: rule_act is the activation we are going to put in the new
          --   SPEC rule; so we want to see if it is covered by another rule with
          --   that same activation.
     is_local  = isLocalId fn
@@ -1652,7 +1652,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
       , isStrongLoopBreaker (idOccInfo fn) -- in GHC.Core.Opt.OccurAnal
       = neverInlinePragma
       | otherwise
-      = inl_prag
+      = fn_prag
 
     ----------------------------------------------------------
         -- Specialise to one particular call pattern
@@ -1770,7 +1770,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                        | otherwise = -- Specialising local fn
                                      text "SPEC"
 
-                spec_rule = mkSpecRule dflags this_mod True inl_act
+                spec_rule = mkSpecRule dflags this_mod True rule_act
                                     herald fn rule_bndrs rule_lhs_args
                                     (mkVarApps (Var spec_fn) rule_rhs_args1)
 
@@ -1780,6 +1780,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                        , ppr spec_rule
                                        , text "acc" <+> ppr rules_acc
                                        , text "existing" <+> ppr existing_rules
+                                       , text "rule_act" <+> ppr rule_act
                                        ]
 
 --           ; pprTrace "spec_call: rule" (vcat [ -- text "poly_qvars" <+> ppr poly_qvars
@@ -2358,8 +2359,8 @@ argument pattern.  Wrinkles
 (SC3) Annoyingly, we /also/ eliminate duplicates in `filterCalls`.
    See (MP3) in Note [Specialising polymorphic dictionaries]
 
-Note [Auto-specialisation and RULES]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Specialise: rule activation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider:
    g :: Num a => a -> a
    g = ...
@@ -2379,15 +2380,23 @@ Thus when adding
 also add
         RULE f g_spec = 0
 
-But that's a bit complicated.  For now we ask the programmer's help,
-by *copying the INLINE activation pragma* to the auto-specialised
-rule.  So if g says {-# NOINLINE[2] g #-}, then the auto-spec rule
-will also not be active until phase 2.  And that's what programmers
-should jolly well do anyway, even aside from specialisation, to ensure
-that g doesn't inline too early.
+But that's a bit complicated.  For now we lean on the programmer:
 
-This in turn means that the RULE would never fire for a NOINLINE
-thing so not much point in generating a specialisation at all.
+ * Make the activation of the RULE be the same as the activation of the Id,
+   i.e. (idInlineActivation g)
+
+So if `g` says {-# NOINLINE[2] g #-}, then the auto-spec rule will also not be
+active until phase 2.  And that's what programmers should jolly well do anyway,
+even aside from specialisation, to ensure that `g` doesn't inline too early.
+
+Wrinkles
+
+(SRA1) This in turn means that the RULE would never fire for a NOINLINE thing
+   so not much point in generating a specialisation at all.  This is a
+   bit moot: it's not unreasonable to have a (NOINLINE) specialisation for a
+   NOINLINE function.  But currently we don't.  And hence we don't create
+   a specialisation for an OPAQUE function either (see Note [OPAQUE pragma]
+   in Language.Haskell.Syntax.Binds.InlinePragma.
 
 Note [Specialisation shape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

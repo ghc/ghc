@@ -1,5 +1,5 @@
 
 ==================== Tidy Core rules ====================
-"SC:$wf30" [2] forall. $wf3 g_imp = f3_$s$wf3
+"SC:$wf30" [1] forall. $wf3 g_imp = f3_$s$wf3
 
 

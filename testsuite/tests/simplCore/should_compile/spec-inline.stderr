@@ -17,7 +17,7 @@ Roman.foo3
 
 Rec {
 -- RHS size: {terms: 40, types: 5, coercions: 0, joins: 0/0}
-Roman.foo_$s$wgo [Occ=LoopBreaker]
+Roman.foo_$s$wgo [InlPrag=[2], Occ=LoopBreaker]
   :: GHC.Internal.Prim.Int#
      -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
 [GblId, Arity=2, Str=<A><L>, Unf=OtherCon []]
@@ -141,7 +141,7 @@ foo
 
 
 ------ Local rules for imported ids --------
-"SC:$wgo0" [2]
+"SC:$wgo0" [1]
     forall (sc :: GHC.Internal.Prim.Int#)
            (sc1 :: GHC.Internal.Prim.Int#).
       Roman.$wgo (GHC.Internal.Maybe.Just
