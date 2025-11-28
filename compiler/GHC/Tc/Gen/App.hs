@@ -354,6 +354,44 @@ Unify result type /before/ typechecking the args
     • In the first argument of ‘Pair’, namely ‘"yes"’
 
 The latter is much better. That is why we call checkResultType before tcValArgs.
+
+Note [QuickLook: arguments before result]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally we try to push the expected result type into the call;
+see Note [Unify with expected type before typechecking arguments].
+But surprisingly we can't do that for QuickLook.  (#26599 was a failed
+attempt to suggest this.)  Consider
+   h :: (Int->Int) -> Int    ids :: [forall a. a->a]
+and the call
+   h (head ids)
+Let's say we instantiate `head :: [a] -> a` with `a:=kappa`.
+We QuickLook at the argument with expected type (Int->Int). We must NOT
+unify kappa:=(Int->Int), because kappa:=forall a. a->a is the only
+solution, and one that we will find if we look at the argument first.
+
+TL;DR: we must do `quickLookArg` on all arguments before doing `quickLookResultType`
+on the result type.
+
+Remember: `quickLookResultType` is really anticipating a /subsumption/ test, not
+an equality test.  Doing `qlUnify` on the result type (always a rho-type) is
+in general wrong if there is an un-guarded kappa in the result type.  It's wrong
+UNLESS we have already gotten all the info about `kappa` (from the
+arguments) that we are going to get.  That's why we QuickLook the arguments first.
+
+This is a bit sad, as #26599 shows.  Consider
+
+  woo :: (x, [forall a. a->a])
+  bar1 = snd woo
+  bar2 = snd (id woo)
+
+For `bar1` we instantiate `snd` at [a:=k1,b:=k2].  Then we QL on the argument `woo`
+(instantiating with `x:=k3`.  Since the result type is guarded we qlUnify
+    (k3,forall a.a->a) ~ (k1,k2)
+and thus succeed in discovering k2:=forall a.a->a, as desired.
+
+But for `bar2` we fail. When quick-looking (id woo) we instantiate `id` with [a:=k],
+and quick-look the argument `woo` with expected type `k`.  That's not guarded,
+so we get no information.  Adding the `id` call makes it un-typeable. Boo.
 -}
 
 tcApp :: HsExpr GhcRn
@@ -403,24 +441,23 @@ tcApp rn_expr exp_res_ty
             DoQL -> do { traceTc "tcApp:DoQL" (ppr rn_fun $$ ppr app_res_rho)
 
                          -- Step 5.1: Take a quick look at the result type
-                       ; inst_args_with_guards <- case exp_res_ty of
-                             Check exp_rho -> do { qlUnify app_res_rho exp_rho
-                                                 ; mapM reGuardArg inst_args }
-                             Infer {} -> return inst_args
-
-                       ; inst_args_ql <- mapM quickLookArg inst_args_with_guards
+                         -- See Note [QuickLook: arguments before result]
+                       ; case exp_res_ty of
+                             Check exp_rho -> quickLookResultType app_res_rho exp_rho
+                             Infer {}      -> return ()
 
                          -- Step 5.3: zonk to expose the polymorphism hidden under
                          --           QuickLook instantiation variables in `app_res_rho`
                        ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
 
                          -- Step 5.4: subsumption check against the expected type
-                       ; res_wrap <- checkResultTy rn_expr tc_head inst_args_ql
-                                                    app_res_rho exp_res_ty
+                         -- See Note [Unify with expected type before typechecking arguments]
+                       ; res_wrap <- checkResultTy rn_expr tc_head inst_args
+                                                   app_res_rho exp_res_ty
 
                          -- Step 5.2: typecheck the arguments, and monomorphise
                          --           any un-unified instantiation variables
-                       ; tc_args <- tcValArgs DoQL inst_args_ql
+                       ; tc_args <- tcValArgs DoQL inst_args
 
                          -- Step 5.5: wrap up
                        ; finishApp tc_head tc_args app_res_rho res_wrap } }
@@ -589,13 +626,13 @@ tcValArg _ (EValArgQL { eaql_wanted  = wanted
 
                     -- Unify with context if we have not already done so
                     -- See (QLA4) in Note [Quick Look at value arguments]
-                  ; unless arg_influences_enclosing_call $  -- Don't repeat
-                    qlUnify app_res_rho exp_arg_rho         -- the qlUnify
+                  ; unless arg_influences_enclosing_call $      -- Don't repeat
+                    quickLookResultType app_res_rho exp_arg_rho -- the qlUnify
 
-                  ; tc_args <- tcValArgs DoQL inst_args
                   ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
                   ; res_wrap <- checkResultTy rn_expr tc_head inst_args
                                               app_res_rho (mkCheckExpType exp_arg_rho)
+                  ; tc_args <- tcValArgs DoQL inst_args
                   ; finishApp tc_head tc_args app_res_rho res_wrap }
 
        ; traceTc "tcEValArgQL }" $
@@ -607,6 +644,10 @@ tcValArg _ (EValArgQL { eaql_wanted  = wanted
 
 
 --------------------
+whenQL :: QLFlag -> ZonkM () -> TcM ()
+whenQL DoQL thing_inside = liftZonkM thing_inside
+whenQL NoQL _            = return ()
+
 wantQuickLook :: HsExpr GhcRn -> TcM QLFlag
 wantQuickLook (HsVar _ (L _ (WithUserRdr _ f)))
   | getUnique f `elem` quickLookKeys = return DoQL
@@ -839,11 +880,8 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
                   (Just $ HsExprTcThing tc_fun)
                   (n_val_args, fun_sigma) fun_ty
 
-           ; let arg' = EValArg { ea_ctxt   = ctxt
-                                , ea_arg    = arg
-                                , ea_arg_ty = arg_ty }
-                 acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
-
+           ; arg' <- quickLookArg do_ql ctxt arg arg_ty
+           ; let acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
            ; go (pos+1) acc' res_ty rest_args }
 
     new_arg_ty :: LHsExpr GhcRn -> Int -> TcM (Scaled TcType)
@@ -1841,21 +1879,28 @@ This turned out to be more subtle than I expected.  Wrinkles:
 
 -}
 
-quickLookArg :: HsExprArg 'TcpInst -> TcM (HsExprArg 'TcpInst)
+quickLookArg :: QLFlag -> AppCtxt
+             -> LHsExpr GhcRn          -- ^ Argument
+             -> Scaled TcSigmaTypeFRR  -- ^ Type expected by the function
+             -> TcM (HsExprArg 'TcpInst)
 -- quickLookArg1 implements the "QL Argument" judgement in Fig 5 of the paper
 -- See Note [Quick Look at value arguments]
-quickLookArg e_arg@(EValArg { ea_ctxt   = ctxt
-                            , ea_arg    = larg@(L _ arg)
-                            , ea_arg_ty = orig_arg_ty })
-  = do { let !(Scaled _ orig_arg_rho) = orig_arg_ty
-             -- NB: orig_arg_rho may not be zonked, but that's ok
-       ; is_rho <- tcIsDeepRho orig_arg_rho
+quickLookArg NoQL ctxt larg orig_arg_ty
+  = skipQuickLook ctxt larg orig_arg_ty
+quickLookArg DoQL ctxt larg orig_arg_ty
+  = do { is_rho <- tcIsDeepRho (scaledThing orig_arg_ty)
        ; traceTc "qla" (ppr orig_arg_ty $$ ppr is_rho)
        ; if not is_rho
-         then return e_arg
-         else
+         then skipQuickLook ctxt larg orig_arg_ty
+         else quickLookArg1 ctxt larg orig_arg_ty }
 
-    addArgCtxt ctxt larg $ -- Context needed for constraints
+quickLookArg1 :: AppCtxt -> LHsExpr GhcRn
+              -> Scaled TcRhoType  -- Deeply skolemised
+              -> TcM (HsExprArg 'TcpInst)
+-- quickLookArg1 implements the "QL Argument" judgement in Fig 5 of the paper
+quickLookArg1 ctxt larg@(L _ arg) sc_arg_ty@(Scaled _ orig_arg_rho)
+             -- NB: orig_arg_rho may not be zonked, but that's ok
+  = addArgCtxt ctxt larg $ -- Context needed for constraints
                            -- generated by calls in arg
     do { ((rn_fun, fun_ctxt), rn_args) <- splitHsApps arg
 
@@ -1873,7 +1918,7 @@ quickLookArg e_arg@(EValArg { ea_ctxt   = ctxt
               , text "args:" <+> ppr rn_args ]
 
        ; case mb_fun_ty of {
-           Nothing -> return e_arg ;  -- fun is too complicated
+           Nothing -> skipQuickLook ctxt larg sc_arg_ty ;  -- fun is too complicated
            Just (tc_fun, fun_sigma) ->
 
        -- step 2: use |-inst to instantiate the head applied to the arguments
@@ -1903,37 +1948,40 @@ quickLookArg e_arg@(EValArg { ea_ctxt   = ctxt
        --         unzonked orig_arg_rho, so that we deliberately do not exploit
        --         guardedness that emerges a result of QL on earlier args
        --     In contrast, we must do the `anyFreeKappa` test /after/ tcInstFun; see (QLA3).
+       ; arg_influences_enclosing_call
+            <- if isGuardedTy orig_arg_rho
+               then return True
+               else not <$> anyFreeKappa app_res_rho  -- (B)
+                    -- For (B) see Note [The fiv test in quickLookArg]
 
-       ; (arg_influences_call, inst_args_ql)
-            <- if isGuardedTy orig_arg_rho                                -- (A)
-               then do { qlUnify app_res_rho orig_arg_rho
-                       ; inst_args_with_guards  <- mapM reGuardArg   inst_args
-                       ; inst_args_ql <- mapM quickLookArg inst_args_with_guards
-                       ; return (True, inst_args_ql) }
-               else do { inst_args_ql <- mapM quickLookArg inst_args
-                       ; has_free_inst_vars <- anyFreeKappa app_res_rho   --(B)
-                       ; if has_free_inst_vars
-                         then return (False, inst_args_ql)
-                         else do { qlUnify app_res_rho orig_arg_rho
-                                 ; return (True, inst_args_ql) } }
+       -- Step 4: do quick-look unification if either (A) or (B) hold
+       -- NB: orig_arg_rho may not be zonked, but that's ok
+       ; when arg_influences_enclosing_call $
+         quickLookResultType app_res_rho orig_arg_rho
 
        ; traceTc "quickLookArg done }" (ppr rn_fun)
 
        ; return (EValArgQL { eaql_ctxt    = ctxt
-                           , eaql_arg_ty  = orig_arg_ty
+                           , eaql_arg_ty  = sc_arg_ty
                            , eaql_larg    = larg
                            , eaql_tc_fun  = tc_head
                            , eaql_fun_ue  = fun_ue
-                           , eaql_args    = inst_args_ql
+                           , eaql_args    = inst_args
                            , eaql_wanted  = wanted
-                           , eaql_encl    = arg_influences_call
-                           , eaql_res_rho = app_res_rho }) }}}}
+                           , eaql_encl    = arg_influences_enclosing_call
+                           , eaql_res_rho = app_res_rho }) }}}
 
-quickLookArg other_arg = return other_arg
+quickLookResultType :: TcRhoType -> TcRhoType -> TcM ()
+-- See Note [QuickLook: arguments before result]
+quickLookResultType app_rest_rho exp_res_rho
+  = qlUnify app_rest_rho exp_res_rho
 
-whenQL :: QLFlag -> ZonkM () -> TcM ()
-whenQL DoQL thing_inside = liftZonkM thing_inside
-whenQL NoQL _            = return ()
+skipQuickLook :: AppCtxt -> LHsExpr GhcRn -> Scaled TcRhoType
+              -> TcM (HsExprArg 'TcpInst)
+skipQuickLook ctxt larg arg_ty
+  = return (EValArg { ea_ctxt   = ctxt
+                    , ea_arg    = larg
+                    , ea_arg_ty = arg_ty })
 
 tcIsDeepRho :: TcType -> TcM Bool
 -- This top-level zonk step, which is the reason we need a local 'go' loop,
@@ -1960,15 +2008,6 @@ tcIsDeepRho ty
 
       | otherwise
       = return True
-
-reGuardArg :: HsExprArg 'TcpInst -> TcM (HsExprArg 'TcpInst)
--- Zonk the result type of an EValArg, so that a subseqent
--- call to isGuardedTy will see the unifications so far
-reGuardArg arg@(EValArg { ea_arg_ty = arg_ty })
-  = do { arg_ty' <- liftZonkM $ zonkScaledTcType arg_ty
-       ; return (arg { ea_arg_ty = arg_ty' }) }
-reGuardArg arg
-  = return arg
 
 isGuardedTy :: TcType -> Bool
 isGuardedTy ty
