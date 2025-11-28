@@ -2006,7 +2006,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
         -- mkSeqs: see Note [SpecConstr and strict fields]
               spec_rhs = mkLams spec_lam_args (mkSeqs cbv_args spec_body_ty spec_body)
               rule_rhs = mkVarApps (Var spec_id) spec_call_args
-              inline_act = idInlineActivation fn
+              inline_act = activeAfter $ nextPhase $ beginPhase $ idInlineActivation fn
               this_mod   = sc_module $ sc_opts env
               rule       = mkRule this_mod True {- Auto -} True {- Local -}
                                   rule_name inline_act
