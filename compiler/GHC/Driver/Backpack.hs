@@ -872,6 +872,8 @@ hsModuleToModSummary home_keys pn hsc_src modname
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
 
+    query <- liftIO $ hscUnitIndexQuery hsc_env
+
     -- Also copied from 'getImports'
     let (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
@@ -884,7 +886,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
         implicit_imports = mkPrelImports modname loc
                                          implicit_prelude imps
 
-        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) modname
+        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) query modname
         convImport (L _ i) = (rn_pkg_qual (ideclPkgQual i), reLoc $ ideclName i)
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
