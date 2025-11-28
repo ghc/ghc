@@ -1,3 +1,6 @@
+-fPIC
+-U__PIC__
+-D__PIC__
 -Wimplicit
 -include
 rts/include/ghcversion.h
@@ -27,3 +30,4 @@ rts/include/ghcversion.h
 -DDEBUG
 -DDYNAMIC
 -DPROFILING
+-DRtsWay="rts_thr_debug_p_dyn"
