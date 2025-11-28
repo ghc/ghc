@@ -424,68 +424,43 @@ tcApp rn_expr exp_res_ty
        ; do_ql <- wantQuickLook rn_fun
        ; (inst_args, app_res_rho) <- tcInstFun do_ql inst_final tc_head fun_sigma rn_args
 
-       ; case do_ql of
-            NoQL -> do { traceTc "tcApp:NoQL" (ppr rn_fun $$ ppr app_res_rho)
-
-                         -- Step 4.1: subsumption check against expected result type
-                         -- See Note [Unify with expected type before typechecking arguments]
-                       ; res_wrap <- checkResultTy rn_expr tc_head inst_args
-                                                   app_res_rho exp_res_ty
-
-                         -- Step 4.2: typecheck the arguments
-                       ; tc_args <- tcValArgs NoQL inst_args
-
-                         -- Step 4.3: wrap up
-                       ; finishApp tc_head tc_args app_res_rho res_wrap }
-
-            DoQL -> do { traceTc "tcApp:DoQL" (ppr rn_fun $$ ppr app_res_rho)
-
-                         -- Step 5.1: Take a quick look at the result type
+       ; app_res_rho <- case do_ql of
+            NoQL -> return app_res_rho
+            DoQL -> do { -- Step 5.1: Take a quick look at the result type
                          -- See Note [QuickLook: arguments before result]
-                       ; case exp_res_ty of
-                             Check exp_rho -> quickLookResultType app_res_rho exp_rho
-                             Infer {}      -> return ()
+                         case exp_res_ty of
+                           Check exp_rho -> quickLookResultType app_res_rho exp_rho
+                           Infer {}      -> return ()
 
                          -- Step 5.3: zonk to expose the polymorphism hidden under
                          --           QuickLook instantiation variables in `app_res_rho`
-                       ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
+                         --           from either quickLookArg or quickLookResultType
+                       ; liftZonkM $ zonkTcType app_res_rho }
 
-                         -- Step 5.4: subsumption check against the expected type
-                         -- See Note [Unify with expected type before typechecking arguments]
-                       ; res_wrap <- checkResultTy rn_expr tc_head inst_args
-                                                   app_res_rho exp_res_ty
+       ; finishApp do_ql rn_expr tc_head inst_args app_res_rho exp_res_ty }
 
-                         -- Step 5.2: typecheck the arguments, and monomorphise
-                         --           any un-unified instantiation variables
-                       ; tc_args <- tcValArgs DoQL inst_args
-
-                         -- Step 5.5: wrap up
-                       ; finishApp tc_head tc_args app_res_rho res_wrap } }
-
--- | Variant of 'getDeepSubsumptionFlag' which enables a top-level subsumption
--- in order to implement the plan of Note [Typechecking data constructors].
-getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
-getDeepSubsumptionFlag_DataConHead app_head =
-  do { user_ds <- xoptM LangExt.DeepSubsumption
-     ; return $
-         if | user_ds
-            -> Deep DeepSub
-            | XExpr (ConLikeTc (RealDataCon {})) <- app_head
-            -> Deep TopSub
-            | otherwise
-            -> Shallow
-    }
-
-finishApp :: (HsExpr GhcTc, AppCtxt) -> [HsExprArg 'TcpTc]
-          -> TcRhoType -> HsWrapper
+finishApp :: QLFlag -> HsExpr GhcRn
+          -> (HsExpr GhcTc, AppCtxt) -> [HsExprArg 'TcpInst]
+          -> TcRhoType -> ExpRhoType
           -> TcM (HsExpr GhcTc)
 -- Do final checks and wrap up the result
-finishApp tc_head@(tc_fun,_) tc_args app_res_rho res_wrap
-  = do {
-       -- Reconstruct, with a horrible special case for tagToEnum#.
-         res_expr <- if isTagToEnum tc_fun
+-- Precondition: app_res_rho has no polymorphism hidden under instantiation variables
+finishApp do_ql rn_expr tc_head@(tc_fun,_) inst_args
+          app_res_rho exp_res_ty
+  = do { -- Step 5.4: subsumption check against the expected type
+         -- See Note [Unify with expected type before typechecking arguments]
+         res_wrap <- checkResultTy rn_expr tc_head inst_args
+                                   app_res_rho exp_res_ty
+
+         -- Step 5.2: Typecheck the arguments, and monomorphise
+         --           any un-unified instantiation variables
+       ; tc_args <- tcValArgs do_ql inst_args
+
+         -- Horrible special case for tagToEnum#.
+       ; res_expr <- if isTagToEnum tc_fun
                      then tcTagToEnum tc_head tc_args app_res_rho
                      else return (rebuildHsApps tc_head tc_args)
+
        ; traceTc "End tcApp }" (ppr tc_fun)
        ; return (mkHsWrap res_wrap res_expr) }
 
@@ -630,10 +605,8 @@ tcValArg _ (EValArgQL { eaql_wanted  = wanted
                     quickLookResultType app_res_rho exp_arg_rho -- the qlUnify
 
                   ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
-                  ; res_wrap <- checkResultTy rn_expr tc_head inst_args
-                                              app_res_rho (mkCheckExpType exp_arg_rho)
-                  ; tc_args <- tcValArgs DoQL inst_args
-                  ; finishApp tc_head tc_args app_res_rho res_wrap }
+                  ; finishApp DoQL rn_expr tc_head inst_args app_res_rho
+                              (mkCheckExpType exp_arg_rho) }
 
        ; traceTc "tcEValArgQL }" $
            vcat [ text "app_res_rho:" <+> ppr app_res_rho ]
@@ -644,6 +617,20 @@ tcValArg _ (EValArgQL { eaql_wanted  = wanted
 
 
 --------------------
+-- | Variant of 'getDeepSubsumptionFlag' which enables a top-level subsumption
+-- in order to implement the plan of Note [Typechecking data constructors].
+getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
+getDeepSubsumptionFlag_DataConHead app_head =
+  do { user_ds <- xoptM LangExt.DeepSubsumption
+     ; return $
+         if | user_ds
+            -> Deep DeepSub
+            | XExpr (ConLikeTc (RealDataCon {})) <- app_head
+            -> Deep TopSub
+            | otherwise
+            -> Shallow
+    }
+
 whenQL :: QLFlag -> ZonkM () -> TcM ()
 whenQL DoQL thing_inside = liftZonkM thing_inside
 whenQL NoQL _            = return ()
