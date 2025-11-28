@@ -844,7 +844,8 @@ initMulti unitArgsFiles  = do
     let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
         hue_flags = homeUnitEnv_dflags homeUnitEnv
         dflags = homeUnitEnv_dflags homeUnitEnv
-    (dbs,unit_state,home_unit,mconstants) <- liftIO $ State.initUnits logger hue_flags cached_unit_dbs home_units
+        index = hscUnitIndex hsc_env
+    (dbs,unit_state,home_unit,mconstants) <- liftIO $ State.initUnits logger hue_flags index cached_unit_dbs home_units
 
     updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
     pure $ HomeUnitEnv
@@ -859,7 +860,7 @@ initMulti unitArgsFiles  = do
 
   let dflags = homeUnitEnv_dflags $ unitEnv_lookup mainUnitId home_unit_graph
   unitEnv <- assertUnitEnvInvariant <$> (liftIO $ initUnitEnv mainUnitId home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags))
-  let final_hsc_env = hsc_env { hsc_unit_env = unitEnv }
+  let final_hsc_env = hsc_env { hsc_unit_env = unitEnv {ue_index = hscUnitIndex hsc_env} }
 
   GHC.setSession final_hsc_env
 
