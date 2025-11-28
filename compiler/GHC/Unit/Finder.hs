@@ -48,6 +48,7 @@ import GHC.Unit.Module
 import GHC.Unit.Home
 import GHC.Unit.State
 import GHC.Unit.Finder.Types
+import GHC.Unit.State (UnitIndexQuery)
 
 import qualified GHC.Data.ShortText as ST
 
@@ -67,7 +68,7 @@ import Control.Monad
 import Data.Time
 import qualified Data.Map as M
 import GHC.Driver.Env
-    ( hsc_home_unit_maybe, HscEnv(hsc_FC, hsc_dflags, hsc_unit_env) )
+    ( hsc_home_unit_maybe, HscEnv(hsc_FC, hsc_dflags, hsc_unit_env), hscUnitIndexQuery )
 import GHC.Driver.Config.Finder
 import qualified Data.Set as Set
 import qualified Data.List.NonEmpty as NE
@@ -162,17 +163,19 @@ findImportedModule hsc_env mod pkg_qual =
       dflags    = hsc_dflags hsc_env
       fopts     = initFinderOpts dflags
   in do
-    findImportedModuleNoHsc fc fopts (hsc_unit_env hsc_env) mhome_unit mod pkg_qual
+    query <- hscUnitIndexQuery hsc_env
+    findImportedModuleNoHsc fc fopts (hsc_unit_env hsc_env) query mhome_unit mod pkg_qual
 
 findImportedModuleNoHsc
   :: FinderCache
   -> FinderOpts
   -> UnitEnv
+  -> UnitIndexQuery
   -> Maybe HomeUnit
   -> ModuleName
   -> PkgQual
   -> IO FindResult
-findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
+findImportedModuleNoHsc fc fopts ue query mhome_unit mod_name mb_pkg =
   case mb_pkg of
     NoPkgQual  -> unqual_import
     ThisPkg uid | (homeUnitId <$> mhome_unit) == Just uid -> home_import
@@ -194,7 +197,7 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
       -- If the module is reexported, then look for it as if it was from the perspective
       -- of that package which reexports it.
       | mod_name `Set.member` finder_reexportedModules opts =
-        findImportedModuleNoHsc fc opts ue (Just $ DefiniteHomeUnit uid Nothing) mod_name NoPkgQual
+        findImportedModuleNoHsc fc opts ue query (Just $ DefiniteHomeUnit uid Nothing) mod_name NoPkgQual
       | mod_name `Set.member` finder_hiddenModules opts =
         return (mkHomeHidden uid)
       | otherwise =
@@ -205,11 +208,11 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
     -- first before looking at the packages in order.
     any_home_import = foldr1 orIfNotFound (home_import: map home_pkg_import other_fopts)
 
-    pkg_import    = findExposedPackageModule fc fopts units  mod_name mb_pkg
+    pkg_import    = findExposedPackageModule fc fopts units query mod_name mb_pkg
 
     unqual_import = any_home_import
                     `orIfNotFound`
-                    findExposedPackageModule fc fopts units mod_name NoPkgQual
+                    findExposedPackageModule fc fopts units query mod_name NoPkgQual
 
     units     = case mhome_unit of
                   Nothing -> ue_units ue
@@ -222,13 +225,13 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
 -- plugin.  This consults the same set of exposed packages as
 -- 'findImportedModule', unless @-hide-all-plugin-packages@ or
 -- @-plugin-package@ are specified.
-findPluginModule :: FinderCache -> FinderOpts -> UnitState -> Maybe HomeUnit -> ModuleName -> IO FindResult
-findPluginModule fc fopts units (Just home_unit) mod_name =
+findPluginModule :: FinderCache -> FinderOpts -> UnitState -> UnitIndexQuery -> Maybe HomeUnit -> ModuleName -> IO FindResult
+findPluginModule fc fopts units query (Just home_unit) mod_name =
   findHomeModule fc fopts home_unit mod_name
   `orIfNotFound`
-  findExposedPluginPackageModule fc fopts units mod_name
-findPluginModule fc fopts units Nothing mod_name =
-  findExposedPluginPackageModule fc fopts units mod_name
+  findExposedPluginPackageModule fc fopts units query mod_name
+findPluginModule fc fopts units query Nothing mod_name =
+  findExposedPluginPackageModule fc fopts units query mod_name
 
 -- | Locate a specific 'Module'.  The purpose of this function is to
 -- create a 'ModLocation' for a given 'Module', that is to find out
@@ -284,15 +287,15 @@ homeSearchCache fc home_unit mod_name do_this = do
   let mod = mkModule home_unit mod_name
   modLocationCache fc mod do_this
 
-findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> PkgQual -> IO FindResult
-findExposedPackageModule fc fopts units mod_name mb_pkg =
+findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> UnitIndexQuery -> ModuleName -> PkgQual -> IO FindResult
+findExposedPackageModule fc fopts units query mod_name mb_pkg =
   findLookupResult fc fopts
-    $ lookupModuleWithSuggestions units mod_name mb_pkg
+    $ lookupModuleWithSuggestions units query mod_name mb_pkg
 
-findExposedPluginPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> IO FindResult
-findExposedPluginPackageModule fc fopts units mod_name =
+findExposedPluginPackageModule :: FinderCache -> FinderOpts -> UnitState -> UnitIndexQuery -> ModuleName -> IO FindResult
+findExposedPluginPackageModule fc fopts units query mod_name =
   findLookupResult fc fopts
-    $ lookupPluginModuleWithSuggestions units mod_name NoPkgQual
+    $ lookupPluginModuleWithSuggestions units query mod_name NoPkgQual
 
 findLookupResult :: FinderCache -> FinderOpts -> LookupResult -> IO FindResult
 findLookupResult fc fopts r = case r of

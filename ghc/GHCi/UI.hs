@@ -3695,19 +3695,21 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
 
 completeModule = wrapIdentCompleterMod $ \w -> do
   hsc_env <- GHC.getSession
-  let pkg_mods = allVisibleModules (hsc_units hsc_env)
+  query <- liftIO $ hscUnitIndexQuery hsc_env
+  let pkg_mods = allVisibleModules query
   loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
   return $ filter (w `isPrefixOf`)
         $ map (showPpr (hsc_dflags hsc_env)) $ loaded_mods ++ pkg_mods
 
 completeSetModule = wrapIdentCompleterWithModifier "+-" $ \m w -> do
   hsc_env <- GHC.getSession
+  query <- liftIO $ hscUnitIndexQuery hsc_env
   modules <- case m of
     Just '-' -> do
       imports <- GHC.getContext
       return $ map iiModuleName imports
     _ -> do
-      let pkg_mods = allVisibleModules (hsc_units hsc_env)
+      let pkg_mods = allVisibleModules query
       loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
       return $ loaded_mods ++ pkg_mods
   return $ filter (w `isPrefixOf`) $ map (showPpr (hsc_dflags hsc_env)) modules
@@ -3775,8 +3777,8 @@ wrapIdentCompleterWithModifier modifChars fun = completeWordWithPrev Nothing wor
 
 -- | Return a list of visible module names for autocompletion.
 -- (NB: exposed != visible)
-allVisibleModules :: UnitState -> [ModuleName]
-allVisibleModules unit_state = listVisibleModuleNames unit_state
+allVisibleModules :: UnitIndexQuery -> [ModuleName]
+allVisibleModules query = listVisibleModuleNames query
 
 completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
                         completeIdentifier

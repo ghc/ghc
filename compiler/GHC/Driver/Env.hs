@@ -7,6 +7,8 @@ module GHC.Driver.Env
    , hsc_home_unit
    , hsc_home_unit_maybe
    , hsc_units
+   , hscUnitIndex
+   , hscUnitIndexQuery
    , hsc_HPT
    , hsc_HUE
    , hsc_HUG
@@ -58,6 +60,7 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Env
 import GHC.Unit.External
+import GHC.Unit.State (UnitIndex, UnitIndexQuery, unitIndexQuery)
 
 import GHC.Core         ( CoreRule )
 import GHC.Core.FamInstEnv
@@ -117,6 +120,12 @@ hsc_home_unit_maybe = ue_homeUnit . hsc_unit_env
 
 hsc_units :: HasDebugCallStack => HscEnv -> UnitState
 hsc_units = ue_units . hsc_unit_env
+
+hscUnitIndex :: HscEnv -> UnitIndex
+hscUnitIndex = ue_index . hsc_unit_env
+
+hscUnitIndexQuery :: HscEnv -> IO UnitIndexQuery
+hscUnitIndexQuery = unitIndexQuery . hscUnitIndex
 
 hsc_HPT :: HscEnv -> HomePackageTable
 hsc_HPT = ue_hpt . hsc_unit_env
