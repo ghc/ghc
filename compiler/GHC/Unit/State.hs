@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow, 2006
 
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, OverloadedRecordDot, RecordWildCards #-}
 
 -- | Unit manipulation
 module GHC.Unit.State (
@@ -48,6 +48,15 @@ module GHC.Unit.State (
         closeUnitDeps,
         closeUnitDeps',
         mayThrowUnitErr,
+
+        UnitConfig (..),
+        UnitIndex (..),
+        UnitIndexQuery (..),
+        UnitVisibility (..),
+        VisibilityMap,
+        ModuleNameProvidersMap,
+        newUnitIndex,
+        unitIndexQuery,
 
         -- * Module hole substitution
         ShHoleSubst,
@@ -121,6 +130,8 @@ import qualified Data.Semigroup as Semigroup
 import qualified Data.Set as Set
 import GHC.LanguageExtensions
 import Control.Applicative
+import Control.Monad.IO.Class (MonadIO (..))
+import Data.IORef (IORef, newIORef, readIORef)
 
 -- ---------------------------------------------------------------------------
 -- The Unit state
@@ -577,10 +588,10 @@ searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
 -- | Find the UnitId which an import qualified by a package import comes from.
 -- Compared to 'lookupPackageName', this function correctly accounts for visibility,
 -- renaming and thinning.
-resolvePackageImport :: UnitState -> ModuleName -> PackageName -> Maybe UnitId
-resolvePackageImport unit_st mn pn = do
+resolvePackageImport :: UnitState -> UnitIndexQuery -> ModuleName -> PackageName -> Maybe UnitId
+resolvePackageImport unit_st query mn pn = do
   -- 1. Find all modules providing the ModuleName (this accounts for visibility/thinning etc)
-  providers <- filterUniqMap originVisible <$> lookupUniqMap (moduleNameProvidersMap unit_st) mn
+  providers <- filterUniqMap originVisible <$> query.findOrigin unit_st mn False
   -- 2. Get the UnitIds of the candidates
   let candidates_uid = concatMap to_uid $ sortOn fst $ nonDetUniqMapToList providers
   -- 3. Get the package names of the candidates
@@ -638,14 +649,14 @@ listUnitInfo state = nonDetEltsUniqMap (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
-initUnits logger dflags cached_dbs home_units = do
+initUnits :: Logger -> DynFlags -> UnitIndex -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
+initUnits logger dflags index cached_dbs home_units = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
 
   (unit_state,dbs) <- withTiming logger (text "initializing unit database")
                    forceUnitInfoMap
-                 $ mkUnitState logger (initUnitConfig dflags cached_dbs home_units)
+                 $ mkUnitState logger (homeUnitId_ dflags) (initUnitConfig dflags cached_dbs home_units) index
 
   putDumpFileMaybe logger Opt_D_dump_mod_map "Module Map"
     FormatText (updSDocContext (\ctx -> ctx {sdocLineLength = 200})
@@ -1021,7 +1032,7 @@ selectPackages prec_map arg pkgs unusable
   = let matches = matching arg
         (ps,rest) = partition matches pkgs
     in if null ps
-        then Left (filter (matches.fst) (nonDetEltsUniqMap unusable))
+        then Left (filter (matches . fst) (nonDetEltsUniqMap unusable))
         else Right (sortByPreference prec_map ps, rest)
 
 -- | Rename a 'UnitInfo' according to some module instantiation.
@@ -1484,9 +1495,11 @@ validateDatabase cfg pkg_map1 =
 
 mkUnitState
     :: Logger
+    -> UnitId
     -> UnitConfig
+    -> UnitIndex
     -> IO (UnitState,[UnitDatabase UnitId])
-mkUnitState logger cfg = do
+mkUnitState logger unit cfg index = do
 {-
    Plan.
 
@@ -1542,14 +1555,8 @@ mkUnitState logger cfg = do
 
   -- if databases have not been provided, read the database flags
   raw_dbs <- case unitConfigDBCache cfg of
-               Nothing  -> readUnitDatabases logger cfg
+               Nothing  -> index.readDatabases logger unit cfg
                Just dbs -> return dbs
-
-  -- distrust all units if the flag is set
-  let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
-      dbs | unitConfigDistrustAll cfg = map distrust_all raw_dbs
-          | otherwise                 = raw_dbs
-
 
   -- This, and the other reverse's that you will see, are due to the fact that
   -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
@@ -1561,159 +1568,7 @@ mkUnitState logger cfg = do
 
   let home_unit_deps = selectHomeUnits (unitConfigHomeUnits cfg) hpt_flags
 
-  -- Merge databases together, without checking validity
-  (pkg_map1, prec_map) <- mergeDatabases logger dbs
-
-  -- Now that we've merged everything together, prune out unusable
-  -- packages.
-  let (pkg_map2, unusable, sccs) = validateDatabase cfg pkg_map1
-
-  reportCycles   logger sccs
-  reportUnusable logger unusable
-
-  -- Apply trust flags (these flags apply regardless of whether
-  -- or not packages are visible or not)
-  pkgs1 <- mayThrowUnitErr
-            $ foldM (applyTrustFlag prec_map unusable)
-                 (nonDetEltsUniqMap pkg_map2) (reverse (unitConfigFlagsTrusted cfg))
-  let prelim_pkg_db = mkUnitInfoMap pkgs1
-
-  --
-  -- Calculate the initial set of units from package databases, prior to any package flags.
-  --
-  -- Conceptually, we select the latest versions of all valid (not unusable) *packages*
-  -- (not units). This is empty if we have -hide-all-packages.
-  --
-  -- Then we create an initial visibility map with default visibilities for all
-  -- exposed, definite units which belong to the latest valid packages.
-  --
-  let preferLater unit unit' =
-        case compareByPreference prec_map unit unit' of
-            GT -> unit
-            _  -> unit'
-      addIfMorePreferable m unit = addToUDFM_C preferLater m (fsPackageName unit) unit
-      -- This is the set of maximally preferable packages. In fact, it is a set of
-      -- most preferable *units* keyed by package name, which act as stand-ins in
-      -- for "a package in a database". We use units here because we don't have
-      -- "a package in a database" as a type currently.
-      mostPreferablePackageReps = if unitConfigHideAll cfg
-                    then emptyUDFM
-                    else foldl' addIfMorePreferable emptyUDFM pkgs1
-      -- When exposing units, we want to consider all of those in the most preferable
-      -- packages. We can implement that by looking for units that are equi-preferable
-      -- with the most preferable unit for package. Being equi-preferable means that
-      -- they must be in the same database, with the same version, and the same package name.
-      --
-      -- We must take care to consider all these units and not just the most
-      -- preferable one, otherwise we can end up with problems like #16228.
-      mostPreferable u =
-        case lookupUDFM mostPreferablePackageReps (fsPackageName u) of
-          Nothing -> False
-          Just u' -> compareByPreference prec_map u u' == EQ
-      vis_map1 = foldl' (\vm p ->
-                            -- Note: we NEVER expose indefinite packages by
-                            -- default, because it's almost assuredly not
-                            -- what you want (no mix-in linking has occurred).
-                            if unitIsExposed p && unitIsDefinite (mkUnit p) && mostPreferable p
-                               then addToUniqMap vm (mkUnit p)
-                                               UnitVisibility {
-                                                 uv_expose_all = True,
-                                                 uv_renamings = [],
-                                                 uv_package_name = First (Just (fsPackageName p)),
-                                                 uv_requirements = emptyUniqMap,
-                                                 uv_explicit = Nothing
-                                               }
-                               else vm)
-                         emptyUniqMap pkgs1
-
-  --
-  -- Compute a visibility map according to the command-line flags (-package,
-  -- -hide-package).  This needs to know about the unusable packages, since if a
-  -- user tries to enable an unusable package, we should let them know.
-  --
-  vis_map2 <- mayThrowUnitErr
-                $ foldM (applyPackageFlag prec_map prelim_pkg_db emptyUniqSet unusable
-                        (unitConfigHideAll cfg) pkgs1)
-                            vis_map1 other_flags
-
-  --
-  -- Sort out which packages are wired in. This has to be done last, since
-  -- it modifies the unit ids of wired in packages, but when we process
-  -- package arguments we need to key against the old versions.
-  --
-  (pkgs2, wired_map) <- findWiredInUnits logger prec_map pkgs1 vis_map2
-  let pkg_db = mkUnitInfoMap pkgs2
-
-  -- Update the visibility map, so we treat wired packages as visible.
-  let vis_map = updateVisibilityMap wired_map vis_map2
-
-  let hide_plugin_pkgs = unitConfigHideAllPlugins cfg
-  plugin_vis_map <-
-    case unitConfigFlagsPlugins cfg of
-        -- common case; try to share the old vis_map
-        [] | not hide_plugin_pkgs -> return vis_map
-           | otherwise -> return emptyUniqMap
-        _ -> do let plugin_vis_map1
-                        | hide_plugin_pkgs = emptyUniqMap
-                        -- Use the vis_map PRIOR to wired in,
-                        -- because otherwise applyPackageFlag
-                        -- won't work.
-                        | otherwise = vis_map2
-                plugin_vis_map2
-                    <- mayThrowUnitErr
-                        $ foldM (applyPackageFlag prec_map prelim_pkg_db emptyUniqSet unusable
-                                hide_plugin_pkgs pkgs1)
-                             plugin_vis_map1
-                             (reverse (unitConfigFlagsPlugins cfg))
-                -- Updating based on wired in packages is mostly
-                -- good hygiene, because it won't matter: no wired in
-                -- package has a compiler plugin.
-                -- TODO: If a wired in package had a compiler plugin,
-                -- and you tried to pick different wired in packages
-                -- with the plugin flags and the normal flags... what
-                -- would happen?  I don't know!  But this doesn't seem
-                -- likely to actually happen.
-                return (updateVisibilityMap wired_map plugin_vis_map2)
-
-  let pkgname_map = listToUFM [ (unitPackageName p, unitInstanceOf p)
-                              | p <- pkgs2
-                              ]
-  -- The explicitUnits accurately reflects the set of units we have turned
-  -- on; as such, it also is the only way one can come up with requirements.
-  -- The requirement context is directly based off of this: we simply
-  -- look for nested unit IDs that are directly fed holes: the requirements
-  -- of those units are precisely the ones we need to track
-  let explicit_pkgs = [(k, uv_explicit v) | (k, v) <- nonDetUniqMapToList vis_map]
-      req_ctx = mapUniqMap (Set.toList)
-              $ plusUniqMapListWith Set.union (map uv_requirements (nonDetEltsUniqMap vis_map))
-
-
-  --
-  -- Here we build up a set of the packages mentioned in -package
-  -- flags on the command line; these are called the "preload"
-  -- packages.  we link these packages in eagerly.  The preload set
-  -- should contain at least rts & base, which is why we pretend that
-  -- the command line contains -package rts & -package base.
-  --
-  -- NB: preload IS important even for type-checking, because we
-  -- need the correct include path to be set.
-  --
-  let preload1 = nonDetKeysUniqMap (filterUniqMap (isJust . uv_explicit) vis_map)
-
-      -- add default preload units if they can be found in the db
-      basicLinkedUnits = fmap (RealUnit . Definite)
-                         $ filter (flip elemUniqMap pkg_db)
-                         $ unitConfigAutoLink cfg
-      preload3 = ordNub $ (basicLinkedUnits ++ preload1)
-
-  -- Close the preload packages with their dependencies
-  dep_preload <- mayThrowUnitErr
-                    $ closeUnitDeps pkg_db
-                    $ zip (map toUnitId preload3) (repeat Nothing)
-
-  let mod_map1 = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet vis_map
-      mod_map2 = mkUnusableModuleNameProvidersMap unusable
-      mod_map = mod_map2 `plusUniqMap` mod_map1
+  (moduleNameProvidersMap, pluginModuleNameProvidersMap, pkg_db, explicit_pkgs, dep_preload, req_ctx, pkgname_map, wired_map) <- index.update logger unit cfg raw_dbs other_flags
 
   -- Force the result to avoid leaking input parameters
   let !state = UnitState
@@ -1722,8 +1577,8 @@ mkUnitState logger cfg = do
          , homeUnitDepends              = Set.toList home_unit_deps
          , unitInfoMap                  = pkg_db
          , preloadClosure               = emptyUniqSet
-         , moduleNameProvidersMap       = mod_map
-         , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
+         , moduleNameProvidersMap
+         , pluginModuleNameProvidersMap
          , packageNameMap               = pkgname_map
          , wireMap                      = wired_map
          , unwireMap                    = listToUniqMap [ (v,k) | (k,v) <- nonDetUniqMapToList wired_map ]
@@ -1896,6 +1751,263 @@ addListTo = foldl' merge
 mkModMap :: Unit -> ModuleName -> ModuleOrigin -> UniqMap Module ModuleOrigin
 mkModMap pkg mod = unitUniqMap (mkModule pkg mod)
 
+-- -----------------------------------------------------------------------------
+-- Index
+
+data UnitIndexQuery =
+  UnitIndexQuery {
+    findOrigin :: UnitState -> ModuleName -> Bool -> Maybe (UniqMap Module ModuleOrigin),
+    index_all :: UnitState -> ModuleNameProvidersMap
+  }
+
+data UnitIndex =
+  UnitIndex {
+    query :: UnitId -> IO UnitIndexQuery,
+    readDatabases :: Logger -> UnitId -> UnitConfig -> IO [UnitDatabase UnitId],
+    update ::
+      Logger ->
+      UnitId ->
+      UnitConfig ->
+      [UnitDatabase UnitId] ->
+      [PackageFlag] ->
+      IO (
+        ModuleNameProvidersMap,
+        ModuleNameProvidersMap,
+        UnitInfoMap,
+        [(Unit, Maybe PackageArg)],
+        [UnitId],
+        UniqMap ModuleName [InstantiatedModule],
+        UniqFM PackageName UnitId,
+        WiringMap
+      )
+  }
+
+unitIndexQuery ::
+  MonadIO m =>
+  UnitId ->
+  UnitIndex ->
+  m UnitIndexQuery
+unitIndexQuery unit index = liftIO (index.query unit)
+
+data UnitIndexBackend =
+  UnitIndexBackend {
+    moduleNameProviders :: !ModuleNameProvidersMap,
+    pluginModuleNameProviders :: !ModuleNameProvidersMap
+  }
+
+newUnitIndexBackend :: UnitIndexBackend
+newUnitIndexBackend =
+  UnitIndexBackend {
+    moduleNameProviders = mempty,
+    pluginModuleNameProviders = mempty
+  }
+
+queryFindOriginDefault ::
+  UnitIndexBackend ->
+  UnitState ->
+  ModuleName ->
+  Bool ->
+  Maybe (UniqMap Module ModuleOrigin)
+queryFindOriginDefault _ UnitState {moduleNameProvidersMap, pluginModuleNameProvidersMap} name plugins =
+  lookupUniqMap source name
+  where
+    source = if plugins then pluginModuleNameProvidersMap else moduleNameProvidersMap
+
+newUnitIndexQuery ::
+  MonadIO m =>
+  IORef UnitIndexBackend ->
+  UnitId ->
+  m UnitIndexQuery
+newUnitIndexQuery ref _ = do
+  state <- liftIO $ readIORef ref
+  pure UnitIndexQuery {
+    findOrigin = queryFindOriginDefault state,
+    index_all = \ s -> s.moduleNameProvidersMap
+  }
+
+updateIndexDefault ::
+  Logger ->
+  UnitId ->
+  UnitConfig ->
+  [UnitDatabase UnitId] ->
+  [PackageFlag] ->
+  IO (ModuleNameProvidersMap, ModuleNameProvidersMap, UnitInfoMap, [(Unit, Maybe PackageArg)], [UnitId], UniqMap ModuleName [InstantiatedModule], UniqFM PackageName UnitId, WiringMap)
+updateIndexDefault logger _ cfg raw_dbs other_flags = do
+
+  -- distrust all units if the flag is set
+  let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
+      dbs | unitConfigDistrustAll cfg = map distrust_all raw_dbs
+          | otherwise                 = raw_dbs
+
+
+  -- Merge databases together, without checking validity
+  (pkg_map1, prec_map) <- mergeDatabases logger dbs
+
+  -- Now that we've merged everything together, prune out unusable
+  -- packages.
+  let (pkg_map2, unusable, sccs) = validateDatabase cfg pkg_map1
+
+  reportCycles   logger sccs
+  reportUnusable logger unusable
+
+  -- Apply trust flags (these flags apply regardless of whether
+  -- or not packages are visible or not)
+  pkgs1 <- mayThrowUnitErr
+            $ foldM (applyTrustFlag prec_map unusable)
+                 (nonDetEltsUniqMap pkg_map2) (reverse (unitConfigFlagsTrusted cfg))
+  let prelim_pkg_db = mkUnitInfoMap pkgs1
+
+  --
+  -- Calculate the initial set of units from package databases, prior to any package flags.
+  --
+  -- Conceptually, we select the latest versions of all valid (not unusable) *packages*
+  -- (not units). This is empty if we have -hide-all-packages.
+  --
+  -- Then we create an initial visibility map with default visibilities for all
+  -- exposed, definite units which belong to the latest valid packages.
+  --
+  let preferLater unit unit' =
+        case compareByPreference prec_map unit unit' of
+            GT -> unit
+            _  -> unit'
+      addIfMorePreferable m unit = addToUDFM_C preferLater m (fsPackageName unit) unit
+      -- This is the set of maximally preferable packages. In fact, it is a set of
+      -- most preferable *units* keyed by package name, which act as stand-ins in
+      -- for "a package in a database". We use units here because we don't have
+      -- "a package in a database" as a type currently.
+      mostPreferablePackageReps = if unitConfigHideAll cfg
+                    then emptyUDFM
+                    else foldl' addIfMorePreferable emptyUDFM pkgs1
+      -- When exposing units, we want to consider all of those in the most preferable
+      -- packages. We can implement that by looking for units that are equi-preferable
+      -- with the most preferable unit for package. Being equi-preferable means that
+      -- they must be in the same database, with the same version, and the same package name.
+      --
+      -- We must take care to consider all these units and not just the most
+      -- preferable one, otherwise we can end up with problems like #16228.
+      mostPreferable u =
+        case lookupUDFM mostPreferablePackageReps (fsPackageName u) of
+          Nothing -> False
+          Just u' -> compareByPreference prec_map u u' == EQ
+      vis_map1 = foldl' (\vm p ->
+                            -- Note: we NEVER expose indefinite packages by
+                            -- default, because it's almost assuredly not
+                            -- what you want (no mix-in linking has occurred).
+                            if unitIsExposed p && unitIsDefinite (mkUnit p) && mostPreferable p
+                               then addToUniqMap vm (mkUnit p)
+                                               UnitVisibility {
+                                                 uv_expose_all = True,
+                                                 uv_renamings = [],
+                                                 uv_package_name = First (Just (fsPackageName p)),
+                                                 uv_requirements = emptyUniqMap,
+                                                 uv_explicit = Nothing
+                                               }
+                               else vm)
+                         emptyUniqMap pkgs1
+
+  --
+  -- Compute a visibility map according to the command-line flags (-package,
+  -- -hide-package).  This needs to know about the unusable packages, since if a
+  -- user tries to enable an unusable package, we should let them know.
+  --
+  vis_map2 <- mayThrowUnitErr
+                $ foldM (applyPackageFlag prec_map prelim_pkg_db emptyUniqSet unusable
+                        (unitConfigHideAll cfg) pkgs1)
+                            vis_map1 other_flags
+
+  --
+  -- Sort out which packages are wired in. This has to be done last, since
+  -- it modifies the unit ids of wired in packages, but when we process
+  -- package arguments we need to key against the old versions.
+  --
+  (pkgs2, wired_map) <- findWiredInUnits logger prec_map pkgs1 vis_map2
+  let pkg_db = mkUnitInfoMap pkgs2
+
+  -- Update the visibility map, so we treat wired packages as visible.
+  let vis_map = updateVisibilityMap wired_map vis_map2
+
+  let hide_plugin_pkgs = unitConfigHideAllPlugins cfg
+  plugin_vis_map <-
+    case unitConfigFlagsPlugins cfg of
+        -- common case; try to share the old vis_map
+        [] | not hide_plugin_pkgs -> return vis_map
+           | otherwise -> return emptyUniqMap
+        _ -> do let plugin_vis_map1
+                        | hide_plugin_pkgs = emptyUniqMap
+                        -- Use the vis_map PRIOR to wired in,
+                        -- because otherwise applyPackageFlag
+                        -- won't work.
+                        | otherwise = vis_map2
+                plugin_vis_map2
+                    <- mayThrowUnitErr
+                        $ foldM (applyPackageFlag prec_map prelim_pkg_db emptyUniqSet unusable
+                                hide_plugin_pkgs pkgs1)
+                             plugin_vis_map1
+                             (reverse (unitConfigFlagsPlugins cfg))
+                -- Updating based on wired in packages is mostly
+                -- good hygiene, because it won't matter: no wired in
+                -- package has a compiler plugin.
+                -- TODO: If a wired in package had a compiler plugin,
+                -- and you tried to pick different wired in packages
+                -- with the plugin flags and the normal flags... what
+                -- would happen?  I don't know!  But this doesn't seem
+                -- likely to actually happen.
+                return (updateVisibilityMap wired_map plugin_vis_map2)
+
+  let pkgname_map = listToUFM [ (unitPackageName p, unitInstanceOf p)
+                              | p <- pkgs2
+                              ]
+  -- The explicitUnits accurately reflects the set of units we have turned
+  -- on; as such, it also is the only way one can come up with requirements.
+  -- The requirement context is directly based off of this: we simply
+  -- look for nested unit IDs that are directly fed holes: the requirements
+  -- of those units are precisely the ones we need to track
+  let explicit_pkgs = [(k, uv_explicit v) | (k, v) <- nonDetUniqMapToList vis_map]
+      req_ctx = mapUniqMap (Set.toList)
+              $ plusUniqMapListWith Set.union (map uv_requirements (nonDetEltsUniqMap vis_map))
+
+
+  --
+  -- Here we build up a set of the packages mentioned in -package
+  -- flags on the command line; these are called the "preload"
+  -- packages.  we link these packages in eagerly.  The preload set
+  -- should contain at least rts & base, which is why we pretend that
+  -- the command line contains -package rts & -package base.
+  --
+  -- NB: preload IS important even for type-checking, because we
+  -- need the correct include path to be set.
+  --
+  let preload1 = nonDetKeysUniqMap (filterUniqMap (isJust . uv_explicit) vis_map)
+
+      -- add default preload units if they can be found in the db
+      basicLinkedUnits = fmap (RealUnit . Definite)
+                         $ filter (flip elemUniqMap pkg_db)
+                         $ unitConfigAutoLink cfg
+      preload3 = ordNub $ (basicLinkedUnits ++ preload1)
+
+  -- Close the preload packages with their dependencies
+  dep_preload <- mayThrowUnitErr
+                    $ closeUnitDeps pkg_db
+                    $ zip (map toUnitId preload3) (repeat Nothing)
+
+  let mod_map1 = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet vis_map
+      mod_map2 = mkUnusableModuleNameProvidersMap unusable
+      mod_map = mod_map2 `plusUniqMap` mod_map1
+      pluginModuleNameProviders = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
+  pure (mod_map, pluginModuleNameProviders, pkg_db, explicit_pkgs, dep_preload, req_ctx, pkgname_map, wired_map)
+
+readDatabasesDefault :: Logger -> UnitId -> UnitConfig -> IO [UnitDatabase UnitId]
+readDatabasesDefault logger _ cfg =
+  readUnitDatabases logger cfg
+
+newUnitIndex :: MonadIO m => m UnitIndex
+newUnitIndex = do
+  ref <- liftIO $ newIORef newUnitIndexBackend
+  pure UnitIndex {
+    query = newUnitIndexQuery ref,
+    readDatabases = readDatabasesDefault,
+    update = updateIndexDefault
+  }
 
 -- -----------------------------------------------------------------------------
 -- Package Utils
@@ -1903,10 +2015,11 @@ mkModMap pkg mod = unitUniqMap (mkModule pkg mod)
 -- | Takes a 'ModuleName', and if the module is in any package returns
 -- list of modules which take that name.
 lookupModuleInAllUnits :: UnitState
+                          -> UnitIndexQuery
                           -> ModuleName
                           -> [(Module, UnitInfo)]
-lookupModuleInAllUnits pkgs m
-  = case lookupModuleWithSuggestions pkgs m NoPkgQual of
+lookupModuleInAllUnits pkgs query m
+  = case lookupModuleWithSuggestions pkgs query m NoPkgQual of
       LookupFound a b -> [(a,fst b)]
       LookupMultiple rs -> map f rs
         where f (m,_) = (m, expectJust "lookupModule" (lookupUnit pkgs
@@ -1933,18 +2046,24 @@ data ModuleSuggestion = SuggestVisible ModuleName Module ModuleOrigin
                       | SuggestHidden ModuleName Module ModuleOrigin
 
 lookupModuleWithSuggestions :: UnitState
+                            -> UnitIndexQuery
                             -> ModuleName
                             -> PkgQual
                             -> LookupResult
-lookupModuleWithSuggestions pkgs
-  = lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs)
+lookupModuleWithSuggestions pkgs query name
+  = lookupModuleWithSuggestions' pkgs query name False
 
 -- | The package which the module **appears** to come from, this could be
 -- the one which reexports the module from it's original package. This function
 -- is currently only used for -Wunused-packages
-lookupModulePackage :: UnitState -> ModuleName -> PkgQual -> Maybe [UnitInfo]
-lookupModulePackage pkgs mn mfs =
-    case lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs) mn mfs of
+lookupModulePackage ::
+  UnitState ->
+  UnitIndexQuery ->
+  ModuleName ->
+  PkgQual ->
+  Maybe [UnitInfo]
+lookupModulePackage pkgs query mn mfs =
+    case lookupModuleWithSuggestions' pkgs query mn False mfs of
       LookupFound _ (orig_unit, origin) ->
         case origin of
           ModOrigin {fromOrigUnit, fromExposedReexport} ->
@@ -1960,19 +2079,21 @@ lookupModulePackage pkgs mn mfs =
       _ -> Nothing
 
 lookupPluginModuleWithSuggestions :: UnitState
+                                  -> UnitIndexQuery
                                   -> ModuleName
                                   -> PkgQual
                                   -> LookupResult
-lookupPluginModuleWithSuggestions pkgs
-  = lookupModuleWithSuggestions' pkgs (pluginModuleNameProvidersMap pkgs)
+lookupPluginModuleWithSuggestions pkgs query name
+  = lookupModuleWithSuggestions' pkgs query name True
 
 lookupModuleWithSuggestions' :: UnitState
-                            -> ModuleNameProvidersMap
+                            -> UnitIndexQuery
                             -> ModuleName
+                            -> Bool
                             -> PkgQual
                             -> LookupResult
-lookupModuleWithSuggestions' pkgs mod_map m mb_pn
-  = case lookupUniqMap mod_map m of
+lookupModuleWithSuggestions' pkgs query m onlyPlugins mb_pn
+  = case query.findOrigin pkgs m onlyPlugins of
         Nothing -> LookupNotFound suggestions
         Just xs ->
           case foldl' classify ([],[],[], []) (sortOn fst $ nonDetUniqMapToList xs) of
@@ -2033,16 +2154,16 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
     all_mods :: [(String, ModuleSuggestion)]     -- All modules
     all_mods = sortBy (comparing fst) $
         [ (moduleNameString m, suggestion)
-        | (m, e) <- nonDetUniqMapToList (moduleNameProvidersMap pkgs)
+        | (m, e) <- nonDetUniqMapToList (query.index_all pkgs)
         , suggestion <- map (getSuggestion m) (nonDetUniqMapToList e)
         ]
     getSuggestion name (mod, origin) =
         (if originVisible origin then SuggestVisible else SuggestHidden)
             name mod origin
 
-listVisibleModuleNames :: UnitState -> [ModuleName]
-listVisibleModuleNames state =
-    map fst (filter visible (nonDetUniqMapToList (moduleNameProvidersMap state)))
+listVisibleModuleNames :: UnitState -> UnitIndexQuery -> [ModuleName]
+listVisibleModuleNames unit_state query =
+    map fst (filter visible (nonDetUniqMapToList (query.index_all unit_state)))
   where visible (_, ms) = anyUniqMap originVisible ms
 
 -- | Takes a list of UnitIds (and their "parent" dependency, used for error
