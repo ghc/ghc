@@ -2573,9 +2573,10 @@ hscTidy hsc_env guts = do
     $! {-# SCC "CoreTidy" #-} tidyProgram opts guts
 
   -- post tidy pretty-printing and linting...
+  query <- hscUnitIndexQuery hsc_env
   let tidy_rules     = md_rules details
   let all_tidy_binds = cg_binds cgguts
-  let name_ppr_ctx   = mkNamePprCtx ptc (hsc_unit_env hsc_env) (mg_rdr_env guts)
+  let name_ppr_ctx   = mkNamePprCtx ptc (hsc_unit_env hsc_env) query (mg_rdr_env guts)
       ptc            = initPromotionTickContext (hsc_dflags hsc_env)
 
   endPassHscEnvIO hsc_env name_ppr_ctx CoreTidy all_tidy_binds tidy_rules

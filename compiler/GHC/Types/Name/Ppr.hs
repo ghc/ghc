@@ -68,11 +68,11 @@ with some holes, we should try to give the user some more useful information.
 
 -- | Creates some functions that work out the best ways to format
 -- names for the user according to a set of heuristics.
-mkNamePprCtx :: Outputable info => PromotionTickContext -> UnitEnv -> GlobalRdrEnvX info -> NamePprCtx
-mkNamePprCtx ptc unit_env env
+mkNamePprCtx :: Outputable info => PromotionTickContext -> UnitEnv -> UnitIndexQuery -> GlobalRdrEnvX info -> NamePprCtx
+mkNamePprCtx ptc unit_env index env
  = QueryQualify
       (mkQualName env)
-      (mkQualModule unit_state home_unit)
+      (mkQualModule unit_state index home_unit)
       (mkQualPackage unit_state)
       (mkPromTick ptc env)
   where
@@ -206,8 +206,8 @@ Side note (int-index):
 -- | Creates a function for formatting modules based on two heuristics:
 -- (1) if the module is the current module, don't qualify, and (2) if there
 -- is only one exposed package which exports this module, don't qualify.
-mkQualModule :: UnitState -> Maybe HomeUnit -> QueryQualifyModule
-mkQualModule unit_state mhome_unit mod
+mkQualModule :: UnitState -> UnitIndexQuery -> Maybe HomeUnit -> QueryQualifyModule
+mkQualModule unit_state index mhome_unit mod
      | Just home_unit <- mhome_unit
      , isHomeModule home_unit mod = False
 
@@ -218,7 +218,7 @@ mkQualModule unit_state mhome_unit mod
      = False
 
      | otherwise = True
-     where lookup = lookupModuleInAllUnits unit_state (moduleName mod)
+     where lookup = lookupModuleInAllUnits unit_state index (moduleName mod)
 
 -- | Creates a function for formatting packages based on two heuristics:
 -- (1) don't qualify if the package in question is "main", and (2) only qualify
