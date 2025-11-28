@@ -1817,7 +1817,7 @@ Other notes about CoercionHole and HoleCo:
   * It carries a type which makes `coercionKind` and `coercionRole` work
   * It has a Unique, which gives the hole an identity; see calls to `ctEvEvId`
 
-(COH3) See Note [CoercionHoles and coercion free variables] in GHC.Core.TyCo.FVs
+(COH3) See Note [CoercionHoles and their free variables] in GHC.Core.TyCo.FVs
 
 (COH4) Coercion holes can be compared for equality like other coercions:
        by looking at the types coerced.
