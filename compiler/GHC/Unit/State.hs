@@ -49,7 +49,12 @@ module GHC.Unit.State (
         closeUnitDeps',
         mayThrowUnitErr,
 
+        UnitConfig (..),
         UnitIndex (..),
+        UnitIndexQuery (..),
+        UnitVisibility (..),
+        VisibilityMap,
+        ModuleNameProvidersMap,
         newUnitIndex,
 
         -- * Module hole substitution
@@ -221,7 +226,7 @@ instance Outputable ModuleOrigin where
         (if null rhs
             then []
             else [text "hidden reexport by" <+>
-                    sep (map (ppr . mkUnit) res)]) ++
+                    sep (map (ppr . mkUnit) rhs)]) ++
         (if f then [text "package flag"] else [])
         ))
 
@@ -1902,7 +1907,8 @@ mkModMap pkg mod = unitUniqMap (mkModule pkg mod)
 
 data UnitIndexQuery =
   UnitIndexQuery {
-    findOrigin :: UnitState -> ModuleName -> Bool -> Maybe (UniqMap Module ModuleOrigin)
+    findOrigin :: UnitState -> ModuleName -> Bool -> Maybe (UniqMap Module ModuleOrigin),
+    moduleProviders :: UnitState -> ModuleNameProvidersMap
   }
 
 data UnitIndex =
@@ -1934,7 +1940,8 @@ queryFindOriginDefault UnitState {moduleNameProvidersMap, pluginModuleNameProvid
 newUnitIndexQuery :: UnitId -> IO UnitIndexQuery
 newUnitIndexQuery _ =
   pure UnitIndexQuery {
-    findOrigin = queryFindOriginDefault
+    findOrigin = queryFindOriginDefault,
+    moduleProviders = moduleNameProvidersMap
   }
 
 readDatabasesDefault :: Logger -> UnitId -> UnitConfig -> IO [UnitDatabase UnitId]
@@ -1959,7 +1966,7 @@ computeProvidersDefault logger _ cfg vis_map plugin_vis_map _initial_dbs pkg_db 
     plugin_mod_map = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
 
 newUnitIndex :: IO UnitIndex
-newUnitIndex = do
+newUnitIndex =
   pure UnitIndex {
     unitIndexQuery = newUnitIndexQuery,
     readDatabases = readDatabasesDefault,
@@ -2111,16 +2118,16 @@ lookupModuleWithSuggestions' pkgs query m onlyPlugins mb_pn
     all_mods :: [(String, ModuleSuggestion)]     -- All modules
     all_mods = sortBy (comparing fst) $
         [ (moduleNameString m, suggestion)
-        | (m, e) <- nonDetUniqMapToList (moduleNameProvidersMap pkgs)
+        | (m, e) <- nonDetUniqMapToList (moduleProviders query pkgs)
         , suggestion <- map (getSuggestion m) (nonDetUniqMapToList e)
         ]
     getSuggestion name (mod, origin) =
         (if originVisible origin then SuggestVisible else SuggestHidden)
             name mod origin
 
-listVisibleModuleNames :: UnitState -> [ModuleName]
-listVisibleModuleNames state =
-    map fst (filter visible (nonDetUniqMapToList (moduleNameProvidersMap state)))
+listVisibleModuleNames :: UnitState -> UnitIndexQuery -> [ModuleName]
+listVisibleModuleNames unit_state query =
+    map fst (filter visible (nonDetUniqMapToList (moduleProviders query unit_state)))
   where visible (_, ms) = anyUniqMap originVisible ms
 
 -- | Takes a list of UnitIds (and their "parent" dependency, used for error
