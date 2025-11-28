@@ -1026,7 +1026,7 @@ afvFolder check_fv = TyCoFolder { tcf_view = noView  -- See Note [Free vars and 
     do_tcv is tv    = Any (not (tv `elemVarSet` is) && check_fv tv)
     do_bndr is tv _ = is `extendVarSet` tv
     do_hole _ hole  = Any (anyFreeVarsOfType check_fv (varType (coHoleCoVar hole)))
-      -- See Note [CoercionHoles and their variables]
+      -- See Note [CoercionHoles and their free variables]
       -- NB: that call to `anyFreeVarsOfType` on the kind starts again with the
       --     empty in-scope set; see Note [Closing over free variable kinds]
 

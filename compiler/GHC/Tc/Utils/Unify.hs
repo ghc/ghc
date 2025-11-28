@@ -3555,7 +3555,7 @@ mkOccFolders lhs_tv = (getAny . check_ty, getAny . check_co)
 
     do_hole _is hole = check_ty (varType (coHoleCoVar hole))
        -- For coercion holes, look in the kind of the hole
-       -- See Note [CorecionHoles and their free variables] in GHC.Core.TyCo.FVs
+       -- See Note [CoercionHoles and their free variables] in GHC.Core.TyCo.FVs
 
 {- *********************************************************************
 *                                                                      *
@@ -4190,7 +4190,7 @@ checkCo flags co =
                 else PuFail reason }
 
         -- Occurs check (no promotion)
-        -- See Note [CorecionHoles and their free variables] in GHC.Core.TyCo.FVs
+        -- See Note [CoercionHoles and their free variables] in GHC.Core.TyCo.FVs
         | OC_Check lhs_tv occ_prob <- occ
         , let (_, check_co) = mkOccFolders lhs_tv
         , check_co co
