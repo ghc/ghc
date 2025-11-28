@@ -190,12 +190,13 @@ depanalE excluded_mods allow_dup_roots = do
     if isEmptyMessages errs
       then do
         hsc_env <- getSession
+        query <- liftIO $ hscUnitIndexQuery hsc_env
         let one_unit_messages get_mod_errs k hue = do
               errs <- get_mod_errs
               unknown_module_err <- warnUnknownModules (hscSetActiveUnitId k hsc_env) (homeUnitEnv_dflags hue) mod_graph
 
               let unused_home_mod_err = warnMissingHomeModules (homeUnitEnv_dflags hue) (hsc_targets hsc_env) mod_graph
-                  unused_pkg_err = warnUnusedPackages (homeUnitEnv_units hue) (homeUnitEnv_dflags hue) mod_graph
+                  unused_pkg_err = warnUnusedPackages (homeUnitEnv_units hue) query (homeUnitEnv_dflags hue) mod_graph
 
 
               return $ errs `unionMessages` unused_home_mod_err
@@ -513,15 +514,15 @@ loadWithCache cache diag_wrapper how_much = do
 -- actually loaded packages. All the packages, specified on command line,
 -- but never loaded, are probably unused dependencies.
 
-warnUnusedPackages :: UnitState -> DynFlags -> ModuleGraph -> DriverMessages
-warnUnusedPackages us dflags mod_graph =
+warnUnusedPackages :: UnitState -> UnitIndexQuery -> DynFlags -> ModuleGraph -> DriverMessages
+warnUnusedPackages us query dflags mod_graph =
     let diag_opts = initDiagOpts dflags
 
         home_mod_sum = filter (\ms -> homeUnitId_ dflags == ms_unitid ms) (mgModSummaries mod_graph)
 
     -- Only need non-source imports here because SOURCE imports are always HPT
         loadedPackages = concat $
-          mapMaybe (\(fs, mn) -> lookupModulePackage us (unLoc mn) fs)
+          mapMaybe (\(fs, mn) -> lookupModulePackage us query (unLoc mn) fs)
             $ concatMap ms_imps home_mod_sum
 
         any_import_ghc_prim = any ms_ghc_prim_import home_mod_sum
@@ -2399,7 +2400,8 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
           mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
           let mopts = map unLoc $ snd $ getOptions popts pi_hspp_buf src_fn
           pure $ ((, mopts) <$>) $ first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps
-  let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
+  query <- liftIO $ hscUnitIndexQuery hsc_env
+  let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) query
   let rn_imps = fmap (\(pk, lmn@(L _ mn)) -> (rn_pkg_qual mn pk, lmn))
   let pi_srcimps = rn_imps pi_srcimps'
   let pi_theimps = rn_imps pi_theimps'
