@@ -283,17 +283,17 @@ following ways:
 
        -- REJECTED: The kind mentions Symbol, which requires DataKinds to use in
        -- a kind position
-       data D2 :: Symbol -> Type
+       type D2 :: Symbol -> Type
        data D2 a
 
        -- ACCEPTED: The kind mentions a type synonym MyType that expands to
        -- Type, which doesn't require DataKinds
-       data D3 :: MyType -> Type
+       type D3 :: MyType -> Type
        data D3 a
 
        -- REJECTED: The kind mentions a type synonym MySymbol that expands to
        -- Symbol, which requires DataKinds to use in a kind position
-       data D4 :: MySymbol -> Type
+       type D4 :: MySymbol -> Type
        data D4 a
 
 Unique syntax for type-level lists and tuples
