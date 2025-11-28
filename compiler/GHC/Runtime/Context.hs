@@ -26,6 +26,7 @@ import GHC.Runtime.Eval.Types ( IcGlobalRdrEnv(..), Resume )
 
 import GHC.Unit
 import GHC.Unit.Env
+import GHC.Unit.State (UnitIndexQuery)
 
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv
@@ -351,8 +352,8 @@ icInScopeTTs ictxt = filter in_scope_unqualified (ic_tythings ictxt)
         ]
 
 -- | Get the NamePprCtx function based on the flags and this InteractiveContext
-icNamePprCtx :: UnitEnv -> InteractiveContext -> NamePprCtx
-icNamePprCtx unit_env ictxt = mkNamePprCtx ptc unit_env (icReaderEnv ictxt)
+icNamePprCtx :: UnitEnv -> UnitIndexQuery -> InteractiveContext -> NamePprCtx
+icNamePprCtx unit_env query ictxt = mkNamePprCtx ptc unit_env query (icReaderEnv ictxt)
   where ptc = initPromotionTickContext (ic_dflags ictxt)
 
 -- | extendInteractiveContext is called with new TyThings recently defined to update the

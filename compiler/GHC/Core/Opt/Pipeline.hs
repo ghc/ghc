@@ -78,6 +78,8 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_rdr_env = rdr_env })
   = do { let builtin_passes = getCoreToDo dflags hpt_rule_base extra_vars
              uniq_tag = 's'
+       ; query <- hscUnitIndexQuery hsc_env
+       ; let name_ppr_ctx = mkNamePprCtx ptc (hsc_unit_env hsc_env) query rdr_env
 
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_tag mod
                                     name_ppr_ctx loc $
@@ -100,7 +102,6 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
     home_pkg_rules = hptRules hsc_env (moduleUnitId mod) (GWIB { gwib_mod = moduleName mod
                                                                , gwib_isBoot = NotBoot })
     hpt_rule_base  = mkRuleBase home_pkg_rules
-    name_ppr_ctx   = mkNamePprCtx ptc (hsc_unit_env hsc_env) rdr_env
     ptc            = initPromotionTickContext dflags
     -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.
     -- This is very convienent for the users of the monad (e.g. plugins do not have to
@@ -459,6 +460,7 @@ doCorePass pass guts = do
   dflags    <- getDynFlags
   us        <- getUniqueSupplyM
   p_fam_env <- getPackageFamInstEnv
+  query <- liftIO $ hscUnitIndexQuery hsc_env
   let platform = targetPlatform dflags
   let fam_envs = (p_fam_env, mg_fam_inst_env guts)
   let updateBinds  f = return $ guts { mg_binds = f (mg_binds guts) }
@@ -471,6 +473,7 @@ doCorePass pass guts = do
         mkNamePprCtx
           (initPromotionTickContext dflags)
           (hsc_unit_env hsc_env)
+          query
           rdr_env
 
 

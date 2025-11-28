@@ -869,7 +869,8 @@ getNamePprCtx
   = do { ptc <- initPromotionTickContext <$> getDynFlags
        ; rdr_env <- getGlobalRdrEnv
        ; hsc_env <- getTopEnv
-       ; return $ mkNamePprCtx ptc (hsc_unit_env hsc_env) rdr_env }
+       ; query <- liftIO $ hscUnitIndexQuery hsc_env
+       ; return $ mkNamePprCtx ptc (hsc_unit_env hsc_env) query rdr_env }
 
 -- | Like logInfoTcRn, but for user consumption
 printForUserTcRn :: SDoc -> TcRn ()

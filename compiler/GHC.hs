@@ -341,7 +341,7 @@ import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Rename.Names (renamePkgQual, renameRawPkgQual, gresFromAvails)
+import GHC.Rename.Names (gresFromAvails, hscRenamePkgQual, hscRenameRawPkgQual)
 
 import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import GHC.Tc.Types
@@ -1382,7 +1382,8 @@ getInsts = withSession $ \hsc_env ->
 
 getNamePprCtx :: GhcMonad m => m NamePprCtx
 getNamePprCtx = withSession $ \hsc_env -> do
-  return $ icNamePprCtx (hsc_unit_env hsc_env) (hsc_IC hsc_env)
+  query <- liftIO $ hscUnitIndexQuery hsc_env
+  return $ icNamePprCtx (hsc_unit_env hsc_env) query (hsc_IC hsc_env)
 
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
@@ -1477,7 +1478,8 @@ mkNamePprCtxForModule ::
   ModuleInfo ->
   m NamePprCtx
 mkNamePprCtxForModule mod minf = withSession $ \hsc_env -> do
-  let name_ppr_ctx = mkNamePprCtx ptc (hsc_unit_env hsc_env) (availsToGlobalRdrEnv hsc_env mod (minf_exports minf))
+  query <- liftIO $ hscUnitIndexQuery hsc_env
+  let name_ppr_ctx = mkNamePprCtx ptc (hsc_unit_env hsc_env) query (availsToGlobalRdrEnv hsc_env mod (minf_exports minf))
       ptc = initPromotionTickContext (hsc_dflags hsc_env)
   return name_ppr_ctx
 
@@ -1714,10 +1716,10 @@ modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc d
    parens (text (expectJust "modNotLoadedError" (ml_hs_file loc)))
 
 renamePkgQualM :: GhcMonad m => ModuleName -> Maybe FastString -> m PkgQual
-renamePkgQualM mn p = withSession $ \hsc_env -> pure (renamePkgQual (hsc_unit_env hsc_env) mn p)
+renamePkgQualM mn p = withSession $ \hsc_env -> hscRenamePkgQual hsc_env mn p
 
 renameRawPkgQualM :: GhcMonad m => ModuleName -> RawPkgQual -> m PkgQual
-renameRawPkgQualM mn p = withSession $ \hsc_env -> pure (renameRawPkgQual (hsc_unit_env hsc_env) mn p)
+renameRawPkgQualM mn p = withSession $ \hsc_env -> hscRenameRawPkgQual hsc_env mn p
 
 -- | Like 'findModule', but differs slightly when the module refers to
 -- a source file, and the file has not been loaded via 'load'.  In
@@ -1741,7 +1743,8 @@ lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
       let units  = hsc_units hsc_env
       let dflags = hsc_dflags hsc_env
       let fopts  = initFinderOpts dflags
-      res <- findExposedPackageModule fc fopts units mod_name NoPkgQual
+      query <- hscUnitIndexQuery hsc_env
+      res <- findExposedPackageModule fc fopts units query mod_name NoPkgQual
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
