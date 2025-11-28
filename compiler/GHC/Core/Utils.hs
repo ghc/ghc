@@ -703,8 +703,14 @@ mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
       = do { (joins, alts) <- go body
 
              -- Check for capture; but only if we could otherwise do a merge
-           ; let capture = outer_bndr `elem` bindersOf bind
-                           || outer_bndr `elemVarSet` bindFreeVars bind
+             --    (i.e. the recursive `go` succeeds)
+             -- "Capture" means
+             --    (a) case x of r { DEFAULT -> join r = ... in ...r... }
+             --    (b) case x of r { DEFAULT -> join j = ...r.. in ... }
+             -- In both cases we can't float the join point out
+             -- because r changes its meaning
+           ; let capture = outer_bndr `elem` bindersOf bind          -- (a)
+                        || outer_bndr `elemVarSet` bindFreeVars bind -- (b)
            ; guard (not capture)
 
            ; return (bind:joins, alts ) }

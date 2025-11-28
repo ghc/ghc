@@ -68,7 +68,6 @@ import GHC.Unit.Module.ModGuts
 import GHC.Core.Unfold
 
 import Data.List( partition )
--- import Data.List.NonEmpty ( NonEmpty (..) )
 
 {-
 ************************************************************************
@@ -1617,11 +1616,12 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     fn_type   = idType fn
     fn_arity  = idArity fn
     fn_unf    = realIdUnfolding fn  -- Ignore loop-breaker-ness here
-    inl_prag  = idInlinePragma fn
-    inl_act   = inlinePragmaActivation inl_prag
+    fn_prag   = idInlinePragma fn
+    rule_act  = inlinePragmaActivation fn_prag
+                -- rule_act: see Note [Auto-specialisation and RULES]
     is_active :: Activation -> Bool
-    is_active = isActive (SimplPhaseRange (beginPhase inl_act) (endPhase inl_act))
-         -- is_active: inl_act is the activation we are going to put in the new
+    is_active = isActive (SimplPhaseRange (beginPhase rule_act) (endPhase rule_act))
+         -- is_active: rule_act is the activation we are going to put in the new
          --   SPEC rule; so we want to see if it is covered by another rule with
          --   that same activation.
     is_local  = isLocalId fn
@@ -1643,7 +1643,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
       , isStrongLoopBreaker (idOccInfo fn) -- in GHC.Core.Opt.OccurAnal
       = neverInlinePragma
       | otherwise
-      = inl_prag
+      = fn_prag
 
     not_in_scope :: InterestingVarFun
     not_in_scope v = isLocalVar v && not (v `elemInScopeSet` in_scope)
@@ -1785,7 +1785,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                        | otherwise = -- Specialising local fn
                                      text "SPEC"
 
-                spec_rule = mkSpecRule dflags this_mod True inl_act
+                spec_rule = mkSpecRule dflags this_mod True rule_act
                                     herald fn all_rule_bndrs rule_lhs_args
                                     (mkVarApps (Var spec_fn) rule_rhs_args1)
 
@@ -1795,9 +1795,10 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                        , ppr spec_rule
                                        , text "acc" <+> ppr rules_acc
                                        , text "existing" <+> ppr existing_rules
+                                       , text "rule_act" <+> ppr rule_act
                                        ]
 
-           ; -- pprTrace "spec_call: rule" _rule_trace_doc
+           ; pprTrace "spec_call: rule" _rule_trace_doc
              return ( spec_rule            : rules_acc
                     , (spec_fn, spec_rhs1) : pairs_acc
                     , rhs_uds2 `thenUDs` uds_acc
@@ -2380,12 +2381,13 @@ Thus when adding
 also add
         RULE f g_spec = 0
 
-But that's a bit complicated.  For now we ask the programmer's help,
-by *copying the INLINE activation pragma* to the auto-specialised
-rule.  So if g says {-# NOINLINE[2] g #-}, then the auto-spec rule
-will also not be active until phase 2.  And that's what programmers
-should jolly well do anyway, even aside from specialisation, to ensure
-that g doesn't inline too early.
+But that's a bit complicated.  For now we lean on the programmer:
+ * Set the activation of the RULE is the same as the activation of the Id,
+   i.e. (idInlineActivation g)
+
+So if `g` says {-# NOINLINE[2] g #-}, then the auto-spec rule will also not be
+active until phase 2.  And that's what programmers should jolly well do anyway,
+even aside from specialisation, to ensure that `g` doesn't inline too early.
 
 This in turn means that the RULE would never fire for a NOINLINE
 thing so not much point in generating a specialisation at all.

@@ -1781,7 +1781,8 @@ specRec :: ScEnv
                                            --     plus details of specialisations
 
 specRec env body_calls rhs_infos
-  = go 1 body_calls nullUsage (map initSpecInfo rhs_infos) []
+  = -- pprTrace "specRec" (ppr (map ri_fn rhs_infos) $$ ppr body_calls) $
+    go 1 body_calls nullUsage (map initSpecInfo rhs_infos) []
     -- body_calls: see Note [Seeding recursive groups]
     -- NB: 'go' always calls 'specialise' once, which in turn unleashes
     --     si_mb_unspec if there are any boring calls in body_calls,
@@ -1801,7 +1802,7 @@ specRec env body_calls rhs_infos
     go n_iter seed_calls usg_so_far spec_infos ws_so_far
       = -- pprTrace "specRec3" (vcat [ text "bndrs" <+> ppr (map ri_fn rhs_infos)
         --                           , text "iteration" <+> int n_iter
-        --                          , text "spec_infos" <+> ppr (map (map os_pat . si_specs) spec_infos)
+        --                           , text "spec_infos" <+> ppr (map (map os_pat . si_specs) spec_infos)
         --                    ]) $
         do  { specs_w_usg <- zipWithM (specialise env seed_calls) rhs_infos spec_infos
 
