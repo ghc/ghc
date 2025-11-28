@@ -39,16 +39,15 @@ import GHC.Core.TyCon   (TyCon, tyConName )
 import GHC.Core.Multiplicity
 import GHC.Core.Ppr     ( pprParendExpr )
 import GHC.Core.Make    ( mkImpossibleExpr )
-
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
 
+import GHC.Types.InlinePragma
 import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.Literal ( litIsLifted )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
-import GHC.Types.InlinePragma ( isNeverActive )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
@@ -1780,7 +1779,8 @@ specRec :: ScEnv
                                            --     plus details of specialisations
 
 specRec env body_calls rhs_infos
-  = go 1 body_calls nullUsage (map initSpecInfo rhs_infos) []
+  = -- pprTrace "specRec" (ppr (map ri_fn rhs_infos) $$ ppr body_calls) $
+    go 1 body_calls nullUsage (map initSpecInfo rhs_infos) []
     -- body_calls: see Note [Seeding recursive groups]
     -- NB: 'go' always calls 'specialise' once, which in turn unleashes
     --     si_mb_unspec if there are any boring calls in body_calls,
@@ -1800,7 +1800,7 @@ specRec env body_calls rhs_infos
     go n_iter seed_calls usg_so_far spec_infos ws_so_far
       = -- pprTrace "specRec3" (vcat [ text "bndrs" <+> ppr (map ri_fn rhs_infos)
         --                           , text "iteration" <+> int n_iter
-        --                          , text "spec_infos" <+> ppr (map (map os_pat . si_specs) spec_infos)
+        --                           , text "spec_infos" <+> ppr (map (map os_pat . si_specs) spec_infos)
         --                    ]) $
         do  { specs_w_usg <- zipWithM (specialise env seed_calls) rhs_infos spec_infos
 
@@ -1864,7 +1864,7 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
     return (nullUsage, spec_info, [])
 
   | not (isNeverActive (idInlineActivation fn))
-      -- See Note [Transfer activation]
+      -- See (SCRA1) in Note [SpecConstr: rule activation]
       -- Don't specialise OPAQUE things, see Note [OPAQUE pragma].
       -- Since OPAQUE things are always never-active (see
       -- GHC.Parser.PostProcess.mkOpaquePragma) this guard never fires for
@@ -1968,10 +1968,10 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
               -- e.g. let f x y = ... in map (f True) xs
               -- will result in y becoming an extra_bndr
 
-              fn_name  = idName fn
-              fn_loc   = nameSrcSpan fn_name
-              fn_occ   = nameOccName fn_name
-              spec_occ = mkSpecOcc fn_occ
+              fn_name   = idName fn
+              fn_loc    = nameSrcSpan fn_name
+              fn_occ    = nameOccName fn_name
+              spec_occ  = mkSpecOcc fn_occ
               -- We use fn_occ rather than fn in the rule_name string
               -- as we don't want the uniq to end up in the rule, and
               -- hence in the ABI, as that can cause spurious ABI
@@ -1985,32 +1985,36 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
 
                 -- And build the results
         ; (qvars', pats') <- generaliseDictPats qvars pats
-        ; let spec_body_ty = exprType spec_body
+        ; let fn_prag      = idInlinePragma fn
+              spec_body_ty = exprType spec_body
               (spec_lam_args, spec_call_args, spec_sig)
                   = calcSpecInfo fn arg_bndrs call_pat extra_bndrs
 
+              spec_id_ty = mkLamTypes spec_lam_args spec_body_ty
               spec_arity = count isId spec_lam_args
               spec_join_arity | isJoinId fn = JoinPoint (length spec_call_args)
                               | otherwise   = NotJoinPoint
               spec_id    = asWorkerLikeId $
-                           mkLocalId spec_name ManyTy
-                                     (mkLamTypes spec_lam_args spec_body_ty)
+                           mkLocalId spec_name ManyTy spec_id_ty
                              -- See Note [Transfer strictness]
-                             `setIdDmdSig`    spec_sig
-                             `setIdCprSig`    topCprSig
-                             `setIdArity`     spec_arity
-                             `asJoinId_maybe` spec_join_arity
+                             `setIdDmdSig`     spec_sig
+                             `setIdCprSig`     topCprSig
+                             -- Transfer the inline pragma to spec_id
+                             `setInlinePragma` fn_prag
+                             `setIdArity`      spec_arity
+                             `asJoinId_maybe`  spec_join_arity
 
-        -- Conditionally use result of new worker-wrapper transform
-        -- mkSeqs: see Note [SpecConstr and strict fields]
-              spec_rhs = mkLams spec_lam_args (mkSeqs cbv_args spec_body_ty spec_body)
+              spec_rhs = mkLams spec_lam_args         $
+                         mkSeqs cbv_args spec_body_ty $
+                         spec_body
+                         -- mkSeqs: see Note [SpecConstr and strict fields]
+
               rule_rhs = mkVarApps (Var spec_id) spec_call_args
-              inline_act = idInlineActivation fn
-              this_mod   = sc_module $ sc_opts env
-              rule       = mkRule this_mod True {- Auto -} True {- Local -}
-                                  rule_name inline_act
-                                  fn_name qvars' pats' rule_rhs
-                           -- See Note [Transfer activation]
+              rule_act = specConstrRuleActivation fn_prag
+              this_mod = sc_module $ sc_opts env
+              rule     = mkRule this_mod True {- Auto -} True {- Local -}
+                                rule_name rule_act
+                                fn_name qvars' pats' rule_rhs
 
 --        ; pprTraceM "spec_one end }" $
 --          vcat [ text "function:" <+> ppr fn <+> braces (ppr (idUnique fn))
@@ -2070,6 +2074,11 @@ mkSeqs seqees res_ty rhs =
         | otherwise
         = rhs
 
+specConstrRuleActivation :: InlinePragmaInfo -> ActivationGhc
+-- See Note [SpecConstr: rule activation]
+specConstrRuleActivation fn_prag
+  = activeAfter $ nextPhase $ beginPhase $ inlinePragmaActivation fn_prag
+
 
 {- Note [SpecConstr void argument insertion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2119,6 +2128,50 @@ Example to illustrate (ii):
 The void argument must follow the foralls, lest the forall be
 ill-kinded.  See Note [Worker/wrapper needs to add void arg last] in
 GHC.Core.Opt.WorkWrap.Utils.
+
+Note [SpecConstr: rule activation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When should the RULE generated by SpecConstr be activated?
+See the function `specConstrRuleActivation`.
+
+Here is a tricky example (#26615):
+
+* Module Lib defines
+    {-# INLINEABLE f #-}
+    f :: Ord a => Maybe a -> blah
+  and a SpecConsr rule
+    {-# RULE: "SC:1" forall a d x. f @a d (Just x) = $sf d x #-}
+  It's INLINEABLE so that client libraries can type-class-specialise it.
+
+* Goal 1.  When compiling Lib, if `f` is recursive, and the recursive call looks
+  like `f d (Just x)`, we must /not/ fire rule "SC:1" in the stable unfolding
+  for f.
+
+  Reason: if we do, the recursive call will look like `$sf d x`, and we can't
+  type-class-specialise `$sf` in a client library, because we don't have its
+  unfolding.
+
+* Goal 2.  Module M imports Lib. Suppose the type-class specialiser makes a rule
+      RULE: "SPEC:f" forall d. f @Int d = $sf2
+  Now we have two rules for f, "SPEC:f" and "SC:1".  We want the type-class rule
+  to "win"; type-class specialisation is a huge win.
+
+We can achieve both Goal 1 and Goal 2 thus:
+
+    specConstrRuleActivation: make "SC:1" become active /one phase later/
+                              than f's own unfolding does.
+
+Goal 1: "SC:1" won't fire in f's unfolding;
+   see Note [What is active in the RHS of a RULE or unfolding?]
+
+Goal 2: "SPEC:f" will fire before "SC:1",
+  because "SPEC:f" has the same activation as `f`;
+  see Note [Specialise: rule activation] in GHC.Core.Opt.Specialise
+
+Wrinkles
+
+(SCRA1) If `f` is NOINLINE we arguably don't want a specialisation at all.
+  See (SRA1) in GHC.Core.Opt.Specialise.  At least that's the choice for now.
 
 Note [generaliseDictPats]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2226,26 +2279,6 @@ The RhsInfo for a binding keeps the *original* body of the binding.  We
 must specialise that, *not* the result of applying specExpr to the RHS
 (which is also kept in RhsInfo). Otherwise we end up specialising a
 specialised RHS, and that can lead directly to exponential behaviour.
-
-Note [Transfer activation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-  This note is for SpecConstr, but exactly the same thing
-  happens in the overloading specialiser; see
-  Note [Auto-specialisation and RULES] in GHC.Core.Opt.Specialise.
-
-In which phase should the specialise-constructor rules be active?
-Originally I made them always-active, but Manuel found that this
-defeated some clever user-written rules.  Then I made them active only
-in FinalPhase; after all, currently, the specConstr transformation is
-only run after the simplifier has reached FinalPhase, but that meant
-that specialisations didn't fire inside wrappers; see test
-simplCore/should_compile/spec-inline.
-
-So now I just use the inline-activation of the parent Id, as the
-activation for the specialisation RULE, just like the main specialiser;
-
-This in turn means there is no point in specialising NOINLINE things,
-so we test for that.
 
 Note [Transfer strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

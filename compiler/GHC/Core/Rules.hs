@@ -231,7 +231,7 @@ mkSpecRule dflags this_mod is_auto inl_act herald fn bndrs args rhs
   where
     rule = mkRule this_mod is_auto is_local
                   rule_name
-                  inl_act       -- Note [Auto-specialisation and RULES]
+                  inl_act       -- Note [Specialise: rule activation]
                   (idName fn)
                   bndrs args rhs
 

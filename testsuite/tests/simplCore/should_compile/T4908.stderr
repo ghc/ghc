@@ -46,7 +46,8 @@ T4908.$trModule
 
 Rec {
 -- RHS size: {terms: 19, types: 5, coercions: 0, joins: 0/0}
-T4908.f_$s$wf [Occ=LoopBreaker] :: Int -> Int# -> Int# -> (# #)
+T4908.f_$s$wf [InlPrag=[2], Occ=LoopBreaker]
+  :: Int -> Int# -> Int# -> (# #)
 [GblId, Arity=3, Str=<A><ML><1L>, Unf=OtherCon []]
 T4908.f_$s$wf
   = \ (sc :: Int) (sc1 :: Int#) (sc2 :: Int#) ->

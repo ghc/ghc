@@ -1073,7 +1073,7 @@ updModeForStableUnfoldings :: ActivationGhc -> SimplMode -> SimplMode
 updModeForStableUnfoldings unf_act current_mode
   = current_mode
     { sm_phase = phaseFromActivation (sm_phase current_mode) unf_act
-        -- See Note [What is active in the RHS of a RULE?]
+        -- See Note [What is active in the RHS of a RULE or unfolding?]
     , sm_eta_expand = False
         -- See Note [Eta expansion in stable unfoldings and rules]
     , sm_inline     = True
@@ -1095,7 +1095,7 @@ updModeForRuleLHS current_mode
 updModeForRuleRHS :: ActivationGhc -> SimplMode -> SimplMode
 updModeForRuleRHS rule_act current_mode =
   current_mode
-    -- See Note [What is active in the RHS of a RULE?]
+    -- See Note [What is active in the RHS of a RULE or unfolding?]
     { sm_phase = phaseFromActivation (sm_phase current_mode) rule_act
     , sm_eta_expand = False
         -- See Note [Eta expansion in stable unfoldings and rules]
@@ -1104,7 +1104,7 @@ updModeForRuleRHS rule_act current_mode =
 -- | Compute the phase range to set the 'SimplMode' to
 -- when simplifying the RHS of a rule or of a stable unfolding.
 --
--- See Note [What is active in the RHS of a RULE?]
+-- See Note [What is active in the RHS of a RULE or unfolding?]
 phaseFromActivation
   :: SimplPhase             -- ^ the current simplifier phase
   -> ActivationGhc -- ^ the activation of the RULE or stable unfolding
@@ -1226,9 +1226,9 @@ running it, we don't want to use -O2.  Indeed, we don't want to inline
 anything, because the byte-code interpreter might get confused about
 unboxed tuples and suchlike.
 
-Note [What is active in the RHS of a RULE?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have either a RULE or an inline pragma with an explicit activation:
+Note [What is active in the RHS of a RULE or unfolding?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have either a RULE or a stable unfolding with an explicit activation:
 
   {-# RULE "R" [p] lhs = rhs #-}
   {-# INLINE [p] foo #-}
@@ -1300,7 +1300,7 @@ one; see OccurAnal.addRuleUsage.
 
 Second, we must be careful when simplifying the RHS that we do not apply RULES
 which are not active over the whole active range of the stable unfolding.
-This is all explained in Note [What is active in the RHS of a RULE?].
+This is all explained in Note [What is active in the RHS of a RULE or unfolding?].
 
 For example,
         {-# INLINE f #-}

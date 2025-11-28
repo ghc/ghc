@@ -300,7 +300,8 @@ data SimplPhase
   -- _Invariant:_ 'simplStartPhase' is not a later phase than 'simplEndPhase'.
   -- Equivalently, 'SimplPhaseRange' is always a non-empty interval of phases.
   --
-  -- See Note [What is active in the RHS of a RULE?] in GHC.Core.Opt.Simplify.Utils.
+  -- See Note [What is active in the RHS of a RULE or unfolding?]
+  --     in GHC.Core.Opt.Simplify.Utils.
   | SimplPhaseRange
       { simplStartPhase :: CompilerPhase
       , simplEndPhase   :: CompilerPhase
@@ -316,7 +317,8 @@ instance Outputable SimplPhase where
 --
 -- For a phase range, @isActive simpl_phase_range act@ is true if and only if
 -- @act@ is active throughout the entire range, as per
--- Note [What is active in the RHS of a RULE?] in GHC.Core.Opt.Simplify.Utils.
+-- Note [What is active in the RHS of a RULE or unfolding?]
+-- in GHC.Core.Opt.Simplify.Utils.
 --
 -- See Note [SimplPhase].
 isActive :: SimplPhase -> ActivationGhc -> Bool
@@ -350,7 +352,7 @@ of setting the simplifier mode to a single phase, we use a phase range
 corresponding to the range of phases in which the rule is active, with the
 'SimplPhaseRange' constructor. This allows us to check whether other rules or
 inlinings are active throughout the whole activation of the rule.
-See Note [What is active in the RHS of a RULE?] in GHC.Core.Opt.Simplify.Utils.
+See Note [What is active in the RHS of a RULE or unfolding?] in GHC.Core.Opt.Simplify.Utils.
 -}
 
 instance Outputable SimplMode where

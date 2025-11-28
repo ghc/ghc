@@ -4795,8 +4795,8 @@ simplRules env mb_new_id rules bind_cxt
                                 BC_Let {}      -> mkBoringStop rhs_ty
                                 BC_Join _ cont -> assertPpr join_ok bad_join_msg cont
 
-    -- See Note [Simplifying rules] and Note [What is active in the RHS of a RULE?]
-    -- in GHC.Core.Opt.Simplify.Utils.
+    -- See Note [What is active in the RHS of a RULE or unfolding?]
+    -- and Note [Simplifying rules] in GHC.Core.Opt.Simplify.Utils.
                  lhs_env = updMode updModeForRuleLHS env'
                  rhs_env = updMode (updModeForRuleRHS act) env'
 
