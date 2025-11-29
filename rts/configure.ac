@@ -37,6 +37,17 @@ if test "$enable_asserts_all_ways" = "yes" ; then
    AC_DEFINE([USE_ASSERTS_ALL_WAYS], [1], [Compile-in ASSERTs in all ways.])
 fi
 
+AC_ARG_ENABLE(hugepages,
+[AS_HELP_STRING([--enable-hugepages],
+                [Enable hugepages and set the MBlock size to 2MB.])],
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableHugepages])],
+  [EnableHugepages=NO]
+)
+if test "$enable_hugepages" = "yes" ; then
+   AC_DEFINE([USE_HUGEPAGES], [1], [Enable support for hugepages and set MBlock size to 2MB.])
+fi
+
+
 # We have to run these unconditionally, but we may discard their
 # results in the following code
 AC_CANONICAL_BUILD
@@ -96,7 +107,7 @@ dnl    off_t, because it will affect the result of that test.
 AC_SYS_LARGEFILE
 
 dnl ** check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS([ctype.h dlfcn.h errno.h fcntl.h limits.h locale.h nlist.h pthread.h signal.h sys/param.h sys/mman.h sys/resource.h sys/select.h sys/time.h sys/timeb.h sys/timerfd.h sys/timers.h sys/times.h sys/utsname.h sys/wait.h termios.h utime.h windows.h winsock.h sched.h])
+AC_CHECK_HEADERS([ctype.h dlfcn.h errno.h fcntl.h limits.h locale.h nlist.h pthread.h signal.h sys/param.h sys/mman.h linux/mman.h sys/resource.h sys/select.h sys/time.h sys/timeb.h sys/timerfd.h sys/timers.h sys/times.h sys/utsname.h sys/wait.h termios.h utime.h windows.h winsock.h sched.h])
 
 dnl sys/cpuset.h needs sys/param.h to be included first on FreeBSD 9.1; #7708
 AC_CHECK_HEADERS([sys/cpuset.h], [], [],

@@ -321,6 +321,10 @@ The supported transformers are listed below:
         <td><code>hie_files</code></td>
         <td>Produce hie files for stage1 libraries</td>
     </tr>
+    <tr>
+        <td><code>hugepages</code></td>
+        <td>Enable support for hugepages in the RTS.</td>
+    </tr>
 </table>
 
 ## Ways

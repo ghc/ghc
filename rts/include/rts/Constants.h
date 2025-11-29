@@ -171,6 +171,8 @@
 /* The size of a megablock (2^MBLOCK_SHIFT bytes) */
 #if defined(wasm32_HOST_ARCH)
 #define MBLOCK_SHIFT   16
+#elif defined(USE_HUGEPAGES)
+#define MBLOCK_SHIFT   21
 #else
 #define MBLOCK_SHIFT   20
 #endif
