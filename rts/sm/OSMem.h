@@ -8,6 +8,12 @@
 
 #pragma once
 
+#if defined(HAVE_LINUX_MMAN_H) && defined(USE_HUGEPAGES)
+#include <linux/mman.h>
+#define HUGEPAGE_FLAGS (MAP_HUGETLB | MAP_HUGE_2MB)
+#define HUGEPAGE_SIZE MBLOCK_SIZE
+#endif
+
 #include "BeginPrivate.h"
 
 void osMemInit(void);

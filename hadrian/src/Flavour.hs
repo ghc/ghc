@@ -86,6 +86,7 @@ flavourTransformers = M.fromList
     , "dump_stg"         =: enableDumpStg
     , "hash_unit_ids"    =: enableHashUnitIds
     , "hie_files"        =: enableHieFiles
+    , "hugepages"        =: enableHugepages
     ]
   where (=:) = (,)
 
@@ -315,6 +316,14 @@ enableUBSan =
           builder (Cc CompileC) ? arg "-fsanitize=undefined",
           builder Testsuite ? arg "--config=have_ubsan=True"
         ]
+
+enableHugepages :: Flavour -> Flavour
+enableHugepages =
+  addArgs $
+    mconcat [package rts
+            ? builder (Cabal Setup)
+            ? arg "--configure-option=--enable-hugepages"
+            ]
 
 -- | Use the LLVM backend in target stages
 viaLlvmBackend :: Flavour -> Flavour
