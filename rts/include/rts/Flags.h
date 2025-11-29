@@ -91,6 +91,7 @@ typedef struct _GC_FLAGS {
     StgWord numaMask;
 
     StgWord64 addressSpaceSize;  /* large address space size in bytes */
+    bool hugepages;              /* Enable hugepages support */
 } GC_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */
