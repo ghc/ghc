@@ -1798,8 +1798,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                        , text "rule_act" <+> ppr rule_act
                                        ]
 
-           ; pprTrace "spec_call: rule" _rule_trace_doc
-             return ( spec_rule            : rules_acc
+           ; return ( spec_rule            : rules_acc
                     , (spec_fn, spec_rhs1) : pairs_acc
                     , rhs_uds2 `thenUDs` uds_acc
                     ) } }

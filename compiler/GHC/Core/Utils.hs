@@ -19,6 +19,7 @@ module GHC.Core.Utils (
         mergeAlts, mergeCaseAlts, trimConArgs,
         filterAlts, combineIdenticalAlts, refineDefaultAlt,
         scaleAltsBy,
+        BinderSwapDecision(..), scrutOkForBinderSwap,
 
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType,
@@ -117,7 +118,6 @@ import Data.Function       ( on )
 import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import qualified Data.List as Partial ( init, last )
 import Data.Ord            ( comparing )
-import Control.Monad       ( guard )
 import qualified Data.Set as Set
 
 {-
@@ -591,6 +591,28 @@ The default alternative must be first, if it exists at all.
 This makes it easy to find, though it makes matching marginally harder.
 -}
 
+data BinderSwapDecision
+  = NoBinderSwap
+  | DoBinderSwap OutVar MCoercion
+
+scrutOkForBinderSwap :: OutExpr -> BinderSwapDecision
+-- If (scrutOkForBinderSwap e = DoBinderSwap v mco, then
+--    v = e |> mco
+-- See Note [Case of cast]
+-- See Historical Note [Care with binder-swap on dictionaries]
+--
+-- We use this same function in SpecConstr, and Simplify.Iteration,
+-- when something binder-swap-like is happening
+--
+-- See Note [Binder swap] in GHC.Core.Opt.OccurAnal
+scrutOkForBinderSwap e
+  = case e of
+      Tick _ e        -> scrutOkForBinderSwap e  -- Drop ticks
+      Var v           -> DoBinderSwap v MRefl
+      Cast (Var v) co -> DoBinderSwap v (MCo (mkSymCo co))
+                         -- Cast: see Note [Case of cast]
+      _               -> NoBinderSwap
+
 -- | Extract the default case alternative
 findDefault :: [Alt b] -> ([Alt b], Maybe (Expr b))
 findDefault (Alt DEFAULT args rhs : alts) = assert (null args) (alts, Just rhs)
@@ -652,9 +674,9 @@ filters down the matching alternatives in GHC.Core.Opt.Simplify.rebuildCase.
 -}
 
 ---------------------------------
-mergeCaseAlts :: Id -> [CoreAlt] -> Maybe ([CoreBind], [CoreAlt])
+mergeCaseAlts :: CoreExpr -> Id -> [CoreAlt] -> Maybe ([CoreBind], [CoreAlt])
 -- See Note [Merge Nested Cases]
-mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
+mergeCaseAlts scrut outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
   | Just (joins, inner_alts) <- go deflt_rhs
   = Just (joins, mergeAlts outer_alts inner_alts)
                 -- NB: mergeAlts gives priority to the left
@@ -666,6 +688,9 @@ mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
                 -- When we merge, we must ensure that e1 takes
                 -- precedence over e2 as the value for A!
   where
+    bndr_swap :: BinderSwapDecision
+    bndr_swap = scrutOkForBinderSwap scrut
+
     go :: CoreExpr -> Maybe ([CoreBind], [CoreAlt])
 
     -- Whizzo: we can merge!
@@ -704,16 +729,9 @@ mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
 
              -- Check for capture; but only if we could otherwise do a merge
              --    (i.e. the recursive `go` succeeds)
-             -- "Capture" means
-             --    (a) case x of r { DEFAULT -> join r = ... in ...r... }
-             --    (b) case x of r { DEFAULT -> join j = ...r.. in ... }
-             -- In both cases we can't float the join point out
-             -- because r changes its meaning
-           ; let capture = outer_bndr `elem` bindersOf bind          -- (a)
-                        || outer_bndr `elemVarSet` bindFreeVars bind -- (b)
-           ; guard (not capture)
+           ; fix_up_binds <- okToFloatJoin bndr_swap outer_bndr bind
 
-           ; return (bind:joins, alts ) }
+           ; return (fix_up_binds ++ (bind : joins), alts ) }
       | otherwise
       = Nothing
 
@@ -725,7 +743,25 @@ mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
 
     go _ = Nothing
 
-mergeCaseAlts _ _ = Nothing
+mergeCaseAlts _ _ _ = Nothing
+
+okToFloatJoin :: BinderSwapDecision -> Id -> CoreBind -> Maybe [CoreBind]
+-- Check a join-point binding to see if it can be floated out of
+-- the DEFAULT branch of a `case`.   A Just result means "yes",
+-- and the [CoreBInd] are the extra fix-up bindings to add.
+-- See Note [Floating join points out of DEFAULT alternatives]
+okToFloatJoin bndr_swap outer_bndr bind
+  | outer_bndr `elem` bindersOf bind          -- (a)
+  = Nothing
+  | outer_bndr `elemVarSet` bindFreeVars bind -- (b)
+  = case bndr_swap of
+      DoBinderSwap scrut_var mco
+        | scrut_var /= outer_bndr
+        -> Just [ NonRec outer_bndr (mkCastMCo (Var scrut_var) mco) ]
+      _ -> Nothing
+  | otherwise
+  = Just []
+
 
 ---------------------------------
 mergeAlts :: [Alt a] -> [Alt a] -> [Alt a]
@@ -934,10 +970,43 @@ Wrinkles
       non-join-points unless the /outer/ case has just one alternative; doing
       so would risk more allocation
 
+      Floating out join points isn't entirely straightforward.
+      See Note [Floating join points out of DEFAULT alternatives]
+
 (MC5) See Note [Cascading case merge]
 
 See also Note [Example of case-merging and caseRules] in GHC.Core.Opt.Simplify.Utils
 
+Note [Floating join points out of DEFAULT alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this, from (MC4) of Note [Merge Nested Cases]
+   case x of r
+     DEFAULT -> join j = rhs in case r of ...
+     alts
+
+We want to float that join point out to give this
+   join j = rhs
+   case x of r
+     DEFAULT -> case r of ...
+     alts
+
+But doing so is flat-out wrong if the scoping gets messed up:
+    (a) case x of r { DEFAULT -> join r = ... in ...r... }
+    (b) case x of r { DEFAULT -> join j = ...r.. in ... }
+In both cases we can't float the join point out because r changes its meaning.
+
+BUT we can fix up case (b) by adding an extra binding, like this
+    let r = x in
+    join j = rhs[r]
+    case x of r
+       DEFAULT -> ...r...
+       ...other alts...
+
+This extra binding is figured out by `okToFloatJoin`.
+
+Note that the cases that still don't work (e.g. (a)) will probably work fine the
+next iteration of the Simplifier, because they involve shadowing, and the Simplifier
+generally eliminates shadowing.
 
 Note [Cascading case merge]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

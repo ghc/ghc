@@ -22,7 +22,7 @@ import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.Opt.Simplify.Utils
-import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs, scrutOkForBinderSwap, BinderSwapDecision (..) )
+import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs )
 import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
 import qualified GHC.Core.Make
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
