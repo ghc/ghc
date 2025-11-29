@@ -30,7 +30,6 @@ import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.FVs     ( exprsFreeVarsList, exprFreeVars )
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.WorkWrap.Utils
-import GHC.Core.Opt.OccurAnal( BinderSwapDecision(..), scrutOkForBinderSwap )
 import GHC.Core.DataCon
 import GHC.Core.Class( classTyVars )
 import GHC.Core.Coercion hiding( substCo )
@@ -2025,9 +2024,9 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
 --               , text "spec_call_args" <+> ppr spec_call_args
 --               , text "rule_rhs" <+> ppr rule_rhs
 --               , text "adds_void_worker_arg" <+> ppr add_void_arg
-----               , text "body" <+> ppr body
-----               , text "spec_rhs" <+> ppr spec_rhs
-----               , text "how_bound" <+> ppr (sc_how_bound env) ]
+--               , text "body" <+> ppr body
+--               , text "spec_rhs" <+> ppr spec_rhs
+--               , text "how_bound" <+> ppr (sc_how_bound env) ]
 --               ]
         ; return (spec_usg, OS { os_pat = call_pat, os_rule = rule
                                , os_id = spec_id

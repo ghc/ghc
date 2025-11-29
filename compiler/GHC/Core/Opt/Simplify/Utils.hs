@@ -2693,7 +2693,7 @@ mkCase, mkCase1, mkCase2, mkCase3
 
 mkCase mode scrut outer_bndr alts_ty alts
   | sm_case_merge mode
-  , Just (joins, alts') <- mergeCaseAlts outer_bndr alts
+  , Just (joins, alts') <- mergeCaseAlts scrut outer_bndr alts
   = do  { tick (CaseMerge outer_bndr)
         ; case_expr <- mkCase1 mode scrut outer_bndr alts_ty alts'
         ; return (mkLets joins case_expr) }
