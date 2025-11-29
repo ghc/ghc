@@ -182,6 +182,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.allocLimitGrace    = (100*1024) / BLOCK_SIZE;
     RtsFlags.GcFlags.numa               = false;
     RtsFlags.GcFlags.numaMask           = 1;
+    RtsFlags.GcFlags.hugepages          = false;
     RtsFlags.GcFlags.ringBell           = false;
     RtsFlags.GcFlags.longGCSync         = 0; /* detection turned off */
 
@@ -567,7 +568,10 @@ usage_text[] = {
 #endif
 "  -xq        The allocation limit given to a thread after it receives",
 "             an AllocationLimitExceeded exception. (default: 100k)",
+#if defined(HUGEPAGE_FLAGS)
+"  -xH        Try to use hugepages to allocate memory.",
 "",
+#endif
 #if defined(USE_LARGE_ADDRESS_SPACE)
 "  -xr        The size of virtual memory address space reserved by the",
 "             two step allocator (default: 1T)",
@@ -1845,11 +1849,11 @@ error = true;
                    */
 
                 case 'q':
-                  OPTION_UNSAFE;
-                  RtsFlags.GcFlags.allocLimitGrace
-                      = decodeSize(rts_argv[arg], 3, BLOCK_SIZE, HS_INT_MAX)
-                          / BLOCK_SIZE;
-                  break;
+                    OPTION_UNSAFE;
+                    RtsFlags.GcFlags.allocLimitGrace
+                        = decodeSize(rts_argv[arg], 3, BLOCK_SIZE, HS_INT_MAX)
+                            / BLOCK_SIZE;
+                    break;
 
                 case 'r':
                     OPTION_UNSAFE;
@@ -1857,7 +1861,16 @@ error = true;
                       = decodeSize(rts_argv[arg], 3, MBLOCK_SIZE, HS_WORD64_MAX);
                     break;
 
-                  default:
+                case 'H':
+                    OPTION_UNSAFE;
+#if defined(HUGEPAGE_FLAGS)
+                    RtsFlags.GcFlags.hugepages = true;
+#else
+                    errorBelch("Program not compiled with hugepages support.");
+#endif
+                    break;
+
+                default:
                     OPTION_SAFE;
                     errorBelch("unknown RTS option: %s",rts_argv[arg]);
                     error = true;

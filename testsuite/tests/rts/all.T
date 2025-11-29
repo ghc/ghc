@@ -15,6 +15,12 @@ test('testmblockalloc',
 # which will crash because the mblocks we allocate are not in a state
 # the leak detector is expecting.
 
+# A variant of the above that tries to use hugepages
+test('testhugepagesmblockalloc',
+     [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0 -xr0.125T -xH'),
+      unless(opsys('linux'), skip)], # Huge pages are only currently supported on Linux
+     compile_and_run, [''])
+
 
 # See bug #101, test requires +RTS -c (or equivalently +RTS -M<something>)
 # only GHCi triggers the bug, but we run the test all ways for completeness.
