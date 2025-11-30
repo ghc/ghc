@@ -469,43 +469,23 @@ getRegister' _ platform (CmmLoad mem pk _)
         return (Any II64 code)
 
 -- catch simple cases of zero- or sign-extended load
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
-
-getRegister' _ _ (CmmMachOp (MO_XX_Conv W8 W32) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
-
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II64 (\dst -> addr_code `snocOL` LD II8 dst addr))
-
-getRegister' _ _ (CmmMachOp (MO_XX_Conv W8 W64) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II64 (\dst -> addr_code `snocOL` LD II8 dst addr))
-
+getRegister' _ _ (CmmMachOp (MO_UU_Conv src tgt) [CmmLoad mem pk _]) = do
+  let format = cmmTypeFormat pk
+  Amode addr addr_code <- getAmode D mem
+  return (Any (intFormat tgt) (\dst -> addr_code `snocOL` LD format dst addr))
+getRegister' _ _ (CmmMachOp (MO_XX_Conv src tgt) [CmmLoad mem pk _]) = do
+  let format = cmmTypeFormat pk
+  Amode addr addr_code <- getAmode D mem
+  return (Any (intFormat tgt) (\dst -> addr_code `snocOL` LD format dst addr))
 -- Note: there is no Load Byte Arithmetic instruction, so no signed case here
-
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II32 (\dst -> addr_code `snocOL` LD II16 dst addr))
 
 getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad mem _ _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II32 (\dst -> addr_code `snocOL` LA II16 dst addr))
 
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II64 (\dst -> addr_code `snocOL` LD II16 dst addr))
-
 getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad mem _ _]) = do
     Amode addr addr_code <- getAmode D mem
     return (Any II64 (\dst -> addr_code `snocOL` LA II16 dst addr))
-
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II64 (\dst -> addr_code `snocOL` LD II32 dst addr))
 
 getRegister' _ _ (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad mem _ _]) = do
     -- lwa is DS-form. See Note [Power instruction format]
