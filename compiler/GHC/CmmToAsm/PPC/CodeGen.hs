@@ -467,48 +467,26 @@ getRegister' _ platform (CmmLoad mem pk _)
         return (Any II64 code)
 
 -- catch simple cases of zero- or sign-extended load
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
+getRegister' _ _ (CmmMachOp (MO_UU_Conv src tgt) [CmmLoad mem pk _])
+  | src < tgt
+  , cmmTypeFormat pk == intFormat src = loadZeroExpand mem pk tgt
 
-getRegister' _ _ (CmmMachOp (MO_XX_Conv W8 W32) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
+getRegister' _ _ (CmmMachOp (MO_XX_Conv src tgt) [CmmLoad mem pk _])
+  | src < tgt
+  , cmmTypeFormat pk == intFormat src = loadZeroExpand mem pk tgt
 
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II64 (\dst -> addr_code `snocOL` LD II8 dst addr))
-
-getRegister' _ _ (CmmMachOp (MO_XX_Conv W8 W64) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II64 (\dst -> addr_code `snocOL` LD II8 dst addr))
-
--- Note: there is no Load Byte Arithmetic instruction, so no signed case here
-
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II32 (\dst -> addr_code `snocOL` LD II16 dst addr))
-
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II32 (\dst -> addr_code `snocOL` LA II16 dst addr))
-
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II64 (\dst -> addr_code `snocOL` LD II16 dst addr))
-
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II64 (\dst -> addr_code `snocOL` LA II16 dst addr))
-
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II64 (\dst -> addr_code `snocOL` LD II32 dst addr))
-
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad mem _ _]) = do
-    -- lwa is DS-form. See Note [Power instruction format]
-    Amode addr addr_code <- getAmode DS mem
-    return (Any II64 (\dst -> addr_code `snocOL` LA II32 dst addr))
+  -- XXX: This is ugly, refactor
+getRegister' _ _ (CmmMachOp (MO_SS_Conv src tgt) [CmmLoad mem pk _])
+  -- Note: there is no Load Byte Arithmetic instruction
+  | cmmTypeFormat pk /= II8
+  , src < tgt = do
+      let format = cmmTypeFormat pk
+      -- lwa is DS-form. See Note [Power instruction format]
+      let form = if format >= II32 then DS else D
+      Amode addr addr_code <- getAmode form mem
+      let code dst = assert (format == intFormat src)
+                     $ addr_code `snocOL` LA format dst addr
+      return (Any (intFormat tgt) code)
 
 getRegister' config platform (CmmMachOp (MO_RelaxedRead w) [e]) =
       getRegister' config platform (CmmLoad e (cmmBits w) NaturallyAligned)
@@ -788,6 +766,12 @@ extendSExpr from to x = CmmMachOp (MO_SS_Conv from to) [x]
 
 extendUExpr :: Width -> Width -> CmmExpr -> CmmExpr
 extendUExpr from to x = CmmMachOp (MO_UU_Conv from to) [x]
+
+loadZeroExpand :: CmmExpr -> CmmType -> Width -> NatM Register
+loadZeroExpand mem pk tgt = do
+    Amode addr addr_code <- getAmode D mem
+    let code dst = addr_code `snocOL` LD (cmmTypeFormat pk) dst addr
+    return (Any (intFormat tgt) code)
 
 -- -----------------------------------------------------------------------------
 --  The 'Amode' type: Memory addressing modes passed up the tree.
@@ -2448,8 +2432,8 @@ srCode width sgn instr x y = do
   let op_len = max W32 width
       extend = if sgn then extendSExpr else extendUExpr
   (src1, code1) <- getSomeReg (extend width op_len x)
-  (src2, code2) <- getSomeReg (extendUExpr width op_len y)
-  -- Note: Shift amount `y` is unsigned
+  (src2, code2) <- getSomeReg y
+
   let code dst = code1 `appOL` code2 `snocOL`
                  instr (intFormat op_len) dst src1 (RIReg src2)
   return (Any (intFormat width) code)
