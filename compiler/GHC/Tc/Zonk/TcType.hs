@@ -139,7 +139,7 @@ writeMetaTyVarRef tyvar ref ty
   | not debugIsOn
   = do { traceZonk "writeMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)
                                      <+> text ":=" <+> ppr ty)
-       ; writeTcRef ref (Indirect ty) }
+       ; writeTcRef' ref (Indirect ty) }
 
   -- Everything from here on only happens if DEBUG is on
   -- Need to zonk 'ty' because we may only recently have promoted
@@ -173,7 +173,7 @@ writeMetaTyVarRef tyvar ref ty
        ; massertPpr kind_check_ok kind_msg
 
        -- Do the write
-       ; writeTcRef ref (Indirect ty) }
+       ; writeTcRef' ref (Indirect ty) }
   where
     tv_kind = tyVarKind tyvar
 
@@ -266,7 +266,7 @@ zonkTcTyVar tv
                ; case cts of
                     Flexi       -> zonk_kind_and_return
                     Indirect ty -> do { zty <- zonkTcType ty
-                                      ; writeTcRef ref (Indirect zty)
+                                      ; writeTcRef' ref (Indirect zty)
                                         -- See Note [Sharing in zonking]
                                       ; return zty } }
 

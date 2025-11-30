@@ -116,7 +116,7 @@ module GHC.Tc.Solver.Monad (
     zonkTyCoVarKind,
 
     -- References
-    newTcRef, readTcRef, writeTcRef, updTcRef,
+    newTcRef, readTcRef, writeTcRef', updTcRef,
 
     -- Misc
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
@@ -674,7 +674,7 @@ updInertSet :: (InertSet -> InertSet) -> TcS ()
 updInertSet upd_fn
   = do { is_var <- getInertSetRef
        ; wrapTcS (do { curr_inert <- TcM.readTcRef is_var
-                     ; TcM.writeTcRef is_var (upd_fn curr_inert) }) }
+                     ; TcM.writeTcRef' is_var (upd_fn curr_inert) }) }
 
 getInertCans :: TcS InertCans
 getInertCans = do { inerts <- getInertSet; return (inert_cans inerts) }
@@ -688,7 +688,7 @@ updRetInertCans upd_fn
   = do { is_var <- getInertSetRef
        ; wrapTcS (do { inerts <- TcM.readTcRef is_var
                      ; let (res, cans') = upd_fn (inert_cans inerts)
-                     ; TcM.writeTcRef is_var (inerts { inert_cans = cans' })
+                     ; TcM.writeTcRef' is_var (inerts { inert_cans = cans' })
                      ; return res }) }
 
 updInertCans :: (InertCans -> InertCans) -> TcS ()
@@ -1110,7 +1110,7 @@ bumpStepCountTcS :: TcS ()
 bumpStepCountTcS = mkTcS $ \env ->
   do { let ref = tcs_count env
      ; n <- TcM.readTcRef ref
-     ; TcM.writeTcRef ref (n+1) }
+     ; TcM.writeTcRef' ref (n+1) }
 
 csTraceTcS :: SDoc -> TcS ()
 csTraceTcS doc
@@ -1456,7 +1456,7 @@ getInertSet :: TcS InertSet
 getInertSet = getInertSetRef >>= readTcRef
 
 setInertSet :: InertSet -> TcS ()
-setInertSet is = do { r <- getInertSetRef; writeTcRef r is }
+setInertSet is = do { r <- getInertSetRef; writeTcRef' r is }
 
 
 newTcRef :: a -> TcS (TcRef a)
@@ -1465,8 +1465,8 @@ newTcRef x = wrapTcS (TcM.newTcRef x)
 readTcRef :: TcRef a -> TcS a
 readTcRef ref = wrapTcS (TcM.readTcRef ref)
 
-writeTcRef :: TcRef a -> a -> TcS ()
-writeTcRef ref val = wrapTcS (TcM.writeTcRef ref val)
+writeTcRef' :: TcRef a -> a -> TcS ()
+writeTcRef' ref val = wrapTcS (TcM.writeTcRef' ref val)
 
 updTcRef :: TcRef a -> (a->a) -> TcS ()
 updTcRef ref upd_fn = wrapTcS (TcM.updTcRef ref upd_fn)
@@ -1813,7 +1813,7 @@ selectNextWorkItem
            where
              pick_me :: Ct -> WorkList -> TcS (Maybe Ct)
              pick_me ct new_wl
-               = do { writeTcRef wl_var new_wl
+               = do { writeTcRef' wl_var new_wl
                     ; return (Just ct) }
                  -- NB: no need for checkReductionDepth (ctLoc ct) (ctPred ct)
                  -- This is done by GHC.Tc.Solver.Dict.chooseInstance
@@ -1893,7 +1893,7 @@ reportCoarseGrainUnifications (TcS thing_inside)
               -- Propagate to outer_ul_ref
               ; outer_ul <- TcM.readTcRef outer_ul_ref
               ; unless (inner_ul `deeperThanOrSame` outer_ul) $
-                TcM.writeTcRef outer_ul_ref inner_ul
+                TcM.writeTcRef' outer_ul_ref inner_ul
 
               ; TcM.traceTc "reportCoarse(Coarse)" $
                 vcat [ text "outer_ul" <+> ppr outer_ul

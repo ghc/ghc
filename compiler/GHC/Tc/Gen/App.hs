@@ -2051,10 +2051,10 @@ qlMonoTcType ty
                   ; ref2  <- newTcRef Flexi
                   ; lvl2  <- getZonkTcLevel
                   ; let details = MetaTv { mtv_info  = info
-                                         , mtv_ref   = ref2
-                                         , mtv_tclvl = lvl2 }
+                                        , mtv_ref   = ref2
+                                        , mtv_tclvl = lvl2 }
                         tv2  = mkTcTyVar (tyVarName tv) kind details
-                 ; writeTcRef ref (Indirect (mkTyVarTy tv2)) }}}
+                ; writeTcRef' ref (Indirect (mkTyVarTy tv2)) }}}
       | otherwise
       = pprPanic "qlMonoTcType" (ppr tv)
 

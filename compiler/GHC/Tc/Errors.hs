@@ -1638,7 +1638,7 @@ maybeAddDeferredBindings hole report = do
         err_tm <- mkSolverErrorTerm (hole_loc hole) ref_ty report
           -- NB: ref_ty, not hole_ty. hole_ty might be rewritten.
           -- See Note [Holes in expressions] in GHC.Hs.Expr
-        writeMutVar ref err_tm
+        writeMutVar' ref err_tm
     _ -> pure ()
   where
     ctxt = reportContext $ sr_important_msg $ report

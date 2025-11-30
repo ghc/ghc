@@ -367,7 +367,7 @@ fillCoercionHole (CoercionHole { ch_ref = ref, ch_co_var = cv }) co
             ; whenIsJust cts $ \old_co ->
               pprPanic "Filling a filled coercion hole" (ppr cv $$ ppr co $$ ppr old_co) }
        ; traceTc "Filling coercion hole" (ppr cv <+> text ":=" <+> ppr co)
-       ; writeTcRef ref (Just co) }
+       ; writeTcRef' ref (Just co) }
 
 {- **********************************************************************
 *
@@ -501,7 +501,7 @@ inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
                             -- See Note [inferResultToType]
                           ; return ty }
             Nothing -> do { tau <- new_meta
-                          ; writeMutVar ref (Just tau)
+                          ; writeMutVar' ref (Just tau)
                           ; return tau }
        ; traceTc "Forcing ExpType to be monomorphic:"
                  (ppr u <+> text ":=" <+> ppr tau)

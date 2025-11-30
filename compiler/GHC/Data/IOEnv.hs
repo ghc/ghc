@@ -14,22 +14,23 @@
 module GHC.Data.IOEnv (
         IOEnv, -- Instance of Monad
 
-        -- Monad utilities
+        -- * Monad utilities
         module GHC.Utils.Monad,
 
-        -- Errors
+        -- * Errors
         failM, failWithM,
         IOEnvFailure(..),
 
-        -- Getting at the environment
+        -- * Getting at the environment
         getEnv, setEnv, updEnv, updEnvIO,
 
         runIOEnv, unsafeInterleaveM, uninterruptibleMaskM_,
         tryM, tryAllM, tryMostM, fixM,
 
-        -- I/O operations
-        IORef, newMutVar, readMutVar, writeMutVar, updMutVar,
-        atomicUpdMutVar, atomicUpdMutVar'
+        -- * I/O operations
+        -- | These operations are generally strict to avoid space leaks.
+        IORef, newMutVar, readMutVar, writeMutVar', updMutVar',
+        atomicUpdMutVar'
   ) where
 
 import GHC.Prelude
@@ -41,8 +42,8 @@ import GHC.Utils.Exception
 import GHC.Unit.Module
 import GHC.Utils.Panic
 
-import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
-                          atomicModifyIORef, atomicModifyIORef' )
+import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef',
+                          atomicModifyIORef' )
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
 import Control.Monad    ( MonadPlus )
@@ -215,24 +216,23 @@ instance MonadPlus (IOEnv env)
 -- Accessing input/output
 ----------------------------------------------------------------------
 
+-- | Strict in initial value.
 newMutVar :: a -> IOEnv env (IORef a)
-newMutVar val = liftIO (newIORef val)
+newMutVar val = liftIO $ newIORef =<< evaluate val
 
-writeMutVar :: IORef a -> a -> IOEnv env ()
-writeMutVar var val = liftIO (writeIORef var val)
+-- | Strict write.
+writeMutVar' :: IORef a -> a -> IOEnv env ()
+writeMutVar' var val = liftIO (writeIORef var $! val)
 
 readMutVar :: IORef a -> IOEnv env a
 readMutVar var = liftIO (readIORef var)
 
-updMutVar :: IORef a -> (a -> a) -> IOEnv env ()
-updMutVar var upd = liftIO (modifyIORef var upd)
+-- | Strict update.
+updMutVar' :: IORef a -> (a -> a) -> IOEnv env ()
+updMutVar' var upd = liftIO (modifyIORef' var upd)
 
--- | Atomically update the reference.  Does not force the evaluation of the
--- new variable contents.  For strict update, use 'atomicUpdMutVar''.
-atomicUpdMutVar :: IORef a -> (a -> (a, b)) -> IOEnv env b
-atomicUpdMutVar var upd = liftIO (atomicModifyIORef var upd)
-
--- | Strict variant of 'atomicUpdMutVar'.
+-- | Atomically update the reference. Force the evaluation of the new
+-- variable contents.
 atomicUpdMutVar' :: IORef a -> (a -> (a, b)) -> IOEnv env b
 atomicUpdMutVar' var upd = liftIO (atomicModifyIORef' var upd)
 

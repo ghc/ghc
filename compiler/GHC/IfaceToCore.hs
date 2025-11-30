@@ -473,7 +473,7 @@ typecheckIfacesForMerging mod ifaces tc_env_vars =
                                                   (nonDetOccEnvElts decl_env))
     let global_type_env = mkNameEnv names_w_things
     case lookupKnotVars tc_env_vars mod of
-      Just tc_env_var -> writeMutVar tc_env_var global_type_env
+      Just tc_env_var -> writeMutVar' tc_env_var global_type_env
       Nothing -> return ()
 
     -- OK, now typecheck each ModIface using this environment

@@ -74,7 +74,7 @@ failWithRn tcRnMessage = do
     errs <- readTcRef errs_var
     -- TODO: maybe associate this with a source location?
     let msg = mkPlainErrorMsgEnvelope noSrcSpan tcRnMessage
-    writeTcRef errs_var (msg `addMessage` errs)
+    writeTcRef' errs_var (msg `addMessage` errs)
     failM
 
 -- | What we have is a generalized ModIface, which corresponds to

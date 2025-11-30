@@ -514,7 +514,7 @@ instance GhcMonad BkpM where
         readMutVar s
     setSession hsc_env = do
         Session s <- fmap bkp_session getEnv
-        writeMutVar s hsc_env
+        writeMutVar' s hsc_env
 
 -- | Get the current 'BkpEnv'.
 getBkpEnv :: BkpM BkpEnv

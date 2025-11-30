@@ -1,6 +1,14 @@
-module GHC.Tc.Types.TcRef (TcRef, newTcRef, readTcRef, writeTcRef, updTcRef, updTcRefM) where
+module GHC.Tc.Types.TcRef
+  ( TcRef
+  , newTcRef
+  , readTcRef
+  , writeTcRef'
+  , updTcRef
+  , updTcRefM
+  ) where
 
 import GHC.Prelude
+import GHC.Utils.Exception
 
 import Control.Monad.IO.Class
 import Data.IORef
@@ -21,9 +29,10 @@ readTcRef :: MonadIO m => TcRef a -> m a
 readTcRef = \ ref -> liftIO $ readIORef ref
 {-# INLINE readTcRef #-}
 
-writeTcRef :: MonadIO m => TcRef a -> a -> m ()
-writeTcRef = \ ref a -> liftIO $ writeIORef ref a
-{-# INLINE writeTcRef #-}
+-- | Strict write.
+writeTcRef' :: MonadIO m => TcRef a -> a -> m ()
+writeTcRef' ref a = liftIO $ writeIORef ref =<< evaluate a
+{-# INLINE writeTcRef' #-}
 
 updTcRef :: MonadIO m => TcRef a -> (a -> a) -> m ()
 updTcRef = \ ref fn -> liftIO $ modifyIORef' ref fn
@@ -33,5 +42,5 @@ updTcRefM :: MonadIO m => TcRef a -> (a -> m a) -> m ()
 updTcRefM ref upd
   = do { contents      <- readTcRef ref
        ; !new_contents <- upd contents
-       ; writeTcRef ref new_contents }
+       ; writeTcRef' ref new_contents }
 {-# INLINE updTcRefM #-}

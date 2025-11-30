@@ -32,7 +32,7 @@ optCallCount opts = Just $
             -- TODO: Remove #20791
             tcPluginIO $ hFlush stdout
 
-            unsafeTcPluginTcM $ writeMutVar c (n + 1)
+            unsafeTcPluginTcM $ writeMutVar' c (n + 1)
             return $ TcPluginOk [] []
 
         , tcPluginRewrite = \ _ -> emptyUFM

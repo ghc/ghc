@@ -479,8 +479,8 @@ setGlobalTypeEnv :: TcGblEnv -> TypeEnv -> TcM TcGblEnv
 setGlobalTypeEnv tcg_env new_type_env
   = do  {     -- Sync the type-envt variable seen by interface files
          ; case lookupKnotVars (tcg_type_env_var tcg_env) (tcg_mod tcg_env) of
-              Just tcg_env_var -> writeMutVar tcg_env_var new_type_env
-              Nothing -> return ()
+             Just tcg_env_var -> writeMutVar' tcg_env_var new_type_env
+             Nothing -> return ()
          ; return (tcg_env { tcg_type_env = new_type_env }) }
 
 

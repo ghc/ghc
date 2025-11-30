@@ -42,7 +42,7 @@ module GHC.Tc.Utils.Monad(
   newSysName, newSysLocalId, newSysLocalIds,
 
   -- * Accessing input/output
-  newTcRef, readTcRef, writeTcRef, updTcRef, updTcRefM,
+  newTcRef, readTcRef, writeTcRef', updTcRef, updTcRefM,
 
   -- * Debugging
   traceTc, traceRn, traceOptTcRn, dumpOptTcRn,
@@ -1048,13 +1048,13 @@ addDependentFiles :: [FilePath] -> TcRn ()
 addDependentFiles fs = do
   ref <- fmap tcg_dependent_files getGblEnv
   dep_files <- readTcRef ref
-  writeTcRef ref (fs ++ dep_files)
+  writeTcRef' ref (fs ++ dep_files)
 
 addDependentDirectories :: [FilePath] -> TcRn ()
 addDependentDirectories ds = do
   ref <- fmap tcg_dependent_dirs getGblEnv
   dep_dirs <- readTcRef ref
-  writeTcRef ref (ds ++ dep_dirs)
+  writeTcRef' ref (ds ++ dep_dirs)
 
 {-
 ************************************************************************
@@ -1197,7 +1197,7 @@ addMessages :: Messages TcRnMessage -> TcRn ()
 addMessages msgs1
   = do { errs_var <- getErrsVar
        ; msgs0    <- readTcRef errs_var
-       ; writeTcRef errs_var (msgs0 `unionMessages` msgs1) }
+       ; writeTcRef' errs_var (msgs0 `unionMessages` msgs1) }
 
 discardWarnings :: TcRn a -> TcRn a
 -- Ignore warnings inside the thing inside;
@@ -1210,7 +1210,7 @@ discardWarnings thing_inside
 
         -- Revert warnings to old_warns
         ; new_errs <- getErrorMessages <$> readTcRef errs_var
-        ; writeTcRef errs_var $ mkMessages (old_warns `unionBags` new_errs)
+        ; writeTcRef' errs_var $ mkMessages (old_warns `unionBags` new_errs)
 
         ; return result }
 
@@ -1249,7 +1249,7 @@ reportDiagnostic msg
   = do { traceTc "Adding diagnostic:" (pprLocMsgEnvelopeDefault msg) ;
          errs_var <- getErrsVar ;
          msgs     <- readTcRef errs_var ;
-         writeTcRef errs_var (msg `addMessage` msgs) }
+         writeTcRef' errs_var (msg `addMessage` msgs) }
 
 -----------------------
 checkNoErrs :: TcM r -> TcM r
@@ -1903,7 +1903,7 @@ getTcEvBindsMap (CoEvBindsVar {})
 
 setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcM ()
 setTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref }) binds
-  = writeTcRef ev_ref binds
+  = writeTcRef' ev_ref binds
 setTcEvBindsMap v@(CoEvBindsVar {}) ev_binds
   | isEmptyEvBindMap ev_binds
   = return ()
@@ -1939,7 +1939,7 @@ addTcEvBind (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) ev_bind
               , text "ev_bind:" <+> ppr ev_bind
               , text "bnds:" <+> ppr bnds
               , text "bnds':" <+> ppr bnds' ]
-       ; writeTcRef ev_ref bnds' }
+       ; writeTcRef' ev_ref bnds' }
 addTcEvBind (CoEvBindsVar { ebv_uniq = u }) ev_bind
   = pprPanic "addTcEvBind CoEvBindsVar" (ppr ev_bind $$ ppr u)
 
@@ -1952,7 +1952,7 @@ addTcEvBinds (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) new_ev_binds
   = do { traceTc "addTcEvBinds" $ ppr u $$
                                   ppr new_ev_binds
        ; old_bnds <- readTcRef ev_ref
-       ; writeTcRef ev_ref (old_bnds `unionEvBindMap` new_ev_binds) }
+       ; writeTcRef' ev_ref (old_bnds `unionEvBindMap` new_ev_binds) }
 addTcEvBinds (CoEvBindsVar { ebv_uniq = u }) new_ev_binds
   = pprPanic "addTcEvBinds CoEvBindsVar" (ppr new_ev_binds $$ ppr u)
 
@@ -1962,7 +1962,7 @@ chooseUniqueOccTc fn =
      ; let dfun_n_var = tcg_dfun_n env
      ; set <- readTcRef dfun_n_var
      ; let occ = fn set
-     ; writeTcRef dfun_n_var (extendOccSet set occ)
+     ; writeTcRef' dfun_n_var (extendOccSet set occ)
      ; return occ }
 
 newZonkAnyType :: Kind -> TcM Type
@@ -1974,7 +1974,7 @@ newZonkAnyType kind
        ; let zany_n_var = tcg_zany_n env
        ; i <- readTcRef zany_n_var
        ; let !i2 = i+1
-       ; writeTcRef zany_n_var i2
+       ; writeTcRef' zany_n_var i2
        ; return (mkTyConApp zonkAnyTyCon [kind, mkNumLitTy i]) }
 
 getConstraintVar :: TcM (TcRef WantedConstraints)
@@ -2244,7 +2244,7 @@ It would be great to have a more systematic solution to this entire mess.
 -}
 
 recordThUse :: TcM ()
-recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
+recordThUse = do { env <- getGblEnv; writeTcRef' (tcg_th_used env) True }
 
 recordThNeededRuntimeDeps :: [Linkable] -> PkgsLoaded -> TcM ()
 recordThNeededRuntimeDeps new_links new_pkgs
@@ -2316,8 +2316,8 @@ addModFinalizersWithLclEnv mod_finalizers
 -- although this is used for more than just that failure case.
 recordUnsafeInfer :: Messages TcRnMessage -> TcM ()
 recordUnsafeInfer msgs =
-    getGblEnv >>= \env -> do writeTcRef (tcg_safe_infer env) False
-                             writeTcRef (tcg_safe_infer_reasons env) msgs
+    getGblEnv >>= \env -> do writeTcRef' (tcg_safe_infer env) False
+                             writeTcRef' (tcg_safe_infer_reasons env) msgs
 
 -- | Figure out the final correct safe haskell mode
 finalSafeMode :: DynFlags -> TcGblEnv -> IO SafeHaskellMode
@@ -2511,7 +2511,7 @@ getCCIndexM get_ccs nm = do
   let cc_st_ref = get_ccs env
   cc_st <- readTcRef cc_st_ref
   let (idx, cc_st') = getCCIndex nm cc_st
-  writeTcRef cc_st_ref cc_st'
+  writeTcRef' cc_st_ref cc_st'
   return idx
 
 -- | See 'getCCIndexM'.

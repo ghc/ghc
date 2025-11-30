@@ -1161,7 +1161,7 @@ fillInferResultNoInst act_res_ty (IR { ir_uniq = u
                      -- Compose the two coercions.
                      ; let final_co = prom_co `mkTransCo` frr_co
 
-                     ; writeTcRef ref (Just act_res_ty)
+                     ; writeTcRef' ref (Just act_res_ty)
 
                      ; return final_co } }
 
@@ -2559,7 +2559,7 @@ recordUnifications (WU_Coarse lvl_ref) tvs
                    vcat [ text "lvl" <+> ppr tv_lvl, text "unif_lvl" <+> ppr unif_lvl ]
                  ; return () }
          else do { traceTc "set-uni-flag" (ppr tv_lvl)
-                 ; writeTcRef lvl_ref tv_lvl } }
+                 ; writeTcRef' lvl_ref tv_lvl } }
 
 recordUnifications (WU_Fine tvs_ref) tvs
   = updTcRef tvs_ref (`unionVarSet` tvs)
@@ -3019,7 +3019,7 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref, u_given_eq_lvl = given_eq_lvl })
                  ; return (mkNomReflCo ty2) }  -- Unification is always Nominal
 
          else -- The kinds don't match yet, so defer instead.
-              do { writeTcRef def_eq_ref def_eqs
+              do { writeTcRef' def_eq_ref def_eqs
                      -- Since we are discarding co_k, also discard any constraints
                      -- emitted by kind unification; they are just useless clutter.
                      -- Do this dicarding by simply restoring the previous state

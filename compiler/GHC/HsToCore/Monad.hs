@@ -508,7 +508,7 @@ diagnosticDs dsMessage
        ; loc <- getSrcSpanDs
        ; !diag_opts <- initDiagOpts <$> getDynFlags
        ; let msg = mkMsgEnvelope diag_opts loc (ds_name_ppr_ctx env) dsMessage
-       ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
+       ; updMutVar' (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Issue an error, but return the expression for (), so that we can continue
 -- reporting errors.
@@ -589,7 +589,7 @@ discardWarningsDs thing_inside
         ; result <- thing_inside
 
         -- Revert messages to old_msgs
-        ; writeTcRef (ds_msgs env) old_msgs
+        ; writeTcRef' (ds_msgs env) old_msgs
 
         ; return result }
 

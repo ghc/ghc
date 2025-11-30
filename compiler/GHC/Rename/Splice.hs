@@ -293,7 +293,7 @@ rnUntypedSpliceGen run_splice (flavour, run_pending) splice
                 ; splice_name <- newLocalBndrRn (L (noAnnSrcSpan loc) unqualSplice)
                 ; result <- run_pending (HsUntypedSpliceNested splice_name) splice'
                 ; ps <- readMutVar ps_var
-                ; writeMutVar ps_var (PendingRnSplice splice_name splice' : ps)
+                ; writeMutVar' ps_var (PendingRnSplice splice_name splice' : ps)
                 ; return (result, fvs) }
 
         _ ->  do { checkTopSpliceAllowed splice

@@ -917,7 +917,7 @@ withoutUnification free_vars action =
      ; mapM_ restore flexis
      ; return result }
   where restore tv = do { traceTc "withoutUnification: restore flexi" (ppr tv)
-                        ; writeTcRef (metaTyVarRef tv) Flexi }
+                        ; writeTcRef' (metaTyVarRef tv) Flexi }
         fuvs = fvVarList free_vars
 
 -- | Reports whether first type (ty_a) subsumes the second type (ty_b),

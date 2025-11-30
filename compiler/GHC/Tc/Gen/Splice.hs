@@ -1521,12 +1521,12 @@ instance TH.Quasi TcM where
   qAddDependentFile fp = do
     ref <- fmap tcg_dependent_files getGblEnv
     dep_files <- readTcRef ref
-    writeTcRef ref (fp:dep_files)
+    writeTcRef' ref (fp:dep_files)
 
   qAddDependentDirectory dp = do
     ref <- fmap tcg_dependent_dirs getGblEnv
     dep_dirs <- readTcRef ref
-    writeTcRef ref (dp:dep_dirs)
+    writeTcRef' ref (dp:dep_dirs)
 
   qAddTempFile suffix = do
     dflags <- getDynFlags
@@ -1770,7 +1770,7 @@ finishTH = do
 #endif
     Just (ExternalInterp {}) -> do
       tcg <- getGblEnv
-      writeTcRef (tcg_th_remote_state tcg) Nothing
+      writeTcRef' (tcg_th_remote_state tcg) Nothing
 
 
 runTHExp :: ForeignHValue -> TcM TH.Exp
@@ -1829,7 +1829,7 @@ runRemoteTH inst recovers = do
     StartRecover -> do -- Note [TH recover with -fexternal-interpreter]
       v <- getErrsVar
       msgs <- readTcRef v
-      writeTcRef v emptyMessages
+      writeTcRef' v emptyMessages
       runRemoteTH inst (msgs : recovers)
     EndRecover caught_error -> do
       let (prev_msgs, rest) = case recovers of
@@ -1838,7 +1838,7 @@ runRemoteTH inst recovers = do
       v <- getErrsVar
       warn_msgs <- getWarningMessages <$> readTcRef v
       -- keep the warnings only if there were no errors
-      writeTcRef v $ if caught_error
+      writeTcRef' v $ if caught_error
         then prev_msgs
         else mkMessages warn_msgs `unionMessages` prev_msgs
       runRemoteTH inst rest

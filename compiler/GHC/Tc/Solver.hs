@@ -147,12 +147,12 @@ simplifyTop wanteds
            -- messages.
            ; errs_var  <- getErrsVar
            ; saved_msg <- TcM.readTcRef errs_var
-           ; TcM.writeTcRef errs_var emptyMessages
+           ; TcM.writeTcRef' errs_var emptyMessages
 
            ; warnAllUnsolved $ emptyWC { wc_simple = fmap CDictCan unsafe_ol }
 
            ; whyUnsafe <- getWarningMessages <$> TcM.readTcRef errs_var
-           ; TcM.writeTcRef errs_var saved_msg
+           ; TcM.writeTcRef' errs_var saved_msg
            ; recordUnsafeInfer (mkMessages whyUnsafe)
            }
        ; traceTc "reportUnsolved (unsafe overlapping) }" empty
