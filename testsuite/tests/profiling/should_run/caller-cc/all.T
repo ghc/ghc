@@ -12,7 +12,7 @@ setTestOpts(grep_prof("calling:"))
 
 # N.B. Main.hs is stolen from heapprof001.
 
-test('CallerCc1', normal,
+test('CallerCc1', expect_broken_for(25959,['prof', 'profasm']),
      multimod_compile_and_run,
      ['Main', '-fprof-callers=*.concat -O0'])
 
