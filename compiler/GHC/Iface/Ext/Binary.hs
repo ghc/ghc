@@ -291,11 +291,7 @@ fromHieName nc hie_name = do
         -- was initialized with known-key names, which is always the case if you
         -- use `newNameCache`).
         Just name -> pure (cache, name)
-        Nothing   -> do
-          uniq <- takeUniqFromNameCache nc
-          let name       = mkExternalName uniq mod occ span
-              new_cache  = extendOrigNameCache cache mod occ name
-          pure (new_cache, name)
+        Nothing   -> allocNameInCache nc mod occ span cache
 
     LocalName occ span -> do
       uniq <- takeUniqFromNameCache nc

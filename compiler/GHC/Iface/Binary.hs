@@ -671,9 +671,7 @@ getSymbolTable bh name_cache = do
               writeArray mut_arr (fromIntegral i) name
               return cache
             Nothing   -> do
-              uniq <- takeUniqFromNameCache name_cache
-              let name      = mkExternalName uniq mod occ noSrcSpan
-                  new_cache = extendOrigNameCache cache mod occ name
+              (new_cache, name) <- allocNameInCache name_cache mod occ noSrcSpan cache
               writeArray mut_arr (fromIntegral i) name
               return new_cache
         arr <- unsafeFreeze mut_arr

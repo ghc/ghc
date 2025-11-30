@@ -15,6 +15,8 @@ module GHC.Types.Name.Cache
   , lookupOrigNameCache
   , extendOrigNameCache'
   , extendOrigNameCache
+  , addNameToCache
+  , allocNameInCache
 
   -- * Known-key names
   , knownKeysOrigNameCache
@@ -28,6 +30,7 @@ import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique (uniqueTag)
+import GHC.Types.SrcLoc
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Builtin.Utils
@@ -142,10 +145,28 @@ extendOrigNameCache' nc name
     extendOrigNameCache nc (nameModule name) (nameOccName name) name
 
 extendOrigNameCache :: OrigNameCache -> Module -> OccName -> Name -> OrigNameCache
-extendOrigNameCache nc mod occ name
+extendOrigNameCache nc mod occ !name
+  -- Avoid Name thunks in the name cache via explicit bang (#19124)
   = extendModuleEnvWith combine nc mod (unitOccEnv occ name)
   where
     combine _ occ_env = extendOccEnv occ_env occ name
+
+-- | Extend the 'OrigNameCache' with a new 'OccName' with the given 'Unique',
+-- returning the finished 'Name'.
+addNameToCache :: Unique -> Module -> OccName -> SrcSpan
+               -> OrigNameCache -> (OrigNameCache, Name)
+addNameToCache uniq mod occ loc cache =
+  (extendOrigNameCache cache mod occ name, name)
+  where
+    !name = mkExternalName uniq mod occ loc
+
+-- | Allocate a fresh 'Unique' from the 'NameCache' and extend it with a new
+-- 'OccName', returning the finished 'Name'.
+allocNameInCache :: NameCache -> Module -> OccName -> SrcSpan
+                 -> OrigNameCache -> IO (OrigNameCache, Name)
+allocNameInCache nc mod occ loc cache = do
+  uniq <- takeUniqFromNameCache nc
+  pure (addNameToCache uniq mod occ loc cache)
 
 -- | Initialize a new name cache
 newNameCache :: IO NameCache
