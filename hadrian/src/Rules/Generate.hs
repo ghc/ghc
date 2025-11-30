@@ -26,6 +26,7 @@ import BindistConfig
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Platform.ArchOS
 import qualified Data.Set as Set
+import UserSettings (finalStage)
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -256,7 +257,12 @@ generateRules = do
 
     forM_ allStages $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
-            go gen file = generate file (semiEmptyTarget (succStage stage)) gen
+            -- For the finalStage, we generate settings for that stage. For
+            -- others we look at the next stage. Why? Because cross-compilers
+            -- require libs from the successor stage, otherwise they are
+            -- compiled for the host and not the target.
+            stage' = if stage /= finalStage then succStage stage else stage
+            go gen file = generate file (semiEmptyTarget stage') gen
         (prefix -/- "settings") %> \out -> go (generateSettings out) out
         -- The compiler in `_build/stage1/` is the stage2 compiler, thus we have to query for "stage from path" + 1
         (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr (targetStage (succStage stage))) out
