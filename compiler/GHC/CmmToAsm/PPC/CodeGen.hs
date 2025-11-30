@@ -469,28 +469,35 @@ getRegister' _ platform (CmmLoad mem pk _)
         return (Any II64 code)
 
 -- catch simple cases of zero- or sign-extended load
-getRegister' _ _ (CmmMachOp (MO_UU_Conv src tgt) [CmmLoad mem pk _]) = do
-  let format = cmmTypeFormat pk
-  Amode addr addr_code <- getAmode D mem
-  return (Any (intFormat tgt) (\dst -> addr_code `snocOL` LD format dst addr))
-getRegister' _ _ (CmmMachOp (MO_XX_Conv src tgt) [CmmLoad mem pk _]) = do
-  let format = cmmTypeFormat pk
-  Amode addr addr_code <- getAmode D mem
-  return (Any (intFormat tgt) (\dst -> addr_code `snocOL` LD format dst addr))
--- Note: there is no Load Byte Arithmetic instruction, so no signed case here
+-- XXX: refactor into separate function
+getRegister' _ _ (CmmMachOp (MO_UU_Conv src tgt) [CmmLoad mem pk _])
+  | src < tgt = do
+      let format = cmmTypeFormat pk
+      Amode addr addr_code <- getAmode D mem
+      let code dst = assert (format == intFormat src)
+                     $ addr_code `snocOL` LD format dst addr
+      return (Any (intFormat tgt) code)
 
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II32 (\dst -> addr_code `snocOL` LA II16 dst addr))
+getRegister' _ _ (CmmMachOp (MO_XX_Conv src tgt) [CmmLoad mem pk _])
+  | src < tgt = do
+      let format = cmmTypeFormat pk
+      Amode addr addr_code <- getAmode D mem
+      let code dst = assert (format == intFormat src)
+                     $ addr_code `snocOL` LD format dst addr
+      return (Any (intFormat tgt) code)
 
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad mem _ _]) = do
-    Amode addr addr_code <- getAmode D mem
-    return (Any II64 (\dst -> addr_code `snocOL` LA II16 dst addr))
-
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad mem _ _]) = do
-    -- lwa is DS-form. See Note [Power instruction format]
-    Amode addr addr_code <- getAmode DS mem
-    return (Any II64 (\dst -> addr_code `snocOL` LA II32 dst addr))
+  -- XXX: This is ugly, refactor
+getRegister' _ _ (CmmMachOp (MO_SS_Conv src tgt) [CmmLoad mem pk _])
+  -- Note: there is no Load Byte Arithmetic instruction
+  | cmmTypeFormat pk /= II8
+  , src < tgt = do
+      let format = cmmTypeFormat pk
+      -- lwa is DS-form. See Note [Power instruction format]
+      let form = if format == II32 then DS else D
+      Amode addr addr_code <- getAmode form mem
+      let code dst = assert (format == intFormat src)
+                     $ addr_code `snocOL` LA format dst addr
+      return (Any (intFormat tgt) code)
 
 getRegister' config platform (CmmMachOp (MO_RelaxedRead w) [e]) =
       getRegister' config platform (CmmLoad e (cmmBits w) NaturallyAligned)
