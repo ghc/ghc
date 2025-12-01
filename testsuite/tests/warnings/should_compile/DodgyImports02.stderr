@@ -1,0 +1,15 @@
+DodgyImports02.hs:5:19: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘data True(..)’ suggests that
+    ‘GHC.Internal.Types.True’ has children,
+                                  but it is not a type constructor or a class
+
+DodgyImports02.hs:6:19: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘data True(data ..)’ suggests that
+    ‘GHC.Internal.Types.True’ has children,
+                                  but it is not a type constructor or a class
+
+DodgyImports02.hs:7:19: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘data True(type ..)’ suggests that
+    ‘GHC.Internal.Types.True’ has children,
+                                  but it is not a type constructor or a class
+

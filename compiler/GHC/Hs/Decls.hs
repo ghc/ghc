@@ -1380,6 +1380,8 @@ type instance XWarnings      GhcTc = SourceText
 type instance XXWarnDecls    (GhcPass _) = DataConCantHappen
 
 type instance XWarning      (GhcPass _) = (NamespaceSpecifier, (EpToken "[", EpToken "]"))
+      -- See #26678 "NamespaceSpecifier in extension fields"
+
 type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 
 

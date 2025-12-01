@@ -608,10 +608,10 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             expacc_exp_occs   = occs,
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
-          } (L loc ie@(IEThingAll (warn_txt_ps, ann) l doc))
+          } (L loc ie@(IEThingAll x l doc))
         = do mb_gre <- lookupGreAvailRn (ieLWrappedNameWhatLooking l) $ lieWrappedName l
              for mb_gre $ \ par -> do
-               all_kids <- lookup_ie_kids_all l par
+               all_kids <- lookup_ie_kids_all ie (ieta_ns_spec x) l par
                let name = greName par
                    all_gres = par : all_kids
                    all_names = map greName all_gres
@@ -622,14 +622,15 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                  <- process_warning export_warn_spans
                                     dont_warn_export
                                     all_names
-                                    warn_txt_ps
+                                    (ieta_warning x)
                                     (locA loc)
 
                doc' <- traverse rnLHsDoc doc
+               let x' = x{ ieta_warning = warn_txt_rn }
                return ( expacc{ expacc_exp_occs   = occs'
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
-                      , L loc (IEThingAll (warn_txt_rn, ann) (replaceLWrappedName l name) doc')
+                      , L loc (IEThingAll x' (replaceLWrappedName l name) doc')
                       , Just $ AvailTC name all_names )
 
     lookup_ie expacc@ExportAccum{
@@ -647,7 +648,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                wc_kids <-
                  case wc of
                    NoIEWildcard -> return []
-                   IEWildcard _ -> lookup_ie_kids_all l par
+                   IEWildcard _ -> lookup_ie_kids_all ie NoNamespaceSpecifier l par
 
                let name = greName par
                    all_kids = with_kids ++ wc_kids
@@ -680,16 +681,21 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
          ; kids <- lookupChildrenExport gre child_gres sub_rdrs
          ; return (unzip kids) }
 
-    lookup_ie_kids_all :: LIEWrappedName GhcPs -> GlobalRdrElt
+    lookup_ie_kids_all :: IE GhcPs
+                  -> NamespaceSpecifier
+                  -> LIEWrappedName GhcPs
+                  -> GlobalRdrElt
                   -> RnM [GlobalRdrElt]
-    lookup_ie_kids_all (L _loc rdr) gre =
+    lookup_ie_kids_all ie ns_spec (L _loc rdr) gre =
       do { let name = greName gre
                gres = findChildren kids_env name
          -- We only choose level 0 exports when filling in part of an export list implicitly.
          ; let kids_0 = mapMaybe pickLevelZeroGRE gres
-         ; addUsedKids (ieWrappedName rdr) kids_0
-         ; when (null kids_0) $ addTcRnDiagnostic (TcRnDodgyExports (DodgyExportsEmptyParent gre))
-         ; return kids_0 }
+               selected_kids = filterByNamespaceGREs ns_spec kids_0
+         ; when (null selected_kids) $
+             addTcRnDiagnostic (TcRnDodgyExports (DodgyExportsEmptyParent ie ns_spec gre))
+         ; addUsedKids (ieWrappedName rdr) selected_kids
+         ; return selected_kids }
 
     -------------
 

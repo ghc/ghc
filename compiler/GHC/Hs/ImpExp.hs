@@ -239,12 +239,19 @@ type instance XIEThingAbs  GhcPs = Maybe (LWarningTxt GhcPs)
 type instance XIEThingAbs  GhcRn = Maybe (LWarningTxt GhcRn)
 type instance XIEThingAbs  GhcTc = ()
 
--- The additional field of type 'Maybe (WarningTxt pass)' holds information
--- about export deprecation annotations and is thus set to Nothing when `IE`
--- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEThingAll  GhcPs = (Maybe (LWarningTxt GhcPs), (EpToken "(", EpToken "..", EpToken ")"))
-type instance XIEThingAll  GhcRn = (Maybe (LWarningTxt GhcRn), (EpToken "(", EpToken "..", EpToken ")"))
-type instance XIEThingAll  GhcTc = (EpToken "(", EpToken "..", EpToken ")")
+data IEThingAllExt pass =
+  IEThingAllExt {
+    ieta_warning  :: Maybe (LWarningTxt pass),
+      -- ^ Export deprecation annotation. Always 'Nothing' for import lists,
+      -- since export deprecation can only be used in exports.
+    ieta_ns_spec  :: NamespaceSpecifier,
+      -- ^ See #26678 "NamespaceSpecifier in extension fields"
+    ieta_tok_lpar :: EpToken "(",
+    ieta_tok_wc   :: EpToken "..",
+    ieta_tok_rpar :: EpToken ")"
+  }
+
+type instance XIEThingAll (GhcPass p) = IEThingAllExt (GhcPass p)
 
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
@@ -266,6 +273,7 @@ data IEWholeNamespaceExt pass =
   IEWholeNamespaceExt {
     iewn_warning :: Maybe (LWarningTxt pass),
     iewn_ns_spec :: NamespaceSpecifier,
+      -- ^ See #26678 "NamespaceSpecifier in extension fields"
     iewn_tok_wc  :: EpToken "..",
     iewn_names   :: [IdP pass]
       -- ^ The list @[Name]@ stores the names that the @..@ expands to;
@@ -308,12 +316,12 @@ ieDeprecation = fmap unLoc . ie_deprecation (ghcPass @p)
     ie_deprecation :: GhcPass p -> IE (GhcPass p) -> Maybe (LWarningTxt (GhcPass p))
     ie_deprecation GhcPs (IEVar xie _ _) = xie
     ie_deprecation GhcPs (IEThingAbs xie _ _) = xie
-    ie_deprecation GhcPs (IEThingAll (xie, _) _ _) = xie
+    ie_deprecation GhcPs (IEThingAll xie _ _) = ieta_warning xie
     ie_deprecation GhcPs (IEThingWith (xie, _) _ _ _ _) = xie
     ie_deprecation GhcPs (IEModuleContents (xie, _) _) = xie
     ie_deprecation GhcRn (IEVar xie _ _) = xie
     ie_deprecation GhcRn (IEThingAbs xie _ _) = xie
-    ie_deprecation GhcRn (IEThingAll (xie, _) _ _) = xie
+    ie_deprecation GhcRn (IEThingAll xie _ _) = ieta_warning xie
     ie_deprecation GhcRn (IEThingWith (xie, _) _ _ _ _) = xie
     ie_deprecation GhcRn (IEModuleContents xie _) = xie
     ie_deprecation _ _ = Nothing
@@ -359,10 +367,9 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
                       , Just $ ppr (unLoc thing)
                       , exportDocstring <$> doc
                       ]
-    ppr ie@(IEThingAll  _   thing doc) =
+    ppr ie@(IEThingAll x thing doc) =
       sep $ catMaybes [ ppr <$> ieDeprecation ie
-                      , Just $ hcat [ppr (unLoc thing)
-                      , text "(..)"]
+                      , Just $ ppr (unLoc thing) <> parens (ppr (ieta_ns_spec x) <+> text "..")
                       , exportDocstring <$> doc
                       ]
     ppr ie@(IEThingWith _ thing wc withs doc) =

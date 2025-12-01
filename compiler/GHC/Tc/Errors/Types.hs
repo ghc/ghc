@@ -6417,7 +6417,7 @@ data DodgyImportsReason =
     Test cases:
       DodgyImports
   -}
-  DodgyImportsEmptyParent !GlobalRdrElt
+  DodgyImportsEmptyParent !(IE GhcPs) !NamespaceSpecifier !GlobalRdrElt
   |
   {-| A 'hiding' clause contains something that would be reported as an error in a
     regular import, but is relaxed to a warning.
@@ -6455,7 +6455,7 @@ data DodgyExportsReason =
 
       Test cases: warnings/should_compile/DodgyExports01
   -}
-  DodgyExportsEmptyParent !GlobalRdrElt
+  DodgyExportsEmptyParent !(IE GhcPs) !NamespaceSpecifier !GlobalRdrElt
   |
   {-| An export list contains a module that has no exports.
 

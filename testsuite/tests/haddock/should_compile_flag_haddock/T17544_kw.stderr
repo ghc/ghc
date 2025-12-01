@@ -63,15 +63,15 @@
        (EpaComments
         []))
       (IEThingAll
-       ((,)
+       (IEThingAllExt
         (Nothing)
-        ((,,)
-         (EpTok
-          (EpaSpan { T17544_kw.hs:9:6 }))
-         (EpTok
-          (EpaSpan { T17544_kw.hs:9:7-8 }))
-         (EpTok
-          (EpaSpan { T17544_kw.hs:9:9 }))))
+        (NoNamespaceSpecifier)
+        (EpTok
+         (EpaSpan { T17544_kw.hs:9:6 }))
+        (EpTok
+         (EpaSpan { T17544_kw.hs:9:7-8 }))
+        (EpTok
+         (EpaSpan { T17544_kw.hs:9:9 })))
        (L
         (EpAnn
          (EpaSpan { T17544_kw.hs:9:3-5 })
@@ -101,15 +101,15 @@
        (EpaComments
         []))
       (IEThingAll
-       ((,)
+       (IEThingAllExt
         (Nothing)
-        ((,,)
-         (EpTok
-          (EpaSpan { T17544_kw.hs:10:6 }))
-         (EpTok
-          (EpaSpan { T17544_kw.hs:10:7-8 }))
-         (EpTok
-          (EpaSpan { T17544_kw.hs:10:9 }))))
+        (NoNamespaceSpecifier)
+        (EpTok
+         (EpaSpan { T17544_kw.hs:10:6 }))
+        (EpTok
+         (EpaSpan { T17544_kw.hs:10:7-8 }))
+        (EpTok
+         (EpaSpan { T17544_kw.hs:10:9 })))
        (L
         (EpAnn
          (EpaSpan { T17544_kw.hs:10:3-5 })
@@ -137,15 +137,15 @@
        (EpaComments
         []))
       (IEThingAll
-       ((,)
+       (IEThingAllExt
         (Nothing)
-        ((,,)
-         (EpTok
-          (EpaSpan { T17544_kw.hs:11:6 }))
-         (EpTok
-          (EpaSpan { T17544_kw.hs:11:7-8 }))
-         (EpTok
-          (EpaSpan { T17544_kw.hs:11:9 }))))
+        (NoNamespaceSpecifier)
+        (EpTok
+         (EpaSpan { T17544_kw.hs:11:6 }))
+        (EpTok
+         (EpaSpan { T17544_kw.hs:11:7-8 }))
+        (EpTok
+         (EpaSpan { T17544_kw.hs:11:9 })))
        (L
         (EpAnn
          (EpaSpan { T17544_kw.hs:11:3-5 })

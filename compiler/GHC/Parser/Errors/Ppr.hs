@@ -274,6 +274,17 @@ instance Diagnostic PsMessage where
            kw_doc = case kw of
              ExplicitTypeNamespace{} -> text "type"
              ExplicitDataNamespace{} -> text "data"
+    PsErrUnsupportedExplicitNamespace kw pos
+      -> mkDecorated
+           [ text "Unsupported use of keyword" <+> quotes kw_doc
+           , case pos of
+                UnsupportedNameSpaceInIEThingWith ->
+                     text "A namespace-specified wildcard may not appear alongside other items"
+                  $$ text "in a list of children." ]
+         where
+           kw_doc = case kw of
+             ExplicitTypeNamespace{} -> text "type"
+             ExplicitDataNamespace{} -> text "data"
     PsErrPlainWildcardImport
       -> mkSimpleDecorated $
            text "Illegal plain wildcard (..) in a module import"
@@ -623,6 +634,7 @@ instance Diagnostic PsMessage where
     PsErrDeclSpliceNotAtTopLevel{}                -> ErrorWithoutFlag
     PsErrMultipleNamesInStandaloneKindSignature{} -> ErrorWithoutFlag
     PsErrIllegalExplicitNamespace{}               -> ErrorWithoutFlag
+    PsErrUnsupportedExplicitNamespace{}           -> ErrorWithoutFlag
     PsErrPlainWildcardImport{}                    -> ErrorWithoutFlag
     PsErrPlainWildcardExport{}                    -> ErrorWithoutFlag
     PsErrUnallowedPragma{}                        -> ErrorWithoutFlag
@@ -765,6 +777,7 @@ instance Diagnostic PsMessage where
     PsErrDeclSpliceNotAtTopLevel{}                -> noHints
     PsErrMultipleNamesInStandaloneKindSignature{} -> noHints
     PsErrIllegalExplicitNamespace{}               -> [suggestExtension LangExt.ExplicitNamespaces]
+    PsErrUnsupportedExplicitNamespace{}           -> noHints
     PsErrPlainWildcardImport{}                    -> [SuggestRemoveImportList]
     PsErrPlainWildcardExport{}                    -> [SuggestNamedModuleSelfExport]
     PsErrUnallowedPragma{}                        -> noHints

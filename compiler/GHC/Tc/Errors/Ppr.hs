@@ -190,8 +190,8 @@ instance Diagnostic TcRnMessage where
            ) : map pprErrCtxtMsg err_ctxt
     TcRnUnusedPatternBinds bind
       -> mkDecorated [hang (text "This pattern-binding binds no variables:") 2 (ppr bind)]
-    TcRnDodgyImports (DodgyImportsEmptyParent gre)
-      -> mkDecorated [dodgy_msg (text "import") gre (dodgy_msg_insert gre)]
+    TcRnDodgyImports (DodgyImportsEmptyParent ie ns_spec gre)
+      -> mkDecorated [dodgy_msg (text "import") gre ie ns_spec]
     TcRnDodgyImports (DodgyImportsHiding reason)
       -> mkSimpleDecorated $
          pprImportLookup reason
@@ -204,8 +204,8 @@ instance Diagnostic TcRnMessage where
       where
         ppr_wc = ppr ns_spec <+> text ".."
 
-    TcRnDodgyExports (DodgyExportsEmptyParent gre)
-      -> mkDecorated [dodgy_msg (text "export") gre (dodgy_msg_insert gre)]
+    TcRnDodgyExports (DodgyExportsEmptyParent ie ns_spec gre)
+      -> mkDecorated [dodgy_msg (text "export") gre ie ns_spec]
     TcRnDodgyExports (DodgyExportsNullModule mod)
       -> mkSimpleDecorated
        $ formatExportItemError
@@ -3685,27 +3685,32 @@ messageWithHsDocContext opts ctxt main_msg = do
 
 --------------------------------------------------------------------------------
 
-dodgy_msg :: Outputable ie => SDoc -> GlobalRdrElt -> ie -> SDoc
-dodgy_msg kind tc ie
+dodgy_msg :: Outputable ie => SDoc -> GlobalRdrElt -> ie -> NamespaceSpecifier -> SDoc
+dodgy_msg kind tc ie ns_spec
   = vcat [ text "The" <+> kind <+> text "item" <+> quotes (ppr ie) <+> text "suggests that"
-         , quotes (ppr $ greName tc) <+> text "has" <+> sep rest ]
+         , quotes (ppr $ greName tc) <+> text "has" <+> fst rest, snd rest ]
   where
-    rest :: [SDoc]
+    rest :: (SDoc, SDoc)
     rest =
       case greInfo tc of
         IAmTyCon ClassFlavour
-          -> [ text "(in-scope) class methods or associated types" <> comma
-             , text "but it has none" ]
+          -> let items = case ns_spec of
+                   NoNamespaceSpecifier     -> text "class methods or associated types"
+                   DataNamespaceSpecifier{} -> text "class methods"
+                   TypeNamespaceSpecifier{} -> text "associated types"
+             in ( text "(in-scope)" <+> items <> comma
+                , text "but it has none" )
         IAmTyCon _
-          -> [ text "(in-scope) constructors or record fields" <> comma
-             , text "but it has none" ]
-        _ -> [ text "children" <> comma
-             , text "but it is not a type constructor or a class" ]
-
-dodgy_msg_insert :: GlobalRdrElt -> IE GhcRn
-dodgy_msg_insert tc_gre = IEThingAll (Nothing, noAnn) ii Nothing
-  where
-    ii = noLocA (IEName noExtField $ noLocA $ greName tc_gre)
+          -> let data_msg = ( text "(in-scope) constructors or record fields" <> comma
+                            , text "but it has none" )
+                 type_msg = ( text "associated types" <> comma
+                            , text "but it is not a class" )
+             in case ns_spec of
+                  NoNamespaceSpecifier     -> data_msg
+                  DataNamespaceSpecifier{} -> data_msg
+                  TypeNamespaceSpecifier{} -> type_msg
+        _ -> ( text "children" <> comma
+             , text "but it is not a type constructor or a class" )
 
 pprNamespaceItems :: NamespaceSpecifier -> [SDoc]
 pprNamespaceItems ns_spec = case ns_spec of
