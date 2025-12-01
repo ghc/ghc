@@ -493,7 +493,7 @@ getRegister' _ _ (CmmMachOp (MO_SS_Conv src tgt) [CmmLoad mem pk _])
   , src < tgt = do
       let format = cmmTypeFormat pk
       -- lwa is DS-form. See Note [Power instruction format]
-      let form = if format == II32 then DS else D
+      let form = if format >= II32 then DS else D
       Amode addr addr_code <- getAmode form mem
       let code dst = assert (format == intFormat src)
                      $ addr_code `snocOL` LA format dst addr
