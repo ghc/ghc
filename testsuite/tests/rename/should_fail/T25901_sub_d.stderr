@@ -1,0 +1,3 @@
+T25901_sub_d.hs:14:16: error: [GHC-76037]
+    Not in scope: type constructor or class ‘#’
+

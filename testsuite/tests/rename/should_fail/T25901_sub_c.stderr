@@ -1,0 +1,7 @@
+T25901_sub_c.hs:12:5: error: [GHC-01928]
+    • Illegal term-level use of the type constructor ‘#’
+    • imported from ‘T25901_sub_c_helper’ at T25901_sub_c.hs:4:1-26
+      (and originally defined at T25901_sub_c_helper.hs:7:3-12)
+    • In the expression: (#)
+      In an equation for ‘f’: f = (#)
+

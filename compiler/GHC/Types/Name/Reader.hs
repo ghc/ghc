@@ -61,6 +61,7 @@ module GHC.Types.Name.Reader (
 
         -- ** Looking up 'GlobalRdrElt's
         FieldsOrSelectors(..), filterFieldGREs, allowGRE,
+        filterByNamespaceGREs,
 
         LookupGRE(..), lookupGRE,
         WhichGREs(.., AllRelevantGREs, RelevantGREsFOS),
@@ -135,6 +136,8 @@ import GHC.Types.Unique.Set
 import GHC.Builtin.Uniques ( isFldNSUnique )
 import GHC.Types.ThLevelIndex
 import qualified Data.Set as Set
+
+import GHC.Hs.Basic
 
 import GHC.Unit.Module
 
@@ -1109,6 +1112,10 @@ data FieldsOrSelectors
 filterFieldGREs :: FieldsOrSelectors -> [GlobalRdrElt] -> [GlobalRdrElt]
 filterFieldGREs WantBoth = id
 filterFieldGREs fos = filter (allowGRE fos)
+
+filterByNamespaceGREs :: NamespaceSpecifier -> [GlobalRdrElt] -> [GlobalRdrElt]
+filterByNamespaceGREs NoNamespaceSpecifier = id
+filterByNamespaceGREs ns_spec = filter (coveredByNamespaceSpecifier ns_spec . greNameSpace)
 
 allowGRE :: FieldsOrSelectors -> GlobalRdrElt -> Bool
 allowGRE WantBoth   _

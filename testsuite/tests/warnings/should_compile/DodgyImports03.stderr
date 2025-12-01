@@ -1,0 +1,30 @@
+DodgyImports03.hs:5:31: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘C(..)’ suggests that
+    ‘DodgyImports03_helper.C’ has (in-scope) class methods or associated types,
+    but it has none
+
+DodgyImports03.hs:6:31: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘C(data ..)’ suggests that
+    ‘DodgyImports03_helper.C’ has (in-scope) class methods,
+    but it has none
+
+DodgyImports03.hs:7:31: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘C(type ..)’ suggests that
+    ‘DodgyImports03_helper.C’ has (in-scope) associated types,
+    but it has none
+
+DodgyImports03.hs:9:31: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘T(..)’ suggests that
+    ‘DodgyImports03_helper.T’ has (in-scope) constructors or record fields,
+    but it has none
+
+DodgyImports03.hs:10:31: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘T(data ..)’ suggests that
+    ‘DodgyImports03_helper.T’ has (in-scope) constructors or record fields,
+    but it has none
+
+DodgyImports03.hs:11:31: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘T(type ..)’ suggests that
+    ‘DodgyImports03_helper.T’ has associated types,
+    but it is not a class
+

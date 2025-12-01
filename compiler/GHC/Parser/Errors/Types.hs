@@ -215,6 +215,9 @@ data PsMessage
    -- | Explicit namespace keyword without 'ExplicitNamespaces'
    | PsErrIllegalExplicitNamespace !ExplicitNamespaceKeyword
 
+   -- | Explicit namespace keyword in unsupported position
+   | PsErrUnsupportedExplicitNamespace !ExplicitNamespaceKeyword
+
    -- | Plain top-level wildcard in an import list, e.g. @import Data.Proxy (..)@
    | PsErrPlainWildcardImport
 

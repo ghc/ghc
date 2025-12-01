@@ -1,0 +1,10 @@
+T25901_sub_f.hs:6:7: warning: [GHC-75356] [-Wdodgy-exports (in -Wextra)]
+    The export item ‘D(type ..)’ suggests that
+    ‘D’ has associated types,
+    but it is not a class
+
+T25901_sub_f.hs:8:7: warning: [GHC-75356] [-Wdodgy-exports (in -Wextra)]
+    The export item ‘type T(type ..)’ suggests that
+    ‘T’ has associated types,
+    but it is not a class
+

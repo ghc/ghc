@@ -1,0 +1,5 @@
+T25901_sub_g.hs:6:45: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘T(type ..)’ suggests that
+    ‘T25901_sub_g_helper.T’ has associated types,
+    but it is not a class
+

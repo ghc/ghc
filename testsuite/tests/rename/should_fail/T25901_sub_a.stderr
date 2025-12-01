@@ -1,0 +1,9 @@
+T25901_sub_a.hs:8:5: error: [GHC-01928]
+    • Data constructor out of scope: ‘Proxy’.
+      NB: the type constructor ‘Proxy’ cannot appear in this position.
+    • In the expression: Proxy
+      In an equation for ‘p’: p = Proxy
+    Suggested fix:
+      Add ‘Proxy’ to the import list in the import of ‘Data.Proxy’
+      (at T25901_sub_a.hs:5:1-35).
+
