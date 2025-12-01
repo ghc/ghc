@@ -3543,7 +3543,7 @@ addBndrSwap scrut case_bndr
   , scrut_var /= case_bndr
       -- Consider: case x of x { ... }
       -- Do not add [x :-> x] to occ_bs_env, else lookupBndrSwap will loop
-  = env { occ_bs_env = extendVarEnv swap_env scrut_var (case_bndr', mco)
+  = env { occ_bs_env = extendVarEnv swap_env scrut_var (case_bndr', mkSymMCo mco)
         , occ_bs_rng = rng_vars `extendVarSet` case_bndr'
                        `unionVarSet` tyCoVarsOfMCo mco }
 

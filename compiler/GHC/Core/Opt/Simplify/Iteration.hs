@@ -3593,11 +3593,13 @@ addAltUnfoldings env case_bndr bndr_swap con_app
     env1 = addBinderUnfolding env case_bndr con_app_unf
 
     -- See Note [Add unfolding for scrutinee]
+    -- e.g. case (x |> co) of K a b -> blah
+    --      We add to `x` the unfolding  (K a b |> sym co)
     env2 | DoBinderSwap v mco <- bndr_swap
          = addBinderUnfolding env1 v $
               if isReflMCo mco  -- isReflMCo: avoid calling mk_simple_unf
               then con_app_unf  --            twice in the common case
-              else mk_simple_unf (mkCastMCo con_app mco)
+              else mk_simple_unf (mkCastMCo con_app (mkSymMCo mco))
 
          | otherwise = env1
 
