@@ -271,22 +271,22 @@ They capture the essence of statement expansions as implemented in `expand_do_st
 
   DO【 _ 】 maps a sequence of do statements and recursively converts them into expressions
 
-          (1) DO【 s; ss 】      = ‹ExpansionStmt s›((>>) (‹PopErrCtxt› s) (‹PopErrCtxt› DO【 ss 】))
+          (1) DO【 s; ss 】      = ‹ExpansionStmt s›((>>) s (DO【 ss 】))
 
           (2) DO【 p <- e; ss 】 = if p is irrefutable
                                    then ‹ExpansionStmt (p <- e)›
-                                          (>>=) (‹PopExprCtxt› s) ((\ p -> ‹PopExprCtxt› DO【 ss 】))
+                                          (>>=) s ((\ p -> DO【 ss 】))
                                    else ‹ExpansionStmt (p <- e)›
-                                          (>>=) (‹PopExprCtxt› s)
-                                                (\case p -> ‹PopExprCtxt› DO【 ss 】
-                                                       _ -> fail "pattern p failure")
+                                          (>>=) s
+                                                (\case p -> DO【 ss 】
+                                                       _ -> ‹ExpansionPat (p <- e) p› fail "pattern p failure")
 
           (3) DO【 let x = e; ss 】
-                                 = ‹ExpansionStmt (let x = e)› (let x = e in (‹PopErrCtxt›DO【 ss 】))
+                                 = ‹ExpansionStmt (let x = e)› (let x = e in (DO【 ss 】))
 
 
           (4) DO【 rec ss; sss 】
-                                 = (>>=) e (\vars -> ‹PopErrCtxt›DO【 sss 】))
+                                 = (>>=) e (\vars -> DO【 sss 】))
                                            where (vars, e) = RECDO【 ss 】
 
           (5) DO【 s 】          = s
@@ -424,10 +424,10 @@ It stores the original statement (with location) and the expanded expression
       ‹ExpandedThingRn do { e1; e2; e3 }›                        -- Original Do Expression
                                                                  -- Expanded Do Expression
           (‹ExpandedThingRn e1›                                  -- Original Statement
-               ({(>>) ‹PopErrCtxt› e1}                           -- Expanded Expression
-                      ‹PopErrCtxt› (‹ExpandedThingRn e2›
-                         ({(>>) ‹PopErrCtxt› e2}
-                                ‹PopErrCtxt› (‹ExpandedThingRn e3› {e3})))))
+               ({(>>) ‹ExpandedThingRn e1› e1}                           -- Expanded Expression
+                      (‹ExpandedThingRn e2›
+                         ({(>>) ‹ExpandedThingRn e2› e2}
+                                (‹ExpandedThingRn e3› {e3})))))
 
   * Whenever the typechecker steps through an `ExpandedThingRn`,
     we push the original statement in the error context, set the error location to the
@@ -437,7 +437,7 @@ It stores the original statement (with location) and the expanded expression
 
   * Recall, that when a source function argument fails to typecheck,
     we print an error message like "In the second argument of the function f..".
-    However, `(>>)` is generated thus, we don't want to display that to the user; it would be confusing.
+    However, `(>>)` is compiler expanded thus, we don't want to display that to the user; it would be confusing.
     But also, we do not want to completely ignore it as we do want to keep the error blame carets
     as precise as possible, and not just blame the complete `do`-block.
     Thus, when we typecheck the application `(>>) e1`, we push the "In the stmt of do block e1" with
@@ -448,14 +448,14 @@ It stores the original statement (with location) and the expanded expression
     and before moving to the next statement of the `do`-block, we need to first pop the top
     of the error context stack which contains the error message for
     the previous statement: eg. "In the stmt of a do block: e1".
-    This is explicitly encoded in the expansion expression using
-    the `XXExprGhcRn.PopErrCtxt`. Whenever `GHC.Tc.Gen.Expr.tcExpr` (via `GHC.Tc.Gen.tcXExpr`)
-    sees a `PopErrCtxt` it calls `GHC.Tc.Utils.Monad.popErrCtxt` to pop of the top of error context stack.
-    See ‹PopErrCtxt› in the example above.
-    Without this popping business for error context stack,
-    if there is a type error in `e2`, we would get a spurious and confusing error message
+    This popping is implicitly done when we push the error context message for the next statment.
+    See Note [ErrCtxtStack Manipulation] and `LclEnv.setLclCtxtSrcCodeOrigin`
+
+    Sans the popping business for error context stack,
+    if there were to be a type error in `e2`, we would get a spurious and confusing error message
     which mentions "In the stmt of a do block e1" along with the message
     "In the stmt of a do block e2".
+
 
   B. Expanding Bind Statements
   -----------------------------
@@ -469,7 +469,7 @@ It stores the original statement (with location) and the expanded expression
                                                                               --
          (‹ExpandedThingRn (p <- e1)›                                         -- Original Statement
                         (((>>=) e1)                                           -- Expanded Expression
-                           ‹PopErrCtxt› ((\ p -> ‹ExpandedThingRn (e2)› e2)))
+                           ((\ p -> ‹ExpandedThingRn (e2)› e2)))
          )
 
 
