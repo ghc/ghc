@@ -2437,8 +2437,8 @@ srCode width sgn instr x y = do
   let op_len = max W32 width
       extend = if sgn then extendSExpr else extendUExpr
   (src1, code1) <- getSomeReg (extend width op_len x)
-  (src2, code2) <- getSomeReg (extendUExpr width op_len y)
-  -- Note: Shift amount `y` is unsigned
+  (src2, code2) <- getSomeReg y
+
   let code dst = code1 `appOL` code2 `snocOL`
                  instr (intFormat op_len) dst src1 (RIReg src2)
   return (Any (intFormat width) code)
