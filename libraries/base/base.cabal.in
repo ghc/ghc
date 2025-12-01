@@ -1,7 +1,7 @@
 cabal-version:  3.0
 
--- WARNING: ghc-experimental.cabal is automatically generated from ghc-experimental.cabal.in
--- Make sure you are editing ghc-experimental.cabal.in, not ghc-experimental.cabal
+-- WARNING: base.cabal is automatically generated from base.cabal.in
+-- Make sure you are editing base.cabal.in, not base.cabal
 
 name:           base
 version:        4.22.0.0
