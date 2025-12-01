@@ -80,8 +80,7 @@ test('T3001-2',
 # For profasm/profthreaded, the answer is correct but the ordering of some
 # lines in the output happen to be different, so we just skip them.
 test('scc001',
-     [grep_prof("scc001.hs"), omit_ways(['profasm', 'profthreaded'])
-     , expect_broken_for(25959, ['prof', 'profdyn'])],
+     [grep_prof("scc001.hs"), omit_ways(['profasm', 'profthreaded'])],
      compile_and_run,
      ['-fno-state-hack -fno-full-laziness']) # Note [consistent stacks]
 
@@ -132,7 +131,7 @@ test('prof-doc-last', [grep_prof("prof-doc-last.hs"), test_opts_dot_prof], compi
 # unicode in cost centre names
 test('T5559', [test_opts_dot_prof, fragile(16350), grep_prof("T5559.hs")], compile_and_run, [''])
 
-test('T7275', [test_opts_dot_prof, expect_broken_for(25959,['prof', 'profdyn'])], makefile_test, [])
+test('T7275', test_opts_dot_prof, makefile_test, [])
 
 # Note [consistent stacks]
 # ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -146,14 +145,12 @@ test('T7275', [test_opts_dot_prof, expect_broken_for(25959,['prof', 'profdyn'])]
 test('callstack001',
      # unoptimised results are different w.r.t. CAF attribution
      [test_opts_dot_prof # produces a different stack
-     , expect_broken_for(25959,['prof', 'profdyn'])
-     , normalise_fun(lambda s: re.sub(r"(?<!('|‘))\\", '/', s).replace("//","/"))
+     ,normalise_fun(lambda s: re.sub(r"(?<!('|‘))\\", '/', s).replace("//","/"))
      ], compile_and_run,
      ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
 
 test('callstack002',
      [ test_opts_dot_prof # produces a different stack
-     , expect_broken_for(25959,['prof', 'profdyn'])
      , normalise_fun(lambda s: re.sub(r"(?<!('|‘))\\", '/', s))
      ],
      compile_and_run,
@@ -185,12 +182,9 @@ test('T11978a',
      compile_and_run, [''])
 
 test('toplevel_scc_1',
-     [grep_prof("toplevel_scc_1.hs"), extra_ways(['prof_no_auto'])
-     , only_ways(['prof_no_auto'])
-     , expect_broken_for(25959, 'prof_no_auto')
-     ]
-     , compile_and_run
-     , [''])
+     [grep_prof("toplevel_scc_1.hs"), extra_ways(['prof_no_auto']), only_ways(['prof_no_auto'])],
+     compile_and_run,
+     [''])
 
 test('T12962', [test_opts_dot_prof, grep_prof("T12962.hs")], compile_and_run, [''])
 
