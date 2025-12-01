@@ -597,7 +597,7 @@ data BinderSwapDecision
 
 scrutOkForBinderSwap :: OutExpr -> BinderSwapDecision
 -- If (scrutOkForBinderSwap e = DoBinderSwap v mco, then
---    v = e |> mco
+--    e = v |> mco
 -- See Note [Case of cast]
 -- See Historical Note [Care with binder-swap on dictionaries]
 --
@@ -609,7 +609,7 @@ scrutOkForBinderSwap e
   = case e of
       Tick _ e        -> scrutOkForBinderSwap e  -- Drop ticks
       Var v           -> DoBinderSwap v MRefl
-      Cast (Var v) co -> DoBinderSwap v (MCo (mkSymCo co))
+      Cast (Var v) co -> DoBinderSwap v (MCo co)
                          -- Cast: see Note [Case of cast]
       _               -> NoBinderSwap
 
