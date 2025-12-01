@@ -474,7 +474,7 @@ getRegister' _ _ (CmmMachOp (MO_UU_Conv src tgt) [CmmLoad mem pk _])
   , cmmTypeFormat pk == intFormat src = loadZeroExpand mem pk tgt
 
 getRegister' _ _ (CmmMachOp (MO_XX_Conv src tgt) [CmmLoad mem pk _])
-  | src < tgt =
+  | src < tgt
   , cmmTypeFormat pk == intFormat src = loadZeroExpand mem pk tgt
 
   -- XXX: This is ugly, refactor
