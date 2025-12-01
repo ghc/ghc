@@ -215,6 +215,9 @@ data PsMessage
    -- | Explicit namespace keyword without 'ExplicitNamespaces'
    | PsErrIllegalExplicitNamespace !ExplicitNamespaceKeyword
 
+   -- | Explicit namespace keyword in unsupported position
+   | PsErrUnsupportedExplicitNamespace !ExplicitNamespaceKeyword !UnsupportedNamespacePosition
+
    -- | Plain top-level wildcard in an import list, e.g. @import Data.Proxy (..)@
    | PsErrPlainWildcardImport
 
@@ -521,6 +524,11 @@ data PsMessage
       !Bool -- ^ Is ExplicitNamespaces on?
 
    deriving Generic
+
+-- | A position in an import/export list in which we do not support an explicit namespace keyword.
+data UnsupportedNamespacePosition
+  -- | We do not support @import T(x, type ..)@
+  = UnsupportedNameSpaceInIEThingWith
 
 -- | Extra details about a parse error, which helps
 -- us in determining which should be the hints to

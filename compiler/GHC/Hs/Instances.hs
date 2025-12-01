@@ -579,6 +579,16 @@ deriving instance Data (ImportDecl GhcPs)
 deriving instance Data (ImportDecl GhcRn)
 deriving instance Data (ImportDecl GhcTc)
 
+-- deriving instance Data (IEThingAllExt p)
+deriving instance Data (IEThingAllExt GhcPs)
+deriving instance Data (IEThingAllExt GhcRn)
+deriving instance Data (IEThingAllExt GhcTc)
+
+-- deriving instance Eq (IEThingAllExt p)
+deriving instance Eq (IEThingAllExt GhcPs)
+deriving instance Eq (IEThingAllExt GhcRn)
+deriving instance Eq (IEThingAllExt GhcTc)
+
 -- deriving instance Data (IEWholeNamespaceExt p)
 deriving instance Data (IEWholeNamespaceExt GhcPs)
 deriving instance Data (IEWholeNamespaceExt GhcRn)

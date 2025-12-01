@@ -1316,19 +1316,25 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                      , let name = greName gre ]
                    , export_depr_warns )
 
-        IEThingAll _ (L l tc) _ -> do
+        IEThingAll x (L l tc) _ -> do
             ImpOccItem { imp_item      = gre
                        , imp_bundled   = bundled_gres
                        , imp_is_parent = is_par
                        }
               <- lookup_parent ie $ ieWrappedName tc
             let name = greName gre
-                child_gres = if is_par then bundled_gres else []
+                ns_spec = ieta_ns_spec x
+
+                child_gres :: [GlobalRdrElt]
+                child_gres
+                  | is_par    = filterByNamespaceGREs ns_spec bundled_gres
+                  | otherwise = []
+
                 imp_list_warn
 
                   | null child_gres
                   -- e.g. f(..) or T(..) where T is a type synonym
-                  = [DodgyImport (DodgyImportsEmptyParent gre)]
+                  = [DodgyImport (DodgyImportsEmptyParent ie ns_spec gre)]
 
                   -- e.g. import M( T(..) )
                   | not (is_qual decl_spec)
@@ -1337,7 +1343,9 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                   | otherwise
                   = []
 
-                renamed_ie = IEThingAll (Nothing, noAnn) (L l (replaceWrappedName tc name)) noDocstring
+                renamed_ie = IEThingAll (x { ieta_warning = Nothing })
+                                        (L l (replaceWrappedName tc name))
+                                        noDocstring
                 export_depr_warn
                   | want_hiding == Exactly
                       = maybeToList $ mk_depr_export_warning gre
@@ -2303,7 +2311,9 @@ getMinimalImports ie_decls
            ] of
         [xs]
           | all_used xs
-          -> return [IEThingAll (Nothing, noAnn) (to_ie_post_rn $ noLocA n) Nothing]
+          -> return [IEThingAll (IEThingAllExt Nothing NoNamespaceSpecifier noAnn noAnn noAnn)
+                                (to_ie_post_rn $ noLocA n)
+                                Nothing]
           | otherwise
           -> do { let ns_gres = map (expectJust . lookupGRE_Name rdr_env) cs
                       ns = map greName ns_gres

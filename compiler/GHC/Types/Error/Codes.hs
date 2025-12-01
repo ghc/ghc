@@ -292,6 +292,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrDeclSpliceNotAtTopLevel"                  = 08451
   GhcDiagnosticCode "PsErrMultipleNamesInStandaloneKindSignature"   = 42569
   GhcDiagnosticCode "PsErrIllegalExplicitNamespace"                 = 47007
+  GhcDiagnosticCode "PsErrUnsupportedExplicitNamespace"             = 04611
   GhcDiagnosticCode "PsErrPlainWildcardImport"                      = 96821
   GhcDiagnosticCode "PsErrPlainWildcardExport"                      = 96822
   GhcDiagnosticCode "PsErrUnallowedPragma"                          = 85314

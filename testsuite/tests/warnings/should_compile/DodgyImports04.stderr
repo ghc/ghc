@@ -1,0 +1,15 @@
+DodgyImports04.hs:5:29: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘type Applicative(type ..)’ suggests that
+    ‘GHC.Internal.Base.Applicative’ has (in-scope) associated types,
+    but it has none
+
+DodgyImports04.hs:6:21: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘type Either(type ..)’ suggests that
+    ‘GHC.Internal.Data.Either.Either’ has associated types,
+    but it is not a class
+
+DodgyImports04.hs:9:20: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘type Proxy(type ..)’ suggests that
+    ‘GHC.Internal.Data.Proxy.Proxy’ has associated types,
+    but it is not a class
+

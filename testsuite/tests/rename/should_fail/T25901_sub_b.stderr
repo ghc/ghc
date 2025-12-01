@@ -1,0 +1,6 @@
+T25901_sub_b.hs:9:15: error: [GHC-76037]
+    Not in scope: type constructor or class ‘Rep’
+    Suggested fix:
+      Add ‘Rep’ to the import list in the import of ‘GHC.Generics’
+      (at T25901_sub_b.hs:5:1-39).
+
