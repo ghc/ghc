@@ -30,8 +30,7 @@ Library
     default-language: Haskell2010
     default-extensions: NoImplicitPrelude
     build-depends:
-        ghc-internal == @ProjectVersionForLib@.*,
-        ghc-prim,
+        ghc-internal == @ProjectVersionForLib@.*
 
     exposed-modules:
           Control.Applicative

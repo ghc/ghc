@@ -22,12 +22,12 @@ module GHC.Exts
      Ptr(..),
      FunPtr(..),
      -- **  Other primitive types
-     module GHC.Types,
+     module GHC.Internal.Types,
      -- **  Legacy interface for arrays of arrays
      module GHC.Internal.ArrayArray,
      -- *  Primitive operations
-     module GHC.Prim,
-     module GHC.Prim.Ext,
+     module GHC.Internal.Prim,
+     module GHC.Internal.Prim.Ext,
      -- **  Running 'RealWorld' state thread
      runRW#,
      -- **  Bit shift operations
@@ -114,7 +114,7 @@ module GHC.Exts
 
 import GHC.Internal.Exts
 import GHC.Internal.ArrayArray
-import GHC.Prim hiding
+import GHC.Internal.Prim hiding
   ( coerce
   -- Hide dataToTag# ops because they are expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
@@ -338,9 +338,9 @@ import GHC.Prim hiding
   , xorWord8X64#
   )
 
-import GHC.Prim.Ext
+import GHC.Internal.Prim.Ext
 
-import GHC.Types hiding (
+import GHC.Internal.Types hiding (
   IO,   -- Exported from "GHC.IO"
   Type, -- Exported from "Data.Kind"
   -- GHC's internal representation of 'TyCon's, for 'Typeable'

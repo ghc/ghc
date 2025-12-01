@@ -80,7 +80,7 @@ import GHC.Internal.Data.Ord (Down(Down))
 import Data.Complex (Complex((:+)))
 
 import GHC.Generics (Generic1(..), Generically1(..), V1, U1(..), Par1(..), Rec1(..), K1(..), M1(..) , (:+:)(..), (:*:)(..), (:.:)(..), URec(..), UAddr, UChar, UDouble, UFloat, UInt, UWord)
-import GHC.Tuple (Solo (..))
+import GHC.Internal.Tuple (Solo (..))
 import GHC.Internal.Read (expectP, list, paren, readField)
 import GHC.Internal.Show (appPrec)
 

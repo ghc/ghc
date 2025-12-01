@@ -21,10 +21,10 @@
 -- compromising the stability of this interface.
 
 module GHC.Base
-    ( module GHC.Types
-    , module GHC.Prim
-    , module GHC.Prim.Ext
-    , module GHC.Prim.PtrEq
+    ( module GHC.Internal.Types
+    , module GHC.Internal.Prim
+    , module GHC.Internal.Prim.Ext
+    , module GHC.Internal.Prim.PtrEq
     , module GHC.Internal.Err
     , module GHC.Internal.Maybe
 
@@ -140,7 +140,7 @@ module GHC.Base
 
 import GHC.Internal.Base hiding ( NonEmpty(..) )
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
-import GHC.Prim hiding
+import GHC.Internal.Prim hiding
   (
   -- Hide dataToTag# ops because they are expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
@@ -363,12 +363,12 @@ import GHC.Prim hiding
   , xorWord8X64#
   )
 
-import GHC.Prim.Ext
-import GHC.Prim.PtrEq
+import GHC.Internal.Prim.Ext
+import GHC.Internal.Prim.PtrEq
 import GHC.Internal.Err
 import GHC.Internal.IO (seq#)
 import GHC.Internal.Maybe
-import GHC.Types hiding (
+import GHC.Internal.Types hiding (
   Unit#,
   Solo#(..),
   Tuple0#,

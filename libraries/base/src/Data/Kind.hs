@@ -19,5 +19,5 @@ module Data.Kind
      FUN
      ) where
 
-import GHC.Prim (FUN)
-import GHC.Types (Type, Constraint)
+import GHC.Internal.Prim (FUN)
+import GHC.Internal.Types (Type, Constraint)

@@ -3,7 +3,7 @@
 module Main (main) where
 
 import Data.Typeable
-import GHC.Types
+import GHC.Internal.Types
 
 main :: IO ()
 main = do
