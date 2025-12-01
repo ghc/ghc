@@ -469,22 +469,13 @@ getRegister' _ platform (CmmLoad mem pk _)
         return (Any II64 code)
 
 -- catch simple cases of zero- or sign-extended load
--- XXX: refactor into separate function
 getRegister' _ _ (CmmMachOp (MO_UU_Conv src tgt) [CmmLoad mem pk _])
-  | src < tgt = do
-      let format = cmmTypeFormat pk
-      Amode addr addr_code <- getAmode D mem
-      let code dst = assert (format == intFormat src)
-                     $ addr_code `snocOL` LD format dst addr
-      return (Any (intFormat tgt) code)
+  | src < tgt
+  , cmmTypeFormat pk == intFormat src = loadZeroExpand mem pk tgt
 
 getRegister' _ _ (CmmMachOp (MO_XX_Conv src tgt) [CmmLoad mem pk _])
-  | src < tgt = do
-      let format = cmmTypeFormat pk
-      Amode addr addr_code <- getAmode D mem
-      let code dst = assert (format == intFormat src)
-                     $ addr_code `snocOL` LD format dst addr
-      return (Any (intFormat tgt) code)
+  | src < tgt =
+  , cmmTypeFormat pk == intFormat src = loadZeroExpand mem pk tgt
 
   -- XXX: This is ugly, refactor
 getRegister' _ _ (CmmMachOp (MO_SS_Conv src tgt) [CmmLoad mem pk _])
@@ -777,6 +768,12 @@ extendSExpr from to x = CmmMachOp (MO_SS_Conv from to) [x]
 
 extendUExpr :: Width -> Width -> CmmExpr -> CmmExpr
 extendUExpr from to x = CmmMachOp (MO_UU_Conv from to) [x]
+
+loadZeroExpand :: CmmExpr -> CmmType -> Format -> NatM Register
+loadZeroExpand mem pk tgt = do
+    Amode addr addr_code <- getAmode D mem
+    let code dst = addr_code `snocOL` LD (cmmTypeFormat pk) dst addr
+    return (Any (intFormat tgt) code)
 
 -- -----------------------------------------------------------------------------
 --  The 'Amode' type: Memory addressing modes passed up the tree.
