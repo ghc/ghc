@@ -25,7 +25,6 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Core.Predicate( EqRel(..) )
 import GHC.Core.TyCon
-import GHC.Core.TyCo.Rep( Type(..) )
 import GHC.Core.Unify( tcUnifyTysForInjectivity, typeListsAreApart )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Subst( elemSubst )
@@ -36,7 +35,6 @@ import GHC.Types.Var.Set
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc( lengthExceeds )
 
 import GHC.Data.Pair
 import Data.Maybe( isNothing, isJust, mapMaybe )
@@ -545,25 +543,11 @@ tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eq
 -----------------------------------------
 mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkTopClosedFamEqFDs ax work_args work_rhs
-  | isInformativeType work_rhs   -- Does RHS have anything useful to say?
   = do { let branches = fromBranches (coAxiomBranches ax)
        ; traceTcS "mkTopClosed" (ppr branches $$ ppr work_args $$ ppr work_rhs)
        ; case getRelevantBranches ax work_args work_rhs of
            [eqn] -> return [eqn]  -- If there is just one relevant equation, use it
            _     -> return [] }
-   | otherwise
-   = return []
-
-isInformativeType :: Type -> Bool
--- The type is headed by something generative, not just
--- a type variable or a type-family application
-isInformativeType ty | Just ty' <- coreView ty = isInformativeType ty'
-isInformativeType (CastTy ty _)                = isInformativeType ty
-isInformativeType (TyVarTy {})                 = False
-isInformativeType (CoercionTy {})              = False  -- Moot
-isInformativeType (TyConApp tc tys)            = isGenerativeTyCon tc Nominal ||
-                                                 tys `lengthExceeds` tyConArity tc
-isInformativeType _ = True  -- AppTy, ForAllTy, FunTy, LitTy
 
 hasRelevantGiven :: [EqCt] -> [TcType] -> EqCt -> Bool
 -- A Given is relevant if it is not apart from the Wanted
@@ -907,14 +891,17 @@ solveFunDeps work_ev fd_eqns
   = return False -- Common case no-op
 
   | otherwise
-  = do { (unifs, _res)
+  = do { loc' <- bumpReductionDepth (ctEvLoc work_ev) (ctEvPred work_ev)
+       ; let work_ev' = work_ev `setCtEvLoc` loc'
+
+       ; (unifs, _res)
              <- reportFineGrainUnifications $
                 nestFunDepsTcS              $
                 TcS.pushTcLevelM_           $
                    -- pushTcLevelTcM: increase the level so that unification variables
                    -- allocated by the fundep-creation itself don't count as useful unifications
                    -- See Note [Deeper TcLevel for partial improvement unification variables]
-                do { (_, eqs) <- wrapUnifier work_ev Nominal do_fundeps
+                do { (_, eqs) <- wrapUnifier work_ev' Nominal do_fundeps
                    ; solveSimpleWanteds eqs }
     -- Why solveSimpleWanteds?  Answer
     --     (a) We don't want to rely on the eager unifier being clever
@@ -938,7 +925,7 @@ instantiateFunDepEqns (FDEqns { fd_qtvs = tvs, fd_eqs = eqs })
   | null tvs
   = return rev_eqs
   | otherwise
-  = do { TcM.traceTc "emitFunDepWanteds 2" (ppr tvs $$ ppr eqs)
+  = do { TcM.traceTc "instantiateFunDepEqns" (ppr tvs $$ ppr eqs)
        ; (_, subst) <- instFlexiXTcM emptySubst tvs  -- Takes account of kind substitution
        ; return (map (subst_pair subst) rev_eqs) }
   where

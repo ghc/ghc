@@ -788,9 +788,8 @@ can_eq_newtype_nc rdr_env envs ev swapped ty1 ((gres, co1), ty1') ty2 ps_ty2
 
          -- Check for blowing our stack, and increase the depth
          -- See Note [Newtypes can blow the stack]
-       ; let loc = ctEvLoc ev
-             ev' = ev `setCtEvLoc` bumpCtLocDepth loc
-       ; checkReductionDepth loc ty1
+       ; loc' <- bumpReductionDepth (ctEvLoc ev) ty1
+       ; let ev' = ev `setCtEvLoc` loc'
 
          -- Next, we record uses of newtype constructors, since coercing
          -- through newtypes is tantamount to using their constructors.

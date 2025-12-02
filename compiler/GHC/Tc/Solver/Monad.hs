@@ -58,7 +58,7 @@ module GHC.Tc.Solver.Monad (
     setEvBind, setWantedEq, setWantedDict, setEqIfWanted, setDictIfWanted,
     fillCoercionHole,
     newEvVar, newGivenEv, emitNewGivens,
-    emitChildEqs, checkReductionDepth,
+    emitChildEqs, bumpReductionDepth,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getLclEnv, setSrcSpan,
@@ -1810,8 +1810,6 @@ selectNextWorkItem
              pick_me ct new_wl
                = do { writeTcRef wl_var new_wl
                     ; return (Just ct) }
-                 -- NB: no need for checkReductionDepth (ctLoc ct) (ctPred ct)
-                 -- This is done by GHC.Tc.Solver.Dict.chooseInstance
 
              -- try_rws looks through rw_eqs to find one that has an empty
              -- rewriter set, after zonking.  If none such, call try_rest.
@@ -2184,12 +2182,13 @@ newWantedNC loc rewriters pty
 
 -- | Checks if the depth of the given location is too much. Fails if
 -- it's too big, with an appropriate error message.
-checkReductionDepth :: CtLoc -> TcType   -- ^ type being reduced
-                    -> TcS ()
-checkReductionDepth loc ty
+bumpReductionDepth :: CtLoc -> TcType   -- ^ type being reduced
+                   -> TcS CtLoc
+bumpReductionDepth loc ty
   = do { dflags <- getDynFlags
        ; when (subGoalDepthExceeded (reductionDepth dflags) (ctLocDepth loc)) $
-         wrapErrTcS $ solverDepthError loc ty }
+         wrapErrTcS $ solverDepthError loc ty
+       ; return (bumpCtLocDepth loc) }
 
 matchFam :: TyCon -> [Type] -> TcS (Maybe ReductionN)
 matchFam tycon args = wrapTcS $ matchFamTcM tycon args
