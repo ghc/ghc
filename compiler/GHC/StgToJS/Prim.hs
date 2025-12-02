@@ -1164,7 +1164,7 @@ genPrim prof bound ty op = case op of
   GetSparkOp                        -> unhandledPrimop op
   AnyToAddrOp                       -> unhandledPrimop op
   MkApUpd0_Op                       -> unhandledPrimop op
-  NewUDCOp                          -> unhandledPrimop op
+  NewNullaryClosureOp                          -> unhandledPrimop op
   NewBCOOp                          -> unhandledPrimop op
   UnpackClosureOp                   -> unhandledPrimop op
   ClosureSizeOp                     -> unhandledPrimop op

@@ -4,7 +4,7 @@
 module GHCi.ResolvedBCO
   ( ResolvedBCO(..)
   , ResolvedBCOPtr(..)
-  , ResolvedUDC(..)
+  , ResolvedNullaryClosure(..)
   , isLittleEndian
   , BCOByteArray(..)
   , mkBCOByteArray
@@ -52,7 +52,7 @@ instance Binary ConInfoTable
 instance NFData ConInfoTable
 
 -- -----------------------------------------------------------------------------
--- ResolvedUDC
+-- ResolvedNullaryClosure
 
 -- | A 'ResolvedBCO' is one in which all the 'Name' references have been
 -- resolved to actual addresses or 'RemoteHValues'.
@@ -69,11 +69,11 @@ data ResolvedBCO
    }
    deriving (Generic, Show)
 
--- | A 'ResolvedUDC' is one in which all arguments have been applied to
+-- | A 'ResolvedNullaryClosure' is one in which all arguments have been applied to
 -- a (potentially unlifted) data constructor.
-newtype ResolvedUDC
-   = ResolvedUDC {
-        unliftedDataConInfo :: ConInfoTable -- RemotePtr StgInfoTable
+newtype ResolvedNullaryClosure
+   = ResolvedNullaryClosure {
+        unliftedDataConInfo :: ConInfoTable
    }
    deriving (Binary, Generic, NFData, Show)
 

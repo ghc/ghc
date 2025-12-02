@@ -3937,9 +3937,9 @@ primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
    with
    out_of_line = True
 
-primop  NewUDCOp "newUDC#" GenPrimOp
+primop  NewNullaryClosureOp "newNullaryClosure#" GenPrimOp
    Addr# -> State# s -> (# State# s, a #)
-   { @newUDC#@ allocates a new application of an
+   { @newNullaryClosure#@ allocates a new application of an
      unlifted data constructor (identified by its info table). }
    with
    effect = ReadWriteEffect

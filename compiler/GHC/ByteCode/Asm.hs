@@ -107,7 +107,7 @@ bcoFreeNames bco
 assembleBCOs
   :: Profile
   -> FlatBag (ProtoBCO Name)
-  -> FlatBag UnlinkedUDC
+  -> FlatBag UnlinkedNullaryClosure
   -> [TyCon]
   -> [(Name, ByteString)]
   -> Maybe InternalModBreaks

@@ -14,7 +14,7 @@
 --
 
 -- | Create real byte-code objects from 'ResolvedBCO's and 'NullaryDataConApp's.
-module GHCi.CreateBCO (createBCOs, createUDCs) where
+module GHCi.CreateBCO (createBCOs, createNullaryClosures) where
 
 import Prelude -- See note [Why do we import Prelude here?]
 import GHCi.BreakArray
@@ -28,20 +28,20 @@ import Data.Array.Base
 import Foreign hiding (newArray)
 import Unsafe.Coerce (unsafeCoerce)
 import GHC.Arr          ( Array(..) )
-import GHC.Exts   hiding ( BCO, mkApUpd0#, newBCO#, newUDC# )
-import GHC.Internal.Base ( BCO, mkApUpd0#, newBCO#, newUDC# )
+import GHC.Exts   hiding ( BCO, mkApUpd0#, newBCO#, newNullaryClosure# )
+import GHC.Internal.Base ( BCO, mkApUpd0#, newBCO#, newNullaryClosure# )
 import GHC.IO
 import GHC.Exts.Heap ( StgInfoTable )
 import Control.Exception ( ErrorCall(..) )
 
-createUDCs :: [RemotePtr StgInfoTable] -> IO [HValueRef]
-createUDCs dcas = do
-  mapM createUnliftedDataConstructor dcas
+createNullaryClosures :: [RemotePtr StgInfoTable] -> IO [HValueRef]
+createNullaryClosures dcas = do
+  mapM createNullaryClosure dcas
 
-createUnliftedDataConstructor :: RemotePtr StgInfoTable -> IO HValueRef
-createUnliftedDataConstructor infoTablePtr =
+createNullaryClosure :: RemotePtr StgInfoTable -> IO HValueRef
+createNullaryClosure infoTablePtr =
   let !(Ptr !addr#) = fromRemotePtr infoTablePtr
-  in  IO $ \s -> newUDC# addr# s
+  in  IO $ \s -> newNullaryClosure# addr# s
 
 createBCOs :: [ResolvedBCO] -> IO [HValueRef]
 createBCOs bcos = do

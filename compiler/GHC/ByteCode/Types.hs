@@ -16,7 +16,7 @@ module GHC.ByteCode.Types
   , RegBitmap(..)
   , NativeCallType(..), NativeCallInfo(..), voidTupleReturnInfo, voidPrimCallInfo
   , ByteOff(..), WordOff(..), HalfWord(..)
-  , UnlinkedUDC(..)
+  , UnlinkedNullaryClosure(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
   , AddrEnv, AddrPtr(..)
@@ -62,7 +62,7 @@ data CompiledByteCode = CompiledByteCode
   { bc_bcos   :: FlatBag UnlinkedBCO
     -- ^ Bunch of interpretable bindings
 
-  , bc_udcs   :: FlatBag UnlinkedUDC
+  , bc_udcs   :: FlatBag UnlinkedNullaryClosure
 
   , bc_itbls  :: [(Name, ConInfoTable)]
     -- ^ Mapping from DataCons to their info tables
@@ -178,16 +178,16 @@ newtype AddrPtr = AddrPtr (RemotePtr ())
 {- |
 Named reference to an unlifted data constructor
 -}
-data UnlinkedUDC
-   = UnlinkedUDC {
-       unlinkedUDCName :: !Name,
-       unlinkedUDCInfo :: !ConInfoTable
+data UnlinkedNullaryClosure
+   = UnlinkedNullaryClosure {
+       unlinkedNullaryClosureName :: !Name,
+       unlinkedNullaryClosureInfo :: !ConInfoTable
    }
 
-instance NFData UnlinkedUDC where
-  rnf UnlinkedUDC{..} =
-    rnf unlinkedUDCName `seq`
-    rnf unlinkedUDCInfo
+instance NFData UnlinkedNullaryClosure where
+  rnf UnlinkedNullaryClosure{..} =
+    rnf unlinkedNullaryClosureName `seq`
+    rnf unlinkedNullaryClosureInfo
 
 {-
 --------------------------------------------------------------------------------

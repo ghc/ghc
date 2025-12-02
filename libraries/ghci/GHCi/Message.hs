@@ -106,7 +106,7 @@ data Message a where
   -- see Note [Parallelize CreateBCOs serialization]
   CreateBCOs :: [ResolvedBCO] -> Message [HValueRef]
 
-  CreateUDCs :: [ResolvedUDC] -> Message [HValueRef]
+  CreateNullaryClosures :: [ResolvedNullaryClosure] -> Message [HValueRef]
 
   -- | Release 'HValueRef's
   FreeHValueRefs :: [HValueRef] -> Message ()
@@ -588,7 +588,7 @@ getMessage = do
       38 -> Msg <$> (ResumeSeq <$> get)
       39 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
       40 -> Msg <$> (WhereFrom <$> get)
-      41 -> Msg <$> (CreateUDCs <$> get)
+      41 -> Msg <$> (CreateNullaryClosures <$> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -635,7 +635,7 @@ putMessage m = case m of
   ResumeSeq a                 -> putWord8 38 >> put a
   LookupSymbolInDLL dll str   -> putWord8 39 >> put dll >> put str
   WhereFrom a                 -> putWord8 40 >> put a
-  CreateUDCs ptr              -> putWord8 41 >> put ptr
+  CreateNullaryClosures ptr              -> putWord8 41 >> put ptr
 
 {-
 Note [Parallelize CreateBCOs serialization]

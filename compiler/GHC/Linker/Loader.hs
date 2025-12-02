@@ -1019,21 +1019,21 @@ linkSomeBCOs :: Interp
 
 linkSomeBCOs interp pkgs_loaded le lb mods = foldr fun do_link mods []
  where
-  fun :: CompiledByteCode -> ([([UnlinkedUDC], [UnlinkedBCO])] -> t) -> [([UnlinkedUDC], [UnlinkedBCO])] -> t
+  fun :: CompiledByteCode -> ([([UnlinkedNullaryClosure], [UnlinkedBCO])] -> t) -> [([UnlinkedNullaryClosure], [UnlinkedBCO])] -> t
   fun CompiledByteCode{..} inner accum =
     inner ((Foldable.toList bc_udcs, Foldable.toList bc_bcos) : accum)
 
-  do_link :: [([UnlinkedUDC], [UnlinkedBCO])] -> IO [(Name, HValueRef)]
+  do_link :: [([UnlinkedNullaryClosure], [UnlinkedBCO])] -> IO [(Name, HValueRef)]
   do_link [] = return []
   do_link mods = do
-    let flat_UDCs = [ udc | (udcs, _) <- mods, udc <- udcs ]
+    let flat_NullaryClosures = [ udc | (udcs, _) <- mods, udc <- udcs ]
         flat_BCOs = [ bco | (_, bcos) <- mods, bco <- bcos ]
-        names_UDCs = map unlinkedUDCName flat_UDCs
+        names_NullaryClosures = map unlinkedNullaryClosureName flat_NullaryClosures
         names_BCOs = map unlinkedBCOName flat_BCOs
         index_BCO = mkNameEnv (zip names_BCOs [0 ..])
-        index_UDC = mkNameEnv (zip names_UDCs [length names_BCOs ..])
+        index_NullaryClosure = mkNameEnv (zip names_NullaryClosures [length names_BCOs ..])
 
-    resolved_BCOs <- sequence [ linkBCO interp pkgs_loaded le lb index_UDC index_BCO bco | bco <- flat_BCOs ]
+    resolved_BCOs <- sequence [ linkBCO interp pkgs_loaded le lb index_NullaryClosure index_BCO bco | bco <- flat_BCOs ]
     hvrefs <- createBCOs interp resolved_BCOs
     return (zip names_BCOs hvrefs)
 

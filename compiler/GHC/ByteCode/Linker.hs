@@ -59,7 +59,7 @@ linkBCO
   -> PkgsLoaded
   -> LinkerEnv
   -> LinkedBreaks
-  -> NameEnv Int -- Named UDCs
+  -> NameEnv Int -- Named NullaryClosures
   -> NameEnv Int -- Named BCOs
   -> UnlinkedBCO
   -> IO ResolvedBCO
@@ -161,13 +161,13 @@ resolvePtr
   -> PkgsLoaded
   -> LinkerEnv
   -> LinkedBreaks
-  -> NameEnv Int -- Named UDCs
+  -> NameEnv Int -- Named NullaryClosures
   -> NameEnv Int -- Named BCOs
   -> BCOPtr
   -> IO ResolvedBCOPtr
 resolvePtr interp pkgs_loaded le lb udc_ix bco_ix ptr = case ptr of
   BCOPtrName nm
-    | Just ix <- lookupNameEnv udc_ix nm -- ref to another UDC in this group
+    | Just ix <- lookupNameEnv udc_ix nm -- ref to another NullaryClosure in this group
     -> return (ResolvedBCORefUnlifted ix)
 
     | Just ix <- lookupNameEnv bco_ix nm -- ref to another BCO in this group

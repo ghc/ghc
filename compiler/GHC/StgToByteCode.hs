@@ -103,7 +103,7 @@ import Control.Monad.Trans.Reader (ReaderT(..))
 import Control.Monad.Trans.State  (StateT(..))
 import Data.Bifunctor (Bifunctor(..))
 
-import GHCi.ResolvedBCO (ResolvedUDC(..))
+import GHCi.ResolvedBCO (ResolvedNullaryClosure(..))
 
 
 -- -----------------------------------------------------------------------------
@@ -310,7 +310,7 @@ argBits platform (rep : args)
 
 -- Compile code for the right-hand side of a top-level binding
 
-schemeTopBind :: (Id, CgStgRhs) -> BcM (Either UnlinkedUDC (ProtoBCO Name))
+schemeTopBind :: (Id, CgStgRhs) -> BcM (Either UnlinkedNullaryClosure (ProtoBCO Name))
 schemeTopBind (id, rhs)
   | isUnliftedType (varType id), StgRhsCon _ dCon conNo _ _ _ <- rhs = do
         profile <- getProfile
@@ -334,8 +334,8 @@ schemeTopBind (id, rhs)
               Numbered i -> i
               NoNumber   -> 0 -- This defaulting seems unsafe?
 
-            finalizer :: ConInfoTable -> Either UnlinkedUDC a
-            finalizer = Left . UnlinkedUDC (getName id)
+            finalizer :: ConInfoTable -> Either UnlinkedNullaryClosure a
+            finalizer = Left . UnlinkedNullaryClosure (getName id)
 
         pure . finalizer $ ConInfoTable
             tables_next_to_code

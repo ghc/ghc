@@ -2145,7 +2145,7 @@ stg_deRefStablePtrzh ( P_ sp )
    Bytecode object primitives
    -------------------------------------------------------------------------  */
 
-stg_newUDHzh ( W_ datacon_itbl )
+stg_newNullaryClosurezh ( W_ datacon_itbl )
 {
     W_ p;
     ALLOC_PRIM(SIZEOF_StgHeader);

@@ -79,8 +79,8 @@ run m = case m of
   MkConInfoTable infoTable -> convertInfoTable infoTable
   ResolveObjs -> resolveObjs
   FindSystemLibrary str -> findSystemLibrary str
-  CreateUDCs dcas ->
-    traverse (convertInfoTable . unliftedDataConInfo) dcas >>= createUDCs
+  CreateNullaryClosures dcas ->
+    traverse (convertInfoTable . unliftedDataConInfo) dcas >>= createNullaryClosures
   CreateBCOs bcos -> createBCOs bcos
   LookupClosure str -> lookupClosure str
 #endif
