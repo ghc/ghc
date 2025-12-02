@@ -667,7 +667,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
                              , recUpdFields  = rbnds }
                        })
        res_ty
-  = assert (notNull rbnds) $
+  = assert (notNull rbnds) $ mkExpandedExprTc expr <$>
     do  { -- Expand the record update. See Note [Record Updates].
 
         ; (ds_expr, ds_res_ty, err_msg)
