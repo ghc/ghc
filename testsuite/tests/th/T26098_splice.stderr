@@ -1,0 +1,7 @@
+T26098_splice.hs:9:20: error: [GHC-28914]
+    • Level error: ‘Foo’ is bound at levels {0, 1} but used at level -1
+    • Available from the imports:
+      • imported from ‘T26098A_splice’ at 1 at T26098_splice.hs:5:1-27
+      • imported from ‘T26098A_splice’ at T26098_splice.hs:4:1-21
+    • In the untyped splice: $(undefined :: Foo)
+
