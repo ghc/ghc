@@ -1582,12 +1582,13 @@ type AmIUnifying = Bool   -- True  <=> Unifying
                           -- False <=> Matching
 
 type InType      = Type       -- Before applying the RnEnv2
-type OutCoercion = Coercion   -- After applying the RnEnv2
+type OutCastCoercion = CastCoercion  -- After applying the RnEnv2
+
 
 
 unify_ty :: UMEnv
          -> InType -> InType  -- Types to be unified
-         -> OutCoercion       -- A nominal coercion between their kinds
+         -> OutCastCoercion   -- A nominal coercion between their kinds
                               -- OutCoercion: the RnEnv has already been applied
                               -- When matching, the coercion is in "target space",
                               --   not "template space"
@@ -1609,28 +1610,28 @@ unify_ty env ty1 ty2 kco
   | Just ty2' <- coreView ty2 = unify_ty env ty1 ty2' kco
 
 unify_ty env (CastTy ty1 co1) ty2 kco
-  | mentionsForAllBoundTyVarsL env (tyCoVarsOfCo co1)
+  | mentionsForAllBoundTyVarsL env (tyCoVarsOfCastCo co1)
     -- See (KCU1) in Note [Kind coercions in Unify]
   = maybeApart MARCast  -- See (KCU2)
 
   | um_unif env
-  = unify_ty env ty1 ty2 (co1 `mkTransCo` kco)
+  = unify_ty env ty1 ty2 (co1 `mkTransCastCo` kco)
 
   | otherwise -- We are matching, not unifying
   = do { subst <- getSubst env
-       ; let co' = substCo subst co1
+       ; let co' = substCastCo subst co1
          -- We match left-to-right, so the free template vars of the
          -- coercion should already have been matched.
          -- See Note [Matching in the presence of casts (1)]
          -- NB: co1 does not mention forall-bound vars, so no need to rename
-       ; unify_ty env ty1 ty2 (co' `mkTransCo` kco) }
+       ; unify_ty env ty1 ty2 (co' `mkTransCastCo` kco) }
 
 unify_ty env ty1 (CastTy ty2 co2) kco
-  | mentionsForAllBoundTyVarsR env (tyCoVarsOfCo co2)
+  | mentionsForAllBoundTyVarsR env (tyCoVarsOfCastCo co2)
     -- See (KCU1) in Note [Kind coercions in Unify]
   = maybeApart MARCast  -- See (KCU2)
   | otherwise
-  = unify_ty env ty1 ty2 (kco `mkTransCo` mkSymCo co2)
+  = unify_ty env ty1 ty2 (kco `mkTransCastCo` mkSymCastCo (typeKind ty2) co2)
     -- NB: co2 does not mention forall-bound variables
 
 -- Applications need a bit of care!
@@ -1647,7 +1648,7 @@ unify_ty _ (LitTy x) (LitTy y) _kco | x == y = return ()
 
 unify_ty env (ForAllTy (Bndr tv1 _) ty1) (ForAllTy (Bndr tv2 _) ty2) kco
   -- ToDo: See Note [Unifying coercion-foralls]
-  = do { unify_ty env (varType tv1) (varType tv2) (mkNomReflCo liftedTypeKind)
+  = do { unify_ty env (varType tv1) (varType tv2) ReflCastCo
        ; let env' = umRnBndr2 env tv1 tv2
        ; unify_ty env' ty1 ty2 kco }
 
@@ -1658,7 +1659,7 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
            CoVarCo cv
              | not (um_unif env)
              , not (cv `elemVarEnv` c_subst)   -- Not forall-bound
-             , let (_mult_co, co_l, co_r) = decomposeFunCo kco
+             , let (_mult_co, co_l, co_r) = decomposeFunCo (castCoToCo (typeKind (CoercionTy co1)) kco)
                      -- Because the coercion is used in a type, it should be safe to
                      -- ignore the multiplicity coercion, _mult_co
                       -- cv :: t1 ~ t2
@@ -1678,7 +1679,7 @@ unify_ty env (TyVarTy tv1) ty2 kco
 
 unify_ty env ty1 (TyVarTy tv2) kco
   | um_unif env  -- If unifying, can swap args; but not when matching
-  = uVarOrFam (umSwapRn env) (TyVarLHS tv2) ty1 (mkSymCo kco)
+  = uVarOrFam (umSwapRn env) (TyVarLHS tv2) ty1 (mkSymCastCo (typeKind ty1) kco)
 
 -- Deal with TyConApps
 unify_ty env ty1 ty2 kco
@@ -1689,7 +1690,7 @@ unify_ty env ty1 ty2 kco
 
   | um_unif env
   , Just (tc,tys) <- mb_sat_fam_app2
-  = uVarOrFam (umSwapRn env) (TyFamLHS tc tys) ty1 (mkSymCo kco)
+  = uVarOrFam (umSwapRn env) (TyFamLHS tc tys) ty1 (mkSymCastCo (typeKind ty1) kco)
 
   -- Handle oversaturated type families. Suppose we have
   --     (F a b) ~ (c d)    where F has arity 1
@@ -1760,8 +1761,8 @@ unify_ty_app env ty1 ty1args ty2 ty2args
   = do { let ki1 = typeKind ty1
              ki2 = typeKind ty2
            -- See Note [Kind coercions in Unify]
-       ; unify_ty  env ki1 ki2 (mkNomReflCo liftedTypeKind)
-       ; unify_ty  env ty1 ty2 (mkNomReflCo ki2)
+       ; unify_ty  env ki1 ki2 ReflCastCo
+       ; unify_ty  env ty1 ty2 ReflCastCo -- TODO: simplify following comment?
                  -- Very important: 'ki2' not 'ki1'
                  -- See Note [Matching in the presence of casts (2)]
        ; unify_tys env ty1args ty2args }
@@ -1775,7 +1776,7 @@ unify_tys env orig_xs orig_ys
     go []     []     = return ()
     go (x:xs) (y:ys)
       -- See Note [Kind coercions in Unify]
-      = do { unify_ty env x y (mkNomReflCo $ typeKind y)
+      = do { unify_ty env x y ReflCastCo -- TODO: simplify following comment?
                  -- Very important: 'y' not 'x'
                  -- See Note [Matching in the presence of casts (2)]
            ; go xs ys }
@@ -1784,7 +1785,7 @@ unify_tys env orig_xs orig_ys
       -- See Note [Polykinded tycon applications]
 
 ---------------------------------
-uVarOrFam :: UMEnv -> CanEqLHS -> InType -> OutCoercion -> UM ()
+uVarOrFam :: UMEnv -> CanEqLHS -> InType -> OutCastCoercion -> UM ()
 -- Invariants: (a) If ty1 is a TyFamLHS, then ty2 is NOT a TyVarTy
 --             (b) both args have had coreView already applied
 -- Why saturated?  See (ATF4) in Note [Apartness and type families]
@@ -1811,7 +1812,7 @@ uVarOrFam env ty1 ty2 kco
     -----------------------------
     -- LHS is a type variable
     -- The sequence of tests is very similar to go_tv
-    go :: SwapFlag -> UMState -> CanEqLHS -> InType -> OutCoercion -> UM ()
+    go :: SwapFlag -> UMState -> CanEqLHS -> InType -> OutCastCoercion -> UM ()
     go swapped substs lhs@(TyVarLHS tv1) ty2 kco
       | Just ty1' <- lookupVarEnv (um_tv_env substs) tv1'
       = -- We already have a substitution for tv1
@@ -1856,7 +1857,7 @@ uVarOrFam env ty1 ty2 kco
       | um_unif env
       , NotSwapped <- swapped  -- If we have swapped already, don't do so again
       , Just lhs2 <- canEqLHS_maybe ty2
-      = go IsSwapped substs lhs2 (mkTyVarTy tv1) (mkSymCo kco)
+      = go IsSwapped substs lhs2 (mkTyVarTy tv1) (mkSymCastCo (varType tv1) kco)
 
       | occurs_check = maybeApart MARInfinite   -- Occurs check
       | otherwise    = surelyApart
@@ -1864,7 +1865,7 @@ uVarOrFam env ty1 ty2 kco
       where
         tv1'            = umRnOccL env tv1
         ty2_fvs         = tyCoVarsOfType ty2
-        rhs             = ty2 `mkCastTy` mkSymCo kco
+        rhs             = ty2 `mkCastTy` mkSymCastCo (varType tv1') kco
         tv1_is_bindable | not (tv1' `elemVarSet` foralld_tvs)
                           -- tv1' is not forall-bound, but tv1 can still differ
                           -- from tv1; see Note [Cloning the template binders]
@@ -1928,13 +1929,14 @@ uVarOrFam env ty1 ty2 kco
       | um_unif env
       , NotSwapped <- swapped
       , Just lhs2 <- canEqLHS_maybe ty2
-      = go IsSwapped substs lhs2 (mkTyConApp tc1 tys1) (mkSymCo kco)
+      , let ty1' = mkTyConApp tc1 tys1
+      = go IsSwapped substs lhs2 ty1' (mkSymCastCo (typeKind ty1') kco)
 
       | otherwise   -- See (ATF5) in Note [Apartness and type families]
       = surelyApart
 
       where
-        rhs = ty2 `mkCastTy` mkSymCo kco
+        rhs = ty2 `mkCastTy` mkSymCastCo (typeKind (mkTyConApp tc1 tys1)) kco
 
     -----------------------------
     -- go_fam_fam: LHS and RHS are both saturated type-family applications,
@@ -1971,7 +1973,7 @@ uVarOrFam env ty1 ty2 kco
          | otherwise
          = return ()
 
-       rhs1 = mkTyConApp tc tys2 `mkCastTy` mkSymCo kco
+       rhs1 = mkTyConApp tc tys2 `mkCastTy` mkSymCastCo (typeKind (mkTyConApp tc tys1)) kco -- TODO: correct?
        rhs2 = mkTyConApp tc tys1 `mkCastTy` kco
 
 
@@ -2335,9 +2337,10 @@ ty_co_match menv subst ty co lkco rkco
     noneSet f = allVarSet (not . f)
 
 ty_co_match menv subst ty co lkco rkco
-  | CastTy ty' co' <- ty
+  | CastTy ty' cco' <- ty
      -- See Note [Matching in the presence of casts (1)]
   = let empty_subst  = mkEmptySubst (rnInScopeSet (me_env menv))
+        co' = castCoToCo (typeKind ty') cco'
         substed_co_l = substCo (liftEnvSubstLeft empty_subst subst)  co'
         substed_co_r = substCo (liftEnvSubstRight empty_subst subst) co'
     in
@@ -2448,7 +2451,7 @@ ty_co_match menv subst ty co1 lkco rkco
   -- But transitive coercions are not helpful. Therefore we deal
   -- with it here: we do recursion on the smaller reflexive coercion,
   -- while propagating the correct kind coercions.
-  = let kco' = mkSymCo co
+  = let kco' = mkSymCo (castCoToCo (typeKind t) co)
     in ty_co_match menv subst ty (mkReflCo r t) (lkco `mkTransCo` kco')
                                                 (rkco `mkTransCo` kco')
 

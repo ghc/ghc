@@ -797,7 +797,7 @@ subst_ty subst ty
         !(subst',tv') = substVarBndrUnchecked subst tv
                         -- Unchecked because subst_ty is used from substTyUnchecked
     go (LitTy n)         = LitTy $! n
-    go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
+    go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (substCastCo subst co)
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
 substTyVar :: Subst -> TyVar -> Type

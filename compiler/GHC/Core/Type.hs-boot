@@ -4,7 +4,7 @@ module GHC.Core.Type where
 
 import GHC.Prelude
 import {-# SOURCE #-} GHC.Core.TyCon
-import {-# SOURCE #-} GHC.Core.TyCo.Rep( Type, Coercion )
+import {-# SOURCE #-} GHC.Core.TyCo.Rep( Type, CastCoercion )
 import GHC.Utils.Misc
 import GHC.Types.Var( FunTyFlag, TyVar )
 import GHC.Types.Basic( TypeOrConstraint )
@@ -16,7 +16,7 @@ chooseFunTyFlag  :: HasDebugCallStack => Type -> Type -> FunTyFlag
 typeKind         :: HasDebugCallStack => Type -> Type
 isCoercionTy     :: Type -> Bool
 mkAppTy          :: Type -> Type -> Type
-mkCastTy         :: Type -> Coercion -> Type
+mkCastTy         :: Type -> CastCoercion -> Type
 mkTyConApp       :: TyCon -> [Type] -> Type
 getLevity        :: HasDebugCallStack => Type -> Type
 getTyVar_maybe   :: Type -> Maybe TyVar

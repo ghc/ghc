@@ -359,11 +359,11 @@ can_eq_nc _rewritten rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 can_eq_nc rewritten rdr_env envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
   | isNothing (canEqLHS_maybe ty2)
   = -- See (EIK3) in Note [Equalities with heterogeneous kinds]
-    canEqCast rewritten rdr_env envs ev eq_rel NotSwapped ty1 co1 ty2 ps_ty2
+    canEqCast rewritten rdr_env envs ev eq_rel NotSwapped ty1 (castCoToCo (typeKind ty1) co1) ty2 ps_ty2
 can_eq_nc rewritten rdr_env envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
   | isNothing (canEqLHS_maybe ty1)
   = -- See (EIK3) in Note [Equalities with heterogeneous kinds]
-    canEqCast rewritten rdr_env envs ev eq_rel IsSwapped ty2 co2 ty1 ps_ty1
+    canEqCast rewritten rdr_env envs ev eq_rel IsSwapped ty2 (castCoToCo (typeKind ty2) co2) ty1 ps_ty1
 
 ----------------------
 -- Otherwise try to decompose
@@ -522,7 +522,7 @@ can_eq_nc_forall ev eq_rel s1 s2
                                       (substTy subst2 (tyVarKind tv2))
 
                    ; let subst2' = extendTvSubstAndInScope subst2 tv2
-                                       (mkCastTy (mkTyVarTy skol_tv) kind_co)
+                                       (mkCastTyCo (mkTyVarTy skol_tv) kind_co)
                          -- skol_tv is already in the in-scope set, but the
                          -- free vars of kind_co are not; hence "...AndInScope"
                    ; co <- go uenv skol_tvs subst2' bndrs1 bndrs2
@@ -1741,7 +1741,7 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
         -- kind_co :: ki2 ~N ki1
         lhs_redn    = mkReflRedn role ps_xi1
         rhs_redn    = mkGReflRightRedn role xi2 kind_co
-        new_xi2     = mkCastTy ps_xi2 kind_co
+        new_xi2     = mkCastTyCo ps_xi2 kind_co
 
 canEqCanLHSHomo :: CtEvidence          -- lhs ~ rhs
                                        -- or, if swapped: rhs ~ lhs
@@ -1753,14 +1753,14 @@ canEqCanLHSHomo :: CtEvidence          -- lhs ~ rhs
 canEqCanLHSHomo ev eq_rel swapped lhs1 ps_xi1 xi2 ps_xi2
   | (xi2', mco) <- split_cast_ty xi2
   , Just lhs2 <- canEqLHS_maybe xi2'
-  = canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 (ps_xi2 `mkCastTyMCo` mkSymMCo mco) mco
+  = canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 (ps_xi2 `mkCastTy` mkSymCastCo (typeKind xi2') mco) mco
 
   | otherwise
   = canEqCanLHSFinish ev eq_rel swapped lhs1 ps_xi2
 
   where
-    split_cast_ty (CastTy ty co) = (ty, MCo co)
-    split_cast_ty other          = (other, MRefl)
+    split_cast_ty (CastTy ty co) = (ty, co)
+    split_cast_ty other          = (other, ReflCastCo)
 
 -- This function deals with the case that both LHS and RHS are potential
 -- CanEqLHSs.
@@ -1771,7 +1771,7 @@ canEqCanLHS2 :: CtEvidence              -- lhs ~ (rhs |> mco)
              -> TcType                  -- pretty lhs
              -> CanEqLHS                -- rhs
              -> TcType                  -- pretty rhs
-             -> MCoercion               -- :: kind(rhs) ~N kind(lhs)
+             -> CastCoercion            -- :: kind(rhs) ~N kind(lhs)
              -> TcS (StopOrContinue (Either IrredCt EqCt))
 canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
   | lhs1 `eqCanEqLHS` lhs2
@@ -1823,13 +1823,13 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
          then finish_with_swapping
          else finish_without_swapping }
   where
-    sym_mco = mkSymMCo mco
+    sym_mco = mkSymCastCo (canEqLHSKind lhs2) mco
     role    = eqRelRole eq_rel
     lhs1_ty  = canEqLHSType lhs1
     lhs2_ty  = canEqLHSType lhs2
 
     finish_without_swapping
-      = canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTyMCo` mco)
+      = canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTy` mco)
 
     -- Swapping. We have   ev : lhs1 ~ lhs2 |> co
     -- We swap to      new_ev : lhs2 ~ lhs1 |> sym co
@@ -1840,7 +1840,7 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
       = do { let lhs1_redn = mkGReflRightMRedn role lhs1_ty sym_mco
                  lhs2_redn = mkGReflLeftMRedn  role lhs2_ty mco
            ; new_ev <-rewriteEqEvidence ev swapped lhs1_redn lhs2_redn emptyCoHoleSet
-           ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTyMCo` sym_mco) }
+           ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTy` sym_mco) }
 
     put_tyvar_on_lhs = isWanted ev && eq_rel == NomEq
     -- See Note [Orienting TyVarLHS/TyFamLHS]

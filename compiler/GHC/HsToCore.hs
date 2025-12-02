@@ -748,7 +748,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
                                                              runtimeRep1Ty
                                                              runtimeRep2Ty
              (scrut2, scrut2_ty, ab_cv_ty) = unsafe_equality (mkTYPEapp runtimeRep2Ty)
-                                                             (openAlphaTy `mkCastTy` alpha_co)
+                                                             (openAlphaTy `mkCastTyCo` alpha_co)
                                                              openBetaTy
 
              -- alpha_co :: TYPE r1 ~# TYPE r2

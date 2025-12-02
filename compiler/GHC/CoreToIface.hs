@@ -192,7 +192,7 @@ toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
 toIfaceTypeX fr (FunTy { ft_arg = t1, ft_mult = w, ft_res = t2, ft_af = af })
   = IfaceFunTy af (toIfaceTypeX fr w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
-toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
+toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCastCoercionX fr co)
 toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
 
 toIfaceTypeX fr (TyConApp tc tys)
@@ -271,9 +271,12 @@ toIfaceTyLit (CharTyLit x) = IfaceCharTyLit x
 
 ----------------
 toIfaceCastCoercion :: CastCoercion -> IfaceCastCoercion
-toIfaceCastCoercion (CCoercion co) = IfaceCCoercion (toIfaceCoercion co)
-toIfaceCastCoercion (ZCoercion ty cos) = IfaceZCoercion (toIfaceType ty) (map (toIfaceCoercion . CoVarCo) (nonDetEltsUniqSet cos)) -- TODO determinism
-toIfaceCastCoercion ReflCastCo         = IfaceReflCastCo
+toIfaceCastCoercion = toIfaceCastCoercionX emptyVarSet
+
+toIfaceCastCoercionX :: VarSet -> CastCoercion -> IfaceCastCoercion
+toIfaceCastCoercionX fr (CCoercion co)     = IfaceCCoercion (toIfaceCoercionX fr co)
+toIfaceCastCoercionX fr (ZCoercion ty cos) = IfaceZCoercion (toIfaceTypeX fr ty) (map (toIfaceCoercionX fr . CoVarCo) (nonDetEltsUniqSet cos)) -- TODO determinism
+toIfaceCastCoercionX _  ReflCastCo         = IfaceReflCastCo
 
 toIfaceCoercion :: Coercion -> IfaceCoercion
 toIfaceCoercion = toIfaceCoercionX emptyVarSet

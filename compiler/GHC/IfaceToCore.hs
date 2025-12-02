@@ -1527,7 +1527,7 @@ tcIfaceType = go
     go (IfaceForAllTy bndr t)
       = bindIfaceForAllBndr bndr $ \ tv' vis ->
         ForAllTy (Bndr tv' vis) <$> go t
-    go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
+    go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCastCoercion co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
 tcIfaceTupleTy :: TupleSort -> PromotionFlag -> IfaceAppArgs -> IfL Type

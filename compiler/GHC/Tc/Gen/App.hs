@@ -813,7 +813,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
            -- NB: kappa is uninstantiated ('go' already checked that)
            ; kind_co <- unifyKind Nothing liftedTypeKind (tyVarKind kappa)
                  -- unifyKind: see (UQL3) in Note [QuickLook unification]
-           ; liftZonkM (writeMetaTyVar kappa (mkCastTy fun_ty' kind_co))
+           ; liftZonkM (writeMetaTyVar kappa (mkCastTyCo fun_ty' kind_co))
 
            ; let co_wrap = mkWpCastN (mkGReflLeftCo Nominal fun_ty' kind_co)
                  acc'    = addArgWrap co_wrap acc
@@ -2225,7 +2225,7 @@ qlUnify ty1 ty2
                 do { co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
                            -- unifyKind: see (UQL2) in Note [QuickLook unification]
                            --            and (MIV2) in Note [Monomorphise instantiation variables]
-                   ; let ty2' = mkCastTy ty2 co
+                   ; let ty2' = mkCastTyCo ty2 co
                    ; traceTc "qlUnify:update" $
                      ppr kappa <+> text ":=" <+> ppr ty2
                    ; liftZonkM $ writeMetaTyVar kappa ty2' }

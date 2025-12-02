@@ -227,7 +227,7 @@ mkGReflRightRedn :: Role -> Type -> CoercionN -> Reduction
 mkGReflRightRedn role ty co
   = mkReduction
       (mkGReflRightCo role ty co)
-      (mkCastTy ty co)
+      (mkCastTyCo ty co)
 {-# INLINE mkGReflRightRedn #-}
 
 -- | Create a 'Reduction' from a kind cast, in which
@@ -236,11 +236,11 @@ mkGReflRightRedn role ty co
 -- Given @ty :: k1@, @mco :: k1 ~ k2@,
 -- produces the 'Reduction' @ty ~res_co~> (ty |> mco)@
 -- at the given 'Role'.
-mkGReflRightMRedn :: Role -> Type -> MCoercionN -> Reduction
+mkGReflRightMRedn :: Role -> Type -> CastCoercion -> Reduction
 mkGReflRightMRedn role ty mco
   = mkReduction
-      (mkGReflRightMCo role ty mco)
-      (mkCastTyMCo ty mco)
+      (mkGReflRightCastCo role ty mco)
+      (mkCastTy ty mco)
 {-# INLINE mkGReflRightMRedn #-}
 
 -- | Create a 'Reduction' from a kind cast, in which
@@ -262,10 +262,10 @@ mkGReflLeftRedn role ty co
 -- Given @ty :: k1@, @mco :: k1 ~ k2@,
 -- produces the 'Reduction' @(ty |> mco) ~res_co~> ty@
 -- at the given 'Role'.
-mkGReflLeftMRedn :: Role -> Type -> MCoercionN -> Reduction
+mkGReflLeftMRedn :: Role -> Type -> CastCoercion -> Reduction
 mkGReflLeftMRedn role ty mco
   = mkReduction
-      (mkGReflLeftMCo role ty mco)
+      (mkGReflLeftCastCo role ty mco)
       ty
 {-# INLINE mkGReflLeftMRedn #-}
 
@@ -279,7 +279,7 @@ mkCoherenceRightRedn :: Role -> Reduction -> CoercionN -> Reduction
 mkCoherenceRightRedn r (Reduction co1 ty2) kco
   = mkReduction
       (mkCoherenceRightCo r ty2 kco co1)
-      (mkCastTy ty2 kco)
+      (mkCastTyCo ty2 kco)
 {-# INLINE mkCoherenceRightRedn #-}
 
 -- | Apply a cast to the result of a 'Reduction', using an 'MCoercionN'.
@@ -314,7 +314,7 @@ mkCastRedn1 r ty cast_co (Reduction co xi)
   -- return_co :: (ty |> cast_co) ~r (ty' |> cast_co)
   = mkReduction
       (castCoercionKind1 co r ty xi cast_co)
-      (mkCastTy xi cast_co)
+      (mkCastTyCo xi cast_co)
 {-# INLINE mkCastRedn1 #-}
 
 -- | Apply casts on both sides of a 'Reduction' (of the given 'Role').
@@ -333,7 +333,7 @@ mkCastRedn2 :: Role
 mkCastRedn2 r ty cast_co (Reduction nco nty) cast_co'
   = mkReduction
       (castCoercionKind2 nco r ty nty cast_co cast_co')
-      (mkCastTy nty cast_co')
+      (mkCastTyCo nty cast_co')
 {-# INLINE mkCastRedn2 #-}
 
 -- | Apply one 'Reduction' to another.

@@ -55,3 +55,9 @@ coercionType :: Coercion -> Type
 topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
   -- used to look through newtypes to the right of
   -- function arrows, in 'GHC.Core.Type.getRuntimeArgTys'
+
+castCoToCo :: Type -> CastCoercion -> Coercion
+isReflexiveCastCo :: Type -> CastCoercion -> Bool
+mkTransCastCo :: HasDebugCallStack => CastCoercion -> CastCoercion -> CastCoercion
+seqCastCoercion :: CastCoercion -> ()
+castCoercionRKind :: HasDebugCallStack => Type -> CastCoercion -> Type

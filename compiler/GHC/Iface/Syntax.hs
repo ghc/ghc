@@ -2067,7 +2067,7 @@ freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfAppArgs ts
 freeNamesIfType (IfaceLitTy _)        = emptyNameSet
 freeNamesIfType (IfaceForAllTy tv t)  = freeNamesIfVarBndr tv &&& freeNamesIfType t
 freeNamesIfType (IfaceFunTy _ w s t)  = freeNamesIfType s &&& freeNamesIfType t &&& freeNamesIfType w
-freeNamesIfType (IfaceCastTy t c)     = freeNamesIfType t &&& freeNamesIfCoercion c
+freeNamesIfType (IfaceCastTy t c)     = freeNamesIfType t &&& freeNamesIfCastCoercion c
 freeNamesIfType (IfaceCoercionTy c)   = freeNamesIfCoercion c
 
 freeNamesIfMCoercion :: IfaceMCoercion -> NameSet

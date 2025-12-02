@@ -2696,11 +2696,11 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
      -- didn't do it this way, and then the unification above was deferred.
     go (CastTy t1 co1) t2
       = do { co_tys <- uType env t1 t2
-           ; return (mkCoherenceLeftCo role t1 co1 co_tys) }
+           ; return (mkCoherenceLeftCo role t1 (castCoToCo (typeKind t1) co1) co_tys) }
 
     go t1 (CastTy t2 co2)
       = do { co_tys <- uType env t1 t2
-           ; return (mkCoherenceRightCo role t2 co2 co_tys) }
+           ; return (mkCoherenceRightCo role t2 (castCoToCo (typeKind t2) co2) co_tys) }
 
         -- Variables; go for uUnfilledVar
         -- Note that we pass in *original* (before synonym expansion),
@@ -3484,7 +3484,7 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
   where
     lhs_info = metaTyVarInfo lhs_tv
 
-    !(occ_in_ty, occ_in_co) = mkOccFolders (tyVarName lhs_tv)
+    !(occ_in_ty, occ_in_co, occ_in_cast_co) = mkOccFolders (tyVarName lhs_tv)
 
     lhs_tv_lvl         = tcTyVarLevel lhs_tv
     lhs_tv_is_concrete = isConcreteTyVar lhs_tv
@@ -3525,17 +3525,17 @@ simpleUnifyCheck caller given_eq_lvl lhs_tv rhs
       | otherwise = False
 
     rhs_is_ok (AppTy t1 t2)    = rhs_is_ok t1 && rhs_is_ok t2
-    rhs_is_ok (CastTy ty co)   = not (occ_in_co co) && rhs_is_ok ty
+    rhs_is_ok (CastTy ty co)   = not (occ_in_cast_co co) && rhs_is_ok ty
     rhs_is_ok (CoercionTy co)  = not (occ_in_co co)
     rhs_is_ok (LitTy {})       = True
 
 
-mkOccFolders :: Name -> (TcType -> Bool, TcCoercion -> Bool)
+mkOccFolders :: Name -> (TcType -> Bool, TcCoercion -> Bool, TcCastCoercion -> Bool)
 -- These functions return True
 --   * if lhs_tv occurs (incl deeply, in the kind of variable)
 --   * if there is a coercion hole
 -- No expansion of type synonyms
-mkOccFolders lhs_tv = (getAny . check_ty, getAny . check_co)
+mkOccFolders lhs_tv = (getAny . check_ty, getAny . check_co, getAny . check_cast_co)
   where
     !(check_ty, _, check_co, _) = foldTyCo occ_folder emptyVarSet
     occ_folder = TyCoFolder { tcf_view  = noView  -- Don't expand synonyms
@@ -3548,6 +3548,11 @@ mkOccFolders lhs_tv = (getAny . check_ty, getAny . check_co)
 
     do_bndr is tcv _faf = extendVarSet is tcv
     do_hole _is _hole = DM.Any True  -- Reject coercion holes
+
+    check_cast_co ReflCastCo = Any False
+    check_cast_co (CCoercion co) = check_co co
+    check_cast_co (ZCoercion _ty _cos) = error "AMG TODO check_cast_co"
+
 
 {- *********************************************************************
 *                                                                      *
@@ -4144,7 +4149,7 @@ check_ty_eq_rhs flags ty
                           ; return (mkAppRedn <$> fun_res <*> arg_res) }
 
       CastTy ty co  -> do { ty_res <- check_ty_eq_rhs flags ty
-                          ; co_res <- checkCo flags co
+                          ; co_res <- checkCo flags (castCoToCo (typeKind ty) co)
                           ; return (mkCastRedn1 Nominal ty <$> co_res <*> ty_res) }
 
       CoercionTy co -> do { co_res <- checkCo flags co
@@ -4540,7 +4545,7 @@ simpleOccursCheck (OC_Check lhs_tv occ_prob) occ_tv
   | otherwise
   = TyVarCheck_Success
   where
-    (check_kind, _) = mkOccFolders lhs_tv
+    (check_kind, _, _) = mkOccFolders lhs_tv
 
 -------------------------
 tyVarLevelCheck :: LevelCheck m -> TcTyVar -> TyVarCheckResult m

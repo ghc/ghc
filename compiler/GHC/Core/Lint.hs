@@ -1990,9 +1990,10 @@ lintType ty@(ForAllTy {})
       = do { lintType body_ty
            ; lintForAllBody tcvs body_ty }
 
-lintType (CastTy ty co)
+lintType (CastTy ty cco)
   = do { lintType ty
        ; ty_kind <- substTyM (typeKind ty)
+       ; let co = castCoToCo (typeKind ty) cco -- TODO: maybe show the actual cco in mkCastTyErr/mkCastErr?
        ; co_lk <- lintStarCoercion co
        ; ensureEqTys ty_kind co_lk (mkCastTyErr ty co ty_kind co_lk) }
 

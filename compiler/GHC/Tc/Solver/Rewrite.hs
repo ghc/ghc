@@ -561,8 +561,9 @@ rewrite_one ty@(ForAllTy {})
        ; redn <- rewrite_one rho
        ; return $ mkHomoForAllRedn bndrs redn }
 
-rewrite_one (CastTy ty g)
+rewrite_one (CastTy ty cco)
   = do { redn <- rewrite_one ty
+       ; let g = castCoToCo (typeKind ty) cco
        ; g'   <- rewrite_co g
        ; role <- getRole
        ; return $ mkCastRedn1 role ty g' redn }

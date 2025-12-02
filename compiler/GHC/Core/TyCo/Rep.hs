@@ -186,7 +186,7 @@ data Type
 
   | CastTy
         Type
-        KindCoercion  -- ^ A kind cast. The coercion is always nominal.
+        CastCoercion  -- ^ A kind cast. The coercion is always nominal.
                       -- INVARIANT: The cast is never reflexive \(EQ2)
                       -- INVARIANT: The Type is not a CastTy (use TransCo instead) \(EQ3)
                       -- INVARIANT: The Type is not a ForAllTy over a tyvar \(EQ4)
@@ -2055,7 +2055,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty env (TyVarTy tv)      = tyvar env tv
     go_ty env (AppTy t1 t2)     = go_ty env t1 `mappend` go_ty env t2
     go_ty _   (LitTy {})        = mempty
-    go_ty env (CastTy ty co)    = go_ty env ty `mappend` go_co env co
+    go_ty env (CastTy ty co)    = go_ty env ty `mappend` go_cast_co env co
     go_ty env (CoercionTy co)   = go_co env co
     go_ty env (FunTy _ w arg res) = go_ty env w `mappend` go_ty env arg `mappend` go_ty env res
     go_ty env (TyConApp _ tys)  = go_tys env tys
@@ -2070,6 +2070,10 @@ foldTyCo (TyCoFolder { tcf_view       = view
     -- See Note [Use explicit recursion in foldTyCo]
     go_cos _   []     = mempty
     go_cos env (c:cs) = go_co env c `mappend` go_cos env cs
+
+    go_cast_co _   ReflCastCo = mempty
+    go_cast_co env (CCoercion co) = go_co env co
+    go_cast_co env (ZCoercion ty cos) = go_ty env ty `mappend` nonDetStrictFoldVarSet (mappend . covar env) mempty cos
 
     go_co env (Refl ty)                = go_ty env ty
     go_co env (GRefl _ ty MRefl)       = go_ty env ty
@@ -2134,7 +2138,7 @@ typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
 typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + typesSize ts
-typeSize (CastTy ty co)             = typeSize ty + coercionSize co
+typeSize (CastTy ty co)             = typeSize ty + castCoercionSize co
 typeSize (CoercionTy co)            = coercionSize co
 
 typesSize :: [Type] -> Int

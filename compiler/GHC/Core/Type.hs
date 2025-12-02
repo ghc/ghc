@@ -73,6 +73,7 @@ module GHC.Core.Type (
         getLevity, levityType_maybe,
 
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
+        mkCastTyCo,
 
         ErrorMsgType, pprUserTypeErrorTy,
 
@@ -236,6 +237,7 @@ import GHC.Core.TyCo.FVs
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.Unique.Set
 
 import GHC.Core.TyCon
 import GHC.Builtin.Types.Prim
@@ -258,9 +260,12 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkSymCo, mkTransCo, mkSelCo, mkLRCo, mkInstCo
    , mkKindCo, mkSubCo, mkFunCo, funRole
    , decomposePiCos, coercionKind
-   , coercionRKind, coercionType
-   , isReflexiveCo, seqCo
+   , coercionType
+   , isReflexiveCastCo, seqCo
    , topNormaliseNewType_maybe
+   , mkTransCastCo
+   , seqCastCoercion, castCoercionRKind
+   , castCoToCo
    )
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isConcreteTyVar )
 
@@ -514,11 +519,15 @@ expandTypeSynonyms ty
     go subst (ForAllTy (Bndr tv vis) t)
       = let (subst', tv') = substVarBndrUsing go subst tv in
         ForAllTy (Bndr tv' vis) (go subst' t)
-    go subst (CastTy ty co)  = mkCastTy (go subst ty) (go_co subst co)
+    go subst (CastTy ty co)  = mkCastTy (go subst ty) (go_cast_co subst co)
     go subst (CoercionTy co) = mkCoercionTy (go_co subst co)
 
     go_mco _     MRefl    = MRefl
     go_mco subst (MCo co) = MCo (go_co subst co)
+
+    go_cast_co _ ReflCastCo = ReflCastCo
+    go_cast_co subst (CCoercion co) = CCoercion (go_co subst co)
+    go_cast_co subst (ZCoercion ty cos) = ZCoercion (go subst ty) (substCoVarSet subst cos)
 
     go_co subst (Refl ty)
       = mkNomReflCo (go subst ty)
@@ -905,7 +914,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_ty !env (TyVarTy tv)    = tyvar env tv
     go_ty !env (AppTy t1 t2)   = mkAppTy <$> go_ty env t1 <*> go_ty env t2
     go_ty !_   ty@(LitTy {})   = return ty
-    go_ty !env (CastTy ty co)  = mkCastTy <$> go_ty env ty <*> go_co env co
+    go_ty !env (CastTy ty co)  = mkCastTy <$> go_ty env ty <*> go_cast_co env co
     go_ty !env (CoercionTy co) = CoercionTy <$> go_co env co
 
     go_ty !env ty@(FunTy _ w arg res)
@@ -935,6 +944,10 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
 
     go_mco !_   MRefl    = return MRefl
     go_mco !env (MCo co) = MCo <$> (go_co env co)
+
+    go_cast_co !_   ReflCastCo = return ReflCastCo
+    go_cast_co !env (CCoercion co) = CCoercion <$> (go_co env co)
+    go_cast_co !env (ZCoercion ty cos) = ZCoercion <$> go_ty env ty <*> (coVarsOfCos <$> mapM (covar env) (nonDetEltsUniqSet cos)) -- TODO
 
     go_co :: env -> Coercion -> m Coercion
     go_co !env (Refl ty)                  = Refl <$> go_ty env ty
@@ -1020,10 +1033,10 @@ isTyVarTy ty = isJust (getTyVar_maybe ty)
 
 -- | If the type is a tyvar, possibly under a cast, returns it, along
 -- with the coercion. Thus, the co is :: kind tv ~N kind ty
-getCastedTyVar_maybe :: Type -> Maybe (TyVar, CoercionN)
+getCastedTyVar_maybe :: Type -> Maybe (TyVar, CastCoercion)
 getCastedTyVar_maybe ty = case coreFullView ty of
   CastTy (TyVarTy tv) co -> Just (tv, co)
-  TyVarTy tv             -> Just (tv, mkReflCo Nominal (tyVarKind tv))
+  TyVarTy tv             -> Just (tv, ReflCastCo)
   _                      -> Nothing
 
 
@@ -1063,9 +1076,10 @@ type checker (e.g. when matching type-function equations).
 -- | Applies a type to another, as in e.g. @k a@
 mkAppTy :: Type -> Type -> Type
   -- See Note [Respecting definitional equality], invariant (EQ1).
-mkAppTy (CastTy fun_ty co) arg_ty
-  | ([arg_co], res_co) <- decomposePiCos co (coercionKind co) [arg_ty]
-  = (fun_ty `mkAppTy` (arg_ty `mkCastTy` arg_co)) `mkCastTy` res_co
+mkAppTy (CastTy fun_ty cco) arg_ty
+  | let co = castCoToCo (typeKind fun_ty) cco -- TOOD: can we get rid of this?
+  , ([arg_co], res_co) <- decomposePiCos co (coercionKind co) [arg_ty]
+  = (fun_ty `mkAppTy` (arg_ty `mkCastTy` CCoercion arg_co)) `mkCastTy` CCoercion res_co
 
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
 mkAppTy ty1               ty2 = AppTy ty1 ty2
@@ -1084,15 +1098,16 @@ mkAppTy ty1               ty2 = AppTy ty1 ty2
 
 mkAppTys :: Type -> [Type] -> Type
 mkAppTys ty1                []   = ty1
-mkAppTys (CastTy fun_ty co) arg_tys  -- much more efficient then nested mkAppTy
+mkAppTys (CastTy fun_ty cco) arg_tys  -- much more efficient then nested mkAppTy
                                      -- Why do this? See (EQ1) of
                                      -- Note [Respecting definitional equality]
                                      -- in GHC.Core.TyCo.Rep
-  = foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
+  = foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` CCoercion res_co) leftovers
   where
+    co = castCoToCo (typeKind fun_ty) cco
     (arg_cos, res_co) = decomposePiCos co (coercionKind co) arg_tys
     (args_to_cast, leftovers) = splitAtList arg_cos arg_tys
-    casted_arg_tys = zipWith mkCastTy args_to_cast arg_cos
+    casted_arg_tys = zipWith (\ ty co -> mkCastTy ty (CCoercion co)) args_to_cast arg_cos
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
 mkAppTys ty1                tys2 = foldl' AppTy ty1 tys2
 
@@ -1647,16 +1662,19 @@ newTyConInstRhs tycon tys
 *                                                                      *
 ********************************************************************* -}
 
-splitCastTy_maybe :: Type -> Maybe (Type, Coercion)
+splitCastTy_maybe :: Type -> Maybe (Type, CastCoercion)
 splitCastTy_maybe ty
   | CastTy ty' co <- coreFullView ty = Just (ty', co)
   | otherwise                        = Nothing
 
+mkCastTyCo :: Type -> Coercion -> Type
+mkCastTyCo ty co = mkCastTy ty (CCoercion co)
+
 -- | Make a 'CastTy'. The Coercion must be nominal. Checks the
 -- Coercion for reflexivity, dropping it if it's reflexive.
 -- See @Note [Respecting definitional equality]@ in "GHC.Core.TyCo.Rep"
-mkCastTy :: Type -> Coercion -> Type
-mkCastTy orig_ty co | isReflexiveCo co = orig_ty  -- (EQ2) from the Note
+mkCastTy :: Type -> CastCoercion -> Type
+mkCastTy orig_ty co | isReflexiveCastCo (typeKind orig_ty) co = orig_ty  -- (EQ2) from the Note
 -- NB: Do the slow check here. This is important to keep the splitXXX
 -- functions working properly. Otherwise, we may end up with something
 -- like (((->) |> something_reflexive_but_not_obviously_so) biz baz)
@@ -1666,7 +1684,7 @@ mkCastTy orig_ty co = mk_cast_ty orig_ty co
 
 -- | Like 'mkCastTy', but avoids checking the coercion for reflexivity,
 -- as that can be expensive.
-mk_cast_ty :: Type -> Coercion -> Type
+mk_cast_ty :: Type -> CastCoercion -> Type
 mk_cast_ty orig_ty co = go orig_ty
   where
     go :: Type -> Type
@@ -1675,14 +1693,14 @@ mk_cast_ty orig_ty co = go orig_ty
 
     go (CastTy ty co1)
       -- (EQ3) from the Note
-      = mkCastTy ty (co1 `mkTransCo` co)
+      = mkCastTy ty (co1 `mkTransCastCo` co)
           -- call mkCastTy again for the reflexivity check
 
     go (ForAllTy (Bndr tv vis) inner_ty)
       -- (EQ4) from the Note
       -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep.
       | isTyVar tv
-      , let fvs = tyCoVarsOfCo co
+      , let fvs = tyCoVarsOfCastCo co
       = -- have to make sure that pushing the co in doesn't capture the bound var!
         if tv `elemVarSet` fvs
         then let empty_subst = mkEmptySubst (mkInScopeSet fvs)
@@ -2546,7 +2564,7 @@ seqType (AppTy t1 t2)               = seqType t1 `seq` seqType t2
 seqType (FunTy _ w t1 t2)           = seqType w `seq` seqType t1 `seq` seqType t2
 seqType (TyConApp tc tys)           = tc `seq` seqTypes tys
 seqType (ForAllTy (Bndr tv _) ty)   = seqType (varType tv) `seq` seqType ty
-seqType (CastTy ty co)              = seqType ty `seq` seqCo co
+seqType (CastTy ty co)              = seqType ty `seq` seqCastCoercion co
 seqType (CoercionTy co)             = seqCo co
 
 seqTypes :: [Type] -> ()
@@ -2640,7 +2658,7 @@ typeKind (TyConApp tc tys)      = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)              = typeLiteralKind l
 typeKind (FunTy { ft_af = af }) = liftedTypeOrConstraintKind (funTyFlagResultTypeOrConstraint af)
 typeKind (TyVarTy tyvar)        = tyVarKind tyvar
-typeKind (CastTy _ty co)        = coercionRKind co
+typeKind (CastTy ty co)         = castCoercionRKind (typeKind ty) co
 typeKind (CoercionTy co)        = coercionType co
 
 typeKind (AppTy fun arg)

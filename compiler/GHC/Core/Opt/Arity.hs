@@ -2925,7 +2925,7 @@ pushCoTyArg co ty
 
   | isForAllTy_ty tyL
   = assertPpr (isForAllTy_ty tyR) (ppr co $$ ppr ty) $
-    Just (ty `mkCastTy` co1, coercionLKind co2, CCoercion co2)
+    Just (ty `mkCastTyCo` co1, coercionLKind co2, CCoercion co2)
 
   | otherwise
   = Nothing

@@ -947,7 +947,7 @@ rnIfaceType (IfaceForAllTy tv t)
 rnIfaceType (IfaceCoercionTy co)
     = IfaceCoercionTy <$> rnIfaceCo co
 rnIfaceType (IfaceCastTy ty co)
-    = IfaceCastTy <$> rnIfaceType ty <*> rnIfaceCo co
+    = IfaceCastTy <$> rnIfaceType ty <*> rnIfaceCastCo co
 
 rnIfaceScaledType :: Rename (IfaceMult, IfaceType)
 rnIfaceScaledType (m, t) = (,) <$> rnIfaceType m <*> rnIfaceType t

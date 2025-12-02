@@ -235,7 +235,7 @@ tidyType env (TyVarTy tv)           = TyVarTy $! tidyTyCoVarOcc env tv
 tidyType _   t@(TyConApp _ [])      = t -- Preserve sharing if possible
 tidyType env (TyConApp tycon tys)   = TyConApp tycon $! tidyTypes env tys
 tidyType env (AppTy fun arg)        = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env (CastTy ty co)         = (CastTy $! tidyType env ty) $! (tidyCo env co)
+tidyType env (CastTy ty co)         = (CastTy $! tidyType env ty) $! (tidyCastCo env co)
 tidyType env (CoercionTy co)        = CoercionTy $! (tidyCo env co)
 tidyType env ty@(FunTy _ w arg res) = let { !w'   = tidyType env w
                                           ; !arg' = tidyType env arg

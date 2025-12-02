@@ -37,7 +37,7 @@ import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
 import GHC.Hs
 
-import GHC.Core.TyCo.Rep( Type(..), Coercion(..), MCoercion(..) )
+import GHC.Core.TyCo.Rep( Type(..), Coercion(..), MCoercion(..), CastCoercion(..) )
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate
 import GHC.Core.Make( rEC_SEL_ERROR_ID )
@@ -101,7 +101,7 @@ synonymTyConsOfType ty
      go (AppTy a b)       = go a `plusNameEnv` go b
      go (FunTy _ w a b)   = go w `plusNameEnv` go a `plusNameEnv` go b
      go (ForAllTy _ ty)   = go ty
-     go (CastTy ty co)    = go ty `plusNameEnv` go_co co
+     go (CastTy ty co)    = go ty `plusNameEnv` go_cast_co co
      go (CoercionTy co)   = go_co co
 
      -- Note [TyCon cycles through coercions?!]
@@ -127,6 +127,10 @@ synonymTyConsOfType ty
      -- sake".
      go_mco MRefl    = emptyNameEnv
      go_mco (MCo co) = go_co co
+
+     go_cast_co ReflCastCo       = emptyNameEnv
+     go_cast_co (CCoercion co)   = go_co co
+     go_cast_co (ZCoercion ty _) = go ty
 
      go_co (Refl ty)            = go ty
      go_co (GRefl _ ty mco)     = go ty `plusNameEnv` go_mco mco

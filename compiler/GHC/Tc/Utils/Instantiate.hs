@@ -331,7 +331,7 @@ instTyVarsWith orig tvs tys
       = go (extendTvSubstAndInScope subst tv ty) tvs tys
       | otherwise
       = do { co <- emitWantedEq orig KindLevel Nominal ty_kind tv_kind
-           ; go (extendTvSubstAndInScope subst tv (ty `mkCastTy` co)) tvs tys }
+           ; go (extendTvSubstAndInScope subst tv (ty `mkCastTyCo` co)) tvs tys }
       where
         tv_kind = substTy subst (tyVarKind tv)
         ty_kind = typeKind ty

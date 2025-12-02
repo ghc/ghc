@@ -1696,7 +1696,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
            do { let arrows_needed = n_initial_val_args all_args
               ; co <- matchExpectedFunKind (HsTypeRnThing $ unLoc hs_ty) arrows_needed substed_fun_ki
 
-              ; fun' <- liftZonkM $ zonkTcType (fun `mkCastTy` co)
+              ; fun' <- liftZonkM $ zonkTcType (fun `mkCastTyCo` co)
                      -- This zonk is essential, to expose the fruits
                      -- of matchExpectedFunKind to the 'go' loop
 
@@ -1963,7 +1963,7 @@ checkExpectedKind hs_ty ty act_kind exp_kind
                  ; traceTc "checkExpectedKind" (vcat [ ppr act_kind
                                                      , ppr exp_kind
                                                      , ppr co_k ])
-                ; return (res_ty `mkCastTy` co_k) } }
+                ; return (res_ty `mkCastTyCo` co_k) } }
     where
       -- We need to make sure that both kinds have the same number of implicit
       -- foralls and constraints out front. If the actual kind has more, instantiate
@@ -1986,7 +1986,7 @@ checkExpKind _rn_ty ty ki (Infer cell) = do
   -- NB: do not instantiate.
   -- See Note [Do not always instantiate eagerly in types]
   co <- fillInferResultNoInst ki cell
-  pure (ty `mkCastTy` co)
+  pure (ty `mkCastTyCo` co)
 
 ---------------------------
 

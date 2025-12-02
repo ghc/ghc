@@ -58,7 +58,7 @@ import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
-import GHC.Core.Coercion( mkSymCo )
+import GHC.Core.Coercion( mkSymCastCo )
 import GHC.Core.Type (mkStrLitTy, mkCastTy)
 import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
@@ -1093,7 +1093,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
                -- So, to make the kinds work out, we reverse the cast here.
                Just (wc_var, wc_co) -> liftZonkM $
                                        writeMetaTyVar wc_var (mkConstraintTupleTy diff_theta
-                                                              `mkCastTy` mkSymCo wc_co)
+                                                              `mkCastTy` mkSymCastCo (varType wc_var) wc_co)
                Nothing              -> pprPanic "chooseInferredQuantifiers 1" (ppr wc_var_ty)
 
            ; traceTc "completeTheta" $

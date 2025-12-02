@@ -884,7 +884,7 @@ opt_trans_rule is co1 co2
                  (opt_trans is' r1 r2')
     where
       is' = is `extendInScopeSet` tv1
-      r2' = substCoWithInScope is' [tv2] [mkCastTy (TyVarTy tv1) kco1] r2
+      r2' = substCoWithInScope is' [tv2] [mkCastTyCo (TyVarTy tv1) kco1] r2
 
 -- Push transitivity inside forall
 -- forall over coercions.
@@ -1481,7 +1481,7 @@ optForAllCoBndr env sym tcv k_mco
                -- override the substitution for the original variable to the
                -- re-kinded one, suitably casted
                tv2    = tv1 `setTyVarKind` coercionLKind k_co'
-               subst2 = (extendTvSubst subst1 tcv (mkTyVarTy tv2 `CastTy` k_co'))
+               subst2 = (extendTvSubst subst1 tcv (mkTyVarTy tv2 `CastTy` CCoercion k_co'))
                         `extendSubstInScope` tv2
 
           _ -> (subst1, tv1)

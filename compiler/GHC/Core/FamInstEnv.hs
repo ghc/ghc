@@ -1485,9 +1485,10 @@ normalise_type ty
            ; redn <- withLC lc' $ normalise_type ty
            ; return $ mkForAllRedn vis tv' k_redn redn }
     go (TyVarTy tv)    = normalise_tyvar tv
-    go (CastTy ty co)
+    go (CastTy ty cco)
       = do { redn <- go ty
            ; lc <- getLC
+           ; let co = castCoToCo (typeKind ty) cco
            ; let co' = substRightCo lc co
            ; return $ mkCastRedn2 Nominal ty co redn co'
              --       ^^^^^^^^^^^ uses castCoercionKind2

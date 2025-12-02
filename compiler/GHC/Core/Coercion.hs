@@ -64,6 +64,8 @@ module GHC.Core.Coercion (
         mkForAllCastCo,
         mkFunResCastCo,
         mkFunCastCoNoFTF,
+        mkGReflLeftCastCo,
+        mkGReflRightCastCo,
         applyForAllTy,
         decomposeFunCastCo,
 
@@ -397,7 +399,7 @@ mkSymMCo (MCo co) = MCo (mkSymCo co)
 -- | Cast a type by an 'MCoercion'
 mkCastTyMCo :: Type -> MCoercion -> Type
 mkCastTyMCo ty MRefl    = ty
-mkCastTyMCo ty (MCo co) = ty `mkCastTy` co
+mkCastTyMCo ty (MCo co) = ty `mkCastTy` CCoercion co
 
 mkFunResMCo :: Id -> CastCoercion -> CastCoercion
 mkFunResMCo _      ReflCastCo    = ReflCastCo
@@ -411,6 +413,17 @@ mkGReflLeftMCo r ty (MCo co) = mkGReflLeftCo r ty co
 mkGReflRightMCo :: Role -> Type -> MCoercionN -> Coercion
 mkGReflRightMCo r ty MRefl    = mkReflCo r ty
 mkGReflRightMCo r ty (MCo co) = mkGReflRightCo r ty co
+
+mkGReflLeftCastCo :: Role -> Type -> CastCoercion -> Coercion
+mkGReflLeftCastCo r ty ReflCastCo = mkReflCo r ty
+mkGReflLeftCastCo r ty (CCoercion co) = mkGReflLeftCo r ty co
+mkGReflLeftCastCo _r _ty (ZCoercion _ki _cos) = error "AMG TODO mkGReflLeftCastCo"
+
+mkGReflRightCastCo :: Role -> Type -> CastCoercion -> Coercion
+mkGReflRightCastCo r ty ReflCastCo  = mkReflCo r ty
+mkGReflRightCastCo r ty (CCoercion co) = mkGReflRightCo r ty co
+mkGReflRightCastCo _r _ty (ZCoercion _ki _cos) = error "AMG TODO mkGReflRightCastCo"
+
 
 -- | Like 'mkCoherenceRightCo', but with an 'MCoercion'
 mkCoherenceRightMCo :: Role -> Type -> MCoercionN -> Coercion -> Coercion
@@ -526,7 +539,7 @@ decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
         --      res_co :: t1[ty |> arg_co / a] ~ t2[ty / b]
       = let arg_co  = mkSelCo SelForAll (mkSymCo co)
             res_co  = mkInstCo co (mkGReflLeftCo Nominal ty arg_co)
-            subst1' = extendTCvSubst subst1 a (ty `CastTy` arg_co)
+            subst1' = extendTCvSubst subst1 a (ty `CastTy` CCoercion arg_co)
             subst2' = extendTCvSubst subst2 b ty
         in
         go (arg_co : acc_arg_cos) (subst1', t1) res_co (subst2', t2) tys
@@ -1797,10 +1810,10 @@ castCoercionKind1 :: Coercion -> Role -> Type -> Type
 castCoercionKind1 g r t1 t2 h
   = case g of
       Refl {} -> assert (r == Nominal) $ -- Refl is always Nominal
-                 mkNomReflCo (mkCastTy t2 h)
+                 mkNomReflCo (mkCastTy t2 (CCoercion h))
       GRefl _ _ mco -> case mco of
-           MRefl       -> mkReflCo r (mkCastTy t2 h)
-           MCo kind_co -> mkGReflMCo r (mkCastTy t1 h)
+           MRefl       -> mkReflCo r (mkCastTy t2 (CCoercion h))
+           MCo kind_co -> mkGReflMCo r (mkCastTy t1 (CCoercion h))
                                (mkSymCo h `mkTransCo` kind_co `mkTransCo` h)
       _ -> castCoercionKind2 g r t1 t2 h h
 
@@ -2293,8 +2306,10 @@ ty_co_subst !lc role ty
          else pprPanic "ty_co_subst: covar is not almost devoid" (ppr t)
     go r ty@(LitTy {})     = assert (r == Nominal) $
                              mkNomReflCo ty
-    go r (CastTy ty co)    = castCoercionKind (go r ty) (substLeftCo lc co)
+    go r (CastTy ty cco)    = castCoercionKind (go r ty) (substLeftCo lc co)
                                                         (substRightCo lc co)
+      where
+        co = castCoToCo (typeKind ty) cco
     go r (CoercionTy co)   = mkProofIrrelCo r kco (substLeftCo lc co)
                                                   (substRightCo lc co)
       where kco = go Nominal (coercionType co)
@@ -2617,7 +2632,7 @@ coercion_lr_kind which orig_co
   where
     go (Refl ty)              = ty
     go (GRefl _ ty MRefl)     = ty
-    go (GRefl _ ty (MCo co1)) = pickLR which (ty, mkCastTy ty co1)
+    go (GRefl _ ty (MCo co1)) = pickLR which (ty, mkCastTy ty (CCoercion co1))
     go (TyConAppCo _ tc cos)  = mkTyConApp tc (map go cos)
     go (AppCo co1 co2)        = mkAppTy (go co1) (go co2)
     go (CoVarCo cv)           = go_covar cv
@@ -2710,7 +2725,7 @@ coercion_lr_kind which orig_co
               k2  = coercionRKind k_co
               tv2 = setTyVarKind tv1 (substTy subst k2)
               subst' = extendTvSubst (extendSubstInScope subst tv2) tv1 $
-                       TyVarTy tv2 `mkCastTy` mkSymCo k_co
+                       TyVarTy tv2 `mkCastTy` CCoercion (mkSymCo k_co)
 
     go_forall_right subst (ForAllCo { fco_tcv = cv1, fco_visR = visR
                                     , fco_kind = k_mco, fco_body = co })
@@ -2815,13 +2830,15 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- coreView ty1 = go ty1' ty2
                | Just ty2' <- coreView ty2 = go ty1 ty2'
 
-    go (CastTy ty1 co) ty2
-      = let co' = go ty1 ty2
+    go (CastTy ty1 cco) ty2
+      = let co = castCoToCo (typeKind ty1) cco
+            co' = go ty1 ty2
             r = coercionRole co'
         in  mkCoherenceLeftCo r ty1 co co'
 
-    go ty1 (CastTy ty2 co)
-      = let co' = go ty1 ty2
+    go ty1 (CastTy ty2 cco)
+      = let co = castCoToCo (typeKind ty2) cco
+            co' = go ty1 ty2
             r = coercionRole co'
         in  mkCoherenceRightCo r ty2 co co'
 
@@ -2858,7 +2875,7 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
       where kind_co  = go (tyVarKind tv1) (tyVarKind tv2)
             in_scope = mkInScopeSet $ tyCoVarsOfType ty2 `unionVarSet` tyCoVarsOfCo kind_co
             ty2'     = substTyWithInScope in_scope [tv2]
-                         [mkTyVarTy tv1 `mkCastTy` kind_co]
+                         [mkTyVarTy tv1 `mkCastTy` CCoercion kind_co]
                          ty2
 
     go (ForAllTy (Bndr cv1 flag1) ty1) (ForAllTy (Bndr cv2 flag2) ty2)
@@ -2972,7 +2989,7 @@ eqCastCoercionX env ty1 co1 ty2 co2 = eqTypeX env ty1 ty2
 
 -- | Convert a 'CastCoercion' back into a 'Coercion', using a 'UnivCo' if we
 -- have discarded the original 'Coercion'.
-castCoToCo :: Type -> CastCoercion -> CoercionR
+castCoToCo :: Type -> CastCoercion -> Coercion
 castCoToCo _      (CCoercion co)         = co
 castCoToCo lhs_ty (ZCoercion rhs_ty cos) = mkUnivCo ZCoercionProv (map CoVarCo (nonDetEltsUniqSet cos)) Representational lhs_ty rhs_ty
 castCoToCo lhs_ty ReflCastCo             = mkRepReflCo lhs_ty

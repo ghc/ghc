@@ -1435,7 +1435,7 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
     go dv (FunTy _ w arg res) = foldlM go dv [w, arg, res]
     go dv (LitTy {})          = return dv
     go dv (CastTy ty co)      = do { dv1 <- go dv ty
-                                   ; collect_cand_qtvs_co orig_ty cur_lvl bound dv1 co }
+                                   ; collect_cand_qtvs_cast_co orig_ty cur_lvl bound dv1 co }
     go dv (CoercionTy co)     = collect_cand_qtvs_co orig_ty cur_lvl bound dv co
 
     go dv (TyVarTy tv)
@@ -1515,6 +1515,18 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
 
                         -- See Note [Recurring into kinds for candidateQTyVars]
                       ; collect_cand_qtvs orig_ty True cur_lvl bound dv' tv_kind } }
+
+collect_cand_qtvs_cast_co :: TcType -- original type at top of recursion; for errors
+                     -> TcLevel
+                     -> VarSet -- bound variables
+                     -> CandidatesQTvs -> CastCoercion
+                     -> TcM CandidatesQTvs
+collect_cand_qtvs_cast_co orig_ty cur_lvl bound dv cco = case cco of
+    ReflCastCo -> return dv
+    CCoercion co -> collect_cand_qtvs_co orig_ty cur_lvl bound dv co
+    ZCoercion ty cos -> do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv ty
+                           ; foldM (\dv cv -> collect_cand_qtvs_co orig_ty cur_lvl bound dv (CoVarCo cv)) dv1 (nonDetEltsUniqSet cos) -- TODO
+                           }
 
 collect_cand_qtvs_co :: TcType -- original type at top of recursion; for errors
                      -> TcLevel

@@ -76,6 +76,7 @@ import GHC.Utils.EndoOS
 
 import GHC.Data.Pair
 
+import Data.Maybe
 import Data.Semigroup
 
 {-
@@ -667,7 +668,7 @@ tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
 tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
 tyCoFVsOfType (FunTy _ w arg res)  f bound_vars acc = (tyCoFVsOfType w `unionFV` tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
 tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
-tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
+tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCastCoercion co) f bound_vars acc
 tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
 
 tyCoFVsBndr :: ForAllTyBinder -> FV -> FV
@@ -765,6 +766,11 @@ almost_devoid_co_var_of_mco :: MCoercion -> CoVar -> Bool
 almost_devoid_co_var_of_mco MRefl    _  = True
 almost_devoid_co_var_of_mco (MCo co) cv = almost_devoid_co_var_of_co co cv
 
+almost_devoid_co_var_of_cast_co :: CastCoercion -> CoVar -> Bool
+almost_devoid_co_var_of_cast_co ReflCastCo    _  = True
+almost_devoid_co_var_of_cast_co (CCoercion co) cv = almost_devoid_co_var_of_co co cv
+almost_devoid_co_var_of_cast_co (ZCoercion ty cos) cv = almost_devoid_co_var_of_type ty cv && not (elemVarSet cv cos)
+
 almost_devoid_co_var_of_co :: Coercion -> CoVar -> Bool
 almost_devoid_co_var_of_co (Refl {}) _ = True   -- covar is allowed in Refl and
 almost_devoid_co_var_of_co (GRefl {}) _ = True  -- GRefl, so we don't look into
@@ -829,7 +835,7 @@ almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
   && (v == cv || almost_devoid_co_var_of_type ty cv)
 almost_devoid_co_var_of_type (CastTy ty co) cv
   = almost_devoid_co_var_of_type ty cv
-  && almost_devoid_co_var_of_co co cv
+  && almost_devoid_co_var_of_cast_co co cv
 almost_devoid_co_var_of_type (CoercionTy co) cv
   = almost_devoid_co_var_of_co co cv
 
@@ -866,7 +872,7 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
       = ((`delVarSet` tv) <$> go ty) `mappend`
         (invisible (tyCoVarsOfType $ varType tv))
     go (LitTy {}) = mempty
-    go (CastTy ty co) = go ty `mappend` invisible (tyCoVarsOfCo co)
+    go (CastTy ty co) = go ty `mappend` invisible (tyCoVarsOfCastCo co)
     go (CoercionTy co) = invisible $ tyCoVarsOfCo co
 
     invisible vs = Pair vs emptyVarSet
@@ -1005,7 +1011,7 @@ invisibleVarsOfType = go
       where (invisibles, visibles) = partitionInvisibleTypes tc tys
     go (ForAllTy tvb ty)  = tyCoFVsBndr tvb $ go ty
     go LitTy{}            = emptyFV
-    go (CastTy ty co)     = tyCoFVsOfCo co `unionFV` go ty
+    go (CastTy ty co)     = tyCoFVsOfCastCoercion co `unionFV` go ty
     go (CoercionTy co)    = tyCoFVsOfCo co
 
 -- | Like 'invisibleVarsOfType', but for many types.
@@ -1096,7 +1102,7 @@ tyConsOfType ty
                                       go a `unionUniqSets` go b
                                       `unionUniqSets` go_tc (funTyFlagTyCon af)
      go (ForAllTy (Bndr tv _) ty)   = go ty `unionUniqSets` go (varType tv)
-     go (CastTy ty co)              = go ty `unionUniqSets` go_co co
+     go (CastTy ty co)              = go ty `unionUniqSets` go_cast_co co
      go (CoercionTy co)             = go_co co
 
      go_co (Refl ty)               = go ty
@@ -1122,6 +1128,10 @@ tyConsOfType ty
 
      go_mco MRefl    = emptyUniqSet
      go_mco (MCo co) = go_co co
+
+     go_cast_co ReflCastCo = emptyUniqSet
+     go_cast_co (CCoercion co) = go_co co
+     go_cast_co (ZCoercion ty _cos) = go ty
 
      go_cos cos   = foldr (unionUniqSets . go_co)  emptyUniqSet cos
 
@@ -1256,7 +1266,7 @@ occCheckExpand vs_to_avoid ty
                       -- Failing that, try to expand a synonym
 
     go cxt (CastTy ty co) =  do { ty' <- go cxt ty
-                                ; co' <- go_co cxt co
+                                ; co' <- go_cast_co cxt co
                                 ; return (CastTy ty' co') }
     go cxt (CoercionTy co) = do { co' <- go_co cxt co
                                 ; return (CoercionTy co') }
@@ -1272,6 +1282,14 @@ occCheckExpand vs_to_avoid ty
     ------------------
     go_mco _   MRefl = return MRefl
     go_mco ctx (MCo co) = MCo <$> go_co ctx co
+
+    go_cast_co _   ReflCastCo = return ReflCastCo
+    go_cast_co ctx (CCoercion co) = CCoercion <$> go_co ctx co
+    go_cast_co ctx (ZCoercion ty cos) = ZCoercion <$> go ctx ty <*> go_covars ctx cos
+
+    go_covars (as, env) cos
+      | anyVarSet (bad_var_occ as) cos = Nothing
+      | otherwise = return $ mapVarSet (\cv -> fromMaybe cv (lookupVarEnv env cv)) cos
 
     ------------------
     go_co cxt (Refl ty)                 = do { ty' <- go cxt ty

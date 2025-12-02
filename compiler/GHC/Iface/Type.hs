@@ -190,7 +190,7 @@ data IfaceType
   | IfaceForAllTy  IfaceForAllBndr IfaceType
   | IfaceTyConApp  IfaceTyCon IfaceAppArgs  -- Not necessarily saturated
                                             -- Includes newtypes, synonyms, tuples
-  | IfaceCastTy     IfaceType IfaceCoercion
+  | IfaceCastTy     IfaceType IfaceCastCoercion
   | IfaceCoercionTy IfaceCoercion
 
   | IfaceTupleTy                  -- Saturated tuples (unsaturated ones use IfaceTyConApp)
@@ -776,11 +776,15 @@ substIfaceType env ty
     go (IfaceTyConApp tc tys) = IfaceTyConApp tc (substIfaceAppArgs env tys)
     go (IfaceTupleTy s i tys) = IfaceTupleTy s i (substIfaceAppArgs env tys)
     go (IfaceForAllTy {})     = pprPanic "substIfaceType" (ppr ty)
-    go (IfaceCastTy ty co)    = IfaceCastTy (go ty) (go_co co)
+    go (IfaceCastTy ty co)    = IfaceCastTy (go ty) (go_cast_co co)
     go (IfaceCoercionTy co)   = IfaceCoercionTy (go_co co)
 
     go_mco IfaceMRefl    = IfaceMRefl
     go_mco (IfaceMCo co) = IfaceMCo $ go_co co
+
+    go_cast_co IfaceReflCastCo = IfaceReflCastCo
+    go_cast_co (IfaceCCoercion co) = IfaceCCoercion (go_co co)
+    go_cast_co (IfaceZCoercion ty cos) = IfaceZCoercion (go ty) (map go_co cos)
 
     go_co (IfaceReflCo ty)           = IfaceReflCo (go ty)
     go_co (IfaceGReflCo r ty mco)    = IfaceGReflCo r (go ty) (go_mco mco)
@@ -2190,6 +2194,9 @@ pprPromotionQuoteI IsPromoted  = char '\''
 
 instance Outputable IfaceCoercion where
   ppr = pprIfaceCoercion
+
+instance Outputable IfaceCastCoercion where
+  ppr = pprIfaceCastCoercion
 
 instance Binary IfaceTyCon where
   put_ bh (IfaceTyCon n i) = put_ bh n >> put_ bh i
