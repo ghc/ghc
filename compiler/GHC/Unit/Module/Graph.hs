@@ -565,16 +565,26 @@ mgReachableLoop mg nk = map summaryNodeSummary modules_below where
     allReachableMany td_map (mapMaybe lookup_node nk)
 
 
--- | @'mgQueryZero' g root b@ answers the question: can we reach @b@ from @root@
+-- | @'mgQueryZero' g root target@ answers the question: can we reach @target@ from @root@
 -- in the module graph @g@, only using normal (level 0) imports?
+--
+-- If the @target@ key is not reachable, there is no path.
+-- The @root@ key not being in @g@ results in a panic.
 mgQueryZero :: ModuleGraph
             -> ZeroScopeKey
             -> ZeroScopeKey
             -> Bool
-mgQueryZero mg nka nkb = isReachable td_map na nb where
+mgQueryZero mg rootKey targetKey =
+  case lookup_node targetKey of
+    -- The module we are looking for may not be in the module graph at all,
+    -- e.g. if a reference to it did not arise from an explicit import
+    -- declaration (as in #26568).
+    Nothing -> False
+    Just ntarget -> isReachable td_map nroot ntarget
+  where
+  -- invariant: the root key has to exist in the graph
+  nroot = fromJust $ lookup_node rootKey
   (td_map, lookup_node) = mg_zero_graph mg
-  na = expectJust $ lookup_node nka
-  nb = expectJust $ lookup_node nkb
 
 
 -- | Reachability Query.

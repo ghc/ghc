@@ -1,0 +1,34 @@
+T26568.hs:5:3: error: [GHC-28914]
+    • Level error:
+      instance for ‘GHC.Internal.Base.Monad GHC.Internal.TH.Monad.Q’
+      is bound at levels {} but used at level -1
+    • In a stmt of a 'do' block: _ <- _
+      In the expression:
+        do _ <- _
+           _
+      In the untyped splice:
+        $(do _ <- _
+             _)
+
+T26568.hs:5:8: error: [GHC-88464]
+    • Found hole: _ :: GHC.Internal.TH.Monad.Q a0
+      Where: ‘a0’ is an ambiguous type variable
+    • In a stmt of a 'do' block: _ <- _
+      In the expression:
+        do _ <- _
+           _
+      In the untyped splice:
+        $(do _ <- _
+             _)
+
+T26568.hs:6:3: error: [GHC-88464]
+    • Found hole:
+        _ :: GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Exp
+    • In a stmt of a 'do' block: _
+      In the expression:
+        do _ <- _
+           _
+      In the untyped splice:
+        $(do _ <- _
+             _)
+
