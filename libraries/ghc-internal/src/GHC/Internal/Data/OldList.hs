@@ -576,7 +576,7 @@ delete                  =  deleteBy (==)
 --
 -- >>> deleteBy (/=) 5 [5, 5, 4, 3, 5, 2]
 -- [5,5,3,5,2]
-deleteBy                :: (a -> a -> Bool) -> a -> [a] -> [a]
+deleteBy                :: (a -> b -> Bool) -> a -> [b] -> [b]
 deleteBy _  _ []        = []
 deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
 
@@ -1342,7 +1342,7 @@ unzip7          =  foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
 --
 -- >>> deleteFirstsBy (/=) [1..10] [1, 3, 5]
 -- [4,5,6,7,8,9,10]
-deleteFirstsBy          :: (a -> a -> Bool) -> [a] -> [a] -> [a]
+deleteFirstsBy          :: (a -> b -> Bool) -> [b] -> [a] -> [b]
 deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
 
 -- | The 'group' function takes a list and returns a list of lists such
