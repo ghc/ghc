@@ -11,7 +11,7 @@ import GHC.Tc.Types ( TcGblEnv(tcg_tc_plugin_rewriters),
                       RewriteEnv(..),
                       runTcPluginM )
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.CtLoc( CtLoc )
+import GHC.Tc.Types.CtLoc( CtLoc, resetCtLocDepth )
 import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
@@ -90,7 +90,8 @@ runRewriteCtEv ev
 runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, CoHoleSet)
 runRewrite loc flav eq_rel thing_inside
   = do { rewriters_ref <- newTcRef emptyCoHoleSet
-       ; let fmode = RE { re_loc       = loc
+       ; let fmode = RE { re_loc       = resetCtLocDepth loc
+                            -- Start reducing from zero
                         , re_flavour   = flav
                         , re_eq_rel    = eq_rel
                         , re_rewriters = rewriters_ref }
@@ -792,8 +793,7 @@ rewrite_fam_app tc tys  -- Can be over-saturated
 -- See Note [How to normalise a family application]
 rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM Reduction
 rewrite_exact_fam_app tc tys
-  = bumpReductionDepthRM (mkTyConApp tc tys) $
-    do { -- Query the typechecking plugins for all their rewriting functions
+  = do { -- Query the typechecking plugins for all their rewriting functions
          -- which apply to a type family application headed by the TyCon 'tc'.
        ; tc_rewriters <- getTcPluginRewritersForTyCon tc
 
@@ -876,7 +876,8 @@ rewrite_exact_fam_app tc tys
            -> Reduction -> RewriteM Reduction
     finish use_cache redn
       = do { -- rewrite the result: FINISH 1
-             final_redn <- rewrite_reduction redn
+             final_redn <- bumpReductionDepthRM (mkTyConApp tc tys) $
+                           rewrite_reduction redn
            ; eq_rel <- getEqRel
 
              -- extend the cache: FINISH 2

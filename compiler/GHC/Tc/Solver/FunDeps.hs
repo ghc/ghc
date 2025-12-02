@@ -38,6 +38,7 @@ import GHC.Utils.Panic
 
 import GHC.Data.Pair
 import Data.Maybe( isNothing, isJust, mapMaybe )
+import Control.Monad( void )
 
 
 {- Note [Overview of functional dependencies in type inference]
@@ -303,17 +304,20 @@ tryDictFunDeps :: DictCt -> SolverStage ()
 
 tryDictFunDeps dict_ct
   = do { -- Note [Do local fundeps before top-level instances]
-         tryDictFunDepsLocal dict_ct
-       ; tryDictFunDepsTop   dict_ct }
+         insoluble <- tryDictFunDepsLocal dict_ct
+       ; if insoluble
+         then nopStage ()
+         else tryDictFunDepsTop dict_ct }
 
-tryDictFunDepsLocal :: DictCt -> SolverStage ()
+tryDictFunDepsLocal :: DictCt -> SolverStage Bool
 -- Using functional dependencies, interact the DictCt with the
 -- inert Givens and Wanteds, to produce new equalities
+-- Returns True if the fundeps are insoluble
 tryDictFunDepsLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
   | isGiven work_ev
   = -- If work_ev is Given, there could in principle be some inert Wanteds
     -- but in practice there never are because we solve Givens first
-    nopStage ()
+    nopStage False
 
   | otherwise
   = Stage $
@@ -324,14 +328,15 @@ tryDictFunDepsLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
        ; let eqns :: [FunDepEqns]
              eqns = foldr ((++) . do_interaction) [] $
                     findDictsByClass (inert_dicts inerts) cls
-       ; imp <- solveFunDeps work_ev eqns
+       ; (insoluble, unif_happened) <- solveFunDeps work_ev eqns
 
        ; traceTcS "tryDictFunDepsLocal }" $
-         text "imp =" <+> ppr imp $$ text "eqns = " <+> ppr eqns
+         text "unif =" <+> ppr unif_happened $$ text "eqns = " <+> ppr eqns
 
-       ; if imp then startAgainWith (CDictCan dict_ct)
-                     -- See (DFL1) of Note [Do fundeps last]
-                else continueWith () }
+       -- See (DFL1) of Note [Do fundeps last]
+       ; if insoluble          then continueWith True
+         else if unif_happened then startAgainWith (CDictCan dict_ct)
+                               else continueWith False }
   where
     work_pred     = ctEvPred work_ev
     work_is_given = isGiven work_ev
@@ -356,11 +361,12 @@ tryDictFunDepsTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
        ; traceTcS "tryDictFunDepsTop {" (ppr dict_ct)
        ; let eqns :: [FunDepEqns]
              eqns = improveFromInstEnv inst_envs cls xis
-       ; imp <- solveFunDeps ev eqns
-       ; traceTcS "tryDictFunDepsTop }" (text "imp =" <+> ppr imp)
+       ; (insoluble, unif_happened) <- solveFunDeps ev eqns
+       ; traceTcS "tryDictFunDepsTop }" (text "unif =" <+> ppr unif_happened)
 
-       ; if imp then startAgainWith (CDictCan dict_ct)
-                else continueWith () }
+       ; if not insoluble && unif_happened
+         then startAgainWith (CDictCan dict_ct)
+         else continueWith () }
 
 {- Note [No Given/Given fundeps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -481,12 +487,12 @@ tryFamEqFunDeps eqs_for_me fam_tc work_args
   = if isGiven ev
     then tryGivenBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_item
     else do { -- Note [Do local fundeps before top-level instances]
-              tryFDEqns fam_tc work_args work_item $
-              mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
+              insoluble <- tryFDEqns fam_tc work_args work_item $
+                           mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
 
-            ; if hasRelevantGiven eqs_for_me work_args work_item
+            ; if insoluble || hasRelevantGiven eqs_for_me work_args work_item
             ; then nopStage ()
-              else tryFDEqns fam_tc work_args work_item $
+              else void $ tryFDEqns fam_tc work_args work_item $
                    mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs }
 
   | isGiven ev    -- See (INJFAM:Given)
@@ -496,15 +502,16 @@ tryFamEqFunDeps eqs_for_me fam_tc work_args
 
   | otherwise   -- Wanted, user-defined type families
   = do { -- Note [Do local fundeps before top-level instances]
-         case tyConInjectivityInfo fam_tc of
-           NotInjective  -> nopStage()
+         insoluble <- case tyConInjectivityInfo fam_tc of
+           NotInjective  -> nopStage False
            Injective inj -> tryFDEqns fam_tc work_args work_item $
                             mkLocalFamEqFDs eqs_for_me fam_tc inj work_args work_rhs
 
-       ; if hasRelevantGiven eqs_for_me work_args work_item
+       ; if insoluble || hasRelevantGiven eqs_for_me work_args work_item
          then nopStage ()
-         else tryFDEqns fam_tc work_args work_item $
-              mkTopFamEqFDs fam_tc work_args work_rhs }
+         else void $ tryFDEqns fam_tc work_args work_item $
+              mkTopFamEqFDs fam_tc work_args work_rhs
+       ; nopStage () }
 
 mkTopFamEqFDs :: TyCon -> [TcType] -> Xi -> TcS [FunDepEqns]
 mkTopFamEqFDs fam_tc work_args work_rhs
@@ -526,17 +533,19 @@ mkTopFamEqFDs fam_tc work_args work_rhs
     -- closed type families with no equations (isClosedFamilyTyCon_maybe returns Nothing)
     return []
 
-tryFDEqns :: TyCon -> [TcType] -> EqCt -> TcS [FunDepEqns] -> SolverStage ()
+tryFDEqns :: TyCon -> [TcType] -> EqCt -> TcS [FunDepEqns] -> SolverStage Bool
+-- Returns True <=> some of the fundep eqns were insoluble
 tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eqns
   = Stage $
     do { fd_eqns <- mk_fd_eqns
        ; traceTcS "tryFDEqns" (vcat [ text "lhs:" <+> ppr fam_tc <+> ppr work_args
                                     , text "rhs:" <+> ppr rhs
                                     , text "eqns:" <+> ppr fd_eqns ])
-       ; imp <- solveFunDeps ev fd_eqns
+       ; (insoluble, unif_happened) <- solveFunDeps ev fd_eqns
 
-       ; if imp then startAgainWith (CEqCan work_item)
-                else continueWith () }
+       ; if insoluble          then continueWith True
+         else if unif_happened then startAgainWith (CEqCan work_item)
+                               else continueWith False }
 
 -----------------------------------------
 --  User-defined type families
@@ -878,7 +887,8 @@ solving.
 
 solveFunDeps :: CtEvidence  -- The work item
              -> [FunDepEqns]
-             -> TcS Bool
+             -> TcS ( Bool   -- True <=> some insoluble fundeps
+                    , Bool ) -- True <=> unifications happened
 -- Solve a bunch of type-equality equations, generated by functional dependencies
 -- By "solve" we mean: (only) do unifications.  We do not generate evidence, and
 -- other than unifications there should be no effects whatsoever
@@ -888,12 +898,13 @@ solveFunDeps :: CtEvidence  -- The work item
 -- See (SOLVE-FD) in Note [Overview of functional dependencies in type inference]
 solveFunDeps work_ev fd_eqns
   | null fd_eqns
-  = return False -- Common case no-op
+  = return (False, False) -- Common case no-op
 
   | otherwise
-  = do { loc' <- bumpReductionDepth (ctEvLoc work_ev) (ctEvPred work_ev)
+  = do { traceTcS "bumping" (ppr work_ev)
+       ; loc' <- bumpReductionDepth (ctEvLoc work_ev) (ctEvPred work_ev)
 
-       ; (unifs, _res)
+       ; (unifs, residual)
              <- reportFineGrainUnifications $
                 nestFunDepsTcS              $
                 TcS.pushTcLevelM_           $
@@ -911,7 +922,7 @@ solveFunDeps work_ev fd_eqns
        -- that were unified by the fundep
        ; kickOutAfterUnification unifs
 
-       ; return (not (isEmptyVarSet unifs)) }
+       ; return (insolubleWC residual, not (isEmptyVarSet unifs)) }
   where
     do_fundeps :: UnifyEnv -> TcM ()
     do_fundeps env = mapM_ (do_one env) fd_eqns

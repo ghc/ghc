@@ -2182,7 +2182,8 @@ newWantedNC loc rewriters pty
 
 -- | Checks if the depth of the given location is too much. Fails if
 -- it's too big, with an appropriate error message.
-bumpReductionDepth :: CtLoc -> TcType   -- ^ type being reduced
+bumpReductionDepth :: CtLoc
+                   -> TcType   -- ^ type or constraint being reduced
                    -> TcS CtLoc
 bumpReductionDepth loc ty
   = do { dflags <- getDynFlags

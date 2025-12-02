@@ -349,11 +349,11 @@ can_eq_nc True _rdr_env _envs ev ReprEq ty1 _ ty2 _
 can_eq_nc _rewritten rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   | ReprEq <- eq_rel
   , Just stuff1 <- tcTopNormaliseNewTypeTF_maybe envs rdr_env ty1
-  = can_eq_newtype_nc rdr_env envs ev NotSwapped ty1 stuff1 ty2 ps_ty2
+  = can_eq_newtype_nc rdr_env envs ev NotSwapped stuff1 ty2 ps_ty2
 
   | ReprEq <- eq_rel
   , Just stuff2 <- tcTopNormaliseNewTypeTF_maybe envs rdr_env ty2
-  = can_eq_newtype_nc rdr_env envs ev IsSwapped ty2 stuff2 ty1 ps_ty1
+  = can_eq_newtype_nc rdr_env envs ev IsSwapped stuff2 ty1 ps_ty1
 
 -- Then, get rid of casts
 can_eq_nc rewritten rdr_env envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
@@ -777,18 +777,17 @@ though, because we check our depth in `can_eq_newtype_nc`.
 can_eq_newtype_nc :: GlobalRdrEnv -> FamInstEnvs
                   -> CtEvidence           -- ^ :: ty1 ~ ty2
                   -> SwapFlag
-                  -> TcType                                    -- ^ ty1
                   -> ((Bag GlobalRdrElt, TcCoercion), TcType)  -- ^ :: ty1 ~ ty1'
                   -> TcType               -- ^ ty2
                   -> TcType               -- ^ ty2, with type synonyms
                   -> TcS (StopOrContinue (Either IrredCt EqCt))
-can_eq_newtype_nc rdr_env envs ev swapped ty1 ((gres, co1), ty1') ty2 ps_ty2
+can_eq_newtype_nc rdr_env envs ev swapped ((gres, co1), ty1') ty2 ps_ty2
   = do { traceTcS "can_eq_newtype_nc" $
          vcat [ ppr ev, ppr swapped, ppr co1, ppr gres, ppr ty1', ppr ty2 ]
 
          -- Check for blowing our stack, and increase the depth
          -- See Note [Newtypes can blow the stack]
-       ; loc' <- bumpReductionDepth (ctEvLoc ev) ty1
+       ; loc' <- bumpReductionDepth (ctEvLoc ev) (ctEvPred ev)
        ; let ev' = ev `setCtEvLoc` loc'
 
          -- Next, we record uses of newtype constructors, since coercing
