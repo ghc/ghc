@@ -673,10 +673,6 @@ quickLookKeys = [dollarIdKey, leftSectionKey, rightSectionKey]
 *                                                                      *
 ********************************************************************* -}
 
--- setQLInstLevel :: QLFlag -> TcM a -> TcM a
--- setQLInstLevel DoQL thing_inside = setTcLevel QLInstVar thing_inside
--- setQLInstLevel NoQL thing_inside = thing_inside
-
 tcInstFun :: QLFlag
           -> Bool   -- False <=> Instantiate only /top-level, inferred/ variables;
                     --           so may return a sigma-type
@@ -700,9 +696,7 @@ tcInstFun do_ql inst_final ds_flag (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigm
                                    , text "args:" <+> ppr rn_args
                                    , text "do_ql" <+> ppr do_ql
                                    , text "ctx" <+> ppr fun_lspan])
-       ; res@(_, fun_ty) <- -- setQLInstLevel do_ql $  -- See (TCAPP1) and (TCAPP2) in
-                                                    -- Note [tcApp: typechecking applications]
-                                go 1 [] fun_sigma rn_args
+       ; res@(_, fun_ty) <- go 1 [] fun_sigma rn_args
        ; traceTc "tcInstFun:ret" (ppr fun_ty)
        ; return res
        }
