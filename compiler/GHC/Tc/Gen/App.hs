@@ -1953,7 +1953,8 @@ quickLookArg1 pos app_lspan (fun, fun_lspan) larg@(L arg_loc arg) sc_arg_ty@(Sca
                            | otherwise = fun_lspan_arg'
 
        -- Step 1: get the type of the head of the argument
-       ; (fun_ue, mb_fun_ty) <- tcCollectingUsage $ tcInferAppHead_maybe rn_fun_arg
+       ; (fun_ue, mb_fun_ty) <- maybe_update_err_ctxt fun_lspan_arg rn_fun_arg $
+                                (tcCollectingUsage $ tcInferAppHead_maybe rn_fun_arg)
          -- tcCollectingUsage: the use of an Id at the head generates usage-info
          -- See the call to `tcEmitBindingUsage` in `check_local_id`.  So we must
          -- capture and save it in the `EValArgQL`.  See (QLA6) in
@@ -2020,6 +2021,17 @@ quickLookArg1 pos app_lspan (fun, fun_lspan) larg@(L arg_loc arg) sc_arg_ty@(Sca
                            , eaql_wanted   = wanted
                            , eaql_encl     = arg_influences_enclosing_call
                            , eaql_res_rho  = app_res_rho }) }}}
+
+
+maybe_update_err_ctxt :: SrcSpan -> HsExpr GhcRn ->  TcM a -> TcM a
+maybe_update_err_ctxt fun_lspan_arg rn_fun_arg thing_inside
+  | not (isGeneratedSrcSpan fun_lspan_arg)
+  , XExpr (ExpandedThingRn{}) <- rn_fun_arg
+  = addLExprCtxt fun_lspan_arg rn_fun_arg $ thing_inside
+  | otherwise
+  = thing_inside
+
+
 
 mk_origin :: SrcSpan       -- SrcSpan of the argument
           -> HsExpr GhcRn  -- The head of the expression application chain
