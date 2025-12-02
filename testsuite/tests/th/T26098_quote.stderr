@@ -1,0 +1,14 @@
+T26098_quote.hs:9:8: error: [GHC-28914]
+    • Level error: ‘T’ is bound at levels {-1, 0} but used at level 1
+    • Available from the imports:
+      • imported from ‘T26098A_quote’ at T26098_quote.hs:5:1-20
+      • imported from ‘T26098A_quote’ at -1 at T26098_quote.hs:4:1-27
+    • In the Template Haskell quotation: [t| T |]
+
+T26098_quote.hs:12:8: error: [GHC-28914]
+    • Level error: ‘MkT’ is bound at levels {-1, 0} but used at level 1
+    • Available from the imports:
+      • imported from ‘T26098A_quote’ at T26098_quote.hs:5:1-20
+      • imported from ‘T26098A_quote’ at -1 at T26098_quote.hs:4:1-27
+    • In the Template Haskell quotation: [t| 'MkT |]
+

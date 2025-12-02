@@ -16,3 +16,5 @@ rnSpliceDecl :: SpliceDecl GhcPs -> RnM (SpliceDecl GhcRn, FreeVars)
 rnTopSpliceDecls :: HsUntypedSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeVars)
 
 checkThLocalTyName :: Name -> RnM ()
+
+checkThLocalNameNoLift :: LIdOccP GhcRn -> RnM ()

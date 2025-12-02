@@ -1,0 +1,16 @@
+T26098_local.hs:9:15: error: [GHC-28914]
+    • Level error: ‘a’ is bound at level 0 but used at level 1
+    • In the Template Haskell quotation: [t| a |]
+
+T26098_local.hs:12:19: error: [GHC-28914]
+    • Level error: ‘a’ is bound at level 0 but used at level 1
+    • In the Template Haskell quotation: [| id @a |]
+
+T26098_local.hs:15:20: error: [GHC-28914]
+    • Level error: ‘a’ is bound at level 0 but used at level 1
+    • In the Template Haskell typed quotation: [|| id @a ||]
+
+T26098_local.hs:32:15: error: [GHC-28914]
+    • Level error: ‘T’ is bound at level 0 but used at level -1
+    • In the untyped splice: $(3 :: T)
+
