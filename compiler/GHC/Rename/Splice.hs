@@ -182,12 +182,12 @@ rnUntypedBracket e br_body
        }
 
 rn_utbracket :: HsQuote GhcPs -> RnM (HsQuote GhcRn, FreeVars)
-rn_utbracket (VarBr _ flg rdr_name)
-  = do { name <- lookupOccRn (if flg then WL_Term else WL_Type) (unLoc rdr_name)
+rn_utbracket (VarBr _ is_value_name rdr_name)
+  = do { name <- lookupOccRn (if is_value_name then WL_Term else WL_Type) (unLoc rdr_name)
        ; let res_name = L (l2l (locA rdr_name)) (WithUserRdr (unLoc rdr_name) name)
-       ; if flg then checkThLocalNameNoLift res_name else checkThLocalTyName name
-       ; check_namespace flg name
-       ; return (VarBr noExtField flg (noLocA name), unitFV name) }
+       ; if is_value_name then checkThLocalNameNoLift res_name else checkThLocalTyName name
+       ; check_namespace is_value_name name
+       ; return (VarBr noExtField is_value_name (noLocA name), unitFV name) }
 
 rn_utbracket (ExpBr _ e) = do { (e', fvs) <- rnLExpr e
                                 ; return (ExpBr noExtField e', fvs) }
@@ -919,8 +919,7 @@ checkThLocalTyName name
         ; case mb_local_use of {
              Nothing -> return () ;  -- Not a locally-bound thing
              Just (top_lvl, bind_lvl, use_lvl) ->
-    do  { let use_lvl_idx = thLevelIndex use_lvl
-        -- We don't check the well levelledness of name here.
+    do  -- We don't check the well levelledness of name here.
         -- this would break test for #20969
         --
         -- Consequently there is no check&restiction for top level splices.
@@ -929,11 +928,11 @@ checkThLocalTyName name
         -- Therefore checkCrossLevelLiftingTy shouldn't assume anything
         -- about bind_lvl and use_lvl relation.
         --
-        ; traceRn "checkThLocalTyName" (ppr name <+> ppr bind_lvl
+        { traceRn "checkThLocalTyName" (ppr name <+> ppr bind_lvl
                                                  <+> ppr use_lvl
                                                  <+> ppr use_lvl)
         ; dflags <- getDynFlags
-        ; checkCrossLevelLiftingTy dflags top_lvl bind_lvl use_lvl use_lvl_idx name } } }
+        ; checkCrossLevelLiftingTy dflags top_lvl bind_lvl use_lvl name } } }
 
 -- | Check whether we are allowed to use a Name in this context (for TH purposes)
 -- In the case of a level incorrect program, attempt to fix it by using
@@ -947,15 +946,18 @@ checkThLocalNameWithLift = checkThLocalName True
 checkThLocalNameNoLift :: LIdOccP GhcRn -> RnM ()
 checkThLocalNameNoLift name = checkThLocalName False name >> return ()
 
--- | Implemenation of the level checks
+-- | Implementation of the level checks
 -- See Note [Template Haskell levels]
 checkThLocalName :: Bool -> LIdOccP GhcRn -> RnM (HsExpr GhcRn)
 checkThLocalName allow_lifting name_var
   -- Exact and Orig names are not imported, so presumed available at all levels.
+  -- whenever the user uses exact names, e.g. say @'mkNameG_v' "" "Foo" "bar"@,
+  -- even though the 'mkNameG_v' here is essentially a quotation, we do not do
+  -- level checks as we assume that the user was trying to bypass the level checks
   | isExact (userRdrName (unLoc name_var)) || isOrig (userRdrName (unLoc name_var))
   = return (HsVar noExtField name_var)
-  | isUnboundName name   -- Do not report two errors for
-  = return (HsVar noExtField name_var)            --   $(not_in_scope args)
+  | isUnboundName name                  -- Do not report two errors for
+  = return (HsVar noExtField name_var)  --   $(not_in_scope args)
   | isWiredInName name
   = return (HsVar noExtField name_var)
   | otherwise
@@ -964,16 +966,15 @@ checkThLocalName allow_lifting name_var
         ; case mb_local_use of {
              Nothing -> return (HsVar noExtField name_var) ;  -- Not a locally-bound thing
              Just (top_lvl, bind_lvl, use_lvl) ->
-    do  { let use_lvl_idx = thLevelIndex use_lvl
-        ; cur_mod <- extractModule <$> getGblEnv
+    do  { cur_mod <- extractModule <$> getGblEnv
         ; let is_local
                   | Just mod <- nameModule_maybe name = mod == cur_mod
                   | otherwise = True
-        ; traceRn "checkThLocalName" (ppr name <+> ppr bind_lvl <+> ppr use_lvl <+> ppr use_lvl)
+        ; traceRn "checkThLocalName" (ppr name <+> ppr bind_lvl <+> ppr use_lvl)
         ; dflags <- getDynFlags
         ; env <- getGlobalRdrEnv
         ; let mgre = lookupGRE_Name env name
-        ; checkCrossLevelLifting dflags (LevelCheckSplice name mgre) top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name_var } } }
+        ; checkCrossLevelLifting dflags (LevelCheckSplice name mgre) top_lvl is_local allow_lifting bind_lvl use_lvl name_var } } }
   where
     name = getName name_var
 
@@ -981,14 +982,21 @@ checkThLocalName allow_lifting name_var
 checkCrossLevelLifting :: DynFlags
                        -> LevelCheckReason
                        -> TopLevelFlag
+                       -- ^ whether or not the identifier is a top level identifier
                        -> Bool
+                       -- ^ the name of the current module is the name of the module
+                       --   of the name that we're examining (if it exists)
                        -> Bool
+                       -- ^ whether or not the compiler is allowed to insert
+                       -- 'lift' to fix a potential staging error
                        -> Set.Set ThLevelIndex
+                       -- ^ the levels at which the identifier is bound
                        -> ThLevel
-                       -> ThLevelIndex
+                       -- ^ the level that the identifier is being used at
                        -> LIdOccP GhcRn
+                       -- ^ the identifier that is being checked
                        -> TcM (HsExpr GhcRn)
-checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use_lvl use_lvl_idx name_var
+checkCrossLevelLifting dflags reason top_lvl_flg is_local allow_lifting bind_lvl use_lvl name_var
   -- 1. If name is in-scope, at the correct level.
   | use_lvl_idx `Set.member` bind_lvl = return (HsVar noExtField name_var)
   -- 2. Name is imported with -XImplicitStagePersistence
@@ -996,11 +1004,12 @@ checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use
   , xopt LangExt.ImplicitStagePersistence dflags = return (HsVar noExtField name_var)
   -- 3. Name is top-level, with -XImplicitStagePersistence, and needs
   -- to be persisted into the future.
-  | isTopLevel top_lvl
+  | isTopLevel top_lvl_flg
   , is_local
   , any (use_lvl_idx >=) (Set.toList bind_lvl)
   , xopt LangExt.ImplicitStagePersistence dflags = when (isExternalName name) (keepAlive name) >> return (HsVar noExtField name_var)
   -- 4. Name is in a bracket, and lifting is allowed
+  --    We need to increment at most once because nested brackets are not allowed
   | Brack _ pending <- use_lvl
   , any (\bind_idx -> use_lvl_idx == incThLevelIndex bind_idx) (Set.toList bind_lvl)
   , allow_lifting
@@ -1020,10 +1029,11 @@ checkCrossLevelLifting dflags reason top_lvl is_local allow_lifting bind_lvl use
   | otherwise = addErrTc (TcRnBadlyLevelled reason bind_lvl use_lvl_idx Nothing ErrorWithoutFlag ) >> return (HsVar noExtField name_var)
   where
     name = getName name_var
+    use_lvl_idx = thLevelIndex use_lvl
 
-checkCrossLevelLiftingTy :: DynFlags -> TopLevelFlag -> Set.Set ThLevelIndex -> ThLevel -> ThLevelIndex -> Name -> TcM ()
-checkCrossLevelLiftingTy dflags top_lvl bind_lvl _use_lvl use_lvl_idx name
-  | isTopLevel top_lvl
+checkCrossLevelLiftingTy :: DynFlags -> TopLevelFlag -> Set.Set ThLevelIndex -> ThLevel -> Name -> TcM ()
+checkCrossLevelLiftingTy dflags top_lvl_flg bind_lvl use_lvl name
+  | isTopLevel top_lvl_flg
   , xopt LangExt.ImplicitStagePersistence dflags
   = return ()
 
@@ -1038,6 +1048,8 @@ checkCrossLevelLiftingTy dflags top_lvl bind_lvl _use_lvl use_lvl_idx name
 
   | otherwise
   = return ()
+  where
+  use_lvl_idx = thLevelIndex use_lvl
 
 {-
 Note [Keeping things alive for Template Haskell]

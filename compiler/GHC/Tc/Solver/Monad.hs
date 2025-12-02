@@ -1683,17 +1683,15 @@ which is defined at the top-level and therefore fails with an error that we have
 the stage restriction.
 
 ```
-Main.hs:12:14: error:
-    • GHC stage restriction:
-        instance for ‘Show
-                        (T ())’ is used in a top-level splice, quasi-quote, or annotation,
-        and must be imported, not defined locally
+Main.hs:10:14: error: [GHC-28914]
+    • Level error: instance for ‘Show (T ())’ is bound at level 0
+      but used at level -1
     • In the expression: foo [|| T () ||]
-      In the Template Haskell splice $$(foo [|| T () ||])
+      In the typed Template Haskell splice: $$(foo [|| T () ||])
       In the expression: $$(foo [|| T () ||])
    |
-12 |   let x = $$(foo [|| T () ||])
-   |
+10 |   let x = $$(foo [|| T () ||])
+   |              ^^^
 ```
 
 Solving a `Typeable (T t1 ...tn)` constraint generates code that relies on
