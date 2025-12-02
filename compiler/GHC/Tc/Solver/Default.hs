@@ -508,6 +508,10 @@ defaultEquality encl_eqs ct
   = return False
 
   where
+    ev  = ctEvidence ct
+    rws = ctEvRewriters ev
+    loc = ctEvLoc ev
+
     -- try_default_tv_nom: used for tv ~#N ty
     try_default_tv_nom lhs_tv rhs_ty
       | MetaTv { mtv_info = info } <- tcTyVarDetails lhs_tv
@@ -546,7 +550,7 @@ defaultEquality encl_eqs ct
           = do { traceTcS "defaultEquality success:" (ppr rhs_ty)
                ; unifyTyVar lhs_tv rhs_ty  -- NB: unifyTyVar adds to the
                                            -- TcS unification counter
-               ; setEqIfWanted (ctEvidence ct) (mkReflCPH NomEq rhs_ty)
+               ; setEqIfWanted ev (mkReflCPH NomEq rhs_ty)
                ; return True
                }
 
@@ -561,7 +565,7 @@ defaultEquality encl_eqs ct
             -- This handles cases such as @IO alpha[tau] ~R# IO Int@
             -- by defaulting @alpha := Int@, which is useful in practice
             -- (see Note [Defaulting representational equalities]).
-           ; (co, new_eqs) <- wrapUnifier (ctEvidence ct) Nominal $ \uenv ->
+           ; (co, new_eqs) <- wrapUnifier rws loc Nominal $ \uenv ->
                               -- NB: nominal equality!
                               uType uenv z_ty1 z_ty2
 
@@ -571,7 +575,7 @@ defaultEquality encl_eqs ct
             -- See Note [Defaulting representational equalities].
            ; if null new_eqs
              then do { traceTcS "defaultEquality ReprEq } (yes)" empty
-                     ; setEqIfWanted (ctEvidence ct) $
+                     ; setEqIfWanted ev $
                        CPH { cph_co = mkSubCo co, cph_holes = emptyCoHoleSet }
                      ; return True }
              else do { traceTcS "defaultEquality ReprEq } (no)" empty

@@ -2257,7 +2257,8 @@ wrapUnifierAndEmit :: CtEvidence -> Role
 --    returns a CoHoleSet describing the new unsolved goals
 wrapUnifierAndEmit ev role do_unifications
   = do { (unifs, (co, eqs)) <- reportFineGrainUnifications $
-                               wrapUnifier ev role do_unifications
+                               wrapUnifier (ctEvRewriters ev) (ctEvLoc ev) role $
+                               do_unifications
 
        -- Emit the deferred constraints
        ; emitChildEqs ev eqs
@@ -2267,7 +2268,7 @@ wrapUnifierAndEmit ev role do_unifications
 
        ; return (CPH { cph_co = co, cph_holes = rewriterSetFromCts eqs }) }
 
-wrapUnifier :: CtEvidence -> Role
+wrapUnifier :: CoHoleSet -> CtLoc -> Role
              -> (UnifyEnv -> TcM a)  -- Some calls to uType
              -> TcS (a, Bag Ct)
 -- Invokes the do_unifications argument, with a suitable UnifyEnv.
@@ -2275,7 +2276,7 @@ wrapUnifier :: CtEvidence -> Role
 --    See Note [wrapUnifier]
 -- The (Bag Ct) are the deferred constraints; we emit them but
 -- also return them
-wrapUnifier ev role do_unifications
+wrapUnifier rws loc role do_unifications
   = do { given_eq_lvl <- getInnermostGivenEqLevel
        ; what_uni     <- getWhatUnifications
 
@@ -2283,8 +2284,8 @@ wrapUnifier ev role do_unifications
          do { defer_ref    <- TcM.newTcRef emptyBag
             ; let env = UE { u_role         = role
                            , u_given_eq_lvl = given_eq_lvl
-                           , u_rewriters    = ctEvRewriters ev
-                           , u_loc          = ctEvLoc ev
+                           , u_rewriters    = rws
+                           , u_loc          = loc
                            , u_defer        = defer_ref
                            , u_what         = what_uni }
               -- u_rewriters: the rewriter set and location from

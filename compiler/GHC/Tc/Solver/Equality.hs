@@ -486,7 +486,7 @@ can_eq_nc_forall :: CtEvidence -> EqRel
 -- See Note [Solving forall equalities]
 
 can_eq_nc_forall ev eq_rel s1 s2
- | CtWanted (WantedCt { ctev_dest = orig_dest }) <- ev
+ | CtWanted (WantedCt { ctev_dest = orig_dest, ctev_rewriters = rws, ctev_loc = loc }) <- ev
  = do { let (bndrs1, phi1, bndrs2, phi2) = split_foralls s1 s2
             flags1 = binderFlags bndrs1
             flags2 = binderFlags bndrs2
@@ -550,7 +550,7 @@ can_eq_nc_forall ev eq_rel s1 s2
                 do { -- Generate constraints
                      (tclvl, (all_co, wanteds))
                           <- pushLevelNoWorkList (ppr skol_info) $
-                             wrapUnifier ev (eqRelRole eq_rel)   $ \uenv ->
+                             wrapUnifier rws loc (eqRelRole eq_rel)   $ \uenv ->
                              go uenv skol_tvs init_subst2 bndrs1 bndrs2
 
                    ; traceTcS "Trying to solve the implication" (ppr s1 $$ ppr s2 $$ ppr wanteds)
@@ -1688,9 +1688,9 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
               ; emitWorkNC [CtGiven kind_ev]
               ; finish emptyCoHoleSet (givenCtEvCoercion kind_ev) }
 
-      CtWanted {}
+      CtWanted (WantedCt { ctev_loc = loc, ctev_rewriters = rws })
          -> do { (unifs, (kind_co, eqs)) <- reportFineGrainUnifications $
-                                            wrapUnifier ev Nominal $ \uenv ->
+                                            wrapUnifier rws loc Nominal $ \uenv ->
                                             let uenv' = updUEnvLoc uenv (mkKindEqLoc xi1 xi2)
                                             in uType uenv' ki2 ki1
                       -- kind_co :: ki2 ~N ki1

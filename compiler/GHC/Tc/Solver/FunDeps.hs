@@ -892,7 +892,6 @@ solveFunDeps work_ev fd_eqns
 
   | otherwise
   = do { loc' <- bumpReductionDepth (ctEvLoc work_ev) (ctEvPred work_ev)
-       ; let work_ev' = work_ev `setCtEvLoc` loc'
 
        ; (unifs, _res)
              <- reportFineGrainUnifications $
@@ -901,7 +900,8 @@ solveFunDeps work_ev fd_eqns
                    -- pushTcLevelTcM: increase the level so that unification variables
                    -- allocated by the fundep-creation itself don't count as useful unifications
                    -- See Note [Deeper TcLevel for partial improvement unification variables]
-                do { (_, eqs) <- wrapUnifier work_ev' Nominal do_fundeps
+                do { (_, eqs) <- wrapUnifier (ctEvRewriters work_ev) loc' Nominal $
+                                 do_fundeps
                    ; solveSimpleWanteds eqs }
     -- Why solveSimpleWanteds?  Answer
     --     (a) We don't want to rely on the eager unifier being clever
