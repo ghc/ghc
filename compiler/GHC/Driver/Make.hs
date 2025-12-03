@@ -113,6 +113,8 @@ import Data.Either ( rights, partitionEithers, lefts )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import GHC.Data.OsPath (OsPath)
+import qualified GHC.Data.OsPath as OsPath
 import Control.Concurrent ( newQSem, waitQSem, signalQSem, ThreadId, killThread, forkIOWithUnmask )
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
@@ -1560,8 +1562,9 @@ moduleGraphNodeMap graph =
 -- are all there, including the imports of non-home-package modules.
 downsweep :: HscEnv
           -> [ModSummary]
-          -> Maybe ModuleGraph
           -- ^ Old summaries
+          -> Maybe ModuleGraph
+          -- ^ Existing module graph to reuse cached nodes from
           -> [ModuleName]       -- Ignore dependencies on these; treat
                                 -- them as if they were package modules
           -> Bool               -- True <=> allow multiple targets to have
@@ -1583,12 +1586,12 @@ downsweep hsc_env old_summaries old_graph excl_mods allow_dup_roots = do
     -- file was used in.
     -- Reuse these if we can because the most expensive part of downsweep is
     -- reading the headers.
-    old_summary_map :: M.Map (UnitId, FilePath) ModSummary
+    old_summary_map :: M.Map (UnitId, OsPath) ModSummary
     old_summary_map =
-      M.fromList [((ms_unitid ms, msHsFilePath ms), ms) | ms <- old_summaries]
+      M.fromList [((ms_unitid ms, OsPath.unsafeEncodeUtf (msHsFilePath ms)), ms) | ms <- old_summaries]
 
 downsweep_imports :: HscEnv
-                  -> M.Map (UnitId, FilePath) ModSummary
+                  -> M.Map (UnitId, OsPath) ModSummary
                   -> Maybe ModuleGraph
                   -> [ModuleName]
                   -> Bool
@@ -1730,7 +1733,7 @@ downsweep_imports hsc_env old_summaries old_graph excl_mods allow_dup_roots (roo
 
 getRootSummary ::
   [ModuleName] ->
-  M.Map (UnitId, FilePath) ModSummary ->
+  M.Map (UnitId, OsPath) ModSummary ->
   HscEnv ->
   Target ->
   IO (Either (UnitId, DriverMessages) ModSummary)
@@ -2076,7 +2079,7 @@ mkRootMap summaries = Map.fromListWith (flip (++))
 summariseFile
         :: HscEnv
         -> HomeUnit
-        -> M.Map (UnitId, FilePath) ModSummary    -- old summaries
+        -> M.Map (UnitId, OsPath) ModSummary    -- old summaries
         -> FilePath                     -- source file name
         -> Maybe Phase                  -- start phase
         -> Maybe (StringBuffer,UTCTime)
@@ -2085,7 +2088,7 @@ summariseFile
 summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
         -- we can use a cached summary if one is available and the
         -- source file hasn't changed,
-   | Just old_summary <- M.lookup (homeUnitId home_unit, src_fn) old_summaries
+   | Just old_summary <- M.lookup (homeUnitId home_unit, src_fn_os) old_summaries
    = do
         let location = ms_location $ old_summary
 
@@ -2106,6 +2109,7 @@ summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
   where
     -- change the main active unit so all operations happen relative to the given unit
     hsc_env = hscSetActiveHomeUnit home_unit hsc_env'
+    src_fn_os = OsPath.unsafeEncodeUtf src_fn
     -- src_fn does not necessarily exist on the filesystem, so we need to
     -- check what kind of target we are dealing with
     get_src_hash = case maybe_buf of
@@ -2195,7 +2199,7 @@ data SummariseResult =
 summariseModule
           :: HscEnv
           -> HomeUnit
-          -> M.Map (UnitId, FilePath) ModSummary
+          -> M.Map (UnitId, OsPath) ModSummary
           -- ^ Map of old summaries
           -> IsBootInterface    -- True <=> a {-# SOURCE #-} import
           -> Located ModuleName -- Imported module to be summarised
@@ -2256,7 +2260,7 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
               Right ms -> FoundHome ms
 
     new_summary_cache_check loc mod src_fn h
-      | Just old_summary <- Map.lookup ((toUnitId (moduleUnit mod), src_fn)) old_summary_map =
+      | Just old_summary <- Map.lookup ((toUnitId (moduleUnit mod), src_fn_os)) old_summary_map =
 
          -- check the hash on the source file, and
          -- return the cached summary if it hasn't changed.  If the
@@ -2267,6 +2271,8 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
            Nothing    ->
                checkSummaryHash hsc_env (new_summary loc mod src_fn) old_summary loc h
       | otherwise = new_summary loc mod src_fn h
+      where
+        src_fn_os = OsPath.unsafeEncodeUtf src_fn
 
     new_summary :: ModLocation
                   -> Module
