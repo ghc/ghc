@@ -89,6 +89,7 @@ import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Deps
+import GHC.Types.Unique.DSet
 
 import GHC.Data.Maybe
 
@@ -474,7 +475,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
                  -- TODO: Check whether we need to account for levels here.
                  -- It seems that this field just gets used to write a comment
                  -- in C codegen, so it's value doesn't affect an important result.
-                 , cg_dep_pkgs      = S.map snd (dep_direct_pkgs deps)
+                 , cg_dep_pkgs      = mkUniqDSet $ map snd $ S.toAscList (dep_direct_pkgs deps)
                  , cg_modBreaks     = modBreaks
                  , cg_spt_entries   = spt_entries
                  }

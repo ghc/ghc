@@ -136,8 +136,8 @@ hsc_HUG = ue_home_unit_graph . hsc_unit_env
 hsc_mod_graph :: HscEnv -> ModuleGraph
 hsc_mod_graph = ue_module_graph . hsc_unit_env
 
-hsc_all_home_unit_ids :: HscEnv -> Set.Set UnitId
-hsc_all_home_unit_ids = HUG.allUnits . hsc_HUG
+hsc_all_home_unit_ids :: HscEnv -> UnitIdSet
+hsc_all_home_unit_ids = unitEnv_keys . hsc_HUG
 
 hscInsertHPT :: HomeModInfo -> HscEnv -> IO ()
 hscInsertHPT hmi hsc_env = UnitEnv.insertHpt hmi (hsc_unit_env hsc_env)
@@ -451,4 +451,3 @@ hscUpdateHPT f hsc_env = hsc_env { hsc_unit_env = updateHug (HUG.unitEnv_adjust 
   where
     ue = hsc_unit_env hsc_env
     upd hue = hue { homeUnitEnv_hpt = f (homeUnitEnv_hpt hue) }
-

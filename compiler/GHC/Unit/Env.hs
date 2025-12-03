@@ -110,8 +110,6 @@ module GHC.Unit.Env
 where
 
 import GHC.Prelude
-import qualified Data.Set as Set
-
 import GHC.Unit.External
 import GHC.Unit.State
 import GHC.Unit.Home
@@ -345,7 +343,7 @@ ue_updateHomeUnitEnv f uid e = e
   { ue_home_unit_graph = HUG.unitEnv_adjust f uid $ ue_home_unit_graph e
   }
 
-ue_all_home_unit_ids :: UnitEnv -> Set.Set UnitId
+ue_all_home_unit_ids :: UnitEnv -> UnitIdSet
 ue_all_home_unit_ids = HUG.allUnits . ue_home_unit_graph
 
 -- | Rename a unit id in the internal unit env.
@@ -470,4 +468,3 @@ in order to allow users to offset their own relative paths.
 {-# DEPRECATED ue_units "Renamed to ue_homeUnitState because of confusion between units(tate) and unit(s) plural" #-}
 ue_units :: HasDebugCallStack => UnitEnv -> UnitState
 ue_units = ue_homeUnitState
-

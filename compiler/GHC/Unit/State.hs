@@ -356,10 +356,10 @@ data UnitConfig = UnitConfig
    , unitConfigFlagsIgnored :: [IgnorePackageFlag] -- ^ Ignored units
    , unitConfigFlagsTrusted :: [TrustFlag]         -- ^ Trusted units
    , unitConfigFlagsPlugins :: [PackageFlag]       -- ^ Plugins exposed units
-   , unitConfigHomeUnits    :: Set.Set UnitId
+   , unitConfigHomeUnits    :: !UnitIdSet
    }
 
-initUnitConfig :: DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> UnitConfig
+initUnitConfig :: DynFlags -> Maybe [UnitDatabase UnitId] -> UnitIdSet -> UnitConfig
 initUnitConfig dflags cached_dbs home_units =
    let !hu_id             = homeUnitId_ dflags
        !hu_instanceof     = homeUnitInstanceOf_ dflags
@@ -640,7 +640,7 @@ listUnitInfo state = nonDetEltsUniqMap (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
+initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> UnitIdSet -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
 initUnits logger dflags cached_dbs home_units = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
@@ -1377,7 +1377,7 @@ mergeDatabases logger = foldM merge (emptyUniqMap, emptyUniqMap) . zip [1..]
     merge (pkg_map, prec_map) (i, UnitDatabase db_path db) = do
       debugTraceMsg logger 2 $
           text "loading package database" <+> ppr db_path
-      forM_ (Set.toList override_set) $ \pkg ->
+      forM_ (uniqDSetToList override_set) $ \pkg ->
           debugTraceMsg logger 2 $
               text "package" <+> ppr pkg <+>
               text "overrides a previously defined package"
@@ -1389,9 +1389,9 @@ mergeDatabases logger = foldM merge (emptyUniqMap, emptyUniqMap) . zip [1..]
       -- The set of UnitIds which appear in both db and pkgs.  These are the
       -- ones that get overridden.  Compute this just to give some
       -- helpful debug messages at -v2
-      override_set :: Set UnitId
-      override_set = Set.intersection (nonDetUniqMapToKeySet db_map)
-                                      (nonDetUniqMapToKeySet pkg_map)
+      override_set :: UnitIdSet
+      override_set = mkUniqDSet (nonDetKeysUniqMap db_map)
+                     `intersectUniqDSets` mkUniqDSet (nonDetKeysUniqMap pkg_map)
 
       -- Now merge the sets together (NB: in case of duplicate,
       -- first argument preferred)
@@ -1703,7 +1703,7 @@ mkUnitState logger cfg = do
   let !state = UnitState
          { preloadUnits                 = dep_preload
          , explicitUnits                = explicit_pkgs
-         , homeUnitDepends              = Set.toList home_unit_deps
+         , homeUnitDepends              = uniqDSetToAscList home_unit_deps
          , unitInfoMap                  = pkg_db
          , preloadClosure               = emptyUniqSet
          , moduleNameProvidersMap       = mod_map
@@ -1716,15 +1716,15 @@ mkUnitState logger cfg = do
          }
   return (state, raw_dbs)
 
-selectHptFlag :: Set.Set UnitId -> PackageFlag -> Bool
-selectHptFlag home_units (ExposePackage _ (UnitIdArg uid) _) | toUnitId uid `Set.member` home_units = True
+selectHptFlag :: UnitIdSet -> PackageFlag -> Bool
+selectHptFlag home_units (ExposePackage _ (UnitIdArg uid) _) | toUnitId uid `elementOfUniqDSet` home_units = True
 selectHptFlag _ _ = False
 
-selectHomeUnits :: Set.Set UnitId -> [PackageFlag] -> Set.Set UnitId
-selectHomeUnits home_units flags = foldl' go Set.empty flags
+selectHomeUnits :: UnitIdSet -> [PackageFlag] -> UnitIdSet
+selectHomeUnits home_units flags = foldl' go emptyUniqDSet flags
   where
-    go :: Set.Set UnitId -> PackageFlag -> Set.Set UnitId
-    go cur (ExposePackage _ (UnitIdArg uid) _) | toUnitId uid `Set.member` home_units = Set.insert (toUnitId uid) cur
+    go :: UnitIdSet -> PackageFlag -> UnitIdSet
+    go cur (ExposePackage _ (UnitIdArg uid) _) | toUnitId uid `elementOfUniqDSet` home_units = addOneToUniqDSet cur (toUnitId uid)
     -- MP: This does not yet support thinning/renaming
     go cur _ = cur
 

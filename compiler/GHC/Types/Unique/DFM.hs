@@ -79,6 +79,7 @@ import GHC.Utils.Outputable
 
 import qualified GHC.Data.Word64Map.Strict as MS
 import qualified GHC.Data.Word64Map as M
+import Control.DeepSeq
 import Data.Data
 import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
@@ -140,6 +141,9 @@ taggedSnd (TaggedVal _ i) = i
 
 instance Eq val => Eq (TaggedVal val) where
   (TaggedVal v1 _) == (TaggedVal v2 _) = v1 == v2
+
+instance NFData val => NFData (TaggedVal val) where
+  rnf (TaggedVal v _) = rnf v
 
 -- | Type of unique deterministic finite maps
 --
@@ -518,6 +522,9 @@ alwaysUnsafeUfmToUdfm = listToUDFM_Directly . nonDetUFMToList
 unsafeCastUDFMKey :: UniqDFM key1 elt -> UniqDFM key2 elt
 unsafeCastUDFMKey = unsafeCoerce -- Only phantom parameter changes so
                                  -- this is safe and avoids reallocation.
+
+instance NFData a => NFData (UniqDFM key a) where
+  rnf (UDFM m _) = rnf m
 
 -- Output-ery
 

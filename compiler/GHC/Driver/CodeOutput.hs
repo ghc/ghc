@@ -60,10 +60,9 @@ import GHC.Types.CostCentre
 import GHC.Types.ForeignStubs
 import GHC.Types.Unique.DSM
 import GHC.Types.Unique.Supply ( UniqueTag(..) )
+import GHC.Types.Unique.DSet
 
 import System.IO
-import Data.Set (Set)
-import qualified Data.Set as Set
 
 {-
 ************************************************************************
@@ -86,7 +85,7 @@ codeOutput
     -> (a -> ForeignStubs)
     -> [(ForeignSrcLang, FilePath)]
     -- ^ additional files to be compiled with the C compiler
-    -> Set UnitId -- ^ Dependencies
+    -> UnitIdSet -- ^ Dependencies
     -> DUniqSupply -- ^ The deterministic unique supply to run the CgStream.
                    -- See Note [Deterministic Uniques in the CG]
     -> CgStream RawCmmGroup a -- ^ Compiled C--
@@ -165,11 +164,11 @@ outputC :: Logger
         -> DUniqSupply -- ^ The deterministic uniq supply to run the CgStream
                        -- See Note [Deterministic Uniques in the CG]
         -> CgStream RawCmmGroup a
-        -> Set UnitId
+        -> UnitIdSet
         -> IO a
 outputC logger dflags filenm dus cmm_stream unit_deps =
   withTiming logger (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
-    let pkg_names = map unitIdString (Set.toAscList unit_deps)
+    let pkg_names = map unitIdString (uniqDSetToAscList unit_deps)
     doOutput filenm $ \ h -> fmap fst $ runUDSMT dus $ do
       liftIO $ do
         hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")

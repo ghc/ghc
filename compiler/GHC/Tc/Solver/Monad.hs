@@ -190,6 +190,7 @@ import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSet (elementOfUniqDSet)
 import GHC.Types.Id
 import GHC.Types.Basic (allImportLevels)
 import GHC.Types.ThLevelIndex (thLevelIndexFromImportLevel)
@@ -1648,7 +1649,7 @@ checkModuleVisibleLevels check_mod = do
 
   -- 2. The key we are looking for, either the module itself in the home package or the
   -- module unit id of the module we are checking.
-  let instance_key = if moduleUnitId check_mod `Set.member` hsc_all_home_unit_ids hsc_env
+  let instance_key = if moduleUnitId check_mod `elementOfUniqDSet` hsc_all_home_unit_ids hsc_env
                        then mkKey NormalLevel check_mod
                        else UnitScope (moduleUnitId check_mod)
 

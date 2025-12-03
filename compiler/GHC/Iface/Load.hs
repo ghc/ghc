@@ -505,7 +505,7 @@ loadInterface doc_str mod from
         -- overlapping instances.
         ; massertPpr
               ((isOneShot (ghcMode (hsc_dflags hsc_env)))
-                || moduleUnitId mod `notElem` hsc_all_home_unit_ids hsc_env
+                || not (moduleUnitId mod `elementOfUniqDSet` hsc_all_home_unit_ids hsc_env)
                 || mod == gHC_PRIM)
                 (text "Attempting to load home package interface into the EPS" $$ ppr (HUG.allUnits hug) $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas

@@ -63,6 +63,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique.Set
 import GHC.Types.Fixity.Env
 import GHC.Types.Unique.Map
+import GHC.Types.Unique.DSet
 import GHC.Unit.External
 import GHC.Unit.Finder
 import GHC.Unit.State
@@ -664,18 +665,21 @@ checkDependencies hsc_env summary iface
            let reason = ModuleChanged mod
            in classify st reason <$> find_import mod mb_pkg)
            imports
-   logger        = hsc_logger hsc_env
+   logger         = hsc_logger hsc_env
    all_home_units = hsc_all_home_unit_ids hsc_env
-   prev_dep_mods = map (\(IfaceImportLevel s,u, a) -> (s, u, gwib_mod a)) $ Set.toAscList $ dep_direct_mods (mi_deps iface)
-   prev_dep_pkgs = Set.toAscList (Set.union (Set.map (first tcImportLevel) (dep_direct_pkgs (mi_deps iface)))
-                                            (Set.map ((SpliceLevel),) (dep_plugin_pkgs (mi_deps iface))))
+   prev_dep_mods  = map (\(lvl, uid, mod) -> (tcImportLevel lvl, uid, gwib_mod mod))
+                       (Set.toAscList $ dep_direct_mods (mi_deps iface))
+   prev_dep_pkgs  = Set.toAscList $ Set.union
+                       (Set.map (first tcImportLevel) (dep_direct_pkgs (mi_deps iface)))
+                       (Set.fromList $ map (SpliceLevel,) (uniqDSetToList (dep_plugin_pkgs (mi_deps iface))))
 
    classify st _ (Found _ mod)
-    | (toUnitId $ moduleUnit mod) `elem` all_home_units = Right (Left ((st, toUnitId $ moduleUnit mod, moduleName mod)))
+    | (toUnitId $ moduleUnit mod) `elementOfUniqDSet` all_home_units = Right (Left ((st, toUnitId $ moduleUnit mod, moduleName mod)))
     | otherwise = Right (Right (moduleNameFS (moduleName mod), (st, toUnitId $ moduleUnit mod)))
    classify _ reason _ = Left (RecompBecause reason)
 
    check_mods :: [(ImportLevel, UnitId, ModuleName)] -> [(ImportLevel, UnitId, ModuleName)] -> IO RecompileRequired
+
    check_mods [] [] = return UpToDate
    check_mods [] (old:_) = do
      -- This case can happen when a module is change from HPT to package import

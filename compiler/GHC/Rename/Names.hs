@@ -80,6 +80,7 @@ import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.PkgQual
 import GHC.Types.GREInfo (ConInfo(..), ConFieldInfo (..), ConLikeInfo (ConIsData))
+import GHC.Types.Unique.DSet
 
 import GHC.Unit
 import GHC.Unit.Module.Warnings
@@ -483,7 +484,7 @@ renamePkgQual unit_env mn mb_pkg = case mb_pkg of
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
 calculateAvails :: HomeUnit
-                -> S.Set UnitId
+                -> UnitIdSet
                 -> ModIface
                 -> IsSafeImport
                 -> IsBootInterface
@@ -538,7 +539,7 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
 
       -- Trusted packages are a lot like orphans.
       trusted_pkgs | mod_safe' = dep_trusted_pkgs deps
-                   | otherwise = S.empty
+                   | otherwise = emptyUniqDSet
 
 
       pkg = moduleUnit (mi_module iface)
@@ -551,7 +552,7 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
         | isHomeUnit home_unit pkg = ptrust
         | otherwise = False
 
-      dependent_pkgs = if toUnitId pkg `S.member` other_home_units
+      dependent_pkgs = if toUnitId pkg `elementOfUniqDSet` other_home_units
                         then S.empty
                         else S.singleton (lvl, ipkg)
 
@@ -560,7 +561,7 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
               ImportedBySystem -> NormalLevel
 
 
-      direct_mods = if toUnitId pkg `S.member` other_home_units
+      direct_mods = if toUnitId pkg `elementOfUniqDSet` other_home_units
                       then mkPlusModDeps (moduleUnitId imp_mod) lvl (GWIB (moduleName imp_mod) want_boot)
                       else emptyInstalledModuleEnv
 
@@ -2552,4 +2553,3 @@ addDupDeclErr gres@(gre :| _)
 checkConName :: RdrName -> TcRn ()
 checkConName name
   = checkErr (isRdrDataCon name || isRdrTc name) (TcRnIllegalDataCon name)
-

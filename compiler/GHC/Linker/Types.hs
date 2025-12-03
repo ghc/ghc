@@ -57,7 +57,7 @@ module GHC.Linker.Types
 where
 
 import GHC.Prelude
-import GHC.Unit                ( UnitId, Module )
+import GHC.Unit                ( UnitId, Module, UnitIdSet )
 import GHC.ByteCode.Types
 import GHCi.BreakArray
 import GHCi.RemoteTypes
@@ -74,7 +74,6 @@ import Control.Concurrent.MVar
 import Data.Array
 import Data.Time               ( UTCTime )
 import GHC.Unit.Module.Env
-import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 import GHC.Unit.Module.WholeCoreBindings
 import Data.Maybe (mapMaybe)
@@ -245,7 +244,7 @@ data LoadedPkgInfo
   , loaded_pkg_non_hs_objs :: ![LibrarySpec]
   , loaded_pkg_hs_dlls     :: ![RemotePtr LoadedDLL]
     -- ^ See Note [Looking up symbols in the relevant objects]
-  , loaded_pkg_trans_deps  :: UniqDSet UnitId
+  , loaded_pkg_trans_deps  :: !UnitIdSet
   }
 
 instance Outputable LoadedPkgInfo where

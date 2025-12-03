@@ -79,6 +79,7 @@ import GHC.Types.SourceFile
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.Map
+import GHC.Types.Unique.DSet
 import GHC.Types.PkgQual
 import GHC.Types.Basic
 
@@ -348,7 +349,7 @@ loopFromInteractive hsc_env (edge:edges) cached_nodes =
 downsweepInstalledModules :: HscEnv -> [Module] -> IO ModuleGraph
 downsweepInstalledModules hsc_env mods = do
     let
-        (home_mods, external_mods) = partition (\u -> moduleUnitId u `elem` hsc_all_home_unit_ids hsc_env) mods
+        (home_mods, external_mods) = partition (\u -> moduleUnitId u `elementOfUniqDSet` hsc_all_home_unit_ids hsc_env) mods
         installed_mods = map (fst . getModuleInstantiation) home_mods
         external_uids = map moduleUnitId external_mods
 
@@ -804,11 +805,11 @@ rootSummariesParallel n_jobs hsc_env diag_wrapper msg get_summary = do
 -- See Note [Multiple Home Units], section 'Closure Property'.
 checkHomeUnitsClosed ::  UnitEnv -> [DriverMessages]
 checkHomeUnitsClosed ue
-    | Set.null bad_unit_ids = []
-    | otherwise = [singleMessage $ mkPlainErrorMsgEnvelope rootLoc $ DriverHomePackagesNotClosed (Set.toList bad_unit_ids)]
+    | isEmptyUniqDSet bad_unit_ids = []
+    | otherwise = [singleMessage $ mkPlainErrorMsgEnvelope rootLoc $ DriverHomePackagesNotClosed (uniqDSetToAscList bad_unit_ids)]
   where
     home_id_set = HUG.allUnits $ ue_home_unit_graph ue
-    bad_unit_ids = upwards_closure Set.\\ home_id_set {- Remove all home units reached, keep only bad nodes -}
+    bad_unit_ids = upwards_closure `minusUniqDSet` home_id_set {- Remove all home units reached, keep only bad nodes -}
     rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
 
     downwards_closure :: Graph (Node UnitId UnitId)
@@ -816,34 +817,37 @@ checkHomeUnitsClosed ue
 
     inverse_closure = graphReachability $ transposeG downwards_closure
 
-    upwards_closure = Set.fromList $ map node_key $ allReachableMany inverse_closure [DigraphNode uid uid [] | uid <- Set.toList home_id_set]
+    upwards_closure = mkUniqDSet $ map node_key $ allReachableMany inverse_closure [DigraphNode uid uid [] | uid <- uniqDSetToList home_id_set]
 
-    all_unit_direct_deps :: UniqMap UnitId (Set.Set UnitId)
-    all_unit_direct_deps
-      = HUG.unitEnv_foldWithKey go emptyUniqMap $ ue_home_unit_graph ue
+    all_unit_direct_deps :: UniqMap UnitId UnitIdSet
+    all_unit_direct_deps =
+      HUG.unitEnv_foldWithKey go emptyUniqMap $ ue_home_unit_graph ue
       where
         go rest this this_uis =
-           plusUniqMap_C Set.union
-             (addToUniqMap_C Set.union external_depends this (Set.fromList $ this_deps))
+           plusUniqMap_C unionUniqDSets
+             (addToUniqMap_C unionUniqDSets external_depends this (mkUniqDSet this_deps))
              rest
            where
-             external_depends = mapUniqMap (Set.fromList . unitDepends) (unitInfoMap this_units)
+             external_depends = mapUniqMap (mkUniqDSet . unitDepends) (unitInfoMap this_units)
              this_units = homeUnitEnv_units this_uis
              this_deps = [ toUnitId unit | (unit,Just _) <- explicitUnits this_units]
 
     graphNodes :: [Node UnitId UnitId]
-    graphNodes = go Set.empty home_id_set
+    graphNodes = go emptyUniqDSet home_id_set
       where
-        go done todo
-          = case Set.minView todo of
-              Nothing -> []
-              Just (uid, todo')
-                | Set.member uid done -> go done todo'
-                | otherwise -> case lookupUniqMap all_unit_direct_deps uid of
-                    Nothing -> pprPanic "uid not found" (ppr (uid, all_unit_direct_deps))
-                    Just depends ->
-                      let todo'' = (depends Set.\\ done) `Set.union` todo'
-                      in DigraphNode uid uid (Set.toList depends) : go (Set.insert uid done) todo''
+        go done todo =
+          case uniqDSetToList todo of
+            [] -> []
+            uid:rest ->
+              let todo' = mkUniqDSet rest in
+              if uid `elementOfUniqDSet` done
+                then go done todo'
+                else case lookupUniqMap all_unit_direct_deps uid of
+                  Nothing -> pprPanic "uid not found" (ppr (uid, all_unit_direct_deps))
+                  Just depends ->
+                    let todo'' = (depends `minusUniqDSet` done) `unionUniqDSets` todo'
+                    in DigraphNode uid uid (uniqDSetToList depends)
+                       : go (addOneToUniqDSet done uid) todo''
 
 -- | Update the every ModSummary that is depended on
 -- by a module that needs template haskell. We enable codegen to
@@ -1367,7 +1371,7 @@ summariseModuleDispatch k hsc_env' home_unit is_boot (L _ wanted_mod) mb_pkg exc
         found <- findImportedModuleWithIsBoot hsc_env wanted_mod is_boot mb_pkg
         case found of
              Found location mod
-                | moduleUnitId mod `Set.member` hsc_all_home_unit_ids hsc_env ->
+                | moduleUnitId mod `elementOfUniqDSet` hsc_all_home_unit_ids hsc_env ->
                         -- Home package
                          k hsc_env location mod
                 | VirtUnit iud <- moduleUnit mod

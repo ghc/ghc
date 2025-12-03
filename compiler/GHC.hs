@@ -450,9 +450,8 @@ import Data.Typeable    ( Typeable )
 import Data.Word        ( Word8 )
 
 import qualified Data.Map.Strict as Map
-import Data.Set (Set)
-import qualified Data.Set as S
 import qualified Data.Sequence as Seq
+import GHC.Types.Unique.DSet
 
 import System.Directory
 import System.Environment ( getEnv, getProgName )
@@ -642,7 +641,7 @@ setSessionDynFlags dflags0 = do
   logger <- getLogger
   dflags <- checkNewDynFlags logger dflags0
   let all_uids = hsc_all_home_unit_ids hsc_env
-  case S.toList all_uids of
+  case uniqDSetToList all_uids of
     [uid] -> do
       setUnitDynFlagsNoCheck uid dflags
       modifySession (hscUpdateLoggerFlags . hscSetActiveUnitId (homeUnitId_ dflags))
@@ -1797,7 +1796,7 @@ isModuleTrusted m = withSession $ \hsc_env ->
     liftIO $ hscCheckSafe hsc_env m noSrcSpan
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
-moduleTrustReqs :: GhcMonad m => Module -> m (Bool, Set UnitId)
+moduleTrustReqs :: GhcMonad m => Module -> m (Bool, UnitIdSet)
 moduleTrustReqs m = withSession $ \hsc_env ->
     liftIO $ hscGetSafe hsc_env m noSrcSpan
 

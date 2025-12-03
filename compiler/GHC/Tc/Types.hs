@@ -158,6 +158,7 @@ import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSet
 import GHC.Types.Basic
 import GHC.Types.CostCentre.State
 
@@ -923,7 +924,7 @@ emptyImportAvails = ImportAvails { imp_mods          = M.empty,
                                    imp_direct_dep_mods = emptyInstalledModuleEnv,
                                    imp_dep_direct_pkgs = S.empty,
                                    imp_sig_mods      = [],
-                                   imp_trust_pkgs    = S.empty,
+                                   imp_trust_pkgs    = emptyUniqDSet,
                                    imp_trust_own_pkg = False,
                                    imp_boot_mods   = emptyInstalledModuleEnv,
                                    imp_orphs         = [],
@@ -953,7 +954,7 @@ plusImportAvails
   = ImportAvails { imp_mods          = M.unionWith (++) mods1 mods2,
                    imp_direct_dep_mods = ddmods1 `plusDirectModDeps` ddmods2,
                    imp_dep_direct_pkgs      = ddpkgs1 `S.union` ddpkgs2,
-                   imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,
+                   imp_trust_pkgs    = tpkgs1 `unionUniqDSets` tpkgs2,
                    imp_trust_own_pkg = tself1 || tself2,
                    imp_boot_mods   = srs1 `plusModDeps` srcs2,
                    imp_sig_mods      = unionListsOrd sig_mods1 sig_mods2,

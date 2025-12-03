@@ -106,6 +106,7 @@ import GHC.Unit.Module.ModDetails
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import GHC.Types.Unique.Set
+import GHC.Types.Unique.DSet (sizeUniqDSet)
 
 import Control.Concurrent.MVar
 import Control.Monad
@@ -425,7 +426,7 @@ load how_much = loadWithCache noIfaceCache mkUnknownDiagnostic how_much
 
 mkBatchMsg :: HscEnv -> Messager
 mkBatchMsg hsc_env =
-  if length (hsc_all_home_unit_ids hsc_env) > 1
+  if sizeUniqDSet (hsc_all_home_unit_ids hsc_env) > 1
     -- This also displays what unit each module is from.
     then batchMultiMsg
     else batchMsg

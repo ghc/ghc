@@ -251,6 +251,7 @@ import GHC.Types.Name.Ppr
 import GHC.Types.TyThing
 import GHC.Types.Unique.Supply ( uniqFromTag, UniqueTag(BcoTag) )
 import GHC.Types.Unique.Set
+import GHC.Types.Unique.DSet
 
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
@@ -285,7 +286,6 @@ import System.Directory
 import qualified Data.Map as M
 import Data.Map (Map)
 import qualified Data.Set as S
-import Data.Set (Set)
 import Control.DeepSeq (force)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import GHC.Unit.Module.WholeCoreBindings
@@ -1624,15 +1624,15 @@ checkSafeImports tcg_env
         clearDiagnostics
 
         -- Check safe imports are correct
-        safePkgs <- S.fromList <$> mapMaybeM checkSafe safeImps
+        safePkgs <- mkUniqDSet <$> mapMaybeM checkSafe safeImps
         safeErrs <- getDiagnostics
         clearDiagnostics
 
         -- Check non-safe imports are correct if inferring safety
         -- See the Note [Safe Haskell Inference]
         (infErrs, infPkgs) <- case (safeInferOn dflags) of
-          False -> return (emptyMessages, S.empty)
-          True -> do infPkgs <- S.fromList <$> mapMaybeM checkSafe regImps
+          False -> return (emptyMessages, emptyUniqDSet)
+          True -> do infPkgs <- mkUniqDSet <$> mapMaybeM checkSafe regImps
                      infErrs <- getDiagnostics
                      clearDiagnostics
                      return (infErrs, infPkgs)
@@ -1683,12 +1683,12 @@ checkSafeImports tcg_env
     checkSafe (m, l, _) = fst `fmap` hscCheckSafe' m l
 
     -- what pkg's to add to our trust requirements
-    pkgTrustReqs :: DynFlags -> Set UnitId -> Set UnitId ->
+    pkgTrustReqs :: DynFlags -> UnitIdSet -> UnitIdSet ->
           Bool -> ImportAvails
     pkgTrustReqs dflags req inf infPassed | safeInferOn dflags
                                   && not (safeHaskellModeEnabled dflags) && infPassed
                                    = emptyImportAvails {
-                                       imp_trust_pkgs = req `S.union` inf
+                                       imp_trust_pkgs = req `unionUniqDSets` inf
                                    }
     pkgTrustReqs dflags _   _ _ | safeHaskell dflags == Sf_Unsafe
                          = emptyImportAvails
@@ -1707,12 +1707,12 @@ hscCheckSafe hsc_env m l = runHsc hsc_env $ do
     return $ isEmptyMessages errs
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
-hscGetSafe :: HscEnv -> Module -> SrcSpan -> IO (Bool, Set UnitId)
+hscGetSafe :: HscEnv -> Module -> SrcSpan -> IO (Bool, UnitIdSet)
 hscGetSafe hsc_env m l = runHsc hsc_env $ do
     (self, pkgs) <- hscCheckSafe' m l
     good         <- isEmptyMessages `fmap` getDiagnostics
     clearDiagnostics -- don't want them printed...
-    let pkgs' | Just p <- self = S.insert p pkgs
+    let pkgs' | Just p <- self = addOneToUniqDSet pkgs p
               | otherwise      = pkgs
     return (good, pkgs')
 
@@ -1721,7 +1721,7 @@ hscGetSafe hsc_env m l = runHsc hsc_env $ do
 -- own package be trusted and a list of other packages required to be trusted
 -- (these later ones haven't been checked) but the own package trust has been.
 hscCheckSafe' :: Module -> SrcSpan
-  -> Hsc (Maybe UnitId, Set UnitId)
+  -> Hsc (Maybe UnitId, UnitIdSet)
 hscCheckSafe' m l = do
     hsc_env <- getHscEnv
     let home_unit = hsc_home_unit hsc_env
@@ -1733,7 +1733,7 @@ hscCheckSafe' m l = do
              -- Not necessary if that is reflected in dependencies
              | otherwise   -> return (Just $ toUnitId (moduleUnit m), pkgs)
   where
-    isModSafe :: HomeUnit -> Module -> SrcSpan -> Hsc (Bool, Set UnitId)
+    isModSafe :: HomeUnit -> Module -> SrcSpan -> Hsc (Bool, UnitIdSet)
     isModSafe home_unit m l = do
         hsc_env <- getHscEnv
         dflags <- getDynFlags
@@ -1813,11 +1813,11 @@ hscCheckSafe' m l = do
 
 
 -- | Check the list of packages are trusted.
-checkPkgTrust :: Set UnitId -> Hsc ()
+checkPkgTrust :: UnitIdSet -> Hsc ()
 checkPkgTrust pkgs = do
     hsc_env <- getHscEnv
     let sec = initSourceErrorContext (hsc_dflags hsc_env)
-        errors = S.foldr go emptyBag pkgs
+        errors = foldr go emptyBag $ uniqDSetToList pkgs
         state  = hsc_units hsc_env
         go pkg acc
             | unitIsTrusted $ unsafeLookupUnitId state pkg
@@ -1865,7 +1865,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
       False -> return tcg_env
 
   where
-    wiped_trust   = (tcg_imports tcg_env) { imp_trust_pkgs = S.empty }
+    wiped_trust   = (tcg_imports tcg_env) { imp_trust_pkgs = emptyUniqDSet }
     pprMod        = ppr $ moduleName $ tcg_mod tcg_env
     whyUnsafe' df = vcat [ quotes pprMod <+> text "has been inferred as unsafe!"
                          , text "Reason:"
@@ -2319,7 +2319,7 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
                   in NoStubs `appendStubC` ip_init
               | otherwise     = NoStubs
         (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
-          <- codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
+          <- codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] emptyUniqDSet
              dus1 rawCmms
         return stub_c_exists
   where

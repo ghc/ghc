@@ -103,6 +103,7 @@ import GHC.Types.Target
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
+import GHC.Types.Unique.DSet
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -125,7 +126,6 @@ import Data.List.NonEmpty (NonEmpty(..))
 
 import Data.Time        ( getCurrentTime )
 import GHC.Iface.Recomp
-import GHC.Types.Unique.DSet
 
 -- Simpler type synonym for actions in the pipeline monad
 type P m = TPipelineClass TPhase m

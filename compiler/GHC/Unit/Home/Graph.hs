@@ -86,7 +86,7 @@ import GHC.Core.FamInstEnv
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
+import GHC.Types.Unique.DSet
 import GHC.Data.Maybe
 import GHC.Data.Graph.Directed
 
@@ -212,7 +212,7 @@ renameUnitId oldUnit newUnit hug = case unitEnv_lookup_maybe oldUnit hug of
     unitEnv_delete oldUnit hug
 
 -- | Retrieve all 'UnitId's of units in the 'HomeUnitGraph'.
-allUnits :: HomeUnitGraph -> Set.Set UnitId
+allUnits :: HomeUnitGraph -> UnitIdSet
 allUnits = unitEnv_keys
 
 -- | Set the 'DynFlags' of the 'HomeUnitEnv' for unit in the 'HomeModuleGraph'
@@ -231,17 +231,17 @@ transitiveHomeDeps :: UnitId -> HomeUnitGraph -> Maybe [UnitId]
 transitiveHomeDeps uid hug = case lookupHugUnitId uid hug of
   Nothing -> Nothing
   Just hue -> Just $
-    Set.toList (loop (Set.singleton uid) (homeUnitDepends (homeUnitEnv_units hue)))
+    uniqDSetToList (loop (unitUniqDSet uid) (homeUnitDepends (homeUnitEnv_units hue)))
     where
       loop acc [] = acc
       loop acc (uid:uids)
-        | uid `Set.member` acc = loop acc uids
+        | uid `elementOfUniqDSet` acc = loop acc uids
         | otherwise =
           let hue = homeUnitDepends
                     . homeUnitEnv_units
                     . expectJust
                     $ lookupHugUnitId uid hug
-          in loop (Set.insert uid acc) (hue ++ uids)
+          in loop (addOneToUniqDSet acc uid) (hue ++ uids)
 
 --------------------------------------------------------------------------------
 -- ** Lookups
@@ -268,7 +268,7 @@ lookupHugByModule mod hug =
 --
 -- You should always prefer 'lookupHug' and 'lookupHugByModule' when possible.
 lookupAllHug :: HomeUnitGraph -> ModuleName -> IO [HomeModInfo]
-lookupAllHug hug mod = mapMaybeM (\uid -> lookupHug hug uid mod) (Set.toList $ unitEnv_keys hug)
+lookupAllHug hug mod = mapMaybeM (\uid -> lookupHug hug uid mod) (uniqDSetToList $ unitEnv_keys hug)
 
 -- | Lookup a 'HomeUnitEnv' by 'UnitId' in a 'HomeUnitGraph'
 lookupHugUnitId :: UnitId -> HomeUnitGraph -> Maybe HomeUnitEnv
@@ -336,8 +336,8 @@ unitEnv_singleton active m = UnitEnvGraph
 unitEnv_lookup_maybe :: UnitEnvGraphKey -> UnitEnvGraph v -> Maybe v
 unitEnv_lookup_maybe u env = Map.lookup u (unitEnv_graph env)
 
-unitEnv_keys :: UnitEnvGraph v -> Set.Set UnitEnvGraphKey
-unitEnv_keys env = Map.keysSet (unitEnv_graph env)
+unitEnv_keys :: UnitEnvGraph v -> UnitIdSet
+unitEnv_keys env = mkUniqDSet (Map.keys (unitEnv_graph env))
 
 unitEnv_foldWithKey :: (b -> UnitEnvGraphKey -> a -> b) -> b -> UnitEnvGraph a -> b
 unitEnv_foldWithKey f z (UnitEnvGraph g)= Map.foldlWithKey' f z g
@@ -378,4 +378,3 @@ pprHomeUnitEnv uid env = do
   return $
     ppr uid <+> text "(flags:" <+> ppr (homeUnitId_ $ homeUnitEnv_dflags env) <> text "," <+> ppr (fmap homeUnitId $ homeUnitEnv_home_unit env) <> text ")" <+> text "->"
     $$ nest 4 hptDoc
-

@@ -24,6 +24,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader (ImpDeclSpec(..))
 import GHC.Types.Name.Set ( NameSet, allUses, emptyNameSet, unionNameSet )
 import GHC.Types.Unique.Set
+import GHC.Types.Unique.DSet
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -39,7 +40,6 @@ import Data.IORef
 import Data.List (sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Data.List.NonEmpty as NE
 
 import GHC.Linker.Types
@@ -223,7 +223,7 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
 
 mk_mod_usage_info :: UsageConfig
               -> HomeUnit
-              -> Set.Set UnitId
+              -> UnitIdSet
               -> Module
               -> ImportedMods
               -> [ImportUserSpec]
@@ -283,7 +283,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports imp_decls u
     --     (need to recompile if its export list changes: export_fprint)
     mkUsage :: Module -> ModIface -> Maybe Usage
     mkUsage mod iface
-      | toUnitId (moduleUnit mod) `Set.notMember` home_unit_ids
+      | not $ toUnitId (moduleUnit mod) `elementOfUniqDSet` home_unit_ids
       = Just $ UsagePackageModule{ usg_mod      = mod,
                                    usg_mod_hash = mod_hash,
                                    usg_safe     = imp_safe }
