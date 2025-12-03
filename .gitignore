@@ -256,3 +256,31 @@ ghc.nix/
 # clangd
 .clangd
 dist-newstyle/
+
+# -----------------------------------------------------------------------------
+# AI Coding Assistants
+# See: https://agents.md/ for the AGENTS.md standard
+
+# Claude Code
+CLAUDE.md
+.claude
+
+# GitHub Copilot
+AGENTS.md
+AGENT.md
+.github/copilot-instructions.md
+.github/instructions/
+
+# Cursor
+.cursorrules
+.cursor/
+
+# Gemini CLI / Google Jules
+GEMINI.md
+JULES.md
+
+# OpenAI Codex
+CODEX.md
+
+# JetBrains Junie
+.aiignore
