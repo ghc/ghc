@@ -68,8 +68,9 @@ import Control.Monad
 import Data.Time
 import qualified Data.Map as M
 import GHC.Driver.Env
-    ( hsc_home_unit_maybe, HscEnv(hsc_FC, hsc_dflags, hsc_unit_env), hscUnitIndexQuery )
+    ( hsc_home_unit_maybe, HscEnv(hsc_FC, hsc_dflags, hsc_unit_env, hsc_mod_graph), hscUnitIndexQuery )
 import GHC.Driver.Config.Finder
+import GHC.Unit.Module.Graph (mgHomeModuleMap, ModuleNameHomeMap)
 import qualified Data.Set as Set
 
 type FileExt = String   -- Filename extension
@@ -162,30 +163,36 @@ findImportedModule hsc_env mod pkg_qual =
       dflags    = hsc_dflags hsc_env
       fopts     = initFinderOpts dflags
   in do
+    let home_module_map = mgHomeModuleMap (hsc_mod_graph hsc_env)
     query <- hscUnitIndexQuery hsc_env
-    findImportedModuleNoHsc fc fopts (hsc_unit_env hsc_env) query mhome_unit mod pkg_qual
+    findImportedModuleNoHsc fc fopts (hsc_unit_env hsc_env) query home_module_map mhome_unit mod pkg_qual
 
 findImportedModuleNoHsc
   :: FinderCache
   -> FinderOpts
   -> UnitEnv
   -> UnitIndexQuery
+  -> ModuleNameHomeMap
   -> Maybe HomeUnit
   -> ModuleName
   -> PkgQual
   -> IO FindResult
-findImportedModuleNoHsc fc fopts ue query mhome_unit mod_name mb_pkg =
+findImportedModuleNoHsc fc fopts ue query home_module_map mhome_unit mod_name mb_pkg =
   case mb_pkg of
     NoPkgQual  -> unqual_import
     ThisPkg uid | (homeUnitId <$> mhome_unit) == Just uid -> home_import
-                | Just os <- lookup uid other_fopts -> home_pkg_import (uid, os)
+                | Just os <- M.lookup uid other_fopts_map -> home_pkg_import (uid, os)
                 | otherwise -> pprPanic "findImportModule" (ppr mod_name $$ ppr mb_pkg $$ ppr (homeUnitId <$> mhome_unit) $$ ppr uid $$ ppr (map fst all_opts))
     OtherPkg _ -> pkg_import
   where
+    (complete_units, module_name_map) = home_module_map
+    module_home_units = M.findWithDefault Set.empty mod_name module_name_map
+    current_unit_id = homeUnitId <$> mhome_unit
     all_opts = case mhome_unit of
-                Nothing -> other_fopts
-                Just home_unit -> (homeUnitId home_unit, fopts) : other_fopts
+                Nothing -> other_fopts_list
+                Just home_unit -> (homeUnitId home_unit, fopts) : other_fopts_list
 
+    other_fopts_map = M.fromList other_fopts_list
 
     home_import = case mhome_unit of
                    Just home_unit -> findHomeModule fc fopts home_unit mod_name
@@ -196,7 +203,7 @@ findImportedModuleNoHsc fc fopts ue query mhome_unit mod_name mb_pkg =
       -- If the module is reexported, then look for it as if it was from the perspective
       -- of that package which reexports it.
       | mod_name `Set.member` finder_reexportedModules opts =
-        findImportedModuleNoHsc fc opts ue query (Just $ DefiniteHomeUnit uid Nothing) mod_name NoPkgQual
+        findImportedModuleNoHsc fc opts ue query home_module_map (Just $ DefiniteHomeUnit uid Nothing) mod_name NoPkgQual
       | mod_name `Set.member` finder_hiddenModules opts =
         return (mkHomeHidden uid)
       | otherwise =
@@ -205,7 +212,7 @@ findImportedModuleNoHsc fc fopts ue query mhome_unit mod_name mb_pkg =
     -- Do not be smart and change this to `foldr orIfNotFound home_import hs` as
     -- that is not the same!! home_import is first because we need to look within ourselves
     -- first before looking at the packages in order.
-    any_home_import = foldr1 orIfNotFound (home_import: map home_pkg_import other_fopts)
+    any_home_import = foldr1 orIfNotFound (home_import: map home_pkg_import other_fopts_list)
 
     pkg_import    = findExposedPackageModule fc fopts units query mod_name mb_pkg
 
@@ -218,9 +225,18 @@ findImportedModuleNoHsc fc fopts ue query mhome_unit mod_name mb_pkg =
                   Just home_unit -> homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
     hpt_deps :: Set.Set UnitId
     hpt_deps  = homeUnitDepends units
-    other_fopts =
+    dep_providers = Set.intersection module_home_units hpt_deps
+    known_other_uids =
+      let providers = maybe dep_providers (\u -> Set.delete u dep_providers) current_unit_id
+      in Set.toList providers
+    unknown_units =
+      let candidates = Set.difference hpt_deps complete_units
+          excluded = maybe dep_providers (\u -> Set.insert u dep_providers) current_unit_id
+      in Set.toList (Set.difference candidates excluded)
+    other_home_uids = known_other_uids ++ unknown_units
+    other_fopts_list =
       [ (uid, initFinderOpts (homeUnitEnv_dflags (ue_findHomeUnitEnv uid ue)))
-      | uid <- Set.toList hpt_deps
+      | uid <- other_home_uids
       ]
 
 -- | Locate a plugin module requested by the user, for a compiler
