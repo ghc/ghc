@@ -113,6 +113,7 @@ module GHC.Data.Word64Map.Lazy (
     -- ** Size
     , WM.null
     , size
+    , sizeExceeds
 
     -- * Combine
 

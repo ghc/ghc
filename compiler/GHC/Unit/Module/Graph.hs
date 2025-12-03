@@ -210,13 +210,13 @@ data ModuleGraph = ModuleGraph
     -- ^ For each module name, which home units provide it.
   }
 
-type HomeModuleNameProvidersMap = UniqMap ModuleName (Set UnitId)
+type HomeModuleNameProvidersMap = UniqMap ModuleName UnitIdSet
 
 mkHomeModuleNameProvidersMap :: [ModuleGraphNode] -> HomeModuleNameProvidersMap
 mkHomeModuleNameProvidersMap nodes
-    = listToUniqMap_C Set.union $
+    = listToUniqMap_C unionUniqDSets $
       [
-          (moduleName, Set.singleton unitID) |
+          (moduleName, unitUniqDSet unitID) |
               ModuleNode _ moduleNodeInfo <- nodes,
               let moduleName = moduleNodeInfoModuleName moduleNodeInfo,
               let unitID     = moduleNodeInfoUnitId moduleNodeInfo

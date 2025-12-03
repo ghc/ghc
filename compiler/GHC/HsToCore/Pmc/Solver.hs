@@ -1432,8 +1432,8 @@ instCompleteSet fuel nabla x cs
       -- strict fields, type constraints, etc., so that we are fast in the
       -- common case
       -- (either many simple constructors *or* few "complicated" ones).
-      | sizeUniqDSet cs <= 5 = sortBy compareConLikeTestability (uniqDSetToList cs)
-      | otherwise            = uniqDSetToList cs
+      | not (sizeUniqDSetExceeds cs 5) = sortBy compareConLikeTestability (uniqDSetToList cs)
+      | otherwise                      = uniqDSetToList cs
       where cs = cmConLikes cm
 
     go :: Nabla -> [ConLike] -> MaybeT DsM Nabla

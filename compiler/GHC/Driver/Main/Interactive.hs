@@ -118,8 +118,7 @@ import Data.Data hiding (Fixity, TyCon)
 import qualified Data.List.NonEmpty as NE
 import Control.Monad
 import Data.IORef
-import qualified Data.Set as S
-import Data.Set (Set)
+import GHC.Types.Unique.DSet ( addOneToUniqDSet, uniqDSetToList )
 import Data.List.NonEmpty (NonEmpty)
 
 
@@ -184,12 +183,12 @@ hscCheckSafe hsc_env m l = runHsc hsc_env $ do
     return $ isEmptyMessages errs
 
 -- | Return if a module is trusted and the pkgs it depends on to be trusted.
-hscGetSafe :: HscEnv -> Module -> SrcSpan -> IO (Bool, Set UnitId)
+hscGetSafe :: HscEnv -> Module -> SrcSpan -> IO (Bool, UnitIdSet)
 hscGetSafe hsc_env m l = runHsc hsc_env $ do
     (self, pkgs) <- hscCheckSafe' m l
     good         <- isEmptyMessages `fmap` getDiagnostics
     clearDiagnostics -- don't want them printed...
-    let pkgs' | Just p <- self = S.insert p pkgs
+    let pkgs' | Just p <- self = addOneToUniqDSet pkgs p
               | otherwise      = pkgs
     return (good, pkgs')
 
@@ -198,7 +197,7 @@ hscGetSafe hsc_env m l = runHsc hsc_env $ do
 -- own package be trusted and a list of other packages required to be trusted
 -- (these later ones haven't been checked) but the own package trust has been.
 hscCheckSafe' :: Module -> SrcSpan
-  -> Hsc (Maybe UnitId, Set UnitId)
+  -> Hsc (Maybe UnitId, UnitIdSet)
 hscCheckSafe' m l = do
     hsc_env <- getHscEnv
     let home_unit = hsc_home_unit hsc_env
@@ -210,7 +209,7 @@ hscCheckSafe' m l = do
              -- Not necessary if that is reflected in dependencies
              | otherwise   -> return (Just $ toUnitId (moduleUnit m), pkgs)
   where
-    isModSafe :: HomeUnit -> Module -> SrcSpan -> Hsc (Bool, Set UnitId)
+    isModSafe :: HomeUnit -> Module -> SrcSpan -> Hsc (Bool, UnitIdSet)
     isModSafe home_unit m l = do
         hsc_env <- getHscEnv
         dflags <- getDynFlags
@@ -290,11 +289,11 @@ hscCheckSafe' m l = do
 
 
 -- | Check the list of packages are trusted.
-checkPkgTrust :: Set UnitId -> Hsc ()
+checkPkgTrust :: UnitIdSet -> Hsc ()
 checkPkgTrust pkgs = do
     hsc_env <- getHscEnv
     let sec = initSourceErrorContext (hsc_dflags hsc_env)
-        errors = S.foldr go emptyBag pkgs
+        errors = foldr go emptyBag $ uniqDSetToList pkgs
         state  = hsc_units hsc_env
         go pkg acc
             | unitIsTrusted $ unsafeLookupUnitId state pkg

@@ -107,6 +107,7 @@ import GHC.Data.FastString
 import qualified GHC.Linker.Loader as Loader
 import GHC.Data.Maybe ( expectJust )
 import GHC.Types.Name.Set
+import GHC.Types.Unique.DSet
 import GHC.Utils.Panic hiding ( showException, try )
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
@@ -136,7 +137,6 @@ import Data.List ( find, intercalate, intersperse,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Set as S
 import Data.Maybe
 import qualified Data.Map as M
 import Data.IntMap.Strict (IntMap)
@@ -803,7 +803,7 @@ installInteractiveHomeUnits dflags = do
         concat
           [ [ sessionUnitExposedFlag ]
           , [ homeUnitPkgFlag uid
-            | uid <- S.toList $ HUG.allUnits $ hsc_HUG hsc_env
+            | uid <- uniqDSetToList $ HUG.allUnits $ hsc_HUG hsc_env
             ]
           , ghciPackageFlags
           ]
@@ -818,7 +818,7 @@ installInteractiveHomeUnits dflags = do
         { packageFlags =
           concat
             [ [ homeUnitPkgFlag uid
-              | uid <- S.toList $ HUG.allUnits $ hsc_HUG hsc_env
+              | uid <- uniqDSetToList $ HUG.allUnits $ hsc_HUG hsc_env
               ]
             , ghciPackageFlags
             ]
@@ -827,9 +827,9 @@ installInteractiveHomeUnits dflags = do
 
   let
     all_unit_ids =
-      S.insert interactiveGhciUnitId $
-      S.insert interactiveSessionUnitId $
-      hsc_all_home_unit_ids hsc_env
+      addOneToUniqDSet
+        (addOneToUniqDSet (hsc_all_home_unit_ids hsc_env) interactiveGhciUnitId)
+        interactiveSessionUnitId
 
   ghciPromptUnit  <- setupHomeUnitFor logger dflagsPrompt  all_unit_ids
   ghciSessionUnit <- setupHomeUnitFor logger dflagsSession all_unit_ids
@@ -854,7 +854,7 @@ installInteractiveHomeUnits dflags = do
 
   pure ()
   where
-    setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> S.Set UnitId -> m HomeUnitEnv
+    setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> UnitIdSet -> m HomeUnitEnv
     setupHomeUnitFor logger dflags all_home_units = do
       (dbs,unit_state,home_unit,_mconstants) <-
         liftIO $ initUnits logger dflags Nothing all_home_units
@@ -2903,15 +2903,15 @@ isSafeModule m = do
     -- print info to user...
     liftIO $ putStrLn $ "Trust type is (Module: " ++ trust ++ ", Package: " ++ pkg ++ ")"
     liftIO $ putStrLn $ "Package Trust: " ++ (if packageTrustOn dflags then "On" else "Off")
-    when (not $ S.null good)
+    when (not $ isEmptyUniqDSet good)
          (liftIO $ putStrLn $ "Trusted package dependencies (trusted): " ++
-                        (intercalate ", " $ map (showPpr dflags) (S.toList good)))
-    case msafe && S.null bad of
+                        (intercalate ", " $ map (showPpr dflags) (uniqDSetToList good)))
+    case msafe && isEmptyUniqDSet bad of
         True -> liftIO $ putStrLn $ mname ++ " is trusted!"
         False -> do
-            when (not $ null bad)
+            when (not $ isEmptyUniqDSet bad)
                  (liftIO $ putStrLn $ "Trusted package dependencies (untrusted): "
-                            ++ (intercalate ", " $ map (showPpr dflags) (S.toList bad)))
+                            ++ (intercalate ", " $ map (showPpr dflags) (uniqDSetToList bad)))
             liftIO $ putStrLn $ mname ++ " is NOT trusted!"
 
   where
@@ -2921,8 +2921,8 @@ isSafeModule m = do
         | isHomeModule (hsc_home_unit hsc_env) md = True
         | otherwise = unitIsTrusted $ unsafeLookupUnit (hsc_units hsc_env) (moduleUnit md)
 
-    tallyPkgs hsc_env deps | not (packageTrustOn dflags) = (S.empty, S.empty)
-                          | otherwise = S.partition part deps
+    tallyPkgs hsc_env deps | not (packageTrustOn dflags) = (emptyUniqDSet, emptyUniqDSet)
+                          | otherwise = partitionUniqDSet part deps
         where part pkg   = unitIsTrusted $ unsafeLookupUnitId unit_state pkg
               unit_state = hsc_units hsc_env
               dflags     = hsc_dflags hsc_env

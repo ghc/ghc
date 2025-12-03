@@ -173,8 +173,6 @@ import Data.IORef
 import System.FilePath as FilePath
 import System.Directory
 import qualified Data.Map as M
-import qualified Data.Set as S
-import Data.Set (Set)
 import Control.DeepSeq (force)
 import Control.Exception as E (mask_, finally)
 import Data.List.NonEmpty (NonEmpty ((:|)))
@@ -182,7 +180,7 @@ import Data.Time
 
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
-import GHC.Types.Unique.DSet ( uniqDSetToList )
+import GHC.Types.Unique.DSet ( uniqDSetToList, mkUniqDSet, emptyUniqDSet, unionUniqDSets )
 
 
 -- -----------------------------------------------------------------------------
@@ -1176,15 +1174,15 @@ checkSafeImports tcg_env
         clearDiagnostics
 
         -- Check safe imports are correct
-        safePkgs <- S.fromList <$> mapMaybeM checkSafe safeImps
+        safePkgs <- mkUniqDSet <$> mapMaybeM checkSafe safeImps
         safeErrs <- getDiagnostics
         clearDiagnostics
 
         -- Check non-safe imports are correct if inferring safety
         -- See the Note [Safe Haskell Inference]
         (infErrs, infPkgs) <- case (safeInferOn dflags) of
-          False -> return (emptyMessages, S.empty)
-          True -> do infPkgs <- S.fromList <$> mapMaybeM checkSafe regImps
+          False -> return (emptyMessages, emptyUniqDSet)
+          True -> do infPkgs <- mkUniqDSet <$> mapMaybeM checkSafe regImps
                      infErrs <- getDiagnostics
                      clearDiagnostics
                      return (infErrs, infPkgs)
@@ -1235,12 +1233,12 @@ checkSafeImports tcg_env
     checkSafe (m, l, _) = fst `fmap` hscCheckSafe' m l
 
     -- what pkg's to add to our trust requirements
-    pkgTrustReqs :: DynFlags -> Set UnitId -> Set UnitId ->
+    pkgTrustReqs :: DynFlags -> UnitIdSet -> UnitIdSet ->
           Bool -> ImportAvails
     pkgTrustReqs dflags req inf infPassed | safeInferOn dflags
                                   && not (safeHaskellModeEnabled dflags) && infPassed
                                    = emptyImportAvails {
-                                       imp_trust_pkgs = req `S.union` inf
+                                       imp_trust_pkgs = req `unionUniqDSets` inf
                                    }
     pkgTrustReqs dflags _   _ _ | safeHaskell dflags == Sf_Unsafe
                          = emptyImportAvails
@@ -1251,7 +1249,7 @@ checkSafeImports tcg_env
 -- own package be trusted and a list of other packages required to be trusted
 -- (these later ones haven't been checked) but the own package trust has been.
 hscCheckSafe' :: Module -> SrcSpan
-  -> Hsc (Maybe UnitId, Set UnitId)
+  -> Hsc (Maybe UnitId, UnitIdSet)
 hscCheckSafe' m l = do
     hsc_env <- getHscEnv
     let home_unit = hsc_home_unit hsc_env
@@ -1263,7 +1261,7 @@ hscCheckSafe' m l = do
              -- Not necessary if that is reflected in dependencies
              | otherwise   -> return (Just $ toUnitId (moduleUnit m), pkgs)
   where
-    isModSafe :: HomeUnit -> Module -> SrcSpan -> Hsc (Bool, Set UnitId)
+    isModSafe :: HomeUnit -> Module -> SrcSpan -> Hsc (Bool, UnitIdSet)
     isModSafe home_unit m l = do
         hsc_env <- getHscEnv
         dflags <- getDynFlags
@@ -1343,11 +1341,11 @@ hscCheckSafe' m l = do
 
 
 -- | Check the list of packages are trusted.
-checkPkgTrust :: Set UnitId -> Hsc ()
+checkPkgTrust :: UnitIdSet -> Hsc ()
 checkPkgTrust pkgs = do
     hsc_env <- getHscEnv
     let sec = initSourceErrorContext (hsc_dflags hsc_env)
-        errors = S.foldr go emptyBag pkgs
+        errors = foldr go emptyBag $ uniqDSetToList pkgs
         state  = hsc_units hsc_env
         go pkg acc
             | unitIsTrusted $ unsafeLookupUnitId state pkg
@@ -1395,7 +1393,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
       False -> return tcg_env
 
   where
-    wiped_trust   = (tcg_imports tcg_env) { imp_trust_pkgs = S.empty }
+    wiped_trust   = (tcg_imports tcg_env) { imp_trust_pkgs = emptyUniqDSet }
     pprMod        = ppr $ moduleName $ tcg_mod tcg_env
     whyUnsafe' df = vcat [ quotes pprMod <+> text "has been inferred as unsafe!"
                          , text "Reason:"

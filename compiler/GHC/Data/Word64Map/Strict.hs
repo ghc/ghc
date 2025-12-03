@@ -130,6 +130,7 @@ module GHC.Data.Word64Map.Strict (
     -- ** Size
     , null
     , size
+    , sizeExceeds
 
     -- * Combine
 

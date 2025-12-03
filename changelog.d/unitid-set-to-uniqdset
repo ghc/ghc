@@ -1,0 +1,10 @@
+section: compiler
+synopsis: Refactor `Set UnitId` to `UniqDSet UnitId` in the `ghc` library.
+issues: #23335
+mrs: !10337
+
+description: {
+  Sets of `UnitId` throughout the `ghc` library now use the deterministic
+  `UniqDSet UnitId` (exposed as the `UnitIdSet` synonym) instead of
+  `Data.Set.Set UnitId`.
+}

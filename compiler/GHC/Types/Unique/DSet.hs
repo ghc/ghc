@@ -28,9 +28,11 @@ module GHC.Types.Unique.DSet (
         elementOfUniqDSet,
         filterUniqDSet,
         sizeUniqDSet,
+        sizeUniqDSetExceeds,
         isEmptyUniqDSet,
         lookupUniqDSet,
         uniqDSetToList,
+        uniqDSetToAscList,
         partitionUniqDSet,
         mapUniqDSet, strictFoldUniqDSet, mapMUniqDSet
     ) where
@@ -42,8 +44,12 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique
 
+import GHC.Utils.Binary
+
 import Data.Coerce
 import Data.Data
+import Data.List (sort)
+import Control.DeepSeq (NFData (..))
 
 -- See Note [UniqSet invariant] in GHC.Types.Unique.Set for why we want a newtype here.
 -- Beyond preserving invariants, we may also want to 'override' typeclass
@@ -110,6 +116,11 @@ filterUniqDSet p (UniqDSet s) = UniqDSet (filterUDFM p s)
 sizeUniqDSet :: UniqDSet a -> Int
 sizeUniqDSet = sizeUDFM . getUniqDSet
 
+-- | @sizeUniqDSetExceeds s n@ is @sizeUniqDSet s > n@, but stops counting as
+-- soon as the threshold is exceeded instead of computing the full size.
+sizeUniqDSetExceeds :: UniqDSet a -> Int -> Bool
+sizeUniqDSetExceeds = sizeUDFMExceeds . getUniqDSet
+
 isEmptyUniqDSet :: UniqDSet a -> Bool
 isEmptyUniqDSet = isNullUDFM . getUniqDSet
 
@@ -118,6 +129,9 @@ lookupUniqDSet = lookupUDFM . getUniqDSet
 
 uniqDSetToList :: UniqDSet a -> [a]
 uniqDSetToList = eltsUDFM . getUniqDSet
+
+uniqDSetToAscList :: Ord a => UniqDSet a -> [a]
+uniqDSetToAscList = sort . uniqDSetToList
 
 partitionUniqDSet :: (a -> Bool) -> UniqDSet a -> (UniqDSet a, UniqDSet a)
 partitionUniqDSet p = coerce . partitionUDFM p . getUniqDSet
@@ -146,6 +160,9 @@ strictFoldUniqDSet k r s = foldl' (\ !r e -> k e r) r $
 instance Eq (UniqDSet a) where
   UniqDSet a == UniqDSet b = equalKeysUDFM a b
 
+instance NFData a => NFData (UniqDSet a) where
+  rnf (UniqDSet s) = rnf s
+
 getUniqDSet :: UniqDSet a -> UniqDFM a a
 getUniqDSet = getUniqDSet'
 
@@ -154,3 +171,7 @@ instance Outputable a => Outputable (UniqDSet a) where
 
 pprUniqDSet :: (a -> SDoc) -> UniqDSet a -> SDoc
 pprUniqDSet f = braces . pprWithCommas f . uniqDSetToList
+
+instance (Uniquable a, Binary a, Ord a) => Binary (UniqDSet a) where
+  put_ bh = put_ bh . uniqDSetToAscList
+  get  bh = mkUniqDSet <$> get bh

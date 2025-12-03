@@ -47,6 +47,7 @@ module GHC.Types.Unique.DFM (
         filterUDFM, filterUDFM_Directly,
         isNullUDFM,
         sizeUDFM,
+        sizeUDFMExceeds,
         intersectUDFM, udfmIntersectUFM,
         disjointUDFM, disjointUdfmUfm,
         equalKeysUDFM,
@@ -74,6 +75,7 @@ import GHC.Utils.Outputable
 
 import qualified GHC.Data.Word64Map.Strict as MS
 import qualified GHC.Data.Word64Map as M
+import Control.DeepSeq
 import Data.Data
 import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
@@ -135,6 +137,9 @@ taggedSnd (TaggedVal _ i) = i
 
 instance Eq val => Eq (TaggedVal val) where
   (TaggedVal v1 _) == (TaggedVal v2 _) = v1 == v2
+
+instance NFData val => NFData (TaggedVal val) where
+  rnf (TaggedVal v _) = rnf v
 
 -- | Type of unique deterministic finite maps
 --
@@ -372,6 +377,11 @@ isNullUDFM (UDFM m _) = M.null m
 sizeUDFM :: UniqDFM key elt -> Int
 sizeUDFM (UDFM m _i) = M.size m
 
+-- | @sizeUDFMExceeds m n@ is @sizeUDFM m > n@, but stops traversing the map as
+-- soon as the threshold is exceeded instead of computing the full size.
+sizeUDFMExceeds :: UniqDFM key elt -> Int -> Bool
+sizeUDFMExceeds (UDFM m _i) n = M.sizeExceeds m n
+
 intersectUDFM :: UniqDFM key elt -> UniqDFM key elt -> UniqDFM key elt
 intersectUDFM (UDFM x i) (UDFM y _j) = UDFM (M.intersection x y) i
   -- M.intersection is left biased, that means the result will only have
@@ -530,6 +540,9 @@ alwaysUnsafeUfmToUdfm = listToUDFM_Directly . nonDetUFMToList
 unsafeCastUDFMKey :: UniqDFM key1 elt -> UniqDFM key2 elt
 unsafeCastUDFMKey = unsafeCoerce -- Only phantom parameter changes so
                                  -- this is safe and avoids reallocation.
+
+instance NFData a => NFData (UniqDFM key a) where
+  rnf (UDFM m _) = rnf m
 
 -- Output-ery
 

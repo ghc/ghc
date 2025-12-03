@@ -139,6 +139,7 @@ import System.Directory
 import qualified Data.Map as M
 import Data.Map (Map)
 import qualified Data.Set as S
+import GHC.Types.Unique.DSet ( emptyUniqDSet )
 import GHC.Unit.Module.WholeCoreBindings
 import GHC.Types.TypeEnv
 import Data.Time
@@ -923,7 +924,7 @@ hscCompileCmmFile hsc_env original_filename filename output_filename = runHsc hs
                   in NoStubs `appendStubC` ip_init
               | otherwise     = NoStubs
         (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
-          <- codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
+          <- codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] emptyUniqDSet
              dus1 rawCmms
         return stub_c_exists
   where

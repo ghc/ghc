@@ -77,8 +77,7 @@ import GHC.Driver.Config.Finder
 import GHC.Types.Unique.Set
 import qualified Data.List as L(sort)
 import Data.List.NonEmpty ( NonEmpty (..) )
-import Data.Set (Set)
-import qualified Data.Set as Set (empty, intersection, difference, null, toList)
+import GHC.Types.Unique.DSet ( emptyUniqDSet, isEmptyUniqDSet, intersectUniqDSets, minusUniqDSet, uniqDSetToAscList )
 import qualified System.Directory as SD
 import qualified System.OsPath as OsPath
 import qualified Data.List.NonEmpty as NE
@@ -290,9 +289,9 @@ findPluginModule hsc_env mod_name = do
 -- such providers during module finding.
 rankedHomeUnitDeps :: HomeModuleNameProvidersMap
                    -> ModuleName
-                   -> Set UnitId
+                   -> UnitIdSet
                    -> [UnitId]
-rankedHomeUnitDeps _ _ home_unit_deps | Set.null home_unit_deps
+rankedHomeUnitDeps _ _ home_unit_deps | isEmptyUniqDSet home_unit_deps
     = []
 -- The special handling of the situation where the dependency set is empty does
 -- not change the result, but it avoids triggering evaluation of the module
@@ -309,19 +308,19 @@ rankedHomeUnitDeps _ _ home_unit_deps | Set.null home_unit_deps
 --     3 | import {-# source #-} A
 --       | ^^^^^^^^^^^^^^^^^^^^^^^
 rankedHomeUnitDeps home_module_name_providers_map mod_name home_unit_deps
-    = Set.toList cached_deps ++ Set.toList uncached_deps
+    = uniqDSetToAscList cached_deps ++ uniqDSetToAscList uncached_deps
     where
 
-    cached_providers :: Set UnitId
+    cached_providers :: UnitIdSet
     cached_providers = lookupWithDefaultUniqMap home_module_name_providers_map
-                                                Set.empty
+                                                emptyUniqDSet
                                                 mod_name
 
-    cached_deps :: Set UnitId
-    cached_deps = Set.intersection home_unit_deps cached_providers
+    cached_deps :: UnitIdSet
+    cached_deps = intersectUniqDSets home_unit_deps cached_providers
 
-    uncached_deps :: Set UnitId
-    uncached_deps = Set.difference home_unit_deps cached_providers
+    uncached_deps :: UnitIdSet
+    uncached_deps = minusUniqDSet home_unit_deps cached_providers
 
 -- | The 'FinderOpts' of the home units that should be searched, sorted by
 -- priority order specified by 'rankedHomeUnitDeps'.

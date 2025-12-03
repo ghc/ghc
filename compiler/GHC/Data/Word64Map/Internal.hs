@@ -72,6 +72,7 @@ module GHC.Data.Word64Map.Internal (
     -- * Query
     , null
     , size
+    , sizeExceeds
     , member
     , notMember
     , lookup
@@ -528,6 +529,22 @@ size = go 0
     go !acc (Bin _ _ l r) = go (go acc l) r
     go acc (Tip _ _) = 1 + acc
     go acc Nil = acc
+
+-- | \(O(\min(n,b))\). @'sizeExceeds' m b@ is @'size' m > b@, but stops counting
+-- as soon as the bound is exceeded instead of computing the whole size. Whole
+-- subtrees are skipped once the budget is spent.
+--
+-- > sizeExceeds (fromList [(1,'a'), (2,'c'), (3,'b')]) 2 == True
+-- > sizeExceeds (fromList [(1,'a'), (2,'c'), (3,'b')]) 3 == False
+sizeExceeds :: Word64Map a -> Int -> Bool
+sizeExceeds m b = go (b + 1) m == 0
+  where
+    -- Subtract each subtree's size from the remaining budget, stopping (and
+    -- not descending further) once it reaches 0.
+    go !budget _ | budget <= 0 = 0
+    go budget Nil              = budget
+    go budget (Tip _ _)        = budget - 1
+    go budget (Bin _ _ l r)    = go (go budget l) r
 
 -- | \(O(\min(n,W))\). Is the key a member of the map?
 --

@@ -359,7 +359,7 @@ data PrimitiveImplementation
 --  > -> Module -- ^ module being compiled
 --  > -> ModLocation
 --  > -> FilePath -- ^ Where to write output
---  > -> Set UnitId -- ^ dependencies
+--  > -> UnitIdSet -- ^ dependencies
 --  > -> Stream IO RawCmmGroup a -- results from `StgToCmm`
 --  > -> IO a
 --
@@ -765,7 +765,7 @@ backendCDefs (Named NoBackend)   = NoCDefs
 -- > -> Module -- ^ module being compiled
 -- > -> ModLocation
 -- > -> FilePath -- ^ Where to write output
--- > -> Set UnitId -- ^ dependencies
+-- > -> UnitIdSet -- ^ dependencies
 -- > -> Stream IO RawCmmGroup a -- results from `StgToCmm`
 -- > -> IO a
 backendCodeOutput :: Backend -> DefunctionalizedCodeOutput
