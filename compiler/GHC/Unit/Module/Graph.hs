@@ -18,6 +18,7 @@ module GHC.Unit.Module.Graph
    , mgModSummaries
    , mgModSummaries'
    , mgLookupModule
+   , mgHomeModuleMap
    , showModMsg
    , moduleGraphNodeModule
    , moduleGraphNodeModSum
@@ -159,17 +160,23 @@ data ModuleGraph = ModuleGraph
   , mg_graph :: (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
     -- A cached transitive dependency calculation so that a lot of work is not
     -- repeated whenever the transitive dependencies need to be calculated (for example, hptInstances)
+  , mg_home_map :: Map.Map ModuleName (Set UnitId)
+    -- ^ For each module name, which home-unit UnitIds define it.
   }
 
 -- | Map a function 'f' over all the 'ModSummaries'.
 -- To preserve invariants 'f' can't change the isBoot status.
 mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
 mapMG f mg@ModuleGraph{..} = mg
-  { mg_mss = flip fmap mg_mss $ \case
-      InstantiationNode uid iuid -> InstantiationNode uid iuid
-      LinkNode uid nks -> LinkNode uid nks
-      ModuleNode deps ms  -> ModuleNode deps (f ms)
+  { mg_mss = new_mss
+  , mg_home_map = mkHomeModuleMap new_mss
   }
+  where
+    new_mss =
+      flip fmap mg_mss $ \case
+        InstantiationNode uid iuid -> InstantiationNode uid iuid
+        LinkNode uid nks -> LinkNode uid nks
+        ModuleNode deps ms  -> ModuleNode deps (f ms)
 
 unionMG :: ModuleGraph -> ModuleGraph -> ModuleGraph
 unionMG a b =
@@ -177,10 +184,18 @@ unionMG a b =
   in ModuleGraph {
         mg_mss = new_mss
       , mg_graph = mkTransDeps new_mss
+      , mg_home_map = mkHomeModuleMap new_mss
       }
 
 mkTransDeps :: [ModuleGraphNode] -> (ReachabilityIndex SummaryNode, NodeKey -> Maybe SummaryNode)
 mkTransDeps = first graphReachability {- module graph is acyclic -} . moduleGraphNodes False
+
+mkHomeModuleMap :: [ModuleGraphNode] -> Map.Map ModuleName (Set UnitId)
+mkHomeModuleMap nodes =
+  Map.fromListWith Set.union
+    [ (ms_mod_name ms, Set.singleton (ms_unitid ms))
+    | ModuleNode _ ms <- nodes
+    ]
 
 mgModSummaries :: ModuleGraph -> [ModSummary]
 mgModSummaries mg = [ m | ModuleNode _ m <- mgModSummaries' mg ]
@@ -200,8 +215,11 @@ mgLookupModule ModuleGraph{..} m = listToMaybe $ mapMaybe go mg_mss
       = Just ms
     go _ = Nothing
 
+mgHomeModuleMap :: ModuleGraph -> Map.Map ModuleName (Set UnitId)
+mgHomeModuleMap = mg_home_map
+
 emptyMG :: ModuleGraph
-emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing)
+emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing) Map.empty
 
 isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
 isTemplateHaskellOrQQNonBoot ms =
@@ -213,9 +231,12 @@ isTemplateHaskellOrQQNonBoot ms =
 -- not an element of the ModuleGraph.
 extendMG :: ModuleGraph -> [NodeKey] -> ModSummary -> ModuleGraph
 extendMG ModuleGraph{..} deps ms = ModuleGraph
-  { mg_mss = ModuleNode deps ms : mg_mss
-  , mg_graph = mkTransDeps (ModuleNode deps ms : mg_mss)
+  { mg_mss = new_mss
+  , mg_graph = mkTransDeps new_mss
+  , mg_home_map = mkHomeModuleMap new_mss
   }
+  where
+    new_mss = ModuleNode deps ms : mg_mss
 
 extendMGInst :: ModuleGraph -> UnitId -> InstantiatedUnit -> ModuleGraph
 extendMGInst mg uid depUnitId = mg
