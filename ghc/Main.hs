@@ -893,7 +893,7 @@ checkUnitCycles :: DynFlags -> UnitEnvGraph HomeUnitEnv -> Ghc ()
 checkUnitCycles dflags graph = processSCCs sccs
   where
     mkNode :: (UnitId, HomeUnitEnv) -> Node UnitId UnitId
-    mkNode (uid, hue) = DigraphNode uid uid (homeUnitDepends (homeUnitEnv_units hue))
+    mkNode (uid, hue) = DigraphNode uid uid (Set.toList (homeUnitDepends (homeUnitEnv_units hue)))
     nodes = map mkNode (unitEnv_elts graph)
 
     sccs = stronglyConnCompFromEdgedVerticesOrd nodes

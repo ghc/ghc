@@ -216,9 +216,12 @@ findImportedModuleNoHsc fc fopts ue query mhome_unit mod_name mb_pkg =
     units     = case mhome_unit of
                   Nothing -> ue_units ue
                   Just home_unit -> homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
-    hpt_deps :: [UnitId]
+    hpt_deps :: Set.Set UnitId
     hpt_deps  = homeUnitDepends units
-    other_fopts  = map (\uid -> (uid, initFinderOpts (homeUnitEnv_dflags (ue_findHomeUnitEnv uid ue)))) hpt_deps
+    other_fopts =
+      [ (uid, initFinderOpts (homeUnitEnv_dflags (ue_findHomeUnitEnv uid ue)))
+      | uid <- Set.toList hpt_deps
+      ]
 
 -- | Locate a plugin module requested by the user, for a compiler
 -- plugin.  This consults the same set of exposed packages as
