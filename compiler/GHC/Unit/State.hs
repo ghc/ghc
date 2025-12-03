@@ -469,7 +469,7 @@ data UnitState = UnitState {
   -- -Wunused-packages warning.
   explicitUnits :: [(Unit, Maybe PackageArg)],
 
-  homeUnitDepends    :: [UnitId],
+  homeUnitDepends    :: Set UnitId,
 
   -- | This is a full map from 'ModuleName' to all modules which may possibly
   -- be providing it.  These providers may be hidden (but we'll still want
@@ -504,7 +504,7 @@ emptyUnitState = UnitState {
     unwireMap      = emptyUniqMap,
     preloadUnits   = [],
     explicitUnits  = [],
-    homeUnitDepends = [],
+    homeUnitDepends = Set.empty,
     moduleNameProvidersMap       = emptyUniqMap,
     pluginModuleNameProvidersMap = emptyUniqMap,
     requirementContext           = emptyUniqMap,
@@ -1573,7 +1573,7 @@ mkUnitState logger cfg index = do
   let !state = UnitState
          { preloadUnits                 = dep_preload
          , explicitUnits                = explicit_pkgs
-         , homeUnitDepends              = Set.toList home_unit_deps
+         , homeUnitDepends              = home_unit_deps
          , unitInfoMap                  = pkg_db
          , preloadClosure               = emptyUniqSet
          , moduleNameProvidersMap
