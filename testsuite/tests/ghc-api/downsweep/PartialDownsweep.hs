@@ -168,7 +168,7 @@ go label mods cnd =
     setTargets [tgt]
 
     hsc_env <- getSession
-    (_, nodes) <- liftIO $ downsweep hsc_env [] [] False
+    (_, nodes) <- liftIO $ downsweep hsc_env [] Nothing [] False
 
     it label $ cnd (mapMaybe moduleGraphNodeModSum nodes)
 
