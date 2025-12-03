@@ -11397,7 +11397,7 @@ module GHC.Natural where
   xorNatural :: Natural -> Natural -> Natural
 
 module GHC.Num where
-  -- Safety: None
+  -- Safety: Safe-Inferred
   type Integer :: *
   data Integer = IS GHC.Internal.Prim.Int# | IP GHC.Internal.Prim.ByteArray# | IN GHC.Internal.Prim.ByteArray#
   type Natural :: *
