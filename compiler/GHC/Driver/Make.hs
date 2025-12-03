@@ -113,6 +113,8 @@ import Data.Either ( rights, partitionEithers, lefts )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import GHC.Data.OsPath (OsPath)
+import qualified GHC.Data.OsPath as OsPath
 import Control.Concurrent ( newQSem, waitQSem, signalQSem, ThreadId, killThread, forkIOWithUnmask )
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
@@ -244,7 +246,7 @@ depanalPartial excluded_mods allow_dup_roots = do
     liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_unit_env hsc_env)
 
     (errs, graph_nodes) <- liftIO $ downsweep
-      hsc_env (mgModSummaries old_graph)
+      hsc_env (mgModSummaries old_graph) Nothing
       excluded_mods allow_dup_roots
     let
       mod_graph = mkModuleGraph graph_nodes
@@ -1537,6 +1539,10 @@ warnUnnecessarySourceImports sccs = do
 -- an import of this module mean.
 type DownsweepCache = M.Map (UnitId, PkgQual, ModuleNameWithIsBoot) [Either DriverMessages ModSummary]
 
+moduleGraphNodeMap :: ModuleGraph -> M.Map NodeKey ModuleGraphNode
+moduleGraphNodeMap graph =
+  M.fromList [(mkNodeKey node, node) | node <- mgModSummaries' graph]
+
 -----------------------------------------------------------------------------
 --
 -- | Downsweep (dependency analysis)
@@ -1555,6 +1561,8 @@ type DownsweepCache = M.Map (UnitId, PkgQual, ModuleNameWithIsBoot) [Either Driv
 downsweep :: HscEnv
           -> [ModSummary]
           -- ^ Old summaries
+          -> Maybe ModuleGraph
+          -- ^ Existing module graph to reuse cached nodes from
           -> [ModuleName]       -- Ignore dependencies on these; treat
                                 -- them as if they were package modules
           -> Bool               -- True <=> allow multiple targets to have
@@ -1564,10 +1572,10 @@ downsweep :: HscEnv
                 -- The non-error elements of the returned list all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true in
                 -- which case there can be repeats
-downsweep hsc_env old_summaries excl_mods allow_dup_roots = do
+downsweep hsc_env old_summaries old_graph excl_mods allow_dup_roots = do
   n_jobs <- mkWorkerLimit (hsc_dflags hsc_env)
   new <- rootSummariesParallel n_jobs hsc_env summary
-  downsweep_imports hsc_env old_summary_map excl_mods allow_dup_roots new
+  downsweep_imports hsc_env old_summary_map old_graph excl_mods allow_dup_roots new
   where
     summary = getRootSummary excl_mods old_summary_map
 
@@ -1576,22 +1584,23 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots = do
     -- file was used in.
     -- Reuse these if we can because the most expensive part of downsweep is
     -- reading the headers.
-    old_summary_map :: M.Map (UnitId, FilePath) ModSummary
+    old_summary_map :: M.Map (UnitId, OsPath) ModSummary
     old_summary_map =
-      M.fromList [((ms_unitid ms, msHsFilePath ms), ms) | ms <- old_summaries]
+      M.fromList [((ms_unitid ms, OsPath.unsafeEncodeUtf (msHsFilePath ms)), ms) | ms <- old_summaries]
 
 downsweep_imports :: HscEnv
-                  -> M.Map (UnitId, FilePath) ModSummary
+                  -> M.Map (UnitId, OsPath) ModSummary
+                  -> Maybe ModuleGraph
                   -> [ModuleName]
                   -> Bool
                   -> ([(UnitId, DriverMessages)], [ModSummary])
                   -> IO ([DriverMessages], [ModuleGraphNode])
-downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, rootSummariesOk)
+downsweep_imports hsc_env old_summaries old_graph excl_mods allow_dup_roots (root_errs, rootSummariesOk)
    = do
        let root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
-       (deps, map0) <- loopSummaries rootSummariesOk (M.empty, root_map)
-       let closure_errs = checkHomeUnitsClosed (hsc_unit_env hsc_env)
+       let done0 = maybe M.empty moduleGraphNodeMap old_graph
+       (deps, map0) <- loopSummaries rootSummariesOk (done0, root_map)
        let unit_env = hsc_unit_env hsc_env
        let tmpfs    = hsc_tmpfs    hsc_env
 
@@ -1601,7 +1610,7 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
            (other_errs, unit_nodes) = partitionEithers $ unitEnv_foldWithKey (\nodes uid hue -> nodes ++ unitModuleNodes downsweep_nodes uid hue) [] (hsc_HUG hsc_env)
            all_nodes = downsweep_nodes ++ unit_nodes
            all_errs  = all_root_errs ++  downsweep_errs ++ other_errs
-           all_root_errs =  closure_errs ++ map snd root_errs
+           all_root_errs =  map snd root_errs
 
        -- if we have been passed -fno-code, we enable code generation
        -- for dependencies of modules that have -XTemplateHaskell,
@@ -1721,7 +1730,7 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
 
 getRootSummary ::
   [ModuleName] ->
-  M.Map (UnitId, FilePath) ModSummary ->
+  M.Map (UnitId, OsPath) ModSummary ->
   HscEnv ->
   Target ->
   IO (Either (UnitId, DriverMessages) ModSummary)
@@ -2067,7 +2076,7 @@ mkRootMap summaries = Map.fromListWith (flip (++))
 summariseFile
         :: HscEnv
         -> HomeUnit
-        -> M.Map (UnitId, FilePath) ModSummary    -- old summaries
+        -> M.Map (UnitId, OsPath) ModSummary    -- old summaries
         -> FilePath                     -- source file name
         -> Maybe Phase                  -- start phase
         -> Maybe (StringBuffer,UTCTime)
@@ -2076,7 +2085,7 @@ summariseFile
 summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
         -- we can use a cached summary if one is available and the
         -- source file hasn't changed,
-   | Just old_summary <- M.lookup (homeUnitId home_unit, src_fn) old_summaries
+   | Just old_summary <- M.lookup (homeUnitId home_unit, src_fn_os) old_summaries
    = do
         let location = ms_location $ old_summary
 
@@ -2097,6 +2106,7 @@ summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
   where
     -- change the main active unit so all operations happen relative to the given unit
     hsc_env = hscSetActiveHomeUnit home_unit hsc_env'
+    src_fn_os = OsPath.unsafeEncodeUtf src_fn
     -- src_fn does not necessarily exist on the filesystem, so we need to
     -- check what kind of target we are dealing with
     get_src_hash = case maybe_buf of
@@ -2186,7 +2196,7 @@ data SummariseResult =
 summariseModule
           :: HscEnv
           -> HomeUnit
-          -> M.Map (UnitId, FilePath) ModSummary
+          -> M.Map (UnitId, OsPath) ModSummary
           -- ^ Map of old summaries
           -> IsBootInterface    -- True <=> a {-# SOURCE #-} import
           -> Located ModuleName -- Imported module to be summarised
@@ -2247,7 +2257,7 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
               Right ms -> FoundHome ms
 
     new_summary_cache_check loc mod src_fn h
-      | Just old_summary <- Map.lookup ((toUnitId (moduleUnit mod), src_fn)) old_summary_map =
+      | Just old_summary <- Map.lookup ((toUnitId (moduleUnit mod), src_fn_os)) old_summary_map =
 
          -- check the hash on the source file, and
          -- return the cached summary if it hasn't changed.  If the
@@ -2258,6 +2268,8 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
            Nothing    ->
                checkSummaryHash hsc_env (new_summary loc mod src_fn) old_summary loc h
       | otherwise = new_summary loc mod src_fn h
+      where
+        src_fn_os = OsPath.unsafeEncodeUtf src_fn
 
     new_summary :: ModLocation
                   -> Module
@@ -2326,7 +2338,8 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
   hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
 
   extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
-  (implicit_sigs, _inst_deps) <- implicitRequirementsShallow (hscSetActiveUnitId (moduleUnitId nms_mod) hsc_env) pi_theimps
+--  (implicit_sigs, _inst_deps) <- implicitRequirementsShallow (hscSetActiveUnitId (moduleUnitId nms_mod) hsc_env) pi_theimps
+  let implicit_sigs = []
 
   return $
         ModSummary
