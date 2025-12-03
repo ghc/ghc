@@ -138,7 +138,7 @@ ue_transitiveHomeDeps uid unit_env = Set.toList (loop Set.empty [uid])
     loop acc (uid:uids)
       | uid `Set.member` acc = loop acc uids
       | otherwise =
-        let hue = homeUnitDepends (homeUnitEnv_units (ue_findHomeUnitEnv uid unit_env))
+        let hue = Set.toList (homeUnitDepends (homeUnitEnv_units (ue_findHomeUnitEnv uid unit_env)))
         in loop (Set.insert uid acc) (hue ++ uids)
 
 

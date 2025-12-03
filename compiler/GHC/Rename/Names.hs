@@ -472,11 +472,14 @@ renamePkgQual unit_env mn mb_pkg = case mb_pkg of
        -- not really correct as pkg_fs is unlikely to be a valid unit-id but
        -- we will report the failure later...
   where
-    home_names  = map (\uid -> (uid, mkFastString <$> thisPackageName (homeUnitEnv_dflags (ue_findHomeUnitEnv uid unit_env)))) hpt_deps
+    home_names =
+      [ (uid, mkFastString <$> thisPackageName (homeUnitEnv_dflags (ue_findHomeUnitEnv uid unit_env)))
+      | uid <- S.toList hpt_deps
+      ]
 
     units = ue_units unit_env
 
-    hpt_deps :: [UnitId]
+    hpt_deps :: S.Set UnitId
     hpt_deps  = homeUnitDepends units
 
 
