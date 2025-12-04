@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Put common type definitions here to break recursive module dependencies.
@@ -9,7 +10,7 @@ module GHC.CmmToAsm.Reg.Linear.Base (
         emptyBlockAssignment,
         updateBlockAssignment,
 
-        Loc(..),
+        VLoc(..), Loc(..), IgnoreFormat(..),
         regsOfLoc,
         RealRegUsage(..),
 
@@ -38,8 +39,6 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
 import GHC.CmmToAsm.Reg.Utils
 import GHC.CmmToAsm.Format
-
-import Data.Function ( on )
 
 data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
 
@@ -70,8 +69,13 @@ updateBlockAssignment :: BlockId
   -> BlockAssignment freeRegs
   -> BlockAssignment freeRegs
 updateBlockAssignment dest (freeRegs, regMap) (BlockAssignment {..}) =
-  BlockAssignment (mapInsert dest (freeRegs, regMap) blockMap)
-                  (mergeUFM combWithExisting id (mapMaybeUFM fromLoc) (firstUsed) (toVRegMap regMap))
+  BlockAssignment
+    (mapInsert dest (freeRegs, regMap) blockMap)
+    (mergeUFM combWithExisting id
+        (mapMaybeUFM (fromVLoc . locWithFormat_loc))
+        firstUsed
+        (toVRegMap regMap)
+    )
   where
     -- The blocks are processed in dependency order, so if there's already an
     -- entry in the map then keep that assignment rather than writing the new
@@ -79,13 +83,14 @@ updateBlockAssignment dest (freeRegs, regMap) (BlockAssignment {..}) =
     combWithExisting :: RealReg -> Loc -> Maybe RealReg
     combWithExisting old_reg _ = Just $ old_reg
 
-    fromLoc :: Loc -> Maybe RealReg
-    fromLoc (InReg rr) = Just $ realReg rr
-    fromLoc (InBoth rr _) = Just $ realReg rr
-    fromLoc _ = Nothing
+    fromVLoc :: VLoc -> Maybe RealReg
+    fromVLoc (InReg rr) = Just rr
+    fromVLoc (InBoth rr _) = Just rr
+    fromVLoc _ = Nothing
 
-
--- | Where a vreg is currently stored
+-- | Where a vreg is currently stored.
+--
+--
 --      A temporary can be marked as living in both a register and memory
 --      (InBoth), for example if it was recently loaded from a spill location.
 --      This makes it cheap to spill (no save instruction required), but we
@@ -96,21 +101,40 @@ updateBlockAssignment dest (freeRegs, regMap) (BlockAssignment {..}) =
 --      save it in a spill location, but mark it as InBoth because the current
 --      instruction might still want to read it.
 --
-data Loc
+data VLoc
         -- | vreg is in a register
-        = InReg   {-# UNPACK #-} !RealRegUsage
+        = InReg   {-# UNPACK #-} !RealReg
 
         -- | vreg is held in stack slots
-        | InMem   {-# UNPACK #-}  !StackSlot
-
+        | InMem   {-# UNPACK #-} !StackSlot
 
         -- | vreg is held in both a register and stack slots
-        | InBoth   {-# UNPACK #-} !RealRegUsage
-                   {-# UNPACK #-} !StackSlot
+        | InBoth  {-# UNPACK #-} !RealReg
+                  {-# UNPACK #-} !StackSlot
         deriving (Eq, Ord, Show)
 
-instance Outputable Loc where
+-- | Where a virtual register is stored, together with the format it is stored at.
+--
+-- See 'VLoc'.
+data Loc
+  = Loc
+  { locWithFormat_loc    :: {-# UNPACK #-} !VLoc
+  , locWithFormat_format :: Format
+  }
+
+-- | A newtype used to hang off 'Eq' and 'Ord' instances for 'Loc' which
+-- ignore the format, as used in 'GHC.CmmToAsm.Reg.Linear.JoinToTargets'.
+newtype IgnoreFormat a = IgnoreFormat a
+instance Eq (IgnoreFormat Loc) where
+  IgnoreFormat (Loc l1 _) == IgnoreFormat (Loc l2 _) = l1 == l2
+instance Ord (IgnoreFormat Loc) where
+  compare (IgnoreFormat (Loc l1 _)) (IgnoreFormat (Loc l2 _)) = compare l1 l2
+
+instance Outputable VLoc where
         ppr l = text (show l)
+
+instance Outputable Loc where
+  ppr (Loc loc fmt) = parens (ppr loc <+> dcolon <+> ppr fmt)
 
 -- | A 'RealReg', together with the specific 'Format' it is used at.
 data RealRegUsage
@@ -122,21 +146,11 @@ data RealRegUsage
 instance Outputable RealRegUsage where
   ppr (RealRegUsage r fmt) = ppr r <> dcolon <+> ppr fmt
 
--- NB: these instances only compare the underlying 'RealReg', as that is what
--- is important for register allocation.
---
--- (It would nonetheless be a good idea to remove these instances.)
-instance Eq RealRegUsage where
-  (==) = (==) `on` realReg
-instance Ord RealRegUsage where
-  compare = compare `on` realReg
-
 -- | Get the reg numbers stored in this Loc.
-regsOfLoc :: Loc -> [RealRegUsage]
+regsOfLoc :: VLoc -> [RealReg]
 regsOfLoc (InReg r)    = [r]
 regsOfLoc (InBoth r _) = [r]
 regsOfLoc (InMem _)    = []
-
 
 -- | Reasons why instructions might be inserted by the spiller.
 --      Used when generating stats for -ddrop-asm-stats.
