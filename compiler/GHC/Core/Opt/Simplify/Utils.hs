@@ -12,7 +12,9 @@ module GHC.Core.Opt.Simplify.Utils (
         tryEtaExpandRhs, wantEtaExpansion,
 
         -- Inlining,
-        preInlineUnconditionally, postInlineUnconditionally,
+        preInlineLetUnconditionally,
+        preInlineBetaUnconditionally,
+        postInlineUnconditionally,
         activeRule,
         getUnfoldingInRuleMatch,
         updModeForStableUnfoldings, updModeForRuleLHS, updModeForRuleRHS,
@@ -173,8 +175,7 @@ data SimplCont
       { sc_dup     :: DupFlag   -- See Note [DupFlag invariants]
       , sc_hole_ty :: OutType   -- Type of the function, presumably (forall a. blah)
                                 -- See Note [The hole type in ApplyToTy]
-      , sc_arg  :: InExpr       -- The argument,
-      , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
+      , sc_arg  :: SimplClo     -- The argument
       , sc_cont :: SimplCont }
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
@@ -216,23 +217,17 @@ data SimplCont
         CoreTickish     -- Tick tickish <hole>
         SimplCont
 
-type StaticEnv = SimplEnv       -- Just the static part is relevant
 
 data FromWhat = FromLet | FromBeta Levity
 
 -- See Note [DupFlag invariants]
 data DupFlag = NoDup       -- Unsimplified, might be big
-             | Simplified  -- Simplified
              | OkToDup     -- Simplified and small
 
 isSimplified :: DupFlag -> Bool
 isSimplified NoDup = False
 isSimplified _     = True       -- Invariant: the subst-env is empty
 
-perhapsSubstTy :: DupFlag -> StaticEnv -> Type -> Type
-perhapsSubstTy dup env ty
-  | isSimplified dup = ty
-  | otherwise        = substTy env ty
 
 {- Note [StaticEnv invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -255,21 +250,16 @@ the expression, and that (rightly) gives ASSERT failures if the InScopeSet
 isn't big enough.
 
 Note [DupFlag invariants]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In both ApplyToVal { se_dup = dup, se_env = env, se_cont = k}
    and  Select { se_dup = dup, se_env = env, se_cont = k}
-the following invariants hold
-
-  (a) if dup = OkToDup, then continuation k is also ok-to-dup
-  (b) if dup = OkToDup or Simplified, the subst-env is empty,
-               or at least is always ignored; the payload is
-               already an OutThing
+the following invariant holds
+  if dup = OkToDup, then continuation k is also ok-to-dup
 -}
 
 instance Outputable DupFlag where
   ppr OkToDup    = text "ok"
   ppr NoDup      = text "nodup"
-  ppr Simplified = text "simpl"
 
 instance Outputable SimplCont where
   ppr (Stop ty interesting eval_sd)
@@ -284,7 +274,7 @@ instance Outputable SimplCont where
     = (text "ApplyToTy" <+> pprParendType ty) $$ ppr cont
   ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont, sc_hole_ty = hole_ty })
     = (hang (text "ApplyToVal" <+> ppr dup <+> text "hole-ty:" <+> pprParendType hole_ty)
-          2 (pprParendExpr arg))
+          2 (ppr arg))
       $$ ppr cont
   ppr (StrictBind { sc_bndr = b, sc_cont = cont })
     = (text "StrictBind" <+> ppr b) $$ ppr cont
@@ -392,9 +382,8 @@ pushSimplifiedArgs env args cont = foldr (pushSimplifiedArg env) cont args
 pushSimplifiedArg :: SimplEnv -> ArgSpec -> SimplCont -> SimplCont
 pushSimplifiedArg _env (TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }) cont
   = ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont }
-pushSimplifiedArg env (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
-  = ApplyToVal { sc_arg = arg, sc_env = env, sc_dup = Simplified
-                 -- The SubstEnv will be ignored since sc_dup=Simplified
+pushSimplifiedArg _env (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
+  = ApplyToVal { sc_arg = DoneEx arg NotJoinPoint, sc_dup = NoDup
                , sc_hole_ty = hole_ty, sc_cont = cont }
 
 argSpecArg :: ArgSpec -> OutExpr
@@ -475,14 +464,17 @@ contHoleType :: SimplCont -> OutType
 contHoleType (Stop ty _ _)                    = ty
 contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt { sc_co = co })          = coercionLKind co
-contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
-  = perhapsSubstTy dup se (idType b)
 contHoleType (StrictArg  { sc_fun_ty = ty })  = funArgTy ty
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
-contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
-  = perhapsSubstTy d se (idType b)
+contHoleType (StrictBind { sc_bndr = b, sc_dup = d, sc_env = se }) = perhapsSubstIdTy d se b
+contHoleType (Select     { sc_bndr = b, sc_dup = d, sc_env = se }) = perhapsSubstIdTy d se b
 
+perhapsSubstIdTy :: DupFlag -> StaticEnv -> Id -> Type
+perhapsSubstIdTy dup_flag env bndr
+  = case dup_flag of
+      OkToDup -> idType bndr                -- The Id is an OutId
+      NoDup   -> substTy env (idType bndr)  -- The Id is an InId
 
 -- Computes the multiplicity scaling factor at the hole. That is, in (case [] of
 -- x ::(p) _ { … }) (respectively for arguments of functions), the scaling
@@ -525,11 +517,11 @@ countValArgs (CastIt     { sc_cont = cont }) = countValArgs cont
 countValArgs _                               = 0
 
 -------------------
-contArgs :: SimplCont -> (Bool, [ArgSummary], SimplCont)
+contArgs :: SimplEnv -> SimplCont -> (Bool, [ArgSummary], SimplCont)
 -- Summarises value args, discards type args and coercions
 -- The returned continuation of the call is only used to
 -- answer questions like "are you interesting?"
-contArgs cont
+contArgs env cont
   | lone cont = (True, [], cont)
   | otherwise = go [] cont
   where
@@ -538,34 +530,22 @@ contArgs cont
     lone (CastIt {})     = False  --     stops it being "lone"
     lone _               = True
 
-    go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
-                                        = go (is_interesting arg se : args) k
+    go args (ApplyToVal { sc_arg = arg_clo, sc_cont = k })
+                                        = go (interestingArg env arg_clo : args) k
     go args (ApplyToTy { sc_cont = k }) = go args k
     go args (CastIt { sc_cont = k })    = go args k
     go args k                           = (False, reverse args, k)
-
-    is_interesting arg se = interestingArg se arg
-                   -- Do *not* use short-cutting substitution here
-                   -- because we want to get as much IdInfo as possible
 
 contOutArgs :: SimplEnv -> SimplCont -> [OutExpr]
 -- Get the leading arguments from the `SimplCont`, as /OutExprs/
 contOutArgs env cont
   = go cont
   where
-    in_scope = seInScope env
-
     go (ApplyToTy { sc_arg_ty = ty, sc_cont = cont })
       = Type ty : go cont
 
-    go (ApplyToVal { sc_dup = dup, sc_arg = arg, sc_env = env, sc_cont = cont })
-      | isSimplified dup = arg : go cont
-      | otherwise        = GHC.Core.Subst.substExpr (getFullSubst in_scope env) arg : go cont
-        -- Make sure we apply the static environment `sc_env` as a substitution
-        --   to get an OutExpr.  See (BF1) in Note [tryRules: plan (BEFORE)]
-        --   in GHC.Core.Opt.Simplify.Iteration
-        -- NB: we use substExpr, not substExprSC: we want to get the benefit of
-        --     knowing what is evaluated etc, via the in-scope set
+    go (ApplyToVal { sc_arg = arg_clo, sc_cont = cont })
+      = simplCloExpr (seInScope env) arg_clo : go cont
 
     -- No more arguments
     go _ = []
@@ -993,16 +973,18 @@ rule for (*) (df d) can fire.  To do this
   b) we say that a con-like argument (eg (df d)) is interesting
 -}
 
-interestingArg :: SimplEnv -> CoreExpr -> ArgSummary
+interestingArg :: SimplEnv -> SimplClo -> ArgSummary
 -- See Note [Interesting arguments]
-interestingArg env e = go env 0 e
+-- Do *not* use short-cutting substitution here
+-- because we want to get as much IdInfo as possible
+interestingArg env e = go_clo env 0 e
   where
+    go_clo _env n (DoneId v)        = go_var n v
+    go_clo env  n (DoneEx e _)      = go (zapSubstEnv env)         n e
+    go_clo env  n (ContEx se e _co) = go (se `setInScopeFromE` env) n e
+
     -- n is # value args to which the expression is applied
-    go env n (Var v)
-       = case substId env v of
-           DoneId v'            -> go_var n v'
-           DoneEx e _           -> go (zapSubstEnv env)             n e
-           ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) n e
+    go env n (Var v) = go_clo env n (substId env v)
 
     go _   _ (Lit l)
        | isLitRubbish l        = TrivArg -- Leads to unproductive inlining in WWRec, #20035
@@ -1490,7 +1472,38 @@ is a term (not a coercion) so we can't necessarily inline the latter in
 the former.
 -}
 
-preInlineUnconditionally
+
+preInlineBetaUnconditionally
+    :: SimplEnv -> Levity -> InId -> SimplClo
+    -> Maybe SimplEnv       -- Returned env has extended substitution
+preInlineBetaUnconditionally env levity bndr clo
+  | not pre_inline_unconditionally = Nothing
+  | isCoVar bndr                   = Nothing -- Note [Do not inline CoVars unconditionally]
+  | not (one_occ (idOccInfo bndr)) = Nothing
+  | needs_case_binding levity      = Nothing
+  | otherwise                      = Just $! extendIdSubst env bndr clo
+  where
+    pre_inline_unconditionally = sePreInline env
+
+    one_occ OneOcc{ occ_n_br = 1, occ_in_lam = NotInsideLam }
+      = True
+    one_occ OneOcc{ occ_n_br = 1, occ_in_lam = IsInsideLam, occ_int_cxt = IsInteresting }
+      = case clo of
+          ContEx _ rhs _ -> canInlineInLam rhs
+          DoneId {}      -> True
+          DoneEx rhs _   -> exprIsTrivial rhs
+    one_occ IAmDead = True -- Happens in ((\x.1) v)
+    one_occ _       = False
+
+    -- NB: exprOkForSpeculation is stable under substitution
+    --     so we can apply it to an InExpr in the ContEx case
+    needs_case_binding Lifted   = False
+    needs_case_binding Unlifted = case clo of
+                                    DoneId {}    -> False
+                                    DoneEx e _   -> exprOkForSpeculation e
+                                    ContEx _ e _ -> exprOkForSpeculation e
+
+preInlineLetUnconditionally
     :: SimplEnv -> TopLevelFlag -> InId
     -> InExpr -> StaticEnv  -- These two go together
     -> Maybe SimplEnv       -- Returned env has extended substitution
@@ -1498,7 +1511,7 @@ preInlineUnconditionally
 -- See Note [Core let-can-float invariant] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
-preInlineUnconditionally env top_lvl bndr rhs rhs_env
+preInlineLetUnconditionally env top_lvl bndr rhs rhs_env
   | not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
@@ -1516,13 +1529,12 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     unf = idUnfolding bndr
     extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
 
+    one_occ OneOcc{ occ_n_br = 1, occ_in_lam = NotInsideLam }
+      = isNotTopLevel top_lvl || early_phase
+    one_occ OneOcc{ occ_n_br = 1, occ_in_lam = IsInsideLam, occ_int_cxt = IsInteresting }
+      = canInlineInLam rhs
     one_occ IAmDead = True -- Happens in ((\x.1) v)
-    one_occ OneOcc{ occ_n_br   = 1
-                  , occ_in_lam = NotInsideLam }   = isNotTopLevel top_lvl || early_phase
-    one_occ OneOcc{ occ_n_br   = 1
-                  , occ_in_lam = IsInsideLam
-                  , occ_int_cxt = IsInteresting } = canInlineInLam rhs
-    one_occ _                                     = False
+    one_occ _       = False
 
     pre_inline_unconditionally = sePreInline env
     active = isActive (sePhase env)
@@ -1530,38 +1542,6 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
              -- See Note [pre/postInlineUnconditionally in gentle mode]
     inline_prag = idInlinePragma bndr
 
--- Be very careful before inlining inside a lambda, because (a) we must not
--- invalidate occurrence information, and (b) we want to avoid pushing a
--- single allocation (here) into multiple allocations (inside lambda).
--- Inlining a *function* with a single *saturated* call would be ok, mind you.
---      || (if is_cheap && not (canInlineInLam rhs) then pprTrace "preinline" (ppr bndr <+> ppr rhs) ok else ok)
---      where
---              is_cheap = exprIsCheap rhs
---              ok = is_cheap && int_cxt
-
-        --      int_cxt         The context isn't totally boring
-        -- E.g. let f = \ab.BIG in \y. map f xs
-        --      Don't want to substitute for f, because then we allocate
-        --      its closure every time the \y is called
-        -- But: let f = \ab.BIG in \y. map (f y) xs
-        --      Now we do want to substitute for f, even though it's not
-        --      saturated, because we're going to allocate a closure for
-        --      (f y) every time round the loop anyhow.
-
-        -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
-        -- so substituting rhs inside a lambda doesn't change the occ info.
-        -- Sadly, not quite the same as exprIsHNF.
-    canInlineInLam (Lit _)    = True
-    canInlineInLam (Cast e _) = canInlineInLam e
-    canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
-    canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
-    canInlineInLam (Var v)    = case idOccInfo v of
-                                  OneOcc { occ_in_lam = IsInsideLam } -> True
-                                  ManyOccs {}                         -> True
-                                  _                                   -> False
-    canInlineInLam _          = False
-      -- not ticks.  Counting ticks cannot be duplicated, and non-counting
-      -- ticks around a Lam will disappear anyway.
 
     early_phase =
       case sePhase env of
@@ -1592,6 +1572,39 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     -- here.
     -- (Nor can we check for `exprIsExpandable rhs`, because that needs to look
     -- at the non-existent unfolding for the `I# 2#` which is also floated out.)
+
+canInlineInLam :: CoreExpr -> Bool
+-- Be very careful before inlining inside a lambda, because (a) we must not
+-- invalidate occurrence information, and (b) we want to avoid pushing a
+-- single allocation (here) into multiple allocations (inside lambda).
+-- Inlining a *function* with a single *saturated* call would be ok, mind you.
+--      || (if is_cheap && not (canInlineInLam rhs) then pprTrace "preinline" (ppr bndr <+> ppr rhs) ok else ok)
+--      where
+--              is_cheap = exprIsCheap rhs
+--              ok = is_cheap && int_cxt
+        --      int_cxt         The context isn't totally boring
+        -- E.g. let f = \ab.BIG in \y. map f xs
+        --      Don't want to substitute for f, because then we allocate
+        --      its closure every time the \y is called
+        -- But: let f = \ab.BIG in \y. map (f y) xs
+        --      Now we do want to substitute for f, even though it's not
+        --      saturated, because we're going to allocate a closure for
+        --      (f y) every time round the loop anyhow.
+
+        -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
+        -- so substituting rhs inside a lambda doesn't change the occ info.
+        -- Sadly, not quite the same as exprIsHNF.
+canInlineInLam (Lit _)    = True
+canInlineInLam (Cast e _) = canInlineInLam e
+canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
+canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
+canInlineInLam (Var v)    = case idOccInfo v of
+                              OneOcc { occ_in_lam = IsInsideLam } -> True
+                              ManyOccs {}                         -> True
+                              _                                   -> False
+canInlineInLam _          = False
+  -- not ticks.  Counting ticks cannot be duplicated, and non-counting
+  -- ticks around a Lam will disappear anyway.
 
 {-
 ************************************************************************
