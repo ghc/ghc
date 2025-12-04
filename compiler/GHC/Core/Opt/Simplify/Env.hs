@@ -11,7 +11,7 @@ module GHC.Core.Opt.Simplify.Env (
         SimplMode(..), updMode, smPlatform,
 
         -- * Environments
-        SimplEnv(..), pprSimplEnv,   -- Temp not abstract
+        SimplEnv(..), StaticEnv, pprSimplEnv,   -- Temp not abstract
         SimplPhase(..), isActive,
         seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
@@ -28,13 +28,13 @@ module GHC.Core.Opt.Simplify.Env (
         SimplEnvIS,  checkSimplEnvIS, pprBadSimplEnvIS,
 
         -- * Substitution results
-        SimplSR(..), mkContEx, substId, lookupRecBndr,
+        SimplClo(..), mkContEx, substId, lookupRecBndr,
 
         -- * Simplifying 'Id' binders
         simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
         simplBinder, simplBinders,
         substTy, substTyVar, getFullSubst, getTCvSubst,
-        substCo, substCoVar,
+        substCo, substCoVar, simplCloExpr, simplCloCoercion_maybe,
 
         -- * Floats
         SimplFloats(..), emptyFloats, isEmptyFloats, mkRecFloats,
@@ -60,8 +60,9 @@ import GHC.Core.Opt.Arity ( ArityOpts(..) )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Rules.Config ( RuleOpts(..) )
 import GHC.Core
+import GHC.Core.Ppr
 import GHC.Core.Utils
-import GHC.Core.Subst( substExprSC )
+import GHC.Core.Subst( substExpr )
 import GHC.Core.Unfold
 import GHC.Core.TyCo.Subst (emptyIdSubstEnv, mkSubst)
 import GHC.Core.Multiplicity( Scaled(..), mkMultMul )
@@ -208,6 +209,8 @@ data SimplEnv
 type SimplEnvIS = SimplEnv
      -- Invariant: the substitution is empty
      -- We want this SimplEnv for its InScopeSet and flags
+
+type StaticEnv = SimplEnv       -- Just the static part is relevant
 
 checkSimplEnvIS :: SimplEnvIS -> Bool
 -- Check the invariant for SimplEnvIS
@@ -459,17 +462,20 @@ pprSimplEnv env
    ppr_one v | isId v = ppr v <+> ppr (idUnfolding v)
              | otherwise = ppr v
 
-type SimplIdSubst = IdEnv SimplSR -- IdId |--> OutExpr
+type SimplIdSubst = IdEnv SimplClo -- IdId |--> OutExpr
         -- See Note [Extending the IdSubstEnv] in GHC.Core.Subst
 
--- | A substitution result.
-data SimplSR
+-- | A "closure" used in the Simplifier
+-- Roughly: either an (InExpr, StaticEnv) pair for an
+--                 as-yet-unsimplified expression
+--          or     an OutExpr, for an already-simplified one
+
+data SimplClo
   = DoneEx OutExpr JoinPointHood
        -- If  x :-> DoneEx e ja   is in the SimplIdSubst
        -- then replace occurrences of x by e
        -- and  ja = Just a <=> x is a join-point of arity a
        -- See Note [Join arity in SimplIdSubst]
-
 
   | DoneId OutId
        -- If  x :-> DoneId v   is in the SimplIdSubst
@@ -477,23 +483,25 @@ data SimplSR
        -- and  v is a join-point of arity a
        --      <=> x is a join-point of arity a
 
-  | ContEx TvSubstEnv                 -- A suspended substitution
-           CvSubstEnv
-           SimplIdSubst
+  | ContEx StaticEnv
            InExpr
-      -- If   x :-> ContEx tv cv id e   is in the SimplISubst
-      -- then replace occurrences of x by (subst (tv,cv,id) e)
+           MOutCoercion   -- An /optimised/ OutCoercion
+      -- If   x :-> ContEx subst e co   is in the SimplISubst
+      -- then replace occurrences of x by ((substExpr subst e) |> co)
 
-instance Outputable SimplSR where
+instance Outputable SimplClo where
   ppr (DoneId v)    = text "DoneId" <+> ppr v
-  ppr (DoneEx e mj) = text "DoneEx" <> pp_mj <+> ppr e
+  ppr (DoneEx e mj) = text "DoneEx" <> pp_mj<> braces (ppr e)
     where
       pp_mj = case mj of
                 NotJoinPoint -> empty
                 JoinPoint n  -> parens (int n)
 
-  ppr (ContEx _tv _cv _id e) = vcat [text "ContEx" <+> ppr e {-,
-                                ppr (filter_env tv), ppr (filter_env id) -}]
+  ppr (ContEx _se e mco)
+    = text "ContEx" <> vcat [ pprParendExpr e
+                            , case mco of
+                                 MRefl -> empty
+                                 MCo co -> text "|>" <+> pprOptCo co ]
         -- where
         -- fvs = exprFreeVars e
         -- filter_env env = filterVarEnv_Directly keep env
@@ -627,7 +635,7 @@ reSimplifying :: SimplEnv -> Bool
 reSimplifying (SimplEnv { seInlineDepth = n }) = n>0
 
 ---------------------
-extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
+extendIdSubst :: SimplEnv -> Id -> SimplClo -> SimplEnv
 extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
   = assertPpr (isId var && not (isCoVar var)) (ppr var) $
     env { seIdSubst = extendVarEnv subst var res }
@@ -725,8 +733,8 @@ zapSubstEnv env@(SimplEnv { seInlineDepth = n })
 setSubstEnv :: SimplEnv -> TvSubstEnv -> CvSubstEnv -> SimplIdSubst -> SimplEnv
 setSubstEnv env tvs cvs ids = env { seTvSubst = tvs, seCvSubst = cvs, seIdSubst = ids }
 
-mkContEx :: SimplEnv -> InExpr -> SimplSR
-mkContEx (SimplEnv { seTvSubst = tvs, seCvSubst = cvs, seIdSubst = ids }) e = ContEx tvs cvs ids e
+mkContEx :: SimplEnv -> InExpr -> SimplClo
+mkContEx env e = ContEx env e MRefl
 
 {-
 ************************************************************************
@@ -1011,7 +1019,7 @@ So we want to look up the inner X.g_34 in the substitution, where we'll
 find that it has been substituted by b.  (Or conceivably cloned.)
 -}
 
-substId :: SimplEnv -> InId -> SimplSR
+substId :: SimplEnv -> InId -> SimplClo
 -- Returns DoneEx only on a non-Var expression
 substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = case lookupVarEnv ids v of  -- Note [Global Ids in the substitution]
@@ -1343,17 +1351,29 @@ getTCvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv
 
 getFullSubst :: InScopeSet -> SimplEnv -> Subst
 getFullSubst in_scope (SimplEnv { seIdSubst = id_env, seTvSubst = tv_env, seCvSubst = cv_env })
-  = mk_full_subst in_scope tv_env cv_env id_env
+  = mkSubst in_scope (mapVarEnv (simplCloExpr in_scope) id_env) tv_env cv_env
 
-mk_full_subst :: InScopeSet -> TvSubstEnv -> CvSubstEnv -> SimplIdSubst -> Subst
-mk_full_subst in_scope tv_env cv_env id_env
-  = mkSubst in_scope (mapVarEnv to_expr id_env) tv_env cv_env
-  where
-    to_expr :: SimplSR -> CoreExpr
-    -- A tiresome impedence-matcher
-    to_expr (DoneEx e _)           = e
-    to_expr (DoneId v)             = Var v
-    to_expr (ContEx tvs cvs ids e) = GHC.Core.Subst.substExprSC (mk_full_subst in_scope tvs cvs ids) e
+simplCloExpr :: InScopeSet -> SimplClo -> OutExpr
+simplCloExpr _        (DoneEx e _)      = e
+simplCloExpr _        (DoneId v)        = Var v
+simplCloExpr in_scope (ContEx se e mco) = mkCastMCo e' mco
+      where
+        e' = GHC.Core.Subst.substExpr (getFullSubst in_scope se) e
+        -- Make sure we apply the static environment `sc_env` as a substitution
+        --   to get an OutExpr.  See (BF1) in Note [tryRules: plan (BEFORE)]
+        --   in GHC.Core.Opt.Simplify.Iteration
+        -- NB: we use substExpr, not substExprSC: we want to get the benefit of
+        --     knowing what is evaluated etc, via the in-scope set
+
+simplCloCoercion_maybe :: SimplClo -> Maybe OutCoercion
+-- If the closure is just a coercion, give it to me
+simplCloCoercion_maybe clo
+  = case clo of
+      DoneEx (Coercion co) _        -> Just co
+      ContEx se (Coercion co) MRefl -> Just (substCo se co)
+                                          -- Do we ever cast a coercion??
+      DoneId {} -> Nothing  -- Coercion variables never occur naked
+      _         -> Nothing
 
 substTy :: HasDebugCallStack => SimplEnv -> Type -> Type
 substTy env ty = Type.substTy (getTCvSubst env) ty

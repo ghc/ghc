@@ -1022,7 +1022,7 @@ instance NFData CoSel where
 
 instance Outputable MCoercion where
   ppr MRefl    = text "MRefl"
-  ppr (MCo co) = text "MCo" <+> ppr co
+  ppr (MCo co) = text "MCo" <> braces (ppr co)
 
 {- Note [Refl invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~
