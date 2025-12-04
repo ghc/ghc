@@ -275,6 +275,10 @@ The supported transformers are listed below:
         <td>Enable building the <code>text</code> package with <code>simdutf</code> support.</td>
     </tr>
     <tr>
+        <td><code>with_profiled_libs</code></td>
+        <td>Enables building of stage1+ libraries and the RTS in profiled build ways (the opposite of <code>no_profiled_libs</code>).</td>
+    </tr>
+    <tr>
         <td><code>no_profiled_libs</code></td>
         <td>Disables building of libraries in profiled build ways.</td>
     </tr>

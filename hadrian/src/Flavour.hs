@@ -15,6 +15,7 @@ module Flavour
   , enableProfiledGhc
   , disableDynamicGhcPrograms
   , disableDynamicLibs
+  , enableProfiledLibs
   , disableProfiledLibs
   , enableLinting
   , enableHaddock
@@ -62,6 +63,7 @@ flavourTransformers = M.fromList
     , "no_dynamic_libs"  =: disableDynamicLibs
     , "native_bignum"    =: useNativeBignum
     , "text_simdutf"     =: enableTextWithSIMDUTF
+    , "with_profiled_libs" =: enableProfiledLibs
     , "no_profiled_libs" =: disableProfiledLibs
     , "omit_pragmas"     =: omitPragmas
     , "ipe"              =: enableIPE
@@ -347,6 +349,20 @@ disableDynamicLibs flavour =
     prune :: Ways -> Ways
     prune = fmap $ Set.filter (not . wayUnit Dynamic)
 
+-- | Build libraries and the RTS in profiled ways (opposite of
+-- 'disableProfiledLibs').
+enableProfiledLibs :: Flavour -> Flavour
+enableProfiledLibs flavour =
+  flavour
+    { libraryWays = addProfilingWays $ libraryWays flavour,
+      rtsWays = addProfilingWays $ rtsWays flavour
+    }
+  where
+    addProfilingWays :: Ways -> Ways
+    addProfilingWays ways = do
+      ws <- ways
+      buildProfiled <- notStage0
+      pure $ if buildProfiled then ws <> Set.map (<> profiling) ws else ws
 
 -- | Don't build libraries in profiled 'Way's.
 disableProfiledLibs :: Flavour -> Flavour
