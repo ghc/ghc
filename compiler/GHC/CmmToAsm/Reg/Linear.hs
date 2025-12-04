@@ -207,7 +207,7 @@ linearRegAlloc
         :: forall instr. (Instruction instr)
         => NCGConfig
         -> [BlockId] -- ^ entry points
-        -> BlockMap (UniqSet RegWithFormat)
+        -> BlockMap Regs
               -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)]
               -- ^ instructions annotated with "deaths"
@@ -246,7 +246,7 @@ linearRegAlloc'
         => NCGConfig
         -> freeRegs
         -> [BlockId]                    -- ^ entry points
-        -> BlockMap (UniqSet RegWithFormat)              -- ^ live regs on entry to each basic block
+        -> BlockMap Regs              -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
         -> UniqDSM ([NatBasicBlock instr], RegAllocStats, Int)
 
@@ -260,7 +260,7 @@ linearRegAlloc' config initFreeRegs entry_ids block_live sccs
 
 linearRA_SCCs :: OutputableRegConstraint freeRegs instr
               => [BlockId]
-              -> BlockMap (UniqSet RegWithFormat)
+              -> BlockMap Regs
               -> [NatBasicBlock instr]
               -> [SCC (LiveBasicBlock instr)]
               -> RegM freeRegs [NatBasicBlock instr]
@@ -295,7 +295,7 @@ linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
 
 process :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
         => [BlockId]
-        -> BlockMap (UniqSet RegWithFormat)
+        -> BlockMap Regs
         -> [GenBasicBlock (LiveInstr instr)]
         -> RegM freeRegs [[NatBasicBlock instr]]
 process entry_ids block_live =
@@ -334,7 +334,7 @@ process entry_ids block_live =
 --
 processBlock
         :: OutputableRegConstraint freeRegs instr
-        => BlockMap (UniqSet RegWithFormat)              -- ^ live regs on entry to each basic block
+        => BlockMap Regs              -- ^ live regs on entry to each basic block
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
 
@@ -351,7 +351,7 @@ processBlock block_live (BasicBlock id instrs)
 -- | Load the freeregs and current reg assignment into the RegM state
 --      for the basic block with this BlockId.
 initBlock :: FR freeRegs
-          => BlockId -> BlockMap (UniqSet RegWithFormat) -> RegM freeRegs ()
+          => BlockId -> BlockMap Regs -> RegM freeRegs ()
 initBlock id block_live
  = do   platform    <- getPlatform
         block_assig <- getBlockAssigR
@@ -368,7 +368,7 @@ initBlock id block_live
                             setFreeRegsR    (frInitFreeRegs platform)
                           Just live ->
                             setFreeRegsR $ foldl' (flip $ frAllocateReg platform) (frInitFreeRegs platform)
-                                                  (nonDetEltsUniqSet $ takeRealRegs live)
+                                                  (nonDetEltsUniqSet $ takeRealRegs $ getRegs live)
                             -- See Note [Unique Determinism and code generation]
                         setAssigR       emptyRegMap
 
@@ -381,7 +381,7 @@ initBlock id block_live
 -- | Do allocation for a sequence of instructions.
 linearRA
         :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
-        => BlockMap (UniqSet RegWithFormat)                      -- ^ map of what vregs are live on entry to each block.
+        => BlockMap Regs                      -- ^ map of what vregs are live on entry to each block.
         -> BlockId                              -- ^ id of the current block, for debugging.
         -> [LiveInstr instr]                    -- ^ liveness annotated instructions in this block.
         -> RegM freeRegs
@@ -406,7 +406,7 @@ linearRA block_live block_id = go [] []
 -- | Do allocation for a single instruction.
 raInsn
         :: OutputableRegConstraint freeRegs instr
-        => BlockMap (UniqSet RegWithFormat)                      -- ^ map of what vregs are love on entry to each block.
+        => BlockMap Regs                      -- ^ map of what vregs are love on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> BlockId                              -- ^ the id of the current block, for debugging
         -> LiveInstr instr                      -- ^ the instr to have its regs allocated, with liveness info.
@@ -437,7 +437,7 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
     -- (we can't eliminate it if the source register is on the stack, because
     --  we do not want to use one spill slot for different virtual registers)
     case takeRegRegMoveInstr platform instr of
-        Just (src,dst)  | Just (RegWithFormat _ fmt) <- lookupUniqSet_Directly (liveDieRead live) (getUnique src),
+        Just (src,dst)  | Just fmt <- lookupReg src (liveDieRead live),
                           isVirtualReg dst,
                           not (dst `elemUFM` assig),
                           isRealReg src || isInReg src assig -> do
@@ -461,8 +461,8 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
            return (new_instrs, [])
 
         _ -> genRaInsn block_live new_instrs id instr
-                        (map regWithFormat_reg $ nonDetEltsUniqSet $ liveDieRead live)
-                        (map regWithFormat_reg $ nonDetEltsUniqSet $ liveDieWrite live)
+                        (map regWithFormat_reg $ nonDetEltsUniqSet $ getRegs $ liveDieRead live)
+                        (map regWithFormat_reg $ nonDetEltsUniqSet $ getRegs $ liveDieWrite live)
                         -- See Note [Unique Determinism and code generation]
 
 raInsn _ _ _ instr
@@ -491,7 +491,7 @@ isInReg src assig | Just (InReg _) <- lookupUFM assig src = True
 
 genRaInsn :: forall freeRegs instr.
              (OutputableRegConstraint freeRegs instr)
-          => BlockMap (UniqSet RegWithFormat)
+          => BlockMap Regs
           -> [instr]
           -> BlockId
           -> instr
@@ -668,10 +668,11 @@ releaseRegs regs = do
 saveClobberedTemps
         :: forall instr freeRegs.
            (Instruction instr, FR freeRegs)
-        => [RealReg]            -- real registers clobbered by this instruction
-        -> [Reg]                -- registers which are no longer live after this insn
-        -> RegM freeRegs [instr]         -- return: instructions to spill any temps that will
-                                -- be clobbered.
+        => [RealReg]             -- ^ real registers clobbered by this instruction
+        -> [Reg]                 -- ^ registers which are no longer live after this instruction,
+                                 -- because read for the last time
+        -> RegM freeRegs [instr] -- return: instructions to spill any temps that will
+                                 -- be clobbered.
 
 saveClobberedTemps [] _
         = return []

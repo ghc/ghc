@@ -30,7 +30,9 @@ module GHC.CmmToAsm.Reg.Liveness (
         patchRegsLiveInstr,
         reverseBlocksInTops,
         regLiveness,
-        cmmTopLiveness
+        cmmTopLiveness,
+
+        module GHC.CmmToAsm.Reg.Regs
   ) where
 import GHC.Prelude
 
@@ -41,11 +43,11 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Utils
+import GHC.CmmToAsm.Reg.Regs
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
-import GHC.CmmToAsm.Reg.Target
 
 import GHC.Data.Graph.Directed
 import GHC.Data.OrdList
@@ -189,9 +191,9 @@ data LiveInstr instr
 
 data Liveness
         = Liveness
-        { liveBorn      :: UniqSet RegWithFormat      -- ^ registers born in this instruction (written to for first time).
-        , liveDieRead   :: UniqSet RegWithFormat      -- ^ registers that died because they were read for the last time.
-        , liveDieWrite  :: UniqSet RegWithFormat}     -- ^ registers that died because they were clobbered by something.
+        { liveBorn      :: Regs      -- ^ registers born in this instruction (written to for first time).
+        , liveDieRead   :: Regs      -- ^ registers that died because they were read for the last time.
+        , liveDieWrite  :: Regs }    -- ^ registers that died because they were clobbered by something.
 
 
 -- | Stash regs live on entry to each basic block in the info part of the cmm code.
@@ -200,7 +202,7 @@ data LiveInfo
                 (LabelMap RawCmmStatics)  -- cmm info table static stuff
                 [BlockId]                 -- entry points (first one is the
                                           -- entry point for the proc).
-                (BlockMap (UniqSet RegWithFormat))         -- argument locals live on entry to this block
+                (BlockMap Regs)       -- argument locals live on entry to this block
                 (BlockMap IntSet)         -- stack slots live on entry to this block
 
 
@@ -246,8 +248,8 @@ instance Outputable instr
                         , pprRegs (text "# w_dying: ") (liveDieWrite live) ]
                     $+$ space)
 
-         where  pprRegs :: SDoc -> UniqSet RegWithFormat -> SDoc
-                pprRegs name regs
+         where  pprRegs :: SDoc -> Regs -> SDoc
+                pprRegs name ( Regs regs )
                  | isEmptyUniqSet regs  = empty
                  | otherwise            = name <>
                      (pprUFM (getUniqSet regs) (hcat . punctuate space . map ppr))
@@ -330,7 +332,7 @@ slurpConflicts
         :: Instruction instr
         => Platform
         -> LiveCmmDecl statics instr
-        -> (Bag (UniqSet RegWithFormat), Bag (Reg, Reg))
+        -> (Bag Regs, Bag (Reg, Reg))
 
 slurpConflicts platform live
         = slurpCmm (emptyBag, emptyBag) live
@@ -364,23 +366,22 @@ slurpConflicts platform live
          = let
                 -- regs that die because they are read for the last time at the start of an instruction
                 --      are not live across it.
-                rsLiveAcross    = rsLiveEntry `minusUniqSet` (liveDieRead live)
+                rsLiveAcross    = rsLiveEntry `minusRegs` (liveDieRead live)
 
                 -- regs live on entry to the next instruction.
                 --      be careful of orphans, make sure to delete dying regs _after_ unioning
                 --      in the ones that are born here.
-                rsLiveNext      = (rsLiveAcross `unionUniqSets` (liveBorn     live))
-                                                `minusUniqSet`  (liveDieWrite live)
+                rsLiveNext      = (rsLiveAcross `unionRegsMaxFmt`  (liveBorn     live))
+                                                `minusCoveredRegs` (liveDieWrite live)
 
                 -- orphan vregs are the ones that die in the same instruction they are born in.
                 --      these are likely to be results that are never used, but we still
                 --      need to assign a hreg to them..
-                rsOrphans       = intersectUniqSets
+                rsOrphans       = intersectRegsMaxFmt
                                         (liveBorn live)
-                                        (unionUniqSets (liveDieWrite live) (liveDieRead live))
+                                        (unionRegsMaxFmt (liveDieWrite live) (liveDieRead live))
 
-                --
-                rsConflicts     = unionUniqSets rsLiveNext rsOrphans
+                rsConflicts     = unionRegsMaxFmt rsLiveNext rsOrphans
 
           in    case takeRegRegMoveInstr platform instr of
                  Just rr        -> slurpLIs rsLiveNext
@@ -619,7 +620,7 @@ patchEraseLive platform patchF cmm
          | LiveInfo static id blockMap mLiveSlots <- info
          = let
                   -- See Note [Unique Determinism and code generation]
-                blockMap'       = mapMap (mapRegFormatSet patchF) blockMap
+                blockMap'       = mapMap (mapRegs patchF) blockMap
 
                 info'           = LiveInfo static id blockMap' mLiveSlots
            in   CmmProc info' label live $ map patchSCC sccs
@@ -648,8 +649,8 @@ patchEraseLive platform patchF cmm
                 | r1 == r2      = True
 
                 -- destination reg is never used
-                | elemUniqSet_Directly (getUnique r2) (liveBorn live)
-                , elemUniqSet_Directly (getUnique r2) (liveDieRead live) || elemUniqSet_Directly (getUnique r2) (liveDieWrite live)
+                | r2 `elemRegs` liveBorn live
+                , r2 `elemRegs` liveDieRead live || r2 `elemRegs` liveDieWrite live
                 = True
 
                 | otherwise     = False
@@ -673,9 +674,9 @@ patchRegsLiveInstr platform patchF li
                 (patchRegsOfInstr platform instr patchF)
                 (Just live
                         { -- WARNING: have to go via lists here because patchF changes the uniq in the Reg
-                          liveBorn      = mapRegFormatSet patchF $ liveBorn live
-                        , liveDieRead   = mapRegFormatSet patchF $ liveDieRead live
-                        , liveDieWrite  = mapRegFormatSet patchF $ liveDieWrite live })
+                          liveBorn      = mapRegs patchF $ liveBorn live
+                        , liveDieRead   = mapRegs patchF $ liveDieRead live
+                        , liveDieWrite  = mapRegs patchF $ liveDieWrite live })
                           -- See Note [Unique Determinism and code generation]
 
 --------------------------------------------------------------------------------
@@ -865,7 +866,7 @@ computeLiveness
         -> [SCC (LiveBasicBlock instr)]
         -> ([SCC (LiveBasicBlock instr)],       -- instructions annotated with list of registers
                                                 -- which are "dead after this instruction".
-               BlockMap (UniqSet RegWithFormat))                 -- blocks annotated with set of live registers
+               BlockMap Regs)               -- blocks annotated with set of live registers
                                                 -- on entry to the block.
 
 computeLiveness platform sccs
@@ -880,11 +881,11 @@ computeLiveness platform sccs
 livenessSCCs
        :: Instruction instr
        => Platform
-       -> BlockMap (UniqSet RegWithFormat)
+       -> BlockMap Regs
        -> [SCC (LiveBasicBlock instr)]          -- accum
        -> [SCC (LiveBasicBlock instr)]
        -> ( [SCC (LiveBasicBlock instr)]
-          , BlockMap (UniqSet RegWithFormat))
+          , BlockMap Regs)
 
 livenessSCCs _ blockmap done []
         = (done, blockmap)
@@ -913,13 +914,14 @@ livenessSCCs platform blockmap done
 
             linearLiveness
                 :: Instruction instr
-                => BlockMap (UniqSet RegWithFormat) -> [LiveBasicBlock instr]
-                -> (BlockMap (UniqSet RegWithFormat), [LiveBasicBlock instr])
+                => BlockMap Regs -> [LiveBasicBlock instr]
+                -> (BlockMap Regs, [LiveBasicBlock instr])
 
             linearLiveness = mapAccumL (livenessBlock platform)
 
                 -- probably the least efficient way to compare two
                 -- BlockMaps for equality.
+            equalBlockMaps :: BlockMap Regs -> BlockMap Regs -> Bool
             equalBlockMaps a b
                 = a' == b'
               where a' = mapToList a
@@ -933,14 +935,14 @@ livenessSCCs platform blockmap done
 livenessBlock
         :: Instruction instr
         => Platform
-        -> BlockMap (UniqSet RegWithFormat)
+        -> BlockMap Regs
         -> LiveBasicBlock instr
-        -> (BlockMap (UniqSet RegWithFormat), LiveBasicBlock instr)
+        -> (BlockMap Regs, LiveBasicBlock instr)
 
 livenessBlock platform blockmap (BasicBlock block_id instrs)
  = let
         (regsLiveOnEntry, instrs1)
-            = livenessBack platform emptyUniqSet blockmap [] (reverse instrs)
+            = livenessBack platform noRegs blockmap [] (reverse instrs)
         blockmap'       = mapInsert block_id regsLiveOnEntry blockmap
 
         instrs2         = livenessForward platform regsLiveOnEntry instrs1
@@ -955,23 +957,26 @@ livenessBlock platform blockmap (BasicBlock block_id instrs)
 livenessForward
         :: Instruction instr
         => Platform
-        -> UniqSet RegWithFormat -- regs live on this instr
+        -> Regs -- regs live on this instr
         -> [LiveInstr instr] -> [LiveInstr instr]
 
 livenessForward _        _           []  = []
 livenessForward platform rsLiveEntry (li@(LiveInstr instr mLive) : lis)
         | Just live <- mLive
         = let
-                RU _ written  = regUsageOfInstr platform instr
+                RU _ rsWritten  = regUsageOfInstr platform instr
                 -- Regs that are written to but weren't live on entry to this instruction
                 --      are recorded as being born here.
-                rsBorn          = mkUniqSet
-                                $ filter (\ r -> not $ elemUniqSet_Directly (getUnique r) rsLiveEntry)
-                                $ written
+                rsBorn          = mkRegsMaxFmt
+                                    [ reg
+                                    | reg@( RegWithFormat r _ ) <- rsWritten
+                                    , not $ r `elemRegs` rsLiveEntry
+                                    ]
 
-                rsLiveNext      = (rsLiveEntry `unionUniqSets` rsBorn)
-                                        `minusUniqSet` (liveDieRead live)
-                                        `minusUniqSet` (liveDieWrite live)
+                   -- See Note [Register formats in liveness analysis]
+                rsLiveNext      = (rsLiveEntry `addRegsMaxFmt` rsWritten)
+                                        `minusRegs` (liveDieRead live)  -- (FmtFwd1)
+                                        `minusRegs` (liveDieWrite live) -- (FmtFwd2)
 
         in LiveInstr instr (Just live { liveBorn = rsBorn })
                 : livenessForward platform rsLiveNext lis
@@ -986,11 +991,11 @@ livenessForward platform rsLiveEntry (li@(LiveInstr instr mLive) : lis)
 livenessBack
         :: Instruction instr
         => Platform
-        -> UniqSet RegWithFormat            -- regs live on this instr
-        -> BlockMap (UniqSet RegWithFormat) -- regs live on entry to other BBs
-        -> [LiveInstr instr]            -- instructions (accum)
-        -> [LiveInstr instr]            -- instructions
-        -> (UniqSet RegWithFormat, [LiveInstr instr])
+        -> Regs           -- ^ regs live on this instr
+        -> BlockMap Regs  -- ^ regs live on entry to other BBs
+        -> [LiveInstr instr]  -- ^ instructions (accum)
+        -> [LiveInstr instr]  -- ^ instructions
+        -> (Regs, [LiveInstr instr])
 
 livenessBack _        liveregs _        done []  = (liveregs, done)
 
@@ -998,15 +1003,14 @@ livenessBack platform liveregs blockmap acc (instr : instrs)
  = let  !(!liveregs', instr')     = liveness1 platform liveregs blockmap instr
    in   livenessBack platform liveregs' blockmap (instr' : acc) instrs
 
-
 -- don't bother tagging comments or deltas with liveness
 liveness1
         :: Instruction instr
         => Platform
-        -> UniqSet RegWithFormat
-        -> BlockMap (UniqSet RegWithFormat)
+        -> Regs
+        -> BlockMap Regs
         -> LiveInstr instr
-        -> (UniqSet RegWithFormat, LiveInstr instr)
+        -> (Regs, LiveInstr instr)
 
 liveness1 _ liveregs _ (LiveInstr instr _)
         | isMetaInstr instr
@@ -1017,14 +1021,14 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
         | not_a_branch
         = (liveregs1, LiveInstr instr
                         (Just $ Liveness
-                        { liveBorn      = emptyUniqSet
+                        { liveBorn      = noRegs
                         , liveDieRead   = r_dying
                         , liveDieWrite  = w_dying }))
 
         | otherwise
         = (liveregs_br, LiveInstr instr
                         (Just $ Liveness
-                        { liveBorn      = emptyUniqSet
+                        { liveBorn      = noRegs
                         , liveDieRead   = r_dying_br
                         , liveDieWrite  = w_dying }))
 
@@ -1033,21 +1037,22 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
 
             -- registers that were written here are dead going backwards.
             -- registers that were read here are live going backwards.
-            liveregs1   = (liveregs `delListFromUniqSet` written)
-                                    `addListToUniqSet` read
+            -- As for the formats, see Note [Register formats in liveness analysis]
+            liveregs1   = (liveregs `minusCoveredRegs` mkRegsMaxFmt written) -- (FmtBwd2)
+                                    `addRegsMaxFmt` read                     -- (FmtBwd1)
 
-            -- registers that are not live beyond this point, are recorded
-            --  as dying here.
-            r_dying     = mkUniqSet
+            -- registers that are not live beyond this point are recorded
+            -- as dying here.
+            r_dying     = mkRegsMaxFmt
                           [ reg
                           | reg@(RegWithFormat r _) <- read
                           , not $ any (\ w -> getUnique w == getUnique r) written
-                          , not (elementOfUniqSet reg liveregs) ]
+                          , not $ r `elemRegs` liveregs ]
 
-            w_dying     = mkUniqSet
+            w_dying     = mkRegsMaxFmt
                           [ reg
-                          | reg <- written
-                          , not (elementOfUniqSet reg liveregs) ]
+                          | reg@(RegWithFormat r _) <- written
+                          , not $ r `elemRegs` liveregs ]
 
             -- union in the live regs from all the jump destinations of this
             -- instruction.
@@ -1057,14 +1062,91 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             targetLiveRegs target
                   = case mapLookup target blockmap of
                                 Just ra -> ra
-                                Nothing -> emptyUniqSet
-
-            live_from_branch = unionManyUniqSets (map targetLiveRegs targets)
-
-            liveregs_br = liveregs1 `unionUniqSets` live_from_branch
+                                Nothing -> noRegs
 
             -- registers that are live only in the branch targets should
             -- be listed as dying here.
-            live_branch_only = live_from_branch `minusUniqSet` liveregs
-            r_dying_br  = (r_dying `unionUniqSets` live_branch_only)
-                          -- See Note [Unique Determinism and code generation]
+            live_from_branch = unionManyRegsMaxFmt (map targetLiveRegs targets)
+            liveregs_br = liveregs1 `unionRegsMaxFmt` live_from_branch
+            live_branch_only = live_from_branch `minusRegs` liveregs
+            r_dying_br  = r_dying `unionRegsMaxFmt` live_branch_only
+              -- NB: we treat registers live in branches similar to any other
+              -- registers read by the instruction, so the logic here matches
+              -- the logic in the definition of 'r_dying' above.
+
+{- Note [Register formats in liveness analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We keep track of which format each virtual register is live at, and make use
+of this information during liveness analysis.
+
+First, we do backwards liveness analysis:
+
+  (FmtBwd1) Take the larger format when computing registers live going backwards.
+
+    Suppose for example that we have:
+
+      <previous instructions>
+      movps  %v0 %v1
+      movupd %v0 %v2
+
+    Here we read %v0 both at format F64 and F64x2, so we must consider it live
+    at format F64x2, going backwards, in the previous instructions.
+    Not doing so caused #26411.
+
+  (FmtBwd2) Only consider fully clobbered registers to be dead going backwards.
+
+    Consider for example the liveness of %v0 going backwards in the following
+    instruction block:
+
+      movlhps %v5 %v0  -- write the upper F64 of %v0
+      movupd  %v1 %v2  -- some unrelated instruction
+      movsd   %v3 %v0  -- write the lower F64 of %v0
+      movupd  %v0 %v4  -- read %v0 at format F64x2
+
+    We must not consider %v0 to be dead going backwards from 'movsd %v3 %v0'.
+    If we do, that means we think %v0 is dead during 'movupd %v1 %v2', and thus
+    that we can assign both %v0 and %v2 to the same real register. However, this
+    would be catastrophic, as 'movupd %v1 %v2' would then clobber the data
+    written to '%v0' in 'movlhps %v5 %v0'.
+
+    Wrinkle [Don't allow scalar partial writes]
+
+      We don't allow partial writes within scalar registers, for many reasons:
+
+        - partial writes can cause partial register stalls, which can have
+          disastrous performance implications (as seen in #20405)
+        - partial writes makes register allocation more difficult, as they can
+          require preserving the contents of a register across many instructions,
+          as in:
+
+            mulw %v0             -- 32-bit write to %rax
+            <many instructions>
+            mulb %v1             -- 16-bit partial write to %rax
+
+          The current register allocator is not equipped for spilling real
+          registers (only virtual registers), which means that e.g. on i386 we
+          end up with only 2 allocatable real GP registers for <many instructions>,
+          which is insufficient for instructions that require 3 registers.
+
+      We could allow this to be customised depending on the architecture, but
+      currently we simply never allow scalar partial writes.
+
+The forwards analysis is a bit simpler:
+
+  (FmtFwd1) Remove without considering format when dead going forwards.
+
+    If a register is no longer read after an instruction, then it is dead
+    going forwards. The format doesn't matter.
+
+  (FmtFwd2) Consider all writes as making a register dead going forwards.
+
+    If we write to the lower 64 bits of a 128 bit register, we don't currently
+    have a way to say "the lower 64 bits are dead but the top 64 bits are still live".
+    We would need a notion of partial register, similar to 'VirtualRegHi' for
+    the top 32 bits of a I32x2 virtual register.
+
+    As a result, the current approach is to consider the entire register to
+    be dead. This might cause us to unnecessarily spill/reload an entire vector
+    register to avoid its lower bits getting clobbered even though later
+    instructions might only care about its upper bits.
+-}
