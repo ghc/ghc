@@ -333,8 +333,11 @@ lHsQTyVarsToTypes tvs =
   [ HsValArg noExtField $ noLocA (case hsLTyVarName tv of
       Nothing -> HsWildCardTy noExtField
       Just nm -> HsTyVar noAnn NotPromoted (noLocA $ noUserRdr nm))
-  | tv <- hsQTvExplicit tvs
+  | tv <- hsq_explicit tvs
   ]
+
+hsQTvExplicitBinders :: LHsQTyVars DocNameI -> [LHsTyVarBndr (HsBndrVis DocNameI) DocNameI]
+hsQTvExplicitBinders = hsq_explicit
 
 --------------------------------------------------------------------------------
 

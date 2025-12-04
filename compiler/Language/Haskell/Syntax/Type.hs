@@ -55,7 +55,6 @@ module Language.Haskell.Syntax.Type (
         FieldOcc(..), LFieldOcc,
 
         mapHsOuterImplicit,
-        hsQTvExplicit,
         isHsKindedTyVar
     ) where
 
@@ -68,7 +67,6 @@ import Language.Haskell.Syntax.Specificity
 
 import GHC.Hs.Doc (LHsDoc)
 import GHC.Data.FastString (FastString)
-import GHC.Utils.Panic( panic )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe
@@ -325,10 +323,6 @@ data LHsQTyVars pass   -- See Note [HsType binders]
                 -- Explicit variables, written by the user
     }
   | XLHsQTyVars !(XXLHsQTyVars pass)
-
-hsQTvExplicit :: LHsQTyVars pass -> [LHsTyVarBndr (HsBndrVis pass) pass]
-hsQTvExplicit (HsQTvs { hsq_explicit = explicit_tvs }) = explicit_tvs
-hsQTvExplicit (XLHsQTyVars {})                         = panic "hsQTvExplicit"
 
 ------------------------------------------------
 --            HsOuterTyVarBndrs
