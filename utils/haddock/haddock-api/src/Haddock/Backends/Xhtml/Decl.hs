@@ -468,7 +468,7 @@ ppTySyn
       hdr =
         hsep
           ( [keyword "type", ppBinder summary occ]
-              ++ ppTyVars unicode qual (hsQTvExplicit ltyvars)
+              ++ ppTyVars unicode qual (hsQTvExplicitBinders ltyvars)
           )
       full = hdr <+> def
       def = case unLoc ltype of
@@ -595,7 +595,7 @@ ppFamHeader
   qual =
     hsep
       [ ppFamilyLeader associated info
-      , ppAppDocNameTyVarBndrs summary unicode qual name (hsq_explicit tvs)
+      , ppAppDocNameTyVarBndrs summary unicode qual name (hsQTvExplicitBinders tvs)
       , ppResultSig result unicode qual
       , injAnn
       , whereBit
@@ -760,7 +760,7 @@ ppClassHdr
 ppClassHdr summ lctxt n tvs fds unicode qual =
   keyword "class"
     <+> (if not (null $ fromMaybeContext lctxt) then ppLContext lctxt unicode qual HideEmptyContexts else noHtml)
-    <+> ppAppDocNameTyVarBndrs summ unicode qual n (hsQTvExplicit tvs)
+    <+> ppAppDocNameTyVarBndrs summ unicode qual n (hsQTvExplicitBinders tvs)
     <+> ppFds fds unicode qual
 
 ppFds :: [LHsFunDep DocNameI] -> Unicode -> Qualification -> Html
@@ -1656,7 +1656,7 @@ ppDataHeader
       ppLContext ctxt unicode qual HideEmptyContexts
       <+>
       -- T a b c ..., or a :+: b
-      ppAppDocNameTyVarBndrs summary unicode qual name (hsQTvExplicit tvs)
+      ppAppDocNameTyVarBndrs summary unicode qual name (hsQTvExplicitBinders tvs)
       <+> case ks of
         Nothing -> mempty
         Just (L _ x) -> dcolon unicode <+> ppKind unicode qual x

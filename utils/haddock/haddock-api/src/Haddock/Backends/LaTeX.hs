@@ -435,7 +435,7 @@ ppFamHeader
         | associated = id
         | otherwise = (<+> keyword "family")
 
-      famName = ppAppDocNameTyVarBndrs unicode name (hsq_explicit tvs)
+      famName = ppAppDocNameTyVarBndrs unicode name (hsQTvExplicitBinders tvs)
 
       famSig = case result of
         NoSig _ -> empty
@@ -644,7 +644,7 @@ ppTyVars :: RenderableBndrFlag flag => Bool -> [LHsTyVarBndr flag DocNameI] -> [
 ppTyVars unicode tvs = map (ppHsTyVarBndr unicode . unLoc) tvs
 
 tyvarNames :: LHsQTyVars DocNameI -> [Maybe Name]
-tyvarNames = map (fmap getName . hsLTyVarNameI) . hsQTvExplicit
+tyvarNames = map (fmap getName . hsLTyVarNameI) . hsQTvExplicitBinders
 
 declWithDoc :: LaTeX -> Maybe LaTeX -> LaTeX
 declWithDoc decl doc =

@@ -640,6 +640,9 @@ hsLTyVarName = hsTyVarName . unLoc
 hsLTyVarNames :: [LHsTyVarBndr flag (GhcPass p)] -> [IdP (GhcPass p)]
 hsLTyVarNames = mapMaybe hsLTyVarName
 
+hsQTvExplicit :: LHsQTyVars (GhcPass p) -> [LHsTyVarBndr (HsBndrVis (GhcPass p)) (GhcPass p)]
+hsQTvExplicit = hsq_explicit
+
 hsForAllTelescopeBndrs :: HsForAllTelescope (GhcPass p) -> [LHsTyVarBndr ForAllTyFlag (GhcPass p)]
 hsForAllTelescopeBndrs (HsForAllVis   _ bndrs) = map (fmap (setHsTyVarBndrFlag Required)) bndrs
 hsForAllTelescopeBndrs (HsForAllInvis _ bndrs) = map (fmap (updateHsTyVarBndrFlag Invisible)) bndrs
