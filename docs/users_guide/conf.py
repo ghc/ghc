@@ -45,7 +45,7 @@ rst_prolog = """
 
 # General information about the project.
 project = u'Glasgow Haskell Compiler'
-copyright = f"{datetime.now(timezone.utc).year}, GHC Team"
+copyright = "{}, GHC Team".format(datetime.now(timezone.utc).year)
 # N.B. version comes from ghc_config
 release = version  # The full version, including alpha/beta/rc tags.
 
