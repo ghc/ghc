@@ -41,6 +41,7 @@ module GHC.Types.Unique.FM (
         listToUFM_C,
         listToIdentityUFM,
         addToUFM,addToUFM_C,addToUFM_Acc,addToUFM_L,
+        strictAddToUFM_C,
         addListToUFM,addListToUFM_C,
         addToUFM_Directly,
         addListToUFM_Directly,
@@ -52,6 +53,7 @@ module GHC.Types.Unique.FM (
         delListFromUFM_Directly,
         plusUFM,
         plusUFM_C,
+        strictPlusUFM_C, strictPlusUFM_C_Directly,
         plusUFM_CD,
         plusUFM_CD2,
         mergeUFM,
@@ -63,6 +65,7 @@ module GHC.Types.Unique.FM (
         minusUFM_C,
         intersectUFM,
         intersectUFM_C,
+        strictIntersectUFM_C,
         disjointUFM,
         equalKeysUFM,
         diffUFM,
@@ -179,6 +182,16 @@ addToUFM_C
 addToUFM_C f (UFM m) k v =
   UFM (M.insertWith (flip f) (getKey $ getUnique k) v m)
 
+strictAddToUFM_C
+  :: Uniquable key
+  => (elt -> elt -> elt)  -- ^ old -> new -> result
+  -> UniqFM key elt       -- ^ old
+  -> key -> elt           -- ^ new
+  -> UniqFM key elt       -- ^ result
+-- Arguments of combining function of MS.insertWith and strictAddToUFM_C are flipped.
+strictAddToUFM_C f (UFM m) k v =
+  UFM (MS.insertWith (flip f) (getKey $ getUnique k) v m)
+
 addToUFM_Acc
   :: Uniquable key
   => (elt -> elts -> elts)  -- Add to existing
@@ -260,6 +273,12 @@ plusUFM (UFM x) (UFM y) = UFM (M.union y x)
 
 plusUFM_C :: (elt -> elt -> elt) -> UniqFM key elt -> UniqFM key elt -> UniqFM key elt
 plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
+
+strictPlusUFM_C :: (elt -> elt -> elt) -> UniqFM key elt -> UniqFM key elt -> UniqFM key elt
+strictPlusUFM_C f (UFM x) (UFM y) = UFM (MS.unionWith f x y)
+
+strictPlusUFM_C_Directly :: (Unique -> elt -> elt -> elt) -> UniqFM key elt -> UniqFM key elt -> UniqFM key elt
+strictPlusUFM_C_Directly f (UFM x) (UFM y) = UFM (MS.unionWithKey (f . mkUniqueGrimily) x y)
 
 -- | `plusUFM_CD f m1 d1 m2 d2` merges the maps using `f` as the
 -- combinding function and `d1` resp. `d2` as the default value if
@@ -370,6 +389,13 @@ intersectUFM_C
   -> UniqFM key elt2
   -> UniqFM key elt3
 intersectUFM_C f (UFM x) (UFM y) = UFM (M.intersectionWith f x y)
+
+strictIntersectUFM_C
+  :: (elt1 -> elt2 -> elt3)
+  -> UniqFM key elt1
+  -> UniqFM key elt2
+  -> UniqFM key elt3
+strictIntersectUFM_C f (UFM x) (UFM y) = UFM (MS.intersectionWith f x y)
 
 disjointUFM :: UniqFM key elt1 -> UniqFM key elt2 -> Bool
 disjointUFM (UFM x) (UFM y) = M.disjoint x y

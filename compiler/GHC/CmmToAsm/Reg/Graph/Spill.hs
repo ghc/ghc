@@ -144,7 +144,7 @@ regSpill_top platform regSlotMap cmm
         -- then record the fact that these slots are now live in those blocks
         -- in the given slotmap.
         patchLiveSlot
-                :: BlockMap IntSet -> BlockId -> UniqSet RegWithFormat-> BlockMap IntSet
+                :: BlockMap IntSet -> BlockId -> Regs -> BlockMap IntSet
 
         patchLiveSlot slotMap blockId regsLive
          = let
@@ -154,7 +154,8 @@ regSpill_top platform regSlotMap cmm
 
                 moreSlotsLive   = IntSet.fromList
                                 $ mapMaybe (lookupUFM regSlotMap . regWithFormat_reg)
-                                $ nonDetEltsUniqSet regsLive
+                                $ nonDetEltsUniqSet
+                                $ getRegs regsLive
                     -- See Note [Unique Determinism and code generation]
 
                 slotMap'
