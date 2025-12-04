@@ -387,6 +387,6 @@ type declarations.
 
    ::
 
-          infix 6 (:--:)
+          infix 6 :--:
           data T a where
             (:--:) :: Int -> Bool -> T Int
