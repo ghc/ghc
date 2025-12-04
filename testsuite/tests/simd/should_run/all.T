@@ -89,6 +89,7 @@ test('simd012', [], compile_and_run, [''])
 test('simd013',
      [ req_c
      , unless(arch('x86_64'), skip) # because the C file uses Intel intrinsics
+     , extra_ways(["optasm"]) # #26526 demonstrated a bug in the optasm way
      ],
      compile_and_run, ['simd013C.c'])
 test('simd014',
