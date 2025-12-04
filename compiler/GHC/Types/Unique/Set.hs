@@ -19,12 +19,14 @@ module GHC.Types.Unique.Set (
         emptyUniqSet,
         unitUniqSet,
         mkUniqSet,
-        addOneToUniqSet, addListToUniqSet,
+        addOneToUniqSet, addListToUniqSet, strictAddOneToUniqSet_C,
         delOneFromUniqSet, delOneFromUniqSet_Directly, delListFromUniqSet,
         delListFromUniqSet_Directly,
         unionUniqSets, unionManyUniqSets,
-        minusUniqSet, uniqSetMinusUFM, uniqSetMinusUDFM,
-        intersectUniqSets,
+        strictUnionUniqSets_C, strictUnionManyUniqSets_C,
+        minusUniqSet, minusUniqSet_C,
+        uniqSetMinusUFM, uniqSetMinusUDFM,
+        intersectUniqSets, strictIntersectUniqSets_C,
         disjointUniqSets,
         restrictUniqSetToUFM,
         uniqSetAny, uniqSetAll,
@@ -109,6 +111,10 @@ addListToUniqSet :: Uniquable a => UniqSet a -> [a] -> UniqSet a
 addListToUniqSet = foldl' addOneToUniqSet
 {-# INLINEABLE addListToUniqSet #-}
 
+strictAddOneToUniqSet_C :: Uniquable a => (a -> a -> a) -> UniqSet a -> a -> UniqSet a
+strictAddOneToUniqSet_C f (UniqSet set) x =
+  UniqSet (strictAddToUFM_C f set x x)
+
 delOneFromUniqSet :: Uniquable a => UniqSet a -> a -> UniqSet a
 delOneFromUniqSet (UniqSet s) a = UniqSet (delFromUFM s a)
 
@@ -127,14 +133,28 @@ delListFromUniqSet_Directly (UniqSet s) l =
 unionUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 unionUniqSets (UniqSet s) (UniqSet t) = UniqSet (plusUFM s t)
 
+strictUnionUniqSets_C :: (a -> a -> a) -> UniqSet a -> UniqSet a -> UniqSet a
+strictUnionUniqSets_C f (UniqSet s) (UniqSet t) =
+  UniqSet (strictPlusUFM_C f s t)
+
 unionManyUniqSets :: [UniqSet a] -> UniqSet a
 unionManyUniqSets = foldl' (flip unionUniqSets) emptyUniqSet
+
+strictUnionManyUniqSets_C :: (a -> a -> a) -> [UniqSet a] -> UniqSet a
+strictUnionManyUniqSets_C f = foldl' (flip (strictUnionUniqSets_C f)) emptyUniqSet
 
 minusUniqSet  :: UniqSet a -> UniqSet a -> UniqSet a
 minusUniqSet (UniqSet s) (UniqSet t) = UniqSet (minusUFM s t)
 
+minusUniqSet_C :: (a -> a -> Maybe a) -> UniqSet a -> UniqSet a -> UniqSet a
+minusUniqSet_C f (UniqSet s) (UniqSet t) = UniqSet (minusUFM_C f s t)
+
 intersectUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 intersectUniqSets (UniqSet s) (UniqSet t) = UniqSet (intersectUFM s t)
+
+strictIntersectUniqSets_C :: (a -> a -> a) -> UniqSet a -> UniqSet a -> UniqSet a
+strictIntersectUniqSets_C f (UniqSet s) (UniqSet t) =
+  UniqSet (strictIntersectUFM_C f s t)
 
 disjointUniqSets :: UniqSet a -> UniqSet a -> Bool
 disjointUniqSets (UniqSet s) (UniqSet t) = disjointUFM s t

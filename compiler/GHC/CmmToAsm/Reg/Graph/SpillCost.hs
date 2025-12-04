@@ -98,7 +98,7 @@ slurpSpillCostInfo platform cfg cmm
         countBlock info freqMap (BasicBlock blockId instrs)
                 | LiveInfo _ _ blockLive _ <- info
                 , Just rsLiveEntry  <- mapLookup blockId blockLive
-                , rsLiveEntry_virt  <- takeVirtualRegs rsLiveEntry
+                , rsLiveEntry_virt  <- takeVirtualRegs $ getRegs rsLiveEntry
                 = countLIs (ceiling $ blockFreq freqMap blockId) rsLiveEntry_virt instrs
 
                 | otherwise
@@ -132,9 +132,9 @@ slurpSpillCostInfo platform cfg cmm
                 mapM_ (incDefs scale) $ nub $ mapMaybe (takeVirtualReg . regWithFormat_reg) written
 
                 -- Compute liveness for entry to next instruction.
-                let liveDieRead_virt    = takeVirtualRegs (liveDieRead  live)
-                let liveDieWrite_virt   = takeVirtualRegs (liveDieWrite live)
-                let liveBorn_virt       = takeVirtualRegs (liveBorn     live)
+                let liveDieRead_virt    = takeVirtualRegs $ getRegs (liveDieRead  live)
+                let liveDieWrite_virt   = takeVirtualRegs $ getRegs (liveDieWrite live)
+                let liveBorn_virt       = takeVirtualRegs $ getRegs (liveBorn     live)
 
                 let rsLiveAcross
                         = rsLiveEntry `minusUniqSet` liveDieRead_virt

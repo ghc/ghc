@@ -13,10 +13,8 @@ import GHC.Cmm
 import GHC.Data.Bag
 import GHC.Data.Graph.Directed
 import GHC.Platform (Platform)
-import GHC.Types.Unique (getUnique)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
-import GHC.Types.Unique.Set
 
 -- | Do register coalescing on this top level thing
 --
@@ -88,8 +86,8 @@ slurpJoinMovs platform live
         slurpLI    rs (LiveInstr _      Nothing)    = rs
         slurpLI    rs (LiveInstr instr (Just live))
                 | Just (r1, r2) <- takeRegRegMoveInstr platform instr
-                , elemUniqSet_Directly (getUnique r1) $ liveDieRead live
-                , elemUniqSet_Directly (getUnique r2) $ liveBorn live
+                , r1 `elemRegs` liveDieRead live
+                , r2 `elemRegs` liveBorn live
 
                 -- only coalesce movs between two virtuals for now,
                 -- else we end up with allocatable regs in the live

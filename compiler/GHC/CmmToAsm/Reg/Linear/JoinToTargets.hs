@@ -38,7 +38,7 @@ import GHC.Types.Unique.Set
 --
 joinToTargets
         :: (FR freeRegs, Instruction instr)
-        => BlockMap (UniqSet RegWithFormat) -- ^ maps the unique of the blockid to the set of vregs
+        => BlockMap Regs -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
         -> BlockId                      -- ^ id of the current block
@@ -62,7 +62,7 @@ joinToTargets block_live id instr
 -----
 joinToTargets'
         :: (FR freeRegs, Instruction instr)
-        => BlockMap (UniqSet RegWithFormat) -- ^ maps the unique of the blockid to the set of vregs
+        => BlockMap Regs -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
         -> [NatBasicBlock instr]        -- ^ acc blocks of fixup code.
@@ -90,7 +90,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
         -- adjust the current assignment to remove any vregs that are not live
         -- on entry to the destination block.
         let live_set            = expectJust $ mapLookup dest block_live
-        let still_live uniq _   = uniq `elemUniqSet_Directly` live_set
+        let still_live uniq _   = uniq `elemUniqSet_Directly` getRegs live_set
         let adjusted_assig      = filterUFM_Directly still_live assig
 
         -- and free up those registers which are now free.
@@ -99,7 +99,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
                         -- This is non-deterministic but we do not
                         -- currently support deterministic code-generation.
                         -- See Note [Unique Determinism and code generation]
-                        , not (elemUniqSet_Directly reg live_set)
+                        , not (elemUniqSet_Directly reg $ getRegs live_set)
                         , r          <- regsOfLoc loc ]
 
         case lookupBlockAssignment  dest block_assig of
@@ -116,7 +116,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
 -- this is the first time we jumped to this block.
 joinToTargets_first :: (FR freeRegs, Instruction instr)
-                    => BlockMap (UniqSet RegWithFormat)
+                    => BlockMap Regs
                     -> [NatBasicBlock instr]
                     -> BlockId
                     -> instr
@@ -145,7 +145,7 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
 
 -- we've jumped to this block before
 joinToTargets_again :: (Instruction instr, FR freeRegs)
-                    => BlockMap (UniqSet RegWithFormat)
+                    => BlockMap Regs
                     -> [NatBasicBlock instr]
                     -> BlockId
                     -> instr

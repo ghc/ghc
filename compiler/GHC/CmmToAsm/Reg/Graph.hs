@@ -335,14 +335,14 @@ buildGraph platform code
 --   Conflicts between virtual and real regs are recorded as exclusions.
 graphAddConflictSet
         :: Platform
-        -> UniqSet RegWithFormat
+        -> Regs
         -> Color.Graph VirtualReg RegClass RealReg
         -> Color.Graph VirtualReg RegClass RealReg
 
 graphAddConflictSet platform regs graph
  = let  arch = platformArch platform
-        virtuals = takeVirtualRegs regs
-        reals    = takeRealRegs regs
+        virtuals = takeVirtualRegs $ getRegs regs
+        reals    = takeRealRegs $ getRegs regs
 
         graph1  = Color.addConflicts virtuals (classOfVirtualReg arch) graph
           -- NB: we could add "arch" as argument to functions such as "addConflicts"
