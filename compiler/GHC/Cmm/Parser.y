@@ -656,7 +656,7 @@ importName
 
         -- A label imported with an explicit UnitId.
         | STRING NAME
-        { ($2, mkCmmCodeLabel (UnitId (mkFastString $1)) $2) }
+        { ($2, mkForeignLabel $2 (ForeignLabelInPackage (UnitId (mkFastString $1))) IsFunction) }
 
 
 names   :: { [FastString] }
