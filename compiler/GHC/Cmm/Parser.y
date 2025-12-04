@@ -670,6 +670,10 @@ importName
         | STRING NAME
         { ($2, mkForeignLabel $2 (ForeignLabelInPackage (UnitId (mkFastString $1))) IsFunction) }
 
+        -- as previous, but 'IsData'
+        | STRING 'DATA' NAME
+        { ($3, mkForeignLabel $3 (ForeignLabelInPackage (UnitId (mkFastString $1))) IsData) }
+
 
 names   :: { [FastString] }
         : NAME                          { [$1] }
