@@ -592,6 +592,8 @@ HsInt loadArchive_ (pathchar *path)
                 if (!readThinArchiveMember(n, memberSize, path, fileName, image)) {
                     goto fail;
                 }
+                // Re-identify object format from actual object data
+                object_fmt = identifyObjectFile_(image, memberSize);
             }
             else
             {
