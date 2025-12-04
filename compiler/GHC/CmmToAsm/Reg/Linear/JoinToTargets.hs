@@ -33,6 +33,8 @@ import GHC.Utils.Outputable
 import GHC.CmmToAsm.Format
 import GHC.Types.Unique.Set
 
+import Data.Coerce (coerce)
+
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
 --
@@ -95,7 +97,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
         -- and free up those registers which are now free.
         let to_free =
-                [ r     | (reg, loc) <- nonDetUFMToList assig
+                [ r     | (reg, Loc loc _locFmt) <- nonDetUFMToList assig
                         -- This is non-deterministic but we do not
                         -- currently support deterministic code-generation.
                         -- See Note [Unique Determinism and code generation]
@@ -106,7 +108,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
          Nothing
           -> joinToTargets_first
                         block_live new_blocks block_id instr dest dests
-                        block_assig adjusted_assig $ map realReg to_free
+                        block_assig adjusted_assig to_free
 
          Just (_, dest_assig)
           -> joinToTargets_again
@@ -142,7 +144,6 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
 
         joinToTargets' block_live new_blocks block_id instr dests
 
-
 -- we've jumped to this block before
 joinToTargets_again :: (Instruction instr, FR freeRegs)
                     => BlockMap Regs
@@ -159,7 +160,9 @@ joinToTargets_again
     src_assig dest_assig
 
         -- the assignments already match, no problem.
-        | nonDetUFMToList dest_assig == nonDetUFMToList src_assig
+        | equalIgnoringFormats
+            (nonDetUFMToList dest_assig)
+            (nonDetUFMToList src_assig)
         -- This is non-deterministic but we do not
         -- currently support deterministic code-generation.
         -- See Note [Unique Determinism and code generation]
@@ -183,7 +186,7 @@ joinToTargets_again
                 --
                 -- We need to do the R2 -> R3 move before R1 -> R2.
                 --
-                let sccs  = stronglyConnCompFromEdgedVerticesOrdR graph
+                let sccs  = movementGraphSCCs graph
 
               -- debugging
                 {-
@@ -267,30 +270,36 @@ makeRegMovementGraph adjusted_assig dest_assig
 --
 expandNode
         :: a
-        -> Loc                  -- ^ source of move
-        -> Loc                  -- ^ destination of move
-        -> [Node Loc a ]
-
-expandNode vreg loc@(InReg src) (InBoth dst mem)
-        | src == dst = [DigraphNode vreg loc [InMem mem]]
-        | otherwise  = [DigraphNode vreg loc [InReg dst, InMem mem]]
-
-expandNode vreg loc@(InMem src) (InBoth dst mem)
-        | src == mem = [DigraphNode vreg loc [InReg dst]]
-        | otherwise  = [DigraphNode vreg loc [InReg dst, InMem mem]]
-
-expandNode _        (InBoth _ src) (InMem dst)
-        | src == dst = [] -- guaranteed to be true
-
-expandNode _        (InBoth src _) (InReg dst)
-        | src == dst = []
-
-expandNode vreg     (InBoth src _) dst
-        = expandNode vreg (InReg src) dst
-
-expandNode vreg src dst
-        | src == dst = []
-        | otherwise  = [DigraphNode vreg src [dst]]
+        -> Loc -- ^ source of move
+        -> Loc -- ^ destination of move
+        -> [Node Loc a]
+expandNode vreg src@(Loc srcLoc srcFmt) dst@(Loc dstLoc dstFmt) =
+  case (srcLoc, dstLoc) of
+    (InReg srcReg, InBoth dstReg dstMem)
+        | srcReg == dstReg
+        -> [DigraphNode vreg src [Loc (InMem dstMem) dstFmt]]
+        | otherwise
+        -> [DigraphNode vreg src [Loc (InReg dstReg) dstFmt
+                                 ,Loc (InMem dstMem) dstFmt]]
+    (InMem srcMem, InBoth dstReg dstMem)
+        | srcMem == dstMem
+        -> [DigraphNode vreg src [Loc (InReg dstReg) dstFmt]]
+        | otherwise
+        -> [DigraphNode vreg src [Loc (InReg dstReg) dstFmt
+                                 ,Loc (InMem dstMem) dstFmt]]
+    (InBoth _ srcMem, InMem dstMem)
+        | srcMem == dstMem
+        -> [] -- guaranteed to be true
+    (InBoth srcReg _, InReg dstReg)
+        | srcReg == dstReg
+        -> []
+    (InBoth srcReg _, _)
+        -> expandNode vreg (Loc (InReg srcReg) srcFmt) dst
+    _
+      | srcLoc == dstLoc
+      -> []
+      | otherwise
+      -> [DigraphNode vreg src [dst]]
 
 
 -- | Generate fixup code for a particular component in the move graph
@@ -327,7 +336,7 @@ handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
 --      require a fixup.
 --
 handleComponent delta instr
-        (CyclicSCC ((DigraphNode vreg (InReg (RealRegUsage sreg scls)) ((InReg (RealRegUsage dreg dcls): _))) : rest))
+        (CyclicSCC ((DigraphNode vreg (Loc (InReg sreg) scls) ((Loc (InReg dreg) dcls: _))) : rest))
         -- dest list may have more than one element, if the reg is also InMem.
  = do
         -- spill the source into its slot
@@ -338,7 +347,7 @@ handleComponent delta instr
         instrLoad       <- loadR (RegWithFormat (RegReal dreg) dcls) slot
 
         remainingFixUps <- mapM (handleComponent delta instr)
-                                (stronglyConnCompFromEdgedVerticesOrdR rest)
+                                (movementGraphSCCs rest)
 
         -- make sure to do all the reloads after all the spills,
         --      so we don't end up clobbering the source values.
@@ -347,29 +356,37 @@ handleComponent delta instr
 handleComponent _ _ (CyclicSCC _)
  = panic "Register Allocator: handleComponent cyclic"
 
+-- Helper functions that use the @Ord (IgnoreFormat Loc)@ instance.
+
+equalIgnoringFormats :: [(Unique, Loc)] -> [(Unique, Loc)] -> Bool
+equalIgnoringFormats =
+  coerce $ (==) @[(Unique, IgnoreFormat Loc)]
+movementGraphSCCs :: [Node Loc Unique] -> [SCC (Node Loc Unique)]
+movementGraphSCCs =
+  coerce $ stronglyConnCompFromEdgedVerticesOrdR @(IgnoreFormat Loc) @Unique
 
 -- | Move a vreg between these two locations.
 --
 makeMove
     :: Instruction instr
-    => Int      -- ^ current C stack delta.
-    -> Unique   -- ^ unique of the vreg that we're moving.
-    -> Loc      -- ^ source location.
-    -> Loc      -- ^ destination location.
-    -> RegM freeRegs [instr]  -- ^ move instruction.
+    => Int           -- ^ current C stack delta
+    -> Unique        -- ^ unique of the vreg that we're moving
+    -> Loc -- ^ source location
+    -> Loc -- ^ destination location
+    -> RegM freeRegs [instr]  -- ^ move instruction
 
-makeMove delta vreg src dst
+makeMove delta vreg (Loc src _srcFmt) (Loc dst dstFmt)
  = do config <- getConfig
       case (src, dst) of
-          (InReg (RealRegUsage s _), InReg (RealRegUsage d fmt)) ->
+          (InReg s, InReg d) ->
               do recordSpill (SpillJoinRR vreg)
-                 return $ [mkRegRegMoveInstr config fmt (RegReal s) (RegReal d)]
-          (InMem s, InReg (RealRegUsage d cls)) ->
+                 return $ [mkRegRegMoveInstr config dstFmt (RegReal s) (RegReal d)]
+          (InMem s, InReg d) ->
               do recordSpill (SpillJoinRM vreg)
-                 return $ mkLoadInstr config (RegWithFormat (RegReal d) cls) delta s
-          (InReg (RealRegUsage s cls), InMem d) ->
+                 return $ mkLoadInstr config (RegWithFormat (RegReal d) dstFmt) delta s
+          (InReg s, InMem d) ->
               do recordSpill (SpillJoinRM vreg)
-                 return $ mkSpillInstr config (RegWithFormat (RegReal s) cls) delta d
+                 return $ mkSpillInstr config (RegWithFormat (RegReal s) dstFmt) delta d
           _ ->
               -- we don't handle memory to memory moves.
               -- they shouldn't happen because we don't share
