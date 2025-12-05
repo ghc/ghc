@@ -125,6 +125,7 @@ run m = case m of
   Shutdown            -> unexpectedMessage m
   RunTH {}            -> unexpectedMessage m
   RunModFinalizers {} -> unexpectedMessage m
+  CustomMessage {}    -> unexpectedMessage m
 
 unexpectedMessage :: Message a -> b
 unexpectedMessage m = error ("GHCi.Run.Run: unexpected message: " ++ show m)

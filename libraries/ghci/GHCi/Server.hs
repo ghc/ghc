@@ -1,7 +1,11 @@
 {-# LANGUAGE CPP, RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables #-}
 module GHCi.Server
-  ( serv
+  ( MessageHook
+  , CustomMessageHandler
+  , serv
+  , servWithCustom
   , defaultServer
+  , defaultServerWithCustom
   )
 where
 
@@ -10,8 +14,8 @@ import GHCi.Run
 import GHCi.Signals
 import GHCi.TH
 import GHCi.Message
-#if defined(wasm32_HOST_ARCH)
 import Data.ByteString (ByteString)
+#if defined(wasm32_HOST_ARCH)
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Internal as B
 import qualified Data.ByteString.Unsafe as B
@@ -22,6 +26,7 @@ import GHC.Wasm.Prim
 #else
 import GHCi.Utils
 #endif
+import Data.Word (Word8)
 
 import Control.DeepSeq
 import Control.Exception
@@ -35,11 +40,27 @@ import System.Exit
 
 type MessageHook = Msg -> IO Msg
 
+-- | How to interpret the 'CustomCommand'.
+type CustomMessageHandler = Word8 -> ByteString -> IO (Maybe ByteString)
+
+noCustomHandler :: CustomMessageHandler
+noCustomHandler _ _ = return Nothing
+
 trace :: String -> IO ()
 trace s = getProgName >>= \name -> printf "[%20s] %s\n" name s
 
 serv :: Bool -> MessageHook -> Pipe -> (forall a .IO a -> IO a) -> IO ()
-serv verbose hook pipe restore = loop
+serv verbose hook pipe restore =
+  servWithCustom verbose hook pipe restore noCustomHandler
+
+servWithCustom
+  :: Bool
+  -> MessageHook
+  -> Pipe
+  -> (forall a .IO a -> IO a)
+  -> CustomMessageHandler
+  -> IO ()
+servWithCustom verbose hook pipe restore customHandler = loop
  where
   loop = do
     when verbose $ trace "reading pipe..."
@@ -49,6 +70,7 @@ serv verbose hook pipe restore = loop
 
     when verbose $ trace ("msg: " ++ (show msg))
     case msg of
+      CustomMessage tag payload -> handleCustom tag payload
       Shutdown -> return ()
       RunTH st q ty loc -> wrapRunTH $ runTH pipe st q ty loc
       RunModFinalizers st qrefs -> wrapRunTH $ runModFinalizerRefs pipe st qrefs
@@ -59,6 +81,13 @@ serv verbose hook pipe restore = loop
     when verbose $ trace ("writing pipe: " ++ show r)
     writePipe pipe (put r)
     loop
+
+  handleCustom tag payload = do
+    mresp <- customHandler tag payload
+    case mresp of
+      Just resp -> reply resp
+      Nothing ->
+        error $ "GHCi.Server: unhandled CustomMessage with tag " ++ show tag
 
   -- Run some TH code, which may interact with GHC by sending
   -- THMessage requests, and then finally send RunTHDone followed by a
@@ -108,12 +137,24 @@ serv verbose hook pipe restore = loop
 -- | Default server
 #if defined(wasm32_HOST_ARCH)
 defaultServer :: Callback (JSVal -> IO ()) -> Callback (IO JSUint8Array) -> Callback (JSUint8Array -> IO ()) -> IO ()
-defaultServer cb_sig cb_recv cb_send = do
+defaultServer cb_sig cb_recv cb_send =
+  defaultServerWithCustom cb_sig cb_recv cb_send noCustomHandler
+
+defaultServerWithCustom
+  :: Callback (JSVal -> IO ())
+  -> Callback (IO JSUint8Array)
+  -> Callback (JSUint8Array -> IO ())
+  -> CustomMessageHandler
+  -> IO ()
+defaultServerWithCustom cb_sig cb_recv cb_send customHandler = do
   args <- getArgs
   let rest = args
 #else
 defaultServer :: IO ()
-defaultServer = do
+defaultServer = defaultServerWithCustom noCustomHandler
+
+defaultServerWithCustom :: CustomMessageHandler -> IO ()
+defaultServerWithCustom customHandler = do
   args <- getArgs
   (outh, inh, rest) <-
       case args of
@@ -151,7 +192,7 @@ defaultServer = do
       putStrLn "Waiting 3s"
     threadDelay 3000000
 
-  uninterruptibleMask $ serv verbose hook pipe
+  uninterruptibleMask $ \restore -> servWithCustom verbose hook pipe restore customHandler
 
   where hook = return -- empty hook
     -- we cannot allow any async exceptions while communicating, because

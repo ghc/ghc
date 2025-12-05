@@ -71,6 +71,7 @@ import qualified GHC.Boot.TH.Monad         as TH
 import System.Exit
 import System.IO
 import System.IO.Error
+import Data.Word (Word8)
 
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server
@@ -245,6 +246,11 @@ data Message a where
   ResumeSeq
     :: RemoteRef (ResumeContext ())
     -> Message (EvalStatus ())
+
+  -- | User-defined request encoded as a tag/payload pair.  This is left
+  -- uninterpreted by GHC and is meant for GHC API applications to be able to supply
+  -- their own interpreter which understands additional commands.
+  CustomMessage :: Word8 -> ByteString -> Message ByteString
 
 deriving instance Show (Message a)
 
@@ -602,6 +608,7 @@ getMessage = do
       38 -> Msg <$> (ResumeSeq <$> get)
       39 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
       40 -> Msg <$> (WhereFrom <$> get)
+      41 -> Msg <$> (CustomMessage <$> get <*> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -648,6 +655,7 @@ putMessage m = case m of
   ResumeSeq a                 -> putWord8 38 >> put a
   LookupSymbolInDLL dll str   -> putWord8 39 >> put dll >> put str
   WhereFrom a                 -> putWord8 40 >> put a
+  CustomMessage tag payload   -> putWord8 41 >> put tag >> put payload
 
 {-
 Note [Parallelize CreateBCOs serialization]
