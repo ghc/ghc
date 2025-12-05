@@ -275,7 +275,7 @@ function setup() {
 
 function fetch_ghc() {
   local should_fetch=false
-  
+
   if [ ! -e "$GHC" ]; then
     if [ -z "${FETCH_GHC_VERSION:-}" ]; then
       fail "GHC not found at '$GHC' and FETCH_GHC_VERSION is not set"
@@ -292,7 +292,7 @@ function fetch_ghc() {
       fi
     fi
   fi
-  
+
   if [ "$should_fetch" = true ]; then
       local v="$FETCH_GHC_VERSION"
 
@@ -887,8 +887,28 @@ function save_cache () {
 }
 
 function clean() {
-  rm -R tmp
-  run rm -Rf _build
+  # When CI_DISPOSABLE_ENVIRONMENT is not true (e.g. using shell
+  # executor on windows/macos), the project directory is not removed
+  # by gitlab runner automatically after each job. To mitigate the
+  # space leak, other than periodic cleaning on the runner host, we
+  # also must aggressively cleanup build products, otherwise we run
+  # into out of space errors too frequently.
+  #
+  # When CI_DISPOSABLE_ENVIRONMENT is true (using docker executor on
+  # linux), the runner will do proper cleanup, so no need to do
+  # anything here.
+  #
+  # The exclude list are the artifacts that we do expect to be
+  # uploaded. Keep in sync with `jobArtifacts` in
+  # `.gitlab/generate-ci/gen_ci.hs`!
+  if [[ "${CI_DISPOSABLE_ENVIRONMENT:-}" != true ]]; then
+    git submodule foreach --recursive git clean -xdf
+    git clean -xdf \
+      --exclude=ci_timings.txt \
+      --exclude=ghc-*.tar.xz \
+      --exclude=junit.xml \
+      --exclude=unexpected-test-output.tar.gz
+  fi
 }
 
 function run_hadrian() {
