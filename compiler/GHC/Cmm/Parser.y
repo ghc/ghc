@@ -647,30 +647,40 @@ importNames
 importName
         :: { (FastString,  CLabel) }
 
-        -- A label imported without an explicit packageId.
-        --      These are taken to come from some foreign, unnamed package.
+        -- A code label imported from within the same shared library.
         : NAME
         { ($1, mkForeignLabel $1 ForeignLabelInThisPackage IsFunction) }
 
-        -- as previous, but for data/variable imports rather than functions.
+        -- A data label imported from within the same shared library.
         | 'DATA' NAME
         { ($2, mkForeignLabel $2 ForeignLabelInThisPackage IsData) }
 
-        -- historical alias for DATA
+        -- CLOSURE is a historical alias for DATA in this context.
         | 'CLOSURE' NAME
         { ($2, mkForeignLabel $2 ForeignLabelInThisPackage IsData) }
 
+        -- A code label imported from another unamed shared library. These may
+        -- come from a foreign shared library, or from the shared library for
+        -- an unnamed Haskell package. This corresponds on Windows/PE to
+        -- __declspec(dllimport) in C.
         | 'extern' NAME
         { ($2, mkForeignLabel $2 ForeignLabelInExternalPackage IsFunction) }
 
+        -- A data label imported from another unamed shared library.
+        -- This corresponds on Windows/PE to __declspec(dllimport) in C (but
+        -- cmm doesn't know about data vs function symbols so we have to say).
         | 'extern' 'DATA' NAME
         { ($3, mkForeignLabel $3 ForeignLabelInExternalPackage IsData) }
 
-        -- A label imported with an explicit UnitId.
+        -- A code label imported from the shared library for a Haskell package
+        -- with the given UnitId. Such labels behave as local when used within
+        -- the specified unit, or as extern otherwise.
         | STRING NAME
         { ($2, mkForeignLabel $2 (ForeignLabelInPackage (UnitId (mkFastString $1))) IsFunction) }
 
-        -- as previous, but 'IsData'
+        -- A data label imported from the shared library for a Haskell package
+        -- with the given UnitId. Such labels behave as local when used within
+        -- the specified unit, or as extern otherwise.
         | STRING 'DATA' NAME
         { ($3, mkForeignLabel $3 (ForeignLabelInPackage (UnitId (mkFastString $1))) IsData) }
 
