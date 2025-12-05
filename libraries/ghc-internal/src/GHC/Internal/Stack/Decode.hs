@@ -269,7 +269,7 @@ decodeLargeBitmap getterFun# stackSnapshot# index relativePayloadOffset = do
     cWordArrayToList ptr size = mapM (peekElemOff ptr) [0 .. (size - 1)]
 
     usedBitmapWords :: Int -> Int
-    usedBitmapWords 0 = error "Invalid large bitmap size 0."
+    usedBitmapWords 0 = 0
     usedBitmapWords size = (size `div` fromIntegral wORD_SIZE_IN_BITS) + 1
 
     bitmapWordsPointerness :: Word -> [Word] -> [Pointerness]
