@@ -797,7 +797,7 @@ subst_ty subst ty
         !(subst',tv') = substVarBndrUnchecked subst tv
                         -- Unchecked because subst_ty is used from substTyUnchecked
     go (LitTy n)         = LitTy $! n
-    go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (substCastCo subst co)
+    go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_cast_co subst co)
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
 substTyVar :: Subst -> TyVar -> Type
@@ -835,9 +835,14 @@ lookupTyVar (Subst _ _ tenv _) tv
     lookupVarEnv tenv tv
 
 substCastCo :: HasDebugCallStack => Subst -> CastCoercion -> CastCoercion
-substCastCo subst (CCoercion co)     = CCoercion (substCo subst co)
-substCastCo subst (ZCoercion ty cos) = ZCoercion (substTy subst ty) (substCoVarSet subst cos)
-substCastCo _     ReflCastCo         = ReflCastCo
+substCastCo subst co
+  | isEmptyTCvSubst subst = co
+  | otherwise = {- checkValidSubst subst [] [co] $ -} subst_cast_co subst co -- TODO
+
+subst_cast_co :: HasDebugCallStack => Subst -> CastCoercion -> CastCoercion
+subst_cast_co subst (CCoercion co)     = CCoercion $! subst_co subst co
+subst_cast_co subst (ZCoercion ty cos) = (ZCoercion $! subst_ty subst ty) $! substCoVarSet subst cos
+subst_cast_co _     ReflCastCo         = ReflCastCo
 
 substCoVarSet :: HasDebugCallStack => Subst -> CoVarSet -> CoVarSet
 substCoVarSet subst = nonDetStrictFoldVarSet (unionVarSet . shallowCoVarsOfCo . substCoVar subst) emptyVarSet -- TODO better impl; determinism?
