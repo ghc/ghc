@@ -92,7 +92,7 @@ showPlainGhcException =
         showString "panic! (the 'impossible' happened)\n"
       . showString ("  GHC version " ++ cProjectVersion ++ ":\n\t")
       . s . showString "\n\n"
-      . showString "Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug\n"
+      . showString "Please report this as a GHC bug:  https://github.com/stable-haskell/ghc/issues\n"
 
 throwPlainGhcException :: PlainGhcException -> a
 throwPlainGhcException = Exception.throw

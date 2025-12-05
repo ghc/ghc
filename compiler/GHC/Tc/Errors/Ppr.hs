@@ -1657,7 +1657,7 @@ instance Diagnostic TcRnMessage where
     TcRnRoleValidationFailed role reason -> mkSimpleDecorated $
       vcat [text "Internal error in role inference:",
             pprRoleValidationFailedReason role reason,
-            text "Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug"]
+            text "Please report this as a GHC bug:  https://github.com/stable-haskell/ghc/issues"]
     TcRnCommonFieldResultTypeMismatch con1 con2 field_name -> mkSimpleDecorated $
       vcat [sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
                  text "have a common field" <+> quotes (ppr field_name) <> comma],

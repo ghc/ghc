@@ -385,7 +385,7 @@ showBanner _postLoadMode dflags = do
 
    -- Display details of the configuration in verbose mode
    when (verb >= 2) $
-    do hPutStr stderr "Glasgow Haskell Compiler, Version "
+    do hPutStr stderr "Glasgow Haskell Compiler (Stable Haskell Edition), Version "
        hPutStr stderr cProjectVersion
        hPutStr stderr ", stage "
        hPutStr stderr cStage
@@ -419,7 +419,7 @@ showSupportedExtensions m_top_dir = do
   mapM_ putStrLn $ supportedLanguagesAndExtensions arch_os
 
 showVersion :: IO ()
-showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
+showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion ++ " (Stable Haskell Edition)")
 
 showOptions :: Bool -> IO ()
 showOptions isInteractive = putStr (unlines availableOptions)

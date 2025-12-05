@@ -254,7 +254,7 @@ linkFail who what
                 , "flags, or simply by naming the relevant files on the GHCi command line."
                 , "Alternatively, this link failure might indicate a bug in GHCi."
                 , "If you suspect the latter, please report this as a GHC bug:"
-                , "  https://www.haskell.org/ghc/reportabug"
+                , "  https://github.com/stable-haskell/ghc/issues"
                 ])
 
 

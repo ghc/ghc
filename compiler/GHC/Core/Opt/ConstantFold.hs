@@ -3422,7 +3422,7 @@ caseRules _ (Var f `App` Type lev `App` Type ty `App` v) -- dataToTag x
       , "be a future bug in GHC, or it may be caused by an unsupported"
       , "use of the ghc-internal primops dataToTagSmall# and dataToTagLarge#."
       , "In either case, the GHC developers would like to know about it!"
-      , "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug"
+      , "Please report this as a GHC bug:  https://github.com/stable-haskell/ghc/issues"
       ]
 
 caseRules _ _ = Nothing
