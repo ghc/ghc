@@ -522,9 +522,6 @@ mkTopFamEqFDs fam_tc work_args work_rhs
 
   | Just ax <- isClosedFamilyTyCon_maybe fam_tc
   = -- Closed type families
-    -- Look at the top-level axioms; we effectively infer injectivity,
-    -- so we don't need tyConInjectivtyInfo.  This works fine for closed
-    -- type families without injectivity info
     mkTopClosedFamEqFDs ax work_args work_rhs
 
   | otherwise
@@ -551,6 +548,10 @@ tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eq
 --  User-defined type families
 -----------------------------------------
 mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> Xi -> TcS [FunDepEqns]
+-- Look at the top-level axioms; we effectively infer injectivity,
+-- so we don't need tyConInjectivtyInfo.  This works fine for closed
+-- type families without injectivity info
+-- See Note [Exploiting closed type families]
 mkTopClosedFamEqFDs ax work_args work_rhs
   = do { let branches = fromBranches (coAxiomBranches ax)
        ; traceTcS "mkTopClosed" (ppr branches $$ ppr work_args $$ ppr work_rhs)
@@ -847,6 +848,184 @@ For /built-in/ type families, it's pretty similar, except that
   equation would indeed be the one to fire.  So we call `apartnessCheck`
   on the branch to ensure this, in `mkTopUserFamEqFDs`.
 
+Definition [Relevance]
+~~~~~~~~~~~~~~~~~~~~~~
+We say that a closed-type-family equation `F lhs = rhs` is
+   /relevant/ for a Wanted [W] F wlhs ~ wrhs
+iff
+  (R1) (lhs,rhs) pre-unifies with (wlhs,wrhs) yielding substitution S.
+       See (RW1),(RW2), (RW3)
+
+  (R2) There is no earlier equation that matches S(lhs).  See (RW4) below.
+
+(RW1) Pre-unification treats type-family applications as binding to anything,
+    rather like type variables.  If two types don't even pre-unify, we say that they
+    are /apart/.  It is done by `tcUnifyTysForInjectivity`.
+
+(RW2) lhs and wlhs are of course each a list of types. We don't really form a
+    tuple (lhs,rhs); we just pre-unify the list (rhs_ty : lhs_tys).
+
+(RW3) Why "pre-unifies with" rather than "unifies with"?  Answer: see Section 5.2
+    in "Injective Type Families for Haskell".  A concrete example is test T12522a:
+
+        newtype I a = I a
+
+        type family Curry (as :: [Type]) b = f | f -> as b where
+            Curry '[]    b = I b
+            Curry (a:as) b = a -> Curry as b
+
+        [W] Curry alpha beta ~ (gamma -> String -> I String)
+
+
+    Clearly the RHS is apart from the first equation and we want to fire injectivity
+    on the second equation.
+
+(RW4) Why "no earlier equation matches" in conditoin (R2)?  Consider the family
+
+          type family Bak a = r where
+             Bak Int  = Char   -- B1
+             Bak Char = Int    -- B2
+             Bak a    = a      -- B3
+
+    and [W] Bak alpha ~ Char. In fact, only (B2) is relevant for this Wanted.
+    You might think that (B3) could be instantiated to Bak Char ~ Char; but
+    actually that instantiation will never fire because (B2) Bak Char ~ Int would
+    fire first.  So the only way to return a Char is if the argment is Int; so we
+    can emit [W] alpha ~ Int.  Hence (B3) is not relevant; only (B2) is relevant.
+
+    That is the reason for condition (R2) in the definition of Relevance above.
+    A watertight proof that this is the Right Thing is not very easy.  See more
+    discussion in #23162.
+
+Note [Exploiting closed type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+    type family F a b where
+       F Int Bool = Bool  -- (F1)
+       F Int Char = Char  -- (F2)
+       F Bool a   = Char  -- (F3)
+
+    [W]  F Int alpha ~ Char
+
+The /only/ way to solve this Wanted is using (F2), so we can safely unify
+alpha:=Char without risking losing any solutions.  That is what
+`mkTopClosedFamEqFDs` does.  Ticket #23162 has lots of background detail
+
+More precisely, here is the Closed Family Fundep Algorithm (CFFA)
+
+    IF * F a is a closed type family.
+       * We are trying to solve [W] F wlhs ~ wrhs.
+       * There are no "relevant" Givens [G] F lhs ~ rhs.  See (CF1) below.
+       * F  has exactly one equation, F lhs = rhs that is "relevant" for that Wanted
+    THEN
+      we can emit and solve the fundep equalities:
+          [W] wlhs1 ~ lhs1
+          ...
+          [W] wlhsn ~ lhsn
+          [W] wrhs ~ rhs     See (CF2) below.
+    with fresh unification vars in lhs and rhs for the quantified variables of the
+    equation.
+
+See Definition [Relevance] for what "relevant" means.
+We need to take care about non-termination; see (CF3).
+
+Key point: equations that are not relevant do not need to be considered for fundeps at all.
+
+(CF1) Why "no relevant Givens"?  Consider test `CEqCanOccursCheck`:
+
+        type family F a where
+          F Bool = Bool
+        type family G a b where
+          G a a = a
+
+        foo :: (F a ~ a, F a ~ b) => G a b -> ()
+
+    In the ambiguity check for foo we get
+      [G] F a ~ a
+      [G] F a ~ b
+      [W] F alpha ~ alpha
+      [W] F alpha ~ beta
+      [W] G a b ~ G alpha beta
+
+    Now use algoritm (CFFA) on [W] F alpha ~ alpha.  There is only one
+    equation for F, and it is relevant, so we gaily emit the fundep equality
+    [W] alpha ~ Bool, and we are immediately dead.  We end up with
+        • Could not deduce ‘b ~ Bool’
+          from the context: (F a ~ a, F a ~ b)
+
+    It is true that the only way a caller can satisfy F a ~ a is by instantiating
+    a to Bool; but we don't have /evidence/ for that which we can use to satisfy
+    b ~ Bool.
+
+    The trouble is that (CFFA) relies on knowing /all/ the equations for F;
+    but in this case we have some Given constraints that locally extend F.
+
+    This relates closely to
+        Note [Do local fundeps before top-level instances] and
+        Note [Do fundeps last] (which are saying much the same thing)
+
+    These Notes are extremely delicate.  Suppose a local Given doesn't give rise
+    to a fundep equation and we move on to the top-level fundeps; but then after
+    some other constraints are solved the local Given would fire.  Indeed this is
+    exactly what happens above!
+
+    Solution: Only run (CFFA) if there are no relevant Givens.  This is much more
+    robust than "only run (CFFA) if attempting local fundeps gives rise to
+    equations" because if a Given is irrelevant is is forever irrelevant.  It's a
+    bit like `noMatchableGivenDicts` and `mightEqualLater` for dictionaries.
+    Indeed we should probably apply a similar check when doing fundeps on
+    dictionaries.
+
+(CF2) Fundeps from RHS as well as LHS.  Consider this from test T6018:
+
+       type family Bak a = r where
+            Bak Int  = Char
+            Bak Char = Int
+            Bak a    = a
+
+   and [W] Bak alpha ~ ().  Only the last equation is relevant, but we clearly
+   don't want to just produce a new fundep Wanted for the LHS: beta ~ alpha,
+   where beta is freshly instantiated from a.  We must /also/ produce an equality
+   [W] beta ~ () from the RHS.  Hence the [W] wrhs ~ rhs in (CFFA).
+
+(CF3) Algorithm (CFFA) can diverge, just as ordinary fundeps can, as discussed
+  extensively in the paper "Understanding functional dependencies via constraint
+  handling rules".  Example (test T16512a):
+
+       type family LV as b where
+           LV (a : as) b = a -> LV as b
+
+        [W] LV as bsk ~ LV as (ask->bsk)
+
+    Here `as` is a unification variable, while `ask` and `bsk` are skolems.
+    There is one relevant equation, because there is only one equation in the
+    family!  Hence algorithm (CFFA) generates new equalities
+          x:asx ~ as
+          bx ~ bsk
+          (ax -> LV asx bx) ~ LV as (ask->bsk)
+
+    where ax, asx and bx are fresh unification variables. We can solve:
+          as := ax:asx
+          bx := bsk
+
+    Leaving us with
+      (ax -> LV asx bsk)  ~   LV (ax:asx) (ask->bsk)
+      -->{reduce RHS with the equation for LV}
+         (ax -> LV asx bsk)  ~   (ax -> LV asx (ask->bsk))
+      -->{decompose ->)
+         LV asx bsk ~ LV asx (ask->bsk)
+
+     And now we are back where we started -- loop.
+
+  We solve this by bumping the `ctLocDepth` in `solveFunDeps`, and imposing
+  a depth bound.  See the call to `bumpReductionDepth`.
+
+(CF4) If one of the fundeps generated by interacting with the local equalities is
+  definitely insoluble (e.g. Int~Bool) then there is no point in continuing to
+  look at the global type-family definitions.  That can happen.  It came up when
+  I was looking at non-termination for closed type families, but it's a small
+  improvement in general.
+
 Note [Cache-caused loops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 It is very dangerous to cache a rewritten wanted family equation as 'solved' in our
@@ -903,6 +1082,7 @@ solveFunDeps work_ev fd_eqns
   | otherwise
   = do { traceTcS "bumping" (ppr work_ev)
        ; loc' <- bumpReductionDepth (ctEvLoc work_ev) (ctEvPred work_ev)
+                 -- See (CF3) in Note [Exploiting closed type families]
 
        ; (unifs, residual)
              <- reportFineGrainUnifications $
@@ -923,6 +1103,7 @@ solveFunDeps work_ev fd_eqns
        ; kickOutAfterUnification unifs
 
        ; return (insolubleWC residual, not (isEmptyVarSet unifs)) }
+           -- insolubleWC: see (CF3) in Note [Exploiting closed type families]
   where
     do_fundeps :: UnifyEnv -> TcM ()
     do_fundeps env = mapM_ (do_one env) fd_eqns
