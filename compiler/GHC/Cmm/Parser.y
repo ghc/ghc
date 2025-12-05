@@ -374,6 +374,7 @@ import qualified Data.ByteString.Char8 as BS8
         'return'        { L _ (CmmT_return) }
         'returns'       { L _ (CmmT_returns) }
         'import'        { L _ (CmmT_import) }
+        'extern'        { L _ (CmmT_extern) }
         'DATA'          { L _ (CmmT_DATA) }
         'switch'        { L _ (CmmT_switch) }
         'case'          { L _ (CmmT_case) }
@@ -658,6 +659,12 @@ importName
         -- historical alias for DATA
         | 'CLOSURE' NAME
         { ($2, mkForeignLabel $2 ForeignLabelInThisPackage IsData) }
+
+        | 'extern' NAME
+        { ($2, mkForeignLabel $2 ForeignLabelInExternalPackage IsFunction) }
+
+        | 'extern' 'DATA' NAME
+        { ($3, mkForeignLabel $3 ForeignLabelInExternalPackage IsData) }
 
         -- A label imported with an explicit UnitId.
         | STRING NAME
