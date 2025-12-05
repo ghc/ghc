@@ -374,6 +374,7 @@ import qualified Data.ByteString.Char8 as BS8
         'return'        { L _ (CmmT_return) }
         'returns'       { L _ (CmmT_returns) }
         'import'        { L _ (CmmT_import) }
+        'DATA'          { L _ (CmmT_DATA) }
         'switch'        { L _ (CmmT_switch) }
         'case'          { L _ (CmmT_case) }
         'default'       { L _ (CmmT_default) }
@@ -650,7 +651,11 @@ importName
         : NAME
         { ($1, mkForeignLabel $1 ForeignLabelInThisPackage IsFunction) }
 
-        -- as previous 'NAME', but 'IsData'
+        -- as previous, but for data/variable imports rather than functions.
+        | 'DATA' NAME
+        { ($2, mkForeignLabel $2 ForeignLabelInThisPackage IsData) }
+
+        -- historical alias for DATA
         | 'CLOSURE' NAME
         { ($2, mkForeignLabel $2 ForeignLabelInThisPackage IsData) }
 

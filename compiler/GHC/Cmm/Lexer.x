@@ -174,6 +174,7 @@ data CmmToken
   | CmmT_return
   | CmmT_returns
   | CmmT_import
+  | CmmT_DATA
   | CmmT_switch
   | CmmT_case
   | CmmT_default
@@ -273,6 +274,7 @@ reservedWordsFM = listToUFM $
         ( "return",             CmmT_return ),
         ( "returns",            CmmT_returns ),
         ( "import",             CmmT_import ),
+        ( "DATA",               CmmT_DATA ),
         ( "switch",             CmmT_switch ),
         ( "case",               CmmT_case ),
         ( "default",            CmmT_default ),
