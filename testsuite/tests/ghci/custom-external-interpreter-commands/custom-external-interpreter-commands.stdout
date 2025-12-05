@@ -1,0 +1,4 @@
+Sending: SquareCommand 12
+Square returned: 144
+Sending: MulCommand 2 144
+Mul returned: 288
