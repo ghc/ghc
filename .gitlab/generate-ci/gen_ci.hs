@@ -889,6 +889,8 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       , if testsuiteUsePerf buildConfig then "RUNTEST_ARGS" =: "--config perf_path=perf" else mempty
       ]
 
+    -- Keep in sync with the exclude list in `function clean()` in
+    -- `.gitlab/ci.sh`!
     jobArtifacts = Artifacts
       { junitReport = "junit.xml"
       , expireIn = "2 weeks"
