@@ -648,11 +648,11 @@ importName
         -- A label imported without an explicit packageId.
         --      These are taken to come from some foreign, unnamed package.
         : NAME
-        { ($1, mkForeignLabel $1 ForeignLabelInExternalPackage IsFunction) }
+        { ($1, mkForeignLabel $1 ForeignLabelInThisPackage IsFunction) }
 
         -- as previous 'NAME', but 'IsData'
         | 'CLOSURE' NAME
-        { ($2, mkForeignLabel $2 ForeignLabelInExternalPackage IsData) }
+        { ($2, mkForeignLabel $2 ForeignLabelInThisPackage IsData) }
 
         -- A label imported with an explicit UnitId.
         | STRING NAME
