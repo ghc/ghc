@@ -31,7 +31,6 @@ import GHC.Core.Coercion.Opt    ( optCoercion )
 import GHC.Core.FamInstEnv      ( FamInstEnv, topNormaliseType_maybe )
 import GHC.Core.DataCon
 import GHC.Core.Opt.Stats ( Tick(..) )
-import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
@@ -1551,7 +1550,7 @@ rebuild_go env expr cont
 
       ApplyToVal { sc_arg = arg_clo, sc_cont = cont, sc_hole_ty = fun_ty }
         -- See Note [Avoid redundant simplification]
-        -> do { arg' <- simplClo env fun_ty Nothing arg_clo
+        -> do { arg' <- simplCloArg env fun_ty Nothing arg_clo
               ; rebuild_go env (App expr arg') cont }
 
 completeBindX :: SimplEnv
@@ -1709,8 +1708,7 @@ simplCast env body co0 cont0
         --         co1 :: t1 ~ s1
         --         co2 :: s2 ~ t2
         addCoerce co co_is_opt cont@(ApplyToVal { sc_arg = arg_clo
-                                                , sc_dup = dup, sc_cont = tail
-                                                , sc_hole_ty = fun_ty })
+                                                , sc_dup = dup, sc_cont = tail })
           | not co_is_opt  -- pushCoValArg duplicates the coercion, so optimise first
           = addCoerce (optOutCoercion (zapSubstEnv env) co co_is_opt) True cont
 
@@ -1739,25 +1737,6 @@ simplCast env body co0 cont0
                                        -- See Note [Optimising reflexivity]
           | otherwise = return (CastIt { sc_co = co, sc_opt = co_is_opt, sc_cont = cont })
 
-simplClo :: SimplEnvIS              -- ^ Used only for its InScopeSet
-         -> OutType                 -- ^ Type of the function applied to this arg
-         -> Maybe ArgInfo           -- ^ Just <=> This arg `ai` occurs in an app
-                                    --   `f a1 ... an` where we have ArgInfo on
-                                    --   how `f` uses `ai`, affecting the Stop
-                                    --   continuation passed to 'simplExprC'
-         -> SimplClo
-         -> SimplM OutExpr
-simplClo env fun_ty mb_arg_info (ContEx arg_se arg mco)
-  = simplExprC arg_env arg stop
-  where
-    arg_env = arg_se `setInScopeFromE` env
-    arg_ty  = funArgTy fun_ty
-    stop    = case mb_arg_info of
-                 Nothing -> mkBoringStop arg_ty
-                 Just ai -> mkLazyArgStop arg_ty ai
-
-simplClo _ _ _ (DoneEx e _) = return e
-simplClo _ _ _ (DoneId v)   = return (Var v)
 
 {-
 ************************************************************************
@@ -1800,8 +1779,7 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg_clo, sc_cont = cont })
 -- Value beta-reduction
 -- This works for /coercion/ lambdas too
 simpl_lam env bndr body (ApplyToVal { sc_arg = arg_clo
-                                    , sc_cont = cont, sc_dup = dup
-                                    , sc_hole_ty = fun_ty})
+                                    , sc_cont = cont, sc_hole_ty = fun_ty})
   = do { tick (BetaReduction bndr)
        ; let from_what = FromBeta arg_levity
              arg_levity
@@ -1817,7 +1795,7 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg_clo
              --      But fun_ty is an OutType, so is fully substituted
 
        ; if | Just env' <- preInlineBetaUnconditionally env arg_levity bndr arg_clo
-            -> do { simplTrace "SimplBindr:inline-uncond3" (ppr bndr) $
+            -> do { simplTrace "SimplBindr:inline-uncond3" (ppr bndr $$ ppr arg_clo) $
                     tick (PreInlineUnconditionally bndr)
                   ; simplLam env' body cont }
 
@@ -1889,7 +1867,8 @@ simplNonRecE env from_what bndr (ContEx rhs_se rhs mco) body cont
     is_strict_bind
   = -- Evaluate RHS strictly
     simplExprF (rhs_se `setInScopeFromE` env) rhs
-               (StrictBind { sc_bndr = bndr, sc_body = body, sc_from = from_what
+               (pushCastCont mco $
+                StrictBind { sc_bndr = bndr, sc_body = body, sc_from = from_what
                            , sc_env = env, sc_cont = cont, sc_dup = NoDup })
 
   | otherwise  -- Evaluate RHS lazily
@@ -2085,15 +2064,14 @@ wrapJoinCont env cont thing_inside
 
 
 --------------------
-trimJoinCont :: Id         -- Used only in error message
-             -> JoinPointHood
+trimJoinCont :: JoinPointHood
              -> SimplCont -> SimplCont
 -- Drop outer context from join point invocation (jump)
 -- See Note [Join points and case-of-case]
 
-trimJoinCont _ NotJoinPoint cont
+trimJoinCont NotJoinPoint cont
   = cont -- Not a jump
-trimJoinCont var (JoinPoint arity) cont
+trimJoinCont (JoinPoint arity) cont
   = trim arity cont
   where
     trim 0 cont@(Stop {})
@@ -2105,7 +2083,7 @@ trimJoinCont var (JoinPoint arity) cont
     trim n cont@(ApplyToTy { sc_cont = k })
       = cont { sc_cont = trim (n-1) k } -- join arity counts types!
     trim _ cont
-      = pprPanic "completeCall" $ ppr var $$ ppr cont
+      = pprPanic "trimJoinCont" $ ppr cont
 
 
 {- Note [Join points and case-of-case]
@@ -2234,21 +2212,48 @@ simplInId :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplInId env var cont
   | Just dc <- isDataConWorkId_maybe var
   , isLazyDataConRep dc                    -- See Note [Fast path for lazy data constructors]
-  = rebuild zapped_env (Var var) cont
+  = rebuild (zapSubstEnv env) (Var var) cont
   | otherwise
-  = case substId env var of
-      ContEx se e mco -> do { e' <- simplExprF (se `setInScopeFromE` env) e cont
-                            ; return (mkCastMCo e' mco) }
+  = simplClo env (substId env var) cont
+
+simplClo :: SimplEnv
+         -> SimplClo
+         -> SimplCont
+         -> SimplM (SimplFloats, OutExpr)
+simplClo env clo cont
+  = case clo of
+      ContEx se e mco -> simplExprF (se `setInScopeFromE` env) e $
+                         pushCastCont mco cont
         -- Don't trimJoinCont; we haven't already simplified e,
         -- so the cont is not embodied in e
 
       DoneId out_id -> simplOutId zapped_env out_id $
-                       trimJoinCont out_id (idJoinPointHood out_id) cont
+                       trimJoinCont (idJoinPointHood out_id) cont
 
       DoneEx e mb_join -> simplExprF zapped_env e $
-                          trimJoinCont var mb_join cont
+                          trimJoinCont mb_join cont
   where
     zapped_env =  zapSubstEnv env  -- See Note [zapSubstEnv]
+
+simplCloArg :: SimplEnvIS     -- ^ Used only for its InScopeSet
+            -> OutType        -- ^ Type of the function applied to this arg
+            -> Maybe ArgInfo  -- ^ Just <=> This arg `ai` occurs in an app
+                              --   `f a1 ... an` where we have ArgInfo on
+                              --   how `f` uses `ai`, affecting the Stop
+                              --   continuation passed to 'simplExprC'
+         -> SimplClo
+         -> SimplM OutExpr
+simplCloArg env fun_ty mb_arg_info clo@(ContEx arg_se arg mco)
+  = simplExprC arg_env arg (pushCastCont mco stop)
+  where
+    arg_env = arg_se `setInScopeFromE` env
+    arg_ty  = funArgTy fun_ty
+    stop    = case mb_arg_info of
+                 Nothing -> mkBoringStop arg_ty
+                 Just ai -> mkLazyArgStop arg_ty ai
+
+simplCloArg _ _ _ (DoneEx e _) = return e
+simplCloArg _ _ _ (DoneId v)   = return (Var v)
 
 ---------------------------------------------------------
 simplOutId :: SimplEnvIS -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
@@ -2266,9 +2271,7 @@ simplOutId env fun cont
                , sc_hole_ty = fun_ty } <- cont2
   -- Do this even if (contIsStop cont), or if seCaseCase is off.
   -- See Note [No eta-expansion in runRW#]
-  = do { let arg_env = arg_se `setInScopeFromE` env
-
-             overall_res_ty = contResultType cont3
+  = do { let overall_res_ty = contResultType cont3
              -- hole_ty is the type of the current runRW# application
              (outer_cont, new_runrw_res_ty, inner_cont)
                 | seCaseCase env = (mkBoringStop overall_res_ty, overall_res_ty, cont3)
@@ -2281,26 +2284,32 @@ simplOutId env fun cont
        --    * If we don't do this we get a beta-redex every time, so the
        --      simplifier keeps doing more iterations.
        --    * Even more important: see Note [No eta-expansion in runRW#]
-       ; arg' <- case arg of
-           Lam s body -> do { (env', s') <- simplBinder arg_env s
-                            ; body' <- simplExprC env' body inner_cont
-                            ; return (Lam s' body') }
+       ; arg' <- case get_arg arg_clo of
+           Just (arg_env, s, body)
+             -> do { (env', s') <- simplBinder arg_env s
+                   ; body' <- simplExprC env' body inner_cont
+                   ; return (Lam s' body') }
                             -- Important: do not try to eta-expand this lambda
                             -- See Note [No eta-expansion in runRW#]
 
            _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
-                   ; let (m,_,_) = splitFunTy fun_ty
-                         env'  = arg_env `addNewInScopeIds` [s']
-                         cont' = ApplyToVal { sc_dup = Dupable, sc_arg = DoneId s'
+                   ; let (mult,_,_) = splitFunTy fun_ty
+                         env'  = env `addNewInScopeIds` [s']
+                         cont' = ApplyToVal { sc_dup = OkToDup, sc_arg = DoneId s'
                                             , sc_cont = inner_cont
-                                            , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy new_runrw_res_ty }
+                                            , sc_hole_ty = mkVisFunTy mult realWorldStatePrimTy new_runrw_res_ty }
                                 -- cont' applies to s', then K
-                   ; body' <- simplExprC env' arg cont'
-                   ; return (Lam s' body') }
+                   ; (floats, body') <- simplClo env' arg_clo cont'
+                   ; return (Lam s' (wrapFloats floats body')) }
 
        ; let rr'   = getRuntimeRep new_runrw_res_ty
              call' = mkApps (Var fun) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
        ; rebuild env call' outer_cont }
+  where
+    get_arg :: SimplClo -> Maybe (SimplEnv, InId, InExpr)
+    get_arg (DoneEx    (Lam s b) _)     = Just (zapSubstEnv env, s, b)
+    get_arg (ContEx se (Lam s b) MRefl) = Just (se `setInScopeFromE` env, s, b)
+    get_arg _ = Nothing
 
 -- Normal case for (f e1 .. en)
 simplOutId env fun cont
@@ -2371,9 +2380,7 @@ rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_c
 
 ---------- Simplify value arguments --------------------
 rebuildCall env fun_info
-            (ApplyToVal { sc_arg = arg_clo
-                        , sc_dup = dup_flag, sc_hole_ty = fun_ty
-                        , sc_cont = cont })
+            (ApplyToVal { sc_arg = arg_clo, sc_hole_ty = fun_ty, sc_cont = cont })
   = case arg_clo of      -- See Note [Avoid redundant simplification]
       DoneId v     -> rebuildCall env (addValArgTo fun_info (Var v) fun_ty) cont
       DoneEx arg _ -> rebuildCall env (addValArgTo fun_info arg     fun_ty) cont
@@ -2383,7 +2390,7 @@ rebuildCall env fun_info
         , seCaseCase env    -- Only when case-of-case is on. See GHC.Driver.Config.Core.Opt.Simplify
                             --    Note [Case-of-case and full laziness]
         -> simplExprF (arg_se `setInScopeFromE` env) in_arg
-               (add_cast mco $
+               (pushCastCont mco $
                 StrictArg { sc_fun = fun_info, sc_fun_ty = fun_ty
                           , sc_dup = NoDup, sc_cont = cont })
                 -- Note [Shadowing in the Simplifier]
@@ -2394,12 +2401,8 @@ rebuildCall env fun_info
         -- There is no benefit (unlike in a let-binding), and we'd
         -- have to be very careful about bogus strictness through
         -- floating a demanded let.
-        -> do { arg' <- simplClo env fun_ty (Just fun_info) arg_clo
+        -> do { arg' <- simplCloArg env fun_ty (Just fun_info) arg_clo
               ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
-
-  where
-    add_cast MRefl    cont = cont
-    add_cast (MCo co) cont = CastIt { sc_co = co, sc_opt = True, sc_cont = cont }
 
 
 ---------- No further useful info, revert to generic rebuild ------------
@@ -2633,7 +2636,7 @@ tryRules env rules fn args
         --, text "Rule activation:" <+> ppr (ruleActivation rule)
           , text "Full arity:" <+>  ppr (ruleArity rule)
           , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
-          , text "After: " <+> mkApps (pprCoreExpr rule_rhs) (drop (ruleArity rule) args) ]
+          , text "After: " <+> ppr (mkApps rule_rhs (drop (ruleArity rule) args)) ]
 
       | logHasDumpFlag logger Opt_D_dump_rule_firings
       = log_rule Opt_D_dump_rule_firings "Rule fired:" $
@@ -3930,8 +3933,7 @@ mkDupableContWithDmds env dmds
                                     , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty }) }
 
 mkDupableContWithDmds env dmds
-    (ApplyToVal { sc_arg = arg_clo, sc_dup = dup
-                , sc_cont = cont, sc_hole_ty = hole_ty })
+    (ApplyToVal { sc_arg = arg_clo, sc_cont = cont, sc_hole_ty = hole_ty })
   =     -- e.g.         [...hole...] (...arg...)
         --      ==>
         --              let a = ...arg...
@@ -3940,7 +3942,7 @@ mkDupableContWithDmds env dmds
     do  { let dmd:|cont_dmds = expectNonEmpty dmds
         ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
-        ; arg' <- simplClo env' hole_ty Nothing arg_clo
+        ; arg' <- simplCloArg env' hole_ty Nothing arg_clo
         ; (let_floats2, arg'') <- makeTrivial env NotTopLevel dmd (fsLit "karg") arg'
         ; let all_floats = floats1 `addLetFloats` let_floats2
         ; return ( all_floats
