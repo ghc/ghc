@@ -8,6 +8,7 @@ test('T25975', extra_ways(ghci_ways), compile_and_run,
 
 test('T26565', extra_files(["T26565.hs"]), ghci_script, ['T26565.script'])
 test('T23973', extra_files(["T23973.hs"]), ghci_script, ['T23973.script'])
+test('T26640', extra_files(["T26640.hs"]), ghci_script, ['T26640.script'])
 
 # Nullary data constructors
 test('T26216', extra_files(["T26216_aux.hs"]), ghci_script, ['T26216.script'])

@@ -1,0 +1,3 @@
+Breakpoint 0 activated at T26640.hs:3:8-14
+Stopped in Main.main, T26640.hs:3:8-14
+_result :: IO () = _
