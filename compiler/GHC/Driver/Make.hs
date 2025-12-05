@@ -1603,7 +1603,6 @@ downsweep_imports hsc_env old_summaries old_graph excl_mods allow_dup_roots (roo
        checkDuplicates root_map
        let done0 = maybe M.empty moduleGraphNodeMap old_graph
        (deps, map0) <- loopSummaries rootSummariesOk (done0, root_map)
-       let closure_errs = checkHomeUnitsClosed (hsc_unit_env hsc_env)
        let unit_env = hsc_unit_env hsc_env
        let tmpfs    = hsc_tmpfs    hsc_env
 
@@ -1613,7 +1612,7 @@ downsweep_imports hsc_env old_summaries old_graph excl_mods allow_dup_roots (roo
            (other_errs, unit_nodes) = partitionEithers $ unitEnv_foldWithKey (\nodes uid hue -> nodes ++ unitModuleNodes downsweep_nodes uid hue) [] (hsc_HUG hsc_env)
            all_nodes = downsweep_nodes ++ unit_nodes
            all_errs  = all_root_errs ++  downsweep_errs ++ other_errs
-           all_root_errs =  closure_errs ++ map snd root_errs
+           all_root_errs =  map snd root_errs
 
        -- if we have been passed -fno-code, we enable code generation
        -- for dependencies of modules that have -XTemplateHaskell,
