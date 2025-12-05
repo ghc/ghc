@@ -5,3 +5,5 @@ test('T23068', ghci_dump_bcos + [filter_stdout_lines(r'.*bitmap: .*')], ghci_scr
 test('T25975', extra_ways(ghci_ways), compile_and_run,
      # Some of the examples work more robustly with these flags
      ['-fno-break-points -fno-full-laziness'])
+
+test('T26640', extra_files(["T26640.hs"]), ghci_script, ['T26640.script'])

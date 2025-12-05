@@ -1,0 +1,6 @@
+:l T26640
+:break 3
+main
+import GHC.Conc
+import GHC.Stack.CloneStack
+() <- mapM_ (\ix -> do !_ <- decode =<< cloneThreadStack ix; return ()) =<< listThreads
