@@ -292,7 +292,8 @@ simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
 
       BC_Let top_lvl is_rec -> simplTrace "SimplBind:normal" (ppr old_bndr) $
                                simplLazyBind top_lvl is_rec
-                                             (old_bndr,env) (new_bndr,env) (rhs,env)
+                                             (old_bndr,env) (new_bndr,env)
+                                             (rhs,env,MRefl)
 
 simplTrace :: String -> SDoc -> SimplM a -> SimplM a
 simplTrace herald doc thing_inside = do
@@ -307,11 +308,11 @@ simplLazyBind :: TopLevelFlag -> RecFlag
               -> (OutId, SimplEnv)      -- OutBinder, and SimplEnv after simplifying that binder
                                         -- The OutId has IdInfo (notably RULES),
                                         -- except arity, unfolding
-              -> (InExpr, SimplEnv)     -- The RHS and its static environment
+              -> (InExpr, SimplEnv, MOutCoercion) -- The RHS and its static environment
               -> SimplM (SimplFloats, SimplEnv)
 -- Precondition: Ids only, no TyVars; not a JoinId
 -- Precondition: rhs obeys the let-can-float invariant
-simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
+simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se,mco)
   = assert (isId bndr )
     assertPpr (not (isJoinId bndr)) (ppr bndr) $
     -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
@@ -364,7 +365,9 @@ simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
 
         ; let env1 = env `setInScopeFromF` rhs_floats
         ; rhs' <- rebuildLam env1 tvs' body3 rhs_cont
-        ; (bind_float, env2) <- completeBind (BC_Let top_lvl is_rec) (bndr,unf_se) (bndr1,rhs',env1)
+        ; (bind_float, env2) <- completeBind (BC_Let top_lvl is_rec)
+                                             (bndr, unf_se)
+                                             (bndr1, mkCastMCo rhs' mco, env1)
         ; return (rhs_floats `addFloats` bind_float, env2) }
 
 --------------------------
@@ -1875,7 +1878,7 @@ simplNonRecE env from_what bndr (ContEx rhs_se rhs mco) body cont
   = do { (env1, bndr1)    <- simplNonRecBndr env bndr
        ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Let NotTopLevel NonRecursive)
        ; (floats1, env3)  <- simplLazyBind NotTopLevel NonRecursive
-                                           (bndr,env) (bndr2,env2) (rhs,rhs_se)
+                                           (bndr,env) (bndr2,env2) (rhs,rhs_se,mco)
        ; (floats2, expr') <- simplNonRecBody env3 from_what body cont
        ; return (floats1 `addFloats` floats2, expr') }
 
@@ -2243,7 +2246,7 @@ simplCloArg :: SimplEnvIS     -- ^ Used only for its InScopeSet
                               --   continuation passed to 'simplExprC'
          -> SimplClo
          -> SimplM OutExpr
-simplCloArg env fun_ty mb_arg_info clo@(ContEx arg_se arg mco)
+simplCloArg env fun_ty mb_arg_info (ContEx arg_se arg mco)
   = simplExprC arg_env arg (pushCastCont mco stop)
   where
     arg_env = arg_se `setInScopeFromE` env
