@@ -224,11 +224,6 @@ data FromWhat = FromLet | FromBeta Levity
 data DupFlag = NoDup       -- Unsimplified, might be big
              | OkToDup     -- Simplified and small
 
-isSimplified :: DupFlag -> Bool
-isSimplified NoDup = False
-isSimplified _     = True       -- Invariant: the subst-env is empty
-
-
 {- Note [StaticEnv invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We pair up an InExpr or InAlts with a StaticEnv, which establishes the
