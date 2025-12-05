@@ -498,10 +498,11 @@ instance Outputable SimplClo where
                 JoinPoint n  -> parens (int n)
 
   ppr (ContEx _se e mco)
-    = text "ContEx" <> vcat [ pprParendExpr e
-                            , case mco of
-                                 MRefl -> empty
-                                 MCo co -> text "|>" <+> pprOptCo co ]
+    = text "ContEx" <>
+      braces (vcat [ pprParendExpr e
+                   , case mco of
+                        MRefl -> empty
+                        MCo co -> text "|>" <+> pprOptCo co ])
         -- where
         -- fvs = exprFreeVars e
         -- filter_env env = filterVarEnv_Directly keep env

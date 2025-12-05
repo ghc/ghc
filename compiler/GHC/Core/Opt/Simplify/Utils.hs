@@ -24,12 +24,12 @@ module GHC.Core.Opt.Simplify.Utils (
 
         -- The continuation type
         SimplCont(..), DupFlag(..), FromWhat(..), StaticEnv,
-        isSimplified, contIsStop,
+        contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs, contIsRhs,
         countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
-        interestingCallContext,
+        interestingCallContext, pushCastCont,
 
         -- ArgInfo
         ArgInfo(..), ArgSpec(..), mkArgInfo,
@@ -419,6 +419,11 @@ mkLazyArgStop :: OutType -> ArgInfo -> SimplCont
 mkLazyArgStop ty fun_info = Stop ty (lazyArgContext fun_info) arg_sd
   where
     arg_sd = subDemandIfEvaluated (Partial.head (ai_dmds fun_info))
+
+pushCastCont :: MOutCoercion -> SimplCont -> SimplCont
+-- Assumes the MOutCoercion is optimised
+pushCastCont MRefl    cont = cont
+pushCastCont (MCo co) cont = CastIt { sc_co = co, sc_opt = True, sc_cont = cont }
 
 -------------------
 contIsRhs :: SimplCont -> Maybe RecFlag
