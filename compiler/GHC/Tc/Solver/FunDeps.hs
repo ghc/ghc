@@ -334,9 +334,8 @@ tryDictFunDepsLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
          text "unif =" <+> ppr unif_happened $$ text "eqns = " <+> ppr eqns
 
        -- See (DFL1) of Note [Do fundeps last]
-       ; if insoluble          then continueWith True
-         else if unif_happened then startAgainWith (CDictCan dict_ct)
-                               else continueWith False }
+       ; if unif_happened  then startAgainWith (CDictCan dict_ct)
+                           else continueWith insoluble }
   where
     work_pred     = ctEvPred work_ev
     work_is_given = isGiven work_ev
@@ -540,9 +539,8 @@ tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eq
                                     , text "eqns:" <+> ppr fd_eqns ])
        ; (insoluble, unif_happened) <- solveFunDeps ev fd_eqns
 
-       ; if insoluble          then continueWith True
-         else if unif_happened then startAgainWith (CEqCan work_item)
-                               else continueWith False }
+       ; if unif_happened  then startAgainWith (CEqCan work_item)
+                           else continueWith insoluble }
 
 -----------------------------------------
 --  User-defined type families
