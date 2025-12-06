@@ -70,7 +70,7 @@ module GHC.Utils.Ppr (
         -- * Constructing documents
 
         -- ** Converting values into documents
-        char, text, ftext, ptext, ztext, sizedText, zeroWidthText, emptyText,
+        char, text, stext, ftext, ptext, ztext, sizedText, zeroWidthText, emptyText,
         int, integer, float, double, rational, hex,
 
         -- ** Simple derived documents
@@ -116,6 +116,9 @@ import Control.Applicative ((<|>))
 
 import GHC.Utils.BufHandle
 import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 import GHC.Utils.Panic.Plain
 import System.IO
 import Numeric (showHex)
@@ -266,6 +269,7 @@ type RDoc = Doc
 -- output at some point.
 data TextDetails = Chr  {-# UNPACK #-} !Char -- ^ A single Char fragment
                  | Str  String -- ^ A whole String fragment
+                 | STStr {-# UNPACK #-} !ST.ShortText -- ^ A whole ShortText fragment
                  | PStr FastString                      -- a hashed string
                  | ZStr FastZString                     -- a z-encoded string
                  | LStr {-# UNPACK #-} !PtrString
@@ -300,6 +304,10 @@ text s = textBeside_ (Str s) (length s) Empty
 {-# NOINLINE [0] text #-}   -- Give the RULE a chance to fire
                             -- It must wait till after phase 1 when
                             -- the unpackCString first is manifested
+
+-- | A document of height 1 containing a literal ShortText.
+stext :: ST.ShortText -> Doc
+stext s = textBeside_ (STStr s) (ST.codepointLength s) Empty
 
 -- RULE that turns (text "abc") into (ptext (A# "abc"#)) to avoid the
 -- intermediate packing/unpacking of the string.
@@ -373,6 +381,7 @@ docHead d = (headChar, rdoc)
     go_td :: TextDetails -> Maybe Char
     go_td (Chr c)  = Just c
     go_td (Str s)  = go_str s
+    go_td (STStr s) = go_str (ST.unpack s)
     go_td (PStr s) = go_str (unpackFS s) -- O(1) because unpackFS is lazy
     go_td (ZStr s) = go_str (zStringTakeN 1 s)
     go_td (LStr s) = go_str (unpackPtrStringTakeN 1 s)
@@ -994,6 +1003,7 @@ renderStyle s = fullRender (mode s) (lineLength s) (ribbonsPerLine s)
 txtPrinter :: TextDetails -> String -> String
 txtPrinter (Chr c)    s  = c:s
 txtPrinter (Str s1)   s2 = s1 ++ s2
+txtPrinter (STStr s1) s2 = ST.unpack s1 ++ s2
 txtPrinter (PStr s1)  s2 = unpackFS s1 ++ s2
 txtPrinter (ZStr s1)  s2 = zString s1 ++ s2
 txtPrinter (LStr s1)  s2 = unpackPtrString s1 ++ s2
@@ -1118,6 +1128,7 @@ printDoc_ mode pprCols hdl doc
   where
     put (Chr c)    next = hPutChar hdl c >> next
     put (Str s)    next = hPutStr  hdl s >> next
+    put (STStr s)  next = BS.hPut hdl (SBS.fromShort (ST.contents s)) >> next
     put (PStr s)   next = hPutStr  hdl (unpackFS s) >> next
                           -- NB. not hPutFS, we want this to go through
                           -- the I/O library's encoding layer. (#3398)
@@ -1182,6 +1193,7 @@ layLeft b (TextBeside s _ p) = put b s >> layLeft b p
  where
     put !b (Chr c)   = bPutChar b c
     put b (Str s)    = bPutStr  b s
+    put b (STStr s)  = bPutSBS  b (ST.contents s)
     put b (PStr s)   = bPutFS   b s
     put b (ZStr s)   = bPutFZS  b s
     put b (LStr s)   = bPutPtrString b s

@@ -64,6 +64,8 @@ import GHC.Iface.Ext.Utils
 
 import GHC.Unit.Module            ( ml_hs_file )
 import GHC.Unit.Module.ModSummary
+import GHC.Data.OsPath            ( OsPath )
+import System.OsPath              ( encodeFS )
 
 import qualified Data.Array as A
 import qualified Data.ByteString as BS
@@ -307,11 +309,12 @@ mkHieFile :: MonadIO m
 mkHieFile ms ts rs = do
   let src_file = expectJust (ml_hs_file $ ms_location ms)
   src <- liftIO $ BS.readFile src_file
-  pure $ mkHieFileWithSource src_file src ms ts rs
+  src_path <- liftIO $ encodeFS src_file
+  pure $ mkHieFileWithSource src_path src ms ts rs
 
 -- | Construct an 'HieFile' from the outputs of the typechecker but don't
 -- read the source file again from disk.
-mkHieFileWithSource :: FilePath
+mkHieFileWithSource :: OsPath
                     -> BS.ByteString
                     -> ModSummary
                     -> TcGblEnv

@@ -15,6 +15,7 @@ import qualified Data.List as List
 import Data.Maybe
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as S
+import qualified GHC.Data.ShortText as ST
 
 import GHC.HsToCore.Breakpoints
 import GHC.ByteCode.Breakpoints
@@ -165,7 +166,7 @@ resolveFunctionBreakpoint inp = do
             mb_modbreaks <- getModBreak modl
             let found = case mb_modbreaks of
                   Nothing -> False
-                  Just mb -> fun_str `elem` (List.intercalate "." <$> elems (modBreaks_decls mb))
+                  Just mb -> fun_str `elem` (ST.unpack . ST.intercalate (ST.pack ".") <$> elems (modBreaks_decls mb))
             if found
               then pure Nothing
               else pure $ Just $ text "No breakpoint found for" <+> quotes (text fun_str)
@@ -182,7 +183,7 @@ findBreakForBind str_name modbreaks = filter (not . enclosed) ticks
   where
     ticks = [ (index, span)
             | (index, decls) <- assocs (modBreaks_decls modbreaks),
-              str_name == List.intercalate "." decls,
+              str_name == ST.unpack (ST.intercalate (ST.pack ".") decls),
               RealSrcSpan span _ <- [modBreaks_locs modbreaks ! index] ]
     enclosed (_,sp0) = any subspan ticks
       where subspan (_,sp) = sp /= sp0 &&
@@ -295,4 +296,3 @@ getCurrentBreakModule = do
           return $ Just $ getBreakSourceMod ibi brks
       ix ->
           Just <$> getHistoryModule hug (resumeHistory r !! (ix-1))
-

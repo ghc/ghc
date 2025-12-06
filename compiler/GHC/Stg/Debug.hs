@@ -19,7 +19,7 @@ import GHC.Types.Tickish
 import GHC.Core.DataCon
 import GHC.Types.IPE
 import GHC.Unit.Module
-import GHC.Types.Name   ( getName, getOccName, occNameFS, nameSrcSpan, occName, occNameString)
+import GHC.Types.Name   ( getName, getOccName, occNameFS, nameSrcSpan, occName)
 import GHC.Data.FastString
 import GHC.Stg.Debug.Types
 
@@ -212,7 +212,7 @@ shouldMakeDistinctTable StgDebugOpts{stgDebug_distinctConstructorTables} dc =
     Only these -> Set.member dcStr these
     None -> False
   where
-    dcStr = occNameString . occName $ dataConName dc
+    dcStr = fastStringToShortText . occNameFS . occName $ dataConName dc
 
 {-
 Note [Mapping Info Tables to Source Positions]

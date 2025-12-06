@@ -19,6 +19,7 @@ module GHC.Utils.BufHandle (
         bPutStr,
         bPutFS,
         bPutFZS,
+        bPutSBS,
         bPutPtrString,
         bPutReplicate,
         bFlush,
@@ -32,6 +33,7 @@ import GHC.Data.FastMutInt
 import Control.Monad    ( when )
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Unsafe as BS
+import qualified Data.ByteString.Short as SBS
 import Data.Char        ( ord )
 import Foreign
 import Foreign.C.String
@@ -100,6 +102,9 @@ bPutFS b fs = bPutBS b $ bytesFS fs
 
 bPutFZS :: BufHandle -> FastZString -> IO ()
 bPutFZS b fs = bPutBS b $ fastZStringToByteString fs
+
+bPutSBS :: BufHandle -> SBS.ShortByteString -> IO ()
+bPutSBS b sbs = bPutBS b (SBS.fromShort sbs)
 
 bPutBS :: BufHandle -> ByteString -> IO ()
 bPutBS b bs = BS.unsafeUseAsCStringLen bs $ bPutCStringLen b

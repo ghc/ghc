@@ -124,8 +124,9 @@ import GHC.Prelude.Basic
 import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 
-import GHC.Utils.BufHandle (BufHandle, bPutChar, bPutStr, bPutFS, bPutFZS)
+import GHC.Utils.BufHandle (BufHandle, bPutChar, bPutStr, bPutFS, bPutFZS, bPutSBS)
 import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
 import qualified GHC.Utils.Ppr as Pretty
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Utils.Ppr       ( Doc, Mode(..) )
@@ -1855,6 +1856,7 @@ class IsOutput doc where
 class IsOutput doc => IsLine doc where
   char :: Char -> doc
   text :: String -> doc
+  stext :: ST.ShortText -> doc
   ftext :: FastString -> doc
   ztext :: FastZString -> doc
 
@@ -1927,6 +1929,8 @@ instance IsLine SDoc where
   {-# INLINE CONLIKE char #-}
   text s = docToSDoc $ Pretty.text s
   {-# INLINE CONLIKE text #-}   -- Inline so that the RULE Pretty.text will fire
+  stext s = docToSDoc $ Pretty.stext s
+  {-# INLINE CONLIKE stext #-}
   ftext s = docToSDoc $ Pretty.ftext s
   {-# INLINE CONLIKE ftext #-}
   ztext s = docToSDoc $ Pretty.ztext s
@@ -1981,6 +1985,8 @@ instance IsLine HLine where
   {-# INLINE CONLIKE char #-}
   text str = HLine (\_ h -> bPutStr h str)
   {-# INLINE CONLIKE text #-}
+  stext st = HLine (\_ h -> bPutSBS h (ST.contents st))
+  {-# INLINE CONLIKE stext #-}
   ftext fstr = HLine (\_ h -> bPutFS h fstr)
   {-# INLINE CONLIKE ftext #-}
   ztext fstr = HLine (\_ h -> bPutFZS h fstr)

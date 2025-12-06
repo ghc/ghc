@@ -119,6 +119,7 @@ import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
 import GHC.Utils.CliOption
 import GHC.Stg.Debug.Types (StgDebugDctConfig(..))
+import qualified GHC.Data.ShortText as ST
 import GHC.SysTools.Terminal ( stderrSupportsAnsiColors )
 import GHC.UniqueSubdir (uniqueSubdir)
 import GHC.Utils.Outputable
@@ -425,7 +426,7 @@ data DynFlags = DynFlags {
   flushOut              :: FlushOut,
 
   ghcVersionFile        :: Maybe FilePath,
-  haddockOptions        :: Maybe String,
+  haddockOptions        :: !(Maybe ST.ShortText),
 
   -- | GHCi scripts specified by -ghci-script, in reverse order
   ghciScripts           :: [String],

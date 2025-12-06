@@ -45,6 +45,7 @@ import Data.Word
 import GHC hiding (NoLink)
 import GHC.Data.FastMutInt
 import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
 import GHC.Iface.Binary (getWithUserData, putSymbolTable)
 import GHC.Iface.Type (IfaceType, putIfaceType)
 import GHC.Types.Name.Cache
@@ -318,10 +319,10 @@ data BinDictionary = BinDictionary
 instance Binary PackageInfo where
   put_ bh PackageInfo{piPackageName, piPackageVersion} = do
     put_ bh (unPackageName piPackageName)
-    put_ bh (showVersion piPackageVersion)
+    put_ bh (ST.pack (showVersion piPackageVersion))
   get bh = do
     name <- PackageName <$> get bh
-    versionString <- get bh
+    versionString <- ST.unpack <$> get bh
     let version = case readP_to_S parseVersion versionString of
           [] -> makeVersion []
           vs -> fst (last vs)
@@ -438,38 +439,38 @@ instance Binary DocOption where
 
 instance Binary Example where
   put_ bh (Example expression result) = do
-    put_ bh expression
-    put_ bh result
+    put_ bh (ST.pack expression)
+    put_ bh (map ST.pack result)
   get bh = do
-    expression <- get bh
-    result <- get bh
+    expression <- ST.unpack <$> get bh
+    result <- map ST.unpack <$> get bh
     return (Example expression result)
 
 instance Binary a => Binary (Hyperlink a) where
   put_ bh (Hyperlink url label) = do
-    put_ bh url
+    put_ bh (ST.pack url)
     put_ bh label
   get bh = do
-    url <- get bh
+    url <- ST.unpack <$> get bh
     label <- get bh
     return (Hyperlink url label)
 
 instance Binary a => Binary (ModLink a) where
   put_ bh (ModLink m label) = do
-    put_ bh m
+    put_ bh (ST.pack m)
     put_ bh label
   get bh = do
-    m <- get bh
+    m <- ST.unpack <$> get bh
     label <- get bh
     return (ModLink m label)
 
 instance Binary Picture where
   put_ bh (Picture uri title) = do
-    put_ bh uri
-    put_ bh title
+    put_ bh (ST.pack uri)
+    put_ bh (fmap ST.pack title)
   get bh = do
-    uri <- get bh
-    title <- get bh
+    uri <- ST.unpack <$> get bh
+    title <- fmap ST.unpack <$> get bh
     return (Picture uri title)
 
 instance Binary a => Binary (Header a) where
@@ -516,10 +517,10 @@ instance Binary Meta where
 
 instance Binary MetaSince where
   put_ bh (MetaSince v p) = do
-    put_ bh v
+    put_ bh (fmap ST.pack v)
     put_ bh p
   get bh = do
-    v <- get bh
+    v <- fmap ST.unpack <$> get bh
     p <- get bh
     return (MetaSince v p)
 
@@ -541,7 +542,7 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
     put_ bh ab
   put_ bh (DocString ac) = do
     putByte bh 2
-    put_ bh ac
+    put_ bh (ST.pack ac)
   put_ bh (DocParagraph ad) = do
     putByte bh 3
     put_ bh ad
@@ -574,7 +575,7 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
     put_ bh x
   put_ bh (DocAName an) = do
     putByte bh 14
-    put_ bh an
+    put_ bh (ST.pack an)
   put_ bh (DocExamples ao) = do
     putByte bh 15
     put_ bh ao
@@ -586,7 +587,7 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
     put_ bh ag
   put_ bh (DocProperty x) = do
     putByte bh 18
-    put_ bh x
+    put_ bh (ST.pack x)
   put_ bh (DocBold x) = do
     putByte bh 19
     put_ bh x
@@ -595,10 +596,10 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
     put_ bh aa
   put_ bh (DocMathInline x) = do
     putByte bh 21
-    put_ bh x
+    put_ bh (ST.pack x)
   put_ bh (DocMathDisplay x) = do
     putByte bh 22
-    put_ bh x
+    put_ bh (ST.pack x)
   put_ bh (DocTable x) = do
     putByte bh 23
     put_ bh x
@@ -617,7 +618,7 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
         ab <- get bh
         return (DocAppend aa ab)
       2 -> do
-        ac <- get bh
+        ac <- ST.unpack <$> get bh
         return (DocString ac)
       3 -> do
         ad <- get bh
@@ -627,7 +628,7 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
         return (DocIdentifier ae)
       -- See note [The DocModule story]
       5 -> do
-        af <- get bh
+        af <- ST.unpack <$> get bh
         return $
           DocModule
             ModLink
@@ -659,7 +660,7 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
         x <- get bh
         return (DocPic x)
       14 -> do
-        an <- get bh
+        an <- ST.unpack <$> get bh
         return (DocAName an)
       15 -> do
         ao <- get bh
@@ -671,7 +672,7 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
         ag <- get bh
         return (DocWarning ag)
       18 -> do
-        x <- get bh
+        x <- ST.unpack <$> get bh
         return (DocProperty x)
       19 -> do
         x <- get bh
@@ -680,10 +681,10 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
         aa <- get bh
         return (DocHeader aa)
       21 -> do
-        x <- get bh
+        x <- ST.unpack <$> get bh
         return (DocMathInline x)
       22 -> do
-        x <- get bh
+        x <- ST.unpack <$> get bh
         return (DocMathDisplay x)
       23 -> do
         x <- get bh

@@ -26,17 +26,19 @@ import GHC.Core.Opt.CallerCC.Types
 
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Stg.Debug.Types
+import qualified GHC.Data.ShortText as ST
+import GHC.Data.OsPath (OsPath, unsafeDecodeUtf)
 
 -- The part of DynFlags which recompilation information needs
 data IfaceDynFlags = IfaceDynFlags
-        { ifaceMainIs :: Maybe (Maybe String)
+        { ifaceMainIs :: !(Maybe (Maybe ST.ShortText))
         , ifaceSafeMode :: IfaceTrustInfo
         , ifaceLang :: Maybe IfaceLanguage
         , ifaceExts :: [IfaceExtension]
-        , ifaceCppOptions :: IfaceCppOptions
-        , ifaceJsOptions  :: IfaceCppOptions
-        , ifaceCmmOptions :: IfaceCppOptions
-        , ifacePaths :: [String]
+        , ifaceCppOptions :: !IfaceCppOptions
+        , ifaceJsOptions  :: !IfaceCppOptions
+        , ifaceCmmOptions :: !IfaceCppOptions
+        , ifacePaths :: ![OsPath]
         , ifaceProf  :: Maybe IfaceProfAuto
         , ifaceTicky :: [IfaceGeneralFlag]
         , ifaceCodeGen :: IfaceCodeGen
@@ -47,7 +49,7 @@ data IfaceDynFlags = IfaceDynFlags
 
 pprIfaceDynFlags :: IfaceDynFlags -> SDoc
 pprIfaceDynFlags (IfaceDynFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14) =
-  vcat [ text "main-is:" <+> (ppr $ fmap (fmap (text @SDoc)) a1)
+  vcat [ text "main-is:" <+> (ppr $ fmap (fmap (stext @SDoc)) a1)
        , text "safe-mode:" <+> ppr a2
        , text "lang:" <+> ppr a3
        , text "exts:" <+> ppr a4
@@ -57,7 +59,7 @@ pprIfaceDynFlags (IfaceDynFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14) 
        , nest 2 $ ppr a6
        , text "cmm-options:"
        , nest 2 $ ppr a7
-       , text "paths:" <+> hcat (map text a8)
+       , text "paths:" <+> hcat (map (text . unsafeDecodeUtf) a8)
        , text "prof:"  <+> ppr a9
        , text "ticky:"
        , nest 2 $ vcat (map ppr a10)
@@ -171,9 +173,9 @@ instance Binary IfaceLanguage where
 instance Outputable IfaceLanguage where
   ppr (IfaceLanguage f) = text (show f)
 
-data IfaceCppOptions = IfaceCppOptions { ifaceCppIncludes :: [FilePath]
-                                       , ifaceCppOpts :: [String]
-                                       , ifaceCppSig :: ([String], Fingerprint)
+data IfaceCppOptions = IfaceCppOptions { ifaceCppIncludes :: ![OsPath]
+                                       , ifaceCppOpts :: ![ST.ShortText]
+                                       , ifaceCppSig :: !([ST.ShortText], Fingerprint)
                                        }
 
 instance NFData IfaceCppOptions where
@@ -189,11 +191,11 @@ instance Binary IfaceCppOptions where
 instance Outputable IfaceCppOptions where
   ppr (IfaceCppOptions is os (wos, fp)) =
         vcat [text "includes:"
-             , nest 2 $ hcat (map text is)
+             , nest 2 $ hcat (map (text . unsafeDecodeUtf) is)
              , text "opts:"
-             , nest 2 $ hcat (map text os)
+             , nest 2 $ hcat (map (stext @SDoc) os)
              , text "signature:"
-             , nest 2 $ parens (ppr fp) <+> ppr (map (text @SDoc) wos)
+             , nest 2 $ parens (ppr fp) <+> ppr (map (stext @SDoc) wos)
 
              ]
 
@@ -234,7 +236,7 @@ instance NFData IfaceDistinctConstructorConfig where
 instance Outputable IfaceDistinctConstructorConfig where
   ppr (IfaceDistinctConstructorConfig cnf) = case cnf of
     All -> text "all"
-    (Only v) -> text "only" <+> brackets (hcat $ fmap text $ Set.toList v)
+    (Only v) -> text "only" <+> brackets (hcat $ fmap stext $ Set.toList v)
     None -> text "none"
 
 instance Binary IfaceDistinctConstructorConfig where

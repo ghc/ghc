@@ -20,6 +20,7 @@ import GHC.Iface.Ext.Types (HieAST (..), HieASTs (..), HieFile (..), SourcedNode
 import GHC.Parser.Lexer as Lexer
 import GHC.Types.SrcLoc (mkRealSrcLoc, realSrcLocSpan, srcSpanFile)
 import GHC.Unit.Module (Module, moduleName)
+import System.OsPath (decodeFS)
 import qualified GHC.Utils.Outputable as Outputable
 import System.Directory
 import System.FilePath
@@ -90,11 +91,12 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
       <$> (readHieFile nc iface.ifaceHieFile)
 
   -- Get the AST and tokens corresponding to the source file we want
-  let fileFs = mkFastString file
+  filePath <- decodeFS file
+  let fileFs = mkFastString filePath
       mast
         | M.size asts == 1 = snd <$> M.lookupMin asts
-        | otherwise = M.lookup (HiePath (mkFastString file)) asts
-      tokens' = parse parserOpts sDocContext file rawSrc
+        | otherwise = M.lookup (HiePath (mkFastString filePath)) asts
+      tokens' = parse parserOpts sDocContext filePath rawSrc
       ast = fromMaybe (emptyHieAst fileFs) mast
       fullAst = recoverFullIfaceTypes sDocContext types ast
 
@@ -105,7 +107,7 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
       out verbosity verbose $
         unwords
           [ "couldn't find ast for"
-          , file
+          , filePath
           , show (M.keys asts)
           ]
 

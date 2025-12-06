@@ -48,8 +48,9 @@ import GHC.Types.Tickish
 import GHC.Types.ProfAuto
 
 import Control.Monad
-import Data.List (isSuffixOf, intersperse)
+import Data.List (isSuffixOf)
 import Data.Foldable (toList)
+import qualified GHC.Data.ShortText as ST
 
 import Trace.Hpc.Mix
 
@@ -84,7 +85,7 @@ data TicksConfig = TicksConfig
 
 data Tick = Tick
   { tick_loc   :: SrcSpan   -- ^ Tick source span
-  , tick_path  :: [String]  -- ^ Path to the declaration
+  , tick_path  :: [ST.ShortText]  -- ^ Path to the declaration
   , tick_ids   :: [OccName] -- ^ Identifiers being bound
   , tick_label :: BoxLabel  -- ^ Label for the tick counter
   }
@@ -382,11 +383,12 @@ bindTick
 bindTick density name pos fvs = do
   decl_path <- getPathEntry
   let
+      decl_path_strs = map ST.unpack decl_path
       toplev        = null decl_path
       count_entries = toplev || density == TickAllFunctions
       top_only      = density /= TickAllFunctions
       box_label     = if toplev then TopLevelBox [name]
-                                else LocalBox (decl_path ++ [name])
+                                else LocalBox (decl_path_strs ++ [name])
   --
   allocATickBox box_label count_entries top_only pos fvs
 
@@ -1080,7 +1082,7 @@ data TickTransEnv = TTE { fileName     :: FastString
                           -- entered should be counted.
                         , exports      :: NameSet
                         , inlines      :: VarSet
-                        , declPath     :: [String]
+                        , declPath     :: [ST.ShortText]
                         , inScope      :: VarSet
                         , blackList    :: Set RealSrcSpan
                         , this_mod     :: Module
@@ -1181,9 +1183,9 @@ freeVar id = TM $ \ env st ->
                    else ((), noFVs, st)
 
 addPathEntry :: String -> TM a -> TM a
-addPathEntry nm = withEnv (\ env -> env { declPath = declPath env ++ [nm] })
+addPathEntry nm = withEnv (\ env -> env { declPath = declPath env ++ [ST.pack nm] })
 
-getPathEntry :: TM [String]
+getPathEntry :: TM [ST.ShortText]
 getPathEntry = declPath `liftM` getEnv
 
 getFileName :: TM FastString
@@ -1260,24 +1262,24 @@ allocATickBox boxLabel countEntries topOnly  pos fvs =
   ifGoodTickSrcSpan pos (do
     let
       mydecl_path = case boxLabel of
-                      TopLevelBox x -> x
-                      LocalBox xs  -> xs
+                      TopLevelBox x -> map ST.pack x
+                      LocalBox xs  -> map ST.pack xs
                       _ -> panic "allocATickBox"
     tickish <- mkTickish boxLabel countEntries topOnly pos fvs mydecl_path
     return (Just tickish)
   ) (return Nothing)
 
 
-mkTickish :: BoxLabel -> Bool -> Bool -> SrcSpan -> OccEnv Id -> [String]
+mkTickish :: BoxLabel -> Bool -> Bool -> SrcSpan -> OccEnv Id -> [ST.ShortText]
           -> TM CoreTickish
 mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
-
   let ids = filter (not . mightBeUnliftedType . idType) $ nonDetOccEnvElts fvs
           -- unlifted types cause two problems here:
           --   * we can't bind them  at the GHCi prompt
           --     (bindLocalsAtBreakpoint already filters them out),
           --   * the simplifier might try to substitute a literal for
           --     the Id, and we can't handle that.
+      decl_path_joined = ST.intercalate (ST.pack ".") decl_path
 
       me = Tick
         { tick_loc   = pos
@@ -1286,8 +1288,8 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
         , tick_label = boxLabel
         }
 
-      cc_name | topOnly   = mkFastString $ head decl_path
-              | otherwise = mkFastString $ concat (intersperse "." decl_path)
+      cc_name | topOnly   = mkFastStringShortText (head decl_path)
+              | otherwise = mkFastStringShortText decl_path_joined
 
   env <- getEnv
   case tickishType env of

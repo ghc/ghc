@@ -52,6 +52,8 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Exception
 import GHC.Utils.Logger
 import GHC.Utils.Constants (debugIsOn)
+import qualified GHC.Data.ShortText as ST
+import GHC.Data.OsPath (unsafeDecodeUtf)
 
 import GHC.Types.Annotations
 import GHC.Types.Avail
@@ -552,14 +554,14 @@ checkIfaceFlags :: IfaceDynFlags -> IfaceDynFlags -> IO [SDoc]
 checkIfaceFlags (IfaceDynFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14)
                 (IfaceDynFlags b1 b2 b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14) =
   flip execStateT [] $ do
-    check_one "main is" (ppr . fmap (fmap (text @SDoc))) a1 b1
+    check_one "main is" (ppr . fmap (fmap (stext @SDoc))) a1 b1
     check_one_simple "safemode" a2 b2
     check_one_simple "lang"  a3 b3
     check_one_simple "exts" a4 b4
     check_one_simple "cpp option" a5 b5
     check_one_simple "js option" a6 b6
     check_one_simple "cmm option" a7 b7
-    check_one "paths" (ppr . map (text @SDoc)) a8 b8
+    check_one "paths" (ppr . map (text @SDoc . unsafeDecodeUtf)) a8 b8
     check_one_simple "prof" a9 b9
     check_one_simple "ticky" a10 b10
     check_one_simple "codegen" a11 b11
@@ -812,7 +814,7 @@ checkModUsage fc UsageFile{ usg_file_path = file,
          else return UpToDate
  where
    reason = FileChanged $ unpackFS file
-   recomp  = needsRecompileBecause $ fromMaybe reason $ fmap CustomReason mlabel
+   recomp  = needsRecompileBecause $ fromMaybe reason $ fmap (CustomReason . ST.unpack) mlabel
    handler = if debugIsOn
       then \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
       else \_ -> return recomp -- if we can't find the file, just recompile, don't fail
@@ -828,7 +830,7 @@ checkModUsage fc UsageDirectory{ usg_dir_path = dir,
          else return UpToDate
  where
    reason  = DirChanged $ unpackFS dir
-   recomp  = needsRecompileBecause $ fromMaybe reason $ fmap CustomReason mlabel
+   recomp  = needsRecompileBecause $ fromMaybe reason $ fmap (CustomReason . ST.unpack) mlabel
    handler = if debugIsOn
       then \e -> pprTrace "UsageDirectory" (text (show e)) $ return recomp
       else \_ -> return recomp -- if we can't find the dir, just recompile, don't fail

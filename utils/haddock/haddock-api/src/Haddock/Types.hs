@@ -51,6 +51,7 @@ import Data.Data (Data)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified GHC.Data.ShortText as ST
 import GHC
 import GHC.Data.BooleanFormula (BooleanFormula)
 import GHC.Driver.Session (Language)
@@ -657,12 +658,12 @@ instance NFData LangExt.Extension
 
 data HaddockModInfo name = HaddockModInfo
   { hmi_description :: Maybe (Doc name)
-  , hmi_copyright :: Maybe String
-  , hmi_license :: Maybe String
-  , hmi_maintainer :: Maybe String
-  , hmi_stability :: Maybe String
-  , hmi_portability :: Maybe String
-  , hmi_safety :: Maybe String
+  , hmi_copyright :: Maybe ST.ShortText
+  , hmi_license :: Maybe ST.ShortText
+  , hmi_maintainer :: Maybe ST.ShortText
+  , hmi_stability :: Maybe ST.ShortText
+  , hmi_portability :: Maybe ST.ShortText
+  , hmi_safety :: Maybe ST.ShortText
   , hmi_language :: Maybe Language
   , hmi_extensions :: [LangExt.Extension]
   }

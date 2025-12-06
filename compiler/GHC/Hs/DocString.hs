@@ -31,6 +31,7 @@ import GHC.Utils.Encoding
 import GHC.Utils.Outputable as Outputable hiding ((<>))
 import GHC.Types.SrcLoc
 import Control.DeepSeq
+import qualified GHC.Data.ShortText as ST
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -126,14 +127,14 @@ instance Binary HsDocStringDecorator where
   put_ bh x = case x of
     HsDocStringNext -> putByte bh 0
     HsDocStringPrevious -> putByte bh 1
-    HsDocStringNamed n -> putByte bh 2 >> put_ bh n
+    HsDocStringNamed n -> putByte bh 2 >> put_ bh (ST.pack n)
     HsDocStringGroup n -> putByte bh 3 >> put_ bh n
   get bh = do
     tag <- getByte bh
     case tag of
       0 -> pure HsDocStringNext
       1 -> pure HsDocStringPrevious
-      2 -> HsDocStringNamed <$> get bh
+      2 -> HsDocStringNamed . ST.unpack <$> get bh
       3 -> HsDocStringGroup <$> get bh
       t -> fail $ "HsDocStringDecorator: invalid tag " ++ show t
 

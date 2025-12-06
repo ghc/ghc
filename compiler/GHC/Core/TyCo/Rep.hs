@@ -94,6 +94,7 @@ import GHC.Builtin.Names
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Binary
@@ -1569,7 +1570,7 @@ data UnivCoProvenance
                    --   considered equivalent. See Note [ProofIrrelProv].
                    -- Can be used in Nominal or Representational coercions
 
-  | PluginProv String
+  | PluginProv !String
       -- ^ From a plugin, which asserts that this coercion is sound.
       --   The string and the variable set are for the use by the plugin.
 
@@ -1590,14 +1591,14 @@ instance NFData UnivCoProvenance where
 instance Binary UnivCoProvenance where
   put_ bh PhantomProv    = putByte bh 1
   put_ bh ProofIrrelProv = putByte bh 2
-  put_ bh (PluginProv a) = putByte bh 3 >> put_ bh a
+  put_ bh (PluginProv a) = putByte bh 3 >> put_ bh (ST.pack a)
   put_ bh SubMultProv    = putByte bh 4
   get bh = do
       tag <- getByte bh
       case tag of
            1 -> return PhantomProv
            2 -> return ProofIrrelProv
-           3 -> do a <- get bh
+           3 -> do a <- ST.unpack <$> get bh
                    return $ PluginProv a
            4 -> return SubMultProv
            _ -> panic ("get UnivCoProvenance " ++ show tag)

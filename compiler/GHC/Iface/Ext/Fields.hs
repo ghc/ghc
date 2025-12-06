@@ -20,8 +20,9 @@ import Control.Monad
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Control.DeepSeq
+import qualified GHC.Data.ShortText as ST
 
-type FieldName = String
+type FieldName = ST.ShortText
 
 newtype ExtensibleFields = ExtensibleFields { getExtensibleFields :: (Map FieldName BinData) }
 

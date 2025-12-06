@@ -33,6 +33,7 @@ import Data.Maybe
 import qualified Data.Semigroup as S
 import GHC.IORef (readIORef)
 import GHC.Unit.Types
+import qualified GHC.Data.ShortText as ST
 import GHC.Hs
 import GHC.Types.Avail
 import qualified Data.List.NonEmpty as NonEmpty
@@ -163,7 +164,7 @@ mkDocStructureFromExportList mdl import_avails export_list =
       (IEModuleContents _ lmn, avails) -> moduleExport (unLoc lmn) avails
       (IEGroup _ level doc, _)         -> DsiSectionHeading level (unLoc doc)
       (IEDoc _ doc, _)                 -> DsiDocChunk (unLoc doc)
-      (IEDocNamed _ name, _)           -> DsiNamedChunkRef name
+      (IEDocNamed _ name, _)           -> DsiNamedChunkRef (ST.pack name)
       (IEThingWith{}, avails)          ->
         DsiExports $
           {- For explicit export lists, use the explicit order. It is deterministic by construction -}
@@ -246,10 +247,10 @@ mkDocStructureFromDecls env all_exports decls =
 -- since there would be no way to link to a named chunk.
 getNamedChunks :: Bool -- ^ Do we have an explicit export list?
                -> HsGroup (GhcPass pass)
-               -> Map String (HsDoc (GhcPass pass))
+               -> Map ST.ShortText (HsDoc (GhcPass pass))
 getNamedChunks True decls =
   M.fromList $ flip mapMaybe (unLoc <$> hs_docs decls) $ \case
-    DocCommentNamed name doc -> Just (name, unLoc doc)
+    DocCommentNamed name doc -> Just (ST.pack name, unLoc doc)
     _                        -> Nothing
 getNamedChunks False _ = M.empty
 

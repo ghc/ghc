@@ -23,17 +23,21 @@ import Foreign
 import Type.Reflection
 import Type.Reflection.Unsafe
 import Data.Kind (Type)
+import qualified GHC.Data.ShortText as ST
 
 
 instance Binary TyCon where
     put_ bh tc = do
-        put_ bh (tyConPackage tc)
-        put_ bh (tyConModule tc)
-        put_ bh (tyConName tc)
+        put_ bh (ST.pack (tyConPackage tc))
+        put_ bh (ST.pack (tyConModule tc))
+        put_ bh (ST.pack (tyConName tc))
         put_ bh (tyConKindArgs tc)
         put_ bh (tyConKindRep tc)
     get bh =
-        mkTyCon <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+        mkTyCon <$> (ST.unpack <$> get bh)
+                <*> (ST.unpack <$> get bh)
+                <*> (ST.unpack <$> get bh)
+                <*> get bh <*> get bh
 
 getSomeTypeRep :: ReadBinHandle -> IO SomeTypeRep
 getSomeTypeRep bh = do
@@ -142,7 +146,7 @@ instance Binary KindRep where
     put_ bh (KindRepApp a b) = putByte bh 2 >> put_ bh a >> put_ bh b
     put_ bh (KindRepFun a b) = putByte bh 3 >> put_ bh a >> put_ bh b
     put_ bh (KindRepTYPE r) = putByte bh 4 >> put_ bh r
-    put_ bh (KindRepTypeLit sort r) = putByte bh 5 >> put_ bh sort >> put_ bh r
+    put_ bh (KindRepTypeLit sort r) = putByte bh 5 >> put_ bh sort >> put_ bh (ST.pack r)
 
     get bh = do
         tag <- getByte bh
@@ -152,7 +156,7 @@ instance Binary KindRep where
           2 -> KindRepApp <$> get bh <*> get bh
           3 -> KindRepFun <$> get bh <*> get bh
           4 -> KindRepTYPE <$> get bh
-          5 -> KindRepTypeLit <$> get bh <*> get bh
+          5 -> KindRepTypeLit <$> get bh <*> (ST.unpack <$> get bh)
           _ -> fail "Binary.putKindRep: invalid tag"
 
 instance Binary TypeLitSort where

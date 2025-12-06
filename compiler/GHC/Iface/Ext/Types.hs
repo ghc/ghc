@@ -34,6 +34,7 @@ import GHC.Core.TyCon             ( isTypeSynonymTyCon, isClassTyCon, isFamilyTy
 import GHC.Types.Id               ( Id, isRecordSelector, isClassOpId )
 import GHC.Types.TyThing          ( TyThing (..) )
 import GHC.Types.Var              ( isTyVar, isFUNArg )
+import GHC.Data.OsPath            ( OsPath )
 
 import qualified Data.Array as A
 import qualified Data.Map as M
@@ -70,7 +71,7 @@ Besides saving compilation cycles, @.hie@ files also offer a more stable
 interface than the GHC API.
 -}
 data HieFile = HieFile
-    { hie_hs_file :: FilePath
+    { hie_hs_file :: !OsPath
     -- ^ Initial Haskell source file path
 
     , hie_module :: Module

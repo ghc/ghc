@@ -19,12 +19,13 @@ import GHC.Utils.Logger (Logger)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic, pprPanic)
 import GHC.Utils.TmpFs
-
+import qualified GHC.Data.ShortText as ST
 import Control.DeepSeq (NFData (..))
 import Data.Traversable (for)
 import Data.Word (Word8)
 import Data.Maybe (fromMaybe)
-import System.FilePath (takeExtension)
+import System.OsPath (OsPath)
+import qualified System.OsPath as OsPath
 
 {-
 Note [Interface Files with Core Definitions]
@@ -300,8 +301,8 @@ instance Outputable IfaceCLabel where
 -- See Note [Foreign stubs and TH bytecode linking]
 data IfaceCStubs =
   IfaceCStubs {
-    header :: String,
-    source :: String,
+    header :: !ST.ShortText,
+    source :: !ST.ShortText,
     initializers :: [IfaceCLabel],
     finalizers :: [IfaceCLabel]
   }
@@ -309,8 +310,8 @@ data IfaceCStubs =
 instance Outputable IfaceCStubs where
   ppr IfaceCStubs {header, source, initializers, finalizers} =
     vcat [
-      hang (text "header:") 2 (vcat (text <$> lines header)),
-      hang (text "source:") 2 (vcat (text <$> lines source)),
+      hang (text "header:") 2 (vcat (text <$> lines (ST.unpack header))),
+      hang (text "source:") 2 (vcat (text <$> lines (ST.unpack source))),
       hang (text "initializers:") 2 (ppr initializers),
       hang (text "finalizers:") 2 (ppr finalizers)
     ]
@@ -376,16 +377,16 @@ data IfaceForeignFile =
 
     -- | The contents of the file, which will be written to a temporary file
     -- when loaded from an interface.
-    source :: String,
+    source :: !ST.ShortText,
 
     -- | The extension used by the user is preserved, to avoid confusing
     -- external tools with an unexpected @.c@ file or similar.
-    extension :: FilePath
+    extension :: !OsPath
   }
 
 instance Outputable IfaceForeignFile where
   ppr IfaceForeignFile {lang, source} =
-    hang (text (show lang) <> colon) 2 (vcat (text <$> lines source))
+    hang (text (show lang) <> colon) 2 (vcat (text <$> lines (ST.unpack source)))
 
 instance Binary IfaceForeignFile where
   get bh = do
@@ -439,16 +440,17 @@ encodeIfaceForeign logger dflags foreign_stubs lang_paths = do
     -- GHC session lifetime in 'GHC.Internal.TH.Syntax.addForeignSource'.
     read_foreign_files =
       for lang_paths $ \ (lang, path) -> do
-        source <- readFile path
-        pure IfaceForeignFile {lang, source, extension = takeExtension path}
+        source <- ST.readFile path
+        extension <- OsPath.takeExtension <$> OsPath.encodeFS path
+        pure IfaceForeignFile {lang, source, extension}
 
     encode_stubs = \case
       NoStubs ->
         pure Nothing
       ForeignStubs (CHeader header) (CStub source inits finals) ->
         pure $ Just IfaceCStubs {
-          header = render header,
-          source = render source,
+          header = ST.pack (render header),
+          source = ST.pack (render source),
           initializers = encode_label <$> inits,
           finalizers = encode_label <$> finals
         }
@@ -476,15 +478,16 @@ decodeIfaceForeign logger tmpfs tmp_dir iff@IfaceForeign {stubs, files} = do
   debugTraceMsg logger 3 $
     hang (text "Decoding foreign data from iface:") 2 (ppr iff)
   lang_paths <- for files $ \ IfaceForeignFile {lang, source, extension} -> do
-    f <- newTempName logger tmpfs tmp_dir TFL_GhcSession extension
-    writeFile f source
+    ext <- OsPath.decodeFS extension
+    f <- newTempName logger tmpfs tmp_dir TFL_GhcSession ext
+    ST.writeFile f source
     pure (lang, f)
   pure (maybe NoStubs decode_stubs stubs, lang_paths)
   where
     decode_stubs IfaceCStubs {header, source, initializers, finalizers} =
       ForeignStubs
-      (CHeader (text header))
-      (CStub (text source) (labels initializers) (labels finalizers))
+      (CHeader (stext header))
+      (CStub (stext source) (labels initializers) (labels finalizers))
 
     labels ls = [fromCStubLabel l | IfaceCLabel l <- ls]
 

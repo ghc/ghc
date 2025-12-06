@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, GeneralizedNewtypeDeriving, DerivingStrategies #-}
+{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, GeneralizedNewtypeDeriving, DerivingStrategies, DeriveDataTypeable #-}
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- gross hack: we maneuvered ourselves into a position where we can't boot GHC with a LLVM based GHC anymore.
 -- LLVM based GHC's fail to compile memcmp ffi calls.  These end up as memcmp$def in the llvm ir, however we
@@ -30,6 +30,11 @@ module GHC.Data.ShortText (
         singleton,
         pack,
         unpack,
+        -- ** File I/O
+        readFile,
+        writeFile,
+        -- ** Combination
+        intercalate,
         -- ** Operations
         codepointLength,
         byteLength,
@@ -39,13 +44,15 @@ module GHC.Data.ShortText (
         stripPrefix
   ) where
 
-import Prelude
+import Prelude hiding (readFile, writeFile)
 
 import Control.Monad (guard)
 import Control.DeepSeq as DeepSeq
+import Data.Data (Data)
 import Data.Binary
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as B8
-import qualified Data.ByteString.Short.Internal as SBS
+import qualified Data.ByteString.Short as SBS
 import GHC.Exts
 import GHC.IO
 import GHC.Utils.Encoding
@@ -56,7 +63,7 @@ file paths, module descriptions, etc.
 -}
 newtype ShortText = ShortText { contents :: SBS.ShortByteString
                               }
-                              deriving stock (Show)
+                              deriving stock (Show, Data)
                               deriving newtype (Eq, Ord, Binary, Semigroup, Monoid, NFData)
 
 -- We don't want to derive this one from ShortByteString since that one won't handle
@@ -79,6 +86,19 @@ pack s = ShortText $ utf8EncodeShortByteString s
 -- | Create a singleton
 singleton :: Char -> ShortText
 singleton s = pack [s]
+
+-- | Read a file as UTF-8 encoded 'ShortText'. Assumes the file contains
+-- well-formed UTF-8 and performs no validation.
+readFile :: FilePath -> IO ShortText
+readFile fp = ShortText . SBS.toShort <$> BS.readFile fp
+
+-- | Write a 'ShortText' to a file as UTF-8 bytes.
+writeFile :: FilePath -> ShortText -> IO ()
+writeFile fp (ShortText sbs) = BS.writeFile fp (SBS.fromShort sbs)
+
+-- | /O(n)/ Concatenate a list of 'ShortText' with a separator.
+intercalate :: ShortText -> [ShortText] -> ShortText
+intercalate = coerce SBS.intercalate
 
 -- | /O(n)/ Convert a 'ShortText' into a 'String'.
 unpack :: ShortText -> String

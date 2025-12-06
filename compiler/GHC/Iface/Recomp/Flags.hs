@@ -24,6 +24,9 @@ import GHC.Iface.Flags
 import GHC.Data.EnumSet as EnumSet
 import System.FilePath (normalise)
 import Data.Maybe
+import Data.Bifunctor (first)
+import qualified GHC.Data.ShortText as ST
+import GHC.Data.OsPath (unsafeEncodeUtf)
 
 -- The subset of DynFlags which is used by the recompilation checker.
 
@@ -39,7 +42,7 @@ fingerprintDynFlags :: HscEnv -> Module
 
 fingerprintDynFlags hsc_env this_mod nameio =
     let dflags@DynFlags{..} = hsc_dflags hsc_env
-        mainis   = if mainModIs (hsc_HUE hsc_env) == this_mod then Just mainFunIs else Nothing
+        mainis   = if mainModIs (hsc_HUE hsc_env) == this_mod then Just (fmap ST.pack mainFunIs) else Nothing
                       -- see #5878
         -- pkgopts  = (homeUnit home_unit, sort $ packageFlags dflags)
         safeHs   = setSafeMode safeHaskell
@@ -55,33 +58,33 @@ fingerprintDynFlags hsc_env this_mod nameio =
 
         -- -I, -D and -U flags affect Haskell C/CPP Preprocessor
         cpp = IfaceCppOptions
-                { ifaceCppIncludes = map normalise $ flattenIncludes includePathsMinusImplicit
+                { ifaceCppIncludes = map (unsafeEncodeUtf . normalise) $ flattenIncludes includePathsMinusImplicit
                 -- normalise: eliminate spurious differences due to "./foo" vs "foo"
-                , ifaceCppOpts = picPOpts dflags
-                , ifaceCppSig =  opt_P_signature dflags
+                , ifaceCppOpts = map ST.pack (picPOpts dflags)
+                , ifaceCppSig =  first (map ST.pack) (opt_P_signature dflags)
                 }
             -- See Note [Repeated -optP hashing]
 
 
         -- -I, -D and -U flags affect JavaScript C/CPP Preprocessor
         js = IfaceCppOptions
-              { ifaceCppIncludes =  map normalise $ flattenIncludes includePathsMinusImplicit
+              { ifaceCppIncludes =  map (unsafeEncodeUtf . normalise) $ flattenIncludes includePathsMinusImplicit
             -- normalise: eliminate spurious differences due to "./foo" vs "foo"
-              , ifaceCppOpts = picPOpts dflags
-              , ifaceCppSig = opt_JSP_signature dflags
+              , ifaceCppOpts = map ST.pack (picPOpts dflags)
+              , ifaceCppSig = first (map ST.pack) (opt_JSP_signature dflags)
               }
             -- See Note [Repeated -optP hashing]
 
         -- -I, -D and -U flags affect C-- CPP Preprocessor
         cmm = IfaceCppOptions {
-              ifaceCppIncludes =  map normalise $ flattenIncludes includePathsMinusImplicit
+              ifaceCppIncludes =  map (unsafeEncodeUtf . normalise) $ flattenIncludes includePathsMinusImplicit
             -- normalise: eliminate spurious differences due to "./foo" vs "foo"
-              , ifaceCppOpts = picPOpts dflags
+              , ifaceCppOpts = map ST.pack (picPOpts dflags)
               , ifaceCppSig = ([], opt_CmmP_signature dflags)
               }
 
         -- Note [path flags and recompilation]
-        paths = [ hcSuf ]
+        paths = [ unsafeEncodeUtf hcSuf ]
 
         -- -fprof-auto etc.
         prof = if sccProfilingEnabled dflags then Just (IfaceProfAuto profAuto) else Nothing
@@ -150,7 +153,7 @@ fingerprintHpcFlags dflags@DynFlags{..} nameio =
         -- hpcDir is output-only, so we should recompile if it changes
         hpc = if gopt Opt_Hpc dflags then Just hpcDir else Nothing
 
-      in computeFingerprint nameio hpc
+      in computeFingerprint nameio (fmap (unsafeEncodeUtf) hpc)
 
 
 {- Note [path flags and recompilation]

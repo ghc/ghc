@@ -55,6 +55,7 @@ import qualified Data.Text.Lazy as LText
 import qualified Data.Text.Encoding as Text
 import qualified Data.Text as Text
 import qualified Data.ByteString.Lazy as LBS
+import qualified GHC.Data.ShortText as ST
 
 import Haddock.Backends.Xhtml.Decl
 import Haddock.Backends.Xhtml.DocMarkup
@@ -333,9 +334,9 @@ moduleInfo iface =
   let
     info = ifaceInfo iface
 
-    doOneEntry :: (String, HaddockModInfo GHC.Name -> Maybe String) -> Maybe HtmlTable
+    doOneEntry :: (String, HaddockModInfo GHC.Name -> Maybe ST.ShortText) -> Maybe HtmlTable
     doOneEntry (fldNm, fld) =
-      fld info >>= \a -> return (th << fldNm <-> td << a)
+      fld info >>= \a -> return (th << fldNm <-> td << ST.unpack a)
 
     entries :: [HtmlTable]
     entries =
@@ -351,7 +352,7 @@ moduleInfo iface =
           ]
         ++ extsForm
       where
-        lg inf = fmap show (hmi_language inf)
+        lg inf = ST.pack . show <$> hmi_language inf
 
         multilineRow :: String -> [String] -> HtmlTable
         multilineRow title xs = (th ! [valign "top"]) << title <-> td << (toLines xs)
@@ -361,7 +362,7 @@ moduleInfo iface =
         copyrightsTable :: Maybe HtmlTable
         copyrightsTable = fmap (multilineRow "Copyright" . split) (hmi_copyright info)
           where
-            split = map (trim . filter (/= ',')) . lines
+            split = map (trim . filter (/= ',')) . lines . ST.unpack
 
         extsForm
           | OptShowExtensions `elem` ifaceOptions iface =

@@ -7,6 +7,7 @@ import GHC.Types.SrcLoc
 
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified GHC.Data.ShortText as ST
 
 data SpanWithLabel = SpanWithLabel RealSrcSpan LexicalFastString
 
@@ -29,7 +30,7 @@ data StgDebugDctConfig =
     --
     -- This is the behavior if @-fdistinct-constructor-tables-only=C1,...,CN@ is
     -- supplied.
-  | Only !(Set String)
+  | Only !(Set ST.ShortText)
 
     -- | Do not create distinct constructor tables for any data constructor.
     --
@@ -43,7 +44,7 @@ data StgDebugDctConfig =
 -- If the given set is empty, that means the user has entered
 -- @-fdistinct-constructor-tables@ with no constructor names specified, and
 -- therefore we consider that an 'All' configuration.
-dctConfigOnly :: StgDebugDctConfig -> Set String -> StgDebugDctConfig
+dctConfigOnly :: StgDebugDctConfig -> Set ST.ShortText -> StgDebugDctConfig
 dctConfigOnly cfg cs
     | Set.null cs = All
     | otherwise =

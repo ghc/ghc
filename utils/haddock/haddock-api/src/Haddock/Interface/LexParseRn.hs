@@ -33,6 +33,7 @@ import qualified Data.Set as Set
 import GHC
 import GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString (unpackFS)
+import qualified GHC.Data.ShortText as ST
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Parser.Lexer (ParserOpts)
@@ -112,7 +113,7 @@ processModuleHeader mLanguage parserOpts sDocContext pkgName safety mayLang extS
       flags = EnumSet.toList extSet \\ languageExtensions mayLang
   return
     ( hmi
-        { hmi_safety = Just $ Outputable.renderWithContext sDocContext (Outputable.ppr safety)
+        { hmi_safety = Just $ ST.pack (Outputable.renderWithContext sDocContext (Outputable.ppr safety))
         , hmi_language = mLanguage
         , hmi_extensions = flags
         }

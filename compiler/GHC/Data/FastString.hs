@@ -59,6 +59,7 @@ module GHC.Data.FastString
 
         -- * ShortText
         fastStringToShortText,
+        mkFastStringShortText,
 
         -- * FastZString
         FastZString,
@@ -162,6 +163,9 @@ fastStringToShortByteString = fs_sbs
 
 fastStringToShortText :: FastString -> ShortText
 fastStringToShortText = ShortText . fs_sbs
+
+mkFastStringShortText :: ShortText -> FastString
+mkFastStringShortText = coerce mkFastStringShortByteString
 
 fastZStringToByteString :: FastZString -> ByteString
 fastZStringToByteString (FastZString bs) = bs

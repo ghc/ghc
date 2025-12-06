@@ -12,6 +12,7 @@ import GHC.Prelude
 
 import GHC.Platform
 import GHC.Platform.Ways
+import qualified GHC.Data.ShortText as ST
 
 -- | A platform profile fully describes the kind of objects that are generated
 -- for a platform.
@@ -41,13 +42,13 @@ profileWordSizeInBytes :: Profile -> Int
 profileWordSizeInBytes profile = platformWordSizeInBytes (profilePlatform profile)
 
 -- | Unique build tag for the profile
-profileBuildTag :: Profile -> String
+profileBuildTag :: Profile -> ST.ShortText
 profileBuildTag profile
     -- profiles using unregisterised convention are not binary compatible with
     -- those that don't. Make sure to make it apparent in the tag so that our
     -- interface files can't be mismatched by mistake.
-  | platformUnregisterised platform = 'u':wayTag
-  | otherwise                       =     wayTag
+  | platformUnregisterised platform = ST.pack ('u' : wayTag)
+  | otherwise                       = ST.pack wayTag
   where
    platform = profilePlatform profile
    wayTag   = waysBuildTag (profileWays profile)

@@ -34,6 +34,7 @@ import GHC.Unit.Module.Deps
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
 
 import Data.IORef
 import Data.List (sortBy)
@@ -199,7 +200,7 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
   where
     linkableToUsage (Linkable _ m uls) = mapM (partToUsage m) (NE.toList uls)
 
-    msg m = moduleNameString (moduleName m) ++ "[TH] changed"
+    msg m = ST.pack (moduleNameString (moduleName m) ++ "[TH] changed")
 
     fing mmsg fn = UsageFile (mkFastString fn) <$> lookupFileCache fc fn <*> pure mmsg
 

@@ -46,6 +46,7 @@ import GHC hiding (lookupName)
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
 import GHC.Core.ConLike (ConLike (..))
+import qualified GHC.Data.ShortText as ST
 import GHC.Data.FastString (FastString, bytesFS, unpackFS)
 import qualified GHC.Driver.Config.Parser as Parser
 import qualified GHC.Driver.DynFlags as DynFlags
@@ -372,10 +373,10 @@ parseWarning parserOpts sDocContext w = case w of
 -- Haddock options that are embedded in the source file
 -------------------------------------------------------------------------------
 
-mkDocOpts :: MonadIO m => Maybe String -> [Flag] -> Module -> IfM m [DocOption]
+mkDocOpts :: MonadIO m => Maybe ST.ShortText -> [Flag] -> Module -> IfM m [DocOption]
 mkDocOpts mbOpts flags mdl = do
   opts <- case mbOpts of
-    Just opts -> case words $ replace ',' ' ' opts of
+    Just opts -> case words $ replace ',' ' ' (ST.unpack opts) of
       [] -> warn "No option supplied to DOC_OPTION/doc_option" >> return []
       xs -> fmap catMaybes (mapM parseOption xs)
     Nothing -> return []
@@ -429,7 +430,7 @@ mkExportItems
   -> DocMap Name
   -> ArgMap Name
   -> FixMap
-  -> Map String (HsDoc GhcRn) -- named chunks
+  -> Map ST.ShortText (HsDoc GhcRn) -- named chunks
   -> DocStructure
   -> InstIfaceMap
   -> DynFlags
@@ -467,7 +468,7 @@ mkExportItems
         DsiNamedChunkRef ref -> do
           case Map.lookup ref namedChunks of
             Nothing -> do
-              warn $ "Cannot find documentation for: $" ++ ref
+              warn $ "Cannot find documentation for: $" ++ ST.unpack ref
               pure []
             Just hsDoc' -> do
               doc <- processDocStringParas parserOpts sDocContext pkgName hsDoc'

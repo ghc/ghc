@@ -1221,7 +1221,7 @@ pprIfaceAnnotation (IfaceAnnotation { ifAnnotatedTarget = target, ifAnnotatedVal
 pprExtensibleFields :: ExtensibleFields -> SDoc
 pprExtensibleFields (ExtensibleFields fs) = vcat . map pprField $ toList fs
   where
-    pprField (name, (BinData size _data)) = text name <+> text "-" <+> ppr size <+> text "bytes"
+    pprField (name, (BinData size _data)) = stext name <+> text "-" <+> ppr size <+> text "bytes"
 
 
 -- | Reason for loading an interface file

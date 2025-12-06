@@ -17,6 +17,7 @@ import GHC.Utils.Outputable
 
 import Haddock.InterfaceFile
 import Haddock.Types
+import qualified GHC.Data.ShortText as ST
 
 jsonInterfaceFile :: InterfaceFile -> JsonDoc
 jsonInterfaceFile InterfaceFile{..} =
@@ -45,11 +46,11 @@ jsonHaddockModInfo :: HaddockModInfo Name -> JsonDoc
 jsonHaddockModInfo HaddockModInfo{..} =
   jsonObject
     [ ("description", jsonMaybe jsonDoc hmi_description)
-    , ("copyright", jsonMaybe jsonString hmi_copyright)
-    , ("maintainer", jsonMaybe jsonString hmi_maintainer)
-    , ("stability", jsonMaybe jsonString hmi_stability)
-    , ("protability", jsonMaybe jsonString hmi_portability)
-    , ("safety", jsonMaybe jsonString hmi_safety)
+    , ("copyright", jsonMaybe (jsonString . ST.unpack) hmi_copyright)
+    , ("maintainer", jsonMaybe (jsonString . ST.unpack) hmi_maintainer)
+    , ("stability", jsonMaybe (jsonString . ST.unpack) hmi_stability)
+    , ("protability", jsonMaybe (jsonString . ST.unpack) hmi_portability)
+    , ("safety", jsonMaybe (jsonString . ST.unpack) hmi_safety)
     , ("language", jsonMaybe (jsonString . show) hmi_language)
     , ("extensions", jsonArray (map (jsonString . show) hmi_extensions))
     ]

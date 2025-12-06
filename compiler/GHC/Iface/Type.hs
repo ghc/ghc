@@ -98,7 +98,8 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 import Data.Maybe (isJust)
 import Data.Proxy
 import qualified Data.Semigroup as Semi
-import Data.Word (Word8)
+import Data.Char (ord, chr)
+import Data.Word (Word8, Word32)
 import Control.Arrow (first)
 import Control.DeepSeq
 import Control.Monad ((<$!>))
@@ -2212,7 +2213,7 @@ instance Outputable IfaceTyLit where
 instance Binary IfaceTyLit where
   put_ bh (IfaceNumTyLit n)   = putByte bh 1 >> put_ bh n
   put_ bh (IfaceStrTyLit n)   = putByte bh 2 >> put_ bh n
-  put_ bh (IfaceCharTyLit n)  = putByte bh 3 >> put_ bh n
+  put_ bh (IfaceCharTyLit n)  = putByte bh 3 >> put_ bh (fromIntegral (ord n) :: Word32)
 
   get bh =
     do tag <- getByte bh
@@ -2222,7 +2223,7 @@ instance Binary IfaceTyLit where
          2 -> do { n <- get bh
                  ; return (IfaceStrTyLit n) }
          3 -> do { n <- get bh
-                 ; return (IfaceCharTyLit n) }
+                 ; return (IfaceCharTyLit (chr (fromIntegral (n :: Word32)))) }
          _ -> panic ("get IfaceTyLit " ++ show tag)
 
 instance Binary IfaceAppArgs where

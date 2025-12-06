@@ -89,6 +89,7 @@ import GHC.StgToJS.Types
 import GHC.Unit.Module
 
 import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
 
 import GHC.Types.Unique.Map
 
@@ -306,12 +307,12 @@ putObject
   -> IO ()
 putObject bh mod_name deps os = do
   putByteString bh hsHeader
-  put_ bh (show hiVersion)
+  put_ bh hiVersion
 
-  -- we store the module name as a String because we don't want to have to
+  -- we store the module name as a 'ShortByteString' because we don't want to have to
   -- decode the FastString table just to decode it when we're looking for an
   -- object in an archive.
-  put_ bh (moduleNameString mod_name)
+  put_ bh (fastStringToShortByteString (moduleNameFS mod_name))
 
   (fs_tbl, fs_writer) <- initFastStringWriterTable
   let bh_fs = addWriterToUserData fs_writer bh
@@ -336,12 +337,12 @@ getObjectHeader bh = do
   case magic == hsHeader of
     False -> pure (Left "invalid magic header for HS object")
     True  -> do
-      is_correct_version <- ((== hiVersion) . read) <$> get bh
+      is_correct_version <- (== hiVersion) <$> get bh
       case is_correct_version of
         False -> pure (Left "invalid header version")
         True  -> do
           mod_name <- get bh
-          pure (Right (mkModuleName (mod_name)))
+          pure (Right (mkModuleNameFS (mkFastStringShortByteString mod_name)))
 
 
 -- | Parse object body. Must be called after a successful getObjectHeader
@@ -677,10 +678,10 @@ instance Binary StaticLit where
 
 -- | Options obtained from pragmas in JS files
 data JSOptions = JSOptions
-  { enableCPP                  :: !Bool     -- ^ Enable CPP on the JS file
-  , emccExtraOptions           :: ![String] -- ^ Pass additional options to emcc at link time
-  , emccExportedFunctions      :: ![String] -- ^ Arguments for `-sEXPORTED_FUNCTIONS`
-  , emccExportedRuntimeMethods :: ![String] -- ^ Arguments for `-sEXPORTED_RUNTIME_METHODS`
+  { enableCPP                  :: !Bool              -- ^ Enable CPP on the JS file
+  , emccExtraOptions           :: ![ST.ShortText]    -- ^ Pass additional options to emcc at link time
+  , emccExportedFunctions      :: ![ST.ShortText]    -- ^ Arguments for `-sEXPORTED_FUNCTIONS`
+  , emccExportedRuntimeMethods :: ![ST.ShortText]    -- ^ Arguments for `-sEXPORTED_RUNTIME_METHODS`
   }
   deriving (Eq, Ord)
 
@@ -740,15 +741,15 @@ getJsOptions handle = do
                       -> opts {enableCPP = True}
 
                       | Just s <- List.stripPrefix "EMCC:EXPORTED_FUNCTIONS=" ys
-                      , fns <- fmap trim (splitOnComma s)
+                      , fns <- fmap (ST.pack . trim) (splitOnComma s)
                       -> opts { emccExportedFunctions = emccExportedFunctions opts ++ fns }
 
                       | Just s <- List.stripPrefix "EMCC:EXPORTED_RUNTIME_METHODS=" ys
-                      , fns <- fmap trim (splitOnComma s)
+                      , fns <- fmap (ST.pack . trim) (splitOnComma s)
                       -> opts { emccExportedRuntimeMethods = emccExportedRuntimeMethods opts ++ fns }
 
                       | Just s <- List.stripPrefix "EMCC:EXTRA=" ys
-                      -> opts { emccExtraOptions = emccExtraOptions opts ++ [s] }
+                      -> opts { emccExtraOptions = emccExtraOptions opts ++ [ST.pack s] }
 
                       | otherwise
                       -> panic ("Unrecognized JS pragma: " ++ ys)

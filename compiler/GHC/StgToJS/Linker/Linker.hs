@@ -349,11 +349,11 @@ jsLink lc_cfg cfg logger tmpfs ar_cache out link_plan = do
           , Option "-sALLOW_TABLE_GROWTH"
           -- keep some RTS methods and functions (otherwise removed as dead
           -- code)
-          , Option ("-sEXPORTED_RUNTIME_METHODS=" ++ concat (intersperse "," (emccExportedRuntimeMethods emcc_opts)))
-          , Option ("-sEXPORTED_FUNCTIONS=" ++ concat (intersperse "," (emccExportedFunctions emcc_opts)))
+          , Option ("-sEXPORTED_RUNTIME_METHODS=" ++ ST.unpack (ST.intercalate (ST.pack ",") (emccExportedRuntimeMethods emcc_opts)))
+          , Option ("-sEXPORTED_FUNCTIONS=" ++ ST.unpack (ST.intercalate (ST.pack ",") (emccExportedFunctions emcc_opts)))
           ]
           -- pass extra options from JS files' pragmas
-          ++ map Option (emccExtraOptions emcc_opts)
+          ++ map (Option . ST.unpack) (emccExtraOptions emcc_opts)
           -- link objects
           ++ map (FileOption "") emcc_objs
 

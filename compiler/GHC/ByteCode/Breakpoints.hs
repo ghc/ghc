@@ -49,6 +49,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import Data.Array
+import qualified GHC.Data.ShortText as ST
 
 {-
 Note [ModBreaks vs InternalModBreaks]
@@ -234,11 +235,14 @@ getBreakVars = getBreakXXX modBreaks_vars
 
 -- | Get the decls for this breakpoint
 getBreakDecls :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO [String]
-getBreakDecls = getBreakXXX modBreaks_decls
+getBreakDecls lookupModule ibi imbs =
+  fmap (map ST.unpack) $ getBreakXXX modBreaks_decls lookupModule ibi imbs
 
 -- | Get the decls for this breakpoint
 getBreakCCS :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO ((String, String))
-getBreakCCS = getBreakXXX modBreaks_ccs
+getBreakCCS lookupModule ibi imbs =
+  fmap (\(a,b) -> (ST.unpack a, ST.unpack b)) $
+    getBreakXXX modBreaks_ccs lookupModule ibi imbs
 
 -- | Internal utility to access a ModBreaks field at a particular breakpoint index
 --

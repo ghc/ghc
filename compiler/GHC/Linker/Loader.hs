@@ -106,6 +106,7 @@ import Control.Monad
 
 import Data.Array
 import Data.ByteString (ByteString)
+import Data.Bifunctor (bimap)
 import qualified Data.Set as Set
 import Data.Char (isSpace)
 import qualified Data.Foldable as Foldable
@@ -1825,7 +1826,7 @@ allocateCCS interp ce mbss
               mkCostCentres
                 interp
                 (moduleNameString $ moduleName modBreaks_module)
-                (elems modBreaks_ccs)
+                (map (bimap ST.unpack ST.unpack) (elems modBreaks_ccs))
             return $ M.fromList $
               zipWith (\el ix -> (BreakpointId modBreaks_module ix, el)) ccs [0..]
         )

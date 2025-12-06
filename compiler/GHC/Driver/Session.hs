@@ -278,6 +278,7 @@ import GHC.Core.Opt.CallerCC
 import GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer (mkParserOpts, initParserState, P(..), ParseResult(..))
 import GHC.Stg.Debug.Types
+import qualified GHC.Data.ShortText as ST
 
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
@@ -770,7 +771,7 @@ addCmdlineFramework f d = d { cmdlineFrameworks = f : cmdlineFrameworks d}
 addGhcVersionFile :: FilePath -> DynFlags -> DynFlags
 addGhcVersionFile f d = d { ghcVersionFile = Just f }
 
-addHaddockOpts f d = d { haddockOptions = Just f}
+addHaddockOpts f d = d { haddockOptions = Just (ST.pack f)}
 
 addGhciScript f d = d { ghciScripts = f : ghciScripts d}
 
@@ -3253,12 +3254,13 @@ onlyDistinctConstructorTables arg = do
 
 -- | Parse a string of comma-separated constructor names into a 'Set' of
 -- 'String's with one entry per constructor.
-parseDistinctConstructorTablesArg :: String -> Set.Set String
+parseDistinctConstructorTablesArg :: String -> Set.Set ST.ShortText
 parseDistinctConstructorTablesArg =
       -- Ensure we insert the last constructor name built by the fold, if not
       -- empty
-      uncurry insertNonEmpty
-    . foldr go ("", Set.empty)
+      Set.map ST.pack
+    . uncurry insertNonEmpty
+    . foldr go ("", Set.empty :: Set.Set String)
   where
     go :: Char -> (String, Set.Set String) -> (String, Set.Set String)
     go ',' (cur, acc) = ("", Set.insert cur acc)

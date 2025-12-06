@@ -46,6 +46,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List.NonEmpty (NonEmpty(..))
 import GHC.LanguageExtensions.Type
+import qualified GHC.Data.ShortText as ST
 import qualified GHC.Utils.Outputable as O
 import GHC.Hs.Extension
 import GHC.Types.Unique.Map
@@ -123,7 +124,7 @@ type LHsDoc pass = Located (HsDoc pass)
 data DocStructureItem
   = DsiSectionHeading !Int !(HsDoc GhcRn)
   | DsiDocChunk !(HsDoc GhcRn)
-  | DsiNamedChunkRef !String
+  | DsiNamedChunkRef !ST.ShortText
   | DsiExports !DetOrdAvails
   | DsiModExport
       !(NonEmpty ModuleName) -- ^ We might re-export avails from multiple
@@ -181,7 +182,7 @@ instance Outputable DocStructureItem where
       , nest 2 (pprHsDocDebug doc)
       ]
     DsiNamedChunkRef name ->
-      text "reference to named chunk:" <+> text name
+      text "reference to named chunk:" <+> stext name
     DsiExports avails ->
       text "avails:" $$ nest 2 (ppr avails)
     DsiModExport mod_names avails ->
@@ -209,12 +210,12 @@ data Docs = Docs
   , docs_args         :: UniqMap Name (IntMap (HsDoc GhcRn))
     -- ^ Docs for arguments. E.g. function arguments, method arguments.
   , docs_structure    :: DocStructure
-  , docs_named_chunks :: Map String (HsDoc GhcRn)
+  , docs_named_chunks :: !(Map ST.ShortText (HsDoc GhcRn))
     -- ^ Map from chunk name to content.
     --
     -- This map will be empty unless we have an explicit export list from which
     -- we can reference the chunks.
-  , docs_haddock_opts :: Maybe String
+  , docs_haddock_opts :: !(Maybe ST.ShortText)
     -- ^ Haddock options from @OPTIONS_HADDOCK@ or from @-haddock-opts@.
   , docs_language     :: Maybe Language
     -- ^ The 'Language' used in the module, for example 'Haskell2010'.
@@ -268,9 +269,9 @@ instance Outputable Docs where
         , pprField (ppr . fmap (ppr . map pprHsDocDebug)) "declaration docs" docs_decls
         , pprField (ppr . fmap (pprIntMap ppr pprHsDocDebug)) "arg docs" docs_args
         , pprField (vcat . map ppr) "documentation structure" docs_structure
-        , pprField (pprMap (doubleQuotes . text) pprHsDocDebug) "named chunks"
+        , pprField (pprMap (doubleQuotes . stext) pprHsDocDebug) "named chunks"
                    docs_named_chunks
-        , pprField pprMbString "haddock options" docs_haddock_opts
+        , pprField pprMbShortText "haddock options" docs_haddock_opts
         , pprField ppr "language" docs_language
         , pprField (vcat . map ppr . EnumSet.toList) "language extensions"
                    docs_extensions
@@ -285,8 +286,8 @@ instance Outputable Docs where
       pprIntMap pprKey pprVal m =
         vcat $ flip map (IntMap.toList m) $ \(k, v) ->
           pprKey k O.<> colon $$ nest 2 (pprVal v)
-      pprMbString Nothing = empty
-      pprMbString (Just s) = text s
+      pprMbShortText Nothing = empty
+      pprMbShortText (Just s) = stext s
       pprMaybe ppr' = \case
         Nothing -> text "Nothing"
         Just x -> text "Just" <+> ppr' x

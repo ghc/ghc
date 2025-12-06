@@ -19,6 +19,7 @@ import Control.Applicative (Alternative (..))
 import Control.Monad (ap)
 import Data.Char
 import GHC.Parser.Lexer (ParserOpts)
+import qualified GHC.Data.ShortText as ST
 
 import Haddock.Parser
 import Haddock.Types
@@ -55,11 +56,11 @@ parseModuleHeader parserOpts pkgName str0 =
    in
     ( HaddockModInfo
         { hmi_description = parseString parserOpts <$> descriptionOpt
-        , hmi_copyright = copyrightOpt
-        , hmi_license = spdxLicenceOpt <|> licenseOpt <|> licenceOpt
-        , hmi_maintainer = maintainerOpt
-        , hmi_stability = stabilityOpt
-        , hmi_portability = portabilityOpt
+        , hmi_copyright = ST.pack <$> copyrightOpt
+        , hmi_license = ST.pack <$> (spdxLicenceOpt <|> licenseOpt <|> licenceOpt)
+        , hmi_maintainer = ST.pack <$> maintainerOpt
+        , hmi_stability = ST.pack <$> stabilityOpt
+        , hmi_portability = ST.pack <$> portabilityOpt
         , hmi_safety = Nothing
         , hmi_language = Nothing -- set in LexParseRn
         , hmi_extensions = [] -- also set in LexParseRn

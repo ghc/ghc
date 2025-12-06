@@ -150,8 +150,8 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import qualified Data.ByteString.Short.Internal as SBS
+import qualified GHC.Data.ShortText as ST
 import Data.IORef
-import Data.Char                ( ord, chr )
 import Data.List.NonEmpty       ( NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
@@ -164,6 +164,7 @@ import Data.List (unfoldr)
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
+import Data.Type.Coercion       ( coerceWith, sym )
 import Type.Reflection          ( Typeable, SomeTypeRep(..) )
 import qualified Type.Reflection as Refl
 import GHC.Real                 ( Ratio(..) )
@@ -172,6 +173,12 @@ import qualified Data.IntMap as IntMap
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 
 import Unsafe.Coerce (unsafeCoerce)
+import System.OsString.Internal.Types
+  ( OsString(..)
+  , PosixString(..)
+  , WindowsString(..)
+  , coercionToPlatformTypes
+  )
 
 type BinArray = ForeignPtr Word8
 
@@ -930,9 +937,7 @@ instance Binary Bool where
     put_ bh b = putByte bh (fromIntegral (fromEnum b))
     get  bh   = do x <- getWord8 bh; return $! (toEnum (fromIntegral x))
 
-instance Binary Char where
-    put_  bh c = put_ bh (fromIntegral (ord c) :: Word32)
-    get  bh   = do x <- get bh; return $! (chr (fromIntegral (x :: Word32)))
+-- Intentionally no Binary Char instance; serialize via Word32 explicitly where needed.
 
 instance Binary Word where
     put_ bh i = put_ bh (fromIntegral i :: Word64)
@@ -1856,9 +1861,32 @@ instance Binary SBS.ShortByteString where
   put_ bh f = putSBS bh f
   get bh = getSBS bh
 
+deriving via SBS.ShortByteString instance Binary ST.ShortText
+
 instance Binary ByteString where
   put_ bh f = putBS bh f
   get bh = getBS bh
+
+instance Binary OsString where
+  put_ bh os =
+    case coercionToPlatformTypes of
+      Left (_, osCo) ->
+        let WindowsString sbs = coerceWith osCo os
+        in put_ bh sbs
+      Right (_, osCo) ->
+        let PosixString sbs = coerceWith osCo os
+        in put_ bh sbs
+
+  get bh =
+    case coercionToPlatformTypes of
+      Left (_, osCo) -> do
+        sbs <- get bh
+        let ws = WindowsString sbs
+        evaluate (coerceWith (sym osCo) ws)
+      Right (_, osCo) -> do
+        sbs <- get bh
+        let ps = PosixString sbs
+        evaluate (coerceWith (sym osCo) ps)
 
 instance Binary LBS.ByteString where
   put_ bh lbs = do

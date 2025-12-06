@@ -129,6 +129,7 @@ import Control.Monad.Trans.Except
 
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
+import qualified GHC.Data.ShortText as ST
 import Data.Char
 import Data.Function
 import qualified Data.Foldable as Foldable
@@ -4054,7 +4055,9 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
     bidsByModule nonquals mod = do
       mb_decls <- fmap GHC.modBreaks_decls <$> getModBreak mod
       let bids = case mb_decls of
-            Just decls -> nub $ declPath <$> elems decls
+            Just decls ->
+              let pathsSt = nub $ declPath <$> elems decls
+              in ST.unpack <$> pathsSt
             Nothing -> []
       pure $ case mod `elem` nonquals of
               True  -> bids
@@ -4086,8 +4089,10 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
           Nothing -> pure []
           Just decls -> do
             let (mod_str, topLvl, _) = splitIdent ident
-                ident_decls = [ elm | elm@(el : _) <- elems decls, el == topLvl ]
-                bids = nub $ declPath <$> ident_decls
+                topLvlSt = ST.pack topLvl
+                ident_decls = [ elm | elm@(el : _) <- elems decls, el == topLvlSt ]
+                bidsSt = nub $ declPath <$> ident_decls
+                bids = ST.unpack <$> bidsSt
             pure $ map (combineModIdent mod_str) bids
 
 completeModule = wrapIdentCompleterMod $ \w -> do
@@ -4907,10 +4912,10 @@ lookupHomeUnitModuleName mod_graph modl = do
 showModule :: Module -> String
 showModule = moduleNameString . moduleName
 
--- Return a String with the declPath of the function of a breakpoint.
+-- Return the ShortText declPath of the function of a breakpoint.
 -- See Note [Field modBreaks_decls] in GHC.ByteCode.Types
-declPath :: [String] -> String
-declPath = intercalate "."
+declPath :: [ST.ShortText] -> ST.ShortText
+declPath = ST.intercalate (ST.pack ".")
 
 -- | Optionally show a fixity declaration like @infixr 4 #@
 --

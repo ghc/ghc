@@ -51,6 +51,7 @@ import qualified Data.Set as Set
 import Data.Bifunctor
 import Control.DeepSeq
 import GHC.Types.Name.Set
+import qualified GHC.Data.ShortText as ST
 
 
 
@@ -348,7 +349,7 @@ data Usage
         usg_file_hash  :: Fingerprint,
         -- ^ 'Fingerprint' of the file contents.
 
-        usg_file_label :: Maybe String
+        usg_file_label :: !(Maybe ST.ShortText)
         -- ^ An optional string which is used in recompilation messages if
         -- file in question has changed.
 
@@ -364,7 +365,7 @@ data Usage
         usg_dir_hash  :: Fingerprint,
         -- ^ 'Fingerprint' of the directories contents.
 
-        usg_dir_label :: Maybe String
+        usg_dir_label :: !(Maybe ST.ShortText)
         -- ^ An optional string which is used in recompilation messages if
         -- dir in question has changed.
 
