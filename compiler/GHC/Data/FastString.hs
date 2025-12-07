@@ -55,6 +55,7 @@ module GHC.Data.FastString
 
         -- * ShortByteString
         fastStringToShortByteString,
+        fastStringToOsPath,
         mkFastStringShortByteString,
 
         -- * ShortText
@@ -142,6 +143,7 @@ import System.IO
 import Data.Data
 import Data.IORef
 import Data.Semigroup as Semi
+import Data.Type.Coercion (coerceWith, sym)
 
 import Foreign
 
@@ -149,6 +151,12 @@ import GHC.Conc.Sync    (sharedCAF)
 
 import GHC.Exts
 import GHC.IO
+import System.OsString.Internal.Types
+  ( PosixString(..)
+  , WindowsString(..)
+  , coercionToPlatformTypes
+  )
+import System.OsPath (OsPath)
 
 -- | Gives the Modified UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS, fastStringToByteString :: FastString -> ByteString
@@ -160,6 +168,14 @@ fastStringToByteString = bytesFS
 
 fastStringToShortByteString :: FastString -> ShortByteString
 fastStringToShortByteString = fs_sbs
+
+fastStringToOsPath :: FastString -> OsPath
+fastStringToOsPath fs =
+  case coercionToPlatformTypes of
+    Left (_cChar, cStr) ->
+      coerceWith (sym cStr) (WindowsString (fastStringToShortByteString fs))
+    Right (_cChar, cStr) ->
+      coerceWith (sym cStr) (PosixString (fastStringToShortByteString fs))
 
 fastStringToShortText :: FastString -> ShortText
 fastStringToShortText = ShortText . fs_sbs

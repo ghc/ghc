@@ -53,7 +53,7 @@ import GHC.Utils.Exception
 import GHC.Utils.Logger
 import GHC.Utils.Constants (debugIsOn)
 import qualified GHC.Data.ShortText as ST
-import GHC.Data.OsPath (unsafeDecodeUtf)
+import GHC.Data.OsPath (OsPath, unsafeDecodeUtf)
 
 import GHC.Types.Annotations
 import GHC.Types.Avail
@@ -195,9 +195,9 @@ data RecompReason
   | ModuleAdded (ImportLevel, UnitId, ModuleName)
   | ModuleChangedRaw ModuleName
   | ModuleChangedIface ModuleName
-  | FileChanged FilePath
-  | DirChanged FilePath
-  | CustomReason String
+  | FileChanged !OsPath
+  | DirChanged !OsPath
+  | CustomReason !ST.ShortText
   | FlagsChanged
   | LinkFlagsChanged
   | OptimFlagsChanged
@@ -232,9 +232,9 @@ instance Outputable RecompReason where
     ModuleChangedIface m     -> ppr m <+> text "changed (interface)"
     ModuleRemoved (_st, _uid, m)   -> ppr m <+> text "removed"
     ModuleAdded (_st, _uid, m)     -> ppr m <+> text "added"
-    FileChanged fp           -> text fp <+> text "changed"
-    DirChanged dp            -> text "Contents of" <+> text dp <+> text "changed"
-    CustomReason s           -> text s
+    FileChanged fp           -> text (unsafeDecodeUtf fp) <+> text "changed"
+    DirChanged dp            -> text "Contents of" <+> text (unsafeDecodeUtf dp) <+> text "changed"
+    CustomReason s           -> text (ST.unpack s)
     FlagsChanged             -> text "Flags changed"
     LinkFlagsChanged         -> text "Flags changed"
     OptimFlagsChanged        -> text "Optimisation flags changed"
@@ -812,10 +812,11 @@ checkModUsage fc UsageFile{ usg_file_path = file,
       if (old_hash /= new_hash)
          then return recomp
          else return UpToDate
- where
-   reason = FileChanged $ unpackFS file
-   recomp  = needsRecompileBecause $ fromMaybe reason $ fmap (CustomReason . ST.unpack) mlabel
-   handler = if debugIsOn
+  where
+    pathOs = fastStringToOsPath file
+    reason = FileChanged pathOs
+    recomp = needsRecompileBecause $ fromMaybe reason (CustomReason <$> mlabel)
+    handler = if debugIsOn
       then \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
       else \_ -> return recomp -- if we can't find the file, just recompile, don't fail
 
@@ -828,10 +829,11 @@ checkModUsage fc UsageDirectory{ usg_dir_path = dir,
       if (old_hash /= new_hash)
          then return recomp
          else return UpToDate
- where
-   reason  = DirChanged $ unpackFS dir
-   recomp  = needsRecompileBecause $ fromMaybe reason $ fmap (CustomReason . ST.unpack) mlabel
-   handler = if debugIsOn
+  where
+    dirOs = fastStringToOsPath dir
+    reason  = DirChanged dirOs
+    recomp  = needsRecompileBecause $ fromMaybe reason (CustomReason <$> mlabel)
+    handler = if debugIsOn
       then \e -> pprTrace "UsageDirectory" (text (show e)) $ return recomp
       else \_ -> return recomp -- if we can't find the dir, just recompile, don't fail
 
