@@ -133,16 +133,22 @@ instance Foldable Identity where
 -- | @since base-4.8.0.0
 instance Functor Identity where
     fmap     = coerce
+    {-# INLINE fmap #-}
 
 -- | @since base-4.8.0.0
 instance Applicative Identity where
     pure     = Identity
+    {-# INLINE pure #-}
     (<*>)    = coerce
+    {-# INLINE (<*>) #-}
     liftA2   = coerce
+    {-# INLINE liftA2 #-}
 
 -- | @since base-4.8.0.0
 instance Monad Identity where
     m >>= k  = k (runIdentity m)
+    {-# INLINE (>>=) #-}
+    --- THIS IS NOT GETTING INLINED IN MY PROGRAM WITH OPTIMISATION AND SPECIALIZATION. DEAR GOD!
 
 -- | @since base-4.8.0.0
 instance MonadFix Identity where
