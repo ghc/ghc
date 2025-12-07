@@ -2576,6 +2576,7 @@ fFlagsDeps = [
   flagSpec "prof-late-overloaded-calls"       Opt_ProfLateoverloadedCallsCCs,
   flagSpec "prof-manual"                      Opt_ProfManualCcs,
   flagSpec "prof-late-inline"                 Opt_ProfLateInlineCcs,
+  flagSpec "ptr-eq"                           Opt_PtrEq,
   flagSpec "regs-graph"                       Opt_RegsGraph,
   flagSpec "regs-iterative"                   Opt_RegsIterative,
   depFlagSpec' "rewrite-rules"                Opt_EnableRewriteRules

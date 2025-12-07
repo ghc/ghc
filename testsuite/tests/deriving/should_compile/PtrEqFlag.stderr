@@ -1,0 +1,59 @@
+
+==================== Derived instances ====================
+Derived class instances:
+  instance GHC.Internal.Classes.Eq a =>
+           GHC.Internal.Classes.Eq (PtrEqFlag.Box a) where
+    (GHC.Internal.Classes.==) a b
+      = case GHC.Internal.Prim.reallyUnsafePtrEquality# a b of
+          1# -> GHC.Internal.Types.True
+          _ -> case a of
+                 (PtrEqFlag.Box a1)
+                   -> case b of
+                        (PtrEqFlag.Box b1) -> ((a1 GHC.Internal.Classes.== b1))
+  
+  instance GHC.Internal.Classes.Ord a =>
+           GHC.Internal.Classes.Ord (PtrEqFlag.Box a) where
+    GHC.Internal.Classes.compare a b
+      = case GHC.Internal.Prim.reallyUnsafePtrEquality# a b of
+          1# -> GHC.Internal.Types.EQ
+          _ -> case a of
+                 PtrEqFlag.Box a1
+                   -> case b of
+                        PtrEqFlag.Box b1 -> (a1 `GHC.Internal.Classes.compare` b1)
+    (GHC.Internal.Classes.<) a b
+      = case GHC.Internal.Prim.reallyUnsafePtrEquality# a b of
+          1# -> GHC.Internal.Types.False
+          _ -> case a of
+                 PtrEqFlag.Box a1
+                   -> case b of PtrEqFlag.Box b1 -> (a1 GHC.Internal.Classes.< b1)
+    (GHC.Internal.Classes.<=) a b
+      = GHC.Internal.Classes.not ((GHC.Internal.Classes.<) b a)
+    (GHC.Internal.Classes.>) a b = (GHC.Internal.Classes.<) b a
+    (GHC.Internal.Classes.>=) a b
+      = GHC.Internal.Classes.not ((GHC.Internal.Classes.<) a b)
+  
+
+Derived type family instances:
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Eq [PtrEqFlag.Box a]
+  (GHC.Internal.Classes./=)
+    = GHC.Internal.Classes.$dm/= @(PtrEqFlag.Box a)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Ord [PtrEqFlag.Box a]
+  GHC.Internal.Classes.max
+    = GHC.Internal.Classes.$dmmax @(PtrEqFlag.Box a)
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Ord [PtrEqFlag.Box a]
+  GHC.Internal.Classes.min
+    = GHC.Internal.Classes.$dmmin @(PtrEqFlag.Box a)
+
+

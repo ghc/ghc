@@ -124,6 +124,10 @@ test('T16179', normal, compile, [''])
 test('T16341', normal, compile, [''])
 test('T16518', normal, compile, [''])
 test('T17240', normal, compile, ['-ddump-deriv -dsuppress-uniques'])
+test('PtrEqFlag', [normalise_errmsg_fun(just_the_deriving)],
+     compile, ['-ddump-deriv -dsuppress-uniques -dsuppress-idinfo -fptr-eq'])
+test('PtrEqFlagEnum', [normalise_errmsg_fun(just_the_deriving)],
+     compile, ['-ddump-deriv -dsuppress-uniques -dsuppress-idinfo -fptr-eq'])
 test('T17324', normal, compile, [''])
 test('T17339', normal, compile,
      ['-ddump-simpl -dsuppress-idinfo -dno-typeable-binds'])

@@ -1,0 +1,62 @@
+
+==================== Derived instances ====================
+Derived class instances:
+  instance GHC.Internal.Classes.Eq PtrEqFlagEnum.Color where
+    (GHC.Internal.Classes.==) a b
+      = case (GHC.Internal.Magic.dataToTag# a) of
+          a#
+            -> case (GHC.Internal.Magic.dataToTag# b) of
+                 b# -> (GHC.Internal.Prim.tagToEnum# (a# GHC.Internal.Prim.==# b#))
+  
+  instance GHC.Internal.Classes.Ord PtrEqFlagEnum.Color where
+    GHC.Internal.Classes.compare a b
+      = case a of
+          PtrEqFlagEnum.Red
+            -> case b of
+                 PtrEqFlagEnum.Red -> GHC.Internal.Types.EQ
+                 _ -> GHC.Internal.Types.LT
+          PtrEqFlagEnum.Green
+            -> case b of
+                 PtrEqFlagEnum.Green -> GHC.Internal.Types.EQ
+                 _ -> GHC.Internal.Types.GT
+    (GHC.Internal.Classes.<) a b
+      = case a of
+          PtrEqFlagEnum.Red
+            -> case b of
+                 PtrEqFlagEnum.Red -> GHC.Internal.Types.False
+                 _ -> GHC.Internal.Types.True
+          PtrEqFlagEnum.Green
+            -> case b of
+                 PtrEqFlagEnum.Green -> GHC.Internal.Types.False
+                 _ -> GHC.Internal.Types.False
+    (GHC.Internal.Classes.<=) a b
+      = GHC.Internal.Classes.not ((GHC.Internal.Classes.<) b a)
+    (GHC.Internal.Classes.>) a b = (GHC.Internal.Classes.<) b a
+    (GHC.Internal.Classes.>=) a b
+      = GHC.Internal.Classes.not ((GHC.Internal.Classes.<) a b)
+  
+
+Derived type family instances:
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Eq [PtrEqFlagEnum.Color]
+  (GHC.Internal.Classes./=)
+    = GHC.Internal.Classes.$dm/= @PtrEqFlagEnum.Color
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Ord [PtrEqFlagEnum.Color]
+  GHC.Internal.Classes.max
+    = GHC.Internal.Classes.$dmmax @PtrEqFlagEnum.Color
+
+
+
+==================== Filling in method body ====================
+GHC.Internal.Classes.Ord [PtrEqFlagEnum.Color]
+  GHC.Internal.Classes.min
+    = GHC.Internal.Classes.$dmmin @PtrEqFlagEnum.Color
+
+

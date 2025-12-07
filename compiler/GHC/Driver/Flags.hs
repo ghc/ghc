@@ -755,6 +755,7 @@ data GeneralFlag
    | Opt_ValidateHie
    | Opt_LocalGhciHistory
    | Opt_NoIt
+   | Opt_PtrEq
 
    -- wasm ghci browser mode
    | Opt_GhciBrowser

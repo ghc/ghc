@@ -73,6 +73,8 @@ import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Var.Set
 
+import GHC.Driver.DynFlags ( GeneralFlag(..), HasDynFlags(..), gopt )
+
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH
 import GHC.Builtin.PrimOps
@@ -216,10 +218,15 @@ produced don't get through the typechecker.
 gen_Eq_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, Bag AuxBindSpec)
 gen_Eq_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                   , dit_rep_tc_args = tycon_args }) = do
-    return (method_binds, emptyBag)
+    dflags <- getDynFlags
+    let use_ptr_eq_flag = use_ptr_eq dflags
+    return (if use_ptr_eq_flag then method_binds_ptr else method_binds_orig,
+            emptyBag)
   where
     all_cons = getPossibleDataCons tycon tycon_args
     non_nullary_cons = filter (not . isNullarySrcDataCon) all_cons
+    is_simple_enum = all isNullarySrcDataCon all_cons
+    use_ptr_eq dflags = gopt Opt_PtrEq dflags && not is_simple_enum
 
     -- Generate tag check. See #17240
     eq_expr_with_tag_check = nlHsCase
@@ -238,8 +245,9 @@ gen_Eq_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                 else non_nullary_pats ++ [mkHsCaseAlt nlWildPat true_Expr]))
       ]
 
-    method_binds = [eq_bind]
-    eq_bind = mkFunBindEC 2 loc eq_RDR (const true_Expr) binds
+    -------------------------- no ptr-eq fast path --------------------
+    method_binds_orig = [eq_bind_orig]
+    eq_bind_orig = mkFunBindEC 2 loc eq_RDR (const true_Expr) binds
       where
         binds
           | null all_cons = []
@@ -257,6 +265,24 @@ gen_Eq_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                     (genPrimOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
           | otherwise
           = [([a_Pat, b_Pat], eq_expr_with_tag_check)]
+
+    -------------------------- ptr-eq fast path ------------------------
+    method_binds_ptr = [eq_bind_ptr]
+    eq_bind_ptr = mkFunBindEC 2 loc eq_RDR (const true_Expr)
+                    [([a_Pat, b_Pat], ptrEqFastPath true_Expr eq_body)]
+
+    eq_body
+      | null all_cons
+      = true_Expr
+      -- Tag checking is redundant when there is only one data constructor
+      | [data_con] <- all_cons
+      = nlHsCase (nlHsVar a_RDR) [pats_etc data_con]
+      -- This is an enum (all constructors are nullary) - just do a simple tag check
+      | all isNullarySrcDataCon all_cons
+      = untag_Expr [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
+                    (genPrimOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR))
+      | otherwise
+      = eq_expr_with_tag_check
 
     ------------------------------------------------------------------
     nested_eq_expr []  [] [] = true_Expr
@@ -403,19 +429,23 @@ gtResult OrdGT      = true_Expr
 gen_Ord_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, Bag AuxBindSpec)
 gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                    , dit_rep_tc_args = tycon_args }) = do
+    dflags <- getDynFlags
+    let ptr_eq_enabled = use_ptr_eq dflags
     return $ if null tycon_data_cons -- No data-cons => invoke bale-out case
-      then ( [mkFunBindEC 2 loc compare_RDR (const eqTag_Expr) []]
+      then ( [ mkFunBindEC 2 loc compare_RDR (const eqTag_Expr) [] ]
            , emptyBag)
-      else ( [mkOrdOp OrdCompare] ++ other_ops
+      else ( [mkOrdOp ptr_eq_enabled OrdCompare] ++ other_ops ptr_eq_enabled
            , aux_binds)
   where
     aux_binds = emptyBag
+    is_simple_enum = all isNullarySrcDataCon tycon_data_cons
+    use_ptr_eq dflags = gopt Opt_PtrEq dflags && not is_simple_enum
 
         -- Note [Game plan for deriving Ord]
-    other_ops
+    other_ops ptr_eq_enabled
       | (last_tag - first_tag) <= 2     -- 1-3 constructors
         || null non_nullary_cons        -- Or it's an enumeration
-      = [mkOrdOp OrdLT, lE, gT, gE]
+      = [mkOrdOp ptr_eq_enabled OrdLT, lE, gT, gE]
       | otherwise
       = []
 
@@ -442,14 +472,19 @@ gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon tycon_data_cons
 
 
-    mkOrdOp :: OrdOp -> LHsBind GhcPs
+    mkOrdOp :: Bool -> OrdOp -> LHsBind GhcPs
     -- Returns a binding   op a b = ... compares a and b according to op ....
-    mkOrdOp op
+    mkOrdOp ptr_eq_enabled op
       = mkSimpleGeneratedFunBind loc (ordMethRdr op) (noLocA [a_Pat, b_Pat])
-                        (mkOrdOpRhs op)
+                        (mkOrdOpRhs ptr_eq_enabled op)
 
-    mkOrdOpRhs :: OrdOp -> LHsExpr GhcPs
-    mkOrdOpRhs op -- RHS for comparing 'a' and 'b' according to op
+    mkOrdOpRhs :: Bool -> OrdOp -> LHsExpr GhcPs
+    mkOrdOpRhs ptr_eq_enabled op
+      | ptr_eq_enabled = ptrEqFastPath (eqResult op) (mkOrdOpRhsNoPtrEq op)
+      | otherwise      = mkOrdOpRhsNoPtrEq op
+
+    mkOrdOpRhsNoPtrEq :: OrdOp -> LHsExpr GhcPs
+    mkOrdOpRhsNoPtrEq op -- RHS for comparing 'a' and 'b' according to op
       | nullary_cons `lengthAtMost` 2 -- Two nullary or fewer, so use cases
       = nlHsCase (nlHsVar a_RDR) $
         map (mkOrdOpAlt op) tycon_data_cons
@@ -2489,6 +2524,14 @@ and_Expr a b = genOpApp a and_RDR    b
 
 -----------------------------------------------------------------------
 
+ptrEqFastPath :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
+ptrEqFastPath eq_result fallback
+  = nlHsCase (nlHsVarApps reallyUnsafePtrEquality_RDR [a_RDR, b_RDR])
+      [ mkHsCaseAlt (nlLitPat (HsIntPrim NoSourceText 1)) eq_result
+      , mkHsCaseAlt nlWildPat fallback ]
+
+-----------------------------------------------------------------------
+
 eq_Expr :: Type -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 eq_Expr ty a b
     | not (isUnliftedType ty) = genOpApp a eq_RDR b
@@ -2585,9 +2628,10 @@ d_Pat           = nlVarPat d_RDR
 k_Pat           = nlVarPat k_RDR
 z_Pat           = nlVarPat z_RDR
 
-minusInt_RDR, tagToEnum_RDR :: RdrName
-minusInt_RDR  = getRdrName (primOpId IntSubOp   )
-tagToEnum_RDR = getRdrName (primOpId TagToEnumOp)
+minusInt_RDR, tagToEnum_RDR, reallyUnsafePtrEquality_RDR :: RdrName
+minusInt_RDR              = getRdrName (primOpId IntSubOp   )
+tagToEnum_RDR             = getRdrName (primOpId TagToEnumOp)
+reallyUnsafePtrEquality_RDR = getRdrName (primOpId ReallyUnsafePtrEqualityOp)
 
 new_tag2con_rdr_name, new_maxtag_rdr_name
   :: SrcSpan -> TyCon -> TcM RdrName
