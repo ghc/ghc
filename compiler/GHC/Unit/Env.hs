@@ -125,11 +125,13 @@ import GHC.Unit.Module.Graph
 import GHC.Platform
 import GHC.Settings
 import GHC.Data.Maybe
+import GHC.Data.SmallArray (SmallArray)
 import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Driver.DynFlags
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Data.Foldable (toList)
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
@@ -226,7 +228,7 @@ preloadUnitsInfo' unit_env ids0 = all_infos
        | isHomeUnitIndefinite home_unit -> []
        | otherwise -> map (toUnitId . moduleUnit . snd) (homeUnitInstantiations home_unit)
     pkg_map = unitInfoMap unit_state
-    preload = preloadUnits unit_state
+    preload = toList (preloadUnits unit_state)
 
     all_pkgs  = closeUnitDeps' pkg_map preload (ids `zip` repeat Nothing)
     all_infos = map (unsafeLookupUnitId unit_state) <$> all_pkgs
@@ -261,7 +263,7 @@ ue_findHomeUnitEnv uid e = case HUG.lookupHugUnitId uid (ue_home_unit_graph e) o
 ue_homeUnitState :: HasDebugCallStack => UnitEnv -> UnitState
 ue_homeUnitState = HUG.homeUnitEnv_units . ue_currentHomeUnitEnv
 
-ue_unit_dbs :: UnitEnv ->  Maybe [UnitDatabase UnitId]
+ue_unit_dbs :: UnitEnv ->  Maybe (SmallArray (UnitDatabase UnitId))
 ue_unit_dbs = HUG.homeUnitEnv_unit_dbs . ue_currentHomeUnitEnv
 
 -- -------------------------------------------------------
@@ -470,4 +472,3 @@ in order to allow users to offset their own relative paths.
 {-# DEPRECATED ue_units "Renamed to ue_homeUnitState because of confusion between units(tate) and unit(s) plural" #-}
 ue_units :: HasDebugCallStack => UnitEnv -> UnitState
 ue_units = ue_homeUnitState
-

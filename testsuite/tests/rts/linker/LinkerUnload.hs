@@ -9,6 +9,7 @@ import GHC.Runtime.Interpreter
 import qualified GHC.Linker.Loader as Loader
 import System.Environment
 import GHC.Utils.Monad ( MonadIO(..) )
+import Data.Foldable (toList)
 
 foreign export ccall loadPackages :: IO ()
 
@@ -21,4 +22,4 @@ loadPackages = do
                          , ghcLink = LinkInMemory }
     setSessionDynFlags dflags'
     hsc_env <- getSession
-    liftIO $ Loader.loadPackages (hscInterp hsc_env) hsc_env (preloadUnits (hsc_units hsc_env))
+    liftIO $ Loader.loadPackages (hscInterp hsc_env) hsc_env (toList (preloadUnits (hsc_units hsc_env)))

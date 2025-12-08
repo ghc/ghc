@@ -108,6 +108,7 @@ import GHC.Utils.Encoding
 import GHC.Data.FastString
 import qualified GHC.Linker.Loader as Loader
 import GHC.Data.Maybe ( expectJust )
+import GHC.Data.SmallArray (SmallArray)
 import GHC.Types.Name.Set
 import GHC.Utils.Panic hiding ( showException, try )
 import GHC.Utils.Misc
@@ -146,6 +147,7 @@ import Data.Time.Format ( formatTime, defaultTimeLocale )
 import Data.Version ( showVersion )
 import qualified Data.Semigroup as S
 import GHC.Prelude
+import qualified GHC.Exts as Exts (fromList)
 
 import GHC.Utils.Exception as Exception hiding (catch, mask, handle)
 import Foreign hiding (void)
@@ -758,7 +760,9 @@ installInteractiveHomeUnits = do
 
   let
     cached_unit_dbs =
-        concat
+        Exts.fromList
+      . concat
+      . map Foldable.toList
       . catMaybes
       . fmap homeUnitEnv_unit_dbs
       $ Foldable.toList
@@ -792,7 +796,7 @@ installInteractiveHomeUnits = do
 
   pure ()
   where
-    setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> S.Set UnitId -> [UnitDatabase UnitId] -> m HomeUnitEnv
+    setupHomeUnitFor :: GHC.GhcMonad m => Logger -> DynFlags -> S.Set UnitId -> SmallArray (UnitDatabase UnitId) -> m HomeUnitEnv
     setupHomeUnitFor logger dflags all_home_units cached_unit_dbs = do
       (dbs,unit_state,home_unit,_mconstants) <-
         liftIO $ initUnits logger dflags (Just cached_unit_dbs) all_home_units
@@ -3542,7 +3546,7 @@ reloadPackages :: GhciMonad m => HscEnv -> m ()
 reloadPackages hsc_env = do
   let
       units =
-        concatMap (preloadUnits . HUG.homeUnitEnv_units)
+        concatMap (Foldable.toList . preloadUnits . HUG.homeUnitEnv_units)
                   (Foldable.toList $ hsc_HUG hsc_env)
   liftIO $ Loader.loadPackages (hscInterp hsc_env) hsc_env units
   -- package flags changed, we can't re-use any of the old context

@@ -356,7 +356,7 @@ reallyInitLoaderState interp hsc_env = do
 
 
       -- (b) Load packages from the command-line (Note [preload packages])
-      pls <- unitEnv_foldWithKey (\k u env -> k >>= \pls' -> loadPackages' interp (hscSetActiveUnitId u hsc_env) (preloadUnits (homeUnitEnv_units env)) pls') (return pls0) (hsc_HUG hsc_env)
+      pls <- unitEnv_foldWithKey (\k u env -> k >>= \pls' -> loadPackages' interp (hscSetActiveUnitId u hsc_env) (Foldable.toList (preloadUnits (homeUnitEnv_units env))) pls') (return pls0) (hsc_HUG hsc_env)
 
       -- steps (c), (d) and (e)
       loadCmdLineLibs' interp hsc_env pls
@@ -383,7 +383,7 @@ loadCmdLineLibs' interp hsc_env pls = snd <$>
       let hsc' = hscSetActiveUnitId uid hsc_env
       -- Load potential dependencies first
       (done', pls') <- foldM (\(done', pls') uid -> load done' uid pls') (done, pls)
-                          (homeUnitDepends (hsc_units hsc'))
+                          (Foldable.toList (homeUnitDepends (hsc_units hsc')))
       pls'' <- loadCmdLineLibs'' interp hsc' pls'
       return $ (Set.insert uid done', pls'')
 

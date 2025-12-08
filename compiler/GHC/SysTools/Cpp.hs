@@ -31,6 +31,7 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import GHC.Utils.Panic
 
+import Data.Foldable (toList)
 import Data.Version
 import Data.Maybe
 
@@ -181,7 +182,7 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
     ghcVersionH <- getGhcVersionIncludeFlags dflags unit_env
 
     -- MIN_VERSION macros
-    let uids = explicitUnits unit_state
+    let uids = toList (explicitUnits unit_state)
         pkgs = mapMaybe (lookupUnit unit_state . fst) uids
     mb_macro_include <-
         if not (null pkgs) && gopt Opt_VersionMacros dflags

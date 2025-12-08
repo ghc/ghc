@@ -96,7 +96,7 @@ import GHC.Data.List.SetOps ( removeDups )
 
 import Control.Arrow    ( second )
 import Control.Monad
-import Data.Foldable    ( for_ )
+import Data.Foldable    ( for_, toList )
 import Data.IntMap      ( IntMap )
 import qualified Data.IntMap as IntMap
 import Data.Map         ( Map )
@@ -477,7 +477,7 @@ renamePkgQual unit_env mn mb_pkg = case mb_pkg of
     unit_state = ue_homeUnitState unit_env
 
     hpt_deps :: [UnitId]
-    hpt_deps  = homeUnitDepends unit_state
+    hpt_deps  = toList (homeUnitDepends unit_state)
 
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
@@ -2552,4 +2552,3 @@ addDupDeclErr gres@(gre :| _)
 checkConName :: RdrName -> TcRn ()
 checkConName name
   = checkErr (isRdrDataCon name || isRdrTc name) (TcRnIllegalDataCon name)
-

@@ -50,6 +50,7 @@ import System.IO
 import System.FilePath
 
 import Data.IORef
+import Data.Foldable (toList)
 import qualified Data.Set    as Set
 import qualified Data.ByteString as B
 
@@ -303,7 +304,7 @@ jsLinkObjects logger tmpfs tmp_dir cfg unit_env inst objs is_root = do
         , lcLinkCsources    = True  -- enable C sources, if any
         }
 
-  let units = preloadUnits (ue_homeUnitState unit_env)
+  let units = toList (preloadUnits (ue_homeUnitState unit_env))
 
   -- compute dependencies
   let link_spec = LinkSpec

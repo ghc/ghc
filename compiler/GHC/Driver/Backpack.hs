@@ -75,6 +75,7 @@ import GHC.Data.Maybe
 import GHC.Data.OsPath (unsafeEncodeUtf, os)
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
+import qualified GHC.Exts as Exts (fromList, toList)
 import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.Data.ShortText as ST
 
@@ -443,9 +444,9 @@ addUnit u = do
         Just dbs ->
          let newdb = UnitDatabase
                { unitDatabasePath  = unsafeEncodeUtf $ "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
-               , unitDatabaseUnits = [u]
+               , unitDatabaseUnits = Exts.fromList [u]
                }
-         in return (dbs ++ [newdb]) -- added at the end because ordering matters
+         in return (Exts.fromList (Exts.toList dbs ++ [newdb])) -- added at the end because ordering matters
     (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 (Just newdbs) (hsc_all_home_unit_ids hsc_env)
 
     -- update platform constants

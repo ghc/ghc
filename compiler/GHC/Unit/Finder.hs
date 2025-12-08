@@ -65,6 +65,7 @@ import GHC.Fingerprint
 import Data.IORef
 import Control.Applicative ((<|>))
 import Control.Monad
+import Data.Foldable (toList)
 import Data.Time
 import qualified Data.Map as M
 import GHC.Types.Unique.Map
@@ -242,7 +243,7 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
                   Nothing -> ue_homeUnitState ue
                   Just home_unit -> HUG.homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
     hpt_deps :: [UnitId]
-    hpt_deps  = homeUnitDepends units
+    hpt_deps  = toList (homeUnitDepends units)
     other_fopts  = map (\uid -> (uid, initFinderOpts (homeUnitEnv_dflags (ue_findHomeUnitEnv uid ue)))) hpt_deps
 
 -- | Locate a plugin module requested by the user, for a compiler

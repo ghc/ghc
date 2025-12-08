@@ -78,6 +78,7 @@ import GHC.Unit.Home.PackageTable
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.State
+import GHC.Data.SmallArray (SmallArray)
 import GHC.Utils.Monad (mapMaybeM)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -86,6 +87,7 @@ import GHC.Core.FamInstEnv
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Foldable (toList)
 import qualified Data.Set as Set
 import GHC.Data.Maybe
 import GHC.Data.Graph.Directed
@@ -128,7 +130,7 @@ data HomeUnitEnv = HomeUnitEnv
   { homeUnitEnv_units     :: !UnitState
       -- ^ External units
 
-  , homeUnitEnv_unit_dbs :: !(Maybe [UnitDatabase UnitId])
+  , homeUnitEnv_unit_dbs :: !(Maybe (SmallArray (UnitDatabase UnitId)))
       -- ^ Stack of unit databases for the target platform.
       --
       -- This field is populated with the result of `initUnits`.
@@ -164,7 +166,7 @@ data HomeUnitEnv = HomeUnitEnv
     -- ^ Home-unit
   }
 
-mkHomeUnitEnv :: UnitState -> Maybe [UnitDatabase UnitId] -> DynFlags -> HomePackageTable -> Maybe HomeUnit -> HomeUnitEnv
+mkHomeUnitEnv :: UnitState -> Maybe (SmallArray (UnitDatabase UnitId)) -> DynFlags -> HomePackageTable -> Maybe HomeUnit -> HomeUnitEnv
 mkHomeUnitEnv us dbs dflags hpt home_unit = HomeUnitEnv
   { homeUnitEnv_units = us
   , homeUnitEnv_unit_dbs = dbs
@@ -231,17 +233,18 @@ transitiveHomeDeps :: UnitId -> HomeUnitGraph -> Maybe [UnitId]
 transitiveHomeDeps uid hug = case lookupHugUnitId uid hug of
   Nothing -> Nothing
   Just hue -> Just $
-    Set.toList (loop (Set.singleton uid) (homeUnitDepends (homeUnitEnv_units hue)))
+    Set.toList (loop (Set.singleton uid) (toList (homeUnitDepends (homeUnitEnv_units hue))))
     where
       loop acc [] = acc
-      loop acc (uid:uids)
-        | uid `Set.member` acc = loop acc uids
+      loop acc (uid':uids)
+        | uid' `Set.member` acc = loop acc uids
         | otherwise =
-          let hue = homeUnitDepends
-                    . homeUnitEnv_units
-                    . expectJust
-                    $ lookupHugUnitId uid hug
-          in loop (Set.insert uid acc) (hue ++ uids)
+          let deps = toList
+                   . homeUnitDepends
+                   . homeUnitEnv_units
+                   . expectJust
+                   $ lookupHugUnitId uid' hug
+          in loop (Set.insert uid' acc) (deps ++ uids)
 
 --------------------------------------------------------------------------------
 -- ** Lookups
@@ -359,7 +362,7 @@ unitEnv_assocs (UnitEnvGraph x) = Map.assocs x
 hugSCCs :: HomeUnitGraph -> [SCC UnitId]
 hugSCCs hug = sccs where
   mkNode :: (UnitId, HomeUnitEnv) -> Node UnitId UnitId
-  mkNode (uid, hue) = DigraphNode uid uid (homeUnitDepends (homeUnitEnv_units hue))
+  mkNode (uid, hue) = DigraphNode uid uid (toList (homeUnitDepends (homeUnitEnv_units hue)))
   nodes = map mkNode (Map.toList $ unitEnv_graph hug)
 
   sccs = stronglyConnCompFromEdgedVerticesOrd nodes
@@ -378,4 +381,3 @@ pprHomeUnitEnv uid env = do
   return $
     ppr uid <+> text "(flags:" <+> ppr (homeUnitId_ $ homeUnitEnv_dflags env) <> text "," <+> ppr (fmap homeUnitId $ homeUnitEnv_home_unit env) <> text ")" <+> text "->"
     $$ nest 4 hptDoc
-

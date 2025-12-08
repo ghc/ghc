@@ -73,6 +73,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.TmpFs
 import GHC.Utils.Constants
 
+import Data.Foldable (toList)
 import GHC.Types.Error
 import GHC.Types.Target
 import GHC.Types.SourceFile
@@ -677,7 +678,7 @@ instantiationNodes uid unit_state = map (uid,) iuids_to_check
   where
     iuids_to_check :: [InstantiatedUnit]
     iuids_to_check =
-      nubSort $ concatMap (goUnitId . fst) (explicitUnits unit_state)
+      nubSort $ concatMap (goUnitId . fst) (toList (explicitUnits unit_state))
      where
       goUnitId uid =
         [ recur
@@ -824,12 +825,12 @@ checkHomeUnitsClosed ue
       where
         go rest this this_uis =
            plusUniqMap_C Set.union
-             (addToUniqMap_C Set.union external_depends this (Set.fromList $ this_deps))
+             (addToUniqMap_C Set.union external_depends this (Set.fromList this_deps))
              rest
-           where
-             external_depends = mapUniqMap (Set.fromList . unitDepends) (unitInfoMap this_units)
-             this_units = homeUnitEnv_units this_uis
-             this_deps = [ toUnitId unit | (unit,Just _) <- explicitUnits this_units]
+          where
+            external_depends = mapUniqMap (Set.fromList . unitDepends) (unitInfoMap this_units)
+            this_units = homeUnitEnv_units this_uis
+            this_deps = [ toUnitId unit | (unit,Just _) <- toList (explicitUnits this_units)]
 
     graphNodes :: [Node UnitId UnitId]
     graphNodes = go Set.empty home_id_set

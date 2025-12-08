@@ -42,6 +42,7 @@ import GHC.Hs
 
 import GHC.Data.Graph.Directed
 import GHC.Data.Maybe
+import Data.Foldable (toList)
 
 import GHC.Utils.Error
 import GHC.Utils.Panic
@@ -619,7 +620,7 @@ checkMergedSignatures hsc_env mod_summary self_recomp = do
         new_merged = case lookupUniqMap (requirementContext unit_state)
                           (ms_mod_name mod_summary) of
                         Nothing -> []
-                        Just r -> sort $ map (instModuleToModule unit_state) r
+                        Just r -> sort $ map (instModuleToModule unit_state) (toList r)
     if old_merged == new_merged
         then up_to_date logger (text "signatures to merge in unchanged" $$ ppr new_merged)
         else return $ needsRecompileBecause SigsMergeChanged

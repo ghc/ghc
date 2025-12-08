@@ -86,6 +86,7 @@ import GHC.Unit.Types
 import GHC.Unit.Module
 import GHC.Unit.Home
 
+import GHC.Data.SmallArray (SmallArray)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
@@ -119,6 +120,7 @@ import Data.Monoid (First(..))
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Set as Set
 import Control.Applicative
+import qualified GHC.Exts as Exts (fromList, toList)
 
 -- ---------------------------------------------------------------------------
 -- The Unit state
@@ -345,7 +347,7 @@ data UnitConfig = UnitConfig
    , unitConfigHideAll        :: !Bool     -- ^ Hide all units by default
    , unitConfigHideAllPlugins :: !Bool     -- ^ Hide all plugins units by default
 
-   , unitConfigDBCache      :: Maybe [UnitDatabase UnitId]
+   , unitConfigDBCache      :: Maybe (SmallArray (UnitDatabase UnitId))
       -- ^ Cache of databases to use, in the order they were specified on the
       -- command line (later databases shadow earlier ones).
       -- If Nothing, databases will be found using `unitConfigFlagsDB`.
@@ -359,7 +361,7 @@ data UnitConfig = UnitConfig
    , unitConfigHomeUnits    :: Set.Set UnitId
    }
 
-initUnitConfig :: DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> UnitConfig
+initUnitConfig :: DynFlags -> Maybe (SmallArray (UnitDatabase UnitId)) -> Set.Set UnitId -> UnitConfig
 initUnitConfig dflags cached_dbs home_units =
    let !hu_id             = homeUnitId_ dflags
        !hu_instanceof     = homeUnitInstanceOf_ dflags
@@ -452,15 +454,15 @@ data UnitState = UnitState {
   -- | The units we're going to link in eagerly.  This list
   -- should be in reverse dependency order; that is, a unit
   -- is always mentioned before the units it depends on.
-  preloadUnits      :: [UnitId],
+  preloadUnits      :: SmallArray UnitId,
 
   -- | Units which we explicitly depend on (from a command line flag).
   -- We'll use this to generate version macros and the unused packages warning. The
   -- original flag which was used to bring the unit into scope is recorded for the
   -- -Wunused-packages warning.
-  explicitUnits :: [(Unit, Maybe PackageArg)],
+  explicitUnits :: SmallArray (Unit, Maybe PackageArg),
 
-  homeUnitDepends    :: [UnitId],
+  homeUnitDepends    :: SmallArray UnitId,
 
   -- | This is a full map from 'ModuleName' to all modules which may possibly
   -- be providing it.  These providers may be hidden (but we'll still want
@@ -477,7 +479,7 @@ data UnitState = UnitState {
   -- and @r[C=\<A>]:C@.
   --
   -- There's an entry in this map for each hole in our home library.
-  requirementContext :: UniqMap ModuleName [InstantiatedModule],
+  requirementContext :: UniqMap ModuleName (SmallArray InstantiatedModule),
 
   -- | Indicate if we can instantiate units on-the-fly.
   --
@@ -493,9 +495,9 @@ emptyUnitState = UnitState {
     packageNameMap = emptyUFM,
     wireMap        = emptyUniqMap,
     unwireMap      = emptyUniqMap,
-    preloadUnits   = [],
-    explicitUnits  = [],
-    homeUnitDepends = [],
+    preloadUnits   = Exts.fromList [],
+    explicitUnits  = Exts.fromList [],
+    homeUnitDepends = Exts.fromList [],
     moduleNameProvidersMap       = emptyUniqMap,
     pluginModuleNameProvidersMap = emptyUniqMap,
     requirementContext           = emptyUniqMap,
@@ -505,7 +507,7 @@ emptyUnitState = UnitState {
 -- | Unit database
 data UnitDatabase unit = UnitDatabase
    { unitDatabasePath  :: OsPath
-   , unitDatabaseUnits :: [GenUnitInfo unit]
+   , unitDatabaseUnits :: SmallArray (GenUnitInfo unit)
    }
 
 instance Outputable u => Outputable (UnitDatabase u) where
@@ -640,7 +642,7 @@ listUnitInfo state = nonDetEltsUniqMap (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
+initUnits :: Logger -> DynFlags -> Maybe (SmallArray (UnitDatabase UnitId)) -> Set.Set UnitId -> IO (SmallArray (UnitDatabase UnitId), UnitState, HomeUnit, Maybe PlatformConstants)
 initUnits logger dflags cached_dbs home_units = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
@@ -794,7 +796,7 @@ readUnitDatabase logger cfg conf_file = do
       pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . mapUnitInfo (\(UnitKey x) -> UnitId x) . mkUnitKeyInfo)
                          proto_pkg_configs
   --
-  return $ UnitDatabase conf_file' pkg_configs1
+  return $ UnitDatabase conf_file' (Exts.fromList pkg_configs1)
   where
     readDirStyleUnitInfo :: OsPath -> IO [DbUnitInfo]
     readDirStyleUnitInfo conf_dir = do
@@ -846,10 +848,11 @@ readUnitDatabase logger cfg conf_file = do
              else return (Just []) -- ghc-pkg will create it when it's updated
         else return Nothing
 
-distrustAllUnits :: [UnitInfo] -> [UnitInfo]
-distrustAllUnits pkgs = map distrust pkgs
-  where
-    distrust pkg = pkg{ unitIsTrusted = False }
+distrustUnit :: UnitInfo -> UnitInfo
+distrustUnit pkg = pkg{ unitIsTrusted = False }
+
+distrustAllUnits :: SmallArray UnitInfo -> SmallArray UnitInfo
+distrustAllUnits = fmap distrustUnit
 
 mungeUnitInfo :: OsPath -> OsPath
                    -> UnitInfo -> UnitInfo
@@ -898,7 +901,7 @@ applyTrustFlag prec_map unusable pkgs flag =
     DistrustPackage str ->
        case selectPackages prec_map (PackageArg str) pkgs unusable of
          Left ps       -> Failed (TrustFlagErr flag ps)
-         Right (ps,qs) -> Succeeded (distrustAllUnits ps ++ qs)
+         Right (ps,qs) -> Succeeded (map distrustUnit ps ++ qs)
 
 applyPackageFlag
    :: UnitPrecedenceMap
@@ -1392,24 +1395,24 @@ mergeDatabases logger = foldM merge (emptyUniqMap, emptyUniqMap) . zip [1..]
               text "package" <+> ppr pkg <+>
               text "overrides a previously defined package"
       return (pkg_map', prec_map')
-     where
-      db_map = mk_pkg_map db
-      mk_pkg_map = listToUniqMap . map (\p -> (unitId p, p))
+      where
+        db_map = mk_pkg_map db
+        mk_pkg_map = listToUniqMap . map (\p -> (unitId p, p)) . Exts.toList
 
-      -- The set of UnitIds which appear in both db and pkgs.  These are the
-      -- ones that get overridden.  Compute this just to give some
-      -- helpful debug messages at -v2
-      override_set :: Set UnitId
-      override_set = Set.intersection (nonDetUniqMapToKeySet db_map)
-                                      (nonDetUniqMapToKeySet pkg_map)
+        -- The set of UnitIds which appear in both db and pkgs.  These are the
+        -- ones that get overridden.  Compute this just to give some
+        -- helpful debug messages at -v2
+        override_set :: Set UnitId
+        override_set = Set.intersection (nonDetUniqMapToKeySet db_map)
+                                        (nonDetUniqMapToKeySet pkg_map)
 
-      -- Now merge the sets together (NB: in case of duplicate,
-      -- first argument preferred)
-      pkg_map' :: UnitInfoMap
-      pkg_map' = pkg_map `plusUniqMap` db_map
+        -- Now merge the sets together (NB: in case of duplicate,
+        -- first argument preferred)
+        pkg_map' :: UnitInfoMap
+        pkg_map' = pkg_map `plusUniqMap` db_map
 
-      prec_map' :: UnitPrecedenceMap
-      prec_map' = prec_map `plusUniqMap` (mapUniqMap (const i) db_map)
+        prec_map' :: UnitPrecedenceMap
+        prec_map' = prec_map `plusUniqMap` (mapUniqMap (const i) db_map)
 
 -- | Validates a database, removing unusable units from it
 -- (this includes removing units that the user has explicitly
@@ -1479,7 +1482,7 @@ validateDatabase cfg pkg_map1 =
 mkUnitState
     :: Logger
     -> UnitConfig
-    -> IO (UnitState,[UnitDatabase UnitId])
+    -> IO (UnitState, SmallArray (UnitDatabase UnitId))
 mkUnitState logger cfg = do
 {-
    Plan.
@@ -1537,7 +1540,7 @@ mkUnitState logger cfg = do
   -- if databases have not been provided, read the database flags
   raw_dbs <- case unitConfigDBCache cfg of
                Nothing  -> readUnitDatabases logger cfg
-               Just dbs -> return dbs
+               Just dbs -> return (Exts.toList dbs)
 
   -- distrust all units if the flag is set
   let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
@@ -1678,7 +1681,7 @@ mkUnitState logger cfg = do
   -- look for nested unit IDs that are directly fed holes: the requirements
   -- of those units are precisely the ones we need to track
   let explicit_pkgs = [(k, uv_explicit v) | (k, v) <- nonDetUniqMapToList vis_map]
-      req_ctx = mapUniqMap (Set.toList)
+      req_ctx = mapUniqMap (Exts.fromList . Set.toList)
               $ plusUniqMapListWith Set.union (map uv_requirements (nonDetEltsUniqMap vis_map))
 
 
@@ -1711,9 +1714,9 @@ mkUnitState logger cfg = do
 
   -- Force the result to avoid leaking input parameters
   let !state = UnitState
-         { preloadUnits                 = dep_preload
-         , explicitUnits                = explicit_pkgs
-         , homeUnitDepends              = Set.toList home_unit_deps
+         { preloadUnits                 = Exts.fromList dep_preload
+         , explicitUnits                = Exts.fromList explicit_pkgs
+         , homeUnitDepends              = Exts.fromList (Set.toList home_unit_deps)
          , unitInfoMap                  = pkg_db
          , preloadClosure               = emptyUniqSet
          , moduleNameProvidersMap       = mod_map
@@ -1724,7 +1727,7 @@ mkUnitState logger cfg = do
          , requirementContext           = req_ctx
          , allowVirtualUnits            = unitConfigAllowVirtual cfg
          }
-  return (state, raw_dbs)
+  return (state, Exts.fromList raw_dbs)
 
 selectHptFlag :: Set.Set UnitId -> PackageFlag -> Bool
 selectHptFlag home_units (ExposePackage _ (UnitIdArg uid) _) | toUnitId uid `Set.member` home_units = True
@@ -2115,7 +2118,7 @@ instance Outputable UnitErr where
 -- to form @mod_name@, or @[]@ if this is not a requirement.
 requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
 requirementMerges pkgstate mod_name =
-  fromMaybe [] (lookupUniqMap (requirementContext pkgstate) mod_name)
+  maybe [] Exts.toList (lookupUniqMap (requirementContext pkgstate) mod_name)
 
 -- -----------------------------------------------------------------------------
 

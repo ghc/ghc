@@ -77,6 +77,7 @@ import GHC.Iface.Recomp    ( RecompileRequired(..), CompileReason(..) )
 import GHC.Data.Bag        ( listToBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.Maybe      ( expectJust )
+import Data.Foldable       ( toList )
 
 import GHC.Utils.Exception ( throwIO, SomeAsyncException )
 import GHC.Utils.Outputable
@@ -480,7 +481,7 @@ warnUnusedPackages us dflags mod_graph =
                   guard (not $ null $ unitExposedModules ui)
                   return (unitId ui, unitPackageName ui, unitPackageVersion ui, flag)
 
-        unusedArgs = sortOn (\(u,_,_,_) -> u) $ mapMaybe resolve (explicitUnits us)
+        unusedArgs = sortOn (\(u,_,_,_) -> u) $ mapMaybe resolve (toList (explicitUnits us))
 
         warn = singleMessage $ mkPlainMsgEnvelope diag_opts noSrcSpan (DriverUnusedPackages unusedArgs)
 
