@@ -1,16 +1,7 @@
-<<<<<<< HEAD
-=======
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
->>>>>>> 5bb1ccc6365 (- `getDeepSubsumptionFlag_DataConHead` performs a non-trivial traversal if the expression passed to it is complex.)
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-{-# LANGUAGE ViewPatterns        #-}
-
+{-# LANGUAGE ViewPatterns         #-}
+{-# LANGUAGE MultiWayIf #-}
 {-
 %
 (c) The University of Glasgow 2006
