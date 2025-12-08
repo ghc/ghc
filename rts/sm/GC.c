@@ -1186,6 +1186,16 @@ new_gc_thread (uint32_t n, gc_thread *t)
     t->free_blocks = NULL;
     t->gc_count = 0;
 
+    // Initialize timing fields to zero to avoid garbage values in stats.
+    // These are set properly in stat_startGC/stat_startGCWorker before use.
+    // Must be done here (not in init_gc_thread) because init_gc_thread is
+    // called at the start of each GC cycle AFTER stat_startGC sets these.
+    t->gc_start_cpu = 0;
+    t->gc_end_cpu = 0;
+    t->gc_sync_start_elapsed = 0;
+    t->gc_start_elapsed = 0;
+    t->gc_end_elapsed = 0;
+
     init_gc_thread(t);
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++)
