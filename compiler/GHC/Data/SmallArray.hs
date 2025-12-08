@@ -1,6 +1,8 @@
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 -- | Small-array
 module GHC.Data.SmallArray
@@ -13,9 +15,6 @@ module GHC.Data.SmallArray
   , indexSmallArray
   , sizeofSmallArray
   , listToArray
-  , mapSmallArray
-  , foldMapSmallArray
-  , rnfSmallArray
 
   -- * IO Operations
   , SmallMutableArrayIO
@@ -111,47 +110,94 @@ indexSmallArray (SmallArray sa#) (I# i) =
   case indexSmallArray# sa# i of
     (# v #) -> v
 
--- | Map a function over the elements of a 'SmallArray'
---
-mapSmallArray :: (a -> b) -> SmallArray a -> SmallArray b
-{-# INLINE mapSmallArray #-}
-mapSmallArray f sa = runST $ ST $ \s ->
-  let
-    n = sizeofSmallArray sa
-    go !i saMut# state#
-      | i < n =
-        let
-          a = indexSmallArray sa i
-          newState# = writeSmallArray saMut# i (f a) state#
-        in
-          go (i + 1) saMut# newState#
-      | otherwise = state#
-  in
-  case newSmallArray n (error "SmallArray: internal error, uninitialised elements") s of
-    (# s', mutArr #) ->
-      case go 0 mutArr s' of
-        s'' -> unsafeFreezeSmallArray mutArr s''
+instance Functor SmallArray where
+  fmap f sa = runST $ ST $ \s ->
+    let
+      n = sizeofSmallArray sa
+      go !i saMut# state#
+        | i < n =
+          let
+            a = indexSmallArray sa i
+            newState# = writeSmallArray saMut# i (f a) state#
+          in
+            go (i + 1) saMut# newState#
+        | otherwise = state#
+    in
+    case newSmallArray n (error "SmallArray: internal error, uninitialised elements") s of
+      (# s', mutArr #) ->
+        case go 0 mutArr s' of
+          s'' -> unsafeFreezeSmallArray mutArr s''
+  {-# INLINE fmap #-}
 
--- | Fold the values of a 'SmallArray' into a 'Monoid m' of choice
-foldMapSmallArray :: Monoid m => (a -> m) -> SmallArray a -> m
-{-# INLINE foldMapSmallArray #-}
-foldMapSmallArray f sa = go 0
-  where
-    n = sizeofSmallArray sa
-    go i
-      | i < n = f (indexSmallArray sa i) `mappend` go (i + 1)
-      | otherwise = mempty
+instance Foldable SmallArray where
+  foldMap f sa = go 0
+    where
+      n = sizeofSmallArray sa
+      go i
+        | i < n = f (indexSmallArray sa i) `mappend` go (i + 1)
+        | otherwise = mempty
+  {-# INLINE foldMap #-}
 
--- | Force the elements of the given 'SmallArray'
---
-rnfSmallArray :: NFData a => SmallArray a -> ()
-{-# INLINE rnfSmallArray #-}
-rnfSmallArray sa = go 0
-  where
-    n = sizeofSmallArray sa
-    go !i
-      | i < n = rnf (indexSmallArray sa i) `seq` go (i + 1)
-      | otherwise = ()
+  null sa = sizeofSmallArray sa == 0
+  {-# INLINE null #-}
+
+  length = sizeofSmallArray
+  {-# INLINE length #-}
+
+  toList sa = go 0
+    where
+      n = sizeofSmallArray sa
+      go i
+        | i < n = indexSmallArray sa i : go (i + 1)
+        | otherwise = []
+  {-# INLINE toList #-}
+
+instance Traversable SmallArray where
+  traverse f sa = fromListN n <$> go 0
+    where
+      n = sizeofSmallArray sa
+      go i
+        | i < n = liftA2 (:) (f (indexSmallArray sa i)) (go (i + 1))
+        | otherwise = pure []
+  {-# INLINE traverse #-}
+
+instance NFData a => NFData (SmallArray a) where
+  rnf sa = go 0
+    where
+      n = sizeofSmallArray sa
+      go !i
+        | i < n = rnf (indexSmallArray sa i) `seq` go (i + 1)
+        | otherwise = ()
+  {-# INLINE rnf #-}
+
+instance IsList (SmallArray a) where
+  type Item (SmallArray a) = a
+
+  fromList xs = fromListN (length xs) xs
+  {-# INLINE fromList #-}
+
+  fromListN n xs
+    | n < 0 = error "SmallArray.fromListN: negative length"
+    | otherwise = runST $ ST $ \s ->
+        case newSmallArray n (error "SmallArray: internal error, uninitialised elements") s of
+          (# s', ma #) ->
+            let
+              fill !i ys state#
+                | i < n = case ys of
+                    y:ys' -> fill (i + 1) ys' (writeSmallArray ma i y state#)
+                    []    -> error "SmallArray.fromListN: insufficient elements"
+                | otherwise = state#
+            in case fill 0 xs s' of
+                 s'' -> unsafeFreezeSmallArray ma s''
+  {-# INLINE fromListN #-}
+
+  toList sa = go 0
+    where
+      n = sizeofSmallArray sa
+      go i
+        | i < n = indexSmallArray sa i : go (i + 1)
+        | otherwise = []
+  {-# INLINE toList #-}
 
 -- | Convert a list into an array.
 listToArray :: Int -> (e -> Int) -> (e -> a) -> [e] -> SmallArray a

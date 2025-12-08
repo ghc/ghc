@@ -46,13 +46,13 @@ instance Functor FlatBag where
   fmap _ EmptyFlatBag = EmptyFlatBag
   fmap f (UnitFlatBag a) = UnitFlatBag $ f a
   fmap f (TupleFlatBag a b) = TupleFlatBag (f a) (f b)
-  fmap f (FlatBag e) = FlatBag $ mapSmallArray f e
+  fmap f (FlatBag e) = FlatBag $ fmap f e
 
 instance Foldable FlatBag where
   foldMap _ EmptyFlatBag = mempty
   foldMap f (UnitFlatBag a) = f a
   foldMap f (TupleFlatBag a b) = f a `mappend` f b
-  foldMap f (FlatBag arr) = foldMapSmallArray f arr
+  foldMap f (FlatBag arr) = foldMap f arr
 
   length = fromIntegral . sizeFlatBag
 
@@ -60,13 +60,13 @@ instance Traversable FlatBag where
   traverse _ EmptyFlatBag = pure EmptyFlatBag
   traverse f (UnitFlatBag a) = UnitFlatBag <$> f a
   traverse f (TupleFlatBag a b) = TupleFlatBag <$> f a <*> f b
-  traverse f fl@(FlatBag arr) = fromList (fromIntegral $ sizeofSmallArray arr) <$> traverse f (elemsFlatBag fl)
+  traverse f (FlatBag arr) = fromSmallArray <$> traverse f arr
 
 instance NFData a => NFData (FlatBag a) where
   rnf EmptyFlatBag = ()
   rnf (UnitFlatBag a) = rnf a
   rnf (TupleFlatBag a b) = rnf a `seq` rnf b
-  rnf (FlatBag arr) = rnfSmallArray arr
+  rnf (FlatBag arr) = rnf arr
 
 instance (Binary a) => Binary (FlatBag a) where
   get bh = do
