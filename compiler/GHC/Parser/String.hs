@@ -19,6 +19,7 @@ import Data.Char (chr, ord)
 import qualified Data.Foldable1 as Foldable1
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (listToMaybe, mapMaybe)
+import GHC.Data.OrdList (fromOL, nilOL, snocOL)
 import GHC.Data.StringBuffer (StringBuffer)
 import qualified GHC.Data.StringBuffer as StringBuffer
 import GHC.Parser.CharClass (
@@ -167,16 +168,16 @@ collapseGaps = go
       [] -> panic "gap unexpectedly ended"
 
 resolveEscapes :: HasChar c => [c] -> Either (c, LexErr) [c]
-resolveEscapes = go dlistEmpty
+resolveEscapes = go nilOL
   where
     go !acc = \case
-      [] -> pure $ dlistToList acc
+      [] -> pure $ fromOL acc
       Char '\\' : Char '&' : cs -> go acc cs
       backslash@(Char '\\') : cs ->
         case resolveEscapeChar cs of
-          Right (esc, cs') -> go (acc `dlistSnoc` setChar esc backslash) cs'
+          Right (esc, cs') -> go (acc `snocOL` setChar esc backslash) cs'
           Left (c, e) -> Left (c, e)
-      c : cs -> go (acc `dlistSnoc` c) cs
+      c : cs -> go (acc `snocOL` c) cs
 
 -- -----------------------------------------------------------------------------
 -- Escape characters
@@ -420,17 +421,3 @@ It's more precisely defined with the following algorithm:
     * Lines with only whitespace characters
 3. Calculate the longest prefix of whitespace shared by all lines in the remaining list
 -}
-
--- -----------------------------------------------------------------------------
--- DList
-
-newtype DList a = DList ([a] -> [a])
-
-dlistEmpty :: DList a
-dlistEmpty = DList id
-
-dlistToList :: DList a -> [a]
-dlistToList (DList f) = f []
-
-dlistSnoc :: DList a -> a -> DList a
-dlistSnoc (DList f) x = DList (f . (x :))
