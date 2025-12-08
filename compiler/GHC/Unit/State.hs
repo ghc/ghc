@@ -108,7 +108,6 @@ import GHC.Utils.Logger
 import GHC.Utils.Error
 import GHC.Utils.Exception
 
-import System.Directory
 import System.FilePath as FilePath
 import Control.Monad
 import Data.Graph (stronglyConnComp, SCC(..))
@@ -332,13 +331,13 @@ data UnitConfig = UnitConfig
       -- Note [About units] in GHC.Unit). This should only be true when we are
       -- type-checking an indefinite unit (not producing any code).
 
-   , unitConfigProgramName    :: !String
+   , unitConfigProgramName    :: !ST.ShortText
       -- ^ Name of the compiler (e.g. "GHC", "GHCJS"). Used to fetch environment
       -- variables such as "GHC[JS]_PACKAGE_PATH".
 
-   , unitConfigGlobalDB :: !FilePath    -- ^ Path to global DB
-   , unitConfigGHCDir   :: !FilePath    -- ^ Main GHC dir: contains settings, etc.
-   , unitConfigDBName   :: !String      -- ^ User DB name (e.g. "package.conf.d")
+   , unitConfigGlobalDB :: !OsPath      -- ^ Path to global DB
+   , unitConfigGHCDir   :: !OsPath      -- ^ Main GHC dir: contains settings, etc.
+   , unitConfigDBName   :: !ST.ShortText -- ^ User DB name (e.g. "package.conf.d")
 
    , unitConfigAutoLink       :: ![UnitId] -- ^ Units to link automatically (e.g. base, rts)
    , unitConfigDistrustAll    :: !Bool     -- ^ Distrust all units by default
@@ -384,13 +383,13 @@ initUnitConfig dflags cached_dbs home_units =
 
    in UnitConfig
       { unitConfigPlatformArchOS = platformArchOS (targetPlatform dflags)
-      , unitConfigProgramName    = programName dflags
+      , unitConfigProgramName    = ST.pack (programName dflags)
       , unitConfigWays           = ways dflags
       , unitConfigAllowVirtual   = allow_virtual_units
 
-      , unitConfigGlobalDB       = globalPackageDatabasePath dflags
-      , unitConfigGHCDir         = topDir dflags
-      , unitConfigDBName         = "package.conf.d"
+      , unitConfigGlobalDB       = OsPath.unsafeEncodeUtf (globalPackageDatabasePath dflags)
+      , unitConfigGHCDir         = OsPath.unsafeEncodeUtf (topDir dflags)
+      , unitConfigDBName         = ST.pack "package.conf.d"
 
       , unitConfigAutoLink       = autoLink
       , unitConfigDistrustAll    = gopt Opt_DistrustAllPackages dflags
@@ -719,7 +718,7 @@ getUnitDbRefs :: UnitConfig -> IO [PkgDbRef]
 getUnitDbRefs cfg = do
   let system_conf_refs = [UserPkgDb, GlobalPkgDb]
 
-  e_pkg_path <- tryIO (getEnv $ map toUpper (unitConfigProgramName cfg) ++ "_PACKAGE_PATH")
+  e_pkg_path <- tryIO (getEnv $ map toUpper (ST.unpack (unitConfigProgramName cfg)) ++ "_PACKAGE_PATH")
   let base_conf_refs = case e_pkg_path of
         Left _ -> system_conf_refs
         Right path
@@ -756,12 +755,14 @@ getUnitDbRefs cfg = do
 -- make sure you update Cabal. (Or, better yet, dump it in the
 -- compiler info so Cabal can use the info.)
 resolveUnitDatabase :: UnitConfig -> PkgDbRef -> IO (Maybe OsPath)
-resolveUnitDatabase cfg GlobalPkgDb = return $ Just $ OsPath.unsafeEncodeUtf $ unitConfigGlobalDB cfg
+resolveUnitDatabase cfg GlobalPkgDb = return $ Just $ unitConfigGlobalDB cfg
 resolveUnitDatabase cfg UserPkgDb = runMaybeT $ do
-  dir <- versionedAppDir (unitConfigProgramName cfg) (unitConfigPlatformArchOS cfg)
-  let pkgconf = dir </> unitConfigDBName cfg
-  exist <- tryMaybeT $ doesDirectoryExist pkgconf
-  if exist then return (OsPath.unsafeEncodeUtf pkgconf) else mzero
+  dir <- versionedAppDir (ST.unpack (unitConfigProgramName cfg)) (unitConfigPlatformArchOS cfg)
+  let dirOs   = OsPath.unsafeEncodeUtf dir
+      nameOs  = OsPath.unsafeEncodeUtf (ST.unpack (unitConfigDBName cfg))
+      pkgconf = dirOs OsPath.</> nameOs
+  exist <- tryMaybeT $ OsPath.doesDirectoryExist pkgconf
+  if exist then return pkgconf else mzero
 resolveUnitDatabase _ (PkgDbPath name) = return $ Just name
 
 readUnitDatabase :: Logger -> UnitConfig -> OsPath -> IO (UnitDatabase UnitId)
@@ -789,7 +790,7 @@ readUnitDatabase logger cfg conf_file = do
   let
       -- Fix #16360: remove trailing slash from conf_file before calculating pkgroot
       conf_file' = OsPath.dropTrailingPathSeparator conf_file
-      top_dir = OsPath.unsafeEncodeUtf (unitConfigGHCDir cfg)
+      top_dir = unitConfigGHCDir cfg
       pkgroot = OsPath.takeDirectory conf_file'
       pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . mapUnitInfo (\(UnitKey x) -> UnitId x) . mkUnitKeyInfo)
                          proto_pkg_configs
