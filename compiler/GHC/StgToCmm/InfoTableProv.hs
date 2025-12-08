@@ -11,6 +11,7 @@ import GHC.IO (unsafePerformIO)
 #endif
 
 import Data.Char
+import Data.Foldable
 import GHC.Prelude
 import GHC.Platform
 import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
@@ -18,6 +19,7 @@ import GHC.Types.Unique.DSM
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Data.FastString (fastStringToShortText, unpackFS, LexicalFastString(..))
+import GHC.Data.OrdList (OrdList, nilOL, snocOL)
 
 import GHC.Cmm
 import GHC.Cmm.CLabel
@@ -286,7 +288,7 @@ data CgInfoProvEnt = CgInfoProvEnt
                                , ipeSrcSpan :: !StrTabOffset
                                }
 
-data StringTable = StringTable { stStrings :: DList ShortText
+data StringTable = StringTable { stStrings :: !(OrdList ShortText)
                                , stLength :: !Int
                                , stLookup :: !(M.Map ShortText StrTabOffset)
                                }
@@ -295,7 +297,7 @@ type StrTabOffset = Word32
 
 emptyStringTable :: StringTable
 emptyStringTable =
-    StringTable { stStrings = emptyDList
+    StringTable { stStrings = nilOL
                 , stLength = 0
                 , stLookup = M.empty
                 }
@@ -303,7 +305,7 @@ emptyStringTable =
 getStringTableStrings :: StringTable -> BS.ByteString
 getStringTableStrings st =
     BSL.toStrict $ BSB.toLazyByteString
-    $ foldMap f $ dlistToList (stStrings st)
+    $ foldMap' f $ stStrings st
   where
     f x = BSB.shortByteString (ST.contents x) `mappend` BSB.word8 0
 
@@ -312,7 +314,7 @@ lookupStringTable str = state $ \st ->
     case M.lookup str (stLookup st) of
       Just off -> (off, st)
       Nothing ->
-          let !st' = st { stStrings = stStrings st `snoc` str
+          let !st' = st { stStrings = stStrings st `snocOL` str
                         , stLength  = stLength st + ST.byteLength str + 1
                         , stLookup  = M.insert str res (stLookup st)
                         }
@@ -359,14 +361,3 @@ foreign import ccall unsafe "ZSTD_compressBound"
 
 defaultCompressionLevel :: Int
 defaultCompressionLevel = 3
-
-newtype DList a = DList ([a] -> [a])
-
-emptyDList :: DList a
-emptyDList = DList id
-
-snoc :: DList a -> a -> DList a
-snoc (DList f) x = DList (f . (x:))
-
-dlistToList :: DList a -> [a]
-dlistToList (DList f) = f []
