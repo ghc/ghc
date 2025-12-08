@@ -2295,7 +2295,7 @@ mkQCErr ctxt items
 mkDictErr :: HasDebugCallStack => SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
 -- Includes implict parameters
 mkDictErr ctxt orig_items@(item1 :| others)
-  | ClassPred cls tys <- classifyPredType (errorItemPred item1)
+  | ClassPred cls _ <- classifyPredType (errorItemPred item1)
   , isIPClass cls   -- Implicit parameters; no need to look in global instance envts
   = do { (ctxt, binds, item1) <- relevantBindings True ctxt item1
        ; let msg = important ctxt $ UnboundImplicitParams (item1 :| others)
