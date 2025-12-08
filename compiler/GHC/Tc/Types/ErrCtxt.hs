@@ -49,18 +49,21 @@ type ErrCtxtMsgM = TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
 
 -- | Additional context to include in an error message, e.g.
 -- "In the type signature ...", "In the ambiguity check for ...", etc.
-data ErrCtxt = MkErrCtxt CodeSrcFlag ErrCtxtMsgM
-             -- Monadic so that we have a chance
-             -- to deal with bound type variables just before error
-             -- message construction
+data ErrCtxt = MkErrCtxt
 
-             -- Bool:  True <=> this is a landmark context; do not
-             --                 discard it when trimming for display
+                 CodeSrcFlag
+                 -- LandmarkUserSrcCode <=> this is a landmark context; do not
+                 --                         discard it when trimming for display
+
+                 ErrCtxtMsgM
+                 -- Monadic so that we have a chance
+                 -- to deal with bound type variables just before error
+                 -- message construction
+
 
 data CodeSrcFlag = VanillaUserSrcCode
                  | LandmarkUserSrcCode
                  | ExpansionCodeCtxt SrcCodeOrigin
-                   -- INVARIANT: SHOULD NEVER APPEAR IN A ExpansionCodeCtxt in CodeSrcFlag ErrCtxt on stack
 
 --------------------------------------------------------------------------------
 -- Error message contexts

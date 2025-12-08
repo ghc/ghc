@@ -450,7 +450,7 @@ tc_lpat :: Scaled ExpSigmaTypeFRR
         -> Checker (LPat GhcRn) (LPat GhcTc)
 tc_lpat pat_ty penv (L span pat) thing_inside
   = setSrcSpanA span $
-    do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat pat_ty penv pat)
+    do  { (pat', res) <- maybeWrapPatCtxt (locA span) pat (tc_pat pat_ty penv pat)
                                           thing_inside
         ; return (L span pat', res) }
 
@@ -470,7 +470,7 @@ checkManyPattern reason pat pat_ty = tcSubMult (NonLinearPatternOrigin reason pa
 tc_forall_lpat :: TcTyVar -> Checker (LPat GhcRn) (LPat GhcTc)
 tc_forall_lpat tv penv (L span pat) thing_inside
   = setSrcSpanA span $
-    do  { (pat', res) <- maybeWrapPatCtxt pat (tc_forall_pat tv penv pat)
+    do  { (pat', res) <- maybeWrapPatCtxt (locA span) pat (tc_forall_pat tv penv pat)
                                           thing_inside
         ; return (L span pat', res) }
 
@@ -1916,17 +1916,19 @@ pattern (perhaps deeply)
 See also Note [Typechecking pattern bindings] in GHC.Tc.Gen.Bind
 -}
 
-maybeWrapPatCtxt :: Pat GhcRn -> (TcM a -> TcM b) -> TcM a -> TcM b
+maybeWrapPatCtxt :: SrcSpan -> Pat GhcRn -> (TcM a -> TcM b) -> TcM a -> TcM b
 -- Not all patterns are worth pushing a context
-maybeWrapPatCtxt pat tcm thing_inside
-  | not (worth_wrapping pat) = tcm thing_inside
+maybeWrapPatCtxt span pat tcm thing_inside
+  | not (worth_wrapping span pat) = tcm thing_inside
   | otherwise                = addErrCtxt (PatCtxt pat) $ tcm $ popErrCtxt thing_inside
                                -- Remember to pop before doing thing_inside
   where
-   worth_wrapping (VarPat {}) = False
-   worth_wrapping (ParPat {}) = False
-   worth_wrapping (AsPat {})  = False
-   worth_wrapping _           = True
+   worth_wrapping _ (VarPat {}) = False
+   worth_wrapping _ (ParPat {}) = False
+   worth_wrapping _ (AsPat {})  = False
+   worth_wrapping span _
+      | isGeneratedSrcSpan span = False -- cf. T12957a
+   worth_wrapping _  _          = True
 
 -----------------------------------------------
 

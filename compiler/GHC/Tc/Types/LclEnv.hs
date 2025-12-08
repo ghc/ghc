@@ -96,7 +96,6 @@ data TcLclEnv           -- Changes as we move inside an expression
 Note [ErrCtxtStack Manipulation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The ErrCtxtStack is a list of ErrCtxt
-ANI: TODO. explain how this works. When is the top of the stack overwritten? When an error ctxt pushed on top
 
 This data structure keeps track of two things:
 1. Are we type checking a compiler generated/non-user written code.
@@ -105,9 +104,14 @@ This data structure keeps track of two things:
 * When the `ErrCtxtStack` is a `UserCodeCtxt`,
   - the current expression being typechecked is user written
 * When the `ErrorCtxtStack` is a `ExpansionCodeCtxt`
-  - the current expression being typechecked is compiler generated;
-  - the original, possibly user written, source code thing is stored in `src_code_origin` field.
-  - the `src_code_origin` is what will be blamed in the error message
+  - the current expression being typechecked is compiler generated/expanded;
+  - the original source code thing is stored in `src_code_origin` field.
+  - the `src_code_origin` is what will be used in the error message displayed to the user
+
+In the current design, if the top of the ErrCtxtStack is an ExpansionCodeCtxt
+i.e. we are currently typechecking a compiler generated expression, and we encounter
+an XExpr, then we _replace_ the top of the stack with the new XExpr. Otherwise, we
+push the new expression error message on top of the stack. cf. `LclEnv.setLclCtxtSrcCodeOrigin`
 
 -}
 
