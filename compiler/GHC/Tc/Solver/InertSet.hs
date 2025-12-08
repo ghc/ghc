@@ -1050,6 +1050,10 @@ Here are the KickOut Criteria:
       * (KK3b) If the role of `fs` is Representational:
            kick out if `rhs_s` is of form `(lhs_w t1 .. tn)`
 
+    * (KK4: completeness) Kick out if
+      * lhs_s = F lhs_tys, and
+      * lhs_w is rewritable (anywhere) in rhs_s
+
 Rationale
 
 * (KK0) kick out only if `fw` can rewrite `fs`.
@@ -1062,6 +1066,13 @@ Rationale
 * (KK2) see Note [KK2: termination of the extended substitution]
 
 * (KK3) see Note [KK3: completeness of solving]
+
+* (KK4) is about completeness.  If we have
+     Inert:  F alpha ~ beta
+     Work:   beta ~ Int
+  and F is closed or injective, then we want to kick out the inert item, in
+  case we get injectivity information from `F alpha ~ Int` that allows us to
+  solve it.
 
 The above story is a bit vague wrt roles, but the code is not.
 See Note [Flavours with roles]
@@ -1187,7 +1198,7 @@ Wrinkles:
   by the inert item.  And too much kick-out is positively harmful.
   (Historical example #14363.)
 
-* (KK3b) addresses teh main example above for KK3. Another way to understand
+* (KK3b) addresses the main example above for KK3. Another way to understand
   (KK3b) is that we treat an inert item
         a -f-> b
   in the same way as
@@ -1731,6 +1742,12 @@ kickOutRewritableLHS ko_spec new_fr@(_, new_role)
       = True   -- (KK1)
          -- The above check redundantly checks the role & flavour,
          -- but it's very convenient
+
+      -- (KK4)
+      | TyFamLHS tc _ <- lhs
+      , famTyConHasInjectivity tc
+      , fr_can_rewrite_ty LookEverywhere eq_rel rhs_ty
+      = True
 
       -- (KK2)
       | let where_to_look | fs_can_rewrite_fr = LookOnlyUnderFamApps

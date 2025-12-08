@@ -479,6 +479,7 @@ kickOutRewritable ko_spec new_fr
              n_kicked = lengthBag kicked_out
        ; setInertCans ics'
 
+       ; traceTcS "kickOutRewritable" (ppr ko_spec $$ ppr new_fr $$ ppr kicked_out)
        ; unless (isEmptyBag kicked_out) $
          do { emitWork kicked_out
 

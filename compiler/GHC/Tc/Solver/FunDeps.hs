@@ -36,6 +36,7 @@ import GHC.Types.Var.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Control.Monad( unless )
 import GHC.Data.Pair
 import Data.Maybe( isNothing, isJust, mapMaybe )
 
@@ -350,9 +351,9 @@ tryDictFunDepsLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
       | otherwise
       = improveFromAnother (ctEvPred inert_ev) work_pred
 
-insolubleFunDep :: CtEvidence -> TcS (StopOrContinue ())
+insolubleFunDep :: CtEvidence -> TcS (StopOrContinue a)
 -- The fundeps generated an insoluble constraint.
--- Stop solving with an (insoluble) CIrredCan
+-- Stop solving with an (insoluble) CIrredCan -- a bit like thowing an exception
 -- It's valuable to flag such constraints as insoluble becuase that improves
 -- pattern-match overlap checking
 insolubleFunDep ev
@@ -495,16 +496,16 @@ tryFamEqFunDeps eqs_for_me fam_tc work_args
   = if isGiven ev
     then tryGivenBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_item
     else do { -- Note [Do local fundeps before top-level instances]
-              tryFDEqns fam_tc work_args work_item $
-              mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
+              eqns <- mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
+            ; tryFDEqns fam_tc work_args work_item eqns
 
-            ; if hasRelevantGiven eqs_for_me work_args work_item
-            ; then nopStage ()
-              else tryFDEqns fam_tc work_args work_item $
-                   mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs }
+            ; unless (hasRelevantGiven eqs_for_me work_args work_item) $
+              do { eqns <- mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
+                 ; tryFDEqns fam_tc work_args work_item eqns } }
 
-  | isGiven ev    -- See (INJFAM:Given)
-  = nopStage ()
+--  | isGiven ev    -- See (INJFAM:Given)
+--  = nopStage ()
+-- Continue even for Givens in the hope of discovering insolubility
 
   -- Only Wanted constraints below here
 
@@ -512,24 +513,23 @@ tryFamEqFunDeps eqs_for_me fam_tc work_args
   = do { -- Note [Do local fundeps before top-level instances]
          case tyConInjectivityInfo fam_tc of
            NotInjective  -> nopStage ()
-           Injective inj -> tryFDEqns fam_tc work_args work_item $
-                            mkLocalFamEqFDs eqs_for_me fam_tc inj work_args work_rhs
+           Injective inj -> do { eqns <- mkLocalFamEqFDs eqs_for_me fam_tc inj work_args work_rhs
+                               ; tryFDEqns fam_tc work_args work_item eqns }
 
-       ; if hasRelevantGiven eqs_for_me work_args work_item
-         then nopStage ()
-         else tryFDEqns fam_tc work_args work_item $
-              mkTopFamEqFDs fam_tc work_args work_rhs }
+       ; unless (hasRelevantGiven eqs_for_me work_args work_item) $
+         do { eqns <- mkTopFamEqFDs fam_tc work_args work_item
+            ; tryFDEqns fam_tc work_args work_item eqns } }
 
-mkTopFamEqFDs :: TyCon -> [TcType] -> Xi -> TcS [FunDepEqns]
-mkTopFamEqFDs fam_tc work_args work_rhs
+mkTopFamEqFDs :: TyCon -> [TcType] -> EqCt -> SolverStage [FunDepEqns]
+mkTopFamEqFDs fam_tc work_args work_item
   | isOpenTypeFamilyTyCon fam_tc
   , Injective inj_flags <- tyConInjectivityInfo fam_tc
   = -- Open, injective type families
-    mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
+    simpleStage (mkTopOpenFamEqFDs fam_tc inj_flags work_args work_item)
 
   | Just ax <- isClosedFamilyTyCon_maybe fam_tc
   = -- Closed type families
-    mkTopClosedFamEqFDs ax work_args work_rhs
+    mkTopClosedFamEqFDs ax work_args work_item
 
   | otherwise
   = -- Data families, abstract families,
@@ -537,13 +537,13 @@ mkTopFamEqFDs fam_tc work_args work_rhs
     -- closed type families with no equations (isClosedFamilyTyCon_maybe returns Nothing)
     return []
 
-tryFDEqns :: TyCon -> [TcType] -> EqCt -> TcS [FunDepEqns] -> SolverStage ()
-tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eqns
+tryFDEqns :: TyCon -> [TcType] -> EqCt -> [FunDepEqns] -> SolverStage ()
+tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) fd_eqns
   = Stage $
-    do { fd_eqns <- mk_fd_eqns
-       ; traceTcS "tryFDEqns" (vcat [ text "lhs:" <+> ppr fam_tc <+> ppr work_args
+    do { traceTcS "tryFDEqns" (vcat [ text "lhs:" <+> ppr fam_tc <+> ppr work_args
                                     , text "rhs:" <+> ppr rhs
                                     , text "eqns:" <+> ppr fd_eqns ])
+
        ; (insoluble, unif_happened) <- solveFunDeps ev fd_eqns
 
        ; if | unif_happened -> startAgainWith (CEqCan work_item)
@@ -553,17 +553,19 @@ tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eq
 -----------------------------------------
 --  User-defined type families
 -----------------------------------------
-mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> Xi -> TcS [FunDepEqns]
+mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> EqCt -> SolverStage [FunDepEqns]
 -- Look at the top-level axioms; we effectively infer injectivity,
 -- so we don't need tyConInjectivtyInfo.  This works fine for closed
 -- type families without injectivity info
 -- See Note [Exploiting closed type families]
-mkTopClosedFamEqFDs ax work_args work_rhs
-  = do { let branches = fromBranches (coAxiomBranches ax)
+mkTopClosedFamEqFDs ax work_args (EqCt { eq_ev = ev, eq_rhs = work_rhs })
+  = Stage $
+    do { let branches = fromBranches (coAxiomBranches ax)
        ; traceTcS "mkTopClosed" (ppr branches $$ ppr work_args $$ ppr work_rhs)
        ; case getRelevantBranches ax work_args work_rhs of
-           [eqn] -> return [eqn]  -- If there is just one relevant equation, use it
-           _     -> return [] }
+           []    -> insolubleFunDep ev
+           [eqn] -> continueWith [eqn]  -- If there is just one relevant equation, use it
+           _     -> continueWith [] }
 
 hasRelevantGiven :: [EqCt] -> [TcType] -> EqCt -> Bool
 -- A Given is relevant if it is not apart from the Wanted
@@ -606,9 +608,9 @@ getRelevantBranches ax work_args work_rhs
          no_match lhs_tys (CoAxBranch { cab_lhs = lhs_tys1 })
             = isNothing (tcUnifyTysForInjectivity False lhs_tys1 lhs_tys)
 
-mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
+mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> EqCt -> TcS [FunDepEqns]
 -- Implements (INJFAM:Wanted/top)
-mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
+mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
   = do { fam_envs <- getFamInstEnvs
        ; let branches :: [CoAxBranch]
              branches = concatMap (fromBranches . coAxiomBranches . fi_axiom) $
@@ -629,7 +631,7 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
       | otherwise
       = Nothing
 
-mkLocalFamEqFDs :: [EqCt] -> TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
+mkLocalFamEqFDs :: [EqCt] -> TyCon -> [Bool] -> [TcType] -> Xi -> SolverStage [FunDepEqns]
 mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
   = do { let -- eqns_from_inerts: see (INJFAM:Wanted/other)
              eqns_from_inerts = mapMaybe do_one eqs_for_me
@@ -723,13 +725,13 @@ tryGivenBuiltinFamEqFDs eqs_for_me fam_tc ops work_args
 
     do_one _ = return ()
 
-mkTopBuiltinFamEqFDs :: TyCon -> BuiltInSynFamily -> [TcType] -> Xi -> TcS [FunDepEqns]
+mkTopBuiltinFamEqFDs :: TyCon -> BuiltInSynFamily -> [TcType] -> Xi -> SolverStage [FunDepEqns]
 mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
   = return [FDEqns { fd_qtvs = []
                    , fd_eqs = map snd $ tryInteractTopFam ops fam_tc work_args work_rhs }]
 
 mkLocalBuiltinFamEqFDs :: [EqCt] -> TyCon -> BuiltInSynFamily
-                       -> [TcType] -> Xi -> TcS [FunDepEqns]
+                       -> [TcType] -> Xi -> SolverStage [FunDepEqns]
 mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
   = do { let do_one :: EqCt -> [FunDepEqns]
              do_one (EqCt { eq_lhs = TyFamLHS _ inert_args, eq_rhs = inert_rhs })
