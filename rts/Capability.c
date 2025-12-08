@@ -252,39 +252,24 @@ popReturningTask (Capability *cap)
 static void
 initCapability (Capability *cap, uint32_t i)
 {
+    // Note: Capabilities are either:
+    // - Static (MainCapability): zeroed by C runtime (BSS section)
+    // - Dynamic: allocated via stgCallocAlignedBytes (zeroed)
+    // So we only need to initialize non-zero fields here.
+
     uint32_t g;
 
     cap->no = i;
     cap->node = capNoToNumaNode(i);
-    cap->in_haskell        = false;
-    cap->idle              = 0;
-    cap->disabled          = false;
 
     cap->run_queue_hd      = END_TSO_QUEUE;
     cap->run_queue_tl      = END_TSO_QUEUE;
-    cap->n_run_queue       = 0;
 
 #if defined(THREADED_RTS)
     initMutex(&cap->lock);
-    cap->running_task      = NULL; // indicates cap is free
-    cap->spare_workers     = NULL;
-    cap->n_spare_workers   = 0;
-    cap->suspended_ccalls  = NULL;
-    cap->n_suspended_ccalls = 0;
-    cap->returning_tasks_hd = NULL;
-    cap->returning_tasks_tl = NULL;
-    cap->n_returning_tasks  = 0;
     cap->inbox              = (Message*)END_TSO_QUEUE;
-    cap->putMVars           = NULL;
     cap->sparks             = allocSparkPool();
-    cap->spark_stats.created    = 0;
-    cap->spark_stats.dud        = 0;
-    cap->spark_stats.overflowed = 0;
-    cap->spark_stats.converted  = 0;
-    cap->spark_stats.gcd        = 0;
-    cap->spark_stats.fizzled    = 0;
 #endif
-    cap->total_allocated        = 0;
 
     initCapabilityIOManager(cap); /* initialises cap->iomgr */
 
@@ -298,38 +283,21 @@ initCapability (Capability *cap, uint32_t i)
     cap->saved_mut_lists = stgMallocBytes(sizeof(bdescr *) *
                                           RtsFlags.GcFlags.generations,
                                           "initCapability");
-    cap->current_segments = NULL;
 
-
-    // At this point storage manager is not initialized yet, so this will be
-    // initialized in initStorage().
-    cap->upd_rem_set.queue.blocks = NULL;
-
+    // mut_lists elements are zeroed by stgMallocBytes returning zeroed memory?
+    // No - stgMallocBytes doesn't zero. But stgCallocBytes would.
+    // Keep the loop for now since mut_lists is allocated separately.
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         cap->mut_lists[g] = NULL;
     }
 
-    cap->weak_ptr_list_hd = NULL;
-    cap->weak_ptr_list_tl = NULL;
     cap->free_tvar_watch_queues = END_STM_WATCH_QUEUE;
     cap->free_trec_chunks = END_STM_CHUNK_LIST;
     cap->free_trec_headers = NO_TREC;
-    cap->transaction_tokens = 0;
-    cap->context_switch = 0;
-    cap->interrupt = 0;
-    cap->pinned_object_block = NULL;
-    cap->pinned_object_blocks = NULL;
-    cap->pinned_object_empty = NULL;
 
 #if defined(PROFILING)
     cap->r.rCCCS = CCS_SYSTEM;
-#else
-    cap->r.rCCCS = NULL;
 #endif
-
-    // cap->r.rCurrentTSO is charged for calls to allocate(), so we
-    // don't want it set when not running a Haskell thread.
-    cap->r.rCurrentTSO = NULL;
 
     traceCapCreate(cap);
     traceCapsetAssignCap(CAPSET_OSPROCESS_DEFAULT, i);
@@ -461,7 +429,7 @@ moreCapabilities (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
     {
         for (uint32_t i = 0; i < to; i++) {
             if (i >= from) {
-                capabilities[i] = stgMallocAlignedBytes(sizeof(Capability),
+                capabilities[i] = stgCallocAlignedBytes(sizeof(Capability),
                                                         CAPABILITY_ALIGNMENT,
                                                         "moreCapabilities");
                 initCapability(capabilities[i], i);

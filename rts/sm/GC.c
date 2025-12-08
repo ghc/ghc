@@ -1171,30 +1171,20 @@ static void heapOverflow(void)
 static void
 new_gc_thread (uint32_t n, gc_thread *t)
 {
+    // Note: gc_thread is allocated with stgCallocAlignedBytes which zeros
+    // all fields, so we only need to initialize non-zero values here.
+
     uint32_t g;
     gen_workspace *ws;
 
     t->cap = getCapability(n);
 
 #if defined(THREADED_RTS)
-    t->id = 0;
-    SEQ_CST_STORE(&t->wakeup, GC_THREAD_INACTIVE);  // starts true, so we can wait for the
-                          // thread to start up, see wakeup_gc_threads
+    // GC_THREAD_INACTIVE is 0, but we use atomic store for proper synchronization
+    SEQ_CST_STORE(&t->wakeup, GC_THREAD_INACTIVE);
 #endif
 
     t->thread_index = n;
-    t->free_blocks = NULL;
-    t->gc_count = 0;
-
-    // Initialize timing fields to zero to avoid garbage values in stats.
-    // These are set properly in stat_startGC/stat_startGCWorker before use.
-    // Must be done here (not in init_gc_thread) because init_gc_thread is
-    // called at the start of each GC cycle AFTER stat_startGC sets these.
-    t->gc_start_cpu = 0;
-    t->gc_end_cpu = 0;
-    t->gc_sync_start_elapsed = 0;
-    t->gc_start_elapsed = 0;
-    t->gc_end_elapsed = 0;
 
     init_gc_thread(t);
 
@@ -1222,18 +1212,7 @@ new_gc_thread (uint32_t n, gc_thread *t)
         }
 
         ws->todo_q = newWSDeque(128);
-        ws->todo_overflow = NULL;
-        ws->n_todo_overflow = 0;
-        ws->todo_large_objects = NULL;
         ws->todo_seg = END_NONMOVING_TODO_LIST;
-
-        ws->part_list = NULL;
-        ws->n_part_blocks = 0;
-        ws->n_part_words = 0;
-
-        ws->scavd_list = NULL;
-        ws->n_scavd_blocks = 0;
-        ws->n_scavd_words = 0;
     }
 }
 
@@ -1262,7 +1241,7 @@ initGcThreads (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
 
     for (i = from; i < to; i++) {
         gc_threads[i] =
-            stgMallocAlignedBytes(sizeof(gc_thread) +
+            stgCallocAlignedBytes(sizeof(gc_thread) +
                            RtsFlags.GcFlags.generations * sizeof(gen_workspace),
                            alignof(gc_thread),
                            "alloc_gc_threads");

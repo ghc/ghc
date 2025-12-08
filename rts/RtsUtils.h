@@ -39,7 +39,14 @@ void *stgCallocBytes(size_t count, size_t size, char *msg)
 char *stgStrndup(const char *s, size_t n)
     STG_MALLOC STG_MALLOC1(stgFree);
 
-void *stgMallocAlignedBytes(size_t n, size_t align, char *msg);
+// Aligned allocation that zeros memory (calloc semantics)
+void *stgCallocAlignedBytes(size_t n, size_t align, char *msg);
+
+// Deprecated: use stgCallocAlignedBytes instead. This wrapper now zeros memory.
+__attribute__((deprecated("use stgCallocAlignedBytes instead")))
+static inline void *stgMallocAlignedBytes(size_t n, size_t align, char *msg) {
+    return stgCallocAlignedBytes(n, align, msg);
+}
 
 void stgFreeAligned(void *p);
 
