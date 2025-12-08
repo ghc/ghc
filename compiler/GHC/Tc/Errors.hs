@@ -652,13 +652,12 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
               ]
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
-    report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
-              , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
+    report2 = [ ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr)
               , ("Quantified",      is_qc,           False, mkGroupReporter mkQCErr) ]
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
-    is_dict, is_equality, is_ip, is_FRR, is_irred :: ErrorItem -> Pred -> Bool
+    is_dict, is_equality, is_FRR, is_irred :: ErrorItem -> Pred -> Bool
 
     is_given_eq item pred
        | Given <- ei_flavour item
@@ -715,9 +714,6 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
 
     is_dict _ (ClassPred {}) = True
     is_dict _ _              = False
-
-    is_ip _ (ClassPred cls _) = isIPClass cls
-    is_ip _ _                 = False
 
     is_irred _ (IrredPred {}) = True
     is_irred _ _              = False
@@ -1687,17 +1683,6 @@ givenConstraints ctxt
 
 ----------------
 
-mkIPErr :: SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
--- What would happen if an item is suppressed because of
--- Note [Wanteds rewrite Wanteds: rewriter-sets] in GHC.Tc.Types.Constraint?
--- Very unclear what's best. Let's not worry about this.
-mkIPErr ctxt (item1:|others)
-  = do { (ctxt, binds, item1) <- relevantBindings True ctxt item1
-       ; let msg = important ctxt $ UnboundImplicitParams (item1 :| others)
-       ; return $ add_relevant_bindings binds msg }
-
-----------------
-
 -- | Report a representation-polymorphism error to the user:
 -- a type is required to have a fixed runtime representation,
 -- but doesn't.
@@ -2308,7 +2293,15 @@ mkQCErr ctxt items
 
 
 mkDictErr :: HasDebugCallStack => SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
-mkDictErr ctxt orig_items
+-- Includes implict parameters
+mkDictErr ctxt orig_items@(item1 :| others)
+  | ClassPred cls tys <- classifyPredType (errorItemPred item1)
+  , isIPClass cls   -- Implicit parameters; no need to look in global instance envts
+  = do { (ctxt, binds, item1) <- relevantBindings True ctxt item1
+       ; let msg = important ctxt $ UnboundImplicitParams (item1 :| others)
+       ; return $ add_relevant_bindings binds msg }
+
+  | otherwise
   = do { inst_envs <- tcGetInstEnvs
        ; let min_items = elim_superclasses items
              lookups = map (lookup_cls_inst inst_envs) min_items
@@ -2362,8 +2355,8 @@ mk_dict_err ctxt (item, (matches, pot_unifiers, unsafe_overlapped))
     { (_, rel_binds, item) <- relevantBindings True ctxt item
     ; candidate_insts <- get_candidate_instances
     ; mb_noBuiltinInst_msg <- getNoBuiltinInstMsg item
-    ; return $
-        CannotResolveInstance item unifiers candidate_insts rel_binds mb_noBuiltinInst_msg
+    ; return $ CannotResolveInstance item unifiers candidate_insts rel_binds
+                                     mb_noBuiltinInst_msg
     }
 
   -- Some matches => overlap errors
