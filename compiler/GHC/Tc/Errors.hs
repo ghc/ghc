@@ -648,6 +648,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
               , ("Homo eqs",      is_homo_equality,  True,  mkGroupReporter mkEqErr)
               , ("Other eqs",     is_equality,       True,  mkGroupReporter mkEqErr)
 
+              , ("Insoluble fundeps", is_insoluble_fundep, True, mkGroupReporter mkDictErr)
               ]
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
@@ -664,6 +665,11 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
        , EqPred {} <- pred = True
        | otherwise         = False
        -- I think all given residuals are equalities
+
+    -- Constraints that have insoluble functional dependencies
+    is_insoluble_fundep item _ = case ei_m_reason item of
+           Just InsolubleFunDepReason -> True
+           _                          -> False
 
     -- Things like (Int ~N Bool)
     utterly_wrong _ (EqPred NomEq ty1 ty2) = isRigidTy ty1 && isRigidTy ty2

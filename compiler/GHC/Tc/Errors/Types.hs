@@ -5423,7 +5423,7 @@ getUserGivens (CEC {cec_encl = implics}) = getUserGivensFromImplics implics
 -- that will give rise to a diagnostic.
 data ErrorItem
 -- We could perhaps use Ct here (and indeed used to do exactly that), but
--- having a separate type gives to denote errors-in-formation gives us
+-- having a separate type to denote error-information gives us
 -- a nice place to do pre-processing, such as calculating ei_suppress.
 -- Perhaps some day, an ErrorItem could eventually evolve to contain
 -- the error text (or some representation of it), so we can then have all
@@ -5436,7 +5436,7 @@ data ErrorItem
          --   for Givens, Nothing
        , ei_flavour  :: CtFlavour
        , ei_loc      :: CtLoc
-       , ei_m_reason :: Maybe CtIrredReason  -- if this ErrorItem was made from a
+       , ei_m_reason :: Maybe CtIrredReason  -- If this ErrorItem was made from a
                                              -- CtIrred, this stores the reason
        , ei_suppress :: Bool    -- Suppress because of
                                 -- Note [Wanteds rewrite Wanteds: rewriter-sets]
