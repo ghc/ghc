@@ -486,7 +486,7 @@ mkTarget opts = do
 
     -- for windows, also used for cross compiling
     windres <- optional $ findProgram "windres" (optWindres opts) ["windres"]
-    dlltool <- optional $ findProgram "dlltool" (optDlltool opts) ["dlltool", "llvm-dlltool"]
+    dlltool <- optional $ findProgram "dlltool" (optDlltool opts) ["llvm-dlltool"]
 
     -- Darwin-specific utilities
     (otool, installNameTool) <-

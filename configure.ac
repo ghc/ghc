@@ -314,13 +314,16 @@ else
     AC_CHECK_TOOL([RANLIB],[ranlib])
     AC_CHECK_TOOL([OBJDUMP],[objdump])
     AC_CHECK_TOOL([WindresCmd],[windres])
+    AC_CHECK_TOOL([DlltoolCmd],[llvm-dlltool])
     AC_CHECK_TOOL([Genlib],[genlib])
 
     if test "$HostOS" = "mingw32"; then
         AC_CHECK_TARGET_TOOL([WindresCmd],[windres])
+        AC_CHECK_TARGET_TOOL([DlltoolCmd],[llvm-dlltool])
         AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
 
         WindresCmd="$(cygpath -m $WindresCmd)"
+        DlltoolCmd="$(cygpath -m $DlltoolCmd)"
 
         if test "$Genlib" != ""; then
             GenlibCmd="$(cygpath -m $Genlib)"
@@ -567,6 +570,11 @@ AC_ARG_VAR(OPT,[Use as the path to LLVM's opt [default=autodetect]])
 FIND_LLVM_PROG([OPT], [opt], [$LlvmMinVersion], [$LlvmMaxVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
+
+dnl ** Which LLVM llvm-dlltool to use?
+dnl --------------------------------------------------------------
+AC_ARG_VAR(DlltoolCmd,[Use as the path to LLVM's llvm-dlltool [default=autodetect]])
+FIND_LLVM_PROG([DlltoolCmd], [llvm-dlltool], [$LlvmMinVersion], [$LlvmMaxVersion])
 
 dnl ** look to see if we have a C compiler using an llvm back end.
 dnl
@@ -1080,9 +1088,10 @@ echo "\
       libdw   : $UseLibdw
 
    Using LLVM tools
-      llc   : $LlcCmd
-      opt   : $OptCmd
-      llvm-as : $LlvmAsCmd"
+      llc          : $LlcCmd
+      opt          : $OptCmd
+      llvm-as      : $LlvmAsCmd
+      llvm-dlltool : $DlltoolCmd"
 
 if test "$HSCOLOUR" = ""; then
 echo "

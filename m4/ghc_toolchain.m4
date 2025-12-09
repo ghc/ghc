@@ -95,6 +95,7 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN],
     echo "--merge-objs=$MergeObjsCmd" >> acargs
     echo "--readelf=$READELF" >> acargs
     echo "--windres=$WindresCmd" >> acargs
+    echo "--dlltool=$DlltoolCmd" >> acargs
     echo "--llc=$LlcCmd" >> acargs
     echo "--opt=$OptCmd" >> acargs
     echo "--llvm-as=$LlvmAsCmd" >> acargs

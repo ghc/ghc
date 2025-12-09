@@ -16,9 +16,12 @@ AC_DEFUN([FIND_LLVM_PROG],[
     AS_IF([test x"$$1" != x],[
         PROG_VERSION=`$$1 --version | sed -n -e 's/.*version \(\([[0-9]][[0-9]]*\.\)\([[0-9]][[0-9]]*\.\)*[[0-9]][[0-9]]*\).*/\1/gp'`
         AS_IF([test x"$PROG_VERSION" = x],
-          [AC_MSG_RESULT(no)
-           $1=""
-           AC_MSG_NOTICE([We only support llvm $3 upto $4 (non-inclusive) (no version found).])],
+          [AS_IF(
+            [test x"$2" = x"llvm-dlltool"],
+            [AC_MSG_RESULT(yes)], # llvm-dlltool doesn't have a --version
+            [AC_MSG_RESULT(no)
+             AC_MSG_NOTICE([We only support llvm $3 upto $4 (non-inclusive) (no version found).])]
+            )],
           [AC_MSG_CHECKING([$$1 version ($PROG_VERSION) is between $3 and $4])
            AX_COMPARE_VERSION([$PROG_VERSION], [lt], [$3],
             [AC_MSG_RESULT(no)
