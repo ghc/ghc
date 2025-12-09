@@ -249,10 +249,6 @@ The supported transformers are listed below:
     <tr>
         <td><code>profiled_ghc</code></td>
         <td>Build the GHC executable with cost-centre profiling support.
-            It is recommended that you use this in conjunction with `no_dynamic_ghc` since
-            GHC does not support loading of profiled libraries with the
-            dynamic linker. You should use a flavour that builds profiling libs and rts,
-            i.e. not <code>quick</code>. <br>
             This flag adds cost centres with the -fprof-late flag.</td>
     </tr>
     <tr>

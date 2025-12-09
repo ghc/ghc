@@ -310,29 +310,11 @@ enableUBSan =
 viaLlvmBackend :: Flavour -> Flavour
 viaLlvmBackend = addArgs $ notStage0 ? builder Ghc ? arg "-fllvm"
 
--- | Build the GHC executable with profiling enabled in stages 2 and later. It
--- is also recommended that you use this with @'dynamicGhcPrograms' = False@
--- since GHC does not support loading of profiled libraries with the
--- dynamically-linker.
+-- | Build the GHC executable with profiling enabled in stages 2 and
+-- later.
 enableProfiledGhc :: Flavour -> Flavour
 enableProfiledGhc flavour =
-  enableLateCCS flavour
-    { rtsWays = do
-        ws <- rtsWays flavour
-        mconcat
-          [ pure ws
-          , buildingCompilerStage' (>= Stage2) ? pure (foldMap profiled_ways ws)
-          ]
-    , libraryWays = mconcat
-        [ libraryWays flavour
-        , buildingCompilerStage' (>= Stage2) ? pure (Set.singleton profiling)
-        ]
-    , ghcProfiled = (>= Stage2)
-    }
-    where
-      profiled_ways w
-        | wayUnit Dynamic w = Set.empty
-        | otherwise         = Set.singleton (w <> profiling)
+  enableLateCCS $ enableProfiledLibs flavour { ghcProfiled = (>= Stage2) }
 
 -- | Disable 'dynamicGhcPrograms'.
 disableDynamicGhcPrograms :: Flavour -> Flavour
