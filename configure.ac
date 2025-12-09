@@ -320,13 +320,16 @@ else
     AC_CHECK_TOOL([RANLIB],[ranlib])
     AC_CHECK_TOOL([OBJDUMP],[objdump])
     AC_CHECK_TOOL([WindresCmd],[windres])
+    AC_CHECK_TOOL([DlltoolCmd],[dlltool])
     AC_CHECK_TOOL([Genlib],[genlib])
 
     if test "$HostOS" = "mingw32"; then
         AC_CHECK_TARGET_TOOL([WindresCmd],[windres])
+        AC_CHECK_TARGET_TOOL([DlltoolCmd],[dlltool])
         AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
 
         WindresCmd="$(cygpath -m $WindresCmd)"
+	DlltoolCmd="$(cygpath -m $DlltoolCmd)"
 
         if test "$Genlib" != ""; then
             GenlibCmd="$(cygpath -m $Genlib)"
@@ -1042,6 +1045,7 @@ echo "\
    otool        : $OtoolCmd
    install_name_tool : $InstallNameToolCmd
    windres      : $WindresCmd
+   dlltool      : $DlltoolCmd
    genlib       : $GenlibCmd
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
