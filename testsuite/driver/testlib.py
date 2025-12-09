@@ -2999,6 +2999,9 @@ def normalise_errmsg(s: str) -> str:
         s = re.sub('Failed to remove file (.*); error= (.*)$', '', s)
         s = re.sub(r'DeleteFile "(.+)": permission denied \(Access is denied\.\)(.*)$', '', s)
 
+    # newer mac x86_64 ld emits these warnings when linking against libffi-clib
+    s = re.sub('.* warning: alignment .* of atom .* is too small and may result in unaligned pointers.*\n', '', s)
+
     # filter out unsupported GNU_PROPERTY_TYPE (5), which is emitted by LLVM10
     # and not understood by older binutils (ar, ranlib, ...)
     s = modify_lines(s, lambda l: re.sub(r'^(.+)warning: (.+): unsupported GNU_PROPERTY_TYPE (?:\(5\) )?type: 0xc000000(.*)$', '', l))
