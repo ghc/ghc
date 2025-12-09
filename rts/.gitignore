@@ -20,3 +20,4 @@
 /ghcautoconf.h.autoconf.in
 /ghcautoconf.h.autoconf
 /include/ghcautoconf.h
+/win32/libHSghc-internal.def
