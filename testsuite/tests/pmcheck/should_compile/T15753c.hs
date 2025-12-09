@@ -41,6 +41,20 @@ g1 Refl su1 su2
   | STrue <- sIsUnit su1
   = case su2 of {}
 
+{- [G]  F u1 u2 ~ Char
+   [W] SBool (IsUnit u1) ~ SBool True
+==>
+   [W] IsUnit u1 ~ True
+==> fundep
+    u1 ~ ()
+
+
+[G] F u1 u2 ~ Char =>(fundep)  [W] F u1a u2a ~ F u1 u2
+                               [W] If (IsUnit u1a) (Case u2b) Int ~ Char
+                   =>(fundep)  [W] IsUnit u1a ~ True
+                               [W] Case u2b ~ Char   <<--  insoluble
+-}
+
 g2 :: F u1 u2 :~: Char
    -> SUnit u1 -> SUnit u2
    -> Void

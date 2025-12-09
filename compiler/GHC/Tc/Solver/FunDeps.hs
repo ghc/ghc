@@ -484,13 +484,14 @@ tryEqFunDeps work_item@(EqCt { eq_lhs = work_lhs
   , TyFamLHS fam_tc work_args <- work_lhs     -- We have F args ~N# rhs
   = do { eqs_for_me <- simpleStage $ getInertFamEqsFor fam_tc work_args work_rhs
        ; simpleStage $ traceTcS "tryEqFunDeps" (ppr work_item $$ ppr eqs_for_me)
-       ; tryFamEqFunDeps eqs_for_me fam_tc work_args work_item }
+       ; mode <- simpleStage getTcSMode
+       ; tryFamEqFunDeps mode eqs_for_me fam_tc work_args work_item }
   | otherwise
   = nopStage ()
 
 
-tryFamEqFunDeps :: [EqCt] -> TyCon -> [TcType] -> EqCt -> SolverStage ()
-tryFamEqFunDeps eqs_for_me fam_tc work_args
+tryFamEqFunDeps :: TcSMode -> [EqCt] -> TyCon -> [TcType] -> EqCt -> SolverStage ()
+tryFamEqFunDeps mode eqs_for_me fam_tc work_args
                 work_item@(EqCt { eq_ev = ev, eq_rhs = work_rhs })
   | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
   = if isGiven ev
@@ -503,9 +504,9 @@ tryFamEqFunDeps eqs_for_me fam_tc work_args
               do { eqns <- mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
                  ; tryFDEqns fam_tc work_args work_item eqns } }
 
---  | isGiven ev    -- See (INJFAM:Given)
---  = nopStage ()
--- Continue even for Givens in the hope of discovering insolubility
+  | isGiven ev  -- See (INJFAM:Given)
+  , not (tcsmResumable mode)   -- In the pattern-match checker, continue even for
+  = nopStage ()                -- Givens in the hope of discovering insolubility
 
   -- Only Wanted constraints below here
 
