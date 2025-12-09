@@ -4,6 +4,8 @@ import Hadrian.BuildPath
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 import qualified Text.Parsec      as Parsec
+import GHC.Platform.ArchOS (ArchOS(archOS_OS), OS(..))
+import GHC.Toolchain.Target (Target(tgtArchOs))
 
 import Base
 import Context
@@ -185,15 +187,26 @@ jsObjects context = do
   srcs <- interpretInContext context (getContextData jsSrcs)
   mapM (objectPath context) srcs
 
--- | Return extra object files needed to build the given library context. The
--- resulting list is currently non-empty only when the package from the
--- 'Context' is @ghc-internal@ built with in-tree GMP backend.
+-- | Return extra object files needed to build the given library context.
+--
+-- This is non-empty for:
+--
+-- * @ghc-internal@ when built with in-tree GMP backend
+-- * @rts@ on Windows when linking dynamically
+--
 extraObjects :: Context -> Action [FilePath]
 extraObjects context
     | package context == ghcInternal = do
          interpretInContext context getBignumBackend >>= \case
             "gmp" -> gmpObjects (stage context)
             _     -> return []
+
+    | package context == rts = do
+          target   <- interpretInContext context getStagedTarget
+          builddir <- buildPath context
+          return [ builddir -/- "libHSghc-internal.dll.a"
+                 | archOS_OS (tgtArchOs target) == OSMinGW32
+                 , Dynamic `wayUnit` way context ]
 
     | otherwise = return []
 
