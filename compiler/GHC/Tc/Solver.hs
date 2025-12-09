@@ -728,7 +728,7 @@ tcCheckGivens :: InertSet -> Bag EvVar -> TcM (Maybe InertSet)
 --
 -- See Note [Pattern match warnings with insoluble Givens] above.
 tcCheckGivens inerts given_ids = do
-  (sat, new_inerts) <- runTcSInerts inerts $ do
+  mb_res <- tryM $ runTcSInerts inerts $ do
     traceTcS "checkGivens {" (ppr inerts <+> ppr given_ids)
     lcl_env <- TcS.getLclEnv
     let given_loc = mkGivenLoc topTcLevel (getSkolemInfo unkSkol) (mkCtLocEnv lcl_env)
@@ -739,7 +739,11 @@ tcCheckGivens inerts given_ids = do
     insols <- try_harder insols
     traceTcS "checkGivens }" (ppr insols)
     return (isEmptyBag insols)
-  return $ if sat then Just new_inerts else Nothing
+  case mb_res of
+    Left _        -> return (Just inerts)
+    Right (sat, new_inerts)
+      | sat       -> return (Just new_inerts)
+      | otherwise -> return Nothing  -- Definitely unsatisfiable
   where
     try_harder :: Cts -> TcS Cts
     -- Maybe we have to search up the superclass chain to find

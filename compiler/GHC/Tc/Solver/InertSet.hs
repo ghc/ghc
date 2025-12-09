@@ -1033,7 +1033,7 @@ Here are the KickOut Criteria:
     When adding [lhs_w -fw-> rhs_w] to a well-formed terminating substitution S,
     element [lhs_s -fs-> rhs_s] in S meets the KickOut Criteria if:
 
-    (KK0) fw >= fs    AND   any of (KK1), (KK2) or (KK3) hold
+    (KK0) fw >= fs    AND   any of (KK1), (KK2), (KK3) or (KK4) hold
 
     * (KK1: satisfy WF1) `lhs_w` is rewritable in `lhs_s`.
 
@@ -1051,8 +1051,9 @@ Here are the KickOut Criteria:
            kick out if `rhs_s` is of form `(lhs_w t1 .. tn)`
 
     * (KK4: completeness) Kick out if
-      * lhs_s = F lhs_tys, and
-      * lhs_w is rewritable (anywhere) in rhs_s
+      * (KK4a) lhs_s = F lhs_tys, and
+      * (KK4b) lhs_w is rewritable (anywhere) in rhs_s
+      * (KK4c) F is closed or has injectivity annotions
 
 Rationale
 
@@ -1068,10 +1069,10 @@ Rationale
 * (KK3) see Note [KK3: completeness of solving]
 
 * (KK4) is about completeness.  If we have
-     Inert:  F alpha ~ beta
+     Inert:  F alpha ~ [beta]
      Work:   beta ~ Int
   and F is closed or injective, then we want to kick out the inert item, in
-  case we get injectivity information from `F alpha ~ Int` that allows us to
+  case we get injectivity information from `F alpha ~ [Int]` that allows us to
   solve it.
 
 The above story is a bit vague wrt roles, but the code is not.

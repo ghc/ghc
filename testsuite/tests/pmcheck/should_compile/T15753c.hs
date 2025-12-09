@@ -41,6 +41,9 @@ g1 Refl su1 su2
   | STrue <- sIsUnit su1
   = case su2 of {}
 
+-- g1a :: F u1 u2 :~: Char -> SUnit u1 -> SUnit u2 -> Void
+-- g1a r _ _ = case r of {}   -- Why does this complain about missing Refl
+
 {- [G]  F u1 u2 ~ Char
    [W] SBool (IsUnit u1) ~ SBool True
 ==>
@@ -49,10 +52,9 @@ g1 Refl su1 su2
     u1 ~ ()
 
 
-[G] F u1 u2 ~ Char =>(fundep)  [W] F u1a u2a ~ F u1 u2
-                               [W] If (IsUnit u1a) (Case u2b) Int ~ Char
-                   =>(fundep)  [W] IsUnit u1a ~ True
-                               [W] Case u2b ~ Char   <<--  insoluble
+[G] F u1 u2 ~ Char =>(fundep)  [W] If (IsUnit u1) (Case u2) Int ~ Char
+                   =>(fundep)  [W] IsUnit u1 ~ True
+                               [W] Case u2 ~ Char   <<--  insoluble: no relevant eqns
 -}
 
 g2 :: F u1 u2 :~: Char
