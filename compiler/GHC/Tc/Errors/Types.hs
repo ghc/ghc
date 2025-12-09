@@ -213,7 +213,6 @@ import GHC.Types.DefaultEnv (ClassDefaults)
 
 import GHC.Unit.Types (Module)
 import GHC.Unit.State (UnitState)
-import GHC.Unit.Module.Warnings (WarningCategory, WarningTxt)
 import GHC.Unit.Module.ModIface (ModIface)
 
 import GHC.Utils.Outputable

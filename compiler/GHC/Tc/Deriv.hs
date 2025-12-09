@@ -56,7 +56,6 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
 
-import GHC.Unit.Module.Warnings
 import GHC.Builtin.Names
 
 import GHC.Utils.Error

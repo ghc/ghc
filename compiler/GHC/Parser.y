@@ -2048,12 +2048,12 @@ maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
                             {% fmap Just $ amsr (sLL $1 $> $ DeprecatedTxt (getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
                                 (AnnPragma (glR $1) (epTok $3) (fst $ unLoc $2) noAnn noAnn noAnn noAnn) }
         | '{-# WARNING' warning_category strings '#-}'
-                            {% fmap Just $ amsr (sLL $1 $> $ WarningTxt $2 (getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
+                            {% fmap Just $ amsr (sLL $1 $> $ WarningTxt (getWARNING_PRAGs $1) $2 (map stringLiteralToHsDocWst $ snd $ unLoc $3))
                                 (AnnPragma (glR $1) (epTok $4) (fst $ unLoc $3) noAnn noAnn noAnn noAnn)}
         |  {- empty -}      { Nothing }
 
-warning_category :: { Maybe (LocatedE InWarningCategory) }
-        : 'in' STRING                  { Just (reLoc $ sLL $1 $> $ InWarningCategory (epTok $1) (getSTRINGs $2)
+warning_category :: { Maybe (LocatedE (InWarningCategory GhcPs)) }
+        : 'in' STRING                  { Just (reLoc $ sLL $1 $> $ InWarningCategory (epTok $1, getSTRINGs $2)
                                                                     (reLoc $ sL1 $2 $ mkWarningCategory (getSTRING $2))) }
         | {- empty -}                  { Nothing }
 
@@ -2078,7 +2078,7 @@ warning :: { OrdList (LWarnDecl GhcPs) }
         : warning_category namespace_spec namelist strings
                 {% fmap unitOL $ amsA' (L (comb4 $1 $2 $3 $4)
                      (Warning (unLoc $2, fst $ unLoc $4) (unLoc $3)
-                              (WarningTxt $1 NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $4))) }
+                              (WarningTxt NoSourceText $1 (map stringLiteralToHsDocWst $ snd $ unLoc $4)))) }
 
 namespace_spec :: { Located NamespaceSpecifier }
   : 'type'      { sL1 $1 $ TypeNamespaceSpecifier (epTok $1) }
