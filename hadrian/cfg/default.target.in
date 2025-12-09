@@ -44,6 +44,7 @@ Target
 , tgtOpt = @OptCmdMaybeProg@
 , tgtLlvmAs = @LlvmAsCmdMaybeProg@
 , tgtWindres = @WindresCmdMaybeProg@
+, tgtDlltool = @DlltoolCmdMaybeProg@
 , tgtOtool = @OtoolCmdMaybeProg@
 , tgtInstallNameTool = @InstallNameToolCmdMaybeProg@
 }
