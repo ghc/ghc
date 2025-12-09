@@ -266,13 +266,13 @@ mkInfoTableContents profile
 
 mkInfoTableContents _ _ _ = panic "mkInfoTableContents"   -- NonInfoTable dealt with earlier
 
--- move this back to GHC/Cmm/Utils.hs?
 mkStgWordCLit :: Platform -> StgWord -> CmmLit
 mkStgWordCLit platform wd = CmmInt (fromStgWord wd) (wordWidth platform)
 
 mkStgHalfWordCLit :: Platform -> Int -> CmmLit
-mkStgHalfWordCLit platform hwd = CmmInt (fromStgHalfWord (toStgHalfWord platform (fromIntegral hwd)))
-                                        (halfWordWidth platform)
+mkStgHalfWordCLit platform hwd
+  = CmmInt (fromStgHalfWord (toStgHalfWord platform (fromIntegral hwd)))
+           (halfWordWidth platform)
 
 mkSRTLit :: Platform
          -> CLabel
