@@ -79,6 +79,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Parser.Annotation
 import GHC.Hs.Doc
+import GHC.Hs.Extension (GhcPass)
 import GHC.Unit.Module.ModIface (IfaceExport)
 import GHC.Unit.Module.Warnings
 
@@ -263,7 +264,7 @@ ghcPrimNames
     ]
 
 -- See Note [GHC.Prim Deprecations]
-ghcPrimWarns :: Warnings a
+ghcPrimWarns :: Warnings (GhcPass p)
 ghcPrimWarns = WarnSome
   -- declaration warnings
   (map mk_decl_dep primOpDeprecations)

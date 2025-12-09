@@ -354,7 +354,7 @@ parseWarning
   -> IfM m (Doc Name)
 parseWarning parserOpts sDocContext w = case w of
   IfDeprecatedTxt _ msg -> format "Deprecated: " (map dstToDoc msg)
-  IfWarningTxt _ _ msg -> format "Warning: " (map dstToDoc msg)
+  IfWarningTxt  _ _ msg -> format "Warning: " (map dstToDoc msg)
   where
     dstToDoc :: (IfaceStringLiteral, [Name]) -> HsDoc GhcRn
     dstToDoc ((IfStringLiteral _ fs), ids) = WithHsDocIdentifiers (fsToDoc fs) (map noLoc ids)

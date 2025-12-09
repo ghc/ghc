@@ -1391,7 +1391,6 @@ type instance XXWarnDecls    (GhcPass _) = DataConCantHappen
 type instance XWarning      (GhcPass _) = (NamespaceSpecifier, (EpToken "[", EpToken "]"))
 type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 
-
 instance OutputableBndrId p
         => Outputable (WarnDecls (GhcPass p)) where
     ppr (Warnings ext decls)
@@ -1411,7 +1410,7 @@ instance OutputableBndrId p
               <+> ppr txt
       where
         ppr_category = case txt of
-                         WarningTxt (Just cat) _ _ -> ppr cat
+                         WarningTxt _ (Just cat) _ -> ppr cat
                          _ -> empty
 
 {-
