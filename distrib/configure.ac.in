@@ -229,6 +229,13 @@ FIND_LLVM_PROG([LLVMAS], [clang], [$LlvmMinVersion], [$LlvmMaxVersion])
 LlvmAsCmd="$LLVMAS"
 AC_SUBST([LlvmAsCmd])
 
+dnl ** Which LLVM llvm-dlltool to use?
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([DlltoolCmd],[llvm-dlltool])
+AC_ARG_VAR(DlltoolCmd,[Use as the path to LLVM's llvm-dlltool [default=autodetect]])
+FIND_LLVM_PROG([DlltoolCmd], [llvm-dlltool], [$LlvmMinVersion], [$LlvmMaxVersion])
+AC_SUBST([DlltoolCmd])
+
 dnl We know that `clang` supports `--target` and it is necessary to pass it
 dnl lest we see #25793.
 if test -z "$LlvmAsFlags" && ! test -z "$LlvmTarget"; then
