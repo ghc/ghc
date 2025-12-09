@@ -761,6 +761,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- TcRnPragmaWarning
   GhcDiagnosticCode "WarningTxt"                                    = 63394
   GhcDiagnosticCode "DeprecatedTxt"                                 = 68441
+  GhcDiagnosticCode "XWarningTxt"                                   = 68077
 
   -- TcRnRunSliceFailure/ConversionFail
   GhcDiagnosticCode "IllegalOccName"                                = 55017

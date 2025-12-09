@@ -31,6 +31,7 @@ import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
 import GHC.Types.Name.Reader (WithUserRdr(..))
 import GHC.Data.BooleanFormula (BooleanFormula(..))
+import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Extension (Anno)
 
 -- ---------------------------------------------------------------------
@@ -271,6 +272,14 @@ deriving instance Data (WarnDecls GhcTc)
 deriving instance Data (WarnDecl GhcPs)
 deriving instance Data (WarnDecl GhcRn)
 deriving instance Data (WarnDecl GhcTc)
+
+deriving instance Data (WarningTxt GhcPs)
+deriving instance Data (WarningTxt GhcRn)
+deriving instance Data (WarningTxt GhcTc)
+
+deriving instance Data (InWarningCategory GhcPs)
+deriving instance Data (InWarningCategory GhcRn)
+deriving instance Data (InWarningCategory GhcTc)
 
 -- deriving instance (DataIdLR p p) => Data (AnnDecl p)
 deriving instance Data (AnnProvenance GhcPs)

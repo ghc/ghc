@@ -314,12 +314,16 @@ rnSrcWarnDecls bndr_set decls'
                               rdrNameOcc (unLoc x) == rdrNameOcc (unLoc y))
 
 rnWarningTxt :: WarningTxt GhcPs -> RnM (WarningTxt GhcRn)
-rnWarningTxt (WarningTxt mb_cat st wst) = do
-  forM_ mb_cat $ \(L _ (InWarningCategory _ _ (L loc cat))) ->
-    unless (validWarningCategory cat) $
-      addErrAt (locA loc) (TcRnInvalidWarningCategory cat)
+rnWarningTxt (WarningTxt st mb_cat wst) = do
+  mb_cat' <- case mb_cat of
+    Nothing -> pure Nothing
+    Just (L x (InWarningCategory y (L loc cat))) -> do
+      unless (validWarningCategory cat) $
+        addErrAt (locA loc) (TcRnInvalidWarningCategory cat)
+      pure . Just $ L x (InWarningCategory y (L loc cat))
   wst' <- traverse (traverse rnHsDoc) wst
-  pure (WarningTxt mb_cat st wst')
+  pure (WarningTxt st mb_cat' wst')
+
 rnWarningTxt (DeprecatedTxt st wst) = do
   wst' <- traverse (traverse rnHsDoc) wst
   pure (DeprecatedTxt st wst')

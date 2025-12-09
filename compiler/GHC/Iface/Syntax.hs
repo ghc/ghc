@@ -422,8 +422,8 @@ data IfaceWarnings
                [(IfExtName, IfaceWarningTxt)]
 
 data IfaceWarningTxt
-  = IfWarningTxt (Maybe WarningCategory) SourceText [(IfaceStringLiteral, [IfExtName])]
-  | IfDeprecatedTxt                      SourceText [(IfaceStringLiteral, [IfExtName])]
+  = IfWarningTxt    SourceText (Maybe WarningCategory) [(IfaceStringLiteral, [IfExtName])]
+  | IfDeprecatedTxt SourceText [(IfaceStringLiteral, [IfExtName])]
 
 data IfaceStringLiteral
   = IfStringLiteral SourceText FastString
@@ -662,7 +662,7 @@ fromIfaceWarnings = \case
 
 fromIfaceWarningTxt :: IfaceWarningTxt -> WarningTxt GhcRn
 fromIfaceWarningTxt = \case
-    IfWarningTxt mb_cat src strs -> WarningTxt (noLocA . fromWarningCategory <$> mb_cat) src (noLocA <$> map fromIfaceStringLiteralWithNames strs)
+    IfWarningTxt src mb_cat strs -> WarningTxt src (noLocA . fromWarningCategory <$> mb_cat) (noLocA <$> map fromIfaceStringLiteralWithNames strs)
     IfDeprecatedTxt src strs -> DeprecatedTxt src (noLocA <$> map fromIfaceStringLiteralWithNames strs)
 
 fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers StringLiteral GhcRn

@@ -1835,7 +1835,7 @@ instance Diagnostic TcRnMessage where
                nest 2 (vcat (map (ppr . hsDocString . unLoc) msg)) ]
          where
           (extra, msg) = case txt of
-            WarningTxt _ _ msg -> ("", msg)
+            WarningTxt  _ _ msg -> ("", msg)
             DeprecatedTxt _ msg -> (" is deprecated", msg)
     TcRnRedundantSourceImport mod_name
       -> mkSimpleDecorated $

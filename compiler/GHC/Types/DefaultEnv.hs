@@ -18,13 +18,12 @@ where
 
 import GHC.Core.Class (Class (className))
 import GHC.Prelude
-import GHC.Hs.Extension (GhcRn)
+import GHC.Hs
 import GHC.Tc.Utils.TcType (Type)
 import GHC.Types.Name (Name, nameUnique, stableNameCmp)
 import GHC.Types.Name.Env
 import GHC.Types.Unique.FM (lookupUFM_Directly)
 import GHC.Types.SrcLoc (SrcSpan)
-import GHC.Unit.Module.Warnings (WarningTxt)
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
 

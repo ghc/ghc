@@ -411,6 +411,17 @@ type family XWarning        x
 type family XXWarnDecl      x
 
 -- -------------------------------------
+-- WarningTxt type families
+type family XDeprecatedTxt x
+type family XWarningTxt    x
+type family XXWarningTxt   x
+
+-- -------------------------------------
+-- InWarningCategory type families
+type family XInWarningCategory  x
+type family XXInWarningCategory x
+
+-- -------------------------------------
 -- AnnDecl type families
 type family XHsAnnotation  x
 type family XXAnnDecl      x

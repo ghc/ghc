@@ -70,6 +70,7 @@
 [GHC-99991] is untested (constructor = TyVarMissingInEnv)
 [GHC-92834] is untested (constructor = BadCoercionRole)
 [GHC-93008] is untested (constructor = HsigShapeSortMismatch)
+[GHC-68077] is untested (constructor = XWarningTxt)
 [GHC-68444] is untested (constructor = SumAltArityExceeded)
 [GHC-63966] is untested (constructor = IllegalSumAlt)
 [GHC-28709] is untested (constructor = MalformedType)

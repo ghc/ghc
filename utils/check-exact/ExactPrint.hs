@@ -53,7 +53,6 @@ import GHC.Types.PkgQual
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Types.Var
-import GHC.Unit.Module.Warnings
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
@@ -1570,14 +1569,14 @@ instance ExactPrint (LocatedP (WarningTxt GhcPs)) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor = setAnchorAn
 
-  exact (L (EpAnn l (AnnPragma o c (os,cs) l1 l2 t m) css) (WarningTxt mb_cat src ws)) = do
+  exact (L (EpAnn l (AnnPragma o c (os,cs) l1 l2 t m) css) (WarningTxt src mb_cat ws)) = do
     o' <- markAnnOpen'' o src "{-# WARNING"
     mb_cat' <- markAnnotated mb_cat
     os' <- markEpToken os
     ws' <- markAnnotated ws
     cs' <- markEpToken cs
     c' <- markEpToken c
-    return (L (EpAnn l (AnnPragma o' c' (os',cs') l1 l2 t m) css) (WarningTxt mb_cat' src ws'))
+    return (L (EpAnn l (AnnPragma o' c' (os',cs') l1 l2 t m) css) (WarningTxt src mb_cat' ws'))
 
   exact (L (EpAnn l (AnnPragma o c (os,cs) l1 l2 t m) css) (DeprecatedTxt src ws)) = do
     o' <- markAnnOpen'' o src "{-# DEPRECATED"
@@ -1587,14 +1586,14 @@ instance ExactPrint (LocatedP (WarningTxt GhcPs)) where
     c' <- markEpToken c
     return (L (EpAnn l (AnnPragma o' c' (os',cs') l1 l2 t m) css) (DeprecatedTxt src ws'))
 
-instance ExactPrint InWarningCategory where
+instance Typeable p => ExactPrint (InWarningCategory (GhcPass p)) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (InWarningCategory tkIn source (L l wc)) = do
+  exact (InWarningCategory (tkIn, source) (L l wc)) = do
       tkIn' <- markEpToken tkIn
       L l' (_,wc') <- markAnnotated (L l (source, wc))
-      return (InWarningCategory tkIn' source (L l' wc'))
+      return (InWarningCategory (tkIn', source) (L l' wc'))
 
 instance ExactPrint (SourceText, WarningCategory) where
   getAnnotationEntry _ = NoEntryVal
@@ -1935,14 +1934,14 @@ instance ExactPrint (WarnDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (Warning (ns_spec, (o,c)) lns  (WarningTxt mb_cat src ls )) = do
+  exact (Warning (ns_spec, (o,c)) lns  (WarningTxt src mb_cat ls )) = do
     mb_cat' <- markAnnotated mb_cat
     ns_spec' <- exactNsSpec ns_spec
     lns' <- markAnnotated lns
     o' <- markEpToken o
     ls' <- markAnnotated ls
     c' <- markEpToken c
-    return (Warning (ns_spec', (o',c')) lns'  (WarningTxt mb_cat' src ls'))
+    return (Warning (ns_spec', (o',c')) lns'  (WarningTxt src mb_cat' ls'))
 
   exact (Warning (ns_spec, (o,c)) lns (DeprecatedTxt src ls)) = do
     ns_spec' <- exactNsSpec ns_spec
