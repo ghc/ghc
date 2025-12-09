@@ -12,3 +12,6 @@ test('T25771', [cmm_src, only_ways(['optasm']),
                 grep_errmsg(r'(12\.345|0\.6640625)',[1]),
                 ],
      compile, ['-ddump-cmm'])
+
+# Cmm should correctly account for word size when performing MUL/DIV/REM by a power of 2 optimization.
+test('T25664', normal, compile_and_run, [''])

@@ -395,26 +395,39 @@ cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt 1 rep))]
     one  = CmmLit (CmmInt 1 (wordWidth platform))
 
 -- Now look for multiplication/division by powers of 2 (integers).
-
-cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt n _))]
+--
+-- Naively this is as simple a matter as left/right bit shifts,
+-- but the Cmm representation if integral values quickly complicated the matter.
+--
+-- We must carefully narrow the value to be within the range of values for the
+-- type's logical bit-width. However, Cmm only represents values as *signed*
+-- integers internally yet the logical type may be unsigned. If we are dealing
+-- with a negative integer type at width @_w@, the only negative number that
+-- wraps around to be a positive power of 2 after calling narrowU is -2^(_w - 1)
+-- which wraps round to 2^(_w - 1), and multiplying by -2^(_w - 1) is indeed
+-- the same as a left shift by (w - 1), so this is OK.
+--
+-- ToDo: See #25664 (comment 605821) describing a change to the Cmm literal representation.
+-- When/If this is completed, this code must be refactored to account for the explicit width sizes.
+cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt n _w))]
   = case mop of
         MO_Mul rep
-           | Just p <- exactLog2 n ->
+           | Just p <- exactLog2 (narrowU rep n) ->
                  Just $! (cmmMachOpFold platform (MO_Shl rep) [x, CmmLit (CmmInt p $ wordWidth platform)])
         MO_U_Quot rep
-           | Just p <- exactLog2 n ->
+           | Just p <- exactLog2 (narrowU rep n) ->
                  Just $! (cmmMachOpFold platform (MO_U_Shr rep) [x, CmmLit (CmmInt p $ wordWidth platform)])
         MO_U_Rem rep
-           | Just _ <- exactLog2 n ->
+           | Just _ <- exactLog2 (narrowU rep n)  ->
                  Just $! (cmmMachOpFold platform (MO_And rep) [x, CmmLit (CmmInt (n - 1) rep)])
         MO_S_Quot rep
-           | Just p <- exactLog2 n,
+           | Just p <- exactLog2 (narrowS rep n),
              CmmReg _ <- x ->   -- We duplicate x in signedQuotRemHelper, hence require
                                 -- it is a reg.  FIXME: remove this restriction.
                 Just $! (cmmMachOpFold platform (MO_S_Shr rep)
                   [signedQuotRemHelper rep p, CmmLit (CmmInt p $ wordWidth platform)])
         MO_S_Rem rep
-           | Just p <- exactLog2 n,
+           | Just p <- exactLog2 (narrowS rep n),
              CmmReg _ <- x ->   -- We duplicate x in signedQuotRemHelper, hence require
                                 -- it is a reg.  FIXME: remove this restriction.
                 -- We replace (x `rem` 2^p) by (x - (x `quot` 2^p) * 2^p).
