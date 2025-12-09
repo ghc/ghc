@@ -56,6 +56,7 @@ data Opts = Opts
     , optOpt       :: ProgOpt
     , optLlvmAs    :: ProgOpt
     , optWindres   :: ProgOpt
+    , optDlltool   :: ProgOpt
     , optOtool     :: ProgOpt
     , optInstallNameTool :: ProgOpt
     -- Note we don't actually configure LD into anything but
@@ -114,6 +115,7 @@ emptyOpts = Opts
     , optOpt       = po0
     , optLlvmAs    = po0
     , optWindres   = po0
+    , optDlltool   = po0
     , optLd        = po0
     , optOtool     = po0
     , optInstallNameTool = po0
@@ -132,7 +134,7 @@ emptyOpts = Opts
 
 _optCc, _optCxx, _optCpp, _optHsCpp, _optJsCpp, _optCmmCpp, _optCcLink, _optAr,
     _optRanlib, _optNm, _optReadelf, _optMergeObjs, _optLlc, _optOpt, _optLlvmAs,
-    _optWindres, _optLd, _optOtool, _optInstallNameTool
+    _optWindres, _optDlltool, _optLd, _optOtool, _optInstallNameTool
     :: Lens Opts ProgOpt
 _optCc      = Lens optCc      (\x o -> o {optCc=x})
 _optCxx     = Lens optCxx     (\x o -> o {optCxx=x})
@@ -150,6 +152,7 @@ _optLlc     = Lens optLlc     (\x o -> o {optLlc=x})
 _optOpt     = Lens optOpt     (\x o -> o {optOpt=x})
 _optLlvmAs  = Lens optLlvmAs  (\x o -> o {optLlvmAs=x})
 _optWindres = Lens optWindres (\x o -> o {optWindres=x})
+_optDlltool = Lens optDlltool (\x o -> o {optDlltool=x})
 _optLd      = Lens optLd (\x o -> o {optLd=x})
 _optOtool   = Lens optOtool (\x o -> o {optOtool=x})
 _optInstallNameTool = Lens optInstallNameTool (\x o -> o {optInstallNameTool=x})
@@ -218,6 +221,7 @@ options =
     , progOpts "opt" "LLVM opt utility" _optOpt
     , progOpts "llvm-as" "Assembler used for LLVM backend (typically clang)" _optLlvmAs
     , progOpts "windres" "windres utility" _optWindres
+    , progOpts "dlltool" "Windows dll utility" _optDlltool
     , progOpts "ld" "linker" _optLd
     , progOpts "otool" "otool utility" _optOtool
     , progOpts "install-name-tool" "install-name-tool utility" _optInstallNameTool
@@ -481,12 +485,13 @@ mkTarget opts = do
     llvmAs <- optional $ findProgram "llvm assembler" (optLlvmAs opts) ["clang"]
 
     -- Windows-specific utilities
-    windres <-
+    (windres, dlltool) <-
         case archOS_OS archOs of
           OSMinGW32 -> do
-            windres <- findProgram "windres" (optWindres opts) ["windres"]
-            return (Just windres)
-          _ -> return Nothing
+            windres <- findProgram "windres" (optWindres opts) ["windres", "llvm-windres"]
+            dlltool <- findProgram "dlltool" (optDlltool opts) ["dlltool", "llvm-dlltool"]
+            return (Just windres, Just dlltool)
+          _ -> return (Nothing, Nothing)
 
     -- Darwin-specific utilities
     (otool, installNameTool) <-
@@ -541,6 +546,7 @@ mkTarget opts = do
                    , tgtOpt = opt
                    , tgtLlvmAs = llvmAs
                    , tgtWindres = windres
+                   , tgtDlltool = dlltool
                    , tgtOtool = otool
                    , tgtInstallNameTool = installNameTool
                    , tgtWordSize
