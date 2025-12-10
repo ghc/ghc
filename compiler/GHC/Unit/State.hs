@@ -216,7 +216,7 @@ instance Outputable ModuleOrigin where
         (if null rhs
             then []
             else [text "hidden reexport by" <+>
-                    sep (map (ppr . mkUnit) res)]) ++
+                    sep (map (ppr . mkUnit) rhs)]) ++
         (if f then [text "package flag"] else [])
         ))
 
