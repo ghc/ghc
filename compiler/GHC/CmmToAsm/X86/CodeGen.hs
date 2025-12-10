@@ -54,7 +54,9 @@ import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
+import GHC.CmmToAsm.Reg.Target (targetClassOfReg)
 import GHC.Platform
+import GHC.Platform.Reg.Class.Unified (RegClass(..))
 
 -- Our intermediate code:
 import GHC.Types.Basic
@@ -4697,7 +4699,14 @@ genCCall64 addr conv dest_regs args = do
         -- It's not safe to omit this assignment, even if the number
         -- of SSE2 regs in use is zero.  If %al is larger than 8
         -- on entry to a varargs function, seg faults ensue.
-        nb_sse_regs_used = count (isFloatFormat . regWithFormat_format) arg_regs_used
+        is_sse_reg (RegWithFormat r _) =
+          -- NB: use 'targetClassOfRealReg' to compute whether this is an SSE
+          -- register or not, as we may have decided to e.g. store a 64-bit
+          -- integer in an xmm register.
+          case targetClassOfReg platform r of
+            RcFloatOrVector -> True
+            RcInteger       -> False
+        nb_sse_regs_used = count is_sse_reg arg_regs_used
         assign_eax_sse_regs
           = unitOL (MOV II32 (OpImm (ImmInt nb_sse_regs_used)) (OpReg eax))
           -- Note: we do this on Windows as well. It's not entirely clear why
