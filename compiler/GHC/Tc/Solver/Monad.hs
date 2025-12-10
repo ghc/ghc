@@ -1170,15 +1170,12 @@ runTcSEqualities thing_inside
 
 -- | A variant of 'runTcS' that takes and returns an 'InertSet' for
 -- later resumption of the 'TcS' session.
-runTcSInerts :: InertSet -> TcS a -> TcM (a, InertSet)
-runTcSInerts inerts tcs
+runTcSInerts :: InertSet -> TcS a -> TcM a
+runTcSInerts inerts thing_inside
   = do { ev_binds_var <- TcM.newTcEvBinds
        ; runTcSWithEvBinds' (vanillaTcSMode { tcsmResumable = True })
                              ev_binds_var $
-         do { setInertSet inerts
-            ; a <- tcs
-            ; new_inerts <- getInertSet
-            ; return (a, new_inerts) } }
+         do { setInertSet inerts; thing_inside } }
 
 runTcSWithEvBinds :: EvBindsVar
                   -> TcS a

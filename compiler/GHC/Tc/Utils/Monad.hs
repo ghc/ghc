@@ -11,7 +11,7 @@
 -- getters...).
 module GHC.Tc.Utils.Monad(
   -- * Initialisation
-  initTc, initTcWithGbl, initTcInteractive, initTcRnIf,
+  initTc, initTcInteractive, initTcRnIf,
 
   -- * Simple accessors
   discardResult,

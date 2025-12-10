@@ -87,7 +87,7 @@ import qualified GHC.Data.Strict as Strict
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
-import Control.Monad      ( unless, when, foldM, forM_ )
+import Control.Monad      ( when, foldM, forM_ )
 import Data.Bifunctor     ( bimap )
 import Data.Foldable      ( toList )
 import Data.Function      ( on )
@@ -482,12 +482,15 @@ mkErrorItem ct
                 CIrredCan (IrredCt { ir_reason = reason }) -> Just reason
                 _                                          -> Nothing
 
-       ; return $ Just $ EI { ei_pred     = ctPred ct
-                            , ei_evdest   = m_evdest
-                            , ei_flavour  = flav
-                            , ei_loc      = loc
-                            , ei_m_reason = m_reason
-                            , ei_suppress = suppress }}
+             insoluble_ct = insolubleCt ct
+
+       ; return $ Just $ EI { ei_pred      = ctPred ct
+                            , ei_evdest    = m_evdest
+                            , ei_flavour   = flav
+                            , ei_loc       = loc
+                            , ei_m_reason  = m_reason
+                            , ei_insoluble = insoluble_ct
+                            , ei_suppress  = suppress }}
 
 -- | Actually report this 'ErrorItem'.
 unsuppressErrorItem :: ErrorItem -> ErrorItem
@@ -648,7 +651,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
               , ("Homo eqs",      is_homo_equality,  True,  mkGroupReporter mkEqErr)
               , ("Other eqs",     is_equality,       True,  mkGroupReporter mkEqErr)
 
-              , ("Insoluble fundeps", is_insoluble_fundep, True, mkGroupReporter mkDictErr)
+              , ("Insoluble fundeps", is_insoluble, True, mkGroupReporter mkDictErr)
               ]
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
@@ -666,9 +669,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
        -- I think all given residuals are equalities
 
     -- Constraints that have insoluble functional dependencies
-    is_insoluble_fundep item _ = case ei_m_reason item of
-           Just InsolubleFunDepReason -> True
-           _                          -> False
+    is_insoluble item _ = ei_insoluble item
 
     -- Things like (Int ~N Bool)
     utterly_wrong _ (EqPred NomEq ty1 ty2) = isRigidTy ty1 && isRigidTy ty2
@@ -1305,18 +1306,30 @@ maybeReportError :: SolverReportErrCtxt
 maybeReportError ctxt items@(item1:|_) (SolverReport { sr_important_msg = important
                                                      , sr_supplementary = supp
                                                      , sr_hints         = hints })
-  = unless (cec_suppress ctxt  -- Some worse error has occurred, so suppress this diagnostic
-         || all ei_suppress items) $
-                           -- if they're all to be suppressed, report nothing
-                           -- if at least one is not suppressed, do report:
-                           -- the function that generates the error message
-                           -- should look for an unsuppressed error item
-    do let reason | any (nonDeferrableOrigin . errorItemOrigin) items = ErrorWithoutFlag
-                  | otherwise                                         = cec_defer_type_errors ctxt
-                  -- See Note [No deferring for multiplicity errors]
-           diag = TcRnSolverReport important reason
-       msg <- mkErrorReport (ctLocEnv (errorItemCtLoc item1)) diag (Just ctxt) supp hints
-       reportDiagnostic msg
+  | suppress_group = return ()
+  | otherwise      = do { msg <- mkErrorReport loc_env diag (Just ctxt) supp hints
+                        ; reportDiagnostic msg }
+  where
+    reason | any (nonDeferrableOrigin . errorItemOrigin) items = ErrorWithoutFlag
+           | otherwise                                         = cec_defer_type_errors ctxt
+           -- See Note [No deferring for multiplicity errors]
+    diag    = TcRnSolverReport important reason
+    loc_env = ctLocEnv (errorItemCtLoc item1)
+
+    suppress_group
+     | all ei_suppress items
+     = True  -- If they are all suppressed (notably, have been rewritten by another unsolved wanted)
+             -- report nothing.  (If at least one is not suppressed, do report: the function that
+             -- generates the error message should look for an unsuppressed error item.)
+
+     | any ei_insoluble items
+     = False  -- Don't suppress insolubles even if cec_suppress is True
+
+     | cec_suppress ctxt
+     = True   -- Some earlier error has occurred, so suppress this diagnostic
+
+     | otherwise
+     = False
 
 addSolverDeferredBinding :: SolverReport -> ErrorItem -> TcM ()
 addSolverDeferredBinding err item =
@@ -2089,7 +2102,7 @@ misMatchOrCND :: SolverReportErrCtxt -> ErrorItem
               -> TcType -> TcType -> TcM MismatchMsg
 -- If oriented then ty1 is actual, ty2 is expected
 misMatchOrCND ctxt item ty1 ty2
-  | insoluble_item   -- See Note [Insoluble mis-match]
+  | ei_insoluble item   -- See Note [Insoluble mis-match]
     || (isRigidTy ty1 && isRigidTy ty2)
     || (ei_flavour item == Given)
     || null givens
@@ -2101,10 +2114,6 @@ misMatchOrCND ctxt item ty1 ty2
   = mkCouldNotDeduceErr givens (item :| []) (Just $ CND_ExpectedActual level ty1 ty2)
 
   where
-    insoluble_item = case ei_m_reason item of
-                       Nothing -> False
-                       Just r  -> isInsolubleReason r
-
     level   = ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel
     givens  = [ given | given <- getUserGivens ctxt, ic_given_eqs given /= NoGivenEqs ]
               -- Keep only UserGivens that have some equalities.
