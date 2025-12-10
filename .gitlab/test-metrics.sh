@@ -17,12 +17,14 @@ fail() {
 
 function pull() {
   local ref="refs/notes/$REF"
-  # 2023-10-04: `git fetch` started failing, first on Darwin in CI and then on
-  # Linux locally, both using git version 2.40.1. See #24055. One workaround is
-  # to set a larger http.postBuffer, although this is definitely a workaround.
-  # The default should work just fine. The error could be in git, GitLab, or
-  # perhaps the networking tube (including all proxies etc) between the two.
-  run git -c http.postBuffer=2097152 fetch -f "$NOTES_ORIGIN" "$ref:$ref"
+
+  # Fetch performance notes from a dedicated promisor remote using a
+  # treeless filter, so that individual note blobs are fetched lazily
+  # as needed.
+  git remote add perf-notes "$NOTES_ORIGIN" || true
+  git config fetch.recurseSubmodules false
+  git config remote.perf-notes.partialclonefilter tree:0
+  run git fetch --force perf-notes "$ref:$ref"
   echo "perf notes ref $ref is $(git rev-parse $ref)"
 }
 
@@ -81,4 +83,3 @@ case $1 in
   pull) pull ;;
   *) fail "Invalid mode $1" ;;
 esac
-
