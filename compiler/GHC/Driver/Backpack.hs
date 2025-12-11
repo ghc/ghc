@@ -430,6 +430,7 @@ addUnit u = do
     logger <- getLogger
     let dflags0 = hsc_dflags hsc_env
     let old_unit_env = hsc_unit_env hsc_env
+        ue_index = hscUnitIndex hsc_env
     newdbs <- case ue_unit_dbs old_unit_env of
         Nothing  -> panic "addUnit: called too early"
         Just dbs ->
@@ -438,7 +439,7 @@ addUnit u = do
                , unitDatabaseUnits = [u]
                }
          in return (dbs ++ [newdb]) -- added at the end because ordering matters
-    (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 (Just newdbs) (hsc_all_home_unit_ids hsc_env)
+    (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 ue_index (Just newdbs) (hsc_all_home_unit_ids hsc_env)
 
     -- update platform constants
     dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
@@ -453,6 +454,7 @@ addUnit u = do
                     (homeUnitId home_unit)
                     (mkHomeUnitEnv dflags (ue_hpt old_unit_env) (Just home_unit))
           , ue_eps       = ue_eps old_unit_env
+          , ue_index
           }
     setSession $ hscSetFlags dflags $ hsc_env { hsc_unit_env = unit_env }
 
@@ -871,6 +873,8 @@ hsModuleToModSummary home_keys pn hsc_src modname
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
 
+    query <- liftIO $ hscUnitIndexQuery hsc_env
+
     -- Also copied from 'getImports'
     let (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
@@ -883,7 +887,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
         implicit_imports = mkPrelImports modname loc
                                          implicit_prelude imps
 
-        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) modname
+        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) query modname
         convImport (L _ i) = (rn_pkg_qual (ideclPkgQual i), reLoc $ ideclName i)
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
