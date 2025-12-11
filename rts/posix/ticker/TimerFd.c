@@ -86,7 +86,7 @@ static bool exited = true;
 
 // Signaled when we want to (re)start the timer
 static Condition start_cond;
-static Mutex mutex;
+static Mutex mutex = MUTEX_INIT;
 static OSThreadId thread;
 
 // file descriptor for the timer (Linux only)
@@ -172,7 +172,7 @@ initTicker (Time interval, TickProc handle_tick)
     int ret;
 
     initCondition(&start_cond);
-    initMutex(&mutex);
+    mutex = MUTEX_INIT;
 
     /* Open the file descriptor for the timer synchronously.
      *
@@ -277,7 +277,6 @@ exitTicker (bool wait)
         close(pipefds[0]);
         close(pipefds[1]);
 
-        closeMutex(&mutex);
         closeCondition(&start_cond);
     } else {
         pthread_detach(thread);

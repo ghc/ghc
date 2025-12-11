@@ -17,7 +17,7 @@
 static HashTable * spt = NULL;
 
 #if defined(THREADED_RTS)
-static Mutex spt_lock;
+static Mutex spt_lock = MUTEX_INIT;
 #endif
 
 /// Hash function for the SPT.
@@ -39,9 +39,6 @@ void hs_spt_insert_stableptr(StgWord64 key[2], StgStablePtr *entry) {
   // the SPT needs to be initialized here.
   if (spt == NULL) {
     spt = allocHashTable();
-#if defined(THREADED_RTS)
-    initMutex(&spt_lock);
-#endif
   }
 
   ACQUIRE_LOCK(&spt_lock);
@@ -107,8 +104,5 @@ void exitStaticPtrTable(void) {
   if (spt) {
     freeHashTable(spt, freeSptEntry);
     spt = NULL;
-#if defined(THREADED_RTS)
-    closeMutex(&spt_lock);
-#endif
   }
 }

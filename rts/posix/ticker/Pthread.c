@@ -83,7 +83,7 @@ static bool exited = true;
 
 // Signaled when we want to (re)start the timer
 static Condition start_cond;
-static Mutex mutex;
+static Mutex mutex = MUTEX_INIT;
 static OSThreadId thread;
 
 static void *itimer_thread_func(void *_handle_tick)
@@ -126,7 +126,7 @@ initTicker (Time interval, TickProc handle_tick)
     int ret;
 
     initCondition(&start_cond);
-    initMutex(&mutex);
+    mutex = MUTEX_INIT;
 
     /*
      * Create the thread with all blockable signals blocked, leaving signal
@@ -181,7 +181,6 @@ exitTicker (bool wait)
         if (pthread_join(thread, NULL)) {
             sysErrorBelch("Ticker: Failed to join: %s", strerror(errno));
         }
-        closeMutex(&mutex);
         closeCondition(&start_cond);
     } else {
         pthread_detach(thread);

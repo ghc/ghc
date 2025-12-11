@@ -162,7 +162,7 @@ new_adjustor_pool(
     pool->chunk_slots = usable_exec_page_sz / ROUND_UP(code_size, code_alignment);
     pool->free_list = NULL;
 #if defined(THREADED_RTS)
-    initMutex(&pool->lock);
+    pool->lock = MUTEX_INIT;
 #endif
     return pool;
 }
@@ -358,4 +358,3 @@ new_adjustor_pool_from_template(const struct AdjustorTemplate *tmpl)
             mk_adjustor_from_template,
             (void *) tmpl);
 }
-

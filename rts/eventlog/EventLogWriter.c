@@ -30,7 +30,7 @@ static FILE *event_log_file = NULL;
 
 #if defined(THREADED_RTS)
 // Protects event_log_file
-static Mutex event_log_mutex;
+static Mutex event_log_mutex = MUTEX_INIT;
 
 static void acquire_event_log_lock(void) { ACQUIRE_LOCK(&event_log_mutex); }
 static void release_event_log_lock(void) { RELEASE_LOCK(&event_log_mutex); }
@@ -105,7 +105,7 @@ initEventLogFileWriter(void)
 
     stgFree(event_log_filename);
 #if defined(THREADED_RTS)
-    initMutex(&event_log_mutex);
+    event_log_mutex = MUTEX_INIT;
 #endif
 }
 
@@ -146,9 +146,6 @@ stopEventLogFileWriter(void)
         fclose(event_log_file);
         event_log_file = NULL;
     }
-#if defined(THREADED_RTS)
-    closeMutex(&event_log_mutex);
-#endif
 }
 
 static void

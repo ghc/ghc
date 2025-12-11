@@ -38,8 +38,8 @@ uint8_t TRACE_spark_full;
 uint8_t TRACE_user;
 uint8_t TRACE_cap;
 
-#if defined(THREADED_RTS)
-static Mutex trace_utx;
+#if defined(THREADED_RTS) && defined(DEBUG)
+static Mutex trace_utx = MUTEX_INIT;
 #endif
 
 #if defined(DEBUG)
@@ -92,10 +92,6 @@ static void updateTraceFlagCache (void)
 
 void initTracing (void)
 {
-#if defined(THREADED_RTS)
-    initMutex(&trace_utx);
-#endif
-
     updateTraceFlagCache();
 
     if (TRACE_gc && RtsFlags.GcFlags.giveStats == NO_GC_STATS) {

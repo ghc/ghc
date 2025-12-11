@@ -106,7 +106,7 @@ volatile StgWord next_nursery[MAX_NUMA_NODES];
  * Storage manager mutex:  protects all the above state from
  * simultaneous access by two STG threads.
  */
-Mutex sm_mutex;
+Mutex sm_mutex = MUTEX_INIT;
 #endif
 
 static void allocNurseries (uint32_t from, uint32_t to);
@@ -190,10 +190,6 @@ initStorage (void)
   ASSERT(!HEAP_ALLOCED(&stg_dummy_ret_closure));
 
   initBlockAllocator();
-
-#if defined(THREADED_RTS)
-  initMutex(&sm_mutex);
-#endif
 
   /* allocate generation info array */
   generations = (generation *)stgMallocBytes(RtsFlags.GcFlags.generations
@@ -343,9 +339,6 @@ freeStorage (bool free_heap)
 {
     stgFree(generations);
     if (free_heap) freeAllMBlocks();
-#if defined(THREADED_RTS)
-    closeMutex(&sm_mutex);
-#endif
     stgFree(nurseries);
     freeGcThreads();
 }

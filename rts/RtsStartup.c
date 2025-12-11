@@ -411,7 +411,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #if defined(PROFILING)
     initProfiling();
 #endif
-    initIpe();
+
     traceInitEvent(dumpIPEToEventLog);
     initHeapProfiling();
 
@@ -624,9 +624,6 @@ hs_exit_(bool wait_foreign)
    finiUserSignals ();
 #endif
 
-    /* tear down statistics subsystem */
-    stat_exit();
-
     // Finally, free all our storage.  However, we only free the heap
     // memory if we have waited for foreign calls to complete;
     // otherwise a foreign call in progress may still be referencing
@@ -640,8 +637,6 @@ hs_exit_(bool wait_foreign)
     // Free threading resources
     freeThreadingResources();
 #endif
-
-    exitIpe();
 }
 
 // Flush stdout and stderr.  We do this during shutdown so that it

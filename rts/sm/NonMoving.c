@@ -1012,7 +1012,7 @@ enum ConcurrentWorkerState {
     CONCURRENT_WORKER_STOPPED,
 };
 
-Mutex concurrent_coll_lock;
+Mutex concurrent_coll_lock = MUTEX_INIT;
 MarkQueue *concurrent_mark_roots;
 Condition start_concurrent_mark_cond;
 Condition concurrent_coll_finished_cond;
@@ -1053,7 +1053,6 @@ static void* nonmovingConcurrentMarkWorker(void *data STG_UNUSED)
 static void nonmovingInitConcurrentWorker(void)
 {
     debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
-    initMutex(&concurrent_coll_lock);
     ACQUIRE_LOCK(&concurrent_coll_lock);
     initCondition(&start_concurrent_mark_cond);
     initCondition(&concurrent_coll_finished_cond);
@@ -1080,7 +1079,6 @@ static void nonmovingExitConcurrentWorker(void)
     }
     RELEASE_LOCK(&concurrent_coll_lock);
 
-    closeMutex(&concurrent_coll_lock);
     closeCondition(&start_concurrent_mark_cond);
     closeCondition(&concurrent_coll_finished_cond);
 }

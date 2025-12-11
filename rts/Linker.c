@@ -208,7 +208,7 @@ StrHashTable *symhash;
 
 #if defined(THREADED_RTS)
 /* This protects all the Linker's global state */
-Mutex linker_mutex;
+Mutex linker_mutex = MUTEX_INIT;
 #endif
 
 /* Generic wrapper function to try and resolve oc files */
@@ -465,10 +465,6 @@ initLinker_ (int retain_cafs)
 
     initUnloadCheck();
 
-#if defined(THREADED_RTS)
-    initMutex(&linker_mutex);
-#endif
-
     symhash = allocStrHashTable();
 
     /* populate the symbol table with stuff from the RTS */
@@ -551,9 +547,6 @@ exitLinker( void ) {
        freeStrHashTable(symhash, free);
        exitUnloadCheck();
    }
-#if defined(THREADED_RTS)
-   closeMutex(&linker_mutex);
-#endif
 }
 
 /* -----------------------------------------------------------------------------

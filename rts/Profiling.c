@@ -60,7 +60,7 @@ CostCentre      *CC_LIST  = NULL;
 static CostCentreStack *CCS_LIST = NULL;
 
 #if defined(THREADED_RTS)
-Mutex ccs_mutex;
+Mutex ccs_mutex = MUTEX_INIT;
 #endif
 
 /*
@@ -152,10 +152,6 @@ void initProfiling (void)
 {
     // initialise our arena
     prof_arena = newArena();
-
-#if defined(THREADED_RTS)
-    initMutex(&ccs_mutex);
-#endif
 
     /* Set up the log file, and dump the header and cost centre
      * information into it.

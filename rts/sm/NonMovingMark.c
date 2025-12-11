@@ -101,7 +101,7 @@ memcount n_nonmoving_marked_compact_blocks = 0;
  * (e.g. finish_upd_rem_set_mark) and the collector (mark_closure) don't try to
  * move the same large object to nonmoving_marked_large_objects more than once.
  */
-static Mutex nonmoving_large_objects_mutex;
+static Mutex nonmoving_large_objects_mutex = MUTEX_INIT;
 // Note that we don't need a similar lock for compact objects because we never
 // mark a compact object eagerly in a write barrier; all compact objects are
 // marked by the mark thread, so there can't be any races here.
@@ -238,7 +238,7 @@ StgIndStatic *debug_caf_list_snapshot = (StgIndStatic*)END_OF_CAF_LIST;
  */
 bdescr *upd_rem_set_block_list = NULL;
 #if defined(THREADED_RTS)
-static Mutex upd_rem_set_lock;
+static Mutex upd_rem_set_lock = MUTEX_INIT;
 
 /* Used during the mark/sweep phase transition to track how many capabilities
  * have pushed their update remembered sets. Protected by upd_rem_set_lock.
@@ -262,9 +262,7 @@ MarkQueue *current_mark_queue = NULL;
 /* Initialise update remembered set data structures */
 void nonmovingMarkInit(void) {
 #if defined(THREADED_RTS)
-    initMutex(&upd_rem_set_lock);
     initCondition(&upd_rem_set_flushed_cond);
-    initMutex(&nonmoving_large_objects_mutex);
 #endif
 }
 

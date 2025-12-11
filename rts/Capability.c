@@ -265,7 +265,7 @@ initCapability (Capability *cap, uint32_t i)
     cap->n_run_queue       = 0;
 
 #if defined(THREADED_RTS)
-    initMutex(&cap->lock);
+    cap->lock              = MUTEX_INIT;
     cap->running_task      = NULL; // indicates cap is free
     cap->spare_workers     = NULL;
     cap->n_spare_workers   = 0;
@@ -1168,8 +1168,9 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
     // Loop indefinitely until all the workers have exited and there
     // are no Haskell threads left.  We used to bail out after 50
     // iterations of this loop, but that occasionally left a worker
-    // running which caused problems later (the closeMutex() below
-    // isn't safe, for one thing).
+    // running which caused problems later (tearing down the lock
+    // while a worker was still waiting for a safe ccall to return
+    // wasn't safe).
 
     for (i = 0; /* i < 50 */; i++) {
         ASSERT(getSchedState() == SCHED_SHUTTING_DOWN);
@@ -1259,7 +1260,7 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
     // ToDo: we can't drop this mutex, because there might still be
     // threads performing foreign calls that will eventually try to
     // return via resumeThread() and attempt to grab cap->lock.
-    // closeMutex(&cap->lock);
+    // The lock therefore intentionally remains initialized.
 #endif
 }
 

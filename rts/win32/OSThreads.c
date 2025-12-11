@@ -526,14 +526,3 @@ timedWaitCondition ( Condition* pCond, Mutex* pMut, Time timeout )
     barf("timedWaitCondition: error %" FMT_Word, (StgWord) GetLastError());
   }
 }
-
-void
-initMutex (Mutex* pMut)
-{
-  InitializeSRWLock(pMut);
-}
-void
-closeMutex (Mutex* pMut)
-{
-  (void)pMut;
-}

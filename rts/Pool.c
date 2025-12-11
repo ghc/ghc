@@ -54,7 +54,7 @@ Pool *poolInit(uint32_t max_size, uint32_t desired_size,
     pool->available = NULL;
     pool->taken = NULL;
 #if defined(THREADED_RTS)
-    initMutex(&pool->mutex);
+    pool->mutex = MUTEX_INIT;
     initCondition(&pool->cond);
 #endif
     return pool;
@@ -67,7 +67,6 @@ int poolFree(Pool *pool) {
     poolSetMaxSize(pool, 0);
 #if defined(THREADED_RTS)
     closeCondition(&pool->cond);
-    closeMutex(&pool->mutex);
 #endif
     stgFree(pool);
     return 0;

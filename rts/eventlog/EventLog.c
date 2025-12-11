@@ -29,7 +29,7 @@
 
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 
-Mutex state_change_mutex;
+Mutex state_change_mutex = MUTEX_INIT;
 bool eventlog_enabled; // protected by state_change_mutex to ensure
                        // serialisation of calls to
                        // startEventLogging/endEventLogging
@@ -130,7 +130,7 @@ static EventsBuf *capEventBuf; // one EventsBuf for each Capability
 
 static EventsBuf eventBuf; // an EventsBuf not associated with any Capability
 #if defined(THREADED_RTS)
-static Mutex eventBufMutex; // protected by this mutex
+static Mutex eventBufMutex = MUTEX_INIT; // protected by this mutex
 #endif
 
 // Event type
@@ -392,8 +392,8 @@ initEventLogging(void)
 
     initEventsBuf(&eventBuf, EVENT_LOG_SIZE, (EventCapNo)(-1));
 #if defined(THREADED_RTS)
-    initMutex(&eventBufMutex);
-    initMutex(&state_change_mutex);
+    eventBufMutex = MUTEX_INIT;
+    state_change_mutex = MUTEX_INIT;
 #endif
 }
 

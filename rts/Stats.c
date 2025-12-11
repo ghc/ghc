@@ -28,7 +28,7 @@
 
 #if defined(THREADED_RTS)
 // Protects all statistics below
-Mutex stats_mutex;
+Mutex stats_mutex = MUTEX_INIT;
 #endif
 
 static Time
@@ -107,7 +107,7 @@ void
 initStats0(void)
 {
 #if defined(THREADED_RTS)
-    initMutex(&stats_mutex);
+    stats_mutex = MUTEX_INIT;
 #endif
 
     start_init_cpu    = 0;
@@ -780,7 +780,7 @@ There are currently three reporting functions:
       Responsible for producing '+RTS -t' output
 
 Stats are accumulated into the global variable 'stats' as the program runs, then
-in 'stat_exit' we do the following:
+in 'stat_exitReport' we do the following:
   * Finalise 'stats'. This involves setting final running times and allocations
     that have not yet been accounted for.
   * Create a RTSSummaryStats. This contains all data for reports that is not
@@ -1467,13 +1467,6 @@ stat_exitReport (void)
     }
 
     RELEASE_LOCK(&all_tasks_mutex);
-}
-
-void stat_exit(void)
-{
-#if defined(THREADED_RTS)
-        closeMutex(&stats_mutex);
-#endif
 }
 
 /* Note [Work Balance]
