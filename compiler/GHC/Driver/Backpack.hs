@@ -429,6 +429,7 @@ addUnit u = do
     logger <- getLogger
     let dflags0 = hsc_dflags hsc_env
     let old_unit_env = hsc_unit_env hsc_env
+        ue_index = hscUnitIndex hsc_env
     newdbs <- case ue_unit_dbs old_unit_env of
         Nothing  -> panic "addUnit: called too early"
         Just dbs ->
@@ -437,7 +438,7 @@ addUnit u = do
                , unitDatabaseUnits = [u]
                }
          in return (dbs ++ [newdb]) -- added at the end because ordering matters
-    (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 (Just newdbs) (hsc_all_home_unit_ids hsc_env)
+    (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 ue_index (Just newdbs) (hsc_all_home_unit_ids hsc_env)
 
     -- update platform constants
     dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
@@ -452,6 +453,7 @@ addUnit u = do
                     (homeUnitId home_unit)
                     (mkHomeUnitEnv dflags (ue_hpt old_unit_env) (Just home_unit))
           , ue_eps       = ue_eps old_unit_env
+          , ue_index
           }
     setSession $ hscSetFlags dflags $ hsc_env { hsc_unit_env = unit_env }
 

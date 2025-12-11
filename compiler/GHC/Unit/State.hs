@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow, 2006
 
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, RecordWildCards #-}
 
 -- | Unit manipulation
 module GHC.Unit.State (
@@ -48,6 +48,9 @@ module GHC.Unit.State (
         closeUnitDeps,
         closeUnitDeps',
         mayThrowUnitErr,
+
+        UnitIndex (..),
+        newUnitIndex,
 
         -- * Module hole substitution
         ShHoleSubst,
@@ -638,14 +641,14 @@ listUnitInfo state = nonDetEltsUniqMap (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
-initUnits logger dflags cached_dbs home_units = do
+initUnits :: Logger -> DynFlags -> UnitIndex -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
+initUnits logger dflags index cached_dbs home_units = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
 
   (unit_state,dbs) <- withTiming logger (text "initializing unit database")
                    forceUnitInfoMap
-                 $ mkUnitState logger (initUnitConfig dflags cached_dbs home_units)
+                 $ mkUnitState logger (homeUnitId_ dflags) (initUnitConfig dflags cached_dbs home_units) index
 
   putDumpFileMaybe logger Opt_D_dump_mod_map "Module Map"
     FormatText (updSDocContext (\ctx -> ctx {sdocLineLength = 200})
@@ -1484,9 +1487,11 @@ validateDatabase cfg pkg_map1 =
 
 mkUnitState
     :: Logger
+    -> UnitId
     -> UnitConfig
+    -> UnitIndex
     -> IO (UnitState,[UnitDatabase UnitId])
-mkUnitState logger cfg = do
+mkUnitState logger unit cfg index = do
 {-
    Plan.
 
@@ -1542,14 +1547,8 @@ mkUnitState logger cfg = do
 
   -- if databases have not been provided, read the database flags
   raw_dbs <- case unitConfigDBCache cfg of
-               Nothing  -> readUnitDatabases logger cfg
+               Nothing  -> readDatabases index logger unit cfg
                Just dbs -> return dbs
-
-  -- distrust all units if the flag is set
-  let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
-      dbs | unitConfigDistrustAll cfg = map distrust_all raw_dbs
-          | otherwise                 = raw_dbs
-
 
   -- This, and the other reverse's that you will see, are due to the fact that
   -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
@@ -1562,14 +1561,19 @@ mkUnitState logger cfg = do
   let home_unit_deps = selectHomeUnits (unitConfigHomeUnits cfg) hpt_flags
 
   -- Merge databases together, without checking validity
-  (pkg_map1, prec_map) <- mergeDatabases logger dbs
+  (pkg_map1, prec_map) <- mergeDatabases logger raw_dbs
 
   -- Now that we've merged everything together, prune out unusable
   -- packages.
-  let (pkg_map2, unusable, sccs) = validateDatabase cfg pkg_map1
+  let (initial_dbs, unusable, sccs) = validateDatabase cfg pkg_map1
 
   reportCycles   logger sccs
   reportUnusable logger unusable
+
+  -- distrust all units if the flag is set
+  let distrust_all info = info {unitIsTrusted = False}
+      pkg_map2 | unitConfigDistrustAll cfg = distrust_all <$> initial_dbs
+               | otherwise                 = initial_dbs
 
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
@@ -1675,6 +1679,9 @@ mkUnitState logger cfg = do
                 -- likely to actually happen.
                 return (updateVisibilityMap wired_map plugin_vis_map2)
 
+  (moduleNameProvidersMap, pluginModuleNameProvidersMap) <-
+    computeProviders index logger unit cfg vis_map plugin_vis_map initial_dbs pkg_db (mkUnusableModuleNameProvidersMap unusable)
+
   let pkgname_map = listToUFM [ (unitPackageName p, unitInstanceOf p)
                               | p <- pkgs2
                               ]
@@ -1687,8 +1694,6 @@ mkUnitState logger cfg = do
       req_ctx = mapUniqMap (Set.toList)
               $ plusUniqMapListWith Set.union (map uv_requirements (nonDetEltsUniqMap vis_map))
 
-
-  --
   -- Here we build up a set of the packages mentioned in -package
   -- flags on the command line; these are called the "preload"
   -- packages.  we link these packages in eagerly.  The preload set
@@ -1711,10 +1716,6 @@ mkUnitState logger cfg = do
                     $ closeUnitDeps pkg_db
                     $ zip (map toUnitId preload3) (repeat Nothing)
 
-  let mod_map1 = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet vis_map
-      mod_map2 = mkUnusableModuleNameProvidersMap unusable
-      mod_map = mod_map2 `plusUniqMap` mod_map1
-
   -- Force the result to avoid leaking input parameters
   let !state = UnitState
          { preloadUnits                 = dep_preload
@@ -1722,8 +1723,8 @@ mkUnitState logger cfg = do
          , homeUnitDepends              = home_unit_deps
          , unitInfoMap                  = pkg_db
          , preloadClosure               = emptyUniqSet
-         , moduleNameProvidersMap       = mod_map
-         , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
+         , moduleNameProvidersMap
+         , pluginModuleNameProvidersMap
          , packageNameMap               = pkgname_map
          , wireMap                      = wired_map
          , unwireMap                    = listToUniqMap [ (v,k) | (k,v) <- nonDetUniqMapToList wired_map ]
@@ -1896,6 +1897,51 @@ addListTo = foldl' merge
 mkModMap :: Unit -> ModuleName -> ModuleOrigin -> UniqMap Module ModuleOrigin
 mkModMap pkg mod = unitUniqMap (mkModule pkg mod)
 
+-- -----------------------------------------------------------------------------
+-- Index
+
+data UnitIndex =
+  UnitIndex {
+    readDatabases :: Logger -> UnitId -> UnitConfig -> IO [UnitDatabase UnitId],
+    computeProviders ::
+      Logger ->
+      UnitId ->
+      UnitConfig ->
+      VisibilityMap ->
+      VisibilityMap ->
+      UnitInfoMap ->
+      UnitInfoMap ->
+      ModuleNameProvidersMap ->
+      IO (ModuleNameProvidersMap, ModuleNameProvidersMap)
+  }
+
+readDatabasesDefault :: Logger -> UnitId -> UnitConfig -> IO [UnitDatabase UnitId]
+readDatabasesDefault logger _ cfg =
+  readUnitDatabases logger cfg
+
+computeProvidersDefault ::
+  Logger ->
+  UnitId ->
+  UnitConfig ->
+  VisibilityMap ->
+  VisibilityMap ->
+  UnitInfoMap ->
+  UnitInfoMap ->
+  ModuleNameProvidersMap ->
+  IO (ModuleNameProvidersMap, ModuleNameProvidersMap)
+computeProvidersDefault logger _ cfg vis_map plugin_vis_map _initial_dbs pkg_db unusable =
+  pure (mod_map, plugin_mod_map)
+  where
+    mod_map1 = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet vis_map
+    mod_map = unusable `plusUniqMap` mod_map1
+    plugin_mod_map = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
+
+newUnitIndex :: IO UnitIndex
+newUnitIndex = do
+  pure UnitIndex {
+    readDatabases = readDatabasesDefault,
+    computeProviders = computeProvidersDefault
+  }
 
 -- -----------------------------------------------------------------------------
 -- Package Utils

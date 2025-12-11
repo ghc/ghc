@@ -625,7 +625,8 @@ setUnitDynFlagsNoCheck uid dflags1 = do
 
   let old_hue = ue_findHomeUnitEnv uid (hsc_unit_env hsc_env)
   let cached_unit_dbs = homeUnitEnv_unit_dbs old_hue
-  (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 cached_unit_dbs (hsc_all_home_unit_ids hsc_env)
+  index <- hscUnitIndex <$> getSession
+  (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 index cached_unit_dbs (hsc_all_home_unit_ids hsc_env)
   updated_dflags <- liftIO $ updatePlatformConstants dflags1 mconstants
 
   let upd hue =
@@ -760,6 +761,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
     then do
         -- additionally, set checked dflags so we don't lose fixes
         old_unit_env <- ue_setFlags dflags0 . hsc_unit_env <$> getSession
+        ue_index <- hscUnitIndex <$> getSession
 
         home_unit_graph <- forM (ue_home_unit_graph old_unit_env) $ \homeUnitEnv -> do
           let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
@@ -767,7 +769,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
               old_hpt = homeUnitEnv_hpt homeUnitEnv
               home_units = unitEnv_keys (ue_home_unit_graph old_unit_env)
 
-          (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags cached_unit_dbs home_units
+          (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags ue_index cached_unit_dbs home_units
 
           updated_dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
           pure HomeUnitEnv
@@ -785,6 +787,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
               , ue_home_unit_graph = home_unit_graph
               , ue_current_unit    = ue_currentUnit old_unit_env
               , ue_eps             = ue_eps old_unit_env
+              , ue_index
               }
         modifySession $ \h -> hscSetFlags dflags1 h{ hsc_unit_env = unit_env }
     else modifySession (hscSetFlags dflags0)
