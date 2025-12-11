@@ -42,7 +42,7 @@ static void   freeTask  (Task *task);
 static Task * newTask   (bool);
 
 #if defined(THREADED_RTS)
-Mutex all_tasks_mutex;
+Mutex all_tasks_mutex = MUTEX_INIT;
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -70,9 +70,6 @@ initTaskManager (void)
         currentWorkerCount = 0;
         peakWorkerCount = 0;
         tasksInitialized = 1;
-#if defined(THREADED_RTS)
-        initMutex(&all_tasks_mutex);
-#endif
     }
 }
 
@@ -99,10 +96,6 @@ freeTaskManager (void)
     all_tasks = NULL;
 
     RELEASE_LOCK(&all_tasks_mutex);
-
-#if defined(THREADED_RTS)
-    closeMutex(&all_tasks_mutex);
-#endif
 
     tasksInitialized = 0;
 
@@ -175,7 +168,6 @@ freeTask (Task *task)
     // RTS (see conc059).
 #if defined(THREADED_RTS)
     closeCondition(&task->cond);
-    closeMutex(&task->lock);
 #endif
 
     for (incall = task->incall; incall != NULL; incall = next) {
@@ -210,7 +202,7 @@ newTask (bool worker)
 
 #if defined(THREADED_RTS)
     initCondition(&task->cond);
-    initMutex(&task->lock);
+    task->lock = MUTEX_INIT;
     task->id = 0;
     task->wakeup = false;
     task->node = 0;
@@ -346,17 +338,18 @@ discardTasksExcept (Task *keep)
         if (task != keep) {
             debugTrace(DEBUG_sched, "discarding task %" FMT_SizeT "", (size_t)TASK_ID(task));
 #if defined(THREADED_RTS)
-            // It is possible that some of these tasks are currently blocked
-            // (in the parent process) either on their condition variable
-            // `cond` or on their mutex `lock`. If they are we may deadlock
-            // when `freeTask` attempts to call `closeCondition` or
-            // `closeMutex` (the behaviour of these functions is documented to
-            // be undefined in the case that there are threads blocked on
-            // them). To avoid this, we re-initialize both the condition
-            // variable and the mutex before calling `freeTask` (we do
-            // precisely the same for all global locks in `forkProcess`).
+            // It is possible that some of these tasks are currently
+            // blocked (in the parent process) either on their
+            // condition variable `cond`. If they are we may deadlock
+            // when `freeTask` attempts to call `closeCondition` (see
+            // https://man7.org/linux/man-pages/man3/pthread_cond_destroy.3p.html,
+            // "Attempting to destroy a condition variable upon which
+            // other threads are currently blocked results in
+            // undefined behavior"). To avoid this, we re-initialize
+            // both the condition variable and the mutex before
+            // calling `freeTask` (we do precisely the same for all
+            // global locks in `forkProcess`).
             initCondition(&task->cond);
-            initMutex(&task->lock);
 #endif
 
             // Note that we do not traceTaskDelete here because

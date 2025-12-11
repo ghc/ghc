@@ -31,7 +31,7 @@ static HashTable *obj_hash;
 static HashTable *key_hash;
 
 #if defined(THREADED_RTS)
-static Mutex file_lock_mutex;
+static Mutex file_lock_mutex = MUTEX_INIT;
 #endif
 
 STATIC_INLINE int cmpLocks(StgWord w1, StgWord w2)
@@ -54,9 +54,6 @@ initFileLocking(void)
 {
     obj_hash = allocHashTable();
     key_hash  = allocHashTable(); /* ordinary word-based table */
-#if defined(THREADED_RTS)
-    initMutex(&file_lock_mutex);
-#endif
 }
 
 static void
@@ -70,9 +67,6 @@ freeFileLocking(void)
 {
     freeHashTable(obj_hash, freeLock);
     freeHashTable(key_hash,  NULL);
-#if defined(THREADED_RTS)
-    closeMutex(&file_lock_mutex);
-#endif
 }
 
 int

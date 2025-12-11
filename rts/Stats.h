@@ -48,7 +48,6 @@ void      stat_startExit(void);
 void      stat_endExit(void);
 
 void      stat_exitReport(void);
-void      stat_exit(void);
 void      stat_workerStop(void);
 
 void      initStats0(void);

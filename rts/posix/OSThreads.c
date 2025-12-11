@@ -267,25 +267,6 @@ osThreadIsAlive(OSThreadId id STG_UNUSED)
     return true;
 }
 
-void
-initMutex(Mutex* pMut)
-{
-#if defined(ASSERTS_ENABLED)
-    pthread_mutexattr_t attr;
-    pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr,PTHREAD_MUTEX_ERRORCHECK);
-    pthread_mutex_init(pMut,&attr);
-#else
-    pthread_mutex_init(pMut,NULL);
-#endif
-    return;
-}
-void
-closeMutex(Mutex* pMut)
-{
-    pthread_mutex_destroy(pMut);
-}
-
 #if defined(THREADED_RTS)
 
 static void *

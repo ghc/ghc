@@ -3,8 +3,8 @@
 #include "TopHandler.h"
 
 #if defined(THREADED_RTS)
-static Mutex m; // Protects the operations on topHandlerPtr,
-                // which aren't atomic
+static Mutex m = MUTEX_INIT; // Protects the operations on topHandlerPtr,
+                             // which aren't atomic
 #endif
 static StgStablePtr topHandlerPtr;
 
@@ -51,16 +51,10 @@ StgTSO *getTopHandlerThread(void) {
 }
 
 void initTopHandler(void) {
-#if defined(THREADED_RTS)
-    initMutex(&m);
-#endif
     topHandlerPtr = NULL;
 }
 
 void exitTopHandler(void) {
     freeStablePtr(topHandlerPtr);
     topHandlerPtr = NULL;
-#if defined(THREADED_RTS)
-    closeMutex(&m);
-#endif
 }

@@ -25,7 +25,7 @@ unsigned int SNT_size = 0;
 #define INIT_SNT_SIZE 64
 
 #if defined(THREADED_RTS)
-Mutex stable_name_mutex;
+Mutex stable_name_mutex = MUTEX_INIT;
 #endif
 
 static void enlargeStableNameTable(void);
@@ -81,10 +81,6 @@ initStableNameTable(void)
      */
     initSnEntryFreeList(stable_name_table + 1,INIT_SNT_SIZE-1,NULL);
     addrToStableHash = allocHashTable();
-
-#if defined(THREADED_RTS)
-    initMutex(&stable_name_mutex);
-#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -122,10 +118,6 @@ exitStableNameTable(void)
         stgFree(stable_name_table);
     stable_name_table = NULL;
     SNT_size = 0;
-
-#if defined(THREADED_RTS)
-    closeMutex(&stable_name_mutex);
-#endif
 }
 
 void

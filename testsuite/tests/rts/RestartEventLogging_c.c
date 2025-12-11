@@ -7,7 +7,7 @@
 #define WRITTEN       2
 
 static int32_t state = STOPPED;
-Mutex writeMutex;
+Mutex writeMutex = MUTEX_INIT;
 
 void test_init(void) {
   if (state != STOPPED) {
@@ -68,7 +68,6 @@ const EventLogWriter writer = {
 };
 
 void c_restart_eventlog(void) {
-  initMutex(&writeMutex);
   for (int i = 0; i < 30; i++) {
     if (!startEventLogging(&writer)) {
       printf("failed to start eventlog\n");
@@ -76,4 +75,3 @@ void c_restart_eventlog(void) {
     endEventLogging();
   }
 }
-

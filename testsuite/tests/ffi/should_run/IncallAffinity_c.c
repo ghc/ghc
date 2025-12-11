@@ -11,7 +11,7 @@ static int results[THREADS];
 static int waiters = 0;
 static int done = 0;
 static Condition cond;
-static Mutex mutex;
+static Mutex mutex = MUTEX_INIT;
 
 HsInt capTest();
 
@@ -51,7 +51,6 @@ int main(int argc, char *argv[])
   bool ok;
   hs_init(&argc, &argv);
   initCondition(&cond);
-  initMutex(&mutex);
   waiters = 0;
   done = 0;
   ok = true;

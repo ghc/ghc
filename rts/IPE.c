@@ -93,7 +93,7 @@ typedef struct {
     ((((uint64_t)(module_id)) << 32) | ((uint64_t)(idx)))
 
 #if defined(THREADED_RTS)
-static Mutex ipeMapLock;
+static Mutex ipeMapLock = MUTEX_INIT;
 #endif
 // Protected by ipeMapLock
 static HashTable *ipeMap = NULL;
@@ -116,20 +116,6 @@ static inline bool ipe_node_valid(const IpeBufferListNode *node) {
            node->entries_block->magic == IPE_MAGIC_WORD &&
            node->string_table_block->magic == IPE_MAGIC_WORD;
 }
-
-#if defined(THREADED_RTS)
-
-void initIpe(void) { initMutex(&ipeMapLock); }
-
-void exitIpe(void) { closeMutex(&ipeMapLock); }
-
-#else
-
-void initIpe(void) { }
-
-void exitIpe(void) { }
-
-#endif // THREADED_RTS
 
 static InfoProvEnt ipeBufferEntryToIpe(const IpeBufferListNode *node, uint32_t idx)
 {

@@ -127,7 +127,7 @@ static spEntry *old_SPTs[MAX_N_OLD_SPTS];
 static uint32_t n_old_SPTs = 0;
 
 #if defined(THREADED_RTS)
-Mutex stable_ptr_mutex;
+Mutex stable_ptr_mutex = MUTEX_INIT;
 #endif
 
 static void enlargeStablePtrTable(void);
@@ -174,10 +174,6 @@ initStablePtrTable(void)
     stable_ptr_table = stgMallocBytes(SPT_size * sizeof(spEntry),
                                       "initStablePtrTable");
     initSpEntryFreeList(stable_ptr_table,INIT_SPT_SIZE);
-
-#if defined(THREADED_RTS)
-    initMutex(&stable_ptr_mutex);
-#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -260,10 +256,6 @@ exitStablePtrTable(void)
     SPT_size = 0;
 
     freeOldSPTs();
-
-#if defined(THREADED_RTS)
-    closeMutex(&stable_ptr_mutex);
-#endif
 }
 
 STATIC_INLINE void

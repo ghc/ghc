@@ -23,7 +23,7 @@ static HANDLE io_manager_event = INVALID_HANDLE_VALUE;
 // We lock using OS_ACQUIRE_LOCK the ensure the non-threaded WINIO
 // C thread does not race with the scheduler code which can also
 // access the event queue via FFI.
-Mutex event_buf_mutex;
+Mutex event_buf_mutex = MUTEX_INIT;
 StgWord32 event_buf[EVENT_BUFSIZ];
 uint32_t next_event;
 
@@ -151,9 +151,6 @@ ioManagerDie (void)
 void
 ioManagerStart (void)
 {
-#if defined(THREADED_RTS)
-    initMutex(&event_buf_mutex);
-#endif
     next_event = 0;
 
     // Make sure the IO manager thread is running

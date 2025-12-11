@@ -139,15 +139,15 @@ static StgWord gc_running_threads;
 
 #if defined(THREADED_RTS)
 
-static Mutex gc_running_mutex;
+static Mutex gc_running_mutex = MUTEX_INIT;
 static Condition gc_running_cv;
 
-static Mutex gc_entry_mutex;
+static Mutex gc_entry_mutex = MUTEX_INIT;
 static StgInt n_gc_entered = 0;
 static Condition gc_entry_arrived_cv;
 static Condition gc_entry_start_now_cv;
 
-static Mutex gc_exit_mutex;
+static Mutex gc_exit_mutex = MUTEX_INIT;
 static StgInt n_gc_exited = 0;
 static Condition gc_exit_arrived_cv;
 static Condition gc_exit_leave_now_cv;
@@ -1240,13 +1240,10 @@ initGcThreads (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
     } else {
         gc_threads = stgMallocBytes (to * sizeof(gc_thread*),
                                      "initGcThreads");
-        initMutex(&gc_entry_mutex);
         initCondition(&gc_entry_arrived_cv);
         initCondition(&gc_entry_start_now_cv);
-        initMutex(&gc_exit_mutex);
         initCondition(&gc_exit_arrived_cv);
         initCondition(&gc_exit_leave_now_cv);
-        initMutex(&gc_running_mutex);
         initCondition(&gc_running_cv);
     }
 
@@ -1282,13 +1279,10 @@ freeGcThreads (void)
             stgFreeAligned (gc_threads[i]);
         }
         closeCondition(&gc_running_cv);
-        closeMutex(&gc_running_mutex);
         closeCondition(&gc_exit_leave_now_cv);
         closeCondition(&gc_exit_arrived_cv);
-        closeMutex(&gc_exit_mutex);
         closeCondition(&gc_entry_start_now_cv);
         closeCondition(&gc_entry_arrived_cv);
-        closeMutex(&gc_entry_mutex);
         stgFree (gc_threads);
 #else
         for (g = 0; g < RtsFlags.GcFlags.generations; g++)

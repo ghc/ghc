@@ -104,7 +104,7 @@ bool allocLimitRunHook = false;
  * the THREADED_RTS runtime.
  */
 #if defined(THREADED_RTS)
-Mutex sched_mutex;
+Mutex sched_mutex = MUTEX_INIT;
 #endif
 
 #if !defined(mingw32_HOST_OS) && !defined(wasm32_HOST_ARCH)
@@ -120,7 +120,7 @@ Mutex sched_mutex;
  */
 #if defined(THREADED_RTS)
 static Condition sync_finished_cond;
-static Mutex sync_finished_mutex;
+static Mutex sync_finished_mutex = MUTEX_INIT;
 #endif
 
 
@@ -2140,17 +2140,17 @@ forkProcess(HsStablePtr *entry
         resetChildProcessStats();
 
 #if defined(THREADED_RTS)
-        initMutex(&sched_mutex);
-        initMutex(&sm_mutex);
-        initMutex(&stable_ptr_mutex);
-        initMutex(&stable_name_mutex);
-        initMutex(&task->lock);
+        sched_mutex = MUTEX_INIT;
+        sm_mutex = MUTEX_INIT;
+        stable_ptr_mutex = MUTEX_INIT;
+        stable_name_mutex = MUTEX_INIT;
+        task->lock = MUTEX_INIT;
 
         for (i=0; i < n_capabilities; i++) {
-            initMutex(&getCapability(i)->lock);
+            getCapability(i)->lock = MUTEX_INIT;
         }
 
-        initMutex(&all_tasks_mutex);
+        all_tasks_mutex = MUTEX_INIT;
 #endif
 
 #if defined(TRACING)
@@ -2768,8 +2768,6 @@ initScheduler(void)
   /* Initialise the mutex and condition variables used by
    * the scheduler. */
 #if defined(THREADED_RTS)
-  initMutex(&sched_mutex);
-  initMutex(&sync_finished_mutex);
   initCondition(&sync_finished_cond);
 #endif
 
@@ -2836,9 +2834,6 @@ freeScheduler( void )
         freeCapabilities();
     }
     RELEASE_LOCK(&sched_mutex);
-#if defined(THREADED_RTS)
-    closeMutex(&sched_mutex);
-#endif
 }
 
 /* -----------------------------------------------------------------------------

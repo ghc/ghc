@@ -78,7 +78,7 @@ static sigset_t userSignals;
 static sigset_t savedSignals;
 
 #if defined(THREADED_RTS)
-static Mutex sig_mutex; // protects signal_handlers, nHandlers
+static Mutex sig_mutex = MUTEX_INIT; // protects signal_handlers, nHandlers
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -89,9 +89,6 @@ void
 initUserSignals(void)
 {
     sigemptyset(&userSignals);
-#if defined(THREADED_RTS)
-    initMutex(&sig_mutex);
-#endif
 }
 
 void
@@ -102,9 +99,6 @@ freeSignalHandlers(void) {
         nHandlers = 0;
         n_haskell_handlers = 0;
     }
-#if defined(THREADED_RTS)
-    closeMutex(&sig_mutex);
-#endif
 }
 
 /* -----------------------------------------------------------------------------

@@ -41,9 +41,13 @@ typedef struct {
 typedef pthread_mutex_t Mutex;
 typedef pthread_t       OSThreadId;
 
-#define OSThreadProcAttr /* nothing */
+#if defined(ASSERTS_ENABLED) && defined(PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP)
+#define MUTEX_INIT ((Mutex)PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP)
+#else
+#define MUTEX_INIT ((Mutex)PTHREAD_MUTEX_INITIALIZER)
+#endif
 
-#define INIT_COND_VAR       PTHREAD_COND_INITIALIZER
+#define OSThreadProcAttr /* nothing */
 
 #if defined(LOCK_DEBUG)
 #define LOCK_DEBUG_BELCH(what, mutex) \
@@ -109,8 +113,6 @@ typedef DWORD OSThreadId;
 
 #define OSThreadProcAttr
 
-#define INIT_COND_VAR  0
-
 /* Note [SRW locks]
    ~~~~~~~~~~~~~~~~
    We have a choice for implementing Mutexes on Windows.  Standard
@@ -129,6 +131,8 @@ typedef DWORD OSThreadId;
    SRWLOCK_INIT assignment. */
 
 typedef SRWLOCK Mutex;
+
+#define MUTEX_INIT ((Mutex)SRWLOCK_INIT)
 
 #if defined(LOCK_DEBUG)
 
@@ -153,21 +157,6 @@ typedef SRWLOCK Mutex;
 #define OS_ASSERT_LOCK_HELD(mutex) /* nothing */
 
 #endif // LOCK_DEBUG
-
-#endif // CMINUSMINUS
-
-# elif defined(wasm32_HOST_ARCH)
-
-#if defined(CMINUSMINUS)
-#else // CMINUSMINUS
-
-#include <errno.h>
-
-typedef void* Condition;
-typedef void* Mutex;
-typedef void* OSThreadId;
-
-#define OSThreadProcAttr
 
 #endif // CMINUSMINUS
 
@@ -206,12 +195,6 @@ extern void signalCondition       ( Condition* pCond );
 extern void waitCondition         ( Condition* pCond, Mutex* pMut );
 // Returns false on timeout, true otherwise.
 extern bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout);
-
-//
-// Mutexes
-//
-extern void initMutex             ( Mutex* pMut );
-extern void closeMutex            ( Mutex* pMut );
 
 // Processors and affinity
 void setThreadAffinity (uint32_t n, uint32_t m);
