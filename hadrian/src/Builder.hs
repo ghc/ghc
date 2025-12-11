@@ -17,7 +17,7 @@ import Development.Shake.Classes
 import Development.Shake.Command
 import Development.Shake.FilePath
 import GHC.Generics
-import GHC.Platform.ArchOS (ArchOS(..), Arch(..))
+import GHC.Platform.ArchOS (ArchOS(..), Arch(..), OS(..))
 import qualified Hadrian.Builder as H
 import Hadrian.Builder hiding (Builder)
 import Hadrian.Builder.Ar
@@ -183,6 +183,7 @@ data Builder = Alex
              | Objdump
              | Python
              | Ranlib
+             | Dlltool
              | Testsuite TestMode
              | Sphinx SphinxMode
              | Tar TarMode
@@ -421,6 +422,7 @@ isOptional target = \case
     Alex     -> True
     -- Most ar implemententions no longer need ranlib, but some still do
     Ranlib   -> not $ Toolchain.arNeedsRanlib (tgtAr target)
+    Dlltool  -> archOS_OS (tgtArchOs target) /= OSMinGW32
     JsCpp    -> not $ (archOS_arch . tgtArchOs) target == ArchJavaScript -- ArchWasm32 too?
     _        -> False
 
@@ -454,6 +456,7 @@ systemBuilderPath builder = case builder of
     Objdump         -> fromKey "objdump"
     Python          -> fromKey "python"
     Ranlib          -> fromTargetTC "ranlib" (maybeProg Toolchain.ranlibProgram . tgtRanlib)
+    Dlltool         -> fromTargetTC "dlltool" (maybeProg id . tgtDlltool)
     Testsuite _     -> fromKey "python"
     Sphinx _        -> fromKey "sphinx-build"
     Tar _           -> fromKey "tar"

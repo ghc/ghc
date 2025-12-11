@@ -379,6 +379,7 @@ templateRules = do
     , interpolateSetting "ProjectPatchLevel1" ProjectPatchLevel1
     , interpolateSetting "ProjectPatchLevel2" ProjectPatchLevel2
     ]
+  templateRule "rts/win32/libHSghc-internal.def" projectVersion
   templateRule "docs/index.html" $ packageUnitIds Stage1
   templateRule "docs/users_guide/ghc_config.py" $ mconcat
     [ projectVersion

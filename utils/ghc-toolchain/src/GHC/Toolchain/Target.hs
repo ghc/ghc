@@ -93,6 +93,7 @@ data Target = Target
 
       -- Windows-specific tools
     , tgtWindres :: Maybe Program
+    , tgtDlltool :: Maybe Program
 
       -- Darwin-specific tools
     , tgtOtool   :: Maybe Program
@@ -150,6 +151,7 @@ instance Show Target where
     , ", tgtOpt = " ++ show tgtOpt
     , ", tgtLlvmAs = " ++ show tgtLlvmAs
     , ", tgtWindres = " ++ show tgtWindres
+    , ", tgtDlltool = " ++ show tgtDlltool
     , ", tgtOtool = " ++ show tgtOtool
     , ", tgtInstallNameTool = " ++ show tgtInstallNameTool
     , "}"
