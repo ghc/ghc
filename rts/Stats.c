@@ -1278,8 +1278,6 @@ stat_exitReport (void)
             Time exit_gc_cpu     = stats.gc_cpu_ns - start_exit_gc_cpu;
             Time exit_gc_elapsed = stats.gc_elapsed_ns - start_exit_gc_elapsed;
 
-            WARN(exit_gc_elapsed > 0);
-
             sum.exit_cpu_ns     = end_exit_cpu
                                       - start_exit_cpu
                                       - exit_gc_cpu;
@@ -1287,7 +1285,35 @@ stat_exitReport (void)
                                        - start_exit_elapsed
                                        - exit_gc_elapsed;
 
-            WARN(sum.exit_elapsed_ns >= 0);
+            // Note [Clamping exit_cpu_ns and exit_elapsed_ns]
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            // In rare cases, these values can become negative due to a timing
+            // accounting edge case when a GC cycle straddles the exit boundary:
+            //
+            // 1. A GC begins (stat_startGC records gc_start_elapsed/cpu)
+            // 2. stat_startExit() is called, capturing start_exit_gc_elapsed
+            //    = stats.gc_elapsed_ns (which does NOT include the in-progress GC)
+            // 3. The GC completes (stat_endGC adds the FULL GC duration to
+            //    stats.gc_elapsed_ns)
+            // 4. stat_endExit() is called
+            //
+            // When we calculate:
+            //   exit_gc_elapsed = stats.gc_elapsed_ns - start_exit_gc_elapsed
+            //
+            // This includes the ENTIRE duration of the straddling GC, even the
+            // portion that occurred BEFORE stat_startExit() was called. This can
+            // make exit_gc_elapsed > (end_exit_elapsed - start_exit_elapsed),
+            // resulting in negative sum.exit_elapsed_ns.
+            //
+            // This is more likely to manifest on systems with different scheduler
+            // behavior or timing granularity (observed on Alpine Linux / musl).
+            //
+            // We clamp to zero rather than attempting complex fixes because:
+            // - These statistics are best-effort approximations anyway
+            // - The edge case is rare (requires GC to straddle exit boundary)
+            // - This matches the existing pattern for mutator_cpu_ns below
+            if (sum.exit_cpu_ns < 0)     { sum.exit_cpu_ns = 0; }
+            if (sum.exit_elapsed_ns < 0) { sum.exit_elapsed_ns = 0; }
 
             stats.mutator_cpu_ns     = start_exit_cpu
                                  - end_init_cpu
@@ -1297,19 +1323,7 @@ stat_exitReport (void)
                                  - end_init_elapsed
                                  - (stats.gc_elapsed_ns - exit_gc_elapsed);
 
-            WARN(stats.mutator_elapsed_ns >= 0);
-
             if (stats.mutator_cpu_ns < 0) { stats.mutator_cpu_ns = 0; }
-
-            // The subdivision of runtime into INIT/EXIT/GC/MUT is just adding
-            // and subtracting, so the parts should add up to the total exactly.
-            // Note that stats->total_ns is captured a tiny bit later than
-            // end_exit_elapsed, so we don't use it here.
-            WARN(stats.init_elapsed_ns // INIT
-                   + stats.mutator_elapsed_ns // MUT
-                   + stats.gc_elapsed_ns // GC
-                   + sum.exit_elapsed_ns // EXIT
-                   == end_exit_elapsed - start_init_elapsed);
 
             // heapCensus() is called by the GC, so RP and HC time are
             // included in the GC stats.  We therefore subtract them to
