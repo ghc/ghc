@@ -29,7 +29,7 @@ module GHC.Core.Opt.Simplify.Utils (
         contIsTrivial, contArgs, contIsRhs,
         countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
-        interestingCallContext, pushCastCont,
+        interestingCallContext, pushCastCont, pushCastMCont,
 
         -- ArgInfo
         ArgInfo(..), ArgSpec(..), mkArgInfo,
@@ -63,6 +63,7 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )
+import GHC.Core.Coercion.Opt    ( optCoercion )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import GHC.Core.Multiplicity
 import GHC.Core.Opt.ConstantFold
@@ -415,11 +416,6 @@ mkLazyArgStop ty fun_info = Stop ty (lazyArgContext fun_info) arg_sd
   where
     arg_sd = subDemandIfEvaluated (Partial.head (ai_dmds fun_info))
 
-pushCastCont :: MOutCoercion -> SimplCont -> SimplCont
--- Assumes the MOutCoercion is optimised
-pushCastCont MRefl    cont = cont
-pushCastCont (MCo co) cont = CastIt { sc_co = co, sc_opt = True, sc_cont = cont }
-
 -------------------
 contIsRhs :: SimplCont -> Maybe RecFlag
 contIsRhs (Stop _ (RhsCtxt is_rec) _) = Just is_rec
@@ -703,6 +699,63 @@ which it is on the LHS of a rule (see updModeForRuleLHS), then don't
 make use of the strictness info for the function.
 -}
 
+
+{- *********************************************************************
+*                                                                      *
+          Pushing a cast onto a continuation
+*                                                                      *
+********************************************************************* -}
+
+pushCastMCont :: SimplEnvIS -> MOutCoercion -> Bool -> SimplCont -> SimplCont
+-- Bool = True <=> the coercion is already optimised
+pushCastMCont _   MRefl    _   cont = cont
+pushCastMCont env (MCo co) opt cont = pushCastCont env co opt cont
+
+pushCastCont :: SimplEnvIS -> OutCoercion -> Bool -> SimplCont -> SimplCont
+pushCastCont _env co _opt cont
+  | isReflCo co  -- isReflCo is cheap
+  = cont   -- Having this test made a huge difference in T12227, for some reason
+           -- See Note [Optimising reflexivity]
+
+pushCastCont env co _opt (CastIt { sc_co = co2, sc_cont = cont })  -- See Note [Optimising reflexivity]
+  = pushCastCont env (mkTransCo co co2) False cont
+        -- False: (mkTransCo co co2) is not fully optimised
+        -- See Note [Avoid re-simplifying coercions]
+
+pushCastCont env co opt (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
+  | Just (arg_ty', m_co') <- pushCoTyArg co arg_ty
+  = {-#SCC "addCoerce-pushCoTyArg" #-}
+    ApplyToTy { sc_arg_ty  = arg_ty'
+              , sc_hole_ty = coercionLKind co
+              , sc_cont    = pushCastMCont env m_co' opt tail }
+    -- sc_hole_ty: As the cast goes past, the hole type changes (#16312)
+
+pushCastCont env co opt cont@(ApplyToVal {})
+  | not opt  -- pushCoValArg duplicates the coercion, so optimise first
+  = pushCastCont env (optCoercion opts empty_subst co) True cont
+  where
+    empty_subst = mkEmptySubst (seInScope env)
+    opts = seOptCoercionOpts env
+
+pushCastCont env co _opt (ApplyToVal { sc_arg = clo, sc_dup = dup, sc_cont = tail })
+ | Just (m_co1, m_co2) <- pushCoValArg co
+ = -- (f |> co) e   ===>   (f (e |> co1)) |> co2
+   -- where   co :: (s1->s2) ~ (t1->t2)
+   --         co1 :: t1 ~ s1
+   --         co2 :: s2 ~ t2
+   ApplyToVal { sc_arg     = mkCloCastMCo clo m_co1
+              , sc_dup     = dup
+              , sc_hole_ty = coercionLKind co
+              , sc_cont    = pushCastMCont env m_co2 True tail }
+
+pushCastCont _env co opt cont
+  = CastIt { sc_co = co, sc_opt = opt, sc_cont = cont }
+
+mkCloCastMCo :: SimplClo -> MOutCoercion -> SimplClo
+mkCloCastMCo clo               MRefl    = clo
+mkCloCastMCo (DoneId v)        (MCo co) = DoneEx (Cast (Var v) co) NotJoinPoint
+mkCloCastMCo (DoneEx e _jp)    (MCo co) = DoneEx (Cast e       co) NotJoinPoint
+mkCloCastMCo (ContEx se e mco) (MCo co) = ContEx se e (mkTransMCoL mco co)
 
 {-
 ************************************************************************
@@ -1859,7 +1912,9 @@ rebuildLam _env [] body _cont
   = return body
 
 rebuildLam env bndrs@(bndr:_) body cont
-  = {-# SCC "rebuildLam" #-} try_eta bndrs body
+  = {-# SCC "rebuildLam" #-}
+    do { traceSmpl "rebuildLam" (ppr bndrs $$ ppr cont)
+       ; try_eta bndrs body }
   where
     rec_ids  = seRecIds env
     in_scope = getInScope env  -- Includes 'bndrs'
