@@ -8,6 +8,7 @@ module GHC.Driver.Env
    , hsc_home_unit_maybe
    , hsc_units
    , hscUnitIndex
+   , hscUnitIndexQuery
    , hsc_HPT
    , hsc_HUE
    , hsc_HUG
@@ -121,6 +122,10 @@ hsc_units = ue_units . hsc_unit_env
 
 hscUnitIndex :: HscEnv -> UnitIndex
 hscUnitIndex = ue_index . hsc_unit_env
+
+hscUnitIndexQuery :: HscEnv -> IO UnitIndexQuery
+hscUnitIndexQuery hsc_env =
+  unitIndexQuery (hscUnitIndex hsc_env) (hscActiveUnitId hsc_env)
 
 hsc_HPT :: HscEnv -> HomePackageTable
 hsc_HPT = ue_hpt . hsc_unit_env

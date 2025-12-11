@@ -588,7 +588,8 @@ checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
  = do
     res_normal <- classify_import (findImportedModule hsc_env) (ms_textual_imps summary ++ ms_srcimps summary)
-    res_plugin <- classify_import (\mod _ -> findPluginModule fc fopts units mhome_unit mod) (ms_plugin_imps summary)
+    query <- liftIO $ hscUnitIndexQuery hsc_env
+    res_plugin <- classify_import (\mod _ -> findPluginModule fc fopts units query mhome_unit mod) (ms_plugin_imps summary)
     case sequence (res_normal ++ res_plugin ++ [Right (fake_ghc_prim_import)| ms_ghc_prim_import summary]) of
       Left recomp -> return $ NeedsRecompile recomp
       Right es -> do
