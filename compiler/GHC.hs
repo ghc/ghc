@@ -376,7 +376,7 @@ import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Rename.Names (renamePkgQual, renameRawPkgQual)
+import GHC.Rename.Names (hscRenamePkgQual, hscRenameRawPkgQual)
 
 import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import GHC.Tc.Types
@@ -663,7 +663,8 @@ setUnitDynFlagsNoCheck uid dflags1 = do
 
   let old_hue = ue_findHomeUnitEnv uid (hsc_unit_env hsc_env)
   let cached_unit_dbs = homeUnitEnv_unit_dbs old_hue
-  (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 cached_unit_dbs (hsc_all_home_unit_ids hsc_env)
+  index <- hscUnitIndex <$> getSession
+  (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 index cached_unit_dbs (hsc_all_home_unit_ids hsc_env)
   updated_dflags <- liftIO $ updatePlatformConstants dflags1 mconstants
 
   let upd hue =
@@ -747,6 +748,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
     then do
         -- additionally, set checked dflags so we don't lose fixes
         old_unit_env <- ue_setFlags dflags0 . hsc_unit_env <$> getSession
+        ue_index <- hscUnitIndex <$> getSession
 
         home_unit_graph <- forM (ue_home_unit_graph old_unit_env) $ \homeUnitEnv -> do
           let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
@@ -754,7 +756,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
               old_hpt = homeUnitEnv_hpt homeUnitEnv
               home_units = HUG.allUnits (ue_home_unit_graph old_unit_env)
 
-          (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags cached_unit_dbs home_units
+          (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags ue_index cached_unit_dbs home_units
 
           updated_dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
           pure HomeUnitEnv
@@ -773,6 +775,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
               , ue_current_unit    = ue_currentUnit old_unit_env
               , ue_module_graph    = ue_module_graph old_unit_env
               , ue_eps             = ue_eps old_unit_env
+              , ue_index
               }
         modifySession $ \h -> hscSetFlags dflags1 h{ hsc_unit_env = unit_env }
     else modifySession (hscSetFlags dflags0)
@@ -830,6 +833,7 @@ setProgramHUG_ invalidate_needed new_hug0 = do
             , ue_current_unit    = ue_currentUnit unit_env0
             , ue_eps             = ue_eps unit_env0
             , ue_module_graph    = ue_module_graph unit_env0
+            , ue_index           = ue_index unit_env0
             }
       modifySession $ \h ->
         -- hscSetFlags takes care of updating the logger as well.
@@ -878,7 +882,7 @@ setProgramHUG_ invalidate_needed new_hug0 = do
           old_hpt = homeUnitEnv_hpt homeUnitEnv
           home_units = HUG.allUnits (ue_home_unit_graph unit_env)
 
-      (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags cached_unit_dbs home_units
+      (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags (ue_index unit_env) cached_unit_dbs home_units
 
       updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
       pure HomeUnitEnv
@@ -1700,10 +1704,10 @@ modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc d
    parens (text (expectJust (ml_hs_file loc)))
 
 renamePkgQualM :: GhcMonad m => ModuleName -> Maybe FastString -> m PkgQual
-renamePkgQualM mn p = withSession $ \hsc_env -> pure (renamePkgQual (hsc_unit_env hsc_env) mn p)
+renamePkgQualM mn p = withSession $ \hsc_env -> hscRenamePkgQual hsc_env mn p
 
 renameRawPkgQualM :: GhcMonad m => ModuleName -> RawPkgQual -> m PkgQual
-renameRawPkgQualM mn p = withSession $ \hsc_env -> pure (renameRawPkgQual (hsc_unit_env hsc_env) mn p)
+renameRawPkgQualM mn p = withSession $ \hsc_env -> hscRenameRawPkgQual hsc_env mn p
 
 -- | Like 'findModule', but differs slightly when the module refers to
 -- a source file, and the file has not been loaded via 'load'.  In
@@ -1728,7 +1732,8 @@ lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
       let dflags = hsc_dflags hsc_env
       let sec    = initSourceErrorContext dflags
       let fopts  = initFinderOpts dflags
-      res <- findExposedPackageModule fc fopts units mod_name NoPkgQual
+      query <- hscUnitIndexQuery hsc_env
+      res <- findExposedPackageModule fc fopts units query mod_name NoPkgQual
       case res of
         Found _ m -> return m
         err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
@@ -1778,7 +1783,8 @@ lookupAllQualifiedModuleNames NoPkgQual mod_name = withSession $ \hsc_env -> do
       let dflags = hsc_dflags hsc_env
       let sec    = initSourceErrorContext dflags
       let fopts  = initFinderOpts dflags
-      res <- findExposedPackageModule fc fopts units mod_name NoPkgQual
+      query <- hscUnitIndexQuery hsc_env
+      res <- findExposedPackageModule fc fopts units query mod_name NoPkgQual
       case res of
         Found _ m -> return [m]
         err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err

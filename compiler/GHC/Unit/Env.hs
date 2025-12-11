@@ -174,6 +174,8 @@ data UnitEnv = UnitEnv
 
     , ue_namever   :: !GhcNameVersion
         -- ^ GHC name/version (used for dynamic library suffix)
+
+    , ue_index :: !UnitIndex
     }
 
 ueEPS :: UnitEnv -> IO ExternalPackageState
@@ -182,6 +184,7 @@ ueEPS = eucEPS . ue_eps
 initUnitEnv :: UnitId -> HomeUnitGraph -> GhcNameVersion -> Platform -> IO UnitEnv
 initUnitEnv cur_unit hug namever platform = do
   eps <- initExternalUnitCache
+  ue_index <- newUnitIndex
   return $ UnitEnv
     { ue_eps             = eps
     , ue_home_unit_graph = hug
@@ -189,6 +192,7 @@ initUnitEnv cur_unit hug namever platform = do
     , ue_current_unit    = cur_unit
     , ue_platform        = platform
     , ue_namever         = namever
+    , ue_index
     }
 
 updateHug :: (HomeUnitGraph -> HomeUnitGraph) -> UnitEnv -> UnitEnv

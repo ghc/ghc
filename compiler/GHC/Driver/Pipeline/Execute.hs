@@ -671,9 +671,10 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   -- gather the imports and module name
   (hspp_buf,mod_name,imps,src_imps) <- do
     buf <- hGetStringBuffer input_fn
+    query <- hscUnitIndexQuery hsc_env
     let imp_prelude = xopt LangExt.ImplicitPrelude dflags
         popts = initParserOpts dflags
-        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
+        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) query
         rn_imps = fmap (\(s, rpk, lmn@(L _ mn)) -> (s, rn_pkg_qual mn rpk, lmn))
         sec = initSourceErrorContext dflags
     eimps <- getImports popts sec imp_prelude buf input_fn (basename <.> suff)

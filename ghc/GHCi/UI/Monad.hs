@@ -365,7 +365,6 @@ unsetOption opt
  = do st <- getGHCiState
       setGHCiState (st{ options = filter (/= opt) (options st) })
 
-
 -- | Run a single Haskell expression
 runStmt
   :: GhciMonad m

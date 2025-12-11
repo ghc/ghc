@@ -145,7 +145,8 @@ deSugar hsc_env
   = do { let dflags = hsc_dflags hsc_env
              logger = hsc_logger hsc_env
              ptc = initPromotionTickContext (hsc_dflags hsc_env)
-             name_ppr_ctx = mkNamePprCtx ptc (hsc_unit_env hsc_env) rdr_env
+        ; query <- hscUnitIndexQuery hsc_env
+        ; let name_ppr_ctx = mkNamePprCtx ptc (hsc_unit_env hsc_env) query rdr_env
         ; withTiming logger
                      (text "Desugar"<+>brackets (ppr mod))
                      (const ()) $
