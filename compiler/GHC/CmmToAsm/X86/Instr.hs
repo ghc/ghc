@@ -114,9 +114,12 @@ data Instr
 
         -- | X86 scalar move instruction.
         --
-        -- When used at a vector format, only moves the lower 64 bits of data;
-        -- the rest of the data in the destination may either be zeroed or
-        -- preserved, depending on the specific format and operands.
+        -- The format is the format the destination is written to. For an XMM
+        -- register, using a scalar format means that we don't care about the
+        -- upper bits, while using a vector format means that we care about the
+        -- upper bits, even though we are only writing to the lower bits.
+        --
+        -- See also Note [Allocated register formats] in GHC.CmmToAsm.Reg.Linear.
         | MOV Format Operand Operand
              -- N.B. Due to AT&T assembler quirks, when used with 'II64'
              -- 'Format' immediate source and memory target operand, the source
@@ -410,18 +413,27 @@ data FMAPermutation = FMA132 | FMA213 | FMA231
 regUsageOfInstr :: Platform -> Instr -> RegUsage
 regUsageOfInstr platform instr
  = case instr of
-    MOV fmt src dst
+
+    -- Recall that MOV is always a scalar move instruction, but when the destination
+    -- is an XMM register, we make the distinction between:
+    --
+    --  - a scalar format, meaning that from now on we no longer care about the top bits
+    --    of the register, and
+    --  - a vector format, meaning that we still care about what's in the high bits.
+    --
+    -- See Note [Allocated register formats] in GHC.CmmToAsm.Reg.Linear.
+    MOV dst_fmt src dst
       -- MOVSS/MOVSD preserve the upper half of vector registers,
       -- but only for reg-2-reg moves
-      | VecFormat _ sFmt <- fmt
+      | VecFormat _ sFmt <- dst_fmt
       , isFloatScalarFormat sFmt
       , OpReg {} <- src
       , OpReg {} <- dst
-      -> usageRM fmt src dst
+      -> usageRM dst_fmt src dst
       -- other MOV instructions zero any remaining upper part of the destination
       -- (largely to avoid partial register stalls)
       | otherwise
-      -> usageRW fmt src dst
+      -> usageRW dst_fmt src dst
     MOVD fmt1 fmt2 src dst    ->
       -- NB: MOVD and MOVQ always zero any remaining upper part of destination,
       -- so the destination is "written" not "modified".
