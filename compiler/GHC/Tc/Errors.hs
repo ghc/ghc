@@ -1322,8 +1322,13 @@ maybeReportError ctxt items@(item1:|_) (SolverReport { sr_important_msg = import
              -- report nothing.  (If at least one is not suppressed, do report: the function that
              -- generates the error message should look for an unsuppressed error item.)
 
-     | any ei_insoluble items
-     = False  -- Don't suppress insolubles even if cec_suppress is True
+-- It is tempting to say that we always want to see all insoluble errors
+-- But then we get a bit more than we want.  Examples:
+--    a ~ t a               occurs check errors (T2534, mc25)
+--    T @X1 T1 ~ T @X2 T2   gives two insolubles: X1~X2 and T1~T2 (KindVType, T17380, T22332b)
+--
+--     | any ei_insoluble items
+--     = False  -- Don't suppress insolubles even if cec_suppress is True
 
      | cec_suppress ctxt
      = True   -- Some earlier error has occurred, so suppress this diagnostic
