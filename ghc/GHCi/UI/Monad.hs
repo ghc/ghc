@@ -374,10 +374,11 @@ printForUserGlobalRdrEnv mb_rdr_env doc = do
     where
       mkNamePprCtxFromGlobalRdrEnv _ Nothing = GHC.getNamePprCtx
       mkNamePprCtxFromGlobalRdrEnv dflags (Just rdr_env) =
-        withSession $ \ hsc_env ->
+        withSession $ \ hsc_env -> do
+        query <- liftIO $ hscUnitIndexQuery hsc_env
         let unit_env = hsc_unit_env hsc_env
             ptc = initPromotionTickContext dflags
-        in  return $ Ppr.mkNamePprCtx ptc unit_env rdr_env
+        return $ Ppr.mkNamePprCtx ptc unit_env query rdr_env
 
 printForUser :: GhcMonad m => SDoc -> m ()
 printForUser doc = do

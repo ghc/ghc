@@ -27,6 +27,7 @@ module GHC.Rename.Names (
         getMinimalImports,
         printMinimalImports,
         renamePkgQual, renameRawPkgQual,
+        hscRenamePkgQual, hscRenameRawPkgQual,
         classifyGREs,
         ImportDeclUsage,
     ) where
@@ -337,7 +338,8 @@ rnImportDecl this_mod
 
     hsc_env <- getTopEnv
     unit_env <- hsc_unit_env <$> getTopEnv
-    let pkg_qual = renameRawPkgQual unit_env imp_mod_name raw_pkg_qual
+    query <- liftIO $ hscUnitIndexQuery hsc_env
+    let pkg_qual = renameRawPkgQual unit_env query imp_mod_name raw_pkg_qual
 
     -- Check for self-import, which confuses the typechecker (#9032)
     -- ghc --make rejects self-import cycles already, but batch-mode may not
@@ -447,14 +449,14 @@ rnImportDecl this_mod
 
 
 -- | Rename raw package imports
-renameRawPkgQual :: UnitEnv -> ModuleName -> RawPkgQual -> PkgQual
-renameRawPkgQual unit_env mn = \case
+renameRawPkgQual :: UnitEnv -> UnitIndexQuery -> ModuleName -> RawPkgQual -> PkgQual
+renameRawPkgQual unit_env query mn = \case
   NoRawPkgQual -> NoPkgQual
-  RawPkgQual p -> renamePkgQual unit_env mn (Just (sl_fs p))
+  RawPkgQual p -> renamePkgQual unit_env query mn (Just (sl_fs p))
 
 -- | Rename raw package imports
-renamePkgQual :: UnitEnv -> ModuleName -> Maybe FastString -> PkgQual
-renamePkgQual unit_env mn mb_pkg = case mb_pkg of
+renamePkgQual :: UnitEnv -> UnitIndexQuery -> ModuleName -> Maybe FastString -> PkgQual
+renamePkgQual unit_env query mn mb_pkg = case mb_pkg of
   Nothing -> NoPkgQual
   Just pkg_fs
     | Just uid <- homeUnitId <$> ue_homeUnit unit_env
@@ -464,7 +466,7 @@ renamePkgQual unit_env mn mb_pkg = case mb_pkg of
     | Just (uid, _) <- find (fromMaybe False . fmap (== pkg_fs) . snd) home_names
     -> ThisPkg uid
 
-    | Just uid <- resolvePackageImport (ue_units unit_env) mn (PackageName pkg_fs)
+    | Just uid <- resolvePackageImport (ue_units unit_env) query mn (PackageName pkg_fs)
     -> OtherPkg uid
 
     | otherwise
@@ -482,6 +484,25 @@ renamePkgQual unit_env mn mb_pkg = case mb_pkg of
     hpt_deps :: S.Set UnitId
     hpt_deps  = homeUnitDepends units
 
+hscRenameRawPkgQual ::
+  MonadIO m =>
+  HscEnv ->
+  ModuleName ->
+  RawPkgQual ->
+  m PkgQual
+hscRenameRawPkgQual hsc_env name raw = do
+  query <- liftIO $ hscUnitIndexQuery hsc_env
+  pure (renameRawPkgQual (hsc_unit_env hsc_env) query name raw)
+
+hscRenamePkgQual ::
+  MonadIO m =>
+  HscEnv ->
+  ModuleName ->
+  Maybe FastString ->
+  m PkgQual
+hscRenamePkgQual hsc_env name package = do
+  query <- liftIO $ hscUnitIndexQuery hsc_env
+  pure (renamePkgQual (hsc_unit_env hsc_env) query name package)
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
