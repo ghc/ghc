@@ -734,6 +734,7 @@ saveClobberedTemps clobbered dying
 
               -- (2) no free registers: spill the value
               [] -> do
+
                   (spill, slot)   <- spillR (RegWithFormat (RegReal reg) fmt) temp
 
                   -- record why this reg was spilled for profiling
@@ -833,19 +834,24 @@ allocateRegsAndSpill reading keep spills alloc (r@(VirtualRegWithFormat vr vrFmt
         let doSpill = allocRegsAndSpill_spill reading keep spills alloc r rs assig
         case lookupUFM assig vr of
                 -- case (1a): already in a register
-                Just (Loc (InReg my_reg) _) ->
-                        allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
+                Just (Loc (InReg my_reg) in_reg_fmt) -> do
+                  -- (RF1) from Note [Allocated register formats]:
+                  -- writes redefine the format the register is used at.
+                  when (not reading && vrFmt /= in_reg_fmt) $
+                    setAssigR $ toRegMap $
+                      addToUFM assig vr (Loc (InReg my_reg) vrFmt)
+                  allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
 
                 -- case (1b): already in a register (and memory)
-                -- NB1. if we're writing this register, update its assignment to be
-                -- InReg, because the memory value is no longer valid.
-                -- NB2. This is why we must process written registers here, even if they
-                -- are also read by the same instruction.
-                Just (Loc (InBoth my_reg _) _)
-                 -> do  when (not reading) $
-                          setAssigR $ toRegMap $
-                            addToUFM assig vr (Loc (InReg my_reg) vrFmt)
-                        allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
+                Just (Loc (InBoth my_reg _) _) -> do
+                  -- NB1. if we're writing this register, update its assignment to be
+                  -- InReg, because the memory value is no longer valid.
+                  -- NB2. This is why we must process written registers here, even if they
+                  -- are also read by the same instruction.
+                  when (not reading) $
+                    setAssigR $ toRegMap $
+                      addToUFM assig vr (Loc (InReg my_reg) vrFmt)
+                  allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
 
                 -- Not already in a register, so we need to find a free one...
                 Just (Loc (InMem slot) memFmt)
@@ -1028,6 +1034,39 @@ loadTemp (VirtualRegWithFormat vreg _fmt) (ReadMem slot memFmt) hreg spills
 
 loadTemp _ _ _ spills =
    return spills
+
+{- Note [Allocated register formats]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We uphold the following principle for the format at which we keep track of
+alllocated registers:
+
+  RF1. Writes redefine the format.
+
+    When we write to a register 'r' at format 'fmt', we consider the register
+    to hold that format going forwards.
+
+    (In cases where a partial write is desired, the move instruction should
+     specify that the destination format is the full register, even if, say,
+     the instruction only writes to the low 64 bits of the register.
+     See also Wrinkle [Don't allow scalar partial writes] in
+     Note [Register formats in liveness analysis] in GHC.CmmToAsm.Reg.Liveness.)
+
+  RF2. Reads from a register do not redefine its format.
+
+    Generally speaking, as explained in Note [Register formats in liveness analysis]
+    in GHC.CmmToAsm.Reg.Liveness, when computing the used format from a collection
+    of reads, we take a least upper bound.
+
+It is particularly important to get (RF1) correct, as otherwise we can end up in
+the situation of T26411b, where code such as
+
+  movsd .Ln6m(%rip),%v1
+  shufpd $0,%v1,%v1
+
+we start off with %v1 :: F64, but after shufpd (which broadcasts the low part
+to the high part) we must consider that %v1 :: F64x2. If we fail to do that,
+then we will silently discard the top bits in spill/reload operations.
+-}
 
 {- Note [Use spilled format when reloading]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
