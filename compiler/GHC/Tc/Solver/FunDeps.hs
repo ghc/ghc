@@ -1089,7 +1089,7 @@ solveFunDeps work_ev fd_eqns
   = return (False, False) -- Common case no-op
 
   | otherwise
-  = do { traceTcS "bumping" (ppr work_ev)
+  = do { traceTcS "solveFunDeps {" (ppr work_ev)
        ; loc' <- bumpReductionDepth (ctEvLoc work_ev) (ctEvPred work_ev)
                  -- See (CF3) in Note [Exploiting closed type families]
 
@@ -1097,7 +1097,7 @@ solveFunDeps work_ev fd_eqns
              <- reportFineGrainUnifications $
                 nestFunDepsTcS              $
                 TcS.pushTcLevelM_           $
-                   -- pushTcLevelTcM: increase the level so that unification variables
+                   -- pushTcLevelTcM: increase the level so that unification variablesb
                    -- allocated by the fundep-creation itself don't count as useful unifications
                    -- See Note [Deeper TcLevel for partial improvement unification variables]
                 do { (_, eqs) <- wrapUnifier (ctEvRewriters work_ev) loc' Nominal $
@@ -1111,7 +1111,12 @@ solveFunDeps work_ev fd_eqns
        -- that were unified by the fundep
        ; kickOutAfterUnification unifs
 
-       ; return (insolubleWC residual, not (isEmptyVarSet unifs)) }
+       ; let insoluble_fundeps = any insolubleCt (wc_simple residual)
+             -- Don't use insolubleWC, because that ignores Given constraints
+             -- and Given constraints are super-important when doing
+             -- tcCheckGivens in the pattern match overlap checker
+       ; traceTcS "solveFunDeps }" (ppr insoluble_fundeps <+>  ppr unifs $$ ppr residual)
+       ; return (insoluble_fundeps, not (isEmptyVarSet unifs)) }
            -- insolubleWC: see (CF3) in Note [Exploiting closed type families]
   where
     do_fundeps :: UnifyEnv -> TcM ()
