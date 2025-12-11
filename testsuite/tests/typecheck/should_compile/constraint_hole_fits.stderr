@@ -1,4 +1,3 @@
-
 constraint_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [a] -> a
       Where: ‘a’ is a rigid type variable bound by
@@ -42,10 +41,10 @@ constraint_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           where ($) :: forall a b. (a -> b) -> a -> b
         ($!) (_ :: [a] -> a)
           where ($!) :: forall a b. (a -> b) -> a -> b
-        return (_ :: a)
-          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: a)
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+        return (_ :: a)
+          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         id (_ :: [a] -> a)
           where id :: forall a. a -> a
         head (_ :: [[a] -> a])
@@ -62,3 +61,4 @@ constraint_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           where (!!) :: forall a.
                         GHC.Internal.Stack.Types.HasCallStack =>
                         [a] -> Int -> a
+

@@ -299,10 +299,10 @@ hard_hole_fits.hs:29:35: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           (bound at hard_hole_fits.hs:29:21)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
       Valid hole fits include
-        n :: Language.Haskell.Syntax.Basic.ConTag
-          (bound at hard_hole_fits.hs:29:25)
         i :: Language.Haskell.Syntax.Basic.SumWidth
           (bound at hard_hole_fits.hs:29:27)
+        n :: Language.Haskell.Syntax.Basic.ConTag
+          (bound at hard_hole_fits.hs:29:25)
         maxBound :: forall a. Bounded a => a
           with maxBound @Int
           (imported from ‘Prelude’

@@ -3595,7 +3595,7 @@ pprHoleFit :: HoleFitDispConfig -> HoleFit -> SDoc
 pprHoleFit _ (RawHoleFit sd) = sd
 pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (TcHoleFit (HoleFit {..})) =
  hang display 2 provenance
- where tyApp = sep $ zipWithEqual pprArg vars hfWrap
+ where tyApp = sep $ zipWith pprArg vars hfWrap
          where pprArg b arg = case binderFlag b of
                                 Specified -> text "@" <> pprParendType arg
                                   -- Do not print type application for inferred
@@ -3604,20 +3604,9 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (TcHoleFit (HoleFit {..})) =
                                 Required  -> pprPanic "pprHoleFit: bad Required"
                                                          (ppr b <+> ppr arg)
        tyAppVars = sep $ punctuate comma $
-           zipWithEqual (\v t -> ppr (binderVar v) <+> text "~" <+> pprParendType t)
+           zipWith (\v t -> ppr (binderVar v) <+> text "~" <+> pprParendType t)
            vars hfWrap
-
-       vars = unwrapTypeVars hfType
-         where
-           -- Attempts to get all the quantified type variables in a type,
-           -- e.g.
-           -- return :: forall (m :: * -> *) Monad m => (forall a . a -> m a)
-           -- into [m, a]
-           unwrapTypeVars :: Type -> [ForAllTyBinder]
-           unwrapTypeVars t = vars ++ case splitFunTy_maybe unforalled of
-                               Just (_, _, _, unfunned) -> unwrapTypeVars unfunned
-                               _ -> []
-             where (vars, unforalled) = splitForAllForAllTyBinders t
+       vars = deepInvisTvBinders hfType
        holeVs = sep $ map (parens . (text "_" <+> dcolon <+>) . ppr) hfMatches
        holeDisp = if sMs then holeVs
                   else sep $ replicate (length hfMatches) $ text "_"
@@ -3643,6 +3632,18 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (TcHoleFit (HoleFit {..})) =
                  GreHFCand gre -> pprNameProvenance gre
                  NameHFCand name -> text "bound at" <+> ppr (getSrcLoc name)
                  IdHFCand id_ -> text "bound at" <+> ppr (getSrcLoc id_)
+
+-- | Similar to 'tcDeepSplitSigmaTy_maybe', but just cares about the binders.
+deepInvisTvBinders :: TcSigmaType -> [ForAllTyBinder]
+deepInvisTvBinders = go
+  where
+    go ty | Just (_arg_ty, res_ty) <- tcSplitFunTy_maybe ty
+          = go res_ty
+          | (tvs, body) <- splitForAllForAllTyBinders ty
+          , not (null tvs)
+          = tvs ++ go body
+          | otherwise
+          = []
 
 -- | Add a "Constraints include..." message.
 --

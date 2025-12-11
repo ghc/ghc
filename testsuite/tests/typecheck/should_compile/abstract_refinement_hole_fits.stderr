@@ -1,4 +1,3 @@
-
 abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [Integer] -> Integer
     • In an equation for ‘f’: f = _
@@ -6,8 +5,8 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
         f :: [Integer] -> Integer
           (bound at abstract_refinement_hole_fits.hs:4:1)
       Valid hole fits include
-        f :: [Integer] -> Integer
         g :: [Integer] -> Integer
+        f :: [Integer] -> Integer
         head :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> a
         last :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> a
         maximum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
@@ -61,46 +60,46 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where fst :: forall a b. (a, b) -> a
         snd (_ :: (a3, t0 -> [Integer] -> Integer)) (_ :: t0)
           where snd :: forall a b. (a, b) -> b
-        return (_ :: Integer)
-          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: Integer)
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
-        (>>=) (_ :: [Integer] -> a6) (_ :: a6 -> [Integer] -> Integer)
-          where (>>=) :: forall (m :: * -> *) a b.
-                         Monad m =>
-                         m a -> (a -> m b) -> m b
-        (>>) (_ :: [Integer] -> a5) (_ :: [Integer] -> Integer)
-          where (>>) :: forall (m :: * -> *) a b.
-                        Monad m =>
-                        m a -> m b -> m b
-        fmap (_ :: a7 -> Integer) (_ :: [Integer] -> a7)
-          where fmap :: forall (f :: * -> *) a b.
-                        Functor f =>
-                        (a -> b) -> f a -> f b
-        (<*>) (_ :: [Integer] -> a9 -> Integer) (_ :: [Integer] -> a9)
-          where (<*>) :: forall (f :: * -> *) a b.
-                         Applicative f =>
-                         f (a -> b) -> f a -> f b
+        return (_ :: Integer)
+          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         (*>) (_ :: [Integer] -> a8) (_ :: [Integer] -> Integer)
           where (*>) :: forall (f :: * -> *) a b.
                         Applicative f =>
                         f a -> f b -> f b
-        (=<<) (_ :: a1 -> [Integer] -> Integer) (_ :: [Integer] -> a1)
-          where (=<<) :: forall (m :: * -> *) a b.
-                         Monad m =>
-                         (a -> m b) -> m a -> m b
-        (<$>) (_ :: a2 -> Integer) (_ :: [Integer] -> a2)
-          where (<$>) :: forall (f :: * -> *) a b.
-                         Functor f =>
-                         (a -> b) -> f a -> f b
-        (<*) (_ :: [Integer] -> Integer) (_ :: [Integer] -> b4)
-          where (<*) :: forall (f :: * -> *) a b.
-                        Applicative f =>
-                        f a -> f b -> f a
         (<$) (_ :: Integer) (_ :: [Integer] -> b5)
           where (<$) :: forall (f :: * -> *) a b.
                         Functor f =>
                         a -> f b -> f a
+        (<*) (_ :: [Integer] -> Integer) (_ :: [Integer] -> b4)
+          where (<*) :: forall (f :: * -> *) a b.
+                        Applicative f =>
+                        f a -> f b -> f a
+        (<*>) (_ :: [Integer] -> a9 -> Integer) (_ :: [Integer] -> a9)
+          where (<*>) :: forall (f :: * -> *) a b.
+                         Applicative f =>
+                         f (a -> b) -> f a -> f b
+        (=<<) (_ :: a1 -> [Integer] -> Integer) (_ :: [Integer] -> a1)
+          where (=<<) :: forall (m :: * -> *) a b.
+                         Monad m =>
+                         (a -> m b) -> m a -> m b
+        (>>) (_ :: [Integer] -> a5) (_ :: [Integer] -> Integer)
+          where (>>) :: forall (m :: * -> *) a b.
+                        Monad m =>
+                        m a -> m b -> m b
+        (>>=) (_ :: [Integer] -> a6) (_ :: a6 -> [Integer] -> Integer)
+          where (>>=) :: forall (m :: * -> *) a b.
+                         Monad m =>
+                         m a -> (a -> m b) -> m b
+        fmap (_ :: a7 -> Integer) (_ :: [Integer] -> a7)
+          where fmap :: forall (f :: * -> *) a b.
+                        Functor f =>
+                        (a -> b) -> f a -> f b
+        (<$>) (_ :: a2 -> Integer) (_ :: [Integer] -> a2)
+          where (<$>) :: forall (f :: * -> *) a b.
+                         Functor f =>
+                         (a -> b) -> f a -> f b
         id (_ :: [Integer] -> Integer)
           where id :: forall a. a -> a
         head (_ :: [[Integer] -> Integer])
@@ -125,16 +124,16 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where const :: forall a b. a -> b -> a
         uncurry (_ :: a4 -> b3 -> [Integer] -> Integer) (_ :: (a4, b3))
           where uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
-        seq (_ :: t2) (_ :: [Integer] -> Integer)
-          where seq :: forall a b. a -> b -> b
         ($!) (_ :: t0 -> [Integer] -> Integer) (_ :: t0)
           where ($!) :: forall a b. (a -> b) -> a -> b
+        seq (_ :: t2) (_ :: [Integer] -> Integer)
+          where seq :: forall a b. a -> b -> b
         ($) (_ :: t0 -> [Integer] -> Integer) (_ :: t0)
           where ($) :: forall a b. (a -> b) -> a -> b
-        return (_ :: [Integer] -> Integer) (_ :: t0)
-          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: [Integer] -> Integer) (_ :: t0)
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+        return (_ :: [Integer] -> Integer) (_ :: t0)
+          where return :: forall (m :: * -> *) a. Monad m => a -> m a
 
 abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Integer -> [Integer] -> Integer
@@ -145,8 +144,8 @@ abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           (bound at abstract_refinement_hole_fits.hs:7:1)
       Valid hole fits include
         const :: forall a b. a -> b -> a
-        return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
       Valid refinement hole fits include
         foldl (_ :: Integer -> Integer -> Integer)
           where foldl :: forall (t :: * -> *) b a.
@@ -190,49 +189,49 @@ abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where fst :: forall a b. (a, b) -> a
         snd (_ :: (a3, t0 -> Integer -> [Integer] -> Integer)) (_ :: t0)
           where snd :: forall a b. (a, b) -> b
-        return (_ :: [Integer] -> Integer)
-          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: [Integer] -> Integer)
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
-        (>>=) (_ :: Integer -> a6)
-              (_ :: a6 -> Integer -> [Integer] -> Integer)
-          where (>>=) :: forall (m :: * -> *) a b.
-                         Monad m =>
-                         m a -> (a -> m b) -> m b
-        (>>) (_ :: Integer -> a5) (_ :: Integer -> [Integer] -> Integer)
-          where (>>) :: forall (m :: * -> *) a b.
-                        Monad m =>
-                        m a -> m b -> m b
-        fmap (_ :: a7 -> [Integer] -> Integer) (_ :: Integer -> a7)
-          where fmap :: forall (f :: * -> *) a b.
+        return (_ :: [Integer] -> Integer)
+          where return :: forall (m :: * -> *) a. Monad m => a -> m a
+        (*>) (_ :: Integer -> a8) (_ :: Integer -> [Integer] -> Integer)
+          where (*>) :: forall (f :: * -> *) a b.
+                        Applicative f =>
+                        f a -> f b -> f b
+        (<$) (_ :: [Integer] -> Integer) (_ :: Integer -> b5)
+          where (<$) :: forall (f :: * -> *) a b.
                         Functor f =>
-                        (a -> b) -> f a -> f b
+                        a -> f b -> f a
+        (<*) (_ :: Integer -> [Integer] -> Integer) (_ :: Integer -> b4)
+          where (<*) :: forall (f :: * -> *) a b.
+                        Applicative f =>
+                        f a -> f b -> f a
         (<*>) (_ :: Integer -> a9 -> [Integer] -> Integer)
               (_ :: Integer -> a9)
           where (<*>) :: forall (f :: * -> *) a b.
                          Applicative f =>
                          f (a -> b) -> f a -> f b
-        (*>) (_ :: Integer -> a8) (_ :: Integer -> [Integer] -> Integer)
-          where (*>) :: forall (f :: * -> *) a b.
-                        Applicative f =>
-                        f a -> f b -> f b
         (=<<) (_ :: a1 -> Integer -> [Integer] -> Integer)
               (_ :: Integer -> a1)
           where (=<<) :: forall (m :: * -> *) a b.
                          Monad m =>
                          (a -> m b) -> m a -> m b
+        (>>) (_ :: Integer -> a5) (_ :: Integer -> [Integer] -> Integer)
+          where (>>) :: forall (m :: * -> *) a b.
+                        Monad m =>
+                        m a -> m b -> m b
+        (>>=) (_ :: Integer -> a6)
+              (_ :: a6 -> Integer -> [Integer] -> Integer)
+          where (>>=) :: forall (m :: * -> *) a b.
+                         Monad m =>
+                         m a -> (a -> m b) -> m b
+        fmap (_ :: a7 -> [Integer] -> Integer) (_ :: Integer -> a7)
+          where fmap :: forall (f :: * -> *) a b.
+                        Functor f =>
+                        (a -> b) -> f a -> f b
         (<$>) (_ :: a2 -> [Integer] -> Integer) (_ :: Integer -> a2)
           where (<$>) :: forall (f :: * -> *) a b.
                          Functor f =>
                          (a -> b) -> f a -> f b
-        (<*) (_ :: Integer -> [Integer] -> Integer) (_ :: Integer -> b4)
-          where (<*) :: forall (f :: * -> *) a b.
-                        Applicative f =>
-                        f a -> f b -> f a
-        (<$) (_ :: [Integer] -> Integer) (_ :: Integer -> b5)
-          where (<$) :: forall (f :: * -> *) a b.
-                        Functor f =>
-                        a -> f b -> f a
         id (_ :: Integer -> [Integer] -> Integer)
           where id :: forall a. a -> a
         head (_ :: [Integer -> [Integer] -> Integer])
@@ -259,13 +258,14 @@ abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -W
         uncurry (_ :: a4 -> b3 -> Integer -> [Integer] -> Integer)
                 (_ :: (a4, b3))
           where uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
-        seq (_ :: t2) (_ :: Integer -> [Integer] -> Integer)
-          where seq :: forall a b. a -> b -> b
         ($!) (_ :: t0 -> Integer -> [Integer] -> Integer) (_ :: t0)
           where ($!) :: forall a b. (a -> b) -> a -> b
+        seq (_ :: t2) (_ :: Integer -> [Integer] -> Integer)
+          where seq :: forall a b. a -> b -> b
         ($) (_ :: t0 -> Integer -> [Integer] -> Integer) (_ :: t0)
           where ($) :: forall a b. (a -> b) -> a -> b
-        return (_ :: Integer -> [Integer] -> Integer) (_ :: t0)
-          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: Integer -> [Integer] -> Integer) (_ :: t0)
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+        return (_ :: Integer -> [Integer] -> Integer) (_ :: t0)
+          where return :: forall (m :: * -> *) a. Monad m => a -> m a
+

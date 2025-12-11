@@ -26,15 +26,15 @@ subsumption_sort_hole_fits.hs:2:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdef
         fail :: forall (m :: * -> *) a.
                 (MonadFail m, GHC.Internal.Stack.Types.HasCallStack) =>
                 String -> m a
-          with fail @[] @String
+          with fail @[]
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))
         return :: forall (m :: * -> *) a. Monad m => a -> m a
-          with return @[] @String
+          with return @[]
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
         pure :: forall (f :: * -> *) a. Applicative f => a -> f a
-          with pure @[] @String
+          with pure @[]
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
 

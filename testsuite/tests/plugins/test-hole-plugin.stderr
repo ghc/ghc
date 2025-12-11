@@ -1,4 +1,3 @@
-
 test-hole-plugin.hs:12:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _too_long :: [Int] -> Int
       Or perhaps ‘_too_long’ is mis-spelled, or not in scope
@@ -14,11 +13,11 @@ test-hole-plugin.hs:13:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Relevant bindings include
         j :: [Int] -> Int (bound at test-hole-plugin.hs:13:1)
       Valid hole fits include
-        j :: [Int] -> Int
         f :: [Int] -> Int
-        i :: [Int] -> Int
         g :: [Int] -> Int
         h :: [Int] -> Int
+        i :: [Int] -> Int
+        j :: [Int] -> Int
         head :: forall a. GHC.Internal.Stack.Types.HasCallStack => [a] -> a
         (Some hole fits suppressed; use -fmax-valid-hole-fits=N or -fno-max-valid-hole-fits)
 
@@ -59,3 +58,4 @@ test-hole-plugin.hs:16:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         minimum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
         product :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
         sum :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
+

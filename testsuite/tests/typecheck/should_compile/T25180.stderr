@@ -29,16 +29,20 @@ T25180.hs:19:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         tup1 :: a -> Solo a (bound at T25180.hs:19:1)
       Valid hole fits include
         tup1 :: a -> Solo a (bound at T25180.hs:19:1)
+        Solo :: forall a. a -> Solo a
+          with Solo @a
+          (imported from ‘Data.Tuple’ at T25180.hs:6:1-17
+           (and originally defined in ‘GHC.Internal.Tuple’))
         MkSolo :: forall a. a -> Solo a
           with MkSolo @a
           (imported from ‘Data.Tuple’ at T25180.hs:6:1-17
            (and originally defined in ‘GHC.Internal.Tuple’))
-        return :: forall (m :: * -> *) a. Monad m => a -> m a
-          with return @Solo @a
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+          with pure @Solo
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
-        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
-          with pure @Solo @a
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
+          with return @Solo
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
 

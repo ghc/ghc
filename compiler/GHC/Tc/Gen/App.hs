@@ -420,20 +420,6 @@ quickLookResultType :: TcRhoType -> ExpRhoType -> TcM ()
 quickLookResultType app_res_rho (Check exp_rho) = qlUnify app_res_rho exp_rho
 quickLookResultType _           _               = return ()
 
--- | Variant of 'getDeepSubsumptionFlag' which enables a top-level subsumption
--- in order to implement the plan of Note [Typechecking data constructors].
-getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
-getDeepSubsumptionFlag_DataConHead app_head =
-  do { user_ds <- xoptM LangExt.DeepSubsumption
-     ; return $
-         if | user_ds
-            -> Deep DeepSub
-            | XExpr (ConLikeTc (RealDataCon {})) <- app_head
-            -> Deep TopSub
-            | otherwise
-            -> Shallow
-    }
-
 finishApp :: (HsExpr GhcTc, AppCtxt) -> [HsExprArg 'TcpTc]
           -> TcRhoType -> HsWrapper
           -> TcM (HsExpr GhcTc)

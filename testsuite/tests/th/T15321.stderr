@@ -6,7 +6,7 @@ T15321.hs:9:9: error: [GHC-88464]
         fail :: forall (m :: * -> *) a.
                 (MonadFail m, GHC.Internal.Stack.Types.HasCallStack) =>
                 String -> m a
-          with fail @GHC.Internal.TH.Monad.Q @GHC.Internal.TH.Syntax.Exp
+          with fail @GHC.Internal.TH.Monad.Q
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))
 

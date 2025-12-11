@@ -11,7 +11,7 @@
 module GHC.Tc.Utils.Unify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcWrapResultMono,
-  tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeDS,
+  tcSubType, tcSubTypeSigma, tcSubTypePat, tcSubTypeDS, tcSubTypeHoleFit,
   addSubTypeCtxt,
   tcSubTypeAmbiguity, tcSubMult,
   checkConstraints, checkTvConstraints,
@@ -19,7 +19,7 @@ module GHC.Tc.Utils.Unify (
 
   -- Skolemisation
   DeepSubsumptionFlag(..), DeepSubsumptionDepth(..),
-  getDeepSubsumptionFlag,
+  getDeepSubsumptionFlag, getDeepSubsumptionFlag_DataConHead,
   isRhoTyDS,
   tcSkolemise, tcSkolemiseCompleteSig, tcSkolemiseExpectedType,
 
@@ -77,6 +77,7 @@ import GHC.Tc.Utils.TcMType qualified as TcM
 
 import GHC.Tc.Solver.InertSet
 
+import GHC.Core.ConLike (ConLike(..))
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep hiding (Refl)
 import GHC.Core.TyCo.FVs( isInjectiveInType )
@@ -1485,6 +1486,16 @@ tcSubTypeSigma :: CtOrigin       -- where did the actual type arise / why are we
 tcSubTypeSigma orig ctxt ty_actual ty_expected
   = tc_sub_type (unifyType Nothing) orig ctxt ty_actual ty_expected
 
+tcSubTypeHoleFit :: DeepSubsumptionFlag
+                 -> CtOrigin
+                 -> TcSigmaType  -- ^ Candidate expression type
+                 -> TcSigmaType  -- ^ Expected type (= hole type)
+                 -> TcM HsWrapper
+tcSubTypeHoleFit ds_flag orig cand_ty hole_ty =
+   -- See Note [Deep subsumption in tcCheckHoleFit]
+  tc_sub_type_ds (Nothing, Top) ds_flag (unifyType Nothing)
+    orig (ExprSigCtxt NoRRC) cand_ty hole_ty
+
 ---------------
 tcSubTypeAmbiguity :: UserTypeCtxt   -- Where did this type arise
                    -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
@@ -2014,6 +2025,20 @@ getDeepSubsumptionFlag =
        then return $ Deep DeepSub
        else return Shallow
      }
+
+-- | Variant of 'getDeepSubsumptionFlag' which enables a top-level subsumption
+-- in order to implement the plan of Note [Typechecking data constructors].
+getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
+getDeepSubsumptionFlag_DataConHead app_head =
+  do { user_ds <- xoptM LangExt.DeepSubsumption
+     ; return $
+         if | user_ds
+            -> Deep DeepSub
+            | XExpr (ConLikeTc (RealDataCon {})) <- app_head
+            -> Deep TopSub
+            | otherwise
+            -> Shallow
+    }
 
 -- | 'tc_sub_type_deep' is where the actual work happens for deep subsumption.
 --

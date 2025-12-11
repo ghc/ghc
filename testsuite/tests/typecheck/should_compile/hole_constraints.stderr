@@ -1,4 +1,3 @@
-
 hole_constraints.hs:8:6: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a
       Where: ‘a’ is a rigid type variable bound by
@@ -67,8 +66,9 @@ hole_constraints.hs:27:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         foo :: AnyShow -> String (bound at hole_constraints.hs:27:1)
       Constraints include Show a (from hole_constraints.hs:27:19-27)
       Valid hole fits include
-        f3 :: forall a. C a => a
         f1 :: forall a. Eq a => a
         f2 :: forall a. (Show a, Eq a) => a
+        f3 :: forall a. C a => a
         [] :: forall a. [a]
         mempty :: forall a. Monoid a => a
+

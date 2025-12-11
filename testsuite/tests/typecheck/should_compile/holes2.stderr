@@ -1,4 +1,3 @@
-
 holes2.hs:3:5: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
     • Ambiguous type variable ‘a0’ arising from a use of ‘show’
       prevents the constraint ‘(Show a0)’ from being solved.
@@ -8,7 +7,7 @@ holes2.hs:3:5: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
           -- Defined in ‘GHC.Internal.Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Internal.Show’
         ...plus 26 others
-        ...plus 48 instances involving out-of-scope types
+        ...plus 49 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: show _
       In an equation for ‘f’: f = show _
@@ -23,10 +22,11 @@ holes2.hs:3:10: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
       Valid hole fits include
         f :: String
         otherwise :: Bool
-        False :: Bool
-        True :: Bool
-        LT :: Ordering
         EQ :: Ordering
         GT :: Ordering
+        LT :: Ordering
         () :: ()
+        False :: Bool
+        True :: Bool
         pi :: forall a. Floating a => a
+

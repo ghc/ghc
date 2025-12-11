@@ -5,16 +5,16 @@ T14884.hs:4:5: error: [GHC-88464]
       In an equation for ‘x’: x = _ print "abc"
     • Relevant bindings include x :: IO () (bound at T14884.hs:4:1)
       Valid hole fits include
+        foldMap :: forall (t :: * -> *) m a.
+                   (Foldable t, Monoid m) =>
+                   (a -> m) -> t a -> m
+          with foldMap @[]
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Data.Foldable’))
         mapM_ :: forall (t :: * -> *) (m :: * -> *) a b.
                  (Foldable t, Monad m) =>
                  (a -> m b) -> t a -> m ()
           with mapM_ @[] @IO @Char @()
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Data.Foldable’))
-        foldMap :: forall (t :: * -> *) m a.
-                   (Foldable t, Monoid m) =>
-                   (a -> m) -> t a -> m
-          with foldMap @[] @(IO ()) @Char
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Data.Foldable’))
         id :: forall a. a -> a

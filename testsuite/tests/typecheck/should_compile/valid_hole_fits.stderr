@@ -25,15 +25,15 @@ valid_hole_fits.hs:17:17: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         x :: Int (bound at valid_hole_fits.hs:16:12)
         c :: Int -> IO Int (bound at valid_hole_fits.hs:16:1)
       Valid hole fits include
-        c :: Int -> IO Int (bound at valid_hole_fits.hs:16:1)
         a :: Int -> IO Int (bound at valid_hole_fits.hs:12:1)
         b :: Int -> IO Int (bound at valid_hole_fits.hs:14:1)
-        return :: forall (m :: * -> *) a. Monad m => a -> m a
-          with return @IO @Int
+        c :: Int -> IO Int (bound at valid_hole_fits.hs:16:1)
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+          with pure @IO
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Base’))
-        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
-          with pure @IO @Int
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
+          with return @IO
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Base’))
 
@@ -82,12 +82,12 @@ valid_hole_fits.hs:27:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with Just @Integer
           (imported from ‘Data.Maybe’ at valid_hole_fits.hs:5:1-17
            (and originally defined in ‘GHC.Internal.Maybe’))
-        return :: forall (m :: * -> *) a. Monad m => a -> m a
-          with return @Maybe @Integer
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+          with pure @Maybe
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Base’))
-        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
-          with pure @Maybe @Integer
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
+          with return @Maybe
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Base’))
 
@@ -100,28 +100,28 @@ valid_hole_fits.hs:30:10: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Relevant bindings include
         f :: String (bound at valid_hole_fits.hs:30:1)
       Valid hole fits include
-        f :: String (bound at valid_hole_fits.hs:30:1)
-        k :: Maybe Integer (defined at valid_hole_fits.hs:27:1)
         h :: String (bound at valid_hole_fits.hs:34:1)
+        k :: Maybe Integer (defined at valid_hole_fits.hs:27:1)
+        f :: String (bound at valid_hole_fits.hs:30:1)
         otherwise :: Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Base’))
-        False :: Bool
-          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Internal.Types’))
-        True :: Bool
-          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Internal.Types’))
-        LT :: Ordering
-          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Internal.Types’))
         EQ :: Ordering
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Types’))
         GT :: Ordering
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Types’))
+        LT :: Ordering
+          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
+           (and originally defined in ‘GHC.Internal.Types’))
         () :: () (bound at <wired into compiler>)
+        False :: Bool
+          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
+           (and originally defined in ‘GHC.Internal.Types’))
+        True :: Bool
+          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
+           (and originally defined in ‘GHC.Internal.Types’))
         pi :: forall a. Floating a => a
           with pi @Double
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
@@ -139,22 +139,14 @@ valid_hole_fits.hs:34:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         not :: Bool -> Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Classes’))
-        enumFrom :: forall a. Enum a => a -> [a]
-          with enumFrom @Bool
-          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Internal.Enum’))
-        Just :: forall a. a -> Maybe a
-          with Just @Bool
-          (imported from ‘Data.Maybe’ at valid_hole_fits.hs:5:1-17
-           (and originally defined in ‘GHC.Internal.Maybe’))
         id :: forall a. a -> a
           with id @Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Base’))
-        repeat :: forall a. a -> [a]
-          with repeat @Bool
+        enumFrom :: forall a. Enum a => a -> [a]
+          with enumFrom @Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Internal.List’))
+           (and originally defined in ‘GHC.Internal.Enum’))
         fromEnum :: forall a. Enum a => a -> Int
           with fromEnum @Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
@@ -167,10 +159,18 @@ valid_hole_fits.hs:34:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with succ @Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Enum’))
+        repeat :: forall a. a -> [a]
+          with repeat @Bool
+          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
+           (and originally defined in ‘GHC.Internal.List’))
         show :: forall a. Show a => a -> String
           with show @Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Show’))
+        Just :: forall a. a -> Maybe a
+          with Just @Bool
+          (imported from ‘Data.Maybe’ at valid_hole_fits.hs:5:1-17
+           (and originally defined in ‘GHC.Internal.Maybe’))
 
 valid_hole_fits.hs:34:14: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Bool
@@ -213,7 +213,7 @@ valid_hole_fits.hs:38:10: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with (:) @a
           (bound at <wired into compiler>)
         (<$) :: forall (f :: * -> *) a b. Functor f => a -> f b -> f a
-          with (<$) @[] @a @a
+          with (<$) @[]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Base’))
         seq :: forall a b. a -> b -> b
@@ -243,16 +243,16 @@ valid_hole_fits.hs:41:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with readIO @()
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.System.IO’))
+        fail :: forall (m :: * -> *) a.
+                (MonadFail m, GHC.Internal.Stack.Types.HasCallStack) =>
+                String -> m a
+          with fail @IO
+          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
+           (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))
         print :: forall a. Show a => a -> IO ()
           with print @String
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.System.IO’))
-        fail :: forall (m :: * -> *) a.
-                (MonadFail m, GHC.Internal.Stack.Types.HasCallStack) =>
-                String -> m a
-          with fail @IO @()
-          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))
         mempty :: forall a. Monoid a => a
           with mempty @(String -> IO ())
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40

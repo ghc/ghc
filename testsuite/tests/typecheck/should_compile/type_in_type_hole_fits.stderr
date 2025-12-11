@@ -1,4 +1,3 @@
-
 type_in_type_hole_fits.hs:79:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole:
         _a :: [Integer] -> Sorted (O (NLogN 2 0)) (O N) True Integer
@@ -14,18 +13,18 @@ type_in_type_hole_fits.hs:79:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefau
                   [a] -> Sorted cpu mem stable a
           with Sorted @(O (NLogN 2 0)) @(O N) @True @Integer
           (defined at type_in_type_hole_fits.hs:54:18)
-        mergeSort :: forall a (n :: AsympPoly) (m :: AsympPoly)
-                            (s :: Bool).
-                     (Ord a, n >=. O (N *. LogN), m >=. O N, IsStable s) =>
-                     [a] -> Sorted n m s a
-          with mergeSort @Integer @(O (NLogN 2 0)) @(O N) @True
-          (defined at type_in_type_hole_fits.hs:61:1)
         insertionSort :: forall a (n :: AsympPoly) (m :: AsympPoly)
                                 (s :: Bool).
                          (Ord a, n >=. O (N ^. 2), m >=. O One, IsStable s) =>
                          [a] -> Sorted n m s a
           with insertionSort @Integer @(O (NLogN 2 0)) @(O N) @True
           (defined at type_in_type_hole_fits.hs:65:1)
+        mergeSort :: forall a (n :: AsympPoly) (m :: AsympPoly)
+                            (s :: Bool).
+                     (Ord a, n >=. O (N *. LogN), m >=. O N, IsStable s) =>
+                     [a] -> Sorted n m s a
+          with mergeSort @Integer @(O (NLogN 2 0)) @(O N) @True
+          (defined at type_in_type_hole_fits.hs:61:1)
 
 type_in_type_hole_fits.hs:82:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole:
@@ -37,16 +36,16 @@ type_in_type_hole_fits.hs:82:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefau
         mySortB :: Sorted (O (N *. LogN)) (O N) False Integer
           (bound at type_in_type_hole_fits.hs:82:1)
       Valid hole fits include
-        quickSort :: forall a (n :: AsympPoly) (m :: AsympPoly).
-                     (Ord a, n >=. O (N *. LogN), m >=. O N) =>
-                     [a] -> Sorted n m False a
-          with quickSort @Integer @(O (NLogN 1 1)) @(O N)
-          (defined at type_in_type_hole_fits.hs:71:1)
         heapSort :: forall a (n :: AsympPoly) (m :: AsympPoly).
                     (Ord a, n >=. O (N *. LogN), m >=. O One) =>
                     [a] -> Sorted n m False a
           with heapSort @Integer @(O (NLogN 1 1)) @(O N)
           (defined at type_in_type_hole_fits.hs:74:1)
+        quickSort :: forall a (n :: AsympPoly) (m :: AsympPoly).
+                     (Ord a, n >=. O (N *. LogN), m >=. O N) =>
+                     [a] -> Sorted n m False a
+          with quickSort @Integer @(O (NLogN 1 1)) @(O N)
+          (defined at type_in_type_hole_fits.hs:71:1)
         Sorted :: forall (cpu :: AsympPoly) (mem :: AsympPoly)
                          (stable :: Bool) a.
                   [a] -> Sorted cpu mem stable a
@@ -79,3 +78,4 @@ type_in_type_hole_fits.hs:85:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefau
                   [a] -> Sorted cpu mem stable a
           with Sorted @(O (NLogN 1 1)) @(O One) @False @Integer
           (defined at type_in_type_hole_fits.hs:54:18)
+

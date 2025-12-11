@@ -42,6 +42,9 @@ Compiler
   bound to variables. The very similar pattern ``Foo{bar = Bar{baz = 42}}``
   will will not yet mark ``bar`` or ``baz`` as covered.
 
+- Pattern synonyms can now be suggested as valid hole fits (except, of course,
+  if they are unidirectional).
+
 - When multiple ``-msse*`` flags are given, the maximum version takes effect.
   For example, ``-msse4.2 -msse2`` is now equivalent to ``-msse4.2``.
   Previously, only the last flag took effect.
@@ -51,6 +54,7 @@ Compiler
   and :ghc-flag:`-mavx512f` now implies :ghc-flag:`-mfma`
   in addition to :ghc-flag:`-mavx2`.
   Refer to the users' guide for more details about each individual flag.
+
 
 GHCi
 ~~~~

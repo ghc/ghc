@@ -19,6 +19,7 @@ import GHC.Types.Name
 import GHC.Data.Bag
 
 import Data.Function ( on )
+import qualified Data.Semigroup as S
 
 data TypedHole = TypedHole { th_relevant_cts :: Bag CtEvidence
                            -- ^ Any relevant Cts to the hole
@@ -77,15 +78,15 @@ instance Ord HoleFitCandidate where
 -- and the refinement level of the fit, which is the number of extra argument
 -- holes that this fit uses (e.g. if hfRefLvl is 2, the fit is for `Id _ _`).
 data TcHoleFit =
-  HoleFit { hfId   :: Id       -- ^ The elements id in the TcM
-          , hfCand :: HoleFitCandidate  -- ^ The candidate that was checked.
-          , hfType :: TcType -- ^ The type of the id, possibly zonked.
-          , hfRefLvl :: Int  -- ^ The number of holes in this fit.
-          , hfWrap :: [TcType] -- ^ The wrapper for the match.
+  HoleFit { hfName :: Name              -- ^ The name of the hole fit identifier
+          , hfCand :: HoleFitCandidate  -- ^ The candidate that was checked
+          , hfType :: TcType -- ^ The type of the hole fit (possibly zonked)
+          , hfRefLvl :: Int  -- ^ The number of holes in this fit
+          , hfWrap :: [TcType] -- ^ The wrapper for the match
           , hfMatches :: [TcType]
           -- ^ What the refinement variables got matched with, if anything
           , hfDoc :: Maybe [HsDocString]
-          -- ^ Documentation of this HoleFit, if available.
+          -- ^ Documentation of this HoleFit, if available
           }
 
 data HoleFit
@@ -96,30 +97,25 @@ data HoleFit
 
 -- We define an Eq and Ord instance to be able to build a graph.
 instance Eq TcHoleFit where
-   (==) = (==) `on` hfId
+   (==) = (==) `on` hfName
 
 instance Outputable HoleFit where
   ppr (TcHoleFit hf)  = ppr hf
   ppr (RawHoleFit sd) = sd
 
 instance Outputable TcHoleFit where
-  ppr (HoleFit _ cand ty _ _ mtchs _) =
-    hang (name <+> holes) 2 (text "where" <+> name <+> dcolon <+> (ppr ty))
-    where name = ppr $ getName cand
-          holes = sep $ map (parens . (text "_" <+> dcolon <+>) . ppr) mtchs
+  ppr (HoleFit { hfName = cand, hfType = ty, hfMatches = mtchs }) =
+    hang (ppr cand <+> holes) 2 (text "where" <+> ppr cand <+> dcolon <+> (ppr ty))
+    where holes = sep $ map (parens . (text "_" <+> dcolon <+>) . ppr) mtchs
 
--- We compare HoleFits by their name instead of their Id, since we don't
--- want our tests to be affected by the non-determinism of `nonDetCmpVar`,
--- which is used to compare Ids. When comparing, we want HoleFits with a lower
--- refinement level to come first.
+-- | Compare HoleFits by their 'Name'. Use 'stableNameCmp' to avoid non-determinism.
+--
+-- When comparing, we want HoleFits with a lower refinement level to come first.
 instance Ord TcHoleFit where
---  compare (RawHoleFit _) (RawHoleFit _) = EQ
---  compare (RawHoleFit _) _ = LT
---  compare _ (RawHoleFit _) = GT
-  compare a@(HoleFit {}) b@(HoleFit {}) = cmp a b
-    where cmp  = if hfRefLvl a == hfRefLvl b
-                 then compare `on` (getName . hfCand)
-                 else compare `on` hfRefLvl
+  compare a@(HoleFit {}) b@(HoleFit {}) =
+    compare (hfRefLvl a) (hfRefLvl b)
+      S.<>
+    stableNameCmp (hfName a) (hfName b)
 
 hfIsLcl :: TcHoleFit -> Bool
 hfIsLcl hf@(HoleFit {}) = case hfCand hf of

@@ -30,7 +30,7 @@ module GHC.Core.DataCon (
         dataConRepType, dataConInstSig, dataConFullSig,
         dataConName, dataConIdentity, dataConTag, dataConTagZ,
         dataConTyCon, dataConOrigTyCon,
-        dataConWrapperType, dataConNonlinearType,
+        dataConWrapperType,
         dataConUnivTyVars, dataConExTyCoVars, dataConUnivAndExTyCoVars,
         dataConConcreteTyVars,
         dataConUserTyVars, dataConUserTyVarBinders,
@@ -1567,23 +1567,6 @@ dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
     mkInvisFunTys (stupid_theta ++ theta) $
     mkScaledFunTys arg_tys $
     res_ty
-
-dataConNonlinearType :: DataCon -> Type
--- ^ Just like 'dataConWrapperType', but with the
--- linearity on the arguments all zapped to Many.
---
--- Only used temporarily as a stop-gap for hole fit suggestions
--- until #26338 is fixed.
-dataConNonlinearType (MkData { dcUserTyVarBinders = user_tvbs,
-                               dcOtherTheta = theta, dcOrigArgTys = arg_tys,
-                               dcOrigResTy = res_ty,
-                               dcStupidTheta = stupid_theta })
-  = mkForAllTys user_tvbs $
-    mkInvisFunTys (stupid_theta ++ theta) $
-    mkScaledFunTys arg_tys' $
-    res_ty
-  where
-    arg_tys' = map (\(Scaled w t) -> Scaled (case w of OneTy -> ManyTy; _ -> w) t) arg_tys
 
 -- | Finds the instantiated types of the arguments required to construct a
 -- 'DataCon' representation

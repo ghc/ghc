@@ -8,14 +8,10 @@ T14590.hs:4:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         x :: Int (bound at T14590.hs:4:4)
         f1 :: Int -> Int -> Int (bound at T14590.hs:4:1)
       Valid hole fits include
-        f1 :: Int -> Int -> Int (bound at T14590.hs:4:1)
         f2 :: Int -> Int -> Int (bound at T14590.hs:5:1)
         f3 :: Int -> Int -> Int (bound at T14590.hs:6:1)
         f4 :: Int -> Int -> Int (bound at T14590.hs:7:1)
-        (-) :: forall a. Num a => a -> a -> a
-          with (-) @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Num’))
+        f1 :: Int -> Int -> Int (bound at T14590.hs:4:1)
         asTypeOf :: forall a. a -> a -> a
           with asTypeOf @Int
           (imported from ‘Prelude’
@@ -24,22 +20,6 @@ T14590.hs:4:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with const @Int @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
-        subtract :: forall a. Num a => a -> a -> a
-          with subtract @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Num’))
-        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
-          with (^) @Int @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
-        gcd :: forall a. Integral a => a -> a -> a
-          with gcd @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
-        lcm :: forall a. Integral a => a -> a -> a
-          with lcm @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
         max :: forall a. Ord a => a -> a -> a
           with max @Int
           (imported from ‘Prelude’
@@ -56,8 +36,28 @@ T14590.hs:4:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with (+) @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Num’))
+        (-) :: forall a. Num a => a -> a -> a
+          with (-) @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Num’))
+        subtract :: forall a. Num a => a -> a -> a
+          with subtract @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Num’))
+        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
+          with (^) @Int @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
         div :: forall a. Integral a => a -> a -> a
           with div @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
+        gcd :: forall a. Integral a => a -> a -> a
+          with gcd @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
+        lcm :: forall a. Integral a => a -> a -> a
+          with lcm @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Real’))
         mod :: forall a. Integral a => a -> a -> a
@@ -76,12 +76,12 @@ T14590.hs:4:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with seq @Int @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Prim’))
-        return :: forall (m :: * -> *) a. Monad m => a -> m a
-          with return @((->) Int) @Int
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+          with pure @((->) Int)
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
-        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
-          with pure @((->) Int) @Int
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
+          with return @((->) Int)
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
 
@@ -96,14 +96,10 @@ T14590.hs:5:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         x :: Int (bound at T14590.hs:5:4)
         f2 :: Int -> Int -> Int (bound at T14590.hs:5:1)
       Valid hole fits include
-        f2 :: Int -> Int -> Int (bound at T14590.hs:5:1)
         f1 :: Int -> Int -> Int (defined at T14590.hs:4:1)
         f3 :: Int -> Int -> Int (bound at T14590.hs:6:1)
         f4 :: Int -> Int -> Int (bound at T14590.hs:7:1)
-        (-) :: forall a. Num a => a -> a -> a
-          with (-) @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Num’))
+        f2 :: Int -> Int -> Int (bound at T14590.hs:5:1)
         asTypeOf :: forall a. a -> a -> a
           with asTypeOf @Int
           (imported from ‘Prelude’
@@ -112,22 +108,6 @@ T14590.hs:5:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with const @Int @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
-        subtract :: forall a. Num a => a -> a -> a
-          with subtract @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Num’))
-        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
-          with (^) @Int @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
-        gcd :: forall a. Integral a => a -> a -> a
-          with gcd @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
-        lcm :: forall a. Integral a => a -> a -> a
-          with lcm @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
         max :: forall a. Ord a => a -> a -> a
           with max @Int
           (imported from ‘Prelude’
@@ -144,8 +124,28 @@ T14590.hs:5:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with (+) @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Num’))
+        (-) :: forall a. Num a => a -> a -> a
+          with (-) @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Num’))
+        subtract :: forall a. Num a => a -> a -> a
+          with subtract @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Num’))
+        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
+          with (^) @Int @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
         div :: forall a. Integral a => a -> a -> a
           with div @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
+        gcd :: forall a. Integral a => a -> a -> a
+          with gcd @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
+        lcm :: forall a. Integral a => a -> a -> a
+          with lcm @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Real’))
         mod :: forall a. Integral a => a -> a -> a
@@ -164,12 +164,12 @@ T14590.hs:5:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with seq @Int @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Prim’))
-        return :: forall (m :: * -> *) a. Monad m => a -> m a
-          with return @((->) Int) @Int
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+          with pure @((->) Int)
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
-        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
-          with pure @((->) Int) @Int
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
+          with return @((->) Int)
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
 
@@ -182,14 +182,10 @@ T14590.hs:6:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         x :: Int (bound at T14590.hs:6:4)
         f3 :: Int -> Int -> Int (bound at T14590.hs:6:1)
       Valid hole fits include
-        f3 :: Int -> Int -> Int (bound at T14590.hs:6:1)
         f1 :: Int -> Int -> Int (defined at T14590.hs:4:1)
         f2 :: Int -> Int -> Int (defined at T14590.hs:5:1)
         f4 :: Int -> Int -> Int (bound at T14590.hs:7:1)
-        (-) :: forall a. Num a => a -> a -> a
-          with (-) @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Num’))
+        f3 :: Int -> Int -> Int (bound at T14590.hs:6:1)
         asTypeOf :: forall a. a -> a -> a
           with asTypeOf @Int
           (imported from ‘Prelude’
@@ -198,22 +194,6 @@ T14590.hs:6:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with const @Int @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
-        subtract :: forall a. Num a => a -> a -> a
-          with subtract @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Num’))
-        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
-          with (^) @Int @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
-        gcd :: forall a. Integral a => a -> a -> a
-          with gcd @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
-        lcm :: forall a. Integral a => a -> a -> a
-          with lcm @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
         max :: forall a. Ord a => a -> a -> a
           with max @Int
           (imported from ‘Prelude’
@@ -230,8 +210,28 @@ T14590.hs:6:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with (+) @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Num’))
+        (-) :: forall a. Num a => a -> a -> a
+          with (-) @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Num’))
+        subtract :: forall a. Num a => a -> a -> a
+          with subtract @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Num’))
+        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
+          with (^) @Int @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
         div :: forall a. Integral a => a -> a -> a
           with div @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
+        gcd :: forall a. Integral a => a -> a -> a
+          with gcd @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
+        lcm :: forall a. Integral a => a -> a -> a
+          with lcm @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Real’))
         mod :: forall a. Integral a => a -> a -> a
@@ -250,12 +250,12 @@ T14590.hs:6:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with seq @Int @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Prim’))
-        return :: forall (m :: * -> *) a. Monad m => a -> m a
-          with return @((->) Int) @Int
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+          with pure @((->) Int)
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
-        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
-          with pure @((->) Int) @Int
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
+          with return @((->) Int)
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
 
@@ -269,14 +269,10 @@ T14590.hs:7:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         x :: Int (bound at T14590.hs:7:4)
         f4 :: Int -> Int -> Int (bound at T14590.hs:7:1)
       Valid hole fits include
-        f4 :: Int -> Int -> Int (bound at T14590.hs:7:1)
         f1 :: Int -> Int -> Int (defined at T14590.hs:4:1)
         f2 :: Int -> Int -> Int (defined at T14590.hs:5:1)
         f3 :: Int -> Int -> Int (defined at T14590.hs:6:1)
-        (-) :: forall a. Num a => a -> a -> a
-          with (-) @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Num’))
+        f4 :: Int -> Int -> Int (bound at T14590.hs:7:1)
         asTypeOf :: forall a. a -> a -> a
           with asTypeOf @Int
           (imported from ‘Prelude’
@@ -285,22 +281,6 @@ T14590.hs:7:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with const @Int @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
-        subtract :: forall a. Num a => a -> a -> a
-          with subtract @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Num’))
-        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
-          with (^) @Int @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
-        gcd :: forall a. Integral a => a -> a -> a
-          with gcd @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
-        lcm :: forall a. Integral a => a -> a -> a
-          with lcm @Int
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Real’))
         max :: forall a. Ord a => a -> a -> a
           with max @Int
           (imported from ‘Prelude’
@@ -317,8 +297,28 @@ T14590.hs:7:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with (+) @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Num’))
+        (-) :: forall a. Num a => a -> a -> a
+          with (-) @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Num’))
+        subtract :: forall a. Num a => a -> a -> a
+          with subtract @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Num’))
+        (^) :: forall a b. (Num a, Integral b) => a -> b -> a
+          with (^) @Int @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
         div :: forall a. Integral a => a -> a -> a
           with div @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
+        gcd :: forall a. Integral a => a -> a -> a
+          with gcd @Int
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Real’))
+        lcm :: forall a. Integral a => a -> a -> a
+          with lcm @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Real’))
         mod :: forall a. Integral a => a -> a -> a
@@ -337,12 +337,12 @@ T14590.hs:7:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with seq @Int @Int
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Prim’))
-        return :: forall (m :: * -> *) a. Monad m => a -> m a
-          with return @((->) Int) @Int
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+          with pure @((->) Int)
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
-        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
-          with pure @((->) Int) @Int
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
+          with return @((->) Int)
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
 
