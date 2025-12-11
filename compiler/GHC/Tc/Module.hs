@@ -266,9 +266,11 @@ tcRnModuleTcRnM hsc_env mod_sum
         ; when (notNull prel_imports) $ do
             addDiagnostic TcRnImplicitImportOfPrelude
 
+        ; query <- liftIO $ hscUnitIndexQuery hsc_env
+
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
-                  ( renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName idecl) (ideclPkgQual idecl)
+                  ( renameRawPkgQual (hsc_unit_env hsc_env) query (unLoc $ ideclName idecl) (ideclPkgQual idecl)
                   , reLoc $ ideclName idecl)
               }
         ; raw_sig_imports <- liftIO
@@ -1996,11 +1998,13 @@ runTcInteractive hsc_env thing_inside
                                  (loadSrcInterface (text "runTcInteractive") m
                                                    NotBoot mb_pkg)
 
+
        ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
             case i of                   -- force above: see #15111
                 IIModule n -> getOrphans n NoPkgQual
-                IIDecl i   -> getOrphans (unLoc (ideclName i))
-                                         (renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i))
+                IIDecl i -> do
+                  qual <- hscRenameRawPkgQual hsc_env (unLoc $ ideclName i) (ideclPkgQual i)
+                  getOrphans (unLoc (ideclName i)) qual
 
        ; let imports = emptyImportAvails { imp_orphs = orphs }
 
