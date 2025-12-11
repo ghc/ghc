@@ -275,7 +275,7 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
 
   where
  --
-    mkEdge :: InteractiveImport -> Either ModuleNodeEdge (UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))
+    mkEdge :: InteractiveImport -> Either ModuleNodeEdge (UnitId, ImportLevel, RawPkgQual, GenWithIsBoot (Located ModuleName))
     -- A simple edge to a module from the same home unit
     mkEdge (IIModule n) =
       let
@@ -294,12 +294,12 @@ downsweepInteractiveImports hsc_env ic = unsafeInterleaveIO $ do
       let lvl = convImportLevel (ideclLevelSpec i)
           wanted_mod = unLoc (ideclName i)
           is_boot = ideclSource i
-          mb_pkg = renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i)
+          raw_pkg = ideclPkgQual i
           unitId = homeUnitId $ hsc_home_unit hsc_env
-      in Right (unitId, lvl, mb_pkg, GWIB (noLoc wanted_mod) is_boot)
+      in Right (unitId, lvl, raw_pkg, GWIB (noLoc wanted_mod) is_boot)
 
 loopFromInteractive :: HscEnv
-                    -> [Either ModuleNodeEdge (UnitId, ImportLevel, PkgQual, GenWithIsBoot (Located ModuleName))]
+                    -> [Either ModuleNodeEdge (UnitId, ImportLevel, RawPkgQual, GenWithIsBoot (Located ModuleName))]
                     -> M.Map NodeKey ModuleGraphNode
                     -> IO ([ModuleNodeEdge],M.Map NodeKey ModuleGraphNode)
 loopFromInteractive _ [] cached_nodes = return ([], cached_nodes)
@@ -308,12 +308,13 @@ loopFromInteractive hsc_env (edge:edges) cached_nodes =
     Left edge -> do
         (edges, cached_nodes') <- loopFromInteractive hsc_env edges cached_nodes
         return (edge : edges, cached_nodes')
-    Right (unitId, lvl, mb_pkg, GWIB wanted_mod is_boot) -> do
+    Right (unitId, lvl, raw_pkg, GWIB wanted_mod is_boot) -> do
       let home_unit = ue_unitHomeUnit unitId (hsc_unit_env hsc_env)
       let k _ loc mod =
             let key = moduleToMnk mod is_boot
             in return $ FoundHome (ModuleNodeFixed key loc)
-      found <- liftIO $ summariseModuleDispatch k hsc_env home_unit is_boot wanted_mod mb_pkg []
+      pkg_qual <- hscRenameRawPkgQual hsc_env (unLoc wanted_mod) raw_pkg
+      found <- liftIO $ summariseModuleDispatch k hsc_env home_unit is_boot wanted_mod pkg_qual []
       case found of
         -- Case 1: Home modules have to already be in the cache.
         FoundHome (ModuleNodeFixed mod _) -> do
@@ -1541,7 +1542,8 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
               sec = initSourceErrorContext pi_local_dflags
           mimps <- getImports popts sec imp_prelude pi_hspp_buf pi_hspp_fn src_fn
           return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
-  let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
+  query <- liftIO $ hscUnitIndexQuery hsc_env
+  let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) query
   let rn_imps = fmap (\(sp, pk, lmn@(L _ mn)) -> (sp, rn_pkg_qual mn pk, lmn))
   let pi_srcimps = pi_srcimps'
   let pi_theimps = rn_imps pi_theimps'

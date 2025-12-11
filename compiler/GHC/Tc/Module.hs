@@ -265,9 +265,11 @@ tcRnModuleTcRnM hsc_env mod_sum
         ; when (notNull prel_imports) $ do
             addDiagnostic TcRnImplicitImportOfPrelude
 
+        ; query <- liftIO $ hscUnitIndexQuery hsc_env
+
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
-                  ( renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName idecl) (ideclPkgQual idecl)
+                  ( renameRawPkgQual (hsc_unit_env hsc_env) query (unLoc $ ideclName idecl) (ideclPkgQual idecl)
                   , reLoc $ ideclName idecl)
               }
         ; raw_sig_imports <- liftIO
@@ -2122,19 +2124,21 @@ runTcInteractive hsc_env thing_inside
                                                  , let local_gres = filter isLocalGRE gres
                                                  , not (null local_gres) ]) ]
 
-       ; let getOrphansForModuleName m mb_pkg = do
-              iface <- loadSrcInterface (text "runTcInteractive") m NotBoot mb_pkg
+       ; let getOrphansForModuleName m pkg = do
+              iface <- loadSrcInterface (text "runTcInteractive") m NotBoot pkg
               pure $ mi_module iface : dep_orphs (mi_deps iface)
 
              getOrphansForModule m = do
               iface <- loadModuleInterface (text "runTcInteractive") m
               pure $ mi_module iface : dep_orphs (mi_deps iface)
 
+
        ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
             case i of                   -- force above: see #15111
                 IIModule n -> getOrphansForModule n
-                IIDecl i   -> getOrphansForModuleName (unLoc (ideclName i))
-                                         (renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i))
+                IIDecl i   -> do
+                  qual <- hscRenameRawPkgQual hsc_env (unLoc $ ideclName i) (ideclPkgQual i)
+                  getOrphansForModuleName (unLoc (ideclName i)) qual
 
 
        ; (home_insts, home_fam_insts) <- liftIO $ UnitEnv.hugAllInstances (hsc_unit_env hsc_env)

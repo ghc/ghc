@@ -128,26 +128,35 @@ initMulti unitArgsFiles lintDynFlagsAndSrcs = do
   (initial_home_graph, mainUnitId) <- liftIO $ createUnitEnvFromFlags unitDflags
   let home_units = HUG.allUnits initial_home_graph
 
-  home_unit_graph <- forM initial_home_graph $ \homeUnitEnv -> do
-    let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
-        hue_flags = homeUnitEnv_dflags homeUnitEnv
-        dflags = homeUnitEnv_dflags homeUnitEnv
-    (dbs,unit_state,home_unit,mconstants) <- liftIO $ State.initUnits logger hue_flags cached_unit_dbs home_units
+  let unit_index = hscUnitIndex hsc_env
+  (shared_cache, home_unit_graph) <-
+    fmap (second (HUG.hugFromList . reverse)) $
+      foldM
+        (\(cache, acc) (uid, homeUnitEnv) -> do
+            let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
+                hue_flags = homeUnitEnv_dflags homeUnitEnv
+                dflags = homeUnitEnv_dflags homeUnitEnv
+            (cache', (dbs,unit_state,home_unit,mconstants)) <-
+              liftIO $ State.initUnitsWithCache logger hue_flags unit_index cached_unit_dbs home_units cache
 
-    updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
-    emptyHpt <- liftIO $ emptyHomePackageTable
-    pure $ HomeUnitEnv
-      { homeUnitEnv_units = unit_state
-      , homeUnitEnv_unit_dbs = Just dbs
-      , homeUnitEnv_dflags = updated_dflags
-      , homeUnitEnv_hpt = emptyHpt
-      , homeUnitEnv_home_unit = Just home_unit
-      }
+            updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
+            emptyHpt <- liftIO $ emptyHomePackageTable
+            let newEnv = HomeUnitEnv
+                  { homeUnitEnv_units = unit_state
+                  , homeUnitEnv_unit_dbs = Just dbs
+                  , homeUnitEnv_dflags = updated_dflags
+                  , homeUnitEnv_hpt = emptyHpt
+                  , homeUnitEnv_home_unit = Just home_unit
+                  }
+            pure (cache', (uid, newEnv) : acc))
+        (State.emptySharedProviders, [])
+        (HUG.unitEnv_assocs initial_home_graph)
 
   checkUnitCycles initial_dflags home_unit_graph
 
   let dflags = homeUnitEnv_dflags $ HUG.unitEnv_lookup mainUnitId home_unit_graph
-  unitEnv <- assertUnitEnvInvariant <$> (liftIO $ initUnitEnv mainUnitId home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags))
+  unitEnv0 <- assertUnitEnvInvariant <$> (liftIO $ initUnitEnv mainUnitId home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags))
+  let unitEnv = unitEnv0 { ue_index = State.newUnitIndex shared_cache }
   let final_hsc_env = hsc_env { hsc_unit_env = unitEnv }
 
   GHC.setSession final_hsc_env
@@ -243,5 +252,3 @@ createUnitEnvFromFlags unitDflags = do
     return (homeUnitId_ dflags, newInternalUnitEnv)
   let activeUnit = fst $ NE.head unitEnvList
   return (HUG.hugFromList (NE.toList unitEnvList), activeUnit)
-
-

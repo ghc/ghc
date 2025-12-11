@@ -43,6 +43,7 @@ import GHC.Core.TyCo.Compare (eqType)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Data.FastString (unpackFS)
+import GHC.Driver.Env (hscUnitIndexQuery)
 import GHC.Driver.Env.Types
 import GHC.HsToCore.Docs
 import GHC.Iface.Load
@@ -73,7 +74,8 @@ attachInstances expInfo ifaces instIfaceMap isOneShot = do
   --
   -- See https://github.com/haskell/haddock/issues/469.
   env <- getSession
-  let mod_to_pkg_conf = moduleNameProvidersMap $ ue_homeUnitState $ hsc_unit_env env
+  query <- liftIO $ hscUnitIndexQuery env
+  let mod_to_pkg_conf = moduleProviders query $ ue_homeUnitState $ hsc_unit_env env
       mods =
         mkModuleSet
           [ m

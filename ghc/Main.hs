@@ -325,6 +325,7 @@ doMake units targets = do
       ok_flag <- GHC.load LoadAllTargets
       when (failed ok_flag) (liftIO $ exitWith (ExitFailure 1))
 
+
 -- ---------------------------------------------------------------------------
 -- Various banners and verbosity output.
 
@@ -510,4 +511,3 @@ abiHash strs = do
   f <- fingerprintBinMem bh
 
   putStrLn (showPpr dflags f)
-

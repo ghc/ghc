@@ -174,6 +174,9 @@ data UnitEnv = UnitEnv
 
     , ue_namever   :: !GhcNameVersion
         -- ^ GHC name/version (used for dynamic library suffix)
+
+    , ue_index :: !UnitIndex
+        -- ^ Shared information about units which is extended by per-unit information stored in UnitState.
     }
 
 ueEPS :: UnitEnv -> IO ExternalPackageState
@@ -182,6 +185,7 @@ ueEPS = eucEPS . ue_eps
 initUnitEnv :: UnitId -> HomeUnitGraph -> GhcNameVersion -> Platform -> IO UnitEnv
 initUnitEnv cur_unit hug namever platform = do
   eps <- initExternalUnitCache
+  let ue_index = newUnitIndex emptySharedProviders
   return $ UnitEnv
     { ue_eps             = eps
     , ue_home_unit_graph = hug
@@ -189,6 +193,7 @@ initUnitEnv cur_unit hug namever platform = do
     , ue_current_unit    = cur_unit
     , ue_platform        = platform
     , ue_namever         = namever
+    , ue_index           = ue_index
     }
 
 updateHug :: (HomeUnitGraph -> HomeUnitGraph) -> UnitEnv -> UnitEnv

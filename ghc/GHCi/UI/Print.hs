@@ -18,6 +18,7 @@ import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Errors
 import GHC.Driver.Config.Diagnostic
+import GHC.Driver.Env (hsc_unit_env, hscUnitIndexQuery)
 
 import GHC.Utils.Logger
 import GHC.Utils.Error
@@ -45,10 +46,11 @@ printForUserGlobalRdrEnv mb_rdr_env doc = do
     where
       mkNamePprCtxFromGlobalRdrEnv _ Nothing = GHC.getNamePprCtx
       mkNamePprCtxFromGlobalRdrEnv dflags (Just rdr_env) =
-        withSession $ \ hsc_env ->
-        let unit_env = hsc_unit_env hsc_env
-            ptc = initPromotionTickContext dflags
-        in  return $ Ppr.mkNamePprCtx ptc unit_env rdr_env
+        withSession $ \ hsc_env -> do
+          query <- liftIO $ hscUnitIndexQuery hsc_env
+          let unit_env = hsc_unit_env hsc_env
+              ptc = initPromotionTickContext dflags
+          return $ Ppr.mkNamePprCtx ptc unit_env query rdr_env
 
 printForUser :: GhcMonad m => SDoc -> m ()
 printForUser doc = do

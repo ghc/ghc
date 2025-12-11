@@ -1,5 +1,5 @@
+{-# LANGUAGE LambdaCase, RecordWildCards #-}
 -- (c) The University of Glasgow, 2006
-
 
 -- | Unit manipulation
 module GHC.Unit.State (
@@ -11,7 +11,10 @@ module GHC.Unit.State (
         UnitDatabase (..),
         UnitErr (..),
         emptyUnitState,
+        SharedModuleProviders,
+        emptySharedProviders,
         initUnits,
+        initUnitsWithCache,
         readUnitDatabases,
         readUnitDatabase,
         getUnitDbRefs,
@@ -47,6 +50,15 @@ module GHC.Unit.State (
         closeUnitDeps,
         closeUnitDeps',
         mayThrowUnitErr,
+
+        UnitConfig (..),
+        UnitIndex (..),
+        UnitIndexQuery (..),
+        UnitVisibility (..),
+        VisibilityMap,
+        ModuleNameProvidersMap,
+        newUnitIndex,
+        newUnitIndexQuery,
 
         -- * Module hole substitution
         ShHoleSubst,
@@ -113,6 +125,8 @@ import Control.Monad
 import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
 import Data.List ( intersperse, partition, sortBy, sortOn )
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Set (Set)
 import Data.Monoid (First(..))
 import qualified Data.Semigroup as Semigroup
@@ -218,22 +232,6 @@ instance Outputable ModuleOrigin where
                     sep (map (ppr . mkUnit) rhs)]) ++
         (if f then [text "package flag"] else [])
         ))
-
--- | Smart constructor for a module which is in @exposed-modules@.  Takes
--- as an argument whether or not the defining package is exposed.
-fromExposedModules :: Bool -> ModuleOrigin
-fromExposedModules e = ModOrigin (Just e) [] [] False
-
--- | Smart constructor for a module which is in @reexported-modules@.  Takes
--- as an argument whether or not the reexporting package is exposed, and
--- also its 'UnitInfo'.
-fromReexportedModules :: Bool -> UnitInfo -> ModuleOrigin
-fromReexportedModules True pkg = ModOrigin Nothing [pkg] [] False
-fromReexportedModules False pkg = ModOrigin Nothing [] [pkg] False
-
--- | Smart constructor for a module which was bound by a package flag.
-fromFlag :: ModuleOrigin
-fromFlag = ModOrigin Nothing [] [] True
 
 instance Semigroup ModuleOrigin where
     x@(ModOrigin e res rhs f) <> y@(ModOrigin e' res' rhs' f') =
@@ -461,13 +459,14 @@ data UnitState = UnitState {
 
   homeUnitDepends    :: [UnitId],
 
-  -- | This is a full map from 'ModuleName' to all modules which may possibly
-  -- be providing it.  These providers may be hidden (but we'll still want
-  -- to report them in error messages), or it may be an ambiguous import.
-  moduleNameProvidersMap    :: !ModuleNameProvidersMap,
+  -- | Visibility of units for normal imports.
+  unitVisibilityMap :: !VisibilityMap,
 
-  -- | A map, like 'moduleNameProvidersMap', but controlling plugin visibility.
-  pluginModuleNameProvidersMap    :: !ModuleNameProvidersMap,
+  -- | Visibility of units for plugin imports.
+  pluginUnitVisibilityMap :: !VisibilityMap,
+
+  -- | Units which are unusable, for diagnostics and reporting.
+  unusableUnits :: !UnusableUnits,
 
   -- | A map saying, for each requirement, what interfaces must be merged
   -- together when we use them.  For example, if our dependencies
@@ -485,6 +484,12 @@ data UnitState = UnitState {
   allowVirtualUnits :: !Bool
   }
 
+type SharedModuleProviders =
+  (GlobalProviders, UniqSet UnitId)
+
+emptySharedProviders :: SharedModuleProviders
+emptySharedProviders = (emptyUniqMap, emptyUniqSet)
+
 emptyUnitState :: UnitState
 emptyUnitState = UnitState {
     unitInfoMap    = emptyUniqMap,
@@ -495,8 +500,9 @@ emptyUnitState = UnitState {
     preloadUnits   = [],
     explicitUnits  = [],
     homeUnitDepends = [],
-    moduleNameProvidersMap       = emptyUniqMap,
-    pluginModuleNameProvidersMap = emptyUniqMap,
+    unitVisibilityMap            = emptyUniqMap,
+    pluginUnitVisibilityMap      = emptyUniqMap,
+    unusableUnits                = emptyUniqMap,
     requirementContext           = emptyUniqMap,
     allowVirtualUnits = False
     }
@@ -578,10 +584,10 @@ searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
 -- | Find the UnitId which an import qualified by a package import comes from.
 -- Compared to 'lookupPackageName', this function correctly accounts for visibility,
 -- renaming and thinning.
-resolvePackageImport :: UnitState -> ModuleName -> PackageName -> Maybe UnitId
-resolvePackageImport unit_st mn pn = do
+resolvePackageImport :: UnitState -> UnitIndexQuery -> ModuleName -> PackageName -> Maybe UnitId
+resolvePackageImport unit_st query mn pn = do
   -- 1. Find all modules providing the ModuleName (this accounts for visibility/thinning etc)
-  providers <- filterUniqMap originVisible <$> lookupUniqMap (moduleNameProvidersMap unit_st) mn
+  providers <- filterUniqMap originVisible <$> findOrigin query unit_st mn False
   -- 2. Get the UnitIds of the candidates
   let candidates_uid = concatMap to_uid $ sortOn fst $ nonDetUniqMapToList providers
   -- 3. Get the package names of the candidates
@@ -639,18 +645,31 @@ listUnitInfo state = nonDetEltsUniqMap (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
-initUnits logger dflags cached_dbs home_units = do
+initUnits :: Logger -> DynFlags -> UnitIndex -> Maybe [UnitDatabase UnitId] -> Set.Set UnitId -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
+initUnits logger dflags index cached_dbs home_units = do
+  (_, res) <- initUnitsWithCache logger dflags index cached_dbs home_units emptySharedProviders
+  pure res
 
-  let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
+initUnitsWithCache ::
+  Logger ->
+  DynFlags ->
+  UnitIndex ->
+  Maybe [UnitDatabase UnitId] ->
+  Set.Set UnitId ->
+  SharedModuleProviders ->
+  IO (SharedModuleProviders, ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants))
+initUnitsWithCache logger dflags index cached_dbs home_units cache0 = do
 
-  (unit_state,dbs) <- withTiming logger (text "initializing unit database")
+  let forceUnitInfoMap ((state, _), _) = unitInfoMap state `seq` ()
+
+  ((unit_state,dbs), cache) <- withTiming logger (text "initializing unit database")
                    forceUnitInfoMap
-                 $ mkUnitState logger (initUnitConfig dflags cached_dbs home_units)
+                 $ mkUnitState logger (homeUnitId_ dflags) (initUnitConfig dflags cached_dbs home_units) index cache0
 
+  let dump_providers = queryModuleProvidersShared cache (homeUnitId_ dflags) unit_state
   putDumpFileMaybe logger Opt_D_dump_mod_map "Module Map"
     FormatText (updSDocContext (\ctx -> ctx {sdocLineLength = 200})
-                $ pprModuleMap (moduleNameProvidersMap unit_state))
+                $ pprModuleMap dump_providers)
 
   let home_unit = mkHomeUnit unit_state
                              (homeUnitId_ dflags)
@@ -674,7 +693,7 @@ initUnits logger dflags cached_dbs home_units = do
         Nothing   -> return Nothing
         Just info -> lookupPlatformConstants (fmap ST.unpack (unitIncludeDirs info))
 
-  return (dbs,unit_state,home_unit,mconstants)
+  return (cache,(dbs,unit_state,home_unit,mconstants))
 
 mkHomeUnit
     :: UnitState
@@ -1480,9 +1499,12 @@ validateDatabase cfg pkg_map1 =
 
 mkUnitState
     :: Logger
+    -> UnitId
     -> UnitConfig
-    -> IO (UnitState,[UnitDatabase UnitId])
-mkUnitState logger cfg = do
+    -> UnitIndex
+    -> SharedModuleProviders
+    -> IO ((UnitState,[UnitDatabase UnitId]), SharedModuleProviders)
+mkUnitState logger unit cfg index cache0 = do
 {-
    Plan.
 
@@ -1538,14 +1560,8 @@ mkUnitState logger cfg = do
 
   -- if databases have not been provided, read the database flags
   raw_dbs <- case unitConfigDBCache cfg of
-               Nothing  -> readUnitDatabases logger cfg
+               Nothing  -> readDatabases index logger unit cfg
                Just dbs -> return dbs
-
-  -- distrust all units if the flag is set
-  let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
-      dbs | unitConfigDistrustAll cfg = map distrust_all raw_dbs
-          | otherwise                 = raw_dbs
-
 
   -- This, and the other reverse's that you will see, are due to the fact that
   -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
@@ -1558,14 +1574,19 @@ mkUnitState logger cfg = do
   let home_unit_deps = selectHomeUnits (unitConfigHomeUnits cfg) hpt_flags
 
   -- Merge databases together, without checking validity
-  (pkg_map1, prec_map) <- mergeDatabases logger dbs
+  (pkg_map1, prec_map) <- mergeDatabases logger raw_dbs
 
   -- Now that we've merged everything together, prune out unusable
   -- packages.
-  let (pkg_map2, unusable, sccs) = validateDatabase cfg pkg_map1
+  let (initial_dbs, unusable, sccs) = validateDatabase cfg pkg_map1
 
   reportCycles   logger sccs
   reportUnusable logger unusable
+
+  -- distrust all units if the flag is set
+  let distrust_all info = info {unitIsTrusted = False}
+      pkg_map2 | unitConfigDistrustAll cfg = distrust_all <$> initial_dbs
+               | otherwise                 = initial_dbs
 
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
@@ -1671,6 +1692,9 @@ mkUnitState logger cfg = do
                 -- likely to actually happen.
                 return (updateVisibilityMap wired_map plugin_vis_map2)
 
+  ((_, _), cache) <-
+    computeProviders index cache0 logger unit cfg vis_map plugin_vis_map initial_dbs pkg_db (mkUnusableModuleNameProvidersMap unusable)
+
   let pkgname_map = listToUFM [ (unitPackageName p, unitInstanceOf p)
                               | p <- pkgs2
                               ]
@@ -1683,8 +1707,6 @@ mkUnitState logger cfg = do
       req_ctx = mapUniqMap (Set.toList)
               $ plusUniqMapListWith Set.union (map uv_requirements (nonDetEltsUniqMap vis_map))
 
-
-  --
   -- Here we build up a set of the packages mentioned in -package
   -- flags on the command line; these are called the "preload"
   -- packages.  we link these packages in eagerly.  The preload set
@@ -1707,10 +1729,6 @@ mkUnitState logger cfg = do
                     $ closeUnitDeps pkg_db
                     $ zip (map toUnitId preload3) (repeat Nothing)
 
-  let mod_map1 = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet vis_map
-      mod_map2 = mkUnusableModuleNameProvidersMap unusable
-      mod_map = mod_map2 `plusUniqMap` mod_map1
-
   -- Force the result to avoid leaking input parameters
   let !state = UnitState
          { preloadUnits                 = dep_preload
@@ -1718,15 +1736,16 @@ mkUnitState logger cfg = do
          , homeUnitDepends              = Set.toList home_unit_deps
          , unitInfoMap                  = pkg_db
          , preloadClosure               = emptyUniqSet
-         , moduleNameProvidersMap       = mod_map
-         , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
+         , unitVisibilityMap            = vis_map
+         , pluginUnitVisibilityMap      = plugin_vis_map
+         , unusableUnits                = unusable
          , packageNameMap               = pkgname_map
          , wireMap                      = wired_map
          , unwireMap                    = listToUniqMap [ (v,k) | (k,v) <- nonDetUniqMapToList wired_map ]
          , requirementContext           = req_ctx
          , allowVirtualUnits            = unitConfigAllowVirtual cfg
          }
-  return (state, raw_dbs)
+  return ((state, raw_dbs), cache)
 
 selectHptFlag :: Set.Set UnitId -> PackageFlag -> Bool
 selectHptFlag home_units (ExposePackage _ (UnitIdArg uid) _) | toUnitId uid `Set.member` home_units = True
@@ -1747,98 +1766,6 @@ unwireUnit :: UnitState -> Unit -> Unit
 unwireUnit state uid@(RealUnit (Definite def_uid)) =
     maybe uid (RealUnit . Definite) (lookupUniqMap (unwireMap state) def_uid)
 unwireUnit _ uid = uid
-
--- -----------------------------------------------------------------------------
--- | Makes the mapping from ModuleName to package info
-
--- Slight irritation: we proceed by leafing through everything
--- in the installed package database, which makes handling indefinite
--- packages a bit bothersome.
-
-mkModuleNameProvidersMap
-  :: Logger
-  -> UnitConfig
-  -> UnitInfoMap
-  -> PreloadUnitClosure
-  -> VisibilityMap
-  -> ModuleNameProvidersMap
-mkModuleNameProvidersMap logger cfg pkg_map closure vis_map =
-    -- What should we fold on?  Both situations are awkward:
-    --
-    --    * Folding on the visibility map means that we won't create
-    --      entries for packages that aren't mentioned in vis_map
-    --      (e.g., hidden packages, causing #14717)
-    --
-    --    * Folding on pkg_map is awkward because if we have an
-    --      Backpack instantiation, we need to possibly add a
-    --      package from pkg_map multiple times to the actual
-    --      ModuleNameProvidersMap.  Also, we don't really want
-    --      definite package instantiations to show up in the
-    --      list of possibilities.
-    --
-    -- So what will we do instead?  We'll extend vis_map with
-    -- entries for every definite (for non-Backpack) and
-    -- indefinite (for Backpack) package, so that we get the
-    -- hidden entries we need.
-    nonDetFoldUniqMap extend_modmap emptyMap vis_map_extended
- where
-  vis_map_extended = {- preferred -} default_vis `plusUniqMap` vis_map
-
-  default_vis = listToUniqMap
-                  [ (mkUnit pkg, mempty)
-                  | (_, pkg) <- nonDetUniqMapToList pkg_map
-                  -- Exclude specific instantiations of an indefinite
-                  -- package
-                  , unitIsIndefinite pkg || null (unitInstantiations pkg)
-                  ]
-
-  emptyMap = emptyUniqMap
-  setOrigins m os = fmap (const os) m
-  extend_modmap (uid, UnitVisibility { uv_expose_all = b, uv_renamings = rns }) modmap
-    = addListTo modmap theBindings
-   where
-    pkg = unit_lookup uid
-
-    theBindings :: [(ModuleName, UniqMap Module ModuleOrigin)]
-    theBindings = newBindings b rns
-
-    newBindings :: Bool
-                -> [(ModuleName, ModuleName)]
-                -> [(ModuleName, UniqMap Module ModuleOrigin)]
-    newBindings e rns  = es e ++ hiddens ++ map rnBinding rns
-
-    rnBinding :: (ModuleName, ModuleName)
-              -> (ModuleName, UniqMap Module ModuleOrigin)
-    rnBinding (orig, new) = (new, setOrigins origEntry fromFlag)
-     where origEntry = case lookupUFM esmap orig of
-            Just r -> r
-            Nothing -> throwGhcException (CmdLineError (renderWithContext
-                        (log_default_user_context (logFlags logger))
-                        (text "package flag: could not find module name" <+>
-                            ppr orig <+> text "in package" <+> ppr pk)))
-
-    es :: Bool -> [(ModuleName, UniqMap Module ModuleOrigin)]
-    es e = do
-     (m, exposedReexport) <- exposed_mods
-     let (pk', m', origin') =
-          case exposedReexport of
-           Nothing -> (pk, m, fromExposedModules e)
-           Just (Module pk' m') ->
-              (pk', m', fromReexportedModules e pkg)
-     return (m, mkModMap pk' m' origin')
-
-    esmap :: UniqFM ModuleName (UniqMap Module ModuleOrigin)
-    esmap = listToUFM (es False) -- parameter here doesn't matter, orig will
-                                 -- be overwritten
-
-    hiddens = [(m, mkModMap pk m ModHidden) | m <- hidden_mods]
-
-    pk = mkUnit pkg
-    unit_lookup uid = lookupUnit' (unitConfigAllowVirtual cfg) pkg_map closure uid
-                        `orElse` pprPanic "unit_lookup" (ppr uid)
-
-    exposed_mods = unitExposedModules pkg
-    hidden_mods  = unitHiddenModules pkg
 
 -- | Make a 'ModuleNameProvidersMap' covering a set of unusable packages.
 mkUnusableModuleNameProvidersMap :: UnusableUnits -> ModuleNameProvidersMap
@@ -1892,6 +1819,288 @@ addListTo = foldl' merge
 mkModMap :: Unit -> ModuleName -> ModuleOrigin -> UniqMap Module ModuleOrigin
 mkModMap pkg mod = unitUniqMap (mkModule pkg mod)
 
+-- -----------------------------------------------------------------------------
+-- Index
+
+data Provider =
+  Provider {
+    providerHidden :: !Bool,
+    providerReexports :: !(Maybe (NonEmpty UnitInfo))
+  }
+
+instance Outputable Provider where
+  ppr (Provider h r) = ppr h <+> ppr (isJust r)
+
+instance Semigroup Provider where
+  l <> r
+    | providerHidden l == providerHidden r =
+        Provider
+          { providerHidden = providerHidden l
+          , providerReexports = providerReexports l Semigroup.<> providerReexports r
+          }
+    | otherwise =
+        pprPanic "Provider: conflicting visibility" $
+          text "left:" <+> ppr (providerHidden l)
+            $$ text "right:" <+> ppr (providerHidden r)
+
+instance Monoid Provider where
+  mempty = Provider { providerHidden = False, providerReexports = Nothing }
+
+type GlobalProviders = UniqMap ModuleName (UniqMap Module Provider)
+
+mkProviderMap :: Unit -> ModuleName -> Provider -> UniqMap Module Provider
+mkProviderMap pkg = unitUniqMap . mkModule pkg
+
+addProvider :: UnitInfo -> GlobalProviders -> GlobalProviders
+addProvider info providers =
+  addListTo providers (exports ++ hiddens)
+  where
+    exports = map mkExport (unitExposedModules info)
+
+    mkExport (name, exposedReexport) =
+      let (originUnit, originName, reexports) = checkReexport name exposedReexport
+      in (name, mkProviderMap originUnit originName Provider { providerHidden = False
+                                                            , providerReexports = reexports
+                                                            })
+
+    checkReexport name = \case
+      Nothing -> (unit, name, Nothing)
+      Just (Module originUnit originName) ->
+        (originUnit, originName, Just (pure info))
+
+    hiddens =
+      [ (name, mkProviderMap unit name Provider { providerHidden = True
+                                                , providerReexports = Nothing
+                                                })
+      | name <- unitHiddenModules info
+      ]
+
+    unit = mkUnit info
+
+updateProviders ::
+  Logger ->
+  UnitConfig ->
+  UnitInfoMap ->
+  GlobalProviders ->
+  UniqSet UnitId ->
+  IO (GlobalProviders, UniqSet UnitId)
+updateProviders _ _ infos providers known = do
+  let newProviders =
+        nonDetFoldUniqMap (addProvider . snd) providers newlySeenUnits
+      newKnown =
+        unionUniqSets known (mkUniqSet (nonDetKeysUniqMap newlySeenUnits))
+  pure (newProviders, newKnown)
+  where
+    newlySeenUnits =
+      mkUnitInfoMap (nonDetEltsUniqMap (filterWithKeyUniqMap (const . isNew) infos))
+
+    isNew uid = not (elementOfUniqSet uid known)
+
+invalidRenamedModule ::
+  ModuleName ->
+  Unit ->
+  GhcException
+invalidRenamedModule orig unit =
+  CmdLineError $
+    showSDocUnsafe $
+      text "package flag: could not find module name"
+        <+> ppr orig
+        <+> text "in package"
+        <+> ppr unit
+
+renamingOrigin :: ModuleOrigin
+renamingOrigin =
+  ModOrigin
+    { fromOrigUnit = Nothing
+    , fromExposedReexport = []
+    , fromHiddenReexport = []
+    , fromPackageFlag = True
+    }
+
+unitOverrides ::
+  VisibilityMap ->
+  ModuleNameProvidersMap ->
+  GlobalProviders ->
+  ModuleNameProvidersMap
+unitOverrides vis_map unusable providers =
+  renamed `plusUniqMap` unusable
+  where
+    renamed =
+      nonDetFoldUniqMap renamings emptyUniqMap vis_map
+
+    renamings (unit, UnitVisibility { uv_renamings }) acc =
+      addListTo acc (map (moduleRenaming unit) uv_renamings)
+
+    moduleRenaming unit (orig, new) =
+      case lookupUniqMap providers orig of
+        Just entries -> (new, fmap (const renamingOrigin) entries)
+        Nothing -> throwGhcException (invalidRenamedModule orig unit)
+
+globalOrigin ::
+  UnitState ->
+  VisibilityMap ->
+  Module ->
+  Provider ->
+  (Module, ModuleOrigin)
+globalOrigin UnitState { wireMap } visibility Module { moduleUnit, moduleName } Provider { providerHidden, providerReexports } = (mkModule resolvedUnit moduleName, origin)
+  where
+
+    origin
+      | providerHidden = ModHidden
+      | Just reex <- providerReexports =
+          mkOrigin (uv_expose_all <$> vis) (NonEmpty.partition visible reex)
+      | otherwise =
+          mkOrigin (Just (maybe False uv_expose_all vis)) ([], [])
+
+    vis = lookupUniqMap visibility resolvedUnit
+
+    visible info = elemUniqMap (mkUnit info) visibility
+
+    mkOrigin fromOrigUnit (fromExposedReexport, fromHiddenReexport) =
+      ModOrigin { fromPackageFlag = False, .. }
+
+    resolvedUnit =
+      case lookupUniqMap wireMap (toUnitId moduleUnit) of
+        Just wired -> RealUnit (Definite wired)
+        Nothing -> moduleUnit
+
+applyVisibility ::
+  UnitState ->
+  VisibilityMap ->
+  UniqMap Module Provider ->
+  UniqMap Module ModuleOrigin
+applyVisibility state visibility providers =
+  listToUniqMap
+    [ globalOrigin state visibility mod provider
+    | (mod, provider) <- nonDetUniqMapToList providers
+    ]
+
+queryFindOriginShared ::
+  SharedModuleProviders ->
+  UnitId ->
+  UnitState ->
+  ModuleName ->
+  Bool ->
+  Maybe (UniqMap Module ModuleOrigin)
+queryFindOriginShared cache _unit state name isPlugin =
+  case base of
+    Nothing
+      | isNullUniqMap overrides -> Nothing
+      | otherwise -> Just overrides
+    Just b -> Just (overrides `plusUniqMap` b)
+  where
+    visibility =
+      if isPlugin
+        then pluginUnitVisibilityMap state
+        else unitVisibilityMap state
+
+    providersMap =
+      lookupUniqMap providerSource name
+
+    providerSource =
+      case cache of
+        (providers, _) -> providers
+
+    base =
+      applyVisibility state visibility <$> providersMap
+
+    overrides =
+      fromMaybe emptyUniqMap $
+        lookupUniqMap (unitOverrides visibility unusable_map providers) name
+
+    unusable_map = mkUnusableModuleNameProvidersMap (unusableUnits state)
+
+    providers =
+      case cache of
+        (providers0, _) -> providers0
+
+queryModuleProvidersShared ::
+  SharedModuleProviders ->
+  UnitId ->
+  UnitState ->
+  ModuleNameProvidersMap
+queryModuleProvidersShared cache _unit state =
+  overrides `plusUniqMap` computed
+  where
+    computed = mapUniqMap (applyVisibility state visibility) providerSource
+
+    visibility = unitVisibilityMap state
+
+    providerSource =
+      case cache of
+        (providers, _) -> providers
+
+    overrides = unitOverrides visibility unusable_map providerSource
+
+    unusable_map = mkUnusableModuleNameProvidersMap (unusableUnits state)
+
+data UnitIndexQuery =
+  UnitIndexQuery {
+    findOrigin :: UnitState -> ModuleName -> Bool -> Maybe (UniqMap Module ModuleOrigin),
+    moduleProviders :: UnitState -> ModuleNameProvidersMap
+  }
+
+-- | An abstract interface for querying information about packages
+-- This is combined with the per-unit UnitState in order to understand which packages
+-- are visible to a unit and what they provide.
+data UnitIndex =
+  UnitIndex {
+    unitIndexQuery :: UnitId -> IO UnitIndexQuery,
+    readDatabases :: Logger -> UnitId -> UnitConfig -> IO [UnitDatabase UnitId],
+    computeProviders ::
+      SharedModuleProviders ->
+      Logger ->
+      UnitId ->
+      UnitConfig ->
+      VisibilityMap ->
+      VisibilityMap ->
+      UnitInfoMap ->
+      UnitInfoMap ->
+      ModuleNameProvidersMap ->
+      IO ((ModuleNameProvidersMap, ModuleNameProvidersMap), SharedModuleProviders)
+  }
+
+newUnitIndexQuery :: SharedModuleProviders -> UnitId -> IO UnitIndexQuery
+newUnitIndexQuery cache unit =
+  pure UnitIndexQuery
+    { findOrigin = \state name plugins ->
+          queryFindOriginShared cache unit state name plugins
+    , moduleProviders = \state ->
+          queryModuleProvidersShared cache unit state
+    }
+
+readDatabasesDefault :: Logger -> UnitId -> UnitConfig -> IO [UnitDatabase UnitId]
+readDatabasesDefault logger _ cfg =
+  readUnitDatabases logger cfg
+
+computeProvidersDefault ::
+  SharedModuleProviders ->
+  Logger ->
+  UnitId ->
+  UnitConfig ->
+  VisibilityMap ->
+  VisibilityMap ->
+  UnitInfoMap ->
+  UnitInfoMap ->
+  ModuleNameProvidersMap ->
+  IO ((ModuleNameProvidersMap, ModuleNameProvidersMap), SharedModuleProviders)
+computeProvidersDefault cache0 logger unit _cfg vis_map plugin_vis_map initial_dbs _pkg_db unusable = do
+  (providers1, known1) <- updateProviders logger _cfg initial_dbs providers0 known0
+  let overrides = unitOverrides vis_map unusable providers1
+      pluginOverrides = unitOverrides plugin_vis_map unusable providers1
+      cache = (providers1, known1)
+  pure ((overrides, pluginOverrides), cache)
+  where
+    (providers0, known0) = cache0
+    providersCached = (nonDetKeysUniqMap providers0)
+
+newUnitIndex :: SharedModuleProviders -> UnitIndex
+newUnitIndex providers =
+  UnitIndex {
+    unitIndexQuery = newUnitIndexQuery providers,
+    readDatabases = readDatabasesDefault,
+    computeProviders = computeProvidersDefault
+  }
 
 -- -----------------------------------------------------------------------------
 -- Package Utils
@@ -1899,10 +2108,11 @@ mkModMap pkg mod = unitUniqMap (mkModule pkg mod)
 -- | Takes a 'ModuleName', and if the module is in any package returns
 -- list of modules which take that name.
 lookupModuleInAllUnits :: UnitState
+                          -> UnitIndexQuery
                           -> ModuleName
                           -> [(Module, UnitInfo)]
-lookupModuleInAllUnits pkgs m
-  = case lookupModuleWithSuggestions pkgs m NoPkgQual of
+lookupModuleInAllUnits pkgs query m
+  = case lookupModuleWithSuggestions pkgs query m NoPkgQual of
       LookupFound a b -> [(a,fst b)]
       LookupMultiple rs -> map f rs
         where f (m,_) = (m, expectJust (lookupUnit pkgs (moduleUnit m)))
@@ -1928,18 +2138,24 @@ data ModuleSuggestion = SuggestVisible ModuleName Module ModuleOrigin
                       | SuggestHidden ModuleName Module ModuleOrigin
 
 lookupModuleWithSuggestions :: UnitState
+                            -> UnitIndexQuery
                             -> ModuleName
                             -> PkgQual
                             -> LookupResult
-lookupModuleWithSuggestions pkgs
-  = lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs)
+lookupModuleWithSuggestions pkgs query name
+  = lookupModuleWithSuggestions' pkgs query name False
 
 -- | The package which the module **appears** to come from, this could be
 -- the one which reexports the module from it's original package. This function
 -- is currently only used for -Wunused-packages
-lookupModulePackage :: UnitState -> ModuleName -> PkgQual -> Maybe [UnitInfo]
-lookupModulePackage pkgs mn mfs =
-    case lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs) mn mfs of
+lookupModulePackage ::
+  UnitState ->
+  UnitIndexQuery ->
+  ModuleName ->
+  PkgQual ->
+  Maybe [UnitInfo]
+lookupModulePackage pkgs query mn mfs =
+    case lookupModuleWithSuggestions' pkgs query mn False mfs of
       LookupFound _ (orig_unit, origin) ->
         case origin of
           ModOrigin {fromOrigUnit, fromExposedReexport} ->
@@ -1955,19 +2171,21 @@ lookupModulePackage pkgs mn mfs =
       _ -> Nothing
 
 lookupPluginModuleWithSuggestions :: UnitState
+                                  -> UnitIndexQuery
                                   -> ModuleName
                                   -> PkgQual
                                   -> LookupResult
-lookupPluginModuleWithSuggestions pkgs
-  = lookupModuleWithSuggestions' pkgs (pluginModuleNameProvidersMap pkgs)
+lookupPluginModuleWithSuggestions pkgs query name
+  = lookupModuleWithSuggestions' pkgs query name True
 
 lookupModuleWithSuggestions' :: UnitState
-                            -> ModuleNameProvidersMap
+                            -> UnitIndexQuery
                             -> ModuleName
+                            -> Bool
                             -> PkgQual
                             -> LookupResult
-lookupModuleWithSuggestions' pkgs mod_map m mb_pn
-  = case lookupUniqMap mod_map m of
+lookupModuleWithSuggestions' pkgs query m onlyPlugins mb_pn
+  = case findOrigin query pkgs m onlyPlugins of
         Nothing -> LookupNotFound suggestions
         Just xs ->
           case foldl' classify ([],[],[], []) (sortOn fst $ nonDetUniqMapToList xs) of
@@ -2028,16 +2246,16 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
     all_mods :: [(String, ModuleSuggestion)]     -- All modules
     all_mods = sortBy (comparing fst) $
         [ (moduleNameString m, suggestion)
-        | (m, e) <- nonDetUniqMapToList (moduleNameProvidersMap pkgs)
+        | (m, e) <- nonDetUniqMapToList (moduleProviders query pkgs)
         , suggestion <- map (getSuggestion m) (nonDetUniqMapToList e)
         ]
     getSuggestion name (mod, origin) =
         (if originVisible origin then SuggestVisible else SuggestHidden)
             name mod origin
 
-listVisibleModuleNames :: UnitState -> [ModuleName]
-listVisibleModuleNames state =
-    map fst (filter visible (nonDetUniqMapToList (moduleNameProvidersMap state)))
+listVisibleModuleNames :: UnitState -> UnitIndexQuery -> [ModuleName]
+listVisibleModuleNames unit_state query =
+    map fst (filter visible (nonDetUniqMapToList (moduleProviders query unit_state)))
   where visible (_, ms) = anyUniqMap originVisible ms
 
 -- | Takes a list of UnitIds (and their "parent" dependency, used for error
