@@ -580,10 +580,10 @@ searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
 -- | Find the UnitId which an import qualified by a package import comes from.
 -- Compared to 'lookupPackageName', this function correctly accounts for visibility,
 -- renaming and thinning.
-resolvePackageImport :: UnitState -> ModuleName -> PackageName -> Maybe UnitId
-resolvePackageImport unit_st mn pn = do
+resolvePackageImport :: UnitState -> UnitIndexQuery -> ModuleName -> PackageName -> Maybe UnitId
+resolvePackageImport unit_st query mn pn = do
   -- 1. Find all modules providing the ModuleName (this accounts for visibility/thinning etc)
-  providers <- filterUniqMap originVisible <$> lookupUniqMap (moduleNameProvidersMap unit_st) mn
+  providers <- filterUniqMap originVisible <$> findOrigin query unit_st mn False
   -- 2. Get the UnitIds of the candidates
   let candidates_uid = concatMap to_uid $ sortOn fst $ nonDetUniqMapToList providers
   -- 3. Get the package names of the candidates
@@ -1900,8 +1900,14 @@ mkModMap pkg mod = unitUniqMap (mkModule pkg mod)
 -- -----------------------------------------------------------------------------
 -- Index
 
+data UnitIndexQuery =
+  UnitIndexQuery {
+    findOrigin :: UnitState -> ModuleName -> Bool -> Maybe (UniqMap Module ModuleOrigin)
+  }
+
 data UnitIndex =
   UnitIndex {
+    unitIndexQuery :: UnitId -> IO UnitIndexQuery,
     readDatabases :: Logger -> UnitId -> UnitConfig -> IO [UnitDatabase UnitId],
     computeProviders ::
       Logger ->
@@ -1913,6 +1919,22 @@ data UnitIndex =
       UnitInfoMap ->
       ModuleNameProvidersMap ->
       IO (ModuleNameProvidersMap, ModuleNameProvidersMap)
+  }
+
+queryFindOriginDefault ::
+  UnitState ->
+  ModuleName ->
+  Bool ->
+  Maybe (UniqMap Module ModuleOrigin)
+queryFindOriginDefault UnitState {moduleNameProvidersMap, pluginModuleNameProvidersMap} name plugins =
+  lookupUniqMap source name
+  where
+    source = if plugins then pluginModuleNameProvidersMap else moduleNameProvidersMap
+
+newUnitIndexQuery :: UnitId -> IO UnitIndexQuery
+newUnitIndexQuery _ =
+  pure UnitIndexQuery {
+    findOrigin = queryFindOriginDefault
   }
 
 readDatabasesDefault :: Logger -> UnitId -> UnitConfig -> IO [UnitDatabase UnitId]
@@ -1939,6 +1961,7 @@ computeProvidersDefault logger _ cfg vis_map plugin_vis_map _initial_dbs pkg_db 
 newUnitIndex :: IO UnitIndex
 newUnitIndex = do
   pure UnitIndex {
+    unitIndexQuery = newUnitIndexQuery,
     readDatabases = readDatabasesDefault,
     computeProviders = computeProvidersDefault
   }
@@ -1949,10 +1972,11 @@ newUnitIndex = do
 -- | Takes a 'ModuleName', and if the module is in any package returns
 -- list of modules which take that name.
 lookupModuleInAllUnits :: UnitState
+                          -> UnitIndexQuery
                           -> ModuleName
                           -> [(Module, UnitInfo)]
-lookupModuleInAllUnits pkgs m
-  = case lookupModuleWithSuggestions pkgs m NoPkgQual of
+lookupModuleInAllUnits pkgs query m
+  = case lookupModuleWithSuggestions pkgs query m NoPkgQual of
       LookupFound a b -> [(a,fst b)]
       LookupMultiple rs -> map f rs
         where f (m,_) = (m, expectJust "lookupModule" (lookupUnit pkgs
@@ -1979,18 +2003,24 @@ data ModuleSuggestion = SuggestVisible ModuleName Module ModuleOrigin
                       | SuggestHidden ModuleName Module ModuleOrigin
 
 lookupModuleWithSuggestions :: UnitState
+                            -> UnitIndexQuery
                             -> ModuleName
                             -> PkgQual
                             -> LookupResult
-lookupModuleWithSuggestions pkgs
-  = lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs)
+lookupModuleWithSuggestions pkgs query name
+  = lookupModuleWithSuggestions' pkgs query name False
 
 -- | The package which the module **appears** to come from, this could be
 -- the one which reexports the module from it's original package. This function
 -- is currently only used for -Wunused-packages
-lookupModulePackage :: UnitState -> ModuleName -> PkgQual -> Maybe [UnitInfo]
-lookupModulePackage pkgs mn mfs =
-    case lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs) mn mfs of
+lookupModulePackage ::
+  UnitState ->
+  UnitIndexQuery ->
+  ModuleName ->
+  PkgQual ->
+  Maybe [UnitInfo]
+lookupModulePackage pkgs query mn mfs =
+    case lookupModuleWithSuggestions' pkgs query mn False mfs of
       LookupFound _ (orig_unit, origin) ->
         case origin of
           ModOrigin {fromOrigUnit, fromExposedReexport} ->
@@ -2006,19 +2036,21 @@ lookupModulePackage pkgs mn mfs =
       _ -> Nothing
 
 lookupPluginModuleWithSuggestions :: UnitState
+                                  -> UnitIndexQuery
                                   -> ModuleName
                                   -> PkgQual
                                   -> LookupResult
-lookupPluginModuleWithSuggestions pkgs
-  = lookupModuleWithSuggestions' pkgs (pluginModuleNameProvidersMap pkgs)
+lookupPluginModuleWithSuggestions pkgs query name
+  = lookupModuleWithSuggestions' pkgs query name True
 
 lookupModuleWithSuggestions' :: UnitState
-                            -> ModuleNameProvidersMap
+                            -> UnitIndexQuery
                             -> ModuleName
+                            -> Bool
                             -> PkgQual
                             -> LookupResult
-lookupModuleWithSuggestions' pkgs mod_map m mb_pn
-  = case lookupUniqMap mod_map m of
+lookupModuleWithSuggestions' pkgs query m onlyPlugins mb_pn
+  = case findOrigin query pkgs m onlyPlugins of
         Nothing -> LookupNotFound suggestions
         Just xs ->
           case foldl' classify ([],[],[], []) (sortOn fst $ nonDetUniqMapToList xs) of
