@@ -31,7 +31,7 @@ data PackageData = PackageData
     , description               :: String
     , packageDependencies       :: [Package]
     , genericPackageDescription :: GenericPackageDescription
-    } deriving (Eq, Generic, Show, Typeable)
+    } deriving (Eq, Generic, Show)
 
 -- | Haskell package metadata obtained after resolving package configuration
 -- flags and associated conditionals according to the current build context.
@@ -75,7 +75,7 @@ data ContextData = ContextData
     , contextLibdir    :: FilePath
     -- The location where dynamic libraries go
     , contextDynLibdir :: FilePath
-    } deriving (Eq, Generic, Show, Typeable)
+    } deriving (Eq, Generic, Show)
 
 instance Binary   PackageData
 instance Hashable PackageData where hashWithSalt salt = hashWithSalt salt . show
