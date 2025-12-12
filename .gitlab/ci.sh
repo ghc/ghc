@@ -259,6 +259,12 @@ function setup() {
   git config user.email "ghc-ci@gitlab-haskell.org"
   git config user.name "GHC GitLab CI"
 
+  # Disable auto gc. Useless in a temporary checkout, and
+  # non-deterministic "Auto packing the repository in background for
+  # optimum performance." message could pop up that confuses the
+  # testsuite driver!
+  git config gc.auto 0
+
   info "====================================================="
   info "Toolchain versions"
   info "====================================================="
