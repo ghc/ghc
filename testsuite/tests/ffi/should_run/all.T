@@ -192,6 +192,9 @@ test('rts_clearMemory', [
      extra_ways(['g1', 'nursery_chunks', 'nonmoving', 'compacting_gc', 'sanity']),
      # On windows, nonmoving way fails with bad exit code (2816)
      when(opsys('mingw32'), fragile(23091)),
+     # For simplicity, ASAN poisoning/unpoisoning logic is omitted
+     # from rts_clearMemory implementation
+     when(have_asan(), skip),
      req_c,
      pre_cmd('$MAKE -s --no-print-directory rts_clearMemory_setup') ],
      # Same hack as ffi023

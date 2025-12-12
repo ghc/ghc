@@ -8,6 +8,7 @@ module Flavour
   , splitSections
   , enableThreadSanitizer
   , enableUBSan
+  , enableASan
   , enableLateCCS
   , enableHashUnitIds
   , enableDebugInfo, enableTickyGhc
@@ -57,6 +58,7 @@ flavourTransformers = M.fromList
     , "thread_sanitizer" =: enableThreadSanitizer False
     , "thread_sanitizer_cmm" =: enableThreadSanitizer True
     , "ubsan"            =: enableUBSan
+    , "asan"             =: enableASan
     , "llvm"             =: viaLlvmBackend
     , "profiled_ghc"     =: enableProfiledGhc
     , "no_dynamic_ghc"   =: disableDynamicGhcPrograms
@@ -305,6 +307,28 @@ enableUBSan =
             <> (needSharedLibSAN ? arg "-optl-shared-libsan"),
           builder (Cc CompileC) ? arg "-fsanitize=undefined",
           builder Testsuite ? arg "--config=have_ubsan=True"
+        ]
+
+-- | Build all stage1+ C/C++ code with AddressSanitizer support:
+-- https://clang.llvm.org/docs/AddressSanitizer.html
+enableASan :: Flavour -> Flavour
+enableASan =
+  addArgs $
+    notStage0
+      ? mconcat
+        [ package rts
+            ? builder (Cabal Flags)
+            ? arg "+asan"
+            <> (needSharedLibSAN ? arg "+shared-libsan"),
+          builder (Ghc CompileHs) ? arg "-optc-fsanitize=address",
+          builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=address",
+          builder (Ghc CompileCppWithGhc) ? arg "-optcxx-fsanitize=address",
+          builder (Ghc LinkHs)
+            ? pure ["-optc-fsanitize=address", "-optl-fsanitize=address"]
+            <> (needSharedLibSAN ? arg "-optl-shared-libsan"),
+          builder (Cc CompileC) ? arg "-fsanitize=address",
+          builder Testsuite
+            ? pure ["--config=have_asan=True", "-e", "config.timeout=1800"]
         ]
 
 -- | Use the LLVM backend in stages 1 and later.
