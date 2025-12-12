@@ -1216,10 +1216,6 @@ Stack Traces in GHCi
 .. index::
   simple: stack trace; in GHCi
 
-[ This is an experimental feature enabled by the new
-``-fexternal-interpreter`` flag that was introduced in GHC 8.0.1.  It
-is currently not supported on Windows.]
-
 GHCi can use the profiling system to collect stack trace information
 when running interpreted code.  To gain access to stack traces, start
 GHCi like this:
