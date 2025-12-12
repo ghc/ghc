@@ -579,6 +579,8 @@ getMBlocks(uint32_t n)
 
     ret = getCommittedMBlocks(n);
 
+    __ghc_asan_unpoison_memory_region(ret, (W_)n * MBLOCK_SIZE);
+
     debugTrace(DEBUG_gc, "allocated %d megablock(s) at %p",n,ret);
 
     mblocks_allocated += n;
@@ -610,6 +612,8 @@ freeMBlocks(void *addr, uint32_t n)
     debugTrace(DEBUG_gc, "freeing %d megablock(s) at %p",n,addr);
 
     mblocks_allocated -= n;
+
+    __ghc_asan_poison_memory_region(addr, (W_)n * MBLOCK_SIZE);
 
     decommitMBlocks(addr, n);
 }
