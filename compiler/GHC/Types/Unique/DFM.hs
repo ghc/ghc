@@ -14,12 +14,6 @@ See Note [Unique Determinism] in GHC.Types.Unique for explanation why @Unique@ o
 is not deterministic.
 -}
 
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module GHC.Types.Unique.DFM (

@@ -1,6 +1,5 @@
-{-# LANGUAGE TypeFamilies, DataKinds, GADTs, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ConstraintKinds #-}
 
 -- This module declares some basic types used by GHC.Stg.Lift
 -- We can import this module into GHC.Stg.Syntax, where the

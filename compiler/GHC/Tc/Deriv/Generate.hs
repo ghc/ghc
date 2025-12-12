@@ -5,10 +5,7 @@
 
 -}
 
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 

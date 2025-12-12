@@ -91,8 +91,7 @@ be ill-typed in Core.  But it must still be well-kinded!
 
 -}
 
-{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, TypeFamilies,
-  DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GHC.Stg.Lint ( lintStgTopBindings ) where
 

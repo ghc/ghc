@@ -1,4 +1,3 @@
-{-# LANGUAGE RoleAnnotations #-}
 module GHC.Hs.Doc where
 
 -- See #21592 for progress on removing this boot file.

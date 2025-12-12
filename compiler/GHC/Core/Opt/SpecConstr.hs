@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-
 ToDo [Oct 2013]
 ~~~~~~~~~~~~~~~

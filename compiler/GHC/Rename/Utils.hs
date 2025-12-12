@@ -1,8 +1,5 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies     #-}
-{-# LANGUAGE GADTs            #-}
 {-# LANGUAGE RecordWildCards  #-}
-{-# LANGUAGE TupleSections    #-}
 
 {-
 

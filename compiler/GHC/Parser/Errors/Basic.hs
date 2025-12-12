@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 module GHC.Parser.Errors.Basic where
 
 import GHC.Utils.Outputable ( SDoc, text )

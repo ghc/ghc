@@ -1,6 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds #-}
 
 module GHC.Wasm.ControlFlow.FromCmm
   ( structuredControl

@@ -1,6 +1,4 @@
-{-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DeriveTraversable #-}
 
 -- | A module graph should be constructed once and never change from there onwards.
 --

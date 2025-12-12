@@ -1,5 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables, LambdaCase #-}
-
 -- | Defines a simple exception type and utilities to throw it. The
 -- 'PlainGhcException' type is a subset of the 'GHC.Utils.Panic.GhcException'
 -- type.  It omits the exception constructors that involve

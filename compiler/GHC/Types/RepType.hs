@@ -1,6 +1,3 @@
-
-{-# LANGUAGE FlexibleContexts #-}
-
 module GHC.Types.RepType
   (
     -- * Code generator views onto Types

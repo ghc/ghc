@@ -11,13 +11,8 @@ ToDo:
 -}
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}

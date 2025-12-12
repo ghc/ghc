@@ -1,6 +1,3 @@
-
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
 
 -- | PrimOp's Ids

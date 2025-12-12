@@ -1,6 +1,4 @@
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE RankNTypes #-}
 
 module GHC.Data.List.Infinite
   ( Infinite (..)

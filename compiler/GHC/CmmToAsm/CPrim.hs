@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 -- | Generating C symbol names emitted by the compiler.
 module GHC.CmmToAsm.CPrim
     ( atomicReadLabel

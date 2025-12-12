@@ -1,4 +1,3 @@
-{-# LANGUAGE KindSignatures #-}
 module GHC.Unit.Types where
 
 -- No Prelude. See Note [Exporting pprTrace from GHC.Prelude]

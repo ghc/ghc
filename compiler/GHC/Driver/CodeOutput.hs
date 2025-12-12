@@ -4,7 +4,6 @@
 \section{Code output phase}
 -}
 
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module GHC.Driver.CodeOutput
    ( codeOutput

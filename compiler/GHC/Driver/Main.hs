@@ -1,6 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}

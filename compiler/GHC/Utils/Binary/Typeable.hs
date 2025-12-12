@@ -1,6 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE GADTs #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 {-# OPTIONS_GHC -Wno-orphans -Wincomplete-patterns #-}

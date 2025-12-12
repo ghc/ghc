@@ -1,4 +1,3 @@
-{-# LANGUAGE TupleSections #-}
 module GHC.Core.LateCC.TopLevelBinds where
 
 import GHC.Prelude

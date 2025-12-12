@@ -1,6 +1,4 @@
-{-# LANGUAGE TypeFamilies, DataKinds, GADTs, FlexibleInstances #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
  -- To permit: type instance XLet 'InferTaggedBinders = XLet 'SomePass
 

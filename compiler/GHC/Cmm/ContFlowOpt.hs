@@ -1,4 +1,3 @@
-{-# LANGUAGE GADTs #-}
 module GHC.Cmm.ContFlowOpt
     ( cmmCfgOpts
     , cmmCfgOptsProc

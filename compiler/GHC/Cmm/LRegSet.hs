@@ -1,6 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module GHC.Cmm.LRegSet (
     LRegSet,
 

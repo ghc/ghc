@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 -- | GHC API utilities for inspecting the GHC session
 module GHC.Driver.Session.Inspect where
 

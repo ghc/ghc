@@ -1,6 +1,3 @@
-
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE PatternSynonyms #-}
 --
 -- (c) The University of Glasgow

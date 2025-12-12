@@ -1,8 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs            #-}
 {-# LANGUAGE MultiWayIf       #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TupleSections    #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-2006

@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module GHC.Driver.Flags
    ( DumpFlag(..)
    , getDumpFlagFrom

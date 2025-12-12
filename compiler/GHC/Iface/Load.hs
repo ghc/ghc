@@ -6,7 +6,6 @@
 
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ViewPatterns #-}

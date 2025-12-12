@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 module GHC.Core.Type where
 
 import GHC.Prelude

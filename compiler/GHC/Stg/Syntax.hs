@@ -1,10 +1,4 @@
-{-# LANGUAGE ConstraintKinds      #-}
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE DeriveDataTypeable   #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE NamedFieldPuns       #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-

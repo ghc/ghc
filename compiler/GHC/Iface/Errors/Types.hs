@@ -1,9 +1,3 @@
-
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-
 module GHC.Iface.Errors.Types (
 
     MissingInterfaceError(..)

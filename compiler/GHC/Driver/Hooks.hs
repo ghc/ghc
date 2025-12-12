@@ -3,7 +3,7 @@
 -- NB: this module is SOURCE-imported by DynFlags, and should primarily
 --     refer to *types*, rather than *code*
 
-{-# LANGUAGE RankNTypes, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GHC.Driver.Hooks
    ( Hooks

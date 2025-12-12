@@ -1,7 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 module GHC.Cmm.Reg
     ( -- * Cmm Registers
       CmmReg(..)

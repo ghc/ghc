@@ -1,6 +1,3 @@
-
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TupleSections    #-}
 {-# LANGUAGE MultiWayIf       #-}
 
 {-

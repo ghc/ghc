@@ -1,7 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE TupleSections #-}
 module GHC.Driver.Session.Lint (checkOptions) where
 
 import GHC.Driver.Backend

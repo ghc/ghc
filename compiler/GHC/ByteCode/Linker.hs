@@ -1,8 +1,5 @@
-{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MagicHash             #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --

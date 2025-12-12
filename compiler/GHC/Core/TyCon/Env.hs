@@ -6,7 +6,6 @@
 -}
 
 
-{-# LANGUAGE ScopedTypeVariables #-}
 
 
 module GHC.Core.TyCon.Env (

@@ -5,8 +5,6 @@
 -}
 
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module GHC.Stg.Pipeline

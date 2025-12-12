@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 module Language.Haskell.Syntax.Basic where
 

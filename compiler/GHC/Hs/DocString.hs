@@ -1,7 +1,4 @@
 -- | An exactprintable structure for docstrings
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module GHC.Hs.DocString
   ( LHsDocString

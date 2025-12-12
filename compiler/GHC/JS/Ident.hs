@@ -1,5 +1,3 @@
-{-# LANGUAGE DerivingStrategies          #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving  #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.JS.Ident

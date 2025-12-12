@@ -1,9 +1,7 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE CPP #-}
 
 #if defined(HAVE_INTERNAL_INTERPRETER) && defined(CAN_LOAD_DLL)
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE UnboxedTuples #-}
 #endif
 

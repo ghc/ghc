@@ -1,9 +1,3 @@
-
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE DisambiguateRecordFields #-}
-
 -- | Desugaring step of the
 -- [Lower Your Guards paper](https://dl.acm.org/doi/abs/10.1145/3408989).
 --

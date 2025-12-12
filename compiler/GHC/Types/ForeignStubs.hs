@@ -1,6 +1,5 @@
 -- | Foreign export stubs
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE TypeApplications #-}
 module GHC.Types.ForeignStubs
    ( ForeignStubs (..)
    , CHeader(..)

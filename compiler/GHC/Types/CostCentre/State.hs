@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module GHC.Types.CostCentre.State
    ( CostCentreState
    , newCostCentreState

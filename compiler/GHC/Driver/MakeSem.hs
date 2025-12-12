@@ -1,8 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE NumericUnderscores #-}
 
 -- | Implementation of a jobserver using system semaphores.
 --

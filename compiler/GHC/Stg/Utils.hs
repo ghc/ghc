@@ -1,5 +1,4 @@
-{-# LANGUAGE CPP, ScopedTypeVariables, TypeFamilies #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE CPP, TypeFamilies #-}
 
 module GHC.Stg.Utils
     ( mkStgAltTypeFromStgAlts

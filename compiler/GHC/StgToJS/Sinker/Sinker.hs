@@ -1,7 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE LambdaCase #-}
-
 module GHC.StgToJS.Sinker.Sinker (sinkPgm) where
 
 import GHC.Prelude

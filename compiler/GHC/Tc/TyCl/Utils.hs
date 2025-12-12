@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-
@@ -988,7 +987,6 @@ We won't bother rehashing the entire specification in this Note, but the tricky
 part is dealing with GADT constructor fields. Here is an appropriately tricky
 example to illustrate the challenges:
 
-  {-# LANGUAGE PolyKinds #-}
   data T a b where
     MkT :: forall b a x.
            { field1 :: forall c. (Num a, Show c) => (Either a c, Proxy b)

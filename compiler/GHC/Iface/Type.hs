@@ -8,7 +8,6 @@ This module defines interface types and binders
 
 
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE LambdaCase #-}
 module GHC.Iface.Type (
         IfExtName,
         IfLclName(..), mkIfLclName, ifLclNameFS,

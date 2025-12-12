@@ -1,7 +1,3 @@
-{-# LANGUAGE RoleAnnotations #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# OPTIONS_GHC -Wall #-}
 
 -- Like 'UniqFM', these are maps for keys which are Uniquable.

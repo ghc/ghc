@@ -1,9 +1,7 @@
-{-# LANGUAGE GADTs, RecordWildCards,
-    NondecreasingIndentation,
-    OverloadedStrings, LambdaCase #-}
-{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE RecordWildCards,
+             NondecreasingIndentation,
+             OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
-
 
 module GHC.Cmm.Info.Build
   ( CAFSet, CAFEnv, cafAnal, cafAnalData

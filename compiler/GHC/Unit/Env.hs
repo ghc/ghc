@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE FlexibleInstances #-}
-
 -- | A 'UnitEnv' provides the complete interface into everything that is loaded
 -- into a GHC session, including the 'HomeUnitGraph' for mapping home units to their
 -- 'HomePackageTable's (which store information about all home modules), and

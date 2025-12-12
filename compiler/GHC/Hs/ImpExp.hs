@@ -1,10 +1,4 @@
 {-# OPTIONS_GHC -Wno-orphans      #-} -- Outputable and IEWrappedName
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE DeriveDataTypeable   #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension

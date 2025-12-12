@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE TupleSections #-}
 -- | Our extended FCode monad.
 
 -- We add a mapping from names to CmmExpr, to support local variable names in

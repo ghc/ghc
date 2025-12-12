@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998

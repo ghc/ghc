@@ -4,7 +4,6 @@
 -}
 
 
-{-# LANGUAGE DeriveFunctor #-}
 
 module GHC.Core.Opt.Monad (
     -- * Types used in core-to-core passes

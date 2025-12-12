@@ -4,10 +4,7 @@
 -}
 
 
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonadComprehensions #-}
 
 -- | The deriving code for the Functor, Foldable, and Traversable classes

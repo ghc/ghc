@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiWayIf, LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-|
 Module      : GHC.Driver.Backend

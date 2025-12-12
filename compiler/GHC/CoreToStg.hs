@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
 
 --

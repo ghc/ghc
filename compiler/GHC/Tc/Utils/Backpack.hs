@@ -1,7 +1,5 @@
-
 {-# LANGUAGE DuplicateRecordFields    #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeFamilies             #-}
 
 module GHC.Tc.Utils.Backpack (

@@ -1,10 +1,4 @@
 {-# OPTIONS_GHC -Wno-orphans     #-} -- Outputable
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE DeriveDataTypeable  #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE RoleAnnotations     #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 -- (c) The University of Glasgow 2012
 

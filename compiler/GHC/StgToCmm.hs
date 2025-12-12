@@ -1,7 +1,3 @@
-
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE LambdaCase #-}
-
 -----------------------------------------------------------------------------
 --
 -- Stg to C-- code generation

@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 module GHC.Runtime.Interpreter.Process
   (
   -- * Message API

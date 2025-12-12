@@ -1,6 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 --
 --  (c) The University of Glasgow 2002-2006

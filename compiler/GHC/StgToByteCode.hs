@@ -1,9 +1,5 @@
 {-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DeriveFunctor              #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE DerivingVia #-}
 
 --

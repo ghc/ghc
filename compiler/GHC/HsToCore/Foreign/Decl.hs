@@ -1,5 +1,3 @@
-
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-

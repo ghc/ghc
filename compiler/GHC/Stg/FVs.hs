@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE LambdaCase #-}
 
 {- |
 Non-global free variable analysis on STG terms. This pass annotates

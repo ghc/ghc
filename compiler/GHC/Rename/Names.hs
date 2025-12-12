@@ -5,12 +5,7 @@ Extracting imported and top-level names in scope
 -}
 
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE LambdaCase #-}
 
 module GHC.Rename.Names (
         rnImports, getLocalNonValBinders, newRecordFieldLabel,

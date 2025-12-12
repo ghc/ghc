@@ -1,17 +1,10 @@
 {-# LANGUAGE CPP                    #-}
-{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE InstanceSigs           #-}
 {-# LANGUAGE MultiWayIf             #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TupleSections          #-}
 {-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE DataKinds              #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# LANGUAGE NamedFieldPuns #-}
 
 #if __GLASGOW_HASKELL__ < 914
 -- In GHC 9.14, GHC.Desugar will be removed from base in favour of

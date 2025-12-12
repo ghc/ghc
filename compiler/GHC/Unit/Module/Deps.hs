@@ -1,6 +1,4 @@
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE DerivingVia #-}
 -- | Dependencies and Usage of a module
 module GHC.Unit.Module.Deps

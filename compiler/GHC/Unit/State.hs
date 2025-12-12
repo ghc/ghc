@@ -1,6 +1,5 @@
 -- (c) The University of Glasgow, 2006
 
-{-# LANGUAGE LambdaCase #-}
 
 -- | Unit manipulation
 module GHC.Unit.State (

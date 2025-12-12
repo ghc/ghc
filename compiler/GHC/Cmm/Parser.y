@@ -232,8 +232,6 @@ See Note [Heap memory barriers] in SMP.h for details.
 ----------------------------------------------------------------------------- -}
 
 {
-{-# LANGUAGE TupleSections #-}
-
 module GHC.Cmm.Parser ( parseCmmFile, CmmParserConfig(..) ) where
 
 import GHC.Prelude

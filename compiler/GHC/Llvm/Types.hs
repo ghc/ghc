@@ -1,6 +1,4 @@
-
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- Workaround for #21972. It can be removed once the minimal bootstrapping
 -- compiler has a fix for this bug.

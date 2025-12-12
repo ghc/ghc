@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -fno-warn-deprecations #-}
-{-# LANGUAGE ConstraintKinds #-}
 
 module GHC.Utils.Exception
     (

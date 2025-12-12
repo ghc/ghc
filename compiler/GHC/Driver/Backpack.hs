@@ -1,5 +1,3 @@
-
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}

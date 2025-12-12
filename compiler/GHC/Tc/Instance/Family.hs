@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ViewPatterns, LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | The @FamInst@ type: family instance heads
 module GHC.Tc.Instance.Family (

@@ -9,9 +9,6 @@ which is declared in the various \tr{Hs*} modules.  This module,
 therefore, is almost nothing but re-exporting.
 -}
 
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-} -- For deriving instance Data
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension

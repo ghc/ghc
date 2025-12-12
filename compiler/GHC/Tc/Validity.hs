@@ -1,6 +1,3 @@
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE LambdaCase #-}
-
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -679,7 +676,6 @@ that case, the solution is to vary the `ExpandMode`s! In more detail:
    exponential blowup. One consequence of this choice is that if you have
    the following type synonym in one module (with RankNTypes enabled):
 
-     {-# LANGUAGE RankNTypes #-}
      module A where
      type A = forall a. a
 

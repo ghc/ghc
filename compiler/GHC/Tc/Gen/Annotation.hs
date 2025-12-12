@@ -4,7 +4,6 @@
 
 -}
 
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Typechecking annotations

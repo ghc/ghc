@@ -1,6 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
-
 module GHC.Utils.Monad.Codensity
   ( Codensity(..), toCodensity, fromCodensity )
   where

@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 -- | The 'HomePackageTable' (HPT) contains information about all modules that are part
 -- of a home package. At its core, the information for each module is a
 -- 'HomeModInfo'.

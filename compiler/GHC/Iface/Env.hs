@@ -1,6 +1,5 @@
 -- (c) The University of Glasgow 2002-2006
 
-{-# LANGUAGE RankNTypes #-}
 
 module GHC.Iface.Env (
         newGlobalBinder, newInteractiveBinder,

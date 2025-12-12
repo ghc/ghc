@@ -92,7 +92,7 @@ Flag bootstrap
         Manual: True
 
 Library
-    Default-Language: GHC2021
+    Default-Language: GHC2024
     Exposed: False
     Includes: Unique.h
               -- CodeGen.Platform.h -- invalid as C, skip
@@ -164,28 +164,11 @@ Library
 
     Other-Extensions:
         CPP
-        DataKinds
-        DeriveDataTypeable
-        DeriveFoldable
-        DeriveFunctor
-        DeriveTraversable
-        DisambiguateRecordFields
-        ExplicitForAll
-        FlexibleContexts
-        FlexibleInstances
-        GADTs
-        GeneralizedNewtypeDeriving
         MagicHash
-        MultiParamTypeClasses
-        NamedFieldPuns
         NondecreasingIndentation
-        RankNTypes
         RecordWildCards
-        StandaloneDeriving
         Trustworthy
-        TupleSections
         TypeFamilies
-        TypeSynonymInstances
         UnboxedTuples
         UndecidableInstances
 
@@ -211,7 +194,6 @@ Library
     -- we use an explicit Prelude
     Default-Extensions:
         NoImplicitPrelude
-       ,MonoLocalBinds
 
     Exposed-Modules:
         GHC

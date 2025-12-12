@@ -1,5 +1,4 @@
 {-# LANGUAGE ApplicativeDo       #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE TypeFamilies        #-}

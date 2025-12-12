@@ -1,7 +1,4 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- | Module for detecting if recompilation is required
 module GHC.Iface.Recomp

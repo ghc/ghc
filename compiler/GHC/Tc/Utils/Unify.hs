@@ -1,13 +1,6 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE DeriveTraversable   #-}
-{-# LANGUAGE DerivingStrategies  #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE TypeApplications    #-}
 
 {-
 (c) The University of Glasgow 2006

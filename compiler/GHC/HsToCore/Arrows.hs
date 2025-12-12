@@ -1,6 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE TupleSections #-}
 
 {-
 (c) The University of Glasgow 2006

@@ -1,8 +1,3 @@
-{-# LANGUAGE DeriveFunctor       #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
-
 -- (c) The University of Glasgow 2006
 --
 -- FamInstEnv: Type checked family instance declarations

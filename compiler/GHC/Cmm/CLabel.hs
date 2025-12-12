@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 -----------------------------------------------------------------------------
 --
 -- Object-file symbols (called CLabel for historical reasons).

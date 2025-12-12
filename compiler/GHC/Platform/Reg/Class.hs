@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 module GHC.Platform.Reg.Class
   ( RegClass (..), RegArch(..), registerArch )
 where

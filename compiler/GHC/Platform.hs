@@ -1,6 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase #-}
-
 -- | Platform description
 module GHC.Platform
    ( Platform (..)

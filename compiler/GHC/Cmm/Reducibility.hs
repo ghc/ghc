@@ -1,6 +1,4 @@
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
 Module      : GHC.Cmm.Reducibility

@@ -1,7 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DataKinds #-}
 
 module GHC.Parser.Types
    ( SumOrTuple(..)

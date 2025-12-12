@@ -1,6 +1,3 @@
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 -- | The 'TPipelineClass' and 'MonadUse' classes and associated types
 module GHC.Driver.Pipeline.Monad (
   TPipelineClass, MonadUse(..)

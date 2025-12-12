@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 module GHCi.Leak
   ( LeakIndicators
   , getLeakIndicators

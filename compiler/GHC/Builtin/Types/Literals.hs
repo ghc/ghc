@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}   -- See calls to mkTemplateTyVars
 
 module GHC.Builtin.Types.Literals

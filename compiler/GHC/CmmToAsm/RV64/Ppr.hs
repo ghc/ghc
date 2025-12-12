@@ -1,5 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module GHC.CmmToAsm.RV64.Ppr (pprNatCmmDecl, pprInstr) where
 
 import GHC.Cmm hiding (topInfoTable)

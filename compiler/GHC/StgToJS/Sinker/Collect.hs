@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module GHC.StgToJS.Sinker.Collect
   ( collectArgsTop
   , collectArgs

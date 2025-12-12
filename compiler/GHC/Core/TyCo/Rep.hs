@@ -1,6 +1,3 @@
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-
 {-# OPTIONS_HADDOCK not-home #-}
 
 {-

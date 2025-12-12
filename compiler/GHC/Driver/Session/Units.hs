@@ -1,7 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE TupleSections #-}
 module GHC.Driver.Session.Units (initMake, initMulti) where
 
 -- The official GHC API

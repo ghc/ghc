@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Info about installed units (compiled libraries)
 module GHC.Unit.Info

@@ -1,6 +1,4 @@
-
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE LambdaCase #-}
 
 {-
 (c) The University of Glasgow 2006-2008

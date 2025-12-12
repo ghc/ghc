@@ -1,10 +1,5 @@
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TypeFamilies       #-}
-{-# LANGUAGE TupleSections      #-}
 
 module GHC.Tc.Gen.Export (rnExports, exports_from_avail, classifyGREs) where
 

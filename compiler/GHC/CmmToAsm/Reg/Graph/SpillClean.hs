@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Clean out unneeded spill\/reload instructions.
 --

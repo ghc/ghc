@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingVia #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}

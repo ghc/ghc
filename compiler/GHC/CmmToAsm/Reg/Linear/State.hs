@@ -1,5 +1,4 @@
-{-# LANGUAGE PatternSynonyms, DeriveFunctor, DerivingVia #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PatternSynonyms, DerivingVia #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 -- | State monad for the linear register allocator.

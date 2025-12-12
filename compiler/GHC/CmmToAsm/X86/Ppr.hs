@@ -1,7 +1,3 @@
-
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -----------------------------------------------------------------------------
 --
 -- Pretty-printing assembly language

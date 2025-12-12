@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module GHC.Driver.Errors (
     reportError
   , reportDiagnostic

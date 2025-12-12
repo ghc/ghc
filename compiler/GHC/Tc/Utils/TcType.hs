@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE MultiWayIf          #-}
 

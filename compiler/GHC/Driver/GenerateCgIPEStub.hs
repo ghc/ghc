@@ -1,6 +1,3 @@
-{-# LANGUAGE GADTs         #-}
-{-# LANGUAGE TupleSections #-}
-
 module GHC.Driver.GenerateCgIPEStub (generateCgIPEStub, lookupEstimatedTicks) where
 
 import Data.Map.Strict (Map)

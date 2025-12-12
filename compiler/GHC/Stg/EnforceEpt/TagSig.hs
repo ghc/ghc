@@ -1,6 +1,5 @@
-{-# LANGUAGE TypeFamilies, DataKinds, GADTs, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ConstraintKinds #-}
 
 -- We export this type from this module instead of GHC.Stg.EnforceEpt.Types
 -- because it's used by more than the analysis itself. For example in interface

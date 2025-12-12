@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 module GHC.Driver.DynFlags (
         -- * Dynamic flags and associated configuration types
         DumpFlag(..),

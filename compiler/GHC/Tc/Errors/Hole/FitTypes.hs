@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 module GHC.Tc.Errors.Hole.FitTypes (
   TypedHole (..), HoleFit (..), TcHoleFit(..), HoleFitCandidate (..),
   hfIsLcl, pprHoleFitCand

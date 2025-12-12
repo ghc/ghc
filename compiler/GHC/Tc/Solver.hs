@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiWayIf, RecursiveDo, TupleSections #-}
+{-# LANGUAGE MultiWayIf, RecursiveDo #-}
 
 module GHC.Tc.Solver(
        InferMode(..), simplifyInfer, findInferredDiff,

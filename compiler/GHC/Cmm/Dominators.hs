@@ -1,5 +1,3 @@
-{-# LANGUAGE GADTs #-}
-
 module GHC.Cmm.Dominators
   (
   -- * Dominator analysis and representation of results

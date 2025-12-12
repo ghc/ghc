@@ -1,5 +1,3 @@
-{-# LANGUAGE GADTs #-}
-
 module GHC.Cmm.Liveness
     ( CmmLocalLive
     , cmmLocalLiveness

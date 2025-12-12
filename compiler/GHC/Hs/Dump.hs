@@ -2,9 +2,6 @@
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds #-}
 
 {-# OPTIONS_GHC -fno-specialise #-}
    -- Don't do type-class specialisation; it goes mad in this module

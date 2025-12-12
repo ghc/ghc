@@ -1,10 +1,7 @@
 -- (c) The University of Glasgow 2006
 
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DeriveFunctor #-}
 
 module GHC.Data.Graph.Directed (
         Graph, graphFromEdgedVerticesOrd, graphFromEdgedVerticesUniq,

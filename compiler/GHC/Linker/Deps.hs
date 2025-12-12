@@ -5,7 +5,6 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE LambdaCase #-}
 
 module GHC.Linker.Deps
   ( LinkDepsOpts (..)

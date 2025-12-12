@@ -1,6 +1,3 @@
-
-{-# LANGUAGE DeriveFunctor       #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
 
 {-

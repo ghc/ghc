@@ -1,11 +1,6 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DeriveAnyClass #-}
 
 module GHC.Unit.Module.ModIface

@@ -1,6 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE BlockArguments    #-}
 {-# LANGUAGE MultiWayIf        #-}
 

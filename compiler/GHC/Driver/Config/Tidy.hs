@@ -1,5 +1,4 @@
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE LambdaCase #-}
 
 module GHC.Driver.Config.Tidy
   ( initTidyOpts

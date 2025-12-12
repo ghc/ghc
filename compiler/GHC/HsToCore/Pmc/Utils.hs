@@ -1,7 +1,3 @@
-
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- | Utility module for the pattern-match coverage checker.
 module GHC.HsToCore.Pmc.Utils (
 

@@ -1,7 +1,4 @@
-
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}

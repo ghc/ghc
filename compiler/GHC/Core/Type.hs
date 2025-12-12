@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE FlexibleContexts, PatternSynonyms, ViewPatterns, MultiWayIf, RankNTypes #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Main functions for manipulating types and type-related things

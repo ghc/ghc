@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- | The SymbolCache is used to cache lookups for specific symbols when using
