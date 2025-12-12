@@ -28,7 +28,7 @@ Flag threaded
     Manual: True
 
 Executable ghc
-    Default-Language: GHC2021
+    Default-Language: GHC2024
 
     Main-Is: Main.hs
     Other-Modules:
@@ -75,14 +75,10 @@ Executable ghc
             GHCi.UI.Exception
             GHCi.Util
         Other-Extensions:
-            FlexibleInstances
-            LambdaCase
             MagicHash
             MultiWayIf
             OverloadedStrings
-            RankNTypes
             RecordWildCards
-            ScopedTypeVariables
             UnboxedTuples
             ViewPatterns
 
@@ -92,11 +88,8 @@ Executable ghc
     Other-Extensions:
         CPP
         NondecreasingIndentation
-        TupleSections
 
     -- This should match the default-extensions used in 'ghc.cabal'. This way,
     -- GHCi can be used to load it all at once.
     Default-Extensions:
         NoImplicitPrelude
-      , ScopedTypeVariables
-      , BangPatterns

@@ -1,6 +1,4 @@
-{-# LANGUAGE FlexibleContexts, RecursiveDo #-}
-{-# LANGUAGE DisambiguateRecordFields #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecursiveDo #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 

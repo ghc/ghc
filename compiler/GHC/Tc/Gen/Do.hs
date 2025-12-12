@@ -1,9 +1,4 @@
-
-{-# LANGUAGE ConstraintKinds  #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE RecordWildCards  #-}
-{-# LANGUAGE TupleSections    #-}
 {-# LANGUAGE TypeFamilies     #-}
 
 {-

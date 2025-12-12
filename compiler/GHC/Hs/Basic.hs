@@ -1,8 +1,5 @@
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable, Binary
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 -- | Fixity
 module GHC.Hs.Basic

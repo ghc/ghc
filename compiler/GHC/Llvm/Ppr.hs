@@ -1,7 +1,3 @@
-
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TypeApplications #-}
-
 --------------------------------------------------------------------------------
 -- | Pretty print LLVM IR Code.
 --

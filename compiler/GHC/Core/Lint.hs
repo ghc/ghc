@@ -1,5 +1,4 @@
 {-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UnboxedTuples #-}
 

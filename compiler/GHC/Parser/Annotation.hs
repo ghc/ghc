@@ -1,11 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE StandaloneDeriving #-}
-
 module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
   EpToken(..), EpUniToken(..),

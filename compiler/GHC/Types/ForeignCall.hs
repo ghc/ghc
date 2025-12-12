@@ -4,7 +4,6 @@
 \section[Foreign]{Foreign calls}
 -}
 
-{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Types.ForeignCall (
         ForeignCall(..), isSafeForeignCall,

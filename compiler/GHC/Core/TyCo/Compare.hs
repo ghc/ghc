@@ -1,8 +1,6 @@
 -- (c) The University of Glasgow 2006
 -- (c) The GRASP/AQUA Project, Glasgow University, 1998
 
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MagicHash #-}
 
 -- | Type equality and comparison

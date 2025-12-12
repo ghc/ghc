@@ -3,7 +3,6 @@
 {-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-{-# LANGUAGE LambdaCase #-}
 
 {-
 (c) The University of Glasgow 2006

@@ -1,7 +1,4 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- | JavaScript interpreter
 --

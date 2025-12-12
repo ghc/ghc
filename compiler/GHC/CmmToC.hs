@@ -1,7 +1,4 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingVia   #-}
-{-# LANGUAGE GADTs         #-}
-{-# LANGUAGE LambdaCase    #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 

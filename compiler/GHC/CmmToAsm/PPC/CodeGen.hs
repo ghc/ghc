@@ -1,5 +1,3 @@
-{-# LANGUAGE GADTs #-}
-
 -----------------------------------------------------------------------------
 --
 -- Generating machine code (instruction selection)

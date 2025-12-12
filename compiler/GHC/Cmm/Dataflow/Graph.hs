@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
 module GHC.Cmm.Dataflow.Graph
     ( Body

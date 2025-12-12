@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE RankNTypes #-}
-
 -------------------------------------------------------------------------------
 --
 -- | Command-line parser

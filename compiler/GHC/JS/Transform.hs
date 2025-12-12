@@ -1,11 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE TupleSections #-}
 
 module GHC.JS.Transform
   ( identsS

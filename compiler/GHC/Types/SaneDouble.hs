@@ -1,6 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase #-}
-
 -- | Double datatype with saner instances
 module GHC.Types.SaneDouble
   ( SaneDouble (..)

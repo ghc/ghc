@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module GHC.Types.CostCentre (
         -- All abstract except to friend: ParseIface.y
         CostCentre(..), CcName, CCFlavour,

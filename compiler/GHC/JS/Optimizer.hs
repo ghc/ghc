@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -----------------------------------------------------------------------------
 -- |

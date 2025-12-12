@@ -1,5 +1,4 @@
 -- | Extract docs from the renamer output so they can be serialized.
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RecordWildCards #-}

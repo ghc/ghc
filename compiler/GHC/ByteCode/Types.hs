@@ -1,7 +1,5 @@
 {-# LANGUAGE CPP                        #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE UnliftedNewtypes           #-}
 --

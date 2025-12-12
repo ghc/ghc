@@ -1,7 +1,4 @@
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeApplications #-}
 
 module GHC.Tc.Solver.InertSet (
     -- * The work list

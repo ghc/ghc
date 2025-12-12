@@ -5,7 +5,6 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ScopedTypeVariables, LambdaCase #-}
 
 #include <ghcautoconf.h>
 

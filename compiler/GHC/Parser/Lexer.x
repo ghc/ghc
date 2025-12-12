@@ -43,13 +43,11 @@
 {
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnboxedSums #-}
 {-# LANGUAGE UnliftedNewtypes #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE DataKinds #-}
 
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}

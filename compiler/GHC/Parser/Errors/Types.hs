@@ -1,6 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds #-}
 
 module GHC.Parser.Errors.Types where
 

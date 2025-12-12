@@ -8,7 +8,6 @@ Buffers for scanning string input stored in external arrays.
 
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -O2 #-}
 -- We always optimise this, otherwise performance of a non-optimised

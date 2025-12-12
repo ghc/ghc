@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module GHC.Llvm.MetaData
   ( MetaId(..)
   , ppMetaId

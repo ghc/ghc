@@ -1,6 +1,4 @@
-
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 {-

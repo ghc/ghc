@@ -1,9 +1,6 @@
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE LambdaCase #-}
 module GHCi.UI.Exception
   ( GhciCommandError(..)
   , throwGhciCommandError

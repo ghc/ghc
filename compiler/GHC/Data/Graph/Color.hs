@@ -4,7 +4,6 @@
 --
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module GHC.Data.Graph.Color (
         module GHC.Data.Graph.Base,

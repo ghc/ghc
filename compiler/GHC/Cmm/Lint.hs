@@ -5,10 +5,7 @@
 -- CmmLint: checking the correctness of Cmm statements and expressions
 --
 -----------------------------------------------------------------------------
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
 module GHC.Cmm.Lint (
     cmmLint, cmmLintGraph
   ) where

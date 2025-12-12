@@ -8,7 +8,6 @@
 --
 -- Basically, the things need to be in class 'Uniquable'.
 
-{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Types.Unique.DSet (
         -- * Unique set type

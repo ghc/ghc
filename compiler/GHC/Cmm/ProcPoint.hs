@@ -1,6 +1,3 @@
-{-# LANGUAGE DisambiguateRecordFields #-}
-{-# LANGUAGE GADTs #-}
-
 module GHC.Cmm.ProcPoint
     ( ProcPointSet, Status(..)
     , callProcPoints, minimalProcPointSet

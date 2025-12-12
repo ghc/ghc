@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 -- | A global typecheckable-thing, essentially anything that has a name.
 module GHC.Types.TyThing
    ( TyThing (..)

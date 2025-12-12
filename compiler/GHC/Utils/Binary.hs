@@ -1,9 +1,6 @@
-
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised

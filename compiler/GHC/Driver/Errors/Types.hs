@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE StandaloneDeriving #-}
-
 module GHC.Driver.Errors.Types (
     GhcMessage(..)
   , AnyGhcDiagnostic

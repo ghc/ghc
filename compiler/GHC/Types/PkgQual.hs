@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE LambdaCase #-}
-
 module GHC.Types.PkgQual where
 
 import GHC.Prelude

@@ -1,5 +1,3 @@
-{-# LANGUAGE BinaryLiterals, ScopedTypeVariables #-}
-
 --
 --  (c) The University of Glasgow 2002-2006
 --

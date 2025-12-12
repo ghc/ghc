@@ -1,8 +1,3 @@
-
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs             #-}
-
 -- | Coverage checking step of the
 -- [Lower Your Guards paper](https://dl.acm.org/doi/abs/10.1145/3408989).
 --

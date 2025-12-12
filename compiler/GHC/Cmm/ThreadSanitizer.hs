@@ -1,6 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE RankNTypes #-}
-
 -- | Annotate a CmmGraph with ThreadSanitizer instrumentation calls.
 module GHC.Cmm.ThreadSanitizer (annotateTSAN) where
 

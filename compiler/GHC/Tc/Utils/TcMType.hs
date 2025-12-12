@@ -1,8 +1,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiWayIf            #-}
 {-# LANGUAGE RecursiveDo           #-}
-{-# LANGUAGE TupleSections         #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-

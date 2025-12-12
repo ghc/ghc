@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module GHC.Cmm.MachOp
     ( MachOp(..)
     , pprMachOp, isCommutableMachOp, isAssociativeMachOp

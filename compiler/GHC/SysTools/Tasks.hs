@@ -1,5 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -----------------------------------------------------------------------------
 --
 -- Tasks running external programs for SysTools

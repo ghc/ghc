@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Types used by the runtime interpreter

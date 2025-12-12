@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
 -- | This data structure holds an updateable environment which is used
 -- when compiling module loops.
 module GHC.Driver.Env.KnotVars( KnotVars(..)

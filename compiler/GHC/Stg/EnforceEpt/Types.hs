@@ -1,6 +1,5 @@
-{-# LANGUAGE TypeFamilies, DataKinds, GADTs, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ConstraintKinds #-}
 
 {-# LANGUAGE UndecidableInstances #-}
  -- To permit: type instance XLet 'InferTaggedBinders = XLet 'CodeGen

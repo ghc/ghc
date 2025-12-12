@@ -7,7 +7,6 @@
 
 {-# LANGUAGE MultiWayIf, PatternSynonyms #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# LANGUAGE DeriveFunctor #-}
 
 -- |
 -- #name_types#

@@ -1,9 +1,3 @@
-
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE GADTs              #-}
-{-# LANGUAGE LambdaCase         #-}
-{-# LANGUAGE StandaloneDeriving #-}
-
 -- | This module coverage checks pattern matches. It finds
 --
 --     * Uncovered patterns, certifying non-exhaustivity

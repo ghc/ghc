@@ -1,10 +1,5 @@
-{-# LANGUAGE ConstraintKinds  #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE RecordWildCards  #-}
-{-# LANGUAGE TupleSections    #-}
 {-# LANGUAGE TypeFamilies     #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE MonadComprehensions  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 

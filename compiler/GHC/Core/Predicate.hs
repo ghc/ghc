@@ -1,5 +1,3 @@
-{-# LANGUAGE DerivingStrategies #-}
-
 {-
 
 Describes predicates as they are considered by the solver.

@@ -1,7 +1,5 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE LambdaCase #-}
 
 module GHC.Tc.Types.Evidence (
 

@@ -1,7 +1,3 @@
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module GHC.CmmToAsm.Reg.Graph.SpillCost (
         SpillCostRecord,
         plusSpillCostRecord,

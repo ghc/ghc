@@ -1,16 +1,10 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonadComprehensions #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic TcRnMessage
-{-# LANGUAGE InstanceSigs #-}
 
 module GHC.Tc.Errors.Ppr
   ( pprTypeDoesNotHaveFixedRuntimeRep

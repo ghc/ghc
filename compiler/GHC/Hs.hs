@@ -10,15 +10,9 @@ therefore, is almost nothing but re-exporting.
 -}
 
 {-# OPTIONS_GHC -Wno-orphans    #-} -- Outputable
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-} -- For deriving instance Data
-{-# LANGUAGE DataKinds #-}
 
 module GHC.Hs (
         module Language.Haskell.Syntax,

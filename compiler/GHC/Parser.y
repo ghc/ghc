@@ -8,11 +8,6 @@
 -- ---------------------------------------------------------------------------
 {
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonadComprehensions #-}
 
 -- | This module provides the generated Happy parser for Haskell. It exports

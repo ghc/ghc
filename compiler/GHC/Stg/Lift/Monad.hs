@@ -1,5 +1,3 @@
-
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Hides away distracting bookkeeping while lambda lifting into a 'LiftM'

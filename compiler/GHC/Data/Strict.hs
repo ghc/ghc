@@ -3,8 +3,6 @@
 --
 -- Import this module qualified as Strict.
 
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveTraversable #-}
 
 module GHC.Data.Strict (
     Maybe(Nothing, Just),

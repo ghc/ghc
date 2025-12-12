@@ -1,7 +1,3 @@
-{-# LANGUAGE DerivingStrategies         #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase                 #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.StgToJS.Types

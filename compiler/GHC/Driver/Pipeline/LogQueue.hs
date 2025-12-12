@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DerivingVia #-}
 module GHC.Driver.Pipeline.LogQueue ( LogQueue(..)
                                   , newLogQueue

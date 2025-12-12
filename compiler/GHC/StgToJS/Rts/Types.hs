@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP,
-             FlexibleInstances,
              OverloadedStrings #-}
 
 -----------------------------------------------------------------------------

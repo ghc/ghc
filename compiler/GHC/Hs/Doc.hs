@@ -1,10 +1,5 @@
 -- | Types and functions for raw and lexed docstrings.
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 module GHC.Hs.Doc
   ( HsDoc

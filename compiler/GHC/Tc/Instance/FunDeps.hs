@@ -5,7 +5,6 @@
 
 -}
 
-{-# LANGUAGE DeriveFunctor #-}
 
 -- | Functional dependencies
 --

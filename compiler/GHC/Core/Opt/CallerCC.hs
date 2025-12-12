@@ -1,10 +1,4 @@
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE TupleSections #-}
 
 -- | Adds cost-centers to call sites selected with the @-fprof-caller=...@
 -- flag.

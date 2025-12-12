@@ -1,8 +1,3 @@
-{-# LANGUAGE DeriveFunctor       #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 {-
 (c) The University of Glasgow 2006
 -}

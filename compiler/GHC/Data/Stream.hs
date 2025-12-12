@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RankNTypes #-}
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2012

@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP             #-}
-{-# LANGUAGE DeriveFunctor   #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MagicHash       #-}
 {-# LANGUAGE UnboxedTuples   #-}

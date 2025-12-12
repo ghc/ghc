@@ -5,7 +5,6 @@
 \section[DataCon]{@DataCon@: Data Constructors}
 -}
 
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable, Binary
 
 module GHC.Core.DataCon (

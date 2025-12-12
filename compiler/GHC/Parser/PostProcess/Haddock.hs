@@ -1,11 +1,5 @@
 {-# LANGUAGE ApplicativeDo              #-}
-{-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE NamedFieldPuns             #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 {- | This module implements 'addHaddockToModule', which inserts Haddock

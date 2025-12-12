@@ -4,8 +4,6 @@
 
 -}
 
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 

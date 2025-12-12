@@ -1,6 +1,3 @@
-{-# LANGUAGE LambdaCase    #-}
-{-# LANGUAGE TupleSections #-}
-
 module GHC.Core.LateCC.OverloadedCalls
   ( overloadedCallsCC
   ) where

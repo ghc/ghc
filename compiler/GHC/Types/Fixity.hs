@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# OPTIONS_GHC -Wno-dodgy-exports #-} -- For re-export of GHC.Hs.Basic instances
 
 -- | Fixity

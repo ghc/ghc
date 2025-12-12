@@ -7,7 +7,6 @@
 The bits common to GHC.Tc.TyCl.Instance and GHC.Tc.Deriv.
 -}
 
-{-# LANGUAGE DeriveDataTypeable, DeriveGeneric #-}
 
 module GHC.Core.InstEnv (
         DFunId, InstMatch, ClsInstLookupResult,

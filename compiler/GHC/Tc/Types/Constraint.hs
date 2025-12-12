@@ -1,8 +1,5 @@
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE TypeApplications #-}
 
 -- | This module defines types and simple operations over constraints, as used
 -- in the type-checker and constraint solver.

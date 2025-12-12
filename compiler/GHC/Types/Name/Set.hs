@@ -4,7 +4,6 @@
 -}
 
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module GHC.Types.Name.Set (
         -- * Names set type
         NameSet,

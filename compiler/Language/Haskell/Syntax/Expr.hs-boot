@@ -1,6 +1,3 @@
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*

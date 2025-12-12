@@ -1,7 +1,5 @@
 {-# language GADTs #-}
 {-# language LambdaCase #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiWayIf #-}
 module GHC.CmmToAsm.LA64.CodeGen (

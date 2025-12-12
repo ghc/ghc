@@ -5,7 +5,6 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 
 module GHC.Builtin.PrimOps (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,

@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
 -- |

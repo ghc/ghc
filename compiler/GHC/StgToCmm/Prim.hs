@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}

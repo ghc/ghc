@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections   #-}
-
 -- This module contains functions which implement
 -- the -finfo-table-map and -fdistinct-constructor-tables flags
 module GHC.Stg.Debug

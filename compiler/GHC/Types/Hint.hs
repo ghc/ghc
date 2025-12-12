@@ -1,5 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
-
 module GHC.Types.Hint (
     GhcHint(..)
   , AvailableBindings(..)

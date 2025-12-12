@@ -1,11 +1,8 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ViewPatterns #-}
 

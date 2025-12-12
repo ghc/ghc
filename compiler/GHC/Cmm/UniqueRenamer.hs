@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, RecordWildCards, MagicHash, UnboxedTuples, PatternSynonyms, ExplicitNamespaces #-}
+{-# LANGUAGE RecordWildCards, MagicHash, UnboxedTuples, PatternSynonyms #-}
 module GHC.Cmm.UniqueRenamer
   ( detRenameCmmGroup
   , detRenameIPEMap

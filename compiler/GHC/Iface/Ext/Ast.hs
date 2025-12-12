@@ -1,18 +1,9 @@
 {-# LANGUAGE AllowAmbiguousTypes     #-}
 {-# LANGUAGE CPP                     #-}
-{-# LANGUAGE ConstraintKinds         #-}
-{-# LANGUAGE DataKinds               #-}
-{-# LANGUAGE DeriveDataTypeable      #-}
-{-# LANGUAGE FlexibleContexts        #-}
-{-# LANGUAGE FlexibleInstances       #-}
-{-# LANGUAGE GADTs                   #-}
 {-# LANGUAGE OverloadedStrings       #-}
-{-# LANGUAGE ScopedTypeVariables     #-}
-{-# LANGUAGE TypeApplications        #-}
 {-# LANGUAGE TypeFamilies            #-}
 {-# LANGUAGE UndecidableInstances    #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
-{-# LANGUAGE RankNTypes #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- For the HasLoc instances
 

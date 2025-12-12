@@ -1,7 +1,3 @@
-{-# LANGUAGE RoleAnnotations #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 

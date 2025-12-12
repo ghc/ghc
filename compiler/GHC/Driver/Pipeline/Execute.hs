@@ -1,9 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE GADTs #-}
 #include <ghcplatform.h>
 
 {- Functions for providing the default interpretation of the 'TPhase' actions

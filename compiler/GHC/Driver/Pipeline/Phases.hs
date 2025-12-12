@@ -1,6 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE RankNTypes #-}
-
 module GHC.Driver.Pipeline.Phases (TPhase(..), PhaseHook(..)) where
 
 import GHC.Prelude

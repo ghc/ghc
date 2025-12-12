@@ -1,5 +1,3 @@
-{-# LANGUAGE GADTs #-}
-
 {-
 (c) The University of Glasgow 2006
 (c) The AQUA Project, Glasgow University, 1996-1998

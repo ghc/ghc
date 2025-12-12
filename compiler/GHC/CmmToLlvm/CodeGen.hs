@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs, MultiWayIf #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 -- | Handle conversion of CmmProc to LLVM code.

@@ -5,7 +5,6 @@
 -}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- | Typechecking @default@ declarations
 module GHC.Tc.Gen.Default ( tcDefaultDecls, extendDefaultEnvWithLocalDefaults ) where

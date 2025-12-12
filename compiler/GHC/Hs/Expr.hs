@@ -1,15 +1,4 @@
 {-# LANGUAGE CPP                       #-}
-{-# LANGUAGE ConstraintKinds           #-}
-{-# LANGUAGE DataKinds                 #-}
-{-# LANGUAGE DeriveDataTypeable        #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleContexts          #-}
-{-# LANGUAGE FlexibleInstances         #-}
-{-# LANGUAGE LambdaCase                #-}
-{-# LANGUAGE MultiParamTypeClasses     #-}
-{-# LANGUAGE ScopedTypeVariables       #-}
-{-# LANGUAGE StandaloneDeriving        #-}
-{-# LANGUAGE TypeApplications          #-}
 {-# LANGUAGE TypeFamilyDependencies    #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension

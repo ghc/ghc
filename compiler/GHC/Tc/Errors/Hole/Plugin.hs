@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 module GHC.Tc.Errors.Hole.Plugin(CandPlugin, FitPlugin, HoleFitPlugin (..), HoleFitPluginR (..)) where
 
 import GHC.Tc.Errors.Hole.FitTypes

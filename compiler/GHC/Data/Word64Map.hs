@@ -1,6 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE MonoLocalBinds #-}
 
 -----------------------------------------------------------------------------
 -- |

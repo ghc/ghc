@@ -1,7 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveTraversable #-}
-
 -----------------------------------------------------------------------------
 --
 -- Types for the linkers and the loader

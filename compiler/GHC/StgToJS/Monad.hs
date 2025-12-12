@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- | JS codegen state monad
 module GHC.StgToJS.Monad

@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 -- | Logger
 --
 -- The Logger is an configurable entity that is used by the compiler to output

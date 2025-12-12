@@ -5,10 +5,9 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TupleSections, ScopedTypeVariables, MultiWayIf #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- | Typecheck type and class declarations
 module GHC.Tc.TyCl (

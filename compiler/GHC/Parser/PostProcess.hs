@@ -1,9 +1,5 @@
-
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MultiWayIf #-}
 
 --

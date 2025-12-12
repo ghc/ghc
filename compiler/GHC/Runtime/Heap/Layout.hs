@@ -4,7 +4,6 @@
 -- Storage manager representation of closures
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module GHC.Runtime.Heap.Layout (
         -- * Words and bytes

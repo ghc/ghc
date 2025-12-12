@@ -1,4 +1,3 @@
-{-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}

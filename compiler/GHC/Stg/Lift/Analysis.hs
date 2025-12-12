@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds #-}
 
 -- | Provides the heuristics for when it's beneficial to lambda lift bindings.
 -- Most significantly, this employs a cost model to estimate impact on heap

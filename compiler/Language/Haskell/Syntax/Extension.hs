@@ -1,15 +1,4 @@
 {-# LANGUAGE AllowAmbiguousTypes     #-} -- for unXRec, etc.
-{-# LANGUAGE ConstraintKinds         #-}
-{-# LANGUAGE DataKinds               #-}
-{-# LANGUAGE DeriveDataTypeable      #-}
-{-# LANGUAGE EmptyCase               #-}
-{-# LANGUAGE EmptyDataDeriving       #-}
-{-# LANGUAGE FlexibleContexts        #-}
-{-# LANGUAGE FlexibleInstances       #-}
-{-# LANGUAGE GADTs                   #-}
-{-# LANGUAGE MultiParamTypeClasses   #-}
-{-# LANGUAGE RankNTypes              #-}
-{-# LANGUAGE ScopedTypeVariables     #-}
 {-# LANGUAGE TypeFamilyDependencies  #-}
 {-# LANGUAGE UndecidableInstances    #-} -- Wrinkle in Note [Trees That Grow]
                                          -- in module Language.Haskell.Syntax.Extension

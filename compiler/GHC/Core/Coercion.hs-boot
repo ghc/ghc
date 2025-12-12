@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 module GHC.Core.Coercion where
 
 import GHC.Prelude

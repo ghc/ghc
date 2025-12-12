@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module GHC.Cmm.Expr

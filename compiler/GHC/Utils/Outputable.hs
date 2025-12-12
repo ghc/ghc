@@ -1,13 +1,5 @@
-{-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 {-
 (c) The University of Glasgow 2006-2012

@@ -1,14 +1,8 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic IfaceMessage
-{-# LANGUAGE InstanceSigs #-}
 
 module GHC.Iface.Errors.Ppr
   ( IfaceMessageOpts(..)

@@ -1,7 +1,4 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE LambdaCase    #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns  #-}
 
 -----------------------------------------------------------------------------

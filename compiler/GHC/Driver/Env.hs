@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 module GHC.Driver.Env
    ( Hsc(..)
    , HscEnv (..)

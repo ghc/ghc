@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE OverloadedStrings, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {- Note [The need for Ar.hs]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
 Building `-staticlib` previously required the presence of libtool, and was a

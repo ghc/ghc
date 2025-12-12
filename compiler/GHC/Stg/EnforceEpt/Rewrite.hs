@@ -1,10 +1,7 @@
-
 -- Copyright (c) 2019 Andreas Klebinger
 --
 
 {-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 module GHC.Stg.EnforceEpt.Rewrite (rewriteTopBinds, rewriteOpApp)

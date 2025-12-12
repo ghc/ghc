@@ -1,5 +1,3 @@
-
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006

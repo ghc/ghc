@@ -6,7 +6,7 @@
 Bag: an unordered collection with duplicates
 -}
 
-{-# LANGUAGE ScopedTypeVariables, DeriveTraversable, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-unrecognised-warning-flags -Wno-x-data-list-nonempty-unzip #-}
 
 module GHC.Data.Bag (

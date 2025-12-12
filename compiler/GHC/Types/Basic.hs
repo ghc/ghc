@@ -15,14 +15,7 @@ types that
 -}
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable PromotionFlag, Binary PromotionFlag, Outputable Boxity, Binay Boxity
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 module GHC.Types.Basic (
         LeftOrRight(..),

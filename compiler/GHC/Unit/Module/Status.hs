@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module GHC.Unit.Module.Status
    ( HscBackendAction(..)
    , HscRecompStatus (..)

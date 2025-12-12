@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 module Language.Haskell.Syntax.ImpExp ( module Language.Haskell.Syntax.ImpExp, IsBootInterface(..) ) where
 
 import Language.Haskell.Syntax.Extension

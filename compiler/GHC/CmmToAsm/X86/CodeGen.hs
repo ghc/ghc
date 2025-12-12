@@ -1,9 +1,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ParallelListComp #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 
 -----------------------------------------------------------------------------

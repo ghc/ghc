@@ -1,5 +1,3 @@
-
-
 -----------------------------------------------------------------------------
 --
 -- Code generator utilities; mostly monadic
@@ -8,7 +6,6 @@
 --
 -----------------------------------------------------------------------------
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
 
 module GHC.StgToCmm.Utils (
         emitDataLits, emitRODataLits,

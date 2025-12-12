@@ -1,6 +1,5 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE RankNTypes #-}
 
 -- | The 'ZonkM' monad, a stripped down 'TcM', used when zonking within
 -- the typechecker in "GHC.Tc.Zonk.TcType".

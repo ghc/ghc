@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 -- | The Name Cache
 module GHC.Types.Name.Cache
   ( NameCache (..)

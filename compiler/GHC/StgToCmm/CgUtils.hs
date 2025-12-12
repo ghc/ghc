@@ -1,5 +1,3 @@
-{-# LANGUAGE GADTs #-}
-
 -----------------------------------------------------------------------------
 --
 -- Code generator utilities; mostly monadic

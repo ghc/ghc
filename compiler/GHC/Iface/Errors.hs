@@ -1,6 +1,3 @@
-
-{-# LANGUAGE FlexibleContexts #-}
-
 module GHC.Iface.Errors
   ( badIfaceFile
   , cannotFindInterface

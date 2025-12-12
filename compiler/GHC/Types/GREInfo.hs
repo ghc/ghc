@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DerivingStrategies #-}
-
 -- | Renamer-level information about 'Name's.
 --
 -- Renamer equivalent of 'TyThing'.

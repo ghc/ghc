@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE ExistentialQuantification #-}
 
 module GHC.Tc.Errors.Hole
    ( findValidHoleFits

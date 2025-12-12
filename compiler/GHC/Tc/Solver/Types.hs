@@ -1,6 +1,3 @@
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GADTs #-}
-
 -- | Utility types used within the constraint solver
 module GHC.Tc.Solver.Types (
     -- Inert CDictCans

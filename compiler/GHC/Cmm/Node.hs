@@ -1,7 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- CmmNode type for representation using Hoopl graphs.
 

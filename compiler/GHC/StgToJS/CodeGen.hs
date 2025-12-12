@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE LambdaCase   #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- | JavaScript code generator

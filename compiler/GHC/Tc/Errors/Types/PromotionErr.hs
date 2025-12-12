@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE LambdaCase #-}
-
 module GHC.Tc.Errors.Types.PromotionErr ( PromotionErr(..)
                                         , pprPECategory
                                         , peCategory

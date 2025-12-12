@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module GHC.Data.List.NonEmpty (module Data.List.NonEmpty, module GHC.Data.List.NonEmpty, toList) where
 
 import Prelude (Bool, (.))

@@ -1,5 +1,4 @@
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module GHC.StgToJS.FFI

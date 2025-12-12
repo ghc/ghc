@@ -3,7 +3,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MonadComprehensions #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Highly random utility functions
 --

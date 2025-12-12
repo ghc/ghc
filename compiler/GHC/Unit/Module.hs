@@ -1,6 +1,3 @@
-{-# LANGUAGE ExplicitNamespaces #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 
 {-

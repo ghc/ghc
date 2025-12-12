@@ -8,13 +8,10 @@ Type checking of type signatures in interface files
 
 
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 {-# LANGUAGE RecursiveDo #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module GHC.IfaceToCore (

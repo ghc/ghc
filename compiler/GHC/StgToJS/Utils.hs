@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase        #-}
 
 module GHC.StgToJS.Utils
   ( assignCoerce1

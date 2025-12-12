@@ -1,5 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE FlexibleInstances #-}
 module GHC.Utils.Json where
 
 import GHC.Prelude

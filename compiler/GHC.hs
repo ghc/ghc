@@ -1,10 +1,8 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE NondecreasingIndentation, ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections, NamedFieldPuns #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- -----------------------------------------------------------------------------
 --

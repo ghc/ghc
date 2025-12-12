@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 -----------------------------------------------------------------------------
 --
 -- Pretty-printing assembly language

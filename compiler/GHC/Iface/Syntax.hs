@@ -4,8 +4,6 @@
 -}
 
 
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveTraversable #-}
 
 module GHC.Iface.Syntax (
         module GHC.Iface.Type,

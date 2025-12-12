@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 -- | Free regs map for i386
 module GHC.CmmToAsm.Reg.Linear.X86 where
 

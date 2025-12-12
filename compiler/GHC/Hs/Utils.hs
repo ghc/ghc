@@ -1,6 +1,3 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE TupleSections   #-}
-
 {-|
 Module      : GHC.Hs.Utils
 Description : Generic helpers for the HsSyn type.
@@ -24,18 +21,9 @@ just attach noSrcSpan to everything.
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE NamedFieldPuns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# LANGUAGE RecordWildCards #-}

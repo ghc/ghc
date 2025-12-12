@@ -13,7 +13,6 @@ have a standard form, namely:
 -}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# LANGUAGE DataKinds #-}
 
 module GHC.Types.Id.Make (
         mkDictFunId, mkDictSelId, mkDictSelRhs,
