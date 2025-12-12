@@ -298,7 +298,7 @@ userSettingRules defaultValue = do
     extra <- shakeExtra <$> getShakeOptionsRules
     return $ lookupExtra defaultValue extra
 
-newtype BuildRoot = BuildRoot FilePath deriving (Typeable, Eq, Show)
+newtype BuildRoot = BuildRoot FilePath deriving (Eq, Show)
 
 -- | All build results are put into the 'buildRoot' directory.
 buildRoot :: Action FilePath
@@ -484,7 +484,6 @@ putColoured code msg = do
         else putInfo msg
 
 newtype BuildProgressColour = BuildProgressColour String
-    deriving Typeable
 
 -- | By default, Hadrian tries to figure out if the current terminal
 --   supports colors using this function. The default can be overridden
@@ -511,7 +510,6 @@ putBuild msg = do
     putColoured code msg
 
 newtype SuccessColour = SuccessColour String
-    deriving Typeable
 
 -- | Generate an encoded colour for successful output from names
 mkSuccessColour :: Colour -> SuccessColour
@@ -528,7 +526,6 @@ putSuccess msg = do
     putColoured code msg
 
 newtype FailureColour = FailureColour String
-    deriving Typeable
 
 -- | Generate an encoded colour for failure output messages
 mkFailureColour :: Colour -> FailureColour
@@ -544,7 +541,7 @@ putFailure msg = do
   FailureColour code <- userSetting red
   putColoured code msg
 
-data ProgressInfo = None | Brief | Normal | Unicorn deriving (Eq, Show, Typeable)
+data ProgressInfo = None | Brief | Normal | Unicorn deriving (Eq, Show)
 
 -- | Version of 'putBuild' controlled by @--progress-info@ command line argument.
 putProgressInfo :: String -> Action ()

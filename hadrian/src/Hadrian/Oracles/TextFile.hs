@@ -118,15 +118,15 @@ queryTargetTarget :: (Toolchain.Target -> a) -> Action a
 queryTargetTarget f = f <$> getTargetTarget
 
 newtype KeyValue = KeyValue (FilePath, String)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult KeyValue = Maybe String
 
 newtype KeyValues = KeyValues (FilePath, String)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult KeyValues = Maybe [String]
 
 newtype TargetFile = TargetFile FilePath
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult TargetFile = Toolchain.Target
 
 -- | These oracle rules are used to cache and track answers to the following

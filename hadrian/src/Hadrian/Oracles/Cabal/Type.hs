@@ -26,13 +26,13 @@ import Stage
 -- | This type of oracle key is used by 'Hadrian.Oracles.Cabal.readPackageData'
 -- to cache reading and parsing of 'Hadrian.Haskell.Cabal.Type.PackageData'.
 newtype PackageDataKey = PackageDataKey Package
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult PackageDataKey = PackageData
 
 -- | This type of oracle key is used by 'Hadrian.Oracles.Cabal.readContextData'
 -- to cache reading and parsing of 'Hadrian.Haskell.Cabal.Type.ContextData'.
 newtype ContextDataKey = ContextDataKey Context
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult ContextDataKey = ContextData
 
 -- TODO: Should @PackageConfiguration@ be simply @()@? Presumably the pair
@@ -40,7 +40,7 @@ type instance RuleResult ContextDataKey = ContextData
 -- | The result of Cabal package configuration produced by the oracle
 -- 'Hadrian.Oracles.Cabal.configurePackageGHC'.
 newtype PackageConfiguration = PackageConfiguration (C.Compiler, C.Platform)
-    deriving (Binary, Eq, Show, Typeable)
+    deriving (Binary, Eq, Show)
 
 instance NFData PackageConfiguration where
     rnf (PackageConfiguration (c, p)) =
@@ -58,5 +58,5 @@ instance Hashable PackageConfiguration where
 -- | This type of oracle key is used by 'Hadrian.Oracles.Cabal.configurePackageGHC'
 -- to cache configuration of a Cabal package.
 newtype PackageConfigurationKey = PackageConfigurationKey (Package, Stage)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult PackageConfigurationKey = PackageConfiguration

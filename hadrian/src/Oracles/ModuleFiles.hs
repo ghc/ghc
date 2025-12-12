@@ -16,11 +16,11 @@ import Expression
 type ModuleName = String
 
 newtype ModuleFiles = ModuleFiles (Stage, Package)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult ModuleFiles = [Maybe FilePath]
 
 newtype Generator = Generator (Stage, Package, FilePath)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult Generator = Maybe FilePath
 
 -- | We scan for the following Haskell source extensions when looking for module
