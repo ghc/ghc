@@ -3,6 +3,8 @@
 #	extra run flags
 #	expected process return value, if not zero
 
+import random
+
 test('arith001', normal, compile_and_run, [''])
 test('arith002', normal, compile_and_run, [''])
 test('arith003', normal, compile_and_run, [''])
@@ -82,7 +84,7 @@ test('IntegerToFloat', normal, compile_and_run, [''])
 test('T20291', normal, compile_and_run, [''])
 test('T22282', normal, compile_and_run, [''])
 test('T22671', js_fragile(24259), compile_and_run, [''])
-test('foundation', [when(js_arch(), run_timeout_multiplier(2)), js_fragile(24259), extra_ways(['optasm','ghci','ghci-opt'])], compile_and_run, ['-package transformers -fno-break-points'])
+test('foundation', [run_timeout_multiplier(2), js_fragile(24259), extra_ways(['optasm','ghci','ghci-opt']), extra_run_opts(str(random.getrandbits(64)))], compile_and_run, ['-fno-break-points'])
 test('T24066', normal, compile_and_run, [''])
 test('div01', normal, compile_and_run, [''])
 test('T24245', normal, compile_and_run, [''])
