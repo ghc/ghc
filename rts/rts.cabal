@@ -289,6 +289,7 @@ library
                         -- ^ generated
                         rts/ghc_ffi.h
                         rts/Adjustor.h
+                        rts/ASANUtils.h
                         rts/ExecPage.h
                         rts/BlockSignals.h
                         rts/Bytecodes.h
