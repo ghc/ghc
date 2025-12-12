@@ -1,3 +1,6 @@
+# libraries/bytestring/cbits/is-valid-utf8.c:66:14: runtime load of misaligned address 0x7ae45206f112 for type 'const uint64_t *' (aka 'const unsigned long *'), which requires 8 byte alignment
+alignment:libraries/bytestring/cbits/is-valid-utf8.c
+
 # libraries/text/cbits/measure_off.c:50:39: runtime left shift of 1 by 31 places cannot be represented in type 'int'
 shift-base:libraries/text/cbits/measure_off.c
 
