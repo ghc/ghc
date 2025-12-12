@@ -66,6 +66,8 @@ initNCGConfig dflags this_mod = NCGConfig
             _          -> Nothing
    , ncgAvx512fEnabled = isAvx512fEnabled dflags
 
+   , ncgLa664Enabled = isLa664Enabled dflags
+
    , ncgDwarfEnabled        = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0 && platformArch (targetPlatform dflags) /= ArchAArch64
    , ncgDwarfUnwindings     = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0
    , ncgDwarfStripBlockInfo = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags < 2 -- We strip out block information when running with -g0 or -g1.

@@ -48,6 +48,7 @@ data NCGConfig = NCGConfig
    , ncgEnableInterModuleFarJumps:: !Bool            -- ^ Use far-jumps for cross-module jumps.
    , ncgComputeUnwinding      :: !Bool            -- ^ Compute block unwinding tables
    , ncgEnableDeadCodeElimination :: !Bool        -- ^ Whether to enable the dead-code elimination
+   , ncgLa664Enabled          :: !Bool            -- ^ la664 is equal to isav1.1
    }
 
 -- | Return Word size

@@ -89,7 +89,9 @@ module GHC.Driver.DynFlags (
         isAvx512pfEnabled,
         isFmaEnabled,
         isBmiEnabled,
-        isBmi2Enabled
+        isBmi2Enabled,
+        -- For LoongArch platform
+        isLa664Enabled
 ) where
 
 import GHC.Prelude
@@ -457,6 +459,7 @@ data DynFlags = DynFlags {
   avx512f               :: Bool, -- Enable AVX-512 instructions.
   avx512pf              :: Bool, -- Enable AVX-512 PreFetch Instructions.
   fma                   :: Bool, -- ^ Enable FMA instructions.
+  la664                 :: Bool, -- Enable LA664 instructions
 
   -- Constants used to control the amount of optimization done.
 
@@ -740,6 +743,8 @@ defaultDynFlags mySettings =
         avx512pf = False,
         -- Use FMA by default on AArch64
         fma = (platformArch . sTargetPlatform $ mySettings) == ArchAArch64,
+        -- For LoongArch, la464 is used by default.
+        la664 = False,
 
         maxInlineAllocSize = 128,
         maxInlineMemcpyInsns = 32,
@@ -1661,6 +1666,11 @@ We handle this as follows:
      e.g. if the user passed -mavx512f then we also set the `SseAvxVersion`
      to `AVX2`.
 -}
+
+-- -----------------------------------------------------------------------------
+-- LA664
+isLa664Enabled :: DynFlags -> Bool
+isLa664Enabled dflags = la664 dflags
 
 -- -----------------------------------------------------------------------------
 -- BMI2

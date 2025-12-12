@@ -218,6 +218,9 @@ module GHC.Driver.Session (
         isAvx512pfEnabled,
         isFmaEnabled,
 
+        -- LoongArch: ISA version: la664, la464(default)
+        isLa664Enabled,
+
         -- * Linker/compiler information
         useXLinkerRPath,
 
@@ -1728,6 +1731,9 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "mavx512pf"    (noArg (\d ->
                                                          d { avx512pf = True }))
   , make_ord_flag defGhcFlag "mfma"         (noArg (\d -> d { fma = True }))
+
+
+  , make_ord_flag defGhcFlag "mla664"       (noArg (\d -> d { la664 = True }))
 
         ------ Plugin flags ------------------------------------------------
   , make_ord_flag defGhcFlag "fplugin-opt" (hasArg addPluginModuleNameOption)

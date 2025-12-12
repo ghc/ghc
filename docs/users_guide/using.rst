@@ -1781,6 +1781,17 @@ Some flags only make sense for particular target platforms.
     multiply-add, which might perform non-IEEE-compliant software emulation on
     some platforms (depending on the implementation of the C standard library).
 
+.. ghc-flag:: -mla664
+    :shortdesc: (LoongArch only) Used for new instructions for la664 uarch
+    :type: dynamic
+    :category: platform-options
+
+    :default: off by default, avoid to generate invalid instructions for non-la664 uarchs.
+
+    GHC currently does not use LA664 specific instructions,
+    so this flag has no effect when used with the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`.
+
 Haddock
 -------
 
