@@ -10,9 +10,7 @@
   compare the result of the primop wrappers with the results of interpretation.
 -}
 
-{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -25,28 +23,23 @@ module Main
     ( main
     ) where
 
+import Data.Array.Byte
 import Data.Bits (Bits((.&.), bit), FiniteBits, finiteBitSize)
 import Data.Word
 import Data.Int
 import GHC.Natural
 import Data.Typeable
-import Data.Proxy
 import GHC.Int
-import GHC.Word
 import GHC.Word
 import Data.Function
 import GHC.Prim
 import Control.Monad.Reader
-import System.IO
-import Foreign.Marshal.Alloc
-import Foreign.Storable
-import Foreign.Ptr
 import Data.List (intercalate)
-import Data.IORef
+import System.Environment (getArgs)
+import Text.Read (readMaybe)
 import Unsafe.Coerce
 import GHC.Types
 import Data.Char
-import Data.Semigroup
 import System.Exit
 
 import qualified GHC.Internal.PrimopWrappers as Wrapper
@@ -194,11 +187,16 @@ newtype LCGGen = LCGGen { randomWord64 :: IO Word64 }
 data LCGParams = LCGParams { seed :: Word64, a :: Word64, c :: Word64, m :: Word64 }
 
 newLCGGen :: LCGParams -> IO LCGGen
-newLCGGen LCGParams{..}  = do
-  var <- newIORef (fromIntegral seed)
-  return $ LCGGen $ do
-    atomicModifyIORef' var (\old_v -> let new_val = (old_v * a + c) `mod` m in (new_val, new_val))
-
+newLCGGen LCGParams {seed = W64# seed#, ..} = do
+  MutableByteArray mba# <- IO $ \s0 -> case newByteArray# 8# s0 of
+    (# s1, mba# #) -> case writeWord64Array# mba# 0# seed# s1 of
+      s2 -> (# s2, MutableByteArray mba# #)
+  pure $ LCGGen $ IO $ \s0 -> case readWord64Array# mba# 0# s0 of
+    (# s1, old_val# #) ->
+      let old_val = W64# old_val#
+          !new_val@(W64# new_val#) = (old_val * a + c) `mod` m
+       in case writeWord64Array# mba# 0# new_val# s1 of
+            s2 -> (# s2, new_val #)
 
 runPropertyCheck (PropertyBinaryOp res desc s1 s2) =
   if res then return Success
@@ -211,7 +209,7 @@ runPropertyCheck (PropertyAnd a1 a2) = (<>) <$> runPropertyCheck a1 <*> runPrope
 
 runProperty :: Property -> ReaderT RunS IO Result
 runProperty (Prop p) = do
-  let iterations = 100
+  let iterations = 1000 :: Int
   loop iterations iterations
   where
     loop iterations 0 = do
@@ -257,14 +255,15 @@ runTestInternal (Property name p) = do
   nest label $ runProperty (property p)
 
 
-runTests :: Test -> IO ()
-runTests t = do
+runTests :: Word64 -> Test -> IO ()
+runTests seed t = do
   -- These params are the same ones as glibc uses.
-  h <- newLCGGen (LCGParams { seed = 1238123213, m = 2^31, a = 1103515245, c = 12345 })
+  h <- newLCGGen (LCGParams { seed, m = 2 ^ (31 :: Int), a = 1103515245, c = 12345 })
   res <- runReaderT  (runTestInternal t) (RunS 0 h [])
   case res of
     Success -> return ()
     Failure tests -> do
+      putStrLn $ "Seed: " ++ show seed
       putStrLn $ "These tests failed:  \n" ++ intercalate "  \n" (map (showStack 0 . reverse) tests)
       exitFailure
 
@@ -455,7 +454,19 @@ instance TestPrimop LowerBitsAreDefined where
 twoNonZero :: (a -> a -> b) -> a -> NonZero a -> b
 twoNonZero f x (NonZero y) = f x y
 
-main = runTests (Group "ALL" [testNumberRefs, testPrimops])
+getSeedFromArgs :: IO Word64
+getSeedFromArgs = do
+  args <- getArgs
+  case args of
+    [arg] -> case readMaybe arg of
+      Just seed -> pure seed
+      Nothing -> die $ "Invalid seed (expected Word64): " ++ show arg
+    _ -> die "Usage: foundation <seed>"
+
+main :: IO ()
+main = do
+  seed <- getSeedFromArgs
+  runTests seed (Group "ALL" [testNumberRefs, testPrimops])
 
 -- Test an interpreted primop vs a compiled primop
 testPrimops = Group "primop"
