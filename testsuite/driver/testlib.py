@@ -1112,6 +1112,9 @@ def have_thread_sanitizer( ) -> bool:
 def have_ubsan( ) -> bool:
     return config.have_ubsan
 
+def have_asan( ) -> bool:
+    return config.have_asan
+
 def gcc_as_cmmp() -> bool:
     return config.cmm_cpp_is_gcc
 

@@ -8,6 +8,8 @@ test('T18623',
      # Recent versions of osx report an error when running `ulimit -v`
      when(opsys('darwin'), skip),
      when(arch('powerpc64le'), skip),
+     # ASan can't allocate shadow memory
+     when(have_asan(), skip),
      cmd_prefix('ulimit -v ' + str(8 * 1024 ** 2) + ' && '),
      ignore_stdout],
     run_command,

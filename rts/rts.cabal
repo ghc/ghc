@@ -97,6 +97,12 @@ flag ubsan
     UndefinedBehaviorSanitizer.
   default: False
   manual: True
+flag asan
+  description:
+    Link with -fsanitize=address, to be enabled when building with
+    AddressSanitizer.
+  default: False
+  manual: True
 flag shared-libsan
   description:
     Link with -shared-libsan, to guarantee only one copy of the
@@ -203,6 +209,9 @@ library
 
       if flag(ubsan)
         ld-options: -fsanitize=undefined
+
+      if flag(asan)
+        ld-options: -fsanitize=address
 
       if flag(shared-libsan)
         ld-options: -shared-libsan

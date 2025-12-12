@@ -194,6 +194,9 @@ class TestConfig:
         # Are we running with UndefinedBehaviorSanitizer enabled?
         self.have_ubsan = False
 
+        # Are we running with AddressSanitizer enabled?
+        self.have_asan = False
+
         # Do symbols use leading underscores?
         self.leading_underscore = False
 

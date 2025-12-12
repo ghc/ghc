@@ -243,6 +243,10 @@ The supported transformers are listed below:
         <td>Build all stage1+ C/C++ code with UndefinedBehaviorSanitizer support</td>
     </tr>
     <tr>
+        <td><code>asan</code></td>
+        <td>Build all stage1+ C/C++ code with AddressSanitizer support</td>
+    </tr>
+    <tr>
         <td><code>llvm</code></td>
         <td>Use GHC's LLVM backend (`-fllvm`) for all stage1+ compilation.</td>
     </tr>

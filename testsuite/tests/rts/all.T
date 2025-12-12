@@ -105,6 +105,8 @@ def remove_parenthesis(s):
     return re.sub(r'\s+\([^)]*\)', '', s)
 
 test('outofmem', [ when(opsys('darwin'), skip),
+                   # ASan shadow memory allocation blows up
+                   when(have_asan(), skip),
                    # this is believed to cause other processes to die
                    # that happen concurrently while the outofmem test
                    # runs in CI. As such we'll need to disable it on
