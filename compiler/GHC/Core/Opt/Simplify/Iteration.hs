@@ -2177,7 +2177,8 @@ simplClo env clo cont
       DoneEx e mb_join -> simplExprF zapped_env e $
                           trimJoinCont mb_join cont
   where
-    zapped_env =  zapSubstEnv env  -- See Note [zapSubstEnv]
+    zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
+        -- zapSubstEnv also bumps seInlineDepth
 
 simplCloArg :: SimplEnvIS     -- ^ Used only for its InScopeSet
             -> OutType        -- ^ Type of the function applied to this arg
