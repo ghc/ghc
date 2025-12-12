@@ -108,7 +108,7 @@ data PackageHashConfigInputs = PackageHashConfigInputs {
   deriving Show
 
 newtype PkgHashKey = PkgHashKey (Stage, Package)
-  deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+  deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult PkgHashKey = String
 
 pkgHash :: Stage -> Package -> Action String

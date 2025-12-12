@@ -15,7 +15,7 @@ import Hadrian.Utilities
 import qualified System.Directory.Extra as IO
 
 data Match = Test FilePattern | Not Match | And [Match] | Or [Match]
-    deriving (Generic, Eq, Show, Typeable)
+    deriving (Generic, Eq, Show)
 
 instance Binary   Match
 instance Hashable Match
@@ -54,7 +54,7 @@ copyDirectoryContentsUntracked expr source target = do
     mapM_ cp =<< directoryContents expr source
 
 newtype DirectoryContents = DirectoryContents (Match, FilePath)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult DirectoryContents = [FilePath]
 
 -- | This oracle answers 'directoryContents' queries and tracks the results.

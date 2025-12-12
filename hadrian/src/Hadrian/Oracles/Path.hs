@@ -34,11 +34,11 @@ fixAbsolutePathOnWindows path =
         return path
 
 newtype LookupInPath = LookupInPath String
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult LookupInPath = String
 
 newtype WindowsPath = WindowsPath FilePath
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult WindowsPath = String
 
 -- | Oracles for looking up paths. These are slow and require caching.

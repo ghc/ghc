@@ -14,11 +14,11 @@ import Flavour
 import Settings (flavour)
 
 newtype DynGhcPrograms =
-  DynGhcPrograms () deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+  DynGhcPrograms () deriving (Show, Eq, Hashable, Binary, NFData)
 type instance RuleResult DynGhcPrograms = Bool
 
 newtype GhcProfiled =
-  GhcProfiled Stage deriving (Show, Typeable, Eq, Hashable, Binary, NFData)
+  GhcProfiled Stage deriving (Show, Eq, Hashable, Binary, NFData)
 type instance RuleResult GhcProfiled = Bool
 
 oracles :: Rules ()

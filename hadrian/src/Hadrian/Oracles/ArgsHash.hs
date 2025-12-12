@@ -38,7 +38,7 @@ trackArgsHash t = do
     void (askOracle $ ArgsHash hashedTarget :: Action Int)
 
 newtype ArgsHash c b = ArgsHash (Target c b)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+    deriving (Binary, Eq, Hashable, NFData, Show)
 type instance RuleResult (ArgsHash c b) = Int
 
 -- | This oracle stores per-target argument list hashes in the Shake database,
