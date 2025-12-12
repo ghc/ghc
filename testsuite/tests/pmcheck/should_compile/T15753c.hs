@@ -34,6 +34,22 @@ type family F (u1 :: ()) (u2 :: ()) :: Type where
 type family Case (u :: ()) :: Type where
   Case '() = Int
 
+---------------------------------------
+-- The checker can (now, Dec 25) see that (F u1 u2 ~ Char) is
+-- unsatisfiable, so the empty pattern match is fine
+g1a :: F u1 u2 :~: Char -> SUnit u1 -> SUnit u2 -> Void
+g1a r _ _ = case r of {}
+
+{- Why   [G] F u1 u2 ~ Char  is unsatisfiable
+
+[G] F u1 u2 ~ Char =>rewrite   [G] If (IsUnit u1) (Case u2) Int ~ Char
+                   =>(fundep)  [W] IsUnit u1 ~ True
+                               [W] Case u2 ~ Char   <<--  insoluble: no relevant eqns
+-}
+
+---------------------------------------
+-- This older test matches on Refl (which is unsatisfiable)
+-- but we now get complaints from inside
 g1 :: F u1 u2 :~: Char
    -> SUnit u1 -> SUnit u2
    -> Void
@@ -41,21 +57,7 @@ g1 Refl su1 su2
   | STrue <- sIsUnit su1
   = case su2 of {}
 
--- g1a :: F u1 u2 :~: Char -> SUnit u1 -> SUnit u2 -> Void
--- g1a r _ _ = case r of {}   -- Why does this complain about missing Refl
 
-{- [G]  F u1 u2 ~ Char
-   [W] SBool (IsUnit u1) ~ SBool True
-==>
-   [W] IsUnit u1 ~ True
-==> fundep
-    u1 ~ ()
-
-
-[G] F u1 u2 ~ Char =>(fundep)  [W] If (IsUnit u1) (Case u2) Int ~ Char
-                   =>(fundep)  [W] IsUnit u1 ~ True
-                               [W] Case u2 ~ Char   <<--  insoluble: no relevant eqns
--}
 
 g2 :: F u1 u2 :~: Char
    -> SUnit u1 -> SUnit u2
@@ -64,4 +66,3 @@ g2 Refl su1 su2
   = case sIsUnit su1 of
       STrue ->
         case su2 of {}
-
