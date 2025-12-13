@@ -316,27 +316,8 @@ withWindowsHandleWritingBiasedRaw
 -- ** Caveats
 
 {-$with-ref-caveats
-    #with-ref-caveats#There are the following caveats regarding the above
-    operations:
-
-      * Flushing of buffers can fail if the given handle is readable but not
-        seekable.
-
-      * If one of these operations is performed as part of an action executed by
-        'System.IO.Unsafe.unsafePerformIO',
-        'System.IO.Unsafe.unsafeInterleaveIO', or one of their “dupable”
-        variants and the user-provided action receives an asychnchronous
-        exception and does not catch it, then the following happens:
-
-          - Before the overall computation is suspended, the blocking of handle
-            operations is removed.
-
-          - When the computation is later resumed due to another evaluation
-            attempt, the blocking of handle operations is reinstantiated, the
-            Haskell-managed buffers are flushed again, and the user-provided
-            action is run from the beginning.
-
-        Repeating the previously executed part of the user-provided action
-        cannot be avoided apparently. See the @[async]@ note in the source code
-        of "GHC.Internal.IO.Handle.Internals" for further explanation.
+    #with-ref-caveats#This subsection is just a dummy, whose purpose is to serve
+    as the target of the hyperlinks above. The real documentation of the caveats
+    is in the /Caveats/ subsection in the @base@ module @System.IO.OS@, which
+    re-exports the above operations.
 -}
