@@ -1551,10 +1551,10 @@ preInlineBetaUnconditionally env levity bndr clo
     -- NB: exprOkForSpeculation is stable under substitution
     --     so we can apply it to an InExpr in the ContEx case
     needs_case_binding Lifted   = False
-    needs_case_binding Unlifted = case clo of
-                                    DoneId {}    -> False
-                                    DoneEx e _   -> exprOkForSpeculation e
-                                    ContEx _ e _ -> exprOkForSpeculation e
+    needs_case_binding Unlifted =  case clo of
+                                      DoneId {}    -> False
+                                      DoneEx e _   -> not $ exprOkForSpeculation e
+                                      ContEx _ e _ -> not $ exprOkForSpeculation e
 
 preInlineLetUnconditionally
     :: SimplEnv -> TopLevelFlag -> InId
