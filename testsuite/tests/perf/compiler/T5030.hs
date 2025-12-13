@@ -1,6 +1,10 @@
 {-# LANGUAGE TypeFamilies, GADTs, EmptyDataDecls, FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+-- Almost all compile time is in coercion optimisation!
+--   -O0 -fno-coercion-opt    372M alloc
+--   -O0 -fcoercion-opt      1600M alloc
+
 module SlowComp where
 
 import Control.Monad
