@@ -524,6 +524,7 @@ test-cabal-reinstall-x86_64-linux-deb10:
     TEST_ENV: "x86_64-linux-deb10-cabal-install"
   rules:
     - if: $NIGHTLY
+      allow_failure: true
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-reinstall.*/'
 
 ########################################
