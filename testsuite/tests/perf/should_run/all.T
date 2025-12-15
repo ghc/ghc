@@ -420,6 +420,7 @@ test('T17949', [collect_stats('bytes allocated', 1), only_ways(['normal'])], com
 test('ByteCodeAsm',
                [ extra_run_opts('"' + config.libdir + '"')
                , js_broken(22261)
+               , when(arch('wasm32'), run_timeout_multiplier(10))
                , collect_stats('bytes allocated', 10),
                ],
                compile_and_run,
