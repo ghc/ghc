@@ -224,6 +224,25 @@ especially since leaving all the boxing/unboxing business to C unifies
 the implementation of JSFFI imports and exports
 (rts_mkJSVal/rts_getJSVal).
 
+We don't support unboxed FFI types like Int# etc. But we do support
+one kind of unlifted FFI type for JSFFI import arguments:
+ByteArray#/MutableByteArray#. The semantics is the same in C: the
+pointer to the ByteArray# payload is passed instead of the ByteArray#
+closure itself. This allows efficient zero-copy data exchange between
+Haskell and JavaScript using unpinned ByteArray#, and the following
+conditions must be met:
+
+- The JSFFI import itself must be a sync import marked as unsafe
+- The JavaScript code must not re-enter Haskell when a ByteArray# is
+  passed as argument
+
+There's no magic in the handling of ByteArray#/MutableByteArray#
+arguments. When generating C stub, we treat them like Ptr that points
+to the payload, just without the rts_getPtr() unboxing call. After
+lowering to C import, the backend takes care of adding the offset, see
+add_shim in GHC.StgToCmm.Foreign and
+Note [Unlifted boxed arguments to foreign calls].
+
 Now, each sync import calls a generated C function with a unique
 symbol. The C function uses rts_get* to unbox the arguments, call into
 JavaScript, then boxes the result with rts_mk* and returns it to
@@ -517,8 +536,9 @@ importCStub sync cfun_name arg_tys res_ty js_src = CStub c_doc [] []
     cfun_ret
       | res_ty `eqType` unitTy = cfun_call_import <> semi
       | otherwise = text "return" <+> cfun_call_import <> semi
-    cfun_make_arg arg_ty arg_val =
-      text ("rts_get" ++ ffiType arg_ty) <> parens arg_val
+    cfun_make_arg arg_ty arg_val
+      | isByteArrayPrimTy arg_ty = arg_val
+      | otherwise = text ("rts_get" ++ ffiType arg_ty) <> parens arg_val
     cfun_make_ret ret_val
       | res_ty `eqType` unitTy = ret_val
       | otherwise =
@@ -543,7 +563,11 @@ importCStub sync cfun_name arg_tys res_ty js_src = CStub c_doc [] []
       | res_ty `eqType` unitTy = text "void"
       | otherwise = text "HaskellObj"
     cfun_arg_list =
-      [text "HaskellObj" <+> char 'a' <> int n | n <- [1 .. length arg_tys]]
+      [ text (if isByteArrayPrimTy arg_ty then "HsPtr" else "HaskellObj")
+          <+> char 'a'
+          <> int n
+      | (arg_ty, n) <- zip arg_tys [1 ..]
+      ]
     cfun_args = case cfun_arg_list of
       [] -> text "void"
       _ -> hsep $ punctuate comma cfun_arg_list
@@ -746,8 +770,18 @@ lookupGhcInternalTyCon m t = do
   n <- lookupOrig (mkGhcInternalModule m) (mkTcOcc t)
   dsLookupTyCon n
 
+isByteArrayPrimTy :: Type -> Bool
+isByteArrayPrimTy ty
+  | Just tc <- tyConAppTyCon_maybe ty,
+    tc == byteArrayPrimTyCon || tc == mutableByteArrayPrimTyCon =
+      True
+  | otherwise =
+      False
+
 ffiType :: Type -> String
-ffiType = occNameString . getOccName . fst . splitTyConApp
+ffiType ty
+  | isByteArrayPrimTy ty = "Ptr"
+  | otherwise = occNameString $ getOccName $ tyConAppTyCon ty
 
 commonCDecls :: SDoc
 commonCDecls =

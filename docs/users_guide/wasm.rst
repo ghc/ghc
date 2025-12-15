@@ -265,7 +265,7 @@ backend’s JavaScript FFI, which we’ll now abbreviate as JSFFI.
 Marshalable types and ``JSVal``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-JSFFI supports all boxed marshalable foreign types in C FFI:
+JSFFI supports all lifted marshalable foreign types in C FFI:
 
 -  ``Bool``
 -  ``Char``
@@ -298,8 +298,14 @@ types in JSFFI. Some caveats to keep in mind:
    results in type errors, so keep this in mind. As for ``Int`` /
    ``Word``, they are 32-bit since the GHC wasm backend is based on
    ``wasm32`` .
--  JSFFI doesn’t support unboxed foreign types like ``Int#``,
-   ``ByteArray#``, etc, even when ``UnliftedFFITypes`` is enabled.
+-  JSFFI doesn’t support unboxed foreign types like ``Int#``, even
+   when ``UnliftedFFITypes`` is enabled. The only supported unlifted
+   types are ``ByteArray#`` and ``MutableByteArray#``, they may only
+   be used as JSFFI import argument types, with the same semantics in
+   C FFI: the pointer to the payload is passed to JavaScript. Be
+   careful and avoid calling back into Haskell in such cases,
+   otherwise GC may occur and the pointer may be invalidated if it's
+   unpinned!
 
 In addition to the above types, JSFFI supports the ``JSVal`` type and
 its ``newtype``\ s as argument/result types. ``JSVal`` is defined in

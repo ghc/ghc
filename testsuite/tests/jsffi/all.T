@@ -25,4 +25,6 @@ test('jsffion', [], compile_and_run, ['-optl-Wl,--export=main'])
 
 test('jsffisleep', [], compile_and_run, ['-optl-Wl,--export=testWouldBlock,--export=testLazySleep,--export=testThreadDelay,--export=testInterruptingSleep'])
 
+test('bytearrayarg', [], compile_and_run, ['-optl-Wl,--export=main'])
+
 test('textconv', [], compile_and_run, ['-optl-Wl,--export=main'])
