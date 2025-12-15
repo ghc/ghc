@@ -26,6 +26,7 @@ import Distribution.Version (Version)
 import qualified Distribution.Types.PackageId as Cabal
 import qualified Distribution.Types.PackageName as Cabal
 import qualified Distribution.Parsec as Cabal
+import qualified Distribution.Text as Cabal
 import qualified Distribution.Compat.Parsing as Cabal
 import qualified Distribution.Parsec.FieldLineStream as Cabal
 import qualified Distribution.Compat.CharParsing as CabalCharParsing
@@ -115,8 +116,16 @@ registerPackageRules rs stage iplace = do
     root -/- relativePackageDbPath (PackageDbLoc stage iplace) -/- "*.conf" %> \conf -> do
         historyDisable
 
-        pkgName <- getPackageNameFromConfFile conf
-        let pkg = unsafeFindPackageByName pkgName
+        let (pkgName, version) =
+              case parseCabalName (takeBaseName conf) of
+                Left err -> error $ "registerPackage: Couldn't parse " ++
+                                    takeBaseName conf ++ ": " ++ err
+                Right x -> x
+            pkg = unsafeFindPackageByName pkgName
+
+        -- We may need to remove a pkg conf file with a different hash computed in a previous build
+        -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26661
+        liftIO $ removeFiles (root -/- relativePackageDbPath (PackageDbLoc stage iplace)) [pkgName ++ "-" ++ Cabal.display version ++ "*.conf"]
 
         when (pkg == compiler) $ do
             baseDeps <- ghcLibDeps stage iplace
@@ -260,14 +269,6 @@ copyConf rs context@Context {..} conf = do
   where
     stdOutToPkgIds :: String -> [String]
     stdOutToPkgIds = drop 1 . concatMap words . lines
-
-getPackageNameFromConfFile :: FilePath -> Action String
-getPackageNameFromConfFile conf
-    | takeBaseName conf == "rts" = return "rts"
-    | otherwise = case parseCabalName (takeBaseName conf) of
-        Left err -> error $ "getPackageNameFromConfFile: Couldn't parse " ++
-                            takeBaseName conf ++ ": " ++ err
-        Right (name, _) -> return name
 
 -- | Parse a cabal-like name
 parseCabalName :: String -> Either String (String, Version)
