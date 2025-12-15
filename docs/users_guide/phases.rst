@@ -155,6 +155,14 @@ given compilation phase:
     :ghc-flag:`-prof` is enabled, ``ghc-iserv-dyn`` if :ghc-flag:`-dynamic` is
     enabled, or ``ghc-iserv`` otherwise.
 
+    If <cmd> is the empty string then GHC will try to build an appropriate iserv
+    program for the target platform. It does this by looking for the installed
+    ``ghci`` unit and by building an executable program that uses
+    ``ghci:GHCi.Server.defaultServer`` as an entry point. Note that it doesn't
+    work when cross-compiling: the cross-compiled ``iserv`` program (if it can
+    be built) can't be run on the build platform.
+
+
 .. _forcing-options-through:
 
 Forcing options to a particular phase
