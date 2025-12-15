@@ -60,7 +60,7 @@ module GHC.Core.TyCon(
         isTypeDataTyCon,
         isEnumerationTyCon,
         isNewTyCon, isAbstractTyCon,
-        isFamilyTyCon, isOpenFamilyTyCon,
+        isFamilyTyCon, isOpenFamilyTyCon, famTyConHasInjectivity,
         isTypeFamilyTyCon, isDataFamilyTyCon,
         isOpenTypeFamilyTyCon, isClosedFamilyTyCon_maybe,
         tyConInjectivityInfo,
@@ -2519,6 +2519,19 @@ isBuiltInSynFamTyCon_maybe :: TyCon -> Maybe BuiltInSynFamily
 isBuiltInSynFamTyCon_maybe (TyCon { tyConDetails = details })
   | FamilyTyCon {famTcFlav = BuiltInSynFamTyCon ops} <- details = Just ops
   | otherwise                                                   = Nothing
+
+famTyConHasInjectivity :: TyCon -> Bool
+-- True if knowing something about the result may tell us
+-- something (not necessarily everything) about the arguments
+famTyConHasInjectivity (TyCon { tyConDetails = details })
+  | FamilyTyCon { famTcFlav = flav, famTcInj = inj } <- details
+  = case (flav, inj) of
+       (ClosedSynFamilyTyCon (Just {}), _) -> True
+       (BuiltInSynFamTyCon {},          _) -> True
+       (_, Injective {})                   -> True
+       _                                   -> False
+  | otherwise
+  = False
 
 -- | Extract type variable naming the result of injective type family
 tyConFamilyResVar_maybe :: TyCon -> Maybe Name
