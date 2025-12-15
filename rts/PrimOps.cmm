@@ -2332,7 +2332,7 @@ stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     CInt reqID;
 
 #if defined(THREADED_RTS)
-    ccall barf("asyncRead# on threaded RTS") never returns;
+    ccall sbarf("asyncRead# on threaded RTS") never returns;
 #else
 
     /* could probably allocate this on the heap instead */
@@ -2358,7 +2358,7 @@ stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     CInt reqID;
 
 #if defined(THREADED_RTS)
-    ccall barf("asyncWrite# on threaded RTS") never returns;
+    ccall sbarf("asyncWrite# on threaded RTS") never returns;
 #else
 
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
@@ -2384,7 +2384,7 @@ stg_asyncDoProczh ( W_ proc, W_ param )
     CInt reqID;
 
 #if defined(THREADED_RTS)
-    ccall barf("asyncDoProc# on threaded RTS") never returns;
+    ccall sbarf("asyncDoProc# on threaded RTS") never returns;
 #else
 
     /* could probably allocate this on the heap instead */

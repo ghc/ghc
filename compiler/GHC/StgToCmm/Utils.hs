@@ -186,23 +186,27 @@ tagToClosure platform tycon tag
 emitBarf :: String -> FCode ()
 emitBarf msg = do
   strLbl <- newStringCLit msg
-  emitRtsCall rtsUnitId (fsLit "barf") [(CmmLit strLbl,AddrHint)] False
+  emitRtsCallGen [] (mkCmmCodeLabel rtsUnitId (fsLit "sbarf"))
+    CmmNeverReturns
+    [(CmmLit strLbl, AddrHint)] False
 
 emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
-emitRtsCall pkg fun = emitRtsCallGen [] (mkCmmCodeLabel pkg fun)
+emitRtsCall pkg fun = emitRtsCallGen [] (mkCmmCodeLabel pkg fun) CmmMayReturn
 
 emitRtsCallWithResult :: LocalReg -> ForeignHint -> UnitId -> FastString
         -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
-emitRtsCallWithResult res hint pkg = emitRtsCallGen [(res,hint)] . mkCmmCodeLabel pkg
+emitRtsCallWithResult res hint pkg =
+  \fun -> emitRtsCallGen [(res,hint)] (mkCmmCodeLabel pkg fun) CmmMayReturn
 
 -- Make a call to an RTS C procedure
 emitRtsCallGen
    :: [(LocalReg,ForeignHint)]
    -> CLabel
+   -> CmmReturnInfo
    -> [(CmmExpr,ForeignHint)]
    -> Bool -- True <=> CmmSafe call
    -> FCode ()
-emitRtsCallGen res lbl args safe
+emitRtsCallGen res lbl ret_info args safe
   = do { platform <- getPlatform
        ; updfr_off <- getUpdFrameOff
        ; let (caller_save, caller_load) = callerSaveVolatileRegs platform
@@ -214,7 +218,7 @@ emitRtsCallGen res lbl args safe
       if safe then
         emit =<< mkCmmCall fun_expr res' args' updfr_off
       else do
-        let conv = ForeignConvention CCallConv arg_hints res_hints CmmMayReturn
+        let conv = ForeignConvention CCallConv arg_hints res_hints ret_info
         emit $ mkUnsafeCall (ForeignTarget fun_expr conv) res' args'
     (args', arg_hints) = unzip args
     (res',  res_hints) = unzip res
