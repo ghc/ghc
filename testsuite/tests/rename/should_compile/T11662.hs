@@ -1,4 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
 module T11662 where
 
 import T11662_A (Rec (Rec))

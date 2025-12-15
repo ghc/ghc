@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 import System.Mem
 import Foreign
 import Control.Exception

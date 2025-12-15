@@ -1,5 +1,3 @@
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -Wno-simplifiable-class-constraints #-}
     -- This test deliberately uses a simplifiable class constraint
 

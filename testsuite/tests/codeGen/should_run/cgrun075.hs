@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, MagicHash #-}
+{-# LANGUAGE CPP, MagicHash #-}
 
 module Main ( main ) where
 

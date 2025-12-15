@@ -1,4 +1,4 @@
-{-# LANGUAGE ImpredicativeTypes, ConstraintKinds, GADTs, AllowAmbiguousTypes #-}
+{-# LANGUAGE ImpredicativeTypes, GADTs, AllowAmbiguousTypes #-}
 
 module T17372 where
 

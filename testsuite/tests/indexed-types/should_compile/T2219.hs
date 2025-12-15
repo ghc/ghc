@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTs, EmptyDataDecls, TypeOperators #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 
 module Test where
 

@@ -1,4 +1,3 @@
-{-# LANGUAGE ImplicitStagePersistence #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 module SI34M1 where

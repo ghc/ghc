@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeFamilies, TypeOperators, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, TypeFamilies, UndecidableInstances #-}
 module T15772 where
 
 import Data.Kind

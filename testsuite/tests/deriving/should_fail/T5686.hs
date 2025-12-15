@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies #-}
 module T5686 where
 
 data U a = U (G a) deriving Functor

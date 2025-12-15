@@ -1,8 +1,8 @@
-{-# LANGUAGE  DeriveDataTypeable,
-              FlexibleContexts, FlexibleInstances,
-              MultiParamTypeClasses,
-              OverlappingInstances, UndecidableInstances,
-              Rank2Types, KindSignatures, EmptyDataDecls #-}
+{-# LANGUAGE OverlappingInstances, UndecidableInstances, Rank2Types
+
+
+
+#-}
 
 {-# OPTIONS_GHC -Wall #-}
 

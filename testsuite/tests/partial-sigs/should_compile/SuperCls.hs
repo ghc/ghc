@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, NamedWildCards #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module SuperCls where
 
 f :: (Ord a, _) => a -> Bool

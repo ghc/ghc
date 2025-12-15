@@ -1,6 +1,5 @@
-{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE UnliftedNewtypes #-}
-{-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, MagicHash #-}
+{-# LANGUAGE DataKinds, TypeFamilies, MagicHash #-}
 
 module SAKS_031 where
 

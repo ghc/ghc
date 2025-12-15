@@ -1,5 +1,3 @@
-{-# LANGUAGE PolyKinds                  #-}
-
 module PolyKinds05 where
 
 data A f

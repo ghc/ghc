@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
-
 class Monad m => C1 m x
 
 class (Monad m, C1 m x) => C2 m x

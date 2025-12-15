@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, PartialTypeSignatures #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 module Bug where
 

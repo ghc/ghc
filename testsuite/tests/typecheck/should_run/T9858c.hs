@@ -1,4 +1,3 @@
-{-# LANGUAGE KindSignatures #-}
 module Main(main) where
 
 import Data.Typeable

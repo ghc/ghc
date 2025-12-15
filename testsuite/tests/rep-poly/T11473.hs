@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, TypeFamilies, MagicHash, DataKinds, RankNTypes #-}
+{-# LANGUAGE TypeFamilies, MagicHash, DataKinds #-}
 
 module T11473 where
 

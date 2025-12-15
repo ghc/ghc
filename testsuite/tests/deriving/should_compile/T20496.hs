@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFoldable, DeriveTraversable, EmptyDataDecls, RoleAnnotations #-}
+{-# LANGUAGE RoleAnnotations #-}
 module T20496 where
 
 data T b = MkT b

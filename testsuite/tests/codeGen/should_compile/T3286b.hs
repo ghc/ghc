@@ -1,6 +1,3 @@
-
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module T3286b (LogFloat) where
 
 newtype LogFloat = LogFloat Double

@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, GADTs #-}
+{-# LANGUAGE GADTs #-}
 
 module T7053a where
 

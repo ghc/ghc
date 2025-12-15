@@ -1,8 +1,6 @@
 {-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE TypeOperators, AllowAmbiguousTypes          #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module T17186 where
 

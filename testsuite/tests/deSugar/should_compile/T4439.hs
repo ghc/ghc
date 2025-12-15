@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, ExistentialQuantification #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 -- None of these should give incomplete-pattern warnings

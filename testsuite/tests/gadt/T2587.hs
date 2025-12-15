@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ExistentialQuantification #-}
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -O -fno-warn-overlapping-patterns #-}
 
 -- #2587

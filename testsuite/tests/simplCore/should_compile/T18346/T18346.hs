@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module GHCBug (field) where
 
 import MiniLens ((^.), Getting, Lens', lens, view)

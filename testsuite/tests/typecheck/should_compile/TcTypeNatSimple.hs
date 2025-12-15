@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeOperators, TypeFamilies, ExplicitForAll #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 module TcTypeNatSimple where
 import GHC.TypeLits as L
 import Data.Proxy

@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, NamedFieldPuns, Arrows #-}
+{-# LANGUAGE RecordWildCards, Arrows #-}
 
 import Control.Monad.Identity
 import Control.Arrow (runKleisli, arr, returnA)

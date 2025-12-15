@@ -1,7 +1,4 @@
-{-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 module T15549a where
 

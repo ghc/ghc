@@ -1,7 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TypeOperators #-}
-
 -- The idea:
 --
 --  1. Register a CAFfy foreign export

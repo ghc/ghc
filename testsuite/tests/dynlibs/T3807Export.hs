@@ -1,5 +1,3 @@
-
-{-# LANGUAGE ForeignFunctionInterface #-}
 module T3807Export where
 
 import Foreign.C

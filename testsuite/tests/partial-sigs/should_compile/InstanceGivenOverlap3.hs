@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, FlexibleContexts #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 module InstanceGivenOverlap3 where
 

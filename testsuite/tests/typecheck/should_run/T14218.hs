@@ -1,5 +1,5 @@
-{-# LANGUAGE ConstraintKinds #-}       -- For 'C'
-{-# LANGUAGE MultiParamTypeClasses #-} -- For nullary 'Trivial' class
+--       -- For 'C'
+-- -- For nullary 'Trivial' class
 {-# LANGUAGE ImplicitParams #-}
 {-# OPTIONS_GHC -Wno-simplifiable-class-constraints #-}
 module Main where

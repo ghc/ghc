@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -funfolding-use-threshold=111640 -fmax-simplifier-iterations=2 #-}
 
 module T23567 where

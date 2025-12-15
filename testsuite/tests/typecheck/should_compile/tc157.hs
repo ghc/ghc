@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 -- Test silly type synonyms
 
 module ShouldCompile where

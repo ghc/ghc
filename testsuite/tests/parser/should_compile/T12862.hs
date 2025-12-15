@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeFamilies, InstanceSigs #-}
-{-# LANGUAGE BangPatterns #-}  -- should parse even with BangPatterns enabled
+{-# LANGUAGE TypeFamilies #-}
+--  -- should parse even with BangPatterns enabled
 
 module T12862 where
 

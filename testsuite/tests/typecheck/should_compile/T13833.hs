@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, KindSignatures #-}
+{-# LANGUAGE DataKinds #-}
 
 import GHC.TypeLits (Nat, Symbol)
 

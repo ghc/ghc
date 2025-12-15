@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -O2 -fforce-recomp #-}
-{-# LANGUAGE BangPatterns #-}
 
 module T18174 (fac1, fac2, fac3, facIO, dataConWrapper, strictField, thunkDiverges, h1, h2) where
 

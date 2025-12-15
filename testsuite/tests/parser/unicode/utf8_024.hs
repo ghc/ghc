@@ -1,4 +1,4 @@
-{-# LANGUAGE ExplicitForAll, UnicodeSyntax #-}
+{-# LANGUAGE UnicodeSyntax #-}
 {-
 Test for valid unicode identifiers
 

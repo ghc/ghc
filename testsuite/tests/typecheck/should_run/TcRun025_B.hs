@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, TypeSynonymInstances, FlexibleInstances, ConstrainedClassMethods #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- Similar to tc024, but cross module
 

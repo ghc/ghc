@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 -- Types should be checked for well-formedness only after
 -- expanding type synonyms.  GHC 5.03 fails this
 

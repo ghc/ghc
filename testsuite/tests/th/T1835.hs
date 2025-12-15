@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell, FlexibleInstances,
-          MultiParamTypeClasses, TypeSynonymInstances #-}
+{-# LANGUAGE TemplateHaskell
+#-}
 module Main where
 
 import Language.Haskell.TH

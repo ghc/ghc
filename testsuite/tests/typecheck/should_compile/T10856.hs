@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 module T10856 where
 
 data Rec a b = Show a => Mk { a :: a, b :: b }

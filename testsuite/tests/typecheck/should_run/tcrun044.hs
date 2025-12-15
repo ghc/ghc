@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 import qualified Data.Set as S
 import GHC.Exts ( Constraint )

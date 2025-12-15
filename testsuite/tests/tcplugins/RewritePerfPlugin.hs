@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-
 module RewritePerfPlugin where
 -- Testing performance of rewriting type-family applications.
 

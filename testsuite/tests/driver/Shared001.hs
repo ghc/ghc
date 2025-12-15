@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 module Shared001 where
 
 -- Test for building DLLs with ghc -shared, see #2745

@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, BangPatterns #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module T6038 where
 

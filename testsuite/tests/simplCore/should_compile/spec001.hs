@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, UnboxedTuples, MagicHash, StandaloneDeriving, DeriveDataTypeable #-}
+{-# LANGUAGE CPP, UnboxedTuples, MagicHash #-}
 {-# OPTIONS_GHC -O #-}
 
 -- In GHC 6.4, compiling this module gave a Core Lint failure following the

@@ -1,7 +1,7 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-              UndecidableInstances,
-              IncoherentInstances,
-              FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances, IncoherentInstances
+
+
+#-}
 
 -- #2307
 

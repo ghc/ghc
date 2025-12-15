@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ExistentialQuantification #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T7156 where
 

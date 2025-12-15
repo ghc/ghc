@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Bug where
 

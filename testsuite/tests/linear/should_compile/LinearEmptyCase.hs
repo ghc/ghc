@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyCase, LinearTypes #-}
+{-# LANGUAGE LinearTypes #-}
 
 module LinearEmptyCase where
 

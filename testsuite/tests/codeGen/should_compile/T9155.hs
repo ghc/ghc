@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module M () where
 
 import Data.Bits ((.&.))

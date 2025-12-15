@@ -1,4 +1,4 @@
-{-# LANGUAGE UnicodeSyntax, Arrows, RankNTypes #-}
+{-# LANGUAGE UnicodeSyntax, Arrows #-}
 module T8959b where
 
 foo :: Int -> Int

@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
-
 -- This fails, because the type in the pattern doesn't exactly match
 -- the context type.  We don't do subsumption in patterns any more.
 

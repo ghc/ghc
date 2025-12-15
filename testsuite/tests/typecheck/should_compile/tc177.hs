@@ -1,5 +1,5 @@
-{-# LANGUAGE FlexibleInstances, UndecidableInstances, FlexibleContexts,
-             MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances, FunctionalDependencies
+#-}
 
 -- This is a rather complicated program that uses functional
 -- dependencies to do Peano arithmetic.

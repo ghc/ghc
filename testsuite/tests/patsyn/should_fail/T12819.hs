@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeFamilies, KindSignatures #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeFamilies #-}
 
 module T12819 where
 

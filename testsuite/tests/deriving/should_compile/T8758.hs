@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module T8758 where
 
 class C m where

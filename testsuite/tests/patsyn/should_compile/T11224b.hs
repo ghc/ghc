@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, GADTs, RankNTypes #-}
+{-# LANGUAGE PatternSynonyms, GADTs #-}
 
 module T11224b where
 

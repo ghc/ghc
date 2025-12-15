@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE FlexibleContexts #-}
 module ClassDefaultInHsBootA3 where
 
 import ClassDefaultInHsBootA1

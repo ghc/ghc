@@ -1,8 +1,6 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE UnliftedFFITypes #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE GHCForeignImportPrim #-}
 
 {- Test 64bit comparisons.

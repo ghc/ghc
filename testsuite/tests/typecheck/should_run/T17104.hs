@@ -1,8 +1,6 @@
 {-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 
 module Main where
 

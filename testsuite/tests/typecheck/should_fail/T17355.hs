@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, DataKinds #-}
+{-# LANGUAGE DataKinds #-}
 module T17355 where
 
 import GHC.Generics

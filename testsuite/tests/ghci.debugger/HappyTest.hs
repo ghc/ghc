@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, MagicHash, BangPatterns #-}
+{-# LANGUAGE CPP, MagicHash #-}
 import Data.Char
 import Data.Array
 import GHC.Exts

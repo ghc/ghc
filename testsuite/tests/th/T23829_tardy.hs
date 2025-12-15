@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskellQuotes, TypeApplications #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 module Main (main) where
 
 import Language.Haskell.TH

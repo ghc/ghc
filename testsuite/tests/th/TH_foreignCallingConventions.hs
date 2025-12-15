@@ -1,6 +1,6 @@
-{-# LANGUAGE ForeignFunctionInterface, CApiFFI, GHCForeignImportPrim,
-             QuasiQuotes, TemplateHaskell, MagicHash,
-             UnliftedFFITypes, CPP #-}
+{-# LANGUAGE CApiFFI, GHCForeignImportPrim, QuasiQuotes, TemplateHaskell, MagicHash, UnliftedFFITypes, CPP
+
+#-}
 #if defined(javascript_HOST_ARCH)
 {-# LANGUAGE JavaScriptFFI #-}
 #endif

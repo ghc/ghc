@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module A where
 
 import Data.Typeable

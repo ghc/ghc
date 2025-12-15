@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fwarn-missing-signatures #-}  -- Report f's inferred type
 
 module T8889 where

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeApplications, RankNTypes, DataKinds, PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
 
 module VtaParse where
 

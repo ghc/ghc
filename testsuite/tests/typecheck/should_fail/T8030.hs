@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, FlexibleContexts, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 module T8030 where
 
 -- The types of op1 and op2 are both ambiguous

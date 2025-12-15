@@ -1,6 +1,6 @@
-{-# LANGUAGE FunctionalDependencies, FlexibleInstances, UndecidableInstances,
-             ScopedTypeVariables, TypeFamilies, TypeApplications, NoPolyKinds,
-             FlexibleContexts, AllowAmbiguousTypes #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances, TypeFamilies, NoPolyKinds, AllowAmbiguousTypes
+
+#-}
 
 -- Sept 25: used to fail but now succeeds, because we don't complain
 --          about insolubles arising solely from fundeps

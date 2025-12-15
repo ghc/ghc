@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFoldable, GADTs, StandaloneDeriving #-}
+{-# LANGUAGE GADTs #-}
 module Main where
 
 class (a ~ Int) => Foo a

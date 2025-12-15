@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, StrictData, GADTs #-}
+{-# LANGUAGE StrictData, GADTs #-}
 
 -- | Tests the StrictData LANGUAGE pragma.
 module Main where

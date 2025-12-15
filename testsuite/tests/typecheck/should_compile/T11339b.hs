@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonomorphismRestriction, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module T11339b where
 

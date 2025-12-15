@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, FlexibleContexts #-}
+{-# LANGUAGE ImplicitParams #-}
 
 module ShouldFail where
 

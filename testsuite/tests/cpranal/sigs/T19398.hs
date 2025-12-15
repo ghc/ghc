@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fdmd-unbox-width=0 #-} -- otherwise we'll optimistically unbox the arg to c
 
 module T19398 where

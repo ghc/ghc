@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fwarn-redundant-constraints #-}
 module T10770b where
 

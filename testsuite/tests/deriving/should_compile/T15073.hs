@@ -1,5 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DataKinds, PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
 module T15073 where
 
 import T15073a

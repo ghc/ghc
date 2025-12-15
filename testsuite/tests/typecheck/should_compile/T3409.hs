@@ -1,4 +1,4 @@
-{-# LANGUAGE  ExistentialQuantification, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- Tests a nasty case where 'exprType' or 'coreAltsType' can
 -- return a type that mentions an out-of-scope type variable

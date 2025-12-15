@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 module T8714 where
 
 data HLState = forall a. HLState (a -> a) !a

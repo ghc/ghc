@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 -- Triggered a lint error due to the specialiser
 
 module T4203 where

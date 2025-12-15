@@ -1,5 +1,3 @@
-{-# LANGUAGE ExistentialQuantification, DeriveDataTypeable #-}
-
 -- This module requires quite trick desugaring,
 -- because of the context in the existentials
 -- It broke a pre 6.4 GHC

@@ -1,4 +1,3 @@
-{-# LANGUAGE EmptyDataDeriving #-}
 module Main where
 
 import Data.Function

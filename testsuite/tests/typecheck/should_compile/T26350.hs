@@ -1,6 +1,5 @@
 {-# LANGUAGE DeepSubsumption #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 
 {-# OPTIONS_GHC -dcore-lint #-}
 

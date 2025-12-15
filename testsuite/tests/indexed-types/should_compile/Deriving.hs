@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, StandaloneDeriving, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module ShouldCompile where
 

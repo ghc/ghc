@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, EmptyDataDecls, TypeFamilies, TypeOperators, DataKinds, FlexibleInstances #-}
+{-# LANGUAGE GADTs, TypeFamilies, DataKinds #-}
 
 {- Defines a C-like printf function using DataKinds extensions. -}
 

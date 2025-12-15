@@ -1,5 +1,3 @@
-{-# LANGUAGE PolyKinds #-}
-
 module TyVarTvKinds where
 
 data T (a :: k1) x = MkT (S a ())

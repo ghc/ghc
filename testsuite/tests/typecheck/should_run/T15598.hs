@@ -1,7 +1,7 @@
-{-# LANGUAGE
-    GADTSyntax
-  , RankNTypes
-  , RebindableSyntax
+{-# LANGUAGE RebindableSyntax
+
+
+
 #-}
 
 import Prelude hiding ((>>=))

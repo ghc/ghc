@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts, GADTs #-}
+{-# LANGUAGE FunctionalDependencies, GADTs #-}
 
 module FDsFromGivens2 where
 

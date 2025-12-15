@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module Main where
 
 findDivBy :: Int -> [Int] -> Maybe Int

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- This one sent an earlier version of GHC into a
 -- loop in the simplifier, because we allowed a RULE

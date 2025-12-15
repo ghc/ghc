@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies
+#-}
 {-# OPTIONS -dcore-lint #-}
 
 {-       This one killed GHC 5.02

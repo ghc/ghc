@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving, DataKinds, KindSignatures, DeriveGeneric, GADTs#-}
+{-# LANGUAGE DataKinds, GADTs #-}
 
 module T7422 where
 

@@ -1,5 +1,3 @@
- {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
-
 -- #2572
 
 module Foo where

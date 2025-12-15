@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, GADTs #-}
+{-# LANGUAGE GADTs #-}
 module T5858 where
 
 class InferOverloaded a where

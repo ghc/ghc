@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE ImplicitParams, RankNTypes #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- This program failed to typecheck in an early version of
 -- GHC with impredicative polymorphism, but it was fixed by

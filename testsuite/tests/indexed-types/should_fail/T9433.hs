@@ -1,7 +1,7 @@
-{-# LANGUAGE
-     TypeFamilies
-   , KindSignatures
-   #-}
+{-# LANGUAGE TypeFamilies
+
+
+#-}
 
 module T9433 where
 

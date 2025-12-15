@@ -1,7 +1,4 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 -- |
 -- Module      : Streamly.Internal.Ring.Foreign
 -- Copyright   : (c) 2019 Composewell Technologies

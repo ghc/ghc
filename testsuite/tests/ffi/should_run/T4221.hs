@@ -1,4 +1,3 @@
-{-# LANGUAGE EmptyDataDecls, ForeignFunctionInterface #-}
 module Main(main) where
 
 import Foreign.Ptr

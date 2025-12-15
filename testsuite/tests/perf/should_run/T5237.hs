@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 module Main (main) where
 
 -- Test that the rewrite rules for small exponents fire (#5237).

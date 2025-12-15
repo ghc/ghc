@@ -1,5 +1,5 @@
-{-# LANGUAGE PolyKinds, TypeApplications, KindSignatures, DataKinds, GADTs
-             , TypeFamilies, RankNTypes #-}
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies
+#-}
 
 module T12045c where
 import Data.Kind

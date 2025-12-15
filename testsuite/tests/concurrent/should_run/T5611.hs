@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP,ForeignFunctionInterface #-}
+{-# LANGUAGE CPP #-}
 
 import Control.Concurrent
 import Data.Functor

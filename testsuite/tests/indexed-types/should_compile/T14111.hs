@@ -1,9 +1,9 @@
 {-# LANGUAGE MagicHash, UnboxedSums, NoImplicitPrelude #-}
 {-# LANGUAGE TypeFamilies #-}
 -- {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+--
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE PolyKinds #-}
+--
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs ,ExplicitNamespaces#-}
 {-# LANGUAGE UnboxedTuples #-}

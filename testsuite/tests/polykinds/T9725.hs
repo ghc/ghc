@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, DataKinds, KindSignatures, PolyKinds, FlexibleContexts, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE GADTs, DataKinds #-}
 module T9725 where
 
 import Data.Kind (Type)

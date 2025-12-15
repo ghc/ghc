@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module T22317 where
 
 data T = T (Maybe Bool) (Maybe Bool) (Maybe Bool) (Maybe Bool)

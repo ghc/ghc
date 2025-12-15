@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
 module T9071_2 where
 
 newtype Mu f = Mu (f (Mu f))

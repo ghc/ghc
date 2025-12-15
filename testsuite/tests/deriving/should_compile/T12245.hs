@@ -1,7 +1,3 @@
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleInstances #-}
-
 module T12245 where
 
 import Data.Data ( Data )

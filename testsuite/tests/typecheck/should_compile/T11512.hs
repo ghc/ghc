@@ -1,5 +1,3 @@
-{-# LANGUAGE PolyKinds, TypeApplications, ScopedTypeVariables #-}
-
 module Bug where
 
 import Data.Proxy

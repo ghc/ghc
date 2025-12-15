@@ -1,5 +1,5 @@
 -- Source: https://github.com/ghc-proposals/ghc-proposals/pull/111#issuecomment-438125526
-{-# LANGUAGE LinearTypes, GADTs, KindSignatures, DataKinds, TypeFamilies, PolyKinds #-}
+{-# LANGUAGE LinearTypes, GADTs, DataKinds, TypeFamilies #-}
 module LinearPolyType where
 
 import GHC.Types

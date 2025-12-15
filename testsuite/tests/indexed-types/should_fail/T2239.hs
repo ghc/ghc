@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE NoMonomorphismRestriction, RankNTypes #-}
-{-# LANGUAGE FunctionalDependencies, MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module T2239 where

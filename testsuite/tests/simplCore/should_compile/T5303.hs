@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, GADTs, TypeFamilies, MultiParamTypeClasses,  FlexibleContexts, ScopedTypeVariables, TypeSynonymInstances,  FlexibleInstances #-}  
+{-# LANGUAGE GADTs, TypeFamilies #-}  
 module T5303( showContextSeries ) where
 
 import Control.Monad.State.Strict( StateT )  

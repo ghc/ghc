@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             ExistentialQuantification, GADTSyntax, FlexibleContexts #-}
+{-# LANGUAGE FunctionalDependencies
+#-}
 {-# OPTIONS_GHC -ddump-types #-}
 
 module FloatFDs2 where

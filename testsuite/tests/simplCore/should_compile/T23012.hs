@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns, FlexibleInstances, MultiParamTypeClasses #-}
-
 module T23012 where
 
 import Data.Kind (Type)

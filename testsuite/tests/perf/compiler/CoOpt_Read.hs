@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module CoOpt_Read where
 

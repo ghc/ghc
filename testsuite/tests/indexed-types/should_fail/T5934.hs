@@ -1,4 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes, RankNTypes, TypeFamilies, KindSignatures #-}
+{-# LANGUAGE AllowAmbiguousTypes, TypeFamilies #-}
 
 -- The type of 'run' is actually ambiguous
 

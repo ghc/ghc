@@ -1,5 +1,3 @@
-{-# LANGUAGE ExistentialQuantification, ScopedTypeVariables #-}
-
 -- !!! Existentials
 
 -- This one killed GHC 5.00.1:

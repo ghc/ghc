@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 -- This one fixed the constraint solver (Lint error)

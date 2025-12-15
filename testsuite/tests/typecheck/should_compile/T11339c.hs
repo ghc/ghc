@@ -1,4 +1,4 @@
-{-# LANGUAGE MonoLocalBinds, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE MonoLocalBinds #-}
 
 module T11339c where
 

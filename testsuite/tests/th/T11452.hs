@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module T11452 where
 

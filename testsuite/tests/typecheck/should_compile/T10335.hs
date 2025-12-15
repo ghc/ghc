@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, ConstraintKinds #-}
-
 module Foo where
 
 type X a = (Eq a, Show a)

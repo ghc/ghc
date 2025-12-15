@@ -1,4 +1,3 @@
-{-# LANGUAGE EmptyCase #-}
 {-# OPTIONS -Wincomplete-patterns #-}
 module T15584 where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ScopedTypeVariables, EmptyDataDecls, RankNTypes #-}
+{-# LANGUAGE GADTs #-}
 
 module T4917 where
 

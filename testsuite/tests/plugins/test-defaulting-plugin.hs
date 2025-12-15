@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, KindSignatures, FlexibleInstances, DataKinds, PolyKinds, RankNTypes, AllowAmbiguousTypes, TypeOperators, TypeFamilies, ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds, AllowAmbiguousTypes, TypeFamilies #-}
 {-# OPTIONS_GHC -fplugin DefaultLifted -fwarn-type-defaults #-}
 
 -- Tests defaulting plugins

@@ -1,6 +1,3 @@
-{-# LANGUAGE NumericUnderscores #-}
-{-# LANGUAGE BinaryLiterals #-}
-{-# LANGUAGE HexFloatLiterals #-}
 {-# LANGUAGE NegativeLiterals #-}
 
 -- Test for NumericUnderscores extension.

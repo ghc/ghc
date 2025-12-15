@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstraintKinds, TypeFamilies, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, UndecidableInstances #-}
 
 module AltPrelude where
 

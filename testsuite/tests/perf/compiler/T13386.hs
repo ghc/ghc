@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeApplications, TypeFamilies, TypeOperators, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, TypeFamilies, UndecidableInstances #-}
 {-# OPTIONS_GHC -O0 -freduction-depth=500 #-}
 -- Subject to Note [Sensitivity to unique increment] with spread of 1.5%
 module T13386 where

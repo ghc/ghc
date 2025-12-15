@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell, RankNTypes, TypeOperators, DataKinds,
-             PolyKinds, TypeFamilies, GADTs, StarIsType #-}
+{-# LANGUAGE TemplateHaskell, DataKinds, TypeFamilies, GADTs
+#-}
 
 module RAE_T32a where
 

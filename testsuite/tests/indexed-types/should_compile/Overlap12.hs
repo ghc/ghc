@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, DataKinds, PolyKinds #-}
+{-# LANGUAGE TypeFamilies, DataKinds #-}
 
 module Overlap12 where
 

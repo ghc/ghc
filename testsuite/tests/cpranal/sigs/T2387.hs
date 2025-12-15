@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeOperators, BangPatterns #-}
-
 module T2387 (mainLoop) where
 
 import Control.Monad.ST

@@ -1,12 +1,12 @@
 -- Basic tests of overloaded labels
 
-{-# LANGUAGE OverloadedLabels
-           , DataKinds
-           , FlexibleContexts
-           , FlexibleInstances
-           , MultiParamTypeClasses
-           , NoMonomorphismRestriction
-  #-}
+{-# LANGUAGE OverloadedLabels, DataKinds, NoMonomorphismRestriction
+
+
+
+
+
+#-}
 
 import GHC.OverloadedLabels
 

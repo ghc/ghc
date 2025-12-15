@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies
+#-}
 -- NB: *no* UndecidableInstances
 
 -- This one (due to Oleg) made 6.4.1 go into a loop in the typechecker,

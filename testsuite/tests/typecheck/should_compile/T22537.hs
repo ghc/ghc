@@ -1,5 +1,3 @@
-{-# LANGUAGE ExplicitForAll #-}
-
 module T22537 where
 
 import Data.Coerce

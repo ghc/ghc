@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies
+#-}
 -- !!! Functional dependencies
 -- This broke an early impl of functional dependencies
 -- (complaining about ambiguity)

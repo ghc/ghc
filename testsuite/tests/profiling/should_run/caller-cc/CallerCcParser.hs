@@ -1,5 +1,5 @@
 -- Unit tests for the CallerCcParser
-{-# LANGUAGE StandaloneDeriving #-}
+--
 module Main where
 
 import GHC.Core.Opt.CallerCC

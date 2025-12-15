@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, ViewPatterns #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module ViewPats where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 module T9263b where
 
 import Data.Proxy

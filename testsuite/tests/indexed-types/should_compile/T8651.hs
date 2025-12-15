@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, FlexibleContexts, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 module T8651 where
 
 import Data.Monoid

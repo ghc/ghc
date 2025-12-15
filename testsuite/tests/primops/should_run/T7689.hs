@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
 module Main where
 
 import Data.Bits (finiteBitSize)

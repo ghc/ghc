@@ -1,5 +1,5 @@
 {-# LANGUAGE LinearTypes #-}
-{-# LANGUAGE NoImplicitPrelude, ScopedTypeVariables, BangPatterns, RankNTypes #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 {-
 This is a simplified version of Data.OldList module from base.

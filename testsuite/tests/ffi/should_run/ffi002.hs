@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 module Foo where
 
 foreign export ccall foo :: Int -> IO Int

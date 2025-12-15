@@ -1,5 +1,4 @@
 {-# LANGUAGE LinearTypes #-}
-{-# LANGUAGE TupleSections #-}
 module LinearConstructors where
 
 data T a b = MkT a b

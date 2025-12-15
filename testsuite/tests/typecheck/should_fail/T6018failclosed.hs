@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeFamilyDependencies, DataKinds, PolyKinds,
-             UndecidableInstances #-}
+{-# LANGUAGE TypeFamilyDependencies, DataKinds, UndecidableInstances
+#-}
 module T6018failclosed where
 
 -- Id is injective...

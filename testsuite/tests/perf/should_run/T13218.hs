@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveTraversable #-}
-
 import Data.Monoid (Endo (..))
 import Control.Exception (evaluate)
 

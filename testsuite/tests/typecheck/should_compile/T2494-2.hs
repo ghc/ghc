@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
-
 -- #2494, should compile ok
 
 module Foo where

@@ -1,7 +1,7 @@
 -- Copyright (C) 2015, Luke Iannini
 
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
+--
 
 module Main where
 import Printf ( pr )

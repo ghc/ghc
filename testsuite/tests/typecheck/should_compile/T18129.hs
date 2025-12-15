@@ -1,15 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes     #-}
 {-# LANGUAGE DataKinds               #-}
-{-# LANGUAGE FlexibleInstances       #-}
 {-# LANGUAGE GADTs                   #-}
-{-# LANGUAGE KindSignatures          #-}
-{-# LANGUAGE PolyKinds               #-}
-{-# LANGUAGE RankNTypes              #-}
 {-# LANGUAGE TypeFamilies            #-}
-{-# LANGUAGE ConstraintKinds         #-}
-{-# LANGUAGE FlexibleContexts        #-}
-{-# LANGUAGE MultiParamTypeClasses   #-}
-{-# LANGUAGE TypeOperators           #-}
 {-# LANGUAGE UndecidableInstances    #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 

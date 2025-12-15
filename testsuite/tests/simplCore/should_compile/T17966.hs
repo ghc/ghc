@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
-
 -- The issue here is whether $cm gets a specialization
 -- See #17966
 

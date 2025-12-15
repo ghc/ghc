@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, OverlappingInstances,
-    UndecidableInstances, FunctionalDependencies #-}
+{-# LANGUAGE OverlappingInstances, UndecidableInstances, FunctionalDependencies
+#-}
 
 module Main where
 

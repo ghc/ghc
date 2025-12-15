@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module Proposal229d ((!)) where
 
 (!) :: a -> b -> (a, b)

@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T9171 where
 data Base

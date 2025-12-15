@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeOperators, TypeFamilies, GADTs, EmptyCase #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 module T10180 where
 
 newtype Foo = Foo Int

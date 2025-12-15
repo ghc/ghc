@@ -1,9 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 
 module T25834 where

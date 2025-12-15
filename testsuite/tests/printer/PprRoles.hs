@@ -1,4 +1,4 @@
-{-# LANGUAGE RoleAnnotations, PolyKinds #-}
+{-# LANGUAGE RoleAnnotations #-}
 
 module Roles where
 

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE FlexibleInstances, UndecidableInstances,
-             MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances, FunctionalDependencies
+#-}
 module T4401 where
 
 class Mul x y z | x y -> z

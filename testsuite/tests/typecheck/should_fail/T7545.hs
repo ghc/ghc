@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes, InstanceSigs #-}
 module T7545 where
 
 class C a where

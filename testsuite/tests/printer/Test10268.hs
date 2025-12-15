@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell,TypeOperators,DataKinds #-}
+{-# LANGUAGE TemplateHaskell, DataKinds #-}
 
 module Test10268 where
 

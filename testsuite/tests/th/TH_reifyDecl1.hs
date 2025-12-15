@@ -1,6 +1,6 @@
 -- test reification of data declarations
 
-{-# LANGUAGE TypeFamilies, TypeApplications, PolyKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 module TH_reifyDecl1 where
 
 import Data.Kind as K

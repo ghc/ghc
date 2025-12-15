@@ -1,6 +1,4 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ConstraintKinds #-}
 
 module Main( main, boo ) where
 

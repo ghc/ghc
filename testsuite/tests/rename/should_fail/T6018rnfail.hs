@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, PolyKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T6018rnfail where
 

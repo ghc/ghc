@@ -1,6 +1,5 @@
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE MagicHash, UnliftedFFITypes #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 
 module Test10313 where
 

@@ -1,6 +1,6 @@
 -- Test we don't get a cycle for "phantom" superclasses,
 -- even if the phantomness is behind a type synonym
-{-# LANGUAGE ConstraintKinds, MultiParamTypeClasses, FlexibleContexts #-}
+--
 {-# LANGUAGE AllowAmbiguousTypes #-}
     -- 'meth' is ambiguous
 

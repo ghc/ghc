@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, KindSignatures, GADTs, TypeFamilies #-}
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -fwarn-overlapping-patterns #-}
 
 module T8970 where

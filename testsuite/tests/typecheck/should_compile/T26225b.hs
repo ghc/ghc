@@ -1,5 +1,4 @@
 {-# LANGUAGE DeepSubsumption #-}
-{-# LANGUAGE RankNTypes #-}
 
 module T26225b where
 

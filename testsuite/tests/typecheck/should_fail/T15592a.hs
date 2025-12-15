@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, TypeApplications, DataKinds, RankNTypes #-}
+{-# LANGUAGE DataKinds #-}
 
 module T15592 where
 import Data.Proxy

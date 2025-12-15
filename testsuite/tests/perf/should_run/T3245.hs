@@ -1,5 +1,3 @@
-{-# LANGUAGE ExistentialQuantification, DeriveDataTypeable #-}
-
 -- The second version (count2) took ages with GHC 6.12
 -- because the typeOf function was not properly memoised
 

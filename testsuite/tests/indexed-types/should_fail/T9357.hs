@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, MagicHash, TypeFamilies, PolyKinds #-}
+{-# LANGUAGE MagicHash, TypeFamilies #-}
 
 module T9357 where
 import GHC.Exts

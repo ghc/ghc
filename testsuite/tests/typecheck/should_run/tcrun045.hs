@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, FlexibleContexts #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- !!! Implicit parameter superclass constraint
 -- These examples actually crashed GHC 4.08.2

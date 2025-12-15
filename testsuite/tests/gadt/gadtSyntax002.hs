@@ -1,5 +1,3 @@
-{-# LANGUAGE GADTSyntax #-}
-
 module GADTSyntax002 where
 
 newtype Down a where

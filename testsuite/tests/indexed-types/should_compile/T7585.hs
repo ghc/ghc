@@ -1,5 +1,5 @@
-{-# LANGUAGE GADTs, RankNTypes, KindSignatures, PolyKinds, TypeOperators, DataKinds,
-             TypeFamilies #-}
+{-# LANGUAGE GADTs, DataKinds, TypeFamilies
+#-}
 
 module Bug where
 

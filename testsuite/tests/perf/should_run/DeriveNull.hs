@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveFoldable #-}
-
 module Main where
 import Data.Semigroup
 

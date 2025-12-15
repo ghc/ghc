@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, RankNTypes, GADTs, PatternSynonyms #-}
+{-# LANGUAGE TemplateHaskell, GADTs, PatternSynonyms #-}
 
 module T8761 where
 

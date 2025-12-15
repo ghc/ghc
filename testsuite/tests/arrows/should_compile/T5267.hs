@@ -1,5 +1,4 @@
-
-{-# LANGUAGE Arrows, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE Arrows #-}
 
 module T5267 where
 

@@ -1,6 +1,6 @@
-{-# LANGUAGE ExistentialQuantification, RankNTypes, MultiParamTypeClasses,
-              FunctionalDependencies, FlexibleInstances, FlexibleContexts
- #-}
+{-# LANGUAGE FunctionalDependencies
+
+#-}
 
 module XMonad.Layout.MultiToggle where
 

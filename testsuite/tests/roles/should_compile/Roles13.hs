@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving,
-             MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE TypeFamilies, FunctionalDependencies
+#-}
 
 -- tests axiom roles
 

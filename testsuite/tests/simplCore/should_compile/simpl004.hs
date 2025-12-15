@@ -1,4 +1,4 @@
-{-# LANGUAGE UnboxedTuples, MagicHash, BangPatterns #-}
+{-# LANGUAGE UnboxedTuples, MagicHash #-}
 
 module ShouldCompile where
 

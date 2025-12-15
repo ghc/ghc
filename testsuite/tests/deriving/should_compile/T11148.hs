@@ -1,6 +1,4 @@
 {-# LANGUAGE TypeFamilies       #-}
-{-# LANGUAGE DeriveFunctor      #-}
-{-# LANGUAGE FlexibleInstances  #-}
 
 module T11148 where
 

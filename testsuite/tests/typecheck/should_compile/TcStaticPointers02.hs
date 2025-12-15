@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StaticPointers     #-}
 
 module StaticPointers02 where

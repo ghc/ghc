@@ -1,4 +1,4 @@
-{-# LANGUAGE NoNegativeLiterals, MagicHash, BinaryLiterals #-}
+{-# LANGUAGE NoNegativeLiterals, MagicHash #-}
 
 -- Even when NegativeLiterals are disabled,
 -- we parse unboxed literals appropriately.

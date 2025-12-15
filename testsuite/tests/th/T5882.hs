@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTSyntax, TemplateHaskell, KindSignatures #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module T5882 where
 

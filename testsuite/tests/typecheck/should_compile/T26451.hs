@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, TypeFamilies, FunctionalDependencies, ScopedTypeVariables #-}
+{-# LANGUAGE ImplicitParams, TypeFamilies, FunctionalDependencies #-}
 
 module T26451 where
 

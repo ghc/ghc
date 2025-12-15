@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE ConstraintKinds, DataKinds, GADTs, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies #-}
 
 module T9747 where
 import Data.List (intercalate)

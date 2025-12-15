@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, GADTs, PolyKinds, RankNTypes, TypeOperators, TypeFamilies
-             , TypeApplications #-}
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies
+#-}
 
 module DumpParsedAst where
 import Data.Kind

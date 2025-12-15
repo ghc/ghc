@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts #-} 
+{-# LANGUAGE TypeFamilies #-} 
 
 -- This one produced a Lint error in GHC 7.4 and 7.6
 

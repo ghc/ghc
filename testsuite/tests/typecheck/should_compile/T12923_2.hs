@@ -1,8 +1,5 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
 
 module T12924 where
 

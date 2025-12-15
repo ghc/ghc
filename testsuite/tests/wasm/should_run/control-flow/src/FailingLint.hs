@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
 
 module Irr3  -- like Irr, but simplified

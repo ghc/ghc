@@ -1,6 +1,4 @@
-{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables, RankNTypes #-}
 
 module T24083a where
 

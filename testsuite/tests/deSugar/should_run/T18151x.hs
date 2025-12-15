@@ -1,5 +1,3 @@
-{-# LANGUAGE PostfixOperators #-}
-
 import Control.Exception
 
 data MyException = MyE

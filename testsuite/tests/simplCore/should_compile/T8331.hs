@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances, RankNTypes #-}
-
 module Main ( main, useAbstractMonad ) where
 
 import Control.Monad

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
-{-# LANGUAGE DataKinds, PolyKinds, GADTs, TypeFamilies #-}
-{-# LANGUAGE TypeOperators, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 module T7230 where
 
 data Nat = Zero | Succ Nat deriving (Show, Eq, Ord)

@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
-
 import Type.Reflection
 
 main :: IO ()

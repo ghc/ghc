@@ -3,7 +3,7 @@
 -- Exporting 'f' from Main is important, otherwise, the corresponding symbol
 -- wouldn't appear in symbol tables.
 --
-{-# LANGUAGE ForeignFunctionInterface #-}
+--
 {-# LANGUAGE MagicHash                #-}
 {-# LANGUAGE UnboxedTuples            #-}
 module Main(main, f) where

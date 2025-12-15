@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, ScopedTypeVariables #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module PatternSig where
 
 bar :: Bool -> Bool

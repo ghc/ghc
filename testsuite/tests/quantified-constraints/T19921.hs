@@ -1,12 +1,12 @@
-{-# LANGUAGE
-    QuantifiedConstraints
-  , StandaloneKindSignatures
-  , TypeOperators
-  , GADTs
-  , ConstraintKinds
-  , RankNTypes
-  , UndecidableInstances
-  , ImpredicativeTypes
+{-# LANGUAGE QuantifiedConstraints, GADTs, UndecidableInstances, ImpredicativeTypes
+
+
+
+
+
+
+
+
 #-}
 module Typelevel.Constraint.Repro where
 

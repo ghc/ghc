@@ -1,7 +1,7 @@
-{-# LANGUAGE TypeFamilies,
-             PolyKinds,
-             ScopedTypeVariables
- #-}
+{-# LANGUAGE TypeFamilies
+
+
+#-}
 
 module T5770 where
 

@@ -1,5 +1,4 @@
 {-# LANGUAGE ApplicativeDo #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 newtype MaybeA a = MaybeA (Maybe a)
                  deriving (Show, Functor, Applicative)

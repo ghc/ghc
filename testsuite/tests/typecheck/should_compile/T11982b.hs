@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ApplicativeDo #-}
 module Main where
 import Control.Concurrent.MVar

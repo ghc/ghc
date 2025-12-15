@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, PatternSynonyms, RecordWildCards #-}
+{-# LANGUAGE PatternSynonyms, RecordWildCards #-}
 module T11987a where
 
 pattern Point :: Int -> Int -> (Int, Int)

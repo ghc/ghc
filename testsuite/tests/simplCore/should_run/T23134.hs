@@ -1,4 +1,4 @@
-{-# LANGUAGE GHC2021, DataKinds, TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 module Main where
 
 import Data.Maybe

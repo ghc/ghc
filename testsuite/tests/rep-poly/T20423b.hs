@@ -1,6 +1,6 @@
-{-# LANGUAGE StandaloneKindSignatures, MagicHash, ExplicitForAll, PolyKinds,
-             DataKinds, UnliftedDatatypes, PatternSynonyms, ViewPatterns,
-             GADTs #-}
+{-# LANGUAGE MagicHash, DataKinds, UnliftedDatatypes, PatternSynonyms, ViewPatterns, GADTs
+
+#-}
 
 module T20423b where
 

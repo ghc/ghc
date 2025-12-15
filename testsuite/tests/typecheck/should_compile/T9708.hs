@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeOperators, TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 {-# OPTIONS_GHC -fwarn-redundant-constraints #-}
 module TcTypeNatSimple where
 

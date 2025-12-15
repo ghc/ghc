@@ -1,5 +1,4 @@
 {-# LANGUAGE LinearTypes #-}
-{-# LANGUAGE TupleSections #-}
 module TupSection where
 {-
 inplace/bin/ghc-stage1 -O2 -dcore-lint

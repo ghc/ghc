@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-} -- only necessary in 7.10
-{-# LANGUAGE FlexibleContexts #-}    -- necessary for showFromF' example
+--    -- necessary for showFromF' example
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 module T10226 where

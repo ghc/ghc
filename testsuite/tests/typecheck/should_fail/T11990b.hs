@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, TypeOperators, TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module T11990b where
 

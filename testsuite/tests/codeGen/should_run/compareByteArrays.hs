@@ -1,5 +1,4 @@
 {-# LANGUAGE MagicHash     #-}
-{-# LANGUAGE RankNTypes    #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 -- exercise the 'compareByteArray#' primitive

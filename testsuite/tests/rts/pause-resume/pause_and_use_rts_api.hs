@@ -1,5 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 import Foreign
 import System.Exit
 import System.Timeout

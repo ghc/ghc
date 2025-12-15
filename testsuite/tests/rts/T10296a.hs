@@ -1,6 +1,6 @@
 -- A reduced version of the original test case
 
-{-# LANGUAGE ForeignFunctionInterface #-}
+--
 
 
 import Control.Concurrent

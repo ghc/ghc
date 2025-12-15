@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# OPTIONS_GHC -fwarn-missing-signatures #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, UndecidableInstances #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances #-}
 
 module Bug where
 

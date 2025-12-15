@@ -1,5 +1,5 @@
-{-# LANGUAGE RebindableSyntax, FlexibleInstances,
-             MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE RebindableSyntax, FunctionalDependencies
+#-}
 
 -- #1537
 

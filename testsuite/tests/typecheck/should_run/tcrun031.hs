@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses, GeneralizedNewtypeDeriving #-}
-
 -- A newtype-deriving test
 
 module Main where

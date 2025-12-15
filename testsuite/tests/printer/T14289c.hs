@@ -1,7 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -ddump-splices -dsuppress-uniques #-}
 
 import Language.Haskell.TH

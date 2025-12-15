@@ -1,5 +1,3 @@
-{-# LANGUAGE StandaloneDeriving, DeriveGeneric #-}
-
 module T10487 where
 
 import GHC.Generics

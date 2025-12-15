@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wincomplete-patterns -fforce-recomp #-}
-{-# LANGUAGE BangPatterns, GADTs, DataKinds, KindSignatures, EmptyCase #-}
+{-# LANGUAGE GADTs, DataKinds #-}
 
 -- | All examples from https://arxiv.org/abs/1702.02281
 module GarrigueLeNormand where

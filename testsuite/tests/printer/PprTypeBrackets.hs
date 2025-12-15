@@ -1,5 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds, PolyKinds, TypeOperators, TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 
 foo (f :: (Maybe t -> Int)) =
      undefined

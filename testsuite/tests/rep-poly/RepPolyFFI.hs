@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 
 module RepPolyFFI1 where

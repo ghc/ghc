@@ -1,9 +1,9 @@
-{-# LANGUAGE
-        FlexibleContexts,
-        RankNTypes,
-        TypeFamilies,
-        MultiParamTypeClasses,
-        FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies
+
+
+
+
+#-}
 
 -- See #4178
 

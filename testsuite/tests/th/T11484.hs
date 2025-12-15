@@ -1,5 +1,3 @@
-{-# LANGUAGE PolyKinds #-}
-
 module T11484 where
 
 import Data.Kind

@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE MonomorphismRestriction, ExtendedDefaultRules #-}
+{-# LANGUAGE ExtendedDefaultRules #-}
 module T10971a where
 
 import Data.Traversable (fmapDefault)

@@ -1,5 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables, RankNTypes #-}
-
 -- Helper for simpl009.hs (see comments there)
 
 module Simpl009Help where

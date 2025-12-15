@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE CPP, TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE CPP, TypeFamilies #-}
 
 module Class ( cleverNamedResolve ) where
 

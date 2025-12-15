@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies
+#-}
 
 -- !!! Functional dependencies
 -- This broke an early impl of functional dependencies

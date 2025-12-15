@@ -1,7 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude, PolyKinds, DataKinds, TypeFamilies,
-             UndecidableSuperClasses, RankNTypes, TypeOperators,
-             FlexibleContexts, TypeSynonymInstances, FlexibleInstances,
-             UndecidableInstances #-}
+{-# LANGUAGE NoImplicitPrelude, DataKinds, TypeFamilies, UndecidableSuperClasses, UndecidableInstances
+
+
+#-}
 module Monolith where
 
 import Data.Kind (Type)

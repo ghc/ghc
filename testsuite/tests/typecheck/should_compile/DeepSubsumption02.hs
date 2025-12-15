@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, Rank2Types, FlexibleContexts, LambdaCase, DeepSubsumption #-}
+{-# LANGUAGE Rank2Types, LambdaCase, DeepSubsumption #-}
 module DeepSubsumption02 where
 
 import Data.Semigroup

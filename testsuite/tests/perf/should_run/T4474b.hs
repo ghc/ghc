@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module Main where
 
 data Tree = Leaf !Int | Fork !Tree !Tree deriving Show

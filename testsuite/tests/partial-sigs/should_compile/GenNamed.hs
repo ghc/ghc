@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, NamedWildCards #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module GenNamed where
 
 bar :: _a -> _a

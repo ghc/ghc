@@ -1,6 +1,4 @@
-
-{-# LANGUAGE UnicodeSyntax, MultiParamTypeClasses, FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UnicodeSyntax #-}
 {-# OPTIONS -w #-}
 
 module A where

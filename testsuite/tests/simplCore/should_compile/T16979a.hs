@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 module T16979a where
 
 data Id a

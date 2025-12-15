@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections, ExplicitNamespaces #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Types.Id

@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 module Test10358 where
 
 mtGamma x v d =

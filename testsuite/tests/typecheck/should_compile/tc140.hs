@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 -- Make sure for-alls can occur in data types
 
 module Foo where

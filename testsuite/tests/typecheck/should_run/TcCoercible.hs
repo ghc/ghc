@@ -1,4 +1,4 @@
-{-# LANGUAGE RoleAnnotations, StandaloneDeriving, FlexibleContexts, UndecidableInstances, GADTs, TypeFamilies #-}
+{-# LANGUAGE RoleAnnotations, UndecidableInstances, GADTs, TypeFamilies #-}
 
 import Data.Coerce (Coercible, coerce)
 import Data.Monoid (mempty, First(First), Last())

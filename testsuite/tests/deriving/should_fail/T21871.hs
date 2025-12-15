@@ -1,4 +1,4 @@
-{-# LANGUAGE DerivingVia, StandaloneDeriving #-}
+{-# LANGUAGE DerivingVia #-}
 
 module T21871 where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, KindSignatures #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 module T11237 where
 

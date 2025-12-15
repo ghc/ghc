@@ -1,19 +1,19 @@
 -- Using overloaded labels to provide nice syntactic sugar for a
 -- term representation using de Bruijn indices
 
-{-# LANGUAGE OverloadedLabels
-           , DataKinds
-           , FlexibleContexts
-           , FlexibleInstances
-           , GADTs
-           , KindSignatures
-           , MultiParamTypeClasses
-           , NoMonomorphismRestriction
-           , OverlappingInstances
-           , ScopedTypeVariables
-           , StandaloneDeriving
-           , TypeOperators
-  #-}
+{-# LANGUAGE OverloadedLabels, DataKinds, GADTs, NoMonomorphismRestriction, OverlappingInstances
+
+
+
+
+
+
+
+
+
+
+
+#-}
 
 import GHC.OverloadedLabels
 import Data.Proxy ( Proxy(..) )

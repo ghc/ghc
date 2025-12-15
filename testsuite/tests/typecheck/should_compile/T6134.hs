@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FunctionalDependencies #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module T6134 where
 

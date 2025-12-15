@@ -1,4 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes, FunctionalDependencies, ScopedTypeVariables, PolyKinds, TypeApplications, DataKinds #-}
+{-# LANGUAGE AllowAmbiguousTypes, FunctionalDependencies, DataKinds #-}
 {-# LANGUAGE RecordWildCards, OverloadedRecordDot, OverloadedRecordUpdate #-}
 
 module RecordDotSyntaxA where

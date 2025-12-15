@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ScopedTypeVariables #-}
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module Foo where

@@ -19,9 +19,9 @@
 --
 -- So really -XStrict shouldn't have any effect on this program.
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+--
 {-# LANGUAGE MagicHash                  #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
+--
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE UnboxedTuples              #-}
 

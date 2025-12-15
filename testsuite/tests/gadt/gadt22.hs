@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ExistentialQuantification, KindSignatures, RankNTypes #-}
+{-# LANGUAGE GADTs #-}
 
 -- Succeeds (needs the (Ord a) in TypeSet 
 -- c.f. gadt21.hs

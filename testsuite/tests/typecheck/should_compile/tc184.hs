@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, ExistentialQuantification #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- Both these two fail in 6.2.2 
 

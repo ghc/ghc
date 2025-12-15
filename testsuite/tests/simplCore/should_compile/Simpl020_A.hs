@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Simpl020_A where
 
 class GUIValue a

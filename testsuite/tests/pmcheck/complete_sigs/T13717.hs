@@ -1,12 +1,9 @@
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE EmptyCase #-}
 
 module Fin (Nat (..), Fin (FZ, FS)) where
 import Numeric.Natural

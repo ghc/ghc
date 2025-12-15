@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             UndecidableInstances #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances
+#-}
 -- UndecidableInstances because 'b' appears in the context but not the head
 
 module ShouldCompile where

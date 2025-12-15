@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, PatternSynonyms, RecordWildCards #-}
+{-# LANGUAGE PatternSynonyms, RecordWildCards #-}
 module T11987 where
 
 import T11987a

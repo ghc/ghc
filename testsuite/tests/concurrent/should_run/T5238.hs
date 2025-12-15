@@ -1,5 +1,4 @@
 {-# LANGUAGE UnicodeSyntax #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 import Control.Exception
 import GHC.Conc

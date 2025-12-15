@@ -1,6 +1,6 @@
-{-# LANGUAGE DataKinds, PolyKinds, KindSignatures #-}
-{-# LANGUAGE ExistentialQuantification, UndecidableInstances, TypeFamilies,
-             FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE UndecidableInstances, TypeFamilies
+#-}
 
 module Test where
 

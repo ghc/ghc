@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, RankNTypes, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 module T5359a (linesT) where
 

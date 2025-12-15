@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, RankNTypes #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module HigherRank2 where
 
 foo :: (forall a. [a] -> [a]) -> (_, _ _)

@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module T12082 where
 
 import Data.Typeable (Typeable)

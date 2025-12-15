@@ -1,7 +1,3 @@
-{-# LANGUAGE PolyKinds          #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE StandaloneDeriving #-}
-
 module T7704 where
 
 import Data.Typeable

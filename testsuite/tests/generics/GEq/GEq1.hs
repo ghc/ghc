@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeOperators, DeriveGeneric, TypeFamilies,
-             FlexibleInstances, MagicHash #-}
+{-# LANGUAGE TypeFamilies, MagicHash
+#-}
 
 module Main where
 

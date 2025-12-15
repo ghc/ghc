@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, KindSignatures #-}
+{-# LANGUAGE CPP #-}
 
 -- The record update triggered a kind error in GHC 6.2
 

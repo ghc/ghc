@@ -1,9 +1,4 @@
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE DeriveFunctor          #-}
 {-# LANGUAGE DefaultSignatures      #-}
-{-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE UndecidableInstances   #-}
 {-# LANGUAGE DeriveAnyClass    #-}
 

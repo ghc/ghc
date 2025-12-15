@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, MagicHash #-}
+{-# LANGUAGE CPP, MagicHash #-}
 
 {- Note!
    If you see output like

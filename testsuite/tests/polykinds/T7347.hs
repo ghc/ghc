@@ -1,7 +1,5 @@
 {-# LANGUAGE DataKinds                 #-}
-{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GADTs                     #-}
-{-# LANGUAGE KindSignatures            #-}
 
 module T7347 where
 

@@ -1,7 +1,7 @@
-{-# LANGUAGE TemplateHaskell, FlexibleInstances, ScopedTypeVariables,
-             GADTs, RankNTypes, FlexibleContexts, TypeSynonymInstances,
-             MultiParamTypeClasses, DeriveDataTypeable, PatternGuards,
-             OverlappingInstances, UndecidableInstances, CPP #-}
+{-# LANGUAGE TemplateHaskell, GADTs, OverlappingInstances, UndecidableInstances, CPP
+
+
+#-}
 
 module T1735_Help.Xml (Element(..), Xml, fromXml) where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, DataKinds, PolyKinds #-}
+{-# LANGUAGE TemplateHaskell, DataKinds #-}
 
 module T6005 where
 

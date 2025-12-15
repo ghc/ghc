@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T16693 where
 

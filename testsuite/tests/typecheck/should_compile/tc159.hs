@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 -- Don't do the cunning new newtype-deriving thing
 -- when the type constructor is recursive
 

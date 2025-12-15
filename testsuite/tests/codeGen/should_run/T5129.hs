@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 import Control.Exception as E
 import Data.Typeable
 

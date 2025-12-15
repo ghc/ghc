@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, StandaloneDeriving, FlexibleInstances, TypeFamilies, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 module T4185 where
 
 import Data.Kind (Type)

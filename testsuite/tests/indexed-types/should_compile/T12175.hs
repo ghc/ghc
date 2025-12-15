@@ -1,6 +1,6 @@
-{-# LANGUAGE ConstraintKinds, MultiParamTypeClasses, TypeFamilies,
-             UndecidableInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies, UndecidableInstances
+#-}
+--
 
 module T12175 where
 

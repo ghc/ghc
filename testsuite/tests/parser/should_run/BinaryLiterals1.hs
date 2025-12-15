@@ -1,6 +1,6 @@
 -- | Test for GHC 7.10+'s @BinaryLiterals@ extensions (see GHC #9224)
 
-{-# LANGUAGE BinaryLiterals #-}
+--
 {-# LANGUAGE MagicHash #-}
 
 module Main where

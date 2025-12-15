@@ -1,4 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts #-}
 -- !!! Scopes in kind checking
 
 -- Exposes a bizarre bug in 4.08.1

@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, GADTs, TypeFamilies #-}
+{-# LANGUAGE GADTs, TypeFamilies #-}
 module Test where
 
 

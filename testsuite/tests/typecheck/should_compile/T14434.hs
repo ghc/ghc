@@ -1,4 +1,4 @@
-{-# LANGUAGE MonoLocalBinds, FlexibleInstances, OverloadedStrings #-}
+{-# LANGUAGE MonoLocalBinds, OverloadedStrings #-}
 {-# OPTIONS -fsolve-constant-dicts #-}
 
 module T14434 where

@@ -1,5 +1,5 @@
-{-# LANGUAGE PolyKinds, DataKinds, KindSignatures, RankNTypes,
-             TypeFamilies, FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, TypeFamilies, UndecidableInstances
+#-}
 
 module T6118 where
 

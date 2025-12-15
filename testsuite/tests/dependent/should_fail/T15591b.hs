@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, MultiParamTypeClasses, DataKinds, TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 
 module T15591b where
 

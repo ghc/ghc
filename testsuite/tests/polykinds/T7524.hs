@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, PolyKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 module T7524 where
 
 type family F (a :: k1) (b :: k2)

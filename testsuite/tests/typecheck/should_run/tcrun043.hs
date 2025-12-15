@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeFamilies, ConstraintKinds #-}
+{-# LANGUAGE GADTs, TypeFamilies #-}
 
 import GHC.Exts ( Constraint )
 

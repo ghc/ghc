@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables#-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T11644 where
 

@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-
 module Main where
 
 import GHC.Generics hiding (C, D)

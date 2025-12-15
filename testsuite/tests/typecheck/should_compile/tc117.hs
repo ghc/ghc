@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances
+#-}
 -- UndecidableInstances now needed because the Coverage Condition fails
 {-# OPTIONS_GHC -Wno-x-partial #-}
 

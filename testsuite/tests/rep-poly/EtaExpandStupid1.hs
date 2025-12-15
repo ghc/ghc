@@ -1,8 +1,6 @@
-
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DatatypeContexts #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnliftedNewtypes #-}
 

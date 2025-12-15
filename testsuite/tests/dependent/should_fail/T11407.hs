@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds, PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
 module T11407 where
 
 import Data.Kind

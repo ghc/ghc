@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstraintKinds, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
 module ShouldFail where
 
 import GHC.Exts

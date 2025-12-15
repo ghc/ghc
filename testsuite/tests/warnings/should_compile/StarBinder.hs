@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeOperators, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS -Wno-star-is-type #-}
 
 module X (type (X.*)) where

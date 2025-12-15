@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs , PolyKinds #-}
+{-# LANGUAGE GADTs #-}
 
 module Bug2 where
 

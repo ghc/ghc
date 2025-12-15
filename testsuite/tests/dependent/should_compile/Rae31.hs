@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell, TypeOperators, PolyKinds, DataKinds,
-             TypeFamilies, RankNTypes #-}
+{-# LANGUAGE TemplateHaskell, DataKinds, TypeFamilies
+#-}
 
 module A where
 

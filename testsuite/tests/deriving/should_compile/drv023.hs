@@ -1,6 +1,6 @@
 -- deriving for data instances is supposed to work
 
-{-# LANGUAGE GHC2021 #-}
+--
 {-# LANGUAGE TypeFamilies #-}
 
 module ShouldSucceed where

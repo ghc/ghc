@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, DeriveDataTypeable, DefaultSignatures, FlexibleContexts, TypeOperators #-}
+{-# LANGUAGE DefaultSignatures #-}
 module SpeedTest (Bar (..), Foo0 (..), Foo1 (..), Foo2 (..), Foo3 (..)) where
 
 import GHC.Generics

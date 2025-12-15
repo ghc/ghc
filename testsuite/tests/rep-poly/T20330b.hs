@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE TypeApplications #-}
 
 module T20330b where
 

@@ -1,6 +1,4 @@
 {-# LANGUAGE QuantifiedConstraints #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DeriveFunctor #-}
 
 -- The instances below have large demands, though I think they're pretty sane.
 {-# LANGUAGE UndecidableInstances #-}

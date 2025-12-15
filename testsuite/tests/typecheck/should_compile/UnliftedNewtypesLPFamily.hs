@@ -1,4 +1,4 @@
-{-# LANGUAGE ExplicitForAll, PolyKinds, TypeFamilies, GADTs, UnliftedNewtypes #-}
+{-# LANGUAGE TypeFamilies, GADTs, UnliftedNewtypes #-}
 
 module UnliftedNewtypesLPFamily where
 

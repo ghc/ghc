@@ -1,5 +1,5 @@
-{-# LANGUAGE UndecidableInstances, FlexibleInstances,
-             MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances, FunctionalDependencies
+#-}
 
 -- Test for trac #816
 -- GHC's typechecker loops when trying to type this, resulting in a

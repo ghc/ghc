@@ -1,5 +1,3 @@
-{-# LANGUAGE ConstrainedClassMethods #-}
-
 module Main where
 
 class C a where

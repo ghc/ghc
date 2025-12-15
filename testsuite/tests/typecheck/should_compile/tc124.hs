@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -O #-}    -- -O casused a Lint error in the simplifier, so I'm putting that in
                           -- all the time, so we don't miss it in a fast validate
 

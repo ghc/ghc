@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, DataKinds, PolyKinds #-}
+{-# LANGUAGE TypeFamilies, DataKinds #-}
 module T8557 where
 
 data family Sing (a :: k)

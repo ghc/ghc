@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, KindSignatures #-}
+{-# LANGUAGE GADTs #-}
 
 -- See #1323; crashed GHC 6.6
 

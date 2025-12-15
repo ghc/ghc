@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedRecordDot, ExplicitForAll #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 identity :: forall a. a -> a
 identity a = a

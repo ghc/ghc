@@ -12,9 +12,9 @@ would fail in an algorithm that required kind unification before
 type unification.
 -}
 
-{-# LANGUAGE TypeOperators, TypeApplications, DataKinds,
-             StandaloneKindSignatures, PolyKinds, GADTs,
-             TypeFamilies, NamedWildCards, PartialTypeSignatures #-}
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies, PartialTypeSignatures
+
+#-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 module LopezJuan where

@@ -1,5 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 import Data.Word
 import Data.IORef
 import GHC.Clock

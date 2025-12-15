@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleInstances #-}
 module TcCustomSolverSuper where
 
 import GHC.TypeLits

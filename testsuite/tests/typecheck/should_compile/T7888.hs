@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
 
 module T7888 where
 import GHC.Err( undefined )

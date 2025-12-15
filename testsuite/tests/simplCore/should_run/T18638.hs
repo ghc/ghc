@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification, BangPatterns #-}
 {-# OPTIONS_GHC -O #-}
 
 module Main (main) where

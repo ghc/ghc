@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeOperators, GADTs #-}
+{-# LANGUAGE DataKinds, GADTs #-}
 
 module T9260 where
 

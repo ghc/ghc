@@ -1,4 +1,4 @@
-{-# LANGUAGE QuantifiedConstraints, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 
 module T15290c where
 

@@ -1,5 +1,3 @@
-{-# LANGUAGE PolyKinds #-}
-
 module InferDependency where
 
 data Proxy k (a :: k)

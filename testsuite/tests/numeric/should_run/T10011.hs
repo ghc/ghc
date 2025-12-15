@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeOperators, GADTs #-}
+{-# LANGUAGE GADTs #-}
 module Main
        ( main -- :: IO ()
        ) where

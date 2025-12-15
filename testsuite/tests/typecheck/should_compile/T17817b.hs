@@ -1,10 +1,6 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE TypeApplications #-}
 module Bug where
 
 import GHC.Exts ( Weak#, State#, RealWorld, mkWeak# )

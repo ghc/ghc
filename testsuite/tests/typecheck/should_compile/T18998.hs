@@ -1,4 +1,4 @@
-{-# LANGUAGE LinearTypes, GADTs, DataKinds, KindSignatures #-}
+{-# LANGUAGE LinearTypes, GADTs, DataKinds #-}
 
 -- this caused a TcLevel assertion failure
 

@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -O -fworker-wrapper-cbv -dcore-lint -Wno-simplifiable-class-constraints #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 -- It is very tricky to tickle this bug in 9.6/9.8!
 -- (It came up in a complicated program due to Mikolaj.)

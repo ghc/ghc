@@ -1,9 +1,9 @@
-{-# LANGUAGE
-  NoImplicitPrelude,
-  PolyKinds, DataKinds,
-  ScopedTypeVariables,
-  TypeFamilies,
-  UndecidableInstances
+{-# LANGUAGE NoImplicitPrelude, DataKinds, TypeFamilies, UndecidableInstances
+
+
+
+
+
 #-}
 
 module T15666 where

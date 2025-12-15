@@ -1,6 +1,6 @@
-{-# LANGUAGE
-  FlexibleInstances,
-  UndecidableInstances
+{-# LANGUAGE UndecidableInstances
+
+
 #-}
 
 module Bug where

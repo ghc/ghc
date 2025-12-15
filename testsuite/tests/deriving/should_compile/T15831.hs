@@ -1,7 +1,4 @@
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
 module T15831 where
 
 import Data.Functor.Const (Const(..))

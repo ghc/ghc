@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
-
 module ShouldCompile where
 
 import Control.Monad.ST

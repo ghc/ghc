@@ -1,4 +1,4 @@
-{-# LANGUAGE ImpredicativeTypes, RankNTypes #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 
 module T9730 where
 

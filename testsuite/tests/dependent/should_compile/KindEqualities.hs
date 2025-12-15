@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, GADTs, ExplicitForAll #-}
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module KindEqualities where

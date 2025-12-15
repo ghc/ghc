@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 {-# OPTIONS_GHC -fwarn-unused-imports #-}
 
 -- #1386

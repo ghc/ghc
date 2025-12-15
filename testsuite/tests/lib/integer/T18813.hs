@@ -1,6 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash    #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -O0 #-}
 
 import GHC.Exts

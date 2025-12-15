@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, DataKinds, ExplicitForAll #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RoleAnnotations #-}
 
 module T15743 where

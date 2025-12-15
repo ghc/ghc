@@ -1,8 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeFamilies, TypeFamilyDependencies #-}
-{-# LANGUAGE KindSignatures, DataKinds, PolyKinds #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeApplications     #-}
+{-# LANGUAGE DataKinds #-}
 module T13538 where
 
 import GHC.TypeLits

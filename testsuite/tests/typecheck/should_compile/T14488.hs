@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module T14488 where
 
 type Lens' s a = forall f. Functor f => (a -> f a) -> s -> f s

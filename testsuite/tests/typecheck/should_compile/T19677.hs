@@ -1,4 +1,4 @@
-{-# LANGUAGE ExplicitForAll, PolyKinds, DataKinds, TypeFamilies, GADTs #-}
+{-# LANGUAGE DataKinds, TypeFamilies, GADTs #-}
 
 module T19677 where
 

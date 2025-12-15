@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, RankNTypes #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- GHC 5.02 got this one wrong.
 

@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 module TcRun038_B where
 
 class Foo a where

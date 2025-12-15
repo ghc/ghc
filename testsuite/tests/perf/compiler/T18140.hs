@@ -1,6 +1,6 @@
 -- Exponential with GHC 8.10
 
-{-# LANGUAGE BangPatterns  #-}
+--
 module T18140 where
 
 

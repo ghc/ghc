@@ -1,5 +1,4 @@
-{-# LANGUAGE StandaloneKindSignatures #-}
-{-# LANGUAGE PolyKinds, DataKinds, RankNTypes, TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 
 module SAKS_029 where
 

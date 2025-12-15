@@ -1,11 +1,10 @@
-{-# LANGUAGE AllowAmbiguousTypes, FunctionalDependencies, ScopedTypeVariables, PolyKinds, TypeApplications, DataKinds #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE AllowAmbiguousTypes, FunctionalDependencies, DataKinds #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot, OverloadedRecordUpdate #-}
 -- For "higher kinded data" test.
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
+--
 
 {-# LANGUAGE RebindableSyntax #-}
 module PprRecordDotSyntax1 where

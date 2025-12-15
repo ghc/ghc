@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, StandaloneDeriving, DeriveDataTypeable, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T1769 where
 

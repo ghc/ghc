@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, PolyKinds, NamedWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- See #10982
 

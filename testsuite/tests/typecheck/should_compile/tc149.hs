@@ -1,5 +1,4 @@
 {-# LANGUAGE LiberalTypeSynonyms #-}
-{-# LANGUAGE RankNTypes #-}
 
 module ShouldCompile where
 

@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
 
 module Irr4  -- like Irr3, but with lifted types

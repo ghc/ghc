@@ -1,5 +1,3 @@
-{-# LANGUAGE GHC2021 #-}
-
 module T24845a where
 
 import GHC.TypeLits

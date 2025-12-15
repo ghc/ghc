@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, TypeAbstractions #-}
+{-# LANGUAGE TypeAbstractions #-}
 
 module T7224 where
 

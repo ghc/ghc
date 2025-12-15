@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 

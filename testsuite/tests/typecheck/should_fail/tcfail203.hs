@@ -1,6 +1,6 @@
 -- trac #2806
 
-{-# LANGUAGE MagicHash, UnboxedTuples, BangPatterns #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -Wunbanged-strict-patterns #-}
 
 module Foo where

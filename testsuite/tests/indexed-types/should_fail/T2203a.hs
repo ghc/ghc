@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeFamilies, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T2203a where
 

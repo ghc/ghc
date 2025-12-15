@@ -1,5 +1,4 @@
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 import Data.Char (toUpper)
 import GHC.Exts
 import GHC.Word

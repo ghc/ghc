@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, ExistentialQuantification, GADTSyntax, TypeFamilies #-}
+{-# LANGUAGE PatternSynonyms, TypeFamilies #-}
 
 module T11010 where
 

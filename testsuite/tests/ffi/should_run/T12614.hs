@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 module Main where
 
 {-# NOINLINE test_reg #-}

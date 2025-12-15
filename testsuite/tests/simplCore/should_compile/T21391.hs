@@ -1,7 +1,4 @@
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE RankNTypes #-}
 module Web.Routing.SafeRouting where
 
 import Control.DeepSeq (NFData (..))

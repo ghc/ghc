@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric   #-}
 {-# OPTIONS_GHC -ddump-deriv #-}
 
 module GenDerivOutput1_0 where

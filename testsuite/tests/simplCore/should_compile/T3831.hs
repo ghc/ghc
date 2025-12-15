@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE ScopedTypeVariables, FlexibleInstances  #-}
 
 -- This test has a deep nest of join points, which led to
 -- an exponential blow-up in GHC.Core.Opt.SpecConstr

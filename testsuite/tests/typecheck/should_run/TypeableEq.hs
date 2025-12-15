@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Test equality predicates of Type.Reflection.
 module Main where

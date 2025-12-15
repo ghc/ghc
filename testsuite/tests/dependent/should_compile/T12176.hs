@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, DataKinds, PolyKinds, GADTs, TypeFamilies #-}
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies #-}
 
 module T12176 where
 

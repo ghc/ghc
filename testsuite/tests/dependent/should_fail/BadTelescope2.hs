@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, PolyKinds, ExplicitForAll #-}
+{-# LANGUAGE DataKinds #-}
 
 module BadTelescope2 where
 

@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 -- Tests newtype deriving with
 -- a non-type constructor in the representation
 

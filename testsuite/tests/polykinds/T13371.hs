@@ -1,9 +1,9 @@
-{-# LANGUAGE
-  MonoLocalBinds,
-  PolyKinds,
+{-# LANGUAGE MonoLocalBinds, FunctionalDependencies
 
-  FunctionalDependencies,
-  FlexibleContexts #-}
+
+
+
+#-}
 
 -- reduced version of
 -- http://code.haskell.org/~aavogt/HList_dredge_ghc802/Data/HList/Dredge.hs

@@ -1,4 +1,4 @@
-{-# LANGUAGE  MagicHash, BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
 module ShouldCompile where
 
 import GHC.Exts

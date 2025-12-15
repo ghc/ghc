@@ -1,4 +1,4 @@
-{-# LANGUAGE IncoherentInstances, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE IncoherentInstances #-}
 
 -- Liberated IncoherentInstances behavior (#8141)
 

@@ -1,5 +1,4 @@
 {-# LANGUAGE RoleAnnotations #-}
-{-# LANGUAGE DeriveTraversable #-}
 
 module DrvPhantom where
 import GHC.Generics (Generic, Generic1)

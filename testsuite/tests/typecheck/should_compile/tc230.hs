@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE ImplicitParams, RankNTypes #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- #1445
 

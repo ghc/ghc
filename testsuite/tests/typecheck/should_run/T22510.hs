@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, UnboxedTuples, UnboxedSums, ScopedTypeVariables, TypeApplications, AllowAmbiguousTypes #-}
+{-# LANGUAGE MagicHash, UnboxedTuples, UnboxedSums, AllowAmbiguousTypes #-}
 module Main where
 
 import Type.Reflection

@@ -1,7 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE PolyKinds #-}
 {-# OPTIONS_GHC -ddump-deriv -fprint-explicit-kinds #-}
 module T10604_deriving where
 

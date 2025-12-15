@@ -1,5 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 import Foreign
 import Data.IORef
 import Control.Concurrent

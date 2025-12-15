@@ -1,4 +1,4 @@
-{-# LANGUAGE MonomorphismRestriction, ExtendedDefaultRules #-}
+{-# LANGUAGE ExtendedDefaultRules #-}
 module T10971c where
 
 import Data.Traversable (fmapDefault)

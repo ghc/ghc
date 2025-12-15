@@ -1,11 +1,6 @@
 {-# LANGUAGE UnliftedDatatypes #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE ConstraintKinds #-}
 
 module UnlDataUsersGuide where
 

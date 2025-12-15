@@ -1,7 +1,7 @@
 -- Test that DuplicateRecordFields works with NamedFieldPuns and
 -- RecordWildCards
 
-{-# LANGUAGE DuplicateRecordFields, NamedFieldPuns, RecordWildCards #-}
+{-# LANGUAGE DuplicateRecordFields, RecordWildCards #-}
 
 data S = MkS { foo :: Int }
   deriving Show

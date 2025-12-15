@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, GADTs, ScopedTypeVariables, TypeAbstractions #-}
+{-# LANGUAGE LambdaCase, GADTs, TypeAbstractions #-}
 
 module T19847a where
 

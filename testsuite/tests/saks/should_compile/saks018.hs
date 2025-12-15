@@ -1,6 +1,3 @@
-{-# LANGUAGE StandaloneKindSignatures #-}
-{-# LANGUAGE PolyKinds, ExplicitForAll #-}
-
 module SAKS_018 where
 
 import Data.Kind (Type)

@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, KindSignatures, PatternSynonyms, FlexibleContexts #-}
+{-# LANGUAGE GADTs, PatternSynonyms #-}
 module ShouldCompile where
 
 import Data.Kind (Type)

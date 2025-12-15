@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstraintKinds, RankNTypes, GADTs #-}
+{-# LANGUAGE GADTs #-}
 module T8644 where
 
 data Dict c where Dict :: c => Dict c

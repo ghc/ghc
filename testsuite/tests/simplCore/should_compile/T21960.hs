@@ -1,8 +1,8 @@
-{-# LANGUAGE BangPatterns, CPP, GeneralizedNewtypeDeriving, MagicHash,
-    UnliftedFFITypes #-}
+{-# LANGUAGE CPP, MagicHash, UnliftedFFITypes
+#-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+--
+--
 {-# LANGUAGE ViewPatterns #-}
 -- |
 -- Module      : Data.Text.Encoding

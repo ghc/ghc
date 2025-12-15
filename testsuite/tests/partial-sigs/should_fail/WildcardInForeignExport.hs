@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, ForeignFunctionInterface #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module WildcardInForeignExport where
 
 import Foreign.C

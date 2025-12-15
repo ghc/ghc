@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternGuards #-}
 module CaseAltComments where
 
 nfCom = case expr of

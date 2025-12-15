@@ -1,5 +1,5 @@
-{-# LANGUAGE GADTs, RankNTypes, ScopedTypeVariables, Strict, TypeApplications
-             #-}
+{-# LANGUAGE GADTs, Strict
+#-}
 
 import Data.Typeable
 

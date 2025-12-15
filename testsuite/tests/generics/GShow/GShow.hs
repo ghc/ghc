@@ -1,11 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE TypeSynonymInstances       #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE DefaultSignatures          #-}
 {-# LANGUAGE MagicHash                  #-}
-{-# LANGUAGE PolyKinds                  #-}
 
 module GShow (
   -- * Generic show class

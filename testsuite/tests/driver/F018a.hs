@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 module TestStub018 where
 foreign export ccall f :: Int -> Int
 f :: Int -> Int

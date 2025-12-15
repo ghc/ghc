@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE KindSignatures #-}
 module T12144_1 where
 
 import Data.Kind (Type)

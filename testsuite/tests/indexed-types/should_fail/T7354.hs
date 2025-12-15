@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TypeFamilies, Rank2Types, FlexibleContexts, FlexibleInstances, GADTs, StandaloneDeriving, UndecidableInstances #-}
+{-# LANGUAGE CPP, TypeFamilies, Rank2Types, GADTs, UndecidableInstances #-}
 
 module T7354 where
 

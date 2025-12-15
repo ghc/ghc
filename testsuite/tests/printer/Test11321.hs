@@ -1,12 +1,12 @@
-{-# LANGUAGE TypeOperators
-           , DataKinds
-           , PolyKinds
-           , TypeFamilies
-           , GADTs
-           , UndecidableInstances
-           , RankNTypes
-           , ScopedTypeVariables
-  #-}
+{-# LANGUAGE DataKinds, TypeFamilies, GADTs, UndecidableInstances
+
+
+
+
+
+
+
+#-}
 module Test11321 where
 
 data instance Sing (z :: [a])

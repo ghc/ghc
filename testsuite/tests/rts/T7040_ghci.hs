@@ -1,5 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 module Main where
 
 foreign import ccall "global.h printx"

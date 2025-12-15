@@ -1,6 +1,6 @@
-{-# LANGUAGE MultiParamTypeClasses, DataKinds, FunctionalDependencies,
-   KindSignatures, PolyKinds, FlexibleInstances, FlexibleContexts,
-   UndecidableInstances #-}
+{-# LANGUAGE DataKinds, FunctionalDependencies, UndecidableInstances
+
+#-}
 
 module T9106 where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, ScopedTypeVariables #-}
+{-# LANGUAGE PatternSynonyms #-}
 module ShouldFail where
 
 pattern Single x = [(x :: Int)]

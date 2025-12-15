@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Werror -Wredundant-constraints #-}
-{-# LANGUAGE QuantifiedConstraints, TypeApplications, UndecidableInstances #-}
+{-# LANGUAGE QuantifiedConstraints, UndecidableInstances #-}
 
 module Lib where
 

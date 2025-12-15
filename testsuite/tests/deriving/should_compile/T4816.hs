@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
-
 module T4816 where
 
 data Silly a = Silly a

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE FlexibleInstances, UndecidableInstances,
-             MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances, FunctionalDependencies
+#-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
     -- 'x' and 'v' are ambiguous
 

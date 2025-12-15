@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE RankNTypes, ExistentialQuantification #-}
 
 -- An interesting interaction of universals and existentials, prompted by
 -- http://www.haskell.org/pipermail/haskell-cafe/2004-October/007160.html

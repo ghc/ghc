@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module T7827 where
 
 bug :: a -> ()

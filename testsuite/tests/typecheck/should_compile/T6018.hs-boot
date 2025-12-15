@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilyDependencies, PolyKinds #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 
 module T6018 where
 

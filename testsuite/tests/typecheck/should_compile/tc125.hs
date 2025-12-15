@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances
+#-}
 -- UndecidableInstances now needed because the Coverage Condition fails
 
 -- !!! Functional dependency test. Hugs [Apr 2001] fails to typecheck this

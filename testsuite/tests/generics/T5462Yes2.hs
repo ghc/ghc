@@ -1,11 +1,6 @@
-{-# LANGUAGE FlexibleContexts              #-}
-{-# LANGUAGE FlexibleInstances             #-}
-{-# LANGUAGE DeriveGeneric                 #-}
 {-# LANGUAGE DefaultSignatures             #-}
-{-# LANGUAGE StandaloneDeriving            #-}
 {-# LANGUAGE UndecidableInstances          #-}
 {-# LANGUAGE DeriveAnyClass                #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving    #-}
 
 module Main where
 

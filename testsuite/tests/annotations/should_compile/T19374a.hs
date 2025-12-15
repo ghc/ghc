@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
 module T19374 where
 
 (%%) :: [a] -> [a] -> [a]

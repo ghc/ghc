@@ -1,5 +1,5 @@
-{-# LANGUAGE BangPatterns, TypeApplications, UnboxedTuples, MagicHash,
-             UnboxedSums, NoMonomorphismRestriction #-}
+{-# LANGUAGE UnboxedTuples, MagicHash, UnboxedSums, NoMonomorphismRestriction
+#-}
 {-# OPTIONS_GHC -Wno-unused-binds -Wno-unbanged-strict-patterns #-}
 
 module Main where

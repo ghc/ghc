@@ -1,7 +1,5 @@
+{-# LANGUAGE UndecidableInstances #-}
 
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, UndecidableInstances #-}
-
---
 -- Test case adopted from the HList library
 -- http://www.cwi.nl/~ralf/HList/
 --

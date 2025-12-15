@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE UndecidableInstances #-}
 

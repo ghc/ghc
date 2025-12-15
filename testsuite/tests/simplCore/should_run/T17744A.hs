@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, GADTs, UndecidableInstances #-}
+{-# LANGUAGE GADTs, UndecidableInstances #-}
 
 module T17744A where
 

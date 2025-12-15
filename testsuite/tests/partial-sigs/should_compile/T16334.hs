@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedWildCards, PartialTypeSignatures, PolyKinds, NoStarIsType #-}
+{-# LANGUAGE PartialTypeSignatures, NoStarIsType #-}
 
 module T16334 where
 

@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -dcore-lint #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts,
-             FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances
+#-}
 
 -- This is a rather exotic functional-dependency test.
 -- It crashed GHC 5.04.3 with a core-lint error, because

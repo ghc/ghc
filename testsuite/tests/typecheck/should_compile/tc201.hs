@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             ExistentialQuantification, FlexibleContexts #-}
+{-# LANGUAGE FunctionalDependencies
+#-}
 
 {-      Email 30 Jan 2006
 

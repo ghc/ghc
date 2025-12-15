@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, DeriveDataTypeable #-}
+{-# LANGUAGE MagicHash #-}
 module T2700 where
 
 import GHC.Exts

@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -O2 #-}
 
 -- See #1746

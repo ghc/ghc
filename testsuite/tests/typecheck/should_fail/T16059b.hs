@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE UnboxedTuples #-}
 module T16059b where
 

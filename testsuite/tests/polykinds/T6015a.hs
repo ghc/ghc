@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE PolyKinds, KindSignatures, FunctionalDependencies,  FlexibleInstances,
-              UndecidableInstances, TypeOperators, DataKinds,  FlexibleContexts #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances, DataKinds
+#-}
 
 module T6015a where
 

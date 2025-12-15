@@ -1,6 +1,6 @@
-{-# LANGUAGE TypeApplications, ScopedTypeVariables, PolyKinds,
-             TypeFamilies, RankNTypes,
-             FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies
+
+#-}
 -- tests about visible type application
 
 module Vta1 where

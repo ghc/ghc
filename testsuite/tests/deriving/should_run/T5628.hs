@@ -1,4 +1,3 @@
-{-# LANGUAGE EmptyDataDecls, StandaloneDeriving #-}
 module Main where
 
 data Z

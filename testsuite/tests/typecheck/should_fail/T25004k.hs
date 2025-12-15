@@ -1,4 +1,4 @@
-{-# LANGUAGE RequiredTypeArguments, EmptyCase, LambdaCase #-}
+{-# LANGUAGE RequiredTypeArguments, LambdaCase #-}
 {-# OPTIONS -Wincomplete-patterns #-}
 
 module T25004k where

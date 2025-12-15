@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module T700 where
 
 -- These two should behave the same way

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTs, EmptyDataDecls #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 
 -- Panics in bind_args
 

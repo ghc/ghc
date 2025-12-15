@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 module Main where
 
 -- Tests that superfluous worker threads are discarded rather than

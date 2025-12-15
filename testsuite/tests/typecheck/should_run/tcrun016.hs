@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies
+#-}
 
 -- !!! Functional dependencies
 -- This one made the 5.00.1 typechecker go into an infinite loop.

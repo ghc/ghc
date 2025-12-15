@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
-
 module T6027 where
 
 data (?) a b = Q a b

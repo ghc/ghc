@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 module Hang where
 import Control.Monad
 import Data.Char

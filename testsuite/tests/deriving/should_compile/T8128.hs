@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving, GADTs, FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 
 module T8128 where
 

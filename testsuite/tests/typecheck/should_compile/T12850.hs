@@ -1,4 +1,4 @@
-{-# LANGUAGE ExplicitForAll, MagicHash, KindSignatures #-}
+{-# LANGUAGE MagicHash #-}
 module T12850 where
 
 import GHC.Types (RuntimeRep(..), TYPE)

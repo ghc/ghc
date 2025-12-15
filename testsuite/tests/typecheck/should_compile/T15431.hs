@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 
 module T15431 where
 

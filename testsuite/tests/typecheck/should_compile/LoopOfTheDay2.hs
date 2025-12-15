@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
-             FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances
+#-}
 
 -- Compilation loops in GHC 6.2!
 -- While LoopOfTheDay1.hs did compile and work,

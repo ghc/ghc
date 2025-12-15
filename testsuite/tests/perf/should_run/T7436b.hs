@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
 -- A variation on T7436 that tests a derived Functor instance.
 module Main where
 

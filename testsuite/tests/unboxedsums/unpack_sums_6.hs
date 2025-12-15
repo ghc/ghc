@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 -- This perhaps overly simple test check if code involving
 -- unbacked sums is faster than non-unpacked ones which at
 -- least in this case we expect to be the case.

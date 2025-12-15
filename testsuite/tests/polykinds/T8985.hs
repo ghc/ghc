@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies, GADTs, TypeOperators #-}
+{-# LANGUAGE DataKinds, TypeFamilies, GADTs #-}
 
 module T8985 where
 

@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeFamilies, PolyKinds, MultiParamTypeClasses, FlexibleContexts,
-             AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeFamilies, AllowAmbiguousTypes
+#-}
 module T7278 where
  
 type family TF (t  :: k) :: * -> * -> *

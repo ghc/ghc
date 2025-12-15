@@ -1,5 +1,5 @@
 -- Should AllowAmbiguousTypes really be needed here?
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleInstances, AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeFamilies, AllowAmbiguousTypes #-}
 module T11347 where
 
 newtype Id1 a = MkId1 a

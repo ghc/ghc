@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, DataKinds, PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
 module BadTelescope4 where
 
 import Data.Proxy

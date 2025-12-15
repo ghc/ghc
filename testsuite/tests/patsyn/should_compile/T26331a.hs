@@ -1,6 +1,5 @@
 {-# LANGUAGE DeepSubsumption #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE RankNTypes #-}
 
 module T26331a where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, GADTs #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoCUSKs #-}
 
 module TcFail225 where

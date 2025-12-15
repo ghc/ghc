@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, ExistentialQuantification, ApplicativeDo #-}
+{-# LANGUAGE ApplicativeDo #-}
 {-# OPTIONS_GHC -foptimal-applicative-do #-}
 module Main where
 

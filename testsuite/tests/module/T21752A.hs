@@ -1,4 +1,3 @@
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 module T21752A (
     module GHC.Exts

@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, UnboxedTuples #-}
+{-# LANGUAGE UnboxedTuples #-}
 module EnforceEpt004 where
 
 x :: Int

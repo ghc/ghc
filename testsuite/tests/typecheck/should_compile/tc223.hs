@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-deprecations #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Foo where
 
 -- This example suggested by Yitzchak Gale

@@ -1,5 +1,5 @@
-{-# LANGUAGE ScopedTypeVariables, TypeOperators, DataKinds, PolyKinds,
-             TypeFamilies, GADTs, StandaloneDeriving #-}
+{-# LANGUAGE DataKinds, TypeFamilies, GADTs
+#-}
 
 module SplitWD where
 

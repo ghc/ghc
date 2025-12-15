@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
-{-# LANGUAGE GADTs, KindSignatures, EmptyCase, LambdaCase #-}
+{-# LANGUAGE GADTs, LambdaCase #-}
 
 -- Check interaction between Newtypes and GADTs
 module EmptyCase006 where

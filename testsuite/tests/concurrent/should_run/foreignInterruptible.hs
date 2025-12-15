@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP,ForeignFunctionInterface,InterruptibleFFI #-}
+{-# LANGUAGE CPP, InterruptibleFFI #-}
 module Main where
 
 import Control.Concurrent

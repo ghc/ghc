@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, PatternSynonyms #-}
+{-# LANGUAGE PatternSynonyms #-}
 module T12746A where
 
 pattern Foo :: Int

@@ -1,9 +1,9 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
-           , ScopedTypeVariables
-           , BangPatterns
-  #-}
+{-# LANGUAGE CPP, NoImplicitPrelude
+
+
+
+#-}
 
 module Ppr008
     (

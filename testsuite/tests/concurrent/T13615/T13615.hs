@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module Main where
 
 import Parallel

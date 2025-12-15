@@ -1,9 +1,9 @@
 -- /tmp/panic.hs
-{-# LANGUAGE FlexibleContexts        #-}
-{-# LANGUAGE FlexibleInstances       #-}
-{-# LANGUAGE InstanceSigs            #-}
+--
+--
+--
 {-# LANGUAGE TypeFamilies            #-}
-{-# LANGUAGE TypeSynonymInstances    #-}
+--
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# OPTIONS_GHC -fdefer-type-errors #-}
 

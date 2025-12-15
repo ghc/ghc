@@ -1,5 +1,5 @@
-{-# LANGUAGE DerivingStrategies, StandaloneDeriving, GeneralizedNewtypeDeriving,
-             DerivingVia #-}
+{-# LANGUAGE DerivingStrategies, DerivingVia
+#-}
 
 module T17328 where
 

@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeApplications     #-}
-
 -- Check that the standard analytic functions are correctly
 -- inverted by the corresponding inverse functions.
 

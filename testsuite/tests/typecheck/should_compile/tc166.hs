@@ -1,6 +1,6 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             ExistentialQuantification, RankNTypes,
-             FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies
+
+#-}
 
 -- Arguably, the type signature for f1 should be enough to make
 -- this program compile, but in 5.04 it wasn't; the

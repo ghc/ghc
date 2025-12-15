@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -fplugin DefaultMultiParam #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 module Main where
 
 class C a b where

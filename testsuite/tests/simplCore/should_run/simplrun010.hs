@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 -- From trac #1947
 -- Should fail with heap exhaustion

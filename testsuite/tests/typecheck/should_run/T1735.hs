@@ -1,8 +1,8 @@
-{-# LANGUAGE TemplateHaskell, FlexibleInstances, ScopedTypeVariables,
-             ScopedTypeVariables, GADTs, RankNTypes, FlexibleContexts,
-             MultiParamTypeClasses, GeneralizedNewtypeDeriving,
-             DeriveDataTypeable,
-             OverlappingInstances, UndecidableInstances, CPP #-}
+{-# LANGUAGE TemplateHaskell, GADTs, OverlappingInstances, UndecidableInstances, CPP
+
+
+
+#-}
 
 module Main (main) where
 

@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor, DeriveFoldable #-}
 module Main where
 
 import Prelude hiding (foldr)

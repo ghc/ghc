@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 import Data.IORef
 import Control.Exception
 import Control.Monad

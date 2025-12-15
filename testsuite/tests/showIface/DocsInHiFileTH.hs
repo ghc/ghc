@@ -1,5 +1,4 @@
-{-# LANGUAGE TemplateHaskell, FlexibleInstances, TypeFamilies, DataKinds #-}
-{-# LANGUAGE MultiParamTypeClasses, StandaloneKindSignatures, PolyKinds #-}
+{-# LANGUAGE TemplateHaskell, TypeFamilies, DataKinds #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 -- |This is the module header

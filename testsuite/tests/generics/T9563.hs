@@ -1,7 +1,4 @@
 {-# LANGUAGE TypeFamilies       #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 module T9563 where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, ViewPatterns, ScopedTypeVariables #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns #-}
 
 module T23038 where
 

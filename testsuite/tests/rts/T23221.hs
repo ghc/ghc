@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, UnboxedTuples, NumericUnderscores #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 module Main where
 

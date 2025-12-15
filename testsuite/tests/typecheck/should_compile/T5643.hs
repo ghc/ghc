@@ -1,6 +1,6 @@
-{-# LANGUAGE MultiParamTypeClasses
-            ,FunctionalDependencies
-            ,FlexibleContexts #-}
+{-# LANGUAGE FunctionalDependencies
+
+#-}
 
 module T5643 where
 

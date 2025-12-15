@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ExistentialQuantification #-}
+{-# LANGUAGE GADTs #-}
 
 -- This typechecker, written by Stephanie Weirich at Dagstuhl (Sept 04)
 -- demonstrates that it's possible to write functions of type

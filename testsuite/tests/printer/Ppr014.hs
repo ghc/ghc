@@ -1,8 +1,5 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 -- from https://ocharles.org.uk/blog/guest-posts/2014-12-19-existential-quantification.html
 

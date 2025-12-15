@@ -1,4 +1,3 @@
-{-# LANGUAGE EmptyDataDecls, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 module T4220 where
 
 import Data.Foldable

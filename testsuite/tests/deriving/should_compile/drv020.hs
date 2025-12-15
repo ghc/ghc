@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FunctionalDependencies
+#-}
 
 -- Test deriving of a multi-parameter class for
 -- one-argument newtype defined in the same module

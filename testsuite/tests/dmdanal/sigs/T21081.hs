@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module T21081 where
 
 -- | Should put demand `MP(SL,SL)` or `MP(1L,1L)` on `pr`, telling us that `f`

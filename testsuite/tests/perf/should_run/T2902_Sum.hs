@@ -1,5 +1,4 @@
-
-{-# LANGUAGE UnicodeSyntax, MultiParamTypeClasses #-}
+{-# LANGUAGE UnicodeSyntax #-}
 
 module T2902_Sum (Sum(..)) where
 

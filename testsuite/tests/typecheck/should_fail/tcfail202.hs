@@ -1,9 +1,9 @@
 -- trac #2307
 -- This was accepted due to a bug in GHC
 
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             UndecidableInstances, IncoherentInstances,
-             FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances, IncoherentInstances
+
+#-}
 
 module Foo where
 

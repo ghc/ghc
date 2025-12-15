@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTSyntax, ExistentialQuantification #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- This one should be rejected.
 -- See Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet

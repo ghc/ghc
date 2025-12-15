@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, GeneralizedNewtypeDeriving, OverlappingInstances, UndecidableInstances #-}
+{-# LANGUAGE OverlappingInstances, UndecidableInstances #-}
 module Main where
 
 class (Monad m) => MonadIO m where

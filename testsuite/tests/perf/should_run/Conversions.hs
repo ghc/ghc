@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 -- | Tests that conversions between various primitive types (e.g.
 -- Word, Double, etc) doesn't allocate.
 module Main (main) where

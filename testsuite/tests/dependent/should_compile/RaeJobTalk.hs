@@ -1,12 +1,12 @@
 {- Copyright (c) 2016 Richard Eisenberg
  -}
 
-{-# LANGUAGE TypeOperators, TypeFamilies, TypeApplications, AllowAmbiguousTypes,
-             ExplicitForAll, ScopedTypeVariables, GADTs, TypeFamilyDependencies,
-             DataKinds, PolyKinds , ConstraintKinds, UndecidableInstances,
-             FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleContexts, StandaloneDeriving, InstanceSigs,
-             RankNTypes, UndecidableSuperClasses #-}
+{-# LANGUAGE TypeFamilies, AllowAmbiguousTypes, GADTs, TypeFamilyDependencies, DataKinds, UndecidableInstances, FunctionalDependencies, UndecidableSuperClasses
+
+
+
+
+#-}
 
 module RaeJobTalk where
 

@@ -1,11 +1,6 @@
-
 {-# LANGUAGE UnliftedDatatypes #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE RankNTypes #-}
 
 module RepPolyUnliftedDatatype2 where
 

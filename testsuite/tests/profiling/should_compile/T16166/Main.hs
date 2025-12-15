@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 -- Main.hs
 module Main (main) where
 

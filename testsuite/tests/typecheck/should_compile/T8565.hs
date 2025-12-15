@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, GeneralizedNewtypeDeriving, ImpredicativeTypes #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 module Foo where
 
 class C a where op :: (forall b. b -> a) -> a

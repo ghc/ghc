@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyDataDecls, GADTs, TypeFamilies #-}
+{-# LANGUAGE GADTs, TypeFamilies #-}
 
 module T7489 where
 

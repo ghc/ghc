@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wpartial-fields #-}
 module T16411 where
 

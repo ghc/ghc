@@ -1,5 +1,5 @@
-{-# LANGUAGE UndecidableInstances, UndecidableSuperClasses, ConstraintKinds, FlexibleInstances,
-  GADTs, QuantifiedConstraints, TypeApplications, ScopedTypeVariables #-}
+{-# LANGUAGE UndecidableInstances, UndecidableSuperClasses, GADTs, QuantifiedConstraints
+#-}
 
 module T19690 where
 

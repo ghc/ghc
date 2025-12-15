@@ -1,4 +1,4 @@
-{-# LANGUAGE ApplicativeDo, DerivingStrategies, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ApplicativeDo, DerivingStrategies #-}
 
 module Main where
 

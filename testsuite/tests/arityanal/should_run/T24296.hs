@@ -1,4 +1,4 @@
-{-# LANGUAGE GHC2021, UnboxedTuples #-}
+{-# LANGUAGE UnboxedTuples #-}
 module Main (main) where
 
 newtype Tricky = TrickyCon { unTrickyCon :: (# #) -> Tricky }

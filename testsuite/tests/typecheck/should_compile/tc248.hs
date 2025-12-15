@@ -1,5 +1,3 @@
-{-# LANGUAGE ExplicitForAll #-}
-
 module ShouldCompile where
 
 identity :: forall a. a -> a

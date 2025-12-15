@@ -1,10 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE ExplicitForAll #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DatatypeContexts, ExistentialQuantification #-}
+{-# LANGUAGE DatatypeContexts #-}
 module MoreExplicitForalls where
 
 import Data.Proxy

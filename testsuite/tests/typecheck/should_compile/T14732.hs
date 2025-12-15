@@ -1,6 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fdefer-type-errors -O #-}
 -- Oddly this bug was only triggered with -fdefer-type-errors
 -- The -O ensures that the RULE is processed

@@ -1,7 +1,7 @@
-{-# LANGUAGE
-    Arrows
-  , TypeOperators
-  #-}
+{-# LANGUAGE Arrows
+
+
+#-}
 -- This is extracted from arrow-list package
 -- The problem was that some internal tuples that Arrows desugaring
 -- generates the components in different orders depending on the order

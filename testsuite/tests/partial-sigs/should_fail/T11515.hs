@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstraintKinds, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T11515 where
 

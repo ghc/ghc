@@ -1,6 +1,5 @@
-
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts,
-             FlexibleInstances, OverlappingInstances, UndecidableInstances #-}
+{-# LANGUAGE OverlappingInstances, UndecidableInstances
+#-}
 
 --
 -- Test case adopted from the HList library

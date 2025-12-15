@@ -1,6 +1,6 @@
 -- In case of types with nested type synonyms, all synonyms should be expanded
 
-{-# LANGUAGE RankNTypes #-}
+--
 
 import Control.Monad.ST
 

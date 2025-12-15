@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, KindSignatures #-}
+{-# LANGUAGE Rank2Types #-}
 module T7368 where
 
 newtype Bad w = Bad (forall a. (w a -> a))

@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -cpp #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 module Main where
 
 import Control.Concurrent

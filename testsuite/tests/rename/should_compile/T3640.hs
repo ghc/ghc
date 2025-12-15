@@ -1,5 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-
 module T3640 where
 
 data Record = Record { f1, f2, f3 :: Int }

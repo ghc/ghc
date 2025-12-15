@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module Bug where
 
 f1 :: forall a. [a] -> [a]

@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module ShouldCompile where
 
 -- Check that we can have a forall to the right of a double-arrow

@@ -1,6 +1,6 @@
-{-# LANGUAGE GADTs, TypeOperators, PolyKinds, DataKinds,
-             TypeFamilyDependencies, RankNTypes, LambdaCase, EmptyCase,
-             UndecidableInstances #-}
+{-# LANGUAGE GADTs, DataKinds, TypeFamilyDependencies, LambdaCase, UndecidableInstances
+
+#-}
 
 module T13822 where
 

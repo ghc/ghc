@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, PolyKinds, TypeFamilies, AllowAmbiguousTypes #-}
+{-# LANGUAGE MagicHash, TypeFamilies, AllowAmbiguousTypes #-}
 
 module T11471 where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyCase, EmptyDataDecls, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T13468 where
 

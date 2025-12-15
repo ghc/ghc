@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns, FlexibleContexts #-}
 module Main where
 
 import Data.Array.Base (unsafeRead, unsafeWrite)

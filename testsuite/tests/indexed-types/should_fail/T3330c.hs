@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyDataDecls, TypeFamilies, TypeOperators, GADTs, KindSignatures #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 
 module T3330c where
 

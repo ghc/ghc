@@ -1,4 +1,4 @@
-{-# LANGUAGE  TypeFamilies, ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module T3169 where
 
 import Prelude hiding ( lookup )

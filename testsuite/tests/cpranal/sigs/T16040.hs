@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module T16040 where
 
 -- A type to take the place of state

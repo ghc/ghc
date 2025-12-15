@@ -1,4 +1,4 @@
-{-# LANGUAGE UnicodeSyntax, RankNTypes, TypeFamilies #-}
+{-# LANGUAGE UnicodeSyntax, TypeFamilies #-}
 module T5595 where
 
 import Data.Kind (Type)

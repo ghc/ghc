@@ -1,5 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 import Control.Concurrent
 import Control.Concurrent.MVar
 import Control.Monad

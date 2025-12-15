@@ -1,4 +1,4 @@
-{-# LANGUAGE ImpredicativeTypes, FlexibleContexts #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 module T2846 where
 
 f :: String

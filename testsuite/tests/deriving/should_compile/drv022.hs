@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module ShouldCompile where
 import Data.Typeable
 

@@ -1,6 +1,3 @@
-{-# LANGUAGE StandaloneKindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses, PolyKinds, ConstraintKinds #-}
-
 module SAKS_004 where
 
 import Data.Kind (Type, Constraint)

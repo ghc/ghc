@@ -1,18 +1,13 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE PolyKinds #-}
 
 -- The code from the ticket lacked these extensions,
 -- but crashed the compiler with "GHC internal error"
 -- It doesn't crash now; and in this test case I've added
 -- the extensions, which makes it compile cleanly
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, UndecidableInstances, FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances, FunctionalDependencies #-}
 
 
 module T12055 where

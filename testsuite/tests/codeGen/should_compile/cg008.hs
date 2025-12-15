@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
 {-# OPTIONS_GHC -O0 #-}
 
 -- Variant of cgrun066; compilation as a module is different.

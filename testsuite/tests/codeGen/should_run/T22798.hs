@@ -1,7 +1,7 @@
 -- Derived from SHA-1.5.0.0
 -- This previously uncovered cases left unhandled in the AArch64 NCG (#22798).
 
-{-# LANGUAGE BangPatterns, CPP, FlexibleInstances #-}
+{-# LANGUAGE CPP #-}
 module Main (main) where
 
 import Data.Binary

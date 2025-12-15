@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
-{-# LANGUAGE UndecidableInstances, MultiParamTypeClasses,
-             FunctionalDependencies, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances, FunctionalDependencies
+#-}
 
 module T3108 where
 

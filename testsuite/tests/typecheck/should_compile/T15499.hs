@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, GADTs, KindSignatures #-}
+{-# LANGUAGE DataKinds, GADTs #-}
 module T15499 ()
 where
 

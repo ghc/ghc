@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, GADTs #-}
+{-# LANGUAGE GADTs #-}
 
 module Bug where
 

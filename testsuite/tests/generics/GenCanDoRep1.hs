@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TypeOperators #-}
-
 module CanDoRep1 where
 
 import GHC.Generics (Generic, Generic1)

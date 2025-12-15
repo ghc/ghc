@@ -1,5 +1,5 @@
-{-# LANGUAGE GADTs, ExistentialQuantification, ScopedTypeVariables,
-             RankNTypes #-}
+{-# LANGUAGE GADTs
+#-}
 
 -- Here's an example from Doaitse Swiestra (Sept 06)
 -- which requires use of scoped type variables

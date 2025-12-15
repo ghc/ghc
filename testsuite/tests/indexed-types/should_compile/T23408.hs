@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, TypeApplications, GADTs, FunctionalDependencies, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies, GADTs, FunctionalDependencies #-}
 
 module T23408 where
 

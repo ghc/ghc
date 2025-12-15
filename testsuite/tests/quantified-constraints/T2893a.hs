@@ -1,9 +1,9 @@
-{-# LANGUAGE
-    GADTs
-  , FlexibleContexts
-  , RankNTypes
-  , ScopedTypeVariables
-  , QuantifiedConstraints #-}
+{-# LANGUAGE GADTs, QuantifiedConstraints
+
+
+
+
+#-}
 
 module T2893a where
 

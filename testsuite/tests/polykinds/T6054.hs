@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, DataKinds #-}
+{-# LANGUAGE DataKinds #-}
 
 module T6054 where
 

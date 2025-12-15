@@ -1,6 +1,5 @@
 {-# LANGUAGE LinearTypes #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RankNTypes #-}
 module RankN where
 {-
 inplace/bin/ghc-stage1 -O2 -dcore-lint

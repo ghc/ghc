@@ -1,5 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTs, ScopedTypeVariables, KindSignatures #-}
-{-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 
 -- Tests whether a type signature can refine a type
 -- See the definition of bug2a

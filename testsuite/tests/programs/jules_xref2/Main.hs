@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 -- partain: the failure (crashing) was w/ -prof-auto compilation
 
 module Main where

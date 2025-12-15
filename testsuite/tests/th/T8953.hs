@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies, TemplateHaskell,
-             FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, TypeFamilies, TemplateHaskell, UndecidableInstances
+#-}
 
 module T8953 where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, DefaultSignatures #-}
+{-# LANGUAGE DefaultSignatures #-}
 
 module T12533 where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
 import Control.Exception
 import System.Environment
 import GHC.Exts

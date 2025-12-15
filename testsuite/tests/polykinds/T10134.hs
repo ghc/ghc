@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeOperators, ConstraintKinds, TypeFamilies, NoMonoLocalBinds, NoMonomorphismRestriction #-}
+{-# LANGUAGE DataKinds, TypeFamilies, NoMonoLocalBinds, NoMonomorphismRestriction #-}
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 module T10134 where

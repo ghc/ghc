@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
-{-# LANGUAGE FlexibleContexts, Rank2Types #-}
+{-# LANGUAGE Rank2Types #-}
 
 module Test where
 

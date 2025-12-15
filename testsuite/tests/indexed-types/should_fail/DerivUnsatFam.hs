@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- Crashed 6.12
 

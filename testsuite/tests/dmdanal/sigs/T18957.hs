@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -O2 -fforce-recomp #-}
-{-# LANGUAGE BangPatterns #-}
 
 -- | This ticket is about the demand `seq` puts its first argument under and how
 -- that affects call demands.

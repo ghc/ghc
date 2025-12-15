@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes, TypeApplications #-}
-
 module VtaCoerce where
 
 import Data.Coerce (coerce)

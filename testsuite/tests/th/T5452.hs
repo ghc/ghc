@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, KindSignatures, FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module T5452 where
 

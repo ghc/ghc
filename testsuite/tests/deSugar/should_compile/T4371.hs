@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns,DeriveDataTypeable #-}
+{-# LANGUAGE ViewPatterns #-}
 module T4371 where
 
 import Data.Typeable

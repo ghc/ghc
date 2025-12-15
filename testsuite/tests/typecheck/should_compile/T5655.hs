@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTs, ConstraintKinds, RankNTypes #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 module T5655 where
 
 import Data.Kind (Type, Constraint)

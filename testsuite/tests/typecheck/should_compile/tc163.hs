@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 -- This one killed GHC 5.05 and earlier
 -- The problem was in a newtype with a record selector, with
 -- a polymorphic argument type.  MkId generated a bogus selector

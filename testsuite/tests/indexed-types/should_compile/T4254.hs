@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, FunctionalDependencies, RankNTypes, MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies, FunctionalDependencies #-}
 module T4254 where
 
 class FD a b | a -> b where

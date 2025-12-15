@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StaticPointers       #-}
 
 module Ppr054 where

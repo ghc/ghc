@@ -1,6 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ExistentialQuantification  #-}
 module Unfold
     ( Unfold (..)
     , supplyFirst

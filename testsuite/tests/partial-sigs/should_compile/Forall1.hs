@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, ScopedTypeVariables #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module Forall1 where
 
 fall :: forall a. _ -> a

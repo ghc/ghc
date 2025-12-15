@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, DataKinds, TemplateHaskell, TypeFamilies, TypeApplications #-}
+{-# LANGUAGE DataKinds, TemplateHaskell, TypeFamilies #-}
 
 module TH_TyInstWhere2 where
 

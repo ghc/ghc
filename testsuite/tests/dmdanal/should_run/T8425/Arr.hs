@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, FlexibleInstances #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Arr (

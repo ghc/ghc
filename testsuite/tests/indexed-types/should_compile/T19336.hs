@@ -1,6 +1,6 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances
-           , DataKinds, NoMonomorphismRestriction, UndecidableInstances
-           , TypeFamilies #-}
+{-# LANGUAGE DataKinds, NoMonomorphismRestriction, UndecidableInstances, TypeFamilies
+
+#-}
 
 {-# OPTIONS_GHC -Wall #-}
 

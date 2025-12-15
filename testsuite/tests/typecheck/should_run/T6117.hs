@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 import Prelude hiding (Semigroup(..))
 
 {-

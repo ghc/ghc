@@ -1,4 +1,4 @@
-{-# LANGUAGE ImpredicativeTypes, FlexibleContexts #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 
 module T9858e where
 import Data.Typeable

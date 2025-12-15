@@ -10,9 +10,9 @@
   compare the result of the primop wrappers with the results of interpretation.
 -}
 
-{-# LANGUAGE FlexibleContexts    #-}
+--
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+--
 {-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE DerivingStrategies #-}

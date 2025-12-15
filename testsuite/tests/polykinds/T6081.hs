@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, PolyKinds, DataKinds, RankNTypes #-}
+{-# LANGUAGE DataKinds #-}
 
 module T6081 where
 

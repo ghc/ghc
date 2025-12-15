@@ -1,7 +1,5 @@
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE RequiredTypeArguments #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE NamedWildCards #-}
 
 module T22326_idv where
 

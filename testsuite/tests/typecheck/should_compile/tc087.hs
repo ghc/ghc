@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module ShouldSucceed where
 
 data SeqView t a              =  Null

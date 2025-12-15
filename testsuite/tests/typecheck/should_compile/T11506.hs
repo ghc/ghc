@@ -1,5 +1,5 @@
-{-# LANGUAGE PolyKinds, ExistentialQuantification, ScopedTypeVariables,
-             TypeFamilies, DataKinds #-}
+{-# LANGUAGE TypeFamilies, DataKinds
+#-}
 
 module T11506 where
 

@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeOperators, DataKinds, PolyKinds,
-             MultiParamTypeClasses, GADTs, ConstraintKinds, TypeFamilies #-}
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies
+#-}
 module T8705 where
 
 data family Sing (a :: k)

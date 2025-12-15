@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -finline-generics-aggressively #-}
 module T11068_aggressive where
 

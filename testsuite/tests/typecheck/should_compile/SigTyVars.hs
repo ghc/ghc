@@ -1,5 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module SigTyVars where
 
 -- Here the lexically scoped type variables 'a' and 'b'

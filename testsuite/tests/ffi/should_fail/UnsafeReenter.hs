@@ -1,5 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 -- | Test that unsafe FFI calls crash the RTS if they attempt to re-enter
 -- Haskell-land
 module Main where

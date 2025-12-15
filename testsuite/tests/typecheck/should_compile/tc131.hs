@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 -- !!! Typechecking of functional dependencies
 -- Showed up (another) bug in the newtype-squashing machinery

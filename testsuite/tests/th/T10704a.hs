@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE TypeFamilies #-}
 module T10704a where
 
 import Language.Haskell.TH

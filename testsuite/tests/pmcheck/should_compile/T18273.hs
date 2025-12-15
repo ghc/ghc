@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -fforce-recomp -Wincomplete-patterns #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
 

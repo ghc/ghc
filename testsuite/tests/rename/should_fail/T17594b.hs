@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, ImpredicativeTypes, NoTypeAbstractions #-}
+{-# LANGUAGE ImpredicativeTypes, NoTypeAbstractions #-}
 module T17594b where
 
 id1 :: forall a. a -> a

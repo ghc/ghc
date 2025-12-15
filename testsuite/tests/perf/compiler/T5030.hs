@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTs, EmptyDataDecls, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module SlowComp where

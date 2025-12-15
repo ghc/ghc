@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, RoleAnnotations #-}
+{-# LANGUAGE RoleAnnotations #-}
 
 module T7272 where
 

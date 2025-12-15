@@ -1,6 +1,3 @@
-
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Foo where
 
 class C a

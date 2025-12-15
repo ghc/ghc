@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, TransformListComp, NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards, TransformListComp #-}
 
 module T3901 where
 

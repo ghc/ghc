@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module T1087 where
 
 prefix_1 = let at a !b = False in at 1 2

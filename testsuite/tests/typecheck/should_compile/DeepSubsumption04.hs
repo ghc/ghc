@@ -1,5 +1,4 @@
 {-# LANGUAGE DeepSubsumption #-}
-{-# LANGUAGE KindSignatures #-}
 module DeepSubsumption04 where
 
 import Data.Kind

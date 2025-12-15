@@ -1,6 +1,4 @@
 {-# LANGUAGE UnliftedDatatypes #-}
-{-# LANGUAGE GADTSyntax #-}
-{-# LANGUAGE KindSignatures #-}
 
 module UnlDataMonoSigs where
 

@@ -1,11 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE InstanceSigs #-}
 
 module WorkingGenerics where
 import GHC.Generics

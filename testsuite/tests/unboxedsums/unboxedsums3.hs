@@ -1,4 +1,4 @@
-{-# LANGUAGE UnboxedSums, MagicHash, BangPatterns, UnboxedTuples #-}
+{-# LANGUAGE UnboxedSums, MagicHash, UnboxedTuples #-}
 
 module Main where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, RankNTypes, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T4358 where
 

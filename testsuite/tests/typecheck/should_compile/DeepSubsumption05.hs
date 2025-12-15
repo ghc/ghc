@@ -1,5 +1,4 @@
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeepSubsumption #-}
 module DeepSubsumption06 where
 

@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 module Data.ByteString.Search.DFA (strictSearcher) where
 
 import qualified Data.ByteString as S

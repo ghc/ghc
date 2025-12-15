@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts,
-             FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances
+#-}
 
 -- This tests an aspect of functional dependencies, revealing a bug in GHC 6.0.1
 -- discovered by Martin Sulzmann

@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ExistentialQuantification #-}
+{-# LANGUAGE GADTs #-}
 
 module ShouldFail where
 

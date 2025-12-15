@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, EmptyDataDecls #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T2639 where
 

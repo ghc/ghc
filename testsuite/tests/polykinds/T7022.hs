@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, TypeFamilies, DataKinds, TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies, DataKinds, TemplateHaskell #-}
 
 module T7022 where
 

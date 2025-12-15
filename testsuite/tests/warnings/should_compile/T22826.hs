@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wmissing-poly-kind-signatures #-}
-{-# LANGUAGE GADTs, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE GADTs, TypeFamilies #-}
 -- without standalone kind signatures or cusks: warnings
 module T22826 where
 

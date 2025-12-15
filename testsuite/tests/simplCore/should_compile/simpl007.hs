@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# OPTIONS_GHC -Wno-x-partial #-}
-{-# LANGUAGE UndecidableInstances,
-             ExistentialQuantification, FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances
+#-}
 
 -- module Formula where
 module Main where

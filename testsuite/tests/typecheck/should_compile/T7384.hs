@@ -1,4 +1,4 @@
-{-# LANGUAGE FunctionalDependencies, PolyKinds #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module T7384 where
 

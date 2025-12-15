@@ -1,11 +1,11 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
-{-# LANGUAGE
-     FlexibleContexts
-   , FlexibleInstances
-   , FunctionalDependencies
-   , MultiParamTypeClasses
-   , KindSignatures
-   , UndecidableInstances #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances
+
+
+
+
+
+#-}
 
 module T7875 where
 

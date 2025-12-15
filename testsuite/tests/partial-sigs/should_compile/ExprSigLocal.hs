@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, RankNTypes #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 module ExprSigLocal where
 

@@ -1,5 +1,5 @@
-{-# LANGUAGE PolyKinds, MultiParamTypeClasses, GADTs, ScopedTypeVariables,
-             TypeOperators #-}
+{-# LANGUAGE GADTs
+#-}
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 module Super where

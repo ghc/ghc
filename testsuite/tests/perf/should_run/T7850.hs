@@ -1,6 +1,3 @@
-
-{-# LANGUAGE BangPatterns #-}
-
 main :: IO ()
 main = print $ ack 4 1
 

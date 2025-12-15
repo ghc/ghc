@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, QuantifiedConstraints, ConstraintKinds  #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 -- NB: disabling these if enabled:
 {-# LANGUAGE NoUndecidableInstances, NoUndecidableSuperClasses #-}
 

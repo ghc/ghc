@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, KindSignatures #-}
+{-# LANGUAGE GADTs #-}
 
 module Gadt23_AST where
 

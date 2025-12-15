@@ -5,7 +5,7 @@
 --
 -- See Note [ARM outline atomics and the RTS linker] in m4/fp_armv8_outline_atomics.m4.
 
-{-# LANGUAGE ForeignFunctionInterface #-}
+--
 
 module Main where
 

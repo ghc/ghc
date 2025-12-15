@@ -1,5 +1,3 @@
-{-# LANGUAGE PolyKinds #-}
-
 module T12987 where
 
 import GHC.Exts

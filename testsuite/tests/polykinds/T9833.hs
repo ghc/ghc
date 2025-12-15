@@ -1,5 +1,3 @@
-{-# LANGUAGE InstanceSigs, PolyKinds #-}
-
 module T9833 where
 
 import Control.Applicative

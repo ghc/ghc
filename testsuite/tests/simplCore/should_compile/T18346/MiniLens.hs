@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module MiniLens ((^.), Getting, Lens', lens, view) where
 
 import Data.Functor.Const (Const(..))

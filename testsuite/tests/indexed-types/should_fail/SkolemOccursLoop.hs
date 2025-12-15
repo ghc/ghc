@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -ftype-function-depth=3 #-}
-{-# LANGUAGE TypeFamilies, FlexibleContexts, EmptyDataDecls #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module SkolemOccursLoop where
 

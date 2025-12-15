@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -freduction-depth=1000 #-} 
-{-# LANGUAGE 
-     FlexibleContexts, FlexibleInstances, FunctionalDependencies, 
-     MultiParamTypeClasses, TypeSynonymInstances, 
-     TypeOperators, UndecidableInstances, TypeFamilies #-} 
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances, TypeFamilies
+
+
+#-} 
 module T5321FD where
 
 -------- USES FUNCTIONAL DEPENDENCIES -------------

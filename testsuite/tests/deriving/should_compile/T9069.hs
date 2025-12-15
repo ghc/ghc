@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveTraversable #-}
-
 module T9069 where
 
 import Data.Foldable

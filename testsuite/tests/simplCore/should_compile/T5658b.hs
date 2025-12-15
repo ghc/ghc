@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
 module T5658b where
 import GHC.Exts
 

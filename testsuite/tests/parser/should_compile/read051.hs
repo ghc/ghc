@@ -1,6 +1,3 @@
-
-{-# LANGUAGE KindSignatures #-}
-
 module Foo where
 
 import Data.Kind (Type)

@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables, RankNTypes, PolyKinds #-}
 module T8856 where
 
 import Data.Proxy

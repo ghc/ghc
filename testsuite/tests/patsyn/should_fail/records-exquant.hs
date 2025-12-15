@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, ExistentialQuantification #-}
+{-# LANGUAGE PatternSynonyms #-}
 module ExQuant where
 
 data Showable = forall a . Show a => Showable a

@@ -1,5 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
-
 -- This test is really meant for human looking; do a -ddump-simpl.
 
 -- The definition that you want to look at is for foo.

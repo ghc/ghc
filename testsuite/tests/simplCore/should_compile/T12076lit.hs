@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
 module T12076lit where
 
 -- This test-case demonstrates that cpeApp's collect_args can

@@ -1,5 +1,4 @@
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ExplicitForAll #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 module T14326 where
 

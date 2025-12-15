@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-
 -- Generates CmmSwitchTest.hs
 
 import qualified Data.Set as S

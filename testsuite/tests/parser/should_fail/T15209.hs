@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeOperators #-}
+{-# LANGUAGE GADTs #-}
 module T15209 where
 
 import GHC.Exts

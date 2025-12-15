@@ -1,10 +1,10 @@
-{-# LANGUAGE
-    MultiParamTypeClasses,
-    FunctionalDependencies,
-    UndecidableInstances,
-    FlexibleInstances,
-    EmptyDataDecls,
-    FlexibleContexts #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances
+
+
+
+
+
+#-}
 
 -- #1797
 

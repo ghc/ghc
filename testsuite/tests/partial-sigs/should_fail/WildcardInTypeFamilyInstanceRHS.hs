@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, TypeFamilies, InstanceSigs #-}
+{-# LANGUAGE PartialTypeSignatures, TypeFamilies #-}
 module WildcardInTypeFamilyInstanceRHS where
 
 class Foo k where

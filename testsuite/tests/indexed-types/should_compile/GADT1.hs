@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTs, EmptyDataDecls #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 
 -- This wrongly fails with
 -- 

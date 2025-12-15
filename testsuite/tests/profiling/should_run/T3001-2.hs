@@ -1,9 +1,8 @@
-
 -- A second test for trac #3001, which segfaults when compiled by
 -- GHC 6.10.1 and run with +RTS -hb. Most of the code is from the
 -- binary 0.4.4 package.
 
-{-# LANGUAGE CPP, FlexibleInstances, FlexibleContexts, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
 
 module Main (main) where
 

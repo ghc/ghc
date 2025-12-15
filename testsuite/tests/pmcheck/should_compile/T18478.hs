@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableSuperClasses, FunctionalDependencies, RoleAnnotations, ExplicitNamespaces, TypeFamilies, RankNTypes, TypeApplications, LambdaCase, DerivingStrategies, ScopedTypeVariables, TypeOperators, DataKinds, PolyKinds, GADTs, TypeFamilyDependencies, ConstraintKinds, UndecidableInstances, TypeSynonymInstances, FlexibleInstances, DeriveGeneric, AllowAmbiguousTypes, StrictData #-}
+{-# LANGUAGE UndecidableSuperClasses, FunctionalDependencies, RoleAnnotations, ExplicitNamespaces, TypeFamilies, LambdaCase, DerivingStrategies, DataKinds, GADTs, TypeFamilyDependencies, UndecidableInstances, AllowAmbiguousTypes, StrictData #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints -fforce-recomp -Wincomplete-patterns #-}
 
 {- | Module, containing restrictions imposed by instruction or value scope.

@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, RebindableSyntax #-}
+{-# LANGUAGE RebindableSyntax #-}
 module T10112 where
 
 import qualified Prelude as P

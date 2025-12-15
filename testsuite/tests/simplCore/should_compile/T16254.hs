@@ -1,5 +1,5 @@
 -- variant of T5327, where we force the newtype to have a wrapper
-{-# LANGUAGE GADTs, ExplicitForAll #-}
+{-# LANGUAGE GADTs #-}
 module T16254 where
 
 newtype Size a b where

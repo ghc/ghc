@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
-
 module Main where
 
 -- Derive functor for a simple data type

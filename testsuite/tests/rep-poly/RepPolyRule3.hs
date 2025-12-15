@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, PolyKinds, StandaloneKindSignatures, TypeFamilyDependencies #-}
+{-# LANGUAGE DataKinds, TypeFamilyDependencies #-}
 
 module RepPolyRule3 where
 

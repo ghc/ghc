@@ -1,4 +1,3 @@
-{-# LANGUAGE PolyKinds #-}
 {-# OPTIONS_GHC -dcore-lint -O #-}
 module T8196 where
 

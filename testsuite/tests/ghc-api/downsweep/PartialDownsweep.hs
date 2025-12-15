@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | This test checks if 'downsweep can return partial results when various
 -- kinds of parse errors occur in modules.

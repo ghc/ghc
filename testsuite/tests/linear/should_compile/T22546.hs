@@ -1,4 +1,4 @@
-{-# LANGUAGE LinearTypes, GADTSyntax #-}
+{-# LANGUAGE LinearTypes #-}
 
 module T22546 where
 

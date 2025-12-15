@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTSyntax #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T17544 where
 

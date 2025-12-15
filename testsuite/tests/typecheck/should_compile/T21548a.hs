@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, DeepSubsumption #-}
+{-# LANGUAGE DeepSubsumption #-}
 
 module T21548a where
 

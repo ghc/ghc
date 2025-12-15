@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
 eval :: forall a b. (a -> b -> b) -> b -> [a] -> b

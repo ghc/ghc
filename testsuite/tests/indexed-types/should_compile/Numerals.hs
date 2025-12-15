@@ -1,7 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeOperators #-}
 
 module Numerals where
 

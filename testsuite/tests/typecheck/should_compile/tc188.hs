@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeOperators, MultiParamTypeClasses, LiberalTypeSynonyms #-}
+{-# LANGUAGE LiberalTypeSynonyms #-}
 
 -- Test infix type constructors for type synonyms
 

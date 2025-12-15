@@ -1,7 +1,7 @@
-{-# LANGUAGE
-            NoImplicitPrelude
-           , ExistentialQuantification
-  #-}
+{-# LANGUAGE NoImplicitPrelude
+
+
+#-}
 
 module Test where
 

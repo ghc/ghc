@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, PolyKinds, DataKinds, GADTs, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies, DataKinds, GADTs #-}
 
 module T14045a where
 

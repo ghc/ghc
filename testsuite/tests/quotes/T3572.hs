@@ -1,5 +1,3 @@
-{-# LANGUAGE EmptyDataDecls #-}
-
 -- #3572
 
 module Main where

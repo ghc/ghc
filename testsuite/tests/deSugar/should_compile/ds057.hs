@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, BangPatterns, UnboxedTuples #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 module ShouldCompile where
 
 import Data.Word

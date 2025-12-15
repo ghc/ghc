@@ -1,10 +1,5 @@
 {-# OPTIONS_GHC -Wincomplete-patterns -fforce-recomp #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE EmptyCase #-}
 module Lib where
 
 import Data.Type.Equality

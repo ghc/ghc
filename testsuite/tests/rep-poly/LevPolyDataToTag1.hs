@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, MagicHash, ScopedTypeVariables, UnliftedDatatypes #-}
+{-# LANGUAGE GADTs, MagicHash, UnliftedDatatypes #-}
 
 module LevPolyDataToTag where
 

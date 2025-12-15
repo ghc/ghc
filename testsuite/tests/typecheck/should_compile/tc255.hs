@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ConstraintKinds, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, UndecidableInstances #-}
 module Ctx where
 
 import Data.Kind ( Type, Constraint )

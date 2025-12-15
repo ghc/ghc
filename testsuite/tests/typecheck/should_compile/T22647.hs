@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeApplications, KindSignatures, DataKinds, TypeFamilies, FlexibleInstances #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 
 module T22647 where
 

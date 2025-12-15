@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, PolyKinds, DataKinds, GADTs #-}
+{-# LANGUAGE TypeFamilies, DataKinds, GADTs #-}
 
 module T8707 where
 

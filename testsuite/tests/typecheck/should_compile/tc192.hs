@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE Arrows, CPP, TypeOperators #-}
+{-# LANGUAGE Arrows, CPP #-}
 
 -- Test infix type notation and arrow notation
 

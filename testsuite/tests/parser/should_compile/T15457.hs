@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
 module T15457 where
 
 import Data.Type.Equality

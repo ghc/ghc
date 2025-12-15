@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -funbox-strict-fields -O #-}
-{-# LANGUAGE ExistentialQuantification #-}
 
 {- OPTIONS_GHC -ddump-simpl -ddump-asm -}
 

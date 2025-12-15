@@ -1,6 +1,3 @@
-
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 import Foreign hiding ( unsafePerformIO )
 import Foreign.C
 import System.IO.Unsafe

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
 
 module Main where
 

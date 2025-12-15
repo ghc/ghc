@@ -1,5 +1,5 @@
-{-# LANGUAGE PolyKinds, MultiParamTypeClasses, FlexibleContexts, DataKinds,
-             TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeFamilies
+#-}
 
 module T9200 where
 

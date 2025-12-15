@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 data Test = Test !Int
 
 {-# NOINLINE f #-}

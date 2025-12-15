@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ExplicitNamespaces, TypeOperators, DataKinds  #-}
+{-# LANGUAGE GADTs, ExplicitNamespaces, DataKinds #-}
 
 module T10806 where
 

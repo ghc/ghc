@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 -- Dead arguments should be dropped in specialisations. See !2913.
 
 module ShouldCompile where

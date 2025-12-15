@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 module T9569a where
 
 g :: (Int -> Int) -> Int

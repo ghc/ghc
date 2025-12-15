@@ -1,14 +1,14 @@
 -- Using overloaded labels as strings, slightly pointlessly
 
-{-# LANGUAGE OverloadedLabels
-           , DataKinds
-           , FlexibleContexts
-           , FlexibleInstances
-           , MultiParamTypeClasses
-           , ScopedTypeVariables
-           , TypeFamilies
-           , TypeSynonymInstances
-  #-}
+{-# LANGUAGE OverloadedLabels, DataKinds, TypeFamilies
+
+
+
+
+
+
+
+#-}
 
 import GHC.OverloadedLabels
 import Data.Proxy ( Proxy(..) )

@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 -- NetworkRequestHeader.hs
 module NetworkRequestHeader (parseHeaderLines, parseRequestLine) where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, PolyKinds, ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module T7404 where
 
 import Data.Kind (Type)

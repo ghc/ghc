@@ -1,4 +1,4 @@
- {-# LANGUAGE TypeFamilies, ScopedTypeVariables, FlexibleContexts #-}  
+{-# LANGUAGE TypeFamilies #-}  
 
 -- See also #5763 for why we don't really want to see
 -- an occurs-check error from this program

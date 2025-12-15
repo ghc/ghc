@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 -- This program must be called with GHC's libdir as the single command line
 -- argument.
 module Main where

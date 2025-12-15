@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, DataKinds #-}
+{-# LANGUAGE DataKinds #-}
 
 module T5798 where
 

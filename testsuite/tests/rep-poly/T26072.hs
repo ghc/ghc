@@ -4,7 +4,6 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE UnliftedDatatypes #-}
 {-# LANGUAGE UnliftedNewtypes #-}

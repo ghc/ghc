@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, UndecidableInstances, FlexibleInstances, TypeSynonymInstances #-}
+{-# LANGUAGE TemplateHaskell, UndecidableInstances #-}
 
 module TH_spliceDecl4 where
 

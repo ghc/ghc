@@ -1,4 +1,4 @@
-{-# LANGUAGE DatatypeContexts, TypeApplications #-}
+{-# LANGUAGE DatatypeContexts #-}
 {-# OPTIONS_GHC -Wno-deprecated-flags #-}
 
 module T19775 where

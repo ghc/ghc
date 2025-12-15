@@ -1,4 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts #-}
 module Main ( main ) where
 
 class Foldable f => C f a where

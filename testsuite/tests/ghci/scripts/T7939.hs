@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, PolyKinds, DataKinds, TypeOperators #-}
+{-# LANGUAGE TypeFamilies, DataKinds #-}
 module T7939 where
 import Data.Kind (Type)
 

@@ -1,14 +1,13 @@
-
 -- Testing performance of type-checking rewriting plugins.
 -- Test based on T9872b.
 
 {-# OPTIONS_GHC -freduction-depth=400 #-}
 
-{-# LANGUAGE MultiParamTypeClasses #-}
+--
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE DataKinds, KindSignatures, PolyKinds #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds #-}
+--
 
 module RewritePerfDefs where
 

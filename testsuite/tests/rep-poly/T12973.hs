@@ -1,4 +1,4 @@
-{-# LANGUAGE RebindableSyntax, PolyKinds, ExplicitForAll #-}
+{-# LANGUAGE RebindableSyntax #-}
 
 module T12973 where
 

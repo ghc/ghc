@@ -1,12 +1,12 @@
-{-# LANGUAGE RankNTypes
-           , PolyKinds
-           , GADTs
-           , TypeApplications
-           , PatternSynonyms
-           , ExistentialQuantification
-           , StandaloneKindSignatures
-           , DataKinds
-           , ExistentialQuantification
+{-# LANGUAGE GADTs, PatternSynonyms, DataKinds
+
+
+
+
+
+
+
+
 #-}
 
 module ExplicitSpecificityA1 where

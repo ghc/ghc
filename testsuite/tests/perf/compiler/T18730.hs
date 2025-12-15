@@ -1,4 +1,3 @@
-{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -funfolding-case-scaling=5 #-}
 
 module T18730 where

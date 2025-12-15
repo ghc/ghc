@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, NamedWildCards, PolyKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- All declarations below are accepted when the NamedWildCards extension is not
 -- enabled and the identifiers starting with _ are parsed as type variables.

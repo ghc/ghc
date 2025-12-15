@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyDataDecls, TypeFamilies, TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies, TemplateHaskell #-}
 module Main where
 
 import Language.Haskell.TH hiding (Type)

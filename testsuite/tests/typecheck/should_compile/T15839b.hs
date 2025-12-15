@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveAnyClass, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 {-# OPTIONS_GHC -Wno-deriving-defaults #-}
 

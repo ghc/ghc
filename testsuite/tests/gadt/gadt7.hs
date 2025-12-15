@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE GADTs #-}
 
 -- From Yann Regis-Gianas at INRIA
 

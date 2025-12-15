@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies,EmptyDataDecls,MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 module Test where
 
 type family Fam1 a

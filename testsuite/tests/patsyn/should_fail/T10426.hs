@@ -1,3 +1,3 @@
-{-# LANGUAGE PatternSynonyms, ViewPatterns, EmptyCase #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns #-}
 
 pattern Id <- (id -> _) where

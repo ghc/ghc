@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, PolyKinds, DataKinds, TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 module GHCBug where
 import Data.Kind
 

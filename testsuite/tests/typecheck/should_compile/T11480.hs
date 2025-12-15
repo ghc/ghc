@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, UndecidableSuperClasses #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 
 module T11480 where
 

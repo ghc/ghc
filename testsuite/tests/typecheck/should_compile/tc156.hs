@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
-
 -- Test infix type constructors
 
 module ShouldCompile where

@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
-
 -- Ensure that we do list fusion on `foldr f z [from..to]` for sized `Int` and
 -- `Word` types. Related tickets: #15185, #8763.
 

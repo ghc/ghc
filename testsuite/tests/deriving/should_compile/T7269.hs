@@ -1,6 +1,3 @@
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE MultiParamTypeClasses, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
-
 module T7269 where
 
 class C (a :: k)

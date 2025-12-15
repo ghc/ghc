@@ -1,5 +1,4 @@
 {-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE FlexibleContexts #-}
 module Main where
 
 import T17151a

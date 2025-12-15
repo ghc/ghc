@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module SilentParametersOverlapping where 
 

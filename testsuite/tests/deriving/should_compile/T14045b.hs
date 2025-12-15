@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, KindSignatures, GADTs, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 
 module T14045b where
 

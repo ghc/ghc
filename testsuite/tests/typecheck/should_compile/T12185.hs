@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, RankNTypes, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T12185 where
 

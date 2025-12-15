@@ -1,6 +1,6 @@
 -- Test -fdefer-type-errors
 -- Should compile and run
-{-# LANGUAGE FlexibleContexts #-}
+--
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -fdefer-type-errors #-}
 

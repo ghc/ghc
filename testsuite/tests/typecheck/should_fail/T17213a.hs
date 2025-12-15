@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 module T17213a where
 
 foo :: (forall a. a->a)-> Int

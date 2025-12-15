@@ -1,7 +1,7 @@
 -- Based on https://github.com/idris-lang/Idris-dev/blob/v0.9.10/libs/effects/Effects.idr
 
-{-# LANGUAGE DataKinds, PolyKinds, ScopedTypeVariables, TypeOperators,
-             TypeApplications, GADTs, TypeFamilies, AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies, AllowAmbiguousTypes
+#-}
 
 module T12442 where
 

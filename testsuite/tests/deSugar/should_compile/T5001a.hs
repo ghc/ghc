@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 module T5001a (Comorphism(..)) where
 
 class Show a => Comorphism a b c d where

@@ -1,5 +1,5 @@
 -- A.hs
-{-# LANGUAGE BangPatterns #-}
+--
 {-# LANGUAGE StaticPointers #-}
 module T12622_A where
 

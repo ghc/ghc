@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, BangPatterns #-}
+{-# LANGUAGE ViewPatterns #-}
 module Main where
 
 import Control.Exception

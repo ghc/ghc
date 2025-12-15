@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, KindSignatures, 
-    GADTs, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE FunctionalDependencies, GADTs
+#-}
 module T5591b where
 
 import Data.Kind (Type)

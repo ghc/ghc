@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ImplicitParams #-}
 
 module T26051_Import (specMe, MaybeShowNum) where

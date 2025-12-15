@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fforce-recomp #-}
-{-# LANGUAGE DataKinds, KindSignatures, GADTs #-}
+{-# LANGUAGE DataKinds, GADTs #-}
 
 module T18572 where
 

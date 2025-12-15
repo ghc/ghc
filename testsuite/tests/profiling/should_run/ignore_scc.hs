@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 main = print (f 20 30)
 
 {-# NOINLINE f #-}

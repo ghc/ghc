@@ -1,5 +1,5 @@
-{-# LANGUAGE KindSignatures, RankNTypes, PolyKinds, GADTs,
-              FlexibleContexts, DataKinds, TypeFamilies #-}
+{-# LANGUAGE GADTs, DataKinds, TypeFamilies
+#-}
 
 module T7020 where
 

@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE TypeApplications #-}
 module Bug where
 
 import GHC.Exts

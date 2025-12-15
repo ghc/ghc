@@ -1,8 +1,5 @@
-{-# LANGUAGE GADTSyntax #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnliftedNewtypes #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
 
 import GHC.Int (Int(I#))

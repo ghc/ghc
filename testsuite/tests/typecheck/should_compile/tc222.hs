@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, RankNTypes #-}
+{-# LANGUAGE ImplicitParams #-}
 
 -- Tests impredivative polymorphism with left-to-right
 -- flow information; see the uses of "$"

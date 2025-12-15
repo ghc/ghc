@@ -1,7 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE RankNTypes #-}
-
 -----------------------------------------------------------------------------
 -- | Modified from cereal, which is
 -- Copyright   : Lennart Kolmodin, Galois Inc. 2009

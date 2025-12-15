@@ -1,6 +1,3 @@
-
-{-# LANGUAGE DoAndIfThenElse #-}
-
 module DoAndIfThenElse where
 
 foo :: IO ()

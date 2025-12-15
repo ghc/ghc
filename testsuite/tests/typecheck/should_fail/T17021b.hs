@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, TypeFamilies, DataKinds #-}
+{-# LANGUAGE TypeFamilies, DataKinds #-}
 
 module T17021b where
 

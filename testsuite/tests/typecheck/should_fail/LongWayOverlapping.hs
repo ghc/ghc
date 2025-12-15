@@ -1,7 +1,7 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses
-  , FlexibleContexts, FlexibleInstances, UndecidableInstances
-  , TypeSynonymInstances, GeneralizedNewtypeDeriving
-  #-}
+{-# LANGUAGE TypeFamilies, UndecidableInstances
+
+
+#-}
 
 module LongWayOverlapping where
 

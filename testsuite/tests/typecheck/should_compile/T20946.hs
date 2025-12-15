@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 module T20946 where
 
 

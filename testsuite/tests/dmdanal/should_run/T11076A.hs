@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -O #-}
-{-# LANGUAGE MagicHash,
-             ForeignFunctionInterface,
-             UnliftedFFITypes,
-             GHCForeignImportPrim,
-             BangPatterns
-  #-}
+{-# LANGUAGE MagicHash, UnliftedFFITypes, GHCForeignImportPrim
+
+
+
+
+#-}
 module T11076A where
 
 import GHC.Exts

@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
-
 module B where
 import A
 

@@ -1,5 +1,5 @@
-{-# LANGUAGE PolyKinds, FlexibleInstances, ScopedTypeVariables,
-             UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances
+#-}
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 module PolyInstances where

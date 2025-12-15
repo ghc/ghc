@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances, FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Main where
 
 class         L0 a where l0 :: a -> a

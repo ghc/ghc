@@ -1,4 +1,4 @@
-{-# LANGUAGE CApiFFI, CPP, DeriveDataTypeable, NondecreasingIndentation #-}
+{-# LANGUAGE CApiFFI, CPP, NondecreasingIndentation #-}
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 {-# OPTIONS_GHC -fno-cse #-}
 module DoubleMatch where

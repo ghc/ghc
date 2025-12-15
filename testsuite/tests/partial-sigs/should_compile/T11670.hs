@@ -1,4 +1,4 @@
-{-# LANGUAGE InstanceSigs, PartialTypeSignatures #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 module T11670 where
 

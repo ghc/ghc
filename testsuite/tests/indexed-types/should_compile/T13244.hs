@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, DataKinds, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE MagicHash, DataKinds, TypeFamilies #-}
 
 module T13244 where
 

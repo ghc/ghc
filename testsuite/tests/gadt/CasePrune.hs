@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GADTs #-}
 
 -- See #1251 and the comments
 -- Note [Pruning dead case alternatives] in types/Unify.lhs

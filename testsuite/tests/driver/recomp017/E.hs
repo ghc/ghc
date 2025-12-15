@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
 module E where
 import A
 import B

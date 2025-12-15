@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeApplications, ExplicitForAll #-}
-
 module T24359a where
 
 data UA i = UA !i

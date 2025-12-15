@@ -1,5 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
-
 -- Existential context should quantify over some new type variables
 --
 -- Jan07: this is now fine, because we've lifted the restriction

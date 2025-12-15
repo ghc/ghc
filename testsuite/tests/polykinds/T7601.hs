@@ -1,4 +1,3 @@
-{-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE TypeFamilies           #-}
 
 module T7601 where

@@ -1,4 +1,3 @@
-{-# LANGUAGE GADTSyntax #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module GADTSymbolicRecordRecordWildcard where

@@ -1,15 +1,7 @@
-{-# LANGUAGE ConstraintKinds           #-}
-{-# LANGUAGE InstanceSigs              #-}
-{-# LANGUAGE FlexibleContexts          #-}
-{-# LANGUAGE FlexibleInstances         #-}
 {-# LANGUAGE GADTs                     #-}
-{-# LANGUAGE MultiParamTypeClasses     #-}
-{-# LANGUAGE RankNTypes                #-}
 {-# LANGUAGE TypeFamilies              #-}
 {-# LANGUAGE TypeFamilyDependencies    #-}
-{-# LANGUAGE PolyKinds                 #-}
 {-# LANGUAGE DataKinds                 #-}
-{-# LANGUAGE TypeOperators             #-}
 {-# LANGUAGE UndecidableInstances      #-}
 {-# LANGUAGE QuantifiedConstraints     #-}
 

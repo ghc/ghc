@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module Main where
 
 -- Stack overflow if the tail recursion does not work out properly

@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE MagicHash         #-}
 module T11174 where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, ImpredicativeTypes, NoTypeAbstractions #-}
+{-# LANGUAGE ImpredicativeTypes, NoTypeAbstractions #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module T17594b_th where

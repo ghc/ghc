@@ -1,7 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Strict            #-}
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE DeriveGeneric     #-}
 
 module Main where
 

@@ -1,5 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 module A ( mkStringWriter, (<>>) ) where
 
 import Foreign.Ptr

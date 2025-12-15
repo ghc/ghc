@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, KindSignatures, TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 module T9263a where
 
 import T9263b

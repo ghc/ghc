@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 module Main (main) where
 
 main :: IO ()

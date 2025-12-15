@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, MonoLocalBinds #-}
+{-# LANGUAGE MonoLocalBinds #-}
 
 module T13804 where
 

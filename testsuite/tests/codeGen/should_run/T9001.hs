@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 newtype FMList = FM {unFM :: forall m. m -> m}
 
 main = print (delete 2000 (FM id) :: Int)

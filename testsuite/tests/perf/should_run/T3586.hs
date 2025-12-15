@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS -optc-O3 -fexcess-precision #-}
 
 import Control.Monad.ST

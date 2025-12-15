@@ -1,4 +1,3 @@
-{-# LANGUAGE GHC2021 #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module T26256 (go) where

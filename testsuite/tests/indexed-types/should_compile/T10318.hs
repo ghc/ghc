@@ -1,6 +1,6 @@
-{-# LANGUAGE FlexibleContexts, TypeSynonymInstances,
-             FlexibleInstances, TypeFamilies,
-             UndecidableSuperClasses #-}
+{-# LANGUAGE TypeFamilies, UndecidableSuperClasses
+
+#-}
 
 module T10318 where
 

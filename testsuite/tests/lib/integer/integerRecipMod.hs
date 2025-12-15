@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples, TupleSections #-}
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
 
 module Main (main) where
 

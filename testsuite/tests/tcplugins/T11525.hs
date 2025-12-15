@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, TypeOperators, KindSignatures, TypeFamilies,
-             ConstraintKinds, FlexibleContexts #-}
+{-# LANGUAGE DataKinds, TypeFamilies
+#-}
 {-# OPTIONS_GHC -fplugin T11525_Plugin #-}
 module T11525 where
 

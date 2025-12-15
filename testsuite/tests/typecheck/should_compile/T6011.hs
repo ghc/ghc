@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, FlexibleInstances, ScopedTypeVariables, TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 
 module T6011 where
 

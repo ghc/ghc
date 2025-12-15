@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 module T12399 where
 
 import GHC.Exts

@@ -10,7 +10,7 @@
 -- So we decided to merely document this change and add a test representing this behaviour
 -- rather than trying to coax ghc back into its old behaviour.
 
-{-# LANGUAGE DeriveGeneric #-}
+--
 
 {-# OPTIONS_GHC #-}
 module Main

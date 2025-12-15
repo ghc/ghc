@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, PolyKinds, ScopedTypeVariables #-}
+{-# LANGUAGE MagicHash #-}
 {-# OPTIONS_GHC -O #-}
 module T13458 where
 import GHC.Exts

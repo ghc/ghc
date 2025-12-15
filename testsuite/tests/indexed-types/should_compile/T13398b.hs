@@ -1,6 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds, PolyKinds #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE DataKinds #-}
 module T13398b where
 
 import GHC.TypeLits

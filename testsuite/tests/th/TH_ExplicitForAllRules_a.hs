@@ -1,4 +1,3 @@
-{-# LANGUAGE ExplicitForAll #-}
 module TH_ExplicitForAllRules_a (decls, hsToTh) where
 
 import Language.Haskell.TH

@@ -1,6 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE PolyKinds                  #-}
-
 module T5717 where
 
 

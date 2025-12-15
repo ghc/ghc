@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ConstraintKinds, GADTs #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 
 module Main where
 

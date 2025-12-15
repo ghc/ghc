@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances, TypeFamilies, DeriveDataTypeable, StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances, TypeFamilies #-}
 
 module T4896 where
 

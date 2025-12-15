@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeFamilies, PolyKinds, GADTs #-}
+{-# LANGUAGE DataKinds, TypeFamilies, GADTs #-}
 
 module T6036 where
 

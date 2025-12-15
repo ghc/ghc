@@ -1,6 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables, AllowAmbiguousTypes, TypeApplications,
-             TypeFamilies, PolyKinds, DataKinds, FlexibleInstances,
-             MultiParamTypeClasses, FlexibleContexts, PartialTypeSignatures #-}
+{-# LANGUAGE AllowAmbiguousTypes, TypeFamilies, DataKinds, PartialTypeSignatures
+
+#-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
 module InstanceGivenOverlap2 where

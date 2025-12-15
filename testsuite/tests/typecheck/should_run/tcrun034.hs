@@ -1,5 +1,3 @@
-{-# LANGUAGE ExplicitForAll, TypeOperators #-}
-
 module Main where
 
 -- Infix type operator

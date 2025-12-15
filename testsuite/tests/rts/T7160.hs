@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
 import GHC.ForeignPtr
 import GHC.Ptr
 import System.Mem

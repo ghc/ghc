@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
 module T12076sat where
 
 -- This test demonstrates that we need to saturate

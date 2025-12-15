@@ -1,15 +1,15 @@
-{-# LANGUAGE DataKinds
-           , PolyKinds
-           , FlexibleContexts
-           , FlexibleInstances
-           , GADTs
-           , MultiParamTypeClasses
-           , OverloadedLabels
-           , ScopedTypeVariables
-           , TypeApplications
-           , TypeOperators
-           , UndecidableInstances
-  #-}
+{-# LANGUAGE DataKinds, GADTs, OverloadedLabels, UndecidableInstances
+
+
+
+
+
+
+
+
+
+
+#-}
 
 import GHC.OverloadedLabels
 import GHC.Records

@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -ddump-simpl -dhex-word-literals -dsuppress-all -dsuppress-uniques -O2 #-}
-{-# LANGUAGE TypeApplications #-}
 module T16402 where
 
 import Data.Word

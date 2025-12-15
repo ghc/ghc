@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, ViewPatterns, ConstraintKinds, TypeFamilies, PolyKinds, KindSignatures #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, TypeFamilies #-}
 module T10997_1a where
 
 import Data.Kind

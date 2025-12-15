@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, PolyKinds, DataKinds #-}
+{-# LANGUAGE TypeFamilies, DataKinds #-}
 
 module T9200b where
 

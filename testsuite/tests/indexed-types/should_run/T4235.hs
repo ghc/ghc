@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, StandaloneDeriving, FlexibleInstances, GADTs #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 module Main where
 
 import Data.Ix

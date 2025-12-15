@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, LinearTypes, ScopedTypeVariables, EmptyCase #-}
+{-# LANGUAGE GADTs, LinearTypes #-}
 module LinearBottomMult where
 
 -- Check that _|_ * Many is not a subusage of One

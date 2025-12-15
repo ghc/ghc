@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 module T9127 where
 
 f = let !_ = 2 * 2

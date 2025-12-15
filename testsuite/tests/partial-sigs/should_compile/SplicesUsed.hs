@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, PartialTypeSignatures, NamedWildCards #-}
+{-# LANGUAGE TemplateHaskell, PartialTypeSignatures #-}
 
 module SplicesUsed where
 

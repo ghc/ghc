@@ -1,4 +1,4 @@
-{-# LANGUAGE InstanceSigs, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 module T9582 where
 
 class C a where

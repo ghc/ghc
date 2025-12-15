@@ -1,5 +1,4 @@
-{-# LANGUAGE TupleSections,TypeFamilies #-}
-{-# LANGUAGE PatternGuards,ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module AnnotationTuple (foo) where
 
 {

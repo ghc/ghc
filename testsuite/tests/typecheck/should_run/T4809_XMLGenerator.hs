@@ -1,6 +1,6 @@
-{-# LANGUAGE CPP, TypeFamilies, MultiParamTypeClasses, FunctionalDependencies,
-      FlexibleContexts, FlexibleInstances, UndecidableInstances, OverlappingInstances,
-      TypeSynonymInstances, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP, TypeFamilies, FunctionalDependencies, UndecidableInstances, OverlappingInstances
+
+#-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  HSX.XMLGenerator

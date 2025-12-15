@@ -1,5 +1,5 @@
-{-# LANGUAGE RebindableSyntax, RankNTypes, TypeApplications, OverloadedStrings,
-             OverloadedLists, TypeFamilies #-}
+{-# LANGUAGE RebindableSyntax, OverloadedStrings, OverloadedLists, TypeFamilies
+#-}
 
 module Bug where
 

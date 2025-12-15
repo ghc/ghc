@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
 module T8011( clean )  where
 
 import Data.Char (isAlphaNum)

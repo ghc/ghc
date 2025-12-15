@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, KindSignatures #-}
+{-# LANGUAGE GADTs #-}
 
 -- Test a couple of trivial things:
 --      explicit layout

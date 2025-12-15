@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, RankNTypes #-}
+{-# LANGUAGE ImplicitParams #-}
 {-# OPTIONS_GHC -dcore-lint #-}
 module Main where
 

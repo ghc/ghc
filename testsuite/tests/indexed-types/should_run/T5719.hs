@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstraintKinds, TypeFamilies, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 module Main where
 
 import GHC.Exts (Constraint)

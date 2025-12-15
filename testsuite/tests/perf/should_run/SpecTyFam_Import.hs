@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE BangPatterns #-}
 
 module SpecTyFam_Import (specMe, MaybeShowNum) where
 

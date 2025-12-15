@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
 module G where
 
 import Data.Functor.Const( Const )

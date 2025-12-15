@@ -1,6 +1,6 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, FlexibleInstances, GADTs #-}
-{-# LANGUAGE KindSignatures, MultiParamTypeClasses, TypeFamilies,
-             TypeOperators #-}
+{-# LANGUAGE DataKinds, GADTs #-}
+{-# LANGUAGE TypeFamilies
+#-}
 
 module T13784 where
 

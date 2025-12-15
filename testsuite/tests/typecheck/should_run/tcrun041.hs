@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections, UnboxedTuples #-}
+{-# LANGUAGE UnboxedTuples #-}
 module Main where
 
 a :: Int -> (Int, Bool)

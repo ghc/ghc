@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Main where
 
 newtype MyMaybe a = MyMaybe (Maybe a)

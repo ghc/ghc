@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -w #-}
-{-# LANGUAGE FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module ShouldCompile where
 

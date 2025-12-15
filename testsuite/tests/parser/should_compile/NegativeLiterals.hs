@@ -1,4 +1,4 @@
-{-# LANGUAGE NegativeLiterals, MagicHash, BinaryLiterals #-}
+{-# LANGUAGE NegativeLiterals, MagicHash #-}
 
 module NegativeLiterals where
 

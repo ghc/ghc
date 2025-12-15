@@ -1,7 +1,6 @@
+{-# LANGUAGE FunctionalDependencies, OverlappingInstances, UndecidableInstances
 
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances, FlexibleContexts,
-             OverlappingInstances, UndecidableInstances #-}
+#-}
 
 --
 -- Test case adopted from the HList library

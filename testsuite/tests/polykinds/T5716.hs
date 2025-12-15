@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE PolyKinds, DataKinds       #-}
+{-# LANGUAGE DataKinds #-}
 
 module T5716 where
 

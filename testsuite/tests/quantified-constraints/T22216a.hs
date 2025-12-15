@@ -1,5 +1,4 @@
 {-# LANGUAGE QuantifiedConstraints, UndecidableInstances #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module T22216a where

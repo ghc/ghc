@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 module Main (main) where
 
 import Language.Haskell.TH

@@ -1,6 +1,3 @@
-
-{-# LANGUAGE ExistentialQuantification #-}
-
 -- This tests an interaction between GADTs and join points
 -- The case-of-case transformation can pretty easily result
 -- in a type mis-match, because the join point does not see

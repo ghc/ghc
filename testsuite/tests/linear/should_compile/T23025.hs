@@ -1,4 +1,4 @@
-{-# LANGUAGE LinearTypes, BangPatterns #-}
+{-# LANGUAGE LinearTypes #-}
 module T23025 where
 
 import Data.Void

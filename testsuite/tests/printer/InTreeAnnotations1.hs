@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns, BangPatterns #-}
+{-# LANGUAGE ViewPatterns #-}
 module InTreeAnnotations1 where
 
 foo a@(_,_) !"a" ~x = undefined

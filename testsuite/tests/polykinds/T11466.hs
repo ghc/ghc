@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, ConstraintKinds #-}
+{-# LANGUAGE ImplicitParams #-}
 
 module T11466 where
 

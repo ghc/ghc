@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, RankNTypes #-}
+{-# LANGUAGE ImplicitParams #-}
 import GHC.Stack
 
 foo :: (?callStack :: CallStack) => [Int]

@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, TypeFamilies, NamedWildCards, ConstraintKinds #-}
+{-# LANGUAGE PartialTypeSignatures, TypeFamilies #-}
 module NamedWildcardsNotInMonotype where
 
 foo :: (Show _a, Eq _c, Eq _b) => _a -> _b -> String

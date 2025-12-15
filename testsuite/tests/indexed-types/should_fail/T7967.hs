@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, DataKinds, TypeOperators, GADTs #-}
+{-# LANGUAGE TypeFamilies, DataKinds, GADTs #-}
 module T7967 where
 
 import Data.Kind (Type)

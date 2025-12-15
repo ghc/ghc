@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 -- | Trusted library that unsafe plugins can use
 module SafeLang09_A where
 

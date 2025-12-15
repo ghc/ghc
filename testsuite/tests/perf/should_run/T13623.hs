@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, GADTs, ExistentialQuantification #-}
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -cpp #-}
 
 module Main where

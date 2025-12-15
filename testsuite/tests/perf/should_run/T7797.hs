@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 module Main where
 
 import T7797a 

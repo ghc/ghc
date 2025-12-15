@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module ShouldFail where
 
 -- With the new typechecker (GHC 7.1), these now all pass

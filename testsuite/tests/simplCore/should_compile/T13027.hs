@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
 module T13027 (insert) where
 

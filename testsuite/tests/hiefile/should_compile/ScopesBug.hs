@@ -1,9 +1,6 @@
 {-# LANGUAGE PatternSynonyms, ViewPatterns #-}
 {-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TypeApplications #-}
 
 module ScopesBug where
 

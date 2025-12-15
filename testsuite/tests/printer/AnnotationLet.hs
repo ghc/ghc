@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeOperators #-}
 module AnnotationLet (foo) where
 
 {

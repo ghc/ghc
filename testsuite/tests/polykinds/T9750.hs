@@ -1,8 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
 
 module T9750 where
 

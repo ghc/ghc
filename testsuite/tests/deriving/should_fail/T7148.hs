@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, GADTs #-}
+{-# LANGUAGE GADTs #-}
 
 module T7148 where
 

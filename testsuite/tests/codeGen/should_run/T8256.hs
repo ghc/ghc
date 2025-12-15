@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, UnboxedTuples , ScopedTypeVariables #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 module Main where
 

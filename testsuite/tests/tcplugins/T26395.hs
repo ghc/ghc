@@ -1,9 +1,6 @@
-
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnliftedDatatypes #-}
 
 {-# OPTIONS_GHC -fplugin=T26395_Plugin #-}

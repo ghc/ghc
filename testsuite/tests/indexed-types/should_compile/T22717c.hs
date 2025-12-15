@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyDataDecls, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 module T22717c() where
 
 import T22717d

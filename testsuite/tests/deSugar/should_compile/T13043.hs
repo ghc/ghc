@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 module T13043 (foo, bar) where
 
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)

@@ -1,7 +1,5 @@
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeOperators #-}
 module T10134a where
 
 import Data.Kind (Type)

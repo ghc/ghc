@@ -1,5 +1,4 @@
 {-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 
 module MonoLocalBinds where

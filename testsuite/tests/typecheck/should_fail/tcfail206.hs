@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections, UnboxedTuples #-}
+{-# LANGUAGE UnboxedTuples #-}
 module ShouldCompile where
 
 a :: Bool -> (Int, Bool)

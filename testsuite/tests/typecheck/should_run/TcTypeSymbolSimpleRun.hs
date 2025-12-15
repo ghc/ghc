@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeOperators, TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeFamilies #-}
 module Main(main) where
 import GHC.TypeLits
 import Data.Proxy

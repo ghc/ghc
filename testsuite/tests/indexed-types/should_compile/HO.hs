@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, TypeOperators, RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module HO where
 

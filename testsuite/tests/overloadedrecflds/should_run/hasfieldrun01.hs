@@ -1,11 +1,11 @@
-{-# LANGUAGE DataKinds
-           , DatatypeContexts
-           , FlexibleInstances
-           , GADTs
-           , MultiParamTypeClasses
-           , TypeFamilies
-           , TypeApplications
-  #-}
+{-# LANGUAGE DataKinds, DatatypeContexts, GADTs, TypeFamilies
+
+
+
+
+
+
+#-}
 
 import GHC.Records (HasField(..))
 

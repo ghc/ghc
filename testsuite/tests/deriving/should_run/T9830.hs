@@ -1,4 +1,3 @@
-{-# LANGUAGE StandaloneDeriving #-}
 module Main where
 
 import T9830a

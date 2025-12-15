@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module T18412 where
 
 hr :: (forall a. a -> a) -> ()

@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wredundant-constraints -dsuppress-uniques #-}
-{-# LANGUAGE DefaultSignatures, InstanceSigs #-}
+{-# LANGUAGE DefaultSignatures #-}
 module M ( f ) where
 
 -- Redundant constraint

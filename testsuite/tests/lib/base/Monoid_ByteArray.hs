@@ -1,4 +1,4 @@
-{-# LANGUAGE DerivingVia, TypeApplications, OverloadedLists #-}
+{-# LANGUAGE DerivingVia, OverloadedLists #-}
 
 module Main where
 

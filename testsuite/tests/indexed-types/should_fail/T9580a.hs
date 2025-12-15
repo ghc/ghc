@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 module T9580a( Dimensional ) where
 
 import Data.Kind (Type)

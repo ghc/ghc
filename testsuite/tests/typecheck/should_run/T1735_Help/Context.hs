@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances, OverlappingInstances, EmptyDataDecls #-}
+{-# LANGUAGE UndecidableInstances, OverlappingInstances #-}
 
 {-
 

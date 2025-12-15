@@ -1,6 +1,6 @@
-{-# LANGUAGE TypeOperators, DataKinds, PolyKinds, TypeFamilies,
-             RankNTypes, FlexibleContexts, TemplateHaskell,
-             UndecidableInstances, GADTs, DefaultSignatures #-}
+{-# LANGUAGE DataKinds, TypeFamilies, TemplateHaskell, UndecidableInstances, GADTs, DefaultSignatures
+
+#-}
 
 -----------------------------------------------------------------------------
 -- |

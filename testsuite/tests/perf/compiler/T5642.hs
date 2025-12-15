@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-
 module GenBigTypes where
 
 import GHC.Generics

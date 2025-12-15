@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE PolyKinds #-}
 module Test23887 where
 -- based on T13343.hs
 import GHC.Exts

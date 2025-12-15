@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ViewPatterns, PatternSynonyms, DataKinds, Arrows, TypeOperators, TypeFamilies, UndecidableInstances, AllowAmbiguousTypes #-}
+{-# LANGUAGE GADTs, ViewPatterns, PatternSynonyms, DataKinds, Arrows, TypeFamilies, UndecidableInstances, AllowAmbiguousTypes #-}
 module T9985 where
 
 import Control.Arrow

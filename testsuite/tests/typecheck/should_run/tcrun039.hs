@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ExplicitForAll #-}
+{-# LANGUAGE GADTs #-}
 
 -- Test for GADTs and implication constraints
 

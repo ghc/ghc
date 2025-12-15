@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
-{-# LANGUAGE TypeFamilies, EmptyCase, LambdaCase #-}
+{-# LANGUAGE TypeFamilies, LambdaCase #-}
 
 -- Check interaction between Newtypes and Type Families
 module EmptyCase007 where

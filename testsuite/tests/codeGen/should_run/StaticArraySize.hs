@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 -- Test allocation of statically sized arrays. There's an optimization
 -- that targets these and we want to make sure that the code generated

@@ -1,9 +1,9 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-{-# LANGUAGE
-    ExplicitForAll
-  , GADTs
-  , RebindableSyntax #-}
+{-# LANGUAGE GADTs, RebindableSyntax
+
+
+#-}
 module T5908
        ( Writer
        , runWriter

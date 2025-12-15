@@ -1,6 +1,3 @@
-
-{-# LANGUAGE TypeOperators #-}
-
 module B where
 
 infixr 9 :-

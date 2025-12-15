@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyCase, GADTs #-}
+{-# LANGUAGE GADTs #-}
 
 module T13990 where
 

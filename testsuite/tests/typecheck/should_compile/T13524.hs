@@ -1,6 +1,4 @@
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TypeApplications      #-}
 
 {-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
 

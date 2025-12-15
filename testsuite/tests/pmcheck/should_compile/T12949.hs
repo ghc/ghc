@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module T12949 where
 
 class Foo a where

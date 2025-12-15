@@ -1,12 +1,12 @@
-{-# LANGUAGE TypeOperators, StarIsType
-           , DataKinds
-           , PolyKinds
-           , TypeFamilies
-           , GADTs
-           , UndecidableInstances
-           , RankNTypes
-           , ScopedTypeVariables
-  #-}
+{-# LANGUAGE DataKinds, TypeFamilies, GADTs, UndecidableInstances
+
+
+
+
+
+
+
+#-}
 
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Werror #-}

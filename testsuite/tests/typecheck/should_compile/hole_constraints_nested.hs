@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fshow-hole-constraints #-}
-{-# LANGUAGE GADTs, TypeOperators #-}
+{-# LANGUAGE GADTs #-}
 module HoleConstraintsNested where
 import Data.Type.Equality
 

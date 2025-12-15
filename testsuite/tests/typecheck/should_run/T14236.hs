@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MagicHash #-}
 import GHC.Exts
 import Type.Reflection

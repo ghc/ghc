@@ -1,4 +1,4 @@
-{-# LANGUAGE MonomorphismRestriction, NoExtendedDefaultRules #-}
+{-# LANGUAGE NoExtendedDefaultRules #-}
 module T10971b where
 import Data.Traversable (fmapDefault)
 f = \x -> length x

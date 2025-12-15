@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, PartialTypeSignatures #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module NestedExtraConstraintsWildcard where
 
 foo :: Bool -> (Eq a, _) => a

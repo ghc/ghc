@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE RankNTypes, ImplicitParams, UnboxedTuples #-}
+{-# LANGUAGE ImplicitParams, UnboxedTuples #-}
 
 -- Test two slightly exotic things about type signatures
 

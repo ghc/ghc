@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -O #-}
   -- #11248, comment:6 showed that this tests failed with -O
 
-{-# LANGUAGE DataKinds, TypeOperators, TypeFamilies,
-             KindSignatures, ConstraintKinds #-}
+{-# LANGUAGE DataKinds, TypeFamilies
+#-}
 
 module T11248 where
 

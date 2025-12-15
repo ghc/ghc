@@ -1,6 +1,5 @@
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module Blowup (Ps(..)) where
 

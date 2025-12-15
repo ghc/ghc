@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module T21265 (extractorProduct') where
 
 class GSerialiseProduct f where

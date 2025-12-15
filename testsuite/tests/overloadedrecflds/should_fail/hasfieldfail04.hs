@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, PolyKinds, FlexibleInstances, MultiParamTypeClasses,
-             TypeFamilies, GADTs #-}
+{-# LANGUAGE DataKinds, TypeFamilies, GADTs
+#-}
 
 import Data.Kind
 import Data.Proxy

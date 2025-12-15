@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE FunctionalDependencies
+#-}
 
 -- Another dependency analysis test
 -- Notice that 'a' and 'b' are mutually recursive, 

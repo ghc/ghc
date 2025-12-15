@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             ExistentialQuantification #-}
+{-# LANGUAGE FunctionalDependencies
+#-}
 
 -- !!! Functional dependencies and existentials
 

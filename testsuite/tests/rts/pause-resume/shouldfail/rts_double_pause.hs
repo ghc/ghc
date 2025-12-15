@@ -1,5 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 import Control.Concurrent
 import Foreign
 import Foreign.C

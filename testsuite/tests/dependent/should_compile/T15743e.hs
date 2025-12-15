@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, PolyKinds, DataKinds, GADTs #-}
+{-# LANGUAGE DataKinds, GADTs #-}
 
 module T15743e where
 

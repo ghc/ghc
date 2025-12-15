@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeOperators, MultiParamTypeClasses, ExistentialQuantification #-}
-
 module T15675 where
 
 class a + b

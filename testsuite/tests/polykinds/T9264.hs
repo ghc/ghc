@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, TypeFamilies, ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module T9264 where
 
 class C (a :: k) where

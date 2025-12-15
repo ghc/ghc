@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, CPP #-}
+{-# LANGUAGE CPP #-}
 -- Test the LANGUAGE pragma
 module ShouldCompile where
 

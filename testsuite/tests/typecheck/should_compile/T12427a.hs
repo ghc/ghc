@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, RankNTypes #-}
+{-# LANGUAGE GADTs #-}
 
 -- Test pattern bindings, existentials, and higher rank
 

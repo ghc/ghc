@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -w -fno-warn-redundant-constraints #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleContexts, FlexibleInstances,
-             OverlappingInstances, UndecidableInstances,
-             KindSignatures #-}
+{-# LANGUAGE FunctionalDependencies, OverlappingInstances, UndecidableInstances
+
+
+#-}
 
 -- Cut down from a larger core-lint error
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, FunctionalDependencies, MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module T9201 where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
 
 module T13625 where
 

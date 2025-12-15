@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, PolyKinds, TypeOperators, TypeFamilies,
-             UndecidableInstances, ConstraintKinds #-}
+{-# LANGUAGE DataKinds, TypeFamilies, UndecidableInstances
+#-}
 module TypeInTypeSubstitutions where
 
 import GHC.TypeLits as L

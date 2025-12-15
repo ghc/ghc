@@ -1,6 +1,6 @@
-{-# LANGUAGE FunctionalDependencies, FlexibleInstances, 
-             TypeFamilies,
-             PolyKinds #-}
+{-# LANGUAGE FunctionalDependencies, TypeFamilies
+
+#-}
 
 module T8391 where
 

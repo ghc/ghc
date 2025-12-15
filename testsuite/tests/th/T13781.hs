@@ -1,5 +1,4 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE PolyKinds #-}
 module T13781 where
 
 import Data.Kind

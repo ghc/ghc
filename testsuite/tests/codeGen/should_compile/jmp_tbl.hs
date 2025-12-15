@@ -1,5 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-
 {-
 This funny module was reduced from a failing build of stage2 using
 the new code generator and the linear register allocator, with this bug:

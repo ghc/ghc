@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, ApplicativeDo #-}
+{-# LANGUAGE ApplicativeDo #-}
 
 module Bug where
 

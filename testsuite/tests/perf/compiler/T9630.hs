@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 module T9630 where
 import T9630a
 import GHC.Generics

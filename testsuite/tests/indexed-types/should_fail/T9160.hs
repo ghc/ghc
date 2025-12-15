@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, TemplateHaskell, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell, TypeFamilies #-}
 
 module T9160 where
 import Language.Haskell.TH

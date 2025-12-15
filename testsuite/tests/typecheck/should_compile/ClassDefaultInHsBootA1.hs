@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 -- Analogous to module Class from tests/backpack/should_compile/bkp58.bkp
 module ClassDefaultInHsBootA1 where

@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 module Bug where
 

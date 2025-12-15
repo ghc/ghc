@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module Proposal229e ((!), f) where
 
 (!) :: Maybe a -> a -> (a, a)

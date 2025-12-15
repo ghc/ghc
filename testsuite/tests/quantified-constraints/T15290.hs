@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeApplications, ImpredicativeTypes, ScopedTypeVariables,
-             QuantifiedConstraints, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ImpredicativeTypes, QuantifiedConstraints
+#-}
 
 module T15290 where
 

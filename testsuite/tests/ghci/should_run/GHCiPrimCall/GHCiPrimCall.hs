@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, GHCForeignImportPrim, UnliftedFFITypes, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE GHCForeignImportPrim, UnliftedFFITypes, MagicHash, UnboxedTuples #-}
 
 module Main where
 

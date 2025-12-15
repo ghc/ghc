@@ -1,6 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CApiFFI #-}
-{-# LANGUAGE NamedFieldPuns #-}
 
 module Main (main) where
 

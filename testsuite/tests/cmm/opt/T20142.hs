@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, MagicHash, RankNTypes, ScopedTypeVariables, UnboxedTuples #-}
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -O2 -dcmm-lint #-}
 
 module Data.Text.Lazy.Builder.Int ( hexadecimal) where

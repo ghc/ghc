@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, KindSignatures #-}
+{-# LANGUAGE GADTs #-}
 
 -- See #301
 -- This particular one doesn't use GADTs per se,

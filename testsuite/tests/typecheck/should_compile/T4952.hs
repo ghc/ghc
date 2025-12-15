@@ -1,9 +1,9 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE UndecidableInstances,
-             MultiParamTypeClasses,
-             KindSignatures,
-             FlexibleInstances,
-             FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances, FunctionalDependencies
+
+
+
+#-}
 
 module Storage.Hashed.Monad () where
 

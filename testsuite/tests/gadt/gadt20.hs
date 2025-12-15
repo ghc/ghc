@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, KindSignatures #-}
+{-# LANGUAGE GADTs #-}
 
 -- Test for trac #810
 -- Should be able to infer bool :: Bool and integer :: Integer, so

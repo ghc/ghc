@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 module TH_overlaps where
 
 import Language.Haskell.TH

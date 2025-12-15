@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP #-}
 module WinCBindings where
 
 #if defined(mingw32_HOST_OS)

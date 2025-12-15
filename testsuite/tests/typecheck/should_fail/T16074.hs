@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeOperators, PolyKinds #-}
+{-# LANGUAGE GADTs #-}
 
 module T16074 where
 

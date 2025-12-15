@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeOperators, GADTs #-}
+{-# LANGUAGE GADTs #-}
 
 -- Enable -Werror to fail in case we get this warning:
 --

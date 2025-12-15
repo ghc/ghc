@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, NamedWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Splices where
 

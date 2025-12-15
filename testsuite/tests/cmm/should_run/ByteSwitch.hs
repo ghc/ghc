@@ -1,6 +1,5 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnliftedFFITypes #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE GHCForeignImportPrim #-}
 
 import GHC.Int

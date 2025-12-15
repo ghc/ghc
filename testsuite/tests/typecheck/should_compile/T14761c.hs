@@ -1,4 +1,4 @@
-{-# LANGUAGE StrictData, TypeOperators, GADTs #-}
+{-# LANGUAGE StrictData, GADTs #-}
 {-# LANGUAGE StrictData #-}
 
 -- Enable -Werror to fail in case we get this warning:

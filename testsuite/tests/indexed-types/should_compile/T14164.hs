@@ -1,7 +1,5 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeOperators #-}
 module T14164 where
 
 data G (x :: a) = GNil | GCons (G x)

@@ -1,9 +1,6 @@
 {-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE PolyKinds                  #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeOperators              #-}
 module T8566a where
 
 import Data.Kind (Type)

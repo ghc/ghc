@@ -1,6 +1,5 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 module T15385 where
 

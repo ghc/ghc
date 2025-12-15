@@ -1,4 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes, RankNTypes, QuantifiedConstraints #-}
+{-# LANGUAGE AllowAmbiguousTypes, QuantifiedConstraints #-}
 
 module T22223 where
 

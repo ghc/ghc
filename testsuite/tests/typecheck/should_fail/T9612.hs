@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, FunctionalDependencies, MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module T9612 where
 import Data.Monoid
 import Control.Monad.Trans.Writer.Lazy( Writer, WriterT )

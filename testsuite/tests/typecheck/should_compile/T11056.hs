@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, DataKinds #-}
+{-# LANGUAGE DataKinds #-}
 module T11056 where
 import Data.Typeable
 

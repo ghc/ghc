@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, ExplicitForAll, PolyKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Main where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables#-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T3220 where
 

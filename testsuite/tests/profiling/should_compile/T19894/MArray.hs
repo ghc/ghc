@@ -1,10 +1,6 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ExistentialQuantification #-}
 module MArray
     (
       Array (..)

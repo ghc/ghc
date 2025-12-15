@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, DataKinds, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell, DataKinds, TypeFamilies #-}
 
 module T9081 where
 

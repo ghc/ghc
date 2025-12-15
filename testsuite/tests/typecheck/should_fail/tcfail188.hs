@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes, KindSignatures #-}
 {-# OPTIONS_GHC -Werror #-}
 
 -- #959

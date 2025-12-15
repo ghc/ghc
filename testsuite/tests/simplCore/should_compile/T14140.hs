@@ -5,7 +5,7 @@
 -- for OtherOS), but just in case GHC decides to get
 -- clever with its knowledge of the possible results
 -- of (==#), we also permit 0#.
-{-# LANGUAGE MagicHash, BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
 module T14140 where
 import GHC.Exts
 

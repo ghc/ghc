@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TypeApplications #-}
+{-# LANGUAGE CPP #-}
 
 #include "MachDeps.h"
 

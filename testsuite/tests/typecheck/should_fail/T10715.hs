@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
 module T10715 where
 
 import Data.Coerce (coerce, Coercible)

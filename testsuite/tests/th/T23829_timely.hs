@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskellQuotes, TypeApplications #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 module T99999_timely (main) where
 
 import Language.Haskell.TH

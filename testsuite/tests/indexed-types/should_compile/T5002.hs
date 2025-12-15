@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
-{-# LANGUAGE TypeFamilies, FlexibleInstances, UndecidableInstances, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies, UndecidableInstances #-}
 
 class A a
 class B a where b :: a -> ()

@@ -1,9 +1,6 @@
 {-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE GADTs                    #-}
-{-# LANGUAGE PolyKinds                #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilyDependencies   #-}
-{-# LANGUAGE TypeOperators            #-}
 
 -- from https://gitlab.haskell.org/ghc/ghc/-/merge_requests/5899#note_407871
 

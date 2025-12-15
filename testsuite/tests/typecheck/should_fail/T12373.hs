@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, ScopedTypeVariables, UnboxedTuples #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 module T12373 where
 

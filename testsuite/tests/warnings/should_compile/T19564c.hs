@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wmissing-kind-signatures #-}
-{-# LANGUAGE GADTs, PolyKinds, TypeFamilies #-}
+{-# LANGUAGE GADTs, TypeFamilies #-}
 -- with cusks but without -XCUSK, warnings
 module T19564c where
 

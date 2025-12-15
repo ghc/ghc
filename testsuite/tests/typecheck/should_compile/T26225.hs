@@ -1,5 +1,4 @@
 {-# LANGUAGE DeepSubsumption #-}
-{-# LANGUAGE NamedWildCards #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnicodeSyntax #-}

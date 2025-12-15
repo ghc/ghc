@@ -1,6 +1,3 @@
-
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 module Main where
 
 main :: IO ()

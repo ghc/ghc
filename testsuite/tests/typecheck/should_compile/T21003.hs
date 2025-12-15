@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
-
 module T21003 where
 
 import Data.IntMap (IntMap, mapKeysMonotonic, Key)

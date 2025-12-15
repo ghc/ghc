@@ -1,4 +1,4 @@
-{-# LANGUAGE ImpredicativeTypes, ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 {-# OPTIONS_GHC -Wno-x-partial #-}
 
 module ShouldCompile where

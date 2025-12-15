@@ -1,8 +1,5 @@
 {-# OPTIONS_GHC -Wno-missing-methods #-}
-{-# LANGUAGE GHC2021 #-}
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE ImplicitPrelude #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module GHC25266 where

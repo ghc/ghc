@@ -1,4 +1,4 @@
-{-# LANGUAGE ExplicitForAll, PolyKinds, StandaloneKindSignatures, TypeApplications, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module RepPolyArgument where
 

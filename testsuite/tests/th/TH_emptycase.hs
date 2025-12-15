@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, EmptyCase #-}
+{-# LANGUAGE TemplateHaskell #-}
 -- #2431: empty case expression
 --             now accepted
 

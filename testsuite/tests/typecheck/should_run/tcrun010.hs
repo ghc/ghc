@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 -- !!! Functional dependencies
 -- This one gave "zonkIdOcc:  FunDep_a11w" in earlier days

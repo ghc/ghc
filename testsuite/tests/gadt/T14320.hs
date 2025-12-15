@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, GADTs, KindSignatures #-}
+{-# LANGUAGE GADTs #-}
 module T14320
 where
 

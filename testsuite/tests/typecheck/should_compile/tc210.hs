@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module ShouldCompile where
 
 f :: forall a. a -> forall b. b -> Int

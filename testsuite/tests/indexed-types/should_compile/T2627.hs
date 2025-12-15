@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeFamilies, EmptyDataDecls #-}
+{-# LANGUAGE GADTs, TypeFamilies #-}
 
 module T2627 where
 

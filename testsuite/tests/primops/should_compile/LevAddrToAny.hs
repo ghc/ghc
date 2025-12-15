@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, TypeApplications, UnliftedDatatypes, KindSignatures, UnboxedTuples #-}
+{-# LANGUAGE MagicHash, UnliftedDatatypes, UnboxedTuples #-}
 
 module LevAddrToAny where
 

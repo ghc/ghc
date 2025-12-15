@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module ShouldCompile where
 
 data Q = Q {f :: forall a. a -> a}

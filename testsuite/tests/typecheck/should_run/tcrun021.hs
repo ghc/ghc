@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies
+#-}
 
 -- This bizarre program failed because GHC.Tc.Solver built a loop of
 -- dictionaries, due to an obscure bug in the way in which superclasses

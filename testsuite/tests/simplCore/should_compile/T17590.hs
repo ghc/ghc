@@ -1,6 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE TypeOperators #-}
 module Codec.Picture.Metadata where
 
 import Control.DeepSeq( NFData( .. ) )

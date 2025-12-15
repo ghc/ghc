@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 module RepArrow where
 
 import Data.Ord ( Down )  -- convenient "Id" newtype, without its constructor

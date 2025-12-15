@@ -1,12 +1,9 @@
 {-# LANGUAGE DataKinds               #-}
-{-# LANGUAGE FlexibleInstances       #-}
 {-# LANGUAGE FunctionalDependencies  #-}
 {-# LANGUAGE GADTs                   #-}
 {-# LANGUAGE LambdaCase              #-}
 {-# LANGUAGE PatternSynonyms         #-}
-{-# LANGUAGE PolyKinds               #-}
 {-# LANGUAGE TypeFamilies            #-}
-{-# LANGUAGE TypeOperators           #-}
 module T15517a () where
 
 import Data.Kind (Type)

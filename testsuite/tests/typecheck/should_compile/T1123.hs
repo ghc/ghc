@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module Bug where
 
 data T a = MkT

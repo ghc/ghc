@@ -1,6 +1,6 @@
-{-# LANGUAGE MagicHash, UnboxedTuples, MultiParamTypeClasses, TypeFamilies,
-  FunctionalDependencies, KindSignatures, PolyKinds, DataKinds,
-  UndecidableInstances #-}
+{-# LANGUAGE MagicHash, UnboxedTuples, TypeFamilies, FunctionalDependencies, DataKinds, UndecidableInstances
+
+#-}
 module T14185 where
 
 import GHC.Types

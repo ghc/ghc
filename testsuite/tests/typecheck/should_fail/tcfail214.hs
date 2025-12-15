@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 module ShouldFail where
 
 import GHC.Exts( Constraint )

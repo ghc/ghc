@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ExistentialQuantification #-}
 
 module Fold
     (

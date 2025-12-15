@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTs, DataKinds, PolyKinds, NamedWildCards #-}
+{-# LANGUAGE TypeFamilies, GADTs, DataKinds #-}
 module NamedWildcardInDataFamilyInstanceLHS where
 
 data MyKind = A | B

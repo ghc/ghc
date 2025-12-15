@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints -Wno-simplifiable-class-constraints #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             FlexibleInstances,
-             UndecidableInstances #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances
+
+#-}
 
 -- Rather exotic example posted to Haskell mailing list 17 Oct 07
 -- It concerns context reduction and functional dependencies

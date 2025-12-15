@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonoLocalBinds, RankNTypes #-}
+{-# LANGUAGE NoMonoLocalBinds #-}
 
 -- Ross Paterson's example from
 -- https://prime.haskell.org/wiki/MonomorphicPatternBindings

@@ -1,4 +1,4 @@
-{-# LANGUAGE RebindableSyntax, MultiParamTypeClasses #-}
+{-# LANGUAGE RebindableSyntax #-}
 
 -- #1537
 

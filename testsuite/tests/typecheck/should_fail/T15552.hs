@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, ExistentialQuantification, GADTs, PolyKinds, TypeOperators #-}
+{-# LANGUAGE DataKinds, GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
 module T15552 where
 

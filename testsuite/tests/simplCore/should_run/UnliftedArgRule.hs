@@ -1,5 +1,4 @@
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE BangPatterns #-}
 import GHC.Exts
 import System.IO.Unsafe ( unsafePerformIO )
 

@@ -1,5 +1,4 @@
 {-# LANGUAGE QuantifiedConstraints #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 

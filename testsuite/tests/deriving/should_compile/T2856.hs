@@ -1,5 +1,5 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-}
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, StandaloneDeriving, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- Test #2856
 

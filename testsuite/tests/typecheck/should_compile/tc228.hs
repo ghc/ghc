@@ -1,5 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
-
 -- Without a type sig this is slightly tricky.
 -- See #1430
 

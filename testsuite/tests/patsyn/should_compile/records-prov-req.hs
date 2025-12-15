@@ -1,5 +1,5 @@
-{-# LANGUAGE PatternSynonyms, ViewPatterns, GADTs, RankNTypes,
- StandaloneDeriving, FlexibleInstances #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, GADTs
+#-}
 module ShouldCompile where
 
 -- Testing that selectors work properly with prov and req thetas

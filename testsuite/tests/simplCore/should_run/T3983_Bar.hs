@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module T3983_Bar where
 import Data.Dynamic
 import Control.Exception

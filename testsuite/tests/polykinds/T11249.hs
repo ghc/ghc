@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, TypeOperators, TypeFamilies,
-             KindSignatures, ConstraintKinds #-}
+{-# LANGUAGE DataKinds, TypeFamilies
+#-}
 
 module T11249 where
 

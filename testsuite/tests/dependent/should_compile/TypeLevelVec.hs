@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, PolyKinds, UnicodeSyntax, GADTs, NoImplicitPrelude,
-             TypeOperators, TypeFamilies #-}
+{-# LANGUAGE DataKinds, UnicodeSyntax, GADTs, NoImplicitPrelude, TypeFamilies
+#-}
 {-# OPTIONS_GHC -fno-warn-unticked-promoted-constructors #-}
 
 module TypeLevelVec where

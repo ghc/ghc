@@ -1,4 +1,4 @@
-{-# LANGUAGE QuantifiedConstraints, DatatypeContexts, PolyKinds #-}
+{-# LANGUAGE QuantifiedConstraints, DatatypeContexts #-}
 -- NB: This actually works with -XNoPolyKinds, due to defaulting.
 
 module T17567StupidTheta where

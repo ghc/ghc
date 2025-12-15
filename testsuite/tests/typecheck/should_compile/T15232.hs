@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wredundant-constraints -Wall -Werror #-}
 import GHC.TypeLits (TypeError, ErrorMessage(..))

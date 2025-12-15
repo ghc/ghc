@@ -1,5 +1,5 @@
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances,
-             DataKinds, TypeFamilies, KindSignatures, PolyKinds, FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances, DataKinds, TypeFamilies, FunctionalDependencies
+#-}
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 module T10564 where

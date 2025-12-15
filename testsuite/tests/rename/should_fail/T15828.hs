@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ExplicitForAll #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T15828 where
 

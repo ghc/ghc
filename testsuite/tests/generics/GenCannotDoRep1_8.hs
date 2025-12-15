@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, TypeFamilies      #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module GenCannotDoRep1_8 where
 

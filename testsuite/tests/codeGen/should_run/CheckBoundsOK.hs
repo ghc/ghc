@@ -8,7 +8,7 @@
 
 {-# LANGUAGE CPP #-}
 
-{-# LANGUAGE GHC2021 #-}
+--
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 

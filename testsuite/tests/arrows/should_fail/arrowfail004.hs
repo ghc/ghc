@@ -1,4 +1,4 @@
-{-# LANGUAGE Arrows, ExistentialQuantification #-}
+{-# LANGUAGE Arrows #-}
 
 -- #1662
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, PolyKinds #-}
+{-# LANGUAGE MagicHash #-}
 
 module Foo where
 

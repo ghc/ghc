@@ -1,5 +1,5 @@
-{-# LANGUAGE ForeignFunctionInterface, UnliftedFFITypes, UnboxedTuples,
-             BangPatterns, MagicHash #-}
+{-# LANGUAGE UnliftedFFITypes, UnboxedTuples, MagicHash
+#-}
 
 -- | Test case for #5486
 -- Test case reduced from HsOpenSSL package BN module

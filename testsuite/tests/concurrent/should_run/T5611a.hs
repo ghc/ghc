@@ -1,6 +1,6 @@
 -- The same as T5611 but with unsafe calls.
 
-{-# LANGUAGE CPP,ForeignFunctionInterface #-}
+{-# LANGUAGE CPP #-}
 
 import Control.Concurrent
 import Data.Functor

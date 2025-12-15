@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 module ShouldCompile where
 
 import Foreign.C.Types

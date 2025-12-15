@@ -1,6 +1,4 @@
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeApplications #-}
 module T14808 where
 
 import Data.Kind

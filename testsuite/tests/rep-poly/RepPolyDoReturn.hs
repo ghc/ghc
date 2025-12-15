@@ -1,6 +1,4 @@
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RebindableSyntax #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module RepPolyDoReturn where
 

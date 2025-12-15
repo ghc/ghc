@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, MagicHash, BangPatterns #-}
+{-# LANGUAGE PatternSynonyms, MagicHash #-}
 module ShouldCompile where
 
 import GHC.Base

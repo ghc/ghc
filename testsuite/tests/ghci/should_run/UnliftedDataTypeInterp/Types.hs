@@ -1,4 +1,4 @@
-{-# LANGUAGE UnliftedDatatypes, StandaloneKindSignatures #-}
+{-# LANGUAGE UnliftedDatatypes #-}
 {-# OPTIONS_GHC -fobject-code #-}
 module Types where
 

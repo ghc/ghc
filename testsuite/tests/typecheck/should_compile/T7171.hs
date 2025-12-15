@@ -1,4 +1,4 @@
-{-# LANGUAGE FunctionalDependencies #-}  {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}  --
 
 module T7171 where
 

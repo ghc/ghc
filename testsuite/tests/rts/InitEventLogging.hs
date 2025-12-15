@@ -1,5 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 import System.IO
 
 -- Test that the startEventLog interface works as expected.

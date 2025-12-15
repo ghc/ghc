@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneKindSignatures, UnliftedDatatypes #-}
+{-# LANGUAGE UnliftedDatatypes #-}
 
 import GHC.Exts
 

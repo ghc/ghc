@@ -1,12 +1,12 @@
-{-# LANGUAGE
-             MagicHash,
-             FlexibleInstances,
-             MultiParamTypeClasses,
-             TypeFamilies,
-             PolyKinds,
-             DataKinds,
-             FunctionalDependencies,
-             TypeFamilyDependencies #-}
+{-# LANGUAGE MagicHash, TypeFamilies, DataKinds, FunctionalDependencies, TypeFamilyDependencies
+
+
+
+
+
+
+
+#-}
 module T17541 where
 
 import GHC.Exts

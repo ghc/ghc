@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 -- Test that the Win32 error code from getLastError is thread-local.
 
 import System.Win32

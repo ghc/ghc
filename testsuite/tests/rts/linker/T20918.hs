@@ -1,5 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-
 module ThrowTest where
 
 import Foreign.C.Types

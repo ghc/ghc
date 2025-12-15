@@ -1,8 +1,5 @@
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE BangPatterns #-}
 
 {- # OPTIONS_GHC -Werror #-}
 {-# OPTIONS_GHC -g -O2 #-}

@@ -1,7 +1,7 @@
-{-# LANGUAGE ConstraintKinds, DataKinds, FlexibleContexts,
-             FlexibleInstances, GADTs, MultiParamTypeClasses,
-             PolyKinds, ScopedTypeVariables, TypeFamilies,
-             TypeOperators #-}
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies
+
+
+#-}
 module T13025a where
 
 import Data.Kind (Type)

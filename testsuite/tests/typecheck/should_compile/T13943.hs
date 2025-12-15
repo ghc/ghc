@@ -1,11 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses   #-}
-{-# LANGUAGE TypeOperators           #-}
-{-# LANGUAGE FlexibleInstances       #-}
-{-# LANGUAGE FlexibleContexts        #-}
-{-# LANGUAGE ScopedTypeVariables     #-}
 {-# LANGUAGE UndecidableInstances    #-}
-{-# LANGUAGE TypeApplications        #-}
-{-# LANGUAGE PolyKinds, DataKinds    #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE AllowAmbiguousTypes     #-}
 {-# LANGUAGE NoImplicitPrelude       #-}
 {-# LANGUAGE GADTs                   #-}

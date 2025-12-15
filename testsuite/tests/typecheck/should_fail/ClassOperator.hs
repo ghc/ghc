@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, TypeOperators, TypeFamilies, MultiParamTypeClasses, GADTs #-}
+{-# LANGUAGE PatternSynonyms, TypeFamilies, GADTs #-}
 
 module ClassOperator where
 

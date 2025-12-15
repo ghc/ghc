@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, PolyKinds, RoleAnnotations #-}
+{-# LANGUAGE TemplateHaskell, RoleAnnotations #-}
 
 module Roles3 where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE LinearTypes, TypeOperators #-}
+{-# LANGUAGE LinearTypes #-}
 module Main (main) where
 
 import Data.Typeable

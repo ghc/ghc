@@ -1,4 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE AllowAmbiguousTypes, TypeFamilies #-}
 
 import Data.Kind
 import Data.Typeable

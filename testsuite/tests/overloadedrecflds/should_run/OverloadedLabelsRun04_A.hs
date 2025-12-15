@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell #-}
 module OverloadedLabelsRun04_A where
 
 import GHC.OverloadedLabels

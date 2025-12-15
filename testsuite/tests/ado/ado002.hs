@@ -1,4 +1,4 @@
-{-# LANGUAGE ApplicativeDo,ScopedTypeVariables #-}
+{-# LANGUAGE ApplicativeDo #-}
 module Test where
 
 -- Test that type errors aren't affected by ApplicativeDo

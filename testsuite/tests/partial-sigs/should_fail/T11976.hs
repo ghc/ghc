@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures, RankNTypes #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 module T11976 where
 

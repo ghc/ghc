@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, UnliftedNewtypes, NoFieldSelectors #-}
+{-# LANGUAGE UnliftedNewtypes, NoFieldSelectors #-}
 
 module T20113 where
 

@@ -1,4 +1,4 @@
-> {-# LANGUAGE BangPatterns,CPP #-}
+> {-# LANGUAGE CPP #-}
 > module IOList (delete) where
 
 Goal: we want all the IORef boxes to go away in the "delete" operation

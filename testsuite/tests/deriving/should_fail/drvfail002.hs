@@ -1,5 +1,5 @@
-{-# LANGUAGE UndecidableInstances, FlexibleContexts,
-             MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances, FunctionalDependencies
+#-}
 
 -- The Show instance for S would have form
 --      instance X T c => Show S

@@ -1,6 +1,6 @@
 -- Tests created by Jan Stolarek <jan.stolarek@p.lodz.pl>
 
-{-# LANGUAGE BangPatterns, MagicHash #-}
+{-# LANGUAGE MagicHash #-}
 module Main where
 
 import GHC.Exts

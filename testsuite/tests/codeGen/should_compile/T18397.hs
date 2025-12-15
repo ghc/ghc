@@ -1,5 +1,4 @@
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE UnboxedTuples #-}
 module T18397 where
 

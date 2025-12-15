@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE GADTs, NamedWildCards, PartialTypeSignatures #-}
+{-# LANGUAGE GADTs, PartialTypeSignatures #-}
 module Test25885 where
 
 {-# SPECIALIZE bug :: Int -> Int #-}

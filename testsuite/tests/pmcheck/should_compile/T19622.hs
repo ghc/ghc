@@ -1,9 +1,6 @@
 {-# LANGUAGE GADTs                     #-}
 {-# LANGUAGE PatternSynonyms           #-}
-{-# LANGUAGE RankNTypes                #-}
-{-# LANGUAGE PolyKinds                 #-}
 {-# LANGUAGE DataKinds                 #-}
-{-# LANGUAGE TypeOperators             #-}
 {-# LANGUAGE ViewPatterns              #-}
 
 module T19622 where

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Foo( shared, foo, bar) where
 -- module Foo where

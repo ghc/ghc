@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeOperators              #-}
-{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE DefaultSignatures          #-}
 
 module GFunctor (

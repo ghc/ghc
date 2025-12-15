@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeOperators, DefaultSignatures,
-             FlexibleContexts, FlexibleInstances, MagicHash #-}
+{-# LANGUAGE DefaultSignatures, MagicHash
+#-}
 
 module GEq1A where
 

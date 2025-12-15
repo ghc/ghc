@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, RankNTypes, PolyKinds #-}
+{-# LANGUAGE GADTs #-}
 module T6093 where
 
 import qualified Data.Kind as K (Type)

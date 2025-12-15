@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, FlexibleContexts, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, UndecidableInstances #-}
 
 -- This is a copy of typecheck/should_run/T3500b, but it's here for
 -- a different reason: at one time, it sent the compiler into a loop.

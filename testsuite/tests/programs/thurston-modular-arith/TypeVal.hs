@@ -1,6 +1,6 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts,
-             UndecidableInstances, ExistentialQuantification,
-             ScopedTypeVariables #-}
+{-# LANGUAGE FunctionalDependencies, UndecidableInstances
+
+#-}
 
 -- TypeVal.hs: dependent types, here we come!
 module TypeVal where

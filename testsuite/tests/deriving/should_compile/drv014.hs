@@ -1,5 +1,3 @@
-{-# LANGUAGE StandaloneDeriving, GeneralizedNewtypeDeriving #-}
-
 module ShouldCompile where
 
 data T a  = T1 a | T2

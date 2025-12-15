@@ -1,4 +1,4 @@
-{-# LANGUAGE ExplicitForAll, PartialTypeSignatures #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module Bug where
 
 g,h:: forall a. a -> _

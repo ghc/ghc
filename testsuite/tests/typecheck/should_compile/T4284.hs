@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 module Test where
 
 foo :: () -> forall b. b

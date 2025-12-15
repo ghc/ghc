@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables, KindSignatures,
-             MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE CPP, FunctionalDependencies
+#-}
 
 -- This one triggered a bug in the indirection-shorting 
 -- machinery, which gave a core-lint error

@@ -1,5 +1,4 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ConstraintKinds #-}
 
 module T8507 where
 

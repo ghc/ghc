@@ -1,4 +1,4 @@
-{-# LANGUAGE ImpredicativeTypes, ScopedTypeVariables, GADTs #-}
+{-# LANGUAGE ImpredicativeTypes, GADTs #-}
 {-# OPTIONS_GHC -Wno-x-partial #-}
 
 -- Nov 2014: impredicative types are very dodgy so I am

@@ -1,7 +1,5 @@
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# OPTIONS_GHC -fno-full-laziness  #-}
 

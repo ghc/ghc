@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module T10031 where
 import Data.Coerce
 coerce' :: Coercible b a => a -> b

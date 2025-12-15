@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, PartialTypeSignatures #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 module T14479 where
 

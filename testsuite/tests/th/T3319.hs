@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell,ForeignFunctionInterface #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module T3319 where
 

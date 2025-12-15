@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, DeriveGeneric #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module T13092b_1 where
 

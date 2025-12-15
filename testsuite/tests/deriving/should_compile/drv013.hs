@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-
 -- Deriving Typeable has various special cases
 module Foo where
 

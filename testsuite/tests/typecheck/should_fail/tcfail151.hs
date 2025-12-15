@@ -1,4 +1,4 @@
-{-# LANGUAGE DatatypeContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE DatatypeContexts #-}
 module ShouldFail where
 
 class (Show a, Eq a, Monad m) => Name m a where 

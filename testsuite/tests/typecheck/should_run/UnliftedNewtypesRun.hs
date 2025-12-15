@@ -1,8 +1,5 @@
-{-# LANGUAGE GADTSyntax #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnliftedNewtypes #-}
-{-# LANGUAGE RankNTypes #-}
 
 import GHC.Int (Int(I#))
 import GHC.Word (Word(W#))

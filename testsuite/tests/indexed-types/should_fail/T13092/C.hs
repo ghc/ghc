@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 module C (x) where
 import Data.Proxy
 import B

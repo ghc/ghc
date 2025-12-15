@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 import Control.Concurrent
 import Control.Exception    (bracket)
 import Foreign.Ptr          (Ptr, intPtrToPtr, ptrToIntPtr)

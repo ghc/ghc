@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, MultiParamTypeClasses #-}
+{-# LANGUAGE GADTs #-}
 
 module T14325 where
 

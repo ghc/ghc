@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, TypeFamilies, PolyKinds #-}
+{-# LANGUAGE TemplateHaskell, TypeFamilies #-}
 
 module T9692 where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections, RankNTypes, ImpredicativeTypes #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 
 -- Sept 16: This test involves wholesale use of impredicative polymorphism
 --          and I'm amazed it has worked for so long. Anyway it is now

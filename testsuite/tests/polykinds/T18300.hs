@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, PolyKinds, DataKinds, TypeFamilies #-}
+{-# LANGUAGE GADTs, DataKinds, TypeFamilies #-}
 
 module Foo where
 

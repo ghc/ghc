@@ -6,12 +6,12 @@
 -- licensed under cc by-sa 3.0
 
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE FlexibleContexts #-}
+--
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators #-}
+--
+--
+--
+--
 {-# LANGUAGE TypeFamilies #-}
 
 import GHC.Generics

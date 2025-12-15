@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE RankNTypes, LiberalTypeSynonyms #-}
+{-# LANGUAGE LiberalTypeSynonyms #-}
 
 -- This test checks that deep skolemisation and deep
 -- instantiation work right.  A buggy prototype

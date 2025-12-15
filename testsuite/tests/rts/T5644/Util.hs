@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module Util where
 
 import Data.Time

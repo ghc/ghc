@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wincomplete-patterns -Wno-missing-methods -fforce-recomp #-}
-{-# LANGUAGE GADTs, TypeFamilies, ViewPatterns, TypeOperators, PatternSynonyms #-}
+{-# LANGUAGE GADTs, TypeFamilies, ViewPatterns, PatternSynonyms #-}
 module Lib where
 
 import Data.Type.Equality

@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, NamedFieldPuns, ParallelListComp, PatternGuards #-}
+{-# LANGUAGE ImplicitParams, ParallelListComp #-}
 
 spec :: Spec
 spec = do

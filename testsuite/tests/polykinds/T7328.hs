@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, GADTs, AllowAmbiguousTypes #-}
+{-# LANGUAGE GADTs, AllowAmbiguousTypes #-}
 
 module T7328 where
 

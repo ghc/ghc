@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 module Data.MemoTrie (HasTrie(..)) where
 
 import Control.Arrow (Arrow(first))

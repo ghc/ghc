@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 module SymbolsViaSections where
 foreign export ccall test :: Int -> IO ()
 test :: Int -> IO ()

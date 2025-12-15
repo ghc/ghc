@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, CApiFFI #-}
+{-# LANGUAGE CApiFFI #-}
 module ShouldCompile where
 
 import Foreign

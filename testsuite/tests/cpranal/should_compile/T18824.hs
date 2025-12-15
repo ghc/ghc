@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -O2 -fforce-recomp #-}
-{-# LANGUAGE DeriveFunctor #-}
 
 module T18824 where
 

@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wincomplete-patterns -fforce-recomp #-}
-{-# LANGUAGE GADTs, DataKinds, TypeFamilies, BangPatterns #-}
+{-# LANGUAGE GADTs, DataKinds, TypeFamilies #-}
 
 module T18533 where
 

@@ -1,8 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE TypeSynonymInstances       #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE DefaultSignatures          #-}
 {- # LANGUAGE IncoherentInstances        #-} -- necessary, unfortunately
 {-# LANGUAGE OverlappingInstances        #-} 

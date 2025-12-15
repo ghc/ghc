@@ -1,5 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE PolyKinds #-}
 module T14270 (mkTrApp) where
 
 import Data.Kind (Type)

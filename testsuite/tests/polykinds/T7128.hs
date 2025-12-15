@@ -1,6 +1,6 @@
-{-# LANGUAGE PolyKinds, DataKinds, MultiParamTypeClasses,
-              FunctionalDependencies
-  #-}
+{-# LANGUAGE DataKinds, FunctionalDependencies
+
+#-}
 
 module T7128 where
 

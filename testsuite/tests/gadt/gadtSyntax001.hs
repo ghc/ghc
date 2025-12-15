@@ -1,6 +1,3 @@
-
-{-# LANGUAGE GADTSyntax #-}
-
 module GadtSyntax001 where
 
 data Foo a b where

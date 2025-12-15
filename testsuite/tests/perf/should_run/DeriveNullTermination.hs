@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveFoldable #-}
-
 module Main where
 
 -- Trying to check if this is null from left to right or right to left

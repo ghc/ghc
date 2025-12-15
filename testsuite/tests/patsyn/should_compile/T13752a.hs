@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, RankNTypes #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module T13752a where
 

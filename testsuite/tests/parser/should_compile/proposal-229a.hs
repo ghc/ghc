@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module Proposal229a where
 
 data T a b = a :! b

@@ -1,7 +1,6 @@
 {-# LANGUAGE BlockArguments   #-}
 {-# LANGUAGE LexicalNegation  #-}
 {-# LANGUAGE MagicHash        #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Main where
 

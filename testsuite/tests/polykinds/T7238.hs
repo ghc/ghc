@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstraintKinds, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 module T7238 where
 
 import GHC.Exts

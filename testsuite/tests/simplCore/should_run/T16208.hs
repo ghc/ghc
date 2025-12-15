@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ExplicitForAll #-}
+{-# LANGUAGE GADTs #-}
 module Main (main) where
 
 import GHC.Exts

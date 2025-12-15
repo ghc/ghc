@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveAnyClass, MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module T9968 where
 

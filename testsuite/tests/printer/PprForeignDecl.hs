@@ -1,5 +1,4 @@
 {-# LANGUAGE MagicHash, UnliftedFFITypes #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 
 -- Based on ghc/testsuite/tests/ffi/should_compile contents
 module PprForeignDecl where

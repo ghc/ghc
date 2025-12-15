@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GADTs, RankNTypes, EmptyDataDecls #-}
+{-# LANGUAGE TypeFamilies, GADTs #-}
 
 module ShouldCompile where
 

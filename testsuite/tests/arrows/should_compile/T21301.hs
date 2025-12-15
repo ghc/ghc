@@ -1,4 +1,4 @@
-{-# LANGUAGE Arrows, EmptyCase #-}
+{-# LANGUAGE Arrows #-}
 
 import Control.Arrow
 

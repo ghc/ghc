@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveAnyClass, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module T15839a () where
 

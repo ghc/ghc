@@ -1,7 +1,7 @@
 -- This is similar to T11982b but 'locker' inlined which allows the module to
 -- compile.
 
-{-# LANGUAGE RankNTypes #-}
+--
 {-# LANGUAGE ApplicativeDo #-}
 module Main where
 import Control.Concurrent.MVar

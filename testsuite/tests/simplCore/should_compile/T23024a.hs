@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fspecialize-aggressively -fexpose-all-unfoldings -Wno-missing-methods #-}
-{-# LANGUAGE FlexibleInstances, FlexibleContexts, UndecidableInstances,
-             DataKinds, MultiParamTypeClasses, RankNTypes, MonoLocalBinds #-}
+{-# LANGUAGE UndecidableInstances, DataKinds, MonoLocalBinds
+#-}
 module T23024a where
 
 import System.IO.Unsafe

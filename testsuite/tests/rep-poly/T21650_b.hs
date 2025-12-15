@@ -1,8 +1,5 @@
-
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DatatypeContexts #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnliftedNewtypes #-}
 {-# LANGUAGE LinearTypes #-}

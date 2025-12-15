@@ -1,4 +1,4 @@
- {-# LANGUAGE DataKinds, PolyKinds, RankNTypes, GADTs #-}
+{-# LANGUAGE DataKinds, GADTs #-}
 
 module T7481 where
 
