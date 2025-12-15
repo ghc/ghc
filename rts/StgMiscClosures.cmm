@@ -473,7 +473,7 @@ INFO_TABLE_RET( stg_dead_thread, RET_SMALL,
                 W_ info_ptr,
                 PROF_HDR_FIELDS(W_,p1,p2)
                 P_ result )
-{ foreign "C" barf("stg_dead_thread entered!", NULL) never returns; }
+{ ccall sbarf("stg_dead_thread entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Entry code for a BCO
@@ -631,11 +631,11 @@ INFO_TABLE(__stg_EAGER_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 }
 
 INFO_TABLE(stg_BLOCKING_QUEUE_CLEAN,4,0,BLOCKING_QUEUE,"BLOCKING_QUEUE","BLOCKING_QUEUE")
-{ foreign "C" barf("BLOCKING_QUEUE_CLEAN object (%p) entered!", R1) never returns; }
+{ ccall pbarf("BLOCKING_QUEUE_CLEAN object (%p) entered!", R1 "ptr") never returns; }
 
 
 INFO_TABLE(stg_BLOCKING_QUEUE_DIRTY,4,0,BLOCKING_QUEUE,"BLOCKING_QUEUE","BLOCKING_QUEUE")
-{ foreign "C" barf("BLOCKING_QUEUE_DIRTY object (%p) entered!", R1) never returns; }
+{ ccall pbarf("BLOCKING_QUEUE_DIRTY object (%p) entered!", R1 "ptr") never returns; }
 
 
 /* ----------------------------------------------------------------------------
@@ -673,7 +673,7 @@ loop:
     ACQUIRE_FENCE_ON(node + OFFSET_StgHeader_info);
     jump %ENTRY_CODE(info) (node);
 #else
-    ccall barf("WHITEHOLE object (%p) entered!", R1) never returns;
+    ccall pbarf("WHITEHOLE object (%p) entered!", R1 "ptr") never returns;
 #endif
 }
 
@@ -684,10 +684,10 @@ loop:
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_TSO, 0,0,TSO, "TSO", "TSO")
-{ foreign "C" barf("TSO object (%p) entered!", R1) never returns; }
+{ ccall pbarf("TSO object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_STACK, 0,0, STACK, "STACK", "STACK")
-{ foreign "C" barf("STACK object (%p) entered!", R1) never returns; }
+{ ccall pbarf("STACK object (%p) entered!", R1 "ptr") never returns; }
 
 /* ----------------------------------------------------------------------------
    Weak pointers
@@ -698,7 +698,7 @@ INFO_TABLE(stg_STACK, 0,0, STACK, "STACK", "STACK")
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_WEAK,1,4,WEAK,"WEAK","WEAK")
-{ foreign "C" barf("WEAK object (%p) entered!", R1) never returns; }
+{ ccall pbarf("WEAK object (%p) entered!", R1 "ptr") never returns; }
 
 /*
  * It's important when turning an existing WEAK into a DEAD_WEAK
@@ -707,7 +707,7 @@ INFO_TABLE(stg_WEAK,1,4,WEAK,"WEAK","WEAK")
  * DEAD_WEAK 5 non-pointer fields.
  */
 INFO_TABLE_CONSTR(stg_DEAD_WEAK,0,5,0,CONSTR,"DEAD_WEAK","DEAD_WEAK")
-{ foreign "C" barf("DEAD_WEAK object (%p) entered!", R1) never returns; }
+{ ccall pbarf("DEAD_WEAK object (%p) entered!", R1 "ptr") never returns; }
 
 /* ----------------------------------------------------------------------------
    C finalizer lists
@@ -716,7 +716,7 @@ INFO_TABLE_CONSTR(stg_DEAD_WEAK,0,5,0,CONSTR,"DEAD_WEAK","DEAD_WEAK")
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_C_FINALIZER_LIST,1,4,0,CONSTR,"C_FINALIZER_LIST","C_FINALIZER_LIST")
-{ foreign "C" barf("C_FINALIZER_LIST object (%p) entered!", R1) never returns; }
+{ ccall pbarf("C_FINALIZER_LIST object (%p) entered!", R1 "ptr") never returns; }
 
 /* ----------------------------------------------------------------------------
    NO_FINALIZER
@@ -726,7 +726,7 @@ INFO_TABLE_CONSTR(stg_C_FINALIZER_LIST,1,4,0,CONSTR,"C_FINALIZER_LIST","C_FINALI
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_NO_FINALIZER,0,0,0,CONSTR_NOCAF,"NO_FINALIZER","NO_FINALIZER")
-{ foreign "C" barf("NO_FINALIZER object (%p) entered!", R1) never returns; }
+{ ccall pbarf("NO_FINALIZER object (%p) entered!", R1 "ptr") never returns; }
 
 CLOSURE(stg_NO_FINALIZER_closure,stg_NO_FINALIZER);
 
@@ -735,7 +735,7 @@ CLOSURE(stg_NO_FINALIZER_closure,stg_NO_FINALIZER);
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_STABLE_NAME,0,1,PRIM,"STABLE_NAME","STABLE_NAME")
-{ foreign "C" barf("STABLE_NAME object (%p) entered!", R1) never returns; }
+{ ccall pbarf("STABLE_NAME object (%p) entered!", R1 "ptr") never returns; }
 
 /* ----------------------------------------------------------------------------
    MVars
@@ -745,38 +745,38 @@ INFO_TABLE(stg_STABLE_NAME,0,1,PRIM,"STABLE_NAME","STABLE_NAME")
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_MVAR_CLEAN,3,0,MVAR_CLEAN,"MVAR","MVAR")
-{ foreign "C" barf("MVAR object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MVAR object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_MVAR_DIRTY,3,0,MVAR_DIRTY,"MVAR","MVAR")
-{ foreign "C" barf("MVAR object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MVAR object (%p) entered!", R1 "ptr") never returns; }
 
 /* -----------------------------------------------------------------------------
    STM
    -------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_TVAR_CLEAN, 2, 1, TVAR, "TVAR", "TVAR")
-{ foreign "C" barf("TVAR_CLEAN object (%p) entered!", R1) never returns; }
+{ ccall pbarf("TVAR_CLEAN object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_TVAR_DIRTY, 2, 1, TVAR, "TVAR", "TVAR")
-{ foreign "C" barf("TVAR_DIRTY object (%p) entered!", R1) never returns; }
+{ ccall pbarf("TVAR_DIRTY object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_TVAR_WATCH_QUEUE, 3, 0, MUT_PRIM, "TVAR_WATCH_QUEUE", "TVAR_WATCH_QUEUE")
-{ foreign "C" barf("TVAR_WATCH_QUEUE object (%p) entered!", R1) never returns; }
+{ ccall pbarf("TVAR_WATCH_QUEUE object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_TREC_CHUNK, 0, 0, TREC_CHUNK, "TREC_CHUNK", "TREC_CHUNK")
-{ foreign "C" barf("TREC_CHUNK object (%p) entered!", R1) never returns; }
+{ ccall pbarf("TREC_CHUNK object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_TREC_HEADER, 2, 1, MUT_PRIM, "TREC_HEADER", "TREC_HEADER")
-{ foreign "C" barf("TREC_HEADER object (%p) entered!", R1) never returns; }
+{ ccall pbarf("TREC_HEADER object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_END_STM_WATCH_QUEUE,0,0,0,CONSTR_NOCAF,"END_STM_WATCH_QUEUE","END_STM_WATCH_QUEUE")
-{ foreign "C" barf("END_STM_WATCH_QUEUE object (%p) entered!", R1) never returns; }
+{ ccall pbarf("END_STM_WATCH_QUEUE object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_END_STM_CHUNK_LIST,0,0,0,CONSTR_NOCAF,"END_STM_CHUNK_LIST","END_STM_CHUNK_LIST")
-{ foreign "C" barf("END_STM_CHUNK_LIST object (%p) entered!", R1) never returns; }
+{ ccall pbarf("END_STM_CHUNK_LIST object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_NO_TREC,0,0,0,CONSTR_NOCAF,"NO_TREC","NO_TREC")
-{ foreign "C" barf("NO_TREC object (%p) entered!", R1) never returns; }
+{ ccall pbarf("NO_TREC object (%p) entered!", R1 "ptr") never returns; }
 
 CLOSURE(stg_END_STM_WATCH_QUEUE_closure,stg_END_STM_WATCH_QUEUE);
 
@@ -791,52 +791,52 @@ CLOSURE(stg_NO_TREC_closure,stg_NO_TREC);
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_SRT_1, 1, 0, 0, CONSTR_1_0, "SRT_1", "SRT_1")
-{ foreign "C" barf("SRT_1 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_1 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_2, 2, 0, 0, CONSTR_2_0, "SRT_2", "SRT_2")
-{ foreign "C" barf("SRT_2 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_2 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_3, 3, 0, 0, CONSTR, "SRT_3", "SRT_3")
-{ foreign "C" barf("SRT_3 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_3 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_4, 4, 0, 0, CONSTR, "SRT_4", "SRT_4")
-{ foreign "C" barf("SRT_4 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_4 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_5, 5, 0, 0, CONSTR, "SRT_5", "SRT_5")
-{ foreign "C" barf("SRT_5 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_5 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_6, 6, 0, 0, CONSTR, "SRT_6", "SRT_6")
-{ foreign "C" barf("SRT_6 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_6 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_7, 7, 0, 0, CONSTR, "SRT_7", "SRT_7")
-{ foreign "C" barf("SRT_7 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_7 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_8, 8, 0, 0, CONSTR, "SRT_8", "SRT_8")
-{ foreign "C" barf("SRT_8 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_8 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_9, 9, 0, 0, CONSTR, "SRT_9", "SRT_9")
-{ foreign "C" barf("SRT_9 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_9 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_10, 10, 0, 0, CONSTR, "SRT_10", "SRT_10")
-{ foreign "C" barf("SRT_10 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_10 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_11, 11, 0, 0, CONSTR, "SRT_11", "SRT_11")
-{ foreign "C" barf("SRT_11 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_11 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_12, 12, 0, 0, CONSTR, "SRT_12", "SRT_12")
-{ foreign "C" barf("SRT_12 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_12 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_13, 13, 0, 0, CONSTR, "SRT_13", "SRT_13")
-{ foreign "C" barf("SRT_13 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_13 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_14, 14, 0, 0, CONSTR, "SRT_14", "SRT_14")
-{ foreign "C" barf("SRT_14 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_14 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_15, 15, 0, 0, CONSTR, "SRT_15", "SRT_15")
-{ foreign "C" barf("SRT_15 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_15 object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_SRT_16, 16, 0, 0, CONSTR, "SRT_16", "SRT_16")
-{ foreign "C" barf("SRT_16 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SRT_16 object (%p) entered!", R1 "ptr") never returns; }
 
 /* ---------------------------------------------------------------------------   Messages
    ------------------------------------------------------------------------- */
@@ -844,20 +844,20 @@ INFO_TABLE_CONSTR(stg_SRT_16, 16, 0, 0, CONSTR, "SRT_16", "SRT_16")
 // PRIM rather than CONSTR, because PRIM objects cannot be duplicated by the GC.
 
 INFO_TABLE_CONSTR(stg_MSG_TRY_WAKEUP,2,0,0,PRIM,"MSG_TRY_WAKEUP","MSG_TRY_WAKEUP")
-{ foreign "C" barf("MSG_TRY_WAKEUP object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MSG_TRY_WAKEUP object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_MSG_THROWTO,4,0,0,PRIM,"MSG_THROWTO","MSG_THROWTO")
-{ foreign "C" barf("MSG_THROWTO object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MSG_THROWTO object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_MSG_BLACKHOLE,3,0,0,PRIM,"MSG_BLACKHOLE","MSG_BLACKHOLE")
-{ foreign "C" barf("MSG_BLACKHOLE object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MSG_BLACKHOLE object (%p) entered!", R1 "ptr") never returns; }
 
 // used to overwrite a MSG_THROWTO when the message has been used/revoked
 INFO_TABLE_CONSTR(stg_MSG_NULL,1,0,0,PRIM,"MSG_NULL","MSG_NULL")
-{ foreign "C" barf("MSG_NULL object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MSG_NULL object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_MSG_CLONE_STACK,3,0,0,PRIM,"MSG_CLONE_STACK","MSG_CLONE_STACK")
-{ foreign "C" barf("stg_MSG_CLONE_STACK object (%p) entered!", R1) never returns; }
+{ ccall pbarf("stg_MSG_CLONE_STACK object (%p) entered!", R1 "ptr") never returns; }
 
 /* ----------------------------------------------------------------------------
    END_TSO_QUEUE
@@ -867,7 +867,7 @@ INFO_TABLE_CONSTR(stg_MSG_CLONE_STACK,3,0,0,PRIM,"MSG_CLONE_STACK","MSG_CLONE_ST
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_END_TSO_QUEUE,0,0,0,CONSTR_NOCAF,"END_TSO_QUEUE","END_TSO_QUEUE")
-{ foreign "C" barf("END_TSO_QUEUE object (%p) entered!", R1) never returns; }
+{ ccall pbarf("END_TSO_QUEUE object (%p) entered!", R1 "ptr") never returns; }
 
 CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
 
@@ -876,7 +876,7 @@ CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_GCD_CAF,0,0,0,CONSTR_NOCAF,"GCD_CAF","GCD_CAF")
-{ foreign "C" barf("Evaluated a CAF (%p) that was GC'd!", R1) never returns; }
+{ ccall pbarf("Evaluated a CAF (%p) that was GC'd!", R1 "ptr") never returns; }
 
 /* ----------------------------------------------------------------------------
    STM_AWOKEN
@@ -886,7 +886,7 @@ INFO_TABLE_CONSTR(stg_GCD_CAF,0,0,0,CONSTR_NOCAF,"GCD_CAF","GCD_CAF")
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_STM_AWOKEN,0,0,0,CONSTR_NOCAF,"STM_AWOKEN","STM_AWOKEN")
-{ foreign "C" barf("STM_AWOKEN object (%p) entered!", R1) never returns; }
+{ ccall pbarf("STM_AWOKEN object (%p) entered!", R1 "ptr") never returns; }
 
 CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
 
@@ -906,40 +906,40 @@ CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_ARR_WORDS, 0, 0, ARR_WORDS, "ARR_WORDS", "ARR_WORDS")
-{ foreign "C" barf("ARR_WORDS object (%p) entered!", R1) never returns; }
+{ ccall pbarf("ARR_WORDS object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_MUT_ARR_PTRS_CLEAN, 0, 0, MUT_ARR_PTRS_CLEAN, "MUT_ARR_PTRS_CLEAN", "MUT_ARR_PTRS_CLEAN")
-{ foreign "C" barf("MUT_ARR_PTRS_CLEAN object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MUT_ARR_PTRS_CLEAN object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_MUT_ARR_PTRS_DIRTY, 0, 0, MUT_ARR_PTRS_DIRTY, "MUT_ARR_PTRS_DIRTY", "MUT_ARR_PTRS_DIRTY")
-{ foreign "C" barf("MUT_ARR_PTRS_DIRTY object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MUT_ARR_PTRS_DIRTY object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN_CLEAN, 0, 0, MUT_ARR_PTRS_FROZEN_CLEAN, "MUT_ARR_PTRS_FROZEN_CLEAN", "MUT_ARR_PTRS_FROZEN_CLEAN")
-{ foreign "C" barf("MUT_ARR_PTRS_FROZEN_CLEAN object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MUT_ARR_PTRS_FROZEN_CLEAN object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN_DIRTY, 0, 0, MUT_ARR_PTRS_FROZEN_DIRTY, "MUT_ARR_PTRS_FROZEN_DIRTY", "MUT_ARR_PTRS_FROZEN_DIRTY")
-{ foreign "C" barf("MUT_ARR_PTRS_FROZEN_DIRTY object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MUT_ARR_PTRS_FROZEN_DIRTY object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_CLEAN, 0, 0, SMALL_MUT_ARR_PTRS_CLEAN, "SMALL_MUT_ARR_PTRS_CLEAN", "SMALL_MUT_ARR_PTRS_CLEAN")
-{ foreign "C" barf("SMALL_MUT_ARR_PTRS_CLEAN object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SMALL_MUT_ARR_PTRS_CLEAN object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_DIRTY, 0, 0, SMALL_MUT_ARR_PTRS_DIRTY, "SMALL_MUT_ARR_PTRS_DIRTY", "SMALL_MUT_ARR_PTRS_DIRTY")
-{ foreign "C" barf("SMALL_MUT_ARR_PTRS_DIRTY object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SMALL_MUT_ARR_PTRS_DIRTY object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN_CLEAN, "SMALL_MUT_ARR_PTRS_FROZEN_CLEAN", "SMALL_MUT_ARR_PTRS_FROZEN_CLEAN")
-{ foreign "C" barf("SMALL_MUT_ARR_PTRS_FROZEN_CLEAN object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SMALL_MUT_ARR_PTRS_FROZEN_CLEAN object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN_DIRTY, "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY", "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY")
-{ foreign "C" barf("SMALL_MUT_ARR_PTRS_FROZEN_DIRTY object (%p) entered!", R1) never returns; }
+{ ccall pbarf("SMALL_MUT_ARR_PTRS_FROZEN_DIRTY object (%p) entered!", R1 "ptr") never returns; }
 
 /* ----------------------------------------------------------------------------
    Mutable Variables
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_MUT_VAR_CLEAN, 1, 0, MUT_VAR_CLEAN, "MUT_VAR_CLEAN", "MUT_VAR_CLEAN")
-{ foreign "C" barf("MUT_VAR_CLEAN object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MUT_VAR_CLEAN object (%p) entered!", R1 "ptr") never returns; }
 INFO_TABLE(stg_MUT_VAR_DIRTY, 1, 0, MUT_VAR_DIRTY, "MUT_VAR_DIRTY", "MUT_VAR_DIRTY")
-{ foreign "C" barf("MUT_VAR_DIRTY object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MUT_VAR_DIRTY object (%p) entered!", R1 "ptr") never returns; }
 
 /* ----------------------------------------------------------------------------
    Dummy return closure
@@ -961,7 +961,7 @@ CLOSURE(stg_dummy_ret_closure,stg_dummy_ret);
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE")
-{ foreign "C" barf("MVAR_TSO_QUEUE object (%p) entered!", R1) never returns; }
+{ ccall pbarf("MVAR_TSO_QUEUE object (%p) entered!", R1 "ptr") never returns; }
 
 /* ----------------------------------------------------------------------------
    COMPACT_NFDATA (a blob of data in NF with no outgoing pointers)
@@ -974,11 +974,11 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
 
 INFO_TABLE( stg_COMPACT_NFDATA_CLEAN, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
     ()
-{ foreign "C" barf("COMPACT_NFDATA_CLEAN object (%p) entered!", R1) never returns; }
+{ ccall pbarf("COMPACT_NFDATA_CLEAN object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
     ()
-{ foreign "C" barf("COMPACT_NFDATA_DIRTY object (%p) entered!", R1) never returns; }
+{ ccall pbarf("COMPACT_NFDATA_DIRTY object (%p) entered!", R1 "ptr") never returns; }
 
 /* ----------------------------------------------------------------------------
    ClosureTable element null value
@@ -988,7 +988,7 @@ INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "C
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_CLOSURE_TABLE_NULL,0,0,0,CONSTR_NOCAF,"CLOSURE_TABLE_NULL","CLOSURE_TABLE_NULL")
-{ foreign "C" barf("CLOSURE_TABLE_NULL object (%p) entered!", R1) never returns; }
+{ ccall pbarf("CLOSURE_TABLE_NULL object (%p) entered!", R1 "ptr") never returns; }
 
 CLOSURE(stg_CLOSURE_TABLE_NULL_closure,stg_CLOSURE_TABLE_NULL);
 
@@ -1003,10 +1003,10 @@ INFO_TABLE_CONSTR(stg_TIMEOUT_QUEUE,
                   stg_TIMEOUT_QUEUE_NUM_PTRS,
                   stg_TIMEOUT_QUEUE_NUM_NONPTRS,
                   0,MUT_PRIM,"TIMEOUT_QUEUE","TIMEOUT_QUEUE")
-{ foreign "C" barf("TIMEOUT_QUEUE object (%p) entered!", R1) never returns; }
+{ ccall pbarf("TIMEOUT_QUEUE object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_TIMEOUT_QUEUE_EMPTY,0,0,0,CONSTR_NOCAF,"TIMEOUT_QUEUE_EMPTY","TIMEOUT_QUEUE_EMPTY")
-{ foreign "C" barf("TIMEOUT_QUEUE_EMPTY object (%p) entered!", R1) never returns; }
+{ ccall pbarf("TIMEOUT_QUEUE_EMPTY object (%p) entered!", R1 "ptr") never returns; }
 
 CLOSURE(stg_TIMEOUT_QUEUE_EMPTY_closure,stg_TIMEOUT_QUEUE_EMPTY);
 
@@ -1022,9 +1022,9 @@ INFO_TABLE_CONSTR(stg_ASYNCIOOP,
                   stg_ASYNCIOOP_NUM_PTRS,
                   stg_ASYNCIOOP_NUM_NONPTRS,
                   0,PRIM,"ASYNCIOOP","ASYNCIOOP")
-{ foreign "C" barf("ASYNCIOOP object (%p) entered!", R1) never returns; }
+{ ccall pbarf("ASYNCIOOP object (%p) entered!", R1 "ptr") never returns; }
 
 INFO_TABLE_CONSTR(stg_ASYNCIO_LIVE0,0,0,0,CONSTR_NOCAF,"ASYNCIO_LIVE0","ASYNCIO_LIVE0")
-{ foreign "C" barf("ASYNCIO_LIVE0 object (%p) entered!", R1) never returns; }
+{ ccall pbarf("ASYNCIO_LIVE0 object (%p) entered!", R1 "ptr") never returns; }
 
 CLOSURE(stg_ASYNCIO_LIVE0_closure,stg_ASYNCIO_LIVE0);

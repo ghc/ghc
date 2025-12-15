@@ -70,7 +70,7 @@ INFO_TABLE_RET (MK_FUN_NM(stg_stack_underflow_frame), UNDERFLOW_FRAME,
 
     jump %ENTRY_CODE(Sp(ret_off)) ALL_ARG_REGS;
 #else
-    ccall barf("stg_stack_underflow_frame: unsupported register", NULL) never returns;
+    ccall sbarf("stg_stack_underflow_frame: unsupported register") never returns;
 #endif
 }
 
@@ -96,6 +96,6 @@ INFO_TABLE_RET (MK_FUN_NM(stg_restore_cccs), RET_SMALL, W_ info_ptr, W_ cccs)
 
     jump %ENTRY_CODE(Sp(0)) ALL_ARG_REGS;
 #else
-    ccall barf("stg_restore_cccs: unsupported register", NULL) never returns;
+    ccall sbarf("stg_restore_cccs: unsupported register") never returns;
 #endif
 }
