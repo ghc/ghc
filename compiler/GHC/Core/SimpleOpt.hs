@@ -30,7 +30,6 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Make ( FloatBind(..), mkWildValBinder )
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
-import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Predicate( isCoVarType )
@@ -113,7 +112,6 @@ See ticket #25790
 -- | Simple optimiser options
 data SimpleOpts = SimpleOpts
    { so_uf_opts :: !UnfoldingOpts   -- ^ Unfolding options
-   , so_co_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
    , so_eta_red :: !Bool            -- ^ Eta reduction on?
    , so_inline :: !Bool             -- ^ False <=> do no inlining whatsoever,
                                     --    even for trivial or used-once things
@@ -123,7 +121,6 @@ data SimpleOpts = SimpleOpts
 defaultSimpleOpts :: SimpleOpts
 defaultSimpleOpts = SimpleOpts
    { so_uf_opts = defaultUnfoldingOpts
-   , so_co_opts = OptCoercionOpts { optCoercionEnabled = False }
    , so_eta_red = False
    , so_inline  = True
    }
@@ -288,7 +285,7 @@ simple_opt_expr env expr = go expr
     go e@(Lam {})  = simple_app env e []
 
     go (Type ty)        = Type     (substTyUnchecked subst ty)
-    go (Coercion co)    = Coercion (go_co co)
+    go (Coercion co)    = Coercion (simple_opt_co env co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
     go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of
@@ -324,13 +321,13 @@ simple_opt_expr env expr = go expr
         (env', b') = subst_opt_bndr env b
 
     ----------------------
-    go_co co = optCoercion (so_co_opts (soe_opts env)) subst co
-
-    ----------------------
     go_alt env (Alt con bndrs rhs)
       = Alt con bndrs' (simple_opt_expr env' rhs)
       where
         (env', bndrs') = subst_opt_bndrs env bndrs
+
+simple_opt_co :: SimpleOptEnv -> InCoercion -> OutCoercion
+simple_opt_co env co = substCo (soe_subst env) co
 
 mk_cast :: CoreExpr -> CoercionR -> CoreExpr
 -- Like GHC.Core.Utils.mkCast, but does a full reflexivity check.
@@ -471,7 +468,7 @@ add_cast env co1 as
       CastIt co2:rest -> CastIt (co1' `mkTransCo` co2):rest
       _               -> CastIt co1':as
   where
-    co1' = optCoercion (so_co_opts (soe_opts env)) (soe_subst env) co1
+    co1' = simple_opt_co env co1
 
 rebuild_app :: HasDebugCallStack
             => SimpleOptEnv -> OutExpr -> [SimpleContItem] -> OutExpr
@@ -606,7 +603,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst, soe_opts = opt
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion co <- in_rhs
-  , let out_co = optCoercion (so_co_opts (soe_opts env)) (soe_subst rhs_env) co
+  , let out_co = simple_opt_co rhs_env co
   = assert (isCoVar in_bndr)
     (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
 

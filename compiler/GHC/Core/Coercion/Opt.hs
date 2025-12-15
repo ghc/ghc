@@ -1,17 +1,14 @@
 -- (c) The University of Glasgow 2006
-
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Coercion.Opt
-   ( optCoercion
-   , OptCoercionOpts (..)
-   )
+module GHC.Core.Coercion.Opt( optCoProgram )
 where
 
 import GHC.Prelude
 
 import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 
+import GHC.Core
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.Compare( eqForAllVis, eqTypeIgnoringMultiplicity )
@@ -42,12 +39,38 @@ import Control.Monad   ( zipWithM )
 %*                                                                      *
 %************************************************************************
 
-This module does coercion optimisation.  See the paper
+Note [Coercion optimisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This module does coercion optimisation.  The purpose is to reduce the size
+of the coercions that the compiler carries around -- they are just proofs,
+and serve no runtime need. So the purpose of coercion optimisation is simply
+to shrink coercions and thereby reduce compile time.
 
+See the paper
    Evidence normalization in Systtem FV (RTA'13)
    https://simon.peytonjones.org/evidence-normalization/
-
 The paper is also in the GHC repo, in docs/opt-coercion.
+
+However, although powerful and occasionally very effective, coercion
+optimisation can itself be very expensive (#26679).  So we apply it sparingly:
+
+* In the Simplifier, function `rebuild_go`, we use `isReflexiveCo` (which
+  computes the type of the coercion) to eliminate reflexive coercion, just
+  before we build a cast (e |> co).
+
+  (More precisely, we use `isReflexiveCoIgnoringMultiplicity;
+   c.f. GHC.Core.Coercion.Opt.opt_univ.)
+
+* We have a whole pass, `optCoProgram` that runs the coercion optimiser on all
+  the coercions in the program.
+
+  - We run it once in all optimisation levels
+    (see GHC.Driver.DynFlags.optLevelFlags)
+
+  - We run it early in the optimisation pipeline
+    (see GHC.Core.Opt.Pipeline.getCoreToDo).
+    Controlled by a flag `-fopt-coercion`, on by default
+
 
 Note [Optimising coercion optimisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -164,33 +187,61 @@ We use the following invariants:
        to the little bits being substituted.
 -}
 
--- | Coercion optimisation options
-newtype OptCoercionOpts = OptCoercionOpts
-   { optCoercionEnabled :: Bool  -- ^ Enable coercion optimisation (reduce its size)
-   }
+{- **********************************************************************
+%*                                                                      *
+                    optCoercionPgm
+%*                                                                      *
+%********************************************************************* -}
 
-optCoercion :: OptCoercionOpts -> Subst -> Coercion -> NormalCo
+optCoProgram :: CoreProgram -> CoreProgram
+optCoProgram binds
+  = map go binds
+  where
+    go (NonRec b r) = NonRec b (optCoExpr in_scope r)
+    go (Rec prs)    = Rec (mapSnd (optCoExpr in_scope) prs)
+    in_scope = mkInScopeSetList (bindersOfBinds binds)
+       -- Put all top-level binders into scope; it is possible to have
+       -- forward references.  See Note [Glomming] in GHC.Core.Opt.OccurAnal
+
+optCoExpr :: InScopeSet -> CoreExpr -> CoreExpr
+optCoExpr _ e@(Var {})     = e
+optCoExpr _ e@(Lit {})     = e
+optCoExpr _ e@(Type {})    = e
+optCoExpr is (App e1 e2)   = App (optCoExpr is e1) (optCoExpr is e2)
+optCoExpr is (Lam b e)     = Lam b (optCoExpr (is `extendInScopeSet` b) e)
+optCoExpr is (Coercion co) = Coercion (optCo is co)
+optCoExpr is (Cast e co)   = Cast (optCoExpr is e) (optCo is co)
+optCoExpr is (Tick t e)    = Tick t (optCoExpr is e)
+optCoExpr is (Let (NonRec b r) e)  = Let (NonRec b (optCoExpr is r))
+                                         (optCoExpr (is `extendInScopeSet` b) e)
+optCoExpr is (Let (Rec prs)    e)  = Let (Rec (mapSnd (optCoExpr is') prs))
+                                         (optCoExpr is' e)
+                                   where
+                                     is' = is `extendInScopeSetList` map fst prs
+optCoExpr is (Case e b ty alts) = Case (optCoExpr is e) b ty
+                                       (map (optCoAlt (is `extendInScopeSet` b)) alts)
+
+optCo :: InScopeSet -> Coercion -> Coercion
+optCo is co = optCoercion (mkEmptySubst is) co
+
+optCoAlt :: InScopeSet -> CoreAlt -> CoreAlt
+optCoAlt is (Alt k bs e)
+  = Alt k bs (optCoExpr (is `extendInScopeSetList` bs) e)
+
+
+{- **********************************************************************
+%*                                                                      *
+                    optCoercion
+%*                                                                      *
+%********************************************************************* -}
+
+optCoercion :: Subst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,
 --   *and* optimises it to reduce its size
-optCoercion opts env co
-  | optCoercionEnabled opts
-  = optCoercion' env co
-
-{-
-  = pprTrace "optCoercion {" (text "Co:" <> ppr co) $
-    let result = optCoercion' env co in
-    pprTrace "optCoercion }"
-       (vcat [ text "Co:"    <+> ppr (coercionSize co)
-             , text "Optco:" <+> ppWhen (isReflCo result) (text "(refl)")
-                             <+> ppr result ]) $
-    result
--}
-
-  | otherwise
-  = substCo env co
-
-optCoercion' :: Subst -> Coercion -> NormalCo
-optCoercion' env co
+-- The substitution is a vestige of an earlier era, when the coercion optimiser
+--   was called by the Simplifier; now it is always empty
+--   But I have not removed it in case we ever want it back.
+optCoercion env co
   | debugIsOn
   = let out_co = opt_co1 lc NotSwapped co
         (Pair in_ty1  in_ty2,  in_role)  = coercionKindRole co
@@ -622,7 +673,7 @@ opt_univ env sym prov deps role ty1 ty2
     in
       -- We only Lint multiplicities in the output of the typechecker, as
       -- described in Note [Linting linearity] in GHC.Core.Lint. This means
-      -- we can use 'eqTypeIgnoringMultiplicity' instea of 'eqType' below.
+      -- we can use 'eqTypeIgnoringMultiplicity' instead of 'eqType' below.
       --
       -- In particular, this gets rid of 'SubMultProv' coercions that were
       -- introduced for typechecking multiplicities of data constructors, as
