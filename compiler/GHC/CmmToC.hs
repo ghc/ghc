@@ -426,7 +426,7 @@ pprMachOpApp :: Platform -> MachOp -> [CmmExpr] -> SDoc
 
 pprMachOpApp platform op args
   | isMulMayOfloOp op
-  = text "mulIntMayOflo" <> parens (commafy (map (pprExpr platform) args))
+  = text "hs_mulIntMayOflo" <> parens (commafy (map (pprExpr platform) args))
   where isMulMayOfloOp (MO_S_MulMayOflo _) = True
         isMulMayOfloOp _ = False
 
