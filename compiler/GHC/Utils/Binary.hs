@@ -116,6 +116,7 @@ module GHC.Utils.Binary
 
 import GHC.Prelude
 
+import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 
@@ -2061,3 +2062,29 @@ instance Binary FFIType where
     FFIUInt16 -> 9
     FFIUInt32 -> 10
     FFIUInt64 -> 11
+
+instance Binary InlineSpec where
+    put_ bh = putByte bh . \case
+      NoUserInlinePrag -> 0
+      Inline           -> 1
+      Inlinable        -> 2
+      NoInline         -> 3
+      Opaque           -> 4
+
+    get bh = do
+      h <- getByte bh
+      return $ case h of
+        0 -> NoUserInlinePrag
+        1 -> Inline
+        2 -> Inlinable
+        3 -> NoInline
+        _ -> Opaque
+
+instance Binary RuleMatchInfo where
+    put_ bh FunLike = putByte bh 0
+    put_ bh ConLike = putByte bh 1
+
+    get bh = do
+      h <- getByte bh
+      if h == 1 then pure ConLike
+                else pure FunLike

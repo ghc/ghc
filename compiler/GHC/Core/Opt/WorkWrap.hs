@@ -22,9 +22,12 @@ import GHC.Core.SimpleOpt
 
 import GHC.Data.FastString
 
+import GHC.Hs.Extension (GhcPass, GhcTc)
+
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
 import GHC.Types.Demand
@@ -827,12 +830,12 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
 
     work_rhs = work_fn (mkLams fn_args fn_body)
     work_act = case fn_inline_spec of  -- See Note [Worker activation]
-                   NoInline _  -> inl_act fn_inl_prag
-                   _           -> inl_act wrap_prag
+                   NoInline -> inl_act fn_inl_prag
+                   _        -> inl_act wrap_prag
 
-    work_prag = InlinePragma { inl_src = SourceText $ fsLit "{-# INLINE"
+    srcTxt = SourceText $ fsLit "{-# INLINE"
+    work_prag = InlinePragma { inl_ext = XInlinePragmaGhc srcTxt AnySaturation
                              , inl_inline = fn_inline_spec
-                             , inl_sat    = Nothing
                              , inl_act    = work_act
                              , inl_rule   = FunLike }
       -- inl_inline: copy from fn_id; see Note [Worker/wrapper for INLINABLE functions]
@@ -894,12 +897,11 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
     fn_unfolding    = realUnfoldingInfo fn_info
     fn_rules        = ruleInfoRules (ruleInfo fn_info)
 
-mkStrWrapperInlinePrag :: InlinePragma -> [CoreRule] -> InlinePragma
+mkStrWrapperInlinePrag :: InlinePragma (GhcPass p) -> [CoreRule] -> InlinePragma GhcTc
 mkStrWrapperInlinePrag (InlinePragma { inl_inline = fn_inl
                                      , inl_act    = fn_act
                                      , inl_rule   = rule_info }) rules
-  = InlinePragma { inl_src    = SourceText $ fsLit "{-# INLINE"
-                 , inl_sat    = Nothing
+  = InlinePragma { inl_ext    = XInlinePragmaGhc srcTxt AnySaturation
 
                  , inl_inline = fn_inl
                       -- See Note [Worker/wrapper for INLINABLE functions]
@@ -909,6 +911,7 @@ mkStrWrapperInlinePrag (InlinePragma { inl_inline = fn_inl
 
                  , inl_rule   = rule_info }  -- RuleMatchInfo is (and must be) unaffected
   where
+    srcTxt = SourceText $ fsLit "{-# INLINE"
     -- See Note [Wrapper activation]
     wrapper_phase = foldr (laterPhase . get_rule_phase) earliest_inline_phase rules
     earliest_inline_phase = beginPhase fn_act `laterPhase` nextPhase InitialPhase

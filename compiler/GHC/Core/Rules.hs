@@ -72,6 +72,8 @@ import GHC.Builtin.Types    ( anyTypeOfKind )
 
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RuleInfo( RuleInfo ) )
+import GHC.Types.InlinePragma
+    ( ActivationGhc, CompilerPhase, isActiveInPhase )
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -188,7 +190,7 @@ to apply the specialised function to, are handled by the fact that the
 Rule contains a template for the result of the specialisation.
 -}
 
-mkRule :: Module -> Bool -> Bool -> RuleName -> Activation
+mkRule :: Module -> Bool -> Bool -> RuleName -> ActivationGhc
        -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- ^ Used to make 'CoreRule' for an 'Id' defined in the module being
 -- compiled. See also 'GHC.Core.CoreRule'
@@ -219,7 +221,7 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
     orph = chooseOrphanAnchor local_lhs_names
 
 --------------
-mkSpecRule :: DynFlags -> Module -> Bool -> Activation -> SDoc
+mkSpecRule :: DynFlags -> Module -> Bool -> ActivationGhc -> SDoc
            -> Id -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- Make a specialisation rule, for Specialise or SpecConstr
 mkSpecRule dflags this_mod is_auto inl_act herald fn bndrs args rhs
@@ -546,7 +548,7 @@ map.
 -- successful.
 lookupRule :: HasDebugCallStack
            => RuleOpts -> InScopeEnv
-           -> (Activation -> Bool)      -- When rule is active
+           -> (ActivationGhc -> Bool)      -- When rule is active
            -> Id -- Function head
            -> [CoreExpr] -- Args
            -> [CoreRule] -- Rules
@@ -629,7 +631,7 @@ ruleLhsIsMoreSpecific in_scope bndrs1 args1 rule2
    in_scope_env  = ISE full_in_scope noUnfoldingFun
                    -- noUnfoldingFun: don't expand in templates
 
-noBlackList :: Activation -> Bool
+noBlackList :: ActivationGhc -> Bool
 noBlackList _ = False           -- Nothing is black listed
 
 {- Note [ruleIsMoreSpecific]
@@ -678,7 +680,7 @@ start, in general eta expansion wastes work.  SLPJ July 99
 
 ------------------------------------
 matchRule :: HasDebugCallStack
-          => RuleOpts -> InScopeEnv -> (Activation -> Bool)
+          => RuleOpts -> InScopeEnv -> (ActivationGhc -> Bool)
           -> Id -> [CoreExpr] -> [Maybe Name]
           -> CoreRule -> Maybe CoreExpr
 
@@ -715,8 +717,8 @@ matchRule opts rule_env _is_active fn args _rough_args
 matchRule _ rule_env is_active _ args rough_args
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
                 , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs })
-  | not (is_active act)               = Nothing
-  | ruleCantMatch tpl_tops rough_args = Nothing
+  | not (is_active act) = Nothing
+  | ruleCantMatch tpl_tops rough_args      = Nothing
   | otherwise = matchN rule_env rule_name tpl_vars tpl_args args rhs
 
 
@@ -1926,7 +1928,7 @@ ruleCheckProgram ropts curr_phase rule_pat rules binds
                           in ds `unionBags` go env' binds
 
 data RuleCheckEnv = RuleCheckEnv
-    { rc_is_active :: Activation -> Bool
+    { rc_is_active :: ActivationGhc -> Bool
     , rc_id_unf    :: IdUnfoldingFun
     , rc_pattern   :: String
     , rc_rules     :: Id -> [CoreRule]

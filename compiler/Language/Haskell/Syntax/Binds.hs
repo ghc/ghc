@@ -20,13 +20,13 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   ( LHsExpr
   , MatchGroup
   , GRHSs )
-import {-# SOURCE #-} Language.Haskell.Syntax.Pat( LPat )
+import {-# SOURCE #-} Language.Haskell.Syntax.Pat(LPat)
+import Language.Haskell.Syntax.Basic (Fixity)
+import Language.Haskell.Syntax.Binds.InlinePragma (InlinePragma)
 import Language.Haskell.Syntax.BooleanFormula (LBooleanFormula)
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
-import Language.Haskell.Syntax.Basic ( Fixity )
 
-import GHC.Types.Basic (InlinePragma)
 import GHC.Types.SourceText (StringLiteral)
 
 import Data.Bool
@@ -332,8 +332,8 @@ data Sig pass
         --
         -- > {#- INLINE f #-}
   | InlineSig   (XInlineSig pass)
-                (LIdP pass)        -- Function name
-                InlinePragma       -- Never defaultInlinePragma
+                (LIdP pass)         -- Function name
+                (InlinePragma pass) -- Never defaultInlinePragma
 
         -- | An old-form specialisation pragma
         --
@@ -341,11 +341,11 @@ data Sig pass
         --
         -- NB: this constructor is deprecated and will be removed in GHC 9.18 (#25540)
   | SpecSig     (XSpecSig pass)
-                (LIdP pass)        -- Specialise a function or datatype  ...
-                [LHsSigType pass]  -- ... to these types
-                InlinePragma       -- The pragma on SPECIALISE_INLINE form.
-                                   -- If it's just defaultInlinePragma, then we said
-                                   --    SPECIALISE, not SPECIALISE_INLINE
+                (LIdP pass)         -- Specialise a function or datatype  ...
+                [LHsSigType pass]   -- ... to these types
+                (InlinePragma pass) -- The pragma on SPECIALISE_INLINE form.
+                                    -- If it's just defaultInlinePragma, then we said
+                                    --    SPECIALISE, not SPECIALISE_INLINE
 
         -- | A new-form specialisation pragma (see GHC Proposal #493)
         --   e.g.  {-# SPECIALISE f @Int 1 :: Int -> Int #-}
@@ -353,7 +353,7 @@ data Sig pass
   | SpecSigE    (XSpecSigE pass)
                 (RuleBndrs pass)
                 (LHsExpr pass)     -- Expression to specialise
-                InlinePragma
+                (InlinePragma pass)
                 -- The expression should be of form
                 --     f a1 ... an [ :: sig ]
                 -- with an optional type signature

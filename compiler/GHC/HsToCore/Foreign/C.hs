@@ -32,6 +32,7 @@ import GHC.HsToCore.Types (ds_next_wrapper_num)
 import GHC.Hs
 
 import GHC.Types.Id
+import GHC.Types.InlinePragma ( ActivationX(NeverActive) )
 import GHC.Types.Literal
 import GHC.Types.ForeignStubs
 import GHC.Types.SourceText

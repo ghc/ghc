@@ -67,7 +67,7 @@ import GHC.Core.Opt.ConstantFold
 
 import GHC.Types.Name
 import GHC.Types.Id
-import GHC.Types.Id.Info
+import GHC.Types.InlinePragma
 import GHC.Types.Tickish
 import GHC.Types.Demand
 import GHC.Types.Var.Set
@@ -1067,7 +1067,7 @@ Reason for (b): we want to inline integerCompare here
 ************************************************************************
 -}
 
-updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
+updModeForStableUnfoldings :: ActivationGhc -> SimplMode -> SimplMode
 -- See Note [The environments of the Simplify pass]
 -- See Note [Simplifying inside stable unfoldings]
 updModeForStableUnfoldings unf_act current_mode
@@ -1092,7 +1092,7 @@ updModeForRuleLHS current_mode
                       -- See Note [Cast swizzling on rule LHSs]
                  , sm_eta_expand   = False }
 
-updModeForRuleRHS :: Activation -> SimplMode -> SimplMode
+updModeForRuleRHS :: ActivationGhc -> SimplMode -> SimplMode
 updModeForRuleRHS rule_act current_mode =
   current_mode
     -- See Note [What is active in the RHS of a RULE?]
@@ -1106,8 +1106,8 @@ updModeForRuleRHS rule_act current_mode =
 --
 -- See Note [What is active in the RHS of a RULE?]
 phaseFromActivation
-  :: SimplPhase -- ^ the current simplifier phase
-  -> Activation -- ^ the activation of the RULE or stable unfolding
+  :: SimplPhase             -- ^ the current simplifier phase
+  -> ActivationGhc -- ^ the activation of the RULE or stable unfolding
   -> SimplPhase
 phaseFromActivation p act
   | isNeverActive act
@@ -1354,7 +1354,7 @@ getUnfoldingInRuleMatch env
      -- but that seems wrong (#20941)
 
 ----------------------
-activeRule :: SimplMode -> Activation -> Bool
+activeRule :: SimplMode -> ActivationGhc -> Bool
 -- Nothing => No rules at all
 activeRule mode
   | not (sm_rules mode) = \_ -> False     -- Rewriting is off

@@ -72,7 +72,8 @@ import GHC.Tc.Zonk.Monad ( ZonkM )
 import GHC.Rename.Utils( mkRnSyntaxExpr )
 
 import GHC.Types.Id.Make( mkDictFunId )
-import GHC.Types.Basic ( TypeOrKind(..), Arity, VisArity )
+import GHC.Types.Arity ( Arity, VisArity )
+import GHC.Types.Basic ( TypeOrKind(..) )
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var.Env

@@ -32,6 +32,7 @@ import GHC.Core.Multiplicity
 
 import GHC.Types.Id
 import GHC.Types.Id.Make
+import GHC.Types.InlinePragma ( ActivationX(NeverActive) )
 import GHC.Types.Literal
 import GHC.Types.ForeignStubs
 import GHC.Types.SourceText

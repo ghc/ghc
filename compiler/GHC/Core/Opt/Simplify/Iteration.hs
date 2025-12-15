@@ -43,11 +43,14 @@ import GHC.Core.FVs     ( mkRuleInfo {- exprsFreeIds -} )
 import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Core.Multiplicity
 
+import GHC.Hs.Extension
+
 import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporarily commented out. See #8326
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Id.Make   ( seqId )
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma
 import GHC.Types.Name   ( mkSystemVarName, isExternalName, getOccFS )
 import GHC.Types.Demand
 import GHC.Types.Unique ( hasKey )
@@ -652,21 +655,26 @@ tryCastWorkerWrapper env _ _ bndr rhs  -- All other bindings
                                    , text "rhs:" <+> ppr rhs ])
         ; return (mkFloatBind env (NonRec bndr rhs)) }
 
-mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
+mkCastWrapperInlinePrag :: InlinePragma GhcTc -> InlinePragma GhcTc
 -- See Note [Cast worker/wrapper]
-mkCastWrapperInlinePrag (InlinePragma { inl_inline = fn_inl, inl_act = fn_act, inl_rule = rule_info })
-  = InlinePragma { inl_src    = SourceText $ fsLit "{-# INLINE"
-                 , inl_inline = fn_inl       -- See Note [Worker/wrapper for INLINABLE functions]
-                 , inl_sat    = Nothing      --     in GHC.Core.Opt.WorkWrap
-                 , inl_act    = wrap_act     -- See Note [Wrapper activation]
-                 , inl_rule   = rule_info }  --     in GHC.Core.Opt.WorkWrap
-                                -- RuleMatchInfo is (and must be) unaffected
+mkCastWrapperInlinePrag prag = prag
+  `setInlinePragmaSource` src_txt
+  `setInlinePragmaSaturation` AnySaturation
+  `setInlinePragmaActivation` wrap_act
+  -- 1. 'Activation' is conditionally updated
+  --    See Note [Wrapper activation]
+  --       in GHC.Core.Opt.WorkWrap
+  -- 2. 'InlineSpec' is also preserved
+  --    See Note [Worker/wrapper for INLINABLE functions]
+  --       in GHC.Core.Opt.WorkWrap
+  -- 3. 'RuleMatchInfo' is (and must be) unaffected
   where
     -- See Note [Wrapper activation] in GHC.Core.Opt.WorkWrap
     -- But simpler, because we don't need to disable during InitialPhase
     wrap_act | isNeverActive fn_act = activateDuringFinal
              | otherwise            = fn_act
-
+    fn_act  = inlinePragmaActivation prag
+    src_txt = SourceText $ fsLit "{-# INLINE"
 
 {- *********************************************************************
 *                                                                      *
@@ -2628,7 +2636,7 @@ tryRules env rules fn args
   where
     ropts        = seRuleOpts env :: RuleOpts
     in_scope_env = getUnfoldingInRuleMatch env :: InScopeEnv
-    act_fun      = activeRule (seMode env) :: Activation -> Bool
+    act_fun      = activeRule (seMode env) :: ActivationGhc -> Bool
 
     printRuleModule rule
       = parens (maybe (text "BUILTIN")

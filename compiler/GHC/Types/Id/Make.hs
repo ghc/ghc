@@ -73,6 +73,7 @@ import GHC.Types.Name.Env
 import GHC.Types.ForeignCall
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Unique.Supply
@@ -605,7 +606,7 @@ mkDataConWorkId wkr_name data_con
                       -- See Note [Strict fields in Core]
                    `setLFInfo`             wkr_lf_info
 
-    wkr_inline_prag = defaultInlinePragma { inl_rule = ConLike }
+    wkr_inline_prag = alwaysConLikePragma
     wkr_arity = dataConRepArity data_con
 
     wkr_sig = mkClosedDmdSig wkr_dmds topDiv
@@ -985,7 +986,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
            ; return (unbox_fn expr) }
 
 
-dataConWrapperInlinePragma :: InlinePragma
+dataConWrapperInlinePragma :: InlinePragmaInfo
 -- See Note [DataCon wrappers are conlike]
 dataConWrapperInlinePragma =  alwaysInlineConLikePragma
 
@@ -1958,7 +1959,7 @@ seqId = pcRepPolyId seqName ty concs info
                        `setArityInfo`      arity
 
     inline_prag
-         = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter 0
+         = alwaysInlinePragma `setInlinePragmaActivation` activeAfter (Phase 0)
                   -- Make 'seq' not inline-always, so that simpleOptExpr
                   -- (see GHC.Core.Subst.simple_app) won't inline 'seq' on the
                   -- LHS of rules.  That way we can have rules for 'seq';

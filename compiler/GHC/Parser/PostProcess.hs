@@ -143,6 +143,7 @@ import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Fixity
 import GHC.Types.Hint
+import GHC.Types.InlinePragma
 import GHC.Types.SourceText
 import GHC.Parser.Types
 import GHC.Parser.Lexer
@@ -1046,7 +1047,7 @@ checkRuleTyVarBndrNames bndrs
 -- in which case we use the old-form.
 --
 -- See Note [Overview of SPECIALISE pragmas] in GHC.Tc.Gen.Sig.
-mkSpecSig :: InlinePragma
+mkSpecSig :: InlinePragma GhcPs
           -> AnnSpecSig
           -> Maybe (RuleBndrs GhcPs)
           -> LHsExpr GhcPs
@@ -3042,14 +3043,13 @@ mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs GhcP
 mk_rec_upd_field (HsFieldBind noAnn (L loc (FieldOcc _ rdr)) arg pun)
   = HsFieldBind noAnn (L loc (FieldOcc noExtField rdr)) arg pun
 
-mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
-               -> InlinePragma
--- The (Maybe Activation) is because the user can omit
+mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe ActivationGhc
+               -> InlinePragma GhcPs
+-- The (Maybe ActivationGhc) is because the user can omit
 -- the activation spec (and usually does)
 mkInlinePragma src (inl, match_info) mb_act
-  = InlinePragma { inl_src = src -- See Note [Pragma source text] in "GHC.Types.SourceText"
+  = InlinePragma { inl_ext = src -- See Note [Pragma source text] in "GHC.Types.SourceText"
                  , inl_inline = inl
-                 , inl_sat    = Nothing
                  , inl_act    = act
                  , inl_rule   = match_info }
   where
@@ -3057,15 +3057,14 @@ mkInlinePragma src (inl, match_info) mb_act
             Just act -> act
             Nothing  -> -- No phase specified
                         case inl of
-                          NoInline _  -> NeverActive
-                          Opaque _    -> NeverActive
-                          _other      -> AlwaysActive
+                          NoInline -> NeverActive
+                          Opaque   -> NeverActive
+                          _other   -> AlwaysActive
 
-mkOpaquePragma :: SourceText -> InlinePragma
+mkOpaquePragma :: SourceText -> InlinePragma GhcPs
 mkOpaquePragma src
-  = InlinePragma { inl_src    = src
-                 , inl_inline = Opaque src
-                 , inl_sat    = Nothing
+  = InlinePragma { inl_ext    = src
+                 , inl_inline = Opaque
                  -- By marking the OPAQUE pragma NeverActive we stop
                  -- (constructor) specialisation on OPAQUE things.
                  --

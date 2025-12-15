@@ -39,6 +39,7 @@ import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
+import GHC.Types.InlinePragma ( isAlwaysActive )
 import GHC.Types.Var      ( isNonCoVarId )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env

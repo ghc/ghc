@@ -55,6 +55,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma
 import GHC.Types.Error
 
 import GHC.Utils.Monad    ( foldlM )
@@ -1619,7 +1620,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     fn_unf    = realIdUnfolding fn  -- Ignore loop-breaker-ness here
     inl_prag  = idInlinePragma fn
     inl_act   = inlinePragmaActivation inl_prag
-    is_active :: Activation -> Bool
+    is_active :: ActivationGhc -> Bool
     is_active = isActive (SimplPhaseRange (beginPhase inl_act) (endPhase inl_act))
          -- is_active: inl_act is the activation we are going to put in the new
          --   SPEC rule; so we want to see if it is covered by another rule with
@@ -1804,8 +1805,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                     ) } }
 
 alreadyCovered :: SpecEnv
-               -> [Var] -> Id -> [CoreExpr]   -- LHS of possible new rule
-               -> (Activation -> Bool)        -- Which rules are active
+               -> [Var] -> Id -> [CoreExpr]        -- LHS of possible new rule
+               -> (ActivationGhc -> Bool) -- Which rules are active
                -> [CoreRule] -> Bool
 -- Note [Specialisations already covered] esp (SC2)
 alreadyCovered env bndrs fn args is_active rules
@@ -1824,7 +1825,7 @@ alreadyCovered env bndrs fn args is_active rules
 -- The SpecEnv's InScopeSet should include all the Vars in the [CoreExpr]
 specLookupRule :: HasDebugCallStack
                => SpecEnv -> Id -> [CoreExpr]
-               -> (Activation -> Bool)  -- Which rules are active
+               -> (ActivationGhc -> Bool)  -- Which rules are active
                -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 specLookupRule env fn args is_active rules
   | null rules

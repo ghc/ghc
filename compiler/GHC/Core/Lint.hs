@@ -73,6 +73,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Types.Unique.FM ( isNullUFM, sizeUFM )

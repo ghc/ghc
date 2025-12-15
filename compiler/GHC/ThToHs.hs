@@ -39,6 +39,7 @@ import qualified GHC.Core.Coercion as Coercion ( Role(..) )
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( fUNTyCon )
 import GHC.Types.Basic as Hs
+import GHC.Types.InlinePragma as Hs
 import GHC.Types.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.SourceText
@@ -891,22 +892,20 @@ cvtPragmaD (InlineP nm inline rm phases)
        ; let src TH.NoInline  = fsLit "{-# NOINLINE"
              src TH.Inline    = fsLit "{-# INLINE"
              src TH.Inlinable = fsLit "{-# INLINABLE"
-       ; let ip   = InlinePragma { inl_src    = toSrcTxt inline
-                                 , inl_inline = cvtInline inline (toSrcTxt inline)
+       ; let ip   = InlinePragma { inl_ext    = toSrcTxt inline
+                                 , inl_inline = cvtInline inline
                                  , inl_rule   = cvtRuleMatch rm
-                                 , inl_act    = cvtPhases phases dflt
-                                 , inl_sat    = Nothing }
+                                 , inl_act    = cvtPhases phases dflt }
                     where
                      toSrcTxt a = SourceText $ src a
        ; returnJustLA $ Hs.SigD noExtField $ InlineSig noAnn nm' ip }
 
 cvtPragmaD (OpaqueP nm)
   = do { nm' <- vNameN nm
-       ; let ip = InlinePragma { inl_src    = srcTxt
-                               , inl_inline = Opaque srcTxt
+       ; let ip = InlinePragma { inl_ext    = srcTxt
+                               , inl_inline = Opaque
                                , inl_rule   = Hs.FunLike
-                               , inl_act    = NeverActive
-                               , inl_sat    = Nothing }
+                               , inl_act    = NeverActive }
                   where
                     srcTxt = SourceText $ fsLit "{-# OPAQUE"
        ; returnJustLA $ Hs.SigD noExtField $ InlineSig noAnn nm' ip }
@@ -979,20 +978,20 @@ cvtPragmaD (SCCP nm str) = do
   returnJustLA $ Hs.SigD noExtField
     $ SCCFunSig (noAnn, SourceText $ fsLit "{-# SCC") nm' str'
 
-dfltActivation :: TH.Inline -> Activation
+dfltActivation :: TH.Inline -> ActivationGhc
 dfltActivation TH.NoInline = NeverActive
 dfltActivation _           = AlwaysActive
 
-cvtInline :: TH.Inline  -> SourceText -> Hs.InlineSpec
-cvtInline TH.NoInline   srcText  = Hs.NoInline  srcText
-cvtInline TH.Inline     srcText  = Hs.Inline    srcText
-cvtInline TH.Inlinable  srcText  = Hs.Inlinable srcText
+cvtInline :: TH.Inline -> Hs.InlineSpec
+cvtInline TH.NoInline  = Hs.NoInline
+cvtInline TH.Inline    = Hs.Inline
+cvtInline TH.Inlinable = Hs.Inlinable
 
 cvtRuleMatch :: TH.RuleMatch -> RuleMatchInfo
 cvtRuleMatch TH.ConLike = Hs.ConLike
 cvtRuleMatch TH.FunLike = Hs.FunLike
 
-cvtPhases :: TH.Phases -> Activation -> Activation
+cvtPhases :: TH.Phases -> ActivationGhc -> ActivationGhc
 cvtPhases AllPhases       dflt = dflt
 cvtPhases (FromPhase i)   _    = ActiveAfter  i
 cvtPhases (BeforePhase i) _    = ActiveBefore i
@@ -1006,23 +1005,22 @@ cvtRuleBndr (TypedRuleVar n ty)
        ; ty' <- cvtType ty
        ; returnLA $ Hs.RuleBndrSig noAnn n' $ mkHsPatSigType noAnn ty' }
 
-cvtInlinePhases :: Maybe Inline -> Phases -> InlinePragma
+cvtInlinePhases :: Maybe Inline -> Phases -> InlinePragma GhcPs
 cvtInlinePhases inline phases =
   let src TH.NoInline  = fsLit "{-# SPECIALISE NOINLINE"
       src TH.Inline    = fsLit "{-# SPECIALISE INLINE"
       src TH.Inlinable = fsLit "{-# SPECIALISE INLINE"
       (inline', dflt, srcText) = case inline of
-        Just inline1 -> (cvtInline inline1 (toSrcTxt inline1), dfltActivation inline1,
+        Just inline1 -> (cvtInline inline1, dfltActivation inline1,
                          toSrcTxt inline1)
         Nothing      -> (NoUserInlinePrag,   AlwaysActive,
                          SourceText $ fsLit "{-# SPECIALISE")
         where
          toSrcTxt a = SourceText $ src a
-  in InlinePragma { inl_src    = srcText
+  in InlinePragma { inl_ext    = srcText
                   , inl_inline = inline'
                   , inl_rule   = Hs.FunLike
-                  , inl_act    = cvtPhases phases dflt
-                  , inl_sat    = Nothing }
+                  , inl_act    = cvtPhases phases dflt }
 
 ---------------------------------------------------
 --              Declarations

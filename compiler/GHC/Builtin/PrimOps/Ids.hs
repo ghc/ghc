@@ -21,11 +21,11 @@ import GHC.Builtin.Uniques
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
 
-import GHC.Types.Basic
 import GHC.Types.Cpr
 import GHC.Types.Demand
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma
 import GHC.Types.TyThing
 import GHC.Types.Name
 import GHC.Types.Name.Env

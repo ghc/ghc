@@ -199,6 +199,7 @@ import GHC.Types.Avail
 import GHC.Types.Hint
 import GHC.Types.ForeignCall (CLabelString)
 import GHC.Types.Id.Info ( RecSelParent(..) )
+import GHC.Types.InlinePragma (InlinePragma(..))
 import GHC.Types.Name (NamedThing(..), Name, OccName, getSrcLoc, getSrcSpan)
 import GHC.Types.Name.Env (NameEnv)
 import qualified GHC.Types.Name.Occurrence as OccName
@@ -2590,8 +2591,8 @@ data TcRnMessage where
   -}
   TcRnMultipleInlinePragmas
     :: !Id -- ^ Target of the pragmas
-    -> !(LocatedA InlinePragma) -- ^ The first pragma
-    -> !(NE.NonEmpty (LocatedA InlinePragma)) -- ^ Other pragmas
+    -> !(LocatedA (InlinePragma GhcTc)) -- ^ The first pragma
+    -> !(NE.NonEmpty (LocatedA (InlinePragma GhcTc))) -- ^ Other pragmas
     -> TcRnMessage
 
   {-| TcRnUnexpectedPragmas is a warning that occurs when unexpected pragmas appear

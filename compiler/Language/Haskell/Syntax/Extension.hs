@@ -240,6 +240,13 @@ type family XSCCFunSig        x
 type family XCompleteMatchSig x
 type family XXSig             x
 
+-- Inline Pragma families
+type family XInlinePragma   x
+type family XXInlinePragma  x
+
+-- Inline Activation family
+type family XXActivation   x
+
 -- FixitySig type families
 type family XFixitySig          x
 type family XXFixitySig         x

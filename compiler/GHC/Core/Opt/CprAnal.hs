@@ -19,6 +19,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma ( activeInFinalPhase, isOpaquePragma )
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Unique.MemoFun

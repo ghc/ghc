@@ -24,7 +24,7 @@ import GHC.Core.Opt.Simplify.Env ( SimplMode(..), SimplPhase(..) )
 import GHC.Core.Opt.Monad
 import GHC.Core.Coercion
 
-import GHC.Types.Basic ( CompilerPhase(..) )
+import GHC.Types.InlinePragma ( CompilerPhase(..) )
 
 import GHC.Utils.Outputable as Outputable
 

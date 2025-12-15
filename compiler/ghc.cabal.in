@@ -885,6 +885,7 @@ Library
         GHC.Tc.Zonk.Type
         GHC.ThToHs
         GHC.Types.Annotations
+        GHC.Types.Arity
         GHC.Types.Avail
         GHC.Types.Basic
         GHC.Types.CompleteMatch
@@ -906,6 +907,7 @@ Library
         GHC.Types.HpcInfo
         GHC.Types.Id
         GHC.Types.IPE
+        GHC.Types.InlinePragma
         GHC.Types.ThLevelIndex
         GHC.Types.Id.Info
         GHC.Types.Id.Make
@@ -1018,6 +1020,7 @@ Library
         Language.Haskell.Syntax
         Language.Haskell.Syntax.Basic
         Language.Haskell.Syntax.Binds
+        Language.Haskell.Syntax.Binds.InlinePragma
         Language.Haskell.Syntax.BooleanFormula
         Language.Haskell.Syntax.Decls
         Language.Haskell.Syntax.Expr

@@ -49,6 +49,7 @@ import GHC.Types.Literal ( litIsLifted )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
+import GHC.Types.InlinePragma ( isNeverActive )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name

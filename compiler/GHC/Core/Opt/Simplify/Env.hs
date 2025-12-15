@@ -76,6 +76,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Id as Id
+import GHC.Types.InlinePragma ( ActivationGhc, CompilerPhase, isActiveInPhase )
 import GHC.Types.Basic
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
@@ -318,7 +319,7 @@ instance Outputable SimplPhase where
 -- Note [What is active in the RHS of a RULE?] in GHC.Core.Opt.Simplify.Utils.
 --
 -- See Note [SimplPhase].
-isActive :: SimplPhase -> Activation -> Bool
+isActive :: SimplPhase -> ActivationGhc -> Bool
 isActive (SimplPhase p) act = isActiveInPhase p act
 isActive (SimplPhaseRange start end) act =
   -- To check whether the activation is active throughout the whole phase range,

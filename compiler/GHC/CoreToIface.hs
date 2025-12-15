@@ -71,6 +71,7 @@ import GHC.Data.BooleanFormula qualified as BF(BooleanFormula(..))
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Id.Make ( noinlineIdName, noinlineConstraintIdName )
+import GHC.Types.InlinePragma
 import GHC.Types.Literal
 import GHC.Types.Name
 import GHC.Types.Basic
@@ -86,7 +87,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
-import GHC.Hs.Extension (GhcRn)
+import GHC.Hs.Extension ( GhcRn )
 
 import Data.Maybe ( isNothing, catMaybes )
 

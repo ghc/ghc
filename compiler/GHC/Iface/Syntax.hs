@@ -72,6 +72,7 @@ import GHC.Types.Avail
 import GHC.Types.ForeignCall
 import GHC.Types.Annotations( AnnPayload, AnnTarget )
 import GHC.Types.Basic
+import GHC.Types.InlinePragma
 import GHC.Types.Tickish
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
@@ -407,7 +408,7 @@ data IfaceFamInst
 data IfaceRule
   = IfaceRule {
         ifRuleName   :: RuleName,
-        ifActivation :: Activation,
+        ifActivation :: ActivationGhc,
         ifRuleBndrs  :: [IfaceBndr],    -- Tyvars and term vars
         ifRuleHead   :: IfExtName,      -- Head of lhs
         ifRuleArgs   :: [IfaceExpr],    -- Args of LHS
@@ -459,7 +460,7 @@ data IfaceInfoItem
   = HsArity         Arity
   | HsDmdSig        DmdSig
   | HsCprSig        CprSig
-  | HsInline        InlinePragma
+  | HsInline        InlinePragmaInfo
   | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
                     IfaceUnfolding   -- See Note [Expose recursive functions]
   | HsNoCafRefs
@@ -3172,7 +3173,7 @@ instance NFData IfaceInfoItem where
   rnf = \case
     HsArity a -> rnf a
     HsDmdSig str -> seqDmdSig str
-    HsInline p -> rnf p `seq` ()
+    HsInline (InlinePragma a b c d) -> rnf a `seq` rnf b `seq` rnf c `seq` rnf d `seq` ()
     HsUnfold b unf -> rnf b `seq` rnf unf
     HsNoCafRefs -> ()
     HsCprSig cpr -> seqCprSig cpr `seq` ()

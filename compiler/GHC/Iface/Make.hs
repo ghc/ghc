@@ -472,13 +472,14 @@ coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn,
                             ru_act = act, ru_bndrs = bndrs,
                             ru_args = args, ru_rhs = rhs,
                             ru_orphan = orph, ru_auto = auto })
-  = IfaceRule { ifRuleName  = name, ifActivation = act,
-                ifRuleBndrs = map toIfaceBndr bndrs,
-                ifRuleHead  = fn,
-                ifRuleArgs  = map do_arg args,
-                ifRuleRhs   = toIfaceExpr rhs,
-                ifRuleAuto  = auto,
-                ifRuleOrph  = orph }
+  = IfaceRule { ifRuleName   = name,
+                ifActivation = act,
+                ifRuleBndrs  = map toIfaceBndr bndrs,
+                ifRuleHead   = fn,
+                ifRuleArgs   = map do_arg args,
+                ifRuleRhs    = toIfaceExpr rhs,
+                ifRuleAuto   = auto,
+                ifRuleOrph   = orph }
   where
         -- For type args we must remove synonyms from the outermost
         -- level.  Reason: so that when we read it back in we'll

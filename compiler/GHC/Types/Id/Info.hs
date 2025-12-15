@@ -52,7 +52,7 @@ module GHC.Types.Id.Info (
         realUnfoldingInfo, unfoldingInfo, setUnfoldingInfo, hasInlineUnfolding,
 
         -- ** The InlinePragInfo type
-        InlinePragInfo,
+        InlinePragmaInfo,
         inlinePragInfo, setInlinePragInfo,
 
         -- ** The OccInfo type
@@ -104,6 +104,7 @@ import GHC.Types.ForeignCall
 import GHC.Unit.Module
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.InlinePragma
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( ConcreteTyVars, noConcreteTyVars )
 
 import GHC.Utils.Outputable
@@ -437,7 +438,7 @@ data IdInfo
         -- See Note [Specialisations and RULES in IdInfo]
         realUnfoldingInfo   :: Unfolding,
         -- ^ The 'Id's unfolding
-        inlinePragInfo  :: InlinePragma,
+        inlinePragInfo  :: InlinePragmaInfo,
         -- ^ Any inline pragma attached to the 'Id'
         occInfo         :: OccInfo,
         -- ^ How the 'Id' occurs in the program
@@ -550,8 +551,10 @@ tagSigInfo = tagSig
 
 setRuleInfo :: IdInfo -> RuleInfo -> IdInfo
 setRuleInfo       info sp = sp `seq` info { ruleInfo = sp }
-setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
+
+setInlinePragInfo :: IdInfo -> InlinePragmaInfo -> IdInfo
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
+
 setOccInfo :: IdInfo -> OccInfo -> IdInfo
 setOccInfo        info oc = oc `seq` info { occInfo = oc }
         -- Try to avoid space leaks by seq'ing
@@ -699,27 +702,6 @@ unknownArity = 0
 ppArityInfo :: Int -> SDoc
 ppArityInfo 0 = empty
 ppArityInfo n = hsep [text "Arity", int n]
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Inline-pragma information}
-*                                                                      *
-************************************************************************
--}
-
--- | Inline Pragma Information
---
--- Tells when the inlining is active.
--- When it is active the thing may be inlined, depending on how
--- big it is.
---
--- If there was an @INLINE@ pragma, then as a separate matter, the
--- RHS will have been made to look small with a Core inline 'Note'
---
--- The default 'InlinePragInfo' is 'AlwaysActive', so the info serves
--- entirely as a way to inhibit inlining until we want it
-type InlinePragInfo = InlinePragma
 
 {-
 ************************************************************************

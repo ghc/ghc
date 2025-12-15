@@ -12,10 +12,10 @@ import GHC.Driver.DynFlags (DynFlags, xopt)
 import GHC.Driver.Flags (WarningFlag)
 import GHC.Hs
 import GHC.HsToCore.Pmc.Solver.Types
-import GHC.Types.Basic (Activation)
 import GHC.Types.Error
 import GHC.Types.ForeignCall
 import GHC.Types.Id
+import GHC.Types.InlinePragma (ActivationGhc)
 import GHC.Types.Name (Name)
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -147,7 +147,7 @@ data DsMessage
 
   | DsRecBindsNotAllowedForUnliftedTys ![LHsBindLR GhcTc GhcTc]
 
-  | DsRuleMightInlineFirst !RuleName !Var !Activation
+  | DsRuleMightInlineFirst !RuleName !Var !ActivationGhc
 
   | DsAnotherRuleMightFireFirst !RuleName
                                 !RuleName -- the \"bad\" rule

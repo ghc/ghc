@@ -40,6 +40,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Core.Type
 import GHC.Types.Name.Set
 import GHC.Types.Basic
+import GHC.Types.InlinePragma
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var
@@ -775,7 +776,7 @@ data TcSpecPrag
       -- ^ 'Id' to be specialised
       HsWrapper
       -- ^ wrapper that specialises the polymorphic function
-      InlinePragma
+      (InlinePragma GhcTc)
       -- ^ inlining spec for the specialised function
    -- | New-form specialise pragma
    | SpecPragE
@@ -787,7 +788,7 @@ data TcSpecPrag
         -- Note that 'spe_fn_nm' may differ from @'idName' 'spe_fn_id'@
         -- in the case of instance methods, where the 'Name' is the
         -- class-op selector but the 'spe_fn_id' is that for the local method
-     , spe_inl   :: InlinePragma
+     , spe_inl   :: InlinePragma GhcTc
         -- ^ (optional) INLINE annotation and activation phase annotation
 
      , spe_bndrs :: [Var]
@@ -810,7 +811,7 @@ isDefaultMethod (SpecPrags {})  = False
 instance OutputableBndrId p => Outputable (Sig (GhcPass p)) where
     ppr sig = ppr_sig sig
 
-ppr_sig :: forall p. OutputableBndrId p
+ppr_sig :: forall p. (IsPass p, OutputableBndrId p)
         => Sig (GhcPass p) -> SDoc
 ppr_sig (TypeSig _ vars ty)  = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig _ is_deflt vars ty)
@@ -818,22 +819,24 @@ ppr_sig (ClassOpSig _ is_deflt vars ty)
   | otherwise                = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (FixSig _ fix_sig)   = ppr fix_sig
 
-ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_src = src, inl_inline = spec }))
-  = pragSrcBrackets (inlinePragmaSource inl) pragmaSrc $
+ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_inline = spec }))
+  = pragSrcBrackets srcTxt pragmaSrc $
     pprSpec (unLoc var) (interpp'SP ty) inl
     where
+      srcTxt = inlinePragmaSource inl
       pragmaSrc = case spec of
-        NoUserInlinePrag -> "{-# " ++ extractSpecPragName src
-        _                -> "{-# " ++ extractSpecPragName src  ++ "_INLINE"
+        NoUserInlinePrag -> "{-# " ++ extractSpecPragName srcTxt
+        _                -> "{-# " ++ extractSpecPragName srcTxt  ++ "_INLINE"
 
-ppr_sig (SpecSigE _ bndrs spec_e inl@(InlinePragma { inl_src = src, inl_inline = spec }))
-  = pragSrcBrackets (inlinePragmaSource inl) pragmaSrc $
+ppr_sig (SpecSigE _ bndrs spec_e inl@(InlinePragma { inl_inline = spec }))
+  = pragSrcBrackets srcTxt pragmaSrc $
     pp_inl <+> hang (ppr bndrs) 2 (pprLExpr spec_e)
   where
+    srcTxt = inlinePragmaSource inl
     -- SPECIALISE or SPECIALISE_INLINE
     pragmaSrc = case spec of
-      NoUserInlinePrag -> "{-# " ++ extractSpecPragName src
-      _                -> "{-# " ++ extractSpecPragName src  ++ "_INLINE"
+      NoUserInlinePrag -> "{-# " ++ extractSpecPragName srcTxt
+      _                -> "{-# " ++ extractSpecPragName srcTxt  ++ "_INLINE"
 
     pp_inl | isDefaultInlinePragma inl = empty
            | otherwise = pprInline inl
@@ -929,7 +932,7 @@ pprVarSig vars pp_ty = sep [pprvars <+> dcolon, nest 2 pp_ty]
   where
     pprvars = hsep $ punctuate comma (map pprPrefixOcc vars)
 
-pprSpec :: (OutputableBndr id) => id -> SDoc -> InlinePragma -> SDoc
+pprSpec :: forall id p. (IsPass p, OutputableBndr id) => id -> SDoc -> InlinePragma (GhcPass p) -> SDoc
 pprSpec var pp_ty inl = pp_inl <+> pprVarSig [var] pp_ty
   where
     pp_inl | isDefaultInlinePragma inl = empty
@@ -941,9 +944,10 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
-    = text (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
+    = text (extractSpecPragName $ inlinePragmaSource inl)
+       <+> pprSpec var (text "<type>") inl
   ppr (SpecPragE { spe_bndrs = bndrs, spe_call = spec_e, spe_inl = inl })
-    = text (extractSpecPragName $ inl_src inl)
+    = text (extractSpecPragName $ inlinePragmaSource inl)
        <+> hang (ppr bndrs) 2 (pprLExpr spec_e)
 
 pprMinimalSig :: OutputableBndrId p  => LBooleanFormula (GhcPass p) -> SDoc

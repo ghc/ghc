@@ -30,6 +30,7 @@ import GHC.Core.Utils
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma
 import GHC.Types.Demand ( DmdSig, isDeadEndSig )
 
 import GHC.Utils.Outputable

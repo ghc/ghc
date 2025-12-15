@@ -70,6 +70,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma ( inlinePragmaActivation, isNeverActive )
 import GHC.Types.Demand  ( isDeadEndAppSig, isNopSig, nopSig, isDeadEndSig )
 import GHC.Types.Basic
 import GHC.Types.TyThing( implicitTyConThings )

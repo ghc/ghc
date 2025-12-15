@@ -92,12 +92,13 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
         -- Because Expr imports Decls via HsBracket
 
 import Language.Haskell.Syntax.Binds
+import Language.Haskell.Syntax.Binds.InlinePragma (Activation)
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Basic (Role, LexicalFixity)
 import Language.Haskell.Syntax.Specificity (Specificity)
 
-import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName, Activation
+import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName
                        ,TyConFlavour(..), TypeOrData(..), NewOrData(..))
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 
@@ -1483,7 +1484,7 @@ data RuleDecl pass
            -- ^ After renamer, free-vars from the LHS and RHS
        , rd_name :: XRec pass RuleName
            -- ^ Note [Pragma source text] in "GHC.Types.SourceText"
-       , rd_act   :: Activation
+       , rd_act   :: Activation pass
        , rd_bndrs :: RuleBndrs pass
        , rd_lhs   :: XRec pass (HsExpr pass)
        , rd_rhs   :: XRec pass (HsExpr pass)

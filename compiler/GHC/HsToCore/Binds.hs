@@ -65,6 +65,7 @@ import GHC.Tc.Types.Evidence
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -455,7 +456,7 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
     inline_prag   = idInlinePragma gbl_id
     inlinable_unf = mkInlinableUnfolding simpl_opts StableUserSrc rhs
     inline_pair
-       | Just arity <- inlinePragmaSat inline_prag
+       | AppliedToAtLeast arity <- inlinePragmaSaturation inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)
         -- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
        , let real_arity = dict_arity + arity
@@ -971,7 +972,7 @@ dsSpec poly_rhs (SpecPragE { spe_fn_nm = poly_nm
        ; dsSpec_help poly_nm poly_id poly_rhs spec_inl bndrs ds_call }
 
 dsSpec_help :: Name -> Id -> CoreExpr              -- Function to specialise
-            -> InlinePragma -> [Var] -> CoreExpr
+            -> InlinePragma GhcTc -> [Var] -> CoreExpr
             -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
 dsSpec_help poly_nm poly_id poly_rhs spec_inl orig_bndrs ds_call
   = do { -- Decompose the call
@@ -1075,11 +1076,12 @@ dsSpec_help poly_nm poly_id poly_rhs spec_inl orig_bndrs ds_call
     inl_prag_act  = inlinePragmaActivation id_inl
     spec_prag_act = inlinePragmaActivation spec_inl
     no_act_spec = case inlinePragmaSpec spec_inl of
-                    NoInline _   -> isNeverActive  spec_prag_act
-                    Opaque _     -> isNeverActive  spec_prag_act
-                    _            -> isAlwaysActive spec_prag_act
-    rule_act | no_act_spec = inl_prag_act    -- Inherit
-             | otherwise   = spec_prag_act   -- Specified by user
+                    NoInline -> isNeverActive  spec_prag_act
+                    Opaque   -> isNeverActive  spec_prag_act
+                    _        -> isAlwaysActive spec_prag_act
+    rule_act :: ActivationGhc
+    rule_act | no_act_spec = inl_prag_act  -- Inherit
+             | otherwise   = spec_prag_act -- Specified by user
 
     is_dfun = case idDetails poly_id of
       DFunId {} -> True
@@ -1113,7 +1115,7 @@ decomposeCall poly_id ds_call
 
     -- Is this SPECIALISE pragma useless?
 checkUselessSpecPrag :: Id -> [CoreExpr]
-   -> [Var] -> Bool -> InlinePragma -> Activation
+   -> [Var] -> Bool -> InlinePragma (GhcPass p) -> ActivationGhc
    ->  Maybe UselessSpecialisePragmaReason
 checkUselessSpecPrag poly_id rule_lhs_args
                      spec_bndrs no_act_spec spec_inl rule_act
@@ -1189,8 +1191,7 @@ getCastedVar (Var v)           = Just (v, MRefl)
 getCastedVar (Cast (Var v) co) = Just (v, MCo co)
 getCastedVar _                 = Nothing
 
-specFunInlinePrag :: Id -> InlinePragma
-                  -> InlinePragma -> InlinePragma
+specFunInlinePrag :: Id -> InlinePragma GhcTc -> InlinePragma GhcTc -> InlinePragma GhcTc
 -- See Note [Activation pragmas for SPECIALISE]
 specFunInlinePrag poly_id id_inl spec_inl
   | not (isDefaultInlinePragma spec_inl)    = spec_inl

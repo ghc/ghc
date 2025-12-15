@@ -69,6 +69,7 @@ import GHC.Types.Basic
 import GHC.Types.Error ( GhcHint(..) )
 import GHC.Types.Fixity
 import GHC.Types.ForeignCall
+import GHC.Types.InlinePragma
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
 import GHC.Types.PkgQual
@@ -1959,7 +1960,7 @@ rule    :: { LRuleDecl GhcPs }
                                    , rd_lhs = $4, rd_rhs = $6 }) }
 
 -- Rules can be specified to be never active, unlike inline/specialize pragmas
-rule_activation :: { (ActivationAnn, Maybe Activation) }
+rule_activation :: { (ActivationAnn, Maybe ActivationGhc) }
         -- See Note [%shift: rule_activation -> {- empty -}]
         : {- empty -} %shift                    { (noAnn, Nothing) }
         | rule_explicit_activation              { (fst $1,Just (snd $1)) }
@@ -1981,9 +1982,9 @@ rule_activation_marker :: { (Maybe (EpToken "~")) }
                            ; return Nothing } }
 
 rule_explicit_activation :: { ( ActivationAnn
-                              , Activation) }  -- In brackets
+                              , ActivationGhc) }  -- In brackets
         : '[' INTEGER ']'       { ( ActivationAnn (epTok $1) (getINTEGERs $2) (epTok $3) Nothing (Just (glR $2))
-                                  , ActiveAfter  (fromInteger (il_value (getINTEGER $2)))) }
+                                  , ActiveAfter (fromInteger (il_value (getINTEGER $2)))) }
         | '[' rule_activation_marker INTEGER ']'
                                 { ( ActivationAnn (epTok $1) (getINTEGERs $3) (epTok $4) $2 (Just (glR $3))
                                   , ActiveBefore (fromInteger (il_value (getINTEGER $3)))) }
@@ -2828,17 +2829,17 @@ sigtypes_maybe :: { Maybe (Located (TokDcolon, OrdList (LHsSigType GhcPs))) }
         : '::' sigtypes1         { Just (sLL $1 $> (epUniTok $1, unLoc $2)) }
         | {- empty -}            { Nothing }
 
-activation :: { (ActivationAnn,Maybe Activation) }
+activation :: { (ActivationAnn, Maybe ActivationGhc) }
         -- See Note [%shift: activation -> {- empty -}]
         : {- empty -} %shift                    { (noAnn ,Nothing) }
         | explicit_activation                   { (fst $1,Just (snd $1)) }
 
-explicit_activation :: { (ActivationAnn, Activation) }  -- In brackets
+explicit_activation :: { (ActivationAnn, ActivationGhc) }  -- In brackets
         : '[' INTEGER ']'       { (ActivationAnn (epTok $1) (getINTEGERs $2) (epTok  $3) Nothing (Just (glR $2))
-                                  ,ActiveAfter   (fromInteger (il_value (getINTEGER $2)))) }
+                                  ,ActiveAfter (fromInteger (il_value (getINTEGER $2)))) }
         | '[' rule_activation_marker INTEGER ']'
                                 { (ActivationAnn (epTok $1) (getINTEGERs $3) (epTok $4) $2 (Just (glR $3))
-                                  ,ActiveBefore  (fromInteger (il_value (getINTEGER $3)))) }
+                                  ,ActiveBefore (fromInteger (il_value (getINTEGER $3)))) }
 
 -----------------------------------------------------------------------------
 -- Expressions
@@ -4254,8 +4255,8 @@ getPRIMWORD64     (L _ (ITprimword64 _ x)) = x
 getPRIMFLOAT      (L _ (ITprimfloat x)) = x
 getPRIMDOUBLE     (L _ (ITprimdouble x)) = x
 getINLINE         (L _ (ITinline_prag _ inl conl)) = (inl,conl)
-getSPEC_INLINE    (L _ (ITspec_inline_prag src True))  = (Inline src,FunLike)
-getSPEC_INLINE    (L _ (ITspec_inline_prag src False)) = (NoInline src,FunLike)
+getSPEC_INLINE    (L _ (ITspec_inline_prag src True))  = (Inline,FunLike)
+getSPEC_INLINE    (L _ (ITspec_inline_prag src False)) = (NoInline,FunLike)
 getCOMPLETE_PRAGs (L _ (ITcomplete_prag x)) = x
 getVOCURLY        (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
 
@@ -4279,7 +4280,7 @@ getPRIMWORD64s    (L _ (ITprimword64 src _)) = src
 getLABELVARIDs    (L _ (ITlabelvarid src _)) = src
 
 -- See Note [Pragma source text] in "GHC.Types.SourceText" for the following
-getINLINE_PRAGs       (L _ (ITinline_prag       _ inl _)) = inlineSpecSource inl
+getINLINE_PRAGs       (L _ (ITinline_prag       src _ _)) = src
 getOPAQUE_PRAGs       (L _ (ITopaque_prag       src))     = src
 getSPEC_PRAGs         (L _ (ITspec_prag         src))     = src
 getSPEC_INLINE_PRAGs  (L _ (ITspec_inline_prag  src _))   = src

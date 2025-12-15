@@ -40,10 +40,11 @@ import GHC.Core.FamInstEnv (FamFlavor)
 import GHC.Core.TyCon (TyCon)
 import GHC.Core.Type (Type)
 import GHC.Types.Fixity (LexicalFixity(..))
+import GHC.Types.InlinePragma (ActivationGhc)
 import GHC.Types.Name (Name, NameSpace, OccName (occNameFS), isSymOcc, nameOccName)
 import GHC.Types.Name.Reader (RdrName (Unqual), ImpDeclSpec, GlobalRdrElt)
 import GHC.Types.SrcLoc (SrcSpan)
-import GHC.Types.Basic (Activation, RuleName)
+import GHC.Types.Basic (RuleName)
 import GHC.Parser.Errors.Basic
 import GHC.Utils.Outputable
 import GHC.Data.FastString (fsLit)
@@ -249,7 +250,7 @@ data GhcHint
     -}
   | SuggestBindToWildcard !(LHsExpr GhcTc)
 
-  | SuggestAddInlineOrNoInlinePragma !Var !Activation
+  | SuggestAddInlineOrNoInlinePragma !Var !ActivationGhc
 
   | SuggestAddPhaseToCompetingRule !RuleName
     {-| Suggests adding an identifier to the export list of a signature.

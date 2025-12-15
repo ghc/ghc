@@ -38,6 +38,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma (isInlinePragma)
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name.Set hiding (FreeVars)

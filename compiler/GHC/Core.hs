@@ -100,6 +100,7 @@ import GHC.Types.Var
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
+import GHC.Types.InlinePragma
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Literal
@@ -1266,7 +1267,7 @@ representation.
 data CoreRule
   = Rule {
         ru_name :: RuleName,            -- ^ Name of the rule, for communication with the user
-        ru_act  :: Activation,          -- ^ When the rule is active
+        ru_act  :: ActivationGhc,    -- ^ When the rule is active
 
         -- Rough-matching stuff
         -- see comments with InstEnv.ClsInst( is_cls, is_rough )
@@ -1353,7 +1354,7 @@ ruleModule :: CoreRule -> Maybe Module
 ruleModule Rule { ru_origin } = Just ru_origin
 ruleModule BuiltinRule {} = Nothing
 
-ruleActivation :: CoreRule -> Activation
+ruleActivation :: CoreRule -> ActivationGhc
 ruleActivation (BuiltinRule { })       = AlwaysActive
 ruleActivation (Rule { ru_act = act }) = act
 

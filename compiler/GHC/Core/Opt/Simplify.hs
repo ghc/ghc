@@ -35,7 +35,7 @@ import GHC.Unit.Module.ModGuts
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Basic
+import GHC.Types.InlinePragma
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Tickish

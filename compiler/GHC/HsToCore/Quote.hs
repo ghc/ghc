@@ -72,6 +72,7 @@ import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Var
 import GHC.Types.Id
+import GHC.Types.InlinePragma
 import GHC.Types.SourceText
 import GHC.Types.TyThing
 import GHC.Types.Name hiding( varName, tcName )
@@ -1091,7 +1092,7 @@ rep_wc_ty_sig mk_sig loc sig_ty nm
   = rep_ty_sig mk_sig loc (hswc_body sig_ty) nm
 
 rep_inline :: LocatedN Name
-           -> InlinePragma      -- Never defaultInlinePragma
+           -> InlinePragma (GhcPass p) -- Never defaultInlinePragma
            -> SrcSpan
            -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_inline nm ispec loc
@@ -1110,7 +1111,7 @@ rep_inline nm ispec loc
        ; return [(loc, pragma)]
        }
 
-rep_inline_phases :: InlinePragma -> MetaM (Maybe (Core TH.Inline), Core TH.Phases)
+rep_inline_phases :: InlinePragma GhcRn -> MetaM (Maybe (Core TH.Inline), Core TH.Phases)
 rep_inline_phases (InlinePragma { inl_act = act, inl_inline = inl })
   = do { phases <- repPhases act
        ; inl <- if noUserInlineSpec inl
@@ -1120,7 +1121,7 @@ rep_inline_phases (InlinePragma { inl_act = act, inl_inline = inl })
                 else Just <$> repInline inl
        ; return (inl, phases) }
 
-rep_specialise :: LocatedN Name -> LHsSigType GhcRn -> InlinePragma
+rep_specialise :: LocatedN Name -> LHsSigType GhcRn -> InlinePragma GhcRn
                -> SrcSpan
                -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_specialise nm ty ispec loc
@@ -1132,7 +1133,7 @@ rep_specialise nm ty ispec loc
        ; return [(loc, pragma)]
        }
 
-rep_specialiseE :: RuleBndrs GhcRn -> LHsExpr GhcRn -> InlinePragma
+rep_specialiseE :: RuleBndrs GhcRn -> LHsExpr GhcRn -> InlinePragma GhcRn
                 -> MetaM (Core (M TH.Dec))
 rep_specialiseE bndrs e ispec
   -- New form SPECIALISE pragmas
@@ -1165,21 +1166,21 @@ rep_sccFun nm (Just (L _ str)) loc = do
   return [(loc, scc)]
 
 repInline :: InlineSpec -> MetaM (Core TH.Inline)
-repInline (NoInline          _ )   = dataCon noInlineDataConName
+repInline NoInline = dataCon noInlineDataConName
 -- There is a mismatch between the TH and GHC representation because
 -- OPAQUE pragmas can't have phase activation annotations (which is
 -- enforced by the TH API), therefore they are desugared to OpaqueP rather than
 -- InlineP, see special case in rep_inline.
-repInline (Opaque            _ )   = panic "repInline: Opaque"
-repInline (Inline            _ )   = dataCon inlineDataConName
-repInline (Inlinable         _ )   = dataCon inlinableDataConName
-repInline NoUserInlinePrag        = notHandled ThNoUserInline
+repInline Opaque = panic "repInline: Opaque"
+repInline Inline = dataCon inlineDataConName
+repInline Inlinable = dataCon inlinableDataConName
+repInline NoUserInlinePrag = notHandled ThNoUserInline
 
 repRuleMatch :: RuleMatchInfo -> MetaM (Core TH.RuleMatch)
 repRuleMatch ConLike = dataCon conLikeDataConName
 repRuleMatch FunLike = dataCon funLikeDataConName
 
-repPhases :: Activation -> MetaM (Core TH.Phases)
+repPhases :: ActivationGhc -> MetaM (Core TH.Phases)
 repPhases (ActiveBefore i) = do { MkC arg <- coreIntLit i
                                 ; dataCon' beforePhaseDataConName [arg] }
 repPhases (ActiveAfter i)  = do { MkC arg <- coreIntLit i

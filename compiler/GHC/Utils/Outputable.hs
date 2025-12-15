@@ -109,12 +109,13 @@ module GHC.Utils.Outputable (
         bPutHDoc
     ) where
 
+import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
+import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
+
+import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
 
 import GHC.Prelude.Basic
-
-import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
-import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 
 import GHC.Utils.BufHandle (BufHandle, bPutChar, bPutStr, bPutFS, bPutFZS)
 import GHC.Data.FastString
@@ -1998,3 +1999,21 @@ instance IsDoc HDoc where
   {-# INLINE CONLIKE ($$) #-}
   dualDoc _ h = h
   {-# INLINE CONLIKE dualDoc #-}
+
+instance Outputable (ActivationX p) where
+   ppr AlwaysActive     = empty
+   ppr NeverActive      = brackets (text "~")
+   ppr (ActiveBefore n) = brackets (char '~' <> int n)
+   ppr (ActiveAfter  n) = brackets (int n)
+   ppr (XActivation  _) = text "[final]"
+
+instance Outputable InlineSpec where
+    ppr Inline           = text "INLINE"
+    ppr NoInline         = text "NOINLINE"
+    ppr Inlinable        = text "INLINABLE"
+    ppr Opaque           = text "OPAQUE"
+    ppr NoUserInlinePrag = empty
+
+instance Outputable RuleMatchInfo where
+   ppr ConLike = text "CONLIKE"
+   ppr FunLike = text "FUNLIKE"

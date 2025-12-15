@@ -70,6 +70,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Id
+import GHC.Types.InlinePragma
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
 import GHC.Types.Name
@@ -2263,7 +2264,7 @@ mkDefMethBind :: SrcSpan -> DFunId -> Class -> Id -> Name
 mkDefMethBind loc dfun_id clas sel_id dm_name dm_spec
   = do  { logger <- getLogger
         ; dm_id <- tcLookupId dm_name
-        ; let inline_prag = idInlinePragma dm_id
+        ; let inline_prag = inlinePragmaToGhcRn $ idInlinePragma dm_id
               inline_prags | isAnyInlinePragma inline_prag
                            = [noLocA (InlineSig noAnn fn inline_prag)]
                            | otherwise
@@ -2281,6 +2282,13 @@ mkDefMethBind loc dfun_id clas sel_id dm_name dm_spec
     (_, _, _, inst_tys) = tcSplitDFunTy (idType dfun_id)
     (_, _, sel_tau) = tcSplitMethodTy (idType sel_id)
     (sel_tvbs, _) = tcSplitForAllInvisTVBinders sel_tau
+
+    -- We get the 'InlinePragmaInfo' from a typechecked 'Id', but we
+    -- want to return the data in 'GhcRn'.
+    inlinePragmaToGhcRn :: InlinePragma GhcTc -> InlinePragma GhcRn
+    inlinePragmaToGhcRn prag@(InlinePragma { inl_ext = src, inl_act = act }) =
+      prag { inl_ext = src, inl_act = act }
+
 
     -- Compute the instance types to use in the visible type application. See
     -- Note [Default methods in instances].

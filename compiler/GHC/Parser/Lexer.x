@@ -120,7 +120,7 @@ import GHC.Utils.Misc ( readSignificandExponentPair, readHexSignificandExponentP
 
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
-import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..))
+import GHC.Types.InlinePragma ( InlineSpec(..), RuleMatchInfo(..))
 import GHC.Hs.Doc
 
 import GHC.Parser.CharClass
@@ -3464,14 +3464,14 @@ ignoredPrags = Map.fromList (map ignored pragmas)
 oneWordPrags = Map.fromList [
      ("rules", rulePrag),
      ("inline",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (Inline (SourceText s)) FunLike))),
+         fstrtoken (\s -> (ITinline_prag (SourceText s) Inline FunLike))),
      ("inlinable",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (Inlinable (SourceText s)) FunLike))),
+         fstrtoken (\s -> (ITinline_prag (SourceText s) Inlinable FunLike))),
      ("inlineable",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (Inlinable (SourceText s)) FunLike))),
+         fstrtoken (\s -> (ITinline_prag (SourceText s) Inlinable FunLike))),
                                     -- Spelling variant
      ("notinline",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (NoInline (SourceText s)) FunLike))),
+         fstrtoken (\s -> (ITinline_prag (SourceText s) NoInline FunLike))),
      ("opaque", fstrtoken (\s -> ITopaque_prag (SourceText s))),
      ("specialize", fstrtoken (\s -> ITspec_prag (SourceText s))),
      ("source", fstrtoken (\s -> ITsource_prag (SourceText s))),
@@ -3493,9 +3493,9 @@ oneWordPrags = Map.fromList [
 
 twoWordPrags = Map.fromList [
      ("inline conlike",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (Inline (SourceText s)) ConLike))),
+         fstrtoken (\s -> (ITinline_prag (SourceText s) Inline ConLike))),
      ("notinline conlike",
-         fstrtoken (\s -> (ITinline_prag (SourceText s) (NoInline (SourceText s)) ConLike))),
+         fstrtoken (\s -> (ITinline_prag (SourceText s) NoInline ConLike))),
      ("specialize inline",
          fstrtoken (\s -> (ITspec_inline_prag (SourceText s) True))),
      ("specialize notinline",

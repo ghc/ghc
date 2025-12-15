@@ -67,6 +67,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Id  ( idName, idType, setInlinePragma
                      , mkLocalId, realIdUnfolding )
+import GHC.Types.InlinePragma
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -600,10 +601,10 @@ addInlinePragArity ar (L l (SpecSig x nm ty inl)) = L l (SpecSig x nm ty (add_in
 addInlinePragArity ar (L l (SpecSigE n x e inl))  = L l (SpecSigE n x e (add_inl_arity ar inl))
 addInlinePragArity _ sig = sig
 
-add_inl_arity :: Arity -> InlinePragma -> InlinePragma
+add_inl_arity :: Arity -> InlinePragma GhcRn -> InlinePragma GhcRn
 add_inl_arity ar prag@(InlinePragma { inl_inline = inl_spec })
   | Inline {} <- inl_spec  -- Add arity only for real INLINE pragmas, not INLINABLE
-  = prag { inl_sat = Just ar }
+  = prag `setInlinePragmaSaturation` AppliedToAtLeast ar
   | otherwise
   = prag
 
@@ -623,7 +624,7 @@ addInlinePrags poly_id prags_for_me
   | otherwise
   = return poly_id
   where
-    inl_prags = [L loc prag | L loc (InlineSig _ _ prag) <- prags_for_me]
+    inl_prags = [L loc (tcInlinePragma prag) | L loc (InlineSig _ _ prag) <- prags_for_me]
 
     warn_multiple_inlines _ [] = return ()
 
@@ -986,7 +987,7 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
     tc_one hs_ty
       = do { spec_ty <- tcHsSigType   (FunSigCtxt name NoRRC) hs_ty
            ; wrap    <- tcSpecWrapper (FunSigCtxt name (lhsSigTypeContextSpan hs_ty)) poly_ty spec_ty
-           ; return (SpecPrag poly_id wrap inl) }
+           ; return (SpecPrag poly_id wrap (tcInlinePragma inl)) }
 
 tcSpecPrag poly_id (SpecSigE nm rule_bndrs spec_e inl)
   -- For running commentary, see Note [Handling new-form SPECIALISE pragmas]
@@ -1049,7 +1050,7 @@ tcSpecPrag poly_id (SpecSigE nm rule_bndrs spec_e inl)
                            , spe_bndrs = qevs ++ rule_bndrs' -- Dependency order
                                                              -- does not matter
                            , spe_call  = lhs_call
-                           , spe_inl   = inl }] }
+                           , spe_inl   = tcInlinePragma inl }] }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
 

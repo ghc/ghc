@@ -57,7 +57,7 @@ import GHC.Utils.Panic
 import GHC.Unit.Module.ModGuts
 
 import GHC.Types.Id.Info
-import GHC.Types.Basic
+import GHC.Types.InlinePragma ( CompilerPhase(..) )
 import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Name.Ppr
 import GHC.Types.Var ( Var )

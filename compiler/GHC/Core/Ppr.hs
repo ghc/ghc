@@ -34,6 +34,7 @@ import GHC.Types.Name( pprInfixName, pprPrefixName )
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.InlinePragma
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core.DataCon

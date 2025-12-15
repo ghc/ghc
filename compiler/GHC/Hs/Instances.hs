@@ -30,9 +30,11 @@ import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
 import GHC.Types.Name.Reader (WithUserRdr(..))
+import GHC.Types.InlinePragma (ActivationGhc)
 import GHC.Data.BooleanFormula (BooleanFormula(..))
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Extension (Anno)
+import Language.Haskell.Syntax.Binds.InlinePragma (ActivationX(..), InlinePragma(..))
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -633,3 +635,10 @@ deriving instance Data XViaStrategyPs
 
 deriving instance (Typeable p, Data (Anno (IdGhcP p)), Data (IdGhcP p)) => Data (BooleanFormula (GhcPass p))
 ---------------------------------------------------------------------
+
+deriving instance Data ActivationGhc
+
+-- deriving instance Data (InlinePragma p)
+deriving instance Data (InlinePragma GhcPs)
+deriving instance Data (InlinePragma GhcRn)
+deriving instance Data (InlinePragma GhcTc)

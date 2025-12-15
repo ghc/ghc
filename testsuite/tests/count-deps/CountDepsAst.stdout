@@ -144,6 +144,7 @@ GHC.Tc.Types.TcRef
 GHC.Tc.Utils.TcType
 GHC.Tc.Zonk.Monad
 GHC.Types.Annotations
+GHC.Types.Arity
 GHC.Types.Avail
 GHC.Types.Basic
 GHC.Types.CostCentre
@@ -163,6 +164,7 @@ GHC.Types.Hint.Ppr
 GHC.Types.Id
 GHC.Types.Id.Info
 GHC.Types.Id.Make
+GHC.Types.InlinePragma
 GHC.Types.Literal
 GHC.Types.Name
 GHC.Types.Name.Env
@@ -236,6 +238,7 @@ GHC.Utils.Word64
 Language.Haskell.Syntax
 Language.Haskell.Syntax.Basic
 Language.Haskell.Syntax.Binds
+Language.Haskell.Syntax.Binds.InlinePragma
 Language.Haskell.Syntax.BooleanFormula
 Language.Haskell.Syntax.Decls
 Language.Haskell.Syntax.Expr

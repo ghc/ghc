@@ -48,6 +48,7 @@ import qualified GHC.Data.Strict as Strict
 import GHC.TypeLits
 import GHC.Types.Basic hiding (EP)
 import GHC.Types.ForeignCall
+import GHC.Types.InlinePragma (ActivationGhc, inlinePragmaActivation, inlinePragmaSource)
 import GHC.Types.Name.Reader
 import GHC.Types.PkgQual
 import GHC.Types.SourceText
@@ -56,6 +57,9 @@ import GHC.Types.Var
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
+
+import Language.Haskell.Syntax.Binds.InlinePragma
+  (ActivationX(ActiveAfter, ActiveBefore, NeverActive))
 
 import Control.Monad (forM, when, unless)
 import Control.Monad.Identity (Identity(..))
@@ -2011,7 +2015,7 @@ instance ExactPrint (RuleDecl GhcPs) where
     return (HsRule ((ann_act', ann_eq'),nsrc) (L ln' n) act bndrs' lhs' rhs')
 
 markActivation :: (Monad m, Monoid w)
-  => ActivationAnn -> Activation -> EP w m ActivationAnn
+  => ActivationAnn -> ActivationGhc -> EP w m ActivationAnn
 markActivation (ActivationAnn o src c t v) act = do
   case act of
     ActiveBefore phase -> do
@@ -2640,15 +2644,15 @@ instance ExactPrint (Sig GhcPs) where
     return (FixSig ((af',ma'),src) (FixitySig ns' names' (Fixity v fdir)))
 
   exact (InlineSig (o,c,act) ln inl) = do
-    o' <- markAnnOpen'' o (inl_src inl) "{-# INLINE"
-    act' <- markActivation act (inl_act inl)
+    o' <- markAnnOpen'' o (inlinePragmaSource inl) "{-# INLINE"
+    act' <- markActivation act (inlinePragmaActivation inl)
     ln' <- markAnnotated ln
     c' <- markEpToken c
     return (InlineSig (o', c', act') ln' inl)
 
   exact (SpecSig (AnnSpecSig o c dc act) ln typs inl) = do
-    o' <- markAnnOpen'' o (inl_src inl) "{-# SPECIALISE" -- Note: may be {-# SPECIALISE_INLINE
-    act' <- markActivation act (inl_act inl)
+    o' <- markAnnOpen'' o (inlinePragmaSource inl) "{-# SPECIALISE" -- Note: may be {-# SPECIALISE_INLINE
+    act' <- markActivation act (inlinePragmaActivation inl)
     ln' <- markAnnotated ln
     dc' <- traverse markEpUniToken dc
     typs' <- markAnnotated typs
@@ -2656,8 +2660,8 @@ instance ExactPrint (Sig GhcPs) where
     return (SpecSig (AnnSpecSig o' c' dc' act') ln' typs' inl)
 
   exact (SpecSigE (AnnSpecSig o c dc act) bndrs expr inl) = do
-    o' <- markAnnOpen'' o (inl_src inl) "{-# SPECIALISE" -- Note: may be {-# SPECIALISE_INLINE
-    act' <- markActivation act (inl_act inl)
+    o' <- markAnnOpen'' o (inlinePragmaSource inl) "{-# SPECIALISE" -- Note: may be {-# SPECIALISE_INLINE
+    act' <- markActivation act (inlinePragmaActivation inl)
     bndrs' <- markAnnotated bndrs
     expr' <- markAnnotated expr
     c' <- markEpToken c

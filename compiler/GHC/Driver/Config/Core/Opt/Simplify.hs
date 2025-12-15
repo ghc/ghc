@@ -21,7 +21,7 @@ import GHC.Driver.DynFlags ( DynFlags(..), GeneralFlag(..), gopt )
 
 import GHC.Runtime.Context ( InteractiveContext(..) )
 
-import GHC.Types.Basic ( CompilerPhase(..) )
+import GHC.Types.InlinePragma ( CompilerPhase(..) )
 import GHC.Types.Var ( Var )
 
 initSimplifyExprOpts :: DynFlags -> InteractiveContext -> SimplifyExprOpts

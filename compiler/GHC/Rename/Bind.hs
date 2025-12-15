@@ -55,6 +55,7 @@ import GHC.Data.List.SetOps    ( findDupsEq )
 
 import GHC.Types.Error
 import GHC.Types.FieldLabel
+import GHC.Types.InlinePragma
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -1102,22 +1103,22 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
                      TopSigCtxt {} -> lookupLocatedOccRn WL_TermVariable v
                      _             -> lookupSigOccRn ctxt sig v
         ; (new_ty, fvs) <- foldM do_one ([],emptyFVs) tys
-        ; return (SpecSig noAnn new_v new_ty inl, fvs) }
+        ; return (SpecSig noAnn new_v new_ty (inl `setInlinePragmaSaturation` AnySaturation), fvs) }
   where
     do_one (tys,fvs) ty
       = do { (new_ty, fvs_ty) <- rnHsSigType (SpecialiseSigCtx v) TypeLevel ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
 renameSig _ctxt (SpecSigE _ bndrs spec_e inl)
-  = do { fn_rdr <- checkSpecESigShape spec_e
+  = do { fn_rdr  <- checkSpecESigShape spec_e
        ; fn_name <- lookupOccRn WL_TermVariable fn_rdr  -- Checks that the head isn't forall-bound
        ; bindRuleBndrs (SpecECtx fn_rdr) bndrs $ \_ bndrs' ->
          do { (spec_e', fvs) <- rnLExpr spec_e
-            ; return (SpecSigE fn_name bndrs' spec_e' inl, fvs) } }
+            ; return (SpecSigE fn_name bndrs' spec_e' (inl `setInlinePragmaSaturation` AnySaturation), fvs) } }
 
 renameSig ctxt sig@(InlineSig _ v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
-        ; return (InlineSig noAnn new_v s, emptyFVs) }
+        ; return (InlineSig noAnn new_v (s `setInlinePragmaSaturation` AnySaturation), emptyFVs) }
 
 renameSig ctxt (FixSig _ fsig)
   = do  { new_fsig <- rnSrcFixityDecl ctxt fsig

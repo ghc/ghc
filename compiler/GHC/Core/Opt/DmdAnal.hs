@@ -41,6 +41,7 @@ import GHC.Types.Unique.MemoFun
 import GHC.Types.RepType
 import GHC.Types.ForeignCall ( isSafeForeignCall )
 import GHC.Types.Id
+import GHC.Types.InlinePragma ( isOpaquePragma )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic

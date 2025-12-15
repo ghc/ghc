@@ -33,12 +33,12 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion
+import GHC.Types.Arity ( Arity )
 import GHC.Types.Id( mkLocalId )
 import GHC.Tc.Utils.Instantiate
 import GHC.Builtin.Types
 import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
-import GHC.Types.Basic( Arity )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
