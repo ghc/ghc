@@ -13,11 +13,10 @@ import GHC.Core.Opt.Simplify ( SimplifyExprOpts(..), SimplifyOpts(..) )
 import GHC.Core.Opt.Simplify.Env ( FloatEnable(..), SimplMode(..), SimplPhase(..) )
 import GHC.Core.Opt.Simplify.Monad ( TopEnvConfig(..) )
 
-import GHC.Driver.Config ( initOptCoercionOpts )
 import GHC.Driver.Config.Core.Lint ( initLintPassResultConfig )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Driver.Config.Core.Opt.Arity ( initArityOpts )
-import GHC.Driver.DynFlags ( DynFlags(..), GeneralFlag(..), gopt )
+import GHC.Driver.DynFlags ( DynFlags(..), GeneralFlag(..), DumpFlag(..), gopt, dopt )
 
 import GHC.Runtime.Context ( InteractiveContext(..) )
 
@@ -69,11 +68,12 @@ initSimplMode dflags phase name = SimplMode
   , sm_pre_inline = gopt Opt_SimplPreInlining dflags
   , sm_float_enable = floatEnable dflags
   , sm_do_eta_reduction = gopt Opt_DoEtaReduction dflags
-  , sm_arity_opts = initArityOpts dflags
-  , sm_rule_opts = initRuleOpts dflags
+  , sm_arity_opts   = initArityOpts dflags
+  , sm_rule_opts    = initRuleOpts dflags
   , sm_case_folding = gopt Opt_CaseFolding dflags
-  , sm_case_merge = gopt Opt_CaseMerge dflags
-  , sm_co_opt_opts = initOptCoercionOpts dflags
+  , sm_case_merge   = gopt Opt_CaseMerge dflags
+  , sm_opt_refl_co  = gopt Opt_OptReflCoSimplifier dflags
+  , sm_check_opt_co = dopt Opt_D_opt_co dflags
   }
 
 initGentleSimplMode :: DynFlags -> SimplMode

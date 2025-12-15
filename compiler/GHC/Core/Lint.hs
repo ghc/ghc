@@ -83,7 +83,6 @@ import GHC.Types.Basic
 import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim
 
 import GHC.Data.Bag
 import GHC.Data.List.SetOps
@@ -543,27 +542,13 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
        ; ensureEqTys binder_ty rhs_ty (mkRhsMsg binder (text "RHS") rhs_ty)
 
        -- If the binding is for a CoVar, the RHS should be (Coercion co)
-       -- See Note [Core type and coercion invariant] in GHC.Core
+       -- See Note [Core type and coercion invariants] in GHC.Core
        ; checkL (not (isCoVar binder) || isCoArg rhs)
                 (mkLetErr binder rhs)
 
-        -- Check the let-can-float invariant
-        -- See Note [Core let-can-float invariant] in GHC.Core
-       ; checkL ( isJoinId binder
-               || mightBeLiftedType binder_ty
-               || (isNonRec rec_flag && exprOkForSpeculation rhs)
-               || isDataConWorkId binder || isDataConWrapId binder -- until #17521 is fixed
-               || exprIsTickedString rhs)
-           (badBndrTyMsg binder (text "unlifted"))
-
-        -- Check that if the binder is at the top level and has type Addr#,
-        -- that it is a string literal.
-        -- See Note [Core top-level string literals].
-       ; checkL (not (isTopLevel top_lvl && binder_ty `eqType` addrPrimTy)
-                 || exprIsTickedString rhs)
-           (mkTopNonLitStrMsg binder)
-
-       ; flags <- getLintFlags
+       -- Check Note [Core binding invariants] in GHC.Core
+       ; checkL (bindingIsOk top_lvl rec_flag binder binder_ty rhs) $
+         mkLetErr binder rhs
 
          -- Check that a join-point binder has a valid type
          -- NB: lintIdBinder has checked that it is not top-level bound
@@ -572,6 +557,7 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
             JoinPoint arity ->  checkL (isValidJoinPointType arity binder_ty)
                                        (mkInvalidJoinPointMsg binder binder_ty)
 
+       ; flags <- getLintFlags
        ; when (lf_check_inline_loop_breakers flags
                && isStableUnfolding (realIdUnfolding binder)
                && isStrongLoopBreaker (idOccInfo binder)
@@ -621,6 +607,29 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
          lintIdUnfolding binder binder_ty (idUnfolding binder)
 
        ; return () }
+
+bindingIsOk :: TopLevelFlag -> RecFlag -> OutId -> OutType -> CoreExpr -> Bool
+-- Checks the invariants of Note [Core binding invariants] in GHC.Core
+bindingIsOk top_lvl rec_flag binder binder_ty rhs
+  | isCoVar binder
+  = isCoArg rhs
+
+  | isJoinId binder
+  = not (isTopLevel top_lvl)
+
+  -- Not a JoinId nor a CoVar
+  | isTopLevel top_lvl
+  = exprIsTopLevelBindable rhs binder_ty
+    || isDataConWorkId binder || isDataConWrapId binder -- until #17521 is fixed
+
+  -- So not top level, not JoinId, not CoVar
+  | isRec rec_flag
+  = exprIsTopLevelBindable rhs binder_ty
+
+  -- Not top level, not recursive
+  | otherwise
+  = mightBeLiftedType binder_ty
+    || exprOkForSpeculation rhs
 
 -- | Checks the RHS of bindings. It only differs from 'lintCoreExpr'
 -- in that it doesn't reject occurrences of the function 'makeStatic' when they
@@ -897,7 +906,7 @@ lintCoreExpr (Tick tickish expr)
 lintCoreExpr (Let (NonRec tv (Type ty)) body)
   | isTyVar tv
   = do  { lintType ty
-        ; lintTyCoBndr tv              $
+        ; lintTyVarBndr tv              $
     do  { addLoc (RhsOf tv)     $ lintTyKind tv ty
         ; addLoc (BodyOfLet tv) $ lintCoreExpr body } }
 
@@ -1780,25 +1789,25 @@ lintBinders site (var:vars) linterF = lintBinder site var $
 -- See Note [GHC Formalism]
 lintBinder :: HasDebugCallStack => BindingSite -> Var -> LintM a -> LintM a
 lintBinder site var linterF
-  | isTyCoVar var = lintTyCoBndr var linterF
-  | otherwise     = lintIdBndr NotTopLevel site var linterF
+  | isTyVar var = lintTyVarBndr var linterF
+  | otherwise   = lintIdBndr NotTopLevel site var linterF
 
-lintTyCoBndr :: HasDebugCallStack => TyCoVar -> LintM a -> LintM a
-lintTyCoBndr tcv thing_inside
+lintTyCoBndr :: HasDebugCallStack => InTyCoVar -> LintM a -> LintM a
+lintTyCoBndr var linterF
+  | isTyVar var = lintTyVarBndr var linterF
+  | otherwise   = lintIdBndr NotTopLevel LambdaBind var linterF
+
+lintTyVarBndr :: HasDebugCallStack => TyVar -> LintM a -> LintM a
+lintTyVarBndr tcv thing_inside
   = do { let tcv_type = varType tcv
              tcv_kind = typeKind tcv_type
 
-       ; lintType (varType tcv)
-         -- See (FORALL1) and (FORALL2) in GHC.Core.Type
-       ; if (isTyVar tcv)
-         then -- Check that in (forall (a:ki). blah) we have ki:Type
-              lintL (isLiftedTypeKind tcv_kind) $
+       ; lintType tcv_type
+
+         -- See (FORALL1) in GHC.Core.Type
+       ; lintL (isLiftedTypeKind tcv_kind) $
               hang (text "TyVar whose kind does not have kind Type:")
                  2 (ppr tcv <+> dcolon <+> ppr tcv_type <+> dcolon <+> ppr tcv_kind)
-         else -- Check that in (forall (cv::ty). blah),
-              -- then ty looks like (t1 ~# t2)
-              lintL (isCoVarType tcv_type) $
-              text "CoVar with non-coercion type:" <+> pprTyVar tcv
 
        ; addInScopeTyCoVar tcv thing_inside }
 
@@ -1841,10 +1850,10 @@ lintIdBndr top_lvl bind_site id thing_inside
          checkL (not is_top_lvl && is_let_bind) $
          mkBadJoinBindMsg id
 
-       -- Check that the Id does not have type (t1 ~# t2) or (t1 ~R# t2);
-       -- if so, it should be a CoVar, and checked by lintCoVarBndr
-       ; lintL (not (isCoVarType id_ty))
-               (text "Non-CoVar has coercion type" <+> ppr id <+> dcolon <+> ppr id_ty)
+       -- Check that the Id is a CoVar <=> has type  (t1 ~# t2) or (t1 ~R# t2);
+       ; lintL (isCoVar id == isCoVarType id_ty) $
+         hang (text "CoVar with non-coercion type or vice versa:")
+            2 (ppr id <+> dcolon <+> ppr id_ty)
 
        -- Check that lambda-bound Ids have no unfolding; not even OtherCon
        -- See #21496
@@ -1855,7 +1864,9 @@ lintIdBndr top_lvl bind_site id thing_inside
 
        ; addLoc (IdTy id) (lintValueType id_ty)
 
-       ; addInScopeId id thing_inside }
+       ; if isCoVar id
+         then addInScopeTyCoVar id thing_inside
+         else addInScopeId      id thing_inside }
   where
     id_ty = idType id
 
@@ -3797,11 +3808,6 @@ mkRhsMsg binder what ty
      hsep [text "Binder's type:", ppr (idType binder)],
      hsep [text "Rhs type:", ppr ty]]
 
-badBndrTyMsg :: Id -> SDoc -> SDoc
-badBndrTyMsg binder what
-  = vcat [ text "The type of this binder is" <+> what <> colon <+> ppr binder
-         , text "Binder's type:" <+> ppr (idType binder) ]
-
 mkNonTopExportedMsg :: Id -> SDoc
 mkNonTopExportedMsg binder
   = hsep [text "Non-top-level binder is marked as exported:", ppr binder]
@@ -3809,10 +3815,6 @@ mkNonTopExportedMsg binder
 mkNonTopExternalNameMsg :: Id -> SDoc
 mkNonTopExternalNameMsg binder
   = hsep [text "Non-top-level binder has an external name:", ppr binder]
-
-mkTopNonLitStrMsg :: Id -> SDoc
-mkTopNonLitStrMsg binder
-  = hsep [text "Top-level Addr# binder has a non-literal rhs:", ppr binder]
 
 mkKindErrMsg :: TyVar -> Type -> SDoc
 mkKindErrMsg tyvar arg_ty

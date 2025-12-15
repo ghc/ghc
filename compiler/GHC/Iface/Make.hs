@@ -199,7 +199,11 @@ updateDecl decls m_stg_infos m_cmm_infos
                                 m_cmm_infos
     tag_sigs = fromMaybe mempty m_stg_infos
 
-    update_decl (IfaceId nm ty details infos)
+    update_decl decl@(IfaceId nm ty details infos)
+      | IfCoVarId <- details
+      = decl -- Coercions can appear at top level in interface files
+             -- but we generate no code for them and they have no LFInfo
+
       | let not_caffy = elemNameSet nm non_cafs
       , let mb_lf_info = lookupNameEnv lf_infos nm
       , let sig = lookupNameEnv tag_sigs nm

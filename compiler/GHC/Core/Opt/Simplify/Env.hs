@@ -15,7 +15,7 @@ module GHC.Core.Opt.Simplify.Env (
         SimplPhase(..), isActive, simplStartPhase, simplEndPhase,
         seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
-        seOptCoercionOpts, sePhase, sePlatform, sePreInline,
+        sePhase, sePlatform, sePreInline,
         seRuleOpts, seRules, seUnfoldingOpts,
         mkSimplEnv, extendIdSubst, extendCvIdSubst,
         extendTvSubst, extendCvSubst,
@@ -54,7 +54,6 @@ module GHC.Core.Opt.Simplify.Env (
 
 import GHC.Prelude
 
-import GHC.Core.Coercion.Opt ( OptCoercionOpts )
 import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Core.Opt.Arity ( ArityOpts(..) )
 import GHC.Core.Opt.Simplify.Monad
@@ -161,15 +160,16 @@ following table:
 
 Note [Inline depth]
 ~~~~~~~~~~~~~~~~~~~
+The seInlineDepth tells us how deep in inlining we are.
+
 When we inline an /already-simplified/ unfolding, we
 * Zap the substitution environment; the inlined thing is an OutExpr
 * Bump the seInlineDepth in the SimplEnv
 Both these tasks are done in zapSubstEnv.
 
-The seInlineDepth tells us how deep in inlining we are.  Currently,
-seInlineDepth is used for just one purpose: when we encounter a
-coercion we don't apply optCoercion to it if seInlineDepth>0.
-Reason: it has already been optimised once, no point in doing so again.
+Currently, `seInlineDepth` is entirely unused! (It was previously used to avoid
+repeatedly optimising coercions.)  But it's cheap to maintain and might prove
+useful, so I have not removed it.
 -}
 
 data SimplEnv
@@ -249,9 +249,6 @@ seInline env = sm_inline (seMode env)
 seNames :: SimplEnv -> [String]
 seNames env = sm_names (seMode env)
 
-seOptCoercionOpts :: SimplEnv -> OptCoercionOpts
-seOptCoercionOpts env = sm_co_opt_opts (seMode env)
-
 sePhase :: SimplEnv -> SimplPhase
 sePhase env = sm_phase (seMode env)
 
@@ -287,7 +284,8 @@ data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
   , sm_rule_opts :: !RuleOpts
   , sm_case_folding :: !Bool
   , sm_case_merge :: !Bool
-  , sm_co_opt_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
+  , sm_opt_refl_co :: !Bool           -- Use `optCoRefl` on each coercion
+  , sm_check_opt_co :: !Bool          -- Do debug-checking/tracing in `optCoRefl`
   }
 
 -- | See Note [SimplPhase]
@@ -436,11 +434,12 @@ data SimplFloats
       }
 
 instance Outputable SimplFloats where
-  ppr (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf, sfInScope = is })
+  ppr (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf, sfInScope = _is })
     = text "SimplFloats"
       <+> braces (vcat [ text "lets: " <+> ppr lf
                        , text "joins:" <+> ppr jf
-                       , text "in_scope:" <+> ppr is ])
+--                       , text "in_scope:" <+> ppr _is
+                       ])
 
 emptyFloats :: SimplEnvIS -> SimplFloats
 emptyFloats env
@@ -637,7 +636,7 @@ reSimplifying :: SimplEnv -> Bool
 reSimplifying (SimplEnv { seInlineDepth = n }) = n>0
 
 ---------------------
-extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
+extendIdSubst :: HasDebugCallStack => SimplEnv -> Id -> SimplSR -> SimplEnv
 extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
   = assertPpr (isId var && not (isCoVar var)) (ppr var) $
     env { seIdSubst = extendVarEnv subst var res }
@@ -758,8 +757,10 @@ Examples
   NonRec x# (y +# 3)    FltOkSpec   -- Unboxed, but ok-for-spec'n
 
   NonRec x* (f y)       FltCareful  -- Strict binding; might fail or diverge
-  NonRec x# (a /# b)    FltCareful  -- Might fail; does not satisfy let-can-float invariant
-  NonRec x# (f y)       FltCareful  -- Might diverge; does not satisfy let-can-float invariant
+  NonRec x# (a /# b)    FltCareful  -- Might fail; does not satisfy
+                                     --    Note [Nested non-rec binding invariants]
+  NonRec x# (f y)       FltCareful  -- Might diverge; does not satisfy
+                                     --    Note [Nested non-rec binding invariants]
 -}
 
 data LetFloats = LetFloats (OrdList OutBind) FloatFlag
@@ -772,7 +773,8 @@ data FloatFlag
   = FltLifted   -- All bindings are lifted and lazy *or*
                 --     consist of a single primitive string literal
                 -- Hence ok to float to top level, or recursive
-                -- NB: consequence: all bindings satisfy let-can-float invariant
+                -- NB: consequence: all bindings satisfy
+                --     Note [Nested non-rec binding invariants]
 
   | FltOkSpec   -- All bindings are FltLifted *or*
                 --      strict (perhaps because unlifted,
@@ -781,12 +783,14 @@ data FloatFlag
                 -- Hence ok to float out of the RHS
                 -- of a lazy non-recursive let binding
                 -- (but not to top level, or into a rec group)
-                -- NB: consequence: all bindings satisfy let-can-float invariant
+                -- NB: consequence: all bindings satisfy
+                --     Note [Nested non-rec binding invariants]
 
   | FltCareful  -- At least one binding is strict (or unlifted)
                 --      and not guaranteed cheap
                 -- Do not float these bindings out of a lazy let!
-                -- NB: some bindings may not satisfy let-can-float
+                -- NB: some bindings may not satisfy
+                --     Note [Nested non-rec binding invariants]
 
 instance Outputable LetFloats where
   ppr (LetFloats binds ff) = ppr ff $$ ppr (fromOL binds)
@@ -869,10 +873,8 @@ unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
   where
     flag (Rec {})                = FltLifted
     flag (NonRec bndr rhs)
-      | not (isStrictId bndr)    = FltLifted
-      | exprIsTickedString rhs   = FltLifted
-          -- String literals can be floated freely.
-          -- See Note [Core top-level string literals] in GHC.Core.
+      | exprIsTopLevelBindable rhs (idType bndr) = FltLifted
+          -- Things that can float freely, including to top level
       | exprOkForSpeculation rhs = FltOkSpec  -- Unlifted, and lifted but ok-for-spec (eg HNF)
       | otherwise                = FltCareful
 
@@ -970,9 +972,14 @@ mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs _ff
   where
     -- See Note [Bangs in the Simplifier]
     !floats'  | isNilOL bs  = emptyLetFloats
-              | otherwise   = unitLetFloat (Rec (flattenBinds (fromOL bs)))
+              | otherwise   = LetFloats (flatten_rec bs) FltLifted
     !jfloats' | isNilOL jbs = emptyJoinFloats
-              | otherwise   = unitJoinFloat (Rec (flattenBinds (fromOL jbs)))
+              | otherwise   = flatten_rec jbs
+
+    flatten_rec :: OrdList OutBind -> OrdList OutBind
+    -- Put CoVar bindings first (guaranteed non-recursive)
+    -- then one recursive value binding
+    flatten_rec bs = unitOL (Rec (flattenBinds (fromOL bs)))
 
 wrapFloats :: SimplFloats -> OutExpr -> OutExpr
 -- Wrap the floats around the expression
@@ -982,8 +989,10 @@ wrapFloats (SimplFloats { sfLetFloats  = LetFloats bs flag
      -- Note: Always safe to put the joins on the inside
      -- since the values can't refer to them
   where
-    mk_let | FltCareful <- flag = mkCoreLet -- need to enforce let-can-float-invariant
-           | otherwise          = Let       -- let-can-float invariant hold
+    mk_let | FltCareful <- flag
+           = mkCoreLet -- Need to enforce Note [Nested non-rec binding invariants]
+           | otherwise
+           = Let       -- Note [Nested non-rec binding invariants] holds
 
 wrapJoinFloatsX :: SimplFloats -> OutExpr -> (SimplFloats, OutExpr)
 -- Wrap the sfJoinFloats of the env around the expression,
@@ -1045,14 +1054,6 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
         -- the in-scope set with better IdInfo.
         --
         -- See also Note [In-scope set as a substitution] in GHC.Core.Opt.Simplify.
-
-refineFromInScope :: InScopeSet -> Var -> Var
-refineFromInScope in_scope v
-  | isLocalId v = case lookupInScope in_scope v of
-                  Just v' -> v'
-                  Nothing -> pprPanic "refineFromInScope" (ppr in_scope $$ ppr v)
-                             -- c.f #19074 for a subtle place where this went wrong
-  | otherwise = v
 
 lookupRecBndr :: SimplEnv -> InId -> OutId
 -- Look up an Id which has been put into the envt by simplRecBndrs,
@@ -1395,7 +1396,7 @@ substCoVarBndr env cv
         (Subst in_scope' _ tv_env' cv_env', cv')
            -> (env { seInScope = in_scope', seTvSubst = tv_env', seCvSubst = cv_env' }, cv')
 
-substCo :: SimplEnv -> Coercion -> Coercion
+substCo :: HasDebugCallStack => SimplEnv -> Coercion -> Coercion
 substCo env co = Coercion.substCo (getTCvSubst env) co
 
 ------------------

@@ -62,7 +62,8 @@ import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Type     hiding( substTy )
+import GHC.Core.Type     hiding( substCo, substTy, extendCvSubst )
+import qualified GHC.Core.Type
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import GHC.Core.Multiplicity
@@ -79,7 +80,6 @@ import GHC.Types.Name.Env
 
 import GHC.Data.List.Infinite ( Infinite(..) )
 import qualified GHC.Data.List.Infinite as Inf
-import GHC.Data.OrdList ( isNilOL )
 import GHC.Data.FastString ( fsLit )
 
 import GHC.Utils.Misc
@@ -170,9 +170,6 @@ data SimplCont
   | CastIt              -- (CastIt co K)[e] = K[ e `cast` co ]
       { sc_co   :: OutCoercion  -- The coercion simplified
                                 -- Invariant: never an identity coercion
-      , sc_opt  :: Bool         -- True <=> sc_co has had optCoercion applied to it
-                                --      See Note [Avoid re-simplifying coercions]
-                                --      in GHC.Core.Opt.Simplify.Iteration
       , sc_cont :: SimplCont }
 
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
@@ -1646,15 +1643,15 @@ preInlineUnconditionally
     :: SimplEnv -> TopLevelFlag -> InId
     -> StaticEnv -> CoreExpr -> MOutCoercion  -- The argument
     -> Maybe SimplEnv       -- Returned env has extended substitution
--- Precondition: rhs satisfies the let-can-float invariant
--- See Note [Core let-can-float invariant] in GHC.Core
+-- Precondition: rhs satisfies Note [Nested non-rec binding invariants]
+-- See Note [Nested non-rec binding invariants] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 preInlineUnconditionally env top_lvl bndr rhs_se rhs rhs_mco
   | not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
-  | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
+  | is_covar, not (isCoArg rhs)              = Nothing -- Note [Do not inline CoVars unconditionally]
   | isExitJoinId bndr                        = Nothing -- Note [Do not inline exit join points]
                                                        -- in module Exitify
   | not (one_occ (idOccInfo bndr))           = Nothing
@@ -1668,6 +1665,7 @@ preInlineUnconditionally env top_lvl bndr rhs_se rhs rhs_mco
   | otherwise                                = Nothing
   where
     unf = idUnfolding bndr
+    is_covar = isCoVar bndr
 
     -- If the rhs is /not/ already simplified, extend the envt with ContEx, which captures
     --    the the lexical environment for us to restore in `simplInId`.
@@ -1676,7 +1674,20 @@ preInlineUnconditionally env top_lvl bndr rhs_se rhs rhs_mco
     --    the RHS.
     -- See Note [Avoid repeated simplification] in GHC.Core.Opt.Simplify.Iteration
     extend_subst_with inl_rhs
-      = extendIdSubst env bndr $!
+      | is_covar
+      , Coercion rhs_co <- inl_rhs
+      = extendCvSubst env bndr $!
+        case rhs_se of
+          Simplified {} -> case rhs_mco of
+                              MRefl -> rhs_co
+                              MCo co1 -> mkCoCast rhs_co co1
+          UnSimplified rhs_env -> GHC.Core.Type.substCo subst rhs_co
+             where
+               subst = getFullSubst (seInScope env) rhs_env
+
+      | otherwise
+      = assertPpr (not (isCoVar bndr)) (ppr bndr <+> ppr inl_rhs) $
+        extendIdSubst env bndr $!
         case rhs_se of
           Simplified _ -> case rhs_mco of
                              MRefl  -> DoneEx inl_rhs NotJoinPoint -- Common case
@@ -1718,15 +1729,16 @@ preInlineUnconditionally env top_lvl bndr rhs_se rhs rhs_mco
         -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
         -- so substituting rhs inside a lambda doesn't change the occ info.
         -- Sadly, not quite the same as exprIsHNF.
-    canInlineInLam (Lit _)    = True
-    canInlineInLam (Cast e _) = canInlineInLam e
-    canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
-    canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
-    canInlineInLam (Var v)    = case idOccInfo v of
-                                  OneOcc { occ_in_lam = IsInsideLam } -> True
-                                  ManyOccs {}                         -> True
-                                  _                                   -> False
-    canInlineInLam _          = False
+    canInlineInLam (Lit _)      = True
+    canInlineInLam (Coercion _) = True
+    canInlineInLam (Cast e _)   = canInlineInLam e
+    canInlineInLam (Lam b e)    = isRuntimeVar b || canInlineInLam e
+    canInlineInLam (Tick t e)   = not (tickishIsCode t) && canInlineInLam e
+    canInlineInLam (Var v)      = case idOccInfo v of
+                                    OneOcc { occ_in_lam = IsInsideLam } -> True
+                                    ManyOccs {}                         -> True
+                                    _                                   -> False
+    canInlineInLam _            = False
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
       -- ticks around a Lam will disappear anyway.
 
@@ -1805,8 +1817,7 @@ postInlineUnconditionally
     -> InId -> OutId    -- The binder (*not* a CoVar), including its unfolding
     -> OutExpr
     -> Bool
--- Precondition: rhs satisfies the let-can-float invariant
--- See Note [Core let-can-float invariant] in GHC.Core
+-- Precondition: rhs satisfies Note [Nested non-rec binding invariants] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 postInlineUnconditionally env bind_cxt old_bndr bndr rhs
@@ -2418,11 +2429,9 @@ new binding is abstracted.  Several points worth noting
 abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
               -> OutExpr -> SimplM ([OutBind], OutExpr)
 abstractFloats uf_opts top_lvl main_tvs floats body
-  = assert (notNull body_floats) $
-    assert (isNilOL (sfJoinFloats floats)) $
-    do  { let sccs = concatMap to_sccs body_floats
+  = do  { let sccs = concatMap to_sccs body_floats
         ; (subst, float_binds) <- mapAccumLM abstract empty_subst sccs
-        ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
+        ; return (catMaybes float_binds, GHC.Core.Subst.substExpr subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl
     body_floats = letFloatBinds (sfLetFloats floats)
@@ -2439,12 +2448,18 @@ abstractFloats uf_opts top_lvl main_tvs floats body
                        (\(_id,_rhs,fvs) -> nonDetStrictFoldVarSet ((:) . getName) [] fvs) -- Wrinkle (AB3)
                        (zip3 ids rhss (map exprFreeVars rhss))
 
-    abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet) -> SimplM (GHC.Core.Subst.Subst, OutBind)
+    abstract :: GHC.Core.Subst.Subst -> SCC (Id, CoreExpr, VarSet)
+             -> SimplM (GHC.Core.Subst.Subst, Maybe OutBind)
     abstract subst (AcyclicSCC (id, rhs, _empty_var_set))
-      = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
+      | Coercion co <- rhs  -- Coercions: can't abstract, so just substitute
+      = return (GHC.Core.Subst.extendCvSubst subst id co, Nothing)
+
+      | otherwise
+      = assertPpr (isId id) (ppr id) $
+        do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
            ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'
                  !subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
-           ; return (subst', NonRec poly_id2 poly_rhs) }
+           ; return (subst', Just $ NonRec poly_id2 poly_rhs) }
       where
         rhs' = GHC.Core.Subst.substExpr subst rhs
 
@@ -2457,7 +2472,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
                  poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
                               | (poly_id, rhs) <- poly_ids `zip` rhss
                               , let rhs' = GHC.Core.Subst.substExpr subst' rhs ]
-           ; return (subst', Rec poly_pairs) }
+           ; return (subst', Just $ Rec poly_pairs) }
       where
         (ids,rhss,_fvss) = unzip3 trpls
 

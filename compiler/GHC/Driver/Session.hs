@@ -22,7 +22,7 @@ module GHC.Driver.Session (
         FatalMessager, FlushOut(..),
         ProfAuto(..),
         glasgowExtsFlags,
-        hasPprDebug, hasNoDebugOutput, hasNoStateHack, hasNoOptCoercion,
+        hasPprDebug, hasNoDebugOutput, hasNoStateHack,
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
         wopt, wopt_set, wopt_unset,
@@ -1348,8 +1348,6 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_NoHsMain))
   , make_ord_flag defGhcFlag "fno-state-hack"
         (NoArg (setGeneralFlag Opt_G_NoStateHack))
-  , make_ord_flag defGhcFlag "fno-opt-coercion"
-        (NoArg (setGeneralFlag Opt_G_NoOptCoercion))
   , make_ord_flag defGhcFlag "with-rtsopts"
         (HasArg setRtsOpts)
   , make_ord_flag defGhcFlag "rtsopts"
@@ -1683,6 +1681,8 @@ dynamic_flags_deps = [
         (NoArg $ forceRecompile >> (setVerbosity $ Just 2))
   , make_ord_flag defGhcFlag "dipe-stats"
         (setDumpFlag Opt_D_ipe_stats)
+  , make_ord_flag defGhcFlag "dcheck-opt-co"
+        (setDumpFlag Opt_D_opt_co)
   , make_ord_flag defGhcFlag "dfaststring-stats"
         (setDumpFlag Opt_D_faststring_stats)
   , make_ord_flag defGhcFlag "dno-llvm-mangler"
@@ -2050,7 +2050,6 @@ dynamic_flags_deps = [
 
      ------ Language flags -------------------------------------------------
  ++ map (mkFlag turnOn  "f"         setExtensionFlag  ) fLangFlagsDeps
- ++ map (mkFlag turnOff "fno-"      unSetExtensionFlag) fLangFlagsDeps
  ++ map (mkFlag turnOn  "X"         setExtensionFlag  ) xFlagsDeps
  ++ map (mkFlag turnOff "XNo"       unSetExtensionFlag) xFlagsDeps
  ++ map (mkFlag turnOn  "X"         setLanguage       ) languageFlagsDeps
@@ -2505,6 +2504,9 @@ fFlagsDeps = [
   flagSpec "cmm-elim-common-blocks"           Opt_CmmElimCommonBlocks,
   flagSpec "cmm-sink"                         Opt_CmmSink,
   flagSpec "cmm-static-pred"                  Opt_CmmStaticPred,
+  flagSpec "opt-coercion"                     Opt_OptCoercion,
+  flagSpec "opt-reflco-simpleopt"             Opt_OptReflCoSimpleOpt,
+  flagSpec "opt-reflco-simplifier"            Opt_OptReflCoSimplifier,
   flagSpec "cse"                              Opt_CSE,
   flagSpec "stg-cse"                          Opt_StgCSE,
   flagSpec "stg-lift-lams"                    Opt_StgLiftLams,

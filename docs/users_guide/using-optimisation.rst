@@ -996,14 +996,37 @@ as such you shouldn't need to set any of them explicitly. A flag
     a warning if the number of arguments in the resulting function would exceed
     the value given by ``-fmax-forced-spec-args``.
 
-.. ghc-flag:: -fno-opt-coercion
-    :shortdesc: Turn off the coercion optimiser
+.. ghc-flag:: -fopt-coercion
+    :shortdesc: Turn on the coercion optimiser
     :type: dynamic
+    :reverse: -fno-opt-coercion
     :category:
 
-    :default: coercion optimisation enabled.
+    :default: on
 
-    Turn off the coercion optimiser.
+    Turn on the "big hammer" coercion optimiser, as a separate core-to-core pass.
+
+.. ghc-flag:: -fopt-reflco-simpleopt
+    :shortdesc: Turn on the lightweight coercion optimiser in the simple optimiser
+    :type: dynamic
+    :reverse: -fno-opt-refl-coercion
+    :category:
+
+    :default: off
+
+    In the simple optimiser, turn on the "lightweight" coercion optimiser, which just
+    looks for reflexivity within sequences of coercions.
+
+.. ghc-flag:: -fopt-reflco-simplifier
+    :shortdesc: Turn on the lightweight coercion optimiser in the main Simplifier
+    :type: dynamic
+    :reverse: -fno-opt-refl-coercion
+    :category:
+
+    :default: on
+
+    In the main Simplifier, turn on the "lightweight" coercion optimiser, which just
+    looks for reflexivity within sequences of coercions.
 
 .. ghc-flag:: -fno-pre-inlining
     :shortdesc: Turn off pre-inlining

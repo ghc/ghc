@@ -1,7 +1,6 @@
 -- | Subsystem configuration
 module GHC.Driver.Config
-   ( initOptCoercionOpts
-   , initSimpleOpts
+   ( initSimpleOpts
    , initEvalOpts
    , EvalStep(..)
    )
@@ -11,23 +10,17 @@ import GHC.Prelude
 
 import GHC.Driver.DynFlags
 import GHC.Core.SimpleOpt
-import GHC.Core.Coercion.Opt
 import GHCi.Message (EvalOpts(..))
-
--- | Initialise coercion optimiser configuration from DynFlags
-initOptCoercionOpts :: DynFlags -> OptCoercionOpts
-initOptCoercionOpts dflags = OptCoercionOpts
-   { optCoercionEnabled = not (hasNoOptCoercion dflags)
-   }
 
 -- | Initialise Simple optimiser configuration from DynFlags
 initSimpleOpts :: DynFlags -> SimpleOpts
 initSimpleOpts dflags = SimpleOpts
    { so_uf_opts = unfoldingOpts dflags
-   , so_co_opts = initOptCoercionOpts dflags
    , so_eta_red = gopt Opt_DoEtaReduction dflags
    , so_inline  = const True
    , so_can_drop = const True
+   , so_opt_co  = gopt Opt_OptReflCoSimpleOpt dflags
+   , so_check_opt_co = dopt Opt_D_opt_co dflags
    }
 
 -- | Instruct the interpreter evaluation to break...

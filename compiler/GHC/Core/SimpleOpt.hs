@@ -26,15 +26,16 @@ import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Unfold
+-- import GHC.Core.TyCo.Compare( eqTypeIgnoringMultiplicity )
 import GHC.Core.Unfold.Make
 import GHC.Core.Make
 import GHC.Core.Opt.OccurAnal( OccurAnalOpts(..), occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
 import GHC.Core.DataCon
-import GHC.Core.Coercion.Opt ( optCoercion, optTransCo, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
+import GHC.Core.Coercion.Opt( optCoRefl )
 
 import GHC.Types.Literal
 import GHC.Types.Id
@@ -201,25 +202,26 @@ In addition to supporting clients of the GHC API, there is another use of
 -- | Simple optimiser options
 data SimpleOpts = SimpleOpts
    { so_uf_opts :: !UnfoldingOpts   -- ^ Unfolding options
-   , so_co_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
    , so_eta_red :: !Bool            -- ^ Eta reduction on?
    , so_inline :: !(Var -> Bool)    -- ^ False <=> do no inline the given
                                     --   binding whatsoever, even for trivial or
                                     --   used-once things
-                                    --
                                     --   See Note [Controlling inlining in the simple optimiser]
    , so_can_drop :: !(Var -> Bool)  -- ^ True <=> can drop the given binding if it is dead
                                     -- See 'oa_can_drop' in 'OccurAnalOpts'.
+   , so_opt_co :: !Bool             -- ^ Run the simple `optCoRefl` optimiser on coercions
+   , so_check_opt_co :: !Bool       -- ^ Do debug-checking for `optCoRefl`
    }
 
 -- | Default options for the Simple optimiser.
 defaultSimpleOpts :: SimpleOpts
 defaultSimpleOpts = SimpleOpts
-   { so_uf_opts = defaultUnfoldingOpts
-   , so_co_opts = OptCoercionOpts { optCoercionEnabled = False }
-   , so_eta_red = False
-   , so_inline  = const True
-   , so_can_drop = const True
+   { so_uf_opts      = defaultUnfoldingOpts
+   , so_eta_red      = False
+   , so_inline       = const True
+   , so_can_drop     = const True
+   , so_opt_co       = True
+   , so_check_opt_co = False
    }
 
 simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
@@ -312,11 +314,15 @@ simpleOptPgm opts this_mod binds rules =
 ----------------------
 type SimpleClo = (SimpleOptEnv, InExpr)
 
-data SimpleContItem = ApplyToArg SimpleClo | CastIt OutCoercion
+data SimpleContItem
+  = ApplyToArg SimpleClo
+  | CastIt OutCoercion
+       -- The OutType is the corecionRKind of the coercion
+       -- Used to make reflexivity checking more efficient
 
 instance Outputable SimpleContItem where
   ppr (ApplyToArg (_, arg)) = text "ARG" <+> ppr arg
-  ppr (CastIt co) = text "CAST" <+> ppr co
+  ppr (CastIt co)           = text "CAST" <+> ppr co
 
 data SimpleOptEnv
   = SOE { soe_opts :: {-# UNPACK #-} !SimpleOpts
@@ -387,7 +393,7 @@ simple_opt_expr env expr = go expr
     go e@(Lam {})  = simple_app env e []
 
     go (Type ty)        = Type     (substTyUnchecked subst ty)
-    go (Coercion co)    = Coercion (go_co co)
+    go (Coercion co)    = Coercion (simple_opt_co env co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
     go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of
@@ -424,13 +430,21 @@ simple_opt_expr env expr = go expr
         (env', b') = subst_opt_bndr env b
 
     ----------------------
-    go_co co = optCoercion (so_co_opts (soe_opts env)) subst co
-
-    ----------------------
     go_alt env (Alt con bndrs rhs)
       = Alt con bndrs' (simple_opt_expr env' rhs)
       where
         (env', bndrs') = subst_opt_bndrs env bndrs
+
+----------------------
+simple_opt_co :: SimpleOptEnv -> InCoercion -> OutCoercion
+-- Optimise a coercion, optionally running
+-- the simple `optCoRefl` optimiser
+-- If (so_opt_co opts) is on, we run the optimiser even if the substition
+--    is empty, to kill off Refls; but if not, `substCo` does a no-op if
+--    the substitution is empty
+simple_opt_co (SOE { soe_subst = subst, soe_opts = opts }) co
+  | so_opt_co opts = optCoRefl (so_check_opt_co opts) subst co
+  | otherwise      = substCo subst co
 
 ----------------------
 -- simple_app collects arguments for beta reduction
@@ -472,7 +486,8 @@ simple_app env e0@(Lam {}) as0@(_:_)
         -- See Note [Dark corner with representation polymorphism]
         needsCaseBinding (idType b') (snd a)
         -- This arg must not be inlined (side-effects) and cannot be let-bound,
-        -- due to the let-can-float invariant. So simply case-bind it here.
+        -- due to Note [Nested non-rec binding invariants].
+        -- So simply case-bind it here.
       , let a' = simple_opt_clo (soeInScope env) a
       = mkDefaultCase a' b' $ do_beta env' body as
 
@@ -481,7 +496,7 @@ simple_app env e0@(Lam {}) as0@(_:_)
       where (env', b') = subst_opt_bndr env b
 
     -- See Note [Eliminate casts in function position]
-    do_beta env e@(Lam b _) as@(CastIt out_co:rest)
+    do_beta env e@(Lam b _) as@(CastIt out_co : rest)
       | isNonCoVarId b
       -- Optimise the inner lambda to make it an 'OutExpr', which makes it
       -- possible to call 'pushCoercionIntoLambda' with the 'OutCoercion' 'co'.
@@ -496,8 +511,8 @@ simple_app env e0@(Lam {}) as0@(_:_)
       | otherwise
       = rebuild_app env (simple_opt_expr env e) as
 
-    do_beta env (Cast e co) as =
-      do_beta env e (add_cast env co as)
+    do_beta env (Cast e co) as
+      = do_beta env e (add_cast env co as)
 
     do_beta env body as
       = simple_app env body as
@@ -556,12 +571,10 @@ add_cast env co1 as
   = as
   | otherwise
   = case as of
-      CastIt co2:rest -> CastIt (optTransCo opts in_scope opt_co1 co2):rest
-      _               -> CastIt opt_co1:as
+      CastIt co2 : rest -> CastIt (mkTransCo opt_co1 co2) : rest
+      _                 -> CastIt opt_co1 : as
   where
-    opts     = so_co_opts (soe_opts env)
-    in_scope = soeInScope env
-    opt_co1  = optCoercion opts (soe_subst env) co1
+    opt_co1 = simple_opt_co env co1
 
 rebuild_app :: HasDebugCallStack
             => SimpleOptEnv -> OutExpr -> [SimpleContItem] -> OutExpr
@@ -704,13 +717,13 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst, soe_opts = opt
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion co <- in_rhs
-  , let out_co = optCoercion (so_co_opts (soe_opts env)) (soe_subst rhs_env) co
+  , let out_co = simple_opt_co rhs_env co
   = assert (isCoVar in_bndr)
     (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
 
   | assertPpr (isNonCoVarId in_bndr) (ppr in_bndr)
     -- The previous two guards got rid of tyvars and coercions
-    -- See Note [Core type and coercion invariant] in GHC.Core
+    -- See Note [Core type and coercion invariants] in GHC.Core
     pre_inline_unconditionally
   = (env { soe_inl = extendVarEnv inl_env in_bndr clo }, Nothing)
 
@@ -794,7 +807,7 @@ simple_out_bind_pair env@(SOE { soe_subst = subst, soe_opts = opts })
                      occ_info active stable_unf top_level
   | assertPpr (isNonCoVarId in_bndr) (ppr in_bndr)
     -- Type and coercion bindings are caught earlier
-    -- See Note [Core type and coercion invariant]
+    -- See Note [Core type and coercion invariants]
     post_inline_unconditionally
   = ( env' { soe_subst = extendIdSubst subst in_bndr out_rhs }
     , Nothing)
