@@ -24,6 +24,7 @@ import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 import GHC.Core
 import GHC.Core.SimpleOpt (simpleOptPgm)
 import GHC.Core.Opt.CSE  ( cseProgram )
+import GHC.Core.Coercion.Opt  ( optCoProgram )
 import GHC.Core.Rules   ( RuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings, pprRules )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
@@ -134,6 +135,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
     strictness    = gopt Opt_Strictness                   dflags
     full_laziness = gopt Opt_FullLaziness                 dflags
     do_specialise = gopt Opt_Specialise                   dflags
+    do_co_opt     = gopt Opt_OptCoercion                 dflags
     do_float_in   = gopt Opt_FloatIn                      dflags
     cse           = gopt Opt_CSE                          dflags
     spec_constr   = gopt Opt_SpecConstr                   dflags
@@ -146,7 +148,6 @@ getCoreToDo dflags hpt_rule_base extra_vars
     static_ptrs   = xopt LangExt.StaticPointers           dflags
     profiling     = ways dflags `hasWay` WayProf
 
-    do_presimplify = do_specialise -- TODO: any other optimizations benefit from pre-simplification?
     do_simpl3      = const_fold || rules_on -- TODO: any other optimizations benefit from three-phase simplification?
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
@@ -215,12 +216,21 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- after this before anything else
         runWhen static_args (CoreDoPasses [ simpl_gently, CoreDoStaticArgs ]),
 
-        -- initial simplify: mk specialiser happy: minimum effort please
-        runWhen do_presimplify simpl_gently,
-
+        -- Initial simplify: make specialiser happy and/or optimise coercions:
+        --                   minimum effort please
         -- Specialisation is best done before full laziness
         -- so that overloaded functions have all their dictionary lambdas manifest
-        runWhen do_specialise CoreDoSpecialising,
+        runWhen do_specialise $
+        CoreDoPasses [ simpl_gently
+                     , runWhen do_specialise CoreDoSpecialising ],
+
+        -- Optimise coercions: see Note [Coercion optimisation]
+        --                         in GHC.Core.Coercion.Opt
+        -- With -O do this after one run of the Simplifier.
+        -- Without -O, just take what the desugarer produced
+        -- I tried running it right after desugaring, regardless of -O,
+        -- but that was worse (longer compile times).
+        runWhen do_co_opt CoreOptCoercion,
 
         if full_laziness then
            CoreDoFloatOutwards $ FloatOutSwitches
@@ -254,7 +264,8 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- Run the simplifier phases 2,1,0 to allow rewrite rules to fire
         runWhen do_simpl3
             (CoreDoPasses $ [ simpl_phase (Phase phase) "main" max_iter
-                            | phase <- [phases, phases-1 .. 1] ] ++
+                            | phase <- [phases, phases-1 .. 1] ]
+                            ++
                             [ simpl_phase (Phase 0) "main" (max max_iter 3) ]),
                 -- Phase 0: allow all Ids to be inlined now
                 -- This gets foldr inlined before strictness analysis
@@ -307,6 +318,8 @@ getCoreToDo dflags hpt_rule_base extra_vars
 
         runWhen do_float_in CoreDoFloatInwards,
 
+        --------- Final run of the Simplifier ---------------
+        -- This runs even with -O0
         simplify "final",  -- Final tidy-up
 
         maybe_rule_check FinalPhase,
@@ -495,6 +508,9 @@ doCorePass pass guts = do
 
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
                                  updateBinds cseProgram
+
+    CoreOptCoercion           -> {-# SCC "OptCoercion" #-}
+                                 updateBinds optCoProgram
 
     CoreLiberateCase          -> {-# SCC "LiberateCase" #-}
                                  updateBinds (liberateCase (initLiberateCaseOpts dflags))

@@ -164,9 +164,6 @@ data SimplCont
   | CastIt              -- (CastIt co K)[e] = K[ e `cast` co ]
       { sc_co   :: OutCoercion  -- The coercion simplified
                                 -- Invariant: never an identity coercion
-      , sc_opt  :: Bool         -- True <=> sc_co has had optCoercion applied to it
-                                --      See Note [Avoid re-simplifying coercions]
-                                --      in GHC.Core.Opt.Simplify.Iteration
       , sc_cont :: SimplCont }
 
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]

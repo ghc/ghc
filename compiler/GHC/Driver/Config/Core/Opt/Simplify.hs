@@ -13,7 +13,6 @@ import GHC.Core.Opt.Simplify ( SimplifyExprOpts(..), SimplifyOpts(..) )
 import GHC.Core.Opt.Simplify.Env ( FloatEnable(..), SimplMode(..), SimplPhase(..) )
 import GHC.Core.Opt.Simplify.Monad ( TopEnvConfig(..) )
 
-import GHC.Driver.Config ( initOptCoercionOpts )
 import GHC.Driver.Config.Core.Lint ( initLintPassResultConfig )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Driver.Config.Core.Opt.Arity ( initArityOpts )
@@ -73,7 +72,6 @@ initSimplMode dflags phase name = SimplMode
   , sm_rule_opts = initRuleOpts dflags
   , sm_case_folding = gopt Opt_CaseFolding dflags
   , sm_case_merge = gopt Opt_CaseMerge dflags
-  , sm_co_opt_opts = initOptCoercionOpts dflags
   }
 
 initGentleSimplMode :: DynFlags -> SimplMode

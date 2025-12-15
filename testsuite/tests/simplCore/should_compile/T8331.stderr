@@ -20,9 +20,9 @@
       = ($fApplicativeReaderT6 @s @r)
         `cast` (forall (a ::~ <*>_N) (b ::~ <*>_N).
                 <a>_R
-                ->_R <ReaderT r (ST s) b>_R
-                ->_R <r>_R ->_R Sym (N:ST <s>_N <a>_R)
-                     ; Sym (N:ReaderT <*>_N <r>_R <ST s>_R <a>_N)
+                ->_R <ReaderT r (ST s) b>_R ->_R <r>_R ->_R Sym (N:ST <s>_N <a>_R)
+                     ; (<ReaderT r (ST s) b>_R
+                        ->_R Sym (N:ReaderT <*>_N <r>_R <ST s>_R <a>_N))
                 :: Coercible
                      (forall a b. a -> ReaderT r (ST s) b -> r -> STRep s a)
                      (forall a b. a -> ReaderT r (ST s) b -> ReaderT r (ST s) a))
@@ -32,9 +32,9 @@
       = ($fApplicativeReaderT1 @s @r)
         `cast` (forall (a ::~ <*>_N) (b ::~ <*>_N).
                 <ReaderT r (ST s) a>_R
-                ->_R <ReaderT r (ST s) b>_R
-                ->_R <r>_R ->_R Sym (N:ST <s>_N <a>_R)
-                     ; Sym (N:ReaderT <*>_N <r>_R <ST s>_R <a>_N)
+                ->_R <ReaderT r (ST s) b>_R ->_R <r>_R ->_R Sym (N:ST <s>_N <a>_R)
+                     ; (<ReaderT r (ST s) b>_R
+                        ->_R Sym (N:ReaderT <*>_N <r>_R <ST s>_R <a>_N))
                 :: Coercible
                      (forall a b.
                       ReaderT r (ST s) a -> ReaderT r (ST s) b -> r -> STRep s a)
@@ -78,9 +78,9 @@
       = ($fApplicativeReaderT7 @s @r)
         `cast` (forall (a ::~ <*>_N) (b ::~ <*>_N).
                 <a -> b>_R
-                ->_R <ReaderT r (ST s) a>_R
-                ->_R <r>_R ->_R Sym (N:ST <s>_N <b>_R)
-                     ; Sym (N:ReaderT <*>_N <r>_R <ST s>_R <b>_N)
+                ->_R <ReaderT r (ST s) a>_R ->_R <r>_R ->_R Sym (N:ST <s>_N <b>_R)
+                     ; (<ReaderT r (ST s) a>_R
+                        ->_R Sym (N:ReaderT <*>_N <r>_R <ST s>_R <b>_N))
                 :: Coercible
                      (forall a b. (a -> b) -> ReaderT r (ST s) a -> r -> STRep s b)
                      (forall a b. (a -> b) -> ReaderT r (ST s) a -> ReaderT r (ST s) b))
@@ -91,9 +91,9 @@
         `cast` (forall (a ::~ <*>_N) (b ::~ <*>_N) (c ::~ <*>_N).
                 <a -> b -> c>_R
                 ->_R <ReaderT r (ST s) a>_R
-                ->_R <ReaderT r (ST s) b>_R
-                ->_R <r>_R ->_R Sym (N:ST <s>_N <c>_R)
-                     ; Sym (N:ReaderT <*>_N <r>_R <ST s>_R <c>_N)
+                ->_R <ReaderT r (ST s) b>_R ->_R <r>_R ->_R Sym (N:ST <s>_N <c>_R)
+                     ; (<ReaderT r (ST s) b>_R
+                        ->_R Sym (N:ReaderT <*>_N <r>_R <ST s>_R <c>_N))
                 :: Coercible
                      (forall a b c.
                       (a -> b -> c)
@@ -114,9 +114,9 @@
       $fApplicativeReaderT_$cpure @(ST s) @r $dApplicative
       = ($fApplicativeReaderT5 @s @r)
         `cast` (forall (a ::~ <*>_N).
-                <a>_R
-                ->_R <r>_R ->_R Sym (N:ST <s>_N <a>_R)
-                     ; Sym (N:ReaderT <*>_N <r>_R <ST s>_R <a>_N)
+                Sym (<a>_R
+                     ->_R N:ReaderT <*>_N <r>_R <ST s>_R <a>_N
+                          ; (<r>_R ->_R N:ST <s>_N <a>_R))
                 :: Coercible
                      (forall a. a -> r -> STRep s a)
                      (forall a. a -> ReaderT r (ST s) a))
@@ -125,9 +125,9 @@
       $fMonadReaderT_$creturn @(ST s) @r $dMonad
       = ($fApplicativeReaderT5 @s @r)
         `cast` (forall (a ::~ <*>_N).
-                <a>_R
-                ->_R <r>_R ->_R Sym (N:ST <s>_N <a>_R)
-                     ; Sym (N:ReaderT <*>_N <r>_R <ST s>_R <a>_N)
+                Sym (<a>_R
+                     ->_R N:ReaderT <*>_N <r>_R <ST s>_R <a>_N
+                          ; (<r>_R ->_R N:ST <s>_N <a>_R))
                 :: Coercible
                      (forall a. a -> r -> STRep s a)
                      (forall a. a -> ReaderT r (ST s) a))
@@ -148,9 +148,9 @@
            ($dMonadAbstractIOST :: MonadAbstractIOST (ReaderT Int (ST s))).
       useAbstractMonad @(ReaderT Int (ST s)) $dMonadAbstractIOST
       = (useAbstractMonad1 @s)
-        `cast` (<Int>_R
-                ->_R <Int>_R ->_R Sym (N:ST <s>_N <Int>_R)
-                     ; Sym (N:ReaderT <*>_N <Int>_R <ST s>_R <Int>_N)
+        `cast` (Sym (<Int>_R
+                     ->_R N:ReaderT <*>_N <Int>_R <ST s>_R <Int>_N
+                          ; (<Int>_R ->_R N:ST <s>_N <Int>_R))
                 :: Coercible
                      (Int -> Int -> STRep s Int) (Int -> ReaderT Int (ST s) Int))
 

@@ -15,7 +15,7 @@ module GHC.Core.Opt.Simplify.Env (
         SimplPhase(..), isActive,
         seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
-        seOptCoercionOpts, sePhase, sePlatform, sePreInline,
+        sePhase, sePlatform, sePreInline,
         seRuleOpts, seRules, seUnfoldingOpts,
         mkSimplEnv, extendIdSubst, extendCvIdSubst,
         extendTvSubst, extendCvSubst,
@@ -54,7 +54,6 @@ module GHC.Core.Opt.Simplify.Env (
 
 import GHC.Prelude
 
-import GHC.Core.Coercion.Opt ( OptCoercionOpts )
 import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Core.Opt.Arity ( ArityOpts(..) )
 import GHC.Core.Opt.Simplify.Monad
@@ -161,15 +160,16 @@ following table:
 
 Note [Inline depth]
 ~~~~~~~~~~~~~~~~~~~
+The seInlineDepth tells us how deep in inlining we are.
+
 When we inline an /already-simplified/ unfolding, we
 * Zap the substitution environment; the inlined thing is an OutExpr
 * Bump the seInlineDepth in the SimplEnv
 Both these tasks are done in zapSubstEnv.
 
-The seInlineDepth tells us how deep in inlining we are.  Currently,
-seInlineDepth is used for just one purpose: when we encounter a
-coercion we don't apply optCoercion to it if seInlineDepth>0.
-Reason: it has already been optimised once, no point in doing so again.
+Currently, `seInlineDepth` is entirely unused! (It was previously used to avoid
+repeatedly optimising coercions.)  But it's cheap to maintain and might prove
+useful, so I have no removed it.
 -}
 
 data SimplEnv
@@ -249,9 +249,6 @@ seInline env = sm_inline (seMode env)
 seNames :: SimplEnv -> [String]
 seNames env = sm_names (seMode env)
 
-seOptCoercionOpts :: SimplEnv -> OptCoercionOpts
-seOptCoercionOpts env = sm_co_opt_opts (seMode env)
-
 sePhase :: SimplEnv -> SimplPhase
 sePhase env = sm_phase (seMode env)
 
@@ -287,7 +284,6 @@ data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
   , sm_rule_opts :: !RuleOpts
   , sm_case_folding :: !Bool
   , sm_case_merge :: !Bool
-  , sm_co_opt_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
   }
 
 -- | See Note [SimplPhase]

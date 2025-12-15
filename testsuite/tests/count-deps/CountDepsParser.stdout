@@ -14,7 +14,6 @@ GHC.Core
 GHC.Core.Class
 GHC.Core.Coercion
 GHC.Core.Coercion.Axiom
-GHC.Core.Coercion.Opt
 GHC.Core.ConLike
 GHC.Core.DataCon
 GHC.Core.FVs

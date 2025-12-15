@@ -52,6 +52,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoSpecialising
   | CoreDoSpecConstr
   | CoreCSE
+  | CoreOptCoercion  -- Run the coercion optimiser
   | CoreDoRuleCheck CompilerPhase String  -- Check for non-application of rules
                                        -- matching this string
   | CoreDoNothing                -- Useful when building up
@@ -81,6 +82,7 @@ instance Outputable CoreToDo where
   ppr CoreDoSpecialising       = text "Specialise"
   ppr CoreDoSpecConstr         = text "SpecConstr"
   ppr CoreCSE                  = text "Common sub-expression"
+  ppr CoreOptCoercion          = text "Optimise coercions"
   ppr CoreDesugar              = text "Desugar (before optimization)"
   ppr CoreDesugarOpt           = text "Desugar (after optimization)"
   ppr CoreTidy                 = text "Tidy Core"
