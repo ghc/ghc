@@ -77,6 +77,7 @@ initEndPassConfig dflags extra_vars name_ppr_ctx pass = EndPassConfig
 coreDumpFlag :: CoreToDo -> Maybe DumpFlag
 coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core
 coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_verbose_core2core
+coreDumpFlag (CoreOptCoercion {})     = Just Opt_D_verbose_core2core
 coreDumpFlag CoreDoFloatInwards       = Just Opt_D_dump_float_in
 coreDumpFlag (CoreDoFloatOutwards {}) = Just Opt_D_dump_float_out
 coreDumpFlag CoreLiberateCase         = Just Opt_D_dump_liberate_case

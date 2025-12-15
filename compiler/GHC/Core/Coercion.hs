@@ -64,7 +64,8 @@ module GHC.Core.Coercion (
 
         isReflKindCo,isReflKindMCo,
         isReflCo, isReflCo_maybe,
-        isReflexiveMCo, isReflexiveCo, isReflexiveCo_maybe,
+        isReflexiveMCo, isReflexiveCo,
+        isReflexiveCoIgnoringMultiplicity,
         isReflCoVar_maybe, mkGReflLeftMCo, mkGReflRightMCo,
         mkCoherenceRightMCo,
 
@@ -660,7 +661,9 @@ isReflCoVar_maybe cv
 -- See Note [KindCoercion] in GHC.Core.TyCo.Rep
 isKindCo :: Coercion -> Bool
 isKindCo co
-  = role == Nominal && isLiftedTypeKind kk1 && isLiftedTypeKind kk2
+  = role == Nominal
+    && definitelyLiftedType kk1
+    && definitelyLiftedType kk2
   where
     (Pair kk1 kk2, role) = coercionKindRole co
 
@@ -674,8 +677,14 @@ isKindCo co
 --    so we return True
 -- See Note [KindCoercion] in GHC.Core.TyCo.Rep
 isReflKindCo :: HasDebugCallStack => KindCoercion -> Bool
-isReflKindCo co@(GRefl {}) = assertPpr (isKindCo co) (ppr co) $
+isReflKindCo co@(GRefl {}) = assertPpr (isKindCo co) (ppr co $$ ppr kk1 $$ ppr kk2
+                                                   $$ ppr (isLiftedTypeKind kk1)
+                                                   $$ ppr (isLiftedTypeKind kk2)
+                                                   $$ ppr (role == Nominal)
+                                                   $$ ppr (isKindCo  co))
                              True
+  where
+    (Pair kk1 kk2, role) = coercionKindRole co
 isReflKindCo (Refl{})      = True -- Refl ty == GRefl N ty MRefl
 isReflKindCo _             = False
 
@@ -695,7 +704,7 @@ isReflCo _ = False
 
 -- | Returns the type coerced if this coercion is reflexive. Guaranteed
 -- to work very quickly. Sometimes a coercion can be reflexive, but not
--- obviously so. c.f. 'isReflexiveCo_maybe'
+-- obviously so.
 isReflCo_maybe :: Coercion -> Maybe (Type, Role)
 isReflCo_maybe (Refl ty) = Just (ty, Nominal)
 isReflCo_maybe (GRefl r ty mco) | isReflKindMCo mco = Just (ty, r)
@@ -704,23 +713,25 @@ isReflCo_maybe _ = Nothing
 -- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
 -- as it walks over the entire coercion.
 isReflexiveCo :: Coercion -> Bool
-isReflexiveCo = isJust . isReflexiveCo_maybe
+isReflexiveCo co
+  = case co of
+      Refl {}       -> True
+      GRefl _ _ mco -> isReflKindMCo mco
+      SymCo co      -> isReflexiveCo co
+      _             -> coercionLKind co `eqType` coercionRKind co
+
+-- | Just like isReflexiveCo but ignores multiplicity
+isReflexiveCoIgnoringMultiplicity :: Coercion -> Bool
+isReflexiveCoIgnoringMultiplicity co
+  = case co of
+      Refl {}       -> True
+      GRefl _ _ mco -> isReflKindMCo mco
+      SymCo co      -> isReflexiveCoIgnoringMultiplicity co
+      _             -> coercionLKind co `eqTypeIgnoringMultiplicity` coercionRKind co
 
 isReflexiveMCo :: MCoercion -> Bool
 isReflexiveMCo MRefl    = True
 isReflexiveMCo (MCo co) = isReflexiveCo co
-
--- | Extracts the coerced type from a reflexive coercion. This potentially
--- walks over the entire coercion, so avoid doing this in a loop.
-isReflexiveCo_maybe :: Coercion -> Maybe (Type, Role)
-isReflexiveCo_maybe (Refl ty) = Just (ty, Nominal)
-isReflexiveCo_maybe (GRefl r ty mco) | isReflKindMCo mco = Just (ty, r)
-isReflexiveCo_maybe co
-  | ty1 `eqType` ty2
-  = Just (ty1, r)
-  | otherwise
-  = Nothing
-  where (Pair ty1 ty2, r) = coercionKindRole co
 
 forAllCoKindCo :: TyCoVar -> KindMCoercion -> KindCoercion
 -- Get the kind coercion from a ForAllCo
@@ -2030,7 +2041,7 @@ This follows the lifting context extension definition in the
 -- ----------------------------------------------------
 
 data LiftingContext = LC Subst LiftCoEnv
-  -- in optCoercion, we need to lift when optimizing InstCo.
+  -- In optCoercion, we need to lift when optimizing InstCo.
   -- See Note [Optimising InstCo] in GHC.Core.Coercion.Opt
   -- We thus propagate the substitution from GHC.Core.Coercion.Opt here.
 

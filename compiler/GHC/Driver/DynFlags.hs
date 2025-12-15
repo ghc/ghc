@@ -6,7 +6,7 @@ module GHC.Driver.DynFlags (
         Language(..),
         FatalMessager, FlushOut(..),
         ProfAuto(..),
-        hasPprDebug, hasNoDebugOutput, hasNoStateHack, hasNoOptCoercion,
+        hasPprDebug, hasNoDebugOutput, hasNoStateHack,
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset,
         wopt, wopt_set, wopt_unset,
@@ -994,9 +994,6 @@ hasNoDebugOutput = dopt Opt_D_no_debug_output
 hasNoStateHack :: DynFlags -> Bool
 hasNoStateHack = gopt Opt_G_NoStateHack
 
-hasNoOptCoercion :: DynFlags -> Bool
-hasNoOptCoercion = gopt Opt_G_NoOptCoercion
-
 -- | Test whether a 'DumpFlag' is set
 dopt :: DumpFlag -> DynFlags -> Bool
 dopt = getDumpFlagFrom verbosity dumpFlags
@@ -1236,6 +1233,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_DoCleverArgEtaExpansion) -- See Note [Eta expansion of arguments in CorePrep]
     , ([0,1,2], Opt_DoEtaReduction)          -- See Note [Eta-reduction in -O0]
     , ([0,1,2], Opt_ProfManualCcs )
+    , ([0,1,2], Opt_OptCoercion )    -- See Note [Coercion optimisation] in GHC.Core.Coercion.Opt
     , ([2], Opt_DictsStrict)
 
     , ([0],     Opt_IgnoreInterfacePragmas)

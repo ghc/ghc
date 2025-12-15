@@ -852,17 +852,17 @@ bound on the LHS:
   Now, if that binding is inlined, so that a=b=Int, we'd get
     RULE forall (c :: Int~Int). f (x |> c) = e
   and now when we simplify the LHS (GHC.Core.Opt.Simplify.Iteration.simplRules),
-  optCoercion (look at the CoVarCo case) will turn that 'c' into Refl:
+  the Simplifier will turn that 'c' into Refl:
     RULE forall (c :: Int~Int). f (x |> <Int>) = e
   and then perhaps drop it altogether.  Now 'c' is unbound.
+  (See the use of isReflexiveCo in GHC.Core.Opt.Simplify.Iteration.)
 
-  It's tricky to be sure this never happens, so instead I
-  say it's OK to have an unbound coercion binder in a RULE
-  provided its type is (c :: t~t).  Then, when the RULE
-  fires we can substitute <t> for c.
+  It's tricky to be sure this never happens, so instead I say it's OK
+  to have an unbound coercion binder in a RULE provided its type is (c
+  :: t~t).  Then, when the RULE fires we can substitute <t> for c.
 
-  This actually happened (in a RULE for a local function)
-  in #13410, and also in test T10602.
+  This actually happened (in a RULE for a local function) in #13410,
+  and also in test T10602.
 
 Note [Cloning the template binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
