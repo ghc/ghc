@@ -174,8 +174,9 @@ optCoercion :: OptCoercionOpts -> Subst -> Coercion -> NormalCo
 --   *and* optimises it to reduce its size
 optCoercion opts env co
 -- Experiment with no optCoercion at all
-  | False -- optCoercionEnabled opts
-  = optCoercion' env co
+  | optCoercionEnabled opts
+  = if False then optCoercion' env co
+             else substCo env co
 
 {-
   = pprTrace "optCoercion {" (text "Co:" <> ppr co) $
