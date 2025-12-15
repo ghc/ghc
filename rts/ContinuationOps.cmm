@@ -36,7 +36,7 @@ import CLOSURE ghc_hs_iface;
    -------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_PROMPT_TAG,0,0,PRIM,"PROMPT_TAG","PROMPT_TAG")
-{ foreign "C" barf("PROMPT_TAG object (%p) entered!", R1) never returns; }
+{ ccall pbarf("PROMPT_TAG object (%p) entered!", R1 "ptr") never returns; }
 
 stg_newPromptTagzh()
 {

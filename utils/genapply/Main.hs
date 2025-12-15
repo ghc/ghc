@@ -79,7 +79,7 @@ in a conditional. For example, stg_stk_save_v32 looks like:
         V32_[Sp+WDS(3)] = YMM1;
         ...
         #else
-        foreign "C" barf("stg_stk_save_v32: unsupported vector register", NULL) never returns;
+        ccall sbarf("stg_stk_save_v32: unsupported vector register") never returns;
         #endif
     }
 
@@ -344,7 +344,7 @@ vecsCpp fun regs code =
          , text "#if" <+> cond ]
          ++ code
          ++ [ text "#else //" <+> cond
-            , text "foreign \"C\" barf(\"" <> fun <> text ": unsupported vector register\", NULL) never returns;"
+            , text "ccall sbarf(\"" <> fun <> text ": unsupported vector register\") never returns;"
             , text "#endif //" <+> cond
             ]
 
@@ -1049,7 +1049,7 @@ genApply targetInfo args =
 
        text "default: {",
        nest 4 (
-         text "foreign \"C\" barf(\"" <> fun_ret_label <> text "\", NULL) never returns;"
+         text "ccall sbarf(\"" <> fun_ret_label <> text "\") never returns;"
        ),
        text "}"
 

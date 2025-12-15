@@ -866,7 +866,7 @@ link_caf node = do
   ; let profile  = stgToCmmProfile cfg
   ; let platform = profilePlatform profile
   ; bh <- newTemp (bWord platform)
-  ; emitRtsCallGen [(bh,AddrHint)] newCAF_lbl
+  ; emitRtsCallGen [(bh,AddrHint)] newCAF_lbl CmmMayReturn
       [ (baseExpr platform,  AddrHint),
         (CmmReg (CmmLocal node), AddrHint) ]
       False

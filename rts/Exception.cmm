@@ -666,11 +666,11 @@ stg_raiseOverflowzh ()
  */
 stg_paniczh (W_ str)
 {
-    ccall barf(str, NULL) never returns;
+    ccall sbarf(str "ptr") never returns;
 }
 
 // See Note [Compiler error functions] in GHC.Prim.Panic
 stg_absentErrorzh (W_ str)
 {
-    ccall barf("Oops!  Entered absent arg %s", str) never returns;
+    ccall ssbarf("Oops!  Entered absent arg %s", str "ptr") never returns;
 }

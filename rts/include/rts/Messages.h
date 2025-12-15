@@ -37,6 +37,18 @@ void barf(const char *s, ...)
 void vbarf(const char *s, va_list ap)
    STG_NORETURN;
 
+/* Non-variadic wrapper around barf(), used by the code generator. */
+void sbarf(const char *s)
+   STG_NORETURN;
+
+/* Non-variadic wrapper around barf() for a format string and one pointer. */
+void pbarf(const char *fmt, void *p)
+   STG_NORETURN;
+
+/* Non-variadic wrapper around barf() for a format string and one string. */
+void ssbarf(const char *fmt, const char *s)
+   STG_NORETURN;
+
 // declared in Rts.h:
 // extern void _assertFail(const char *filename, unsigned int linenum)
 //    STG_NORETURN;

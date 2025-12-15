@@ -59,6 +59,24 @@ vbarf(const char*s, va_list ap)
 }
 
 void
+sbarf(const char*s)
+{
+  barf("%s", s);
+}
+
+void
+pbarf(const char*fmt, void *p)
+{
+  barf(fmt, p);
+}
+
+void
+ssbarf(const char *fmt, const char *s)
+{
+  barf(fmt, s);
+}
+
+void
 _assertFail(const char*filename, unsigned int linenum)
 {
     barf("ASSERTION FAILED: file %s, line %u\n", filename, linenum);
