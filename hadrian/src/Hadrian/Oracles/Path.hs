@@ -45,7 +45,7 @@ type instance RuleResult WindowsPath = String
 pathOracle :: Rules ()
 pathOracle = do
     void $ addOracleCache $ \(WindowsPath path) -> do
-        Stdout out <- quietly $ cmd ["cygpath", "-m", path]
+        Stdout out <- quietly $ cmd ["cygpath" <.> exe, "-m", path]
         let windowsPath = unifyPath $ dropWhileEnd isSpace out
         putVerbose $ "| Windows path mapping: " ++ path ++ " => " ++ windowsPath
         return windowsPath
