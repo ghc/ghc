@@ -1031,7 +1031,7 @@ export_cs : export {% return (unitOL $1) }
    -- They are built in syntax, always available
 export  :: { LIE GhcPs }
         : maybe_warning_pragma qcname_ext export_subspec {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
-                                                          ; impExp <- mkModuleImpExp $1 (fst $ unLoc $3) $2 (snd $ unLoc $3)
+                                                          ; impExp <- mkModuleExp $1 (fst $ unLoc $3) $2 (snd $ unLoc $3)
                                                           ; return $ reLoc $ sL span $ impExp } }
         | maybe_warning_pragma 'module' modid            {% do { let { span = (maybe comb2 comb3 $1) $2 $>
                                                                      ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
@@ -1191,10 +1191,7 @@ maybeas :: { (Maybe (EpToken "as"),Located (Maybe (LocatedA ModuleName))) }
         | {- empty -}                          { (Nothing,noLoc Nothing) }
 
 maybeimpspec :: { Located (Maybe (ImportListInterpretation, LocatedLI [LIE GhcPs])) }
-        : impspec                  {% let (b, ie) = unLoc $1 in
-                                       checkImportSpec ie
-                                        >>= \checkedIe ->
-                                          return (L (gl $1) (Just (b, checkedIe)))  }
+        : impspec                  { fmap Just $1 }
         | {- empty -}              { noLoc Nothing }
 
 impspec :: { Located (ImportListInterpretation, LocatedLI [LIE GhcPs]) }
@@ -1228,7 +1225,7 @@ importlist1 :: { OrdList (LIE GhcPs) }
         | import          { $1 }
 
 import  :: { OrdList (LIE GhcPs) }
-        : qcname_ext export_subspec {% fmap (unitOL . reLoc . (sLL $1 $>)) $ mkModuleImpExp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
+        : qcname_ext export_subspec {% fmap (unitOL . reLoc . (sLL $1 $>)) $ mkModuleImp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
         | 'module' modid            {% fmap (unitOL . reLoc) $ return (sLL $1 $> (IEModuleContents (Nothing, (epTok $1)) $2)) }
         | 'pattern' qcon            {% do { warnPatternNamespaceSpecifier (getLoc $1)
                                           ; return $ unitOL $ reLoc $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (epTok $1) $2)) Nothing } }
