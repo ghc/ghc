@@ -1,0 +1,3 @@
+:set -XGADTs
+:l T23146_liftedeq
+main
