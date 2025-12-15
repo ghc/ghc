@@ -1,0 +1,18 @@
+section: compiler
+synopsis: Substantially reduce coercion optimisation
+issues: #26679
+mrs: !15175
+
+description: {
+The coercion optimiser can gobble up a lot of compile time when there
+are lots of coercions.  Its goal is to shrink coercions in order to reduce
+compile time, so it's bad that it sometimes increases it.
+
+This change introduces a simpler and faster coercion optimser, called
+`optCoRefl`, which is used frequently, relegating the big-hammer coercion
+optimiser to a separate pass of its own.
+
+A new flag `-fopt-refl-coercion` (on by default) controls the new `optCoRefl`
+optimiser.
+}
+

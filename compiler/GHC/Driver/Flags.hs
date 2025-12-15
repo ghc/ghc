@@ -533,6 +533,8 @@ data DumpFlag
    | Opt_D_dump_faststrings
    | Opt_D_faststring_stats
    | Opt_D_ipe_stats
+   | Opt_D_opt_co     -- Check the coercion optimisations,
+                      -- and report ones that reduce size
    deriving (Eq, Show, Enum)
 
 -- | Helper function to query whether a given `DumpFlag` is enabled or not.
@@ -642,6 +644,8 @@ data GeneralFlag
    | Opt_InlineGenerics
    | Opt_InlineGenericsAggressively
    | Opt_StaticArgumentTransformation
+   | Opt_OptCoercion            -- Run the big-hammer coercion optimiser `optCoercion`
+   | Opt_OptReflCoercion        -- Use the cheap "refl" coercion optimiser `optCoRefl`
    | Opt_CSE
    | Opt_StgCSE
    | Opt_StgLiftLams
@@ -890,7 +894,6 @@ data GeneralFlag
    | Opt_PluginTrustworthy
 
    | Opt_G_NoStateHack
-   | Opt_G_NoOptCoercion
    deriving (Eq, Show, Enum)
 
 -- | The set of flags which affect optimisation for the purposes of
@@ -913,6 +916,8 @@ optimisationFlags = EnumSet.fromList
    , Opt_CrossModuleSpecialise
    , Opt_StaticArgumentTransformation
    , Opt_PolymorphicSpecialisation
+   , Opt_OptCoercion
+   , Opt_OptReflCoercion
    , Opt_CSE
    , Opt_StgCSE
    , Opt_StgLiftLams

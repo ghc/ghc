@@ -34,6 +34,7 @@ module GHC.Core.FVs (
         rulesFreeVarsDSet, mkRuleInfo,
         ruleLhsFreeIds, ruleLhsFreeIdsList,
         ruleRhsFreeVars, rulesRhsFreeIds,
+        rulesFVs, RuleFVsFrom(..),
 
         exprFVs, addCoreBndrFV, addCoreBndrsFV, unitFV,
 
@@ -339,7 +340,6 @@ stableUnfoldingFVs unf
          -> Just (addCoreBndrsFV bndrs (exprsFVs args))
             -- DFuns are top level, so no fvs from types of bndrs
       _other -> Nothing
-
 
 --      Comment about obsolete code
 -- We used to gather the free variables the RULES at a variable occurrence

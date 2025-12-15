@@ -287,9 +287,9 @@ Here is another reason that we do not use SUBSTITUTE for
 all trivial expressions. Consider
    case x |> co of (y::Array# Int) { ... }
 
-We do not want to extend the substitution with (y -> x |> co); since y
-is of unlifted type, this would destroy the let-can-float invariant if
-(x |> co) was not ok-for-speculation.
+We do not want to extend the substitution with (y -> x |> co); since y is of
+unlifted type, this would destroy Note [Nested non-rec binding invariants]
+if (x |> co) was not ok-for-speculation.
 
 But surely (x |> co) is ok-for-speculation, because it's a trivial
 expression, and x's type is also unlifted, presumably.  Well, maybe
@@ -450,7 +450,7 @@ cse_bind toplevel env_rhs env_body (in_id, in_rhs) out_id
   | otherwise
   = (env_body', (out_id'', out_rhs))
   where
-    (env_body', out_id') = extendCSEnvWithBinding env_body  in_id out_id out_rhs cse_done
+    (env_body', out_id') = extendCSEnvWithBinding env_body in_id out_id out_rhs cse_done
     (cse_done, out_rhs)  = try_for_cse env_rhs in_rhs
     out_id'' | cse_done  = zapStableUnfolding $
                            delayInlining toplevel out_id'

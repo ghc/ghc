@@ -26,11 +26,10 @@ import GHC.Core.Make hiding( wrapFloats )
 import qualified GHC.Core.Make
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
 import qualified GHC.Core.Coercion as Coercion
+import GHC.Core.Coercion.Opt( optCoRefl )
 import GHC.Core.Reduction
-import GHC.Core.Coercion.Opt    ( optCoercion )
 import GHC.Core.Type hiding ( substCo, substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.TyCo.Compare( eqType )
-import GHC.Core.TyCo.Subst( isEmptyTvSubst )
 import GHC.Core.FamInstEnv      ( FamInstEnv, topNormaliseType_maybe )
 import GHC.Core.DataCon
 import GHC.Core.Ppr     ( pprCoreExpr )
@@ -261,11 +260,11 @@ simplRecBind env0 bind_cxt pairs0
         = do { (env', bndr') <- addBndrRules env bndr (lookupRecBndr env bndr) bind_cxt
              ; return (env', (bndr, bndr', rhs)) }
 
+    go :: SimplEnv -> [(InId, OutId, InExpr)] -> SimplM (SimplFloats, SimplEnv)
     go env [] = return (emptyFloats env, env)
 
     go env ((old_bndr, new_bndr, rhs) : pairs)
-        = do { (float, env1) <- simplRecOrTopPair env bind_cxt
-                                                  old_bndr new_bndr rhs
+        = do { (float, env1) <- simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
              ; (floats, env2) <- go env1 pairs
              ; return (float `addFloats` floats, env2) }
 
@@ -301,6 +300,7 @@ simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
                                              (old_bndr,env) (new_bndr,env) (rhs,env)
 
 simplTrace :: String -> SDoc -> SimplM a -> SimplM a
+-- Spit out a trace with `-dverbose-core2core`
 simplTrace herald doc thing_inside = do
   logger <- getLogger
   if logHasDumpFlag logger Opt_D_verbose_core2core
@@ -316,7 +316,7 @@ simplLazyBind :: TopLevelFlag -> RecFlag
               -> (InExpr, SimplEnv)     -- The RHS and its static environment
               -> SimplM (SimplFloats, SimplEnv)
 -- Precondition: Ids only, no TyVars; not a JoinId
--- Precondition: rhs obeys the let-can-float invariant
+-- Precondition: rhs obeys Note [Nested non-rec binding invariants]
 simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
   = assert (isId bndr )
     assertPpr (not (isJoinId bndr)) (ppr bndr) $
@@ -397,7 +397,7 @@ simplAuxBind :: (SimplAltFlag, SimplEnv)
 -- The binder comes from a case expression (case binder or alternative)
 -- and so does not have rules, unfolding, inline pragmas etc.
 --
--- Precondition: rhs satisfies the let-can-float invariant
+-- Precondition: rhs satisfies Note [Nested non-rec binding invariants]
 
 simplAuxBind (saf,env) bndr new_rhs
   | assertPpr (isId bndr && not (isJoinId bndr)) (ppr bndr) $
@@ -628,15 +628,20 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
               work_id   = mkLocalIdWithInfo work_name ManyTy work_ty work_info
               is_strict = isStrictId bndr
 
+        ; (co_floats, co') <- makeCoTrivial co
+
         ; (rhs_floats, work_rhs) <- prepareBinding env top_lvl is_rec is_strict
                                                    work_id (emptyFloats env) rhs
 
         ; work_unf <- mk_worker_unfolding top_lvl work_id work_rhs
-        ; let  work_id_w_unf = work_id `setIdUnfolding` work_unf
-               floats   = rhs_floats `addLetFloats`
-                          unitLetFloat (NonRec work_id_w_unf work_rhs)
 
-               triv_rhs = Cast (Var work_id_w_unf) co
+        ; let  work_id_w_unf = work_id `setIdUnfolding` work_unf
+               work_float = unitLetFloat (NonRec work_id_w_unf work_rhs)
+
+               floats = rhs_floats `addLetFloats`
+                        (co_floats `addLetFlts` work_float)
+
+               triv_rhs = Cast (Var work_id_w_unf) co'
 
         ; if postInlineUnconditionally env bind_cxt old_bndr bndr triv_rhs
              -- Almost always True, because the RHS is trivial
@@ -784,13 +789,13 @@ prepareRhs :: HasDebugCallStack
 --            x = Just a
 -- See Note [prepareRhs]
 prepareRhs env top_lvl occ rhs0
-  | is_expandable = anfise rhs0
+  | is_expandable = do { (flts,rhs) <- anfise rhs0
+                       ; return (flts, rhs) }
   | otherwise     = return (emptyLetFloats, rhs0)
   where
-    -- We can't use exprIsExpandable because the WHOLE POINT is that
-    -- we want to treat (K <big>) as expandable, because we are just
-    -- about "anfise" the <big> expression.  exprIsExpandable would
-    -- just say no!
+    -- We can't use exprIsExpandable because the WHOLE POINT is that we want to
+    -- treat (K <big>) as expandable, because we are just about "anfise" the
+    -- <big> expression.  exprIsExpandable would just say no!
     is_expandable = go rhs0 0
        where
          go (Var fun) n_val_args       = isExpandableApp fun n_val_args
@@ -803,8 +808,9 @@ prepareRhs env top_lvl occ rhs0
 
     anfise :: OutExpr -> SimplM (LetFloats, OutExpr)
     anfise (Cast rhs co)
-        = do { (floats, rhs') <- anfise rhs
-             ; return (floats, Cast rhs' co) }
+        = do { (floats1, rhs') <- anfise rhs
+             ; (floats2, co')  <- makeCoTrivial co
+             ; return (floats1 `addLetFlts` floats2, Cast rhs' co') }
     anfise (App fun (Type ty))
         = do { (floats, rhs') <- anfise fun
              ; return (floats, App rhs' (Type ty)) }
@@ -850,13 +856,23 @@ makeTrivial :: HasDebugCallStack
 -- For the Demand argument, see Note [Keeping demand info in StrictArg Plan A]
 makeTrivial env top_lvl dmd occ_fs expr
   | exprIsTrivial expr                          -- Already trivial
-  || not (bindingOk top_lvl expr expr_ty)       -- Cannot trivialise
-                                                --   See Note [Cannot trivialise]
-  = return (emptyLetFloats, expr)
+  = simplTrace "makeTrivial:triv" (ppr expr) $
+    return (emptyLetFloats, expr)
+
+  | not (bindingOk top_lvl expr expr_ty)       -- Cannot trivialise
+                                               --   See Note [Cannot trivialise]
+  = simplTrace "makeTrivial:cannot" (ppr expr) $
+    return (emptyLetFloats, expr)
 
   | Cast expr' co <- expr
-  = do { (floats, triv_expr) <- makeTrivial env top_lvl dmd occ_fs expr'
-       ; return (floats, Cast triv_expr co) }
+  = do { (floats1, triv_co)   <- makeCoTrivial co
+       ; (floats2, triv_expr) <- makeTrivial env top_lvl dmd occ_fs expr'
+       ; simplTrace "makeTrivial:co" (ppr (Cast triv_expr triv_co)) $
+         return (floats1 `addLetFlts` floats2, Cast triv_expr triv_co) }
+
+  | Coercion co <- expr
+  = do { (floats, triv_co) <- makeCoTrivial co
+       ; return (floats, Coercion triv_co) }
 
   | otherwise -- 'expr' is not of form (Cast e co)
   = do  { (floats, expr1) <- prepareRhs env top_lvl occ_fs expr
@@ -881,6 +897,17 @@ makeTrivial env top_lvl dmd occ_fs expr
   where
     id_info = vanillaIdInfo `setDemandInfo` dmd
     expr_ty = exprType expr
+
+makeCoTrivial :: OutCoercion -> SimplM (LetFloats, OutCoercion)
+makeCoTrivial co
+  | coercionIsSmall co
+  = return (emptyLetFloats, co)
+  | otherwise
+  = do { co_uniq <- getUniqueM
+       ; let co_name = mkSystemVarName co_uniq (fsLit "aco")
+             co_var = mkLocalCoVar co_name (coercionType co)
+       ; return ( unitLetFloat (NonRec co_var (Coercion co))
+                , mkCoVarCo co_var ) }
 
 bindingOk :: TopLevelFlag -> CoreExpr -> Type -> Bool
 -- True iff we can have a binding of this expression at this level
@@ -953,14 +980,18 @@ completeBind :: BindContext
 --      * or by adding to the floats in the envt
 --
 -- Binder /can/ be a JoinId
--- Precondition: rhs obeys the let-can-float invariant
+-- Precondition: rhs obeys Note [Nested non-rec binding invariants]
 completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
- | isCoVar old_bndr
- = case new_rhs of
-     Coercion co -> return (emptyFloats env, extendCvSubst env old_bndr co)
-     _           -> return (mkFloatBind env (NonRec new_bndr new_rhs))
+  | isCoVar old_bndr
+  = case new_rhs of
+     Coercion co   -- Inline if it is trivial
+       | postInlineUnconditionally env bind_cxt old_bndr new_bndr new_rhs
+       -> return (emptyFloats env, extendCvSubst env old_bndr co)
+     _otherwise -> -- Can't inline anything other than a Coercion inside a coercion
+                   -- So retain the binding insteadd
+                   return (mkFloatBind env (NonRec new_bndr new_rhs))
 
- | otherwise
+ | otherwise  -- Non-CoVars
  = assert (isId new_bndr) $
    do { let old_info = idInfo old_bndr
             old_unf  = realUnfoldingInfo old_info
@@ -987,8 +1018,8 @@ completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
                    return ( emptyFloats env
                           , extendIdSubst env old_bndr $
                             DoneEx unf_rhs (idJoinPointHood new_bndr)) }
-                -- Use the substitution to make quite, quite sure that the
-                -- substitution will happen, since we are going to discard the binding
+                        -- Use the substitution to make quite, quite sure that the
+                        -- substitution will happen, since we are going to discard the binding
 
         else -- Keep the binding; do cast worker/wrapper
 --             simplTrace "completeBind" (vcat [ text "bndrs" <+> ppr old_bndr <+> ppr new_bndr
@@ -1300,9 +1331,9 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
        ; simplExprF (extendTvSubst env bndr ty') body cont }
 
   | Just env' <- preInlineUnconditionally env NotTopLevel bndr (UnSimplified env) rhs MRefl
-    -- Because of the let-can-float invariant, it's ok to
+    -- Because of Note [Nested non-rec binding invariants], it's ok to
     -- inline freely, or to drop the binding if it is dead.
-  = do { simplTrace "SimplBindr:inline-uncond2" (ppr bndr) $
+  = do { simplTrace "SimplBindr:inline-uncond2" (ppr bndr <+> ppr rhs) $
          tick (PreInlineUnconditionally bndr)
        ; simplExprF env' body cont }
 
@@ -1400,6 +1431,24 @@ simplCoercionF env co cont
 
 simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
+  = do { let out_co | sm_opt_refl_co mode
+                    = if isEmptyTCvSubst subst
+                      then co
+                      else optCoRefl chk_opts subst co
+                    | otherwise  -- substCo also has a shortcut
+                                 -- when substitution is empty
+                    = Coercion.substCo subst co
+
+       ; seqCo out_co `seq`
+         return out_co }
+  where
+    mode     = seMode env
+    chk_opts = sm_check_opt_co mode
+    subst    = getTCvSubst env
+
+
+{-    Old code where we did some coercion optimisation
+
   = seqCo opt_co `seq` return opt_co
   where
     -- See Note [Optimising coercions]
@@ -1411,8 +1460,8 @@ simplCoercion env co
     opts  = seOptCoercionOpts env
     subst_only = isEmptyTvSubst subst || reSimplifying env
 
-{- Note [Optimising coercions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Optimising coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Some programs have very big coercions and we'd like to avoid repeatedly
 re-optimising them:
 
@@ -1435,7 +1484,6 @@ re-optimising them:
   risks non-linear behaviour.  See Note [Inline depth] in GHC.Core.Opt.Simplify.Env.
 
   But if the inlining did a type substitution maybe we should re-optimise?
-
 
 -}
 
@@ -1608,15 +1656,15 @@ rebuild_go env expr cont
     case cont of
       Stop {}          -> return (emptyFloats env, expr)
       TickIt t cont    -> rebuild_go env (mkTick t expr) cont
-      CastIt { sc_co = co, sc_opt = opt, sc_cont = cont }
-        | isReflexiveCo co'  -- Worth trying this because casts can
-                             -- get stacked up by simplCast
+      CastIt { sc_co = co, sc_cont = cont }
+        | isReflexiveCoIgnoringMultiplicity co
+          -- isReflexiveCo: see Note [Coercion optimisation]
+          --                in GHc.Core.Coercion.Opt
         -> rebuild_go env expr cont
+
         | otherwise
-        -> rebuild_go env (mkCast expr co') cont
+        -> rebuild_go env (mkCast expr co) cont
            -- NB: mkCast implements the (Coercion co |> g) optimisation
-        where
-          co' = optOutCoercion env co opt
 
       Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont }
         -> rebuildCase (mkAltEnv env se) expr bndr alts cont
@@ -1643,13 +1691,13 @@ rebuild_go env expr cont
 completeBindX :: SimplEnv
               -> FromWhat
               -> InId -> OutExpr   -- Non-recursively bind this Id to this (simplified) expression
-                                   -- (the let-can-float invariant may not be satisfied)
+                                   -- (Note [Nested non-rec binding invariants] may not be satisfied)
               -> InExpr            -- In this body
               -> SimplCont         -- Consumed by this continuation
               -> SimplM (SimplFloats, OutExpr)
 completeBindX env from_what bndr rhs body cont
   | FromBeta arg_levity <- from_what
-  , needsCaseBindingL arg_levity rhs -- Enforcing the let-can-float-invariant
+  , needsCaseBindingL arg_levity rhs -- Enforcing Note [Nested non-rec binding invariants]
   = do { (env1, bndr1)   <- simplNonRecBndr env bndr  -- Lambda binders don't have rules
        ; (floats, expr') <- simplNonRecBody env1 from_what body cont
        -- Do not float floats past the Case binder below
@@ -1719,34 +1767,6 @@ isReflexiveCo
 In investigating this I saw missed opportunities for on-the-fly
 coercion shrinkage. See #15090.
 
-Note [Avoid re-simplifying coercions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In some benchmarks (with deeply nested cases) we successively push
-casts onto the SimplCont.  We don't want to call the coercion optimiser
-on each successive composition -- that's at least quadratic.  So:
-
-* The CastIt constructor in SimplCont has a `sc_opt :: Bool` flag to
-  record whether the coercion optimiser has been applied to the coercion.
-
-* In `simplCast`, when we see (Cast e co), we simplify `co` to get
-  an OutCoercion, and built a CastIt with sc_opt=True.
-
-  Actually not quite: if we are simplifying the result of inlining an
-  unfolding (seInlineDepth > 0), then instead of /optimising/ it again,
-  just /substitute/ which is cheaper.  See `simplCoercion`.
-
-* In `pushCast` if we combine this new coercion with an existing one,
-  we build a CastIt for (co1 ; co2) with sc_opt=False.
-
-* When unpacking a CastIt, in `rebuild`, we optimise the (presumably
-  composed) coercion if sc_opt=False; this is done by `optOutCoercion`.
-
-* When duplicating a continuation in `mkDupableContWithDmds`, before
-  duplicating a CastIt, optimise the coercion. Otherwise we'll end up
-  optimising it separately in the duplicate copies.
-
-* See also Note [The sc_cast field of ApplyToVal].
-
 Note [The sc_cast field of ApplyToVal]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the `ApplyToVal` case of `pushCast` we want to push an `OutCoercion` into the
@@ -1762,43 +1782,30 @@ But we /also/ sometimes want to substitute that argument for a lambda-binder, in
 appropriately when /applying/ the substitution in `simplInId`.
 -}
 
-
-optOutCoercion :: SimplEnvIS -> OutCoercion -> Bool -> OutCoercion
--- See Note [Avoid re-simplifying coercions]
-optOutCoercion env co already_optimised
-  | already_optimised = co  -- See Note [Avoid re-simplifying coercions]
-  | otherwise         = optCoercion opts empty_subst co
-  where
-    empty_subst = mkEmptySubst (seInScope env)
-    opts = seOptCoercionOpts env
-
 addCastMCo :: MOutCoercion -> SimplCont -> SimplCont
 -- Simpler, non-monadic version of pushCastMCo when we are certain that
 -- the cast should be at the top; i.e. cont is Stop or StrictArg
 addCastMCo MRefl    cont = cont
-addCastMCo (MCo co) cont = CastIt { sc_co = co, sc_opt = False, sc_cont = cont }
+addCastMCo (MCo co) cont = CastIt { sc_co = co, sc_cont = cont }
 
 pushCastMCo :: SimplEnv -> MOutCoercion -> SimplCont -> SimplM SimplCont
 pushCastMCo _env MRefl    cont = return cont
 pushCastMCo env  (MCo co) cont = pushCast env co cont
 
 pushCast :: SimplEnv -> OutCoercion -> SimplCont -> SimplM SimplCont
-pushCast env co cont
-  = go co True cont
+pushCast _env co cont
+  = go co cont
   where
-
     -- ToDo:   pushCast Refl (ApplylToVal arg1 (ApplyToVal arg2 ...))
     --         will do lots of unnecessary work.
-    go :: OutCoercion -> Bool -> SimplCont -> SimplM SimplCont
-    go co1 _ (CastIt { sc_co = co2, sc_cont = cont })  -- See Note [Optimising reflexivity]
-      = go (mkTransCo co1 co2) False cont
-                  -- False: (mkTransCo co1 co2) is not fully optimised
-                  -- See Note [Avoid re-simplifying coercions]
+    go :: OutCoercion -> SimplCont -> SimplM SimplCont
+    go co1 (CastIt { sc_co = co2, sc_cont = cont })  -- See Note [Optimising reflexivity]
+      = go (mkTransCo co1 co2) cont
 
-    go co co_is_opt (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
+    go co (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
       | Just (tyL, arg_ty', m_co') <- pushCoTyArg co arg_ty
       = {-#SCC "addCoerce-pushCoTyArg" #-}
-        do { tail' <- go_mco m_co' co_is_opt tail
+        do { tail' <- go_mco m_co' tail
            ; return (ApplyToTy { sc_arg_ty  = arg_ty'
                                , sc_cont    = tail'
                                , sc_hole_ty = tyL }) }
@@ -1809,15 +1816,11 @@ pushCast env co cont
     -- where   co :: (s1->s2) ~ (t1->t2)
     --         co1 :: t1 ~ s1
     --         co2 :: s2 ~ t2
-    go co co_is_opt cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                     , sc_cast = arg_mco, sc_cont = tail })
-      | not co_is_opt
-      = -- pushCoValArg duplicates the coercion, so optimise first
-        go (optOutCoercion (zapSubstEnv env) co co_is_opt) True cont
-
+    go co (ApplyToVal { sc_arg = arg, sc_env = arg_se
+                      , sc_cast = arg_mco, sc_cont = tail })
       | Just (tyL, m_co1, m_co2) <- pushCoValArg co
       = {-#SCC "addCoerce-pushCoValArg" #-}
-        do { tail' <- go_mco m_co2 True tail
+        do { tail' <- go_mco m_co2 tail
              -- Dealing with m_co1 is the entire reason for the sc_cast field
              -- of ApplyToVal; see Note [The sc_cast field of ApplyToVal]
            ; return (ApplyToVal { sc_arg  = arg
@@ -1826,17 +1829,17 @@ pushCast env co cont
                                 , sc_cont = tail'
                                 , sc_hole_ty = tyL }) }
 
-    go co co_is_opt cont
+    go co cont
       | isReflCo co = return cont  -- Having this at the end makes a huge
                                    -- difference in T12227, for some reason
                                    -- See Note [Optimising reflexivity]
-      | otherwise = return (CastIt { sc_co = co, sc_opt = co_is_opt, sc_cont = cont })
+      | otherwise = return (CastIt { sc_co = co, sc_cont = cont })
 
         -- If the first parameter is MRefl, then simplifying revealed a
         -- reflexive coercion. Omit.
-    go_mco :: MOutCoercion -> Bool -> SimplCont -> SimplM SimplCont
-    go_mco MRefl    _   cont = return cont
-    go_mco (MCo co) opt cont = go co opt cont
+    go_mco :: MOutCoercion -> SimplCont -> SimplM SimplCont
+    go_mco MRefl    cont = return cont
+    go_mco (MCo co) cont = go co cont
 
 simplArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
          -> Maybe ArgInfo           -- ^ Just <=> This arg `ai` occurs in an app
@@ -1986,7 +1989,7 @@ simplNonRecE :: HasDebugCallStack
 -- It deals with strict bindings, via the StrictBind continuation,
 -- which may abort the whole process.
 --
--- from_what=FromLet => the RHS satisfies the let-can-float invariant
+-- from_what=FromLet => the RHS satisfies Note [Nested non-rec binding invariants]
 -- Otherwise it may or may not satisfy it.
 
 simplNonRecE env from_what bndr (rhs, rhs_se) body cont
@@ -2008,8 +2011,8 @@ simplNonRecE env from_what bndr (rhs, rhs_se) body cont
   where
     is_strict_bind = case from_what of
        FromBeta Unlifted -> True
-       -- If we are coming from a beta-reduction (FromBeta) we must
-       -- establish the let-can-float invariant, so go via StrictBind
+       -- If we are coming from a beta-reduction (FromBeta) we must establish
+       -- Note [Nested non-rec binding invariants], so go via StrictBind
        -- If not, the invariant holds already, and it's optional.
 
        -- (FromBeta Lifted) or FromLet: look at the demand info
@@ -3032,7 +3035,7 @@ this transformation:
 We treat the unlifted and lifted cases separately:
 
 * Unlifted case: 'e' satisfies exprOkForSpeculation
-  (ok-for-spec is needed to satisfy the let-can-float invariant).
+  (ok-for-spec is needed to satisfy Note [Nested non-rec binding invariants].
   This turns     case a +# b of r -> ...r...
   into           let r = a +# b in ...r...
   and thence     .....(a +# b)....
@@ -3268,7 +3271,7 @@ rebuildCase (saf,env) scrut case_bndr alts cont
       = assert (null bs) $
         do { (floats1, env') <- simplAuxBind (saf,env) case_bndr case_bndr_rhs
                -- scrut is a constructor application,
-               -- hence satisfies let-can-float invariant
+               -- hence satisfies Note [Nested non-rec binding invariants]
            ; (floats2, expr') <- simplExprF env' rhs cont
            ; return (floats1 `addFloats` floats2, expr') }
 
@@ -3338,7 +3341,7 @@ doCaseToLet :: OutExpr          -- Scrutinee
 -- Can we transform thus?   let { b = scrut } in body
 doCaseToLet scrut case_bndr
   | isTyCoVar case_bndr    -- Respect GHC.Core
-  = isTyCoArg scrut        -- Note [Core type and coercion invariant]
+  = isTyCoArg scrut        -- Note [Core type and coercion invariants]
 
   | isUnliftedType (exprType scrut)
     -- We can call isUnliftedType here: scrutinees always have a fixed RuntimeRep (see FRRCase).
@@ -3798,13 +3801,14 @@ We pin on a (OtherCon []) unfolding to the case-binder of a Case,
 even though it'll be over-ridden in every case alternative with a more
 informative unfolding.  Why?  Because suppose a later, less clever, pass
 simply replaces all occurrences of the case binder with the binder itself;
-then Lint may complain about the let-can-float invariant.  Example
+then Lint may complain about failing Note [Nested non-rec binding invariants].
+Example:
     case e of b { DEFAULT -> let v = reallyUnsafePtrEquality# b y in ....
                 ; K       -> blah }
 
-The let-can-float invariant requires that y is evaluated in the call to
-reallyUnsafePtrEquality#, which it is.  But we still want that to be true if we
-propagate binders to occurrences.
+Note [Nested non-rec binding invariants] requires that y is evaluated in the
+call to reallyUnsafePtrEquality#, which it is.  But we still want that to be
+true if we propagate binders to occurrences.
 
 This showed up in #13027.
 
@@ -3948,9 +3952,9 @@ knownCon env scrut dc dc_args case_bndr alt_bndrs rhs cont
       = assert (isTyVar b )
         bind_args (extendTvSubst env' b ty) bs' args
 
-    bind_args env' (b:bs') (Coercion co : args)
-      = assert (isCoVar b )
-        bind_args (extendCvSubst env' b co) bs' args
+--    bind_args env' (b:bs') (Coercion co : args)
+--      = assert (isCoVar b )
+--        bind_args (extendCvSubst env' b co) bs' args
 
     bind_args env' (b:bs') (arg : args)
       = assert (isId b) $
@@ -3959,8 +3963,8 @@ knownCon env scrut dc dc_args case_bndr alt_bndrs rhs cont
              -- occur in the RHS; and simplAuxBind may therefore discard it.
              -- Nevertheless we must keep it if the case-binder is alive,
              -- because it may be used in the con_app.  See Note [knownCon occ info]
+             -- NB: arg satisfies Note [Nested non-rec binding invariants]
            ; (floats1, env2) <- simplAuxBind (SAF_In,env') b' arg
-                                -- arg satisfies let-can-float invariant
            ; (floats2, env3) <- bind_args env2 bs' args
            ; return (floats1 `addFloats` floats2, env3) }
 
@@ -4092,11 +4096,9 @@ mkDupableContWithDmds env _ cont
 
 mkDupableContWithDmds _ _ (Stop {}) = panic "mkDupableCont"     -- Handled by previous eqn
 
-mkDupableContWithDmds env dmds (CastIt { sc_co = co, sc_opt = opt, sc_cont = cont })
+mkDupableContWithDmds env dmds (CastIt { sc_co = co, sc_cont = cont })
   = do  { (floats, cont') <- mkDupableContWithDmds env dmds cont
-        ; return (floats, CastIt { sc_co = optOutCoercion env co opt
-                                 , sc_opt = True, sc_cont = cont' }) }
-                 -- optOutCoercion: see Note [Avoid re-simplifying coercions]
+        ; return (floats, CastIt { sc_co = co, sc_cont = cont' }) }
 
 -- Duplicating ticks for now, not sure if this is good or not
 mkDupableContWithDmds env dmds (TickIt t cont)

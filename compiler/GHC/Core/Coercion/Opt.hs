@@ -1,10 +1,8 @@
 -- (c) The University of Glasgow 2006
-
 {-# LANGUAGE CPP #-}
 
 module GHC.Core.Coercion.Opt
-   ( optCoercion, optTransCo
-   , OptCoercionOpts (..)
+   ( optCoProgram, optCoRefl, optTransCo
    )
 where
 
@@ -12,14 +10,16 @@ import GHC.Prelude
 
 import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 
+import GHC.Core
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
-import GHC.Core.TyCo.Compare( eqForAllVis, eqTypeIgnoringMultiplicity )
+import GHC.Core.TyCo.Compare
 import GHC.Core.Coercion
 import GHC.Core.Type as Type hiding( substTyVarBndr, substTy )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Unify
+import GHC.Core.Map.Type
 
 import GHC.Types.Basic( SwapFlag(..), flipSwap, isSwapped, pickSwap, notSwapped )
 import GHC.Types.Var
@@ -27,9 +27,9 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 
 import GHC.Data.Pair
+import GHC.Data.TrieMap
 
 import GHC.Utils.Outputable
-import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
@@ -42,12 +42,38 @@ import Control.Monad   ( zipWithM )
 %*                                                                      *
 %************************************************************************
 
-This module does coercion optimisation.  See the paper
+Note [Coercion optimisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This module does coercion optimisation.  The purpose is to reduce the size
+of the coercions that the compiler carries around -- they are just proofs,
+and serve no runtime need. So the purpose of coercion optimisation is simply
+to shrink coercions and thereby reduce compile time and .hi file sizes.
 
+See the paper
    Evidence normalization in Systtem FV (RTA'13)
    https://simon.peytonjones.org/evidence-normalization/
-
 The paper is also in the GHC repo, in docs/opt-coercion.
+
+However, although powerful and occasionally very effective, coercion
+optimisation can itself be very expensive (#26679).  So we apply it sparingly:
+
+* In the Simplifier, function `rebuild_go`, we use `isReflexiveCo` (which
+  computes the type of the coercion) to eliminate reflexive coercions, just
+  before we build a cast (e |> co).
+
+  (More precisely, we use `isReflexiveCoIgnoringMultiplicity;
+   c.f. GHC.Core.Coercion.Opt.opt_univ.)
+
+* We have a whole pass, `optCoProgram` that runs the coercion optimiser on all
+  the coercions in the program.
+
+  - We run it once in all optimisation levels
+    (see GHC.Driver.DynFlags.optLevelFlags)
+
+  - We run it early in the optimisation pipeline
+    (see GHC.Core.Opt.Pipeline.getCoreToDo).
+    Controlled by a flag `-fopt-coercion`, on by default
+
 
 Note [Optimising coercion optimisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -164,47 +190,275 @@ We use the following invariants:
        to the little bits being substituted.
 -}
 
--- | Coercion optimisation options
-newtype OptCoercionOpts = OptCoercionOpts
-   { optCoercionEnabled :: Bool  -- ^ Enable coercion optimisation (reduce its size)
-   }
+{- **********************************************************************
+%*                                                                      *
+                    optCoercionPgm
+%*                                                                      *
+%********************************************************************* -}
 
-optTransCo :: HasDebugCallStack => OptCoercionOpts -> InScopeSet
+optTransCo :: HasDebugCallStack => InScopeSet
            -> NormalCo -> NormalCo -> NormalCo
-optTransCo opts in_scope co1 co2
-  | optCoercionEnabled opts
+optTransCo in_scope co1 co2
   = opt_trans in_scope co1 co2
-  | otherwise
-  = co1 `mkTransCo` co2
 
-optCoercion :: OptCoercionOpts -> Subst -> Coercion -> NormalCo
--- ^ optCoercion applies a substitution to a coercion,
---   *and* optimises it to reduce its size
-optCoercion opts env co
-  | optCoercionEnabled opts
-  = optCoercion' env co
+optCoProgram :: Bool   -- True <=> do extra checks/tracking
+             -> CoreProgram -> CoreProgram
+-- Apply optCoercion to all coercions in /expressions/
+-- There may also be coercions in /types/ but we `optCoProgram` doesn't
+-- look at them; they are typically fewer and smaller, and it doesn't seem
+-- worth the cost of traversing and rebuilding all the types in the program.
+optCoProgram do_checks binds
+  = map go binds
+  where
+    go (NonRec b r) = NonRec b (optCoExpr (do_checks, in_scope) r)
+    go (Rec prs)    = Rec (mapSnd (optCoExpr (do_checks, in_scope)) prs)
 
-{-
-  = pprTrace "optCoercion {" (text "Co:" <> ppr co) $
-    let result = optCoercion' env co in
-    pprTrace "optCoercion }"
-       (vcat [ text "Co:"    <+> ppr (coercionSize co)
-             , text "Optco:" <+> ppWhen (isReflCo result) (text "(refl)")
-                             <+> ppr result ]) $
-    result
+    in_scope = mkInScopeSetList (bindersOfBinds binds)
+       -- Put all top-level binders into scope; it is possible to have
+       -- forward references.  See Note [Glomming] in GHC.Core.Opt.OccurAnal
+
+optCoExpr :: (Bool, InScopeSet) -> CoreExpr -> CoreExpr
+optCoExpr !_ e@(Var {})    = e
+optCoExpr _  e@(Lit {})    = e
+optCoExpr _  e@(Type {})   = e
+optCoExpr is (App e1 e2)   = App (optCoExpr is e1) (optCoExpr is e2)
+optCoExpr is (Lam b e)     = Lam b (optCoExpr (is `add_bndr` b) e)
+optCoExpr is (Coercion co) = Coercion (optCo is co)
+optCoExpr is (Cast e co)   = Cast (optCoExpr is e) (optCo is co)
+optCoExpr is (Tick t e)    = Tick t (optCoExpr is e)
+optCoExpr is (Let (NonRec b r) e) = Let (NonRec b (optCoExpr is r))
+                                        (optCoExpr (is `add_bndr` b) e)
+optCoExpr is (Let (Rec prs)    e) = Let (Rec (mapSnd (optCoExpr is') prs))
+                                        (optCoExpr is' e)
+                                  where
+                                    is' = is `add_bndrs` map fst prs
+optCoExpr is (Case e b ty alts) = Case (optCoExpr is e) b ty (map do_alt alts)
+  where
+     is' = is `add_bndr` b
+     do_alt (Alt k bs e) = Alt k bs (optCoExpr (is' `add_bndrs` bs) e)
+
+add_bndr :: (Bool, InScopeSet) -> Var -> (Bool, InScopeSet)
+add_bndr (do_checks, is) b = (do_checks, is `extendInScopeSet` b)
+
+add_bndrs :: (Bool, InScopeSet) -> [Var] -> (Bool, InScopeSet)
+add_bndrs (do_checks, is) bs = (do_checks, is `extendInScopeSetList` bs)
+
+optCo :: (Bool, InScopeSet) -> Coercion -> Coercion
+optCo (do_checks, is) co = optCoercionChecking do_checks (mkEmptySubst is) co
+
+
+{- **********************************************************************
+%*                                                                      *
+                    optCoercionRefls
+%*                                                                      *
+%********************************************************************* -}
+
+{- Note [optCoRefl]
+~~~~~~~~~~~~~~~~~~~~
+`optCoRefl` is an experimental cheap-and-cheerful version of `optCoercion`.
+
+* It focuses entirely on chains of TransCo, thus
+      co1 ; co2 ; co3 ; ... ; con
+
+* It looks for sub-sequences in this chain that are Refl, based on their
+  types.  The clever business is all in `gobble`, which springs into action
+  when we find a `TransCo`.
+
+* It can sometimes do a bit more than `optCoercion`. It'll eliminate /any/
+  subsequence of co1..con that is reflexive, whereas `optCoercion` just works
+  left-to-right, and won't spot (co1 ; co2 ; sym co2)
 -}
 
-  | otherwise
-  = substCo env co
+optCoRefl :: Bool -> Subst -> Coercion -> Coercion
+-- See Note [optCoRefl]
+optCoRefl check_stuff subst in_co
+  | not check_stuff
+  = opt_co_refl subst in_co
+  | otherwise  -- Do expensive checks
+  = let out_co = opt_co_refl subst in_co
+        (Pair in_l in_r) = coercionKind in_co
+        (Pair out_l out_r) = coercionKind out_co
+        in_l' = substTy subst in_l
+        in_r' = substTy subst in_r
+        in_co' = substCo subst in_co
+        in_sz = coercionSize in_co'
+        out_sz = coercionSize out_co
 
-optCoercion' :: Subst -> Coercion -> NormalCo
-optCoercion' env co
-  | debugIsOn
-  = let out_co = opt_co1 lc NotSwapped co
-        (Pair in_ty1  in_ty2,  in_role)  = coercionKindRole co
+        details = setPprDebug False $
+                  vcat [ text "in_l':"  <+> ppr in_l'
+                       , text "in_r':"  <+> ppr in_r'
+                       , text "out_l:" <+> ppr out_l
+                       , text "out_r:" <+> ppr out_r
+                       , text "in_co:" <+> ppr in_co
+                       , text "out_co:" <+> ppr out_co ]
+
+    in pprTraceWhen (not ((in_l' `eqTypeIgnoringMultiplicity` out_l) &&
+                          (in_r' `eqTypeIgnoringMultiplicity` out_r)))
+          "Yikes: optReflCo changes type" details $
+
+       pprTraceWhen (out_sz > in_sz)
+          "Yikes: optReflCo makes coercion bigger"
+          (vcat [ int in_sz <+> text "-->" <+> int out_sz
+                , whenPprDebug details ]) $
+
+       pprTraceWhen (in_sz > out_sz)
+            "optCoRefl: size reduction:"
+            (vcat [ int in_sz <+> text "-->" <+> int out_sz
+                  , whenPprDebug details ])
+       out_co
+
+opt_co_refl :: Subst -> InCoercion -> OutCoercion
+opt_co_refl subst co
+  | lk' `eqTypeIgnoringMultiplicity` rk' = mkReflCo (coercionRole co) lk'
+  | otherwise                            = out_co
+  where
+    out_co = go co
+    Pair lk' rk' = coercionKind out_co
+
+    go_m MRefl    = MRefl
+    go_m (MCo co) = MCo (go co)
+
+    go_ty ty = substTy subst ty
+
+    go_s cos = map go cos
+
+    -- See Note [Substituting in a coercion hole]
+    go_hole h@(CH { ch_co_var = cv })
+      = h { ch_co_var = updateVarType go_ty cv }
+
+    go (Refl ty)                     = Refl $!! substTy subst ty
+    go (GRefl r ty mco)              = GRefl r $!! go_ty ty $!! go_m mco
+    go (CoVarCo cv)                  = substCoVar subst cv
+    go (HoleCo h)                    = HoleCo    $!! go_hole h
+    go (SymCo co)                    = mkSymCo   $!! go co
+    go (KindCo co)                   = mkKindCo  $!! go co
+    go (SubCo co)                    = mkSubCo   $!! go co
+    go (SelCo n co)                  = mkSelCo n $!! go co
+    go (LRCo n co)                   = mkLRCo n  $!! go co
+    go (AppCo co1 co2)               = mkAppCo   $!! go co1 $!! go co2
+    go (InstCo co1 co2)              = mkInstCo  $!! go co1 $!! go co2
+    go (FunCo r afl afr com coa cor) = mkFunCo2 r afl afr
+                                           $!! go com $!! go coa $!! go cor
+    go (TyConAppCo r tc cos)         = mkTyConAppCo r tc $!! go_s cos
+    go (UnivCo p r lt rt cos)        = optUnivCo p $!! go_s cos $!! r $!! go_ty lt $!! go_ty rt
+    go (AxiomCo ax cos)              = mkAxiomCo ax $!! (go_s cos)
+
+    go (ForAllCo v vl vr mco co)     = mkForAllCo v' vl vr
+                                           $!! go_m mco
+                                           $!! opt_co_refl subst' co
+      where
+        !(subst', v') = substVarBndr subst v
+
+    -- The TransCo case fires up the main loop for
+    -- eliminating reflexive chains of TransCo
+    -- See Note [Optimising TransCo sequences]
+    go co@(TransCo {}) = gobble gs0 out_cos
+      where
+         out_cos :: [OutCoercion]  -- None of these are TransCos, and the list non-empty
+         out_cos = get_in co []
+         out_co1 = case out_cos of
+                     (co1:_) -> co1
+                     []      -> pprPanic "gobble" (ppr co)
+         gs0  = GS (mkReflCo role lk) tm0
+         tm0  = insertTM lk gs0 emptyTM
+         lk   = coercionLKind out_co1
+         role = coercionRole out_co1
+
+    get_in :: InCoercion -> [OutCoercion] -> [OutCoercion]
+    get_in (TransCo co1 co2)         cos = get_in co1 (get_in co2 cos)
+    get_in (SymCo (TransCo co1 co2)) cos = get_in (mkSymCo co2) (get_in (mkSymCo co1) cos)
+    get_in co                        cos = get_out (go co) cos
+
+    get_out :: OutCoercion -> [OutCoercion] -> [OutCoercion]
+    -- Maybe `go` returned an OutCoercion that is a `TransCo`
+    get_out (TransCo co1 co2)         cos = get_out co1 (get_out co2 cos)
+    get_out (SymCo (TransCo co1 co2)) cos = get_out (mkSymCo co2) (get_out (mkSymCo co1) cos)
+    get_out co                        cos = co : cos
+
+    gobble :: GobbleState -> [OutCoercion] -> OutCoercion
+    gobble (GS co0 tm) cos
+       = case cos of
+           []        -> co0
+           (co1:cos) -> case lookupTM rk1 tm of
+                          Just gs -> gobble gs cos    -- A hit in the GobbleState map;
+                                                      -- revert to the earlier state gs
+                          Nothing -> gobble gs' cos   -- Miss: make a new GobbleState gs'
+               where
+                 rk1 = coercionRKind co1
+                 gs' = GS (co0 `mkTransCo` co1) (insertTM rk1 gs' tm)
+
+data GobbleState = GS OutCoercion !(TypeMap GobbleState)
+
+{- Note [Optimising TransCo sequences]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a composition (co1; co2; co3; ... ; con) we work left-to-right, maintaining
+a `GobbleState`. Imagine we start with gs0::GobbleState, we process `co1` to get
+`gs1` and so on.
+
+When composing co_i, if coercionRKind( co_i ) is the same as any earlier type in
+the chain, we want to discard it and simply revert to the GobbleState of that
+earlier point.
+
+A GobbleState gs_k consists of:
+
+* The coercion so far: a coercion equivalent to (co1;co2;cok)
+* A map from types to all earlier GobbleStates, thus
+    tyR_i :-> gs_i
+  where (INVARIANT) tyR_i is the coercionRKind of co_i stored in gs_i
+
+Wrinkles:
+
+* Wart: the TypeMap is (currently) multiplicity-sensitive so we might
+  miss a possible TransCo optimisation.
+-}
+
+optUnivCo :: UnivCoProvenance -> [Coercion]
+          -> Role -> Type -> Type -> Coercion
+optUnivCo prov cos role lty rty
+  | lty `eqTypeIgnoringMultiplicity` rty
+      -- We only Lint multiplicities in the output of the typechecker, as
+      -- described in Note [Linting linearity] in GHC.Core.Lint. This means
+      -- we can use 'eqTypeIgnoringMultiplicity' instead of 'eqType' below.
+      --
+      -- In particular, this gets rid of 'SubMultProv' coercions that were
+      -- introduced for typechecking multiplicities of data constructors, as
+      -- described in Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
+  = mkReflCo role lty
+
+  | otherwise
+  = UnivCo { uco_prov = prov, uco_role = role
+           , uco_lty = lty, uco_rty = rty
+           , uco_deps = cos }
+
+{- **********************************************************************
+%*                                                                      *
+                    optCoercion
+%*                                                                      *
+%********************************************************************* -}
+
+optCoercionChecking :: Bool -> Subst -> Coercion -> NormalCo
+-- ^ optCoercion applies a substitution to a coercion,
+--   *and* optimises it to reduce its size
+-- The substitution is a vestige of an earlier era, when the coercion optimiser
+--   was called by the Simplifier; now it is always empty
+--   But I have not removed it in case we ever want it back.
+optCoercionChecking do_checks subst in_co
+  | not do_checks
+  = optCoercion1 subst in_co
+
+  | otherwise
+  = let out_co = optCoercion1 subst in_co
+
+        (Pair in_ty1  in_ty2,  in_role)  = coercionKindRole in_co
         (Pair out_ty1 out_ty2, out_role) = coercionKindRole out_co
 
-        details = vcat [ text "in_co:" <+> ppr co
+        in_co' = substCo subst in_co
+        Pair in_ty1' in_ty2' = coercionKind in_co'
+
+        in_size  = coercionSize in_co'
+        out_size = coercionSize out_co
+
+        details = vcat [ text "in_co:" <+> ppr in_co
                        , text "in_ty1:" <+> ppr in_ty1
                        , text "in_ty2:" <+> ppr in_ty2
                        , text "out_co:" <+> ppr out_co
@@ -214,22 +468,34 @@ optCoercion' env co
                        , text "out_role:" <+> ppr out_role
                        ]
     in
-    warnPprTrace (not (isReflCo out_co) && isReflexiveCo out_co)
-                 "optCoercion: reflexive but not refl" details $
+    -- Check that the type isn't changed
+    pprTraceWhen (not ((in_ty1' `eqTypeIgnoringMultiplicity` out_ty1) &&
+                       (in_ty2' `eqTypeIgnoringMultiplicity` out_ty2)))
+                 "optCoercion changes type!!!" details $
+
     -- The coercion optimiser should usually optimise
     --     co:ty~ty   -->  Refl ty
     -- But given a silly `newtype N = MkN N`, the axiom has type (N ~ N),
     -- and so that can trigger this warning (e.g. test str002).
     -- Maybe we should optimise that coercion to (Refl N), but it
     -- just doesn't seem worth the bother
+    pprTraceWhen (not (isReflCo out_co) && isReflexiveCo out_co)
+                 "optCoercion: reflexive but not refl" details $
+
+    -- Show a trace if the coercion shrinks
+    pprTraceWhen (in_size > out_size)
+       "optCoercion:size reduction"
+       (vcat [ int in_size <+> text "-->" <+> int out_size
+             , whenPprDebug      $   -- Show details with -dppr-debug
+               setPprDebug False $
+               details ]) $
     out_co
 
-  | otherwise
-  = opt_co1 lc NotSwapped co
-  where
-    lc = mkSubstLiftingContext env
---    ppr_one cv = ppr cv <+> dcolon <+> ppr (coVarKind cv)
-
+optCoercion1 :: Subst -> Coercion -> NormalCo
+-- Starting point for the coercion optimiser: does no checking
+-- but initialises the substitution and calls opt_co1
+optCoercion1 subst co
+  = opt_co1 (mkSubstLiftingContext subst) NotSwapped co
 
 type NormalCo    = Coercion
   -- Invariants:
@@ -402,12 +668,7 @@ opt_co4' env sym rep r (CoVarCo cv)
   where
     Pair ty1 ty2 = coVarTypes cv1
 
-    cv1 = case lookupInScope (lcInScopeSet env) cv of
-             Just cv1 -> cv1
-             Nothing  -> warnPprTrace True
-                          "opt_co: not in scope"
-                          (ppr cv $$ ppr env)
-                          cv
+    cv1 = refineFromInScope (lcInScopeSet env) cv
           -- cv1 might have a substituted kind!
 
 opt_co4' _ _ _ _ (HoleCo h)
@@ -628,19 +889,7 @@ opt_univ env sym prov deps role ty1 ty2
         deps' = map (opt_co1 env sym) deps
         (ty1'', ty2'') = swapSym sym (ty1', ty2')
     in
-      -- We only Lint multiplicities in the output of the typechecker, as
-      -- described in Note [Linting linearity] in GHC.Core.Lint. This means
-      -- we can use 'eqTypeIgnoringMultiplicity' instea of 'eqType' below.
-      --
-      -- In particular, this gets rid of 'SubMultProv' coercions that were
-      -- introduced for typechecking multiplicities of data constructors, as
-      -- described in Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
-      if ty1'' `eqTypeIgnoringMultiplicity` ty2''
-      then mkReflCo role ty2''
-      else
-        UnivCo { uco_prov = prov, uco_role = role
-               , uco_lty = ty1'', uco_rty = ty2''
-               , uco_deps = deps' }
+    optUnivCo prov deps' role ty1'' ty2''
 
 {-
 opt_univ env PhantomProv cvs _r ty1 ty2

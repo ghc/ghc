@@ -64,6 +64,7 @@ initEndPassConfig dflags extra_vars name_ppr_ctx pass = EndPassConfig
 coreDumpFlag :: CoreToDo -> Maybe DumpFlag
 coreDumpFlag (CoreDoSimplify {})      = Just Opt_D_verbose_core2core
 coreDumpFlag (CoreDoPluginPass {})    = Just Opt_D_verbose_core2core
+coreDumpFlag (CoreOptCoercion {})     = Just Opt_D_verbose_core2core
 coreDumpFlag CoreDoFloatInwards       = Just Opt_D_dump_float_in
 coreDumpFlag (CoreDoFloatOutwards {}) = Just Opt_D_dump_float_out
 coreDumpFlag CoreLiberateCase         = Just Opt_D_dump_liberate_case
@@ -141,10 +142,12 @@ perPassFlags dflags pass
                           _        -> AllowAtTopLevel
 
     -- See Note [Linting linearity]
-    check_linearity = gopt Opt_DoLinearCoreLinting dflags || (
-                        case pass of
-                          CoreDesugar -> True
-                          _ -> False)
+    check_linearity = gopt Opt_DoLinearCoreLinting dflags
+                          -- `-dlinear-core-lint`: check linearity in every pass
+                    || -- Always check linearity just after desugaring
+                       case pass of
+                          CoreDesugar -> True  -- Before even the simple optimiser
+                          _ -> False
 
     -- See Note [Checking for rubbish literals] in GHC.Core.Lint
     check_rubbish = case pass of
