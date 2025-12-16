@@ -535,12 +535,12 @@ warnIfDeclDeprecated gre@(GRE { gre_imp = iss })
     definedMod = moduleName $ assertPpr (isExternalName name) (ppr name) (nameModule name)
     doc = text "The name" <+> quotes (ppr occ) <+> text "is mentioned explicitly"
 
-lookupImpDeclDeprec :: ModIface -> GlobalRdrElt -> Maybe (WarningTxt GhcRn)
+lookupImpDeclDeprec :: SimpleModIface -> GlobalRdrElt -> Maybe (WarningTxt GhcRn)
 lookupImpDeclDeprec iface gre
   -- Bleat if the thing, or its parent, is warn'd
-  = mi_decl_warn_fn iface (greOccName gre) `mplus`
+  = (mi_cache_decl_warn_fn $ mi_simple_caches $ mi_simple_info_public iface) (greOccName gre) `mplus`
     case greParent gre of
-       ParentIs p -> mi_decl_warn_fn iface (nameOccName p)
+       ParentIs p -> (mi_cache_decl_warn_fn $ mi_simple_caches $ mi_simple_info_public iface) (nameOccName p)
        NoParent   -> Nothing
 
 warnIfExportDeprecated :: GlobalRdrElt -> RnM ()
@@ -561,7 +561,7 @@ warnIfExportDeprecated gre@(GRE { gre_imp = iss })
     process_import_spec is = do
       let mod = is_mod $ is_decl is
       iface <- loadInterfaceForModule doc mod
-      let mb_warn_txt = mi_export_warn_fn iface name
+      let mb_warn_txt = (mi_cache_export_warn_fn $ mi_simple_caches $ mi_simple_info_public iface) name
       return $ (moduleName mod, ) <$> mb_warn_txt
 
 -------------------------

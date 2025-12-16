@@ -13,6 +13,9 @@ module GHC.Unit.External
    , PackageRuleBase
    , PackageCompleteMatches
    , emptyPackageIfaceTable
+
+   -- | Lookup functions
+   , lookupEPSimpleInfo
    )
 where
 
@@ -35,6 +38,8 @@ import GHC.Types.Unique.DSet
 import GHC.Linker.Types (Linkable)
 
 import Data.IORef
+
+import Control.Monad (join)
 
 
 type PackageTypeEnv          = TypeEnv
@@ -68,7 +73,7 @@ eucEPS = readIORef . euc_eps
 initExternalPackageState :: ExternalPackageState
 initExternalPackageState = EPS
   { eps_is_boot          = emptyInstalledModuleEnv
-  , eps_PIT              = emptyPackageIfaceTable
+  , eps_simple_info      = emptyModuleEnv
   , eps_free_holes       = emptyInstalledModuleEnv
   , eps_PTE              = emptyTypeEnv
   , eps_iface_bytecode   = emptyModuleEnv
@@ -91,6 +96,8 @@ initExternalPackageState = EPS
   , eps_defaults         = emptyModuleEnv
   }
 
+lookupEPSimpleInfo :: ExternalPackageState -> Module -> Maybe SimpleModIface
+lookupEPSimpleInfo eps mod = join $ lookupModuleEnv (eps_simple_info eps) mod
 
 -- | Information about other packages that we have slurped in by reading
 -- their interface files
@@ -109,6 +116,11 @@ data ExternalPackageState
                 -- debug prints, and it's convenient because this field comes
                 -- direct from 'GHC.Tc.Utils.imp_dep_mods'
 
+        -- | The simple information which we always keep in memory about an external package.
+        -- This is ModIface but with some parts removed to save memory.
+        eps_simple_info :: !(ModuleEnv (Maybe SimpleModIface)),
+
+        {-
         eps_PIT :: !PackageIfaceTable,
                 -- ^ The 'ModIface's for modules in external packages
                 -- whose interfaces we have opened.
@@ -128,6 +140,7 @@ data ExternalPackageState
                 -- * Fixities
                 --
                 -- * Deprecations and warnings
+                -}
 
         eps_free_holes :: InstalledModuleEnv (UniqDSet ModuleName),
                 -- ^ Cache for 'mi_free_holes'.  Ordinarily, we can rely on

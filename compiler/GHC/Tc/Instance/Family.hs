@@ -14,7 +14,6 @@ module GHC.Tc.Instance.Family (
 import GHC.Prelude
 
 import GHC.Driver.DynFlags
-import GHC.Driver.Env
 
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
@@ -57,6 +56,7 @@ import Data.Function ( on )
 import qualified GHC.LanguageExtensions  as LangExt
 import Data.List (sortOn)
 import qualified GHC.Unit.Home.Graph as HUG
+import qualified GHC.Unit.CombinedState as Combined
 
 {- Note [The type family instance consistency story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -288,12 +288,12 @@ why we still do redundant checks.
 -- See Note [The type family instance consistency story].
 checkFamInstConsistency :: [Module] -> TcM ()
 checkFamInstConsistency directlyImpMods
-  = do { (eps, hug) <- getEpsAndHug
+  = do { combined_state@(Combined.CombinedState _eps hug) <- getCombinedState
        ; traceTc "checkFamInstConsistency" (ppr directlyImpMods)
        ; let { -- Fetch the iface of a given module.  Must succeed as
                -- all directly imported modules must already have been loaded.
                modIface mod = liftIO $
-                 lookupIfaceByModule hug (eps_PIT eps) mod >>= \case
+                 Combined.lookupSimpleIface combined_state mod >>= \case
                    Nothing    -> panicDoc "FamInst.checkFamInstConsistency"
                                           (ppr mod $$ ppr (HUG.allUnits hug))
                    Just iface -> pure iface
@@ -306,9 +306,9 @@ checkFamInstConsistency directlyImpMods
              ; modConsistent :: Module -> TcM [Module]
              ; modConsistent mod = do
                  ifc <- modIface mod
-                 deps <- dep_finsts . mi_deps <$> modIface mod
+                 deps <- dep_finsts . mi_simple_info_deps <$> modIface mod
                  pure $
-                   if mi_finsts ifc
+                   if mi_abi_finsts (mi_simple_abi_hashes (mi_simple_info_public ifc))
                       then mod:deps
                       else deps
 

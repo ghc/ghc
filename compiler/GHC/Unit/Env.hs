@@ -43,6 +43,7 @@ module GHC.Unit.Env
     ( UnitEnv (..)
     , initUnitEnv
     , ueEPS -- Not really needed, get directly type families and rule base!
+    , ueCombinedState
     , updateHug
     -- * Unit Env helper functions
     , ue_currentHomeUnitEnv
@@ -134,6 +135,7 @@ import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
+import GHC.Unit.CombinedState
 
 --------------------------------------------------------------------------------
 -- The hard queries
@@ -181,6 +183,9 @@ data UnitEnv = UnitEnv
 
 ueEPS :: UnitEnv -> IO ExternalPackageState
 ueEPS = eucEPS . ue_eps
+
+ueCombinedState :: UnitEnv -> IO CombinedState
+ueCombinedState ue_env = CombinedState <$> ueEPS ue_env <*> pure (ue_home_unit_graph ue_env)
 
 initUnitEnv :: UnitId -> HomeUnitGraph -> GhcNameVersion -> Platform -> IO UnitEnv
 initUnitEnv cur_unit hug namever platform = do

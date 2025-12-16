@@ -171,7 +171,7 @@ rnDepModules sel mods = do
         if isHoleModule mod
           then do iface <- liftIO . initIfaceCheck (text "rnDepModule") hsc_env
                                   $ loadSysInterface (text "rnDepModule") mod'
-                  return (mod' : sel (mi_deps iface))
+                  return (mod' : sel (mi_simple_info_deps iface))
           else return [mod']
 
 {-
@@ -345,7 +345,7 @@ rnIfaceGlobal n = do
                         else m'
             iface <- liftIO . initIfaceCheck (text "rnIfaceGlobal") hsc_env
                             $ loadSysInterface (text "rnIfaceGlobal") m''
-            let nsubst = mkNameShape (moduleName m) (mi_exports iface)
+            let nsubst = mkNameShape (moduleName m) (mi_simple_info_exports $ mi_simple_info_public iface)
             case maybeSubstNameShape nsubst n of
                 -- NB: report m' because it's more user-friendly
                 Nothing -> failWithRn $ TcRnIdNotExportedFromModuleSig n m'

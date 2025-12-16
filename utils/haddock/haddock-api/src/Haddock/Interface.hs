@@ -74,7 +74,7 @@ import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 import GHC.Unit.Module.Graph (ModuleGraphNode (..), ModuleNodeInfo(..))
 import GHC.Unit.Module.ModDetails
-import GHC.Unit.Module.ModIface (mi_semantic_module, mi_boot)
+import GHC.Unit.Module.ModIface (mi_simple_semantic_module, mi_simple_boot)
 import GHC.Unit.Module.ModSummary (isBootSummary)
 import GHC.Utils.Outputable (Outputable, (<+>), pprModuleName, text)
 import GHC.Utils.Error (withTiming)
@@ -257,16 +257,17 @@ dropErr (Failed _) = Nothing
 loadHiFile :: HscEnv -> Outputable.SDoc -> Module -> IO (ModIface, ([ClsInst], [FamInst]))
 loadHiFile hsc_env doc theModule = initIfaceLoad hsc_env $ do
 
+  -- "loadSysInterface" is the wrong function here.
   mod_iface <- loadSysInterface doc theModule
 
-  insts <- initIfaceLcl (mi_semantic_module mod_iface) doc (mi_boot mod_iface) $ do
+  insts <- initIfaceLcl (mi_simple_semantic_module mod_iface) doc (mi_simple_boot mod_iface) $ do
 
-    new_eps_insts     <- mapM tcIfaceInst (mi_insts mod_iface)
-    new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts mod_iface)
+    new_eps_insts     <- error "todo-lookup insts from EPS" --mapM tcIfaceInst (mi_insts mod_iface)
+    new_eps_fam_insts <- error "todo-lookup insts from EPS" -- mapM tcIfaceFamInst (mi_fam_insts mod_iface)
 
     pure (new_eps_insts, new_eps_fam_insts)
 
-  pure (mod_iface, insts)
+  pure (error "todo", insts)
 
 processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> WarningMap -> Ghc (Maybe Interface)
 processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do

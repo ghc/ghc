@@ -113,6 +113,7 @@ import Control.Monad.Trans.Reader
 import qualified Data.Map.Strict as M
 import Control.Monad.Trans.Class
 import System.IO.Unsafe (unsafeInterleaveIO)
+import qualified GHC.Unit.CombinedState as Combined
 
 {-
 Note [Downsweep and the ModuleGraph]
@@ -512,19 +513,20 @@ loopFixedModule key loc done = do
   case M.lookup nk done of
     Just {} -> return done
     Nothing -> do
+      combined_state <- liftIO $ hscCombinedState hsc_env
       -- MP: TODO, we should just read the dependency info from the interface rather than either
       -- a. Loading the whole thing into the EPS (this might never nececssary and causes lots of things to be permanently loaded into memory)
       -- b. Loading the whole interface into a buffer before discarding it. (wasted allocation and deserialisation)
-      read_result <- liftIO $
+      maybe_deps <- liftIO $
         -- 1. Check if the interface is already loaded into the EPS by some other
         -- part of the compiler.
-        lookupIfaceByModuleHsc hsc_env (mnkToModule key) >>= \case
-          Just iface -> return (M.Succeeded iface)
-          Nothing -> readIface (hsc_hooks hsc_env) (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule key) (ml_hi_file loc)
-      case read_result of
-        M.Succeeded iface -> do
+        Combined.lookupDependencies combined_state (mnkToModule key) >>= \case
+          Just deps -> return (M.Succeeded deps)
+          Nothing -> fmap mi_deps <$> readIface (hsc_hooks hsc_env) (hsc_logger hsc_env) (hsc_dflags hsc_env) (hsc_NC hsc_env) (mnkToModule key) (ml_hi_file loc)
+      case maybe_deps of
+        M.Succeeded deps -> do
           -- Computer information about this node
-          let node_deps = ifaceDeps (mi_deps iface)
+          let node_deps = ifaceDeps deps
               edges = map mkFixedEdge node_deps
               node = ModuleNode edges (ModuleNodeFixed key loc)
           foldM (loopFixedNodeKey (mnkUnitId key)) (M.insert nk node done) (bimap snd snd <$> node_deps)

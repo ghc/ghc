@@ -29,7 +29,7 @@ module GHC.Tc.Utils.Monad(
   getEpsVar,
   getEps,
   updateEps, updateEps_,
-  getHpt, getEpsAndHug,
+  getHpt, getEpsAndHug, getCombinedState,
 
   -- * Initialising TcM plugins
   withTcPlugins, withDefaultingPlugins, withHoleFitPlugins,
@@ -242,6 +242,7 @@ import GHC.Types.Annotations
 import GHC.Types.Basic( TopLevelFlag(..), TypeOrKind(..) )
 import GHC.Types.CostCentre.State
 import GHC.Types.SourceFile
+import qualified GHC.Unit.CombinedState as Combined
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -681,6 +682,9 @@ getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
 getEpsAndHug :: TcRnIf gbl lcl (ExternalPackageState, HomeUnitGraph)
 getEpsAndHug = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
                   ; return (eps, hsc_HUG env) }
+
+getCombinedState :: TcRnIf gbl lcl Combined.CombinedState
+getCombinedState = do { env <- getTopEnv; liftIO $ hscCombinedState env }
 
 -- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
 -- an exception if it is an error.

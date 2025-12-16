@@ -7,7 +7,6 @@ module GHC.HsToCore.Usage (
 
 import GHC.Prelude
 
-import GHC.Driver.Env
 
 import GHC.Tc.Types
 
@@ -27,7 +26,6 @@ import GHC.Types.Unique.Set
 
 import GHC.Unit
 import GHC.Unit.Env
-import GHC.Unit.External
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
@@ -35,7 +33,6 @@ import GHC.Unit.Module.Deps
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
-import Data.IORef
 import Data.List (sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -47,6 +44,7 @@ import GHC.Unit.Finder
 import GHC.Types.Unique.DFM
 import GHC.Driver.Plugins
 import qualified GHC.Unit.Home.Graph as HUG
+import GHC.Unit.CombinedState
 
 {- Note [Module self-dependency]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -81,13 +79,12 @@ mkUsageInfo uc plugins fc unit_env
   this_mod dir_imp_mods imp_decls used_names
   dependent_files dependent_dirs merged needed_links needed_pkgs
   = do
-    eps <- liftIO $ readIORef (euc_eps (ue_eps unit_env))
+    combined_state <- liftIO $ ueCombinedState unit_env
     file_hashes <- liftIO $ mapM getFileHash dependent_files
     dirs_hashes <- liftIO $ mapM getDirHash dependent_dirs
     let hu = ue_unsafeHomeUnit unit_env
-        hug = ue_home_unit_graph unit_env
     -- Dependencies on object files due to TH and plugins
-    object_usages <- liftIO $ mkObjectUsage (eps_PIT eps) plugins fc hug needed_links needed_pkgs
+    object_usages <- liftIO $ mkObjectUsage combined_state plugins fc needed_links needed_pkgs
     let all_home_ids = HUG.allUnits (ue_home_unit_graph unit_env)
     mod_usages <- mk_mod_usage_info uc hu all_home_ids this_mod
                                        dir_imp_mods imp_decls used_names
@@ -190,8 +187,8 @@ for a module or not. This is similar to how the recompilation checking for the l
 
 -- | Find object files corresponding to the transitive closure of given home
 -- modules and direct object files for pkg dependencies
-mkObjectUsage :: PackageIfaceTable -> Plugins -> FinderCache -> HomeUnitGraph-> [Linkable] -> PkgsLoaded -> IO [Usage]
-mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
+mkObjectUsage :: CombinedState -> Plugins -> FinderCache -> [Linkable] -> PkgsLoaded -> IO [Usage]
+mkObjectUsage combined_state plugins fc th_links_needed th_pkgs_needed = do
       let ls = ordNubOn linkableModule (th_links_needed ++ plugins_links_needed)
           ds = concatMap loaded_pkg_hs_objs $ eltsUDFM (plusUDFM th_pkgs_needed plugin_pkgs_needed) -- TODO possibly record loaded_pkg_non_hs_objs as well
           (plugins_links_needed, plugin_pkgs_needed) = loadedPluginDeps plugins
@@ -209,11 +206,11 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
         Nothing ->  do
           -- This should only happen for home package things but oneshot puts
           -- home package ifaces in the PIT.
-          miface <- lookupIfaceByModule hug pit m
+          miface <- lookupIfaceHash combined_state m
           case miface of
             Nothing -> pprPanic "linkableToUsage" (ppr m)
-            Just iface ->
-              return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) (mi_iface_hash iface)
+            Just iface_hash ->
+              return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) iface_hash
 
     librarySpecToUsage :: LibrarySpec -> IO [Usage]
     librarySpecToUsage (Objects os) = traverse (fing Nothing) os
@@ -281,7 +278,7 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports imp_decls u
     --  a) we used something from it; has something in used_names
     --  b) we imported it, even if we used nothing from it
     --     (need to recompile if its export list changes: export_fprint)
-    mkUsage :: Module -> ModIface -> Maybe Usage
+    mkUsage :: Module -> SimpleModIface -> Maybe Usage
     mkUsage mod iface
       | toUnitId (moduleUnit mod) `Set.notMember` home_unit_ids
       = Just $ UsagePackageModule{ usg_mod      = mod,
@@ -307,9 +304,11 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports imp_decls u
                       usg_entities = Map.toList ent_hashs,
                       usg_safe     = imp_safe }
       where
-        finsts_mod = mi_finsts iface
-        hash_env   = mi_hash_fn iface
-        mod_hash   = mi_mod_hash iface
+        finsts_mod = mi_abi_finsts $ mi_simple_abi_hashes (mi_simple_info_public iface)
+        hash_env   = mi_cache_hash_fn (mi_simple_caches ( mi_simple_info_public iface))
+        mod_hash   = mi_abi_mod_hash $ mi_simple_abi_hashes (mi_simple_info_public iface)
+        orphan_like_hash = mi_abi_orphan_like_hash $ mi_simple_abi_hashes (mi_simple_info_public iface)
+        export_avails_hash = mi_abi_export_avails_hash $ mi_simple_abi_hashes (mi_simple_info_public iface)
         imported_exports
           = if not depend_on_exports
             then Nothing
@@ -317,9 +316,9 @@ mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports imp_decls u
               Just $
                 HomeModImport
                  { hmiu_orphanLikeHash
-                     = mi_orphan_like_hash iface
+                     = orphan_like_hash
                  , hmiu_importedAvails
-                     = moduleImportedAvails mod (mi_export_avails_hash iface) imp_decls
+                     = moduleImportedAvails mod export_avails_hash imp_decls
                  }
 
         by_is_safe (ImportedByUser imv) = imv_is_safe imv

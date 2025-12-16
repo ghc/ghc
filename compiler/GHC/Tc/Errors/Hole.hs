@@ -76,7 +76,7 @@ import GHC.Tc.Utils.Unify ( tcSubTypeSigma )
 
 import GHC.HsToCore.Docs ( extractDocs )
 import GHC.Hs.Doc
-import GHC.Unit.Module.ModIface ( mi_docs )
+import GHC.Unit.Module.ModIface ( mi_simple_docs )
 import GHC.Iface.Load  ( loadInterfaceForName )
 
 import GHC.Builtin.Utils (knownKeyNames)
@@ -478,7 +478,7 @@ addHoleFitDocs fits =
      let name = getName cand in
      do { mb_docs <- if hfIsLcl fit
                      then pure mb_local_docs
-                     else mi_docs <$> loadInterfaceForName msg name
+                     else mi_simple_docs <$> loadInterfaceForName msg name
         ; case mb_docs of
             { Nothing -> return (Set.insert (nameOrigin name) mods_without_docs, TcHoleFit fit)
             ; Just docs -> do

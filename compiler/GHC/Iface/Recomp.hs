@@ -92,6 +92,8 @@ import Data.Functor
 import Data.Bifunctor (first)
 import GHC.Types.PkgQual
 
+import qualified GHC.Unit.CombinedState as Combined
+
 {-
   -----------------------------------------------
           Recompilation checking
@@ -710,7 +712,7 @@ checkDependencies hsc_env summary iface
         return $ needsRecompileBecause $ ModulePackageChanged new_name
 
 
-needInterface :: Module -> (ModIface -> IO RecompileRequired)
+needInterface :: Module -> (SimpleModIface -> IO RecompileRequired)
              -> IfG RecompileRequired
 needInterface mod continue
   = do
@@ -721,7 +723,7 @@ needInterface mod continue
         Nothing -> return $ NeedsRecompile MustCompile
         Just iface -> liftIO $ continue iface
 
-tryGetModIface :: String -> Module -> IfG (Maybe ModIface)
+tryGetModIface :: String -> Module -> IfG (Maybe SimpleModIface)
 tryGetModIface doc_msg mod
   = do  -- Load the imported interface if possible
     logger <- getLogger
@@ -752,7 +754,7 @@ checkModUsage _ UsagePackageModule{
   logger <- getLogger
   needInterface mod $ \iface -> do
     let reason = ModuleChanged (moduleName mod)
-    checkModuleFingerprint logger reason old_mod_hash (mi_mod_hash iface)
+    checkModuleFingerprint logger reason old_mod_hash (mi_abi_mod_hash $ mi_simple_abi_hashes $ mi_simple_info_public iface)
         -- We only track the ABI hash of package modules, rather than
         -- individual entity usages, so if the ABI hash changes we must
         -- recompile.  This is safe but may entail more recompilation when
@@ -762,7 +764,7 @@ checkModUsage _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_ha
   logger <- getLogger
   needInterface mod $ \iface -> do
     let reason = ModuleChangedRaw (moduleName mod)
-    checkModuleFingerprint logger reason old_mod_hash (mi_mod_hash iface)
+    checkModuleFingerprint logger reason old_mod_hash (mi_abi_mod_hash $ mi_simple_abi_hashes $ mi_simple_info_public iface)
 checkModUsage _  UsageHomeModuleInterface{ usg_mod_name = mod_name
                                                  , usg_unit_id = uid
                                                  , usg_iface_hash = old_mod_hash } = do
@@ -770,7 +772,7 @@ checkModUsage _  UsageHomeModuleInterface{ usg_mod_name = mod_name
   logger <- getLogger
   needInterface mod $ \iface -> do
     let reason = ModuleChangedIface mod_name
-    checkIfaceFingerprint logger reason old_mod_hash (mi_iface_hash iface)
+    checkIfaceFingerprint logger reason old_mod_hash (mi_simple_info_iface_hash iface)
 
 checkModUsage _ UsageHomeModule{
                                 usg_mod_name = mod_name,
@@ -783,8 +785,8 @@ checkModUsage _ UsageHomeModule{
     logger <- getLogger
     needInterface mod $ \iface -> do
      let
-         new_mod_hash    = mi_mod_hash iface
-         new_decl_hash   = mi_hash_fn  iface
+         new_mod_hash    = mi_abi_mod_hash $ mi_simple_abi_hashes $ mi_simple_info_public iface
+         new_decl_hash   = mi_cache_hash_fn $ mi_simple_caches $ mi_simple_info_public iface
          reason = ModuleChanged (moduleName mod)
 
      liftIO $ do
@@ -837,7 +839,7 @@ checkModUsage fc UsageDirectory{ usg_dir_path = dir,
 -- Does this require recompilation?
 --
 -- See Note [When to recompile when export lists change?]
-checkHomeModImport :: Logger -> RecompReason -> Maybe HomeModImport -> ModIface -> IO RecompileRequired
+checkHomeModImport :: Logger -> RecompReason -> Maybe HomeModImport -> SimpleModIface -> IO RecompileRequired
 checkHomeModImport _ _ Nothing _ = return UpToDate
 checkHomeModImport logger reason
   (Just (HomeModImport old_orphan_like_hash old_avails))
@@ -874,9 +876,9 @@ checkHomeModImport logger reason
                       2 (ppr changes)
                  return $ needsRecompileBecause reason
   where
-    new_orphan_like_hash = mi_orphan_like_hash iface
-    new_avails_hash      = mi_export_avails_hash iface
-    new_exports          = mi_exports iface
+    new_orphan_like_hash = mi_abi_orphan_like_hash $ mi_simple_abi_hashes $ mi_simple_info_public iface
+    new_avails_hash      = mi_abi_export_avails_hash $ mi_simple_abi_hashes $ mi_simple_info_public iface
+    new_exports          = mi_simple_info_exports $ mi_simple_info_public iface
 
 -- | The exported avails of a module have changed. Should this cause recompilation
 -- of a module that imports it?
@@ -1257,7 +1259,6 @@ addAbiHashes :: HscEnv -> IfaceModInfo -> PartialIfacePublic -> Dependencies -> 
 addAbiHashes hsc_env info
   iface_public
   deps = do
-  eps <- hscEPS hsc_env
   let
       -- If you have arrived here by accident then congratulations,
       -- you have discovered the ABI hash. Your reward is to update the ABI hash to
@@ -1341,7 +1342,7 @@ addAbiHashes hsc_env info
       groups :: [SCC IfaceDeclABI]
       groups = stronglyConnCompFromEdgedVerticesOrd edges
 
-      global_hash_fn = mkHashFun hsc_env eps
+      global_hash_fn = mkHashFun hsc_env
 
         -- How to output Names when generating the data to fingerprint.
         -- Here we want to output the fingerprint for each top-level
@@ -1591,7 +1592,7 @@ getOrphanHashes hsc_env mods = do
     get_orph_hash mod = do
           iface <- initIfaceLoad hsc_env . withIfaceErr ctx
                             $ loadInterface (text "getOrphanHashes") mod ImportBySystem
-          return (mi_orphan_hash iface)
+          return (mi_abi_orphan_hash $ mi_simple_abi_hashes $ mi_simple_info_public iface)
 
   mapM get_orph_hash mods
 
@@ -1882,9 +1883,8 @@ mkOrphMap get_key decls
 
 mkHashFun
         :: HscEnv                       -- needed to look up versions
-        -> ExternalPackageState         -- ditto
         -> (Name -> IO Fingerprint)
-mkHashFun hsc_env eps name
+mkHashFun hsc_env name
   | isHoleModule orig_mod
   = lookup (mkHomeModule home_unit (moduleName orig_mod))
   | otherwise
@@ -1892,35 +1892,41 @@ mkHashFun hsc_env eps name
   where
       home_unit = hsc_home_unit hsc_env
       dflags = hsc_dflags hsc_env
-      hpt = hsc_HUG hsc_env
-      pit = eps_PIT eps
       ctx = initSDocContext dflags defaultUserStyle
       occ = nameOccName name
       orig_mod = nameModule name
+      ensureLoaded mod = do
+        combined_state <- hscCombinedState hsc_env
+        Combined.isModuleLoaded combined_state mod >>= \case
+          True -> return ()
+          False -> do
+            -- This can occur when we're writing out ifaces for
+            -- requirements; we didn't do any /real/ typechecking
+            -- so there's no guarantee everything is loaded.
+            -- Kind of a heinous hack.
+            void $ initIfaceLoad hsc_env . withIfaceErr ctx
+                $ withoutDynamicNow $
+                  -- If you try and load interfaces when dynamic-too
+                  -- enabled then it attempts to load the dyn_hi and hi
+                  -- interface files. Backpack doesn't really care about
+                  -- dynamic object files as it isn't doing any code
+                  -- generation so -dynamic-too is turned off.
+                  -- Some tests fail without doing this (such as T16217),
+                  -- but they fail because dyn_hi files are not found for
+                  -- one of the dependencies (because they are deliberately turned off)
+                  -- Why is this check turned off here? That is unclear but
+                  -- just one of the many horrible hacks in the backpack
+                  -- implementation.
+                  loadInterface (text "lookupVers2") mod ImportBySystem
+
       lookup mod = do
+        ensureLoaded mod
+        combined_state <- hscCombinedState hsc_env
         massertPpr (isExternalName name) (ppr name)
-        iface <- lookupIfaceByModule hpt pit mod >>= \case
-                  Just iface -> return iface
-                  Nothing ->
-                      -- This can occur when we're writing out ifaces for
-                      -- requirements; we didn't do any /real/ typechecking
-                      -- so there's no guarantee everything is loaded.
-                      -- Kind of a heinous hack.
-                      initIfaceLoad hsc_env . withIfaceErr ctx
-                          $ withoutDynamicNow
-                            -- If you try and load interfaces when dynamic-too
-                            -- enabled then it attempts to load the dyn_hi and hi
-                            -- interface files. Backpack doesn't really care about
-                            -- dynamic object files as it isn't doing any code
-                            -- generation so -dynamic-too is turned off.
-                            -- Some tests fail without doing this (such as T16219),
-                            -- but they fail because dyn_hi files are not found for
-                            -- one of the dependencies (because they are deliberately turned off)
-                            -- Why is this check turned off here? That is unclear but
-                            -- just one of the many horrible hacks in the backpack
-                            -- implementation.
-                          $ loadInterface (text "lookupVers2") mod ImportBySystem
-        return $ snd (mi_hash_fn iface occ `orElse`
+        hash_fn <- Combined.lookupHashFunction combined_state mod >>= \case
+                  Just hash_fn -> return hash_fn
+                  Nothing -> pprPanic "lookupVers1" (ppr mod <+> ppr occ)
+        return $ snd (hash_fn occ `orElse`
                   pprPanic "lookupVers1" (ppr mod <+> ppr occ))
 
 {- Note [Fingerprinting complete matches]

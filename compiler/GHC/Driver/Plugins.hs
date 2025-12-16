@@ -227,7 +227,7 @@ data PluginWithArgs = PluginWithArgs
 data LoadedPlugin = LoadedPlugin
   { lpPlugin :: PluginWithArgs
   -- ^ the actual plugin together with its commandline arguments
-  , lpModule :: ModIface
+  , lpModule :: SimpleModIface
   -- ^ the module containing the plugin
   }
 
@@ -249,7 +249,7 @@ data StaticPlugin = StaticPlugin
   }
 
 lpModuleName :: LoadedPlugin -> ModuleName
-lpModuleName = moduleName . mi_module . lpModule
+lpModuleName = moduleName . mi_mod_info_module . mi_simple_info . lpModule
 
 pluginRecompile' :: PluginWithArgs -> IO PluginRecompile
 pluginRecompile' (PluginWithArgs plugin args) = pluginRecompile plugin args

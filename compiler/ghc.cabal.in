@@ -991,6 +991,7 @@ Library
         GHC.Unit.Parser
         GHC.Unit.Ppr
         GHC.Unit.State
+        GHC.Unit.CombinedState
         GHC.Unit.Types
         GHC.Utils.Asm
         GHC.Utils.Binary

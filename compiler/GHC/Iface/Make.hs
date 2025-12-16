@@ -244,7 +244,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
           let deps = mkDependencies home_unit
                                     (tcg_mod tc_result)
                                     (tcg_imports tc_result)
-                                    (map mi_module pluginModules)
+                                    (map (mi_mod_info_module . mi_simple_info) pluginModules)
 
           usage <- mkRecompUsageInfo hsc_env tc_result
           docs <- extractDocs (ms_hspp_opts mod_summary) tc_result

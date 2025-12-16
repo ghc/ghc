@@ -2811,7 +2811,7 @@ isSafeModule m = do
                                     (GHC.moduleNameString $ GHC.moduleName m))
 
     (msafe, pkgs) <- GHC.moduleTrustReqs m
-    let trust  = show $ getSafeMode $ GHC.mi_trust $ fromJust iface
+    let trust  = "bad" --show $ getSafeMode $ GHC.mi_trust $ fromJust iface
         pkg    = if packageTrusted hsc_env m then "trusted" else "untrusted"
         (good, bad) = tallyPkgs hsc_env pkgs
 

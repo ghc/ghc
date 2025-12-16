@@ -89,7 +89,7 @@ data ModuleInfo = ModuleInfo {
         minf_type_env  :: TypeEnv,
         minf_exports   :: [AvailInfo],
         minf_instances :: [ClsInst],
-        minf_iface     :: Maybe ModIface,
+        minf_iface     :: Maybe SimpleModIface,
         minf_safe      :: SafeHaskellMode,
         minf_modBreaks :: Maybe InternalModBreaks
   }
@@ -108,7 +108,7 @@ getPackageModuleInfo hsc_env mdl
   = do  eps <- hscEPS hsc_env
         iface <- hscGetModuleInterface hsc_env mdl
         let
-            avails = mi_exports iface
+            avails = mi_simple_info_exports (mi_simple_info_public iface)
             pte    = eps_PTE eps
             tys    = [ ty | name <- concatMap availNames avails,
                             Just ty <- [lookupTypeEnv pte name] ]
@@ -118,7 +118,7 @@ getPackageModuleInfo hsc_env mdl
                         minf_exports   = avails,
                         minf_instances = error "getModuleInfo: instances for package module unimplemented",
                         minf_iface     = Just iface,
-                        minf_safe      = getSafeMode $ mi_trust iface,
+                        minf_safe      = getSafeMode $ mi_simple_trust_info (mi_simple_info_public iface),
                         minf_modBreaks = Nothing
                 }))
 
@@ -148,7 +148,7 @@ getHomeModuleInfo hsc_env mdl =
                         minf_exports   = md_exports details,
                          -- NB: already forced. See Note [Forcing GREInfo] in GHC.Types.GREInfo.
                         minf_instances = instEnvElts $ md_insts details,
-                        minf_iface     = Just iface,
+                        minf_iface     = Just (mkSimpleModiface iface),
                         minf_safe      = getSafeMode $ mi_trust iface,
                         minf_modBreaks = getModBreaks hmi
                         }))
@@ -189,7 +189,7 @@ modInfoLookupName minf name = withSession $ \hsc_env -> do
      Just tyThing -> return (Just tyThing)
      Nothing      -> liftIO (lookupType hsc_env name)
 
-modInfoIface :: ModuleInfo -> Maybe ModIface
+modInfoIface :: ModuleInfo -> Maybe SimpleModIface
 modInfoIface = minf_iface
 
 -- | Retrieve module safe haskell mode

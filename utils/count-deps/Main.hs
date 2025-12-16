@@ -14,6 +14,7 @@ import System.Environment
 import GHC.Unit.Module.Deps
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
+import GHC.Unit.Module.ModIface
 
 -- Example invocation:
 --  inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` "GHC.Parser"
@@ -79,5 +80,5 @@ calcDeps modName libdir =
     mkModule :: String -> ModuleName -> Module
     mkModule ghcUnitId = Module (stringToUnit ghcUnitId)
 
-    modDeps :: ModIface -> [ModuleName]
-    modDeps mi = map (gwib_mod . (\(_, _, mn) -> mn)) $ Set.toList $ dep_direct_mods (mi_deps mi)
+    modDeps :: SimpleModIface -> [ModuleName]
+    modDeps mi = map (gwib_mod . (\(_, _, mn) -> mn)) $ Set.toList $ dep_direct_mods (mi_simple_info_deps mi)

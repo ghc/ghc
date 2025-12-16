@@ -1651,7 +1651,7 @@ lookupDeclDoc nm = do
       mIface <- getExternalModIface nm
       case mIface of
         Just iface
-          | Just Docs{docs_decls = dmap} <- mi_docs iface ->
+          | Just Docs{docs_decls = dmap} <- mi_simple_docs iface ->
           pure $ renderHsDocStrings . map hsDocString <$> lookupUniqMap dmap nm
         _ -> pure Nothing
 
@@ -1668,12 +1668,12 @@ lookupArgDoc i nm = do
       mIface <- getExternalModIface nm
       case mIface of
         Just iface
-          | Just Docs{docs_args = amap} <- mi_docs iface->
+          | Just Docs{docs_args = amap} <- mi_simple_docs iface->
           pure $ renderHsDocString . hsDocString <$> (lookupUniqMap amap nm >>= IntMap.lookup i)
         _ -> pure Nothing
 
 -- | Returns the module a Name belongs to, if it is isn't local.
-getExternalModIface :: Name -> TcM (Maybe ModIface)
+getExternalModIface :: Name -> TcM (Maybe SimpleModIface)
 getExternalModIface nm = do
   isLocal <- nameIsLocalOrFrom <$> getModule <*> pure nm
   if isLocal
@@ -2989,7 +2989,7 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
 
       reifyFromIface reifMod = do
         iface <- loadInterfaceForModule (text "reifying module from TH for" <+> ppr reifMod) reifMod
-        let IfaceTopEnv _ imports = mi_top_env iface
+        let IfaceTopEnv _ imports = mi_simple_top_env iface
             -- Convert IfaceImport to module names
             usages = [modToTHMod (ifImpModule imp) | imp <- imports]
         return $ TH.ModuleInfo usages

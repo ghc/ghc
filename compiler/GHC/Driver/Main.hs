@@ -2,6 +2,7 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
@@ -304,6 +305,8 @@ import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
 
+import qualified GHC.Unit.CombinedState as Combined
+
 import GHC.ByteCode.Serialize
 
 {- **********************************************************************
@@ -463,7 +466,7 @@ hscIsGHCiMonad :: HscEnv -> String -> IO Name
 hscIsGHCiMonad hsc_env name
   = runHsc hsc_env $ ioMsgMaybe $ hoistTcRnMessage $ isGHCiMonad hsc_env name
 
-hscGetModuleInterface :: HscEnv -> Module -> IO ModIface
+hscGetModuleInterface :: HscEnv -> Module -> IO SimpleModIface
 hscGetModuleInterface hsc_env0 mod = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
   ioMsgMaybe $ hoistTcRnMessage $ getModuleInterface hsc_env mod
@@ -1737,25 +1740,26 @@ hscCheckSafe' m l = do
     isModSafe home_unit m l = do
         hsc_env <- getHscEnv
         dflags <- getDynFlags
-        iface <- lookup' m
+        ensureLoaded m
+        combined_state <- liftIO $ hscCombinedState hsc_env
+        safe_haskell <- liftIO $ Combined.lookupSafeHaskell combined_state m
+        deps <- liftIO $ Combined.lookupDependencies combined_state m
         sec <- getSourceErrorContext
         let diag_opts = initDiagOpts dflags
-        case iface of
+        case (,) <$> safe_haskell <*> deps of
             -- can't load iface to check trust!
             Nothing -> throwOneError sec $
                          mkPlainErrorMsgEnvelope l $
                          GhcDriverMessage $ DriverCannotLoadInterfaceFile m
 
             -- got iface, check trust
-            Just iface' ->
-                let trust = getSafeMode $ mi_trust iface'
-                    trust_own_pkg = mi_trust_pkg iface'
-                    -- check module is trusted
+            Just ((getSafeMode -> trust, trust_own_pkg), deps) ->
+                let -- check module is trusted
                     safeM = trust `elem` [Sf_Safe, Sf_SafeInferred, Sf_Trustworthy]
                     -- check package is trusted
                     safeP = packageTrusted dflags (hsc_units hsc_env) home_unit trust trust_own_pkg m
                     -- pkg trust reqs
-                    pkgRs = dep_trusted_pkgs $ mi_deps iface'
+                    pkgRs = dep_trusted_pkgs $ deps
                     -- warn if Safe module imports Safe-Inferred module.
                     warns = if wopt Opt_WarnInferredSafeImports dflags
                                 && safeLanguageOn dflags
@@ -1800,16 +1804,17 @@ hscCheckSafe' m l = do
             _ | isHomeModule home_unit mod      -> True
             _ -> unitIsTrusted $ unsafeLookupUnit unit_state (moduleUnit m)
 
-    lookup' :: Module -> Hsc (Maybe ModIface)
-    lookup' m = do
+    ensureLoaded :: Module -> Hsc ()
+    ensureLoaded m = do
         hsc_env <- getHscEnv
-        iface <- liftIO $ lookupIfaceByModuleHsc hsc_env m
+        combined_state <- liftIO $ hscCombinedState hsc_env
+        loaded <- liftIO $ Combined.isModuleLoaded combined_state m
         -- the 'lookupIfaceByModule' method will always fail when calling from GHCi
         -- as the compiler hasn't filled in the various module tables
         -- so we need to call 'getModuleInterface' to load from disk
-        case iface of
-            Just _  -> return iface
-            Nothing -> liftIO $ initIfaceLoad hsc_env (Just <$> loadSysInterface (text "checkSafeImports") m)
+        if loaded
+          then return ()
+          else liftIO $ initIfaceLoad hsc_env (() <$ loadSysInterface (text "checkSafeImports") m)
 
 
 -- | Check the list of packages are trusted.

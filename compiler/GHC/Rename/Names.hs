@@ -374,7 +374,7 @@ rnImportDecl this_mod
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
-    warnPprTrace ((want_boot == NotBoot) && (mi_boot iface == IsBoot)) "rnImportDecl" (ppr imp_mod_name) $ do
+    warnPprTrace ((want_boot == NotBoot) && (mi_simple_boot iface == IsBoot)) "rnImportDecl" (ppr imp_mod_name) $ do
 
     -- Issue a user warning for a redundant {- SOURCE -} import
     -- NB that we arrange to read all the ordinary imports before
@@ -385,12 +385,12 @@ rnImportDecl this_mod
     -- the non-boot module depends on the compilation order, which
     -- is not deterministic.  The hs-boot test can show this up.
     dflags <- getDynFlags
-    warnIf ((want_boot == IsBoot) && (mi_boot iface == NotBoot) && isOneShot (ghcMode dflags))
+    warnIf ((want_boot == IsBoot) && (mi_simple_boot iface == NotBoot) && isOneShot (ghcMode dflags))
            (TcRnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
         addErr (TcRnSafeImportsDisabled imp_mod_name)
 
-    let imp_mod = mi_module iface
+    let imp_mod = mi_mod_info_module $ mi_simple_info iface
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
         imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only,
                                   is_dloc = locA loc, is_as = qual_mod_name,
@@ -427,7 +427,7 @@ rnImportDecl this_mod
         imports = calculateAvails home_unit other_home_units iface mod_safe' want_boot (ImportedByUser imv)
 
     -- Complain if we import a deprecated module
-    case fromIfaceWarnings (mi_warns iface) of
+    case fromIfaceWarnings (mi_simple_warns $ mi_simple_info_public iface) of
        WarnAll txt -> addDiagnostic (TcRnDeprecatedModule imp_mod_name txt)
        _           -> return ()
 
@@ -484,20 +484,20 @@ renamePkgQual unit_env mn mb_pkg = case mb_pkg of
 -- interface, but without 'imp_mods'.
 calculateAvails :: HomeUnit
                 -> S.Set UnitId
-                -> ModIface
+                -> SimpleModIface
                 -> IsSafeImport
                 -> IsBootInterface
                 -> ImportedBy
                 -> ImportAvails
 calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by =
-  let imp_mod    = mi_module iface
-      imp_sem_mod= mi_semantic_module iface
-      orph_iface = mi_orphan iface
-      has_finsts = mi_finsts iface
-      deps       = mi_deps iface
-      trust      = getSafeMode $ mi_trust iface
-      trust_pkg  = mi_trust_pkg iface
-      is_sig     = mi_hsc_src iface == HsigFile
+  let imp_mod    = mi_mod_info_module $ mi_simple_info iface
+      imp_sem_mod= mi_mod_info_semantic_module $ mi_simple_info iface
+      orph_iface = mi_abi_orphan $ mi_simple_abi_hashes $ mi_simple_info_public iface
+      has_finsts = mi_abi_finsts $ mi_simple_abi_hashes $ mi_simple_info_public iface
+      deps       = mi_simple_info_deps iface
+      trust      = getSafeMode $ mi_simple_trust_info $ mi_simple_info_public iface
+      trust_pkg  = mi_simple_trust_pkg $ mi_simple_info_public iface
+      is_sig     = mi_mod_info_hsc_src (mi_simple_info iface) == HsigFile
 
       -- If the module exports anything defined in this module, just
       -- ignore it.  Reason: otherwise it looks as if there are two
@@ -541,7 +541,7 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
                    | otherwise = S.empty
 
 
-      pkg = moduleUnit (mi_module iface)
+      pkg = moduleUnit (mi_mod_info_module $ mi_simple_info iface)
       ipkg = toUnitId pkg
 
       -- Does this import mean we now require our own pkg
@@ -583,7 +583,7 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
 
 
   in ImportAvails {
-          imp_mods       = Map.singleton (mi_module iface) [imported_by],
+          imp_mods       = Map.singleton (mi_mod_info_module $ mi_simple_info iface) [imported_by],
           imp_orphs      = orphans,
           imp_finsts     = finsts,
           imp_sig_mods   = sig_mods,
@@ -1170,18 +1170,18 @@ gresFromAvail hsc_env prov avail =
 gresFromAvails :: HscEnv -> Maybe ImportSpec -> [AvailInfo] -> [GlobalRdrElt]
 gresFromAvails hsc_env prov = concatMap (gresFromAvail hsc_env prov)
 
-importsFromIface :: HscEnv -> ModIface -> ImpDeclSpec -> Maybe NameSet -> GlobalRdrEnv
+importsFromIface :: HscEnv -> SimpleModIface -> ImpDeclSpec -> Maybe NameSet -> GlobalRdrEnv
 importsFromIface hsc_env iface decl_spec hidden = mkGlobalRdrEnv $ case hidden of
     Nothing -> all_gres
     Just hidden_names -> filter (not . (`elemNameSet` hidden_names) . greName) all_gres
   where
-    all_gres = gresFromAvails hsc_env (Just imp_spec) (mi_exports iface)
+    all_gres = gresFromAvails hsc_env (Just imp_spec) (mi_simple_info_exports $ mi_simple_info_public iface)
     imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
 
 filterImports
     :: HasDebugCallStack
     => HscEnv
-    -> ModIface
+    -> SimpleModIface
     -> ImpDeclSpec
          -- ^ Import spec
     -> Maybe (ImportListInterpretation, LocatedLI [LIE GhcPs])
@@ -1212,8 +1212,8 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
         return (Just (want_hiding, L l (map fst items2)), imp_user_list, gres)
   where
-    import_mod = mi_module iface
-    all_avails = mi_exports iface
+    import_mod = mi_mod_info_module $ mi_simple_info iface
+    all_avails = mi_simple_info_exports $ mi_simple_info_public iface
     imp_occ_env = mkImportOccEnv hsc_env decl_spec all_avails
 
     -- Look up a parent (type constructor, class or data constructor)
@@ -1403,7 +1403,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
               renamed_ie = IEWholeNamespace x { iewn_warning  = Nothing
                                               , iewn_names    = names }
               gres = filter (coveredByNamespaceSpecifier ns_spec . greNameSpace) $
-                     gresFromAvails hsc_env (Just imp_spec) (mi_exports iface)
+                     gresFromAvails hsc_env (Just imp_spec) (mi_simple_info_exports $ mi_simple_info_public iface)
               imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
               dodgy_warn
                 | null gres = [DodgyImport (DodgyImportsWildcard mod_name ns_spec)]
@@ -1435,7 +1435,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
           | otherwise = failLookupWith (BadImport ie sub)
 
         mk_depr_export_warning gre
-          = DeprecatedExport name <$> mi_export_warn_fn iface name
+          = DeprecatedExport name <$> (mi_cache_export_warn_fn $ mi_simple_caches $ mi_simple_info_public iface) name
           where
             name = greName gre
 
@@ -2285,7 +2285,7 @@ getMinimalImports ie_decls
       where
         doc = text "Compute minimal imports for" <+> ppr decl
 
-    to_ie :: GlobalRdrEnv -> ModIface -> AvailInfo -> RnM [IE GhcRn]
+    to_ie :: GlobalRdrEnv -> SimpleModIface -> AvailInfo -> RnM [IE GhcRn]
     -- The main trick here is that if we're importing all the constructors
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
@@ -2297,7 +2297,7 @@ getMinimalImports ie_decls
       | availExportsDecl avail
       = return [IEThingAbs Nothing (to_ie_post_rn $ noLocA n) Nothing]
     to_ie rdr_env iface (AvailTC n cs) =
-      case [ xs | avail@(AvailTC x xs) <- mi_exports iface
+      case [ xs | avail@(AvailTC x xs) <- mi_simple_info_exports $ mi_simple_info_public iface
            , x == n
            , availExportsDecl avail  -- Note [Partial export]
            ] of
@@ -2448,7 +2448,7 @@ DRFPatSynExport for a test of this.
 -}
 
 badImportItemErr
-  :: ModIface -> ImpDeclSpec -> IE GhcPs
+  :: SimpleModIface -> ImpDeclSpec -> IE GhcPs
   -> IsSubordinateError
   -> [AvailInfo]
   -> TcRn (NonEmpty ImportLookupReason)
@@ -2519,7 +2519,7 @@ badImportItemErr iface decl_spec ie sub avails = do
     rdr = ieName ie
     importedFS = occNameFS $ rdrNameOcc rdr
     imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
-    all_avails = mi_exports iface
+    all_avails = mi_simple_info_exports $ mi_simple_info_public iface
 
 importLookupExtensions :: TcRn ImportLookupExtensions
 importLookupExtensions = do

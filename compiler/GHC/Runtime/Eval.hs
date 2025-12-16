@@ -979,7 +979,7 @@ getDocs name =
            then pure (Left InteractiveName)
            else do
              iface <- liftIO $ hscGetModuleInterface hsc_env mod
-             case mi_docs iface of
+             case mi_simple_docs iface of
                Nothing -> pure (Left (NoDocsInIface mod compiled))
                Just Docs { docs_decls = decls
                          , docs_args = args

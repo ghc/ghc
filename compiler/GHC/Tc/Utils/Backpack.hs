@@ -933,18 +933,18 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     impl_iface <- initIfaceTcRn $
         loadSysInterface (text "checkImplements 1") impl_mod
     let impl_gr = mkGlobalRdrEnv
-                    (gresFromAvails hsc_env Nothing (mi_exports impl_iface))
-        nsubst = mkNameShape (moduleName impl_mod) (mi_exports impl_iface)
+                    (gresFromAvails hsc_env Nothing ((mi_simple_info_exports (mi_simple_info_public impl_iface))))
+        nsubst = mkNameShape (moduleName impl_mod) ((mi_simple_info_exports (mi_simple_info_public impl_iface)))
 
     -- Load all the orphans, so the subsequent 'checkHsigIface' sees
     -- all the instances it needs to
     loadModuleInterfaces (text "Loading orphan modules (from implementor of hsig)")
-                         (dep_orphs (mi_deps impl_iface))
+                         (dep_orphs (mi_simple_info_deps impl_iface))
 
     let avails = calculateAvails home_unit other_home_units
                     impl_iface False{- safe -} NotBoot ImportedBySystem
         fix_env = mkNameEnv [ (greName rdr_elt, FixItem occ f)
-                            | (occ, f) <- mi_fixities impl_iface
+                            | (occ, f) <- mi_simple_fixities (mi_simple_info_public impl_iface)
                             , rdr_elt <- lookupGRE impl_gr (LookupOccName occ AllRelevantGREs) ]
     updGblEnv (\tcg_env -> tcg_env {
         -- Setting tcg_rdr_env to treat all exported entities from

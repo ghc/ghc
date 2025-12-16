@@ -183,7 +183,7 @@ lookupFixityRn_help name
       -- loadInterfaceForName will find B.hi even if B is a hidden module,
       -- and that's what we want.
       = do { iface <- loadInterfaceForName doc name
-           ; let mb_fix = mi_fix_fn iface occ
+           ; let mb_fix = (mi_cache_fix_fn $ mi_simple_caches $ mi_simple_info_public iface) occ
            ; let msg = case mb_fix of
                             Nothing ->
                                   text "looking up name" <+> ppr name

@@ -25,12 +25,11 @@ module GHC.Driver.Env
    , mkInteractiveHscEnv
    , runInteractiveHsc
    , hscEPS
+   , hscCombinedState
    , hscInterp
    , prepareAnnotations
    , discardIC
    , lookupType
-   , lookupIfaceByModule
-   , lookupIfaceByModuleHsc
    , mainModIs
 
    , hugRulesBelow
@@ -66,10 +65,10 @@ import GHC.Unit.Module.Graph
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Env as UnitEnv
 import GHC.Unit.External
+import qualified GHC.Unit.CombinedState as Combined
 
 import GHC.Types.Error ( emptyMessages, Messages )
 import GHC.Types.Name
-import GHC.Types.Name.Env
 import GHC.Types.TyThing
 
 import GHC.Data.Maybe
@@ -222,6 +221,9 @@ configured via command-line flags (in `GHC.setTopSessionDynFlags`).
 hscEPS :: HscEnv -> IO ExternalPackageState
 hscEPS hsc_env = readIORef (euc_eps (ue_eps (hsc_unit_env hsc_env)))
 
+hscCombinedState :: HscEnv -> IO Combined.CombinedState
+hscCombinedState hsc_env = Combined.CombinedState <$> hscEPS hsc_env <*> pure (hsc_HUG hsc_env)
+
 --------------------------------------------------------------------------------
 -- * Queries on Transitive Closure
 --------------------------------------------------------------------------------
@@ -331,48 +333,14 @@ prepareAnnotations hsc_env mb_guts = do
 -- have to do that yourself, if desired
 lookupType :: HscEnv -> Name -> IO (Maybe TyThing)
 lookupType hsc_env name = do
-   eps <- liftIO $ hscEPS hsc_env
-   let pte = eps_PTE eps
-   lookupTypeInPTE hsc_env pte name
-
-lookupTypeInPTE :: HscEnv -> PackageTypeEnv -> Name -> IO (Maybe TyThing)
-lookupTypeInPTE hsc_env pte name = ty
-  where
-    hpt = hsc_HUG hsc_env
-    mod = assertPpr (isExternalName name) (ppr name) $
-          if isHoleName name
+   combined_state <- liftIO $ hscCombinedState hsc_env
+   let mod = assertPpr (isExternalName name) (ppr name) $
+              if isHoleName name
             then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
             else nameModule name
+   Combined.lookupType combined_state mod name
 
-    ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
-            -- in one-shot, we don't use the HPT
-            then return $! lookupNameEnv pte name
-            else HUG.lookupHugByModule mod hpt >>= \case
-             Just hm -> pure $! lookupNameEnv (md_types (hm_details hm)) name
-             Nothing -> pure $! lookupNameEnv pte name
 
--- | Find the 'ModIface' for a 'Module', searching in both the loaded home
--- and external package module information
-lookupIfaceByModule
-        :: HomeUnitGraph
-        -> PackageIfaceTable
-        -> Module
-        -> IO (Maybe ModIface)
-lookupIfaceByModule hug pit mod
-  = HUG.lookupHugByModule mod hug >>= pure . \case
-       Just hm -> Just (hm_iface hm)
-       Nothing -> lookupModuleEnv pit mod
-   -- If the module does come from the home package, why do we look in the PIT as well?
-   -- (a) In OneShot mode, even home-package modules accumulate in the PIT
-   -- (b) Even in Batch (--make) mode, there is *one* case where a home-package
-   --     module is in the PIT, namely GHC.Prim when compiling the base package.
-   -- We could eliminate (b) if we wanted, by making GHC.Prim belong to a package
-   -- of its own, but it doesn't seem worth the bother.
-
-lookupIfaceByModuleHsc :: HscEnv -> Module -> IO (Maybe ModIface)
-lookupIfaceByModuleHsc hsc_env mod = do
-  eps <- hscEPS hsc_env
-  lookupIfaceByModule (hsc_HUG hsc_env) (eps_PIT eps) mod
 
 mainModIs :: HomeUnitEnv -> Module
 mainModIs hue = mkHomeModule (expectJust $ homeUnitEnv_home_unit hue) (mainModuleNameIs (homeUnitEnv_dflags hue))

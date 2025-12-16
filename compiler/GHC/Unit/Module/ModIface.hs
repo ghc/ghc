@@ -9,7 +9,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
 
 module GHC.Unit.Module.ModIface
-   ( ModIface
+   ( SimpleModIface(..)
+   , SimpleIfacePublic(..)
+   , mkSimpleModiface
+   , ModIface
    , ModIface_
       ( mi_mod_info
       , mi_module
@@ -92,8 +95,12 @@ module GHC.Unit.Module.ModIface
    , IfaceTopEnv (..)
    , IfaceImport(..)
    , mi_boot
+   , mi_simple_boot
    , mi_fix
+   , mi_simple_fix
    , mi_semantic_module
+   , mi_simple_semantic_module
+   , mi_simple_free_holes
    , mi_mod_info_semantic_module
    , mi_free_holes
    , mi_mnwib
@@ -248,7 +255,48 @@ withSelfRecomp iface nk jk =
     Nothing -> nk
     Just x -> jk x
 
+-- | The parts of a ModIface which we retain in memory.
+data SimpleModIface = SimpleModIface {
+  mi_simple_info :: IfaceModInfo,
+  mi_simple_info_deps :: Dependencies,
+  mi_simple_info_iface_hash :: Fingerprint,
+  mi_simple_info_public :: SimpleIfacePublic,
+  mi_simple_docs :: Maybe Docs,
+  mi_simple_top_env :: IfaceTopEnv
+}
 
+data SimpleIfacePublic = SimpleIfacePublic {
+  mi_simple_info_exports :: [IfaceExport],
+  mi_simple_warns :: IfaceWarnings,
+  mi_simple_trust_info :: IfaceTrustInfo,
+  mi_simple_trust_pkg :: Bool,
+  mi_simple_fixities :: [(OccName, Fixity)],
+  mi_simple_abi_hashes :: IfaceAbiHashes,
+  mi_simple_caches :: IfaceCache  -- TODO: The cache probably retains reference to mi_decls unless we are careful.
+}
+
+mkSimpleModiface :: ModIface -> SimpleModIface
+mkSimpleModiface iface = SimpleModIface {
+  mi_simple_info = mi_mod_info iface,
+  mi_simple_info_deps = mi_deps iface,
+  mi_simple_info_iface_hash = mi_iface_hash iface,
+  mi_simple_docs = mi_docs iface,
+  mi_simple_top_env = mi_top_env iface,
+  mi_simple_info_public = SimpleIfacePublic {
+    mi_simple_info_exports = mi_exports iface,
+    mi_simple_trust_info = mi_trust iface,
+    mi_simple_warns = mi_warns iface,
+    mi_simple_trust_pkg = mi_trust_pkg iface,
+    mi_simple_fixities = mi_fixities iface,
+    mi_simple_abi_hashes = mi_abi_hashes iface,
+    mi_simple_caches = IfaceCache {
+      mi_cache_decl_warn_fn = mi_decl_warn_fn iface,
+      mi_cache_export_warn_fn = mi_export_warn_fn iface,
+      mi_cache_fix_fn = mi_fix_fn iface,
+      mi_cache_hash_fn = mi_hash_fn iface
+    }
+  }
+}
 
 -- | A 'ModIface' summarises everything we know
 -- about a compiled module.
@@ -319,6 +367,8 @@ data IfaceModInfo = IfaceModInfo {
   mi_mod_info_sig_of :: Maybe Module, -- ^ Are we a sig of another mod?
   mi_mod_info_hsc_src :: HscSource -- ^ Boot? Signature?
 }
+
+
 
 -- | The public interface of a module which are used by other modules when importing this module.
 -- The ABI of a module.
@@ -548,6 +598,11 @@ mi_orphan_hash iface = mi_abi_orphan_hash (mi_abi_hashes iface)
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
 -- file.
+mi_simple_boot :: SimpleModIface -> IsBootInterface
+mi_simple_boot iface = if mi_mod_info_hsc_src (mi_simple_info iface) == HsBootFile
+    then IsBoot
+    else NotBoot
+
 mi_boot :: ModIface -> IsBootInterface
 mi_boot iface = if mi_hsc_src iface == HsBootFile
     then IsBoot
@@ -561,6 +616,9 @@ mi_mnwib iface = GWIB (moduleName $ mi_module iface) (mi_boot iface)
 mi_fix :: ModIface -> OccName -> Fixity
 mi_fix iface name = mi_fix_fn iface name `orElse` defaultFixity
 
+mi_simple_fix :: SimpleModIface -> OccName -> Fixity
+mi_simple_fix iface name = mi_cache_fix_fn (mi_simple_caches $ mi_simple_info_public iface) name `orElse` defaultFixity
+
 -- | The semantic module for this interface; e.g., if it's a interface
 -- for a signature, if 'mi_module' is @p[A=<A>]:A@, 'mi_semantic_module'
 -- will be @<A>@.
@@ -571,6 +629,9 @@ mi_mod_info_semantic_module iface = case mi_mod_info_sig_of iface of
 
 mi_semantic_module :: ModIface_ a -> Module
 mi_semantic_module iface = mi_mod_info_semantic_module (mi_mod_info iface)
+
+mi_simple_semantic_module :: SimpleModIface -> Module
+mi_simple_semantic_module iface = mi_mod_info_semantic_module (mi_simple_info iface)
 
 -- | The "precise" free holes, e.g., the signatures that this
 -- 'ModIface' depends on.
@@ -584,6 +645,17 @@ mi_free_holes iface =
     _   -> emptyUniqDSet
   where
     cands = dep_sig_mods $ mi_deps iface
+
+mi_simple_free_holes :: SimpleModIface -> UniqDSet ModuleName
+mi_simple_free_holes iface =
+  case getModuleInstantiation (mi_mod_info_module (mi_simple_info iface)) of
+    (_, Just indef)
+        -- A mini-hack: we rely on the fact that 'renameFreeHoles'
+        -- drops things that aren't holes.
+        -> renameFreeHoles (mkUniqDSet cands) (instUnitInsts (moduleUnit indef))
+    _   -> emptyUniqDSet
+  where
+    cands = dep_sig_mods $ mi_simple_info_deps iface
 
 -- | Given a set of free holes, and a unit identifier, rename
 -- the free holes according to the instantiation of the unit

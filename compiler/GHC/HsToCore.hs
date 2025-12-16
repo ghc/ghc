@@ -218,7 +218,7 @@ deSugar hsc_env
         ; let deps = mkDependencies home_unit
                                     (tcg_mod tcg_env)
                                     (tcg_imports tcg_env)
-                                    (map mi_module pluginModules)
+                                    (map (mi_mod_info_module . mi_simple_info) pluginModules)
 
         ; safe_mode <- finalSafeMode dflags tcg_env
 
