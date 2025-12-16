@@ -40,7 +40,6 @@ import Settings.Builders.HsCpp
 import Settings.Builders.Ar
 import Settings.Builders.Ld
 import Settings.Builders.Make
-import Settings.Builders.MergeObjects
 import Settings.Builders.SplitSections
 import Settings.Builders.RunTest
 import Settings.Builders.Xelatex
@@ -328,7 +327,6 @@ defaultBuilderArgs = mconcat
     , ldBuilderArgs
     , arBuilderArgs
     , makeBuilderArgs
-    , mergeObjectsBuilderArgs
     , runTestBuilderArgs
     , validateBuilderArgs
     , xelatexBuilderArgs

@@ -71,16 +71,9 @@ topLevelTargets = action $ do
     name stage pkg | isLibrary pkg = return (pkgName pkg)
                    | otherwise     = programName (vanillaContext stage pkg)
 
--- TODO: Get rid of the @includeGhciLib@ hack.
 -- | Return the list of targets associated with a given 'Stage' and 'Package'.
--- By setting the Boolean parameter to False it is possible to exclude the GHCi
--- library from the targets, and avoid configuring the package to determine
--- whether GHCi library needs to be built for it. We typically want to set
--- this parameter to True, however it is important to set it to False when
--- computing 'topLevelTargets', as otherwise the whole build gets sequentialised
--- because packages are configured in the order respecting their dependencies.
-packageTargets :: Bool -> Stage -> Package -> Action [FilePath]
-packageTargets includeGhciLib stage pkg = do
+packageTargets :: Stage -> Package -> Action [FilePath]
+packageTargets stage pkg = do
     let context = vanillaContext stage pkg
     activePackages <- stagePackages stage
     if pkg `notElem` activePackages
@@ -90,7 +83,7 @@ packageTargets includeGhciLib stage pkg = do
             let pkgWays = if pkg == rts then getRtsWays else getLibraryWays
             ways  <- interpretInContext context pkgWays
             libs  <- mapM (\w -> pkgLibraryFile (Context stage pkg w (error "unused"))) (Set.toList ways)
-            more  <- Rules.Library.libraryTargets includeGhciLib context
+            more  <- Rules.Library.libraryTargets context
             setupConfig <- pkgSetupConfigFile context
             return $ [setupConfig] ++ libs ++ more
         else do -- The only target of a program package is the executable.

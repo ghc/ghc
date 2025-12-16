@@ -178,7 +178,6 @@ data Builder = Alex
              | Ld Stage --- ^ linker
              | Make FilePath
              | Makeinfo
-             | MergeObjects Stage -- ^ linker to be used to merge object files.
              | Nm
              | Objdump
              | Python
@@ -453,15 +452,6 @@ systemBuilderPath builder = case builder of
     HsCpp           -> fromTargetTC "hs-cpp" (Toolchain.hsCppProgram . tgtHsCPreprocessor)
     JsCpp           -> fromTargetTC "js-cpp" (maybeProg Toolchain.jsCppProgram . tgtJsCPreprocessor)
     Ld _            -> fromTargetTC "ld" (Toolchain.ccLinkProgram . tgtCCompilerLink)
-    -- MergeObjects Stage0 is a special case in case of
-    -- cross-compiling. We're building stage1, e.g. code which will be
-    -- executed on the host and hence we need to use host's merge
-    -- objects tool and not the target merge object tool.
-    -- Note, merge object tool is usually platform linker with some
-    -- parameters. E.g. building a cross-compiler on and for x86_64
-    -- which will target ppc64 means that MergeObjects Stage0 will use
-    -- x86_64 linker and MergeObject _ will use ppc64 linker.
-    MergeObjects st -> fromStageTC st "merge-objects" (maybeProg Toolchain.mergeObjsProgram . tgtMergeObjs)
     Make _          -> fromKey "make"
     Makeinfo        -> fromKey "makeinfo"
     Nm              -> fromTargetTC "nm" (Toolchain.nmProgram . tgtNm)

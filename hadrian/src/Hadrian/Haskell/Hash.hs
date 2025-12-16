@@ -82,7 +82,6 @@ data PackageHashConfigInputs = PackageHashConfigInputs {
        pkgHashVanillaLib          :: Bool,
        pkgHashSharedLib           :: Bool,
        pkgHashDynExe              :: Bool,
-       pkgHashGHCiLib             :: Bool,
        pkgHashProfLib             :: Bool,
        pkgHashProfExe             :: Bool,
        pkgHashSplitObjs           :: Bool,
@@ -139,7 +138,6 @@ pkgHashOracle = void $ addOracleCache $ \(PkgHashKey (stag, pkg)) -> do
       pkgHashVanillaLib = vanilla `Set.member` libWays
       pkgHashSharedLib = dynamic `Set.member` libWays
       pkgHashDynExe = dyn_ghc
-      pkgHashGHCiLib = False
       pkgHashProfLib = profiling `Set.member` libWays
       pkgHashProfExe = pkg == ghc && ghcProfiled flav stag
       pkgHashSplitObjs = False -- Deprecated
@@ -239,7 +237,6 @@ renderPackageHashInputs PackageHashInputs{
       , opt   "vanilla-lib" True  show pkgHashVanillaLib
       , opt   "shared-lib"  False show pkgHashSharedLib
       , opt   "dynamic-exe" False show pkgHashDynExe
-      , opt   "ghci-lib"    False show pkgHashGHCiLib
       , opt   "prof-lib"    False show pkgHashProfLib
       , opt   "prof-exe"    False show pkgHashProfExe
       , opt   "split-objs"   False show pkgHashSplitObjs
