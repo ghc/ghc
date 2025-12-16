@@ -1504,11 +1504,12 @@ coercion.
 mkIrredErr :: SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
 mkIrredErr ctxt items
   = do { (ctxt, binds, item1) <- relevantBindings True ctxt item1
-       ; couldNotDeduceErr <- mkCouldNotDeduceErr (getUserGivens ctxt) (item1 :| others) Nothing
+       ; couldNotDeduceErr <- mkCouldNotDeduceErr useful_givens (item1 :| others) Nothing
        ; let msg = important ctxt $ mkPlainMismatchMsg couldNotDeduceErr
        ; return $ add_relevant_bindings binds msg  }
   where
     item1:|others = tryFilter (not . ei_suppress) items
+    useful_givens = getUsefulGivens ctxt item1
 
 {- Note [Constructing Hole Errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1689,8 +1690,8 @@ validHoleFits ctxt@(CEC { cec_encl = implics
 givenConstraints :: SolverReportErrCtxt -> [(Type, RealSrcSpan)]
 -- Returned outermost first
 -- See Note [Constraints include ...]
-givenConstraints ctxt
-  = do { implic@Implic{ ic_given = given } <- getUserGivens ctxt
+givenConstraints (CEC { cec_encl = implics })
+  = do { implic@Implic{ ic_given = given } <- getGivensFromImplics implics
        ; constraint <- given
        ; return (varType constraint, getCtLocEnvLoc (ic_env implic)) }
 
@@ -2100,6 +2101,7 @@ eqInfoMsgs ty1 ty2
 
 misMatchOrCND :: SolverReportErrCtxt -> ErrorItem
               -> TcType -> TcType -> TcM MismatchMsg
+-- Make a message for a failed equality constraint (t1 ~ t2)
 -- If oriented then ty1 is actual, ty2 is expected
 misMatchOrCND ctxt item ty1 ty2
   | ei_insoluble item   -- See Note [Insoluble mis-match]
@@ -2115,7 +2117,8 @@ misMatchOrCND ctxt item ty1 ty2
 
   where
     level   = ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel
-    givens  = [ given | given <- getUserGivens ctxt, ic_given_eqs given /= NoGivenEqs ]
+    givens  = [ given | given <- getUsefulGivens ctxt item
+                      , ic_given_eqs given /= NoGivenEqs ]
               -- Keep only UserGivens that have some equalities.
               -- See Note [Suppress redundant givens during error reporting]
 
@@ -2297,7 +2300,8 @@ mkQCErr :: HasDebugCallStack => SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM
 mkQCErr ctxt items
   | item1 :| _ <- tryFilter (not . ei_suppress) items
     -- Ignore multiple qc-errors on the same line
-  = do { couldNotDeduceErr <- mkCouldNotDeduceErr (getUserGivens ctxt) (item1 :| []) Nothing
+  = do { couldNotDeduceErr <- mkCouldNotDeduceErr (getUsefulGivens ctxt item1)
+                                                  (item1 :| []) Nothing
        ; return $ important ctxt $ mkPlainMismatchMsg couldNotDeduceErr }
 
 
@@ -2327,7 +2331,8 @@ mkDictErr ctxt orig_items@(item1 :| others)
   where
     items = tryFilter (not . ei_suppress) orig_items
 
-    no_givens = null (getUserGivens ctxt)
+    useful_givens = getUsefulGivens ctxt item1
+    no_givens = null useful_givens
 
     is_no_inst (item, (matches, unifiers, _))
       =  no_givens
@@ -2466,9 +2471,9 @@ mkCouldNotDeduceErr
   -> NonEmpty ErrorItem
   -> Maybe CND_ExpectedActual
   -> TcM MismatchMsg
-mkCouldNotDeduceErr user_givens items@(item :| _) mb_ea
+mkCouldNotDeduceErr useful_givens items@(item :| _) mb_ea
   = do { mb_noBuiltinInst_info <- getNoBuiltinInstMsg item
-       ; return $ CouldNotDeduce user_givens items mb_ea mb_noBuiltinInst_info }
+       ; return $ CouldNotDeduce useful_givens items mb_ea mb_noBuiltinInst_info }
 
 getNoBuiltinInstMsg :: ErrorItem -> TcM (Maybe NoBuiltinInstanceMsg)
 getNoBuiltinInstMsg item =

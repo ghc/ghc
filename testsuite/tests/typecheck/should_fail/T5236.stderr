@@ -1,0 +1,7 @@
+T5236.hs:16:9: error: [GHC-39999]
+    • No instance for ‘Id A B’
+      Insoluble functional dependencies wrt top-level instances
+    • In the ambiguity check for ‘loop’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      In the type signature: loop :: Id A B => Bool
+

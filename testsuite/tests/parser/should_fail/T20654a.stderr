@@ -5,6 +5,7 @@ T20654a.hs:7:9: error: [GHC-91416]
         bound by the type signature for:
                    foo :: (?poly::forall a. a -> a) => Int -> Int
         at T20654a.hs:6:1-48
+      Insoluble functional dependencies wrt other constraints
     • In the expression: ?poly x
       In an equation for ‘foo’: foo x = ?poly x
 

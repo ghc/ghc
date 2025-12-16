@@ -23,6 +23,7 @@ import GHC.Tc.Types.Constraint
 
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
+import GHC.Core.TyCo.Rep( Type(..) )
 import GHC.Core.Predicate( EqRel(..) )
 import GHC.Core.TyCon
 import GHC.Core.Unify( tcUnifyTysForInjectivity, typeListsAreApart )
@@ -36,6 +37,7 @@ import GHC.Types.Var.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Control.Monad( unless )
 import GHC.Data.Pair
 import Data.Maybe( isNothing, isJust, mapMaybe )
 
@@ -51,6 +53,15 @@ Here is our plan for dealing with functional dependencies
        * kick out any inert constraints that mention the unified variables
        * send the current constraint back to the start of the pipeline;
          it might now be soluble, and it probably isn't inert
+
+
+* Once a unification is done, it can't be un-done.  So we must be very careful
+  not to threaten completeness by doing a unification when there might be
+  another way to solve the constraint.
+
+  Hence Principle (FUNDEP-COMPLETENESS):
+    We generate a fundep-equality from a Wanted constraint only if the /sole/
+    way to solve that constraint is for that equality to hold.
 
 * (GEN-FD) How we generate those [FunDepEqns] varies:
        - tryDictFunDeps: for class constraints (C t1 .. tn)
@@ -283,6 +294,76 @@ the Wanted matches the second instance, so we never get as far
 as the fundeps.
 
 #7875 is a case in point.
+
+Note [Insoluble fundeps]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The pattern-match overlap checker uses the constraint solver
+to find definitely-insoluble (aka inconsistent) constraints;
+see `GHC.Tc.Solver.tcCheckGivens.`
+
+But that insolubility could show up via a fundep (#22652).  Consider
+    type family F a where
+      F Int = Bool  -- (F1)
+      F Char = Int  -- (F2)
+and
+   [G] F Bool ~ Bool
+
+The type-family is closed, so the only way to make a Bool is via (F1),
+so we know that the original constraint is insoluble.
+
+Knowing this is good because
+  * Marking the constraint as insoluble means we we'll put it in the Irreds,
+    and won't use it to (confusingly) "help" solve other constraints.
+  * Detecting insolubilitly is crucial for patterm-match overlap checking.
+
+
+The moving parts are:
+
+  * `solveFunDeps` checks to see if the residual unsolved fundep
+    equalities are insoluble, and returns a boolean to say
+
+  * All the callers of `solveFunDeps` check this insolubility flag
+      - when doing fundeps on dictionaries
+      - when doing fundeps on type-family equalities
+
+  * When we detect insolubility, `insolubleFunDep`
+      - Adds the constraint to the inert set as a CIrredCan,
+        with a CtIrredReason of InsolubleFunDepReason.
+      - Returns Stop from the Stage
+
+Wrinkles:
+
+(IFD0) In `mkTopClosedFamEqFDs, if there are no relevant equations, the equality
+    can't be solved, so we can call `insolubleFunDep` there too.
+
+(IFD1) Usually we don't generate fundeps for Givens type-family equalities
+  (except for built-in type families, see (INJFAM:Given)), because fundeps
+  don't generate evidence.  BUT when doing /pattern-match overlap checking/
+  we DO want to generate fundeps so that we can see if they are insoluble.
+
+  So we have a rather ad-hoc check in `tryFamEqFunDeps` for this.
+
+(IFD2) During error reporting, don't want to say "Could not deduce X from Y"
+  if the constraint X is outright insoluble becuase of /top-level/ equations.
+  Then the Y part is just distracting.  But we /do/ want to report the Y part
+  if insolublity comes from /local/ constraints.  Consider
+     [G] IP "x" Int
+     [W] IP "x" String
+  This generates the insoluble Int~String, but we don't want to say that
+  ?x::String is outright insoluble, only that we can't solve it from ?x::Int.
+
+  Hence the Bool parameter to InsolubleFunDepReason:
+
+    True <=>  Insolubility from top-level equations only
+              e.g. type family F a where
+                      F Int = Char
+                   [W] F Bool ~ Char   -- Definitely insoluble
+
+    False <=> Insolubility from /local/ constraints
+              e.g. [G] ?x::Int
+                   [W] ?x::String
+              We get an insoluble Int~String
+
 -}
 
 
@@ -332,8 +413,8 @@ tryDictFunDepsLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
 
        -- See (DFL1) of Note [Do fundeps last]
        ; if | unif_happened -> startAgainWith (CDictCan dict_ct)
-            | insoluble     -> insolubleFunDep work_ev
-            | otherwise     ->  continueWith () }
+            | insoluble     -> insolubleFunDep False work_ev
+            | otherwise     -> continueWith () }
   where
     work_pred     = ctEvPred work_ev
     work_is_given = isGiven work_ev
@@ -350,16 +431,18 @@ tryDictFunDepsLocal dict_ct@(DictCt { di_cls = cls, di_ev = work_ev })
       | otherwise
       = improveFromAnother (ctEvPred inert_ev) work_pred
 
-insolubleFunDep :: CtEvidence -> TcS (StopOrContinue ())
+insolubleFunDep :: Bool -> CtEvidence -> TcS (StopOrContinue a)
 -- The fundeps generated an insoluble constraint.
--- Stop solving with an (insoluble) CIrredCan
--- It's valuable to flag such constraints as insoluble becuase that improves
--- pattern-match overlap checking
-insolubleFunDep ev
+-- Stop solving with an inert (insoluble) CIrredCan
+-- It's valuable to flag such constraints as insoluble because that improves
+-- pattern-match overlap checking; see Note [Insoluble fundeps]
+--
+-- For the `is_top` parameter see (IFD2) in Note [Insoluble fundeps]
+insolubleFunDep is_top ev
   = do { updInertIrreds irred_ct
        ; stopWith ev "Insoluble fundep" }
   where
-    irred_ct = IrredCt { ir_ev = ev, ir_reason = InsolubleFunDepReason }
+    irred_ct = IrredCt { ir_ev = ev, ir_reason = InsolubleFunDepReason is_top }
 
 tryDictFunDepsTop :: DictCt -> SolverStage ()
 tryDictFunDepsTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
@@ -373,7 +456,7 @@ tryDictFunDepsTop dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = xis })
        ; traceTcS "tryDictFunDepsTop }" (text "unif =" <+> ppr unif_happened)
 
        ; if | unif_happened -> startAgainWith (CDictCan dict_ct)
-            | insoluble     -> insolubleFunDep ev
+            | insoluble     -> insolubleFunDep True ev
             | otherwise     -> continueWith () }
 
 {- Note [No Given/Given fundeps]
@@ -479,32 +562,34 @@ tryEqFunDeps :: EqCt -> SolverStage ()
 tryEqFunDeps work_item@(EqCt { eq_lhs = work_lhs
                              , eq_rhs = work_rhs
                              , eq_eq_rel = eq_rel })
-  | NomEq <- eq_rel
+  | NomEq <- eq_rel   -- Functional dependencies only work for nominal equalities
   , TyFamLHS fam_tc work_args <- work_lhs     -- We have F args ~N# rhs
   = do { eqs_for_me <- simpleStage $ getInertFamEqsFor fam_tc work_args work_rhs
        ; simpleStage $ traceTcS "tryEqFunDeps" (ppr work_item $$ ppr eqs_for_me)
-       ; tryFamEqFunDeps eqs_for_me fam_tc work_args work_item }
+       ; mode <- simpleStage getTcSMode
+       ; tryFamEqFunDeps mode eqs_for_me fam_tc work_args work_item }
   | otherwise
   = nopStage ()
 
 
-tryFamEqFunDeps :: [EqCt] -> TyCon -> [TcType] -> EqCt -> SolverStage ()
-tryFamEqFunDeps eqs_for_me fam_tc work_args
+tryFamEqFunDeps :: TcSMode -> [EqCt] -> TyCon -> [TcType] -> EqCt -> SolverStage ()
+tryFamEqFunDeps mode eqs_for_me fam_tc work_args
                 work_item@(EqCt { eq_ev = ev, eq_rhs = work_rhs })
   | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
   = if isGiven ev
     then tryGivenBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_item
     else do { -- Note [Do local fundeps before top-level instances]
-              tryFDEqns fam_tc work_args work_item $
-              mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
+              eqns <- mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
+            ; tryFDEqns False fam_tc work_args work_item eqns
 
-            ; if hasRelevantGiven eqs_for_me work_args work_item
-            ; then nopStage ()
-              else tryFDEqns fam_tc work_args work_item $
-                   mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs }
+            ; unless (hasRelevantGiven eqs_for_me work_args work_item) $
+              do { eqns <- mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
+                 ; tryFDEqns True fam_tc work_args work_item eqns } }
 
-  | isGiven ev    -- See (INJFAM:Given)
-  = nopStage ()
+  | isGiven ev  -- See (INJFAM:Given)
+  , not (tcsmResumable mode)   -- In the pattern-match checker, continue even for
+  = nopStage ()                -- Givens in the hope of discovering insolubility
+                               -- See (IFD1) in Note [Insoluble fundeps]
 
   -- Only Wanted constraints below here
 
@@ -512,24 +597,23 @@ tryFamEqFunDeps eqs_for_me fam_tc work_args
   = do { -- Note [Do local fundeps before top-level instances]
          case tyConInjectivityInfo fam_tc of
            NotInjective  -> nopStage ()
-           Injective inj -> tryFDEqns fam_tc work_args work_item $
-                            mkLocalFamEqFDs eqs_for_me fam_tc inj work_args work_rhs
+           Injective inj -> do { eqns <- mkLocalFamEqFDs eqs_for_me fam_tc inj work_args work_rhs
+                               ; tryFDEqns False fam_tc work_args work_item eqns }
 
-       ; if hasRelevantGiven eqs_for_me work_args work_item
-         then nopStage ()
-         else tryFDEqns fam_tc work_args work_item $
-              mkTopFamEqFDs fam_tc work_args work_rhs }
+       ; unless (hasRelevantGiven eqs_for_me work_args work_item) $
+         do { eqns <- mkTopFamEqFDs fam_tc work_args work_item
+            ; tryFDEqns True fam_tc work_args work_item eqns } }
 
-mkTopFamEqFDs :: TyCon -> [TcType] -> Xi -> TcS [FunDepEqns]
-mkTopFamEqFDs fam_tc work_args work_rhs
+mkTopFamEqFDs :: TyCon -> [TcType] -> EqCt -> SolverStage [FunDepEqns]
+mkTopFamEqFDs fam_tc work_args work_item
   | isOpenTypeFamilyTyCon fam_tc
   , Injective inj_flags <- tyConInjectivityInfo fam_tc
   = -- Open, injective type families
-    mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
+    simpleStage (mkTopOpenFamEqFDs fam_tc inj_flags work_args work_item)
 
   | Just ax <- isClosedFamilyTyCon_maybe fam_tc
   = -- Closed type families
-    mkTopClosedFamEqFDs ax work_args work_rhs
+    mkTopClosedFamEqFDs ax work_args work_item
 
   | otherwise
   = -- Data families, abstract families,
@@ -537,35 +621,55 @@ mkTopFamEqFDs fam_tc work_args work_rhs
     -- closed type families with no equations (isClosedFamilyTyCon_maybe returns Nothing)
     return []
 
-tryFDEqns :: TyCon -> [TcType] -> EqCt -> TcS [FunDepEqns] -> SolverStage ()
-tryFDEqns fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) mk_fd_eqns
+tryFDEqns :: Bool -> TyCon -> [TcType] -> EqCt -> [FunDepEqns] -> SolverStage ()
+tryFDEqns is_top fam_tc work_args work_item@(EqCt { eq_ev = ev, eq_rhs= rhs }) fd_eqns
   = Stage $
-    do { fd_eqns <- mk_fd_eqns
-       ; traceTcS "tryFDEqns" (vcat [ text "lhs:" <+> ppr fam_tc <+> ppr work_args
+    do { traceTcS "tryFDEqns" (vcat [ text "lhs:" <+> ppr fam_tc <+> ppr work_args
                                     , text "rhs:" <+> ppr rhs
                                     , text "eqns:" <+> ppr fd_eqns ])
+
        ; (insoluble, unif_happened) <- solveFunDeps ev fd_eqns
 
        ; if | unif_happened -> startAgainWith (CEqCan work_item)
-            | insoluble     -> insolubleFunDep ev
+            | insoluble     -> insolubleFunDep is_top ev
             | otherwise     -> continueWith () }
 
 -----------------------------------------
 --  User-defined type families
 -----------------------------------------
-mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> Xi -> TcS [FunDepEqns]
+mkTopClosedFamEqFDs :: CoAxiom Branched -> [TcType] -> EqCt -> SolverStage [FunDepEqns]
 -- Look at the top-level axioms; we effectively infer injectivity,
 -- so we don't need tyConInjectivtyInfo.  This works fine for closed
 -- type families without injectivity info
 -- See Note [Exploiting closed type families]
-mkTopClosedFamEqFDs ax work_args work_rhs
-  = do { let branches = fromBranches (coAxiomBranches ax)
+mkTopClosedFamEqFDs ax work_args (EqCt { eq_ev = ev, eq_rhs = work_rhs })
+  | isGenerativeType work_rhs -- See (CF5) in Note [Exploiting closed type families]
+  = Stage $
+    do { let branches = fromBranches (coAxiomBranches ax)
        ; traceTcS "mkTopClosed" (ppr branches $$ ppr work_args $$ ppr work_rhs)
        ; case getRelevantBranches ax work_args work_rhs of
-           [eqn] -> return [eqn]  -- If there is just one relevant equation, use it
-           _     -> return [] }
+           []    -> insolubleFunDep True ev  -- See (IFD0) in Note [Insoluble fundeps]
+           [eqn] -> continueWith [eqn]       -- If there is just one relevant equation, use it
+           _     -> continueWith [] }
+  | otherwise
+  = Stage $ continueWith []
+
+isGenerativeType :: Type -> Bool
+-- True <=> This type cannot rewrite to, or be substituted to,
+--          a saturated type-family application
+-- See (CF5) in Note [Exploiting closed type families]
+isGenerativeType ty | Just ty' <- coreView ty = isGenerativeType ty'
+isGenerativeType (FunTy {})      = True
+isGenerativeType (CastTy ty _)   = isGenerativeType ty
+isGenerativeType (ForAllTy {})   = True
+isGenerativeType (TyConApp tc _) = isGenerativeTyCon tc Nominal
+isGenerativeType (AppTy {})      = True
+isGenerativeType (LitTy {})      = True
+isGenerativeType (TyVarTy {})    = False
+isGenerativeType (CoercionTy {}) = False
 
 hasRelevantGiven :: [EqCt] -> [TcType] -> EqCt -> Bool
+-- See (CF1) in Note [Exploiting closed type families]
 -- A Given is relevant if it is not apart from the Wanted
 hasRelevantGiven eqs_for_me work_args (EqCt { eq_rhs = work_rhs })
   = any relevant eqs_for_me
@@ -606,9 +710,9 @@ getRelevantBranches ax work_args work_rhs
          no_match lhs_tys (CoAxBranch { cab_lhs = lhs_tys1 })
             = isNothing (tcUnifyTysForInjectivity False lhs_tys1 lhs_tys)
 
-mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
+mkTopOpenFamEqFDs :: TyCon -> [Bool] -> [TcType] -> EqCt -> TcS [FunDepEqns]
 -- Implements (INJFAM:Wanted/top)
-mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
+mkTopOpenFamEqFDs fam_tc inj_flags work_args (EqCt { eq_rhs = work_rhs })
   = do { fam_envs <- getFamInstEnvs
        ; let branches :: [CoAxBranch]
              branches = concatMap (fromBranches . coAxiomBranches . fi_axiom) $
@@ -623,13 +727,16 @@ mkTopOpenFamEqFDs fam_tc inj_flags work_args work_rhs
                       -- False: matching, not unifying
       , let (subst', qtvs) = trim_qtvs subst branch_tvs
             branch_lhs_tys' = substTys subst' branch_lhs_tys
-      , apartnessCheck branch_lhs_tys' branch  -- See (TIF2)
+      , apartnessCheck branch_lhs_tys' branch  -- See (TIF3)
       = Just (mkInjectivityFDEqn inj_flags qtvs branch_lhs_tys' work_args)
 
       | otherwise
       = Nothing
 
-mkLocalFamEqFDs :: [EqCt] -> TyCon -> [Bool] -> [TcType] -> Xi -> TcS [FunDepEqns]
+mkLocalFamEqFDs :: [EqCt] -> TyCon -> [Bool] -> [TcType] -> Xi -> SolverStage [FunDepEqns]
+-- Wanted constraints only
+-- Both open and closed type families, but only ones with declared injectivity
+-- See Note [Type inference for type families with injectivity] esp (TIF2)
 mkLocalFamEqFDs eqs_for_me fam_tc inj_flags work_args work_rhs
   = do { let -- eqns_from_inerts: see (INJFAM:Wanted/other)
              eqns_from_inerts = mapMaybe do_one eqs_for_me
@@ -723,13 +830,13 @@ tryGivenBuiltinFamEqFDs eqs_for_me fam_tc ops work_args
 
     do_one _ = return ()
 
-mkTopBuiltinFamEqFDs :: TyCon -> BuiltInSynFamily -> [TcType] -> Xi -> TcS [FunDepEqns]
+mkTopBuiltinFamEqFDs :: TyCon -> BuiltInSynFamily -> [TcType] -> Xi -> SolverStage [FunDepEqns]
 mkTopBuiltinFamEqFDs fam_tc ops work_args work_rhs
   = return [FDEqns { fd_qtvs = []
                    , fd_eqs = map snd $ tryInteractTopFam ops fam_tc work_args work_rhs }]
 
 mkLocalBuiltinFamEqFDs :: [EqCt] -> TyCon -> BuiltInSynFamily
-                       -> [TcType] -> Xi -> TcS [FunDepEqns]
+                       -> [TcType] -> Xi -> SolverStage [FunDepEqns]
 mkLocalBuiltinFamEqFDs eqs_for_me fam_tc ops work_args work_rhs
   = do { let do_one :: EqCt -> [FunDepEqns]
              do_one (EqCt { eq_lhs = TyFamLHS _ inert_args, eq_rhs = inert_rhs })
@@ -782,8 +889,8 @@ getInertFamEqsFor fam_tc work_args work_rhs
                            , eqnIsRelevant inert_args inert_rhs work_args work_rhs ] }
 
 eqnIsRelevant :: [TcType] -> TcType
-                -> [TcType] -> TcType
-                -> Bool
+              -> [TcType] -> TcType
+              -> Bool
 eqnIsRelevant lhs_tys1 rhs_ty1 lhs_tys2 rhs_ty2
   = not ((rhs_ty1:lhs_tys1) `typeListsAreApart` (rhs_ty2:lhs_tys2))
 
@@ -796,7 +903,13 @@ Suppose we have a type family with an injectivity annotation:
 Here is the plan; see also Note [Injective type families]
 in GHC.Core.TyCon):
 
-For /injective/, /user-defined/ type families
+Suppose we have a constraint
+   [G/W]  F t1 t2 ~ rhs
+Then if F is
+    - user-defined, not built-in
+    - declared injective
+    - either open or closed
+we attempt to exploit injectivity, via `mkLocalFamEqFDs`:
 
 * (INJFAM:Given) For Given constraints
   - When F is user-defined, do nothing at all
@@ -819,7 +932,7 @@ For /injective/, /user-defined/ type families
   and we can /match/ the LHS, so that
      S(top_rhs) = rhs
   then we can generate the FunDepEqns:  forall a c. s2 ~ S(t2)
-  But see wrinkle (TIF1), (TIF2)
+  But see wrinkle (TIF1), (TIF3)
 
 For /built-in/ type families, it's pretty similar, except that
 
@@ -829,7 +942,7 @@ For /built-in/ type families, it's pretty similar, except that
   See `tryGivenBuiltinFamEqFDs`
 
 * For Wanteds things go much as for user-defined families.
-   * mkLocalbuiltinFamEqFDs
+   * mkLocalBuiltinFamEqFDs
    * mkTopBuiltinFamEqFDs
 
 (TIF1) Generating fundeps from a top-level type instance is covered in
@@ -849,7 +962,22 @@ For /built-in/ type families, it's pretty similar, except that
   This fancy footwork for `fd_qtvs` is done by `trim_qtvs` in
   `mkInjWantedFamEqTopEqns`.
 
-(TIF2) Further to (TIF1), if we are considering a /closed/ type family, we
+(TIF2) All this applies equally to /closed/ type families; it is /not/
+  subsumed by Note [Exploiting closed type families].  Consider:
+      type family F a | r -> a where { .... }
+
+      [W] F t1 ~ a
+      [W] F t2 ~ a
+
+  Then since F is declared injective, we can generate t1~t2.
+
+  As for open type families, we insist on /user-declared/ injectivity only; we
+  don't try to /infer/ injectivity even for a closed family.  See Section 3.4
+  of the "Injective type families" paper.  (Arguably, we could /infer/
+  injectivity for closed type families, and that would be more in the spirit of
+  Note [Exploiting closed type families].)
+
+(TIF3) Further to (TIF1), if we are considering a /closed/ type family, we
   must ensure (see Section 5.2 of the paper) that after matching that
   equation would indeed be the one to fire.  So we call `apartnessCheck`
   on the branch to ensure this, in `mkTopUserFamEqFDs`.
@@ -937,7 +1065,8 @@ We need to take care about non-termination; see (CF3).
 
 Key point: equations that are not relevant do not need to be considered for fundeps at all.
 
-(CF1) Why "no relevant Givens"?  Consider test `CEqCanOccursCheck`:
+(CF1) Why "no relevant Givens", implemented by `hasRelevantGivens`?
+      Consider test `CEqCanOccursCheck`:
 
         type family F a where
           F Bool = Bool
@@ -1024,7 +1153,12 @@ Key point: equations that are not relevant do not need to be considered for fund
      And now we are back where we started -- loop.
 
   We solve this by bumping the `ctLocDepth` in `solveFunDeps`, and imposing
-  a depth bound.  See the call to `bumpReductionDepth`.
+  a depth bound.  See the call to `bumpReductionDepth`.  If the depth limit
+  is exceeded we add an error message and fail in the monad.
+
+  Take care: when we are solving-for-unsatisfiability, in the pattern match
+  checker, we must carefully catch this failure: see the use of `tryM` in
+  `tcCheckGivens`.
 
 (CF4) If one of the fundeps generated by interacting with the local equalities is
   definitely insoluble (e.g. Int~Bool) then there is no point in continuing to
@@ -1032,11 +1166,43 @@ Key point: equations that are not relevant do not need to be considered for fund
   I was looking at non-termination for closed type families, but it's a small
   improvement in general.
 
+(CF5) Consider (see "Yikes5" in #23162):
+      type family F a where
+         F (Just x) = Int
+
+      [W] F alpha ~ F (G beta)
+      [W] alpha ~ G beta
+  We can solve both Wanteds by `alpha := G beta`.  But if we use fundeps on the
+  first Wanted, we see that there is just one relevant equation, so we'll emit
+      [W] alpha ~ Just gamma
+      [W] F (G beta) ~ Int
+  and try to solve them.  We'll do `alpha := Just gamma`, and then it's game over;
+  we end up with these constraints that we can't solve
+      [W] Just gamma ~ F (G beta)
+      [W] Just gamma ~ G beta
+  This actually happens when compiling the libarary `type-rows`, in Data.Row.Variants.
+
+  Even if there is only one relevant equation, we can only use it /if/ we are
+  sure that we cannot solve the current Wanted by reflexivity; that is, if we
+  must do a type-family reduction to solve it.  So if the Wanted is [W] F tys ~
+  rhs we must be sure that `rhs` can't turn into `F tys`.  The only way to be
+  sure of that is if `rhs` is headed by a generative type constructor. See
+  `isGenerativeType`.
+
+  Otherwise prinicple (FUNDEP-COMPLETENESS) is threatened.
+
+  It's important for `isGenerativeType` to look through casts.  Consider T13822
+      type I :: Ty k -> IK k
+      type family I t = res | res -> t where
+        I TInt = Int |> g    -- where g :: Type ~# IK k
+  and [W] I alpha ~ Int |> g2
+  Here we definiteily want to take advantage of injectivity.
+
 Note [Cache-caused loops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-It is very dangerous to cache a rewritten wanted family equation as 'solved' in our
-solved cache (which is the default behaviour or xCtEvidence), because the interaction
-may not be contributing towards a solution. Here is an example:
+It is very dangerous to cache a rewritten wanted family equation as 'solved' in
+our solved cache (which is the default behaviour or xCtEvidence), because the
+interaction may not be contributing towards a solution. Here is an example:
 
 Initial inert set:
   [W] g1 : F a ~ beta1
@@ -1073,12 +1239,11 @@ solving.
 solveFunDeps :: CtEvidence  -- The work item
              -> [FunDepEqns]
              -> TcS ( Bool   -- True <=> some insoluble fundeps
+                             --    See Note [Insoluble fundeps]
                     , Bool ) -- True <=> unifications happened
 -- Solve a bunch of type-equality equations, generated by functional dependencies
 -- By "solve" we mean: (only) do unifications.  We do not generate evidence, and
 -- other than unifications there should be no effects whatsoever
---
--- The returned Bool is True if some unifications happened
 --
 -- See (SOLVE-FD) in Note [Overview of functional dependencies in type inference]
 solveFunDeps work_ev fd_eqns
@@ -1086,7 +1251,7 @@ solveFunDeps work_ev fd_eqns
   = return (False, False) -- Common case no-op
 
   | otherwise
-  = do { traceTcS "bumping" (ppr work_ev)
+  = do { traceTcS "solveFunDeps {" (ppr work_ev)
        ; loc' <- bumpReductionDepth (ctEvLoc work_ev) (ctEvPred work_ev)
                  -- See (CF3) in Note [Exploiting closed type families]
 
@@ -1108,8 +1273,14 @@ solveFunDeps work_ev fd_eqns
        -- that were unified by the fundep
        ; kickOutAfterUnification unifs
 
-       ; return (insolubleWC residual, not (isEmptyVarSet unifs)) }
-           -- insolubleWC: see (CF3) in Note [Exploiting closed type families]
+       ; let insoluble_fundeps = any insolubleCt (wc_simple residual)
+             -- Don't use insolubleWC, because that ignores Given constraints
+             -- and Given constraints are super-important when doing
+             -- tcCheckGivens in the pattern match overlap checker
+             -- See Note [Insoluble fundeps]
+
+       ; traceTcS "solveFunDeps }" (ppr insoluble_fundeps <+>  ppr unifs $$ ppr residual)
+       ; return (insoluble_fundeps, not (isEmptyVarSet unifs)) }
   where
     do_fundeps :: UnifyEnv -> TcM ()
     do_fundeps env = mapM_ (do_one env) fd_eqns

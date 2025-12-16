@@ -1,6 +1,7 @@
 T19415b.hs:15:8: error: [GHC-39999]
-    • No instance for ‘Ping (T a0) (T b0) Char’
+    • No instance for ‘Ping (T a0) (T b) Char’
         arising from a use of ‘foo’
+      Insoluble functional dependencies wrt top-level instances
     • In the expression: foo 'c' MkT
       In an equation for ‘loop’: loop = foo 'c' MkT
 

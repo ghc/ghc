@@ -723,24 +723,47 @@ they can still be solved:
 -}
 
 tcCheckGivens :: InertSet -> Bag EvVar -> TcM (Maybe InertSet)
--- ^ Return (Just new_inerts) if the Givens are satisfiable, Nothing if definitely
--- contradictory.
+-- ^ Return (Just new_inerts) if the Givens are satisfiable,
+--          Nothing if definitely contradictory.
+-- So Nothing says something definite; if in doubt return Just
 --
 -- See Note [Pattern match warnings with insoluble Givens] above.
-tcCheckGivens inerts given_ids = do
-  (sat, new_inerts) <- runTcSInerts inerts $ do
-    traceTcS "checkGivens {" (ppr inerts <+> ppr given_ids)
-    lcl_env <- TcS.getLclEnv
-    let given_loc = mkGivenLoc topTcLevel (getSkolemInfo unkSkol) (mkCtLocEnv lcl_env)
-    let given_cts = mkGivens given_loc (bagToList given_ids)
-    -- See Note [Superclasses and satisfiability]
-    solveSimpleGivens given_cts
-    insols <- getInertInsols
-    insols <- try_harder insols
-    traceTcS "checkGivens }" (ppr insols)
-    return (isEmptyBag insols)
-  return $ if sat then Just new_inerts else Nothing
+tcCheckGivens inerts given_ids
+  = do { traceTc "checkGivens {" (ppr inerts <+> ppr given_ids)
+
+       ; lcl_env <- TcM.getLclEnv
+       ; let given_loc = mkGivenLoc topTcLevel (getSkolemInfo unkSkol) (mkCtLocEnv lcl_env)
+             given_cts = mkGivens given_loc (bagToList given_ids)
+             -- See Note [Superclasses and satisfiability]
+
+       ; mb_res <- tryM                $  -- try_to_solve may throw an exception;
+                                          --   e.g. reduction stack overflow
+                   discardErrs         $  -- An exception is not an error;
+                                          --   just means "not definitely unsat"
+                   runTcSInerts inerts $
+                   try_to_solve given_cts
+
+       -- If mb_res = Left err, solving threw an exception, e.g. reduction stack
+       -- overflow.  So return the original incoming inerts to say "not definitely
+       -- unsatisfiable".  See (CF3) in Note [Exploiting closed type families], and
+       -- test T15753c.
+       ; let res = case mb_res of
+                     Right res -> res
+                     Left {}   -> Just inerts
+
+       ; traceTc "checkGivens }" (ppr res)
+       ; return res }
+
   where
+    try_to_solve :: [Ct] -> TcS (Maybe InertSet)
+    try_to_solve given_cts
+      = do { solveSimpleGivens given_cts
+           ; insols <- getInertInsols
+           ; insols <- try_harder insols
+           ; if isEmptyBag insols
+             then do { new_inerts <- getInertSet; return (Just new_inerts) }
+             else return Nothing } -- Definitely unsatisfiable
+
     try_harder :: Cts -> TcS Cts
     -- Maybe we have to search up the superclass chain to find
     -- an unsatisfiable constraint.  Example: pmcheck/T3927b.
@@ -756,27 +779,25 @@ tcCheckGivens inerts given_ids = do
 
 tcCheckWanteds :: InertSet -> ThetaType -> TcM Bool
 -- ^ Return True if the Wanteds are soluble, False if not
-tcCheckWanteds inerts wanteds = do
-  cts <- newWanteds PatCheckOrigin wanteds
-  (sat, _new_inerts) <- runTcSInerts inerts $ do
-    traceTcS "checkWanteds {" (ppr inerts <+> ppr wanteds)
-    -- See Note [Superclasses and satisfiability]
-    wcs <- solveWanteds (mkSimpleWC cts)
-    traceTcS "checkWanteds }" (ppr wcs)
-    return (isSolvedWC wcs)
-  return sat
+tcCheckWanteds inerts wanteds
+  = do { cts <- newWanteds PatCheckOrigin wanteds
+       ; runTcSInerts inerts $
+         do { traceTcS "checkWanteds {" (ppr inerts <+> ppr wanteds)
+              -- See Note [Superclasses and satisfiability]
+            ; wcs <- solveWanteds (mkSimpleWC cts)
+            ; traceTcS "checkWanteds }" (ppr wcs)
+            ; return (isSolvedWC wcs) } }
 
 -- | Normalise a type as much as possible using the given constraints.
 -- See @Note [tcNormalise]@.
 tcNormalise :: InertSet -> Type -> TcM Type
 tcNormalise inerts ty
   = do { norm_loc <- getCtLocM PatCheckOrigin Nothing
-       ; (res, _new_inerts) <- runTcSInerts inerts $
-             do { traceTcS "tcNormalise {" (ppr inerts)
-                ; ty' <- rewriteType norm_loc ty
-                ; traceTcS "tcNormalise }" (ppr ty')
-                ; pure ty' }
-       ; return res }
+       ; runTcSInerts inerts $
+         do { traceTcS "tcNormalise {" (ppr inerts)
+            ; ty' <- rewriteType norm_loc ty
+            ; traceTcS "tcNormalise }" (ppr ty')
+            ; pure ty' } }
 
 {- Note [Superclasses and satisfiability]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

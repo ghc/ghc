@@ -50,6 +50,7 @@ Compiler
   that type family. As a consequence:
 
   * typechecking will succeed a bit more often (see :ghc-ticket:`23162`)
+  * pattern-match incompleteness checking is a bit smarter, giving fewer false warnings (see :ghc-ticket:`#22652`)
 
 - When multiple ``-msse*`` flags are given, the maximum version takes effect.
   For example, ``-msse4.2 -msse2`` is now equivalent to ``-msse4.2``.
