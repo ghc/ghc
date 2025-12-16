@@ -476,7 +476,6 @@ basicKnownKeyNames
 
         -- Generics
         , genClassName, gen1ClassName
-        , datatypeClassName, constructorClassName, selectorClassName
 
         -- Monad comprehensions
         , guardMName
@@ -1480,14 +1479,9 @@ readClassName :: Name
 readClassName   = clsQual gHC_INTERNAL_READ (fsLit "Read")      readClassKey
 
 -- Classes Generic and Generic1, Datatype, Constructor and Selector
-genClassName, gen1ClassName, datatypeClassName, constructorClassName,
-  selectorClassName :: Name
+genClassName, gen1ClassName :: Name
 genClassName  = clsQual gHC_INTERNAL_GENERICS (fsLit "Generic")  genClassKey
 gen1ClassName = clsQual gHC_INTERNAL_GENERICS (fsLit "Generic1") gen1ClassKey
-
-datatypeClassName    = clsQual gHC_INTERNAL_GENERICS (fsLit "Datatype")    datatypeClassKey
-constructorClassName = clsQual gHC_INTERNAL_GENERICS (fsLit "Constructor") constructorClassKey
-selectorClassName    = clsQual gHC_INTERNAL_GENERICS (fsLit "Selector")    selectorClassKey
 
 genericClassNames :: [Name]
 genericClassNames = [genClassName, gen1ClassName]
@@ -1739,14 +1733,9 @@ applicativeClassKey     = mkPreludeClassUnique 34
 foldableClassKey        = mkPreludeClassUnique 35
 traversableClassKey     = mkPreludeClassUnique 36
 
-genClassKey, gen1ClassKey, datatypeClassKey, constructorClassKey,
-  selectorClassKey :: Unique
+genClassKey, gen1ClassKey :: Unique
 genClassKey   = mkPreludeClassUnique 37
 gen1ClassKey  = mkPreludeClassUnique 38
-
-datatypeClassKey    = mkPreludeClassUnique 39
-constructorClassKey = mkPreludeClassUnique 40
-selectorClassKey    = mkPreludeClassUnique 41
 
 -- KnownNat: see Note [KnownNat & KnownSymbol and EvLit] in GHC.Tc.Instance.Class
 knownNatClassNameKey :: Unique
