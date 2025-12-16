@@ -388,7 +388,7 @@ data CachedIface = CachedIface { cached_modiface :: !ModIface
                                , cached_linkable :: !HomeModLinkable }
 
 instance Outputable CachedIface where
-  ppr (CachedIface mi ln) = hsep [text "CachedIface", ppr (miKey mi), ppr ln]
+  ppr (CachedIface mi ln) = hsep [text "CachedIface", ppr (miKey (mkSimpleModiface mi)), ppr ln]
 
 noIfaceCache :: Maybe ModIfaceCache
 noIfaceCache = Nothing
@@ -806,7 +806,7 @@ pruneCache hpt summ
                            , cached_linkable = linkable
                            }) = HomeModInfo iface emptyModDetails linkable'
           where
-           modl = miKey iface
+           modl = miKey (mkSimpleModiface iface)
            linkable'
                 | Just ms <- M.lookup modl ms_map
                 , mi_src_hash iface == Just (ms_hs_hash ms)
@@ -1210,7 +1210,7 @@ upsweep n_jobs hsc_env hmi_cache diag_wrapper mHscMessage old_hpt build_plan = d
           return (success_flag, completed)
 
 toCache :: [HomeModInfo] -> M.Map (ModNodeKeyWithUid) HomeModInfo
-toCache hmis = M.fromList ([(miKey $ hm_iface hmi, hmi) | hmi <- hmis])
+toCache hmis = M.fromList ([(miKey $ hm_simple_iface hmi, hmi) | hmi <- hmis])
 
 upsweep_inst :: HscEnv
              -> Maybe Messager

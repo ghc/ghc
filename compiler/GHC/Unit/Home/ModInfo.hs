@@ -55,7 +55,7 @@ data HomeModInfo = HomeModInfo
    }
 
 hm_module :: HomeModInfo -> Module
-hm_module = mi_module . hm_iface
+hm_module = mi_mod_info_module . mi_simple_info . hm_simple_iface
 
 hm_simple_iface :: HomeModInfo -> SimpleModIface
 hm_simple_iface = mkSimpleModiface . hm_iface
@@ -64,7 +64,7 @@ hm_boot :: HomeModInfo -> IsBootInterface
 hm_boot = mi_simple_boot . hm_simple_iface
 
 hm_hsc_src :: HomeModInfo -> HscSource
-hm_hsc_src = mi_mod_info_hsc_src . mi_mod_info . hm_iface
+hm_hsc_src = mi_mod_info_hsc_src . mi_simple_info . hm_simple_iface
 
 hm_top_env :: HomeModInfo -> IfaceTopEnv
 hm_top_env = mi_simple_top_env . hm_simple_iface

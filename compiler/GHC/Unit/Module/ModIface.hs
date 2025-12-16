@@ -104,6 +104,7 @@ module GHC.Unit.Module.ModIface
    , mi_mod_info_semantic_module
    , mi_free_holes
    , mi_mnwib
+   , mi_simple_mnwib
    , mi_flag_hash
    , mi_opt_hash
    , mi_hpc_hash
@@ -610,6 +611,9 @@ mi_boot iface = if mi_hsc_src iface == HsBootFile
 
 mi_mnwib :: ModIface -> ModuleNameWithIsBoot
 mi_mnwib iface = GWIB (moduleName $ mi_module iface) (mi_boot iface)
+
+mi_simple_mnwib :: SimpleModIface -> ModuleNameWithIsBoot
+mi_simple_mnwib iface = GWIB (moduleName $ mi_mod_info_module (mi_simple_info iface)) (mi_simple_boot iface)
 
 -- | Lookups up a (possibly cached) fixity from a 'ModIface'. If one cannot be
 -- found, 'defaultFixity' is returned instead.

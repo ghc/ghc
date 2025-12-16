@@ -232,7 +232,7 @@ hptCollectDependencies :: HomePackageTable -> IO (Set.Set (IfaceImportLevel, Uni
 hptCollectDependencies HPT{table} = do
   hpt <- readIORef table
   return $
-    foldr (Set.union . dep_direct_pkgs . mi_deps . hm_iface) Set.empty hpt
+    foldr (Set.union . dep_direct_pkgs . mi_simple_info_deps . hm_simple_iface) Set.empty hpt
 
 -- | Collect the linkable object of all modules in the HPT.
 -- The linkable objects are given by @'homeModInfoObject'@.

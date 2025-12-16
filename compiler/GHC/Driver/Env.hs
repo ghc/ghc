@@ -56,7 +56,6 @@ import GHC.Runtime.Interpreter.Types (Interp)
 
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
-import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable

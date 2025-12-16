@@ -774,8 +774,8 @@ mnKey :: ModuleNodeInfo -> ModNodeKeyWithUid
 mnKey (ModuleNodeFixed key _) = key
 mnKey (ModuleNodeCompile ms) = msKey ms
 
-miKey :: ModIface -> ModNodeKeyWithUid
-miKey hmi = ModNodeKeyWithUid (mi_mnwib hmi) ((toUnitId $ moduleUnit (mi_module hmi)))
+miKey :: SimpleModIface -> ModNodeKeyWithUid
+miKey si = ModNodeKeyWithUid (mi_simple_mnwib si) ((toUnitId $ moduleUnit (mi_mod_info_module (mi_simple_info si))))
 
 type ModNodeKey = ModuleNameWithIsBoot
 

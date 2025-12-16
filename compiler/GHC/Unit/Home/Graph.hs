@@ -76,7 +76,6 @@ import GHC.Unit.Home
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Home.PackageTable
 import GHC.Unit.Module
-import GHC.Unit.Module.ModIface
 import GHC.Unit.State
 import GHC.Utils.Monad (mapMaybeM)
 import GHC.Utils.Outputable
