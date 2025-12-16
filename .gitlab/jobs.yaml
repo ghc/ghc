@@ -5386,7 +5386,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-windows-int_native-release": {
+  "release-x86_64-windows-int_native-release+no_split_sections": {
     "after_script": [
       "bash .gitlab/ci.sh save_cache",
       "bash .gitlab/ci.sh save_test_output",
@@ -5396,7 +5396,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-windows-int_native-release.tar.xz",
+        "ghc-x86_64-windows-int_native-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -5435,8 +5435,8 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-windows-int_native-release",
-      "BUILD_FLAVOUR": "release",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-int_native-release+no_split_sections",
+      "BUILD_FLAVOUR": "release+no_split_sections",
       "CABAL_INSTALL_VERSION": "3.10.2.0",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "FETCH_GHC_VERSION": "9.10.1",
@@ -5446,11 +5446,11 @@
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-windows-int_native-release",
+      "TEST_ENV": "x86_64-windows-int_native-release+no_split_sections",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-windows-release": {
+  "release-x86_64-windows-release+no_split_sections": {
     "after_script": [
       "bash .gitlab/ci.sh save_cache",
       "bash .gitlab/ci.sh save_test_output",
@@ -5460,7 +5460,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-windows-release.tar.xz",
+        "ghc-x86_64-windows-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -5499,8 +5499,8 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-windows-release",
-      "BUILD_FLAVOUR": "release",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-release+no_split_sections",
+      "BUILD_FLAVOUR": "release+no_split_sections",
       "CABAL_INSTALL_VERSION": "3.10.2.0",
       "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "FETCH_GHC_VERSION": "9.10.1",
@@ -5510,7 +5510,7 @@
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-windows-release",
+      "TEST_ENV": "x86_64-windows-release+no_split_sections",
       "XZ_OPT": "-9"
     }
   },

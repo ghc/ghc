@@ -574,7 +574,7 @@ doc-tarball:
       optional: true
     - job: nightly-x86_64-windows-validate
       optional: true
-    - job: release-x86_64-windows-release
+    - job: release-x86_64-windows-release+no_split_sections
       optional: true
 
   tags:

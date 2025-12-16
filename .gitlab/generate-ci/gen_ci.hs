@@ -1228,8 +1228,8 @@ fedora_x86 =
 
 windows_x86 :: [JobGroup Job]
 windows_x86 =
-  [ fastCI (standardBuildsWithConfig Amd64 Windows vanilla)
-  , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
+  [ fastCI (standardBuildsWithConfig Amd64 Windows $ splitSectionsBroken vanilla)
+  , disableValidate (standardBuildsWithConfig Amd64 Windows $ splitSectionsBroken nativeInt)
   ]
 
 darwin :: [JobGroup Job]
@@ -1405,7 +1405,7 @@ platform_mapping = Map.map go combined_result
                 , "release-x86_64-linux-deb11-release"
                 , "release-x86_64-linux-deb12-release"
                 , "release-x86_64-linux-fedora43-release"
-                , "release-x86_64-windows-release"
+                , "release-x86_64-windows-release+no_split_sections"
                 ]
 
     process sel =
