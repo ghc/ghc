@@ -437,7 +437,7 @@ regUsageOfInstr platform instr
     IMUL   fmt src dst    -> usageRM fmt src dst
 
     -- Result of IMULB will be in just in %ax
-    IMUL2  II8 src       -> mkRU (mk II8 eax:use_R II8 src []) [mk II8 eax]
+    IMUL2  II8 src       -> mkRU (mk II8 eax:use_R II8 src []) [mk II16 eax]
     -- Result of IMUL for wider values, will be split between %dx/%edx/%rdx and
     -- %ax/%eax/%rax.
     IMUL2  fmt src        -> mkRU (mk fmt eax:use_R fmt src []) [mk fmt eax,mk fmt edx]
