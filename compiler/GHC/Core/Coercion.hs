@@ -709,7 +709,10 @@ isReflCo_maybe _ = Nothing
 -- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
 -- as it walks over the entire coercion.
 isReflexiveCo :: Coercion -> Bool
-isReflexiveCo = isJust . isReflexiveCo_maybe
+isReflexiveCo (Refl {})       = True
+isReflexiveCo (GRefl _ _ mco) = isReflKindMCo mco
+isReflexiveCo (SymCo co)      = isReflexiveCo co
+isReflexiveCo co              = coercionLKind co `eqType` coercionRKind co
 
 isReflexiveMCo :: MCoercion -> Bool
 isReflexiveMCo MRefl    = True
