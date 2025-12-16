@@ -5,6 +5,7 @@ FDsFromGivens2.hs:15:15: error: [GHC-39999]
                    KCC :: C Char Char => () -> KCC,
                  in an equation for ‘bar’
         at FDsFromGivens2.hs:15:6-10
+      Insoluble functional dependencies wrt other constraints
     • In the expression: f
       In an equation for ‘bar’: bar (KCC _) = f
 

@@ -54,7 +54,7 @@ module GHC.Tc.Errors.Types (
   , SolverReport(..), SupplementaryInfo(..)
   , SolverReportWithCtxt(..)
   , SolverReportErrCtxt(..)
-  , getUserGivens, discardProvCtxtGivens
+  , getUsefulGivens
   , TcSolverReportMsg(..)
   , CannotUnifyVariableReason(..)
   , MismatchMsg(..)
@@ -5401,10 +5401,6 @@ data SolverReportErrCtxt
                                     -- See Note [Suppressing error messages]
       }
 
-getUserGivens :: SolverReportErrCtxt -> [UserGiven]
--- One item for each enclosing implication
-getUserGivens (CEC {cec_encl = implics}) = getUserGivensFromImplics implics
-
 ----------------------------------------------------------------------------
 --
 --   ErrorItem
@@ -5430,7 +5426,7 @@ data ErrorItem
        , ei_loc      :: CtLoc
        , ei_m_reason :: Maybe CtIrredReason  -- If this ErrorItem was made from a
                                              -- CtIrred, this stores the reason
-       , ei_insoluble :: Bool   -- True if the constraint is defdinitely insoluble
+       , ei_insoluble :: Bool   -- True if the constraint is definitely insoluble
                                 -- Cache of `insolubleCt`
 
        , ei_suppress  :: Bool   -- Suppress because of
@@ -5504,6 +5500,31 @@ message (showing both problems):
          the signature for pattern synonym `Pat' ...
 -}
 
+
+getUsefulGivens :: SolverReportErrCtxt -> ErrorItem -> [UserGiven]
+-- One item for each enclosing implication
+getUsefulGivens (CEC {cec_encl = implics}) item
+  | dont_show_local_givens
+  = []
+  | otherwise
+  = discardProvCtxtGivens orig $
+    getGivensFromImplics implics
+  where
+    orig = errorItemOrigin item
+
+    -- If the constraint is utterly insoluble, we won't try to solve it
+    -- from the inert Givens, so can be positively confusing to list them;
+    -- we may get stuff like "Can't deduce X from X".
+    -- EXCEPTION: when the insolubility comes from a fundep interaction
+    --            between the constraint and a local Given, it's confusing
+    --            NOT to show the Given.  Example:
+    --               [G] ?x::Int   [W] ?x::String
+    -- See Note [Insoluble fundeps] in GHC.Tc.Solver.FunDeps
+    dont_show_local_givens
+      | Just (InsolubleFunDepReason is_top) <- ei_m_reason item
+      = is_top
+      | otherwise
+      = ei_insoluble item
 
 discardProvCtxtGivens :: CtOrigin -> [UserGiven] -> [UserGiven]
 discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]

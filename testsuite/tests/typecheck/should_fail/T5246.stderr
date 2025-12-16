@@ -3,6 +3,7 @@ T5246.hs:11:10: error: [GHC-91416]
       from the context: ?x::String
         bound by the implicit-parameter binding for ?x
         at T5246.hs:(10,7)-(11,12)
+      Insoluble functional dependencies wrt other constraints
     • In the expression: foo
       In the expression: let ?x = "hello" in foo
       In an equation for ‘bar’: bar = let ?x = "hello" in foo

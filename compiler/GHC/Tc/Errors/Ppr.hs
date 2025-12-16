@@ -4178,7 +4178,7 @@ pprTcSolverReportMsg _ (ExpectingMoreArguments n thing) =
      | n == 1    = text "more argument to"
      | otherwise = text "more arguments to" -- n > 1
 pprTcSolverReportMsg ctxt (UnboundImplicitParams (item :| items)) =
-  let givens = getUserGivens ctxt
+  let givens = getUsefulGivens ctxt item
   in if null givens
      then addArising (errorItemCtLoc item) $
             sep [ text "Unbound implicit parameter" <> plural preds
@@ -4202,7 +4202,7 @@ pprTcSolverReportMsg _ (AmbiguityPreventsSolvingCt item ambigs) =
   pprArising (errorItemCtLoc item) $$
   text "prevents the constraint" <+> quotes (pprParendType $ errorItemPred item)
   <+> text "from being solved."
-pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
+pprTcSolverReportMsg ctxt
   (CannotResolveInstance item unifiers candidates rel_binds mb_HasField_msg)
   = pprWithInvisibleBits invis_bits $
     vcat
@@ -4233,7 +4233,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
     (ambig_kvs, ambig_tvs) = ambigTkvsOfTy pred
     ambigs = ambig_kvs ++ ambig_tvs
     has_ambigs = not (null ambigs)
-    useful_givens = discardProvCtxtGivens orig (getUserGivensFromImplics implics)
+    useful_givens = getUsefulGivens ctxt item
          -- useful_givens are the enclosing implications with non-empty givens,
          -- modulo the horrid discardProvCtxtGivens
     lead_with_ambig = not (null ambigs)
@@ -4298,7 +4298,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
       = empty
 
     ----------- Possible fixes ----------------
-    ctxt_fixes = ctxtFixes has_ambigs pred implics
+    ctxt_fixes = ctxtFixes ctxt has_ambigs pred
 
     drv_fixes = case orig of
                    DerivOrigin standalone             -> [drv_fix standalone]
@@ -4332,7 +4332,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
                              Just (_, tys) -> not (all isTyVarTy tys)
                              Nothing       -> False
 
-pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances item matches unifiers) =
+pprTcSolverReportMsg ctxt (OverlappingInstances item matches unifiers) =
   vcat
     [ addArising ct_loc $
         (text "Overlapping instances for"
@@ -4370,12 +4370,11 @@ pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances item match
                ])]
   where
     ct_loc          = errorItemCtLoc item
-    orig            = ctLocOrigin ct_loc
     pred            = errorItemPred item
     (clas, tys)     = getClassPredTys pred
     tyCoVars        = tyCoVarsOfTypesList tys
     famTyCons       = filter isFamilyTyCon $ concatMap (nonDetEltsUniqSet . tyConsOfType) tys
-    useful_givens   = discardProvCtxtGivens orig (getUserGivensFromImplics implics)
+    useful_givens   = getUsefulGivens ctxt item
     matching_givens = mapMaybe matchable useful_givens
     matchable implic@(Implic { ic_given = evvars, ic_info = skol_info })
       = case ev_vars_matching of
@@ -4707,10 +4706,15 @@ pprMismatchMsg ctxt
       | otherwise          = vcat ( addArising ct_loc no_deduce_msg
                                   : pp_from_givens useful_givens)
 
-    ea_supplementary = case mb_ea of
-      Nothing -> empty
-      Just (CND_ExpectedActual level ty1 ty2) ->
-        mk_supplementary_ea_msg ctxt level ty1 ty2 orig
+    ea_supplementary
+      | Just (CND_ExpectedActual level ty1 ty2) <- mb_ea
+      = mk_supplementary_ea_msg ctxt level ty1 ty2 orig
+      | Just (InsolubleFunDepReason is_top) <- ei_m_reason item
+      = case is_top of
+          True  -> text "Insoluble functional dependencies wrt top-level instances"
+          False -> text "Insoluble functional dependencies wrt other constraints"
+      | otherwise
+      = empty
 
     ct_loc = errorItemCtLoc item
     orig   = ctLocOrigin ct_loc
@@ -5583,8 +5587,8 @@ show_fixes []     = empty
 show_fixes (f:fs) = sep [ text "Possible fix:"
                         , nest 2 (vcat (f : map (text "or" <+>) fs))]
 
-ctxtFixes :: Bool -> PredType -> [Implication] -> [SDoc]
-ctxtFixes has_ambig_tvs pred implics
+ctxtFixes :: SolverReportErrCtxt -> Bool -> PredType -> [SDoc]
+ctxtFixes (CEC {cec_encl = implics}) has_ambig_tvs pred
   | not has_ambig_tvs
   , isTyVarClassPred pred   -- Don't suggest adding (Eq T) to the context, say
   , (skol:skols) <- usefulContext implics pred

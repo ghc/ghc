@@ -1,0 +1,19 @@
+T15753c.hs:46:5: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘g1’:
+        g1 Refl su1 su2 | STrue <- sIsUnit su1 = ...
+
+T15753c.hs:47:5: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns of type ‘SUnit u2’ not matched: SUnit
+
+T15753c.hs:52:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘g2’: g2 Refl su1 su2 = ...
+
+T15753c.hs:55:9: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns of type ‘SUnit u2’ not matched: SUnit
+

@@ -6,11 +6,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wincomplete-patterns #-}
 
--- NB: After fixing #22652 this program right produces warnings
---     because (F u1 u1 ~ Char) is unsatisfiable
--- But it produces too many warnings: #26685
+-- This test is a spin-off from the test T15753c
 
-module Bug where
+module T22652a where
 
 import Data.Kind (Type)
 import Data.Type.Equality ((:~:)(..))
@@ -19,14 +17,12 @@ import Data.Void (Void)
 data SBool :: Bool -> Type where
   SFalse :: SBool False
   STrue  :: SBool True
+
 data SUnit :: () -> Type where
   SUnit :: SUnit '()
 
 type family IsUnit (u :: ()) :: Bool where
   IsUnit '() = True
-
-sIsUnit :: SUnit u -> SBool (IsUnit u)
-sIsUnit SUnit = STrue
 
 type family If (c :: Bool) (t :: Type) (f :: Type) :: Type where
   If True  t _ = t
@@ -39,17 +35,15 @@ type family F (u1 :: ()) (u2 :: ()) :: Type where
 type family Case (u :: ()) :: Type where
   Case '() = Int
 
-g1 :: F u1 u2 :~: Char
-   -> SUnit u1 -> SUnit u2
-   -> Void
-g1 Refl su1 su2
-  | STrue <- sIsUnit su1
-  = case su2 of {}
+---------------------------------------
+-- The checker can (now, Dec 25) see that (F u1 u2 ~ Char) is
+-- unsatisfiable, so the empty pattern match is fine
+g1a :: F u1 u2 :~: Char -> SUnit u1 -> SUnit u2 -> Void
+g1a r _ _ = case r of {}
 
-g2 :: F u1 u2 :~: Char
-   -> SUnit u1 -> SUnit u2
-   -> Void
-g2 Refl su1 su2
-  = case sIsUnit su1 of
-      STrue ->
-        case su2 of {}
+{- Why   [G] F u1 u2 ~ Char  is unsatisfiable
+
+[G] F u1 u2 ~ Char =>rewrite   [G] If (IsUnit u1) (Case u2) Int ~ Char
+                   =>(fundep)  [W] IsUnit u1 ~ True
+                               [W] Case u2 ~ Char   <<--  insoluble: no relevant eqns
+-}
