@@ -1,9 +1,8 @@
 -- (c) The University of Glasgow 2006
-
 {-# LANGUAGE CPP #-}
 
 module GHC.Core.Coercion.Opt
-   ( optCoercion
+   ( optCoProgram, optCoercion
    , OptCoercionOpts (..)
    )
 where
@@ -12,6 +11,7 @@ import GHC.Prelude
 
 import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 
+import GHC.Core
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.Compare( eqForAllVis, eqTypeIgnoringMultiplicity )
@@ -163,6 +163,54 @@ We use the following invariants:
        `opt_co4`) applied.  The ambient sym applies to the entire coercion not
        to the little bits being substituted.
 -}
+
+{- **********************************************************************
+%*                                                                      *
+                    optCoercionPgm
+%*                                                                      *
+%********************************************************************* -}
+
+optCoProgram :: CoreProgram -> CoreProgram
+optCoProgram binds
+  = map go binds
+  where
+    go (NonRec b r) = NonRec b (optCoExpr in_scope r)
+    go (Rec prs)    = Rec (mapSnd (optCoExpr in_scope) prs)
+    in_scope = mkInScopeSetList (bindersOfBinds binds)
+       -- Put all top-level binders into scope; it is possible to have
+       -- forward references.  See Note [Glomming] in GHC.Core.Opt.OccurAnal
+
+optCoExpr :: InScopeSet -> CoreExpr -> CoreExpr
+optCoExpr _ e@(Var {})     = e
+optCoExpr _ e@(Lit {})     = e
+optCoExpr _ e@(Type {})    = e
+optCoExpr is (App e1 e2)   = App (optCoExpr is e1) (optCoExpr is e2)
+optCoExpr is (Lam b e)     = Lam b (optCoExpr (is `extendInScopeSet` b) e)
+optCoExpr is (Coercion co) = Coercion (optCo is co)
+optCoExpr is (Cast e co)   = Cast (optCoExpr is e) (optCo is co)
+optCoExpr is (Tick t e)    = Tick t (optCoExpr is e)
+optCoExpr is (Let (NonRec b r) e)  = Let (NonRec b (optCoExpr is r))
+                                         (optCoExpr (is `extendInScopeSet` b) e)
+optCoExpr is (Let (Rec prs)    e)  = Let (Rec (mapSnd (optCoExpr is') prs))
+                                         (optCoExpr is' e)
+                                   where
+                                     is' = is `extendInScopeSetList` map fst prs
+optCoExpr is (Case e b ty alts) = Case (optCoExpr is e) b ty
+                                       (map (optCoAlt (is `extendInScopeSet` b)) alts)
+
+optCo :: InScopeSet -> Coercion -> Coercion
+optCo is co = optCoercion' (mkEmptySubst is) co
+
+optCoAlt :: InScopeSet -> CoreAlt -> CoreAlt
+optCoAlt is (Alt k bs e)
+  = Alt k bs (optCoExpr (is `extendInScopeSetList` bs) e)
+
+
+{- **********************************************************************
+%*                                                                      *
+                    optCoercion
+%*                                                                      *
+%********************************************************************* -}
 
 -- | Coercion optimisation options
 newtype OptCoercionOpts = OptCoercionOpts
@@ -624,7 +672,7 @@ opt_univ env sym prov deps role ty1 ty2
     in
       -- We only Lint multiplicities in the output of the typechecker, as
       -- described in Note [Linting linearity] in GHC.Core.Lint. This means
-      -- we can use 'eqTypeIgnoringMultiplicity' instea of 'eqType' below.
+      -- we can use 'eqTypeIgnoringMultiplicity' instead of 'eqType' below.
       --
       -- In particular, this gets rid of 'SubMultProv' coercions that were
       -- introduced for typechecking multiplicities of data constructors, as

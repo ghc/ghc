@@ -1328,8 +1328,6 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_NoHsMain))
   , make_ord_flag defGhcFlag "fno-state-hack"
         (NoArg (setGeneralFlag Opt_G_NoStateHack))
-  , make_ord_flag defGhcFlag "fno-opt-coercion"
-        (NoArg (setGeneralFlag Opt_G_NoOptCoercion))
   , make_ord_flag defGhcFlag "with-rtsopts"
         (HasArg setRtsOpts)
   , make_ord_flag defGhcFlag "rtsopts"
@@ -2477,6 +2475,7 @@ fFlagsDeps = [
   flagSpec "cmm-elim-common-blocks"           Opt_CmmElimCommonBlocks,
   flagSpec "cmm-sink"                         Opt_CmmSink,
   flagSpec "cmm-static-pred"                  Opt_CmmStaticPred,
+  flagSpec "opt-coercion"                     Opt_OptCoercion,
   flagSpec "cse"                              Opt_CSE,
   flagSpec "stg-cse"                          Opt_StgCSE,
   flagSpec "stg-lift-lams"                    Opt_StgLiftLams,

@@ -641,6 +641,7 @@ data GeneralFlag
    | Opt_InlineGenerics
    | Opt_InlineGenericsAggressively
    | Opt_StaticArgumentTransformation
+   | Opt_OptCoercion
    | Opt_CSE
    | Opt_StgCSE
    | Opt_StgLiftLams
@@ -887,7 +888,6 @@ data GeneralFlag
    | Opt_PluginTrustworthy
 
    | Opt_G_NoStateHack
-   | Opt_G_NoOptCoercion
    deriving (Eq, Show, Enum)
 
 -- | The set of flags which affect optimisation for the purposes of
@@ -910,6 +910,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_CrossModuleSpecialise
    , Opt_StaticArgumentTransformation
    , Opt_PolymorphicSpecialisation
+   , Opt_OptCoercion
    , Opt_CSE
    , Opt_StgCSE
    , Opt_StgLiftLams

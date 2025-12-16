@@ -17,7 +17,7 @@ import GHCi.Message (EvalOpts(..))
 -- | Initialise coercion optimiser configuration from DynFlags
 initOptCoercionOpts :: DynFlags -> OptCoercionOpts
 initOptCoercionOpts dflags = OptCoercionOpts
-   { optCoercionEnabled = not (hasNoOptCoercion dflags)
+   { optCoercionEnabled = gopt Opt_OptCoercion dflags
    }
 
 -- | Initialise Simple optimiser configuration from DynFlags

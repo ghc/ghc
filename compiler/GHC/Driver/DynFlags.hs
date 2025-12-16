@@ -996,7 +996,7 @@ hasNoStateHack :: DynFlags -> Bool
 hasNoStateHack = gopt Opt_G_NoStateHack
 
 hasNoOptCoercion :: DynFlags -> Bool
-hasNoOptCoercion = gopt Opt_G_NoOptCoercion
+hasNoOptCoercion flags = not (gopt Opt_OptCoercion flags)
 
 -- | Test whether a 'DumpFlag' is set
 dopt :: DumpFlag -> DynFlags -> Bool
@@ -1237,6 +1237,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_DoCleverArgEtaExpansion) -- See Note [Eta expansion of arguments in CorePrep]
     , ([0,1,2], Opt_DoEtaReduction)          -- See Note [Eta-reduction in -O0]
     , ([0,1,2], Opt_ProfManualCcs )
+    , ([0,1,2], Opt_OptCoercion )
     , ([2], Opt_DictsStrict)
 
     , ([0],     Opt_IgnoreInterfacePragmas)

@@ -1531,8 +1531,11 @@ rebuild_go env expr cont
       Stop {}          -> return (emptyFloats env, expr)
       TickIt t cont    -> rebuild_go env (mkTick t expr) cont
       CastIt { sc_co = co, sc_opt = opt, sc_cont = cont }
-        | isReflexiveCo co -> rebuild_go env expr              cont
-        | otherwise        -> rebuild_go env (mkCast expr co') cont
+        | isReflexiveCoIgnoringMultiplicity co
+              -- ignoring multiplicity: c.f. GHC.Core.Coercion.Opt.opt_univ
+        -> rebuild_go env expr cont
+        | otherwise
+        -> rebuild_go env (mkCast expr co') cont
            -- NB: mkCast implements the (Coercion co |> g) optimisation
         where
           co' = optOutCoercion env co opt

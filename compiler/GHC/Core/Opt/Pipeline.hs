@@ -24,6 +24,7 @@ import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 import GHC.Core
 import GHC.Core.SimpleOpt (simpleOptPgm)
 import GHC.Core.Opt.CSE  ( cseProgram )
+import GHC.Core.Coercion.Opt  ( optCoProgram )
 import GHC.Core.Rules   ( RuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings, pprRules )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
@@ -134,6 +135,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
     strictness    = gopt Opt_Strictness                   dflags
     full_laziness = gopt Opt_FullLaziness                 dflags
     do_specialise = gopt Opt_Specialise                   dflags
+    do_co_opt     = gopt Opt_OptCoercion                 dflags
     do_float_in   = gopt Opt_FloatIn                      dflags
     cse           = gopt Opt_CSE                          dflags
     spec_constr   = gopt Opt_SpecConstr                   dflags
@@ -146,7 +148,6 @@ getCoreToDo dflags hpt_rule_base extra_vars
     static_ptrs   = xopt LangExt.StaticPointers           dflags
     profiling     = ways dflags `hasWay` WayProf
 
-    do_presimplify = do_specialise -- TODO: any other optimizations benefit from pre-simplification?
     do_simpl3      = const_fold || rules_on -- TODO: any other optimizations benefit from three-phase simplification?
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
@@ -215,12 +216,14 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- after this before anything else
         runWhen static_args (CoreDoPasses [ simpl_gently, CoreDoStaticArgs ]),
 
-        -- initial simplify: mk specialiser happy: minimum effort please
-        runWhen do_presimplify simpl_gently,
-
+        -- Initial simplify: make specialiser happy and/or optimise coercions:
+        --                   minimum effort please
         -- Specialisation is best done before full laziness
         -- so that overloaded functions have all their dictionary lambdas manifest
-        runWhen do_specialise CoreDoSpecialising,
+        runWhen (do_specialise || do_co_opt) $
+        CoreDoPasses [ simpl_gently
+                     , runWhen do_co_opt     CoreOptCoercion
+                     , runWhen do_specialise CoreDoSpecialising ],
 
         if full_laziness then
            CoreDoFloatOutwards $ FloatOutSwitches
@@ -495,6 +498,9 @@ doCorePass pass guts = do
 
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
                                  updateBinds cseProgram
+
+    CoreOptCoercion           -> {-# SCC "OptCoercion" #-}
+                                 updateBinds optCoProgram
 
     CoreLiberateCase          -> {-# SCC "LiberateCase" #-}
                                  updateBinds (liberateCase (initLiberateCaseOpts dflags))
