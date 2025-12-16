@@ -46,7 +46,6 @@ newtype ZipList a = ZipList { getZipList :: [a] }
                            , Generic  -- ^ @since base-4.7.0.0
                            , Generic1 -- ^ @since base-4.7.0.0
                            )
--- See GHC.Internal.Data.Traversable for Traversable instance due to import loops
 
 
 -- | @since base-4.9.0.0
