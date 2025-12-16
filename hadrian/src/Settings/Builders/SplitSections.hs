@@ -32,8 +32,6 @@ splitSectionsArgs = do
         , builder (Ghc CompileCWithGhc) ? arg "-fsplit-sections"
         , builder (Ghc CompileCppWithGhc) ? arg "-fsplit-sections"
         , builder (Cc CompileC) ? arg "-ffunction-sections" <> arg "-fdata-sections"
-        , builder MergeObjects ? ifM (expr isWinTarget)
-            (pure ["-T", "driver/utils/merge_sections_pe.ld"])
-            (pure ["-T", "driver/utils/merge_sections.ld"])
+        , builder MergeObjects ? pure ["-T", "driver/utils/merge_sections.ld"]
         ]
     ) else mempty
