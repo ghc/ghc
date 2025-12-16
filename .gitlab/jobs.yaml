@@ -3195,7 +3195,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-fedora43-validate+debug_info+ubsan": {
+  "nightly-x86_64-linux-fedora43-validate+debug_info+ubsan+asan": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -3206,7 +3206,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan.tar.xz",
+        "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan+asan.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -3248,14 +3248,15 @@
       "x86_64-linux"
     ],
     "variables": {
+      "ASAN_OPTIONS": "detect_leaks=false:handle_segv=0:handle_sigfpe=0:verify_asan_link_order=false",
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan",
-      "BUILD_FLAVOUR": "validate+debug_info+ubsan",
-      "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan+asan",
+      "BUILD_FLAVOUR": "validate+debug_info+ubsan+asan",
+      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=none",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora43-validate+debug_info+ubsan",
+      "TEST_ENV": "x86_64-linux-fedora43-validate+debug_info+ubsan+asan",
       "UBSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.ubsan-suppressions",
       "XZ_OPT": "-9"
     }
@@ -7346,7 +7347,7 @@
       "TEST_ENV": "x86_64-linux-fedora43-validate+debug_info"
     }
   },
-  "x86_64-linux-fedora43-validate+debug_info+ubsan": {
+  "x86_64-linux-fedora43-validate+debug_info+ubsan+asan": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -7357,7 +7358,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan.tar.xz",
+        "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan+asan.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -7383,7 +7384,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora43-validate\\+debug_info\\+ubsan(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-fedora43-validate\\+debug_info\\+ubsan\\+asan(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/))))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -7399,14 +7400,15 @@
       "x86_64-linux"
     ],
     "variables": {
+      "ASAN_OPTIONS": "detect_leaks=false:handle_segv=0:handle_sigfpe=0:verify_asan_link_order=false",
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan",
-      "BUILD_FLAVOUR": "validate+debug_info+ubsan",
-      "CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora43-validate+debug_info+ubsan+asan",
+      "BUILD_FLAVOUR": "validate+debug_info+ubsan+asan",
+      "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "HADRIAN_ARGS": "--docs=none",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "x86_64-linux-fedora43-validate+debug_info+ubsan",
+      "TEST_ENV": "x86_64-linux-fedora43-validate+debug_info+ubsan+asan",
       "UBSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.ubsan-suppressions"
     }
   },

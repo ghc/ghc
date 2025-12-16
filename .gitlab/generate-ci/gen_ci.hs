@@ -162,6 +162,7 @@ data BuildConfig
                 , tablesNextToCode :: Bool
                 , threadSanitiser :: Bool
                 , ubsan :: Bool
+                , asan :: Bool
                 , noSplitSections :: Bool
                 , validateNonmovingGc :: Bool
                 , textWithSIMDUTF :: Bool
@@ -173,7 +174,7 @@ configureArgsStr :: BuildConfig -> String
 configureArgsStr bc = unwords $
      ["--enable-unregisterised"| unregisterised bc ]
   ++ ["--disable-tables-next-to-code" | not (tablesNextToCode bc) ]
-  ++ ["--with-intree-gmp" | Just _ <- pure (crossTarget bc) ]
+  ++ ["--with-intree-gmp" | isJust (crossTarget bc) || ubsan bc || asan bc ]
   ++ ["--with-system-libffi" | crossTarget bc == Just "wasm32-wasi" ]
   ++ ["--enable-ipe-data-compression" | withZstd bc ]
   ++ ["--enable-strict-ghc-toolchain-check"]
@@ -188,6 +189,7 @@ mkJobFlavour BuildConfig{..} = Flavour buildFlavour opts
            [HostFullyStatic | hostFullyStatic] ++
            [ThreadSanitiser | threadSanitiser] ++
            [UBSan | ubsan] ++
+           [ASan | asan] ++
            [NoSplitSections | noSplitSections, buildFlavour == Release ] ++
            [BootNonmovingGc | validateNonmovingGc ] ++
            [TextWithSIMDUTF | textWithSIMDUTF]
@@ -201,6 +203,7 @@ data FlavourTrans =
     | HostFullyStatic
     | ThreadSanitiser
     | UBSan
+    | ASan
     | NoSplitSections
     | BootNonmovingGc
     | TextWithSIMDUTF
@@ -230,6 +233,7 @@ vanilla = BuildConfig
   , tablesNextToCode = True
   , threadSanitiser = False
   , ubsan = False
+  , asan = False
   , noSplitSections = False
   , validateNonmovingGc = False
   , textWithSIMDUTF = False
@@ -283,8 +287,8 @@ llvm = vanilla { llvmBootstrap = True }
 tsan :: BuildConfig
 tsan = vanilla { threadSanitiser = True }
 
-enableUBSan :: BuildConfig
-enableUBSan = vanilla { withDwarf = True, ubsan = True }
+enableUBSanASan :: BuildConfig
+enableUBSanASan = vanilla { withDwarf = True, ubsan = True, asan = True }
 
 noTntc :: BuildConfig
 noTntc = vanilla { tablesNextToCode = False }
@@ -381,6 +385,7 @@ flavourString (Flavour base trans) = base_string base ++ concatMap (("+" ++) . f
     flavour_string HostFullyStatic = "host_fully_static"
     flavour_string ThreadSanitiser = "thread_sanitizer_cmm"
     flavour_string UBSan = "ubsan"
+    flavour_string ASan = "asan"
     flavour_string NoSplitSections = "no_split_sections"
     flavour_string BootNonmovingGc = "boot_nonmoving_gc"
     flavour_string TextWithSIMDUTF = "text_simdutf"
@@ -1213,15 +1218,24 @@ fedora_x86 =
   , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora43) releaseConfig))
   , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora43) dwarf)
   , disableValidate (standardBuilds Amd64 (Linux Fedora43))
-    -- For UBSan jobs, only enable for validate/nightly pipelines.
-    -- Also disable docs since it's not the point for UBSan jobs.
+    -- For UBSan/ASan jobs, only enable for validate/nightly
+    -- pipelines. Also disable docs since it's not the point for
+    -- UBSan/ASan jobs.
+    --
+    -- See
+    -- https://github.com/llvm/llvm-project/blob/llvmorg-21.1.8/compiler-rt/lib/sanitizer_common/sanitizer_flags.inc
+    -- for ASAN options help, for now these are required to pass the
+    -- testsuite
   , modifyJobs
       ( setVariable "HADRIAN_ARGS" "--docs=none"
           . addVariable
             "UBSAN_OPTIONS"
             "suppressions=$CI_PROJECT_DIR/rts/.ubsan-suppressions"
+          . addVariable
+            "ASAN_OPTIONS"
+            "detect_leaks=false:handle_segv=0:handle_sigfpe=0:verify_asan_link_order=false"
       )
-      $ validateBuilds Amd64 (Linux Fedora43) enableUBSan
+      $ validateBuilds Amd64 (Linux Fedora43) enableUBSanASan
   ]
   where
     hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-for-hackage")
