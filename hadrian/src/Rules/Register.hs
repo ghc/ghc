@@ -6,20 +6,17 @@ module Rules.Register (
 
 import Base
 import Context
-import Expression ( getContextData )
 import Flavour
 import Oracles.Setting
 import Hadrian.BuildPath
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
-import Oracles.Flag (platformSupportsGhciObjects)
 import Packages
 import Rules.Rts
 import Settings
 import Target
 import Utilities
 
-import Hadrian.Haskell.Cabal.Type
 import qualified Text.Parsec      as Parsec
 import qualified Data.Set         as Set
 import qualified Data.Char        as Char
@@ -298,17 +295,9 @@ extraTargets context
 -- | Given a library 'Package' this action computes all of its targets. Needing
 -- all the targets should build the library such that it is ready to be
 -- registered into the package database.
--- See 'Rules.packageTargets' for the explanation of the @includeGhciLib@
--- parameter.
-libraryTargets :: Bool -> Context -> Action [FilePath]
-libraryTargets includeGhciLib context@Context {..} = do
+libraryTargets :: Context -> Action [FilePath]
+libraryTargets context = do
     libFile  <- pkgLibraryFile     context
-    ghciLib  <- pkgGhciLibraryFile context
-    ghciObjsSupported <- platformSupportsGhciObjects
-    ghci     <- if ghciObjsSupported && includeGhciLib && not (wayUnit Dynamic way)
-                then interpretInContext context $ getContextData buildGhciLib
-                else return False
     extra    <- extraTargets context
     return $ [ libFile ]
-          ++ [ ghciLib | ghci ]
           ++ extra

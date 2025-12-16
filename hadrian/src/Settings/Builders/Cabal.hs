@@ -5,13 +5,12 @@ import Hadrian.Haskell.Cabal
 
 import Builder
 import Context
-import Flavour
 import Packages
 import Settings.Builders.Common
 import qualified Settings.Builders.Common as S
 import Control.Exception (assert)
 import qualified Data.Set as Set
-import Settings.Program (programContext, ghcWithInterpreter)
+import Settings.Program (programContext)
 import GHC.Toolchain (ccLinkProgram, tgtCCompilerLink)
 import GHC.Toolchain.Program (prgFlags)
 
@@ -128,7 +127,6 @@ commonCabalArgs stage = do
             ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
--- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
 -- TODO: should `elem` be `wayUnit`?
 -- This approach still doesn't work. Previously libraries were build only in the
 -- Default flavours and not using context.
@@ -136,11 +134,6 @@ libraryArgs :: Args
 libraryArgs = do
     flavourWays <- getLibraryWays
     contextWay  <- getWay
-    package     <- getPackage
-    stage       <- getStage
-    withGhci    <- expr $ ghcWithInterpreter stage
-    dynPrograms <- expr (flavour >>= dynamicGhcPrograms)
-    ghciObjsSupported <- expr platformSupportsGhciObjects
     let ways = Set.insert contextWay flavourWays
         hasVanilla = vanilla `elem` ways
         hasProfiling = any (wayUnit Profiling) ways
@@ -155,11 +148,7 @@ libraryArgs = do
          , if hasProfilingShared
             then "--enable-profiling-shared"
             else "--disable-profiling-shared"
-         , if ghciObjsSupported &&
-              (hasVanilla || hasProfiling) &&
-              package /= rts && withGhci && not dynPrograms
-           then  "--enable-library-for-ghci"
-           else "--disable-library-for-ghci"
+         , "--disable-library-for-ghci"
          , if hasDynamic
            then  "--enable-shared"
            else "--disable-shared" ]

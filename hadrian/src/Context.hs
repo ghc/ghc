@@ -8,7 +8,7 @@ module Context (
     -- * Paths
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile, pkgSetupConfigDir,
     pkgHaddockFile, pkgRegisteredLibraryFile, pkgRegisteredLibraryFileName,
-    pkgLibraryFile, pkgGhciLibraryFile,
+    pkgLibraryFile,
     pkgConfFile, pkgStampFile, resourcePath, objectPath, contextPath, getContextPath, libPath, distDir,
     distDynDir,
     haddockStatsFilesDir, ensureConfigured, autogenPath, rtsContext, rtsBuildPath, libffiBuildPath
@@ -154,13 +154,6 @@ pkgLibraryFile :: Context -> Action FilePath
 pkgLibraryFile context@Context {..} = do
     extension <- libsuf stage way
     pkgFile context "libHS" extension
-
--- | Path to the GHCi library file of a given 'Context', e.g.:
--- @_build/stage1/libraries/array/build/HSarray-0.5.1.0.o@.
-pkgGhciLibraryFile :: Context -> Action FilePath
-pkgGhciLibraryFile context@Context {..} = do
-    let extension = "" <.> osuf way
-    pkgFile context "HS" extension
 
 -- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath

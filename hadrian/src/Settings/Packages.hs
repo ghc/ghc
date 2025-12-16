@@ -75,8 +75,7 @@ packageArgs = do
               pure ["-O0"] ]
 
           , builder (Cabal Setup) ? mconcat
-            [ arg "--disable-library-for-ghci"
-            , anyTargetOs [OSOpenBSD] ? arg "--ld-options=-E"
+            [ anyTargetOs [OSOpenBSD] ? arg "--ld-options=-E"
             , compilerStageOption ghcProfiled ? arg "--ghc-pkg-option=--force"
             , cabalExtraDirs libzstdIncludeDir libzstdLibraryDir
             ]

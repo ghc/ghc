@@ -334,7 +334,6 @@ resolveContextData context@Context {..} = do
           , depIncludeDirs     = forDeps Installed.includeDirs
           , depCcOpts          = forDeps Installed.ccOptions
           , depLdOpts          = forDeps Installed.ldOptions
-          , buildGhciLib       = C.withGHCiLib lbi'
           , frameworks         = map C.getSymbolicPath (C.frameworks buildInfo)
           , packageDescription = pd'
           , contextLibdir        = libdir install_dirs

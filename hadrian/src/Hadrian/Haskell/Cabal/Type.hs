@@ -67,7 +67,6 @@ data ContextData = ContextData
     , depIncludeDirs     :: [String]
     , depCcOpts          :: [String]
     , depLdOpts          :: [String]
-    , buildGhciLib       :: Bool
     , frameworks         :: [String]
     , packageDescription :: PackageDescription
 

@@ -3,7 +3,6 @@
 module Oracles.Flag (
     Flag (..), flag, getFlag,
     platformSupportsSharedLibs,
-    platformSupportsGhciObjects,
     targetRTSLinkerOnlySupportsSharedLibs,
     targetSupportsThreadedRts,
     targetSupportsSMP,
@@ -70,15 +69,6 @@ flag f = do
 -- | Get a configuration setting.
 getFlag :: Flag -> Expr c b Bool
 getFlag = expr . flag
-
--- | Does the platform support object merging (and therefore we can build GHCi objects
--- when appropriate).
-platformSupportsGhciObjects :: Action Bool
--- FIXME: The name of the function is not entirely clear about which platform, it would be better named targetSupportsGhciObjects
-platformSupportsGhciObjects = do
-    has_merge_objs <- isJust <$> queryTargetTarget tgtMergeObjs
-    only_shared_libs <- targetRTSLinkerOnlySupportsSharedLibs
-    pure $ has_merge_objs && not only_shared_libs
 
 targetRTSLinkerOnlySupportsSharedLibs :: Action Bool
 targetRTSLinkerOnlySupportsSharedLibs = queryTargetTarget Toolchain.tgtRTSLinkerOnlySupportsSharedLibs
