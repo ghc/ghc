@@ -8,7 +8,11 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wall -Wno-unticked-promoted-constructors #-}
-module Bug where
+
+-- NB: After fixing #22652 this program right produces warnings
+-- But it produces too many warnings: #26685
+
+module T15753d where
 
 import Data.Kind
 import Data.Type.Bool

@@ -1,6 +1,7 @@
 T19415.hs:27:8: error: [GHC-39999]
-    • No instance for ‘SetField "name" (Pet a0) (Pet b0) Char’
+    • No instance for ‘SetField "name" (Pet a0) (Pet b) Char’
         arising from a use of ‘setField’
+      Insoluble functional dependencies wrt top-level instances
     • In the expression: setField @"name" 'c' (Pet "hi")
       In an equation for ‘loop’: loop = setField @"name" 'c' (Pet "hi")
 

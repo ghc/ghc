@@ -2,6 +2,7 @@ RecordDotSyntaxFail13.hs:26:11: error: [GHC-39999]
     • No instance for ‘HasField "foo" Foo (Foo -> Int)’
         arising from a record update
       NB: ‘HasField’ is not the built-in ‘GHC.Internal.Records.HasField’ class.
+      Insoluble functional dependencies wrt top-level instances
     • In the second argument of ‘($)’, namely ‘a {foo}’
       In a stmt of a 'do' block: print $ a {foo}
       In the expression:

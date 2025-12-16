@@ -46,3 +46,14 @@ blah :: forall (t :: Type) (re :: RegExp t).
 blah (SApp sre1 sre2)
   = case (sReNotEmpty sre1, sReNotEmpty sre2) of
       (STrue, STrue) -> ()
+
+{-  [W] ReNotEmpty alpha ~ True
+--> fundeps
+    [W] alpha ~ App beta1 beta2
+    [W] ReNotEmpty beta1 && ReNotEmpty beta2 ~ True
+--> fundeps +  alpha := App beta1 beta2
+    [W] ReNotEmpty beta1 ~ True
+    [W] ReNotEmpty beta2 ~ True
+
+Unproducive loop!
+-}

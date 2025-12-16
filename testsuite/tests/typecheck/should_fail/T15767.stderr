@@ -1,9 +1,10 @@
-
 T15767.hs:7:5: error: [GHC-39999]
-    • No instance for ‘C () b0’ arising from a use of ‘x’
+    • No instance for ‘C () b’ arising from a use of ‘x’
+      Insoluble functional dependencies wrt other constraints
     • In the expression: x
       In an equation for ‘y’:
           y = x
             where
                 x :: (C () b, C Bool b) => b
                 x = f ()
+

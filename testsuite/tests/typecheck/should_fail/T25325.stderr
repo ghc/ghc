@@ -9,6 +9,7 @@ T25325.hs:13:20: error: [GHC-39999]
                            MonadState (Buggy (f :+: g) m) m =>
                            (:+:) f g (m Int) -> m Int
         at T25325.hs:13:5-8
+      Insoluble functional dependencies wrt other constraints
     • In the expression: demo l
       In an equation for ‘demo’: demo (Inl l) = demo l
       In the instance declaration for ‘GhcBug (f :+: g)’
@@ -24,6 +25,7 @@ T25325.hs:14:20: error: [GHC-39999]
                            MonadState (Buggy (f :+: g) m) m =>
                            (:+:) f g (m Int) -> m Int
         at T25325.hs:13:5-8
+      Insoluble functional dependencies wrt other constraints
     • In the expression: demo r
       In an equation for ‘demo’: demo (Inr r) = demo r
       In the instance declaration for ‘GhcBug (f :+: g)’

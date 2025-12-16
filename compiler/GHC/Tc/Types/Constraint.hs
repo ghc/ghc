@@ -63,7 +63,7 @@ module GHC.Tc.Types.Constraint (
 
         Implication(..), implicationPrototype, checkTelescopeSkol,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
-        UserGiven, getUserGivensFromImplics,
+        UserGiven, getGivensFromImplics,
         HasGivenEqs(..), checkImplicationInvariants,
         EvNeedSet(..), emptyEvNeedSet, unionEvNeedSet, extendEvNeedSet, delGivensFromEvNeedSet,
 
@@ -488,9 +488,13 @@ data CtIrredReason
     -- ^ A typechecker plugin returned this in the pluginBadCts field
     -- of TcPluginProgress
 
-  | InsolubleFunDepReason
+  | InsolubleFunDepReason Bool
     -- ^ This constraint generated a functional dependency that is
     -- insoluble -- so we can regard this constraint too as insoluble
+    -- See Note [Insoluble fundeps] in GHC.Tc.Solver.FunDeps
+    --
+    -- Bool = True <=> insolubility arises from top-level constraints only
+    --    See (IFD2) in the Note [Insoluble fundeps]
 
 instance Outputable CtIrredReason where
   ppr IrredShapeReason          = text "(irred)"
@@ -499,17 +503,18 @@ instance Outputable CtIrredReason where
   ppr ShapeMismatchReason       = text "(shape)"
   ppr AbstractTyConReason       = text "(abstc)"
   ppr PluginReason              = text "(plugin)"
-  ppr InsolubleFunDepReason     = text "(fundep)"
+  ppr (InsolubleFunDepReason _) = text "(fundep)"
 
 -- | Are we sure that more solving will never solve this constraint?
 isInsolubleReason :: CtIrredReason -> Bool
-isInsolubleReason IrredShapeReason          = False
-isInsolubleReason (NonCanonicalReason cter) = cterIsInsoluble cter
-isInsolubleReason ReprEqReason              = False
-isInsolubleReason ShapeMismatchReason       = True
-isInsolubleReason AbstractTyConReason       = True
-isInsolubleReason PluginReason              = True
-isInsolubleReason InsolubleFunDepReason     = True
+isInsolubleReason IrredShapeReason           = False
+isInsolubleReason (NonCanonicalReason cter)  = cterIsInsoluble cter
+isInsolubleReason ReprEqReason               = False
+isInsolubleReason ShapeMismatchReason        = True
+isInsolubleReason AbstractTyConReason        = True
+isInsolubleReason PluginReason               = True
+isInsolubleReason (InsolubleFunDepReason {}) = True
+  -- We only say that insoluble
 
 ------------------------------------------------------------------------------
 --
@@ -1634,10 +1639,10 @@ data HasGivenEqs -- See Note [HasGivenEqs]
 
 type UserGiven = Implication
 
-getUserGivensFromImplics :: [Implication] -> [UserGiven]
+getGivensFromImplics :: [Implication] -> [UserGiven]
 -- The argument [Implication] is innermost first;
 --   the returned [UserGiven] is outermost first
-getUserGivensFromImplics implics
+getGivensFromImplics implics
   = get [] implics
   where
     get :: [UserGiven] -> [Implication] -> [UserGiven]
