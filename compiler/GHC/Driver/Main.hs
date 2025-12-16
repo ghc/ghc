@@ -824,7 +824,7 @@ This is the only thing that isn't caught by the type-system.
 hscRecompStatus :: Maybe Messager
                 -> HscEnv
                 -> ModSummary
-                -> Maybe ModIface
+                -> Maybe (IO ModIface)
                 -> HomeModLinkable
                 -> (Int,Int)
                 -> IO HscRecompStatus
@@ -1038,16 +1038,19 @@ checkByteCodeFromIfaceCoreBindings _hsc_env iface mod_sum = do
 -- Compilers
 --------------------------------------------------------------
 
-add_iface_to_hpt :: ModIface -> ModDetails -> HscEnv -> IO ()
-add_iface_to_hpt iface details =
-  hscInsertHPT (HomeModInfo iface details emptyHomeModInfoLinkable)
+add_iface_to_hpt :: SimpleModIface -> ModDetails -> LoadHomeModInfoParts -> HscEnv -> IO ()
+add_iface_to_hpt iface details loading =
+  hscInsertHPT (HomeModInfo iface details emptyHomeModInfoLinkable loading)
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
 initModDetails :: HscEnv -> ModIface -> IO ModDetails
 initModDetails hsc_env iface =
   fixIO $ \details' -> do
-    add_iface_to_hpt iface details' hsc_env
+    add_iface_to_hpt (mkSimpleModiface iface) details' (LoadHomeModInfoParts {
+      loadModIface = return iface,
+      loadModDetails = genModDetails hsc_env iface
+    }) hsc_env
     -- NB: This result is actually not that useful
     -- in one-shot mode, since we're not going to do
     -- any further typechecking.  It's much more useful
@@ -1144,10 +1147,11 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
 initWholeCoreBindings ::
   HscEnv ->
   ModIface ->
+  LoadHomeModInfoParts ->
   ModDetails ->
   RecompLinkables ->
   IO HomeModLinkable
-initWholeCoreBindings hsc_env iface details (RecompLinkables bc o) = do
+initWholeCoreBindings hsc_env iface loading details (RecompLinkables bc o) = do
   bc' <- go bc
   pure $ HomeModLinkable bc' o
   where
@@ -1157,7 +1161,7 @@ initWholeCoreBindings hsc_env iface details (RecompLinkables bc o) = do
     go (NormalLinkable l) = pure l
     go (WholeCoreBindingsLinkable wcbl) =
       fmap Just $ for wcbl $ \wcb -> do
-        add_iface_to_hpt iface details hsc_env
+        add_iface_to_hpt (mkSimpleModiface iface) details loading hsc_env
         bco <- unsafeInterleaveIO $
                        compileWholeCoreBindings hsc_env type_env wcb
         pure $ NE.singleton (DotGBC bco)

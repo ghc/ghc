@@ -382,13 +382,14 @@ data ModIfaceCache = ModIfaceCache { iface_clearCache :: IO [CachedIface]
                                    , iface_addToCache :: CachedIface -> IO () }
 
 addHmiToCache :: ModIfaceCache -> HomeModInfo -> IO ()
-addHmiToCache c (HomeModInfo i _ l) = iface_addToCache c (CachedIface i l)
+addHmiToCache c (HomeModInfo i _ l load) = iface_addToCache c (CachedIface l i load)
 
-data CachedIface = CachedIface { cached_modiface :: !ModIface
-                               , cached_linkable :: !HomeModLinkable }
+data CachedIface = CachedIface { cached_linkable :: !HomeModLinkable
+                               , cached_simple_iface :: !SimpleModIface
+                               , cached_loading :: !LoadHomeModInfoParts }
 
 instance Outputable CachedIface where
-  ppr (CachedIface mi ln) = hsep [text "CachedIface", ppr (miKey (mkSimpleModiface mi)), ppr ln]
+  ppr (CachedIface ln iface _) = hsep [text "CachedIface", ppr (miKey iface), ppr ln]
 
 noIfaceCache :: Maybe ModIfaceCache
 noIfaceCache = Nothing
@@ -802,14 +803,15 @@ pruneCache :: [CachedIface]
                       -> [HomeModInfo]
 pruneCache hpt summ
   = strictMap prune hpt
-  where prune (CachedIface { cached_modiface = iface
+  where prune (CachedIface { cached_simple_iface = iface
                            , cached_linkable = linkable
-                           }) = HomeModInfo iface emptyModDetails linkable'
+                           , cached_loading = loading
+                           }) = HomeModInfo iface emptyModDetails linkable' loading
           where
-           modl = miKey (mkSimpleModiface iface)
+           modl = miKey iface
            linkable'
                 | Just ms <- M.lookup modl ms_map
-                , mi_src_hash iface == Just (ms_hs_hash ms)
+                , mi_simple_src_hash iface == Just (ms_hs_hash ms)
                 = linkable
                 | otherwise
                 = emptyHomeModInfoLinkable
@@ -1237,7 +1239,7 @@ upsweep_mod :: HscEnv
             -> IO HomeModInfo
 upsweep_mod hsc_env mHscMessage old_hmi summary mod_index nmods =  do
   compileOne' mHscMessage hsc_env summary
-              mod_index nmods (hm_iface <$> old_hmi) (maybe emptyHomeModInfoLinkable hm_linkable old_hmi)
+              mod_index nmods (loadModIface . hm_loading <$> old_hmi) (maybe emptyHomeModInfoLinkable hm_linkable old_hmi)
 
 
 -- Note [When source is considered modified]
@@ -1612,7 +1614,11 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mni = do
             mb_object <- findObjectLinkableMaybe (mi_module iface) loc
             mb_bytecode <- loadIfaceByteCodeLazy hsc_env iface loc (md_types details)
             let hm_linkable = HomeModLinkable mb_bytecode mb_object
-            return (HomeModInfo iface details hm_linkable)
+            let loading = LoadHomeModInfoParts {
+              loadModIface = return iface,
+              loadModDetails = genModDetails hsc_env iface
+            }
+            return (HomeModInfo (mkSimpleModiface iface) details hm_linkable loading)
 
     executeCompileNodeWithSource :: HscEnv -> MakeEnv -> ModSummary -> IO (Maybe HomeModInfo)
     executeCompileNodeWithSource hsc_env MakeEnv{diag_wrapper, env_messager} mod = do
@@ -1644,8 +1650,7 @@ rehydrate hsc_env hmis = do
   -- modules are looked up in HPT when it is forced. If we didn't "reset" the
   -- ModDetails, modules in a loop would refer the wrong (hs-boot) definitions
   -- (as explained in Note [Rehydrating Modules]).
-  mds <- initIfaceCheck (text "rehydrate") hsc_env $
-            mapM (typecheckIface . hm_iface) hmis
+  mds <- mapM (loadModDetails . hm_loading) hmis
   let new_mods = [ hmi{ hm_details = details }
                  | (hmi,details) <- zip hmis mds
                  ]

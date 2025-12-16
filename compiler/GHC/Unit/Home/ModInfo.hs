@@ -4,6 +4,7 @@ module GHC.Unit.Home.ModInfo
    (
      HomeModInfo (..)
    , HomeModLinkable (..)
+   , LoadHomeModInfoParts (..)
    , homeModInfoObject
    , homeModInfoByteCode
    , emptyHomeModInfoLinkable
@@ -28,7 +29,7 @@ import GHC.Types.SourceFile (HscSource)
 
 -- | Information about modules in the package being compiled
 data HomeModInfo = HomeModInfo
-   { hm_iface    :: !ModIface
+   { hm_iface    :: !SimpleModIface
         -- ^ The basic loaded interface file: every loaded module has one of
         -- these, even if it is imported from another package
 
@@ -52,13 +53,17 @@ data HomeModInfo = HomeModInfo
         -- When re-linking a module ('GHC.Driver.Main.HscNoRecomp'), we construct the
         -- 'HomeModInfo' by building a new 'ModDetails' from the old
         -- 'ModIface' (only).
+
+     -- | How to load the additional parts of the HomeModInfo
+     , hm_loading :: !LoadHomeModInfoParts
+
    }
 
 hm_module :: HomeModInfo -> Module
 hm_module = mi_mod_info_module . mi_simple_info . hm_simple_iface
 
 hm_simple_iface :: HomeModInfo -> SimpleModIface
-hm_simple_iface = mkSimpleModiface . hm_iface
+hm_simple_iface = hm_iface
 
 hm_boot :: HomeModInfo -> IsBootInterface
 hm_boot = mi_simple_boot . hm_simple_iface
@@ -85,6 +90,7 @@ data HomeModLinkable = HomeModLinkable { homeMod_bytecode :: !(Maybe Linkable)
 instance Outputable HomeModLinkable where
   ppr (HomeModLinkable l1 l2) = ppr l1 $$ ppr l2
 
+
 {-
 Note [Home module build products]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -108,3 +114,14 @@ also want to use `-fprefer-byte-code` then you should probably also use this
 flag to make sure that byte code is generated for your modules.
 
 -}
+
+-- | We do not keep ModIface in memory, but if you really need it, you can load it temporaily by
+-- calling `loadModIface`.
+--
+-- Likewise, if you want to refresh the ModDetails, you can call `loadModDetails`.
+data LoadHomeModInfoParts =
+       LoadHomeModInfoParts {
+          loadModIface :: IO ModIface,
+          loadModDetails :: IO ModDetails
+       }
+

@@ -288,8 +288,8 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap warningMap = do
 
       let cls_insts = instEnvElts . md_insts $ hm_details hmi
           fam_insts = md_fam_insts $ hm_details hmi
-
-      pure (hm_iface hmi, (cls_insts, fam_insts))
+      iface <- liftIO $ loadModIface (hm_loading hmi)
+      pure (iface, (cls_insts, fam_insts))
 
   !interface <- do
     logger <- getLogger

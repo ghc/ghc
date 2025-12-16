@@ -263,7 +263,8 @@ data SimpleModIface = SimpleModIface {
   mi_simple_info_iface_hash :: Fingerprint,
   mi_simple_info_public :: SimpleIfacePublic,
   mi_simple_docs :: Maybe Docs,
-  mi_simple_top_env :: IfaceTopEnv
+  mi_simple_top_env :: IfaceTopEnv,
+  mi_simple_src_hash :: Maybe Fingerprint
 }
 
 data SimpleIfacePublic = SimpleIfacePublic {
@@ -283,6 +284,7 @@ mkSimpleModiface iface = SimpleModIface {
   mi_simple_info_iface_hash = mi_iface_hash iface,
   mi_simple_docs = mi_docs iface,
   mi_simple_top_env = mi_top_env iface,
+  mi_simple_src_hash = mi_src_hash iface,
   mi_simple_info_public = SimpleIfacePublic {
     mi_simple_info_exports = mi_exports iface,
     mi_simple_trust_info = mi_trust iface,

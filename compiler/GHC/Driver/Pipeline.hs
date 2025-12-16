@@ -215,7 +215,7 @@ compileOne :: HscEnv
            -> ModSummary      -- ^ summary for module being compiled
            -> Int             -- ^ module N ...
            -> Int             -- ^ ... of M
-           -> Maybe ModIface  -- ^ old interface, if we have one
+           -> Maybe (IO ModIface)  -- ^ How to load an old interface, if we have one
            -> HomeModLinkable  -- ^ old linkable, if we have one
            -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
@@ -226,7 +226,7 @@ compileOne' :: Maybe Messager
             -> ModSummary      -- ^ summary for module being compiled
             -> Int             -- ^ module N ...
             -> Int             -- ^ ... of M
-            -> Maybe ModIface  -- ^ old interface, if we have one
+            -> Maybe (IO ModIface)  -- ^ old interface, if we have one
             -> HomeModLinkable
             -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
@@ -251,9 +251,13 @@ compileOne' mHscMessage
    let pipeline = hscPipeline pipe_env (setDumpPrefix pipe_env plugin_hsc_env, upd_summary, status)
    (iface, linkable) <- runPipeline (hsc_hooks plugin_hsc_env) pipeline
    -- See Note [ModDetails and --make mode]
+   let loading = LoadHomeModInfoParts {
+     loadModIface = return iface,
+     loadModDetails = genModDetails plugin_hsc_env iface
+   }
    details <- initModDetails plugin_hsc_env iface
-   linkable' <- initWholeCoreBindings plugin_hsc_env iface details linkable
-   return $! HomeModInfo iface details linkable'
+   linkable' <- initWholeCoreBindings plugin_hsc_env iface loading details linkable
+   return $! HomeModInfo (mkSimpleModiface iface) details linkable' loading
 
  where lcl_dflags  = ms_hspp_opts summary
        location    = ms_location summary

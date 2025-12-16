@@ -25,6 +25,7 @@ import System.Mem
 import System.Mem.Weak
 import GHC.Types.Unique.DFM
 import Control.Exception
+import GHC.Unit.Module.ModIface
 
 -- Checking for space leaks in GHCi. See #15111, and the
 -- -fghci-leak-check flag.
@@ -33,7 +34,7 @@ data LeakIndicators = LeakIndicators [LeakModIndicators]
 
 data LeakModIndicators = LeakModIndicators
   { leakMod :: Weak HomeModInfo
-  , leakIface :: Weak ModIface
+  , leakIface :: Weak SimpleModIface
   , leakDetails :: Weak ModDetails
   , leakLinkable :: [Maybe (Weak Linkable)]
   }
@@ -69,7 +70,7 @@ checkLeakIndicators dflags (LeakIndicators leakmods)  = do
           showSDoc dflags (ppr (hm_module hmi))) (Just hmi)
     deRefWeak leakIface >>= \case
       Nothing -> return ()
-      Just miface -> report ("ModIface:" ++ moduleNameString (moduleName (mi_module miface))) (Just miface)
+      Just miface -> report ("ModIface:" ++ moduleNameString (moduleName (mi_mod_info_module (mi_simple_info miface)))) (Just miface)
     deRefWeak leakDetails >>= report "ModDetails"
     forM_ leakLinkable $ \l -> forM_ l $ \l' -> deRefWeak l' >>= report "Linkable"
  where

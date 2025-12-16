@@ -90,7 +90,6 @@ import GHC.Unit.External (ExternalPackageState (..))
 import GHC.Unit.Module
 import GHC.Unit.Module.ModNodeKey
 import GHC.Unit.Module.Graph
-import GHC.Unit.Module.ModIface
 import GHC.Unit.State as Packages
 
 import qualified GHC.Data.ShortText as ST

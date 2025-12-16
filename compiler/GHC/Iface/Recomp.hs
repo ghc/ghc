@@ -276,7 +276,7 @@ checkList = \case
 checkOldIface
   :: HscEnv
   -> ModSummary
-  -> Maybe ModIface         -- Old interface from compilation manager, if any
+  -> Maybe (IO ModIface)         -- Old interface from compilation manager, if any
   -> IO (MaybeValidated ModIface)
 
 checkOldIface hsc_env mod_summary maybe_iface
@@ -292,7 +292,7 @@ checkOldIface hsc_env mod_summary maybe_iface
 check_old_iface
   :: HscEnv
   -> ModSummary
-  -> Maybe ModIface
+  -> Maybe (IO ModIface)
   -> IfG (MaybeValidated ModIface)
 
 check_old_iface hsc_env mod_summary maybe_iface
@@ -300,10 +300,10 @@ check_old_iface hsc_env mod_summary maybe_iface
         logger = hsc_logger hsc_env
         getIface =
             case maybe_iface of
-                Just {}  -> do
+                Just load_iface  -> do
                     trace_if logger (text "We already have the old interface for" <+>
                       ppr (ms_mod mod_summary))
-                    return maybe_iface
+                    Just <$> liftIO load_iface
                 Nothing -> loadIface dflags (msHiFilePath mod_summary)
 
         loadIface read_dflags iface_path = do
@@ -351,8 +351,12 @@ check_old_iface hsc_env mod_summary maybe_iface
             -- If the source has changed and we're in interactive mode,
             -- avoid reading an interface; just return the one we might
             -- have been supplied with.
-            True | not (backendWritesFiles $ backend dflags) ->
-                return $ OutOfDateItem MustCompile maybe_iface
+            True | not (backendWritesFiles $ backend dflags) -> do
+                case maybe_iface of
+                  Just load_iface -> do
+                    iface <- liftIO load_iface
+                    return $ OutOfDateItem MustCompile (Just iface)
+                  Nothing -> return $ OutOfDateItem MustCompile Nothing
 
             -- Try and read the old interface for the current module
             -- from the .hi file left from the last time we compiled it
