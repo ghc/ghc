@@ -142,14 +142,14 @@ getHomeModuleInfo hsc_env mdl =
     Nothing  -> return Nothing
     Just hmi -> do
       let details  = hm_details hmi
-          iface    = hm_iface hmi
+          iface    = hm_simple_iface hmi
       return (Just (ModuleInfo {
                         minf_type_env  = md_types details,
                         minf_exports   = md_exports details,
                          -- NB: already forced. See Note [Forcing GREInfo] in GHC.Types.GREInfo.
                         minf_instances = instEnvElts $ md_insts details,
-                        minf_iface     = Just (mkSimpleModiface iface),
-                        minf_safe      = getSafeMode $ mi_trust iface,
+                        minf_iface     = Just iface,
+                        minf_safe      = getSafeMode $ mi_simple_trust_info (mi_simple_info_public iface),
                         minf_modBreaks = getModBreaks hmi
                         }))
 

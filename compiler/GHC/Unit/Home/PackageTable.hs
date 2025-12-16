@@ -137,7 +137,7 @@ lookupHptByModule hpt mod
   = -- The HPT is indexed by ModuleName, not Module,
     -- we must check for a hit on the right Module
     lookupHpt hpt (moduleName mod) >>= pure . \case
-      Just hm | mi_module (hm_iface hm) == mod -> Just hm
+      Just hm | hm_module hm == mod -> Just hm
       _otherwise                               -> Nothing
 
 --------------------------------------------------------------------------------
@@ -154,7 +154,7 @@ lookupHptByModule hpt mod
 -- When the module already has an entry, inserting a new one entry in the HPT
 -- will always overwrite the existing entry for that module.
 addHomeModInfoToHpt :: HomeModInfo -> HomePackageTable -> IO ()
-addHomeModInfoToHpt hmi hpt = addToHpt hpt (moduleName (mi_module (hm_iface hmi))) hmi
+addHomeModInfoToHpt hmi hpt = addToHpt hpt (moduleName (hm_module hmi)) hmi
 
 {-# DEPRECATED addToHpt "Deprecated in favour of 'addHomeModInfoToHpt', as the module at which a 'HomeModInfo' is inserted should always be derived from the 'HomeModInfo' itself." #-}
 -- After deprecation cycle, move `addToHpt` to a `where` clause inside `addHomeModInfoToHpt`.
@@ -179,7 +179,7 @@ addHomeModInfosToHpt hpt = mapM_ (flip addHomeModInfoToHpt hpt)
 restrictHpt :: HomePackageTable -> [HomeModInfo] -> IO ()
 restrictHpt HPT{table=hptr} hmis =
   let key_set = map (getKey . getUnique . hmi_mod) hmis
-      hmi_mod hmi = moduleName (mi_module (hm_iface hmi))
+      hmi_mod hmi = moduleName (hm_module hmi)
   in atomicModifyIORef' hptr (\hpt -> (udfmRestrictKeysSet hpt (W64.fromList key_set), ()))
 
 {-# DEPRECATED addListToHpt "Deprecated in favour of 'addHomeModInfosToHpt', as the module at which a 'HomeModInfo' is inserted should always be derived from the 'HomeModInfo' itself." #-}
@@ -207,9 +207,8 @@ hptAllInstances hpt = do
 
 -- | Find all the family instance declarations from the HPT
 hptAllFamInstances :: HomePackageTable -> IO (ModuleEnv FamInstEnv)
-hptAllFamInstances = fmap mkModuleEnv . concatHpt (\hmi -> [(hmiModule hmi, hmiFamInstEnv hmi)])
+hptAllFamInstances = fmap mkModuleEnv . concatHpt (\hmi -> [(hm_module hmi, hmiFamInstEnv hmi)])
   where
-    hmiModule     = mi_module . hm_iface
     hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv
                       . md_fam_insts . hm_details
 
@@ -262,7 +261,7 @@ pprHPT HPT{table=hptr} = do
   hpt <- readIORef hptr
   return $!
     pprUDFM hpt $ \hms ->
-      vcat [ ppr (mi_module (hm_iface hm))
+      vcat [ ppr (hm_module hm)
            | hm <- hms ]
 
 ----------------------------------------------------------------------------------

@@ -1740,7 +1740,7 @@ lookupLoadedHomeModule :: GhcMonad m => UnitId -> ModuleName -> m (Maybe Module)
 lookupLoadedHomeModule uid mod_name = withSession $ \hsc_env -> liftIO $ do
   trace_if (hsc_logger hsc_env) (text "lookupLoadedHomeModule" <+> ppr mod_name <+> ppr uid)
   HUG.lookupHug (hsc_HUG hsc_env) uid mod_name >>= \case
-    Just mod_info      -> return (Just (mi_module (hm_iface mod_info)))
+    Just mod_info      -> return (Just (hm_module mod_info))
     _not_a_home_module -> return Nothing
 
 -- | Lookup the given 'ModuleName' in the 'HomeUnitGraph'.
@@ -1760,7 +1760,7 @@ lookupLoadedHomeModuleByModuleName mod_name = withSession $ \hsc_env -> liftIO $
   trace_if (hsc_logger hsc_env) (text "lookupLoadedHomeModuleByModuleName" <+> ppr mod_name)
   HUG.lookupAllHug (hsc_HUG hsc_env) mod_name >>= \case
     []        -> return Nothing
-    mod_infos -> return (Just (mi_module . hm_iface <$> mod_infos))
+    mod_infos -> return (Just (hm_module <$> mod_infos))
 
 -- | Given a 'ModuleName' and 'PkgQual', lookup all 'Module's that may fit the criteria.
 --

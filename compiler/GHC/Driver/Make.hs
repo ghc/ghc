@@ -1174,7 +1174,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       -- Checks that the interfaces returned from hydration match-up with the names of the
       -- modules which were fed into the function.
     checkRehydrationInvariant hmis deps =
-        let hmi_names = map (moduleName . mi_module . hm_iface) hmis
+        let hmi_names = map (moduleName . hm_module) hmis
             start = mapMaybe (nodeKeyModName . gwib_mod) deps
         in massertPpr (hmi_names == start) $ (ppr hmi_names $$ ppr start)
 
@@ -1505,7 +1505,7 @@ restrictDepsHscEnv deps hsc_env =
       hug = ue_home_unit_graph $ hsc_unit_env hsc_env
       go hmi = (hmi_unit, hmi)
         where
-          hmi_mod  = mi_module (hm_iface hmi)
+          hmi_mod  = hm_module hmi
           hmi_unit = toUnitId (moduleUnit hmi_mod)
   in HUG.restrictHug deps_with_unit hug
 
@@ -1637,7 +1637,7 @@ rehydrate :: HscEnv        -- ^ The HPT in this HscEnv needs rehydrating.
           -> IO [HomeModInfo]
 rehydrate hsc_env hmis = do
   debugTraceMsg logger 2 $ (
-     text "Re-hydrating loop: " <+> (ppr (map (mi_module . hm_iface) hmis)))
+     text "Re-hydrating loop: " <+> (ppr (map hm_module hmis)))
   -- When the HPT was pure we had to tie a knot to update the ModDetails in the
   -- HPT required to update those ModDetails, but since it was made an IORef we
   -- just have to make sure the new ModDetails are "reset" so that the new

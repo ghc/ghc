@@ -186,7 +186,7 @@ addHomeModInfoToHug hmi hug =
       addHomeModInfoToHpt hmi (homeUnitEnv_hpt hue)
   where
     hmi_mod :: Module
-    hmi_mod  = mi_module (hm_iface hmi)
+    hmi_mod  = hm_module hmi
     hmi_unit = toUnitId (moduleUnit hmi_mod)
 
 -- | Thin each HPT variable to only contain keys from the given dependencies.

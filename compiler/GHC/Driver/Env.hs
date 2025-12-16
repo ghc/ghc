@@ -256,7 +256,7 @@ hugInstancesBelow hsc_env uid mnwib = do
        hugSomeThingsBelowUs (\mod_info ->
                                   let details = hm_details mod_info
                                   -- Don't include instances for the current module
-                                  in if moduleName (mi_module (hm_iface mod_info)) == mn
+                                  in if moduleName (hm_module mod_info) == mn
                                        then []
                                        else [(md_insts details, md_fam_insts details)])
                           True -- Include -hi-boot

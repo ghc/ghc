@@ -702,7 +702,7 @@ get_reachable_nodes hsc_env mods
     get_mod_info :: NodeKey -> IO (Maybe (Either Module UnitId))
     get_mod_info (NodeKey_Module m@(ModNodeKeyWithUid gwib uid)) =
       lookupHug (ue_home_unit_graph unit_env) uid (gwib_mod gwib) >>= \case
-        Just hmi -> return $ Just (Left  (mi_module (hm_iface hmi)))
+        Just hmi -> return $ Just (Left (hm_module hmi))
         Nothing -> return (Just (Left (mnkToModule m)))
     get_mod_info (NodeKey_ExternalUnit uid) = return (Just (Right uid))
     get_mod_info _ = return Nothing

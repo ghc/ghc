@@ -412,7 +412,7 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
         -- the linkables to link
         home_mods <- hptCollectHomeModInfo hpt
 
-        let home_modules = map (mi_module . hm_iface) home_mods
+        let home_modules = map hm_module home_mods
         debugTraceMsg logger 3 (text "link: hmi ..." $$ vcat (map ppr home_modules))
         debugTraceMsg logger 3 (text "link: linkables are ..." $$ vcat (map (ppr . hm_linkable) home_mods))
         debugTraceMsg logger 3 (text "link: pkg deps are ..." $$ vcat (map ppr pkg_deps))
@@ -500,9 +500,9 @@ checkAllModulesHaveLinkable selector home_mods =
           -- 2. Has a linkable, but some so far don't
           (Just _, Left ms)  -> go rest (Left ms)
           -- 3. Has no linkable, but some so far do
-          (Nothing, Right _) -> go rest (Left [mi_module (hm_iface hmi)])
+          (Nothing, Right _) -> go rest (Left [hm_module hmi])
           -- 4. Has no linkable, and some so far don't
-          (Nothing, Left ms) -> go rest (Left (mi_module (hm_iface hmi) : ms))
+          (Nothing, Left ms) -> go rest (Left (hm_module hmi : ms))
   in go home_mods (Right [])
 
 

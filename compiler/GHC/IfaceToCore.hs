@@ -612,7 +612,7 @@ tcHiBootIface hsc_src mod
           then do { (_, hug) <- getEpsAndHug
                   ; liftIO $
                     HUG.lookupHugByModule mod hug >>= pure . \case
-                      Just info | mi_boot (hm_iface info) == IsBoot
+                      Just info | mi_simple_boot (hm_simple_iface info) == IsBoot
                                 -> SelfBoot { sb_mds = hm_details info }
                       _ -> NoSelfBoot }
           else do

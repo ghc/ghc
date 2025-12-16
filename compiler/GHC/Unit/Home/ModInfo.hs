@@ -7,6 +7,11 @@ module GHC.Unit.Home.ModInfo
    , homeModInfoObject
    , homeModInfoByteCode
    , emptyHomeModInfoLinkable
+   , hm_module
+   , hm_simple_iface
+   , hm_boot
+   , hm_hsc_src
+   , hm_top_env
    )
 where
 
@@ -18,6 +23,8 @@ import GHC.Unit.Module.ModDetails
 import GHC.Linker.Types ( Linkable )
 
 import GHC.Utils.Outputable
+import GHC.Unit.Types
+import GHC.Types.SourceFile (HscSource)
 
 -- | Information about modules in the package being compiled
 data HomeModInfo = HomeModInfo
@@ -46,6 +53,21 @@ data HomeModInfo = HomeModInfo
         -- 'HomeModInfo' by building a new 'ModDetails' from the old
         -- 'ModIface' (only).
    }
+
+hm_module :: HomeModInfo -> Module
+hm_module = mi_module . hm_iface
+
+hm_simple_iface :: HomeModInfo -> SimpleModIface
+hm_simple_iface = mkSimpleModiface . hm_iface
+
+hm_boot :: HomeModInfo -> IsBootInterface
+hm_boot = mi_simple_boot . hm_simple_iface
+
+hm_hsc_src :: HomeModInfo -> HscSource
+hm_hsc_src = mi_mod_info_hsc_src . mi_mod_info . hm_iface
+
+hm_top_env :: HomeModInfo -> IfaceTopEnv
+hm_top_env = mi_simple_top_env . hm_simple_iface
 
 homeModInfoByteCode :: HomeModInfo -> Maybe Linkable
 homeModInfoByteCode = homeMod_bytecode . hm_linkable

@@ -348,7 +348,7 @@ buildUnit session cid insts lunit = do
         -- Compile relevant only
         hsc_env <- getSession
         let takeLinkables x
-              | mi_hsc_src (hm_iface x) == HsSrcFile
+              | hm_hsc_src x == HsSrcFile
               = [Just $ expectJust $ homeModInfoObject x]
               | otherwise
               = [Nothing]

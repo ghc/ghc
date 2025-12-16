@@ -861,7 +861,7 @@ mkTopLevEnv hsc_env modl
   = HUG.lookupHugByModule modl hug >>= \case
       Nothing -> pure $ Left "not a home module"
       Just details ->
-         case mi_top_env (hm_iface details) of
+         case hm_top_env details of
                 (IfaceTopEnv exports _imports) -> do
                   imports_env <- mkTopLevImportedEnv hsc_env details
                   let exports_env = mkGlobalRdrEnv $ gresFromAvails hsc_env Nothing (getDetOrdAvails exports)
@@ -890,7 +890,7 @@ mkTopLevImportedEnv hsc_env details = do
         let spec' = ImpSpec { is_decl = spec, is_item = ImpSome { is_explicit = True, is_iloc = noSrcSpan } }
         in mkGlobalRdrEnv $ gresFromAvails hsc_env (Just spec') x
   where
-    IfaceTopEnv _ imports = mi_top_env (hm_iface details)
+    IfaceTopEnv _ imports = hm_top_env details
 
 -- | Get the interactive evaluation context, consisting of a pair of the
 -- set of modules from which we take the full top-level scope, and the set

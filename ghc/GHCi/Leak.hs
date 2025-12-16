@@ -66,7 +66,7 @@ checkLeakIndicators dflags (LeakIndicators leakmods)  = do
       Nothing -> return ()
       Just hmi ->
         report ("HomeModInfo for " ++
-          showSDoc dflags (ppr (mi_module (hm_iface hmi)))) (Just hmi)
+          showSDoc dflags (ppr (hm_module hmi))) (Just hmi)
     deRefWeak leakIface >>= \case
       Nothing -> return ()
       Just miface -> report ("ModIface:" ++ moduleNameString (moduleName (mi_module miface))) (Just miface)
