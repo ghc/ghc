@@ -459,17 +459,17 @@ typecheckIfacesForMerging mod ifaces tc_env_vars =
     -- serialize them out.  See Note [rnIfaceNeverExported] in GHC.Iface.Rename
     -- NB: But coercions are OK, because they will have the right OccName.
     let mk_decl_env decls
-            = mkOccEnv [ (getOccName decl, decl)
-                       | decl <- decls
+            = mkOccEnv [ (getOccName name, decl)
+                       | (name, decl) <- decls
                        , case decl of
                             IfaceId { ifIdDetails = IfDFunId } -> False -- exclude DFuns
                             _ -> True ]
-        decl_envs = map (mk_decl_env . map snd . mi_decls) ifaces
+        decl_envs = map (mk_decl_env . map (\(IfaceDeclBoxed _ name _ decl) -> (name, decl)) . mi_decls) ifaces
                         :: [OccEnv IfaceDecl]
         decl_env = foldl' mergeIfaceDecls emptyOccEnv decl_envs
                         ::  OccEnv IfaceDecl
     -- TODO: change tcIfaceDecls to accept w/o Fingerprint
-    names_w_things <- tcIfaceDecls ignore_prags (map (\x -> (fingerprint0, x))
+    names_w_things <- tcIfaceDecls ignore_prags (map (\x -> mkBoxedDecl fingerprint0 x)
                                                   (nonDetOccEnvElts decl_env))
     let global_type_env = mkNameEnv names_w_things
     case lookupKnotVars tc_env_vars mod of
@@ -1008,21 +1008,18 @@ mk_top_id (IfLclTopBndr raw_name iface_type info details) = do
    return new_id
 
 tcIfaceDecls :: Bool
-          -> [(Fingerprint, IfaceDecl)]
+          -> [IfaceDeclBoxed]
           -> IfL [(Name,TyThing)]
 tcIfaceDecls ignore_prags ver_decls
    = concatMapM (tc_iface_decl_fingerprint ignore_prags) ver_decls
 
 tc_iface_decl_fingerprint :: Bool                    -- Don't load pragmas into the decl pool
-          -> (Fingerprint, IfaceDecl)
+          -> IfaceDeclBoxed
           -> IfL [(Name,TyThing)]   -- The list can be poked eagerly, but the
                                     -- TyThings are forkM'd thunks
-tc_iface_decl_fingerprint ignore_prags (_version, decl)
+tc_iface_decl_fingerprint ignore_prags (IfaceDeclBoxed fingerprint main_name implicitBndrs decl)
   = do  {       -- Populate the name cache with final versions of all
                 -- the names associated with the decl
-          let !main_name = ifName decl
-                -- Force this field access, as `main_name` thunk will otherwise
-                -- be retained in the thunk created by `forkM`.
 
         -- Typecheck the thing, lazily
         -- NB. Firstly, the laziness is there in case we never need the
@@ -1095,7 +1092,7 @@ tc_iface_decl_fingerprint ignore_prags (_version, decl)
                            Nothing    ->
                              pprPanic "tc_iface_decl_fingerprint" (ppr main_name <+> ppr n $$ ppr (decl))
 
-        ; implicit_names <- mapM lookupIfaceTop (ifaceDeclImplicitBndrs decl)
+        ; implicit_names <- mapM lookupIfaceTop implicitBndrs
 
 --         ; traceIf (text "Loading decl for " <> ppr main_name $$ ppr implicit_names)
         ; return $ (main_name, thing) :

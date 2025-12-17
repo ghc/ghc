@@ -149,7 +149,7 @@ createInterface1' flags unit_state dflags hie_file mod_iface ifaces inst_ifaces 
     def_meths_env = mkOccEnv def_meths
     def_meths =
       [ (nameOccName nm, nm)
-      | (_, IfaceId{ifName = nm}) <- mi_decls mod_iface
+      | (IfaceDeclBoxed _ _ _ (IfaceId{ifName = nm})) <- mi_decls mod_iface
       , let occ = nameOccName nm
       , isDefaultMethodOcc occ
       ]

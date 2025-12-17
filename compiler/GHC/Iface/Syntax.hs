@@ -29,6 +29,8 @@ module GHC.Iface.Syntax (
         ifImpModule,
         ImpIfaceList(..), IfaceExport,
 
+        IfaceDeclBoxed(..), mkBoxedDecl,
+
         -- * Binding names
         IfaceTopBndr,
         putIfaceTopBndr, getIfaceTopBndr,
@@ -183,6 +185,31 @@ putIfaceTopBndr bh name =
       tbl ->
           --pprTrace "putIfaceTopBndr" (ppr name) $
           putEntry tbl bh (BindingName name)
+
+-- | A wrapper around IfaceDecl which separates parts which are needed eagerly from parts which are needed lazily.
+data IfaceDeclBoxed
+  = IfaceDeclBoxed {
+    ifBoxedFingerprint :: !Fingerprint,
+    ifBoxedName :: !IfaceTopBndr,
+    ifBoxedImplicitBndrs :: ![OccName],
+    ifBoxedDecl :: IfaceDecl
+  }
+
+mkBoxedDecl :: Fingerprint -> IfaceDecl -> IfaceDeclBoxed
+mkBoxedDecl fingerprint decl = IfaceDeclBoxed fingerprint (ifName decl) (ifaceDeclImplicitBndrs decl) decl
+
+instance Binary IfaceDeclBoxed where
+  put_ bh (IfaceDeclBoxed fingerprint name implicitBndrs decl) = do
+    put_ bh fingerprint
+    put_ bh name
+    put_ bh implicitBndrs
+    lazyPut bh decl
+  get bh = do
+    fingerprint <- get bh
+    name <- get bh
+    implicitBndrs <- get @[OccName] bh
+    decl <- lazyGet bh
+    return $ IfaceDeclBoxed fingerprint name implicitBndrs decl
 
 data IfaceDecl
   = IfaceId { ifName      :: IfaceTopBndr,
@@ -648,11 +675,12 @@ ifaceConDeclImplicitBndrs (IfCon {
        -- different fingerprint!  So we calculate the fingerprint of
        -- each binder by combining the fingerprint of the whole
        -- declaration with the name of the binder. (#5614, #7215)
-ifaceDeclFingerprints :: Fingerprint -> IfaceDecl -> [(OccName,Fingerprint)]
-ifaceDeclFingerprints hash decl
-  = (getOccName decl, hash) :
+ifaceDeclFingerprints :: IfaceDeclBoxed -> [(OccName,Fingerprint)]
+ifaceDeclFingerprints (IfaceDeclBoxed hash name implicitBndrs _)
+  = (getOccName name, hash) :
     [ (occ, computeFingerprint' (hash,occ))
-    | occ <- ifaceDeclImplicitBndrs decl ]
+    -- TODO: maybe more laziness here
+    | occ <- implicitBndrs ]
   where
     computeFingerprint' = computeFingerprint (panic "ifaceDeclFingerprints")
 

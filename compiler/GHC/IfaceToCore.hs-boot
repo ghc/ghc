@@ -2,7 +2,7 @@ module GHC.IfaceToCore where
 
 import GHC.Prelude
 import GHC.Iface.Syntax ( IfaceDecl, IfaceDefault, IfaceClsInst, IfaceFamInst, IfaceRule
-                        , IfaceAnnotation, IfaceCompleteMatch )
+                        , IfaceAnnotation, IfaceCompleteMatch, IfaceDeclBoxed )
 import GHC.Types.TyThing   ( TyThing )
 import GHC.Tc.Types        ( IfL )
 import GHC.Core.InstEnv    ( ClsInst )
@@ -23,4 +23,4 @@ tcIfaceInst            :: IfaceClsInst -> IfL ClsInst
 tcIfaceFamInst         :: IfaceFamInst -> IfL FamInst
 tcIfaceAnnotations     :: [IfaceAnnotation] -> IfL [Annotation]
 tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL CompleteMatches
-tcIfaceDecls           :: Bool -> [(Fingerprint, IfaceDecl)] -> IfL [(Name,TyThing)]
+tcIfaceDecls           :: Bool -> [IfaceDeclBoxed] -> IfL [(Name,TyThing)]

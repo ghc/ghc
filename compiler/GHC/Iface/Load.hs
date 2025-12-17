@@ -1142,7 +1142,7 @@ pprModIface unit_state iface
         , pprDeps unit_state (mi_deps iface)
         , vcat (map pprIfaceAnnotation (mi_anns iface))
         , pprFixities (mi_fixities iface)
-        , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls iface]
+        , vcat [ppr ver $$ nest 2 (ppr decl) | (IfaceDeclBoxed ver name implicitBndrs decl) <- mi_decls iface]
         , case mi_simplified_core iface of
             Nothing -> empty
             Just (IfaceSimplifiedCore eds fs) ->

@@ -382,9 +382,10 @@ thinModIface avails iface =
         -- perhaps there might be two IfaceTopBndr that are the same
         -- OccName but different Name.  Requires better understanding
         -- of invariants here.
-        & set_mi_decls (exported_decls ++ non_exported_decls ++ dfun_decls)
+        & set_mi_decls  (error "todo")
         -- mi_insts = ...,
         -- mi_fam_insts = ...,
+        {-
   where
     decl_pred occs decl = nameOccName (ifName decl) `elemOccSet` occs
     filter_decls occs = filter (decl_pred occs . snd) (mi_decls iface)
@@ -402,6 +403,7 @@ thinModIface avails iface =
     dfun_pred IfaceId{ ifIdDetails = IfDFunId } = True
     dfun_pred _ = False
     dfun_decls = filter (dfun_pred . snd) (mi_decls iface)
+    -}
 
 -- | The list of 'Name's of *non-exported* 'IfaceDecl's which this
 -- 'IfaceDecl' may refer to.  A non-exported 'IfaceDecl' should be kept

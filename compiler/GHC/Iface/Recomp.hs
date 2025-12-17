@@ -1215,9 +1215,9 @@ addFingerprints hsc_env iface0 = do
   (abiHashes, caches, decls_w_hashes) <- addAbiHashes hsc_env (mi_mod_info iface0) (mi_public iface0) (mi_deps iface0)
 
    -- put the declarations in a canonical order, sorted by OccName
-  let sorted_decls :: [(Fingerprint, IfaceDecl)]
+  let sorted_decls :: [IfaceDeclBoxed]
       sorted_decls = Map.elems $ Map.fromList $
-                          [(getOccName d, e) | e@(_, d) <- decls_w_hashes]
+                          [(getOccName (ifBoxedName d), d) | d <- decls_w_hashes]
 
        -- This key is safe because mi_extra_decls contains tidied things.
       getOcc (IfGblTopBndr b) = getOccName b
@@ -1259,7 +1259,7 @@ addFingerprints hsc_env iface0 = do
 -- Why the convoluted way? Hashing individual declarations allows us to do fine-grained
 -- recompilation checking for home package modules, which record precisely what they use
 -- from each module.
-addAbiHashes :: HscEnv -> IfaceModInfo -> PartialIfacePublic -> Dependencies -> IO (IfaceAbiHashes, IfaceCache, [(Fingerprint, IfaceDecl)])
+addAbiHashes :: HscEnv -> IfaceModInfo -> PartialIfacePublic -> Dependencies -> IO (IfaceAbiHashes, IfaceCache, [IfaceDeclBoxed])
 addAbiHashes hsc_env info
   iface_public
   deps = do
@@ -1383,31 +1383,36 @@ addAbiHashes hsc_env info
         -- take a strongly-connected group of declarations and compute
         -- its fingerprint.
 
+      mkBoxedDecl :: Fingerprint -> IfaceDecl -> IfaceDeclBoxed
+      mkBoxedDecl fingerprint decl = IfaceDeclBoxed fingerprint (ifName decl) (ifaceDeclImplicitBndrs decl) decl
+
       fingerprint_group :: (OccEnv (OccName,Fingerprint),
-                             [(Fingerprint,IfaceDecl)])
+                             [IfaceDeclBoxed])
                          -> SCC IfaceDeclABI
                          -> IO (OccEnv (OccName,Fingerprint),
-                                [(Fingerprint,IfaceDecl)])
+                                [IfaceDeclBoxed])
 
       fingerprint_group (local_env, decls_w_hashes) (AcyclicSCC abi)
          = do let hash_fn = mk_put_name local_env
                   decl = abiDecl abi
                --pprTrace "fingerprinting" (ppr (ifName decl) ) $ do
               let !hash = computeFingerprint hash_fn abi
-              env' <- extend_hash_env local_env (hash,decl)
-              return (env', (hash,decl) : decls_w_hashes)
+              env' <- extend_hash_env local_env (mkBoxedDecl hash decl)
+              return (env', mkBoxedDecl hash decl : decls_w_hashes)
+
+
 
       fingerprint_group (local_env, decls_w_hashes) (CyclicSCC abis)
           = do let stable_abis = sortBy cmp_abiNames abis
                    stable_decls = map abiDecl stable_abis
                local_env1 <- foldM extend_hash_env local_env
-                                   (zip (map mkRecFingerprint [0..]) stable_decls)
+                                   (zipWith mkBoxedDecl (map mkRecFingerprint [0..]) stable_decls)
                 -- See Note [Fingerprinting recursive groups]
                let hash_fn = mk_put_name local_env1
                -- pprTrace "fingerprinting" (ppr (map ifName decls) ) $ do
                 -- put the cycle in a canonical order
                let !hash = computeFingerprint hash_fn stable_abis
-               let pairs = zip (map (bumpFingerprint hash) [0..]) stable_decls
+               let pairs = zipWith mkBoxedDecl (map (bumpFingerprint hash) [0..]) stable_decls
                 -- See Note [Fingerprinting recursive groups]
                local_env2 <- foldM extend_hash_env local_env pairs
                return (local_env2, pairs ++ decls_w_hashes)
@@ -1424,11 +1429,11 @@ addAbiHashes hsc_env info
        -- use when referencing those OccNames in later declarations.
        --
       extend_hash_env :: OccEnv (OccName,Fingerprint)
-                       -> (Fingerprint,IfaceDecl)
+                       -> IfaceDeclBoxed
                        -> IO (OccEnv (OccName,Fingerprint))
-      extend_hash_env env0 (hash,d) =
+      extend_hash_env env0 boxed =
           return (foldr (\(b,fp) env -> extendOccEnv env b (b,fp)) env0
-                 (ifaceDeclFingerprints hash d))
+                 (ifaceDeclFingerprints boxed))
 
    --
   (local_env, decls_w_hashes) <-
@@ -1489,7 +1494,7 @@ addAbiHashes hsc_env info
   --   - deprecations
   --   - flag abi hash
   let !mod_hash = computeFingerprint putNameLiterally
-                      (sort (map fst decls_w_hashes),
+                      (sort (map ifBoxedFingerprint decls_w_hashes),
                        exported_avails_hash,
                        orphan_like_hash,  -- includes orphan_hash
                        ann_fn AnnModule,

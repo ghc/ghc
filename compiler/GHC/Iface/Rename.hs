@@ -493,8 +493,8 @@ rnIfaceFamInst
         , ifFamInstOrph  = orph
         }
 
-rnIfaceDecl' :: Rename (Fingerprint, IfaceDecl)
-rnIfaceDecl' (fp, decl) = (,) fp <$> rnIfaceDecl decl
+rnIfaceDecl' :: Rename IfaceDeclBoxed
+rnIfaceDecl' (IfaceDeclBoxed fp _ _ decl) = mkBoxedDecl fp <$> rnIfaceDecl decl
 
 rnIfaceDecl :: Rename IfaceDecl
 rnIfaceDecl = \case

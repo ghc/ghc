@@ -158,6 +158,7 @@ import GHC.Utils.Binary
 
 import Control.DeepSeq
 import Control.Exception
+import Control.Monad
 
 
 {- Note [Interface file stages]
@@ -231,7 +232,7 @@ data ModIfacePhase
 -- a fingerprint, which is used for recompilation checks.
 type family IfaceDeclExts (phase :: ModIfacePhase) = decl | decl -> phase where
   IfaceDeclExts 'ModIfaceCore = IfaceDecl
-  IfaceDeclExts 'ModIfaceFinal = (Fingerprint, IfaceDecl)
+  IfaceDeclExts 'ModIfaceFinal = IfaceDeclBoxed
 
 type family IfaceAbiHashesExts (phase :: ModIfacePhase) = bk | bk -> phase where
   IfaceAbiHashesExts 'ModIfaceCore = ()
@@ -910,13 +911,13 @@ emptyFullModIface mod =
 
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
-mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
+mkIfaceHashCache :: [IfaceDeclBoxed]
                  -> (OccName -> Maybe (OccName, Fingerprint))
 mkIfaceHashCache pairs
   = \occ -> lookupOccEnv env occ
   where
     env = foldl' add_decl emptyOccEnv pairs
-    add_decl env0 (v,d) = foldl' add env0 (ifaceDeclFingerprints v d)
+    add_decl env0 v = foldl' add env0 (ifaceDeclFingerprints v)
       where
         add env0 (occ,hash) = extendOccEnv env0 occ (occ,hash)
 
@@ -984,9 +985,12 @@ instance NFData IfaceCache where
     `seq` rnf a4
 
 
-
+{-
 forceModIface :: ModIface -> IO ()
 forceModIface iface = () <$ (evaluate $ force iface)
+-}
+
+forceModIface _ = return ()
 
 -- | Records whether a module has orphans. An \"orphan\" is one of:
 --
@@ -1030,7 +1034,7 @@ to serialise the 'ModIface' to disk again.
 -- missing fields.
 completePartialModIface :: PartialModIface
   -> Fingerprint
-  -> [(Fingerprint, IfaceDecl)]
+  -> [IfaceDeclBoxed]
   -> Maybe IfaceSimplifiedCore
   -> IfaceAbiHashes
   -> IfaceCache
@@ -1045,7 +1049,7 @@ completePartialModIface partial iface_hash decls extra_decls final_exts cache = 
 
 -- | Given a 'PartialIfacePublic', turn it into an 'IfacePublic' by completing
 -- missing fields.
-completePublicModIface :: [(Fingerprint, IfaceDecl)]
+completePublicModIface :: [IfaceDeclBoxed]
                        -> IfaceAbiHashes
                        -> IfaceCache
                        -> PartialIfacePublic
