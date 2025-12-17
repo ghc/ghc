@@ -978,7 +978,7 @@ section "data"      = Data
 section "rodata"    = ReadOnlyData
 section "relrodata" = RelocatableReadOnlyData
 section "bss"       = UninitialisedData
-section s           = OtherSection s
+section s           = panic ("CmmParse: unknown section type: " ++ s)
 
 mkString :: String -> CmmStatic
 mkString s = CmmString (BS8.pack s)

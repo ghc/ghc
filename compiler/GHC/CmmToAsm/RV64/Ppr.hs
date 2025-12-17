@@ -99,8 +99,6 @@ pprAlignForSection _seg = pprAlign . mkAlignment $ 8
 --     .section .text
 --     .balign 8
 pprSectionAlign :: (IsDoc doc) => NCGConfig -> Section -> doc
-pprSectionAlign _config (Section (OtherSection _) _) =
-  panic "RV64.Ppr.pprSectionAlign: unknown section"
 pprSectionAlign config sec@(Section seg _) =
   line (pprSectionHeader config sec)
     $$ pprAlignForSection seg

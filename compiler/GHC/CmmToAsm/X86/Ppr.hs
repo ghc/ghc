@@ -526,8 +526,6 @@ pprAddr platform (AddrBaseIndex base index displacement)
 
 -- | Print section header and appropriate alignment for that section.
 pprSectionAlign :: IsDoc doc => NCGConfig -> Section -> doc
-pprSectionAlign _config (Section (OtherSection _) _) =
-     panic "X86.Ppr.pprSectionAlign: unknown section"
 pprSectionAlign config sec@(Section seg _) =
     line (pprSectionHeader config sec) $$
     pprAlignForSection (ncgPlatform config) seg
