@@ -236,7 +236,7 @@ mkProtoBCO
    -> [StgWord] -- ^ bitmap
    -> Bool      -- ^ True <=> it's a case continuation, rather than a function
                 -- See also Note [Case continuation BCOs].
-   -> ProtoBCO Name
+   -> ProtoBCO
 mkProtoBCO platform _add_bco_name nm instrs_ordlist origin arity bitmap_size bitmap is_ret
    = ProtoBCO {
         protoBCOName = nm,
@@ -300,7 +300,7 @@ argBits platform (rep : args)
 
 -- Compile code for the right-hand side of a top-level binding
 
-schemeTopBind :: (Id, CgStgRhs) -> BcM (ProtoBCO Name)
+schemeTopBind :: (Id, CgStgRhs) -> BcM ProtoBCO
 schemeTopBind (id, rhs)
   | Just data_con <- isDataConWorkId_maybe id,
     isNullaryRepDataCon data_con = do
@@ -340,7 +340,7 @@ schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
                                 -- will appear in the thunk.  Empty for
                                 -- top-level things, which have no free vars.
         -> (Name, CgStgRhs)
-        -> BcM (ProtoBCO Name)
+        -> BcM ProtoBCO
 schemeR fvs (nm, rhs)
    = schemeR_wrk fvs nm rhs (collect rhs)
 
@@ -357,7 +357,7 @@ schemeR_wrk
     -> Name
     -> CgStgRhs            -- expression e, for debugging only
     -> ([Var], CgStgExpr)  -- result of collect on e
-    -> BcM (ProtoBCO Name)
+    -> BcM ProtoBCO
 schemeR_wrk fvs nm original_body (args, body)
    = do
      add_bco_name <- shouldAddBcoName
@@ -561,7 +561,7 @@ schemeE d s p (StgLet _ext binds body) = do
              :: StackDepth
              -> [Id]
              -> WordOff
-             -> ProtoBCO Name
+             -> ProtoBCO
              -> WordOff
              -> HalfWord
              -> BcM BCInstrList
@@ -1779,7 +1779,7 @@ Note [unboxed tuple bytecodes and tuple_BCO]
 
  -}
 
-tupleBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> ProtoBCO Name
+tupleBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> ProtoBCO
 tupleBCO platform args_info args =
   mkProtoBCO platform Nothing invented_name body_code (Left [])
              0{-no arity-} bitmap_size bitmap False{-not alts-}
@@ -1800,7 +1800,7 @@ tupleBCO platform args_info args =
     body_code = mkSlideW 0 1          -- pop frame header
                 `snocOL` RETURN_TUPLE -- and add it again
 
-primCallBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> ProtoBCO Name
+primCallBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> ProtoBCO
 primCallBCO platform args_info args =
   mkProtoBCO platform Nothing invented_name body_code (Left [])
              0{-no arity-} bitmap_size bitmap False{-not alts-}
