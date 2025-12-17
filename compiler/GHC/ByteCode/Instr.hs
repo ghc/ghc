@@ -35,9 +35,9 @@ import GHC.Stg.Syntax
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
 
-data ProtoBCO a
+data ProtoBCO
    = ProtoBCO {
-        protoBCOName       :: a,          -- name, in some sense
+        protoBCOName       :: Name,       -- name, in some sense
         protoBCOInstrs     :: [BCInstr],  -- instrs
         -- arity and GC info
         protoBCOBitmap     :: [StgWord],
@@ -87,13 +87,13 @@ data BCInstr
    -- Push a (heap) ptr  (these all map to PUSH_G really)
    | PUSH_G       Name
    | PUSH_PRIMOP  PrimOp
-   | PUSH_BCO     (ProtoBCO Name)
+   | PUSH_BCO     ProtoBCO
 
    -- Push an alt continuation
-   | PUSH_ALTS          (ProtoBCO Name) ArgRep
-   | PUSH_ALTS_TUPLE    (ProtoBCO Name) -- continuation
+   | PUSH_ALTS          ProtoBCO ArgRep
+   | PUSH_ALTS_TUPLE    ProtoBCO -- continuation
                         !NativeCallInfo
-                        (ProtoBCO Name) -- tuple return BCO
+                        ProtoBCO -- tuple return BCO
 
    -- Pushing 8, 16 and 32 bits of padding (for constructors).
    | PUSH_PAD8
@@ -277,7 +277,7 @@ data BCInstr
 -- -----------------------------------------------------------------------------
 -- Printing bytecode instructions
 
-instance Outputable a => Outputable (ProtoBCO a) where
+instance Outputable ProtoBCO where
    ppr (ProtoBCO { protoBCOName       = name
                  , protoBCOInstrs     = instrs
                  , protoBCOBitmap     = bitmap
@@ -468,7 +468,7 @@ instance Outputable BCInstr where
 -- This could all be made more accurate by keeping track of a proper
 -- stack high water mark, but it doesn't seem worth the hassle.
 
-protoBCOStackUse :: ProtoBCO a -> Word
+protoBCOStackUse :: ProtoBCO -> Word
 protoBCOStackUse bco = sum (map bciStackUse (protoBCOInstrs bco))
 
 bciStackUse :: BCInstr -> Word
