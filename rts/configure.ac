@@ -96,7 +96,7 @@ dnl    off_t, because it will affect the result of that test.
 AC_SYS_LARGEFILE
 
 dnl ** check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS([ctype.h dirent.h dlfcn.h errno.h fcntl.h grp.h limits.h locale.h nlist.h pthread.h pwd.h signal.h sys/param.h sys/mman.h sys/resource.h sys/select.h sys/time.h sys/timeb.h sys/timerfd.h sys/timers.h sys/times.h sys/utsname.h sys/wait.h termios.h utime.h windows.h winsock.h sched.h])
+AC_CHECK_HEADERS([ctype.h dlfcn.h errno.h fcntl.h limits.h locale.h nlist.h pthread.h signal.h sys/param.h sys/mman.h sys/resource.h sys/select.h sys/time.h sys/timeb.h sys/timerfd.h sys/timers.h sys/times.h sys/utsname.h sys/wait.h termios.h utime.h windows.h winsock.h sched.h])
 
 dnl sys/cpuset.h needs sys/param.h to be included first on FreeBSD 9.1; #7708
 AC_CHECK_HEADERS([sys/cpuset.h], [], [],
@@ -148,7 +148,7 @@ FP_CHECK_FUNC([GetModuleFileName],
 
 dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
-AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r sched_setaffinity sched_getaffinity setlocale uselocale])
+AC_CHECK_FUNCS([getclock getrusage gettimeofday sysconf times ctime_r sched_setaffinity sched_getaffinity uselocale])
 
 dnl ** On OS X 10.4 (at least), time.h doesn't declare ctime_r if
 dnl ** _POSIX_C_SOURCE is defined
@@ -488,5 +488,3 @@ cat ghcautoconf.h.autoconf | sed \
    >> include/ghcautoconf.h
 echo "#endif /* __GHCAUTOCONF_H__ */" >> include/ghcautoconf.h
 ]
-
-

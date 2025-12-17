@@ -57,13 +57,9 @@ dnl ** which are needed by FP_SETUP_PROJECT_VERSION
 
 dnl ** Find find command (for Win32's benefit)
 FP_PROG_FIND
-FP_PROG_SORT
 
 dnl ----------------------------------------------------------
 FP_SETUP_PROJECT_VERSION
-
-# Hmmm, we fix the RPM release number to 1 here... Is this convenient?
-AC_SUBST([release], [1])
 
 dnl * We require autoconf version 2.69 due to
 dnl   https://bugs.ruby-lang.org/issues/8179. Also see #14910.
@@ -248,9 +244,6 @@ then
     fi
 fi
 AC_SUBST([WithGhc])
-
-dnl ** Without optimization some INLINE trickery fails for GHCi
-SRC_CC_OPTS="-O"
 
 dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
@@ -752,10 +745,6 @@ AC_PROG_LN_S
 
 dnl ** Find the path to sed
 AC_PATH_PROGS(SedCmd,gsed sed,sed)
-
-
-dnl ** check for time command
-AC_PATH_PROG(TimeCmd,time)
 
 dnl ** check for tar
 dnl   if GNU tar is named gtar, look for it first.
