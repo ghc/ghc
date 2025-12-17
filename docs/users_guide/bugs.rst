@@ -701,6 +701,9 @@ Bugs in GHC
 -  Because of a toolchain limitation we are unable to support full Unicode paths
    on Windows. On Windows we support up to Latin-1. See :ghc-ticket:`12971` for more.
 
+- The typechecker might reject certain programs using the ``($)`` operator which
+  are accepted by using explicit parentheses. See :ghc-ticket:`26543` for details.
+
 .. _bugs-ghci:
 
 Bugs in GHCi (the interactive GHC)
