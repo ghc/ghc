@@ -183,6 +183,7 @@ freeTask (Task *task)
         stgFree(incall);
     }
     for (incall = task->spare_incalls; incall != NULL; incall = next) {
+        __ghc_asan_unpoison_memory_region(incall, sizeof(InCall));
         next = incall->next;
         stgFree(incall);
     }
@@ -252,6 +253,7 @@ newInCall (Task *task)
 
     if (task->spare_incalls != NULL) {
         incall = task->spare_incalls;
+        __ghc_asan_unpoison_memory_region(incall, sizeof(InCall));
         task->spare_incalls = incall->next;
         task->n_spare_incalls--;
     } else {
@@ -283,6 +285,7 @@ endInCall (Task *task)
         stgFree(incall);
     } else {
         incall->next = task->spare_incalls;
+        __ghc_asan_poison_memory_region(incall, sizeof(InCall));
         task->spare_incalls = incall;
         task->n_spare_incalls++;
     }
