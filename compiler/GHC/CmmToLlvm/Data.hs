@@ -148,7 +148,6 @@ llvmSectionType p t = case t of
     IPE                     -> fsLit ".ipe"
     InitArray               -> panic "llvmSectionType: InitArray"
     FiniArray               -> panic "llvmSectionType: FiniArray"
-    OtherSection _          -> panic "llvmSectionType: unknown section type"
 
 -- | Format a Cmm Section into a LLVM section name
 llvmSection :: Section -> LlvmM LMSection

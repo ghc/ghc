@@ -240,8 +240,6 @@ pprGNUSectionHeader config t suffix =
         | OSMinGW32 <- platformOS platform
                     -> text ".rdata"
         | otherwise -> text ".ipe"
-      OtherSection _ ->
-        panic "PprBase.pprGNUSectionHeader: unknown section type"
     flags = case t of
       Text
         | OSMinGW32 <- platformOS platform, splitSections
@@ -286,6 +284,5 @@ pprDarwinSectionHeader t = case t of
   FiniArray               -> panic "pprDarwinSectionHeader: fini not supported"
   CString                 -> text ".section\t__TEXT,__cstring,cstring_literals"
   IPE                     -> text ".const"
-  OtherSection _          -> panic "pprDarwinSectionHeader: unknown section type"
 {-# SPECIALIZE pprDarwinSectionHeader :: SectionType -> SDoc #-}
 {-# SPECIALIZE pprDarwinSectionHeader :: SectionType -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable

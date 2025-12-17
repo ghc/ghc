@@ -302,7 +302,6 @@ pprAlignForSection platform seg = line $
        CString
         | ppc64          -> text ".align 3"
         | otherwise      -> text ".align 2"
-       OtherSection _    -> panic "PprMach.pprSectionAlign: unknown section"
 
 pprDataItem :: IsDoc doc => Platform -> CmmLit -> doc
 pprDataItem platform lit
