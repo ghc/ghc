@@ -124,6 +124,8 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
+import GHCi.FFI
+import GHCi.Message
 
 import Control.DeepSeq
 import Control.Monad            ( when, (<$!>), unless, forM_, void )
@@ -157,6 +159,9 @@ import qualified Data.IntMap as IntMap
 #if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 #endif
+import GHC.Stack
+import GHC.Utils.Outputable
+
 
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -1321,7 +1326,7 @@ forwardGetRel bh get_A = do
 lazyPut :: Binary a => WriteBinHandle -> a -> IO ()
 lazyPut = lazyPut' put_
 
-lazyGet :: Binary a => ReadBinHandle -> IO a
+lazyGet :: (HasCallStack, Binary a) => ReadBinHandle -> IO a
 lazyGet = lazyGet' get
 
 lazyPut' :: (WriteBinHandle -> a -> IO ()) -> WriteBinHandle -> a -> IO ()
@@ -1334,13 +1339,20 @@ lazyPut' f bh a = do
     putAtRel bh pre_a q    -- fill in slot before a with ptr to q
     seekBinWriter bh q        -- finally carry on writing at q
 
-lazyGet' :: (ReadBinHandle -> IO a) -> ReadBinHandle -> IO a
+lazyGet' :: HasCallStack =>(ReadBinHandle -> IO a) -> ReadBinHandle -> IO a
 lazyGet' f bh = do
     p <- getRelBin bh -- a BinPtr
     p_a <- tellBinReader bh
     a <- unsafeInterleaveIO $ do
         -- NB: Use a fresh rbm_off_r variable in the child thread, for thread
         -- safety.
+        {-
+        stack <- cloneMyStack
+        decoded_stack <- decode stack
+        let printId (StackEntry fn mn _ _) = text fn <+> text mn
+        pprTraceM "lazyGet" (callStackDoc $$ vcat (map printId decoded_stack))
+        -}
+
         off_r <- newFastMutInt 0
         let bh' = bh { rbm_off_r = off_r }
         seekBinReader bh' p_a

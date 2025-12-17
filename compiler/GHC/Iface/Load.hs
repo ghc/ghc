@@ -1147,7 +1147,7 @@ pprModIface unit_state iface
         , vcat (map pprUsage (mi_usages iface))
         , vcat (map pprIfaceAnnotation (mi_anns iface))
         , pprFixities (mi_fixities iface)
-        , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls iface]
+        , vcat [ppr ver $$ nest 2 (ppr decl) | (IfaceDeclBoxed ver _name _implicitBndrs decl) <- mi_decls iface]
         , case mi_extra_decls iface of
             Nothing -> empty
             Just eds -> text "extra decls:"
