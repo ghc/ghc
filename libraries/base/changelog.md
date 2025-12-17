@@ -1,6 +1,6 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.22.0.0 *TBA*
+## 4.22.0.0 *December 2025*
   * Shipped with GHC 9.14.1
   * The internal `GHC.Weak.Finalize.runFinalizerBatch` function has been deprecated ([CLC proposal #342](https://github.com/haskell/core-libraries-committee/issues/342))
   * Define `displayException` of `SomeAsyncException` to unwrap the exception.

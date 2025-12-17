@@ -110,6 +110,9 @@ Language
 - Explicit level import support, allowing ``import`` declarations to explicitly
   state which compilation stages they are are visible to.
 
+- Fix handling of tabs in string gaps (:ghc-ticket:`26415`). Tabs are now
+  correctly treated as whitespace in string gaps, matching the Haskell Report.
+
 Compiler
 ~~~~~~~~
 
@@ -160,6 +163,23 @@ Compiler
 
 - Initial native code generator support for the LoongArch CPU architecture.
 
+- Several fixes to :extension:`DeepSubsumption` type checking, improving handling
+  of higher-rank types in various contexts (:ghc-ticket:`26225`, :ghc-ticket:`26255`,
+  :ghc-ticket:`26277`, :ghc-ticket:`26331`, :ghc-ticket:`26332`).
+
+- Fix a scoping error in the Specialiser that could cause incorrect code generation
+  with :ghc-flag:`-fpolymorphic-specialisation` (:ghc-ticket:`26329`).
+
+- Fix a long-standing bug in the coercion optimiser that could produce invalid
+  coercions for ``ForAllCo`` (:ghc-ticket:`26345`).
+
+- Fix the type-family occurs check in unification (:ghc-ticket:`26457`).
+
+- Fix solving of forall-constraints (quantified constraints) to avoid infinite
+  loops in certain cases (:ghc-ticket:`26314`, :ghc-ticket:`26315`, :ghc-ticket:`26376`).
+
+- Fix reporting of redundant constraints on default-method declarations
+  (:ghc-ticket:`25992`).
 
 GHCi
 ~~~~
@@ -188,6 +208,12 @@ GHCi
     debugging clients
   * Internal refactorings towards making the debugger multi-thread aware (:ghc-ticket:`26064`)
 
+- Fix bytecode generation for unsaturated applications of data constructor
+  workers (:ghc-ticket:`23210`).
+
+- Fix bytecode to use 32 bits for breakpoint indices, allowing more breakpoints
+  in large modules (:ghc-ticket:`26325`).
+
 WebAssembly backend
 ~~~~~~~~~~~~~~~~~~~
 
@@ -201,6 +227,18 @@ See the blog post on `Tweag's blog
 <https://www.tweag.io/blog/2025-04-17-wasm-ghci-browser/>`_ for more
 information.
 
+- Fix handling of forward declared ``GOT.func`` items in the wasm dynamic
+  linker (:ghc-ticket:`26430`).
+
+- Fix ``setKeepCAFs()`` to be properly called during wasm GHCi initialization
+  (:ghc-ticket:`26106`).
+
+- Fix JSFFI initialization constructor code to avoid clashing with user-defined
+  main functions.
+
+- Improve error handling in the JavaScript linker when library directories
+  are misconfigured (:ghc-ticket:`26383`).
+
 Runtime system
 ~~~~~~~~~~~~~~
 
@@ -212,16 +250,43 @@ Runtime system
 - Reorganise how certain symbols are linked to avoid a bootstrapping failure
   with the linker shipping newer macOS versions (:ghc-ticket:`26166`)
 
+- Fix eager black holes handling: properly record mutated closures and fix
+  an incorrect assertion that could cause issues with multiple threads racing
+  to claim a black hole (:ghc-ticket:`26495`)
+
+- Fix the Windows runtime linker to copy DLL path strings before inserting
+  them into the cache, preventing use-after-free issues (:ghc-ticket:`26613`)
+
+- Fix lost wakeups in ``threadPaused`` for threads blocked on black holes,
+  which could cause hangs in concurrent programs (:ghc-ticket:`26324`).
+
+- Fix heap reservation logic on POSIX systems to avoid infinite loops when
+  the OS repeatedly returns low memory addresses (:ghc-ticket:`26151`).
+
+- Fix handling of ``WHITEHOLE`` closures in ``scavenge_one`` when using the
+  non-moving garbage collector (:ghc-ticket:`26204`).
+
+- Fix alignment for ``gen_workspace`` on s390x to allow bootstrap on that
+  platform (:ghc-ticket:`26334`).
+
+- Push the correct update frame type in ``stg_AP_STACK`` for eager black holes.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
 - Updated to `Unicode 17.0.0 <https://www.unicode.org/versions/Unicode17.0.0>`_.
+
+- Removed unstable heap representation details from ``GHC.Exts`` (:ghc-ticket:`25110`).
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
 ``ghc-prim`` is now a legacy interface providing access to primitive operations
 and types which are now also exposed via the ``ghc-experimental`` package.
+
+- A new primop ``annotateStack#`` has been added, allowing arbitrary data to be
+  pushed onto the call stack for later extraction when decoding stack traces
+  (:ghc-ticket:`26218`).
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
@@ -262,6 +327,16 @@ and types which are now also exposed via the ``ghc-experimental`` package.
   ``getClosurePtrArgs`` and ``getClosurePtrArgs_maybe`` have been added to allow
   reading of the relevant Closure attributes without reliance on incomplete
   selectors.
+
+* Fix a race condition with profiling builds (:ghc-ticket:`15197`, :ghc-ticket:`26407`).
+
+* Fix stack decoding when using the profiled runtime (:ghc-ticket:`26507`).
+
+``ghc-internal`` library
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix ``naturalAndNot`` for the ``NB``/``NS`` (native bignum) case
+  (:ghc-ticket:`26230`).
 
 ``ghc-experimental`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
