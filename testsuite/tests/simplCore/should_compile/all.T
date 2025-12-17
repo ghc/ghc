@@ -563,3 +563,4 @@ test('T26115', [grep_errmsg(r'DFun')], compile, ['-O -ddump-simpl -dsuppress-uni
 test('T26116', normal, compile, ['-O -ddump-rules'])
 test('T26117', [grep_errmsg(r'==')], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T26349',  normal, compile, ['-O -ddump-rules'])
+test('T26681',  normal, compile, ['-O'])
