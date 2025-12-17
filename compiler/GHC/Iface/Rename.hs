@@ -38,7 +38,6 @@ import GHC.Types.Name.Shape
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Error
-import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 
 import qualified Data.Traversable as T
@@ -416,8 +415,8 @@ rnIfaceFamInst d = do
     axiom <- rnIfaceGlobal (ifFamInstAxiom d)
     return d { ifFamInstFam = fam, ifFamInstTys = tys, ifFamInstAxiom = axiom }
 
-rnIfaceDecl' :: Rename (Fingerprint, IfaceDecl)
-rnIfaceDecl' (fp, decl) = (,) fp <$> rnIfaceDecl decl
+rnIfaceDecl' :: Rename IfaceDeclBoxed
+rnIfaceDecl' (IfaceDeclBoxed fp _ _ decl) = mkBoxedDecl fp <$> rnIfaceDecl decl
 
 rnIfaceDecl :: Rename IfaceDecl
 rnIfaceDecl d@IfaceId{} = do

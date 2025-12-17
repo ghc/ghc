@@ -121,8 +121,6 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 
 import Control.DeepSeq
-import Control.Exception
-import qualified GHC.Data.Strict as Strict
 
 {- Note [Interface file stages]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -198,7 +196,7 @@ data ModIfacePhase
 -- a fingerprint, which is used for recompilation checks.
 type family IfaceDeclExts (phase :: ModIfacePhase) = decl | decl -> phase where
   IfaceDeclExts 'ModIfaceCore = IfaceDecl
-  IfaceDeclExts 'ModIfaceFinal = (Fingerprint, IfaceDecl)
+  IfaceDeclExts 'ModIfaceFinal = IfaceDeclBoxed
 
 type family IfaceBackendExts (phase :: ModIfacePhase) = bk | bk -> phase where
   IfaceBackendExts 'ModIfaceCore = ()
@@ -656,13 +654,13 @@ emptyFullModIface mod =
           mi_hash_fn = emptyIfaceHashCache } }
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
-mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
+mkIfaceHashCache :: [IfaceDeclBoxed]
                  -> (OccName -> Maybe (OccName, Fingerprint))
 mkIfaceHashCache pairs
   = \occ -> lookupOccEnv env occ
   where
     env = foldl' add_decl emptyOccEnv pairs
-    add_decl env0 (v,d) = foldl' add env0 (ifaceDeclFingerprints v d)
+    add_decl env0 v = foldl' add env0 (ifaceDeclFingerprints v)
       where
         add env0 (occ,hash) = extendOccEnv env0 occ (occ,hash)
 
@@ -729,9 +727,8 @@ instance NFData (ModIfaceBackend) where
     `seq` rnf mi_fix_fn
     `seq` rnf mi_hash_fn
 
-
 forceModIface :: ModIface -> IO ()
-forceModIface iface = () <$ (evaluate $ force iface)
+forceModIface _ = return ()
 
 -- | Records whether a module has orphans. An \"orphan\" is one of:
 --
@@ -774,7 +771,7 @@ to serialise the 'ModIface' to disk again.
 -- | Given a 'PartialModIface', turn it into a 'ModIface' by completing
 -- missing fields.
 completePartialModIface :: PartialModIface
-  -> [(Fingerprint, IfaceDecl)]
+  -> [IfaceDeclBoxed]
   -> Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo]
   -> ModIfaceBackend
   -> ModIface

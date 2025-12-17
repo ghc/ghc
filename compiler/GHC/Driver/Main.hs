@@ -1398,7 +1398,7 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
             GHC.Utils.Touch.touch hie_file
     else
         -- See Note [Strictness in ModIface]
-        forceModIface iface
+        return ()
 
 --------------------------------------------------------------
 -- NoRecomp handlers
