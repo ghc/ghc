@@ -91,6 +91,7 @@ import GHC.Core.Utils
 import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
 import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst
+import GHC.Core.TyCo.Subst( lookupTyVar )
 import GHC.Core.Make    ( sortQuantVars )
 import GHC.Core.Type    ( Type, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet
@@ -466,8 +467,8 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
     ty' = substTyUnchecked (le_subst env) ty
 
     incd_lvl = incMinorLvl (le_ctxt_lvl env)
-    dest_lvl = maxFvLevel (const True) env scrut_fvs
-            -- Don't abstract over type variables, hence const True
+    dest_lvl = maxFvLevel includeTyVars env scrut_fvs
+            -- Don't abstract over type variables, hence includeTyVars
 
     lvl_alt alts_env (AnnAlt con bs rhs)
       = do { rhs' <- lvlMFE new_env True rhs
@@ -719,8 +720,11 @@ hasFreeJoin :: LevelEnv -> DVarSet -> Bool
 -- (In the latter case it won't be a join point any more.)
 -- Not treating top-level ones specially had a massive effect
 -- on nofib/minimax/Prog.prog
-hasFreeJoin env fvs
-  = not (maxFvLevel isJoinId env fvs == tOP_LEVEL)
+hasFreeJoin env fvs = anyDVarSet bad_join fvs
+  where
+    bad_join v = isJoinId v &&
+                 maxIn True env v tOP_LEVEL /= tOP_LEVEL
+
 
 {- Note [Saving work]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1607,10 +1611,10 @@ destLevel env fvs fvs_ty is_function is_bot
 
   | otherwise = max_fv_id_level
   where
-    max_fv_id_level = maxFvLevel isId env fvs -- Max over Ids only; the
-                                              -- tyvars will be abstracted
+    max_fv_id_level = maxFvLevel idsOnly env fvs -- Max over Ids only; the
+                                                 -- tyvars will be abstracted
 
-    as_far_as_poss = maxFvLevel' isId env fvs_ty
+    as_far_as_poss = maxFvLevel' idsOnly env fvs_ty
                      -- See Note [Floating and kind casts]
 
 {- Note [Floating and kind casts]
@@ -1768,28 +1772,47 @@ extendCaseBndrEnv le@(LE { le_subst = subst, le_env = id_env })
        , le_env     = add_id id_env (case_bndr, scrut_var) }
 extendCaseBndrEnv env _ _ = env
 
-maxFvLevel :: (Var -> Bool) -> LevelEnv -> DVarSet -> Level
-maxFvLevel max_me env var_set
-  = nonDetStrictFoldDVarSet (maxIn max_me env) tOP_LEVEL var_set
+includeTyVars, idsOnly :: Bool
+idsOnly       = False
+includeTyVars = True
+
+maxFvLevel :: Bool -> LevelEnv -> DVarSet -> Level
+maxFvLevel include_tyvars env var_set
+  = nonDetStrictFoldDVarSet (maxIn include_tyvars env) tOP_LEVEL var_set
     -- It's OK to use a non-deterministic fold here because maxIn commutes.
 
-maxFvLevel' :: (Var -> Bool) -> LevelEnv -> TyCoVarSet -> Level
+maxFvLevel' :: Bool -> LevelEnv -> TyCoVarSet -> Level
 -- Same but for TyCoVarSet
-maxFvLevel' max_me env var_set
-  = nonDetStrictFoldUniqSet (maxIn max_me env) tOP_LEVEL var_set
+maxFvLevel' include_tyvars env var_set
+  = nonDetStrictFoldUniqSet (maxIn include_tyvars env) tOP_LEVEL var_set
     -- It's OK to use a non-deterministic fold here because maxIn commutes.
 
-maxIn :: (Var -> Bool) -> LevelEnv -> InVar -> Level -> Level
-maxIn max_me (LE { le_lvl_env = lvl_env, le_env = id_env }) in_var lvl
+maxIn :: Bool -> LevelEnv -> InVar -> Level -> Level
+-- True <=> include tyvars
+maxIn include_tyvars env@(LE { le_subst = subst, le_env = id_env }) in_var lvl
+  | isId in_var
   = case lookupVarEnv id_env in_var of
+      Nothing            -> maxOut env in_var lvl
       Just (abs_vars, _) -> foldr max_out lvl abs_vars
-      Nothing            -> max_out in_var lvl
-  where
-    max_out out_var lvl
-        | max_me out_var = case lookupVarEnv lvl_env out_var of
-                                Just lvl' -> maxLvl lvl' lvl
-                                Nothing   -> lvl
-        | otherwise = lvl       -- Ignore some vars depending on max_me
+          where
+            max_out out_var lvl
+              | isTyVar out_var && not include_tyvars
+                          = lvl
+              | otherwise = maxOut env out_var lvl
+
+  | include_tyvars -- TyVars
+  = case lookupTyVar subst in_var of
+      Just ty -> nonDetStrictFoldVarSet (maxOut env) lvl (tyCoVarsOfType ty)
+      Nothing -> maxOut env in_var lvl
+
+  | otherwise      -- Ignore free tyvars
+  = lvl
+
+maxOut :: LevelEnv -> OutVar -> Level -> Level
+maxOut (LE { le_lvl_env = lvl_env }) out_var lvl
+  = case lookupVarEnv lvl_env out_var of
+       Just lvl' -> maxLvl lvl' lvl
+       Nothing   -> lvl
 
 lookupVar :: LevelEnv -> Id -> LevelledExpr
 lookupVar le v = case lookupVarEnv (le_env le) v of
