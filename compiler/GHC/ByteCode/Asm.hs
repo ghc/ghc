@@ -105,7 +105,7 @@ bcoFreeNames bco
 -- Top level assembler fn.
 assembleBCOs
   :: Profile
-  -> FlatBag (ProtoBCO Name)
+  -> FlatBag ProtoBCO
   -> [TyCon]
   -> [(Name, ByteString)]
   -> Maybe InternalModBreaks
@@ -194,7 +194,7 @@ assembleRunAsm p i = assembleI @RunAsm p i
 assembleInspectAsm :: Platform -> BCInstr -> InspectAsm ()
 assembleInspectAsm p i = assembleI @InspectAsm p i
 
-assembleBCO :: Platform -> ProtoBCO Name -> IO UnlinkedBCO
+assembleBCO :: Platform -> ProtoBCO -> IO UnlinkedBCO
 assembleBCO platform
             (ProtoBCO { protoBCOName       = nm
                       , protoBCOInstrs     = instrs
