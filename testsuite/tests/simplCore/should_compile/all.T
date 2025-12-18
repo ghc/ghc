@@ -557,3 +557,11 @@ test('T26051',   [ grep_errmsg(r'\$wspecMe')
 test('T26115', [grep_errmsg(r'DFun')], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T26116', normal, compile, ['-O -ddump-rules'])
 test('T26117', [grep_errmsg(r'==')], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('T26349',  normal, compile, ['-O -ddump-rules'])
+test('T26681',  normal, compile, ['-O'])
+
+# T26709: we expect three `case` expressions not four
+test('T26709', [grep_errmsg(r'case')],
+       multimod_compile,
+       ['T26709', '-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
+test('T26682',  normal, multimod_compile, ['T26682', '-O -v0'])
