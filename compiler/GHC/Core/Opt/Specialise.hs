@@ -1629,7 +1629,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     dflags    = se_dflags env
     this_mod  = se_module env
     subst     = se_subst env
-    in_scope  = Core.substInScopeSet subst
+--    in_scope  = Core.substInScopeSet subst
         -- Figure out whether the function has an INLINE pragma
         -- See Note [Inline specialisations]
 
@@ -1645,8 +1645,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
       | otherwise
       = inl_prag
 
-    not_in_scope :: InterestingVarFun
-    not_in_scope v = isLocalVar v && not (v `elemInScopeSet` in_scope)
+--    not_in_scope :: InterestingVarFun
+--    not_in_scope v = isLocalVar v && not (v `elemInScopeSet` in_scope)
 
     ----------------------------------------------------------
         -- Specialise to one particular call pattern
@@ -1664,17 +1664,24 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
              -- Find qvars, the type variables to add to the binders for the rule
              -- Namely those free in `ty` that aren't in scope
              -- See (MP2) in Note [Specialising polymorphic dictionaries]
-           ; let poly_qvars = scopedSort $ fvVarList $ specArgsFVs not_in_scope call_args
-                 subst'     = subst `Core.extendSubstInScopeList` poly_qvars
-                              -- Maybe we should clone the poly_qvars telescope?
+--           ; let poly_qvars = scopedSort $ fvVarList $
+--                              filterFV not_in_scope  $
+--                              tyCoFVsOfTypes [ ty | SpecType ty <- call_args ]
+--                 subst'     = subst `Core.extendSubstInScopeList` poly_qvars
+--                              -- Maybe we should clone the poly_qvars telescope?
+           ; let subst' = subst
 
              -- Any free Ids will have caused the call to be dropped
-           ; massertPpr (all isTyCoVar poly_qvars)
-                        (ppr fn $$ ppr all_call_args $$ ppr poly_qvars)
+--           ; massertPpr (all isTyCoVar poly_qvars)
+--                        (ppr fn $$ ppr all_call_args $$ ppr poly_qvars)
+
+--           ; pprTrace "spec_call_entry" (vcat [text "fun" <+> ppr fn, text "call_args" <+> ppr call_args
+--                                              , text "in_scope" <+> ppr in_scope ])
+--             return ()
 
            ; (useful, subst'', rule_bndrs, rule_lhs_args, spec_bndrs, dx_binds, spec_args)
                  <- specHeader subst' rhs_bndrs all_call_args
-           ; let all_rule_bndrs = poly_qvars ++ rule_bndrs
+           ; let all_rule_bndrs = {- poly_qvars ++ -} rule_bndrs
                  env' = env { se_subst = subst'' }
 
            -- Check for (a) usefulness and (b) not already covered
@@ -1685,23 +1692,22 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                  already_covered = alreadyCovered env' all_rule_bndrs fn
                                                   rule_lhs_args is_active all_rules
 
-{-         ; pprTrace "spec_call" (vcat
-                [ text "fun:       "  <+> ppr fn
-                , text "call info: "  <+> ppr _ci
-                , text "useful:    "  <+> ppr useful
-                , text "already_covered:"  <+> ppr already_covered
-                , text "poly_qvars: " <+> ppr poly_qvars
-                , text "useful:    "  <+> ppr useful
-                , text "all_rule_bndrs:"  <+> ppr all_rule_bndrs
-                , text "rule_lhs_args:"  <+> ppr rule_lhs_args
-                , text "spec_bndrs:" <+> ppr spec_bndrs
-                , text "dx_binds:"   <+> ppr dx_binds
-                , text "spec_args: "  <+> ppr spec_args
-                , text "rhs_bndrs"    <+> ppr rhs_bndrs
-                , text "rhs_body"     <+> ppr rhs_body
-                , text "subst''" <+> ppr subst'' ]) $
-             return ()
--}
+--         ; pprTrace "spec_call" (vcat
+--                [ text "fun:       "  <+> ppr fn
+--                , text "call info: "  <+> ppr _ci
+--                , text "useful:    "  <+> ppr useful
+--                , text "already_covered:"  <+> ppr already_covered
+--                , text "useful:    "  <+> ppr useful
+--                , text "all_rule_bndrs:"  <+> ppr all_rule_bndrs
+--                , text "rule_lhs_args:"  <+> ppr rule_lhs_args
+--                , text "spec_bndrs:" <+> ppr spec_bndrs
+--                , text "dx_binds:"   <+> ppr dx_binds
+--                , text "spec_args: "  <+> ppr spec_args
+--                , text "rhs_bndrs"    <+> ppr rhs_bndrs
+--                , text "rhs_body"     <+> ppr rhs_body
+--                , text "subst''" <+> ppr subst'' ]) $
+--             return ()
+
 
            ; if not useful          -- No useful specialisation
                 || already_covered  -- Useful, but done already
@@ -1723,15 +1729,16 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 
            -- Make the RHS of the specialised function
            ; let spec_rhs_bndrs = spec_bndrs ++ inner_rhs_bndrs'
-                 (rhs_uds1, inner_dumped_dbs) = dumpUDs spec_rhs_bndrs rhs_uds
-                 (rhs_uds2, outer_dumped_dbs) = dumpUDs poly_qvars (dx_binds `consDictBinds` rhs_uds1)
+--                  (rhs_uds1, inner_dumped_dbs) = dumpUDs spec_rhs_bndrs rhs_uds
+--                  (rhs_uds2, outer_dumped_dbs) = dumpUDs poly_qvars (dx_binds `consDictBinds` rhs_uds1)
+                 (rhs_uds2, inner_dumped_dbs) = dumpUDs spec_rhs_bndrs (dx_binds `consDictBinds` rhs_uds)
                  -- dx_binds comes from the arguments to the call, and so can mention
                  -- poly_qvars but no other local binders
-                 spec_rhs = mkLams poly_qvars               $
-                            wrapDictBindsE outer_dumped_dbs $
+                 spec_rhs = -- mkLams poly_qvars               $
+                            -- wrapDictBindsE outer_dumped_dbs $
                             mkLams spec_rhs_bndrs           $
                             wrapDictBindsE inner_dumped_dbs rhs_body'
-                 rule_rhs_args = poly_qvars ++ spec_bndrs
+                 rule_rhs_args = {- poly_qvars ++ -} spec_bndrs
 
                  -- Maybe add a void arg to the specialised function,
                  -- to avoid unlifted bindings
@@ -1797,8 +1804,12 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                        , text "existing" <+> ppr existing_rules
                                        ]
 
-           ; -- pprTrace "spec_call: rule" _rule_trace_doc
-             return ( spec_rule            : rules_acc
+--           ; pprTrace "spec_call: rule" (vcat [ -- text "poly_qvars" <+> ppr poly_qvars
+--                                                text "rule_bndrs" <+> ppr rule_bndrs
+--                                              , text "rule_lhs_args" <+> ppr rule_lhs_args
+--                                              , text "all_call_args" <+> ppr all_call_args
+--                                              , ppr spec_rule ]) $
+           ; return ( spec_rule            : rules_acc
                     , (spec_fn, spec_rhs1) : pairs_acc
                     , rhs_uds2 `thenUDs` uds_acc
                     ) } }
@@ -2592,12 +2603,22 @@ specHeader subst _  [] = pure (False, subst, [], [], [], [], [])
 -- 'a->T1', as well as a LHS argument for the resulting RULE and unfolding
 -- details.
 specHeader subst (bndr:bndrs) (SpecType ty : args)
-  = do { let subst1 = Core.extendTvSubst subst bndr ty
-       ; (useful, subst2, rule_bs, rule_args, spec_bs, dx, spec_args)
-             <- specHeader subst1 bndrs args
-       ; pure ( useful, subst2
-              , rule_bs,     Type ty : rule_args
-              , spec_bs, dx, Type ty : spec_args ) }
+  = do { -- Find free_tvs, the type variables to add to the binders for the rule
+         -- Namely those free in `ty` that aren't in scope
+         -- See (MP2) in Note [Specialising polymorphic dictionaries]
+         let in_scope = Core.substInScopeSet subst
+             not_in_scope tv = not (tv `elemInScopeSet` in_scope)
+             free_tvs = scopedSort $ fvVarList $
+                        filterFV not_in_scope  $
+                        tyCoFVsOfType ty
+             subst1 = subst `Core.extendSubstInScopeList` free_tvs
+
+       ; let subst2 = Core.extendTvSubst subst1 bndr ty
+       ; (useful, subst3, rule_bs, rule_args, spec_bs, dx, spec_args)
+             <- specHeader subst2 bndrs args
+       ; pure ( useful, subst3
+              , free_tvs ++ rule_bs,     Type ty : rule_args
+              , free_tvs ++ spec_bs, dx, Type ty : spec_args ) }
 
 -- Next we have a type that we don't want to specialise. We need to perform
 -- a substitution on it (in case the type refers to 'a'). Additionally, we need
@@ -2681,7 +2702,7 @@ bindAuxiliaryDict subst orig_dict_id fresh_dict_id dict_arg
   -- don’t bother creating a new dict binding; just substitute
   | exprIsTrivial dict_arg
   , let subst' = Core.extendSubst subst orig_dict_id dict_arg
-  = -- pprTrace "bindAuxiliaryDict:trivial" (ppr orig_dict_id <+> ppr dict_id) $
+  = -- pprTrace "bindAuxiliaryDict:trivial" (ppr orig_dict_id <+> ppr dict_arg) $
     (subst', Nothing, dict_arg)
 
   | otherwise  -- Non-trivial dictionary arg; make an auxiliary binding
@@ -2977,7 +2998,8 @@ pprCallInfo fn (CI { ci_key = key })
 
 instance Outputable CallInfo where
   ppr (CI { ci_key = key, ci_fvs = _fvs })
-    = text "CI" <> braces (sep (map ppr key))
+    = text "CI" <> braces (text "fvs" <+> ppr _fvs
+                           $$ sep (map ppr key))
 
 unionCalls :: CallDetails -> CallDetails -> CallDetails
 unionCalls c1 c2 = plusDVarEnv_C unionCallInfoSet c1 c2
@@ -3397,7 +3419,6 @@ dumpUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, OrdList DictBind)
 dumpUDs bndrs uds@(MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
   | null bndrs = (uds, nilOL)  -- Common in case alternatives
   | otherwise  = -- pprTrace "dumpUDs" (vcat
-                 --    [ text "bndrs" <+> ppr bndrs
                  --    , text "uds" <+> ppr uds
                  --    , text "free_uds" <+> ppr free_uds
                  --    , text "dump-dbs" <+> ppr dump_dbs ]) $
