@@ -652,9 +652,7 @@ specProgram guts@(ModGuts { mg_module = this_mod
               -- Easiest thing is to do it all at once, as if all the top-level
               -- decls were mutually recursive
        ; let top_env = SE { se_subst = Core.mkEmptySubst $
-                                        mkInScopeSetBndrs binds
-                                      --    mkInScopeSetList $
-                                      --  bindersOfBinds binds
+                                       mkInScopeSetBndrs binds
                           , se_module = this_mod
                           , se_rules  = rule_env
                           , se_dflags = dflags }
@@ -814,9 +812,12 @@ spec_imports env callers dict_binds calls
     go :: SpecEnv -> [CallInfoSet] -> CoreM (SpecEnv, [CoreRule], [CoreBind])
     go env [] = return (env, [], [])
     go env (cis : other_calls)
-      = do { -- debugTraceMsg (text "specImport {" <+> ppr cis)
+      = do {
+--             debugTraceMsg (text "specImport {" <+> vcat [ ppr cis
+--                                                         , text "callers" <+> ppr callers
+--                                                         , text "dict_binds" <+> ppr dict_binds ])
            ; (env, rules1, spec_binds1) <- spec_import env callers dict_binds cis
-           ; -- debugTraceMsg (text "specImport }" <+> ppr cis)
+--           ; debugTraceMsg (text "specImport }" <+> ppr cis)
 
            ; (env, rules2, spec_binds2) <- go env other_calls
            ; return (env, rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
@@ -833,13 +834,18 @@ spec_import :: SpecEnv               -- Passed in so that all top-level Ids are 
                      , [CoreBind] )  -- Specialised bindings
 spec_import env callers dict_binds cis@(CIS fn _)
   | isIn "specImport" fn callers
-  = return (env, [], [])  -- No warning.  This actually happens all the time
-                          -- when specialising a recursive function, because
-                          -- the RHS of the specialised function contains a recursive
-                          -- call to the original function
+  = do {
+--         debugTraceMsg (text "specImport1-bad" <+> (ppr fn $$ text "callers" <+> ppr callers))
+       ; return (env, [], []) }
+    -- No warning.  This actually happens all the time
+    -- when specialising a recursive function, because
+    -- the RHS of the specialised function contains a recursive
+    -- call to the original function
 
   | null good_calls
-  = return (env, [], [])
+  = do {
+--        debugTraceMsg (text "specImport1-no-good" <+> (ppr cis $$ text "dict_binds" <+> ppr dict_binds))
+       ; return (env, [], []) }
 
   | Just rhs <- canSpecImport dflags fn
   = do {     -- Get rules from the external package state
@@ -888,7 +894,10 @@ spec_import env callers dict_binds cis@(CIS fn _)
        ; return (env, rules2 ++ rules1, final_binds) }
 
   | otherwise
-  = do { tryWarnMissingSpecs dflags callers fn good_calls
+  = do {
+--         debugTraceMsg (hang (text "specImport1-missed")
+--                          2 (vcat [ppr cis, text "can-spec" <+> ppr (canSpecImport dflags fn)]))
+       ; tryWarnMissingSpecs dflags callers fn good_calls
        ; return (env, [], [])}
 
   where
@@ -1500,7 +1509,9 @@ specBind top_lvl env (NonRec fn rhs) do_body
 
        ; (fn4, spec_defns, body_uds1) <- specDefn env body_uds fn3 rhs
 
-       ; let (free_uds, dump_dbs, float_all) = dumpBindUDs [fn4] body_uds1
+       ; let can_float_this_one = exprIsTopLevelBindable rhs (idType fn)
+                 -- exprIsTopLevelBindable: see Note [Care with unlifted bindings]
+             (free_uds, dump_dbs, float_all) = dumpBindUDs can_float_this_one [fn4] body_uds1
              all_free_uds                    = free_uds `thenUDs` rhs_uds
 
              pairs = spec_defns ++ [(fn4, rhs')]
@@ -1516,10 +1527,8 @@ specBind top_lvl env (NonRec fn rhs) do_body
                          = [mkDB $ NonRec b r | (b,r) <- pairs]
                            ++ fromOL dump_dbs
 
-             can_float_this_one = exprIsTopLevelBindable rhs (idType fn)
-             -- exprIsTopLevelBindable: see Note [Care with unlifted bindings]
 
-       ; if float_all && can_float_this_one then
+       ; if float_all then
              -- Rather than discard the calls mentioning the bound variables
              -- we float this (dictionary) binding along with the others
               return ([], body', all_free_uds `snocDictBinds` final_binds)
@@ -1554,7 +1563,7 @@ specBind top_lvl env (Rec pairs) do_body
                               <- specDefns rec_env uds2 (bndrs2 `zip` rhss)
                         ; return (bndrs3, spec_defns3 ++ spec_defns2, uds3) }
 
-       ; let (final_uds, dumped_dbs, float_all) = dumpBindUDs bndrs1 uds3
+       ; let (final_uds, dumped_dbs, float_all) = dumpBindUDs True bndrs1 uds3
              final_bind = recWithDumpedDicts (spec_defns3 ++ zip bndrs3 rhss')
                                              dumped_dbs
 
@@ -1937,6 +1946,16 @@ floating to top level anyway; but that is hard to spot (since we don't know what
 the non-top-level in-scope binders are) and rare (since the binding must satisfy
 Note [Core let-can-float invariant] in GHC.Core).
 
+Arguably we'd be better off if we had left that `x` in the RHS of `n`, thus
+    f x = let n::Natural = let x::ByteArray# = <some literal> in
+                           NB x
+          in wombat @192827 (n |> co)
+Now we could float `n` happily.  But that's in conflict with exposing the `NB`
+data constructor in the body of the `let`, so I'm leaving this unresolved.
+
+Another case came up in #26682, where the binding had an unlifted sum type
+(# Word# | ByteArray# #), itself arising from an UNPACK pragma.  Test case
+T26682.
 
 Note [Specialising Calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2975,7 +2994,8 @@ pprCallInfo fn (CI { ci_key = key })
 
 instance Outputable CallInfo where
   ppr (CI { ci_key = key, ci_fvs = _fvs })
-    = text "CI" <> braces (sep (map ppr key))
+    = text "CI" <> braces (text "fvs" <+> ppr _fvs
+                           $$ sep (map ppr key))
 
 unionCalls :: CallDetails -> CallDetails -> CallDetails
 unionCalls c1 c2 = plusDVarEnv_C unionCallInfoSet c1 c2
@@ -3286,7 +3306,7 @@ wrapDictBindsE dbs expr
 
 ----------------------
 dumpUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, OrdList DictBind)
--- Used at a lambda or case binder; just dump anything mentioning the binder
+-- Used at binder; just dump anything mentioning the binder
 dumpUDs bndrs uds@(MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
   | null bndrs = (uds, nilOL)  -- Common in case alternatives
   | otherwise  = -- pprTrace "dumpUDs" (ppr bndrs $$ ppr free_uds $$ ppr dump_dbs) $
@@ -3295,25 +3315,36 @@ dumpUDs bndrs uds@(MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
     free_uds = uds { ud_binds = free_dbs, ud_calls = free_calls }
     bndr_set = mkVarSet bndrs
     (free_dbs, dump_dbs, dump_set) = splitDictBinds orig_dbs bndr_set
-    free_calls = deleteCallsMentioning dump_set $   -- Drop calls mentioning bndr_set on the floor
-                 deleteCallsFor bndrs orig_calls    -- Discard calls for bndr_set; there should be
-                                                    -- no calls for any of the dicts in dump_dbs
 
-dumpBindUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, OrdList DictBind, Bool)
+    -- Delete calls:
+    --   * For any binder in `bndrs`
+    --   * That mention a dictionary bound in `dump_set`
+    -- These variables aren't in scope "above" the binding and the `dump_dbs`,
+    -- so no call should mention them.  (See #26682.)
+    free_calls = deleteCallsMentioning dump_set $
+                 deleteCallsFor bndrs orig_calls
+
+dumpBindUDs :: Bool   -- Main binding can float to top
+            -> [CoreBndr] -> UsageDetails
+            -> (UsageDetails, OrdList DictBind, Bool)
 -- Used at a let(rec) binding.
--- We return a boolean indicating whether the binding itself is mentioned,
--- directly or indirectly, by any of the ud_calls; in that case we want to
--- float the binding itself;
--- See Note [Floated dictionary bindings]
-dumpBindUDs bndrs (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
-  = -- pprTrace "dumpBindUDs" (ppr bndrs $$ ppr free_uds $$ ppr dump_dbs $$ ppr float_all) $
-    (free_uds, dump_dbs, float_all)
+-- We return a boolean indicating whether the binding itself
+--    is mentioned, directly or indirectly, by any of the ud_calls;
+--    in that case we want to float the binding itself.
+--    See Note [Floated dictionary bindings]
+-- If the boolean is True, then the returned ud_calls can mention `bndrs`;
+-- if False, then returned ud_calls must not mention `bndrs`
+dumpBindUDs can_float_bind bndrs (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
+  = ( MkUD { ud_binds = free_dbs, ud_calls = free_calls2 }
+    , dump_dbs
+    , can_float_bind && calls_mention_bndrs )
   where
-    free_uds = MkUD { ud_binds = free_dbs, ud_calls = free_calls }
     bndr_set = mkVarSet bndrs
     (free_dbs, dump_dbs, dump_set) = splitDictBinds orig_dbs bndr_set
-    free_calls = deleteCallsFor bndrs orig_calls
-    float_all = dump_set `intersectsVarSet` callDetailsFVs free_calls
+    free_calls1 = deleteCallsFor bndrs orig_calls
+    calls_mention_bndrs = dump_set `intersectsVarSet` callDetailsFVs free_calls1
+    free_calls2 | can_float_bind = free_calls1
+                | otherwise      = deleteCallsMentioning dump_set free_calls1
 
 callsForMe :: Id -> UsageDetails -> (UsageDetails, [CallInfo])
 callsForMe fn uds@MkUD { ud_binds = orig_dbs, ud_calls = orig_calls }
