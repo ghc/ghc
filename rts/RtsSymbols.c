@@ -634,6 +634,7 @@ extern char **environ;
       SymI_HasDataProto(stg_casSmallArrayzh)                                \
       SymI_HasDataProto(stg_copyArray_barrier)                              \
       SymI_HasDataProto(stg_newBCOzh)                                       \
+      SymI_HasDataProto(stg_newConAppObjzh)                                 \
       SymI_HasDataProto(stg_newByteArrayzh)                                 \
       SymI_HasDataProto(stg_casIntArrayzh)                                  \
       SymI_HasDataProto(stg_casInt8Arrayzh)                                 \
@@ -655,7 +656,7 @@ extern char **environ;
       SymI_HasDataProto(stg_isMutableByteArrayWeaklyPinnedzh)               \
       SymI_HasDataProto(stg_shrinkMutableByteArrayzh)                       \
       SymI_HasDataProto(stg_resizzeMutableByteArrayzh)                      \
-      SymI_HasDataProto(stg_shrinkSmallMutableArrayzh)                       \
+      SymI_HasDataProto(stg_shrinkSmallMutableArrayzh)                      \
       SymI_HasProto(newSpark)                                           \
       SymI_HasProto(updateRemembSetPushThunk)                             \
       SymI_HasProto(updateRemembSetPushThunk_)                            \

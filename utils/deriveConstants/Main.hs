@@ -451,9 +451,10 @@ wanteds os = concat
           ,closureSize  Both "StgAnnFrame"
           ,closureField C    "StgAnnFrame" "ann"
 
-          ,closureSize  Both "StgMutArrPtrs"
-          ,closureField Both "StgMutArrPtrs" "ptrs"
-          ,closureField Both "StgMutArrPtrs" "size"
+          ,closureSize    Both "StgMutArrPtrs"
+          ,closureField   Both "StgMutArrPtrs" "ptrs"
+          ,closureField   Both "StgMutArrPtrs" "size"
+          ,closurePayload C    "StgMutArrPtrs" "payload"
 
           ,closureSize  Both "StgSmallMutArrPtrs"
           ,closureField Both "StgSmallMutArrPtrs" "ptrs"

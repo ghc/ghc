@@ -47,6 +47,16 @@ data ResolvedBCO
           -- ^ non-ptrs - subword sized entries still take up a full (host) word
         resolvedBCOPtrs   :: (SizedSeq ResolvedBCOPtr)  -- ^ ptrs
    }
+   -- | A resolved static constructor
+   -- See Note [Static constructors in Bytecode]
+   | ResolvedStaticCon {
+        resolvedBCOIsLE          :: Bool,
+        resolvedStaticConInfoPtr :: {-# UNPACK #-} !Word, -- ^ info ptr Addr# as a Word
+        resolvedStaticConArity   :: {-# UNPACK #-} !Word,
+        resolvedStaticConLits    :: BCOByteArray Word,
+        resolvedStaticConPtrs    :: SizedSeq ResolvedBCOPtr,
+        resolvedStaticConIsUnlifted :: Bool
+   }
    deriving (Generic, Show)
 
 -- | Wrapper for a 'ByteArray#'.
@@ -80,13 +90,27 @@ instance Show (BCOByteArray Word) where
 -- same endianness.
 instance Binary ResolvedBCO where
   put ResolvedBCO{..} = do
+    putWord8 0
     put resolvedBCOIsLE
     put resolvedBCOArity
     put resolvedBCOInstrs
     put resolvedBCOBitmap
     put resolvedBCOLits
     put resolvedBCOPtrs
-  get = ResolvedBCO <$> get <*> get <*> get <*> get <*> get <*> get
+  put ResolvedStaticCon{..} = do
+    putWord8 1
+    put resolvedBCOIsLE
+    put resolvedStaticConInfoPtr
+    put resolvedStaticConArity
+    put resolvedStaticConLits
+    put resolvedStaticConPtrs
+    put resolvedStaticConIsUnlifted
+  get = do
+    t <- getWord8
+    case t of
+      0 -> ResolvedBCO <$> get <*> get <*> get <*> get <*> get <*> get
+      1 -> ResolvedStaticCon <$> get <*> get <*> get <*> get <*> get <*> get
+      _ -> error "Binary ResolvedBCO: invalid byte"
 
 -- See Note [BCOByteArray serialization]
 instance (Binary a, Storable a, IArray UArray a) => Binary (BCOByteArray a) where
@@ -96,7 +120,8 @@ instance (Binary a, Storable a, IArray UArray a) => Binary (BCOByteArray a) wher
 
 data ResolvedBCOPtr
   = ResolvedBCORef {-# UNPACK #-} !Int
-      -- ^ reference to the Nth BCO in the current set
+      -- ^ reference to the Nth BCO in the current set of BCOs and
+      -- lifted static constructors
   | ResolvedBCOPtr {-# UNPACK #-} !(RemoteRef HValue)
       -- ^ reference to a previously created BCO
   | ResolvedBCOStaticPtr {-# UNPACK #-} !(RemotePtr ())
@@ -105,6 +130,12 @@ data ResolvedBCOPtr
       -- ^ a nested BCO
   | ResolvedBCOPtrBreakArray {-# UNPACK #-} !(RemoteRef BreakArray)
       -- ^ Resolves to the MutableArray# inside the BreakArray
+  | ResolvedStaticConRef {-# UNPACK #-} !Int
+      -- ^ reference to the Nth static constructor in the current set of BCOs
+      -- and lifted static constructors
+  | ResolvedUnliftedStaticConRef {-# UNPACK #-} !Int
+      -- ^ reference to the Nth unlifted static constructor in the current set
+      -- of exclusively unlifted static constructors
   deriving (Generic, Show)
 
 instance Binary ResolvedBCOPtr

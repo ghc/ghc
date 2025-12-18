@@ -4,6 +4,7 @@
 {-# LANGUAGE UnboxedTuples   #-}
 {-# LANGUAGE PatternSynonyms   #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
+{-# LANGUAGE LambdaCase #-}
 --
 --
 --  (c) The University of Glasgow 2002-2006
@@ -21,9 +22,9 @@ module GHC.ByteCode.Asm (
         assembleBCO
   ) where
 
-import GHC.Prelude hiding ( any )
+import GHC.Prelude hiding ( any, words )
 
-
+import Data.Maybe
 import GHC.ByteCode.Instr
 import GHC.ByteCode.InfoTable
 import GHC.ByteCode.Types
@@ -37,9 +38,12 @@ import GHC.Types.SptEntry
 import GHC.Types.Unique.FM
 import GHC.Unit.Types
 
-import GHC.Utils.Outputable
+import GHC.Utils.Outputable ( Outputable(..), text, (<+>), vcat )
 import GHC.Utils.Panic
 
+import GHC.Builtin.Types.Prim ( addrPrimTy )
+import GHC.Core.Type          ( isUnliftedType )
+import GHC.Core.TyCo.Compare  ( eqType )
 import GHC.Core.TyCon
 import GHC.Data.SizedSeq
 import GHC.Data.SmallArray
@@ -66,11 +70,13 @@ import Data.Array.Base  ( unsafeWrite )
 import Foreign hiding (shiftL, shiftR)
 import Data.ByteString (ByteString)
 import Data.Char  (ord)
-import Data.Maybe (fromMaybe)
 import GHC.Float (castFloatToWord32, castDoubleToWord64)
 
 import qualified Data.List as List ( any )
 import GHC.Exts
+import GHC.Core.DataCon
+import GHC.Data.FlatBag
+import GHC.Types.Id
 
 
 -- -----------------------------------------------------------------------------
@@ -83,14 +89,23 @@ import GHC.Exts
 -- defined by this group of BCOs themselves
 bcoFreeNames :: UnlinkedBCO -> UniqDSet Name
 bcoFreeNames bco
-  = bco_refs bco `uniqDSetMinusUniqSet` mkNameSet [unlinkedBCOName bco]
+  = bco_refs bco
   where
-    bco_refs (UnlinkedBCO _ _ _ _ nonptrs ptrs)
+    bco_refs UnlinkedBCO{unlinkedBCOName, unlinkedBCOLits, unlinkedBCOPtrs}
         = unionManyUniqDSets (
-             mkUniqDSet [ n | BCOPtrName n <- elemsFlatBag ptrs ] :
-             mkUniqDSet [ n | BCONPtrItbl n <- elemsFlatBag nonptrs ] :
-             map bco_refs [ bco | BCOPtrBCO bco <- elemsFlatBag ptrs ]
+             mkUniqDSet [ n | BCOPtrName n <- elemsFlatBag unlinkedBCOPtrs ] :
+             mkUniqDSet [ n | BCONPtrItbl n <- elemsFlatBag unlinkedBCOLits ] :
+             map bco_refs [ bco | BCOPtrBCO bco <- elemsFlatBag unlinkedBCOPtrs ]
+          ) `uniqDSetMinusUniqSet` mkNameSet [unlinkedBCOName]
+    bco_refs UnlinkedStaticCon{ unlinkedStaticConName, unlinkedStaticConDataConName
+                              , unlinkedStaticConLits, unlinkedStaticConPtrs }
+        = unionManyUniqDSets (
+             mkUniqDSet [ unlinkedStaticConDataConName ] :
+             mkUniqDSet [ n | BCOPtrName n <- elemsFlatBag unlinkedStaticConPtrs ] :
+             mkUniqDSet [ n | BCONPtrItbl n <- elemsFlatBag unlinkedStaticConLits ] :
+             map bco_refs [ bco | BCOPtrBCO bco <- elemsFlatBag unlinkedStaticConPtrs ]
           )
+          `uniqDSetMinusUniqSet` mkNameSet [ unlinkedStaticConName ]
 
 -- -----------------------------------------------------------------------------
 -- The bytecode assembler
@@ -147,9 +162,9 @@ assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
 --
 
 data RunAsmReader = RunAsmReader { isn_array :: {-# UNPACK #-} !(Array.IOUArray Int Word16)
-                                  , ptr_array :: {-# UNPACK #-} !(SmallMutableArrayIO BCOPtr)
-                                  , lit_array :: {-# UNPACK #-} !(SmallMutableArrayIO BCONPtr )
-                                  }
+                                 , ptr_array :: {-# UNPACK #-} !(SmallMutableArrayIO BCOPtr)
+                                 , lit_array :: {-# UNPACK #-} !(SmallMutableArrayIO BCONPtr)
+                                 }
 
 data RunAsmResult = RunAsmResult { final_isn_array :: !(Array.UArray Int Word16)
                                  , final_ptr_array :: !(SmallArray BCOPtr)
@@ -195,6 +210,40 @@ assembleInspectAsm :: Platform -> BCInstr -> InspectAsm ()
 assembleInspectAsm p i = assembleI @InspectAsm p i
 
 assembleBCO :: Platform -> ProtoBCO -> IO UnlinkedBCO
+assembleBCO platform
+            (ProtoStaticCon { protoStaticConName
+                            , protoStaticCon = dc
+                            , protoStaticConData = args
+                            }) = do
+  let ptrs    = foldr mappendFlatBag emptyFlatBag (mapMaybe idBCOArg args)
+  let nonptrs = foldr mappendFlatBag emptyFlatBag (mapMaybe litBCOArg args)
+  pure UnlinkedStaticCon
+    { unlinkedStaticConName = protoStaticConName
+    , unlinkedStaticConDataConName = dataConName dc
+    , unlinkedStaticConLits = nonptrs
+    , unlinkedStaticConPtrs = ptrs
+    , unlinkedStaticConIsUnlifted = isUnliftedType (idType (dataConWrapId dc))
+    }
+  where
+    litBCOArg (Left l) = Just $ case literal platform l of
+      OnlyOne np -> unitFlatBag np
+      OnlyTwo np1 np2 -> TupleFlatBag np1 np2
+    litBCOArg (Right var)
+      -- Addr# literals are non-pointers
+      | idType var `eqType` addrPrimTy
+      = Just $ unitFlatBag (BCONPtrAddr (getName var))
+      | otherwise
+      = Nothing
+
+    idBCOArg (Left _) = Nothing
+    idBCOArg (Right var)
+      | idType var `eqType` addrPrimTy
+      = Nothing
+      | Just prim <- isPrimOpId_maybe var
+      = Just $ unitFlatBag (BCOPtrPrimOp prim)
+      | otherwise
+      = Just $ unitFlatBag (BCOPtrName (getName var))
+
 assembleBCO platform
             (ProtoBCO { protoBCOName       = nm
                       , protoBCOInstrs     = instrs
@@ -561,9 +610,9 @@ oneTwoLength (OnlyTwo {}) = 2
 
 class Monad m => MonadAssembler m where
   ioptr :: IO BCOPtr -> m Word
-  lit :: OneOrTwo BCONPtr -> m Word
+  lit   :: OneOrTwo BCONPtr -> m Word
   label :: LocalLabel -> m ()
-  emit :: PlatformWordSize -> Word16 -> [Operand] -> m ()
+  emit  :: PlatformWordSize -> Word16 -> [Operand] -> m ()
 
 lit1 :: MonadAssembler m => BCONPtr -> m Word
 lit1 p = lit (OnlyOne p)
@@ -603,20 +652,20 @@ assembleI platform i = case i of
                                                                 tuple_proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  p_tup <- ioptr (liftM BCOPtrBCO ul_tuple_bco)
-                                 info <- word (fromIntegral $
-                                              mkNativeCallInfoSig platform call_info)
+                                 info <- lit $ word $ fromIntegral $
+                                              mkNativeCallInfoSig platform call_info
                                  emit_ bci_PUSH_ALTS_T
                                       [Op p, Op info, Op p_tup]
   PUSH_PAD8                -> emit_ bci_PUSH_PAD8 []
   PUSH_PAD16               -> emit_ bci_PUSH_PAD16 []
   PUSH_PAD32               -> emit_ bci_PUSH_PAD32 []
-  PUSH_UBX8 lit            -> do np <- literal lit
+  PUSH_UBX8 litv           -> do np <- lit $ literal platform litv
                                  emit_ bci_PUSH_UBX8 [Op np]
-  PUSH_UBX16 lit           -> do np <- literal lit
+  PUSH_UBX16 litv          -> do np <- lit $ literal platform litv
                                  emit_ bci_PUSH_UBX16 [Op np]
-  PUSH_UBX32 lit           -> do np <- literal lit
+  PUSH_UBX32 litv          -> do np <- lit $ literal platform litv
                                  emit_ bci_PUSH_UBX32 [Op np]
-  PUSH_UBX lit nws         -> do np <- literal lit
+  PUSH_UBX litv nws        -> do np <- lit $ literal platform litv
                                  emit_ bci_PUSH_UBX [Op np, wOp nws]
   -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode
   PUSH_ADDR nm             -> do np <- lit1 (BCONPtrAddr nm)
@@ -644,53 +693,53 @@ assembleI platform i = case i of
   PACK      dcon sz        -> do itbl_no <- lit1 (BCONPtrItbl (getName dcon))
                                  emit_ bci_PACK [Op itbl_no, wOp sz]
   LABEL     lbl            -> label lbl
-  TESTLT_I  i l            -> do np <- int i
+  TESTLT_I  i l            -> do np <- lit $ int i
                                  emit_ bci_TESTLT_I [Op np, LabelOp l]
-  TESTEQ_I  i l            -> do np <- int i
+  TESTEQ_I  i l            -> do np <- lit $ int i
                                  emit_ bci_TESTEQ_I [Op np, LabelOp l]
-  TESTLT_W  w l            -> do np <- word w
+  TESTLT_W  w l            -> do np <- lit $ word w
                                  emit_ bci_TESTLT_W [Op np, LabelOp l]
-  TESTEQ_W  w l            -> do np <- word w
+  TESTEQ_W  w l            -> do np <- lit $ word w
                                  emit_ bci_TESTEQ_W [Op np, LabelOp l]
-  TESTLT_I64  i l          -> do np <- word64 (fromIntegral i)
+  TESTLT_I64  i l          -> do np <- lit $ word64 platform (fromIntegral i)
                                  emit_ bci_TESTLT_I64 [Op np, LabelOp l]
-  TESTEQ_I64  i l          -> do np <- word64 (fromIntegral i)
+  TESTEQ_I64  i l          -> do np <- lit $ word64 platform (fromIntegral i)
                                  emit_ bci_TESTEQ_I64 [Op np, LabelOp l]
-  TESTLT_I32  i l          -> do np <- word (fromIntegral i)
+  TESTLT_I32  i l          -> do np <- lit $ word (fromIntegral i)
                                  emit_ bci_TESTLT_I32 [Op np, LabelOp l]
-  TESTEQ_I32 i l           -> do np <- word (fromIntegral i)
+  TESTEQ_I32 i l           -> do np <- lit $ word (fromIntegral i)
                                  emit_ bci_TESTEQ_I32 [Op np, LabelOp l]
-  TESTLT_I16  i l          -> do np <- word (fromIntegral i)
+  TESTLT_I16  i l          -> do np <- lit $ word (fromIntegral i)
                                  emit_ bci_TESTLT_I16 [Op np, LabelOp l]
-  TESTEQ_I16 i l           -> do np <- word (fromIntegral i)
+  TESTEQ_I16 i l           -> do np <- lit $ word (fromIntegral i)
                                  emit_ bci_TESTEQ_I16 [Op np, LabelOp l]
-  TESTLT_I8  i l           -> do np <- word (fromIntegral i)
+  TESTLT_I8  i l           -> do np <- lit $ word (fromIntegral i)
                                  emit_ bci_TESTLT_I8 [Op np, LabelOp l]
-  TESTEQ_I8 i l            -> do np <- word (fromIntegral i)
+  TESTEQ_I8 i l            -> do np <- lit $ word (fromIntegral i)
                                  emit_ bci_TESTEQ_I8 [Op np, LabelOp l]
-  TESTLT_W64  w l          -> do np <- word64 w
+  TESTLT_W64  w l          -> do np <- lit $ word64 platform w
                                  emit_ bci_TESTLT_W64 [Op np, LabelOp l]
-  TESTEQ_W64  w l          -> do np <- word64 w
+  TESTEQ_W64  w l          -> do np <- lit $ word64 platform w
                                  emit_ bci_TESTEQ_W64 [Op np, LabelOp l]
-  TESTLT_W32  w l          -> do np <- word (fromIntegral w)
+  TESTLT_W32  w l          -> do np <- lit $ word (fromIntegral w)
                                  emit_ bci_TESTLT_W32 [Op np, LabelOp l]
-  TESTEQ_W32  w l          -> do np <- word (fromIntegral w)
+  TESTEQ_W32  w l          -> do np <- lit $ word (fromIntegral w)
                                  emit_ bci_TESTEQ_W32 [Op np, LabelOp l]
-  TESTLT_W16  w l          -> do np <- word (fromIntegral w)
+  TESTLT_W16  w l          -> do np <- lit $ word (fromIntegral w)
                                  emit_ bci_TESTLT_W16 [Op np, LabelOp l]
-  TESTEQ_W16  w l          -> do np <- word (fromIntegral w)
+  TESTEQ_W16  w l          -> do np <- lit $ word (fromIntegral w)
                                  emit_ bci_TESTEQ_W16 [Op np, LabelOp l]
-  TESTLT_W8  w l           -> do np <- word (fromIntegral w)
+  TESTLT_W8  w l           -> do np <- lit $ word (fromIntegral w)
                                  emit_ bci_TESTLT_W8 [Op np, LabelOp l]
-  TESTEQ_W8  w l           -> do np <- word (fromIntegral w)
+  TESTEQ_W8  w l           -> do np <- lit $ word (fromIntegral w)
                                  emit_ bci_TESTEQ_W8 [Op np, LabelOp l]
-  TESTLT_F  f l            -> do np <- float f
+  TESTLT_F  f l            -> do np <- lit $ float platform f
                                  emit_ bci_TESTLT_F [Op np, LabelOp l]
-  TESTEQ_F  f l            -> do np <- float f
+  TESTEQ_F  f l            -> do np <- lit $ float platform f
                                  emit_ bci_TESTEQ_F [Op np, LabelOp l]
-  TESTLT_D  d l            -> do np <- double d
+  TESTLT_D  d l            -> do np <- lit $ double platform d
                                  emit_ bci_TESTLT_D [Op np, LabelOp l]
-  TESTEQ_D  d l            -> do np <- double d
+  TESTEQ_D  d l            -> do np <- lit $ double platform d
                                  emit_ bci_TESTEQ_D [Op np, LabelOp l]
   TESTLT_P  i l            -> emit_ bci_TESTLT_P [SmallOp i, LabelOp l]
   TESTEQ_P  i l            -> emit_ bci_TESTEQ_P [SmallOp i, LabelOp l]
@@ -864,84 +913,86 @@ assembleI platform i = case i of
 
   where
     unsupported_width = panic "GHC.ByteCode.Asm: Unsupported Width"
-    emit_ = emit word_size
+    emit_ = emit (platformWordSize platform)
 
-    literal :: Literal -> m Word
-    literal (LitLabel fs _)   = litlabel fs
-    literal LitNullAddr       = word 0
-    literal (LitFloat r)      = float (fromRational r)
-    literal (LitDouble r)     = double (fromRational r)
-    literal (LitChar c)       = int (ord c)
-    literal (LitString bs)    = lit1 (BCONPtrStr bs)
-       -- LitString requires a zero-terminator when emitted
-    literal (LitNumber nt i) = case nt of
-      LitNumInt     -> word (fromIntegral i)
-      LitNumWord    -> word (fromIntegral i)
-      LitNumInt8    -> word8 (fromIntegral i)
-      LitNumWord8   -> word8 (fromIntegral i)
-      LitNumInt16   -> word16 (fromIntegral i)
-      LitNumWord16  -> word16 (fromIntegral i)
-      LitNumInt32   -> word32 (fromIntegral i)
-      LitNumWord32  -> word32 (fromIntegral i)
-      LitNumInt64   -> word64 (fromIntegral i)
-      LitNumWord64  -> word64 (fromIntegral i)
-      LitNumBigNat  -> panic "GHC.ByteCode.Asm.literal: LitNumBigNat"
+literal :: Platform -> Literal -> OneOrTwo BCONPtr
+literal platform = \case
+  LitLabel fs _  -> OnlyOne (BCONPtrLbl fs)
+  LitNullAddr    -> word 0
+  LitFloat r     -> float platform (fromRational r)
+  LitDouble r    -> double platform (fromRational r)
+  LitChar c      -> int (ord c)
+  LitString bs   -> OnlyOne (BCONPtrStr bs)
+   -- LitString requires a zero-terminator when emitted
+  LitNumber nt i -> case nt of
+    LitNumInt     -> word (fromIntegral i)
+    LitNumWord    -> word (fromIntegral i)
+    LitNumInt8    -> word8  platform (fromIntegral i)
+    LitNumWord8   -> word8  platform (fromIntegral i)
+    LitNumInt16   -> word16 platform (fromIntegral i)
+    LitNumWord16  -> word16 platform (fromIntegral i)
+    LitNumInt32   -> word32 platform (fromIntegral i)
+    LitNumWord32  -> word32 platform (fromIntegral i)
+    LitNumInt64   -> word64 platform (fromIntegral i)
+    LitNumWord64  -> word64 platform (fromIntegral i)
+    LitNumBigNat  -> panic "GHC.ByteCode.Asm.literal: LitNumBigNat"
 
     -- We can lower 'LitRubbish' to an arbitrary constant, but @NULL@ is most
     -- likely to elicit a crash (rather than corrupt memory) in case absence
     -- analysis messed up.
-    literal (LitRubbish {}) = word 0
+  LitRubbish {} -> word 0
 
-    litlabel fs = lit1 (BCONPtrLbl fs)
-    words ws = lit (fmap BCONPtrWord ws)
-    word w = words (OnlyOne w)
-    word2 w1 w2 = words (OnlyTwo w1 w2)
-    word_size  = platformWordSize platform
-    word_size_bits = platformWordSizeInBits platform
+words :: OneOrTwo Word -> OneOrTwo BCONPtr
+words ws = fmap BCONPtrWord ws
 
-    -- Make lists of host-sized words for literals, so that when the
-    -- words are placed in memory at increasing addresses, the
-    -- bit pattern is correct for the host's word size and endianness.
-    --
-    -- Note that we only support host endianness == target endianness for now,
-    -- even with the external interpreter. This would need to be fixed to
-    -- support host endianness /= target endianness
-    int :: Int -> m Word
-    int  i = word (fromIntegral i)
+word :: Word -> OneOrTwo BCONPtr
+word w = words (OnlyOne w)
 
-    float :: Float -> m Word
-    float f = word32 (castFloatToWord32 f)
+word2 :: Word -> Word -> OneOrTwo BCONPtr
+word2 w1 w2 = words (OnlyTwo w1 w2)
 
-    double :: Double -> m Word
-    double d = word64 (castDoubleToWord64 d)
+-- Make lists of host-sized words for literals, so that when the
+-- words are placed in memory at increasing addresses, the
+-- bit pattern is correct for the host's word size and endianness.
+--
+-- Note that we only support host endianness == target endianness for now,
+-- even with the external interpreter. This would need to be fixed to
+-- support host endianness /= target endianness
+int :: Int -> OneOrTwo BCONPtr
+int i = word (fromIntegral i)
 
-    word64 :: Word64 -> m Word
-    word64 ww = case word_size of
-       PW4 ->
-        let !wl = fromIntegral ww
-            !wh = fromIntegral (ww `unsafeShiftR` 32)
-        in case platformByteOrder platform of
-            LittleEndian -> word2 wl wh
-            BigEndian    -> word2 wh wl
-       PW8 -> word (fromIntegral ww)
+float :: Platform -> Float -> OneOrTwo BCONPtr
+float platform f = word32 platform (castFloatToWord32 f)
 
-    word8 :: Word8 -> m Word
-    word8  x = case platformByteOrder platform of
-      LittleEndian -> word (fromIntegral x)
-      BigEndian    -> word (fromIntegral x `unsafeShiftL` (word_size_bits - 8))
+double :: Platform -> Double -> OneOrTwo BCONPtr
+double p d = word64 p (castDoubleToWord64 d)
 
-    word16 :: Word16 -> m Word
-    word16 x = case platformByteOrder platform of
-      LittleEndian -> word (fromIntegral x)
-      BigEndian    -> word (fromIntegral x `unsafeShiftL` (word_size_bits - 16))
+word64 :: Platform -> Word64 -> OneOrTwo BCONPtr
+word64 platform ww = case platformWordSize platform of
+   PW4 ->
+    let !wl = fromIntegral ww
+        !wh = fromIntegral (ww `unsafeShiftR` 32)
+    in case platformByteOrder platform of
+        LittleEndian -> word2 wl wh
+        BigEndian    -> word2 wh wl
+   PW8 -> word (fromIntegral ww)
 
-    word32 :: Word32 -> m Word
-    word32 x = case platformByteOrder platform of
-      LittleEndian -> word (fromIntegral x)
-      BigEndian    -> case word_size of
-        PW4 -> word (fromIntegral x)
-        PW8 -> word (fromIntegral x `unsafeShiftL` 32)
+word8 :: Platform -> Word8 -> OneOrTwo BCONPtr
+word8 platform x = case platformByteOrder platform of
+  LittleEndian -> word (fromIntegral x)
+  BigEndian    -> word (fromIntegral x `unsafeShiftL` (platformWordSizeInBits platform - 8))
 
+word16 :: Platform -> Word16 -> OneOrTwo BCONPtr
+word16 platform x = case platformByteOrder platform of
+  LittleEndian -> word (fromIntegral x)
+  BigEndian    -> word (fromIntegral x `unsafeShiftL` (platformWordSizeInBits platform - 16))
+
+word32 :: Platform -> Word32 -> OneOrTwo BCONPtr
+word32 platform x = case platformByteOrder platform of
+  LittleEndian -> word (fromIntegral x)
+  BigEndian    -> case platformWordSize platform of
+    PW4 -> word (fromIntegral x)
+    PW8 -> word (fromIntegral x `unsafeShiftL` 32)
 
 isLargeW :: Word -> Bool
 isLargeW n = n > 65535

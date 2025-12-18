@@ -12,6 +12,7 @@ module GHC.ByteCode.Linker
   , lookupStaticPtr
   , lookupIE
   , linkFail
+  , BCOIx(..)
   )
 where
 
@@ -46,31 +47,68 @@ import Data.Array.Unboxed
 import Foreign.Ptr
 import GHC.Exts
 
-{-
+{- |
   Linking interpretables into something we can run
 -}
-
 linkBCO
   :: Interp
   -> PkgsLoaded
   -> BytecodeLoaderState
-  -> NameEnv Int
+  -> NameEnv BCOIx
+  -- ^ A mapping from names to references to other BCOs
+  --   or static constructors in this group.
   -> UnlinkedBCO
   -> IO ResolvedBCO
-linkBCO interp pkgs_loaded bytecode_state bco_ix
-           (UnlinkedBCO _ arity insns bitmap lits0 ptrs0) = do
-  -- fromIntegral Word -> Word64 should be a no op if Word is Word64
-  -- otherwise it will result in a cast to longlong on 32bit systems.
-  (lits :: [Word]) <- mapM (fmap fromIntegral . lookupLiteral interp pkgs_loaded bytecode_state) (elemsFlatBag lits0)
-  ptrs <- mapM (resolvePtr interp pkgs_loaded bytecode_state bco_ix) (elemsFlatBag ptrs0)
-  let lits' = listArray (0 :: Int, fromIntegral (sizeFlatBag lits0)-1) lits
-  return $ ResolvedBCO { resolvedBCOIsLE   = isLittleEndian
-                       , resolvedBCOArity  = arity
-                       , resolvedBCOInstrs = insns
-                       , resolvedBCOBitmap = bitmap
-                       , resolvedBCOLits   = mkBCOByteArray lits'
-                       , resolvedBCOPtrs   = addListToSS emptySS ptrs
-                       }
+linkBCO interp pkgs_loaded bytecode_state bco_ix unl_bco = do
+  case unl_bco of
+    UnlinkedBCO _ arity insns
+           bitmap lits0 ptrs0 -> do
+        lits <- doLits lits0
+        ptrs <- doPtrs ptrs0
+        return ResolvedBCO
+          { resolvedBCOIsLE   = isLittleEndian
+          , resolvedBCOArity  = arity
+          , resolvedBCOInstrs = insns
+          , resolvedBCOBitmap = bitmap
+          , resolvedBCOLits   = lits
+          , resolvedBCOPtrs   = ptrs
+          }
+
+    UnlinkedStaticCon
+      { unlinkedStaticConLits = lits0
+      , unlinkedStaticConPtrs = ptrs0
+      , unlinkedStaticConDataConName
+      , unlinkedStaticConIsUnlifted
+      } -> do
+        Ptr itbl_ptr# <- lookupIE interp pkgs_loaded bytecode_state unlinkedStaticConDataConName
+        lits <- doLits lits0
+        ptrs <- doPtrs ptrs0
+        return ResolvedStaticCon
+          { resolvedBCOIsLE = isLittleEndian
+          , resolvedStaticConInfoPtr = W# (int2Word# (addr2Int# itbl_ptr#))
+          , resolvedStaticConArity = sizeFlatBag lits0 + sizeFlatBag ptrs0
+          , resolvedStaticConLits = lits
+          , resolvedStaticConPtrs = ptrs
+          , resolvedStaticConIsUnlifted = unlinkedStaticConIsUnlifted
+          }
+  where
+    doLits lits0 = do
+      (lits :: [Word]) <- mapM (lookupLiteral interp pkgs_loaded bytecode_state) (elemsFlatBag lits0)
+      let lits' = listArray (0 :: Int, fromIntegral (sizeFlatBag lits0)-1) lits
+      return $ mkBCOByteArray lits'
+    doPtrs ptrs0 = addListToSS emptySS <$> do
+      mapM (resolvePtr interp pkgs_loaded bytecode_state bco_ix) (elemsFlatBag ptrs0)
+
+-- | An index into a BCO or Static Constructor in this group.
+--
+-- We distinguish between lifted and unlifted static constructors because
+-- lifted ones get resolved by tying a knot, since there may be circular
+-- dependencies between them, whereas unlifted ones get constructed in a first
+-- pass.
+data BCOIx = BCOIx !Int
+           | LiftedStaticConIx !Int
+           | UnliftedStaticConIx !Int
+  deriving (Eq, Ord, Show)
 
 lookupLiteral :: Interp -> PkgsLoaded -> BytecodeLoaderState -> BCONPtr -> IO Word
 lookupLiteral interp pkgs_loaded bytecode_state ptr = case ptr of
@@ -154,13 +192,16 @@ resolvePtr
   :: Interp
   -> PkgsLoaded
   -> BytecodeLoaderState
-  -> NameEnv Int
+  -> NameEnv BCOIx
   -> BCOPtr
   -> IO ResolvedBCOPtr
 resolvePtr interp pkgs_loaded bco_loader_state bco_ix ptr = case ptr of
   BCOPtrName nm
-    | Just ix <- lookupNameEnv bco_ix nm
-    -> return (ResolvedBCORef ix) -- ref to another BCO in this group
+    | Just bix <- lookupNameEnv bco_ix nm
+    -> return $ case bix of
+        BCOIx ix               -> ResolvedBCORef ix
+        LiftedStaticConIx ix   -> ResolvedStaticConRef ix
+        UnliftedStaticConIx ix -> ResolvedUnliftedStaticConRef ix
 
     | Just (_, rhv) <- lookupNameBytecodeState bco_loader_state nm
     -> return (ResolvedBCOPtr (unsafeForeignRefToRemoteRef rhv))

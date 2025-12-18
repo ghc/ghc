@@ -584,6 +584,7 @@ RTS_FUN_DECL(stg_runRWzh);
 
 RTS_FUN_DECL(stg_newBCOzh);
 RTS_FUN_DECL(stg_mkApUpd0zh);
+RTS_FUN_DECL(stg_newConAppObjzh);
 
 RTS_FUN_DECL(stg_retryzh);
 RTS_FUN_DECL(stg_catchRetryzh);

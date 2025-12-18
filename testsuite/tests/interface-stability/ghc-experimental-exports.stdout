@@ -5469,6 +5469,7 @@ module GHC.PrimOps where
   newArrayArray# :: forall s. Int# -> State# s -> (# State# s, MutableArrayArray# s #)
   newBCO# :: forall a d. ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# d -> (# State# d, BCO #)
   newByteArray# :: forall d. Int# -> State# d -> (# State# d, MutableByteArray# d #)
+  newConAppObj# :: forall {l :: Levity} {k :: Levity} (a :: TYPE (BoxedRep l)) d (b :: TYPE (BoxedRep k)). Addr# -> ByteArray# -> Array# a -> Word# -> State# d -> (# State# d, b #)
   newMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). State# d -> (# State# d, MVar# d a #)
   newMutVar# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. a -> State# d -> (# State# d, MutVar# d a #)
   newPinnedByteArray# :: forall d. Int# -> State# d -> (# State# d, MutableByteArray# d #)

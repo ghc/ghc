@@ -1771,6 +1771,7 @@ emitPrimOp cfg primop =
   DataToTagLargeOp -> alwaysExternal
   MkApUpd0_Op -> alwaysExternal
   NewBCOOp -> alwaysExternal
+  NewConAppObjOp -> alwaysExternal
   UnpackClosureOp -> alwaysExternal
   ListThreadsOp -> alwaysExternal
   ClosureSizeOp -> alwaysExternal

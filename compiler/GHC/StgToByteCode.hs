@@ -301,6 +301,21 @@ argBits platform (rep : args)
 -- Compile code for the right-hand side of a top-level binding
 
 schemeTopBind :: (Id, CgStgRhs) -> BcM ProtoBCO
+schemeTopBind (id, rhs@(StgRhsCon _ dc _ _ args _))
+  = do
+    profile <- getProfile
+    let non_voids = addArgReps (assertNonVoidStgArgs args)
+        (_, _, args_offsets)
+                  -- Compute the expected runtime ordering for the datacon fields
+                  = mkVirtConstrOffsets profile non_voids
+    return ProtoStaticCon
+      { protoStaticConName = getName id
+      , protoStaticCon     = dc
+      , protoStaticConData = [ case a of StgLitArg l -> Left l
+                                         StgVarArg i -> Right i
+                             | (NonVoid a, _) <- args_offsets ]
+      , protoStaticConExpr = rhs
+      }
 schemeTopBind (id, rhs)
   | Just data_con <- isDataConWorkId_maybe id,
     isNullaryRepDataCon data_con = do
@@ -321,7 +336,6 @@ schemeTopBind (id, rhs)
   | otherwise
   = schemeR [{- No free variables -}] (getName id, rhs)
 
-
 -- -----------------------------------------------------------------------------
 -- schemeR
 
@@ -341,22 +355,22 @@ schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
                                 -- top-level things, which have no free vars.
         -> (Name, CgStgRhs)
         -> BcM ProtoBCO
-schemeR fvs (nm, rhs)
-   = schemeR_wrk fvs nm rhs (collect rhs)
+schemeR fvs (nm, rhs@(StgRhsClosure _ _ _ args body _))
+   = schemeR_wrk fvs nm rhs (args, body)
+schemeR fvs (nm, rhs@(StgRhsCon _cc dc cnum _ticks args _type))
+   -- unlike top-level StgRhsCon, which are static (see schemeTopBind),
+   -- non-top-level StgRhsCon are compiled just like StgRhsClosure StgConApp
+   = schemeR_wrk fvs nm rhs ([], StgConApp dc cnum args [])
 
 -- If an expression is a lambda, return the
 -- list of arguments to the lambda (in R-to-L order) and the
 -- underlying expression
 
-collect :: CgStgRhs -> ([Var], CgStgExpr)
-collect (StgRhsClosure _ _ _ args body _) = (args, body)
-collect (StgRhsCon _cc dc cnum _ticks args _typ) = ([], StgConApp dc cnum args [])
-
 schemeR_wrk
     :: [Id]
     -> Name
     -> CgStgRhs            -- expression e, for debugging only
-    -> ([Var], CgStgExpr)  -- result of collect on e
+    -> ([Var], CgStgExpr)  -- the args and body of an StgRhsClosure
     -> BcM ProtoBCO
 schemeR_wrk fvs nm original_body (args, body)
    = do
@@ -546,7 +560,9 @@ schemeE d s p (StgLet _ext binds body) = do
          sizes = map (\rhs_fvs -> sum (map size_w rhs_fvs)) fvss
 
          -- the arity of each rhs
-         arities = map (strictGenericLength . fst . collect) rhss
+         stgRhsArity (StgRhsClosure _ _ _ args _ _) = strictGenericLength args
+         stgRhsArity StgRhsCon{}                    = 0
+         arities = map stgRhsArity rhss
 
          -- This p', d' defn is safe because all the items being pushed
          -- are ptrs, so all have size 1 word.  d' and p' reflect the stack
@@ -622,7 +638,7 @@ schemeE d s p (StgCase scrut bndr _ alts)
   and then compile the code as if it was just the expression E.
 -}
 
--- Compile code to do a tail call.  Specifically, push the fn,
+-- | Compile code to do a tail call.  Specifically, push the fn,
 -- slide the on-stack app back down to the sequel depth,
 -- and enter.  Four cases:
 --
@@ -642,7 +658,6 @@ schemeE d s p (StgCase scrut bndr _ alts)
 --
 -- 4.  Otherwise, it must be a function call.  Push the args
 --     right to left, SLIDE and ENTER.
-
 schemeT :: StackDepth   -- Stack depth
         -> Sequel       -- Sequel depth
         -> BCEnv        -- stack env

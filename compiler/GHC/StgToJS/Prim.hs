@@ -1165,6 +1165,7 @@ genPrim prof bound ty op = case op of
   AnyToAddrOp                       -> unhandledPrimop op
   MkApUpd0_Op                       -> unhandledPrimop op
   NewBCOOp                          -> unhandledPrimop op
+  NewConAppObjOp                    -> unhandledPrimop op
   UnpackClosureOp                   -> unhandledPrimop op
   ClosureSizeOp                     -> unhandledPrimop op
   GetApStackValOp                   -> unhandledPrimop op
