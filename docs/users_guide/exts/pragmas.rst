@@ -58,10 +58,9 @@ prefixing it with "``-X``"; for example ``-XForeignFunctionInterface``.
 
 A list of all supported language extensions can be obtained by invoking
 ``ghc --supported-extensions`` (see :ghc-flag:`--supported-extensions`).
+Alternatively see :ref:`table`.
 
-Any extension from the ``Extension`` type defined in
-:cabal-ref:`Language.Haskell.Extension.` may be used. GHC will report an error
-if any of the requested extensions are not supported.
+GHC will report an error if any of the requested extensions are not supported.
 
 .. _options-pragma:
 

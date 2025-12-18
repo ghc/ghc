@@ -1,3 +1,5 @@
+.. _table:
+
 Overview of all language extensions
 -----------------------------------
 
