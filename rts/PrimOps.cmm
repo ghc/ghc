@@ -2208,6 +2208,44 @@ for:
     return (bco);
 }
 
+// Ptr InfoTable, [Literals] [Ptrs] ==> CONSTR heap closure
+stg_newConAppObjzh ( W_ datacon_info, P_ literals, P_ ptrs , W_ arity )
+{
+    W_ con_obj, bytes;
+
+    bytes = SIZEOF_StgHeader + WDS(arity);
+
+    ALLOC_PRIM (bytes);
+    con_obj = Hp - bytes + WDS(1);
+
+    // No memory barrier necessary as this is a new allocation.
+    SET_HDR(con_obj, datacon_info, CCS_MAIN);
+
+    // Copy the ptrs followed by nonptrs into the constructor payload
+    W_ i, n_ptrs;
+    n_ptrs = StgMutArrPtrs_ptrs(ptrs);
+    i = 0;
+loop1:
+    if (i < n_ptrs) {
+        StgClosure_payload(con_obj,i) = StgMutArrPtrs_payload(ptrs,i);
+        i = i + 1;
+        goto loop1;
+    }
+    i = 0;
+loop2:
+    if (i < BYTE_ARR_WDS(literals)) {
+        W_ offset;
+        offset = n_ptrs + i;
+        StgClosure_payload(con_obj,offset) = StgArrBytes_payload(literals,i);
+        i = i + 1;
+        goto loop2;
+    }
+
+    W_ tagged_con_obj;
+    (tagged_con_obj) = ccall tagConstr(con_obj);
+    return (tagged_con_obj);
+}
+
 stg_mkApUpd0zh ( P_ bco )
 {
     W_ ap;

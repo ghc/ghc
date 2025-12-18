@@ -3947,6 +3947,18 @@ primop  NewBCOOp "newBCO#" GenPrimOp
    effect = ReadWriteEffect
    out_of_line      = True
 
+primop  NewConAppObjOp "newConAppObj#" GenPrimOp
+   Addr# -> ByteArray# -> Array# a_levpoly -> Word# -> State# s -> (# State# s, b_levpoly #)
+   { @'newConAppObj#' datacon_itbl lits ptrs arity@ creates a new constructor
+     application object on the heap from the info table pointer of the data
+     constructor and the data arguments given in @ptrs@ and @lits@. The
+     resulting object is a heap closure for the constructor application. It is
+     evaluated and properly tagged. The given @arity@ gives the total size of
+     pointers and literals in number of words. }
+   with
+   effect = ReadWriteEffect
+   out_of_line      = True
+
 primop  UnpackClosureOp "unpackClosure#" GenPrimOp
    a -> (# Addr#, ByteArray#, Array# b #)
    { @'unpackClosure#' closure@ copies the closure and pointers in the

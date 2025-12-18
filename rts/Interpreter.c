@@ -709,14 +709,6 @@ slow_spw(void *Sp, StgStack *cur_stack, StgWord offset_words){
   }
 }
 
-// Compute the pointer tag for the constructor and tag the pointer;
-// see Note [Data constructor dynamic tags] in GHC.StgToCmm.Closure.
-//
-// Note: we need to update this if we change the tagging strategy.
-STATIC_INLINE StgClosure *tagConstr(StgClosure *con) {
-    return TAG_CLOSURE(stg_min(TAG_MASK, 1 + GET_TAG(con)), con);
-}
-
 static StgWord app_ptrs_itbl[] = {
     (W_)&stg_ap_p_info,
     (W_)&stg_ap_pp_info,
