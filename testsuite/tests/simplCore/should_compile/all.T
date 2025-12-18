@@ -563,4 +563,6 @@ test('T26681',  normal, compile, ['-O'])
 test('T26709', [grep_errmsg(r'case')],
        multimod_compile,
        ['T26709', '-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
+test('T26682',  normal, multimod_compile, ['T26682', '-O -v0'])
+
 
