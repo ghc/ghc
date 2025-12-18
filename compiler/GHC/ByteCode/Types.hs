@@ -29,6 +29,7 @@ module GHC.ByteCode.Types
   ) where
 
 import GHC.Prelude
+import qualified Data.ByteString.Char8 as BS8
 
 import GHC.Data.FastString
 import GHC.Data.FlatBag
@@ -248,16 +249,31 @@ data UnlinkedBCO
    = UnlinkedBCO {
         unlinkedBCOName   :: !Name,
         unlinkedBCOArity  :: {-# UNPACK #-} !Int,
-        unlinkedBCOInstrs :: !(BCOByteArray Word16),      -- insns
-        unlinkedBCOBitmap :: !(BCOByteArray Word),      -- bitmap
-        unlinkedBCOLits   :: !(FlatBag BCONPtr),       -- non-ptrs
-        unlinkedBCOPtrs   :: !(FlatBag BCOPtr)         -- ptrs
+        unlinkedBCOInstrs :: !(BCOByteArray Word16),  -- insns
+        unlinkedBCOBitmap :: !(BCOByteArray Word),    -- bitmap
+        unlinkedBCOLits   :: !(FlatBag BCONPtr),      -- non-ptrs
+        unlinkedBCOPtrs   :: !(FlatBag BCOPtr)        -- ptrs
+   }
+   -- | An unlinked top-level static constructor
+   -- See Note [Static constructors in Bytecode]
+   | UnlinkedStaticCon {
+        unlinkedStaticConName :: !Name,
+        -- ^ The name to which this static constructor is bound, not to be
+        -- confused with the name of the static constructor itself
+        -- ('unlinkedStaticConDataConName')
+        unlinkedStaticConDataConName :: !Name,
+        unlinkedStaticConLits :: !(FlatBag BCONPtr), -- non-ptrs
+        unlinkedStaticConPtrs :: !(FlatBag BCOPtr),  -- ptrs
+        unlinkedStaticConIsUnlifted :: !Bool
    }
 
 instance NFData UnlinkedBCO where
   rnf UnlinkedBCO{..} =
     rnf unlinkedBCOLits `seq`
     rnf unlinkedBCOPtrs
+  rnf UnlinkedStaticCon{..} =
+    rnf unlinkedStaticConLits `seq`
+    rnf unlinkedStaticConPtrs
 
 data BCOPtr
   = BCOPtrName   !Name
@@ -269,6 +285,12 @@ data BCOPtr
 instance NFData BCOPtr where
   rnf (BCOPtrBCO bco) = rnf bco
   rnf x = x `seq` ()
+
+instance Outputable BCOPtr where
+  ppr (BCOPtrName nm)        = text "BCOPtrName" <+> ppr nm
+  ppr (BCOPtrPrimOp op)      = text "BCOPtrPrimOp" <+> ppr op
+  ppr (BCOPtrBCO bco)        = text "BCOPtrBCO" <+> ppr bco
+  ppr (BCOPtrBreakArray mod) = text "<break array for" <+> ppr mod <> char '>'
 
 data BCONPtr
   = BCONPtrWord  {-# UNPACK #-} !Word
@@ -287,12 +309,28 @@ data BCONPtr
   -- | A 'CostCentre' remote pointer array's respective 'BreakpointId'
   | BCONPtrCostCentre !InternalBreakpointId
 
+instance Outputable BCONPtr where
+  ppr (BCONPtrWord w)         = integer (fromIntegral w)
+  ppr (BCONPtrLbl lbl)        = text "<label:" <> ftext lbl <> char '>'
+  ppr (BCONPtrItbl nm)        = text "<itbl:" <+> ppr nm <> char '>'
+  ppr (BCONPtrAddr nm)        = text "<addr:" <+> ppr nm <> char '>'
+  ppr (BCONPtrStr bs)         = text "<string literal: " <+> text (BS8.unpack bs) <> char '>'
+  ppr (BCONPtrFS fs)          = text "<fast string literal:" <+> ftext fs <> char '>'
+  ppr (BCONPtrFFIInfo _)      = text "<FFIInfo>"
+  ppr (BCONPtrCostCentre bid) = text "<CostCentre for BreakpointId:" <+> ppr bid <> char '>'
+
 instance NFData BCONPtr where
   rnf x = x `seq` ()
 
 instance Outputable UnlinkedBCO where
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
       = sep [text "BCO", ppr nm, text "with",
+             ppr (sizeFlatBag lits), text "lits",
+             ppr (sizeFlatBag ptrs), text "ptrs" ]
+   ppr (UnlinkedStaticCon nm dc_nm lits ptrs unl)
+      = sep [text "StaticCon", ppr nm, text "for",
+             if unl then text "unlifted" else text "lifted",
+             ppr dc_nm, text "with",
              ppr (sizeFlatBag lits), text "lits",
              ppr (sizeFlatBag ptrs), text "ptrs" ]
 

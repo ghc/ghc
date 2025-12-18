@@ -1052,11 +1052,35 @@ linkSomeBCOs interp pkgs_loaded bytecode_state mods = foldr fun do_link mods []
   do_link [] = return []
   do_link mods = do
     let flat = [ bco | bcos <- mods, bco <- bcos ]
-        names = map unlinkedBCOName flat
-        bco_ix = mkNameEnv (zip names [0..])
+        unl_objs = filter isUnliftedObj flat
+        lif_objs = filter (not . isUnliftedObj) flat
+        unl_objs_ix = mkNameEnv (zipWith mkBCOIx [0..] unl_objs)
+        lif_objs_ix = mkNameEnv (zipWith mkBCOIx [0..] lif_objs)
+        bco_ix = plusNameEnv unl_objs_ix lif_objs_ix
     resolved <- sequence [ linkBCO interp pkgs_loaded bytecode_state bco_ix bco | bco <- flat ]
-    hvrefs <- createBCOs interp resolved
-    return (zip names hvrefs)
+    hvrefs   <- createBCOs interp resolved
+    return (zip (map mkBCOName $ unl_objs ++ lif_objs) hvrefs)
+
+  mkBCOName UnlinkedBCO{unlinkedBCOName}
+    = unlinkedBCOName
+  mkBCOName UnlinkedStaticCon{unlinkedStaticConName}
+    = unlinkedStaticConName
+
+  mkBCOIx ix
+    UnlinkedBCO{unlinkedBCOName}
+    = (unlinkedBCOName, BCOIx ix)
+  mkBCOIx ix
+    UnlinkedStaticCon
+      { unlinkedStaticConName
+      , unlinkedStaticConIsUnlifted }
+    | unlinkedStaticConIsUnlifted
+    = (unlinkedStaticConName, UnliftedStaticConIx ix)
+    | otherwise
+    = (unlinkedStaticConName, LiftedStaticConIx ix)
+
+  isUnliftedObj = \case
+      UnlinkedStaticCon{..} -> unlinkedStaticConIsUnlifted
+      _                     -> False
 
 -- | Useful to apply to the result of 'linkSomeBCOs'
 makeForeignNamedHValueRefs
