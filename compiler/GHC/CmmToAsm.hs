@@ -85,6 +85,7 @@ import GHC.CmmToAsm.BlockLayout as BlockLayout
 import GHC.Settings.Config
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
+import GHC.CmmToAsm.Ppr (pprSectionHeader)
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class (RegClass)
 import GHC.CmmToAsm.Monad
@@ -97,7 +98,9 @@ import GHC.Cmm.DebugBlock
 import GHC.Cmm.BlockId
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
 import GHC.Cmm
+import GHC.Cmm.Dataflow.Graph (entryLabel)
 import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Block (foldBlockNodesF)
 import GHC.Cmm.GenericOpt
 import GHC.Cmm.CLabel
 
@@ -123,13 +126,18 @@ import GHC.Data.Stream (liftIO)
 import qualified GHC.Data.Stream as Stream
 import GHC.Settings
 
-import Data.List (sortBy)
+import Data.List (sortBy, find)
 import Data.List.NonEmpty (groupAllWith, head)
 import Data.Maybe
 import Data.Ord         ( comparing )
+import Data.Char (isSpace)
 import Control.Monad
 import System.IO
-import System.Directory ( getCurrentDirectory )
+import System.Directory ( getCurrentDirectory, getTemporaryDirectory, removeFile )
+import qualified Data.Graph as Graph
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Data.ByteString.Char8 as BS8
 
 --------------------
 nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle
@@ -139,7 +147,13 @@ nativeCodeGen logger ts config modLoc h cmms
  = let platform = ncgPlatform config
        nCG' :: ( OutputableP Platform statics, Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> UniqDSMT IO a
-       nCG' ncgImpl = nativeCodeGen' logger config modLoc ncgImpl h cmms
+       nCG' ncgImpl
+         | shouldGroupSplitSections config
+         = nativeCodeGenGrouped logger config modLoc ncgImpl h cmms
+         | otherwise
+         = do
+             (a, _) <- nativeCodeGen' logger config modLoc ncgImpl False h cmms
+             return a
    in case platformArch platform of
       ArchX86       -> nCG' (X86.ncgX86     config)
       ArchX86_64    -> nCG' (X86.ncgX86_64  config)
@@ -174,7 +188,256 @@ data NativeGenAcc statics instr
         , ngs_unwinds     :: !(LabelMap [UnwindPoint])
              -- ^ see Note [Unwinding information in the NCG]
              -- and Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
+        , ngs_splitSecAcc :: !(Maybe SplitSecAcc)
         }
+
+-- -----------------------------------------------------------------------------
+-- Split sections grouping
+
+data SplitNodeKey
+  = SplitNodeKey !SectionType !CLabel
+
+data SplitSecAcc = SplitSecAcc
+  { ssOwner      :: !(Map.Map CLabel SplitNodeKey)
+  , ssNodeOrder  :: !(Map.Map SplitNodeKey Int)
+  , ssNodes      :: ![SplitNodeKey] -- ^ first-seen order
+  , ssNextId     :: !Int
+  , ssPendingRefs :: !(Map.Map SplitNodeKey (Set.Set CLabel))
+  }
+
+emptySplitSecAcc :: SplitSecAcc
+emptySplitSecAcc = SplitSecAcc
+  { ssOwner = Map.empty
+  , ssNodeOrder = Map.empty
+  , ssNodes = []
+  , ssNextId = 0
+  , ssPendingRefs = Map.empty
+  }
+
+ensureSplitNode :: SplitNodeKey -> SplitSecAcc -> SplitSecAcc
+ensureSplitNode node acc =
+  case Map.lookup node (ssNodeOrder acc) of
+    Just _  -> acc
+    Nothing ->
+      let newId = ssNextId acc
+      in acc { ssNodeOrder = Map.insert node newId (ssNodeOrder acc)
+             , ssNodes = ssNodes acc ++ [node]
+             , ssNextId = newId + 1
+             }
+
+addSplitOwner :: CLabel -> SplitNodeKey -> SplitSecAcc -> SplitSecAcc
+addSplitOwner lbl node acc =
+  let acc' = ensureSplitNode node acc
+  in acc' { ssOwner = Map.insert lbl node (ssOwner acc') }
+
+addSplitRefs :: SplitNodeKey -> Set.Set CLabel -> SplitSecAcc -> SplitSecAcc
+addSplitRefs node refs acc =
+  let acc' = ensureSplitNode node acc
+      refs' = Map.findWithDefault Set.empty node (ssPendingRefs acc')
+      refs'' = refs `Set.union` refs'
+  in acc' { ssPendingRefs = Map.insert node refs'' (ssPendingRefs acc') }
+
+sectionTypeKey :: SectionType -> Int
+sectionTypeKey t = case t of
+  Text                    -> 0
+  Data                    -> 1
+  ReadOnlyData            -> 2
+  RelocatableReadOnlyData -> 3
+  UninitialisedData       -> 4
+  InitArray               -> 5
+  FiniArray               -> 6
+  CString                 -> 7
+  IPE                     -> 8
+
+instance Eq SplitNodeKey where
+  SplitNodeKey t1 l1 == SplitNodeKey t2 l2 =
+    sectionTypeKey t1 == sectionTypeKey t2 && l1 == l2
+
+instance Ord SplitNodeKey where
+  compare (SplitNodeKey t1 l1) (SplitNodeKey t2 l2) =
+    compare (sectionTypeKey t1, l1) (sectionTypeKey t2, l2)
+
+shouldGroupSplitSections :: NCGConfig -> Bool
+shouldGroupSplitSections config =
+  ncgSplitSections config && case platformOS (ncgPlatform config) of
+    OSDarwin -> False
+    OSAIX    -> False
+    _        -> True
+
+labelsOfCmmLit :: CmmLit -> Set.Set CLabel
+labelsOfCmmLit lit = case lit of
+  CmmLabel lbl             -> Set.singleton lbl
+  CmmLabelOff lbl _         -> Set.singleton lbl
+  CmmLabelDiffOff lbl1 lbl2 _ _ -> Set.fromList [lbl1, lbl2]
+  _                        -> Set.empty
+
+labelsOfCmmExpr :: CmmExpr -> Set.Set CLabel -> Set.Set CLabel
+labelsOfCmmExpr expr acc = case expr of
+  CmmLit lit -> labelsOfCmmLit lit `Set.union` acc
+  _          -> acc
+
+collectStaticsLabels :: [CmmStatic] -> Set.Set CLabel
+collectStaticsLabels = foldl' collect Set.empty
+  where
+    collect acc (CmmStaticLit lit) = labelsOfCmmLit lit `Set.union` acc
+    collect acc _                  = acc
+
+collectGraphLabels :: CmmGraph -> Set.Set CLabel
+collectGraphLabels graph =
+  foldl' collectBlock Set.empty (toBlockList graph)
+  where
+    collectBlock acc block =
+      foldBlockNodesF (\node a -> foldExpDeep labelsOfCmmExpr node a) block acc
+
+procSectionLabelRaw :: RawCmmDecl -> CLabel
+procSectionLabelRaw (CmmProc infos entry _ graph) =
+  case mapLookup (g_entry graph) infos of
+    Just (CmmStaticsRaw info_lbl _) -> info_lbl
+    Nothing                         -> entry
+procSectionLabelRaw _ = panic "procSectionLabelRaw: not a CmmProc"
+
+procSectionLabelNat :: NatCmmDecl statics instr -> CLabel
+procSectionLabelNat (CmmProc infos entry _ (ListGraph blocks)) =
+  case find (\b -> blockLbl (blockId b) == entry) blocks of
+    Just b ->
+      case mapLookup (blockId b) infos of
+        Just (CmmStaticsRaw info_lbl _) -> info_lbl
+        Nothing                         -> entry
+    Nothing -> entry
+procSectionLabelNat _ = panic "procSectionLabelNat: not a CmmProc"
+
+collectSplitSecRawDecl :: RawCmmDecl -> SplitSecAcc -> SplitSecAcc
+collectSplitSecRawDecl decl acc = case decl of
+  CmmData (Section secTy suffix) (CmmStaticsRaw _ statics) ->
+    let node = SplitNodeKey secTy suffix
+        acc' = addSplitOwner suffix node acc
+        refs = collectStaticsLabels statics
+    in addSplitRefs node refs acc'
+  CmmProc infos entry _ graph ->
+    let procLbl = procSectionLabelRaw decl
+        procNode = SplitNodeKey Text procLbl
+        acc1 = addSplitOwner entry procNode acc
+        acc2 = addSplitOwner procLbl procNode acc1
+        acc3 = foldl' (\a b -> addSplitOwner (blockLbl (entryLabel b)) procNode a)
+                      acc2 (toBlockList graph)
+        infoStatics = mapElems infos
+        acc4 = foldl' (\a (CmmStaticsRaw info_lbl _) -> addSplitOwner info_lbl procNode a)
+                      acc3 infoStatics
+        infoRefs = foldl' (\s (CmmStaticsRaw _ st) -> collectStaticsLabels st `Set.union` s)
+                          Set.empty infoStatics
+        graphRefs = collectGraphLabels graph
+        refs = graphRefs `Set.union` infoRefs
+    in addSplitRefs procNode refs acc4
+
+collectSplitSecJumpTables :: [NatCmmDecl statics instr] -> SplitSecAcc -> SplitSecAcc
+collectSplitSecJumpTables decls acc = go Nothing acc decls
+  where
+    go _ acc' [] = acc'
+    go mProc acc' (d:ds) = case d of
+      CmmProc _ _ _ _ ->
+        let procLbl = procSectionLabelNat d
+            procNode = SplitNodeKey Text procLbl
+            acc'' = addSplitOwner procLbl procNode acc'
+        in go (Just procLbl) acc'' ds
+      CmmData (Section secTy suffix) _ ->
+        case mProc of
+          Nothing      -> go mProc acc' ds
+          Just procLbl ->
+            let procNode = SplitNodeKey Text procLbl
+                tableNode = SplitNodeKey secTy suffix
+                acc1 = addSplitOwner suffix tableNode acc'
+                acc2 = addSplitRefs procNode (Set.singleton suffix) acc1
+                acc3 = addSplitRefs tableNode (Set.singleton procLbl) acc2
+            in go mProc acc3 ds
+
+splitSectionGroups :: SplitSecAcc -> Map.Map SplitNodeKey CLabel
+splitSectionGroups acc =
+  let nodes = ssNodes acc
+      owner = ssOwner acc
+      refsMap = ssPendingRefs acc
+      nodeOrder node = Map.findWithDefault maxBound node (ssNodeOrder acc)
+      edgesFor node =
+        let refs = Map.findWithDefault Set.empty node refsMap
+            addRef s lbl =
+              case Map.lookup lbl owner of
+                Just node' -> Set.insert node' s
+                Nothing    -> s
+        in Set.toList (Set.foldl' addRef Set.empty refs)
+      sccs = Graph.stronglyConnComp [ (node, node, edgesFor node) | node <- nodes ]
+  in foldl' (assignScc nodeOrder) Map.empty sccs
+  where
+    assignScc nodeOrder acc' scc =
+      let sccNodes = case scc of
+            Graph.AcyclicSCC n  -> [n]
+            Graph.CyclicSCC ns -> ns
+          reps = foldl' (pickRep nodeOrder) Map.empty sccNodes
+          pickRep order repsAcc node@(SplitNodeKey secTy lbl) =
+            let secKey = sectionTypeKey secTy in
+            case Map.lookup secKey repsAcc of
+              Nothing -> Map.insert secKey lbl repsAcc
+              Just curLbl ->
+                if order node < order (SplitNodeKey secTy curLbl)
+                  then Map.insert secKey lbl repsAcc
+                  else repsAcc
+          addNode m node@(SplitNodeKey secTy _) =
+            case Map.lookup (sectionTypeKey secTy) reps of
+              Just repLbl -> Map.insert node repLbl m
+              Nothing     -> m
+      in foldl' addNode acc' sccNodes
+
+splitSectionRewriteMap :: NCGConfig -> SplitSecAcc -> Map.Map BS8.ByteString BS8.ByteString
+splitSectionRewriteMap config acc =
+  let ctx = ncgAsmContext config
+      groups = splitSectionGroups acc
+      lineFor secTy lbl =
+        BS8.pack $ showSDocOneLine ctx (pprSectionHeader config (Section secTy lbl))
+      addEntry m (SplitNodeKey secTy oldLbl) newLbl =
+        let oldLine = lineFor secTy oldLbl
+            newLine = lineFor secTy newLbl
+        in if oldLine == newLine
+             then m
+             else case Map.lookup oldLine m of
+                    Nothing -> Map.insert oldLine newLine m
+                    Just _  -> m
+  in Map.foldlWithKey' addEntry Map.empty groups
+
+rewriteSplitSections :: Map.Map BS8.ByteString BS8.ByteString -> Handle -> Handle -> IO ()
+rewriteSplitSections mapping hIn hOut = loop
+  where
+    sectionPrefix = BS8.pack ".section "
+    loop = do
+      eof <- hIsEOF hIn
+      unless eof $ do
+        line <- BS8.hGetLine hIn
+        let (prefix, body) = BS8.span isSpace line
+            line' =
+              if BS8.isPrefixOf sectionPrefix body
+                then case Map.lookup body mapping of
+                       Just newBody -> BS8.append prefix newBody
+                       Nothing      -> line
+                else line
+        BS8.hPut hOut line'
+        BS8.hPut hOut (BS8.singleton '\n')
+        loop
+
+nativeCodeGenGrouped :: (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
+               => Logger
+               -> NCGConfig
+               -> ModLocation
+               -> NcgImpl statics instr jumpDest
+               -> Handle
+               -> CgStream RawCmmGroup a
+               -> UniqDSMT IO a
+nativeCodeGenGrouped logger config modLoc ncgImpl h cmms = do
+  tmpDir <- liftIO getTemporaryDirectory
+  (tmpPath, tmpHandle) <- liftIO $ openBinaryTempFile tmpDir "ghc-split-sections"
+  (a, acc) <- nativeCodeGen' logger config modLoc ncgImpl True tmpHandle cmms
+  liftIO $ hClose tmpHandle
+  let mapping = splitSectionRewriteMap config acc
+  liftIO $ withBinaryFile tmpPath ReadMode $ \hIn ->
+    rewriteSplitSections mapping hIn h
+  liftIO $ removeFile tmpPath
+  return a
 
 {-
 Note [Unwinding information in the NCG]
@@ -205,19 +468,22 @@ nativeCodeGen' :: (OutputableP Platform statics, Outputable jumpDest, Instructio
                -> NCGConfig
                -> ModLocation
                -> NcgImpl statics instr jumpDest
+               -> Bool
                -> Handle
                -> CgStream RawCmmGroup a
-               -> UniqDSMT IO a
-nativeCodeGen' logger config modLoc ncgImpl h cmms
+               -> UniqDSMT IO (a, SplitSecAcc)
+nativeCodeGen' logger config modLoc ncgImpl collectSplit h cmms
  = do
         -- BufHandle is a performance hack.  We could hide it inside
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- liftIO $ newBufHandle h
-        let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
+        let splitAcc = if collectSplit then Just emptySplitSecAcc else Nothing
+        let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty splitAcc
         (ngs, a) <- cmmNativeGenStream logger config modLoc ncgImpl bufh cmms ngs0
         _ <- finishNativeGen logger config modLoc bufh ngs
-        return a
+        let finalAcc = fromMaybe emptySplitSecAcc (ngs_splitSecAcc ngs)
+        return (a, finalAcc)
 
 finishNativeGen :: Instruction instr
                 => Logger
@@ -359,7 +625,11 @@ cmmNativeGens logger config ncgImpl h dbgMap = go
         return (ngs, us)
 
     go (cmm : cmms) ngs count us = do
-        let fileIds = ngs_dwarfFiles ngs
+        let ngs1 = case ngs_splitSecAcc ngs of
+              Nothing  -> ngs
+              Just acc -> ngs { ngs_splitSecAcc = Just (collectSplitSecRawDecl cmm acc) }
+
+        let fileIds = ngs_dwarfFiles ngs1
         (us', fileIds', native, imports, colorStats, linearStats, unwinds, mcfg)
           <- {-# SCC "cmmNativeGen" #-}
              cmmNativeGen logger ncgImpl us fileIds dbgMap
@@ -399,15 +669,17 @@ cmmNativeGens logger config ncgImpl h dbgMap = go
                         then native : ngs_natives ngs else []
 
             mCon = maybe id (:)
-            ngs' = ngs{ ngs_imports     = imports : ngs_imports ngs
-                      , ngs_natives     = natives'
-                      , ngs_colorStats  = colorStats `mCon` ngs_colorStats ngs
-                      , ngs_linearStats = linearStats `mCon` ngs_linearStats ngs
-                      , ngs_labels      = ngs_labels ngs ++ labels'
-                      , ngs_dwarfFiles  = fileIds'
-                      , ngs_unwinds     = ngs_unwinds ngs `mapUnion` unwinds
-                      }
-        go cmms ngs' (count + 1) us'
+            ngs' = ngs1{ ngs_imports     = imports : ngs_imports ngs1
+                       , ngs_natives     = natives'
+                       , ngs_colorStats  = colorStats `mCon` ngs_colorStats ngs1
+                       , ngs_linearStats = linearStats `mCon` ngs_linearStats ngs1
+                       , ngs_labels      = ngs_labels ngs1 ++ labels'
+                       , ngs_dwarfFiles  = fileIds'
+                       , ngs_unwinds     = ngs_unwinds ngs1 `mapUnion` unwinds
+                       }
+            ngs'' = ngs' { ngs_splitSecAcc =
+                             fmap (collectSplitSecJumpTables native) (ngs_splitSecAcc ngs') }
+        go cmms ngs'' (count + 1) us'
 
 
 -- see Note [pprNatCmmDeclS and pprNatCmmDeclH] in GHC.CmmToAsm.Monad
