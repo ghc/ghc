@@ -140,6 +140,45 @@ EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con)
     return get_itbl(con)->srt;
 }
 
+/* ----------------------------------------------------------------------------
+   Macros for untagging and retagging closure pointers
+   For more information look at the comments in Cmm.h
+   ------------------------------------------------------------------------- */
+
+EXTERN_INLINE StgWord GET_CLOSURE_TAG(const StgClosure * p);
+EXTERN_INLINE StgWord GET_CLOSURE_TAG(const StgClosure * p)
+{
+    return (StgWord)p & TAG_MASK;
+}
+
+EXTERN_INLINE StgClosure *UNTAG_CLOSURE(StgClosure * p);
+EXTERN_INLINE StgClosure *UNTAG_CLOSURE(StgClosure * p)
+{
+    return (StgClosure*)((StgWord)p & ~TAG_MASK);
+}
+
+EXTERN_INLINE const StgClosure *UNTAG_CONST_CLOSURE(const StgClosure * p);
+EXTERN_INLINE const StgClosure *UNTAG_CONST_CLOSURE(const StgClosure * p)
+{
+    return (const StgClosure*)((StgWord)p & ~TAG_MASK);
+}
+
+EXTERN_INLINE StgClosure *TAG_CLOSURE(StgWord tag,StgClosure * p);
+EXTERN_INLINE StgClosure *TAG_CLOSURE(StgWord tag,StgClosure * p)
+{
+    return (StgClosure*)((StgWord)p | tag);
+}
+
+// Compute the pointer tag for the constructor and tag the pointer;
+// see Note [Data constructor dynamic tags] in GHC.StgToCmm.Closure.
+//
+// Note: we need to update this if we change the tagging strategy.
+EXTERN_INLINE StgClosure *tagConstr(StgClosure *con);
+EXTERN_INLINE StgClosure *tagConstr(StgClosure *con)
+{
+    return TAG_CLOSURE(stg_min(TAG_MASK, 1 + GET_TAG(con)), con);
+}
+
 /* -----------------------------------------------------------------------------
    Macros for building closures
    -------------------------------------------------------------------------- */
@@ -250,35 +289,6 @@ EXTERN_INLINE P_ CHARLIKE_CLOSURE(int n) {
 EXTERN_INLINE P_ INTLIKE_CLOSURE(int n);
 EXTERN_INLINE P_ INTLIKE_CLOSURE(int n) {
     return (P_)&stg_INTLIKE_closure[(n)-MIN_INTLIKE];
-}
-
-/* ----------------------------------------------------------------------------
-   Macros for untagging and retagging closure pointers
-   For more information look at the comments in Cmm.h
-   ------------------------------------------------------------------------- */
-
-EXTERN_INLINE StgWord GET_CLOSURE_TAG(const StgClosure * p);
-EXTERN_INLINE StgWord GET_CLOSURE_TAG(const StgClosure * p)
-{
-    return (StgWord)p & TAG_MASK;
-}
-
-EXTERN_INLINE StgClosure *UNTAG_CLOSURE(StgClosure * p);
-EXTERN_INLINE StgClosure *UNTAG_CLOSURE(StgClosure * p)
-{
-    return (StgClosure*)((StgWord)p & ~TAG_MASK);
-}
-
-EXTERN_INLINE const StgClosure *UNTAG_CONST_CLOSURE(const StgClosure * p);
-EXTERN_INLINE const StgClosure *UNTAG_CONST_CLOSURE(const StgClosure * p)
-{
-    return (const StgClosure*)((StgWord)p & ~TAG_MASK);
-}
-
-EXTERN_INLINE StgClosure *TAG_CLOSURE(StgWord tag,StgClosure * p);
-EXTERN_INLINE StgClosure *TAG_CLOSURE(StgWord tag,StgClosure * p)
-{
-    return (StgClosure*)((StgWord)p | tag);
 }
 
 /* -----------------------------------------------------------------------------

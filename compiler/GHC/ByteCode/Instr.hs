@@ -16,6 +16,7 @@ import GHC.Cmm.Type (Width)
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Utils.Outputable
 import GHC.Types.Name
+import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Types.Unique
 import GHC.Core.DataCon
@@ -43,9 +44,71 @@ data ProtoBCO
         protoBCOBitmap     :: [StgWord],
         protoBCOBitmapSize :: Word,
         protoBCOArity      :: Int,
-        -- what the BCO came from, for debugging only
+        -- | What the BCO came from, for debugging only
         protoBCOExpr       :: Either [CgStgAlt] CgStgRhs
    }
+   -- | A top-level static constructor application object
+   -- See Note [Static constructors in Bytecode]
+   | ProtoStaticCon {
+        protoStaticConName :: Name,
+        -- ^ The name to which this static constructor is bound,
+        -- not to be confused with the DataCon itself.
+        protoStaticCon     :: DataCon,
+        -- ^ The DataCon being constructed.
+        -- We use this to construct the right info table.
+        protoStaticConData :: [Either Literal Id],
+        -- ^ The static constructor pointer and non-pointer arguments, sorted
+        -- in the order they should appear at runtime (see
+        -- 'mkVirtHeapOffsetsWithPadding' in 'schemeTopBind').
+        --
+        -- The non-pointer arguments are meant to be laid contiguously in
+        -- memory using the width of each literal individually. The padding is
+        -- given as Literals of value 0 with the appropriate width.
+        protoStaticConNonPtrsSize :: Int,
+        -- ^ How many words needed to store the non-pointer arguments.
+        -- Note that this may be smaller than the number of non-pointer
+        -- arguments, since subword arguments need to be packed.
+        protoStaticConExpr :: CgStgRhs
+        -- ^ What the static con came from, for debugging only
+   }
+
+{-
+Note [Static constructors in Bytecode]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In bytecode, top-level 'StgRhsCon's are lowered to 'ProtoStaticCon' rather than
+'ProtoBCO'. A 'ProtoStaticCon' represents directly a heap allocated data
+constructor application. We can do this only for top-level 'StgRhsCon's, where
+all the data arguments to the constructor are statically known.
+
+'StgRhsCon's which have free variables are compiled down to BCOs which push the
+arguments and then 'PACK' the constructor, just like 'StgConApp's.
+
+Example:
+
+  Haskell:
+
+    data X = X Char# Char
+    x = X 'a'# 'b'
+
+  Stg:
+
+    x1  = GHC.Types.C#! ['b'#];
+    X.x = X.X! ['a#' x2];
+
+    X.X = \r [arg1 arg2] X.X [arg1 arg2];
+
+  ByteCode:
+    ProtoStaticCon x1:
+      C# [Left 'b'#]
+    ProtoStaticCon X.x:
+      X.X [Left 'a'#, Right x1]
+
+    ProtoBCO X.X:
+     PUSH_LL  0 1
+     PACK     X.X 2
+     SLIDE    1 2
+     RETURN   P
+-}
 
 -- | A local block label (e.g. identifying a case alternative).
 newtype LocalLabel = LocalLabel { getLocalLabel :: Word32 }
@@ -278,6 +341,12 @@ data BCInstr
 -- Printing bytecode instructions
 
 instance Outputable ProtoBCO where
+   ppr (ProtoStaticCon nm con args nonPtrsSize origin)
+      = text "ProtoStaticCon" <+> ppr nm <> colon
+        $$ nest 3 (pprStgRhsShort shortStgPprOpts origin)
+        $$ nest 3 (text "constructor: "  <+> ppr con)
+        $$ nest 3 (text "sorted args: "  <+> ppr args)
+        $$ nest 3 (text "non-ptrs (packed) size: " <+> int (fromIntegral nonPtrsSize) <+> text "words")
    ppr (ProtoBCO { protoBCOName       = name
                  , protoBCOInstrs     = instrs
                  , protoBCOBitmap     = bitmap
@@ -469,7 +538,8 @@ instance Outputable BCInstr where
 -- stack high water mark, but it doesn't seem worth the hassle.
 
 protoBCOStackUse :: ProtoBCO -> Word
-protoBCOStackUse bco = sum (map bciStackUse (protoBCOInstrs bco))
+protoBCOStackUse ProtoBCO{protoBCOInstrs} = sum (map bciStackUse protoBCOInstrs)
+protoBCOStackUse ProtoStaticCon{} = 0
 
 bciStackUse :: BCInstr -> Word
 bciStackUse STKCHECK{}            = 0

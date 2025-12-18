@@ -59,6 +59,27 @@ data ResolvedBCO
           -- ^ non-ptrs - subword sized entries still take up a full (host) word
         resolvedBCOPtrs   :: !(SmallArray ResolvedBCOPtr)  -- ^ ptrs
    }
+   -- | A resolved static constructor
+   -- See Note [Static constructors in Bytecode]
+   | ResolvedStaticCon {
+        resolvedBCOIsLE          :: Bool,
+        resolvedStaticConInfoPtr :: {-# UNPACK #-} !Word, -- ^ info ptr Addr# as a Word
+        resolvedStaticConArity   :: {-# UNPACK #-} !Word,
+        -- ^ how many words are used for the payload of the static constructor
+        -- (size of ptrs and (packed) non-ptrs combined)
+        resolvedStaticConLits    :: !(BCOByteArray Word),
+        -- ^ Notably, sub-word non-ptr arguments and padding have already been
+        -- packed into full words, and this array only stores the full final
+        -- words to write as the constructor payload.
+        --
+        -- This is opposed to what we do for BCO literals, where we keep
+        -- sub-word literals as full words. For static constructors, the layout
+        -- must match exactly what the NCG also expects, so we must pack
+        -- sub-words accordingly for compatibility between interpreted and
+        -- compiled code.
+        resolvedStaticConPtrs       :: !(SmallArray ResolvedBCOPtr),
+        resolvedStaticConIsUnlifted :: !Bool
+   }
    deriving (Generic, Show)
 
 -- | Wrapper for a 'ByteArray#'.
@@ -104,13 +125,27 @@ instance Show (BCOByteArray Word) where
 -- same endianness.
 instance Binary ResolvedBCO where
   put ResolvedBCO{..} = do
+    putWord8 0
     put resolvedBCOIsLE
     put resolvedBCOArity
     put resolvedBCOInstrs
     put resolvedBCOBitmap
     put resolvedBCOLits
     put resolvedBCOPtrs
-  get = ResolvedBCO <$> get <*> get <*> get <*> get <*> get <*> get
+  put ResolvedStaticCon{..} = do
+    putWord8 1
+    put resolvedBCOIsLE
+    put resolvedStaticConInfoPtr
+    put resolvedStaticConArity
+    put resolvedStaticConLits
+    put resolvedStaticConPtrs
+    put resolvedStaticConIsUnlifted
+  get = do
+    t <- getWord8
+    case t of
+      0 -> ResolvedBCO <$> get <*> get <*> get <*> get <*> get <*> get
+      1 -> ResolvedStaticCon <$> get <*> get <*> get <*> get <*> get <*> get
+      _ -> error "Binary ResolvedBCO: invalid byte"
 
 -- See Note [BCOByteArray serialization]
 instance Binary (BCOByteArray Word16) where
@@ -156,7 +191,8 @@ instance Binary (BCOByteArray Word) where
 
 data ResolvedBCOPtr
   = ResolvedBCORef {-# UNPACK #-} !Int
-      -- ^ reference to the Nth BCO in the current set
+      -- ^ reference to the Nth BCO in the current set of BCOs and
+      -- lifted static constructors
   | ResolvedBCOPtr {-# UNPACK #-} !(RemoteRef HValue)
       -- ^ reference to a previously created BCO
   | ResolvedBCOStaticPtr {-# UNPACK #-} !(RemotePtr ())
@@ -165,6 +201,12 @@ data ResolvedBCOPtr
       -- ^ a nested BCO
   | ResolvedBCOPtrBreakArray {-# UNPACK #-} !(RemoteRef BreakArray)
       -- ^ Resolves to the MutableArray# inside the BreakArray
+  | ResolvedStaticConRef {-# UNPACK #-} !Int
+      -- ^ reference to the Nth static constructor in the current set of BCOs
+      -- and lifted static constructors
+  | ResolvedUnliftedStaticConRef {-# UNPACK #-} !Int
+      -- ^ reference to the Nth unlifted static constructor in the current set
+      -- of exclusively unlifted static constructors
   deriving (Generic, Show)
 
 instance Binary ResolvedBCOPtr
