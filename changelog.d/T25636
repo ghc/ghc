@@ -1,0 +1,16 @@
+section: bytecode
+synopsis: Allocate static constructors for bytecode, fixing segfaults when
+          certain programs are loaded by the bytecode interpreter
+issues: #25636
+mrs: !15221
+
+description: {
+    Static data constructor applications are allocated
+    directly on the heap by the bytecode linker (using the new
+    primop newConApp#), rather than compiled and linked as BCOs.
+
+    Fixes correctness of bytecode-linking unlifted data
+    constructors (typically originated from top-level nullary
+    data constructors).
+}
+

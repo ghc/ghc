@@ -156,22 +156,39 @@ instance Binary CompiledByteCode where
     put_ bh bc_spt_entries
 
 instance Binary UnlinkedBCO where
-  get bh =
-    UnlinkedBCO
-      <$> getViaBinName bh
-      <*> get bh
-      <*> get bh
-      <*> get bh
-      <*> get bh
-      <*> get bh
+  get bh = do
+    t <- getByte bh
+    case t of
+      0 -> UnlinkedBCO
+        <$> getViaBinName bh
+        <*> get bh
+        <*> get bh
+        <*> get bh
+        <*> get bh
+        <*> get bh
+      1 -> UnlinkedStaticCon
+        <$> getViaBinName bh
+        <*> getViaBinName bh
+        <*> get bh
+        <*> get bh
+        <*> get bh
+      _ -> panic "Binary UnlinkedBCO: invalid byte"
 
   put_ bh UnlinkedBCO {..} = do
+    putByte bh 0
     putViaBinName bh unlinkedBCOName
     put_ bh unlinkedBCOArity
     put_ bh unlinkedBCOInstrs
     put_ bh unlinkedBCOBitmap
     put_ bh unlinkedBCOLits
     put_ bh unlinkedBCOPtrs
+  put_ bh UnlinkedStaticCon {..} = do
+    putByte bh 1
+    putViaBinName bh unlinkedStaticConName
+    putViaBinName bh unlinkedStaticConDataConName
+    put_ bh unlinkedStaticConLits
+    put_ bh unlinkedStaticConPtrs
+    put_ bh unlinkedStaticConIsUnlifted
 
 -- Also see Note [BCOByteArray serialization]. This instance is unlike
 -- the `Binary` instances in `ghci`, which are for the `Binary` class
