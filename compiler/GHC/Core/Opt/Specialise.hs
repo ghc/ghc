@@ -654,9 +654,7 @@ specProgram guts@(ModGuts { mg_module = this_mod
               -- Easiest thing is to do it all at once, as if all the top-level
               -- decls were mutually recursive
        ; let top_env = SE { se_subst = Core.mkEmptySubst $
-                                        mkInScopeSetBndrs binds
-                                      --    mkInScopeSetList $
-                                      --  bindersOfBinds binds
+                                       mkInScopeSetBndrs binds
                           , se_module = this_mod
                           , se_rules  = rule_env
                           , se_dflags = dflags }
@@ -816,9 +814,12 @@ spec_imports env callers dict_binds calls
     go :: SpecEnv -> [CallInfoSet] -> CoreM (SpecEnv, [CoreRule], [CoreBind])
     go env [] = return (env, [], [])
     go env (cis : other_calls)
-      = do { -- debugTraceMsg (text "specImport {" <+> ppr cis)
+      = do {
+--             debugTraceMsg (text "specImport {" <+> vcat [ ppr cis
+--                                                         , text "callers" <+> ppr callers
+--                                                         , text "dict_binds" <+> ppr dict_binds ])
            ; (env, rules1, spec_binds1) <- spec_import env callers dict_binds cis
-           ; -- debugTraceMsg (text "specImport }" <+> ppr cis)
+--           ; debugTraceMsg (text "specImport }" <+> ppr cis)
 
            ; (env, rules2, spec_binds2) <- go env other_calls
            ; return (env, rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
@@ -835,13 +836,18 @@ spec_import :: SpecEnv               -- Passed in so that all top-level Ids are 
                      , [CoreBind] )  -- Specialised bindings
 spec_import env callers dict_binds cis@(CIS fn _)
   | isIn "specImport" fn callers
-  = return (env, [], [])  -- No warning.  This actually happens all the time
-                          -- when specialising a recursive function, because
-                          -- the RHS of the specialised function contains a recursive
-                          -- call to the original function
+  = do {
+--         debugTraceMsg (text "specImport1-bad" <+> (ppr fn $$ text "callers" <+> ppr callers))
+       ; return (env, [], []) }
+    -- No warning.  This actually happens all the time
+    -- when specialising a recursive function, because
+    -- the RHS of the specialised function contains a recursive
+    -- call to the original function
 
   | null good_calls
-  = return (env, [], [])
+  = do {
+--        debugTraceMsg (text "specImport1-no-good" <+> (ppr cis $$ text "dict_binds" <+> ppr dict_binds))
+       ; return (env, [], []) }
 
   | Just rhs <- canSpecImport dflags fn
   = do {     -- Get rules from the external package state
@@ -890,7 +896,10 @@ spec_import env callers dict_binds cis@(CIS fn _)
        ; return (env, rules2 ++ rules1, final_binds) }
 
   | otherwise
-  = do { tryWarnMissingSpecs dflags callers fn good_calls
+  = do {
+--         debugTraceMsg (hang (text "specImport1-missed")
+--                          2 (vcat [ppr cis, text "can-spec" <+> ppr (canSpecImport dflags fn)]))
+       ; tryWarnMissingSpecs dflags callers fn good_calls
        ; return (env, [], [])}
 
   where
@@ -1455,7 +1464,9 @@ specBind top_lvl env (NonRec fn rhs) do_body
 
        ; (fn4, spec_defns, body_uds1) <- specDefn env body_uds fn3 rhs
 
-       ; let (free_uds, dump_dbs, float_all) = dumpBindUDs [fn4] body_uds1
+       ; let can_float_this_one = exprIsTopLevelBindable rhs (idType fn)
+                 -- exprIsTopLevelBindable: see Note [Care with unlifted bindings]
+             (free_uds, dump_dbs, float_all) = dumpBindUDs can_float_this_one [fn4] body_uds1
              all_free_uds                    = free_uds `thenUDs` rhs_uds
 
              pairs = spec_defns ++ [(fn4, rhs')]
@@ -1471,10 +1482,8 @@ specBind top_lvl env (NonRec fn rhs) do_body
                          = [mkDB $ NonRec b r | (b,r) <- pairs]
                            ++ fromOL dump_dbs
 
-             can_float_this_one = exprIsTopLevelBindable rhs (idType fn)
-             -- exprIsTopLevelBindable: see Note [Care with unlifted bindings]
 
-       ; if float_all && can_float_this_one then
+       ; if float_all then
              -- Rather than discard the calls mentioning the bound variables
              -- we float this (dictionary) binding along with the others
               return ([], body', all_free_uds `snocDictBinds` final_binds)
@@ -1509,7 +1518,7 @@ specBind top_lvl env (Rec pairs) do_body
                               <- specDefns rec_env uds2 (bndrs2 `zip` rhss)
                         ; return (bndrs3, spec_defns3 ++ spec_defns2, uds3) }
 
-       ; let (final_uds, dumped_dbs, float_all) = dumpBindUDs bndrs1 uds3
+       ; let (final_uds, dumped_dbs, float_all) = dumpBindUDs True bndrs1 uds3
              final_bind = recWithDumpedDicts (spec_defns3 ++ zip bndrs3 rhss')
                                              dumped_dbs
 
@@ -1630,7 +1639,6 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     dflags    = se_dflags env
     this_mod  = se_module env
     subst     = se_subst env
-    in_scope  = Core.substInScopeSet subst
         -- Figure out whether the function has an INLINE pragma
         -- See Note [Inline specialisations]
 
@@ -1646,9 +1654,6 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
       | otherwise
       = inl_prag
 
-    not_in_scope :: InterestingVarFun
-    not_in_scope v = isLocalVar v && not (v `elemInScopeSet` in_scope)
-
     ----------------------------------------------------------
         -- Specialise to one particular call pattern
     spec_call :: SpecInfo                         -- Accumulating parameter
@@ -1662,47 +1667,34 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                  mk_extra_dfun_arg bndr | isTyVar bndr = UnspecType
                                         | otherwise    = UnspecArg
 
-             -- Find qvars, the type variables to add to the binders for the rule
-             -- Namely those free in `ty` that aren't in scope
-             -- See (MP2) in Note [Specialising polymorphic dictionaries]
-           ; let poly_qvars = scopedSort $ fvVarList $ specArgsFVs not_in_scope call_args
-                 subst'     = subst `Core.extendSubstInScopeList` poly_qvars
-                              -- Maybe we should clone the poly_qvars telescope?
-
-             -- Any free Ids will have caused the call to be dropped
-           ; massertPpr (all isTyCoVar poly_qvars)
-                        (ppr fn $$ ppr all_call_args $$ ppr poly_qvars)
-
-           ; (useful, subst'', rule_bndrs, rule_lhs_args, spec_bndrs, dx_binds, spec_args)
-                 <- specHeader subst' rhs_bndrs all_call_args
-           ; let all_rule_bndrs = poly_qvars ++ rule_bndrs
-                 env' = env { se_subst = subst'' }
+           ; (useful, subst', rule_bndrs, rule_lhs_args, spec_bndrs, dx_binds, spec_args)
+                 <- specHeader subst rhs_bndrs all_call_args
+           ; let env' = env { se_subst = subst' }
 
            -- Check for (a) usefulness and (b) not already covered
            -- See (SC1) in Note [Specialisations already covered]
            ; let all_rules = rules_acc ++ existing_rules
                  -- all_rules: we look both in the rules_acc (generated by this invocation
                  --   of specCalls), and in existing_rules (passed in to specCalls)
-                 already_covered = alreadyCovered env' all_rule_bndrs fn
+                 already_covered = alreadyCovered env' rule_bndrs fn
                                                   rule_lhs_args is_active all_rules
 
-{-         ; pprTrace "spec_call" (vcat
-                [ text "fun:       "  <+> ppr fn
-                , text "call info: "  <+> ppr _ci
-                , text "useful:    "  <+> ppr useful
-                , text "already_covered:"  <+> ppr already_covered
-                , text "poly_qvars: " <+> ppr poly_qvars
-                , text "useful:    "  <+> ppr useful
-                , text "all_rule_bndrs:"  <+> ppr all_rule_bndrs
-                , text "rule_lhs_args:"  <+> ppr rule_lhs_args
-                , text "spec_bndrs:" <+> ppr spec_bndrs
-                , text "dx_binds:"   <+> ppr dx_binds
-                , text "spec_args: "  <+> ppr spec_args
-                , text "rhs_bndrs"    <+> ppr rhs_bndrs
-                , text "rhs_body"     <+> ppr rhs_body
-                , text "subst''" <+> ppr subst'' ]) $
-             return ()
--}
+--         ; pprTrace "spec_call" (vcat
+--                [ text "fun:       "  <+> ppr fn
+--                , text "call info: "  <+> ppr _ci
+--                , text "useful:    "  <+> ppr useful
+--                , text "already_covered:"  <+> ppr already_covered
+--                , text "useful:    "  <+> ppr useful
+--                , text "rule_bndrs:"  <+> ppr (sep (map (pprBndr LambdaBind) rule_bndrs))
+--                , text "rule_lhs_args:"  <+> ppr rule_lhs_args
+--                , text "spec_bndrs:" <+> ppr (sep (map (pprBndr LambdaBind) spec_bndrs))
+--                , text "dx_binds:"   <+> ppr dx_binds
+--                , text "spec_args: "  <+> ppr spec_args
+--                , text "rhs_bndrs"    <+> ppr (sep (map (pprBndr LambdaBind) rhs_bndrs))
+--                , text "rhs_body"     <+> ppr rhs_body
+--                , text "subst'" <+> ppr subst'
+--                ]) $ return ()
+
 
            ; if not useful          -- No useful specialisation
                 || already_covered  -- Useful, but done already
@@ -1716,23 +1708,15 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
              -- Run the specialiser on the specialised RHS
            ; (rhs_body', rhs_uds) <- specExpr env'' rhs_body
 
-{-         ; pprTrace "spec_call2" (vcat
-                 [ text "fun:" <+> ppr fn
-                 , text "rhs_body':" <+> ppr rhs_body' ]) $
-             return ()
--}
-
            -- Make the RHS of the specialised function
            ; let spec_rhs_bndrs = spec_bndrs ++ inner_rhs_bndrs'
-                 (rhs_uds1, inner_dumped_dbs) = dumpUDs spec_rhs_bndrs rhs_uds
-                 (rhs_uds2, outer_dumped_dbs) = dumpUDs poly_qvars (dx_binds `consDictBinds` rhs_uds1)
-                 -- dx_binds comes from the arguments to the call, and so can mention
-                 -- poly_qvars but no other local binders
-                 spec_rhs = mkLams poly_qvars               $
-                            wrapDictBindsE outer_dumped_dbs $
-                            mkLams spec_rhs_bndrs           $
+                 (rhs_uds2, inner_dumped_dbs) = dumpUDs spec_rhs_bndrs $
+                                                dx_binds `consDictBinds` rhs_uds
+                 -- dx_binds comes from the arguments to the call,
+                 -- and so can mention poly_qvars but no other local binders
+                 spec_rhs = mkLams spec_rhs_bndrs           $
                             wrapDictBindsE inner_dumped_dbs rhs_body'
-                 rule_rhs_args = poly_qvars ++ spec_bndrs
+                 rule_rhs_args = spec_bndrs
 
                  -- Maybe add a void arg to the specialised function,
                  -- to avoid unlifted bindings
@@ -1787,7 +1771,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                      text "SPEC"
 
                 spec_rule = mkSpecRule dflags this_mod True inl_act
-                                    herald fn all_rule_bndrs rule_lhs_args
+                                    herald fn rule_bndrs rule_lhs_args
                                     (mkVarApps (Var spec_fn) rule_rhs_args1)
 
                 _rule_trace_doc = vcat [ ppr fn <+> dcolon <+> ppr fn_type
@@ -1798,8 +1782,12 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                        , text "existing" <+> ppr existing_rules
                                        ]
 
-           ; -- pprTrace "spec_call: rule" _rule_trace_doc
-             return ( spec_rule            : rules_acc
+--           ; pprTrace "spec_call: rule" (vcat [ -- text "poly_qvars" <+> ppr poly_qvars
+--                                                text "rule_bndrs" <+> ppr rule_bndrs
+--                                              , text "rule_lhs_args" <+> ppr rule_lhs_args
+--                                              , text "all_call_args" <+> ppr all_call_args
+--                                              , ppr spec_rule ]) $
+           ; return ( spec_rule            : rules_acc
                     , (spec_fn, spec_rhs1) : pairs_acc
                     , rhs_uds2 `thenUDs` uds_acc
                     ) } }
@@ -1946,6 +1934,16 @@ floating to top level anyway; but that is hard to spot (since we don't know what
 the non-top-level in-scope binders are) and rare (since the binding must satisfy
 Note [Core let-can-float invariant] in GHC.Core).
 
+Arguably we'd be better off if we had left that `x` in the RHS of `n`, thus
+    f x = let n::Natural = let x::ByteArray# = <some literal> in
+                           NB x
+          in wombat @192827 (n |> co)
+Now we could float `n` happily.  But that's in conflict with exposing the `NB`
+data constructor in the body of the `let`, so I'm leaving this unresolved.
+
+Another case came up in #26682, where the binding had an unlifted sum type
+(# Word# | ByteArray# #), itself arising from an UNPACK pragma.  Test case
+T26682.
 
 Note [Specialising Calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2593,12 +2591,22 @@ specHeader subst _  [] = pure (False, subst, [], [], [], [], [])
 -- 'a->T1', as well as a LHS argument for the resulting RULE and unfolding
 -- details.
 specHeader subst (bndr:bndrs) (SpecType ty : args)
-  = do { let subst1 = Core.extendTvSubst subst bndr ty
-       ; (useful, subst2, rule_bs, rule_args, spec_bs, dx, spec_args)
-             <- specHeader subst1 bndrs args
-       ; pure ( useful, subst2
-              , rule_bs,     Type ty : rule_args
-              , spec_bs, dx, Type ty : spec_args ) }
+  = do { -- Find free_tvs, the type variables to add to the binders for the rule
+         -- Namely those free in `ty` that aren't in scope
+         -- See (MP2) in Note [Specialising polymorphic dictionaries]
+         let in_scope = Core.substInScopeSet subst
+             not_in_scope tv = not (tv `elemInScopeSet` in_scope)
+             free_tvs = scopedSort $ fvVarList $
+                        filterFV not_in_scope  $
+                        tyCoFVsOfType ty
+             subst1 = subst `Core.extendSubstInScopeList` free_tvs
+
+       ; let subst2 = Core.extendTvSubst subst1 bndr ty
+       ; (useful, subst3, rule_bs, rule_args, spec_bs, dx, spec_args)
+             <- specHeader subst2 bndrs args
+       ; pure ( useful, subst3
+              , free_tvs ++ rule_bs,     Type ty : rule_args
+              , free_tvs ++ spec_bs, dx, Type ty : spec_args ) }
 
 -- Next we have a type that we don't want to specialise. We need to perform
 -- a substitution on it (in case the type refers to 'a'). Additionally, we need
@@ -2682,7 +2690,7 @@ bindAuxiliaryDict subst orig_dict_id fresh_dict_id dict_arg
   -- don’t bother creating a new dict binding; just substitute
   | exprIsTrivial dict_arg
   , let subst' = Core.extendSubst subst orig_dict_id dict_arg
-  = -- pprTrace "bindAuxiliaryDict:trivial" (ppr orig_dict_id <+> ppr dict_id) $
+  = -- pprTrace "bindAuxiliaryDict:trivial" (ppr orig_dict_id <+> ppr dict_arg) $
     (subst', Nothing, dict_arg)
 
   | otherwise  -- Non-trivial dictionary arg; make an auxiliary binding
@@ -2978,7 +2986,8 @@ pprCallInfo fn (CI { ci_key = key })
 
 instance Outputable CallInfo where
   ppr (CI { ci_key = key, ci_fvs = _fvs })
-    = text "CI" <> braces (sep (map ppr key))
+    = text "CI" <> braces (text "fvs" <+> ppr _fvs
+                           $$ sep (map ppr key))
 
 unionCalls :: CallDetails -> CallDetails -> CallDetails
 unionCalls c1 c2 = plusDVarEnv_C unionCallInfoSet c1 c2
@@ -3394,38 +3403,49 @@ wrapDictBindsE dbs expr
 
 ----------------------
 dumpUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, OrdList DictBind)
--- Used at a lambda or case binder; just dump anything mentioning the binder
+-- Used at binder; just dump anything mentioning the binder
 dumpUDs bndrs uds@(MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
   | null bndrs = (uds, nilOL)  -- Common in case alternatives
   | otherwise  = -- pprTrace "dumpUDs" (vcat
-                 --    [ text "bndrs" <+> ppr bndrs
-                 --    , text "uds" <+> ppr uds
-                 --    , text "free_uds" <+> ppr free_uds
-                 --    , text "dump-dbs" <+> ppr dump_dbs ]) $
+                 --   [ text "bndrs" <+> ppr bndrs
+                 --   , text "uds" <+> ppr uds
+                 --   , text "free_uds" <+> ppr free_uds
+                 --   , text "dump_dbs" <+> ppr dump_dbs ]) $
                  (free_uds, dump_dbs)
   where
     free_uds = uds { ud_binds = free_dbs, ud_calls = free_calls }
     bndr_set = mkVarSet bndrs
     (free_dbs, dump_dbs, dump_set) = splitDictBinds orig_dbs bndr_set
-    free_calls = deleteCallsMentioning dump_set $   -- Drop calls mentioning bndr_set on the floor
-                 deleteCallsFor bndrs orig_calls    -- Discard calls for bndr_set; there should be
-                                                    -- no calls for any of the dicts in dump_dbs
 
-dumpBindUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, OrdList DictBind, Bool)
+    -- Delete calls:
+    --   * For any binder in `bndrs`
+    --   * That mention a dictionary bound in `dump_set`
+    -- These variables aren't in scope "above" the binding and the `dump_dbs`,
+    -- so no call should mention them.  (See #26682.)
+    free_calls = deleteCallsMentioning dump_set $
+                 deleteCallsFor bndrs orig_calls
+
+dumpBindUDs :: Bool   -- Main binding can float to top
+            -> [CoreBndr] -> UsageDetails
+            -> (UsageDetails, OrdList DictBind, Bool)
 -- Used at a let(rec) binding.
--- We return a boolean indicating whether the binding itself is mentioned,
--- directly or indirectly, by any of the ud_calls; in that case we want to
--- float the binding itself;
--- See Note [Floated dictionary bindings]
-dumpBindUDs bndrs (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
-  = -- pprTrace "dumpBindUDs" (ppr bndrs $$ ppr free_uds $$ ppr dump_dbs $$ ppr float_all) $
-    (free_uds, dump_dbs, float_all)
+-- We return a boolean indicating whether the binding itself
+--    is mentioned, directly or indirectly, by any of the ud_calls;
+--    in that case we want to float the binding itself.
+--    See Note [Floated dictionary bindings]
+-- If the boolean is True, then the returned ud_calls can mention `bndrs`;
+-- if False, then returned ud_calls must not mention `bndrs`
+dumpBindUDs can_float_bind bndrs (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
+  = ( MkUD { ud_binds = free_dbs, ud_calls = free_calls2 }
+    , dump_dbs
+    , can_float_bind && calls_mention_bndrs )
   where
-    free_uds = MkUD { ud_binds = free_dbs, ud_calls = free_calls }
     bndr_set = mkVarSet bndrs
     (free_dbs, dump_dbs, dump_set) = splitDictBinds orig_dbs bndr_set
-    free_calls = deleteCallsFor bndrs orig_calls
-    float_all = dump_set `intersectsVarSet` callDetailsFVs free_calls
+    free_calls1 = deleteCallsFor bndrs orig_calls
+    calls_mention_bndrs = dump_set `intersectsVarSet` callDetailsFVs free_calls1
+    free_calls2 | can_float_bind = free_calls1
+                | otherwise      = deleteCallsMentioning dump_set free_calls1
 
 callsForMe :: Id -> UsageDetails -> (UsageDetails, [CallInfo])
 callsForMe fn uds@MkUD { ud_binds = orig_dbs, ud_calls = orig_calls }
