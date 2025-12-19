@@ -292,7 +292,7 @@ basicKnownKeyNames
         fmapName,
 
         -- Monad stuff
-        thenIOName, bindIOName, returnIOName, failIOName, bindMName, thenMName,
+        thenIOName, bindIOName, returnIOName, bindMName, thenMName,
         returnMName, joinMName,
 
         -- MonadFail
@@ -1451,13 +1451,12 @@ ghciStepIoMName = varQual gHC_INTERNAL_GHCI (fsLit "ghciStepIO") ghciStepIoMClas
 
 -- IO things
 ioTyConName, ioDataConName,
-  thenIOName, bindIOName, returnIOName, failIOName :: Name
+  thenIOName, bindIOName, returnIOName :: Name
 ioTyConName       = tcQual  gHC_TYPES (fsLit "IO")       ioTyConKey
 ioDataConName     = dcQual  gHC_TYPES (fsLit "IO")       ioDataConKey
 thenIOName        = varQual gHC_INTERNAL_BASE  (fsLit "thenIO")   thenIOIdKey
 bindIOName        = varQual gHC_INTERNAL_BASE  (fsLit "bindIO")   bindIOIdKey
 returnIOName      = varQual gHC_INTERNAL_BASE  (fsLit "returnIO") returnIOIdKey
-failIOName        = varQual gHC_INTERNAL_IO    (fsLit "failIO")   failIOIdKey
 
 -- IO things
 printName :: Name
@@ -2252,7 +2251,7 @@ cstringLengthIdKey            = mkPreludeMiscIdUnique 28
 
 concatIdKey, filterIdKey, zipIdKey,
     bindIOIdKey, returnIOIdKey, newStablePtrIdKey,
-    printIdKey, failIOIdKey, nullAddrIdKey, voidArgIdKey,
+    printIdKey, nullAddrIdKey, voidArgIdKey,
     otherwiseIdKey, assertIdKey :: Unique
 concatIdKey                   = mkPreludeMiscIdUnique 31
 filterIdKey                   = mkPreludeMiscIdUnique 32
@@ -2261,7 +2260,6 @@ bindIOIdKey                   = mkPreludeMiscIdUnique 34
 returnIOIdKey                 = mkPreludeMiscIdUnique 35
 newStablePtrIdKey             = mkPreludeMiscIdUnique 36
 printIdKey                    = mkPreludeMiscIdUnique 37
-failIOIdKey                   = mkPreludeMiscIdUnique 38
 nullAddrIdKey                 = mkPreludeMiscIdUnique 39
 voidArgIdKey                  = mkPreludeMiscIdUnique 40
 otherwiseIdKey                = mkPreludeMiscIdUnique 43
