@@ -467,7 +467,6 @@ basicKnownKeyNames
 
         -- Monad comprehensions
         , guardMName
-        , liftMName
         , mzipName
 
         -- GHCi Sandbox
@@ -1501,9 +1500,8 @@ choiceAName        = varQual gHC_INTERNAL_ARROW (fsLit "|||")       choiceAIdKey
 loopAName          = varQual gHC_INTERNAL_ARROW (fsLit "loop")      loopAIdKey
 
 -- Monad comprehensions
-guardMName, liftMName, mzipName :: Name
+guardMName, mzipName :: Name
 guardMName         = varQual gHC_INTERNAL_MONAD (fsLit "guard")    guardMIdKey
-liftMName          = varQual gHC_INTERNAL_MONAD (fsLit "liftM")    liftMIdKey
 mzipName           = varQual gHC_INTERNAL_CONTROL_MONAD_ZIP (fsLit "mzip") mzipIdKey
 
 
@@ -2378,9 +2376,8 @@ toIntegerClassOpKey  = mkPreludeMiscIdUnique 192
 toRationalClassOpKey = mkPreludeMiscIdUnique 193
 
 -- Monad comprehensions
-guardMIdKey, liftMIdKey, mzipIdKey :: Unique
+guardMIdKey, mzipIdKey :: Unique
 guardMIdKey     = mkPreludeMiscIdUnique 194
-liftMIdKey      = mkPreludeMiscIdUnique 195
 mzipIdKey       = mkPreludeMiscIdUnique 196
 
 -- GHCi
