@@ -96,6 +96,7 @@ import qualified Data.Set as Set
 import Data.Char (isSpace)
 import Data.Functor ((<&>))
 import Data.Foldable (for_)
+import qualified Data.Foldable as Foldable
 import Data.IORef
 import Data.List (intercalate, isPrefixOf, nub, partition)
 import Data.Maybe
