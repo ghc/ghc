@@ -1190,6 +1190,7 @@ genPrim prof bound ty op = case op of
   VecQuotOp _ _ _                   -> unhandledPrimop op
   VecRemOp _ _ _                    -> unhandledPrimop op
   VecNegOp _ _ _                    -> unhandledPrimop op
+  VecAbsOp _ _ _                    -> unhandledPrimop op
   VecIndexByteArrayOp _ _ _         -> unhandledPrimop op
   VecReadByteArrayOp _ _ _          -> unhandledPrimop op
   VecWriteByteArrayOp _ _ _         -> unhandledPrimop op

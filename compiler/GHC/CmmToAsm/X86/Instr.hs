@@ -341,6 +341,10 @@ data Instr
         | VPMULL     Format Operand Reg Reg
         | PMULUDQ    Format Operand Reg
 
+        -- Absolute value and square root
+        | PABS       Format Operand Reg -- SSE2
+        | VPABS      Format Operand Reg -- AVX512F Int64
+
         -- SIMD compare
         | PCMPGT     Format Operand Reg
 
@@ -382,6 +386,7 @@ data Instr
         -- Shift
         | PSLL       Format Operand Reg
         | PSLLDQ     Format Imm Reg
+        | PSRA       Format Operand Reg
         | PSRL       Format Operand Reg
         | PSRLDQ     Format Imm Reg
         | PALIGNR    Format Imm Operand Reg
@@ -604,6 +609,8 @@ regUsageOfInstr platform instr
     PMULL        fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     VPMULL       fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
     PMULUDQ      fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    PABS         fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
+    VPABS        fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
 
     PCMPGT       fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
@@ -631,6 +638,7 @@ regUsageOfInstr platform instr
     PSLL   fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
     PSLLDQ fmt _off dst -> mkRU [mk fmt dst] [mk fmt dst]
     PSRL   fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
+    PSRA   fmt off dst -> mkRU (use_R fmt off [mk fmt dst]) [mk fmt dst]
     PSRLDQ fmt _off dst -> mkRU [mk fmt dst] [mk fmt dst]
     PALIGNR fmt _off src dst -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
@@ -916,6 +924,8 @@ patchRegsOfInstr platform instr env
     PMULL      fmt src dst   -> PMULL fmt (patchOp src) (env dst)
     VPMULL     fmt s1 s2 dst -> VPMULL fmt (patchOp s1) (env s2) (env dst)
     PMULUDQ    fmt src dst   -> PMULUDQ fmt (patchOp src) (env dst)
+    PABS       fmt src dst   -> PABS fmt (patchOp src) (env dst)
+    VPABS      fmt src dst   -> VPABS fmt (patchOp src) (env dst)
 
     PCMPGT     fmt src dst   -> PCMPGT fmt (patchOp src) (env dst)
 
@@ -942,6 +952,8 @@ patchRegsOfInstr platform instr env
 
     PSLL         fmt off dst
       -> PSLL    fmt (patchOp off) (env dst)
+    PSRA         fmt off dst
+      -> PSRA    fmt (patchOp off) (env dst)
     PSLLDQ       fmt off dst
       -> PSLLDQ  fmt off (env dst)
     PSRL         fmt off dst

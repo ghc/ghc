@@ -361,6 +361,25 @@ import GHC.Prim hiding
   , xorWord8X16#
   , xorWord8X32#
   , xorWord8X64#
+  -- Don't re-export vector absolute value
+  , absInt8X16#
+  , absInt16X8#
+  , absInt32X4#
+  , absInt64X2#
+  , absInt8X32#
+  , absInt16X16#
+  , absInt32X8#
+  , absInt64X4#
+  , absInt8X64#
+  , absInt16X32#
+  , absInt32X16#
+  , absInt64X8#
+  , absFloatX4#
+  , absDoubleX2#
+  , absFloatX8#
+  , absDoubleX4#
+  , absFloatX16#
+  , absDoubleX8#
   )
 
 import GHC.Prim.Ext

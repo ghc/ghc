@@ -1016,6 +1016,8 @@ pprInstr platform i = case i of
      -> pprFormatOpRegReg (text "vpmull") format s1 s2 dst
    PMULUDQ format src dst
      -> pprOpReg (text "pmuludq") format src dst
+   PABS format src dst -> pprFormatOpReg (text "pabs") format src dst
+   VPABS format src dst -> pprFormatOpReg (text "vpabs") format src dst
    PCMPGT format src dst
      -> pprFormatOpReg (text "pcmpgt") format src dst
    VBROADCAST format@(VecFormat _ sFmt) from to
@@ -1105,6 +1107,8 @@ pprInstr platform i = case i of
      -> pprFormatOpReg (text "psrl") format offset dst
    PSRLDQ format offset dst
      -> pprDoubleShift (text "psrldq") format offset dst
+   PSRA format offset dst
+     -> pprFormatOpReg (text "psra") format offset dst
    PALIGNR format offset src dst
      -> pprImmOpReg (text "palignr") format offset src dst
 

@@ -4753,6 +4753,24 @@ module GHC.PrimOps where
   type ZeroBitRep = TupleRep '[]
   type ZeroBitType :: *
   type ZeroBitType = TYPE ZeroBitRep
+  absDoubleX2# :: DoubleX2# -> DoubleX2#
+  absDoubleX4# :: DoubleX4# -> DoubleX4#
+  absDoubleX8# :: DoubleX8# -> DoubleX8#
+  absFloatX16# :: FloatX16# -> FloatX16#
+  absFloatX4# :: FloatX4# -> FloatX4#
+  absFloatX8# :: FloatX8# -> FloatX8#
+  absInt16X16# :: Int16X16# -> Int16X16#
+  absInt16X32# :: Int16X32# -> Int16X32#
+  absInt16X8# :: Int16X8# -> Int16X8#
+  absInt32X16# :: Int32X16# -> Int32X16#
+  absInt32X4# :: Int32X4# -> Int32X4#
+  absInt32X8# :: Int32X8# -> Int32X8#
+  absInt64X2# :: Int64X2# -> Int64X2#
+  absInt64X4# :: Int64X4# -> Int64X4#
+  absInt64X8# :: Int64X8# -> Int64X8#
+  absInt8X16# :: Int8X16# -> Int8X16#
+  absInt8X32# :: Int8X32# -> Int8X32#
+  absInt8X64# :: Int8X64# -> Int8X64#
   acosDouble# :: Double# -> Double#
   acosFloat# :: Float# -> Float#
   acoshDouble# :: Double# -> Double#

@@ -169,6 +169,7 @@ data MachOp
   | MO_V_Sub Length Width
   | MO_V_Mul Length Width
   | MO_VS_Neg  Length Width
+  | MO_VS_Abs  Length Width
 
   -- Vector shuffles
   | MO_V_Shuffle  Length Width [Int]
@@ -183,6 +184,7 @@ data MachOp
   | MO_VF_Add  Length Width
   | MO_VF_Sub  Length Width
   | MO_VF_Neg  Length Width      -- unary negation
+  | MO_VF_Abs  Length Width      -- absolute value
   | MO_VF_Mul  Length Width
   | MO_VF_Quot Length Width
 
@@ -522,6 +524,7 @@ machOpResultType platform mop tys =
     MO_VF_Xor l w        -> cmmVec l (cmmBits w)
 
     MO_VS_Neg  l w      -> cmmVec l (cmmBits w)
+    MO_VS_Abs  l w      -> cmmVec l (cmmBits w)
     MO_VS_Min  l w      -> cmmVec l (cmmBits w)
     MO_VS_Max  l w      -> cmmVec l (cmmBits w)
 
@@ -540,6 +543,7 @@ machOpResultType platform mop tys =
     MO_VF_Mul  l w      -> cmmVec l (cmmFloat w)
     MO_VF_Quot l w      -> cmmVec l (cmmFloat w)
     MO_VF_Neg  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Abs  l w      -> cmmVec l (cmmFloat w)
     MO_VF_Min  l w      -> cmmVec l (cmmFloat w)
     MO_VF_Max  l w      -> cmmVec l (cmmFloat w)
 
@@ -635,6 +639,7 @@ machOpArgReps platform op =
     MO_V_Mul l w        -> [vecwidth l w, vecwidth l w]
 
     MO_VS_Neg  l w      -> [vecwidth l w]
+    MO_VS_Abs  l w      -> [vecwidth l w]
     MO_VS_Min  l w      -> [vecwidth l w, vecwidth l w]
     MO_VS_Max  l w      -> [vecwidth l w, vecwidth l w]
 
@@ -647,6 +652,7 @@ machOpArgReps platform op =
     MO_VF_Mul  l w      -> [vecwidth l w, vecwidth l w]
     MO_VF_Quot l w      -> [vecwidth l w, vecwidth l w]
     MO_VF_Neg  l w      -> [vecwidth l w]
+    MO_VF_Abs  l w      -> [vecwidth l w]
     MO_VF_Min  l w      -> [vecwidth l w, vecwidth l w]
     MO_VF_Max  l w      -> [vecwidth l w, vecwidth l w]
 

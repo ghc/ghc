@@ -979,8 +979,11 @@ getRegister' _ _ (CmmMachOp mop []) =
   pprPanic "getRegister(x86): nullary MachOp" (text $ show mop)
 
 getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
-    avx    <- avxEnabled
-    avx2   <- avx2Enabled
+    sse42   <- sse4_2Enabled
+    ssse3    <- ssse3Enabled
+    avx     <- avxEnabled
+    avx2    <- avx2Enabled
+    avx512vl <- avx512vlEnabled
     case mop of
       MO_F_Neg w  -> sse2NegCode w x
 
@@ -1072,6 +1075,19 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       -- SIMD NCG TODO: Support 256/512-bit integer vectors
       MO_VS_Neg l w -> getRegister' platform is32Bit (CmmMachOp (MO_V_Sub l w) [zero_vec, x])
         where zero_vec = CmmLit $ CmmVec $ replicate l $ CmmInt 0 w
+
+      MO_VF_Abs l w ->     vector_float_abs      l w x
+
+      MO_VS_Abs l w
+        -- PABS[B|W|D] require SSSE3
+        | w `elem` [W8, W16, W32] && ssse3 -> vector_int_abs_ssse3 l w x
+        | w `elem` [W8, W16, W32] -> vector_int_abs_sse2 l w x
+      MO_VS_Abs l w@W64
+        -- VPABSQ for 128-bit vectors requires AVX-512VL
+        | avx512vl  -> vector_int64_abs_avx512 l w x
+        | sse42     -> vector_int64_abs_sse42 l w x
+        | otherwise -> vector_int64_abs_sse2 l w x
+      MO_VS_Abs {} -> pprPanic "Unsupported integer vector operation for: " (pdoc platform x)
 
       MO_VF_Broadcast l w
         | avx
@@ -1229,6 +1245,97 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                          exp `snocOL`
                          (MOVU fmt (OpReg reg) (OpReg dst)) `snocOL`
                          (XOR  fmt (OpReg maskReg) (OpReg dst))
+          return (Any fmt code)
+
+        -----------------------
+
+        vector_float_abs :: Length -> Width -> CmmExpr -> NatM Register
+        vector_float_abs len w expr = do
+          exp <- getAnyReg expr
+
+          let fmt = VecFormat len (floatScalarFormat w)
+              mask = case w of
+                W32 -> CmmInt (complement $ bit 31) w
+                W64 -> CmmInt (complement $ bit 63) w
+                _ -> panic "SSE floating-point absolute value: elements must be FF32 or FF64"
+
+          Amode mem memCode <- memConstant (mkAlignment 16) (CmmVec $ replicate len mask)
+
+          let code dst =
+                  exp dst `appOL`
+                  memCode `snocOL`
+                  AND fmt (OpAddr mem) (OpReg dst)
+
+          return (Any fmt code)
+
+        vector_int_abs_ssse3 :: Length -> Width -> CmmExpr -> NatM Register
+        vector_int_abs_ssse3 len w expr = do
+          (reg, exp) <- getSomeReg expr
+          let fmt = VecFormat len (intScalarFormat w)
+              code dst = exp `snocOL` PABS fmt (OpReg reg) dst
+
+          return (Any fmt code)
+
+        vector_int_abs_sse2 :: Length -> Width -> CmmExpr -> NatM Register
+        vector_int_abs_sse2 len w expr = do
+          -- SSE2 fallback: Compute a mask of 0s/1s using PCMPGT. Then
+          -- abs x = (x `xor` mask) - mask, where mask is -1 is x is negative and 0
+          -- otherwise.
+          (reg, exp) <- getSomeReg expr
+          (maskReg, maskCode) <- getSomeReg . CmmLit . CmmVec $ replicate 2 (CmmInt 0 W64)
+          let fmt = VecFormat len (intScalarFormat w)
+              code dst = exp `appOL`
+                         maskCode `snocOL`
+                         MOVDQU fmt (OpReg reg) (OpReg dst) `snocOL` -- dst <- reg
+                         PCMPGT fmt (OpReg reg) maskReg `snocOL`     -- maskReg <- if reg > - then 0 else -1
+                         PXOR fmt (OpReg maskReg) dst `snocOL`       -- dst <- if maskReg then ~dst else dst
+                         PSUB fmt (OpReg maskReg) dst                -- dist <- dst - maskReg
+
+          return (Any fmt code)
+
+        vector_int64_abs_avx512 len w expr = do
+          (reg, exp) <- getSomeReg expr
+          let fmt = VecFormat len (intScalarFormat w)
+              code dst = exp `snocOL` VPABS fmt (OpReg reg) dst
+
+          return (Any fmt code)
+
+        vector_int64_abs_sse42 len w expr = do
+          -- SSE4.2 fallback: Compute a mask of 0s/1s using PCMPGT. Then
+          -- abs x = (x `xor` mask) - mask, where mask is -1 is x is negative and 0
+          -- otherwise.
+          let fmt = VecFormat len (intScalarFormat w)
+          (reg, exp) <- getSomeReg expr
+          (maskReg, maskCode) <- getSomeReg . CmmLit . CmmVec $ replicate 2 (CmmInt 0 W64)
+
+          let code dst =
+                exp `appOL`
+                maskCode `snocOL`
+                MOVDQU fmt (OpReg reg) (OpReg dst) `snocOL` -- dst <- reg
+                PCMPGT fmt (OpReg reg) maskReg `snocOL`     -- maskReg <- if reg > 0 then 0 else -1
+                PXOR fmt (OpReg maskReg) dst `snocOL`       -- dst <- if maskReg then ~dst else dst
+                PSUB fmt (OpReg maskReg) dst                -- dst <- dst - maskReg
+
+          return (Any fmt code)
+
+        vector_int64_abs_sse2 len w expr = do
+          -- SSE2 fallback: Compute a mask by broadcasting the sign bit to all the lower
+          -- bits. The rest is the same as the SSE4.2 implementation.
+          let fmt = VecFormat len (intScalarFormat w)
+              i32Fmt = VecFormat len FmtInt32
+          (reg, exp) <- getSomeReg expr
+          (maskReg, maskCode) <- getSomeReg . CmmLit . CmmVec $ replicate 2 (CmmInt 0 W64)
+
+          let code dst =
+                exp `appOL`
+                maskCode `snocOL`
+                MOVDQU fmt (OpReg reg) (OpReg dst) `snocOL` -- dst <- reg
+                -- Copy the high order double words to the low order double words
+                PSHUFD i32Fmt (ImmInt 0b11_11_01_01) (OpReg reg) maskReg `snocOL`
+                PSRA i32Fmt (OpImm $ ImmInt 31) maskReg `snocOL` -- maskReg <- if sign bit = 1 then -1 else 0
+                PXOR fmt (OpReg maskReg) dst `snocOL`            -- dst <- if maskReg then ~dst else dst
+                PSUB fmt (OpReg maskReg) dst                     -- dst <- dst - maskReg
+
           return (Any fmt code)
 
         -----------------------
@@ -1530,6 +1637,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_AlignmentCheck {} -> incorrectOperands
       MO_VS_Neg {} -> incorrectOperands
       MO_VF_Neg {} -> incorrectOperands
+      MO_VS_Abs {} -> incorrectOperands
+      MO_VF_Abs {} -> incorrectOperands
       MO_V_Broadcast {} -> incorrectOperands
       MO_VF_Broadcast {} -> incorrectOperands
 

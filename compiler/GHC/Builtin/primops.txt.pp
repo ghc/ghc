@@ -4268,6 +4268,11 @@ primop VecNegOp "negate#" GenPrimOp
    { Negate element-wise. }
    with vector = SIGNED_VECTOR_TYPES
 
+primop VecAbsOp "abs#" GenPrimOp
+   VECTOR -> VECTOR
+   { Element-wise absolute value. }
+   with vector = SIGNED_VECTOR_TYPES
+
 primop VecIndexByteArrayOp "indexArray#" GenPrimOp
    ByteArray# -> Int# -> VECTOR
    { Read a vector from the specified index of an immutable array.
