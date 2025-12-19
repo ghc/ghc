@@ -1784,16 +1784,18 @@ genClz :: Width -> LocalReg -> CmmExpr -> NatM InstrBlock
 genClz w dst src = do
   platform <- getPlatform
   (reg_x, _, code_x) <- getSomeReg src
+  tmp <- getNewRegNat II64
   let dst_reg = getRegisterReg platform (CmmLocal dst)
   if w `elem` [W32, W64] then do
     return (code_x `snocOL` CLZ (OpReg w dst_reg) (OpReg w reg_x))
   else if w `elem` [W8, W16] then do
+    -- Process uniformly according to one data length, W32.
     return (code_x `appOL` toOL
                  [
-                  MOV (OpReg W64 dst_reg) (OpImm (ImmInt 1)),
-                  SLL (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpImm (ImmInt (31-shift))),
-                  SLL (OpReg W64 reg_x) (OpReg W64 reg_x) (OpImm (ImmInt (32-shift))),
-                  OR (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpReg W64 reg_x),
+                  MOV (OpReg W64 tmp) (OpImm (ImmInt 1)),
+                  SLL (OpReg W64 tmp) (OpReg W64 tmp) (OpImm (ImmInt (31-shift))),
+                  SLL (OpReg W64 dst_reg) (OpReg W32 reg_x) (OpImm (ImmInt (32-shift))),
+                  OR (OpReg W64 dst_reg) (OpReg W64 tmp) (OpReg W64 dst_reg),
                   CLZ (OpReg W64 dst_reg) (OpReg W32 dst_reg)
                  ]
            )
@@ -1806,16 +1808,17 @@ genCtz :: Width -> LocalReg -> CmmExpr -> NatM InstrBlock
 genCtz w dst src = do
   platform <- getPlatform
   (reg_x, _, code_x) <- getSomeReg src
+  tmp <- getNewRegNat II64
   let dst_reg = getRegisterReg platform (CmmLocal dst)
   if w `elem` [W32, W64] then do
     return (code_x `snocOL` CTZ (OpReg w dst_reg) (OpReg w reg_x))
   else if w `elem` [W8, W16] then do
     return (code_x `appOL` toOL
                  [
-                  MOV (OpReg W64 dst_reg) (OpImm (ImmInt 1)),
-                  SLL (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpImm (ImmInt shift)),
-                  BSTRPICK II64 (OpReg W64 reg_x) (OpReg W64 reg_x) (OpImm (ImmInt (shift-1))) (OpImm (ImmInt 0)),
-                  OR  (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpReg W64 reg_x),
+                  MOV (OpReg W64 tmp) (OpImm (ImmInt 1)),
+                  SLL (OpReg W64 tmp) (OpReg W64 tmp) (OpImm (ImmInt shift)),
+                  BSTRPICK II64 (OpReg W64 dst_reg) (OpReg W64 reg_x) (OpImm (ImmInt (shift-1))) (OpImm (ImmInt 0)),
+                  OR  (OpReg W64 dst_reg) (OpReg W64 dst_reg) (OpReg W64 tmp),
                   CTZ (OpReg W64 dst_reg) (OpReg W64 dst_reg)
                  ]
            )
