@@ -409,26 +409,18 @@ basicKnownKeyNames
         naturalQuotName,
         naturalRemName,
         naturalAndName,
-        naturalAndNotName,
         naturalOrName,
         naturalXorName,
         naturalTestBitName,
         naturalBitName,
         naturalGcdName,
         naturalLcmName,
-        naturalLog2Name,
-        naturalLogBaseWordName,
-        naturalLogBaseName,
-        naturalPowModName,
-        naturalSizeInBaseName,
 
         bignatEqName,
 
         -- Float/Double
         integerToFloatName,
         integerToDoubleName,
-        naturalToFloatName,
-        naturalToDoubleName,
         rationalToFloatName,
         rationalToDoubleName,
 
@@ -1154,18 +1146,12 @@ integerFromNaturalName
    , naturalQuotName
    , naturalRemName
    , naturalAndName
-   , naturalAndNotName
    , naturalOrName
    , naturalXorName
    , naturalTestBitName
    , naturalBitName
    , naturalGcdName
    , naturalLcmName
-   , naturalLog2Name
-   , naturalLogBaseWordName
-   , naturalLogBaseName
-   , naturalPowModName
-   , naturalSizeInBaseName
    , bignatEqName
    , bignatCompareName
    , bignatCompareWordName
@@ -1194,18 +1180,12 @@ naturalQuotRemName        = bnnVarQual "naturalQuotRem#"           naturalQuotRe
 naturalQuotName           = bnnVarQual "naturalQuot"               naturalQuotIdKey
 naturalRemName            = bnnVarQual "naturalRem"                naturalRemIdKey
 naturalAndName            = bnnVarQual "naturalAnd"                naturalAndIdKey
-naturalAndNotName         = bnnVarQual "naturalAndNot"             naturalAndNotIdKey
 naturalOrName             = bnnVarQual "naturalOr"                 naturalOrIdKey
 naturalXorName            = bnnVarQual "naturalXor"                naturalXorIdKey
 naturalTestBitName        = bnnVarQual "naturalTestBit#"           naturalTestBitIdKey
 naturalBitName            = bnnVarQual "naturalBit#"               naturalBitIdKey
 naturalGcdName            = bnnVarQual "naturalGcd"                naturalGcdIdKey
 naturalLcmName            = bnnVarQual "naturalLcm"                naturalLcmIdKey
-naturalLog2Name           = bnnVarQual "naturalLog2#"              naturalLog2IdKey
-naturalLogBaseWordName    = bnnVarQual "naturalLogBaseWord#"       naturalLogBaseWordIdKey
-naturalLogBaseName        = bnnVarQual "naturalLogBase#"           naturalLogBaseIdKey
-naturalPowModName         = bnnVarQual "naturalPowMod"             naturalPowModIdKey
-naturalSizeInBaseName     = bnnVarQual "naturalSizeInBase#"        naturalSizeInBaseIdKey
 
 integerFromNaturalName    = bniVarQual "integerFromNatural"        integerFromNaturalIdKey
 integerToNaturalClampName = bniVarQual "integerToNaturalClamp"     integerToNaturalClampIdKey
@@ -1276,12 +1256,9 @@ realFloatClassName = clsQual gHC_INTERNAL_FLOAT (fsLit "RealFloat") realFloatCla
 
 -- other GHC.Internal.Float functions
 integerToFloatName, integerToDoubleName,
-  naturalToFloatName, naturalToDoubleName,
   rationalToFloatName, rationalToDoubleName :: Name
 integerToFloatName   = varQual gHC_INTERNAL_FLOAT (fsLit "integerToFloat#") integerToFloatIdKey
 integerToDoubleName  = varQual gHC_INTERNAL_FLOAT (fsLit "integerToDouble#") integerToDoubleIdKey
-naturalToFloatName   = varQual gHC_INTERNAL_FLOAT (fsLit "naturalToFloat#") naturalToFloatIdKey
-naturalToDoubleName  = varQual gHC_INTERNAL_FLOAT (fsLit "naturalToDouble#") naturalToDoubleIdKey
 rationalToFloatName  = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToFloat") rationalToFloatIdKey
 rationalToDoubleName = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToDouble") rationalToDoubleIdKey
 
@@ -2354,11 +2331,9 @@ considerAccessibleIdKey = mkPreludeMiscIdUnique 125
 noinlineIdKey           = mkPreludeMiscIdUnique 126
 noinlineConstraintIdKey = mkPreludeMiscIdUnique 127
 
-integerToFloatIdKey, integerToDoubleIdKey, naturalToFloatIdKey, naturalToDoubleIdKey :: Unique
+integerToFloatIdKey, integerToDoubleIdKey :: Unique
 integerToFloatIdKey    = mkPreludeMiscIdUnique 128
 integerToDoubleIdKey   = mkPreludeMiscIdUnique 129
-naturalToFloatIdKey    = mkPreludeMiscIdUnique 130
-naturalToDoubleIdKey   = mkPreludeMiscIdUnique 131
 
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 132
@@ -2584,18 +2559,12 @@ integerFromNaturalIdKey
    , naturalQuotIdKey
    , naturalRemIdKey
    , naturalAndIdKey
-   , naturalAndNotIdKey
    , naturalOrIdKey
    , naturalXorIdKey
    , naturalTestBitIdKey
    , naturalBitIdKey
    , naturalGcdIdKey
    , naturalLcmIdKey
-   , naturalLog2IdKey
-   , naturalLogBaseWordIdKey
-   , naturalLogBaseIdKey
-   , naturalPowModIdKey
-   , naturalSizeInBaseIdKey
    , bignatEqIdKey
    , bignatCompareIdKey
    , bignatCompareWordIdKey
@@ -2650,18 +2619,12 @@ naturalQuotRemIdKey        = mkPreludeMiscIdUnique 669
 naturalQuotIdKey           = mkPreludeMiscIdUnique 670
 naturalRemIdKey            = mkPreludeMiscIdUnique 671
 naturalAndIdKey            = mkPreludeMiscIdUnique 672
-naturalAndNotIdKey         = mkPreludeMiscIdUnique 673
 naturalOrIdKey             = mkPreludeMiscIdUnique 674
 naturalXorIdKey            = mkPreludeMiscIdUnique 675
 naturalTestBitIdKey        = mkPreludeMiscIdUnique 676
 naturalBitIdKey            = mkPreludeMiscIdUnique 677
 naturalGcdIdKey            = mkPreludeMiscIdUnique 678
 naturalLcmIdKey            = mkPreludeMiscIdUnique 679
-naturalLog2IdKey           = mkPreludeMiscIdUnique 680
-naturalLogBaseWordIdKey    = mkPreludeMiscIdUnique 681
-naturalLogBaseIdKey        = mkPreludeMiscIdUnique 682
-naturalPowModIdKey         = mkPreludeMiscIdUnique 683
-naturalSizeInBaseIdKey     = mkPreludeMiscIdUnique 684
 
 bignatEqIdKey              = mkPreludeMiscIdUnique 691
 bignatCompareIdKey         = mkPreludeMiscIdUnique 692
