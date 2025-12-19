@@ -370,7 +370,7 @@ extendTCvSubstWithClone subst tcv
 -- You must ensure that the in-scope set is such that
 -- Note [The substitution invariant] holds
 -- after extending the substitution like this.
-extendTvSubst :: Subst -> TyVar -> Type -> Subst
+extendTvSubst :: HasDebugCallStack => Subst -> TyVar -> Type -> Subst
 extendTvSubst (Subst in_scope ids tvs cvs) tv ty
   = assert (isTyVar tv) $
     Subst in_scope ids (extendVarEnv tvs tv ty) cvs
