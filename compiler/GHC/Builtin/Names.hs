@@ -339,8 +339,7 @@ basicKnownKeyNames
         getFieldName, setFieldName,
 
         -- List operations
-        concatName, filterName, mapName,
-        zipName, foldrName, buildName, augmentName, appendName,
+        mapName, foldrName, buildName, augmentName,
 
         -- FFI primitive types that are not wired-in.
         stablePtrTyConName, ptrTyConName, funPtrTyConName, constPtrConName,
@@ -694,9 +693,8 @@ ltTag_RDR               = nameRdrName  ordLTDataConName
 eqTag_RDR               = nameRdrName  ordEQDataConName
 gtTag_RDR               = nameRdrName  ordGTDataConName
 
-map_RDR, append_RDR :: RdrName
+map_RDR :: RdrName
 map_RDR                 = nameRdrName mapName
-append_RDR              = nameRdrName appendName
 
 foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR
     :: RdrName
@@ -1068,7 +1066,7 @@ considerAccessibleName = varQual gHC_INTERNAL_EXTS (fsLit "considerAccessible") 
 
 -- Random GHC.Internal.Base functions
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
-    mapName, appendName, assertName,
+    mapName, assertName,
     dollarName :: Name
 dollarName        = varQual gHC_INTERNAL_BASE (fsLit "$")          dollarIdKey
 otherwiseIdName   = varQual gHC_INTERNAL_BASE (fsLit "otherwise")  otherwiseIdKey
@@ -1076,7 +1074,6 @@ foldrName         = varQual gHC_INTERNAL_BASE (fsLit "foldr")      foldrIdKey
 buildName         = varQual gHC_INTERNAL_BASE (fsLit "build")      buildIdKey
 augmentName       = varQual gHC_INTERNAL_BASE (fsLit "augment")    augmentIdKey
 mapName           = varQual gHC_INTERNAL_BASE (fsLit "map")        mapIdKey
-appendName        = varQual gHC_INTERNAL_BASE (fsLit "++")         appendIdKey
 assertName        = varQual gHC_INTERNAL_BASE (fsLit "assert")     assertIdKey
 fromStringName    = varQual gHC_INTERNAL_DATA_STRING (fsLit "fromString") fromStringClassOpKey
 
@@ -1408,12 +1405,6 @@ enumFromToName     = varQual gHC_INTERNAL_ENUM (fsLit "enumFromTo")     enumFrom
 enumFromThenName   = varQual gHC_INTERNAL_ENUM (fsLit "enumFromThen")   enumFromThenClassOpKey
 enumFromThenToName = varQual gHC_INTERNAL_ENUM (fsLit "enumFromThenTo") enumFromThenToClassOpKey
 boundedClassName   = clsQual gHC_INTERNAL_ENUM (fsLit "Bounded")        boundedClassKey
-
--- List functions
-concatName, filterName, zipName :: Name
-concatName        = varQual gHC_INTERNAL_LIST (fsLit "concat") concatIdKey
-filterName        = varQual gHC_INTERNAL_LIST (fsLit "filter") filterIdKey
-zipName           = varQual gHC_INTERNAL_LIST (fsLit "zip")    zipIdKey
 
 -- Overloaded lists
 isListClassName, fromListName, fromListNName, toListName :: Name
@@ -2201,7 +2192,7 @@ naturalNBDataConKey       = mkPreludeDataConUnique 124
 ************************************************************************
 -}
 
-wildCardKey, absentErrorIdKey, absentConstraintErrorIdKey, augmentIdKey, appendIdKey,
+wildCardKey, absentErrorIdKey, absentConstraintErrorIdKey, augmentIdKey,
     buildIdKey, foldrIdKey, recSelErrorIdKey,
     seqIdKey, eqStringIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
@@ -2218,7 +2209,6 @@ wildCardKey                    = mkPreludeMiscIdUnique  0  -- See Note [WildCard
 absentErrorIdKey               = mkPreludeMiscIdUnique  1
 absentConstraintErrorIdKey     = mkPreludeMiscIdUnique  2
 augmentIdKey                   = mkPreludeMiscIdUnique  3
-appendIdKey                    = mkPreludeMiscIdUnique  4
 buildIdKey                     = mkPreludeMiscIdUnique  5
 foldrIdKey                     = mkPreludeMiscIdUnique  6
 recSelErrorIdKey               = mkPreludeMiscIdUnique  7
@@ -2247,13 +2237,9 @@ divIntIdKey                   = mkPreludeMiscIdUnique 26
 modIntIdKey                   = mkPreludeMiscIdUnique 27
 cstringLengthIdKey            = mkPreludeMiscIdUnique 28
 
-concatIdKey, filterIdKey, zipIdKey,
-    bindIOIdKey, returnIOIdKey, newStablePtrIdKey,
+bindIOIdKey, returnIOIdKey, newStablePtrIdKey,
     printIdKey, nullAddrIdKey, voidArgIdKey,
     otherwiseIdKey, assertIdKey :: Unique
-concatIdKey                   = mkPreludeMiscIdUnique 31
-filterIdKey                   = mkPreludeMiscIdUnique 32
-zipIdKey                      = mkPreludeMiscIdUnique 33
 bindIOIdKey                   = mkPreludeMiscIdUnique 34
 returnIOIdKey                 = mkPreludeMiscIdUnique 35
 newStablePtrIdKey             = mkPreludeMiscIdUnique 36
