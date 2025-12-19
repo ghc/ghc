@@ -479,9 +479,6 @@ basicKnownKeyNames
         , staticPtrDataConName, staticPtrInfoDataConName
         , fromStaticPtrName
 
-        -- Fingerprint
-        , fingerprintDataConName
-
         -- Custom type errors
         , errorMessageTypeErrorFamName
         , typeErrorTextDataConName
@@ -1595,10 +1592,6 @@ fromStaticPtrName :: Name
 fromStaticPtrName =
     varQual gHC_INTERNAL_STATICPTR (fsLit "fromStaticPtr") fromStaticPtrClassOpKey
 
-fingerprintDataConName :: Name
-fingerprintDataConName =
-    dcQual gHC_INTERNAL_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
-
 constPtrConName :: Name
 constPtrConName =
     tcQual gHC_INTERNAL_FOREIGN_C_CONSTPTR (fsLit "ConstPtr") constPtrTyConKey
@@ -2080,9 +2073,6 @@ staticPtrDataConKey                     = mkPreludeDataConUnique 33
 
 staticPtrInfoDataConKey :: Unique
 staticPtrInfoDataConKey                 = mkPreludeDataConUnique 34
-
-fingerprintDataConKey :: Unique
-fingerprintDataConKey                   = mkPreludeDataConUnique 35
 
 srcLocDataConKey :: Unique
 srcLocDataConKey                        = mkPreludeDataConUnique 37
