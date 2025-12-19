@@ -1094,7 +1094,7 @@ So, we work as follows:
  2. Take all the free vars of the range of the substitution:
        {a, z, rest, b}
     NB: the free variable finder closes over
-    the kinds of variable occurrences
+        the kinds of variable occurrences
 
  3. If none are in the domain of the substitution, stop.
     We have found a fixpoint.
@@ -1159,7 +1159,8 @@ niFixSubst in_scope tenv
 
     add_free_tv :: Subst -> TyVar -> Subst
     add_free_tv subst tv
-      = extendTvSubst subst tv (mkTyVarTy tv')
+      | isTyVar tv = extendTvSubst subst tv (mkTyVarTy tv')
+      | otherwise  = subst  -- Ignore free coercion variables
      where
         tv' = updateTyVarKind (substTy subst) tv
 
