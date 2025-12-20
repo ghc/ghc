@@ -387,20 +387,6 @@ lint-submods-branch:
     paths:
       - cabal-cache
 
-# Disabled due to #22830
-.hlint-ghc-and-base:
-  extends: .lint-params
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
-  variables:
-    BUILD_FLAVOUR: default
-  script:
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    - .gitlab/ci.sh run_hadrian lint:ghc-internal
-    - .gitlab/ci.sh run_hadrian lint:ghc-experimental
-    - .gitlab/ci.sh run_hadrian lint:base
-    - .gitlab/ci.sh run_hadrian lint:compiler
-
 ############################################################
 # GHC-in-GHCi (Hadrian)
 ############################################################
