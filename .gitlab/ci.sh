@@ -265,6 +265,15 @@ function setup() {
   # testsuite driver!
   git config gc.auto 0
 
+  # Some runners still choke at the perf note fetch step, which has to
+  # do with slow internet connection, see
+  # https://docs.gitlab.com/topics/git/troubleshooting_git/#error-stream-0-was-not-closed-cleanly
+  # for the http.postBuffer mitigation. It might seem
+  # counter-intuitive that "post buffer" helps with fetching, but git
+  # indeed issues post requests when fetching over https, it's a
+  # bidirectional negotiation with the remote.
+  git config http.postBuffer 52428800
+
   info "====================================================="
   info "Toolchain versions"
   info "====================================================="
