@@ -480,7 +480,7 @@ hIsOpen handle =
       SemiClosedHandle     -> return False
       _                    -> return True
 
--- | @'hIsOpen' hdl@ returns whether the handle is closed.
+-- | @'hIsClosed' hdl@ returns whether the handle is closed.
 -- If the 'haType' of @hdl@ is 'ClosedHandle' this returns 'True'
 -- and 'False' otherwise.
 hIsClosed :: Handle -> IO Bool
