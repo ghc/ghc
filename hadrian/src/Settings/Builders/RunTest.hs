@@ -47,12 +47,20 @@ runTestGhcFlags = do
                            then "-optc-fno-builtin"
                            else ""
 
+    -- Also pass -keep-tmp-files to GHC when --keep-test-files is
+    -- passed to hadrian for debugging purpose (#26688)
+    keepFiles <- testKeepFiles <$> userSetting defaultTestArgs
+    let keepTmpFilesFlag
+          | keepFiles = "-keep-tmp-files"
+          | otherwise = ""
+
     -- Take flags to send to the Haskell compiler from test.mk.
     -- See: https://github.com/ghc/ghc/blob/master/testsuite/mk/test.mk#L37
     unwords <$> sequence
         [ pure " -dcore-lint -dstg-lint -dcmm-lint -no-user-package-db -fno-dump-with-ways -fprint-error-index-links=never -rtsopts"
         , pure ghcOpts
         , pure ghcExtraFlags
+        , pure keepTmpFilesFlag
         , ifMinGhcVer "711" "-fno-warn-missed-specialisations"
         , ifMinGhcVer "711" "-fshow-warning-groups"
         , ifMinGhcVer "801" "-fdiagnostics-color=never"
