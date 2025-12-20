@@ -1905,7 +1905,9 @@ changeDirectory dir = do
       fhv <- compileGHCiExpr $
         "System.Directory.setCurrentDirectory " ++ show dir'
       liftIO $ evalIO interp fhv
+#if defined(HAVE_INTERNAL_INTERPRETER)
     _ -> pure ()
+#endif
 
 trySuccess :: GhciMonad m => m SuccessFlag -> m SuccessFlag
 trySuccess act =

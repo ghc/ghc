@@ -114,7 +114,8 @@ packageArgs = do
              , compilerStageOption ghcDebugAssertions ? arg "-DDEBUG" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage1]] `cabalFlag` "internal-interpreter"
+            [ andM [expr (ghcWithInterpreter stage), orM [expr (notM cross), stage1]] `cabalFlag` "interpreter"
+            , andM [expr (ghcWithInterpreter stage), notM (expr cross)] `cabalFlag` "internal-interpreter"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.
