@@ -26,6 +26,7 @@
   * Add a new module `System.IO.OS` with operations for obtaining operating-system handles (file descriptors, Windows handles). ([CLC proposal #369](https://github.com/haskell/core-libraries-committee/issues/369))
   * Evaluate backtraces for "error" exceptions at the moment they are thrown. ([CLC proposal #383](https://github.com/haskell/core-libraries-committee/issues/383))
   * Hide implementation details when throwing exceptions in throw and throwSTM. ([CLC proposal #387](https://github.com/haskell/core-libraries-committee/issues/387))
+  * Change `hIsReadable` and `hIsWritable` such that they always throw a respective exception when encountering a closed or semi-closed handle, not just in the case of a file handle. ([CLC proposal #371](github.com/haskell/core-libraries-committee/issues/371))
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1

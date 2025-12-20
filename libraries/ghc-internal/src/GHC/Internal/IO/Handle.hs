@@ -502,9 +502,14 @@ hIsClosed handle =
 
 -- | @'hIsReadable' hdl@ returns whether it is possible to read from the handle.
 hIsReadable :: Handle -> IO Bool
-hIsReadable (DuplexHandle _ _ _) = return True
-hIsReadable handle =
-    withHandle_ "hIsReadable" handle $ \ handle_ -> do
+hIsReadable handle@(FileHandle _ var)
+    = hIsReadable' handle var
+hIsReadable handle@(DuplexHandle _ readingVar _)
+    = hIsReadable' handle readingVar
+
+hIsReadable' :: Handle -> MVar Handle__ -> IO Bool
+hIsReadable' handle readingVar =
+    withHandle_' "hIsReadable" handle readingVar $ \ handle_ -> do
     case haType handle_ of
       ClosedHandle         -> ioe_closedHandle
       SemiClosedHandle     -> ioe_semiclosedHandle
@@ -512,9 +517,14 @@ hIsReadable handle =
 
 -- | @'hIsWritable' hdl@ returns whether it is possible to write to the handle.
 hIsWritable :: Handle -> IO Bool
-hIsWritable (DuplexHandle _ _ _) = return True
-hIsWritable handle =
-    withHandle_ "hIsWritable" handle $ \ handle_ -> do
+hIsWritable handle@(FileHandle _ var)
+    = hIsWritable' handle var
+hIsWritable handle@(DuplexHandle _ _ writingVar)
+    = hIsWritable' handle writingVar
+
+hIsWritable' :: Handle -> MVar Handle__ -> IO Bool
+hIsWritable' handle writingVar =
+    withHandle_' "hIsWritable" handle writingVar $ \ handle_ -> do
     case haType handle_ of
       ClosedHandle         -> ioe_closedHandle
       SemiClosedHandle     -> ioe_semiclosedHandle
