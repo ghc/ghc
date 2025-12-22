@@ -958,7 +958,7 @@ addArgCtxt arg_no (app_head, app_head_lspan) (L arg_loc arg) thing_inside
                                     , ppr arg
                                     , ppr arg_no])
        ; setSrcSpanA arg_loc $
-           mkNthFunArgErrCtxt app_head arg arg_no $
+           addNthFunArgErrCtxt app_head arg arg_no $
              thing_inside
        }
   | otherwise
@@ -971,8 +971,8 @@ addArgCtxt arg_no (app_head, app_head_lspan) (L arg_loc arg) thing_inside
           thing_inside
        }
  where
-    mkNthFunArgErrCtxt :: HsExpr GhcRn -> HsExpr GhcRn -> Int -> TcM a -> TcM a
-    mkNthFunArgErrCtxt app_head arg arg_no thing_inside
+    addNthFunArgErrCtxt :: HsExpr GhcRn -> HsExpr GhcRn -> Int -> TcM a -> TcM a
+    addNthFunArgErrCtxt app_head arg arg_no thing_inside
       | XExpr (ExpandedThingRn o _) <- arg
       = addExpansionErrCtxt o (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
           thing_inside
