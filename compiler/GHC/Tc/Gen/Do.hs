@@ -114,7 +114,7 @@ expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
   | otherwise
   = pprPanic "expand_do_stmts: The impossible happened, missing bind operator from renamer" (text "stmt" <+> ppr  stmt)
 
-expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ (L e_lspan e) (SyntaxExprRn then_op) _)) : lstmts) =
+expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ (L _e_lspan e) (SyntaxExprRn then_op) _)) : lstmts) =
 -- See Note [BodyStmt] in Language.Haskell.Syntax.Expr
 -- See  Note [Expanding HsDo with XXExprGhcRn] Equation (1) below
 --              stmts ~~> stmts'
@@ -122,7 +122,8 @@ expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ (L e_lspan e) (SyntaxExprRn t
 --      e ; stmts ~~> (>>) e stmts'
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
      let expansion = genHsExpApps then_op  -- (>>)
-                     [ L e_lspan (mkExpandedStmt stmt doFlavour e)
+                     [ -- L e_lspan (mkExpandedStmt stmt doFlavour e)
+                       wrapGenSpan e
                      , expand_stmts_expr ]
      return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 

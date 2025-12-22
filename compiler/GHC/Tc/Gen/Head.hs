@@ -462,7 +462,7 @@ tcInferAppHead_maybe fun = case fun of
       ExprWithTySig _ e hs_ty     -> Just <$> with_get_ds (tcExprWithSig e hs_ty)
       HsOverLit _ lit             -> Just <$> with_get_ds (tcInferOverLit lit)
       XExpr (HsRecSelRn f)        -> Just <$> with_get_ds (tcInferRecSelId f)
-      XExpr (ExpandedThingRn o e) -> Just <$> (-- addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) $
+      XExpr (ExpandedThingRn o e) -> Just <$> (
                                               -- We do not want to instantiate the type of the head as there may be
                                               -- visible type applications in the argument.
                                               -- c.f. T19167

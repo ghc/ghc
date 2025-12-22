@@ -181,8 +181,10 @@ tcExprSigma :: Bool -> CtOrigin -> HsExpr GhcRn -> TcM (HsExpr GhcTc, DeepSubsum
 tcExprSigma inst fun_orig rn_expr
   = do { (fun@(rn_fun,fun_lspan), rn_args) <- splitHsApps rn_expr
        ; (tc_fun, ds_flag, fun_sigma) <- tcInferAppHead fun
+       ; igc <- inGeneratedCode
        ; traceTc "tcExprSigma" (vcat [ text "rn_expr:" <+> ppr rn_expr
-                                     , text "tc_fun" <+> ppr tc_fun ])
+                                     , text "tc_fun" <+> ppr tc_fun
+                                     , text "igc:" <+> ppr igc])
        ; (inst_args, app_res_sigma) <- tcInstFun DoQL inst ds_flag (fun_orig, rn_fun, fun_lspan)
                                            tc_fun fun_sigma rn_args
        ; tc_args <- tcValArgs DoQL (rn_fun, fun_lspan) inst_args
@@ -955,7 +957,9 @@ addArgCtxt arg_no (app_head, app_head_lspan) (L arg_loc arg) thing_inside
                                     , ppr arg_loc
                                     , ppr arg
                                     , ppr arg_no])
-       ; setSrcSpanA arg_loc $ mkNthFunArgErrCtxt app_head arg arg_no thing_inside
+       ; setSrcSpanA arg_loc $
+           mkNthFunArgErrCtxt app_head arg arg_no $
+             thing_inside
        }
   | otherwise
   = do { traceTc "addArgCtxt" (vcat [text "generated Head"
@@ -2027,7 +2031,11 @@ maybe_update_err_ctxt :: SrcSpan -> HsExpr GhcRn ->  TcM a -> TcM a
 maybe_update_err_ctxt fun_lspan_arg rn_fun_arg thing_inside
   | not (isGeneratedSrcSpan fun_lspan_arg)
   , XExpr (ExpandedThingRn{}) <- rn_fun_arg
-  = addLExprCtxt fun_lspan_arg rn_fun_arg $ thing_inside
+  = do igc <- inGeneratedCode
+       if igc
+        then thing_inside
+        else addLExprCtxt fun_lspan_arg rn_fun_arg $
+               thing_inside
   | otherwise
   = thing_inside
 
