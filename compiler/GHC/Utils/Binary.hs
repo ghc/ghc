@@ -1912,8 +1912,7 @@ instance Binary UnhelpfulSpanReason where
     UnhelpfulNoLocationInfo -> putByte bh 0
     UnhelpfulWiredIn        -> putByte bh 1
     UnhelpfulInteractive    -> putByte bh 2
-    UnhelpfulGenerated      -> putByte bh 3
-    UnhelpfulOther fs       -> putByte bh 4 >> put_ bh fs
+    UnhelpfulOther fs       -> putByte bh 3 >> put_ bh fs
 
   get bh = do
     h <- getByte bh
@@ -1921,10 +1920,24 @@ instance Binary UnhelpfulSpanReason where
       0 -> return UnhelpfulNoLocationInfo
       1 -> return UnhelpfulWiredIn
       2 -> return UnhelpfulInteractive
-      3 -> return UnhelpfulGenerated
       _ -> UnhelpfulOther <$> get bh
 
 newtype BinSrcSpan = BinSrcSpan { unBinSrcSpan :: SrcSpan }
+
+instance Binary GeneratedSrcSpanDetails where
+  put_ bh (OrigSpan ss) = do
+          putByte bh 0
+          put_ bh $ BinSpan ss
+
+  put_ bh UnhelpfulGenerated = do
+          putByte bh 1
+
+  get bh = do
+          h <- getByte bh
+          case h of
+            0 -> do BinSpan ss <- get bh
+                    return $ OrigSpan ss
+            _ -> do return UnhelpfulGenerated
 
 -- See Note [Source Location Wrappers]
 instance Binary BinSrcSpan where
@@ -1938,13 +1951,19 @@ instance Binary BinSrcSpan where
           putByte bh 1
           put_ bh s
 
+  put_ bh (BinSrcSpan (GeneratedSrcSpan ss)) = do
+          putByte bh 2
+          put_ bh ss
+
   get bh = do
           h <- getByte bh
           case h of
             0 -> do BinSpan ss <- get bh
                     return $ BinSrcSpan (RealSrcSpan ss Strict.Nothing)
-            _ -> do s <- get bh
+            1 -> do s <- get bh
                     return $ BinSrcSpan (UnhelpfulSpan s)
+            _ -> do ss <- get bh
+                    return $ BinSrcSpan (GeneratedSrcSpan ss)
 
 
 {-

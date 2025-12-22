@@ -17,7 +17,7 @@ module GHC.Rename.Utils (
         DeprecationWarnings(..), warnIfDeprecated,
         checkUnusedRecordWildcard,
         badQualBndrErr, typeAppErr, badFieldConErr,
-        wrapGenSpan, wrapNoSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps', genHsExpApps,
+        wrapGenSpan, wrapGenSpan', wrapNoSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps', genHsExpApps,
         genLHsApp, genAppType,
         genLHsLit, genHsIntegralLit, genHsTyLit, genSimpleConPat,
         genVarPat, genWildPat,
@@ -700,6 +700,11 @@ wrapGenSpan :: (HasAnnotation an) => a -> GenLocated an a
 -- Wrap something in a "generatedSrcSpan"
 -- See Note [Rebindable syntax and XXExprGhcRn]
 wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
+
+wrapGenSpan' :: (HasAnnotation an) => SrcSpan -> a -> GenLocated an a
+wrapGenSpan' s x = case s of
+  RealSrcSpan s _ -> L (noAnnSrcSpan $ GeneratedSrcSpan (OrigSpan s)) x
+  _ -> wrapGenSpan x
 
 wrapNoSpan :: (HasAnnotation an) => a -> GenLocated an a
 -- Wrap something in a "noSrcSpan"

@@ -121,7 +121,7 @@ addTicksToBinds logger cfg
                       , blackList    = Set.fromList $
                                        mapMaybe (\tyCon -> case getSrcSpan (tyConName tyCon) of
                                                              RealSrcSpan l _ -> Just l
-                                                             UnhelpfulSpan _ -> Nothing)
+                                                             _                -> Nothing)
                                                 tyCons
                       , density      = mkDensity tickish $ ticks_profAuto cfg
                       , this_mod     = mod
@@ -1192,7 +1192,7 @@ getFileName = fileName `liftM` getEnv
 
 isGoodSrcSpan' :: SrcSpan -> Bool
 isGoodSrcSpan' pos@(RealSrcSpan _ _) = srcSpanStart pos /= srcSpanEnd pos
-isGoodSrcSpan' (UnhelpfulSpan _) = False
+isGoodSrcSpan' _ = False
 
 isGoodTickSrcSpan :: SrcSpan -> TM Bool
 isGoodTickSrcSpan pos = do
@@ -1218,11 +1218,11 @@ bindLocals from (TM m) = TM $ \env st ->
 
 withBlackListed :: SrcSpan -> TM a -> TM a
 withBlackListed (RealSrcSpan ss _) = withEnv (\ env -> env { blackList = Set.insert ss (blackList env) })
-withBlackListed (UnhelpfulSpan _)  = id
+withBlackListed _  = id
 
 isBlackListed :: SrcSpan -> TM Bool
 isBlackListed (RealSrcSpan pos _) = TM $ \ env st -> (Set.member pos (blackList env), noFVs, st)
-isBlackListed (UnhelpfulSpan _) = return False
+isBlackListed _ = return False
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations

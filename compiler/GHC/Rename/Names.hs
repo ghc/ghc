@@ -2166,7 +2166,7 @@ insertImportMap :: GlobalRdrElt -> ImportMap -> ImportMap
 insertImportMap gre@(GRE { gre_imp = imp_specs }) importMap
   | RealSrcSpan importSpan _ <- is_dloc best_imp_spec =
       importMap{im_imports = insertElem importSpan gre $ im_imports importMap}
-  | UnhelpfulSpan UnhelpfulGenerated <- is_dloc best_imp_spec =
+  | GeneratedSrcSpan{} <- is_dloc best_imp_spec =
       importMap{im_generatedImports = insertElem (moduleName $ is_mod best_imp_spec) gre $ im_generatedImports importMap}
   | otherwise = importMap
   where
@@ -2187,7 +2187,7 @@ lookupImportMap (L srcSpan ImportDecl{ideclName = L _ modName}) importMap =
     -- should match logic in insertImportMap
     case locA srcSpan of
       RealSrcSpan realSrcSpan _ -> realSrcSpan `Map.lookup` im_imports importMap
-      UnhelpfulSpan UnhelpfulGenerated -> modName `Map.lookup` im_generatedImports importMap
+      GeneratedSrcSpan{} -> modName `Map.lookup` im_generatedImports importMap
       _ -> Nothing
 
 warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
@@ -2557,4 +2557,3 @@ addDupDeclErr gres@(gre :| _)
 checkConName :: RdrName -> TcRn ()
 checkConName name
   = checkErr (isRdrDataCon name || isRdrTc name) (TcRnIllegalDataCon name)
-

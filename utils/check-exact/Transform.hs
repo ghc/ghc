@@ -255,6 +255,8 @@ setEntryDPDecl d dp = setEntryDP d dp
 setEntryDP :: LocatedAn t a -> DeltaPos -> LocatedAn t a
 setEntryDP (L (EpAnn (EpaSpan ss@(UnhelpfulSpan _)) an cs) a) dp
   = L (EpAnn (EpaDelta ss dp []) an cs) a
+setEntryDP (L (EpAnn (EpaSpan ss@(GeneratedSrcSpan _)) an cs) a) dp
+  = L (EpAnn (EpaDelta ss dp []) an cs) a
 setEntryDP (L (EpAnn (EpaSpan ss) an (EpaComments [])) a) dp
   = L (EpAnn (EpaDelta ss dp []) an (EpaComments [])) a
 setEntryDP (L (EpAnn (EpaDelta ss d csd) an cs) a) dp
@@ -320,20 +322,20 @@ getEntryDP _ = SameLine 1
 
 addEpaLocationDelta :: LayoutStartCol -> RealSrcSpan -> EpaLocation -> EpaLocation
 addEpaLocationDelta _off _anc (EpaDelta ss d cs) = EpaDelta ss d cs
-addEpaLocationDelta _off _anc (EpaSpan ss@(UnhelpfulSpan _)) = EpaDelta ss (SameLine 0) []
 addEpaLocationDelta  off  anc (EpaSpan ss@(RealSrcSpan r _))
   = EpaDelta ss (adjustDeltaForOffset off (ss2deltaEnd anc r)) []
+addEpaLocationDelta _off _anc (EpaSpan ss) = EpaDelta ss (SameLine 0) []
 
 -- Set the entry DP for an element coming after an existing keyword annotation
 setEntryDPFromAnchor :: LayoutStartCol -> EpaLocation -> LocatedA t -> LocatedA t
-setEntryDPFromAnchor _off (EpaDelta _ _ _) (L la a) = L la a
-setEntryDPFromAnchor _off (EpaSpan (UnhelpfulSpan _)) (L la a) = L la a
 setEntryDPFromAnchor  off (EpaSpan (RealSrcSpan anc _)) ll@(L la _) = setEntryDP ll dp'
   where
     dp' = case la of
       (EpAnn (EpaSpan (RealSrcSpan r' _)) _ _) -> adjustDeltaForOffset off (ss2deltaEnd anc r')
       (EpAnn (EpaSpan _) _ _)                  -> adjustDeltaForOffset off (SameLine 0)
       (EpAnn (EpaDelta _ dp _) _ _)            -> adjustDeltaForOffset off dp
+
+setEntryDPFromAnchor _off _ ll = ll
 
 -- ---------------------------------------------------------------------
 
@@ -902,7 +904,7 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
             let
               off = case l of
                       (EpaSpan (RealSrcSpan r _)) -> LayoutStartCol $ snd $ ss2pos r
-                      (EpaSpan (UnhelpfulSpan _)) -> LayoutStartCol 0
+                      (EpaSpan _)                 -> LayoutStartCol 0
                       (EpaDelta _ (SameLine _) _) -> LayoutStartCol 0
                       (EpaDelta _ (DifferentLine _ c) _) -> LayoutStartCol c
               ex'' = setEntryDPFromAnchor off i ex

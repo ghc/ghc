@@ -481,6 +481,7 @@ enterAnn !(Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
             dp = adjustDeltaForOffset
                    off (ss2delta priorEndAfterComments r)
         Just (EpaSpan (UnhelpfulSpan r)) -> panic $ "enterAnn: UnhelpfulSpan:" ++ show r
+        Just (EpaSpan (GeneratedSrcSpan r)) -> panic $ "enterAnn: UnhelpfulSpan:" ++ show r
   when (isJust med) $ debugM $ "enterAnn:(med,edp)=" ++ showAst (med,edp)
   when (isJust medr) $ setExtraDPReturn medr
   -- ---------------------------------------------
@@ -741,7 +742,7 @@ printStringAtNC el str = do
 printStringAtAAC :: (Monad m, Monoid w)
   => CaptureComments -> EpaLocation -> String -> EP w m EpaLocation
 printStringAtAAC capture (EpaSpan (RealSrcSpan r _)) s = printStringAtRsC capture r s
-printStringAtAAC _capture (EpaSpan ss@(UnhelpfulSpan _)) _s = error $ "printStringAtAAC:ss=" ++ show ss
+printStringAtAAC _capture (EpaSpan ss) _s = error $ "printStringAtAAC:ss=" ++ show ss
 printStringAtAAC capture (EpaDelta ss d cs) s = do
   mapM_ printOneComment $ concatMap tokComment cs
   pe1 <- getPriorEndD
@@ -1360,7 +1361,7 @@ printOneComment c@(Comment _str loc _r _mo) = do
         let dp = ss2delta pe r
         debugM $ "printOneComment:(dp,pe,loc)=" ++ showGhc (dp,pe,loc)
         adjustDeltaForOffsetM dp
-    EpaSpan (UnhelpfulSpan _) -> return (SameLine 0)
+    EpaSpan _ -> return (SameLine 0)
   mep <- getExtraDP
   dp' <- case mep of
     Just (EpaDelta _ edp _) -> do
