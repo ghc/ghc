@@ -765,7 +765,7 @@ tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcXExpr (ExpandedThingRn o e) res_ty
    = mkExpandedTc o <$> -- necessary for hpc ticks
          -- Need to call tcExpr and not tcApp
-         -- as e can be let statements which tcApp cannot gracefully handle
+         -- as e can be let statement which tcApp cannot gracefully handle
          tcExpr e res_ty
 
 -- For record selection, same as HsVar case
