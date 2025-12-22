@@ -395,6 +395,7 @@ wanteds os = concat
           ,fieldOffset Both "StgRegTable" "rCurrentTSO"
           ,fieldOffset Both "StgRegTable" "rCurrentNursery"
           ,fieldOffset Both "StgRegTable" "rHpAlloc"
+          ,structField C    "StgRegTable" "rCurrentAlloc"
           ,structField C    "StgRegTable" "rRet"
           ,structField C    "StgRegTable" "rNursery"
 
@@ -414,6 +415,7 @@ wanteds os = concat
           ,structField C    "Capability" "weak_ptr_list_hd"
           ,structField C    "Capability" "weak_ptr_list_tl"
           ,structField C    "Capability" "n_run_queue"
+          ,structField C    "Capability" "pinned_object_block"
 
           ,structField Both "bdescr" "start"
           ,structField Both "bdescr" "free"
@@ -629,6 +631,8 @@ wanteds os = concat
                           "RTS_FLAGS" "DebugFlags.sanity"
           ,structField_ C "RtsFlags_DebugFlags_weak"
                           "RTS_FLAGS" "DebugFlags.weak"
+          ,structField_ C "RtsFlags_DebugFlags_zero_on_gc"
+                          "RTS_FLAGS" "DebugFlags.zero_on_gc"
           ,structField_ C "RtsFlags_GcFlags_initialStkSize"
                           "RTS_FLAGS" "GcFlags.initialStkSize"
           ,structField_ C "RtsFlags_MiscFlags_tickInterval"
