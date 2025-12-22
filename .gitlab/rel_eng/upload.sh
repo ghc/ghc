@@ -1,4 +1,4 @@
-#!/usr/bin/env nix-shell
+#!/usr/bin/bash
 #! nix-shell -i bash -p moreutils lzip zip lftp gnupg
 
 set -Eeuo pipefail
@@ -41,7 +41,7 @@ set -Eeuo pipefail
 : ${ver:=$(ls ghc-*.tar.* | sed -ne 's/ghc-\([0-9]\+\.[0-9]\+\.[0-9]\+\(\.[0-9]\+\)\?\).\+/\1/p' | head -n1)}
 if [ -z "$ver" ]; then echo "Failed to infer \$ver"; exit 1; fi
 
-host="gitlab-storage.haskell.org"
+host="gitlab.haskell.org:2222"
 
 usage() {
     echo "Usage: [rel_name=<name>] ver=7.10.3-rc2 $0 <action>"

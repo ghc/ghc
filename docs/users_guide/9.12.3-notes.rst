@@ -17,11 +17,14 @@ Compiler
 - Fixed CprAnal to detect recursive newtypes (:ghc-ticket:`25944`)
 - Fixed specialisation of incoherent instances (:ghc-ticket:`25883`)
 - Fixed bytecode generation for ``tagToEnum# <LITERAL>`` (:ghc-ticket:`25975`)
+- Fixed bytecode generation for unsaturated data constructor workers (:ghc-ticket:`23210`)
 - Fixed panic with EmptyCase and RequiredTypeArguments (:ghc-ticket:`25004`)
+- Fixed EmptyCase panic in tcMatches with invisible forall (:ghc-ticket:`25960`)
 - Fixed ``tyConStupidTheta`` to handle ``PromotedDataCon`` (:ghc-ticket:`25739`)
 - Fixed unused import warnings for duplicate record fields (:ghc-ticket:`24035`)
 - Fixed lexing of ``"\^\"`` (:ghc-ticket:`25937`)
 - Fixed string gap collapsing (:ghc-ticket:`25784`)
+- Fixed tabs in string gaps (:ghc-ticket:`26415`)
 - Fixed lexing of comments in multiline strings (:ghc-ticket:`25609`)
 - Made unexpected LLVM versions a warning rather than an error (:ghc-ticket:`25915`)
 - Disabled ``-fprof-late-overloaded-calls`` for join points to avoid invalid transformations
@@ -38,6 +41,7 @@ Runtime System
 
 - Fixed ``MessageBlackHole.link`` to always be a valid closure
 - Fixed handling of WHITEHOLE in ``messageBlackHole`` (:ghc-ticket:`26205`)
+- Fixed handling of WHITEHOLEs in ``scavenge_one`` (:ghc-ticket:`26204`)
 - Fixed ``rts_clearMemory`` logic when sanity checks are enabled (:ghc-ticket:`26011`)
 - Fixed underflow frame lookups in the bytecode interpreter (:ghc-ticket:`25750`)
 - Fixed overflows and reentrancy in interpreter statistics calculation (:ghc-ticket:`25756`)
@@ -76,6 +80,8 @@ Linker
 - Fixed incorrect use of ``break`` in nested for loop (:ghc-ticket:`26052`)
 - Fixed linker to not fail due to ``RTLD_NOW`` (:ghc-ticket:`25943`)
 - Dropped obsolete Windows XP compatibility checks
+- Fix the Windows runtime linker to copy DLL path strings before inserting
+  them into the cache, preventing use-after-free issues (:ghc-ticket:`26613`)
 
 GHCi
 ~~~~
