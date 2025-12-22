@@ -502,11 +502,11 @@ rnExpr (ExplicitList _ exps)
           then return  (ExplicitList noExtField exps', fvs)
           else
     do { (from_list_n_name, fvs') <- lookupSyntaxName fromListNName
-       ; loc <- getSrcSpanM -- See Note [Source locations for implicit function calls]
+       --; loc <- getSrcSpanM -- See Note [Source locations for implicit function calls]
        ; let rn_list  = ExplicitList noExtField exps'
              lit_n    = mkIntegralLit (length exps)
              hs_lit   = genHsIntegralLit lit_n
-             exp_list = genHsApps' (L (noAnnSrcSpan loc) from_list_n_name) [hs_lit, wrapGenSpan rn_list]
+             exp_list = genHsApps' (wrapGenSpan from_list_n_name) [hs_lit, wrapGenSpan rn_list]
        ; return ( mkExpandedExpr rn_list exp_list
                 , fvs `plusFV` fvs') } }
 
