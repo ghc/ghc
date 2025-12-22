@@ -30,6 +30,7 @@ module GHC.Types.SrcLoc (
         -- * SrcSpan
         RealSrcSpan,            -- Abstract
         SrcSpan(..),
+        GeneratedSrcSpanDetails(..),
         UnhelpfulSpanReason(..),
 
         -- ** Constructing SrcSpan
@@ -49,6 +50,8 @@ module GHC.Types.SrcLoc (
         pprUserSpan,
         unhelpfulSpanFS,
         srcSpanToRealSrcSpan,
+        pprGeneratedSrcSpanDetails,
+        generatedSrcSpanDetailsFS,
 
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
@@ -306,7 +309,7 @@ lookupSrcLoc (UnhelpfulLoc _) = const Nothing
 
 lookupSrcSpan :: SrcSpan -> Map.Map RealSrcSpan a -> Maybe a
 lookupSrcSpan (RealSrcSpan l _) = Map.lookup l
-lookupSrcSpan (UnhelpfulSpan _) = const Nothing
+lookupSrcSpan _ = const Nothing
 
 instance Outputable RealSrcLoc where
     ppr (SrcLoc (LexicalFastString src_path) src_line src_col)
@@ -387,16 +390,22 @@ instance Semigroup BufSpan where
 -- or a human-readable description of a location.
 data SrcSpan =
     RealSrcSpan !RealSrcSpan !(Strict.Maybe BufSpan)  -- See Note [Why Maybe BufPos]
+  | GeneratedSrcSpan !GeneratedSrcSpanDetails
   | UnhelpfulSpan !UnhelpfulSpanReason
 
   deriving (Eq, Show) -- Show is used by GHC.Parser.Lexer, because we
                       -- derive Show for Token
 
+-- Needed for HIE
+data GeneratedSrcSpanDetails =
+    OrigSpan !RealSrcSpan -- this the span of the user written thing
+  | UnhelpfulGenerated
+  deriving (Eq, Show)
+
 data UnhelpfulSpanReason
   = UnhelpfulNoLocationInfo
   | UnhelpfulWiredIn
   | UnhelpfulInteractive
-  | UnhelpfulGenerated
   | UnhelpfulOther !FastString
   deriving (Eq, Show)
 
@@ -426,7 +435,12 @@ messages, constructing a SrcSpan without a BufSpan.
 
 instance ToJson SrcSpan where
   json (UnhelpfulSpan {} ) = JSNull --JSObject [( "type", "unhelpful")]
+  json (GeneratedSrcSpan d) = json d
   json (RealSrcSpan rss _) = json rss
+
+instance ToJson GeneratedSrcSpanDetails where
+  json (UnhelpfulGenerated) = JSNull
+  json (OrigSpan s) = json s
 
 instance ToJson RealSrcSpan where
   json (RealSrcSpan'{..}) = JSObject [ ("file", JSString (unpackFS srcSpanFile)),
@@ -444,27 +458,32 @@ instance NFData RealSrcSpan where
 instance NFData SrcSpan where
   rnf (RealSrcSpan a1 a2) = rnf a1 `seq` rnf a2
   rnf (UnhelpfulSpan a1) = rnf a1
+  rnf (GeneratedSrcSpan a1) = rnf a1
+
+instance NFData GeneratedSrcSpanDetails where
+  rnf (OrigSpan s) = rnf s
+  rnf (UnhelpfulGenerated) = ()
 
 instance NFData UnhelpfulSpanReason where
   rnf (UnhelpfulNoLocationInfo) = ()
   rnf (UnhelpfulWiredIn) = ()
   rnf (UnhelpfulInteractive) = ()
-  rnf (UnhelpfulGenerated) = ()
   rnf (UnhelpfulOther a1) = rnf a1
 
 getBufSpan :: SrcSpan -> Strict.Maybe BufSpan
 getBufSpan (RealSrcSpan _ mbspan) = mbspan
-getBufSpan (UnhelpfulSpan _) = Strict.Nothing
+getBufSpan _ = Strict.Nothing
+
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
 noSrcSpan, generatedSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
 noSrcSpan          = UnhelpfulSpan UnhelpfulNoLocationInfo
 wiredInSrcSpan     = UnhelpfulSpan UnhelpfulWiredIn
 interactiveSrcSpan = UnhelpfulSpan UnhelpfulInteractive
-generatedSrcSpan   = UnhelpfulSpan UnhelpfulGenerated
+generatedSrcSpan   = GeneratedSrcSpan UnhelpfulGenerated
 
 isGeneratedSrcSpan :: SrcSpan -> Bool
-isGeneratedSrcSpan (UnhelpfulSpan UnhelpfulGenerated) = True
+isGeneratedSrcSpan (GeneratedSrcSpan{})               = True
 isGeneratedSrcSpan _                                  = False
 
 isNoSrcSpan :: SrcSpan -> Bool
@@ -515,6 +534,8 @@ mkSrcSpan (RealSrcLoc loc1 mbpos1) (RealSrcLoc loc2 mbpos2)
 combineSrcSpans :: SrcSpan -> SrcSpan -> SrcSpan
 combineSrcSpans (UnhelpfulSpan _) r = r -- this seems more useful
 combineSrcSpans l (UnhelpfulSpan _) = l
+combineSrcSpans (GeneratedSrcSpan{}) r = r
+combineSrcSpans l (GeneratedSrcSpan{}) = l
 combineSrcSpans (RealSrcSpan span1 mbspan1) (RealSrcSpan span2 mbspan2)
   | srcSpanFile span1 == srcSpanFile span2
       = RealSrcSpan (combineRealSrcSpans span1 span2) (liftA2 combineBufSpans mbspan1 mbspan2)
@@ -543,6 +564,7 @@ combineBufSpans span1 span2 = BufSpan start end
 -- | Convert a SrcSpan into one that represents only its first character
 srcSpanFirstCharacter :: SrcSpan -> SrcSpan
 srcSpanFirstCharacter l@(UnhelpfulSpan {}) = l
+srcSpanFirstCharacter l@(GeneratedSrcSpan {}) = l
 srcSpanFirstCharacter (RealSrcSpan span mbspan) =
     RealSrcSpan (mkRealSrcSpan loc1 loc2) (fmap mkBufSpan mbspan)
   where
@@ -564,13 +586,13 @@ srcSpanFirstCharacter (RealSrcSpan span mbspan) =
 -- | Test if a 'SrcSpan' is "good", i.e. has precise location information
 isGoodSrcSpan :: SrcSpan -> Bool
 isGoodSrcSpan (RealSrcSpan _ _) = True
-isGoodSrcSpan (UnhelpfulSpan _) = False
+isGoodSrcSpan _ = False
 
 isOneLineSpan :: SrcSpan -> Bool
 -- ^ True if the span is known to straddle only one line.
 -- For "bad" 'SrcSpan', it returns False
 isOneLineSpan (RealSrcSpan s _) = srcSpanStartLine s == srcSpanEndLine s
-isOneLineSpan (UnhelpfulSpan _) = False
+isOneLineSpan _ = False
 
 isZeroWidthSpan :: SrcSpan -> Bool
 -- ^ True if the span has a width of zero, as returned for "virtual"
@@ -578,7 +600,7 @@ isZeroWidthSpan :: SrcSpan -> Bool
 -- For "bad" 'SrcSpan', it returns False
 isZeroWidthSpan (RealSrcSpan s _) = srcSpanStartLine s == srcSpanEndLine s
                                  && srcSpanStartCol s == srcSpanEndCol s
-isZeroWidthSpan (UnhelpfulSpan _) = False
+isZeroWidthSpan _ = False
 
 -- | Tests whether the first span "contains" the other span, meaning
 -- that it covers at least as much source code. True where spans are equal.
@@ -620,11 +642,13 @@ srcSpanEndCol RealSrcSpan'{ srcSpanECol=c } = c
 -- | Returns the location at the start of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
 srcSpanStart :: SrcSpan -> SrcLoc
 srcSpanStart (UnhelpfulSpan r) = UnhelpfulLoc (unhelpfulSpanFS r)
+srcSpanStart (GeneratedSrcSpan d) = UnhelpfulLoc (generatedSrcSpanDetailsFS d)
 srcSpanStart (RealSrcSpan s b) = RealSrcLoc (realSrcSpanStart s) (fmap bufSpanStart b)
 
 -- | Returns the location at the end of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
 srcSpanEnd :: SrcSpan -> SrcLoc
 srcSpanEnd (UnhelpfulSpan r) = UnhelpfulLoc (unhelpfulSpanFS r)
+srcSpanEnd (GeneratedSrcSpan d) = UnhelpfulLoc (generatedSrcSpanDetailsFS d)
 srcSpanEnd (RealSrcSpan s b) = RealSrcLoc (realSrcSpanEnd s) (fmap bufSpanEnd b)
 
 realSrcSpanStart :: RealSrcSpan -> RealSrcLoc
@@ -640,7 +664,7 @@ realSrcSpanEnd s = mkRealSrcLoc (srcSpanFile s)
 -- | Obtains the filename for a 'SrcSpan' if it is "good"
 srcSpanFileName_maybe :: SrcSpan -> Maybe FastString
 srcSpanFileName_maybe (RealSrcSpan s _) = Just (srcSpanFile s)
-srcSpanFileName_maybe (UnhelpfulSpan _) = Nothing
+srcSpanFileName_maybe _ = Nothing
 
 srcSpanToRealSrcSpan :: SrcSpan -> Maybe RealSrcSpan
 srcSpanToRealSrcSpan (RealSrcSpan ss _) = Just ss
@@ -710,13 +734,19 @@ unhelpfulSpanFS r = case r of
   UnhelpfulNoLocationInfo -> fsLit "<no location info>"
   UnhelpfulWiredIn        -> fsLit "<wired into compiler>"
   UnhelpfulInteractive    -> fsLit "<interactive>"
-  UnhelpfulGenerated      -> fsLit "<generated>"
 
 pprUnhelpfulSpanReason :: UnhelpfulSpanReason -> SDoc
 pprUnhelpfulSpanReason r = ftext (unhelpfulSpanFS r)
 
+generatedSrcSpanDetailsFS :: GeneratedSrcSpanDetails -> FastString
+generatedSrcSpanDetailsFS _ = fsLit "<generated>"
+
+pprGeneratedSrcSpanDetails :: GeneratedSrcSpanDetails -> SDoc
+pprGeneratedSrcSpanDetails d = ftext (generatedSrcSpanDetailsFS d)
+
 pprUserSpan :: Bool -> SrcSpan -> SDoc
 pprUserSpan _         (UnhelpfulSpan r) = pprUnhelpfulSpanReason r
+pprUserSpan _         (GeneratedSrcSpan d) = pprGeneratedSrcSpanDetails d
 pprUserSpan show_path (RealSrcSpan s _) = pprUserRealSpan show_path s
 
 pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
@@ -843,15 +873,19 @@ leftmost_largest = compareSrcSpanBy $
 
 compareSrcSpanBy :: (RealSrcSpan -> RealSrcSpan -> Ordering) -> SrcSpan -> SrcSpan -> Ordering
 compareSrcSpanBy cmp (RealSrcSpan a _) (RealSrcSpan b _) = cmp a b
-compareSrcSpanBy _   (RealSrcSpan _ _) (UnhelpfulSpan _) = LT
+compareSrcSpanBy _   (RealSrcSpan _ _) _ = LT
 compareSrcSpanBy _   (UnhelpfulSpan _) (RealSrcSpan _ _) = GT
-compareSrcSpanBy _   (UnhelpfulSpan _) (UnhelpfulSpan _) = EQ
+compareSrcSpanBy _   (UnhelpfulSpan _) _ = EQ
+compareSrcSpanBy _   (GeneratedSrcSpan _) (RealSrcSpan _ _) = GT
+compareSrcSpanBy _   (GeneratedSrcSpan _) _ = EQ
+
 
 -- | Determines whether a span encloses a given line and column index
 spans :: SrcSpan -> (Int, Int) -> Bool
-spans (UnhelpfulSpan _) _ = panic "spans UnhelpfulSpan"
 spans (RealSrcSpan span _) (l,c) = realSrcSpanStart span <= loc && loc <= realSrcSpanEnd span
    where loc = mkRealSrcLoc (srcSpanFile span) l c
+spans (UnhelpfulSpan _) _ = panic "spans UnhelpfulSpan"
+spans (GeneratedSrcSpan _) _ = panic "spans GeneratedSrcSpan"
 
 -- | Determines whether a span is enclosed by another one
 isSubspanOf :: SrcSpan -- ^ The span that may be enclosed by the other

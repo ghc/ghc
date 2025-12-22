@@ -123,7 +123,6 @@ expand_do_stmts doFlavour (stmt@(L loc (BodyStmt _ (L e_lspan e) (SyntaxExprRn t
   do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
      let expansion = genHsExpApps then_op  -- (>>)
                      [ L e_lspan (mkExpandedStmt stmt doFlavour e)
-                       -- wrapGenSpan e
                      , expand_stmts_expr ]
      return $ L loc (mkExpandedStmt stmt doFlavour expansion)
 

@@ -2692,8 +2692,9 @@ parseSpanArg s = do
 -- @<filename>:(<line>,<col>)-(<line-end>,<col-end>)@
 -- while simply unpacking 'UnhelpfulSpan's
 showSrcSpan :: SrcSpan -> String
-showSrcSpan (UnhelpfulSpan s)  = unpackFS (unhelpfulSpanFS s)
-showSrcSpan (RealSrcSpan spn _) = showRealSrcSpan spn
+showSrcSpan (UnhelpfulSpan s)    = unpackFS (unhelpfulSpanFS s)
+showSrcSpan (GeneratedSrcSpan d) = unpackFS (generatedSrcSpanDetailsFS d)
+showSrcSpan (RealSrcSpan spn _)  = showRealSrcSpan spn
 
 -- | Variant of 'showSrcSpan' for 'RealSrcSpan's
 showRealSrcSpan :: RealSrcSpan -> String
@@ -4235,14 +4236,14 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
       mb_span <- getCurrentBreakSpan
       case mb_span of
         Nothing  -> stepCmd []
-        Just (UnhelpfulSpan _) -> liftIO $ putStrLn (            -- #14690
-           ":steplocal is not possible." ++
-           "\nCannot determine current top-level binding after " ++
-           "a break on error / exception.\nUse :stepmodule.")
-        Just loc -> do
+        Just loc@(RealSrcSpan{}) -> do
            md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
            current_toplevel_decl <- flip enclosingTickSpan loc <$> getTickArray md
            doContinue (GHC.LocalStep (RealSrcSpan current_toplevel_decl Strict.Nothing))
+        Just _ -> liftIO $ putStrLn (            -- #14690
+           ":steplocal is not possible." ++
+           "\nCannot determine current top-level binding after " ++
+           "a break on error / exception.\nUse :stepmodule.")
 
 stepModuleCmd :: GhciMonad m => String -> m ()
 stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
@@ -4580,7 +4581,7 @@ listCmd "" = do
           printForUser $ text "Not stopped at a breakpoint; nothing to list"
       Just (RealSrcSpan pan _) ->
           listAround pan True
-      Just pan@(UnhelpfulSpan _) ->
+      Just pan@_ ->
           do resumes <- GHC.getResumeContext
              case resumes of
                  [] -> panic "No resumes"

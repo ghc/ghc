@@ -251,6 +251,11 @@ getUnlocatedEvBinds file = do
             let node = Node (mkSourcedNodeInfo org ni) spn []
                 ni = NodeInfo mempty [] $ M.fromList [mkNodeInfo e]
               in (xs,node:ys)
+        GeneratedSrcSpan (OrigSpan spn)
+          | srcSpanFile spn == file ->
+            let node = Node (mkSourcedNodeInfo org ni) spn []
+                ni = NodeInfo mempty [] $ M.fromList [mkNodeInfo e]
+              in (xs,node:ys)
         _ -> (mkNodeInfo e : xs,ys)
 
       (nis,asts) = foldr go ([],[]) elts
@@ -419,6 +424,7 @@ getRealSpanA la = getRealSpan (locA la)
 
 getRealSpan :: SrcSpan -> Maybe Span
 getRealSpan (RealSrcSpan sp _) = Just sp
+getRealSpan (GeneratedSrcSpan (OrigSpan sp)) = Just sp
 getRealSpan _ = Nothing
 
 grhss_span :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p)))) ~ EpAnn NoEpAnns)
@@ -606,35 +612,38 @@ instance ToHie (Context (Located a)) => ToHie (Context (LocatedN a)) where
 instance ToHie (Context (Located a)) => ToHie (Context (LocatedA a)) where
   toHie (C c (L l a)) = toHie (C c (L (locA l) a))
 
-instance ToHie (Context (Located Var)) where
-  toHie c = case c of
-      C context (L (RealSrcSpan span _) name')
-        | varUnique name' == mkBuiltinUnique 1 -> pure []
-          -- `mkOneRecordSelector` makes a field var using this unique, which we ignore
-        | otherwise -> do
-          m <- lift $ gets name_remapping
-          org <- ask
-          let name = case lookupNameEnv m (varName name') of
-                Just var -> var
-                Nothing-> name'
-              ty = case isDataConId_maybe name' of
+toHieCtxLocVar :: ContextInfo -> RealSrcSpan -> Var -> HieM [HieAST Type]
+toHieCtxLocVar context span name'
+  | varUnique name' == mkBuiltinUnique 1 = pure []
+  -- `mkOneRecordSelector` makes a field var using this unique, which we ignore
+  | otherwise = do
+      m <- lift $ gets name_remapping
+      org <- ask
+      let name = case lookupNameEnv m (varName name') of
+                   Just var -> var
+                   Nothing-> name'
+          ty = case isDataConId_maybe name' of
                       Nothing -> varType name'
                       Just dc -> dataConWrapperType dc
           -- insert the entity info for the name into the entity_infos map
-          insertEntityInfo (varName name) $ idEntityInfo name
-          insertEntityInfo (varName name') $ idEntityInfo name'
-          pure
-            [Node
-              (mkSourcedNodeInfo org $ NodeInfo S.empty [] $
-                M.singleton (Right $ varName name)
+      insertEntityInfo (varName name) $ idEntityInfo name
+      insertEntityInfo (varName name') $ idEntityInfo name'
+      pure [Node (mkSourcedNodeInfo org $ NodeInfo S.empty [] $
+                   M.singleton (Right $ varName name)
                             (IdentifierDetails (Just ty)
                                                (S.singleton context)))
-              span
-              []]
+                 span
+                 []]
+
+instance ToHie (Context (Located Var)) where
+  toHie c = case c of
+      C context (L (RealSrcSpan span _) name') -> toHieCtxLocVar context span name'
+      C context (L (GeneratedSrcSpan (OrigSpan span)) name') -> toHieCtxLocVar context span name'
       C (EvidenceVarBind i _ sp)  (L _ name) -> do
         addUnlocatedEvBind name (EvidenceVarBind i ModuleScope sp)
         pure []
       _ -> pure []
+
 
 instance ToHie (Context (Located Name)) where
   toHie c = case c of

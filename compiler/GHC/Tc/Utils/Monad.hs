@@ -62,7 +62,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Error management
   getSrcCodeOrigin,
-  getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
+  getSrcSpanM, getRealSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
   inGeneratedCode,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_,wrapLocMA,
@@ -1069,6 +1069,11 @@ addDependentDirectories ds = do
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
 getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (getLclEnvLoc env) Strict.Nothing) }
+
+getRealSrcSpanM :: TcRn RealSrcSpan
+        -- Avoid clash with Name.getSrcLoc
+getRealSrcSpanM = do { env <- getLclEnv; return $ getLclEnvLoc env }
+
 
 -- See Note [Error contexts in generated code]
 inGeneratedCode :: TcRn Bool

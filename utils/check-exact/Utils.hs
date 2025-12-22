@@ -530,9 +530,10 @@ sortEpaComments cs = sortBy cmp cs
 
 -- | Makes a comment which originates from a specific keyword.
 mkKWComment :: String -> NoCommentsLocation -> Comment
-mkKWComment kw (EpaSpan (RealSrcSpan ss mb)) = Comment kw (EpaSpan (RealSrcSpan ss mb)) ss (Just kw)
-mkKWComment kw (EpaSpan (UnhelpfulSpan _))   = Comment kw (EpaDelta noSrcSpan (SameLine 0) NoComments) placeholderRealSpan (Just kw)
 mkKWComment kw (EpaDelta ss dp cs)           = Comment kw (EpaDelta ss dp cs) placeholderRealSpan (Just kw)
+mkKWComment kw (EpaSpan (RealSrcSpan ss mb)) = Comment kw (EpaSpan (RealSrcSpan ss mb)) ss (Just kw)
+mkKWComment kw (EpaSpan _)                   = Comment kw (EpaDelta noSrcSpan (SameLine 0) NoComments) placeholderRealSpan (Just kw)
+
 
 sortAnchorLocated :: [GenLocated EpaLocation a] -> [GenLocated EpaLocation a]
 sortAnchorLocated = sortBy (compare `on` (epaLocationRealSrcSpan . getLoc))

@@ -19,7 +19,7 @@ import GHC.Hs.Expr ()   -- instance Outputable
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName,ImpDeclSpec (..), rdrNameOcc, rdrNameSpace)
-import GHC.Types.SrcLoc (SrcSpan(..), srcSpanStartLine)
+import GHC.Types.SrcLoc (SrcSpan(..), srcSpanStartLine, UnhelpfulSpanReason(..), pprGeneratedSrcSpanDetails)
 import GHC.Unit.Module.Imported (ImportedModsVal(..))
 import GHC.Unit.Types
 import GHC.Utils.Outputable
@@ -424,6 +424,7 @@ pprSimilarName mb_tried_ns (SimilarRdrName rdr_name _gre_info how_in_scope)
         LocallyBoundAt loc ->
           case loc of
             UnhelpfulSpan l -> parens (ppr l)
+            GeneratedSrcSpan ss -> parens (pprGeneratedSrcSpanDetails ss)
             RealSrcSpan l _ -> parens (text "line" <+> int (srcSpanStartLine l))
         ImportedBy is ->
           parens (text "imported from" <+> ppr (moduleName $ is_mod is))

@@ -1359,7 +1359,7 @@ expandRecordUpd :: LHsExpr GhcRn
                            -- error context to push when typechecking
                            -- the expanded code
                         )
-expandRecordUpd record_expr possible_parents rbnds res_ty
+expandRecordUpd record_expr@(L lspan _) possible_parents rbnds res_ty
   = do {  -- STEP 0: typecheck the record_expr, the record to be updated.
           --
           -- Until GHC proposal #366 is implemented, we still use the type of
@@ -1527,7 +1527,7 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
              ds_expr = HsLet noExtField let_binds (wrapGenSpan case_expr)
 
              case_expr :: HsExpr GhcRn
-             case_expr = HsCase RecUpd (wrapGenSpan (unLoc record_expr))
+             case_expr = HsCase RecUpd (wrapGenSpan' (locA lspan) (unLoc record_expr))
                        $ mkMatchGroup (Generated OtherExpansion DoPmc) (wrapGenSpan matches)
              matches :: [LMatch GhcRn (LHsExpr GhcRn)]
              matches = map make_pat (NE.toList relevant_cons)

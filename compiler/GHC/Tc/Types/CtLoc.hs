@@ -257,8 +257,7 @@ setCtLocEnvLoc :: CtLocEnv -> SrcSpan -> CtLocEnv
 -- for the ctl_in_gen_code manipulation
 setCtLocEnvLoc env (RealSrcSpan loc _)
   = env { ctl_loc = loc, ctl_in_gen_code = False }
-
-setCtLocEnvLoc env loc@(UnhelpfulSpan _)
+setCtLocEnvLoc env loc
   | isGeneratedSrcSpan loc
   = env { ctl_in_gen_code = True }
   | otherwise
