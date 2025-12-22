@@ -155,6 +155,53 @@ parse parserOpts sDocContext fpath bs = case unP (go False []) initState of
 
           pure (plainTok : [spaceTok | not (BS.null spaceBStr)], inPrag')
 
+        GeneratedSrcSpan rsp -> do
+          let typ = if inPrag then TkPragma else classify tok
+              RealSrcLoc lStart _ = srcSpanStart sp -- safe since @sp@ is real
+              (spaceBStr, bStart) = spanPosition lInit lStart bInit
+              inPragDef = inPragma inPrag tok
+
+          (bEnd', inPrag') <- case tok of
+            -- Update internal line + file position if this is a LINE pragma
+            ITline_prag _ -> tryOrElse (bEnd, inPragDef) $ do
+              L _ (ITinteger (IL{il_value = line})) <- tryP wrappedLexer
+              L _ (ITstring _ file) <- tryP wrappedLexer
+              L spF ITclose_prag <- tryP wrappedLexer
+
+              let newLoc = mkRealSrcLoc file (fromIntegral line - 1) (srcSpanEndCol spF)
+              (bEnd'', _) <- lift getInput
+              lift $ setInput (bEnd'', newLoc)
+
+              pure (bEnd'', False)
+
+            -- Update internal column position if this is a COLUMN pragma
+            ITcolumn_prag _ -> tryOrElse (bEnd, inPragDef) $ do
+              L _ (ITinteger (IL{il_value = col})) <- tryP wrappedLexer
+              L spF ITclose_prag <- tryP wrappedLexer
+
+              let newLoc = mkRealSrcLoc (srcSpanFile spF) (srcSpanEndLine spF) (fromIntegral col)
+              (bEnd'', _) <- lift getInput
+              lift $ setInput (bEnd'', newLoc)
+
+              pure (bEnd'', False)
+            _ -> pure (bEnd, inPragDef)
+
+          let tokBStr = splitStringBuffer bStart bEnd'
+              plainTok =
+                T.Token
+                  { tkType = typ
+                  , tkValue = tokBStr
+                  , tkSpan = rsp
+                  }
+              spaceTok =
+                T.Token
+                  { tkType = TkSpace
+                  , tkValue = spaceBStr
+                  , tkSpan = mkRealSrcSpan lInit lStart
+                  }
+
+          pure (plainTok : [spaceTok | not (BS.null spaceBStr)], inPrag')
+
     -- \| Parse whatever remains of the line as an unknown token (can't fail)
     unknownLine :: P ([T.Token], Bool)
     unknownLine = do

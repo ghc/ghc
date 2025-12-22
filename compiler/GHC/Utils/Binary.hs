@@ -1952,13 +1952,19 @@ instance Binary BinSrcSpan where
           putByte bh 1
           put_ bh s
 
+  put_ bh (BinSrcSpan (GeneratedSrcSpan ss)) = do
+          putByte bh 2
+          put_ bh $ BinSpan ss
+
   get bh = do
           h <- getByte bh
           case h of
             0 -> do BinSpan ss <- get bh
                     return $ BinSrcSpan (RealSrcSpan ss Strict.Nothing)
-            _ -> do s <- get bh
+            1 -> do s <- get bh
                     return $ BinSrcSpan (UnhelpfulSpan s)
+            _ -> do BinSpan ss <- get bh
+                    return $ BinSrcSpan (GeneratedSrcSpan ss)
 
 
 {-

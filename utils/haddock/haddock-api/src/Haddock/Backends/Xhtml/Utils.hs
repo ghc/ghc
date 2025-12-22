@@ -103,6 +103,8 @@ spliceURL' maybe_mod maybe_name maybe_loc = run
         case span_ of
           RealSrcSpan span__ _ ->
             show $ srcSpanStartLine span__
+          GeneratedSrcSpan span__ ->
+            show $ srcSpanStartLine span__
           UnhelpfulSpan _ -> ""
 
     run "" = ""
