@@ -204,12 +204,47 @@ stg_isMutableByteArrayWeaklyPinnedzh ( gcptr mba )
 stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
 // MutableByteArray# s -> Int# -> State# s -> State# s
 {
-   ASSERT(new_size <= StgArrBytes_bytes(mba));
+   W_ old_size, old_wds, new_wds;
+   W_ bd;
 
-   OVERWRITING_CLOSURE_MUTABLE(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
-                                     ROUNDUP_BYTES_TO_WDS(new_size)));
+   old_size = StgArrBytes_bytes(mba);
+   ASSERT(new_size <= old_size);
+   old_wds = BYTES_TO_WDS(SIZEOF_StgArrBytes) + ROUNDUP_BYTES_TO_WDS(old_size);
+   new_wds = BYTES_TO_WDS(SIZEOF_StgArrBytes) + ROUNDUP_BYTES_TO_WDS(new_size);
+
+   // Try to shrink bd->free as well, to reclaim slop space at the end
+   // of current block and avoid unnecessary fragmentation. But we
+   // must guarantee that:
+   //
+   // 1. mba is already at the end of current block (check bd->free).
+   //    Otherwise we can't move closures that come after it anyway.
+   // 2. It's a nursery block that belongs to the current Capability,
+   //    so check rCurrentAlloc (used by allocateMightFail) or
+   //    pinned_object_block (used by allocatePinned). There's also no
+   //    point if it's an older generation block, the mutator won't
+   //    allocate into those blocks anyway.
+   //
+   // If check fails, fall back to the conservative code path: just
+   // zero the slop and return.
+   bd = Bdescr(mba);
+   if (bdescr_free(bd) != mba + WDS(old_wds) ||
+       (bd != StgRegTable_rCurrentAlloc(BaseReg) && bd != Capability_pinned_object_block(MyCapability()))) {
+       OVERWRITING_CLOSURE_MUTABLE(mba, new_wds);
+       StgArrBytes_bytes(mba) = new_size;
+       // No need to call PROF_HEADER_CREATE. See Note [LDV profiling and resizing arrays]
+       return ();
+   }
+
+   // Check passes, we can shrink bd->free! Also uninitialize the slop
+   // if zero_on_gc is enabled, to conform with debug RTS convention.
    StgArrBytes_bytes(mba) = new_size;
-   // No need to call PROF_HEADER_CREATE. See Note [LDV profiling and resizing arrays]
+   IF_DEBUG(zero_on_gc,
+       prim %memset(mba + WDS(new_wds),
+                    0xaa,
+                    WDS(old_wds - new_wds),
+                    1);
+   );
+   bdescr_free(bd) = mba + WDS(new_wds);
 
    return ();
 }
@@ -223,18 +258,10 @@ stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
 stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
 // MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
 {
-   W_ new_size_wds;
+   ASSERT(new_size `ge` 0);
 
-   ASSERT(new_size >= 0);
-
-   new_size_wds = ROUNDUP_BYTES_TO_WDS(new_size);
-
-   if (new_size_wds <= BYTE_ARR_WDS(mba)) {
-      OVERWRITING_CLOSURE_MUTABLE(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
-                                        new_size_wds));
-      StgArrBytes_bytes(mba) = new_size;
-      // No need to call PROF_HEADER_CREATE. See Note [LDV profiling and resizing arrays]
-
+   if (new_size <= StgArrBytes_bytes(mba)) {
+      call stg_shrinkMutableByteArrayzh(mba, new_size);
       return (mba);
    } else {
       (P_ new_mba) = call stg_newByteArrayzh(new_size);
