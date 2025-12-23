@@ -1055,8 +1055,6 @@ Reason for (a):
   were evaluated, nothing more.  That in turn make the enclosing function
   too big to inline elsewhere.
 
-  
-
 Reason for (b): we want to inline integerCompare here
   integerLt# :: Integer -> Integer -> Bool#
   integerLt# (IS x) (IS y)                  = x <# y
