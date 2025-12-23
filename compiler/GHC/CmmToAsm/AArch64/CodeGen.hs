@@ -713,7 +713,7 @@ getRegister' config plat expr
                                                       , MOV (OpReg W64 dst) (OpReg W64 tmp)
                                                       ]))
         CmmFloat _f _w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (pdoc plat expr)
-        CmmVec _ -> pprPanic "getRegister' (CmmLit:CmmVec): " (pdoc plat expr)
+        CmmVec _ -> vectorsNeedLlvm
         CmmLabel _lbl -> do
           (op, imm_code) <- litToImm' lit
           let rep = cmmLitType plat lit
@@ -864,8 +864,6 @@ getRegister' config plat expr
         MO_VF_Neg {} -> vectorsNeedLlvm
       where
         notUnary = pprPanic "getRegister' (non-unary CmmMachOp with 1 argument):" (pdoc plat expr)
-        vectorsNeedLlvm =
-            sorry "SIMD operations on AArch64 currently require the LLVM backend"
         toImm W8 =  (OpImm (ImmInt 7))
         toImm W16 = (OpImm (ImmInt 15))
         toImm W32 = (OpImm (ImmInt 31))
@@ -1284,8 +1282,6 @@ getRegister' config plat expr
                 (pprMachOp op) <+> text "in" <+> (pdoc plat expr)
 
       where
-          vectorsNeedLlvm =
-            sorry "SIMD operations on AArch64 currently require the LLVM backend"
           float3Op w op = do
             (reg_fx, format_x, code_fx) <- getFloatReg x
             (reg_fy, format_y, code_fy) <- getFloatReg y
@@ -1303,6 +1299,9 @@ getRegister' config plat expr
       -> pprPanic "getRegister' (variadic CmmMachOp): " (pdoc plat expr)
 
   where
+    vectorsNeedLlvm =
+      sorry "SIMD operations on AArch64 currently require the LLVM backend"
+
     isNbitEncodeable :: Int -> Integer -> Bool
     isNbitEncodeable n_bits i = let shift = n_bits - 1 in (-1 `shiftL` shift) <= i && i < (1 `shiftL` shift)
 
