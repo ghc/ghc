@@ -669,3 +669,5 @@ test('TimeoutQueue',
 test('ClosureTable',
      [req_c, only_ways(['normal', 'debug']), extra_files(['ClosureTable_c.c'])], compile_and_run,
      ['-debug -O0 ClosureTable_c.c -I{top}/../rts -I{top}/../rts/include'])
+
+test('resizeMutableByteArrayInPlace', [req_cmm, extra_ways(['optasm', 'sanity']), only_ways(['optasm', 'sanity'])], compile_and_run, [''])

@@ -200,6 +200,26 @@ stg_isMutableByteArrayWeaklyPinnedzh ( gcptr mba )
  * used to as the LDV profiler will essentially ignore arrays anyways.
  */
 
+/* Note [Resizing arrays in-place]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * We try to shrink or grow bd->free when resizing a MutableByteArray in-place,
+ * to reclaim or use slop space at the end of the current block and avoid
+ * unnecessary fragmentation/allocation.
+ *
+ * But we must guarantee that:
+ *
+ * 1. mba is already at the end of current block (check bd->free).
+ *    Otherwise we can't move closures that come after it anyway.
+ * 2. It's a nursery block that belongs to the current Capability,
+ *    so check rCurrentAlloc (used by allocateMightFail) or
+ *    pinned_object_block (used by allocatePinned). There's also no
+ *    point if it's an older generation block, the mutator won't
+ *    allocate into those blocks anyway.
+ *
+ * If check fails, fall back to the conservative code path: just zero the slop
+ * and return when shrinking, or allocate a new array when growing.
+ */
+
 // shrink size of MutableByteArray in-place
 stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
 // MutableByteArray# s -> Int# -> State# s -> State# s
@@ -212,20 +232,7 @@ stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
    old_wds = BYTES_TO_WDS(SIZEOF_StgArrBytes) + ROUNDUP_BYTES_TO_WDS(old_size);
    new_wds = BYTES_TO_WDS(SIZEOF_StgArrBytes) + ROUNDUP_BYTES_TO_WDS(new_size);
 
-   // Try to shrink bd->free as well, to reclaim slop space at the end
-   // of current block and avoid unnecessary fragmentation. But we
-   // must guarantee that:
-   //
-   // 1. mba is already at the end of current block (check bd->free).
-   //    Otherwise we can't move closures that come after it anyway.
-   // 2. It's a nursery block that belongs to the current Capability,
-   //    so check rCurrentAlloc (used by allocateMightFail) or
-   //    pinned_object_block (used by allocatePinned). There's also no
-   //    point if it's an older generation block, the mutator won't
-   //    allocate into those blocks anyway.
-   //
-   // If check fails, fall back to the conservative code path: just
-   // zero the slop and return.
+   // See Note [Resizing arrays in-place]
    bd = Bdescr(mba);
    if (bdescr_free(bd) != mba + WDS(old_wds) ||
        (bd != StgRegTable_rCurrentAlloc(BaseReg) && bd != Capability_pinned_object_block(MyCapability()))) {
@@ -258,19 +265,32 @@ stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
 stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
 // MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
 {
+   W_ old_size, old_wds, new_wds, new_free;
+   W_ bd;
+
    ASSERT(new_size `ge` 0);
 
-   if (new_size <= StgArrBytes_bytes(mba)) {
+   old_size = StgArrBytes_bytes(mba);
+   if (new_size <= old_size) {
       call stg_shrinkMutableByteArrayzh(mba, new_size);
+      return (mba);
+   }
+
+   bd = Bdescr(mba);
+   old_wds = BYTES_TO_WDS(SIZEOF_StgArrBytes) + ROUNDUP_BYTES_TO_WDS(old_size);
+   new_wds = BYTES_TO_WDS(SIZEOF_StgArrBytes) + ROUNDUP_BYTES_TO_WDS(new_size);
+   new_free = mba + WDS(new_wds);
+
+   // See Note [Resizing arrays in-place]
+   // we also need to check that we don't grow past the end of current block.
+   if (bdescr_free(bd) == mba + WDS(old_wds) &&
+       (bd == StgRegTable_rCurrentAlloc(BaseReg) || bd == Capability_pinned_object_block(MyCapability())) &&
+       new_free <= bdescr_start(bd) + (TO_W_(bdescr_blocks(bd)) * BLOCK_SIZE)) {
+      bdescr_free(bd) = new_free;
+      StgArrBytes_bytes(mba) = new_size;
       return (mba);
    } else {
       (P_ new_mba) = call stg_newByteArrayzh(new_size);
-
-      // maybe at some point in the future we may be able to grow the
-      // MBA in-place w/o copying if we know the space after the
-      // current MBA is still available, as often we want to grow the
-      // MBA shortly after we allocated the original MBA. So maybe no
-      // further allocations have occurred by then.
 
       // copy over old content
       prim %memcpy(BYTE_ARR_CTS(new_mba), BYTE_ARR_CTS(mba),
