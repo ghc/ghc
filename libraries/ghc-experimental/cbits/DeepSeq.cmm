@@ -1,0 +1,190 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 2026
+ *
+ * Support for the deepseq# primcall.
+ *
+ * ---------------------------------------------------------------------------*/
+
+#include "Cmm.h"
+
+/* -----------------------------------------------------------------------------
+   deepseq#
+
+   Deeply evaluate a value to (approximate) normal form, without requiring an
+   NFData constraint. This is used to provide a primitive analogue of
+   Control.DeepSeq.force / rnf.
+
+   See the GHC.DeepSeq documentation for the intended semantics and
+   limitations.
+   -------------------------------------------------------------------------- */
+
+// Worker which performs deep evaluation. This lets us tail-call when traversing
+// the final pointer field, avoiding stack blowup on common spine-recursive
+// structures (e.g. lists).
+//
+// The second argument is a boolean (0/1) accumulator tracking whether any
+// evaluation was forced in the transitive closure so far.
+stg_deepseqWorkzh (P_ p, W_ forced)
+{
+    W_ type, info;
+
+    again: MAYBE_GC(again);
+    STK_CHK_GEN();
+
+    p = UNTAG(p);
+    // Values in compact regions are already fully evaluated.
+    (W_ in_compact) = call stg_compactContainsAnyzh(p);
+    if (in_compact != 0) {
+        return (forced);
+    }
+    info  = %INFO_PTR(p);
+    type = TO_W_(%INFO_TYPE(%STD_INFO(info)));
+
+    switch [0 .. N_CLOSURE_TYPES] type {
+
+    // Unevaluated things must be evaluated first:
+    case
+        THUNK,
+        THUNK_1_0,
+        THUNK_0_1,
+        THUNK_2_0,
+        THUNK_1_1,
+        THUNK_0_2,
+        THUNK_STATIC,
+        AP,
+        AP_STACK,
+        BLACKHOLE,
+        THUNK_SELECTOR : {
+        (P_ evald) = call %ENTRY_CODE(info) (p);
+        jump stg_deepseqWorkzh(evald, 1);
+    }
+
+    // Follow indirections:
+    case IND, IND_STATIC: {
+        p = %acquire StgInd_indirectee(p);
+        jump stg_deepseqWorkzh(p, forced);
+    }
+
+    // WHITEHOLEs are transient. Yield and try again.
+    case WHITEHOLE: {
+        goto again;
+    }
+
+    // Arrays of pointers: evaluate elements.
+    case
+        MUT_ARR_PTRS_DIRTY,
+        MUT_ARR_PTRS_CLEAN,
+        MUT_ARR_PTRS_FROZEN_DIRTY,
+        MUT_ARR_PTRS_FROZEN_CLEAN: {
+        W_ i_arr, ptrs_arr;
+        ptrs_arr = StgMutArrPtrs_ptrs(p);
+        if (ptrs_arr == 0) { return (forced); }
+        i_arr = ptrs_arr - 1;
+      deepseq_arr_loop0:
+        if (i_arr == 0) {
+            // Tail-call the final element to avoid building up a deep stack
+            // when traversing large immutable arrays.
+            jump stg_deepseqWorkzh(P_[p + SIZEOF_StgMutArrPtrs], forced);
+        }
+        (W_ forced_arr) = call stg_deepseqWorkzh(P_[p + SIZEOF_StgMutArrPtrs + WDS(i_arr)], forced);
+        forced = forced_arr;
+        i_arr = i_arr - 1;
+        goto deepseq_arr_loop0;
+    }
+
+    case
+        SMALL_MUT_ARR_PTRS_DIRTY,
+        SMALL_MUT_ARR_PTRS_CLEAN,
+        SMALL_MUT_ARR_PTRS_FROZEN_DIRTY,
+        SMALL_MUT_ARR_PTRS_FROZEN_CLEAN: {
+        W_ i_sarr, ptrs_sarr;
+        ptrs_sarr = StgSmallMutArrPtrs_ptrs(p);
+        if (ptrs_sarr == 0) { return (forced); }
+        i_sarr = ptrs_sarr - 1;
+      deepseq_arr_loop1:
+        if (i_sarr == 0) {
+            // Tail-call the final element to avoid building up a deep stack
+            // when traversing large immutable arrays.
+            jump stg_deepseqWorkzh(P_[p + SIZEOF_StgSmallMutArrPtrs], forced);
+        }
+        (W_ forced_sarr) = call stg_deepseqWorkzh(P_[p + SIZEOF_StgSmallMutArrPtrs + WDS(i_sarr)], forced);
+        forced = forced_sarr;
+        i_sarr = i_sarr - 1;
+        goto deepseq_arr_loop1;
+    }
+
+    // Constructors: evaluate their pointer fields.
+    case
+        CONSTR,
+        CONSTR_1_0,
+        CONSTR_2_0,
+        CONSTR_1_1,
+        CONSTR_NOCAF: {
+        W_ i_constr, ptrs_constr;
+        ptrs_constr  = TO_W_(%INFO_PTRS(%STD_INFO(info)));
+        if (ptrs_constr == 0) { return (forced); }
+        i_constr = 0;
+      deepseq_constr_loop:
+        if (i_constr < ptrs_constr) {
+            // Tail-call the last one. This avoids building up a deep stack
+            // when traversing long lists. We count up so the final pointer
+            // field (e.g. the tail of a list cell) is tail-called.
+            if (i_constr == ptrs_constr - 1) {
+                jump stg_deepseqWorkzh(StgClosure_payload(p,i_constr), forced);
+            }
+            (W_ forced_constr) = call stg_deepseqWorkzh(StgClosure_payload(p,i_constr), forced);
+            forced = forced_constr;
+            i_constr = i_constr + 1;
+            goto deepseq_constr_loop;
+        }
+        return (forced);
+    }
+
+    case
+        MUT_VAR_CLEAN,
+        MUT_VAR_DIRTY: {
+        p = StgMutVar_var(p);
+        jump stg_deepseqWorkzh(p, forced);
+    }
+
+    case
+        MVAR_CLEAN,
+        MVAR_DIRTY: {
+        p = StgMVar_value(p);
+        jump stg_deepseqWorkzh(p, forced);
+    }
+
+    case TVAR: {
+        (P_ tvar_val) = call stg_readTVarIOzh(p);
+        jump stg_deepseqWorkzh(tvar_val, forced);
+    }
+
+    case WEAK: {
+        // Follow the value of a live weak pointer.
+        jump stg_deepseqWorkzh(StgWeak_value(p), forced);
+    }
+
+    // Anything else: conservatively stop.
+    //
+    // This includes (among other closure types) function-like closures, TSOs, etc,
+    // matching the intended "mimic typical NFData instances" semantics
+    // described in the primop documentation.
+    //
+    // We should never see frames here, but if we do, returning is safer than
+    // entering arbitrary things.
+    default: {
+        return (forced);
+    }}
+}
+
+// deepseq# primop entry point.
+//   deepseq# :: forall a s. a -> State# s -> (# State# s, Int#, a #)
+//
+// The State# argument/result has no runtime representation, so the RTS entry
+// only takes the value being forced.
+stg_deepseqzh (P_ p)
+{
+    (W_ forced) = call stg_deepseqWorkzh(p, 0);
+    return (forced, p);
+}

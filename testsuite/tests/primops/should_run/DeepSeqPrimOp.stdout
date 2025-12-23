@@ -1,0 +1,14 @@
+thunk-forced
+fun-ok
+noforce-ok
+noforce-int-ok
+force-int-ok
+forcest-int-ok
+thunk-ok
+array-thunk-forced
+ioarray-thunk-forced
+ioref-thunk-forced
+mvar-thunk-forced
+tvar-thunk-forced
+weak-thunk-forced
+compact-loop-ok

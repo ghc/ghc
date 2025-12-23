@@ -17,6 +17,7 @@ test('T13825-compile', normal, compile_and_run, [''])
 test('T16164', normal, compile_and_run, [''])
 test('ShowPrim', normal, compile_and_run, [''])
 test('T12492', normal, compile_and_run, [''])
+test('DeepSeqPrimOp', [js_skip, extra_ways(['ghci','ghci-opt']), extra_hc_opts('-package ghc-experimental -package ghc-compact')], compile_and_run, [''])
 
 test('ArithInt8', normal, compile_and_run, [''])
 test('ArithWord8', normal, compile_and_run, [''])

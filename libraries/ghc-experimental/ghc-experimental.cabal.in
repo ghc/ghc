@@ -35,6 +35,7 @@ library
     exposed-modules:
       Data.Sum.Experimental
       Data.Tuple.Experimental
+      GHC.DeepSeq
       GHC.PrimOps
       GHC.Profiling.Eras
       GHC.TypeLits.Experimental
@@ -51,4 +52,5 @@ library
     build-depends:    base >=4.20 && < 4.23,
                       ghc-internal == @ProjectVersionForLib@.*
     hs-source-dirs:   src
+    cmm-sources:      cbits/DeepSeq.cmm
     default-language: Haskell2010

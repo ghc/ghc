@@ -4454,6 +4454,12 @@ module Data.Tuple.Experimental where
   data Unit# = ...
   getSolo :: forall a. Solo a -> a
 
+module GHC.DeepSeq where
+  -- Safety: None
+  force :: forall a. a -> (GHC.Internal.Types.Bool, a)
+  forceIO :: forall a. a -> GHC.Internal.Types.IO (GHC.Internal.Types.Bool, a)
+  forceST :: forall a s. a -> GHC.Internal.ST.ST s (GHC.Internal.Types.Bool, a)
+
 module GHC.Exception.Backtrace.Experimental where
   -- Safety: None
   type BacktraceMechanism :: *
