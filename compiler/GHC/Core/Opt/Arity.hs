@@ -81,6 +81,7 @@ import GHC.Builtin.Uniques
 import GHC.Data.FastString
 import GHC.Data.Graph.UnVar
 import GHC.Data.Pair
+import GHC.Data.List (reverseAppend)
 
 import GHC.Utils.GlobalVars( unsafeHasNoStateHack )
 import GHC.Utils.Constants (debugIsOn)
@@ -3183,7 +3184,7 @@ etaExpandToJoinPoint join_arity expr
     go 0 rev_bs e         = (reverse rev_bs, e)
     go n rev_bs (Lam b e) = go (n-1) (b : rev_bs) e
     go n rev_bs e         = case etaBodyForJoinPoint n e of
-                              (bs, e') -> (reverse rev_bs ++ bs, e')
+                              (bs, e') -> (rev_bs `reverseAppend` bs, e')
 
 etaExpandToJoinPointRule :: JoinArity -> CoreRule -> CoreRule
 etaExpandToJoinPointRule _ rule@(BuiltinRule {})

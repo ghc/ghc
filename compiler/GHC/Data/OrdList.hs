@@ -25,6 +25,7 @@ import GHC.Utils.Misc (strictMap)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import GHC.Data.List (reverseAppend)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as Semigroup
@@ -180,7 +181,7 @@ fromOLReverse a = go a []
         go (Cons a b) acc = go b (a : acc)
         go (Snoc a b) acc = b : go a acc
         go (Two a b)  acc = go b (go a acc)
-        go (Many xs)  acc = reverse (NE.toList xs) ++ acc
+        go (Many xs)  acc = NE.toList xs `reverseAppend` acc
 
 mapOL :: (a -> b) -> OrdList a -> OrdList b
 mapOL = fmap

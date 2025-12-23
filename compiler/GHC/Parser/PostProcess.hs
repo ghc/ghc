@@ -158,6 +158,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )
 import GHC.Data.OrdList
+import GHC.Data.List (reverseAppend)
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.FastString
 import GHC.Data.Maybe
@@ -605,7 +606,7 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
             (lfm', loc'') = transferCommentsOnlyA lfm loc'
           in
             ( L loc'' (makeFunBind fun_id1 (mkLocatedList $ (L lfm' first_m:tail matches')))
-              , (reverse doc_decls) ++ binds)
+              , (doc_decls `reverseAppend` binds))
         -- Reverse the final matches, to get it back in the right order
         -- Do the same thing with the trailing doc comments
 
@@ -965,7 +966,7 @@ checkTyVars pp_what equals_or_where tc tparms
         | Just (ann, bvar) <- match_bndr_var t
             = let
                 bkind = HsBndrKind noExtField k
-                an = (reverse ops) ++ cps
+                an = ops `reverseAppend` cps
               in
                 return (L (widenLocatedAnL (l Semi.<> annt) (for_widening bvis:an))
                        (HsTvb (AnnTyVarBndr (reverse ops) cps ann tok_dc) bvis bvar bkind))
@@ -973,7 +974,7 @@ checkTyVars pp_what equals_or_where tc tparms
         | Just (ann, bvar) <- match_bndr_var t
             = let
                 bkind = HsBndrNoKind noExtField
-                an = (reverse ops) ++ cps
+                an = ops `reverseAppend` cps
               in
                 return (L (widenLocatedAnL l (for_widening bvis:an))
                                      (HsTvb (AnnTyVarBndr (reverse ops) cps ann noAnn) bvis bvar bkind))

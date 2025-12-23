@@ -109,6 +109,7 @@ import GHC.Driver.DynFlags
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.Maybe (firstJusts)
+import GHC.Data.List (reverseAppend)
 
 import Control.Monad
 import Data.Functor.Identity (Identity(..))
@@ -835,7 +836,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
            ; (ev_binds, (wrap_res, result))
                   <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
                      check n_req'
-                           (reverse (map ExpForAllPatTy bndrs) ++ rev_pat_tys)
+                           (map ExpForAllPatTy bndrs `reverseAppend` rev_pat_tys)
                            inner_ty
            ; assertPpr (not (null bndrs && null given)) (ppr ty) $
                        -- The guard ensures that we made some progress
@@ -928,7 +929,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
     defer :: VisArity -> [ExpPatType] -> TcRhoType -> TcM (HsWrapper, a)
     defer n_req rev_pat_tys fun_ty
       = do { more_arg_tys <- mapM (new_check_arg_ty herald) [arity - n_req + 1 .. arity]
-           ; let all_pats = reverse rev_pat_tys ++ map mkCheckExpFunPatTy more_arg_tys
+           ; let all_pats = rev_pat_tys `reverseAppend` map mkCheckExpFunPatTy more_arg_tys
            ; res_ty <- newOpenFlexiTyVarTy
            ; result <- thing_inside all_pats (mkCheckExpType res_ty)
 

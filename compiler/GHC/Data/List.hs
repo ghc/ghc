@@ -1,5 +1,7 @@
 module GHC.Data.List where
 
+import Data.Foldable
+
 mapAndUnzip :: (a -> (b, c)) -> [a] -> ([b], [c])
 mapAndUnzip _ [] = ([], [])
 mapAndUnzip f (x:xs)
@@ -23,3 +25,9 @@ mapAndUnzip4 f (x:xs)
         (rs1, rs2, rs3, rs4) = mapAndUnzip4 f xs
     in
     (r1:rs1, r2:rs2, r3:rs3, r4:rs4)
+
+-- | @'reverseAppend' xs ys@ is equivalent to @'reverse' xs '++' ys@,
+-- except it's defined in terms of 'foldl'' and more efficient.
+reverseAppend :: [a] -> [a] -> [a]
+reverseAppend xs ys = foldl' (\acc x -> x : acc) ys xs
+{-# INLINE reverseAppend #-}

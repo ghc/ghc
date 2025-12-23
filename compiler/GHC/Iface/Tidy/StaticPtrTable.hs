@@ -158,6 +158,7 @@ import GHC.Types.Id.Info ( CafInfo(..) )
 import GHC.Types.ForeignStubs
 import GHC.Data.Maybe
 import GHC.Data.FastString
+import GHC.Data.List (reverseAppend)
 
 import Control.Monad.Trans.State.Strict
 import Data.List (intercalate)
@@ -196,7 +197,7 @@ sptCreateStaticBinds opts this_mod binds = do
       []        -> return (reverse fps, reverse bs)
       bnd : xs' -> do
         (fps', bnd') <- replaceStaticBind bnd
-        go (reverse fps' ++ fps) (bnd' : bs) xs'
+        go (fps' `reverseAppend` fps) (bnd' : bs) xs'
 
     -- Generates keys and replaces 'makeStatic' with 'StaticPtr'.
     --

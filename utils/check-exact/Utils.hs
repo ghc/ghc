@@ -33,6 +33,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Driver.Ppr
 import GHC.Data.FastString
+import GHC.Data.List (reverseAppend)
 import GHC.Base (NonEmpty(..))
 import GHC.Parser.Lexer (allocateComments)
 
@@ -379,7 +380,7 @@ balanceFirstLocatedAComments ((L (EpAnn anc an csd) a):ds) = (L (EpAnn anc an cs
                                        (priorComments csd)
             pcds = priorCommentsDeltas' s priors
             (attached, header) = break (\(d,_c) -> d /= 1) pcds
-            csd' = setPriorComments csd (reverse (map snd attached) ++ inners)
+            csd' = setPriorComments csd (map snd attached `reverseAppend` inners)
             hc = reverse (map snd header)
         _ -> (csd, [])
 

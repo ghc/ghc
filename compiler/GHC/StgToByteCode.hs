@@ -51,6 +51,7 @@ import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
 import GHC.Builtin.Uniques
 import GHC.Data.FastString
+import GHC.Data.List (reverseAppend)
 import GHC.Utils.Panic
 import GHC.Utils.Exception (evaluate)
 import GHC.CmmToAsm.Config (platformWordWidth)
@@ -364,7 +365,7 @@ schemeR_wrk fvs nm original_body (args, body)
      profile <- getProfile
      let
          platform  = profilePlatform profile
-         all_args  = reverse args ++ fvs
+         all_args  = args `reverseAppend` fvs
          arity     = length all_args
          -- all_args are the args in reverse order.  We're compiling a function
          -- \fv1..fvn x1..xn -> e

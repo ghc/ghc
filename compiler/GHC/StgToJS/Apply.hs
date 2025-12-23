@@ -67,6 +67,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Outputable (vcat, ppr)
 import GHC.Data.FastString
+import GHC.Data.List (reverseAppend)
 
 import qualified Data.Bits as Bits
 import Data.Monoid
@@ -948,8 +949,8 @@ fastApply s fun_name nargs nvars = if nargs == 0 && nvars == 0
                               <> (farity |= infoFunArity c)
                               <> fun_case_fun)
                ,(toJExpr Pap, traceRts s (toJExpr (fun_name <> ": pap")) <> (arity |= papArity r1) <> fun_case_pap)
-               ,(toJExpr Thunk, traceRts s (toJExpr (fun_name <> ": thunk")) <> push' s (reverse regArgs ++ mkAp nargs nvars) <> profStat s pushRestoreCCS <> returnS c)
-               ,(toJExpr Blackhole, traceRts s (toJExpr (fun_name <> ": blackhole")) <> push' s (reverse regArgs ++ mkAp nargs nvars) <> push' s [r1, global "h$return"] <> returnS (app "h$blockOnBlackhole" [r1]))]
+               ,(toJExpr Thunk, traceRts s (toJExpr (fun_name <> ": thunk")) <> push' s (regArgs `reverseAppend` mkAp nargs nvars) <> profStat s pushRestoreCCS <> returnS c)
+               ,(toJExpr Blackhole, traceRts s (toJExpr (fun_name <> ": blackhole")) <> push' s (regArgs `reverseAppend` mkAp nargs nvars) <> push' s [r1, global "h$return"] <> returnS (app "h$blockOnBlackhole" [r1]))]
                (appS throwStr [toJExpr (fun_name <> ": unexpected closure type: ") + infoClosureType c])
              ]
 

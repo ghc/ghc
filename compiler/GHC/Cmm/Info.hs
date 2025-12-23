@@ -45,6 +45,7 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Platform
 import GHC.Platform.Profile
 import GHC.Data.Maybe
+import GHC.Data.List (reverseAppend)
 import GHC.Utils.Error (withTimingSilent)
 import GHC.Utils.Panic
 import GHC.Utils.Logger
@@ -164,7 +165,7 @@ mkInfoTable profile proc@(CmmProc infos entry_lbl live blocks)
         rel_extra_bits = map (makeRelativeRefTo platform info_lbl) extra_bits
      --
      return (top_decls, (lbl, CmmStaticsRaw info_lbl $ map CmmStaticLit $
-                              reverse rel_extra_bits ++ rel_std_info))
+                              rel_extra_bits `reverseAppend` rel_std_info))
 
 -----------------------------------------------------
 type InfoTableContents = ( [CmmLit]          -- The standard part

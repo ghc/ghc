@@ -66,6 +66,7 @@ import GHC.StgToJS.Symbols
 import GHC.StgToJS.Arg
 import GHC.StgToJS.Closure
 
+import GHC.Data.List (reverseAppend)
 import GHC.Unit.State
 import GHC.Unit.Env
 import GHC.Unit.Home.ModInfo
@@ -465,7 +466,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
                    -- see Note [Multiple Home Units aware GHCi] for GHCi session setup.
                    $ filter (/= interactiveUnitId)
                    $ nub
-                   $ rts_wired_units ++ reverse obj_units ++ reverse units
+                   $ rts_wired_units ++ (obj_units `reverseAppend` reverse units)
 
   -- all the units we want to link together, including their dependencies,
   -- preload units, and backpack instantiations

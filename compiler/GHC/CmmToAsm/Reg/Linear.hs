@@ -129,6 +129,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 
+import GHC.Data.List (reverseAppend)
 import GHC.Data.Graph.Directed
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
@@ -271,14 +272,14 @@ linearRA_SCCs _ _ blocksAcc []
 linearRA_SCCs entry_ids block_live blocksAcc (AcyclicSCC block : sccs)
  = do   blocks' <- processBlock block_live block
         linearRA_SCCs entry_ids block_live
-                ((reverse blocks') ++ blocksAcc)
+                (blocks' `reverseAppend` blocksAcc)
                 sccs
 
 linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
  = do
         blockss' <- process entry_ids block_live blocks
         linearRA_SCCs entry_ids block_live
-                (reverse (concat blockss') ++ blocksAcc)
+                (concat blockss' `reverseAppend` blocksAcc)
                 sccs
 
 {- from John Dias's patch 2008/10/16:

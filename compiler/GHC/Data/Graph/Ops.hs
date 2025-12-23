@@ -46,6 +46,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 
+import GHC.Data.List (reverseAppend)
 import Data.List (mapAccumL, sortBy)
 import Data.Maybe
 
@@ -350,7 +351,7 @@ coalesceGraph' aggressive triv graph kkPairsAcc
         -- keep running until there are no more coalesces can be found
    in   case catMaybes mPairs of
          []     -> (graph', reverse kkPairsAcc)
-         pairs  -> coalesceGraph' aggressive triv graph' (reverse pairs ++ kkPairsAcc)
+         pairs  -> coalesceGraph' aggressive triv graph' (pairs `reverseAppend` kkPairsAcc)
 
 
 -- | Coalesce this pair of nodes unconditionally \/ aggressively.
@@ -696,4 +697,3 @@ adjustUFM_C f k map
  = case lookupUFM map k of
         Nothing -> map
         Just a  -> addToUFM map k (f a)
-

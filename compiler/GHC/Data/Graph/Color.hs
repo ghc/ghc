@@ -26,6 +26,7 @@ import GHC.Types.Unique.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import GHC.Data.List (reverseAppend)
 import Data.Maybe
 import Data.List (mapAccumL)
 
@@ -199,7 +200,7 @@ colorScan_spin iterative triv spill graph
                 --      go back to Simplify and see if this frees up more nodes to be trivially colorable.
                 (graph2, kksCoalesceFound@(_:_))
                  -> colorScan_spin iterative triv spill graph2
-                        ksTriv ksSpill (reverse kksCoalesceFound ++ kksCoalesce)
+                        ksTriv ksSpill (kksCoalesceFound `reverseAppend` kksCoalesce)
 
                 -- Freeze:
                 -- nothing could be coalesced (or was triv),
@@ -378,4 +379,3 @@ selectColor colors graph u
                 = Nothing
 
    in   chooseColor
-
