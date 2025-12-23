@@ -1,7 +1,7 @@
 
 ==================== Demand analysis (including Boxity) ====================
 Result size of Demand analysis (including Boxity)
-  = {terms: 189, types: 95, coercions: 0, joins: 0/2}
+  = {terms: 195, types: 95, coercions: 0, joins: 0/2}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule :: GHC.Prim.Addr#
@@ -51,7 +51,7 @@ lvl :: Int
          Guidance=IF_ARGS [] 10 10}]
 lvl = GHC.Types.I# 0#
 
--- RHS size: {terms: 42, types: 15, coercions: 0, joins: 0/1}
+-- RHS size: {terms: 45, types: 15, coercions: 0, joins: 0/1}
 g2 [InlPrag=NOINLINE, Dmd=LC(S,C(1,!P(M!P(L),1!P(L))))]
   :: Int -> Int -> (Int, Int)
 [LclId,
@@ -59,7 +59,7 @@ g2 [InlPrag=NOINLINE, Dmd=LC(S,C(1,!P(M!P(L),1!P(L))))]
  Str=<L><1!P(1L)>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [20 20] 106 20}]
+         Guidance=IF_ARGS [20 20] 126 20}]
 g2
   = \ (m :: Int) (ds [Dmd=1!P(1L)] :: Int) ->
       case ds of { GHC.Types.I# ds [Dmd=1L] ->
@@ -80,7 +80,8 @@ g2
                { __DEFAULT ->
                GHC.Types.I# ds2
                };
-             0# -> GHC.Real.divZeroError @Int
+             -1# -> GHC.Types.I# -2#;
+             0# -> GHC.Internal.Real.divZeroError @Int
            });
         1# -> (m, lvl)
       }
@@ -125,7 +126,7 @@ h2
         __DEFAULT ->
           case GHC.Prim.remInt# ds 2# of {
             __DEFAULT ->
-              case g2 wild lvl of { (ds1 [Dmd=A], y [Dmd=1!P(L)]) -> y };
+              case g2 wild lvl of { (_ [Occ=Dead, Dmd=A], y [Dmd=1!P(L)]) -> y };
             0# ->
               case g2 lvl wild of { (x [Dmd=1!P(L)], ds [Dmd=1!P(L)]) ->
               case x of { GHC.Types.I# x ->
@@ -161,14 +162,14 @@ lvl :: (Int, Int)
          Guidance=IF_ARGS [] 10 10}]
 lvl = (lvl, lvl)
 
--- RHS size: {terms: 36, types: 10, coercions: 0, joins: 0/1}
+-- RHS size: {terms: 39, types: 10, coercions: 0, joins: 0/1}
 g1 [InlPrag=NOINLINE, Dmd=LC(L,!P(L,L))] :: Int -> (Int, Int)
 [LclId,
  Arity=1,
  Str=<1!P(1L)>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [20] 86 10}]
+         Guidance=IF_ARGS [20] 106 10}]
 g1
   = \ (ds [Dmd=1!P(1L)] :: Int) ->
       case ds of { GHC.Types.I# ds [Dmd=1L] ->
@@ -189,7 +190,8 @@ g1
                { __DEFAULT ->
                GHC.Types.I# ds2
                };
-             0# -> GHC.Real.divZeroError @Int
+             -1# -> GHC.Types.I# -2#;
+             0# -> GHC.Internal.Real.divZeroError @Int
            });
         1# -> lvl
       }
@@ -239,7 +241,7 @@ h1
 
 ==================== Demand analysis ====================
 Result size of Demand analysis
-  = {terms: 171, types: 111, coercions: 0, joins: 0/2}
+  = {terms: 178, types: 112, coercions: 0, joins: 0/2}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule :: GHC.Prim.Addr#
@@ -289,7 +291,15 @@ lvl :: Int
          Guidance=IF_ARGS [] 10 10}]
 lvl = GHC.Types.I# 0#
 
--- RHS size: {terms: 39, types: 17, coercions: 0, joins: 0/1}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+lvl = GHC.Types.I# -2#
+
+-- RHS size: {terms: 41, types: 17, coercions: 0, joins: 0/1}
 $wg2 [InlPrag=NOINLINE, Dmd=LC(S,C(1,!P(M!P(L),1!P(L))))]
   :: Int -> GHC.Prim.Int# -> (# Int, Int #)
 [LclId[StrictWorker([])],
@@ -297,7 +307,7 @@ $wg2 [InlPrag=NOINLINE, Dmd=LC(S,C(1,!P(M!P(L),1!P(L))))]
  Str=<L><1L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [20 30] 76 20}]
+         Guidance=IF_ARGS [20 30] 86 20}]
 $wg2
   = \ (m :: Int) (ww [Dmd=1L] :: GHC.Prim.Int#) ->
       case ww of ds [Dmd=ML] {
@@ -317,7 +327,8 @@ $wg2
                  { __DEFAULT ->
                  GHC.Types.I# ds2
                  };
-               0# -> GHC.Real.divZeroError @Int
+               -1# -> lvl;
+               0# -> GHC.Internal.Real.divZeroError @Int
              } #);
         1# -> (# m, lvl #)
       }
@@ -345,7 +356,10 @@ h2
         __DEFAULT ->
           case GHC.Prim.remInt# ds 2# of {
             __DEFAULT ->
-              case $wg2 wild 2# of { (# ww [Dmd=A], ww [Dmd=1!P(L)] #) -> ww };
+              case $wg2 wild 2# of
+              { (# _ [Occ=Dead, Dmd=A], ww [Dmd=1!P(L)] #) ->
+              ww
+              };
             0# ->
               case $wg2 lvl ds of { (# ww [Dmd=1!P(L)], ww [Dmd=1!P(L)] #) ->
               case ww of { GHC.Types.I# x ->
@@ -357,7 +371,7 @@ h2
       }
       }
 
--- RHS size: {terms: 34, types: 14, coercions: 0, joins: 0/1}
+-- RHS size: {terms: 36, types: 14, coercions: 0, joins: 0/1}
 $wg1 [InlPrag=NOINLINE, Dmd=LC(L,!P(L,L))]
   :: GHC.Prim.Int# -> (# GHC.Prim.Int#, Int #)
 [LclId[StrictWorker([])],
@@ -365,7 +379,7 @@ $wg1 [InlPrag=NOINLINE, Dmd=LC(L,!P(L,L))]
  Str=<1L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [30] 56 20}]
+         Guidance=IF_ARGS [30] 66 20}]
 $wg1
   = \ (ww [Dmd=1L] :: GHC.Prim.Int#) ->
       case ww of ds {
@@ -385,7 +399,8 @@ $wg1
                  { __DEFAULT ->
                  GHC.Types.I# ds2
                  };
-               0# -> GHC.Real.divZeroError @Int
+               -1# -> lvl;
+               0# -> GHC.Internal.Real.divZeroError @Int
              } #);
         1# -> (# 15#, lvl #)
       }
@@ -399,7 +414,7 @@ lvl :: (Int, Int)
 lvl = case $wg1 2# of { (# ww, ww #) -> (GHC.Types.I# ww, ww) }
 
 -- RHS size: {terms: 22, types: 16, coercions: 0, joins: 0/0}
-$wh1 [InlPrag=[2]] :: GHC.Prim.Int# -> Int
+$wh1 [InlPrag=[2], Dmd=LC(S,!P(L))] :: GHC.Prim.Int# -> Int
 [LclId[StrictWorker([])],
  Arity=1,
  Str=<1L>,
