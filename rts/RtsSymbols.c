@@ -644,6 +644,7 @@ extern char **environ;
       SymI_HasDataProto(stg_newMutVarzh)                                    \
       SymI_HasDataProto(stg_newTVarzh)                                      \
       SymI_HasDataProto(stg_noDuplicatezh)                                  \
+      SymI_HasDataProto(stg_deepseqzh)                                      \
       SymI_HasDataProto(stg_atomicModifyMutVar2zh)                          \
       SymI_HasDataProto(stg_atomicModifyMutVarzuzh)                         \
       SymI_HasDataProto(stg_casMutVarzh)                                    \

@@ -149,6 +149,9 @@ import GHC.Prim hiding
   -- whereFrom# is similarly internal.
   , whereFrom#
   , isByteArrayWeaklyPinned#, isMutableByteArrayWeaklyPinned#
+  -- Users should use the interface provided by GHC.DeepSeq in
+  -- ghc-experimental.
+  , deepseq#
   -- Don't re-export vector FMA instructions
   , fmaddFloatX4#
   , fmsubFloatX4#

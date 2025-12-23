@@ -1592,6 +1592,7 @@ module GHC.Prim where
   decodeDouble_2Int# :: Double# -> (# Int#, Word#, Word#, Int# #)
   decodeDouble_Int64# :: Double# -> (# Int64#, Int# #)
   decodeFloat_Int# :: Float# -> (# Int#, Int# #)
+  deepseq# :: forall a d. a -> State# d -> (# State# d, Int#, a #)
   delay# :: forall d. Int# -> State# d -> State# d
   divideDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2#
   divideDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4#
@@ -3156,6 +3157,7 @@ module GHC.PrimopWrappers where
   decodeDouble_2Int# :: GHC.Internal.Prim.Double# -> (# GHC.Internal.Prim.Int#, GHC.Internal.Prim.Word#, GHC.Internal.Prim.Word#, GHC.Internal.Prim.Int# #)
   decodeDouble_Int64# :: GHC.Internal.Prim.Double# -> (# GHC.Internal.Prim.Int64#, GHC.Internal.Prim.Int# #)
   decodeFloat_Int# :: GHC.Internal.Prim.Float# -> (# GHC.Internal.Prim.Int#, GHC.Internal.Prim.Int# #)
+  deepseq# :: forall a s. a -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, GHC.Internal.Prim.Int#, a #)
   delay# :: forall s. GHC.Internal.Prim.Int# -> GHC.Internal.Prim.State# s -> GHC.Internal.Prim.State# s
   divideFloat# :: GHC.Internal.Prim.Float# -> GHC.Internal.Prim.Float# -> GHC.Internal.Prim.Float#
   double2Float# :: GHC.Internal.Prim.Double# -> GHC.Internal.Prim.Float#

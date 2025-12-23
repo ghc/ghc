@@ -4537,6 +4537,23 @@ primop PrefetchValueOp0 "prefetchValue0#" GenPrimOp
    with effect = ReadWriteEffect
 
 
+------------------------------------------------------------------------
+section "Forcing evaluation"
+        {Primitives for forcing evaluation within a state thread.}
+------------------------------------------------------------------------
+
+primop DeepSeqOp "deepseq#" GenPrimOp
+   a -> State# s -> (# State# s, Int#, a #)
+   { @'deepseq#' x s@ deeply evaluates @x@ in the state thread; see
+     'GHC.DeepSeq.forceIO' for the user-facing semantics. }
+   with
+   out_of_line = True
+   effect = ReadWriteEffect
+   -- See Note [seq# magic] in GHC.Types.Id.Make: we must not let strictness
+   -- analysis see through the sequencing effect.
+   strictness = { \ _arity -> mkClosedDmdSig [ topDmd, topDmd ] topDiv }
+
+
 -- Note [RuntimeRep polymorphism in continuation-style primops]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --  See below.

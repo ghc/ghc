@@ -1705,6 +1705,7 @@ emitPrimOp cfg primop =
   AtomicModifyMutVar2Op -> alwaysExternal
   AtomicModifyMutVar_Op -> alwaysExternal
   CasMutVarOp -> alwaysExternal
+  DeepSeqOp -> alwaysExternal
   CatchOp -> alwaysExternal
   RaiseOp -> alwaysExternal
   RaiseUnderflowOp -> alwaysExternal

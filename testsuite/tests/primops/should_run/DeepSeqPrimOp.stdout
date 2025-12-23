@@ -1,0 +1,9 @@
+thunk-forced
+fun-ok
+noforce-ok
+thunk-ok
+array-thunk-forced
+ioarray-thunk-forced
+ioref-thunk-forced
+mvar-thunk-forced
+weak-thunk-forced

@@ -359,6 +359,7 @@ library
       cmm-sources: Apply.cmm
                    Compact.cmm
                    ContinuationOps.cmm
+                   DeepSeq.cmm
                    Exception.cmm
                    HeapStackCheck.cmm
                    Jumps_D.cmm

@@ -4454,6 +4454,11 @@ module Data.Tuple.Experimental where
   data Unit# = ...
   getSolo :: forall a. Solo a -> a
 
+module GHC.DeepSeq where
+  -- Safety: None
+  force :: forall a. a -> (GHC.Internal.Types.Bool, a)
+  forceIO :: forall a. a -> GHC.Internal.Types.IO (GHC.Internal.Types.Bool, a)
+
 module GHC.PrimOps where
   -- Safety: Unsafe
   (*#) :: Int# -> Int# -> Int#
@@ -4924,6 +4929,7 @@ module GHC.PrimOps where
   decodeDouble_2Int# :: Double# -> (# Int#, Word#, Word#, Int# #)
   decodeDouble_Int64# :: Double# -> (# Int64#, Int# #)
   decodeFloat_Int# :: Float# -> (# Int#, Int# #)
+  deepseq# :: forall a d. a -> State# d -> (# State# d, Int#, a #)
   delay# :: forall d. Int# -> State# d -> State# d
   divideDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2#
   divideDoubleX4# :: DoubleX4# -> DoubleX4# -> DoubleX4#
