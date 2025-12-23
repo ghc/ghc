@@ -1106,8 +1106,17 @@ dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs
 
     WithDmdType rhs_dmd_ty rhs' = dmdAnal env rhs_sd rhs
     DmdType rhs_env rhs_dmds = rhs_dmd_ty
+
+    -- See Note [Absence analysis for stable unfoldings and RULES]
+    -- If there's a stable unfolding, we need to combine argument demands
+    -- from the unfolding with those from the RHS, because the unfolding
+    -- might use arguments that the (optimised) RHS doesn't.
+    -- Any argument with a demand absent in one but not the other can
+    -- be problematic, see #26416
+    combined_rhs_dmds = combineUnfoldingDmds env rhs_sd id rhs_dmds
+
     (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id ww_arity
-                                                      rhs_dmds (de_div rhs_env) rhs'
+                                                      combined_rhs_dmds (de_div rhs_env) rhs'
 
     dmd_sig_arity = ww_arity + strictCallArity body_sd
     sig = mkDmdSigForArity dmd_sig_arity (DmdType sig_env final_rhs_dmds)
@@ -1143,6 +1152,28 @@ dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs
 splitWeakDmds :: DmdEnv -> (DmdEnv, WeakDmds)
 splitWeakDmds (DE fvs div) = (DE sig_fvs div, weak_fvs)
   where (!weak_fvs, !sig_fvs) = partitionVarEnv isWeakDmd fvs
+
+-- | If there is a stable unfolding, don't let any demand be absent that
+-- is also not absent in the unfolding
+-- See Note [Absence analysis for stable unfoldings and RULES], Wrinkle (W3).
+combineUnfoldingDmds :: AnalEnv -> SubDemand -> Id -> [Demand] -> [Demand]
+combineUnfoldingDmds env rhs_sd id rhs_dmds
+  | not (isStableUnfolding unf)
+  = rhs_dmds  -- No stable unfolding, nothing to do
+
+  | Just unf_body <- maybeUnfoldingTemplate unf
+  , let WithDmdType (DmdType _ unf_dmds) _ = dmdAnal env rhs_sd unf_body
+  , let result = go rhs_dmds unf_dmds
+  = -- pprTrace "lubUnfoldingDmds" (ppr id $$ ppr rhs_dmds $$ ppr unf_dmds $$ ppr result) $
+   result
+  | otherwise = rhs_dmds
+  where
+    unf = realIdUnfolding id
+    go rhs          []            = rhs
+    go []           _             = []
+    go (AbsDmd:rhs) (u:unfs)      = u : go rhs unfs
+    go (r:rhs)      (AbsDmd:unfs) = r : go rhs unfs
+    go (r:rhs)      (_:unfs) = r : go rhs unfs
 
 -- | The result type after applying 'idArity' many arguments. Returns 'Nothing'
 -- when the type doesn't have exactly 'idArity' many arrows.
@@ -1522,6 +1553,25 @@ Wrinkles:
     the demand signature of `sg`, too! Before #23208 we simply added a 'topDmd'
     for `sg`, failing to unleash the signature and hence observed an absent
     error instead of the `really important message`.
+
+  (W3) The SOLUTION above handles /free variables/ of stable unfoldings, but
+    what about /arguments/?  Consider (#25965)
+
+       fromVector :: (Storable a, KnownNat n) => Vector a -> Vector a
+       fromVector v = ... (uses Storable dictionary) ...
+       {-# INLINABLE fromVector #-}
+
+    Suppose that the optimised RHS of `fromVector` somehow discards the use of
+    the Storable dictionary, but the stable unfolding still uses it. Then the
+    demand signature will say that the Storable dictionary argument is absent,
+    and worker/wrapper will replace it with `LitRubbish`.  But when the
+    worker's unfolding is inlined, it will use that rubbish value as a real
+    dictionary, leading to a segfault!
+
+    SOLUTION: in `dmdAnalRhsSig`, if the function has a stable unfolding,
+    analyse it and drop any AbsDmds which are not absent in the unfolding.
+    This is done by `combineUnfoldingDmds`.  This ensures that if the unfolding
+    uses an argument, it won't be marked as absent.
 
 Note [DmdAnal for DataCon wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2046,8 +2096,11 @@ finaliseArgBoxities env fn ww_arity arg_dmds div rhs
 
     arg_triples :: [(Type, StrictnessMark, Demand)]
     arg_triples = take ww_arity $
-                  [ (idType bndr, NotMarkedStrict, get_dmd bndr)
-                  | bndr <- bndrs, isRuntimeVar bndr ]
+                  zipWith mk_triple
+                          [ bndr | bndr <- bndrs, isRuntimeVar bndr ]
+                          arg_dmds
+      where
+        mk_triple bndr dmd = (idType bndr, NotMarkedStrict, get_dmd dmd)
 
     arg_dmds' = ww_arg_dmds ++ map trimBoxity (drop ww_arity arg_dmds)
                 -- If ww_arity < length arg_dmds, the leftover ones
@@ -2063,12 +2116,10 @@ finaliseArgBoxities env fn ww_arity arg_dmds div rhs
                     -- This is the budget initialisation step of
                     -- Note [Worker argument budget]
 
-    get_dmd :: Id -> Demand
-    get_dmd bndr
+    get_dmd :: Demand -> Demand
+    get_dmd dmd
       | is_bot_fn = unboxDeeplyDmd dmd -- See Note [Boxity for bottoming functions],
       | otherwise = dmd                --     case (B)
-      where
-        dmd = idDemandInfo bndr
 
     -- is_bot_fn:  see Note [Boxity for bottoming functions]
     is_bot_fn = div == botDiv
