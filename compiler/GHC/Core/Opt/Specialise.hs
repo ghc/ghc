@@ -804,20 +804,22 @@ spec_imports :: SpecEnv          -- Passed in so that all top-level Ids are in s
                       , [CoreBind] ) -- Specialised bindings
 spec_imports env callers dict_binds calls
   = do { let import_calls = dVarEnvElts calls
---       ; debugTraceMsg (text "specImports {" <+>
---                         vcat [ text "calls:" <+> ppr import_calls
---                              , text "dict_binds:" <+> ppr dict_binds ])
+       ; debugTraceMsg (text "specImports {" <+>
+                         vcat [ text "calls:" <+> ppr import_calls
+                              , text "dict_binds:" <+> ppr dict_binds ])
        ; (env, rules, spec_binds) <- go env import_calls
---       ; debugTraceMsg (text "End specImports }" <+> ppr import_calls)
+       ; debugTraceMsg (text "End specImports }" <+> ppr import_calls)
 
        ; return (env, rules, spec_binds) }
   where
     go :: SpecEnv -> [CallInfoSet] -> CoreM (SpecEnv, [CoreRule], [CoreBind])
     go env [] = return (env, [], [])
     go env (cis : other_calls)
-      = do { -- debugTraceMsg (text "specImport {" <+> ppr cis)
+      = do { debugTraceMsg (text "specImport {" <+> vcat [ ppr cis
+                                                         , text "callers" <+> ppr callers
+                                                         , text "dict_binds" <+> ppr dict_binds ])
            ; (env, rules1, spec_binds1) <- spec_import env callers dict_binds cis
-           ; -- debugTraceMsg (text "specImport }" <+> ppr cis)
+           ; debugTraceMsg (text "specImport }" <+> ppr cis)
 
            ; (env, rules2, spec_binds2) <- go env other_calls
            ; return (env, rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
@@ -834,13 +836,16 @@ spec_import :: SpecEnv               -- Passed in so that all top-level Ids are 
                      , [CoreBind] )  -- Specialised bindings
 spec_import env callers dict_binds cis@(CIS fn _)
   | isIn "specImport" fn callers
-  = return (env, [], [])  -- No warning.  This actually happens all the time
-                          -- when specialising a recursive function, because
-                          -- the RHS of the specialised function contains a recursive
-                          -- call to the original function
+  = do { debugTraceMsg (text "specImport1-bad" <+> (ppr fn $$ text "callers" <+> ppr callers))
+       ; return (env, [], []) }
+    -- No warning.  This actually happens all the time
+    -- when specialising a recursive function, because
+    -- the RHS of the specialised function contains a recursive
+    -- call to the original function
 
   | null good_calls
-  = return (env, [], [])
+  = do { debugTraceMsg (text "specImport1-no-good" <+> (ppr cis $$ text "dict_binds" <+> ppr dict_binds))
+       ; return (env, [], []) }
 
   | Just rhs <- canSpecImport dflags fn
   = do {     -- Get rules from the external package state
@@ -849,12 +854,12 @@ spec_import env callers dict_binds cis@(CIS fn _)
        ; eps_rules <- getExternalRuleBase
        ; let rule_env = se_rules env `updExternalPackageRules` eps_rules
 
---       ; debugTraceMsg (text "specImport1" <+> vcat
---           [ text "function:" <+> ppr fn
---           , text "good calls:" <+> ppr good_calls
---           , text "existing rules:" <+> ppr (getRules rule_env fn)
---           , text "rhs:" <+> ppr rhs
---           , text "dict_binds:" <+> ppr dict_binds ])
+       ; debugTraceMsg (text "specImport1" <+> vcat
+           [ text "function:" <+> ppr fn
+           , text "good calls:" <+> ppr good_calls
+           , text "existing rules:" <+> ppr (getRules rule_env fn)
+           , text "rhs:" <+> ppr rhs
+           , text "dict_binds:" <+> ppr dict_binds ])
 
        ; (rules1, spec_pairs, MkUD { ud_binds = dict_binds1, ud_calls = new_calls })
             <- runSpecM $ specCalls True env (getRules rule_env fn) good_calls fn rhs
@@ -889,7 +894,9 @@ spec_import env callers dict_binds cis@(CIS fn _)
        ; return (env, rules2 ++ rules1, final_binds) }
 
   | otherwise
-  = do { tryWarnMissingSpecs dflags callers fn good_calls
+  = do { debugTraceMsg (hang (text "specImport1-missed")
+                           2 (vcat [ppr cis, text "can-spec" <+> ppr (canSpecImport dflags fn)]))
+       ; tryWarnMissingSpecs dflags callers fn good_calls
        ; return (env, [], [])}
 
   where
@@ -1698,15 +1705,15 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 --                , text "useful:    "  <+> ppr useful
 --                , text "already_covered:"  <+> ppr already_covered
 --                , text "useful:    "  <+> ppr useful
---                , text "all_rule_bndrs:"  <+> ppr all_rule_bndrs
+--                , text "all_rule_bndrs:"  <+> ppr (sep (map (pprBndr LambdaBind) all_rule_bndrs))
 --                , text "rule_lhs_args:"  <+> ppr rule_lhs_args
---                , text "spec_bndrs:" <+> ppr spec_bndrs
+--                , text "spec_bndrs:" <+> ppr (sep (map (pprBndr LambdaBind) spec_bndrs))
 --                , text "dx_binds:"   <+> ppr dx_binds
 --                , text "spec_args: "  <+> ppr spec_args
---                , text "rhs_bndrs"    <+> ppr rhs_bndrs
+--                , text "rhs_bndrs"    <+> ppr (sep (map (pprBndr LambdaBind) rhs_bndrs))
 --                , text "rhs_body"     <+> ppr rhs_body
---                , text "subst''" <+> ppr subst'' ]) $
---             return ()
+--                , text "subst''" <+> ppr subst''
+--                ]) $ return ()
 
 
            ; if not useful          -- No useful specialisation
