@@ -404,7 +404,6 @@ data LintPassResultConfig = LintPassResultConfig
   { lpr_diagOpts         :: !DiagOpts
   , lpr_platform         :: !Platform
   , lpr_makeLintFlags    :: !LintFlags
-  , lpr_showLintWarnings :: !Bool
   , lpr_passPpr          :: !SDoc
   , lpr_localsInScope    :: ![Var]
   }
@@ -424,18 +423,16 @@ lintPassResult logger cfg binds
            "Core Linted result of " ++
            renderWithContext defaultSDocContext (lpr_passPpr cfg)
        ; displayLintResults logger
-                            (lpr_showLintWarnings cfg) (lpr_passPpr cfg)
+                            (lpr_passPpr cfg)
                             (pprCoreBindings binds) warns_and_errs
        }
 
 displayLintResults :: Logger
-                   -> Bool -- ^ If 'True', display linter warnings.
-                           --   If 'False', ignore linter warnings.
                    -> SDoc -- ^ The source of the linted program
                    -> SDoc -- ^ The linted program, pretty-printed
                    -> WarnsAndErrs
                    -> IO ()
-displayLintResults logger display_warnings pp_what pp_pgm (warns, errs)
+displayLintResults logger pp_what pp_pgm (warns, errs)
   | not (isEmptyBag errs)
   = do { lintMessage logger
            (vcat [ lint_banner "errors" pp_what, Err.pprMessageBag errs
@@ -446,7 +443,6 @@ displayLintResults logger display_warnings pp_what pp_pgm (warns, errs)
 
   | not (isEmptyBag warns)
   , log_enable_debug (logFlags logger)
-  , display_warnings
   = lintMessage logger
         (lint_banner "warnings" pp_what $$ Err.pprMessageBag (mapBag ($$ blankLine) warns))
 
@@ -857,6 +853,31 @@ remember the details, but could probably recover it if we want to revisit.
 So Lint current accepts (Coercion co) in arbitrary places.  There is no harm in
 that: it really is a value, albeit a zero-bit value.
 
+Note [Checking for rubbish literals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC uses "rubbish literals" (see Note [Rubbish literals] in GHC.Types.Literal)
+to fill for absent arguments, in worker/wrapper.  See Note [Absent fillers] in
+GHC.Core.Opt.WorkWrap.Utils.
+
+These rubbish literals are almost always discarded as dead code, in post-w/w
+optimisation.  If they are ever used at runtime, something is wrong.  For lifted
+absent fillers, instead of using a `LitRubbish` we use an error thunk. So if,
+through some catastrophe, it is used at runtime after all, we get a civilised
+runtime error
+
+But for /unlifted/ ones we can't use a thunk, so we use a random "rubbish" value
+of the right type.  That could lead to bizarre behaviour at runtime.
+
+Worse, for dictionaries, for reasons explained in Note [Absent fillers], we also
+don't use an error thunk. Now if we use it at runtime after all, a seg-fault will
+happen (e.g. #26416). Yikes!
+
+So Lint warns about the presence of rubbish literals, in the output of CorePrep
+only (see GHC.Driver.Config.Core.Lint.perPassFlags).  It's a warning, not an
+error, because it's not /necessarily/ wrong to see a rubbish literal. But it's
+suspicious and worth investigating if you have a seg-fault or bizarre behaviour.
+
+
 ************************************************************************
 *                                                                      *
 \subsection[lintCoreExpr]{lintCoreExpr}
@@ -882,7 +903,14 @@ lintCoreExpr (Var var)
        ; return var_pair }
 
 lintCoreExpr (Lit lit)
-  = return (literalType lit, zeroUE)
+  = do { flags <- getLintFlags
+
+       ; -- See Note [Checking for rubbish literals]
+         when (lf_check_rubbish_lits flags)     $
+         checkWarnL (not (isLitRubbish lit)) $
+         hang (text "Unexpected rubbish literal:") 2 (ppr lit)
+
+       ; return (literalType lit, zeroUE) }
 
 lintCoreExpr (Cast expr co)
   = do { (expr_ty, ue) <- markAllJoinsBad (lintCoreExpr expr)
@@ -2784,7 +2812,7 @@ lintAxioms :: Logger
            -> [CoAxiom Branched]
            -> IO ()
 lintAxioms logger cfg what axioms =
-  displayLintResults logger True what (vcat $ map pprCoAxiom axioms) $
+  displayLintResults logger what (vcat $ map pprCoAxiom axioms) $
   initL cfg $
   do { mapM_ lint_axiom axioms
      ; let axiom_groups = groupWith coAxiomTyCon axioms
@@ -2967,9 +2995,10 @@ data LintFlags
   = LF { lf_check_global_ids           :: Bool -- See Note [Checking for global Ids]
        , lf_check_inline_loop_breakers :: Bool -- See Note [Checking for INLINE loop breakers]
        , lf_check_static_ptrs :: StaticPtrCheck -- ^ See Note [Checking StaticPtrs]
-       , lf_report_unsat_syns :: Bool -- ^ See Note [Linting type synonym applications]
-       , lf_check_linearity :: Bool -- ^ See Note [Linting linearity]
-       , lf_check_fixed_rep :: Bool -- See Note [Checking for representation polymorphism]
+       , lf_report_unsat_syns :: Bool  -- ^ See Note [Linting type synonym applications]
+       , lf_check_linearity :: Bool    -- ^ See Note [Linting linearity]
+       , lf_check_fixed_rep :: Bool    -- ^ See Note [Checking for representation polymorphism]
+       , lf_check_rubbish_lits :: Bool -- ^ See Note [Checking for rubbish literals]
     }
 
 -- See Note [Checking StaticPtrs]

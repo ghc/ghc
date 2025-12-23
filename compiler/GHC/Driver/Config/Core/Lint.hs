@@ -106,26 +106,18 @@ initLintPassResultConfig dflags extra_vars pass = LintPassResultConfig
   { lpr_diagOpts      = initDiagOpts dflags
   , lpr_platform      = targetPlatform dflags
   , lpr_makeLintFlags = perPassFlags dflags pass
-  , lpr_showLintWarnings = showLintWarnings pass
   , lpr_passPpr = ppr pass
   , lpr_localsInScope = extra_vars
   }
 
-showLintWarnings :: CoreToDo -> Bool
--- Disable Lint warnings on the first simplifier pass, because
--- there may be some INLINE knots still tied, which is tiresomely noisy
-showLintWarnings (CoreDoSimplify cfg)
-  | SimplPhase InitialPhase <- sm_phase (so_mode cfg)
-  = False
-showLintWarnings _ = True
-
 perPassFlags :: DynFlags -> CoreToDo -> LintFlags
 perPassFlags dflags pass
   = (defaultLintFlags dflags)
-               { lf_check_global_ids = check_globals
+               { lf_check_global_ids           = check_globals
                , lf_check_inline_loop_breakers = check_lbs
-               , lf_check_static_ptrs = check_static_ptrs
-               , lf_check_linearity = check_linearity }
+               , lf_check_static_ptrs          = check_static_ptrs
+               , lf_check_linearity            = check_linearity
+               , lf_check_rubbish_lits         = check_rubbish }
   where
     -- See Note [Checking for global Ids]
     check_globals = case pass of
@@ -137,6 +129,14 @@ perPassFlags dflags pass
     check_lbs = case pass of
                       CoreDesugar    -> False
                       CoreDesugarOpt -> False
+
+                      -- Disable Lint warnings on the first simplifier pass, because
+                      -- there may be some INLINE knots still tied, which is tiresomely noisy
+                      CoreDoSimplify cfg
+                        | SimplPhase InitialPhase <- sm_phase (so_mode cfg)
+                        -> True
+                        | otherwise
+                        -> False
                       _              -> True
 
     -- See Note [Checking StaticPtrs]
@@ -153,6 +153,11 @@ perPassFlags dflags pass
                           CoreDesugar -> True
                           _ -> False)
 
+    -- See Note [Checking for rubbish literals] in GHC.Core.Lint
+    check_rubbish = case pass of
+                      CorePrep -> True
+                      _        -> False
+
 initLintConfig :: DynFlags -> [Var] -> LintConfig
 initLintConfig dflags vars =LintConfig
   { l_diagOpts = initDiagOpts dflags
@@ -168,4 +173,5 @@ defaultLintFlags dflags = LF { lf_check_global_ids = False
                              , lf_check_linearity = gopt Opt_DoLinearCoreLinting dflags
                              , lf_report_unsat_syns = True
                              , lf_check_fixed_rep = True
+                             , lf_check_rubbish_lits = True
                              }
