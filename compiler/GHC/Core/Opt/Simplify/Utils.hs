@@ -1032,7 +1032,7 @@ interestingArg env e = go env 0 e
        | n > 0         = NonTrivArg -- Saturated or unknown call
        | otherwise  -- n==0, no value arguments; look for an interesting unfolding
        = case idUnfolding v of
---           OtherCon [] -> NonTrivArg   -- It's evaluated, but that's all we know
+           OtherCon [] -> TrivArg      -- It's evaluated, but that's all we know
            OtherCon _  -> NonTrivArg   -- Evaluated and we know it isn't these constructors
               -- See Note [OtherCon and interestingArg]
            DFunUnfolding {} -> ValueArg   -- We konw that idArity=0
@@ -1046,13 +1046,16 @@ interestingArg env e = go env 0 e
 {- Note [OtherCon and interestingArg]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 interstingArg returns
-   (a) NonTrivArg for an arg with an OtherCon [] unfolding
-   (b) ValueArg for an arg with an OtherCon [c1,c2..] unfolding.
+   (a) TrivArg for an arg with an OtherCon [] unfolding
+   (b) NonTrivArg for an arg with an OtherCon [c1,c2..] unfolding.
 
-Reason for (a): I found (in the GHC.Internal.Bignum.Integer module) that I was
-inlining a pretty big function when all we knew was that its arguments
-were evaluated, nothing more.  That in turn make the enclosing function
-too big to inline elsewhere.
+Reason for (a):
+  I found (in the GHC.Internal.Bignum.Integer module) that I was
+  inlining a pretty big function when all we knew was that its arguments
+  were evaluated, nothing more.  That in turn make the enclosing function
+  too big to inline elsewhere.
+
+  
 
 Reason for (b): we want to inline integerCompare here
   integerLt# :: Integer -> Integer -> Bool#
