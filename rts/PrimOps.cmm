@@ -258,19 +258,34 @@ stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
 stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
 // MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
 {
+   W_ old_size, old_wds, new_wds, new_free;
+   W_ bd;
+
    ASSERT(new_size `ge` 0);
 
-   if (new_size <= StgArrBytes_bytes(mba)) {
+   old_size = StgArrBytes_bytes(mba);
+   if (new_size <= old_size) {
       call stg_shrinkMutableByteArrayzh(mba, new_size);
+      return (mba);
+   }
+
+   bd = Bdescr(mba);
+   old_wds = BYTES_TO_WDS(SIZEOF_StgArrBytes) + ROUNDUP_BYTES_TO_WDS(old_size);
+   new_wds = BYTES_TO_WDS(SIZEOF_StgArrBytes) + ROUNDUP_BYTES_TO_WDS(new_size);
+   new_free = mba + WDS(new_wds);
+
+   // Just like stg_shrinkMutableByteArrayzh above, we try to grow mba
+   // in-place if possible. The conditions are similar to the
+   // conditions when we can set bd->free when shrinking mba, and we
+   // also need to check that we don't grow past the end of current block.
+   if (bdescr_free(bd) == mba + WDS(old_wds) &&
+       (bd == StgRegTable_rCurrentAlloc(BaseReg) || bd == Capability_pinned_object_block(MyCapability())) &&
+       new_free <= bdescr_start(bd) + (TO_W_(bdescr_blocks(bd)) * BLOCK_SIZE)) {
+      bdescr_free(bd) = new_free;
+      StgArrBytes_bytes(mba) = new_size;
       return (mba);
    } else {
       (P_ new_mba) = call stg_newByteArrayzh(new_size);
-
-      // maybe at some point in the future we may be able to grow the
-      // MBA in-place w/o copying if we know the space after the
-      // current MBA is still available, as often we want to grow the
-      // MBA shortly after we allocated the original MBA. So maybe no
-      // further allocations have occurred by then.
 
       // copy over old content
       prim %memcpy(BYTE_ARR_CTS(new_mba), BYTE_ARR_CTS(mba),
