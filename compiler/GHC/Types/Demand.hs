@@ -23,6 +23,8 @@ module GHC.Types.Demand (
     lubCard, lubDmd, lubSubDmd,
     -- *** Greatest lower bound
     glbCard,
+    -- *** Maximum (glb on strictness, lub on usage)
+    maxCard, maxDmd,
     -- *** Plus
     plusCard, plusDmd, plusSubDmd,
     -- *** Multiply
@@ -49,13 +51,13 @@ module GHC.Types.Demand (
 
     -- * Demand environments
     DmdEnv(..), addVarDmdEnv, mkTermDmdEnv, nopDmdEnv, plusDmdEnv, plusDmdEnvs,
-    multDmdEnv, reuseEnv,
+    lubDmdEnv, multDmdEnv, reuseEnv,
 
     -- * Demand types
     DmdType(..), dmdTypeDepth,
     -- ** Algebra
     nopDmdType, botDmdType,
-    lubDmdType, plusDmdType, multDmdType, discardArgDmds,
+    lubDmdType, maxDmdType, plusDmdType, multDmdType, discardArgDmds,
     -- ** Other operations
     peelFV, findIdDemand, addDemand, splitDmdTy, deferAfterPreciseException,
 
@@ -863,6 +865,89 @@ lubSubDmd (Poly b1 n1) (Poly b2 n2) = Poly (lubBoxity b1 b2) (lubCard n1 n2)
 lubSubDmd sd1@Poly{}   sd2          = lubSubDmd sd2 sd1
 -- Otherwise (Call `lub` Prod) return Top
 lubSubDmd _            _            = topSubDmd
+
+{- Note [Combining demands for stable unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a function has a stable unfolding, the optimised RHS and the unfolding
+may have different demand signatures for the same arguments. This can happen
+because:
+
+  * The optimised RHS may have had transformations applied that reveal
+    strictness (e.g., inlining exposes a case on an argument).
+    Example:
+       RHS: x
+       Unfolding: head [x]
+    It's clear that the RHS is strict in `x`, but the demand analyser won't
+    spot that when it analyses the unfolding.
+
+  * The optimised RHS may have had transformations applied that drop usage
+    (e.g., a rewrite rule fires that doesn't use an argument, or a seq on
+    a dictionary is dropped because dictionaries are known to terminate).
+    Example:
+       RHS: a
+       Unfolding: fst g
+    where `g` is in scope as `g = (a,b)`.
+
+See Note [Absence analysis for stable unfoldings and RULES] in
+GHC.Core.Opt.DmdAnal for the broader context.
+
+When we inline the stable unfolding at a call site, we get the unfolding's
+behaviour, not the RHS's. So we must be conservative and combine the demands:
+
+  * For strictness (lower bounds): we can take the MAXIMUM (glb).
+    If the RHS reveals that an argument is strict, that strictness was
+    always there semantically - the analysis just couldn't see it in the
+    unfolding. Sound optimisations never make lazy code strict.
+
+  * For usage (upper bounds): we must take the MAXIMUM (lub).
+    If the unfolding uses an argument but the RHS doesn't, we must not
+    mark it absent, or we'll replace it with rubbish that the unfolding
+    will then try to use, causing a segfault. See #26416.
+
+So for cardinality bounds [l1..u1] from RHS and [l2..u2] from unfolding,
+we compute [max(l1,l2)..max(u1,u2)].
+-}
+
+-- | Takes the maximum of both the lower and upper bound of two 'Card's.
+-- Semantically, this is glb on lower (strictness) and lub on upper (usage).
+-- See Note [Combining demands for stable unfoldings].
+maxCard :: Card -> Card -> Card
+-- Given Note [Bit vector representation for Card]:
+--   * bit 0 (strictness): take AND (glb) - 0 means strict, so 0 wins
+--   * bits 1,2 (usage): take OR (lub) - if either uses, result uses
+maxCard (Card a) (Card b) = Card ((a .&. b .&. 0b001) .|. ((a .|. b) .&. 0b110))
+
+-- | Takes the maximum of both the lower and upper bounds of two 'Demand's.
+-- Semantically, glb on lower (strictness) and lub on upper (usage).
+-- See Note [Combining demands for stable unfoldings].
+maxDmd :: Demand -> Demand -> Demand
+maxDmd BotDmd      dmd2        = dmd2
+maxDmd dmd1        BotDmd      = dmd1
+maxDmd (n1 :* sd1) (n2 :* sd2) =
+  maxCard n1 n2 :* maxSubDmd sd1 sd2
+
+maxSubDmd :: SubDemand -> SubDemand -> SubDemand
+-- Shortcuts for neutral and absorbing elements.
+maxSubDmd (Poly Unboxed C_00)  sd                   = sd
+maxSubDmd sd                   (Poly Unboxed C_00)  = sd
+maxSubDmd sd@(Poly Boxed C_1N) _                    = sd
+maxSubDmd _                    sd@(Poly Boxed C_1N) = sd
+-- Prod
+maxSubDmd (Prod b1 ds1) (Poly b2 n2)
+  | let !d = polyFieldDmd b2 n2
+  = mkProd (lubBoxity b1 b2) (strictMap (maxDmd d) ds1)
+maxSubDmd (Prod b1 ds1) (Prod b2 ds2)
+  | equalLength ds1 ds2
+  = mkProd (lubBoxity b1 b2) (strictZipWith maxDmd ds1 ds2)
+-- Handle Call
+maxSubDmd (Call n1 sd1) (viewCall -> Just (n2, sd2)) =
+  mkCall (maxCard n1 n2) (maxSubDmd sd1 sd2)
+-- Handle Poly
+maxSubDmd (Poly b1 n1) (Poly b2 n2) = Poly (lubBoxity b1 b2) (maxCard n1 n2)
+-- Other Poly case by commutativity
+maxSubDmd sd1@Poly{}   sd2          = maxSubDmd sd2 sd1
+-- Otherwise (Call `max` Prod) return Top
+maxSubDmd _            _            = topSubDmd
 
 -- | Denotes '+' on 'Demand'.
 plusDmd :: Demand -> Demand -> Demand
@@ -1833,6 +1918,26 @@ lubDmdType d1 d2 = DmdType lub_fv lub_ds
     (DmdType fv2 ds2) = etaExpandDmdType n d2
     lub_ds  = zipWithEqual lubDmd ds1 ds2
     lub_fv = lubDmdEnv fv1 fv2
+
+-- | Combine two 'DmdType's for stable unfolding analysis.
+-- See Note [Combining demands for stable unfoldings].
+maxDmdType :: DmdType -> DmdType -> DmdType
+maxDmdType (DmdType fv1 ds1) (DmdType fv2 ds2)
+  = DmdType combined_fv combined_ds
+  where
+    combined_fv = maxDmdEnv fv1 fv2
+    combined_ds = go ds1 ds2
+    -- If lists have different lengths, keep remaining ds1 (from RHS)
+    go rhs []           = rhs
+    go []  _            = []
+    go (r:rhs) (u:unfs) = maxDmd r u : go rhs unfs
+
+-- | See Note [Combining demands for stable unfoldings].
+maxDmdEnv :: DmdEnv -> DmdEnv -> DmdEnv
+maxDmdEnv (DE fv1 d1) (DE fv2 d2) = DE combined_fv combined_div
+  where
+    combined_fv  = plusVarEnv_CD maxDmd fv1 (defaultFvDmd d1) fv2 (defaultFvDmd d2)
+    combined_div = lubDivergence d1 d2
 
 discardArgDmds :: DmdType -> DmdEnv
 discardArgDmds (DmdType fv _) = fv

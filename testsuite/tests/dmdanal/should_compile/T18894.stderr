@@ -399,7 +399,8 @@ lvl :: (Int, Int)
 lvl = case $wg1 2# of { (# ww, ww #) -> (GHC.Types.I# ww, ww) }
 
 -- RHS size: {terms: 22, types: 16, coercions: 0, joins: 0/0}
-$wh1 [InlPrag=[2]] :: GHC.Prim.Int# -> Int
+$wh1 [InlPrag=[2], Dmd=LC(S,!P(L))]
+  :: GHC.Prim.Int# -> Int
 [LclId[StrictWorker([])],
  Arity=1,
  Str=<1L>,
