@@ -747,7 +747,7 @@ mergeCaseAlts _ _ _ = Nothing
 okToFloatJoin :: BinderSwapDecision -> Id -> CoreBind -> Maybe [CoreBind]
 -- Check a join-point binding to see if it can be floated out of
 -- the DEFAULT branch of a `case`.   A Just result means "yes",
--- and the [CoreBInd] are the extra fix-up bindings to add.
+-- and the [CoreBind] are the extra fix-up bindings to add.
 -- See Note [Floating join points out of DEFAULT alternatives]
 okToFloatJoin bndr_swap outer_bndr bind
   | outer_bndr `elem` bindersOf bind          -- (a)

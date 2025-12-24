@@ -220,10 +220,14 @@ getCoreToDo dflags hpt_rule_base extra_vars
         --                   minimum effort please
         -- Specialisation is best done before full laziness
         -- so that overloaded functions have all their dictionary lambdas manifest
-        runWhen (do_specialise || do_co_opt) $
+        runWhen do_specialise $
         CoreDoPasses [ simpl_gently
-                     , runWhen do_co_opt     CoreOptCoercion
                      , runWhen do_specialise CoreDoSpecialising ],
+
+        -- Optimise coercions
+        -- With -O do this after one run of the Simplifier.
+        -- Without -O, just take what the desugarer produced
+        runWhen do_co_opt CoreOptCoercion,
 
         if full_laziness then
            CoreDoFloatOutwards $ FloatOutSwitches
@@ -257,7 +261,8 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- Run the simplifier phases 2,1,0 to allow rewrite rules to fire
         runWhen do_simpl3
             (CoreDoPasses $ [ simpl_phase (Phase phase) "main" max_iter
-                            | phase <- [phases, phases-1 .. 1] ] ++
+                            | phase <- [phases, phases-1 .. 1] ]
+                            ++
                             [ simpl_phase (Phase 0) "main" (max max_iter 3) ]),
                 -- Phase 0: allow all Ids to be inlined now
                 -- This gets foldr inlined before strictness analysis
@@ -310,6 +315,8 @@ getCoreToDo dflags hpt_rule_base extra_vars
 
         runWhen do_float_in CoreDoFloatInwards,
 
+        --------- Final run of the Simplifier ---------------
+        -- This runs even with -O0
         simplify "final",  -- Final tidy-up
 
         maybe_rule_check FinalPhase,
