@@ -1508,10 +1508,12 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env decl
       IfaceClass{ifBody = IfConcreteClass { ifSigs=sigs, ifATs=ats }} ->
                      IfaceClassExtras (fix_fn n) insts (ann_fn n) meths defms
           where
-            insts = (map ifDFun $ (concatMap at_extras ats)
-                                    ++ lookupOccEnvL inst_env n)
-                           -- Include instances of the associated types
-                           -- as well as instances of the class (#5147)
+            insts =
+              let (atFamInsts, atClsInsts) = foldMap at_extras ats
+              in (ifFamInstAxiom <$> atFamInsts) ++ (ifDFun <$> atClsInsts)
+                 ++ (ifDFun <$> lookupOccEnvL inst_env n)
+                           -- Include instances and axioms of the associated types
+                           -- as well as instances of the class (#5147) (#26183)
             meths = [id_extras (getOccName op) | IfaceClassOp op _ _ <- sigs]
             -- Names of all the default methods (see Note [default method Name])
             defms = [ dmName
@@ -1527,7 +1529,10 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env decl
   where
         n = getOccName decl
         id_extras occ = IdExtras (fix_fn occ) (lookupOccEnvL rule_env occ) (ann_fn occ)
-        at_extras (IfaceAT decl _) = lookupOccEnvL inst_env (getOccName decl)
+        at_extras (IfaceAT decl _) =
+          ( lookupOccEnvL fi_env (getOccName decl) -- Axioms
+          , lookupOccEnvL inst_env (getOccName decl) -- Class instances
+          )
 
 
 {- Note [default method Name] (see also #15970)
