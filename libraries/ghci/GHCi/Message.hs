@@ -44,7 +44,6 @@ import qualified GHC.Exts.Heap as Heap
 #endif
 import GHC.ForeignSrcLang
 import GHC.Fingerprint
-import GHC.Conc (pseq, par)
 import Control.Concurrent
 import Control.DeepSeq
 import Control.Exception
@@ -66,11 +65,13 @@ import Data.Map (Map)
 import Foreign
 import GHC.Generics
 import GHC.Stack.CCS
+import GHC.Utils.Spark
 import qualified GHC.Boot.TH.Syntax        as TH
 import qualified GHC.Boot.TH.Monad         as TH
 import System.Exit
 import System.IO
 import System.IO.Error
+import System.IO.Unsafe
 
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server
@@ -572,7 +573,7 @@ getMessage = do
       9  -> Msg <$> RemoveLibrarySearchPath <$> get
       10 -> Msg <$> return ResolveObjs
       11 -> Msg <$> FindSystemLibrary <$> get
-      12 -> Msg <$> (CreateBCOs . concatMap (runGet get)) <$> (get :: Get [LB.ByteString])
+      12 -> Msg <$> (CreateBCOs . fmap (runGet get)) <$> (get :: Get [LB.ByteString])
                     -- See Note [Parallelize CreateBCOs serialization]
       13 -> Msg <$> FreeHValueRefs <$> get
       14 -> Msg <$> MallocData <$> get
@@ -653,29 +654,16 @@ putMessage m = case m of
 Note [Parallelize CreateBCOs serialization]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Serializing ResolvedBCO is expensive, so we do it in parallel.
-We split the list [ResolvedBCO] into chunks of length <= 100,
-and serialize every chunk in parallel, getting a [LB.ByteString]
-where every bytestring corresponds to a single chunk (multiple ResolvedBCOs).
+For each element in the list [ResolvedBCO], we spawn a spark which
+serializes it, getting a [LB.ByteString] where every fully evaluated
+lazy ByteString corresponds to a single ResolvedBCO.
 
 Previously, we stored [LB.ByteString] in the Message object, but that
 incurs unneccessary serialization with the internal interpreter (#23919).
 -}
 
 serializeBCOs :: [ResolvedBCO] -> [LB.ByteString]
-serializeBCOs rbcos = parMap doChunk (chunkList 100 rbcos)
- where
-  -- make sure we force the whole lazy ByteString
-  doChunk c = pseq (LB.length bs) bs
-    where bs = runPut (put c)
-
-  -- We don't have the parallel package, so roll our own simple parMap
-  parMap _ [] = []
-  parMap f (x:xs) = fx `par` (fxs `pseq` (fx : fxs))
-    where fx = f x; fxs = parMap f xs
-
-  chunkList :: Int -> [a] -> [[a]]
-  chunkList _ [] = []
-  chunkList n xs = as : chunkList n bs where (as,bs) = splitAt n xs
+serializeBCOs = unsafeDupablePerformIO . traverse (spark . force . runPut . put)
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages
