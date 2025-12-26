@@ -55,6 +55,7 @@ Library
             GHC.Data.SizedSeq
             GHC.Utils.Encoding
             GHC.Utils.Encoding.UTF8
+            GHC.Utils.Spark
             GHC.LanguageExtensions
             GHC.Unit.Database
             GHC.Serialized
