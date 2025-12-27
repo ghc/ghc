@@ -294,7 +294,7 @@ void initRtsFlagsDefaults(void)
 #endif
 
 #if defined(THREADED_RTS)
-    RtsFlags.ParFlags.maxLocalSparks    = 4096;
+    RtsFlags.ParFlags.maxLocalSparks    = 1048576;
 #endif /* THREADED_RTS */
 
 #if defined(TICKY_TICKY)
@@ -554,7 +554,7 @@ usage_text[] = {
 "             The number of worker threads to use in the native I/O manager to",
 "             handle completion events. (default: num cores)",
 #endif
-"  -e<n>      Maximum number of outstanding local sparks (default: 4096)",
+"  -e<n>      Maximum number of outstanding local sparks (default: 1048576)",
 #endif
 #if defined(x86_64_HOST_ARCH)
 #if !DEFAULT_LINKER_ALWAYS_PIC
