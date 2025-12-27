@@ -594,6 +594,16 @@ deriving instance Eq (IEThingAllExt GhcPs)
 deriving instance Eq (IEThingAllExt GhcRn)
 deriving instance Eq (IEThingAllExt GhcTc)
 
+-- deriving instance Data (IEThingWithExt p)
+deriving instance Data (IEThingWithExt GhcPs)
+deriving instance Data (IEThingWithExt GhcRn)
+deriving instance Data (IEThingWithExt GhcTc)
+
+-- deriving instance Eq (IEThingWithExt p)
+deriving instance Eq (IEThingWithExt GhcPs)
+deriving instance Eq (IEThingWithExt GhcRn)
+deriving instance Eq (IEThingWithExt GhcTc)
+
 -- deriving instance Data (IEWholeNamespaceExt p)
 deriving instance Data (IEWholeNamespaceExt GhcPs)
 deriving instance Data (IEWholeNamespaceExt GhcRn)

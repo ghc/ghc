@@ -1369,7 +1369,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                   return ( [mkIEThingAbs tc' l gre]
                          , maybeToList $ mk_depr_export_warning gre)
 
-        IEThingWith (deprecation, ann) ltc@(L l rdr_tc) wc rdr_ns _ -> do
+        IEThingWith x ltc@(L l rdr_tc) wc rdr_ns _ -> do
            ImpOccItem { imp_item = gre, imp_bundled = subnames }
                <- lookup_parent (IEThingAbs Nothing ltc noDocstring) (ieWrappedName rdr_tc)
            let name = greName gre
@@ -1381,7 +1381,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
            bad_import_warns <-
              if null children_errs then return [] else
              let items = map lce_wrapped_name children_errs
-                 ie    = IEThingWith (deprecation, ann) ltc wc items noDocstring
+                 ie    = IEThingWith x ltc wc items noDocstring
                          -- We are trying to import T( a,b,c,d ), and failed
                          -- to find 'b' and 'd'.  So we make up an import item
                          -- to report as failing, namely T( b, d ).
@@ -1395,8 +1395,12 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                export_depr_warns
                  | want_hiding == Exactly = mapMaybe mk_depr_export_warning gres
                  | otherwise              = []
-           return ([ (IEThingWith (Nothing, ann) (L l name') wc childnames' noDocstring
-                     ,gres)]
+               renamed_ie = IEThingWith (x { ietw_warning = Nothing })
+                                        (L l name')
+                                        wc
+                                        childnames'
+                                        noDocstring
+           return ( [(renamed_ie, gres)]
                   , bad_import_warns ++ export_depr_warns)
 
         IEWholeNamespace x -> do
@@ -2312,7 +2316,8 @@ getMinimalImports ie_decls
           | otherwise
           -> do { let ns_gres = map (expectJust . lookupGRE_Name rdr_env) cs
                       ns = map greName ns_gres
-                ; return [IEThingWith (Nothing, noAnn) (to_ie_post_rn $ noLocA n) NoIEWildcard
+                      x = IEThingWithExt Nothing noAnn noAnn noAnn noAnn
+                ; return [IEThingWith x (to_ie_post_rn $ noLocA n) NoIEWildcard
                                  (map (to_ie_post_rn . noLocA) (filter (/= n) ns)) Nothing] }
                                        -- Note [Overloaded field import]
         _other
@@ -2320,10 +2325,11 @@ getMinimalImports ie_decls
                       (ns_gres,fs_gres) = classifyGREs infos
                       ns = map greName (ns_gres ++ fs_gres)
                       fs = map fieldGREInfo fs_gres
+                      x = IEThingWithExt Nothing noAnn noAnn noAnn noAnn
                 ; return $
                   if all_non_overloaded fs
                   then map (\nm -> IEVar Nothing (to_ie_post_rn_var $ noLocA nm) Nothing) ns
-                  else [IEThingWith (Nothing, noAnn) (to_ie_post_rn $ noLocA n) NoIEWildcard
+                  else [IEThingWith x (to_ie_post_rn $ noLocA n) NoIEWildcard
                          (map (to_ie_post_rn . noLocA) (filter (/= n) ns)) Nothing] }
         where
 

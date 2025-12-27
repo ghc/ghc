@@ -253,14 +253,18 @@ data IEThingAllExt pass =
 
 type instance XIEThingAll (GhcPass p) = IEThingAllExt (GhcPass p)
 
--- The additional field of type 'Maybe (WarningTxt pass)' holds information
--- about export deprecation annotations and is thus set to Nothing when `IE`
--- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEThingWith GhcPs = (Maybe (LWarningTxt GhcPs), IEThingWithAnns)
-type instance XIEThingWith GhcRn = (Maybe (LWarningTxt GhcRn), IEThingWithAnns)
-type instance XIEThingWith GhcTc = IEThingWithAnns
+data IEThingWithExt pass =
+  IEThingWithExt {
+    ietw_warning   :: Maybe (LWarningTxt pass),
+      -- ^ Export deprecation annotation. Always 'Nothing' for import lists,
+      -- since export deprecation can only be used in exports.
+    ietw_tok_lpar  :: EpToken "(",
+    ietw_tok_wc    :: EpToken "..",
+    ietw_tok_comma :: EpToken ",",
+    ietw_tok_rpar  :: EpToken ")"
+  }
 
-type IEThingWithAnns = (EpToken "(", EpToken "..", EpToken ",", EpToken ")")
+type instance XIEThingWith (GhcPass p) = IEThingWithExt (GhcPass p)
 
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
@@ -317,12 +321,12 @@ ieDeprecation = fmap unLoc . ie_deprecation (ghcPass @p)
     ie_deprecation GhcPs (IEVar xie _ _) = xie
     ie_deprecation GhcPs (IEThingAbs xie _ _) = xie
     ie_deprecation GhcPs (IEThingAll xie _ _) = ieta_warning xie
-    ie_deprecation GhcPs (IEThingWith (xie, _) _ _ _ _) = xie
+    ie_deprecation GhcPs (IEThingWith xie _ _ _ _) = ietw_warning xie
     ie_deprecation GhcPs (IEModuleContents (xie, _) _) = xie
     ie_deprecation GhcRn (IEVar xie _ _) = xie
     ie_deprecation GhcRn (IEThingAbs xie _ _) = xie
     ie_deprecation GhcRn (IEThingAll xie _ _) = ieta_warning xie
-    ie_deprecation GhcRn (IEThingWith (xie, _) _ _ _ _) = xie
+    ie_deprecation GhcRn (IEThingWith xie _ _ _ _) = ietw_warning xie
     ie_deprecation GhcRn (IEModuleContents xie _) = xie
     ie_deprecation _ _ = Nothing
 

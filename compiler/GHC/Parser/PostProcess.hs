@@ -3272,11 +3272,8 @@ mkModuleImpExp ctx warning (top, tcp) (L l specname) subs = do
     ImpExpList xs -> do
       -- `xs` contains no wildcards (checked by mkImpExpSubSpec)
       newName <- nameT
-      return $ IEThingWith (warning, (top,NoEpTok,NoEpTok,tcp))
-                           (L l newName)
-                           NoIEWildcard
-                           (wrapped xs)
-                           noExportDoc
+      let x = IEThingWithExt warning top NoEpTok NoEpTok tcp
+      return $ IEThingWith x (L l newName) NoIEWildcard (wrapped xs) noExportDoc
     ImpExpAllWith xs -> do
       -- `xs` contains at least one wildcard (checked by mkImpExpSubSpec)
       let withs = map unLoc xs
@@ -3296,11 +3293,8 @@ mkModuleImpExp ctx warning (top, tcp) (L l specname) subs = do
          | not patSyns ->
              addError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrIllegalPatSynExport
          | otherwise -> return ()
-      return $ IEThingWith (warning, (top,td,tc,tcp))
-                           (L l newName)
-                           (IEWildcard pos)
-                           ies
-                           noExportDoc
+      let x = IEThingWithExt warning top td tc tcp
+      return $ IEThingWith x (L l newName) (IEWildcard pos) ies noExportDoc
   where
     noExportDoc :: Maybe (LHsDoc GhcPs)
     noExportDoc = Nothing

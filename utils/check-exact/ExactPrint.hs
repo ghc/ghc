@@ -4575,25 +4575,26 @@ instance ExactPrint (IE GhcPs) where
     let x' = IEThingAllExt depr' ns_spec' op' dd' cp'
     return (IEThingAll x' thing' doc')
 
-  exact (IEThingWith (depr, (op,dd,c,cp)) thing wc withs doc) = do
-    depr' <- markAnnotated depr
+  exact (IEThingWith x thing wc withs doc) = do
+    depr' <- markAnnotated (ietw_warning x)
     thing' <- markAnnotated thing
-    op' <- markEpToken op
+    op' <- markEpToken (ietw_tok_lpar x)
     (dd',c', wc', withs') <-
       case wc of
         NoIEWildcard -> do
           withs'' <- markAnnotated withs
-          return (dd, c, wc, withs'')
+          return (ietw_tok_wc x, ietw_tok_comma x, wc, withs'')
         IEWildcard pos -> do
           let (bs, as) = splitAt pos withs
           bs' <- markAnnotated bs
-          dd' <- markEpToken dd
-          c' <- markEpToken c
+          dd' <- markEpToken (ietw_tok_wc x)
+          c' <- markEpToken (ietw_tok_comma x)
           as' <- markAnnotated as
           return (dd',c', wc, bs'++as')
-    cp' <- markEpToken cp
+    cp' <- markEpToken (ietw_tok_rpar x)
     doc' <- markAnnotated doc
-    return (IEThingWith (depr', (op',dd',c',cp')) thing' wc' withs' doc')
+    let x' = IEThingWithExt depr' op' dd' c' cp'
+    return (IEThingWith x' thing' wc' withs' doc')
 
   exact (IEModuleContents (depr, an) m) = do
     depr' <- markAnnotated depr
