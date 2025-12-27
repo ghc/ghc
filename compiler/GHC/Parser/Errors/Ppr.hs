@@ -225,8 +225,6 @@ instance Diagnostic PsMessage where
     PsErrOverloadedRecordDotInvalid
       -> mkSimpleDecorated $
            text "Use of OverloadedRecordDot '.' not valid ('.' isn't allowed when constructing records or in record patterns)"
-    PsErrIllegalPatSynExport
-      -> mkSimpleDecorated $ text "Illegal export form"
     PsErrOverloadedRecordUpdateNoQualifiedFields
       -> mkSimpleDecorated $ text "Fields cannot be qualified when OverloadedRecordUpdate is enabled"
     PsErrExplicitForall is_unicode
@@ -276,17 +274,6 @@ instance Diagnostic PsMessage where
            kw_doc = case kw of
              ExplicitTypeNamespace{} -> text "type"
              ExplicitDataNamespace{} -> text "data"
-    PsErrUnsupportedExplicitNamespace kw pos
-      -> mkDecorated
-           [ text "Unsupported use of keyword" <+> quotes kw_doc
-           , case pos of
-                UnsupportedNameSpaceInIEThingWith ->
-                     text "A namespace-specified wildcard may not appear alongside other items"
-                  $$ text "in a list of children." ]
-         where
-           kw_doc = case kw of
-             ExplicitTypeNamespace{} -> text "type"
-             ExplicitDataNamespace{} -> text "data"
     PsErrPlainWildcardImport
       -> mkSimpleDecorated $
            text "Illegal plain wildcard (..) in a module import"
@@ -305,10 +292,6 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ text "Multiple occurrences of 'qualified'"
     PsErrSpliceOrQuoteTwice
       -> mkSimpleDecorated $ text "Multiple occurrences of a splice or quote keyword"
-    PsErrIllegalImportBundleForm
-      -> mkSimpleDecorated $
-           text "Illegal import form, this syntax can only be used to bundle"
-           $+$ text "pattern synonyms with types in module exports."
     PsErrInvalidRuleActivationMarker
       -> mkSimpleDecorated $ text "Invalid rule activation marker"
 
@@ -624,7 +607,6 @@ instance Diagnostic PsMessage where
     PsErrNumUnderscores{}                         -> ErrorWithoutFlag
     PsErrIllegalBangPattern{}                     -> ErrorWithoutFlag
     PsErrOverloadedRecordDotInvalid{}             -> ErrorWithoutFlag
-    PsErrIllegalPatSynExport                      -> ErrorWithoutFlag
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> ErrorWithoutFlag
     PsErrExplicitForall{}                         -> ErrorWithoutFlag
     PsErrIllegalQualifiedDo{}                     -> ErrorWithoutFlag
@@ -637,14 +619,12 @@ instance Diagnostic PsMessage where
     PsErrDeclSpliceNotAtTopLevel{}                -> ErrorWithoutFlag
     PsErrMultipleNamesInStandaloneKindSignature{} -> ErrorWithoutFlag
     PsErrIllegalExplicitNamespace{}               -> ErrorWithoutFlag
-    PsErrUnsupportedExplicitNamespace{}           -> ErrorWithoutFlag
     PsErrPlainWildcardImport{}                    -> ErrorWithoutFlag
     PsErrPlainWildcardExport{}                    -> ErrorWithoutFlag
     PsErrUnallowedPragma{}                        -> ErrorWithoutFlag
     PsErrImportPostQualified                      -> ErrorWithoutFlag
     PsErrImportQualifiedTwice                     -> ErrorWithoutFlag
     PsErrSpliceOrQuoteTwice                       -> ErrorWithoutFlag
-    PsErrIllegalImportBundleForm                  -> ErrorWithoutFlag
     PsErrInvalidRuleActivationMarker              -> ErrorWithoutFlag
     PsErrMissingBlock                             -> ErrorWithoutFlag
     PsErrUnsupportedBoxedSumExpr{}                -> ErrorWithoutFlag
@@ -768,7 +748,6 @@ instance Diagnostic PsMessage where
     PsErrNumUnderscores{}                         -> [suggestExtension LangExt.NumericUnderscores]
     PsErrIllegalBangPattern{}                     -> [suggestExtension LangExt.BangPatterns]
     PsErrOverloadedRecordDotInvalid{}             -> noHints
-    PsErrIllegalPatSynExport                      -> [suggestExtension LangExt.PatternSynonyms]
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> noHints
     PsErrExplicitForall is_unicode                -> [useExtensionInOrderTo info LangExt.ExplicitForAll]
       where info = "to enable syntax:" <+> forallSym is_unicode <+> angleBrackets "tvs" <> dot <+> angleBrackets "type"
@@ -782,14 +761,12 @@ instance Diagnostic PsMessage where
     PsErrDeclSpliceNotAtTopLevel{}                -> noHints
     PsErrMultipleNamesInStandaloneKindSignature{} -> noHints
     PsErrIllegalExplicitNamespace{}               -> [suggestExtension LangExt.ExplicitNamespaces]
-    PsErrUnsupportedExplicitNamespace{}           -> noHints
     PsErrPlainWildcardImport{}                    -> [SuggestRemoveImportList]
     PsErrPlainWildcardExport{}                    -> [SuggestNamedModuleSelfExport]
     PsErrUnallowedPragma{}                        -> noHints
     PsErrImportPostQualified                      -> [suggestExtension LangExt.ImportQualifiedPost]
     PsErrImportQualifiedTwice                     -> noHints
     PsErrSpliceOrQuoteTwice                       -> noHints
-    PsErrIllegalImportBundleForm                  -> noHints
     PsErrInvalidRuleActivationMarker              -> noHints
     PsErrMissingBlock                             -> noHints
     PsErrUnsupportedBoxedSumExpr{}                -> noHints

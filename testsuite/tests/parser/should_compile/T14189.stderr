@@ -303,15 +303,12 @@
        (EpaComments
         []))
       (IEThingWith
-       ((,)
+       (IEThingWithExt
         (Nothing)
-        ((,,,)
-         (EpTok
-          (EpaSpan { T14189.hs:3:10 }))
-         (NoEpTok)
-         (NoEpTok)
-         (EpTok
-          (EpaSpan { T14189.hs:3:15 }))))
+        (EpTok
+         (EpaSpan { T14189.hs:3:10 }))
+        (EpTok
+         (EpaSpan { T14189.hs:3:15 })))
        (L
         (EpAnn
          (EpaSpan { T14189.hs:3:3-8 })
@@ -329,7 +326,7 @@
            (EpaComments
             []))
           {Name: T14189.MyType})))
-       (NoIEWildcard)
+       []
        [(L
          (EpAnn
           (EpaSpan { T14189.hs:3:11 })

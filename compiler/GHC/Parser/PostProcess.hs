@@ -166,7 +166,6 @@ import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Monad (unlessM)
 import Data.Either
-import Data.List        ( findIndex )
 import Data.Foldable
 import qualified Data.Semigroup as Semi
 import GHC.Unit.Module.Warnings
@@ -3283,27 +3282,22 @@ mkExtName rdrNm = occNameFS (rdrNameOcc rdrNm)
 --------------------------------------------------------------------------------
 -- Help with module system imports/exports
 
--- Context for whether we are parsing an import or export list.
-data InExportOrImportList
-  = InExportList
-  | InImportList
-
 data ImpExpSubSpec = ImpExpAbs
                    | ImpExpAll (Maybe ExplicitNamespaceKeyword) (EpToken "..")
                    | ImpExpList    [LocatedA ImpExpQcSpec]   -- no wildcards
                    | ImpExpAllWith [LocatedA ImpExpQcSpec]   -- at least one wildcard
 
 data ImpExpQcSpec = ImpExpQcName (Maybe ExplicitNamespaceKeyword) (LocatedN RdrName)
-                  | ImpExpQcWildcard (Maybe ExplicitNamespaceKeyword) (EpToken "..") (EpToken ",")
+                  | ImpExpQcWildcard (Maybe ExplicitNamespaceKeyword) (EpToken "..")
 
 mkModuleImp, mkModuleExp :: Maybe (LWarningTxt GhcPs) -> (EpToken "(", EpToken ")") -> LocatedA ImpExpQcSpec
                          -> ImpExpSubSpec -> P (IE GhcPs)
-mkModuleImp = mkModuleImpExp InImportList
-mkModuleExp = mkModuleImpExp InExportList
+mkModuleImp = mkModuleImpExp
+mkModuleExp = mkModuleImpExp
 
-mkModuleImpExp :: InExportOrImportList -> Maybe (LWarningTxt GhcPs) -> (EpToken "(", EpToken ")") -> LocatedA ImpExpQcSpec
+mkModuleImpExp :: Maybe (LWarningTxt GhcPs) -> (EpToken "(", EpToken ")") -> LocatedA ImpExpQcSpec
                -> ImpExpSubSpec -> P (IE GhcPs)
-mkModuleImpExp ctx warning (top, tcp) (L l specname) subs = do
+mkModuleImpExp warning (top, tcp) (L l specname) subs = do
   case subs of
     ImpExpAbs
       | isVarNameSpace (rdrNameSpace name)
@@ -3318,35 +3312,17 @@ mkModuleImpExp ctx warning (top, tcp) (L l specname) subs = do
     ImpExpList xs -> do
       -- `xs` contains no wildcards (checked by mkImpExpSubSpec)
       newName <- nameT
-      return $ IEThingWith (warning, (top,NoEpTok,NoEpTok,tcp))
-                           (L l newName)
-                           NoIEWildcard
-                           (wrapped xs)
-                           noExportDoc
+      let x = IEThingWithExt warning top tcp
+      return $ IEThingWith x (L l newName) [] (wrapped xs) noExportDoc
     ImpExpAllWith xs -> do
       -- `xs` contains at least one wildcard (checked by mkImpExpSubSpec)
-      let withs = map unLoc xs
-          pos   = fromMaybe (panic "ImpExpAllWith with no wildcard") $  -- should've been ImpExpList
-                  findIndex isImpExpQcWildcard withs
-          (m_kw,td,tc) = case withs !! pos of
-            ImpExpQcWildcard m_kw td tc -> (m_kw,td,tc)
-            _ -> panic "mkModuleImpExp: item is not a wildcard"  -- shouldn't have matched isImpExpQcWildcard
-          ies :: [LocatedA (IEWrappedName GhcPs)]
-          ies   = wrapped $ filter (not . isImpExpQcWildcard . unLoc) xs
+      let mkIESub (L ann spec) = L ann $ case spec of
+            ImpExpQcName  {}         -> IESubName (ieNameFromSpec spec)
+            ImpExpQcWildcard m_kw td -> IESubWc (IEWildcard td (namespaceSpecifierFromKw m_kw))
+          (ies, wcs) = partitionIESubs (map mkIESub xs)
       newName <- nameT
-      patSyns <- getBit PatternSynonymsBit
-      if | Just kw <- m_kw ->
-             unsupportedExplicitNamespaceKeyword kw UnsupportedNameSpaceInIEThingWith
-         | InImportList <- ctx ->
-             addFatalError $ mkPlainErrorMsgEnvelope (locA l) PsErrIllegalImportBundleForm
-         | not patSyns ->
-             addError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrIllegalPatSynExport
-         | otherwise -> return ()
-      return $ IEThingWith (warning, (top,td,tc,tcp))
-                           (L l newName)
-                           (IEWildcard pos)
-                           ies
-                           noExportDoc
+      let x = IEThingWithExt warning top tcp
+      return $ IEThingWith x (L l newName) wcs ies noExportDoc
   where
     noExportDoc :: Maybe (LHsDoc GhcPs)
     noExportDoc = Nothing
@@ -3402,7 +3378,7 @@ mkTypeWcImpExp :: SrcSpan
 mkTypeWcImpExp loc tk_ns tk_wc = do
   let ns_kw = ExplicitTypeNamespace tk_ns
   requireExplicitNamespaces ns_kw
-  let ie_spec = ImpExpQcWildcard (Just ns_kw) tk_wc NoEpTok
+  let ie_spec = ImpExpQcWildcard (Just ns_kw) tk_wc
   return (L (noAnnSrcSpan loc) ie_spec)
 
 mkDataWcImpExp :: SrcSpan
@@ -3412,7 +3388,7 @@ mkDataWcImpExp :: SrcSpan
 mkDataWcImpExp loc tk_ns tk_wc = do
   let ns_kw = ExplicitDataNamespace tk_ns
   requireExplicitNamespaces ns_kw
-  let ie_spec = ImpExpQcWildcard (Just ns_kw) tk_wc NoEpTok
+  let ie_spec = ImpExpQcWildcard (Just ns_kw) tk_wc
   return (L (noAnnSrcSpan loc) ie_spec)
 
 mkIEWholeNamespacePs :: Maybe (LWarningTxt GhcPs)
@@ -3454,7 +3430,7 @@ mkPlainWcImpExp warning tk_wc = do
 -- In the correct order
 mkImpExpSubSpec :: [LocatedA ImpExpQcSpec] -> P ImpExpSubSpec
 mkImpExpSubSpec [] = return (ImpExpList [])
-mkImpExpSubSpec [L _ (ImpExpQcWildcard m_kw td _tc)] =
+mkImpExpSubSpec [L _ (ImpExpQcWildcard m_kw td)] =
   return (ImpExpAll m_kw td)
 mkImpExpSubSpec xs =
   if (any (isImpExpQcWildcard . unLoc) xs)
@@ -3464,6 +3440,7 @@ mkImpExpSubSpec xs =
 isImpExpQcWildcard :: ImpExpQcSpec -> Bool
 isImpExpQcWildcard ImpExpQcWildcard{} = True
 isImpExpQcWildcard _                  = False
+
 
 -----------------------------------------------------------------------------
 -- Warnings and failures
@@ -3506,15 +3483,6 @@ requireExplicitNamespaces kw = do
   allowed <- getBit ExplicitNamespacesBit
   unless allowed $
     addError $ mkPlainErrorMsgEnvelope loc $ PsErrIllegalExplicitNamespace kw
-  where
-    loc = case kw of
-      ExplicitTypeNamespace tok -> getEpTokenSrcSpan tok
-      ExplicitDataNamespace tok -> getEpTokenSrcSpan tok
-
-unsupportedExplicitNamespaceKeyword :: MonadP m => ExplicitNamespaceKeyword -> UnsupportedNamespacePosition -> m ()
-unsupportedExplicitNamespaceKeyword kw pos =
-  addError $ mkPlainErrorMsgEnvelope loc $
-    PsErrUnsupportedExplicitNamespace kw pos
   where
     loc = case kw of
       ExplicitTypeNamespace tok -> getEpTokenSrcSpan tok

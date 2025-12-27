@@ -363,6 +363,10 @@ instance HasTrailing (TokForall, EpToken ".") where
   trailing _ = []
   setTrailing a _ = a
 
+instance HasTrailing (EpToken s) where
+  trailing _ = []
+  setTrailing a _ = a
+
 -- ---------------------------------------------------------------------
 
 fromAnn' :: (HasEntry a) => a -> Entry
@@ -1930,7 +1934,7 @@ instance ExactPrint (WarnDecl GhcPs) where
 
   exact (Warning (o,c) ns_spec lns (WarningTxt src mb_cat ls )) = do
     mb_cat' <- markAnnotated mb_cat
-    ns_spec' <- exactNsSpec ns_spec
+    ns_spec' <- markAnnotated ns_spec
     lns' <- markAnnotated lns
     o' <- markEpToken o
     ls' <- markAnnotated ls
@@ -1938,21 +1942,12 @@ instance ExactPrint (WarnDecl GhcPs) where
     return (Warning (o',c') ns_spec' lns' (WarningTxt src mb_cat' ls'))
 
   exact (Warning (o,c) ns_spec lns (DeprecatedTxt src ls)) = do
-    ns_spec' <- exactNsSpec ns_spec
+    ns_spec' <- markAnnotated ns_spec
     lns' <- markAnnotated lns
     o' <- markEpToken o
     ls' <- markAnnotated ls
     c' <- markEpToken c
     return (Warning (o',c') ns_spec' lns' (DeprecatedTxt src ls'))
-
-exactNsSpec :: (Monad m, Monoid w) => NamespaceSpecifier GhcPs -> EP w m (NamespaceSpecifier GhcPs)
-exactNsSpec (NoNamespaceSpecifier x) = pure (NoNamespaceSpecifier x)
-exactNsSpec (TypeNamespaceSpecifier type_) = do
-  type_' <- markEpToken type_
-  pure (TypeNamespaceSpecifier type_')
-exactNsSpec (DataNamespaceSpecifier data_) = do
-  data_' <- markEpToken data_
-  pure (DataNamespaceSpecifier data_')
 
 -- ---------------------------------------------------------------------
 
@@ -4590,25 +4585,16 @@ instance ExactPrint (IE GhcPs) where
     let x' = IEThingAllExt depr' op' dd' cp'
     return (IEThingAll x' ns_spec' thing' doc')
 
-  exact (IEThingWith (depr, (op,dd,c,cp)) thing wc withs doc) = do
-    depr' <- markAnnotated depr
+  exact (IEThingWith x thing wcs withs doc) = do
+    depr' <- markAnnotated (ietw_warning x)
     thing' <- markAnnotated thing
-    op' <- markEpToken op
-    (dd',c', wc', withs') <-
-      case wc of
-        NoIEWildcard -> do
-          withs'' <- markAnnotated withs
-          return (dd, c, wc, withs'')
-        IEWildcard pos -> do
-          let (bs, as) = splitAt pos withs
-          bs' <- markAnnotated bs
-          dd' <- markEpToken dd
-          c' <- markEpToken c
-          as' <- markAnnotated as
-          return (dd',c', wc, bs'++as')
-    cp' <- markEpToken cp
+    op' <- markEpToken (ietw_tok_lpar x)
+    subs' <- markAnnotated (flattenIESubs withs wcs)
+    let (withs', wcs') = partitionIESubs subs'
+    cp' <- markEpToken (ietw_tok_rpar x)
     doc' <- markAnnotated doc
-    return (IEThingWith (depr', (op',dd',c',cp')) thing' wc' withs' doc')
+    let x' = IEThingWithExt depr' op' cp'
+    return (IEThingWith x' thing' wcs' withs' doc')
 
   exact (IEModuleContents (depr, an) m) = do
     depr' <- markAnnotated depr
@@ -4630,6 +4616,24 @@ instance ExactPrint (IE GhcPs) where
     return (IEDoc x doc)
   exact (IEDocNamed x str) = do
     return (IEDocNamed x str)
+
+-- ---------------------------------------------------------------------
+
+instance ExactPrint (IEWildcard GhcPs) where
+  getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+  exact (IEWildcard tok ns_spec) = do
+    ns_spec' <- markAnnotated ns_spec
+    tok' <- markEpToken tok
+    return (IEWildcard tok' ns_spec')
+
+-- ---------------------------------------------------------------------
+
+instance ExactPrint (IESub GhcPs) where
+  getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor a _ _ _ = a
+  exact (IESubName n) = IESubName <$> exact n
+  exact (IESubWc  wc) = IESubWc  <$> exact wc
 
 -- ---------------------------------------------------------------------
 

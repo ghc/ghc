@@ -56,6 +56,7 @@ import Control.Applicative
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
 import Data.Functor.Identity
+import Data.Function (on)
 
 import {-# SOURCE #-} GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer
@@ -322,7 +323,7 @@ instance HasHaddock (LocatedA (IE GhcPs)) where
             IEVar ext nm _                 -> IEVar ext nm mb_ldoc
             IEThingAbs ext nm _            -> IEThingAbs ext nm mb_ldoc
             IEThingAll ext ns nm _         -> IEThingAll ext ns nm mb_ldoc
-            IEThingWith ext nm wild subs _ -> IEThingWith ext nm wild subs mb_ldoc
+            IEThingWith ext nm wc subs _   -> IEThingWith ext nm wc subs mb_ldoc
             x                              -> x
       pure $ L l_export ie'
 
@@ -1482,7 +1483,7 @@ flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
   --
   -- - 'LHsDecl' produced by 'decl_cls' in Parser.y always have a 'BufSpan'
   -- - 'partitionBindsAndSigs' does not discard this 'BufSpan'
-  mergeListsBy cmpBufSpanA [
+  mergeListsBy (cmpBufSpan `on` getHasLoc) [
     mapLL (\b -> ValD noExtField b) all_bs,
     mapLL (\s -> SigD noExtField s) all_ss,
     mapLL (\t -> TyClD noExtField (FamDecl noExtField t)) all_ts,
@@ -1490,9 +1491,6 @@ flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
     mapLL (\dfi -> InstD noExtField (DataFamInstD noExtField dfi)) all_dfis,
     mapLL (\d -> DocD noExtField d) all_docs
   ]
-
-cmpBufSpanA :: GenLocated (EpAnn a1) a2 -> GenLocated (EpAnn a3) a2 -> Ordering
-cmpBufSpanA (L la a) (L lb b) = cmpBufSpan (L (locA la) a) (L (locA lb) b)
 
 {- *********************************************************************
 *                                                                      *

@@ -638,7 +638,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             expacc_exp_occs   = occs,
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
-          } (L loc ie@(IEThingWith (warn_txt_ps, ann) l wc sub_rdrs doc))
+          } (L loc ie@(IEThingWith x l wcs sub_rdrs doc))
         = do mb_gre <- addErrCtxt (ExportCtxt ie)
                      $ lookupGreAvailRn (ieLWrappedNameWhatLooking l) $ lieWrappedName l
              for mb_gre $ \ par -> do
@@ -646,10 +646,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                  <- addErrCtxt (ExportCtxt ie)
                   $ lookup_ie_kids_with par sub_rdrs
 
-               wc_kids <-
-                 case wc of
-                   NoIEWildcard -> return []
-                   IEWildcard _ -> lookup_ie_kids_all ie (NoNamespaceSpecifier noExtField) l par
+               let ns_specs = dedupNamespaceSpecifiers [ns_spec | L _ (IEWildcard _ ns_spec) <- wcs]
+               wc_kids <- concatMapM (\ns_spec -> lookup_ie_kids_all ie ns_spec l par) ns_specs
 
                let name = greName par
                    all_kids = with_kids ++ wc_kids
@@ -662,14 +660,18 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                  <- process_warning export_warn_spans
                                     dont_warn_export
                                     all_names
-                                    warn_txt_ps
+                                    (ietw_warning x)
                                     (locA loc)
 
                doc' <- traverse rnLHsDoc doc
+               let x' = x{ ietw_warning = warn_txt_rn }
                return ( expacc{ expacc_exp_occs   = occs'
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
-                      , L loc (IEThingWith (warn_txt_rn, ann) (replaceLWrappedName l name) wc subs doc')
+                      , L loc (IEThingWith x' (replaceLWrappedName l name)
+                                              (fmap rnLIEWildcard wcs)
+                                              subs
+                                              doc')
                       , Just $ AvailTC name all_names )
 
     lookup_ie _ _ = panic "lookup_ie"    -- Other cases covered earlier

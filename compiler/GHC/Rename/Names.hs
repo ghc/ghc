@@ -25,7 +25,8 @@ module GHC.Rename.Names (
         renamePkgQual, renameRawPkgQual,
         classifyGREs,
         ImportDeclUsage,
-        rnNamespaceSpecifier
+        rnNamespaceSpecifier,
+        rnLIEWildcard,
     ) where
 
 import GHC.Prelude hiding ( head, init, last, tail )
@@ -1182,6 +1183,9 @@ rnNamespaceSpecifier (NoNamespaceSpecifier _)   = NoNamespaceSpecifier noExtFiel
 rnNamespaceSpecifier (TypeNamespaceSpecifier x) = TypeNamespaceSpecifier x
 rnNamespaceSpecifier (DataNamespaceSpecifier x) = DataNamespaceSpecifier x
 
+rnLIEWildcard :: LIEWildcard GhcPs -> LIEWildcard GhcRn
+rnLIEWildcard (L ann (IEWildcard x ns_spec)) = L ann (IEWildcard x (rnNamespaceSpecifier ns_spec))
+
 filterImports
     :: HasDebugCallStack
     => HscEnv
@@ -1378,19 +1382,34 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                   return ( [mkIEThingAbs tc' l gre]
                          , maybeToList $ mk_depr_export_warning gre)
 
-        IEThingWith (deprecation, ann) ltc@(L l rdr_tc) wc rdr_ns _ -> do
-           ImpOccItem { imp_item = gre, imp_bundled = subnames }
+        IEThingWith x ltc@(L l rdr_tc) wcs rdr_ns _ -> do
+           ImpOccItem { imp_item      = gre
+                      , imp_bundled   = bundled_gres
+                      , imp_is_parent = is_par
+                      }
                <- lookup_parent (IEThingAbs Nothing ltc noDocstring) (ieWrappedName rdr_tc)
-           let name = greName gre
+           let name     = greName gre
+
+               ns_specs :: [NamespaceSpecifier GhcPs]
+               ns_specs = dedupNamespaceSpecifiers [ns_spec | L _ (IEWildcard _ ns_spec) <- wcs]
+
+               child_gres, wc_gres :: [GlobalRdrElt]
+               child_gres
+                 | is_par = do { ns_spec <- ns_specs
+                               ; filterByNamespaceSpecifierGREs ns_spec bundled_gres }
+                 | otherwise = []
+               wc_gres
+                 | null wcs  = []
+                 | otherwise = child_gres
 
            -- Look up the children in the sub-names of the parent
            -- See Note [Importing DuplicateRecordFields]
-           let (children_errs, childnames) = lookupChildren subnames rdr_ns
+           let (children_errs, childnames) = lookupChildren bundled_gres rdr_ns
 
            bad_import_warns <-
              if null children_errs then return [] else
              let items = map lce_wrapped_name children_errs
-                 ie    = IEThingWith (deprecation, ann) ltc wc items noDocstring
+                 ie    = IEThingWith x ltc wcs items noDocstring
                          -- We are trying to import T( a,b,c,d ), and failed
                          -- to find 'b' and 'd'.  So we make up an import item
                          -- to report as failing, namely T( b, d ).
@@ -1400,13 +1419,22 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
            let name' = replaceWrappedName rdr_tc name
                childnames' = map (to_ie_post_rn . fmap greName) childnames
-               gres = gre : map unLoc childnames
+               explicit_gres = gre : map unLoc childnames
+               imp_list_wc_warn
+                 | null wcs                = []
+                 | null child_gres         = [DodgyImport (DodgyImportsEmptyParent ie ns_spec gre) | ns_spec <- ns_specs]
+                 | not (is_qual decl_spec) = [MissingImportList]
+                 | otherwise               = []
                export_depr_warns
-                 | want_hiding == Exactly = mapMaybe mk_depr_export_warning gres
+                 | want_hiding == Exactly = mapMaybe mk_depr_export_warning explicit_gres
                  | otherwise              = []
-           return ([ (IEThingWith (Nothing, ann) (L l name') wc childnames' noDocstring
-                     ,gres)]
-                  , bad_import_warns ++ export_depr_warns)
+               renamed_ie = IEThingWith (x { ietw_warning = Nothing })
+                                        (L l name')
+                                        (fmap rnLIEWildcard wcs)
+                                        childnames'
+                                        noDocstring
+           return ( [(renamed_ie, explicit_gres ++ wc_gres)]
+                  , bad_import_warns ++ imp_list_wc_warn ++ export_depr_warns)
 
         IEWholeNamespace x ns_spec -> do
           let mod_name   = moduleName import_mod
@@ -2009,12 +2037,12 @@ findImportUsage imports used_gres
         add_unused (IEVar _ n _)      acc = add_unused_name (lieWrappedName n) True acc
         add_unused (IEThingAbs _ n _) acc = add_unused_name (lieWrappedName n) False acc
         add_unused (IEThingAll _ _ n _) acc = add_unused_all (lieWrappedName n) acc
-        add_unused (IEThingWith _ p wc ns _) acc = add_wc_all (add_unused_with pn xs acc)
+        add_unused (IEThingWith _ p wcs ns _) acc = add_wc_all (add_unused_with pn xs acc)
           where pn = lieWrappedName p
                 xs = map lieWrappedName ns
-                add_wc_all = case wc of
-                            NoIEWildcard -> id
-                            IEWildcard _ -> add_unused_all pn
+                add_wc_all
+                  | null wcs  = id
+                  | otherwise = add_unused_all pn
         add_unused (IEWholeNamespace x ns_spec) acc = add_unused_wildcard ns_spec (iewn_names x) acc
         add_unused _ acc = acc
 
@@ -2322,7 +2350,8 @@ getMinimalImports ie_decls
           | otherwise
           -> do { let ns_gres = map (expectJust . lookupGRE_Name rdr_env) cs
                       ns = map greName ns_gres
-                ; return [IEThingWith (Nothing, noAnn) (to_ie_post_rn $ noLocA n) NoIEWildcard
+                      x = IEThingWithExt Nothing noAnn noAnn
+                ; return [IEThingWith x (to_ie_post_rn $ noLocA n) []
                                  (map (to_ie_post_rn . noLocA) (filter (/= n) ns)) Nothing] }
                                        -- Note [Overloaded field import]
         _other
@@ -2330,10 +2359,11 @@ getMinimalImports ie_decls
                       (ns_gres,fs_gres) = classifyGREs infos
                       ns = map greName (ns_gres ++ fs_gres)
                       fs = map fieldGREInfo fs_gres
+                      x = IEThingWithExt Nothing noAnn noAnn
                 ; return $
                   if all_non_overloaded fs
                   then map (\nm -> IEVar Nothing (to_ie_post_rn_var $ noLocA nm) Nothing) ns
-                  else [IEThingWith (Nothing, noAnn) (to_ie_post_rn $ noLocA n) NoIEWildcard
+                  else [IEThingWith x (to_ie_post_rn $ noLocA n) []
                          (map (to_ie_post_rn . noLocA) (filter (/= n) ns)) Nothing] }
         where
 

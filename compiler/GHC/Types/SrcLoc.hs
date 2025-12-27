@@ -90,7 +90,7 @@ module GHC.Types.SrcLoc (
         pprLocatedAlways,
 
         -- ** Combining and comparing Located values
-        eqLocated, cmpLocated, cmpBufSpan,
+        eqLocated, cmpLocated, cmpBufSpan, cmpBufSpanOr,
         combineLocs, addCLoc,
         leftmost_smallest, leftmost_largest, rightmost_smallest,
         spans, isSubspanOf, isRealSubspanOf,
@@ -821,16 +821,20 @@ eqLocated a b = unLoc a == unLoc b
 cmpLocated :: Ord a => GenLocated l a -> GenLocated l a -> Ordering
 cmpLocated a b = unLoc a `compare` unLoc b
 
--- | Compare the 'BufSpan' of two located things.
---
--- Precondition: both operands have an associated 'BufSpan'.
-cmpBufSpan :: HasDebugCallStack => Located a -> Located a -> Ordering
-cmpBufSpan (L l1 _) (L l2  _)
+-- | Compare the 'BufSpan' of two located things, using a fallback comparison
+-- function for when a 'BufSpan' is not available.
+cmpBufSpanOr :: (SrcSpan -> SrcSpan -> Ordering) -> SrcSpan -> SrcSpan -> Ordering
+cmpBufSpanOr fallback l1 l2
   | Strict.Just a <- getBufSpan l1
   , Strict.Just b <- getBufSpan l2
   = compare a b
+  | otherwise = fallback l1 l2
 
-  | otherwise = panic "cmpBufSpan: no BufSpan"
+-- | Compare the 'BufSpan' of two located things.
+--
+-- Precondition: both operands have an associated 'BufSpan'.
+cmpBufSpan :: HasDebugCallStack => SrcSpan -> SrcSpan -> Ordering
+cmpBufSpan = cmpBufSpanOr (panic "cmpBufSpan: no BufSpan")
 
 instance (Outputable e) => Outputable (Located e) where
   ppr (L l e) = -- GenLocated:

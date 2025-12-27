@@ -791,6 +791,10 @@ type family XIEDocNamed        x
 type family XXIE               x
 
 -- -------------------------------------
+-- IEWildcard type families
+type family XIEWildcard p
+
+-- -------------------------------------
 -- IEWrappedName type families
 type family XIEName p
 type family XIEDefault p

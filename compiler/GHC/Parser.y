@@ -1070,8 +1070,6 @@ qcnames :: { [LocatedA ImpExpQcSpec] }
 
 qcnames1 :: { [LocatedA ImpExpQcSpec] }     -- A reversed list
         :  qcnames1 ',' qcname_ext_w_wildcard  {% case $1 of
-                                                    ((L la (ImpExpQcWildcard m_kw tok _)):t) ->
-                                                       do { return ($3 : L la (ImpExpQcWildcard m_kw tok (epTok $2)) : t) }
                                                     (l:t) ->
                                                        do { l' <- addTrailingCommaA l (epTok $2)
                                                           ; return ($3 : l' : t)} }
@@ -1083,7 +1081,7 @@ qcnames1 :: { [LocatedA ImpExpQcSpec] }     -- A reversed list
 -- or tagged type constructor
 qcname_ext_w_wildcard :: { LocatedA ImpExpQcSpec }
         :  qcname_ext               { $1 }
-        |  '..'                     { sL1a $1 (ImpExpQcWildcard Nothing (epTok $1) NoEpTok)  }
+        |  '..'                     { sL1a $1 (ImpExpQcWildcard Nothing (epTok $1))  }
         |  'type' '..'              {% mkTypeWcImpExp (comb2 $1 $>) (epTok $1) (epTok $2) }
         |  'data' '..'              {% mkDataWcImpExp (comb2 $1 $>) (epTok $1) (epTok $2) }
 

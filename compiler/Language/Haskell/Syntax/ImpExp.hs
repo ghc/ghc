@@ -110,7 +110,7 @@ data IE pass
         -- See Note [Located RdrNames] in GHC.Hs.Expr
   | IEThingWith (XIEThingWith pass)
                 (LIEWrappedName pass)
-                IEWildcard
+                [LIEWildcard pass]
                 [LIEWrappedName pass]
                 (Maybe (ExportDoc pass))
         -- ^ Imported or exported thing with explicit subordinate list.
@@ -165,14 +165,23 @@ data IE pass
         -- @
   | XIE !(XXIE pass)
 
+data IESub pass
+  = IESubName (IEWrappedName pass)
+  | IESubWc (IEWildcard pass)
+
+type LIESub pass = XRec pass (IESub pass)
+
 -- | Wildcard in an import or export sublist, like the @..@ in
--- @import Mod ( T(Mk1, Mk2, ..) )@.
-data IEWildcard
-  = NoIEWildcard   -- ^ no wildcard in this list
-  | IEWildcard Int -- ^ wildcard after the given \# of items in this list
-                   -- The @Int@ is in the range [0..n], where n is the length
-                   -- of the list.
-  deriving (Eq, Data)
+-- @import Mod ( T(Mk1, Mk2, ..) )@ or @import Mod ( T(Mk1, type ..) )@.
+data IEWildcard pass
+  = IEWildcard (XIEWildcard pass)
+               (NamespaceSpecifier pass)
+                   -- ^ wildcard with optional namespace specifier
+
+-- | Located wildcard in an import or export sublist.
+-- The annotation holds the comma token that separates the wildcard
+-- from the items following it.
+type LIEWildcard pass = XRec pass (IEWildcard pass)
 
 -- | A name in an import or export specification which may have
 -- adornments. Used primarily for accurate pretty printing of

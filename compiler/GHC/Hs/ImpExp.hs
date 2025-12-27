@@ -34,12 +34,13 @@ import GHC.Hs.Extension
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc ((<||>))
+import GHC.Utils.Misc ((<||>), mergeListsBy)
 
 import GHC.Unit.Module.Warnings
 
 import Data.Data
 import Data.Maybe
+import Data.Function (on)
 import GHC.Hs.Doc (LHsDoc)
 
 
@@ -110,6 +111,14 @@ deriving instance Data (NamespaceSpecifier GhcTc)
 deriving instance Eq (NamespaceSpecifier GhcPs)
 deriving instance Eq (NamespaceSpecifier GhcRn)
 deriving instance Eq (NamespaceSpecifier GhcTc)
+
+deriving instance Data (IEWildcard GhcPs)
+deriving instance Data (IEWildcard GhcRn)
+deriving instance Data (IEWildcard GhcTc)
+
+deriving instance Eq (IEWildcard GhcPs)
+deriving instance Eq (IEWildcard GhcRn)
+deriving instance Eq (IEWildcard GhcTc)
 
 -- ---------------------------------------------------------------------
 
@@ -237,6 +246,12 @@ type instance XXNamespaceSpecifier    (GhcPass _) = DataConCantHappen
 
 type instance Anno (IEWrappedName (GhcPass _)) = SrcSpanAnnA
 
+type instance XIEWildcard (GhcPass _) = EpToken ".."
+
+type instance Anno (IEWildcard (GhcPass _)) = SrcSpanAnnA
+
+type instance Anno (IESub (GhcPass _)) = SrcSpanAnnA
+
 type instance Anno (IE (GhcPass p)) = SrcSpanAnnA
 
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
@@ -265,14 +280,16 @@ data IEThingAllExt pass =
 
 type instance XIEThingAll (GhcPass p) = IEThingAllExt (GhcPass p)
 
--- The additional field of type 'Maybe (WarningTxt pass)' holds information
--- about export deprecation annotations and is thus set to Nothing when `IE`
--- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEThingWith GhcPs = (Maybe (LWarningTxt GhcPs), IEThingWithAnns)
-type instance XIEThingWith GhcRn = (Maybe (LWarningTxt GhcRn), IEThingWithAnns)
-type instance XIEThingWith GhcTc = IEThingWithAnns
+data IEThingWithExt pass =
+  IEThingWithExt {
+    ietw_warning   :: Maybe (LWarningTxt pass),
+      -- ^ Export deprecation annotation. Always 'Nothing' for import lists,
+      -- since export deprecation can only be used in exports.
+    ietw_tok_lpar  :: EpToken "(",
+    ietw_tok_rpar  :: EpToken ")"
+  }
 
-type IEThingWithAnns = (EpToken "(", EpToken "..", EpToken ",", EpToken ")")
+type instance XIEThingWith (GhcPass p) = IEThingWithExt (GhcPass p)
 
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
@@ -298,6 +315,24 @@ type instance XIEDocNamed        (GhcPass _) = NoExtField
 type instance XXIE               (GhcPass _) = DataConCantHappen
 
 type instance Anno (LocatedA (IE (GhcPass p))) = SrcSpanAnnA
+
+partitionIESubs
+  :: [LIESub (GhcPass p)]
+  -> ([LIEWrappedName (GhcPass p)], [LIEWildcard (GhcPass p)])
+partitionIESubs = foldr f ([], [])
+  where
+    f (L l sub) (ns, wcs) = case sub of
+      IESubName n -> (L l n : ns, wcs)
+      IESubWc  wc -> (ns, L l wc : wcs)
+
+flattenIESubs
+  :: [LIEWrappedName (GhcPass p)]
+  -> [LIEWildcard (GhcPass p)]
+  -> [LIESub (GhcPass p)]
+flattenIESubs ns wcs =
+  mergeListsBy (cmpBufSpanOr leftmost_smallest `on` getHasLoc)
+    [ map (fmap IESubName) ns
+    , map (fmap IESubWc)   wcs ]
 
 ieLIEWrappedName :: IE (GhcPass p) -> LIEWrappedName (GhcPass p)
 ieLIEWrappedName (IEVar _ n _)           = n
@@ -327,12 +362,12 @@ ieDeprecation = fmap unLoc . ie_deprecation (ghcPass @p)
     ie_deprecation GhcPs (IEVar xie _ _) = xie
     ie_deprecation GhcPs (IEThingAbs xie _ _) = xie
     ie_deprecation GhcPs (IEThingAll xie _ _ _) = ieta_warning xie
-    ie_deprecation GhcPs (IEThingWith (xie, _) _ _ _ _) = xie
+    ie_deprecation GhcPs (IEThingWith xie _ _ _ _) = ietw_warning xie
     ie_deprecation GhcPs (IEModuleContents (xie, _) _) = xie
     ie_deprecation GhcRn (IEVar xie _ _) = xie
     ie_deprecation GhcRn (IEThingAbs xie _ _) = xie
     ie_deprecation GhcRn (IEThingAll xie _ _ _) = ieta_warning xie
-    ie_deprecation GhcRn (IEThingWith (xie, _) _ _ _ _) = xie
+    ie_deprecation GhcRn (IEThingWith xie _ _ _ _) = ietw_warning xie
     ie_deprecation GhcRn (IEModuleContents xie _) = xie
     ie_deprecation _ _ = Nothing
 
@@ -382,19 +417,13 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
                       , Just $ ppr (unLoc thing) <> parens (ppr ns_spec <+> text "..")
                       , exportDocstring <$> doc
                       ]
-    ppr ie@(IEThingWith _ thing wc withs doc) =
+    ppr ie@(IEThingWith _ thing wcs withs doc) =
       sep $ catMaybes [ ppr <$> ieDeprecation ie
                       , Just $ ppr (unLoc thing) <> parens (fsep (punctuate comma ppWiths))
                       , exportDocstring <$> doc
                       ]
       where
-        ppWiths =
-          case wc of
-              NoIEWildcard ->
-                map (ppr . unLoc) withs
-              IEWildcard pos ->
-                let (bs, as) = splitAt pos (map (ppr . unLoc) withs)
-                in bs ++ [text ".."] ++ as
+        ppWiths = map ppr $ flattenIESubs withs wcs
     ppr ie@(IEModuleContents _ mod')
         = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "module" <+> ppr mod']
     ppr (IEWholeNamespace _ ns_spec) = ppr ns_spec <+> text ".."
@@ -409,6 +438,13 @@ instance OutputableBndrId p => OutputableBndr (IEWrappedName (GhcPass p)) where
   pprBndr bs   w = pprBndr bs   (ieWrappedName w)
   pprPrefixOcc w = pprPrefixOcc (ieWrappedName w)
   pprInfixOcc  w = pprInfixOcc  (ieWrappedName w)
+
+instance OutputableBndrId p => Outputable (IEWildcard (GhcPass p)) where
+  ppr (IEWildcard _ ns_spec) = ppr ns_spec <+> text ".."
+
+instance OutputableBndrId p => Outputable (IESub (GhcPass p)) where
+  ppr (IESubName n)  = ppr n
+  ppr (IESubWc   wc) = ppr wc
 
 instance OutputableBndrId p => Outputable (IEWrappedName (GhcPass p)) where
   ppr (IEDefault _ (L _ n)) = text "default" <+> pprPrefixOcc n
@@ -432,6 +468,24 @@ overlappingNamespaceSpecifiers _ NoNamespaceSpecifier{} = True
 overlappingNamespaceSpecifiers TypeNamespaceSpecifier{} TypeNamespaceSpecifier{} = True
 overlappingNamespaceSpecifiers DataNamespaceSpecifier{} DataNamespaceSpecifier{} = True
 overlappingNamespaceSpecifiers _ _ = False
+
+-- | Deduplicate a list of namespace specifiers:
+--     * NoNamespaceSpecifier subsumes all others, so no others are kept
+--     * TypeNamespaceSpecifier: only the first one is kept
+--     * DataNamespaceSpecifier: only the first one is kept
+dedupNamespaceSpecifiers :: [NamespaceSpecifier (GhcPass p)] -> [NamespaceSpecifier (GhcPass p)]
+dedupNamespaceSpecifiers = go False False
+  where
+    go _ _ [] = []
+    go _ _ (ns@NoNamespaceSpecifier{} : _) = [ns]
+    go seen_type seen_data (ns@TypeNamespaceSpecifier{} : rest)
+      | seen_type = go seen_type seen_data rest
+      | otherwise = ns : go True seen_data rest
+    go seen_type seen_data (ns@DataNamespaceSpecifier{} : rest)
+      | seen_data = go seen_type seen_data rest
+      | otherwise = ns : go seen_type True rest
+    go seen_type seen_data (ns@XNamespaceSpecifier{} : rest)
+      = ns : go seen_type seen_data rest
 
 -- | Check if namespace is covered by a namespace specifier:
 --     * NoNamespaceSpecifier covers both namespaces
