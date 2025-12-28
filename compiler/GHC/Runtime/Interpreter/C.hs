@@ -8,7 +8,9 @@ where
 
 import GHC.Prelude
 import GHC.Platform
+import GHC.Platform.Ways
 import GHC.Data.FastString
+import GHC.Driver.Session
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import GHC.Unit.Types
@@ -18,11 +20,10 @@ import GHC.Unit.State
 import GHC.Utils.Panic.Plain
 import GHC.Linker.Executable
 import GHC.Linker.Config
-import GHC.Utils.CliOption
 
 -- | Generate iserv program for the target
-generateIservC :: Logger -> TmpFs -> ExecutableLinkOpts -> UnitEnv -> IO FilePath
-generateIservC logger tmpfs opts unit_env = do
+generateIservC :: DynFlags -> Logger -> TmpFs -> ExecutableLinkOpts -> UnitEnv -> IO FilePath
+generateIservC dflags logger tmpfs opts unit_env = do
   -- get the unit-id of the ghci package. We need this to load the
   -- interpreter code.
   let unit_state = ue_homeUnitState unit_env
@@ -59,6 +60,12 @@ generateIservC logger tmpfs opts unit_env = do
           -- we never know what symbols GHC will look up in the future, so we
           -- must retain CAFs for running interpreted code.
         , leKeepCafs = True
+
+          -- link with -threaded if target has threaded RTS
+        , leWays =
+            let ways = leWays opts
+                ways' = addWay WayThreaded ways
+            in if targetHasRTSWays dflags ways' then ways' else ways
 
           -- enable all rts options
         , leRtsOptsEnabled = RtsOptsAll

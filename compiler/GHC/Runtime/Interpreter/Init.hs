@@ -9,6 +9,7 @@ where
 
 
 import GHC.Prelude
+import GHC.Driver.DynFlags
 import GHC.Platform
 import GHC.Platform.Ways
 import GHC.Settings
@@ -57,14 +58,15 @@ data InterpOpts = InterpOpts
 
 -- | Initialize code interpreter
 initInterpreter
-  :: TmpFs
+  :: DynFlags
+  -> TmpFs
   -> Logger
   -> Platform
   -> FinderCache
   -> UnitEnv
   -> InterpOpts
   -> IO (Maybe Interp)
-initInterpreter tmpfs logger platform finder_cache unit_env opts = do
+initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
 
   lookup_cache  <- liftIO $ mkInterpSymbolCache
 
@@ -125,7 +127,7 @@ initInterpreter tmpfs logger platform finder_cache unit_env opts = do
           dynamic  = interpWays opts `hasWay` WayDyn
         prog <- case interpProg opts of
           -- build iserv program if none specified
-          "" -> generateIservC logger tmpfs (interpExecutableLinkOpts opts) unit_env
+          "" -> generateIservC dflags logger tmpfs (interpExecutableLinkOpts opts) unit_env
           _ -> pure (interpProg opts ++ flavour)
             where
               flavour
