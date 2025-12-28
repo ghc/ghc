@@ -719,7 +719,7 @@ setTopSessionDynFlags dflags = do
                       { interpCreateProcess = createIservProcessHook (hsc_hooks hsc_env)
                       }
 
-  interp <- liftIO $ initInterpreter tmpfs logger platform finder_cache unit_env interp_opts
+  interp <- liftIO $ initInterpreter dflags tmpfs logger platform finder_cache unit_env interp_opts
 
   modifySession $ \h -> hscSetFlags dflags
                         h{ hsc_IC = (hsc_IC h){ ic_dflags = dflags }
