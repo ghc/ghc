@@ -217,7 +217,7 @@ timeoutPath = "testsuite/timeout/install-inplace/bin/timeout" <.> exe
 -- TODO: Can we extract this information from Cabal files?
 -- | Some program packages should not be linked with Haskell main function.
 nonHsMainPackage :: Package -> Bool
-nonHsMainPackage = (`elem` [hp2ps, iserv, unlit, ghciWrapper])
+nonHsMainPackage = (`elem` [hp2ps, unlit, ghciWrapper])
 
 
 {-

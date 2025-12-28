@@ -23,11 +23,17 @@ Category: Development
 build-type: Simple
 cabal-version: >=1.10
 
+Flag threaded
+    Description: Link the iserv executable against the threaded RTS
+    Default: True
+    Manual: True
+
 Executable iserv
     Default-Language: Haskell2010
-    ghc-options: -no-hs-main
+    ghc-options: -fkeep-cafs -rtsopts
+    if flag(threaded)
+      ghc-options: -threaded
     Main-Is: Main.hs
-    C-Sources: cbits/iservmain.c
     Hs-Source-Dirs: src
     include-dirs: .
     Build-Depends:
