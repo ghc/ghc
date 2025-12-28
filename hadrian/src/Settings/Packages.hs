@@ -41,6 +41,8 @@ packageArgs = do
     libzstdLibraryDir <- getSetting LibZstdLibDir
     stageVersion <- readVersion <$> (expr $ ghcVersionStage stage)
 
+    rtsWays <- getRtsWays
+
     mconcat
         --------------------------------- base ---------------------------------
         [ package base ? mconcat
@@ -186,10 +188,14 @@ packageArgs = do
         --
         -- The Solaris linker does not support --export-dynamic option. It also
         -- does not need it since it exports all dynamic symbols by default
-        , package iserv
-          ? expr isElfTarget
+        , package iserv ? mconcat [
+            expr isElfTarget
           ? notM (expr $ anyTargetOs [OSFreeBSD, OSSolaris2])? mconcat
           [ builder (Ghc LinkHs) ? arg "-optl-Wl,--export-dynamic" ]
+
+            -- Link iserv with -threaded if possible
+          , builder (Cabal Flags) ? any (wayUnit Threaded) rtsWays `cabalFlag` "threaded"
+        ]
 
         -------------------------------- haddock -------------------------------
         , package haddockApi ?
