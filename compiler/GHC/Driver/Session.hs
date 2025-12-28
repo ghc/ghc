@@ -197,6 +197,8 @@ module GHC.Driver.Session (
         -- * Compiler configuration suitable for display to the user
         compilerInfo,
 
+        targetHasRTSWays,
+
         wordAlignment,
 
         setUnsafeGlobalDynFlags,
@@ -3634,6 +3636,15 @@ compilerInfo dflags
     queryCmdMaybe, queryFlagsMaybe :: (a -> Program) -> (Target -> Maybe a) -> String
     queryCmdMaybe p f = expandDirectories (query (maybe "" (prgPath . p) . f))
     queryFlagsMaybe p f = query (maybe "" (unwords . map escapeArg . prgFlags . p) . f)
+
+-- | Query if the target RTS has the given 'Ways'. It's computed from
+-- the @"RTS ways"@ field in the settings file.
+targetHasRTSWays :: DynFlags -> Ways -> Bool
+targetHasRTSWays dflags ways
+  | Just ws <- lookup "RTS ways" $ compilerInfo dflags =
+      waysTag ways
+        `elem` words ws
+  | otherwise = panic "RTS ways not found in settings"
 
 -- Note [Special unit-ids]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
