@@ -474,6 +474,7 @@ alloc_mega_group (uint32_t node, StgWord mblocks)
         bd = alloc_mega_group_from_free_list(&deferred_free_mblock_list[node], n, &best);
         if(bd)
         {
+            __ghc_asan_unpoison_memory_region(bd->start, (W_)bd->blocks * BLOCK_SIZE);
             return bd;
         }
         else if(!best)
@@ -490,6 +491,7 @@ alloc_mega_group (uint32_t node, StgWord mblocks)
 
     if (bd)
     {
+        __ghc_asan_unpoison_memory_region(bd->start, (W_)bd->blocks * BLOCK_SIZE);
         return bd;
     }
     else if (best)
@@ -500,6 +502,7 @@ alloc_mega_group (uint32_t node, StgWord mblocks)
                           (best_mblocks-mblocks)*MBLOCK_SIZE);
 
         best->blocks = MBLOCK_GROUP_BLOCKS(best_mblocks - mblocks);
+        __ghc_asan_unpoison_memory_region(MBLOCK_ROUND_DOWN(bd), mblocks * MBLOCK_SIZE);
         initMBlock(MBLOCK_ROUND_DOWN(bd), node);
     }
     else
@@ -878,6 +881,8 @@ free_mega_group (bdescr *mg)
 
         IF_DEBUG(sanity, checkFreeListSanity());
     }
+
+    __ghc_asan_poison_memory_region(mg->start, (W_)mg->blocks * BLOCK_SIZE);
 }
 
 static void
@@ -924,6 +929,8 @@ free_deferred_mega_groups (uint32_t node)
 
         // coalesce forwards
         coalesce_mblocks(mg);
+
+        __ghc_asan_poison_memory_region(mg->start, (W_)mg->blocks * BLOCK_SIZE);
 
         // initialize search for next round
         prev = mg;
