@@ -17,7 +17,7 @@ module GHC.Hs.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep,
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
-  NewOrData, newOrDataToFlavour, anyLConIsGadt,
+  NewOrData, newOrDataToFlavour, dataDefnConsNewOrData, anyLConIsGadt,
   StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
 
   -- ** Class or type declarations
@@ -1105,6 +1105,11 @@ anyLConIsGadt xs = case toList xs of
     _ -> False
 {-# SPECIALIZE anyLConIsGadt :: [GenLocated l (ConDecl pass)] -> Bool #-}
 {-# SPECIALIZE anyLConIsGadt :: DataDefnCons (GenLocated l (ConDecl pass)) -> Bool #-}
+
+dataDefnConsNewOrData :: DataDefnCons a -> NewOrData
+dataDefnConsNewOrData = \ case
+    NewTypeCon   {} -> NewType
+    DataTypeCons {} -> DataType
 
 {-
 ************************************************************************

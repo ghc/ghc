@@ -59,7 +59,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Hs
-import GHC.Types.Basic (DefMethSpec (..), TopLevelFlag (..), TupleSort (..))
+import GHC.Types.Basic (DefMethSpec (..), TupleSort (..))
 import GHC.Types.Id (idType, setIdType)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (mkVarUnqual)

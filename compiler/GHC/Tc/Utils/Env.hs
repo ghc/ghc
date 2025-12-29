@@ -119,7 +119,6 @@ import GHC.Data.List.SetOps
 import GHC.Data.Maybe( MaybeErr(..), orElse, maybeToList, fromMaybe )
 
 import GHC.Types.SrcLoc
-import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
 import GHC.Types.Name

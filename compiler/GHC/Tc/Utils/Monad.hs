@@ -239,7 +239,7 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique (uniqueTag)
 import GHC.Types.Annotations
-import GHC.Types.Basic( TopLevelFlag(..), TypeOrKind(..) )
+import GHC.Types.Basic( TypeOrKind(..) )
 import GHC.Types.CostCentre.State
 import GHC.Types.SourceFile
 

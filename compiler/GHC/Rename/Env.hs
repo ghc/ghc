@@ -80,7 +80,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Builtin.Names( rOOT_MAIN )
-import GHC.Types.Basic  ( TopLevelFlag(..), TupleSort(..), tupleSortBoxity )
+import GHC.Types.Basic  ( TupleSort(..), tupleSortBoxity )
 import GHC.Types.TyThing ( tyThingGREInfo )
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Utils.Outputable as Outputable

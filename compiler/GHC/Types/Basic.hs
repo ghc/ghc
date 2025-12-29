@@ -103,7 +103,6 @@ module GHC.Types.Basic (
 import GHC.Prelude
 
 import GHC.ForeignSrcLang
-import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Binary
@@ -111,14 +110,15 @@ import GHC.Types.Arity
 import GHC.Types.SourceText
 import qualified GHC.LanguageExtensions as LangExt
 import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
-import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag)
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr (HsDoFlavour)
+
+import Language.Haskell.Syntax.Basic
+import Language.Haskell.Syntax.ImpExp
+
 import Control.DeepSeq ( NFData(..) )
 import Data.Data
 import Data.Maybe
 import qualified Data.Semigroup as Semi
-
-import Language.Haskell.Syntax.ImpExp
 
 {-
 ************************************************************************
@@ -420,54 +420,9 @@ instance NFData FunctionOrData where
 ************************************************************************
 -}
 
-type RuleName = FastString
-
 pprRuleName :: RuleName -> SDoc
 pprRuleName rn = doubleQuotes (ftext rn)
 
-
-{-
-************************************************************************
-*                                                                      *
-\subsection[Top-level/local]{Top-level/not-top level flag}
-*                                                                      *
-************************************************************************
--}
-
-data TopLevelFlag
-  = TopLevel
-  | NotTopLevel
-  deriving Data
-
-isTopLevel, isNotTopLevel :: TopLevelFlag -> Bool
-
-isNotTopLevel NotTopLevel = True
-isNotTopLevel TopLevel    = False
-
-isTopLevel TopLevel     = True
-isTopLevel NotTopLevel  = False
-
-instance Outputable TopLevelFlag where
-  ppr TopLevel    = text "<TopLevel>"
-  ppr NotTopLevel = text "<NotTopLevel>"
-
-{-
-************************************************************************
-*                                                                      *
-                Boxity flag
-*                                                                      *
-************************************************************************
--}
-
-instance Outputable Boxity where
-  ppr Boxed   = text "Boxed"
-  ppr Unboxed = text "Unboxed"
-
-instance Binary Boxity where -- implemented via isBoxed-isomorphism to Bool
-  put_ bh = put_ bh . isBoxed
-  get bh  = do
-    b <- get bh
-    pure $ if b then Boxed else Unboxed
 
 {-
 ************************************************************************
@@ -1571,7 +1526,6 @@ instance Outputable (TyConFlavour tc) where
       go BuiltInTypeFlavour      = "built-in type"
       go PromotedDataConFlavour  = "promoted data constructor"
 
-
 -- | Get the enclosing class TyCon (if there is one) for the given TyConFlavour
 tyConFlavourAssoc_maybe :: TyConFlavour tc -> Maybe tc
 tyConFlavourAssoc_maybe (OpenFamilyFlavour _ mb_parent) = mb_parent
@@ -1596,7 +1550,7 @@ instance Outputable TypeOrData where
   ppr IAmType = text "type"
 
 instance Outputable NewOrData where
- ppr = \case
+  ppr = \case
     NewType  -> text "newtype"
     DataType -> text "data"
 
