@@ -318,6 +318,7 @@ test('T23687', normal, compile_and_run, [''])
 test('T23697',
   [ when(opsys('mingw32'), skip) # header not found
   , when(opsys('darwin'), skip)  # permission denied
+  , js_broken(22355)
   ], makefile_test, ['T23697'])
 test('stimesEndo', normal, compile_and_run, [''])
 test('T24807', exit_code(1), compile_and_run, [''])
