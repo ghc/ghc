@@ -105,10 +105,11 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.OldList (intersperse)
 
+import Language.Haskell.Syntax.Basic (Boxity(Boxed, Unboxed))
+
 import Control.DeepSeq
 import Data.Data
 import qualified Data.Semigroup as S
-import GHC.Types.Basic (Boxity(Boxed, Unboxed))
 import GHC.Builtin.Uniques ( isTupleTyConUnique, isCTupleTyConUnique,
                              isSumTyConUnique, isTupleDataConLikeUnique )
 

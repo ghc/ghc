@@ -10,7 +10,7 @@ The bits common to GHC.Tc.TyCl.Instance and GHC.Tc.Deriv.
 module GHC.Core.InstEnv (
         DFunId, InstMatch, ClsInstLookupResult,
         CanonicalEvidence(..), PotentialUnifiers(..), getCoherentUnifiers, nullUnifiers,
-        OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
+        OverlapFlag(..), OverlapMode(..),
         ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprDFunId, pprInstances,
         instanceWarning, instanceHead, instanceSig, mkLocalClsInst, mkImportedClsInst,
         instanceDFunId, updateClsInstDFuns, updateClsInstDFun,
@@ -40,6 +40,7 @@ import GHC.Core.RoughMap
 import GHC.Core.Class
 import GHC.Core.Unify
 import GHC.Core.FVs( orphNamesOfTypes, orphNamesOfType )
+import GHC.Hs.Decls.Overlap
 import GHC.Hs.Extension
 
 import GHC.Unit.Module.Env
@@ -50,7 +51,6 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Generics (Generic)
 import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )

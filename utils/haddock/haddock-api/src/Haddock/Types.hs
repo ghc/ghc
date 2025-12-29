@@ -56,6 +56,7 @@ import GHC.Data.BooleanFormula (BooleanFormula)
 import GHC.Driver.Session (Language)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.InstEnv (is_dfun_name)
+import GHC.Hs.Decls.Overlap (OverlapMode)
 import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (RdrName (..))
@@ -829,6 +830,7 @@ type instance Anno (FamilyResultSig DocNameI) = EpAnn NoEpAnns
 type instance Anno (HsOuterTyVarBndrs Specificity DocNameI) = SrcSpanAnnA
 type instance Anno (HsSigType DocNameI) = SrcSpanAnnA
 type instance Anno (BooleanFormula DocNameI) = SrcSpanAnnL
+type instance Anno (OverlapMode DocNameI) = EpAnn AnnPragma
 
 type XRecCond a =
   ( XParTy a ~ (EpToken "(", EpToken ")")
@@ -960,8 +962,10 @@ type instance XClassDecl DocNameI = NoExtField
 type instance XDataDecl DocNameI = NoExtField
 type instance XSynDecl DocNameI = NoExtField
 type instance XFamDecl DocNameI = NoExtField
+type instance XOverlapMode DocNameI = NoExtField
 type instance XXHsDataDefn DocNameI = DataConCantHappen
 type instance XXFamilyDecl DocNameI = DataConCantHappen
+type instance XXOverlapMode DocNameI = DataConCantHappen
 type instance XXTyClDecl DocNameI = DataConCantHappen
 
 type instance XHsWC DocNameI _ = NoExtField

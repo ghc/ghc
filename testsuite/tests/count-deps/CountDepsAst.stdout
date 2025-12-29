@@ -94,6 +94,7 @@ GHC.Hs
 GHC.Hs.Basic
 GHC.Hs.Binds
 GHC.Hs.Decls
+GHC.Hs.Decls.Overlap
 GHC.Hs.Doc
 GHC.Hs.DocString
 GHC.Hs.Expr
@@ -241,6 +242,7 @@ Language.Haskell.Syntax.Binds
 Language.Haskell.Syntax.Binds.InlinePragma
 Language.Haskell.Syntax.BooleanFormula
 Language.Haskell.Syntax.Decls
+Language.Haskell.Syntax.Decls.Overlap
 Language.Haskell.Syntax.Expr
 Language.Haskell.Syntax.Extension
 Language.Haskell.Syntax.ImpExp

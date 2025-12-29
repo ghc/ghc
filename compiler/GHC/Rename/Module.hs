@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE TypeFamilies        #-}
@@ -21,6 +22,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
+import GHC.Hs.Decls.Overlap ( OverlapMode(..) )
 
 import GHC.Rename.HsType
 import GHC.Rename.Bind
@@ -52,7 +54,7 @@ import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Types.Basic  ( VisArity, TyConFlavour(..), TypeOrKind(..), RuleName )
+import GHC.Types.Basic  ( VisArity,  TyConFlavour(..), TypeOrKind(..), NewOrData(..) )
 import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
 import GHC.Types.Hint (SigLike(..))
 import GHC.Types.Unique.Set
@@ -582,7 +584,7 @@ rnClsInstDecl :: ClsInstDecl GhcPs -> RnM (ClsInstDecl GhcRn, FreeVars)
 rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                            , cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
-                           , cid_overlap_mode = oflag
+                           , cid_overlap_mode = omode
                            , cid_datafam_insts = adts })
   = do { rec { let ctxt = ClassInstanceCtx head_ty'
              ; checkInferredVars ctxt inst_ty
@@ -656,13 +658,14 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                    ; (adts', adt_fvs) <- rnATInstDecls rnDataFamInstDecl cls ktv_names adts
                    ; return ( (ats', adts'), at_fvs `plusFV` adt_fvs) }
 
+       ; let omode'  = rnOverlapMode omode
        ; let all_fvs = meth_fvs `plusFV` more_fvs
                                 `plusFV` inst_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
-                             , cid_overlap_mode = oflag
+                             , cid_overlap_mode = omode'
                              , cid_datafam_insts = adts' },
                  all_fvs) }
              -- We return the renamed associated data type declarations so
@@ -684,6 +687,18 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
     bail_out ctxt (l, err_msg) = do
       addErrAt l $ TcRnWithHsDocContext ctxt err_msg
       pure $ mkUnboundName (mkTcOccFS (fsLit "<class>"))
+
+rnOverlapMode :: Maybe (XRec GhcPs (OverlapMode GhcPs))
+              -> Maybe (XRec GhcRn (OverlapMode GhcRn))
+rnOverlapMode =
+    let advancePass = \case
+          NoOverlap    s -> NoOverlap    s
+          Overlappable s -> Overlappable s
+          Overlapping  s -> Overlapping  s
+          Overlaps     s -> Overlaps     s
+          Incoherent   s -> Incoherent   s
+          NonCanonical s -> NonCanonical s
+    in  fmap (fmap advancePass)
 
 rnFamEqn :: HsDocContext
          -> AssocTyFamInfo
@@ -1167,7 +1182,8 @@ rnSrcDerivDecl (DerivDecl (inst_warn_ps, ann) ty mds overlap)
            NFC_StandaloneDerivedInstanceHead
            (getLHsInstDeclHead $ dropWildCards ty')
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
-       ; return (DerivDecl (inst_warn_rn, ann) ty' mds' overlap, fvs) }
+       ; let overlap' = rnOverlapMode overlap
+       ; return (DerivDecl (inst_warn_rn, ann) ty' mds' overlap', fvs) }
   where
     ctxt    = DerivDeclCtx
     nowc_ty = dropWildCards ty

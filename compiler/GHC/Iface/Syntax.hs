@@ -85,6 +85,7 @@ import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.EnforceEpt.TagSig
 import GHC.Parser.Annotation (noLocA)
 import GHC.Hs.Extension ( GhcRn )
+import GHC.Hs.Decls.Overlap ( OverlapFlag )
 import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
 
 import GHC.Utils.Lexeme (isLexSym)

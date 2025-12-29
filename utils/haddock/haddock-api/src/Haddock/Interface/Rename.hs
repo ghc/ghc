@@ -37,7 +37,8 @@ import GHC hiding (NoLink, HsTypeGhcPsExt (..))
 import GHC.Builtin.Types (eqTyCon_RDR, tupleDataConName, tupleTyConName)
 import GHC.Core.TyCon (tyConResKind)
 import GHC.Driver.DynFlags (getDynFlags)
-import GHC.Types.Basic (TopLevelFlag (..), TupleSort (..))
+import GHC.Hs.Decls.Overlap (OverlapMode(..))
+import GHC.Types.Basic (TupleSort (..))
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName (Exact))
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
@@ -860,9 +861,18 @@ renameDerivD
           { deriv_ext = noExtField
           , deriv_type = ty'
           , deriv_strategy = strat'
-          , deriv_overlap_mode = omode
+          , deriv_overlap_mode = fmap convertOverlapMode <$> omode
           }
       )
+
+convertOverlapMode :: OverlapMode GhcRn -> OverlapMode DocNameI
+convertOverlapMode = \case
+  NoOverlap    _ -> NoOverlap    NoExtField
+  Overlappable _ -> Overlappable NoExtField
+  Overlapping  _ -> Overlapping  NoExtField
+  Overlaps     _ -> Overlaps     NoExtField
+  Incoherent   _ -> Incoherent   NoExtField
+  NonCanonical _ -> NonCanonical NoExtField
 
 renameDerivStrategy :: DerivStrategy GhcRn -> RnM (DerivStrategy DocNameI)
 renameDerivStrategy (StockStrategy a) = pure (StockStrategy a)
@@ -885,7 +895,7 @@ renameClsInstD
     return
       ( ClsInstDecl
           { cid_ext = noExtField
-          , cid_overlap_mode = omode
+          , cid_overlap_mode = fmap convertOverlapMode <$> omode
           , cid_poly_ty = ltype'
           , cid_binds = []
           , cid_sigs = []

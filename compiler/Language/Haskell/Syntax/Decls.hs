@@ -18,7 +18,7 @@ module Language.Haskell.Syntax.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep, FunDep(..),
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
-  NewOrData(..), DataDefnCons(..), dataDefnConsNewOrData,
+  DataDefnCons(..),
   isTypeDataDefnCons, firstDataDefnCon,
   StandaloneKindSig(..), LStandaloneKindSig,
 
@@ -31,7 +31,7 @@ module Language.Haskell.Syntax.Decls (
   FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
-  InstDecl(..), LInstDecl, FamilyInfo(..), familyInfoTyConFlavour,
+  InstDecl(..), LInstDecl, FamilyInfo(..),
   TyFamInstDecl(..), LTyFamInstDecl,
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
@@ -88,18 +88,18 @@ module Language.Haskell.Syntax.Decls (
 
 -- friends:
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
-  ( HsExpr, HsUntypedSplice )
+  (HsExpr, HsUntypedSplice)
         -- Because Expr imports Decls via HsBracket
 
+import Language.Haskell.Syntax.Basic
+  (LexicalFixity, Role, RuleName, TopLevelFlag)
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Binds.InlinePragma (Activation)
+import Language.Haskell.Syntax.Decls.Overlap (OverlapMode)
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Type
-import Language.Haskell.Syntax.Basic (Role, LexicalFixity)
 import Language.Haskell.Syntax.Specificity (Specificity)
+import Language.Haskell.Syntax.Type
 
-import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName
-                       ,TyConFlavour(..), TypeOrData(..), NewOrData(..))
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 
 import GHC.Data.FastString (FastString)
@@ -108,7 +108,6 @@ import GHC.Hs.Doc (WithHsDocIdentifiers)
 import GHC.Types.SourceText (StringLiteral)
 
 import Control.DeepSeq
-import Control.Exception (assert)
 import Control.Monad
 import Data.Data        hiding (TyCon, Fixity, Infix)
 import Data.Maybe
@@ -120,7 +119,7 @@ import Prelude (Show)
 import Data.Foldable
 import Data.Traversable
 import Data.List.NonEmpty (NonEmpty (..))
-import GHC.Generics ( Generic )
+import GHC.Generics (Generic)
 
 
 {-
@@ -779,18 +778,6 @@ data FamilyInfo pass
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
-familyInfoTyConFlavour
-  :: Maybe tc    -- ^ Just cls <=> this is an associated family of class cls
-  -> FamilyInfo pass
-  -> TyConFlavour tc
-familyInfoTyConFlavour mb_parent_tycon info =
-  case info of
-    DataFamily         -> OpenFamilyFlavour (IAmData DataType) mb_parent_tycon
-    OpenTypeFamily     -> OpenFamilyFlavour IAmType mb_parent_tycon
-    ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon)
-                          -- See Note [Closed type family mb_parent_tycon]
-                          ClosedTypeFamilyFlavour
-
 {- Note [Closed type family mb_parent_tycon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There's no way to write a closed type family inside a class declaration:
@@ -931,11 +918,6 @@ data DataDefnCons a
              -- False <=> data T x = ...
       [a]    -- The (possibly empty) list of data constructors
   deriving ( Eq, Data, Foldable, Functor, Traversable )                -- Needed because Demand derives Eq
-
-dataDefnConsNewOrData :: DataDefnCons a -> NewOrData
-dataDefnConsNewOrData = \ case
-    NewTypeCon   {} -> NewType
-    DataTypeCons {} -> DataType
 
 -- | Are the constructors within a @type data@ declaration?
 -- See Note [Type data declarations] in GHC.Rename.Module.
@@ -1279,7 +1261,7 @@ data ClsInstDecl pass
       , cid_sigs          :: [LSig pass]         -- User-supplied pragmatic info
       , cid_tyfam_insts   :: [LTyFamInstDecl pass]   -- Type family instances
       , cid_datafam_insts :: [LDataFamInstDecl pass] -- Data family instances
-      , cid_overlap_mode  :: Maybe (XRec pass OverlapMode)
+      , cid_overlap_mode  :: Maybe (XRec pass (OverlapMode pass))
       }
   | XClsInstDecl !(XXClsInstDecl pass)
 
@@ -1328,7 +1310,7 @@ data DerivDecl pass = DerivDecl
           -- See Note [Inferring the instance context] in GHC.Tc.Deriv.Infer.
 
         , deriv_strategy     :: Maybe (LDerivStrategy pass)
-        , deriv_overlap_mode :: Maybe (XRec pass OverlapMode)
+        , deriv_overlap_mode :: Maybe (XRec pass (OverlapMode pass))
         }
   | XDerivDecl !(XXDerivDecl pass)
 

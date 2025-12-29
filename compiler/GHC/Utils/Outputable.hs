@@ -112,7 +112,9 @@ module GHC.Utils.Outputable (
 import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 
+import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
+import Language.Haskell.Syntax.Decls.Overlap ( OverlapMode(..) )
 import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
 
 import GHC.Prelude.Basic
@@ -2001,19 +2003,36 @@ instance IsDoc HDoc where
   {-# INLINE CONLIKE dualDoc #-}
 
 instance Outputable (ActivationX p) where
-   ppr AlwaysActive     = empty
-   ppr NeverActive      = brackets (text "~")
-   ppr (ActiveBefore n) = brackets (char '~' <> int n)
-   ppr (ActiveAfter  n) = brackets (int n)
-   ppr (XActivation  _) = text "[final]"
+  ppr AlwaysActive     = empty
+  ppr NeverActive      = brackets (text "~")
+  ppr (ActiveBefore n) = brackets (char '~' <> int n)
+  ppr (ActiveAfter  n) = brackets (int n)
+  ppr (XActivation  _) = text "[final]"
 
 instance Outputable InlineSpec where
-    ppr Inline           = text "INLINE"
-    ppr NoInline         = text "NOINLINE"
-    ppr Inlinable        = text "INLINABLE"
-    ppr Opaque           = text "OPAQUE"
-    ppr NoUserInlinePrag = empty
+  ppr Inline           = text "INLINE"
+  ppr NoInline         = text "NOINLINE"
+  ppr Inlinable        = text "INLINABLE"
+  ppr Opaque           = text "OPAQUE"
+  ppr NoUserInlinePrag = empty
+
+instance Outputable Boxity where
+  ppr Boxed   = text "Boxed"
+  ppr Unboxed = text "Unboxed"
 
 instance Outputable RuleMatchInfo where
-   ppr ConLike = text "CONLIKE"
-   ppr FunLike = text "FUNLIKE"
+  ppr ConLike = text "CONLIKE"
+  ppr FunLike = text "FUNLIKE"
+
+instance Outputable TopLevelFlag where
+  ppr TopLevel    = text "<TopLevel>"
+  ppr NotTopLevel = text "<NotTopLevel>"
+
+instance Outputable (OverlapMode p) where
+  ppr (NoOverlap    _) = empty
+  ppr (Overlappable _) = text "[overlappable]"
+  ppr (Overlapping  _) = text "[overlapping]"
+  ppr (Overlaps     _) = text "[overlap ok]"
+  ppr (Incoherent   _) = text "[incoherent]"
+  ppr (NonCanonical _) = text "[noncanonical]"
+  ppr (XOverlapMode _) = text "[user TTG extension]"

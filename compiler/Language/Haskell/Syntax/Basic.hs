@@ -1,6 +1,8 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
+
 module Language.Haskell.Syntax.Basic where
 
+import Control.DeepSeq
 import Data.Data (Data)
 import Data.Eq
 import Data.Ord
@@ -8,7 +10,37 @@ import Data.Bool
 import Prelude
 
 import GHC.Data.FastString (FastString)
-import Control.DeepSeq
+
+{-
+************************************************************************
+*                                                                      *
+Rules
+*                                                                      *
+************************************************************************
+-}
+
+type RuleName = FastString
+
+{-
+************************************************************************
+*                                                                      *
+\subsection[Top-level/local]{Top-level/not-top level flag}
+*                                                                      *
+************************************************************************
+-}
+
+data TopLevelFlag
+  = TopLevel
+  | NotTopLevel
+  deriving Data
+
+isTopLevel, isNotTopLevel :: TopLevelFlag -> Bool
+
+isNotTopLevel NotTopLevel = True
+isNotTopLevel TopLevel    = False
+
+isTopLevel TopLevel     = True
+isTopLevel NotTopLevel  = False
 
 {-
 ************************************************************************

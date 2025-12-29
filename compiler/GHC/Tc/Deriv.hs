@@ -763,7 +763,7 @@ deriveStandalone (L loc (DerivDecl (warn, _) deriv_ty mb_lderiv_strat overlap_mo
          then do warnUselessTypeable
                  return Nothing
          else do early_deriv_spec <-
-                   mkEqnHelp (fmap unLoc overlap_mode)
+                   mkEqnHelp (fmap (tcOverlapMode . unLoc) overlap_mode)
                              tvs' cls inst_tys'
                              deriv_ctxt' mb_deriv_strat'
                              (fmap unLoc warn)
@@ -772,6 +772,16 @@ deriveStandalone (L loc (DerivDecl (warn, _) deriv_ty mb_lderiv_strat overlap_mo
                    deriv_ty
                    early_deriv_spec
                  pure (Just early_deriv_spec) }
+
+
+tcOverlapMode :: OverlapMode GhcRn -> OverlapMode GhcTc
+tcOverlapMode = \case
+  NoOverlap    s -> NoOverlap    s
+  Overlappable s -> Overlappable s
+  Overlapping  s -> Overlapping  s
+  Overlaps     s -> Overlaps     s
+  Incoherent   s -> Incoherent   s
+  NonCanonical s -> NonCanonical s
 
 -- Typecheck the type in a standalone deriving declaration.
 --
@@ -1218,7 +1228,7 @@ instance (at least from the user's perspective), the amount of engineering
 required to obtain the latter instance just isn't worth it.
 -}
 
-mkEqnHelp :: Maybe OverlapMode
+mkEqnHelp :: Maybe (OverlapMode GhcTc)
           -> [TyVar]
           -> Class -> [Type]
           -> DerivContext

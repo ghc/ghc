@@ -45,8 +45,8 @@ import GHC.Base (NonEmpty(..))
 import qualified GHC.Data.BooleanFormula as BF
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
+import GHC.Hs.Decls.Overlap (OverlapMode(..))
 import GHC.TypeLits
-import GHC.Types.Basic hiding (EP)
 import GHC.Types.ForeignCall
 import GHC.Types.InlinePragma (ActivationGhc, inlinePragmaActivation, inlinePragmaSource)
 import GHC.Types.Name.Reader
@@ -2263,7 +2263,7 @@ instance ExactPrint (TyFamInstDecl GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (LocatedP OverlapMode) where
+instance Typeable p => ExactPrint (LocatedP (OverlapMode (GhcPass p))) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor = setAnchorAn
 

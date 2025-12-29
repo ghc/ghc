@@ -33,6 +33,7 @@ import GHC.Types.Name.Reader (WithUserRdr(..))
 import GHC.Types.InlinePragma (ActivationGhc)
 import GHC.Data.BooleanFormula (BooleanFormula(..))
 import Language.Haskell.Syntax.Decls
+import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
 import Language.Haskell.Syntax.Extension (Anno)
 import Language.Haskell.Syntax.Binds.InlinePragma (ActivationX(..), InlinePragma(..))
 
@@ -642,3 +643,8 @@ deriving instance Data ActivationGhc
 deriving instance Data (InlinePragma GhcPs)
 deriving instance Data (InlinePragma GhcRn)
 deriving instance Data (InlinePragma GhcTc)
+
+-- deriving instance Data (OverlapMode p)
+deriving instance Data (OverlapMode GhcPs)
+deriving instance Data (OverlapMode GhcRn)
+deriving instance Data (OverlapMode GhcTc)

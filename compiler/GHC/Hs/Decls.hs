@@ -17,7 +17,7 @@ module GHC.Hs.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep,
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
-  NewOrData, newOrDataToFlavour, anyLConIsGadt,
+  NewOrData, newOrDataToFlavour, dataDefnConsNewOrData, anyLConIsGadt,
   StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
 
   -- ** Class or type declarations
@@ -100,13 +100,17 @@ module GHC.Hs.Decls (
 -- friends:
 import GHC.Prelude
 
+import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Decls
+import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
 import Language.Haskell.Syntax.Extension
 
-import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprUntypedSplice )
+import {-# SOURCE #-} GHC.Hs.Expr (pprExpr, pprUntypedSplice)
         -- Because Expr imports Decls via HsBracket
 
-import GHC.Hs.Binds
+import GHC.Hs.Binds (ActivationAnn(..),
+                     emptyValBindsIn, emptyValBindsOut, isEmptyValBinds,
+                     plusHsValBinds, pprDeclList, pprLHsBindsForUser)
 import GHC.Hs.Type
 import GHC.Hs.Doc
 import GHC.Types.Basic
@@ -1061,7 +1065,7 @@ ppDerivStrategy mb =
     Nothing       -> empty
     Just (L _ ds) -> ppr ds
 
-ppOverlapPragma :: Maybe (LocatedP OverlapMode) -> SDoc
+ppOverlapPragma :: Maybe (LocatedP (OverlapMode (GhcPass p))) -> SDoc
 ppOverlapPragma mb =
   case mb of
     Nothing           -> empty
@@ -1105,6 +1109,11 @@ anyLConIsGadt xs = case toList xs of
     _ -> False
 {-# SPECIALIZE anyLConIsGadt :: [GenLocated l (ConDecl pass)] -> Bool #-}
 {-# SPECIALIZE anyLConIsGadt :: DataDefnCons (GenLocated l (ConDecl pass)) -> Bool #-}
+
+dataDefnConsNewOrData :: DataDefnCons a -> NewOrData
+dataDefnConsNewOrData = \ case
+    NewTypeCon   {} -> NewType
+    DataTypeCons {} -> DataType
 
 {-
 ************************************************************************
@@ -1484,7 +1493,7 @@ type instance Anno (ClsInstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (InstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DocDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DerivDecl (GhcPass p)) = SrcSpanAnnA
-type instance Anno OverlapMode = SrcSpanAnnP
+type instance Anno (OverlapMode (GhcPass p)) = SrcSpanAnnP
 type instance Anno (DerivStrategy (GhcPass p)) = EpAnnCO
 type instance Anno (DefaultDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (ForeignDecl (GhcPass p)) = SrcSpanAnnA

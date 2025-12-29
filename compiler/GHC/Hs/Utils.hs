@@ -53,6 +53,7 @@ module GHC.Hs.Utils(
   -- * Bindings
   mkFunBind, mkVarBind, mkHsVarBind, mkSimpleGeneratedFunBind, mkTopFunBind,
   mkPatSynBind,
+  familyInfoTyConFlavour,
   isInfixFunBind,
   spanHsLocaLBinds,
 
@@ -111,7 +112,6 @@ import GHC.Hs.Expr
 import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Hs.Lit
-import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
@@ -148,6 +148,7 @@ import Control.Arrow ( first )
 import Data.Foldable ( toList )
 import Data.List ( partition )
 import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
+import Data.Maybe ( isNothing )
 import qualified Data.List.NonEmpty as NE
 
 import Data.IntMap ( IntMap )
@@ -1501,6 +1502,18 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
   , tyDeclConsWithFields = hsDataDefnBinders defn }
   where
     flav = newOrDataToFlavour $ dataDefnConsNewOrData $ dd_cons defn
+
+familyInfoTyConFlavour
+  :: Maybe tc    -- ^ Just cls <=> this is an associated family of class cls
+  -> FamilyInfo pass
+  -> TyConFlavour tc
+familyInfoTyConFlavour mb_parent_tycon info =
+  case info of
+    DataFamily         -> OpenFamilyFlavour (IAmData DataType) mb_parent_tycon
+    OpenTypeFamily     -> OpenFamilyFlavour IAmType mb_parent_tycon
+    ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon)
+                          -- See Note [Closed type family mb_parent_tycon]
+                          ClosedTypeFamilyFlavour
 
 -------------------
 hsForeignDeclsBinders :: forall p a. (UnXRec (GhcPass p), IsSrcSpanAnn p a)

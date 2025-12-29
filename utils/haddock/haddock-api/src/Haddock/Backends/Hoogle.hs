@@ -33,7 +33,6 @@ import GHC
 import GHC.Core.InstEnv
 import qualified GHC.Driver.DynFlags as DynFlags
 import GHC.Driver.Ppr
-import GHC.Plugins (TopLevelFlag (..))
 import GHC.Types.SourceText
 import GHC.Unit.State
 import GHC.Utils.Outputable as Outputable

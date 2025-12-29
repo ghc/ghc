@@ -117,6 +117,7 @@ module GHC.Utils.Binary
 
 import GHC.Prelude
 
+import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
@@ -2010,6 +2011,12 @@ instance Binary a => Binary (FingerprintWithValue a) where
 instance NFData a => NFData (FingerprintWithValue a) where
   rnf (FingerprintWithValue fp mflags)
     = rnf fp `seq` rnf mflags `seq` ()
+
+instance Binary Boxity where -- implemented via isBoxed-isomorphism to Bool
+  put_ bh = put_ bh . isBoxed
+  get bh  = do
+    b <- get bh
+    pure $ if b then Boxed else Unboxed
 
 instance Binary ConInfoTable where
   get bh = Binary.decode <$> get bh

@@ -4,7 +4,7 @@ module GHC.HsToCore.Errors.Types where
 
 import GHC.Prelude
 
-import GHC.Core (CoreRule, CoreExpr, RuleName)
+import GHC.Core (CoreRule, CoreExpr)
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.Type
