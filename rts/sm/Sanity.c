@@ -597,7 +597,6 @@ checkClosure( const StgClosure* p )
 void checkHeapChain (bdescr *bd)
 {
     for (; bd != NULL; bd = bd->link) {
-        if(!(bd->flags & BF_SWEPT)) {
             StgPtr p = bd->start;
             while (p < bd->free) {
                 uint32_t size = checkClosure((StgClosure *)p);
@@ -609,7 +608,6 @@ void checkHeapChain (bdescr *bd)
                 while (p < bd->free &&
                        (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR(*p))) { p++; }
             }
-        }
     }
 }
 

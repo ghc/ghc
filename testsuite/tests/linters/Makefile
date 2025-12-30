@@ -90,8 +90,6 @@ whitespace:
 				rts/sm/MarkStack.h\
 				rts/sm/MarkWeak.h\
 				rts/sm/Scav.h\
-				rts/sm/Sweep.c\
-				rts/sm/Sweep.h\
 				rts/win32/veh_excn.h\
 				utils/genprimopcode/Parser.y\
 				utils/genprimopcode/Syntax.hs\

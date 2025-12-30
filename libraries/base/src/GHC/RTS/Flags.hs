@@ -55,7 +55,7 @@ module GHC.RTS.Flags
   , getHpcFlags
   ) where
 
-import Prelude (Show,IO,Bool,Maybe,String,Int,Enum,FilePath,Double,Eq,(<$>))
+import Prelude (Show,IO,Bool(..),Maybe,String,Int,Enum,FilePath,Double,Eq,(<$>))
 
 import GHC.Generics (Generic)
 import qualified GHC.Internal.RTS.Flags as Internal
@@ -107,7 +107,8 @@ data GCFlags = GCFlags
     , compact               :: Bool -- ^ True <=> "compact all the time"
     , compactThreshold      :: Double
     , sweep                 :: Bool
-      -- ^ use "mostly mark-sweep" instead of copying for the oldest generation
+      -- ^ Always 'False', refers to the legacy mark-and-sweep
+      -- collector (@+RTS -w@) that's now removed
     , ringBell              :: Bool
     , idleGCDelayTime       :: RtsTime
     , doIdleGC              :: Bool
@@ -362,7 +363,7 @@ internal_to_base_RTSFlags Internal.RTSFlags{..} =
 internal_to_base_GCFlags :: Internal.GCFlags -> GCFlags
 internal_to_base_GCFlags i@Internal.GCFlags{..} =
   let give_stats = internal_to_base_giveStats (Internal.giveStats i)
-  in GCFlags{ giveStats = give_stats, .. }
+  in GCFlags{ giveStats = give_stats, sweep = False, .. }
   where
     internal_to_base_giveStats :: Internal.GiveGCStats -> GiveGCStats
     internal_to_base_giveStats Internal.NoGCStats      = NoGCStats

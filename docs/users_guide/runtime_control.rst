@@ -449,18 +449,6 @@ performance.
     Large values are likely to lead to diminishing returns as
     , in practice, the Haskell heap tends to be dominated by small objects.
 
-
-.. rts-flag:: -w
-
-    :default: off
-    :since: a long time ago
-    :reverse: none
-
-    Uses a mark-region garbage collection strategy for the oldest-generation heap.
-    Note that this cannot be used in conjunction with heap profiling
-    (:rts-flag:`-hT`) unless linked against the profiling runtime system with
-    :ghc-flag:`-prof`.
-
 .. rts-flag:: -A ⟨size⟩
 
     :default: 4MB

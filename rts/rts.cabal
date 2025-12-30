@@ -528,7 +528,6 @@ library
                  sm/Scav.c
                  sm/Scav_thr.c
                  sm/Storage.c
-                 sm/Sweep.c
                  fs.c
                  prim/atomic.c
                  prim/bitrev.c

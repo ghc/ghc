@@ -170,7 +170,6 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.squeezeUpdFrames   = true;
     RtsFlags.GcFlags.compact            = false;
     RtsFlags.GcFlags.compactThreshold   = 30.0;
-    RtsFlags.GcFlags.sweep              = false;
     RtsFlags.GcFlags.idleGCDelayTime    = USToTime(300000); // 300ms
     RtsFlags.GcFlags.interIdleGCWait    = 0;
 #if defined(THREADED_RTS)
@@ -361,7 +360,6 @@ usage_text[] = {
 "            -M (default: 30%)",
 "  -c        Use in-place compaction for all oldest generation collections",
 "            (the default is to use copying)",
-"  -w        Use mark-region for the oldest generation (experimental)",
 #if defined(THREADED_RTS)
 "  -I<sec>   Perform full GC after <sec> idle time (default: 0.3, 0 == off)",
 "  -Iw<sec>  Minimum wait time between idle GC runs (default: 0, 0 == no min wait time)",
@@ -1266,12 +1264,6 @@ error = true;
                   }
                   break;
 
-              case 'w':
-                OPTION_UNSAFE;
-                RtsFlags.GcFlags.sweep = true;
-                unchecked_arg_start++;
-                goto check_rest;
-
               case 'F':
                 OPTION_UNSAFE;
                 switch(rts_argv[arg][2]) {
@@ -2018,16 +2010,6 @@ static void normaliseRtsOpts (void)
     if (RtsFlags.GcFlags.useNonmoving && RtsFlags.GcFlags.generations == 1) {
         barf("The non-moving collector doesn't support -G1");
     }
-
-#if !defined(PROFILING) && !defined(DEBUG)
-    // The mark-region collector is incompatible with heap census unless
-    // we zero slop of blackhole'd thunks, which doesn't happen in the
-    // vanilla way. See #9666.
-    if (RtsFlags.ProfFlags.doHeapProfile && RtsFlags.GcFlags.sweep) {
-        barf("The mark-region collector can only be used with profiling\n"
-             "when linked against the profiled RTS.");
-    }
-#endif
 
     if (RtsFlags.GcFlags.compact && RtsFlags.GcFlags.useNonmoving) {
         errorBelch("The non-moving collector cannot be used in conjunction with\n"

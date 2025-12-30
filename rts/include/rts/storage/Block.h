@@ -168,8 +168,6 @@ typedef struct bdescr_ {
 #define BF_FRAGMENTED 64
 /* we know about this block (for finding leaks) */
 #define BF_KNOWN     128
-/* Block was swept in the last generation */
-#define BF_SWEPT     256
 /* Block is part of a Compact */
 #define BF_COMPACT   512
 /* A non-moving allocator segment (see NonMoving.c) */

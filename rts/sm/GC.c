@@ -26,7 +26,6 @@
 #include "MarkStack.h"
 #include "MarkWeak.h"
 #include "Sparks.h"
-#include "Sweep.h"
 
 #include "Arena.h"
 #include "Storage.h"
@@ -384,7 +383,7 @@ GarbageCollect (struct GcConfig config,
 
 #if defined(THREADED_RTS)
   /* How many threads will be participating in this GC?
-   * We don't always parallelise minor GCs, or mark/compact/sweep GC.
+   * We don't always parallelise minor GCs, or mark/compact GC.
    * The policy on when to do a parallel GC is controlled by RTS flags (see
    * below)
 
@@ -602,14 +601,11 @@ GarbageCollect (struct GcConfig config,
 
   // NO MORE EVACUATION AFTER THIS POINT!
 
-  // Finally: compact or sweep the oldest generation.
+  // Finally: compact the oldest generation.
   if (major_gc && oldest_gen->mark) {
-      if (oldest_gen->compact)
           compact(gct->scavenged_static_objects,
                   &dead_weak_ptr_list,
                   &resurrected_threads);
-      else
-          sweep(oldest_gen);
   }
 
   copied = 0;
@@ -1792,10 +1788,6 @@ prepare_collected_gen (generation *gen)
                 if (!(bd->flags & BF_FRAGMENTED)) {
                     bd->flags |= BF_MARKED;
                 }
-
-                // BF_SWEPT should be marked only for blocks that are being
-                // collected in sweep()
-                bd->flags &= ~BF_SWEPT;
             }
         }
     }
@@ -2023,10 +2015,6 @@ resizeGenerations (void)
         oldest_gen->mark = 0;
         oldest_gen->compact = 0;
 //        debugBelch("compaction: off\n", live);
-    }
-
-    if (RtsFlags.GcFlags.sweep) {
-        oldest_gen->mark = 1;
     }
 
     // if we're going to go over the maximum heap size, reduce the

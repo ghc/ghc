@@ -226,13 +226,12 @@ initStorage (void)
   nonmovingInit();
 
   /* The oldest generation has one step. */
-  if (RtsFlags.GcFlags.compact || RtsFlags.GcFlags.sweep) {
+  if (RtsFlags.GcFlags.compact) {
       if (RtsFlags.GcFlags.generations == 1) {
           errorBelch("WARNING: compact/sweep is incompatible with -G1; disabled");
       } else {
           oldest_gen->mark = 1;
-          if (RtsFlags.GcFlags.compact)
-              oldest_gen->compact = 1;
+          oldest_gen->compact = 1;
       }
   }
 

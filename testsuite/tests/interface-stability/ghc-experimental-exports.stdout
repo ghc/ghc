@@ -6415,7 +6415,6 @@ module GHC.RTS.Flags.Experimental where
                squeezeUpdFrames :: GHC.Internal.Types.Bool,
                compact :: GHC.Internal.Types.Bool,
                compactThreshold :: GHC.Internal.Types.Double,
-               sweep :: GHC.Internal.Types.Bool,
                ringBell :: GHC.Internal.Types.Bool,
                idleGCDelayTime :: RtsTime,
                doIdleGC :: GHC.Internal.Types.Bool,

@@ -126,8 +126,6 @@ data GCFlags = GCFlags
     , squeezeUpdFrames      :: Bool
     , compact               :: Bool -- ^ True <=> "compact all the time"
     , compactThreshold      :: Double
-    , sweep                 :: Bool
-      -- ^ use "mostly mark-sweep" instead of copying for the oldest generation
     , ringBell              :: Bool
     , idleGCDelayTime       :: RtsTime
     , doIdleGC              :: Bool
@@ -472,8 +470,6 @@ getGCFlags = do
           <*> (toBool <$>
                 (#{peek GC_FLAGS, compact} ptr :: IO CBool))
           <*> #{peek GC_FLAGS, compactThreshold} ptr
-          <*> (toBool <$>
-                (#{peek GC_FLAGS, sweep} ptr :: IO CBool))
           <*> (toBool <$>
                 (#{peek GC_FLAGS, ringBell} ptr :: IO CBool))
           <*> #{peek GC_FLAGS, idleGCDelayTime} ptr

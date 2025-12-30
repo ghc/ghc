@@ -61,8 +61,6 @@ typedef struct _GC_FLAGS {
     bool compact;               /* True <=> "compact all the time" */
     double  compactThreshold;
 
-    bool sweep;                 /* use "mostly mark-sweep" instead of copying
-                                 * for the oldest generation */
     bool ringBell;
 
     Time    idleGCDelayTime;    /* units: TIME_RESOLUTION */
