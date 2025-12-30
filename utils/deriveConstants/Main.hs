@@ -397,7 +397,6 @@ wanteds os = concat
           ,fieldOffset Both "StgRegTable" "rHpAlloc"
           ,structField C    "StgRegTable" "rCurrentAlloc"
           ,structField C    "StgRegTable" "rRet"
-          ,structField C    "StgRegTable" "rNursery"
 
           ,defIntOffset Both "stgEagerBlackholeInfo"
                              "FUN_OFFSET(stgEagerBlackholeInfo)"
@@ -405,7 +404,6 @@ wanteds os = concat
           ,defIntOffset Both "stgGCFun"    "FUN_OFFSET(stgGCFun)"
 
           ,fieldOffset Both "Capability" "r"
-          ,fieldOffset C    "Capability" "lock"
           ,structField C    "Capability" "no"
           ,structField C    "Capability" "mut_lists"
           ,structField C    "Capability" "context_switch"
@@ -424,18 +422,11 @@ wanteds os = concat
           ,structField C    "bdescr" "link"
           ,structField Both "bdescr" "flags"
 
-          ,structSize C  "generation"
           ,structField C "generation" "n_new_large_words"
-          ,structField C "generation" "weak_ptr_list"
 
           ,structSize Both   "CostCentreStack"
-          ,structField C     "CostCentreStack" "ccsID"
           ,structFieldH Both "CostCentreStack" "mem_alloc"
           ,structFieldH Both "CostCentreStack" "scc_count"
-          ,structField C     "CostCentreStack" "prevStack"
-
-          ,structField C "CostCentre" "ccID"
-          ,structField C "CostCentre" "link"
 
           ,structField C     "StgHeader" "info"
           ,structField_ Both "StgHeader_ccs" "StgHeader" "prof.ccs"
@@ -472,18 +463,14 @@ wanteds os = concat
           ,closurePayload C    "StgArrBytes" "payload"
 
           ,closureField  C    "StgTSO"      "_link"
-          ,closureField  C    "StgTSO"      "global_link"
           ,closureField  C    "StgTSO"      "what_next"
           ,closureField  C    "StgTSO"      "why_blocked"
           ,closureField  C    "StgTSO"      "block_info"
           ,closureField  C    "StgTSO"      "blocked_exceptions"
           ,closureField  C    "StgTSO"      "id"
           ,closureField  C    "StgTSO"      "cap"
-          ,closureField  C    "StgTSO"      "saved_errno"
           ,closureField  C    "StgTSO"      "trec"
           ,closureField  C    "StgTSO"      "flags"
-          ,closureField  C    "StgTSO"      "dirty"
-          ,closureField  C    "StgTSO"      "bq"
           ,closureField  C    "StgTSO"      "label"
           ,closureField  C    "StgTSO"      "bound"
           ,closureField  Both "StgTSO"      "alloc_limit"
@@ -495,8 +482,6 @@ wanteds os = concat
           ,closureField       C    "StgStack" "stack_size"
           ,closureField       C    "StgStack" "dirty"
           ,closureField       C    "StgStack" "marking"
-
-          ,structSize C "StgTSOProfInfo"
 
           ,closureField Both "StgUpdateFrame" "updatee"
           ,closureField Both "StgOrigThunkInfoFrame" "info_ptr"
@@ -519,18 +504,14 @@ wanteds os = concat
           ,closureFieldGcptr C "StgAP" "fun"
           ,closurePayload    C "StgAP" "payload"
 
-          ,thunkSize         C "StgAP_STACK"
           ,closureField      C "StgAP_STACK" "size"
           ,closureFieldGcptr C "StgAP_STACK" "fun"
           ,closurePayload    C "StgAP_STACK" "payload"
 
-          ,closureSize       C "StgContinuation"
           ,closureField      C "StgContinuation" "apply_mask_frame"
           ,closureField      C "StgContinuation" "mask_frame_offset"
           ,closureField      C "StgContinuation" "stack_size"
           ,closurePayload    C "StgContinuation" "stack"
-
-          ,thunkSize C "StgSelector"
 
           ,closureFieldGcptr C "StgInd" "indirectee"
 
@@ -551,10 +532,6 @@ wanteds os = concat
           ,closureField C "StgCatchRetryFrame" "running_alt_code"
           ,closureField C "StgCatchRetryFrame" "first_code"
           ,closureField C "StgCatchRetryFrame" "alt_code"
-
-          ,closureField C "StgTVarWatchQueue" "closure"
-          ,closureField C "StgTVarWatchQueue" "next_queue_entry"
-          ,closureField C "StgTVarWatchQueue" "prev_queue_entry"
 
           ,closureSize  C "StgTVar"
           ,closureField C "StgTVar" "current_value"
@@ -595,29 +572,19 @@ wanteds os = concat
           ,closureSize  C "StgStableName"
           ,closureField C "StgStableName" "sn"
 
-          ,closureSize  C "StgBlockingQueue"
-          ,closureField C "StgBlockingQueue" "bh"
-          ,closureField C "StgBlockingQueue" "owner"
-          ,closureField C "StgBlockingQueue" "queue"
-          ,closureField C "StgBlockingQueue" "link"
-
           ,closureSize  C "MessageBlackHole"
           ,closureField C "MessageBlackHole" "link"
           ,closureField C "MessageBlackHole" "tso"
           ,closureField C "MessageBlackHole" "bh"
 
-          ,closureSize  C "StgCompactNFData"
           ,closureField C "StgCompactNFData" "totalW"
-          ,closureField C "StgCompactNFData" "autoBlockW"
           ,closureField C "StgCompactNFData" "nursery"
-          ,closureField C "StgCompactNFData" "last"
           ,closureField C "StgCompactNFData" "hp"
           ,closureField C "StgCompactNFData" "hpLim"
           ,closureField C "StgCompactNFData" "hash"
           ,closureField C "StgCompactNFData" "result"
 
           ,structSize   C "StgCompactNFDataBlock"
-          ,structField  C "StgCompactNFDataBlock" "self"
           ,structField  C "StgCompactNFDataBlock" "owner"
           ,structField  C "StgCompactNFDataBlock" "next"
 
@@ -635,10 +602,7 @@ wanteds os = concat
                           "RTS_FLAGS" "DebugFlags.zero_on_gc"
           ,structField_ C "RtsFlags_GcFlags_initialStkSize"
                           "RTS_FLAGS" "GcFlags.initialStkSize"
-          ,structField_ C "RtsFlags_MiscFlags_tickInterval"
-                          "RTS_FLAGS" "MiscFlags.tickInterval"
 
-          ,structSize   C "StgFunInfoExtraFwd"
           ,structField  C "StgFunInfoExtraFwd" "slow_apply"
           ,structField  C "StgFunInfoExtraFwd" "fun_type"
           ,structFieldH Both "StgFunInfoExtraFwd" "arity"
@@ -652,11 +616,9 @@ wanteds os = concat
           ,structField_ C    "StgFunInfoExtraRev_bitmap_offset" "StgFunInfoExtraRev" "b.bitmap_offset"
 
           ,structField C "StgLargeBitmap" "size"
-          ,fieldOffset C "StgLargeBitmap" "bitmap"
 
           ,structSize  C "snEntry"
           ,structField C "snEntry" "sn_obj"
-          ,structField C "snEntry" "addr"
 
           ,structSize  C "spEntry"
           ,structField C "spEntry" "addr"
@@ -672,51 +634,15 @@ wanteds os = concat
            else []
 
            -- struct HsIface
-          ,structField C "HsIface" "processRemoteCompletion_closure"
-          ,structField C "HsIface" "runIO_closure"
-          ,structField C "HsIface" "runNonIO_closure"
           ,structField C "HsIface" "Z0T_closure"
           ,structField C "HsIface" "True_closure"
           ,structField C "HsIface" "False_closure"
-          ,structField C "HsIface" "unpackCString_closure"
-          ,structField C "HsIface" "runFinalizzerBatch_closure"
-          ,structField C "HsIface" "stackOverflow_closure"
           ,structField C "HsIface" "heapOverflow_closure"
-          ,structField C "HsIface" "allocationLimitExceeded_closure"
-          ,structField C "HsIface" "blockedIndefinitelyOnMVar_closure"
-          ,structField C "HsIface" "blockedIndefinitelyOnSTM_closure"
           ,structField C "HsIface" "cannotCompactFunction_closure"
           ,structField C "HsIface" "cannotCompactPinned_closure"
           ,structField C "HsIface" "cannotCompactMutable_closure"
-          ,structField C "HsIface" "nonTermination_closure"
           ,structField C "HsIface" "nestedAtomically_closure"
           ,structField C "HsIface" "noMatchingContinuationPrompt_closure"
-          ,structField C "HsIface" "blockedOnBadFD_closure"
-          ,structField C "HsIface" "runSparks_closure"
-          ,structField C "HsIface" "ensureIOManagerIsRunning_closure"
-          ,structField C "HsIface" "interruptIOManager_closure"
-          ,structField C "HsIface" "ioManagerCapabilitiesChanged_closure"
-          ,structField C "HsIface" "runHandlersPtr_closure"
-          ,structField C "HsIface" "flushStdHandles_closure"
-          ,structField C "HsIface" "runMainIO_closure"
-          ,structField C "HsIface" "Czh_con_info"
-          ,structField C "HsIface" "Izh_con_info"
-          ,structField C "HsIface" "Fzh_con_info"
-          ,structField C "HsIface" "Dzh_con_info"
-          ,structField C "HsIface" "Wzh_con_info"
-          ,structField C "HsIface" "runAllocationLimitHandler_closure"
-          ,structField C "HsIface" "Ptr_con_info"
-          ,structField C "HsIface" "FunPtr_con_info"
-          ,structField C "HsIface" "I8zh_con_info"
-          ,structField C "HsIface" "I16zh_con_info"
-          ,structField C "HsIface" "I32zh_con_info"
-          ,structField C "HsIface" "I64zh_con_info"
-          ,structField C "HsIface" "W8zh_con_info"
-          ,structField C "HsIface" "W16zh_con_info"
-          ,structField C "HsIface" "W32zh_con_info"
-          ,structField C "HsIface" "W64zh_con_info"
-          ,structField C "HsIface" "StablePtr_con_info"
-          ,structField C "HsIface" "StackSnapshot_closure"
           ,structField C "HsIface" "divZZeroException_closure"
           ,structField C "HsIface" "underflowException_closure"
           ,structField C "HsIface" "overflowException_closure"
