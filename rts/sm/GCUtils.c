@@ -348,6 +348,7 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
         } else {
             if (gct->free_blocks) {
                 bd = gct->free_blocks;
+                __ghc_asan_unpoison_memory_region(bd->start, (W_)bd->blocks * BLOCK_SIZE);
                 gct->free_blocks = bd->link;
             } else {
                 // We allocate in chunks of at most 16 blocks, use one
@@ -357,6 +358,9 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
                 StgWord n_blocks = stg_min(chunk_size, 1 << (MBLOCK_SHIFT - BLOCK_SHIFT - 1));
                 allocBlocks_sync(n_blocks, &bd);
                 gct->free_blocks = bd->link;
+                for (bdescr *bd = gct->free_blocks; bd; bd = bd->link) {
+                    __ghc_asan_poison_memory_region(bd->start, (W_)bd->blocks * BLOCK_SIZE);
+                }
             }
         }
         initBdescr(bd, ws->gen, ws->gen->to);
