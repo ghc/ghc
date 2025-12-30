@@ -1242,6 +1242,10 @@ start_new_pinned_block(Capability *cap)
         ACQUIRE_SM_LOCK;
         bd = allocNursery(cap->node, NULL, PINNED_EMPTY_SIZE);
         RELEASE_SM_LOCK;
+
+        for (bdescr *pbd = bd; pbd; pbd = pbd->link) {
+            __ghc_asan_poison_memory_region(pbd->start, (W_)pbd->blocks * BLOCK_SIZE);
+        }
     }
 
     // Bump up the nursery pointer to avoid the pathological situation
@@ -1267,6 +1271,7 @@ start_new_pinned_block(Capability *cap)
     }
 
     cap->pinned_object_empty = bd->link;
+    __ghc_asan_unpoison_memory_region(bd->start, (W_)bd->blocks * BLOCK_SIZE);
     newNurseryBlock(bd);
     if (bd->link != NULL) {
       bd->link->u.back = cap->pinned_object_empty;
