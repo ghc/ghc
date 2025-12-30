@@ -1250,7 +1250,7 @@ alpine_x86 =
   , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) staticNativeInt)))
     -- Dynamically linked build, suitable for building your own static executables on alpine
   , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine323) (splitSectionsBroken vanilla))
-  , allowFailureGroup (standardBuildsWithConfig I386 (Linux Alpine323) (splitSectionsBroken vanilla))
+  , standardBuildsWithConfig I386 (Linux Alpine323) (splitSectionsBroken vanilla)
   ]
   where
     -- ghcilink002 broken due to #17869
