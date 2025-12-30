@@ -1,31 +1,16 @@
 module Settings.Flavours.Validate (validateFlavour, slowValidateFlavour,
                                     quickValidateFlavour) where
 
-import qualified Data.Set as Set
 
 import Expression
 import Flavour
-import Oracles.Flag
 import {-# SOURCE #-} Settings.Default
 
 -- Please update doc/flavours.md when changing this file.
 validateFlavour :: Flavour
-validateFlavour = enableLinting $ werror $ defaultFlavour
+validateFlavour = enableLinting $ quickValidateFlavour
     { name = "validate"
     , extraArgs = validateArgs <> defaultHaddockExtraArgs
-    , libraryWays = Set.fromList <$>
-                    mconcat [ pure [vanilla]
-                            , notStage0 ? platformSupportsSharedLibs ? pure [dynamic]
-                            ]
-    , rtsWays = Set.fromList <$>
-                mconcat [ pure [vanilla, debug]
-                        , targetSupportsThreadedRts ? pure [threaded, threadedDebug]
-                        , notStage0 ? platformSupportsSharedLibs ? pure
-                            [ dynamic, debugDynamic
-                            ]
-                        , notStage0 ? platformSupportsSharedLibs ? targetSupportsThreadedRts ? pure
-                            [ threadedDynamic, threadedDebugDynamic ]
-                        ]
     , ghcDebugAssertions = (<= Stage1)
     }
 
@@ -59,6 +44,6 @@ quickValidateArgs = sourceArgs SourceArgs
     }
 
 quickValidateFlavour :: Flavour
-quickValidateFlavour = werror $ validateFlavour
+quickValidateFlavour = werror $ disableProfiledLibs $ defaultFlavour
     { name               = "quick-validate"
     , extraArgs               = quickValidateArgs }
