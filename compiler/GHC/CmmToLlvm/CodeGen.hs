@@ -248,6 +248,14 @@ Since x86 PDep/PExt instructions only exist for 32/64 bit widths
 we use the 32bit variant to compute the 8/16bit primops.
 To do so we extend/truncate the argument/result around the
 call.
+
+Note that the 64-bit intrinsics (`llvm.x86.bmi.pdep.64` and
+`llvm.x86.bmi.pext.64`) are only legal on 64-bit x86 targets, not on
+i386. Therefore on i386 we must fall back to the runtime helper
+(`hs_pdep64`/`hs_pext64`) for the 64-bit primops.
+
+See https://github.com/llvm/llvm-project/issues/172857 for upstream
+discussion about portable pdep/pext intrinsics.
 -}
 genCall (PrimTarget op@(MO_Pdep w)) [dst] args = do
     cfg <- getConfig
@@ -970,36 +978,34 @@ cmmPrimOpFunctions mop = do
           W8   -> fsLit "llvm.x86.bmi.pdep.32"
           W16  -> fsLit "llvm.x86.bmi.pdep.32"
           W32  -> fsLit "llvm.x86.bmi.pdep.32"
-          W64  -> fsLit "llvm.x86.bmi.pdep.64"
-          W128 -> fsLit "llvm.x86.bmi.pdep.128"
-          W256 -> fsLit "llvm.x86.bmi.pdep.256"
-          W512 -> fsLit "llvm.x86.bmi.pdep.512"
+          W64
+            | is32bit   -> fsLit "hs_pdep64"
+            | otherwise -> fsLit "llvm.x86.bmi.pdep.64"
+          -- LLVM only provides x86 PDep/PExt intrinsics for 32/64 bits
+          _ -> unsupported
       | otherwise -> case w of
           W8   -> fsLit "hs_pdep8"
           W16  -> fsLit "hs_pdep16"
           W32  -> fsLit "hs_pdep32"
           W64  -> fsLit "hs_pdep64"
-          W128 -> fsLit "hs_pdep128"
-          W256 -> fsLit "hs_pdep256"
-          W512 -> fsLit "hs_pdep512"
+          _ -> unsupported
     MO_Pext w
       | isBmi2Enabled -> case w of
           -- See Note [LLVM PDep/PExt intrinsics]
           W8   -> fsLit "llvm.x86.bmi.pext.32"
           W16  -> fsLit "llvm.x86.bmi.pext.32"
           W32  -> fsLit "llvm.x86.bmi.pext.32"
-          W64  -> fsLit "llvm.x86.bmi.pext.64"
-          W128 -> fsLit "llvm.x86.bmi.pext.128"
-          W256 -> fsLit "llvm.x86.bmi.pext.256"
-          W512 -> fsLit "llvm.x86.bmi.pext.512"
+          W64
+            | is32bit   -> fsLit "hs_pext64"
+            | otherwise -> fsLit "llvm.x86.bmi.pext.64"
+          -- LLVM only provides x86 PDep/PExt intrinsics for 32/64 bits
+          _ -> unsupported
       | otherwise -> case w of
           W8   -> fsLit "hs_pext8"
           W16  -> fsLit "hs_pext16"
           W32  -> fsLit "hs_pext32"
           W64  -> fsLit "hs_pext64"
-          W128 -> fsLit "hs_pext128"
-          W256 -> fsLit "hs_pext256"
-          W512 -> fsLit "hs_pext512"
+          _ -> unsupported
 
     MO_AddIntC w    -> case w of
       W8   -> fsLit "llvm.sadd.with.overflow.i8"
