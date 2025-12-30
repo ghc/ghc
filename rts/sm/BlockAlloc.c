@@ -261,6 +261,8 @@ initGroup(bdescr *head)
       head[i].flags = 0;
   }
 #endif
+
+  __ghc_asan_unpoison_memory_region(head->start, (W_)head->blocks * BLOCK_SIZE);
 }
 
 #if SIZEOF_VOID_P == SIZEOF_LONG
@@ -1051,6 +1053,8 @@ freeGroup(bdescr *p)
 
   setup_tail(p);
   free_list_insert(node,p);
+
+  __ghc_asan_poison_memory_region(p->start, (W_)p->blocks * BLOCK_SIZE);
 
   IF_DEBUG(sanity, checkFreeListSanity());
 }
