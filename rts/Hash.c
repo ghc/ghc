@@ -283,6 +283,7 @@ allocHashList (HashTable *table)
     if (table->freeList != NULL) {
         HashList *hl = table->freeList;
         table->freeList = hl->next;
+        __ghc_asan_unpoison_memory_region(hl, offsetof(HashList, next));
         return hl;
     } else {
         /* We allocate one block of memory which contains:
@@ -302,8 +303,11 @@ allocHashList (HashTable *table)
 
         table->freeList = hl + 1;
         HashList *p = table->freeList;
-        for (; p < hl + HCHUNK - 1; p++)
+        for (; p < hl + HCHUNK - 1; p++) {
+            __ghc_asan_poison_memory_region(p, offsetof(HashList, next));
             p->next = p + 1;
+        }
+        __ghc_asan_poison_memory_region(p, offsetof(HashList, next));
         p->next = NULL;
         return hl;
     }
@@ -318,6 +322,7 @@ freeHashList (HashTable *table, HashList *hl)
     // HashListChunks.
     hl->next = table->freeList;
     table->freeList = hl;
+    __ghc_asan_poison_memory_region(hl, offsetof(HashList, next));
 }
 
 STATIC_INLINE void
@@ -388,9 +393,10 @@ removeHashTable_inlined(HashTable *table, StgWord key, const void *data,
                 table->dir[segment][index] = hl->next;
             else
                 prev->next = hl->next;
+            void *hl_data = (void*)hl->data;
             freeHashList(table,hl);
             table->kcount--;
-            return (void *) hl->data;
+            return hl_data;
         }
         prev = hl;
     }
