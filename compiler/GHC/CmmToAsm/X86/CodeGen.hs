@@ -1089,6 +1089,10 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
         | otherwise -> vector_int64_abs_sse2 l w x
       MO_VS_Abs {} -> pprPanic "Unsupported integer vector operation for: " (pdoc platform x)
 
+      MO_VF_Sqrt l w
+        | avx -> vector_float_sqrt_avx l w x
+        | otherwise -> vector_float_sqrt l w x
+
       MO_VF_Broadcast l w
         | avx
         -> vector_float_broadcast_avx l w x
@@ -1247,8 +1251,6 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                          (XOR  fmt (OpReg maskReg) (OpReg dst))
           return (Any fmt code)
 
-        -----------------------
-
         vector_float_abs :: Length -> Width -> CmmExpr -> NatM Register
         vector_float_abs len w expr = do
           exp <- getAnyReg expr
@@ -1335,6 +1337,24 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                 PSRA i32Fmt (OpImm $ ImmInt 31) maskReg `snocOL` -- maskReg <- if sign bit = 1 then -1 else 0
                 PXOR fmt (OpReg maskReg) dst `snocOL`            -- dst <- if maskReg then ~dst else dst
                 PSUB fmt (OpReg maskReg) dst                     -- dst <- dst - maskReg
+
+          return (Any fmt code)
+
+        vector_float_sqrt_avx :: Length -> Width -> CmmExpr -> NatM Register
+        vector_float_sqrt_avx len w expr = do
+          (reg, exp) <- getSomeReg expr
+
+          let fmt = VecFormat len (floatScalarFormat w)
+              code dst = exp `snocOL` VSQRT fmt (OpReg reg) dst
+
+          return (Any fmt code)
+
+        vector_float_sqrt :: Length -> Width -> CmmExpr -> NatM Register
+        vector_float_sqrt len w expr = do
+          (reg, exp) <- getSomeReg expr
+
+          let fmt = VecFormat len (floatScalarFormat w)
+              code dst = exp `snocOL` SQRT fmt (OpReg reg) dst
 
           return (Any fmt code)
 
@@ -1639,6 +1659,7 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_VF_Neg {} -> incorrectOperands
       MO_VS_Abs {} -> incorrectOperands
       MO_VF_Abs {} -> incorrectOperands
+      MO_VF_Sqrt {} -> incorrectOperands
       MO_V_Broadcast {} -> incorrectOperands
       MO_VF_Broadcast {} -> incorrectOperands
 

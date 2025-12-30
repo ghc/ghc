@@ -344,6 +344,7 @@ data Instr
         -- Absolute value and square root
         | PABS       Format Operand Reg -- SSE2
         | VPABS      Format Operand Reg -- AVX512F Int64
+        | VSQRT      Format Operand Reg -- AVX
 
         -- SIMD compare
         | PCMPGT     Format Operand Reg
@@ -611,6 +612,7 @@ regUsageOfInstr platform instr
     PMULUDQ      fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PABS         fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
     VPABS        fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
+    VSQRT        fmt src dst   -> mkRU (use_R fmt src []) [mk fmt dst]
 
     PCMPGT       fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
@@ -926,6 +928,7 @@ patchRegsOfInstr platform instr env
     PMULUDQ    fmt src dst   -> PMULUDQ fmt (patchOp src) (env dst)
     PABS       fmt src dst   -> PABS fmt (patchOp src) (env dst)
     VPABS      fmt src dst   -> VPABS fmt (patchOp src) (env dst)
+    VSQRT      fmt src dst   -> VSQRT fmt (patchOp src) (env dst)
 
     PCMPGT     fmt src dst   -> PCMPGT fmt (patchOp src) (env dst)
 

@@ -4273,6 +4273,11 @@ primop VecAbsOp "abs#" GenPrimOp
    { Element-wise absolute value. }
    with vector = SIGNED_VECTOR_TYPES
 
+primop VecSqrtOp "sqrt#" GenPrimOp
+   VECTOR -> VECTOR
+   { Element-wise square root. }
+   with vector = FLOAT_VECTOR_TYPES
+
 primop VecIndexByteArrayOp "indexArray#" GenPrimOp
    ByteArray# -> Int# -> VECTOR
    { Read a vector from the specified index of an immutable array.

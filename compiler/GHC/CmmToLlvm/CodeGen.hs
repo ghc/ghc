@@ -1527,12 +1527,17 @@ genMachOp _ op [x] = case op of
     MO_VS_Abs len w ->
       let elemTy = widthToLlvmInt w
           vecTy = LMVector len elemTy -- Should be the same type as `x`
-      in absVec vecTy "abs" [mkIntLit i1 1]
+      in intrinsCallVec vecTy "abs" [mkIntLit i1 1]
 
     MO_VF_Abs len w ->
       let elemTy = widthToLlvmFloat w
           vecTy = LMVector len elemTy -- Should be the same type as `x`
-      in absVec vecTy "fabs" []
+      in intrinsCallVec vecTy "fabs" []
+
+    MO_VF_Sqrt len w ->
+      let elemTy = widthToLlvmFloat w
+          vecTy = LMVector len elemTy -- Should be the same type as `x`
+      in intrinsCallVec vecTy "sqrt" []
 
     MO_V_Broadcast  l w -> genBroadcastOp l w x
     MO_VF_Broadcast l w -> genBroadcastOp l w x
@@ -1633,7 +1638,7 @@ genMachOp _ op [x] = case op of
             (v1, s1) <- doExpr ty $ LlvmOp negOp v2 vx'
             return (v1, stmts1 `appOL` stmts2 `snocOL` s1, top)
 
-        absVec vecTy intrins extraArgs = do
+        intrinsCallVec vecTy intrins extraArgs = do
           (xVar, stmts, top) <- exprToVar x
 
           let intrinsName = "llvm." ++ intrins ++ "." ++ ppLlvmTypeShort vecTy
@@ -1644,7 +1649,6 @@ genMachOp _ op [x] = case op of
           (resVar, stmt') <- doExpr vecTy $ Call StdCall funPtr intrinsParams [ReadNone, NoUnwind]
 
           return (resVar, stmts `snocOL` stmt', top ++ top')
-
 
         fiConv ty convOp = do
             (vx, stmts, top) <- exprToVar x
@@ -1835,6 +1839,8 @@ genMachOp_slow opt op [x, y] = case op of
 
     MO_VF_Abs {} -> panicOp
     MO_VS_Abs {} -> panicOp
+
+    MO_VF_Sqrt {} -> panicOp
 
     -- Min/max
     MO_F_Min  {} -> genMinMaxOp "minnum" x y

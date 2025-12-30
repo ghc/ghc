@@ -4,6 +4,8 @@
 
 - New and/or/xor SIMD primops for bitwise logical operations, such as andDoubleX4#, orWord32X4#, xorInt8X16#, etc.
   These are supported by the LLVM backend and by the X86_64 NCG backend (for the latter, only for 128-wide vectors).
+- New abs/sqrt SIM primops for absolute value and square root, such as absInt32X4#, sqrtDoubleX4#, etc. These are
+  supported by the LLVM backend and the X86_64 NCG backend (for the latter, only for 128-wide vectors).
 
 ## ghc-experimental-9.1402.0
 

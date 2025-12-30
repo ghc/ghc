@@ -6017,7 +6017,13 @@ module GHC.PrimOps where
   sortWith :: forall b a. GHC.Internal.Classes.Ord b => (a -> b) -> [a] -> [a]
   spark# :: forall a d. a -> State# d -> (# State# d, a #)
   sqrtDouble# :: Double# -> Double#
+  sqrtDoubleX2# :: DoubleX2# -> DoubleX2#
+  sqrtDoubleX4# :: DoubleX4# -> DoubleX4#
+  sqrtDoubleX8# :: DoubleX8# -> DoubleX8#
   sqrtFloat# :: Float# -> Float#
+  sqrtFloatX16# :: FloatX16# -> FloatX16#
+  sqrtFloatX4# :: FloatX4# -> FloatX4#
+  sqrtFloatX8# :: FloatX8# -> FloatX8#
   stableNameToInt# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). StableName# a -> Int#
   subInt16# :: Int16# -> Int16# -> Int16#
   subInt32# :: Int32# -> Int32# -> Int32#

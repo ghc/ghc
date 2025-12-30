@@ -185,6 +185,7 @@ data MachOp
   | MO_VF_Sub  Length Width
   | MO_VF_Neg  Length Width      -- unary negation
   | MO_VF_Abs  Length Width      -- absolute value
+  | MO_VF_Sqrt Length Width      -- square root
   | MO_VF_Mul  Length Width
   | MO_VF_Quot Length Width
 
@@ -544,6 +545,7 @@ machOpResultType platform mop tys =
     MO_VF_Quot l w      -> cmmVec l (cmmFloat w)
     MO_VF_Neg  l w      -> cmmVec l (cmmFloat w)
     MO_VF_Abs  l w      -> cmmVec l (cmmFloat w)
+    MO_VF_Sqrt l w      -> cmmVec l (cmmFloat w)
     MO_VF_Min  l w      -> cmmVec l (cmmFloat w)
     MO_VF_Max  l w      -> cmmVec l (cmmFloat w)
 
@@ -653,6 +655,7 @@ machOpArgReps platform op =
     MO_VF_Quot l w      -> [vecwidth l w, vecwidth l w]
     MO_VF_Neg  l w      -> [vecwidth l w]
     MO_VF_Abs  l w      -> [vecwidth l w]
+    MO_VF_Sqrt l w      -> [vecwidth l w]
     MO_VF_Min  l w      -> [vecwidth l w, vecwidth l w]
     MO_VF_Max  l w      -> [vecwidth l w, vecwidth l w]
 

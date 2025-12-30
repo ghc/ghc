@@ -361,7 +361,7 @@ import GHC.Prim hiding
   , xorWord8X16#
   , xorWord8X32#
   , xorWord8X64#
-  -- Don't re-export vector absolute value
+  -- Don't re-export vector square root and absolute value
   , absInt8X16#
   , absInt16X8#
   , absInt32X4#
@@ -380,6 +380,12 @@ import GHC.Prim hiding
   , absDoubleX4#
   , absFloatX16#
   , absDoubleX8#
+  , sqrtFloatX4#
+  , sqrtDoubleX2#
+  , sqrtFloatX8#
+  , sqrtDoubleX4#
+  , sqrtFloatX16#
+  , sqrtDoubleX8#
   )
 
 import GHC.Prim.Ext

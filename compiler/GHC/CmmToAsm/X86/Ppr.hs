@@ -1018,6 +1018,7 @@ pprInstr platform i = case i of
      -> pprOpReg (text "pmuludq") format src dst
    PABS format src dst -> pprFormatOpReg (text "pabs") format src dst
    VPABS format src dst -> pprFormatOpReg (text "vpabs") format src dst
+   VSQRT format src dst -> pprFormatOpReg (text "vsqrt") format src dst
    PCMPGT format src dst
      -> pprFormatOpReg (text "pcmpgt") format src dst
    VBROADCAST format@(VecFormat _ sFmt) from to

@@ -832,6 +832,7 @@ getRegister' config plat expr
         MO_VS_Neg {} -> notUnary
         MO_VF_Abs {} -> vectorsNeedLlvm
         MO_VS_Abs {} -> vectorsNeedLlvm
+        MO_VF_Sqrt {} -> vectorsNeedLlvm
         MO_V_Shuffle {} -> notUnary
         MO_VF_Shuffle  {} -> notUnary
         MO_VF_Insert {} -> notUnary
@@ -1232,6 +1233,7 @@ getRegister' config plat expr
         MO_VS_Neg {} -> vectorsNeedLlvm
         MO_VF_Abs {} -> vectorsNeedLlvm
         MO_VS_Abs {} -> vectorsNeedLlvm
+        MO_VF_Sqrt {} -> vectorsNeedLlvm
         MO_VF_Extract {} -> vectorsNeedLlvm
         MO_VF_Add {} -> vectorsNeedLlvm
         MO_VF_Sub {} -> vectorsNeedLlvm

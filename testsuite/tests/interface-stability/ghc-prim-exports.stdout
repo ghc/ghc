@@ -2627,7 +2627,13 @@ module GHC.Prim where
   sizeofSmallMutableArray# :: forall {l :: GHC.Internal.Types.Levity} d (a :: TYPE (GHC.Internal.Types.BoxedRep l)). SmallMutableArray# d a -> Int#
   spark# :: forall a d. a -> State# d -> (# State# d, a #)
   sqrtDouble# :: Double# -> Double#
+  sqrtDoubleX2# :: DoubleX2# -> DoubleX2#
+  sqrtDoubleX4# :: DoubleX4# -> DoubleX4#
+  sqrtDoubleX8# :: DoubleX8# -> DoubleX8#
   sqrtFloat# :: Float# -> Float#
+  sqrtFloatX16# :: FloatX16# -> FloatX16#
+  sqrtFloatX4# :: FloatX4# -> FloatX4#
+  sqrtFloatX8# :: FloatX8# -> FloatX8#
   stableNameToInt# :: forall {l :: GHC.Internal.Types.Levity} (a :: TYPE (GHC.Internal.Types.BoxedRep l)). StableName# a -> Int#
   subInt16# :: Int16# -> Int16# -> Int16#
   subInt32# :: Int32# -> Int32# -> Int32#

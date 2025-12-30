@@ -1568,6 +1568,7 @@ emitPrimOp cfg primop =
   (VecRemOp  FloatVec _ _) -> \_ -> panic "unsupported primop"
   (VecNegOp  FloatVec n w) -> opTranslate (MO_VF_Neg  n w)
   (VecAbsOp  FloatVec n w) -> opTranslate (MO_VF_Abs  n w)
+  (VecSqrtOp FloatVec n w) -> opTranslate (MO_VF_Sqrt n w)
   (VecMinOp  FloatVec n w) -> opTranslate (MO_VF_Min  n w)
   (VecMaxOp  FloatVec n w) -> opTranslate (MO_VF_Max  n w)
 
@@ -1579,6 +1580,7 @@ emitPrimOp cfg primop =
   (VecRemOp  IntVec n w) -> opCallish (MO_VS_Rem n w)
   (VecNegOp  IntVec n w) -> opTranslate (MO_VS_Neg  n w)
   (VecAbsOp  IntVec n w) -> opTranslate (MO_VS_Abs  n w)
+  (VecSqrtOp IntVec _ _) -> \_ -> panic "unsupported primop"
   (VecMinOp  IntVec 2 W64)
     | not allowIntWord64X2MinMax -> opCallish MO_I64X2_Min
   (VecMinOp  IntVec n w) -> opTranslate (MO_VS_Min  n w)
@@ -1594,6 +1596,7 @@ emitPrimOp cfg primop =
   (VecRemOp  WordVec n w) -> opCallish (MO_VU_Rem n w)
   (VecNegOp  WordVec _ _) -> \_ -> panic "unsupported primop"
   (VecAbsOp  WordVec _ _) -> \_ -> panic "unsupported primop"
+  (VecSqrtOp WordVec _ _) -> \_ -> panic "unsupported primop"
   (VecMinOp  WordVec 2 W64)
     | not allowIntWord64X2MinMax -> opCallish MO_W64X2_Min
   (VecMinOp  WordVec n w) -> opTranslate (MO_VU_Min  n w)
