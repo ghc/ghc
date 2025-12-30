@@ -126,6 +126,12 @@ gmpRules = do
                 interpretInContext ctx $
                 mconcat
                     [ getStagedCCFlags
+                    -- gmp fails to configure with newer compilers
+                    -- that default to c23:
+                    -- https://gmplib.org/list-archives/gmp-devel/2025-January/006279.html.
+                    -- for now just manually specify -std=gnu11 until
+                    -- next upstream release.
+                    , arg "-std=gnu11"
                     -- gmp symbols are only used by bignum logic in
                     -- ghc-internal and shouldn't be exported by the
                     -- ghc-internal shared library.
