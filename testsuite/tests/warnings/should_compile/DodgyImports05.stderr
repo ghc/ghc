@@ -1,0 +1,5 @@
+DodgyImports05.hs:6:19: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘Bool(False, type ..)’ suggests that
+    ‘GHC.Internal.Types.Bool’ has associated types,
+    but it is not a class
+

@@ -258,6 +258,8 @@ data IEThingWithExt pass =
     ietw_warning   :: Maybe (LWarningTxt pass),
       -- ^ Export deprecation annotation. Always 'Nothing' for import lists,
       -- since export deprecation can only be used in exports.
+    ietw_ns_spec  :: NamespaceSpecifier,
+      -- ^ See #26678 "NamespaceSpecifier in extension fields"
     ietw_tok_lpar  :: EpToken "(",
     ietw_tok_wc    :: EpToken "..",
     ietw_tok_comma :: EpToken ",",
@@ -376,7 +378,7 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
                       , Just $ ppr (unLoc thing) <> parens (ppr (ieta_ns_spec x) <+> text "..")
                       , exportDocstring <$> doc
                       ]
-    ppr ie@(IEThingWith _ thing wc withs doc) =
+    ppr ie@(IEThingWith x thing wc withs doc) =
       sep $ catMaybes [ ppr <$> ieDeprecation ie
                       , Just $ ppr (unLoc thing) <> parens (fsep (punctuate comma ppWiths))
                       , exportDocstring <$> doc
@@ -388,7 +390,7 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
                 map (ppr . unLoc) withs
               IEWildcard pos ->
                 let (bs, as) = splitAt pos (map (ppr . unLoc) withs)
-                in bs ++ [text ".."] ++ as
+                in bs ++ [ppr (ietw_ns_spec x) <+> text ".."] ++ as
     ppr ie@(IEModuleContents _ mod')
         = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "module" <+> ppr mod']
     ppr (IEWholeNamespace x)      = ppr (iewn_ns_spec x) <+> text ".."

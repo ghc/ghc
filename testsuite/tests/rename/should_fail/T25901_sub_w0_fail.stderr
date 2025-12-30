@@ -1,0 +1,10 @@
+T25901_sub_w0_fail.hs:3:34: error: [GHC-04611]
+    • Unsupported use of keyword ‘data’
+    • A namespace-specified wildcard may not appear alongside
+      other wildcards in a list of children.
+
+T25901_sub_w0_fail.hs:5:25: error: [GHC-04611]
+    • Unsupported use of keyword ‘type’
+    • A namespace-specified wildcard may not appear alongside
+      other wildcards in a list of children.
+

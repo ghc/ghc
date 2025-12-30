@@ -293,15 +293,15 @@
        (EpaComments
         []))
       (IEThingWith
-       ((,)
+       (IEThingWithExt
         (Nothing)
-        ((,,,)
-         (EpTok
-          (EpaSpan { T14189.hs:3:10 }))
-         (NoEpTok)
-         (NoEpTok)
-         (EpTok
-          (EpaSpan { T14189.hs:3:15 }))))
+        (NoNamespaceSpecifier)
+        (EpTok
+         (EpaSpan { T14189.hs:3:10 }))
+        (NoEpTok)
+        (NoEpTok)
+        (EpTok
+         (EpaSpan { T14189.hs:3:15 })))
        (L
         (EpAnn
          (EpaSpan { T14189.hs:3:3-8 })

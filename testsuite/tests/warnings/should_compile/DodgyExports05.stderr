@@ -1,0 +1,5 @@
+DodgyExports05.hs:4:5: warning: [GHC-75356] [-Wdodgy-exports (in -Wextra)]
+    The export item ‘Bool(False, type ..)’ suggests that
+    ‘Bool’ has associated types,
+    but it is not a class
+
