@@ -1370,13 +1370,28 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                          , maybeToList $ mk_depr_export_warning gre)
 
         IEThingWith x ltc@(L l rdr_tc) wc rdr_ns _ -> do
-           ImpOccItem { imp_item = gre, imp_bundled = subnames }
+           ImpOccItem { imp_item      = gre
+                      , imp_bundled   = bundled_gres
+                      , imp_is_parent = is_par
+                      }
                <- lookup_parent (IEThingAbs Nothing ltc noDocstring) (ieWrappedName rdr_tc)
-           let name = greName gre
+           let name     = greName gre
+               ns_spec  = ietw_ns_spec x
+               has_wc   = case wc of
+                 NoIEWildcard -> False
+                 IEWildcard{} -> True
+
+               child_gres, wc_gres :: [GlobalRdrElt]
+               child_gres
+                 | is_par    = filterByNamespaceGREs ns_spec bundled_gres
+                 | otherwise = []
+               wc_gres
+                 | has_wc    = child_gres
+                 | otherwise = []
 
            -- Look up the children in the sub-names of the parent
            -- See Note [Importing DuplicateRecordFields]
-           let (children_errs, childnames) = lookupChildren subnames rdr_ns
+           let (children_errs, childnames) = lookupChildren bundled_gres rdr_ns
 
            bad_import_warns <-
              if null children_errs then return [] else
@@ -1391,17 +1406,22 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
            let name' = replaceWrappedName rdr_tc name
                childnames' = map (to_ie_post_rn . fmap greName) childnames
-               gres = gre : map unLoc childnames
+               explicit_gres = gre : map unLoc childnames
+               imp_list_wc_warn
+                 | not has_wc              = []
+                 | null child_gres         = [DodgyImport (DodgyImportsEmptyParent ie ns_spec gre)]
+                 | not (is_qual decl_spec) = [MissingImportList]
+                 | otherwise               = []
                export_depr_warns
-                 | want_hiding == Exactly = mapMaybe mk_depr_export_warning gres
+                 | want_hiding == Exactly = mapMaybe mk_depr_export_warning explicit_gres
                  | otherwise              = []
                renamed_ie = IEThingWith (x { ietw_warning = Nothing })
                                         (L l name')
                                         wc
                                         childnames'
                                         noDocstring
-           return ( [(renamed_ie, gres)]
-                  , bad_import_warns ++ export_depr_warns)
+           return ( [(renamed_ie, explicit_gres ++ wc_gres)]
+                  , bad_import_warns ++ imp_list_wc_warn ++ export_depr_warns)
 
         IEWholeNamespace x -> do
           let ns_spec    = iewn_ns_spec x
@@ -2316,7 +2336,7 @@ getMinimalImports ie_decls
           | otherwise
           -> do { let ns_gres = map (expectJust . lookupGRE_Name rdr_env) cs
                       ns = map greName ns_gres
-                      x = IEThingWithExt Nothing noAnn noAnn noAnn noAnn
+                      x = IEThingWithExt Nothing NoNamespaceSpecifier noAnn noAnn noAnn noAnn
                 ; return [IEThingWith x (to_ie_post_rn $ noLocA n) NoIEWildcard
                                  (map (to_ie_post_rn . noLocA) (filter (/= n) ns)) Nothing] }
                                        -- Note [Overloaded field import]
@@ -2325,7 +2345,7 @@ getMinimalImports ie_decls
                       (ns_gres,fs_gres) = classifyGREs infos
                       ns = map greName (ns_gres ++ fs_gres)
                       fs = map fieldGREInfo fs_gres
-                      x = IEThingWithExt Nothing noAnn noAnn noAnn noAnn
+                      x = IEThingWithExt Nothing NoNamespaceSpecifier noAnn noAnn noAnn noAnn
                 ; return $
                   if all_non_overloaded fs
                   then map (\nm -> IEVar Nothing (to_ie_post_rn_var $ noLocA nm) Nothing) ns

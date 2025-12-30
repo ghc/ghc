@@ -256,3 +256,4 @@ test('T25901_exp_2', [extra_files(['T25901_exp_2_helper.hs'])], multimod_compile
 test('T25901_sub_e', normal, compile, [''])
 test('T25901_sub_f', normal, compile, ['-Wdodgy-exports -Wno-duplicate-exports'])
 test('T25901_sub_g', [extra_files(['T25901_sub_g_helper.hs'])], multimod_compile, ['T25901_sub_g', '-v0 -Wdodgy-imports'])
+test('T25901_sub_w2_ok', normal, compile, [''])

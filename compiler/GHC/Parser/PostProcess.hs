@@ -173,7 +173,7 @@ import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
 
 import Control.Monad
-import Text.ParserCombinators.ReadP as ReadP
+import Text.ParserCombinators.ReadP as ReadP hiding (count)
 import Data.Char
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 import Data.Kind       ( Type )
@@ -3272,28 +3272,31 @@ mkModuleImpExp ctx warning (top, tcp) (L l specname) subs = do
     ImpExpList xs -> do
       -- `xs` contains no wildcards (checked by mkImpExpSubSpec)
       newName <- nameT
-      let x = IEThingWithExt warning top NoEpTok NoEpTok tcp
+      let x = IEThingWithExt warning NoNamespaceSpecifier top NoEpTok NoEpTok tcp
       return $ IEThingWith x (L l newName) NoIEWildcard (wrapped xs) noExportDoc
     ImpExpAllWith xs -> do
       -- `xs` contains at least one wildcard (checked by mkImpExpSubSpec)
       let withs = map unLoc xs
           pos   = fromMaybe (panic "ImpExpAllWith with no wildcard") $  -- should've been ImpExpList
                   findIndex isImpExpQcWildcard withs
-          (m_kw,td,tc) = case withs !! pos of
-            ImpExpQcWildcard m_kw td tc -> (m_kw,td,tc)
+          m_kw  = asum (map getImpExpQcWcKw withs)
+          ns_spec = namespaceSpecifierFromKw m_kw
+          (td,tc) = case withs !! pos of
+            ImpExpQcWildcard _ td tc -> (td,tc)
             _ -> panic "mkModuleImpExp: item is not a wildcard"  -- shouldn't have matched isImpExpQcWildcard
           ies :: [LocatedA (IEWrappedName GhcPs)]
           ies   = wrapped $ filter (not . isImpExpQcWildcard . unLoc) xs
       newName <- nameT
       patSyns <- getBit PatternSynonymsBit
       if | Just kw <- m_kw ->
+             unless (count isImpExpQcWildcard withs == 1) $
              unsupportedExplicitNamespaceKeyword kw UnsupportedNameSpaceInIEThingWith
          | InImportList <- ctx ->
              addFatalError $ mkPlainErrorMsgEnvelope (locA l) PsErrIllegalImportBundleForm
          | not patSyns ->
              addError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrIllegalPatSynExport
          | otherwise -> return ()
-      let x = IEThingWithExt warning top td tc tcp
+      let x = IEThingWithExt warning ns_spec top td tc tcp
       return $ IEThingWith x (L l newName) (IEWildcard pos) ies noExportDoc
   where
     noExportDoc :: Maybe (LHsDoc GhcPs)
@@ -3414,6 +3417,10 @@ mkImpExpSubSpec xs =
 isImpExpQcWildcard :: ImpExpQcSpec -> Bool
 isImpExpQcWildcard ImpExpQcWildcard{} = True
 isImpExpQcWildcard _                  = False
+
+getImpExpQcWcKw :: ImpExpQcSpec -> Maybe ExplicitNamespaceKeyword
+getImpExpQcWcKw (ImpExpQcWildcard m_kw _ _) = m_kw
+getImpExpQcWcKw _ = Nothing
 
 -----------------------------------------------------------------------------
 -- Warnings and failures

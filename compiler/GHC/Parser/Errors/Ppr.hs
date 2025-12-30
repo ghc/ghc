@@ -279,8 +279,8 @@ instance Diagnostic PsMessage where
            [ text "Unsupported use of keyword" <+> quotes kw_doc
            , case pos of
                 UnsupportedNameSpaceInIEThingWith ->
-                     text "A namespace-specified wildcard may not appear alongside other items"
-                  $$ text "in a list of children." ]
+                     text "A namespace-specified wildcard may not appear alongside"
+                  $$ text "other wildcards in a list of children." ]
          where
            kw_doc = case kw of
              ExplicitTypeNamespace{} -> text "type"

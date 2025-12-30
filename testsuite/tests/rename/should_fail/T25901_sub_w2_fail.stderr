@@ -1,0 +1,7 @@
+T25901_sub_w2_fail.hs:9:8: error: [GHC-88464]
+    Data constructor not in scope: True :: Bool
+    Suggested fixes:
+      • Perhaps use variable ‘true’ (line 9)
+      • Add ‘True’ to the import list in the import of ‘Data.Bool’
+        (at T25901_sub_w2_fail.hs:6:1-39).
+

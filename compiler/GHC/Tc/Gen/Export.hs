@@ -648,7 +648,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                wc_kids <-
                  case wc of
                    NoIEWildcard -> return []
-                   IEWildcard _ -> lookup_ie_kids_all ie NoNamespaceSpecifier l par
+                   IEWildcard _ -> lookup_ie_kids_all ie (ietw_ns_spec x) l par
 
                let name = greName par
                    all_kids = with_kids ++ wc_kids

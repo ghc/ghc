@@ -262,4 +262,7 @@ test('T25901_sub_a', normal, compile_fail, [''])
 test('T25901_sub_b', normal, compile_fail, [''])
 test('T25901_sub_c', [extra_files(['T25901_sub_c_helper.hs'])], multimod_compile_fail, ['T25901_sub_c', '-v0'])
 test('T25901_sub_d', [extra_files(['T25901_sub_d_helper.hs'])], multimod_compile_fail, ['T25901_sub_d', '-v0'])
-test('T25901_sub_w', normal, compile_fail, [''])
+test('T25901_sub_w0_fail', normal, compile_fail, [''])
+test('T25901_sub_w2_fail', normal, compile_fail, [''])
+
+test('T25901_sub_w1', [extra_files(['T25901_sub_w1_helper.hs'])], multimod_compile_fail, ['T25901_sub_w1', '-v0'])
