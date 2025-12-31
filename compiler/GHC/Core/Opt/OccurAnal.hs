@@ -28,7 +28,7 @@ core expression with (hopefully) improved usage information.
 module GHC.Core.Opt.OccurAnal (
     occurAnalysePgm,
     occurAnalyseExpr,
-    zapLambdaBndrs, BinderSwapDecision(..), scrutOkForBinderSwap
+    zapLambdaBndrs
   ) where
 
 import GHC.Prelude hiding ( head, init, last, tail )
@@ -36,7 +36,7 @@ import GHC.Prelude hiding ( head, init, last, tail )
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
-                          mkCastMCo, mkTicks )
+                          mkCastMCo, mkTicks, BinderSwapDecision(..), scrutOkForBinderSwap )
 import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
 import GHC.Core.Type
@@ -3537,6 +3537,7 @@ doesn't use it. So this is only to satisfy the perhaps-over-picky Lint.
 -}
 
 addBndrSwap :: OutExpr -> Id -> OccEnv -> OccEnv
+-- See Note [Binder swap]
 -- See Note [The binder-swap substitution]
 addBndrSwap scrut case_bndr
             env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars })
@@ -3544,7 +3545,7 @@ addBndrSwap scrut case_bndr
   , scrut_var /= case_bndr
       -- Consider: case x of x { ... }
       -- Do not add [x :-> x] to occ_bs_env, else lookupBndrSwap will loop
-  = env { occ_bs_env = extendVarEnv swap_env scrut_var (case_bndr', mco)
+  = env { occ_bs_env = extendVarEnv swap_env scrut_var (case_bndr', mkSymMCo mco)
         , occ_bs_rng = rng_vars `extendVarSet` case_bndr'
                        `unionVarSet` tyCoVarsOfMCo mco }
 
@@ -3553,27 +3554,6 @@ addBndrSwap scrut case_bndr
   where
     case_bndr' = zapIdOccInfo case_bndr
                  -- See Note [Zap case binders in proxy bindings]
-
--- | See bBinderSwaOk.
-data BinderSwapDecision
-  = NoBinderSwap
-  | DoBinderSwap OutVar MCoercion
-
-scrutOkForBinderSwap :: OutExpr -> BinderSwapDecision
--- If (scrutOkForBinderSwap e = DoBinderSwap v mco, then
---    v = e |> mco
--- See Note [Case of cast]
--- See Historical Note [Care with binder-swap on dictionaries]
---
--- We use this same function in SpecConstr, and Simplify.Iteration,
--- when something binder-swap-like is happening
-scrutOkForBinderSwap e
-  = case e of
-      Tick _ e        -> scrutOkForBinderSwap e  -- Drop ticks
-      Var v           -> DoBinderSwap v MRefl
-      Cast (Var v) co -> DoBinderSwap v (MCo (mkSymCo co))
-                         -- Cast: see Note [Case of cast]
-      _               -> NoBinderSwap
 
 lookupBndrSwap :: OccEnv -> Id -> (CoreExpr, Id)
 -- See Note [The binder-swap substitution]

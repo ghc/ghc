@@ -19,6 +19,7 @@ module GHC.Core.Utils (
         mergeAlts, mergeCaseAlts, trimConArgs,
         filterAlts, combineIdenticalAlts, refineDefaultAlt,
         scaleAltsBy,
+        BinderSwapDecision(..), scrutOkForBinderSwap,
 
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType,
@@ -589,6 +590,28 @@ which allows only (Coercion co) on the RHS.
 The default alternative must be first, if it exists at all.
 This makes it easy to find, though it makes matching marginally harder.
 -}
+
+data BinderSwapDecision
+  = NoBinderSwap
+  | DoBinderSwap OutVar MCoercion
+
+scrutOkForBinderSwap :: OutExpr -> BinderSwapDecision
+-- If (scrutOkForBinderSwap e = DoBinderSwap v mco, then
+--    e = v |> mco
+-- See Note [Case of cast]
+-- See Historical Note [Care with binder-swap on dictionaries]
+--
+-- We use this same function in SpecConstr, and Simplify.Iteration,
+-- when something binder-swap-like is happening
+--
+-- See Note [Binder swap] in GHC.Core.Opt.OccurAnal
+scrutOkForBinderSwap e
+  = case e of
+      Tick _ e        -> scrutOkForBinderSwap e  -- Drop ticks
+      Var v           -> DoBinderSwap v MRefl
+      Cast (Var v) co -> DoBinderSwap v (MCo co)
+                         -- Cast: see Note [Case of cast]
+      _               -> NoBinderSwap
 
 -- | Extract the default case alternative
 findDefault :: [Alt b] -> ([Alt b], Maybe (Expr b))
