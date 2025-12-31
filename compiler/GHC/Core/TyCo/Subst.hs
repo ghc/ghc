@@ -960,7 +960,8 @@ substTyVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
     -- Assertion check that we are not capturing something in the substitution
 
     old_ki = tyVarKind old_var
-    no_kind_change = noFreeVarsOfType old_ki -- verify that kind is closed
+    no_kind_change = isEmptyTCvSubst subst || noFreeVarsOfType old_ki
+                     -- isEmptyTCvSubst: see Note [Keeping the substitution empty]
     no_change = no_kind_change && (new_var == old_var)
         -- no_change means that the new_var is identical in
         -- all respects to the old_var (same unique, same kind)
@@ -988,7 +989,8 @@ substCoVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
     (Subst (in_scope `extendInScopeSet` new_var) idenv tenv new_cenv, new_var)
   where
     new_co         = mkCoVarCo new_var
-    no_kind_change = noFreeVarsOfTypes [t1, t2]
+    no_kind_change = isEmptyTCvSubst subst || noFreeVarsOfTypes [t1, t2]
+                     -- isEmptyTCvSubst: see Note [Keeping the substitution empty]
     no_change      = new_var == old_var && no_kind_change
 
     new_cenv | no_change = delVarEnv cenv old_var
@@ -1034,3 +1036,22 @@ substTyCoBndr subst (Anon ty af)          = (subst, Anon (substScaledTy subst ty
 substTyCoBndr subst (Named (Bndr tv vis)) = (subst', Named (Bndr tv' vis))
                                           where
                                             (subst', tv') = substVarBndr subst tv
+
+{- Note [Keeping the substitution empty]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A very common situation is where we run over a term doing no cloning,
+no substitution, nothing.  In that case the TCvSubst till be empty, and
+it is /very/ valuable to /keep/ it empty:
+
+* It's wasted effort to build up an identity substitution mapping
+  [x:->x, y:->y].
+
+* When we come to a binder, if the incoming substitution is empty,
+  we can avoid substituting its type; and that in turn may mean that
+  the binder itself does not change and we don't need to extend the
+  substitution.
+
+* In the Simplifier we substitute over both types and coercions.
+  If the substitution is empty, this is a no-op -- but only if it
+  is empty!
+-}
