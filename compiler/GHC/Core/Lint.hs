@@ -410,7 +410,9 @@ data LintPassResultConfig = LintPassResultConfig
   }
 
 lintPassResult :: Logger -> LintPassResultConfig
-               -> CoreProgram -> [CoreRule] -> IO ()
+               -> CoreProgram
+               -> [CoreRule]    -- Rules defined in this module for imported Ids
+               -> IO ()
 lintPassResult logger cfg binds rules
   = do { let warns_and_errs = lintCoreBindings' config binds rules
        ; Err.showPass logger $
@@ -2295,12 +2297,17 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
 
 
 lintImpRule :: CoreRule -> LintM ()
+-- Lint a RULE defined in this module, for an imported Id
+-- We don't have the type of the Id conveniently available,
+--    so we do a less-good job than `lintCoreRule`
 lintImpRule (BuiltinRule {})
   = return ()  -- Don't bother
 
 lintImpRule (Rule { ru_name = name, ru_bndrs = bndrs
                   , ru_args = args, ru_rhs = rhs })
-  = addLoc (InRule name)              $
+  = noMultiplicityChecks $ -- Skip linearity checking for rules
+                           -- See Note [Linting linearity]
+    addLoc (InRule name)              $
     lintLocalBinders LambdaBind bndrs $ \ _ ->
     do { mapM_ lintCoreArg args
        ; _ <- lintCoreExpr rhs
