@@ -1839,7 +1839,7 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
             , not ( isSimplified dup &&  -- See (SR2) in Note [Avoiding simplifying repeatedly]
                     not (exprIsTrivial arg) &&
                     not (isDeadOcc (idOccInfo bndr)) )
-            -> do { simplTrace "SimplBindr:inline-uncond3" (ppr bndr <+> text ":=" <+> ppr arg $$ ppr (seIdSubst env)) $
+            -> do { simplTrace "simpl_lam:inline-uncond3" (ppr bndr <+> text ":=" <+> ppr arg) $
                     tick (PreInlineUnconditionally bndr)
                   ; simplLam env' body cont }
 
@@ -2406,7 +2406,7 @@ rebuildCall env fun_info
   | isStrictArgInfo fun_info
   , seCaseCase env    -- Only when case-of-case is on. See GHC.Driver.Config.Core.Opt.Simplify
                       --    Note [Case-of-case and full laziness]
-  = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
+  = -- simplTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env)) $
     simplExprF (arg_se `setInScopeFromE` env) arg
                (StrictArg { sc_fun = fun_info, sc_fun_ty = fun_ty
                           , sc_dup = Simplified
@@ -2419,7 +2419,8 @@ rebuildCall env fun_info
         -- There is no benefit (unlike in a let-binding), and we'd
         -- have to be very careful about bogus strictness through
         -- floating a demanded let.
-  = do  { (_, _, arg') <- simplLazyArg env dup_flag fun_ty (Just fun_info) arg_se arg
+  = -- simplTrace "Lazy Arg" (ppr arg $$ ppr (seIdSubst env)) $
+    do  { (_, _, arg') <- simplLazyArg env dup_flag fun_ty (Just fun_info) arg_se arg
         ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
 
 ---------- No further useful info, revert to generic rebuild ------------

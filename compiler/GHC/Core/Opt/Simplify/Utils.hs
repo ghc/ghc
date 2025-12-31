@@ -24,7 +24,7 @@ module GHC.Core.Opt.Simplify.Utils (
         SimplCont(..), DupFlag(..), FromWhat(..), StaticEnv,
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
-        contIsTrivial, contArgs, contIsRhs,
+        contIsTrivial, contIsRhs,
         countArgs, contOutArgs, dropContArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
@@ -284,9 +284,12 @@ instance Outputable SimplCont where
     = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
     = (text "ApplyToTy" <+> pprParendType ty) $$ ppr cont
-  ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont, sc_hole_ty = hole_ty })
+  ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont
+                  , sc_hole_ty = hole_ty, sc_env = _env })
     = (hang (text "ApplyToVal" <+> ppr dup <+> text "hole-ty:" <+> pprParendType hole_ty)
-          2 (pprParendExpr arg))
+          2 (vcat [ text "arg =" <+> pprParendExpr arg
+--                  , text "env =" <+> ppr (getFullSubst (seInScope env) _env)
+                  ] ))
       $$ ppr cont
   ppr (StrictBind { sc_bndr = b, sc_cont = cont })
     = (text "StrictBind" <+> ppr b) $$ ppr cont

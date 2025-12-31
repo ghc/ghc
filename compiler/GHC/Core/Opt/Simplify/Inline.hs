@@ -25,9 +25,9 @@ import GHC.Core.FVs( exprFreeIds )
 
 import GHC.Types.Id
 import GHC.Types.Literal ( isLitRubbish )
-import GHC.Types.Basic  ( Arity, RecFlag(..) )
 import GHC.Types.Var.Set
-import GHC.Types.Basic  ( Arity, RecFlag(..), isActive )
+import GHC.Types.Var.Env
+import GHC.Types.Basic  ( Arity, RecFlag(..) )
 import GHC.Types.Name
 
 import GHC.Utils.Logger
@@ -78,20 +78,7 @@ callSiteInline logger env fn cont
         OtherCon {}      -> Nothing
         DFunUnfolding {} -> Nothing     -- Never unfold a DFun
   where
-    active_unf = activeUnfolding (seMode env) id
-
-activeUnfolding :: SimplMode -> Id -> Bool
-activeUnfolding mode id
-  | isCompulsoryUnfolding (realIdUnfolding id)
-  = True   -- Even sm_inline can't override compulsory unfoldings
-  | otherwise
-  = isActive (sm_phase mode) (idInlineActivation id)
-  && sm_inline mode
-      -- `or` isStableUnfolding (realIdUnfolding id)
-      -- Inline things when
-      --  (a) they are active
-      --  (b) sm_inline says so, except that for stable unfoldings
-      --                         (ie pragmas) we inline anyway
+    active_unf = activeUnfolding (seMode env) fn
 
 activeUnfolding :: SimplMode -> Id -> Bool
 activeUnfolding mode id
@@ -758,12 +745,12 @@ exprDigest :: SimplEnv -> CoreExpr -> ArgDigest
 --     We want to see that x is (a,b) at the call site of f
 exprDigest env e = go env e []
   where
-    go :: SimplEnv -> CoreExpr
-       -> [CoreExpr]   -- Value arg only
+    go :: SimplEnv -> InExpr
+       -> [ArgDigest]   -- Value args only
        -> ArgDigest
     go env (Cast e _) as = go env e as
     go env (Tick _ e) as = go env e as
-    go env (App f a)  as | isValArg a = go env f (a:as)
+    go env (App f a)  as | isValArg a = go env f (exprDigest env a : as)
                          | otherwise  = go env f as
 
     -- Look through let-expressions
@@ -808,12 +795,12 @@ exprDigest env e = go env e []
     go _ _ _ = ArgNonTriv  -- Some structure; not all boring
                            -- Example of improvement: base/tests/T9848
 
-    go_var :: SimplEnv -> Id
-           -> [CoreExpr]   -- Value args only
+    go_var :: SimplEnv -> OutId
+           -> [ArgDigest]   -- Value args only
            -> ArgDigest
     go_var env f val_args
       | Just con <- isDataConWorkId_maybe f
-      = ArgIsCon (DataAlt con) (map (exprDigest env) val_args)
+      = ArgIsCon (DataAlt con) val_args
 
       | Just rhs <- expandUnfolding_maybe unfolding
       = go (zapSubstEnv env) rhs val_args
