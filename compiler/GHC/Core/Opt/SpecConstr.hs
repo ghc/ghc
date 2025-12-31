@@ -29,7 +29,6 @@ import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.FVs     ( exprsFreeVarsList, exprFreeVars )
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.WorkWrap.Utils
-import GHC.Core.Opt.OccurAnal( BinderSwapDecision(..), scrutOkForBinderSwap )
 import GHC.Core.DataCon
 import GHC.Core.Class( classTyVars )
 import GHC.Core.Coercion hiding( substCo )
