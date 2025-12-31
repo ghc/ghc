@@ -5,6 +5,10 @@
 
 import random
 
+# some bugs only surface with -O, omitting optasm may cause them to
+# slip into releases! (e.g. #26711)
+setTestOpts(when(have_ncg(), extra_ways(['optasm'])))
+
 test('arith001', normal, compile_and_run, [''])
 test('arith002', normal, compile_and_run, [''])
 test('arith003', normal, compile_and_run, [''])
