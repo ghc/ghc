@@ -380,8 +380,10 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
 
     old_ty = idType old_id
     old_w = idMult old_id
-    no_type_change = (isEmptyVarEnv tvs && isEmptyVarEnv cvs) ||
+    no_type_change = isEmptyTCvSubst subst ||
                      (noFreeVarsOfType old_ty && noFreeVarsOfType old_w)
+                     -- isEmptyTCvSubst: see Note [Keeping the substitution empty]
+                     --                  in GHC.Core.TyCo.Subst
 
         -- new_id has the right IdInfo
         -- The lazy-set is because we're in a loop here, with
