@@ -1,0 +1,32 @@
+[1 of 1] Compiling T26709           ( T26709.hs, T26709.o )
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 26, types: 9, coercions: 0, joins: 1/1}
+
+Rec {
+-- RHS size: {terms: 25, types: 7, coercions: 0, joins: 1/1}
+f [Occ=LoopBreaker] :: T -> Bool
+[GblId, Arity=1, Str=<SL>, Unf=OtherCon []]
+f = \ (x :: T) ->
+      join {
+        j [InlPrag=NOINLINE, Dmd=MC(1,L)] :: Bool -> Bool
+        [LclId[JoinId(1)(Just [!])], Arity=1, Str=<1L>, Unf=OtherCon []]
+        j (eta [OS=OneShot] :: Bool)
+          = case eta of {
+              False -> GHC.Internal.Types.False;
+              True ->
+                case f x of {
+                  False -> GHC.Internal.Types.True;
+                  True -> GHC.Internal.Types.False
+                }
+            } } in
+      case x of {
+        A -> GHC.Internal.Types.True;
+        B -> jump j GHC.Internal.Types.True;
+        C -> jump j GHC.Internal.Types.False
+      }
+end Rec }
+
+
+

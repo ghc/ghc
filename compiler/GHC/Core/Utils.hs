@@ -73,7 +73,7 @@ import GHC.Platform
 
 import GHC.Core
 import GHC.Core.Ppr
-import GHC.Core.FVs( bindFreeVars )
+import GHC.Core.FVs( exprFreeVars, bindFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
 import GHC.Core.Predicate( isEqPred )
@@ -113,11 +113,11 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
+import Control.Monad       ( guard )
 import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
 import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import Data.Ord            ( comparing )
-import Control.Monad       ( guard )
 import qualified Data.Set as Set
 
 {-
@@ -674,11 +674,12 @@ filters down the matching alternatives in GHC.Core.Opt.Simplify.rebuildCase.
 -}
 
 ---------------------------------
-mergeCaseAlts :: Id -> [CoreAlt] -> Maybe ([CoreBind], [CoreAlt])
+mergeCaseAlts :: CoreExpr -> Id -> [CoreAlt] -> Maybe ([CoreBind], [CoreAlt])
 -- See Note [Merge Nested Cases]
-mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
+mergeCaseAlts scrut outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
   | Just (joins, inner_alts) <- go deflt_rhs
-  = Just (joins, mergeAlts outer_alts inner_alts)
+  , Just aux_binds <- mk_aux_binds joins
+  = Just ( aux_binds ++ joins, mergeAlts outer_alts inner_alts )
                 -- NB: mergeAlts gives priority to the left
                 --      case x of
                 --        A -> e1
@@ -688,6 +689,20 @@ mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
                 -- When we merge, we must ensure that e1 takes
                 -- precedence over e2 as the value for A!
   where
+    scrut_fvs = exprFreeVars scrut
+
+    -- See Note [Floating join points out of DEFAULT alternatives]
+    mk_aux_binds join_binds
+      | not (any mentions_outer_bndr join_binds)
+      = Just []                         -- Good!  No auxiliary bindings needed
+      | exprIsTrivial scrut
+      , not (outer_bndr `elemVarSet` scrut_fvs)
+      = Just [NonRec outer_bndr scrut]  -- Need a fixup binding
+      | otherwise
+      = Nothing                         -- Can't do it
+
+    mentions_outer_bndr bind = outer_bndr `elemVarSet` bindFreeVars bind
+
     go :: CoreExpr -> Maybe ([CoreBind], [CoreAlt])
 
     -- Whizzo: we can merge!
@@ -725,11 +740,10 @@ mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
       = do { (joins, alts) <- go body
 
              -- Check for capture; but only if we could otherwise do a merge
-           ; let capture = outer_bndr `elem` bindersOf bind
-                           || outer_bndr `elemVarSet` bindFreeVars bind
-           ; guard (not capture)
+             --    (i.e. the recursive `go` succeeds)
+           ; guard (okToFloatJoin scrut_fvs outer_bndr bind)
 
-           ; return (bind:joins, alts ) }
+           ; return (bind : joins, alts ) }
       | otherwise
       = Nothing
 
@@ -741,7 +755,18 @@ mergeCaseAlts outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
 
     go _ = Nothing
 
-mergeCaseAlts _ _ = Nothing
+mergeCaseAlts _ _ _ = Nothing
+
+okToFloatJoin :: VarSet -> Id -> CoreBind -> Bool
+-- Check a join-point binding to see if it can be floated out of
+-- the DEFAULT branch of a `case`.
+-- See Note [Floating join points out of DEFAULT alternatives]
+okToFloatJoin scrut_fvs outer_bndr bind
+  = not (any bad_bndr (bindersOf bind))
+  where
+    bad_bndr bndr = bndr == outer_bndr              -- (a)
+                    || bndr `elemVarSet` scrut_fvs  -- (b)
+
 
 ---------------------------------
 mergeAlts :: [Alt a] -> [Alt a] -> [Alt a]
@@ -950,9 +975,45 @@ Wrinkles
       non-join-points unless the /outer/ case has just one alternative; doing
       so would risk more allocation
 
+      Floating out join points isn't entirely straightforward.
+      See Note [Floating join points out of DEFAULT alternatives]
+
 (MC5) See Note [Cascading case merge]
 
 See also Note [Example of case-merging and caseRules] in GHC.Core.Opt.Simplify.Utils
+
+Note [Floating join points out of DEFAULT alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this, from (MC4) of Note [Merge Nested Cases]
+   case x of r
+     DEFAULT -> join j = rhs in case r of ...
+     alts
+
+We want to float that join point out to give this
+   join j = rhs
+   case x of r
+     DEFAULT -> case r of ...
+     alts
+
+But doing so is flat-out wrong if the scoping gets messed up:
+    (a) case x of r { DEFAULT -> join r = ... in ...r... }
+    (b) case j of r { DEFAULT -> join j = ... in ... }
+    (c) case x of r { DEFAULT -> join j = ...r.. in ... }
+In all these cases we can't float the join point out because r changes its
+meaning.  For (a) and (b) the Simplifier removes shadowing, so they'll
+be solved in the next iteration.  But case (c) will persist.
+
+Happily, we can fix up case (c) by adding an auxiliary binding, like this
+    let r = e in
+    join j = rhs[r]
+    case e of r
+       DEFAULT -> ...r...
+       ...other alts...
+
+We can only do this if
+  * We don't introduce shadowing: that is `j` and `r` do not appear free in `e`.
+    (Again the Simplifier will eliminate such shadowing.)
+  * The scrutinee `e` is trivial so that the transformation doesn't duplicate work.
 
 
 Note [Cascading case merge]
