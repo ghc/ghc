@@ -61,7 +61,7 @@ initSimplifyOpts dflags extra_vars iterations mode hpt_rule_base = let
   in opts
 
 initSimplMode :: DynFlags -> Module -> CompilerPhase -> String -> SimplMode
-initSimplMode dflags phase name = SimplMode
+initSimplMode dflags mod phase name = SimplMode
   { sm_module = mod
   , sm_names = [name]
   , sm_phase = SimplPhase phase

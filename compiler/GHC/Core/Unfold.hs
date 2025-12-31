@@ -64,8 +64,6 @@ import GHC.Data.Bag
 import GHC.Data.Maybe
 
 import qualified Data.ByteString as BS
-import Data.List.NonEmpty (nonEmpty)
-import qualified Data.List.NonEmpty as NE
 
 
 {- Note [Overview of inlining heuristics]
@@ -777,22 +775,28 @@ mkExprTree opts args expr
 
     -----------Case expressions ------------------
     go_case :: Int -> ETVars -> CoreExpr -> Id -> [CoreAlt] -> Maybe ExprTree
-    -- Empty case
-    go_case rcd vs scrut _ [] = go rcd vs scrut
-         -- case e of {} never returns, so take size of scrutinee
+    go_case remaining_case_depth vs scrut case_bndr alts
+      | null alts    -- case e of {} never returns, so take size of scrutinee
+      = go remaining_case_depth vs scrut
 
-    -- Record a CaseOf
-    go_case remaining_case_depth vs scrut b alts
       | alts `lengthExceeds` max_width
       = Nothing   -- See Note [Bale out on very wide case expressions]
 
       | Just scrut_id <- interestingVarScrut vs scrut
-      = if   remaining_case_depth > 0
+      = -- Record a Caseof
+        if   remaining_case_depth > 0
         then do { alts' <- mapM (alt_alt_tree scrut_id) alts
-                ; etCaseOf bOMB_OUT_SIZE scrut_id b alts' }
+                ; etCaseOf bOMB_OUT_SIZE scrut_id case_bndr alts' }
         else Just (etScrutOf scrut_id caseElimDiscount) `met_add`
               -- When this scrutinee has structure, we expect to eliminate the case
-             go_alts remaining_case_depth vs b alts
+             go_ne_alts alts
+
+      | otherwise
+      = -- Don't record a Caseof
+        -- caseDiscount scrut alts  `metAddS`   -- It is a bit odd that this `caseDiscount` business is only
+        --                                      -- applied in this equation, not in the previous ones
+        go remaining_case_depth vs scrut      `met_add`
+        go_ne_alts alts
       where
         -- Decremement remaining case depth when going inside
         -- a case with more than one alternative.
@@ -805,31 +809,26 @@ mkExprTree opts args expr
         alt_alt_tree :: Id -> Alt Var -> Maybe AltTree
         alt_alt_tree scrut_id (Alt con bs rhs)
           = do { let val_bs = filter isId bs  -- The AltTree only has value binders
-               ; rhs <- go rcd1 (add_alt_lvs vs scrut_id (b:val_bs)) rhs
-                        -- (b:bs) don't forget to include the case binder
+               ; rhs <- go rcd1 (add_alt_lvs vs scrut_id (case_bndr:val_bs)) rhs
+                        -- (case_bndr:bs) don't forget to include the case binder
                ; return (AltTree con val_bs rhs) }
 
-    -- Don't record a CaseOf
-    go_case rcd vs scrut b alts    -- alts is non-empty
-      = -- caseDiscount scrut alts  `metAddS`   -- It is a bit odd that this `caseDiscount` business is only
-        --                                  -- applied in this equation, not in the previous ones
-        go rcd vs scrut      `met_add`
-        go_alts (rcd-1) vs b alts
-
-    go_alts :: Int -> ETVars -> Id -> [CoreAlt] -> Maybe ExprTree
-    -- Add up the sizes of all RHSs.  Only used for ScrutOf.
-    -- IMPORTANT: include a charge for the case itself, else we
-    -- find that giant case nests are treated as practically free
-    -- A good example is Foreign.C.Error.errnoToIOError
-    go_alts rcd vs case_bndr alts
-      = caseSize case_bndr alts `metAddS`
-        foldr1 met_add_alt (map alt_expr_tree alts)
-      where
-        alt_expr_tree :: Alt Var -> Maybe ExprTree
-        alt_expr_tree (Alt _con bs rhs) = go rcd (vs `add_lvs` (case_bndr : bs)) rhs
-            -- Don't charge for bndrs, so that wrappers look cheap
-            -- (See comments about wrappers with Case)
-            -- Don't forget to add the case binder, b, to lvs.
+        go_ne_alts :: [CoreAlt] -> Maybe ExprTree
+        -- Add up the sizes of all RHSs.  Only used for ScrutOf.
+        -- IMPORTANT: include a charge for the case itself, else we
+        -- find that giant case nests are treated as practically free
+        -- A good example is Foreign.C.Error.errnoToIOError
+        go_ne_alts []  -- Empty case dealt with by `go_case`
+          = pprPanic "go_ne_alts" (ppr alts)
+        go_ne_alts alts@(alt1:rest_alts)
+          = caseSize case_bndr alts `metAddS`
+            foldr (met_add_alt . do_one) (do_one alt1) rest_alts
+          where
+            do_one :: Alt Var -> Maybe ExprTree
+            do_one (Alt _con bs rhs) = go rcd1 (vs `add_lvs` (case_bndr : bs)) rhs
+                -- Don't charge for bndrs, so that wrappers look cheap
+                -- (See comments about wrappers with Case)
+                -- Don't forget to add the case_bndr to lvs.
 
 add_lv :: ETVars -> Var -> ETVars
 add_lv (avs,lvs) b = (avs, lvs `extendVarSet` b)
@@ -916,7 +915,7 @@ jumpSize val_args = vanillaCallSize val_args
   -- better solution?
 
 classOpAppET :: UnfoldingOpts -> Class -> ETVars -> Id -> [CoreExpr] -> ExprTree
-classOpAppET opts vs fn val_args
+classOpAppET opts cls vs fn val_args
   | [] <- val_args
   = etZero
 
