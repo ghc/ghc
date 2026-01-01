@@ -53,7 +53,7 @@ packageArgs = do
         -- for Stage0 only so we can link ghc-pkg against it, so there is little
         -- reason to spend the effort to optimise it.
         , package cabal ?
-          stage0 ? builder Ghc ? arg "-O0"
+          andM [stage0, notCross] ? builder Ghc ? arg "-O0"
 
         ------------------------------- compiler -------------------------------
         , package compiler ? mconcat
@@ -71,7 +71,7 @@ packageArgs = do
             -- These files take a very long time to compile with -O1,
             -- so we use -O0 for them just in Stage0 to speed up the
             -- build but not affect Stage1+ executables
-            , inputs ["**/GHC/Hs/Instances.hs", "**/GHC/Driver/Session.hs"] ? stage0 ?
+            , inputs ["**/GHC/Hs/Instances.hs", "**/GHC/Driver/Session.hs"] ? andM [stage0, notCross] ?
               pure ["-O0"] ]
 
           , builder (Cabal Setup) ? mconcat
