@@ -169,10 +169,10 @@ werror =
 -- | Build C and Haskell objects with debugging information.
 enableDebugInfo :: Flavour -> Flavour
 enableDebugInfo = addArgs $ notStage0 ? mconcat
-    [ builder (Ghc CompileHs) ? pure ["-g3"]
-    , builder (Ghc CompileCWithGhc) ? pure ["-optc-g3"]
-    , builder (Ghc CompileCppWithGhc) ? pure ["-optcxx-g3"]
-    , builder (Cc CompileC) ? arg "-g3"
+    [ builder (Ghc CompileHs) ? pure ["-g3", "-optc-fno-omit-frame-pointer"]
+    , builder (Ghc CompileCWithGhc) ? pure ["-optc-g3", "-optc-fno-omit-frame-pointer"]
+    , builder (Ghc CompileCppWithGhc) ? pure ["-optcxx-g3", "-optcxx-fno-omit-frame-pointer"]
+    , builder (Cc CompileC) ? pure ["-g3", "-fno-omit-frame-pointer"]
     , builder (Cabal Setup) ? arg "--disable-library-stripping"
     , builder (Cabal Setup) ? arg "--disable-executable-stripping"
     ]
