@@ -1797,7 +1797,9 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env complete_env decl
       IfaceSynonym{} -> IfaceSynonymExtras (fix_fn n)
                                            (ann_fn (AnnOccName n))
       IfaceFamily{} -> IfaceFamilyExtras (fix_fn n)
-                        (map ifFamInstAxiom (lookupOccEnvL fi_env n))
+                        (map ifFamInstAxiom (lookupOccEnvL fi_env n)
+                        ++ map ifDFun (lookupOccEnvL inst_env n)
+                        )
                         (ann_fn (AnnOccName n))
       IfacePatSyn{} -> IfacePatSynExtras (fix_fn n) (lookup_complete_match n)
       _other -> IfaceOtherDeclExtras
