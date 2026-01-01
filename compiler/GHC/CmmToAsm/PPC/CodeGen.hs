@@ -1206,6 +1206,60 @@ genCCall _ (PrimTarget (MO_Prefetch_Data _)) _ _
 genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
  = do let fmt      = intFormat (max width W32)
           reg_dst  = getLocalRegReg dst
+      platform <- getPlatform
+      let addr_fmt = intFormat (wordWidth platform)
+
+      (unaligned_addr, ucode) <- getSomeReg addr
+      (n_reg, ncode)          <- getSomeReg n
+
+      aligned_addr <- getNewRegNat addr_fmt
+      Amode aligned_addr align_code <- case width of
+         W8 -> return $ Amode (AddrRegReg r0 aligned_addr)
+                   (unitOL (CLRRI addr_fmt aligned_addr
+                            unaligned_addr 2))
+         W16 -> return $ Amode (AddrRegReg r0 aligned_addr)
+                   (unitOL (CLRRI addr_fmt aligned_addr
+                            unaligned_addr 2))
+         _   -> return $ Amode (AddrRegReg r0 unaligned_addr)
+                   nilOL
+
+      shift        <- getNewRegNat fmt
+      mask         <- getNewRegNat fmt
+      shifted_n    <- getNewRegNat fmt
+      tmp          <- getNewRegNat fmt
+      masked_res   <- getNewRegNat fmt
+      masked_other <- getNewRegNat fmt
+
+      (n_reg', ini) <- case width of
+            W8  -> do
+              let i = toOL [ RLWINM shift unaligned_addr 3 27 28
+                           , LI mask (ImmInt 255)
+                           , SL fmt mask mask (RIReg shift)
+                           , SL fmt shifted_n n_reg (RIReg shift)
+                           ]
+              return (shifted_n, i)
+            W16 -> do
+              let i = toOL [ RLWINM shift unaligned_addr 3 27 27
+                           , LI mask (ImmInt 0)
+                           , OR mask mask (RIImm (ImmInt 65535))
+                           , SL fmt mask mask (RIReg shift)
+                           , SL fmt shifted_n n_reg (RIReg shift)
+                           ]
+              return (shifted_n, i)
+            _    -> return (n_reg, nilOL)
+      let build_result =
+             let m = toOL [ AND masked_res tmp (RIReg mask)
+                          , ANDC masked_other reg_dst mask
+                          , OR tmp masked_other (RIReg masked_res)
+                          ]
+                 f = unitOL $ SR fmt reg_dst tmp (RIReg shift)
+                 in (m, f)
+
+      let (insert, shift_back) = case width of
+            W8  -> build_result
+            W16 -> build_result
+            _   -> (nilOL, nilOL)
+{-
       (instr, n_code) <- case amop of
             AMO_Add  -> getSomeRegOrImm ADD True reg_dst
             AMO_Sub  -> case n of
@@ -1221,25 +1275,35 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                            return (NAND reg_dst reg_dst n_reg, n_code)
             AMO_Or   -> getSomeRegOrImm OR False reg_dst
             AMO_Xor  -> getSomeRegOrImm XOR False reg_dst
-      Amode addr_reg addr_code <- getAmodeIndex addr
+-}
+      let instr = case amop of
+            AMO_Add  -> ADD tmp reg_dst (RIReg n_reg')
+            AMO_Sub  -> SUBF tmp n_reg' reg_dst
+            AMO_And  -> AND tmp reg_dst (RIReg n_reg')
+            AMO_Nand -> NAND tmp reg_dst n_reg'
+            AMO_Or   -> OR tmp reg_dst (RIReg n_reg')
+            AMO_Xor  -> XOR tmp reg_dst (RIReg n_reg')
+
       lbl_retry <- getBlockIdNat
       lbl_done <- getBlockIdNat
-      return $ n_code `appOL` addr_code
+      return $ ncode `appOL` ucode `appOL` align_code `appOL` ini
         `appOL` toOL [ HWSYNC
                      , BCC ALWAYS lbl_retry Nothing
 
                      , NEWBLOCK lbl_retry
-                     , LDR fmt reg_dst addr_reg
+                     , LDR fmt reg_dst aligned_addr
                      ]
-        `appOL` unitOL instr
-        `appOL` toOL [ STC fmt reg_dst addr_reg
+        `appOL` unitOL instr `appOL` insert
+        `appOL` toOL [ STC fmt tmp aligned_addr
                      , BCC NE lbl_retry (Just False)
                      , BCC ALWAYS lbl_done Nothing
 
                      , NEWBLOCK lbl_done
                      , ISYNC
                      ]
-         where
+        `appOL` shift_back
+{-
+        where
            getAmodeIndex (CmmMachOp (MO_Add _) [x, y])
              = do
                  (regX, codeX) <- getSomeReg x
@@ -1257,16 +1321,19 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                     -> do
                           (n_reg, n_code) <- getSomeReg n
                           return  (op dst dst (RIReg n_reg), n_code)
+-}
 
 genCCall _ (PrimTarget (MO_AtomicRead width _)) [dst] [addr]
  = do let fmt      = intFormat width
           reg_dst  = getLocalRegReg dst
           form     = if widthInBits width == 64 then DS else D
+      platform <- getPlatform
+      let arch_fmt = intFormat (wordWidth platform)
       Amode addr_reg addr_code <- getAmode form addr
       lbl_end <- getBlockIdNat
       return $ addr_code `appOL` toOL [ HWSYNC
                                       , LD fmt reg_dst addr_reg
-                                      , CMP fmt reg_dst (RIReg reg_dst)
+                                      , CMP arch_fmt reg_dst (RIReg reg_dst)
                                       , BCC NE lbl_end (Just False)
                                       , BCC ALWAYS lbl_end Nothing
                             -- See Note [Seemingly useless cmp and bne]
