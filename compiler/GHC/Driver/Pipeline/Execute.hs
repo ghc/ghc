@@ -454,7 +454,7 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
           | otherwise
           = []
 
-  let cc_opt | llvmOptLevel dflags >= 2 = [ "-O2" ]
+  let cc_opt | llvmOptLevel dflags >= 2 = [ "-O3" ]
              | llvmOptLevel dflags >= 1 = [ "-O" ]
              | otherwise            = []
 

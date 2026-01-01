@@ -46,7 +46,7 @@ packageArgs = do
         [ package base ? mconcat
           [ -- This fixes the 'unknown symbol stat' issue.
             -- See: https://github.com/snowleopard/hadrian/issues/259.
-            builder (Ghc CompileCWithGhc) ? arg "-optc-O2" ]
+            builder (Ghc CompileCWithGhc) ? arg "-optc-O3" ]
 
         --------------------------------- cabal --------------------------------
         -- Cabal is a large library and slow to compile. Moreover, we build it
@@ -335,13 +335,7 @@ rtsPackageArgs = package rts ? do
           [ rtsWarnings
           , wayCcArgs
           , arg "-fomit-frame-pointer"
-          -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
-          -- requires that functions are inlined to work as expected. Inlining
-          -- only happens for optimised builds. Otherwise we can assume that
-          -- there is a non-inlined variant to use instead. But RTS does not
-          -- provide non-inlined alternatives and hence needs the function to
-          -- be inlined. See https://github.com/snowleopard/hadrian/issues/90.
-          , arg "-O2"
+          , arg "-O3"
 
           , arg "-Irts"
           , arg $ "-I" ++ path
@@ -365,10 +359,6 @@ rtsPackageArgs = package rts ? do
           , input "**/RtsUtils.c" ? pure
             [ "-DRtsWay=\"rts_" ++ show way ++ "\""
             ]
-
-          -- We're after pure performance here. So make sure fast math and
-          -- vectorization is enabled.
-          , input "**/Hash.c" ? pure [ "-O3" ]
 
           , inputs ["**/Evac.c", "**/Evac_thr.c"] ? arg "-funroll-loops"
 
