@@ -181,52 +181,13 @@ runMergeForeign _pipe_env hsc_env input_fn foreign_os = do
 
 runLlvmLlcPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
 runLlvmLlcPhase pipe_env hsc_env input_fn = do
-    -- Note [Clamping of llc optimizations]
-    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    -- See #13724
-    --
-    -- we clamp the llc optimization between [1,2]. This is because passing -O0
-    -- to llc 3.9 or llc 4.0, the naive register allocator can fail with
-    --
-    --   Error while trying to spill R1 from class GPR: Cannot scavenge register
-    --   without an emergency spill slot!
-    --
-    -- Observed at least with target 'arm-unknown-linux-gnueabihf'.
-    --
-    --
-    -- With LLVM4, llc -O3 crashes when ghc-stage1 tries to compile
-    --   rts/HeapStackCheck.cmm
-    --
-    -- llc -O3 '-mtriple=arm-unknown-linux-gnueabihf' -enable-tbaa /var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_6.bc -o /var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_7.lm_s
-    -- 0  llc                      0x0000000102ae63e8 llvm::sys::PrintStackTrace(llvm::raw_ostream&) + 40
-    -- 1  llc                      0x0000000102ae69a6 SignalHandler(int) + 358
-    -- 2  libsystem_platform.dylib 0x00007fffc23f4b3a _sigtramp + 26
-    -- 3  libsystem_c.dylib        0x00007fffc226498b __vfprintf + 17876
-    -- 4  llc                      0x00000001029d5123 llvm::SelectionDAGISel::LowerArguments(llvm::Function const&) + 5699
-    -- 5  llc                      0x0000000102a21a35 llvm::SelectionDAGISel::SelectAllBasicBlocks(llvm::Function const&) + 3381
-    -- 6  llc                      0x0000000102a202b1 llvm::SelectionDAGISel::runOnMachineFunction(llvm::MachineFunction&) + 1457
-    -- 7  llc                      0x0000000101bdc474 (anonymous namespace)::ARMDAGToDAGISel::runOnMachineFunction(llvm::MachineFunction&) + 20
-    -- 8  llc                      0x00000001025573a6 llvm::MachineFunctionPass::runOnFunction(llvm::Function&) + 134
-    -- 9  llc                      0x000000010274fb12 llvm::FPPassManager::runOnFunction(llvm::Function&) + 498
-    -- 10 llc                      0x000000010274fd23 llvm::FPPassManager::runOnModule(llvm::Module&) + 67
-    -- 11 llc                      0x00000001027501b8 llvm::legacy::PassManagerImpl::run(llvm::Module&) + 920
-    -- 12 llc                      0x000000010195f075 compileModule(char**, llvm::LLVMContext&) + 12133
-    -- 13 llc                      0x000000010195bf0b main + 491
-    -- 14 libdyld.dylib            0x00007fffc21e5235 start + 1
-    -- Stack dump:
-    -- 0.  Program arguments: llc -O3 -mtriple=arm-unknown-linux-gnueabihf -enable-tbaa /var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_6.bc -o /var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_7.lm_s
-    -- 1.  Running pass 'Function Pass Manager' on module '/var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_6.bc'.
-    -- 2.  Running pass 'ARM Instruction Selection' on function '@"stg_gc_f1$def"'
-    --
-    -- Observed at least with -mtriple=arm-unknown-linux-gnueabihf -enable-tbaa
-    --
     llvm_config <- readLlvmConfigCache (hsc_llvm_config hsc_env)
     let dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
         llvmOpts = case llvmOptLevel dflags of
           0 -> "-O1" -- required to get the non-naive reg allocator. Passing -regalloc=greedy is not sufficient.
           1 -> "-O1"
-          _ -> "-O2"
+          _ -> "-O3"
 
     llvm_version <- figureLlvmVersion logger dflags
     let defaultOptions = map GHC.SysTools.Option . concatMap words . snd
@@ -259,7 +220,7 @@ runLlvmOptPhase pipe_env hsc_env input_fn = do
     llvm_config <- readLlvmConfigCache (hsc_llvm_config hsc_env)
     let -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
-        optIdx = max 0 $ min 2 $ llvmOptLevel dflags  -- ensure we're in [0,2]
+        optIdx = max 0 $ min 3 $ llvmOptLevel dflags  -- ensure we're in [0,3]
         llvmOpts = case lookup optIdx $ llvmPasses llvm_config of
                     Just passes -> passes
                     Nothing -> panic ("runPhase LlvmOpt: llvm-passes file "

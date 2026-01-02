@@ -798,8 +798,11 @@ updOptLevelChanged n dfs
      | not (gopt f dfs) = (dfs, changed)
      | otherwise = (gopt_unset dfs f, True)
 
+   -- Use -O3 for llc/opt when we are compiling with -O2
+   llvm_n = if final_n == 2 then 3 else final_n
+
    setLlvmOptLevel dfs
-     | llvmOptLevel dfs /= final_n = (dfs{ llvmOptLevel = final_n }, True)
+     | llvmOptLevel dfs /= llvm_n = (dfs{ llvmOptLevel = llvm_n }, True)
      | otherwise = (dfs, False)
 
 updOptLevel :: Int -> DynFlags -> DynFlags

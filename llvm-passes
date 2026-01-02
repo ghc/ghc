@@ -1,5 +1,6 @@
 [
 (0, "-passes=function(require<tbaa>),function(mem2reg),globalopt,function(lower-expect)"),
 (1, "-passes=default<O1>"),
-(2, "-passes=default<O2>")
+(2, "-passes=default<O2>"),
+(3, "-passes=default<O3>")
 ]
