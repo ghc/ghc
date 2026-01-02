@@ -31,7 +31,7 @@ module GHC.Core.Utils (
         exprIsWorkFree, exprIsConLike,
         isCheapApp, isExpandableApp, isSaturatedConApp,
         exprIsTickedString, exprIsTickedString_maybe,
-        exprIsTopLevelBindable,
+        exprIsCoercion, exprIsTopLevelBindable,
         exprIsUnaryClassFun, isUnaryClassId,
         altsAreExhaustive, etaExpansionTick,
 
@@ -1280,37 +1280,44 @@ it off at source.
 -}
 
 {-# INLINE trivial_expr_fold #-}
-trivial_expr_fold :: (Id -> r) -> (Literal -> r) -> r -> r -> CoreExpr -> r
+trivial_expr_fold :: (Id -> r)             -- Var
+                  -> (Literal -> r)        -- Lit
+                  -> (Type -> r)           -- Type
+                  -> (Coercion -> r)       -- Coercion
+                  -> (r -> Coercion -> r)  -- Cast
+                  -> r                     -- Anything else
+                  -> CoreExpr -> r
 -- ^ The worker function for Note [exprIsTrivial] and Note [getIdFromTrivialExpr]
 -- This is meant to have the code of both functions in one place and make it
 -- easy to derive custom predicates.
 --
--- (trivial_expr_fold k_id k_triv k_not_triv e)
+-- (trivial_expr_fold k_id k_ty k_co k_not_triv e)
 -- * returns (k_id x) if `e` is a variable `x` (with trivial wrapping)
 -- * returns (k_lit x) if `e` is a trivial literal `l` (with trivial wrapping)
--- * returns k_triv if `e` is a literal, type, or coercion (with trivial wrapping)
+-- * returns (k_ty ty) if `e` is a type (with trivial wrapping)
+-- * returns (k_co co) if `e` is a coercion (with trivial wrapping)
 -- * returns k_not_triv otherwise
 --
 -- where "trivial wrapping" is
 -- * Type application or abstraction
 -- * Ticks other than `tickishIsCode`
 -- * `case e of {}` an empty case
-trivial_expr_fold k_id k_lit k_triv k_not_triv = go
+trivial_expr_fold k_id k_lit k_ty k_co k_cast k_not_triv = go
   where
     -- If you change this function, be sure to change
     -- SetLevels.notWorthFloating as well!
     -- (Or yet better: Come up with a way to share code with this function.)
     go (Var v)                            = k_id v  -- See Note [Variables are trivial]
     go (Lit l)    | litIsTrivial l        = k_lit l
-    go (Type _)                           = k_triv
-    go (Coercion _)                       = k_triv
+    go (Type ty)                          = k_ty ty
+    go (Coercion co)                      = k_co co
+    go (Cast e co)                        = k_cast (go e) co
     go (App f arg)
       | not (isRuntimeArg arg)            = go f
       | exprIsUnaryClassFun f             = go arg
       | otherwise                         = k_not_triv
     go (Lam b e)  | not (isRuntimeVar b)  = go e
     go (Tick t e) | not (tickishIsCode t) = go e              -- See Note [Tick trivial]
-    go (Cast e _)                         = go e
     go (Case e b _ as)
       | null as
       = go e     -- See Note [Empty case is trivial]
@@ -1319,7 +1326,13 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     go _                                  = k_not_triv
 
 exprIsTrivial :: CoreExpr -> Bool
-exprIsTrivial e = trivial_expr_fold (const True) (const True) True False e
+exprIsTrivial e = trivial_expr_fold
+                      (const True)     -- Ids
+                      (const True)     -- Literals
+                      (const True)     -- Types
+                      coercionIsSmall  -- Coercions
+                      (\ r co -> r && coercionIsSmall co)  -- Casts
+                      False e
 
 {-
 Note [getIdFromTrivialExpr]
@@ -1340,12 +1353,16 @@ T12076lit for an example where this matters.
 
 getIdFromTrivialExpr :: HasDebugCallStack => CoreExpr -> Id
 -- See Note [getIdFromTrivialExpr]
-getIdFromTrivialExpr e = trivial_expr_fold id (const panic) panic panic e
+getIdFromTrivialExpr e
+  = trivial_expr_fold id panic panic panic panic panic e
   where
+    panic :: forall a. a
     panic = pprPanic "getIdFromTrivialExpr" (ppr e)
 
 getIdFromTrivialExpr_maybe :: CoreExpr -> Maybe Id
-getIdFromTrivialExpr_maybe e = trivial_expr_fold Just (const Nothing) Nothing Nothing e
+getIdFromTrivialExpr_maybe e
+  = trivial_expr_fold Just (const Nothing) (const Nothing)
+                           (const Nothing) (\ r _ -> r) Nothing e
 
 {- *********************************************************************
 *                                                                      *
@@ -2370,6 +2387,13 @@ exprIsTopLevelBindable expr ty
     -- consequently we must use 'mightBeUnliftedType' rather than 'isUnliftedType',
     -- as the latter would panic.
   || exprIsTickedString expr
+
+  || exprIsCoercion expr
+
+-- | Check if the expression is a literal coercion; these can appear at top level
+exprIsCoercion :: CoreExpr -> Bool
+exprIsCoercion (Coercion {}) = True
+exprIsCoercion _             = False
 
 -- | Check if the expression is zero or more Ticks wrapped around a literal
 -- string.

@@ -2169,6 +2169,7 @@ data FloatInfoArgs
   , fia_is_hnf :: Bool
   , fia_is_triv :: Bool
   , fia_is_string :: Bool
+  , fia_is_coercion :: Bool
   , fia_is_dc_worker :: Bool
   , fia_ok_for_spec :: Bool
   }
@@ -2181,14 +2182,17 @@ defFloatInfoArgs bndr rhs
   , fia_is_hnf = exprIsHNF rhs
   , fia_is_triv = exprIsTrivial rhs
   , fia_is_string = exprIsTickedString rhs
+  , fia_is_coercion = exprIsCoercion rhs
   , fia_is_dc_worker = isJust (isDataConId_maybe bndr) -- mkCaseFloat uses False
   , fia_ok_for_spec = False -- mkNonRecFloat uses exprOkForSpecEval
   }
 
 decideFloatInfo :: FloatInfoArgs -> (BindInfo, FloatInfo)
 decideFloatInfo FIA{fia_levity=lev, fia_demand=dmd, fia_is_hnf=is_hnf,
-                    fia_is_triv=is_triv, fia_is_string=is_string,
+                    fia_is_triv=is_triv, fia_is_string=is_string, fia_is_coercion = is_coercion,
                     fia_is_dc_worker=is_dc_worker, fia_ok_for_spec=ok_for_spec}
+  -- NB: this function should line up with exprIsTopLevelBindable
+  -- ToDo: explain a bit more
   | Lifted <- lev, is_hnf, not is_triv = (LetBound, TopLvlFloatable)
       -- is_lifted: We currently don't allow unlifted values at the
       --            top-level or inside letrecs
@@ -2199,8 +2203,9 @@ decideFloatInfo FIA{fia_levity=lev, fia_demand=dmd, fia_is_hnf=is_hnf,
       -- We need this special case for nullary unlifted DataCon
       -- workers/wrappers (top-level bindings) until #17521 is fixed
   | is_string             = (CaseBound, TopLvlFloatable)
+  | is_coercion           = (LetBound,  TopLvlFloatable)
       -- String literals are unboxed (so must be case-bound) and float to
-      -- the top-level
+      -- the top-level. Coercion are ok at top level too.
   | ok_for_spec           = (CaseBound, case lev of Unlifted -> LazyContextFloatable
                                                     Lifted   -> TopLvlFloatable)
       -- See Note [Speculative evaluation]
@@ -2543,8 +2548,10 @@ extendCorePrepEnvList cpe@(CPE { cpe_subst = subst }) prs
       subst2 = extendIdSubstList subst1 [(id, Var id') | (id,id') <- prs]
 
 extendCorePrepEnvExpr :: CorePrepEnv -> Id -> CoreExpr -> CorePrepEnv
+-- The Id can be a CoVar
 extendCorePrepEnvExpr cpe id expr
-    = cpe { cpe_subst = extendIdSubst (cpe_subst cpe) id expr }
+    = cpe { cpe_subst = extendSubst (cpe_subst cpe) id expr }
+      -- NB: extendSubst not extendIdSubst; the id can be a CoVar
 
 lookupCorePrepEnv :: CorePrepEnv -> Id -> CoreExpr
 lookupCorePrepEnv cpe id

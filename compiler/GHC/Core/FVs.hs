@@ -29,12 +29,14 @@ module GHC.Core.FVs (
         idUnfoldingVars, idFreeVars, dIdFreeVars,
         bndrRuleAndUnfoldingVarsDSet,
         bndrRuleAndUnfoldingIds,
-        idFVs,
-        idRuleVars, stableUnfoldingVars,
+        idFVs, idRuleVars,
+        stableUnfoldingVars,
+        unfoldingFVs,
         ruleFreeVars, rulesFreeVars,
         rulesFreeVarsDSet, mkRuleInfo,
         ruleLhsFreeIds, ruleLhsFreeIdsList,
         ruleRhsFreeVars, rulesRhsFreeIds,
+        rulesFVs, RuleFVsFrom(..),
 
         exprFVs, exprLocalFVs, addBndrFV, addBndrsFV,
 
@@ -647,15 +649,17 @@ stableUnfoldingVars unf = fvVarSet `fmap` stableUnfoldingFVs unf
 
 stableUnfoldingFVs :: Unfolding -> Maybe FV
 stableUnfoldingFVs unf
-  = case unf of
-      CoreUnfolding { uf_tmpl = rhs, uf_src = src }
-         | isStableSource src
-         -> Just (exprLocalFVs rhs)
-      DFunUnfolding { df_bndrs = bndrs, df_args = args }
-         -> Just (filterFV isLocalVar $ FV.delFVs (mkVarSet bndrs) $ exprsFVs args)
-            -- DFuns are top level, so no fvs from types of bndrs
-      _other -> Nothing
+  | isStableUnfolding unf = Just (unfoldingFVs unf)
+  | otherwise             = Nothing
 
+unfoldingFVs :: Unfolding -> FV
+unfoldingFVs (CoreUnfolding { uf_tmpl = rhs })
+  = exprLocalFVs rhs
+unfoldingFVs (DFunUnfolding { df_bndrs = bndrs, df_args = args })
+  = FV.delFVs (mkVarSet bndrs) $ exprsLocalFVs args
+    -- DFuns are top level, so no fvs from types of bndrs
+unfoldingFVs _
+  = emptyFV
 
 {-
 ************************************************************************

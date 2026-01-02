@@ -149,10 +149,12 @@ perPassFlags dflags pass
                           _                     -> AllowAnywhere
 
     -- See Note [Linting linearity]
-    check_linearity = gopt Opt_DoLinearCoreLinting dflags || (
-                        case pass of
+    check_linearity = gopt Opt_DoLinearCoreLinting dflags
+                          -- `-dlinear-core-lint`: check linearity in every pass
+                    || -- Always check linearity just after desugaring
+                       case pass of
                           CoreDesugar -> True
-                          _ -> False)
+                          _ -> False
 
     -- See Note [Checking for rubbish literals] in GHC.Core.Lint
     check_rubbish = case pass of

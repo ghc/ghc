@@ -191,7 +191,7 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
 
 ppr_expr add_par (Var id)      = ppr_id_occ add_par id
 ppr_expr add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weird
-ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
+ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> pprOptCo co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
 
 ppr_expr add_par (Cast expr co)

@@ -223,9 +223,6 @@ toIfaceTypeX fr (TyConApp tc tys)
 toIfaceTyVar :: TyVar -> IfLclName
 toIfaceTyVar = mkIfLclName . occNameFS . getOccName
 
-toIfaceCoVar :: CoVar -> IfLclName
-toIfaceCoVar = mkIfLclName . occNameFS . getOccName
-
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon
 toIfaceTyCon tc
@@ -287,7 +284,11 @@ toIfaceCoercionX fr co
     go (CoVarCo cv)
       -- See Note [Free TyVars and CoVars in IfaceType] in GHC.Iface.Type
       | cv `elemVarSet` fr = IfaceFreeCoVar cv
-      | otherwise          = IfaceCoVarCo (toIfaceCoVar cv)
+      | isExternalName nm  = IfaceExtCoVar nm
+      | otherwise          = IfaceCoVarCo (mkIfLclName $ occNameFS $ nameOccName nm)
+      where
+        nm = idName cv
+
     go (HoleCo h)          = IfaceHoleCo  (coHoleCoVar h)
 
     go (AppCo co1 co2)     = IfaceAppCo  (go co1) (go co2)
@@ -454,6 +455,7 @@ toIfaceTopBndr id
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId                      = IfVanillaId
 toIfaceIdDetails (WorkerLikeId dmds)            = IfWorkerLikeId dmds
+toIfaceIdDetails CoVarId                        = IfCoVarId
 toIfaceIdDetails (DFunId {})                    = IfDFunId
 toIfaceIdDetails (RecSelId { sel_naughty = n
                            , sel_tycon = tc

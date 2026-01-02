@@ -624,7 +624,7 @@ reSimplifying :: SimplEnv -> Bool
 reSimplifying (SimplEnv { seInlineDepth = n }) = n>0
 
 ---------------------
-extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
+extendIdSubst :: HasDebugCallStack => SimplEnv -> Id -> SimplSR -> SimplEnv
 extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
   = assertPpr (isId var && not (isCoVar var)) (ppr var) $
     env { seIdSubst = extendVarEnv subst var res }
@@ -845,10 +845,8 @@ unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
   where
     flag (Rec {})                = FltLifted
     flag (NonRec bndr rhs)
-      | not (isStrictId bndr)    = FltLifted
-      | exprIsTickedString rhs   = FltLifted
-          -- String literals can be floated freely.
-          -- See Note [Core top-level string literals] in GHC.Core.
+      | exprIsTopLevelBindable rhs (idType bndr) = FltLifted
+          -- Things that can float freely, including to top level
       | exprOkForSpeculation rhs = FltOkSpec  -- Unlifted, and lifted but ok-for-spec (eg HNF)
       | otherwise                = FltCareful
 
@@ -946,9 +944,14 @@ mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs _ff
   where
     -- See Note [Bangs in the Simplifier]
     !floats'  | isNilOL bs  = emptyLetFloats
-              | otherwise   = unitLetFloat (Rec (flattenBinds (fromOL bs)))
+              | otherwise   = LetFloats (flatten_rec bs) FltLifted
     !jfloats' | isNilOL jbs = emptyJoinFloats
-              | otherwise   = unitJoinFloat (Rec (flattenBinds (fromOL jbs)))
+              | otherwise   = flatten_rec jbs
+
+    flatten_rec :: OrdList OutBind -> OrdList OutBind
+    -- Put CoVar bindings first (guaranteed non-recursive)
+    -- then one recursive value binding
+    flatten_rec bs = unitOL (Rec (flattenBinds (fromOL bs)))
 
 wrapFloats :: SimplFloats -> OutExpr -> OutExpr
 -- Wrap the floats around the expression
@@ -1021,14 +1024,6 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
         -- the in-scope set with better IdInfo.
         --
         -- See also Note [In-scope set as a substitution] in GHC.Core.Opt.Simplify.
-
-refineFromInScope :: InScopeSet -> Var -> Var
-refineFromInScope in_scope v
-  | isLocalId v = case lookupInScope in_scope v of
-                  Just v' -> v'
-                  Nothing -> pprPanic "refineFromInScope" (ppr in_scope $$ ppr v)
-                             -- c.f #19074 for a subtle place where this went wrong
-  | otherwise = v
 
 lookupRecBndr :: SimplEnv -> InId -> OutId
 -- Look up an Id which has been put into the envt by simplRecBndrs,
@@ -1373,7 +1368,7 @@ substCoVarBndr env cv
         (Subst in_scope' _ tv_env' cv_env', cv')
            -> (env { seInScope = in_scope', seTvSubst = tv_env', seCvSubst = cv_env' }, cv')
 
-substCo :: SimplEnv -> Coercion -> Coercion
+substCo :: HasDebugCallStack => SimplEnv -> Coercion -> Coercion
 substCo env co = Coercion.substCo (getTCvSubst env) co
 
 ------------------

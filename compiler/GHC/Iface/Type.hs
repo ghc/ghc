@@ -475,13 +475,15 @@ data IfaceMCoercion
   | IfaceMCo IfaceCoercion deriving (Eq, Ord)
 
 data IfaceCoercion
-  = IfaceReflCo       IfaceType
+  = IfaceFreeCoVar    CoVar       -- ^ See Note [Free TyVars and CoVars in IfaceType]
+  | IfaceExtCoVar     IfExtName   -- Imported or top-level external coercion var
+  | IfaceCoVarCo      IfLclName   -- Regular, locally-bound coercion var
+  | IfaceReflCo       IfaceType
   | IfaceGReflCo      Role IfaceType (IfaceMCoercion)
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceBndr !ForAllTyFlag !ForAllTyFlag IfaceMCoercion IfaceCoercion
-  | IfaceCoVarCo      IfLclName
   | IfaceAxiomCo      IfaceAxiomRule [IfaceCoercion]
        -- ^ There are only a fixed number of CoAxiomRules, so it suffices
        -- to use an IfaceLclName to distinguish them.
@@ -494,7 +496,6 @@ data IfaceCoercion
   | IfaceInstCo       IfaceCoercion IfaceCoercion
   | IfaceKindCo       IfaceCoercion
   | IfaceSubCo        IfaceCoercion
-  | IfaceFreeCoVar    CoVar    -- ^ See Note [Free TyVars and CoVars in IfaceType]
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
   deriving (Eq, Ord)
   -- Why Ord?  See Note [Ord instance of IfaceType]
@@ -779,9 +780,10 @@ substIfaceType env ty
     go_co (IfaceTyConAppCo r tc cos) = IfaceTyConAppCo r tc (go_cos cos)
     go_co (IfaceAppCo c1 c2)         = IfaceAppCo (go_co c1) (go_co c2)
     go_co (IfaceForAllCo {})         = pprPanic "substIfaceCoercion" (ppr ty)
-    go_co (IfaceFreeCoVar cv)        = IfaceFreeCoVar cv
-    go_co (IfaceCoVarCo cv)          = IfaceCoVarCo cv
-    go_co (IfaceHoleCo cv)           = IfaceHoleCo cv
+    go_co co@(IfaceFreeCoVar {})     = co
+    go_co co@(IfaceExtCoVar {})      = co
+    go_co co@(IfaceCoVarCo {})       = co
+    go_co co@(IfaceHoleCo {})        = co
     go_co (IfaceUnivCo p r t1 t2 ds) = IfaceUnivCo p r (go t1) (go t2) (go_cos ds)
     go_co (IfaceSymCo co)            = IfaceSymCo (go_co co)
     go_co (IfaceTransCo co1 co2)     = IfaceTransCo (go_co co1) (go_co co2)
@@ -2076,8 +2078,9 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
       = let (tvs, co'') = split_co co' in ((bndr,kind_co,visL,visR):tvs,co'')
     split_co co' = ([], co')
 
--- Why these three? See Note [Free TyVars and CoVars in IfaceType]
+-- Why these four? See Note [Free TyVars and CoVars in IfaceType]
 ppr_co _ (IfaceFreeCoVar covar) = ppr covar
+ppr_co _ (IfaceExtCoVar covar)  = ppr covar
 ppr_co _ (IfaceCoVarCo covar)   = ppr covar
 ppr_co _ (IfaceHoleCo covar)    = braces (ppr covar)
 
@@ -2457,6 +2460,9 @@ instance Binary IfaceCoercion where
   put_ bh (IfaceCoVarCo a) = do
           putByte bh 7
           put_ bh a
+  put_ bh (IfaceExtCoVar a) = do
+          putByte bh 8
+          put_ bh a
   put_ bh (IfaceUnivCo a b c d deps) = do
           putByte bh 9
           put_ bh a
@@ -2530,6 +2536,8 @@ instance Binary IfaceCoercion where
                    return $ IfaceForAllCo a visL visR b c
            7 -> do a <- get bh
                    return $ IfaceCoVarCo a
+           8 -> do a <- get bh
+                   return $ IfaceExtCoVar a
            9 -> do a <- get bh
                    b <- get bh
                    c <- get bh
@@ -2605,13 +2613,14 @@ instance NFData IfaceTyLit where
 
 instance NFData IfaceCoercion where
   rnf = \case
+    IfaceExtCoVar f1 -> rnf f1
+    IfaceCoVarCo f1 -> rnf f1
     IfaceReflCo f1 -> rnf f1
     IfaceGReflCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
     IfaceFunCo f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
     IfaceTyConAppCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
     IfaceAppCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceForAllCo f1 f2 f3 f4 f5 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
-    IfaceCoVarCo f1 -> rnf f1
     IfaceAxiomCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceUnivCo f1 f2 f3 f4 deps -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf deps
     IfaceSymCo f1 -> rnf f1

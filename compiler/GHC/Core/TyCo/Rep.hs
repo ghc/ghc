@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 {-
@@ -63,7 +64,7 @@ module GHC.Core.TyCo.Rep (
         TyCoFolder(..), foldTyCo, noView,
 
         -- * Sizes
-        typeSize, typesSize, coercionSize,
+        typeSize, typesSize, coercionSize, coercionIsSmall,
 
         -- * Multiplicities
         Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
@@ -96,8 +97,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Binary
 
 -- libraries
+import GHC.Exts
 import qualified Data.Data as Data hiding ( TyCon )
-import Data.Coerce
 import Data.IORef ( IORef )   -- for CoercionHole
 import Control.DeepSeq
 
@@ -815,7 +816,7 @@ type CoercionN = Coercion       -- always Nominal
 type CoercionR = Coercion       -- always Representational
 type CoercionP = Coercion       -- always Phantom
 
-type MCoercionN = MCoercion     -- alwyas Nominal
+type MCoercionN = MCoercion     -- always Nominal
 type MCoercionR = MCoercion     -- always Representational
 
 {- Note [KindCoercion]
@@ -2092,6 +2093,61 @@ coercionSize (SubCo co)          = 1 + coercionSize co
 mCoercionSize :: MCoercion -> Int
 mCoercionSize MRefl    = 0
 mCoercionSize (MCo co) = coercionSize co
+
+coercionIsSmall :: Coercion -> Bool
+-- This function is called inside `exprIsTrivial` so it needs to be
+-- pretty efficient.  It should return False quickly on a big coercion;
+-- it should /not/ traverse the big coercion!
+coercionIsSmall co
+  = not (isTrue# ((coercion_is_small co 100#) <# 0#))
+
+coercion_is_small :: Coercion -> Int# -> Int#
+coercion_is_small co n = go co n
+  where
+    go :: Coercion -> Int# -> Int#
+    go _co n | isTrue# (n <# 0#)   = n
+    go (Refl ty)                 n = type_is_small ty n
+    go (GRefl _ ty mco)          n = type_is_small ty $ go_mco mco n
+    go (TyConAppCo _ _ cos)      n = go_cos cos $ dec n
+    go (AxiomCo _ cos)           n = go_cos cos $ dec n
+    go (UnivCo _ _ _ _ cos)      n = go_cos cos $ dec n
+    go (AppCo co1 co2)           n = go co1 $ go co2 $ dec n
+    go (CoVarCo {})              n = dec n
+    go (HoleCo {})               n = dec n
+    go (SymCo co)                n = go co $ dec n
+    go (KindCo co)               n = go co $ dec n
+    go (SubCo co)                n = go co $ dec n
+    go (TransCo co1 co2)         n = go co1 $ go co2 $ dec n
+    go (SelCo _  co)             n = go co $ dec n
+    go (LRCo _  co)              n = go co $ dec n
+    go (InstCo co1 co2)          n = go co1 $ go co2 $ dec n
+    go (ForAllCo _ _ _ kco co)   n = go co $ go_mco kco $ dec n
+    go (FunCo _ _ _ mco aco rco) n = go mco $ go aco $ go rco $ dec n
+
+    go_cos []       n = n
+    go_cos (co:cos) n = go_cos cos (go co n)
+
+    go_mco MRefl    n = dec n
+    go_mco (MCo co) n = go co n
+
+type_is_small :: Type -> Int# -> Int#
+type_is_small ty n = go ty n
+  where
+    go _ty n | isTrue# (n <# 0#) = n
+    go (TyVarTy {})      n = dec n
+    go (LitTy {})        n = dec n
+    go (AppTy t1 t2)     n = go t1 $ go t2 $ dec n
+    go (TyConApp _ tys) n = go_tys tys $ dec n
+    go (ForAllTy _ ty)   n = go ty $ dec n
+    go (FunTy _ m a r)   n = go m $ go a $ go r $ dec n
+    go (CastTy ty co)    n = go ty $ coercion_is_small co $ dec n
+    go (CoercionTy co)   n = coercion_is_small co n
+
+    go_tys []       n = n
+    go_tys (ty:tys) n = go ty $ go_tys tys n
+
+dec :: Int# -> Int#
+dec n = n -# 1#
 
 {-
 ************************************************************************

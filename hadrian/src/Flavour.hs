@@ -70,7 +70,8 @@ flavourTransformers = M.fromList
     , "fully_static"     =: fullyStatic
     , "host_fully_static" =: hostFullyStatic
     , "collect_timings"  =: collectTimings
-    , "assertions"       =: enableAssertions
+    , "assertions"        =: enableAssertions Stage2
+    , "assertions_stage1" =: enableAssertions Stage1
     , "debug_ghc"        =: debugGhc Stage2
     , "debug_stage1_ghc" =: debugGhc Stage1
     , "lint"             =: enableLinting
@@ -394,11 +395,11 @@ enableLateCCS = addArgs
   ? arg "-fprof-late"
 
 -- | Enable assertions for the stage2 compiler
-enableAssertions :: Flavour -> Flavour
-enableAssertions flav = flav { ghcDebugAssertions = f }
+enableAssertions :: Stage -> Flavour -> Flavour
+enableAssertions stage flav = flav { ghcDebugAssertions = f }
   where
-    f Stage2 = True
-    f st = ghcDebugAssertions flav st
+    f s | s == stage = True
+        | otherwise  = ghcDebugAssertions flav s
 
 -- | Build the stage3 compiler using the non-moving GC.
 enableBootNonmovingGc :: Flavour -> Flavour

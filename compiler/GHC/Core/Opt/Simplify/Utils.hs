@@ -59,7 +59,7 @@ import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Opt.Simplify.Monad
-import GHC.Core.Type     hiding( substTy )
+import GHC.Core.Type     hiding( substTy, extendCvSubst )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import GHC.Core.Multiplicity
@@ -1499,7 +1499,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
-  | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
+  | isCoVar bndr, not (isCoArg rhs)          = Nothing -- Note [Do not inline CoVars unconditionally]
   | isExitJoinId bndr                        = Nothing -- Note [Do not inline exit join points]
                                                        -- in module Exitify
   | not (one_occ (idOccInfo bndr))           = Nothing
@@ -1511,7 +1511,9 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | otherwise                                = Nothing
   where
     unf = idUnfolding bndr
-    extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
+    extend_subst_with inl_rhs
+      | Coercion co <- inl_rhs = extendCvSubst env bndr co
+      | otherwise              = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br   = 1
@@ -1548,15 +1550,16 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
         -- canInlineInLam => free vars of rhs are (Once in_lam) or Many,
         -- so substituting rhs inside a lambda doesn't change the occ info.
         -- Sadly, not quite the same as exprIsHNF.
-    canInlineInLam (Lit _)    = True
-    canInlineInLam (Cast e _) = canInlineInLam e
-    canInlineInLam (Lam b e)  = isRuntimeVar b || canInlineInLam e
-    canInlineInLam (Tick t e) = not (tickishIsCode t) && canInlineInLam e
-    canInlineInLam (Var v)    = case idOccInfo v of
-                                  OneOcc { occ_in_lam = IsInsideLam } -> True
-                                  ManyOccs {}                         -> True
-                                  _                                   -> False
-    canInlineInLam _          = False
+    canInlineInLam (Lit _)      = True
+    canInlineInLam (Coercion _) = True
+    canInlineInLam (Cast e _)   = canInlineInLam e
+    canInlineInLam (Lam b e)    = isRuntimeVar b || canInlineInLam e
+    canInlineInLam (Tick t e)   = not (tickishIsCode t) && canInlineInLam e
+    canInlineInLam (Var v)      = case idOccInfo v of
+                                    OneOcc { occ_in_lam = IsInsideLam } -> True
+                                    ManyOccs {}                         -> True
+                                    _                                   -> False
+    canInlineInLam _            = False
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
       -- ticks around a Lam will disappear anyway.
 
@@ -2250,9 +2253,12 @@ new binding is abstracted.  Several points worth noting
 abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
               -> OutExpr -> SimplM ([OutBind], OutExpr)
 abstractFloats uf_opts top_lvl main_tvs floats body
-  = assert (notNull body_floats) $
+  | assert (notNull body_floats) $
     assert (isNilOL (sfJoinFloats floats)) $
-    do  { let sccs = concatMap to_sccs body_floats
+    any isCoVar (bindersOfBinds body_floats)   -- ToDo: Explain this case
+  = return ([], wrapFloats floats body)
+  | otherwise
+  = do  { let sccs = concatMap to_sccs body_floats
         ; (subst, float_binds) <- mapAccumLM abstract empty_subst sccs
         ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
   where

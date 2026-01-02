@@ -1,3 +1,5 @@
+{-# LANGUAGE MagicHash #-}
+
 {-
 (c) The University of Glasgow 2006
 -}
@@ -23,6 +25,7 @@ module GHC.Core.Coercion (
         coercionType, mkCoercionType,
         coercionKind, coercionLKind, coercionRKind,coercionKinds,
         coercionRole, coercionKindRole,
+        coercionIsSmall,
 
         -- ** Constructing coercions
         mkGReflCo, mkGReflMCo, mkReflCo, mkRepReflCo, mkNomReflCo,
@@ -168,6 +171,7 @@ import Data.Char( isDigit )
 import qualified Data.Monoid as Monoid
 import Data.List.NonEmpty ( NonEmpty (..) )
 import Control.DeepSeq
+
 
 {-
 %************************************************************************

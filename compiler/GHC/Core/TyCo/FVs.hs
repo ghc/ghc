@@ -350,7 +350,8 @@ deepTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synon
   where
     do_tcv is v = EndoOS do_it
       where
-        do_it acc | v `elemVarSet` is  = acc
+        do_it acc | not (isLocalVar v) = acc
+                  | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
                   | otherwise          = appEndoOS (deep_ty (varType v)) $
                                          acc `extendVarSet` v
@@ -412,7 +413,8 @@ shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and sy
   where
     do_tcv is v = EndoOS do_it
       where
-        do_it acc | v `elemVarSet` is  = acc
+        do_it acc | not (isLocalVar v) = acc
+                  | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
                   | otherwise          = acc `extendVarSet` v
 
@@ -475,7 +477,8 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
 
     do_covar is v = EndoOS do_it
       where
-        do_it acc | v `elemVarSet` is  = acc
+        do_it acc | not (isLocalVar v) = acc
+                  | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
                   | otherwise          = appEndoOS (deep_cv_ty (varType v)) $
                                          acc `extendVarSet` v
@@ -706,7 +709,10 @@ tyCoFVsOfCo (SubCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in
 
 tyCoFVsOfCoVar :: CoVar -> FV
 tyCoFVsOfCoVar v fv_cand in_scope acc
+  | isLocalId v
   = (unitFV v `unionFV` tyCoFVsOfType (varType v)) fv_cand in_scope acc
+  | otherwise
+  = emptyFV fv_cand in_scope acc
 
 tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc

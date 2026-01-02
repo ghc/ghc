@@ -258,11 +258,11 @@ simplRecBind env0 bind_cxt pairs0
         = do { (env', bndr') <- addBndrRules env bndr (lookupRecBndr env bndr) bind_cxt
              ; return (env', (bndr, bndr', rhs)) }
 
+    go :: SimplEnv -> [(InId, OutId, InExpr)] -> SimplM (SimplFloats, SimplEnv)
     go env [] = return (emptyFloats env, env)
 
     go env ((old_bndr, new_bndr, rhs) : pairs)
-        = do { (float, env1) <- simplRecOrTopPair env bind_cxt
-                                                  old_bndr new_bndr rhs
+        = do { (float, env1) <- simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
              ; (floats, env2) <- go env1 pairs
              ; return (float `addFloats` floats, env2) }
 
@@ -298,6 +298,7 @@ simplRecOrTopPair env bind_cxt old_bndr new_bndr rhs
                                              (old_bndr,env) (new_bndr,env) (rhs,env)
 
 simplTrace :: String -> SDoc -> SimplM a -> SimplM a
+-- Spit out a trace with `-dverbose-core2core`
 simplTrace herald doc thing_inside = do
   logger <- getLogger
   if logHasDumpFlag logger Opt_D_verbose_core2core
@@ -597,15 +598,20 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
               work_id   = mkLocalIdWithInfo work_name ManyTy work_ty work_info
               is_strict = isStrictId bndr
 
+        ; (co_floats, co') <- makeCoTrivial co
+
         ; (rhs_floats, work_rhs) <- prepareBinding env top_lvl is_rec is_strict
                                                    work_id (emptyFloats env) rhs
 
         ; work_unf <- mk_worker_unfolding top_lvl work_id work_rhs
-        ; let  work_id_w_unf = work_id `setIdUnfolding` work_unf
-               floats   = rhs_floats `addLetFloats`
-                          unitLetFloat (NonRec work_id_w_unf work_rhs)
 
-               triv_rhs = Cast (Var work_id_w_unf) co
+        ; let  work_id_w_unf = work_id `setIdUnfolding` work_unf
+               work_float = unitLetFloat (NonRec work_id_w_unf work_rhs)
+
+               floats = rhs_floats `addLetFloats`
+                        (co_floats `addLetFlts` work_float)
+
+               triv_rhs = Cast (Var work_id_w_unf) co'
 
         ; if postInlineUnconditionally env bind_cxt old_bndr bndr triv_rhs
              -- Almost always True, because the RHS is trivial
@@ -715,12 +721,15 @@ prepareBinding env top_lvl is_rec strict_bind bndr rhs_floats rhs
        ; let all_floats = rhs_floats1 `addLetFloats` anf_floats
        ; if doFloatFromRhs (seFloatEnable env) top_lvl is_rec strict_bind all_floats rhs2
          then -- Float!
+              simplTrace "prepareBinding:yes" (ppr all_floats $$ text "rhs" <+> ppr rhs2) $
               do { tick LetFloatFromLet
                  ; return (all_floats, rhs2) }
 
          else -- Abandon floating altogether; revert to original rhs
               -- Since we have already built rhs1, we just need to add
               -- rhs_floats1 to it
+              simplTrace "prepareBinding:no" (vcat [ ppr all_floats
+                                                   , text "rhs" <+> ppr rhs2 ]) $
               return (emptyFloats env, wrapFloats rhs_floats1 rhs1) }
 
 {- Note [prepareRhs]
@@ -753,13 +762,13 @@ prepareRhs :: HasDebugCallStack
 --            x = Just a
 -- See Note [prepareRhs]
 prepareRhs env top_lvl occ rhs0
-  | is_expandable = anfise rhs0
+  | is_expandable = do { (flts,rhs) <- anfise rhs0
+                       ; return (flts, rhs) }
   | otherwise     = return (emptyLetFloats, rhs0)
   where
-    -- We can't use exprIsExpandable because the WHOLE POINT is that
-    -- we want to treat (K <big>) as expandable, because we are just
-    -- about "anfise" the <big> expression.  exprIsExpandable would
-    -- just say no!
+    -- We can't use exprIsExpandable because the WHOLE POINT is that we want to
+    -- treat (K <big>) as expandable, because we are just about "anfise" the
+    -- <big> expression.  exprIsExpandable would just say no!
     is_expandable = go rhs0 0
        where
          go (Var fun) n_val_args       = isExpandableApp fun n_val_args
@@ -772,8 +781,9 @@ prepareRhs env top_lvl occ rhs0
 
     anfise :: OutExpr -> SimplM (LetFloats, OutExpr)
     anfise (Cast rhs co)
-        = do { (floats, rhs') <- anfise rhs
-             ; return (floats, Cast rhs' co) }
+        = do { (floats1, rhs') <- anfise rhs
+             ; (floats2, co')  <- makeCoTrivial co
+             ; return (floats1 `addLetFlts` floats2, Cast rhs' co') }
     anfise (App fun (Type ty))
         = do { (floats, rhs') <- anfise fun
              ; return (floats, App rhs' (Type ty)) }
@@ -818,13 +828,23 @@ makeTrivial :: HasDebugCallStack
 -- For the Demand argument, see Note [Keeping demand info in StrictArg Plan A]
 makeTrivial env top_lvl dmd occ_fs expr
   | exprIsTrivial expr                          -- Already trivial
-  || not (bindingOk top_lvl expr expr_ty)       -- Cannot trivialise
-                                                --   See Note [Cannot trivialise]
-  = return (emptyLetFloats, expr)
+  = simplTrace "makeTrivial:triv" (ppr expr) $
+    return (emptyLetFloats, expr)
+
+  | not (bindingOk top_lvl expr expr_ty)       -- Cannot trivialise
+                                               --   See Note [Cannot trivialise]
+  = simplTrace "makeTrivial:cannot" (ppr expr) $
+    return (emptyLetFloats, expr)
 
   | Cast expr' co <- expr
-  = do { (floats, triv_expr) <- makeTrivial env top_lvl dmd occ_fs expr'
-       ; return (floats, Cast triv_expr co) }
+  = do { (floats1, triv_co)   <- makeCoTrivial co
+       ; (floats2, triv_expr) <- makeTrivial env top_lvl dmd occ_fs expr'
+       ; simplTrace "makeTrivial:co" (ppr (Cast triv_expr triv_co)) $
+         return (floats1 `addLetFlts` floats2, Cast triv_expr triv_co) }
+
+  | Coercion co <- expr
+  = do { (floats, triv_co) <- makeCoTrivial co
+       ; return (floats, Coercion triv_co) }
 
   | otherwise -- 'expr' is not of form (Cast e co)
   = do  { (floats, expr1) <- prepareRhs env top_lvl occ_fs expr
@@ -849,6 +869,17 @@ makeTrivial env top_lvl dmd occ_fs expr
   where
     id_info = vanillaIdInfo `setDemandInfo` dmd
     expr_ty = exprType expr
+
+makeCoTrivial :: OutCoercion -> SimplM (LetFloats, OutCoercion)
+makeCoTrivial co
+  | coercionIsSmall co
+  = return (emptyLetFloats, co)
+  | otherwise
+  = do { co_uniq <- getUniqueM
+       ; let co_name = mkSystemVarName co_uniq (fsLit "aco")
+             co_var = mkLocalCoVar co_name (coercionType co)
+       ; return ( unitLetFloat (NonRec co_var (Coercion co))
+                , mkCoVarCo co_var ) }
 
 bindingOk :: TopLevelFlag -> CoreExpr -> Type -> Bool
 -- True iff we can have a binding of this expression at this level
@@ -923,12 +954,16 @@ completeBind :: BindContext
 -- Binder /can/ be a JoinId
 -- Precondition: rhs obeys the let-can-float invariant
 completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
- | isCoVar old_bndr
- = case new_rhs of
-     Coercion co -> return (emptyFloats env, extendCvSubst env old_bndr co)
-     _           -> return (mkFloatBind env (NonRec new_bndr new_rhs))
+  | isCoVar old_bndr
+  = case new_rhs of
+     Coercion co   -- Inline if it is trivial
+       | postInlineUnconditionally env bind_cxt old_bndr new_bndr new_rhs
+       -> return (emptyFloats env, extendCvSubst env old_bndr co)
+     _otherwise -> -- Can't inline anything other than a Coercion inside a coercion
+                   -- So retain the binding insteadd
+                   return (mkFloatBind env (NonRec new_bndr new_rhs))
 
- | otherwise
+ | otherwise  -- Non-CoVars
  = assert (isId new_bndr) $
    do { let old_info = idInfo old_bndr
             old_unf  = realUnfoldingInfo old_info
@@ -955,8 +990,8 @@ completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
                    return ( emptyFloats env
                           , extendIdSubst env old_bndr $
                             DoneEx unf_rhs (idJoinPointHood new_bndr)) }
-                -- Use the substitution to make quite, quite sure that the
-                -- substitution will happen, since we are going to discard the binding
+                        -- Use the substitution to make quite, quite sure that the
+                        -- substitution will happen, since we are going to discard the binding
 
         else -- Keep the binding; do cast worker/wrapper
 --             simplTrace "completeBind" (vcat [ text "bndrs" <+> ppr old_bndr <+> ppr new_bndr
@@ -1259,7 +1294,7 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
   | Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
     -- Because of the let-can-float invariant, it's ok to
     -- inline freely, or to drop the binding if it is dead.
-  = do { simplTrace "SimplBindr:inline-uncond2" (ppr bndr) $
+  = do { simplTrace "SimplBindr:inline-uncond2" (ppr bndr <+> ppr rhs) $
          tick (PreInlineUnconditionally bndr)
        ; simplExprF env' body cont }
 
@@ -1758,12 +1793,12 @@ simpl_lam env bndr body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
        ; simplLam (extendTvSubst env bndr arg_ty) body cont }
 
 -- Coercion beta-reduction
-simpl_lam env bndr body (ApplyToVal { sc_arg = Coercion arg_co, sc_env = arg_se
-                                    , sc_cont = cont })
-  = assertPpr (isCoVar bndr) (ppr bndr) $
-    do { tick (BetaReduction bndr)
-       ; let arg_co' = substCo (arg_se `setInScopeFromE` env) arg_co
-       ; simplLam (extendCvSubst env bndr arg_co') body cont }
+-- simpl_lam env bndr body (ApplyToVal { sc_arg = Coercion arg_co, sc_env = arg_se
+--                                    , sc_cont = cont })
+--  = assertPpr (isCoVar bndr) (ppr bndr) $
+--    do { tick (BetaReduction bndr)
+--       ; let arg_co' = substCo (arg_se `setInScopeFromE` env) arg_co
+--       ; simplLam (extendCvSubst env bndr arg_co') body cont }
 
 -- Value beta-reduction
 -- This works for /coercion/ lambdas too
@@ -1791,7 +1826,7 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
             , not ( isSimplified dup &&  -- See (SR2) in Note [Avoiding simplifying repeatedly]
                     not (exprIsTrivial arg) &&
                     not (isDeadOcc (idOccInfo bndr)) )
-            -> do { simplTrace "SimplBindr:inline-uncond3" (ppr bndr) $
+            -> do { simplTrace "SimplBindr:inline-uncond3" (ppr bndr <+> ppr arg) $
                     tick (PreInlineUnconditionally bndr)
                   ; simplLam env' body cont }
 
@@ -3688,9 +3723,9 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
       = assert (isTyVar b )
         bind_args (extendTvSubst env' b ty) bs' args
 
-    bind_args env' (b:bs') (Coercion co : args)
-      = assert (isCoVar b )
-        bind_args (extendCvSubst env' b co) bs' args
+--    bind_args env' (b:bs') (Coercion co : args)
+--      = assert (isCoVar b )
+--        bind_args (extendCvSubst env' b co) bs' args
 
     bind_args env' (b:bs') (arg : args)
       = assert (isId b) $

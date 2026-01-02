@@ -886,13 +886,14 @@ rnIfaceMCo IfaceMRefl    = pure IfaceMRefl
 rnIfaceMCo (IfaceMCo co) = IfaceMCo <$> rnIfaceCo co
 
 rnIfaceCo :: Rename IfaceCoercion
+rnIfaceCo co@(IfaceExtCoVar {})         = pure co
+rnIfaceCo co@(IfaceFreeCoVar {})        = pure co
+rnIfaceCo co@(IfaceCoVarCo {})          = pure co
 rnIfaceCo (IfaceReflCo ty)              = IfaceReflCo <$> rnIfaceType ty
 rnIfaceCo (IfaceGReflCo role ty mco)    = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
 rnIfaceCo (IfaceFunCo role w co1 co2)   = IfaceFunCo role <$> rnIfaceCo w <*> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceTyConAppCo role tc cos) = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
 rnIfaceCo (IfaceAppCo co1 co2)          = IfaceAppCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
-rnIfaceCo (IfaceFreeCoVar c)            = pure (IfaceFreeCoVar c)
-rnIfaceCo (IfaceCoVarCo lcl)            = IfaceCoVarCo <$> pure lcl
 rnIfaceCo (IfaceHoleCo lcl)             = IfaceHoleCo  <$> pure lcl
 rnIfaceCo (IfaceSymCo c)                = IfaceSymCo <$> rnIfaceCo c
 rnIfaceCo (IfaceTransCo c1 c2)          = IfaceTransCo <$> rnIfaceCo c1 <*> rnIfaceCo c2

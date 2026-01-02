@@ -1582,40 +1582,34 @@ tcIfaceCo = go
     go_mco IfaceMRefl    = pure MRefl
     go_mco (IfaceMCo co) = MCo <$> (go co)
 
+    go (IfaceExtCoVar n)         = CoVarCo <$> tcIfaceExtId n
+    go (IfaceCoVarCo n)          = CoVarCo <$> tcIfaceLclId n
     go (IfaceReflCo t)           = Refl <$> tcIfaceType t
     go (IfaceGReflCo r t mco)    = GRefl r <$> tcIfaceType t <*> go_mco mco
     go (IfaceFunCo r w c1 c2)    = mkFunCoNoFTF r <$> go w <*> go c1 <*> go c2
     go (IfaceTyConAppCo r tc cs) = TyConAppCo r <$> tcIfaceTyCon tc <*> mapM go cs
     go (IfaceAppCo c1 c2)        = AppCo <$> go c1 <*> go c2
+    go (IfaceSymCo c)            = SymCo     <$> go c
+    go (IfaceTransCo c1 c2)      = TransCo   <$> go c1 <*> go c2
+    go (IfaceInstCo c1 t2)       = InstCo    <$> go c1 <*> go t2
+    go (IfaceSelCo d c)          = mkSelCo d <$> go c
+    go (IfaceLRCo lr c)          = LRCo lr   <$> go c
+    go (IfaceKindCo c)           = KindCo    <$> go c
+    go (IfaceSubCo c)            = SubCo     <$> go c
     go (IfaceForAllCo tcv visL visR k co)
       = do { k' <- go_mco k
            ; bindIfaceBndr tcv $ \ tv' ->
         do { co' <- go co
            ; return (ForAllCo { fco_tcv = tv', fco_visL = visL, fco_visR = visR
                               , fco_kind = k', fco_body = co' }) } }
-    go (IfaceCoVarCo n)           = CoVarCo <$> go_var n
     go (IfaceUnivCo p r t1 t2 ds) = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2
                                        ; ds' <- mapM go ds
                                        ; return (UnivCo { uco_prov = p, uco_role = r
                                                         , uco_lty = t1', uco_rty = t2'
                                                         , uco_deps = ds' }) }
-    go (IfaceSymCo c)            = SymCo    <$> go c
-    go (IfaceTransCo c1 c2)      = TransCo  <$> go c1
-                                            <*> go c2
-    go (IfaceInstCo c1 t2)       = InstCo   <$> go c1
-                                            <*> go t2
-    go (IfaceSelCo d c)          = do { c' <- go c
-                                      ; return $ mkSelCo d c' }
-    go (IfaceLRCo lr c)          = LRCo lr  <$> go c
-    go (IfaceKindCo c)           = KindCo   <$> go c
-    go (IfaceSubCo c)            = SubCo    <$> go c
-    go (IfaceAxiomCo ax cos)     = AxiomCo <$> tcIfaceAxiomRule ax
-                                           <*> mapM go cos
+    go (IfaceAxiomCo ax cos)     = AxiomCo <$> tcIfaceAxiomRule ax <*> mapM go cos
     go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
     go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
-
-    go_var :: IfLclName -> IfL CoVar
-    go_var = tcIfaceLclId
 
 {-
 ************************************************************************
@@ -1801,6 +1795,7 @@ tcIfaceDataAlt mult con inst_tys arg_strs rhs
 
 tcIdDetails :: Name -> Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _ _  IfVanillaId           = return VanillaId
+tcIdDetails _ _  IfCoVarId             = return CoVarId
 tcIdDetails _ _  (IfWorkerLikeId dmds) = return $ WorkerLikeId dmds
 tcIdDetails _ ty IfDFunId              = return (DFunId (isUnaryClass cls))
   where

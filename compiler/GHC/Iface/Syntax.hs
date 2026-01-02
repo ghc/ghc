@@ -490,6 +490,7 @@ data IfGuidance
 
 data IfaceIdDetails
   = IfVanillaId
+  | IfCoVarId
   | IfWorkerLikeId [CbvMark]
   | IfRecSelId
     { ifRecSelIdParent     :: Either IfaceTyCon IfaceDecl
@@ -1877,6 +1878,7 @@ instance Outputable IfaceIdDetails where
                                   then text "<naughty>"
                                   else Outputable.empty
   ppr IfDFunId          = text "DFunId"
+  ppr IfCoVarId         = text "CoVarId"
 
 instance Outputable IfaceInfoItem where
   ppr (HsUnfold lb unf)     = text "Unfolding"
@@ -1994,6 +1996,7 @@ freeNamesIfIdDetails (IfRecSelId tc first_con _ fl) =
 freeNamesIfIdDetails IfVanillaId         = emptyNameSet
 freeNamesIfIdDetails (IfWorkerLikeId {}) = emptyNameSet
 freeNamesIfIdDetails IfDFunId            = emptyNameSet
+freeNamesIfIdDetails IfCoVarId           = emptyNameSet
 
 -- All other changes are handled via the version info on the tycon
 freeNamesIfFamFlav :: IfaceFamTyConFlav -> NameSet
@@ -2086,6 +2089,7 @@ freeNamesIfCoercion (IfaceAppCo c1 c2)
 freeNamesIfCoercion (IfaceForAllCo _tcv _visL _visR kind_co co)
   = freeNamesIfMCoercion kind_co &&& freeNamesIfCoercion co
 freeNamesIfCoercion (IfaceFreeCoVar _) = emptyNameSet
+freeNamesIfCoercion (IfaceExtCoVar n)  = unitNameSet n
 freeNamesIfCoercion (IfaceCoVarCo _)   = emptyNameSet
 freeNamesIfCoercion (IfaceHoleCo _)    = emptyNameSet
 freeNamesIfCoercion (IfaceUnivCo _ _ t1 t2 cos)
@@ -2718,6 +2722,7 @@ instance Binary IfaceIdDetails where
                                        ; put_ bh d }
     put_ bh (IfWorkerLikeId dmds) = putByte bh 2 >> put_ bh dmds
     put_ bh IfDFunId              = putByte bh 3
+    put_ bh IfCoVarId             = putByte bh 4
     get bh = do
         h <- getByte bh
         case h of
@@ -2729,7 +2734,8 @@ instance Binary IfaceIdDetails where
                     ; return (IfRecSelId a b c d) }
             2 -> do { dmds <- get bh
                     ; return (IfWorkerLikeId dmds) }
-            _ -> return IfDFunId
+            3 -> return IfDFunId
+            _ -> return IfCoVarId
 
 instance Binary IfaceInfoItem where
     put_ bh (HsArity aa)          = putByte bh 0 >> put_ bh aa
@@ -3167,7 +3173,8 @@ instance NFData IfaceIdDetails where
     IfWorkerLikeId dmds -> rnf dmds `seq` ()
     IfRecSelId (Left tycon) b c d -> rnf tycon `seq` rnf b `seq` rnf c `seq` rnf d
     IfRecSelId (Right decl) b c d -> rnf decl `seq` rnf b `seq` rnf c `seq` rnf d
-    IfDFunId -> ()
+    IfDFunId  -> ()
+    IfCoVarId -> ()
 
 instance NFData IfaceInfoItem where
   rnf = \case

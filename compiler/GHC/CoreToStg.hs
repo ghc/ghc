@@ -598,8 +598,12 @@ getStgArgFromTrivialArg :: HasDebugCallStack => CoreArg -> StgArg
 -- CoreArgs may not immediately look trivial, e.g., `case e of {}` or
 -- `case unsafeequalityProof of UnsafeRefl -> e` might intervene.
 -- Good thing we can just call `trivial_expr_fold` here.
-getStgArgFromTrivialArg e = trivial_expr_fold StgVarArg StgLitArg panic panic e
+getStgArgFromTrivialArg e = trivial_expr_fold StgVarArg StgLitArg
+                                panic panic get_cast panic e
   where
+    get_cast r _ = r
+
+    panic :: forall a. a
     panic = pprPanic "getStgArgFromTrivialArg" (ppr e)
 
 coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [StgTickish])
