@@ -64,7 +64,7 @@ instance Monoid ExceptionContext where
 emptyExceptionContext :: ExceptionContext
 emptyExceptionContext = ExceptionContext []
 
--- | Construct a singleton 'ExceptionContext' from an 'ExceptionAnnotation'.
+-- | Add an 'ExceptionAnnotation' to a given 'ExceptionContext'.
 --
 -- @since base-4.20.0.0
 addExceptionAnnotation :: ExceptionAnnotation a => a -> ExceptionContext -> ExceptionContext
