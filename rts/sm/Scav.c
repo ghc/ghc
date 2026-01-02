@@ -138,6 +138,7 @@ scavengeTSO (StgTSO *tso)
         evacuate((StgClosure **)&tso->label);
     }
 
+    // Keep in sync with thread_TSO in Compact.c!
     switch (ACQUIRE_LOAD(&tso->why_blocked)) {
     case BlockedOnMVar:
     case BlockedOnMVarRead:

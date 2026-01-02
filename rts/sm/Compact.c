@@ -15,6 +15,7 @@
 #include "Rts.h"
 
 #include "GCThread.h"
+#include "IOManager.h"
 #include "Storage.h"
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
@@ -468,6 +469,7 @@ thread_TSO (StgTSO *tso)
     thread_(&tso->_link);
     thread_(&tso->global_link);
 
+    // Keep in sync with scavengeTSO in Scav.c!
     switch (ACQUIRE_LOAD(&tso->why_blocked)) {
     case BlockedOnMVar:
     case BlockedOnMVarRead:
@@ -476,6 +478,19 @@ thread_TSO (StgTSO *tso)
     case NotBlocked:
         thread_(&tso->block_info.closure);
         break;
+
+    // Same with scavengeTSOIOManager
+    case BlockedOnRead:
+    case BlockedOnWrite:
+    case BlockedOnDelay:
+    case BlockedOnDoProc:
+#if defined(IOMGR_ENABLED_POLL)
+        if (iomgr_type == IO_MANAGER_POLL) {
+            thread_(&tso->block_info.closure);
+        }
+#endif
+        break;
+
     default:
         break;
     }
