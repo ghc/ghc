@@ -55,9 +55,9 @@ module GHC.Types.Var.Env (
         -- ** Operations on InScopeSets
         emptyInScopeSet, mkInScopeSet, mkInScopeSetList, delInScopeSet,
         extendInScopeSet, extendInScopeSetList, extendInScopeSetSet,
-        getInScopeVars, lookupInScope, lookupInScope_Directly,
+        lookupInScope, lookupInScope_Directly, refineFromInScope,
         unionInScope, elemInScopeSet, uniqAway,
-        varSetInScope,
+        varSetInScope, getInScopeVars,
         unsafeGetFreshLocalUnique,
 
         -- * The RnEnv2 type
@@ -190,6 +190,14 @@ unionInScope (InScope s1) (InScope s2)
 
 varSetInScope :: VarSet -> InScopeSet -> Bool
 varSetInScope vars (InScope s1) = vars `subVarSet` s1
+
+refineFromInScope :: HasDebugCallStack => InScopeSet -> Var -> Var
+refineFromInScope in_scope v
+  | isLocalVar v = case lookupInScope in_scope v of
+                     Just v' -> v'
+                     Nothing -> pprPanic "refineFromInScope" (ppr in_scope $$ ppr v)
+                             -- c.f #19074 for a subtle place where this went wrong
+  | otherwise = v
 
 {-
 Note [Local uniques]

@@ -282,7 +282,8 @@ deepUnitFV fvs_of_kind v
   = MkFV (\bvs -> EndoOS (do_it bvs))
   where
     do_it :: BoundVars -> TyCoVarSet -> TyCoVarSet
-    do_it bvs acc | v `elemVarSet` bvs = acc
+    do_it bvs acc | not (isLocalVar v) = acc
+                  | v `elemVarSet` bvs = acc
                   | v `elemVarSet` acc = acc
                   | otherwise          = runFVAcc (fvs_of_kind (varType v)) acc
                                          `extendVarSet` v
@@ -562,7 +563,6 @@ closeOverKindsDSet :: DTyVarSet -> DTyVarSet
 closeOverKindsDSet vs = nonDetStrictFoldDVarSet do_one vs vs
   where
     do_one v = runFVAcc (deepDetTypeFV (varType v))
-
 
 {-
 %************************************************************************

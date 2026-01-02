@@ -445,12 +445,7 @@ opt_co4' env sym rep r (CoVarCo cv)
   where
     Pair ty1 ty2 = coVarTypes cv1
 
-    cv1 = case lookupInScope (lcInScopeSet env) cv of
-             Just cv1 -> cv1
-             Nothing  -> warnPprTrace True
-                          "opt_co: not in scope"
-                          (ppr cv $$ ppr env)
-                          cv
+    cv1 = refineFromInScope (lcInScopeSet env) cv
           -- cv1 might have a substituted kind!
 
 opt_co4' _ _ _ _ (HoleCo h)
