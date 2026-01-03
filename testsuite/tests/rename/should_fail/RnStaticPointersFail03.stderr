@@ -1,4 +1,3 @@
-
 RnStaticPointersFail03.hs:8:7: error: [GHC-88431]
     • ‘x’ is used in a static form but it is not closed because it
       is not let-bound.
@@ -27,3 +26,4 @@ RnStaticPointersFail03.hs:19:15: error: [GHC-88431]
             where
                 g = h
                 h = typeOf
+
