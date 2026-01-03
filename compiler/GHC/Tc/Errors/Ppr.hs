@@ -1833,6 +1833,11 @@ instance Diagnostic TcRnMessage where
     TcRnUnusedName name reason
       -> mkSimpleDecorated $
          pprUnusedName name reason
+    TcRnStaticFormWarning names
+      -> mkSimpleDecorated $
+         vcat [ hang (text "From GHC 9.16, static forms cannot mention nested let-bound variables")
+                   2 (text "Offending variables:" <+> pprWithCommas ppr names)
+              , text "Solution: move these free variables to top level" ]
     TcRnQualifiedBinder rdr_name
       -> mkSimpleDecorated $
          text "Qualified name in binding position:" <+> ppr rdr_name
@@ -3315,6 +3320,8 @@ instance Diagnostic TcRnMessage where
     TcRnUnusedRecordWildcard{}
       -> [SuggestRemoveRecordWildcard]
     TcRnUnusedName{}
+      -> noHints
+    TcRnStaticFormWarning{}
       -> noHints
     TcRnQualifiedBinder{}
       -> noHints

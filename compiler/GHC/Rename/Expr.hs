@@ -646,23 +646,34 @@ this module. See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrT
 -}
 
 rnExpr e@(HsStatic _ expr) = do
-    -- Normally, you wouldn't be able to construct a static expression without
-    -- first enabling -XStaticPointers in the first place, since that extension
-    -- is what makes the parser treat `static` as a keyword. But this is not a
-    -- sufficient safeguard, as one can construct static expressions by another
-    -- mechanism: Template Haskell (see #14204). To ensure that GHC is
-    -- absolutely prepared to cope with static forms, we check for
-    -- -XStaticPointers here as well.
-    unlessXOptM LangExt.StaticPointers $
-      addErr $ TcRnIllegalStaticExpression e
-    (expr',fvExpr) <- rnLExpr expr
-    level <- getThLevel
-    case level of
-      Splice _ _ -> addErr $ TcRnTHError $ IllegalStaticFormInSplice e
-      _        -> return ()
-    mod <- getModule
-    let fvExpr' = filterNameSet (nameIsLocalOrFrom mod) fvExpr
-    return (HsStatic fvExpr' expr', fvExpr)
+  do {  -- Normally, you wouldn't be able to construct a static expression without
+        -- first enabling -XStaticPointers in the first place, since that extension
+        -- is what makes the parser treat `static` as a keyword. But this is not a
+        -- sufficient safeguard, as one can construct static expressions by another
+        -- mechanism: Template Haskell (see #14204). To ensure that GHC is
+        -- absolutely prepared to cope with static forms, we check for
+        -- -XStaticPointers here as well.
+     ; unlessXOptM LangExt.StaticPointers $
+       addErr $ TcRnIllegalStaticExpression e
+
+     ; (expr',fvExpr) <- rnLExpr expr
+
+     -- Complain about staging
+     ; level <- getThLevel
+     ; case level of
+        Splice _ _ -> addErr $ TcRnTHError $ IllegalStaticFormInSplice e
+        _        -> return ()
+
+     -- Complain about nested-bound free vars
+     -- This is a deprecation warning in 9.14 only
+     -- In 9.16 it becomes an error
+     ; mod <- getModule
+     ; let fvExpr' = filterNameSet (nameIsLocalOrFrom mod) fvExpr
+           bad_fvs = filterNameSet (not . isExternalName) fvExpr'
+     ; unless (isEmptyNameSet bad_fvs) $
+       addErr (TcRnStaticFormWarning (nameSetElemsStable bad_fvs))
+
+     ; return (HsStatic fvExpr' expr', fvExpr) }
 
 {-
 ************************************************************************

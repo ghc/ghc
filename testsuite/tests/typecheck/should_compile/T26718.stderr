@@ -1,0 +1,5 @@
+T26718.hs:8:7: error: [GHC-82529]
+    From GHC 9.16, static forms cannot mention nested let-bound variables
+      Offending variables: y
+    Solution: move these free variables to top level
+
