@@ -1134,8 +1134,8 @@ fillInferResultNoInst act_res_ty (IR { ir_uniq = u
                -> do { traceTc "Joining inferred ExpType" $
                        ppr u <> colon <+> ppr act_res_ty <+> char '~' <+> ppr exp_res_ty
                      ; cur_lvl <- getTcLevel
-                     ; unless (cur_lvl `sameDepthAs` res_lvl) $
-                       ensureMonoType act_res_ty -- See (FIR1)
+                     -- ; unless (cur_lvl `sameDepthAs` res_lvl) $ -- TODO: Artin
+                       -- ensureMonoType act_res_ty -- See (FIR1)
                      ; unifyType Nothing act_res_ty exp_res_ty }
             Nothing
                -> do { traceTc "Filling inferred ExpType" $
