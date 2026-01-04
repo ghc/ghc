@@ -314,7 +314,7 @@ Core: https://gitlab.haskell.org/ghc/ghc/issues/11795#note_118976
 -- | @'replicateM' n act@ performs the action @act@ @n@ times,
 -- and then returns the list of results.
 --
--- @replicateM n (pure x) == 'replicate' n x@
+-- @replicateM n (pure x) == pure ('replicate' n x)@
 --
 -- ==== __Examples__
 --
