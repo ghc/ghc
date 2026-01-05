@@ -1210,6 +1210,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
           reg_dst  = getLocalRegReg dst
 
       (n_reg, ncode)          <- getSomeReg n
+      -- (n_ri, pre_code, mid_code) <-
 
       (Amode aligned_addr align_code, maybe_unaligned_addr) <- case width of
          W8  -> align_address
@@ -1229,7 +1230,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
               let unaligned_addr = fromJust maybe_unaligned_addr
               let i = toOL [ RLWINM shift unaligned_addr 3 27 28
                            , LI mask (ImmInt 255)
-                           , SL fmt mask mask (RIReg shift)
+                           , SL fmt masked_other mask (RIReg shift)
                            , SL fmt shifted_n n_reg (RIReg shift)
                            ]
               return (shifted_n, i)
@@ -1238,7 +1239,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
               let i = toOL [ RLWINM shift unaligned_addr 3 27 27
                            , LI mask (ImmInt 0)
                            , OR mask mask (RIImm (ImmInt 65535))
-                           , SL fmt mask mask (RIReg shift)
+                           , SL fmt masked_other mask (RIReg shift)
                            , SL fmt shifted_n n_reg (RIReg shift)
                            ]
               return (shifted_n, i)
@@ -1289,7 +1290,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                      , NEWBLOCK lbl_retry
                      , LDR fmt tmp1 aligned_addr
                      ]
-        `appOL` unitOL instr `appOL` insert
+        `snocOL` instr `appOL` insert
         `appOL` toOL [ STC fmt tmp2 aligned_addr
                      , BCC NE lbl_retry (Just False)
                      , BCC ALWAYS lbl_done Nothing
