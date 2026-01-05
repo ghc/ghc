@@ -1,4 +1,5 @@
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -----------------------------------------------------------------------------
 --
@@ -14,6 +15,7 @@ module GHC.CmmToAsm.Ppr (
         pprASCII,
         pprString,
         pprFileEmbed,
+        pprCOFFComdatKey,
         pprSectionHeader
 )
 
@@ -23,6 +25,7 @@ import GHC.Prelude
 
 import GHC.Utils.Asm
 import GHC.Cmm.CLabel
+import GHC.Cmm.InitFini
 import GHC.Cmm
 import GHC.CmmToAsm.Config
 import GHC.Utils.Outputable as SDoc
@@ -220,8 +223,8 @@ pprGNUSectionHeader config t suffix =
                     | otherwise -> text ".rodata"
       RelocatableReadOnlyData | OSMinGW32 <- platformOS platform
                                 -- Concept does not exist on Windows,
-                                -- So map these to R/O data.
-                                          -> text ".rdata$rel.ro"
+                                -- So map these to data.
+                                          -> text ".data"
                               | otherwise -> text ".data.rel.ro"
       UninitialisedData -> text ".bss"
       InitArray
@@ -240,23 +243,78 @@ pprGNUSectionHeader config t suffix =
         | OSMinGW32 <- platformOS platform
                     -> text ".rdata"
         | otherwise -> text ".ipe"
-    flags = case t of
-      Text
-        | OSMinGW32 <- platformOS platform, splitSections
-                    -> text ",\"xr\""
-        | splitSections
-                    -> text ",\"ax\"," <> sectionType platform "progbits"
-      CString
-        | OSMinGW32 <- platformOS platform
-                    -> empty
-        | otherwise -> text ",\"aMS\"," <> sectionType platform "progbits" <> text ",1"
-      IPE
-        | OSMinGW32 <- platformOS platform
-                    -> empty
-        | otherwise -> text ",\"a\"," <> sectionType platform "progbits"
-      _ -> empty
+    flags
+      -- See
+      -- https://github.com/llvm/llvm-project/blob/llvmorg-21.1.8/lld/COFF/Chunks.cpp#L54
+      -- and https://llvm.org/docs/Extensions.html#section-directive.
+      -- LLD COFF backend gc-sections only work on COMDAT sections so
+      -- we need to mark it as a COMDAT section. You can use clang64
+      -- toolchain to compile small examples with
+      -- `-ffunction-sections -fdata-sections -S` to see these section
+      -- headers in the wild. Also see Note [Split sections on COFF objects]
+      -- below.
+      | OSMinGW32 <- platformOS platform,
+        splitSections =
+          if
+            | Just _ <- isInitOrFiniSection t -> text ",\"dw\""
+            | otherwise ->
+                let coff_section_flags
+                      | Text <- t = "xr"
+                      | UninitialisedData <- t = "bw"
+                      | ReadOnlySection <- sectionProtection t = "dr"
+                      | otherwise = "dw"
+                 in hcat
+                      [ text ",\"",
+                        text coff_section_flags,
+                        text "\",one_only,",
+                        pprCOFFComdatKey platform suffix
+                      ]
+      | otherwise =
+          case t of
+            Text
+              | splitSections
+                          -> text ",\"ax\"," <> sectionType platform "progbits"
+            CString
+              | OSMinGW32 <- platformOS platform
+                          -> empty
+              | otherwise -> text ",\"aMS\"," <> sectionType platform "progbits" <> text ",1"
+            IPE
+              | OSMinGW32 <- platformOS platform
+                          -> empty
+              | otherwise -> text ",\"a\"," <> sectionType platform "progbits"
+            _ -> empty
 {-# SPECIALIZE pprGNUSectionHeader :: NCGConfig -> SectionType -> CLabel -> SDoc #-}
 {-# SPECIALIZE pprGNUSectionHeader :: NCGConfig -> SectionType -> CLabel -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+
+-- | Note [Split sections on COFF objects]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- On Windows/COFF, LLD's gc-sections only works on COMDAT sections,
+-- so we mark split sections as COMDAT and need to provide a unique
+-- "key" symbol.
+--
+-- Important: We must not use a dot-prefixed local label (e.g.
+-- @.L...@) as the COMDAT key symbol, because LLVM's COFF assembler
+-- treats dot-prefixed COMDAT key symbols specially and forces them to
+-- have value 0 (the beginning of the section). That breaks
+-- @tablesNextToCode@, where the info label is intentionally placed
+-- after the info table data (at a non-zero offset).
+--
+-- Therefore we generate a non-dot-prefixed key symbol derived from
+-- the section suffix, and (see arch-specific 'pprSectionAlign') we
+-- emit a label definition for it at the beginning of the section.
+--
+-- ctor/dtor sections are specially treated; they must be emitted as
+-- regular data sections, otherwise LLD will drop them.
+--
+-- Note that we must not emit .equiv directives for COMDAT sections in
+-- COFF objects, they seriously confuse LLD and we end up with access
+-- violations at runtimes.
+pprCOFFComdatKey :: IsLine doc => Platform -> CLabel -> doc
+pprCOFFComdatKey platform suffix =
+  text "__ghc_coff_comdat_" <> pprAsmLabel platform suffix
+{-# SPECIALIZE pprCOFFComdatKey :: Platform -> CLabel -> SDoc #-}
+{-# SPECIALIZE pprCOFFComdatKey :: Platform -> CLabel -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- XCOFF doesn't support relocating label-differences, so we place all
 -- RO sections into .text[PR] sections

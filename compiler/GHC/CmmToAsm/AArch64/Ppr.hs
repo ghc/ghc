@@ -19,6 +19,7 @@ import GHC.Cmm.Dataflow.Label
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
+import GHC.Cmm.InitFini
 
 import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Platform
@@ -28,9 +29,7 @@ import GHC.Utils.Panic
 
 pprNatCmmDecl :: IsDoc doc => NCGConfig -> NatCmmDecl RawCmmStatics Instr -> doc
 pprNatCmmDecl config (CmmData section dats) =
-  let platform = ncgPlatform config
-  in
-  pprSectionAlign config section $$ pprDatas platform dats
+  pprSectionAlign config section $$ pprDatas config dats
 
 pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   let platform = ncgPlatform config
@@ -91,9 +90,20 @@ pprAlignForSection _platform _seg
 --     .balign 8
 --
 pprSectionAlign :: IsDoc doc => NCGConfig -> Section -> doc
-pprSectionAlign config sec@(Section seg _) =
+pprSectionAlign config sec@(Section seg suffix) =
     line (pprSectionHeader config sec)
+    $$ coffSplitSectionComdatKey
     $$ pprAlignForSection (ncgPlatform config) seg
+  where
+    platform = ncgPlatform config
+    -- See Note [Split sections on COFF objects]
+    coffSplitSectionComdatKey
+      | OSMinGW32 <- platformOS platform
+      , ncgSplitSections config
+      , Nothing <- isInitOrFiniSection seg
+      = line (pprCOFFComdatKey platform suffix <> colon)
+      | otherwise
+      = empty
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: IsDoc doc => Platform -> CLabel -> doc
@@ -136,20 +146,26 @@ pprBasicBlock platform with_dwarf info_env (BasicBlock blockid instrs)
       (l@LOCATION{} : _) -> pprInstr platform l
       _other             -> empty
 
-pprDatas :: IsDoc doc => Platform -> RawCmmStatics -> doc
+pprDatas :: IsDoc doc => NCGConfig -> RawCmmStatics -> doc
 -- See Note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
-pprDatas platform (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas config (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
         labelInd _ = Nothing
   , Just ind' <- labelInd ind
   , alias `mayRedirectTo` ind'
+  -- See Note [Split sections on COFF objects]
+  , not $ platformOS platform == OSMinGW32 && ncgSplitSections config
   = pprGloblDecl platform alias
     $$ line (text ".equiv" <+> pprAsmLabel platform alias <> comma <> pprAsmLabel platform ind')
+    where
+      platform = ncgPlatform config
 
-pprDatas platform (CmmStaticsRaw lbl dats)
+pprDatas config (CmmStaticsRaw lbl dats)
   = vcat (pprLabel platform lbl : map (pprData platform) dats)
+    where
+      platform = ncgPlatform config
 
 pprData :: IsDoc doc => Platform -> CmmStatic -> doc
 pprData _platform (CmmString str) = line (pprString str)

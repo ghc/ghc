@@ -31,6 +31,7 @@ import GHC.Cmm              hiding (topInfoTable)
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
+import GHC.Cmm.InitFini
 import GHC.Cmm.DebugBlock (pprUnwindTable)
 
 import GHC.Types.Basic (Alignment, mkAlignment, alignmentBytes)
@@ -195,8 +196,12 @@ pprDatas config (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticL
         labelInd _ = Nothing
   , Just ind' <- labelInd ind
   , alias `mayRedirectTo` ind'
+  -- See Note [Split sections on COFF objects]
+  , not $ platformOS platform == OSMinGW32 && ncgSplitSections config
   = pprGloblDecl (ncgPlatform config) alias
     $$ line (text ".equiv" <+> pprAsmLabel (ncgPlatform config) alias <> comma <> pprAsmLabel (ncgPlatform config) ind')
+    where
+      platform = ncgPlatform config
 
 pprDatas config (align, (CmmStaticsRaw lbl dats))
  = vcat (pprAlign platform align : pprLabel platform lbl : map (pprData config) dats)
@@ -526,9 +531,20 @@ pprAddr platform (AddrBaseIndex base index displacement)
 
 -- | Print section header and appropriate alignment for that section.
 pprSectionAlign :: IsDoc doc => NCGConfig -> Section -> doc
-pprSectionAlign config sec@(Section seg _) =
+pprSectionAlign config sec@(Section seg suffix) =
     line (pprSectionHeader config sec) $$
+    coffSplitSectionComdatKey $$
     pprAlignForSection (ncgPlatform config) seg
+  where
+    platform = ncgPlatform config
+    -- See Note [Split sections on COFF objects]
+    coffSplitSectionComdatKey
+      | OSMinGW32 <- platformOS platform
+      , ncgSplitSections config
+      , Nothing <- isInitOrFiniSection seg
+      = line (pprCOFFComdatKey platform suffix <> colon)
+      | otherwise
+      = empty
 
 -- | Print appropriate alignment for the given section type.
 pprAlignForSection :: IsDoc doc => Platform -> SectionType -> doc
