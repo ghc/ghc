@@ -1219,6 +1219,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
 
       shift        <- getNewRegNat fmt
       mask         <- getNewRegNat fmt
+      shifted_mask <- getNewRegNat fmt
       shifted_n    <- getNewRegNat fmt
       tmp1         <- getNewRegNat fmt
       masked_res   <- getNewRegNat fmt
@@ -1234,7 +1235,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
               let i = unitOL (RLWINM shift unaligned_addr 3 27 28)
                       `appOL` inv `appOL`
                       toOL [ LI mask (ImmInt 255)
-                           , SL fmt masked_other mask (RIReg shift)
+                           , SL fmt shifted_mask mask (RIReg shift)
                            , SL fmt shifted_n n_reg (RIReg shift)
                            ]
               return (shifted_n, i)
@@ -1247,14 +1248,14 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                       `appOL` inv `appOL`
                       toOL [ LI mask (ImmInt 0)
                            , OR mask mask (RIImm (ImmInt 65535))
-                           , SL fmt masked_other mask (RIReg shift)
+                           , SL fmt shifted_mask mask (RIReg shift)
                            , SL fmt shifted_n n_reg (RIReg shift)
                            ]
               return (shifted_n, i)
             _    -> return (n_reg, nilOL)
       let build_result =
-             let m = toOL [ AND masked_res tmp2 (RIReg mask)
-                          , ANDC masked_other tmp1 mask
+             let m = toOL [ AND masked_res tmp2 (RIReg shifted_mask)
+                          , ANDC masked_other tmp1 shifted_mask
                           , OR tmp2 masked_other (RIReg masked_res)
                           ]
                  f = unitOL $ SR fmt reg_dst tmp2 (RIReg shift)
