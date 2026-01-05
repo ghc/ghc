@@ -2,6 +2,7 @@
 module GHC.Cmm.InitFini
     ( InitOrFini(..)
     , isInitOrFiniArray
+    , isInitOrFiniSection
     ) where
 
 import GHC.Prelude
@@ -63,8 +64,8 @@ finalizer CmmDecl will be emitted per module.
 data InitOrFini = IsInitArray | IsFiniArray
 
 isInitOrFiniArray :: RawCmmDecl -> Maybe (InitOrFini, [CLabel])
-isInitOrFiniArray (CmmData sect (CmmStaticsRaw _ lits))
-  | Just initOrFini <- isInitOrFiniSection sect
+isInitOrFiniArray (CmmData (Section t _) (CmmStaticsRaw _ lits))
+  | Just initOrFini <- isInitOrFiniSection t
   = Just (initOrFini, map get_label lits)
   where
     get_label :: CmmStatic -> CLabel
@@ -72,7 +73,7 @@ isInitOrFiniArray (CmmData sect (CmmStaticsRaw _ lits))
     get_label static = pprPanic "isInitOrFiniArray: invalid entry" (ppr static)
 isInitOrFiniArray _ = Nothing
 
-isInitOrFiniSection :: Section -> Maybe InitOrFini
-isInitOrFiniSection (Section InitArray _) = Just IsInitArray
-isInitOrFiniSection (Section FiniArray _) = Just IsFiniArray
+isInitOrFiniSection :: SectionType -> Maybe InitOrFini
+isInitOrFiniSection InitArray = Just IsInitArray
+isInitOrFiniSection FiniArray = Just IsFiniArray
 isInitOrFiniSection _                     = Nothing
