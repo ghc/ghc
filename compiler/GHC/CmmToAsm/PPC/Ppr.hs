@@ -916,7 +916,7 @@ pprInstr platform instr = case instr of
       -> line $ hcat [
             text "\tclrl",
             pprFormat fmt,
-            text "i ",
+            text "i\t",
             pprReg reg1,
             text ", ",
             pprReg reg2,
@@ -928,7 +928,7 @@ pprInstr platform instr = case instr of
       -> line $ hcat [
             text "\tclrr",
             pprFormat fmt,
-            text "i ",
+            text "i\t",
             pprReg reg1,
             text ", ",
             pprReg reg2,
