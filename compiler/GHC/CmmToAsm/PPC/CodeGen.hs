@@ -1246,7 +1246,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
             _    -> return (n_reg, nilOL)
       let build_result =
              let m = toOL [ AND masked_res tmp2 (RIReg mask)
-                          , ANDC masked_other reg_dst mask
+                          , ANDC masked_other tmp1 mask
                           , OR tmp2 masked_other (RIReg masked_res)
                           ]
                  f = unitOL $ SR fmt reg_dst tmp2 (RIReg shift)
