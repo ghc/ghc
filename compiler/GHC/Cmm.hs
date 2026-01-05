@@ -278,8 +278,8 @@ data SectionProtection
   deriving (Eq)
 
 -- | Should a data in this section be considered constant at runtime
-sectionProtection :: Section -> SectionProtection
-sectionProtection (Section t _) = case t of
+sectionProtection :: SectionType -> SectionProtection
+sectionProtection t = case t of
     Text                    -> ReadOnlySection
     ReadOnlyData            -> ReadOnlySection
     RelocatableReadOnlyData -> WriteProtectedSection

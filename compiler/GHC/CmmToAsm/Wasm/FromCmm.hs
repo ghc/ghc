@@ -107,7 +107,7 @@ symKindFromCLabel lbl
 -- | Calculate a data section's kind, see haddock docs of
 -- 'DataSectionKind' for more explanation.
 dataSectionKindFromCmmSection :: Section -> DataSectionKind
-dataSectionKindFromCmmSection s = case sectionProtection s of
+dataSectionKindFromCmmSection (Section t _) = case sectionProtection t of
   ReadWriteSection -> SectionData
   _ -> SectionROData
 

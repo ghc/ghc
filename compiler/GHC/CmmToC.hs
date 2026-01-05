@@ -121,7 +121,7 @@ pprTop platform = \case
     pprDataExterns platform lits $$
     pprWordArray platform (isSecConstant section) lbl lits
   where
-    isSecConstant section = case sectionProtection section of
+    isSecConstant (Section t _) = case sectionProtection t of
       ReadOnlySection -> True
       WriteProtectedSection -> True
       _ -> False

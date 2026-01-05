@@ -75,7 +75,7 @@ genLlvmData (sect, statics)
                 IsFiniArray -> fsLit "llvm.global_dtors"
     in genGlobalLabelArray var clbls
 
-genLlvmData (sec, CmmStaticsRaw lbl xs) = do
+genLlvmData (sec@(Section t _), CmmStaticsRaw lbl xs) = do
     label <- strCLabel_llvm lbl
     static <- mapM genData xs
     lmsec <- llvmSection sec
@@ -92,7 +92,7 @@ genLlvmData (sec, CmmStaticsRaw lbl xs) = do
                                                     then Just 2 else Just 1
                             Section Data _    -> Just $ platformWordSizeInBytes platform
                             _                 -> Nothing
-        const          = if sectionProtection sec == ReadOnlySection
+        const          = if sectionProtection t == ReadOnlySection
                             then Constant else Global
         varDef         = LMGlobalVar label tyAlias link lmsec align const
         globDef        = LMGlobal varDef struct
