@@ -747,7 +747,7 @@
   * `Generic1`, as well as the associated datatypes and typeclasses in
     `GHC.Generics`, are now poly-kinded (#10604)
 
-  * `New modules `Data.Bifoldable` and `Data.Bitraversable` (previously defined
+  * New modules `Data.Bifoldable` and `Data.Bitraversable` (previously defined
     in the `bifunctors` package) (#10448)
 
   * `Data.Either` now provides `fromLeft` and `fromRight` (#12402)
