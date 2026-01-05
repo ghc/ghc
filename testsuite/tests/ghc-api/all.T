@@ -28,7 +28,7 @@ test('T8628',
      ['-package ghc -package exceptions'])
 
 test('T9015',
-     [extra_run_opts(f'"{config.libdir}"'), req_rts_linker],
+     [extra_run_opts(f'"{config.libdir}"'), req_interp],
      compile_and_run,
      ['-package ghc'])
 
