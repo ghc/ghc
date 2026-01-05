@@ -62,6 +62,7 @@ import GHC.Utils.Panic
 
 import Control.Monad    ( mapAndUnzipM, when )
 import Data.Word
+import Data.Maybe       ( fromJust )
 
 import GHC.Types.Basic
 import GHC.Data.FastString
@@ -1207,32 +1208,25 @@ genCCall _ (PrimTarget (MO_Prefetch_Data _)) _ _
 genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
  = do let fmt      = intFormat (max width W32)
           reg_dst  = getLocalRegReg dst
-      platform <- getPlatform
-      let addr_fmt = intFormat (wordWidth platform)
 
-      (unaligned_addr, ucode) <- getSomeReg addr
       (n_reg, ncode)          <- getSomeReg n
 
-      aligned_addr <- getNewRegNat addr_fmt
-      Amode aligned_addr align_code <- case width of
-         W8 -> return $ Amode (AddrRegReg r0 aligned_addr)
-                   (unitOL (CLRRI addr_fmt aligned_addr
-                            unaligned_addr 2))
-         W16 -> return $ Amode (AddrRegReg r0 aligned_addr)
-                   (unitOL (CLRRI addr_fmt aligned_addr
-                            unaligned_addr 2))
-         _   -> return $ Amode (AddrRegReg r0 unaligned_addr)
-                   nilOL
+      (Amode aligned_addr align_code, maybe_unaligned_addr) <- case width of
+         W8  -> align_address
+         W16 -> align_address
+         _   -> getAmodeIndex addr
 
       shift        <- getNewRegNat fmt
       mask         <- getNewRegNat fmt
       shifted_n    <- getNewRegNat fmt
-      tmp          <- getNewRegNat fmt
+      tmp1         <- getNewRegNat fmt
       masked_res   <- getNewRegNat fmt
       masked_other <- getNewRegNat fmt
+      tmp2         <- getNewRegNat fmt
 
       (n_reg', ini) <- case width of
             W8  -> do
+              let unaligned_addr = fromJust maybe_unaligned_addr
               let i = toOL [ RLWINM shift unaligned_addr 3 27 28
                            , LI mask (ImmInt 255)
                            , SL fmt mask mask (RIReg shift)
@@ -1240,6 +1234,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                            ]
               return (shifted_n, i)
             W16 -> do
+              let unaligned_addr = fromJust maybe_unaligned_addr
               let i = toOL [ RLWINM shift unaligned_addr 3 27 27
                            , LI mask (ImmInt 0)
                            , OR mask mask (RIImm (ImmInt 65535))
@@ -1249,17 +1244,17 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
               return (shifted_n, i)
             _    -> return (n_reg, nilOL)
       let build_result =
-             let m = toOL [ AND masked_res tmp (RIReg mask)
+             let m = toOL [ AND masked_res tmp2 (RIReg mask)
                           , ANDC masked_other reg_dst mask
-                          , OR tmp masked_other (RIReg masked_res)
+                          , OR tmp2 masked_other (RIReg masked_res)
                           ]
-                 f = unitOL $ SR fmt reg_dst tmp (RIReg shift)
+                 f = unitOL $ SR fmt reg_dst tmp2 (RIReg shift)
                  in (m, f)
 
       let (insert, shift_back) = case width of
             W8  -> build_result
             W16 -> build_result
-            _   -> (nilOL, nilOL)
+            _   -> (nilOL, unitOL $ MR reg_dst tmp2)
 {-
       (instr, n_code) <- case amop of
             AMO_Add  -> getSomeRegOrImm ADD True reg_dst
@@ -1278,24 +1273,24 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
             AMO_Xor  -> getSomeRegOrImm XOR False reg_dst
 -}
       let instr = case amop of
-            AMO_Add  -> ADD tmp reg_dst (RIReg n_reg')
-            AMO_Sub  -> SUBF tmp n_reg' reg_dst
-            AMO_And  -> AND tmp reg_dst (RIReg n_reg')
-            AMO_Nand -> NAND tmp reg_dst n_reg'
-            AMO_Or   -> OR tmp reg_dst (RIReg n_reg')
-            AMO_Xor  -> XOR tmp reg_dst (RIReg n_reg')
+            AMO_Add  -> ADD tmp2 tmp1 (RIReg n_reg')
+            AMO_Sub  -> SUBF tmp2 n_reg' tmp1
+            AMO_And  -> AND tmp2 tmp1 (RIReg n_reg')
+            AMO_Nand -> NAND tmp2 tmp1 n_reg'
+            AMO_Or   -> OR tmp2 tmp1 (RIReg n_reg')
+            AMO_Xor  -> XOR tmp2 tmp1 (RIReg n_reg')
 
       lbl_retry <- getBlockIdNat
       lbl_done <- getBlockIdNat
-      return $ ncode `appOL` ucode `appOL` align_code `appOL` ini
+      return $ ncode `appOL` align_code `appOL` ini
         `appOL` toOL [ HWSYNC
                      , BCC ALWAYS lbl_retry Nothing
 
                      , NEWBLOCK lbl_retry
-                     , LDR fmt reg_dst aligned_addr
+                     , LDR fmt tmp1 aligned_addr
                      ]
         `appOL` unitOL instr `appOL` insert
-        `appOL` toOL [ STC fmt tmp aligned_addr
+        `appOL` toOL [ STC fmt tmp2 aligned_addr
                      , BCC NE lbl_retry (Just False)
                      , BCC ALWAYS lbl_done Nothing
 
@@ -1303,17 +1298,30 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                      , ISYNC
                      ]
         `appOL` shift_back
-{-
+
         where
            getAmodeIndex (CmmMachOp (MO_Add _) [x, y])
              = do
                  (regX, codeX) <- getSomeReg x
                  (regY, codeY) <- getSomeReg y
-                 return (Amode (AddrRegReg regX regY) (codeX `appOL` codeY))
+                 return ((Amode (AddrRegReg regX regY) (codeX `appOL` codeY))
+                        , Nothing)
            getAmodeIndex other
              = do
                  (reg, code) <- getSomeReg other
-                 return (Amode (AddrRegReg r0 reg) code) -- NB: r0 is 0 here!
+                 return ((Amode (AddrRegReg r0 reg) code) -- NB: r0 is 0 here!
+                        , Nothing)
+
+           align_address
+             = do
+             platform <- getPlatform
+             let addr_fmt = intFormat (wordWidth platform)
+             (unaligned_addr, ucode) <- getSomeReg addr
+             aligned_addr <- getNewRegNat addr_fmt
+             return (Amode (AddrRegReg r0 aligned_addr)
+                     (ucode `snocOL` (CLRRI addr_fmt aligned_addr
+                                      unaligned_addr 2)), Just unaligned_addr)
+{-
            getSomeRegOrImm op sign dst
              = case n of
                  CmmLit (CmmInt i _) | Just imm <- makeImmediate width sign i
