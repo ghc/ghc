@@ -34,13 +34,6 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
             , notStage0 ? arg ("--cflag=-D" ++ tOs   ++ "_HOST_OS=1"  )
             , arg $ "--cflag=-D__GLASGOW_HASKELL__=" ++ version
             , arg $ "--template=" ++ tmpl
-              -- We'll assume we compile with gcc or clang, and both support
-              -- `-S` and can as such use the --via-asm flag, which should be
-              -- faster and is required for cross compiling to windows, as the c
-              -- compiler complains about non-constant expressions even though
-              -- they are constant and end up as constants in the assembly.
-              -- See #12849
-            , flag CrossCompiling ? isWinTarget ? arg "--via-asm"
             , arg =<< getInput
             , arg "-o", arg =<< getOutput ]
 
