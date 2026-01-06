@@ -3588,7 +3588,7 @@ compilerInfo dflags
        ("target has RTS linker",       showBool $ platformHasRTSLinker platform),
        ("Target default backend",      show     $ platformDefaultBackend platform),
        -- Whether or not we support @-dynamic-too@
-       ("Support dynamic-too",         showBool $ not isWindows),
+       ("Support dynamic-too",         "YES"),
        -- Whether or not we support the @-j@ flag with @--make@.
        ("Support parallel --make",     "YES"),
        -- Whether or not we support "Foo from foo-0.1-XXX:Foo" syntax in
@@ -3623,7 +3623,6 @@ compilerInfo dflags
     showBool True  = "YES"
     showBool False = "NO"
     platform  = targetPlatform dflags
-    isWindows = platformOS platform == OSMinGW32
     expandDirectories = expandToolDir (toolDir dflags) . expandTopDir (topDir dflags)
     query :: (Target -> a) -> a
     query f = f (rawTarget dflags)
@@ -3712,11 +3711,6 @@ makeDynFlagsConsistent :: DynFlags -> (DynFlags, [Warn], [Located SDoc])
 -- ensure that a later change doesn't invalidate an earlier check.
 -- Be careful not to introduce potential loops!
 makeDynFlagsConsistent dflags
- -- Disable -dynamic-too on Windows (#8228, #7134, #5987)
- | os == OSMinGW32 && gopt Opt_BuildDynamicToo dflags
-    = let dflags' = gopt_unset dflags Opt_BuildDynamicToo
-          warn    = "-dynamic-too is not supported on Windows"
-      in loop dflags' warn
  -- Disable -dynamic-too if we are are compiling with -dynamic already, otherwise
  -- you get two dynamic object files (.o and .dyn_o). (#20436)
  | ways dflags `hasWay` WayDyn && gopt Opt_BuildDynamicToo dflags
