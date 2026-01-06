@@ -14,7 +14,6 @@ import Hadrian.Expression
 import Hadrian.Haskell.Cabal
 import Oracles.Flag (platformSupportsGhciObjects)
 import Packages
-import Rules.Rts
 import Settings
 import Target
 import Utilities
@@ -91,13 +90,8 @@ parseToBuildSubdirectory root = do
 -- * Registering
 
 registerPackages :: [Context] -> Action ()
-registerPackages ctxs = do
+registerPackages ctxs =
     need =<< mapM pkgRegisteredLibraryFile ctxs
-
-    -- Dynamic RTS library files need symlinks (Rules.Rts.rtsRules).
-    forM_ ctxs $ \ ctx -> when (package ctx == rts) $ do
-        ways <- interpretInContext ctx (getLibraryWays <> getRtsWays)
-        needRtsSymLinks (stage ctx) ways
 
 -- | Register a package and initialise the corresponding package database if
 -- need be. Note that we only register packages in 'Stage0' and 'Stage1'.
