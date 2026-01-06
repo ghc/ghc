@@ -116,7 +116,7 @@ __attribute__((noreturn)) int run (char *exePath,
        didn't do the trick either.
 
        Irrespective of this issue, using CreateProcess() is preferable,
-       as it makes this wrapper work on both mingw and cygwin.
+       as it makes this wrapper work reliably on Windows.
     */
 #if 0
     fprintf(stderr, "Invoking %s\n", new_cmdline); fflush(stderr);

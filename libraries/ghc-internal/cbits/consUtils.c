@@ -3,16 +3,12 @@
  *
  * Win32 Console API support
  */
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32)
 /* to the end */
 
 #include "consUtils.h"
 #include <windows.h>
 #include <io.h>
-
-#if defined(__CYGWIN__)
-#define _get_osfhandle get_osfhandle
-#endif
 
 int is_console__(int fd) {
     DWORD st;

@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
     char *preArgv[1];
 
     if (isMinTTY()) {
-        printf("WARNING: GHCi invoked via 'ghci.exe' in MinTTY consoles (e.g., Cygwin or MSYS)\n");
+        printf("WARNING: GHCi invoked via 'ghci.exe' in MinTTY consoles (e.g., MSYS2)\n");
         printf("         doesn't handle Ctrl-C well; use the 'ghcii.sh' shell wrapper instead\n");
         fflush(stdout);
     }

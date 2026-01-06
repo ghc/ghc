@@ -1139,7 +1139,7 @@ read and write this syntax respectively. Here's an example of the
                  Operating System Interface for Computing Environments -
                  IEEE Std. 1003.1).
                  .
-                 The package is not supported under Windows (except under Cygwin).
+                 The package is not supported under Windows.
     category: System
     author:
     exposed: True

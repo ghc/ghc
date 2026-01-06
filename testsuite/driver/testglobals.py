@@ -80,7 +80,6 @@ class TestConfig:
         self.os = ''
         self.arch = ''
         self.msys = False
-        self.cygwin = False
 
         # What is the wordsize (in bits) of this platform?
         self.wordsize = ''

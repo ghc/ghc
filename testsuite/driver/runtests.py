@@ -21,8 +21,8 @@ from pathlib import Path
 # We don't actually need subprocess in runtests.py, but:
 # * We do need it in testlibs.py
 # * We can't import testlibs.py until after we have imported ctypes
-# * If we import ctypes before subprocess on cygwin, then sys.exit(0)
-#   says "Aborted" and we fail with exit code 134.
+# * If we import ctypes before subprocess on some Windows environments,
+#   then sys.exit(0) says "Aborted" and we fail with exit code 134.
 # So we import it here first, so that the testsuite doesn't appear to fail.
 import subprocess
 
@@ -182,16 +182,13 @@ elif args.ignore_perf_failures == 'decreases':
 if args.test_env:
     config.test_env = args.test_env
 
-config.cygwin = False
 config.msys = False
 
 if windows:
     h = os.popen('uname -s', 'r')
     v = h.read()
     h.close()
-    if v.startswith("CYGWIN"):
-        config.cygwin = True
-    elif v.startswith("MINGW") or v.startswith("MSYS"):
+    if v.startswith("MINGW") or v.startswith("MSYS"):
 # msys gives "MINGW32"
 # msys2 gives "MINGW_NT-6.2" or "MSYS_NT-6.3"
         config.msys = True
@@ -274,12 +271,6 @@ def format_path(path):
             # letter representation. Otherwise it thinks we're adding two env
             # variables E and /Foo when we add E:/Foo.
             path = re.sub('([a-zA-Z]):', '/\\1', path)
-        if config.cygwin:
-            # On cygwin we can't put "c:\foo" in $PATH, as : is a
-            # field separator. So convert to /cygdrive/c/foo instead.
-            # Other pythons use ; as the separator, so no problem.
-            path = re.sub('([a-zA-Z]):', '/cygdrive/\\1', path)
-            path = re.sub('\\\\', '/', path)
     return path
 
 # On Windows we need to set $PATH to include the paths to all the DLLs

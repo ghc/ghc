@@ -65,13 +65,13 @@ TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -f
 
 RUNTEST_OPTS =
 
-ifeq "$(filter $(TargetOS_CPP), cygwin32 mingw32)" ""
+ifeq "$(filter $(TargetOS_CPP), mingw32)" ""
 exeext =
 else
 exeext = .exe
 endif
 
-ifneq "$(filter $(TargetOS_CPP),cygwin32 mingw32)" ""
+ifneq "$(filter $(TargetOS_CPP),mingw32)" ""
 dllext = .dll
 else ifeq "$(TargetOS_CPP)" "darwin"
 dllext = .dylib
