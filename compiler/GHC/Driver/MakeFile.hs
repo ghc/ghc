@@ -331,7 +331,7 @@ writeDependency :: FilePath -> Handle -> [FilePath] -> FilePath -> IO ()
 writeDependency root hdl targets dep
   = do let -- We need to avoid making deps on
            --     c:/foo/...
-           -- on cygwin as make gets confused by the :
+           -- on Windows as make gets confused by the :
            -- Making relative deps avoids some instances of this.
            dep' = makeRelative root dep
            forOutput = escapeSpaces . reslash Forwards . normalise

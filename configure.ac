@@ -469,7 +469,7 @@ dnl --------------------------------------------------------------
 dnl Note: we may not have objdump on OS X, and we only need it on
 dnl Windows (for DLL checks), OpenBSD, and AIX
 case $HostOS_CPP in
-  cygwin32|mingw32|openbsd|aix)
+  mingw32|openbsd|aix)
     AC_CHECK_TARGET_TOOL([OBJDUMP], [objdump])
     ;;
 esac

@@ -67,9 +67,7 @@ data Handler
 -- running in a Windows console.  Certain environments that look like consoles
 -- do not support console events, these include:
 --
---  * Cygwin shells with @CYGWIN=tty@ set (if you don't set @CYGWIN=tty@,
---    then a Cygwin shell behaves like a Windows console).
---  * Cygwin xterm and rxvt windows
+--  * MSYS MinTTY shells
 --  * MSYS rxvt windows
 --
 -- In order for your application to receive console events, avoid running

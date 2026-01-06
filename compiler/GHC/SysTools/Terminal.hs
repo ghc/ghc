@@ -41,7 +41,7 @@ stderrSupportsAnsiColors' = do
       case eMode of
         Left (_ :: IOError) -> Win32.isMinTTYHandle h
                                  -- Check if the we're in a MinTTY terminal
-                                 -- (e.g., Cygwin or MSYS2)
+                                 -- (e.g., MSYS2)
         Right mode
           | modeHasVTP mode -> pure True
           | otherwise       -> enableVTP h mode

@@ -1,7 +1,7 @@
 #include "HsBase.h"
 #include "HsFFI.h"
 
-#if defined(HAVE_WINSOCK_H) && !defined(__CYGWIN__)
+#if defined(HAVE_WINSOCK_H)
 
 static int winsock_inited = 0;
 

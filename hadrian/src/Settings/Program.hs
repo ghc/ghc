@@ -40,7 +40,7 @@ programContext stage pkg = do
 ghcWithInterpreter :: Stage -> Action Bool
 ghcWithInterpreter stage = do
     is_cross <- flag CrossCompiling
-    goodOs <- anyTargetOs [ OSMinGW32, OSLinux, OSSolaris2 -- TODO "cygwin32"?,
+    goodOs <- anyTargetOs [ OSMinGW32, OSLinux, OSSolaris2
                           , OSFreeBSD, OSDragonFly, OSNetBSD, OSOpenBSD
                           , OSDarwin, OSKFreeBSD
                           , OSWasi ]

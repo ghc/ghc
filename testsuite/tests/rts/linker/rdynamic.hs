@@ -39,10 +39,8 @@ loadFunction mpkg m valsym = do
   where
     prefixUnderscore = case (os, arch) of
                          ("mingw32", "x86_64") -> ""
-                         ("cygwin" , "x86_64") -> ""
                          ("mingw32", _       ) -> "_"
                          ("darwin" , _       ) -> "_"
-                         ("cygwin" , _       ) -> "_"
                          _                     -> ""
 
 foreign import ccall safe "lookupSymbol" c_lookupSymbol :: CString -> IO (Ptr a)

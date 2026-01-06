@@ -575,7 +575,7 @@ hGetEcho handle = do
 -- | Is the handle connected to a terminal?
 --
 -- On Windows the result of 'hIsTerminalDevide' might be misleading,
--- because non-native terminals, such as MinTTY used in MSYS and Cygwin environments,
+-- because non-native terminals, such as MinTTY used in MSYS environments,
 -- are implemented via redirection.
 -- Use @System.Win32.Types.withHandleToHANDLE System.Win32.MinTTY.isMinTTYHandle@
 -- to recognise it. Also consider @ansi-terminal@ package for crossplatform terminal

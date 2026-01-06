@@ -33,23 +33,16 @@ We recommend running GHCi in a standard Windows console: select the
 use ``Start->Run->cmd`` to get a Windows console and invoke ``ghci``
 from there (as long as it's in your ``PATH``).
 
-If you run GHCi in a Cygwin or MSYS shell, then the Control-C behaviour
-is adversely affected. In one of these environments you should use the
+If you run GHCi in an MSYS shell, then the Control-C behaviour
+is adversely affected. In this environment you should use the
 ``ghcii.sh`` script to start GHCi, otherwise when you hit Control-C
 you'll be returned to the shell prompt but the GHCi process will still
 be running. However, even using the ``ghcii.sh`` script, if you hit
 Control-C then the GHCi process will be killed immediately, rather than
 letting you interrupt a running program inside GHCi as it should. This
-problem is caused by the fact that the Cygwin and MSYS shell
-environments don't pass Control-C events to non-Cygwin child processes,
-because in order to do that there needs to be a Windows console.
-
-There's an exception: you can use a Cygwin shell if the ``CYGWIN``
-environment variable does *not* contain ``tty``. In this mode, the
-Cygwin shell behaves like a Windows console shell and console events are
-propagated to child processes. Note that the ``CYGWIN`` environment
-variable must be set *before* starting the Cygwin shell; changing it
-afterwards has no effect on the shell.
+problem is caused by the fact that the MSYS shell environment doesn't
+pass Control-C events to non-console child processes, because in order
+to do that there needs to be a Windows console.
 
 This problem doesn't just affect GHCi, it affects any GHC-compiled
 program that wants to catch console events. See the
@@ -137,78 +130,6 @@ See the
 `Windows documentation <https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file>`_
 for more details.
 
-
-.. _ghci-cygwin:
-
-Using GHC (and other GHC-compiled executables) with Cygwin
-----------------------------------------------------------
-
-Background
-~~~~~~~~~~
-
-The Cygwin tools aim to provide a Unix-style API on top of the windows
-libraries, to facilitate ports of Unix software to windows. To this end,
-they introduce a Unix-style directory hierarchy under some root
-directory (typically ``/`` is ``C:\cygwin\``). Moreover, everything
-built against the Cygwin API (including the Cygwin tools and programs
-compiled with Cygwin's GHC) will see ``/`` as the root of their file system,
-happily pretending to work in a typical unix environment, and finding
-things like ``/bin`` and ``/usr/include`` without ever explicitly
-bothering with their actual location on the windows system (probably
-``C:\cygwin\bin`` and ``C:\cygwin\usr\include``).
-
-The problem
-~~~~~~~~~~~
-
-GHC, by default, no longer depends on cygwin, but is a native Windows
-program. It is built using mingw, and it uses mingw's GHC while
-compiling your Haskell sources (even if you call it from cygwin's bash),
-but what matters here is that - just like any other normal windows
-program - neither GHC nor the executables it produces are aware of
-Cygwin's pretended unix hierarchy. GHC will happily accept either ``/`` or
-``\`` as path separators, but it won't know where to find ``/home/joe/Main.hs``
-or ``/bin/bash`` or the like. This causes all kinds of fun when GHC is used from
-within Cygwin's bash, or in make-sessions running under Cygwin.
-
-Things to do
-~~~~~~~~~~~~
-
--  Don't use absolute paths in ``make``, ``configure`` & co if there is any
-   chance that those might be passed to GHC (or to GHC-compiled
-   programs). Relative paths are fine because cygwin tools are happy
-   with them and GHC accepts ``/`` as path-separator. And relative paths
-   don't depend on where Cygwin's root directory is located, or on which
-   partition or network drive your source tree happens to reside, as
-   long as you ``cd`` there first.
-
--  If you have to use absolute paths (beware of the innocent-looking
-   ``ROOT=$(pwd)`` in makefile hierarchies or configure scripts), Cygwin
-   provides a tool called ``cygpath`` that can convert Cygwin's
-   Unix-style paths to their actual Windows-style counterparts. Many
-   Cygwin tools actually accept absolute Windows-style paths (remember,
-   though, that you either need to escape ``\`` or convert ``\`` to ``/``),
-   so you should be fine just using those everywhere. If you need to use
-   tools that do some kind of path-mangling that depends on unix-style
-   paths (one fun example is trying to interpret ``:`` as a separator in
-   path lists), you can still try to convert paths using ``cygpath``
-   just before they are passed to GHC and friends.
-
--  If you don't have ``cygpath``, you probably don't have cygwin and
-   hence no problems with it... unless you want to write one build
-   process for several platforms. Again, relative paths are your friend,
-   but if you have to use absolute paths, and don't want to use
-   different tools on different platforms, you can simply write a short
-   Haskell program to print the current directory (thanks to George
-   Russell for this idea): compiled with GHC, this will give you the
-   view of the file system that GHC depends on (which will differ
-   depending on whether GHC is compiled with cygwin's gcc or mingw's gcc
-   or on a real Unix system..) - that little program can also deal with
-   escaping ``\`` in paths. Apart from the banner and the startup time,
-   something like this would also do:
-
-   .. code-block:: none
-
-         $ echo "Directory.getCurrentDirectory >>= putStrLn . init . tail . show " | ghci
 
 .. _win32-dlls:
 

@@ -28,6 +28,6 @@ bool isMinTTY() {
   PWSTR fn = pfni->FileName;
   fn[pfni->FileNameLength] = L'\0';
 
-  return ((wcsstr(fn, L"\\cygwin-") || wcsstr(fn, L"\\msys-")) &&
-           wcsstr(fn, L"-pty") && wcsstr(fn, L"-master"));
+  return (wcsstr(fn, L"\\msys-") &&
+          wcsstr(fn, L"-pty") && wcsstr(fn, L"-master"));
 }
