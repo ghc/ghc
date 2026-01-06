@@ -128,6 +128,9 @@ stripStgTicksTopE p = go
          go other               = other
 
 -- | Do we allow the given top-level (static) ConApp?
+--
+-- Currently this is unconditionally True, but historically it has been more
+-- complicated, so the mechanism to choose otherwise is still here for now.
 allowTopLevelConApp
   :: Platform
   -> Bool          -- is Opt_ExternalDynamicRefs enabled?
@@ -138,22 +141,18 @@ allowTopLevelConApp
 allowTopLevelConApp platform ext_dyn_refs this_mod con args
   -- we're not using dynamic linking
   | not ext_dyn_refs = True
-  -- if the target OS is Windows, we only allow top-level ConApps if they don't
-  -- reference external names (Windows DLLs have a problem with static cross-DLL
-  -- refs)
-  | platformOS platform == OSMinGW32 = not is_external_con_app
+
+  -- On Windows, for now, always use top level constructor applications, and
+  -- rely on Mingw "pseudo relocations" to make this work. We might want to
+  -- have a flag to control this behaviour, because using pseudo-relocations
+  -- can be incompatible with some security restrictions, but note that
+  -- ghc-internal and everything would need to be rebuilt. Note also that
+  -- dynamic top level con apps increases symbol exports a lot.
+  | platformOS platform == OSMinGW32 = True
+
   -- otherwise, allowed
   -- Sylvain: shouldn't this be False when (ext_dyn_refs && is_external_con_app)?
   | otherwise = True
-  where
-    is_external_con_app = isDynLinkName platform this_mod (dataConName con) || any is_dll_arg args
-
-    -- NB: typePrimRep1 is legit because any free variables won't have
-    -- unlifted type (there are no unlifted things at top level)
-    is_dll_arg :: StgArg -> Bool
-    is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep1 (idType v))
-                             && isDynLinkName platform this_mod (idName v)
-    is_dll_arg _             = False
 
 -- True of machine addresses; these are the things that don't work across DLLs.
 -- The key point here is that VoidRep comes out False, so that a top level
