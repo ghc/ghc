@@ -66,6 +66,7 @@ import GHC.Tc.Utils.Monad
 
 import GHC.Utils.Binary   ( BinData(..) )
 import GHC.Utils.Error
+import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
@@ -989,7 +990,8 @@ writeIface :: Logger -> Profile -> CompressionIFace -> FilePath -> ModIface -> I
 writeIface logger profile compression_level hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
          let printer = TraceBinIFace (debugTraceMsg logger 3)
-         writeBinIface profile printer compression_level hi_file_path new_iface
+         withAtomicRename hi_file_path $ \temp_path ->
+           writeBinIface profile printer compression_level temp_path new_iface
 
 flagsToIfCompression :: DynFlags -> CompressionIFace
 flagsToIfCompression dflags
