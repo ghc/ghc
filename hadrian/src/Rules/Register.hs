@@ -118,7 +118,18 @@ registerPackageRules rs stage iplace = do
         pkgName <- getPackageNameFromConfFile conf
         let pkg = unsafeFindPackageByName pkgName
 
-        when (pkg == compiler) $ need =<< ghcLibDeps stage iplace
+        when (pkg == compiler) $ do
+            baseDeps <- ghcLibDeps stage iplace
+            jsTarget <- isJsTarget
+            wasmTarget <- isWasmTarget
+            libPath <- stageLibPath stage
+            let jsDeps
+                  | jsTarget  = ["ghc-interp.js"]
+                  | otherwise = []
+                wasmDeps
+                  | wasmTarget = ["dyld.mjs", "post-link.mjs", "prelude.mjs"]
+                  | otherwise  = []
+            need (baseDeps ++ map (libPath -/-) (jsDeps ++ wasmDeps))
 
         -- Only used in guard when Stage0 {} but can be GlobalLibs or InTreeLibs
         isBoot <- (pkg `notElem`) <$> stagePackages stage

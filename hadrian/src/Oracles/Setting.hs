@@ -9,7 +9,7 @@ module Oracles.Setting (
 
     -- ** Target platform things
     anyTargetOs, anyTargetArch, anyHostOs,
-    isElfTarget, isOsxTarget, isWinTarget, isJsTarget, isArmTarget,
+    isElfTarget, isOsxTarget, isWinTarget, isJsTarget, isWasmTarget, isArmTarget,
     isWinHost,
     targetArmVersion
     ) where
@@ -127,6 +127,9 @@ isWinTarget = anyTargetOs [OSMinGW32]
 
 isJsTarget :: Action Bool
 isJsTarget = anyTargetArch [ArchJavaScript]
+
+isWasmTarget :: Action Bool
+isWasmTarget = anyTargetArch [ArchWasm32]
 
 isOsxTarget :: Action Bool
 isOsxTarget = anyTargetOs [OSDarwin]
