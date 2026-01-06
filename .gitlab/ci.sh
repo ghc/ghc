@@ -341,11 +341,27 @@ function fetch_ghc() {
 }
 
 function fetch_cabal() {
+  local should_fetch=false
+
   if [ ! -e "$CABAL" ]; then
-      local v="$CABAL_INSTALL_VERSION"
-      if [[ -z "$v" ]]; then
-          fail "neither CABAL nor CABAL_INSTALL_VERSION are not set"
+    if [ -z "${CABAL_INSTALL_VERSION:-}" ]; then
+      fail "cabal not found at '$CABAL' and CABAL_INSTALL_VERSION is not set"
+    fi
+    should_fetch=true
+  fi
+
+  if  [ -e "$CABAL" ] && [ -n "${CABAL_INSTALL_VERSION:-}" ]; then
+    local current_version
+    if current_version=$($CABAL --numeric-version 2>/dev/null); then
+      if [ "$current_version" != "$CABAL_INSTALL_VERSION" ]; then
+        info "cabal version mismatch: found $current_version, expected $CABAL_INSTALL_VERSION"
+        should_fetch=true
       fi
+    fi
+  fi
+
+  if [ "$should_fetch" = true ]; then
+      local v="$CABAL_INSTALL_VERSION"
 
       start_section fetch-cabal "Fetch Cabal"
       case "$(uname)" in
@@ -355,7 +371,7 @@ function fetch_cabal() {
             CLANG64) cabal_arch="x86_64" ;;
             *) fail "unknown MSYSTEM $MSYSTEM" ;;
           esac
-          url="https://downloads.haskell.org/~cabal/cabal-install-$v/cabal-install-$v-$cabal_arch-windows.zip"
+          local url="https://downloads.haskell.org/~cabal/cabal-install-$v/cabal-install-$v-$cabal_arch-windows.zip"
           info "Fetching cabal binary distribution from $url..."
           curl "$url" > "$TMP/cabal.zip"
           unzip "$TMP/cabal.zip"
@@ -365,19 +381,21 @@ function fetch_cabal() {
           local base_url="https://downloads.haskell.org/~cabal/cabal-install-$v/"
           case "$(uname)" in
             Darwin) cabal_url="$base_url/cabal-install-$v-x86_64-apple-darwin17.7.0.tar.xz" ;;
-            FreeBSD) cabal_url="$base_url/cabal-install-$v-x86_64-freebsd14.tar.xz" ;;
+            FreeBSD) cabal_url="https://downloads.haskell.org/ghcup/unofficial-bindists/cabal/$v/cabal-install-$v-x86_64-portbld-freebsd.tar.xz" ;;
             *) fail "don't know where to fetch cabal-install for $(uname)"
           esac
           echo "Fetching cabal-install from $cabal_url"
           curl "$cabal_url" > cabal.tar.xz
-          tmp="$(tar -tJf cabal.tar.xz | head -n1)"
-          $TAR -xJf cabal.tar.xz
+          local path="$(tar -tJf cabal.tar.xz | head -n1)"
+          local tmp_dir=$(mktemp -d XXXX-cabal)
+          $TAR -xJf cabal.tar.xz -C "${tmp_dir}"
           # Check if the bindist has directory structure
-          if [[ "$tmp" = "cabal" ]]; then
-              mv cabal "$toolchain/bin"
+          if [[ "$path" = "cabal" ]]; then
+              mv "${tmp_dir}"/cabal "$toolchain/bin"
           else
-              mv "$tmp/cabal" "$toolchain/bin"
+              mv "${tmp_dir}/$path/cabal" "$toolchain/bin"
           fi
+          rmdir "${tmp_dir}"
           ;;
       esac
       end_section fetch-cabal
