@@ -88,6 +88,8 @@ Runtime system
   kqueue). This first one, based on `poll()`, is merely intended to be
   portable.
 
+- The default for :rts-flag:`--eventlog-flush-interval=⟨seconds⟩` has changed from being disabled to being enabled with a flush inverval of 5 seconds.
+
 
 Cmm
 ~~~
