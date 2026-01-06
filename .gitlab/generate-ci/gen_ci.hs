@@ -451,7 +451,7 @@ opsysVariables _ FreeBSD14 = mconcat
   , "CC" =: "cc"
   , "CXX" =: "c++"
   , "FETCH_GHC_VERSION" =: "9.10.1"
-  , "CABAL_INSTALL_VERSION" =: "3.10.3.0"
+  , "CABAL_INSTALL_VERSION" =: "3.14.2.0"
   ]
 opsysVariables arch (Linux distro) = distroVariables arch distro
 opsysVariables AArch64 (Darwin {}) = mconcat
@@ -480,9 +480,9 @@ opsysVariables Amd64 (Darwin {}) = mconcat
 opsysVariables _ (Windows {}) = mconcat
   [ "MSYSTEM" =: "CLANG64"
   , "LANG" =: "en_US.UTF-8"
-  , "CABAL_INSTALL_VERSION" =: "3.10.2.0"
+  , "CABAL_INSTALL_VERSION" =: "3.14.2.0"
   , "HADRIAN_ARGS" =: "--docs=no-sphinx-pdfs"
-  , "FETCH_GHC_VERSION" =: "9.10.1"
+  , "FETCH_GHC_VERSION" =: "9.10.3"
   ]
 opsysVariables _ _ = mempty
 
