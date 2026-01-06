@@ -11,69 +11,67 @@ let
   hsPkgs = pkgs.haskellPackages;
   alex = hsPkgs.alex;
   happy = hsPkgs.happy;
-  targetTriple = pkgs.stdenv.targetPlatform.config;
+  targetTriple = pkgs.stdenvNoCC.targetPlatform.config;
 
   ghcBindists = let version = ghc.version; in {
-    aarch64-darwin = hostPkgs.fetchurl {
+    aarch64-darwin = hostPkgs.fetchzip {
       url = "https://downloads.haskell.org/ghc/${version}/ghc-${version}-aarch64-apple-darwin.tar.xz";
-      sha256 = "sha256-/6+DtdeossBJIMbjkJwL4h3eJ7rzgNCV+ifoQKOi6AQ=";
+      hash = "sha512-xUlt7zc/OT3a1SR0BxmFFgrabPkWUENATdw4NbQwEi5+nH5yPau+HSrGI5UUoKdO4gdpgZlPaxtI7eSk0fx1+g==";
     };
-    x86_64-darwin = hostPkgs.fetchurl {
+    x86_64-darwin = hostPkgs.fetchzip {
       url = "https://downloads.haskell.org/ghc/${version}/ghc-${version}-x86_64-apple-darwin.tar.xz";
-      sha256 = "sha256-jPIhiJMOENesUnDUJeIaPatgavc6ZVSTY5NFIAxlC+k=";
+      hash = "sha512-4/INeJwPPGbOj9MepwnIvIg2lvFkqS8w/3U/I8f6gCsoNlgwPr78iyY9vd6vfMONR1GxNQU3L/lxE07F3P0Qag==";
     };
-
   };
 
-  ghc = pkgs.stdenv.mkDerivation rec {
-    version = "9.10.1";
+  ghc = pkgs.stdenvNoCC.mkDerivation rec {
+    version = "9.10.3";
     name = "ghc";
-    src = ghcBindists.${pkgs.stdenv.hostPlatform.system};
+    src = ghcBindists.${pkgs.stdenvNoCC.hostPlatform.system};
+
+    dontUpdateAutotoolsGnuConfigScripts = true;
+
     configureFlags = [
-      "CC=/usr/bin/clang"
-      "CLANG=/usr/bin/clang"
       "AR=/usr/bin/ar"
-      "LLC=${llvm}/bin/llc"
-      "OPT=${llvm}/bin/opt"
-      "LLVMAS=${llvm_clang}/bin/clang"
-      "CONF_CC_OPTS_STAGE2=--target=${targetTriple}"
-      "CONF_CXX_OPTS_STAGE2=--target=${targetTriple}"
-      "CONF_GCC_LINKER_OPTS_STAGE2=--target=${targetTriple}"
+      "CC=/usr/bin/clang"
+      "CXX=/usr/bin/clang++"
+      "INSTALL=/usr/bin/install"
+      "INSTALL_NAME_TOOL=/usr/bin/install_name_tool"
+      "MergeObjsCmd=/usr/bin/ld"
+      "NM=/usr/bin/nm"
+      "OTOOL=/usr/bin/otool"
+      "RANLIB=/usr/bin/ranlib"
     ];
-    buildPhase = "true";
 
-    # This is a horrible hack because the configure script invokes /usr/bin/clang
-    # without a `--target` flag. Then depending on whether the `nix` binary itself is
-    # a native x86 or arm64 binary means that /usr/bin/clang thinks it needs to run in
-    # x86 or arm64 mode.
-
-    # The correct answer for the check in question is the first one we try, so by replacing
-    # the condition to true; we select the right C++ standard library still.
-    preConfigure = ''
-      sed "s/\"\$CC\" -o actest actest.o \''${1} 2>\/dev\/null/true/i" configure > configure.new
-      mv configure.new configure
-      chmod +x configure
-      cat configure
-
+    # Use the arch command to explicitly specify architecture, so that
+    # configure and its subprocesses would pick up the architecture we
+    # choose via the system argument.
+    preConfigure = pkgs.lib.optionalString (system == "aarch64-darwin") ''
+      substituteInPlace configure \
+        --replace-fail "#! /bin/sh" "#!/usr/bin/env -S /usr/bin/arch -arm64 /bin/sh"
+    '' + pkgs.lib.optionalString (system == "x86_64-darwin") ''
+      substituteInPlace configure \
+        --replace-fail "#! /bin/sh" "#!/usr/bin/env -S /usr/bin/arch -x86_64 /bin/sh"
+    '' + ''
+      unset DEVELOPER_DIR SDKROOT
+      export DEVELOPER_DIR="$(/usr/bin/xcode-select --print-path)"
+      export SDKROOT="$(/usr/bin/xcrun --sdk macosx --show-sdk-path)"
     '';
+
+    dontPatchShebangsInConfigure = true;
 
     # N.B. Work around #20253.
     nativeBuildInputs = [ pkgs.gnused ];
-    postInstallPhase = ''
-      settings="$out/lib/ghc-${version}/settings"
-      sed -i -e "s%\"llc\"%\"${llvm}/bin/llc\"%" $settings
-      sed -i -e "s%\"opt\"%\"${llvm}/bin/opt\"%" $settings
-      sed -i -e "s%\"clang\"%\"/usr/bin/clang\"%" $settings
-      sed -i -e 's%("C compiler command", "")%("C compiler command", "/usr/bin/clang")%' $settings
-      sed -i -e 's%("C compiler flags", "")%("C compiler flags", "--target=${targetTriple}")%' $settings
-      sed -i -e 's%("C++ compiler flags", "")%("C++ compiler flags", "--target=${targetTriple}")%' $settings
-      sed -i -e 's%("C compiler link flags", "")%("C compiler link flags", "--target=${targetTriple}")%' $settings
-    '';
+
+    dontBuild = true;
+
+    enableParallelInstalling = true;
+
+    dontFixup = true;
 
     # Sanity check: verify that we can compile hello world.
     doInstallCheck = true;
     installCheckPhase = ''
-      unset DYLD_LIBRARY_PATH
       $out/bin/ghc --info
       cd $TMP
       mkdir test-ghc; cd test-ghc
@@ -91,13 +89,13 @@ let
   ourtexlive = with pkgs;
     texlive.combine {
       inherit (texlive)
-        scheme-medium collection-xetex fncychap titlesec tabulary varwidth
+        scheme-small collection-xetex fncychap tex-gyre titlesec tabulary varwidth
         framed capt-of wrapfig needspace dejavu-otf helvetic upquote;
     };
   fonts = with pkgs; makeFontsConf { fontDirectories = [ dejavu_fonts ]; };
 
-  llvm = pkgs.llvm_15;
-  llvm_clang = pkgs.llvmPackages_15.clang-unwrapped;
+  llvm = pkgs.llvm_21;
+  llvm_clang = pkgs.llvmPackages_21.clang-unwrapped;
 in
 pkgs.writeTextFile {
   name = "toolchain";
