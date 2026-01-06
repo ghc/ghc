@@ -297,7 +297,11 @@ The supported transformers are listed below:
     </tr>
     <tr>
         <td><code>assertions</code></td>
-        <td>Build the stage2 compiler with assertions enabled. </td>
+        <td>Build the stage2 compiler with <code>-DDEBUG</code> assertions enabled. </td>
+    </tr>
+    <tr>
+        <td><code>assertions_stage1</code></td>
+        <td>Build the stage1 compiler with <code>-DDEBUG</code> assertions enabled. </td>
     </tr>
     <tr>
         <td><code>fully_static</code></td>
