@@ -250,7 +250,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.ticky         = false;
     RtsFlags.TraceFlags.trace_output  = NULL;
 #  if defined(THREADED_RTS)
-    RtsFlags.TraceFlags.eventlogFlushTime = 0;
+    RtsFlags.TraceFlags.eventlogFlushTime = SecondsToTime(5); // 5s
 #  endif
     RtsFlags.TraceFlags.nullWriter = false;
 #endif
