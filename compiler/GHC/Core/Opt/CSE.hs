@@ -450,7 +450,7 @@ cse_bind toplevel env_rhs env_body (in_id, in_rhs) out_id
   | otherwise
   = (env_body', (out_id'', out_rhs))
   where
-    (env_body', out_id') = extendCSEnvWithBinding env_body  in_id out_id out_rhs cse_done
+    (env_body', out_id') = extendCSEnvWithBinding env_body in_id out_id out_rhs cse_done
     (cse_done, out_rhs)  = try_for_cse env_rhs in_rhs
     out_id'' | cse_done  = zapStableUnfolding $
                            delayInlining toplevel out_id'

@@ -329,8 +329,8 @@ mkLocalIdOrCoVar name w ty
   | isCoVarType ty = mkLocalCoVar name   ty
   | otherwise      = mkLocalId    name w ty
 
-    -- proper ids only; no covars!
 mkLocalIdWithInfo :: HasDebugCallStack => Name -> Mult -> Type -> IdInfo -> Id
+-- Used for proper ids only; no covars!
 mkLocalIdWithInfo name w ty info =
   Var.mkLocalVar VanillaId name w (assert (not (isCoVarType ty)) ty) info
         -- Note [Free type variables]
