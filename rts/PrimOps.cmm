@@ -386,22 +386,9 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
 
     again: MAYBE_GC(again);
 
-    ("ptr" arr) = ccall allocateMutArrPtrs(MyCapability() "ptr", n, CCCS);
+    ("ptr" arr) = ccall allocateMutArrPtrs(MyCapability() "ptr", n, init "ptr", CCCS);
     if (arr == NULL) (likely: False) {
         jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
-    }
-
-    // Initialise all elements of the array with the value init
-    W_ p;
-    p = arr + SIZEOF_StgMutArrPtrs;
-    // Avoid the shift for `WDS(n)` in the inner loop
-    W_ limit;
-    limit = arr + SIZEOF_StgMutArrPtrs + WDS(n);
-  for:
-    if (p < limit) (likely: True) {
-        W_[p] = init;
-        p = p + WDS(1);
-        goto for;
     }
 
     return (arr);
@@ -496,22 +483,9 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
 
     again: MAYBE_GC(again);
 
-    ("ptr" arr) = ccall allocateSmallMutArrPtrs(MyCapability() "ptr", n, CCCS);
+    ("ptr" arr) = ccall allocateSmallMutArrPtrs(MyCapability() "ptr", n, init "ptr", CCCS);
     if (arr == NULL) (likely: False) {
         jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
-    }
-
-    // Initialise all elements of the array with the value init
-    W_ p;
-    p = arr + SIZEOF_StgSmallMutArrPtrs;
-    // Avoid the shift for `WDS(n)` in the inner loop
-    W_ limit;
-    limit = arr + SIZEOF_StgSmallMutArrPtrs + WDS(n);
-  for:
-    if (p < limit) (likely: True) {
-        W_[p] = init;
-        p = p + WDS(1);
-        goto for;
     }
 
     return (arr);

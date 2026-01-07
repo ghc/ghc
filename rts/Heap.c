@@ -279,7 +279,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     StgClosure **ptrs = (StgClosure **) stgMallocBytes(sizeof(StgClosure *) * size, "heap_view_closurePtrs");
     StgWord nptrs = collect_pointers(closure, ptrs);
 
-    StgMutArrPtrs *arr = allocateMutArrPtrs(cap, nptrs, cap->r.rCCCS);
+    StgMutArrPtrs *arr = allocateMutArrPtrs(cap, nptrs, NULL, cap->r.rCCCS);
     if (RTS_UNLIKELY(arr == NULL)) goto end;
     SET_INFO((StgClosure *) arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info);
 

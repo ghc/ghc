@@ -46,7 +46,7 @@ bool enlargeClosureTable(Capability *cap, ClosureTable *t, int newcapacity)
     ASSERT(newcapacity > oldcapacity);
 
     StgMutArrPtrs *newarr;
-    newarr = allocateMutArrPtrs(cap, newcapacity, CCS_SYSTEM_OR_NULL);
+    newarr = allocateMutArrPtrs(cap, newcapacity, NULL, CCS_SYSTEM_OR_NULL);
     if (RTS_UNLIKELY(newarr == NULL)) return false;
 
     StgArrBytes *newfree;
@@ -276,4 +276,3 @@ static bool isCompactClosureTable(ClosureTable *t)
     }
     return isCompact;
 }
-

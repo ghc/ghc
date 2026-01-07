@@ -21,16 +21,19 @@
  */
 
 /* Allocate a StgMutArrPtrs for a given number of elements. It is allocated in
- * the DIRTY state.
+ * the DIRTY state. If init is non-NULL, initialize payload elements to init.
  */
 StgMutArrPtrs *allocateMutArrPtrs (Capability *cap,
                                    StgWord nelements,
+                                   StgClosure *init,
                                    CostCentreStack *ccs);
 
-/* Allocate a StgSmallMutArrPtrs for a given number of elements.
+/* Allocate a StgSmallMutArrPtrs for a given number of elements. If init is
+ * non-NULL, initialize payload elements to init.
  */
 StgSmallMutArrPtrs *allocateSmallMutArrPtrs (Capability *cap,
                                              StgWord nelements,
+                                             StgClosure *init,
                                              CostCentreStack *ccs);
 
 /* Allocate a StgArrBytes for a given number of bytes.

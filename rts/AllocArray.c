@@ -5,6 +5,7 @@
 
 StgMutArrPtrs *allocateMutArrPtrs (Capability *cap,
                                    StgWord nelements,
+                                   StgClosure *init,
                                    CostCentreStack *ccs USED_IF_PROFILING)
 {
     /* All sizes in words */
@@ -25,6 +26,12 @@ StgMutArrPtrs *allocateMutArrPtrs (Capability *cap,
     arr->ptrs = nelements;
     arr->size = arrsize;
 
+    if (init != NULL) {
+        for (StgWord i = 0; i < nelements; ++i) {
+            arr->payload[i] = init;
+        }
+    }
+
     /* Initialize the card array. Note that memset needs sizes in bytes. */
     memset(&(arr->payload[nelements]), 0, mutArrPtrsCards(nelements));
 
@@ -33,6 +40,7 @@ StgMutArrPtrs *allocateMutArrPtrs (Capability *cap,
 
 StgSmallMutArrPtrs *allocateSmallMutArrPtrs (Capability *cap,
                                              StgWord nelements,
+                                             StgClosure *init,
                                              CostCentreStack *ccs
                                                USED_IF_PROFILING)
 {
@@ -47,6 +55,13 @@ StgSmallMutArrPtrs *allocateSmallMutArrPtrs (Capability *cap,
     /* No write barrier needed since this is a new allocation. */
     SET_HDR(arr, &stg_SMALL_MUT_ARR_PTRS_DIRTY_info, ccs);
     arr->ptrs = nelements;
+
+    if (init != NULL) {
+        for (StgWord i = 0; i < nelements; ++i) {
+            arr->payload[i] = init;
+        }
+    }
+
     return arr;
 }
 
