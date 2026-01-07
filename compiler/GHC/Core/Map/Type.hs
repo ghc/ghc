@@ -20,6 +20,7 @@ module GHC.Core.Map.Type (
    TypeMapG, CoercionMapG,
 
    DeBruijn(..), deBruijnize, eqDeBruijnType, eqDeBruijnVar,
+   eqDeBruijnCoercion,
 
    BndrMap, xtBndr, lkBndr,
    VarMap, xtVar, lkVar, lkDFreeVar, xtDFreeVar,
@@ -78,9 +79,14 @@ import Control.Monad ( (>=>) )
 ************************************************************************
 -}
 
--- We should really never care about the contents of a coercion. Instead,
--- just look up the coercion's type.
+{- Note [Equality for coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A coercion is a proof, and any one proof is as good as any other.
+So to compare coercions we just compare their types.
+-}
+
 newtype CoercionMap a = CoercionMap (CoercionMapG a)
+  -- See [Equality for coercions]
 
 -- TODO(22292): derive
 instance Functor CoercionMap where
@@ -98,6 +104,9 @@ instance TrieMap CoercionMap where
 
 type CoercionMapG = GenMap CoercionMapX
 newtype CoercionMapX a = CoercionMapX (TypeMapX a)
+-- CoercionMapX key point: two coercions are considered equal if
+-- their coercionTypes are the same; so we just defer to TypeMap
+
 
 -- TODO(22292): derive
 instance Functor CoercionMapX where
@@ -113,11 +122,6 @@ instance TrieMap CoercionMapX where
   filterTM f (CoercionMapX core_tm) = CoercionMapX (filterTM f core_tm)
   mapMaybeTM f (CoercionMapX core_tm) = CoercionMapX (mapMaybeTM f core_tm)
 
-instance Eq (DeBruijn Coercion) where
-  D env1 co1 == D env2 co2
-    = D env1 (coercionType co1) ==
-      D env2 (coercionType co2)
-
 lkC :: DeBruijn Coercion -> CoercionMapX a -> Maybe a
 lkC (D env co) (CoercionMapX core_tm) = lkT (D env $ coercionType co)
                                         core_tm
@@ -125,6 +129,16 @@ lkC (D env co) (CoercionMapX core_tm) = lkT (D env $ coercionType co)
 xtC :: DeBruijn Coercion -> XT a -> CoercionMapX a -> CoercionMapX a
 xtC (D env co) f (CoercionMapX m)
   = CoercionMapX (xtT (D env $ coercionType co) f m)
+
+-- This equality instance is needed for the equality test in leaf compression;
+-- see GenMap and Note [Compressed TrieMap] in GHC.Data.TrieMap
+instance Eq (DeBruijn Coercion) where
+  (==) = eqDeBruijnCoercion
+
+eqDeBruijnCoercion :: DeBruijn Coercion -> DeBruijn Coercion -> Bool
+eqDeBruijnCoercion (D env1 co1) (D env2 co2)
+  = eqDeBruijnType (D env1 (coercionType co1)) (D env2 (coercionType co2))
+
 
 {-
 ************************************************************************
@@ -139,9 +153,7 @@ xtC (D env co) f (CoercionMapX m)
 -- but it is strictly internal to this module.  If you are including a 'TypeMap'
 -- inside another 'TrieMap', this is the type you want. Note that this
 -- lookup does not do a kind-check. Thus, all keys in this map must have
--- the same kind. Also note that this map respects the distinction between
--- @Type@ and @Constraint@, despite the fact that they are equivalent type
--- synonyms in Core.
+-- the same kind.
 type TypeMapG = GenMap TypeMapX
 
 -- | @TypeMapX a@ is the base map from @DeBruijn Type@ to @a@, but without the
@@ -191,9 +203,6 @@ instance TrieMap TypeMapX where
    filterTM = filterT
    mapMaybeTM = mpT
 
-instance Eq (DeBruijn Type) where
-  (==) = eqDeBruijnType
-
 -- | An equality relation between two 'Type's (known below as @t1 :: k2@
 -- and @t2 :: k2@)
 data TypeEquality = TNEQ -- ^ @t1 /= t2@
@@ -219,7 +228,7 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
 
     liftEquality :: Bool -> TypeEquality
     liftEquality False = TNEQ
-    liftEquality _     = TEQ
+    liftEquality True  = TEQ
 
     hasCast :: TypeEquality -> TypeEquality
     hasCast TEQ = TEQX
@@ -272,7 +281,7 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
                  go (D (extendCME env tv) ty) (D (extendCME env' tv') ty')
           (CoercionTy {}, CoercionTy {})
               -> TEQ
-          _ -> TNEQ
+          _   -> TNEQ
 
     -- These bangs make 'gos' strict in the CMEnv, which in turn
     -- keeps the CMEnv unboxed across the go/gos mutual recursion
@@ -282,15 +291,20 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
                                       gos e1 e2 tys1 tys2
     gos _  _  _          _          = TNEQ
 
-instance Eq (DeBruijn Var) where
-  (==) = eqDeBruijnVar
-
 eqDeBruijnVar :: DeBruijn Var -> DeBruijn Var -> Bool
 eqDeBruijnVar (D env1 v1) (D env2 v2) =
     case (lookupCME env1 v1, lookupCME env2 v2) of
         (Just b1, Just b2) -> b1 == b2
         (Nothing, Nothing) -> v1 == v2
         _ -> False
+
+-- This equality instance is needed for the equality test in leaf compression;
+-- see GenMap and Note [Compressed TrieMap] in GHC.Data.TrieMap
+instance Eq (DeBruijn Type) where
+  (==) = eqDeBruijnType
+
+instance Eq (DeBruijn Var) where
+  (==) = eqDeBruijnVar
 
 instance {-# OVERLAPPING #-}
          Outputable a => Outputable (TypeMapG a) where
@@ -487,6 +501,7 @@ instance TrieMap LooseTypeMap where
   foldTM f (LooseTypeMap m) = foldTM f m
   filterTM f (LooseTypeMap m) = LooseTypeMap (filterTM f m)
   mapMaybeTM f (LooseTypeMap m) = LooseTypeMap (mapMaybeTM f m)
+
 
 {-
 ************************************************************************

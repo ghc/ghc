@@ -359,7 +359,6 @@ mpList f (LM { lm_nil = mnil, lm_cons = mcons })
 
 Note [Compressed TrieMap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The GenMap constructor augments TrieMaps with leaf compression.  This helps
 solve the performance problem detailed in #9960: suppose we have a handful
 H of entries in a TrieMap, each with a very large key, size K. If you fold over
