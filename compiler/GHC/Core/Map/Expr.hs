@@ -26,6 +26,7 @@ import GHC.Prelude
 import GHC.Data.TrieMap
 import GHC.Core.Map.Type
 import GHC.Core
+import GHC.Core.Coercion( coercionRKind )
 import GHC.Core.Type
 import GHC.Types.Tickish
 import GHC.Types.Var
@@ -150,13 +151,16 @@ instance Eq (DeBruijn CoreExpr) where
 
 eqDeBruijnExpr :: DeBruijn CoreExpr -> DeBruijn CoreExpr -> Bool
 eqDeBruijnExpr (D env1 e1) (D env2 e2) = go e1 e2 where
-    go (Var v1) (Var v2)             = eqDeBruijnVar (D env1 v1) (D env2 v2)
-    go (Lit lit1)    (Lit lit2)      = lit1 == lit2
-    go (Type t1)    (Type t2)        = eqDeBruijnType (D env1 t1) (D env2 t2)
-    -- See Note [Alpha-equality for Coercion arguments]
-    go (Coercion {}) (Coercion {}) = True
-    go (Cast e1 co1) (Cast e2 co2) = D env1 co1 == D env2 co2 && go e1 e2
-    go (App f1 a1)   (App f2 a2)   = go f1 f2 && go a1 a2
+    go (Var v1)       (Var v2)       = eqDeBruijnVar (D env1 v1) (D env2 v2)
+    go (Lit lit1)     (Lit lit2)     = lit1 == lit2
+    go (Type t1)      (Type t2)      = eqDeBruijnType     (D env1 t1)  (D env2 t2)
+    go (Coercion co1) (Coercion co2) = eqDeBruijnCoercion (D env1 co1) (D env2 co2)
+    go (Cast e1 co1)  (Cast e2 co2)  = go e1 e2 && eqDeBruijnType (D env1 (coercionRKind co1))
+                                                                  (D env2 (coercionRKind co2))
+    go (App f1 a1)    (App f2 a2)
+      | isCoArg a1, isCoArg a2     = go f1 f2
+      | otherwise                  = go f1 f2 && go a1 a2
+      -- isCoArg: see Note [Coercions in expressions]
     go (Tick n1 e1) (Tick n2 e2)
       =  eqDeBruijnTickish (D env1 n1) (D env2 n2)
       && go e1 e2
@@ -204,12 +208,17 @@ eqDeBruijnTickish (D env1 t1) (D env2 t2) = go t1 t2 where
 eqCoreExpr :: CoreExpr -> CoreExpr -> Bool
 eqCoreExpr e1 e2 = eqDeBruijnExpr (deBruijnize e1) (deBruijnize e2)
 
-{- Note [Alpha-equality for Coercion arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The 'Coercion' constructor only appears in argument positions, and so, if the
-functions are equal, then the arguments must have equal types. Because the
-comparison for coercions (correctly) checks only their types, checking for
-alpha-equality of the coercions is redundant.
+{- Note [Coercions in expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a coercion appears in an expression, we mainly use `eqDeBruijnCoercion`
+(see Note [Equality for coercions] in GHC.Core.Map.Type).  But we can optimise
+  * Applications: f1 (CO: co1)  =  f2 (CO: co2)
+    If the two functions are equal their argument coercions must have equal
+    types, so no need to compare the coercions at all.
+
+  * Casts:  e1 |> co1   =    e2 |> co2
+    If e1 and e2 are equal, the coercionLKinds of the coercions are equal;
+    so we only need to compare the coercionRKinds
 -}
 
 {- Note [Alpha-equality for let-bindings]
