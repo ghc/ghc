@@ -120,6 +120,7 @@ module Control.Concurrent where
   isCurrentThreadBound :: GHC.Internal.Types.IO GHC.Internal.Types.Bool
   isEmptyMVar :: forall a. MVar a -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
   killThread :: ThreadId -> GHC.Internal.Types.IO ()
+  labelThread :: ThreadId -> GHC.Internal.Base.String -> GHC.Internal.Types.IO ()
   mkWeakMVar :: forall a. MVar a -> GHC.Internal.Types.IO () -> GHC.Internal.Types.IO (GHC.Internal.Weak.Weak (MVar a))
   mkWeakThreadId :: ThreadId -> GHC.Internal.Types.IO (GHC.Internal.Weak.Weak ThreadId)
   modifyMVar :: forall a b. MVar a -> (a -> GHC.Internal.Types.IO (a, b)) -> GHC.Internal.Types.IO b
