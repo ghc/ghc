@@ -1,0 +1,4 @@
+T24867.hs:17:1: error: [GHC-94210] [-Woverlapping-patterns (in -Wdefault), Werror=overlapping-patterns]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘f’: f _ SS = ...
+
