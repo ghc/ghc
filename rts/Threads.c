@@ -894,7 +894,7 @@ StgMutArrPtrs *listThreads(Capability *cap)
     }
 
     // Allocate a suitably-sized array...
-    StgMutArrPtrs *arr = allocateMutArrPtrs(cap, n_threads, cap->r.rCCCS);
+    StgMutArrPtrs *arr = allocateMutArrPtrs(cap, n_threads, NULL, cap->r.rCCCS);
     if (RTS_UNLIKELY(arr == NULL)) goto end;
 
     // Populate it...

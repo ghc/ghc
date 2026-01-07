@@ -146,7 +146,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 
     debugTrace(DEBUG_weak, "weak: batching %d finalizers", n);
 
-    StgMutArrPtrs *arr = allocateMutArrPtrs(cap, n, CCS_SYSTEM_OR_NULL);
+    StgMutArrPtrs *arr = allocateMutArrPtrs(cap, n, NULL, CCS_SYSTEM_OR_NULL);
     if (RTS_UNLIKELY(arr == NULL)) exitHeapOverflow();
     // No write barrier needed here; this array is only going to referred to by this core.
     SET_INFO((StgClosure *) arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info);
