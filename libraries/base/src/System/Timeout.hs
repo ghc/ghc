@@ -29,7 +29,6 @@ import GHC.Internal.Control.Exception   (Exception(..), handleJust, bracket,
                             asyncExceptionToException,
                             asyncExceptionFromException)
 import GHC.Internal.Data.Unique         (Unique, newUnique)
-import GHC.Conc (labelThread)
 import Prelude
 
 -- $setup

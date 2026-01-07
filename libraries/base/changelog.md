@@ -22,6 +22,7 @@
   * `GHC.Conc.throwSTM` and `GHC.Conc.Sync.throwSTM` now carry a `HasCallStack` constraint and attach a `Backtrace` annotation to the thrown exception. ([GHC #25365](https://gitlab.haskell.org/ghc/ghc/-/issues/25365))
   * `GHC.Conc.catchSTM` and `GHC.Conc.Sync.catchSTM` now attach `WhileHandling` annotation to exceptions thrown from the handler. ([GHC #25365](https://gitlab.haskell.org/ghc/ghc/-/issues/25365))
   * Remove `GHC.JS.Prim.Internal.Build`, as per [CLC #329](https://github.com/haskell/core-libraries-committee/issues/329)
+  * Export `labelThread` from `Control.Concurrent`.([CLC proposal #376](https://github.com/haskell/core-libraries-committee/issues/376))
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1
