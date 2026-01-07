@@ -1698,12 +1698,21 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
      return (Case scrut' case_bndr' (coreAltsType alts') alts')
 
 tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
+  | IfaceCo co <- rhs
+  = -- For CoVars we ignore `info` and `ji`
+    do  { name    <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
+        ; ty'     <- tcIfaceType ty
+        ; let covar = mkLocalCoVar name ty'
+        ; co'   <- tcIfaceCo co
+        ; body' <- extendIfaceIdEnv [covar] (tcIfaceExpr body)
+        ; return (Let (NonRec covar (Coercion co'))  body') }
+  | otherwise
   = do  { name    <- newIfaceName (mkVarOccFS (ifLclNameFS fs))
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               NotTopLevel name ty' info
         ; let id = mkLocalIdWithInfo name ManyTy ty' id_info
-                     `asJoinId_maybe` ji
+                   `asJoinId_maybe` ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
         ; return (Let (NonRec id rhs') body') }

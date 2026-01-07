@@ -422,11 +422,12 @@ data SimplFloats
       }
 
 instance Outputable SimplFloats where
-  ppr (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf, sfInScope = is })
+  ppr (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf, sfInScope = _is })
     = text "SimplFloats"
       <+> braces (vcat [ text "lets: " <+> ppr lf
                        , text "joins:" <+> ppr jf
-                       , text "in_scope:" <+> ppr is ])
+--                       , text "in_scope:" <+> ppr _is
+                       ])
 
 emptyFloats :: SimplEnv -> SimplFloats
 emptyFloats env

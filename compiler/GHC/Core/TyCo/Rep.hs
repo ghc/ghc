@@ -2098,8 +2098,9 @@ coercionIsSmall :: Coercion -> Bool
 -- This function is called inside `exprIsTrivial` so it needs to be
 -- pretty efficient.  It should return False quickly on a big coercion;
 -- it should /not/ traverse the big coercion!
+-- The literal constant 40# is pretty arbitrary
 coercionIsSmall co
-  = not (isTrue# ((coercion_is_small co 100#) <# 0#))
+  = not (isTrue# ((coercion_is_small co 40#) <# 0#))
 
 coercion_is_small :: Coercion -> Int# -> Int#
 coercion_is_small co n = go co n
