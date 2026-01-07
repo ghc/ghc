@@ -30,6 +30,8 @@ Flag threaded
 
 Executable iserv
     Default-Language: Haskell2010
+    -- We never know what symbols GHC will look up in the future, so we
+    -- must retain CAFs for running interpreted code.
     ghc-options: -fkeep-cafs -rtsopts
     if flag(threaded)
       ghc-options: -threaded
