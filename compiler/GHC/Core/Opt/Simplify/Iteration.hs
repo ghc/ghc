@@ -26,6 +26,7 @@ import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs, scrutOkForBind
 import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
 import qualified GHC.Core.Make
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
+import GHC.Core.Coercion.Opt
 import GHC.Core.Reduction
 import GHC.Core.FamInstEnv      ( FamInstEnv, topNormaliseType_maybe )
 import GHC.Core.DataCon
@@ -721,15 +722,12 @@ prepareBinding env top_lvl is_rec strict_bind bndr rhs_floats rhs
        ; let all_floats = rhs_floats1 `addLetFloats` anf_floats
        ; if doFloatFromRhs (seFloatEnable env) top_lvl is_rec strict_bind all_floats rhs2
          then -- Float!
-              simplTrace "prepareBinding:yes" (ppr all_floats $$ text "rhs" <+> ppr rhs2) $
               do { tick LetFloatFromLet
                  ; return (all_floats, rhs2) }
 
          else -- Abandon floating altogether; revert to original rhs
               -- Since we have already built rhs1, we just need to add
               -- rhs_floats1 to it
-              simplTrace "prepareBinding:no" (vcat [ ppr all_floats
-                                                   , text "rhs" <+> ppr rhs2 ]) $
               return (emptyFloats env, wrapFloats rhs_floats1 rhs1) }
 
 {- Note [prepareRhs]
@@ -1392,7 +1390,7 @@ simplCoercionF env co cont
 
 simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
-  = do { let out_co = substCo env co
+  = do { let out_co = optCoRefl (substCo env co)
        ; seqCo out_co `seq` return out_co }
 
 -----------------------------------
