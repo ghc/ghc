@@ -34,23 +34,21 @@ TcCoercibleFail.hs:18:8: error: [GHC-18872]
       In the expression: coerce $ one :: Down Int
       In an equation for ‘foo4’: foo4 = coerce $ one :: Down Int
 
-TcCoercibleFail.hs:21:8: error: [GHC-18872]
-    • Couldn't match representation of type ‘Void’ with that of ‘()’
-        arising from a use of ‘coerce’
+TcCoercibleFail.hs:21:8: error: [GHC-40404]
+    • Reduction stack overflow; size = 201
+      When simplifying the following constraint: Coercible () Void
     • In the expression: coerce :: Void -> ()
       In an equation for ‘foo5’: foo5 = coerce :: Void -> ()
+    Suggested fix:
+      Use -freduction-depth=0 to disable this check
+      (any upper bound you could choose might fail unpredictably with
+       minor updates to GHC, so disabling the check is recommended if
+       you're sure that type checking should terminate)
 
-TcCoercibleFail.hs:30:9: error: [GHC-18872]
-    • Couldn't match representation of type ‘VoidBad ()’
-                               with that of ‘()’
-        arising from a use of ‘coerce’
-    • In the expression: coerce :: (VoidBad ()) -> ()
-      In an equation for ‘foo5'’: foo5' = coerce :: (VoidBad ()) -> ()
-
-TcCoercibleFail.hs:35:8: error: [GHC-40404]
+TcCoercibleFail.hs:26:8: error: [GHC-40404]
     • Reduction stack overflow; size = 201
       When simplifying the following constraint:
-        Coercible (Either Int (Fix (Either Int))) (Fix (Either Age))
+        Coercible (Fix (Either Age)) (Either Int (Fix (Either Int)))
     • In the expression: coerce :: Fix (Either Int) -> Fix (Either Age)
       In an equation for ‘foo6’:
           foo6 = coerce :: Fix (Either Int) -> Fix (Either Age)
@@ -60,10 +58,9 @@ TcCoercibleFail.hs:35:8: error: [GHC-40404]
        minor updates to GHC, so disabling the check is recommended if
        you're sure that type checking should terminate)
 
-TcCoercibleFail.hs:36:8: error: [GHC-18872]
-    • Couldn't match representation of type ‘Either
-                                               Int (Fix (Either Int))’
-                               with that of ‘()’
+TcCoercibleFail.hs:27:8: error: [GHC-18872]
+    • Couldn't match representation of type ‘()’
+                               with that of ‘Either Int (Fix (Either Int))’
         arising from a use of ‘coerce’
     • In the expression: coerce :: Fix (Either Int) -> ()
       In an equation for ‘foo7’: foo7 = coerce :: Fix (Either Int) -> ()

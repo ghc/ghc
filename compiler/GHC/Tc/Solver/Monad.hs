@@ -22,7 +22,7 @@ module GHC.Tc.Solver.Monad (
     updWorkListTcS,
     pushLevelNoWorkList, pushTcLevelM_,
 
-    runTcPluginTcS, recordUsedGREs,
+    runTcPluginTcS, recordUsedGRE,
     matchGlobalInst, TcM.ClsInstResult(..),
 
     QCInst(..),
@@ -1519,18 +1519,16 @@ tcLookupTyCon n = wrapTcS $ TcM.tcLookupTyCon n
 -- pure veneer of TcS. But it's just about warnings around unused imports
 -- and local constructors (GHC will issue fewer warnings than it otherwise
 -- might), so it's not worth losing sleep over.
-recordUsedGREs :: Bag GlobalRdrElt -> TcS ()
-recordUsedGREs gres
-  = do { wrapTcS $ TcM.addUsedGREs NoDeprecationWarnings gre_list
+recordUsedGRE :: GlobalRdrElt -> TcS ()
+recordUsedGRE gre
+  = do { wrapTcS $ TcM.addUsedGRE NoDeprecationWarnings gre
          -- If a newtype constructor was imported, don't warn about not
          -- importing it...
-       ; wrapTcS $ traverse_ (TcM.keepAlive . greName) gre_list }
+       ; wrapTcS $ TcM.keepAlive (greName gre) }
          -- ...and similarly, if a newtype constructor was defined in the same
          -- module, don't warn about it being unused.
          -- See Note [Tracking unused binding and imports] in GHC.Tc.Utils.
 
-  where
-    gre_list = bagToList gres
 
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
