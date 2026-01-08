@@ -825,9 +825,10 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
                                                       -- LFInfo stores post-unarisation arity
 
              wrap_arg_dmds =
-               replicate (length theta) topDmd ++ map mk_dmd arg_ibangs
+               replicate (length stupid_theta + length theta) topDmd
+                 ++ map mk_dmd arg_ibangs
                -- Don't forget the dictionary arguments when building
-               -- the strictness signature (#14290).
+               -- the strictness signature (#14290, #26748).
 
              mk_dmd str | isBanged str = evalDmd
                         | otherwise    = topDmd
