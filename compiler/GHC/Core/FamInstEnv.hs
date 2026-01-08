@@ -1061,10 +1061,10 @@ lookup_fam_inst_env' lookup_mode (FamIE _ ie) fam match_tys
                             , fi_tys = tpl_tys }) =  do
       subst <- tcMatchTys tpl_tys match_tys1
       return (FamInstMatch { fim_instance = item
-                             , fim_tys      = substTyVars subst tpl_tvs `chkAppend` match_tys2
-                             , fim_cos      = assert (all (isJust . lookupCoVar subst) tpl_cvs) $
-                                               substCoVars subst tpl_cvs
-                             })
+                           , fim_tys      = substTyVars subst tpl_tvs `chkAppend` match_tys2
+                           , fim_cos      = assert (all (isJust . lookupCoVar subst) tpl_cvs) $
+                                            substCoVars subst tpl_cvs
+                           })
         where
           (match_tys1, match_tys2) = split_tys tpl_tys
 

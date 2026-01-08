@@ -326,11 +326,7 @@ test('T7989', normal, compile_fail, [''])
 test('T8034', normal, compile_fail, [''])
 test('T8142', normal, compile_fail, [''])
 test('T8262', normal, compile_fail, [''])
-
-# TcCoercibleFail times out with the compiler is compiled with -DDEBUG.
-# This is expected (see comment in source file).
-test('TcCoercibleFail', [when(compiler_debugged(), skip)], compile_fail, [''])
-
+test('TcCoercibleFail', [], compile_fail, [''])
 test('TcCoercibleFail2', [], compile_fail, [''])
 test('TcCoercibleFail3', [], compile_fail, [''])
 test('T8306', normal, compile_fail, [''])

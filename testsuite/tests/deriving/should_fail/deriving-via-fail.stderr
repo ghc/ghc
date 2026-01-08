@@ -1,12 +1,12 @@
 deriving-via-fail.hs:10:34: error: [GHC-10283]
-    • Couldn't match representation of type ‘a’ with that of ‘b’
+    • Couldn't match representation of type ‘b’ with that of ‘a’
         arising from the coercion of the method ‘showsPrec’
           from type ‘Int -> Identity b -> ShowS’
             to type ‘Int -> Foo1 a -> ShowS’
-      ‘a’ is a rigid type variable bound by
+      ‘b’ is a rigid type variable bound by
         the deriving clause for ‘Show (Foo1 a)’
         at deriving-via-fail.hs:10:34-37
-      ‘b’ is a rigid type variable bound by
+      ‘a’ is a rigid type variable bound by
         the deriving clause for ‘Show (Foo1 a)’
         at deriving-via-fail.hs:10:34-37
     • When deriving the instance for (Show (Foo1 a))

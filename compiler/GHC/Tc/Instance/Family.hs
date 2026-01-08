@@ -5,7 +5,7 @@ module GHC.Tc.Instance.Family (
         FamInstEnvs, tcGetFamInstEnvs,
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
         tcLookupDataFamInst, tcLookupDataFamInst_maybe,
-        tcTopNormaliseNewTypeTF_maybe,
+        tcUnwrapNewtype_maybe,
 
         -- * Injectivity
         reportInjectivityErrors, reportConflictingInjectivityErrs
@@ -46,7 +46,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.FV
 
-import GHC.Data.Bag( Bag, unionBags, unitBag )
 import GHC.Data.Maybe
 
 import Control.Monad
@@ -452,58 +451,57 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
   | otherwise
   = Nothing
 
--- | 'tcTopNormaliseNewTypeTF_maybe' gets rid of top-level newtypes,
--- potentially looking through newtype /instances/ and type synonyms.
+-- | 'tcUnwrapNewtype_mabye' gets rid of /one layer/ of top-level newtypes
 --
 -- It is only used by the type inference engine (specifically, when
 -- solving representational equality), and hence it is careful to unwrap
 -- only if the relevant data constructor is in scope.  That's why
 -- it gets a GlobalRdrEnv argument.
 --
--- It is careful not to unwrap data/newtype instances nor synonyms
--- if it can't continue unwrapping.  Such care is necessary for proper
--- error messages.
+-- It is capable of unwrapping a newtype /instance/.  E.g
+--    data D a
+--    newtype instance D Int = MkD Bool
+-- Then `tcUnwrapNewtype_maybe (D Int)` will unwrap to give the `Bool` inside.
+-- However, it is careful not to unwrap data/newtype instances if it can't
+-- unwrap the newtype inside it; that might in the example if `MkD` was
+-- not in scope.  Such care is necessary for proper error messages.
 --
 -- It does not look through type families.
--- It does not normalise arguments to a tycon.
+-- It does not normalise arguments to the tycon.
 --
--- If the result is Just ((gres, co), rep_ty), then
+-- If the result is Just (gre, co, rep_ty), then
 --    co : ty ~R rep_ty
---    gres are the GREs for the data constructors that
---                          had to be in scope
-tcTopNormaliseNewTypeTF_maybe :: FamInstEnvs
-                              -> GlobalRdrEnv
-                              -> Type
-                              -> Maybe ((Bag GlobalRdrElt, TcCoercion), Type)
-tcTopNormaliseNewTypeTF_maybe faminsts rdr_env ty
--- cf. FamInstEnv.topNormaliseType_maybe and Coercion.topNormaliseNewType_maybe
-  = topNormaliseTypeX stepper plus ty
+--    gre is the GRE for the data constructor that had to be in scope
+tcUnwrapNewtype_maybe :: FamInstEnvs
+                      -> GlobalRdrEnv
+                      -> Type
+                      -> Maybe (GlobalRdrElt, TcCoercion, Type)
+tcUnwrapNewtype_maybe faminsts rdr_env ty
+  | Just (tc,tys) <- tcSplitTyConApp_maybe ty
+  = firstJust (try_nt_unwrap tc tys)
+              (try_fam_unwrap tc tys)
+  | otherwise
+  = Nothing
   where
-    plus :: (Bag GlobalRdrElt, TcCoercion) -> (Bag GlobalRdrElt, TcCoercion)
-         -> (Bag GlobalRdrElt, TcCoercion)
-    plus (gres1, co1) (gres2, co2) = ( gres1 `unionBags` gres2
-                                     , co1 `mkTransCo` co2 )
-
-    stepper :: NormaliseStepper (Bag GlobalRdrElt, TcCoercion)
-    stepper = unwrap_newtype `composeSteppers` unwrap_newtype_instance
-
-    -- For newtype instances we take a double step or nothing, so that
+    -- For newtype /instances/ we take a double step or nothing, so that
     -- we don't return the representation type of the newtype instance,
     -- which would lead to terrible error messages
-    unwrap_newtype_instance rec_nts tc tys
-      | Just (tc', tys', co) <- tcLookupDataFamInst_maybe faminsts tc tys
-      = fmap (mkTransCo co) <$> unwrap_newtype rec_nts tc' tys'
-      | otherwise = NS_Done
+    try_fam_unwrap tc tys
+      | Just (tc', tys', fam_co) <- tcLookupDataFamInst_maybe faminsts tc tys
+      , Just (gre, nt_co, ty') <- try_nt_unwrap tc' tys'
+      = Just (gre, mkTransCo fam_co nt_co, ty')
+      | otherwise
+      = Nothing
 
-    unwrap_newtype rec_nts tc tys
+    try_nt_unwrap tc tys
       | Just con <- newTyConDataCon_maybe tc
       , Just gre <- lookupGRE_Name rdr_env (dataConName con)
            -- This is where we check that the
            -- data constructor is in scope
-      = (,) (unitBag gre) <$> unwrapNewTypeStepper rec_nts tc tys
-
+      , Just (ty', co) <- instNewTyCon_maybe tc tys
+      = Just (gre, co, ty')
       | otherwise
-      = NS_Done
+      = Nothing
 
 {-
 ************************************************************************
