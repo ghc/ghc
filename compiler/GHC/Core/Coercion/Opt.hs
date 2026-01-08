@@ -239,6 +239,8 @@ optCoAlt is (Alt k bs e)
 
 optCoRefl :: Coercion -> Coercion
 optCoRefl in_co
+#ifdef DEBUG
+  -- Debug check that optCoRefl doesn't change the type
   = let out_co = go in_co
         (Pair in_l in_r) = coercionKind in_co
         (Pair out_l out_r) = coercionKind out_co
@@ -251,6 +253,9 @@ optCoRefl in_co
                                        , text "in_co:" <+> ppr in_co
                                        , text "out_co:" <+> ppr out_co ]) $
             out_co
+#else
+  = go in_co
+#endif
   where
     go_m MRefl    = MRefl
     go_m (MCo co) = MCo (go co)
@@ -274,6 +279,7 @@ optCoRefl in_co
     go (UnivCo p r lt rt cos)        = mkUnivCo p (go_s cos) r lt rt
     go (AxiomCo ax cos)              = mkAxiomCo ax (go_s cos)
 
+    -- This is the main payload
     go (TransCo co1 co2) = gobble gs0 co1 [co2]
        where
          lk   = coercionLKind co1
@@ -288,8 +294,7 @@ optCoRefl in_co
        = gobble gs co2 (co3 : cos)
     gobble (GS co1 tm) co2 cos
        = case lookupTM rk tm of
-            Just gs -> pprTrace "optCoRefl:hit eliminated" (ppr (TransCo co1 co2)) $
-                       gobble0 gs  cos
+            Just gs -> gobble0 gs  cos
             Nothing -> gobble0 gs' cos
        where
          rk = coercionRKind co2
