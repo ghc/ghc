@@ -1,0 +1,45 @@
+=== throwIO SimpleBoom ===
+Caught exception: SimpleBoom
+Exception context:
+- IPE backtrace:
+-   throwIO SimpleBoom
+-   raising action
+-   catch site for throwIO SimpleBoom
+-   annotateCallStackIO, called at ann_frame005.hs:26:3 in main:Main
+- HasCallStack backtrace:
+-   throwIO, called at ann_frame005.hs:34:7 in main:Main
+Handler annotation not present in context
+=== undefined ===
+Caught exception: Prelude.undefined
+Exception context:
+- IPE backtrace:
+-   undefined thunk
+-   raising undefined action
+-   catch site for undefined
+-   annotateCallStackIO, called at ann_frame005.hs:26:3 in main:Main
+- HasCallStack backtrace:
+-   undefined, called at ann_frame005.hs:41:48 in main:Main
+Handler annotation not present in context
+=== error ===
+Caught exception: error from annotateStackString
+Exception context:
+- IPE backtrace:
+-   error thunk
+-   raising error action
+-   catch site for error
+-   annotateCallStackIO, called at ann_frame005.hs:26:3 in main:Main
+- HasCallStack backtrace:
+-   error, called at ann_frame005.hs:48:44 in main:Main
+Handler annotation not present in context
+=== throwSTM ===
+Caught exception: SimpleBoom
+Exception context:
+- IPE backtrace:
+-   raising throwSTM action
+-   catch site for throwSTM
+-   annotateCallStackIO, called at ann_frame005.hs:26:3 in main:Main
+- HasCallStack backtrace:
+-   collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:170:37 in ghc-internal:GHC.Internal.Exception
+-   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/STM.hs:190:26 in ghc-internal:GHC.Internal.STM
+-   throwSTM, called at ann_frame005.hs:55:9 in main:Main
+Handler annotation not present in context

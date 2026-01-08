@@ -4,9 +4,10 @@ HasCallStack backtrace:
   error, called at <interactive>:2:1 in interactive:Ghci1
 
 Stopped in <exception thrown>, <unknown>
-_exception :: e = _
+_exception :: e = GHC.Internal.Exception.Type.SomeException
+                    (GHC.Internal.Exception.ErrorCall _)
 Stopped in <exception thrown>, <unknown>
-_exception :: e = _
+_exception :: e = SomeException (ErrorCall _)
 -1  : main (Test7.hs:2:18-28)
 -2  : main (Test7.hs:2:8-29)
 <end of history>
@@ -26,7 +27,7 @@ _exception :: SomeException = SomeException (ErrorCall "foo")
 *** Exception: foo
 
 HasCallStack backtrace:
-  error, called at Test7.hs:2:18 in main:Main
+  error, called at Test7.hs:2:18 in interactive-session:Main
 
 Stopped in <exception thrown>, <unknown>
 _exception :: e = _
@@ -35,5 +36,5 @@ _exception :: e = _
 *** Exception: foo
 
 HasCallStack backtrace:
-  error, called at Test7.hs:2:18 in main:Main
+  error, called at Test7.hs:2:18 in interactive-session:Main
 
