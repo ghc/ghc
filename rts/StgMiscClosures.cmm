@@ -949,7 +949,7 @@ INFO_TABLE(stg_MUT_VAR_DIRTY, 1, 0, MUT_VAR_DIRTY, "MUT_VAR_DIRTY", "MUT_VAR_DIR
    just enter the top stack word to start the thread.  (see deleteThread)
  * ------------------------------------------------------------------------- */
 
-INFO_TABLE( stg_dummy_ret, 0, 0, CONSTR_NOCAF, "DUMMY_RET", "DUMMY_RET")
+INFO_TABLE_CONSTR( stg_dummy_ret, 0, 0, 0, CONSTR_NOCAF, "DUMMY_RET", "DUMMY_RET")
     ()
 {
     return ();
