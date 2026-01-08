@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, ImplicitParams #-}
 {-# LANGUAGE RankNTypes, PolyKinds, DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -23,28 +24,10 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Err( absentErr, error, errorWithoutStackTrace, undefined ) where
-import GHC.Internal.Types (Char, RuntimeRep)
-import GHC.Internal.Stack.Types
-import GHC.Internal.Prim
 import {-# SOURCE #-} GHC.Internal.Exception
-  ( errorCallWithCallStackException
-  , errorCallException )
-
--- | 'error' stops execution and displays an error message.
-error :: forall (r :: RuntimeRep). forall (a :: TYPE r).
-         HasCallStack => [Char] -> a
-error s = raise# (errorCallWithCallStackException s ?callStack)
-          -- Bleh, we should be using 'GHC.Internal.Stack.callStack' instead of
-          -- '?callStack' here, but 'GHC.Internal.Stack.callStack' depends on
-          -- 'GHC.Internal.Stack.popCallStack', which is partial and depends on
-          -- 'error'.. Do as I say, not as I do.
-
--- | A variant of 'error' that does not produce a stack trace.
---
--- @since base-4.9.0.0
-errorWithoutStackTrace :: forall (r :: RuntimeRep). forall (a :: TYPE r).
-                          [Char] -> a
-errorWithoutStackTrace s = raise# (errorCallException s)
+  ( error, errorWithoutStackTrace, undefined )
+import GHC.Internal.Types
+import GHC.Internal.Stack.Types
 
 
 -- Note [Errors in base]
@@ -61,19 +44,6 @@ errorWithoutStackTrace s = raise# (errorCallException s)
 -- where the stack trace would help.  Therefore we annotate most calls to
 -- error, so users have a chance to get a better idea.
 
--- | A special case of 'error'.
--- It is expected that compilers will recognize this and insert error
--- messages which are more appropriate to the context in which 'undefined'
--- appears.
-undefined :: forall (r :: RuntimeRep). forall (a :: TYPE r).
-             HasCallStack => a
--- This used to be
---   undefined = error "Prelude.undefined"
--- but that would add an extra call stack entry that is not actually helpful
--- nor wanted (see #19886). We’d like to use withFrozenCallStack, but that
--- is not available in this module yet, and making it so is hard. So let’s just
--- use raise# directly.
-undefined = raise# (errorCallWithCallStackException "Prelude.undefined" ?callStack)
 
 -- | Used for compiler-generated error message;
 -- encoding saves bytes of string junk.

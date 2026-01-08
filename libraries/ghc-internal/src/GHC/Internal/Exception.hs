@@ -44,6 +44,9 @@ module GHC.Internal.Exception
 
       -- * Throwing
     , throw
+    , error
+    , errorWithoutStackTrace
+    , undefined
 
       -- * Concrete exceptions
       -- ** Arithmetic exceptions
@@ -89,6 +92,28 @@ throw e =
     let se :: SomeException
         !se = noinline (unsafePerformIO (toExceptionWithBacktrace e))
     in raise# se
+
+-- | 'error' stops execution and displays an error message.
+error :: forall (r :: RuntimeRep). forall (a :: TYPE r).
+         HasCallStack => [Char] -> a
+error s = throw (ErrorCall s)
+
+-- | A special case of 'error'.
+-- It is expected that compilers will recognize this and insert error
+-- messages which are more appropriate to the context in which 'undefined'
+-- appears.
+undefined :: forall (r :: RuntimeRep). forall (a :: TYPE r).
+             HasCallStack => a
+undefined =
+  error "Prelude.undefined"
+
+
+-- | A variant of 'error' that does not produce a stack trace.
+--
+-- @since base-4.9.0.0
+errorWithoutStackTrace :: forall (r :: RuntimeRep). forall (a :: TYPE r).
+                          [Char] -> a
+errorWithoutStackTrace s = raise# (errorCallException s)
 
 -- Note [Capturing the backtrace in throw]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,5 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE PolyKinds #-}
 
 {-
 This SOURCE-imported hs-boot module cuts a big dependency loop:
@@ -26,13 +29,19 @@ to get a visibly-bottom value.
 
 module GHC.Internal.Exception
   ( module GHC.Internal.Exception.Type
-  , errorCallException
-  , errorCallWithCallStackException
+  , error, errorWithoutStackTrace, undefined
   ) where
 
 import {-# SOURCE #-} GHC.Internal.Exception.Type
-import GHC.Internal.Types ( Char )
-import GHC.Internal.Stack.Types ( CallStack )
+import GHC.Internal.Types ( Char, RuntimeRep, TYPE)
+import GHC.Internal.Stack.Types ( HasCallStack )
 
-errorCallException :: [Char] -> SomeException
-errorCallWithCallStackException :: [Char] -> CallStack -> SomeException
+
+error :: forall (r :: RuntimeRep). forall (a :: TYPE r).
+         HasCallStack => [Char] -> a
+
+errorWithoutStackTrace :: forall (r :: RuntimeRep). forall (a :: TYPE r).
+                          [Char] -> a
+
+undefined :: forall (r :: RuntimeRep). forall (a :: TYPE r).
+             HasCallStack => a
