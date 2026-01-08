@@ -1210,8 +1210,6 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
           reg_dst  = getLocalRegReg dst
       platform <- getPlatform
 
-      (n_reg, ncode)          <- getSomeReg n
-      -- (n_ri, pre_code, mid_code) <-
 
       (Amode aligned_addr align_code, maybe_unaligned_addr) <- case width of
          W8  -> align_address platform
@@ -1227,33 +1225,6 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
       masked_other <- getNewRegNat fmt
       tmp2         <- getNewRegNat fmt
 
-      (n_reg', ini) <- case width of
-            W8  -> do
-              let unaligned_addr = fromJust maybe_unaligned_addr
-              let inv = case platformByteOrder platform of
-                    BigEndian -> unitOL $ XOR shift shift (RIImm (ImmInt 24))
-                    LittleEndian -> nilOL
-              let i = unitOL (RLWINM shift unaligned_addr 3 27 28)
-                      `appOL` inv `appOL`
-                      toOL [ LI mask (ImmInt 255)
-                           , SL fmt shifted_mask mask (RIReg shift)
-                           , SL fmt shifted_n n_reg (RIReg shift)
-                           ]
-              return (shifted_n, i)
-            W16 -> do
-              let unaligned_addr = fromJust maybe_unaligned_addr
-              let inv = case platformByteOrder platform of
-                    BigEndian -> unitOL $ XOR shift shift (RIImm (ImmInt 16))
-                    LittleEndian -> nilOL
-              let i = unitOL (RLWINM shift unaligned_addr 3 27 27)
-                      `appOL` inv `appOL`
-                      toOL [ LI mask (ImmInt 0)
-                           , OR mask mask (RIImm (ImmInt 65535))
-                           , SL fmt shifted_mask mask (RIReg shift)
-                           , SL fmt shifted_n n_reg (RIReg shift)
-                           ]
-              return (shifted_n, i)
-            _    -> return (n_reg, nilOL)
       let build_result =
              let m = toOL [ AND masked_res tmp2 (RIReg shifted_mask)
                           , ANDC masked_other tmp1 shifted_mask
@@ -1262,45 +1233,75 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                  f = unitOL $ SR fmt reg_dst tmp2 (RIReg shift)
                  in (m, f)
 
-      let (insert, shift_back) = case width of
-            W8  -> build_result
-            W16 -> build_result
-            _   -> (nilOL, unitOL $ MR reg_dst tmp2)
-{-
-      (instr, n_code) <- case amop of
-            AMO_Add  -> getSomeRegOrImm ADD True reg_dst
+      (n_ri, pre_code, mid_code, post_code) <- case width of
+        W8  -> do
+          (n_reg, ncode) <- getSomeReg n
+          let unaligned_addr = fromJust maybe_unaligned_addr
+          let inv = case platformByteOrder platform of
+                      BigEndian -> unitOL $ XOR shift shift (RIImm (ImmInt 24))
+                      LittleEndian -> nilOL
+          let i = ncode `appOL` unitOL (RLWINM shift unaligned_addr 3 27 28)
+                  `appOL` inv `appOL`
+                  toOL [ LI mask (ImmInt 255)
+                       , SL fmt shifted_mask mask (RIReg shift)
+                       , SL fmt shifted_n n_reg (RIReg shift)
+                       ]
+          let (insert, shift_back) = build_result
+          return (RIReg shifted_n, i, insert, shift_back)
+        W16 -> do
+          (n_reg, ncode) <- getSomeReg n
+          let unaligned_addr = fromJust maybe_unaligned_addr
+          let inv = case platformByteOrder platform of
+                      BigEndian -> unitOL $ XOR shift shift (RIImm (ImmInt 16))
+                      LittleEndian -> nilOL
+          let i = ncode `appOL` unitOL (RLWINM shift unaligned_addr 3 27 27)
+                  `appOL` inv `appOL`
+                  toOL [ LI mask (ImmInt 0)
+                       , OR mask mask (RIImm (ImmInt 65535))
+                       , SL fmt shifted_mask mask (RIReg shift)
+                       , SL fmt shifted_n n_reg (RIReg shift)
+                       ]
+          let (insert, shift_back) = build_result
+          return (RIReg shifted_n, i, insert, shift_back)
+        _   -> do
+          (n_ri, n_code) <- case amop of
+            AMO_Add  -> getSomeRegOrImm True
             AMO_Sub  -> case n of
-                CmmLit (CmmInt i _)
-                  | Just imm <- makeImmediate width True (-i)
-                   -> return (ADD reg_dst reg_dst (RIImm imm), nilOL)
-                _
-                   -> do
-                         (n_reg, n_code) <- getSomeReg n
-                         return  (SUBF reg_dst n_reg reg_dst, n_code)
-            AMO_And  -> getSomeRegOrImm AND False reg_dst
-            AMO_Nand -> do (n_reg, n_code) <- getSomeReg n
-                           return (NAND reg_dst reg_dst n_reg, n_code)
-            AMO_Or   -> getSomeRegOrImm OR False reg_dst
-            AMO_Xor  -> getSomeRegOrImm XOR False reg_dst
--}
+                 CmmLit (CmmInt i _) | Just imm <- makeImmediate width True (-i)
+                    -> return (RIImm imm, nilOL)
+                 _
+                    -> do
+                          (n_reg, n_code) <- getSomeReg n
+                          return  (RIReg n_reg, n_code)
+            AMO_And  -> getSomeRegOrImm False
+            AMO_Or   -> getSomeRegOrImm False
+            AMO_Xor  -> getSomeRegOrImm False
+            _        -> do (n_reg, n_code) <- getSomeReg n
+                           return (RIReg n_reg, n_code)
+          return (n_ri, n_code, nilOL, unitOL $ MR reg_dst tmp2)
+
       let instr = case amop of
-            AMO_Add  -> ADD tmp2 tmp1 (RIReg n_reg')
-            AMO_Sub  -> SUBF tmp2 n_reg' tmp1
-            AMO_And  -> AND tmp2 tmp1 (RIReg n_reg')
-            AMO_Nand -> NAND tmp2 tmp1 n_reg'
-            AMO_Or   -> OR tmp2 tmp1 (RIReg n_reg')
-            AMO_Xor  -> XOR tmp2 tmp1 (RIReg n_reg')
+            AMO_Add  -> ADD tmp2 tmp1 n_ri
+            AMO_Sub  -> case n_ri of
+              RIReg n_reg -> SUBF tmp2 n_reg tmp1
+              RIImm _     -> ADD  tmp2 tmp1 n_ri
+            AMO_And  -> AND tmp2 tmp1 n_ri
+            AMO_Nand -> case n_ri of
+              RIReg n_reg -> NAND tmp2 tmp1 n_reg
+              _           -> panic "PPC NCG: No NAND immediate"
+            AMO_Or   -> OR tmp2 tmp1 n_ri
+            AMO_Xor  -> XOR tmp2 tmp1 n_ri
 
       lbl_retry <- getBlockIdNat
       lbl_done <- getBlockIdNat
-      return $ ncode `appOL` align_code `appOL` ini
+      return $ pre_code `appOL` align_code
         `appOL` toOL [ HWSYNC
                      , BCC ALWAYS lbl_retry Nothing
 
                      , NEWBLOCK lbl_retry
                      , LDR fmt tmp1 aligned_addr
                      ]
-        `snocOL` instr `appOL` insert
+        `snocOL` instr `appOL` mid_code
         `appOL` toOL [ STC fmt tmp2 aligned_addr
                      , BCC NE lbl_retry (Just False)
                      , BCC ALWAYS lbl_done Nothing
@@ -1308,7 +1309,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                      , NEWBLOCK lbl_done
                      , ISYNC
                      ]
-        `appOL` shift_back
+        `appOL` post_code
 
         where
            getAmodeIndex (CmmMachOp (MO_Add _) [x, y])
@@ -1331,16 +1332,14 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
              return (Amode (AddrRegReg r0 aligned_addr)
                      (ucode `snocOL` (CLRRI addr_fmt aligned_addr
                                       unaligned_addr 2)), Just unaligned_addr)
-{-
-           getSomeRegOrImm op sign dst
+           getSomeRegOrImm sign
              = case n of
                  CmmLit (CmmInt i _) | Just imm <- makeImmediate width sign i
-                    -> return (op dst dst (RIImm imm), nilOL)
+                    -> return (RIImm imm, nilOL)
                  _
                     -> do
                           (n_reg, n_code) <- getSomeReg n
-                          return  (op dst dst (RIReg n_reg), n_code)
--}
+                          return  (RIReg n_reg, n_code)
 
 genCCall _ (PrimTarget (MO_AtomicRead width _)) [dst] [addr]
  = do let fmt      = intFormat width
