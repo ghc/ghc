@@ -1,5 +1,6 @@
 "Stopped in <exception thrown>, <unknown>
-_exception :: e = _
+_exception :: e = GHC.Internal.Exception.Type.SomeException
+                    (GHC.Internal.Exception.ErrorCall _)
 Logged breakpoint at QSort.hs:6:32-34
 _result :: Char -> Bool
 a :: Char

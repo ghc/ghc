@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, ImplicitParams #-}
 {-# LANGUAGE RankNTypes, PolyKinds, DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -25,6 +26,7 @@
 module GHC.Internal.Err( absentErr, error, errorWithoutStackTrace, undefined ) where
 import GHC.Internal.Types (Char, RuntimeRep)
 import GHC.Internal.Stack.Types
+import GHC.Internal.Magic
 import GHC.Internal.Prim
 import {-# SOURCE #-} GHC.Internal.Exception
   ( errorCallWithCallStackException
@@ -33,7 +35,10 @@ import {-# SOURCE #-} GHC.Internal.Exception
 -- | 'error' stops execution and displays an error message.
 error :: forall (r :: RuntimeRep). forall (a :: TYPE r).
          HasCallStack => [Char] -> a
-error s = raise# (errorCallWithCallStackException s ?callStack)
+error s =
+  -- See Note [Capturing the backtrace in throw] and Note [Hiding precise exception signature in throw]
+  let !se = noinline (errorCallWithCallStackException s ?callStack)
+  in raise# se
           -- Bleh, we should be using 'GHC.Internal.Stack.callStack' instead of
           -- '?callStack' here, but 'GHC.Internal.Stack.callStack' depends on
           -- 'GHC.Internal.Stack.popCallStack', which is partial and depends on
@@ -73,7 +78,10 @@ undefined :: forall (r :: RuntimeRep). forall (a :: TYPE r).
 -- nor wanted (see #19886). We’d like to use withFrozenCallStack, but that
 -- is not available in this module yet, and making it so is hard. So let’s just
 -- use raise# directly.
-undefined = raise# (errorCallWithCallStackException "Prelude.undefined" ?callStack)
+undefined =
+    -- See Note [Capturing the backtrace in throw] and Note [Hiding precise exception signature in throw]
+    let !se = noinline (errorCallWithCallStackException "Prelude.undefined" ?callStack)
+    in raise# se
 
 -- | Used for compiler-generated error message;
 -- encoding saves bytes of string junk.
