@@ -1,7 +1,7 @@
 -- (c) The University of Glasgow 2006
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Coercion.Opt( optCoProgram )
+module GHC.Core.Coercion.Opt( optCoProgram, optCoRefl )
 where
 
 import GHC.Prelude
@@ -11,12 +11,13 @@ import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 import GHC.Core
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
-import GHC.Core.TyCo.Compare( eqForAllVis, eqTypeIgnoringMultiplicity )
+import GHC.Core.TyCo.Compare( eqForAllVis, eqTypeIgnoringMultiplicity, eqType )
 import GHC.Core.Coercion
 import GHC.Core.Type as Type hiding( substTyVarBndr, substTy )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Unify
+import GHC.Core.Map.Type
 
 import GHC.Types.Basic( SwapFlag(..), flipSwap, isSwapped, pickSwap, notSwapped )
 import GHC.Types.Var
@@ -24,6 +25,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 
 import GHC.Data.Pair
+import GHC.Data.TrieMap
 
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
@@ -228,6 +230,75 @@ optCoAlt :: InScopeSet -> CoreAlt -> CoreAlt
 optCoAlt is (Alt k bs e)
   = Alt k bs (optCoExpr (is `extendInScopeSetList` bs) e)
 
+
+{- **********************************************************************
+%*                                                                      *
+                    optCoercionRefls
+%*                                                                      *
+%********************************************************************* -}
+
+optCoRefl :: Coercion -> Coercion
+optCoRefl in_co
+  = let out_co = go in_co
+        (Pair in_l in_r) = coercionKind in_co
+        (Pair out_l out_r) = coercionKind out_co
+    in if (in_l `eqType` out_l) && (in_r `eqType` out_r)
+       then out_co
+       else pprTrace "optReflCo" (vcat [ text "in_l:"  <+> ppr in_l
+                                       , text "in_r:"  <+> ppr in_r
+                                       , text "out_l:" <+> ppr out_l
+                                       , text "out_r:" <+> ppr out_r
+                                       , text "in_co:" <+> ppr in_co
+                                       , text "out_co:" <+> ppr out_co ]) $
+            out_co
+  where
+    go_m MRefl    = MRefl
+    go_m (MCo co) = MCo (go co)
+
+    go_s cos = map go cos
+
+    go co@(Refl {})                  = co
+    go co@(GRefl {})                 = co
+    go co@(CoVarCo {})               = co
+    go co@(HoleCo {})                = co
+    go (SymCo co)                    = mkSymCo (go co)
+    go (KindCo co)                   = mkKindCo (go co)
+    go (SubCo co)                    = mkSubCo (go co)
+    go (SelCo n co)                  = mkSelCo n (go co)
+    go (LRCo n co)                   = mkLRCo n (go co)
+    go (AppCo co1 co2)               = mkAppCo (go co1) (go co2)
+    go (InstCo co1 co2)              = mkInstCo (go co1) (go co2)
+    go (ForAllCo v vl vr mco co)     = mkForAllCo v vl vr (go_m mco) (go co)
+    go (FunCo r afl afr com coa cor) = mkFunCo2 r afl afr (go com) (go coa) (go cor)
+    go (TyConAppCo r tc cos)         = mkTyConAppCo r tc (go_s cos)
+    go (UnivCo p r lt rt cos)        = mkUnivCo p (go_s cos) r lt rt
+    go (AxiomCo ax cos)              = mkAxiomCo ax (go_s cos)
+
+    go (TransCo co1 co2) = gobble gs0 co1 [co2]
+       where
+         lk   = coercionLKind co1
+         role = coercionRole co1
+
+         gs0 :: GobbleState
+         gs0 = GS (mkReflCo role lk) (insertTM lk gs0 emptyTM)
+
+    gobble :: GobbleState -> Coercion -> [Coercion] -> Coercion
+    -- gobble (GS co1 tm) co2 cos   returns a coercion equivalent to (co1;co2;cos)
+    gobble gs (TransCo co2 co3) cos
+       = gobble gs co2 (co3 : cos)
+    gobble (GS co1 tm) co2 cos
+       = case lookupTM rk tm of
+            Just gs -> pprTrace "optCoRefl:hit eliminated" (ppr (TransCo co1 co2)) $
+                       gobble0 gs  cos
+            Nothing -> gobble0 gs' cos
+       where
+         rk = coercionRKind co2
+         gs' = GS (co1 `mkTransCo` co2) (insertTM rk gs' tm)
+
+    gobble0 (GS co _) [] = co
+    gobble0 gs (co:cos)  = gobble gs co cos
+
+data GobbleState = GS Coercion (TypeMap GobbleState)
 
 {- **********************************************************************
 %*                                                                      *
