@@ -34,7 +34,7 @@ quickFlavour = defaultFlavour
 
 quickArgs :: Args
 quickArgs = sourceArgs SourceArgs
-    { hsDefault  = mconcat [ pure ["-O0", "-H64m"] ]
+    { hsDefault  = mconcat [ pure ["-O0", "+RTS", "-O64M", "-RTS"] ]
     , hsLibrary  = notStage0 ? arg "-O"
     , hsCompiler = stage0 ? arg "-O2"
     , hsGhc      = stage0 ? arg "-O" }

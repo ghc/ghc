@@ -26,7 +26,7 @@ developmentFlavour ghcStage = defaultFlavour
 developmentArgs :: Stage -> Args
 developmentArgs ghcStage =
     sourceArgs SourceArgs
-        { hsDefault  = mconcat [ pure ["-O", "-H64m"],
+        { hsDefault  = mconcat [ pure ["-O", "+RTS", "-O64M", "-RTS"],
                                  -- Disable optimization when building Cabal;
                                  -- this saves many minutes of build time.
                                  package cabal ? pure ["-O0"]]

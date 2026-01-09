@@ -16,7 +16,7 @@ benchmarkFlavour = defaultFlavour
 
 benchmarkArgs :: Args
 benchmarkArgs = sourceArgs SourceArgs
-    { hsDefault  = pure ["-O", "-H64m"]
+    { hsDefault  = pure ["-O", "+RTS", "-O64M", "-RTS"]
     , hsLibrary  = pure ["-O2"]
     -- TODO: We should really pass -O2 when notStage0. Otherwise, we aren't
     -- really measuring the overhead of a potential new optimisation we want

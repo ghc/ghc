@@ -37,8 +37,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>default<br></td>
     <td> </td>
-    <td>-O<br>-H32m<br></td>
-    <td>-O2<br>-H32m</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS<br></td>
+    <td>-O2<br>+RTS<br>-O64M<br>-RTS</td>
     <td></td>
     <td>-haddock</td>
     <td></td>
@@ -49,8 +49,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>quick</td>
     <td> </td>
-    <td>-O0<br>-H64m</td>
-    <td>-O0<br>-H64m</td>
+    <td>-O0<br>+RTS<br>-O64M<br>-RTS</td>
+    <td>-O0<br>+RTS<br>-O64M<br>-RTS</td>
     <td></td>
     <td>-O</td>
     <td>-O2</td>
@@ -61,8 +61,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>quick-validate</td>
     <td></td>
-    <td>-O0<br>-H64m<br>-Werror</td>
-    <td>-O0<br>-H64m<br>-Werror</td>
+    <td>-O0<br>+RTS<br>-O64M<br>-RTS<br>-Werror</td>
+    <td>-O0<br>+RTS<br>-O64M<br>-RTS<br>-Werror</td>
     <td></td>
     <td>-O</td>
     <td>-O2</td>
@@ -73,8 +73,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>quick-debug</td>
     <td></td>
-    <td>-O0<br>-H64m</td>
-    <td>-O0<br>-H64m</td>
+    <td>-O0<br>+RTS<br>-O64M<br>-RTS</td>
+    <td>-O0<br>+RTS<br>-O64M<br>-RTS</td>
     <td></td>
     <td>-O</td>
     <td>-O2</td>
@@ -85,8 +85,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>quickest</td>
     <td></td>
-    <td>-O0<br>-H64m</td>
-    <td>-O0<br>-H64m</td>
+    <td>-O0<br>+RTS<br>-O64M<br>-RTS</td>
+    <td>-O0<br>+RTS<br>-O64M<br>-RTS</td>
     <td></td>
     <td></td>
     <td>-O</td>
@@ -97,8 +97,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>perf</td>
     <td> Yes (on supported platforms) </td>
-    <td>-O<br>-H64m</td>
-    <td>-O<br>-H64m</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
     <td></td>
     <td>-O2</td>
     <td>-O2</td>
@@ -109,8 +109,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>release (same as perf with -haddock and +no_self_recomp+hash_unit_ids)</td>
     <td></td>
-    <td>-O<br>-H64m</td>
-    <td>-O<br>-H64m</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
     <td></td>
     <td>-O2</td>
     <td>-O2</td>
@@ -121,8 +121,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>bench</td>
     <td></td>
-    <td>-O<br>-H64m</td>
-    <td>-O<br>-H64m</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
     <td></td>
     <td>-O2</td>
     <td>-O2</td>
@@ -133,8 +133,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>devel1</td>
     <td></td>
-    <td>-O<br>-H64m</td>
-    <td>-O<br>-H64m</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
     <td></td>
     <td>-dcore-lint</td>
     <td>-O0<br>-DDEBUG</td>
@@ -145,8 +145,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>devel2</td>
     <td></td>
-    <td>-O<br>-H64m</td>
-    <td>-O<br>-H64m</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
     <td></td>
     <td>-dcore-lint</td>
     <td>-O2</td>
@@ -157,7 +157,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>validate</td>
     <td></td>
-    <td>-O0<br>-H64m</td>
+    <td>-O0<br>+RTS<br>-O64M<br>-RTS</td>
     <td>-fllvm-fill-undef-with-garbage<br>-fcheck-prim-bounds</td>
     <td></td>
     <td>-O<br>-dcore-lint<br>-dno-debug-output</td>
@@ -169,7 +169,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>slow-validate</td>
     <td></td>
-    <td>-O0<br>-H64m</td>
+    <td>-O0<br>+RTS<br>-O64M<br>-RTS</td>
     <td>-fllvm-fill-undef-with-garbage</td>
     <td></td>
     <td>-O<br>-dcore-lint<br>-dno-debug-output</td>
@@ -181,8 +181,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   <tr>
     <th>static</td>
     <td></td>
-    <td>-O<br>-H64m<br>-fPIC -static</td>
-    <td>-O<br>-H64m<br>-fPIC -static</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS<br>-fPIC -static</td>
+    <td>-O<br>+RTS<br>-O64M<br>-RTS<br>-fPIC -static</td>
     <td></td>
     <td>-O2</td>
     <td>-O2</td>
