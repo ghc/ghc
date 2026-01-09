@@ -1079,7 +1079,7 @@ setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 setSrcSpan (RealSrcSpan loc _) thing_inside
   = updLclCtxt (\env -> env { tcl_loc = loc }) thing_inside
 
-setSrcSpan loc thing_inside
+setSrcSpan _ thing_inside
   = thing_inside
 
 getSrcCodeOrigin :: TcRn (Maybe SrcCodeOrigin)
