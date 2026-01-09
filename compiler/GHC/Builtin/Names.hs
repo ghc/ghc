@@ -526,7 +526,7 @@ genericTyConNames = [
 
 gHC_PRIM, gHC_PRIM_PANIC,
     gHC_TYPES, gHC_INTERNAL_DATA_DATA, gHC_MAGIC, gHC_MAGIC_DICT,
-    gHC_CLASSES, gHC_PRIMOPWRAPPERS :: Module
+    gHC_CLASSES, gHC_CLASSES_IP, gHC_PRIMOPWRAPPERS :: Module
 gHC_PRIM           = mkGhcInternalModule (fsLit "GHC.Internal.Prim")   -- Primitive types and values
 gHC_PRIM_PANIC     = mkGhcInternalModule (fsLit "GHC.Internal.Prim.Panic")
 gHC_TYPES          = mkGhcInternalModule (fsLit "GHC.Internal.Types")
@@ -534,6 +534,7 @@ gHC_MAGIC          = mkGhcInternalModule (fsLit "GHC.Internal.Magic")
 gHC_MAGIC_DICT     = mkGhcInternalModule (fsLit "GHC.Internal.Magic.Dict")
 gHC_CSTRING        = mkGhcInternalModule (fsLit "GHC.Internal.CString")
 gHC_CLASSES        = mkGhcInternalModule (fsLit "GHC.Internal.Classes")
+gHC_CLASSES_IP     = mkGhcInternalModule (fsLit "GHC.Internal.Classes.IP")
 gHC_PRIMOPWRAPPERS = mkGhcInternalModule (fsLit "GHC.Internal.PrimopWrappers")
 gHC_INTERNAL_TUPLE = mkGhcInternalModule (fsLit "GHC.Internal.Tuple")
 
@@ -1521,7 +1522,7 @@ fromLabelClassOpName
 -- Implicit Parameters
 ipClassName :: Name
 ipClassName
-  = clsQual gHC_CLASSES (fsLit "IP") ipClassKey
+  = clsQual gHC_CLASSES_IP (fsLit "IP") ipClassKey
 
 -- Overloaded record fields
 hasFieldClassName :: Name

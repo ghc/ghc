@@ -1,10 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, StandaloneDeriving, BangPatterns,
              KindSignatures, DataKinds, ConstraintKinds,
-              MultiParamTypeClasses, FunctionalDependencies #-}
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-  -- ip :: IP x a => a  is strictly speaking ambiguous, but IP is magic
+             MultiParamTypeClasses, FunctionalDependencies,
+             UnboxedTuples #-}
+
 {-# LANGUAGE UndecidableSuperClasses #-}
   -- Because of the type-variable superclasses for tuples
 
@@ -142,18 +141,13 @@ import GHC.Internal.Prim
 import GHC.Internal.Tuple
 import GHC.Internal.CString (unpackCString#)
 import GHC.Internal.Types
+import GHC.Internal.Classes.IP
 
 infix  4  ==, /=, <, <=, >=, >
 infixr 3  &&
 infixr 2  ||
 
 default ()              -- Double isn't available yet
-
--- | The syntax @?x :: a@ is desugared into @IP "x" a@
--- IP is declared very early, so that libraries can take
--- advantage of the implicit-call-stack feature
-class IP (x :: Symbol) a | x -> a where
-  ip :: a
 
 {- $matching_overloaded_methods_in_rules
 

@@ -1,5 +1,5 @@
-Main.funcToReify :: GHC.Internal.Classes.IP "z"
-                                            GHC.Internal.Types.Int =>
+Main.funcToReify :: GHC.Internal.Classes.IP.IP "z"
+                                               GHC.Internal.Types.Int =>
                     GHC.Internal.Types.Int
 5
 1

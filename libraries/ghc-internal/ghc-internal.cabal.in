@@ -343,6 +343,7 @@ Library
 
         GHC.Internal.CString
         GHC.Internal.Classes
+        GHC.Internal.Classes.IP
         GHC.Internal.Debug
         GHC.Internal.Magic
         GHC.Internal.Magic.Dict
