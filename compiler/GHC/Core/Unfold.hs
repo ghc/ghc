@@ -821,7 +821,7 @@ mkExprTree opts args expr
         go_ne_alts []  -- Empty case dealt with by `go_case`
           = pprPanic "go_ne_alts" (ppr alts)
         go_ne_alts alts@(alt1:rest_alts)
-          = caseSize case_bndr alts `metAddS`
+          = caseSize False case_bndr alts `metAddS`
             foldr (met_add_alt . do_one) (do_one alt1) rest_alts
           where
             do_one :: Alt Var -> Maybe ExprTree
@@ -891,13 +891,14 @@ callTree opts vs fun val_args
       _                -> genAppET opts vs fun val_args
 
 -- | The size of a function call
-vanillaCallSize :: [CoreExpr] -> Size
+vanillaCallSize :: [CoreExpr]   -- Type args already removed
+                -> Size
 vanillaCallSize val_args = foldl' arg_sz 2 val_args
   where
     arg_sz n arg
-      | isZeroBitArg arg  = n
-      | exprIsTrivial arg = n+2
-      | otherwise         = n+closureSize
+      | isZeroBitArg arg  = n               -- No runtime arg to pass
+      | exprIsTrivial arg = n+5             -- Just data shuffling
+      | otherwise         = n+closureSize   -- Closure to allocate
 -- 10 * (1 + n_val_args - voids)
         -- The 1+ is for the function itself
         -- Add 1 for each non-trivial value arg
@@ -992,7 +993,7 @@ primOpSize op val_args
 closureSize :: Size  -- Size for a heap-allocated closure
 closureSize = 15
 
-caseSize :: Id -> [alt] -> Size
+caseSize :: Bool -> Id -> [alt] -> Size
 -- For a case expression we charge for charge for each alternative.
 -- (This does /not/ include the cost of the alternatives themselves)
 -- If there are no alternatives (case e of {}), we get zero
@@ -1001,16 +1002,17 @@ caseSize :: Id -> [alt] -> Size
 -- save live variables, push a return address create an info table
 -- An unlifted case is just a conditional; and if there is only one
 -- alternative, it's not even a conditional, hence size zero
-caseSize scrut_id alts
-  | isUnliftedType (idType scrut_id)
-  = if isSingleton alts then 0
-                        else 5 * length alts
-  | otherwise
-  = 10 * length alts
+caseSize id_is_evald scrut_id alts
+  = eval_size + switch_size alts
+  where
+    eval_size
+      | id_is_evald                      = 0
+      | isUnliftedType (idType scrut_id) = 0
+      | otherwise                        = 20
 
-caseElimDiscount :: Discount
--- Bonus for eliminating a case
-caseElimDiscount = 10
+   switch_size
+      | isSingleton alts = 0
+      | otherwise        = 5 * length alts
 
 {- Note [Bale out on very wide case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1282,7 +1284,7 @@ etCaseOf bOMB_OUT_SIZE scrut case_bndr alts
 altTreesSize :: Id -> [AltTree] -> Size
 -- Total worst-case size of a [AltTree], including the per-alternative cost of altSize
 altTreesSize scrut_id alts
-  = foldl' add_alt (caseSize scrut_id alts) alts
+  = foldl' add_alt (caseSize False scrut_id alts) alts
   where
     add_alt :: Size -> AltTree -> Size
     add_alt sz (AltTree _ _ (ExprTree { et_wc_tot = alt_tot })) = sz + alt_tot
@@ -1365,10 +1367,11 @@ caseTreeSize ic (ScrutOf bndr disc)
 
 caseTreeSize ic (CaseOf scrut_var case_bndr alts)
   = case lookupBndr ic scrut_var of
-      ArgNoInfo  -> caseAltsSize ic case_bndr alts + case_size
-      ArgNonTriv -> caseAltsSize ic case_bndr alts + case_size
+      ArgNoInfo  -> caseAltsSize ic case_bndr alts + case_size False
+      ArgNonTriv -> caseAltsSize ic case_bndr alts + case_size False
 
       ArgIsNot cons -> caseAltsSize ic case_bndr (trim_alts cons alts)
+                       + case_size True
          -- The case-expression may not disappear, but it scrutinises
          -- a variable bound to something with structure; may lead to
          -- avoiding a thunk, or other benefits.  So we give a discount
@@ -1388,13 +1391,13 @@ caseTreeSize ic (CaseOf scrut_var case_bndr alts)
                      -- In DEFAULT case, bs is empty, so extending is a no-op
          -> assertPpr ((alt_con == DEFAULT) || (bndrs `equalLength` args))
                       (ppr arg_digest $$ ppr at) $
-            exprTreeSize ic' rhs - caseElimDiscount
-              -- Take off an extra discount for eliminating the case expression itself
+            exprTreeSize ic' rhs
+              -- The case expression itself has disappeared, so no size
 
          | otherwise  -- Happens for empty alternatives
-         -> caseAltsSize ic case_bndr alts
+         -> 0
   where
-    case_size = caseSize scrut_var alts
+    case_size is_evald = caseSize is_evald case_bndr alts
 
 find_alt :: AltCon -> [AltTree] -> Maybe AltTree
 find_alt _   []                     = Nothing

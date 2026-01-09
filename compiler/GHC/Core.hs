@@ -1510,6 +1510,9 @@ data ExprTree
              , et_cases  :: Bag CaseTree              -- ^ Case expressions and discounts
     }
 
+-- NB: The case expression in et_cases have no size recorded anywhere
+--     We add that in `caseTreeSize`.
+
 data CaseTree
   = CaseOf Id            -- Abstracts a case expression on this Id
            Id            -- Case binder
