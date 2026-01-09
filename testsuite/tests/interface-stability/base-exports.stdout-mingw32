@@ -3293,6 +3293,7 @@ module GHC.Base where
     {-# MINIMAL fmap #-}
   type IO :: * -> *
   newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
+  type role IP nominal representational
   type IP :: Symbol -> * -> Constraint
   class IP x a | x -> a where
     ip :: a

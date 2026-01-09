@@ -1171,6 +1171,7 @@ module GHC.Classes where
     (==) :: a -> a -> GHC.Internal.Types.Bool
     (/=) :: a -> a -> GHC.Internal.Types.Bool
     {-# MINIMAL (==) | (/=) #-}
+  type role IP nominal representational
   type IP :: GHC.Internal.Types.Symbol -> * -> Constraint
   class IP x a | x -> a where
     ip :: a

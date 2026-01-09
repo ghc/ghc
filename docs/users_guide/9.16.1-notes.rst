@@ -30,6 +30,18 @@ Language
 - The extension :extension:`ExplicitNamespaces` now allows namespace-specified
   wildcards ``type ..`` and ``data ..`` in import and export lists.
 
+- Implicit parameters and ``ImpredicativeTypes``.  GHC now knows
+  that if ``?foo::S`` is coecible to ``?foo::T`` only if ``S`` is coercible to ``T``.
+  Example (from :ghc-ticket:`#26737`)::
+
+    {-# LANGUAGE ImplicitParams, ImpredicativeTypes #-}
+    newtype N = MkN Int
+    test :: ((?foo::N) => Bool) -> ((?foo::Int) => Bool)
+    test = coerce
+
+  This is achieved by arranging that ``?foo :: T`` has a representational
+  role for ``T``.
+
 Compiler
 ~~~~~~~~
 
