@@ -345,11 +345,7 @@ instance H.Builder Builder where
 
                 Haddock BuildPackage -> runHaddock path buildArgs buildInputs
 
-                Ghc FindHsDependencies _ -> do
-                  -- Use a response file for ghc -M invocations, to
-                  -- avoid issues with command line size limit on
-                  -- Windows (#26637)
-                  runGhcWithResponse path buildArgs buildInputs
+                Ghc _ _ -> runGhcWithResponse path buildArgs buildInputs buildOptions
 
                 HsCpp    -> captureStdout
 
@@ -393,16 +389,18 @@ runHaddock haddockPath flagArgs fileInputs = withTempFile $ \tmp -> do
     writeFile' tmp $ escapeArgs fileInputs
     cmd [haddockPath] flagArgs ('@' : tmp)
 
-runGhcWithResponse :: FilePath -> [String] -> [FilePath] -> Action ()
-runGhcWithResponse ghcPath flagArgs fileInputs = withTempFile $ \tmp -> do
-
-    writeFile' tmp $ escapeArgs fileInputs
-
-    -- We can't put the flags in a response file, because some flags
-    -- require empty arguments (such as the -dep-suffix flag), but
-    -- that isn't supported yet due to #26560.
-    cmd [ghcPath] flagArgs ('@' : tmp)
-
+-- | Use a response file for ghc invocations to avoid issues with command line
+-- size limit on Windows (#26637).
+runGhcWithResponse :: FilePath -- ^ Path to ghc
+  -> [String] -- ^ Arguments passed on the command line
+  -> [FilePath] -- ^ Input file paths (passed via response file)
+  -> [CmdOption]
+  -> Action ()
+runGhcWithResponse ghcPath buildArgs buildInputs buildOptions = withTempFile $ \tmp -> do
+  let tmpContents = escapeArgs buildInputs
+  putVerbose $ "Build Inputs (" <> tmp <> "): " <> show buildInputs
+  writeFile' tmp tmpContents
+  cmd [ghcPath] buildArgs ('@' : tmp) buildOptions
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- 'Objdump' is only required on OpenBSD and AIX. Add support for platform

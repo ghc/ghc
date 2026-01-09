@@ -62,7 +62,6 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
                   [ arg "-fwrite-ide-info"
                   , arg "-hiedir", arg hie_path
                   ]
-            , getInputs
             , arg "-o", arg =<< getOutput ]
 
 compileC :: Args
@@ -78,7 +77,6 @@ compileC = builder (Ghc CompileCWithGhc) ? do
             , mconcat (map (map ("-optc" ++) <$>) ccArgs)
             , defaultGhcWarningsArgs
             , arg "-c"
-            , getInputs
             , arg "-o"
             , arg =<< getOutput ]
 
@@ -95,7 +93,6 @@ compileCxx = builder (Ghc CompileCppWithGhc) ? do
             , mconcat (map (map ("-optcxx" ++) <$>) ccArgs)
             , defaultGhcWarningsArgs
             , arg "-c"
-            , getInputs
             , arg "-o"
             , arg =<< getOutput ]
 
