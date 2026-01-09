@@ -356,6 +356,10 @@ instance H.Builder Builder where
                 Ghc FindHsDependencies _ -> do
                   runGhcWithResponse path buildArgs buildInputs
 
+                Ghc LinkHs _ -> do
+                  runGhcWithResponse path [ "-v" | verbosity >= Diagnostic ]
+                                          buildArgs
+
                 HsCpp    -> captureStdout
 
                 Make dir -> cmd' buildOptions path ["-C", dir] buildArgs
