@@ -107,7 +107,7 @@ InternalCounters:
 .PHONY: KeepCafsFail
 KeepCafsFail:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c -g -v0 KeepCafsBase.hs KeepCafs1.hs KeepCafs2.hs
-	"$(TEST_HC)" $(TEST_HC_OPTS) -g -v0 KeepCafsMain.hs KeepCafsBase.o -debug -rdynamic -fwhole-archive-hs-libs $(KEEPCAFS)
+	"$(TEST_HC)" $(TEST_HC_OPTS) -package ghci -g -v0 KeepCafsMain.hs KeepCafsBase.o -debug -rdynamic -fwhole-archive-hs-libs $(KEEPCAFS)
 	./KeepCafsMain 2>&1 || echo "exit($$?)"
 
 .PHONY: KeepCafs

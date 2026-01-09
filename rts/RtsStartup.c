@@ -11,7 +11,6 @@
 #include "HsFFI.h"
 
 #include "sm/Storage.h"
-#include "linker/MMap.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "BuiltinClosures.h"
@@ -347,8 +346,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* Initialise the adjustors subsystem */
     initAdjustors();
 
-    /* Initialise mmapForLinker */
-    initLinkerMMap();
 
     /* Initialise the stats department, phase 1 */
     initStats1();

@@ -11,11 +11,11 @@
 #include "Rts.h"
 #include "LinkerInternals.h"
 
-#include "BeginPrivate.h"
-
 void foreignExportsLoadingObject(ObjectCode *oc);
 void foreignExportsFinishedLoadingObject(void);
+
+#include "BeginPrivate.h"
+
 void processForeignExports(void);
 
 #include "EndPrivate.h"
-

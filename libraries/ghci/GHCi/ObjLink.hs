@@ -29,18 +29,15 @@ module GHCi.ObjLink
 import Prelude -- See note [Why do we import Prelude here?]
 import GHCi.RemoteTypes
 import GHCi.Message (LoadedDLL)
-import Control.Exception (throwIO, ErrorCall(..))
-import Control.Monad    ( when )
-import Data.Foldable
-import Foreign.C
-import Foreign.Marshal.Alloc ( alloca, free )
-import Foreign          ( nullPtr, peek )
 import GHC.Exts
-import System.Posix.Internals ( CFilePath, withFilePath, peekFilePath )
-import System.FilePath  ( dropExtension, normalise )
+
+#if !defined(wasm32_HOST_ARCH)
+import qualified GHCi.ObjLinker as HsLinker
+#endif
 
 #if defined(wasm32_HOST_ARCH)
-import Control.Exception (catch, evaluate)
+import Control.Exception (catch, evaluate, throwIO, ErrorCall(..))
+import Foreign          ( nullPtr )
 import GHC.Wasm.Prim
 #endif
 
@@ -146,26 +143,18 @@ foreign import javascript safe "__ghc_wasm_jsffi_dyld.findSystemLibrary($1)"
 #else
 
 initObjLinker :: ShouldRetainCAFs -> IO ()
-initObjLinker RetainCAFs = c_initLinker_ 1
-initObjLinker _ = c_initLinker_ 0
+initObjLinker RetainCAFs = HsLinker.initObjLinker True
+initObjLinker _ = HsLinker.initObjLinker False
 
 lookupSymbol :: String -> IO (Maybe (Ptr a))
 lookupSymbol str_in = do
    let str = prefixUnderscore str_in
-   withCAString str $ \c_str -> do
-     addr <- c_lookupSymbol c_str
-     if addr == nullPtr
-        then return Nothing
-        else return (Just addr)
+   HsLinker.lookupSymbol str
 
 lookupSymbolInDLL :: Ptr LoadedDLL -> String -> IO (Maybe (Ptr a))
 lookupSymbolInDLL dll str_in = do
    let str = prefixUnderscore str_in
-   withCAString str $ \c_str -> do
-     addr <- c_lookupSymbolInNativeObj dll c_str
-     if addr == nullPtr
-       then return Nothing
-       else return (Just addr)
+   HsLinker.lookupSymbolInDLL dll str
 
 prefixUnderscore :: String -> String
 prefixUnderscore
@@ -178,104 +167,38 @@ prefixUnderscore
 -- (e.g. "libfoo.so" or "foo.dll").  In the latter case, loadDLL
 -- searches the standard locations for the appropriate library.
 --
-loadDLL :: String -> IO (Either String (Ptr LoadedDLL))
-loadDLL str0 = do
-  let
-     -- On Windows, addDLL takes a filename without an extension, because
-     -- it tries adding both .dll and .drv.  To keep things uniform in the
-     -- layers above, loadDLL always takes a filename with an extension, and
-     -- we drop it here on Windows only.
-     str | isWindowsHost = dropExtension str0
-         | otherwise     = str0
-  --
-  (maybe_handle, maybe_errmsg) <- withFilePath (normalise str) $ \dll ->
-    alloca $ \errmsg_ptr -> (,)
-      <$> c_loadNativeObj dll errmsg_ptr
-      <*> peek errmsg_ptr
-
-  if maybe_handle == nullPtr
-    then do str <- peekCString maybe_errmsg
-            free maybe_errmsg
-            return (Left str)
-    else return (Right maybe_handle)
-
 loadArchive :: String -> IO ()
-loadArchive str = do
-   withFilePath str $ \c_str -> do
-     r <- c_loadArchive c_str
-     when (r == 0) (throwIO (ErrorCall ("loadArchive " ++ show str ++ ": failed")))
+loadArchive = HsLinker.loadArchive
 
 loadObj :: String -> IO ()
-loadObj str = do
-   withFilePath str $ \c_str -> do
-     r <- c_loadObj c_str
-     when (r == 0) (throwIO (ErrorCall ("loadObj " ++ show str ++ ": failed")))
+loadObj = HsLinker.loadObj
 
 -- | @unloadObj@ drops the given dynamic library from the symbol table
 -- as well as enables the library to be removed from memory during
 -- a future major GC.
 unloadObj :: String -> IO ()
-unloadObj str =
-   withFilePath str $ \c_str -> do
-     r <- c_unloadObj c_str
-     when (r == 0) (throwIO (ErrorCall ("unloadObj " ++ show str ++ ": failed")))
+unloadObj = HsLinker.unloadObj
 
 -- | @purgeObj@ drops the symbols for the dynamic library from the symbol
 -- table. Unlike 'unloadObj', the library will not be dropped memory during
 -- a future major GC.
 purgeObj :: String -> IO ()
-purgeObj str =
-   withFilePath str $ \c_str -> do
-     r <- c_purgeObj c_str
-     when (r == 0) (throwIO (ErrorCall ("purgeObj " ++ show str ++ ": failed")))
+purgeObj = HsLinker.purgeObj
 
 addLibrarySearchPath :: String -> IO (Ptr ())
-addLibrarySearchPath str =
-   withFilePath str c_addLibrarySearchPath
+addLibrarySearchPath = HsLinker.addLibrarySearchPath
 
 removeLibrarySearchPath :: Ptr () -> IO Bool
-removeLibrarySearchPath = c_removeLibrarySearchPath
+removeLibrarySearchPath = HsLinker.removeLibrarySearchPath
 
 findSystemLibrary :: String -> IO (Maybe String)
-findSystemLibrary str = do
-    result <- withFilePath str c_findSystemLibrary
-    case result == nullPtr of
-        True  -> return Nothing
-        False -> do path <- peekFilePath result
-                    free result
-                    return $ Just path
+findSystemLibrary = HsLinker.findSystemLibrary
 
 resolveObjs :: IO Bool
-resolveObjs = do
-   r <- c_resolveObjs
-   return (r /= 0)
+resolveObjs = HsLinker.resolveObjs
 
 loadDLLs :: [String] -> IO (Either String [Ptr LoadedDLL])
-loadDLLs = foldrM load_one $ Right []
-  where
-    load_one _ err@(Left _) = pure err
-    load_one p (Right dlls) = do
-      r <- loadDLL p
-      pure $ case r of
-        Left err -> Left err
-        Right dll -> Right $ dll : dlls
-
--- ---------------------------------------------------------------------------
--- Foreign declarations to RTS entry points which does the real work;
--- ---------------------------------------------------------------------------
-
-foreign import ccall unsafe "loadNativeObj"           c_loadNativeObj           :: CFilePath -> Ptr CString -> IO (Ptr LoadedDLL)
-foreign import ccall unsafe "lookupSymbolInNativeObj" c_lookupSymbolInNativeObj :: Ptr LoadedDLL -> CString -> IO (Ptr a)
-foreign import ccall unsafe "initLinker_"             c_initLinker_             :: CInt -> IO ()
-foreign import ccall unsafe "lookupSymbol"            c_lookupSymbol            :: CString -> IO (Ptr a)
-foreign import ccall unsafe "loadArchive"             c_loadArchive             :: CFilePath -> IO Int
-foreign import ccall unsafe "loadObj"                 c_loadObj                 :: CFilePath -> IO Int
-foreign import ccall unsafe "purgeObj"                c_purgeObj                :: CFilePath -> IO Int
-foreign import ccall unsafe "unloadObj"               c_unloadObj               :: CFilePath -> IO Int
-foreign import ccall unsafe "resolveObjs"             c_resolveObjs             :: IO Int
-foreign import ccall unsafe "addLibrarySearchPath"    c_addLibrarySearchPath    :: CFilePath -> IO (Ptr ())
-foreign import ccall unsafe "findSystemLibrary"       c_findSystemLibrary       :: CFilePath -> IO CFilePath
-foreign import ccall unsafe "removeLibrarySearchPath" c_removeLibrarySearchPath :: Ptr() -> IO Bool
+loadDLLs = HsLinker.loadDLLs
 
 -- -----------------------------------------------------------------------------
 -- Configuration
@@ -287,13 +210,6 @@ cLeadingUnderscore :: Bool
 cLeadingUnderscore = True
 #else
 cLeadingUnderscore = False
-#endif
-
-isWindowsHost :: Bool
-#if defined(mingw32_HOST_OS)
-isWindowsHost = True
-#else
-isWindowsHost = False
 #endif
 
 #endif

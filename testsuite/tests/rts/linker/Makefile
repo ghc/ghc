@@ -2,19 +2,21 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+TEST_HC_OPTS += -package ghci
+
 unsigned_reloc_macho_x64:
 	as -o unsigned_reloc_macho_x64.o unsigned_reloc_macho_x64.s
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RTSOPTS) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c
+	'$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c
 	./runner unsigned_reloc_macho_x64.o getAnswer
 
 section_alignment:
 	'$(TEST_CC)' $(TEST_CC_OPTS) -c -o section_alignment.o section_alignment.c
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RTSOPTS) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c
+	'$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c
 	./runner section_alignment.o isAligned
 
 T23066:
 	'$(TEST_CC)' $(TEST_CC_OPTS) -c -o T23066_c.o T23066_c.c
-	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RTSOPTS) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c -static
+	'$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c -static
 	./runner T23066_c.o isAligned
 
 T2615-prep:
@@ -95,7 +97,8 @@ linker_unload_native:
 .PHONY: linker_error1
 linker_error1:
 	"$(TEST_HC)" -c linker_error.c -o linker_error1.o
-	"$(TEST_HC)" linker_error1.o -o linker_error1 -no-hs-main -optc-g -debug -threaded
+	"$(TEST_HC)" linker_error1.o -o linker_error1 -no-hs-main -optc-g -debug -threaded \
+		$(filter-out -rtsopts, $(TEST_HC_OPTS))
 	./linker_error1 linker_error.c
 
 # linker_error2: the object file has an unknown symbol (fails in
@@ -105,7 +108,8 @@ linker_error1:
 linker_error2:
 	"$(TEST_HC)" -c linker_error.c -o linker_error2.o
 	"$(TEST_HC)" -c linker_error2.c -o linker_error2_o.o
-	"$(TEST_HC)" linker_error2.o -o linker_error2 -no-hs-main -optc-g -debug -threaded
+	"$(TEST_HC)" linker_error2.o -o linker_error2 -no-hs-main -optc-g -debug -threaded \
+		$(filter-out -rtsopts, $(TEST_HC_OPTS))
 	./linker_error2 linker_error2_o.o
 
 # linker_error3: the object file duplicates an existing symbol (fails
@@ -115,19 +119,21 @@ linker_error2:
 linker_error3:
 	"$(TEST_HC)" -c linker_error.c -o linker_error3.o
 	"$(TEST_HC)" -c linker_error3.c -o linker_error3_o.o
-	"$(TEST_HC)" linker_error3.o -o linker_error3 -no-hs-main -optc-g -debug -threaded
+	"$(TEST_HC)" linker_error3.o -o linker_error3 -no-hs-main -optc-g -debug -threaded \
+		$(filter-out -rtsopts, $(TEST_HC_OPTS))
 	./linker_error3 linker_error3_o.o
 
 .PHONY: T7072
 T7072:
-	"$(TEST_HC)" load-object.c -o load-object -no-hs-main -debug
+	"$(TEST_HC)" load-object.c -o load-object -no-hs-main -debug \
+		$(filter-out -rtsopts, $(TEST_HC_OPTS))
 	"$(TEST_HC)" -c T7072.c -o T7072.o
 	./load-object T7072.o
 
 .PHONY: T20494
 T20494:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T20494-obj.c -o T20494-obj.o
-	"$(TEST_HC)" -v0 T20494.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T20494.hs
 	./T20494 T20494-obj.o
 
 .PHONY: T20918
@@ -142,7 +148,8 @@ T21618:
 
 .PHONY: reloc-none
 reloc-none:
-	"$(TEST_HC)" load-object.c -o load-object -no-hs-main -debug
+	"$(TEST_HC)" load-object.c -o load-object -no-hs-main -debug \
+		$(filter-out -rtsopts, $(TEST_HC_OPTS))
 	"$(TEST_HC)" -c reloc-none.c -o reloc-none.o
 	./load-object reloc-none.o
 
@@ -150,5 +157,5 @@ reloc-none:
 T25191:
 	"$(TEST_HC)" -c T25191_foo1.c -o foo1.o -v0
 	"$(TEST_HC)" -c T25191_foo2.c -o foo2.o -v0
-	"$(TEST_HC)" T25191.hs -v0
+	"$(TEST_HC)" $(TEST_HC_OPTS) T25191.hs -v0
 	./T25191

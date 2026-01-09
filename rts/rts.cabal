@@ -424,7 +424,6 @@ library
                  LdvProfile.c
                  Libdw.c
                  LibdwPool.c
-                 Linker.c
                  ReportMemoryMap.c
                  Messages.c
                  OldARMAtomic.c
@@ -482,29 +481,9 @@ library
                  hooks/OnExit.c
                  hooks/OutOfHeap.c
                  hooks/StackOverflow.c
-                 linker/CacheFlush.c
-                 linker/Elf.c
-                 linker/InitFini.c
-                 linker/LoadArchive.c
-                 linker/LoadNativeObjPosix.c
-                 linker/M32Alloc.c
-                 linker/MMap.c
-                 linker/MachO.c
-                 linker/macho/plt.c
-                 linker/macho/plt_aarch64.c
+                 LinkerStub.c
                  linker/ProddableBlocks.c
-                 linker/PEi386.c
-                 linker/SymbolExtras.c
-                 linker/elf_got.c
-                 linker/elf_plt.c
-                 linker/elf_plt_aarch64.c
-                 linker/elf_plt_riscv64.c
-                 linker/elf_plt_arm.c
-                 linker/elf_reloc.c
-                 linker/elf_reloc_aarch64.c
-                 linker/elf_reloc_riscv64.c
-                 linker/elf_tlsgd.c
-                 linker/elf_util.c
+                 linker/MMap.c
                  sm/BlockAlloc.c
                  sm/CNF.c
                  sm/Compact.c

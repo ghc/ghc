@@ -497,11 +497,6 @@ extern char **environ;
       SymI_HasDataProto(stg_block_readmvar)                                 \
       SymI_HasDataProto(stg_block_putmvar)                                  \
       MAIN_CAP_SYM                                                      \
-      SymI_HasProto(addDLL)                                             \
-      SymI_HasProto(loadNativeObj)                                      \
-      SymI_HasProto(addLibrarySearchPath)                               \
-      SymI_HasProto(removeLibrarySearchPath)                            \
-      SymI_HasProto(findSystemLibrary)                                  \
       SymI_HasProto(__int_encodeDouble)                                 \
       SymI_HasProto(__word_encodeDouble)                                \
       SymI_HasProto(__int_encodeFloat)                                  \
@@ -593,8 +588,6 @@ extern char **environ;
       SymI_HasProto(hs_try_putmvar)                                     \
       SymI_HasProto(hs_try_putmvar_with_value)                          \
       SymI_HasProto(defaultRtsConfig)                                   \
-      SymI_HasProto(initLinker)                                         \
-      SymI_HasProto(initLinker_)                                        \
       SymI_HasDataProto(stg_unpackClosurezh)                            \
       SymI_HasDataProto(stg_closureSizzezh)                                 \
       SymI_HasDataProto(stg_whereFromzh)                                 \
@@ -606,12 +599,7 @@ extern char **environ;
       SymI_HasDataProto(stg_killThreadzh)                                   \
       SymI_HasDataProto(stg_listThreadszh)                                  \
       SymI_HasDataProto(stg_threadLabelzh)                                  \
-      SymI_HasProto(loadArchive)                                        \
-      SymI_HasProto(loadObj)                                            \
-      SymI_HasProto(purgeObj)                                           \
       SymI_HasProto(insertSymbol)                                       \
-      SymI_HasProto(lookupSymbol)                                       \
-      SymI_HasProto(lookupSymbolInNativeObj)                            \
       SymI_HasDataProto(stg_makeStablePtrzh)                                \
       SymI_HasDataProto(stg_mkApUpd0zh)                                     \
       SymI_HasDataProto(stg_labelThreadzh)                                  \
@@ -679,7 +667,6 @@ extern char **environ;
       SymI_HasProto(resumeThread)                                       \
       SymI_HasProto(setNumCapabilities)                                 \
       SymI_HasProto(getNumberOfProcessors)                              \
-      SymI_HasProto(resolveObjs)                                        \
       SymI_HasDataProto(stg_retryzh)                                        \
       SymI_HasProto(rts_apply)                                          \
       SymI_HasProto(rts_checkSchedStatus)                               \
@@ -873,7 +860,6 @@ extern char **environ;
       SymI_HasDataProto(stg_tryTakeMVarzh)                                  \
       SymI_HasDataProto(stg_tryReadMVarzh)                                  \
       SymI_HasDataProto(stg_unmaskAsyncExceptionszh)                        \
-      SymI_HasProto(unloadObj)                                              \
       SymI_HasDataProto(stg_unsafeThawArrayzh)                              \
       SymI_HasDataProto(stg_waitReadzh)                                     \
       SymI_HasDataProto(stg_waitWritezh)                                    \

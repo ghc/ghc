@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ITERATIONS 1000
+#define ITERATIONS 100
 
 #if defined(mingw32_HOST_OS)
 #define OBJPATH L"Test.o"

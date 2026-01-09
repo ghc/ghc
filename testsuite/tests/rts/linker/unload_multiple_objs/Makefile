@@ -11,7 +11,6 @@ linker_unload_multiple_objs:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c C.hs -v0
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c D.hs -v0
 	# -rtsopts causes a warning
-	"$(TEST_HC)" LinkerUnload.hs -package ghc $(filter-out -rtsopts, $(TEST_HC_OPTS)) linker_unload_multiple_objs.c -o linker_unload_multiple_objs -no-hs-main -optc-Werror
+	"$(TEST_HC)" LinkerUnload.hs -package ghc -package ghci $(filter-out -rtsopts, $(TEST_HC_OPTS)) linker_unload_multiple_objs.c -o linker_unload_multiple_objs -no-hs-main -optc-Werror
 	./linker_unload_multiple_objs "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
-
 

@@ -67,10 +67,19 @@ library
             GHCi.StaticPtrTable
             GHCi.TH
             GHCi.Server
+        other-modules:
+            GHCi.ObjLinker
 
         if !arch(javascript)
           exposed-modules:
             GHCi.InfoTable
+
+        if !arch(wasm32)
+          c-sources:
+            cbits/ghci_objlinker.c
+          include-dirs:
+            ../../rts
+            ../../rts/include
 
     exposed-modules:
         GHCi.BreakArray

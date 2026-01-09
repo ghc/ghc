@@ -20,5 +20,5 @@ Lib.a: Lib.o
 
 main: main.c
 	"$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS)) \
-		-rdynamic -no-hs-main -optc-Werror -prof \
+		-rdynamic -no-hs-main -optc-Werror -prof -package ghci \
 		main.c -o main
