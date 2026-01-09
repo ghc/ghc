@@ -1,10 +1,16 @@
 RecordDotSyntaxFail10.hs:40:11: error: [GHC-39999]
     • No instance for ‘HasField "quux" Quux String’
+        arising from a record update
       NB: ‘HasField’ is not the built-in ‘GHC.Internal.Records.HasField’ class.
       Insoluble functional dependencies wrt top-level instances
     • In the second argument of ‘($)’, namely ‘a {foo.bar.baz.quux}’
-      In a stmt of a 'do' block: print $ a {foo.bar.baz.quux}
       In the expression:
-	do let a = Foo {foo = ...}
-	   let quux = "Expecto patronum!"
-	   print $ a {foo.bar.baz.quux}
+        do let a = Foo {foo = ...}
+           let quux = "Expecto patronum!"
+           print $ a {foo.bar.baz.quux}
+      In an equation for ‘main’:
+          main
+            = do let a = ...
+                 let quux = "Expecto patronum!"
+                 print $ a {foo.bar.baz.quux}
+
