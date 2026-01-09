@@ -32,7 +32,7 @@ quickCrossFlavour = defaultFlavour
 quickCrossArgs :: Args
 quickCrossArgs = sourceArgs SourceArgs
     { hsDefault  = mconcat $
-        [ pure ["-O0", "-H64m"]
+        [ pure ["-O0", "+RTS", "-O64M", "-RTS"]
         ]
     , hsLibrary  = notStage0 ? mconcat [ arg "-O", arg "-fllvm" ]
     , hsCompiler = stage0 ? arg "-O2"

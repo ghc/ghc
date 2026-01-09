@@ -16,11 +16,12 @@ validateFlavour = enableLinting $ quickValidateFlavour
 
 validateArgs :: Args
 validateArgs = sourceArgs SourceArgs
-    { hsDefault  = mconcat [ stage0 ? pure ["-O0", "-H64m"]
+    { hsDefault  = mconcat [ stage0 ? pure ["-O0"]
                              -- See #11487
                            , notStage0 ? arg "-fllvm-fill-undef-with-garbage"
                            , notStage0 ? arg "-dno-debug-output"
                            , notStage0 ? arg "-fcheck-prim-bounds"
+                           , pure ["+RTS", "-O64M", "-RTS"]
                            ]
     , hsLibrary  = pure ["-O"]
     , hsCompiler = mconcat [ stage0 ? pure ["-O2"]
@@ -37,7 +38,7 @@ slowValidateFlavour = validateFlavour
 
 quickValidateArgs :: Args
 quickValidateArgs = sourceArgs SourceArgs
-    { hsDefault  = mempty
+    { hsDefault  = pure ["+RTS", "-O64M", "-RTS"]
     , hsLibrary  = pure [ "-O" ]
     , hsCompiler = mconcat [ stage0 ? arg "-O2", notStage0 ? arg "-O"]
     , hsGhc      = pure [ "-O", "-hide-all-packages" ]
