@@ -156,7 +156,7 @@ stringEncodeOS = \case
   OSHaiku     -> "haiku"
   OSQNXNTO    -> "nto-qnx"
   OSAIX       -> "aix"
-  OSHurd      -> "hurd"
+  OSHurd      -> "gnu"
   OSWasi      -> "wasi"
   OSGhcjs     -> "ghcjs"
 
