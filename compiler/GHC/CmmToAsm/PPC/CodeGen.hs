@@ -1240,13 +1240,19 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
           let inv = case platformByteOrder platform of
                       BigEndian -> unitOL $ XOR shift shift (RIImm (ImmInt 24))
                       LittleEndian -> nilOL
+              and_mask = case amop of
+                AMO_And -> unitOL $ ORC shifted_n shifted_n shifted_mask
+                _       -> nilOL
           let i = ncode `appOL` unitOL (RLWINM shift unaligned_addr 3 27 28)
                   `appOL` inv `appOL`
                   toOL [ LI mask (ImmInt 255)
                        , SL fmt shifted_mask mask (RIReg shift)
                        , SL fmt shifted_n n_reg (RIReg shift)
                        ]
-          let (insert, shift_back) = build_result
+                  `appOL` and_mask
+          let (insert, shift_back) = case amop of
+                AMO_And -> (nilOL, unitOL $ SR fmt reg_dst tmp2 (RIReg shift))
+                _       -> build_result
           return (RIReg shifted_n, i, insert, shift_back)
         W16 -> do
           (n_reg, ncode) <- getSomeReg n
@@ -1254,6 +1260,9 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
           let inv = case platformByteOrder platform of
                       BigEndian -> unitOL $ XOR shift shift (RIImm (ImmInt 16))
                       LittleEndian -> nilOL
+              and_mask = case amop of
+                AMO_And -> unitOL $ ORC shifted_n shifted_n shifted_mask
+                _       -> nilOL
           let i = ncode `appOL` unitOL (RLWINM shift unaligned_addr 3 27 27)
                   `appOL` inv `appOL`
                   toOL [ LI mask (ImmInt 0)
@@ -1261,7 +1270,10 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                        , SL fmt shifted_mask mask (RIReg shift)
                        , SL fmt shifted_n n_reg (RIReg shift)
                        ]
-          let (insert, shift_back) = build_result
+                  `appOL` and_mask
+          let (insert, shift_back) = case amop of
+                AMO_And -> (nilOL, unitOL $ SR fmt reg_dst tmp2 (RIReg shift))
+                _       -> build_result
           return (RIReg shifted_n, i, insert, shift_back)
         _   -> do
           (n_ri, n_code) <- case amop of
