@@ -4,6 +4,7 @@ module Rules.Lint
 
 import Base
 import Settings.Builders.Common
+import System.Directory (findExecutable)
 import System.Exit (exitFailure)
 
 lintRules :: Rules ()
