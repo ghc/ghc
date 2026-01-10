@@ -43,7 +43,6 @@ test('JumpTableNoStackDealloc',
 test('AtomicFetch',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    req_cmm
-     ,    when(arch('i386'), skip) # https://gitlab.haskell.org/ghc/ghc/-/issues/23217
      ],
      multi_compile_and_run,
      ['AtomicFetch', [('AtomicFetch_cmm.cmm', '')], ''])
