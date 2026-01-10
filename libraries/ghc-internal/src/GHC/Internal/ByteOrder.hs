@@ -27,8 +27,6 @@ module GHC.Internal.ByteOrder
 
 import GHC.Internal.Base
 import GHC.Internal.Enum
-import GHC.Internal.Generics (Generic)
-import GHC.Internal.Text.Read
 import GHC.Internal.Text.Show
 
 -- | Byte ordering.
@@ -39,9 +37,7 @@ data ByteOrder
              , Ord     -- ^ @since base-4.11.0.0
              , Bounded -- ^ @since base-4.11.0.0
              , Enum    -- ^ @since base-4.11.0.0
-             , Read    -- ^ @since base-4.11.0.0
              , Show    -- ^ @since base-4.11.0.0
-             , Generic -- ^ @since base-4.15.0.0
              )
 
 -- | The byte ordering of the target machine.

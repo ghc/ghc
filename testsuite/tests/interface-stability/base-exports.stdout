@@ -12464,12 +12464,12 @@ instance forall a. GHC.Internal.Generics.Generic (Data.Semigroup.Max a) -- Defin
 instance forall a. GHC.Internal.Generics.Generic (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
 instance forall m. GHC.Internal.Generics.Generic (Data.Semigroup.WrappedMonoid m) -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Generics.Generic GHC.Internal.Data.Version.Version -- Defined in ‘GHC.Internal.Data.Version’
-instance GHC.Internal.Generics.Generic GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). GHC.Internal.Generics.Generic ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). GHC.Internal.Generics.Generic ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Internal.Generics.Generic ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic GHC.Internal.Generics.Associativity -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic GHC.Internal.Types.Bool -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Generics.Generic GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic GHC.Internal.Generics.DecidedStrictness -- Defined in ‘GHC.Internal.Generics’
 instance forall a. GHC.Internal.Generics.Generic (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Generics’
 instance forall a b. GHC.Internal.Generics.Generic (GHC.Internal.Data.Either.Either a b) -- Defined in ‘GHC.Internal.Generics’
@@ -12756,6 +12756,7 @@ instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Inter
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Data.Bits.Xor a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance forall a b. (GHC.Internal.Ix.Ix a, GHC.Internal.Read.Read a, GHC.Internal.Read.Read b) => GHC.Internal.Read.Read (GHC.Internal.Arr.Array a b) -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Internal.Types.Bool -- Defined in ‘GHC.Internal.Read’
+instance GHC.Internal.Read.Read GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Internal.Types.Char -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Read’
 instance GHC.Internal.Read.Read GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Read’
@@ -12851,7 +12852,6 @@ instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CULong -- Defined i
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CUSeconds -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
-instance GHC.Internal.Read.Read GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Read.Read (f p), GHC.Internal.Read.Read (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Read.Read (f p), GHC.Internal.Read.Read (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Internal.Read.Read (f (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Generics’

@@ -751,6 +751,7 @@ import GHC.Internal.Stack.Types ( SrcLoc(..) )
 import GHC.Internal.Tuple   (Solo (..))
 import GHC.Internal.Unicode ( GeneralCategory(..) )
 import GHC.Internal.Fingerprint.Type ( Fingerprint(..) )
+import GHC.Internal.ByteOrder ( ByteOrder(..) )
 
 -- Needed for metadata
 import GHC.Internal.Data.Proxy   ( Proxy(..) )
@@ -1640,6 +1641,9 @@ deriving instance Generic GeneralCategory
 
 -- | @since base-4.15.0.0
 deriving instance Generic Fingerprint
+
+-- | @since base-4.15.0.0
+deriving instance Generic ByteOrder
 
 -- | @since base-4.6.0.0
 deriving instance Generic1 []
