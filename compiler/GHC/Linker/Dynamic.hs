@@ -227,7 +227,6 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
 
             runLink logger tmpfs linker_config (
                     map Option verbFlags
-                 ++ libmLinkOpts platform
                  ++ [ Option "-o"
                     , FileOption "" output_fn
                     ]
@@ -260,6 +259,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                     --    driver is a more pragmatic solution.
                  ++ [ Option "-Wl,--Bsymbolic,--experimental-pic,--unresolved-symbols=import-dynamic" | arch == ArchWasm32 ]
                  ++ extra_ld_inputs
+                 ++ libmLinkOpts platform
                  ++ map Option lib_path_opts
                  ++ map Option pkg_lib_path_opts
                  ++ map Option pkg_link_opts
