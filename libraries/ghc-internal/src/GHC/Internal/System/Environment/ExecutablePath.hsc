@@ -51,7 +51,7 @@ import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.System.IO.Error (isDoesNotExistError)
 import GHC.Internal.System.Posix.Internals
-#elif defined(linux_HOST_OS)
+#elif defined(linux_HOST_OS) || defined(gnu_HOST_OS)
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.List (isSuffixOf)
 import GHC.Internal.Foreign.C.Types
