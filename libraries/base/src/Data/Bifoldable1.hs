@@ -2,6 +2,7 @@
 -- Copyright: Edward Kmett, Oleg Grenrus
 -- License: BSD-3-Clause
 --
+-- @since 4.18.0.0
 
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Safe              #-}
