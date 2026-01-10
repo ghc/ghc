@@ -21,12 +21,15 @@
 module System.Info
   ( os
   , arch
+  , ByteOrder(..)
+  , hostByteOrder
   , compilerName
   , compilerVersion
   , fullCompilerVersion
   ) where
 
 import GHC.Internal.Data.Version (Version (..))
+import GHC.Internal.ByteOrder
 import Prelude
 
 -- | The version of 'compilerName' with which the program was compiled

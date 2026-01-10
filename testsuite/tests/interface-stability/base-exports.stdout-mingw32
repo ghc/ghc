@@ -5040,6 +5040,7 @@ module GHC.ByteOrder where
   -- Safety: Safe
   type ByteOrder :: *
   data ByteOrder = BigEndian | LittleEndian
+  hostByteOrder :: ByteOrder
   targetByteOrder :: ByteOrder
 
 module GHC.Char where
@@ -10669,10 +10670,13 @@ module System.IO.Unsafe where
 
 module System.Info where
   -- Safety: Safe
+  type ByteOrder :: *
+  data ByteOrder = BigEndian | LittleEndian
   arch :: GHC.Internal.Base.String
   compilerName :: GHC.Internal.Base.String
   compilerVersion :: GHC.Internal.Data.Version.Version
   fullCompilerVersion :: GHC.Internal.Data.Version.Version
+  hostByteOrder :: ByteOrder
   os :: GHC.Internal.Base.String
 
 module System.Mem where

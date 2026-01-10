@@ -55,7 +55,7 @@ lookupBit64 addr# (I# index#) = W# (word## `and#` bitMask##) /= 0
       _  -> popCount fbs -- this is a really weird architecture
 
     wordIndex# = index# `uncheckedIShiftRL#` logFbs#
-    word## = case targetByteOrder of
+    word## = case hostByteOrder of
       BigEndian    -> byteSwap# (indexWordOffAddr# addr# wordIndex#)
       LittleEndian -> indexWordOffAddr# addr# wordIndex#
     bitIndex# = index# `andI#` fbs#
