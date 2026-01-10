@@ -19,7 +19,6 @@ module Hadrian.Utilities (
     copyFile, copyFileUntracked, createFileLink, fixFile,
     makeExecutable, moveFile, removeFile, createDirectory, copyDirectory,
     moveDirectory, removeDirectory, removeFile_, writeFileChangedBS,
-    findExecutable,
 
     -- * Diagnostic info
     Colour (..), ANSIColour (..), putColoured, shouldUseColor,
@@ -691,7 +690,3 @@ renderUnicorn ls =
     ponyPadding = "                                            "
     boxLines :: [String]
     boxLines = ["", "", ""] ++ (lines . renderBox $ ls)
-
--- Workaround for https://github.com/haskell/directory/issues/180
-findExecutable :: String -> IO (Maybe FilePath)
-findExecutable exe = IO.catch (IO.findExecutable exe) $ \(_ :: IO.IOException) -> pure Nothing
