@@ -90,9 +90,9 @@ import GHC.Types.Unique.Map
 
 import GHC.Utils.Binary hiding (SymbolTable)
 import GHC.Utils.Outputable (ppr, Outputable, hcat, vcat, text, hsep)
+import GHC.Utils.Misc
 import GHC.Utils.Monad (mapMaybeM)
 import GHC.Utils.Panic
-import GHC.Utils.Misc (dropWhileEndLE)
 import System.IO.Unsafe
 import qualified Control.Exception as Exception
 
@@ -693,8 +693,8 @@ instance Semigroup JSOptions where
   a <> b = JSOptions
     { enableCPP                  = enableCPP a || enableCPP b
     , emccExtraOptions           = emccExtraOptions a ++ emccExtraOptions b
-    , emccExportedFunctions      = List.nub (List.sort (emccExportedFunctions a ++ emccExportedFunctions b))
-    , emccExportedRuntimeMethods = List.nub (List.sort (emccExportedRuntimeMethods a ++ emccExportedRuntimeMethods b))
+    , emccExportedFunctions      = nubSort $ emccExportedFunctions a ++ emccExportedFunctions b
+    , emccExportedRuntimeMethods = nubSort $ emccExportedRuntimeMethods a ++ emccExportedRuntimeMethods b
     }
 
 defaultJSOptions :: JSOptions

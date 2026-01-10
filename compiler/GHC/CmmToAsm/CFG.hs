@@ -70,7 +70,7 @@ import GHC.Utils.Panic
 --import GHC.Data.OrdList
 --import GHC.Cmm.DebugBlock.Trace
 
-import Data.List (sort, nub, partition)
+import Data.List (sort, partition)
 import Data.STRef.Strict
 import Control.Monad.ST
 
@@ -882,7 +882,7 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
     -- Block b is part of n loop bodies => loop nest level of n
     loopCounts =
       let bodies = map (first snd) loopBodies -- [(Header, Body)]
-          loopCount n = length $ nub . map fst . filter (setMember n . snd) $ bodies
+          loopCount n = setSize $ setFromList . map fst . filter (setMember n . snd) $ bodies
       in  map (\n -> (n, loopCount n)) $ nodes :: [(BlockId, Int)]
 
     mkDomMap :: Tree BlockId -> LabelMap LabelSet

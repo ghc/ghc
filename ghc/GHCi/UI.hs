@@ -129,7 +129,7 @@ import Data.Function
 import qualified Data.Foldable as Foldable
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( find, intercalate, intersperse,
-                   isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
+                   isPrefixOf, isSuffixOf, partition, sort, sortBy, (\\) )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 import Data.Maybe
@@ -910,7 +910,7 @@ runGHCi paths maybe_exprs = do
       userCfgs <- do
         paths <- catMaybes <$> sequence [ appDataCfg, homeCfg ]
         checkedPaths <- liftIO $ filterM checkFileAndDirPerms paths
-        liftIO . fmap (nub . catMaybes) $ mapM canonicalizePath' checkedPaths
+        liftIO . fmap (ordNub . catMaybes) $ mapM canonicalizePath' checkedPaths
 
       localCfg <- do
         let path = ".ghci"
@@ -938,7 +938,7 @@ runGHCi paths maybe_exprs = do
     -- We don't require that a script explicitly added by -ghci-script
     -- is owned by the current user. (#6017)
 
-  mapM_ sourceConfigFile $ nub arg_cfgs \\ processedCfgs
+  mapM_ sourceConfigFile $ ordNub arg_cfgs \\ processedCfgs
     -- Dedup, and remove any configs we already processed.
     -- Importantly, if $PWD/.ghci was ignored due to configuration,
     -- explicitly specifying it does cause it to be processed.
@@ -3989,7 +3989,7 @@ completeGhciCommand = wrapCompleter " " $ \w -> do
   let command_names = map (':':) . map cmdName $ filter (not . cmdHidden) cmds
   let{ candidates = case w of
       ':' : ':' : _ -> map (':':) command_names
-      _ -> nub $ macro_names ++ command_names }
+      _ -> ordNub $ macro_names ++ command_names }
   return $ filter (w `isPrefixOptOf`) candidates
 
 completeMacro = wrapIdentCompleter $ \w -> do
@@ -4019,7 +4019,7 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
     let (mod_str, _, _) = splitIdent w
     bids_mod_breaks <- bidsFromModBreaks mod_str
     bids_inscopes <- bidsFromInscopes
-    pure $ nub $ filter (isPrefixOf w) $ bids_mod_breaks ++ bids_inscopes
+    pure $ ordNub $ filter (isPrefixOf w) $ bids_mod_breaks ++ bids_inscopes
   where
     -- Extract all bids from ModBreaks for a given module name prefix
     bidsFromModBreaks :: GhciMonad m => String -> m [String]
@@ -4049,7 +4049,7 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
     bidsByModule nonquals mod = do
       mb_decls <- fmap GHC.modBreaks_decls <$> getModBreak mod
       let bids = case mb_decls of
-            Just decls -> nub $ declPath <$> elems decls
+            Just decls -> ordNub $ declPath <$> elems decls
             Nothing -> []
       pure $ case mod `elem` nonquals of
               True  -> bids
@@ -4082,7 +4082,7 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
           Just decls -> do
             let (mod_str, topLvl, _) = splitIdent ident
                 ident_decls = [ elm | elm@(el : _) <- elems decls, el == topLvl ]
-                bids = nub $ declPath <$> ident_decls
+                bids = ordNub $ declPath <$> ident_decls
             pure $ map (combineModIdent mod_str) bids
 
 completeModule = wrapIdentCompleterMod $ \w -> do

@@ -80,7 +80,6 @@ import GHC.Utils.Panic
 import qualified Data.Bits as Bits
 import qualified Data.Foldable as F
 import qualified Data.Set      as S
-import qualified Data.List     as L
 import Data.Set (Set)
 import Data.Monoid
 
@@ -419,7 +418,7 @@ stgLneLive' b = filter (`notElem` bindees b) (stgLneLive b)
 
 stgLneLive :: CgStgBinding -> [Id]
 stgLneLive (StgNonRec _b e) = stgLneLiveExpr e
-stgLneLive (StgRec bs)      = L.nub $ concatMap (stgLneLiveExpr . snd) bs
+stgLneLive (StgRec bs)      = ordNub $ concatMap (stgLneLiveExpr . snd) bs
 
 stgLneLiveExpr :: CgStgRhs -> [Id]
 stgLneLiveExpr rhs = dVarSetElems (liveVars $ stgRhsLive rhs)

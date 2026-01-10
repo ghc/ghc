@@ -273,7 +273,7 @@ import GHC.SysTools.BaseDir (findTopDir)
 
 import Data.Data hiding (Fixity, TyCon)
 import Data.Functor ((<&>))
-import Data.List ( nub, isPrefixOf, partition )
+import Data.List ( isPrefixOf, partition )
 import qualified Data.List.NonEmpty as NE
 import Data.Traversable (for)
 import Control.Monad
@@ -541,7 +541,7 @@ hscParse' mod_summary
             --
             let n_hspp  = FilePath.normalise src_filename
                 TempDir tmp_dir = tmpDir dflags
-                srcs0 = nub $ filter (not . (tmp_dir `isPrefixOf`))
+                srcs0 = ordNub $ filter (not . (tmp_dir `isPrefixOf`))
                             $ filter (not . (== n_hspp))
                             $ map FilePath.normalise
                             $ filter (not . isPrefixOf "<")

@@ -109,7 +109,7 @@ import qualified Data.Set as Set
 import Data.Char (isSpace)
 import qualified Data.Foldable as Foldable
 import Data.IORef
-import Data.List (intercalate, isPrefixOf, nub, partition, zip4)
+import Data.List (intercalate, isPrefixOf, partition, zip4)
 import Data.Maybe
 import Data.Either
 import Control.Concurrent.MVar
@@ -450,8 +450,8 @@ loadCmdLineLibs'' interp hsc_env pls =
                                      : framework_paths
                                     ++ lib_paths_base
                                     ++ [ takeDirectory dll | DLLPath dll <- libspecs ]
-                           in nub $ map normalise paths
-           let lib_paths = nub $ lib_paths_base ++ gcc_paths
+                           in ordNub $ map normalise paths
+           let lib_paths = ordNub $ lib_paths_base ++ gcc_paths
            all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
            pathCache <- mapM (addLibrarySearchPath interp) all_paths_env
 
@@ -882,7 +882,7 @@ mkDynLoadLib hsc_env modify_ways temp_sos dep_uids objs = do
                       -- library.
                       ldInputs =
                            concatMap (\l -> [ Option ("-l" ++ l) ])
-                                     (nub $ snd <$> temp_sos)
+                                     (ordNub $ snd <$> temp_sos)
                         ++ concatMap (\lp -> Option ("-L" ++ lp)
                                           : if useXLinkerRPath dflags (platformOS platform)
                                             then [ Option "-Xlinker"
@@ -890,7 +890,7 @@ mkDynLoadLib hsc_env modify_ways temp_sos dep_uids objs = do
                                                  , Option "-Xlinker"
                                                  , Option lp ]
                                             else [])
-                                     (nub $ fst <$> temp_sos)
+                                     (ordNub $ fst <$> temp_sos)
                         ++ concatMap
                              (\lp -> Option ("-L" ++ lp)
                                   : if useXLinkerRPath dflags (platformOS platform)
@@ -1273,7 +1273,7 @@ loadPackage interp hsc_env pkgs pls
 
         -- Add directories to library search paths
         let dll_paths  = map takeDirectory known_dlls
-            all_paths  = nub $ map normalise $ dll_paths ++ concat dirs
+            all_paths  = ordNub $ map normalise $ dll_paths ++ concat dirs
         all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
         pathCache <- mapM (addLibrarySearchPath interp) all_paths_env
 
@@ -1664,7 +1664,7 @@ getGCCPaths logger platform ld_config
   | platformOS platform == OSMinGW32 || platformArch platform == ArchWasm32 =
         do gcc_dirs <- getGccSearchDirectory logger ld_config "libraries"
            sys_dirs <- getSystemDirectories
-           return $ nub $ gcc_dirs ++ sys_dirs
+           return $ ordNub $ gcc_dirs ++ sys_dirs
   | otherwise = return []
 
 -- | Cache for the GCC search directories as this can't easily change

@@ -80,6 +80,7 @@ import GHC.Utils.Logger (Logger, logVerbAtLeast)
 import GHC.Utils.Binary
 import qualified GHC.Utils.Ppr as Ppr
 import GHC.Utils.TmpFs
+import GHC.Utils.Misc
 
 import GHC.Types.Unique.Set
 
@@ -98,7 +99,7 @@ import qualified Data.ByteString          as BS
 import Data.Function            (on)
 import qualified Data.IntSet              as IS
 import Data.IORef
-import Data.List  ( nub, intercalate, groupBy, intersperse )
+import Data.List  ( intercalate, groupBy, intersperse )
 import Data.Map.Strict          (Map)
 import qualified Data.Map.Strict          as M
 import Data.Maybe
@@ -454,7 +455,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
   (objs_block_info, objs_required_blocks) <- loadObjBlockInfo hs_objs
 
   let obj_roots = S.fromList . filter obj_is_root $ concatMap (M.keys . bi_exports . lbi_info) (M.elems objs_block_info)
-      obj_units = map moduleUnitId $ nub (M.keys objs_block_info)
+      obj_units = map moduleUnitId $ M.keys objs_block_info
 
   let (rts_wired_units, rts_wired_functions) = rtsDeps
 
@@ -464,7 +465,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
                    -- If this breaks for some reason,
                    -- see Note [Multiple Home Units aware GHCi] for GHCi session setup.
                    $ filter (/= interactiveUnitId)
-                   $ nub
+                   $ ordNub
                    $ rts_wired_units ++ reverse obj_units ++ reverse units
 
   -- all the units we want to link together, including their dependencies,

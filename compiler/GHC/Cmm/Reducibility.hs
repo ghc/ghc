@@ -30,7 +30,6 @@ where
 import GHC.Prelude hiding (splitAt, succ)
 
 import Control.Monad
-import Data.List (nub)
 import Data.Maybe
 import Data.Semigroup
 import qualified Data.Sequence as Seq
@@ -129,7 +128,7 @@ cgraphOfCmm g = foldl' addSuccEdges (mkGraph cnodes []) blocks
                    swap (k, block) = (entryLabel block, k)
          addSuccEdges :: CGraph -> (Node, CmmBlock) -> CGraph
          addSuccEdges graph (k, block) =
-             insEdges [(k, labelNumber lbl, ()) | lbl <- nub $ successors block] graph
+             insEdges [(k, labelNumber lbl, ()) | lbl <- setElems $ setFromList $ successors block] graph
 {-
 Note [Reducibility resources]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

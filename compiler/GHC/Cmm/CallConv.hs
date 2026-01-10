@@ -16,11 +16,11 @@ import GHC.Cmm (Convention(..))
 import GHC.Platform
 import GHC.Platform.Reg.Class
 import GHC.Platform.Profile
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.Maybe ( maybeToList )
-import Data.List (nub)
 
 -- Calculate the 'GlobalReg' or stack locations for function call
 -- parameters as used by the Cmm calling convention.
@@ -269,7 +269,7 @@ allArgRegsCover :: Platform
                     -- ^ which kinds of registers do we want to cover?
                 -> [GlobalReg]
 allArgRegsCover platform argRegs =
-  nub (node : realArgRegsCover platform argRegs)
+  ordNub (node : realArgRegsCover platform argRegs)
   where
     node = VanillaReg 1
 

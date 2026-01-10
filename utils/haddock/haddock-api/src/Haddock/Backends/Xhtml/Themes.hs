@@ -21,13 +21,13 @@ where
 import Control.Monad (liftM)
 import Data.Char (toLower)
 import Data.Either (lefts, rights)
-import Data.List (nub)
 import Data.Maybe (isJust, listToMaybe)
 import System.Directory
 import System.FilePath
 import Text.XHtml hiding (name, p, quote, title, (</>))
 import qualified Text.XHtml as XHtml
 import qualified Data.Text.Lazy as LText
+import GHC.Utils.Misc
 
 import Haddock.Backends.Xhtml.Types (BaseURL, withBaseURL)
 import Haddock.Options
@@ -178,7 +178,7 @@ isCssFilePath path = takeExtension path == ".css"
 --------------------------------------------------------------------------------
 
 cssFiles :: Themes -> [String]
-cssFiles ts = nub $ concatMap themeFiles ts
+cssFiles ts = ordNub $ concatMap themeFiles ts
 
 styleSheet :: BaseURL -> Themes -> Html
 styleSheet base_url ts = toHtml $ zipWith mkLink rels ts

@@ -34,7 +34,6 @@ import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Format
 import GHC.Utils.Misc
 
-import Data.List        (nub)
 import Data.Maybe
 import Control.Monad (join)
 
@@ -128,8 +127,8 @@ slurpSpillCostInfo platform cfg cmm
 
                 -- Increment counts for what regs were read/written from.
                 let (RU read written)   = regUsageOfInstr platform instr
-                mapM_ (incUses scale) $ nub $ mapMaybe (takeVirtualReg . regWithFormat_reg) read
-                mapM_ (incDefs scale) $ nub $ mapMaybe (takeVirtualReg . regWithFormat_reg) written
+                mapM_ (incUses scale) $ ordNub $ mapMaybe (takeVirtualReg . regWithFormat_reg) read
+                mapM_ (incDefs scale) $ ordNub $ mapMaybe (takeVirtualReg . regWithFormat_reg) written
 
                 -- Compute liveness for entry to next instruction.
                 let liveDieRead_virt    = takeVirtualRegs $ getRegs (liveDieRead  live)

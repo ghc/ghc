@@ -63,6 +63,7 @@ import GHC.Driver.Session hiding (projectVersion, verbosity)
 import qualified GHC.Driver.Session as DynFlags (DynFlags(..))
 import GHC.Utils.Error
 import GHC.Utils.Logger
+import GHC.Utils.Misc
 import GHC.Types.Name.Cache
 import GHC.Unit
 import GHC.Utils.Panic (handleGhcException)
@@ -504,7 +505,7 @@ render dflags parserOpts logger unit_state flags sinceQual qual ifaces packages 
             ppJsonIndex odir sourceUrls' opt_wiki_urls
                         unicode Nothing qual
                         ifaces
-                        ( List.nub
+                        ( ordNub
                         . map fst
                         . filter ((== Visible) . piVisibility . snd)
                         $ packages)

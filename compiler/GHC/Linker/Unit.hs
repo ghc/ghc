@@ -24,7 +24,6 @@ import qualified GHC.Data.ShortText as ST
 import GHC.Settings
 
 import Control.Monad
-import Data.List (nub)
 import Data.Semigroup ( Semigroup(..) )
 import System.Directory
 import System.FilePath
@@ -78,7 +77,7 @@ collectLinkOpts namever ways mExecutableLinkMode ps = do
                           else do forM staticLibs $ \l -> do
                                    archives <- filterM doesFileExist
                                      [ searchPath </> ("lib" ++ l ++ ".a")
-                                     | searchPath <- (nub . filter notNull . map ST.unpack . unitLibraryDirsStatic $ pc)
+                                     | searchPath <- (ordNub . filter notNull . map ST.unpack . unitLibraryDirsStatic $ pc)
                                      ]
                                    case archives of
                                      [] -> throwGhcExceptionIO (ProgramError $ "Failed to find static archive of " ++ show l)

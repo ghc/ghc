@@ -52,7 +52,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Cmm.Dataflow.Label
 
-import Data.List (nub, find)
+import Data.List (find)
 import Data.Maybe
 import Data.IntSet              (IntSet)
 import qualified Data.IntSet    as IntSet
@@ -216,7 +216,7 @@ cleanForward config blockId assoc acc (li : instrs)
         -- Writing to a reg changes its value.
         | LiveInstr instr _     <- li
         , RU _ written          <- regUsageOfInstr (ncgPlatform config) instr
-        = let assoc'    = foldr delAssoc assoc (map SReg $ nub $ map regWithFormat_reg written)
+        = let assoc'    = foldr delAssoc assoc (map SReg $ ordNub $ map regWithFormat_reg written)
           in  cleanForward config blockId assoc' (li : acc) instrs
 
 
