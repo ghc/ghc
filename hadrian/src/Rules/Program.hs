@@ -53,27 +53,10 @@ getProgramContexts stage = do
   -- TODO: Shall we use Stage2 for testsuite packages instead?
   let allPackages = sPackages
                  ++ tPackages
-  fmap concat . forM allPackages $ \pkg -> do
-    -- the iserv pkg results in three different programs at
-    -- the moment, ghc-iserv (built the vanilla way),
-    -- ghc-iserv-prof (built the profiling way),
-    -- ghc-iserv-dyn (built the dynamic way), and
-    -- ghc-iserv-prof-dyn (built the profiling+dynamic way).
-    -- The testsuite requires all to be present, so we
-    -- make sure that we cover these
-    -- "prof-build-under-other-name" cases.
-    -- iserv gets its names from Packages.hs:programName
+  forM allPackages $ \pkg -> do
     ctx <- programContext stage pkg -- TODO: see todo on programContext.
-    let allCtxs = if pkg == iserv
-        then [ vanillaContext stage pkg
-             , Context stage pkg profiling Final
-             , Context stage pkg dynamic Final
-             , Context stage pkg profilingDynamic Final
-             ]
-        else [ ctx ]
-    forM allCtxs $ \ctx -> do
-      name <- programName ctx
-      return (name <.> exe, ctx)
+    name <- programName ctx
+    return (name <.> exe, ctx)
 
 lookupProgramContext :: FilePath -> [(FilePath, Context)] -> Maybe Context
 lookupProgramContext wholePath progs = lookup (takeFileName wholePath) progs

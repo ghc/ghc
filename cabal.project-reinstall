@@ -52,7 +52,6 @@ packages: ./compiler
           ./utils/hsc2hs
           ./utils/runghc
           ./utils/unlit
-          ./utils/iserv
           ./linters/**/*.cabal
 
 constraints: ghc +internal-interpreter +dynamic-system-linke,

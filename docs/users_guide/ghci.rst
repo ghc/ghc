@@ -3560,15 +3560,18 @@ default in future releases.
 Building an external interpreter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The source code for the external interpreter program is in `utils/iserv`. It is
-very simple because most of the heavy lifting code is from the `ghci` library.
+When :ghc-flag:`-fexternal-interpreter` is enabled, GHC builds a small external
+interpreter executable on demand using the installed `ghci` library and runs it
+directly. There is no longer a dedicated `utils/iserv` program in the tree.
 
 It is sometimes desirable to customize the external interpreter program. For
 example, it is possible to add symbols to the RTS linker used by the external
 interpreter. This is done simply at link time by linking an additional `.o` that
 defines a `rtsExtraSyms` function returning the extra symbols. Doing it this way
 avoids the need to recompile the RTS with symbols added to its built-in list.
-A typical C file would look like this:
+Build your custom interpreter (using `ghci:GHCi.Server.defaultServer` as the
+entry point) and point :ghc-flag:`-pgmi ⟨cmd⟩` at it. A typical C file would
+look like this:
 
 .. code:: C
 

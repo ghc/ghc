@@ -2,7 +2,6 @@ module Rules.CabalReinstall where
 
 import Context
 import Expression
-import Oracles.Flag
 import Packages
 import Settings
 import Target
@@ -48,9 +47,7 @@ cabalBuildRules = do
         -- We 'need' all binaries and libraries
         all_pkgs <- stagePackages Stage1
         (lib_targets, bin_targets) <- partitionEithers <$> mapM pkgTarget all_pkgs
-        cross <- flag CrossCompiling
-        iserv_targets <- if cross then pure [] else iservBins
-        need (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
+        need (lib_targets ++ map snd bin_targets)
 
         distDir        <- Context.distDir (vanillaContext Stage1 rts)
         let rtsIncludeDir    = distDir -/- "include"
@@ -69,7 +66,7 @@ cabalBuildRules = do
 
         let cabal_package_db = cwd -/- root -/- "stage-cabal" -/- "dist-newstyle" -/- "packagedb" -/- "ghc-" ++ version
 
-        forM_ (filter ((/= iserv) . fst) bin_targets) $ \(bin_pkg,_bin_path) -> do
+        forM_ bin_targets $ \(bin_pkg,_bin_path) -> do
             let pgmName pkg
                   | pkg == ghc    = "ghc"
                   | pkg == hpcBin = "hpc"
@@ -92,14 +89,4 @@ cabalBuildRules = do
               makeExecutable output_file
               pure ()
 
-        -- Just symlink these for now
-        -- TODO: build these with cabal as well
-        forM_ iserv_targets $ \(_bin_pkg,bin_path') -> do
-            bin_path <- liftIO $ makeAbsolute bin_path'
-            let orig_filename = takeFileName bin_path
-                output_file = outputDir -/- orig_filename
-            liftIO $ do
-              IO.removeFile output_file <|> pure ()
-              IO.createFileLink bin_path output_file
-            pure ()
         writeFile' stamp "OK"

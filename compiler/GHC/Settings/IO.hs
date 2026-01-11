@@ -41,8 +41,6 @@ initSettings
 initSettings top_dir = do
   let installed :: FilePath -> FilePath
       installed file = top_dir </> file
-      libexec :: FilePath -> FilePath
-      libexec file = top_dir </> ".." </> "bin" </> file
       settingsFile = installed "settings"
       targetFile   = installed $ "targets" </> "default.target"
 
@@ -142,7 +140,9 @@ initSettings top_dir = do
         ld_r_prog <- tgtMergeObjs target
         let (ld_r_path, ld_r_args) = getTool (mergeObjsProgram . const ld_r_prog)
         pure (ld_r_path, map Option ld_r_args)
-      iserv_prog   = libexec "ghc-iserv"
+      -- Default to the on-demand external interpreter. A non-empty value can
+      -- be provided via -pgmi to use a custom external interpreter.
+      iserv_prog   = ""
 
   ghcWithInterpreter <- getBooleanSetting "Use interpreter"
 

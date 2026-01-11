@@ -5,7 +5,6 @@ import CommandLine
 import Context
 import Expression
 import Oracles.Setting
-import Oracles.Flag
 import Packages
 import Settings
 import Settings.Program (programContext)
@@ -154,10 +153,7 @@ bindistRules = do
         -- We 'need' all binaries and libraries
         all_pkgs <- stagePackages Stage1
         (lib_targets, bin_targets) <- partitionEithers <$> mapM pkgTarget all_pkgs
-        cross <- flag CrossCompiling
-        iserv_targets <- if cross then pure [] else iservBins
-
-        let lib_exe_targets = (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
+        let lib_exe_targets = lib_targets ++ map snd bin_targets
 
         let doc_target = ["docs"]
 
@@ -173,7 +169,7 @@ bindistRules = do
         createDirectory (bindistFilesDir -/- "bin")
         createDirectory (bindistFilesDir -/- "lib")
         -- Also create wrappers with version suffixes (#20074)
-        forM_ (bin_targets ++ iserv_targets) $ \(pkg, prog_path) -> do
+        forM_ bin_targets $ \(pkg, prog_path) -> do
             let orig_filename = takeFileName prog_path
                 (name, ext) = splitExtensions orig_filename
                 suffix = if useGhcPrefix pkg
@@ -480,20 +476,6 @@ ghciScriptWrapper = do
   pure $ unlines
     [ "executable=\"$bindir/" ++ prefix ++ "ghc-" ++ version ++ "\""
     , "exec $executable --interactive \"$@\"" ]
-
--- | When not on Windows, we want to ship the 3 flavours of the iserv program
---   in binary distributions. This isn't easily achievable by just asking for
---   the package to be built, since here we're generating 3 different
---   executables out of just one package, so we need to specify all 3 contexts
---   explicitly and 'need' the result of building them.
-iservBins :: Action [(Package, FilePath)]
-iservBins = do
-  rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
-  traverse (fmap (\p -> (iserv, p)) . programPath)
-      [ Context Stage1 iserv w Final
-      | w <- [vanilla, profiling, dynamic]
-      , w `elem` rtsways
-      ]
 
 -- Version wrapper scripts
 -- See Note [Two Types of Wrappers]

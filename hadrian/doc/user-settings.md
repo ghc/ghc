@@ -238,7 +238,7 @@ quickDebug = quickFlavour { name = "dbg", ghcDebugged = const True }
 ```
 
 Running `build --flavour=dbg` will build a `quick`-flavoured GHC and link
-GHC, iserv, iserv-proxy and remote-iserv against the debugged RTS, by passing
+GHC, iserv-proxy and remote-iserv against the debugged RTS, by passing
 `-debug` to the commands that link those executables.
 
 More generally, a predicate on `Stage` can be provided to specify which stages should be built debugged. For example, setting `ghcDebugged = (>= Stage2)` will build a debugged compiler at stage 2 or higher, but not stage 1.

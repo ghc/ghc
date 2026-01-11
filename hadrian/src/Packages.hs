@@ -7,7 +7,7 @@ module Packages (
     exceptions, filepath, fileio, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform,
     ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim,
     ghcToolchain, ghcToolchainBin, haddockApi, haddockLibrary, haddock, haskeline,
-    hsc2hs, hp2ps, hpc, hpcBin, integerGmp, iserv, iservProxy,
+    hsc2hs, hp2ps, hpc, hpcBin, integerGmp, iservProxy,
     libffi, mtl, osString, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, semaphoreCompat, stm, templateHaskell, thLift, thQuasiquoter, terminfo, text, time, timeout,
     transformers, unlit, unix, win32, xhtml,
@@ -38,7 +38,7 @@ ghcPackages =
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform
     , ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim
     , ghcToolchain, ghcToolchainBin, haddockApi, haddockLibrary, haddock, haskeline, hsc2hs
-    , hp2ps, hpc, hpcBin, integerGmp, iserv, libffi, mtl, osString
+    , hp2ps, hpc, hpcBin, integerGmp, libffi, mtl, osString
     , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell, thLift, thQuasiquoter
     , terminfo, text, time, transformers, unlit, unix, win32, xhtml, fileio
     , timeout
@@ -55,7 +55,7 @@ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, count
   exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform,
   ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghci, ghcInternal, ghciWrapper, ghcPkg, ghcPrim,
   ghcToolchain, ghcToolchainBin, haddockLibrary, haddockApi, haddock, haskeline, hsc2hs,
-  hp2ps, hpc, hpcBin, integerGmp, iserv, iservProxy, remoteIserv, libffi, mtl,
+  hp2ps, hpc, hpcBin, integerGmp, iservProxy, remoteIserv, libffi, mtl,
   osString, parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell, thLift, thQuasiquoter,
   terminfo, text, time, transformers, unlit, unix, win32, xhtml,
   timeout,
@@ -109,7 +109,6 @@ hp2ps               = util "hp2ps"
 hpc                 = lib  "hpc"
 hpcBin              = util "hpc-bin"         `setPath` "utils/hpc"
 integerGmp          = lib  "integer-gmp"
-iserv               = util "iserv"
 iservProxy          = util "iserv-proxy"
 libffi              = top  "libffi"
 mtl                 = lib  "mtl"
@@ -182,24 +181,12 @@ programName :: Context -> Action String
 programName Context {..} = do
     prefix <- crossPrefix
     -- TODO: Can we extract this information from Cabal files?
-    -- Alp: We could, but then the iserv package would have to
-    --      use Cabal conditionals + a 'profiling' flag
-    --      to declare the executable name, and I'm not sure
-    --      this is allowed (or desired for that matter).
     return $ prefix ++ basename
   where
     basename
       | package == ghc          = "ghc"
       | package == ghciWrapper  = "ghci" -- See Note [Hadrian's ghci-wrapper package]
       | package == hpcBin       = "hpc"
-      | package == iserv        = "ghc-iserv" ++ concat [
-                                        if wayUnit' `wayUnit` way
-                                            then suffix
-                                            else ""
-                                        | (wayUnit', suffix) <- [
-                                            (Profiling, "-prof"),
-                                            (Dynamic,   "-dyn")
-                                        ]]
       | otherwise               = pkgName package
 
 -- | The 'FilePath' to a program executable in a given 'Context'.

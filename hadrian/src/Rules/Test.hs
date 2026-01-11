@@ -17,7 +17,6 @@ import Settings.Builders.RunTest
 import Settings.Program (programContext)
 import Target
 import Utilities
-import Context.Type
 import qualified System.Directory as IO
 
 import GHC.Toolchain as Toolchain
@@ -320,11 +319,9 @@ needTestsuitePackages stg = do
   -- This is a hack, but a major usecase for testing the stage1 compiler is
   -- so that we can use it even if ghc stage2 fails to build
   -- Unfortunately, we still need the liba
-  let pkgs = filter (\(_,p) -> not $ "iserv" `isInfixOf` pkgName p || ((pkgName p `elem` ["ghc", "Cabal"]) && isStage0 stg))
+  let pkgs = filter (\(_,p) -> not $ (pkgName p `elem` ["ghc", "Cabal"]) && isStage0 stg)
                     (libpkgs ++ exepkgs ++ [ (stg,timeout) | windowsHost ])
   need =<< mapM (uncurry pkgFile) pkgs
-  cross <- flag CrossCompiling
-  when (not cross) $ needIservBins stg
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc
@@ -333,28 +330,6 @@ stageOf "stage1" = Just stage0InTree
 stageOf "stage2" = Just Stage1
 stageOf "stage3" = Just Stage2
 stageOf _ = Nothing
-
-needIservBins :: Stage -> Action ()
-needIservBins stg = do
-  let ws = [vanilla, profiling, dynamic]
-  progs <- catMaybes <$> mapM (canBuild stg) ws
-  need progs
-  where
-    -- Only build iserv binaries if all dependencies are built the right
-    -- way already. In particular this fixes the case of no_profiled_libs
-    -- not working with the testsuite, see #19624
-    canBuild (Stage0 {}) _ = pure Nothing
-    canBuild stg w = do
-      contextDeps <- contextDependencies (Context stg iserv w Final)
-      ws <- forM contextDeps $ \c ->
-              interpretInContext c (getLibraryWays <>
-                                    if Context.Type.package c == rts
-                                      then getRtsWays
-                                      else mempty)
-      if (all (w `elem`) ws)
-        then Just <$> programPath (Context stg iserv w Final)
-        else return Nothing
-
 
 pkgFile :: Stage -> Package -> Action FilePath
 pkgFile stage pkg
