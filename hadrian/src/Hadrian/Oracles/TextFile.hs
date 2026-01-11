@@ -124,8 +124,8 @@ getBuildTarget :: Action Toolchain.Target
 getBuildTarget = getTargetConfig buildTargetFile
 
 -- | Get the host target configuration through 'getTargetConfig'
-getHostTarget :: Action Toolchain.Target
-getHostTarget = do
+getHostTarget :: Stage -> Action Toolchain.Target
+getHostTarget stage | stage >= Stage1 = do
   -- MP: If we are not cross compiling then we should use the target file in order to
   -- build things for the host, in particular we want to use the configured values for the
   -- target for building the RTS (ie are we using Libffi for adjustors, and the wordsize)
@@ -135,8 +135,7 @@ getHostTarget = do
   if (Toolchain.targetPlatformTriple ht) == (Toolchain.targetPlatformTriple tt)
     then return tt
     else return ht
-  -- where
-  --   msg = "The host's target configuration file " ++ quote hostTargetFile ++ " does not exist! ghc-toolchain might have failed to generate it."
+getHostTarget _stage {- stage0 -} = getTargetConfig hostTargetFile
 
 -- | Get the target target configuration through 'getTargetConfig'
 getTargetTarget :: Action Toolchain.Target
@@ -145,9 +144,8 @@ getTargetTarget = getTargetConfig targetTargetFile
 queryBuildTarget :: (Toolchain.Target -> a) -> Action a
 queryBuildTarget f = f <$> getBuildTarget
 
-queryHostTarget :: (Toolchain.Target -> a) -> Action a
-queryHostTarget f = f <$> getHostTarget
-
+queryHostTarget :: Stage -> (Toolchain.Target -> a) -> Action a
+queryHostTarget stage f = f <$> getHostTarget stage
 
 newtype KeyValue = KeyValue (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show)

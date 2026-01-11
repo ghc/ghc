@@ -13,8 +13,8 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     ccPath  <- getBuilderPath $ Cc CompileC stage
     gmpDir  <- staged (buildSetting GmpIncludeDir)
     top     <- expr topDirectory
-    hArch   <- queryHost queryArch
-    hOs     <- queryHost queryOS
+    hArch   <- queryHost queryArch stage
+    hOs     <- queryHost queryOS stage
     tArch   <- queryTarget stage queryArch
     tOs     <- queryTarget stage queryOS
     version <- case stage of

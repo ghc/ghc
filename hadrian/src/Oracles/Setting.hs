@@ -137,7 +137,7 @@ getSetting = expr . setting
 bashPath :: Action FilePath
 bashPath = setting BourneShell
 
-isWinHost :: Action Bool
+isWinHost :: Stage -> Action Bool
 isWinHost = anyHostOs [OSMinGW32]
 
 isWinTarget :: Stage -> Action Bool
@@ -153,8 +153,8 @@ isArmTarget :: Stage -> Action Bool
 isArmTarget stage = queryTargetTarget stage (isARM . archOS_arch . tgtArchOs)
 
 -- | Check whether the host OS setting matches one of the given strings.
-anyHostOs :: [OS] -> Action Bool
-anyHostOs oss = (`elem` oss) <$> queryHostTarget (archOS_OS . tgtArchOs)
+anyHostOs :: [OS] -> Stage ->  Action Bool
+anyHostOs oss  stage = (`elem` oss) <$> queryHostTarget stage (archOS_OS . tgtArchOs)
 
 -- | Check whether the target architecture setting matches one of the given
 -- strings.
@@ -233,7 +233,7 @@ libsuf st way
 -- For example, we want to build RTS with stage1 for the host target as we
 -- produce a host executable with stage1 (which cross-compiles to stage2).
 targetStage :: Stage -> Action Target
-targetStage stage | isHostStage stage = getHostTarget
+targetStage stage | isHostStage stage = getHostTarget stage
 targetStage _ = getTargetTarget
 
 isHostStage :: Stage -> Bool

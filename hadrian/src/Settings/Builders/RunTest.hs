@@ -124,7 +124,7 @@ inTreeCompilerArgs stg = do
     debugged            <- ghcDebugged        <$> flavour <*> pure ghcStage
     profiled            <- ghcProfiled        <$> flavour <*> pure ghcStage
 
-    os          <- queryHostTarget queryOS
+    os          <- queryHostTarget ghcStage queryOS
     arch        <- queryTargetTarget ghcStage queryArch
     let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64", "wasm32", "riscv64", "loongarch64"]
     let withNativeCodeGen

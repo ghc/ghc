@@ -409,7 +409,7 @@ bindistRules = do
     , interpolateSetting "ProjectPatchLevel2" ProjectPatchLevel2
     , interpolateSetting "ProjectGitCommitId" ProjectGitCommitId
 
-    , interpolateVar "HostOS_CPP" $ fmap cppify $ interp $ queryHost queryOS
+    , interpolateVar "HostOS_CPP" $ fmap cppify $ interp $ queryHost queryOS Stage1
 
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
     , interpolateVar "TargetPlatform_CPP" $ cppify <$> getTarget targetPlatformTriple
@@ -433,7 +433,7 @@ bindistRules = do
     , interpolateVar "TargetHasLibm" $ yesNo <$> interp (staged (buildFlag TargetHasLibm))
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
     , interpolateVar "BuildPlatform"  $ interp $ queryBuild targetPlatformTriple
-    , interpolateVar "HostPlatform"   $ interp $ queryHost targetPlatformTriple
+    , interpolateVar "HostPlatform"   $ interp $ queryHost  targetPlatformTriple Stage1
     , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
     , interpolateVar "TargetWordSize" $ getTarget wordSize
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
@@ -523,7 +523,7 @@ generateConfigHs = do
     let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
     let queryTarget f = f <$> expr (targetStage stage)
     -- Not right for stage3
-    buildPlatform <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
+    buildPlatform <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple stage)
     hostPlatform <- queryTarget targetPlatformTriple
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
@@ -626,9 +626,9 @@ generatePlatformHostHs = do
     stage <- getStage
     let chooseHostQuery = case stage of
             Stage0 {} -> queryHost
-            _         -> queryTarget stage
-    cHostPlatformArch <- chooseHostQuery (archOS_arch . tgtArchOs)
-    cHostPlatformOS   <- chooseHostQuery (archOS_OS . tgtArchOs)
+            _         -> flip queryTarget
+    cHostPlatformArch <- chooseHostQuery (archOS_arch . tgtArchOs) stage
+    cHostPlatformOS   <- chooseHostQuery (archOS_OS . tgtArchOs) stage
     return $ unlines
         [ "module GHC.Platform.Host where"
         , ""

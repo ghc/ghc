@@ -326,7 +326,7 @@ bindistRules = do
     -- phony "binary-dist-dir-stage3" $ buildBinDistDir root targetBindist
 
     let buildBinDist compressor = do
-          win_host <- isWinHost
+          win_host <- isWinHost Stage1
           win_target <- isWinTarget Stage2
           when (win_target && win_host) (error "normal binary-dist does not work for windows targets, use `reloc-binary-dist-*` target instead.")
           buildBinDistX "binary-dist-dir" "bindist" compressor
