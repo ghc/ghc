@@ -168,7 +168,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , pure [ "-L" ++ libDir | libDir <- libDirs ]
             , rtsFfiArg
             , osxTarget ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
-            , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
+            , debugged ? packageOneOf [ghc, iservProxy, remoteIserv] ?
               arg "-debug"
             ]
 

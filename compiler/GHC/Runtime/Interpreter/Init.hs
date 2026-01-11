@@ -128,13 +128,7 @@ initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
         prog <- case interpProg opts of
           -- build iserv program if none specified
           "" -> generateIservC dflags logger tmpfs (interpExecutableLinkOpts opts) unit_env
-          _ -> pure (interpProg opts ++ flavour)
-            where
-              flavour
-                | profiled && dynamic = "-prof-dyn"
-                | profiled  = "-prof"
-                | dynamic   = "-dyn"
-                | otherwise = ""
+          _  -> pure $ interpProg opts
         let msg = text "Starting " <> text prog
         tr <- if interpVerbosity opts >= 3
                then return (logInfo logger $ withPprStyle defaultDumpStyle msg)

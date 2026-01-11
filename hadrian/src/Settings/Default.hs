@@ -183,7 +183,6 @@ stage1Packages = do
         ]
       , when (not cross)
         [ hpcBin
-        , iserv
         , runGhc
         , ghcToolchainBin
         ]

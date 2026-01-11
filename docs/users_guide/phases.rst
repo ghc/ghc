@@ -151,16 +151,10 @@ given compilation phase:
     :category: phase-programs
 
     Use ⟨cmd⟩ as the external interpreter command (see
-    :ref:`external-interpreter`).  Default: ``ghc-iserv-prof`` if
-    :ghc-flag:`-prof` is enabled, ``ghc-iserv-dyn`` if :ghc-flag:`-dynamic` is
-    enabled, or ``ghc-iserv`` otherwise.
-
-    If <cmd> is the empty string then GHC will try to build an appropriate iserv
-    program for the target platform. It does this by looking for the installed
-    ``ghci`` unit and by building an executable program that uses
-    ``ghci:GHCi.Server.defaultServer`` as an entry point. Note that it doesn't
-    work when cross-compiling: the cross-compiled ``iserv`` program (if it can
-    be built) can't be run on the build platform.
+    :ref:`external-interpreter`).  By default GHC builds an on-demand external
+    interpreter using the installed ``ghci`` unit and runs it directly. This
+    requires that target executables can run on the build host; when
+    cross-compiling, pass ``-pgmi`` to use a proxy such as ``iserv-proxy``.
 
 
 .. _forcing-options-through:
