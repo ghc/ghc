@@ -256,3 +256,12 @@ ghc.nix/
 # clangd
 .clangd
 dist-newstyle/
+
+# -----------------------------------------------------------------------------
+# CI
+
+# Windows CI
+toolchain/
+ghc-*/
+inplace/
+tmp/
