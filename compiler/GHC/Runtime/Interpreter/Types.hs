@@ -118,6 +118,7 @@ data InterpStatus inst
 -- | Configuration needed to spawn an external interpreter
 data IServConfig = IServConfig
   { iservConfProgram  :: !String   -- ^ External program to run
+  , iservConfPreOpts  :: ![String] -- ^ Options to pass before pipe handles
   , iservConfOpts     :: ![String] -- ^ Command-line options
   , iservConfProfiled :: !Bool     -- ^ Use Profiling way
   , iservConfDynamic  :: !Bool     -- ^ Use Dynamic way

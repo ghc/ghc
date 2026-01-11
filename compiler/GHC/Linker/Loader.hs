@@ -424,8 +424,10 @@ loadCmdLineLibs'' interp hsc_env pls =
                        _         -> minus_ls_1
       -- See Note [Fork/Exec Windows]
       gcc_paths <- getGCCPaths logger platform ld_config
+      extra_paths <- extraWindowsSearchPaths dflags
+      let lib_paths_base' = nub $ lib_paths_base ++ extra_paths
 
-      lib_paths_env <- addEnvPaths "LIBRARY_PATH" lib_paths_base
+      lib_paths_env <- addEnvPaths "LIBRARY_PATH" lib_paths_base'
 
       maybePutStrLn logger "Search directories (user):"
       maybePutStr logger (unlines $ map ("  "++) lib_paths_env)
@@ -457,10 +459,10 @@ loadCmdLineLibs'' interp hsc_env pls =
            -- on Windows. On Unix OSes this function is a NOP.
            let all_paths = let paths = takeDirectory (pgm_c dflags)
                                      : framework_paths
-                                    ++ lib_paths_base
+                                    ++ lib_paths_base'
                                     ++ [ takeDirectory dll | DLLPath dll <- libspecs ]
                            in nub $ map normalise paths
-           let lib_paths = nub $ lib_paths_base ++ gcc_paths
+           let lib_paths = nub $ lib_paths_base' ++ gcc_paths
            all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
            pathCache <- mapM (addLibrarySearchPath interp) all_paths_env
 
@@ -1247,11 +1249,14 @@ loadPackage interp hsc_env pkgs pls
                                       then Packages.unitExtDepLibsSys pkg
                                       else Packages.unitExtDepLibsGhc pkg) | pkg <- pkgs]
             linkerlibs = [[ lib | '-':'l':lib <- (map ST.unpack $ Packages.unitLinkerOptions pkg) ] | pkg <- pkgs]
-            extra_libs = zipWith (++) extdeplibs linkerlibs
+            extra_libs0 = zipWith (++) extdeplibs linkerlibs
 
         -- See Note [Fork/Exec Windows]
         gcc_paths <- getGCCPaths logger platform ld_config
-        dirs_env <- traverse (addEnvPaths "LIBRARY_PATH") dirs
+        extra_paths <- extraWindowsSearchPaths dflags
+        let dirs' = map (\ds -> nub $ ds ++ extra_paths) dirs
+        dirs_env <- traverse (addEnvPaths "LIBRARY_PATH") dirs'
+        let extra_libs = extra_libs0
 
         hs_classifieds
            <- sequenceA [mapM (locateLib interp hsc_env True bc_dir_  dirs_env_ gcc_paths) hs_libs'_ | (bc_dir_, dirs_env_, hs_libs'_) <- zip3 bc_dirs dirs_env hs_libs ]
@@ -1276,7 +1281,7 @@ loadPackage interp hsc_env pkgs pls
 
         -- Add directories to library search paths
         let dll_paths  = map takeDirectory known_dlls
-            all_paths  = nub $ map normalise $ dll_paths ++ concat dirs
+            all_paths  = nub $ map normalise $ dll_paths ++ concat dirs ++ extra_paths
         all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
         pathCache <- mapM (addLibrarySearchPath interp) all_paths_env
 
@@ -1329,8 +1334,6 @@ loadPackage interp hsc_env pkgs pls
            else let errmsg = text "unable to load units `"
                              <> vcat (map pprUnitInfoForUser pkgs) <> text "'"
                  in throwGhcExceptionIO (InstallationError (showSDoc dflags errmsg))
-
-
 loadBytecodeLibrary :: HscEnv -> Interp -> LoaderState -> FilePath -> IO LoaderState
 loadBytecodeLibrary hsc_env interp pls path = do
   path' <- canonicalizePath path -- Note [loadObj and relative paths]
@@ -1480,17 +1483,32 @@ locateLib interp hsc_env is_hs bc_dirs lib_dirs gcc_dirs lib0
     --
   =
 #if defined(CAN_LOAD_DLL)
-    findDll   user `orElse`
+    apply (if preferImportLibs
+             then [ tryImpLib user
+                  , tryImpLib gcc
+                  , findArchive
+                  , findDll user
+                  , findDll gcc
+                  , findSysDll
+                  , tryGcc
+                  ]
+             else [ findDll user
+                  , tryImpLib user
+                  , findDll gcc
+                  , findSysDll
+                  , tryImpLib gcc
+                  , findArchive
+                  , tryGcc
+                  ])
+      `orElse` assumeDll
+#else
+    apply [ tryImpLib user
+          , tryImpLib gcc
+          , findArchive
+          , tryGcc
+          ]
+      `orElse` assumeDll
 #endif
-    tryImpLib user `orElse`
-#if defined(CAN_LOAD_DLL)
-    findDll   gcc  `orElse`
-    findSysDll     `orElse`
-#endif
-    tryImpLib gcc  `orElse`
-    findArchive    `orElse`
-    tryGcc         `orElse`
-    assumeDll
 
   | loading_dynamic_hs_libs -- search for .so libraries first.
   , prefer_bytecode
@@ -1588,9 +1606,9 @@ locateLib interp hsc_env is_hs bc_dirs lib_dirs gcc_dirs lib0
      findBytecodeLib = liftM (fmap BytecodeLibrary) $ findFile bc_dirs hs_bytecode_lib_file
 #if defined(CAN_LOAD_DLL)
      findDll    re = let dirs' = if re == user then lib_dirs else gcc_dirs
-                     in liftM (fmap DLLPath) $ findFile dirs' dyn_lib_file
+                      in liftM (fmap DLLPath) $ findFile dirs' dyn_lib_file
      findSysDll    = fmap (fmap $ DLL . dropExtension . takeFileName) $
-                        findSystemLibrary interp so_name
+                         findSystemLibrary interp so_name
 #endif
      tryGcc        = let search   = searchForLibUsingGcc logger ld_config
 #if defined(CAN_LOAD_DLL)
@@ -1645,6 +1663,14 @@ locateLib interp hsc_env is_hs bc_dirs lib_dirs gcc_dirs lib0
      arch = platformArch platform
 #endif
      os = platformOS platform
+#if defined(mingw32_HOST_OS)
+     hostIsWindows = True
+#else
+     hostIsWindows = False
+#endif
+     preferImportLibs = platformIsCrossCompiling platform
+                     && platformOS platform == OSMinGW32
+                     && not hostIsWindows
 
 searchForLibUsingGcc :: Logger -> LdConfig -> String -> [FilePath] -> IO (Maybe FilePath)
 searchForLibUsingGcc logger ld_config so dirs = do
@@ -1725,6 +1751,37 @@ getSystemDirectories :: IO [FilePath]
 getSystemDirectories = fmap (:[]) getSystemDirectory
 #else
 getSystemDirectories = return []
+#endif
+
+extraWindowsSearchPaths :: DynFlags -> IO [FilePath]
+#if defined(mingw32_HOST_OS)
+extraWindowsSearchPaths _ = pure []
+#else
+extraWindowsSearchPaths dflags = do
+  let platform = targetPlatform dflags
+      isCrossWin = platformIsCrossCompiling platform
+                && platformOS platform == OSMinGW32
+  if not isCrossWin
+    then pure []
+    else do
+      let toolchainBin = takeDirectory (pgm_c dflags)
+          toolchainRoot = takeDirectory toolchainBin
+          targetTriple = platformMisc_targetPlatformString (platformMisc dflags)
+          ccPrefix = intercalate "-" . init . splitDash $ takeFileName (pgm_c dflags)
+          candidateRoots =
+            nub $ filter (not . null)
+              [ toolchainRoot </> ccPrefix
+              , toolchainRoot </> targetTriple
+              ]
+          candidatePaths =
+            nub $ concatMap (\root -> [root </> "bin", root </> "lib"]) candidateRoots
+      filterM doesDirectoryExist candidatePaths
+  where
+    splitDash :: String -> [String]
+    splitDash [] = [""]
+    splitDash xs = case break (== '-') xs of
+      (a, [])     -> [a]
+      (a, _:rest) -> a : splitDash rest
 #endif
 
 -- | Merge the given list of paths with those in the environment variable
