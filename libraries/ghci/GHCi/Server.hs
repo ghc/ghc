@@ -33,6 +33,9 @@ import Text.Printf
 import System.Environment (getProgName, getArgs)
 import System.Exit
 import System.IO
+#if !defined(wasm32_HOST_ARCH)
+import System.Environment (setEnv)
+#endif
 
 type MessageHook = Msg -> IO Msg
 
@@ -116,13 +119,29 @@ defaultServer cb_sig cb_recv cb_send = do
 defaultServer :: IO ()
 defaultServer = do
   args <- getArgs
-  (outh, inh, rest) <-
-      case args of
-        arg0:arg1:rest -> do
-            inh  <- readGhcHandle arg1
-            outh <- readGhcHandle arg0
-            return (outh, inh, rest)
-        _ -> dieWithUsage
+  let (useWineFd, restArgs) = case args of
+        "--wine-fd":rest -> (True, rest)
+        _                -> (False, args)
+  when useWineFd $ do
+    setEnv "GHCI_WINE_FD" "1"
+    ensureMsvcrtAssertShim
+  (outh, inh, rest) <- case restArgs of
+    arg0:arg1:rest -> do
+      (outh', inh') <- if useWineFd
+#if defined(mingw32_HOST_OS)
+        then do
+          inh'  <- readGhcHandleWineRead arg1
+          outh' <- readGhcHandleWineWrite arg0
+          return (outh', inh')
+#else
+        then dieWithUsage
+#endif
+        else do
+          inh'  <- readGhcHandle arg1
+          outh' <- readGhcHandle arg0
+          return (outh', inh')
+      return (outh', inh', rest)
+    _ -> dieWithUsage
 #endif
 
   (verbose, rest') <- case rest of
@@ -164,7 +183,7 @@ dieWithUsage = do
     die $ prog ++ ": " ++ msg
   where
 #if defined(WINDOWS)
-    msg = "usage: iserv <write-handle> <read-handle> [-v]"
+    msg = "usage: iserv <write-handle> <read-handle> [-v] | iserv --wine-fd <write-fd> <read-fd> [-v]"
 #else
     msg = "usage: iserv <write-fd> <read-fd> [-v]"
 #endif

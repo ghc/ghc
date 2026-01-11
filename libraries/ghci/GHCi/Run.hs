@@ -26,6 +26,7 @@ import GHCi.Message
 import GHCi.ObjLink
 import GHCi.RemoteTypes
 import GHCi.TH
+import GHCi.Utils (addWineLibrarySearchPath)
 import GHCi.BreakArray
 import GHCi.StaticPtrTable
 
@@ -44,6 +45,7 @@ import Foreign.C
 import GHC.Conc.Sync
 import GHC.IO hiding ( bracket )
 import System.Mem.Weak  ( deRefWeak )
+import System.Environment (lookupEnv)
 import Unsafe.Coerce
 
 -- -----------------------------------------------------------------------------
@@ -73,7 +75,13 @@ run m = case m of
   LoadArchive str -> loadArchive str
   LoadObj str -> loadObj str
   UnloadObj str -> unloadObj str
-  AddLibrarySearchPath str -> toRemotePtr <$> addLibrarySearchPath str
+  AddLibrarySearchPath str -> do
+    wine <- isWineIserv
+    if wine
+      then do
+        addWineLibrarySearchPath str
+        pure (toRemotePtr nullPtr)
+      else toRemotePtr <$> addLibrarySearchPath str
   RemoveLibrarySearchPath ptr -> removeLibrarySearchPath (fromRemotePtr ptr)
   MkConInfoTable (ConInfoTable tc ptrs nptrs tag ptrtag desc) ->
     toRemotePtr <$> mkConInfoTable tc ptrs nptrs tag ptrtag desc
@@ -457,3 +465,8 @@ getIdValFromApStack apStack (I# stackDepth) = do
             case ok of
               0# -> return Nothing -- AP_STACK not found
               _  -> return (Just (unsafeCoerce# result))
+
+isWineIserv :: IO Bool
+isWineIserv = do
+  m <- lookupEnv "GHCI_WINE_FD"
+  pure (maybe False (const True) m)

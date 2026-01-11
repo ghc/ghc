@@ -29,6 +29,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Logger
 import GHC.Utils.Error
 import Control.Concurrent
+import System.Environment (lookupEnv)
 import System.Process
 
 data InterpOpts = InterpOpts
@@ -133,10 +134,29 @@ initInterpreter dflags tmpfs logger platform finder_cache unit_env opts = do
         tr <- if interpVerbosity opts >= 3
                then return (logInfo logger $ withPprStyle defaultDumpStyle msg)
                else return (pure ())
+        crossEmulatorEnv <- liftIO $ lookupEnv "CROSS_EMULATOR"
+        let crossEmulator = case crossEmulatorEnv of
+              Just "" -> Nothing
+              other   -> other
+            isCross = platformIsCrossCompiling platform
+            isTargetWindows = platformOS platform == OSMinGW32
+#if defined(mingw32_HOST_OS)
+            hostIsWindows = True
+#else
+            hostIsWindows = False
+#endif
+            useCrossEmulator = isCross && maybe False (const True) crossEmulator
+            useWineFds = useCrossEmulator && isTargetWindows && not hostIsWindows
+            (prog', pre_opts, opts') = case crossEmulator of
+              Just emu | useCrossEmulator ->
+                let pre = if useWineFds then [prog, "--wine-fd"] else [prog]
+                in (emu, pre, interpOpts opts)
+              _ -> (prog, [], interpOpts opts)
         let
          conf = IServConfig
-           { iservConfProgram  = prog
-           , iservConfOpts     = interpOpts opts
+           { iservConfProgram  = prog'
+           , iservConfPreOpts  = pre_opts
+           , iservConfOpts     = opts'
            , iservConfProfiled = profiled
            , iservConfDynamic  = dynamic
            , iservConfHook     = interpCreateProcess opts

@@ -612,8 +612,8 @@ spawnIServ conf = do
                                         ; return ph })
                              (iservConfHook conf)
   (ph, rh, wh) <- runWithPipes createProc (iservConfProgram conf)
-                                          []
-                                          (iservConfOpts    conf)
+                               (iservConfPreOpts conf)
+                               (iservConfOpts    conf)
   interpPipe <- mkPipeFromHandles rh wh
   lock <- newMVar ()
   let process = InterpProcess
