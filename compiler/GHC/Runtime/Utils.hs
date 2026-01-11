@@ -6,21 +6,20 @@ module GHC.Runtime.Utils
 where
 
 import GHC.Prelude
-
 #if defined(mingw32_HOST_OS)
+import GHC.Utils.Exception as Ex
 import Foreign.C
 import GHC.IO.Handle.FD (fdToHandle)
-import GHC.Utils.Exception as Ex
 # if defined(__IO_MANAGER_WINIO__)
 import GHC.IO.SubSystem ((<!>))
 import GHC.IO.Handle.Windows (handleToHANDLE)
 import GHC.Event.Windows (associateHandle')
 # endif
 #else
-import System.Posix as Posix
+import qualified System.Posix as Posix
 #endif
 import System.Process
-import System.IO
+import System.IO (Handle)
 
 runWithPipes :: (CreateProcess -> IO ProcessHandle)
              -> FilePath -> [String] -> [String] -> IO (ProcessHandle, Handle, Handle)
@@ -71,14 +70,13 @@ runWithPipes = runWithPipesPOSIX
 runWithPipes createProc prog pre_opts opts = do
     (rfd1, wfd1) <- Posix.createPipe -- we read on rfd1
     (rfd2, wfd2) <- Posix.createPipe -- we write on wfd2
-    setFdOption rfd1 CloseOnExec True
-    setFdOption wfd2 CloseOnExec True
+    Posix.setFdOption rfd1 Posix.CloseOnExec True
+    Posix.setFdOption wfd2 Posix.CloseOnExec True
     let args = pre_opts ++ (show wfd1 : show rfd2 : opts)
     ph <- createProc (proc prog args)
-    closeFd wfd1
-    closeFd rfd2
-    rh <- fdToHandle rfd1
-    wh <- fdToHandle wfd2
+    Posix.closeFd wfd1
+    Posix.closeFd rfd2
+    rh <- Posix.fdToHandle rfd1
+    wh <- Posix.fdToHandle wfd2
     return (ph, rh, wh)
 #endif
-

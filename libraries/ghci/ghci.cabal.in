@@ -106,6 +106,9 @@ library
 
     if !os(windows)
         Build-Depends: unix >= 2.7 && < 2.9
+    if os(windows)
+        Build-Depends: Win32 >= 2.14 && < 2.15
+        C-Sources: cbits/ghci_msvcrt_assert_shim.c
 
     if arch(wasm32)
         build-depends: ghc-experimental == @ProjectVersionForLib@.0
