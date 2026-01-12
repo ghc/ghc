@@ -345,6 +345,25 @@ emitPrimOp cfg primop =
     emitPrimCall [res] (MO_Xchg (wordWidth platform)) [dst, val]
     emitDirtyMutVar mutv (CmmReg (CmmLocal res))
 
+  TryPutMVarOp -> \[mvar, val] -> inlinePrimop $ \[res] -> do
+    cres <- newTemp b8
+    emitCCall
+      [(cres, NoHint)]
+      ( CmmLit
+          ( CmmLabel
+              ( mkForeignLabel
+                  (fsLit "performTryPutMVar")
+                  ForeignLabelInExternalPackage
+                  IsFunction
+              )
+          )
+      )
+      [(myCapabilityExpr platform, AddrHint), (mvar, AddrHint), (val, AddrHint)]
+    emitAssign (CmmLocal res) $
+      CmmMachOp
+        (MO_UU_Conv W8 (wordWidth platform))
+        [CmmReg (CmmLocal cres)]
+
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes
   SizeofByteArrayOp -> \[arg] -> inlinePrimop $ \[res] ->
@@ -1777,7 +1796,6 @@ emitPrimOp cfg primop =
   TakeMVarOp -> alwaysExternal
   TryTakeMVarOp -> alwaysExternal
   PutMVarOp -> alwaysExternal
-  TryPutMVarOp -> alwaysExternal
   ReadMVarOp -> alwaysExternal
   TryReadMVarOp -> alwaysExternal
   IsEmptyMVarOp -> alwaysExternal
