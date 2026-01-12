@@ -207,14 +207,15 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     alpine3_23 = mk(alpine("3_23"))
     alpine3_23_arm64 = mk(alpine("3_23", arch='aarch64'))
     alpine3_23_i386 = mk(alpine("3_23", arch='i386'))
-    deb9 = mk(debian(9, "x86_64"))
-    deb10 = mk(debian(10, "x86_64"))
     deb11 = mk(debian(11, "x86_64"))
     deb12 = mk(debian(12, "x86_64"))
-    deb10_arm64 = mk(debian(10, "aarch64"))
+    deb13 = mk(debian(13, "x86_64"))
+    deb11_arm64 = mk(debian(11, "aarch64"))
     deb12_arm64 = mk(debian(12, "aarch64"))
-    deb10_i386 = mk(debian(10, "i386"))
+    deb13_arm64 = mk(debian(13, "aarch64"))
+    deb11_i386 = mk(debian(11, "i386"))
     deb12_i386 = mk(debian(12, "i386"))
+    deb13_i386 = mk(debian(13, "i386"))
 
     source = mk_one_metadata(release_mode, version, job_map, source_artifact)
     test = mk_one_metadata(release_mode, version, job_map, test_artifact)
@@ -222,13 +223,11 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     # The actual metadata, this is not a precise science, but just what the ghcup
     # developers want.
 
-    a64 = { "Linux_Debian": { "< 10": deb9
-                           , "( >= 10 && < 11 )": deb10
-                           , "( >= 11 && < 12 )": deb11
-                           , ">= 12": deb12
-                           , "unknown_versioning": deb11 }
+    a64 = { "Linux_Debian": { "< 12" : deb11
+                            , "( >= 12 && < 13 )": deb12
+                            , ">= 13": deb13
+                            , "unknown_versioning": deb11 }
           , "Linux_Ubuntu" : { "unknown_versioning": ubuntu2004
-                             , "( >= 16 && < 18 )": deb9
                              , "( >= 18 && < 19 )": ubuntu1804
                              , "( >= 19 && < 21 )": ubuntu2004
                              , "( >= 21 && < 24 )": ubuntu2204
@@ -248,20 +247,20 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
           , "Linux_Alpine" : { "unknown_versioning": alpine3_23 }
           }
 
-    a32 = { "Linux_Debian": { "( >= 10 && < 12 )": deb10_i386
+    a32 = { "Linux_Debian": { "( >= 11 && < 12 )": deb11_i386
                             , ">= 12": deb12_i386
-                            , "unknown_versioning": deb10_i386 }
-          , "Linux_Ubuntu": { "unknown_versioning": deb10_i386 }
-          , "Linux_Mint" : { "unknown_versioning": deb10_i386 }
+                            , "unknown_versioning": deb11_i386 }
+          , "Linux_Ubuntu": { "unknown_versioning": deb11_i386 }
+          , "Linux_Mint" : { "unknown_versioning": deb11_i386 }
           , "Linux_Alpine" : { "unknown_versioning": alpine3_23_i386 }
-          , "Linux_UnknownLinux" : { "unknown_versioning": deb10_i386 }
+          , "Linux_UnknownLinux" : { "unknown_versioning": deb11_i386 }
           }
 
-    arm64 = { "Linux_UnknownLinux": { "unknown_versioning": deb10_arm64 }
+    arm64 = { "Linux_UnknownLinux": { "unknown_versioning": deb11_arm64 }
             , "Linux_Alpine" : { "unknown_versioning": alpine3_23_arm64 }
-            , "Linux_Debian": { "( >= 10 && < 12 )": deb10_arm64
+            , "Linux_Debian": { "( >= 11 && < 12 )": deb11_arm64
                               , "( >= 12 )": deb12_arm64
-                              , "unknown_versioning": deb10_arm64
+                              , "unknown_versioning": deb11_arm64
                               }
             , "Darwin": { "unknown_versioning": darwin_arm64 }
             }

@@ -135,16 +135,16 @@ class MetricAcceptanceWindow:
     given a baseline value.
     """
     def get_bounds(self, baseline: float) -> Tuple[float, float]:
-        raise NotImplemented
+        raise NotImplementedError
     def describe(self) -> str:
-        raise NotImplemented
+        raise NotImplementedError
 
 class AlwaysAccept(MetricAcceptanceWindow):
     def get_bounds(self, baseline: float) -> Tuple[float, float]:
         return (-math.inf, +math.inf)
 
     def describe(self) -> str:
-        raise NotImplemented
+        raise NotImplementedError
 
 class RelativeMetricAcceptanceWindow(MetricAcceptanceWindow):
     """
@@ -398,7 +398,7 @@ def best_fit_ci_test_env() -> Optional[TestEnv]:
         arch = "x86_64" if isArch64 else "i386"
 
         if platform.startswith("linux"):
-            test_env = TestEnv(arch + "-linux-deb9")  # type: Optional[TestEnv]
+            test_env = TestEnv(arch + "-linux-deb13")  # type: Optional[TestEnv]
         elif platform.startswith("win32"):
             # There are no windows CI test results.
             test_env = None
@@ -855,7 +855,7 @@ def main() -> None:
     #                  T1234                 T1234
     #              max_bytes             max_bytes
     #                 normal                normal
-    # commit   x86_64-darwin       i386-linux-deb9
+    # commit   x86_64-darwin      i386-linux-deb13
     # --------------------------------------------
     # HEAD              9123                  9123
     # HEAD~1           10023                 10023

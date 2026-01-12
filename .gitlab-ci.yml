@@ -11,7 +11,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 71454506c0c2e215953306b04572092cb89a6c2a
+  DOCKER_REV: 4c3454a524436623df71b5faabd24e30b0f816d5
 
   # Sequential version number of all cached things.
   # Bump to invalidate GitLab CI cache.
@@ -116,10 +116,10 @@ workflow:
 .bootstrap_matrix : &bootstrap_matrix
   matrix:
     # If you update this version, be sure to also update 'MinBootGhcVersion' in configure.ac
-    - GHC_VERSION: 9.10.1
-      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12-ghc9_10:$DOCKER_REV"
+    - GHC_VERSION: 9.10.3
+      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13-ghc9_10:$DOCKER_REV"
     - GHC_VERSION: 9.12.2
-      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12-ghc9_12:$DOCKER_REV"
+      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13-ghc9_12:$DOCKER_REV"
 
 # Allow linters to fail on draft MRs.
 # This must be explicitly transcluded in lint jobs which
@@ -206,7 +206,7 @@ not-interruptible:
   stage: not-interruptible
   script: "true"
   interruptible: false
-  image: "debian:10"
+  image: "debian:13"
   variables:
     GIT_STRATEGY: none
   tags:
@@ -231,7 +231,7 @@ include: '.gitlab/jobs.yaml'
 
 ghc-linters:
   stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   extends: .lint-params
   variables:
     BUILD_FLAVOUR: default
@@ -253,7 +253,7 @@ lint-linters:
 
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   extends: .lint
   script:
     - make -Ctestsuite list_broken TEST_HC=$GHC
@@ -271,7 +271,7 @@ typecheck-testsuite:
 # accommodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
 .lint-submods:
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   extends: .lint-params
   variables:
     BUILD_FLAVOUR: default
@@ -289,7 +289,7 @@ typecheck-testsuite:
 # accommodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
 lint-author:
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   extends: .lint-params
   variables:
     BUILD_FLAVOUR: default
@@ -370,7 +370,7 @@ lint-submods-branch:
 
 .lint-params:
   needs: []
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   extends: .lint
   before_script:
     - export PATH="/opt/toolchain/bin:$PATH"
@@ -397,7 +397,7 @@ hadrian-ghc-in-ghci:
     - job: lint-linters
     - job: lint-submods
       optional: true
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -430,14 +430,14 @@ hadrian-ghc-in-ghci:
 hadrian-multi:
   stage: testing
   needs:
-    - job: x86_64-linux-deb12-validate
+    - job: x86_64-linux-deb13-validate
       optional: true
-    - job: nightly-x86_64-linux-deb12-validate
+    - job: nightly-x86_64-linux-deb13-validate
       optional: true
-    - job: release-x86_64-linux-deb12-release
+    - job: release-x86_64-linux-deb13-release
       optional: true
   dependencies: null
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -457,8 +457,8 @@ hadrian-multi:
     - ls
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-linux-deb12-validate.tar.xz -C tmp \
-        || tar -xf ghc-x86_64-linux-deb12-release.tar.xz -C tmp
+      tar -xf ghc-x86_64-linux-deb13-validate.tar.xz -C tmp \
+        || tar -xf ghc-x86_64-linux-deb13-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
@@ -502,13 +502,13 @@ stack-hadrian-build:
 # Testing reinstallable ghc codepath
 ####################################
 
-test-cabal-reinstall-x86_64-linux-deb10:
-  extends: nightly-x86_64-linux-deb10-validate
+test-cabal-reinstall-x86_64-linux-deb13:
+  extends: nightly-x86_64-linux-deb13-validate
   stage: full-build
   variables:
     REINSTALL_GHC: "yes"
     BUILD_FLAVOUR: validate
-    TEST_ENV: "x86_64-linux-deb10-cabal-install"
+    TEST_ENV: "x86_64-linux-deb13-cabal-install"
   rules:
     - if: $NIGHTLY
       allow_failure: true
@@ -550,11 +550,11 @@ abi-test-nightly:
 doc-tarball:
   stage: packaging
   needs:
-    - job: x86_64-linux-deb12-numa-slow-validate
+    - job: x86_64-linux-deb13-numa-slow-validate
       optional: true
-    - job: nightly-x86_64-linux-deb12-validate
+    - job: nightly-x86_64-linux-deb13-validate
       optional: true
-    - job: release-x86_64-linux-deb12-release
+    - job: release-x86_64-linux-deb13-release
       optional: true
 
     - job: x86_64-windows-validate
@@ -566,10 +566,10 @@ doc-tarball:
 
   tags:
     - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   dependencies: null
   variables:
-    LINUX_BINDIST: "ghc-x86_64-linux-deb12.tar.xz"
+    LINUX_BINDIST: "ghc-x86_64-linux-deb13.tar.xz"
     WINDOWS_BINDIST: "ghc-x86_64-windows.tar.xz"
   artifacts:
     expose_as: "Documentation Preview"
@@ -585,15 +585,15 @@ doc-tarball:
       - users_guide.pdf
   script:
     - |
-      mv "ghc-x86_64-linux-deb12-numa-slow-validate.tar.xz" "$LINUX_BINDIST" \
-        || mv "ghc-x86_64-linux-deb12-validate.tar.xz" "$LINUX_BINDIST" \
-        || mv "ghc-x86_64-linux-deb12-release.tar.xz" "$LINUX_BINDIST" \
+      mv "ghc-x86_64-linux-deb13-numa-slow-validate.tar.xz" "$LINUX_BINDIST" \
+        || mv "ghc-x86_64-linux-deb13-validate.tar.xz" "$LINUX_BINDIST" \
+        || mv "ghc-x86_64-linux-deb13-release.tar.xz" "$LINUX_BINDIST" \
         || true
       mv "ghc-x86_64-windows-validate.tar.xz" "$WINDOWS_BINDIST" \
         || mv "ghc-x86_64-windows-release.tar.xz" "$WINDOWS_BINDIST" \
         || true
       if [ ! -f "$LINUX_BINDIST" ]; then
-        echo "Error: $LINUX_BINDIST does not exist. Did the Debian 9 job fail?"
+        echo "Error: $LINUX_BINDIST does not exist. Did the Debian job fail?"
         exit 1
       fi
       if [ ! -f "$WINDOWS_BINDIST" ]; then
@@ -615,7 +615,7 @@ hackage-doc-tarball:
     - job: source-tarball
   tags:
     - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   dependencies: null
   variables:
     # Don't clone the git repo..
@@ -645,7 +645,7 @@ source-tarball:
     - hadrian-ghc-in-ghci
   tags:
     - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   dependencies: []
   artifacts:
     paths:
@@ -689,7 +689,7 @@ package-hadrian-bootstrap-sources:
   tags:
     - x86_64-linux
   needs: ["generate-hadrian-bootstrap-sources"]
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   artifacts:
     paths:
       - hadrian-bootstrap-sources-all.tar.gz
@@ -733,7 +733,7 @@ test-bootstrap:
   variables:
     # Don't record performance benchmarks
     TEST_ENV: ""
-    BIN_DIST_NAME: "ghc-x86_64-deb12-linux"
+    BIN_DIST_NAME: "ghc-x86_64-deb13-linux"
     BUILD_FLAVOUR: "validate"
     NO_BOOT: "1"
   rules:
@@ -782,16 +782,16 @@ test-bootstrap:
 
 hackage-lint:
   needs:
-    - job: x86_64-linux-deb12-numa-slow-validate
+    - job: x86_64-linux-deb13-numa-slow-validate
       optional: true
       artifacts: false
-    - job: nightly-x86_64-linux-deb12-numa-slow-validate
+    - job: nightly-x86_64-linux-deb13-numa-slow-validate
       optional: true
       artifacts: false
-    - job: nightly-aarch64-linux-deb12-validate
+    - job: nightly-aarch64-linux-deb13-validate
       optional: true
       artifacts: false
-    - job: aarch64-linux-deb12-validate
+    - job: aarch64-linux-deb13-validate
       optional: true
       artifacts: false
   extends: .hackage
@@ -806,10 +806,10 @@ hackage-lint:
 
 hackage-label-lint:
   needs:
-    - job: x86_64-linux-deb12-numa-slow-validate
+    - job: x86_64-linux-deb13-numa-slow-validate
       optional: true
       artifacts: false
-    - job: aarch64-linux-deb12-validate
+    - job: aarch64-linux-deb13-validate
       optional: true
       artifacts: false
   extends: .hackage
@@ -823,10 +823,10 @@ hackage-label-lint:
 # affects the total allocation numbers for the simplifier portion significantly.
 nightly-hackage-lint:
   needs:
-    - job: nightly-x86_64-linux-deb12-numa-slow-validate
+    - job: nightly-x86_64-linux-deb13-numa-slow-validate
       optional: true
       artifacts: false
-    - job: nightly-aarch64-linux-deb12-validate
+    - job: nightly-aarch64-linux-deb13-validate
       optional: true
       artifacts: false
   rules:
@@ -843,7 +843,7 @@ nightly-hackage-perf:
     - job: nightly-x86_64-linux-fedora43-release
       optional: true
       artifacts: false
-    - job: nightly-aarch64-linux-deb12-validate
+    - job: nightly-aarch64-linux-deb13-validate
       optional: true
       artifacts: false
   rules:
@@ -862,7 +862,7 @@ release-hackage-lint:
     - job: release-x86_64-linux-fedora43-release
       optional: true
       artifacts: false
-    - job: release-aarch64-linux-deb12-release+no_split_sections
+    - job: release-aarch64-linux-deb13-release+no_split_sections
       optional: true
       artifacts: false
   rules:
@@ -895,9 +895,9 @@ release-hackage-lint:
 
 .test-primops-validate-template:
   needs:
-    - job: x86_64-linux-deb12-validate
+    - job: x86_64-linux-deb13-validate
       artifacts: false
-    - job: aarch64-linux-deb12-validate
+    - job: aarch64-linux-deb13-validate
       artifacts: false
     - job: aarch64-darwin-validate
       artifacts: false
@@ -917,9 +917,9 @@ test-primops-label:
 test-primops-nightly:
   extends: .test-primops
   needs:
-    - job: nightly-x86_64-linux-deb12-validate
+    - job: nightly-x86_64-linux-deb13-validate
       artifacts: false
-    - job: nightly-aarch64-linux-deb12-validate
+    - job: nightly-aarch64-linux-deb13-validate
       artifacts: false
     - job: nightly-aarch64-darwin-validate
       artifacts: false
@@ -988,14 +988,14 @@ perf-nofib:
 perf:
   stage: testing
   needs:
-    - job: x86_64-linux-deb12-validate
+    - job: x86_64-linux-deb13-validate
       optional: true
-    - job: nightly-x86_64-linux-deb12-validate
+    - job: nightly-x86_64-linux-deb13-validate
       optional: true
-    - job: release-x86_64-linux-deb12-release
+    - job: release-x86_64-linux-deb13-release
       optional: true
   dependencies: null
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   tags:
     - x86_64-linux-perf
   before_script:
@@ -1005,8 +1005,8 @@ perf:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-linux-deb12-validate.tar.xz -C tmp \
-        || tar -xf ghc-x86_64-linux-deb12-release.tar.xz -C tmp
+      tar -xf ghc-x86_64-linux-deb13-validate.tar.xz -C tmp \
+        || tar -xf ghc-x86_64-linux-deb13-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
@@ -1030,22 +1030,22 @@ perf:
 abi-test:
   stage: testing
   needs:
-    - job: x86_64-linux-deb12-validate
+    - job: x86_64-linux-deb13-validate
       optional: true
-    - job: nightly-x86_64-linux-deb12-validate
+    - job: nightly-x86_64-linux-deb13-validate
       optional: true
-    - job: release-x86_64-linux-deb12-release
+    - job: release-x86_64-linux-deb13-release
       optional: true
   dependencies: null
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   tags:
     - x86_64-linux
   script:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-linux-deb12-validate.tar.xz -C tmp \
-        || tar -xf ghc-x86_64-linux-deb12-release.tar.xz -C tmp
+      tar -xf ghc-x86_64-linux-deb13-validate.tar.xz -C tmp \
+        || tar -xf ghc-x86_64-linux-deb13-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
@@ -1112,7 +1112,7 @@ pages:
   stage: deploy
   needs: [doc-tarball]
   dependencies: null
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: "debian:13"
   # See #18973
   allow_failure: true
   tags:
@@ -1147,7 +1147,7 @@ pages:
 
 project-version:
   stage: packaging
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
   tags:
     - x86_64-linux
   variables:
@@ -1224,23 +1224,21 @@ ghcup-metadata-nightly:
       artifacts: false
     - job: nightly-x86_64-linux-alpine3_23-validate
       artifacts: false
-    - job: nightly-x86_64-linux-deb9-validate
+    - job: nightly-i386-linux-deb11-validate
       artifacts: false
-    - job: nightly-i386-linux-deb10-validate
-      artifacts: false
-    - job: nightly-i386-linux-deb12-validate
+    - job: nightly-i386-linux-deb13-validate
       artifacts: false
     - job: nightly-i386-linux-alpine3_23-validate
       artifacts: false
-    - job: nightly-x86_64-linux-deb10-validate
-      artifacts: false
-    - job: nightly-aarch64-linux-deb10-validate
+    - job: nightly-aarch64-linux-deb11-validate
       artifacts: false
     - job: nightly-x86_64-linux-deb11-validate
       artifacts: false
-    - job: nightly-x86_64-linux-deb12-validate
+    - job: nightly-x86_64-linux-deb13-validate
       artifacts: false
-    - job: nightly-aarch64-linux-deb12-validate
+    - job: nightly-aarch64-linux-deb13-validate
+      artifacts: false
+    - job: nightly-x86_64-linux-deb12-validate
       artifacts: false
     - job: nightly-aarch64-linux-alpine3_23-validate
       artifacts: false

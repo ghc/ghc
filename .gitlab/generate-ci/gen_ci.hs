@@ -20,6 +20,7 @@ import qualified Data.ByteString.Lazy.Char8 as B
 import qualified Data.Set as S
 import System.Environment
 import Data.List
+import qualified Data.ByteString.Lazy.Char8 as B8
 
 {-
 Note [Generating the CI pipeline]
@@ -111,13 +112,12 @@ data Opsys
   | Windows deriving (Eq)
 
 data LinuxDistro
-  = Debian12
+  = Debian13
+  | Debian12
   | Debian12Wine
-  | Debian12Riscv
+  | Debian13Riscv
   | Debian11
   | Debian11Js
-  | Debian10
-  | Debian9
   | Fedora43
   | Ubuntu2404LoongArch64
   | Ubuntu2404
@@ -318,13 +318,12 @@ runnerPerfTag arch sys = runnerTag arch sys ++ "-perf"
 -- These names are used to find the docker image so they have to match what is
 -- in the docker registry.
 distroName :: LinuxDistro -> String
+distroName Debian13      = "deb13"
 distroName Debian12      = "deb12"
 distroName Debian11      = "deb11"
 distroName Debian11Js    = "deb11-emsdk-closure"
-distroName Debian12Riscv = "deb12-riscv"
+distroName Debian13Riscv = "deb13-riscv"
 distroName Debian12Wine  = "deb12-wine"
-distroName Debian10      = "deb10"
-distroName Debian9       = "deb9"
 distroName Fedora43      = "fedora43"
 distroName Ubuntu2404LoongArch64 = "ubuntu24_04-loongarch"
 distroName Ubuntu1804    = "ubuntu18_04"
@@ -804,6 +803,9 @@ data Job
         , jobPlatform  :: (Arch, Opsys)
         }
 
+instance Show Job where
+  show = B8.unpack . encode
+
 instance ToJSON Job where
   toJSON Job{..} = object
     [ "stage" A..= jobStage
@@ -1133,13 +1135,10 @@ jobs = Map.fromList $ concatMap flattenJobGroup job_groups
 debian_x86 :: [JobGroup Job]
 debian_x86 =
   [ -- Release configurations
-    -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
-    -- not being at EOL until April 2023 and they still need tinfo5.
-    disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
-  , disableValidate (standardBuilds Amd64 (Linux Debian10))
-  , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian10) dwarf)
+    disableValidate (standardBuildsWithConfig Amd64 (Linux Debian11) dwarf)
   , disableValidate (standardBuilds Amd64 (Linux Debian11))
   , disableValidate (standardBuilds Amd64 (Linux Debian12))
+  , disableValidate (standardBuilds Amd64 (Linux Debian13))
 
 
     -- Validate only builds
@@ -1151,7 +1150,7 @@ debian_x86 =
   , -- Nightly allowed to fail: #22343
     modifyNightlyJobs allowFailure (modifyValidateJobs manual (validateBuilds Amd64 (Linux validate_debian) noTntc))
     -- Run the 'perf' profiling nightly job in the release config.
-  , perfProfilingJob Amd64 (Linux Debian12) releaseConfig
+  , perfProfilingJob Amd64 (Linux Debian13) releaseConfig
 
   , onlyRule LLVMBackend (validateBuilds Amd64 (Linux validate_debian) llvm)
   , addValidateRule TestPrimops (standardBuilds Amd64 (Linux validate_debian))
@@ -1160,7 +1159,7 @@ debian_x86 =
   , onlyRule IpeData (validateBuilds Amd64 (Linux validate_debian) zstdIpe)
   ]
   where
-    validate_debian = Debian12
+    validate_debian = Debian13
 
     perfProfilingJob arch sys buildConfig =
         -- Rename the job to avoid conflicts
@@ -1179,16 +1178,17 @@ debian_x86 =
 debian_aarch64 :: [JobGroup Job]
 debian_aarch64 =
   [
-     disableValidate (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
+     disableValidate (standardBuildsWithConfig AArch64 (Linux Debian11) (splitSectionsBroken vanilla))
    , fastCI (standardBuildsWithConfig AArch64 (Linux Debian12) (splitSectionsBroken vanilla))
+   , fastCI (standardBuildsWithConfig AArch64 (Linux Debian13) (splitSectionsBroken vanilla))
      -- LLVM backend bootstrap
-   , onlyRule LLVMBackend (validateBuilds AArch64 (Linux Debian12) llvm)
+   , onlyRule LLVMBackend (validateBuilds AArch64 (Linux Debian13) llvm)
   ]
 
 debian_i386 :: [JobGroup Job]
 debian_i386 =
-  [ disableValidate (standardBuildsWithConfig I386 (Linux Debian10) (splitSectionsBroken vanilla))
-  , addValidateRule I386Backend (standardBuildsWithConfig I386 (Linux Debian12) (splitSectionsBroken vanilla))
+  [ disableValidate (standardBuildsWithConfig I386 (Linux Debian11) (splitSectionsBroken vanilla))
+  , addValidateRule I386Backend (standardBuildsWithConfig I386 (Linux Debian13) (splitSectionsBroken vanilla))
   ]
 
 ubuntu_x86 :: [JobGroup Job]
@@ -1267,10 +1267,10 @@ alpine_aarch64 = [
 cross_jobs :: [JobGroup Job]
 cross_jobs = [
     -- x86 -> aarch64
-    validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
+    validateBuilds Amd64 (Linux Debian13) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
 
     -- x86_64 -> riscv
-  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian12Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
+  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian13Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
 
     -- x86_64 -> loongarch64
   , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404LoongArch64) (crossConfig "loongarch64-linux-gnu" (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing))
@@ -1380,30 +1380,30 @@ platform_mapping :: Map String (JobGroup BindistInfo)
 platform_mapping = Map.map go combined_result
   where
     whitelist = [ "x86_64-linux-alpine3_12-validate+fully_static"
-                , "x86_64-linux-deb11-validate"
+                , "x86_64-linux-deb11-validate+debug_info"
                 , "x86_64-linux-deb12-validate"
-                , "x86_64-linux-deb10-validate+debug_info"
+                , "x86_64-linux-deb13-validate"
                 , "x86_64-linux-fedora43-release"
-                , "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
                 , "x86_64-windows-validate"
                 , "aarch64-linux-deb12-validate"
+                , "aarch64-linux-deb13-validate"
                 , "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate"
                 , "nightly-x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
                 , "nightly-x86_64-linux-deb11-validate"
                 , "nightly-x86_64-linux-deb12-validate"
+                , "nightly-x86_64-linux-deb13-validate"
                 , "x86_64-linux-alpine3_23-wasm-cross_wasm32-wasi-release+host_fully_static+text_simdutf"
-                , "x86_64-linux-deb12-validate+thread_sanitizer_cmm"
-                , "nightly-aarch64-linux-deb10-validate"
+                , "nightly-aarch64-linux-deb11-validate"
                 , "nightly-aarch64-linux-deb12-validate"
+                , "nightly-aarch64-linux-deb13-validate"
                 , "nightly-aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate"
                 , "nightly-x86_64-linux-alpine3_12-validate+fully_static"
-                , "nightly-x86_64-linux-deb10-validate"
                 , "nightly-x86_64-linux-fedora43-release"
                 , "nightly-x86_64-windows-validate"
                 , "release-x86_64-linux-alpine3_12-release+fully_static+no_split_sections"
-                , "release-x86_64-linux-deb10-release"
                 , "release-x86_64-linux-deb11-release"
                 , "release-x86_64-linux-deb12-release"
+                , "release-x86_64-linux-deb13-release"
                 , "release-x86_64-linux-fedora43-release"
                 , "release-x86_64-windows-release"
                 ]
@@ -1422,13 +1422,20 @@ platform_mapping = Map.map go combined_result
 
     combined_result =
       Map.fromList
-      [ (p, StandardTriple { v = Map.lookup p vs
-                           , n = Map.lookup p ns
-                           , r = Map.lookup p rs })
-      | p <- S.toList all_platforms
+      [ (platform, StandardTriple
+          { v = Map.lookup platform vs
+          , n = Map.lookup platform ns
+          , r = Map.lookup platform rs })
+      | platform <- S.toList all_platforms
       ]
 
     combine a b
+      | name a `elem` whitelist
+      , name b `elem` whitelist
+      , name a /= name b = error $ unlines
+        [ "both selected, can only select one job for a specific key: "
+        , show (name a)
+        , show (name b) ] -- Explicitly selected
       | name a `elem` whitelist = a -- Explicitly selected
       | name b `elem` whitelist = b
       | otherwise = error (show (name a) ++ show (name b))
