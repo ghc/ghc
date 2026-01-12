@@ -23,7 +23,6 @@
 
 module Main (main) where
 
-import Debug.Trace
 import qualified GHC.Unit.Database as GhcPkg
 import GHC.Unit.Database hiding (mkMungePathUrl)
 import GHC.HandleEncoding
@@ -1634,7 +1633,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
 simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()
 simplePackageList my_flags pkgs = do
    let showPkg :: InstalledPackageInfo -> String
-       showPkg | FlagShowUnitIds `elem` my_flags = traceId . display . installedUnitId
+       showPkg | FlagShowUnitIds `elem` my_flags = display . installedUnitId
                | FlagNamesOnly `elem` my_flags   = display . mungedName . mungedId
                | otherwise                       = display . mungedId
        strs = map showPkg pkgs
