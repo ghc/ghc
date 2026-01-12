@@ -795,8 +795,6 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
 
 /* ----------------------------------------------------------------------------
    Implementation of tryPutMVar#
-
-   NOTE: this should be kept in sync with stg_tryPutMVarzh in PrimOps.cmm
    ------------------------------------------------------------------------- */
 
 bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value)
