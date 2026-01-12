@@ -441,12 +441,6 @@
 #define HP_CHK_P(bytes, fun, arg)               \
    HEAP_CHECK(bytes, GC_PRIM_P(fun,arg))
 
-// TODO I'm not seeing where ALLOC_P_TICKY is used; can it be removed?
-//         -NSF March 2013
-#define ALLOC_P_TICKY(bytes, fun, arg)          \
-   HP_CHK_P(bytes);                             \
-   TICK_ALLOC_RTS(bytes);
-
 // Load a field out of structure with relaxed ordering.
 #define RELAXED_LOAD_FIELD(fld, ptr) \
     REP_##fld![(ptr) + OFFSET_##fld]
