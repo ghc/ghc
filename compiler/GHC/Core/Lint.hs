@@ -586,8 +586,7 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
        ; checkL (not (isCoVar binder) || isCoArg rhs)
                 (mkLetErr binder rhs)
 
-        -- Check the let-can-float invariant
-        -- See Note [Core let-can-float invariant] in GHC.Core
+       -- Check Note [Core binding invariants] in GHC.Core
        ; checkL (bindingIsOk top_lvl rec_flag binder binder_ty rhs) $
          mkLetErr binder rhs
 
@@ -647,6 +646,7 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
         -- the unfolding is a SimplifiableCoreExpr. Give up for now.
 
 bindingIsOk :: TopLevelFlag -> RecFlag -> OutId -> OutType -> CoreExpr -> Bool
+-- Checks the invariants of Note [Core binding invariants] in GHC.Core
 bindingIsOk top_lvl rec_flag binder binder_ty rhs
   | isCoVar binder
   = isCoArg rhs

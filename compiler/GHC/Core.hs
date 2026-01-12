@@ -188,8 +188,7 @@ These data types are the heart of the compiler
 --    this corresponds to allocating a thunk for the things
 --    bound and then executing the sub-expression.
 --
---    See Note [Core letrec invariant]
---    See Note [Core let-can-float invariant]
+--    See Note [Core binding invariants]
 --    See Note [Representation polymorphism invariants]
 --    See Note [Core type and coercion invariant]
 --
@@ -393,25 +392,37 @@ extremely difficult to GUARANTEE it:
 
 * See Note [Shadowing in SpecConstr] in GHC.Core.Opt.SpecContr
 
-Note [Core letrec invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Core letrec invariant:
+Note [Core binding invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A core binding, `CoreBind`, obeys these invariants:
 
-  The right hand sides of all /top-level/ or /recursive/
-  bindings must be of lifted type
+* For /top level/ or /recursive/ bindings,
+  see Note [Top-level binding invariants]
+
+* For /nested/ (not top-level) /non-recursive/ bindings,
+  see Note [Nested binding invariants]
+
+Note [Top-level binding invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A /top-level/ or /recursive/ binding must
+
+  * be of lifted type
+OR
+  * have a RHS that is a primitive string literal
+    (see Note [Core top-level string literals], or
+OR
+  * have a rhs that is (Coercion co)
+OR
+  * be a worker or wrapper for an unlifted non-newtype data constructor; see (TL1).
+
+For the non-top-level, non-recursive case see Note [Nested binding invariants].
+(NB: this Note applies to recursive as well as top-level bindings, but I wanted
+a short title!)
 
 See "Type#type_classification" in GHC.Core.Type
 for the meaning of "lifted" vs. "unlifted".
 
-For the non-top-level, non-recursive case see
-Note [Core let-can-float invariant].
-
-At top level, however, there are two exceptions to this rule:
-
-(TL1) A top-level binding is allowed to bind primitive string literal,
-      (which is unlifted).  See Note [Core top-level string literals].
-
-(TL2) In Core, we generate a top-level binding for every non-newtype data
+(TL1) In Core, we generate a top-level binding for every non-newtype data
 constructor worker or wrapper
       e.g.   data T = MkT Int
       we generate
@@ -428,16 +439,17 @@ constructor worker or wrapper
              S1 = S1
       We allow this top-level unlifted binding to exist.
 
-Note [Core let-can-float invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The let-can-float invariant:
+Note [Nested binding invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A /non-top-level/, /non-recursive/ binding must
+  * Be a join point; see Note [Invariants on join points]
+OR
+  * Be of lifted type
+OR
+  * Have a RHS that is ok-for-speculation
 
-    The right hand side of a /non-top-level/, /non-recursive/ binding
-    may be of unlifted type, but only if
-    the expression is ok-for-speculation
-    or the 'Let' is for a join point.
-
-    (For top-level or recursive lets see Note [Core letrec invariant].)
+NB: this only applies to /non-recursive/ bindings.  For recursive
+(or top-level) bindings see Note [Top-level binding invariants].
 
 This means that the let can be floated around
 without difficulty. For example, this is OK:
@@ -454,14 +466,14 @@ In this situation you should use @case@ rather than a @let@. The function
 alternatively use 'GHC.Core.Make.mkCoreLet' rather than this constructor directly,
 which will generate a @case@ if necessary
 
-The let-can-float invariant is initially enforced by mkCoreLet in GHC.Core.Make.
+The Core binding invariants are initially enforced by mkCoreLet in GHC.Core.Make.
 
 Historical Note [The let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Before 2022 GHC used the "let/app invariant", which applied the let-can-float rules
-to the argument of an application, as well as to the RHS of a let.  This made some
-kind of sense, because 'let' can always be encoded as application:
-   let x=rhs in b   =    (\x.b) rhs
+Before 2022 GHC used the "let/app invariant", which applied
+Note [Nested binding invariants] to the argument of an application,
+as well as to the RHS of a let.  This made some kind of sense, because 'let' can
+always be encoded as application: let x=rhs in b = (\x.b) rhs
 
 But the let/app invariant got in the way of RULES; see #19313.  For example
   up :: Int# -> Int#
@@ -472,7 +484,7 @@ Indeed RULES is a big reason that GHC doesn't use ANF, where the argument of an
 application is always a variable or a constant.  To allow RULES to work nicely
 we need to allow lots of things in the arguments of a call.
 
-TL;DR: we relaxed the let/app invariant to become the let-can-float invariant.
+TL;DR: we relaxed the let/app invariant to focus just on /bindings/.
 
 Note [Core top-level string literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -631,13 +643,33 @@ checked by Core Lint.
 
 Note [Core type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We allow a /non-recursive/, /non-top-level/ let to bind type and
-coercion variables.  These can be very convenient for postponing type
-substitutions until the next run of the simplifier.
+We allow `let` to bind type and coercion variables.
+
+* A type or coercion binding is always /non-recursive/
+
+* A type binding cannot be top level (yet) but a coercion binding
+  can be top-level.
 
 * A type variable binding must have a RHS of (Type ty)
 
 * A coercion variable binding must have a RHS of (Coercion co)
+  See Note [Coercion bindings]
+
+
+Note [Coercion bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~
+We allow non-recursive let-bindings for coercion variables, CoVars,
+of type (t1 ~r# t2).
+
+The /main motivation/ is to support sharing:
+   let g::T a ~# b
+       g = Coercion <some big coercion?
+   in ...g..g..g...
+If we simply duplicate `g` at every occurrence site, we can bloat the
+size of the program, increasing both compile time and .hi-file sizes.
+
+* A  coercion binding always has a RHS of (Coercion co).
+  See Note [Core type and coercion invariants].
 
   It is possible to have terms that return a coercion, but we use
   case-binding for those; e.g.
@@ -649,6 +681,15 @@ substitutions until the next run of the simplifier.
   Which is very exotic, and I think never encountered; but see
   Note [Equality superclasses in quantified constraints]
   in GHC.Tc.Solver.Dict
+
+* Coercion bindings can be top level.  And a top-level coercion binding can be
+  exported, and hence must:
+   * Have a GlobalId.
+   * Appear as a declaration in an interface file
+  That means that a coercion might mention a CoVar that is an imported GlobalId.
+  Just as for Core expressions, the free variable finder for Coercions can
+  ignore GlobalIds.
+
 
 Note [Representation polymorphism invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -846,7 +887,7 @@ Join points must follow these invariants:
 However, join points have simpler invariants in other ways
 
   5. A join point can have an unboxed type without the RHS being
-     ok-for-speculation (i.e. drop the let-can-float invariant)
+     ok-for-speculation; see 
      e.g.  let j :: Int# = factorial x in ...
 
   6. The RHS of join point is not required to have a fixed runtime representation,
@@ -2053,8 +2094,8 @@ mkDoubleLitDouble :: Double -> Expr b
 mkDoubleLit       d = Lit (mkLitDouble d)
 mkDoubleLitDouble d = Lit (mkLitDouble (toRational d))
 
--- | Bind all supplied binding groups over an expression in a nested let expression. Assumes
--- that the rhs satisfies the let-can-float invariant.  Prefer to use
+-- | Bind all supplied binding groups over an expression in a nested let expression.
+-- Assumes that the rhs satisfies Note [Nested binding invariants].  Prefer to use
 -- 'GHC.Core.Make.mkCoreLets' if possible, which does guarantee the invariant
 mkLets        :: [Bind b] -> Expr b -> Expr b
 -- | Bind all supplied binders over an expression in a nested lambda expression. Prefer to

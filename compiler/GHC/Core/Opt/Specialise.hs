@@ -1944,7 +1944,7 @@ case) do not float the binding itself unless it satisfies exprIsTopLevelBindable
 This is conservative: maybe the RHS of `x` has a free var that would stop it
 floating to top level anyway; but that is hard to spot (since we don't know what
 the non-top-level in-scope binders are) and rare (since the binding must satisfy
-Note [Core let-can-float invariant] in GHC.Core).
+Note [Nested binding invariants] in GHC.Core).
 
 
 Note [Specialising Calls]

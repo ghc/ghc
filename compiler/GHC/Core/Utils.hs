@@ -1813,13 +1813,11 @@ exprIsUnaryClassFun _                       = False
 -- See also Note [Classifying primop effects] in "GHC.Builtin.PrimOps"
 -- and Note [Transformations affected by primop effects].
 --
--- 'exprOkForSpeculation' is used to define Core's let-can-float
--- invariant.  (See Note [Core let-can-float invariant] in
--- "GHC.Core".)  It is therefore frequently called on arguments of
--- unlifted type, especially via 'needsCaseBinding'.  But it is
--- sometimes called on expressions of lifted type as well.  For
--- example, see Note [Speculative evaluation] in "GHC.CoreToStg.Prep".
-
+-- 'exprOkForSpeculation' is used in the definition of Note [Nested binding
+-- invariants]in GHC.Core.  It is therefore frequently called on arguments of
+-- unlifted type, especially via 'needsCaseBinding'.  But it is sometimes
+-- called on expressions of lifted type as well.  For example, see
+-- Note [Speculative evaluation] in "GHC.CoreToStg.Prep".
 
 exprOkForSpeculation, exprOkToDiscard :: CoreExpr -> Bool
 exprOkForSpeculation = expr_ok fun_always_ok primOpOkForSpeculation
@@ -2044,12 +2042,14 @@ But we restrict it sharply:
                                                ; False -> e2 }
                        in ...) ...
 
-  Does the RHS of v satisfy the let-can-float invariant?  Previously we said
-  yes, on the grounds that y is evaluated.  But the binder-swap done
-  by GHC.Core.Opt.SetLevels would transform the inner alternative to
+  Does the RHS of v satisfy Note [Nested binding invariants]?
+  Previously we said yes, on the grounds that y is evaluated.  But the
+  binder-swap done by GHC.Core.Opt.SetLevels would transform the inner
+  alternative to
+
      DEFAULT -> ... (let v::Int# = case x of { ... }
                      in ...) ....
-  which does /not/ satisfy the let-can-float invariant, because x is
+  which does /not/ satisfy Note [Nested bindings invariants], because x is
   not evaluated. See Note [Binder-swap during float-out]
   in GHC.Core.Opt.SetLevels.  To avoid this awkwardness it seems simpler
   to stick to unlifted scrutinees where the issue does not
@@ -2134,7 +2134,7 @@ extremely useful for float-out, changes these expressions to
 
 And now the expression does not obey the let-can-float invariant!  Yikes!
 Moreover we really might float (dataToTagLarge# x) outside the case,
-and then it really, really doesn't obey the let-can-float invariant.
+and then it really, really doesn't obey Note [Nested binding invariants].
 
 The solution is simple: exprOkForSpeculation does not try to take
 advantage of the evaluated-ness of (lifted) variables.  And it returns
@@ -2144,7 +2144,8 @@ by marking the relevant primops as "ThrowsException" or
 GHC.Builtin.PrimOps.
 
 Note that exprIsHNF /can/ and does take advantage of evaluated-ness;
-it doesn't have the trickiness of the let-can-float invariant to worry about.
+it doesn't have the trickiness of Note [Nested binding invariants]
+to worry about.
 
 ************************************************************************
 *                                                                      *

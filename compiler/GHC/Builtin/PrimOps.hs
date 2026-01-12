@@ -435,12 +435,12 @@ follows, in decreasing order of permissiveness:
     NoEffect, we may float such an invalid call out of a dead branch
     and speculatively evaluate it.
 
-    In particular, we cannot safely rewrite such an invalid call to a
-    runtime error; we must emit code that produces a valid Word32#.
-    (If we're lucky, Core Lint may complain that the result of such a
-    rewrite violates the let-can-float invariant (#16742), but the
-    rewrite is always wrong!)  See also Note [Guarding against silly shifts]
-    in GHC.Core.Opt.ConstantFold.
+    In particular, we cannot safely rewrite such an invalid call to a runtime
+    error; we must emit code that produces a valid Word32#.  (If we're lucky,
+    Core Lint may complain that the result of such a rewrite violates
+    Note [Core binding invariants: nested non-rec] (#16742), but the rewrite
+    is always wrong!)  See also Note [Guarding against silly shifts] in
+    GHC.Core.Opt.ConstantFold.
 
     Marking uncheckedShiftLWord32# as CanFail instead of NoEffect
     would give us the freedom to rewrite such invalid calls to runtime
@@ -578,12 +578,12 @@ Several predicates on primops test this flag:
     where it is guarded by exprOkToDiscard, which in turn checks
     primOpOkToDiscard.
 
-  * The "no-float-out" thing is achieved by ensuring that we never
-    let-bind a saturated primop application unless it has NoEffect.
-    The RHS of a let-binding (which can float in and out freely)
-    satisfies exprOkForSpeculation; this is the let-can-float
-    invariant.  And exprOkForSpeculation is false of a saturated
-    primop application unless it has NoEffect.
+  * The "no-float-out" thing is achieved by ensuring that we never let-bind a
+    saturated primop application unless it has NoEffect.  The RHS of a
+    let-binding (which can float in and out freely) satisfies
+    exprOkForSpeculation; this is Note [Core binding invariants: nested non-rec].
+    And exprOkForSpeculation is false of a saturated primop application unless it
+    has NoEffect.
 
   * So primops that aren't NoEffect will appear only as the
     scrutinees of cases, and that's why the FloatIn pass is capable

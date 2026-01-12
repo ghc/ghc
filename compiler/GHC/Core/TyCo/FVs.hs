@@ -350,7 +350,8 @@ deepTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synon
   where
     do_tcv is v = EndoOS do_it
       where
-        do_it acc | not (isLocalVar v) = acc
+        do_it acc | not (isLocalVar v) = acc  -- A CoVar can be a GlobalId
+                               -- See Note [Coercion bindings] in GHC.Core
                   | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
                   | otherwise          = appEndoOS (deep_ty (varType v)) $

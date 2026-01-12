@@ -1606,11 +1606,11 @@ as follows:
     let x = I# (error "invalid shift")
     in ...
 
-This was originally done in the fix to #16449 but this breaks the
-let-can-float invariant (see Note [Core let-can-float invariant] in
-GHC.Core) as noted in #16742.  For the reasons discussed under
-"NoEffect" in Note [Classifying primop effects] (in GHC.Builtin.PrimOps)
-there is no safe way to rewrite the argument of I# such that it bottoms.
+This was originally done in the fix to #16449 but this breaks
+Note [Nested binding invariants] in GHC.Core, as noted in #16742.  For the
+reasons discussed under "NoEffect" in Note [Classifying primop effects] (in
+GHC.Builtin.PrimOps) there is no safe way to rewrite the argument of I# such
+that it bottoms.
 
 Consequently we instead take advantage of the fact that the result of a
 large shift is unspecified (see associated documentation in primops.txt.pp)
@@ -2177,15 +2177,15 @@ BigNat). These rules implement the same kind of constant folding as we have for
 Int#/Word#/etc. primops. See builtinBignumRules.
 
 These rules are built-in because they can't be expressed as regular rules for
-now. The reason is that due to the let-can-float invariant (see Note [Core
-let-can-float invariant] in GHC.Core), GHC is too conservative with some bignum
-operations and they don't match rules. For example:
+now. The reason is that due to Note [Nested binding invariants] in GHC.Core,
+GHC is too conservative with some bignum operations and they don't match rules.
+For example:
 
   case integerAdd 1 x of r { _ -> integerAdd 1 r }
 
 doesn't constant-fold into `integerAdd 2 x` with a regular rule. That's because
 GHC never floats in `integerAdd 1 x` to form `integerAdd 1 (integerAdd 1 x)`
-because of the let-can-float invariant (it doesn't know if `integerAdd`
+because of Note [Nested binding invariants] (it doesn't know if `integerAdd`
 terminates).
 
 In the built-in rule for `integerAdd` we can access the unfolding of `r` and we

@@ -1040,7 +1040,7 @@ substTyCoBndr subst (Named (Bndr tv vis)) = (subst', Named (Bndr tv' vis))
 {- Note [Keeping the substitution empty]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A very common situation is where we run over a term doing no cloning,
-no substitution, nothing.  In that case the TCvSubst till be empty, and
+no substitution, nothing.  In that case the TCvSubst will be empty, and
 it is /very/ valuable to /keep/ it empty:
 
 * It's wasted effort to build up an identity substitution mapping
