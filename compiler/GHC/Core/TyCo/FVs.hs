@@ -282,7 +282,8 @@ deepUnitFV fvs_of_kind v
   = MkFV (\bvs -> EndoOS (do_it bvs))
   where
     do_it :: BoundVars -> TyCoVarSet -> TyCoVarSet
-    do_it bvs acc | not (isLocalVar v) = acc
+    do_it bvs acc | not (isLocalVar v) = acc  -- A CoVar can be a GlobalId
+                               -- See Note [Coercion bindings] in GHC.Core
                   | v `elemVarSet` bvs = acc
                   | v `elemVarSet` acc = acc
                   | otherwise          = runFVAcc (fvs_of_kind (varType v)) acc

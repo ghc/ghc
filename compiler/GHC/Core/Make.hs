@@ -112,8 +112,9 @@ sortQuantVars vs = sorted_tcvs ++ ids
 -- | Bind a binding group over an expression, using a @let@ or @case@ as
 -- appropriate (see "GHC.Core#let_can_float_invariant")
 mkCoreLet :: HasDebugCallStack => CoreBind -> CoreExpr -> CoreExpr
-mkCoreLet (NonRec bndr rhs) body        -- See Note [Core let-can-float invariant]
-  = bindNonRec bndr rhs body
+mkCoreLet (NonRec bndr rhs) body
+  = -- See Note [Core binding invariants: nested non-rec]
+    bindNonRec bndr rhs body
 mkCoreLet bind body
   = Let bind body
 

@@ -46,7 +46,7 @@ Note [Coercion optimisation]
 This module does coercion optimisation.  The purpose is to reduce the size
 of the coercions that the compiler carries around -- they are just proofs,
 and serve no runtime need. So the purpose of coercion optimisation is simply
-to shrink coercions and thereby reduce compile time.
+to shrink coercions and thereby reduce compile time and .hi file sizes.
 
 See the paper
    Evidence normalization in Systtem FV (RTA'13)
@@ -57,7 +57,7 @@ However, although powerful and occasionally very effective, coercion
 optimisation can itself be very expensive (#26679).  So we apply it sparingly:
 
 * In the Simplifier, function `rebuild_go`, we use `isReflexiveCo` (which
-  computes the type of the coercion) to eliminate reflexive coercion, just
+  computes the type of the coercion) to eliminate reflexive coercions, just
   before we build a cast (e |> co).
 
   (More precisely, we use `isReflexiveCoIgnoringMultiplicity;
@@ -196,6 +196,10 @@ We use the following invariants:
 %********************************************************************* -}
 
 optCoProgram :: CoreProgram -> CoreProgram
+-- Apply optCoercion to all coercions in /expressions/
+-- There may also be coercions in /types/ but we `optCoProgram` doesn't
+-- look at them; they are typically fewer and smaller, and it doesn't seem
+-- worth the cost of traversing and rebuilding all the types in the program.
 optCoProgram binds
   = map go binds
   where
@@ -237,7 +241,24 @@ optCoAlt is (Alt k bs e)
 %*                                                                      *
 %********************************************************************* -}
 
+{- Note [optCoRefl]
+~~~~~~~~~~~~~~~~~~~~
+`optCoRefl` is an experimental cheap-and-cheerful version of `optCoercion`.
+
+* It focuses entirely on chains of TransCo, thus
+      co1 ; co2 ; co3 ; ... ; con
+
+* It looks for sub-sequences in this chain that are Refl, based on their
+  types.  The clever business is all in `gobble`, which springs into action
+  when we find a `TransCo`.
+
+* It can sometimes do a bit more than `optCoercion`. It'll eliminate /any/
+  subsequence of co1..con that is reflexive, whereas `optCoercion` just works
+  left-to-right, and won't spot (co1 ; co2 ; sym co2)
+-}
+
 optCoRefl :: Coercion -> Coercion
+-- See Note [optCoRefl]
 optCoRefl in_co
 #ifdef DEBUG
   -- Debug check that optCoRefl doesn't change the type
