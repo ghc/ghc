@@ -24,7 +24,7 @@ void migrateThread       (Capability *from, StgTSO *tso, Capability *to);
 //
 #if defined(THREADED_RTS)
 void wakeupThreadOnCapability (Capability *cap,
-                               Capability *other_cap, 
+                               Capability *other_cap,
                                StgTSO *tso);
 #endif
 
@@ -39,8 +39,6 @@ StgBool isThreadBound (StgTSO* tso);
 // Overflow/underflow
 void threadStackOverflow  (Capability *cap, StgTSO *tso);
 W_   threadStackUnderflow (Capability *cap, StgTSO *tso);
-
-bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);
 
 #if defined(DEBUG)
 void printThreadBlockage (StgTSO *tso);

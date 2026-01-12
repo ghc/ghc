@@ -90,3 +90,5 @@ extern Capability MainCapability;
 // current value at the moment).
 //
 extern void setNumCapabilities (uint32_t new_);
+
+bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);
