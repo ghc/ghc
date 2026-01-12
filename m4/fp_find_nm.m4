@@ -12,6 +12,7 @@ AC_DEFUN([FP_FIND_NM],
     if test "$HostOS" = "mingw32"
     then
       NmCmd=$(cygpath -m "$NM")
+      NM_STAGE0=$NmCmd
     else
       NmCmd="$NM"
     fi
