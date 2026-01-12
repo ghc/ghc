@@ -37,7 +37,11 @@ data StackMap
 
           -- See Note [UniqFM and the register allocator]
           -- | Assignment of vregs to stack slots.
-        , stackMapAssignment    :: UniqFM Unique StackSlot }
+          --
+          -- We record not just the slot, but also how many stack slots the vreg
+          -- takes up, in order to avoid re-using a stack slot for a register
+          -- that has grown but already had a stack slot (#26668).
+        , stackMapAssignment    :: UniqFM Unique (StackSlot, Int) }
 
 
 -- | An empty stack map, with all slots available.
@@ -50,14 +54,19 @@ emptyStackMap = StackMap 0 emptyUFM
 --
 getStackSlotFor :: StackMap -> Format -> Unique -> (StackMap, Int)
 
-getStackSlotFor fs@(StackMap _ reserved) _fmt regUnique
-  | Just slot <- lookupUFM reserved regUnique  =  (fs, slot)
-
-getStackSlotFor (StackMap freeSlot reserved) fmt regUnique =
-  let
-    nbSlots = (formatInBytes fmt + 7) `div` 8
-  in
-    (StackMap (freeSlot+nbSlots) (addToUFM reserved regUnique freeSlot), freeSlot)
+getStackSlotFor fs@(StackMap freeSlot reserved) fmt regUnique
+  -- The register already has a stack slot; try to re-use it.
+  | Just (slot, nbSlots) <- lookupUFM reserved regUnique
+  -- Make sure the slot is big enough for this format, in case the register
+  -- has grown (#26668).
+  , nbNeededSlots <= nbSlots
+  = (fs, slot)
+  | otherwise
+  = (StackMap (freeSlot+nbNeededSlots) (addToUFM reserved regUnique (freeSlot, nbNeededSlots)), freeSlot)
+    -- NB: this can create fragmentation if a register keeps growing.
+    -- That's probably OK, as this is only happens very rarely.
+  where
+    !nbNeededSlots = (formatInBytes fmt + 7) `div` 8
 
 -- | Return the number of stack slots that were allocated
 getStackUse :: StackMap -> Int

@@ -406,7 +406,7 @@ linearRA block_live block_id = go [] []
 -- | Do allocation for a single instruction.
 raInsn
         :: OutputableRegConstraint freeRegs instr
-        => BlockMap Regs                      -- ^ map of what vregs are love on entry to each block.
+        => BlockMap Regs                         -- ^ map of what vregs are live on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> BlockId                              -- ^ the id of the current block, for debugging
         -> LiveInstr instr                      -- ^ the instr to have its regs allocated, with liveness info.
