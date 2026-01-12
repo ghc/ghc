@@ -75,9 +75,6 @@ import GHC.Utils.Panic
 
 import GHC.Data.Maybe
 
-import qualified GHC.LanguageExtensions as LangExt
-
-
 {- *********************************************************************
 *                                                                      *
               HsExprArg: auxiliary data type
@@ -479,43 +476,6 @@ with_get_ds mthing =
      ; ds_flag <- getDeepSubsumptionFlag_DataConHead expr_tc
      ; return (expr_tc, ds_flag, sig_ty)
      }
-
-
-
--- | Variant of 'getDeepSubsumptionFlag' which enables a top-level subsumption
--- in order to implement the plan of Note [Typechecking data constructors].
-getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
-getDeepSubsumptionFlag_DataConHead app_head =
-  do { user_ds <- xoptM LangExt.DeepSubsumption
-     ; traceTc "getDeepSubsumptionFlag_DataConHead" (ppr app_head)
-     ; return $
-         if | user_ds
-            -> Deep DeepSub
-            | otherwise
-            -> go app_head
-     }
-  where
-    go :: HsExpr GhcTc -> DeepSubsumptionFlag
-    go app_head
-     | XExpr (ConLikeTc (RealDataCon {})) <- app_head
-     = Deep TopSub
-     | XExpr (ExpandedThingTc _ f) <- app_head
-     = go f
-     | XExpr (WrapExpr _ f) <- app_head
-     = go f
-     | HsVar _ f <- app_head
-     , isDataConId (unLoc f)
-     = Deep TopSub
-     | HsApp _ f _ <- app_head
-     = go (unLoc f)
-     | HsAppType _ f _ <- app_head
-     = go (unLoc f)
-     | OpApp _ _ f _ <- app_head
-     = go (unLoc f)
-     | HsPar _ f <- app_head
-     = go (unLoc f)
-     | otherwise
-     = Shallow
 
 {- *********************************************************************
 *                                                                      *
