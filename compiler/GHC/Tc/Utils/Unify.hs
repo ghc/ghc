@@ -93,12 +93,13 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Builtin.Types
 import GHC.Types.Name
-import GHC.Types.Id( idType )
+import GHC.Types.Id( idType, isDataConId )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
+import GHC.Types.SrcLoc (unLoc)
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -2031,14 +2032,36 @@ getDeepSubsumptionFlag =
 getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
 getDeepSubsumptionFlag_DataConHead app_head =
   do { user_ds <- xoptM LangExt.DeepSubsumption
+     ; traceTc "getDeepSubsumptionFlag_DataConHead" (ppr app_head)
      ; return $
          if | user_ds
             -> Deep DeepSub
-            | XExpr (ConLikeTc (RealDataCon {})) <- app_head
-            -> Deep TopSub
             | otherwise
-            -> Shallow
-    }
+            -> go app_head
+     }
+  where
+    go :: HsExpr GhcTc -> DeepSubsumptionFlag
+    go app_head
+     | XExpr (ConLikeTc (RealDataCon {})) <- app_head
+     = Deep TopSub
+     | XExpr (ExpandedThingTc _ f) <- app_head
+     = go f
+     | XExpr (WrapExpr _ f) <- app_head
+     = go f
+     | HsVar _ f <- app_head
+     , isDataConId (unLoc f)
+     = Deep TopSub
+     | HsApp _ f _ <- app_head
+     = go (unLoc f)
+     | HsAppType _ f _ <- app_head
+     = go (unLoc f)
+     | OpApp _ _ f _ <- app_head
+     = go (unLoc f)
+     | HsPar _ f <- app_head
+     = go (unLoc f)
+     | otherwise
+     = Shallow
+
 
 -- | 'tc_sub_type_deep' is where the actual work happens for deep subsumption.
 --
