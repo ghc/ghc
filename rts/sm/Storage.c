@@ -990,7 +990,7 @@ move_STACK (StgStack *src, StgStack *dest)
 void
 accountAllocation(Capability *cap, W_ n)
 {
-    TICK_ALLOC_RTS(WDS(n));
+    TICK_ALLOC_RTS(n*sizeof(W_));
     CCS_ALLOC(cap->r.rCCCS,n);
     if (cap->r.rCurrentTSO != NULL) {
         // cap->r.rCurrentTSO->alloc_limit -= n*sizeof(W_)
