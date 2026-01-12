@@ -112,7 +112,7 @@ use the RTS :rts-flag:`-N ⟨x⟩` options.
 
 .. rts-flag:: -N ⟨x⟩
               -N
-              -maxN ⟨x⟩
+              -maxN ⟨x⟩ :since: 8.0
 
     Use ⟨x⟩ simultaneous threads when running the program.
 
