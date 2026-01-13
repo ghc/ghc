@@ -542,9 +542,17 @@ FIND_LLVM_PROG([OPT], [opt], [$LlvmMinVersion], [$LlvmMaxVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
+dnl ** look to see if we have a C compiler using an llvm back end.
+dnl
+FP_CC_LLVM_BACKEND
+AC_SUBST(CcLlvmBackend)
+
 dnl ** Which LLVM assembler to use?
 dnl --------------------------------------------------------------
 AC_ARG_VAR(LLVMAS,[Use as the path to LLVM's assembler (typically clang) [default=autodetect]])
+if test "x$CcLlvmBackend" = "xYES" && test -z "$LLVMAS"; then
+    LLVMAS="$CC"
+fi
 FIND_LLVM_PROG([LLVMAS], [clang], [$LlvmMinVersion], [$LlvmMaxVersion])
 LlvmAsCmd="$LLVMAS"
 AC_SUBST([LlvmAsCmd])
@@ -621,11 +629,6 @@ if test "$need_latomic" = 1; then
 else
     AC_SUBST([NeedLibatomic],[NO])
 fi
-
-dnl ** look to see if we have a C compiler using an llvm back end.
-dnl
-FP_CC_LLVM_BACKEND
-AC_SUBST(CcLlvmBackend)
 
 FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])
 FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_GCC_LINKER_OPTS_STAGE0],[CONF_LD_LINKER_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
