@@ -934,6 +934,14 @@ llvmOptions llvm_config llvm_version dflags =
        [("-relocation-model=" ++ rmodel
         ,"-relocation-model=" ++ rmodel) | not (null rmodel)]
 
+    -- Both llc/opt need these flags for split sections
+    ++ [ ("--data-sections", "--data-sections")
+       | gopt Opt_SplitSections dflags
+       ]
+    ++ [ ("--function-sections", "--function-sections")
+       | gopt Opt_SplitSections dflags
+       ]
+
     -- Additional llc flags
     ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu)
                                  , not (any (isInfixOf "-mcpu") (getOpts dflags opt_lc)) ]
