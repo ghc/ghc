@@ -22,13 +22,8 @@ AC_DEFUN([GHC_TABLES_NEXT_TO_CODE],
                   AC_MSG_RESULT([no])
                   ;;
               *)
-                  if test "$TargetOS" = "mingw32" && test "$TargetArch" = "aarch64"; then
-                    TablesNextToCodeDefault=NO
-                    AC_MSG_RESULT([no])
-                  else
-                    TablesNextToCodeDefault=YES
-                    AC_MSG_RESULT([yes])
-                  fi
+                  TablesNextToCodeDefault=YES
+                  AC_MSG_RESULT([yes])
                   ;;
           esac
           ;;
