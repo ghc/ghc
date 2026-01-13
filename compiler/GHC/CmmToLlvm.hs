@@ -271,15 +271,23 @@ cmmUsedLlvmGens = do
   -- used if we didn't provide these hints. This will generate a
   -- definition of the form
   --
-  --   @llvm.used = appending global [42 x i8*] [i8* bitcast <var> to i8*, ...]
+  --   @llvm.compiler.used = appending global [42 x i8*] [i8* bitcast <var> to i8*, ...]
   --
   -- Which is the LLVM way of protecting them against getting removed.
+  --
+  -- We used to emit @llvm.used, but it's too strong and results in
+  -- SHF_GNU_RETAIN section flag in the object, which prevents linker
+  -- gc-sections from working properly for LLVM backend (#26770).
+  -- @llvm.compiler.used serves a similar purpose that protects the
+  -- variable from being dropped by llc/opt, but it allows linker
+  -- gc-sections to work. See
+  -- https://llvm.org/docs/LangRef.html#the-llvm-compiler-used-global-variable
   ivars <- getUsedVars
   let cast x = LMBitc (LMStaticPointer (pVarLift x)) i8Ptr
       ty     = LMArray (length ivars) i8Ptr
       usedArray = LMStaticArray (map cast ivars) ty
       sectName  = Just $ fsLit "llvm.metadata"
-      lmUsedVar = LMGlobalVar (fsLit "llvm.used") ty Appending sectName Nothing Constant
+      lmUsedVar = LMGlobalVar (fsLit "llvm.compiler.used") ty Appending sectName Nothing Constant
       lmUsed    = LMGlobal lmUsedVar (Just usedArray)
   if null ivars
      then return ()

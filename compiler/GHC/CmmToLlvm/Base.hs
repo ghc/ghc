@@ -286,7 +286,7 @@ data LlvmEnv = LlvmEnv
   , envUniqMeta  :: UniqFM Unique MetaId   -- ^ Global metadata nodes
   , envFunMap    :: LlvmEnvMap       -- ^ Global functions so far, with type
   , envAliases   :: UniqSet LMString -- ^ Globals that we had to alias, see [Llvm Forward References]
-  , envUsedVars  :: [LlvmVar]        -- ^ Pointers to be added to llvm.used (see @cmmUsedLlvmGens@)
+  , envUsedVars  :: [LlvmVar]        -- ^ Pointers to be added to llvm.compiler.used (see @cmmUsedLlvmGens@)
 
     -- the following get cleared for every function (see @withClearVars@)
   , envVarMap    :: LlvmEnvMap       -- ^ Local variables so far, with type
