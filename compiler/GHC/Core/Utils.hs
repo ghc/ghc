@@ -59,7 +59,7 @@ module GHC.Core.Utils (
         isJoinBind,
 
         -- * Tag inference
-        mkStrictFieldSeqs, shouldStrictifyIdForCbv, shouldUseCbvForId,
+        mkStrictFieldSeqs, wantCbvForId,
 
         -- * unsafeEqualityProof
         isUnsafeEqualityCase,
@@ -1509,6 +1509,23 @@ going to put up with this, because the previous more aggressive inlining
 (which treated 'noFactor' as work-free) was duplicating primops, which
 in turn was making inner loops of array calculations runs slow (#5623)
 
+Wrinkles
+
+(WF1) Strict constructor fields.  We regard (K x) as work-free even if
+  K is a strict data constructor (see Note [Strict fields in Core])
+      data T a = K !a
+  If we have
+    let t = K x in ...(case t of K y -> blah)...
+  we want to treat t's binding as expandable so that `exprIsConApp_maybe`
+  will look through its unfolding. (NB: exprIsWorkFree implies
+  exprIsExpandable.)
+
+  Note, however, that because K is strict, after inlining we'll get a leftover
+  eval on x, which may or may not disappear
+    let t = K x in ...(case x of y -> blah)...
+  We put up with this extra eval: in effect we count duplicating the eval as
+  work-free.
+
 Note [Case expressions are work-free]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Are case-expressions work-free?  Consider
@@ -1650,7 +1667,8 @@ isWorkFreeApp fn n_val_args
   = True
   | otherwise
   = case idDetails fn of
-      DataConWorkId {} -> True
+      DataConWorkId {} -> True  -- Even if the data constructor is strict
+                                -- See (WF1) in Note [exprIsWorkFree]
       PrimOpId op _    -> primOpIsWorkFree op
       _                -> False
 
@@ -1750,6 +1768,8 @@ expansion.  Specifically:
   say that (q @ Float) expands to (Ptr a (a +# b)), and that will
   duplicate the (a +# b) primop, which we should not do lightly.
   (It's quite hard to trigger this bug, but T13155 does so for GHC 8.0.)
+
+NB: exprIsWorkFree implies exprIsExpandable.
 
 Note [isExpandableApp: bottoming functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2901,29 +2921,38 @@ dumpIdInfoOfProgram dump_locals ppr_id_info binds = vcat (map printId ids)
 
 {- Note [Call-by-value for worker args]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we unbox a constructor with strict fields we want to
-preserve the information that some of the arguments came
-out of strict fields and therefore should be already properly
-tagged, however we can't express this directly in core.
-
-Instead what we do is generate a worker like this:
+If we unbox a constructor with strict fields we want to preserve the information
+that some of the arguments came out of strict fields and therefore should be
+already evaluated and properly tagged (EPT) throughout the body of the
+function.  We express this fact in Core like this:
 
   data T = MkT A !B
 
   foo = case T of MkT a b -> $wfoo a b
 
   $wfoo a b = case b of b' -> rhs[b/b']
+              ^^^^ The "extra eval"
 
-This makes the worker strict in b causing us to use a more efficient
-calling convention for `b` where the caller needs to ensure `b` is
-properly tagged and evaluated before it's passed to $wfoo. See Note [CBV Function Ids].
+Now
+ * Throughout `rhs` the Simplifier can see that `b` is EPT, and can (say)
+   drop evals on `b`.
 
-Usually the argument will be known to be properly tagged at the call site so there is
+ * The EPT enforcement pass will make $wfoo into a CBV function, where
+   the caller guarantees to pass an EPT argument (see Note [EPT enforcement] in
+   GHC.Core.Stg.EnforceEpt)
+
+ * The code generator will discard that "extra eval" case, because $wfoo is
+   CBV.
+
+See also Note [CBV Function Ids: overview].
+
+In tihs case the argument is known to be properly tagged at the call site so there is
 no additional work for the caller and the worker can be more efficient since it can
 assume the presence of a tag.
 
 This is especially true for recursive functions like this:
     -- myPred expect it's argument properly tagged
+    -- The EnforceEPT pass has made it a CBV function
     myPred !x = ...
 
     loop :: MyPair -> Int
@@ -2933,11 +2962,10 @@ This is especially true for recursive functions like this:
             B -> 2
             _ -> loop (MyPair (myPred x) (myPred y))
 
-Here we would ordinarily not be strict in y after unboxing.
-However if we pass it as a regular argument then this means on
-every iteration of loop we will incur an extra seq on y before
-we can pass it to `myPred` which isn't great! That is in STG after
-tag inference we get:
+Here we would ordinarily not be strict in y after unboxing.  However if we pass
+it as a regular argument then this means on every iteration of loop we will
+incur an extra seq on y before we can pass it to `myPred` which isn't great!
+That is in STG after tag inference we get:
 
     Rec {
     Find.$wloop [InlPrag=[2], Occ=LoopBreaker]
@@ -2962,7 +2990,7 @@ tag inference we get:
             };
     end Rec }
 
-Here comes the tricky part: If we make $wloop strict in both x/y and we get:
+But if we add an extra eval on `y` during worker/wrapper we this this:
 
     Rec {
     Find.$wloop [InlPrag=[2], Occ=LoopBreaker]
@@ -2986,18 +3014,24 @@ Here comes the tricky part: If we make $wloop strict in both x/y and we get:
             };
     end Rec }
 
-Here both x and y are known to be tagged in the function body since we pass strict worker args using unlifted cbv.
-This means the seqs on x and y both become no-ops and compared to the first version the seq on `y` disappears at runtime.
+Here both x and y are known to be tagged in the function body since we pass
+strict worker args using unlifted cbv.  This means the seqs on x and y both
+become no-ops (via (EPT-codegen) in Not [EPT enforcement]) and, compared to the
+first version, the seq on `y` disappears at runtime.
 
-The downside is that the caller of $wfoo potentially has to evaluate `y` once if we can't prove it isn't already evaluated.
-But y coming out of a strict field is in WHNF so safe to evaluated. And most of the time it will be properly tagged+evaluated
-already at the call site because of the EPT Invariant! See Note [EPT enforcement] for more in this.
-This makes GHC itself around 1% faster despite doing slightly more work! So this is generally quite good.
+The downside is that the caller of $wfoo potentially has to evaluate `y` once if
+we can't prove it isn't already evaluated.  The wrapper, which calls `$wfoo` has
+just pulled `y` out of a strict field of a data constructor, so it will always
+be EPT.  See Note [EPT enforcement] for more in this.  This makes GHC itself
+around 1% faster despite doing slightly more work! So this is generally quite
+good.
 
-We only apply this when we think there is a benefit in doing so however. There are a number of cases in which
-it would be useless to insert an extra seq. ShouldStrictifyIdForCbv tries to identify these to avoid churn in the
+We only apply this when we think there is a benefit in doing so however. There
+are a number of cases in which it would be useless to insert an extra
+seq. `wantCbvForId` tries to identify these to avoid churn in the
 simplifier. See Note [Which Ids should be strictified] for details on this.
 -}
+
 mkStrictFieldSeqs :: [(Id,StrictnessMark)] -> CoreExpr -> (CoreExpr)
 mkStrictFieldSeqs args rhs =
   foldr addEval rhs args
@@ -3007,7 +3041,7 @@ mkStrictFieldSeqs args rhs =
       addEval (arg_id,arg_cbv) (rhs)
         -- Argument representing strict field.
         | isMarkedStrict arg_cbv
-        , shouldStrictifyIdForCbv arg_id
+        , wantCbvForId arg_id
         -- Make sure to remove unfoldings here to avoid the simplifier dropping those for OtherCon[] unfoldings.
         = Case (Var $! zapIdUnfolding arg_id) arg_id case_ty ([Alt DEFAULT [] rhs])
         -- Normal argument
@@ -3027,87 +3061,99 @@ There are multiple reasons why we might not want to insert a seq in the rhs to
 strictify a functions argument:
 
 1) The argument doesn't exist at runtime.
-
-For zero width types (like Types) there is no benefit as we don't operate on them
-at runtime at all. This includes things like void#, coercions and state tokens.
+   For zero width types (like Types) there is no benefit as we don't operate on them
+   at runtime at all. This includes things like void#, coercions and state tokens.
 
 2) The argument is a unlifted type.
-
-If the argument is a unlifted type the calling convention already is explicitly
-cbv. This means inserting a seq on this argument wouldn't do anything as the seq
-would be a no-op *and* it wouldn't affect the calling convention.
+   If the argument is a unlifted type the calling convention already is explicitly
+   cbv. This means inserting a seq on this argument wouldn't do anything as the seq
+   would be a no-op *and* it wouldn't affect the calling convention.
 
 3) The argument is absent.
+   If the argument is absent in the body there is no advantage to it being passed as
+   cbv to the function. The function won't ever look at it so we don't save any work.
 
-If the argument is absent in the body there is no advantage to it being passed as
-cbv to the function. The function won't ever look at it so we don't safe any work.
+   This mostly happens for join points. For example we might have:
 
-This mostly happens for join point. For example we might have:
+       data T = MkT ![Int] [Char]
+       f t = case t of MkT xs{strict} ys-> snd (xs,ys)
 
-    data T = MkT ![Int] [Char]
-    f t = case t of MkT xs{strict} ys-> snd (xs,ys)
+   and abstract the case alternative to:
 
-and abstract the case alternative to:
+       f t = join j1 = \xs ys -> snd (xs,ys)
+             in case t of MkT xs{strict} ys-> j1 xs xy
 
-    f t = join j1 = \xs ys -> snd (xs,ys)
-          in case t of MkT xs{strict} ys-> j1 xs xy
+   While we "use" xs inside `j1` it's not used inside the function `snd` we pass it to.
+   In short a absent demand means neither our RHS, nor any function we pass the argument
+   to will inspect it. So there is no work to be saved by forcing `xs` early.
 
-While we "use" xs inside `j1` it's not used inside the function `snd` we pass it to.
-In short a absent demand means neither our RHS, nor any function we pass the argument
-to will inspect it. So there is no work to be saved by forcing `xs` early.
-
-NB: There is an edge case where if we rebox we *can* end up seqing an absent value.
-Note [Absent fillers] has an example of this. However this is so rare it's not worth
-caring about here.
-
-4) The argument is already strict.
-
-Consider this code:
-
-    data T = MkT ![Int]
-    f t = case t of MkT xs{strict} -> reverse xs
-
-The `xs{strict}` indicates that `xs` is used strictly by the `reverse xs`.
-If we do a w/w split, and add the extra eval on `xs`, we'll get
-
-    $wf xs =
-        case xs of xs1 ->
-            let t = MkT xs1 in
-            case t of MkT xs2 -> reverse xs2
-
-That's not wrong; but the w/w body will simplify to
-
-    $wf xs = case xs of xs1 -> reverse xs1
-
-and now we'll drop the `case xs` because `xs1` is used strictly in its scope.
-Adding that eval was a waste of time.  So don't add it for strictly-demanded Ids.
+   NB: There is an edge case where if we rebox we *can* end up seqing an absent value.
+   Note [Absent fillers] has an example of this. However this is so rare it's not worth
+   caring about here.
 
 5) Functions
+   Functions are tricky (see Note [TagInfo of functions] in EnforceEpt).
+   But the gist of it even if we make a higher order function argument strict
+   we can't avoid the tag check when it's used later in the body.
+   So there is no benefit.
 
-Functions are tricky (see Note [TagInfo of functions] in EnforceEpt).
-But the gist of it even if we make a higher order function argument strict
-we can't avoid the tag check when it's used later in the body.
-So there is no benefit.
+Wrinkles:
+
+(WIS1) You might have thought that we can omit the eval if the argument is used
+   strictly demanded in the body.  But you'd be wrong. Consider this code:
+          data T = MkT ![Int]
+          f t = case t of MkT xs{Dmd=STR} -> reverse xs
+
+   The `xs{Dmd=STR}` indicates that `xs` is used strictly by the `reverse xs`.
+   If we do a w/w split, and add the extra eval on `xs`, we'll get
+       $wf xs = case xs of xs1 ->
+                  let t = MkT xs1 in
+                  case t of MkT xs2 -> reverse xs2
+
+   That's not wrong; but you might wonder if the eval on `xs` is needed
+   when it is certainly evaluated by the `reverse`.  But yes, it is (#26722):
+       g s True  t = f s t t
+       g s False t = g s True t
+
+       f True  (MkT xs) t = f False (MkT xs) t
+       f False (MkT xs) _ = xs
+
+   After worker/wrapper we get:
+       g s b t = case t of MkT ww -> $wg s b ww
+       $wg s ds ww = case ds of {
+                      False -> case ww of wg { __DEFAULT -> Bar.$wg s True wg }
+                      True  -> let { t1 = MkT ww } in f s t1 t1 }
+
+   We must make `f` inline inside `$wg`, because `f` too is ww'd, and we
+   don't want to rebox `t1` before passing it to `f`.  BUT while `t1`
+   looks like a HNF, `exprIsHNF` will say False because `MkT` is strict
+   and `ww` isn't evaluated.  So `f` doesn't inline and we get lots of
+   reboxing.
+
+   The Right Thing to to is to add the eval for the data con argument:
+       $wg s ds ww = case ww of ww' { DEFAULT ->
+                     case ds of {
+                      False -> case ww of wg { __DEFAULT -> Bar.$wg s True wg }
+                      True  -> let { t1 = MkT ww' } in f s t1 t1 } }
+
+   Now `t1` will be a HNF, and `f` will inline, and we get
+       $wg s ds ww = case ww of ww' { DEFAULT ->
+                     case ds of {
+                      False -> Bar.$wg s True ww'
+                      True  -> $wf s ww'
+
+  (Ultimately `$wg` will be a CBV function, so that `case ww` will be a
+  no-op: see (EPT-codegen) in Note [EPT enforcement] in GHC.Stg.EnforceEpt.)
 
 -}
--- | Do we expect there to be any benefit if we make this var strict
--- in order for it to get treated as as cbv argument?
--- See Note [Which Ids should be strictified]
--- See Note [CBV Function Ids] for more background.
-shouldStrictifyIdForCbv :: Var -> Bool
-shouldStrictifyIdForCbv = wantCbvForId False
-
--- Like shouldStrictifyIdForCbv but also wants to use cbv for strict args.
-shouldUseCbvForId :: Var -> Bool
-shouldUseCbvForId = wantCbvForId True
 
 -- When we strictify we want to skip strict args otherwise the logic is the same
--- as for shouldUseCbvForId so we common up the logic here.
+-- as for wantCbvForId so we common up the logic here.
 -- Basically returns true if it would be beneficial for runtime to pass this argument
 -- as CBV independent of weither or not it's correct. E.g. it might return true for lazy args
 -- we are not allowed to force.
-wantCbvForId :: Bool -> Var -> Bool
-wantCbvForId cbv_for_strict v
+wantCbvForId :: Var -> Bool
+wantCbvForId v
   -- Must be a runtime var.
   -- See Note [Which Ids should be strictified] point 1)
   | isId v
@@ -3121,9 +3167,6 @@ wantCbvForId cbv_for_strict v
   , not $ isFunTy ty
   -- If the var is strict already a seq is redundant.
   -- See Note [Which Ids should be strictified] point 4)
-  , not (isStrictDmd dmd) || cbv_for_strict
-  -- If the var is absent a seq is almost always useless.
-  -- See Note [Which Ids should be strictified] point 3)
   , not (isAbsDmd dmd)
   = True
   | otherwise

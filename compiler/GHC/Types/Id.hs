@@ -117,7 +117,7 @@ module GHC.Types.Id (
         setIdCbvMarks,
         idCbvMarks_maybe,
         idCbvMarkArity,
-        asWorkerLikeId, asNonWorkerLikeId,
+        setCbvCandidate, removeCbvCandidate,
 
         idDemandInfo,
         idDmdSig,
@@ -563,7 +563,7 @@ isDataConId id = case Var.idDetails id of
 
 -- | An Id for which we might require all callers to pass strict arguments properly tagged + evaluated.
 --
--- See Note [CBV Function Ids]
+-- See Note [CBV Function Ids: overview]
 isWorkerLikeId :: Id -> Bool
 isWorkerLikeId id = case Var.idDetails id of
   WorkerLikeId _  -> True
@@ -668,19 +668,20 @@ idJoinArity id = case idJoinPointHood id of
                    NotJoinPoint -> pprPanic "idJoinArity" (ppr id)
 
 asJoinId :: Id -> JoinArity -> JoinId
-asJoinId id arity = warnPprTrace (not (isLocalId id))
-                         "global id being marked as join var"  (ppr id) $
-                    warnPprTrace (not (is_vanilla_or_join id))
-                         "asJoinId"
-                         (ppr id <+> pprIdDetails (idDetails id)) $
-                    id `setIdDetails` JoinId arity (idCbvMarks_maybe id)
+asJoinId id arity
+  = warnPprTrace (not (isLocalId id))
+      "global id being marked as join var"  (ppr id) $
+    id `setIdDetails` JoinId arity cbv_info
   where
-    is_vanilla_or_join id = case Var.idDetails id of
-                              VanillaId -> True
-                              -- Can workers become join ids? Yes!
-                              WorkerLikeId {} -> pprTraceDebug "asJoinId (call by value function)" (ppr id) True
-                              JoinId {} -> True
-                              _         -> False
+   cbv_info = case Var.idDetails id of
+                 VanillaId          -> Nothing
+                 WorkerLikeId marks -> Just marks
+                 JoinId _ mb_marks  -> mb_marks
+                 _ -> pprTraceDebug "asJoinId"
+                         (ppr id <+> pprIdDetails (idDetails id)) $
+                      Nothing
+   -- Can workers become join ids? Yes!
+   -- See Note [CBV Function Ids: overview] in GHC.Types.Id.Info
 
 zapJoinId :: Id -> Id
 -- May be a regular id already
@@ -691,7 +692,7 @@ zapJoinId jid | isJoinId jid = zapIdTailCallInfo (newIdDetails `seq` jid `setIdD
               where
                 newIdDetails = case idDetails jid of
                   -- We treat join points as CBV functions. Even after they are floated out.
-                  -- See Note [Use CBV semantics only for join points and workers]
+                  -- See Note [Which Ids should be CBV candidates?]
                   JoinId _ (Just marks) -> WorkerLikeId marks
                   JoinId _ Nothing      -> WorkerLikeId []
                   _                     -> panic "zapJoinId: newIdDetails can only be used if Id was a join Id."
@@ -840,7 +841,7 @@ setIdCbvMarks id marks
       -- Perhaps that's sensible but for now be conservative.
       -- Similarly we don't need any lazy marks at the end of the list.
       -- This way the length of the list is always exactly number of arguments
-      -- that must be visible to CodeGen. See See Note [CBV Function Ids]
+      -- that must be visible to CodeGen. See Note [CBV Function Ids: overview]
       -- for more details.
       trimmedMarks = dropWhileEndLE (not . isMarkedCbv) $ take (idArity id) marks
 
@@ -855,24 +856,26 @@ idCbvMarks_maybe id = case idDetails id of
 idCbvMarkArity :: Id -> Arity
 idCbvMarkArity fn = maybe 0 length (idCbvMarks_maybe fn)
 
--- | Remove any cbv marks on arguments from a given Id.
-asNonWorkerLikeId :: Id -> Id
-asNonWorkerLikeId id =
-  let details = case idDetails id of
-        WorkerLikeId{}      -> Just $ VanillaId
-        JoinId arity Just{} -> Just $ JoinId arity Nothing
-        _                   -> Nothing
-  in maybeModifyIdDetails details id
-
--- | Turn this id into a WorkerLikeId if possible.
-asWorkerLikeId :: Id -> Id
-asWorkerLikeId id =
+-- | Make this Id into a candidate for CBV treatment, if possible.
+-- See Note [CBV Function Ids: overview] in GHC.Types.Id.Info
+setCbvCandidate :: Id -> Id
+setCbvCandidate id =
   let details = case idDetails id of
         WorkerLikeId{}        -> Nothing
         JoinId _arity Just{}  -> Nothing
         JoinId arity Nothing  -> Just (JoinId arity (Just []))
         VanillaId             -> Just $ WorkerLikeId []
         _                     -> Nothing
+  in maybeModifyIdDetails details id
+
+-- | Remove any CBV-candidate info from a given Id.
+-- See Note [CBV Function Ids: overview] in GHC.Types.Id.Info
+removeCbvCandidate :: Id -> Id
+removeCbvCandidate id =
+  let details = case idDetails id of
+        WorkerLikeId{}      -> Just $ VanillaId
+        JoinId arity Just{} -> Just $ JoinId arity Nothing
+        _                   -> Nothing
   in maybeModifyIdDetails details id
 
 setCaseBndrEvald :: StrictnessMark -> Id -> Id

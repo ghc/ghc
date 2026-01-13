@@ -575,3 +575,6 @@ test('T26682',  normal, multimod_compile, ['T26682', '-O -v0'])
 # In the bug report #26615, the overloaded calls were signalled by a dictionary
 #    argument like fEqList_xxxx, so we grep for that. Not a very robust test
 test('T26615',  [grep_errmsg(r'fEqList')], multimod_compile, ['T26615', '-O -fspec-constr -ddump-simpl -dsuppress-uniques'])
+
+# T26722: there should be no reboxing in $wg
+test('T26722', [grep_errmsg(r'SPEC')], compile, ['-O -dno-typeable-binds'])

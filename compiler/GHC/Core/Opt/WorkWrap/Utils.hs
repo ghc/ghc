@@ -914,23 +914,26 @@ C) Unlift *any* (non-boot exported) functions arguments if they are strict.
       an impedance matcher function. Leading to massive code bloat.
       Essentially we end up creating a impromptu wrapper function
       wherever we wouldn't inline the wrapper with a W/W approach.
-    ~ There is the option of achieving this without eta-expansion if we instead expand
-      the partial application code to check for demands on the calling convention and
-      for it to evaluate the arguments. The main downsides there would be the complexity
-      of the implementation and that it carries a certain overhead even for functions who
-      don't take advantage of this functionality. I haven't tried this approach because it's
-      not trivial to implement and doing W/W splits seems to work well enough.
+    ~ There is the option of achieving this without eta-expansion if we instead
+      expand the partial application code to check for demands on the calling
+      convention and for it to evaluate the arguments. The main downsides there
+      would be the complexity of the implementation and that it carries a
+      certain overhead even for functions who don't take advantage of this
+      functionality. I haven't tried this approach because it's not trivial to
+      implement and doing W/W splits seems to work well enough.
 
-Currently we use the first approach A) by default, with a flag that allows users to fall back to the
-more aggressive approach B).
+Currently we use the first approach A) by default, with a flag that allows users
+to fall back to the more aggressive approach B).
 
-I also tried the third approach C) using eta-expansion at call sites to avoid modifying the PAP-handling
-code which wasn't fruitful. See https://gitlab.haskell.org/ghc/ghc/-/merge_requests/5614#note_389903.
-We could still try to do C) in the future by having PAP calls which will evaluate the required arguments
-before calling the partially applied function. But this would be neither a small nor simple change so we
-stick with A) and a flag for B) for now.
+I also tried the third approach C) using eta-expansion at call sites to avoid
+modifying the PAP-handling code which wasn't fruitful. See
+https://gitlab.haskell.org/ghc/ghc/-/merge_requests/5614#note_389903.  We could
+still try to do C) in the future by having PAP calls which will evaluate the
+required arguments before calling the partially applied function. But this would
+be neither a small nor simple change so we stick with A) and a flag for B) for
+now.
 
-See also Note [EPT enforcement] and Note [CBV Function Ids]
+See also Note [EPT enforcement] and Note [CBV Function Ids: overview]
 
 Note [Worker/wrapper for strict arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -954,7 +957,7 @@ an "eval" (see `GHC.StgToCmm.Expr.cgCase`).  A call (f (a:as)) will
 have the wrapper inlined, and will drop the `case x`, so no eval
 happens at all.
 
-The worker `$wf` is a CBV function (see `Note [CBV Function Ids]`
+The worker `$wf` is a CBV function (see `Note [CBV Function Ids: overview]`
 in GHC.Types.Id.Info) and the code generator guarantees that every
 call to `$wf` has a properly tagged argument (see `GHC.Stg.EnforceEpt.Rewrite`).
 
@@ -1044,7 +1047,7 @@ mkWWstr_one opts arg str_mark =
 
     DontUnbox
       | isStrictDmd arg_dmd || isMarkedStrict str_mark
-      , wwUseForUnlifting opts  -- See Note [CBV Function Ids]
+      , wwUseForUnlifting opts  -- See Note [WW for calling convention]
       , not (isFunTy arg_ty)
       , not (isUnliftedType arg_ty) -- Already unlifted!
         -- NB: function arguments have a fixed RuntimeRep,
@@ -1311,12 +1314,13 @@ Needless to say, there are some wrinkles:
      But that also means we emit a rubbish lit for other args that have
      cardinality 'C_10' (say, the arg to a bottoming function) where we could've
      used an error-thunk.
-     NB from Andreas: But I think using an error thunk there would be dodgy no matter what
-     for example if we decide to pass the argument to the bottoming function cbv.
-     As we might do if the function in question is a worker.
-     See Note [CBV Function Ids] in GHC.Types.Id.Info. So I just left the strictness check
-     in place on top of threading through the marks from the constructor. It's a *really* cheap
-     and easy check to make anyway.
+
+     NB from Andreas: But I think using an error thunk there would be dodgy no
+     matter what for example if we decide to pass the argument to the bottoming
+     function cbv.  As we might do if the function in question is a worker.  See
+     Note [CBV Function Ids: overview] in GHC.Types.Id.Info. So I just left the
+     strictness check in place on top of threading through the marks from the
+     constructor. It's a *really* cheap and easy check to make anyway.
 
 (AF3) We can only emit a LitRubbish if the arg's type `arg_ty` is mono-rep, e.g.
      of the form `TYPE rep` where `rep` is not (and doesn't contain) a variable.

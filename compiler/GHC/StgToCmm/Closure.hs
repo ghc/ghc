@@ -617,12 +617,15 @@ getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
 getCallMethod cfg name id (LFUnknown might_be_a_function) n_args _cg_locs _self_loop_info
   | n_args == 0
   , Just sig <- idTagSig_maybe id
-  , isTaggedSig sig -- Infered to be already evaluated by EPT analysis
-  -- When profiling we must enter all potential functions to make sure we update the SCC
-  -- even if the function itself is already evaluated.
+  , isTaggedSig sig -- This `id` is evaluated and properly tagged; no need to enter it
+                    -- See (EPT-codegen) in Note [EPT enforcement] in GHC.Stg.EnforceEpt
+
+  -- When profiling we must enter all potential functions to make sure we update
+  -- the SCC even if the function itself is already evaluated.
   -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
   , not (profileIsProfiling (stgToCmmProfile cfg) && might_be_a_function)
-  = InferedReturnIt -- See Note [EPT enforcement]
+
+  = InferedReturnIt -- See (EPT-codegen) in Note [EPT enforcement]
 
   | might_be_a_function = SlowCall
 

@@ -1994,7 +1994,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
               spec_arity = count isId spec_lam_args
               spec_join_arity | isJoinId fn = JoinPoint (length spec_call_args)
                               | otherwise   = NotJoinPoint
-              spec_id    = asWorkerLikeId $
+              spec_id    = setCbvCandidate $
                            mkLocalId spec_name ManyTy spec_id_ty
                              -- See Note [Transfer strictness]
                              `setIdDmdSig`     spec_sig
@@ -2065,7 +2065,7 @@ mkSeqs seqees res_ty rhs =
       addEval :: Var -> CoreExpr -> CoreExpr
       addEval arg_id rhs
         -- Argument representing strict field and it's worth passing via cbv
-        | shouldStrictifyIdForCbv arg_id
+        | wantCbvForId arg_id
         = Case (Var arg_id)
                (localiseId arg_id)  -- See (SCF1) in Note [SpecConstr and strict fields]
                res_ty

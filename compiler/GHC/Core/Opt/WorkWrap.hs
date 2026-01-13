@@ -848,7 +848,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
       -- worker is join point iff wrapper is join point
       -- (see Note [Don't w/w join points for CPR])
 
-    work_id  = asWorkerLikeId $
+    work_id  = setCbvCandidate $
                mkWorkerId work_uniq fn_id (exprType work_rhs)
                 `setIdOccInfo` occInfo fn_info
                         -- Copy over occurrence info from parent

@@ -143,14 +143,14 @@ T18013.$wmapMaybeRule [InlPrag=NOINLINE]
  Unf=OtherCon []]
 T18013.$wmapMaybeRule
   = \ (@a) (@b) (@s) (ww :: s) (ww1 :: s -> a -> IO (Result s b)) ->
+      case ww of ww2 { __DEFAULT ->
       case ww1 of wild { __DEFAULT ->
-      case ww of wild1 { __DEFAULT ->
       T18013a.Rule
         @IO
         @(Maybe a)
         @(Maybe b)
         @s
-        wild1
+        ww2
         ((\ (s2 :: s)
             (a1 :: Maybe a)
             (s1 :: GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld) ->
@@ -158,7 +158,7 @@ T18013.$wmapMaybeRule
               Nothing ->
                 (# s1,
                    T18013a.Result
-                     @s @(Maybe b) wild1 (GHC.Internal.Maybe.Nothing @b) #);
+                     @s @(Maybe b) ww2 (GHC.Internal.Maybe.Nothing @b) #);
               Just x ->
                 case ((wild s2 x)
                       `cast` <Co:4> :: IO (Result s b)

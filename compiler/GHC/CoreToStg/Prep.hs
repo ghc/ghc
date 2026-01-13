@@ -1582,7 +1582,8 @@ maybeSaturate fn expr n_args unsat_ticks
     -- See Note [Eta expansion of hasNoBinding things in CorePrep]
   = return $ wrapLamBody (\body -> foldr mkTick body unsat_ticks) sat_expr
 
-  | mark_arity > 0 -- A call-by-value function. See Note [CBV Function Ids]
+  | mark_arity > 0 -- A call-by-value function.
+                   -- See Note [CBV Function Ids: overview]
   , not applied_marks
   = assertPpr
       ( not (isJoinId fn)) -- See Note [Do not eta-expand join points]

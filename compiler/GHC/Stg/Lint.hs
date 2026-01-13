@@ -420,7 +420,7 @@ lintAppCbvMarks e@(StgApp fun args) = do
   when (lf_unarised lf) $ do
     -- A function which expects a unlifted argument as n'th argument
     -- always needs to be applied to n arguments.
-    -- See Note [CBV Function Ids].
+    -- See Note [CBV Function Ids: overview].
     let marks = fromMaybe [] $ idCbvMarks_maybe fun
     when (length (dropWhileEndLE (not . isMarkedCbv) marks) > length args) $ do
       addErrL $ hang (text "Undersatured cbv marked ID in App" <+> ppr e ) 2 $

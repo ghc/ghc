@@ -1053,6 +1053,7 @@ cgIdApp fun_id args = do
           | otherwise                -> emitReturn [fun]
 
         -- A value infered to be in WHNF, so we can just return it.
+        -- See (EPT-codegen) in Note [EPT enforcement] in GHC.Stg.EnforceEpt
         InferedReturnIt
           | isZeroBitTy (idType fun_id) -> trace >> emitReturn []
           | otherwise                   -> trace >> assertTag >>

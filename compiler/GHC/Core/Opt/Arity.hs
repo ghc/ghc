@@ -2515,7 +2515,7 @@ eta-reduce that are specific to Core and GHC:
     See Note [Eta expanding primops].
 
 (W) We may not undersaturate StrictWorkerIds.
-    See Note [CBV Function Ids] in GHC.Types.Id.Info.
+    See Note [CBV Function Ids: overview] in GHC.Types.Id.Info.
 
 Here is a list of historic accidents surrounding unsound eta-reduction:
 
@@ -2848,7 +2848,7 @@ cantEtaReduceFun fun
 
     || (isJust (idCbvMarks_maybe fun)) -- (W)
        -- Don't undersaturate StrictWorkerIds.
-       -- See Note [CBV Function Ids] in GHC.Types.Id.Info.
+       -- See Note [CBV Function Ids: overview] in GHC.Types.Id.Info.
 
 
 {- *********************************************************************

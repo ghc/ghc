@@ -66,13 +66,13 @@ SG thinks it would be good to fix this; see #21792.
 Note [EPT enforcement]
 ~~~~~~~~~~~~~~~~~~~~~~
 The goal of EnforceEPT pass is to mark as many binders as possible as EPT
-(see Note [Evaluated and Properly Tagged]).
-To find more EPT binders, it establishes the following
+(see Note [Evaluated and Properly Tagged]). It establishes the following
+invariant:
 
 EPT INVARIANT:
 > Any binder of
 >   * a strict field (see Note [Strict fields in Core]), or
->   * a CBV argument (see Note [CBV Function Ids])
+>   * a CBV argument (see Note [CBV Function Ids: overview])
 > is EPT.
 
 (Note that prior to EPT enforcement, this invariant may *not* always be upheld.
@@ -105,7 +105,7 @@ however, we presently only promote worker functions such as $wf to CBV because
 we see all its call sites and can use the proper by-value calling convention.
 More precisely, with -O0, we guarantee that no CBV functions are visible in
 the interface file, so that naïve clients do not need to know how to call CBV
-functions. See Note [CBV Function Ids] for more details.
+functions. See Note [CBV Function Ids: overview] for more details.
 
 Specification
 -------------
@@ -140,9 +140,11 @@ Afterwards, the *EPT rewriter* inserts the actual evals realising Upcasts.
 Implementation
 --------------
 
-* EPT analysis is implemented in GHC.Stg.EnforceEpt.inferTags.
+(EPT-anal) EPT analysis is implemented in `GHC.Stg.EnforceEpt.inferTags.`
   It attaches its result to /binders/, not occurrence sites.
-* The EPT rewriter establishes the EPT invariant by inserting evals. That is, if
+
+(EPT-rewrite) The EPT rewriter, `GHC.Stg.EnforceEpt.Rewrite.rewriteTopBinds`,
+   establishes the EPT invariant by inserting evals. That is, if
     (a) a binder x is used to
           * construct a strict field (`SP x y`), or
           * passed as a CBV argument (`$wf x`),
@@ -152,17 +154,27 @@ Implementation
     case x of x' { __ DEFAULT -> SP x' y }.
     case x of x' { __ DEFAULT -> $wf x' }.
   (Recall that the case binder x' is always EPT.)
-  This is implemented in GHC.Stg.EnforceEpt.Rewrite.rewriteTopBinds.
+
   This pass also propagates the EPTness from binders to occurrences.
+
   It is sound to insert evals on strict fields (Note [Strict fields in Core]),
-  and on CBV arguments as well (Note [CBV Function Ids]).
-* We also export the EPTness of top level bindings to allow this optimisation
+  and on CBV arguments as well (Note [CBV Function Ids: overview]).
+
+(EPT-codegen) Finally, code generation for (case x of alts) skips the thunk check
+  when `x` is EPT. This is done (a bit indirectly) thus:
+   * GHC.StgToCmm.Expr.cgCase: builds a `sequel`, and recurses into `cgExpr` on `x`.
+   * When `cgExpr` sees a `x` goes to `cgIdApp`, which uses `getCallMethod`.
+   * Then `getCallMethod` sees that `x` is EPT (via `idTagSigMaybe`), and
+     returns `InferredReturnIt`.
+   * Now `cgIdApp` can jump straight to the case-alternative switch in the `sequel`
+     constructed by `cgCase`.
+
+(EPT-export) We also export the EPTness of top level bindings to allow this optimisation
   to work across module boundaries.
+
   NB: The EPT Invariant *must* be upheld, regardless of the optimisation level;
   hence EPTness is practically part of the internal ABI of a strict data
-  constructor or CBV function. Note [CBV Function Ids] contains the details.
-* Finally, code generation skips the thunk check when branching on binders that
-  are EPT. This is done by `cgExpr`/`cgCase` in the backend.
+  constructor or CBV function. Note [CBV Function Ids: overview] has the details.
 
 Evaluation
 ----------
