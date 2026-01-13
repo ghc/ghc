@@ -152,10 +152,12 @@ updateCaseScaling n opts = opts { unfoldingCaseScaling = n }
 updateReportPrefix :: Maybe String -> UnfoldingOpts -> UnfoldingOpts
 updateReportPrefix n opts = opts { unfoldingReportPrefix = n }
 
-data ArgSummary = TrivArg       -- Nothing interesting
-                | NonTrivArg    -- Arg has structure
-                | ValueArg      -- Arg is a con-app or PAP
-                                -- ..or con-like. Note [Conlike is interesting]
+data ArgSummary
+  = TrivArg       -- Nothing interesting
+  | NonTrivArg    -- Arg has structure
+  | ValueArg      -- Arg is a con-app or PAP
+                  -- ..or con-like. See (IA1) in Note [Interesting arguments]
+                  --                          in GHC.Core.Opt.Simplify.Utils
 
 instance Outputable ArgSummary where
   ppr TrivArg    = text "TrivArg"
@@ -776,7 +778,7 @@ litSize _other = 0    -- Must match size of nullary constructors
                       --            (eg via case binding)
 
 classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> ExprSize
--- See Note [Conlike is interesting]
+-- See (IA1) in Note [Interesting arguments] in GHC.Core.Opt.Simplify.Utils
 classOpSize opts cls top_args args
   | isUnaryClass cls
   = sizeZero   -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon

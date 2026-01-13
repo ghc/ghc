@@ -982,15 +982,58 @@ But we don't regard (f x y) as interesting, unless f is unsaturated.
 If it's saturated and f hasn't inlined, then it's probably not going
 to now!
 
-Note [Conlike is interesting]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-        f d = ...((*) d x y)...
-        ... f (df d')...
-where df is con-like. Then we'd really like to inline 'f' so that the
-rule for (*) (df d) can fire.  To do this
-  a) we give a discount for being an argument of a class-op (eg (*) d)
-  b) we say that a con-like argument (eg (df d)) is interesting
+Wrinkles:
+
+(IA1) Conlike is interesting.
+   Consider
+           f d = ...((*) d x y)...
+           ... f (df d')...
+   where df is con-like. Then we'd really like to inline 'f' so that the
+   rule for (*) (df d) can fire.  To do this
+     a) we give a discount for being an argument of a class-op (eg (*) d)
+     b) we say that a con-like argument (eg (df d)) is interesting
+
+(IA2) OtherCon.
+   interestingArg returns
+      (a) NonTrivArg for an arg with an OtherCon [] unfolding
+      (b) ValueArg for an arg with an OtherCon [c1,c2..] unfolding.
+
+   Reason for (a): I found (in the GHC.Internal.Bignum.Integer module) that I was
+   inlining a pretty big function when all we knew was that its arguments
+   were evaluated, nothing more.  That in turn make the enclosing function
+   too big to inline elsewhere.
+
+   Reason for (b): we want to inline integerCompare here
+     integerLt# :: Integer -> Integer -> Bool#
+     integerLt# (IS x) (IS y)                  = x <# y
+     integerLt# x y | LT <- integerCompare x y = 1#
+     integerLt# _ _                            = 0#
+
+(IA3) Rubbish literals.
+   In a worker we might see
+     $wfoo x = let y = RUBBISH in
+               ...(g y True)...
+   where `g` has a wrapper that discards its first argment.  We really really
+   want to inline g's wrapper, to expose that it discards its RUBBISH arg.
+   That may not happen if RUBBISH looks like TrivArg, so we use NonTrivArg
+   instead.  See #26722.  (This reverses the plan in #20035, but the problem
+   reported there appears to have gone away.)
+
+(IA4) Consider a call `f (g x)`. If `f` has a an argument discount on its argument,
+   then f's body scrutinises its argument in a `case` expression, or perhaps applies
+   it.  We give the arg `(g x)` an ArgSummary of `NonTrivArg` so that `f` has a bit
+   of encouragment to inline in these cases.
+
+   Now consider `let y = g x in f y`.  Now we have to look through y's unfolding.
+   When should we do so?  Suppose we did inline `f` so we ended up with
+       let y = g x in ...(case y of alts)...
+   Then we'll call `exprIsConApp_maybe` on `y`; and that looks through "expandable"
+   unfoldings; indeed that's the whole purpose of `exprIsExpanadable`. See
+   Note [exprIsExpandable] in GHC.Core.Utils.
+
+   Conclusion: `interestingArg` should give some encouragement (NonTrivArg) to `f`
+   when the argument is expandable. Hence `uf_expandable` in the `Var` case.
+
 -}
 
 interestingArg :: SimplEnv -> CoreExpr -> ArgSummary
@@ -1005,7 +1048,7 @@ interestingArg env e = go env 0 e
            ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) n e
 
     go _   _ (Lit l)
-       | isLitRubbish l        = TrivArg -- Leads to unproductive inlining in WWRec, #20035
+       | isLitRubbish l        = NonTrivArg -- See (IA3) in Note [Interesting arguments]
        | otherwise             = ValueArg
     go _   _ (Type _)          = TrivArg
     go _   _ (Coercion _)      = TrivArg
@@ -1027,45 +1070,29 @@ interestingArg env e = go env 0 e
     go_var n v
        | isConLikeId v = ValueArg   -- Experimenting with 'conlike' rather that
                                     --    data constructors here
-                                    -- DFuns are con-like; see Note [Conlike is interesting]
+                                    -- DFuns are con-like;
+                                    --    see (IA1) in Note [Interesting arguments]
        | idArity v > n = ValueArg   -- Catches (eg) primops with arity but no unfolding
        | n > 0         = NonTrivArg -- Saturated or unknown call
        | otherwise  -- n==0, no value arguments; look for an interesting unfolding
        = case idUnfolding v of
            OtherCon [] -> NonTrivArg   -- It's evaluated, but that's all we know
            OtherCon _  -> ValueArg     -- Evaluated and we know it isn't these constructors
-              -- See Note [OtherCon and interestingArg]
+              -- See (IA2) in Note [Interesting arguments]
            DFunUnfolding {} -> ValueArg   -- We konw that idArity=0
            CoreUnfolding{ uf_cache = cache }
              | uf_is_conlike cache -> ValueArg    -- Includes constructor applications
-             | uf_is_value cache   -> NonTrivArg  -- Things like partial applications
+             | uf_expandable cache -> NonTrivArg  -- See (IA4)
              | otherwise           -> TrivArg
            BootUnfolding           -> TrivArg
            NoUnfolding             -> TrivArg
 
-{- Note [OtherCon and interestingArg]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-interstingArg returns
-   (a) NonTrivArg for an arg with an OtherCon [] unfolding
-   (b) ValueArg for an arg with an OtherCon [c1,c2..] unfolding.
 
-Reason for (a): I found (in the GHC.Internal.Bignum.Integer module) that I was
-inlining a pretty big function when all we knew was that its arguments
-were evaluated, nothing more.  That in turn make the enclosing function
-too big to inline elsewhere.
-
-Reason for (b): we want to inline integerCompare here
-  integerLt# :: Integer -> Integer -> Bool#
-  integerLt# (IS x) (IS y)                  = x <# y
-  integerLt# x y | LT <- integerCompare x y = 1#
-  integerLt# _ _                            = 0#
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
                   SimplMode
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 updModeForStableUnfoldings :: ActivationGhc -> SimplMode -> SimplMode
 -- See Note [The environments of the Simplify pass]
