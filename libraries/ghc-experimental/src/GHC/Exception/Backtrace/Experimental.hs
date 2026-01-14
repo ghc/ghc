@@ -15,7 +15,7 @@ module GHC.Exception.Backtrace.Experimental
     , getBacktraceMechanismState
     , setBacktraceMechanismState
     -- * Collecting backtraces
-    , Backtraces(..),
+    , Backtraces(..)
     , displayBacktraces
     , collectBacktraces
     -- * Collecting exception annotations on throwing 'Exception's
