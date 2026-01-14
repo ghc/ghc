@@ -4454,6 +4454,22 @@ module Data.Tuple.Experimental where
   data Unit# = ...
   getSolo :: forall a. Solo a -> a
 
+module GHC.Exception.Backtrace.Experimental where
+  -- Safety: None
+  type BacktraceMechanism :: *
+  data BacktraceMechanism = CostCentreBacktrace | HasCallStackBacktrace | ExecutionBacktrace | IPEBacktrace
+  type Backtraces :: *
+  data Backtraces = Backtraces {btrCostCentre :: GHC.Internal.Maybe.Maybe (GHC.Internal.Ptr.Ptr GHC.Internal.Stack.CCS.CostCentreStack), btrHasCallStack :: GHC.Internal.Maybe.Maybe GHC.Internal.Stack.Types.CallStack, btrExecutionStack :: GHC.Internal.Maybe.Maybe GHC.Internal.ExecutionStack.Internal.StackTrace, btrIpe :: GHC.Internal.Maybe.Maybe GHC.Internal.Stack.CloneStack.StackSnapshot}
+  type CollectExceptionAnnotationMechanism :: *
+  data CollectExceptionAnnotationMechanism = ...
+  collectBacktraces :: (?callStack::GHC.Internal.Stack.Types.CallStack) => GHC.Internal.Types.IO Backtraces
+  collectExceptionAnnotation :: GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Types.IO GHC.Internal.Exception.Context.SomeExceptionAnnotation
+  displayBacktraces :: Backtraces -> GHC.Internal.Base.String
+  getBacktraceMechanismState :: BacktraceMechanism -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
+  getCollectExceptionAnnotationMechanism :: GHC.Internal.Types.IO CollectExceptionAnnotationMechanism
+  setBacktraceMechanismState :: BacktraceMechanism -> GHC.Internal.Types.Bool -> GHC.Internal.Types.IO ()
+  setCollectExceptionAnnotation :: forall a. GHC.Internal.Exception.Context.ExceptionAnnotation a => (GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Types.IO a) -> GHC.Internal.Types.IO ()
+
 module GHC.PrimOps where
   -- Safety: Unsafe
   (*#) :: Int# -> Int# -> Int#
@@ -11185,6 +11201,7 @@ instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.GiveGCStats -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Enum.Enum GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
+instance GHC.Internal.Exception.Context.ExceptionAnnotation GHC.Internal.Exception.Backtrace.Backtraces -- Defined in ‘GHC.Internal.Exception.Backtrace’
 instance forall a. GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.RealFloat (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Foreign.Storable.Storable a => GHC.Internal.Foreign.Storable.Storable (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
