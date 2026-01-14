@@ -36,6 +36,7 @@ library
       GHC.TypeLits.Experimental
       GHC.TypeNats.Experimental
       Prelude.Experimental
+      GHC.Exception.Backtrace.Experimental
     if arch(wasm32)
         exposed-modules:  GHC.Wasm.Prim
     other-extensions:
