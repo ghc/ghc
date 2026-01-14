@@ -860,33 +860,33 @@ subst_co subst co
     go_mco (MCo co) = MCo (go co)
 
     go :: Coercion -> Coercion
-    go (Refl ty)             = mkNomReflCo $! (go_ty ty)
-    go (GRefl r ty mco)      = (mkGReflCo r $! (go_ty ty)) $! (go_mco mco)
-    go (TyConAppCo r tc args)= mkTyConAppCo r tc $! go_cos args
-    go (AxiomCo con cos)     = mkAxiomCo con $! go_cos cos
-    go (AppCo co arg)        = (mkAppCo $! go co) $! go arg
+    go (Refl ty)             = mkNomReflCo $!! go_ty ty
+    go (GRefl r ty mco)      = mkGReflCo r $!! go_ty ty $!! go_mco mco
+    go (TyConAppCo r tc args)= mkTyConAppCo r tc $!! go_cos args
+    go (AxiomCo con cos)     = mkAxiomCo con $!! go_cos cos
+    go (AppCo co arg)        = mkAppCo $!! go co $!! go arg
     go (ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
                  , fco_kind = kind_co, fco_body = co })
-      = ((mkForAllCo $! tcv') visL visR
-           $! go_mco kind_co)
-           $! subst_co subst' co
+      = (mkForAllCo $!! tcv') visL visR
+           $!! go_mco kind_co
+           $!! subst_co subst' co
       where
         !(subst', tcv') = substVarBndrUnchecked subst tcv
                           -- Unchecked because used from substTyUnchecked
-    go (FunCo r afl afr w co1 co2)   = ((mkFunCo2 r afl afr $! go w) $! go co1) $! go co2
+    go (FunCo r afl afr w co1 co2)   = mkFunCo2 r afl afr $!! go w $!! go co1 $!! go co2
     go (CoVarCo cv)          = substCoVar subst cv
     go (UnivCo { uco_prov = p, uco_role = r
                , uco_lty = t1, uco_rty = t2, uco_deps = deps })
-                             = ((((mkUnivCo $! p) $! go_cos deps) $! r) $!
-                                  (go_ty t1)) $! (go_ty t2)
-    go (SymCo co)            = mkSymCo $! (go co)
-    go (TransCo co1 co2)     = (mkTransCo $! (go co1)) $! (go co2)
-    go (SelCo d co)          = mkSelCo d $! (go co)
-    go (LRCo lr co)          = mkLRCo lr $! (go co)
-    go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg
-    go (KindCo co)           = mkKindCo $! (go co)
-    go (SubCo co)            = mkSubCo $! (go co)
-    go (HoleCo h)            = HoleCo $! go_hole h
+                             = mkUnivCo p $!! go_cos deps $!! r
+                                          $!! go_ty t1 $!! go_ty t2
+    go (SymCo co)            = mkSymCo $!! go co
+    go (TransCo co1 co2)     = mkTransCo $!! go co1 $!! go co2
+    go (SelCo d co)          = mkSelCo d $!! go co
+    go (LRCo lr co)          = mkLRCo lr $!! go co
+    go (InstCo co arg)       = mkInstCo $!! go co $!! go arg
+    go (KindCo co)           = mkKindCo $!! go co
+    go (SubCo co)            = mkSubCo $!! go co
+    go (HoleCo h)            = HoleCo $!! go_hole h
 
     go_cos cos = let cos' = map go cos
                  in cos' `seqList` cos'

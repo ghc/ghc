@@ -8,7 +8,7 @@
 --
 module GHC.Utils.Misc (
         -- * Miscellaneous higher-order functions
-        applyWhen, nTimes, const2,
+        applyWhen, nTimes, const2, ($!!),
 
         -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -44,8 +44,7 @@ module GHC.Utils.Misc (
         mergeListsBy,
         isSortedBy,
 
-        -- Foldable generalised functions,
-
+        -- * Foldable generalised functions,
         mapMaybe',
 
         -- * Tuples
@@ -153,6 +152,8 @@ import qualified Data.Set as Set
 
 import Data.Time
 
+infixl 0 $!!    -- LEFT associative
+
 {-
 ************************************************************************
 *                                                                      *
@@ -198,6 +199,14 @@ third3 f (a, b, c) = (a, b, f c)
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a, b, c) = f a b c
+
+($!!) :: forall r a (b :: TYPE r). (a -> b) -> a -> b
+-- | ^ ($!!) is left-associative so you can write
+--   (f $!! e1 $!! e2)   for a multi-argument strict application
+-- In contrast ($) and ($!) are right associative
+{-# INLINE ($!!) #-}
+f $!! x = let !vx = x in f vx  -- see #2273
+
 
 {-
 ************************************************************************

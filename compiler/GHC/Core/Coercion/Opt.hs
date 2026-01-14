@@ -257,12 +257,17 @@ optCoAlt is (Alt k bs e)
   left-to-right, and won't spot (co1 ; co2 ; sym co2)
 -}
 
-optCoRefl :: Coercion -> Coercion
+optCoRefl :: Subst -> Coercion -> Coercion
 -- See Note [optCoRefl]
-optCoRefl in_co
-#ifdef DEBUG
+optCoRefl subst in_co
+  | isEmptyTCvSubst subst = in_co
+
+  | otherwise
+#ifndef DEBUG
+  = opt_co_refl subst in_co
+#else
   -- Debug check that optCoRefl doesn't change the type
-  = let out_co = go in_co
+  = let out_co = opt_co_refl subst in_co
         (Pair in_l in_r) = coercionKind in_co
         (Pair out_l out_r) = coercionKind out_co
     in if (in_l `eqType` out_l) && (in_r `eqType` out_r)
@@ -274,9 +279,11 @@ optCoRefl in_co
                                        , text "in_co:" <+> ppr in_co
                                        , text "out_co:" <+> ppr out_co ]) $
             out_co
-#else
-  = go in_co
 #endif
+
+
+opt_co_refl :: Subst -> Coercion -> Coercion
+opt_co_refl subst co = go co
   where
     go_m MRefl    = MRefl
     go_m (MCo co) = MCo (go co)
@@ -294,11 +301,16 @@ optCoRefl in_co
     go (LRCo n co)                   = mkLRCo n (go co)
     go (AppCo co1 co2)               = mkAppCo (go co1) (go co2)
     go (InstCo co1 co2)              = mkInstCo (go co1) (go co2)
-    go (ForAllCo v vl vr mco co)     = mkForAllCo v vl vr (go_m mco) (go co)
     go (FunCo r afl afr com coa cor) = mkFunCo2 r afl afr (go com) (go coa) (go cor)
     go (TyConAppCo r tc cos)         = mkTyConAppCo r tc (go_s cos)
     go (UnivCo p r lt rt cos)        = mkUnivCo p (go_s cos) r lt rt
     go (AxiomCo ax cos)              = mkAxiomCo ax (go_s cos)
+
+    go (ForAllCo v vl vr mco co)     = mkForAllCo v' vl vr
+                                           $!! go_m mco
+                                           $!! opt_co_refl subst' co
+      where
+        !(subst', v') = substVarBndr subst v
 
     -- This is the main payload
     go (TransCo co1 co2) = gobble gs0 co1 [co2]
