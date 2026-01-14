@@ -282,18 +282,24 @@ optCoRefl subst in_co
 #endif
 
 
-opt_co_refl :: Subst -> Coercion -> Coercion
+opt_co_refl :: Subst -> InCoercion -> OutCoercion
 opt_co_refl subst co = go co
   where
     go_m MRefl    = MRefl
     go_m (MCo co) = MCo (go co)
 
+    go_ty ty = substTy subst ty
+
     go_s cos = map go cos
 
-    go co@(Refl {})                  = co
-    go co@(GRefl {})                 = co
-    go co@(CoVarCo {})               = co
-    go co@(HoleCo {})                = co
+    -- See Note [Substituting in a coercion hole]
+    go_hole h@(CoercionHole { ch_co_var = cv })
+      = h { ch_co_var = updateVarType go_ty cv }
+
+    go (Refl ty)                     = Refl (substTy subst ty)
+    go (GRefl r ty mco)              = GRefl r (go_ty ty) (go_m mco)
+    go (CoVarCo cv)                  = substCoVar subst cv
+    go (HoleCo h)                    = HoleCo $!! go_hole h
     go (SymCo co)                    = mkSymCo (go co)
     go (KindCo co)                   = mkKindCo (go co)
     go (SubCo co)                    = mkSubCo (go co)
@@ -315,28 +321,30 @@ opt_co_refl subst co = go co
     -- This is the main payload
     go (TransCo co1 co2) = gobble gs0 co1 [co2]
        where
-         lk   = coercionLKind co1
+         lk'  = substTy subst (coercionLKind co1)
          role = coercionRole co1
 
          gs0 :: GobbleState
-         gs0 = GS (mkReflCo role lk) (insertTM lk gs0 emptyTM)
+         gs0 = GS (mkReflCo role lk') (insertTM lk' gs0 emptyTM)
 
-    gobble :: GobbleState -> Coercion -> [Coercion] -> Coercion
+    gobble :: GobbleState -> InCoercion -> [InCoercion] -> OutCoercion
     -- gobble (GS co1 tm) co2 cos   returns a coercion equivalent to (co1;co2;cos)
     gobble gs (TransCo co2 co3) cos
        = gobble gs co2 (co3 : cos)
-    gobble (GS co1 tm) co2 cos
-       = case lookupTM rk tm of
+    gobble (GS co1' tm) co2 cos
+       = case lookupTM rk' tm of
             Just gs -> gobble0 gs  cos
             Nothing -> gobble0 gs' cos
        where
-         rk = coercionRKind co2
-         gs' = GS (co1 `mkTransCo` co2) (insertTM rk gs' tm)
+         co2' = go co2
+         rk'  = coercionRKind co2'
+         gs'  = GS (co1' `mkTransCo` co2') (insertTM rk' gs' tm)
 
     gobble0 (GS co _) [] = co
     gobble0 gs (co:cos)  = gobble gs co cos
 
-data GobbleState = GS Coercion (TypeMap GobbleState)
+data GobbleState = GS OutCoercion (TypeMap GobbleState)
+                   -- The map is keyed by OutType
 
 {- **********************************************************************
 %*                                                                      *
