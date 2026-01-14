@@ -199,6 +199,7 @@ getLclEnvErrCtxt = tcl_err_ctxt . tcl_lcl_ctxt
 setLclEnvErrCtxt :: ErrCtxtStack -> TcLclEnv -> TcLclEnv
 setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_err_ctxt = ctxt })
 
+-- See Note [ErrCtxtStack Manipulation]
 addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
 addLclEnvErrCtxt ec = setLclEnvSrcCodeOrigin ec
 

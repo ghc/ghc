@@ -1333,6 +1333,7 @@ addErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
+-- See Note [ErrCtxtStack Manipulation]
 addExpansionErrCtxt :: SrcCodeOrigin -> ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addExpansionErrCtxt #-}   -- Note [Inlining addErrCtxt]
 addExpansionErrCtxt o msg = addExpansionErrCtxtM o (\env -> return (env, msg))
@@ -1343,6 +1344,7 @@ addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addErrCtxtM ctxt = pushCtxt (MkErrCtxt VanillaUserSrcCode ctxt)
 
+-- See Note [ErrCtxtStack Manipulation]
 addExpansionErrCtxtM :: SrcCodeOrigin -> (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 {-# INLINE addExpansionErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addExpansionErrCtxtM o ctxt = pushCtxt (MkErrCtxt (ExpansionCodeCtxt o) ctxt)
