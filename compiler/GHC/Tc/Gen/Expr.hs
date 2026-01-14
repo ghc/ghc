@@ -304,6 +304,7 @@ tcExpr :: HsExpr GhcRn
 --   - ones taken apart by GHC.Tc.Gen.Head.splitHsApps
 --   - ones understood by GHC.Tc.Gen.Head.tcInferAppHead_maybe
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
+-- Se Note [Overview of Typechecking an XExpr]
 tcExpr e@(HsVar {})              res_ty = tcApp e res_ty
 tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
 tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
@@ -759,6 +760,50 @@ tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
                 Expansion Expressions (XXExprGhcRn)
 *                                                                      *
 ************************************************************************
+-}
+
+{- Note [Overview of Typechecking an XExpr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Certain constructs undergo expansion right before type checking.
+
+   tcExpr ue@(RecordUpd{}) rho = do { ee <- expand e; tcExpr ee rho }
+
+See Note [Handling overloaded and rebindable constructs] and
+Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
+for details about which constructs are expanded.
+
+The expansion process typically takes a user written thing
+       L lspan ue
+and returns
+       L lspan (XExpr (ExpandedThingRn { xrn_orig = ue
+                                       , xrn_expanded = ee } ))
+
+where `ee` is the expansion of the user written thing `ue`
+
+Now, when a `tcMonoLHsExpr :: LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)`
+gets a located expression, It does 2 things:
+1. calls `addLExprCtxt` to perform error context management, and;
+2. calls tcExpr to typecheck the expression.
+
+The type checker context has 2 key fields:
+
+     TcLclCtxt { tcl_loc         :: RealSrcSpan
+               , tcl_err_ctxt    :: [ErrCtxt]
+               , ... }
+
+When called on an XExpr, `addLExprCtxt` updates the location of `tcl_loc` with
+the `lspan` above and adds an ErrCtxt on top of the `tcl_err_ctxt`. If the
+`lspan` is generated, then `addLExprCtxt` is a no-op.
+
+The type checker error stack element `GHC.Tc.Types.ErrCtxt.ErrCtxt` has two fields
+
+     ErrCtxt = EC CodeSrcFlag ErrCtxtMsgM
+
+`CodeSrcFlag` says whether we are typechecking an expanded thing, and what that expanded thing is
+`ErrCtxtMsgM` stores the pre-text error message itself. When called on an `XExpr`, `addLExprCtxt`,
+adds the user written thing `ue`, and the error message provided by the caller on the `ErrCtxtStack`
+See Note [ErrCtxtStack Manipulation] for more details.
+
 -}
 
 tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
