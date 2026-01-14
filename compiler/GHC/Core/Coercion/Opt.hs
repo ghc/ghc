@@ -11,7 +11,7 @@ import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 import GHC.Core
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
-import GHC.Core.TyCo.Compare( eqForAllVis, eqTypeIgnoringMultiplicity, eqType )
+import GHC.Core.TyCo.Compare
 import GHC.Core.Coercion
 import GHC.Core.Type as Type hiding( substTyVarBndr, substTy )
 import GHC.Core.TyCon
@@ -297,20 +297,22 @@ opt_co_refl subst co = go co
       = h { ch_co_var = updateVarType go_ty cv }
 
     go (Refl ty)                     = Refl (substTy subst ty)
-    go (GRefl r ty mco)              = GRefl r (go_ty ty) (go_m mco)
+    go (GRefl r ty mco)              = GRefl r $!! go_ty ty $!! go_m mco
     go (CoVarCo cv)                  = substCoVar subst cv
     go (HoleCo h)                    = HoleCo $!! go_hole h
-    go (SymCo co)                    = mkSymCo (go co)
-    go (KindCo co)                   = mkKindCo (go co)
-    go (SubCo co)                    = mkSubCo (go co)
-    go (SelCo n co)                  = mkSelCo n (go co)
-    go (LRCo n co)                   = mkLRCo n (go co)
-    go (AppCo co1 co2)               = mkAppCo (go co1) (go co2)
-    go (InstCo co1 co2)              = mkInstCo (go co1) (go co2)
-    go (FunCo r afl afr com coa cor) = mkFunCo2 r afl afr (go com) (go coa) (go cor)
-    go (TyConAppCo r tc cos)         = mkTyConAppCo r tc (go_s cos)
-    go (UnivCo p r lt rt cos)        = mkUnivCo p (go_s cos) r lt rt
-    go (AxiomCo ax cos)              = mkAxiomCo ax (go_s cos)
+    go (SymCo co)                    = mkSymCo $!! go co
+    go (KindCo co)                   = mkKindCo $!! go co
+    go (SubCo co)                    = mkSubCo $!! go co
+    go (SelCo n co)                  = mkSelCo n $!! go co
+    go (LRCo n co)                   = mkLRCo n $!! go co
+    go (AppCo co1 co2)               = mkAppCo  $!! go co1 $!! go co2
+    go (InstCo co1 co2)              = mkInstCo $!! go co1 $!! go co2
+    go (FunCo r afl afr com coa cor) = mkFunCo2 r afl afr
+                                           $!! go com $!! go coa $!! go cor
+    go (TyConAppCo r tc cos)         = mkTyConAppCo r tc $!! go_s cos
+    go (UnivCo p r lt rt cos)        = mkUnivCo p $!! (go_s cos) $!! r
+                                                  $!! (go_ty lt) $!! (go_ty rt)
+    go (AxiomCo ax cos)              = mkAxiomCo ax $!! (go_s cos)
 
     go (ForAllCo v vl vr mco co)     = mkForAllCo v' vl vr
                                            $!! go_m mco
