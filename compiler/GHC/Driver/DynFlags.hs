@@ -1233,7 +1233,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_DoCleverArgEtaExpansion) -- See Note [Eta expansion of arguments in CorePrep]
     , ([0,1,2], Opt_DoEtaReduction)          -- See Note [Eta-reduction in -O0]
     , ([0,1,2], Opt_ProfManualCcs )
-    , ([0,1,2], Opt_OptCoercion )    -- See Note [Coercion optimisation] in GHC.Core.Coercion.Opt
+    , ([2], Opt_OptCoercion )    -- See Note [Coercion optimisation] in GHC.Core.Coercion.Opt
     , ([2], Opt_DictsStrict)
 
     , ([0],     Opt_IgnoreInterfacePragmas)
