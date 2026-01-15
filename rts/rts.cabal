@@ -511,7 +511,7 @@ library
                  sm/CNF.c
                  sm/Compact.c
                  sm/Evac.c
-                 sm/Evac_thr.c
+                 sm/Evac_par.c
                  sm/GC.c
                  sm/GCAux.c
                  sm/GCUtils.c
@@ -526,7 +526,7 @@ library
                  sm/NonMovingSweep.c
                  sm/Sanity.c
                  sm/Scav.c
-                 sm/Scav_thr.c
+                 sm/Scav_par.c
                  sm/Storage.c
                  sm/Sweep.c
                  fs.c
