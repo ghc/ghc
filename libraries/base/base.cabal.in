@@ -299,7 +299,6 @@ Library
         exposed-modules:
               GHC.JS.Prim
             , GHC.JS.Prim.Internal
-            , GHC.JS.Prim.Internal.Build
             , GHC.JS.Foreign.Callback
 
     other-modules:
