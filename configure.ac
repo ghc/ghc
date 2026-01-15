@@ -833,6 +833,9 @@ dnl ** check for installed alex binary + version
 AC_ARG_VAR(ALEX,[Use as the path to alex [default=autodetect]])
 FPTOOLS_ALEX
 
+dnl ** check for cygpath on windows
+FP_PROG_CYGPATH
+
 dnl --------------------------------------------------
 dnl ### program checking section ends here ###
 dnl --------------------------------------------------

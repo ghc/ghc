@@ -13,6 +13,8 @@ import System.Directory
 import System.Info.Extra
 
 import Hadrian.Utilities
+import Hadrian.Oracles.TextFile
+import Base
 
 -- | Lookup a specified 'FilePath' in the system @PATH@.
 lookupInPath :: FilePath -> Action FilePath
@@ -45,7 +47,8 @@ type instance RuleResult WindowsPath = String
 pathOracle :: Rules ()
 pathOracle = do
     void $ addOracleCache $ \(WindowsPath path) -> do
-        Stdout out <- quietly $ cmd ["cygpath", "-m", path]
+        cygpath <- fromMaybe (error "cygpath not set by configure") <$> lookupValue configFile "cygpath"
+        Stdout out <- quietly $ cmd [cygpath, "-m", path]
         let windowsPath = unifyPath $ dropWhileEnd isSpace out
         putVerbose $ "| Windows path mapping: " ++ path ++ " => " ++ windowsPath
         return windowsPath
