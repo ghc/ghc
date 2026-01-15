@@ -3211,7 +3211,7 @@ doCaseToLet :: OutExpr          -- Scrutinee
 -- Can we transform thus?   let { b = scrut } in body
 doCaseToLet scrut case_bndr
   | isTyCoVar case_bndr    -- Respect GHC.Core
-  = isTyCoArg scrut        -- Note [Core type and coercion invariant]
+  = isTyCoArg scrut        -- Note [Core type and coercion invariants]
 
   | isUnliftedType (exprType scrut)
     -- We can call isUnliftedType here: scrutinees always have a fixed RuntimeRep (see FRRCase).

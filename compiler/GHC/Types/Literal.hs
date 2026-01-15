@@ -1004,7 +1004,7 @@ data type. Here are the moving parts:
    levity/runtime-rep polymorphism naturally uphold this invariant.
 
    INVARIANT 2: we never make a rubbish literal of type (a ~# b). Reason:
-   see Note [Core type and coercion invariant] in GHC.Core.  We can't substitute
+   see Note [Core type and coercion invariants] in GHC.Core.  We can't substitute
    a LitRubbish inside a coercion, so it's best not to make one. They are zero
    width anyway, so passing absent ones around costs nothing.  If we wanted
    an absent filler of type (a ~# b) we should use (Coercion (UnivCo ...)),

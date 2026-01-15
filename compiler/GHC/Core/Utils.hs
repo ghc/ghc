@@ -577,7 +577,7 @@ can be eliminated by expanding the synonym.
 Note [Binding coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Consider binding a CoVar, c = e.  Then, we must satisfy
-Note [Core type and coercion invariant] in GHC.Core,
+Note [Core type and coercion invariants] in GHC.Core,
 which allows only (Coercion co) on the RHS.
 
 ************************************************************************
@@ -1813,10 +1813,11 @@ exprIsUnaryClassFun _                       = False
 -- See also Note [Classifying primop effects] in "GHC.Builtin.PrimOps"
 -- and Note [Transformations affected by primop effects].
 --
--- 'exprOkForSpeculation' is used in the definition of Note [Nested binding
--- invariants]in GHC.Core.  It is therefore frequently called on arguments of
--- unlifted type, especially via 'needsCaseBinding'.  But it is sometimes
--- called on expressions of lifted type as well.  For example, see
+-- 'exprOkForSpeculation' is used in the definition of
+-- Note [Nested non-rec binding invariants] in GHC.Core.  It is therefore
+-- frequently called on arguments of unlifted type, especially via
+-- 'needsCaseBinding'.  But it is sometimes called on expressions of
+-- lifted type as well.  For example, see
 -- Note [Speculative evaluation] in "GHC.CoreToStg.Prep".
 
 exprOkForSpeculation, exprOkToDiscard :: CoreExpr -> Bool
@@ -2049,7 +2050,7 @@ But we restrict it sharply:
 
      DEFAULT -> ... (let v::Int# = case x of { ... }
                      in ...) ....
-  which does /not/ satisfy Note [Nested non-rec bindings invariants],
+  which does /not/ satisfy Note [Nested non-rec binding invariants],
   because x is not evaluated. See Note [Binder-swap during float-out]
   in GHC.Core.Opt.SetLevels.  To avoid this awkwardness it seems simpler
   to stick to unlifted scrutinees where the issue does not

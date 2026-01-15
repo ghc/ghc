@@ -190,7 +190,7 @@ These data types are the heart of the compiler
 --
 --    See Note [Core binding invariants]
 --    See Note [Representation polymorphism invariants]
---    See Note [Core type and coercion invariant]
+--    See Note [Core type and coercion invariants]
 --
 -- *  Case expression. Operationally this corresponds to evaluating
 --    the scrutinee (expression examined) to weak head normal form
@@ -449,7 +449,7 @@ OR
   * Have a RHS that is ok-for-speculation
 
 NB: this only applies to /non-recursive/ bindings.  For recursive
-(or top-level) bindings see Note [Top-level binding invariants].
+(or top-level) bindings see Note [Top/rec binding invariants].
 
 This means that the let can be floated around
 without difficulty. For example, this is OK:
@@ -2122,13 +2122,13 @@ mkLetRec [] body = body
 mkLetRec bs body = Let (Rec bs) body
 
 -- | Create a binding group where a type variable is bound to a type.
--- Per Note [Core type and coercion invariant],
+-- Per Note [Core type and coercion invariants],
 -- this can only be used to bind something in a non-recursive @let@ expression
 mkTyBind :: TyVar -> Type -> CoreBind
 mkTyBind tv ty      = NonRec tv (Type ty)
 
 -- | Create a binding group where a type variable is bound to a type.
--- Per Note [Core type and coercion invariant],
+-- Per Note [Core type and coercion invariants],
 -- this can only be used to bind something in a non-recursive @let@ expression
 mkCoBind :: CoVar -> Coercion -> CoreBind
 mkCoBind cv co      = NonRec cv (Coercion co)
