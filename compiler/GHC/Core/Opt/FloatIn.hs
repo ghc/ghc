@@ -665,7 +665,7 @@ noFloatIntoRhs is_rec bndr rhs
   = isRec is_rec -- Joins are one-shot iff non-recursive
 
   | definitelyUnliftedType (idType bndr)
-  = True  -- Preserve Note [Nested binding invariants],
+  = True  -- Preserve Note [Nested non-rec binding invariants],
           -- see Note [noFloatInto considerations]
 
   | otherwise
@@ -691,7 +691,7 @@ When do we want to float bindings into
    - noFloatIntoArg: the argument of a function application
 
 Definitely don't float into RHS if it has unlifted type;
-that would destroy Note [Nested binding invariants].
+that would destroy Note [Nested non-rec binding invariants].
 
 * Wrinkle 1: do not float in if
      (a) any non-one-shot value lambdas

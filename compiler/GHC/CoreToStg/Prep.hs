@@ -302,7 +302,7 @@ expose the values:
 see Note [wantFloatLocal].)
 If `v` is bound at the top-level, we might even float `sat` to top-level;
 see Note [Floating out of top level bindings].
-For nested let bindings, we have to keep in mind Note [Core letrec invariant]
+For nested let bindings, we have to keep in mind Note [Core binding invariants],
 and may exploit strict contexts; see Note [wantFloatLocal].
 
 There are 3 main categories of floats, encoded in the `FloatingBind` type:
@@ -1509,7 +1509,7 @@ Wrinkles:
 
 (FS1) We detect string literals in `cpeBind Rec{}` and float them out anyway;
       otherwise we'd try to bind a string literal in a letrec, violating
-      Note [Core letrec invariant]. Since we know that literals don't have
+      Note [Top/rec binding invariants]. Since we know that literals don't have
       free variables, we float further.
       Arguably, we could just as well relax the letrec invariant for
       string literals, or anthing that is a value (lifted or not).
@@ -2363,7 +2363,7 @@ Wrinkles:
                x = f y r
                y = [x]
         in e
-      and now we have violated Note [Core letrec invariant].
+      and now we have violated Note [Top/rec binding invariants].
       So we preempt this case in `wantFloatLocal`, responding `FloatNone` unless
       all floats are `TopLvlFloatable`.
 -}

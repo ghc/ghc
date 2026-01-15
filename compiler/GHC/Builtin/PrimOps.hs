@@ -438,7 +438,7 @@ follows, in decreasing order of permissiveness:
     In particular, we cannot safely rewrite such an invalid call to a runtime
     error; we must emit code that produces a valid Word32#.  (If we're lucky,
     Core Lint may complain that the result of such a rewrite violates
-    Note [Core binding invariants: nested non-rec] (#16742), but the rewrite
+    Note [Nested non-rec binding invariants] (#16742), but the rewrite
     is always wrong!)  See also Note [Guarding against silly shifts] in
     GHC.Core.Opt.ConstantFold.
 
@@ -581,7 +581,7 @@ Several predicates on primops test this flag:
   * The "no-float-out" thing is achieved by ensuring that we never let-bind a
     saturated primop application unless it has NoEffect.  The RHS of a
     let-binding (which can float in and out freely) satisfies
-    exprOkForSpeculation; this is Note [Core binding invariants: nested non-rec].
+    exprOkForSpeculation; this is Note [Nested non-rec binding invariants].
     And exprOkForSpeculation is false of a saturated primop application unless it
     has NoEffect.
 

@@ -1003,11 +1003,11 @@ Why?  Because it's important /not/ to transform
      let x = a /# 3
 to
      let x = case bx of I# a -> a /# 3
-because the let binding no longer obeys Note [Nested binding invariants].
+because the let binding no longer obeys Note [Nested non-rec binding invariants].
 But (a /# 3) is ok-for-spec due to a special hack that says division operators
 can't fail when the denominator is definitely non-zero.  And yet that same
 expression says False to exprIsCheap.  Simplest way to guarantee
-Note [Nested binding invariants] is to use the same function!
+Note [Nested non-rec binding invariants] is to use the same function!
 
 If an expression is okay for speculation, we could also float it out
 *without* boxing and unboxing, since evaluating it early is okay.

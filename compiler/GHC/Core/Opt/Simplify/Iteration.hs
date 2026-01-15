@@ -315,7 +315,7 @@ simplLazyBind :: TopLevelFlag -> RecFlag
               -> (InExpr, SimplEnv)     -- The RHS and its static environment
               -> SimplM (SimplFloats, SimplEnv)
 -- Precondition: Ids only, no TyVars; not a JoinId
--- Precondition: rhs obeys Note [Nested binding invariants]
+-- Precondition: rhs obeys Note [Nested non-rec binding invariants]
 simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
   = assert (isId bndr )
     assertPpr (not (isJoinId bndr)) (ppr bndr) $
@@ -397,7 +397,7 @@ simplAuxBind :: String
 -- The binder comes from a case expression (case binder or alternative)
 -- and so does not have rules, unfolding, inline pragmas etc.
 --
--- Precondition: rhs satisfies Note [Nested binding invariants]
+-- Precondition: rhs satisfies Note [Nested non-rec binding invariants]
 
 simplAuxBind _str env bndr new_rhs
   | assertPpr (isId bndr && not (isJoinId bndr)) (ppr bndr) $
@@ -950,7 +950,7 @@ completeBind :: BindContext
 --      * or by adding to the floats in the envt
 --
 -- Binder /can/ be a JoinId
--- Precondition: rhs obeys Note [Nested binding invariants]
+-- Precondition: rhs obeys Note [Nested non-rec binding invariants]
 completeBind bind_cxt (old_bndr, unf_se) (new_bndr, new_rhs, env)
   | isCoVar old_bndr
   = case new_rhs of
@@ -1290,7 +1290,7 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
        ; simplExprF (extendTvSubst env bndr ty') body cont }
 
   | Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
-    -- Because of Note [Nested binding invariants], it's ok to
+    -- Because of Note [Nested non-rec binding invariants], it's ok to
     -- inline freely, or to drop the binding if it is dead.
   = do { simplTrace "SimplBindr:inline-uncond2" (ppr bndr <+> ppr rhs) $
          tick (PreInlineUnconditionally bndr)
@@ -1594,13 +1594,13 @@ rebuild_go env expr cont
 completeBindX :: SimplEnv
               -> FromWhat
               -> InId -> OutExpr   -- Non-recursively bind this Id to this (simplified) expression
-                                   -- (Note [Nested binding invariants] may not be satisfied)
+                                   -- (Note [Nested non-rec binding invariants] may not be satisfied)
               -> InExpr            -- In this body
               -> SimplCont         -- Consumed by this continuation
               -> SimplM (SimplFloats, OutExpr)
 completeBindX env from_what bndr rhs body cont
   | FromBeta arg_levity <- from_what
-  , needsCaseBindingL arg_levity rhs -- Enforcing Note [Nested binding invariants]
+  , needsCaseBindingL arg_levity rhs -- Enforcing Note [Nested non-rec binding invariants]
   = do { (env1, bndr1)   <- simplNonRecBndr env bndr  -- Lambda binders don't have rules
        ; (floats, expr') <- simplNonRecBody env1 from_what body cont
        -- Do not float floats past the Case binder below
@@ -1887,7 +1887,7 @@ simplNonRecE :: HasDebugCallStack
 -- It deals with strict bindings, via the StrictBind continuation,
 -- which may abort the whole process.
 --
--- from_what=FromLet => the RHS satisfies Note [Nested binding invariants]
+-- from_what=FromLet => the RHS satisfies Note [Nested non-rec binding invariants]
 -- Otherwise it may or may not satisfy it.
 
 simplNonRecE env from_what bndr (rhs, rhs_se) body cont
@@ -1909,8 +1909,8 @@ simplNonRecE env from_what bndr (rhs, rhs_se) body cont
   where
     is_strict_bind = case from_what of
        FromBeta Unlifted -> True
-       -- If we are coming from a beta-reduction (FromBeta) we must
-       -- establish Note [Nested binding invariants], so go via StrictBind
+       -- If we are coming from a beta-reduction (FromBeta) we must establish
+       -- Note [Nested non-rec binding invariants], so go via StrictBind
        -- If not, the invariant holds already, and it's optional.
 
        -- (FromBeta Lifted) or FromLet: look at the demand info
@@ -2857,7 +2857,7 @@ this transformation:
 We treat the unlifted and lifted cases separately:
 
 * Unlifted case: 'e' satisfies exprOkForSpeculation
-  (ok-for-spec is needed to satisfy Note [Nested binding invariants].
+  (ok-for-spec is needed to satisfy Note [Nested non-rec binding invariants].
   This turns     case a +# b of r -> ...r...
   into           let r = a +# b in ...r...
   and thence     .....(a +# b)....
@@ -3112,7 +3112,7 @@ rebuildCase env scrut case_bndr alts cont
       assert (null bs) $
       do { (floats1, env') <- simplAuxBind "rebuildCase" env case_bndr case_bndr_rhs
              -- scrut is a constructor application,
-             -- hence satisfies Note [Nested binding invariants]
+             -- hence satisfies Note [Nested non-rec binding invariants]
          ; (floats2, expr') <- simplExprF env' rhs cont
          ; case wfloats of
              [] -> return (floats1 `addFloats` floats2, expr')
@@ -3624,13 +3624,14 @@ We pin on a (OtherCon []) unfolding to the case-binder of a Case,
 even though it'll be over-ridden in every case alternative with a more
 informative unfolding.  Why?  Because suppose a later, less clever, pass
 simply replaces all occurrences of the case binder with the binder itself;
-then Lint may complain about failing Note [Nested binding invariants].  Example
+then Lint may complain about failing Note [Nested non-rec binding invariants].
+Example:
     case e of b { DEFAULT -> let v = reallyUnsafePtrEquality# b y in ....
                 ; K       -> blah }
 
-Note [Nested binding invariants] requires that y is evaluated in the call to
-reallyUnsafePtrEquality#, which it is.  But we still want that to be true if we
-propagate binders to occurrences.
+Note [Nested non-rec binding invariants] requires that y is evaluated in the
+call to reallyUnsafePtrEquality#, which it is.  But we still want that to be
+true if we propagate binders to occurrences.
 
 This showed up in #13027.
 
@@ -3732,7 +3733,7 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
              -- occur in the RHS; and simplAuxBind may therefore discard it.
              -- Nevertheless we must keep it if the case-binder is alive,
              -- because it may be used in the con_app.  See Note [knownCon occ info]
-             -- NB: arg satisfies Note [Nested binding invariants]
+             -- NB: arg satisfies Note [Nested non-rec binding invariants]
            ; (floats1, env2) <- simplAuxBind "knownCon" env' b' arg
            ; (floats2, env3) <- bind_args env2 bs' args
            ; return (floats1 `addFloats` floats2, env3) }

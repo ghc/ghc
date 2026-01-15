@@ -1937,14 +1937,14 @@ where
 
 Left to itself, the specialiser would float the bindings for `x` and `n` to top
 level, so we can specialise `wombat`.  But we can't have a top-level ByteArray#
-(see Note [Core letrec invariant] in GHC.Core).  Boo.
+(see Note [Top/rec binding invariants] in GHC.Core).  Boo.
 
 This is pretty exotic, so we take a simple way out: in specBind (the NonRec
 case) do not float the binding itself unless it satisfies exprIsTopLevelBindable.
 This is conservative: maybe the RHS of `x` has a free var that would stop it
 floating to top level anyway; but that is hard to spot (since we don't know what
 the non-top-level in-scope binders are) and rare (since the binding must satisfy
-Note [Nested binding invariants] in GHC.Core).
+Note [Nested non-rec binding invariants] in GHC.Core).
 
 
 Note [Specialising Calls]

@@ -2042,15 +2042,15 @@ But we restrict it sharply:
                                                ; False -> e2 }
                        in ...) ...
 
-  Does the RHS of v satisfy Note [Nested binding invariants]?
+  Does the RHS of v satisfy Note [Nested non-rec binding invariants]?
   Previously we said yes, on the grounds that y is evaluated.  But the
   binder-swap done by GHC.Core.Opt.SetLevels would transform the inner
   alternative to
 
      DEFAULT -> ... (let v::Int# = case x of { ... }
                      in ...) ....
-  which does /not/ satisfy Note [Nested bindings invariants], because x is
-  not evaluated. See Note [Binder-swap during float-out]
+  which does /not/ satisfy Note [Nested non-rec bindings invariants],
+  because x is not evaluated. See Note [Binder-swap during float-out]
   in GHC.Core.Opt.SetLevels.  To avoid this awkwardness it seems simpler
   to stick to unlifted scrutinees where the issue does not
   arise.
@@ -2134,7 +2134,7 @@ extremely useful for float-out, changes these expressions to
 
 And now the expression does not obey the let-can-float invariant!  Yikes!
 Moreover we really might float (dataToTagLarge# x) outside the case,
-and then it really, really doesn't obey Note [Nested binding invariants].
+and then it really, really doesn't obey Note [Nested non-rec binding invariants].
 
 The solution is simple: exprOkForSpeculation does not try to take
 advantage of the evaluated-ness of (lifted) variables.  And it returns
@@ -2144,7 +2144,7 @@ by marking the relevant primops as "ThrowsException" or
 GHC.Builtin.PrimOps.
 
 Note that exprIsHNF /can/ and does take advantage of evaluated-ness;
-it doesn't have the trickiness of Note [Nested binding invariants]
+it doesn't have the trickiness of Note [Nested non-rec binding invariants]
 to worry about.
 
 ************************************************************************

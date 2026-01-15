@@ -113,7 +113,7 @@ sortQuantVars vs = sorted_tcvs ++ ids
 -- appropriate (see "GHC.Core#let_can_float_invariant")
 mkCoreLet :: HasDebugCallStack => CoreBind -> CoreExpr -> CoreExpr
 mkCoreLet (NonRec bndr rhs) body
-  = -- See Note [Core binding invariants: nested non-rec]
+  = -- See Note [Nested non-rec binding invariants]
     bindNonRec bndr rhs body
 mkCoreLet bind body
   = Let bind body

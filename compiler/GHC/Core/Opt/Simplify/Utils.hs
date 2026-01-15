@@ -1491,8 +1491,8 @@ preInlineUnconditionally
     :: SimplEnv -> TopLevelFlag -> InId
     -> InExpr -> StaticEnv  -- These two go together
     -> Maybe SimplEnv       -- Returned env has extended substitution
--- Precondition: rhs satisfies Note [Nested binding invariants]
--- See Note [Nested binding invariants] in GHC.Core
+-- Precondition: rhs satisfies Note [Nested non-rec binding invariants]
+-- See Note [Nested non-rec binding invariants] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 preInlineUnconditionally env top_lvl bndr rhs rhs_env
@@ -1638,7 +1638,7 @@ postInlineUnconditionally
     -> InId -> OutId    -- The binder (*not* a CoVar), including its unfolding
     -> OutExpr
     -> Bool
--- Precondition: rhs satisfies Note [Nested binding invariants] in GHC.Core
+-- Precondition: rhs satisfies Note [Nested non-rec binding invariants] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 postInlineUnconditionally env bind_cxt old_bndr bndr rhs

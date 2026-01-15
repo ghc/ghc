@@ -749,8 +749,10 @@ Examples
   NonRec x# (y +# 3)    FltOkSpec   -- Unboxed, but ok-for-spec'n
 
   NonRec x* (f y)       FltCareful  -- Strict binding; might fail or diverge
-  NonRec x# (a /# b)    FltCareful  -- Might fail; does not satisfy Note [Nested binding invariants]
-  NonRec x# (f y)       FltCareful  -- Might diverge; does not satisfy Note [Nested binding invariants]
+  NonRec x# (a /# b)    FltCareful  -- Might fail; does not satisfy
+                                     --    Note [Nested non-rec binding invariants]
+  NonRec x# (f y)       FltCareful  -- Might diverge; does not satisfy
+                                     --    Note [Nested non-rec binding invariants]
 -}
 
 data LetFloats = LetFloats (OrdList OutBind) FloatFlag
@@ -763,7 +765,8 @@ data FloatFlag
   = FltLifted   -- All bindings are lifted and lazy *or*
                 --     consist of a single primitive string literal
                 -- Hence ok to float to top level, or recursive
-                -- NB: consequence: all bindings satisfy Note [Nested binding invariants]
+                -- NB: consequence: all bindings satisfy
+                --     Note [Nested non-rec binding invariants]
 
   | FltOkSpec   -- All bindings are FltLifted *or*
                 --      strict (perhaps because unlifted,
@@ -772,12 +775,14 @@ data FloatFlag
                 -- Hence ok to float out of the RHS
                 -- of a lazy non-recursive let binding
                 -- (but not to top level, or into a rec group)
-                -- NB: consequence: all bindings satisfy Note [Nested binding invariants]
+                -- NB: consequence: all bindings satisfy
+                --     Note [Nested non-rec binding invariants]
 
   | FltCareful  -- At least one binding is strict (or unlifted)
                 --      and not guaranteed cheap
                 -- Do not float these bindings out of a lazy let!
-                -- NB: some bindings may not satisfy Note [Nested binding invariants]
+                -- NB: some bindings may not satisfy
+                --     Note [Nested non-rec binding invariants]
 
 instance Outputable LetFloats where
   ppr (LetFloats binds ff) = ppr ff $$ ppr (fromOL binds)
@@ -962,8 +967,10 @@ wrapFloats (SimplFloats { sfLetFloats  = LetFloats bs flag
      -- Note: Always safe to put the joins on the inside
      -- since the values can't refer to them
   where
-    mk_let | FltCareful <- flag = mkCoreLet -- Need to enforce Note [Nested binding invariants]
-           | otherwise          = Let       -- Note [Nested binding invariants] holds
+    mk_let | FltCareful <- flag
+           = mkCoreLet -- Need to enforce Note [Nested non-rec binding invariants]
+           | otherwise
+           = Let       -- Note [Nested non-rec binding invariants] holds
 
 wrapJoinFloatsX :: SimplFloats -> OutExpr -> (SimplFloats, OutExpr)
 -- Wrap the sfJoinFloats of the env around the expression,

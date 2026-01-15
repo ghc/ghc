@@ -397,27 +397,27 @@ Note [Core binding invariants]
 A core binding, `CoreBind`, obeys these invariants:
 
 * For /top level/ or /recursive/ bindings,
-  see Note [Top-level binding invariants]
+  see Note [Top/rec binding invariants]
 
 * For /nested/ (not top-level) /non-recursive/ bindings,
-  see Note [Nested binding invariants]
+  see Note [Nested non-rec binding invariants]
 
-Note [Top-level binding invariants]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Top/rec binding invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A /top-level/ or /recursive/ binding must
 
-  * be of lifted type
-OR
-  * have a RHS that is a primitive string literal
-    (see Note [Core top-level string literals], or
-OR
-  * have a rhs that is (Coercion co)
-OR
-  * be a worker or wrapper for an unlifted non-newtype data constructor; see (TL1).
+  * be of lifted type, OR
 
-For the non-top-level, non-recursive case see Note [Nested binding invariants].
-(NB: this Note applies to recursive as well as top-level bindings, but I wanted
-a short title!)
+  * have a RHS that is a primitive string literal
+    (see Note [Core top-level string literals], OR
+
+  * have a rhs that is (Coercion co), OR
+
+  * be a worker or wrapper for an unlifted non-newtype
+    data constructor; see (TL1).
+
+For the non-top-level, non-recursive case
+see Note [Nested non-rec binding invariants].
 
 See "Type#type_classification" in GHC.Core.Type
 for the meaning of "lifted" vs. "unlifted".
@@ -439,8 +439,8 @@ constructor worker or wrapper
              S1 = S1
       We allow this top-level unlifted binding to exist.
 
-Note [Nested binding invariants]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Nested non-rec binding invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A /non-top-level/, /non-recursive/ binding must
   * Be a join point; see Note [Invariants on join points]
 OR
@@ -471,7 +471,7 @@ The Core binding invariants are initially enforced by mkCoreLet in GHC.Core.Make
 Historical Note [The let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Before 2022 GHC used the "let/app invariant", which applied
-Note [Nested binding invariants] to the argument of an application,
+Note [Nested non-rec binding invariants] to the argument of an application,
 as well as to the RHS of a let.  This made some kind of sense, because 'let' can
 always be encoded as application: let x=rhs in b = (\x.b) rhs
 
@@ -641,8 +641,8 @@ checked by Core Lint.
    multiplicity of the corresponding field /scaled by the multiplicity of the
    case binder/. Checked in lintCoreAlt.
 
-Note [Core type and coercion invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Core type and coercion invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow `let` to bind type and coercion variables.
 
 * A type or coercion binding is always /non-recursive/
@@ -887,7 +887,7 @@ Join points must follow these invariants:
 However, join points have simpler invariants in other ways
 
   5. A join point can have an unboxed type without the RHS being
-     ok-for-speculation; see 
+     ok-for-speculation; see
      e.g.  let j :: Int# = factorial x in ...
 
   6. The RHS of join point is not required to have a fixed runtime representation,
@@ -2095,8 +2095,8 @@ mkDoubleLit       d = Lit (mkLitDouble d)
 mkDoubleLitDouble d = Lit (mkLitDouble (toRational d))
 
 -- | Bind all supplied binding groups over an expression in a nested let expression.
--- Assumes that the rhs satisfies Note [Nested binding invariants].  Prefer to use
--- 'GHC.Core.Make.mkCoreLets' if possible, which does guarantee the invariant
+-- Assumes that the rhs satisfies Note [Nested non-rec binding invariants].
+-- Prefer to use 'GHC.Core.Make.mkCoreLets' if possible, which does guarantee the invariant
 mkLets        :: [Bind b] -> Expr b -> Expr b
 -- | Bind all supplied binders over an expression in a nested lambda expression. Prefer to
 -- use 'GHC.Core.Make.mkCoreLams' if possible
