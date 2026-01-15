@@ -287,8 +287,8 @@ Here is another reason that we do not use SUBSTITUTE for
 all trivial expressions. Consider
    case x |> co of (y::Array# Int) { ... }
 
-We do not want to extend the substitution with (y -> x |> co); since y
-is of unlifted type, this would destroy Note [Nested binding invariants]
+We do not want to extend the substitution with (y -> x |> co); since y is of
+unlifted type, this would destroy Note [Nested non-rec binding invariants]
 if (x |> co) was not ok-for-speculation.
 
 But surely (x |> co) is ok-for-speculation, because it's a trivial

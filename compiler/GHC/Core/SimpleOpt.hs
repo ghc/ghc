@@ -381,7 +381,8 @@ simple_app env e0@(Lam {}) as0@(_:_)
         -- See Note [Dark corner with representation polymorphism]
         needsCaseBinding (idType b') (snd a)
         -- This arg must not be inlined (side-effects) and cannot be let-bound,
-        -- due to Note [Nested binding invariants]. So simply case-bind it here.
+        -- due to Note [Nested non-rec binding invariants].
+        -- So simply case-bind it here.
       , let a' = simple_opt_clo (soeInScope env) a
       = mkDefaultCase a' b' $ do_beta env' body as
 

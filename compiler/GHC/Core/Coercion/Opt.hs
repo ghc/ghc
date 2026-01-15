@@ -270,10 +270,12 @@ optCoRefl subst in_co
   = let out_co = opt_co_refl subst in_co
         (Pair in_l in_r) = coercionKind in_co
         (Pair out_l out_r) = coercionKind out_co
-    in if (in_l `eqType` out_l) && (in_r `eqType` out_r)
+        in_l' = substTy subst in_l
+        in_r' = substTy subst in_r
+    in if (in_l' `eqType` out_l) && (in_r' `eqType` out_r)
        then out_co
-       else pprTrace "optReflCo" (vcat [ text "in_l:"  <+> ppr in_l
-                                       , text "in_r:"  <+> ppr in_r
+       else pprTrace "optReflCo" (vcat [ text "in_l':"  <+> ppr in_l'
+                                       , text "in_r':"  <+> ppr in_r'
                                        , text "out_l:" <+> ppr out_l
                                        , text "out_r:" <+> ppr out_r
                                        , text "in_co:" <+> ppr in_co
