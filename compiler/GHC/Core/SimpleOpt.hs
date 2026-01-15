@@ -610,7 +610,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst, soe_opts = opt
 
   | assertPpr (isNonCoVarId in_bndr) (ppr in_bndr)
     -- The previous two guards got rid of tyvars and coercions
-    -- See Note [Core type and coercion invariant] in GHC.Core
+    -- See Note [Core type and coercion invariants] in GHC.Core
     pre_inline_unconditionally
   = (env { soe_inl = extendVarEnv inl_env in_bndr clo }, Nothing)
 
@@ -694,7 +694,7 @@ simple_out_bind_pair env@(SOE { soe_subst = subst, soe_opts = opts })
                      occ_info active stable_unf top_level
   | assertPpr (isNonCoVarId in_bndr) (ppr in_bndr)
     -- Type and coercion bindings are caught earlier
-    -- See Note [Core type and coercion invariant]
+    -- See Note [Core type and coercion invariants]
     post_inline_unconditionally
   = ( env' { soe_subst = extendIdSubst subst in_bndr out_rhs }
     , Nothing)
