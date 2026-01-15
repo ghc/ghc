@@ -296,10 +296,15 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
                    mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
                in case mrts_pkg of
                     Just rts_pkg -> concatMap mk_include (unitIncludes rts_pkg)
-                    -- This case only happens when compiling foreign stub for the rts
-                    -- library itself. The only time we do this at the moment is for
-                    -- IPE information for the RTS info tables
-                    Nothing -> ""
+                    -- The Nothing case only happens when compiling
+                    -- foreign stubs for the rts library itself (e.g.
+                    -- building with +ipe), and the rts unit is not
+                    -- registered yet.
+                    --
+                    -- The generated stubs may still use RTS API, so
+                    -- we must ensure that Rts.h is included,
+                    -- otherwise we may run into regressions (#26779).
+                    Nothing -> "#include \"Rts.h\"\n"
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
