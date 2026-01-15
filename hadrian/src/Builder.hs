@@ -163,6 +163,7 @@ data Builder = Alex
              | Cabal ConfigurationInfo Stage
              | Cc CcMode Stage
              | Configure FilePath
+             | Cygpath
              | DeriveConstants
              | GenApply (Maybe Int) -- ^ vector size, or Nothing for non-vectors
              | GenPrimopCode
