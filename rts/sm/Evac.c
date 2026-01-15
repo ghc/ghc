@@ -498,7 +498,7 @@ evacuate_static_object (StgClosure **link_field, StgClosure *q)
     // See Note [STATIC_LINK fields] for how the link field bits work
     if (((link & STATIC_BITS) | prev_static_flag) != 3) {
         StgWord new_list_head = (StgWord)q | static_flag;
-#if !defined(THREADED_RTS)
+#if !defined(PARALLEL_GC)
         *link_field = gct->static_objects;
         gct->static_objects = (StgClosure *)new_list_head;
 #else
