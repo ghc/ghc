@@ -257,32 +257,36 @@ optCoAlt is (Alt k bs e)
   left-to-right, and won't spot (co1 ; co2 ; sym co2)
 -}
 
-optCoRefl :: Subst -> Coercion -> Coercion
+optCoRefl :: Bool -> Subst -> Coercion -> Coercion
 -- See Note [optCoRefl]
-optCoRefl subst in_co
+optCoRefl check_stuff subst in_co
   | isEmptyTCvSubst subst = in_co
-
-  | otherwise
-#ifndef DEBUG
-  = opt_co_refl subst in_co
-#else
-  -- Debug check that optCoRefl doesn't change the type
+  | not check_stuff       = opt_co_refl subst in_co
+  | otherwise  -- Do expensive checks
   = let out_co = opt_co_refl subst in_co
         (Pair in_l in_r) = coercionKind in_co
         (Pair out_l out_r) = coercionKind out_co
         in_l' = substTy subst in_l
         in_r' = substTy subst in_r
-    in if (in_l' `eqType` out_l) && (in_r' `eqType` out_r)
-       then out_co
-       else pprTrace "optReflCo" (vcat [ text "in_l':"  <+> ppr in_l'
-                                       , text "in_r':"  <+> ppr in_r'
-                                       , text "out_l:" <+> ppr out_l
-                                       , text "out_r:" <+> ppr out_r
-                                       , text "in_co:" <+> ppr in_co
-                                       , text "out_co:" <+> ppr out_co ]) $
+        in_co' = substCo subst in_co
+        in_sz = coercionSize in_co'
+        out_sz = coercionSize out_co
+    in if not ((in_l' `eqType` out_l) && (in_r' `eqType` out_r))
+       then pprTrace "Yikes: optReflCo changes type"
+               (vcat [ text "in_l':"  <+> ppr in_l'
+                     , text "in_r':"  <+> ppr in_r'
+                     , text "out_l:" <+> ppr out_l
+                     , text "out_r:" <+> ppr out_r
+                     , text "in_co:" <+> ppr in_co
+                     , text "out_co:" <+> ppr out_co ]) $
             out_co
-#endif
-
+       else if out_sz < in_sz
+            then pprTrace "optCoRefl: size reduction:"
+                   (vcat [ int in_sz <+> text "-->" <+> int out_sz
+                         , text "in_co':" <+> ppr in_co'
+                         , text "out_co:" <+> ppr out_co ]) $
+                 out_co
+       else out_co
 
 opt_co_refl :: Subst -> InCoercion -> OutCoercion
 opt_co_refl subst co = go co

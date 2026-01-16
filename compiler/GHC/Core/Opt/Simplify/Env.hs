@@ -284,6 +284,8 @@ data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
   , sm_rule_opts :: !RuleOpts
   , sm_case_folding :: !Bool
   , sm_case_merge :: !Bool
+  , sm_opt_refl_co :: !Bool
+  , sm_check_opt_co :: !Bool
   }
 
 -- | See Note [SimplPhase]

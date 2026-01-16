@@ -1678,6 +1678,8 @@ dynamic_flags_deps = [
         (NoArg $ forceRecompile >> (setVerbosity $ Just 2))
   , make_ord_flag defGhcFlag "dipe-stats"
         (setDumpFlag Opt_D_ipe_stats)
+  , make_ord_flag defGhcFlag "dcheck-opt-co"
+        (setDumpFlag Opt_D_opt_co)
   , make_ord_flag defGhcFlag "dfaststring-stats"
         (setDumpFlag Opt_D_faststring_stats)
   , make_ord_flag defGhcFlag "dno-llvm-mangler"
@@ -2502,6 +2504,7 @@ fFlagsDeps = [
   flagSpec "cmm-sink"                         Opt_CmmSink,
   flagSpec "cmm-static-pred"                  Opt_CmmStaticPred,
   flagSpec "opt-coercion"                     Opt_OptCoercion,
+  flagSpec "opt-refl-coercion"                Opt_OptReflCoercion,
   flagSpec "cse"                              Opt_CSE,
   flagSpec "stg-cse"                          Opt_StgCSE,
   flagSpec "stg-lift-lams"                    Opt_StgLiftLams,
