@@ -866,6 +866,11 @@ performance.
     This option is there mainly to stop the program eating up all the
     available memory in the machine if it gets into an infinite loop.
 
+    Note that if the process is termined through a ``StackOverflow`` exception
+    the reported stack usage is not representative of actual stack use. It
+    reports stack use during error handling, rather than stack use at the time
+    the exception was raised initially.
+
 .. rts-flag:: -m ⟨n⟩
 
     :default: 3%
