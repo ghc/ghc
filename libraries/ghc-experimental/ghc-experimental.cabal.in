@@ -7,13 +7,17 @@ name:               ghc-experimental
 -- The project is ghc's version plus ghc-experimental's version suffix.
 -- For example, for ghc=9.10.1, ghc-experimental's version will be 9.1001.0.
 version:            @ProjectVersionForLib@.0
-synopsis:           Experimental features of GHC's standard library
+synopsis:           Experimental features of GHC's standard library and unstable GHC internals.
 description:
     This package is where experimental GHC standard library interfaces start
     life and mature. Eventually, stabilized interfaces will be
     migrated into the @base@ library.
 
+    This library also exposes some interfaces that are considered too unstable for
+    the @base@ library like primitives built into GHC.
+
 homepage:           https://www.haskell.org/ghc/
+bug-reports:        https://gitlab.haskell.org/ghc/ghc/-/issues/new
 license:            BSD-3-Clause
 license-file:       LICENSE
 author:             The GHC Team

@@ -1,5 +1,22 @@
 # Revision history for ghc-experimental
 
+## ghc-experimental-9.1401.0
+
+- Expose access to RTS flags via `GHC.RTS.Flags.Experimental`
+- Expose access to era profiling interface via `GHC.Profiling.Eras`
+- Expose access to runtime stack annotations via `GHC.Stack.Annotation.Experimental`
+- Expose custom allocation limit handler via `System.Mem.Experimental`
+- Expose module Prelude.Experimental, which reexports some modules from ghc-experimental for convenience, like Prelude does for base.
+
+## ghc-experimental-9.1201.0
+
+- Expose `GHC.TypeLits.Experimental` and `GHC.TypeNats.Experimental`
+
+## ghc-experimental-9.1002.0
+
+- Expose primops via `GHC.PrimOps`
+
+
 ## 0.1.0.0 -- YYYY-mm-dd
 
 * First version. Released on an unsuspecting world.
