@@ -79,13 +79,12 @@ summarises the moving parts.
   bindings, breaking out usual rule.  See GHC.Core
   Note [Core top-level string literals]
 
-* TODO: There is work on a special code-gen path for top-level boxed strings
+* There is a special code-gen path for top-level boxed strings
+
      str :: [Char]
      str = unpackCString# "foo"#
-  so that they can all share a common code pointer
 
-  There is a WIP MR on gitlab for this: !3012
-
+  It's document in Note [unpack_cstring closures].
 -}
 
 -----------------------------------------------------------------------------
