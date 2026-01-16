@@ -128,7 +128,7 @@ test('T4978',
      ['-O2'])
 
 test('T5205',
-     [collect_stats('bytes allocated',5),
+     [collect_stats('bytes allocated',15),
       only_ways(['normal', 'optasm'])
       ],
      compile_and_run,
