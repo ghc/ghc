@@ -712,7 +712,74 @@ which Roman did.
 *                                                                      *
 ********************************************************************* -}
 
--------------------
+{- Note [Argument digests]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+An `ArgDigest` is an abstraction of the arugment of a function call,
+under a given Substitution.
+
+It's like a very simple version of exprIsConApp_maybe
+But we /do/ take the SimplEnv into account.  We must:
+
+ (a) Apply the substitution.  E.g
+       (\x. ...(f x)...) (a,b)
+     We may have x:->(a,b) in the substitution, and we want to see that
+     (a,b) when we are deciding whether or not to inline f
+
+ (b) Refine using the in-scope set. E.g
+       \x. ....case x of { (a,b) -> ...f x... }....
+     We want to see that x is (a,b) at the call site of f
+
+*** TODO Check these out of date notes ***
+(AD1) Conlike is interesting.
+   Consider
+           f d = ...((*) d x y)...
+           ... f (df d')...
+   where df is con-like. Then we'd really like to inline 'f' so that the
+   rule for (*) (df d) can fire.  To do this
+     a) we give a discount for being an argument of a class-op (eg (*) d)
+     b) we say that a con-like argument (eg (df d)) is interesting
+
+(IA2) OtherCon.
+   interestingArg returns
+      (a) NonTrivArg for an arg with an OtherCon [] unfolding
+      (b) ValueArg for an arg with an OtherCon [c1,c2..] unfolding.
+
+   Reason for (a): I found (in the GHC.Internal.Bignum.Integer module) that I was
+   inlining a pretty big function when all we knew was that its arguments
+   were evaluated, nothing more.  That in turn make the enclosing function
+   too big to inline elsewhere.
+
+   Reason for (b): we want to inline integerCompare here
+     integerLt# :: Integer -> Integer -> Bool#
+     integerLt# (IS x) (IS y)                  = x <# y
+     integerLt# x y | LT <- integerCompare x y = 1#
+     integerLt# _ _                            = 0#
+
+(AD3) Rubbish literals.
+   In a worker we might see
+     $wfoo x = let y = RUBBISH in
+               ...(g y True)...
+   where `g` has a wrapper that discards its first argment.  We really really
+   want to inline g's wrapper, to expose that it discards its RUBBISH arg.
+   That may not happen if RUBBISH looks like TrivArg, so we use NonTrivArg
+   instead.  See #26722.  (This reverses the plan in #20035, but the problem
+   reported there appears to have gone away.)
+
+(AD4) Consider a call `f (g x)`. If `f` has a an argument discount on its argument,
+   then f's body scrutinises its argument in a `case` expression, or perhaps applies
+   it.  We give the arg `(g x)` an ArgSummary of `NonTrivArg` so that `f` has a bit
+   of encouragment to inline in these cases.
+
+   Now consider `let y = g x in f y`.  Now we have to look through y's unfolding.
+   When should we do so?  Suppose we did inline `f` so we ended up with
+       let y = g x in ...(case y of alts)...
+   Then we'll call `exprIsConApp_maybe` on `y`; and that looks through "expandable"
+   unfoldings; indeed that's the whole purpose of `exprIsExpanadable`. See
+   Note [exprIsExpandable] in GHC.Core.Utils.
+
+   Conclusion: `exprDigest` should look through y's unfolding if it is expandable.
+-}
+
 contArgDigests :: SimplCont -> ( [ArgDigest]   -- One for each value argument
                                , SimplCont )    -- The rest
 -- Summarises value args, discards type args and casts.
@@ -734,15 +801,6 @@ loneVariable _               = True
 
 ------------------------------
 exprDigest :: SimplEnv -> CoreExpr -> ArgDigest
--- Very simple version of exprIsConApp_maybe
--- But /do/ take the SimplEnv into account.  We must:
--- (a) Apply the substitution.  E.g
---       (\x. ...(f x)...) (a,b)
----    We may have x:->(a,b) in the substitution, and we want to see that
---     (a,b) when we are deciding whether or not to inline f
--- (b) Refine using the in-scope set. E.g
---       \x. ....case x of { (a,b) -> ...f x... }....
---     We want to see that x is (a,b) at the call site of f
 exprDigest env e = go env e []
   where
     go :: SimplEnv -> InExpr
@@ -781,7 +839,7 @@ exprDigest env e = go env e []
            ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) e as
 
     go _ (Lit l) as
-       | isLitRubbish l = ArgNoInfo -- Leads to unproductive inlining in WWRec, #20035
+       | isLitRubbish l = ArgNonTriv -- See (AD3) in Note [Argument digests]
        | otherwise      = assertPpr (null as) (ppr as) $
                           ArgIsCon (LitAlt l) []
 
@@ -803,7 +861,9 @@ exprDigest env e = go env e []
       = ArgIsCon (DataAlt con) val_args
 
       | Just rhs <- expandUnfolding_maybe unfolding
-      = go (zapSubstEnv env) rhs val_args
+      = -- Look through an expandable unfolding
+        -- See (AD4) in Note [Argument digests]
+        go (zapSubstEnv env) rhs val_args
 
 --      | DFunUnfolding {} <- unfolding
       | hasSomeUnfolding unfolding
@@ -814,7 +874,7 @@ exprDigest env e = go env e []
                      -- discount.  But the ArgDigest had better be good enough to
                      -- attract that ScrutOf discount!  We want liftM2 to be inlined
                      -- in its use in the liftA2 method of instance Applicative (ST s)
-                     -- See Note [DFun applications are interesting]
+                     -- See (AD1) in Note [Argument digests]
                      --
                      -- Actually in spectral/puzzle I found that we got a big (40%!)
                      -- benefit from    let newDest = ... in case (notSeen newDest) of ...
@@ -842,16 +902,3 @@ exprDigest env e = go env e []
       = ArgNoInfo
       where
         unfolding = idUnfolding f
-
-
-{- Note [DFun applications are interesting]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-        f d = ...((*) d x y)...
-        ... f (df d')...
-where df is con-like. Then we'd really like to inline 'f' so that the
-rule for (*) (df d) can fire.  To do this
-  a) we give a discount for being an argument of a class-op (eg (*) d)
-  b) we say that a con-like argument (eg (df d)) has digest (ArgIsNot [])
--}
-
