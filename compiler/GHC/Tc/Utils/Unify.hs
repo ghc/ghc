@@ -591,7 +591,6 @@ implicationNeeded skol_info skol_tvs given
 
 alwaysBuildImplication :: SkolemInfoAnon -> Bool
 -- See Note [When to build an implication]
-alwaysBuildImplication (SigSkol  _ _ _) = True
 alwaysBuildImplication _ = False
 
 {-  Commmented out for now while I figure out about error messages.
