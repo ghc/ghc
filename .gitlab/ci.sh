@@ -493,6 +493,11 @@ function fetch_perf_notes() {
 }
 
 function push_perf_notes() {
+  if [[ "${CI_COMMIT_BRANCH:-}" != "master" ]] && [[ ! "${CI_COMMIT_BRANCH:-}" =~ ghc-[0-9]+\.[0-9]+ ]]; then
+    info "Perf notes are only pushed on master/release branches"
+    return
+  fi
+
   if [[ -z "${TEST_ENV:-}" ]]; then
     return
   fi
