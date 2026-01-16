@@ -177,6 +177,10 @@ data UnfoldingOpts = UnfoldingOpts
    , unfoldingDictDiscount :: !Discount
       -- ^ Discount for dictionaries
 
+   , caseElimDiscount :: !Discount
+      -- ^ When we are deeper than exprTreeCaseDepth, record
+      --   this dicount when scrutinising a variable
+
    , unfoldingVeryAggressive :: !Bool
       -- ^ Force inlining in many more cases
 
@@ -221,6 +225,9 @@ defaultUnfoldingOpts = UnfoldingOpts
    , unfoldingDictDiscount   = 30
       -- Be fairly keen to inline a function if that means
       -- we'll be able to pick the right method from a dictionary
+
+   , caseElimDiscount = 20
+      -- Not very important; only happens if we are very deep in cases
 
    , unfoldingVeryAggressive = False
 
@@ -592,13 +599,7 @@ in the typical case we will record an UnfoldingGuidance of
                     , ug_tree = mkExprTree body }
 
 The ug_tree :: ExprTree is an abstaction or "digest" of the body
-of the function.  An ExprTree has
-
-  * A CaseOf for each case-expression that scrutinises an argument or
-    free variable, with a branch for each alternative.
-
-  * A ScrutOf for each other interesting use a variable, giving a discount
-    to apply if that argument has structure. e.g. a function that is applied.
+of the function. See Note [ExprTree] in GHC.Core
 
 How mkExprTree works
 ------------------
@@ -787,7 +788,7 @@ mkExprTree opts args expr
         if   remaining_case_depth > 0
         then do { alts' <- mapM (alt_alt_tree scrut_id) alts
                 ; etCaseOf bOMB_OUT_SIZE scrut_id case_bndr alts' }
-        else Just (etScrutOf scrut_id caseElimDiscount) `met_add`
+        else Just (etScrutOf scrut_id (unfoldingDictDiscount opts)) `met_add`
               -- When this scrutinee has structure, we expect to eliminate the case
              go_ne_alts alts
 
@@ -888,7 +889,9 @@ callTree opts vs fun val_args
       PrimOpId op _    -> exprTreeS (primOpSize op   val_args)
       DataConWorkId dc -> conAppET dc val_args
       ClassOpId cls _  -> classOpAppET opts cls vs fun val_args
-      _                -> genAppET opts vs fun val_args
+      _ | fun `hasKey` buildIdKey   -> etZero -- Applications of build/augment: inline!
+        | fun `hasKey` augmentIdKey -> etZero -- So we give size zero to the whole call
+        | otherwise                 -> genAppET opts vs fun val_args
 
 -- | The size of a function call
 vanillaCallSize :: [CoreExpr]   -- Type args already removed
@@ -939,11 +942,9 @@ genAppET :: UnfoldingOpts -> ETVars -> Id -> [CoreExpr] -> ExprTree
 -- Size for function calls that are not constructors or primops
 -- Note [Function applications]
 genAppET opts (avs,_) fun val_args
-  | fun `hasKey` buildIdKey   = etZero  -- We want to inline applications of build/augment
-  | fun `hasKey` augmentIdKey = etZero  -- so we give size zero to the whole call
-  | otherwise = ExprTree { et_wc_tot = size, et_size  = size
-                         , et_cases = cases
-                         , et_ret   = res_discount }
+  = ExprTree { et_wc_tot = size, et_size  = size
+             , et_cases = cases
+             , et_ret   = res_discount }
   where
     size | null val_args = 0    -- Naked variable counts zero
          | otherwise     = vanillaCallSize val_args
@@ -1003,14 +1004,14 @@ caseSize :: Bool -> Id -> [alt] -> Size
 -- An unlifted case is just a conditional; and if there is only one
 -- alternative, it's not even a conditional, hence size zero
 caseSize id_is_evald scrut_id alts
-  = eval_size + switch_size alts
+  = eval_size + switch_size
   where
     eval_size
       | id_is_evald                      = 0
       | isUnliftedType (idType scrut_id) = 0
       | otherwise                        = 20
 
-   switch_size
+    switch_size
       | isSingleton alts = 0
       | otherwise        = 5 * length alts
 
@@ -1349,6 +1350,8 @@ exprTreeWillInline limit (ExprTree { et_wc_tot = tot }) = tot <= limit
 
 -------------------------
 exprTreeSize :: InlineContext -> ExprTree -> Size
+-- Given a particular InlineContext, and an ExprTree (computed once at
+-- the definition site) compute a "size" for the inlined function body
 -- See Note [Overview of inlining heuristics]
 exprTreeSize !ic (ExprTree { et_size  = size, et_cases = cases })
   = foldr ((+) . caseTreeSize ic) size cases

@@ -1498,34 +1498,6 @@ data UnfoldingGuidance
 
   | UnfNever        -- The RHS is big, so don't inline it
 
-type Size     = Int
-type Discount = Int
-
-data ExprTree
-  = ExprTree { et_wc_tot :: {-# UNPACK #-} !Size      -- ^ Total worst-case size of whole tree
-             , et_ret    :: {-# UNPACK #-} !Discount  -- ^ Total discount when result is scrutinised
-                  -- Both et_wc_tot and et_ret /include/ et_cases
-
-             , et_size   :: {-# UNPACK #-} !Size      -- ^ Size of the tree /apart from/ et_cases
-             , et_cases  :: Bag CaseTree              -- ^ Case expressions and discounts
-    }
-
--- NB: The case expression in et_cases have no size recorded anywhere
---     We add that in `caseTreeSize`.
-
-data CaseTree
-  = CaseOf Id            -- Abstracts a case expression on this Id
-           Id            -- Case binder
-           [AltTree]     -- Always non-empty, but not worth making NonEmpty;
-                         -- nothing relies on non-empty-ness
-
-  | ScrutOf Id Discount  -- If this Id is bound to a value, apply this discount
-                         -- All size info is accounted for elsewhere;
-                         -- ScrutOf just records a discount
-
-data AltTree  = AltTree AltCon
-                        [Id]      -- Term variables only
-                        ExprTree
 
 {- Note [UnfoldingCache]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1857,14 +1829,68 @@ Given this decision it's vital that we do *always* do it.
   may inline g entirely in body, dropping its binding, and leaving the
   occurrence in f out of scope. This happened in #8892, where the unfolding
   in question was a DFun unfolding.
+-}
+
+{- *********************************************************************
+*                                                                      *
+                  ExprTree
+*                                                                      *
+********************************************************************* -}
+
+{- Note [ExprTree]
+~~~~~~~~~~~~~~~~~~
+An ExprTree is an abstaction or "digest" of the body
+of the function.
+
+  * A CaseOf for each case-expression that scrutinises an argument or
+    free variable, with a branch for each alternative.
+
+  * A ScrutOf for each other interesting use of a variable, giving a discount
+    to apply if that argument has structure. e.g. a function that is applied.
+-}
 
 
-************************************************************************
+type Size     = Int
+type Discount = Int
+
+-- See Note [ExprTree]
+data ExprTree
+  = ExprTree { et_wc_tot :: {-# UNPACK #-} !Size
+                            -- ^ Total worst-case size of whole tree
+             , et_ret    :: {-# UNPACK #-} !Discount
+                            -- ^ Total discount when result is scrutinised
+              -- Both et_wc_tot and et_ret /include/ et_cases
+
+             , et_size   :: {-# UNPACK #-} !Size
+                            -- ^ Size of the tree /apart from/ et_cases
+             , et_cases  :: Bag CaseTree
+                            -- ^ Case expressions and discounts
+    }
+
+-- NB: The case expression themselves in et_cases have no size
+--     recorded anywhere. We add that in `caseTreeSize`.
+
+-- See Note [ExprTree]
+data CaseTree
+  = CaseOf Id            -- Abstracts a case expression on this Id
+           Id            -- Case binder
+           [AltTree]     -- Always non-empty, but not worth making NonEmpty;
+                         -- nothing relies on non-empty-ness
+
+  | ScrutOf Id Discount  -- If this Id is bound to a value, apply this discount
+                         -- All size info is accounted for elsewhere;
+                         -- ScrutOf just records a discount
+
+-- See Note [ExprTree]
+data AltTree  = AltTree AltCon
+                        [Id]      -- Term variables only
+                        ExprTree
+
+{- *********************************************************************
 *                                                                      *
                   AltCon
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 -- The Ord is needed for the FiniteMap used in the lookForConstructor
 -- in GHC.Core.Opt.Simplify.Env.  If you declared that lookForConstructor
