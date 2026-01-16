@@ -122,4 +122,4 @@
 	url = https://gitlab.haskell.org/ghc/template-haskell-quasiquoter.git
 [submodule "libraries/libffi-clib"]
 	path = libraries/libffi-clib
-	url = https://github.com/stable-haskell/libffi-clib.git
+	url = https://gitlab.haskell.org/ghc/libffi-clib.git
