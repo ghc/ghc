@@ -26,7 +26,7 @@ import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs, scrutOkForBind
 import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
 import qualified GHC.Core.Make
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
--- import GHC.Core.Coercion.Opt
+import GHC.Core.Coercion.Opt
 import GHC.Core.Reduction
 import GHC.Core.FamInstEnv      ( FamInstEnv, topNormaliseType_maybe )
 import GHC.Core.DataCon
@@ -1390,9 +1390,12 @@ simplCoercionF env co cont
 
 simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
-  = do { let out_co = -- optCoRefl (getTCvSubst env) co
-                      substCo env co
+  = do { let out_co | sm_opt_refl_co mode = optCoRefl (sm_check_opt_co mode)
+                                                      (getTCvSubst env) co
+                    | otherwise          = substCo env co
        ; seqCo out_co `seq` return out_co }
+  where
+    mode = seMode env
 
 -----------------------------------
 -- | Push a TickIt context outwards past applications and cases, as

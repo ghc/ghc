@@ -16,7 +16,7 @@ import GHC.Core.Opt.Simplify.Monad ( TopEnvConfig(..) )
 import GHC.Driver.Config.Core.Lint ( initLintPassResultConfig )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Driver.Config.Core.Opt.Arity ( initArityOpts )
-import GHC.Driver.DynFlags ( DynFlags(..), GeneralFlag(..), gopt )
+import GHC.Driver.DynFlags ( DynFlags(..), GeneralFlag(..), DumpFlag(..), gopt, dopt )
 
 import GHC.Runtime.Context ( InteractiveContext(..) )
 
@@ -72,6 +72,8 @@ initSimplMode dflags phase name = SimplMode
   , sm_rule_opts = initRuleOpts dflags
   , sm_case_folding = gopt Opt_CaseFolding dflags
   , sm_case_merge = gopt Opt_CaseMerge dflags
+  , sm_opt_refl_co = gopt Opt_OptReflCoercion dflags
+  , sm_check_opt_co = dopt Opt_D_opt_co dflags
   }
 
 initGentleSimplMode :: DynFlags -> SimplMode
