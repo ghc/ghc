@@ -1094,9 +1094,6 @@ In a function application (f a b)
 Code for manipulating sizes
 -}
 
--- | Does an ExprSize include an evaluation Discount?
-data HasDiscount = NoDiscount | WithDiscount deriving (Eq)
-
 type PlainSize = Int -- Things that have a size, but not argument discount, nor scrut discount
 
 -- | The size of a candidate expression for unfolding
