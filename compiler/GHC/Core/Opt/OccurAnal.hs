@@ -2816,7 +2816,7 @@ occAnalApp !env (Var fun_id, [], ticks)
     WUD fun_uds (mkTicks ticks fun')
   where
     !(fun', fun_id')  = lookupBndrSwap env fun_id
-    !fun_uds = mkOneOcc env fun_id' int_cxt 0
+    !fun_uds = mkOneIdOcc env fun_id' int_cxt 0
     !int_cxt = case occ_encl env of
                    OccScrut -> IsInteresting
                    _other   -> NotInteresting
@@ -3348,7 +3348,7 @@ addLocalLet env@(OccEnv { occ_nested_lets = ids }) top_lvl id
 
 addJoinPoint :: OccEnv -> Id -> UsageDetails -> OccEnv
 addJoinPoint env@(OccEnv { occ_join_points = join_points, occ_nested_lets = nested_lets })
-             join_bndr (UD { ud_env = rhs_occs })
+             join_bndr (UD { ud_id_env = rhs_occs })
   | isEmptyVarEnv zeroed_form
   = env
   | otherwise
@@ -3839,12 +3839,12 @@ data UsageDetails
   --            `ud_z_tyco` is a subset of ud_tyco_env
 
 instance Outputable UsageDetails where
-  ppr ud@(UD { ud_env = id_env, ud_tyco_env = tyco_env, ud_z_tail = z_tail })
+  ppr ud@(UD { ud_id_env = id_env, ud_tyco_env = tyco_env, ud_z_tail = z_tail })
     = text "UD" <> (braces (vcat
          [ -- `final` shows the result of a proper lookupOccInfo, returning OccInfo
            --         after accounting for `ud_z_tail` etc.
            text "final =" <+> (fsep $ punctuate comma $
-                 [ ppr uq <+> text ":->" <+> ppr (lookupOccInfoByUnique ud uq)
+                 [ ppr uq <+> text ":->" <+> ppr (lookupIdOccByUnique ud uq)
                  | (uq, _) <- nonDetStrictFoldVarEnv_Directly do_one [] id_env ])
          , text "ud_tyco_env =" <+> ppr tyco_env
          , text "ud_z_tail" <+> ppr z_tail ] ))
