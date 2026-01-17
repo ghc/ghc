@@ -1812,7 +1812,7 @@ decideGeneralisationPlan dflags top_lvl closed_type sig_fn lbinds
         -- types (see #25428). So we don't force it.
         -- See (NVP5) in Note [Non-variable pattern bindings aren't linear] in GHC.Tc.Gen.Bind.
 
-      | isTopLevel top_lvl             = True
+      | isTopLevel top_lvl = True
         -- See Note [Always generalise top-level bindings]
 
       | has_mult_anns_and_pats = False

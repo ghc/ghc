@@ -916,8 +916,8 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
     (rep_tys, rep_strs) = unzip (concat rep_tys_w_strs)
 
     -- This is True if the data constructor or class dictionary constructor
-    -- needs a wrapper. This wrapper is injected into the program later in the
-    -- CoreTidy pass. See Note [Injecting implicit bindings] in GHC.Iface.Tidy,
+    -- needs a wrapper. This wrapper is injected into the program later in the CoreTidy
+    -- pass. See Note [Injecting implicit bindings] in GHC.CoreToStg.AddImplicitBinds
     -- along with the accompanying implementation in getTyConImplicitBinds.
     wrapper_reqd
       | isTypeDataTyCon tycon
