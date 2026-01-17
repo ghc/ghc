@@ -561,10 +561,11 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       --    and affects how names are rendered in error messages
       --  * the local env exposes the local Ids to simplifyTop,
       --    so that we get better error messages (monomorphism restriction)
-      ; new_ev_binds <- {-# SCC "simplifyTop" #-}
-                        restoreEnvs (tcg_env, tcl_env) $
-                        do { lie_main <- checkMainType tcg_env
-                           ; simplifyTop (lie `andWC` lie_main) }
+      ; tcg_env <- {-# SCC "simplifyTop" #-}
+                   restoreEnvs (tcg_env, tcl_env) $
+                   do { lie_main <- checkMainType tcg_env
+                      ; ev_binds <- simplifyTop (lie `andWC` lie_main)
+                      ; return (tcg_env `addEvBinds` ev_binds) }
 
         -- Emit Typeable bindings
       ; tcg_env <- setGblEnv tcg_env $
@@ -579,7 +580,8 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
         -- Even simplifyTop may do some unification.
         -- This pass also warns about missing type signatures
       ; (id_env, ev_binds', binds', fords', imp_specs', rules', pat_syns')
-            <- zonkTcGblEnv new_ev_binds tcg_env
+            <- zonkTcGblEnv tcg_env
+      ; traceTc "Tc10" empty
 
       --------- Run finalizers --------------
       -- Finalizers must run after constraints are simplified, lest types
@@ -613,12 +615,12 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       --------- Emit the ':Main.main = runMainIO main' declaration ----------
       -- Do this /after/ rnExports, so that it can consult
       -- the tcg_exports created by rnExports
-      ; (tcg_env, main_ev_binds)
+      ; tcg_env
            <- restoreEnvs (tcg_env, tcl_env) $
               do { (tcg_env, lie) <- captureTopConstraints $
                                      checkMain explicit_mod_hdr export_ies
                  ; ev_binds <- simplifyTop lie
-                 ; return (tcg_env, ev_binds) }
+                 ; return (tcg_env `addEvBinds` ev_binds) }
 
       ; failIfErrsM    -- Stop now if if there have been errors
                        -- Continuing is a waste of time; and we may get debug
@@ -629,7 +631,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       -- and main. This won't give rise to any more finalisers as you
       -- can't nest finalisers inside finalisers.
       ; (id_env_mf, ev_binds_mf, binds_mf, fords_mf, imp_specs_mf, rules_mf, patsyns_mf)
-            <- zonkTcGblEnv main_ev_binds tcg_env
+            <- zonkTcGblEnv tcg_env
 
       ; let { !final_type_env = tcg_type_env tcg_env
                                 `plusTypeEnv` id_env_mf
@@ -648,20 +650,19 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       ; setGlobalTypeEnv tcg_env' final_type_env
    }
 
-zonkTcGblEnv :: Bag EvBind -> TcGblEnv
+zonkTcGblEnv :: TcGblEnv
              -> TcM (TypeEnv, Bag EvBind, LHsBinds GhcTc,
                        [LForeignDecl GhcTc], [LTcSpecPrag], [LRuleDecl GhcTc], [PatSyn])
-zonkTcGblEnv ev_binds tcg_env@(TcGblEnv { tcg_binds     = binds
-                                        , tcg_ev_binds  = cur_ev_binds
-                                        , tcg_imp_specs = imp_specs
-                                        , tcg_rules     = rules
-                                        , tcg_fords     = fords
-                                        , tcg_patsyns   = pat_syns })
+zonkTcGblEnv tcg_env@(TcGblEnv { tcg_binds     = binds
+                               , tcg_ev_binds  = ev_binds
+                               , tcg_imp_specs = imp_specs
+                               , tcg_rules     = rules
+                               , tcg_fords     = fords
+                               , tcg_patsyns   = pat_syns })
   = {-# SCC "zonkTopDecls" #-}
     setGblEnv tcg_env $ -- This sets the GlobalRdrEnv which is used when rendering
                         --   error messages during zonking (notably levity errors)
-    do { let all_ev_binds = cur_ev_binds `unionBags` ev_binds
-       ; zonkTopDecls all_ev_binds binds rules imp_specs fords pat_syns }
+    zonkTopDecls ev_binds binds rules imp_specs fords pat_syns
 
 -- | Runs TH finalizers and renames and typechecks the top-level declarations
 -- that they could introduce.

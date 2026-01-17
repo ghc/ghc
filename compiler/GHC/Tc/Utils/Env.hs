@@ -25,7 +25,7 @@ module GHC.Tc.Utils.Env(
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
         lookupGlobal, lookupGlobal_maybe,
-        addTypecheckedBinds,
+        addTypecheckedBinds, addEvBinds, addTopEvBinds,
         failIllegalTyCon, failIllegalTyVar,
 
         -- Local environment
@@ -90,6 +90,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType ( tcCheckUsage )
 import GHC.Tc.Types.LclEnv
+import GHC.Tc.Types.Evidence
 
 import GHC.Core.InstEnv
 import GHC.Core.DataCon ( DataCon, dataConTyCon, flSelector )
@@ -138,6 +139,8 @@ import GHC.Iface.Errors.Types
 import GHC.Rename.Unbound ( unknownNameSuggestions )
 import GHC.Tc.Errors.Types.PromotionErr
 import {-# SOURCE #-} GHC.Tc.Errors.Hole (getHoleFitDispConfig)
+
+import GHC.Data.Bag
 
 import Control.Monad
 import Data.IORef
@@ -212,6 +215,17 @@ addTypecheckedBinds tcg_env binds
   | otherwise = tcg_env { tcg_binds = foldr (++)
                                             (tcg_binds tcg_env)
                                             binds }
+
+addEvBinds :: TcGblEnv -> Bag EvBind -> TcGblEnv
+addEvBinds tcg_env ev_binds
+  = tcg_env { tcg_ev_binds = tcg_ev_binds tcg_env `unionBags` ev_binds }
+
+addTopEvBinds :: Bag EvBind -> TcM a -> TcM a
+-- Defined here (rather than in GHC.Tc.Utils.Monad)
+-- because it depends on addEvBinds
+addTopEvBinds new_ev_binds thing_inside
+  = updGblEnv (\env -> env `addEvBinds` new_ev_binds) thing_inside
+
 {-
 ************************************************************************
 *                                                                      *

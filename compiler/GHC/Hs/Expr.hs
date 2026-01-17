@@ -361,8 +361,9 @@ type instance XProc          (GhcPass _) = (EpToken "proc", TokRarrow)
 
 type instance XStatic        GhcPs = EpToken "static"
 type instance XStatic        GhcRn = NoExtField
-type instance XStatic        GhcTc = Type
-  -- Type of expression, this is stored for convenience as wiring in
+type instance XStatic        GhcTc = (Type, HsExpr GhcTc)
+  -- Type of expression, and the (fromStaticPtr function)
+  -- These are stored for convenience as the wiring in
   -- StaticPtr is a bit tricky (see #20150)
 
 type instance XEmbTy         GhcPs = EpToken "type"

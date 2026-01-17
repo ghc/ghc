@@ -44,7 +44,7 @@ import GHC.Rename.Pat
 import GHC.Driver.DynFlags
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( nilDataConName )
-import GHC.Unit.Module ( getModule, isInteractiveModule )
+import GHC.Unit.Module ( isInteractiveModule )
 
 import GHC.Types.Basic (TypeOrKind (TypeLevel))
 import GHC.Types.FieldLabel

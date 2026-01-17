@@ -592,16 +592,16 @@ tcExpr (HsStatic _ expr) res_ty
                                     [liftedTypeKind, expr_ty]
 
         -- Wrap the static form with the 'fromStaticPtr' call.
-        ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName
-                                             [p_ty]
+        --   fromStaticPtr :: forall p. (IsStatic p) =>
+        --                    forall a. (Typeable a) =>
+        --                    StaticPtr a -> p a
+        ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName [p_ty]
         ; static_ptr_ty_con <- tcLookupTyCon staticPtrTyConName
-        ; loc <- getSrcSpanM
         ; let wrap = mkWpEvVarApps [typeable_ev] <.> mkWpTyApps [expr_ty]
-              expr_ty = mkTyConApp static_ptr_ty_con [expr_ty]
+              static_expr_ty = mkTyConApp static_ptr_ty_con [expr_ty]
         ; return $ mkHsWrapCo co $
-          HsApp noExtField
-              (L (noAnnSrcSpan loc) $ mkHsWrap wrap fromStaticPtr)
-              (L (noAnnSrcSpan loc) (HsStatic expr_ty expr''))
+          HsStatic (static_expr_ty, mkHsWrap wrap fromStaticPtr)
+                   expr''
         }
 
 tcExpr (HsEmbTy _ _)      _ = failWith (TcRnIllegalTypeExpr TypeKeywordSyntax)

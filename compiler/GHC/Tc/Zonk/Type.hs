@@ -1078,9 +1078,10 @@ zonkExpr (HsProc x pat body)
         ; return (HsProc x new_pat new_body) }
 
 -- StaticPointers extension
-zonkExpr (HsStatic ty expr)
+zonkExpr (HsStatic (ty, fs) expr)
   = do new_ty <- zonkTcTypeToTypeX ty
-       HsStatic new_ty <$> zonkLExpr expr
+       new_fs <- zonkExpr fs
+       HsStatic (new_ty, new_fs) <$> zonkLExpr expr
 
 zonkExpr (HsEmbTy x _) = dataConCantHappen x
 zonkExpr (HsQual x _ _) = dataConCantHappen x

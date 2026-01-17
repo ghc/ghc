@@ -465,22 +465,26 @@ dsExpr (ArithSeq expr witness seq)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
 for an overview.
-    g = ... static e ...
-==>
-    s = /\abc. e
-    g = ... (s @a @b @c) ...
+        ... static{from_static_ptr} e ...
+    ==>
+        s = /\abc. makeStatic e
+        ... (from_static_ptr (s @a @b @c)) ...
+
+Here `from_static_ptr` is a suitably-instantiated instantiated version of
+the overloaded function `fromStaticPtr`.
 -}
 
-dsExpr (HsStatic whole_ty expr@(L loc _))
+dsExpr (HsStatic (static_ptr_ty, from_static_fun) expr@(L loc _))
   = do { dflags <- getDynFlags
 
        ; make_static_id <- dsLookupGlobalId makeStaticName
        ; expr_ds        <- dsLExpr expr
+       ; from_static_ds <- dsExpr from_static_fun
 
        -- The static expression can have free type variables,
        -- which we should quantify.  We can also have free Ids,
        -- but they will be bound at top level
-       ; let (_, [ty]) = splitTyConApp whole_ty
+       ; let (_, [ty]) = splitTyConApp static_ptr_ty
 
              static_fvs :: [Var]
              static_fvs = scopedSort $
@@ -498,11 +502,11 @@ dsExpr (HsStatic whole_ty expr@(L loc _))
              static_rhs = mkLams static_fvs $
                           mkCoreApps (Var make_static_id) [ Type ty, srcLoc, expr_ds ]
 
-       ; static_id <- newStaticId (mkSpecForAllTys static_fvs whole_ty)
+       ; static_id <- newStaticId (mkSpecForAllTys static_fvs static_ptr_ty)
 
        ; emitStaticBinds [(static_id, static_rhs)]
 
-       ; return (mkVarApps (Var static_id) static_fvs) }
+       ; return (App from_static_ds (mkVarApps (Var static_id) static_fvs)) }
 
 {- Note [Desugaring record construction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
