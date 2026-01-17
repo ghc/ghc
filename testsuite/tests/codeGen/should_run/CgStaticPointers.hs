@@ -15,9 +15,9 @@ main = do
   print $ deRefStaticPtr (static g)
   print $ deRefStaticPtr p0 'a'
   print $ deRefStaticPtr (static t_field) $ T 'b'
- where
-  g :: String
-  g = "found"
+
+g :: String
+g = "found"
 
 lookupKey :: StaticPtr a -> IO a
 lookupKey p = unsafeLookupStaticPtr (staticKey p) >>= \case
