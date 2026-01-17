@@ -149,6 +149,7 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import qualified Data.ByteString.Short.Internal as SBS
+import qualified Data.Text.Internal as T
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.List.NonEmpty       ( NonEmpty(..))
@@ -1815,13 +1816,19 @@ putSBS :: WriteBinHandle -> SBS.ShortByteString -> IO ()
 putSBS bh sbs = do
   let l = SBS.length sbs
   put_ bh l
-  putPrim bh l (\p -> SBS.copyToPtr sbs 0 p l)
+  putSBSOffLen bh sbs 0 l
 
+putSBSOffLen :: WriteBinHandle -> SBS.ShortByteString -> Int -> Int -> IO ()
+putSBSOffLen bh sbs off len =
+  putPrim bh len $ \p -> SBS.copyToPtr sbs off p len
 
 getSBS :: ReadBinHandle -> IO SBS.ShortByteString
 getSBS bh = do
   l <- get bh :: IO Int
-  getPrim bh l (\src -> SBS.createFromPtr src l)
+  getSBSLen bh l
+
+getSBSLen :: ReadBinHandle -> Int -> IO SBS.ShortByteString
+getSBSLen bh len = getPrim bh len $ \src -> SBS.createFromPtr src len
 
 putBS :: WriteBinHandle -> ByteString -> IO ()
 putBS bh bs =
@@ -1854,6 +1861,16 @@ instance Binary LBS.ByteString where
     LBS.foldrChunks f (pure ()) lbs
 
   get bh = LBS.fromStrict <$> get bh
+
+instance Binary T.Text where
+  put_ bh (T.Text ba off len) = do
+    put_ bh len
+    putSBSOffLen bh (SBS.ShortByteString ba) off len
+
+  get bh = do
+    len <- get bh
+    SBS.ShortByteString ba <- getSBSLen bh len
+    pure $ T.Text ba 0 len
 
 instance Binary FastString where
   put_ bh f =
