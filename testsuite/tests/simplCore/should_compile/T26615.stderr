@@ -2,7 +2,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 1,209, types: 1,139, coercions: 18, joins: 17/29}
+  = {terms: 1,200, types: 1,136, coercions: 18, joins: 17/29}
 
 -- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
 unArray :: forall a. Array a -> SmallArray# a
@@ -725,7 +725,7 @@ lvl1
   = GHC.Internal.Control.Exception.Base.patError @LiftedRep @() lvl
 
 Rec {
--- RHS size: {terms: 133, types: 126, coercions: 0, joins: 1/2}
+-- RHS size: {terms: 130, types: 125, coercions: 0, joins: 1/2}
 T26615a.disjointSubtrees_$s$wdisjointSubtrees [InlPrag=INLINABLE[2],
                                                Occ=LoopBreaker]
   :: forall b a k.
@@ -748,7 +748,6 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
         Empty -> GHC.Internal.Types.True;
         Leaf bx ds ->
           case ds of { L kB ds1 ->
-          case kB of k0 { __DEFAULT ->
           case eqWord# bx sc of {
             __DEFAULT -> GHC.Internal.Types.True;
             1# ->
@@ -780,8 +779,7 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
                     }
                     }; } in
               jump $wlookupInArrayCont_
-                k0 sc1 0# (sizeofSmallArray# @Lifted @(Leaf k a) sc1)
-          }
+                kB sc1 0# (sizeofSmallArray# @Lifted @(Leaf k a) sc1)
           }
           };
         Collision bx bx1 ->
@@ -822,7 +820,7 @@ T26615a.disjointSubtrees_$s$wdisjointSubtrees
 end Rec }
 
 Rec {
--- RHS size: {terms: 705, types: 732, coercions: 18, joins: 13/23}
+-- RHS size: {terms: 699, types: 730, coercions: 18, joins: 13/23}
 T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
   :: forall k a b. Eq k => Int# -> HashMap k a -> HashMap k b -> Bool
 [GblId[StrictWorker([~, ~, !])],
@@ -852,7 +850,6 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                          Empty -> GHC.Internal.Types.True;
                          Leaf bx [Occ=Once1] ds2 [Occ=Once1!] ->
                            case ds2 of { L kB [Occ=Once1] _ [Occ=Dead] ->
-                           case kB of k0 [Occ=Once1] { __DEFAULT ->
                            joinrec {
                              lookupCont_ [Occ=LoopBreakerT[5]]
                                :: Eq k => Word -> k -> Int -> HashMap k a -> Bool
@@ -980,8 +977,7 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                  }
                                  }; } in
                            jump lookupCont_
-                             $dEq (GHC.Internal.Types.W# bx) k0 (GHC.Internal.Types.I# ww) ds
-                           }
+                             $dEq (GHC.Internal.Types.W# bx) kB (GHC.Internal.Types.I# ww) ds
                            };
                          Collision _ [Occ=Dead] _ [Occ=Dead] ->
                            T26615a.$wdisjointSubtrees @k @b @a $dEq ww wild ds
@@ -992,7 +988,6 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                      case ds1 of { L kA [Occ=Once2] _ [Occ=Dead] ->
                      case _b of wild2 [Occ=Once1] {
                        __DEFAULT ->
-                         case kA of k0 [Occ=Once1] { __DEFAULT ->
                          joinrec {
                            lookupCont_ [Occ=LoopBreakerT[5]]
                              :: Eq k => Word -> k -> Int -> HashMap k b -> Bool
@@ -1116,8 +1111,11 @@ T26615a.$wdisjointSubtrees [InlPrag=INLINABLE[2], Occ=LoopBreaker]
                                }
                                }; } in
                          jump lookupCont_
-                           $dEq (GHC.Internal.Types.W# bx) k0 (GHC.Internal.Types.I# ww) wild2
-                         };
+                           $dEq
+                           (GHC.Internal.Types.W# bx)
+                           kA
+                           (GHC.Internal.Types.I# ww)
+                           wild2;
                        Leaf bx1 [Occ=Once1] ds3 [Occ=Once1!] ->
                          case ds3 of { L kB [Occ=Once1] _ [Occ=Dead] ->
                          case GHC.Internal.Classes.neWord
@@ -1391,7 +1389,6 @@ T26615a.$wdisjointSubtrees
               Empty -> GHC.Internal.Types.True;
               Leaf bx ds2 ->
                 case ds2 of { L kB ds3 ->
-                case kB of k0 { __DEFAULT ->
                 join {
                   exit [Dmd=LC(S,C(1,C(1,C(1,L))))]
                     :: Word# -> k -> Word# -> Leaf k a -> Bool
@@ -1503,8 +1500,7 @@ T26615a.$wdisjointSubtrees
                           }
                       }
                       }; } in
-                jump $wlookupCont_ bx k0 ww ds
-                }
+                jump $wlookupCont_ bx kB ww ds
                 };
               Collision bx bx1 ->
                 T26615a.disjointSubtrees_$s$wdisjointSubtrees
@@ -1516,7 +1512,6 @@ T26615a.$wdisjointSubtrees
           case ds1 of { L kA ds2 ->
           case _b of wild2 {
             __DEFAULT ->
-              case kA of k0 { __DEFAULT ->
               join {
                 exit [Dmd=LC(S,C(1,C(1,C(1,L))))]
                   :: Word# -> k -> Word# -> Leaf k b -> Bool
@@ -1628,8 +1623,7 @@ T26615a.$wdisjointSubtrees
                         }
                     }
                     }; } in
-              jump $wlookupCont_ bx k0 ww wild2
-              };
+              jump $wlookupCont_ bx kA ww wild2;
             Leaf bx1 ds3 ->
               case ds3 of { L kB ds4 ->
               case neWord# bx bx1 of {
@@ -1950,7 +1944,7 @@ disjointSubtrees
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 614, types: 666, coercions: 18, joins: 8/14}
+  = {terms: 609, types: 665, coercions: 18, joins: 8/14}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T26615.$trModule2 :: GHC.Internal.Prim.Addr#
@@ -2128,7 +2122,7 @@ $wpoly_lookupCont_
 end Rec }
 
 Rec {
--- RHS size: {terms: 448, types: 507, coercions: 18, joins: 8/13}
+-- RHS size: {terms: 443, types: 506, coercions: 18, joins: 8/13}
 T26615.$s$wdisjointSubtrees [InlPrag=[~], Occ=LoopBreaker]
   :: forall a b.
      GHC.Internal.Prim.Int#
@@ -2163,11 +2157,7 @@ T26615.$s$wdisjointSubtrees
             T26615a.Leaf bx1 ds3 ->
               case ds3 of { T26615a.L kB ds4 ->
               case GHC.Internal.Prim.neWord# bx bx1 of {
-                __DEFAULT ->
-                  case GHC.Internal.Classes.$fEqList_$s$c==1 kA kB of {
-                    False -> GHC.Internal.Types.True;
-                    True -> GHC.Internal.Types.False
-                  };
+                __DEFAULT -> GHC.Internal.Classes.$fEqList_$s$c/=1 kA kB;
                 1# -> GHC.Internal.Types.True
               }
               }

@@ -1060,7 +1060,9 @@ interestingArg env e = go env 0 e
     go env n (Lam v e)
        | isTyVar v             = go env n e
        | n>0                   = NonTrivArg     -- (\x.b) e   is NonTriv
-       | otherwise             = NonTrivArg
+       | otherwise             = ValueArg       -- (\x.b)     is Value
+                                                -- Having ValueArg here is very important
+                                                -- for getting higher order functions to inline
     go _ _ (Case {})           = NonTrivArg
     go env n (Let b e)         = case go env' n e of
                                    ValueArg -> ValueArg
@@ -1070,10 +1072,9 @@ interestingArg env e = go env 0 e
 
     go_var n v
        | isConLikeId v = ValueArg   -- Experimenting with 'conlike' rather that
-                                    --    data constructors here
-                                    -- DFuns are con-like; see Note [Conlike is interesting]
+                                    --    data constructors here (includes DFuns)
                                     --    see (IA1) in Note [Interesting arguments]
-       | idArity v > n = NonTrivArg   -- Catches (eg) primops with arity but no unfolding
+       | idArity v > n = NonTrivArg -- Catches (eg) primops with arity but no unfolding
        | n > 0         = NonTrivArg -- Saturated or unknown call
        | otherwise  -- n==0, no value arguments; look for an interesting unfolding
        = case idUnfolding v of
