@@ -2602,7 +2602,8 @@ callToPat :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
 callToPat env bndr_occs call@(Call fn args con_env)
   = do  { let in_scope = substInScopeSet (sc_subst env)
 
-        ; arg_triples <- zipWith3M (argToPat env in_scope con_env) args bndr_occs (map (const NotMarkedStrict) args)
+        ; arg_triples <- zipWith3M (argToPat env in_scope con_env) args bndr_occs
+                                   (map (const NotMarkedStrict) args)
                    -- This zip trims the args to be no longer than
                    -- the lambdas in the function definition (bndr_occs)
 
@@ -2639,6 +2640,15 @@ callToPat env bndr_occs call@(Call fn args con_env)
               sanitise id = updateIdTypeAndMult expandTypeSynonyms id
                 -- See Note [Free type variables of the qvar types]
 
+--         ; pprTraceM "callToPatOut" $
+--           vcat [ text "fn:" <+> ppr fn
+--                , text "args:" <+> ppr args
+--                , text "arg_triples:" <+> ppr arg_triples
+--                , text "bndr_occs:" <+> ppr bndr_occs
+--                , text "pat_fvs:" <+> ppr pat_fvs
+--                , text "qvars':" <+> ppr qvars'
+--                , text "pats:" <+> ppr pats ]
+
         -- Check for bad coercion variables: see Note [SpecConstr and casts]
         ; let bad_covars = filter isCoVar qids
         ; warnPprTrace (not (null bad_covars))
@@ -2648,12 +2658,6 @@ callToPat env bndr_occs call@(Call fn args con_env)
           if interesting && null bad_covars
           then do { let cp_res = CP { cp_qvars = qvars', cp_args = pats
                                     , cp_strict_args = concat cbv_ids }
---                  ; pprTraceM "callToPatOut" $
---                    vcat [ text "fn:" <+> ppr fn
---                         , text "args:" <+> ppr args
---                         , text "bndr_occs:" <+> ppr bndr_occs
---                         , text "pat_fvs:" <+> ppr pat_fvs
---                         , text "cp_res:" <+> ppr cp_res ]
                   ; return (Just cp_res) }
           else return Nothing }
 
@@ -2684,9 +2688,9 @@ argToPat :: ScEnv
 
 argToPat env in_scope val_env arg arg_occ arg_str
   = do
-    -- pprTraceM "argToPatIn" (ppr arg)
+    -- pprTraceM "argToPatIn {" (ppr arg)
     !res <- argToPat1 env in_scope val_env arg arg_occ arg_str
-    -- pprTraceM "argToPatOut" (ppr res)
+    -- pprTraceM "argToPatOut }" (ppr arg $$ ppr res)
     return res
 
 argToPat1 :: ScEnv
@@ -2780,7 +2784,8 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
   --    (b) we know what its value is
   -- In that case it counts as "interesting"
 argToPat1 env in_scope val_env (Var v) arg_occ arg_str
-  | sc_force env || specialisableArgOcc arg_occ  -- (a)
+  | -- pprTrace "argToPat:var" (ppr v $$ ppr is_value) $
+    sc_force env || specialisableArgOcc arg_occ  -- (a)
     -- See Note [Forcing specialisation], point (FS3)
   , is_value                                     -- (b)
        -- Ignoring sc_keen here to avoid gratuitously incurring Note [Reboxing]
