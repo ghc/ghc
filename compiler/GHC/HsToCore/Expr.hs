@@ -180,7 +180,8 @@ ds_val_bind dflags (NonRecursive, hsbinds) body
         ; let rhs' = mkOptTickBox rhs_tick rhs_expr
         ; let body_ty = exprType body
         ; let mult = getTcMultAnn mult_ann
-        ; error_expr <- mkErrorAppDs pAT_ERROR_ID body_ty (ppr pat')
+        ; error_expr <- mkErrorAppDs pAT_ERROR_ID body_ty (ppr pat)
+                        -- Show the original user-written `pat` in error msg
         ; matchSimply rhs' PatBindRhs mult pat' body error_expr }
     -- This is the one place where matchSimply is given a non-ManyTy
     -- multiplicity argument.
