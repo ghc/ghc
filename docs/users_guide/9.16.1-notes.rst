@@ -101,6 +101,9 @@ to
 
 See :ghc-ticket:`25345`.
 
+- Add several options for x86 extensions: :ghc-flag:`-mavx512bw`,
+  :ghc-flag:`-mavx512dq`, :ghc-flag:`-mavx512vl`, and :ghc-flag:`-mgfni`.
+
 GHCi
 ~~~~
 

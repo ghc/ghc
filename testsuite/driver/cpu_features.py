@@ -9,9 +9,9 @@ SUPPORTED_CPU_FEATURES = {
 
     # x86:
     'sse', 'sse2', 'sse3', 'pni', 'ssse3', 'sse4_1', 'sse4_2',
-    'avx', 'avx2', 'avx512f',
+    'avx', 'avx2', 'avx512f', 'avx512vl', 'avx512bw', 'avx512dq',
     'fma',
-    'popcnt', 'bmi1', 'bmi2'
+    'popcnt', 'bmi1', 'bmi2', 'gfni',
 }
 
 cpu_feature_cache = None

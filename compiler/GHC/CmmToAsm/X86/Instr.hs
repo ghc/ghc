@@ -338,6 +338,7 @@ data Instr
         | PADD       Format Operand Reg
         | PSUB       Format Operand Reg
         | PMULL      Format Operand Reg
+        | VPMULL     Format Operand Reg Reg
         | PMULUDQ    Format Operand Reg
 
         -- SIMD compare
@@ -601,6 +602,7 @@ regUsageOfInstr platform instr
     PADD         fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PSUB         fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
     PMULL        fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
+    VPMULL       fmt s1 s2 dst -> mkRU (use_R fmt s1  [mk fmt s2])  [mk fmt dst]
     PMULUDQ      fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
 
     PCMPGT       fmt src dst   -> mkRU (use_R fmt src [mk fmt dst]) [mk fmt dst]
@@ -912,6 +914,7 @@ patchRegsOfInstr platform instr env
     PADD       fmt src dst   -> PADD fmt (patchOp src) (env dst)
     PSUB       fmt src dst   -> PSUB fmt (patchOp src) (env dst)
     PMULL      fmt src dst   -> PMULL fmt (patchOp src) (env dst)
+    VPMULL     fmt s1 s2 dst -> VPMULL fmt (patchOp s1) (env s2) (env dst)
     PMULUDQ    fmt src dst   -> PMULUDQ fmt (patchOp src) (env dst)
 
     PCMPGT     fmt src dst   -> PCMPGT fmt (patchOp src) (env dst)

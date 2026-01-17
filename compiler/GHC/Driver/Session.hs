@@ -212,11 +212,15 @@ module GHC.Driver.Session (
         isBmi2Enabled,
         isAvxEnabled,
         isAvx2Enabled,
+        isAvx512bwEnabled,
         isAvx512cdEnabled,
+        isAvx512dqEnabled,
         isAvx512erEnabled,
         isAvx512fEnabled,
         isAvx512pfEnabled,
+        isAvx512vlEnabled,
         isFmaEnabled,
+        isGfniEnabled,
 
         -- LoongArch: ISA version: la664, la464(default)
         isLa664Enabled,
@@ -1723,14 +1727,17 @@ dynamic_flags_deps = [
                                                  d { sseAvxVersion = max (Just AVX1) (sseAvxVersion d) }))
   , make_ord_flag defGhcFlag "mavx2"        (noArg (\d ->
                                                  d { sseAvxVersion = max (Just AVX2) (sseAvxVersion d) }))
-  , make_ord_flag defGhcFlag "mavx512cd"    (noArg (\d ->
-                                                         d { avx512cd = True }))
-  , make_ord_flag defGhcFlag "mavx512er"    (noArg (\d ->
-                                                         d { avx512er = True }))
+  , make_ord_flag defGhcFlag "mavx512bw"    (noArg (\d -> d { avx512bw = True }))
+  , make_ord_flag defGhcFlag "mavx512cd"    (noArg (\d -> d { avx512cd = True }))
+  , make_ord_flag defGhcFlag "mavx512dq"    (noArg (\d -> d { avx512dq = True }))
+  , make_dep_flag defGhcFlag "mavx512er"    (noArg (\d -> d { avx512er = True }))
+        "AVX-512ER was only available on Xeon Phi"
   , make_ord_flag defGhcFlag "mavx512f"     (noArg (\d -> d { avx512f = True }))
-  , make_ord_flag defGhcFlag "mavx512pf"    (noArg (\d ->
-                                                         d { avx512pf = True }))
+  , make_dep_flag defGhcFlag "mavx512pf"    (noArg (\d -> d { avx512pf = True }))
+        "AVX-512PF was only available on Xeon Phi"
+  , make_ord_flag defGhcFlag "mavx512vl"    (noArg (\d -> d { avx512vl = True }))
   , make_ord_flag defGhcFlag "mfma"         (noArg (\d -> d { fma = True }))
+  , make_ord_flag defGhcFlag "mgfni"        (noArg (\d -> d { gfni = True }))
 
 
   , make_ord_flag defGhcFlag "mla664"       (noArg (\d -> d { la664 = True }))

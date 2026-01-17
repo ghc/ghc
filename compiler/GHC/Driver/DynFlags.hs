@@ -83,11 +83,15 @@ module GHC.Driver.DynFlags (
         isSse4_2Enabled,
         isAvxEnabled,
         isAvx2Enabled,
+        isAvx512bwEnabled,
         isAvx512cdEnabled,
+        isAvx512dqEnabled,
         isAvx512erEnabled,
         isAvx512fEnabled,
         isAvx512pfEnabled,
+        isAvx512vlEnabled,
         isFmaEnabled,
+        isGfniEnabled,
         isBmiEnabled,
         isBmi2Enabled,
         -- For LoongArch platform
@@ -454,12 +458,16 @@ data DynFlags = DynFlags {
   -- | Machine dependent flags (-m\<blah> stuff)
   sseAvxVersion         :: Maybe SseAvxVersion,
   bmiVersion            :: Maybe BmiVersion,
-  avx512cd              :: Bool, -- Enable AVX-512 Conflict Detection Instructions.
-  avx512er              :: Bool, -- Enable AVX-512 Exponential and Reciprocal Instructions.
-  avx512f               :: Bool, -- Enable AVX-512 instructions.
-  avx512pf              :: Bool, -- Enable AVX-512 PreFetch Instructions.
+  avx512bw              :: Bool, -- ^ Enable AVX-512BW Instructions.
+  avx512cd              :: Bool, -- ^ Enable AVX-512 Conflict Detection Instructions.
+  avx512dq              :: Bool, -- ^ Enable AVX-512DQ Instructions.
+  avx512er              :: Bool, -- ^ Enable AVX-512 Exponential and Reciprocal Instructions.
+  avx512f               :: Bool, -- ^ Enable AVX-512 instructions.
+  avx512pf              :: Bool, -- ^ Enable AVX-512 PreFetch Instructions.
+  avx512vl              :: Bool, -- ^ Enable AVX-512VL Instructions.
   fma                   :: Bool, -- ^ Enable FMA instructions.
-  la664                 :: Bool, -- Enable LA664 instructions
+  gfni                  :: Bool, -- ^ Enable GFNI Instructions.
+  la664                 :: Bool, -- ^ Enable LA664 instructions
 
   -- Constants used to control the amount of optimization done.
 
@@ -737,12 +745,16 @@ defaultDynFlags mySettings =
         interactivePrint = Nothing,
         sseAvxVersion = Nothing,
         bmiVersion = Nothing,
+        avx512bw = False,
         avx512cd = False,
+        avx512dq = False,
         avx512er = False,
         avx512f = False,
         avx512pf = False,
+        avx512vl = False,
         -- Use FMA by default on AArch64
         fma = (platformArch . sTargetPlatform $ mySettings) == ArchAArch64,
+        gfni = False,
         -- For LoongArch, la464 is used by default.
         la664 = False,
 
@@ -1616,17 +1628,26 @@ isAvxEnabled dflags = sseAvxVersion dflags >= Just AVX1 || (isX86 && fma dflags)
 isAvx2Enabled :: DynFlags -> Bool
 isAvx2Enabled dflags = sseAvxVersion dflags >= Just AVX2 || isAvx512fEnabled dflags
 
+isAvx512bwEnabled :: DynFlags -> Bool
+isAvx512bwEnabled dflags = avx512bw dflags
+
 isAvx512cdEnabled :: DynFlags -> Bool
 isAvx512cdEnabled dflags = avx512cd dflags
+
+isAvx512dqEnabled :: DynFlags -> Bool
+isAvx512dqEnabled dflags = avx512dq dflags
 
 isAvx512erEnabled :: DynFlags -> Bool
 isAvx512erEnabled dflags = avx512er dflags
 
 isAvx512fEnabled :: DynFlags -> Bool
-isAvx512fEnabled dflags = avx512f dflags || avx512cd dflags || avx512er dflags || avx512pf dflags
+isAvx512fEnabled dflags = avx512f dflags || avx512bw dflags || avx512cd dflags || avx512dq dflags || avx512er dflags || avx512pf dflags || avx512vl dflags
 
 isAvx512pfEnabled :: DynFlags -> Bool
 isAvx512pfEnabled dflags = avx512pf dflags
+
+isAvx512vlEnabled :: DynFlags -> Bool
+isAvx512vlEnabled dflags = avx512vl dflags
 
 isFmaEnabled :: DynFlags -> Bool
 isFmaEnabled dflags = fma dflags || (isX86 && isAvx512fEnabled dflags)
@@ -1636,6 +1657,9 @@ isFmaEnabled dflags = fma dflags || (isX86 && isAvx512fEnabled dflags)
       ArchX86_64 -> True
       ArchX86    -> True
       _          -> False
+
+isGfniEnabled :: DynFlags -> Bool
+isGfniEnabled dflags = gfni dflags
 
 {- Note [Implications between X86 CPU feature flags]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1649,7 +1673,7 @@ structures:
 together with other implications such as
 
   3. FMA -> AVX
-  4. AVX512{CD,ED,PF} -> AVX512F -> AVX2
+  4. AVX512{BW,CD,DQ,ER,PF,VL} -> AVX512F -> AVX2
 
 
 We handle this as follows:

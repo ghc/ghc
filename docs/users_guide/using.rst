@@ -1601,7 +1601,7 @@ Some flags only make sense for particular target platforms.
     :implies: :ghc-flag:`-msse4.2`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
-    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX instructions.
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86 AVX instructions.
 
 .. ghc-flag:: -mavx2
     :shortdesc: (x86 only) Enable support for AVX2 SIMD extensions
@@ -1611,47 +1611,84 @@ Some flags only make sense for particular target platforms.
     :implies: :ghc-flag:`-mavx`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
-    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX2 instructions.
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86 AVX2 instructions.
+
+.. ghc-flag:: -mavx512bw
+    :shortdesc: (x86 only) Enable support for AVX-512BW SIMD extensions
+    :type: dynamic
+    :category: platform-options
+
+    :since: 9.16.1
+    :implies: :ghc-flag:`-mavx512f`
+
+    (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86 AVX-512BW instructions.
 
 .. ghc-flag:: -mavx512cd
-    :shortdesc: (x86 only) Enable support for AVX512-CD SIMD extensions
+    :shortdesc: (x86 only) Enable support for AVX-512CD SIMD extensions
     :type: dynamic
     :category: platform-options
 
     :implies: :ghc-flag:`-mavx512f`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
-    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-CD instructions.
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86 AVX-512CD instructions.
+
+.. ghc-flag:: -mavx512dq
+    :shortdesc: (x86 only) Enable support for AVX-512DQ SIMD extensions
+    :type: dynamic
+    :category: platform-options
+
+    :since: 9.16.1
+    :implies: :ghc-flag:`-mavx512f`
+
+    (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86 AVX-512DQ instructions.
 
 .. ghc-flag:: -mavx512er
-    :shortdesc: (x86 only) Enable support for AVX512-ER SIMD extensions
+    :shortdesc: (x86 only, deprecated) Enable support for AVX-512ER SIMD extensions
     :type: dynamic
     :category: platform-options
 
     :implies: :ghc-flag:`-mavx512f`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
-    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-ER instructions.
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86 AVX-512ER instructions.
+
+    The AVX-512ER extension is deprecated and not supported by newer LLVM versions.
 
 .. ghc-flag:: -mavx512f
-    :shortdesc: (x86 only) Enable support for AVX512-F SIMD extensions
+    :shortdesc: (x86 only) Enable support for AVX-512F SIMD extensions
     :type: dynamic
     :category: platform-options
 
     :implies: :ghc-flag:`-mavx2`, :ghc-flag:`-mfma`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
-    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-F instructions.
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86 AVX-512F instructions.
 
 .. ghc-flag:: -mavx512pf
-    :shortdesc: (x86 only) Enable support for AVX512-PF SIMD extensions
+    :shortdesc: (x86 only, deprecated) Enable support for AVX-512PF SIMD extensions
     :type: dynamic
     :category: platform-options
 
     :implies: :ghc-flag:`-mavx512f`
 
     (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
-    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86_64 AVX512-PF instructions.
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86 AVX-512PF instructions.
+
+    The AVX-512PF extension is deprecated and not supported by newer LLVM versions.
+
+.. ghc-flag:: -mavx512vl
+    :shortdesc: (x86 only) Enable support for AVX-512VL SIMD extensions
+    :type: dynamic
+    :category: platform-options
+
+    :since: 9.16.1
+    :implies: :ghc-flag:`-mavx512f`
+
+    (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86 AVX-512VL instructions.
 
 .. ghc-flag:: -msse
     :shortdesc: (x86 only) Use SSE for floating-point operations
@@ -1714,13 +1751,13 @@ Some flags only make sense for particular target platforms.
     or the :ref:`LLVM backend <llvm-code-gen>`).
 
 .. ghc-flag:: -msse4
-    :shortdesc: (x86 only) Use SSE4 for floating-point operations
+    :shortdesc: (x86 only) Use SSE4.1 for floating-point operations
     :type: dynamic
     :category: platform-options
 
     :implies: :ghc-flag:`-mssse3`
 
-    (x86 only) Use the SSE4 instruction set to
+    (x86 only) Use the SSE4.1 instruction set to
     implement some floating point and bit operations(whether using the :ref:`native code generator <native-code-gen>`
     or the :ref:`LLVM backend <llvm-code-gen>`).
 
@@ -1780,6 +1817,16 @@ Some flags only make sense for particular target platforms.
     When this flag is disabled, GHC falls back to the C implementation of fused
     multiply-add, which might perform non-IEEE-compliant software emulation on
     some platforms (depending on the implementation of the C standard library).
+
+.. ghc-flag:: -mgfni
+    :shortdesc: (x86 only) Use GFNI for advanced bit manipulations
+    :type: dynamic
+    :category: platform-options
+
+    :since: 9.16.1
+
+    (x86 only) This flag allows the code generator (whether the :ref:`native code generator <native-code-gen>`
+    or the :ref:`LLVM backend <llvm-code-gen>`) to emit x86 GFNI instructions.
 
 .. ghc-flag:: -mla664
     :shortdesc: (LoongArch only) Used for new instructions for la664 uarch

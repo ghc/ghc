@@ -65,6 +65,9 @@ initNCGConfig dflags this_mod = NCGConfig
             ArchX86    -> v
             _          -> Nothing
    , ncgAvx512fEnabled = isAvx512fEnabled dflags
+   , ncgAvx512vlEnabled = isAvx512vlEnabled dflags
+   , ncgAvx512bwEnabled = isAvx512bwEnabled dflags
+   , ncgAvx512dqEnabled = isAvx512dqEnabled dflags
 
    , ncgLa664Enabled = isLa664Enabled dflags
 

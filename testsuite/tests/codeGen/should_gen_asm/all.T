@@ -17,3 +17,9 @@ test('msse-option-order', [unless(arch('x86_64') or arch('i386'), skip),
                            when(unregisterised(), skip)], compile_grep_asm, ['hs', False, '-msse4.2 -msse2'])
 test('mavx-should-enable-popcnt', [unless(arch('x86_64') or arch('i386'), skip),
                                    when(unregisterised(), skip)], compile_grep_asm, ['hs', False, '-mavx'])
+test('avx512-int64-mul', [unless(arch('x86_64'), skip),
+                          when(unregisterised(), skip)], compile_grep_asm, ['hs', True, '-mavx512dq -mavx512vl'])
+test('avx512-int64-minmax', [unless(arch('x86_64'), skip),
+                             when(unregisterised(), skip)], compile_grep_asm, ['hs', True, '-mavx512vl'])
+test('avx512-word64-minmax', [unless(arch('x86_64'), skip),
+                              when(unregisterised(), skip)], compile_grep_asm, ['hs', True, '-mavx512vl'])

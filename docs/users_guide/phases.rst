@@ -553,8 +553,10 @@ SIMD macros
     These are defined conditionally based on the SIMD
     flags used for compilation:
 
-    ``__SSE__``, ``__SSE2__``, ``__SSE4_2__``, ``__FMA__``,
-    ``__AVX__``, ``__AVX2__``, ``__AVX512CD__``, ``__AVX512ER__``, ``__AVX512F__``, ``__AVX512PF__``,
+    ``__SSE__``, ``__SSE2__``, ``__SSE3__``, ``__SSSE3__``,
+    ``__SSE4_1__``, ``__SSE4_2__``, ``__FMA__``, ``__AVX__``, ``__AVX2__``,
+    ``__AVX512BW__``, ``__AVX512CD__``, ``__AVX512DQ__``, ``__AVX512ER__``,
+    ``__AVX512F__``, ``__AVX512PF__``, ``__AVX512VL__``, ``__GFNI__``
 
 .. _cpp-string-gaps:
 

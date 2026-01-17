@@ -165,10 +165,16 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
     let avx_defs =
           [ "-D__AVX__"      | isAvxEnabled      dflags ] ++
           [ "-D__AVX2__"     | isAvx2Enabled     dflags ] ++
+          [ "-D__AVX512BW__" | isAvx512bwEnabled dflags ] ++
           [ "-D__AVX512CD__" | isAvx512cdEnabled dflags ] ++
+          [ "-D__AVX512DQ__" | isAvx512dqEnabled dflags ] ++
           [ "-D__AVX512ER__" | isAvx512erEnabled dflags ] ++
           [ "-D__AVX512F__"  | isAvx512fEnabled  dflags ] ++
-          [ "-D__AVX512PF__" | isAvx512pfEnabled dflags ]
+          [ "-D__AVX512PF__" | isAvx512pfEnabled dflags ] ++
+          [ "-D__AVX512VL__" | isAvx512vlEnabled dflags ]
+
+    let gfni_def =
+          [ "-D__GFNI__"     | isGfniEnabled dflags ]
 
     backend_defs <- applyCDefs (backendCDefs $ backend dflags) logger dflags
 
@@ -209,6 +215,7 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
                     ++ map GHC.SysTools.Option sse_defs
                     ++ map GHC.SysTools.Option fma_def
                     ++ map GHC.SysTools.Option avx_defs
+                    ++ map GHC.SysTools.Option gfni_def
                     ++ map GHC.SysTools.Option io_manager_defs
                     ++ mb_macro_include
                     ++ line_pragmas

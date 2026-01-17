@@ -66,6 +66,9 @@ setTestOpts(
   , when(have_cpu_feature('avx'), extra_hc_opts('-mavx'))
   , when(have_cpu_feature('avx2'), extra_hc_opts('-mavx2'))
   , when(have_cpu_feature('avx512f'), extra_hc_opts('-mavx512f'))
+  , when(have_cpu_feature('avx512vl'), extra_hc_opts('-mavx512vl'))
+  , when(have_cpu_feature('avx512bw'), extra_hc_opts('-mavx512bw'))
+  , when(have_cpu_feature('avx512dq'), extra_hc_opts('-mavx512dq'))
   ])
 
 test('simd000', [], compile_and_run, [''])

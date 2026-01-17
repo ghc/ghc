@@ -984,13 +984,17 @@ llvmOptions llvm_config llvm_version dflags =
                    -- It may become deprecated in a future LLVM version, though.
               ++ ["+avx2"    | isAvx2Enabled dflags     ]
               ++ ["+avx"     | isAvxEnabled dflags      ]
+              ++ ["+avx512bw"| isAvx512bwEnabled dflags ]
               ++ ["+avx512cd"| isAvx512cdEnabled dflags ]
+              ++ ["+avx512dq"| isAvx512dqEnabled dflags ]
               ++ ["+avx512er"| isAvx512erEnabled dflags ]
               ++ ["+avx512pf"| isAvx512pfEnabled dflags ]
-              -- For Arch64 +fma is not a option (it's unconditionally available).
+              ++ ["+avx512vl"| isAvx512vlEnabled dflags ]
+              -- For AArch64 +fma is not a option (it's unconditionally available).
               ++ ["+fma"     | isFmaEnabled dflags && (arch /= ArchAArch64) ]
               ++ ["+bmi"     | isBmiEnabled dflags      ]
               ++ ["+bmi2"    | isBmi2Enabled dflags     ]
+              ++ ["+gfni"    | isGfniEnabled dflags     ]
 
         abi :: String
         abi = case platformArch (targetPlatform dflags) of

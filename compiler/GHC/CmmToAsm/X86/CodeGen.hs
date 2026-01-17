@@ -134,6 +134,12 @@ avx2Enabled = do
   config <- getConfig
   return (ncgSseAvxVersion config >= Just AVX2)
 
+avx512vlEnabled :: NatM Bool
+avx512vlEnabled = ncgAvx512vlEnabled <$> getConfig
+
+avx512dqEnabled :: NatM Bool
+avx512dqEnabled = ncgAvx512dqEnabled <$> getConfig
+
 cmmTopCodeGen
         :: RawCmmDecl
         -> NatM [NatCmmDecl (Alignment, RawCmmStatics) Instr]
@@ -1314,6 +1320,8 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   sse4_1 <- sse4_1Enabled
   sse4_2 <- sse4_2Enabled
   avx <- avxEnabled
+  avx512vl <- avx512vlEnabled
+  avx512dq <- avx512dqEnabled
   case mop of
       MO_F_Eq _ -> condFltReg is32Bit EQQ x y
       MO_F_Ne _ -> condFltReg is32Bit NE  x y
@@ -1432,57 +1440,76 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_V_Sub l w | l * widthInBits w == 128 -> vector_int_op_sse PSUB l w x y
                    | otherwise -> needLlvm mop
       MO_V_Mul 16 W8 -> vector_int8x16_mul_sse2 x y
-      MO_V_Mul l@8 w@W16 -> vector_int_op_sse PMULL l w x y -- PMULLW (SSE2)
-      MO_V_Mul l@4 w@W32 | sse4_1 -> vector_int_op_sse PMULL l w x y -- PMULLD (SSE4.1)
+      MO_V_Mul l@8 w@W16 | avx -> vector_int_op_avx VPMULL l w x y -- VPMULLW (AVX)
+                         | otherwise -> vector_int_op_sse PMULL l w x y -- PMULLW (SSE2)
+      MO_V_Mul l@4 w@W32 | avx -> vector_int_op_avx VPMULL l w x y -- VPMULLD (AVX)
+                         | sse4_1 -> vector_int_op_sse PMULL l w x y -- PMULLD (SSE4.1)
                          | otherwise -> vector_int32x4_mul_sse2 x y
-      MO_V_Mul 2 W64 -> vector_int64x2_mul_sse2 x y
+      MO_V_Mul l@2 w@W64 | avx512dq && avx512vl -> vector_int_op_avx VPMULL l w x y -- VPMULLQ (AVX512DQ+VL)
+                         | otherwise -> vector_int64x2_mul_sse2 x y
       MO_V_Mul {} -> needLlvm mop
 
       MO_VU_Min l@16 w@W8
-                    -> vector_int_op_sse (MINMAX Min (IntVecMinMax False)) l w x y -- PMINUB (SSE2)
+        | avx       -> vector_int_op_avx (VMINMAX Min (IntVecMinMax False)) l w x y -- VPMINUB (AVX)
+        | otherwise -> vector_int_op_sse (MINMAX Min (IntVecMinMax False)) l w x y -- PMINUB (SSE2)
       MO_VU_Min l@8 w@W16
+        | avx       -> vector_int_op_avx (VMINMAX Min (IntVecMinMax False)) l w x y -- VPMINUW (AVX)
         | sse4_1    -> vector_int_op_sse (MINMAX Min (IntVecMinMax False)) l w x y -- PMINUW (SSE4.1)
         | otherwise -> vector_word_minmax_sse Min l w x y
       MO_VU_Min l@4 w@W32
+        | avx       -> vector_int_op_avx (VMINMAX Min (IntVecMinMax False)) l w x y -- VPMINUD (AVX)
         | sse4_1    -> vector_int_op_sse (MINMAX Min (IntVecMinMax False)) l w x y -- PMINUD (SSE4.1)
         | otherwise -> vector_word_minmax_sse Min l w x y
       MO_VU_Min l@2 w@W64
+        | avx512vl  -> vector_int_op_avx (VMINMAX Min (IntVecMinMax False)) l w x y -- VPMINUQ (AVX512F+VL)
         | sse4_2    -> vector_word_minmax_sse Min l w x y -- PCMPGTQ requires SSE4.2
         -- The SSE2 version is implemented as a C call (MO_W64X2_Min)
       MO_VU_Min {} -> needLlvm mop
       MO_VU_Max l@16 w@W8
-                    -> vector_int_op_sse (MINMAX Max (IntVecMinMax False)) l w x y -- PMAXUB (SSE2)
+        | avx       -> vector_int_op_avx (VMINMAX Max (IntVecMinMax False)) l w x y -- VPMAXUB (AVX)
+        | otherwise -> vector_int_op_sse (MINMAX Max (IntVecMinMax False)) l w x y -- PMAXUB (SSE2)
       MO_VU_Max l@8 w@W16
+        | avx       -> vector_int_op_avx (VMINMAX Max (IntVecMinMax False)) l w x y -- VPMAXUW (AVX)
         | sse4_1    -> vector_int_op_sse (MINMAX Max (IntVecMinMax False)) l w x y -- PMAXUW (SSE4.1)
         | otherwise -> vector_word_minmax_sse Max l w x y
       MO_VU_Max l@4 w@W32
+        | avx       -> vector_int_op_avx (VMINMAX Max (IntVecMinMax False)) l w x y -- VPMAXUD (AVX)
         | sse4_1    -> vector_int_op_sse (MINMAX Max (IntVecMinMax False)) l w x y -- PMAXUD (SSE4.1)
         | otherwise -> vector_word_minmax_sse Max l w x y
       MO_VU_Max l@2 w@W64
+        | avx512vl  -> vector_int_op_avx (VMINMAX Max (IntVecMinMax False)) l w x y -- VPMAXUQ (AVX512F+VL)
         | sse4_2    -> vector_word_minmax_sse Max l w x y -- PCMPGTQ requires SSE4.2
         -- The SSE2 version is implemented as a C call (MO_W64X2_Max)
       MO_VU_Max {} -> needLlvm mop
       MO_VS_Min l@16 w@W8
+        | avx       -> vector_int_op_avx (VMINMAX Min (IntVecMinMax True)) l w x y -- VPMINSB (AVX)
         | sse4_1    -> vector_int_op_sse (MINMAX Min (IntVecMinMax True)) l w x y -- PMINSB (SSE4.1)
         | otherwise -> vector_int_minmax_sse Min l w x y
       MO_VS_Min l@8 w@W16
-                    -> vector_int_op_sse (MINMAX Min (IntVecMinMax True)) l w x y -- PMINSW (SSE2)
+        | avx       -> vector_int_op_avx (VMINMAX Min (IntVecMinMax True)) l w x y -- VPMINSW (AVX)
+        | otherwise -> vector_int_op_sse (MINMAX Min (IntVecMinMax True)) l w x y -- PMINSW (SSE2)
       MO_VS_Min l@4 w@W32
+        | avx       -> vector_int_op_avx (VMINMAX Min (IntVecMinMax True)) l w x y -- VPMINSD (AVX)
         | sse4_1    -> vector_int_op_sse (MINMAX Min (IntVecMinMax True)) l w x y -- PMINSD (SSE4.1)
         | otherwise -> vector_int_minmax_sse Min l w x y
       MO_VS_Min l@2 w@W64
+        | avx512vl  -> vector_int_op_avx (VMINMAX Min (IntVecMinMax True)) l w x y -- VPMINSQ (AVX512F+VL)
         | sse4_2    -> vector_int_minmax_sse Min l w x y -- PCMPGTQ requires SSE4.2
         -- The SSE2 version is implemented as a C call (MO_I64X2_Min)
       MO_VS_Min {} -> needLlvm mop
       MO_VS_Max l@16 w@W8
+        | avx       -> vector_int_op_avx (VMINMAX Max (IntVecMinMax True)) l w x y -- VPMAXSB (AVX)
         | sse4_1    -> vector_int_op_sse (MINMAX Max (IntVecMinMax True)) l w x y -- PMAXSB (SSE4.1)
         | otherwise -> vector_int_minmax_sse Max l w x y
       MO_VS_Max l@8 w@W16
-                    -> vector_int_op_sse (MINMAX Max (IntVecMinMax True)) l w x y -- PMAXSW (SSE2)
+        | avx       -> vector_int_op_avx (VMINMAX Max (IntVecMinMax True)) l w x y -- VPMAXSW (AVX)
+        | otherwise -> vector_int_op_sse (MINMAX Max (IntVecMinMax True)) l w x y -- PMAXSW (SSE2)
       MO_VS_Max l@4 w@W32
+        | avx       -> vector_int_op_avx (VMINMAX Max (IntVecMinMax True)) l w x y -- VPMAXSD (AVX)
         | sse4_1    -> vector_int_op_sse (MINMAX Max (IntVecMinMax True)) l w x y -- PMAXSD (SSE4.1)
         | otherwise -> vector_int_minmax_sse Max l w x y
       MO_VS_Max l@2 w@W64
+        | avx512vl  -> vector_int_op_avx (VMINMAX Max (IntVecMinMax True)) l w x y -- VPMAXSQ (AVX512F+VL)
         | sse4_2    -> vector_int_minmax_sse Max l w x y -- PCMPGTQ requires SSE4.2
         -- The SSE2 version is implemented as a C call (MO_I64X2_Max)
       MO_VS_Max {} -> needLlvm mop
@@ -1975,7 +2002,6 @@ getRegister' platform is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                      (PUNPCKLDQ format (OpReg tmpOdd1) dst)                                  -- dst <- (dst[0],tmpOdd1[0],dst[1],tmpOdd1[1])
       return (Any format code)
 
-    -- TODO: We could use `VPMULLQ` if AVX-512 or AVX10.1 is available.
     vector_int64x2_mul_sse2 :: CmmExpr -> CmmExpr -> NatM Register
     vector_int64x2_mul_sse2 expr1 expr2 = do
       -- implement 64 bit multiplication using 32-bit PMULUDQ multiplication instructions

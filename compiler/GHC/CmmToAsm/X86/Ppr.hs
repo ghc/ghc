@@ -1012,6 +1012,8 @@ pprInstr platform i = case i of
      -> pprFormatOpReg (text "psub") format src dst
    PMULL format src dst
      -> pprFormatOpReg (text "pmull") format src dst
+   VPMULL format s1 s2 dst
+     -> pprFormatOpRegReg (text "vpmull") format s1 s2 dst
    PMULUDQ format src dst
      -> pprOpReg (text "pmuludq") format src dst
    PCMPGT format src dst
@@ -1574,7 +1576,8 @@ pprInstr platform i = case i of
    pprMinMax wantV minOrMax mmTy fmt regs
      = line $ hcat ( instr : intersperse comma ( map ( pprOperand platform fmt ) regs ) )
       where
-        instr =  (if wantV then text "v" else empty)
+        instr =  char '\t'
+              <> (if wantV then text "v" else empty)
               <> (case mmTy of { IntVecMinMax {} -> text "p"; FloatMinMax -> empty })
               <> (case minOrMax of { Min -> text "min"; Max -> text "max" })
               <> (case mmTy of { IntVecMinMax wantSigned -> if wantSigned then text "s" else text "u"; FloatMinMax -> empty })
