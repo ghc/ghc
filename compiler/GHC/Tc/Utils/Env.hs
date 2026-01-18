@@ -117,7 +117,7 @@ import GHC.Utils.Misc ( HasDebugCallStack )
 
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
-import GHC.Data.Maybe( MaybeErr(..), maybeToList, fromMaybe )
+import GHC.Data.Maybe( MaybeErr(..), maybeToList, fromMaybe, isNothing )
 
 import GHC.Types.SrcLoc
 import GHC.Types.Basic hiding( SuccessFlag(..) )
@@ -677,7 +677,8 @@ tcExtendNameTyVarEnv binds thing_inside
 
 isTypeClosedLetBndr :: Id -> Bool
 -- See Note [Bindings with closed types: ClosedTypeId] in GHC.Tc.Types
-isTypeClosedLetBndr = noFreeVarsOfType . idType
+isTypeClosedLetBndr id
+   = noFreeVarsOfType (idType id)
 
 tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
 -- Used for binding the recursive uses of Ids in a binding
@@ -712,11 +713,18 @@ tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> ClosedTypeId
 -- Used for both top-level value bindings and nested let/where-bindings
 -- Used for a single NonRec or a single Rec
 -- Adds to the TcBinderStack too
-tcExtendLetEnv top_lvl _sig_fn closed ids thing_inside
+-- Note (ELE) For Ids that are in `sig_fn` we have /already/ extended the env,
+--    using `tcExtendSigIds`, so no point in doing so again.  Moreover, for
+--    those Ids, we want closed-ness to be driven entirely by the signature,
+--    and not by the free vars (which are embodied in `closed`.
+tcExtendLetEnv top_lvl sig_fn closed ids thing_inside
   = tcExtendBinderStack [TcIdBndr id top_lvl | Scaled _ id <- ids] $
     tc_extend_local_env top_lvl
-          [ (idName id, ATcId { tct_id = id, tct_info = LetBound closed })
-          | Scaled _ id <- ids ] $
+          [ (id_nm, ATcId { tct_id = id, tct_info = LetBound closed })
+          | Scaled _ id <- ids
+          , let id_nm = idName id
+          , isNothing (sig_fn id_nm)  -- See (ELE) above
+          ] $
     foldr check_one_usg thing_inside ids
   where
     check_one_usg (Scaled mult id) thing_inside

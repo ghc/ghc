@@ -1798,7 +1798,9 @@ instance Outputable GeneralisationPlan where
   ppr (CheckGen _ s) = text "CheckGen" <+> ppr s
 
 decideGeneralisationPlan
-   :: DynFlags -> TopLevelFlag -> ClosedTypeId -> TcSigFun
+   :: DynFlags -> TopLevelFlag
+   -> ClosedTypeId   -- True <=> all the free vars have closed types
+   -> TcSigFun
    -> [LHsBind GhcRn] -> GeneralisationPlan
 decideGeneralisationPlan dflags top_lvl closed_type sig_fn lbinds
   | Just (bind, sig) <- one_funbind_with_sig = CheckGen bind sig
