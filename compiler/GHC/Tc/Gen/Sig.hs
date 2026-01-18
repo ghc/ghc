@@ -163,6 +163,9 @@ errors were dealt with by the renamer.
 ********************************************************************* -}
 
 tcTySigs :: [LSig GhcRn] -> TcM ([TcId], TcSigFun)
+-- The returned [TcId] are the ones for which we have
+--   a /complete/ type signature.
+-- See Note [Complete and partial type signatures]
 tcTySigs hs_sigs
   = checkNoErrs $
     do { -- Fail if any of the signatures is duff
@@ -172,9 +175,6 @@ tcTySigs hs_sigs
 
        ; let ty_sigs = concat ty_sigs_s
              poly_ids = mapMaybe completeSigPolyId_maybe ty_sigs
-                        -- The returned [TcId] are the ones for which we have
-                        -- a complete type signature.
-                        -- See Note [Complete and partial type signatures]
              env = mkNameEnv [(tcSigInfoName sig, sig) | sig <- ty_sigs]
 
        ; return (poly_ids, lookupNameEnv env) }

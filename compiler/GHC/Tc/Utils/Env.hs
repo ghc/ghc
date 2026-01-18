@@ -723,7 +723,7 @@ tcExtendLetEnv top_lvl sig_fn closed ids thing_inside
           [ (id_nm, ATcId { tct_id = id, tct_info = LetBound closed })
           | Scaled _ id <- ids
           , let id_nm = idName id
-          , isNothing (sig_fn id_nm)  -- See (ELE) above
+          , not (hasCompleteSig sig_fn id_nm)  -- See (ELE) above
           ] $
     foldr check_one_usg thing_inside ids
   where
