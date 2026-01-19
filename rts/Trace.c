@@ -685,7 +685,8 @@ void traceHeapProfSampleString(const char *label, StgWord residency)
 void traceIPE(const InfoProvEnt *ipe)
 {
 #if defined(DEBUG)
-    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR
+        && RtsFlags.DebugFlags.ipe) {
         ACQUIRE_LOCK(&trace_utx);
 
         char closure_desc_buf[CLOSURE_DESC_BUFFER_SIZE] = {};

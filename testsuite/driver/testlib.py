@@ -1074,6 +1074,9 @@ def have_profiling( ) -> bool:
 def have_threaded( ) -> bool:
     return config.ghc_with_threaded_rts
 
+def ghc_with_ipe( ) -> bool:
+    return config.ghc_with_ipe
+
 def in_tree_compiler( ) -> bool:
     return config.in_tree_compiler
 

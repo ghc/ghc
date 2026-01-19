@@ -118,6 +118,7 @@ typedef struct _DEBUG_FLAGS {
     bool compact;        /* 'C' */
     bool continuation;   /* 'k' */
     bool iomanager;      /* 'o' */
+    bool ipe;            /* 'I' */
 } DEBUG_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

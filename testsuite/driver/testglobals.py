@@ -72,6 +72,10 @@ class TestConfig:
         # Was the compiler compiled with -debug?
         self.debug_rts = False
 
+        # Were the compiler + libraries built with IPE-related options
+        # (e.g. -finfo-table-map, -fdistinct-constructor-tables)?
+        self.ghc_with_ipe = False
+
         # Was the compiler compiled with LLVM?
         self.ghc_built_by_llvm = False
 

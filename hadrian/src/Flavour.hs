@@ -384,9 +384,15 @@ omitPragmas = addArgs
 -- | Build stage2 dependencies with options to enable IPE debugging
 -- information.
 enableIPE :: Flavour -> Flavour
-enableIPE = addArgs
-    $ notStage0 ? builder (Ghc CompileHs)
-    ? pure ["-finfo-table-map", "-fdistinct-constructor-tables"]
+enableIPE =
+  addArgs $
+    mconcat
+      [ notStage0
+          ? builder (Ghc CompileHs)
+          ? pure
+            ["-finfo-table-map", "-fdistinct-constructor-tables"],
+        builder Testsuite ? arg "--config=ghc_with_ipe=True"
+      ]
 
 enableLateCCS :: Flavour -> Flavour
 enableLateCCS = addArgs

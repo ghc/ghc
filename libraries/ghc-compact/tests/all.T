@@ -20,7 +20,8 @@ test('compact_gc', [fragile_for(17253, ['ghci']), ignore_stdout], compile_and_ru
 # this test computes closure sizes and those are affected
 # by the ghci and prof ways, because of BCOs and profiling headers.
 # Optimization levels slightly change what is/isn't shared so only run in normal mode
-test('compact_share', only_ways(['normal']), compile_and_run, [''])
+test('compact_share', [only_ways(['normal']), when(ghc_with_ipe(), skip)], # IPE changes allocation/layout affecting compactSize output.
+     compile_and_run, [''])
 test('compact_bench', [ ignore_stdout, extra_run_opts('100') ],
                        compile_and_run, [''])
 test('T17044', normal, compile_and_run, [''])
