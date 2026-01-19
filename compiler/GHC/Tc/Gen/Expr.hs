@@ -1522,12 +1522,12 @@ expandRecordUpd record_expr possible_parents rbnds res_ty
                                       generatedSrcSpan
                        in (genVarPat fld_nm, genLHsVar fld_nm)
 
-       -- STEP 2 (b): expand to HsCase, as per note [Record Updates]
+       -- STEP 2 (b): expand to HsCase, as per Note [Record Updates]
        ; let ds_expr :: HsExpr GhcRn
              ds_expr = HsLet noExtField let_binds (wrapGenSpan case_expr)
 
              case_expr :: HsExpr GhcRn
-             case_expr = HsCase RecUpd record_expr
+             case_expr = HsCase RecUpd (wrapGenSpan (unLoc record_expr))
                        $ mkMatchGroup (Generated OtherExpansion DoPmc) (wrapGenSpan matches)
              matches :: [LMatch GhcRn (LHsExpr GhcRn)]
              matches = map make_pat (NE.toList relevant_cons)
