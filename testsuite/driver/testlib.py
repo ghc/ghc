@@ -25,7 +25,7 @@ from testglobals import config, ghc_env, default_testopts, brokens, t, \
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, testing_metrics, residency_testing_metrics, \
                      stable_perf_counters, \
-                     PassFail, badResult, memoize
+                     PassFail, badResult, memoize, str_removeprefix
 from term_color import Color, colored
 import testutil
 from cpu_features import have_cpu_feature
@@ -1792,7 +1792,7 @@ async def do_test(name: TestName,
     if opts.expect not in ['pass', 'fail', 'missing-lib']:
         framework_fail(name, way, 'bad expected ' + opts.expect)
 
-    directory = re.sub(r'^\.[/\\]', '', str(opts.testdir))
+    directory = str_removeprefix(str_removeprefix(str(opts.testdir), './'), '.\\')
 
     if way in opts.fragile_ways:
         if_verbose(1, '*** fragile test %s resulted in %s' % (full_name, 'pass' if result.passed else 'fail'))
@@ -1830,7 +1830,7 @@ async def do_test(name: TestName,
 # if found and instead have the testsuite decide on what to do
 # with the output.
 def override_options(pre_cmd):
-    if config.verbose >= 5 and bool(re.match(r'\$make', pre_cmd, re.I)):
+    if config.verbose >= 5 and pre_cmd.lower().startswith('$make'):
         return pre_cmd.replace(' -s'     , '') \
                       .replace('--silent', '') \
                       .replace('--quiet' , '')
@@ -1843,7 +1843,7 @@ def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str
     # so we need to take care not to blow up with the wrong way
     # and report the actual reason for the failure.
     try:
-      directory = re.sub(r'^\.[/\\]', '', str(opts.testdir))
+      directory = str_removeprefix(str_removeprefix(str(opts.testdir), './'), '.\\')
     except:
       directory = ''
     full_name = '%s(%s)' % (name, way)
@@ -1856,7 +1856,7 @@ def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str
 
 def framework_warn(name: TestName, way: WayName, reason: str) -> None:
     opts = getTestOpts()
-    directory = re.sub(r'^\.[/\\]', '', str(opts.testdir))
+    directory = str_removeprefix(str_removeprefix(str(opts.testdir), './'), '.\\')
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework warning for %s %s ' % (full_name, reason))
     t.framework_warnings.append(TestResult(directory, name, reason, way))
@@ -2550,7 +2550,7 @@ def split_file(in_fn: Path, delimiter: str, out1_fn: Path, out2_fn: Path):
         with out1_fn.open('w', encoding='utf8', newline='') as out1:
             with out2_fn.open('w', encoding='utf8', newline='') as out2:
                 line = infile.readline()
-                while re.sub(r'^\s*','',line) != delimiter and line != '':
+                while line.lstrip() != delimiter and line != '':
                     out1.write(line)
                     line = infile.readline()
 
@@ -2933,6 +2933,14 @@ def normalise_callstacks(s: str) -> str:
 
 tyCon_re = re.compile(r'TyCon\s*\d+\#\#\d?\d?\s*\d+\#\#\d?\d?\s*', flags=re.MULTILINE)
 
+def drop_lines_containing(s: str, needle: str) -> str:
+    """
+    Drop lines from `s` which contain `needle`.
+    """
+    if needle not in s:
+        return s
+    return ''.join(line for line in s.splitlines(keepends=True) if needle not in line)
+
 def normalise_type_reps(s: str) -> str:
     """ Normalise out fingerprints from Typeable TyCon representations """
     return re.sub(tyCon_re, 'TyCon FINGERPRINT FINGERPRINT ', s)
@@ -2944,8 +2952,8 @@ def normalise_errmsg(s: str) -> str:
         s = s.replace('ld: 0706-027 The -x flag is ignored.\n', '')
     # remove " error:" and lower-case " Warning:" to make patch for
     # trac issue #10021 smaller
-    s = modify_lines(s, lambda l: re.sub(' error:', '', l))
-    s = modify_lines(s, lambda l: re.sub(' Warning:', ' warning:', l))
+    s = modify_lines(s, lambda l: l.replace(' error:', ''))
+    s = modify_lines(s, lambda l: l.replace(' Warning:', ' warning:'))
     s = normalise_callstacks(s)
     s = normalise_type_reps(s)
 
@@ -2960,7 +2968,7 @@ def normalise_errmsg(s: str) -> str:
     #   a target prefix (e.g. `aarch64-linux-gnu-ghc`)
     # * On Windows the executable name may mention the
     #   versioned name (e.g. `ghc-9.2.1`)
-    s = re.sub(Path(config.compiler).name + ':', 'ghc:', s)
+    s = s.replace(Path(config.compiler).name + ':', 'ghc:')
 
     # If somefile ends in ".exe" or ".exe:", zap ".exe" (for Windows)
     #    the colon is there because it appears in error messages; this
@@ -2973,11 +2981,13 @@ def normalise_errmsg(s: str) -> str:
     s = re.sub(r'([^\s])\.jsexe', r'\1', s)
 
     # hpc executable is given ghc suffix
-    s = re.sub('hpc-ghc', 'hpc', s)
+    s = s.replace('hpc-ghc', 'hpc')
 
     # The inplace ghc's are called ghc-stage[123] to avoid filename
     # collisions, so we need to normalise that to just "ghc"
-    s = re.sub('ghc-stage[123]', 'ghc', s)
+    s = (s.replace('ghc-stage1', 'ghc')
+           .replace('ghc-stage2', 'ghc')
+           .replace('ghc-stage3', 'ghc'))
     # Remove platform prefix (e.g. javascript-unknown-ghcjs) for cross-compiled tools
     # (ghc, ghc-pkg, unlit, etc.)
     s = re.sub(r'\w+(-\w+)*-ghc', 'ghc', s)
@@ -3000,7 +3010,7 @@ def normalise_errmsg(s: str) -> str:
     # Also filter out bullet characters.  This is because bullets are used to
     # separate error sections, and tests shouldn't be sensitive to how the
     # the division happens.
-    bullet = '•'.encode('utf8') if isinstance(s, bytes) else '•'
+    bullet = '•'
     s = s.replace(bullet, '')
 
     # Windows only, this is a bug in hsc2hs but it is preventing
@@ -3015,19 +3025,19 @@ def normalise_errmsg(s: str) -> str:
     s = modify_lines(s, lambda l: re.sub(r'^(.+)warning: (.+): unsupported GNU_PROPERTY_TYPE (?:\(5\) )?type: 0xc000000(.*)$', '', l))
 
     s = re.sub(r'ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
-    s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
+    s = s.replace('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version', '')
     # ignore superfluous dylibs passed to the linker.
-    s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
+    s = drop_lines_containing(s, 'ignoring unexpected dylib file')
     # ignore LLVM Version mismatch garbage; this will just break tests.
-    s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
-    s = re.sub('Currently only [\\.0-9]+ is supported. System LLVM version: [\\.0-9]+.*\n','',s)
-    s = re.sub('We will try though\\.\\.\\..*\n','',s)
+    s = drop_lines_containing(s, 'You are using an unsupported version of LLVM!')
+    s = drop_lines_containing(s, 'System LLVM version:')
+    s = drop_lines_containing(s, 'We will try though...')
     # ignore warning about strip invalidating signatures
-    s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
+    s = drop_lines_containing(s, 'strip: changes being made to the file will invalidate the code signature in')
     # clang may warn about unused argument when used as assembler
-    s = re.sub('.*warning: argument unused during compilation:.*\n', '', s)
+    s = drop_lines_containing(s, 'warning: argument unused during compilation:')
     # Emscripten displays cache info and old emcc doesn't support EMCC_LOGGING=0
-    s = re.sub('cache:INFO: .*\n', '', s)
+    s = drop_lines_containing(s, 'cache:INFO:')
     # Old emcc warns when we export HEAP8 but new one requires it (see #26290)
     s = s.replace('warning: invalid item in EXPORTED_RUNTIME_METHODS: HEAP8\nwarning: invalid item in EXPORTED_RUNTIME_METHODS: HEAPU8\nemcc: warning: warnings in JS library compilation [-Wjs-compiler]\n','')
 
@@ -3050,7 +3060,7 @@ def normalise_prof (s: str) -> str:
 
     # The next step assumes none of the fields have no spaces in, which is broke
     # when the src = <no location info>
-    s = re.sub('no location info','no-location-info', s)
+    s = s.replace('no location info', 'no-location-info')
 
     # Source locations from internal libraries, remove the source location
     # > libraries/ghc-internal/src/path/Foo.hs:204:1-18
@@ -3103,21 +3113,21 @@ def normalise_prof (s: str) -> str:
     return s
 
 def normalise_slashes_( s: str ) -> str:
-    s = re.sub(r'\\', '/', s)
-    s = re.sub(r'//', '/', s)
+    s = s.replace('\\', '/')
+    s = s.replace('//', '/')
     return s
 
 def normalise_exe_( s: str ) -> str:
-    s = re.sub(r'\.exe', '', s)
-    s = re.sub(r'\.wasm', '', s)
-    s = re.sub(r'\.jsexe', '', s)
+    s = s.replace('.exe', '')
+    s = s.replace('.wasm', '')
+    s = s.replace('.jsexe', '')
     return s
 
 def normalise_output( s: str ) -> str:
     # remove " error:" and lower-case " Warning:" to make patch for
     # trac issue #10021 smaller
-    s = modify_lines(s, lambda l: re.sub(' error:', '', l))
-    s = modify_lines(s, lambda l: re.sub(' Warning:', ' warning:', l))
+    s = modify_lines(s, lambda l: l.replace(' error:', ''))
+    s = modify_lines(s, lambda l: l.replace(' Warning:', ' warning:'))
     # Remove a .exe extension (for Windows)
     # and .wasm extension (for the Wasm backend)
     # and .jsexe extension (for the JS backend)
@@ -3129,19 +3139,19 @@ def normalise_output( s: str ) -> str:
     s = normalise_type_reps(s)
     # ghci outputs are pretty unstable with -fexternal-dynamic-refs, which is
     # requires for -fPIC
-    s = re.sub('  -fexternal-dynamic-refs\n','',s)
+    s = s.replace('  -fexternal-dynamic-refs\n', '')
     s = re.sub(r'ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
-    s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
+    s = s.replace('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version', '')
     # ignore superfluous dylibs passed to the linker.
-    s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
+    s = drop_lines_containing(s, 'ignoring unexpected dylib file')
     # ignore LLVM Version mismatch garbage; this will just break tests.
-    s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
-    s = re.sub('Currently only [\\.0-9]+ is supported. System LLVM version: [\\.0-9]+.*\n','',s)
-    s = re.sub('We will try though\\.\\.\\..*\n','',s)
+    s = drop_lines_containing(s, 'You are using an unsupported version of LLVM!')
+    s = drop_lines_containing(s, 'System LLVM version:')
+    s = drop_lines_containing(s, 'We will try though...')
     # ignore warning about strip invalidating signatures
-    s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
+    s = drop_lines_containing(s, 'strip: changes being made to the file will invalidate the code signature in')
     # clang may warn about unused argument when used as assembler
-    s = re.sub('.*warning: argument unused during compilation:.*\n', '', s)
+    s = drop_lines_containing(s, 'warning: argument unused during compilation:')
 
     # strip the cross prefix if any
     s = re.sub(r'\w+(-\w+)*-ghc', 'ghc', s)

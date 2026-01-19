@@ -28,7 +28,7 @@ import subprocess
 
 import asyncio
 
-from testutil import getStdout, str_warn, str_info, print_table, shorten_metric_name
+from testutil import getStdout, str_warn, str_info, print_table, shorten_metric_name, str_removeprefix
 from testglobals import getConfig, ghc_env, TestConfig, t, \
                         TestOptions, brokens, PerfMetric
 from my_typing import TestName
@@ -291,7 +291,7 @@ if windows:
     for line in pkginfo.split('\n'):
         if line.startswith('library-dirs:'):
             path = line.rstrip()
-            path = re.sub('^library-dirs: ', '', path)
+            path = str_removeprefix(path, 'library-dirs: ')
             # Use string.replace instead of re.sub, because re.sub
             # interprets backslashes in the replacement string as
             # escape sequences.
