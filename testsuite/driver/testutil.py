@@ -40,6 +40,12 @@ def strip_quotes(s: str) -> str:
     # Don't wrap commands to subprocess.call/Popen in quotes.
     return s.strip('\'"')
 
+# Python 3.7 compatibility shim for str.removeprefix (added in Python 3.9).
+def str_removeprefix(s: str, prefix: str) -> str:
+    if s.startswith(prefix):
+        return s.replace(prefix, '', 1)
+    return s
+
 def str_warn(s: str) -> str:
     return colored(Color.YELLOW, s)
 
