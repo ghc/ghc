@@ -134,7 +134,6 @@ getCoreToDo dflags hpt_rule_base extra_vars
     strictness    = gopt Opt_Strictness                   dflags
     full_laziness = gopt Opt_FullLaziness                 dflags
     do_specialise = gopt Opt_Specialise                   dflags
-    do_co_opt     = gopt Opt_OptCoercion                 dflags
     do_float_in   = gopt Opt_FloatIn                      dflags
     cse           = gopt Opt_CSE                          dflags
     spec_constr   = gopt Opt_SpecConstr                   dflags
@@ -145,6 +144,8 @@ getCoreToDo dflags hpt_rule_base extra_vars
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
     profiling     = ways dflags `hasWay` WayProf
+    do_co_opt     = gopt Opt_OptCoercion                  dflags
+    opt_co_checks = dopt Opt_D_opt_co                     dflags
 
     do_simpl3      = const_fold || rules_on -- TODO: any other optimizations benefit from three-phase simplification?
 
@@ -213,7 +214,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- Without -O, just take what the desugarer produced
         -- I tried running it right after desugaring, regardless of -O,
         -- but that was worse (longer compile times).
-        runWhen do_co_opt CoreOptCoercion,
+        runWhen do_co_opt (CoreOptCoercion opt_co_checks),
 
         runWhen full_laziness
            (CoreDoFloatOutwards $ FloatOutSwitches
@@ -487,8 +488,8 @@ doCorePass pass guts = do
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
                                  updateBinds cseProgram
 
-    CoreOptCoercion           -> {-# SCC "OptCoercion" #-}
-                                 updateBinds optCoProgram
+    CoreOptCoercion checks    -> {-# SCC "OptCoercion" #-}
+                                 updateBinds (optCoProgram checks)
 
     CoreLiberateCase          -> {-# SCC "LiberateCase" #-}
                                  updateBinds (liberateCase (initLiberateCaseOpts dflags))

@@ -68,11 +68,11 @@ initSimplMode dflags phase name = SimplMode
   , sm_pre_inline = gopt Opt_SimplPreInlining dflags
   , sm_float_enable = floatEnable dflags
   , sm_do_eta_reduction = gopt Opt_DoEtaReduction dflags
-  , sm_arity_opts = initArityOpts dflags
-  , sm_rule_opts = initRuleOpts dflags
+  , sm_arity_opts   = initArityOpts dflags
+  , sm_rule_opts    = initRuleOpts dflags
   , sm_case_folding = gopt Opt_CaseFolding dflags
-  , sm_case_merge = gopt Opt_CaseMerge dflags
-  , sm_opt_refl_co = gopt Opt_OptReflCoercion dflags
+  , sm_case_merge   = gopt Opt_CaseMerge dflags
+  , sm_opt_refl_co  = gopt Opt_OptReflCoercion dflags
   , sm_check_opt_co = dopt Opt_D_opt_co dflags
   }
 
