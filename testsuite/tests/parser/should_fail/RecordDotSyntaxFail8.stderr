@@ -3,6 +3,7 @@ RecordDotSyntaxFail8.hs:47:17: error: [GHC-39999]
         arising from selecting the field ‘quux1’
       NB: ‘HasField’ is not the built-in ‘GHC.Internal.Records.HasField’ class.
     • In the second argument of ‘($)’, namely ‘....bar.baz.quux1’
+      In a stmt of a 'do' block: print @Quux $ ....baz.quux1
       In the expression:
         do let a = Foo {foo = ...}
            print @Quux $ ....quux1
@@ -10,19 +11,13 @@ RecordDotSyntaxFail8.hs:47:17: error: [GHC-39999]
            print @Quux $ b.quux2
            let c = Foo {foo = ...}
            ...
-      In an equation for ‘main’:
-          main
-            = do let a = ...
-                 print @Quux $ ....quux1
-                 let b = myQuux
-                 print @Quux $ b.quux2
-                 ...
 
 RecordDotSyntaxFail8.hs:50:17: error: [GHC-39999]
     • No instance for ‘HasField "quux2" Quux Quux’
         arising from selecting the field ‘quux2’
       NB: ‘HasField’ is not the built-in ‘GHC.Internal.Records.HasField’ class.
     • In the second argument of ‘($)’, namely ‘b.quux2’
+      In a stmt of a 'do' block: print @Quux $ b.quux2
       In the expression:
         do let a = Foo {foo = ...}
            print @Quux $ ....quux1
@@ -30,31 +25,12 @@ RecordDotSyntaxFail8.hs:50:17: error: [GHC-39999]
            print @Quux $ b.quux2
            let c = Foo {foo = ...}
            ...
-      In an equation for ‘main’:
-          main
-            = do let a = ...
-                 print @Quux $ ....quux1
-                 let b = myQuux
-                 print @Quux $ b.quux2
-                 ...
 
 RecordDotSyntaxFail8.hs:53:17: error: [GHC-39999]
     • No instance for ‘HasField "quux3" Quux a0’
         arising from selecting the field ‘quux3’
       NB: ‘HasField’ is not the built-in ‘GHC.Internal.Records.HasField’ class.
     • In the expression: ....bar.baz.quux3
-      In the expression:
-        do let a = Foo {foo = ...}
-           print @Quux $ ....quux1
-           let b = myQuux
-           print @Quux $ b.quux2
-           let c = Foo {foo = ...}
-           ...
-      In an equation for ‘main’:
-          main
-            = do let a = ...
-                 print @Quux $ ....quux1
-                 let b = myQuux
-                 print @Quux $ b.quux2
-                 ...
+      In the second argument of ‘($)’, namely ‘....baz.quux3.wob’
+      In a stmt of a 'do' block: print @Bool $ ....quux3.wob
 

@@ -4,11 +4,8 @@ RecordDotSyntaxFail13.hs:26:11: error: [GHC-39999]
       NB: ‘HasField’ is not the built-in ‘GHC.Internal.Records.HasField’ class.
       Insoluble functional dependencies wrt top-level instances
     • In the second argument of ‘($)’, namely ‘a {foo}’
+      In a stmt of a 'do' block: print $ a {foo}
       In the expression:
         do let a = Foo {foo = 12}
            print $ a {foo}
-      In an equation for ‘main’:
-          main
-            = do let a = ...
-                 print $ a {foo}
 
