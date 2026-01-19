@@ -8,7 +8,7 @@ test('ipeMap', [extra_files(['ipe_lib.c', 'ipe_lib.h']), c_src, omit_ghci], comp
 test('ipeEventLog',
      [ c_src,
        extra_files(['ipe_lib.c', 'ipe_lib.h']),
-       extra_run_opts('+RTS -va -RTS'),
+       extra_run_opts('+RTS -va -DI -RTS'),
        grep_errmsg('table_name_'),
        only_ways(debug_ways),
        normalise_errmsg_fun(noCapabilityOutputFilter),
@@ -24,7 +24,7 @@ test('ipeEventLog',
 test('ipeEventLog_fromMap',
      [ c_src,
        extra_files(['ipe_lib.c', 'ipe_lib.h']),
-       extra_run_opts('+RTS -va -RTS'),
+       extra_run_opts('+RTS -va -DI -RTS'),
        grep_errmsg('table_name_'),
        only_ways(debug_ways),
        normalise_errmsg_fun(noCapabilityOutputFilter),
@@ -34,4 +34,3 @@ test('ipeEventLog_fromMap',
        when(opsys('darwin'), fragile(0))
      ],
      compile_and_run, ['ipe_lib.c'])
-
