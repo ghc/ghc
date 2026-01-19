@@ -133,7 +133,6 @@ import GHC.Stack (HasCallStack)
 import GHC.Data.List
 
 import Control.Monad    ( guard )
-import Control.Monad.IO.Class ( MonadIO, liftIO )
 import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, getModificationTime, renameFile )
 import qualified System.Directory.OsPath as OsPath
@@ -1273,8 +1272,8 @@ fileHashIfExists f =
 -- and uses their modification time to skip work later,
 -- as otherwise a partially written file (e.g. due to crash or Ctrl+C)
 -- also results in a skip.
-
-withAtomicRename :: (MonadIO m) => FilePath -> (FilePath -> m a) -> m a
+{-# INLINE withAtomicRename #-}
+withAtomicRename :: FilePath -> (FilePath -> IO ()) -> IO ()
 withAtomicRename targetFile f = do
   -- The temp file must be on the same file system (mount) as the target file
   -- to result in an atomic move on most platforms.
@@ -1282,9 +1281,8 @@ withAtomicRename targetFile f = do
   -- This can still be fooled when somebody mounts a different file system
   -- at just the right time, but that is not a case we aim to cover here.
   let temp = targetFile <.> "tmp"
-  res <- f temp
-  liftIO $ renameFile temp targetFile
-  return res
+  f temp
+  renameFile temp targetFile
 
 -- --------------------------------------------------------------
 -- split a string at the last character where 'pred' is True,
