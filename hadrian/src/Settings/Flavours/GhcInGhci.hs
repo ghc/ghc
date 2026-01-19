@@ -22,7 +22,7 @@ ghcInGhciFlavour = defaultFlavour
 ghciArgs :: Args
 ghciArgs = sourceArgs SourceArgs
     { hsDefault  = mconcat $
-        [ pure ["-O0", "+RTS", "-O64M", "-RTS"]
+        [ pure ["-O0"]
         ]
     , hsLibrary  = mempty
     , hsCompiler = mempty
