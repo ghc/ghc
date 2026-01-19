@@ -552,9 +552,6 @@ HsInt loadArchive_ (pathchar *path)
                 if (!readThinArchiveMember(n, memberSize, path, fileName, image)) {
                     goto fail;
                 }
-                // Unlike for regular archives for thin archives we can only identify the object format
-                // after having read the file pointed to.
-                object_fmt = identifyObjectFile_(image, memberSize);
             }
             else
             {
