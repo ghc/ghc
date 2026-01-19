@@ -3774,7 +3774,7 @@ Here the /occurrence/ of x, namely (x::S a) has a syntactically different type t
 the binder.  After expanding the synonym it's the same, but it's still very
 dodgy for two reasons:
 
- * The (deep) free vars of 
+ * The (deep) free vars of
 -}
 
 lookupJoinId :: Id -> LintM JoinPointHood

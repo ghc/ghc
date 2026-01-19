@@ -91,7 +91,6 @@ import GHC.Core.Utils
 import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
 import GHC.Core.FVs
 import GHC.Core.Subst
-import GHC.Core.TyCo.Subst( lookupTyVar )
 import GHC.Core.Predicate( scopedSort )
 import GHC.Core.Type
 
