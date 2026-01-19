@@ -3321,7 +3321,7 @@ mkPolyAbsLams (getter,setter) bndrs body
       | isTyVar var, change_ty
       , let binds' | isDeadBinder var = binds
                    | otherwise        = NonRec bndr (Type (mkTyVarTy var1)) : binds
-            -- Why this let-binding? 
+            -- Why this let-binding?
       = Lam (setter var1 bndr) (go unf_tvs binds' bndrs)
 
       | isId var, change_ty || change_unf
@@ -3376,4 +3376,3 @@ mkAbsVarApps fun [] = fun
 mkAbsVarApps fun (a:as)
   | Just {} <- tyVarUnfolding_maybe a = mkAbsVarApps fun                         as
   | otherwise                         = mkAbsVarApps (App fun (varToCoreExpr a)) as
-
