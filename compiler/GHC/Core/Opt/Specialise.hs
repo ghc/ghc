@@ -1448,7 +1448,7 @@ specBind top_lvl env (NonRec tv (Type rhs_ty)) do_body
 
        ; let rhs_ty' = substTy env rhs_ty
              bind' = NonRec tv' (Type rhs_ty')
-             (free_uds, dump_dbs, float_all) = dumpBindUDs [tv'] body_uds
+             (free_uds, dump_dbs, float_all) = dumpBindUDs True [tv'] body_uds
              final_binds = mkDB bind' : fromOL dump_dbs
 
        ; if float_all then

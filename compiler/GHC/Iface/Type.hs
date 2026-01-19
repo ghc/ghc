@@ -1140,7 +1140,7 @@ ppr_ty ctxt_prec ty
   | not (isIfaceRhoType ty)             = ppr_sigma ShowForAllMust ctxt_prec ty
 ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIfaceRhoType
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
-ppr_ty _         (IfaceTyVar tyvar)     = text "{free}" <> ppr tyvar  -- See Note [Free TyVars and CoVars in IfaceType]
+ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free TyVars and CoVars in IfaceType]
 ppr_ty _         (IfaceExtTyVar tyvar)  = text "{ext}" <> ppr tyvar
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = ppr_tuple ctxt_prec i p tys -- always fully saturated
