@@ -1,6 +1,7 @@
 -- | Tracing utilities
 module GHC.Utils.Trace
   ( pprTrace
+  , pprTraceWhen
   , pprTraceM
   , pprTraceDebug
   , pprTraceIt
@@ -35,6 +36,10 @@ import GHC.Stack
 
 import Debug.Trace (trace)
 import Control.Monad.IO.Class
+
+pprTraceWhen :: Bool -> String -> SDoc -> a -> a
+pprTraceWhen False _   _   x = x
+pprTraceWhen True  str doc x = pprTrace str doc x
 
 -- | If debug output is on, show some 'SDoc' on the screen
 pprTrace :: String -> SDoc -> a -> a

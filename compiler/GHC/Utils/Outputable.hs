@@ -104,7 +104,7 @@ module GHC.Utils.Outputable (
         mkUserStyle, cmdlineParserStyle, Depth(..),
         withUserStyle, withErrStyle,
 
-        ifPprDebug, whenPprDebug, getPprDebug,
+        ifPprDebug, whenPprDebug, getPprDebug, setPprDebug,
 
         bPutHDoc
     ) where
@@ -616,6 +616,9 @@ userStyle _other       = False
 getPprDebug :: IsOutput doc => (Bool -> doc) -> doc
 {-# INLINE CONLIKE getPprDebug #-}
 getPprDebug d = docWithContext $ \ctx -> d (sdocPprDebug ctx)
+
+setPprDebug :: Bool -> SDoc -> SDoc
+setPprDebug dbg = updSDocContext (\cxt -> cxt { sdocPprDebug = dbg })
 
 -- | Says what to do with and without -dppr-debug
 ifPprDebug :: IsOutput doc => doc -> doc -> doc

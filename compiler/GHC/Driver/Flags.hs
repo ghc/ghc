@@ -641,8 +641,8 @@ data GeneralFlag
    | Opt_InlineGenerics
    | Opt_InlineGenericsAggressively
    | Opt_StaticArgumentTransformation
-   | Opt_OptCoercion
-   | Opt_OptReflCoercion
+   | Opt_OptCoercion            -- Run the big-hammer coercion optimiser `optCoercion`
+   | Opt_OptReflCoercion        -- Use the cheap "refl" coercion optimiser `optCoRefl`
    | Opt_CSE
    | Opt_StgCSE
    | Opt_StgLiftLams

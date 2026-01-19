@@ -1390,10 +1390,18 @@ simplCoercionF env co cont
 
 simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
-  = do { let out_co | sm_opt_refl_co mode = optCoRefl (sm_check_opt_co mode)
-                                                      (getTCvSubst env) co
-                    | otherwise          = substCo env co
-       ; seqCo out_co `seq` return out_co }
+  = do { let out_co | sm_opt_refl_co mode
+                    , not (isEmptyTCvSubst subst) || initial_phase
+                    = optCoRefl (sm_check_opt_co mode) subst co
+                    | otherwise
+                    = substCo env co
+             subst = getTCvSubst env
+             initial_phase = case sePhase env of
+                               SimplPhase InitialPhase -> True
+                               _ -> False
+
+       ; seqCo out_co `seq`
+         return out_co }
   where
     mode = seMode env
 
