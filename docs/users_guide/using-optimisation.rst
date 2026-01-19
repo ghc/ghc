@@ -1004,7 +1004,18 @@ as such you shouldn't need to set any of them explicitly. A flag
 
     :default: on
 
-    Turn on the coercion optimiser.
+    Turn on the "big hammer" coercion optimiser.
+
+.. ghc-flag:: -fopt-refl-coercion
+    :shortdesc: Turn on the lightweight coercion optimiser
+    :type: dynamic
+    :reverse: -fno-opt-refl-coercion
+    :category:
+
+    :default: on
+
+    Turn on the "lightweight" coercion optimiser, which just looks for
+    reflexivity within sequences of coercions.
 
 .. ghc-flag:: -fno-pre-inlining
     :shortdesc: Turn off pre-inlining

@@ -265,6 +265,17 @@ the desugarer and includes the simplifier, worker-wrapper transformation, the
 rule engine, the specialiser, the strictness/occurrence analyser, and a common
 subexpression elimination pass.
 
+.. ghc-flag:: -dcheck-opt-co
+    :shortdesc: Add consistency checks to the coercion optimisiers
+        shorter
+    :type: dynamic
+
+    Affects both :ghc-flag:`-fopt-coercion` and :ghc-flag:`-fopt-refl-coercion`.
+    Adds compile-time checks that these coercion optimisers don't change types;
+    and adds a trace message if they succeeds in shrinking (or expanding) the
+    coercion.  If you add :ghc-flag:`-dppr-debug` you can see the shrunk/expanded
+    coercion itself.
+
 .. ghc-flag:: -ddump-call-arity
     :shortdesc: Dump output of the call arity analysis pass.
     :type: dynamic
