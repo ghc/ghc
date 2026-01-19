@@ -140,7 +140,7 @@ T20199:
 .PHONY: EventlogOutput_IPE
 EventlogOutput_IPE:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -debug -finfo-table-map -v0 EventlogOutput.hs
-	./EventlogOutput +RTS -va 2> EventlogOutput_IPE.stderr.log
+	./EventlogOutput +RTS -va -DI 2> EventlogOutput_IPE.stderr.log
 	grep "IPE:" EventlogOutput_IPE.stderr.log
 
 .PHONY: T23142

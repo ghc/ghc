@@ -535,6 +535,7 @@ test('T13676',
 test('InitEventLogging',
      [ only_ways(['normal'])
      , extra_run_opts('+RTS -RTS')
+     , when(ghc_with_ipe(), skip) # IPE builds can change eventlog writer call counts.
      , req_c
      ],
      compile_and_run, ['InitEventLogging_c.c'])
@@ -597,6 +598,7 @@ test('cloneThreadStackMigrating',
 
 test('decodeMyStack',
   [ omit_ghci, js_broken(22261) # cloneMyStack# not yet implemented
+  , when(ghc_with_ipe(), skip) # IPE builds can change decoded stack output.
   ], compile_and_run, ['-finfo-table-map'])
 
 # Options:
@@ -604,6 +606,7 @@ test('decodeMyStack',
 test('decodeMyStack_underflowFrames',
   [ extra_run_opts('+RTS -kc8K -RTS')
   , omit_ghci, js_broken(22261) # cloneMyStack# not yet implemented
+  , when(ghc_with_ipe(), skip) # IPE builds can change decoded stack layout/length.
   ], compile_and_run, ['-finfo-table-map -rtsopts'])
 
 # -finfo-table-map intentionally missing
@@ -611,6 +614,7 @@ test('decodeMyStack_emptyListForMissingFlag',
   [ ignore_stdout
   , ignore_stderr
   , js_broken(22261) # cloneMyStack# not yet implemented
+  , when(ghc_with_ipe(), skip) # IPE builds can populate IPE info even without -finfo-table-map on this module.
   ], compile_and_run, [''])
 
 # Tests RTS flag parsing. Skipped on JS as it uses a distinct RTS.
@@ -662,7 +666,7 @@ test('T25280', [unless(opsys('linux'),skip),req_process,js_skip], compile_and_ru
 test('T25560', [req_c_rts, ignore_stderr], compile_and_run, [''])
 
 test('TestProddableBlockSet', [req_c_rts], multimod_compile_and_run, ['TestProddableBlockSet.c', '-no-hs-main'])
-test('T22859', 
+test('T22859',
      [js_skip,
       # Allocation behaviour differs with the wasm backend so we get different output
       when(arch('wasm32'), skip)],

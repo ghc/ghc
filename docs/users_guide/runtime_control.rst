@@ -1458,6 +1458,7 @@ recommended for everyday use!
 
 .. rts-flag::  -Ds  DEBUG: scheduler
 .. rts-flag::  -Di  DEBUG: interpreter
+.. rts-flag::  -DI  DEBUG: IPE
 .. rts-flag::  -Dw  DEBUG: weak
 .. rts-flag::  -DG  DEBUG: gccafs
 .. rts-flag::  -Dg  DEBUG: gc

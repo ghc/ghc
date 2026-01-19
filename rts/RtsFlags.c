@@ -211,6 +211,8 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.numa            = false;
     RtsFlags.DebugFlags.compact         = false;
     RtsFlags.DebugFlags.continuation    = false;
+    RtsFlags.DebugFlags.iomanager       = false;
+    RtsFlags.DebugFlags.ipe             = false;
 
 #if defined(PROFILING)
     RtsFlags.CcFlags.doCostCentres      = COST_CENTRES_NONE;
@@ -472,6 +474,7 @@ usage_text[] = {
 #if defined(DEBUG)
 "  -Ds  DEBUG: scheduler",
 "  -Di  DEBUG: interpreter",
+"  -DI  DEBUG: IPE",
 "  -Dw  DEBUG: weak",
 "  -DG  DEBUG: gccafs",
 "  -Dg  DEBUG: gc",
@@ -2315,6 +2318,9 @@ static void read_debug_flags(const char* arg)
             break;
         case 'o':
             RtsFlags.DebugFlags.iomanager = true;
+            break;
+        case 'I':
+            RtsFlags.DebugFlags.ipe = true;
             break;
         default:
             bad_option( arg );
