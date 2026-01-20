@@ -2,9 +2,9 @@
 Caught exception: SimpleBoom
 Exception context:
 - IPE backtrace:
--   throwIO SimpleBoom
--   raising action
--   catch site for throwIO SimpleBoom
+-   throwIO SimpleBoom, called at ann_frame005.hs:33:5 in main:Main
+-   raising action, called at ann_frame005.hs:32:3 in main:Main
+-   catch site for throwIO SimpleBoom, called at ann_frame005.hs:27:5 in main:Main
 -   annotateCallStackIO, called at ann_frame005.hs:26:3 in main:Main
 - HasCallStack backtrace:
 -   throwIO, called at ann_frame005.hs:34:7 in main:Main
@@ -13,9 +13,9 @@ Handler annotation not present in context
 Caught exception: Prelude.undefined
 Exception context:
 - IPE backtrace:
--   undefined thunk
--   raising undefined action
--   catch site for undefined
+-   undefined thunk, called at ann_frame005.hs:41:9 in main:Main
+-   raising undefined action, called at ann_frame005.hs:38:3 in main:Main
+-   catch site for undefined, called at ann_frame005.hs:27:5 in main:Main
 -   annotateCallStackIO, called at ann_frame005.hs:26:3 in main:Main
 - HasCallStack backtrace:
 -   undefined, called at ann_frame005.hs:41:48 in main:Main
@@ -24,9 +24,9 @@ Handler annotation not present in context
 Caught exception: error from annotateStackString
 Exception context:
 - IPE backtrace:
--   error thunk
--   raising error action
--   catch site for error
+-   error thunk, called at ann_frame005.hs:48:9 in main:Main
+-   raising error action, called at ann_frame005.hs:45:3 in main:Main
+-   catch site for error, called at ann_frame005.hs:27:5 in main:Main
 -   annotateCallStackIO, called at ann_frame005.hs:26:3 in main:Main
 - HasCallStack backtrace:
 -   error, called at ann_frame005.hs:48:44 in main:Main
@@ -35,8 +35,8 @@ Handler annotation not present in context
 Caught exception: SimpleBoom
 Exception context:
 - IPE backtrace:
--   raising throwSTM action
--   catch site for throwSTM
+-   raising throwSTM action, called at ann_frame005.hs:52:3 in main:Main
+-   catch site for throwSTM, called at ann_frame005.hs:27:5 in main:Main
 -   annotateCallStackIO, called at ann_frame005.hs:26:3 in main:Main
 - HasCallStack backtrace:
 -   throwSTM, called at ann_frame005.hs:55:9 in main:Main

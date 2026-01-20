@@ -1,0 +1,10 @@
+T26806b: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Backtrace Test: 125000000
+
+IPE backtrace:
+  Lovely annotation, called at T26806b.hs:16:7 in main:Main
+  [1,2,3,4], called at T26806b.hs:15:5 in main:Main
+  annotateCallStack, called at T26806b.hs:14:3 in main:Main
+HasCallStack backtrace:
+  throw, called at T26806b.hs:17:9 in main:Main
