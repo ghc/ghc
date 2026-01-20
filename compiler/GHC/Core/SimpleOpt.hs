@@ -34,6 +34,7 @@ import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSub
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Predicate( isCoVarType )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
+import GHC.Core.Coercion.Opt( optCoRefl )
 
 import GHC.Types.Literal
 import GHC.Types.Id
@@ -115,14 +116,18 @@ data SimpleOpts = SimpleOpts
    , so_eta_red :: !Bool            -- ^ Eta reduction on?
    , so_inline :: !Bool             -- ^ False <=> do no inlining whatsoever,
                                     --    even for trivial or used-once things
+   , so_opt_co :: !Bool            -- ^ Run the simple `optCoRefl` optimiser on coercions
+   , so_check_opt_co :: !Bool      -- ^ Do debug-checking for `optCoRefl`
    }
 
 -- | Default options for the Simple optimiser.
 defaultSimpleOpts :: SimpleOpts
 defaultSimpleOpts = SimpleOpts
-   { so_uf_opts = defaultUnfoldingOpts
-   , so_eta_red = False
-   , so_inline  = True
+   { so_uf_opts      = defaultUnfoldingOpts
+   , so_eta_red      = False
+   , so_inline       = True
+   , so_opt_co       = True
+   , so_check_opt_co = False
    }
 
 simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
@@ -327,19 +332,15 @@ simple_opt_expr env expr = go expr
         (env', bndrs') = subst_opt_bndrs env bndrs
 
 simple_opt_co :: SimpleOptEnv -> InCoercion -> OutCoercion
-simple_opt_co env co = substCo (soe_subst env) co
+-- Optimise a coercion, optionally running
+-- the simple `optCoRefl` optimiser
+-- If (so_opt_co opts) is on, we run the optimiser even if the substition
+--    is empty, to kill off Refls; but if not, `substCo` does a no-op if
+--    the substitution is empty
+simple_opt_co (SOE { soe_subst = subst, soe_opts = opts }) co
+  | so_opt_co opts = optCoRefl (so_check_opt_co opts) subst co
+  | otherwise      = substCo subst co
 
-mk_cast :: CoreExpr -> CoercionR -> CoreExpr
--- Like GHC.Core.Utils.mkCast, but does a full reflexivity check.
--- mkCast doesn't do that because the Simplifier does (in simplCast)
--- But in SimpleOpt it's nice to kill those nested casts (#18112)
-mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCo` co2)
-mk_cast (Tick t e)   co         = Tick t (mk_cast e co)
-mk_cast e co
-  | isReflexiveCo co
-  = e
-  | otherwise
-  = Cast e co
 
 ----------------------
 -- simple_app collects arguments for beta reduction
@@ -406,8 +407,8 @@ simple_app env e0@(Lam {}) as0@(_:_)
       | otherwise
       = rebuild_app env (simple_opt_expr env e) as
 
-    do_beta env (Cast e co) as =
-      do_beta env e (add_cast env co as)
+    do_beta env (Cast e co) as
+      = do_beta env e (add_cast env co as)
 
     do_beta env body as
       = simple_app env body as
@@ -478,7 +479,7 @@ rebuild_app env fun args = foldl mk_app fun args
     in_scope = soeInScope env
     mk_app out_fun = \case
       ApplyToArg arg -> App out_fun (simple_opt_clo in_scope arg)
-      CastIt co      -> mk_cast out_fun co
+      CastIt co      -> mkCast out_fun co
 
 {- Note [Desugaring unlifted newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

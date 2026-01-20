@@ -300,8 +300,13 @@ optCoRefl check_stuff subst in_co
        out_co
 
 opt_co_refl :: Subst -> InCoercion -> OutCoercion
-opt_co_refl subst co = go co
+opt_co_refl subst co
+  | lk `eqTypeIgnoringMultiplicity` rk = mkReflCo (coercionRole co) lk
+  | otherwise                          = out_co
   where
+    out_co = go co
+    Pair lk rk = coercionKind out_co
+
     go_m MRefl    = MRefl
     go_m (MCo co) = MCo (go co)
 
@@ -339,14 +344,25 @@ opt_co_refl subst co = go co
       where
         !(subst', v') = substVarBndr subst v
 
-    -- This is the main payload
-    go (TransCo co1 co2) = gobble gs0 co1 [co2]
+    -- The TransCo case fires up the main loop for
+    -- eliminating reflexive chains of TransCo
+    go (TransCo co1 co2)
+       | lk' `eqTypeIgnoringMultiplicity` rk' = go co2
+       | otherwise                            = gobble0 gs1 [co2]
        where
-         lk'  = substTy subst (coercionLKind co1)
+         co1' = go co1
+         Pair lk' rk' = coercionKind co1
          role = coercionRole co1
 
-         gs0 :: GobbleState
-         gs0 = GS (mkReflCo role lk') (insertTM lk' gs0 emptyTM)
+         gs0, gs1 :: GobbleState
+         gs0 = GS (mkReflCo role lk') tm0
+         gs1 = GS co1' (insertTM rk' gs1 tm0)
+
+         tm0 = insertTM lk' gs0 emptyTM
+
+    gobble0 :: GobbleState -> [InCoercion] -> OutCoercion
+    gobble0 (GS co _) [] = co
+    gobble0 gs (co:cos)  = gobble gs co cos
 
     gobble :: GobbleState -> InCoercion -> [InCoercion] -> OutCoercion
     -- gobble (GS co1 tm) co2 cos   returns a coercion equivalent to (co1;co2;cos)
@@ -361,8 +377,6 @@ opt_co_refl subst co = go co
          rk'  = coercionRKind co2'
          gs'  = GS (co1' `mkTransCo` co2') (insertTM rk' gs' tm)
 
-    gobble0 (GS co _) [] = co
-    gobble0 gs (co:cos)  = gobble gs co cos
 
 data GobbleState = GS OutCoercion (TypeMap GobbleState)
                    -- The map is keyed by OutType
