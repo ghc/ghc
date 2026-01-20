@@ -881,6 +881,8 @@ pprCtOrigin (ExpansionOrigin o)
         OrigExpr (RecordUpd{}) -> text "a record update"
         OrigExpr (ExplicitList{}) -> text "an overloaded list"
         OrigExpr (HsIf{}) -> text "an if-then-else expression"
+        OrigExpr (HsProjection _ p) -> text "the record selector" <+>
+             quotes (ppr ((FieldLabelStrings $ fmap noLocA p)))
         OrigExpr e -> text "the expression" <+> (ppr e)
 
 pprCtOrigin (GivenSCOrigin sk d blk)
