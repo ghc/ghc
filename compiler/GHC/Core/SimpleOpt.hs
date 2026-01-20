@@ -26,6 +26,7 @@ import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Unfold
+import GHC.Core.TyCo.Compare( eqTypeIgnoringMultiplicity )
 import GHC.Core.Unfold.Make
 import GHC.Core.Make ( FloatBind(..), mkWildValBinder )
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
@@ -215,11 +216,15 @@ simpleOptPgm opts this_mod binds rules =
 ----------------------
 type SimpleClo = (SimpleOptEnv, InExpr)
 
-data SimpleContItem = ApplyToArg SimpleClo | CastIt OutCoercion
+data SimpleContItem
+  = ApplyToArg SimpleClo
+  | CastIt OutCoercion OutType
+       -- The OutType is the corecionRKind of the coercion
+       -- Used to make reflexivity checking more efficient
 
 instance Outputable SimpleContItem where
   ppr (ApplyToArg (_, arg)) = text "ARG" <+> ppr arg
-  ppr (CastIt co) = text "CAST" <+> ppr co
+  ppr (CastIt co _) = text "CAST" <+> ppr co
 
 data SimpleOptEnv
   = SOE { soe_opts :: {-# UNPACK #-} !SimpleOpts
@@ -392,7 +397,7 @@ simple_app env e0@(Lam {}) as0@(_:_)
       where (env', b') = subst_opt_bndr env b
 
     -- See Note [Eliminate casts in function position]
-    do_beta env e@(Lam b _) as@(CastIt out_co:rest)
+    do_beta env e@(Lam b _) as@(CastIt out_co _ : rest)
       | isNonCoVarId b
       -- Optimise the inner lambda to make it an 'OutExpr', which makes it
       -- possible to call 'pushCoercionIntoLambda' with the 'OutCoercion' 'co'.
@@ -467,8 +472,11 @@ add_cast env co1 as
   = as
   | otherwise
   = case as of
-      CastIt co2:rest -> CastIt (co1' `mkTransCo` co2):rest
-      _               -> CastIt co1':as
+      CastIt co2 ty2 : rest
+        | ty2 `eqTypeIgnoringMultiplicity` coercionLKind co1'
+                      -> rest
+        | otherwise   -> CastIt (co1' `mkTransCo` co2) ty2 : rest
+      _               -> CastIt co1' (coercionRKind co1') : as
   where
     co1' = simple_opt_co env co1
 
@@ -479,7 +487,7 @@ rebuild_app env fun args = foldl mk_app fun args
     in_scope = soeInScope env
     mk_app out_fun = \case
       ApplyToArg arg -> App out_fun (simple_opt_clo in_scope arg)
-      CastIt co      -> mkCast out_fun co
+      CastIt co _    -> mkCast out_fun co
 
 {- Note [Desugaring unlifted newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
