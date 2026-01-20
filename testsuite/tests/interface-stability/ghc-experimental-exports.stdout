@@ -6499,25 +6499,27 @@ module GHC.Stack.Annotation.Experimental where
   newtype CallStackAnnotation = CallStackAnnotation GHC.Internal.Stack.Types.CallStack
   type ShowAnnotation :: *
   data ShowAnnotation where
-    ShowAnnotation :: forall a. GHC.Internal.Show.Show a => a -> ShowAnnotation
+    ShowAnnotation :: forall a. GHC.Internal.Show.Show a => !(GHC.Internal.Maybe.Maybe GHC.Internal.Stack.Types.SrcLoc) -> a -> ShowAnnotation
   type SomeStackAnnotation :: *
   data SomeStackAnnotation where
     SomeStackAnnotation :: forall a. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> SomeStackAnnotation
   type StackAnnotation :: * -> Constraint
   class StackAnnotation a where
     displayStackAnnotation :: a -> GHC.Internal.Base.String
-    {-# MINIMAL displayStackAnnotation #-}
+    stackAnnotationSourceLocation :: a -> GHC.Internal.Maybe.Maybe GHC.Internal.Stack.Types.SrcLoc
+    displayStackAnnotationShort :: a -> GHC.Internal.Base.String
+    {-# MINIMAL displayStackAnnotation | displayStackAnnotationShort #-}
   type StringAnnotation :: *
   data StringAnnotation where
-    StringAnnotation :: GHC.Internal.Base.String -> StringAnnotation
+    StringAnnotation :: !(GHC.Internal.Maybe.Maybe GHC.Internal.Stack.Types.SrcLoc) -> GHC.Internal.Base.String -> StringAnnotation
   annotateCallStack :: forall b. GHC.Internal.Stack.Types.HasCallStack => b -> b
   annotateCallStackIO :: forall a. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Types.IO a -> GHC.Internal.Types.IO a
-  annotateStack :: forall a b. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> b -> b
-  annotateStackIO :: forall a b. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
-  annotateStackShow :: forall a b. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Show.Show a) => a -> b -> b
-  annotateStackShowIO :: forall a b. GHC.Internal.Show.Show a => a -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
-  annotateStackString :: forall b. GHC.Internal.Base.String -> b -> b
-  annotateStackStringIO :: forall b. GHC.Internal.Base.String -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
+  annotateStack :: forall a b. (GHC.Internal.Stack.Types.HasCallStack, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> b -> b
+  annotateStackIO :: forall a b. (GHC.Internal.Stack.Types.HasCallStack, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
+  annotateStackShow :: forall a b. (GHC.Internal.Stack.Types.HasCallStack, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Show.Show a) => a -> b -> b
+  annotateStackShowIO :: forall a b. (GHC.Internal.Stack.Types.HasCallStack, GHC.Internal.Show.Show a) => a -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
+  annotateStackString :: forall b. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Base.String -> b -> b
+  annotateStackStringIO :: forall b. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Base.String -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
 
 module GHC.Stats.Experimental where
   -- Safety: Safe

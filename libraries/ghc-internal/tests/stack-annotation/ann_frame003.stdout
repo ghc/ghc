@@ -1,6 +1,6 @@
 47
 Stack annotations:
-- "bar"
-- "foo"
-- "tailCallEx"
+- "bar", called at ann_frame003.hs:25:9 in main:Main
+- "foo", called at ann_frame003.hs:21:11 in main:Main
+- "tailCallEx", called at ann_frame003.hs:16:18 in main:Main
 40
