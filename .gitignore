@@ -261,7 +261,7 @@ dist-newstyle/
 # CI
 
 # Windows CI
-toolchain/
-ghc-*/
-inplace/
-tmp/
+/toolchain/
+/ghc-*/
+/inplace/
+/tmp/
