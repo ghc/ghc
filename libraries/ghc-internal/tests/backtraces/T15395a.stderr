@@ -1,0 +1,9 @@
+T15395a: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+throw error
+
+HasCallStack backtrace:
+  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:170:37 in ghc-internal:GHC.Internal.Exception
+  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:90:42 in ghc-internal:GHC.Internal.Exception
+  throw, called at T15395a.hs:5:3 in main:Main
+

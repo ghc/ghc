@@ -1,0 +1,7 @@
+T15395d: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+Prelude.undefined
+
+HasCallStack backtrace:
+  undefined, called at T15395d.hs:4:3 in main:Main
+

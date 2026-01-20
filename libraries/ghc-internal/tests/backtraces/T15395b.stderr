@@ -1,0 +1,7 @@
+T15395b: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+throwIO error
+
+HasCallStack backtrace:
+  throwIO, called at T15395b.hs:5:3 in main:Main
+

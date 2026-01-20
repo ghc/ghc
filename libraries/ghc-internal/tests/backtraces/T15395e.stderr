@@ -1,0 +1,7 @@
+T15395e: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+error
+
+HasCallStack backtrace:
+  error, called at T15395e.hs:4:3 in main:Main
+
