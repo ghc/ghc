@@ -1,12 +1,12 @@
 Stack annotations:
-- (2,3)
+- (2,3), called at ann_frame001.hs:5:13 in main:Main
 47
 Stack annotations:
-- "bar"
-- "foo"
-- "tailCallEx"
+- "bar", called at ann_frame001.hs:23:9 in main:Main
+- "foo", called at ann_frame001.hs:21:11 in main:Main
+- "tailCallEx", called at ann_frame001.hs:17:18 in main:Main
 Stack annotations:
-- "bar"
-- "foo"
-- "tailCallEx"
+- "bar", called at ann_frame001.hs:23:9 in main:Main
+- "foo", called at ann_frame001.hs:21:11 in main:Main
+- "tailCallEx", called at ann_frame001.hs:17:18 in main:Main
 40

@@ -1,11 +1,17 @@
 # Revision history for ghc-experimental
 
+## ghc-experimental-9.1402.0
+
+- Add optional `SrcLoc` to `StackAnnotation` class in `GHC.Stack.Annotation.Experimental`
+
+
 ## ghc-experimental-9.1401.0
 
 - Expose access to RTS flags via `GHC.RTS.Flags.Experimental`
 - Expose access to era profiling interface via `GHC.Profiling.Eras`
 - Expose access to runtime stack annotations via `GHC.Stack.Annotation.Experimental`
 - Expose custom allocation limit handler via `System.Mem.Experimental`
+- Expose access to Stack Annotations via `GHC.Stack.Annotation.Experimental`
 - Expose module Prelude.Experimental, which reexports some modules from ghc-experimental for convenience, like Prelude does for base.
 
 ## ghc-experimental-9.1201.0
