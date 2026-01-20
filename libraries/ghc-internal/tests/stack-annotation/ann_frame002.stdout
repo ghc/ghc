@@ -7,5 +7,5 @@ Finish some work
 Some more work in bar
 17711
 Stack annotations:
-- bar
+- bar, called at ann_frame002.hs:23:29 in main:Main
 - annotateCallStackIO, called at ann_frame002.hs:23:7 in main:Main

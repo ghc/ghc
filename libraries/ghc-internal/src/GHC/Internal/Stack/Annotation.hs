@@ -4,6 +4,7 @@ module GHC.Internal.Stack.Annotation where
 
 import GHC.Internal.Base
 import GHC.Internal.Data.Typeable
+import GHC.Internal.Stack (SrcLoc, prettySrcLoc)
 
 -- ----------------------------------------------------------------------------
 -- StackAnnotation
@@ -13,7 +14,35 @@ import GHC.Internal.Data.Typeable
 -- as the payload of 'AnnFrame' stack frames.
 --
 class StackAnnotation a where
+  -- | Display a human readable string for the 'StackAnnotation'.
+  --
+  -- This is supposed to be the long version of 'displayStackAnnotationShort'
+  -- and may contain a source location.
+  --
+  -- If not provided, 'displayStackAnnotation' is derived from 'sourceLocationOfStackAnnotation'
+  -- and 'displayStackAnnotationShort'.
   displayStackAnnotation :: a -> String
+
+  -- | Get the 'SrcLoc' of the given 'StackAnnotation'.
+  --
+  -- This is optional, 'SrcLoc' are not strictly required for 'StackAnnotation', but
+  -- it is still heavily encouarged to provide a 'SrcLoc' for better IPE backtraces.
+  sourceLocationOfStackAnnotation :: a -> Maybe SrcLoc
+
+  -- | The description of the StackAnnotation without any metadata such as source locations.
+  --
+  -- Pefer implementing 'displayStackAnnotationShort' over 'displayStackAnnotation'.
+  displayStackAnnotationShort :: a -> String
+
+  {-# MINIMAL displayStackAnnotation | displayStackAnnotationShort #-}
+
+  displayStackAnnotation ann =
+    displayStackAnnotationShort ann
+      ++ case sourceLocationOfStackAnnotation ann of
+          Nothing -> ""
+          Just srcLoc -> ", called at " ++ prettySrcLoc srcLoc
+  sourceLocationOfStackAnnotation _ann = Nothing
+  displayStackAnnotationShort = displayStackAnnotation
 
 -- ----------------------------------------------------------------------------
 -- Annotations
@@ -29,3 +58,5 @@ data SomeStackAnnotation where
 
 instance StackAnnotation SomeStackAnnotation where
   displayStackAnnotation (SomeStackAnnotation a) = displayStackAnnotation a
+  sourceLocationOfStackAnnotation (SomeStackAnnotation a) = sourceLocationOfStackAnnotation a
+  displayStackAnnotationShort (SomeStackAnnotation a) = displayStackAnnotationShort a

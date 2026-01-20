@@ -133,20 +133,32 @@ import GHC.Internal.Stack.Annotation
 -- Annotations
 -- ----------------------------------------------------------------------------
 
+
+-- | A 'String' only annotation with an optional source location.
 data StringAnnotation where
-  StringAnnotation :: String -> StringAnnotation
+  StringAnnotation :: !(Maybe SrcLoc) -> String -> StringAnnotation
 
 instance StackAnnotation StringAnnotation where
-  displayStackAnnotation (StringAnnotation str) = str
+  displayStackAnnotationShort (StringAnnotation _srcLoc str) =
+    str
+
+  sourceLocationOfStackAnnotation (StringAnnotation srcLoc _str) =
+    srcLoc
 
 -- | Use the 'Show' instance of a type to display as the 'StackAnnotation'.
 data ShowAnnotation where
-  ShowAnnotation :: forall a . Show a => a -> ShowAnnotation
+  ShowAnnotation :: forall a . Show a => !(Maybe SrcLoc) -> a -> ShowAnnotation
 
 instance StackAnnotation ShowAnnotation where
-  displayStackAnnotation (ShowAnnotation showAnno) = show showAnno
+  displayStackAnnotationShort (ShowAnnotation _srcLoc showAnno) =
+    show showAnno
+
+  sourceLocationOfStackAnnotation (ShowAnnotation srcLoc _showAnno) =
+    srcLoc
 
 -- | A 'CallStack' stack annotation.
+--
+-- Captures the whole 'CallStack'.
 newtype CallStackAnnotation = CallStackAnnotation CallStack
 
 instance Show CallStackAnnotation where
@@ -154,9 +166,23 @@ instance Show CallStackAnnotation where
 
 -- | Displays the first entry of the 'CallStack'
 instance StackAnnotation CallStackAnnotation where
-  displayStackAnnotation (CallStackAnnotation cs) = case getCallStack cs of
+  sourceLocationOfStackAnnotation (CallStackAnnotation cs) =
+    callStackHeadSrcLoc cs
+
+  displayStackAnnotationShort (CallStackAnnotation cs) =
+    callStackHeadFunctionName cs
+
+callStackHeadSrcLoc :: CallStack -> Maybe SrcLoc
+callStackHeadSrcLoc cs =
+  case getCallStack cs of
+    [] -> Nothing
+    (_, srcLoc):_ -> Just srcLoc
+
+callStackHeadFunctionName :: CallStack -> String
+callStackHeadFunctionName cs =
+  case getCallStack cs of
     [] -> "<unknown source location>"
-    ((fnName,srcLoc):_) -> fnName ++ ", called at " ++ prettySrcLoc srcLoc
+    (fnName, _):_ -> fnName
 
 -- ----------------------------------------------------------------------------
 -- Annotate the CallStack with custom data
@@ -172,7 +198,7 @@ instance StackAnnotation CallStackAnnotation where
 --
 -- WARNING: forces the evaluation of @b@ to WHNF.
 {-# NOINLINE annotateStack #-}
-annotateStack :: forall a b. (Typeable a, StackAnnotation a) => a -> b -> b
+annotateStack :: forall a b. (HasCallStack, Typeable a, StackAnnotation a) => a -> b -> b
 annotateStack ann b = unsafePerformIO $
   annotateStackIO ann (evaluate b)
 
@@ -196,9 +222,9 @@ annotateCallStack b = unsafePerformIO $ withFrozenCallStack $
 -- information to stack traces.
 --
 -- WARNING: forces the evaluation of @b@ to WHNF.
-annotateStackString :: forall b . String -> b -> b
+annotateStackString :: forall b . HasCallStack => String -> b -> b
 annotateStackString ann =
-  annotateStack (StringAnnotation ann)
+  annotateStack (StringAnnotation (callStackHeadSrcLoc ?callStack) ann)
 
 -- | @'annotateStackShow' showable b@ annotates the evaluation stack of @b@
 -- with the value @showable@.
@@ -207,16 +233,16 @@ annotateStackString ann =
 -- information to stack traces.
 --
 -- WARNING: forces the evaluation of @b@ to WHNF.
-annotateStackShow :: forall a b . (Typeable a, Show a) => a -> b -> b
+annotateStackShow :: forall a b . (HasCallStack, Typeable a, Show a) => a -> b -> b
 annotateStackShow ann =
-  annotateStack (ShowAnnotation ann)
+  annotateStack (ShowAnnotation (callStackHeadSrcLoc ?callStack) ann)
 
 -- | @'annotateStackIO' showable b@ annotates the evaluation stack of @b@
 -- with the value @showable@.
 --
 -- When decoding the call stack, the annotation frames can be used to add more
 -- information to stack traces.
-annotateStackIO :: forall a b . (Typeable a, StackAnnotation a) => a -> IO b -> IO b
+annotateStackIO :: forall a b . (HasCallStack, Typeable a, StackAnnotation a) => a -> IO b -> IO b
 annotateStackIO ann (IO act) =
   IO $ \s -> annotateStack# (SomeStackAnnotation ann) act s
 {-# NOINLINE annotateStackIO #-}
@@ -226,18 +252,18 @@ annotateStackIO ann (IO act) =
 --
 -- When decoding the call stack, the annotation frames can be used to add more
 -- information to stack traces.
-annotateStackStringIO :: forall b . String -> IO b -> IO b
+annotateStackStringIO :: forall b . HasCallStack => String -> IO b -> IO b
 annotateStackStringIO ann =
-  annotateStackIO (StringAnnotation ann)
+  annotateStackIO (StringAnnotation (callStackHeadSrcLoc ?callStack) ann)
 
 -- | @'annotateStackShowIO' msg b@ annotates the evaluation stack of @b@
 -- with the value @msg@.
 --
 -- When decoding the call stack, the annotation frames can be used to add more
 -- information to stack traces.
-annotateStackShowIO :: forall a b . (Show a) => a -> IO b -> IO b
+annotateStackShowIO :: forall a b . (HasCallStack, Show a) => a -> IO b -> IO b
 annotateStackShowIO ann =
-  annotateStackIO (ShowAnnotation ann)
+  annotateStackIO (ShowAnnotation (callStackHeadSrcLoc ?callStack) ann)
 
 -- | @'annotateCallStackIO' b@ annotates the evaluation stack of @b@ with the
 -- current 'callstack'.

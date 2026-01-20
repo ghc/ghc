@@ -13,5 +13,5 @@ Stack annotations:
 - annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
 - annotateCallStack, called at ann_frame004.hs:21:17 in main:Main
 - annotateCallStack, called at ann_frame004.hs:13:10 in main:Main
-- bar
+- bar, called at ann_frame004.hs:12:29 in main:Main
 - annotateCallStackIO, called at ann_frame004.hs:12:7 in main:Main
