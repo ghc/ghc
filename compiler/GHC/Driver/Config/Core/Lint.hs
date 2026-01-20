@@ -153,7 +153,7 @@ perPassFlags dflags pass
                           -- `-dlinear-core-lint`: check linearity in every pass
                     || -- Always check linearity just after desugaring
                        case pass of
-                          CoreDesugar -> True
+                          CoreDesugar -> True  -- Before even the simple optimiser
                           _ -> False
 
     -- See Note [Checking for rubbish literals] in GHC.Core.Lint
