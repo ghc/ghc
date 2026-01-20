@@ -32,11 +32,12 @@ import Data.Binary
 import Text.Printf
 import System.Environment (getProgName, getArgs)
 import System.Exit
+import System.IO
 
 type MessageHook = Msg -> IO Msg
 
 trace :: String -> IO ()
-trace s = getProgName >>= \name -> printf "[%20s] %s\n" name s
+trace s = getProgName >>= \name -> hPrintf stderr "[%20s] %s\n" name s
 
 serv :: Bool -> MessageHook -> Pipe -> (forall a .IO a -> IO a) -> IO ()
 serv verbose hook pipe restore = loop
