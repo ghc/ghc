@@ -75,6 +75,8 @@ needDocDeps = do
     let templatedCabalFiles = map pkgCabalFile
             [ ghcBoot
             , ghcBootTh
+            , ghcExperimental
+            , ghcInternal
             , ghci
             , compiler
             , ghcHeap
