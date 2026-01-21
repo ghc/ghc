@@ -10,7 +10,7 @@ Multi-way if-expressions
 
     Allow the use of multi-way-``if`` syntax.
 
-With :extension:`MultiWayIf` extension GHC accepts conditional expressions with
+With the :extension:`MultiWayIf` extension GHC accepts conditional expressions with
 multiple branches: ::
 
       if | guard1 -> expr1
@@ -24,12 +24,12 @@ which is roughly equivalent to ::
         ...
         _ | guardN -> exprN
 
-Multi-way if expressions introduce a new layout context. So the example
+Multi-way if expressions introduce a new kind of layout context that does not generate semicolons. The example
 above is equivalent to: ::
 
       if { | guard1 -> expr1
-         ; | ...
-         ; | guardN -> exprN
+           | ...
+           | guardN -> exprN
          }
 
 The following behaves as expected: ::
@@ -41,14 +41,14 @@ The following behaves as expected: ::
 because layout translates it as ::
 
       if { | guard1 -> if { | guard2 -> expr2
-                          ; | guard3 -> expr3
+                            | guard3 -> expr3
                           }
-         ; | guard4 -> expr4
+           | guard4 -> expr4
          }
 
 Layout with multi-way if works in the same way as other layout contexts,
-except that the semi-colons between guards in a multi-way if are
-optional. So it is not necessary to line up all the guards at the same
+except that desugaring does not insert semicolons.
+So it is not necessary to line up all the guards at the same
 column; this is consistent with the way guards work in function
 definitions and case expressions.
 
