@@ -32,7 +32,7 @@ import GHC.Generics
 
 import GHC.Exts
 import Data.Array.Base (UArray(..))
-
+import qualified GHC.Exts.Heap as Heap
 
 #include "MachDeps.h"
 
@@ -62,8 +62,8 @@ data ResolvedBCO
    -- | A resolved static constructor
    -- See Note [Static constructors in Bytecode]
    | ResolvedStaticCon {
-        resolvedBCOIsLE          :: Bool,
-        resolvedStaticConInfoPtr :: {-# UNPACK #-} !Word, -- ^ info ptr Addr# as a Word
+        resolvedBCOIsLE          :: !Bool,
+        resolvedStaticConInfoPtr :: !(RemotePtr Heap.StgInfoTable),
         resolvedStaticConArity   :: {-# UNPACK #-} !Word,
         -- ^ how many words are used for the payload of the static constructor
         -- (size of ptrs and (packed) non-ptrs combined)
