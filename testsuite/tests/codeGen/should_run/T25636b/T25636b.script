@@ -1,0 +1,10 @@
+:set -XMagicHash
+import GHC.Exts
+import GHC.Word
+:{
+data Foo = Foo Word8# Word16#
+f = Foo (wordToWord8# 1##) (wordToWord16# 2##)
+unFoo :: Foo -> (Word8, Word16)
+unFoo (Foo a b) = (W8# a, W16# b)
+:}
+print (unFoo f)
