@@ -46,6 +46,7 @@ import GHC.Types.Unique.DFM
 import Data.Array.Unboxed
 import Foreign.Ptr
 import GHC.Exts
+import qualified GHC.Exts.Heap as Heap
 
 {- |
   Linking interpretables into something we can run
@@ -80,12 +81,12 @@ linkBCO interp pkgs_loaded bytecode_state bco_ix unl_bco = do
       , unlinkedStaticConDataConName
       , unlinkedStaticConIsUnlifted
       } -> do
-        Ptr itbl_ptr# <- lookupIE interp pkgs_loaded bytecode_state unlinkedStaticConDataConName
+        itbl_ptr <- lookupIE interp pkgs_loaded bytecode_state unlinkedStaticConDataConName
         lits <- doLits lits0
         ptrs <- doPtrs ptrs0
         return ResolvedStaticCon
           { resolvedBCOIsLE = isLittleEndian
-          , resolvedStaticConInfoPtr = W# (int2Word# (addr2Int# itbl_ptr#))
+          , resolvedStaticConInfoPtr = itbl_ptr
           , resolvedStaticConArity = sizeFlatBag lits0 + sizeFlatBag ptrs0
           , resolvedStaticConLits = lits
           , resolvedStaticConPtrs = ptrs
@@ -114,13 +115,13 @@ lookupLiteral :: Interp -> PkgsLoaded -> BytecodeLoaderState -> BCONPtr -> IO Wo
 lookupLiteral interp pkgs_loaded bytecode_state ptr = case ptr of
   BCONPtrWord lit -> return lit
   BCONPtrLbl  sym -> do
-    Ptr a# <- lookupStaticPtr interp sym
+    Ptr a# <- fromRemotePtr <$> lookupStaticPtr interp sym
     return (W# (int2Word# (addr2Int# a#)))
   BCONPtrItbl nm -> do
-    Ptr a# <- lookupIE interp pkgs_loaded bytecode_state nm
+    (Ptr a#) <- fromRemotePtr <$> lookupIE interp pkgs_loaded bytecode_state nm
     return (W# (int2Word# (addr2Int# a#)))
   BCONPtrAddr nm -> do
-    Ptr a# <- lookupAddr interp pkgs_loaded bytecode_state nm
+    Ptr a# <- fromRemotePtr <$> lookupAddr interp pkgs_loaded bytecode_state nm
     return (W# (int2Word# (addr2Int# a#)))
   BCONPtrStr bs -> do
     RemotePtr p <- fmap head $ interpCmd interp $ MallocStrings [bs]
@@ -139,7 +140,7 @@ lookupLiteral interp pkgs_loaded bytecode_state ptr = case ptr of
         case toRemotePtr nullPtr of
           RemotePtr p -> pure $ fromIntegral p
 
-lookupStaticPtr :: Interp -> FastString -> IO (Ptr ())
+lookupStaticPtr :: Interp -> FastString -> IO (RemotePtr ())
 lookupStaticPtr interp addr_of_label_string = do
   m <- lookupSymbol interp (IFaststringSymbol addr_of_label_string)
   case m of
@@ -147,30 +148,30 @@ lookupStaticPtr interp addr_of_label_string = do
     Nothing  -> linkFail "GHC.ByteCode.Linker: can't find label"
                   (ppr addr_of_label_string)
 
-lookupIE :: Interp -> PkgsLoaded -> BytecodeLoaderState -> Name -> IO (Ptr ())
+lookupIE :: Interp -> PkgsLoaded -> BytecodeLoaderState -> Name -> IO (RemotePtr Heap.StgInfoTable)
 lookupIE interp pkgs_loaded bytecode_state con_nm =
   case lookupInfoTableBytecodeState bytecode_state con_nm of
-    Just (_, ItblPtr a) -> return (fromRemotePtr (castRemotePtr a))
+    Just (_, ItblPtr a) -> return a
     Nothing -> do -- try looking up in the object files.
        let sym_to_find1 = IConInfoSymbol con_nm
        m <- lookupHsSymbol interp pkgs_loaded sym_to_find1
        case m of
-          Just addr -> return addr
+          Just addr -> return (castRemotePtr addr)
           Nothing
              -> do -- perhaps a nullary constructor?
                    let sym_to_find2 = IStaticInfoSymbol con_nm
                    n <- lookupHsSymbol interp pkgs_loaded sym_to_find2
                    case n of
-                      Just addr -> return addr
+                      Just addr -> return (castRemotePtr addr)
                       Nothing   -> linkFail "GHC.ByteCode.Linker.lookupIE"
                                       (ppr sym_to_find1 <> " or " <>
                                        ppr sym_to_find2)
 
 -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode
-lookupAddr :: Interp -> PkgsLoaded -> BytecodeLoaderState -> Name -> IO (Ptr ())
+lookupAddr :: Interp -> PkgsLoaded -> BytecodeLoaderState -> Name -> IO (RemotePtr ())
 lookupAddr interp pkgs_loaded bytecode_state addr_nm = do
   case lookupAddressBytecodeState bytecode_state addr_nm of
-    Just (_, AddrPtr ptr) -> return (fromRemotePtr ptr)
+    Just (_, AddrPtr ptr) -> return ptr
     Nothing -> do -- try looking up in the object files.
       let sym_to_find = IBytesSymbol addr_nm
                           -- see Note [Bytes label] in GHC.Cmm.CLabel
@@ -185,7 +186,7 @@ lookupPrimOp interp pkgs_loaded primop = do
   let sym_to_find = primopToCLabel primop "closure"
   m <- lookupHsSymbol interp pkgs_loaded (IClosureSymbol (Id.idName $ primOpId primop))
   case m of
-    Just p -> return (toRemotePtr p)
+    Just p -> return p
     Nothing -> linkFail "GHC.ByteCode.Linker.lookupCE(primop)" (text sym_to_find)
 
 resolvePtr
@@ -212,7 +213,7 @@ resolvePtr interp pkgs_loaded bco_loader_state bco_ix ptr = case ptr of
           let sym_to_find = IClosureSymbol nm
           m <- lookupHsSymbol interp pkgs_loaded sym_to_find
           case m of
-            Just p -> return (ResolvedBCOStaticPtr (toRemotePtr p))
+            Just p -> return (ResolvedBCOStaticPtr p)
             Nothing -> linkFail "GHC.ByteCode.Linker.lookupCE" (ppr sym_to_find)
 
   BCOPtrPrimOp op
@@ -229,7 +230,7 @@ resolvePtr interp pkgs_loaded bco_loader_state bco_ix ptr = case ptr of
 -- loaded units.
 --
 -- See Note [Looking up symbols in the relevant objects].
-lookupHsSymbol :: Interp -> PkgsLoaded -> InterpSymbol (Suffix s) -> IO (Maybe (Ptr ()))
+lookupHsSymbol :: Interp -> PkgsLoaded -> InterpSymbol (Suffix s) -> IO (Maybe (RemotePtr ()))
 lookupHsSymbol interp pkgs_loaded sym_to_find = do
   massertPpr (isExternalName (interpSymbolName sym_to_find)) (ppr sym_to_find)
   let pkg_id = moduleUnitId $ nameModule (interpSymbolName sym_to_find)
