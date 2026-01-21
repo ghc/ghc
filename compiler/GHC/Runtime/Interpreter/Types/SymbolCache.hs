@@ -22,15 +22,15 @@ import GHC.Prelude
 import GHC.Types.Unique.FM
 import GHC.Types.Name
 import GHC.Data.FastString
-import Foreign
 
 import Control.Concurrent
 import GHC.Utils.Outputable
 import GHC.TypeLits
+import GHCi.RemoteTypes
 
 
 -- The symbols records the suffix which each cache deals with.
-newtype SymbolCache (s :: Symbol) = SymbolCache { _getSymbolCache :: UniqFM Name (Ptr ()) }
+newtype SymbolCache (s :: Symbol) = SymbolCache { _getSymbolCache :: UniqFM Name (RemotePtr ()) }
 
 -- Each cache is keyed by Name, there is one cache for each type of symbol we will
 -- potentially lookup. The caches are keyed by 'Name' so that it is not necessary to consult
@@ -40,7 +40,7 @@ data InterpSymbolCache = InterpSymbolCache {
       , interpConInfoCache :: MVar (SymbolCache "con_info")
       , interpStaticInfoCache :: MVar (SymbolCache "static_info")
       , interpBytesCache   :: MVar (SymbolCache "bytes")
-      , interpFaststringCache   :: MVar (UniqFM FastString (Ptr ()))
+      , interpFaststringCache   :: MVar (UniqFM FastString (RemotePtr ()))
       }
 
 data SuffixOrInterpreted = Suffix Symbol | Interpreted
@@ -87,26 +87,26 @@ interpSymbolSuffix (IBytesSymbol {})      = "bytes"
 emptySymbolCache :: SymbolCache s
 emptySymbolCache = SymbolCache emptyUFM
 
-lookupSymbolCache :: InterpSymbol (Suffix s) -> SymbolCache s -> Maybe (Ptr ())
+lookupSymbolCache :: InterpSymbol (Suffix s) -> SymbolCache s -> Maybe (RemotePtr ())
 lookupSymbolCache s (SymbolCache cache) = lookupUFM cache (interpSymbolName s)
 
-insertSymbolCache :: InterpSymbol (Suffix s) -> Ptr () -> SymbolCache s -> SymbolCache s
+insertSymbolCache :: InterpSymbol (Suffix s) -> RemotePtr () -> SymbolCache s -> SymbolCache s
 insertSymbolCache s v (SymbolCache cache) = SymbolCache (addToUFM cache (interpSymbolName s) v)
 
-lookupInterpSymbolCache :: InterpSymbol s -> InterpSymbolCache -> IO (Maybe (Ptr ()))
+lookupInterpSymbolCache :: InterpSymbol s -> InterpSymbolCache -> IO (Maybe (RemotePtr ()))
 lookupInterpSymbolCache = withInterpSymbolCache
                             (\(IFaststringSymbol f) mvar_var -> (\cache -> lookupUFM cache f) <$> readMVar mvar_var)
                             (\s mvar_var -> lookupSymbolCache s <$> readMVar mvar_var)
 
 
 updateInterpSymbolCache :: InterpSymbol s
-                                 -> InterpSymbolCache -> Ptr () -> IO ()
+                                 -> InterpSymbolCache -> RemotePtr () -> IO ()
 updateInterpSymbolCache = withInterpSymbolCache
                             (\(IFaststringSymbol f) mvar_var v -> modifyMVar_ mvar_var (\cache -> pure $ addToUFM cache f v))
                             (\s mvar_var v -> modifyMVar_ mvar_var (\cache -> pure $ insertSymbolCache s v cache))
 
 withInterpSymbolCache ::
-                (InterpSymbol Interpreted -> MVar (UniqFM FastString (Ptr ())) -> r)
+                (InterpSymbol Interpreted -> MVar (UniqFM FastString (RemotePtr ())) -> r)
                 -> (forall x . InterpSymbol (Suffix x) -> MVar (SymbolCache x) -> r)
                 -> InterpSymbol s
                 -> InterpSymbolCache
