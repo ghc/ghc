@@ -52,7 +52,7 @@ module GHC.Internal.IO (
 import GHC.Internal.Base
 import GHC.Internal.ST
 import GHC.Internal.Exception
-import GHC.Internal.Exception.Type (NoBacktrace(..), WhileHandling(..), HasExceptionContext, ExceptionWithContext(..))
+import GHC.Internal.Exception.Type (NoBacktrace(..), whileHandling, WhileHandling(..), HasExceptionContext, ExceptionWithContext(..))
 import GHC.Internal.Show
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce )
@@ -363,7 +363,7 @@ getMaskingState  = IO $ \s ->
 
 onException :: IO a -> IO b -> IO a
 onException io what = io `catchExceptionNoPropagate` \e -> do
-    _ <- what
+    _ <- annotateIO (whileHandling e) what
     rethrowIO (e :: ExceptionWithContext SomeException)
 
 -- | Executes an IO computation with asynchronous

@@ -203,7 +203,7 @@ tryJust p a = catchJust p (Right `fmap` a) (return . Left)
 -- exception raised by the computation.
 onException :: IO a -> IO b -> IO a
 onException io what = io `catchNoPropagate` \e -> do
-                        _ <- what
+                        _ <- annotateIO (whileHandling e) what
                         rethrowIO (e :: ExceptionWithContext SomeException)
 
 -----------------------------------------------------------------------------
