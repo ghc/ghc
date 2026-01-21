@@ -1,0 +1,7 @@
+T26759a: Uncaught exception ghc-internal:GHC.Internal.Exception.ErrorCall:
+
+outer failure
+
+HasCallStack backtrace:
+  throwIO, called at T26759a.hs:6:21 in main:Main
+
