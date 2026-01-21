@@ -1,0 +1,16 @@
+:set -XMagicHash
+import GHC.Exts
+import GHC.Word
+:{
+data J = J Char# Word16# Word8# Word8#
+j = J 'A'# (wordToWord16# 258##) (wordToWord8# 3##) (wordToWord8# 4##)
+unJ :: J -> (Char, Word16, Word8, Word8)
+unJ (J a b c d) = (C# a, W16# b, W8# c, W8# d)
+
+data K = K Word16# Char# Word8# Char#
+k = K (wordToWord16# 1286##) 'B'# (wordToWord8# 7##) 'C'#
+unK :: K -> (Word16, Char, Word8, Char)
+unK (K a b c d) = (W16# a, C# b, W8# c, C# d)
+:}
+print (unJ j)
+print (unK k)
