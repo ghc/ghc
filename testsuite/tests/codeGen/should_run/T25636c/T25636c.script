@@ -1,0 +1,28 @@
+:set -XMagicHash
+import GHC.Exts
+import GHC.Word
+:{
+data A = A Word8# Word16# Word8#
+a = A (wordToWord8# 1##) (wordToWord16# 258##) (wordToWord8# 3##)
+unA :: A -> (Word8, Word16, Word8)
+unA (A x y z) = (W8# x, W16# y, W8# z)
+
+data B = B Word16# Word8# Word8#
+b = B (wordToWord16# 772##) (wordToWord8# 5##) (wordToWord8# 6##)
+unB :: B -> (Word16, Word8, Word8)
+unB (B x y z) = (W16# x, W8# y, W8# z)
+
+data C = C Word8# Word8# Word8# Word8#
+c = C (wordToWord8# 7##) (wordToWord8# 8##) (wordToWord8# 9##) (wordToWord8# 10##)
+unC :: C -> (Word8, Word8, Word8, Word8)
+unC (C w x y z) = (W8# w, W8# x, W8# y, W8# z)
+
+data D = D Word32# Word8# Word16# Word8#
+d = D (wordToWord32# 16909060##) (wordToWord8# 11##) (wordToWord16# 3086##) (wordToWord8# 13##)
+unD :: D -> (Word32, Word8, Word16, Word8)
+unD (D w x y z) = (W32# w, W8# x, W16# y, W8# z)
+:}
+print (unA a)
+print (unB b)
+print (unC c)
+print (unD d)

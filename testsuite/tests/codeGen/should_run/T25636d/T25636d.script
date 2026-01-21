@@ -1,0 +1,28 @@
+:set -XMagicHash
+import GHC.Exts
+import GHC.Int
+:{
+data E = E Int8# Int16# Int8#
+e = E (intToInt8# (-1#)) (intToInt16# (-258#)) (intToInt8# 3#)
+unE :: E -> (Int8, Int16, Int8)
+unE (E x y z) = (I8# x, I16# y, I8# z)
+
+data F = F Int16# Int8# Int8#
+f = F (intToInt16# (-1025#)) (intToInt8# 6#) (intToInt8# (-7#))
+unF :: F -> (Int16, Int8, Int8)
+unF (F x y z) = (I16# x, I8# y, I8# z)
+
+data G = G Int8# Int8# Int8# Int8#
+g = G (intToInt8# (-8#)) (intToInt8# 9#) (intToInt8# (-10#)) (intToInt8# 11#)
+unG :: G -> (Int8, Int8, Int8, Int8)
+unG (G w x y z) = (I8# w, I8# x, I8# y, I8# z)
+
+data H = H Int32# Int8# Int16# Int8#
+h = H (intToInt32# (-16909060#)) (intToInt8# 12#) (intToInt16# (-3342#)) (intToInt8# 14#)
+unH :: H -> (Int32, Int8, Int16, Int8)
+unH (H w x y z) = (I32# w, I8# x, I16# y, I8# z)
+:}
+print (unE e)
+print (unF f)
+print (unG g)
+print (unH h)

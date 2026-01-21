@@ -1,0 +1,9 @@
+:set -XMagicHash
+import GHC.Exts
+:{
+data F = F Float# Float#
+f = F 1.0# 2.0#
+unF :: F -> (Float, Float)
+unF (F a b) = (F# a, F# b)
+:}
+print (unF f)
