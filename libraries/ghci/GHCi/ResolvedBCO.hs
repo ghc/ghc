@@ -20,7 +20,7 @@ import GHC.Generics
 import Foreign.Storable
 import GHC.Exts
 import Data.Array.Base (IArray, UArray(..))
-
+import qualified GHC.Exts.Heap as Heap
 
 #include "MachDeps.h"
 
@@ -51,7 +51,7 @@ data ResolvedBCO
    -- See Note [Static constructors in Bytecode]
    | ResolvedStaticCon {
         resolvedBCOIsLE          :: Bool,
-        resolvedStaticConInfoPtr :: {-# UNPACK #-} !Word, -- ^ info ptr Addr# as a Word
+        resolvedStaticConInfoPtr :: !(RemotePtr Heap.StgInfoTable),
         resolvedStaticConArity   :: {-# UNPACK #-} !Word,
         resolvedStaticConLits    :: BCOByteArray Word,
         resolvedStaticConPtrs    :: SizedSeq ResolvedBCOPtr,

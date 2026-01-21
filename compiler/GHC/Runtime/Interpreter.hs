@@ -105,7 +105,6 @@ import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (mask)
 import Data.Binary
 import Data.ByteString (ByteString)
-import Foreign hiding (void)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Directory
@@ -461,29 +460,29 @@ handleSeqHValueStatus interp unit_env eval_status =
 initObjLinker :: Interp -> IO ()
 initObjLinker interp = interpCmd interp InitLinker
 
-lookupSymbol :: Interp -> InterpSymbol s -> IO (Maybe (Ptr ()))
+lookupSymbol :: Interp -> InterpSymbol s -> IO (Maybe (RemotePtr ()))
 lookupSymbol interp str = withSymbolCache interp str $
   case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
+    InternalInterp -> run (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
 #endif
     ExternalInterp ext -> case ext of
-      ExtIServ i -> withIServ i $ \inst -> fmap fromRemotePtr <$> do
+      ExtIServ i -> withIServ i $ \inst -> do
         uninterruptibleMask_ $
           sendMessage inst (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
-      ExtWasm i -> withWasmInterp i $ \inst -> fmap fromRemotePtr <$> do
+      ExtWasm i -> withWasmInterp i $ \inst -> do
         uninterruptibleMask_ $
           sendMessage inst (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
 
-lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> InterpSymbol s -> IO (Maybe (Ptr ()))
+lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> InterpSymbol s -> IO (Maybe (RemotePtr ()))
 lookupSymbolInDLL interp dll str = withSymbolCache interp str $
   case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (unpackFS (interpSymbolToCLabel str)))
+    InternalInterp -> run (LookupSymbolInDLL dll (unpackFS (interpSymbolToCLabel str)))
 #endif
     ExternalInterp ext -> case ext of
-      ExtIServ i -> withIServ i $ \inst -> fmap fromRemotePtr <$> do
+      ExtIServ i -> withIServ i $ \inst -> do
         uninterruptibleMask_ $
           sendMessage inst (LookupSymbolInDLL dll (unpackFS (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
@@ -529,11 +528,11 @@ lookupClosure interp str =
 withSymbolCache :: Interp
                 -> InterpSymbol s
                 -- ^ The symbol we are looking up in the cache
-                -> IO (Maybe (Ptr ()))
+                -> IO (Maybe (RemotePtr ()))
                 -- ^ An action which determines the address of the symbol we
                 -- are looking up in the cache, which is run if there is a
                 -- cache miss. The result will be cached.
-                -> IO (Maybe (Ptr ()))
+                -> IO (Maybe (RemotePtr ()))
 withSymbolCache interp str determine_addr = do
 
   -- Profiling of GHCi showed a lot of time and allocation spent
@@ -587,13 +586,13 @@ unloadObj interp path = do
 -- GHC process, so we must make paths absolute before sending them
 -- over.
 
-addLibrarySearchPath :: Interp -> String -> IO (Ptr ())
+addLibrarySearchPath :: Interp -> String -> IO (RemotePtr ())
 addLibrarySearchPath interp str =
-  fromRemotePtr <$> interpCmd interp (AddLibrarySearchPath str)
+  interpCmd interp (AddLibrarySearchPath str)
 
-removeLibrarySearchPath :: Interp -> Ptr () -> IO Bool
+removeLibrarySearchPath :: Interp -> RemotePtr () -> IO Bool
 removeLibrarySearchPath interp p =
-  interpCmd interp (RemoveLibrarySearchPath (toRemotePtr p))
+  interpCmd interp (RemoveLibrarySearchPath p)
 
 resolveObjs :: Interp -> IO SuccessFlag
 resolveObjs interp = successIf <$> interpCmd interp ResolveObjs

@@ -238,8 +238,7 @@ linkBCO' arr unl_arr resolved_obj =
 
         literals_barr = barr (getBCOByteArray resolvedStaticConLits)
 
-        !(W# itbl_ptr_w#) = resolvedStaticConInfoPtr
-        !(Ptr itbl_ptr#)  = Ptr (int2Addr# (word2Int# itbl_ptr_w#))
+        !(Ptr itbl_ptr#) = fromRemotePtr resolvedStaticConInfoPtr
 
       PtrsArr marr <- mkPtrsArray arr unl_arr n_ptrs ptrs
 
