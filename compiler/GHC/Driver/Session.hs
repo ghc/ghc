@@ -3038,7 +3038,13 @@ forceRecompile = do dfs <- liftEwM getCmdLineState
 
 
 setVerbosity :: Maybe Int -> DynP ()
-setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
+setVerbosity mb_n = upd (\dfs -> setVerbosityFlags mb_n dfs)
+  where
+    setVerbosityFlags :: Maybe Int -> DynFlags -> DynFlags
+    setVerbosityFlags Nothing dynFlags = dynFlags{ verbosity = 3 }
+    setVerbosityFlags (Just n) dynFlags
+      | n <= 1 = gopt_set (dynFlags{ verbosity = n }) Opt_HideSourcePaths
+      | otherwise = dynFlags{verbosity = n}
 
 setDebugLevel :: Maybe Int -> DynP ()
 setDebugLevel mb_n =
@@ -3645,6 +3651,7 @@ makeDynFlagsConsistent dflags
           warn = "Hpc can't be used with " ++ backendDescription (backend dflags) ++
                  ". Ignoring -fhpc."
       in loop dflags' warn
+
 
  | backendSwappableWithViaC (backend dflags) &&
    platformUnregisterised (targetPlatform dflags)

@@ -712,8 +712,7 @@ backendSupportsHpc (Named NCG)         = True
 backendSupportsHpc (Named LLVM)        = True
 backendSupportsHpc (Named ViaC)        = True
 backendSupportsHpc (Named JavaScript)  = False
--- TODO: @terrorjack thinks that the bytecode backend should support HPC now since (!13493)
-backendSupportsHpc (Named Bytecode) = False
+backendSupportsHpc (Named Bytecode)    = True
 backendSupportsHpc (Named NoBackend)   = True
 
 -- | This flag says whether the back end supports foreign

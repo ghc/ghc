@@ -62,9 +62,10 @@ import GHCi.RemoteTypes
 import GHC.Iface.Load
 import GHCi.Message
 
+import GHC.ByteCode.Asm
 import GHC.ByteCode.Breakpoints
 import GHC.ByteCode.Linker
-import GHC.ByteCode.Asm
+import GHC.ByteCode.Serialize
 import GHC.ByteCode.Types
 
 import GHC.Stack.CCS
@@ -92,8 +93,9 @@ import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModIface
 import GHC.Unit.State as Packages
 
-import qualified GHC.Data.ShortText as ST
 import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Linker.Deps
 import GHC.Linker.MacOS
@@ -131,7 +133,6 @@ import qualified GHC.Runtime.Interpreter as GHCi
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Map.Strict as M
 import Foreign.Ptr (nullPtr)
-import GHC.ByteCode.Serialize
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -219,7 +220,7 @@ lookupFromLoadedEnv interp name = do
 -- | Load the module containing the given Name and get its associated 'HValue'.
 --
 -- Throws a 'ProgramError' if loading fails or the name cannot be found.
-loadName :: Interp -> HscEnv -> Name -> IO (ForeignHValue, [Linkable], PkgsLoaded)
+loadName :: Interp -> HscEnv -> Name -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 loadName interp hsc_env name = do
   initLoaderState interp hsc_env
   modifyLoaderState interp $ \pls0 -> do
@@ -249,7 +250,7 @@ loadDependencies
   -> LoaderState
   -> SrcSpan
   -> [Module]
-  -> IO (LoaderState, SuccessFlag, [Linkable], PkgsLoaded) -- ^ returns the set of linkables required
+  -> IO (LoaderState, SuccessFlag, [LinkableUsage], PkgsLoaded) -- ^ returns the set of linkables required
 -- When called, the loader state must have been initialized (see `initLoaderState`)
 loadDependencies interp hsc_env pls span needed_mods = do
    let opts = initLinkDepsOpts hsc_env
@@ -636,7 +637,7 @@ initLinkDepsOpts hsc_env = opts
     dflags = hsc_dflags hsc_env
 
     ldLoadByteCode mod locn = do
-      bytecode_linkable <-  findBytecodeLinkableMaybe hsc_env mod locn
+      bytecode_linkable <-  findBytecodeLinkableMaybe hsc_env locn
       case bytecode_linkable of
         Nothing -> findWholeCoreBindings hsc_env mod
         Just bco -> return (Just bco)
@@ -650,19 +651,14 @@ findWholeCoreBindings hsc_env mod = do
       sequence (lookupModuleEnv eps_iface_bytecode mod)
 
 
-findBytecodeLinkableMaybe :: HscEnv -> Module -> ModLocation -> IO (Maybe Linkable)
-findBytecodeLinkableMaybe hsc_env mod locn = do
+findBytecodeLinkableMaybe :: HscEnv -> ModLocation -> IO (Maybe Linkable)
+findBytecodeLinkableMaybe hsc_env locn = do
   let bytecode_fn    = ml_bytecode_file locn
       bytecode_fn_os = ml_bytecode_file_ospath locn
   maybe_bytecode_time <- modificationTimeIfExists bytecode_fn_os
   case maybe_bytecode_time of
     Nothing -> return Nothing
     Just bytecode_time -> do
-      -- Also load the interface, for reasons to do with recompilation avoidance.
-      -- See Note [Recompilation avoidance with bytecode objects]
-      _ <- initIfaceLoad hsc_env $
-             loadInterface (text "get_reachable_nodes" <+> parens (ppr mod))
-                 mod ImportBySystem
       bco <- readBinByteCode hsc_env bytecode_fn
       return $ Just $ mkModuleByteCodeLinkable bytecode_time bco
 
@@ -714,7 +710,7 @@ get_reachable_nodes hsc_env mods
   ********************************************************************* -}
 
 -- | Load the dependencies of a linkable, and then load the linkable itself.
-loadDecls :: Interp -> HscEnv -> SrcSpan -> Linkable -> IO ([Linkable], PkgsLoaded)
+loadDecls :: Interp -> HscEnv -> SrcSpan -> Linkable -> IO ([LinkableUsage], PkgsLoaded)
 loadDecls interp hsc_env span linkable = do
     -- Initialise the linker (if it's not been done already)
     initLoaderState interp hsc_env
@@ -814,7 +810,7 @@ loadModuleLinkables interp hsc_env pls keep_spec linkables
     (objs, bcos) = partitionLinkables linkables
 
 
-linkableInSet :: Linkable -> LinkableSet -> Bool
+linkableInSet :: Linkable -> LinkableSet LinkableUsage -> Bool
 linkableInSet l objs_loaded =
   case lookupModuleEnv objs_loaded (linkableModule l) of
         Nothing -> False
@@ -943,17 +939,17 @@ dynLoadObjs interp hsc_env pls objs = do
                         then addWay WayProf
                         else id
 
-rmDupLinkables :: LinkableSet    -- Already loaded
-               -> [Linkable]    -- New linkables
-               -> (LinkableSet,  -- New loaded set (including new ones)
+rmDupLinkables :: LinkableSet LinkableUsage  -- ^ Already loaded
+               -> [Linkable]    -- ^ New linkables
+               -> (LinkableSet LinkableUsage,  -- New loaded set (including new ones)
                    [Linkable])  -- New linkables (excluding dups)
 rmDupLinkables already ls
   = go already [] ls
   where
-    go already extras [] = (already, extras)
-    go already extras (l:ls)
+    go !already extras [] = (already, extras)
+    go !already extras (l:ls)
         | linkableInSet l already = go already     extras     ls
-        | otherwise               = go (extendModuleEnv already (linkableModule l) l) (l:extras) ls
+        | otherwise               = go (extendModuleEnv already (linkableModule l) $! mkLinkableUsage l) (l:extras) ls
 
 {- **********************************************************************
 
@@ -1010,6 +1006,8 @@ dynLinkCompiledByteCode interp pkgs_loaded whole_bytecode_state traverse_bytecod
           let ce2 = extendClosureEnv (closure_env (bco_linker_env bytecode_state)) new_binds
           -- Add SPT entries
           mapM_ (linkSptEntry interp ce2) (concatMap bc_spt_entries cbcs)
+          -- Load HPC modules
+          mapM_ (linkHpcEntry interp . bc_hpc_info) cbcs
           return $! bytecode_state { bco_linker_env = (bco_linker_env bytecode_state) { closure_env = ce2 } }
 
 -- | Register SPT entries for this module in the interpreter
@@ -1022,8 +1020,14 @@ linkSptEntry interp ce (SptEntry name fpr) = do
     Nothing -> pprPanic "linkSptEntry" (ppr name)
     Just (_, hval) -> addSptEntry interp fpr hval
 
-
-
+linkHpcEntry :: Interp -> Strict.Maybe ByteCodeHpcInfo -> IO ()
+linkHpcEntry _interp Strict.Nothing = pure ()
+linkHpcEntry interp (Strict.Just info) = do
+  addHpcModule interp
+    (bchi_module_name info)
+    (bchi_tick_count info)
+    (bchi_hash info)
+    (bchi_tickbox_name info)
 
 -- Link a bunch of BCOs and return references to their values
 linkSomeBCOs :: Interp
@@ -1106,7 +1110,7 @@ unload_wkr interp pls@LoaderState{..}  = do
 
   -- If we unloaded any object files at all, we need to purge the cache
   -- of lookupSymbol results.
-  when (not (null (filter (not . null . linkableObjs) linkables_to_unload))) $
+  when (not (null (filter (not . null . linkableUsageObjs) linkables_to_unload))) $
     purgeLookupSymbolCache interp
 
   let !new_pls = pls { bco_loader_state = modifyHomePackageBytecodeState bco_loader_state $ \_ -> emptyBytecodeState,
@@ -1116,7 +1120,7 @@ unload_wkr interp pls@LoaderState{..}  = do
 
   return new_pls
   where
-    unloadObjs :: Linkable -> IO ()
+    unloadObjs :: LinkableUsage -> IO ()
     unloadObjs lnk
       | interpreterDynamic interp = return ()
         -- We don't do any cleanup when linking objects with the
@@ -1124,7 +1128,7 @@ unload_wkr interp pls@LoaderState{..}  = do
         -- not much benefit.
 
       | otherwise
-      = mapM_ (unloadObj interp) (linkableObjs lnk)
+      = mapM_ (unloadObj interp) (linkableUsageObjs lnk)
                 -- The components of a BCO linkable may contain
                 -- dot-o files (generated from C stubs).
                 --
@@ -1824,7 +1828,7 @@ allocateCCS interp ce mbss
             ccs <- {- one ccs ptr per tick index -}
               mkCostCentres
                 interp
-                (moduleNameString $ moduleName modBreaks_module)
+                (moduleNameFS $ moduleName modBreaks_module)
                 (elems modBreaks_ccs)
             return $ M.fromList $
               zipWith (\el ix -> (BreakpointId modBreaks_module ix, el)) ccs [0..]

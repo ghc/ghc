@@ -101,6 +101,13 @@ disInstr ( StgBCO *bco, int pc )
          }
          debugBelch("\n");
          break; }
+      case bci_HPC_TICK: {
+         W_ p1, info_wix;
+         p1       = BCO_GET_LARGE_ARG;
+         info_wix = BCO_READ_NEXT_32;
+         debugBelch("HPC_TICK "); printPtr((StgPtr)literals[p1]);
+         debugBelch(" %" FMT_Word "\n", info_wix);
+         break; }
       case bci_SWIZZLE: {
          W_     stkoff = BCO_GET_LARGE_ARG;
          StgInt by     = BCO_GET_LARGE_ARG;

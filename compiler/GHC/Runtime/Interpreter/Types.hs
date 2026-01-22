@@ -48,6 +48,7 @@ import GHC.Linker.Types
 import GHCi.RemoteTypes
 import GHCi.Message         ( Pipe )
 
+import GHC.Data.FastString.Env
 import GHC.Platform
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHC.Platform.Ways
@@ -76,6 +77,9 @@ data Interp = Interp
 
   , interpSymbolCache :: !InterpSymbolCache
       -- ^ LookupSymbol cache
+
+  , interpStringCache :: !(MVar (FastStringEnv (RemotePtr ())))
+      -- ^ MallocStrings cache
   }
 
 data InterpInstance

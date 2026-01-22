@@ -59,7 +59,7 @@ T25837:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(TEST_HC_OPTS_DYN) -ticky -c T25837Module.hs
 
 	# Now try to compile with -dynamic-too, should detect the mismatch and recompile
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -dynamic-too --make T25837Module.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -fno-hide-source-paths -dynamic-too --make T25837Module.hs
 
 	# Verify that both interfaces now match (optional check)
 	$(call checkExists,T25837Module.hi)

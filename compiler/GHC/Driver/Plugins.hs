@@ -344,7 +344,7 @@ data Plugins = Plugins
       -- The purpose of this field is to cache the plugins so they
       -- don't have to be loaded each time they are needed.  See
       -- 'GHC.Runtime.Loader.initializePlugins'.
-  , loadedPluginDeps :: !([Linkable], PkgsLoaded)
+  , loadedPluginDeps :: !([LinkableUsage], PkgsLoaded)
   -- ^ The object files required by the loaded plugins
   -- See Note [Plugin dependencies]
   }
@@ -407,7 +407,7 @@ loadExternalPlugins ps = do
         symbol
           | null unit = ztmp
           | otherwise = zEncodeString unit ++ "_" ++ ztmp
-    plugin <- lookupSymbol symbol >>= \case
+    plugin <- lookupSymbol (utf8EncodeShortByteString symbol) >>= \case
       Nothing -> pprPanic "loadExternalPlugins"
                   (vcat [ text "Symbol not found"
                         , text "  Library path: " <> text path
