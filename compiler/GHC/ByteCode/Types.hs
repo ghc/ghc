@@ -8,6 +8,8 @@
 --  (c) The University of Glasgow 2002-2006
 --
 
+#include "Bytecodes.h"
+
 -- | Bytecode assembler types
 module GHC.ByteCode.Types
   ( CompiledByteCode(..), seqCompiledByteCode
@@ -15,6 +17,7 @@ module GHC.ByteCode.Types
   , FFIInfo(..)
   , RegBitmap(..)
   , NativeCallType(..), NativeCallInfo(..), voidTupleReturnInfo, voidPrimCallInfo
+  , mAX_SMALL_TUPLE_CTOI
   , ByteOff(..), WordOff(..), HalfWord(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
@@ -23,6 +26,9 @@ module GHC.ByteCode.Types
 
   -- * Mod Breaks
   , ModBreaks (..), BreakpointId(..), BreakTickIndex
+
+  -- * Hpc Info
+  , ByteCodeHpcInfo(..)
 
   -- * Internal Mod Breaks
   , InternalModBreaks(..), CgBreakInfo(..), seqInternalModBreaks
@@ -34,6 +40,7 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Data.FlatBag
+import qualified GHC.Data.Strict as Strict
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Binary
@@ -50,6 +57,7 @@ import GHCi.ResolvedBCO ( BCOByteArray(..), mkBCOByteArray )
 
 import Foreign
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 import GHC.Unit.Module
@@ -78,6 +86,28 @@ data CompiledByteCode = CompiledByteCode
     -- ^ Static pointer table entries which should be loaded along with the
     -- BCOs. See Note [Grand plan for static forms] in
     -- "GHC.Iface.Tidy.StaticPtrTable".
+
+  , bc_hpc_info :: !(Strict.Maybe ByteCodeHpcInfo)
+    -- ^ 'ByteCodeHpcInfo' that should be added to the run-time system when this 'CompiledByteCode'
+    -- object is loaded.
+    --
+    -- It is safe to load the same 'ByteCodeHpcInfo' multiple times.
+  }
+
+-- | ByteCode specific HPC information.
+--
+-- All fields are strict to avoid retaining references to bigger structures,
+-- for example the 'CgInteractiveGuts' from which 'ByteCodeHpcInfo' can be
+-- derived from
+data ByteCodeHpcInfo = ByteCodeHpcInfo
+  { bchi_module_name :: !ShortByteString
+  -- ^ Name of the module.
+  , bchi_tickbox_name :: !ShortByteString
+  -- ^ Name of the tick box that has been added via 'CStub'.
+  , bchi_tick_count :: {-# UNPACK #-} !Int
+  -- ^ Number of ticks.
+  , bchi_hash :: {-# UNPACK #-} !Int
+  -- ^ mix-file hash.
   }
 
 -- | A libffi ffi_cif function prototype.
@@ -161,6 +191,12 @@ voidTupleReturnInfo = NativeCallInfo NativeTupleReturn 0 emptyRegSet 0
 
 voidPrimCallInfo :: NativeCallInfo
 voidPrimCallInfo = NativeCallInfo NativePrimCall 0 emptyRegSet 0
+
+-- | Maximum nativeCallStackSpillSize for which we use a small
+-- stg_ctoi_tN frame (no old_spill slot, no TSO access) instead of
+-- the generic stg_ctoi_t frame.
+mAX_SMALL_TUPLE_CTOI :: WordOff
+mAX_SMALL_TUPLE_CTOI = MAX_SMALL_TUPLE_CTOI
 
 type ItblEnv = NameEnv (Name, ItblPtr)
 type AddrEnv = NameEnv (Name, AddrPtr)

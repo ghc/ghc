@@ -473,7 +473,16 @@ extern char **environ;
       SymI_HasDataProto(stg_ret_d_info)                                     \
       SymI_HasDataProto(stg_ret_l_info)                                     \
       SymI_HasDataProto(stg_ret_t_info)                                     \
-      SymI_HasDataProto(stg_ctoi_t)                                         \
+      SymI_HasDataProto(stg_ctoi_t_info)                                    \
+      SymI_HasDataProto(stg_ctoi_t0_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t1_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t2_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t3_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t4_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t5_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t6_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t7_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t8_info)                                   \
       SymI_HasDataProto(stg_primcall_info)                                  \
       SymI_HasDataProto(stg_gc_prim_p)                                      \
       SymI_HasDataProto(stg_gc_prim_pp)                                     \
@@ -589,6 +598,7 @@ extern char **environ;
       SymI_HasProto(hs_free_fun_ptr)                                    \
       SymI_HasProto(hs_hpc_rootModule)                                  \
       SymI_HasProto(hs_hpc_module)                                      \
+      SymI_HasProto(startupHpc)                                         \
       SymI_HasProto(hs_thread_done)                                     \
       SymI_HasProto(hs_try_putmvar)                                     \
       SymI_HasProto(hs_try_putmvar_with_value)                          \

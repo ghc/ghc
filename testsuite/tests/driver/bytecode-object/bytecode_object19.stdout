@@ -1,5 +1,5 @@
 Testing GHCi with .gbc file removal and reload...
-GHCi, version 9.15.20251003: https://www.haskell.org/ghc/  :? for help
+GHCi, version 9.15.20260122: https://www.haskell.org/ghc/  :? for help
 [1 of 1] Compiling BytecodeTest     ( BytecodeTest.hs, BytecodeTest.gbc )[main]
 Ok, one module loaded.
 ghci> ghci> [1 of 1] Compiling BytecodeTest     ( BytecodeTest.hs, BytecodeTest.gbc )[main] [Missing bytecode]

@@ -1,0 +1,12 @@
+section: bytecode
+synopsis: Enable the bytecode interpreter to work with :ghc-flag:`-fhpc`.
+issues: #27036
+mrs: !15843
+
+description: {
+  Allows producing :ghc-flag:`-fhpc` information with the bytecode interpreter.
+
+  We insert :ghc-flag:`-fhpc` ticks similar to how we insert :ghc-flag:`-fbreak-points` ticks.
+  `hpc` is started, when the first byte code object with :ghc-flag:`-fhpc` information is loaded into
+  the bytecode interpreter.
+}

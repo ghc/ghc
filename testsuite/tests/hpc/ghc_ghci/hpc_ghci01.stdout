@@ -1,0 +1,33 @@
+'z'
+100% expressions used (2/2)
+100% boolean coverage (0/0)
+     100% guards (0/0)
+     100% 'if' conditions (0/0)
+     100% qualifiers (0/0)
+100% alternatives used (0/0)
+100% local declarations used (0/0)
+100% top-level declarations used (2/2)
+-----<module A>-----
+100% expressions used (1/1)
+100% boolean coverage (0/0)
+     100% guards (0/0)
+     100% 'if' conditions (0/0)
+     100% qualifiers (0/0)
+100% alternatives used (0/0)
+100% local declarations used (0/0)
+100% top-level declarations used (1/1)
+-----<module B>-----
+100% expressions used (1/1)
+100% boolean coverage (0/0)
+     100% guards (0/0)
+     100% 'if' conditions (0/0)
+     100% qualifiers (0/0)
+100% alternatives used (0/0)
+100% local declarations used (0/0)
+100% top-level declarations used (1/1)
+Writing: B.hs.html
+Writing: A.hs.html
+Writing: hpc_index.html
+Writing: hpc_index_fun.html
+Writing: hpc_index_alt.html
+Writing: hpc_index_exp.html

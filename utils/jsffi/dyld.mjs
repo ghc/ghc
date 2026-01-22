@@ -1112,6 +1112,13 @@ class DyLD {
     }
     return 0;
   }
+
+  lookupSymbolPtr(symPtr, symLen) {
+    const sym = new TextDecoder("utf-8", { fatal: true }).decode(
+      new Uint8Array(this.#memory.buffer, symPtr, symLen)
+    );
+    return this.lookupSymbol(sym);
+  }
 }
 
 export async function main({ rpc, libdir, ghciSoPath, args }) {

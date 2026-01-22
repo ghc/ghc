@@ -554,72 +554,6 @@ void interp_shutdown( void ){
 
 #endif
 
-const StgPtr ctoi_tuple_infos[] = {
-    (StgPtr) &stg_ctoi_t0_info,
-    (StgPtr) &stg_ctoi_t1_info,
-    (StgPtr) &stg_ctoi_t2_info,
-    (StgPtr) &stg_ctoi_t3_info,
-    (StgPtr) &stg_ctoi_t4_info,
-    (StgPtr) &stg_ctoi_t5_info,
-    (StgPtr) &stg_ctoi_t6_info,
-    (StgPtr) &stg_ctoi_t7_info,
-    (StgPtr) &stg_ctoi_t8_info,
-    (StgPtr) &stg_ctoi_t9_info,
-    (StgPtr) &stg_ctoi_t10_info,
-    (StgPtr) &stg_ctoi_t11_info,
-    (StgPtr) &stg_ctoi_t12_info,
-    (StgPtr) &stg_ctoi_t13_info,
-    (StgPtr) &stg_ctoi_t14_info,
-    (StgPtr) &stg_ctoi_t15_info,
-    (StgPtr) &stg_ctoi_t16_info,
-    (StgPtr) &stg_ctoi_t17_info,
-    (StgPtr) &stg_ctoi_t18_info,
-    (StgPtr) &stg_ctoi_t19_info,
-    (StgPtr) &stg_ctoi_t20_info,
-    (StgPtr) &stg_ctoi_t21_info,
-    (StgPtr) &stg_ctoi_t22_info,
-    (StgPtr) &stg_ctoi_t23_info,
-    (StgPtr) &stg_ctoi_t24_info,
-    (StgPtr) &stg_ctoi_t25_info,
-    (StgPtr) &stg_ctoi_t26_info,
-    (StgPtr) &stg_ctoi_t27_info,
-    (StgPtr) &stg_ctoi_t28_info,
-    (StgPtr) &stg_ctoi_t29_info,
-    (StgPtr) &stg_ctoi_t30_info,
-    (StgPtr) &stg_ctoi_t31_info,
-    (StgPtr) &stg_ctoi_t32_info,
-    (StgPtr) &stg_ctoi_t33_info,
-    (StgPtr) &stg_ctoi_t34_info,
-    (StgPtr) &stg_ctoi_t35_info,
-    (StgPtr) &stg_ctoi_t36_info,
-    (StgPtr) &stg_ctoi_t37_info,
-    (StgPtr) &stg_ctoi_t38_info,
-    (StgPtr) &stg_ctoi_t39_info,
-    (StgPtr) &stg_ctoi_t40_info,
-    (StgPtr) &stg_ctoi_t41_info,
-    (StgPtr) &stg_ctoi_t42_info,
-    (StgPtr) &stg_ctoi_t43_info,
-    (StgPtr) &stg_ctoi_t44_info,
-    (StgPtr) &stg_ctoi_t45_info,
-    (StgPtr) &stg_ctoi_t46_info,
-    (StgPtr) &stg_ctoi_t47_info,
-    (StgPtr) &stg_ctoi_t48_info,
-    (StgPtr) &stg_ctoi_t49_info,
-    (StgPtr) &stg_ctoi_t50_info,
-    (StgPtr) &stg_ctoi_t51_info,
-    (StgPtr) &stg_ctoi_t52_info,
-    (StgPtr) &stg_ctoi_t53_info,
-    (StgPtr) &stg_ctoi_t54_info,
-    (StgPtr) &stg_ctoi_t55_info,
-    (StgPtr) &stg_ctoi_t56_info,
-    (StgPtr) &stg_ctoi_t57_info,
-    (StgPtr) &stg_ctoi_t58_info,
-    (StgPtr) &stg_ctoi_t59_info,
-    (StgPtr) &stg_ctoi_t60_info,
-    (StgPtr) &stg_ctoi_t61_info,
-    (StgPtr) &stg_ctoi_t62_info,
-};
-
 #if defined(PROFILING)
 
 //
@@ -1299,10 +1233,12 @@ do_return_nonpointer:
                  things on the stack. Therefore we store the CCCS inside the
                  stg_ctoi_t frame.
 
-                 If we have a tuple being returned, the stack looks like this:
+                 If we have a tuple being returned, the stack looks like this
+                 for the generic stg_ctoi_t frame:
 
                      ...
-                     <CCCS>           <- to restore, Sp offset <next frame + 4 words>
+                     <CCCS>           <- to restore, Sp offset <next frame + 5 words>
+                     old_spill
                      tuple_BCO
                      tuple_info
                      cont_BCO
@@ -1313,12 +1249,30 @@ do_return_nonpointer:
                      tuple_info
                      tuple_BCO
                      stg_ret_t        <- Sp
+
+                 Small frames (stg_ctoi_tN) omit the old_spill slot,
+                 so CCCS is at offset <next frame + 4 words>.
                */
 
               if(SpW(0) == (W_)&stg_ret_t_info) {
-                  cap->r.rCCCS = (CostCentreStack*)ReadSpW(offset + 4);
+                  StgWord cccs_offset =
+                      (ReadSpW(offset) == (W_)&stg_ctoi_t_info) ? 5 : 4;
+                  cap->r.rCCCS = (CostCentreStack*)ReadSpW(offset + cccs_offset);
               }
 #endif
+
+              /* When returning a tuple to a generic stg_ctoi_t frame
+                 (as opposed to a small stg_ctoi_tN frame), restore
+                 tso->ctoi_tuple_spill_words from the frame's old_spill
+                 slot.
+
+                 See Note [GHCi unboxed tuples stack spills] in
+                 StgMiscClosures.cmm. */
+              if(SpW(0) == (W_)&stg_ret_t_info
+                 && ReadSpW(offset) == (W_)&stg_ctoi_t_info) {
+                  cap->r.rCurrentTSO->ctoi_tuple_spill_words =
+                      ReadSpW(offset + CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET);
+              }
 
               /* Keep the ret frame and the ctoi frame for run_BCO.
                * See Note [Stack layout when entering run_BCO] */
@@ -1739,7 +1693,7 @@ run_BCO:
             &&lbl_bci_TESTEQ_W8 - &&lbl_bci_DEFAULT,
             &&lbl_bci_PRIMCALL - &&lbl_bci_DEFAULT,
             &&lbl_bci_BCO_NAME - &&lbl_bci_DEFAULT,
-            &&lbl_bci_DEFAULT - &&lbl_bci_DEFAULT,
+            &&lbl_bci_HPC_TICK - &&lbl_bci_DEFAULT,
             &&lbl_bci_OP_ADD_64 - &&lbl_bci_DEFAULT,
             &&lbl_bci_OP_SUB_64 - &&lbl_bci_DEFAULT,
             &&lbl_bci_OP_AND_64 - &&lbl_bci_DEFAULT,
@@ -2106,6 +2060,15 @@ run_BCO:
             NEXT_INSTRUCTION;
         }
 
+        INSTRUCTION(bci_HPC_TICK): {
+            W_ arg1_ticks_array, arg2_tick_index;
+            arg1_ticks_array = BCO_GET_LARGE_ARG;
+            arg2_tick_index  = BCO_READ_NEXT_32;
+
+            ((StgWord64*)BCO_LIT(arg1_ticks_array))[arg2_tick_index]++;
+            NEXT_INSTRUCTION;
+        }
+
         INSTRUCTION(bci_STKCHECK): {
             // Explicit stack check at the beginning of a function
             // *only* (stack checks in case alternatives are
@@ -2314,22 +2277,47 @@ run_BCO:
             W_ o_bco = BCO_GET_LARGE_ARG;
             W_ tuple_info = (W_)BCO_LIT(BCO_GET_LARGE_ARG);
             W_ o_tuple_bco = BCO_GET_LARGE_ARG;
+            int tuple_stack_words = tuple_info >> 24;
 
 #if defined(PROFILING)
             SpW(-1) = (W_)cap->r.rCCCS;
             Sp_subW(1);
 #endif
 
-            SpW(-1) = BCO_PTR(o_tuple_bco);
-            SpW(-2) = tuple_info;
-            SpW(-3) = BCO_PTR(o_bco);
-            int tuple_stack_words = (tuple_info >> 24) & 0xff;
-            if (tuple_stack_words > 62) {
-                barf("unsupported tuple size %d", tuple_stack_words);
+            /* See Note [GHCi unboxed tuples stack spills] in
+               StgMiscClosures.cmm */
+            if (tuple_stack_words <= MAX_SMALL_TUPLE_CTOI) {
+                /* Use a small info table that encodes the spill
+                   count statically, avoiding access to
+                   TSO->ctoi_tuple_spill_words entirely.
+                   The frame is one word smaller than stg_ctoi_t
+                   (no old_spill slot). */
+                static const StgInfoTable *const ctoi_t_small[] = {
+                    &stg_ctoi_t0_info, &stg_ctoi_t1_info,
+                    &stg_ctoi_t2_info, &stg_ctoi_t3_info,
+                    &stg_ctoi_t4_info, &stg_ctoi_t5_info,
+                    &stg_ctoi_t6_info, &stg_ctoi_t7_info,
+                    &stg_ctoi_t8_info
+                };
+                _Static_assert(sizeof(ctoi_t_small) / sizeof(ctoi_t_small[0])
+                    == MAX_SMALL_TUPLE_CTOI + 1,
+                    "ctoi_t_small must have MAX_SMALL_TUPLE_CTOI + 1 entries");
+                SpW(-1) = BCO_PTR(o_tuple_bco);
+                SpW(-2) = tuple_info;
+                SpW(-3) = BCO_PTR(o_bco);
+                SpW(-4) = (W_)ctoi_t_small[tuple_stack_words];
+                Sp_subW(4);
+            } else {
+                /* Generic path: save/restore ctoi_tuple_spill_words
+                   via the TSO */
+                SpW(-1) = cap->r.rCurrentTSO->ctoi_tuple_spill_words;
+                SpW(-2) = BCO_PTR(o_tuple_bco);
+                SpW(-3) = tuple_info;
+                SpW(-4) = BCO_PTR(o_bco);
+                SpW(-5) = (W_)&stg_ctoi_t_info;
+                Sp_subW(5);
+                cap->r.rCurrentTSO->ctoi_tuple_spill_words = tuple_stack_words;
             }
-            W_ ctoi_t_offset = (W_) ctoi_tuple_infos[tuple_stack_words];
-            SpW(-4) = ctoi_t_offset;
-            Sp_subW(4);
             NEXT_INSTRUCTION;
         }
 

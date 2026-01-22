@@ -71,6 +71,7 @@ import GHC.Data.Maybe
 import GHC.Types.Tickish
 import GHC.Types.SptEntry
 import GHC.ByteCode.Breakpoints
+import qualified GHC.HsToCore.Coverage as Coverage
 
 import Data.List ( genericReplicate, intersperse
                  , partition, scanl', sortBy, zip4, zip6 )
@@ -100,6 +101,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT(..))
 import Control.Monad.Trans.State  (StateT(..))
 import Data.Bifunctor (Bifunctor(..))
+import qualified GHC.Data.Strict as Strict
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -110,8 +112,9 @@ byteCodeGen :: HscEnv
             -> [TyCon]
             -> Maybe ModBreaks
             -> [SptEntry]
+            -> Strict.Maybe ByteCodeHpcInfo
             -> IO CompiledByteCode
-byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
+byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries hpc_info
    = withTiming logger
                 (text "GHC.StgToByteCode"<+>brackets (ppr this_mod))
                 (const ()) $ do
@@ -137,7 +140,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
         let mod_breaks = case mb_modBreaks of
              Nothing -> Nothing
              Just mb -> Just $ mkInternalModBreaks this_mod breakInfo mb
-        cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries
+        cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries hpc_info
 
         -- Squash space leaks in the CompiledByteCode.  This is really
         -- important, because when loading a set of modules into GHCi
@@ -606,6 +609,11 @@ schemeE d s p (StgLet _ext binds body) = do
 schemeE _d _s _p (StgTick (Breakpoint _ bp_id _) _rhs)
    = pprPanic "schemeE: Breakpoint without let binding:"
         (ppr bp_id <+> text "forgot to run bcPrep?")
+
+schemeE d s p (StgTick (HpcTick mod ix) rhs) = do
+   platform <- profilePlatform <$> getProfile
+   rhs_code <- schemeE d s p rhs
+   pure (unitOL (HPC_TICK (mkHpcTickBoxesLabell platform mod) (fromIntegral ix)) `appOL` rhs_code)
 
 -- ignore other kinds of tick
 schemeE d s p (StgTick _ rhs) = schemeE d s p rhs
@@ -1122,7 +1130,7 @@ doCase d s p scrut bndr alts
         -- 'Simple' tuples with at most one non-void component,
         -- like (# Word# #) or (# Int#, State# RealWorld #) do not have a
         -- tuple return frame. This is because (# foo #) and (# foo, Void# #)
-        -- have the same runtime rep. We have more efficient specialized
+        -- have the same runtime rep. We have more efficient small
         -- return frames for the situations with one non-void element.
 
         non_void_arg_reps = typeArgReps platform bndr_ty
@@ -1140,10 +1148,19 @@ doCase d s p scrut bndr alts
         -- When an alt is entered, it assumes the returned value is
         -- on top of the itbl; see Note [Return convention for non-tuple values]
         -- for details.
+        -- Whether this tuple return uses a small stg_ctoi_tN frame
+        -- (no old_spill slot, no TSO access) instead of the generic
+        -- stg_ctoi_t frame.
+        small_tuple_frame :: Bool
+        small_tuple_frame =
+          ubx_tuple_frame && nativeCallStackSpillSize call_info <= mAX_SMALL_TUPLE_CTOI
+
         ctoi_frame_header_w :: WordOff
         ctoi_frame_header_w
-          | ubx_tuple_frame =
+          | small_tuple_frame =
               if profiling then 5 else 4
+          | ubx_tuple_frame =
+              if profiling then 6 else 5
           | otherwise = 2
 
         -- The size of the ret_*_info frame header, whose frame returns the
@@ -1289,10 +1306,16 @@ doCase d s p scrut bndr alts
         -- case-of-case expressions, which is the only time we can be compiling a
         -- case expression with s /= 0.
 
-        -- unboxed tuples get two more words, the second is a pointer (tuple_bco)
+        -- unboxed tuples get extra words in the ctoi frame after the
+        -- info pointer and cont_BCO:
+        --   call_info, tuple_BCO, [old_spill], [CCCS]
+        -- tuple_BCO at position 1 is a pointer.
+        -- Small frames (stg_ctoi_tN) omit the old_spill slot.
         (extra_pointers, extra_slots)
-           | ubx_tuple_frame && profiling = ([1], 3) -- call_info, tuple_BCO, CCCS
-           | ubx_tuple_frame              = ([1], 2) -- call_info, tuple_BCO
+           | small_tuple_frame && profiling = ([1], 3) -- call_info, tuple_BCO, CCCS
+           | small_tuple_frame              = ([1], 2) -- call_info, tuple_BCO
+           | ubx_tuple_frame && profiling = ([1], 4) -- call_info, tuple_BCO, old_spill, CCCS
+           | ubx_tuple_frame              = ([1], 3) -- call_info, tuple_BCO, old_spill
            | otherwise                    = ([], 0)
 
         bitmap_size :: WordOff
@@ -1530,13 +1553,11 @@ for the call and and a stack offset. The layout is as follows:
                list is active. Bit 1 for the
                second register in the list and so on.
 
-  - bit 24-31: Unsigned byte indicating the stack offset
+  - bit 24+:   Unsigned value indicating the stack offset
                of the continuation in words. For tuple returns
                this is the number of words returned on the
                stack. For primcalls this field is unused, since
                we don't jump to a continuation.
-
-The upper 32 bits on 64 bit platforms are currently unused.
 
 If a register is smaller than a word on the stack (for example a
 single precision float on a 64 bit system), then the stack slot
@@ -1546,8 +1567,8 @@ is padded to a whole word.
 
     If a tuple is returned in three registers and an additional two
     words on the stack, then three bits in the register bitmap
-    (bits 0-23) would be set. And bit 24-31 would be
-    00000010 (two in binary).
+    (bits 0-23) would be set. And the stack offset (bits 24+) would
+    encode the value two.
 
     The values on the stack before a call to POP_ARG_REGS would
     be as follows:
@@ -1575,7 +1596,7 @@ is padded to a whole word.
 
     At this point all the arguments are in place and we are ready
     to jump to the continuation, the location (offset from Sp) of
-    which is found by inspecting the value of bits 24-31. In this
+    which is found by inspecting the value of bits 24+. In this
     case the offset is two words.
 
 On x86_64, the double precision (Dn) and single precision
@@ -1729,9 +1750,11 @@ Note [unboxed tuple bytecodes and tuple_BCO]
      * tuple_BCO: see below
 
   The interpreter pushes these onto the stack when the PUSH_ALTS_TUPLE
-  instruction is executed, followed by stg_ctoi_tN_info, with N depending
-  on the number of stack words used by the tuple in the GHC native calling
-  convention. N is derived from call_info.
+  instruction is executed, followed by stg_ctoi_t_info. It also saves
+  the old ctoi_tuple_spill_words value from the TSO in the frame and sets
+  the TSO field to the number of stack words used by the tuple in the
+  GHC native calling convention. This spill count is derived from
+  call_info.
 
   For example if we expect a tuple with three words on the stack, the stack
   looks as follows after PUSH_ALTS_TUPLE:
@@ -1742,12 +1765,13 @@ Note [unboxed tuple bytecodes and tuple_BCO]
       cont_free_var_2
       ...
       cont_free_var_n
+      old_spill
       call_info
       tuple_BCO
       cont_BCO
-      stg_ctoi_t3_info <- Sp
+      stg_ctoi_t_info  <- Sp
 
-  If the tuple is returned by object code, stg_ctoi_t3 will deal with
+  If the tuple is returned by object code, stg_ctoi_t will deal with
   adjusting the stack pointer and converting the tuple to the bytecode
   calling convention. See Note [GHCi unboxed tuples stack spills] for more
   details.
@@ -2763,6 +2787,10 @@ getLastBreakTick = BcM $ \env st ->
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
+
+mkHpcTickBoxesLabell :: Platform -> Module -> FastString
+mkHpcTickBoxesLabell platform mod =
+  fsLit (Coverage.mkHpcTickBoxesLabell platform mod)
 
 -- Dehydrating CgBreakInfo
 
