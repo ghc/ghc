@@ -10088,6 +10088,9 @@ module System.IO.Error where
 
 module System.IO.OS where
   -- Safety: Safe
+  type OSHandleType :: *
+  data OSHandleType = FileDescriptor | WindowsHandle
+  osHandleType :: OSHandleType
   withFileDescriptorReadingBiased :: forall r. GHC.Internal.IO.Handle.Types.Handle -> (GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.Types.IO r) -> GHC.Internal.Types.IO r
   withFileDescriptorReadingBiasedRaw :: forall r. GHC.Internal.IO.Handle.Types.Handle -> (GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.Types.IO r) -> GHC.Internal.Types.IO r
   withFileDescriptorWritingBiased :: forall r. GHC.Internal.IO.Handle.Types.Handle -> (GHC.Internal.Foreign.C.Types.CInt -> GHC.Internal.Types.IO r) -> GHC.Internal.Types.IO r
@@ -11402,6 +11405,7 @@ instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Classes.Eq (GHC.Int
 instance forall (s :: GHC.Internal.Types.Symbol). GHC.Internal.Classes.Eq (GHC.Internal.TypeLits.SSymbol s) -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Classes.Eq GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Classes.Eq GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance [safe] GHC.Internal.Classes.Eq GHC.Internal.System.IO.OS.OSHandleType -- Defined in ‘GHC.Internal.System.IO.OS’
 instance GHC.Internal.Classes.Eq System.Timeout.Timeout -- Defined in ‘System.Timeout’
 instance GHC.Internal.Classes.Eq GHC.Internal.Text.Read.Lex.Lexeme -- Defined in ‘GHC.Internal.Text.Read.Lex’
 instance GHC.Internal.Classes.Eq GHC.Internal.Text.Read.Lex.Number -- Defined in ‘GHC.Internal.Text.Read.Lex’
@@ -11555,6 +11559,7 @@ instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Classes.Ord (GHC.In
 instance forall (s :: GHC.Internal.Types.Symbol). GHC.Internal.Classes.Ord (GHC.Internal.TypeLits.SSymbol s) -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Classes.Ord GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Classes.Ord GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance [safe] GHC.Internal.Classes.Ord GHC.Internal.System.IO.OS.OSHandleType -- Defined in ‘GHC.Internal.System.IO.OS’
 instance GHC.Internal.Control.Arrow.Arrow (->) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance forall (m :: * -> *). GHC.Internal.Base.Monad m => GHC.Internal.Control.Arrow.Arrow (GHC.Internal.Control.Arrow.Kleisli m) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance GHC.Internal.Control.Arrow.ArrowApply (->) -- Defined in ‘GHC.Internal.Control.Arrow’
@@ -11954,6 +11959,7 @@ instance GHC.Internal.Enum.Bounded GHC.Internal.Generics.Associativity -- Define
 instance GHC.Internal.Enum.Bounded GHC.Internal.Generics.DecidedStrictness -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Enum.Bounded GHC.Internal.Generics.SourceStrictness -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Enum.Bounded GHC.Internal.Generics.SourceUnpackedness -- Defined in ‘GHC.Internal.Generics’
+instance [safe] GHC.Internal.Enum.Bounded GHC.Internal.System.IO.OS.OSHandleType -- Defined in ‘GHC.Internal.System.IO.OS’
 instance forall a k (b :: k). GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (GHC.Internal.Data.Bits.And a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (GHC.Internal.Data.Bits.Iff a) -- Defined in ‘GHC.Internal.Data.Bits’
@@ -12035,6 +12041,7 @@ instance GHC.Internal.Enum.Enum GHC.Internal.IO.Device.SeekMode -- Defined in �
 instance GHC.Internal.Enum.Enum GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
 instance GHC.Internal.Enum.Enum GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
 instance GHC.Internal.Enum.Enum GHC.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.RTS.Flags’
+instance [safe] GHC.Internal.Enum.Enum GHC.Internal.System.IO.OS.OSHandleType -- Defined in ‘GHC.Internal.System.IO.OS’
 instance GHC.Internal.Exception.Context.ExceptionAnnotation GHC.Internal.Exception.Type.WhileHandling -- Defined in ‘GHC.Internal.Exception.Type’
 instance GHC.Internal.Exception.Context.ExceptionAnnotation GHC.Internal.Exception.Backtrace.Backtraces -- Defined in ‘GHC.Internal.Exception.Backtrace’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.IO.Exception.AllocationLimitExceeded -- Defined in ‘GHC.Internal.IO.Exception’
@@ -12584,6 +12591,7 @@ instance [safe] GHC.Internal.Read.Read GHC.Stats.RTSStats -- Defined in ‘GHC.S
 instance GHC.Internal.Read.Read GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Internal.Read.Read GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Read.Read GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance [safe] GHC.Internal.Read.Read GHC.Internal.System.IO.OS.OSHandleType -- Defined in ‘GHC.Internal.System.IO.OS’
 instance forall a k (b :: k). GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Real.Fractional (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
 instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.Fractional (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
@@ -12918,6 +12926,7 @@ instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Show.Show (GHC.Inte
 instance forall (s :: GHC.Internal.Types.Symbol). GHC.Internal.Show.Show (GHC.Internal.TypeLits.SSymbol s) -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Show.Show GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Show.Show GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance [safe] GHC.Internal.Show.Show GHC.Internal.System.IO.OS.OSHandleType -- Defined in ‘GHC.Internal.System.IO.OS’
 instance GHC.Internal.Show.Show System.Timeout.Timeout -- Defined in ‘System.Timeout’
 instance GHC.Internal.Show.Show GHC.Internal.Text.Read.Lex.Lexeme -- Defined in ‘GHC.Internal.Text.Read.Lex’
 instance GHC.Internal.Show.Show GHC.Internal.Text.Read.Lex.Number -- Defined in ‘GHC.Internal.Text.Read.Lex’

@@ -1,6 +1,1 @@
-Right "0"
-Right "1"
-Right "2"
-Left <stdin>: withWindowsHandleReadingBiasedRaw: inappropriate type (handle does not use Windows handles)
-Left <stdout>: withWindowsHandleWritingBiasedRaw: inappropriate type (handle does not use Windows handles)
-Left <stderr>: withWindowsHandleWritingBiasedRaw: inappropriate type (handle does not use Windows handles)
+FileDescriptor

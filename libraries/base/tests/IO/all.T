@@ -189,9 +189,11 @@ test('mkdirExists', [exit_code(1), when(opsys('mingw32'), ignore_stderr)], compi
 
 test('osHandles001FileDescriptors', omit_ways(['winio', 'winio_threaded']), compile_and_run, [''])
 test('osHandles001WindowsHandles', only_ways(['winio', 'winio_threaded']), compile_and_run, [''])
-test('osHandles002FileDescriptors', [when(opsys('mingw32'), skip), when(arch('javascript'), skip)], compile_and_run, [''])
+test('osHandles002FileDescriptors', omit_ways(['winio', 'winio_threaded']), compile_and_run, [''])
 test('osHandles002WindowsHandles', only_ways(['winio', 'winio_threaded']), compile_and_run, [''])
-# It would be good to let `osHandles002FileDescriptors` run also on
+test('osHandles003FileDescriptors', [when(opsys('mingw32'), skip), when(arch('javascript'), skip)], compile_and_run, [''])
+test('osHandles003WindowsHandles', only_ways(['winio', 'winio_threaded']), compile_and_run, [''])
+# It would be good to let `osHandles003FileDescriptors` run also on
 # Windows with the file-descriptor-based I/O manager. However, this
 # test, as it is currently implemented, requires the `unix` package.
 # That said, `UCRT.DLL`, which is used by GHC-generated Windows

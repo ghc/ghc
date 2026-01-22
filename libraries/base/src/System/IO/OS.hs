@@ -6,6 +6,10 @@
 -}
 module System.IO.OS
 (
+    -- * OS handle type detection
+    OSHandleType (FileDescriptor, WindowsHandle),
+    osHandleType,
+
     -- * Obtaining file descriptors and Windows handles
     withFileDescriptorReadingBiased,
     withFileDescriptorWritingBiased,
@@ -23,6 +27,8 @@ where
 
 import GHC.Internal.System.IO.OS
        (
+           OSHandleType (FileDescriptor, WindowsHandle),
+           osHandleType,
            withFileDescriptorReadingBiased,
            withFileDescriptorWritingBiased,
            withWindowsHandleReadingBiased,

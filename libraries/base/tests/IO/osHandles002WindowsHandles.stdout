@@ -1,1 +1,6 @@
-We've got to get in to get out
+Left <stdin>: withFileDescriptorReadingBiasedRaw: inappropriate type (handle does not use file descriptors)
+Left <stdout>: withFileDescriptorWritingBiasedRaw: inappropriate type (handle does not use file descriptors)
+Left <stderr>: withFileDescriptorWritingBiasedRaw: inappropriate type (handle does not use file descriptors)
+Right "_"
+Right "_"
+Right "_"
