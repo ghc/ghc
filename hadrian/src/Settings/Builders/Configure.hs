@@ -8,8 +8,7 @@ configureBuilderArgs :: Args
 configureBuilderArgs = do
     stage      <- getStage
     gmpPath    <- expr (gmpBuildPath stage)
-    libffiPath <- expr (libffiBuildPath stage)
-    mconcat [ builder (Configure gmpPath) ? do
+    builder (Configure gmpPath) ? do
                 targetArch <- queryTarget queryArch
                 targetPlatform <- queryTarget targetPlatformTriple
                 buildPlatform <- queryBuild targetPlatformTriple
@@ -28,16 +27,3 @@ configureBuilderArgs = do
                      -- option.
                      <> [ "--enable-alloca=malloc-notreentrant" | targetArch == "wasm32" ]
                      <> [ "--with-pic=yes" ]
-
-            , builder (Configure libffiPath) ? do
-                top            <- expr topDirectory
-                targetPlatform <- queryTarget targetPlatformTriple
-                way            <- getWay
-                pure [ "--prefix=" ++ top -/- libffiPath -/- "inst"
-                     , "--libdir=" ++ top -/- libffiPath -/- "inst/lib"
-                     , "--enable-static=yes"
-                     , "--enable-shared="
-                            ++ (if wayUnit Dynamic way
-                                    then "yes"
-                                    else "no")
-                     , "--host=" ++ targetPlatform ] ]
