@@ -74,7 +74,7 @@ module GHC.Utils.Misc (
         transitiveClosure,
 
         -- * Strictness
-        seqList, strictMap, strictZipWith, strictZipWith3,
+        seqList, seqNonEmpty, strictMap, strictZipWith, strictZipWith3,
 
         -- * Module names
         looksLikeModuleName,
@@ -970,6 +970,9 @@ unzipWith = fmap . uncurry
 seqList :: [a] -> b -> b
 seqList [] b = b
 seqList (x:xs) b = x `seq` seqList xs b
+
+seqNonEmpty :: NonEmpty a -> b -> b
+seqNonEmpty (x :| xs) b = x `seq` seqList xs b
 
 strictMap :: (a -> b) -> [a] -> [b]
 strictMap _ []     = []

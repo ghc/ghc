@@ -2148,7 +2148,7 @@ It would be great to have a more systematic solution to this entire mess.
 recordThUse :: TcM ()
 recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
 
-recordThNeededRuntimeDeps :: [Linkable] -> PkgsLoaded -> TcM ()
+recordThNeededRuntimeDeps :: [LinkableUsage] -> PkgsLoaded -> TcM ()
 recordThNeededRuntimeDeps new_links new_pkgs
   = do { env <- getGblEnv
        ; updTcRef (tcg_th_needed_deps env) $ \(needed_links, needed_pkgs) ->

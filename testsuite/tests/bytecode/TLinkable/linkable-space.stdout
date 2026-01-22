@@ -1,0 +1,5 @@
+### Heap Census
+No UnlinkedBCO or DotGBC is alive after loading
+ConstrLinkable: Objects found
+ConstrUnlinkedBCO: 0
+ConstrDotGBC: 0

@@ -25,6 +25,8 @@ module GHC.ByteCode.Asm (
 import GHC.Prelude hiding ( any )
 
 
+import qualified GHC.Data.Strict as Strict
+
 import GHC.ByteCode.Instr
 import GHC.ByteCode.InfoTable
 import GHC.ByteCode.Types
@@ -111,8 +113,9 @@ assembleBCOs
   -> [(Name, ByteString)]
   -> Maybe InternalModBreaks
   -> [SptEntry]
+  -> Strict.Maybe ByteCodeHpcInfo
   -> IO CompiledByteCode
-assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
+assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries use_hpc = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   let itbls = mkITbls profile tycons
@@ -123,6 +126,7 @@ assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
     , bc_strs = top_strs
     , bc_breaks = modbreaks
     , bc_spt_entries = spt_entries
+    , bc_hpc_info = use_hpc
     }
 
 -- Note [Allocating string literals]
@@ -856,6 +860,12 @@ assembleI platform i = case i of
     emit_ bci_BRK_FUN [ Op p1, Op info_addr, Op info_unitid_addr
                       , SmallOp ix_hi, SmallOp ix_lo, Op np ]
 
+  HPC_TICK lbl ix -> do
+    p <- lit1 (BCONPtrLbl lbl)
+    let ix_hi = fromIntegral (ix `shiftR` 16)
+        ix_lo = fromIntegral (ix .&. 0xffff)
+    emit_ bci_HPC_TICK [Op p, SmallOp ix_hi, SmallOp ix_lo]
+
 #if MIN_VERSION_rts(1,0,3)
   BCO_NAME name            -> do np <- lit1 (BCONPtrStr name)
                                  emit_ bci_BCO_NAME [Op np]
@@ -973,13 +983,16 @@ return_non_tuple V32 = error "return_non_tuple: vector"
 return_non_tuple V64 = error "return_non_tuple: vector"
 
 {-
-  we can only handle up to a fixed number of words on the stack,
-  because we need a stg_ctoi_tN stack frame for each size N. See
-  Note [unboxed tuple bytecodes and tuple_BCO].
+  The maximum number of words that can be spilled on the stack for
+  a tuple return. This is limited by the encoding of the stack
+  spill size in the call_info word (used by stg_ret_t):
 
-  If needed, you can support larger tuples by adding more in
-  Jumps.cmm, StgMiscClosures.cmm, Interpreter.c and MiscClosures.h and
-  raising this limit.
+    - On 32-bit platforms: 8-bit  (bits 24-31), max 255
+    - On 64-bit platforms: 40-bit (bits 24-63)
+
+  The stg_ctoi_t frame itself has no size limit since it reads the
+  spill count from the TSO's ctoi_tuple_spill_words field. See
+  Note [GHCi unboxed tuples stack spills] in StgMiscClosures.cmm.
 
   Note that the limit is the number of words passed on the stack.
   If the calling convention passes part of the tuple in registers, the
@@ -987,8 +1000,10 @@ return_non_tuple V64 = error "return_non_tuple: vector"
   take multiple words on the stack (for example Double# on a 32 bit
   platform).
  -}
-maxTupleReturnNativeStackSize :: WordOff
-maxTupleReturnNativeStackSize = 62
+maxTupleReturnNativeStackSize :: Platform -> WordOff
+maxTupleReturnNativeStackSize platform = case platformWordSize platform of
+  PW4 -> 255
+  PW8 -> 1099511627775
 
 {-
   Construct the call_info word that stg_ctoi_t, stg_ret_t and stg_primcall
@@ -997,9 +1012,10 @@ maxTupleReturnNativeStackSize = 62
 
   See Note [GHCi and native call registers] for more information.
  -}
-mkNativeCallInfoSig :: Platform -> NativeCallInfo -> Word32
+mkNativeCallInfoSig :: Platform -> NativeCallInfo -> Word64
 mkNativeCallInfoSig platform NativeCallInfo{..}
-  | nativeCallType == NativeTupleReturn && nativeCallStackSpillSize > maxTupleReturnNativeStackSize
+  | nativeCallType == NativeTupleReturn
+  && nativeCallStackSpillSize > maxTupleReturnNativeStackSize platform
   = pprPanic "mkNativeCallInfoSig: tuple too big for the bytecode compiler"
              (ppr nativeCallStackSpillSize <+> text "stack words." <+>
               text "Use -fobject-code to get around this limit"
@@ -1008,8 +1024,9 @@ mkNativeCallInfoSig platform NativeCallInfo{..}
   = -- 24 bits for register bitmap
     assertPpr (length argRegs <= 24) (text "too many registers for bitmap:" <+> ppr (length argRegs))
 
-    -- 8 bits for continuation offset (only for NativeTupleReturn)
-    assertPpr (cont_offset < 255) (text "continuation offset too large:" <+> ppr cont_offset)
+    -- continuation offset must fit in available bits above the bitmap
+    assertPpr (cont_offset <= fromIntegral (maxTupleReturnNativeStackSize platform))
+              (text "continuation offset too large:" <+> ppr cont_offset)
 
     -- all regs accounted for
     assertPpr (all (`elem` (map fst argRegs)) (regSetToList nativeCallRegs))
@@ -1023,12 +1040,12 @@ mkNativeCallInfoSig platform NativeCallInfo{..}
 
     foldl' reg_bit 0 argRegs .|. (cont_offset `shiftL` 24)
   where
-    cont_offset :: Word32
+    cont_offset :: Word64
     cont_offset
       | nativeCallType == NativeTupleReturn = fromIntegral nativeCallStackSpillSize
       | otherwise                           = 0 -- there is no continuation for primcalls
 
-    reg_bit :: Word32 -> (GlobalReg, Int) -> Word32
+    reg_bit :: Word64 -> (GlobalReg, Int) -> Word64
     reg_bit x (r, n)
       | r `elemRegSet` nativeCallRegs = x .|. 1 `shiftL` n
       | otherwise                     = x

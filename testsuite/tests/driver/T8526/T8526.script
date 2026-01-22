@@ -1,5 +1,6 @@
 :set -fforce-recomp
 :set -v1
+:set -fno-hide-source-paths
 
 :! echo a = True > A.inc
 :load A

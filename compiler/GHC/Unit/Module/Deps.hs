@@ -2,6 +2,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE LambdaCase #-}
 -- | Dependencies and Usage of a module
 module GHC.Unit.Module.Deps
    ( Dependencies(dep_direct_mods
@@ -24,16 +25,22 @@ module GHC.Unit.Module.Deps
    , ImportAvails (..)
    , IfaceImportLevel(..)
    , tcImportLevel
+   , LinkablePartUsage(..)
+   , linkablePartUsageObjectPaths
    )
 where
 
 import GHC.Prelude
 
 import GHC.Data.FastString
+import GHC.Data.FlatBag
+import GHC.Data.OsPath
+import qualified GHC.Data.OsPath as OsPath
 
 import GHC.Types.Avail
 import GHC.Types.SafeHaskell
 import GHC.Types.Name
+import GHC.Types.Name.Set
 import GHC.Types.Basic
 
 import GHC.Unit.Module.Imported
@@ -45,13 +52,12 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
 
+import Control.DeepSeq
+import Data.Bifunctor
+import qualified Data.Foldable as Foldable
 import Data.List (sortBy, sort, partition)
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Bifunctor
-import Control.DeepSeq
-import GHC.Types.Name.Set
-
 
 
 -- | Dependency information about ALL modules and packages below this one
@@ -357,12 +363,12 @@ data Usage
         -- contents don't change.  This previously lead to odd
         -- recompilation behaviors; see #8114
   }
-  | UsageHomeModuleInterface {
+  | UsageHomeModuleBytecode {
         usg_mod_name :: ModuleName
         -- ^ Name of the module
         , usg_unit_id :: UnitId
         -- ^ UnitId of the HomeUnit the module is from
-        , usg_iface_hash :: Fingerprint
+        , usg_bytecode_hash :: Fingerprint
         -- ^ The *interface* hash of the module, not the ABI hash.
         -- This changes when anything about the interface (and hence the
         -- module) has changed.
@@ -396,7 +402,7 @@ instance NFData Usage where
   rnf (UsageHomeModule mod uid hash entities exports safe) = rnf mod `seq` rnf uid `seq` rnf hash `seq` rnf entities `seq` rnf exports `seq` rnf safe `seq` ()
   rnf (UsageFile file hash label) = rnf file `seq` rnf hash `seq` rnf label `seq` ()
   rnf (UsageMergedRequirement mod hash) = rnf mod `seq` rnf hash `seq` ()
-  rnf (UsageHomeModuleInterface mod uid hash) = rnf mod `seq` rnf uid `seq` rnf hash `seq` ()
+  rnf (UsageHomeModuleBytecode mod uid hash) = rnf mod `seq` rnf uid `seq` rnf hash `seq` ()
 
 instance Binary Usage where
     put_ bh usg@UsagePackageModule{} = do
@@ -425,11 +431,11 @@ instance Binary Usage where
         put_ bh (usg_mod      usg)
         put_ bh (usg_mod_hash usg)
 
-    put_ bh usg@UsageHomeModuleInterface{} = do
+    put_ bh usg@UsageHomeModuleBytecode{} = do
         putByte bh 4
         put_ bh (usg_mod_name usg)
         put_ bh (usg_unit_id  usg)
-        put_ bh (usg_iface_hash usg)
+        put_ bh (usg_bytecode_hash usg)
 
     get bh = do
         h <- getByte bh
@@ -461,7 +467,7 @@ instance Binary Usage where
             mod <- get bh
             uid <- get bh
             hash <- get bh
-            return UsageHomeModuleInterface { usg_mod_name = mod, usg_unit_id = uid, usg_iface_hash = hash }
+            return UsageHomeModuleBytecode { usg_mod_name = mod, usg_unit_id = uid, usg_bytecode_hash = hash }
           i -> error ("Binary.get(Usage): " ++ show i)
 
 -- | Records the imports that we depend on from a home module,
@@ -667,3 +673,33 @@ data ImportAvails
           -- ^ Family instance modules below us in the import tree (and maybe
           -- including us for imported modules)
       }
+
+-- | Record usage of a 'LinkablePart'.
+data LinkablePartUsage
+  = FileLinkablePartUsage
+    { flu_file :: !FilePath
+    , flu_module :: !Module
+    , flu_linkable_objs :: !(FlatBag OsPath)
+    }
+  | ByteCodeLinkablePartUsage
+    { bclu_module :: !Module
+    , bclu_hash :: !Fingerprint
+    , bclu_linkable_objs :: !(FlatBag OsPath)
+    }
+
+instance Outputable LinkablePartUsage where
+  ppr = \ case
+    FileLinkablePartUsage fp modl _objs ->
+      text "FileLinkableUsage" <+> text fp <+> ppr modl
+
+    ByteCodeLinkablePartUsage modl hash _objs ->
+      text "ByteCodeLinkableUsage" <+> ppr modl <+> ppr hash
+
+linkablePartUsageObjectPaths :: LinkablePartUsage -> [FilePath]
+linkablePartUsageObjectPaths lnkUsage =
+  map OsPath.unsafeDecodeUtf . Foldable.toList $ linkableUsageObjectOsPaths lnkUsage
+
+linkableUsageObjectOsPaths :: LinkablePartUsage -> FlatBag OsPath
+linkableUsageObjectOsPaths lnkUsage = case lnkUsage of
+  FileLinkablePartUsage{flu_linkable_objs} -> flu_linkable_objs
+  ByteCodeLinkablePartUsage{bclu_linkable_objs} -> bclu_linkable_objs

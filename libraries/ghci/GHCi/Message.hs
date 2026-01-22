@@ -85,9 +85,9 @@ data Message a where
 
   -- These all invoke the corresponding functions in the RTS Linker API.
   InitLinker :: Message ()
-  LookupSymbol :: String -> Message (Maybe (RemotePtr ()))
-  LookupSymbolInDLL :: RemotePtr LoadedDLL -> String -> Message (Maybe (RemotePtr ()))
-  LookupClosure :: String -> Message (Maybe HValueRef)
+  LookupSymbol :: !BS.ShortByteString -> Message (Maybe (RemotePtr ()))
+  LookupSymbolInDLL :: !(RemotePtr LoadedDLL) -> !BS.ShortByteString -> Message (Maybe (RemotePtr ()))
+  LookupClosure :: !BS.ShortByteString -> Message (Maybe HValueRef)
   LoadDLLs :: [String] -> Message (Either String [RemotePtr LoadedDLL])
   LoadArchive :: String -> Message () -- error?
   LoadObj :: String -> Message () -- error?
@@ -110,6 +110,8 @@ data Message a where
 
   -- | Add entries to the Static Pointer Table
   AddSptEntry :: Fingerprint -> HValueRef -> Message ()
+  -- | Add module to hpc
+  AddHpcModule :: BS.ShortByteString -> Int -> Int -> BS.ShortByteString -> Message ()
 
   -- | Malloc some data and return a 'RemotePtr' to it
   MallocData :: ByteString -> Message (RemotePtr ())
@@ -161,8 +163,8 @@ data Message a where
 
   -- | Create a set of CostCentres with the same module name
   MkCostCentres
-   :: String     -- module, RemotePtr so it can be shared
-   -> [(String,String)] -- (name, SrcSpan)
+   :: !(RemotePtr ())                             -- ModuleName
+   -> ![(BS.ShortByteString, BS.ShortByteString)] -- (name, SrcSpan)
    -> Message [RemotePtr CostCentre]
 
   -- | Show a 'CostCentreStack' as a @[String]@
@@ -422,7 +424,7 @@ data EvalStatus_ a b
 instance Binary a => Binary (EvalStatus_ a b)
 
 data EvalBreakpoint = EvalBreakpoint
-  { eb_info_mod      :: String -- ^ Breakpoint info module
+  { eb_info_mod      :: !BS.ShortByteString -- ^ Breakpoint info module
   , eb_info_mod_unit :: BS.ShortByteString -- ^ Breakpoint tick module unit id
   , eb_info_index    :: Int    -- ^ Breakpoint info index
   }
@@ -599,6 +601,7 @@ getMessage = do
       38 -> Msg <$> (ResumeSeq <$> get)
       39 -> Msg <$> (LookupSymbolInDLL <$> get <*> get)
       40 -> Msg <$> (WhereFrom <$> get)
+      41 -> Msg <$> (AddHpcModule <$> get <*> get <*> get <*> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -645,6 +648,7 @@ putMessage m = case m of
   ResumeSeq a                 -> putWord8 38 >> put a
   LookupSymbolInDLL dll str   -> putWord8 39 >> put dll >> put str
   WhereFrom a                 -> putWord8 40 >> put a
+  AddHpcModule m n h ticks    -> putWord8 41 >> put m >> put n >> put h >> put ticks
 
 {-
 Note [Parallelize CreateBCOs serialization]

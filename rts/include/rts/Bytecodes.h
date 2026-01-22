@@ -118,6 +118,7 @@
 #define bci_PRIMCALL                    87
 
 #define bci_BCO_NAME                    88
+#define bci_HPC_TICK                    89
 
 #define bci_OP_ADD_64                   90
 #define bci_OP_SUB_64                   91
@@ -231,5 +232,11 @@
    rendering an explicit check unnecessary in the majority of
    cases. */
 #define INTERP_STACK_CHECK_THRESH 50
+
+/* Maximum nativeCallStackSpillSize for which we use a small stg_ctoi_tN
+   frame (no old_spill slot, no TSO access) instead of the generic
+   stg_ctoi_t frame.  Must match the stg_ctoi_tN definitions in
+   StgMiscClosures.cmm. */
+#define MAX_SMALL_TUPLE_CTOI    8
 
 /*-------------------------------------------------------------------------*/

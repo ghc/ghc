@@ -155,6 +155,7 @@ import GHC.Hs.Dump
 import GHC.Hs.Stats         ( ppSourceStats )
 
 import GHC.HsToCore
+import qualified GHC.HsToCore.Coverage as Coverage
 
 import GHC.StgToByteCode    ( byteCodeGen )
 import GHC.StgToJS          ( stgToJS )
@@ -211,6 +212,8 @@ import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos, LambdaFormInfo(..))
 import GHC.StgToCmm.CgUtils (CgStream)
 
+import qualified GHC.ByteCode.Serialize as ByteCode
+
 import GHC.Cmm
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
@@ -241,6 +244,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Error
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
+import GHC.Types.HpcInfo (HpcInfo (..))
 import GHC.Types.IPE
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
@@ -252,6 +256,7 @@ import GHC.Types.TyThing
 import GHC.Types.Unique.Supply (uniqFromTag)
 import GHC.Types.Unique.Set
 
+import GHC.Utils.Encoding.UTF8 ( utf8EncodeShortByteString )
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
 import GHC.Utils.Error
@@ -266,6 +271,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.OsPath (unsafeEncodeUtf)
+import qualified GHC.Data.Strict as Strict
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Stream as Stream
 import GHC.Data.Maybe
@@ -303,8 +309,6 @@ import GHC.Cmm.Config (CmmConfig)
 import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
-
-import GHC.ByteCode.Serialize
 
 {- **********************************************************************
 %*                                                                      *
@@ -987,23 +991,22 @@ checkObjects dflags mb_old_linkable summary = do
 -- | Check to see if we can reuse the old linkable, by this point we will
 -- have just checked that the old interface matches up with the source hash, so
 -- no need to check that again here
-checkByteCodeInMemory :: HscEnv -> ModSummary -> Maybe Linkable -> IO (MaybeValidated Linkable)
+checkByteCodeInMemory :: HscEnv -> ModSummary -> Maybe (LinkableWith ModuleByteCode) -> IO (MaybeValidated (LinkableWith ModuleByteCode))
 checkByteCodeInMemory hsc_env mod_sum mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
-      | not (linkableIsNativeCodeOnly old_linkable)
       -- If `-fwrite-byte-code` is enabled, then check that the .gbc file is
       -- up-to-date with the linkable we have in our hand.
       -- If ms_bytecode_date is Nothing, then the .gbc file does not exist yet.
       -- Otherwise, check that the date matches the linkable date exactly.
-      , if gopt Opt_WriteByteCode (hsc_dflags hsc_env)
+      | if gopt Opt_WriteByteCode (hsc_dflags hsc_env)
           then maybe False (linkableTime old_linkable ==) (ms_bytecode_date mod_sum)
           else True
       -> return $ (UpToDateItem old_linkable)
     _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
 -- | Load bytecode from a ".gbc" object file if it exists and is up-to-date
-checkByteCodeFromObject :: HscEnv -> ModSummary -> IO (MaybeValidated Linkable)
+checkByteCodeFromObject :: HscEnv -> ModSummary -> IO (MaybeValidated (LinkableWith ModuleByteCode))
 checkByteCodeFromObject hsc_env mod_sum = do
   let
     obj_fn = ml_bytecode_file (ms_location mod_sum)
@@ -1015,8 +1018,8 @@ checkByteCodeFromObject hsc_env mod_sum = do
           -- Don't force this if we reuse the linkable already loaded into memory, but we have to check
           -- that the one we have on disk would be suitable as well.
           linkable <- unsafeInterleaveIO $ do
-            bco <- readBinByteCode hsc_env obj_fn
-            return $ mkModuleByteCodeLinkable obj_date bco
+            bco <- ByteCode.readBinByteCode hsc_env obj_fn
+            return $ mkOnlyModuleByteCodeLinkable obj_date bco
           return $ UpToDateItem linkable
     _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
@@ -1100,7 +1103,7 @@ loadIfaceByteCodeLazy ::
   ModIface ->
   ModLocation ->
   TypeEnv ->
-  IO (Maybe Linkable)
+  IO (Maybe (LinkableWith ModuleByteCode))
 loadIfaceByteCodeLazy hsc_env iface location type_env =
   case iface_core_bindings iface location of
     Nothing -> return Nothing
@@ -1108,8 +1111,9 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
       Just <$> compile wcb
   where
     compile decls = do
-      bco <- unsafeInterleaveIO $ compileWholeCoreBindings hsc_env type_env decls
-      linkable $ NE.singleton (DotGBC bco)
+      bco <- unsafeInterleaveIO $ do
+          compileWholeCoreBindings hsc_env type_env decls
+      linkable bco
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file_ospath location)
@@ -1150,14 +1154,14 @@ initWholeCoreBindings hsc_env iface details (RecompLinkables bc o) = do
   where
     type_env = md_types details
 
-    go :: RecompBytecodeLinkable -> IO (Maybe Linkable)
+    go :: RecompBytecodeLinkable -> IO (Maybe (LinkableWith ModuleByteCode))
     go (NormalLinkable l) = pure l
     go (WholeCoreBindingsLinkable wcbl) =
       fmap Just $ for wcbl $ \wcb -> do
         add_iface_to_hpt iface details hsc_env
-        bco <- unsafeInterleaveIO $
-                       compileWholeCoreBindings hsc_env type_env wcb
-        pure $ NE.singleton (DotGBC bco)
+        bco <- unsafeInterleaveIO $ do
+            compileWholeCoreBindings hsc_env type_env wcb
+        pure bco
 
 -- | Hydrate interface Core bindings and compile them to bytecode.
 --
@@ -1200,7 +1204,7 @@ compileWholeCoreBindings hsc_env type_env wcb = do
     gen_bytecode core_binds stubs foreign_files = do
       let cgi_guts = CgInteractiveGuts wcb_module core_binds
                       (typeEnvTyCons type_env) stubs foreign_files
-                      Nothing []
+                      Nothing [] NoHpcInfo
       trace_if logger (text "Generating ByteCode for" <+> ppr wcb_module)
       mkModuleByteCode hsc_env wcb_module wcb_mod_location cgi_guts
 
@@ -2150,11 +2154,12 @@ data CgInteractiveGuts = CgInteractiveGuts { cgi_module :: Module
                                            , cgi_foreign_files :: [(ForeignSrcLang, FilePath)]
                                            , cgi_modBreaks ::  Maybe ModBreaks
                                            , cgi_spt_entries :: [SptEntry]
+                                           , cgi_hpc_info :: HpcInfo
                                            }
 
 mkCgInteractiveGuts :: CgGuts -> CgInteractiveGuts
-mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_foreign_files, cg_modBreaks, cg_spt_entries}
-  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_foreign_files cg_modBreaks cg_spt_entries
+mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_foreign_files, cg_modBreaks, cg_spt_entries, cg_hpc_info}
+  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_foreign_files cg_modBreaks cg_spt_entries cg_hpc_info
 
 hscInteractive :: HscEnv
                -> CgInteractiveGuts
@@ -2177,13 +2182,15 @@ hscGenerateByteCode :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO Compiled
 hscGenerateByteCode hsc_env cgguts location = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
+    let platform = targetPlatform dflags
     let CgInteractiveGuts{ -- This is the last use of the ModGuts in a compilation.
                 -- From now on, we just use the bits we need.
                cgi_module   = this_mod,
                cgi_binds    = core_binds,
                cgi_tycons   = tycons,
                cgi_modBreaks = mod_breaks,
-               cgi_spt_entries = spt_entries } = cgguts
+               cgi_spt_entries = spt_entries,
+               cgi_hpc_info = hpc_info } = cgguts
 
     -------------------
     -- ADD IMPLICIT BINDINGS
@@ -2208,8 +2215,22 @@ hscGenerateByteCode hsc_env cgguts location = do
 
     let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
+    -------------------
+    -- Setup HPC info
+    let
+      -- Strict to not retain a reference to the 'cgguts' via 'hpc_info'
+      !bytecodeHpcInfo = case hpc_info of
+        NoHpcInfo -> Strict.Nothing
+        HpcInfo{hpcInfoTickCount, hpcInfoHash} ->
+          Strict.Just ByteCodeHpcInfo
+            { bchi_tick_count = hpcInfoTickCount
+            , bchi_hash = hpcInfoHash
+            , bchi_tickbox_name = utf8EncodeShortByteString $ Coverage.mkHpcTickBoxesLabell platform this_mod
+            , bchi_module_name = utf8EncodeShortByteString $ Coverage.mkHpcModuleLabel this_mod
+            }
+
     -----------------  Generate byte code ------------------
-    byteCodeGen hsc_env this_mod stg_binds tycons mod_breaks spt_entries
+    byteCodeGen hsc_env this_mod stg_binds tycons mod_breaks spt_entries bytecodeHpcInfo
 
 -- | Generate a byte code object linkable and write it to a file if `-fwrite-byte-code` is enabled.
 generateAndWriteByteCode :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO ModuleByteCode
@@ -2219,7 +2240,7 @@ generateAndWriteByteCode hsc_env cgguts mod_location = do
   -- See Note [-fwrite-byte-code is not the default]
   when (gopt Opt_WriteByteCode dflags) $ do
     let bc_path = ml_bytecode_file mod_location
-    writeBinByteCode bc_path comp_bc
+    ByteCode.writeBinByteCode bc_path comp_bc
   return comp_bc
 
 {-
@@ -2234,20 +2255,20 @@ make user's opt into writing the files.
 -}
 
 -- | Generate a 'ModuleByteCode' and write it to disk if `-fwrite-byte-code` is enabled.
-generateAndWriteByteCodeLinkable :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO Linkable
+generateAndWriteByteCodeLinkable :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO (LinkableWith ModuleByteCode)
 generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
   bco_object <- generateAndWriteByteCode hsc_env cgguts mod_location
   -- Either, get the same time as the .gbc file if it exists, or just the current time.
   -- It's important the time of the linkable matches the time of the .gbc file for recompilation
   -- checking.
   bco_time <- maybe getCurrentTime pure =<< modificationTimeIfExists (ml_bytecode_file_ospath mod_location)
-  return $ mkModuleByteCodeLinkable bco_time bco_object
+  return $ mkOnlyModuleByteCodeLinkable bco_time bco_object
 
 mkModuleByteCode :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ModuleByteCode
 mkModuleByteCode hsc_env mod mod_location cgguts = do
   bcos <- hscGenerateByteCode hsc_env cgguts mod_location
   objs <- outputAndCompileForeign hsc_env mod mod_location (cgi_foreign_files cgguts) (cgi_foreign cgguts)
-  return $! ModuleByteCode mod bcos objs
+  ByteCode.mkModuleByteCode mod bcos objs
 
 -- | Generate a fresh 'ModuleByteCode' for a given module but do not write it to disk.
 generateFreshByteCodeLinkable :: HscEnv
@@ -2769,13 +2790,13 @@ hscTidy hsc_env guts = do
 %*                                                                      *
 %********************************************************************* -}
 
-hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [Linkable], PkgsLoaded)
+hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 hscCompileCoreExpr hsc_env loc expr =
   case hscCompileCoreExprHook (hsc_hooks hsc_env) of
       Nothing -> hscCompileCoreExpr' hsc_env loc expr
       Just h  -> h                   hsc_env loc expr
 
-hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [Linkable], PkgsLoaded)
+hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   {- Simplify it -}
   -- Question: should we call SimpleOpt.simpleOptExpr here instead?
@@ -2847,7 +2868,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
 
   case interp of
     -- always generate JS code for the JS interpreter (no bytecode!)
-    Interp (ExternalInterp (ExtJS i)) _ _ ->
+    Interp { interpInstance = ExternalInterp (ExtJS i) } ->
       jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id
 
     _ -> do
@@ -2858,11 +2879,13 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
                 []
                 Nothing -- modbreaks
                 [] -- spt entries
+                Strict.Nothing -- no hpc info
 
       {- load it -}
       bco_time <- getCurrentTime
+      mbc <- ByteCode.mkModuleByteCode this_mod bcos []
       (mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
-        Linkable bco_time this_mod $ NE.singleton $ DotGBC (ModuleByteCode this_mod bcos [])
+        Linkable bco_time this_mod $ NE.singleton (DotGBC mbc)
       -- Get the foreign reference to the name we should have just loaded.
       mhvs <- lookupFromLoadedEnv interp (idName binding_id)
       {- Get the HValue for the root -}
@@ -2878,7 +2901,7 @@ jsCodeGen
   -> Module
   -> [(CgStgTopBinding,IdSet)]
   -> Id
-  -> IO (ForeignHValue, [Linkable], PkgsLoaded)
+  -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
   let logger           = hsc_logger hsc_env
       tmpfs            = hsc_tmpfs hsc_env

@@ -18,6 +18,7 @@ module GHC.Runtime.Interpreter
   , mallocData
   , createBCOs
   , addSptEntry
+  , addHpcModule
   , mkCostCentres
   , costCentreStackInfo
   , newBreakArray
@@ -106,6 +107,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (mask)
 import Data.Binary
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Short as SBS
 import Foreign hiding (void)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
@@ -351,9 +353,15 @@ evalStringToIOString interp fhv str =
 mallocData :: Interp -> ByteString -> IO (RemotePtr ())
 mallocData interp bs = interpCmd interp (MallocData bs)
 
-mkCostCentres :: Interp -> String -> [(String,String)] -> IO [RemotePtr CostCentre]
-mkCostCentres interp mod ccs =
-  interpCmd interp (MkCostCentres mod ccs)
+mkCostCentres :: Interp -> FastString -> [(SBS.ShortByteString, SBS.ShortByteString)] -> IO [RemotePtr CostCentre]
+mkCostCentres interp mod ccs = do
+  rp <- modifyMVar (interpStringCache interp) $ \fs_env ->
+    case lookupFsEnv fs_env mod of
+      Just rp -> pure (fs_env, rp)
+      Nothing -> do
+        rp <- fmap head $ interpCmd interp $ MallocStrings [bytesFS mod]
+        pure (extendFsEnv fs_env mod rp, rp)
+  interpCmd interp $ MkCostCentres rp ccs
 
 -- | Create a set of BCOs that may be mutually recursive.
 createBCOs :: Interp -> [ResolvedBCO] -> IO [HValueRef]
@@ -364,6 +372,10 @@ addSptEntry :: Interp -> Fingerprint -> ForeignHValue -> IO ()
 addSptEntry interp fpr ref =
   withForeignRef ref $ \val ->
     interpCmd interp (AddSptEntry fpr val)
+
+addHpcModule :: Interp -> SBS.ShortByteString -> Int -> Int -> SBS.ShortByteString -> IO ()
+addHpcModule interp modLabel tickNo hash tickboxes  =
+  interpCmd interp (AddHpcModule modLabel tickNo hash tickboxes)
 
 costCentreStackInfo :: Interp -> RemotePtr CostCentreStack -> IO [String]
 costCentreStackInfo interp ccs =
@@ -412,7 +424,7 @@ evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
 evalBreakpointToId eval_break =
   let
     mkUnitId u = fsToUnit $ mkFastStringShortByteString u
-    toModule u n = mkModule (mkUnitId u) (mkModuleName n)
+    toModule u n = mkModule (mkUnitId u) (mkModuleNameFS (mkFastStringShortByteString n))
   in
     InternalBreakpointId
       { ibi_info_mod   = toModule (eb_info_mod_unit eval_break) (eb_info_mod eval_break)
@@ -466,27 +478,27 @@ lookupSymbol :: Interp -> InterpSymbol s -> IO (Maybe (Ptr ()))
 lookupSymbol interp str = withSymbolCache interp str $
   case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
+    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (fastStringToShortByteString (interpSymbolToCLabel str)))
 #endif
     ExternalInterp ext -> case ext of
       ExtIServ i -> withIServ i $ \inst -> fmap fromRemotePtr <$> do
         uninterruptibleMask_ $
-          sendMessage inst (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
+          sendMessage inst (LookupSymbol (fastStringToShortByteString (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
       ExtWasm i -> withWasmInterp i $ \inst -> fmap fromRemotePtr <$> do
         uninterruptibleMask_ $
-          sendMessage inst (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
+          sendMessage inst (LookupSymbol (fastStringToShortByteString (interpSymbolToCLabel str)))
 
 lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> InterpSymbol s -> IO (Maybe (Ptr ()))
 lookupSymbolInDLL interp dll str = withSymbolCache interp str $
   case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (unpackFS (interpSymbolToCLabel str)))
+    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (fastStringToShortByteString (interpSymbolToCLabel str)))
 #endif
     ExternalInterp ext -> case ext of
       ExtIServ i -> withIServ i $ \inst -> fmap fromRemotePtr <$> do
         uninterruptibleMask_ $
-          sendMessage inst (LookupSymbolInDLL dll (unpackFS (interpSymbolToCLabel str)))
+          sendMessage inst (LookupSymbolInDLL dll (fastStringToShortByteString (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
       -- wasm dyld doesn't track which symbol comes from which .so
       ExtWasm {} -> lookupSymbol interp str
@@ -520,7 +532,7 @@ interpSymbolToCLabel s = eliminateInterpSymbol s interpretedInterpSymbol $ \is -
 
 lookupClosure :: Interp -> InterpSymbol s -> IO (Maybe HValueRef)
 lookupClosure interp str =
-  interpCmd interp (LookupClosure (unpackFS (interpSymbolToCLabel str)))
+  interpCmd interp (LookupClosure (fastStringToShortByteString (interpSymbolToCLabel str)))
 
 -- | 'withSymbolCache' tries to find a symbol in the 'interpLookupSymbolCache'
 -- which maps symbols to the address where they are loaded.

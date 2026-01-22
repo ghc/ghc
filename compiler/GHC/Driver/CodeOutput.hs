@@ -348,7 +348,6 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
    cplusplus_hdr = "#if defined(__cplusplus)\nextern \"C\" {\n#endif\n"
    cplusplus_ftr = "#if defined(__cplusplus)\n}\n#endif\n"
 
-
 -- It is more than likely that the stubs file will
 -- turn out to be empty, in which case no file should be created.
 outputForeignStubs_help :: FilePath -> String -> String -> String -> IO Bool
