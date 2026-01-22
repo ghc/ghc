@@ -25,8 +25,8 @@ module GHC.IO.SubSystem
      whenIoSubSystem,
      ioSubSystem,
      IoSubSystem(..),
-     conditional,
-     (<!>),
+     {-# DEPRECATED "Please use System.IO.OS.osHandleType." #-} conditional,
+     {-# DEPRECATED "Please use System.IO.OS.osHandleType." #-} (<!>),
      isWindowsNativeIO
      ) where
 

@@ -8,6 +8,10 @@
 -}
 module System.IO.OS
 (
+    -- * OS handle type detection
+    OSHandleType (FileDescriptor, WindowsHandle),
+    osHandleType,
+
     -- * Obtaining file descriptors and Windows handles
     withFileDescriptorReadingBiased,
     withFileDescriptorWritingBiased,
@@ -28,6 +32,11 @@ import Control.Concurrent.MVar (MVar)
 import Control.Exception (mask)
 import Data.Function (const, (.), ($))
 import Data.Functor (fmap)
+import Data.Eq (Eq)
+import Data.Ord (Ord)
+import Data.Enum (Enum)
+import Data.Bounded (Bounded)
+import Data.Typeable (Typeable, cast)
 import Data.Maybe (Maybe (Nothing), maybe)
 #if defined(mingw32_HOST_OS)
 import Data.Bool (otherwise)
@@ -35,8 +44,10 @@ import Data.Maybe (Maybe (Just))
 #endif
 import Data.List ((++))
 import Data.String (String)
-import Data.Typeable (Typeable, cast)
+import Text.Show (Show)
+import Text.Read (Read)
 import System.IO (IO)
+import GHC.Internal.IO.SubSystem (conditional)
 import GHC.IO.FD (fdFD)
 #if defined(mingw32_HOST_OS)
 import GHC.IO.Windows.Handle
@@ -61,6 +72,19 @@ import GHC.IO.Exception
        )
 import Foreign.Ptr (Ptr)
 import Foreign.C.Types (CInt)
+
+-- * OS handle type detection
+
+-- | The type of operating-system handle types.
+data OSHandleType = FileDescriptor | WindowsHandle
+    deriving (Eq, Ord, Bounded, Enum, Show, Read)
+
+{-|
+    The type of operating-system handles that underlie Haskell handles with the
+    I/O manager currently in use.
+-}
+osHandleType :: OSHandleType
+osHandleType = conditional FileDescriptor WindowsHandle
 
 -- * Obtaining POSIX file descriptors and Windows handles
 
