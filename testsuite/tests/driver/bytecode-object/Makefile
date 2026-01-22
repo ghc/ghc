@@ -77,7 +77,7 @@ bytecode_object13:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghciWayFlags) -c BytecodeTest.hs -fbyte-code -fwrite-byte-code -fwrite-interface
 	@[ -f BytecodeTest.gbc ] || (echo "ERROR: Expected BytecodeTest.gbc file not found"; echo "Files in current directory:"; ls -la; exit 1)
 	@echo "Testing recompilation in GHCi..."
-	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
 
 # Test recompilation after touching .hi file to make it newer than .gbc file
 bytecode_object14:
@@ -86,14 +86,14 @@ bytecode_object14:
 	@[ -f BytecodeTest.hi ] || (echo "ERROR: Expected BytecodeTest.hi file not found"; echo "Files in current directory:"; ls -la; exit 1)
 	@touch BytecodeTest.hi
 	@echo "Testing recompilation in GHCi after touching .hi file..."
-	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
 
 # Test recompilation by generating .gbc via GHCi , then starting GHCi again
 bytecode_object15:
-	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
 	@[ -f BytecodeTest.gbc ] || (echo "ERROR: Expected BytecodeTest.gbc file not found"; echo "Files in current directory:"; ls -la; exit 1)
 	@echo "Testing recompilation in GHCi..."
-	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
 
 # Test what happens when .gbc file is deleted before starting GHCi
 bytecode_object16:
@@ -101,7 +101,7 @@ bytecode_object16:
 	@[ -f BytecodeTest.gbc ] || (echo "ERROR: Expected BytecodeTest.gbc file not found"; echo "Files in current directory:"; ls -la; exit 1)
 	@rm BytecodeTest.gbc
 	@echo "Testing GHCi startup without .gbc file..."
-	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs -e ":quit"
 
 # Test what happens with interface file but no bytecode file
 # This should recompute from scratch since we are missing the .gbc file
@@ -110,7 +110,7 @@ bytecode_object17:
 	@[ -f BytecodeTest.hi ] || (echo "ERROR: Expected BytecodeTest.hi file not found"; echo "Files in current directory:"; ls -la; exit 1)
 	@[ ! -f BytecodeTest.gbc ] || (echo "ERROR: Unexpected BytecodeTest.gbc file not found"; echo "Files in current directory:"; ls -la; exit 1)
 	@echo "Testing GHCi startup with interface file but no bytecode file..."
-	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fbyte-code -fwrite-byte-code -fwrite-interface -fwrite-if-simplified-core BytecodeTest.hs -e ":quit"
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths -fbyte-code -fwrite-byte-code -fwrite-interface -fwrite-if-simplified-core BytecodeTest.hs -e ":quit"
 
 # Test what happens with interface file but no bytecode file (without -fwrite-byte-code)
 # This should use the bindings in the .hi file to avoid recomputing from scratch.
@@ -119,13 +119,13 @@ bytecode_object18:
 	@[ -f BytecodeTest.hi ] || (echo "ERROR: Expected BytecodeTest.hi file not found"; echo "Files in current directory:"; ls -la; exit 1)
 	@[ ! -f BytecodeTest.gbc ] || (echo "ERROR: Unexpected BytecodeTest.gbc file not found"; echo "Files in current directory:"; ls -la; exit 1)
 	@echo "Testing GHCi startup with interface file but no bytecode file (without -fwrite-byte-code)..."
-	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fbyte-code -fwrite-if-simplified-core -fwrite-interface BytecodeTest.hs -e ":quit"
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths -fbyte-code -fwrite-if-simplified-core -fwrite-interface BytecodeTest.hs -e ":quit"
 
 # Test removing .gbc file and reloading in GHCi
 # The module should be recompiled.
 bytecode_object19:
 	@echo "Testing GHCi with .gbc file removal and reload..."
-	@cat bytecode_object19.script | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs
+	@cat bytecode_object19.script | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeTest.hs
 
 # Test that -bytecodelib and -o pkg.bytecode in --make mode produces a bytecodelib
 bytecode_object20:
@@ -150,12 +150,12 @@ bytecode_object23:
 # Test that changing ByteCode.hs causes bytecode library to be recompiled
 bytecode_object24:
 	@echo "Testing that bytecode library is recompiled when BytecodeTest.hs changes..."
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -bytecodelib -o linked.bytecode BytecodeTest.hs -fwrite-byte-code -fbyte-code -fwrite-interface
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -fno-hide-source-paths -bytecodelib -o linked.bytecode BytecodeTest.hs -fwrite-byte-code -fbyte-code -fwrite-interface
 	@echo "new_defn = ()" >> BytecodeTest.hs
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -bytecodelib -o linked.bytecode BytecodeTest.hs -fwrite-byte-code -fbyte-code -fwrite-interface
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -fno-hide-source-paths -bytecodelib -o linked.bytecode BytecodeTest.hs -fwrite-byte-code -fbyte-code -fwrite-interface
 
 # Test that bytecode generation works with foreign functions
 bytecode_object25:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c BytecodeForeign.hs -fbyte-code -fwrite-byte-code -fwrite-interface $(ghciWayFlags)
-	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeForeign.hs -e "testForeign"
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeForeign.hs -e "testForeign"
 
