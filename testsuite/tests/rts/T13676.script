@@ -1,3 +1,4 @@
+:set -fno-hide-source-paths
 :load T13676.hs
 import System.Environment
 Just ghcPath <- lookupEnv "HC"       -- must be set by the testsuite driver

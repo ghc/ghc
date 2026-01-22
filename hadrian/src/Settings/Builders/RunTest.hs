@@ -68,6 +68,7 @@ runTestGhcFlags = do
         , ifMinGhcVer "801" "-fno-diagnostics-show-caret"
         , pure "-Werror=compat" -- See #15278
         , pure "-dno-debug-output"
+        , pure "-fno-hide-source-paths"
         ]
 
 data TestCompilerArgs = TestCompilerArgs{

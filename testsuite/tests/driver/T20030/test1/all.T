@@ -3,7 +3,7 @@ test('T20030_test1',
                    , 'D.hs' , 'E.hs-boot' , 'E.hs' , 'F.hs' , 'G.hs' , 'H.hs'
                    , 'I.hs', 'J.hs-boot', 'J.hs', 'K.hs' ])
      ],
-     multimod_compile, ['I.hs K.hs', '-v1'])
+     multimod_compile, ['I.hs K.hs', '-v1 -fno-hide-source-paths'])
 
 test('T20030_test1j',
      [ extra_files([ 'A.hs-boot' , 'A.hs' , 'B.hs' , 'C.hs-boot' , 'C.hs'
@@ -12,4 +12,4 @@ test('T20030_test1j',
      , req_target_smp
      , req_ghc_smp
      ],
-     multimod_compile, ['I.hs K.hs', '-v1 -j'])
+     multimod_compile, ['I.hs K.hs', '-v1 -j -fno-hide-source-paths'])

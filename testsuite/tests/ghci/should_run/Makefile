@@ -9,7 +9,7 @@ T3171:
 	sleep 2; kill -INT $$!; wait
 
 TopEnvIface:
-	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) TopEnvIface -v1 -e "a" -e ":q" -fwrite-if-simplified-core -fwrite-interface
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) TopEnvIface -v1 -fno-hide-source-paths -e "a" -e ":q" -fwrite-if-simplified-core -fwrite-interface
 	# Second compilation starts from interface files, but still can print "a"
-	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) TopEnvIface -v1 -e "a" -e ":q" -fwrite-if-simplified-core -fwrite-interface
+	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) TopEnvIface -v1 -fno-hide-source-paths -e "a" -e ":q" -fwrite-if-simplified-core -fwrite-interface
 

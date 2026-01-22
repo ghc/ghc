@@ -74,6 +74,32 @@ Compiler
   in addition to :ghc-flag:`-mavx2`.
   Refer to the users' guide for more details about each individual flag.
 
+- The flag ``-fhide-source-paths`` is enabled by default at verbosity level 1 and below by default.
+  This improves the readability of the compiler output, as we transition from:
+
+.. code-block:: text
+
+    [  1 of 139] Compiling Distribution.Compat.Binary ( src/Distribution/Compat/Binary.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Binary.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Binary.dyn_o )
+    [  2 of 139] Compiling Distribution.Compat.Exception ( src/Distribution/Compat/Exception.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Exception.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Exception.dyn_o )
+    [  3 of 139] Compiling Distribution.Compat.Newtype ( src/Distribution/Compat/Newtype.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Newtype.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Newtype.dyn_o )
+    [  4 of 139] Compiling Distribution.Compat.Semigroup ( src/Distribution/Compat/Semigroup.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Semigroup.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Compat/Semigroup.dyn_o )
+    [  5 of 139] Compiling Distribution.PackageDescription.Utils ( src/Distribution/PackageDescription/Utils.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/PackageDescription/Utils.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/PackageDescription/Utils.dyn_o )
+    [  6 of 139] Compiling Distribution.Utils.Base62 ( src/Distribution/Utils/Base62.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/Base62.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/Base62.dyn_o )
+    [  7 of 139] Compiling Distribution.Utils.MD5 ( src/Distribution/Utils/MD5.hs, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/MD5.o, /home/tchoutri/Code/cabal/dist-newstyle/build/x86_64-linux/ghc-9.12.2/Cabal-syntax-3.17.0.0/build/Distribution/Utils/MD5.dyn_o )
+
+to
+
+.. code-block:: text
+
+    [  1 of 139] Compiling Distribution.Compat.Binary
+    [  2 of 139] Compiling Distribution.Compat.Exception
+    [  3 of 139] Compiling Distribution.Compat.Newtype
+    [  4 of 139] Compiling Distribution.Compat.Semigroup
+    [  5 of 139] Compiling Distribution.PackageDescription.Utils
+    [  6 of 139] Compiling Distribution.Utils.Base62
+    [  7 of 139] Compiling Distribution.Utils.MD5
+
+See :ghc-ticket:`25345`.
 
 GHCi
 ~~~~
