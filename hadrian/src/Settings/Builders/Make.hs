@@ -12,12 +12,8 @@ makeBuilderArgs = do
     threads    <- shakeThreads <$> expr getShakeOptions
     stage      <- getStage
     gmpPath    <- expr (gmpBuildPath stage)
-    libffiPaths <- forM [Stage1, Stage2, Stage3 ] $ \s -> expr (libffiBuildPath s)
     let t = show $ max 4 (threads - 2) -- Don't use all Shake's threads
-    mconcat $
-        (builder (Make gmpPath   ) ? pure ["MAKEFLAGS=-j" ++ t]) :
-        [ builder (Make libffiPath) ? pure ["MAKEFLAGS=-j" ++ t, "install"]
-        | libffiPath <- libffiPaths ]
+    builder (Make gmpPath) ? pure ["MAKEFLAGS=-j" ++ t]
 
 validateBuilderArgs :: Args
 validateBuilderArgs = builder (Make "testsuite/tests") ? do

@@ -11,7 +11,7 @@ module Context (
     pkgLibraryFile,
     pkgConfFile, pkgStampFile, resourcePath, objectPath, contextPath, getContextPath, libPath, distDir,
     distDynDir,
-    haddockStatsFilesDir, ensureConfigured, autogenPath, rtsContext, rtsBuildPath, libffiBuildPath
+    haddockStatsFilesDir, ensureConfigured, autogenPath, rtsContext, rtsBuildPath
     ) where
 
 import Base
@@ -92,14 +92,6 @@ rtsContext stage = vanillaContext stage rts
 -- | Path to the RTS build directory.
 rtsBuildPath :: Stage -> Action FilePath
 rtsBuildPath stage = buildPath (rtsContext stage)
-
--- | Build directory for in-tree 'libffi' library.
-libffiBuildPath :: Stage -> Action FilePath
-libffiBuildPath stage = buildPath $ Context
-    stage
-    libffi
-    (error "libffiBuildPath: way not set.")
-    (error "libffiBuildPath: inplace not set.")
 
 pkgFileName :: Context -> Package -> String -> String -> Action FilePath
 pkgFileName context package prefix suffix = do
