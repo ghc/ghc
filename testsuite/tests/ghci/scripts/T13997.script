@@ -1,4 +1,5 @@
 :set -v1
+:set -fno-hide-source-paths
 System.IO.writeFile "Bug.hs" "module Bug where import Bug2; bug = bug2"
 System.IO.writeFile "Bug2.hs" "module Bug2 where bug2 = False"
 :load Bug

@@ -1,0 +1,46 @@
+p7 True (1,2,3,4,5,6,7)
+n2 True (1,2)
+n7 True (1,2,3,4,5,6,7)
+n15 True ((1,2,3,4,5),(6,7,8,9,10),(11,12,13,14,15))
+d7 True (1.5,2.5,3.5,4.5,5.5,6.5,7.5)
+fl7 True (1.25,2.25,3.25,4.25,5.25,6.25,7.25)
+w7 True (100,200,300,400,500,600,700)
+mpi6 True (1,2,3,4,5,6)
+mpd6 True (1,1.5,2,2.5,3,3.5)
+mall8 True (1,2,3.0,4.0,5,6,7.0,8.0)
+sub5 True (42,1000,70000,99,100)
+vd6 True (11,22,33)
+n14 True ((1,2,3,4,5,6,7),(8,9,10,11,12,13,14))
+n20 True ((1,2,3,4,5),(6,7,8,9,10),(11,12,13,14,15),(16,17,18,19,20))
+n32 True ((1,2,3,4,5,6,7,8),(9,10,11,12,13,14,15,16),(17,18,19,20,21,22,23,24),(25,26,27,28,29,30,31,32))
+mix32 True ((1,2,3.0,4.0),(5,6,7.0,8.0),(9,10,11.0,12.0),(13,14,15.0,16.0),(17,18,19.0,20.0),(21,22,23.0,24.0),(25,26,27.0,28.0),(29,30,31.0,32.0))
+loop_p7 True
+loop_mpd True
+loop_n32 True
+chain_arith (80,80,80,40,80,80,80)
+swap_stress (1,2)
+rec_mixed (50,100,25.0,75.0)
+fib_cross 832040
+exc_n7_bo True
+exc_n15_bo True
+exc_mpd_bo True
+exc_repeat True
+exc_n14_bo True
+exc_n32_bo True
+exc_nested_2gen True
+exc_catch_between True
+async_n7 True
+async_other True
+async_n14 True
+async_nested True
+async_exc_combo True
+async_loop True
+async_2ctoi True
+async_3ctoi True
+async_nested_ctoi True
+async_n32 True
+async_2gen32 True
+async_gen_mix True
+async_replay_base True
+async_replay_2inner True
+async_replay_catch True

@@ -23,6 +23,7 @@ module GHC.HsToCore.Breakpoints
 
 import GHC.Prelude
 import Data.Array
+import qualified Data.ByteString.Short as SBS
 
 import GHC.HsToCore.Ticks (Tick (..))
 import GHC.Data.SizedSeq
@@ -31,6 +32,7 @@ import GHC.Types.Name (OccName)
 import GHC.Types.Tickish (BreakTickIndex, BreakpointId(..))
 import GHC.Unit.Module (Module)
 import GHC.Utils.Binary
+import GHC.Utils.Encoding (utf8EncodeShortByteString)
 import GHC.Utils.Outputable
 import Data.List (intersperse)
 import Data.Coerce
@@ -59,7 +61,7 @@ data ModBreaks
    , modBreaks_decls  :: !(Array BreakTickIndex [String])
         -- ^ An array giving the names of the declarations enclosing each breakpoint.
         -- See Note [Field modBreaks_decls]
-   , modBreaks_ccs    :: !(Array BreakTickIndex (String, String))
+   , modBreaks_ccs    :: !(Array BreakTickIndex (SBS.ShortByteString, SBS.ShortByteString))
         -- ^ Array pointing to cost centre info for each breakpoint;
         -- actual 'CostCentre' allocation is done at link-time.
    , modBreaks_module :: !Module
@@ -89,8 +91,8 @@ mkModBreaks interpreterProfiled modl extendedMixEntries
           | interpreterProfiled =
               listArray
                 (0, count - 1)
-                [ ( concat $ intersperse "." $ tick_path t,
-                    renderWithContext defaultSDocContext $ ppr $ tick_loc t
+                [ ( utf8EncodeShortByteString $ concat $ intersperse "." $ tick_path t,
+                    utf8EncodeShortByteString $ renderWithContext defaultSDocContext $ ppr $ tick_loc t
                   )
                 | t <- entries
                 ]

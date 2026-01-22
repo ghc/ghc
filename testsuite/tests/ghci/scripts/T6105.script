@@ -1,3 +1,4 @@
 :set -v1
+:set -fno-hide-source-paths
 :load T6105.hs
 :reload
