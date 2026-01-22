@@ -1,4 +1,5 @@
 :set -v1
+:set -fno-hide-source-paths
 System.IO.writeFile "T1914A.hs" "module T1914A where { import T1914B; }"
 System.IO.writeFile "T1914B.hs" "module T1914B where { type T = Int; }"
 :load T1914A

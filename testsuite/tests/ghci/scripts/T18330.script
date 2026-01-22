@@ -1,3 +1,4 @@
+:set -fno-hide-source-paths
 :l T18330.hs
 :shell echo "new line" > T18330.extra
 :r

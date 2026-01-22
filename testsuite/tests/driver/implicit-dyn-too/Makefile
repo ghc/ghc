@@ -6,7 +6,7 @@ clean:
 	rm -f *.o *.hi *.dyn_hi *.dyn_o
 
 implicit-dyn-too: clean
-	'$(TEST_HC)' $(TEST_HC_OPTS) "QuasiQuote.hs" -fno-code -fwrite-interface -v1 --make
+	'$(TEST_HC)' $(TEST_HC_OPTS) "QuasiQuote.hs" -fno-code -fwrite-interface -v1 -fno-hide-source-paths --make
 	rm "QuasiExpr.dyn_o"
-	'$(TEST_HC)' $(TEST_HC_OPTS) "QuasiQuote.hs" -fno-code -fwrite-interface -v1 --make
+	'$(TEST_HC)' $(TEST_HC_OPTS) "QuasiQuote.hs" -fno-code -fwrite-interface -v1 -fno-hide-source-paths --make
 
