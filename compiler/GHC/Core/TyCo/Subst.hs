@@ -892,8 +892,7 @@ subst_co subst co
                  in cos' `seqList` cos'
 
     -- See Note [Substituting in a coercion hole]
-    go_hole h@(CoercionHole { ch_co_var = cv })
-      = h { ch_co_var = updateVarType go_ty cv }
+    go_hole h@(CH { ch_co_var = cv }) = h { ch_co_var = updateVarType go_ty cv }
 
 -- | Perform a substitution within a 'DVarSet' of free variables,
 -- returning the shallow free coercion variables.

@@ -15,7 +15,7 @@ module GHC.Tc.Solver.Monad (
     failTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
     runTcSEqualities,
     nestTcS, nestImplicTcS, tryShortCutTcS, nestFunDepsTcS,
-    setEvBindsTcS, setTcLevelTcS, updTcEvBinds,
+    setEvBindsTcS, setTcLevelTcS,
 
     selectNextWorkItem,
     getWorkList,
@@ -58,7 +58,7 @@ module GHC.Tc.Solver.Monad (
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getLclEnv, setSrcSpan,
     getTcEvBindsVar, getTcLevel,
-    getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
+    getTcEvBindsMap, setTcEvBindsMap, getTcEvBindsState, combineTcEvBinds,
     tcLookupClass, tcLookupId, tcLookupTyCon,
 
     -- Inerts
@@ -1140,7 +1140,7 @@ csTraceTcM mk_doc
 {-# INLINE csTraceTcM #-}  -- see Note [INLINE conditional tracing utilities]
 
 runTcS :: TcS a                -- What to run
-       -> TcM (a, EvBindMap)
+       -> TcM (a, EvBindsMap)
 runTcS tcs
   = do { ev_binds_var <- TcM.newTcEvBinds
        ; res <- runTcSWithEvBinds ev_binds_var tcs
@@ -1222,7 +1222,7 @@ runTcSWithEvBinds' mode ev_binds_var thing_inside
 
 ----------------------------
 #if defined(DEBUG)
-checkForCyclicBinds :: EvBindMap -> TcM ()
+checkForCyclicBinds :: EvBindsMap -> TcM ()
 checkForCyclicBinds ev_binds_map
   | null cycles
   = return ()
@@ -1351,7 +1351,7 @@ nestTcS (TcS thing_inside)
 
        ; return res }
 
-tryShortCutTcS :: TcS Bool -> TcS Bool
+tryShortCutTcS :: TcS WantedConstraints -> TcS Bool
 -- Like nestTcS, but
 --   (a) be a no-op if the nested computation returns False
 --   (b) if (but only if) success, propagate nested bindings to the caller
@@ -1380,26 +1380,43 @@ tryShortCutTcS (TcS thing_inside)
                             , tcs_inerts   = new_inert_var
                             , tcs_worklist = new_wl_var }
 
-       ; TcM.traceTc "tryTcS {" $
+       ; TcM.traceTc "tryShortCutTcS {" $
          vcat [ text "old_ev_binds:" <+> ppr old_ev_binds_var
               , text "new_ev_binds:" <+> ppr new_ev_binds_var
               , ppr old_inerts ]
-       ; solved <- thing_inside nest_env
-       ; TcM.traceTc "tryTcS }" (ppr solved)
+       ; residual <- thing_inside nest_env
+       ; let solved = isSolvedWC residual
+              -- NB: isSolvedWC, not isEmptyWC (#26805). We might succeed
+              --     in fully-solving the constraint but still leave some
+              --     /solved/ implications in the residual.
+              --     See (SCS4) in Note [Shortcut solving]
+       ; TcM.traceTc "tryShortCutTcS }" (ppr solved)
 
-       ; if not solved
-         then return False
-         else do {  -- Successfully solved
-                   -- Add the new bindings to the existing ones
-                 ; TcM.updTcEvBinds old_ev_binds_var new_ev_binds_var
+       ; when solved $    -- Successfully solved
+         do {  -- Add the new bindings to the existing ones
+            ; TcM.combineTcEvBinds old_ev_binds_var new_ev_binds_var
 
-                 -- Update the existing inert set
-                 ; new_inerts <- TcM.readTcRef new_inert_var
-                 ; TcM.updTcRef inerts_var (`updateInertsWith` new_inerts)
+            -- We are discarding some implications; we must add their
+            -- NeededEvIds to the current bindings, lest we fail to record
+            -- some needed givens, and then wrongly prune away their bindings
+            ; TcM.addNeededEvIds old_ev_binds_var $
+              foldr add_implic emptyVarSet $
+              wc_impl residual
 
-                 ; TcM.traceTc "tryTcS update" (ppr (inert_solved_dicts new_inerts))
+            -- Update the existing inert set
+            ; new_inerts <- TcM.readTcRef new_inert_var
+            ; TcM.updTcRef inerts_var (`updateInertsWith` new_inerts) }
 
-                 ; return True } }
+
+       ; return solved
+       }
+  where
+    add_implic :: Implication -> NeededEvIds -> NeededEvIds
+    add_implic implic@(Implic { ic_status = status }) needs
+      | IC_Solved { ics_dm = dm, ics_non_dm = non_dm } <- status
+      = needs `unionVarSet` dm `unionVarSet` non_dm
+      | otherwise
+      = pprPanic "tryShortCutTcS" (ppr implic)
 
 updateInertsWith :: InertSet -> InertSet -> InertSet
 -- Update the current inert set with bits from a nested solve,
@@ -1465,21 +1482,21 @@ getTcEvBindsVar = TcS (return . tcs_ev_binds)
 getTcLevel :: TcS TcLevel
 getTcLevel = wrapTcS TcM.getTcLevel
 
-getTcEvTyCoVars :: EvBindsVar -> TcS [TcCoercion]
-getTcEvTyCoVars ev_binds_var
-  = wrapTcS $ TcM.getTcEvTyCoVars ev_binds_var
+getTcEvBindsState :: EvBindsVar -> TcS EvBindsState
+getTcEvBindsState ev_binds_var
+  = wrapTcS $ TcM.getTcEvBindsState ev_binds_var
 
-getTcEvBindsMap :: EvBindsVar -> TcS EvBindMap
+getTcEvBindsMap :: EvBindsVar -> TcS EvBindsMap
 getTcEvBindsMap ev_binds_var
   = wrapTcS $ TcM.getTcEvBindsMap ev_binds_var
 
-setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcS ()
+setTcEvBindsMap :: EvBindsVar -> EvBindsMap -> TcS ()
 setTcEvBindsMap ev_binds_var binds
   = wrapTcS $ TcM.setTcEvBindsMap ev_binds_var binds
 
-updTcEvBinds :: EvBindsVar -> EvBindsVar -> TcS ()
-updTcEvBinds evb nested_evb
-  = wrapTcS $ TcM.updTcEvBinds evb nested_evb
+combineTcEvBinds :: EvBindsVar -> EvBindsVar -> TcS ()
+combineTcEvBinds evb nested_evb
+  = wrapTcS $ TcM.combineTcEvBinds evb nested_evb
 
 getDefaultInfo ::  TcS (DefaultEnv, Bool)
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
@@ -2029,12 +2046,9 @@ setWantedDict dest canonical tm
       HoleDest h      -> pprPanic "setWantedEq: HoleDest" (ppr h)
 
 fillCoercionHole :: CoercionHole -> CoercionPlusHoles -> TcS ()
-fillCoercionHole hole co_plus_holes@(CPH { cph_co = co })
+fillCoercionHole hole co_plus_holes
   = do { ev_binds_var <- getTcEvBindsVar
-       ; wrapTcS $ do { -- Record usage of the free vars of this coercion
-                        TcM.updTcRef (ebv_tcvs ev_binds_var) (co :)
-                      ; -- Fill the hole
-                        TcM.fillCoercionHole hole co_plus_holes }
+       ; wrapTcS $ TcM.addTcEvCoBind ev_binds_var hole co_plus_holes
        ; kickOutAfterFillingCoercionHole hole co_plus_holes }
 
 newTcEvBinds :: TcS EvBindsVar

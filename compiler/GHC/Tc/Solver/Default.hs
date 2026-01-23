@@ -272,10 +272,9 @@ unsatisfiableEv_maybe v = (v,) <$> isUnsatisfiableCt_maybe (idType v)
 -- solve all the other Wanted constraints, including those nested within
 -- deeper implications.
 solveImplicationUsingUnsatGiven :: (EvVar, Type) -> Implication -> TcS Implication
-solveImplicationUsingUnsatGiven
-  unsat_given@(given_ev,_)
+solveImplicationUsingUnsatGiven unsat_given
   impl@(Implic { ic_wanted = wtd, ic_tclvl = tclvl, ic_binds = ev_binds_var
-               , ic_need_implic = inner, ic_info = skol_info })
+               , ic_info = skol_info })
   | isCoEvBindsVar ev_binds_var
   -- We can't use Unsatisfiable evidence in kinds.
   -- See Note [Coercion evidence only] in GHC.Tc.Types.Evidence.
@@ -283,9 +282,7 @@ solveImplicationUsingUnsatGiven
   | otherwise
   = do { wcs <- nestImplicTcS skol_info ev_binds_var tclvl $ go_wc wtd
        ; setImplicationStatus $
-         impl { ic_wanted = wcs
-              , ic_need_implic = inner `extendEvNeedSet` given_ev } }
-                -- Record that the Given is needed; I'm not certain why
+         impl { ic_wanted = wcs } }
   where
     go_wc :: WantedConstraints -> TcS WantedConstraints
     go_wc wc@(WC { wc_simple = wtds, wc_impl = impls })

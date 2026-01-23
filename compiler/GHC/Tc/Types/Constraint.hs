@@ -65,7 +65,6 @@ module GHC.Tc.Types.Constraint (
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         UserGiven, getGivensFromImplics,
         HasGivenEqs(..), checkImplicationInvariants,
-        EvNeedSet(..), emptyEvNeedSet, unionEvNeedSet, extendEvNeedSet, delGivensFromEvNeedSet,
 
         -- CtLocEnv
         CtLocEnv(..), setCtLocEnvLoc, setCtLocEnvLvl, getCtLocEnvLoc, getCtLocEnvLvl, ctLocEnvInGeneratedCode,
@@ -1061,6 +1060,13 @@ mkImplicWC :: Bag Implication -> WantedConstraints
 mkImplicWC implic
   = emptyWC { wc_impl = implic }
 
+-- | `isEmptyWC` sees if a `WantedConstraints` is truly empty, including
+-- having no implications.
+--
+-- It's possible that it might have /solved/ implications, which are left around
+-- just so we can report unreachable code.  So:
+--    isEmptyWC implies isSolvedWC
+-- but not vice versa
 isEmptyWC :: WantedConstraints -> Bool
 isEmptyWC (WC { wc_simple = f, wc_impl = i, wc_errors = errors })
   = isEmptyBag f && isEmptyBag i && isEmptyBag errors
@@ -1563,44 +1569,8 @@ data Implication
       ic_binds  :: EvBindsVar,    -- Points to the place to fill in the
                                   -- abstraction and bindings.
 
-      -- The ic_need fields keep track of which Given evidence
-      -- is used by this implication or its children
-      -- See Note [Tracking redundant constraints]
-      -- NB: these sets include stuff used by fully-solved nested implications
-      --     that have since been discarded
-      ic_need  :: EvNeedSet,        -- All needed Given evidence, from this implication
-                                    --   or outer ones
-                                    -- That is, /after/ deleting the binders of ic_binds,
-                                    --   but /before/ deleting ic_givens
-
-      ic_need_implic :: EvNeedSet,  -- Union of of the ic_need of all implications in ic_wanted
-                                    -- /including/ any fully-solved implications that have been
-                                    -- discarded by `pruneImplications`.  This discarding is why
-                                    -- we need to keep this field in the first place.
-
       ic_status   :: ImplicStatus
     }
-
-data EvNeedSet = ENS { ens_dms :: VarSet   -- Needed only by default methods
-                     , ens_fvs :: VarSet   -- Needed by things /other than/ default methods
-                       -- See (TRC5) in Note [Tracking redundant constraints]
-                 }
-
-emptyEvNeedSet :: EvNeedSet
-emptyEvNeedSet = ENS { ens_dms = emptyVarSet, ens_fvs = emptyVarSet }
-
-unionEvNeedSet :: EvNeedSet -> EvNeedSet -> EvNeedSet
-unionEvNeedSet (ENS { ens_dms = dm1, ens_fvs = fv1 })
-               (ENS { ens_dms = dm2, ens_fvs = fv2 })
-  = ENS { ens_dms = dm1 `unionVarSet` dm2, ens_fvs = fv1 `unionVarSet` fv2 }
-
-extendEvNeedSet :: EvNeedSet -> Var -> EvNeedSet
-extendEvNeedSet ens@(ENS { ens_fvs = fvs }) v = ens { ens_fvs = fvs `extendVarSet` v }
-
-delGivensFromEvNeedSet :: EvNeedSet -> [Var] -> EvNeedSet
-delGivensFromEvNeedSet (ENS { ens_dms = dms, ens_fvs = fvs }) givens
-  = ENS { ens_dms = dms `delVarSetList` givens
-        , ens_fvs = fvs `delVarSetList` givens }
 
 implicationPrototype :: CtLocEnv -> Implication
 implicationPrototype ct_loc_env
@@ -1618,14 +1588,21 @@ implicationPrototype ct_loc_env
             , ic_given       = []
             , ic_wanted      = emptyWC
             , ic_given_eqs   = MaybeGivenEqs
-            , ic_status      = IC_Unsolved
-            , ic_need        = emptyEvNeedSet
-            , ic_need_implic = emptyEvNeedSet }
+            , ic_status      = IC_Unsolved }
 
 data ImplicStatus
   = IC_Solved     -- All wanteds in the tree are solved, all the way down
-       { ics_dead :: [EvVar] }  -- Subset of ic_given that are not needed
-         -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
+       { ics_dead   :: [EvVar]     -- Subset of ic_given that are not needed
+
+       , ics_dm     :: NeededEvIds -- Enclosing Given EvIds that are needed by
+                                   -- calls to default methods (typically empty)
+
+       , ics_non_dm :: NeededEvIds -- Enclosing Given EvIds that are needed, other than
+                                   -- calls to default methods
+       }
+      -- Reporting redundant givens: use ics_non_dm
+      -- Pruning evidence bindings:  use ics_dm `union` ics_non_dm
+      -- See Note [Tracking needed EvIds] in GHC.Tc.Solver.Solve
 
   | IC_Insoluble  -- At least one insoluble Wanted constraint in the tree
 
@@ -1714,7 +1691,6 @@ instance Outputable Implication where
               , ic_given = given, ic_given_eqs = given_eqs
               , ic_wanted = wanted, ic_status = status
               , ic_binds = binds
-              , ic_need = need, ic_need_implic = need_implic
               , ic_info = info })
    = hang (text "Implic" <+> lbrace)
         2 (sep [ text "TcLevel =" <+> ppr tclvl
@@ -1724,21 +1700,17 @@ instance Outputable Implication where
                , hang (text "Given =")  2 (pprEvVars given)
                , hang (text "Wanted =") 2 (ppr wanted)
                , text "Binds =" <+> ppr binds
-               , text "need =" <+> ppr need
-               , text "need_implic =" <+> ppr need_implic
                , pprSkolInfo info ] <+> rbrace)
-
-instance Outputable EvNeedSet where
-  ppr (ENS { ens_dms = dms, ens_fvs = fvs })
-    = text "ENS" <> braces (sep [text "ens_dms =" <+> ppr dms
-                                , text "ens_fvs =" <+> ppr fvs])
 
 instance Outputable ImplicStatus where
   ppr IC_Insoluble    = text "Insoluble"
   ppr IC_BadTelescope = text "Bad telescope"
   ppr IC_Unsolved     = text "Unsolved"
-  ppr (IC_Solved { ics_dead = dead })
-    = text "Solved" <+> (braces (text "Dead givens =" <+> ppr dead))
+  ppr (IC_Solved { ics_dead = dead, ics_dm = dm, ics_non_dm = non_dm })
+    = text "Solved" <> (braces $
+      vcat [ text "Dead givens =" <+> ppr dead
+           , text "need_dm =" <+> ppr dm
+           , text "need_non_dm =" <+> ppr non_dm ])
 
 checkTelescopeSkol :: SkolemInfoAnon -> Bool
 -- See Note [Checking telescopes]

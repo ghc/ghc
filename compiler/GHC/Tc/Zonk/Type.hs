@@ -485,7 +485,7 @@ zonkCoVarOcc cv
           _        -> mkCoVarCo <$> (lift $ liftZonkM $ zonkCoVar cv) }
 
 zonkCoHole :: CoercionHole -> ZonkTcM Coercion
-zonkCoHole hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
+zonkCoHole hole@(CH { ch_ref = ref, ch_co_var = cv })
   = do { contents <- readTcRef ref
        ; case contents of
            Just (CPH { cph_co = co })
@@ -1910,8 +1910,9 @@ zonk_tc_ev_binds (EvBinds bs)    = zonkEvBinds bs
 
 zonkEvBindsVar :: EvBindsVar -> ZonkBndrTcM (Bag EvBind)
 zonkEvBindsVar (EvBindsVar { ebv_binds = ref })
-  = do { bs <- readTcRef ref
+  = do { EBS { ebs_binds = bs }  <- readTcRef ref
        ; zonkEvBinds (evBindMapBinds bs) }
+
 zonkEvBindsVar (CoEvBindsVar {}) = return emptyBag
 
 zonkEvBinds :: Bag EvBind -> ZonkBndrTcM (Bag EvBind)

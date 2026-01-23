@@ -746,7 +746,7 @@ can_eq_nc_forall ev eq_rel s1 s2
                    -- they are kept alive by `neededEvVars`. Admittedly they are free in `all_co`,
                    -- but only if we zonk it, which `neededEvVars` does not do (see test T7196).
                   ev_binds_var <- getTcEvBindsVar
-                ; updTcEvBinds ev_binds_var nested_ev_binds_var
+                ; combineTcEvBinds ev_binds_var nested_ev_binds_var
 
                 ; setWantedEq orig_dest (CPH { cph_co = all_co, cph_holes = emptyCoHoleSet })
                      -- emptyCoHoleSet: fully solved, so all_co has no holes

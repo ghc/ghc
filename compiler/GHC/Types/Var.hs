@@ -176,7 +176,7 @@ type KindVar = Var     -- Definitely a kind variable
 
 -- See Note [Evidence: EvIds and CoVars]
 -- | Evidence Identifier
-type EvId   = Id        -- Term-level evidence: DictId, IpId, or EqVar
+type EvId   = Id        -- Term-level evidence: DictId, IpId, or CoVar
 
 -- | Evidence Variable
 type EvVar  = EvId      -- ...historical name for EvId

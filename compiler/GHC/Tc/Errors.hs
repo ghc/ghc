@@ -405,7 +405,7 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
               _               -> False
 
 warnRedundantConstraints :: SolverReportErrCtxt -> CtLocEnv -> SkolemInfoAnon -> [EvVar] -> TcM ()
--- See Note [Tracking redundant constraints] in GHC.Tc.Solver
+-- See Note [Tracking needed EvIds] in GHC.Tc.Solver
 warnRedundantConstraints ctxt env info redundant_evs
  | not (cec_warn_redundant ctxt)
  = return ()

@@ -33,7 +33,6 @@ import qualified GHC.Tc.Zonk.TcType   as TcM
 import GHC.Core.Predicate
 import GHC.Core.Reduction
 import GHC.Core.Coercion
-import GHC.Core.TyCo.FVs( coVarsOfCos )
 import GHC.Core.Class( classHasSCs )
 
 import GHC.Types.Id(  idType )
@@ -432,12 +431,10 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                                                  , ic_wanted = final_wanted })
 
        ; evbinds <- TcS.getTcEvBindsMap ev_binds_var
-       ; tcvs    <- TcS.getTcEvTyCoVars ev_binds_var
        ; traceTcS "solveImplication end }" $ vcat
              [ text "has_given_eqs =" <+> ppr has_given_eqs
              , text "res_implic =" <+> ppr res_implic
-             , text "implication evbinds =" <+> ppr (evBindMapBinds evbinds)
-             , text "implication tvcs =" <+> ppr tcvs ]
+             , text "evbinds =" <+> ppr evbinds ]
 
        ; return res_implic }
 
@@ -460,30 +457,27 @@ setImplicationStatus :: Implication -> TcS Implication
 --   * Prune unnecessary evidence bindings
 --   * Prune unnecessary child implications
 -- Precondition: the ic_status field is not already IC_Solved
-setImplicationStatus implic@(Implic { ic_status = old_status
-                                    , ic_info   = info
-                                    , ic_wanted = wc })
- = assertPpr (not (isSolvedStatus old_status)) (ppr info) $
-   -- Precondition: we only set the status if it is not already solved
-   do { traceTcS "setImplicationStatus {" (ppr implic)
+setImplicationStatus implic@(Implic { ic_wanted = wc })
+ | insolubleWC wc
+ = do { traceTcS "setImplicationStatus:insoluble" (ppr implic)
+      ; return (implic { ic_status = IC_Insoluble }) }
 
-      ; let solved = isSolvedWC wc
-      ; new_implic    <- neededEvVars implic
-      ; bad_telescope <- if solved then checkBadTelescope implic
-                                   else return False
+ | not (isSolvedWC wc)
+ = -- Precondition: we only set the status if it is not /already/ solved
+   do { traceTcS "setImplicationStatus:in progress" (ppr implic)
+      ; return (implic { ic_status = IC_Unsolved }) }
 
-      ; let new_status | insolubleWC wc = IC_Insoluble
-                       | not solved     = IC_Unsolved
-                       | bad_telescope  = IC_BadTelescope
-                       | otherwise      = IC_Solved { ics_dead = dead_givens }
-            dead_givens = findRedundantGivens new_implic
-            new_wc      = pruneImplications wc
+ | otherwise  -- The Wanteds are all solved
+ = do { traceTcS "setImplicationStatus:solved" (ppr implic)
+      ; bad_telescope <- checkBadTelescope implic
+      ; if bad_telescope
+        then return (implic { ic_status = IC_BadTelescope })
+        else
 
-            final_implic = new_implic { ic_status = new_status
-                                      , ic_wanted = new_wc }
-
-      ; traceTcS "setImplicationStatus }" (ppr final_implic)
-      ; return final_implic }
+   do { solved_status <- computeSolvedStatus implic
+      ; let pruned_wc = pruneImplications wc
+      ; return (implic { ic_status = solved_status
+                       , ic_wanted = pruned_wc }) } }
 
 pruneImplications :: WantedConstraints -> WantedConstraints
 -- We have now recorded the `ic_need` variables of the child
@@ -502,44 +496,6 @@ pruneImplications wc@(WC { wc_impl = implics })
       | otherwise
       = True        -- Otherwise, keep it
 
-findRedundantGivens :: Implication -> [EvVar]
-findRedundantGivens (Implic { ic_info = info, ic_need = need, ic_given = givens })
-  | not (warnRedundantGivens info)   -- Don't report redundant constraints at all
-  = []                    -- See (TRC4) of Note [Tracking redundant constraints]
-
-  | not (null unused_givens)         -- Some givens are literally unused
-  = unused_givens
-
-  -- Only try this if unused_givens is empty: see (TRC2a)
-  | otherwise                       -- All givens are used, but some might
-  = redundant_givens                -- still be redundant e.g. (Eq a, Ord a)
-
-  where
-    in_instance_decl = case info of { InstSkol {} -> True; _ -> False }
-                       -- See Note [Redundant constraints in instance decls]
-
-    unused_givens = filterOut is_used givens
-
-    needed_givens_ignoring_default_methods = ens_fvs need
-    is_used given =  is_type_error given
-                  || given `elemVarSet` needed_givens_ignoring_default_methods
-                  || (in_instance_decl && is_improving (idType given))
-
-    minimal_givens = mkMinimalBySCs evVarPred givens  -- See (TRC2)
-
-    is_minimal = (`elemVarSet` mkVarSet minimal_givens)
-    redundant_givens
-      | in_instance_decl = []
-      | otherwise        = filterOut is_minimal givens
-
-    -- See #15232
-    is_type_error id = containsUserTypeError False (idType id)
-      -- False <=> do not look under ty-fam apps, AppTy etc.
-      -- See (UTE1) in Note [Custom type errors in constraints].
-
-    is_improving pred -- (transSuperClasses p) does not include p
-      = any isImprovementPred (pred : transSuperClasses pred)
-
 warnRedundantGivens :: SkolemInfoAnon -> Bool
 warnRedundantGivens (SigSkol ctxt _ _)
   = case ctxt of
@@ -549,7 +505,7 @@ warnRedundantGivens (SigSkol ctxt _ _)
 
 warnRedundantGivens (InstSkol from _)
  -- Do not report redundant constraints for quantified constraints
- -- See (TRC4) in Note [Tracking redundant constraints]
+ -- See (TRC4) in Note [Tracking needed EvIds]
  -- Fortunately it is easy to spot implications constraints that arise
  -- from quantified constraints, from their SkolInfo
  = case from of
@@ -611,113 +567,142 @@ checkBadTelescope (Implic { ic_info  = info
       | otherwise
       = go (later_skols `extendVarSet` one_skol) earlier_skols
 
-neededEvVars :: Implication -> TcS Implication
--- Find all the evidence variables that are "needed",
--- /and/ delete dead evidence bindings
+computeSolvedStatus :: Implication -> TcS ImplicStatus
+-- Given a fully-solved implication,
+--    - Figure out the right IC_Solved fields
+--    - Delete unused evidence bindings
 --
---   See Note [Tracking redundant constraints]
+--   See Note [Tracking needed EvIds]
 --   See Note [Delete dead Given evidence bindings]
---
---   - Start from initial_seeds (from nested implications)
---
---   - Add free vars of RHS of all Wanted evidence bindings
---     and coercion variables accumulated in tcvs (all Wanted)
---
---   - Generate 'needed', the needed set of EvVars, by doing transitive
---     closure through Given bindings
---     e.g.   Needed {a,b}
---            Given  a = sc_sel a2
---            Then a2 is needed too
---
---   - Prune out all Given bindings that are not needed
-
-neededEvVars implic@(Implic { ic_info        = info
+computeSolvedStatus (Implic { ic_info        = info
                             , ic_binds       = ev_binds_var
-                            , ic_wanted      = WC { wc_impl = implics }
-                            , ic_need_implic = old_need_implic    -- See (TRC1)
-                    })
- = do { ev_binds <- TcS.getTcEvBindsMap ev_binds_var
-      ; used_cos <- TcS.getTcEvTyCoVars ev_binds_var
+                            , ic_given       = givens
+                            , ic_wanted      = WC { wc_impl = implics } })
+ = do { ev_binds_state <- TcS.getTcEvBindsState ev_binds_var
 
-      ; let -- Find the variables needed by `implics`
-            new_need_implic@(ENS { ens_dms = dm_seeds, ens_fvs = other_seeds })
-                = foldr add_implic old_need_implic implics
-                  -- Start from old_need_implic!  See (TRC1)
+      ; let EBS { ebs_binds = ev_binds, ebs_needs = local_needs } = ev_binds_state
 
-            -- Get the variables needed by the solved bindings
-            -- (It's OK to use a non-deterministic fold here
-            --  because add_wanted is commutative.)
-            used_covars = coVarsOfCos used_cos
-            seeds_w = nonDetStrictFoldEvBindMap add_wanted used_covars ev_binds
+            -- Gather the raw needed EvIds, from the
+            -- current evidence bindings `local_needs`, and the `implics`
+            (need_dm, need_non_dm) = foldr add_implic (emptyVarSet, local_needs) implics
 
-            need_ignoring_dms = findNeededGivenEvVars ev_binds (other_seeds `unionVarSet` seeds_w)
-            need_from_dms     = findNeededGivenEvVars ev_binds dm_seeds
-            need_full         = need_ignoring_dms `unionVarSet` need_from_dms
+            -- Do transitive closure through the evidence bindings
+            -- and delete all EvIds bound by the bindings
+            need_dm1     = findNeededGivenEvVars ev_binds need_dm
+            need_non_dm1 = findNeededGivenEvVars ev_binds need_non_dm
 
-            -- `need`: the Givens from outer scopes that are used in this implication
-            -- is_dm_skol: see (TRC5)
-            need | is_dm_skol info = ENS { ens_dms = trim ev_binds need_full
-                                         , ens_fvs = emptyVarSet }
-                 | otherwise       = ENS { ens_dms = trim ev_binds need_from_dms
-                                         , ens_fvs = trim ev_binds need_ignoring_dms }
+            -- Compute the redundant Givens
+            dead_givens = findRedundantGivens info need_non_dm1 givens
 
-      -- Delete dead Given evidence bindings
+            -- Delete variables bound by ev_binds or by givens
+            need_dm2     = trim_needs need_dm1
+            need_non_dm2 = trim_needs need_non_dm1
+
+            trim_needs :: NeededEvIds -> NeededEvIds
+            trim_needs needs = (needs `varSetMinusEvBindsMap` ev_binds)
+                               `delVarSetList` givens
+
+      -- Prune dead Given evidence bindings
       -- See Note [Delete dead Given evidence bindings]
-      ; let live_ev_binds = filterEvBindMap (needed_ev_bind need_full) ev_binds
-      ; TcS.setTcEvBindsMap ev_binds_var live_ev_binds
+      ; let need_full       = need_dm1 `unionVarSet` need_non_dm1
+            pruned_ev_binds = filterEvBindsMap (keep_ev_bind need_full) ev_binds
+      ; TcS.setTcEvBindsMap ev_binds_var pruned_ev_binds
 
-      ; traceTcS "neededEvVars" $
-        vcat [ text "old_need_implic:" <+> ppr old_need_implic
-             , text "new_need_implic:" <+> ppr new_need_implic
-             , text "used_covars:" <+> ppr used_covars
-             , text "need_ignoring_dms:" <+> ppr need_ignoring_dms
-             , text "need_from_dms:"     <+> ppr need_from_dms
-             , text "need:" <+> ppr need
+      ; traceTcS "computeSolvedStatus" $
+        vcat [ text "local_needs:" <+> ppr local_needs
+             , text "need_dm:" <+> ppr need_dm
+             , text "need_non_dm:" <+> ppr need_non_dm
+             , text "need_dm1:" <+> ppr need_dm1
+             , text "need_non_dm1:" <+> ppr need_non_dm1
+             , text "need_dm2:" <+> ppr need_dm2
+             , text "need_non_dm2:" <+> ppr need_non_dm2
              , text "ev_binds:" <+> ppr ev_binds
-             , text "live_ev_binds:" <+> ppr live_ev_binds ]
-      ; return (implic { ic_need        = need
-                       , ic_need_implic = new_need_implic }) }
+             , text "deleted ev_binds:"
+               <+> ppr (filterEvBindsMap (not . keep_ev_bind need_full) ev_binds) ]
+
+      ; if is_dm_skol info
+        then return (IC_Solved { ics_dead   = dead_givens
+                               , ics_dm     = need_dm2 `unionVarSet` need_non_dm2
+                               , ics_non_dm = emptyVarSet })
+
+        else return (IC_Solved { ics_dead   = dead_givens
+                               , ics_dm     = need_dm2
+                               , ics_non_dm = need_non_dm2 }) }
  where
-    trim :: EvBindMap -> VarSet -> VarSet
-    -- Delete variables bound by Givens or bindings
-    trim ev_binds needs = needs `varSetMinusEvBindMap` ev_binds
+    add_implic :: Implication -> (NeededEvIds, NeededEvIds) -> (NeededEvIds, NeededEvIds)
+    add_implic (Implic { ic_status = status}) (dm2, non_dm2)
+       | IC_Solved { ics_dm = dm1, ics_non_dm = non_dm1 } <- status
+       = (dm1 `unionVarSet` dm2, non_dm1 `unionVarSet` non_dm2)
+       | otherwise
+       = pprPanic "computeSolvedStatus" (ppr implics)
 
-    add_implic :: Implication -> EvNeedSet -> EvNeedSet
-    add_implic (Implic { ic_given = givens, ic_need = need }) acc
-       = (need `delGivensFromEvNeedSet` givens) `unionEvNeedSet` acc
-
-    needed_ev_bind needed (EvBind { eb_lhs = ev_var, eb_info = info })
+    keep_ev_bind :: NeededEvIds -> EvBind -> Bool
+    -- False => we can discard this unused Given evidence binding
+    -- We always keep all the Wanted bindings
+    keep_ev_bind needed (EvBind { eb_lhs = ev_var, eb_info = info })
       | EvBindGiven{} <- info = ev_var `elemVarSet` needed
       | otherwise             = True   -- Keep all wanted bindings
-
-    add_wanted :: EvBind -> VarSet -> VarSet
-    add_wanted (EvBind { eb_info = info, eb_rhs = rhs }) needs
-      | EvBindGiven{} <- info = needs  -- Add the rhs vars of the Wanted bindings only
-      | otherwise = nestedEvIdsOfTerm rhs `unionVarSet` needs
 
     is_dm_skol :: SkolemInfoAnon -> Bool
     is_dm_skol (MethSkol _ is_dm) = is_dm
     is_dm_skol _                  = False
 
-findNeededGivenEvVars :: EvBindMap -> VarSet -> VarSet
+findRedundantGivens :: SkolemInfoAnon -> NeededEvIds -> [EvVar] -> [EvVar]
+findRedundantGivens info need givens
+  | not (warnRedundantGivens info)   -- Don't report redundant constraints at all
+  = []                    -- See (TRC4) of Note [Tracking needed EvIds]
+
+  | not (null unused_givens)         -- Some givens are literally unused
+  = unused_givens
+
+  -- Only try this if unused_givens is empty: see (TRC2a)
+  | otherwise                       -- All givens are used, but some might
+  = redundant_givens                -- still be redundant e.g. (Eq a, Ord a)
+
+  where
+    in_instance_decl = case info of { InstSkol {} -> True; _ -> False }
+                       -- See Note [Redundant constraints in instance decls]
+
+    unused_givens = filterOut is_used givens
+
+    is_used given =  is_type_error given
+                  || given `elemVarSet` need
+                  || (in_instance_decl && is_improving (idType given))
+
+    minimal_givens = mkMinimalBySCs evVarPred givens  -- See (TRC2)
+
+    is_minimal = (`elemVarSet` mkVarSet minimal_givens)
+    redundant_givens
+      | in_instance_decl = []
+      | otherwise        = filterOut is_minimal givens
+
+    -- See #15232
+    is_type_error id = containsUserTypeError False (idType id)
+      -- False <=> do not look under ty-fam apps, AppTy etc.
+      -- See (UTE1) in Note [Custom type errors in constraints].
+
+    is_improving pred -- (transSuperClasses p) does not include p
+      = any isImprovementPred (pred : transSuperClasses pred)
+
+findNeededGivenEvVars :: EvBindsMap -> NeededEvIds -> NeededEvIds
 -- Find all the Given evidence needed by seeds,
 -- looking transitively through bindings for Givens (only)
 findNeededGivenEvVars ev_binds seeds
   = transCloVarSet also_needs seeds
   where
-   also_needs :: VarSet -> VarSet
-   also_needs needs = nonDetStrictFoldUniqSet add emptyVarSet needs
-     -- It's OK to use a non-deterministic fold here because we immediately
-     -- forget about the ordering by creating a set
+    also_needs :: VarSet -> VarSet
+    also_needs needs = nonDetStrictFoldUniqSet add emptyVarSet needs
+      -- It's OK to use a non-deterministic fold here because we immediately
+      -- forget about the ordering by creating a set
 
-   add :: Var -> VarSet -> VarSet
-   add v needs
-     | Just ev_bind <- lookupEvBind ev_binds v
-     , EvBind { eb_info = EvBindGiven, eb_rhs = rhs } <- ev_bind
-       -- Look at Given bindings only
-     = nestedEvIdsOfTerm rhs `unionVarSet` needs
-     | otherwise
-     = needs
+    add :: Var -> VarSet -> VarSet
+    add v needs
+      | Just ev_bind <- lookupEvBind ev_binds v
+      , EvBind { eb_info = EvBindGiven, eb_rhs = rhs } <- ev_bind
+        -- Look at Given bindings only
+      = nestedEvIdsOfTerm rhs `unionVarSet` needs
+      | otherwise
+      = needs
 
 -------------------------------------------------
 simplifyDelayedErrors :: Bag DelayedError -> TcS (Bag DelayedError)
@@ -837,26 +822,80 @@ from TypeHole in HoleSort.
 See also Note [Extra-constraint holes in partial type signatures]
 in GHC.Tc.Gen.HsType.
 
-Note [Tracking redundant constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-With Opt_WarnRedundantConstraints, GHC can report which constraints of a type
-signature (or instance declaration) are redundant, and can be omitted.  Here is
-an overview of how it works.
+Note [Tracking needed EvIds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The solver has some careful footwork to track:
 
-This is all tested in typecheck/should_compile/T20602 (among others).
+    Which Given EvIds are in fact needed
 
-How tracking works:
+The relevant type is NeededEvIds, which is just a VarSet; it may be a mixture
+of DictIds and CoVars.
 
-* We maintain the `ic_need` field in an implication:
-     ic_need: the set of Given evidence variables that are needed somewhere
-              inside this implication; and are bound either by this implication
-              or by an enclosing one.
+The NeededEvIds are used for two related purposes:
 
-* `setImplicationStatus` does all the work:
-  - When the constraint solver finishes solving all the wanteds in
-    an implication, it sets its status to IC_Solved
+* Redundant Givens. With Opt_WarnRedundantConstraints, GHC can report which
+  constraints of a type signature (or instance declaration) are redundant, and
+  can be omitted.  We report this by computing which of the Implication's
+  `ic_givens` are not in the `NeededIds` for that Implication.
 
-  - `neededEvVars`: computes which evidence variables are needed by an
+  See `findRedundantGivens`
+
+* Pruning useless evidence bindings. The solver creates lots of superclass
+  bindings, in the EvBinds of an Implication, just in case they are needed.  So
+  we might get
+      \ (d::Ord a).  let d2:Eq a = sc_sel d in ...
+  That `d2` binding may or may not be needed.  For fully-solved implications,
+  GHC prunes away the un-needed bindings simply to reduce clutter; less to zonk,
+  less to desugar etc.
+
+  See Note [Delete dead Given evidence bindings]
+  and the pruning code in `computeSolvedStatus`
+
+The tracking works like this:
+
+* An `Implication` has `ic_binds :: EvBindVar`.
+
+* That EvBindsVar holds a mutable reference to an `EvBindsState`.
+
+* That `EvBindsState` is a  pair of
+  * ebs_binds :: EvBindsMap    The evidence bindings themselves
+  * ebs_needs :: NeededEvIds   The free EvIds of the Wanted `ebs_binds`
+                               NB: only the Wanted ones!
+
+  When we add a new binding to `ebs_binds` we also add to `ebs_needs` the free
+  EvIds of the RHS, iff the binding is Wanted. Why Wanted only?  Each Wanted
+  binding solves a Wanted constraint, so we want them all. But Given bindings
+  are speculative; we work them out in `findNeededGivenEvVars`.
+
+  See `GHC.Tc.Utils.Monad.addTcEvBind` and `addTcCoBind`
+
+* When an implication is fully Solved, we give it an `ic_status` of IC_Solved,
+  in `setImplicationStatus`:
+     data ImplicStatus
+       = ...
+       | IC_Solved { ics_dead   :: [EvVar]
+                   , ics_dm     :: NeededEvIds
+                   , ics_non_dm :: NeededEvIds }
+   The `ics_dead` field records the `ic_given` EvVars that are unused.
+   The other two fields record the NeededEvIds bound by /enclosing/ Implications;
+   that is, the `ic_given` from /this/ implication have been removed.
+
+   Why two fields?  See (TRC5) below.
+
+* `computeSolvedStatus` does all the work of computing these fields.
+
+  - It combines the NeededEvIds from the sub-implications, plus
+    those from the bindings.
+
+  - It uses a transitive closure algorithm across the Given bindings
+    so find the transitive needs.  E.g. suppose the bindings are
+       [G] d2 = sc_sel d1
+       [G] d3 = sc_sel d2
+       [W] w1 = d3
+    The `ebs_needs` for these bindings will be {d3} (free var of the RHS
+    of the Wanted bindings). But needing d3 needs d2 and needing d2 needs
+    d1.   Hence the transitive closure in `findNeededGivenEvVars`.
+
     implication in `setImplicationStatus`.  A variable is needed if
 
       a) It is in the ic_need field of this implication, computed in
@@ -884,15 +923,13 @@ How tracking works:
 
 Wrinkles:
 
-(TRC1) `pruneImplications` drops any sub-implications of an Implication
-  that are irrelevant for error reporting:
-      - no unsolved wanteds
-      - no sub-implications
-      - no redundant givens to report
-  But in doing so we must not lose track of the variables that those implications
-  needed!  So we track the ic_needs of all child implications in `ic_need_implics`.
-  Crucially, this set includes things need by child implications that have been
-  discarded by `pruneImplications`.
+(TRC1) In `setImplicationStatus`, for a fully-solved Implication, we take
+  the opportunity to discard any fully-solved child implications, using
+  `pruneImplications`.  We can't drop /all/ fully-solved children; we can
+  drop a sub-implication  only if:
+     - it has empty `ics_dead` (if not, keep the Implication so we can report the
+       redundant givens later
+     - it itself has no sub-implications (presumably with redundant givens)
 
 (TRC2) A Given can be redundant because it is implied by other Givens
          f :: (Eq a, Ord a)     => blah   -- Eq a unnecessary
@@ -914,6 +951,7 @@ Wrinkles:
   the one from the user-written Eq a, not the superclass selection. This means
   we report the Ord a as redundant with -Wredundant-constraints, not the Eq a.
   Getting this wrong was #20602.
+  See Note [Replacement vs keeping] in GHC.Tc.Solver.InertSet
 
 (TRC4) We don't compute redundant givens for *every* implication; only
   for those which reply True to `warnRedundantGivens`:
@@ -949,7 +987,7 @@ Wrinkles:
      and because of the degnerate instance for `Show (T a)`, we don't need the `Eq a`
      constraint.  But we don't want to report it as redundant!
 
-(TRC5) Consider this (#25992), where `op2` has a default method
+(TRC5) Default methods.  Consider this (#25992), where `op2` has a default method
         class C a where { op1, op2 :: a -> a
                         ; op2 = op1 . op1 }
         instance C a => C [a] where
@@ -960,17 +998,22 @@ Wrinkles:
         $dmop2 = op1 . op1
 
         $fCList :: forall a. C a => C [a]
-        $fCList @a (d::C a) = MkC (\(x:a).x) ($dmop2 @a d)
+        $fCList @a (d::C a) = MkC (\(x:a).x)
+                                  ($dmop2 @[a] ($fCList @a d))
 
-   Notice that `d` gets passed to `$dmop`: it is "needed".  But it's only
-   /really/ needed if some /other/ method (in this case `op1`) uses it.
+   Notice that `d` gets passed (indirectly) to `$dmop`: it appears to be
+   "needed".  But it's only /really/ needed if some /other/ method or
+   superclass (in this case `op1`) uses it.
 
-   So, rather than one set of "needed Givens" we use `EvNeedSet` to track
-   a /pair/ of sets:
-      ens_dms: needed /only/ by default-method calls
-      ens_fvs: needed by something other than a default-method call
+   So, in IC_Solved rather than one set of NeededEvIds we have /two/:
+      ics_dm:     needed /only/ by default-method calls
+      ics_non_dm: needed by something other than a default-method call
+   Then:
+      - For tracking redundant Givens we use only ics_non_dm
+      - For pruning evidence bindings we use the union of the two
+
    It's a bit of a palaver, but not really difficult.
-   All the logic is localised in `neededEvVars`.
+   All the logic is localised in `computeSolvedStatus`.
 
    But NOTE that this only applies to /vanilla/ default methods.
    For /generic/ default methods, like
@@ -979,26 +1022,26 @@ Wrinkles:
    the (Eq a) constraint really is needed (e.g. class NFData and #25992).
    Hence the `Bool` field of `MethSkol` indicates a /vanilla/ default method.
 
------ Examples
+----- Examples of reporting redundant Givens
 
     f, g, h :: (Eq a, Ord a) => a -> Bool
     f x = x == x
     g x = x > x
     h x = x == x && x > x
 
-    All of f,g,h will discover that they have two [G] Eq a constraints: one as
-    given and one extracted from the Ord a constraint. They will both discard
-    the latter; see (TRC3).
+All of f,g,h will discover that they have two [G] Eq a constraints: one as
+given and one extracted from the Ord a constraint. They will both discard
+the latter; see (TRC3).
 
-    The body of f uses the [G] Eq a, but not the [G] Ord a. It will report a
-    redundant Ord a.
+* The body of f uses the [G] Eq a, but not the [G] Ord a. It will report a
+  redundant Ord a.
 
-    The body of g uses the [G] Ord a, but not the [G] Eq a. It will report a
-    redundant Eq a.
+* The body of g uses the [G] Ord a, but not the [G] Eq a. It will report a
+  redundant Eq a.
 
-    The body of h uses both [G] Ord a and [G] Eq a; each is used in a solved
-    Wanted evidence binding.  But (TRC2) kicks in and discovers the Eq a
-    is redundant.
+* The body of h uses both [G] Ord a and [G] Eq a; each is used in a solved
+  Wanted evidence binding.  But (TRC2) kicks in and discovers the Eq a
+  is redundant.
 
 ----- Shortcomings
 
@@ -1010,10 +1053,10 @@ Shortcoming 1.  Consider
   k :: (Eq a, b ~ a) => a -> Bool
   k x = x == x
 
-Currently (Nov 2021), j issues no warning, while k says that b ~ a
-is redundant. This is because j uses the a ~ b constraint to rewrite
-everything to be in terms of b, while k does none of that. This is
-ridiculous, but I (Richard E) don't see a good fix.
+Currently (Nov 2021), j issues no warning, while k says that b ~ a is
+redundant. This is because j uses the a ~ b constraint to rewrite everything to
+be in terms of b, while k does none of that. This is ridiculous, but I (Richard
+E) don't see a good fix.
 
 Shortcoming 2.  Removing a redundant constraint can cause clients to fail to
 compile, by making the function more polymorphic. Consider (#16154)
@@ -1645,10 +1688,12 @@ solveWantedQCI mode ct@(CQuantCan (QCI { qci_ev =  ev, qci_tvs = tvs
               --     carrying a record of which evidence variables are used
               --     See Note [Free vars of EvFun] in GHC.Tc.Types.Evidence
              do { setWantedDict dest EvCanonical $
-                  EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
+                  EvFun { et_tvs   = skol_tvs
+                        , et_given = given_ev_vars
                         , et_binds = TcEvBinds ev_binds_var
-                        , et_body = wantedCtEvEvId wanted_ev }
+                        , et_body  = wantedCtEvEvId wanted_ev }
 
+                ; traceTcS "solveWantedQCI" (ppr imp')
                 ; return (Right imp') }
     }
 

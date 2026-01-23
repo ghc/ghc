@@ -11,6 +11,7 @@ module GHC.Utils.Trace
   , warnPprTraceM
   , pprTraceUserWarning
   , trace
+  , traceCallStackDoc
   )
 where
 

@@ -22,7 +22,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Solver.Monad  ( runTcS )
 import GHC.Tc.Solver.Solve  ( solveWanteds )
-import GHC.Tc.Types.Constraint ( isEmptyWC, andWC, mkSimpleWC )
+import GHC.Tc.Types.Constraint ( isSolvedWC, andWC, mkSimpleWC )
 import GHC.Tc.Types.Origin  ( CtOrigin(DefaultOrigin) )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
@@ -296,7 +296,7 @@ simplifyDefault cls dflt_ty@(L l _)
                 , text "inst_pred:" <+> ppr inst_pred
                 , text "all_wanteds " <+> ppr all_wanteds
                 , text "unsolved:" <+> ppr unsolved ]
-       ; let is_instance = isEmptyWC unsolved
+       ; let is_instance = isSolvedWC unsolved
        ; return $
            if | is_instance
               , ClassPred _ tys <- classifyPredType inst_pred

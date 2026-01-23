@@ -236,7 +236,7 @@ zonkCo      :: Coercion -> ZonkM Coercion
       , tcm_tycon      = zonkTcTyCon }
       where
         hole :: () -> CoercionHole -> ZonkM Coercion
-        hole _ hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
+        hole _ hole@(CH { ch_ref = ref, ch_co_var = cv })
           = do { contents <- readTcRef ref
                ; case contents of
                    Just (CPH { cph_co = co })
@@ -617,7 +617,7 @@ instance Monoid UnfilledCoercionHoleMonoid where
 
 -- | Is a coercion hole filled in?
 isFilledCoercionHole :: CoercionHole -> ZonkM Bool
-isFilledCoercionHole (CoercionHole { ch_ref = ref })
+isFilledCoercionHole (CH { ch_ref = ref })
   = isJust <$> readTcRef ref
 
 -- | Retrieve the contents of a coercion hole. Panics if the hole
@@ -631,7 +631,7 @@ unpackCoercionHole hole
 
 -- | Retrieve the contents of a coercion hole, if it is filled
 unpackCoercionHole_maybe :: CoercionHole -> ZonkM (Maybe CoercionPlusHoles)
-unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
+unpackCoercionHole_maybe (CH { ch_ref = ref }) = readTcRef ref
 
 
 {-

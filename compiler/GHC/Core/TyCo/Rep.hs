@@ -1688,11 +1688,9 @@ holes `HoleCo`, which get filled in later.
 
 -- | A coercion to be filled in by the type-checker. See Note [Coercion holes]
 data CoercionHole
-  = CoercionHole { ch_co_var  :: CoVar
-                       -- See Note [Coercion holes] wrinkle (COH2)
-
-                 , ch_ref :: IORef (Maybe CoercionPlusHoles)
-                 }
+  = CH { ch_co_var  :: CoVar  -- See Note [Coercion holes] wrinkle (COH2)
+       , ch_ref :: IORef (Maybe CoercionPlusHoles)
+       }
 
 data CoercionPlusHoles
   = CPH { cph_co    :: Coercion
@@ -1714,7 +1712,7 @@ instance Data.Data CoercionHole where
   dataTypeOf _ = mkNoRepType "CoercionHole"
 
 instance Outputable CoercionHole where
-  ppr (CoercionHole { ch_co_var = cv }) = braces (ppr cv)
+  ppr (CH { ch_co_var = cv }) = braces (ppr cv)
 
 instance Outputable CoercionPlusHoles where
   ppr (CPH { cph_co = co, cph_holes = holes })
@@ -1723,7 +1721,7 @@ instance Outputable CoercionPlusHoles where
                        , text "cph_holes =" <+> ppr holes ])
 
 instance Uniquable CoercionHole where
-  getUnique (CoercionHole { ch_co_var = cv }) = getUnique cv
+  getUnique (CH { ch_co_var = cv }) = getUnique cv
 
 
 -- | A CoHoleSet stores a set of CoercionHoles that have been used to rewrite

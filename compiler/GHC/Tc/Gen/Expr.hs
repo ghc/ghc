@@ -199,6 +199,9 @@ tcPolyExprCheck expr res_ty
                     -> TcM (HsExpr GhcTc)
     outer_skolemise (Left ty) thing_inside
       = do { (wrap, expr') <- tcSkolemiseExpectedType ty thing_inside
+           ; traceTc "outer_skol" (vcat [ text "wrap" <+> ppr wrap
+                                        , text "expr'" <+> ppr expr'
+                                        , text "wrapped" <+> ppr (mkHsWrap wrap expr') ])
            ; return (mkHsWrap wrap expr') }
     outer_skolemise (Right sig) thing_inside
       = do { (wrap, expr') <- tcSkolemiseCompleteSig sig thing_inside
