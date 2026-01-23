@@ -444,14 +444,14 @@ hadrian-ghc-in-ghci:
 hadrian-multi:
   stage: testing
   needs:
-    - job: x86_64-linux-fedora43-release
+    - job: x86_64-linux-deb12-validate
       optional: true
-    - job: nightly-x86_64-linux-fedora43-release
+    - job: nightly-x86_64-linux-deb12-validate
       optional: true
-    - job: release-x86_64-linux-fedora43-release
+    - job: release-x86_64-linux-deb12-release
       optional: true
   dependencies: null
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -471,7 +471,8 @@ hadrian-multi:
     - ls
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-linux-fedora43-release.tar.xz -C tmp
+      tar -xf ghc-x86_64-linux-deb12-validate.tar.xz -C tmp \
+        || tar -xf ghc-x86_64-linux-deb12-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
@@ -1001,14 +1002,14 @@ perf-nofib:
 perf:
   stage: testing
   needs:
-    - job: x86_64-linux-fedora43-release
+    - job: x86_64-linux-deb12-validate
       optional: true
-    - job: nightly-x86_64-linux-fedora43-release
+    - job: nightly-x86_64-linux-deb12-validate
       optional: true
-    - job: release-x86_64-linux-fedora43-release
+    - job: release-x86_64-linux-deb12-release
       optional: true
   dependencies: null
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
   tags:
     - x86_64-linux-perf
   before_script:
@@ -1018,7 +1019,8 @@ perf:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-linux-fedora43-release.tar.xz -C tmp
+      tar -xf ghc-x86_64-linux-deb12-validate.tar.xz -C tmp \
+        || tar -xf ghc-x86_64-linux-deb12-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
@@ -1042,21 +1044,22 @@ perf:
 abi-test:
   stage: testing
   needs:
-    - job: x86_64-linux-fedora43-release
+    - job: x86_64-linux-deb12-validate
       optional: true
-    - job: nightly-x86_64-linux-fedora43-release
+    - job: nightly-x86_64-linux-deb12-validate
       optional: true
-    - job: release-x86_64-linux-fedora43-release
+    - job: release-x86_64-linux-deb12-release
       optional: true
   dependencies: null
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV"
   tags:
     - x86_64-linux
   script:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-linux-fedora43-release.tar.xz -C tmp
+      tar -xf ghc-x86_64-linux-deb12-validate.tar.xz -C tmp \
+        || tar -xf ghc-x86_64-linux-deb12-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
