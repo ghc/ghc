@@ -38,7 +38,7 @@ trouble.
 The way to identify such situations is to have *roles* assigned to type
 variables of datatypes, classes, and type synonyms.
 
-Roles as implemented in GHC are a from a simplified version of the work
+Roles as implemented in GHC are based on a simplified version of the work
 described in `Generative type abstraction and type-level
 computation <https://www.seas.upenn.edu/~sweirich/papers/popl163af-weirich.pdf>`__,
 published at POPL 2011.
