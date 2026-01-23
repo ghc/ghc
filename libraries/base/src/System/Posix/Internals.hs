@@ -7,7 +7,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/392>)
 -- Portability :  non-portable (requires POSIX)
 --
 -- POSIX support layer for the standard libraries.
@@ -23,7 +23,12 @@
 --  * S_ISSOCK (no sockets in POSIX)
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "System.Posix.Internals should be removed in GHC 10.02."
+#endif
+
 module System.Posix.Internals
+  {-# DEPRECATED ["System.Posix.Internals is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context."] #-}
   ( module GHC.Internal.System.Posix.Internals -- TODO: deprecate
   ) where
 

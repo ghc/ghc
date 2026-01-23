@@ -8,7 +8,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/392>)
 -- Portability :  non-portable
 --
 -- This module defines the basic operations on I\/O \"handles\".  All
@@ -21,7 +21,12 @@
 -- change rapidly without much warning.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.IO.Handle.Internals should be removed in GHC 10.02."
+#endif
+
 module GHC.IO.Handle.Internals
+  {-# DEPRECATED ["GHC.IO.Handle.Internals is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context."] #-}
     (withHandle,
      withHandle',
      withHandle_,
