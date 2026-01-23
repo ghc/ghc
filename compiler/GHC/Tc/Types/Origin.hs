@@ -94,7 +94,7 @@ data UserTypeCtxt
                     -- Also used for types in SPECIALISE pragmas
        Name              -- Name of the function
        ReportRedundantConstraints
-         -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
+         -- See Note [Tracking needed EvIds] in GHC.Tc.Solver
          -- This field is usually 'WantRCC', but 'NoRCC' for
          --   * Record selectors (not important here)
          --   * Class and instance methods.  Here the code may legitimately
@@ -285,7 +285,7 @@ data SkolemInfoAnon
   | MethSkol Name Bool  -- Bound by the type of class method op
                         -- True  <=> it's a vanilla default method
                         -- False <=> it's a user-written, or generic-default, method
-                        -- See (TRC5) in Note [Tracking redundant constraints]
+                        -- See (TRC5) in Note [Tracking needed EvIds]
                         --            in GHC.Tc.Solver.Solve
 
   | FamInstSkol         -- Bound at a family instance decl

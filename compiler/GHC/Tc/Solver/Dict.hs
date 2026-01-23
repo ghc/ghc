@@ -663,6 +663,12 @@ Some wrinkles:
     of the caller (#15164).  You might worry about having a solved-dict that uses
     a Given -- but that too will have been subject to short-cut solving so it's fine.
 
+(SCS4) In `tryShortCutSolver`, when deciding if we have "completely solved" the
+   constraint, we must use `isSolvedWC` not `isEmptyWC`.  The latter says "False"
+   if the residual constraint has any implications, even solved ones; and we
+   don't want to reject short-cut solving just because we have some leftover
+   /solved/ implications.  #26805 was a case in point.
+
 Note [Shortcut solving: incoherence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This optimization relies on coherence of dictionaries to be correct. When we
@@ -742,7 +748,8 @@ try_inert_dicts inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys
   = -- There is a matching dictionary in the inert set
     do { -- For a Wanted, first to try to solve it /completely/ from top level instances
          -- See Note [Shortcut solving]
-       ; short_cut_worked <- tryShortCutSolver (isGiven ev_i) dict_w
+       ; dflags <- getDynFlags
+       ; short_cut_worked <- tryShortCutSolver dflags (isGiven ev_i) dict_w
 
        ; if | short_cut_worked
             -> stopWith ev_w "shortCutSolver worked(1)"
@@ -770,7 +777,8 @@ try_inert_dicts inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys
        ; continueWith () }
 
 -- See Note [Shortcut solving]
-tryShortCutSolver :: Bool       -- True <=> try the short-cut solver; False <=> don't
+tryShortCutSolver :: DynFlags
+                  -> Bool       -- True <=> try the short-cut solver; False <=> don't
                   -> DictCt     -- Work item
                   -> TcS Bool   -- True <=> success
 -- We are about to solve a [W] constraint from a [G] constraint. We take
@@ -778,30 +786,25 @@ tryShortCutSolver :: Bool       -- True <=> try the short-cut solver; False <=> 
 -- Note that we only do this for the sake of performance. Exactly the same
 -- programs should typecheck regardless of whether we take this step or
 -- not. See Note [Shortcut solving]
-tryShortCutSolver try_short_cut dict_w@(DictCt { di_ev = ev_w })
-  | not try_short_cut
-  = return False
-  | otherwise
-  = do { dflags <- getDynFlags
-       ; if | CtWanted (WantedCt { ctev_pred = pred_w }) <- ev_w
+tryShortCutSolver dflags try_short_cut dict_w
+  | try_short_cut
+  , DictCt { di_ev = ev_w } <- dict_w
+  , CtWanted (WantedCt { ctev_pred = pred_w }) <- ev_w
+  , not (couldBeIPLike pred_w)   -- Not for implicit parameters (#18627)
 
-            , not (couldBeIPLike pred_w)   -- Not for implicit parameters (#18627)
-
-            , not (xopt LangExt.IncoherentInstances dflags)
+  , not (xopt LangExt.IncoherentInstances dflags)
               -- If IncoherentInstances is on then we cannot rely on coherence of proofs
               -- in order to justify this optimization: The proof provided by the
               -- [G] constraint's superclass may be different from the top-level proof.
               -- See Note [Shortcut solving: incoherence]
-
-            , gopt Opt_SolveConstantDicts dflags
+  , gopt Opt_SolveConstantDicts dflags
               -- Enabled by the -fsolve-constant-dicts flag
 
-            -> tryShortCutTcS $  -- tryTcS tries to completely solve some contraints
-               do { residual <- solveSimpleWanteds (unitBag (CDictCan dict_w))
-                  ; return (isEmptyWC residual) }
+  = tryShortCutTcS $  -- tryTcS tries to completely solve some contraints
+    solveSimpleWanteds (unitBag (CDictCan dict_w))
 
-            | otherwise
-            -> return False }
+  | otherwise
+  = return False
 
 
 {- *******************************************************************
@@ -836,7 +839,7 @@ try_instances inerts work_item@(DictCt { di_ev = ev@(CtWanted wev), di_cls = cls
         ; case lkup_res of
                OneInst { cir_what = what }
                   -> do { let is_local_given = case what of { LocalInstance -> True; _ -> False }
-                        ; take_shortcut <- tryShortCutSolver is_local_given work_item
+                        ; take_shortcut <- tryShortCutSolver dflags is_local_given work_item
                         ; if take_shortcut
                           then stopWith ev "shortCutSolver worked(2)"
                           else do { insertSafeOverlapFailureTcS what work_item

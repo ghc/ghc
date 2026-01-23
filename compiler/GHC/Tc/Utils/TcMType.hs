@@ -341,31 +341,13 @@ newImplication
          (implicationPrototype (mkCtLocEnv env))
            { ic_warn_inaccessible = warn_inaccessible && not in_gen_code }
 
-{-
-************************************************************************
-*                                                                      *
-        Coercion holes
-*                                                                      *
-************************************************************************
--}
-
 newCoercionHole :: TcPredType -> TcM CoercionHole
 -- For the Bool, see (EIK2) in Note [Equalities with heterogeneous kinds]
 newCoercionHole pred_ty
   = do { co_var <- newEvVar pred_ty
        ; traceTc "New coercion hole:" (ppr co_var <+> dcolon <+> ppr pred_ty)
        ; ref <- newMutVar Nothing
-       ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }
-
--- | Put a value in a coercion hole
-fillCoercionHole :: CoercionHole -> CoercionPlusHoles -> TcM ()
-fillCoercionHole (CoercionHole { ch_ref = ref, ch_co_var = cv }) co
-  = do { when debugIsOn $
-         do { cts <- readTcRef ref
-            ; whenIsJust cts $ \old_co ->
-              pprPanic "Filling a filled coercion hole" (ppr cv $$ ppr co $$ ppr old_co) }
-       ; traceTc "Filling coercion hole" (ppr cv <+> text ":=" <+> ppr co)
-       ; writeTcRef ref (Just co) }
+       ; return $ CH { ch_co_var = co_var, ch_ref = ref } }
 
 {- **********************************************************************
 *

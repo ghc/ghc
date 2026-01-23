@@ -1481,8 +1481,7 @@ Notice that
    implication for the whole instance declaration, with the expected
    skolems and givens.  We need this to get the correct "redundant
    constraint" warnings, gathering all the uses from all the methods
-   and superclasses.  See GHC.Tc.Solver Note [Tracking redundant
-   constraints]
+   and superclasses.  See GHC.Tc.SolverSolve Note [Tracking needed EvIds]
 
  * The given constraints in the outer implication may generate
    evidence, notably by superclass selection.  Since the method and
@@ -1947,7 +1946,7 @@ tcMethods _skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
         mismatched_meths = bind_nms `minusList` cls_meth_nms
 
     is_vanilla_dm :: DefMethSpec ty -> Bool
-    -- See (TRC5) in Note [Tracking redundant constraints]
+    -- See (TRC5) in Note [Tracking needed EvIds]
     --            in GHC.Tc.Solver.Solve
     is_vanilla_dm VanillaDM      = True
     is_vanilla_dm (GenericDM {}) = False
@@ -2022,7 +2021,7 @@ Instead, we take the following approach:
 
 ------------------------
 tcMethodBody :: Bool   -- True <=> This is a vanilla default method
-                       -- See (TRC5) in Note [Tracking redundant constraints]
+                       -- See (TRC5) in Note [Tracking needed EvIds]
                        --            in GHC.Tc.Solver.Solve
              -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
              -> TcEvBinds -> Bool

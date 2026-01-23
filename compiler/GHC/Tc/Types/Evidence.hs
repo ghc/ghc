@@ -14,14 +14,15 @@ module GHC.Tc.Types.Evidence (
   optSubTypeHsWrapper,
 
   -- * Evidence bindings
-  TcEvBinds(..), EvBindsVar(..),
-  EvBindMap(..), emptyEvBindMap, extendEvBinds, unionEvBindMap,
+  TcEvBinds(..), EvBindsVar(..), NeededEvIds,
+  EvBindsState(..), emptyEvBindsState, unionEvBindsState, addNeededEvIdsEBS,
+  EvBindsMap(..), emptyEvBindsMap, extendEvBinds, unionEvBindsMap,
   lookupEvBind, evBindMapBinds,
-  foldEvBindMap, nonDetStrictFoldEvBindMap,
-  filterEvBindMap,
-  isEmptyEvBindMap,
+  foldEvBindsMap, nonDetStrictFoldEvBindsMap,
+  filterEvBindsMap,
+  isEmptyEvBindsMap,
   evBindMapToVarSet,
-  varSetMinusEvBindMap,
+  varSetMinusEvBindsMap,
   EvBindInfo(..), EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   evBindVar, isCoEvBindsVar,
 
@@ -725,29 +726,44 @@ data EvBindsVar
       ebv_uniq :: Unique,
          -- The Unique is for debug printing only
 
-      ebv_binds :: IORef EvBindMap,
+      ebv_binds :: IORef EvBindsState
       -- The main payload: the value-level evidence bindings
       --     (dictionaries etc)
-      -- Some Given, some Wanted
-
-      ebv_tcvs :: IORef [TcCoercion]
-      -- When we solve a Wanted by filling in a CoercionHole, it is as
-      -- if we were adding an evidence binding
-      --       co_hole := coercion
-      -- We keep all these RHS coercions in a list, alongside `ebv_binds`,
-      --  so that we can report unused given constraints,
-      --  in GHC.Tc.Solver.neededEvVars
-      -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
-      -- Also: we garbage-collect unused bindings in `neededEvVars`,
-      --       so this matters for correctness too.
+      -- Some Given, some Wanted; this is tracked in the `eb_info`
+      -- field of the `EvBind`.
     }
 
   | CoEvBindsVar {  -- See Note [Coercion evidence only]
 
       -- See above for comments on ebv_uniq, ebv_tcvs
-      ebv_uniq :: Unique,
-      ebv_tcvs :: IORef [TcCoercion]
+      ebv_uniq  :: Unique,
+      ebv_needs :: IORef NeededEvIds
     }
+
+type NeededEvIds = VarSet
+
+data EvBindsState = EBS { ebs_binds :: EvBindsMap
+                        , ebs_needs :: NeededEvIds }
+
+emptyEvBindsState :: EvBindsState
+emptyEvBindsState = EBS { ebs_binds = emptyEvBindsMap
+                        , ebs_needs = emptyVarSet }
+
+unionEvBindsState :: EvBindsState -> EvBindsState -> EvBindsState
+unionEvBindsState (EBS { ebs_binds = bs1, ebs_needs = n1 })
+                  (EBS { ebs_binds = bs2, ebs_needs = n2 })
+  = EBS { ebs_binds = bs1 `unionEvBindsMap` bs2
+        , ebs_needs = n1  `unionVarSet`    n2 }
+
+addNeededEvIdsEBS :: NeededEvIds -> EvBindsState -> EvBindsState
+addNeededEvIdsEBS n1 ebs@(EBS { ebs_needs = n2 })
+  = ebs { ebs_needs = n1 `unionVarSet` n2 }
+
+instance Outputable EvBindsState where
+  ppr (EBS { ebs_binds = bs, ebs_needs = needs })
+    = text "EBS" <> (braces $
+        sep [ text "needs =" <+> ppr needs
+            , text "binds =" <+> ppr bs ])
 
 instance Data.Data TcEvBinds where
   -- Placeholder; we can't traverse into TcEvBinds
@@ -778,8 +794,8 @@ isCoEvBindsVar (CoEvBindsVar {}) = True
 isCoEvBindsVar (EvBindsVar {})   = False
 
 -----------------
-newtype EvBindMap
-  = EvBindMap {
+newtype EvBindsMap
+  = EvBindsMap {
        ev_bind_varenv :: DVarEnv EvBind
     }       -- Map from evidence variables to evidence terms
             -- We use @DVarEnv@ here to get deterministic ordering when we
@@ -801,56 +817,56 @@ newtype EvBindMap
             -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why
             -- @UniqFM@ can lead to nondeterministic order.
 
-emptyEvBindMap :: EvBindMap
-emptyEvBindMap = EvBindMap { ev_bind_varenv = emptyDVarEnv }
+emptyEvBindsMap :: EvBindsMap
+emptyEvBindsMap = EvBindsMap { ev_bind_varenv = emptyDVarEnv }
 
-extendEvBinds :: EvBindMap -> EvBind -> EvBindMap
+extendEvBinds :: EvBindsMap -> EvBind -> EvBindsMap
 extendEvBinds bs ev_bind
-  = EvBindMap { ev_bind_varenv = extendDVarEnv (ev_bind_varenv bs)
+  = EvBindsMap { ev_bind_varenv = extendDVarEnv (ev_bind_varenv bs)
                                                (eb_lhs ev_bind)
                                                ev_bind }
 
 -- | Union two evidence binding maps
-unionEvBindMap :: EvBindMap -> EvBindMap -> EvBindMap
-unionEvBindMap (EvBindMap env1) (EvBindMap env2) =
-  EvBindMap { ev_bind_varenv = plusDVarEnv env1 env2 }
+unionEvBindsMap :: EvBindsMap -> EvBindsMap -> EvBindsMap
+unionEvBindsMap (EvBindsMap env1) (EvBindsMap env2) =
+  EvBindsMap { ev_bind_varenv = plusDVarEnv env1 env2 }
 
-isEmptyEvBindMap :: EvBindMap -> Bool
-isEmptyEvBindMap (EvBindMap m) = isEmptyDVarEnv m
+isEmptyEvBindsMap :: EvBindsMap -> Bool
+isEmptyEvBindsMap (EvBindsMap m) = isEmptyDVarEnv m
 
-lookupEvBind :: EvBindMap -> EvVar -> Maybe EvBind
+lookupEvBind :: EvBindsMap -> EvVar -> Maybe EvBind
 lookupEvBind bs = lookupDVarEnv (ev_bind_varenv bs)
 
-evBindMapBinds :: EvBindMap -> Bag EvBind
-evBindMapBinds = foldEvBindMap consBag emptyBag
+evBindMapBinds :: EvBindsMap -> Bag EvBind
+evBindMapBinds = foldEvBindsMap consBag emptyBag
 
-foldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
-foldEvBindMap k z bs = foldDVarEnv k z (ev_bind_varenv bs)
+foldEvBindsMap :: (EvBind -> a -> a) -> a -> EvBindsMap -> a
+foldEvBindsMap k z bs = foldDVarEnv k z (ev_bind_varenv bs)
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
-nonDetStrictFoldEvBindMap :: (EvBind -> a -> a) -> a -> EvBindMap -> a
-nonDetStrictFoldEvBindMap k z bs = nonDetStrictFoldDVarEnv k z (ev_bind_varenv bs)
+nonDetStrictFoldEvBindsMap :: (EvBind -> a -> a) -> a -> EvBindsMap -> a
+nonDetStrictFoldEvBindsMap k z bs = nonDetStrictFoldDVarEnv k z (ev_bind_varenv bs)
 
-filterEvBindMap :: (EvBind -> Bool) -> EvBindMap -> EvBindMap
-filterEvBindMap k (EvBindMap { ev_bind_varenv = env })
-  = EvBindMap { ev_bind_varenv = filterDVarEnv k env }
+filterEvBindsMap :: (EvBind -> Bool) -> EvBindsMap -> EvBindsMap
+filterEvBindsMap k (EvBindsMap { ev_bind_varenv = env })
+  = EvBindsMap { ev_bind_varenv = filterDVarEnv k env }
 
-evBindMapToVarSet :: EvBindMap -> VarSet
-evBindMapToVarSet (EvBindMap dve) = unsafeUFMToUniqSet (mapUFM evBindVar (udfmToUfm dve))
+evBindMapToVarSet :: EvBindsMap -> VarSet
+evBindMapToVarSet (EvBindsMap dve) = unsafeUFMToUniqSet (mapUFM evBindVar (udfmToUfm dve))
 
-varSetMinusEvBindMap :: VarSet -> EvBindMap -> VarSet
-varSetMinusEvBindMap vs (EvBindMap dve) = vs `uniqSetMinusUDFM` dve
+varSetMinusEvBindsMap :: VarSet -> EvBindsMap -> VarSet
+varSetMinusEvBindsMap vs (EvBindsMap dve) = vs `uniqSetMinusUDFM` dve
 
-instance Outputable EvBindMap where
-  ppr (EvBindMap m) = ppr m
+instance Outputable EvBindsMap where
+  ppr (EvBindsMap m) = ppr m
 
-data EvBindInfo
-  = EvBindGiven { -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
-    }
-  | EvBindWanted { ebi_canonical :: CanonicalEvidence -- See Note [Desugaring non-canonical evidence]
-    }
+data EvBindInfo    -- See Note [Tracking needed EvIds] in GHC.Tc.Solver.Solve
+  = EvBindGiven
+  | EvBindWanted
+      { ebi_canonical :: CanonicalEvidence }
+        -- See Note [Desugaring non-canonical evidence]
 
 -----------------
 -- All evidence is bound by EvBinds; no side effects
@@ -1334,7 +1350,7 @@ can just squeeze by.  Here's how.
   * Each EvBindsVar in an et_binds field of an EvFun is /also/ in the
     ic_binds field of an Implication
   * So we can track usage via the processing for that implication,
-    (see Note [Tracking redundant constraints] in GHC.Tc.Solver).
+    (see Note [Tracking needed EvIds] in GHC.Tc.Solver).
     We can ignore usage from the EvFun altogether.
 
 * /After/ typechecking `evTermFVs` is used by `GHC.Iface.Ext.Ast`, but by

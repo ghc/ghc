@@ -2127,7 +2127,7 @@ solveOneFromTheOther.
 
       - For everything else, we want to keep the outermost one.  Reason: that
         makes it more likely that the inner one will turn out to be unused,
-        and can be reported as redundant.  See Note [Tracking redundant constraints]
+        and can be reported as redundant.  See Note [Tracking needed EvIds]
         in GHC.Tc.Solver.
 
         It transpires that using the outermost one is responsible for an
@@ -2140,7 +2140,7 @@ solveOneFromTheOther.
            according to Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance.
 
        (b) Prefer constraints that are not superclass selections. See
-           (TRC3) in Note [Tracking redundant constraints] in GHC.Tc.Solver.
+           (TRC3) in Note [Tracking needed EvIds] in GHC.Tc.Solver.
 
        (c) If both are GivenSCOrigin, chooose the one with the shallower
            superclass-selection depth, in the hope of identifying more correct

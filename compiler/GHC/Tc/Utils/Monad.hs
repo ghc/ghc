@@ -104,9 +104,10 @@ module GHC.Tc.Utils.Monad(
 
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
-  addTcEvBind, addTcEvBinds, addTopEvBinds,
-  getTcEvBindsMap, setTcEvBindsMap, updTcEvBinds,
-  getTcEvTyCoVars, chooseUniqueOccTc,
+  addTcEvCoBind, addTcEvBind, addTopEvBinds,
+  getTcEvBindsMap, getTcEvBindsState,
+  setTcEvBindsMap, combineTcEvBinds, addNeededEvIds,
+  chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
   emitConstraints, emitSimple, emitSimples,
   emitImplication, emitImplications, ensureReflMultiplicityCo,
@@ -118,6 +119,7 @@ module GHC.Tc.Utils.Monad(
   getLclTypeEnv, setLclTypeEnv,
   traceTcConstraints,
   emitNamedTypeHole, IsExtraConstraint(..), emitAnonTypeHole,
+  fillCoercionHole,
 
   -- * Template Haskell context
   recordThUse, recordThNeededRuntimeDeps,
@@ -187,12 +189,13 @@ import GHC.Unit.Module.Warnings
 import GHC.Unit.Home.PackageTable
 
 import GHC.Core.UsageEnv
-
 import GHC.Core.Coercion ( isReflCo )
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Type( mkNumLitTy )
+import GHC.Core.TyCo.Rep( CoercionHole(..) )
+import GHC.Core.TyCo.FVs( coVarsOfCo )
 import GHC.Core.TyCon ( TyCon )
 
 import GHC.Driver.Env
@@ -230,6 +233,7 @@ import GHC.Types.SafeHaskell
 import GHC.Types.Id
 import GHC.Types.TypeEnv
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -1660,6 +1664,105 @@ tryTcDiscardingErrs' validate recover_invalid recover_error thing_inside
                  recover_error
         }
 
+{- Note [Constraints and errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (#12124):
+
+  foo :: Maybe Int
+  foo = return (case Left 3 of
+                  Left -> 1  -- Hard error here!
+                  _    -> 0)
+
+The call to 'return' will generate a (Monad m) wanted constraint; but
+then there'll be "hard error" (i.e. an exception in the TcM monad), from
+the unsaturated Left constructor pattern.
+
+We'll recover in tcPolyBinds, using recoverM.  But then the final
+tcSimplifyTop will see that (Monad m) constraint, with 'm' utterly
+un-filled-in, and will emit a misleading error message.
+
+The underlying problem is that an exception interrupts the constraint
+gathering process. Bottom line: if we have an exception, it's best
+simply to discard any gathered constraints.  Hence in 'attemptM' we
+capture the constraints in a fresh variable, and only emit them into
+the surrounding context if we exit normally.  If an exception is
+raised, simply discard the collected constraints... we have a hard
+error to report.  So this capture-the-emit dance isn't as stupid as it
+looks :-).
+
+However suppose we throw an exception inside an invocation of
+captureConstraints, and discard all the constraints. Some of those
+constraints might be "variable out of scope" Hole constraints, and that
+might have been the actual original cause of the exception!  For
+example (#12529):
+   f = p @ Int
+Here 'p' is out of scope, so we get an insoluble Hole constraint. But
+the visible type application fails in the monad (throws an exception).
+We must not discard the out-of-scope error.
+
+It's distressingly delicate though:
+
+* If we discard too /many/ constraints we may fail to report the error
+  that led us to interrupt the constraint gathering process.
+
+  One particular example "variable out of scope" Hole constraints. For
+  example (#12529):
+   f = p @ Int
+  Here 'p' is out of scope, so we get an insoluble Hole constraint. But
+  the visible type application fails in the monad (throws an exception).
+  We must not discard the out-of-scope error.
+
+  Also GHC.Tc.Solver.simplifyAndEmitFlatConstraints may fail having
+  emitted some constraints with skolem-escape problems.
+
+* If we discard too /few/ constraints, we may get the misleading
+  class constraints mentioned above.
+
+  We may /also/ end up taking constraints built at some inner level, and
+  emitting them (via the exception catching in `tryCaptureConstraints`) at some
+  outer level, and then breaking the TcLevel invariants See Note [TcLevel
+  invariants] in GHC.Tc.Utils.TcType
+
+So `dropMisleading` has a horridly ad-hoc structure:
+
+* It keeps only /insoluble/ flat constraints (which are unlikely to very visibly
+  trip up on the TcLevel invariant)
+
+* But it keeps all /implication/ constraints (except the class constraints
+  inside them).  The implication constraints are OK because they set the ambient
+  level before attempting to solve any inner constraints.
+
+Ugh! I hate this. But it seems to work.
+
+Other wrinkles
+
+(CERR1) Note that freshly-generated constraints like (Int ~ Bool), or
+    ((a -> b) ~ Int) are all CNonCanonical, and hence won't be flagged as
+    insoluble.  The constraint solver does that.  So they'll be discarded.
+    That's probably ok; but see th/5358 as a not-so-good example:
+       t1 :: Int
+       t1 x = x   -- Manifestly wrong
+
+       foo = $(...raises exception...)
+    We report the exception, but not the bug in t1.  Oh well.  Possible
+    solution: make GHC.Tc.Utils.Unify.uType spot manifestly-insoluble constraints.
+
+(CERR2) In #26015 I found that from the constraints
+           [W] alpha ~ Int      -- A class constraint
+           [W] F alpha ~# Bool  -- An equality constraint
+  we were dropping the first (because it's a class constraint) but not the
+  second, and then getting a misleading error message from the second.  As
+  #25607 shows, we can get not just one but a zillion bogus messages, which
+  conceal the one genuine error.  Boo.
+
+  For now I have added an even more ad-hoc "drop class constraints except
+  equality classes (~) and (~~)"; see `dropMisleading`.  That just kicks the can
+  down the road; but this problem seems somewhat rare anyway.  The code in
+  `dropMisleading` hasn't changed for years.
+
+It would be great to have a more systematic solution to this entire mess.
+-}
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1854,107 +1957,112 @@ debugTc thing
 
 addTopEvBinds :: Bag EvBind -> TcM a -> TcM a
 addTopEvBinds new_ev_binds thing_inside
-  =updGblEnv upd_env thing_inside
+  = updGblEnv upd_env thing_inside
   where
     upd_env tcg_env = tcg_env { tcg_ev_binds = tcg_ev_binds tcg_env
                                                `unionBags` new_ev_binds }
 
 newTcEvBinds :: TcM EvBindsVar
-newTcEvBinds = do { binds_ref <- newTcRef emptyEvBindMap
-                  ; tcvs_ref  <- newTcRef []
+newTcEvBinds = do { binds_ref <- newTcRef emptyEvBindsState
                   ; uniq <- newUnique
                   ; traceTc "newTcEvBinds" (text "unique =" <+> ppr uniq)
                   ; return (EvBindsVar { ebv_binds = binds_ref
-                                       , ebv_tcvs = tcvs_ref
                                        , ebv_uniq = uniq }) }
 
 -- | Creates an EvBindsVar incapable of holding any bindings. It still
--- tracks covar usages (see comments on ebv_tcvs in "GHC.Tc.Types.Evidence"), thus
+-- tracks covar usages (see comments on ebv_needs in "GHC.Tc.Types.Evidence"), thus
 -- must be made monadically
 newNoTcEvBinds :: TcM EvBindsVar
 newNoTcEvBinds
-  = do { tcvs_ref  <- newTcRef []
+  = do { tcvs_ref  <- newTcRef emptyVarSet
        ; uniq <- newUnique
        ; traceTc "newNoTcEvBinds" (text "unique =" <+> ppr uniq)
-       ; return (CoEvBindsVar { ebv_tcvs = tcvs_ref
-                              , ebv_uniq = uniq }) }
+       ; return (CoEvBindsVar { ebv_needs = tcvs_ref
+                              , ebv_uniq  = uniq }) }
 
 cloneEvBindsVar :: EvBindsVar -> TcM EvBindsVar
 -- Clone the refs, so that any binding created when
 -- solving don't pollute the original
 cloneEvBindsVar ebv@(EvBindsVar {})
-  = do { binds_ref <- newTcRef emptyEvBindMap
-       ; tcvs_ref  <- newTcRef []
-       ; return (ebv { ebv_binds = binds_ref
-                     , ebv_tcvs = tcvs_ref }) }
+  = do { binds_ref <- newTcRef emptyEvBindsState
+       ; uniq <- newUnique
+       ; return (ebv { ebv_uniq = uniq
+                     , ebv_binds = binds_ref }) }
 cloneEvBindsVar ebv@(CoEvBindsVar {})
-  = do { tcvs_ref  <- newTcRef []
-       ; return (ebv { ebv_tcvs = tcvs_ref }) }
+  = do { tcvs_ref  <- newTcRef emptyVarSet
+       ; return (ebv { ebv_needs = tcvs_ref }) }
 
-getTcEvTyCoVars :: EvBindsVar -> TcM [TcCoercion]
-getTcEvTyCoVars ev_binds_var
-  = readTcRef (ebv_tcvs ev_binds_var)
+getTcEvBindsMap :: EvBindsVar -> TcM EvBindsMap
+getTcEvBindsMap ebv = do { EBS { ebs_binds = bs } <- getTcEvBindsState ebv
+                         ; return bs }
 
-getTcEvBindsMap :: EvBindsVar -> TcM EvBindMap
-getTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref })
+getTcEvBindsState :: EvBindsVar -> TcM EvBindsState
+getTcEvBindsState (EvBindsVar { ebv_binds = ev_ref })
   = readTcRef ev_ref
-getTcEvBindsMap (CoEvBindsVar {})
-  = return emptyEvBindMap
+getTcEvBindsState (CoEvBindsVar { ebv_needs = needs_ref })
+  = do { needs <- readTcRef needs_ref
+       ; return (EBS { ebs_binds = emptyEvBindsMap, ebs_needs = needs }) }
 
-setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcM ()
-setTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref }) binds
-  = writeTcRef ev_ref binds
-setTcEvBindsMap v@(CoEvBindsVar {}) ev_binds
-  | isEmptyEvBindMap ev_binds
-  = return ()
-  | otherwise
-  = pprPanic "setTcEvBindsMap" (ppr v $$ ppr ev_binds)
+setTcEvBindsMap :: EvBindsVar -> EvBindsMap -> TcM ()
+setTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref }) ev_binds
+  = updTcRef ev_ref (\ebs -> ebs { ebs_binds = ev_binds })
+setTcEvBindsMap (CoEvBindsVar {}) ev_binds
+  = assertPpr (isEmptyEvBindsMap ev_binds) (ppr ev_binds) $
+    return ()
 
-updTcEvBinds :: EvBindsVar -> EvBindsVar -> TcM ()
-updTcEvBinds (EvBindsVar { ebv_binds = old_ebv_ref, ebv_tcvs = old_tcv_ref })
-             (EvBindsVar { ebv_binds = new_ebv_ref, ebv_tcvs = new_tcv_ref })
+combineTcEvBinds :: EvBindsVar -> EvBindsVar -> TcM ()
+combineTcEvBinds (EvBindsVar { ebv_binds = old_ebv_ref })
+                 (EvBindsVar { ebv_binds = new_ebv_ref })
   = do { new_ebvs <- readTcRef new_ebv_ref
-       ; updTcRef old_ebv_ref (`unionEvBindMap` new_ebvs)
-       ; new_tcvs <- readTcRef new_tcv_ref
-       ; updTcRef old_tcv_ref (new_tcvs ++) }
-updTcEvBinds (EvBindsVar { ebv_tcvs = old_tcv_ref })
-             (CoEvBindsVar { ebv_tcvs = new_tcv_ref })
+       ; updTcRef old_ebv_ref (`unionEvBindsState` new_ebvs) }
+combineTcEvBinds (EvBindsVar { ebv_binds = old_tcv_ref })
+                 (CoEvBindsVar { ebv_needs = new_tcv_ref })
   = do { new_tcvs <- readTcRef new_tcv_ref
-       ; updTcRef old_tcv_ref (new_tcvs ++) }
-updTcEvBinds (CoEvBindsVar { ebv_tcvs = old_tcv_ref })
-             (CoEvBindsVar { ebv_tcvs = new_tcv_ref })
+       ; updTcRef old_tcv_ref (addNeededEvIdsEBS new_tcvs) }
+combineTcEvBinds (CoEvBindsVar { ebv_needs = old_tcv_ref })
+                 (CoEvBindsVar { ebv_needs = new_tcv_ref })
   = do { new_tcvs <- readTcRef new_tcv_ref
-       ; updTcRef old_tcv_ref (new_tcvs ++) }
-updTcEvBinds old_var new_var
-  = pprPanic "updTcEvBinds" (ppr old_var $$ ppr new_var)
+       ; updTcRef old_tcv_ref (unionVarSet new_tcvs) }
+combineTcEvBinds old_var new_var
+  = pprPanic "combineTcEvBinds" (ppr old_var $$ ppr new_var)
     -- Terms inside types, no good
+
+addNeededEvIds :: EvBindsVar -> NeededEvIds -> TcM ()
+addNeededEvIds (EvBindsVar { ebv_binds = bs_ref }) needed
+  = updTcRef bs_ref (addNeededEvIdsEBS needed)
+addNeededEvIds (CoEvBindsVar { ebv_needs = need_ref }) needed
+  = updTcRef need_ref (unionVarSet needed)
+
+addTcEvCoBind :: EvBindsVar -> CoercionHole -> CoercionPlusHoles -> TcM ()
+addTcEvCoBind ebv hole co_plus_holes@(CPH { cph_co = co })
+  = do { fillCoercionHole hole co_plus_holes
+         -- Record usage of the free vars of this coercion
+       ; addNeededEvIds ebv (coVarsOfCo co) }
 
 addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
-addTcEvBind (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) ev_bind
-  = do { bnds <- readTcRef ev_ref
-       ; let bnds' = extendEvBinds bnds ev_bind
+addTcEvBind (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u })
+            ev_bind@(EvBind { eb_info = info, eb_rhs = rhs })
+  = do { EBS { ebs_binds = bnds, ebs_needs = needs } <- readTcRef ev_ref
+       ; let bnds'  = extendEvBinds bnds ev_bind
+             needs' = case info of
+                        EvBindWanted {} -> nestedEvIdsOfTerm rhs
+                                           `unionVarSet` needs
+                        EvBindGiven {} -> needs
+
        ; traceTc "addTcEvBind" $
          vcat [ text "EvBindsVar:" <+> ppr u
               , text "ev_bind:" <+> ppr ev_bind
               , text "bnds:" <+> ppr bnds
-              , text "bnds':" <+> ppr bnds' ]
-       ; writeTcRef ev_ref bnds' }
+              , text "bnds':" <+> ppr bnds'
+              , text "needs" <+> ppr needs
+              , text "needs'" <+> ppr needs' ]
+
+       ; writeTcRef ev_ref $
+         EBS { ebs_binds = bnds', ebs_needs = needs' } }
+
 addTcEvBind (CoEvBindsVar { ebv_uniq = u }) ev_bind
   = pprPanic "addTcEvBind CoEvBindsVar" (ppr ev_bind $$ ppr u)
-
-addTcEvBinds :: EvBindsVar -> EvBindMap -> TcM ()
--- ^ Add a collection of binding to the TcEvBinds by side effect
-addTcEvBinds _ new_ev_binds
-  | isEmptyEvBindMap new_ev_binds
-  = return ()
-addTcEvBinds (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) new_ev_binds
-  = do { traceTc "addTcEvBinds" $ ppr u $$
-                                  ppr new_ev_binds
-       ; old_bnds <- readTcRef ev_ref
-       ; writeTcRef ev_ref (old_bnds `unionEvBindMap` new_ev_binds) }
-addTcEvBinds (CoEvBindsVar { ebv_uniq = u }) new_ev_binds
-  = pprPanic "addTcEvBinds CoEvBindsVar" (ppr new_ev_binds $$ ppr u)
 
 chooseUniqueOccTc :: (OccSet -> OccName) -> TcM OccName
 chooseUniqueOccTc fn =
@@ -2137,111 +2245,22 @@ emitNamedTypeHole (name, tv)
   where
     occ       = nameOccName name
 
-{- Note [Constraints and errors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (#12124):
-
-  foo :: Maybe Int
-  foo = return (case Left 3 of
-                  Left -> 1  -- Hard error here!
-                  _    -> 0)
-
-The call to 'return' will generate a (Monad m) wanted constraint; but
-then there'll be "hard error" (i.e. an exception in the TcM monad), from
-the unsaturated Left constructor pattern.
-
-We'll recover in tcPolyBinds, using recoverM.  But then the final
-tcSimplifyTop will see that (Monad m) constraint, with 'm' utterly
-un-filled-in, and will emit a misleading error message.
-
-The underlying problem is that an exception interrupts the constraint
-gathering process. Bottom line: if we have an exception, it's best
-simply to discard any gathered constraints.  Hence in 'attemptM' we
-capture the constraints in a fresh variable, and only emit them into
-the surrounding context if we exit normally.  If an exception is
-raised, simply discard the collected constraints... we have a hard
-error to report.  So this capture-the-emit dance isn't as stupid as it
-looks :-).
-
-However suppose we throw an exception inside an invocation of
-captureConstraints, and discard all the constraints. Some of those
-constraints might be "variable out of scope" Hole constraints, and that
-might have been the actual original cause of the exception!  For
-example (#12529):
-   f = p @ Int
-Here 'p' is out of scope, so we get an insoluble Hole constraint. But
-the visible type application fails in the monad (throws an exception).
-We must not discard the out-of-scope error.
-
-It's distressingly delicate though:
-
-* If we discard too /many/ constraints we may fail to report the error
-  that led us to interrupt the constraint gathering process.
-
-  One particular example "variable out of scope" Hole constraints. For
-  example (#12529):
-   f = p @ Int
-  Here 'p' is out of scope, so we get an insoluble Hole constraint. But
-  the visible type application fails in the monad (throws an exception).
-  We must not discard the out-of-scope error.
-
-  Also GHC.Tc.Solver.simplifyAndEmitFlatConstraints may fail having
-  emitted some constraints with skolem-escape problems.
-
-* If we discard too /few/ constraints, we may get the misleading
-  class constraints mentioned above.
-
-  We may /also/ end up taking constraints built at some inner level, and
-  emitting them (via the exception catching in `tryCaptureConstraints` at some
-  outer level, and then breaking the TcLevel invariants See Note [TcLevel
-  invariants] in GHC.Tc.Utils.TcType
-
-So `dropMisleading` has a horridly ad-hoc structure:
-
-* It keeps only /insoluble/ flat constraints (which are unlikely to very visibly
-  trip up on the TcLevel invariant
-
-* But it keeps all /implication/ constraints (except the class constraints
-  inside them).  The implication constraints are OK because they set the ambient
-  level before attempting to solve any inner constraints.
-
-Ugh! I hate this. But it seems to work.
-
-Other wrinkles
-
-(CERR1) Note that freshly-generated constraints like (Int ~ Bool), or
-    ((a -> b) ~ Int) are all CNonCanonical, and hence won't be flagged as
-    insoluble.  The constraint solver does that.  So they'll be discarded.
-    That's probably ok; but see th/5358 as a not-so-good example:
-       t1 :: Int
-       t1 x = x   -- Manifestly wrong
-
-       foo = $(...raises exception...)
-    We report the exception, but not the bug in t1.  Oh well.  Possible
-    solution: make GHC.Tc.Utils.Unify.uType spot manifestly-insoluble constraints.
-
-(CERR2) In #26015 I found that from the constraints
-           [W] alpha ~ Int      -- A class constraint
-           [W] F alpha ~# Bool  -- An equality constraint
-  we were dropping the first (becuase it's a class constraint) but not the
-  second, and then getting a misleading error message from the second.  As
-  #25607 shows, we can get not just one but a zillion bogus messages, which
-  conceal the one genuine error.  Boo.
-
-  For now I have added an even more ad-hoc "drop class constraints except
-  equality classes (~) and (~~)"; see `dropMisleading`.  That just kicks the can
-  down the road; but this problem seems somewhat rare anyway.  The code in
-  `dropMisleading` hasn't changed for years.
-
-It would be great to have a more systematic solution to this entire mess.
+-- | Put a value in a coercion hole
+fillCoercionHole :: CoercionHole -> CoercionPlusHoles -> TcM ()
+fillCoercionHole (CH { ch_ref = ref, ch_co_var = cv }) co
+  = do { when debugIsOn $
+         do { cts <- readTcRef ref
+            ; whenIsJust cts $ \old_co ->
+              pprPanic "Filling a filled coercion hole" (ppr cv $$ ppr co $$ ppr old_co) }
+       ; traceTc "Filling coercion hole" (ppr cv <+> text ":=" <+> ppr co)
+       ; writeTcRef ref (Just co) }
 
 
-************************************************************************
+{- *********************************************************************
 *                                                                      *
              Template Haskell context
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 recordThUse :: TcM ()
 recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }

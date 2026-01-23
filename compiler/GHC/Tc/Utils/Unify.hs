@@ -418,7 +418,8 @@ Some examples:
 -}
 
 tcSkolemiseGeneral
-  :: DeepSubsumptionFlag
+  :: HasDebugCallStack
+  => DeepSubsumptionFlag
   -> UserTypeCtxt
   -> TcType -> TcType   -- top_ty and expected_ty
         -- Here, top_ty      is the type we started to skolemise; used only in SigSkol
@@ -446,15 +447,16 @@ tcSkolemiseGeneral ds_flag ctxt top_ty expected_ty thing_inside
              ; skol_info <- mkSkolemInfo sig_skol }
 
        ; let skol_tvs = map (binderVar . snd) tv_prs
-       ; traceTc "tcSkolemiseGeneral" (pprUserTypeCtxt ctxt <+> ppr skol_tvs <+> ppr given)
+       ; traceTc "tcSkolemiseGeneral {" (pprUserTypeCtxt ctxt <+> ppr skol_tvs <+> ppr given)
        ; (ev_binds, result) <- checkConstraints sig_skol skol_tvs given $
                                thing_inside tv_prs rho_ty
 
+       ; traceTc "tcSkolemiseGeneral }" (ppr ev_binds $$ traceCallStackDoc)
        ; return (wrap <.> mkWpLet ev_binds, result) }
          -- The ev_binds returned by checkConstraints is very
          -- often empty, in which case mkWpLet is a no-op
 
-tcSkolemiseCompleteSig :: TcCompleteSig
+tcSkolemiseCompleteSig :: HasDebugCallStack => TcCompleteSig
                        -> ([ExpPatType] -> TcRhoType -> TcM result)
                        -> TcM (HsWrapper, result)
 -- ^ The wrapper has type: spec_ty ~~> expected_ty
@@ -471,7 +473,7 @@ tcSkolemiseCompleteSig (CSig { sig_bndr = poly_id, sig_ctxt = ctxt, sig_loc = lo
          tcExtendNameTyVarEnv (map (fmap binderVar) tv_prs) $
          thing_inside (map (mkInvisExpPatType . snd) tv_prs) rho_ty }
 
-tcSkolemiseExpectedType :: TcSigmaType
+tcSkolemiseExpectedType :: HasDebugCallStack => TcSigmaType
                         -> ([ExpPatType] -> TcRhoType -> TcM result)
                         -> TcM (HsWrapper, result)
 -- Just like tcSkolemiseCompleteSig, except that we don't have a user-written
@@ -483,14 +485,15 @@ tcSkolemiseExpectedType exp_ty thing_inside
   = tcSkolemiseGeneral Shallow GenSigCtxt exp_ty exp_ty $ \tv_prs rho_ty ->
     thing_inside (map (mkInvisExpPatType . snd) tv_prs) rho_ty
 
-tcSkolemise :: DeepSubsumptionFlag -> UserTypeCtxt -> TcSigmaType
+tcSkolemise :: HasDebugCallStack => DeepSubsumptionFlag -> UserTypeCtxt -> TcSigmaType
             -> (TcRhoType -> TcM result)
             -> TcM (HsWrapper, result)
 tcSkolemise ds_flag ctxt expected_ty thing_inside
   = tcSkolemiseGeneral ds_flag ctxt expected_ty expected_ty $ \_ rho_ty ->
     thing_inside rho_ty
 
-checkConstraints :: SkolemInfoAnon
+checkConstraints :: HasDebugCallStack
+                 => SkolemInfoAnon
                  -> [TcTyVar]           -- Skolems
                  -> [EvVar]             -- Given
                  -> TcM result
@@ -504,14 +507,16 @@ checkConstraints skol_info skol_tvs given thing_inside
        ; if implication_needed
          then do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
                  ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_tvs given wanted
-                 ; traceTc "checkConstraints" (ppr tclvl $$ ppr skol_tvs)
+                 ; traceTc "checkConstraints A" (ppr tclvl $$ ppr skol_tvs $$ traceCallStackDoc)
                  ; emitImplications implics
                  ; return (ev_binds, result) }
 
          else -- Fast path.  We check every function argument with tcCheckPolyExpr,
               -- which uses tcTopSkolemise and hence checkConstraints.
               -- So this fast path is well-exercised
-              do { res <- thing_inside
+              do { traceTc "checkConstraints B" (ppr skol_tvs $$ ppr given $$ ppr skol_info $$
+                                                 traceCallStackDoc)
+                 ; res <- thing_inside
                  ; return (emptyTcEvBinds, res) } }
 
 checkTvConstraints :: SkolemInfo
