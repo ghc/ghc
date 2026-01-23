@@ -28,7 +28,6 @@
 
 module GHC.GHCi
   {-# DEPRECATED ["GHC.GHCi is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context."] #-}
-    {-# WARNING "This is an unstable interface." #-}
     (GHCiSandboxIO(..),
      NoIO()
      ) where
