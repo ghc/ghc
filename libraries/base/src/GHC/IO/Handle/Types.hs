@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE Safe #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -7,7 +9,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/392>)
 -- Portability :  non-portable
 --
 -- Basic types for the implementation of IO Handles.
@@ -18,7 +20,12 @@
 -- change rapidly without much warning.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.IO.Handle.Types should be removed in GHC 10.02."
+#endif
+
 module GHC.IO.Handle.Types (
+  {-# DEPRECATED "GHC.IO.Handle.Types is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context." #-}
       Handle(..), Handle__(..), showHandle,
       checkHandleInvariants,
       BufferList(..),

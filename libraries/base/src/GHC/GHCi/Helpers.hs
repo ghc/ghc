@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE Safe #-}
 
 -- |
@@ -7,7 +9,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/392>)
 -- Portability :  non-portable (GHC Extensions)
 --
 -- Various helpers used by the GHCi shell.
@@ -18,7 +20,12 @@
 -- change rapidly without much warning.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.GHCi.Helpers should be removed in GHC 10.02."
+#endif
+
 module GHC.GHCi.Helpers
+  {-# DEPRECATED "GHC.GHCi.Helpers is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context." #-}
     (disableBuffering,
      flushAll,
      evalWrapper

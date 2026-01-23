@@ -47,12 +47,12 @@ import GHC.IO.Windows.Handle
            toHANDLE
        )
 #endif
-import GHC.IO.Handle.Types
+import GHC.Internal.IO.Handle.Types
        (
            Handle (FileHandle, DuplexHandle),
            Handle__ (Handle__, haDevice)
        )
-import GHC.IO.Handle.Internals (withHandle_', flushBuffer)
+import GHC.Internal.IO.Handle.Internals (withHandle_', flushBuffer)
 import GHC.IO.Exception
        (
            IOErrorType (InappropriateType),
