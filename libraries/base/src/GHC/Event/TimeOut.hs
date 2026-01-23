@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- |
 -- Module      :  GHC.Event.TimeOut
 -- Copyright   :  (c) Tamar Christina 2018

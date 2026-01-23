@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE Safe #-}
 
 -- |
