@@ -80,6 +80,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader (WithUserRdr(..))
+import GHC.Types.OverlapFlag (makeOverlapFlag)
 import GHC.Types.Var
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -912,7 +913,7 @@ hasFixedRuntimeRepRes std_nm user_expr ty = mapM_ do_check mb_arity
 ************************************************************************
 -}
 
-getOverlapFlag :: Maybe OverlapMode   -- User pragma if any
+getOverlapFlag :: Maybe (OverlapMode (GhcPass p)) -- User pragma if any
                -> TcM OverlapFlag
 -- Construct the OverlapFlag from the global module flags,
 -- but if the overlap_mode argument is (Just m),
@@ -946,18 +947,16 @@ getOverlapFlag overlap_mode_prag
               -- See GHC.Core.InstEnv Note [Coherence and specialisation: overview]
               final_overlap_mode
                 | Incoherent s <- overlap_mode
-                , noncanonical_incoherence       = NonCanonical s
-                | otherwise                      = overlap_mode
+                , noncanonical_incoherence    = NonCanonical s
+                | otherwise                   = overlap_mode
 
-        ; return (OverlapFlag { isSafeOverlap = safeLanguageOn dflags
-                              , overlapMode   = final_overlap_mode }) }
-
+        ; return $ makeOverlapFlag (safeLanguageOn dflags) final_overlap_mode }
 
 tcGetInsts :: TcM [ClsInst]
 -- Gets the local class instances.
 tcGetInsts = fmap tcg_insts getGblEnv
 
-newClsInst :: Maybe OverlapMode   -- User pragma
+newClsInst :: Maybe (OverlapMode (GhcPass p))   -- User pragma
            -> Name -> [TyVar] -> ThetaType
            -> Class -> [Type] -> Maybe (WarningTxt GhcRn) -> TcM ClsInst
 newClsInst overlap_mode dfun_name tvs theta clas tys warn
@@ -986,7 +985,7 @@ tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
 tcExtendLocalInstEnv dfuns thing_inside
  = do { traceDFuns dfuns
       ; env <- getGblEnv
-      -- Force the access to the TcgEnv so it isn't retained.
+      -- F~orce the access to the TcgEnv so it isn't retained.
       -- During auditing it is much easier to observe in -hi profiles if
       -- there are a very small number of TcGblEnv. Keeping a TcGblEnv
       -- alive is quite dangerous because it contains reference to many

@@ -32,7 +32,6 @@ import GHC.Prelude
 import GHC.Data.FastString
 
 import GHC.Utils.Outputable
-import GHC.Utils.Binary
 import GHC.Utils.Panic
 
 import Data.Function (on)
@@ -112,21 +111,6 @@ instance NFData SourceText where
     rnf = \case
         SourceText s -> rnf s
         NoSourceText -> ()
-
-instance Binary SourceText where
-  put_ bh NoSourceText = putByte bh 0
-  put_ bh (SourceText s) = do
-        putByte bh 1
-        put_ bh s
-
-  get bh = do
-    h <- getByte bh
-    case h of
-      0 -> return NoSourceText
-      1 -> do
-        s <- get bh
-        return (SourceText s)
-      _ -> panic $ "Binary SourceText:" ++ show h
 
 -- | Special combinator for showing string literals.
 pprWithSourceText :: SourceText -> SDoc -> SDoc

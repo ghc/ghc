@@ -73,6 +73,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Annotations( AnnPayload, AnnTarget )
 import GHC.Types.Basic
 import GHC.Types.InlinePragma
+import GHC.Types.OverlapFlag ( OverlapFlag )
 import GHC.Types.Tickish
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings

@@ -146,8 +146,8 @@ import GHC.Data.Graph.Directed.Reachability
 import GHC.Driver.Backend
 import GHC.Driver.DynFlags
 
+import GHC.Types.ImportLevel
 import GHC.Types.SourceFile ( hscSourceString, isHsigFile, HscSource(..))
-import GHC.Types.Basic
 
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Types

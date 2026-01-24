@@ -39,11 +39,11 @@ import GHC.Driver.DynFlags
 import GHC.Unit.Types
 import GHC.Unit.Module
 
+import GHC.Types.ImportLevel
 import GHC.Types.SourceFile ( HscSource(..), hscSourceString )
 import GHC.Types.SrcLoc
 import GHC.Types.Target
 import GHC.Types.PkgQual
-import GHC.Types.Basic
 
 import GHC.Data.Maybe
 import GHC.Data.OsPath (OsPath)

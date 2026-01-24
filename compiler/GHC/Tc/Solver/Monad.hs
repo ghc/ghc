@@ -186,7 +186,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
 import GHC.Types.Id
-import GHC.Types.Basic (allImportLevels)
+import GHC.Types.ImportLevel (allImportLevels)
 import GHC.Types.ThLevelIndex (thLevelIndexFromImportLevel)
 import GHC.Types.SrcLoc
 

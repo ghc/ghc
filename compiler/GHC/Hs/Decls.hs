@@ -1061,7 +1061,7 @@ ppDerivStrategy mb =
     Nothing       -> empty
     Just (L _ ds) -> ppr ds
 
-ppOverlapPragma :: Maybe (LocatedP OverlapMode) -> SDoc
+ppOverlapPragma :: Maybe (LocatedP (OverlapMode (GhcPass p))) -> SDoc
 ppOverlapPragma mb =
   case mb of
     Nothing           -> empty
@@ -1489,7 +1489,7 @@ type instance Anno (ClsInstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (InstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DocDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DerivDecl (GhcPass p)) = SrcSpanAnnA
-type instance Anno OverlapMode = SrcSpanAnnP
+type instance Anno (OverlapMode (GhcPass p)) = SrcSpanAnnP
 type instance Anno (DerivStrategy (GhcPass p)) = EpAnnCO
 type instance Anno (DefaultDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (ForeignDecl (GhcPass p)) = SrcSpanAnnA

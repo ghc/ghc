@@ -92,8 +92,8 @@ import {-# SOURCE #-} GHC.Builtin.Types ( listTyCon )
 
 import GHC.Platform
 import GHC.Types.Name.Occurrence
-import GHC.Unit.Module
 import GHC.Unit.Home
+import GHC.Unit.Module
 import GHC.Types.FieldLabel
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
@@ -105,10 +105,11 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.OldList (intersperse)
 
+import Language.Haskell.Syntax.Basic (Boxity(Boxed, Unboxed))
+
 import Control.DeepSeq
 import Data.Data
 import qualified Data.Semigroup as S
-import GHC.Types.Basic (Boxity(Boxed, Unboxed))
 import GHC.Builtin.Uniques ( isTupleTyConUnique, isCTupleTyConUnique,
                              isSumTyConUnique, isTupleDataConLikeUnique )
 

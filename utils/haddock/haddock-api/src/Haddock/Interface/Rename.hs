@@ -40,6 +40,7 @@ import GHC.Driver.DynFlags (getDynFlags)
 import GHC.Types.Basic (TupleSort (..))
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName (Exact))
+import GHC.Types.OverlapMode (changeOverlapModeType)
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
 
 import Haddock.Backends.Hoogle (ppExportD)
@@ -860,9 +861,12 @@ renameDerivD
           { deriv_ext = noExtField
           , deriv_type = ty'
           , deriv_strategy = strat'
-          , deriv_overlap_mode = omode
+          , deriv_overlap_mode = fmap convertOverlapMode <$> omode
           }
       )
+
+convertOverlapMode :: OverlapMode GhcRn -> OverlapMode DocNameI
+convertOverlapMode = changeOverlapModeType (const NoExtField)
 
 renameDerivStrategy :: DerivStrategy GhcRn -> RnM (DerivStrategy DocNameI)
 renameDerivStrategy (StockStrategy a) = pure (StockStrategy a)
@@ -885,7 +889,7 @@ renameClsInstD
     return
       ( ClsInstDecl
           { cid_ext = noExtField
-          , cid_overlap_mode = omode
+          , cid_overlap_mode = fmap convertOverlapMode <$> omode
           , cid_poly_ty = ltype'
           , cid_binds = []
           , cid_sigs = []

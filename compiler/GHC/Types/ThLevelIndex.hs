@@ -2,7 +2,7 @@ module GHC.Types.ThLevelIndex where
 
 import GHC.Prelude
 import GHC.Utils.Outputable
-import GHC.Types.Basic ( ImportLevel(..) )
+import GHC.Types.ImportLevel ( ImportLevel(..) )
 import Data.Data
 
 -- | The integer which represents the level

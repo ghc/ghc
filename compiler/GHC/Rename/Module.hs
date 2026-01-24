@@ -52,6 +52,7 @@ import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
+import GHC.Types.OverlapMode ( changeOverlapModePass )
 import GHC.Types.Basic  ( VisArity,  TyConFlavour(..), TypeOrKind(..), NewOrData(..) )
 import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
 import GHC.Types.Hint (SigLike(..))
@@ -582,7 +583,7 @@ rnClsInstDecl :: ClsInstDecl GhcPs -> RnM (ClsInstDecl GhcRn, FreeVars)
 rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                            , cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
-                           , cid_overlap_mode = oflag
+                           , cid_overlap_mode = omode
                            , cid_datafam_insts = adts })
   = do { rec { let ctxt = ClassInstanceCtx head_ty'
              ; checkInferredVars ctxt inst_ty
@@ -656,13 +657,14 @@ rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
                    ; (adts', adt_fvs) <- rnATInstDecls rnDataFamInstDecl cls ktv_names adts
                    ; return ( (ats', adts'), at_fvs `plusFV` adt_fvs) }
 
+       ; let omode'  = fmap changeOverlapModePass <$> omode
        ; let all_fvs = meth_fvs `plusFV` more_fvs
                                 `plusFV` inst_fvs
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
        ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
-                             , cid_overlap_mode = oflag
+                             , cid_overlap_mode = omode'
                              , cid_datafam_insts = adts' },
                  all_fvs) }
              -- We return the renamed associated data type declarations so
@@ -1167,7 +1169,8 @@ rnSrcDerivDecl (DerivDecl (inst_warn_ps, ann) ty mds overlap)
            NFC_StandaloneDerivedInstanceHead
            (getLHsInstDeclHead $ dropWildCards ty')
        ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
-       ; return (DerivDecl (inst_warn_rn, ann) ty' mds' overlap, fvs) }
+       ; let overlap' = fmap changeOverlapModePass <$> overlap
+       ; return (DerivDecl (inst_warn_rn, ann) ty' mds' overlap', fvs) }
   where
     ctxt    = DerivDeclCtx
     nowc_ty = dropWildCards ty

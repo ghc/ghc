@@ -2026,3 +2026,12 @@ instance Outputable RuleMatchInfo where
 instance Outputable TopLevelFlag where
   ppr TopLevel    = text "<TopLevel>"
   ppr NotTopLevel = text "<NotTopLevel>"
+
+instance Outputable (OverlapMode p) where
+  ppr (NoOverlap    _) = empty
+  ppr (Overlappable _) = text "[overlappable]"
+  ppr (Overlapping  _) = text "[overlapping]"
+  ppr (Overlaps     _) = text "[overlap ok]"
+  ppr (Incoherent   _) = text "[incoherent]"
+  ppr (NonCanonical _) = text "[noncanonical]"
+  ppr (XOverlapMode _) = text "[user TTG extension]"

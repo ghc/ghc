@@ -72,14 +72,13 @@ import GHC.Utils.TmpFs
 import GHC.Utils.Constants
 
 import GHC.Types.Error
+import GHC.Types.ImportLevel ( convImportLevel )
 import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.Map
 import GHC.Types.PkgQual
-import GHC.Types.Basic
-
 
 import GHC.Unit
 import GHC.Unit.Env

@@ -1443,7 +1443,7 @@ inst_decl :: { LInstDecl GhcPs }
                                    (fmap reverse $7)
                             (AnnDataDefn [] [] NoEpTok tnewtype tdata (epTok $2) dcolon twhere oc cc NoEpTok)}}
 
-overlap_pragma :: { Maybe (LocatedP OverlapMode) }
+overlap_pragma :: { Maybe (LocatedP (OverlapMode GhcPs)) }
   : '{-# OVERLAPPABLE'    '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1)))
                                        (AnnPragma (glR $1) (epTok $2) noAnn noAnn noAnn noAnn noAnn) }
   | '{-# OVERLAPPING'     '#-}' {% fmap Just $ amsr (sLL $1 $> (Overlapping (getOVERLAPPING_PRAGs $1)))

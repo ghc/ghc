@@ -360,6 +360,11 @@ type family XTyFamInstD    x
 type family XXInstDecl     x
 
 -- -------------------------------------
+-- OverlapMode type families
+type family XOverlapMode  x
+type family XXOverlapMode x
+
+-- -------------------------------------
 -- DerivDecl type families
 type family XCDerivDecl      x
 type family XXDerivDecl      x

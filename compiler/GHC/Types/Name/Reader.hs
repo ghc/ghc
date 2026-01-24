@@ -118,10 +118,12 @@ import GHC.Data.Maybe
 
 import GHC.Types.Avail
 import GHC.Types.Basic
-import GHC.Types.GREInfo
 import GHC.Types.FieldLabel
+import GHC.Types.GREInfo
+import GHC.Types.ImportLevel
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Name.RdrName
 import GHC.Types.Name.Set
 import GHC.Types.PkgQual
 import GHC.Types.SrcLoc as SrcLoc
@@ -153,78 +155,10 @@ import System.IO.Unsafe ( unsafePerformIO )
 {-
 ************************************************************************
 *                                                                      *
-\subsection{The main data type}
-*                                                                      *
-************************************************************************
--}
-
--- | Reader Name
---
--- Do not use the data constructors of RdrName directly: prefer the family
--- of functions that creates them, such as 'mkRdrUnqual'
---
--- - Note: A Located RdrName will only have API Annotations if it is a
---         compound one,
---   e.g.
---
--- > `bar`
--- > ( ~ )
---
-data RdrName
-  = Unqual OccName
-        -- ^ Unqualified  name
-        --
-        -- Used for ordinary, unqualified occurrences, e.g. @x@, @y@ or @Foo@.
-        -- Create such a 'RdrName' with 'mkRdrUnqual'
-
-  | Qual ModuleName OccName
-        -- ^ Qualified name
-        --
-        -- A qualified name written by the user in
-        -- /source/ code.  The module isn't necessarily
-        -- the module where the thing is defined;
-        -- just the one from which it is imported.
-        -- Examples are @Bar.x@, @Bar.y@ or @Bar.Foo@.
-        -- Create such a 'RdrName' with 'mkRdrQual'
-
-  | Orig Module OccName
-        -- ^ Original name
-        --
-        -- An original name; the module is the /defining/ module.
-        -- This is used when GHC generates code that will be fed
-        -- into the renamer (e.g. from deriving clauses), but where
-        -- we want to say \"Use Prelude.map dammit\". One of these
-        -- can be created with 'mkOrig'
-
-  | Exact Name
-        -- ^ Exact name
-        --
-        -- We know exactly the 'Name'. This is used:
-        --
-        --  (1) When the parser parses built-in syntax like @[]@
-        --      and @(,)@, but wants a 'RdrName' from it
-        --
-        --  (2) By Template Haskell, when TH has generated a unique name
-        --
-        -- Such a 'RdrName' can be created by using 'getRdrName' on a 'Name'
-  deriving Data
-
-{-
-************************************************************************
-*                                                                      *
 \subsection{Simple functions}
 *                                                                      *
 ************************************************************************
 -}
-
-instance HasOccName RdrName where
-  occName = rdrNameOcc
-
-rdrNameOcc :: RdrName -> OccName
-rdrNameOcc (Qual _ occ) = occ
-rdrNameOcc (Unqual occ) = occ
-rdrNameOcc (Orig _ occ) = occ
-rdrNameOcc (Exact name) = nameOccName name
 
 rdrNameSpace :: RdrName -> NameSpace
 rdrNameSpace = occNameSpace . rdrNameOcc
@@ -292,11 +226,6 @@ nameRdrName name = Exact name
 -- unique is still there for debug printing, particularly
 -- of Types (which are converted to IfaceTypes before printing)
 
-nukeExact :: Name -> RdrName
-nukeExact n
-  | isExternalName n = Orig (nameModule n) (nameOccName n)
-  | otherwise        = Unqual (nameOccName n)
-
 isRdrDataCon :: RdrName -> Bool
 isRdrTyVar   :: RdrName -> Bool
 isRdrTc      :: RdrName -> Bool
@@ -333,76 +262,6 @@ isOrig_maybe _          = Nothing
 isExact :: RdrName -> Bool
 isExact (Exact _) = True
 isExact _         = False
-
-isExact_maybe :: RdrName -> Maybe Name
-isExact_maybe (Exact n) = Just n
-isExact_maybe _         = Nothing
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Instances}
-*                                                                      *
-************************************************************************
--}
-
-instance Outputable RdrName where
-    ppr (Exact name)   = ppr name
-    ppr (Unqual occ)   = ppr occ
-    ppr (Qual mod occ) = ppr mod <> dot <> ppr occ
-    ppr (Orig mod occ) = getPprStyle (\sty -> pprModulePrefix sty mod Nothing occ <> ppr occ)
-
-instance OutputableBndr RdrName where
-    pprBndr _ n
-        | isTvOcc (rdrNameOcc n) = char '@' <> ppr n
-        | otherwise              = ppr n
-
-    pprInfixOcc  rdr = pprInfixVar  (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
-    pprPrefixOcc rdr
-      | Just name <- isExact_maybe rdr = pprPrefixName name
-             -- pprPrefixName has some special cases, so
-             -- we delegate to them rather than reproduce them
-      | otherwise = pprPrefixVar (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
-
-instance Eq RdrName where
-    (Exact n1)    == (Exact n2)    = n1==n2
-        -- Convert exact to orig
-    (Exact n1)    == r2@(Orig _ _) = nukeExact n1 == r2
-    r1@(Orig _ _) == (Exact n2)    = r1 == nukeExact n2
-
-    (Orig m1 o1)  == (Orig m2 o2)  = m1==m2 && o1==o2
-    (Qual m1 o1)  == (Qual m2 o2)  = m1==m2 && o1==o2
-    (Unqual o1)   == (Unqual o2)   = o1==o2
-    _             == _             = False
-
-instance Ord RdrName where
-    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
-    a <  b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
-    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
-    a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
-
-        -- Exact < Unqual < Qual < Orig
-        -- [Note: Apr 2004] We used to use nukeExact to convert Exact to Orig
-        --      before comparing so that Prelude.map == the exact Prelude.map, but
-        --      that meant that we reported duplicates when renaming bindings
-        --      generated by Template Haskell; e.g
-        --      do { n1 <- newName "foo"; n2 <- newName "foo";
-        --           <decl involving n1,n2> }
-        --      I think we can do without this conversion
-    compare (Exact n1) (Exact n2) = n1 `compare` n2
-    compare (Exact _)  _          = LT
-
-    compare (Unqual _)   (Exact _)    = GT
-    compare (Unqual o1)  (Unqual  o2) = o1 `compare` o2
-    compare (Unqual _)   _            = LT
-
-    compare (Qual _ _)   (Exact _)    = GT
-    compare (Qual _ _)   (Unqual _)   = GT
-    compare (Qual m1 o1) (Qual m2 o2) = compare o1 o2 S.<> compare m1 m2
-    compare (Qual _ _)   (Orig _ _)   = LT
-
-    compare (Orig m1 o1) (Orig m2 o2) = compare o1 o2 S.<> compare m1 m2
-    compare (Orig _ _)   _            = GT
 
 {-
 ************************************************************************
@@ -2217,29 +2076,6 @@ pprLoc (UnhelpfulSpan {}) = empty
 opIsAt :: RdrName -> Bool
 opIsAt e = e == mkUnqual varName (fsLit "@")
 
-
---------------------------------------------------------------------------------
--- Preserving user-written qualification
-
--- | 'WithUserRdr' allows us to keep track of the original user-written
--- 'RdrName', and in particular, any user-written module qualification.
---
--- See Note [IdOcc] in Language.Haskell.Syntax.Extension.
-data WithUserRdr a = WithUserRdr RdrName a
-  deriving stock (Functor, Foldable, Traversable)
-
-instance NamedThing a => NamedThing (WithUserRdr a) where
-  getName (WithUserRdr _rdr a) = getName a
-instance Outputable (WithUserRdr Name) where
-    ppr (WithUserRdr rdr name) =
-      pprName_userQual (rdrQual_maybe rdr) name
-instance OutputableBndr (WithUserRdr Name) where
-    pprBndr _ (WithUserRdr rdr name) =
-      pprName_userQual (rdrQual_maybe rdr) name
-    pprInfixOcc :: WithUserRdr Name -> SDoc
-    pprInfixOcc  = pprInfixName
-    pprPrefixOcc = pprPrefixName
-
 unLocWithUserRdr :: GenLocated l (WithUserRdr a) -> a
 unLocWithUserRdr (L _ (WithUserRdr _ a)) = a
 
@@ -2248,10 +2084,3 @@ noUserRdr n = WithUserRdr (nameRdrName n) n
 
 userRdrName :: WithUserRdr Name -> RdrName
 userRdrName (WithUserRdr rdr _) = rdr
-
-rdrQual_maybe :: RdrName -> Maybe ModuleName
-rdrQual_maybe = \case
-  Qual q _ -> Just q
-  _        -> Nothing
-
---------------------------------------------------------------------------------

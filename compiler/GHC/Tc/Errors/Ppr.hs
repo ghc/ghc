@@ -91,6 +91,7 @@ import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.OverlapMode
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing

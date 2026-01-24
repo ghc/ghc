@@ -30,9 +30,9 @@ import GHC.Prelude
 import GHC.Data.FastString
 
 import GHC.Types.Avail
+import GHC.Types.ImportLevel
 import GHC.Types.SafeHaskell
 import GHC.Types.Name
-import GHC.Types.Basic
 
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module

@@ -922,6 +922,8 @@ Library
         GHC.Types.Name.Set
         GHC.Types.Name.Shape
         GHC.Types.Name.Ppr
+        GHC.Types.OverlapFlag
+        GHC.Types.OverlapMode
         GHC.Types.PkgQual
         GHC.Types.ProfAuto
         GHC.Types.RepType

@@ -50,8 +50,9 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Basic
 import GHC.Types.Id
+import GHC.Types.OverlapFlag
+import GHC.Types.OverlapMode
 import GHC.Generics (Generic)
 import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE

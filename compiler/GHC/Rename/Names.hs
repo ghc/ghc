@@ -60,6 +60,7 @@ import GHC.Utils.Misc as Utils
 import GHC.Utils.Panic
 
 import GHC.Types.Fixity.Env
+import GHC.Types.ImportLevel ( convImportLevel )
 import GHC.Types.SafeHaskell
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -70,7 +71,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.Hint
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Basic  ( TyConFlavour (..), convImportLevel )
+import GHC.Types.Basic  ( TyConFlavour (..) )
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.PkgQual

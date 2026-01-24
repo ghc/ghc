@@ -44,12 +44,12 @@ import GHC hiding (Failed, Succeeded)
 import GHC.Tc.Utils.Monad
 import GHC.Iface.Recomp
 
+import GHC.Types.ImportLevel (convImportLevel)
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceFile
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
-import GHC.Types.Basic (convImportLevel)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Fingerprint

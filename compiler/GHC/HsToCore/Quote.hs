@@ -68,7 +68,6 @@ import qualified GHC.Data.List.NonEmpty as NE
 
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
-import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Var
 import GHC.Types.Id
@@ -2731,7 +2730,7 @@ repNewtypeStrategy = rep2 newtypeStrategyName []
 repViaStrategy :: Core (M TH.Type) -> MetaM (Core (M TH.DerivStrategy))
 repViaStrategy (MkC t) = rep2 viaStrategyName [t]
 
-repOverlap :: Maybe OverlapMode -> MetaM (Core (Maybe TH.Overlap))
+repOverlap :: Maybe (OverlapMode GhcRn) -> MetaM (Core (Maybe TH.Overlap))
 repOverlap mb =
   case mb of
     Nothing -> nothing

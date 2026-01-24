@@ -35,11 +35,11 @@ import GHC.Hs
 import GHC.Builtin.Names
 
 import GHC.Types.Error
+import GHC.Types.ImportLevel (ImportLevel(..), convImportLevel)
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceText
 import GHC.Types.PkgQual
-import GHC.Types.Basic (ImportLevel(..), convImportLevel)
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic

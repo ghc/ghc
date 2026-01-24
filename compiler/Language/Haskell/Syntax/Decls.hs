@@ -91,7 +91,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   ( HsExpr, HsUntypedSplice )
         -- Because Expr imports Decls via HsBracket
 
-import Language.Haskell.Syntax.Basic (TopLevelFlag, RuleName)
+import Language.Haskell.Syntax.Basic (OverlapMode, RuleName, TopLevelFlag)
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Binds.InlinePragma (Activation)
 import Language.Haskell.Syntax.Extension
@@ -99,7 +99,6 @@ import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Basic (Role, LexicalFixity)
 import Language.Haskell.Syntax.Specificity (Specificity)
 
-import GHC.Types.Basic (OverlapMode)
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 
 import GHC.Data.FastString (FastString)
@@ -1261,7 +1260,7 @@ data ClsInstDecl pass
       , cid_sigs          :: [LSig pass]         -- User-supplied pragmatic info
       , cid_tyfam_insts   :: [LTyFamInstDecl pass]   -- Type family instances
       , cid_datafam_insts :: [LDataFamInstDecl pass] -- Data family instances
-      , cid_overlap_mode  :: Maybe (XRec pass OverlapMode)
+      , cid_overlap_mode  :: Maybe (XRec pass (OverlapMode pass))
       }
   | XClsInstDecl !(XXClsInstDecl pass)
 
@@ -1310,7 +1309,7 @@ data DerivDecl pass = DerivDecl
           -- See Note [Inferring the instance context] in GHC.Tc.Deriv.Infer.
 
         , deriv_strategy     :: Maybe (LDerivStrategy pass)
-        , deriv_overlap_mode :: Maybe (XRec pass OverlapMode)
+        , deriv_overlap_mode :: Maybe (XRec pass (OverlapMode pass))
         }
   | XDerivDecl !(XXDerivDecl pass)
 
