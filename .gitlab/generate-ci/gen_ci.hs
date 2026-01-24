@@ -286,6 +286,18 @@ crossConfig triple emulator configure_wrapper =
             , configureWrapper = configure_wrapper
             }
 
+-- | cross-compiled compilers (build /= host/target)
+stage3CrossConfig :: String       -- ^ target triple
+            -> CrossEmulator -- ^ emulator for testing
+            -> Maybe String -- ^ Configure wrapper
+            -> BuildConfig
+stage3CrossConfig triple emulator configure_wrapper =
+    vanilla { crossTarget = Just triple
+            , crossStage  = Just 3
+            , crossEmulator = emulator
+            , configureWrapper = configure_wrapper
+            }
+
 llvm :: BuildConfig
 llvm = vanilla { llvmBootstrap = True }
 
@@ -373,6 +385,8 @@ testEnv arch opsys bc =
     , ["zstd"  | withZstd bc ]
     , ["no_tntc"  | not (tablesNextToCode bc) ]
     , ["cross_"++triple  | Just triple <- pure $ crossTarget bc ]
+    -- TODO: Is there something better than `show` for this?
+    , ["stage_" ++ show stage | Just stage <- pure (crossStage bc), Just triple <- pure (crossTarget bc), "riscv" `isInfixOf` triple ]
     , [flavourString (mkJobFlavour bc)]
     ]
 
@@ -1293,8 +1307,11 @@ cross_jobs = [
     -- x86 -> aarch64
     validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
 
-    -- x86_64 -> riscv
+    -- x86_64 (build/host) -> riscv (target)
   , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian12Riscv) (crossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
+
+    -- x86_64 (build) -> riscv (host/target)
+  , addValidateRule RiscV (validateBuilds Amd64 (Linux Debian12Riscv) (stage3CrossConfig "riscv64-linux-gnu" (Emulator "qemu-riscv64 -L /usr/riscv64-linux-gnu") Nothing))
 
     -- x86_64 -> loongarch64
   , addValidateRule LoongArch64 (validateBuilds Amd64 (Linux Ubuntu2404LoongArch64) (crossConfig "loongarch64-linux-gnu" (Emulator "qemu-loongarch64 -L /usr/loongarch64-linux-gnu") Nothing))
