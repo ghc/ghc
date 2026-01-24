@@ -282,8 +282,11 @@ needDependencies lang context@Context {..} src depFile = do
             discover   -- Continue the discovery process
 
     -- We need to pass different flags to cc depending on whether the
-    -- file to compile is a .c or a .cpp file
-    depType = if lang == Cxx then CxxDep else CDep
+    -- file to compile is a .c or a .cpp or a .S file
+    depType = case lang of
+                Cxx -> CxxDep
+                Asm -> AsmDep
+                _   -> CDep
 
     parseFile :: FilePath -> Action [String]
     parseFile file = do

@@ -49,7 +49,7 @@ import GHC.Toolchain.Program
 -- * Compile or preprocess a source file.
 -- * Extract source dependencies by passing @-MM@ command line argument.
 data CcMode = CompileC | FindCDependencies DependencyType deriving (Eq, Generic, Show)
-data DependencyType = CDep | CxxDep deriving (Eq, Generic, Show)
+data DependencyType = CDep | CxxDep | AsmDep deriving (Eq, Generic, Show)
 
 instance Binary   CcMode
 instance Hashable CcMode
