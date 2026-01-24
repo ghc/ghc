@@ -319,8 +319,8 @@ bindistRules = do
       buildBinDistDir root cfg
 
     phony "binary-dist-dir-cross" $ buildBinDistDir root crossBindist
-    -- MP: Not working yet
-    -- phony "binary-dist-dir-stage3" $ buildBinDistDir root targetBindist
+
+    phony "binary-dist-dir-stage3" $ buildBinDistDir root targetBindist
 
     let buildBinDist compressor = do
           win_host <- isWinHost
