@@ -2800,7 +2800,7 @@ mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity cas
         --
         -- Don't worry about nested casts, because the simplifier combines them
 
-    re_cast scrut (Cast rhs co) = Cast (re_cast scrut rhs) co
+    re_cast scrut (Cast rhs co) = mkCast (re_cast scrut rhs) co
     re_cast scrut _             = scrut
 
 mkCase1 mode scrut bndr alts_ty alts = mkCase2 mode scrut bndr alts_ty alts

@@ -1,18 +1,12 @@
 Breakpoint 0 activated at T26042c.hs:10:15-22
 Stopped in Main.foo, T26042c.hs:10:15-22
-_result ::
-  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
-  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
-        Int #) = _
+_result :: IO Int = _
 9  foo :: Bool -> Int -> IO Int
 10  foo True  i = return i
                   ^^^^^^^^
 11  foo False _ = do
 Stopped in Main.main, T26042c.hs:5:3-26
-_result ::
-  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
-  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
-        () #) = _
+_result :: IO () = _
 4  main = do
 5    a <- foo False undefined
      ^^^^^^^^^^^^^^^^^^^^^^^^
