@@ -56,6 +56,7 @@ import GHC.Types.Var
 import GHC.Types.Id( idScaledType )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
+import GHC.Core.Utils( mkCast )
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
@@ -528,7 +529,7 @@ evCoercion co = EvExpr (Coercion co)
 -- | d |> co
 evCast :: EvExpr -> TcCoercion -> EvTerm
 evCast et tc | isReflCo tc = EvExpr et
-             | otherwise   = EvExpr (Cast et tc)
+             | otherwise   = EvExpr (mkCast et tc)
 
 -- Dictionary instance application
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
