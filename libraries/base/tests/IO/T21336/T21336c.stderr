@@ -1,5 +1,3 @@
 FinalizerExceptionHandler.hs:7:1: warning: [GHC-15328] [-Wdeprecations (in -Wextended-warnings)]
     Module ‘GHC.Exception’ is deprecated:
       "GHC.Exception is deprecated and will be removed in GHC 10.02. Please use Control.Exception where possible and the ghc-internal package otherwise."
-
-Exception during weak pointer finalization (ignored): <stdout>: hFlush: resource exhausted (No space left on device)

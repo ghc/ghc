@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -8,7 +9,7 @@
 -- License     :  see libraries/ghc-prim/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/393>)
 -- Portability :  non-portable (GHC Extensions)
 --
 -- Type definitions for implicit call-stacks.
@@ -21,7 +22,12 @@
 -- change rapidly without much warning.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.Stack.Types should be removed in GHC 10.02."
+#endif
+
 module GHC.Stack.Types
+  {-# DEPRECATED "GHC.Stack.Types is deprecated and will be removed in GHC 10.02. Please use GHC.Stack." #-}
     (-- *  Implicit call stacks
      CallStack(..),
      HasCallStack,

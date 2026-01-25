@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -7,7 +8,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/393>)
 -- Portability :  non-portable
 --
 -- IO-related Exception types and functions
@@ -18,7 +19,12 @@
 -- change rapidly without much warning.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.IO.Exception should be removed in GHC 10.02."
+#endif
+
 module GHC.IO.Exception (
+  {-# DEPRECATED "GHC.IO.Exception is deprecated and will be removed in GHC 10.02. Please ask for the inclusion of needed functionality into ghc-experimental via the GHC issue tracker." #-}
   BlockedIndefinitelyOnMVar(..), blockedIndefinitelyOnMVar,
   BlockedIndefinitelyOnSTM(..), blockedIndefinitelyOnSTM,
   Deadlock(..),
