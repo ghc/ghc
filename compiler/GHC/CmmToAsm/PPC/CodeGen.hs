@@ -180,7 +180,7 @@ stmtToInstrs stmt = do
               format = cmmTypeFormat ty
 
     CmmUnsafeForeignCall target result_regs args
-       -> genCCall target result_regs args
+       -> genCCall platform target result_regs args
 
     CmmBranch id          -> genBranch id
     CmmCondBranch arg true false prediction -> do
@@ -1183,24 +1183,25 @@ genCondJump id bool prediction = do
 -- @get_arg@, which moves the arguments to the correct registers/stack
 -- locations.  Apart from that, the code is easy.
 
-genCCall :: ForeignTarget      -- function to call
+genCCall :: Platform
+         -> ForeignTarget      -- function to call
          -> [CmmFormal]        -- where to put the result
          -> [CmmActual]        -- arguments (of mixed type)
          -> NatM InstrBlock
-genCCall (PrimTarget MO_AcquireFence) _ _
+genCCall _ (PrimTarget MO_AcquireFence) _ _
  = return $ unitOL LWSYNC
-genCCall (PrimTarget MO_ReleaseFence) _ _
+genCCall _ (PrimTarget MO_ReleaseFence) _ _
  = return $ unitOL LWSYNC
-genCCall (PrimTarget MO_SeqCstFence) _ _
+genCCall _ (PrimTarget MO_SeqCstFence) _ _
  = return $ unitOL HWSYNC
 
-genCCall (PrimTarget MO_Touch) _ _
+genCCall _ (PrimTarget MO_Touch) _ _
  = return $ nilOL
 
-genCCall (PrimTarget (MO_Prefetch_Data _)) _ _
+genCCall _ (PrimTarget (MO_Prefetch_Data _)) _ _
  = return $ nilOL
 
-genCCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
+genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
  = do let fmt      = intFormat width
           reg_dst  = getLocalRegReg dst
       (instr, n_code) <- case amop of
@@ -1250,7 +1251,7 @@ genCCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                           (n_reg, n_code) <- getSomeReg n
                           return  (op dst dst (RIReg n_reg), n_code)
 
-genCCall (PrimTarget (MO_AtomicRead width _)) [dst] [addr]
+genCCall _ (PrimTarget (MO_AtomicRead width _)) [dst] [addr]
  = do let fmt      = intFormat width
           reg_dst  = getLocalRegReg dst
           form     = if widthInBits width == 64 then DS else D
@@ -1277,12 +1278,12 @@ genCCall (PrimTarget (MO_AtomicRead width _)) [dst] [addr]
 -- This is also what gcc does.
 
 
-genCCall (PrimTarget (MO_AtomicWrite width _)) [] [addr, val] = do
+genCCall _ (PrimTarget (MO_AtomicWrite width _)) [] [addr, val] = do
     code <- assignMem_IntCode (intFormat width) addr val
     return $ unitOL HWSYNC `appOL` code
 
-genCCall (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new]
-  | width == W32 || width == W64
+genCCall platform (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new]
+  | width == W32 || (width == W64 && not (target32Bit platform))
   = do
       (old_reg, old_code) <- getSomeReg old
       (new_reg, new_code) <- getSomeReg new
@@ -1311,9 +1312,8 @@ genCCall (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new]
     format = intFormat width
 
 
-genCCall (PrimTarget (MO_Clz width)) [dst] [src]
- = do platform <- getPlatform
-      let reg_dst = getLocalRegReg dst
+genCCall platform (PrimTarget (MO_Clz width)) [dst] [src]
+ = do let reg_dst = getLocalRegReg dst
       if target32Bit platform && width == W64
         then do
           RegCode64 code vr_hi vr_lo <- iselExpr64 src
@@ -1361,9 +1361,8 @@ genCCall (PrimTarget (MO_Clz width)) [dst] [src]
           let cntlz = unitOL (CNTLZ format reg_dst reg)
           return $ s_code `appOL` pre `appOL` cntlz `appOL` post
 
-genCCall (PrimTarget (MO_Ctz width)) [dst] [src]
- = do platform <- getPlatform
-      let reg_dst = getLocalRegReg dst
+genCCall platform (PrimTarget (MO_Ctz width)) [dst] [src]
+ = do let reg_dst = getLocalRegReg dst
       if target32Bit platform && width == W64
         then do
           let format = II32
@@ -1425,9 +1424,8 @@ genCCall (PrimTarget (MO_Ctz width)) [dst] [src]
                           , SUBFC dst r' (RIImm (ImmInt (format_bits)))
                           ]
 
-genCCall target dest_regs argsAndHints
- = do platform <- getPlatform
-      case target of
+genCCall platform target dest_regs argsAndHints
+ = do case target of
         PrimTarget (MO_S_QuotRem  width) -> divOp1 True  width
                                                    dest_regs argsAndHints
         PrimTarget (MO_U_QuotRem  width) -> divOp1 False width
