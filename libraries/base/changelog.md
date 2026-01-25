@@ -28,6 +28,23 @@
   * Hide implementation details when throwing exceptions in throw and throwSTM. ([CLC proposal #387](https://github.com/haskell/core-libraries-committee/issues/387))
   * Change `hIsReadable` and `hIsWritable` such that they always throw a respective exception when encountering a closed or semi-closed handle, not just in the case of a file handle. ([CLC proposal #371](github.com/haskell/core-libraries-committee/issues/371))
   * Annotate `onException` continuation with `WhileHandling`. ([CLC Proposal #397](https://github.com/haskell/core-libraries-committee/issues/397))
+  * Declare the following modules deprecated, and announce that they will be removed in GHC 10.2:
+      * `GHC.Arr`
+      * `GHC.ArrayArray`
+      * `GHC.Conc.IO`
+      * `GHC.Encoding.UTF8`
+      * `GHC.Exception`
+      * `GHC.Exception.Type`
+      * `GHC.Fingerprint.Type`
+      * `GHC.InfoProv`
+      * `GHC.IO.Buffer`
+      * `GHC.IO.Device`
+      * `GHC.IO.Encoding`
+      * `GHC.IO.Exception`
+      * `GHC.IO.Handle.Text`
+      * `GHC.Stack.Types`
+      * `GHC.TopHandler`
+    ([CLC proposal #393](github.com/haskell/core-libraries-committee/issues/393))
 
 ## 4.22.0.0 *TBA*
   * Shipped with GHC 9.14.1

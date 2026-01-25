@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 
 -- |
@@ -7,7 +8,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/393>)
 -- Portability :  non-portable (GHC extensions)
 --
 -- /The API of this module is unstable and not meant to be consumed by the general public./
@@ -24,7 +25,12 @@
 -- overview.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.Encoding.UTF8 should be removed in GHC 10.02."
+#endif
+
 module GHC.Encoding.UTF8
+  {-# DEPRECATED "GHC.Encoding.UTF8 is deprecated and will be removed in GHC 10.02. Please use the text package." #-}
     (-- *  Decoding single characters
      utf8DecodeCharAddr#,
      utf8DecodeCharPtr,

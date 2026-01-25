@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# OPTIONS_HADDOCK not-home #-}
@@ -8,7 +9,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/393>)
 -- Portability :  non-portable (GHC extensions)
 --
 -- Exceptions and exception-handling functions.
@@ -19,7 +20,12 @@
 -- change rapidly without much warning.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.Exception should be removed in GHC 10.02."
+#endif
+
 module GHC.Exception
+  {-# DEPRECATED "GHC.Exception is deprecated and will be removed in GHC 10.02. Please use Control.Exception where possible and otherwise ask for the inclusion of needed functionality into ghc-experimental via the GHC issue tracker." #-}
     ( -- * 'Exception' class
       Exception(..)
 
