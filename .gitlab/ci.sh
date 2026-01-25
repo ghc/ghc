@@ -835,6 +835,7 @@ function cabal_test() {
   run "$HC" \
     -hidir tmp -odir tmp -fforce-recomp \
     -dumpdir "$OUT/dumps" -ddump-timings \
+    -j"$cores" \
     +RTS --machine-readable "-t$OUT/rts.log" -RTS \
     -ilibraries/Cabal/Cabal/src -XNoPolyKinds Distribution.Simple \
     "$@" 2>&1 | tee $OUT/log
