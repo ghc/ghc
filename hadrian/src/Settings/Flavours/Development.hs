@@ -1,21 +1,15 @@
 module Settings.Flavours.Development (developmentFlavour) where
 
-import qualified Data.Set as Set
-
 import Expression
 import Flavour
-import Oracles.Flag
 import Packages
 import {-# SOURCE #-} Settings.Default
 
 -- Please update doc/flavours.md when changing this file.
 developmentFlavour :: Stage -> Flavour
-developmentFlavour ghcStage = defaultFlavour
+developmentFlavour ghcStage = disableDynamicLibs $ disableProfiledLibs $ defaultFlavour
     { name = "devel" ++ stageString ghcStage
     , extraArgs = developmentArgs ghcStage <> defaultHaddockExtraArgs
-    , libraryWays = pure $ Set.fromList [vanilla]
-    , rtsWays = Set.fromList <$> mconcat [pure [vanilla, debug], targetSupportsThreadedRts ? pure [threaded, threadedDebug]]
-    , dynamicGhcPrograms = return False
     , ghcDebugAssertions = (== ghcStage) }
     where
       stageString Stage2 = "2"
