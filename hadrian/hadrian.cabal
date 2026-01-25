@@ -119,7 +119,6 @@ executable hadrian
                        , Settings.Builders.Win32Tarballs
                        , Settings.Builders.Xelatex
                        , Settings.Default
-                       , Settings.Flavours.Benchmark
                        , Settings.Flavours.Development
                        , Settings.Flavours.GhcInGhci
                        , Settings.Flavours.Performance

@@ -119,18 +119,6 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O2</td>
   </tr>
   <tr>
-    <th>bench</td>
-    <td></td>
-    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
-    <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
-    <td></td>
-    <td>-O2</td>
-    <td>-O2</td>
-    <td>-O0</td>
-    <td>-O2</td>
-    <td>-O2</td>
-  </tr>
-  <tr>
     <th>devel1</td>
     <td></td>
     <td>-O<br>+RTS<br>-O64M<br>-RTS</td>
@@ -404,7 +392,7 @@ information. The following table lists ways that are built in different flavours
     <td>debug<br>threaded<br>threadedDebug<br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic</td>
 </tr>
 <tr>
-    <th>quickest<br>bench</th>
+    <th>quickest</th>
     <td>vanilla</td>
     <td>vanilla</td>
     <td>vanilla<br>threaded</td>
