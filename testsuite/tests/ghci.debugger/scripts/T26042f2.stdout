@@ -1,6 +1,6 @@
 Breakpoint 0 activated at T26042f.hs:(20,7)-(21,14)
 Stopped in T8.t, T26042f.hs:(20,7)-(21,14)
-_result :: Int = _
+_result :: Identity Int = _
 x :: Int = 450
 19  t :: Int -> Identity Int
         vv
@@ -18,12 +18,12 @@ _result :: Identity Int = _
       ^^^^^^^^^^^^
 15    n <- pure (a+a)
 Stopped in T8.f, T26042f.hs:8:3-14
-_result :: Identity Int = _
+_result :: Int = _
 x :: Int = 15
 7  f x = do
 8    b <- g (x*x)
      ^^^^^^^^^^^^
 9    y <- pure (b+b)
 x :: Int = 15
-_result :: Identity Int = _
+_result :: Int = _
 7248

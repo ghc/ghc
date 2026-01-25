@@ -22,30 +22,18 @@ _result ::
   -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
         Int #) = _
 Stopped in Main.foo, T26042b.hs:14:3-18
-_result ::
-  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
-  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
-        Int #) = _
+_result :: IO Int = _
 13        y = 4
 14    n <- bar (x + y)
       ^^^^^^^^^^^^^^^^
 15    return n
-_result ::
-  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
-  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
-        Int #) = _
+_result :: IO Int = _
 Stopped in Main.main, T26042b.hs:5:3-26
-_result ::
-  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
-  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
-        () #) = _
+_result :: IO () = _
 4  main = do
 5    a <- foo False undefined
      ^^^^^^^^^^^^^^^^^^^^^^^^
 6    print a
-_result ::
-  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
-  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
-        () #) = _
+_result :: IO () = _
 14
 14
