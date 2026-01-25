@@ -6,7 +6,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/393>)
 -- Portability :  non-portable (GHC Extensions)
 --
 -- Access to GHC's info-table provenance metadata.
@@ -19,7 +19,12 @@
 -- @since 4.18.0.0
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.InfoProv should be removed in GHC 10.02."
+#endif
+
 module GHC.InfoProv
+  {-# DEPRECATED ["GHC.InfoProv is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."] #-}
     ( InfoProv(..)
     , ipLoc
     , ipeProv

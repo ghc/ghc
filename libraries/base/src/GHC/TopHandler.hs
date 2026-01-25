@@ -8,7 +8,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/393>)
 -- Portability :  non-portable (GHC Extensions)
 --
 -- Support for catching exceptions raised during top-level computations
@@ -20,7 +20,12 @@
 -- change rapidly without much warning.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.TopHandler should be removed in GHC 10.02."
+#endif
+
 module GHC.TopHandler
+  {-# DEPRECATED ["GHC.TopHandler is deprecated and will be removed in GHC 10.02. Please use GHC.Conc where possible and the ghc-internal package otherwise."] #-}
     (runMainIO,
      runIO,
      runIOFastExit,

@@ -7,7 +7,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/393>)
 -- Portability :  non-portable (GHC Extensions)
 --
 -- Buffers used in the IO system
@@ -18,7 +18,12 @@
 -- change rapidly without much warning.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.IO.Buffer should be removed in GHC 10.02."
+#endif
+
 module GHC.IO.Buffer
+  {-# DEPRECATED ["GHC.IO.Buffer is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."] #-}
     (-- *  Buffers of any element
      Buffer(..),
      BufferState(..),

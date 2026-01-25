@@ -7,7 +7,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/393>)
 -- Portability :  non-portable (GHC extensions)
 --
 -- Fingerprints for recompilation checking and ABI versioning, and
@@ -18,7 +18,12 @@
 -- bound, e.g., @base < 4.X@ rather than @base < 5@, because the interface can
 -- change rapidly without much warning.
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.Fingerprint.Type should be removed in GHC 10.02."
+#endif
+
 module GHC.Fingerprint.Type
+  {-# DEPRECATED ["GHC.Fingerprint.Type is deprecated and will be removed in GHC 10.02. Please use GHC.Fingerprint."] #-}
     (Fingerprint(..)
      ) where
 

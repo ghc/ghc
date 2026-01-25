@@ -7,7 +7,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/393>)
 -- Portability :  non-portable (GHC extensions)
 --
 -- GHC\'s array implementation.
@@ -18,7 +18,12 @@
 -- change rapidly without much warning.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.Arr should be removed in GHC 10.02."
+#endif
+
 module GHC.Arr
+  {-# DEPRECATED ["GHC.Arr is deprecated and will be removed in GHC 10.02. Please use the array package."] #-}
     (Ix(..),
      Array(..),
      STArray(..),

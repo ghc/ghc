@@ -7,7 +7,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/393>)
 -- Portability :  non-portable
 --
 -- Text codecs for I/O
@@ -18,7 +18,12 @@
 -- change rapidly without much warning.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.IO.Encoding should be removed in GHC 10.02."
+#endif
+
 module GHC.IO.Encoding
+  {-# DEPRECATED ["GHC.IO.Encoding is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."] #-}
     (BufferCodec(..),
      TextEncoding(..),
      TextEncoder,

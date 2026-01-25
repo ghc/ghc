@@ -8,7 +8,7 @@
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  ghc-devs@haskell.org
--- Stability   :  internal
+-- Stability   :  deprecated (<https://github.com/haskell/core-libraries-committee/issues/393>)
 -- Portability :  non-portable (GHC Extensions)
 --
 -- Legacy interface for arrays of arrays.
@@ -18,7 +18,12 @@
 -- Use GHC.Exts instead of importing this module directly.
 --
 
+#if __GLASGOW_HASKELL__ >= 1002
+#error "GHC.ArrayArray should be removed in GHC 10.02."
+#endif
+
 module GHC.ArrayArray
+  {-# DEPRECATED ["GHC.ArrayArray is deprecated and will be removed in GHC 10.02. Please use GHC.Exts."] #-}
     (ArrayArray#(..),
      MutableArrayArray#(..),
      newArrayArray#,
