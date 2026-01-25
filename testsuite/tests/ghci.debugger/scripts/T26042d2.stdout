@@ -1,10 +1,7 @@
 Breakpoint 0 activated at T26042d2.hs:11:3-21
 hello1
 Stopped in Main.f, T26042d2.hs:11:3-21
-_result ::
-  GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld
-  -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld,
-        () #) = _
+_result :: IO () = _
 10  f = do
 11    putStrLn "hello2.1"
       ^^^^^^^^^^^^^^^^^^^

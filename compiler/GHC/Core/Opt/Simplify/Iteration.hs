@@ -1713,6 +1713,7 @@ simplCast env body co0 cont0
                                    , sc_hole_ty = coercionLKind co }) }
                                         -- NB!  As the cast goes past, the
                                         -- type of the hole changes (#16312)
+
         -- (f |> co) e   ===>   (f (e |> co1)) |> co2
         -- where   co :: (s1->s2) ~ (t1->t2)
         --         co1 :: t1 ~ s1

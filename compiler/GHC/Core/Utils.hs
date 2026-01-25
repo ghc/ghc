@@ -252,7 +252,7 @@ applyTypeToArgs op_ty args
 
 mkCastMCo :: CoreExpr -> MCoercionR -> CoreExpr
 mkCastMCo e MRefl    = e
-mkCastMCo e (MCo co) = Cast e co
+mkCastMCo e (MCo co) = mkCast e co
   -- We are careful to use (MCo co) only when co is not reflexive
   -- Hence (Cast e co) rather than (mkCast e co)
 
@@ -305,40 +305,41 @@ mkCast expr co
 -- | Wraps the given expression in the source annotation, dropping the
 -- annotation if possible.
 mkTick :: CoreTickish -> CoreExpr -> CoreExpr
-mkTick t orig_expr = mkTick' id id orig_expr
+mkTick t orig_expr = mkTick' id orig_expr
  where
   -- Some ticks (cost-centres) can be split in two, with the
   -- non-counting part having laxer placement properties.
   canSplit = tickishCanSplit t && tickishPlace (mkNoCount t) /= tickishPlace t
+
   -- mkTick' handles floating of ticks *into* the expression.
-  -- In this function, `top` is applied after adding the tick, and `rest` before.
-  -- This will result in applications that look like (top $ Tick t $ rest expr).
-  -- If we want to push the tick deeper, we pre-compose `top` with a function
-  -- adding the tick.
-  mkTick' :: (CoreExpr -> CoreExpr) -- apply after adding tick (float through)
-          -> (CoreExpr -> CoreExpr) -- apply before adding tick (float with)
-          -> CoreExpr               -- current expression
+  mkTick' :: (CoreExpr -> CoreExpr) -- Apply before adding tick (float with)
+                                    -- Always a composition of (Tick t) wrappers
+          -> CoreExpr               -- Current expression
           -> CoreExpr
-  mkTick' top rest expr = case expr of
+          -- So in the call (mkTick' rest e), the expression
+          --   (rest e)
+          -- has the same type as e
+          -- Returns an expression equivalent to (Tick t (rest e))
+  mkTick' rest expr = case expr of
     -- Float ticks into unsafe coerce the same way we would do with a cast.
     Case scrut bndr ty alts@[Alt ac abs _rhs]
       | Just rhs <- isUnsafeEqualityCase scrut bndr alts
-      -> top $ mkTick' (\e -> Case scrut bndr ty [Alt ac abs e]) rest rhs
+      -> Case scrut bndr ty [Alt ac abs (mkTick' rest rhs)]
 
     -- Cost centre ticks should never be reordered relative to each
     -- other. Therefore we can stop whenever two collide.
     Tick t2 e
-      | ProfNote{} <- t2, ProfNote{} <- t -> top $ Tick t $ rest expr
+      | ProfNote{} <- t2, ProfNote{} <- t -> Tick t $ rest expr
 
     -- Otherwise we assume that ticks of different placements float
     -- through each other.
-      | tickishPlace t2 /= tickishPlace t -> mkTick' (top . Tick t2) rest e
+      | tickishPlace t2 /= tickishPlace t -> Tick t2 $ mkTick' rest e
 
     -- For annotations this is where we make sure to not introduce
     -- redundant ticks.
-      | tickishContains t t2              -> mkTick' top rest e
-      | tickishContains t2 t              -> orig_expr
-      | otherwise                         -> mkTick' top (rest . Tick t2) e
+      | tickishContains t t2              -> mkTick' rest e  -- Drop t2
+      | tickishContains t2 t              -> rest e          -- Drop t
+      | otherwise                         -> mkTick' (rest . Tick t2) e
 
     -- Ticks don't care about types, so we just float all ticks
     -- through them. Note that it's not enough to check for these
@@ -346,14 +347,14 @@ mkTick t orig_expr = mkTick' id id orig_expr
     -- expressions below ticks, such constructs can be the result of
     -- unfoldings. We therefore make an effort to put everything into
     -- the right place no matter what we start with.
-    Cast e co   -> mkTick' (top . flip Cast co) rest e
-    Coercion co -> Coercion co
+    Cast e co   -> mkCast (mkTick' rest e) co
+    Coercion co -> Tick t $ rest (Coercion co)
 
     Lam x e
       -- Always float through type lambdas. Even for non-type lambdas,
       -- floating is allowed for all but the most strict placement rule.
       | not (isRuntimeVar x) || tickishPlace t /= PlaceRuntime
-      -> mkTick' (top . Lam x) rest e
+      -> Lam x $ mkTick' rest e
 
       -- If it is both counting and scoped, we split the tick into its
       -- two components, often allowing us to keep the counting tick on
@@ -362,25 +363,25 @@ mkTick t orig_expr = mkTick' id id orig_expr
       -- floated, and the lambda may then be in a position to be
       -- beta-reduced.
       | canSplit
-      -> top $ Tick (mkNoScope t) $ rest $ Lam x $ mkTick (mkNoCount t) e
+      -> Tick (mkNoScope t) $ rest $ Lam x $ mkTick (mkNoCount t) e
 
     App f arg
       -- Always float through type applications.
       | not (isRuntimeArg arg)
-      -> mkTick' (top . flip App arg) rest f
+      -> App (mkTick' rest f) arg
 
       -- We can also float through constructor applications, placement
       -- permitting. Again we can split.
       | isSaturatedConApp expr && (tickishPlace t==PlaceCostCentre || canSplit)
       -> if tickishPlace t == PlaceCostCentre
-         then top $ rest $ tickHNFArgs t expr
-         else top $ Tick (mkNoScope t) $ rest $ tickHNFArgs (mkNoCount t) expr
+         then rest $ tickHNFArgs t expr
+         else Tick (mkNoScope t) $ rest $ tickHNFArgs (mkNoCount t) expr
 
     Var x
       | notFunction && tickishPlace t == PlaceCostCentre
-      -> orig_expr
+      -> rest expr  -- Drop t
       | notFunction && canSplit
-      -> top $ Tick (mkNoScope t) $ rest expr
+      -> Tick (mkNoScope t) $ rest expr
       where
         -- SCCs can be eliminated on variables provided the variable
         -- is not a function.  In these cases the SCC makes no difference:
@@ -392,10 +393,10 @@ mkTick t orig_expr = mkTick' id id orig_expr
 
     Lit{}
       | tickishPlace t == PlaceCostCentre
-      -> orig_expr
+      -> rest expr   -- Drop t
 
     -- Catch-all: Annotate where we stand
-    _any -> top $ Tick t $ rest expr
+    _any -> Tick t $ rest expr
 
 mkTicks :: [CoreTickish] -> CoreExpr -> CoreExpr
 mkTicks ticks expr = foldr mkTick expr ticks
