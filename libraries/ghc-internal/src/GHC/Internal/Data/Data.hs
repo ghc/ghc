@@ -144,6 +144,8 @@ import qualified GHC.Internal.Generics as Generics (Fixity(..))
 import GHC.Internal.Generics hiding (Fixity(..))
                              -- So we can give Data instance for U1, V1, ...
 import qualified GHC.Internal.TH.Syntax as TH
+import GHC.Internal.Functor.ZipList (ZipList(..))
+import GHC.Internal.Exts (SpecConstrAnnotation(..))
 
 ------------------------------------------------------------------------------
 --
@@ -1414,3 +1416,9 @@ deriving instance Data TH.TySynEqn
 deriving instance Data TH.Type
 deriving instance Data TH.TypeFamilyHead
 deriving instance Data flag => Data (TH.TyVarBndr flag)
+
+-- | @since base-4.14.0.0
+deriving instance Data a => Data (ZipList a)
+
+-- | @since base-4.3.0.0
+deriving instance Data SpecConstrAnnotation

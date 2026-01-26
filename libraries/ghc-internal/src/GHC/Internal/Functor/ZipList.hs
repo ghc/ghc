@@ -3,7 +3,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Internal.Functor.ZipList (ZipList(..)) where
 
@@ -14,7 +13,6 @@ import GHC.Internal.Read (Read)
 import GHC.Internal.Show (Show)
 import GHC.Internal.Data.Foldable (Foldable)
 import GHC.Internal.Data.Traversable (Traversable(..))
-import GHC.Internal.Data.Data (Data)
 
 -- | Lists, but with an 'Applicative' functor based on zipping.
 --
@@ -76,7 +74,3 @@ instance Alternative ZipList where
        go (x:xs) (_:ys) = x : go xs ys
        go    []     ys  = ys
        go    xs      _  = xs
-
--- | @since base-4.14.0.0
-deriving instance Data a => Data (ZipList a)
-

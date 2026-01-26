@@ -5,7 +5,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
 
 -----------------------------------------------------------------------------
@@ -317,7 +316,6 @@ import GHC.Internal.IsList (IsList(..)) -- for re-export
 import qualified GHC.Internal.Data.Coerce
 import GHC.Internal.Data.String
 import GHC.Internal.Data.OldList
-import GHC.Internal.Data.Data
 import GHC.Internal.Data.Ord
 import qualified GHC.Internal.Debug.Trace
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# ) -- just for re-export
@@ -384,8 +382,7 @@ traceEvent = GHC.Internal.Debug.Trace.traceEventIO
 -- entire ghc package at runtime
 
 data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
-                deriving ( Data -- ^ @since base-4.3.0.0
-                         , Eq   -- ^ @since base-4.3.0.0
+                deriving ( Eq   -- ^ @since base-4.3.0.0
                          )
 
 

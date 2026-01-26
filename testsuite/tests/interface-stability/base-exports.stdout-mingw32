@@ -11861,7 +11861,6 @@ instance GHC.Internal.Control.Monad.Zip.MonadZip Data.Complex.Complex -- Defined
 instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Control.Monad.Zip.MonadZip f, GHC.Internal.Control.Monad.Zip.MonadZip g) => GHC.Internal.Control.Monad.Zip.MonadZip (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
 instance forall (a :: * -> * -> *) b c. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable b, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable c, GHC.Internal.Data.Data.Data (a b c)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedArrow a b c) -- Defined in ‘Control.Applicative’
 instance forall (m :: * -> *) a. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable m, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Data.Data.Data (m a)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedMonad m a) -- Defined in ‘Control.Applicative’
-instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Functor.ZipList.ZipList a) -- Defined in ‘GHC.Internal.Functor.ZipList’
 instance GHC.Internal.Data.Data.Data Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
 instance forall s. ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable s => GHC.Internal.Data.Data.Data (Data.Array.Byte.MutableByteArray s) -- Defined in ‘Data.Array.Byte’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
@@ -11964,6 +11963,7 @@ instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.SourceStrictness -- 
 instance GHC.Internal.Data.Data.Data GHC.Internal.Generics.SourceStrictness -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Generics.SourceUnpackedness -- Defined in ‘GHC.Internal.Data.Data’
+instance GHC.Internal.Data.Data.Data GHC.Internal.Exts.SpecConstrAnnotation -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Semigroup.Internal.Sum a) -- Defined in ‘GHC.Internal.Data.Data’
@@ -11989,6 +11989,7 @@ instance GHC.Internal.Data.Data.Data GHC.Internal.Word.Word32 -- Defined in ‘G
 instance GHC.Internal.Data.Data.Data GHC.Internal.Word.Word64 -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Word.Word8 -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Foreign.Ptr.WordPtr -- Defined in ‘GHC.Internal.Data.Data’
+instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Functor.ZipList.ZipList a) -- Defined in ‘GHC.Internal.Data.Data’
 instance forall k (a :: k). (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable k, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a) => GHC.Internal.Data.Data.Data (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 (f :: k1 -> *) k2 (g :: k2 -> k1) (a :: k2). (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable g, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable k1, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable k2, GHC.Internal.Data.Data.Data (f (g a))) => GHC.Internal.Data.Data.Data (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable g, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data (g a)) => GHC.Internal.Data.Data.Data (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
@@ -11999,7 +12000,6 @@ instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data 
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
 instance forall m. GHC.Internal.Data.Data.Data m => GHC.Internal.Data.Data.Data (Data.Semigroup.WrappedMonoid m) -- Defined in ‘Data.Semigroup’
-instance GHC.Internal.Data.Data.Data GHC.Internal.Exts.SpecConstrAnnotation -- Defined in ‘GHC.Internal.Exts’
 instance forall m. GHC.Internal.Data.Foldable.Foldable (GHC.Internal.Data.Functor.Const.Const m) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Functor.ZipList.ZipList -- Defined in ‘GHC.Internal.Functor.ZipList’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Data.Foldable.Foldable f, GHC.Internal.Data.Foldable.Foldable g) => GHC.Internal.Data.Foldable.Foldable (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Data.Foldable’
