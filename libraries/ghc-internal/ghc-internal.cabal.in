@@ -153,7 +153,6 @@ Library
         GHC.Internal.Data.Functor.Identity
         GHC.Internal.Data.Functor.Utils
         GHC.Internal.Data.IORef
-        GHC.Internal.Data.Ix
         GHC.Internal.Data.List
         GHC.Internal.Data.List.NonEmpty
         GHC.Internal.Data.Maybe
