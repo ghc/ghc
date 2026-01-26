@@ -50,3 +50,4 @@ module Control.Arrow
      ) where
 
 import GHC.Internal.Control.Arrow
+import GHC.Internal.Control.Monad.Fix (ArrowLoop(..))

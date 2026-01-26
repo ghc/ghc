@@ -33,7 +33,6 @@ module GHC.Internal.Data.Functor.Identity (
     Identity(..),
   ) where
 
-import GHC.Internal.Control.Monad.Fix
 import GHC.Internal.Data.Bits (Bits, FiniteBits)
 import GHC.Internal.Data.Coerce
 import GHC.Internal.Data.Foldable
@@ -143,7 +142,3 @@ instance Applicative Identity where
 -- | @since base-4.8.0.0
 instance Monad Identity where
     m >>= k  = k (runIdentity m)
-
--- | @since base-4.8.0.0
-instance MonadFix Identity where
-    mfix f   = Identity (fix (runIdentity . f))

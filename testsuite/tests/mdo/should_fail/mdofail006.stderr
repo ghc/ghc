@@ -5,5 +5,5 @@ cyclic evaluation in fixIO
 While handling thread blocked indefinitely in an MVar operation
 
 HasCallStack backtrace:
-  throwIO, called at libraries/ghc-internal/src/GHC/Internal/System/IO.hs:641:37 in ghc-internal:GHC.Internal.System.IO
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/Control/Monad/Fix.hs:167:37 in ghc-internal:GHC.Internal.Control.Monad.Fix
 

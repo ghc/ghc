@@ -35,7 +35,7 @@ import GHC.Internal.Real (fromIntegral)
 import qualified GHC.Internal.Event.Array as A
 import GHC.Internal.IO.Handle.Internals (debugIO)
 import GHC.Internal.Conc.Sync (ThreadId(..))
-import GHC.Internal.RTS.Flags
+import GHC.Internal.RTS.Flags.Test
 
 ------------------------------------------------------------------------
 -- Thread spool manager
@@ -60,7 +60,7 @@ startThreadPool job = do
   let thrMinThreads = 2
   let thrCurThreads = 0
   let thrCallBack   = job
-  thrMaxThreads     <- (fromIntegral . numIoWorkerThreads) `fmap` getMiscFlags
+  thrMaxThreads     <- getNumIoWorkerThreads
   thrActiveThreads  <- newMVar 0
   thrMonitor        <- newEmptyMVar
   thrThreadIds      <- undefined -- A.new thrMaxThreads

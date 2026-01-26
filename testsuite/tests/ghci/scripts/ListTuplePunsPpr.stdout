@@ -41,10 +41,10 @@ data Tuple2 a b = (,) a b
   	-- Defined in ‘GHC.Internal.Tuple’
 instance Traversable (Tuple2 a)
   -- Defined in ‘GHC.Internal.Data.Traversable’
-instance Foldable (Tuple2 a)
-  -- Defined in ‘GHC.Internal.Data.Foldable’
 instance Monoid a => Applicative (Tuple2 a)
   -- Defined in ‘GHC.Internal.Base’
+instance Foldable (Tuple2 a)
+  -- Defined in ‘GHC.Internal.Data.Foldable’
 instance Functor (Tuple2 a) -- Defined in ‘GHC.Internal.Base’
 instance Monoid a => Monad (Tuple2 a)
   -- Defined in ‘GHC.Internal.Base’

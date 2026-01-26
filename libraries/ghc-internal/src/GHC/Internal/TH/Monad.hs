@@ -28,13 +28,8 @@ import Data.Data hiding (Fixity(..))
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Fix (MonadFix (..))
-import Control.Exception (BlockedIndefinitelyOnMVar (..), catch, throwIO)
-import Control.Exception.Base (FixIOException (..))
-import Control.Concurrent.MVar (newEmptyMVar, readMVar, putMVar)
 import System.IO        ( hPutStrLn, stderr )
 import qualified Data.Kind as Kind (Type)
-import GHC.IO.Unsafe    ( unsafeDupableInterleaveIO )
 import GHC.Types        (TYPE, RuntimeRep(..))
 #else
 import GHC.Internal.Base hiding (NonEmpty(..),Type, Module, sequence)
@@ -46,12 +41,8 @@ import GHC.Internal.Data.Foldable
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Control.Monad.IO.Class
 import GHC.Internal.Control.Monad.Fail
-import GHC.Internal.Control.Monad.Fix
-import GHC.Internal.Control.Exception
 import GHC.Internal.Num
 import GHC.Internal.IO.Unsafe
-import GHC.Internal.MVar
-import GHC.Internal.IO.Exception
 import qualified GHC.Internal.Types as Kind (Type)
 #endif
 import GHC.Internal.ForeignSrcLang
@@ -257,22 +248,6 @@ instance Semigroup a => Semigroup (Q a) where
 -- | @since 2.17.0.0
 instance Monoid a => Monoid (Q a) where
   mempty = pure mempty
-
--- | If the function passed to 'mfix' inspects its argument,
--- the resulting action will throw a 'FixIOException'.
---
--- @since 2.17.0.0
-instance MonadFix Q where
-  -- We use the same blackholing approach as in fixIO.
-  -- See Note [Blackholing in fixIO] in System.IO in base.
-  mfix k = do
-    m <- runIO newEmptyMVar
-    ans <- runIO (unsafeDupableInterleaveIO
-             (readMVar m `catch` \BlockedIndefinitelyOnMVar ->
-                                    throwIO FixIOException))
-    result <- k ans
-    runIO (putMVar m result)
-    return result
 
 
 -----------------------------------------------------

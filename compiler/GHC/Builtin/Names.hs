@@ -1489,7 +1489,9 @@ composeAName       = varQual gHC_INTERNAL_DESUGAR (fsLit ">>>") composeAIdKey
 firstAName         = varQual gHC_INTERNAL_ARROW (fsLit "first")     firstAIdKey
 appAName           = varQual gHC_INTERNAL_ARROW (fsLit "app")       appAIdKey
 choiceAName        = varQual gHC_INTERNAL_ARROW (fsLit "|||")       choiceAIdKey
-loopAName          = varQual gHC_INTERNAL_ARROW (fsLit "loop")      loopAIdKey
+-- This is defined in Monad.Fix to flatten the module hierarchy of `ghc-internal`
+-- It is the only thing from Control.Arrow that requires MonadFix
+loopAName          = varQual gHC_INTERNAL_MONAD_FIX (fsLit "loop")      loopAIdKey
 
 -- Monad comprehensions
 guardMName, mzipName :: Name
