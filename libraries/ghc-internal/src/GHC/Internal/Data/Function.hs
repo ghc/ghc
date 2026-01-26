@@ -30,8 +30,7 @@ module GHC.Internal.Data.Function
   , applyWhen
   ) where
 
-import GHC.Internal.Base ( TYPE, ($), (.), id, const, flip )
-import GHC.Internal.Data.Bool ( Bool(..) )
+import GHC.Internal.Base ( TYPE, ($), (.), id, const, flip, Bool(..) )
 
 infixl 0 `on`
 infixl 1 &
