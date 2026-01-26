@@ -40,6 +40,7 @@ import GHC.Internal.Generics
 import GHC.Internal.List ( head, drop )
 import GHC.Internal.Control.Monad.ST.Imp
 import GHC.Internal.System.IO
+import GHC.Internal.Data.Functor.Identity (Identity(..))
 
 -- | Monads having fixed points with a \'knot-tying\' semantics.
 -- Instances of 'MonadFix' should satisfy the following laws:
@@ -171,3 +172,8 @@ instance (MonadFix f, MonadFix g) => MonadFix (f :*: g) where
 -- | @since base-4.12.0.0
 instance MonadFix Down where
     mfix f = Down (fix (getDown . f))
+
+
+-- | @since base-4.8.0.0
+instance MonadFix Identity where
+    mfix f   = Identity (fix (runIdentity . f))
