@@ -1063,7 +1063,7 @@ alternativeClassKey = mkPreludeMiscIdUnique 754
 
 -- Functions for GHC extensions
 considerAccessibleName :: Name
-considerAccessibleName = varQual gHC_INTERNAL_EXTS (fsLit "considerAccessible") considerAccessibleIdKey
+considerAccessibleName = varQual gHC_MAGIC (fsLit "considerAccessible") considerAccessibleIdKey
 
 -- Random GHC.Internal.Base functions
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,

@@ -3894,6 +3894,7 @@ module GHC.Tuple where
   type Unit :: *
   data Unit = ()
   getSolo :: forall a. Solo a -> a
+  maxTupleSize :: GHC.Internal.Types.Int
 
 module GHC.Types where
   -- Safety: None

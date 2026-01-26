@@ -32,7 +32,6 @@ module GHC.Internal.Wasm.Prim.Exports (
 
 import GHC.Internal.Base
 import GHC.Internal.Exception.Type
-import GHC.Internal.Exts
 import GHC.Internal.IO
 import GHC.Internal.IORef
 import GHC.Internal.Int
@@ -40,6 +39,8 @@ import GHC.Internal.Stable
 import GHC.Internal.TopHandler (flushStdHandles)
 import GHC.Internal.Wasm.Prim.Types
 import GHC.Internal.Word
+import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# )
+import GHC.Internal.Ptr
 
 mkJSCallback :: (StablePtr a -> IO JSVal) -> a -> IO JSVal
 mkJSCallback adjustor f = do

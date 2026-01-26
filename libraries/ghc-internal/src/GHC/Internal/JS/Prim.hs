@@ -42,8 +42,8 @@ module GHC.Internal.JS.Prim ( JSVal(..), JSVal#
 import           GHC.Internal.Unsafe.Coerce (unsafeCoerce)
 
 import           GHC.Internal.Prim
+import           GHC.Internal.Types
 import qualified GHC.Internal.Exception as Ex
-import qualified GHC.Internal.Exts as Exts
 import qualified GHC.Internal.CString as GHC
 import           GHC.Internal.IO
 import           GHC.Internal.Data.Bool
@@ -78,15 +78,15 @@ instance Show JSException where
 #if defined(javascript_HOST_ARCH)
 
 {-# NOINLINE toIO #-}
-toIO :: Exts.Any -> IO Exts.Any
+toIO :: Any -> IO Any
 toIO x = pure x
 
 {-# NOINLINE resolve #-}
-resolve :: JSVal# -> JSVal# -> Exts.Any -> IO ()
+resolve :: JSVal# -> JSVal# -> Any -> IO ()
 resolve accept reject x = resolveIO accept reject (pure x)
 
 {-# NOINLINE resolveIO #-} -- used by the rts
-resolveIO :: JSVal# -> JSVal# -> IO Exts.Any -> IO ()
+resolveIO :: JSVal# -> JSVal# -> IO Any -> IO ()
 resolveIO accept reject x =
   (x >>= evaluate >>= js_callback_any accept) `catch`
   (\(e::Ex.SomeException) -> do
@@ -260,16 +260,16 @@ seqList xs = go xs `seq` xs
         go []     = ()
 
 foreign import javascript unsafe "h$toHsString"
-  js_fromJSString :: JSVal -> Exts.Any
+  js_fromJSString :: JSVal -> Any
 
 foreign import javascript unsafe "h$fromHsString"
-  js_toJSString :: Exts.Any -> JSVal
+  js_toJSString :: Any -> JSVal
 
 foreign import javascript unsafe "h$toHsListJSVal"
-  js_fromJSArray :: JSVal -> IO Exts.Any
+  js_fromJSArray :: JSVal -> IO Any
 
 foreign import javascript unsafe "h$fromHsListJSVal"
-  js_toJSArray :: Exts.Any -> IO JSVal
+  js_toJSArray :: Any -> IO JSVal
 
 foreign import javascript unsafe "(($1) => { return ($1 === null); })"
   js_isNull :: JSVal -> Bool
@@ -287,10 +287,10 @@ foreign import javascript unsafe "(() => { return null; })"
   js_null :: JSVal
 
 foreign import javascript unsafe "(($1,$2) => { return $1[h$fromHsString($2)]; })"
-  js_getProp :: JSVal -> Exts.Any -> IO JSVal
+  js_getProp :: JSVal -> Any -> IO JSVal
 
 foreign import javascript unsafe "(($1,$2) => { return $1[h$fromHsString($2)]; })"
-  js_unsafeGetProp :: JSVal -> Exts.Any -> JSVal
+  js_unsafeGetProp :: JSVal -> Any -> JSVal
 
 foreign import javascript unsafe "(($1,$2) => { return $1[$2]; })"
   js_getProp' :: JSVal -> JSVal -> IO JSVal
@@ -311,7 +311,7 @@ foreign import javascript unsafe "(($1_1, $1_2) => { return h$decodeUtf8z($1_1,$
   js_unsafeUnpackJSStringUtf8## :: Addr# -> JSVal#
 
 foreign import javascript unsafe "(($1, $2) => { return $1($2); })"
-  js_callback_any :: JSVal# -> Exts.Any -> IO ()
+  js_callback_any :: JSVal# -> Any -> IO ()
 
 foreign import javascript unsafe "(($1, $2) => { return $1($2); })"
   js_callback_jsval :: JSVal# -> JSVal -> IO ()

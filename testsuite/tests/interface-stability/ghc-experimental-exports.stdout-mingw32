@@ -4453,6 +4453,7 @@ module Data.Tuple.Experimental where
   type Unit# :: GHC.Internal.Types.ZeroBitType
   data Unit# = ...
   getSolo :: forall a. Solo a -> a
+  maxTupleSize :: GHC.Internal.Types.Int
 
 module GHC.Exception.Backtrace.Experimental where
   -- Safety: None
@@ -11047,6 +11048,7 @@ module Prelude.Experimental where
   type Unit# :: GHC.Internal.Types.ZeroBitType
   data Unit# = ...
   getSolo :: forall a. Solo a -> a
+  maxTupleSize :: GHC.Internal.Types.Int
 
 module System.Mem.Experimental where
   -- Safety: None

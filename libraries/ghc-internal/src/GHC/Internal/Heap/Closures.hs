@@ -75,9 +75,10 @@ import GHC.Internal.Int
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Word
-import GHC.Internal.Exts
 import GHC.Internal.Generics
 import GHC.Internal.Numeric
+import GHC.Internal.Ptr
+import GHC.Internal.Unsafe.Coerce
 import GHC.Internal.Stack (HasCallStack)
 
 ------------------------------------------------------------------------

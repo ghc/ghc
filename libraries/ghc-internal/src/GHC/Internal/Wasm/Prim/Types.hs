@@ -20,9 +20,9 @@ module GHC.Internal.Wasm.Prim.Types (
 
 import GHC.Internal.Base
 import GHC.Internal.Exception.Type
-import GHC.Internal.Exts
 import GHC.Internal.Foreign.C.String.Encoding
 import GHC.Internal.ForeignPtr
+import GHC.Internal.Ptr
 import GHC.Internal.IO
 import GHC.Internal.IO.Encoding
 import GHC.Internal.Num

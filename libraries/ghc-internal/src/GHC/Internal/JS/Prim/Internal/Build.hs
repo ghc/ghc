@@ -145,7 +145,6 @@ module GHC.Internal.JS.Prim.Internal.Build
   ) where
 
 import GHC.Internal.JS.Prim
-import GHC.Internal.Exts
 import GHC.Internal.IO
 import GHC.Internal.Unsafe.Coerce
 import GHC.Internal.Base
