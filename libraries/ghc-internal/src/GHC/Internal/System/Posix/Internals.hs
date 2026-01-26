@@ -70,7 +70,7 @@ import GHC.Internal.Foreign.Storable
 import qualified GHC.Internal.Foreign.C.String.Encoding as GHC
 #else
 import GHC.Internal.Int
-import GHC.Internal.Data.OldList (elem)
+import GHC.Internal.List (elem)
 #endif
 
 -- ---------------------------------------------------------------------------

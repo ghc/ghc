@@ -103,7 +103,7 @@ import GHC.Internal.IORef
 import GHC.Internal.Maybe
 import GHC.Internal.Ptr
 import GHC.Internal.Word
-import GHC.Internal.Data.OldList (deleteBy)
+import GHC.Internal.List (deleteBy)
 import qualified GHC.Internal.Event.Array    as A
 import GHC.Internal.Base
 import GHC.Internal.Conc.Bound

@@ -28,7 +28,7 @@ import GHC.Internal.Data.Proxy
 --import qualified Data.List.NonEmpty as NE
 import GHC.Internal.Generics
 import qualified GHC.Internal.Data.List.NonEmpty as NE
-import qualified GHC.Internal.Data.List as List
+import qualified GHC.Internal.List as List
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Tuple
 --import Prelude

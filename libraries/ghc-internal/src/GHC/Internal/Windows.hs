@@ -80,7 +80,7 @@ module GHC.Internal.Windows (
 
 import GHC.Internal.Data.Bits (finiteBitSize, shiftL, shiftR, (.|.), (.&.))
 import GHC.Internal.Unicode (isSpace)
-import GHC.Internal.Data.OldList
+import GHC.Internal.List
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Word
 import GHC.Internal.Int

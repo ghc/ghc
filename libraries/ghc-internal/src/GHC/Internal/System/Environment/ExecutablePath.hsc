@@ -53,7 +53,7 @@ import GHC.Internal.System.IO.Error (isDoesNotExistError)
 import GHC.Internal.System.Posix.Internals
 #elif defined(linux_HOST_OS) || defined(gnu_HOST_OS)
 import GHC.Internal.Data.Functor
-import GHC.Internal.Data.List (isSuffixOf)
+import GHC.Internal.Data.OldList (isSuffixOf)
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.String
@@ -85,7 +85,7 @@ import GHC.Internal.System.Posix.Internals
 import GHC.Internal.Control.Exception
 import GHC.Internal.Control.Monad.Fail
 import GHC.Internal.Data.Functor
-import GHC.Internal.Data.List (isPrefixOf, drop)
+import GHC.Internal.Data.OldList (isPrefixOf, drop)
 import GHC.Internal.Word
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Foreign.Marshal.Array
