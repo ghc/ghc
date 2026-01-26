@@ -319,10 +319,7 @@ import GHC.Internal.Data.OldList
 import GHC.Internal.Data.Ord
 import qualified GHC.Internal.Debug.Trace
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# ) -- just for re-export
-
--- XXX This should really be in Data.Tuple, where the definitions are
-maxTupleSize :: Int
-maxTupleSize = 64
+import GHC.Internal.Tuple (maxTupleSize)
 
 -- | 'the' ensures that all the elements of the list are identical
 -- and then returns that unique element
@@ -441,27 +438,3 @@ resizeSmallMutableArray# arr0 szNew a s0 =
           (# s2, arr1 #) -> case copySmallMutableArray# arr0 0# arr1 0# szOld s2 of
             s3 -> (# s3, arr1 #)
         else (# s1, arr0 #)
-
--- | Semantically, @considerAccessible = True@. But it has special meaning
--- to the pattern-match checker, which will never flag the clause in which
--- 'considerAccessible' occurs as a guard as redundant or inaccessible.
--- Example:
---
--- > case (x, x) of
--- >   (True,  True)  -> 1
--- >   (False, False) -> 2
--- >   (True,  False) -> 3 -- Warning: redundant
---
--- The pattern-match checker will warn here that the third clause is redundant.
--- It will stop doing so if the clause is adorned with 'considerAccessible':
---
--- > case (x, x) of
--- >   (True,  True)  -> 1
--- >   (False, False) -> 2
--- >   (True,  False) | considerAccessible -> 3 -- No warning
---
--- Put 'considerAccessible' as the last statement of the guard to avoid get
--- confusing results from the pattern-match checker, which takes \"consider
--- accessible\" by word.
-considerAccessible :: Bool
-considerAccessible = True

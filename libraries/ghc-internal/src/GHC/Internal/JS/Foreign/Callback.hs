@@ -21,8 +21,6 @@ module GHC.Internal.JS.Foreign.Callback
 
 import           GHC.Internal.JS.Prim
 
-import qualified GHC.Internal.Exts as Exts
-
 import           GHC.Internal.Unsafe.Coerce
 import           GHC.Internal.Base
 
@@ -131,18 +129,18 @@ asyncCallback3 x = js_asyncCallbackApply 3 (unsafeCoerce x)
 -- ----------------------------------------------------------------------------
 
 foreign import javascript unsafe "(($1, $2) => { return h$makeCallback(h$runSync, [$1], $2); })"
-  js_syncCallback :: Bool -> Exts.Any -> IO (Callback (IO b))
+  js_syncCallback :: Bool -> Any -> IO (Callback (IO b))
 foreign import javascript unsafe "(($1) => { return h$makeCallback(h$run, [], $1); })"
-  js_asyncCallback :: Exts.Any -> IO (Callback (IO b))
+  js_asyncCallback :: Any -> IO (Callback (IO b))
 foreign import javascript unsafe "(($1) => { return h$makeCallback(h$runSyncReturn, [false], $1); })"
-  js_syncCallbackReturn :: Exts.Any -> IO (Callback (IO JSVal))
+  js_syncCallbackReturn :: Any -> IO (Callback (IO JSVal))
 
 foreign import javascript unsafe "(($1, $2, $3) => { return h$makeCallbackApply($2, h$runSync, [$1], $3); })"
-  js_syncCallbackApply :: Bool -> Int -> Exts.Any -> IO (Callback b)
+  js_syncCallbackApply :: Bool -> Int -> Any -> IO (Callback b)
 foreign import javascript unsafe "(($1, $2) => { return h$makeCallbackApply($1, h$run, [], $2); })"
-  js_asyncCallbackApply :: Int -> Exts.Any -> IO (Callback b)
+  js_asyncCallbackApply :: Int -> Any -> IO (Callback b)
 foreign import javascript unsafe "(($1, $2) => { return h$makeCallbackApply($1, h$runSyncReturn, [false], $2); })"
-  js_syncCallbackApplyReturn :: Int -> Exts.Any -> IO (Callback b)
+  js_syncCallbackApplyReturn :: Int -> Any -> IO (Callback b)
 
 foreign import javascript unsafe "h$release"
   js_release :: Callback a -> IO ()
