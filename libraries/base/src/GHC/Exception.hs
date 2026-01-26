@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# OPTIONS_HADDOCK not-home #-}

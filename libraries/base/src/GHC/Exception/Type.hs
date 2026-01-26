@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
