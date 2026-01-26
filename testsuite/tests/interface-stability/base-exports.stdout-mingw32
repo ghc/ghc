@@ -5257,13 +5257,6 @@ module GHC.ConsoleHandler where
 module GHC.Constants where
   -- Safety: None
 
-module GHC.Desugar where
-  -- Safety: Safe
-  (>>>) :: forall (arr :: * -> * -> *) a b c. GHC.Internal.Control.Arrow.Arrow arr => arr a b -> arr b c -> arr a c
-  type AnnotationWrapper :: *
-  data AnnotationWrapper = forall a. GHC.Internal.Data.Data.Data a => AnnotationWrapper a
-  toAnnotationWrapper :: forall a. GHC.Internal.Data.Data.Data a => a -> AnnotationWrapper
-
 module GHC.Encoding.UTF8 where
   -- Safety: None
   utf8CompareByteArray# :: GHC.Internal.Prim.ByteArray# -> GHC.Internal.Prim.ByteArray# -> GHC.Internal.Types.Ordering

@@ -161,7 +161,6 @@ Library
         , GHC.Conc.Sync
         , GHC.ConsoleHandler
         , GHC.Constants
-        , GHC.Desugar
         , GHC.Encoding.UTF8
         , GHC.Enum
         , GHC.Environment
