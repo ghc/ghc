@@ -2052,7 +2052,6 @@ instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Type -- Defined in ‘G
 instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Ord GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.LanguageExtensions’
 instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
-instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
 instance GHC.Internal.Control.Monad.IO.Class.MonadIO GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.TH.Syntax.TyVarBndr -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.TH.Syntax.TyVarBndr -- Defined in ‘GHC.Internal.TH.Syntax’

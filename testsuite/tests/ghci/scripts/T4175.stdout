@@ -44,8 +44,8 @@ instance Traversable Maybe
   -- Defined in ‘GHC.Internal.Data.Traversable’
 instance MonadFail Maybe
   -- Defined in ‘GHC.Internal.Control.Monad.Fail’
-instance Foldable Maybe -- Defined in ‘GHC.Internal.Data.Foldable’
 instance Applicative Maybe -- Defined in ‘GHC.Internal.Base’
+instance Foldable Maybe -- Defined in ‘GHC.Internal.Data.Foldable’
 instance Functor Maybe -- Defined in ‘GHC.Internal.Base’
 instance Monad Maybe -- Defined in ‘GHC.Internal.Base’
 instance Semigroup a => Monoid (Maybe a)

@@ -37,7 +37,6 @@ module GHC.Internal.Control.Monad.ST.Lazy.Imp (
         unsafeIOToST
     ) where
 
-import GHC.Internal.Control.Monad.Fix
 import GHC.Internal.Data.Tuple
 
 import qualified GHC.Internal.Control.Monad.ST.Imp as ST
@@ -209,10 +208,6 @@ fixST m = ST (\ s ->
 -- thunk, r, to m. Uh oh? No, I think it should be fine, because that thunk
 -- itself is demanded directly in the `let` body. See also
 -- Note [Lazy ST: not producing lazy pairs].
-
--- | @since base-2.01
-instance MonadFix (ST s) where
-        mfix = fixST
 
 -- | @since base-4.23.0.0
 instance Semigroup a => Semigroup (ST s a) where
