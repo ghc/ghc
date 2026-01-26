@@ -11527,8 +11527,6 @@ instance GHC.Internal.Control.Arrow.ArrowApply (->) -- Defined in ‘GHC.Interna
 instance forall (m :: * -> *). GHC.Internal.Base.Monad m => GHC.Internal.Control.Arrow.ArrowApply (GHC.Internal.Control.Arrow.Kleisli m) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance GHC.Internal.Control.Arrow.ArrowChoice (->) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance forall (m :: * -> *). GHC.Internal.Base.Monad m => GHC.Internal.Control.Arrow.ArrowChoice (GHC.Internal.Control.Arrow.Kleisli m) -- Defined in ‘GHC.Internal.Control.Arrow’
-instance GHC.Internal.Control.Arrow.ArrowLoop (->) -- Defined in ‘GHC.Internal.Control.Arrow’
-instance forall (m :: * -> *). GHC.Internal.Control.Monad.Fix.MonadFix m => GHC.Internal.Control.Arrow.ArrowLoop (GHC.Internal.Control.Arrow.Kleisli m) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance forall (m :: * -> *). GHC.Internal.Base.MonadPlus m => GHC.Internal.Control.Arrow.ArrowPlus (GHC.Internal.Control.Arrow.Kleisli m) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance forall (m :: * -> *). GHC.Internal.Base.MonadPlus m => GHC.Internal.Control.Arrow.ArrowZero (GHC.Internal.Control.Arrow.Kleisli m) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance forall (m :: * -> *). GHC.Internal.Base.Monad m => GHC.Internal.Control.Category.Category (GHC.Internal.Control.Arrow.Kleisli m) -- Defined in ‘GHC.Internal.Control.Arrow’
@@ -11544,6 +11542,8 @@ instance forall (f :: * -> *). GHC.Internal.Control.Monad.Fail.MonadFail f => GH
 instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.Text.ParserCombinators.ReadP.P -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
 instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.Text.ParserCombinators.ReadP.ReadP -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
 instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
+instance GHC.Internal.Control.Monad.Fix.ArrowLoop (->) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
+instance forall (m :: * -> *). GHC.Internal.Control.Monad.Fix.MonadFix m => GHC.Internal.Control.Monad.Fix.ArrowLoop (GHC.Internal.Control.Arrow.Kleisli m) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Control.Monad.Fix.MonadFix f, GHC.Internal.Control.Monad.Fix.MonadFix g) => GHC.Internal.Control.Monad.Fix.MonadFix (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall (f :: * -> *). GHC.Internal.Control.Monad.Fix.MonadFix f => GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall (f :: * -> *). GHC.Internal.Control.Monad.Fix.MonadFix f => GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
@@ -11553,6 +11553,7 @@ instance forall e. GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Data.Ei
 instance forall r. GHC.Internal.Control.Monad.Fix.MonadFix ((->) r) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Monoid.First -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Control.Monad.Fix’
+instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Monoid.Last -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix [] -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall (f :: * -> *) i (c :: GHC.Internal.Generics.Meta). GHC.Internal.Control.Monad.Fix.MonadFix f => GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Generics.M1 i c f) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
@@ -11560,14 +11561,14 @@ instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Maybe.Maybe -- Def
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Base.NonEmpty -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Generics.Par1 -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Semigroup.Internal.Product -- Defined in ‘GHC.Internal.Control.Monad.Fix’
+instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall (f :: * -> *). GHC.Internal.Control.Monad.Fix.MonadFix f => GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Generics.Rec1 f) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
+instance forall s. GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall s. GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.ST.ST s) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix Solo -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Semigroup.Internal.Sum -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Control.Monad.Fix.MonadFix ((,) a) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
-instance forall s. GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘GHC.Internal.Control.Monad.ST.Lazy.Imp’
 instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Complex.Complex -- Defined in ‘Data.Complex’
-instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Control.Monad.Fix.MonadFix f, GHC.Internal.Control.Monad.Fix.MonadFix g) => GHC.Internal.Control.Monad.Fix.MonadFix (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
 instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.First -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.Last -- Defined in ‘Data.Semigroup’

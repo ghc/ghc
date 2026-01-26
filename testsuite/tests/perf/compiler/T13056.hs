@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE RoleAnnotations #-}
+{-# OPTIONS_GHC -ddump-if-trace #-}
 
 module Bug where
 import Data.Typeable

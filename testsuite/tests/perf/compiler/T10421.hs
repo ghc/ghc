@@ -1,6 +1,8 @@
 -- Exponential with GHC 8.10
+{-# OPTIONS_GHC -ddump-if-trace #-}
 
 module RegBig where
+
 
 import Prelude
 

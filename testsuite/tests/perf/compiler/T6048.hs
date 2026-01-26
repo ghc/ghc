@@ -1,4 +1,6 @@
+{-# OPTIONS_GHC -ddump-if-trace #-}
 module T6048 where
+
 
 import Control.Applicative
 

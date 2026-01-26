@@ -1,4 +1,5 @@
 {-# LANGUAGE MagicHash #-}
+{-# OPTIONS_GHC -ddump-if-trace #-}
 
 import GHC.Exts
 
