@@ -1286,7 +1286,7 @@ module Data.Int where
   data Int8 = ...
 
 module Data.Ix where
-  -- Safety: Safe
+  -- Safety: Trustworthy
   type Ix :: * -> Constraint
   class GHC.Internal.Classes.Ord a => Ix a where
     range :: (a, a) -> [a]

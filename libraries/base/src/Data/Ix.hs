@@ -1,4 +1,4 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 -- |
 --
@@ -42,4 +42,4 @@ module Data.Ix
      -- <https://www.haskell.org/onlinereport/haskell2010/haskellch19.html>.
      ) where
 
-import GHC.Internal.Data.Ix
+import GHC.Internal.Ix
