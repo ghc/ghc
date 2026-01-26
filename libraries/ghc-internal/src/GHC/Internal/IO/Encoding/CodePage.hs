@@ -30,7 +30,7 @@ import GHC.Internal.IO.Encoding.Types
 import GHC.Internal.IO.Buffer
 import GHC.Internal.Data.Bits
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Data.OldList (lookup)
+import GHC.Internal.List (lookup)
 
 import qualified GHC.Internal.IO.Encoding.CodePage.API as API
 import GHC.Internal.IO.Encoding.CodePage.Table

@@ -117,7 +117,7 @@ import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Monoid
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Data.Ord
-import GHC.Internal.Data.List (findIndex)
+import GHC.Internal.Data.OldList (findIndex)
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Data.Version( Version(..) )
 import GHC.Internal.Base hiding (Any, IntRep, FloatRep, NonEmpty(..))

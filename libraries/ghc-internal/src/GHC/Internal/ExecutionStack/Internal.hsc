@@ -39,7 +39,7 @@ module GHC.Internal.ExecutionStack.Internal (
 
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Data.List (reverse, null)
+import GHC.Internal.List (reverse, null)
 import GHC.Internal.Word
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.String (peekCString, CString)

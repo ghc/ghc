@@ -36,7 +36,7 @@ import GHC.Internal.Num
 import GHC.Internal.Data.Bits
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.Maybe (catMaybes)
-import GHC.Internal.Data.List
+import GHC.Internal.List
 import GHC.Internal.Data.Tuple
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable

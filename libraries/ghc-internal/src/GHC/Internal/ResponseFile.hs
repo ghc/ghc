@@ -28,7 +28,7 @@ import GHC.Internal.Control.Exception
 import GHC.Internal.Data.Foldable      (Foldable(..))
 import GHC.Internal.Base
 import GHC.Internal.Unicode        (isSpace)
-import GHC.Internal.Data.List          (filter, unlines, concat, reverse)
+import GHC.Internal.Data.OldList       (filter, unlines, concat, reverse)
 import GHC.Internal.Text.Show          (show)
 import GHC.Internal.System.Environment (getArgs)
 import GHC.Internal.System.Exit        (exitFailure)

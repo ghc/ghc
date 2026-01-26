@@ -40,14 +40,14 @@ module GHC.Internal.System.Environment.Blank
   ) where
 
 import GHC.Internal.Data.Functor
-import GHC.Internal.Data.List (elem, null, takeWhile)
+import GHC.Internal.List (elem, null, takeWhile)
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Base
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Windows
 import GHC.Internal.Control.Monad
-import GHC.Internal.Data.List (lookup)
+import GHC.Internal.List (lookup)
 #else
 import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.Types
