@@ -11186,7 +11186,6 @@ instance forall a. GHC.Internal.Classes.Ord (GHC.Internal.Ptr.FunPtr a) -- Defin
 instance forall a. GHC.Internal.Classes.Ord (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.Internal.Ptr’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Classes.Ord GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Base’
-instance GHC.Internal.Data.Data.Data GHC.Internal.Exts.SpecConstrAnnotation -- Defined in ‘GHC.Internal.Exts’
 instance forall a k (b :: k). GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. (a ~ GHC.Internal.Types.Char) => GHC.Internal.Data.String.IsString [a] -- Defined in ‘GHC.Internal.Data.String’
