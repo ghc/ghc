@@ -30,10 +30,10 @@ module GHC.Internal.Wasm.Prim.Imports (
 
 import GHC.Internal.Base
 import GHC.Internal.Exception
-import GHC.Internal.Exts
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.Stable
 import GHC.Internal.Wasm.Prim.Types
+import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# )
 
 {-# OPAQUE raiseJSException #-}
 raiseJSException :: JSVal -> a

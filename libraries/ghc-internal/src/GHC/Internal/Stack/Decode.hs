@@ -40,8 +40,8 @@ import GHC.Internal.Data.List
 import GHC.Internal.Data.Tuple
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable
-import GHC.Internal.Exts
 import GHC.Internal.Unsafe.Coerce
+import GHC.Internal.Ptr
 
 import GHC.Internal.ClosureTypes
 import GHC.Internal.Heap.Closures

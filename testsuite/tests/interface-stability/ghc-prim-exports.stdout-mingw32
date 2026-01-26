@@ -1232,6 +1232,7 @@ module GHC.Magic where
   class DataToTag a where
     dataToTag# :: a -> GHC.Internal.Prim.Int#
     {-# MINIMAL dataToTag# #-}
+  considerAccessible :: GHC.Internal.Types.Bool
   inline :: forall a. a -> a
   lazy :: forall a. a -> a
   noinline :: forall a. a -> a
@@ -3894,6 +3895,7 @@ module GHC.Tuple where
   type Unit :: *
   data Unit = ()
   getSolo :: forall a. Solo a -> a
+  maxTupleSize :: GHC.Internal.Types.Int
 
 module GHC.Types where
   -- Safety: None
