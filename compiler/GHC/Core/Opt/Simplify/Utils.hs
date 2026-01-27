@@ -72,6 +72,7 @@ import GHC.Types.Tickish
 import GHC.Types.Demand
 import GHC.Types.Var.Set
 import GHC.Types.Basic
+import GHC.Types.Name.Env
 
 import GHC.Data.OrdList ( isNilOL )
 import GHC.Data.FastString ( fsLit )
@@ -81,9 +82,9 @@ import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Control.Monad    ( when )
+import Control.Monad    ( guard, when )
 import Data.List        ( sortBy )
-import GHC.Types.Name.Env
+import Data.Maybe
 import Data.Graph
 
 {- *********************************************************************
@@ -2570,7 +2571,27 @@ Note [Eliminate Identity Case]
                 True  -> True;
                 False -> False
 
-and similar friends.
+and similar friends.  There are some tricky wrinkles:
+
+(EIC1) Casts. We've seen this:
+            case e of x { _ -> x `cast` c }
+       And we definitely want to eliminate this case, to give
+            e `cast` c
+(EIC2) Ticks. Similarly
+            case e of x { _ -> Tick t x }
+       At least if the tick is 'floatable' we want to eliminate the case
+       to give
+            Tick t e
+
+So `check_eq` strips off enclosing casts and ticks from the RHS of the
+alternative, returning a wrapper function that will rebuild them around
+the scrutinee if case-elim is successful.
+
+(EIC3) What if there are many alternatives, all identities. If casts
+  are involved they must be the same cast, to make the types line up.
+  In principle there could be different ticks in each RHS, but we just
+  pick the ticks from the first alternative.  (In the common case there
+  is only one alternative.)
 
 Note [Scrutinee Constant Folding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2764,44 +2785,46 @@ mkCase mode scrut outer_bndr alts_ty alts
 --         See Note [Eliminate Identity Case]
 --------------------------------------------------
 
-mkCase1 _mode scrut case_bndr _ alts@(Alt _ _ rhs1 : alts')      -- Identity case
-  | all identity_alt alts
+mkCase1 _mode scrut case_bndr _ (alt1 : alts)      -- Identity case
+  | Just wrap <- identity_alt alt1   -- `wrap`: see (EIC1) and (EIC2)
+  , all (isJust . identity_alt) alts -- See (EIC3) in Note [Eliminate Identity Case]
   = do { tick (CaseIdentity case_bndr)
-       ; return (mkTicks ticks $ re_cast scrut rhs1) }
+       ; return (wrap scrut) }
   where
-    ticks = concatMap (\(Alt _ _ rhs) -> stripTicksT tickishFloatable rhs) alts'
-    identity_alt (Alt con args rhs) = check_eq rhs con args
+    identity_alt :: CoreAlt -> Maybe (CoreExpr -> CoreExpr)
+    identity_alt (Alt con args rhs) = check_eq con args rhs
 
-    check_eq (Cast rhs co) con args        -- See Note [RHS casts]
-      = not (any (`elemVarSet` tyCoVarsOfCo co) args) && check_eq rhs con args
-    check_eq (Tick t e) alt args
-      = tickishFloatable t && check_eq e alt args
+    check_eq :: AltCon -> [Var] -> CoreExpr -> Maybe (CoreExpr -> CoreExpr)
+    -- (check_eq con args e) return True if
+    --       e   looks like   (Tick (Cast (Tick (con args))))
+    -- where (con args) is the LHS of the alternative
+    -- In that case it returns (\e. Tick (Cast (Tick e))),
+    -- a wrapper function that can rebuild the tick/cast stuff
+    -- See (EIC1) and (EIC2) in Note [Eliminate Identity Case]
+    check_eq alt_con args (Cast e co)         -- See (EIC1)
+      = do { guard (not (any (`elemVarSet` tyCoVarsOfCo co) args))
+           ; wrap <- check_eq alt_con args e
+           ; return (flip mkCast co . wrap) }
+    check_eq alt_con args (Tick t e)          -- See (EIC2)
+      = do { guard (tickishFloatable t)
+           ; wrap <- check_eq alt_con args e
+           ; return (Tick t . wrap) }
+    check_eq alt_con args e
+      | is_id alt_con args e = Just (\e -> e)
+      | otherwise            = Nothing
 
-    check_eq (Lit lit) (LitAlt lit') _     = lit == lit'
-    check_eq (Var v) _ _  | v == case_bndr = True
-    check_eq (Var v)   (DataAlt con) args
-      | null arg_tys, null args            = v == dataConWorkId con
-                                             -- Optimisation only
-    check_eq rhs        (DataAlt con) args = cheapEqExpr' tickishFloatable rhs $
-                                             mkConApp2 con arg_tys args
-    check_eq _          _             _    = False
+    is_id :: AltCon -> [Var] -> CoreExpr -> Bool
+    is_id _ _  (Var v) | v == case_bndr = True
+    is_id (LitAlt lit') _ (Lit lit)     = lit == lit'
+    is_id (DataAlt con) args rhs
+      | Var v <- rhs   -- Optimisation only
+      , null arg_tys
+      , null args      = v == dataConWorkId con
+      | otherwise      = cheapEqExpr' tickishFloatable rhs $
+                         mkConApp2 con arg_tys args
+    is_id _ _ _ = False
 
     arg_tys = tyConAppArgs (idType case_bndr)
-
-        -- Note [RHS casts]
-        -- ~~~~~~~~~~~~~~~~
-        -- We've seen this:
-        --      case e of x { _ -> x `cast` c }
-        -- And we definitely want to eliminate this case, to give
-        --      e `cast` c
-        -- So we throw away the cast from the RHS, and reconstruct
-        -- it at the other end.  All the RHS casts must be the same
-        -- if (all identity_alt alts) holds.
-        --
-        -- Don't worry about nested casts, because the simplifier combines them
-
-    re_cast scrut (Cast rhs co) = mkCast (re_cast scrut rhs) co
-    re_cast scrut _             = scrut
 
 mkCase1 mode scrut bndr alts_ty alts = mkCase2 mode scrut bndr alts_ty alts
 
