@@ -502,4 +502,6 @@ ObjectCode* mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
 void initSegment(Segment *s, void *start, size_t size, SegmentProt prot, int n_sections);
 void freeSegments(ObjectCode *oc);
 
+void initLinkerRtsSyms(StrHashTable *symhash);
+
 #include "EndPrivate.h"

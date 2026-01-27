@@ -46,8 +46,6 @@ typedef struct _RtsSymbolVal {
     SymType type;
 } RtsSymbolVal;
 
-extern RtsSymbolVal rtsSyms[];
-
 extern RtsSymbolVal* __attribute__((weak)) rtsExtraSyms(void);
 
 /* See Note [_iob_func symbol].  */

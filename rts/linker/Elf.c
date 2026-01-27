@@ -76,18 +76,6 @@
  *
  * See bug #781
  * See thread http://www.haskell.org/pipermail/cvs-ghc/2007-September/038458.html
- *
- * Naming Scheme for Symbol Macros
- *
- * SymI_*: symbol is internal to the RTS. It resides in an object
- *         file/library that is statically.
- * SymE_*: symbol is external to the RTS library. It might be linked
- *         dynamically.
- *
- * Sym*_HasProto  : the symbol prototype is imported in an include file
- *                  or defined explicitly
- * Sym*_NeedsProto: the symbol is undefined and we add a dummy
- *                  default proto extern void sym(void);
  */
 #define X86_64_ELF_NONPIC_HACK (!RtsFlags.MiscFlags.linkerAlwaysPic)
 
