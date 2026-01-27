@@ -2,6 +2,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 module Web.Routing.SafeRouting where
 
 import Control.DeepSeq (NFData (..))
