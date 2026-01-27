@@ -108,19 +108,24 @@ StgFunPtr StgReturn(void)
 /*
  * Note [Stack Alignment on X86]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * On X86 (both 32bit and 64bit) we keep the stack aligned on function calls at
- * a 16-byte boundary. This is done because on a number of architectures the
- * ABI requires this (e.g. the System V AMD64 ABI, Mac OS X 32-bit/64-bit ABIs,
- * and the Win64 ABI) as well as interfacing with * other libraries through the
- * FFI.
+ * On X86, we keep the stack aligned on function calls. We use 64-byte alignment
+ * because it is required for passing AVX-512 vector types (__m512 and friends)
+ * as arguments. See #26822 for a problem caused by insufficient stack alignment.
  *
- * As part of this arrangement we must maintain the stack at a 16-byte boundary
- * - word_size-bytes (so 16n - 4 for i386 and 16n - 8 for x64) on entry to a
- * procedure since both GCC and LLVM expect this. This is because the stack
- * should have been 16-byte boundary aligned and then a call made which pushes
- * a return address onto the stack (so word_size more space used). In STG code
- * we only jump to other STG procedures, so we maintain the 16n - word_size
- * alignment for these jumps.
+ * Strictly speaking, we only need 16-byte alignment when we do not use AVX or
+ * AVX-512, but dispatching based on the available ISA extensions would
+ * complicate things. Always using 64-byte alignment is simpler.
+ *
+ * However, the C ABI only requires 16-byte alignment, which is just sufficient
+ * for SSE2 vectors. Therefore, we dynamically align the stack with
+ * `and{l,q} $-64`, and save the original stack pointer.
+ *
+ * On entry to a procedure, we must maintain the stack at a 64-byte boundary
+ * - word_size-bytes (so 64n - 4 for i386 and 64n - 8 for x64) since both GCC
+ * and LLVM expect this. This is because the stack should have been aligned to
+ * a 64-byte boundary, and then a call made which pushes a return address onto
+ * the stack (so word_size more space used). In STG code we only jump to other
+ * STG procedures, so we maintain the 64n - word_size alignment for these jumps.
  *
  * This gives us binary compatibility with LLVM and GCC as well as dealing
  * with the FFI. Previously we just maintained a 16n byte alignment for
@@ -157,51 +162,84 @@ StgFunPtr StgReturn(void)
  * Concretely this means we must always keep the stack valid.
  * */
 
+/* Stack layout on x86-32:
+  +-----------------------------+ <------ esp
+  |        4-byte padding       |
+  |-----------------------------| <------ esp + 4 (64-byte aligned)
+  |                             |
+  | RESERVED_C_STACK_BYTES ~16k |
+  |                             |
+  |-----------------------------| <------ 64-byte aligned
+  |             ebx             |
+  |-----------------------------|
+  |             esi             |
+  |-----------------------------|
+  |             edi             |
+  |-----------------------------|
+  |             ebp             |
+  |-----------------------------|
+  |          saved esp          |----+
+  |-----------------------------|    |
+  |   (padding for alignment)   |    |
+  |-----------------------------| <--+
+  |  eip saved by call StgRun   |
+  |        in schedule()        |
+  +-----------------------------+
+  |    the function pointer     |
+  +-----------------------------+
+  |           BaseReg           |
+  +-----------------------------+
+                ...
+      schedule() stack frame
+
+ Lower addresses on the top
+ */
+
+#if RESERVED_C_STACK_BYTES % 64 != 0
+#error "RESERVED_C_STACK_BYTES must be a multiple of 64. If you are changing it, please make sure %esp+4 is a multiple of 64"
+#endif
 
 static void STG_USED
 StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile (
         STG_GLOBAL STG_RUN "\n"
-#if !defined(mingw32_HOST_OS)
         STG_HIDDEN STG_RUN "\n"
-#endif
         STG_RUN ":\n\t"
 
         /*
          * move %esp down to reserve an area for temporary storage
          * during the execution of STG code.
          *
-         * The stack pointer has to be aligned to a multiple of 16
-         * bytes from here - this is a requirement of the C ABI, so
-         * that C code can assign SSE2 registers directly to/from
-         * stack locations.
-         *
-         * See Note [Windows Stack allocations]
+         * We want the stack pointer to be aligned to a multiple of 64
+         * bytes from here - this is a requirement of the C ABI for
+         * AVX-512, so that C code can assign ZMM registers directly
+         * to/from stack locations.
          */
-#if defined(mingw32_HOST_OS)
-        "movl %0, %%eax\n\t"
-        "call ___chkstk_ms\n\t"
-#endif
-        "subl %0, %%esp\n\t"
 
+        /* We no longer support i386 Windows, so no need to call __chkstk_ms */
+
+        /* Save the original esp in eax */
+        "movl %%esp, %%eax\n\t"
+        "subl $20, %%esp\n\t"  /* area to save 5 registers */
+        "andl $-64, %%esp\n\t"
         /*
          * save callee-saves registers on behalf of the STG code.
          */
-        "movl %%esp, %%eax\n\t"
-        "addl %0-16, %%eax\n\t"
-        "movl %%ebx,0(%%eax)\n\t"
-        "movl %%esi,4(%%eax)\n\t"
-        "movl %%edi,8(%%eax)\n\t"
-        "movl %%ebp,12(%%eax)\n\t"
+        "movl %%ebx, 0(%%esp)\n\t"
+        "movl %%esi, 4(%%esp)\n\t"
+        "movl %%edi, 8(%%esp)\n\t"
+        "movl %%ebp, 12(%%esp)\n\t"
+        "movl %%eax, 16(%%esp)\n\t"
+        "subl %0, %%esp\n\t"
         /*
          * Set BaseReg
          */
-        "movl 24(%%eax),%%ebx\n\t"
+        "movl 8(%%eax),%%ebx\n\t"
         /*
          * grab the function argument from the stack
          */
-        "movl 20(%%eax),%%eax\n\t"
+        "movl 4(%%eax),%%eax\n\t"
         /*
          * jump to it
          */
@@ -216,17 +254,16 @@ StgRunIsImplementedInAssembler(void)
          * restore callee-saves registers.  (Don't stomp on %%eax!)
          */
         "movl %%esp, %%edx\n\t"
-        "addl %0-16, %%edx\n\t"
+        "addl %0, %%edx\n\t"
         "movl 0(%%edx),%%ebx\n\t"       /* restore the registers saved above */
         "movl 4(%%edx),%%esi\n\t"
         "movl 8(%%edx),%%edi\n\t"
         "movl 12(%%edx),%%ebp\n\t"
-
-        "addl %0, %%esp\n\t"
+        "movl 16(%%edx),%%esp\n\t"
         "ret"
 
-      : : "i" (RESERVED_C_STACK_BYTES + 16)
-        // + 16 to make room for the 4 registers we have to save
+      : : "i" (RESERVED_C_STACK_BYTES + 4)
+        // + 4 to mimic `calll`
         // See Note [Stack Alignment on X86]
     );
 }
@@ -302,10 +339,12 @@ is as follows:
      C STACK "ADDRESS SPACE"   |
                                v
   +-----------------------------+ <------ rsp
+  |        8-byte padding       |
+  |-----------------------------| <------ rsp + 8 (64-byte aligned)
   |                             |
   | RESERVED_C_STACK_BYTES ~16k |
   |                             |
-  |-----------------------------|
+  |-----------------------------| <------ 64-byte aligned
   |             rbx             ||
   |-----------------------------| \
   |             rbp             | |
@@ -315,9 +354,13 @@ is as follows:
   |             r13             |   | STG_RUN_STACK_FRAME_SIZE
   |-----------------------------|  /
   |             r14             |  |
-  |-----------------------------| /
-  |             r15             | |
-  |-----------------------------|/
+  |-----------------------------|  |
+  |             r15             | /
+  |-----------------------------| |
+  |          saved rsp          |-+---
+  |-----------------------------|/   |
+  |   (padding for alignment)   |    |
+  |-----------------------------| <---
   |  rip saved by call StgRun   |
   |        in schedule()        |
   +-----------------------------+
@@ -367,6 +410,10 @@ stack unwinding.
 */
 
 
+#if RESERVED_C_STACK_BYTES % 64 != 0
+#error "RESERVED_C_STACK_BYTES must be a multiple of 64. If you are changing it, please make sure %rsp+8 is a multiple of 64"
+#endif
+
 static void STG_USED
 StgRunIsImplementedInAssembler(void)
 {
@@ -385,9 +432,22 @@ StgRunIsImplementedInAssembler(void)
 #if defined(mingw32_HOST_OS)
         "movq %1, %%rax\n\t"
         "addq %0, %%rax\n\t"
+        "addq $63, %%rax\n\t"  /* extra space for 64-byte alignment */
         "callq ___chkstk_ms\n\t"
 #endif
+        /*
+         * Save the original rsp in r11 (caller-saved, so we don't need to
+         * preserve it across calls). We need this to restore rsp after
+         * the 64-byte alignment.
+         */
+        "movq %%rsp, %%r11\n\t"
+        /*
+         * Allocate space for saved registers, then align to 64-byte boundary.
+         * The alignment is required for AVX-512 instructions.
+         * See Note [Stack Alignment on X86].
+         */
         "subq %1, %%rsp\n\t"
+        "andq $-64, %%rsp\n\t"
         "movq %%rsp, %%rax\n\t"
         "subq %0, %%rsp\n\t"
         "movq %%rbx,0(%%rax)\n\t"
@@ -396,6 +456,7 @@ StgRunIsImplementedInAssembler(void)
         "movq %%r13,24(%%rax)\n\t"
         "movq %%r14,32(%%rax)\n\t"
         "movq %%r15,40(%%rax)\n\t"
+        "movq %%r11,48(%%rax)\n\t"  /* save original rsp */
 #if defined(mingw32_HOST_OS)
         /*
          * Additional callee saved registers on Win64. This must match
@@ -403,25 +464,35 @@ StgRunIsImplementedInAssembler(void)
          * both represent the Win64 calling convention.
          *
          * Note that we must save the entire 128-bit width of the XMM
-         * registers, as noted in #21465. Moreover, note that, due to the
-         * presence of the return address on the stack, %rsp+8 is
-         * 16-byte aligned. Since MOVAPS requires memory operands to be aligned
-         * to 16-bytes, we must add a word of padding here.
+         * registers, as noted in #21465. Since we align the stack to
+         * 64 bytes, MOVAPS alignment requirements are satisfied.
+         *
+         * The Win64 calling convention says the upper YMM/ZMM parts are
+         * volatile, so we do not need to save them. See Microsoft Learn
+         * for the description of the calling convention:
+         * https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170#callercallee-saved-registers
+         *
+         * Layout (offsets from rax):
+         *   0-47:  rbx, rbp, r12, r13, r14, r15
+         *   48:    original rsp
+         *   56:    rdi
+         *   64:    rsi
+         *   72:    padding for 16-byte alignment of XMM registers
+         *   80-239: xmm6-xmm15 (10 * 16 bytes)
          */
-        "movq %%rdi,   48(%%rax)\n\t"
-        "movq %%rsi,   56(%%rax)\n\t"
+        "movq %%rdi,   56(%%rax)\n\t"
+        "movq %%rsi,   64(%%rax)\n\t"
         /* 8 bytes of padding for alignment */
-        "movaps %%xmm6,  72(%%rax)\n\t"
-        "movaps %%xmm7,  88(%%rax)\n\t"
-        "movaps %%xmm8, 104(%%rax)\n\t"
-        "movaps %%xmm9, 120(%%rax)\n\t"
-        "movaps %%xmm10,136(%%rax)\n\t"
-        "movaps %%xmm11,152(%%rax)\n\t"
-        "movaps %%xmm12,168(%%rax)\n\t"
-        "movaps %%xmm13,184(%%rax)\n\t"
-        "movaps %%xmm14,200(%%rax)\n\t"
-        "movaps %%xmm15,216(%%rax)\n\t"
-        /* 8 bytes of padding for alignment */
+        "movaps %%xmm6,  80(%%rax)\n\t"
+        "movaps %%xmm7,  96(%%rax)\n\t"
+        "movaps %%xmm8, 112(%%rax)\n\t"
+        "movaps %%xmm9, 128(%%rax)\n\t"
+        "movaps %%xmm10,144(%%rax)\n\t"
+        "movaps %%xmm11,160(%%rax)\n\t"
+        "movaps %%xmm12,176(%%rax)\n\t"
+        "movaps %%xmm13,192(%%rax)\n\t"
+        "movaps %%xmm14,208(%%rax)\n\t"
+        "movaps %%xmm15,224(%%rax)\n\t"
 #endif
 
 #if defined(ENABLE_UNWINDING)
@@ -431,6 +502,11 @@ StgRunIsImplementedInAssembler(void)
          *
          * N.B. We don't support unwinding on Darwin due to
          * various toolchain insanity.
+         *
+         * Note: Due to dynamic 64-byte alignment, the exact stack offset
+         * varies at runtime. The original rsp is saved at offset 48 in the
+         * register save area. We use a DWARF expression to compute the
+         * CFA from the saved rsp value.
          */
         ".cfi_def_cfa rsp, 0\n\t"
         ".cfi_offset rbx, %c2\n\t"
@@ -439,29 +515,68 @@ StgRunIsImplementedInAssembler(void)
         ".cfi_offset r13, %c5\n\t"
         ".cfi_offset r14, %c6\n\t"
         ".cfi_offset r15, %c7\n\t"
-        ".cfi_offset rip, %c8\n\t"
-        ".cfi_escape " // DW_CFA_val_expression is not expressible otherwise
-          "0x16, " // DW_CFA_val_expression
-          "0x07, " // register num 7 - rsp
-          "0x04, " // block length
-          "0x77, " // DW_OP_breg7 - signed LEB128 offset from rsp
-#define RSP_DELTA (RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE + 8)
-          "%c9" // signed LEB128 encoded delta - byte 1
-#if (RSP_DELTA >> 7) > 0
-          ", %c10" // signed LEB128 encoded delta - byte 2
+        /*
+         * The original rsp is saved at RESERVED_C_STACK_BYTES + 56 from
+         * current rsp. We use DW_CFA_expression to indicate that rsp's
+         * value can be found by loading from that stack location.
+         */
+#define RSP_DELTA (RESERVED_C_STACK_BYTES + 56)
+        ".cfi_escape "
+          "0x10, "  // DW_CFA_expression
+          "0x07, "  // register num 7 - rsp
+#if (RSP_DELTA >> 20) > 0
+          "0x05, "  // block length = 5
+#elif (RSP_DELTA >> 13) > 0
+          "0x04, "  // block length = 4
+#elif (RSP_DELTA >> 6) > 0
+          "0x03, "  // block length = 3
+#else
+          "0x02, "  // block length = 2
 #endif
-
-#if (RSP_DELTA >> 14) > 0
-          ", %c11" // signed LEB128 encoded delta - byte 3
+          "0x77, "  // DW_OP_breg7 (rsp + offset)
+          "%c8"     // signed LEB128 offset to saved rsp (RESERVED_C_STACK_BYTES + 56)
+#if (RSP_DELTA >> 6) > 0
+          ", %c9"   // signed LEB128 encoded delta - byte 2
 #endif
-
-#if (RSP_DELTA >> 21) > 0
-          ", %c12" // signed LEB128 encoded delta - byte 4
+#if (RSP_DELTA >> 13) > 0
+          ", %c10"  // signed LEB128 encoded delta - byte 3
 #endif
-
-#if (RSP_DELTA >> 28) > 0
+#if (RSP_DELTA >> 20) > 0
+          ", %c11"  // signed LEB128 encoded delta - byte 4
+#endif
+#if (RSP_DELTA >> 27) > 0
 #error "RSP_DELTA too big"
 #endif
+          "\n\t"
+        /*
+         * The return address (rip) is at the original rsp location.
+         * Since original rsp is saved at offset 48 in register save area,
+         * rip = *saved_rsp = **(rsp + 8 + RESERVED_C_STACK_BYTES + 48).
+         */
+        ".cfi_escape "
+          "0x10, "  // DW_CFA_expression
+          "0x10, "  // register num 16 - rip
+#if (RSP_DELTA >> 20) > 0
+          "0x06, "  // block length = 6
+#elif (RSP_DELTA >> 13) > 0
+          "0x05, "  // block length = 5
+#elif (RSP_DELTA >> 6) > 0
+          "0x04, "  // block length = 4
+#else
+          "0x03, "  // block length = 3
+#endif
+          "0x77, "  // DW_OP_breg7 (rsp + offset)
+          "%c8"     // signed LEB128 offset to saved rsp
+#if (RSP_DELTA >> 6) > 0
+          ", %c9"   // signed LEB128 encoded delta - byte 2
+#endif
+#if (RSP_DELTA >> 13) > 0
+          ", %c10"  // signed LEB128 encoded delta - byte 3
+#endif
+#if (RSP_DELTA >> 20) > 0
+          ", %c11"  // signed LEB128 encoded delta - byte 4
+#endif
+          ", 0x06"  // DW_OP_deref
           "\n\t"
 #endif /* defined(ENABLE_UNWINDING) */
 
@@ -510,55 +625,50 @@ StgRunIsImplementedInAssembler(void)
         "movq 32(%%rsp),%%r14\n\t"
         "movq 40(%%rsp),%%r15\n\t"
 #if defined(mingw32_HOST_OS)
-        "movq 48(%%rsp),%%rdi\n\t"
-        "movq 56(%%rsp),%%rsi\n\t"
+        "movq 56(%%rsp),%%rdi\n\t"
+        "movq 64(%%rsp),%%rsi\n\t"
         /* 8 bytes of padding for alignment */
-        "movaps  72(%%rsp),%%xmm6\n\t"
-        "movaps  88(%%rsp),%%xmm7\n\t"
-        "movaps 104(%%rsp),%%xmm8\n\t"
-        "movaps 120(%%rsp),%%xmm9\n\t"
-        "movaps 136(%%rsp),%%xmm10\n\t"
-        "movaps 152(%%rsp),%%xmm11\n\t"
-        "movaps 168(%%rsp),%%xmm12\n\t"
-        "movaps 184(%%rsp),%%xmm13\n\t"
-        "movaps 200(%%rsp),%%xmm14\n\t"
-        "movaps 216(%%rsp),%%xmm15\n\t"
-        /* 8 bytes of padding for alignment */
+        "movaps  80(%%rsp),%%xmm6\n\t"
+        "movaps  96(%%rsp),%%xmm7\n\t"
+        "movaps 112(%%rsp),%%xmm8\n\t"
+        "movaps 128(%%rsp),%%xmm9\n\t"
+        "movaps 144(%%rsp),%%xmm10\n\t"
+        "movaps 160(%%rsp),%%xmm11\n\t"
+        "movaps 176(%%rsp),%%xmm12\n\t"
+        "movaps 192(%%rsp),%%xmm13\n\t"
+        "movaps 208(%%rsp),%%xmm14\n\t"
+        "movaps 224(%%rsp),%%xmm15\n\t"
 #endif
-        "addq %1, %%rsp\n\t"
+        "movq 48(%%rsp),%%rsp\n\t"  /* restore original rsp */
         "retq"
 
         :
-        : "i"(RESERVED_C_STACK_BYTES),
+        : "i"(RESERVED_C_STACK_BYTES + 8),
           "i"(STG_RUN_STACK_FRAME_SIZE /* stack frame size */),
-          "i"(RESERVED_C_STACK_BYTES /* rbx relative to cfa (rsp) */),
-          "i"(RESERVED_C_STACK_BYTES + 8 /* rbp relative to cfa (rsp) */),
-          "i"(RESERVED_C_STACK_BYTES + 16 /* r12 relative to cfa (rsp) */),
-          "i"(RESERVED_C_STACK_BYTES + 24 /* r13 relative to cfa (rsp) */),
-          "i"(RESERVED_C_STACK_BYTES + 32 /* r14 relative to cfa (rsp) */),
-          "i"(RESERVED_C_STACK_BYTES + 40 /* r15 relative to cfa (rsp) */),
-          "i"(RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE
-              /* rip relative to cfa */)
+          "i"(RESERVED_C_STACK_BYTES + 8 /* rbx relative to cfa (rsp) */),
+          "i"(RESERVED_C_STACK_BYTES + 16 /* rbp relative to cfa (rsp) */),
+          "i"(RESERVED_C_STACK_BYTES + 24 /* r12 relative to cfa (rsp) */),
+          "i"(RESERVED_C_STACK_BYTES + 32 /* r13 relative to cfa (rsp) */),
+          "i"(RESERVED_C_STACK_BYTES + 40 /* r14 relative to cfa (rsp) */),
+          "i"(RESERVED_C_STACK_BYTES + 48 /* r15 relative to cfa (rsp) */)
 
 #if defined(ENABLE_UNWINDING)
-          , "i"((RSP_DELTA & 127) | (128 * ((RSP_DELTA >> 7) > 0)))
+          /* LEB128-encoded offset to saved rsp (RESERVED_C_STACK_BYTES + 56) */
+          , "i"((RSP_DELTA & 127) | (128 * ((RSP_DELTA >> 6) > 0)))
             /* signed LEB128-encoded delta from rsp - byte 1 */
-#if (RSP_DELTA >> 7) > 0
-          , "i"(((RSP_DELTA >> 7) & 127) | (128 * ((RSP_DELTA >> 14) > 0)))
+#if (RSP_DELTA >> 6) > 0
+          , "i"(((RSP_DELTA >> 7) & 127) | (128 * ((RSP_DELTA >> 13) > 0)))
             /* signed LEB128-encoded delta from rsp - byte 2 */
 #endif
-
-#if (RSP_DELTA >> 14) > 0
-          , "i"(((RSP_DELTA >> 14) & 127) | (128 * ((RSP_DELTA >> 21) > 0)))
+#if (RSP_DELTA >> 13) > 0
+          , "i"(((RSP_DELTA >> 14) & 127) | (128 * ((RSP_DELTA >> 20) > 0)))
             /* signed LEB128-encoded delta from rsp - byte 3 */
 #endif
-
-#if (RSP_DELTA >> 21) > 0
-          , "i"(((RSP_DELTA >> 21) & 127) | (128 * ((RSP_DELTA >> 28) > 0)))
+#if (RSP_DELTA >> 20) > 0
+          , "i"(((RSP_DELTA >> 21) & 127) | (128 * ((RSP_DELTA >> 27) > 0)))
             /* signed LEB128-encoded delta from rsp - byte 4 */
 #endif
 #undef RSP_DELTA
-
 #endif /* defined(ENABLE_UNWINDING) */
 
         );
