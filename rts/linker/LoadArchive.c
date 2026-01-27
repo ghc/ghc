@@ -24,6 +24,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <ctype.h>
+#include <sys/types.h>
 #include <fs_rts.h>
 
 #define FAIL(...) do {\
@@ -110,7 +111,7 @@ static bool loadFatArchive(char input[static 20], FILE* f, pathchar* path)
 }
 #endif
 
-static bool readThinArchiveMember(int n, int memberSize, pathchar* path,
+static bool readThinArchiveMember(int memberSize, pathchar* path,
         char* fileName, char* image)
 {
     bool has_succeeded = false;
@@ -136,7 +137,7 @@ static bool readThinArchiveMember(int n, int memberSize, pathchar* path,
                    memberPath);
         goto inner_fail;
     }
-    n = fread(image, 1, memberSize, member);
+    int n = fread(image, 1, memberSize, member);
     if (n != memberSize) {
         errorBelch("loadArchive: error whilst reading `%s'",
                    fileName);
@@ -362,6 +363,9 @@ HsInt loadArchive_ (pathchar *path)
         FAIL("failed to identify archive format of %" PATH_FMT ".", path);
     }
     bool isThin = archive_fmt == ThinArchive;
+    if(isThin) {
+        DEBUG_LOG("Found thin archive.\n");
+    }
 
     DEBUG_LOG("loading archive contents\n");
 
@@ -519,18 +523,55 @@ HsInt loadArchive_ (pathchar *path)
         * for sections. So on windows, just try to load it all.
         *
         * Linker members (e.g. filename / are skipped since they are not needed)
+        *
+        * AK: The gist of it is really that we need to:
+        * + Load .dll members as objects if they are *not* an import lib.
+        * + Load .dll members as import libs if they are ... import libs.
+        *
+        * There seems to be no good place to make this decision so i've put the
+        * ugly import lib detection code here, keeping the rest of the verification/loading
+        * logic relatively tidy. We basically read parts of the member file to get
+        * the header and then reuse the PE linkers type detection logic.
+        *
+        * We read at least sizeof(ANON_OBJECT_HEADER) bytes, but at most
+        * sizeof(ANON_OBJECT_HEADER_BIGOBJ). Members might be megabytes in size
+        * and we really only need at most the size of the largest header to determine
+        * the type.
         */
-        bool isImportLib = thisFileNameSize >= 4 && strncmp(fileName + thisFileNameSize - 4, ".dll", 4) == 0;
-#else
-        bool isImportLib = false;
-#endif // windows
+        bool mb_peImportLib = thisFileNameSize >= 4 && strncmp(fileName + thisFileNameSize - 4, ".dll", 4) == 0;
+        bool importLib = false;
+        if (mb_peImportLib) {
 
+            char buf[sizeof(ANON_OBJECT_HEADER_BIGOBJ)];
+            // Too small to be a import lib
+            if(memberSize < sizeof(ANON_OBJECT_HEADER)) { importLib = false;}
+            // Read & Check the header
+            else {
+                if (isThin)
+                {   if (!readThinArchiveMember(
+                            stg_min(sizeof(ANON_OBJECT_HEADER_BIGOBJ), memberSize),
+                            path, fileName, buf))
+                    { goto fail; }
+                }
+                else {
+                    ssize_t sz = fread(buf, 1, sizeof(ANON_OBJECT_HEADER_BIGOBJ), f);
+                    CHECK(fseek(f, -sz, SEEK_CUR) == 0);
+                }
+                importLib = getObjectType(buf, path) == COFF_IMPORT_LIB;
+            }
+            if(importLib) { DEBUG_LOG("\tfound import lib.\n"); }
+        }
+
+#endif // windows
         DEBUG_LOG("\tthisFileNameSize = %d\n", (int)thisFileNameSize);
 
-        if (!is_symbol_table && !isImportLib)
+        if (!is_symbol_table
+#if defined(OBJFORMAT_PEi386)
+            && !importLib
+#endif
+        )
         {
             DEBUG_LOG("Member might be an object file...loading...\n");
-
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
             if (RTS_LINKER_USE_MMAP)
                 image = mmapAnonForLinker(memberSize);
@@ -549,7 +590,7 @@ HsInt loadArchive_ (pathchar *path)
             image = stgMallocBytes(memberSize, "loadArchive(image)");
 #endif
             if (isThin) {
-                if (!readThinArchiveMember(n, memberSize, path, fileName, image)) {
+                if (!readThinArchiveMember(memberSize, path, fileName, image)) {
                     goto fail;
                 }
             }
@@ -615,8 +656,8 @@ while reading filename from `%" PATH_FMT "'", path);
             gnuFileIndex[memberSize] = '/';
             gnuFileIndexSize = memberSize;
         }
-        else if (isImportLib) {
 #if defined(OBJFORMAT_PEi386)
+        else if (importLib) {
             if (checkAndLoadImportLibrary(path, fileName, f)) {
                 DEBUG_LOG("Member is an import file section... "
                           "Corresponding DLL has been loaded...\n");
@@ -629,8 +670,8 @@ while reading filename from `%" PATH_FMT "'", path);
                     FAIL("error whilst seeking by %zd in `%" PATH_FMT "'",
                     memberSize, path);
             }
-#endif
         }
+#endif
         else {
             DEBUG_LOG("`%s' does not appear to be an object file\n",
                       fileName);
@@ -659,7 +700,7 @@ while reading filename from `%" PATH_FMT "'", path);
         }
         memberIdx ++;
         DEBUG_LOG("reached end of archive loading while loop\n");
-    }
+    } // while(1)
     retcode = 1;
 fail:
     if (f != NULL)

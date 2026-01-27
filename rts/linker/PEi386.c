@@ -812,6 +812,13 @@ COFF_HEADER_INFO* getHeaderInfo ( ObjectCode* oc )
          info->numberOfSections     = hdr->NumberOfSections;
         }
         break;
+       case COFF_IMPORT_LIB:
+        {
+         errorBelch ("Unexpected COFF_IMPORT_LIB in getHeaderInfo.\n");
+         stgFree(info);
+         info = NULL;
+         break;
+        }
        default:
         {
          stgFree (info);
