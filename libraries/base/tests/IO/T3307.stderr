@@ -1,0 +1,3 @@
+T3307.hs:10:1: warning: [GHC-15328] [-Wdeprecations (in -Wextended-warnings)]
+    Module ‘GHC.IO.Encoding’ is deprecated:
+      "GHC.IO.Encoding is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."
