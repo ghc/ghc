@@ -14,169 +14,86 @@
 
 StgWord hs_atomic_add8(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_add((volatile StgWord8 *) x, (StgWord8) val);
+  return __atomic_fetch_add((volatile StgWord8 *) x, (StgWord8) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_add16(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_add((volatile StgWord16 *) x, (StgWord16) val);
+  return __atomic_fetch_add((volatile StgWord16 *) x, (StgWord16) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_add32(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_add((volatile StgWord32 *) x, (StgWord32) val);
+  return __atomic_fetch_add((volatile StgWord32 *) x, (StgWord32) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord64 hs_atomic_add64(StgWord x, StgWord64 val)
 {
-  return __sync_fetch_and_add((volatile StgWord64 *) x, val);
+  return __atomic_fetch_add((volatile StgWord64 *) x, val, __ATOMIC_SEQ_CST);
 }
 
 // FetchSubByteArrayOp_Int
 
 StgWord hs_atomic_sub8(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_sub((volatile StgWord8 *) x, (StgWord8) val);
+  return __atomic_fetch_sub((volatile StgWord8 *) x, (StgWord8) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_sub16(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_sub((volatile StgWord16 *) x, (StgWord16) val);
+  return __atomic_fetch_sub((volatile StgWord16 *) x, (StgWord16) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_sub32(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_sub((volatile StgWord32 *) x, (StgWord32) val);
+  return __atomic_fetch_sub((volatile StgWord32 *) x, (StgWord32) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord64 hs_atomic_sub64(StgWord x, StgWord64 val)
 {
-  return __sync_fetch_and_sub((volatile StgWord64 *) x, val);
+  return __atomic_fetch_sub((volatile StgWord64 *) x, val, __ATOMIC_SEQ_CST);
 }
 
 // FetchAndByteArrayOp_Int
 
 StgWord hs_atomic_and8(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_and((volatile StgWord8 *) x, (StgWord8) val);
+  return __atomic_fetch_and((volatile StgWord8 *) x, (StgWord8) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_and16(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_and((volatile StgWord16 *) x, (StgWord16) val);
+  return __atomic_fetch_and((volatile StgWord16 *) x, (StgWord16) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_and32(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_and((volatile StgWord32 *) x, (StgWord32) val);
+  return __atomic_fetch_and((volatile StgWord32 *) x, (StgWord32) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord64 hs_atomic_and64(StgWord x, StgWord64 val)
 {
-  return __sync_fetch_and_and((volatile StgWord64 *) x, val);
+  return __atomic_fetch_and((volatile StgWord64 *) x, val, __ATOMIC_SEQ_CST);
 }
-
-// FetchNandByteArrayOp_Int
-
-// Note [__sync_fetch_and_nand usage]
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// The __sync_fetch_and_nand builtin is a bit of a disaster. It was introduced
-// in GCC long ago with silly semantics. Specifically:
-//
-//    *ptr = ~(tmp & value)
-//
-// Clang introduced the builtin with the same semantics.
-//
-// In GCC 4.4 the operation's semantics were rightly changed to,
-//
-//    *ptr = ~tmp & value
-//
-// and the -Wsync-nand warning was added warning users of the operation about
-// the change.
-//
-// Clang took this change as a reason to remove support for the
-// builtin in 2010. Then, in 2014 Clang re-added support with the new
-// semantics. However, the warning flag was given a different name
-// (-Wsync-fetch-and-nand-semantics-changed) for added fun.
-//
-// Consequently, we are left with a bit of a mess: GHC requires GCC >4.4
-// (enforced by the FP_GCC_VERSION autoconf check), so we thankfully don't need
-// to support the operation's older broken semantics. However, we need to take
-// care to explicitly disable -Wsync-nand wherever possible, lest the build
-// fails with -Werror.  Furthermore, we need to emulate the operation when
-// building with some Clang versions (shipped by some Mac OS X releases) which
-// lack support for the builtin.
-//
-// In the words of Bob Dylan: everything is broken.
-//
-// See also:
-//
-//  * https://bugs.llvm.org/show_bug.cgi?id=8842
-//  * https://gitlab.haskell.org/ghc/ghc/issues/9678
-//
-
-#define CAS_NAND(x, val)                                            \
-  {                                                                 \
-    __typeof__ (*(x)) tmp = *(x);                                   \
-    while (!__sync_bool_compare_and_swap(x, tmp, ~(tmp & (val)))) { \
-      tmp = *(x);                                                   \
-    }                                                               \
-    return tmp;                                                     \
-  }
-
-// N.B. __has_builtin is only provided by clang
-#if !defined(__has_builtin)
-#define __has_builtin(x) 0
-#endif
-
-#if defined(__clang__) && !__has_builtin(__sync_fetch_and_nand)
-#define USE_SYNC_FETCH_AND_NAND 0
-#else
-#define USE_SYNC_FETCH_AND_NAND 1
-#endif
-
-// Otherwise this fails with -Werror
-#pragma GCC diagnostic push
-#if defined(__clang__)
-#pragma GCC diagnostic ignored "-Wsync-fetch-and-nand-semantics-changed"
-#else
-#pragma GCC diagnostic ignored "-Wsync-nand"
-#endif
 
 StgWord hs_atomic_nand8(StgWord x, StgWord val)
 {
-#if USE_SYNC_FETCH_AND_NAND
-  return __sync_fetch_and_nand((volatile StgWord8 *) x, (StgWord8) val);
-#else
-  CAS_NAND((volatile StgWord8 *) x, (StgWord8) val)
-#endif
+  return __atomic_fetch_nand((volatile StgWord8 *) x, (StgWord8) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_nand16(StgWord x, StgWord val)
 {
-#if USE_SYNC_FETCH_AND_NAND
-  return __sync_fetch_and_nand((volatile StgWord16 *) x, (StgWord16) val);
-#else
-  CAS_NAND((volatile StgWord16 *) x, (StgWord16) val);
-#endif
+  return __atomic_fetch_nand((volatile StgWord16 *) x, (StgWord16) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_nand32(StgWord x, StgWord val)
 {
-#if USE_SYNC_FETCH_AND_NAND
-  return __sync_fetch_and_nand((volatile StgWord32 *) x, (StgWord32) val);
-#else
-  CAS_NAND((volatile StgWord32 *) x, (StgWord32) val);
-#endif
+  return __atomic_fetch_nand((volatile StgWord32 *) x, (StgWord32) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord64 hs_atomic_nand64(StgWord x, StgWord64 val)
 {
-#if USE_SYNC_FETCH_AND_NAND
-  return __sync_fetch_and_nand((volatile StgWord64 *) x, val);
-#else
-  CAS_NAND((volatile StgWord64 *) x, val);
-#endif
+  return __atomic_fetch_nand((volatile StgWord64 *) x, val, __ATOMIC_SEQ_CST);
 }
 
 #pragma GCC diagnostic pop
@@ -185,44 +102,44 @@ StgWord64 hs_atomic_nand64(StgWord x, StgWord64 val)
 
 StgWord hs_atomic_or8(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_or((volatile StgWord8 *) x, (StgWord8) val);
+  return __atomic_fetch_or((volatile StgWord8 *) x, (StgWord8) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_or16(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_or((volatile StgWord16 *) x, (StgWord16) val);
+  return __atomic_fetch_or((volatile StgWord16 *) x, (StgWord16) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_or32(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_or((volatile StgWord32 *) x, (StgWord32) val);
+  return __atomic_fetch_or((volatile StgWord32 *) x, (StgWord32) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord64 hs_atomic_or64(StgWord x, StgWord64 val)
 {
-  return __sync_fetch_and_or((volatile StgWord64 *) x, val);
+  return __atomic_fetch_or((volatile StgWord64 *) x, val, __ATOMIC_SEQ_CST);
 }
 
 // FetchXorByteArrayOp_Int
 
 StgWord hs_atomic_xor8(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_xor((volatile StgWord8 *) x, (StgWord8) val);
+  return __atomic_fetch_xor((volatile StgWord8 *) x, (StgWord8) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_xor16(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_xor((volatile StgWord16 *) x, (StgWord16) val);
+  return __atomic_fetch_xor((volatile StgWord16 *) x, (StgWord16) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord hs_atomic_xor32(StgWord x, StgWord val)
 {
-  return __sync_fetch_and_xor((volatile StgWord32 *) x, (StgWord32) val);
+  return __atomic_fetch_xor((volatile StgWord32 *) x, (StgWord32) val, __ATOMIC_SEQ_CST);
 }
 
 StgWord64 hs_atomic_xor64(StgWord x, StgWord64 val)
 {
-  return __sync_fetch_and_xor((volatile StgWord64 *) x, val);
+  return __atomic_fetch_xor((volatile StgWord64 *) x, val, __ATOMIC_SEQ_CST);
 }
 
 // CasByteArrayOp_Int
@@ -283,10 +200,6 @@ StgWord64 hs_xchg64(StgWord x, StgWord64 val)
 // __ATOMIC_SEQ_CST: Full barrier in both directions (hoisting and sinking
 // of code) and synchronizes with acquire loads and release stores in
 // all threads.
-//
-// When we lack C11 atomics support we emulate these using the old GCC __sync
-// primitives which the GCC documentation claims "usually" implies a full
-// barrier.
 
 StgWord hs_atomicread8(StgWord x)
 {
