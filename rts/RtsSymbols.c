@@ -9,6 +9,7 @@
 #include "ghcplatform.h"
 #include "Rts.h"
 #include "RtsSymbols.h"
+#include "LinkerInternals.h"
 
 #include "TopHandler.h"
 #include "HsFFI.h"
@@ -50,6 +51,18 @@ extern char **environ;
 
 /* -----------------------------------------------------------------------------
  * Symbols to be inserted into the RTS symbol table.
+ *
+ * Note [Naming Scheme for Symbol Macros]
+ *
+ * SymI_*: symbol is internal to the RTS. It resides in an object
+ *         file/library that is statically.
+ * SymE_*: symbol is external to the RTS library. It might be linked
+ *         dynamically.
+ *
+ * Sym*_HasProto  : the symbol prototype is imported in an include file
+ *                  or defined explicitly
+ * Sym*_NeedsProto: the symbol is undefined and we add a dummy
+ *                  default proto extern void sym(void);
  */
 
 #define Maybe_Stable_Names      SymI_HasProto(stg_mkWeakzh)                   \
@@ -1127,12 +1140,21 @@ extern char **environ;
       SymI_HasProto(hs_word2float64)
 
 
-/* entirely bogus claims about types of these symbols */
-#define SymI_NeedsProto(vvv)  extern void vvv(void);
-#define SymI_NeedsDataProto(vvv)  extern StgWord vvv[];
-#define SymE_NeedsProto(vvv)  SymI_NeedsProto(vvv);
-#define SymE_NeedsDataProto(vvv)  SymI_NeedsDataProto(vvv);
-#define SymE_HasProto(vvv)    SymI_HasProto(vvv);
+/* Declare prototypes for the symbols that need it, so we can refer
+ * to them in the rtsSyms table below.
+ *
+ * In particular, for the external ones (SymE_*) we use the dllimport attribute
+ * to indicate that (on Windows) they come from external DLLs. This attribute
+ * is ignored on other platforms.
+ *
+ * The claims about the types of these symbols are entirely bogus.
+ */
+#define SymI_NeedsProto(vvv)      extern                            void vvv(void);
+#define SymI_NeedsDataProto(vvv)  extern                            StgWord vvv[];
+#define SymE_NeedsProto(vvv)      extern __attribute__((dllimport)) void vvv(void);
+#define SymE_NeedsDataProto(vvv)  extern __attribute__((dllimport)) StgWord vvv[];
+
+#define SymE_HasProto(vvv) /**/
 #define SymI_HasProto(vvv) /**/
 #define SymI_HasDataProto(vvv) /**/
 #define SymI_HasProto_redirect(vvv,xxx,strength,ty) /**/
@@ -1161,6 +1183,8 @@ RTS_SYMBOLS_PRIM
 #undef SymE_NeedsProto
 #undef SymE_NeedsDataProto
 
+/* See Note [Naming Scheme for Symbol Macros] */
+
 #define SymI_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
                     (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
 #define SymI_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
@@ -1181,7 +1205,16 @@ RTS_SYMBOLS_PRIM
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
       (void*)(&(xxx)), strength, ty },
 
-RtsSymbolVal rtsSyms[] = {
+
+/* Populate the symbol table with stuff from the RTS. */
+void initLinkerRtsSyms (StrHashTable *symhash) {
+
+    /* The address of data symbols with the dllimport attribute are not
+     * compile-time constants and so cannot be used in constant initialisers.
+     * For this reason, rtsSyms is a local variable within this function
+     * rather than a global constant (as it was historically).
+     */
+    const RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
       RTS_RET_SYMBOLS
       RTS_POSIX_ONLY_SYMBOLS
@@ -1196,7 +1229,19 @@ RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS_PRIM
       SymI_HasDataProto(nonmoving_write_barrier_enabled)
       { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
-};
+    };
+
+    IF_DEBUG(linker, debugBelch("populating linker symbol table with built-in RTS symbols\n"));
+    for (const RtsSymbolVal *sym = rtsSyms; sym->lbl != NULL; sym++) {
+        IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
+        if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
+                                    symhash, sym->lbl, sym->addr,
+                                    sym->strength, sym->type, NULL)) {
+            barf("ghciInsertSymbolTable failed");
+        }
+    }
+    IF_DEBUG(linker, debugBelch("done with built-in RTS symbols\n"));
+}
 
 
 // Note [Extra RTS symbols]
