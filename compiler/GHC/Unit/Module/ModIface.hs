@@ -894,13 +894,7 @@ instance (NFData (IfaceAbiHashesExts phase), NFData (IfaceDeclExts phase)) => NF
     `seq` rnf a14
 
 instance NFData IfaceCache where
-  rnf (IfaceCache a1 a2 a3 a4)
-    =  rnf a1
-    `seq` rnf a2
-    `seq` rnf a3
-    `seq` rnf a4
-
-
+  rnf = rwhnf
 
 forceModIface :: ModIface -> IO ()
 forceModIface iface = () <$ (evaluate $ force iface)
