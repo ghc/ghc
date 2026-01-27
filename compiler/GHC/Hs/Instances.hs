@@ -32,8 +32,8 @@ import GHC.Parser.Annotation
 import GHC.Types.Name.Reader (WithUserRdr(..))
 import GHC.Types.InlinePragma (ActivationGhc)
 import GHC.Data.BooleanFormula (BooleanFormula(..))
-import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Decls
+import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
 import Language.Haskell.Syntax.Extension (Anno)
 import Language.Haskell.Syntax.Binds.InlinePragma (ActivationX(..), InlinePragma(..))
 

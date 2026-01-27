@@ -41,7 +41,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Types.OverlapMode (changeOverlapModePass)
 
-import Language.Haskell.Syntax.Basic (OverlapMode(..))
+import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
 
 import Control.DeepSeq (NFData(..))
 

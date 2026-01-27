@@ -39,10 +39,11 @@ import qualified GHC.Core.Coercion as Coercion ( Role(..) )
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( fUNTyCon )
 import GHC.Types.Basic as Hs
-import GHC.Types.InlinePragma as Hs
 import GHC.Types.ForeignCall
-import GHC.Types.Unique
+import GHC.Types.InlinePragma as Hs
+import GHC.Types.OverlapMode as Hs
 import GHC.Types.SourceText
+import GHC.Types.Unique
 import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Data.FastString

@@ -72,6 +72,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.InlinePragma
+import GHC.Types.OverlapMode
 import GHC.Types.SourceText
 import GHC.Types.TyThing
 import GHC.Types.Name hiding( varName, tcName )

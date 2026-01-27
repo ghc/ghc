@@ -88,16 +88,17 @@ module Language.Haskell.Syntax.Decls (
 
 -- friends:
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
-  ( HsExpr, HsUntypedSplice )
+  (HsExpr, HsUntypedSplice)
         -- Because Expr imports Decls via HsBracket
 
-import Language.Haskell.Syntax.Basic (OverlapMode, RuleName, TopLevelFlag)
+import Language.Haskell.Syntax.Basic
+  (LexicalFixity, Role, RuleName, TopLevelFlag)
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Binds.InlinePragma (Activation)
+import Language.Haskell.Syntax.Decls.Overlap (OverlapMode)
 import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Type
-import Language.Haskell.Syntax.Basic (Role, LexicalFixity)
 import Language.Haskell.Syntax.Specificity (Specificity)
+import Language.Haskell.Syntax.Type
 
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 
@@ -118,7 +119,7 @@ import Prelude (Show)
 import Data.Foldable
 import Data.Traversable
 import Data.List.NonEmpty (NonEmpty (..))
-import GHC.Generics ( Generic )
+import GHC.Generics (Generic)
 
 
 {-

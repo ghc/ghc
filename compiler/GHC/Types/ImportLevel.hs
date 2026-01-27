@@ -1,7 +1,14 @@
 {-# LANGUAGE DerivingVia #-}
 
 module GHC.Types.ImportLevel (
-        ImportLevel(..), convImportLevel, convImportLevelSpec, allImportLevels,
+        -- * ImportLevel
+        -- ** Data-type
+        ImportLevel(..),
+        -- ** Enumeration
+        allImportLevels,
+        -- ** Conversion
+        convImportLevel,
+        convImportLevelSpec
    ) where
 
 import GHC.Prelude

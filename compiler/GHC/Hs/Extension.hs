@@ -16,10 +16,11 @@ import GHC.Prelude
 import Data.Data hiding ( Fixity )
 import Language.Haskell.Syntax.Extension
 import GHC.Types.Name
-import GHC.Types.Name.RdrName
+import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Types.SrcLoc (GenLocated(..), unLoc)
+import GHC.Utils.Panic
 import GHC.Parser.Annotation
 
 {-
@@ -152,9 +153,9 @@ data GhcPass (c :: Pass) where
 -- This really should never be entered, but the data-deriving machinery
 -- needs the instance to exist.
 instance Typeable p => Data (GhcPass p) where
-  gunfold _ _ _ = error "instance Data GhcPass"
-  toConstr  _   = error "instance Data GhcPass"
-  dataTypeOf _  = error "instance Data GhcPass"
+  gunfold _ _ _ = panic "instance Data GhcPass"
+  toConstr  _   = panic "instance Data GhcPass"
+  dataTypeOf _  = panic "instance Data GhcPass"
 
 data Pass = Parsed | Renamed | Typechecked
          deriving (Data)

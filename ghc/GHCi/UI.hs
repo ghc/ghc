@@ -75,6 +75,7 @@ import GHC.Core.TyCo.Ppr
 import GHC.Types.SafeHaskell ( getSafeMode )
 import GHC.Types.SourceError ( SourceError, initSourceErrorContext )
 import GHC.Types.Name
+import GHC.Types.ImportLevel ( convImportLevel )
 import GHC.Types.Var ( varType )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Builtin.Names

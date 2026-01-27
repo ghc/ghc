@@ -59,6 +59,7 @@ import GHC.Core.InstEnv (is_dfun_name)
 import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (RdrName (..))
+import GHC.Types.OverlapMode (OverlapMode)
 import GHC.Types.SrcLoc (srcSpanToRealSrcSpan)
 import GHC.Types.Var (Specificity)
 import GHC.Utils.Outputable

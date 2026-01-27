@@ -40,7 +40,7 @@ import GHC.Driver.DynFlags (getDynFlags)
 import GHC.Types.Basic (TupleSort (..))
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName (Exact))
-import GHC.Types.OverlapMode (changeOverlapModeType)
+import GHC.Types.OverlapMode (OverlapMode, changeOverlapModeType)
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
 
 import Haddock.Backends.Hoogle (ppExportD)

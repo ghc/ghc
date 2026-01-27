@@ -120,8 +120,8 @@ import GHC.Prelude
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Module.Name (ModuleName(..))
+import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
 
-import {-# SOURCE #-} GHC.Hs.Extension (GhcPass)
 import {-# SOURCE #-} GHC.Types.Name (Name)
 import GHC.Data.FastString
 import GHC.Data.TrieMap
@@ -130,19 +130,14 @@ import GHC.Utils.Panic.Plain
 import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
 import GHC.Utils.Fingerprint
-import GHC.Types.OverlapMode
-import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
-import GHC.Unit.Types
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
 import GHCi.FFI
 import GHCi.Message
 
-import GHC.Types.Unique.DSet ( unionManyUniqDSets )
-
-import Control.DeepSeq ( NFData(..) )
+import Control.DeepSeq
 import Control.Monad            ( when, (<$!>), unless, forM_, void )
 import Foreign hiding (bit, setBit, clearBit, shiftL, shiftR, void)
 import Data.Array
@@ -2017,85 +2012,6 @@ instance NFData a => NFData (FingerprintWithValue a) where
   rnf (FingerprintWithValue fp mflags)
     = rnf fp `seq` rnf mflags `seq` ()
 
-instance Binary SourceText where
-  put_ bh NoSourceText = putByte bh 0
-  put_ bh (SourceText s) = do
-        putByte bh 1
-        put_ bh s
-
-  get bh = do
-    h <- getByte bh
-    case h of
-      0 -> return NoSourceText
-      1 -> do
-        s <- get bh
-        return (SourceText s)
-      _ -> panic $ "Binary SourceText:" ++ show h
-
---------------------------------------------------------------------------------
--- Instances for the GHC.Unit.Types module
---------------------------------------------------------------------------------
-
-instance Binary a => Binary (GenModule a) where
-  put_ bh (Module p n) = put_ bh p >> put_ bh n
-  -- Module has strict fields, so use $! in order not to allocate a thunk
-  get bh = do p <- get bh; n <- get bh; return $! Module p n
-
-instance Binary InstantiatedUnit where
-  put_ bh indef = do
-    put_ bh (instUnitInstanceOf indef)
-    put_ bh (instUnitInsts indef)
-  get bh = do
-    cid   <- get bh
-    insts <- get bh
-    let fs = mkInstantiatedUnitHash cid insts
-    -- InstantiatedUnit has strict fields, so use $! in order not to allocate a t\
-hunk
-    return $! InstantiatedUnit {
-                instUnitInstanceOf = cid,
-                instUnitInsts = insts,
-                instUnitHoles = unionManyUniqDSets (map (moduleFreeHoles.snd) ins\
-ts),
-                instUnitFS = fs,
-                instUnitKey = getUnique fs
-              }
-
--- Performance: would prefer to have a NameCache like thing
-instance Binary Unit where
-  put_ bh (RealUnit def_uid) = do
-    putByte bh 0
-    put_ bh def_uid
-  put_ bh (VirtUnit indef_uid) = do
-    putByte bh 1
-    put_ bh indef_uid
-  put_ bh HoleUnit =
-    putByte bh 2
-  get bh = do b <- getByte bh
-              u <- case b of
-                0 -> fmap RealUnit (get bh)
-                1 -> fmap VirtUnit (get bh)
-                _ -> pure HoleUnit
-              -- Unit has strict fields that need forcing; otherwise we allocate \
-a thunk.
-              pure $! u
-
-instance Binary UnitId where
-  put_ bh (UnitId fs) = put_ bh fs
-  get bh = do fs <- get bh; return (UnitId fs)
-
-instance Binary a => Binary (GenWithIsBoot a) where
-  put_ bh (GWIB { gwib_mod, gwib_isBoot }) = do
-    put_ bh gwib_mod
-    put_ bh gwib_isBoot
-  get bh = do
-    gwib_mod <- get bh
-    gwib_isBoot <- get bh
-    pure $ GWIB { gwib_mod, gwib_isBoot }
-
-deriving newtype instance Binary x => Binary (Definite x)
-
---------------------------------------------------------------------------------
-
 instance Binary Boxity where -- implemented via isBoxed-isomorphism to Bool
   put_ bh = put_ bh . isBoxed
   get bh  = do
@@ -2164,21 +2080,3 @@ instance Binary RuleMatchInfo where
       h <- getByte bh
       if h == 1 then pure ConLike
                 else pure FunLike
-
-instance Binary (OverlapMode (GhcPass p)) where
-    put_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
-    put_ bh (Overlaps     s) = putByte bh 1 >> put_ bh s
-    put_ bh (Incoherent   s) = putByte bh 2 >> put_ bh s
-    put_ bh (Overlapping  s) = putByte bh 3 >> put_ bh s
-    put_ bh (Overlappable s) = putByte bh 4 >> put_ bh s
-    put_ bh (NonCanonical s) = putByte bh 5 >> put_ bh s
-
-    get bh = do
-        h <- getByte bh
-        case h of
-            0 -> (get bh) >>= \s -> return $ NoOverlap s
-            1 -> (get bh) >>= \s -> return $ Overlaps s
-            2 -> (get bh) >>= \s -> return $ Incoherent s
-            3 -> (get bh) >>= \s -> return $ Overlapping s
-            4 -> (get bh) >>= \s -> return $ Overlappable s
-            _ -> (get bh) >>= \s -> return $ NonCanonical s

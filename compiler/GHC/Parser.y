@@ -70,6 +70,7 @@ import GHC.Types.Error ( GhcHint(..) )
 import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.InlinePragma
+import GHC.Types.OverlapMode
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
 import GHC.Types.PkgQual

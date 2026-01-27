@@ -101,6 +101,7 @@ module GHC.Hs.Decls (
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Decls
+import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
 import Language.Haskell.Syntax.Extension
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprUntypedSplice )

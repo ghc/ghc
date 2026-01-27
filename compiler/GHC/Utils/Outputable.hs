@@ -114,6 +114,7 @@ import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
+import Language.Haskell.Syntax.Decls.Overlap ( OverlapMode(..) )
 import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
 
 import GHC.Prelude.Basic
