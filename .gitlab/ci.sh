@@ -695,7 +695,7 @@ function cabal_abi_test() {
 
   start_section "Cabal test: $OUT"
   mkdir -p "$OUT"
-  run "$HC" \
+  "$HC" \
     -hidir tmp -odir tmp -fforce-recomp -haddock \
     -iCabal/Cabal/src -XNoPolyKinds Distribution.Simple -j"$cores" \
     "$@" 2>&1 | tee $OUT/log
