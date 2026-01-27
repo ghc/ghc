@@ -19,8 +19,7 @@ module GHC.Tc.Gen.Head
        , tyConOf, tyConOfET
        , nonBidirectionalErr
 
-       , pprArgInst
-       , addLExprCtxt, addFunResCtxt ) where
+       , pprArgInst, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
@@ -1075,39 +1074,3 @@ Notice that tcSplitNestedSigmaTys looks through function arrows too, regardless
 of simple/deep subsumption.  Here we are concerned only whether there is a
 mis-match in the number of value arguments.
 -}
-
-
-{- *********************************************************************
-*                                                                      *
-             Misc utility functions
-*                                                                      *
-********************************************************************* -}
-
--- | !Caution!: Users should not call add_expr_ctxt, they ought to use addLExprCtxt
-add_expr_ctxt :: HsExpr GhcRn -> TcRn a -> TcRn a
-add_expr_ctxt e thing_inside
-  = case e of
-      HsHole{} -> thing_inside
-   -- The HsHole special case addresses situations like
-   --    f x = _
-   -- when we don't want to say "In the expression: _",
-   -- because it is mentioned in the error message itself
-
-      ExprWithTySig _ (L _ e') _
-        | XExpr (ExpandedThingRn o _) <- e' -> addExpansionErrCtxt o (ExprCtxt e) thing_inside
-   -- There is a special case for expressions with signatures to avoid having too verbose
-   -- error context. So here we flip the ErrCtxt state to expanded if the expression is expanded.
-   -- c.f. RecordDotSyntaxFail9
-
-      XExpr (ExpandedThingRn o _) -> addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) thing_inside
-   -- Flip error ctxt into expansion mode
-
-      _ -> addErrCtxt (ExprCtxt e) thing_inside
-
-
-addLExprCtxt :: SrcSpan -> HsExpr GhcRn -> TcRn a -> TcRn a
-addLExprCtxt lspan e thing_inside
-  | not (isGeneratedSrcSpan lspan)
-  = setSrcSpan lspan $ add_expr_ctxt e thing_inside
-  | otherwise   -- no op in generated code
-  = thing_inside
