@@ -125,7 +125,7 @@ data DocStructureItem
   = DsiSectionHeading !Int !(HsDoc GhcRn)
   | DsiDocChunk !(HsDoc GhcRn)
   | DsiNamedChunkRef !String
-  | DsiExports !Avails
+  | DsiExports !DetOrdAvails
   | DsiModExport
       !(NonEmpty ModuleName) -- ^ We might re-export avails from multiple
                             -- modules with a single export declaration. E.g.
@@ -137,7 +137,7 @@ data DocStructureItem
                             --
                             -- Invariant: This list of ModuleNames must be
                             -- sorted to guarantee interface file determinism.
-      !Avails
+      !DetOrdAvails
                             -- ^ Invariant: This list of Avails must be sorted
                             -- to guarantee interface file determinism.
 
