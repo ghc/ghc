@@ -5580,7 +5580,7 @@ data TcSolverReportMsg
      { mismatchMsg           :: MismatchMsg
      , mismatchTyVarInfo     :: Maybe TyVarInfo
      , mismatchAmbiguityInfo :: [AmbiguityInfo]
-     , mismatchCoercibleInfo :: Maybe CoercibleMsg }
+     , mismatchCoercibleInfo :: [CoercibleMsg] }
 
    -- | A violation of the representation-polymorphism invariants.
    --
@@ -5760,8 +5760,7 @@ data CannotUnifyVariableReason
   --
   -- For example, trying to unify a 'SkolemTv' with the
   -- type Int, or with a 'TyVarTv'.
-  | DifferentTyVars TyVarInfo
-  | RepresentationalEq TyVarInfo (Maybe CoercibleMsg)
+  | DifferentTyVars TyVarInfo [CoercibleMsg]
   deriving Generic
 
 -- | Report a mismatch error without any extra
@@ -5772,7 +5771,7 @@ mkPlainMismatchMsg msg
      { mismatchMsg           = msg
      , mismatchTyVarInfo     = Nothing
      , mismatchAmbiguityInfo = []
-     , mismatchCoercibleInfo = Nothing }
+     , mismatchCoercibleInfo = [] }
 
 -- | Additional information to be given in a 'CouldNotDeduce' message,
 -- which is then passed on to 'mk_supplementary_ea_msg'.
@@ -5984,6 +5983,10 @@ data CoercibleMsg
   -- Test cases: none.
   | TyConIsAbstract TyCon
 
+  -- | The type constructor has the given role in the specified
+  -- argument positions.
+  | TyConHasRoleInArgs Role TyCon (NE.NonEmpty Int)
+
   -- | We can't unwrap a newtype whose constructor is not in scope.
   --
   -- Example:
@@ -5993,7 +5996,11 @@ data CoercibleMsg
   --   foo = coerce
   --
   -- Test cases: TcCoercibleFail.
-  | OutOfScopeNewtypeConstructor TyCon DataCon
+  | OutOfScopeNewtypeConstructor DataCon [ImportSuggestion]
+
+  -- | A type is a data family application which does not reduce to a
+  -- known instance.
+  | StuckDataFamApps TyCon (NE.NonEmpty [Type])
 
 -- | Explains why GHC wasn't able to provide a built-in instance for
 -- a particular class.

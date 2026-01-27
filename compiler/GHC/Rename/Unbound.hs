@@ -18,6 +18,7 @@ module GHC.Rename.Unbound
    , similarNameSuggestions
    , fieldSelectorSuggestions
    , anyQualImportSuggestions
+   , exactNameImportSuggestions
    , WhatLooking(..)
    , WhereLooking(..)
    , LookingFor(..)
@@ -451,6 +452,28 @@ importSuggestions_ looking_for interesting_imports lookup_gre
   -- explicit import list
   (helpful_imports_hiding, helpful_imports_non_hiding)
     = partition (imv_is_hiding . snd) helpful_imports
+
+-- | Could the user import this exact 'Name' by adding an import item to
+-- any of the existing imported modules (or removing from a hiding list of
+-- an existing imported module with a hiding list)?
+exactNameImportSuggestions :: ImportAvails -> Name -> [ImportSuggestion]
+exactNameImportSuggestions imports wanted_nm =
+  [ CouldImportFrom (mod :| mods) | (mod : mods) <- [ helpful_imports_non_hiding ] ]
+  ++
+  [ CouldUnhideFrom (mod :| mods) | (mod : mods) <- [ helpful_imports_hiding ] ]
+  where
+
+    has_name :: (Module, ImportedModsVal) -> Bool
+    has_name (_,imv) =
+      isJust $ lookupGRE_Name (imv_all_exports imv) wanted_nm
+
+    (helpful_imports_hiding, helpful_imports_non_hiding)
+      = partition (imv_is_hiding . snd)
+      $ filter has_name
+          [ (mod, imp)
+          | (mod, mod_imports) <- M.toList (imp_mods imports)
+          , imp <- importedByUser mod_imports
+          ]
 
 extensionSuggestions :: RdrName -> [GhcHint]
 extensionSuggestions rdrName

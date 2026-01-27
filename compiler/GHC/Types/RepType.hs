@@ -99,12 +99,13 @@ unwrapType ty
     go (CastTy t _)              = go t
     go t                         = t
 
-     -- cf. Coercion.unwrapNewTypeStepper
+    -- cf. GHC.Core.Coercion.unwrapNewTypeStepper
+    stepper :: RecTcChecker -> TyCon -> [Type] -> NormaliseStepResult ()
     stepper rec_nts tc tys
       | Just (ty', _) <- instNewTyCon_maybe tc tys
       = case checkRecTc rec_nts tc of
           Just rec_nts' -> NS_Step rec_nts' (go ty') ()
-          Nothing       -> NS_Abort   -- infinite newtypes
+          Nothing       -> NS_Abort  -- infinite newtypes
       | otherwise
       = NS_Done
 

@@ -352,12 +352,12 @@ mkReprEqPred ty1  ty2
     k1 = typeKind ty1
     k2 = typeKind ty2
 
--- | Makes a lifted equality predicate at the given role
+-- | Makes a primitive unlifted equality predicate at the given role
 mkEqPred :: EqRel -> Type -> Type -> PredType
 mkEqPred NomEq  = mkNomEqPred
 mkEqPred ReprEq = mkReprEqPred
 
--- | Makes a lifted equality predicate at the given role
+-- | Makes a primitive unlifted equality predicate at the given role
 mkEqPredRole :: Role -> Type -> Type -> PredType
 mkEqPredRole Nominal          = mkNomEqPred
 mkEqPredRole Representational = mkReprEqPred

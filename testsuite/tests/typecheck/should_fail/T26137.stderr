@@ -1,0 +1,13 @@
+T26137.hs:12:12: error: [GHC-18872]
+    • Couldn't match type ‘Generically T’ with ‘T’
+        arising from the coercion of the method ‘foo’
+          from type ‘Reader () (Generically T)’ to type ‘Reader () T’
+      • Note:
+        • The data constructor ‘Control.Monad.Trans.Reader.ReaderT’
+            of newtype ‘Control.Monad.Trans.Reader.ReaderT’ is not in scope.
+        • The type constructor ‘Control.Monad.Trans.Reader.ReaderT’ has nominal role in its third argument.
+    • When deriving the instance for (MyClass T)
+    Suggested fix:
+      Add ‘ReaderT’ to the import list in the import of
+      ‘Control.Monad.Trans.Reader’ (at T26137.hs:5:1-41).
+

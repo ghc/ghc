@@ -1,0 +1,41 @@
+T25949.hs:11:14: error: [GHC-18872]
+    • Couldn't match representation of type ‘OpaqueNT’
+                               with that of ‘Int’
+        arising from a use of ‘coerce’
+      Note: The type ‘OpaqueNT’ is an opaque newtype, whose constructor is hidden.
+    • In the expression: coerce
+      In an equation for ‘testOpaque’: testOpaque = coerce
+
+T25949.hs:14:18: error: [GHC-18872]
+    • Couldn't match representation of type ‘OutOfScopeNT’
+                               with that of ‘Int’
+        arising from a use of ‘coerce’
+      Note: The data constructor ‘T25949_aux.MkOutOfScopeNT’
+              of newtype ‘OutOfScopeNT’ is not in scope.
+    • In the expression: coerce
+      In an equation for ‘testOutOfScope’: testOutOfScope = coerce
+    Suggested fix:
+      Add ‘MkOutOfScopeNT’ to the import list in the import of
+      ‘T25949_aux’ (at T25949.hs:(5,1)-(8,3)).
+
+T25949.hs:17:17: error: [GHC-18872]
+    • Couldn't match representation of type ‘FamNT Opaque’
+                               with that of ‘Int’
+        arising from a use of ‘coerce’
+      Note: The type ‘FamNT
+                        Opaque’ is an opaque newtype, whose constructor is hidden.
+    • In the expression: coerce
+      In an equation for ‘testOpaqueFam’: testOpaqueFam = coerce
+
+T25949.hs:20:21: error: [GHC-18872]
+    • Couldn't match representation of type ‘FamNT OutOfScope’
+                               with that of ‘Int’
+        arising from a use of ‘coerce’
+      Note: The data constructor ‘T25949_aux.MkOutOfScopeFamNT’
+              of newtype ‘FamNT OutOfScope’ is not in scope.
+    • In the expression: coerce
+      In an equation for ‘testOutOfScopeFam’: testOutOfScopeFam = coerce
+    Suggested fix:
+      Add ‘MkOutOfScopeFamNT’ to the import list in the import of
+      ‘T25949_aux’ (at T25949.hs:(5,1)-(8,3)).
+

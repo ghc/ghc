@@ -39,7 +39,10 @@ import qualified GHC.Boot.TH.Syntax as TH
 import qualified GHC.Boot.TH.Ppr as TH
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon, pretendNameIsInScope )
+import GHC.Builtin.Types
+  ( boxedRepDataConTyCon, tYPETyCon
+  , pretendNameIsInScope
+  )
 
 import GHC.Types.Name.Reader
 import GHC.Unit.Module.ModIface
@@ -131,8 +134,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Foldable ( fold )
 import Data.Function (on)
-import Data.List ( groupBy, sortBy, tails
-                 , partition, unfoldr )
+import Data.List ( groupBy, sortBy, sortOn, tails, partition, unfoldr )
 import Data.Ord ( comparing )
 import Data.Bifunctor
 
@@ -4067,14 +4069,16 @@ pprTcSolverReportMsg ctxt
      { mismatchMsg           = mismatch_msg
      , mismatchTyVarInfo     = tv_info
      , mismatchAmbiguityInfo = ambig_infos
-     , mismatchCoercibleInfo = coercible_info })
+     , mismatchCoercibleInfo = coercible_msgs })
   = let invis_bits = mismatchInvisibleBits mismatch_msg
         ppr_mismatch = pprMismatchMsg ctxt mismatch_msg
     in pprWithInvisibleBits invis_bits $
-         vcat ([ ppr_mismatch
-               , maybe empty (pprTyVarInfo ctxt) tv_info
-               , maybe empty pprCoercibleMsg coercible_info ]
-               ++ (map pprAmbiguityInfo ambig_infos))
+          vcat
+            ( ppr_mismatch
+            : maybe empty (pprTyVarInfo ctxt) tv_info
+            : pprCoercibleMsgs coercible_msgs
+            : map pprAmbiguityInfo ambig_infos
+            )
 pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
   vcat (map make_msg frr_origs)
   where
@@ -4458,11 +4462,8 @@ pprCannotUnifyVariableReason ctxt
       vcat (map (tyvar_binding . tidyTyCoVarOcc (cec_tidy ctxt))
                 (tv:tvs))
     tyvar_binding tyvar = ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)
-pprCannotUnifyVariableReason ctxt (DifferentTyVars tv_info)
-  = pprTyVarInfo ctxt tv_info
-pprCannotUnifyVariableReason ctxt (RepresentationalEq tv_info mb_coercible_msg)
-  = pprTyVarInfo ctxt tv_info
-  $$ maybe empty pprCoercibleMsg mb_coercible_msg
+pprCannotUnifyVariableReason ctxt (DifferentTyVars tv_info coercible_msgs)
+  = pprTyVarInfo ctxt tv_info $$ pprCoercibleMsgs coercible_msgs
 
 pprUntouchableVariable :: TcTyVar -> Implication -> SDoc
 pprUntouchableVariable tv (Implic { ic_given = given, ic_info = skol_info, ic_env = env })
@@ -4521,7 +4522,8 @@ pprMismatchMsg ctxt
           , pprQCOriginExtra item
           , ea_extra
           , maybe empty (pprWhenMatching ctxt) mb_match_txt
-          , maybe empty pprSameOccInfo same_occ_info ]
+          , maybe empty pprSameOccInfo same_occ_info
+          ]
   where
     msg
       | (isLiftedRuntimeRep ty1 && isUnliftedRuntimeRep ty2) ||
@@ -4556,7 +4558,7 @@ pprMismatchMsg ctxt
       = case ea of
          NoEA        -> (False, empty)
          EA mb_extra -> (True , maybe empty (pprExpectedActualInfo ctxt) mb_extra)
-    is_repr = case errorItemEqRel item of { ReprEq -> True; NomEq -> False }
+    is_repr = errorItemEqRel item == ReprEq
 
     what = levelString (ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel)
 
@@ -5100,16 +5102,75 @@ pprExpectedActualInfo _
       , text "Expected type:" <+> ppr exp
       , text "  Actual type:" <+> ppr act ]
 
+pprCoercibleMsgs :: [CoercibleMsg] -> SDoc
+pprCoercibleMsgs = \case
+  [] -> empty
+  [msg] -> bullet <+> (note $ pprCoercibleMsg msg)
+  msgs ->
+    let sorted_msgs = sortOn msg_prio msgs
+    in
+      bullet <+> text "Note:" $$
+      nest 2 (vcat $ map ((<> dot) . (bullet <+>) . pprCoercibleMsg) sorted_msgs)
+  where
+    -- Print the messages with a given priority order
+    msg_prio :: CoercibleMsg -> Int
+    msg_prio = \case
+      OutOfScopeNewtypeConstructor {} -> 0 -- highest priority; print first
+      TyConIsAbstract {} -> 1
+      UnknownRoles {} -> 2
+      StuckDataFamApps {} -> 3
+      TyConHasRoleInArgs {} -> 4           -- lowest priority; print last
+
+
 pprCoercibleMsg :: CoercibleMsg -> SDoc
 pprCoercibleMsg (UnknownRoles ty) =
-  note $ "We cannot know what roles the parameters to" <+> quotes (ppr ty) <+> "have;" $$
-           "we must assume that the role is nominal"
+  "We cannot know what roles the parameters to" <+> quotes (ppr ty) <+> "have;" $$
+    "we must assume that the role is nominal"
+pprCoercibleMsg (TyConHasRoleInArgs role tc args)
+  = vcat [ role_msg, oversat_msg ]
+  where
+    (oversat_args, normal_args) = partition (> tyConArity tc) $ NE.toList args
+    role_msg = case NE.nonEmpty normal_args of
+      Nothing -> empty
+      Just neArgs ->
+        "The type constructor" <+> quotes (pprSourceTyCon tc)
+        <+> "has" <+> ppr role <+> "role in its" <+> ppr_args neArgs
+    oversat_msg = case NE.nonEmpty oversat_args of
+      Nothing -> empty
+      Just neArgs ->
+        "The type constructor" <+> quotes (pprSourceTyCon tc) <+> "is oversaturated;" $$
+        "we must assume that the" <+> ppr_args neArgs
+          <+> hasOrHave (NE.toList neArgs) <+> "nominal role."
+    ppr_args neArgs =
+      fsep (punctuateFinal comma (text " and") (map speakNth (NE.init neArgs)))
+        <+> speakNth (NE.last neArgs)
+        <+> "argument" <> plural (NE.toList neArgs)
 pprCoercibleMsg (TyConIsAbstract tc) =
-  note $ "The type constructor" <+> quotes (pprSourceTyCon tc) <+> "is abstract"
-pprCoercibleMsg (OutOfScopeNewtypeConstructor tc dc) =
-  hang (text "The data constructor" <+> quotes (ppr $ dataConName dc))
-    2 (sep [ text "of newtype" <+> quotes (pprSourceTyCon tc)
-           , text "is not in scope" ])
+  "The type constructor" <+> quotes (pprSourceTyCon tc) <+> "is abstract"
+pprCoercibleMsg (StuckDataFamApps tc tyss) =
+  "The data family application" <> plural (NE.toList tyss)
+        <+> fsep (punctuateFinal comma (text " and") (map ppr_one (NE.init tyss)))
+        <+> ppr_one (NE.last tyss)
+    <+> doOrDoes (NE.toList tyss) <+> "not reduce"
+  where
+    ppr_one tys = quotes (ppr (mkTyConApp tc tys))
+pprCoercibleMsg (OutOfScopeNewtypeConstructor dc import_suggs) =
+  -- If we don't have any suggestions for bringing the newtype constructor
+  -- into scope, perhaps it is a deliberately opaque newtype (#25949),
+  -- so give a slightly different error message to reflect that.
+  --
+  -- NB: the hints get displayed separately, using coercibleMsgHints,
+  -- so don't display them here.
+  if null import_suggs
+  then
+    text "The type" <+> quotes (pprSourceTyCon tc)
+      <+> text "is an opaque newtype, whose constructor is hidden"
+  else
+    hang (text "The data constructor" <+> quotes (ppr dc))
+      2 (sep [ text "of newtype" <+> quotes (pprSourceTyCon tc)
+             , text "is not in scope" ])
+  where
+    tc = dataConTyCon dc
 
 pprNoBuiltinInstanceMsg :: NoBuiltinInstanceMsg -> SDoc
 pprNoBuiltinInstanceMsg = \case
@@ -5407,8 +5468,9 @@ tcSolverReportMsgHints ctxt = \case
     -> noHints
   CannotUnifyVariable mismatch_msg rea
     -> mismatchMsgHints ctxt mismatch_msg ++ cannotUnifyVariableHints rea
-  Mismatch { mismatchMsg = mismatch_msg }
+  Mismatch { mismatchMsg = mismatch_msg, mismatchCoercibleInfo = coercible_msgs }
     -> mismatchMsgHints ctxt mismatch_msg
+    ++ concatMap coercibleMsgHints coercible_msgs
   FixedRuntimeRepError {}
     -> noHints
   ExpectingMoreArguments {}
@@ -5495,10 +5557,17 @@ cannotUnifyVariableHints = \case
     -> noHints
   SkolemEscape {}
     -> noHints
-  DifferentTyVars {}
-    -> noHints
-  RepresentationalEq {}
-    -> noHints
+  DifferentTyVars _ coercible_msgs
+    -> concatMap coercibleMsgHints coercible_msgs
+
+coercibleMsgHints :: CoercibleMsg -> [GhcHint]
+coercibleMsgHints = \case
+  UnknownRoles {} -> []
+  TyConIsAbstract {} -> []
+  TyConHasRoleInArgs {} -> []
+  StuckDataFamApps {} -> []
+  OutOfScopeNewtypeConstructor dc import_suggs ->
+    map (ImportSuggestion (getOccName dc)) import_suggs
 
 suggestAddSig :: SolverReportErrCtxt -> TcType -> TcType -> Maybe GhcHint
 -- See Note [Suggest adding a type signature]

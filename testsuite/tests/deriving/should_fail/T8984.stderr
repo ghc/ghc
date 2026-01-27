@@ -1,9 +1,14 @@
 T8984.hs:7:46: error: [GHC-25897]
     • Couldn't match type ‘cat’ with ‘N cat’
+        arising from defaulting the representational equality
+          between: cat a (cat a Int)
+              and: cat a (N cat a Int)
         arising from the coercion of the method ‘app’
           from type ‘cat a (cat a Int)’ to type ‘N cat a (N cat a Int)’
       ‘cat’ is a rigid type variable bound by
         the deriving clause for ‘C (N cat a)’
         at T8984.hs:7:46
+      • Note: We cannot know what roles the parameters to ‘cat’ have;
+              we must assume that the role is nominal.
     • When deriving the instance for (C (N cat a))
 

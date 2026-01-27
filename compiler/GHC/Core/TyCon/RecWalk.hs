@@ -69,9 +69,14 @@ good to be able to unwrap multiple layers.
 The function that manages all this is checkRecTc.
 -}
 
-data RecTcChecker = RC !Int (TyConEnv Int)
-  -- The upper bound, and the number of times
-  -- we have encountered each TyCon
+-- | Keeps track of how many times we have unwrapped various 'TyCon's,
+-- to avoid falling into a loop.
+--
+-- See Note [Expanding newtypes and products].
+data RecTcChecker =
+  RC
+    !Int -- ^ upper bound
+    (TyConEnv Int) -- ^ number of times we have encountered each 'TyCon'
 
 instance Outputable RecTcChecker where
   ppr (RC n env) = text "RC:" <> int n <+> ppr env

@@ -371,7 +371,7 @@ pmTopNormaliseType (TySt _ inert) typ = {-# SCC "pmTopNormaliseType" #-} do
 
     -- A 'NormaliseStepper' that unwraps newtypes, careful not to fall into
     -- a loop. If it would fall into a loop, it produces 'NS_Abort'.
-    newTypeStepper :: NormaliseStepper ([Type] -> [Type],[(Type, DataCon, Type)] -> [(Type, DataCon, Type)])
+    newTypeStepper :: NormaliseStepper ([Type] -> [Type], [(Type, DataCon, Type)] -> [(Type, DataCon, Type)])
     newTypeStepper rec_nts tc tys
       | Just (ty', _co) <- instNewTyCon_maybe tc tys
       , let orig_ty = TyConApp tc tys

@@ -3,5 +3,8 @@ T15801.hs:52:10: error: [GHC-18872]
       When matching types
         b :: Op (*)
         UnOp b :: *
+      • Note: We cannot know what roles the parameters to ‘(-->)
+                                                             op_a’ have;
+              we must assume that the role is nominal.
     • In the instance declaration for ‘OpRíki (Op (*))’
 

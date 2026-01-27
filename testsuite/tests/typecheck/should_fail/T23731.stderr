@@ -1,0 +1,7 @@
+T23731.hs:13:7: error: [GHC-18872]
+    • Couldn't match type ‘Sum Int’ with ‘Int’
+        arising from a use of ‘coerce’
+      Note: The type constructor ‘Foo’ has nominal role in its first argument.
+    • In the expression: coerce (Foo (10 :: Sum Int))
+      In an equation for ‘foo’: foo = coerce (Foo (10 :: Sum Int))
+

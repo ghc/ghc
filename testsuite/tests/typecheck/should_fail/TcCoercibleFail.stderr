@@ -7,7 +7,12 @@ TcCoercibleFail.hs:11:8: error: [GHC-18872]
 
 TcCoercibleFail.hs:14:8: error: [GHC-18872]
     • Couldn't match type ‘Int’ with ‘Age’
+        arising from defaulting the representational equality
+          between: m Int
+              and: m Age
         arising from a use of ‘coerce’
+      • Note: We cannot know what roles the parameters to ‘m’ have;
+              we must assume that the role is nominal.
     • In the first argument of ‘($)’, namely ‘coerce’
       In the expression: coerce $ (return one :: m Int)
       In an equation for ‘foo2’: foo2 = coerce $ (return one :: m Int)
@@ -15,16 +20,23 @@ TcCoercibleFail.hs:14:8: error: [GHC-18872]
 TcCoercibleFail.hs:16:8: error: [GHC-18872]
     • Couldn't match type ‘Int’ with ‘Age’
         arising from a use of ‘coerce’
+      • Note: The type constructor ‘Map’ has nominal role in its first argument.
     • In the first argument of ‘($)’, namely ‘coerce’
       In the expression: coerce $ Map one () :: Map Age ()
       In an equation for ‘foo3’: foo3 = coerce $ Map one () :: Map Age ()
 
 TcCoercibleFail.hs:18:8: error: [GHC-18872]
-    • Couldn't match type ‘Int’ with ‘Down Int’
+    • Couldn't match representation of type ‘Int’
+                               with that of ‘Down Int’
         arising from a use of ‘coerce’
+      • Note: The data constructor ‘GHC.Internal.Data.Ord.Down’
+                of newtype ‘Down’ is not in scope.
     • In the first argument of ‘($)’, namely ‘coerce’
       In the expression: coerce $ one :: Down Int
       In an equation for ‘foo4’: foo4 = coerce $ one :: Down Int
+    Suggested fix:
+      Add ‘Down’ to the import list in the import of ‘Data.Ord’
+      (at TcCoercibleFail.hs:4:1-22).
 
 TcCoercibleFail.hs:21:8: error: [GHC-40404]
     • Reduction stack overflow; size = 201

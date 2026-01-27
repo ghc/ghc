@@ -20,7 +20,7 @@ import GHC.Tc.Zonk.TcType     as TcM
 import GHC.Tc.Solver.Solve( solveWanteds )
 import GHC.Tc.Solver.Monad  as TcS
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.CtLoc( mkGivenLoc )
+import GHC.Tc.Types.CtLoc( mkGivenLoc, updateCtLocOrigin )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 
@@ -564,7 +564,8 @@ defaultEquality encl_eqs ct
             -- This handles cases such as @IO alpha[tau] ~R# IO Int@
             -- by defaulting @alpha := Int@, which is useful in practice
             -- (see Note [Defaulting representational equalities]).
-           ; nom_ev <- newWantedNC loc rws $ mkNomEqPred z_ty1 z_ty2
+           ; let loc' = loc `updateCtLocOrigin` DefaultReprEqOrigin z_ty1 z_ty2
+           ; nom_ev <- newWantedNC loc' rws $ mkNomEqPred z_ty1 z_ty2
 
             -- Call the solver on this nominal equality
            ; residual_wc <-

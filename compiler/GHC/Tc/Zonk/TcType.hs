@@ -706,12 +706,11 @@ zonkTidyOrigin env (KindEqOrigin ty1 ty2 orig t_or_k)
        ; (env2, ty2')  <- zonkTidyTcType env1 ty2
        ; (env3, orig') <- zonkTidyOrigin env2 orig
        ; return (env3, KindEqOrigin ty1' ty2' orig' t_or_k) }
-zonkTidyOrigin env (InjTFOrigin1 pred1 orig1 loc1 pred2 orig2 loc2)
-  = do { (env1, pred1') <- zonkTidyTcType env  pred1
-       ; (env2, orig1') <- zonkTidyOrigin env1 orig1
-       ; (env3, pred2') <- zonkTidyTcType env2 pred2
-       ; (env4, orig2') <- zonkTidyOrigin env3 orig2
-       ; return (env4, InjTFOrigin1 pred1' orig1' loc1 pred2' orig2' loc2) }
+zonkTidyOrigin env (DefaultReprEqOrigin ty1 ty2 orig)
+  = do { (env1, ty1')  <- zonkTidyTcType env  ty1
+       ; (env2, ty2')  <- zonkTidyTcType env1 ty2
+       ; (env3, orig') <- zonkTidyOrigin env2 orig
+       ; return (env3, DefaultReprEqOrigin ty1' ty2' orig') }
 zonkTidyOrigin env (CycleBreakerOrigin orig)
   = do { (env1, orig') <- zonkTidyOrigin env orig
        ; return (env1, CycleBreakerOrigin orig') }

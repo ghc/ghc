@@ -1,5 +1,5 @@
 deriving-via-fail5.hs:8:1: error: [GHC-25897]
-    • Couldn't match type ‘b’ with ‘a’
+    • Couldn't match representation of type ‘b’ with that of ‘a’
         arising from a use of ‘GHC.Internal.Prim.coerce’
       ‘b’ is a rigid type variable bound by
         the instance declaration
@@ -25,7 +25,7 @@ deriving-via-fail5.hs:8:1: error: [GHC-25897]
           (bound at deriving-via-fail5.hs:8:1)
 
 deriving-via-fail5.hs:8:1: error: [GHC-25897]
-    • Couldn't match type ‘b’ with ‘a’
+    • Couldn't match representation of type ‘b’ with that of ‘a’
         arising from a use of ‘GHC.Internal.Prim.coerce’
       ‘b’ is a rigid type variable bound by
         the instance declaration
@@ -48,7 +48,7 @@ deriving-via-fail5.hs:8:1: error: [GHC-25897]
         show :: Foo4 a -> String (bound at deriving-via-fail5.hs:8:1)
 
 deriving-via-fail5.hs:8:1: error: [GHC-25897]
-    • Couldn't match type ‘b’ with ‘a’
+    • Couldn't match representation of type ‘b’ with that of ‘a’
         arising from a use of ‘GHC.Internal.Prim.coerce’
       ‘b’ is a rigid type variable bound by
         the instance declaration

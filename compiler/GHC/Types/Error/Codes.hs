@@ -425,7 +425,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "OccursCheck"                                   = 27958
   GhcDiagnosticCode "SkolemEscape"                                  = 46956
   GhcDiagnosticCode "DifferentTyVars"                               = 25897
-  GhcDiagnosticCode "RepresentationalEq"                            = 10283
+  GhcDiagnosticCode "RepresentationalEq"                            = Outdated 10283
 
   -- Typechecker/renamer diagnostic codes
   GhcDiagnosticCode "TcRnSolverDepthError"                          = 40404

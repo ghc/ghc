@@ -11,6 +11,7 @@ T7148.hs:27:40: error: [GHC-25897]
       ‘b’ is a rigid type variable bound by
         the deriving clause for ‘IsoUnit (Tagged a b)’
         at T7148.hs:27:40-46
+      Note: The type constructor ‘SameType’ has nominal role in its third argument.
     • When deriving the instance for (IsoUnit (Tagged a b))
 
 T7148.hs:27:40: error: [GHC-25897]
@@ -26,5 +27,6 @@ T7148.hs:27:40: error: [GHC-25897]
       ‘b’ is a rigid type variable bound by
         the deriving clause for ‘IsoUnit (Tagged a b)’
         at T7148.hs:27:40-46
+      Note: The type constructor ‘SameType’ has nominal role in its second argument.
     • When deriving the instance for (IsoUnit (Tagged a b))
 

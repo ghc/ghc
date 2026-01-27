@@ -12,6 +12,7 @@ T22645.hs:9:5: error: [GHC-25897]
         the type signature for:
           p :: forall a b. Coercible a b => T Maybe a -> T Maybe b
         at T22645.hs:8:1-44
+      Note: The type constructor ‘T’ has nominal role in its second argument.
     • In the expression: coerce
       In an equation for ‘p’: p = coerce
     • Relevant bindings include

@@ -62,11 +62,12 @@ import GHC.Core.Type
 import GHC.Core.Class (className)
 import GHC.Core.ConLike (isExistentialRecordField, ConLike (..))
 import GHC.Core.Coercion
-import GHC.Core.TyCo.Ppr     ( pprTyVars )
+import GHC.Core.DataCon
+import GHC.Core.TyCo.Ppr  ( pprTyVars )
 import GHC.Core.TyCo.Tidy
+
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
-import GHC.Core.DataCon
 
 import GHC.Utils.Error  (diagReasonSeverity,  pprLocMsgEnvelope )
 import GHC.Utils.Misc
@@ -86,11 +87,16 @@ import Control.Monad      ( when, foldM, forM_ )
 import Data.Bifunctor     ( bimap )
 import Data.Foldable      ( toList )
 import Data.Function      ( on )
+import Data.Functor.Classes ( liftCompare )
+import Data.IntSet        ( IntSet )
+import qualified Data.IntSet as IntSet
 import Data.List          ( partition, union, sort, sortBy )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import Data.Ord         ( comparing )
-import Data.Either (partitionEithers)
+import Data.Ord           ( comparing )
+import Data.Either        ( partitionEithers )
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 
 {-
 ************************************************************************
@@ -1815,46 +1821,89 @@ mkEqErr1 ctxt item   -- Wanted only
   where
     (ty1, ty2) = getEqPredTys (errorItemPred item)
 
--- | This function tries to reconstruct why a "Coercible ty1 ty2" constraint
--- is left over.
-mkCoercibleExplanation :: GlobalRdrEnv -> FamInstEnvs
-                       -> TcType -> TcType -> Maybe CoercibleMsg
-mkCoercibleExplanation rdr_env fam_envs ty1 ty2
-  | Just (tc, tys) <- tcSplitTyConApp_maybe ty1
-  , (rep_tc, _, _) <- tcLookupDataFamInst fam_envs tc tys
-  , Just msg <- coercible_msg_for_tycon rep_tc
-  = Just msg
-  | Just (tc, tys) <- splitTyConApp_maybe ty2
-  , (rep_tc, _, _) <- tcLookupDataFamInst fam_envs tc tys
-  , Just msg <- coercible_msg_for_tycon rep_tc
-  = Just msg
-  | Just (s1, _) <- tcSplitAppTy_maybe ty1
-  , Just (s2, _) <- tcSplitAppTy_maybe ty2
-  , s1 `eqType` s2
-  , has_unknown_roles s1
-  = Just $ UnknownRoles s1
-  | otherwise
-  = Nothing
-  where
-    coercible_msg_for_tycon tc
-        | isAbstractTyCon tc
-        = Just $ TyConIsAbstract tc
-        | isNewTyCon tc
-        , [data_con] <- tyConDataCons tc
-        , let dc_name = dataConName data_con
-        , isNothing (lookupGRE_Name rdr_env dc_name)
-        = Just $ OutOfScopeNewtypeConstructor tc data_con
-        | otherwise = Nothing
+-- | This function looks at the 'CtExplanations' field of the 'CtLoc' to
+-- see what might have caused a representational equality to remain unsolved.
+--
+-- For example: a newtype constructor was out of scope.
+--
+-- See Note [CtExplanations] in GHC.Tc.Types.CtLoc.
+mkCoercibleExplanation :: ImportAvails -> CtLoc -> [CoercibleMsg]
+mkCoercibleExplanation imports loc
+  = concat
+     [ concatMap coercible_msgs_for_tycon $
+         UM.nonDetUniqMapToList tc_args
+     , mapMaybe unknown_roles_msg $
+         nubOrdBy nonDetCmpType app_tys
+     , map out_of_scope_nt_msg $
+         nonDetEltsUniqSet out_of_scope_nts
+     , map stuck_data_fam_app_msg $
+         UM.nonDetUniqMapToList stuck_datafamapps
+     ]
 
-    has_unknown_roles ty
-      | Just (tc, tys) <- tcSplitTyConApp_maybe ty
-      = tys `lengthAtLeast` tyConArity tc  -- oversaturated tycon
-      | Just (s, _) <- tcSplitAppTy_maybe ty
-      = has_unknown_roles s
-      | isTyVarTy ty
-      = True
+  where
+    CtExplanations
+      { ctexpl_roleExplanations = role_explns
+      , ctexpl_outOfScopeNTs    = out_of_scope_nts
+      , ctexpl_stuckDataFamApps = stuck_datafamapps
+      }
+      = ctLocExplanations loc
+
+    (tc_args, app_tys) = collectRoleExplanations role_explns
+
+    coercible_msgs_for_tycon (tc, arg_roles)
+      | isAbstractTyCon tc
+      = [TyConIsAbstract tc]
       | otherwise
-      = False
+      = [ TyConHasRoleInArgs r tc (a1 NE.:| as)
+        | (r, argsSet) <- Map.toList arg_roles
+        , let args = IntSet.toAscList argsSet
+        , a1 : as <- [ args ]
+        ]
+
+    unknown_roles_msg ty
+      | Just (tc, tys) <- tcSplitTyConApp_maybe ty
+      = if tys `lengthAtLeast` tyConArity tc  -- oversaturated tycon
+        then Just $ UnknownRoles ty
+        else Nothing
+      | Just (s, _) <- tcSplitAppTy_maybe ty
+      = unknown_roles_msg s
+      | isTyVarTy ty
+      = Just $ UnknownRoles ty
+      | otherwise
+      = Nothing
+
+    out_of_scope_nt_msg :: DataCon -> CoercibleMsg
+    out_of_scope_nt_msg nt =
+      OutOfScopeNewtypeConstructor nt $
+        exactNameImportSuggestions imports (getName nt)
+
+    stuck_data_fam_app_msg :: (TyCon, NE.NonEmpty [Type]) -> CoercibleMsg
+    stuck_data_fam_app_msg (tc, tyss) =
+      StuckDataFamApps tc $ NE.fromList $
+        nubOrdBy (liftCompare nonDetCmpType) (NE.toList tyss)
+
+-- | Collect up 'RoleExplanation's that share a 'TyCon' at the head,
+-- in order to report them together, so that we can produce explanations like:
+--
+--  - "T has nominal role in its first and second arguments."
+--
+-- rather than two separate explanations:
+--
+--  - "T has nominal role in its first argument."
+--  - "T has nominal role in its second argument."
+collectRoleExplanations :: [RoleExplanation] -> (UM.UniqMap TyCon (Map Role IntSet), [Type])
+collectRoleExplanations rs = foldl' add_one (mempty, []) rs
+  where
+    add_one :: (UM.UniqMap TyCon (Map Role IntSet), [Type])
+            -> RoleExplanation
+            -> (UM.UniqMap TyCon (Map Role IntSet), [Type])
+    add_one (tcs, app_tys) = \case
+      NominalAppTy ty -> (tcs, ty : app_tys)
+      TyConArg tc arg role ->
+        ( UM.addToUniqMap_C (Map.unionWith IntSet.union)
+            tcs tc
+            (Map.singleton role (IntSet.singleton arg))
+        , app_tys )
 
 mkEqErr_help :: SolverReportErrCtxt
              -> ErrorItem
@@ -1877,25 +1926,23 @@ reportEqErr :: SolverReportErrCtxt
 reportEqErr ctxt item ty1 ty2
   = do
     mismatch <- misMatchOrCND ctxt item ty1 ty2
-    mb_coercible_info <- if errorItemEqRel item == ReprEq
-                         then coercible_msg ty1 ty2
-                         else return Nothing
+    imports <- getImports
+    let coercible_msgs = errorItem_coercible_msgs imports item
     tv_info <- case getTyVar_maybe ty2 of
                  Nothing  -> return Nothing
                  Just tv2 -> Just <$> extraTyVarEqInfo (tv2, Nothing) ty1
     return $ Mismatch { mismatchMsg           = mismatch
                       , mismatchTyVarInfo     = tv_info
                       , mismatchAmbiguityInfo = eqInfos
-                      , mismatchCoercibleInfo = mb_coercible_info }
+                      , mismatchCoercibleInfo = coercible_msgs }
   where
     eqInfos  = eqInfoMsgs ty1 ty2
 
-coercible_msg :: TcType -> TcType -> TcM (Maybe CoercibleMsg)
-coercible_msg ty1 ty2
-  = do
-    rdr_env  <- getGlobalRdrEnv
-    fam_envs <- tcGetFamInstEnvs
-    return $ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
+-- | Compute a list of informational messages relating to unsolved
+-- representational equalities.
+errorItem_coercible_msgs :: ImportAvails -> ErrorItem -> [CoercibleMsg]
+errorItem_coercible_msgs imports item =
+  mkCoercibleExplanation imports (errorItemCtLoc item)
 
 mkTyVarEqErr :: SolverReportErrCtxt -> ErrorItem
              -> TcTyVar -> TcType -> TcM TcSolverReportMsg
@@ -1940,17 +1987,19 @@ mkTyVarEqErr' ctxt item tv1 ty2
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
                        -- swapped in Solver.Equality.canEqTyVarHomo
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
-    || errorItemEqRel item == ReprEq
+    || is_repr
      -- The cases below don't really apply to ReprEq (except occurs check)
   = do
     headline_msg <- misMatchOrCND ctxt item ty1 ty2
     tv_extra <- extraTyVarEqInfo (tv1, Nothing) ty2
-    reason <- if errorItemEqRel item == ReprEq
-              then RepresentationalEq tv_extra <$> coercible_msg ty1 ty2
-              else return $ DifferentTyVars tv_extra
-    let main_msg = CannotUnifyVariable
-                     { mismatchMsg       = headline_msg
-                     , cannotUnifyReason = reason }
+    imports <- getImports
+    let
+      coercible_msgs = errorItem_coercible_msgs imports item
+      main_msg =
+        CannotUnifyVariable
+          { mismatchMsg       = headline_msg
+          , cannotUnifyReason = DifferentTyVars tv_extra coercible_msgs
+          }
     return main_msg
 
   | tv1 `elemVarSet` tyCoVarsOfType ty2
@@ -1992,7 +2041,7 @@ mkTyVarEqErr' ctxt item tv1 ty2
                { mismatchMsg           = mismatch_msg
                , mismatchTyVarInfo     = Just tv_extra
                , mismatchAmbiguityInfo = []
-               , mismatchCoercibleInfo = Nothing }
+               , mismatchCoercibleInfo = [] }
     return msg
 
   -- Check for skolem escape
@@ -2024,7 +2073,7 @@ mkTyVarEqErr' ctxt item tv1 ty2
                { mismatchMsg           = mismatch_msg
                , mismatchTyVarInfo     = Just tv_extra'
                , mismatchAmbiguityInfo = []
-               , mismatchCoercibleInfo = Nothing }
+               , mismatchCoercibleInfo = [] }
     return msg
 
   | otherwise
@@ -2033,6 +2082,9 @@ mkTyVarEqErr' ctxt item tv1 ty2
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
   where
+
+    is_repr = errorItemEqRel item == ReprEq
+
     mismatch_msg = mkMismatchMsg item ty1 ty2
 
     -- The following doesn't use the cterHasProblem mechanism because
@@ -2192,33 +2244,54 @@ mkMismatchMsg :: ErrorItem -> Type -> Type -> MismatchMsg
 mkMismatchMsg item ty1 ty2 =
   case orig of
     TypeEqOrigin { uo_actual, uo_expected, uo_thing = mb_thing } ->
-      (TypeEqMismatch
+      TypeEqMismatch
         { teq_mismatch_item     = item
         , teq_mismatch_ty1      = ty1
         , teq_mismatch_ty2      = ty2
         , teq_mismatch_actual   = uo_actual
         , teq_mismatch_expected = uo_expected
         , teq_mismatch_what     = mb_thing
-        , teq_mb_same_occ       = sameOccExtras ty2 ty1 })
-    KindEqOrigin cty1 cty2 sub_o mb_sub_t_or_k -> BasicMismatch
-      { mismatch_ea           = NoEA
-      , mismatch_item         = item
-      , mismatch_ty1          = ty1
-      , mismatch_ty2          = ty2
-      , mismatch_whenMatching = Just $ WhenMatching cty1 cty2 sub_o mb_sub_t_or_k
-      , mismatch_mb_same_occ  = mb_same_occ
-      }
-    _ -> BasicMismatch
-      { mismatch_ea           = NoEA
-      , mismatch_item         = item
-      , mismatch_ty1          = ty1
-      , mismatch_ty2          = ty2
-      , mismatch_whenMatching = Nothing
-      , mismatch_mb_same_occ  = mb_same_occ
-      }
+        , teq_mb_same_occ       = sameOccExtras ty2 ty1 }
+    KindEqOrigin cty1 cty2 sub_o mb_sub_t_or_k ->
+      BasicMismatch
+        { mismatch_ea           = NoEA
+        , mismatch_item         = item
+        , mismatch_ty1          = ty1
+        , mismatch_ty2          = ty2
+        , mismatch_whenMatching = Just $ WhenMatching cty1 cty2 sub_o mb_sub_t_or_k
+        , mismatch_mb_same_occ  = mb_same_occ
+        }
+
+    -- If we defaulted a representational equality to nominal but made no
+    -- further progress on it, report the original representational equality
+    -- instead of the nominal equality.
+    _ | EqPred NomEq lty rty <- classifyPredType (ei_pred item)
+      , let repr_origs = defaultReprEqOrigins $ ctLocOrigin (ei_loc item)
+      , inner_orig : _ <- mapMaybe same_types_maybe repr_origs
+      -> let item' = item { ei_pred = mkReprEqPred lty rty
+                          , ei_loc  = setCtLocOrigin (ei_loc item) inner_orig
+                          }
+         in mkMismatchMsg item' ty1 ty2
+
+    _ ->
+      BasicMismatch
+        { mismatch_ea           = NoEA
+        , mismatch_item         = item
+        , mismatch_ty1          = ty1
+        , mismatch_ty2          = ty2
+        , mismatch_whenMatching = Nothing
+        , mismatch_mb_same_occ  = mb_same_occ
+        }
   where
     orig = errorItemOrigin item
     mb_same_occ = sameOccExtras ty2 ty1
+
+    same_types_maybe :: (CtOrigin, (TcType, TcType)) -> Maybe CtOrigin
+    same_types_maybe (o, (lty, rty)) =
+      if (lty `tcEqType` ty1 && rty `tcEqType` ty2)
+           || (lty `tcEqType` ty2 && rty `tcEqType` ty1)
+      then Just o
+      else Nothing
 
 {- Note [Insoluble mis-match]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

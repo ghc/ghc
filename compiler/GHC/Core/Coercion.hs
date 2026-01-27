@@ -1848,12 +1848,17 @@ type NormaliseStepper ev = RecTcChecker
 -- | The result of stepping in a normalisation function.
 -- See 'topNormaliseTypeX'.
 data NormaliseStepResult ev
-  = NS_Done   -- ^ Nothing more to do
-  | NS_Abort  -- ^ Utter failure. The outer function should fail too.
-  | NS_Step RecTcChecker Type ev    -- ^ We stepped, yielding new bits;
-                                    -- ^ ev is evidence;
-                                    -- Usually a co :: old type ~ new type
-  deriving (Functor)
+  -- | Nothing more to do.
+  = NS_Done
+  -- | We exceeded the maximum stepper depth (e.g. recursive newtypes).
+  -- Give up.
+  | NS_Abort
+  -- | We stepped, yielding a new type.
+  | NS_Step
+      RecTcChecker
+      Type
+      ev -- ^ evidence; usually a coercion @co :: old_type ~ new_type@
+  deriving stock (Functor, Foldable, Traversable)
 
 instance Outputable ev => Outputable (NormaliseStepResult ev) where
   ppr NS_Done           = text "NS_Done"
@@ -1890,12 +1895,13 @@ unwrapNewTypeStepper rec_nts tc tys
 -- 'NormaliseStepper' must all be the same, which is the role returned from
 -- the call to 'topNormaliseTypeX'.
 --
--- Typically ev is Coercion.
+-- Typically @ev@ is 'Coercion'.
 --
--- If topNormaliseTypeX step plus ty = Just (ev, ty')
--- then ty ~ev1~ t1 ~ev2~ t2 ... ~evn~ ty'
--- and ev = ev1 `plus` ev2 `plus` ... `plus` evn
--- If it returns Nothing then no newtype unwrapping could happen
+-- If @topNormaliseTypeX step plus ty@ returns @Just (ev, ty')@
+-- then @ty ~ev1~ t1 ~ev2~ t2 ... ~evn~ ty'@
+-- and @ev = ev1 `plus` ev2 `plus` ... `plus` evn@.
+--
+-- If it returns Nothing it means that no newtype unwrapping could happen.
 topNormaliseTypeX :: NormaliseStepper ev
                   -> (ev -> ev -> ev)
                   -> Type -> Maybe (ev, Type)

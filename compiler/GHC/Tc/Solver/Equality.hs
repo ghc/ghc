@@ -37,10 +37,11 @@ import GHC.Core.Reduction
 import GHC.Core.FamInstEnv ( FamInstEnvs )
 import GHC.Core
 import GHC.Types.Var
+
+import GHC.Types.Basic
+import GHC.Types.Name.Reader
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Name.Reader
-import GHC.Types.Basic
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -54,7 +55,7 @@ import Data.List  ( zip4 )
 
 import qualified Data.Semigroup as S
 import Data.Bifunctor ( bimap )
-import Data.Void( Void )
+import Data.Void ( Void )
 
 {- *********************************************************************
 *                                                                      *
@@ -295,7 +296,105 @@ code -- for the AppTy/AppTy case!  Hence this Note
 *                                                                      *
 *           canonicaliseEquality
 *                                                                      *
-********************************************************************* -}
+************************************************************************
+
+Note [How can_eq_nc works]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The key function `can_eq_nc` tries to make progress with a type equality t1~t2.
+
+(EQNC1) It checks if `t1` or `t2` are type synonyms and unwraps them if so.
+   But first it does a check for /nullary/ type synonyms;
+   see Note [Unifying type synonyms]
+
+(EQNC2) For representational equalities, it unwraps newtypes if possible,
+  See Note [Solving newtype equalities: overview], and `can_eq_newtype_nc`.
+  E.g.
+      newtype N a = MkN (a->a)
+      [W] N Int ~R# (Int->Int)
+  Here we want to unwrap N. Once unwrapped, we go back to the top of `can_eq_nc`
+  and try again.  There may be multiple layers to unwrap.
+
+  If we fail to unwrap we add an explanation to the constraint. We avoid doing
+  so repeatedly via Note [CanEqState].
+
+(EQNC3) Get rid of casts
+  See Note [Equalities with heterogeneous kinds]
+
+(EQNC4) Decompose if we have lit~lit, forall~forall, or (T tys1) ~ (T tys2)
+
+(EQNC5) Now we have run out of ideas!  So we apply the type rewriter to rewrite any
+  type variables that have been unified, or have a Given equality; and to rewrite
+  any type-family applications.  Then we go back to the top of `can_eq_nc` to try
+  again.  We avoid doing this repeatedly via Note [CanEqState].
+
+(EQNC6) If we have already rewritten both sides, we see if either side is a
+  valid `canEqLHS`.  If so, the consraint may now be canonical, and we to
+  go to `canEqCanLHS`.
+
+(EQNC7) Give up. Make the (fully-rewrittten) constraint into an Irred and put it
+  in the inerts.  See `finishCanWithIrred`.
+
+Note [CanEqState]
+~~~~~~~~~~~~~~~~~
+In `can_eq_nc` we want to avoid repeated attempts to rewrite or unwrap newtypes.
+To do that, `CanEqState` tracks:
+    ces_rwL :: Bool    True <=> the LHS type has been rewritten
+    ces_ntL :: Bool    True <=> we have tried and failed to newtype-unwrap the LHS type
+(and similarly for the right argument).
+
+Why track?
+
+* Loops (ces_rwL/R): if we have already rewritten a type there is no point in
+  rewriting it and starting again -- that would just give an infinite loop.
+
+* Soundness (ces_rwL/R): we can only call `canEqLHS` in (EQNC6) if both sides
+  are fully rewritten.  Cannonical constraints are fully rewritten.
+
+* Newtype-unwrapping explanations (ces_ntL/R): when we fail to unwrap a newtype
+  (e.g. because its constructor was out of scope), we add an explanation to the
+  constraint (see `addExplanations`), but we don't want to add the same explanation
+  repeatedly. See Note [CtExplanations] in GHC.Tc.Types.CtLoc.
+
+NB: When we unwrap a newtype, we might expose new type-family applications, so we
+must reset the `ces_rw` flag for /that/ type (but not for the other one).
+-}
+
+-- | Internal state for 'can_eq_nc', keeping track of whether we have
+-- already rewritten or unwrapped newtypes.
+--
+-- See Note [CanEqState].
+data CanEqState
+  = CES { ces_rwL :: Bool -- ^ LHS type is rewritten
+        , ces_rwR :: Bool -- ^ LHS type is rewritten
+        , ces_ntL :: Bool -- ^ True <=> we have tried and failed to newtype unwrap the LHS type
+        , ces_ntR :: Bool -- ^ True <=> we have tried and failed to newtype unwrap the RHS type
+        }
+instance Outputable CanEqState where
+  ppr (CES rwL rwR ntL ntR) =
+    hcat [ flag (text "RW_L") rwL
+         , flag (text "RW_R") rwR
+         , flag (text "NT_L") ntL
+         , flag (text "NT_R") ntR
+         ]
+    where
+      flag t b = if b then brackets t else empty
+
+initCanEqState :: CanEqState
+initCanEqState =
+  CES
+    { ces_rwL = False, ces_rwR = False
+    , ces_ntL = False, ces_ntR = False
+    }
+
+swapCES :: SwapFlag -> CanEqState -> CanEqState
+swapCES NotSwapped ces = ces
+swapCES IsSwapped  ces =
+  ces
+    { ces_rwL = ces_rwR ces, ces_rwR = ces_rwL ces
+    , ces_ntL = ces_ntR ces, ces_ntR = ces_ntL ces }
+
+bothRewritten :: CanEqState -> Bool
+bothRewritten ces = ces_rwL ces && ces_rwR ces
 
 canonicaliseEquality
    :: CtEvidence -> EqRel
@@ -311,10 +410,13 @@ canonicaliseEquality ev eq_rel ty1 ty2
                  vcat [ ppr ev, ppr eq_rel, ppr ty1, ppr ty2 ]
                ; rdr_env   <- getGlobalRdrEnvTcS
                ; fam_insts <- getFamInstEnvs
-               ; can_eq_nc False rdr_env fam_insts ev eq_rel ty1 ty1 ty2 ty2 }
+               ; can_eq_nc initCanEqState rdr_env fam_insts ev eq_rel ty1 ty1 ty2 ty2 }
 
+-- | Main worker function for 'canonicaliseEquality'.
+--
+-- See Note [How can_eq_nc works].
 can_eq_nc
-   :: Bool           -- True => both input types are rewritten
+   :: CanEqState
    -> GlobalRdrEnv   -- needed to see which newtypes are in scope
    -> FamInstEnvs    -- needed to unwrap data instances
    -> CtEvidence
@@ -323,16 +425,17 @@ can_eq_nc
    -> Type -> Type    -- RHS, after and before type-synonym expansion, resp
    -> TcS (StopOrContinue (Either IrredCt EqCt))
 
--- See Note [Unifying type synonyms] in GHC.Core.Unify
-can_eq_nc _flat _rdr_env _envs ev eq_rel ty1@(TyConApp tc1 []) _ps_ty1 (TyConApp tc2 []) _ps_ty2
+-- (EQNC1) See Note [Unifying type synonyms] in GHC.Core.Unify
+can_eq_nc _ces _rdr_env _envs ev eq_rel ty1@(TyConApp tc1 []) _ps_ty1 (TyConApp tc2 []) _ps_ty2
   | tc1 == tc2
   = canEqReflexive ev eq_rel ty1
 
--- Expand synonyms first; see Note [Type synonyms and canonicalization]
-can_eq_nc rewritten rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
-  | Just ty1' <- coreView ty1 = can_eq_nc rewritten rdr_env envs ev eq_rel ty1' ps_ty1 ty2  ps_ty2
-  | Just ty2' <- coreView ty2 = can_eq_nc rewritten rdr_env envs ev eq_rel ty1  ps_ty1 ty2' ps_ty2
+-- (EQNC1) Expand synonyms first; see Note [Type synonyms and canonicalization]
+can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
+  | Just ty1' <- coreView ty1 = can_eq_nc ces rdr_env envs ev eq_rel ty1' ps_ty1 ty2  ps_ty2
+  | Just ty2' <- coreView ty2 = can_eq_nc ces rdr_env envs ev eq_rel ty1  ps_ty1 ty2' ps_ty2
 
+-- (EQNC2) Eager newtype decomposition (ReprEq only).
 -- Look for (N s1 .. sn) ~R# (N t1 .. tn)
 -- where either si=ti
 --       or     N is phantom in i'th position
@@ -341,7 +444,7 @@ can_eq_nc rewritten rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 -- We try this /before/ attempting to unwrap N, because if N is
 -- recursive, unwrapping will loop.
 -- This /matters/ for newtypes, but is /safe/ for all types
-can_eq_nc _rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
+can_eq_nc _ces _rdr_env _envs ev eq_rel ty1 _ ty2 _
   | ReprEq <- eq_rel
   , TyConApp tc1 tys1 <- ty1
   , TyConApp tc2 tys2 <- ty2
@@ -364,7 +467,7 @@ can_eq_nc _rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
     ok _  _  _  = False  -- Mis-matched lengths, just about possible because of
                          -- kind polymorphism.  Anyway False is a safe result!
 
--- Unwrap newtypes, when in ReprEq only
+-- (EQNC2) Unwrap newtypes (ReprEq only).
 -- See Note [Solving newtype equalities: overview]
 -- and (for details) Note [Unwrap newtypes first]
 -- This must be above the TyVarTy case, in order to guarantee (TyEq:N)
@@ -372,31 +475,48 @@ can_eq_nc _rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
 -- We unwrap *one layer only*; `can_eq_newtype_nc` then loops back to
 -- `can_eq_nc`.  If there is a recursive newtype, so that we keep
 -- unwrapping, the depth limit in `can_eq_newtype_nc` will blow up.
-can_eq_nc _rewritten rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
-  | ReprEq <- eq_rel
-  , Just stuff1 <- tcUnwrapNewtype_maybe envs rdr_env ty1
-  = can_eq_newtype_nc rdr_env envs ev NotSwapped stuff1 ty2 ps_ty2
+can_eq_nc ces rdr_env envs ev ReprEq ty1 ps_ty1 ty2 ps_ty2
+  -- Try unwrapping ty1 if we haven't already.
+  | not $ ces_ntL ces
+  = case tcUnwrapNewtype_maybe envs rdr_env ty1 of
+      Left explns1 ->
+        -- Can't unwrap:
+        --
+        --  1. Add the explanations to the CtEvidence.
+        --       See Note [CtExplanations] in GHC.Tc.Types.CtLoc.
+        --  2. Set 'ces_ntL = True' so that we don't try again.
+        --     (Trying again would duplicate adding explanations.)
+        let ev1 = addExplanations explns1 ev in
+        can_eq_nc (ces { ces_ntL = True }) rdr_env envs ev1 ReprEq ty1 ps_ty1 ty2 ps_ty2
+      Right unwrap1 ->
+        -- We successfully unwrapped one layer.
+        can_eq_newtype_nc ces rdr_env envs ev NotSwapped unwrap1 ty2 ps_ty2
+  -- Try unwrapping ty2 if we haven't already.
+  | not $ ces_ntR ces
+  = case tcUnwrapNewtype_maybe envs rdr_env ty2 of
+    -- NB: see the 'ty1' case above for commentary.
+      Left explns2 ->
+        let ev2 = addExplanations explns2 ev in
+        can_eq_nc (ces { ces_ntR = True }) rdr_env envs ev2 ReprEq ty1 ps_ty1 ty2 ps_ty2
+      Right unwrap2 ->
+        can_eq_newtype_nc ces rdr_env envs ev IsSwapped unwrap2 ty1 ps_ty1
 
-  | ReprEq <- eq_rel
-  , Just stuff2 <- tcUnwrapNewtype_maybe envs rdr_env ty2
-  = can_eq_newtype_nc rdr_env envs ev IsSwapped stuff2 ty1 ps_ty1
-
--- Then, get rid of casts
-can_eq_nc rewritten rdr_env envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
+-- (EQNC3) Get rid of casts
+can_eq_nc ces rdr_env envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
   | isNothing (canEqLHS_maybe ty2)
   = -- See (EIK3) in Note [Equalities with heterogeneous kinds]
-    canEqCast rewritten rdr_env envs ev eq_rel NotSwapped ty1 co1 ty2 ps_ty2
-can_eq_nc rewritten rdr_env envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
+    canEqCast ces rdr_env envs ev eq_rel NotSwapped ty1 co1 ty2 ps_ty2
+can_eq_nc ces rdr_env envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
   | isNothing (canEqLHS_maybe ty1)
   = -- See (EIK3) in Note [Equalities with heterogeneous kinds]
-    canEqCast rewritten rdr_env envs ev eq_rel IsSwapped ty2 co2 ty1 ps_ty1
+    canEqCast ces rdr_env envs ev eq_rel IsSwapped ty2 co2 ty1 ps_ty1
 
 ----------------------
 -- Otherwise try to decompose
 ----------------------
 
--- Literals
-can_eq_nc _rewritten _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
+-- (EQNC4) Literals
+can_eq_nc _ces _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
  | l1 == l2
   = do { setEqIfWanted ev (mkReflCPH eq_rel ty1)
        ; stopWith ev "Equal LitTy" }
@@ -406,17 +526,19 @@ can_eq_nc _rewritten _rdr_env _envs ev eq_rel
            s2@ForAllTy{} _
   = can_eq_nc_forall ev eq_rel s1 s2
 
+-- (EQNC4) FunTy
 -- Decompose FunTy: (s -> t) and (c => t)
 -- NB: don't decompose (Int -> blah) ~ (Show a => blah)
-can_eq_nc _rewritten _rdr_env _envs ev eq_rel
+can_eq_nc _ces _rdr_env _envs ev eq_rel
            ty1@(FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
            ty2@(FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
   | af1 == af2  -- See Note [Decomposing FunTy]
   = canDecomposableFunTy ev eq_rel af1 (ty1,am1,ty1a,ty1b) (ty2,am2,ty2a,ty2b)
 
+-- (EQNC4) TyCon
 -- Decompose type constructor applications
 -- NB: we have expanded type synonyms already
-can_eq_nc rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1 _ ty2 _
   | Just (tc1, tys1) <- tcSplitTyConApp_maybe ty1
   , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2
    -- tcSplitTyConApp_maybe: we want to catch e.g. Maybe Int ~ (Int -> Int)
@@ -428,14 +550,17 @@ can_eq_nc rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
     -- to the canonical-LHS cases (look for canEqLHS_maybe)
 
   -- See (TC1) in Note [Canonicalising TyCon/TyCon equalities]
-  , let role            = eqRelRole eq_rel
-        both_generative = isGenerativeTyCon tc1 role && isGenerativeTyCon tc2 role
-  , rewritten || both_generative
-  = canTyConApp ev eq_rel both_generative (ty1,tc1,tys1) (ty2,tc2,tys2)
+  , let role         = eqRelRole eq_rel
+        generative_1 = isGenerativeTyCon tc1 role
+        generative_2 = isGenerativeTyCon tc2 role
+  , ces_rwL ces || generative_1
+  , ces_rwR ces || generative_2
+  = canTyConApp ev eq_rel (generative_1 && generative_2) (ty1,tc1,tys1) (ty2,tc2,tys2)
 
+-- (EQNC4) AppTy
 -- Decompose applications
-can_eq_nc rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
-  | True <- rewritten -- Why True?  See Note [Canonicalising type applications]
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1 _ ty2 _
+  | bothRewritten ces -- Why bothRewritten?  See Note [Canonicalising type applications]
   -- Use tcSplitAppTy, not matching on AppTy, to catch oversaturated type families
   , Just (t1, s1) <- tcSplitAppTy_maybe ty1
   , Just (t2, s2) <- tcSplitAppTy_maybe ty2
@@ -452,31 +577,52 @@ can_eq_nc rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
 -- Can't decompose.
 -------------------
 
+-- (EQNC5) Rewrite
 -- No similarity in type structure detected. Rewrite and try again.
-can_eq_nc False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
+can_eq_nc ces rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
+  | not $ bothRewritten ces
   = -- Rewrite the two types and try again
-    do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite ev ps_ty1
-       ; (redn2@(Reduction _ xi2), rewriters2) <- rewrite ev ps_ty2
+    do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite_if_unrewritten (ces_rwL ces) ps_ty1
+       ; (redn2@(Reduction _ xi2), rewriters2) <- rewrite_if_unrewritten (ces_rwR ces) ps_ty2
        ; new_ev <- rewriteEqEvidence ev NotSwapped redn1 redn2
                                      (rewriters1 S.<> rewriters2)
        ; traceTcS "can_eq_nc: go round again" (ppr new_ev $$ ppr xi1 $$ ppr xi2)
-       ; can_eq_nc True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
+
+       -- If we tried and failed to newtype-unwrap the LHS and it was already rewritten,
+       -- then preserve ces_ntL = True. If we rewrote the LHS type, then we want
+       -- to try newtype unwrapping again (e.g. for a data family/newtype instance),
+       -- so set ces_ntL = False. Ditto for ces_ntR.
+       ; let ces' = ces { ces_ntL = ces_ntL ces && ces_rwL ces
+                        , ces_ntR = ces_ntR ces && ces_rwR ces
+                        , ces_rwL = True
+                        , ces_rwR = True
+                        }
+       ; can_eq_nc ces' rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
+  where
+    rewrite_if_unrewritten :: Bool -> TcType -> TcS (Reduction, CoHoleSet)
+    rewrite_if_unrewritten already_rewritten ps_ty
+      | already_rewritten
+      = return (mkReflRedn (eqRelRole eq_rel) ps_ty, emptyCoHoleSet)
+      | otherwise
+      = rewrite ev ps_ty
 
 ----------------------------
 -- Look for a canonical LHS.
 -- Only rewritten types end up below here.
 ----------------------------
 
--- NB: pattern match on rewritten=True: we want only rewritten types sent to canEqLHS
+-- (EQNC6): use canEqCanLHS
+--
+-- NB: pattern match on bothRewritten: we want only rewritten types sent to canEqCanLHS
 -- This means we've rewritten any variables and reduced any type family redexes
 -- See also Note [No top-level newtypes on RHS of representational equalities]
-
-can_eq_nc True _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
-  | Just can_eq_lhs1 <- canEqLHS_maybe ty1
+can_eq_nc ces _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
+  | bothRewritten ces
+  , Just can_eq_lhs1 <- canEqLHS_maybe ty1
   = do { traceTcS "can_eq1" (ppr ty1 $$ ppr ty2)
        ; canEqCanLHS ev eq_rel NotSwapped can_eq_lhs1 ps_ty1 ty2 ps_ty2 }
-
-  | Just can_eq_lhs2 <- canEqLHS_maybe ty2
+  | bothRewritten ces
+  , Just can_eq_lhs2 <- canEqLHS_maybe ty2
   = do { traceTcS "can_eq2" (ppr ty1 $$ ppr ty2)
        ; canEqCanLHS ev eq_rel IsSwapped can_eq_lhs2 ps_ty2 ty1 ps_ty1 }
 
@@ -492,15 +638,14 @@ can_eq_nc True _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 -- Fall-through. Give up.
 ----------------------------
 
--- We've rewritten and the types don't match. Give up.
-can_eq_nc True _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
+-- (EQNC7) We've rewritten and the types don't match. Give up.
+can_eq_nc _ _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
   = do { traceTcS "can_eq_nc catch-all case" (ppr ps_ty1 $$ ppr ps_ty2)
        ; case eq_rel of -- See Note [Unsolved equalities]
             ReprEq -> finishCanWithIrred ReprEqReason ev
             NomEq  -> finishCanWithIrred ShapeMismatchReason ev }
           -- No need to call canEqSoftFailure/canEqHardFailure because they
           -- rewrite, and the types involved here are already rewritten
-
 
 {- Note [Unsolved equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -700,14 +845,15 @@ There are lots of wrinkles of course:
 
 ------------------------
 -- | We're able to unwrap a newtype. Update the bits accordingly.
-can_eq_newtype_nc :: GlobalRdrEnv -> FamInstEnvs
+can_eq_newtype_nc :: CanEqState
+                  -> GlobalRdrEnv -> FamInstEnvs
                   -> CtEvidence           -- ^ :: ty1 ~ ty2
                   -> SwapFlag
                   -> (GlobalRdrElt, TcCoercion, TcType)  -- ^ :: ty1 ~ ty1'
                   -> TcType               -- ^ ty2
                   -> TcType               -- ^ ty2, with type synonyms
                   -> TcS (StopOrContinue (Either IrredCt EqCt))
-can_eq_newtype_nc rdr_env envs ev swapped (gre, co1, ty1') ty2 ps_ty2
+can_eq_newtype_nc ces rdr_env envs ev swapped (gre, co1, ty1') ty2 ps_ty2
   = do { traceTcS "can_eq_newtype_nc" $
          vcat [ ppr ev, ppr swapped, ppr co1, ppr gre, ppr ty1', ppr ty2 ]
 
@@ -731,7 +877,20 @@ can_eq_newtype_nc rdr_env envs ev swapped (gre, co1, ty1') ty2 ps_ty2
        -- where newtype Id a = MkId a  and newtype Rec = MkRec Rec
        -- we'll unwrap both Ids, then spot Rec=Rec.
        -- See (END2) in Note [Eager newtype decomposition]
-       ; can_eq_nc False rdr_env envs new_ev ReprEq ty2 ps_ty2 ty1' ty1' }
+       ; let totalSwap = flipSwap swapped
+             ces' =
+                (swapCES totalSwap ces) -- Account for total swap
+                  { ces_ntR = False
+                  , ces_rwR = False }
+                    -- We have newtype-unwrapped ty1', so:
+                    --   - it may no longer be rewritten,
+                    --   - we might be able to newtype unwrap it again,
+                    --     as 'tcUnwrapNewtype_maybe' only unwraps one layer.
+                    --
+                    -- Update ces_ntR and ces_rwR (not ces_ntL/ces_rwL), as
+                    -- ty1' is the RHS type in the call to can_eq_nc below.
+
+       ; can_eq_nc ces' rdr_env envs new_ev ReprEq ty2 ps_ty2 ty1' ty1' }
 
 ---------
 -- ^ Decompose a type application.
@@ -757,7 +916,8 @@ can_eq_app ev s1 t1 s2 t2
             do { let mb_invis = if isNextArgVisible s1
                                 then Nothing
                                 else Just InvisibleKind
-                     arg_env = updUEnvLoc uenv (adjustCtLoc mb_invis False)
+                     role_expln = appTyRoleExplanation s1 (ctLocOrigin (u_loc uenv))
+                     arg_env = updUEnvLoc uenv (adjustCtLoc mb_invis False role_expln)
                ; co_t <- uType arg_env t1 t2
                ; co_s <- uType uenv s1 s2
                ; return (mkAppCo co_s co_t) }
@@ -796,7 +956,7 @@ can_eq_app ev s1 t1 s2 t2
 -----------------------
 -- | Break apart an equality over a casted type
 -- looking like   (ty1 |> co1) ~ ty2   (modulo a swap-flag)
-canEqCast :: Bool         -- are both types rewritten?
+canEqCast :: CanEqState
           -> GlobalRdrEnv -> FamInstEnvs
           -> CtEvidence
           -> EqRel
@@ -804,7 +964,7 @@ canEqCast :: Bool         -- are both types rewritten?
           -> TcType -> Coercion   -- LHS (res. RHS), ty1 |> co1
           -> TcType -> TcType     -- RHS (res. LHS), ty2 both normal and pretty
           -> TcS (StopOrContinue (Either IrredCt EqCt))
-canEqCast rewritten rdr_env envs ev eq_rel swapped ty1 co1 ty2 ps_ty2
+canEqCast ces rdr_env envs ev eq_rel swapped ty1 co1 ty2 ps_ty2
   = do { traceTcS "Decomposing cast" (vcat [ ppr ev
                                            , ppr ty1 <+> text "|>" <+> ppr co1
                                            , ppr ps_ty2 ])
@@ -812,7 +972,7 @@ canEqCast rewritten rdr_env envs ev eq_rel swapped ty1 co1 ty2 ps_ty2
                       (mkGReflLeftRedn role ty1 co1)
                       (mkReflRedn role ps_ty2)
                       emptyCoHoleSet
-       ; can_eq_nc rewritten rdr_env envs new_ev eq_rel ty1 ty1 ty2 ps_ty2 }
+       ; can_eq_nc (swapCES swapped ces) rdr_env envs new_ev eq_rel ty1 ty1 ty2 ps_ty2 }
   where
     role = eqRelRole eq_rel
 
@@ -892,7 +1052,8 @@ Suppose we are canonicalising [W] Int ~R# DF (TF a).  Then
          [W] Int ~R# DF Bool
       and then the `tcUnwrapNewtype_maybe` call would fire and
       we'd unwrap the newtype.  So we must do that "go round again" bit.
-      Hence the complicated guard (rewritten || both_generative) in `can_eq_nc`.
+      Hence the complicated guard that checks that both arguments are either
+      generative or rewritten `can_eq_nc`.
 
 (TC2) If we can't rewrite `a` yet, we'll finish with an unsolved
          [W] Int ~R# DF (TF a)
@@ -1507,14 +1668,23 @@ canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
       --    messages say "kind", not "type". This is determined based on whether
       --    the corresponding tyConBinder is named (that is, dependent)
       --  * if the argument is invisible, note this as well, again by
-      --    looking at the corresponding binder
+      --    looking at the corresponding binder,
+      --  * if a representational equality gives rise to a nominal equality
+      --    due to a nominal role in that argument, keep track of this (#23731)
       -- For oversaturated tycons, we need the (repeat loc) tail, which doesn't
       -- do either of these changes. (Forgetting to do so led to #16188)
       --
       -- NB: infinite in length
-    new_locs = [ adjustCtLocTyConBinder bndr loc
-               | bndr <- tyConBinders tc ]
-               ++ repeat loc
+    new_locs =
+      zipWith adjust_loc
+        [1..]
+        (map Just (tyConBinders tc) ++ repeat Nothing)
+
+    adjust_loc :: Int -> Maybe TyConBinder -> CtLoc
+    adjust_loc arg_no mb_bndr =
+      let arg_role = tyConRole role tc (arg_no - 1)
+          mb_role_expln = tyConAppRoleExplanation role tc (arg_no, arg_role)
+      in adjustCtLocTyConBinder mb_bndr mb_role_expln loc
 
 canDecomposableFunTy :: CtEvidence -> EqRel -> FunTyFlag
                      -> (Type,Type,Type,Type)   -- (fun_ty,multiplicity,arg,res)
@@ -3101,4 +3271,17 @@ lovely quantified constraint.  Alas!
 
 This test arranges to ignore the instance-based solution under these
 (rare) circumstances.   It's sad, but I  really don't see what else we can do.
+-}
+
+addExplanations :: CtExplanations -> CtEvidence -> CtEvidence
+addExplanations new_explns ev =
+  setCtEvLoc ev $ updCtLocExplanations (S.<> new_explns) (ctEvLoc ev)
+
+{- Note [Recording out-of-scope data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When tcTopNormaliseNewTypeTF_maybe fails because of an out-of-scope
+newtype constructor, we use addOutOfScopeDataCons to modify the CtEvidence
+to record this information. This allows us to provide better error messages
+for out-of-scope data constructors without having to reconstruct the error
+after the fact.
 -}

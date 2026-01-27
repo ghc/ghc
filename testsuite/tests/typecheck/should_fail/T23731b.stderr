@@ -1,0 +1,13 @@
+T23731b.hs:9:7: error: [GHC-18872]
+    • Couldn't match type ‘Int’ with ‘Sum Int’
+        arising from a use of ‘coerce’
+      • Note:
+        • The data constructor ‘T23731b_aux.MkFoo’
+            of newtype ‘Foo’ is not in scope.
+        • The type constructor ‘Foo’ has nominal role in its first argument.
+    • In the expression: coerce
+      In an equation for ‘foo’: foo = coerce
+    Suggested fix:
+      Add ‘MkFoo’ to the import list in the import of ‘T23731b_aux’
+      (at T23731b.hs:3:1-24).
+

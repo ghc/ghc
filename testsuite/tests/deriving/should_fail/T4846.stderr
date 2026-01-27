@@ -1,6 +1,7 @@
 T4846.hs:29:1: error: [GHC-18872]
     • Couldn't match type ‘Bool’ with ‘BOOL’
         arising from a use of ‘GHC.Internal.Prim.coerce’
+      Note: The type constructor ‘Expr’ has nominal role in its first argument.
     • In the expression:
         GHC.Internal.Prim.coerce @(Expr Bool) @(Expr BOOL) (mkExpr @Bool)
       In an equation for ‘mkExpr’:

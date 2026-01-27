@@ -5,7 +5,7 @@ deriving-via-fail4.hs:15:12: error: [GHC-18872]
     • When deriving the instance for (Eq F1)
 
 deriving-via-fail4.hs:18:13: error: [GHC-25897]
-    • Couldn't match type ‘a2’ with ‘a1’
+    • Couldn't match representation of type ‘a2’ with that of ‘a1’
         arising from the coercion of the method ‘c’
           from type ‘a -> a -> Bool’ to type ‘a -> F2 a1 -> Bool’
       ‘a2’ is a rigid type variable bound by

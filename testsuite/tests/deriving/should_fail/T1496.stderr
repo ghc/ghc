@@ -1,9 +1,11 @@
 T1496.hs:10:32: error: [GHC-18872]
     • Couldn't match type ‘Int’ with ‘Moo’
+        arising from defaulting the representational equality
+          between: c Int
+              and: c Moo
         arising (via a quantified constraint) from
           the coercion of derived method ‘isInt’
-      When trying to solve the quantified constraint
-        forall (c :: * -> *). Coercible (c Int -> c Int) (c Int -> c Moo)
-        arising from the coercion of derived method ‘isInt’
+      Note: We cannot know what roles the parameters to ‘c’ have;
+            we must assume that the role is nominal.
     • When deriving the instance for (IsInt Moo)
 

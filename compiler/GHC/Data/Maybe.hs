@@ -11,6 +11,7 @@ module GHC.Data.Maybe (
 
         orElse,
         firstJust, firstJusts, firstJustsM,
+        firstRight,
         whenIsJust,
         expectJust,
         rightToMaybe,
@@ -81,6 +82,15 @@ orElse = flip fromMaybe
 rightToMaybe :: Either a b -> Maybe b
 rightToMaybe (Left _)  = Nothing
 rightToMaybe (Right x) = Just x
+
+-- | Return the first 'Right' value in the list.
+--
+-- If the list does not contain any 'Right' values, accumulate the errors of
+-- all the 'Left' values.
+firstRight :: Monoid err => [Either err a] -> Either err a
+firstRight =
+  -- Switch Left/Right & use short-circuiting for 'Applicative (Either a)'.
+  either Right (Left . mconcat) . traverse (either Right Left)
 
 {-
 ************************************************************************

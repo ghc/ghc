@@ -11,6 +11,7 @@ RolesIArray.hs:10:13: error: [GHC-18872]
            ((N -> e' -> N) -> N -> (i, i) -> [(Int, e')] -> UArray i N),
          Ix i)
         arising from the coercion of derived method ‘Data.Array.Base.unsafeAccumArray’
+      Note: The type constructor ‘UArray’ has nominal role in its second argument.
     • When deriving the instance for (IArray UArray N)
 
 RolesIArray.hs:10:13: error: [GHC-18872]
@@ -26,6 +27,7 @@ RolesIArray.hs:10:13: error: [GHC-18872]
            ((N -> e' -> N) -> UArray i N -> [(Int, e')] -> UArray i N),
          Ix i)
         arising from the coercion of derived method ‘Data.Array.Base.unsafeAccum’
+      Note: The type constructor ‘UArray’ has nominal role in its second argument.
     • When deriving the instance for (IArray UArray N)
 
 RolesIArray.hs:10:13: error: [GHC-18872]
@@ -40,6 +42,7 @@ RolesIArray.hs:10:13: error: [GHC-18872]
            (UArray i N -> [(Int, N)] -> UArray i N),
          Ix i)
         arising from the coercion of derived method ‘Data.Array.Base.unsafeReplace’
+      Note: The type constructor ‘UArray’ has nominal role in its second argument.
     • When deriving the instance for (IArray UArray N)
 
 RolesIArray.hs:10:13: error: [GHC-18872]
@@ -53,6 +56,7 @@ RolesIArray.hs:10:13: error: [GHC-18872]
            (UArray i Word64 -> Int -> Word64) (UArray i N -> Int -> N),
          Ix i)
         arising from the coercion of derived method ‘Data.Array.Base.unsafeAt’
+      Note: The type constructor ‘UArray’ has nominal role in its second argument.
     • When deriving the instance for (IArray UArray N)
 
 RolesIArray.hs:10:13: error: [GHC-18872]
@@ -67,6 +71,7 @@ RolesIArray.hs:10:13: error: [GHC-18872]
            ((i, i) -> [(Int, N)] -> UArray i N),
          Ix i)
         arising from the coercion of derived method ‘Data.Array.Base.unsafeArray’
+      Note: The type constructor ‘UArray’ has nominal role in its second argument.
     • When deriving the instance for (IArray UArray N)
 
 RolesIArray.hs:10:13: error: [GHC-18872]
@@ -78,6 +83,7 @@ RolesIArray.hs:10:13: error: [GHC-18872]
         Ix i =>
         (Coercible (UArray i Word64 -> Int) (UArray i N -> Int), Ix i)
         arising from the coercion of derived method ‘Data.Array.Base.numElements’
+      Note: The type constructor ‘UArray’ has nominal role in its second argument.
     • When deriving the instance for (IArray UArray N)
 
 RolesIArray.hs:10:13: error: [GHC-18872]
@@ -90,5 +96,6 @@ RolesIArray.hs:10:13: error: [GHC-18872]
         (Coercible (UArray i Word64 -> (i, i)) (UArray i N -> (i, i)),
          Ix i)
         arising from the coercion of derived method ‘bounds’
+      Note: The type constructor ‘UArray’ has nominal role in its second argument.
     • When deriving the instance for (IArray UArray N)
 

@@ -27,6 +27,7 @@ import GHC.Core.TyCo.FVs
 import GHC.Iface.Load
 
 import GHC.Tc.Errors.Types
+import GHC.Tc.Types.CtLoc (CtExplanations, stuckDataFamApp, outOfScopeNT)
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
@@ -56,6 +57,7 @@ import Data.Function ( on )
 import qualified GHC.LanguageExtensions  as LangExt
 import Data.List (sortOn)
 import qualified GHC.Unit.Home.Graph as HUG
+
 
 {- Note [The type family instance consistency story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -451,12 +453,12 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
   | otherwise
   = Nothing
 
--- | 'tcUnwrapNewtype_mabye' gets rid of /one layer/ of top-level newtypes
+-- | 'tcUnwrapNewtype_maybe' gets rid of /one layer/ of top-level newtypes
 --
 -- It is only used by the type inference engine (specifically, when
 -- solving representational equality), and hence it is careful to unwrap
 -- only if the relevant data constructor is in scope.  That's why
--- it gets a GlobalRdrEnv argument.
+-- it gets a 'GlobalRdrEnv' argument.
 --
 -- It is capable of unwrapping a newtype /instance/.  E.g
 --    data D a
@@ -469,39 +471,53 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
 -- It does not look through type families.
 -- It does not normalise arguments to the tycon.
 --
--- If the result is Just (gre, co, rep_ty), then
---    co : ty ~R rep_ty
---    gre is the GRE for the data constructor that had to be in scope
+-- If the result is Right (gre, co, rep_ty), then:
+--
+--    - co : ty ~R rep_ty
+--    - gre is the GRE for the data constructor that had to be in scope
+--
+-- If the result is Left explns, then we failed to unwrap, and @explns@ stores
+-- any information we would like to report to the user about why we failed to
+-- unwrap (e.g. failed to unwrap because the newtype constructor was out of scope).
+-- See Note [CtExplanations] in GHC.Tc.Types.CtLoc.
+-- This might be empty (e.g. if the type is not a newtype at all).
 tcUnwrapNewtype_maybe :: FamInstEnvs
                       -> GlobalRdrEnv
                       -> Type
-                      -> Maybe (GlobalRdrElt, TcCoercion, Type)
+                      -> Either CtExplanations (GlobalRdrElt, TcCoercion, Type)
 tcUnwrapNewtype_maybe faminsts rdr_env ty
   | Just (tc,tys) <- tcSplitTyConApp_maybe ty
-  = firstJust (try_nt_unwrap tc tys)
-              (try_fam_unwrap tc tys)
+  = firstRight [ try_nt_unwrap tc tys, try_fam_unwrap tc tys ]
   | otherwise
-  = Nothing
+  = Left mempty
   where
     -- For newtype /instances/ we take a double step or nothing, so that
     -- we don't return the representation type of the newtype instance,
     -- which would lead to terrible error messages
     try_fam_unwrap tc tys
       | Just (tc', tys', fam_co) <- tcLookupDataFamInst_maybe faminsts tc tys
-      , Just (gre, nt_co, ty') <- try_nt_unwrap tc' tys'
-      = Just (gre, mkTransCo fam_co nt_co, ty')
+      = case try_nt_unwrap tc' tys' of
+          Right (gre, nt_co, ty') ->
+            Right (gre, mkTransCo fam_co nt_co, ty')
+          Left expln -> Left expln
       | otherwise
-      = Nothing
+      = Left $ if isDataFamilyTyCon tc
+               then stuckDataFamApp tc tys
+               else mempty
 
     try_nt_unwrap tc tys
       | Just con <- newTyConDataCon_maybe tc
-      , Just gre <- lookupGRE_Name rdr_env (dataConName con)
-           -- This is where we check that the
-           -- data constructor is in scope
       , Just (ty', co) <- instNewTyCon_maybe tc tys
-      = Just (gre, co, ty')
+
+      -- Now check whether the data constructor is in scope.
+      -- If not, store it in the 'CtExplanations' field for error messages.
+      = case lookupGRE_Name rdr_env (dataConName con) of
+          Nothing ->
+            Left $ outOfScopeNT con
+          Just gre ->
+            Right (gre, co, ty')
       | otherwise
-      = Nothing
+      = Left mempty
 
 {-
 ************************************************************************

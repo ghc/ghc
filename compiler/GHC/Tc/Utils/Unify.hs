@@ -70,7 +70,11 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.CtLoc( CtLoc, mkKindEqLoc, adjustCtLoc, updateCtLocOrigin, ctLocOrigin )
+import GHC.Tc.Types.CtLoc
+  ( CtLoc
+  , mkKindEqLoc, adjustCtLoc, updateCtLocOrigin, ctLocOrigin
+  , tyConAppRoleExplanation, appTyRoleExplanation
+  )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Utils.TcMType qualified as TcM
@@ -2779,9 +2783,11 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
       , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality
       = assertPpr (isGenerativeTyCon tc1 role) (ppr tc1) $
         do { traceTc "go-tycon" (ppr tc1 $$ ppr tys1 $$ ppr tys2 $$ ppr (take 10 (tyConRoleListX role tc1)))
-           ; cos <- zipWith4M u_tc_arg (tyConVisibilities tc1)   -- Infinite
-                                       (tyConRoleListX role tc1) -- Infinite
-                                       tys1 tys2
+           ; cos <- zipWith5M (u_tc_arg tc1)
+                        (tyConVisibilities tc1)   -- Infinite
+                        (tyConRoleListX role tc1) -- Infinite
+                        [1..]
+                        tys1 tys2
            ; return $ mkTyConAppCo role tc1 cos }
 
     go (LitTy m) ty@(LitTy n)
@@ -2822,13 +2828,16 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
 
 
     ------------------
-    u_tc_arg is_vis role ty1 ty2
-      = do { traceTc "u_tc_arg" (ppr role $$ ppr ty1 $$ ppr ty2)
+    u_tc_arg tc is_vis arg_role arg_no ty1 ty2
+      = do { traceTc "u_tc_arg" (ppr tc $$ ppr arg_role $$ ppr ty1 $$ ppr ty2)
            ; uType env_arg ty1 ty2 }
       where
-        mb_invis = if is_vis then Nothing else Just InvisibleKind
-        env_arg = env { u_loc = adjustCtLoc mb_invis False (u_loc env)
-                      , u_role = role }
+        !mb_invis = if is_vis then Nothing else Just InvisibleKind
+        !mb_role_expln = tyConAppRoleExplanation role tc (arg_no, arg_role)
+        !loc = adjustCtLoc mb_invis False mb_role_expln (u_loc env)
+        env_arg =
+          env { u_loc = loc
+              , u_role = arg_role }
 
     ------------------
     -- For AppTy, decompose only nominal equalities
@@ -2839,8 +2848,10 @@ uType env@(UE { u_role = role }) orig_ty1 orig_ty2
         -- the former have smaller kinds, and hence simpler error messages
         -- c.f. GHC.Tc.Solver.Equality.can_eq_app
         -- Example: test T8603
-        do { let mb_invis = if vis then Nothing else Just InvisibleKind
-                 env_arg = env { u_loc = adjustCtLoc mb_invis False (u_loc env) }
+        do { let !mb_invis = if vis then Nothing else Just InvisibleKind
+                 !mb_role_expln = appTyRoleExplanation s1 (ctLocOrigin (u_loc env))
+                 !loc = adjustCtLoc mb_invis False mb_role_expln (u_loc env)
+                 env_arg = env { u_loc = loc }
            ; co_t <- uType env_arg t1 t2
            ; co_s <- uType env s1 s2
            ; return $ mkAppCo co_s co_t }

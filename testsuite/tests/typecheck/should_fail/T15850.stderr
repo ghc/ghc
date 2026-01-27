@@ -1,0 +1,13 @@
+T15850.hs:11:18: error: [GHC-18872]
+    • Couldn't match type ‘LocalIdentity ()’ with ‘()’
+        arising from a use of ‘coerce’
+      • Note:
+        • The data constructor ‘T15850_Lib.LibIdentity’
+            of newtype ‘LibIdentity’ is not in scope.
+        • The type constructor ‘LibIdentity’ has nominal role in its first argument.
+    • In the expression: coerce
+      In an equation for ‘difficultError’: difficultError = coerce
+    Suggested fix:
+      Add ‘LibIdentity’ to the import list in the import of ‘T15850_Lib’
+      (at T15850.hs:5:1-31).
+

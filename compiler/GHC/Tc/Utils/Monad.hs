@@ -1379,6 +1379,7 @@ getCtLocM origin t_or_k
        ; return (CtLoc { ctl_origin   = origin
                        , ctl_env      = mkCtLocEnv env
                        , ctl_t_or_k   = t_or_k
+                       , ctl_expln    = mempty -- start off with no explanations
                        , ctl_depth    = initialSubGoalDepth }) }
 
 mkCtLocEnv :: TcLclEnv -> CtLocEnv

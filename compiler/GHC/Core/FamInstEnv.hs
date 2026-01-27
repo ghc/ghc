@@ -1352,8 +1352,8 @@ topNormaliseType_maybe env ty
     unwrapNewTypeStepper' rec_nts tc tys
       = (, MRefl) <$> unwrapNewTypeStepper rec_nts tc tys
 
-      -- second coercion below is the kind coercion relating the original type's kind
-      -- to the normalised type's kind
+    -- The 'MCoercionN' is a kind coercion relating the original type's kind
+    -- to the normalised type's kind
     tyFamStepper :: NormaliseStepper (Coercion, MCoercionN)
     tyFamStepper rec_nts tc tys  -- Try to step a type/data family
       = case topReduceTyFamApp_maybe env tc tys of

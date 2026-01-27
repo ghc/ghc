@@ -1,5 +1,6 @@
 T7148a.hs:19:50: error: [GHC-25897]
-    • Couldn't match type ‘b’ with ‘Result a b’
+    • Couldn't match representation of type ‘b’
+                               with that of ‘Result a b’
         arising (via a quantified constraint) from
           the coercion of derived method ‘coerce’
       When trying to solve the quantified constraint

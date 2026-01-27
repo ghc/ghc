@@ -10,7 +10,7 @@ module GHC.Utils.Monad
         , MonadFix(..)
         , MonadIO(..)
 
-        , zipWith3M, zipWith3M_, zipWith4M, zipWithAndUnzipM
+        , zipWith3M, zipWith3M_, zipWith4M, zipWith5M, zipWithAndUnzipM
         , zipWith3MNE
         , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M, mapAndUnzip5M
         , mapAccumLM
@@ -35,7 +35,7 @@ import Control.Monad.Fix
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State.Strict (StateT (..))
 import Data.Foldable (sequenceA_, foldlM, foldrM)
-import Data.List (unzip4, unzip5, zipWith4)
+import Data.List (unzip4, unzip5, zipWith4, zipWith5)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Monoid (Ap (Ap, getAp))
 import Data.Tuple (swap)
@@ -79,16 +79,23 @@ zipWith3M f xs ys zs = sequenceA (zipWith3 f xs ys zs)
 
 zipWith3M_ :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m ()
 {-# INLINE zipWith3M_ #-}
--- Inline so that fusion with 'zipWith4' and 'sequenceA' has a chance to fire.
+-- Inline so that fusion with 'zipWith3' and 'sequenceA' has a chance to fire.
 -- See  Note [Inline @zipWithNM@ functions] above.
 zipWith3M_ f xs ys zs = sequenceA_ (zipWith3 f xs ys zs)
 
 zipWith4M :: Monad m => (a -> b -> c -> d -> m e)
           -> [a] -> [b] -> [c] -> [d] -> m [e]
 {-# INLINE zipWith4M #-}
--- Inline so that fusion with 'zipWith5' and 'sequenceA' has a chance to fire.
+-- Inline so that fusion with 'zipWith4' and 'sequenceA' has a chance to fire.
 -- See  Note [Inline @zipWithNM@ functions] above.
 zipWith4M f xs ys ws zs = sequenceA (zipWith4 f xs ys ws zs)
+
+zipWith5M :: Monad m => (a -> b -> c -> d -> e -> m f)
+          -> [a] -> [b] -> [c] -> [d] -> [e] -> m [f]
+{-# INLINE zipWith5M #-}
+-- Inline so that fusion with 'zipWith5' and 'sequenceA' has a chance to fire.
+-- See  Note [Inline @zipWithNM@ functions] above.
+zipWith5M f xs ys ws zs ts = sequenceA (zipWith5 f xs ys ws zs ts)
 
 zipWithAndUnzipM :: Monad m
                  => (a -> b -> m (c, d)) -> [a] -> [b] -> m ([c], [d])

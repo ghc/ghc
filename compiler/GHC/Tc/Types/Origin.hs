@@ -16,7 +16,7 @@ module GHC.Tc.Types.Origin (
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
   invisibleOrigin_maybe, isVisibleOrigin, toInvisibleOrigin,
   pprCtOrigin, pprCtOriginBriefly, isGivenOrigin,
-  isWantedSuperclassOrigin,
+  defaultReprEqOrigins, isWantedSuperclassOrigin,
   ClsInstOrQC(..), NakedScFlag(..), NonLinearPatternReason(..),
   HsImplicitLiftSplice(..),
   StandaloneDeriv,
@@ -537,10 +537,17 @@ data CtOrigin
                     -- visible.) Only used for prioritizing error messages.
                  }
 
+    -- | A kind equality arising from unifying two types
   | KindEqOrigin
-      TcType TcType             -- A kind equality arising from unifying these two types
-      CtOrigin                  -- originally arising from this
+      TcType TcType             -- lhs and rhs types
+      CtOrigin                  -- CtOrigin of the original type equality
       (Maybe TypeOrKind)        -- the level of the eq this arises from
+
+    -- | A constraint that arose from defaulting a representational
+    -- equality to a nominal equality
+  | DefaultReprEqOrigin
+      TcType TcType             -- lhs and rhs types
+      CtOrigin                  -- CtOrigin of the original type equality
 
   | IPOccOrigin  HsIPName       -- Occurrence of an implicit parameter
   | OverLabelOrigin FastString  -- Occurrence of an overloaded label
@@ -603,10 +610,6 @@ data CtOrigin
        -- We don't need auxiliary info because fundep constraints
        -- never show up in errors.  See (SOLVE-FD) in
        -- Note [Overview of functional dependencies in type inference]
-
-  | InjTFOrigin1    -- injective type family equation combining
-      PredType CtOrigin RealSrcSpan    -- This constraint arising from ...
-      PredType CtOrigin RealSrcSpan    -- and this constraint arising from ...
 
   | ExprHoleOrigin (Maybe RdrName)   -- from an expression hole
   | TypeHoleOrigin OccName   -- from a type hole (partial type signature)
@@ -805,11 +808,6 @@ pprCtOrigin (SpecPragOrigin ctxt)
        SpecInstCtxt   -> text "a SPECIALISE INSTANCE pragma"
        _              -> text "a SPECIALISE pragma"  -- Never happens I think
 
-pprCtOrigin (InjTFOrigin1 pred1 orig1 loc1 pred2 orig2 loc2)
-  = hang (ctoHerald <+> text "reasoning about an injective type family using constraints:")
-       2 (vcat [ hang (quotes (ppr pred1)) 2 (pprCtOrigin orig1 <+> text "at" <+> ppr loc1)
-               , hang (quotes (ppr pred2)) 2 (pprCtOrigin orig2 <+> text "at" <+> ppr loc2) ])
-
 pprCtOrigin AssocFamPatOrigin
   = ctoHerald <+> text "matching a family LHS with its class instance head"
 
@@ -820,6 +818,14 @@ pprCtOrigin (TypeEqOrigin { uo_actual = t1, uo_expected =  t2, uo_invisible = in
 pprCtOrigin (KindEqOrigin t1 t2 _ _)
   = hang (ctoHerald <+> text "a kind equality arising from")
        2 (sep [ppr t1, char '~', ppr t2])
+
+pprCtOrigin (DefaultReprEqOrigin t1 t2 orig)
+  = hang (ctoHerald <+> text "defaulting the representational equality")
+      -- Avoid mentioning ~R#, which is not something users typically know about.
+      -- Don't use Coercible either, as the kinds of t1 and t2 may differ.
+      2 (vcat [ text "between:" <+> ppr t1
+              , text "    and:" <+> ppr t2])
+  $$ pprCtOrigin orig
 
 pprCtOrigin (DerivOriginDC dc n _)
   = hang (ctoHerald <+> text "the" <+> speakNth n
@@ -954,9 +960,9 @@ ppr_br (ImplicitLiftOrigin isp) = text "an implicit lift of" <+> quotes (ppr (im
 ppr_br (GivenOrigin {})             = text "a given constraint"
 ppr_br (GivenSCOrigin {})           = text "the superclass of a given constraint"
 ppr_br (SpecPragOrigin {})          = text "a SPECIALISE pragma"
-ppr_br (InjTFOrigin1 {})            = text "an injective type family"
 ppr_br (TypeEqOrigin {})            = text "a type equality"
 ppr_br (KindEqOrigin {})            = text "a kind equality"
+ppr_br (DefaultReprEqOrigin {})     = text "defaulting a representational equality"
 ppr_br (DerivOriginDC {})           = text "a deriving clause"
 ppr_br (DerivOriginCoerce m _ _ _)  = text "the coercion of derived method" <+> quotes (ppr m)
 ppr_br (DoPatOrigin {})             = text "a do statement"
@@ -979,6 +985,33 @@ pprNonLinearPatternReason PatternSynonymReason = parens (text "pattern synonyms 
 pprNonLinearPatternReason ViewPatternReason = parens (text "view patterns aren't linear")
 pprNonLinearPatternReason OtherPatternReason = empty
 
+{- *********************************************************************
+*                                                                      *
+               Defaulting of representational equalities
+*                                                                      *
+********************************************************************* -}
+
+-- | Did this constraint arise from defaulting a representational equality?
+--
+-- That is, this function extracts all occurrences of the 'DefaultReprEqOrigin'
+-- constructor from within a 'CtOrigin'.
+defaultReprEqOrigins :: CtOrigin -> [(CtOrigin, (TcType, TcType))]
+defaultReprEqOrigins = go
+  where
+    go = \case
+      DefaultReprEqOrigin l r o -> (o, (l, r)) : go o
+
+      -- Handle recursive occurrences of 'CtOrigin' within 'CtOrigin'.
+      -- TODO: use syb to derive this, so that the following never goes out of date.
+      ScOrigin cls_or_qc _ ->
+        case cls_or_qc of
+          IsClsInst -> []
+          IsQC _ o -> go o
+      KindEqOrigin _ _ o _ -> go o
+      CycleBreakerOrigin o -> go o
+      WantedSuperclassOrigin _ o -> go o
+
+      _ -> []
 
 {- *********************************************************************
 *                                                                      *

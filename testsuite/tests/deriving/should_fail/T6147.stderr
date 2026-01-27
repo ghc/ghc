@@ -2,5 +2,8 @@ T6147.hs:13:32: error: [GHC-18872]
     • Couldn't match type ‘Int’ with ‘Foo’
         arising from the coercion of the method ‘foo’
           from type ‘Int -> T Int’ to type ‘Foo -> T Foo’
+      • Note:
+        • The data family application ‘T Foo’ does not reduce.
+        • The type constructor ‘T’ has nominal role in its first argument.
     • When deriving the instance for (C Foo)
 
