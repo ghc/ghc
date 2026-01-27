@@ -472,16 +472,7 @@ initLinker_ (int retain_cafs)
     symhash = allocStrHashTable();
 
     /* populate the symbol table with stuff from the RTS */
-    IF_DEBUG(linker, debugBelch("populating linker symbol table with built-in RTS symbols\n"));
-    for (const RtsSymbolVal *sym = rtsSyms; sym->lbl != NULL; sym++) {
-        IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
-        if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
-                                    symhash, sym->lbl, sym->addr,
-                                    sym->strength, sym->type, NULL)) {
-            barf("ghciInsertSymbolTable failed");
-        }
-    }
-    IF_DEBUG(linker, debugBelch("done with built-in RTS symbols\n"));
+    initLinkerRtsSyms(symhash);
 
     /* Add extra symbols. rtsExtraSyms() is a weakly defined symbol in the rts,
      * that can be overrided by linking in an object with a corresponding

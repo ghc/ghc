@@ -9,6 +9,7 @@
 #pragma once
 
 #include "ghcautoconf.h"
+#include "Hash.h"
 
 #if defined(LEADING_UNDERSCORE)
 #define MAYBE_LEADING_UNDERSCORE_STR(s) ("_" s)
@@ -46,7 +47,7 @@ typedef struct _RtsSymbolVal {
     SymType type;
 } RtsSymbolVal;
 
-extern RtsSymbolVal rtsSyms[];
+void initLinkerRtsSyms (StrHashTable *symhash);
 
 extern RtsSymbolVal* __attribute__((weak)) rtsExtraSyms(void);
 
