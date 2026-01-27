@@ -117,16 +117,14 @@
    How large is the stack frame saved by StgRun?
    world.  Used in StgCRun.c.
 
-   The size has to be enough to save the registers (see StgCRun)
-   plus padding if the result is not 16 byte aligned.
-   See the Note [Stack Alignment on X86] in StgCRun.c for details.
+   The size has to be enough to save the registers (see StgCRun).
 
    -------------------------------------------------------------------------- */
 #if defined(x86_64_HOST_ARCH)
 #  if defined(mingw32_HOST_OS)
 #    define STG_RUN_STACK_FRAME_SIZE 240
 #  else
-#    define STG_RUN_STACK_FRAME_SIZE 48
+#    define STG_RUN_STACK_FRAME_SIZE 56
 #  endif
 #endif
 

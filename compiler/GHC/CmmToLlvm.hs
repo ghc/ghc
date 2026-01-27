@@ -217,11 +217,15 @@ cmmMetaLlvmPrelude = do
               Nothing -> [ MetaStr name ]
 
   platform <- getPlatform
-  cfg <- getConfig
   let stack_alignment_metas =
           case platformArch platform of
-            ArchX86_64 | llvmCgAvxEnabled cfg -> [mkStackAlignmentMeta 32]
-            _                                 -> []
+            -- LLVM inserts stack realignment prologue/epilogue when it wants to place __m256 or __m512 on the stack.
+            -- However, it reserves %rbp as the frame pointer, conflicting with our use of it.
+            -- Therefore, we tell LLVM that the stack is already aligned to avoid stack realignment.
+            -- See also Note [Stack Alignment on X86] and https://gitlab.haskell.org/ghc/ghc/-/issues/26595.
+            ArchX86    -> [mkStackAlignmentMeta 64]
+            ArchX86_64 -> [mkStackAlignmentMeta 64]
+            _          -> []
   let codel_model_metas =
           case platformArch platform of
             -- FIXME: We should not rely on LLVM

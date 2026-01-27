@@ -38,7 +38,7 @@ llvmFixupAsm platform f1 f2 = {-# SCC "llvm_mangler" #-}
 
 -- | These are the rewrites that the mangler will perform
 rewrites :: [Rewrite]
-rewrites = [rewriteSymType, rewriteAVX, rewriteCall, rewriteJump]
+rewrites = [rewriteSymType, rewriteCall, rewriteJump]
 
 type Rewrite = Platform -> B.ByteString -> Maybe B.ByteString
 
@@ -84,23 +84,6 @@ rewriteSymType _ l
       where
         funcType = prefix `B.cons` B.pack "function"
         objType  = prefix `B.cons` B.pack "object"
-
--- | This rewrites aligned AVX instructions to their unaligned counterparts on
--- x86-64. This is necessary because the stack is not adequately aligned for
--- aligned AVX spills, so LLVM would emit code that adjusts the stack pointer
--- and disable tail call optimization. Both would be catastrophic here so GHC
--- tells LLVM that the stack is 32-byte aligned (even though it isn't) and then
--- rewrites the instructions in the mangler.
-rewriteAVX :: Rewrite
-rewriteAVX platform s
-  | not isX86_64 = Nothing
-  | isVmovdqa s  = Just $ replaceOnce (B.pack "vmovdqa") (B.pack "vmovdqu") s
-  | isVmovap s   = Just $ replaceOnce (B.pack "vmovap") (B.pack "vmovup") s
-  | otherwise    = Nothing
-  where
-    isX86_64 = platformArch platform == ArchX86_64
-    isVmovdqa = B.isPrefixOf (B.pack "vmovdqa")
-    isVmovap = B.isPrefixOf (B.pack "vmovap")
 
 -- | This rewrites (tail) calls to avoid creating PLT entries for
 -- functions on riscv64. The replacement will load the address from the
