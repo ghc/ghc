@@ -1839,7 +1839,7 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
             , not ( isSimplified dup &&  -- See (SR2) in Note [Avoiding simplifying repeatedly]
                     not (exprIsTrivial arg) &&
                     not (isDeadOcc (idOccInfo bndr)) )
-            -> do { simplTrace "SimplBindr:inline-uncond3" (ppr bndr) $
+            -> do { simplTrace "SimplBindr:inline-uncond3" (ppr bndr <+> text ":=" <+> ppr arg $$ ppr (seIdSubst env)) $
                     tick (PreInlineUnconditionally bndr)
                   ; simplLam env' body cont }
 
