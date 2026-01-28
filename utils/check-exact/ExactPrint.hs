@@ -50,6 +50,7 @@ import GHC.Types.Basic hiding (EP)
 import GHC.Types.ForeignCall
 import GHC.Types.InlinePragma (ActivationGhc, inlinePragmaActivation, inlinePragmaSource)
 import GHC.Types.Name.Reader
+import GHC.Types.OverlapMode (OverlapMode(..))
 import GHC.Types.PkgQual
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc

@@ -1,5 +1,11 @@
 {-# LANGUAGE DerivingVia #-}
 
+{- |
+Defines all possible import levels of Haskell code.
+These import levels are used to correctly stage code generation of Template Haskell.
+
+Additionally exports conversion functions from AST components.
+-}
 module GHC.Types.ImportLevel (
         -- * ImportLevel
         -- ** Data-type
@@ -22,7 +28,7 @@ import Data.Data
 
 -- | ImportLevel
 data ImportLevel = NormalLevel | SpliceLevel | QuoteLevel
-  deriving (Eq, Ord, Data, Show, Enum, Bounded)
+  deriving (Bounded, Data, Enum, Eq, Ord, Show)
 
 instance Outputable ImportLevel where
   ppr NormalLevel = text "normal"
