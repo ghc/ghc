@@ -13,16 +13,16 @@ module GHC.Types.ImportLevel (
 
 import GHC.Prelude
 
-import GHC.Utils.Outputable
 import GHC.Utils.Binary
+import GHC.Utils.Outputable
 
 import Language.Haskell.Syntax.ImpExp
 
 import Data.Data
 
 -- | ImportLevel
-
-data ImportLevel = NormalLevel | SpliceLevel | QuoteLevel deriving (Eq, Ord, Data, Show, Enum, Bounded)
+data ImportLevel = NormalLevel | SpliceLevel | QuoteLevel
+  deriving (Eq, Ord, Data, Show, Enum, Bounded)
 
 instance Outputable ImportLevel where
   ppr NormalLevel = text "normal"
@@ -32,7 +32,7 @@ instance Outputable ImportLevel where
 deriving via (EnumBinary ImportLevel) instance Binary ImportLevel
 
 allImportLevels :: [ImportLevel]
-allImportLevels = [minBound..maxBound]
+allImportLevels = [minBound .. maxBound]
 
 convImportLevel :: ImportDeclLevelStyle -> ImportLevel
 convImportLevel (LevelStylePre level) = convImportLevelSpec level
