@@ -24,7 +24,7 @@ module GHC.Types.Basic (
         ConTag, ConTagZ, fIRST_TAG,
 
         Arity, VisArity, RepArity, JoinArity, FullArgCount,
-        JoinPointHood(..), isJoinPoint,
+        JoinPointCategory(..), JoinPointHood(..), joinPointHoodArity, isJoinPoint,
 
         Alignment, mkAlignment, alignmentOf, alignmentBytes,
 
@@ -70,7 +70,7 @@ module GHC.Types.Basic (
         BranchCount, oneBranch,
         InterestingCxt(..),
         TailCallInfo(..), tailCallInfo, zapOccTailCallInfo,
-        isAlwaysTailCalled,
+        isAlwaysTailCalled, occInfoJoinPointType_maybe,
 
         EP(..),
 
@@ -1149,8 +1149,18 @@ instance Monoid InsideLam where
   mappend = (Semi.<>)
 
 -----------------
+
+joinPointHoodArity :: JoinPointHood -> Maybe JoinArity
+joinPointHoodArity = \case
+  NotJoinPoint -> Nothing
+  JoinPoint { joinPointArity = ja } -> Just ja
+
+-- | See Note [TailCallInfo]
 data TailCallInfo
-  = AlwaysTailCalled {-# UNPACK #-} !JoinArity -- See Note [TailCallInfo]
+  = AlwaysTailCalled
+     { tailCallArity         :: {-# UNPACK #-} !JoinArity
+     , tailCallJoinPointType :: !JoinPointCategory -- ^ See Note [Quasi join points]
+     }
   | NoTailCallInfo
   deriving (Eq)
 
@@ -1167,9 +1177,19 @@ isAlwaysTailCalled occ
   = case tailCallInfo occ of AlwaysTailCalled{} -> True
                              NoTailCallInfo     -> False
 
+-- | Is this 'Id' a join point (@Just@)?
+-- If so, is it a true join point or a quasi join point?
+--
+-- See Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration.
+occInfoJoinPointType_maybe :: OccInfo -> Maybe JoinPointCategory
+occInfoJoinPointType_maybe occ =
+  case tailCallInfo occ of
+    AlwaysTailCalled { tailCallJoinPointType = join_cat } -> Just join_cat
+    NoTailCallInfo -> Nothing
 instance Outputable TailCallInfo where
-  ppr (AlwaysTailCalled ar) = sep [ text "Tail", int ar ]
-  ppr _                     = empty
+  ppr (AlwaysTailCalled { tailCallJoinPointType = join_cat, tailCallArity = ar }) =
+    sep [ ppr join_cat <> text "Tail", int ar ]
+  ppr NoTailCallInfo = text "NoTailCallInfo"
 
 -----------------
 strongLoopBreaker, weakLoopBreaker :: OccInfo
@@ -1217,7 +1237,12 @@ instance Outputable OccInfo where
           pp_tail                = pprShortTailCallInfo tail_info
 
 pprShortTailCallInfo :: TailCallInfo -> SDoc
-pprShortTailCallInfo (AlwaysTailCalled ar) = char 'T' <> brackets (int ar)
+pprShortTailCallInfo
+  (AlwaysTailCalled
+    { tailCallJoinPointType = join_cat
+    , tailCallArity = ar })
+  = char 'T' <> (case join_cat of { TrueJoinPoint -> empty; QuasiJoinPoint -> char 'Q' })
+             <> brackets (int ar)
 pprShortTailCallInfo NoTailCallInfo        = empty
 
 {-
@@ -1250,6 +1275,9 @@ point can also be invoked from other join points, not just from case branches:
 
 Here both 'j1' and 'j2' will get marked AlwaysTailCalled, but j1 will get
 ManyOccs and j2 will get `OneOcc { occ_n_br = 2 }`.
+
+We also store how many profiling ticks and casts the join point occurs under.
+The rationale is described in Note [Quasi join points].
 
 ************************************************************************
 *                                                                      *

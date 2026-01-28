@@ -493,7 +493,8 @@ instance Outputable SimplSR where
     where
       pp_mj = case mj of
                 NotJoinPoint -> empty
-                JoinPoint n  -> parens (int n)
+                JoinPoint { joinPointCategory = join_cat, joinPointArity = n }
+                  -> ppr join_cat <> parens (int n)
 
   ppr (ContEx _tv _cv _id e) = vcat [text "ContEx" <+> ppr e {-,
                                 ppr (filter_env tv), ppr (filter_env id) -}]

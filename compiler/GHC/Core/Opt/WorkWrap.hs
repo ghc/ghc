@@ -843,8 +843,11 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
       -- inl_act:    see Note [Worker activation]
       -- inl_rule:   it does not make sense for workers to be constructorlike.
 
-    work_join_arity | isJoinId fn_id = JoinPoint join_arity
-                    | otherwise      = NotJoinPoint
+    work_join_arity
+      | Just join_cat <- joinId_maybe fn_id
+      = JoinPoint join_cat join_arity
+      | otherwise
+      = NotJoinPoint
       -- worker is join point iff wrapper is join point
       -- (see Note [Don't w/w join points for CPR])
 

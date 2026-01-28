@@ -645,7 +645,7 @@ fiBind platform to_drop (AnnRec bindings) body_fvs
 ------------------
 fiRhs :: Platform -> RevFloatInBinds -> CoreBndr -> CoreExprWithFVs -> CoreExpr
 fiRhs platform to_drop bndr rhs
-  | JoinPoint join_arity <- idJoinPointHood bndr
+  | JoinPoint { joinPointArity = join_arity } <- idJoinPointHood bndr
   , let (bndrs, body) = collectNAnnBndrs join_arity rhs
   = mkLams bndrs (fiExpr platform to_drop body)
   | otherwise

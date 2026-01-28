@@ -441,7 +441,7 @@ floatRhs :: CoreBndr
          -> LevelledExpr
          -> (FloatStats, FloatBinds, CoreExpr)
 floatRhs bndr rhs
-  | JoinPoint join_arity <- idJoinPointHood bndr
+  | JoinPoint { joinPointArity = join_arity } <- idJoinPointHood bndr
   , Just (bndrs, body) <- try_collect join_arity rhs []
   = case bndrs of
       []                -> floatExpr rhs
