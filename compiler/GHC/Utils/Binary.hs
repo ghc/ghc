@@ -2013,10 +2013,14 @@ instance NFData a => NFData (FingerprintWithValue a) where
     = rnf fp `seq` rnf mflags `seq` ()
 
 instance Binary Boxity where -- implemented via isBoxed-isomorphism to Bool
-  put_ bh = put_ bh . isBoxed
+  put_ bh t = putByte bh $ case t of
+    Boxed -> 0
+    Unboxed -> 1
   get bh  = do
-    b <- get bh
-    pure $ if b then Boxed else Unboxed
+    t <- getByte bh
+    evaluate $ case t of
+      0 -> Boxed
+      1 -> Unboxed
 
 instance Binary ConInfoTable where
   get bh = Binary.decode <$> get bh

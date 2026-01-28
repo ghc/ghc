@@ -3,8 +3,6 @@
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Eq XOverlapMode, NFData OverlapMode
 
--- | Data-type defintions of the Abstrast Sytntax Tree
--- which *do not* have any /Trees That Grow/ extension points.
 module Language.Haskell.Syntax.Basic where
 
 import Control.DeepSeq

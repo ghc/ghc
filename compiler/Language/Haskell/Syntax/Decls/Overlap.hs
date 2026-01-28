@@ -4,7 +4,7 @@
 {-# LANGUAGE UndecidableInstances #-} -- Eq XOverlapMode, NFData OverlapMode
 
 {- |
-Data-type describing the state of "overlapping instances" for a type.
+Data-type describing the overlap annotations for instances.
 -}
 module Language.Haskell.Syntax.Decls.Overlap where
 

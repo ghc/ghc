@@ -985,7 +985,7 @@ tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
 tcExtendLocalInstEnv dfuns thing_inside
  = do { traceDFuns dfuns
       ; env <- getGblEnv
-      -- F~orce the access to the TcgEnv so it isn't retained.
+      -- Force the access to the TcgEnv so it isn't retained.
       -- During auditing it is much easier to observe in -hi profiles if
       -- there are a very small number of TcGblEnv. Keeping a TcGblEnv
       -- alive is quite dangerous because it contains reference to many
