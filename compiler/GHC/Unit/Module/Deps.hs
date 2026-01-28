@@ -1,5 +1,8 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DerivingVia #-}
+
+{-# OPTIONS_GHC -Wwarn=incomplete-record-selectors #-}
+
 -- | Dependencies and Usage of a module
 module GHC.Unit.Module.Deps
    ( Dependencies(dep_direct_mods
@@ -17,6 +20,7 @@ module GHC.Unit.Module.Deps
    , noDependencies
    , pprDeps
    , Usage (..)
+   , stableUsageCmp
    , HomeModImport (..)
    , HomeModImportedAvails (..)
    , ImportAvails (..)
@@ -52,6 +56,7 @@ import GHC.Utils.Outputable
 import Control.DeepSeq
 import Data.Bifunctor
 import qualified Data.Foldable as Foldable
+import Data.Function (on)
 import Data.List (sortBy, sort, partition)
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -496,6 +501,47 @@ instance Binary Usage where
             return UsageDirectory { usg_dir_path = dp, usg_dir_hash = hash, usg_dir_label = label }
 
           i -> error ("Binary.get(Usage): " ++ show i)
+
+-- | Compares 'Usage's by constructor and, if the constructors are the same, by
+--   identifying strings, to achieve a predictable ordering.
+stableUsageCmp :: Usage -> Usage -> Ordering
+stableUsageCmp
+    usage1@UsagePackageModule {}
+    usage2@UsagePackageModule {}
+    = (compare `on` usg_mod) usage1 usage2
+stableUsageCmp
+    usage1@UsageHomeModule {}
+    usage2@UsageHomeModule {}
+    = (compare `on` Module <$> usg_unit_id <*> usg_mod_name) usage1 usage2
+stableUsageCmp
+    usage1@UsageFile {}
+    usage2@UsageFile {}
+    = (lexicalCompareFS `on` usg_file_path) usage1 usage2
+stableUsageCmp
+    usage1@UsageDirectory {}
+    usage2@UsageDirectory {}
+    = (lexicalCompareFS `on` usg_dir_path) usage1 usage2
+stableUsageCmp
+    usage1@UsageHomeModuleBytecode {}
+    usage2@UsageHomeModuleBytecode {}
+    = (compare `on` Module <$> usg_unit_id <*> usg_mod_name) usage1 usage2
+stableUsageCmp
+    usage1@UsageMergedRequirement {}
+    usage2@UsageMergedRequirement {}
+    = (compare `on` usg_mod) usage1 usage2
+stableUsageCmp
+    usage1
+    usage2
+    = (compare `on` constructorIndex) usage1 usage2
+    where
+
+    constructorIndex :: Usage -> Int
+    constructorIndex UsagePackageModule      {} = 0
+    constructorIndex UsageHomeModule         {} = 1
+    constructorIndex UsageFile               {} = 2
+    constructorIndex UsageDirectory          {} = 3
+    constructorIndex UsageHomeModuleBytecode {} = 4
+    constructorIndex UsageMergedRequirement  {} = 5
 
 -- | Records the imports that we depend on from a home module,
 -- for recompilation checking.
