@@ -338,6 +338,8 @@ iselExpr64 (CmmReg (CmmLocal local_reg)) = do
   let Reg64 hi lo = localReg64 local_reg
   return (RegCode64 nilOL hi lo)
 
+iselExpr64 regoff@(CmmRegOff _ _) = iselExpr64 $ mangleIndexTree regoff
+
 iselExpr64 (CmmLit (CmmInt i _)) = do
   Reg64 rhi rlo <- getNewReg64
   let
