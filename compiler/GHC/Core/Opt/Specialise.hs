@@ -17,9 +17,9 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Core.Type  hiding( substTy, substCo, extendTvSubst, zapSubst )
 import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith, exprIsConApp_maybe )
 import GHC.Core.Predicate
-import GHC.Core.Class( classMethods )
+-- import GHC.Core.Class( classMethods )
 import GHC.Core.Coercion( Coercion )
-import GHC.Core.DataCon (dataConTyCon)
+-- import GHC.Core.DataCon (dataConTyCon)
 
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
@@ -28,7 +28,7 @@ import GHC.Core.Make      ( mkLitRubbish )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
 import GHC.Core.Subst (substTickish)
-import GHC.Core.TyCon (tyConClass_maybe)
+-- import GHC.Core.TyCon (tyConClass_maybe)
 import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
                           , mkCast, exprType, exprIsHNF
                           , stripTicksTop, mkInScopeSetBndrs )
@@ -3128,8 +3128,8 @@ interestingDict env arg  -- Main Plan: use exprIsConApp_maybe
        | otherwise
        -> exprIsHNF arg   -- See (ID7)
 
-  | Just (_, _, data_con, _tys, args) <- exprIsConApp_maybe in_scope_env arg
-  , Just cls <- tyConClass_maybe (dataConTyCon data_con)
+  | Just (_, _, _data_con, _tys, _args) <- exprIsConApp_maybe in_scope_env arg
+--   , Just cls <- tyConClass_maybe (dataConTyCon data_con)
   , definitely_not_ip_like       -- See (ID4)
   = True
 --  = if null (classMethods cls)   -- See (ID6)
