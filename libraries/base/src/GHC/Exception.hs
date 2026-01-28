@@ -25,7 +25,7 @@
 #endif
 
 module GHC.Exception
-  {-# DEPRECATED ["GHC.Exception is deprecated and will be removed in GHC 10.02. Please use Control.Exception where possible and the ghc-internal package otherwise."] #-}
+  {-# DEPRECATED "GHC.Exception is deprecated and will be removed in GHC 10.02. Please use Control.Exception where possible and the ghc-internal package otherwise." #-}
     ( -- * 'Exception' class
       Exception(..)
 

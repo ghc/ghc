@@ -26,7 +26,7 @@
 #endif
 
 module GHC.TopHandler
-  {-# DEPRECATED ["GHC.TopHandler is deprecated and will be removed in GHC 10.02. Please use GHC.Conc where possible and the ghc-internal package otherwise."] #-}
+  {-# DEPRECATED "GHC.TopHandler is deprecated and will be removed in GHC 10.02. Please use GHC.Conc where possible and the ghc-internal package otherwise." #-}
     (runMainIO,
      runIO,
      runIOFastExit,

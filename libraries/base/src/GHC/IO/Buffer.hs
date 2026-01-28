@@ -24,7 +24,7 @@
 #endif
 
 module GHC.IO.Buffer
-  {-# DEPRECATED ["GHC.IO.Buffer is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."] #-}
+  {-# DEPRECATED "GHC.IO.Buffer is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package." #-}
     (-- *  Buffers of any element
      Buffer(..),
      BufferState(..),

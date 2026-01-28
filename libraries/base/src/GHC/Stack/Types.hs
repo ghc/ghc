@@ -27,7 +27,7 @@
 #endif
 
 module GHC.Stack.Types
-  {-# DEPRECATED ["GHC.Stack.Types is deprecated and will be removed in GHC 10.02. Please use GHC.Stack."] #-}
+  {-# DEPRECATED "GHC.Stack.Types is deprecated and will be removed in GHC 10.02. Please use GHC.Stack." #-}
     (-- *  Implicit call stacks
      CallStack(..),
      HasCallStack,

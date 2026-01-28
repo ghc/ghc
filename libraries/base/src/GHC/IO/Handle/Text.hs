@@ -24,7 +24,7 @@
 #endif
 
 module GHC.IO.Handle.Text (
-  {-# DEPRECATED ["GHC.IO.Handle.Text is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."] #-}
+  {-# DEPRECATED "GHC.IO.Handle.Text is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package." #-}
         hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
         commitBuffer',       -- hack, see below
         hGetBuf, hGetBufSome, hGetBufNonBlocking, hPutBuf, hPutBufNonBlocking,

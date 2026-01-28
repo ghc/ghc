@@ -24,7 +24,7 @@
 #endif
 
 module GHC.Fingerprint.Type
-  {-# DEPRECATED ["GHC.Fingerprint.Type is deprecated and will be removed in GHC 10.02. Please use GHC.Fingerprint."] #-}
+  {-# DEPRECATED "GHC.Fingerprint.Type is deprecated and will be removed in GHC 10.02. Please use GHC.Fingerprint." #-}
     (Fingerprint(..)
      ) where
 

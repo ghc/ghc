@@ -24,7 +24,7 @@
 #endif
 
 module GHC.IO.Encoding
-  {-# DEPRECATED ["GHC.IO.Encoding is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."] #-}
+  {-# DEPRECATED "GHC.IO.Encoding is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package." #-}
     (BufferCodec(..),
      TextEncoding(..),
      TextEncoder,

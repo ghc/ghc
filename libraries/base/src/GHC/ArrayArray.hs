@@ -24,7 +24,7 @@
 #endif
 
 module GHC.ArrayArray
-  {-# DEPRECATED ["GHC.ArrayArray is deprecated and will be removed in GHC 10.02. Please use GHC.Exts."] #-}
+  {-# DEPRECATED "GHC.ArrayArray is deprecated and will be removed in GHC 10.02. Please use GHC.Exts." #-}
     (ArrayArray#(..),
      MutableArrayArray#(..),
      newArrayArray#,

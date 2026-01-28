@@ -30,7 +30,7 @@
 #endif
 
 module GHC.Encoding.UTF8
-  {-# DEPRECATED ["GHC.Encoding.UTF8 is deprecated and will be removed in GHC 10.02. Please use the text package."] #-}
+  {-# DEPRECATED "GHC.Encoding.UTF8 is deprecated and will be removed in GHC 10.02. Please use the text package." #-}
     (-- *  Decoding single characters
      utf8DecodeCharAddr#,
      utf8DecodeCharPtr,

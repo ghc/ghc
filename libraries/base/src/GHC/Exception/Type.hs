@@ -19,7 +19,7 @@
 #endif
 
 module GHC.Exception.Type
-  {-# DEPRECATED ["GHC.Exception.Type is deprecated and will be removed in GHC 10.02. Please use Control.Exception where possible and the ghc-internal package otherwise."] #-}
+  {-# DEPRECATED "GHC.Exception.Type is deprecated and will be removed in GHC 10.02. Please use Control.Exception where possible and the ghc-internal package otherwise." #-}
        ( Exception(..)    -- Class
        , SomeException(..), ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException

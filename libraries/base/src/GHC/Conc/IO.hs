@@ -24,7 +24,7 @@
 #endif
 
 module GHC.Conc.IO
-  {-# DEPRECATED ["GHC.Conc.IO is deprecated and will be removed in GHC 10.02. Please use GHC.Conc where possible and the ghc-internal package otherwise."] #-}
+  {-# DEPRECATED "GHC.Conc.IO is deprecated and will be removed in GHC 10.02. Please use GHC.Conc where possible and the ghc-internal package otherwise." #-}
     (ensureIOManagerIsRunning,
      ioManagerCapabilitiesChanged,
      interruptIOManager,

@@ -24,7 +24,7 @@
 #endif
 
 module GHC.IO.Exception (
-  {-# DEPRECATED ["GHC.IO.Exception is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."] #-}
+  {-# DEPRECATED "GHC.IO.Exception is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package." #-}
   BlockedIndefinitelyOnMVar(..), blockedIndefinitelyOnMVar,
   BlockedIndefinitelyOnSTM(..), blockedIndefinitelyOnSTM,
   Deadlock(..),

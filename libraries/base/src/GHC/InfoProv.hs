@@ -25,7 +25,7 @@
 #endif
 
 module GHC.InfoProv
-  {-# DEPRECATED ["GHC.InfoProv is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."] #-}
+  {-# DEPRECATED "GHC.InfoProv is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package." #-}
     ( InfoProv(..)
     , ipLoc
     , ipeProv

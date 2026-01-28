@@ -23,7 +23,7 @@
 #endif
 
 module GHC.IO.Device (
-  {-# DEPRECATED ["GHC.IO.Device is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."] #-}
+  {-# DEPRECATED "GHC.IO.Device is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package." #-}
         RawIO(..),
         IODevice(..),
         IODeviceType(..),

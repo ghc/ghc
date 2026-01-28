@@ -24,7 +24,7 @@
 #endif
 
 module GHC.Arr
-  {-# DEPRECATED ["GHC.Arr is deprecated and will be removed in GHC 10.02. Please use the array package."] #-}
+  {-# DEPRECATED "GHC.Arr is deprecated and will be removed in GHC 10.02. Please use the array package." #-}
     (Ix(..),
      Array(..),
      STArray(..),
