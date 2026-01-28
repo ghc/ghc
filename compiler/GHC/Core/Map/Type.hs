@@ -46,7 +46,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Types.Unique.FM
+import GHC.Types.Unique.DFM
 import GHC.Utils.Outputable
 
 import GHC.Utils.Panic
@@ -362,14 +362,14 @@ filterT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
 
 ------------------------
 data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
-                      , tlm_string :: UniqFM  FastString a
+                      , tlm_string :: UniqDFM  FastString a
                       , tlm_char   :: Map.Map Char a
                       }
 
 -- TODO(22292): derive
 instance Functor TyLitMap where
     fmap f TLM { tlm_number = tn, tlm_string = ts, tlm_char = tc } = TLM
-      { tlm_number = Map.map f tn, tlm_string = mapUFM f ts, tlm_char = Map.map f tc }
+      { tlm_number = Map.map f tn, tlm_string = mapUDFM f ts, tlm_char = Map.map f tc }
 
 instance TrieMap TyLitMap where
    type Key TyLitMap = TyLit
@@ -380,30 +380,30 @@ instance TrieMap TyLitMap where
    filterTM = filterTyLit
 
 emptyTyLitMap :: TyLitMap a
-emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUFM, tlm_char = Map.empty }
+emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUDFM, tlm_char = Map.empty }
 
 lkTyLit :: TyLit -> TyLitMap a -> Maybe a
 lkTyLit l =
   case l of
     NumTyLit n -> tlm_number >.> Map.lookup n
-    StrTyLit n -> tlm_string >.> (`lookupUFM` n)
+    StrTyLit n -> tlm_string >.> (`lookupUDFM` n)
     CharTyLit n -> tlm_char >.> Map.lookup n
 
 xtTyLit :: TyLit -> XT a -> TyLitMap a -> TyLitMap a
 xtTyLit l f m =
   case l of
     NumTyLit n ->  m { tlm_number = Map.alter f n (tlm_number m) }
-    StrTyLit n ->  m { tlm_string = alterUFM  f (tlm_string m) n }
+    StrTyLit n ->  m { tlm_string = alterUDFM  f (tlm_string m) n }
     CharTyLit n -> m { tlm_char = Map.alter f n (tlm_char m) }
 
 foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
-foldTyLit l m = flip (nonDetFoldUFM l) (tlm_string m)
+foldTyLit l m = flip (foldUDFM l)  (tlm_string m)
               . flip (Map.foldr l) (tlm_number m)
               . flip (Map.foldr l) (tlm_char m)
 
 filterTyLit :: (a -> Bool) -> TyLitMap a -> TyLitMap a
 filterTyLit f (TLM { tlm_number = tn, tlm_string = ts, tlm_char = tc })
-  = TLM { tlm_number = Map.filter f tn, tlm_string = filterUFM f ts, tlm_char = Map.filter f tc }
+  = TLM { tlm_number = Map.filter f tn, tlm_string = filterUDFM f ts, tlm_char = Map.filter f tc }
 
 -------------------------------------------------
 -- | @TypeMap a@ is a map from 'Type' to @a@.  If you are a client, this
