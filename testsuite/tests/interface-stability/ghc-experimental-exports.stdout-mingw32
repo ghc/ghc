@@ -4540,8 +4540,6 @@ module GHC.PrimOps where
   data DoubleX4#
   type DoubleX8# :: TYPE (VecRep Vec8 DoubleElemRep)
   data DoubleX8#
-  type Down :: * -> *
-  newtype Down a = Down {getDown :: a}
   type role FUN nominal representational representational
   type FUN :: forall (n :: Multiplicity) -> forall {q :: RuntimeRep} {r :: RuntimeRep}. TYPE q -> TYPE r -> *
   data FUN n a b
@@ -11065,7 +11063,6 @@ module System.Mem.Experimental where
 instance GHC.Internal.Base.Alternative GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Alternative [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Alternative GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
-instance GHC.Internal.Base.Applicative GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall r. GHC.Internal.Base.Applicative ((->) r) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Applicative GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Applicative [] -- Defined in ‘GHC.Internal.Base’
@@ -11074,7 +11071,6 @@ instance GHC.Internal.Base.Applicative Solo -- Defined in ‘GHC.Internal.Base�
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Applicative ((,) a) -- Defined in ‘GHC.Internal.Base’
 instance forall a b. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b) => GHC.Internal.Base.Applicative ((,,) a b) -- Defined in ‘GHC.Internal.Base’
 instance forall a b c. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b, GHC.Internal.Base.Monoid c) => GHC.Internal.Base.Applicative ((,,,) a b c) -- Defined in ‘GHC.Internal.Base’
-instance GHC.Internal.Base.Functor GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall r. GHC.Internal.Base.Functor ((->) r) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Functor GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Functor [] -- Defined in ‘GHC.Internal.Base’
@@ -11086,7 +11082,6 @@ instance forall a b c. GHC.Internal.Base.Functor ((,,,) a b c) -- Defined in ‘
 instance forall a b c d. GHC.Internal.Base.Functor ((,,,,) a b c d) -- Defined in ‘GHC.Internal.Base’
 instance forall a b c d e. GHC.Internal.Base.Functor ((,,,,,) a b c d e) -- Defined in ‘GHC.Internal.Base’
 instance forall a b c d e f. GHC.Internal.Base.Functor ((,,,,,,) a b c d e f) -- Defined in ‘GHC.Internal.Base’
-instance GHC.Internal.Base.Monad GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall r. GHC.Internal.Base.Monad ((->) r) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monad GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monad [] -- Defined in ‘GHC.Internal.Base’
@@ -11098,7 +11093,6 @@ instance forall a b c. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b, 
 instance GHC.Internal.Base.MonadPlus GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.MonadPlus [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.MonadPlus GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
-instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall b a. GHC.Internal.Base.Monoid b => GHC.Internal.Base.Monoid (a -> b) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Types.IO a) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Monoid [a] -- Defined in ‘GHC.Internal.Base’
@@ -11110,7 +11104,6 @@ instance forall a b c. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b, 
 instance forall a b c d. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b, GHC.Internal.Base.Monoid c, GHC.Internal.Base.Monoid d) => GHC.Internal.Base.Monoid (a, b, c, d) -- Defined in ‘GHC.Internal.Base’
 instance forall a b c d e. (GHC.Internal.Base.Monoid a, GHC.Internal.Base.Monoid b, GHC.Internal.Base.Monoid c, GHC.Internal.Base.Monoid d, GHC.Internal.Base.Monoid e) => GHC.Internal.Base.Monoid (a, b, c, d, e) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monoid () -- Defined in ‘GHC.Internal.Base’
-instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall b a. GHC.Internal.Base.Semigroup b => GHC.Internal.Base.Semigroup (a -> b) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Types.IO a) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Semigroup [a] -- Defined in ‘GHC.Internal.Base’
@@ -11123,8 +11116,6 @@ instance forall a b c d. (GHC.Internal.Base.Semigroup a, GHC.Internal.Base.Semig
 instance forall a b c d e. (GHC.Internal.Base.Semigroup a, GHC.Internal.Base.Semigroup b, GHC.Internal.Base.Semigroup c, GHC.Internal.Base.Semigroup d, GHC.Internal.Base.Semigroup e) => GHC.Internal.Base.Semigroup (a, b, c, d, e) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Semigroup () -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Semigroup GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Base’
-instance forall a. GHC.Internal.Bits.Bits a => GHC.Internal.Bits.Bits (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
-instance forall a. GHC.Internal.Bits.FiniteBits a => GHC.Internal.Bits.FiniteBits (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance GHC.Internal.Classes.Eq GHC.Internal.Types.Bool -- Defined in ‘GHC.Internal.Classes’
 instance GHC.Internal.Classes.Eq GHC.Internal.Types.Char -- Defined in ‘GHC.Internal.Classes’
 instance GHC.Internal.Classes.Eq GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Classes’
@@ -11152,7 +11143,6 @@ instance forall a b c d e f g h i. (GHC.Internal.Classes.Eq a, GHC.Internal.Clas
 instance GHC.Internal.Classes.Eq GHC.Internal.Types.TyCon -- Defined in ‘GHC.Internal.Classes’
 instance GHC.Internal.Classes.Eq () -- Defined in ‘GHC.Internal.Classes’
 instance GHC.Internal.Classes.Eq GHC.Internal.Types.Word -- Defined in ‘GHC.Internal.Classes’
-instance forall a. GHC.Internal.Classes.Eq a => GHC.Internal.Classes.Eq (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance GHC.Internal.Classes.Eq GHC.Internal.Exts.SpecConstrAnnotation -- Defined in ‘GHC.Internal.Exts’
 instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.Ptr.FunPtr a) -- Defined in ‘GHC.Internal.Ptr’
 instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.Internal.Ptr’
@@ -11186,7 +11176,6 @@ instance forall a b c d e f g h i. (GHC.Internal.Classes.Ord a, GHC.Internal.Cla
 instance GHC.Internal.Classes.Ord GHC.Internal.Types.TyCon -- Defined in ‘GHC.Internal.Classes’
 instance GHC.Internal.Classes.Ord () -- Defined in ‘GHC.Internal.Classes’
 instance GHC.Internal.Classes.Ord GHC.Internal.Types.Word -- Defined in ‘GHC.Internal.Classes’
-instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Classes.Ord (GHC.Internal.Ptr.FunPtr a) -- Defined in ‘GHC.Internal.Ptr’
 instance forall a. GHC.Internal.Classes.Ord (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.Internal.Ptr’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Base’
@@ -11194,8 +11183,6 @@ instance GHC.Internal.Classes.Ord GHC.Internal.Base.Void -- Defined in ‘GHC.In
 instance forall a k (b :: k). GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. (a ~ GHC.Internal.Types.Char) => GHC.Internal.Data.String.IsString [a] -- Defined in ‘GHC.Internal.Data.String’
-instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
-instance forall a. (GHC.Internal.Enum.Enum a, GHC.Internal.Enum.Bounded a, GHC.Internal.Classes.Eq a) => GHC.Internal.Enum.Enum (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoCostCentres -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.DoTrace -- Defined in ‘GHC.Internal.RTS.Flags’
@@ -11203,9 +11190,6 @@ instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.GiveGCStats -- Defined in
 instance GHC.Internal.Enum.Enum GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Enum.Enum GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
 instance GHC.Internal.Exception.Context.ExceptionAnnotation GHC.Internal.Exception.Backtrace.Backtraces -- Defined in ‘GHC.Internal.Exception.Backtrace’
-instance forall a. GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
-instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.RealFloat (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
-instance forall a. GHC.Internal.Foreign.Storable.Storable a => GHC.Internal.Foreign.Storable.Storable (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.CCFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.ConcFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Generics.Generic GHC.Internal.RTS.Flags.DebugFlags -- Defined in ‘GHC.Internal.RTS.Flags’
@@ -11228,15 +11212,8 @@ instance forall a. GHC.Internal.IsList.IsList [a] -- Defined in ‘GHC.Internal.
 instance forall a. GHC.Internal.IsList.IsList (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.IsList’
 instance GHC.Internal.IsList.IsList GHC.Internal.Data.Version.Version -- Defined in ‘GHC.Internal.IsList’
 instance forall a. GHC.Internal.IsList.IsList (GHC.Internal.Functor.ZipList.ZipList a) -- Defined in ‘GHC.Internal.IsList’
-instance forall a. GHC.Internal.Ix.Ix a => GHC.Internal.Ix.Ix (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
-instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
-instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance GHC.Internal.Read.Read GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
 instance GHC.Internal.Read.Read GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
-instance forall a. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
-instance forall a. GHC.Internal.Real.Real a => GHC.Internal.Real.Real (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
-instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
-instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Show.Show (GHC.Internal.Ptr.FunPtr a) -- Defined in ‘GHC.Internal.Ptr’
 instance forall a. GHC.Internal.Show.Show (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.Internal.Ptr’
 instance GHC.Internal.Show.Show GHC.Internal.IO.MaskingState -- Defined in ‘GHC.Internal.IO’

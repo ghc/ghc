@@ -33,7 +33,6 @@ import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Monoid ( Monoid, Dual(..), Sum(..), Product(..)
                    , First(..), Last(..), Alt(..), Ap(..) )
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
-import GHC.Internal.Data.Ord ( Down(..) )
 import GHC.Internal.Data.Tuple ( Solo(..), snd )
 import GHC.Internal.Base ( Monad, errorWithoutStackTrace, (.) )
 import GHC.Internal.Generics
@@ -166,13 +165,6 @@ instance (MonadFix f, MonadFix g) => MonadFix (f :*: g) where
       where
         fstP (a :*: _) = a
         sndP (_ :*: b) = b
-
--- Instances for Data.Ord
-
--- | @since base-4.12.0.0
-instance MonadFix Down where
-    mfix f = Down (fix (getDown . f))
-
 
 -- | @since base-4.8.0.0
 instance MonadFix Identity where

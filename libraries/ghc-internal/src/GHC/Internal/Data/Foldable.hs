@@ -57,7 +57,6 @@ import GHC.Internal.Data.Functor.Utils (Max(..), Min(..), (#.))
 import qualified GHC.Internal.List as List
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Monoid
-import GHC.Internal.Data.Ord
 import GHC.Internal.Data.Proxy
 
 import GHC.Internal.Arr  ( Array(..), elems, numElements,
@@ -921,9 +920,6 @@ deriving instance Foldable UInt
 -- | @since base-4.9.0.0
 deriving instance Foldable UWord
 
--- Instances for Data.Ord
--- | @since base-4.12.0.0
-deriving instance Foldable Down
 
 -- | Right-to-left monadic fold over the elements of a structure.
 --
