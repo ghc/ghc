@@ -318,7 +318,7 @@ import qualified GHC.Internal.Data.Coerce
 import GHC.Internal.Data.String
 import GHC.Internal.Data.OldList
 import GHC.Internal.Data.Data
-import GHC.Internal.Data.Ord
+import GHC.Internal.Data.Ord.Down
 import qualified GHC.Internal.Debug.Trace
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# ) -- just for re-export
 

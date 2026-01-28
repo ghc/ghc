@@ -921,9 +921,6 @@ deriving instance Foldable UInt
 -- | @since base-4.9.0.0
 deriving instance Foldable UWord
 
--- Instances for Data.Ord
--- | @since base-4.12.0.0
-deriving instance Foldable Down
 
 -- | Right-to-left monadic fold over the elements of a structure.
 --

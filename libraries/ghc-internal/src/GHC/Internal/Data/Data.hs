@@ -116,7 +116,7 @@ import GHC.Internal.Data.Eq
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Monoid
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
-import GHC.Internal.Data.Ord
+import GHC.Internal.Data.Ord.Down
 import GHC.Internal.Data.OldList (findIndex)
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Data.Version( Version(..) )

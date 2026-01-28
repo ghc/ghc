@@ -23,7 +23,6 @@ import GHC.Internal.Data.Functor.Identity
 import qualified GHC.Internal.Data.Functor
 import GHC.Internal.Data.Monoid
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
-import GHC.Internal.Data.Ord ( Down(..) )
 import GHC.Internal.Data.Proxy
 --import qualified Data.List.NonEmpty as NE
 import GHC.Internal.Generics
@@ -136,9 +135,3 @@ instance MonadZip f => MonadZip (M1 i c f) where
 -- | @since 4.9.0.0
 instance (MonadZip f, MonadZip g) => MonadZip (f :*: g) where
     mzipWith f (x1 :*: y1) (x2 :*: y2) = mzipWith f x1 x2 :*: mzipWith f y1 y2
-
--- instances for GHC.Internal.Data.Ord
-
--- | @since 4.12.0.0
-instance MonadZip Down where
-    mzipWith = liftM2
