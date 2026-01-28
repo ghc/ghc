@@ -26,7 +26,7 @@
 #endif
 
 module GHC.IO.SubSystem
-  {-# DEPRECATED ["GHC.IO.SubSystem is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context."] #-}
+  {-# DEPRECATED "GHC.IO.SubSystem is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context." #-}
     (withIoSubSystem,
      withIoSubSystem',
      whenIoSubSystem,

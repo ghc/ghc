@@ -25,7 +25,7 @@
 #endif
 
 module GHC.GHCi.Helpers
-  {-# DEPRECATED ["GHC.GHCi.Helpers is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context."] #-}
+  {-# DEPRECATED "GHC.GHCi.Helpers is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context." #-}
     (disableBuffering,
      flushAll,
      evalWrapper

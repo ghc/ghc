@@ -30,7 +30,7 @@
 #endif
 
 module System.Posix.Internals
-  {-# DEPRECATED ["System.Posix.Internals is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context."] #-}
+  {-# DEPRECATED "System.Posix.Internals is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context." #-}
   ( module GHC.Internal.System.Posix.Internals -- TODO: deprecate
   ) where
 

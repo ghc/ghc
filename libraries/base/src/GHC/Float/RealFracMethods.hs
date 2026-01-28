@@ -29,7 +29,7 @@
 #endif
 
 module GHC.Float.RealFracMethods
-  {-# DEPRECATED ["GHC.Float.RealFracMethods is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context."] #-}
+  {-# DEPRECATED "GHC.Float.RealFracMethods is deprecated and will be removed in GHC 10.02. See https://github.com/well-typed/reinstallable-base/tree/main/hackage-uses-of-internals/stability-risk-3 for context." #-}
     (-- *  Double methods
      -- **  Integer results
      properFractionDoubleInteger,
