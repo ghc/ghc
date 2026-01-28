@@ -37,6 +37,7 @@ import GHC.Unit.Module.Deps
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
+import Data.Function (on)
 import Data.IORef
 import Data.List (sortBy)
 import Data.Map (Map)
@@ -171,7 +172,8 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
       let ls = ordNubOn linkableModule (th_links_needed ++ plugins_links_needed)
           ds = concatMap loaded_pkg_hs_objs $ eltsUDFM (plusUDFM th_pkgs_needed plugin_pkgs_needed) -- TODO possibly record loaded_pkg_non_hs_objs as well
           (plugins_links_needed, plugin_pkgs_needed) = loadedPluginDeps plugins
-      concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)
+      xs <- concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)
+      pure (sortBy (compare `on` getFing) xs)
   where
     linkableToUsage (Linkable _ m uls) = mapM (partToUsage m) (NE.toList uls)
 
@@ -196,6 +198,13 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
     librarySpecToUsage (Archive fn) = traverse (fing Nothing) [fn]
     librarySpecToUsage (DLLPath fn) = traverse (fing Nothing) [fn]
     librarySpecToUsage _ = return []
+
+    getFing :: Usage -> Fingerprint
+    getFing x@UsagePackageModule {} = usg_mod_hash x
+    getFing x@UsageHomeModule {} = usg_mod_hash x
+    getFing x@UsageFile {} = usg_file_hash x
+    getFing x@UsageHomeModuleInterface {} = usg_iface_hash x
+    getFing x@UsageMergedRequirement {} = usg_mod_hash x
 
 mk_mod_usage_info :: UsageConfig
               -> HomeUnit
