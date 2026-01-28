@@ -116,7 +116,6 @@ import GHC.Internal.Data.Eq
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Monoid
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
-import GHC.Internal.Data.Ord
 import GHC.Internal.Data.List (findIndex)
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Data.Version( Version(..) )
@@ -1350,12 +1349,6 @@ deriving instance Data SourceStrictness
 
 -- | @since base-4.9.0.0
 deriving instance Data DecidedStrictness
-
-----------------------------------------------------------------------------
--- Data instances for GHC.Internal.Data.Ord
-
--- | @since base-4.12.0.0
-deriving instance Data a => Data (Down a)
 
 ----------------------------------------------------------------------------
 -- Data instances for GHC.Internal.TH.Syntax

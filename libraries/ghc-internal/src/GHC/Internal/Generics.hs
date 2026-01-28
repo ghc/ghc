@@ -732,7 +732,6 @@ module GHC.Internal.Generics  (
 -- We use some base types
 import GHC.Internal.Data.Either     ( Either (..) )
 import GHC.Internal.Data.Maybe      ( Maybe(..), fromMaybe )
-import GHC.Internal.Data.Ord        ( Down(..) )
 import GHC.Internal.Bignum.Integer ( Integer, integerToInt )
 import GHC.Internal.Prim        ( Addr#, Char#, Double#, Float#, Int#, Word# )
 import GHC.Internal.Ptr         ( Ptr(..) )
@@ -1629,9 +1628,6 @@ deriving instance Generic ((,,,,,,,,,,,,,) a b c d e f g h i j k l m n)
 -- | @since base-4.16.0.0
 deriving instance Generic ((,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o)
 
--- | @since base-4.12.0.0
-deriving instance Generic (Down a)
-
 -- | @since base-4.15.0.0
 deriving instance Generic SrcLoc
 
@@ -1700,9 +1696,6 @@ deriving instance Generic1 ((,,,,,,,,,,,,,) a b c d e f g h i j k l m)
 
 -- | @since base-4.16.0.0
 deriving instance Generic1 ((,,,,,,,,,,,,,,) a b c d e f g h i j k l m n)
-
--- | @since base-4.12.0.0
-deriving instance Generic1 Down
 
 --------------------------------------------------------------------------------
 -- Copied from the singletons package

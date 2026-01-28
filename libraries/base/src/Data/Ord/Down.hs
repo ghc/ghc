@@ -1,10 +1,14 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
 
------------------------------------------------------------------------------
 -- |
--- Module      :  GHC.Internal.Data.Ord
+--
+-- Module      :  Data.Ord.Down
 -- Copyright   :  (c) The University of Glasgow 2005
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 --
@@ -12,62 +16,34 @@
 -- Stability   :  stable
 -- Portability :  portable
 --
--- Orderings
+-- The @Down@ datatype
 --
------------------------------------------------------------------------------
 
-module GHC.Internal.Data.Ord (
-   Ord(..),
-   Ordering(..),
-   Down(..),
-   comparing,
-   clamp,
- ) where
+module Data.Ord.Down
+    ( Down(..)
+    ) where
 
-import GHC.Internal.Data.Bits (Bits, FiniteBits, complement)
-import GHC.Internal.Foreign.Storable (Storable)
-import GHC.Internal.Ix (Ix)
-import GHC.Internal.Base
-import GHC.Internal.Enum (Bounded(..), Enum(..))
-import GHC.Internal.Float (Floating, RealFloat)
-import GHC.Internal.Num
-import GHC.Internal.Read
-import GHC.Internal.Real (Fractional, Real, RealFrac)
-import GHC.Internal.Show
+import GHC.Base
+    ( otherwise, ($), coerce, Eq((==)), Monad((>>=)), Functor(fmap)
+    , Ord(..), Applicative(pure, (<*>)), Semigroup, Monoid, IO(IO)
+    , (.), liftM2 )
+import GHC.Internal.Control.Monad.Zip ( MonadZip(mzipWith) )
+import GHC.Internal.Data.Bits ( Bits, FiniteBits, complement )
+import GHC.Internal.Data.Data ( Data )
+import GHC.Internal.Data.Foldable ( Foldable )
+import GHC.Internal.Data.Traversable ( Traversable )
+import GHC.Internal.Enum ( Bounded(..), Enum(..) )
+import GHC.Internal.Float ( Floating, RealFloat )
+import GHC.Internal.Foreign.Storable ( Storable )
+import GHC.Internal.Generics ( Generic, Generic1 )
+import GHC.Internal.Ix ( Ix )
+import GHC.Internal.Num ( Num )
+import GHC.Internal.Read ( Read(readsPrec), lex, readParen )
+import GHC.Internal.Real ( Fractional, Real, RealFrac )
+import GHC.Internal.Show ( Show(showsPrec), showParen, showString )
 
 -- $setup
 -- >>> import Prelude
-
--- |
--- > comparing p x y = compare (p x) (p y)
---
--- Useful combinator for use in conjunction with the @xxxBy@ family
--- of functions from "Data.List", for example:
---
--- >   ... sortBy (comparing fst) ...
-comparing :: (Ord a) => (b -> a) -> b -> b -> Ordering
-comparing p x y = compare (p x) (p y)
-
--- |
--- > clamp (low, high) a = min high (max a low)
---
--- Function for ensuring the value @a@ is within the inclusive bounds given by
--- @low@ and @high@. If it is, @a@ is returned unchanged. The result
--- is otherwise @low@ if @a <= low@, or @high@ if @high <= a@.
---
--- When clamp is used at Double and Float, it has NaN propagating semantics in
--- its second argument. That is, @clamp (l,h) NaN = NaN@, but @clamp (NaN, NaN)
--- x = x@.
---
--- >>> clamp (0, 10) 2
--- 2
---
--- >>> clamp ('a', 'm') 'x'
--- 'm'
---
--- @since base-4.16.0.0
-clamp :: (Ord a) => (a, a) -> a -> a
-clamp (low, high) a = min high (max a low)
 
 -- | The 'Down' type allows you to reverse sort order conveniently.  A value of type
 -- @'Down' a@ contains a value of type @a@ (represented as @'Down' a@).
@@ -113,7 +89,21 @@ newtype Down a = Down
       , RealFrac   -- ^ @since base-4.14.0.0
       , RealFloat  -- ^ @since base-4.14.0.0
       , Storable   -- ^ @since base-4.14.0.0
+      , Generic    -- ^ @since base-4.12.0.0
       )
+
+-- | @since base-4.12.0.0
+deriving instance Generic1 Down
+
+-- | @since base-4.12.0.0
+deriving instance Foldable Down
+
+-- | @since base-4.12.0.0
+deriving instance Traversable Down
+
+-- | @since 4.12.0.0
+instance MonadZip Down where
+    mzipWith = liftM2
 
 -- | This instance would be equivalent to the derived instances of the
 -- 'Down' newtype if the 'getDown' field were removed
@@ -180,3 +170,6 @@ instance Applicative Down where
 -- | @since base-4.11.0.0
 instance Monad Down where
     Down a >>= k = k a
+
+-- | @since base-4.12.0.0
+deriving instance Data a => Data (Down a)

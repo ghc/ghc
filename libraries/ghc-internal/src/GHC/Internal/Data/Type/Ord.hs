@@ -38,10 +38,9 @@ import GHC.Internal.Show(Show(..))
 import GHC.Internal.TypeError
 import GHC.Internal.TypeLits.Internal
 import GHC.Internal.TypeNats.Internal
-import GHC.Internal.Types (type (~), Char)
 import GHC.Internal.Data.Bool
 import GHC.Internal.Data.Eq
-import GHC.Internal.Data.Ord
+import GHC.Internal.Base
 
 -- | 'Compare' branches on the kind of its arguments to either compare by
 -- 'Symbol' or 'Nat'.

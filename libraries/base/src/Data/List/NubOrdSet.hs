@@ -13,7 +13,7 @@ module Data.List.NubOrdSet (
 
 import GHC.Internal.Data.Bool (Bool(..))
 import GHC.Internal.Data.Function ((.))
-import GHC.Internal.Data.Ord (Ordering(..))
+import Data.Ord (Ordering(..))
 
 -- | Implemented as a red-black tree, a la Okasaki.
 data NubOrdSet a

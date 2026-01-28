@@ -300,6 +300,7 @@ Library
 
     other-modules:
         Data.List.NubOrdSet
+        Data.Ord.Down
         System.CPUTime.Unsupported
         System.CPUTime.Utils
     if os(windows)

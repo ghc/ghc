@@ -45,7 +45,7 @@ import Data.Complex (Complex (..))
 import GHC.Generics
        (M1 (..), Par1 (..), Rec1 (..), V1, (:*:) (..), (:+:) (..), (:.:) (..))
 
-import GHC.Internal.Data.Ord (Down (..))
+import Data.Ord (Down (..))
 
 import qualified GHC.Internal.Data.Monoid as Mon
 

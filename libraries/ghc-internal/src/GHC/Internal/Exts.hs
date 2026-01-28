@@ -110,7 +110,7 @@ module GHC.Internal.Exts
         IsList(..),
 
         -- * Transform comprehensions
-        Down(..), groupWith, sortWith, the,
+        groupWith, sortWith, the,
 
         -- * Strings
         -- ** Overloaded string literals
@@ -316,7 +316,6 @@ import GHC.Internal.IsList (IsList(..)) -- for re-export
 import qualified GHC.Internal.Data.Coerce
 import GHC.Internal.Data.String
 import GHC.Internal.Data.OldList
-import GHC.Internal.Data.Ord
 import qualified GHC.Internal.Debug.Trace
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# ) -- just for re-export
 import GHC.Internal.Tuple (maxTupleSize)

@@ -475,3 +475,5 @@ import GHC.Types hiding (
   Sum62#,
   Sum63#,
   )
+
+import Data.Ord (Down(..))

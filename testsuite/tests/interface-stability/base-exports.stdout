@@ -10584,7 +10584,7 @@ instance forall (f :: * -> *). Data.Foldable1.Foldable1 f => Data.Foldable1.Fold
 instance forall (f :: * -> *). Data.Foldable1.Foldable1 f => Data.Foldable1.Foldable1 (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 Data.Complex.Complex -- Defined in ‘Data.Foldable1’
 instance forall (f :: * -> *) (g :: * -> *). (Data.Foldable1.Foldable1 f, Data.Foldable1.Foldable1 g) => Data.Foldable1.Foldable1 (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Foldable1’
-instance Data.Foldable1.Foldable1 GHC.Internal.Data.Ord.Down -- Defined in ‘Data.Foldable1’
+instance Data.Foldable1.Foldable1 Data.Ord.Down -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 GHC.Internal.Data.Semigroup.Internal.Dual -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 Data.Semigroup.First -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘Data.Foldable1’
@@ -10607,7 +10607,7 @@ instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Eq1 f,
 instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Eq1 f, Data.Functor.Classes.Eq1 g) => Data.Functor.Classes.Eq1 (f GHC.Internal.Generics.:.: g) -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Eq1 Data.Complex.Complex -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Internal.Classes.Eq a => Data.Functor.Classes.Eq1 (GHC.Internal.Data.Functor.Const.Const a) -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Data.Ord.Down -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Eq1 Data.Ord.Down -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Internal.Classes.Eq a => Data.Functor.Classes.Eq1 (GHC.Internal.Data.Either.Either a) -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall (f :: * -> *). (GHC.Internal.Generics.Generic1 f, Data.Functor.Classes.Eq1 (GHC.Internal.Generics.Rep1 f)) => Data.Functor.Classes.Eq1 (GHC.Internal.Generics.Generically1 f) -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Eq1 GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘Data.Functor.Classes’
@@ -10643,7 +10643,7 @@ instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Ord1 f
 instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Ord1 f, Data.Functor.Classes.Ord1 g) => Data.Functor.Classes.Ord1 (f GHC.Internal.Generics.:+: g) -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Ord1 f, Data.Functor.Classes.Ord1 g) => Data.Functor.Classes.Ord1 (f GHC.Internal.Generics.:.: g) -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Internal.Classes.Ord a => Data.Functor.Classes.Ord1 (GHC.Internal.Data.Functor.Const.Const a) -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Data.Ord.Down -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Ord1 Data.Ord.Down -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Internal.Classes.Ord a => Data.Functor.Classes.Ord1 (GHC.Internal.Data.Either.Either a) -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall (f :: * -> *). (GHC.Internal.Generics.Generic1 f, Data.Functor.Classes.Ord1 (GHC.Internal.Generics.Rep1 f)) => Data.Functor.Classes.Ord1 (GHC.Internal.Generics.Generically1 f) -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Ord1 GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘Data.Functor.Classes’
@@ -10680,7 +10680,7 @@ instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Read1 
 instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Read1 f, Data.Functor.Classes.Read1 g) => Data.Functor.Classes.Read1 (f GHC.Internal.Generics.:.: g) -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Read1 Data.Complex.Complex -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Internal.Read.Read a => Data.Functor.Classes.Read1 (GHC.Internal.Data.Functor.Const.Const a) -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Read1 GHC.Internal.Data.Ord.Down -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Read1 Data.Ord.Down -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Internal.Read.Read a => Data.Functor.Classes.Read1 (GHC.Internal.Data.Either.Either a) -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Read1 GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall c i. GHC.Internal.Read.Read c => Data.Functor.Classes.Read1 (GHC.Internal.Generics.K1 i c) -- Defined in ‘Data.Functor.Classes’
@@ -10710,7 +10710,7 @@ instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Show1 
 instance [safe] forall (f :: * -> *) (g :: * -> *). (Data.Functor.Classes.Show1 f, Data.Functor.Classes.Show1 g) => Data.Functor.Classes.Show1 (f GHC.Internal.Generics.:.: g) -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Show1 Data.Complex.Complex -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Internal.Show.Show a => Data.Functor.Classes.Show1 (GHC.Internal.Data.Functor.Const.Const a) -- Defined in ‘Data.Functor.Classes’
-instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Data.Ord.Down -- Defined in ‘Data.Functor.Classes’
+instance [safe] Data.Functor.Classes.Show1 Data.Ord.Down -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall a. GHC.Internal.Show.Show a => Data.Functor.Classes.Show1 (GHC.Internal.Data.Either.Either a) -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Show1 GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘Data.Functor.Classes’
 instance [safe] forall c i. GHC.Internal.Show.Show c => Data.Functor.Classes.Show1 (GHC.Internal.Generics.K1 i c) -- Defined in ‘Data.Functor.Classes’
@@ -10834,7 +10834,7 @@ instance GHC.Internal.Base.Applicative GHC.Internal.Data.Semigroup.Internal.Sum 
 instance forall (f :: * -> *). GHC.Internal.Base.Applicative f => GHC.Internal.Base.Applicative (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance GHC.Internal.Base.Applicative GHC.Internal.Data.Monoid.First -- Defined in ‘GHC.Internal.Data.Monoid’
 instance GHC.Internal.Base.Applicative GHC.Internal.Data.Monoid.Last -- Defined in ‘GHC.Internal.Data.Monoid’
-instance GHC.Internal.Base.Applicative GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Data.Ord’
+instance GHC.Internal.Base.Applicative Data.Ord.Down -- Defined in ‘Data.Ord’
 instance GHC.Internal.Base.Applicative Data.Semigroup.First -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Applicative Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Applicative Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
@@ -10887,7 +10887,7 @@ instance GHC.Internal.Base.Functor GHC.Internal.Data.Semigroup.Internal.Sum -- D
 instance forall (f :: * -> *). GHC.Internal.Base.Functor f => GHC.Internal.Base.Functor (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance GHC.Internal.Base.Functor GHC.Internal.Data.Monoid.First -- Defined in ‘GHC.Internal.Data.Monoid’
 instance GHC.Internal.Base.Functor GHC.Internal.Data.Monoid.Last -- Defined in ‘GHC.Internal.Data.Monoid’
-instance GHC.Internal.Base.Functor GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Data.Ord’
+instance GHC.Internal.Base.Functor Data.Ord.Down -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Base.Functor (Data.Semigroup.Arg a) -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Functor Data.Semigroup.First -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Functor Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
@@ -10944,7 +10944,7 @@ instance GHC.Internal.Base.Monad GHC.Internal.Data.Semigroup.Internal.Sum -- Def
 instance forall (f :: * -> *). GHC.Internal.Base.Monad f => GHC.Internal.Base.Monad (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance GHC.Internal.Base.Monad GHC.Internal.Data.Monoid.First -- Defined in ‘GHC.Internal.Data.Monoid’
 instance GHC.Internal.Base.Monad GHC.Internal.Data.Monoid.Last -- Defined in ‘GHC.Internal.Data.Monoid’
-instance GHC.Internal.Base.Monad GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Data.Ord’
+instance GHC.Internal.Base.Monad Data.Ord.Down -- Defined in ‘Data.Ord’
 instance GHC.Internal.Base.Monad Data.Semigroup.First -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Monad Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Monad Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
@@ -11014,7 +11014,7 @@ instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Base.Monoid (GHC.Inter
 instance forall (f :: * -> *) a. (GHC.Internal.Base.Applicative f, GHC.Internal.Base.Monoid a) => GHC.Internal.Base.Monoid (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Base.Monoid (GHC.Internal.Data.Monoid.First a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Base.Monoid (GHC.Internal.Data.Monoid.Last a) -- Defined in ‘GHC.Internal.Data.Monoid’
-instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. (GHC.Internal.Classes.Ord a, GHC.Internal.Enum.Bounded a) => GHC.Internal.Base.Monoid (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
 instance forall a. (GHC.Internal.Classes.Ord a, GHC.Internal.Enum.Bounded a) => GHC.Internal.Base.Monoid (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
 instance forall m. GHC.Internal.Base.Monoid m => GHC.Internal.Base.Monoid (Data.Semigroup.WrappedMonoid m) -- Defined in ‘Data.Semigroup’
@@ -11074,7 +11074,7 @@ instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Base.Semigroup (GHC.In
 instance forall (f :: * -> *) a. (GHC.Internal.Base.Applicative f, GHC.Internal.Base.Semigroup a) => GHC.Internal.Base.Semigroup (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Base.Semigroup (GHC.Internal.Data.Monoid.First a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Base.Semigroup (GHC.Internal.Data.Monoid.Last a) -- Defined in ‘GHC.Internal.Data.Monoid’
-instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Base.Semigroup (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Base.Semigroup (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Base.Semigroup (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
@@ -11108,7 +11108,7 @@ instance GHC.Internal.Bits.Bits GHC.Internal.Int.Int16 -- Defined in ‘GHC.Inte
 instance GHC.Internal.Bits.Bits GHC.Internal.Int.Int32 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Internal.Bits.Bits GHC.Internal.Int.Int64 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Internal.Bits.Bits GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.Int’
-instance forall a. GHC.Internal.Bits.Bits a => GHC.Internal.Bits.Bits (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Bits.Bits a => GHC.Internal.Bits.Bits (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance GHC.Internal.Bits.Bits GHC.Internal.Word.Word16 -- Defined in ‘GHC.Internal.Word’
 instance GHC.Internal.Bits.Bits GHC.Internal.Word.Word32 -- Defined in ‘GHC.Internal.Word’
 instance GHC.Internal.Bits.Bits GHC.Internal.Word.Word64 -- Defined in ‘GHC.Internal.Word’
@@ -11148,7 +11148,7 @@ instance GHC.Internal.Bits.FiniteBits GHC.Internal.Int.Int16 -- Defined in ‘GH
 instance GHC.Internal.Bits.FiniteBits GHC.Internal.Int.Int32 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Internal.Bits.FiniteBits GHC.Internal.Int.Int64 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Internal.Bits.FiniteBits GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.Int’
-instance forall a. GHC.Internal.Bits.FiniteBits a => GHC.Internal.Bits.FiniteBits (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Bits.FiniteBits a => GHC.Internal.Bits.FiniteBits (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance GHC.Internal.Bits.FiniteBits GHC.Internal.Word.Word16 -- Defined in ‘GHC.Internal.Word’
 instance GHC.Internal.Bits.FiniteBits GHC.Internal.Word.Word32 -- Defined in ‘GHC.Internal.Word’
 instance GHC.Internal.Bits.FiniteBits GHC.Internal.Word.Word64 -- Defined in ‘GHC.Internal.Word’
@@ -11257,7 +11257,7 @@ instance forall a. GHC.Internal.Classes.Eq a => GHC.Internal.Classes.Eq (GHC.Int
 instance forall k (f :: k -> *) (a :: k). GHC.Internal.Classes.Eq (f a) => GHC.Internal.Classes.Eq (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Classes.Eq a => GHC.Internal.Classes.Eq (GHC.Internal.Data.Monoid.First a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Classes.Eq a => GHC.Internal.Classes.Eq (GHC.Internal.Data.Monoid.Last a) -- Defined in ‘GHC.Internal.Data.Monoid’
-instance forall a. GHC.Internal.Classes.Eq a => GHC.Internal.Classes.Eq (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Classes.Eq a => GHC.Internal.Classes.Eq (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Classes.Eq a => GHC.Internal.Classes.Eq (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
 instance forall s a. GHC.Internal.Classes.Eq (GHC.Internal.STRef.STRef s a) -- Defined in ‘GHC.Internal.STRef’
 instance forall a b. GHC.Internal.Classes.Eq a => GHC.Internal.Classes.Eq (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
@@ -11435,7 +11435,7 @@ instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.I
 instance forall k (f :: k -> *) (a :: k). GHC.Internal.Classes.Ord (f a) => GHC.Internal.Classes.Ord (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Data.Monoid.First a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Data.Monoid.Last a) -- Defined in ‘GHC.Internal.Data.Monoid’
-instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Classes.Ord (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
 instance forall a b. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
@@ -11547,7 +11547,6 @@ instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.Text.ParserCombi
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Control.Monad.Fix.MonadFix f, GHC.Internal.Control.Monad.Fix.MonadFix g) => GHC.Internal.Control.Monad.Fix.MonadFix (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall (f :: * -> *). GHC.Internal.Control.Monad.Fix.MonadFix f => GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall (f :: * -> *). GHC.Internal.Control.Monad.Fix.MonadFix f => GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
-instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance GHC.Internal.Control.Monad.Fix.MonadFix GHC.Internal.Data.Semigroup.Internal.Dual -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall e. GHC.Internal.Control.Monad.Fix.MonadFix (GHC.Internal.Data.Either.Either e) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall r. GHC.Internal.Control.Monad.Fix.MonadFix ((->) r) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
@@ -11576,7 +11575,6 @@ instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.Min -- Defined i
 instance GHC.Internal.Control.Monad.IO.Class.MonadIO GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Control.Monad.IO.Class’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Control.Monad.Zip.MonadZip f, GHC.Internal.Control.Monad.Zip.MonadZip g) => GHC.Internal.Control.Monad.Zip.MonadZip (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Control.Monad.Zip’
 instance forall (f :: * -> *). GHC.Internal.Control.Monad.Zip.MonadZip f => GHC.Internal.Control.Monad.Zip.MonadZip (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Control.Monad.Zip’
 instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Semigroup.Internal.Dual -- Defined in ‘GHC.Internal.Control.Monad.Zip’
 instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Monoid.First -- Defined in ‘GHC.Internal.Control.Monad.Zip’
 instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘GHC.Internal.Control.Monad.Zip’
@@ -11594,6 +11592,7 @@ instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Semigroup.Int
 instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Generics.U1 -- Defined in ‘GHC.Internal.Control.Monad.Zip’
 instance GHC.Internal.Control.Monad.Zip.MonadZip Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Control.Monad.Zip.MonadZip f, GHC.Internal.Control.Monad.Zip.MonadZip g) => GHC.Internal.Control.Monad.Zip.MonadZip (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
+instance GHC.Internal.Control.Monad.Zip.MonadZip Data.Ord.Down -- Defined in ‘Data.Ord’
 instance forall (a :: * -> * -> *) b c. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable b, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable c, GHC.Internal.Data.Data.Data (a b c)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedArrow a b c) -- Defined in ‘Control.Applicative’
 instance forall (m :: * -> *) a. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable m, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Data.Data.Data (m a)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedMonad m a) -- Defined in ‘Control.Applicative’
 instance GHC.Internal.Data.Data.Data Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
@@ -11631,7 +11630,6 @@ instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DerivClause -- Defin
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DerivStrategy -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DocLoc -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Data.Data’
-instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Semigroup.Internal.Dual a) -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a b. (GHC.Internal.Data.Data.Data a, GHC.Internal.Data.Data.Data b) => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Either.Either a b) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Exp -- Defined in ‘GHC.Internal.Data.Data’
@@ -11729,6 +11727,7 @@ instance forall k (a :: k). (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.In
 instance forall k1 (f :: k1 -> *) k2 (g :: k2 -> k1) (a :: k2). (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable g, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable k1, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable k2, GHC.Internal.Data.Data.Data (f (g a))) => GHC.Internal.Data.Data.Data (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable g, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data (g a)) => GHC.Internal.Data.Data.Data (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
 instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable g, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data (g a)) => GHC.Internal.Data.Data.Data (Data.Functor.Sum.Sum f g a) -- Defined in ‘Data.Functor.Sum’
+instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a b. (GHC.Internal.Data.Data.Data a, GHC.Internal.Data.Data.Data b) => GHC.Internal.Data.Data.Data (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
@@ -11743,7 +11742,6 @@ instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Data.Foldable.Foldabl
 instance forall (f :: * -> *). GHC.Internal.Data.Foldable.Foldable f => GHC.Internal.Data.Foldable.Foldable (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Data.Foldable’
 instance forall (f :: * -> *). GHC.Internal.Data.Foldable.Foldable f => GHC.Internal.Data.Foldable.Foldable (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Foldable’
 instance forall i. GHC.Internal.Data.Foldable.Foldable (GHC.Internal.Arr.Array i) -- Defined in ‘GHC.Internal.Data.Foldable’
-instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Data.Foldable’
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Data.Semigroup.Internal.Dual -- Defined in ‘GHC.Internal.Data.Foldable’
 instance forall a. GHC.Internal.Data.Foldable.Foldable (GHC.Internal.Data.Either.Either a) -- Defined in ‘GHC.Internal.Data.Foldable’
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Data.Monoid.First -- Defined in ‘GHC.Internal.Data.Foldable’
@@ -11773,6 +11771,7 @@ instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Data.Foldable.Foldabl
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Data.Foldable.Foldable f, GHC.Internal.Data.Foldable.Foldable g) => GHC.Internal.Data.Foldable.Foldable (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Data.Foldable.Foldable f, GHC.Internal.Data.Foldable.Foldable g) => GHC.Internal.Data.Foldable.Foldable (Data.Functor.Sum.Sum f g) -- Defined in ‘Data.Functor.Sum’
+instance GHC.Internal.Data.Foldable.Foldable Data.Ord.Down -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Data.Foldable.Foldable (Data.Semigroup.Arg a) -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Data.Foldable.Foldable Data.Semigroup.First -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Data.Foldable.Foldable Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
@@ -11789,7 +11788,6 @@ instance forall (f :: * -> *). GHC.Internal.Data.Traversable.Traversable f => GH
 instance forall (f :: * -> *). GHC.Internal.Data.Traversable.Traversable f => GHC.Internal.Data.Traversable.Traversable (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Traversable’
 instance forall i. GHC.Internal.Ix.Ix i => GHC.Internal.Data.Traversable.Traversable (GHC.Internal.Arr.Array i) -- Defined in ‘GHC.Internal.Data.Traversable’
 instance forall m. GHC.Internal.Data.Traversable.Traversable (GHC.Internal.Data.Functor.Const.Const m) -- Defined in ‘GHC.Internal.Data.Traversable’
-instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Data.Traversable’
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Data.Semigroup.Internal.Dual -- Defined in ‘GHC.Internal.Data.Traversable’
 instance forall a. GHC.Internal.Data.Traversable.Traversable (GHC.Internal.Data.Either.Either a) -- Defined in ‘GHC.Internal.Data.Traversable’
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Data.Monoid.First -- Defined in ‘GHC.Internal.Data.Traversable’
@@ -11819,6 +11817,7 @@ instance GHC.Internal.Data.Traversable.Traversable Data.Complex.Complex -- Defin
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Data.Traversable.Traversable f, GHC.Internal.Data.Traversable.Traversable g) => GHC.Internal.Data.Traversable.Traversable (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Functor.Compose’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Data.Traversable.Traversable f, GHC.Internal.Data.Traversable.Traversable g) => GHC.Internal.Data.Traversable.Traversable (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Data.Traversable.Traversable f, GHC.Internal.Data.Traversable.Traversable g) => GHC.Internal.Data.Traversable.Traversable (Data.Functor.Sum.Sum f g) -- Defined in ‘Data.Functor.Sum’
+instance GHC.Internal.Data.Traversable.Traversable Data.Ord.Down -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Data.Traversable.Traversable (Data.Semigroup.Arg a) -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Data.Traversable.Traversable Data.Semigroup.First -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Data.Traversable.Traversable Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
@@ -11882,7 +11881,7 @@ instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Semigroup.Internal.Product a) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Semigroup.Internal.Sum a) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall (f :: * -> *) a. (GHC.Internal.Base.Applicative f, GHC.Internal.Enum.Bounded a) => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
-instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
@@ -11950,7 +11949,7 @@ instance GHC.Internal.Enum.Enum GHC.Internal.Int.Int64 -- Defined in ‘GHC.Inte
 instance GHC.Internal.Enum.Enum GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.Int’
 instance forall k (f :: k -> *) (a :: k). GHC.Internal.Enum.Enum (f a) => GHC.Internal.Enum.Enum (GHC.Internal.Data.Semigroup.Internal.Alt f a) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall k (f :: k -> *) (a :: k). GHC.Internal.Enum.Enum (f a) => GHC.Internal.Enum.Enum (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
-instance forall a. (GHC.Internal.Enum.Enum a, GHC.Internal.Enum.Bounded a, GHC.Internal.Classes.Eq a) => GHC.Internal.Enum.Enum (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. (GHC.Internal.Enum.Enum a, GHC.Internal.Enum.Bounded a, GHC.Internal.Classes.Eq a) => GHC.Internal.Enum.Enum (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Enum.Enum (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
@@ -12038,7 +12037,7 @@ instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.Floating
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Float.Floating (f (g a)) => GHC.Internal.Float.Floating (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a b. GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (Data.Functor.Contravariant.Op a b) -- Defined in ‘Data.Functor.Contravariant’
 instance forall a. GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
-instance forall a. GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance GHC.Internal.Float.Floating GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Float.Floating GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Float.Floating GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
@@ -12046,7 +12045,7 @@ instance GHC.Internal.Float.Floating GHC.Internal.Types.Float -- Defined in ‘G
 instance forall a k (b :: k). GHC.Internal.Float.RealFloat a => GHC.Internal.Float.RealFloat (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Float.RealFloat (f (g a)) => GHC.Internal.Float.RealFloat (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.RealFloat (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
-instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.RealFloat (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.RealFloat (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance GHC.Internal.Float.RealFloat GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Float.RealFloat GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Float.RealFloat GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
@@ -12054,7 +12053,7 @@ instance GHC.Internal.Float.RealFloat GHC.Internal.Types.Float -- Defined in ‘
 instance forall a k (b :: k). GHC.Internal.Foreign.Storable.Storable a => GHC.Internal.Foreign.Storable.Storable (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Foreign.Storable.Storable a => GHC.Internal.Foreign.Storable.Storable (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
 instance forall a. GHC.Internal.Foreign.Storable.Storable a => GHC.Internal.Foreign.Storable.Storable (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
-instance forall a. GHC.Internal.Foreign.Storable.Storable a => GHC.Internal.Foreign.Storable.Storable (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Foreign.Storable.Storable a => GHC.Internal.Foreign.Storable.Storable (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance GHC.Internal.Foreign.Storable.Storable GHC.Internal.Foreign.Ptr.IntPtr -- Defined in ‘GHC.Internal.Foreign.Ptr’
 instance GHC.Internal.Foreign.Storable.Storable GHC.Internal.Foreign.Ptr.WordPtr -- Defined in ‘GHC.Internal.Foreign.Ptr’
 instance GHC.Internal.Foreign.Storable.Storable GHC.Internal.Types.Bool -- Defined in ‘GHC.Internal.Foreign.Storable’
@@ -12129,6 +12128,7 @@ instance forall a. GHC.Internal.Generics.Generic (GHC.Internal.Data.Semigroup.In
 instance forall k (f :: k -> *) (a :: k). GHC.Internal.Generics.Generic (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Generics.Generic (GHC.Internal.Data.Monoid.First a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Generics.Generic (GHC.Internal.Data.Monoid.Last a) -- Defined in ‘GHC.Internal.Data.Monoid’
+instance forall a. GHC.Internal.Generics.Generic (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a b. GHC.Internal.Generics.Generic (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Generics.Generic (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Generics.Generic (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
@@ -12143,7 +12143,6 @@ instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Internal.Gen
 instance GHC.Internal.Generics.Generic GHC.Internal.Generics.Associativity -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic GHC.Internal.Types.Bool -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic GHC.Internal.Generics.DecidedStrictness -- Defined in ‘GHC.Internal.Generics’
-instance forall a. GHC.Internal.Generics.Generic (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Generics’
 instance forall a b. GHC.Internal.Generics.Generic (GHC.Internal.Data.Either.Either a b) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic GHC.Internal.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic GHC.Internal.Generics.Fixity -- Defined in ‘GHC.Internal.Generics’
@@ -12213,13 +12212,13 @@ instance GHC.Internal.Generics.Generic1 GHC.Internal.Data.Semigroup.Internal.Pro
 instance GHC.Internal.Generics.Generic1 GHC.Internal.Data.Semigroup.Internal.Sum -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance GHC.Internal.Generics.Generic1 GHC.Internal.Data.Monoid.First -- Defined in ‘GHC.Internal.Data.Monoid’
 instance GHC.Internal.Generics.Generic1 GHC.Internal.Data.Monoid.Last -- Defined in ‘GHC.Internal.Data.Monoid’
+instance GHC.Internal.Generics.Generic1 Data.Ord.Down -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Generics.Generic1 (Data.Semigroup.Arg a) -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Generics.Generic1 Data.Semigroup.First -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Generics.Generic1 Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Generics.Generic1 Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Generics.Generic1 Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Generics.Generic1 Data.Semigroup.WrappedMonoid -- Defined in ‘Data.Semigroup’
-instance GHC.Internal.Generics.Generic1 GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Generics’
 instance forall a. GHC.Internal.Generics.Generic1 (GHC.Internal.Data.Either.Either a) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic1 [] -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic1 GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Generics’
@@ -12330,7 +12329,7 @@ instance forall a1 a2 a3 a4 a5 a6 a7 a8 a9. (GHC.Internal.Ix.Ix a1, GHC.Internal
 instance GHC.Internal.Ix.Ix () -- Defined in ‘GHC.Internal.Ix’
 instance GHC.Internal.Ix.Ix GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Ix’
 instance GHC.Internal.Ix.Ix GHC.Internal.Types.Word -- Defined in ‘GHC.Internal.Ix’
-instance forall a. GHC.Internal.Ix.Ix a => GHC.Internal.Ix.Ix (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Ix.Ix a => GHC.Internal.Ix.Ix (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance GHC.Internal.Ix.Ix GHC.Internal.Word.Word16 -- Defined in ‘GHC.Internal.Word’
 instance GHC.Internal.Ix.Ix GHC.Internal.Word.Word32 -- Defined in ‘GHC.Internal.Word’
 instance GHC.Internal.Ix.Ix GHC.Internal.Word.Word64 -- Defined in ‘GHC.Internal.Word’
@@ -12377,7 +12376,7 @@ instance forall k (f :: k -> *) (a :: k). GHC.Internal.Num.Num (f a) => GHC.Inte
 instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (GHC.Internal.Data.Semigroup.Internal.Product a) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (GHC.Internal.Data.Semigroup.Internal.Sum a) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall (f :: * -> *) a. (GHC.Internal.Base.Applicative f, GHC.Internal.Num.Num a) => GHC.Internal.Num.Num (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
-instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Num.Num (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
 instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
@@ -12486,7 +12485,7 @@ instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Inter
 instance forall k (f :: k -> *) (a :: k). GHC.Internal.Read.Read (f a) => GHC.Internal.Read.Read (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Data.Monoid.First a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Data.Monoid.Last a) -- Defined in ‘GHC.Internal.Data.Monoid’
-instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a b. (GHC.Internal.Read.Read a, GHC.Internal.Read.Read b) => GHC.Internal.Read.Read (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
@@ -12554,7 +12553,7 @@ instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.Frac
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Real.Fractional (f (g a)) => GHC.Internal.Real.Fractional (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a b. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (Data.Functor.Contravariant.Op a b) -- Defined in ‘Data.Functor.Contravariant’
 instance forall a. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
-instance forall a. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Real.Fractional (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
 instance GHC.Internal.Real.Fractional GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Real.Fractional GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
@@ -12605,7 +12604,7 @@ instance GHC.Internal.Real.Real GHC.Internal.Int.Int16 -- Defined in ‘GHC.Inte
 instance GHC.Internal.Real.Real GHC.Internal.Int.Int32 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Internal.Real.Real GHC.Internal.Int.Int64 -- Defined in ‘GHC.Internal.Int’
 instance GHC.Internal.Real.Real GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.Int’
-instance forall a. GHC.Internal.Real.Real a => GHC.Internal.Real.Real (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Real.Real a => GHC.Internal.Real.Real (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance GHC.Internal.Real.Real GHC.Internal.Types.Int -- Defined in ‘GHC.Internal.Real’
 instance GHC.Internal.Real.Real GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Real’
 instance GHC.Internal.Real.Real GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Real’
@@ -12649,7 +12648,7 @@ instance forall a k (b :: k). GHC.Internal.Real.RealFrac a => GHC.Internal.Real.
 instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.RealFrac (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Real.RealFrac (f (g a)) => GHC.Internal.Real.RealFrac (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
-instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Real.RealFrac (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
 instance GHC.Internal.Real.RealFrac GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Real.RealFrac GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
@@ -12765,7 +12764,7 @@ instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Inter
 instance forall k (f :: k -> *) (a :: k). GHC.Internal.Show.Show (f a) => GHC.Internal.Show.Show (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Data.Monoid.First a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Data.Monoid.Last a) -- Defined in ‘GHC.Internal.Data.Monoid’
-instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
+instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance GHC.Internal.Show.Show GHC.Internal.Real.FractionalExponentBase -- Defined in ‘GHC.Internal.Real’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
 instance forall a b. (GHC.Internal.Show.Show a, GHC.Internal.Show.Show b) => GHC.Internal.Show.Show (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’

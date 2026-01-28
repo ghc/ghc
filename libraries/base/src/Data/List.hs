@@ -188,11 +188,11 @@ import GHC.Internal.Data.Bool (otherwise)
 import GHC.Internal.Data.Function (const)
 import GHC.Internal.Data.List
 import GHC.Internal.Data.List.NonEmpty (NonEmpty(..))
-import GHC.Internal.Data.Ord (Ord, compare, Ordering(..), (<), (>))
 import GHC.Internal.Int (Int)
 import GHC.Internal.Num ((-))
 import GHC.List (build)
 import qualified Data.List.NubOrdSet as NubOrdSet
+import Data.Ord (Ord, compare, Ordering(..), (<), (>))
 
 inits1, tails1 :: [a] -> [NonEmpty a]
 
