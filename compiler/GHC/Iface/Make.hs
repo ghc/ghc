@@ -255,7 +255,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
                                     (map mi_module pluginModules)
           let hpc_info = emptyHpcInfo other_hpc_info
           used_th <- readIORef tc_splice_used
-          dep_files <- (readIORef dependent_files)
+          dep_files <- sortBy compare <$> (readIORef dependent_files)
           (needed_links, needed_pkgs) <- readIORef (tcg_th_needed_deps tc_result)
           let uc = initUsageConfig hsc_env
               plugins = hsc_plugins hsc_env
