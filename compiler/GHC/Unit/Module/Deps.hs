@@ -17,6 +17,7 @@ module GHC.Unit.Module.Deps
    , noDependencies
    , pprDeps
    , Usage (..)
+   , usageFingerprint
    , HomeModImport (..)
    , HomeModImportedAvails (..)
    , ImportAvails (..)
@@ -491,6 +492,17 @@ instance Binary Usage where
             return UsageDirectory { usg_dir_path = dp, usg_dir_hash = hash, usg_dir_label = label }
 
           i -> error ("Binary.get(Usage): " ++ show i)
+
+-- | Extract the distinguishing fingerprint carried by a particular 'Usage'
+-- constructor.  Every constructor stores a hash capturing the bit of state
+-- that drives recompilation decisions, so we can sort on it directly.
+usageFingerprint :: Usage -> Fingerprint
+usageFingerprint UsagePackageModule{ usg_mod_hash = fp } = fp
+usageFingerprint UsageHomeModule{ usg_mod_hash = fp } = fp
+usageFingerprint UsageFile{ usg_file_hash = fp } = fp
+usageFingerprint UsageDirectory{ usg_dir_hash = fp } = fp
+usageFingerprint UsageHomeModuleInterface{ usg_iface_hash = fp } = fp
+usageFingerprint UsageMergedRequirement{ usg_mod_hash = fp } = fp
 
 -- | Records the imports that we depend on from a home module,
 -- for recompilation checking.

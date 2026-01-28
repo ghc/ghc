@@ -36,7 +36,7 @@ import GHC.Data.Maybe
 import GHC.Data.FastString
 
 import Data.IORef
-import Data.List (sortBy)
+import Data.List (sortBy, sortOn)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -73,6 +73,8 @@ data UsageConfig = UsageConfig
   { uc_safe_implicit_imps_req :: !Bool -- ^ Are all implicit imports required to be safe for this Safe Haskell mode?
   }
 
+-- | Build the list of 'Usage's that drives recompilation checking.
+-- The resulting list is deterministically sorted (see 'usageFingerprint').
 mkUsageInfo :: UsageConfig -> Plugins -> FinderCache -> UnitEnv
             -> Module -> ImportedMods -> [ImportUserSpec] -> NameSet
             -> [FilePath] -> [FilePath] -> [(Module, Fingerprint)] -> [Linkable] -> PkgsLoaded
@@ -105,7 +107,10 @@ mkUsageInfo uc plugins fc unit_env
                                     }
                                | (mod, hash) <- merged ]
                             ++ object_usages
-    usages `seqList` return usages
+
+    -- Sort all the Usages to ensure a deterministic ordering.
+    let sorted_usages = sortOn usageFingerprint usages
+    sorted_usages `seqList` return sorted_usages
     -- seq the list of Usages returned: occasionally these
     -- don't get evaluated for a while and we can end up hanging on to
     -- the entire collection of Ifaces.
