@@ -70,6 +70,8 @@ data UsageConfig = UsageConfig
   { uc_safe_implicit_imps_req :: !Bool -- ^ Are all implicit imports required to be safe for this Safe Haskell mode?
   }
 
+-- | Build the list of 'Usage's that drive recompilation checking.
+-- The resulting list is deterministically sorted.
 mkUsageInfo :: UsageConfig -> Plugins -> FinderCache -> UnitEnv
             -> Module -> ImportedMods -> [ImportUserSpec] -> NameSet
             -> [FilePath] -> [FilePath] -> [(Module, Fingerprint)] -> [LinkableUsage] -> PkgsLoaded
@@ -100,10 +102,10 @@ mkUsageInfo uc plugins fc unit_env
                                     }
                                | (mod, hash) <- merged ]
                             ++ object_usages
-    usages `seqList` return usages
-    -- seq the list of Usages returned: occasionally these
-    -- don't get evaluated for a while and we can end up hanging on to
-    -- the entire collection of Ifaces.
+    usages `seqList` return (sortBy stableUsageCmp usages)
+    -- The use of 'seqList' is important because occasionally the returned list
+    -- is not evaluated for a while, so that with too much laziness here we
+    -- could end up hanging on to the entire collection of 'Iface's.
 
 {- Note [Plugin dependencies]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
