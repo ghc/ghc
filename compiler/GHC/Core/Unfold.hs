@@ -779,22 +779,24 @@ litSize _other = 0    -- Must match size of nullary constructors
 
 classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> ExprSize
 -- See (IA1) in Note [Interesting arguments] in GHC.Core.Opt.Simplify.Utils
-classOpSize opts cls top_args args
-  | isUnaryClass cls
-  = sizeZero   -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
-  | otherwise
-  = case args of
-       []                -> sizeZero
-       (arg1:other_args) -> SizeIs (size other_args) (arg_discount arg1) 0
+classOpSize _opts _cls _top_args []
+  = sizeZero   -- A non-applied classop
+classOpSize opts cls top_args (dict_arg:other_val_args)
+  = SizeIs size (arg_discount dict_arg) 0
   where
-    size other_args = 20 + (10 * length other_args)
+    size | isUnaryClass cls = 0    -- See (UCM4) in Note [Unary class magic] in GHC.Core.TyCon
+         | otherwise        = 20 + (10 * length other_val_args)
 
     -- If the class op is scrutinising a lambda bound dictionary then
     -- give it a discount, to encourage the inlining of this function
     -- The actual discount is rather arbitrarily chosen
-    arg_discount (Var dict) | dict `elem` top_args
-                   = unitBag (dict, unfoldingDictDiscount opts)
-    arg_discount _ = emptyBag
+    arg_discount (Cast arg _co)                    = arg_discount arg
+    arg_discount (Var dict) | dict `elem` top_args = unitBag (dict, dict_discount)
+    arg_discount _                                 = emptyBag
+
+    dict_discount
+      | null other_val_args = unfoldingDictDiscount opts
+      | otherwise           = unfoldingDictDiscount opts + unfoldingFunAppDiscount opts
 
 -- | The size of a function call
 callSize

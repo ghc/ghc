@@ -3131,9 +3131,10 @@ interestingDict env arg  -- Main Plan: use exprIsConApp_maybe
   | Just (_, _, data_con, _tys, args) <- exprIsConApp_maybe in_scope_env arg
   , Just cls <- tyConClass_maybe (dataConTyCon data_con)
   , definitely_not_ip_like       -- See (ID4)
-  = if null (classMethods cls)   -- See (ID6)
-    then any (interestingDict env) args
-    else True
+  = True
+--  = if null (classMethods cls)   -- See (ID6)
+--    then any (interestingDict env) args
+--    else True
 
   | otherwise
   = not (exprIsTrivial arg) && definitely_not_ip_like  -- See (ID8)
