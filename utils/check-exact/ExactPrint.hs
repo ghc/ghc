@@ -2264,7 +2264,7 @@ instance ExactPrint (TyFamInstDecl GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (LocatedP OverlapMode) where
+instance ExactPrint (LocatedP (OverlapMode (GhcPass p))) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor = setAnchorAn
 
