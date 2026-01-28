@@ -46,7 +46,6 @@ import GHC.Internal.Data.Functor.Identity ( Identity(..) )
 import GHC.Internal.Data.Functor.Utils ( StateL(..), StateR(..), StateT(..), (#.) )
 import GHC.Internal.Data.Monoid ( Dual(..), Sum(..), Product(..),
                      First(..), Last(..), Alt(..), Ap(..) )
-import GHC.Internal.Data.Ord ( Down(..) )
 import GHC.Internal.Data.Proxy ( Proxy(..) )
 
 import GHC.Internal.Arr
@@ -308,10 +307,6 @@ instance (Traversable f) => Traversable (Ap f) where
 
 -- | @since base-4.9.0.0
 deriving instance Traversable Identity
-
--- Instance for Data.Ord
--- | @since base-4.12.0.0
-deriving instance Traversable Down
 
 -- general functions
 

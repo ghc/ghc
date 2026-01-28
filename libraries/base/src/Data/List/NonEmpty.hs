@@ -126,9 +126,9 @@ import qualified Data.Maybe                       as List (mapMaybe)
 import           GHC.Internal.Data.Foldable       hiding (length, toList)
 import qualified GHC.Internal.Data.Foldable       as Foldable
 import           GHC.Internal.Data.Function       (on)
-import           GHC.Internal.Data.Ord            (comparing)
 import           GHC.Internal.Stack.Types     (HasCallStack)
 import           GHC.Internal.Data.List.NonEmpty (NonEmpty (..), map, zip, zipWith)
+import           Data.Ord            (comparing)
 
 infixr 5 <|
 

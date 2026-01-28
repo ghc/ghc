@@ -56,7 +56,6 @@ import qualified GHC.Internal.List as List
 import GHC.Internal.Magic ( oneShot )
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Monoid
-import GHC.Internal.Data.Ord
 import GHC.Internal.Data.Proxy
 
 import GHC.Internal.Arr  ( Array(..), elems, numElements,
@@ -67,12 +66,12 @@ import GHC.Internal.Base (
     Alternative(..), Applicative(..), Monad(..), MonadPlus, NonEmpty(..), build,
     id, flip, map, ($!), (.),
   )
-import GHC.Internal.Classes ( Eq(..), not )
+import GHC.Internal.Classes ( Eq(..), Ord(..), not )
 import GHC.Internal.Err ( errorWithoutStackTrace )
 import GHC.Internal.Prim ( coerce, seq )
 import GHC.Internal.Tuple (Solo (..))
 import GHC.Internal.Num  ( Num(..) )
-import GHC.Internal.Types ( Bool(..), Int )
+import GHC.Internal.Types ( Bool(..), Int, Ordering(..) )
 
 -- $setup
 -- >>> :set -XDeriveFoldable
@@ -864,10 +863,6 @@ instance (Foldable f) => Foldable (Alt f) where
 -- | @since base-4.12.0.0
 instance (Foldable f) => Foldable (Ap f) where
     foldMap f = foldMap f . getAp
-
--- Instances for Data.Ord
--- | @since base-4.12.0.0
-deriving instance Foldable Down
 
 -- | Right-to-left monadic fold over the elements of a structure.
 --

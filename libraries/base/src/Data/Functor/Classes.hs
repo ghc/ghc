@@ -76,7 +76,7 @@ import Control.Applicative (Alternative((<|>)), Const(Const))
 import GHC.Internal.Data.Functor.Identity (Identity(Identity))
 import GHC.Internal.Data.Proxy (Proxy(Proxy))
 import Data.List.NonEmpty (NonEmpty(..))
-import GHC.Internal.Data.Ord (Down(Down))
+import Data.Ord (Down(Down))
 import Data.Complex (Complex((:+)))
 
 import GHC.Generics (Generic1(..), Generically1(..), V1, U1(..), Par1(..), Rec1(..), K1(..), M1(..) , (:+:)(..), (:*:)(..), (:.:)(..), URec(..), UAddr, UChar, UDouble, UFloat, UInt, UWord)

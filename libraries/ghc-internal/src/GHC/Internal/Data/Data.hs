@@ -116,7 +116,6 @@ import GHC.Internal.Data.Either
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Monoid
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
-import GHC.Internal.Data.Ord
 import GHC.Internal.Data.List (findIndex)
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Data.Version( Version(..) )
@@ -132,6 +131,7 @@ import GHC.Internal.Tuple (Solo (..))
 import GHC.Internal.Text.Read( reads )
 import GHC.Internal.Types (
     Bool(..), Char, Coercible, Float, Double, Type, type (~), type (~~),
+    Ordering(..),
   )
 
 -- Imports for the instances
@@ -1356,12 +1356,6 @@ deriving instance Data SourceStrictness
 
 -- | @since base-4.9.0.0
 deriving instance Data DecidedStrictness
-
-----------------------------------------------------------------------------
--- Data instances for GHC.Internal.Data.Ord
-
--- | @since base-4.12.0.0
-deriving instance Data a => Data (Down a)
 
 ----------------------------------------------------------------------------
 -- Data instances for GHC.Internal.TH.Syntax
