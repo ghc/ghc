@@ -1874,9 +1874,9 @@ isClosedBndrGroup type_env binds
 
       | otherwise
       = True   -- The free-var set for a top level binding mentions
-               -- * imported things so that we can report unused imports
-               -- * class method etc from the current module
-               -- * the Ids from the current Rec group
+               --  - imported things so that we can report unused imports
+               --  - class method etc from the current module
+               --  - the Ids from the current Rec group
                -- None of these will be in the type envt
 
 lHsBindFreeVars :: LHsBind GhcRn -> NameSet

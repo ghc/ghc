@@ -29,6 +29,7 @@ import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Pmc
+import GHC.HsToCore.Types( LdiNablas(..) )
 import GHC.HsToCore.Pmc.Utils
 import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Quote
@@ -505,7 +506,12 @@ dsExpr (HsStatic (static_ptr_ty, from_static_fun) expr@(L loc _))
 
        ; static_id <- newStaticId (mkSpecForAllTys static_fvs static_ptr_ty)
 
-       ; emitStaticBinds [(static_id, static_rhs)]
+       -- Emit the static bindings to top level, but NOT when we are in
+       -- the auxiliary desugaring for the pattern-match checking
+       ; ldi_nablas <- getPmNablas
+       ; case ldi_nablas of
+           NoPmc  -> return ()
+           Ldi {} -> emitStaticBinds [(static_id, static_rhs)]
 
        ; return (App from_static_ds (mkVarApps (Var static_id) static_fvs)) }
 

@@ -117,7 +117,7 @@ import GHC.Utils.Misc ( HasDebugCallStack )
 
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
-import GHC.Data.Maybe( MaybeErr(..), maybeToList, fromMaybe, isNothing )
+import GHC.Data.Maybe( MaybeErr(..), maybeToList, fromMaybe )
 
 import GHC.Types.SrcLoc
 import GHC.Types.Basic hiding( SuccessFlag(..) )

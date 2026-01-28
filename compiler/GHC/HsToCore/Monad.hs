@@ -65,7 +65,7 @@ import GHC.Hs
 
 import GHC.HsToCore.Types
 import GHC.HsToCore.Errors.Types
-import GHC.HsToCore.Pmc.Solver.Types (Nablas, initNablas)
+import GHC.HsToCore.Pmc.Solver.Types (initNablas)
 
 import GHC.Core.FamInstEnv
 import GHC.Core
@@ -416,7 +416,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
                            }
         lcl_env = DsLclEnv { dsl_meta        = emptyNameEnv
                            , dsl_loc         = real_span
-                           , dsl_nablas      = initNablas
+                           , dsl_nablas      = Ldi initNablas
                            , dsl_unspecables = Just emptyVarSet
                            }
     in (gbl_env, lcl_env)
@@ -479,12 +479,12 @@ getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
 
 -- | Get the current pattern match oracle state. See 'dsl_nablas'.
-getPmNablas :: DsM Nablas
+getPmNablas :: DsM LdiNablas
 getPmNablas = do { env <- getLclEnv; return (dsl_nablas env) }
 
 -- | Set the pattern match oracle state within the scope of the given action.
 -- See 'dsl_nablas'.
-updPmNablas :: Nablas -> DsM a -> DsM a
+updPmNablas :: LdiNablas -> DsM a -> DsM a
 updPmNablas nablas = updLclEnv (\env -> env { dsl_nablas = nablas })
 
 addUnspecables :: [EvVar] -> DsM a -> DsM a
