@@ -914,9 +914,9 @@ mkStrWrapperInlinePrag (InlinePragma { inl_inline = fn_inl
   where
     srcTxt = SourceText $ fsLit "{-# INLINE"
     -- See Note [Wrapper activation]
-    wrapper_phase = foldr (laterPhase . get_rule_phase) earliest_inline_phase rules
-    earliest_inline_phase = beginPhase fn_act `laterPhase` nextPhase InitialPhase
-          -- laterPhase (nextPhase InitialPhase) is a temporary hack
+    wrapper_phase = foldr (latestPhase . get_rule_phase) earliest_inline_phase rules
+    earliest_inline_phase = beginPhase fn_act `latestPhase` nextPhase InitialPhase
+          -- latestPhase (nextPhase InitialPhase) is a temporary hack
           -- to inline no earlier than phase 2.  I got regressions in
           -- 'mate', due to changes in full laziness due to Note [Case
           -- MFEs], when I did earlier inlining.

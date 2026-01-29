@@ -104,9 +104,8 @@ module GHC.Types.InlinePragma
   , endPhase
     -- *** Queries
   , isActiveInPhase
-  , laterPhase
-  , laterThanPhase
-  , nextPhase
+  , latestPhase, earliestPhase
+  , laterThanPhase, nextPhase
   ) where
 
 import GHC.Prelude
@@ -422,13 +421,21 @@ nextPhase (Phase 0)    = FinalPhase
 nextPhase (Phase n)    = Phase (n-1)
 nextPhase FinalPhase   = FinalPhase
 
-laterPhase :: CompilerPhase -> CompilerPhase -> CompilerPhase
--- ^ Returns the later of two phases
-laterPhase (Phase n1)   (Phase n2)   = Phase (n1 `min` n2)
-laterPhase InitialPhase p2           = p2
-laterPhase FinalPhase   _            = FinalPhase
-laterPhase p1           InitialPhase = p1
-laterPhase _            FinalPhase   = FinalPhase
+earliestPhase :: CompilerPhase -> CompilerPhase -> CompilerPhase
+-- ^ Returns the earliest of two phases
+earliestPhase (Phase n1)   (Phase n2)   = Phase (n1 `max` n2)
+earliestPhase InitialPhase _            = InitialPhase
+earliestPhase FinalPhase   p2           = p2
+earliestPhase _            InitialPhase = InitialPhase
+earliestPhase p1           FinalPhase   = p1
+
+latestPhase :: CompilerPhase -> CompilerPhase -> CompilerPhase
+-- ^ Returns the latest of two phases
+latestPhase (Phase n1)   (Phase n2)   = Phase (n1 `min` n2)
+latestPhase InitialPhase p2           = p2
+latestPhase FinalPhase   _            = FinalPhase
+latestPhase p1           InitialPhase = p1
+latestPhase _            FinalPhase   = FinalPhase
 
 -- | @p1 `laterThanOrEqualPhase` p2@ computes whether @p1@ happens (strictly)
 -- after @p2@.
