@@ -12,7 +12,7 @@ module GHC.Core.Opt.Simplify.Env (
 
         -- * Environments
         SimplEnv(..), pprSimplEnv,   -- Temp not abstract
-        SimplPhase(..), isActive,
+        SimplPhase(..), isActive, simplStartPhase, simplEndPhase,
         seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
         seOptCoercionOpts, sePhase, sePlatform, sePreInline,
@@ -293,7 +293,9 @@ data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
 -- | See Note [SimplPhase]
 data SimplPhase
   -- | A simplifier phase: InitialPhase, Phase 2, Phase 1, Phase 0, FinalPhase
+  -- NB: (SimplPhase p) is equivalent to (SimplPhaseRange p p)
   = SimplPhase CompilerPhase
+
   -- | Simplifying the RHS of a rule or of a stable unfolding: the range of
   -- phases of the activation of the rule/stable unfolding.
   --
@@ -302,12 +304,17 @@ data SimplPhase
   --
   -- See Note [What is active in the RHS of a RULE or unfolding?]
   --     in GHC.Core.Opt.Simplify.Utils.
-  | SimplPhaseRange
-      { simplStartPhase :: CompilerPhase
-      , simplEndPhase   :: CompilerPhase
-      }
+  | SimplPhaseRange CompilerPhase CompilerPhase
 
   deriving Eq
+
+simplStartPhase :: SimplPhase -> CompilerPhase
+simplStartPhase (SimplPhase p)        = p
+simplStartPhase (SimplPhaseRange p _) = p
+
+simplEndPhase :: SimplPhase -> CompilerPhase
+simplEndPhase (SimplPhase p)        = p
+simplEndPhase (SimplPhaseRange _ p) = p
 
 instance Outputable SimplPhase where
   ppr (SimplPhase p) = ppr p
@@ -322,12 +329,13 @@ instance Outputable SimplPhase where
 --
 -- See Note [SimplPhase].
 isActive :: SimplPhase -> ActivationGhc -> Bool
-isActive (SimplPhase p) act = isActiveInPhase p act
-isActive (SimplPhaseRange start end) act =
-  -- To check whether the activation is active throughout the whole phase range,
-  -- it's sufficient to check the endpoints of the phase range, because an
-  -- activation can never have gaps (all activations are phase intervals).
-  isActiveInPhase start act && isActiveInPhase end act
+isActive (SimplPhase p) act
+  = isActiveInPhase p act
+isActive (SimplPhaseRange start end) act
+  = -- To check whether the activation is active throughout the whole phase range,
+    -- it's sufficient to check the endpoints of the phase range, because an
+    -- activation can never have gaps (all activations are phase intervals).
+    isActiveInPhase start act && isActiveInPhase end act
 
 {- Note [SimplPhase]
 ~~~~~~~~~~~~~~~~~~~~

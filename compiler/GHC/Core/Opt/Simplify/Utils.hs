@@ -1099,7 +1099,7 @@ updModeForStableUnfoldings :: ActivationGhc -> SimplMode -> SimplMode
 -- See Note [Simplifying inside stable unfoldings]
 updModeForStableUnfoldings unf_act current_mode
   = current_mode
-    { sm_phase = phaseFromActivation (sm_phase current_mode) unf_act
+    { sm_phase = phaseForRuleOrUnf (sm_phase current_mode) unf_act
         -- See Note [What is active in the RHS of a RULE or unfolding?]
     , sm_eta_expand = False
         -- See Note [Eta expansion in stable unfoldings and rules]
@@ -1123,27 +1123,32 @@ updModeForRuleRHS :: ActivationGhc -> SimplMode -> SimplMode
 updModeForRuleRHS rule_act current_mode =
   current_mode
     -- See Note [What is active in the RHS of a RULE or unfolding?]
-    { sm_phase = phaseFromActivation (sm_phase current_mode) rule_act
+    { sm_phase = phaseForRuleOrUnf (sm_phase current_mode) rule_act
     , sm_eta_expand = False
         -- See Note [Eta expansion in stable unfoldings and rules]
     }
 
--- | Compute the phase range to set the 'SimplMode' to
--- when simplifying the RHS of a rule or of a stable unfolding.
+-- | `phaseForRuleOrUnf` computes the phase range to use when
+-- simplifying the RHS of a rule or of a stable unfolding.
 --
+-- This subtle function implements the careful plan described in
 -- See Note [What is active in the RHS of a RULE or unfolding?]
-phaseFromActivation
-  :: SimplPhase             -- ^ the current simplifier phase
+phaseForRuleOrUnf
+  :: SimplPhase    -- ^ the current simplifier phase
   -> ActivationGhc -- ^ the activation of the RULE or stable unfolding
   -> SimplPhase
-phaseFromActivation p act
-  | isNeverActive act
-  = p
+phaseForRuleOrUnf current_phase act
+  | start == end
+  = SimplPhase start
   | otherwise
-  = SimplPhaseRange act_start act_end
+  = SimplPhaseRange start end
   where
-    act_start = beginPhase act
-    act_end   = endPhase   act
+    start, end :: CompilerPhase
+    start = beginPhase act `earliestPhase` simplStartPhase current_phase
+    end   = endPhase   act `latestPhase`   simplEndPhase   current_phase
+    -- The beginPhase/endPhase           implements (WAR1)
+    -- The simplStartPhase/simplEndPhase implements (WAR2)
+    -- of Note [What is active in the RHS of a RULE or unfolding?]
 
 {- Note [Simplifying rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1275,25 +1280,46 @@ Our carefully crafted plan is as follows:
 
   -------------------------------------------------------------
   When simplifying the RHS of a RULE R with activation range A,
-  fire only other rules R' that are active throughout all of A.
+  fire only other rules R' that are active
+      (WAR1) throughout all of A
+      (WAR2) in the current phase
+  See `phaseForRuleOrUnf`.
   -------------------------------------------------------------
 
-Reason: R might fire in any phase in A. Then R' can fire only if R' is active
-in that phase. If not, it's not safe to unconditionally fire R' in the RHS of R.
+Reasons for (WAR1):
+  * R might fire in any phase in A. Then R' can fire only if R' is active in that
+    phase. If not, it's not safe to unconditionally fire R' in the RHS of R.
+
+Reasons for (WAR2):
+  * If A is empty (e.g. a NOINLINE pragma, so the unfolding is never active)
+    we don't want to vacuously satisfy (WAR1) and thereby fire /all/ RULES in
+    the unfolding.  Two RULES may be crafted so that they are never simultaneously
+    active, and will loop if they are.
+
+  * Suppose we are in Phase 2, looking at a stable unfolding for INLINE [1].
+    If we just do (WAR1) we will fire RULES active in phase 1; but the
+    occurrence analyser ignores any rules not active in the current phase.
+    So occ-anal may fail to detect a loop breaker; see #26826 for details.
+    See Note [Rules and loop breakers] in GHC.Core.Opt.OccurAnal.
+
+  * Aesthetically, this means that when the simplifer is in phase N, it
+    won't switch to a phase-range that doesn't include N (e.g. might be later
+    than N).  This is what caused #26826.
+
+  * Also note that as the current phase advances, it'll eventually be inside
+    the range specified by (WAR1), and hence will not widen the range.
+    Unless the latter is empty, of course.
 
 This plan is implemented by:
 
-  1. Setting the simplifier phase to the range of phases
-     corresponding to the start/end phases of the rule's activation.
+  1. Setting the simplifier phase to the /range/ of phases
+     corresponding to the start/end phases of the rule's activation, implementing
+     (WAR1) and (WAR2). This happens in `phaseForRuleOrUnf`.
+
   2. When checking whether another rule is active, we use the function
        isActive :: SimplPhase -> Activation -> Bool
      from GHC.Core.Opt.Simplify.Env, which checks whether the other rule is
      active throughout the whole range of phases.
-
-However, if the rule whose RHS we are simplifying is never active, instead of
-setting the phase range to an empty interval, we keep the current simplifier
-phase. This special case avoids firing ALL rules in the RHS of a never-active
-rule.
 
 You might wonder about a situation such as the following:
 
@@ -1307,6 +1333,7 @@ It looks tempting to use "r1" when simplifying the RHS of "r2", yet we
 **must not** do so: for any module M that imports M1, we are going to start
 simplification in M starting at InitialPhase, and we will see the
 fully simplified rules RHSs imported from M1.
+
 Conclusion: stick to the plan.
 
 Note [Simplifying inside stable unfoldings]

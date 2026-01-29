@@ -1417,16 +1417,17 @@ then we *must* choose f to be a loop breaker.  Example: see Note
 That is the whole reason for computing rule_fv_env in mkLoopBreakerNodes.
 Wrinkles:
 
-* We only consider /active/ rules. See Note [Finding rule RHS free vars]
+(RLB1) We only consider /active/ rules.
+  This is important: see Note [Finding rule RHS free vars]
 
-* We need only consider free vars that are also binders in this Rec
+(RLB2) We need only consider free vars that are also binders in this Rec
   group.  See also Note [Finding rule RHS free vars]
 
-* We only consider variables free in the *RHS* of the rule, in
+(RLB3) We only consider variables free in the *RHS* of the rule, in
   contrast to the way we build the Rec group in the first place (Note
   [Rule dependency info])
 
-* Why "transitive sequence of rules"?  Because active rules apply
+(RLB4) Why "transitive sequence of rules"?  Because active rules apply
   unconditionally, without checking loop-breaker-ness.
  See Note [Loop breaker dependencies].
 
@@ -1854,10 +1855,13 @@ makeNode !env imp_rule_edges bndr_set (bndr, rhs)
     add_rule_uds (_, l, r) uds = l `andUDs` r `andUDs` uds
 
     -------- active_rule_fvs ------------
+    -- See Note [Rules and loop breakers]
     active_rule_fvs = foldr add_active_rule imp_rule_fvs rules_w_uds
     add_active_rule (rule, _, rhs_uds) fvs
-      | is_active (ruleActivation rule)
+      | is_active (ruleActivation rule)  -- See (RLB1)
       = udFreeVars bndr_set rhs_uds `unionVarSet` fvs
+        -- Only consider the `rhs_uss`, not the LHS ones; see (RLB3)
+        -- udFreeVars restricts to bndr_set; see (RLB2)
       | otherwise
       = fvs
 
