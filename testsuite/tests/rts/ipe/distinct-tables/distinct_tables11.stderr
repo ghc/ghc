@@ -1,3 +1,7 @@
 Main.hs:3:1: warning: [GHC-15328] [-Wdeprecations (in -Wextended-warnings)]
     Module ‘GHC.InfoProv’ is deprecated:
       "GHC.InfoProv is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."
+
+Main.hs:3:1: warning: [GHC-15328] [-Wdeprecations (in -Wextended-warnings)]
+    Module ‘GHC.InfoProv’ is deprecated:
+      "GHC.InfoProv is deprecated and will be removed in GHC 10.02. Please use the ghc-internal package."
