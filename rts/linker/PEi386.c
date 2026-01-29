@@ -475,7 +475,7 @@ static void addDLLHandle(
 
 static bool verifyCOFFHeader(
     uint16_t machine,
-    IMAGE_FILE_HEADER *hdr,
+    IMAGE_FILE_HEADER *hdr
     pathchar *fileName);
 
 static bool checkIfDllLoaded(

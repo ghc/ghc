@@ -1764,6 +1764,7 @@ machoGetMisalignment( FILE * f, int* misalignment_out )
             return 0;
         }
     }
+    //This seems wrong, but likely only matters for broken archives anyway.
     fseek(f, -sizeof(header), SEEK_CUR);
 
     if(header.magic != MH_MAGIC_64) {

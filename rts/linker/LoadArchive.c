@@ -579,6 +579,7 @@ HsInt loadArchive_ (pathchar *path)
                 /* See loadObj() */
                 if(!machoGetMisalignment(f, &misalignment)) {
                     DEBUG_LOG("Failed to load member as mach-o file. Skipping.\n");
+                    debugBelch("Failed to load member as mach-o file. Skipping.\n");
                     continue;
                 }
                 image = stgMallocBytes(memberSize + misalignment,

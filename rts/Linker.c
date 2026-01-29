@@ -1530,6 +1530,7 @@ HsInt verifyAndInitOc (ObjectCode* oc)
 #endif
     if (!r) {
         IF_DEBUG(linker, ocDebugBelch(oc, "ocVerifyImage_* failed\n"));
+        ocDebugBelch(oc, "ocVerifyImage_* failed\n");
         return r;
     }
     return 1;
@@ -1565,6 +1566,7 @@ HsInt loadOc (ObjectCode* oc)
    if (!r) {
        IF_DEBUG(linker,
                 ocDebugBelch(oc, "ocAllocateExtras_MachO failed\n"));
+       ocDebugBelch(oc, "ocAllocateExtras_MachO failed\n");
        return r;
    }
 #  elif defined(OBJFORMAT_ELF)
@@ -1589,6 +1591,7 @@ HsInt loadOc (ObjectCode* oc)
 #  endif
    if (!r) {
        IF_DEBUG(linker, ocDebugBelch(oc, "ocGetNames_* failed\n"));
+       ocDebugBelch(oc, "ocGetNames_* failed\n");
        return r;
    }
 
