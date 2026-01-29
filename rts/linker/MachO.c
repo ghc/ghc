@@ -175,7 +175,7 @@ resolveImports(
 int
 ocAllocateExtras_MachO(ObjectCode* oc)
 {
-    IF_DEBUG(linker, DEBUG_LOG_ALWAYS("ocAllocateExtras_MachO: start\n"));
+    IF_DEBUG(linker, DEBUG_LOG("ocAllocateExtras_MachO: start\n"));
 
     if (NULL != oc->info->symCmd) {
         IF_DEBUG(linker,
@@ -200,7 +200,7 @@ int
 ocVerifyImage_MachO(ObjectCode * oc)
 {
     char *image = (char*) oc->image;
-    if (oc->fileSize < sizeof(MachOHeader)) {
+    if (oc->fileSize < (int) sizeof(MachOHeader)) {
         errorBelch("Tried loading machO smaller than header size.\n");
         return 0;
     }
