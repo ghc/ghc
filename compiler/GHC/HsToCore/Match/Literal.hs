@@ -117,7 +117,6 @@ dsLit l = do
     HsDoublePrim _ fl -> return (Lit (LitDouble (rationalFromFractionalLit fl)))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
-    HsMultilineString _ str -> mkStringExprFS str
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
     XLit x           -> case ghcPass @p of
       GhcTc          -> case x of
@@ -463,7 +462,6 @@ getSimpleIntegralLit (XLit (HsInteger _ i ty))  = Just (i, ty)
 getSimpleIntegralLit HsChar{}           = Nothing
 getSimpleIntegralLit HsCharPrim{}       = Nothing
 getSimpleIntegralLit HsString{}         = Nothing
-getSimpleIntegralLit HsMultilineString{} = Nothing
 getSimpleIntegralLit HsStringPrim{}     = Nothing
 getSimpleIntegralLit (XLit (HsRat{}))   = Nothing
 getSimpleIntegralLit HsFloatPrim{}      = Nothing

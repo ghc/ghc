@@ -1,0 +1,13 @@
+T26860ppr.hs:8:5: error: [GHC-83865]
+    • Couldn't match type ‘[Char]’ with ‘Int’
+      Expected: Int
+        Actual: String
+    • In the expression:
+        "first line \
+            \asdf\n\
+            \second line"
+      In an equation for ‘x’:
+          x = "first line \
+                  \asdf\n\
+                  \second line"
+

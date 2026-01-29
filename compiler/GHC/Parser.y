@@ -4130,7 +4130,7 @@ literal :: { Located (HsLit GhcPs) }
         : CHAR              { sL1 $1 $ HsChar       (getCHARs $1) $ getCHAR $1 }
         | STRING            { sL1 $1 $ HsString     (getSTRINGs $1)
                                                     $ getSTRING $1 }
-        | STRING_MULTI      { sL1 $1 $ HsMultilineString (getSTRINGMULTIs $1)
+        | STRING_MULTI      { sL1 $1 $ HsString     (getSTRINGMULTIs $1)
                                                     $ getSTRINGMULTI $1 }
         | PRIMINTEGER       { sL1 $1 $ HsIntPrim    (getPRIMINTEGERs $1)
                                                     $ getPRIMINTEGER $1 }
