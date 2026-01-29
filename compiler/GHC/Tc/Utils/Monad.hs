@@ -104,7 +104,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
-  addTcEvBind, addTcEvBinds,
+  addTcEvCoBind, addTcEvBind,
   getTcEvBindsMap, getTcEvBindsState,
   setTcEvBindsMap, combineTcEvBinds, addNeededEvIds,
   chooseUniqueOccTc,
