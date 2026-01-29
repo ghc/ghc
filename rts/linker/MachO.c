@@ -1772,7 +1772,7 @@ machoGetMisalignment( FILE * f, int* misalignment_out )
     fseek(f, -sizeof(header), SEEK_CUR);
 
     if(header.magic != MH_MAGIC_64) {
-        debugBelch("Bad magic. Expected: %08x, got: %08x.",
+        errorBelch("Bad magic. Expected: %08x, got: %08x.",
              MH_MAGIC_64, header.magic);
         return 0;
     }

@@ -574,6 +574,7 @@ HsInt loadArchive_ (pathchar *path)
 #endif
         )
         {
+            ASSERT(!isGnuIndex);
             DEBUG_LOG("Member might be an object file...loading...\n");
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
             if (RTS_LINKER_USE_MMAP)
@@ -635,6 +636,7 @@ HsInt loadArchive_ (pathchar *path)
             if (0 == loadOc(oc)) {
                 errorBelch("Failed to load OC %" PATH_FMT " , aborting.\n", path);
                 stgFree(fileName);
+                freeObjectCode( oc );
                 fclose(f);
                 return 0;
             } else {
