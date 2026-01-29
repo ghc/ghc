@@ -12,12 +12,16 @@ import re
 INCLUDE_RE = re.compile('# *include ([<"][^">]+[>"])')
 
 def get_includes(file: Path) -> List[Tuple[int, str]]:
-    txt = file.read_text()
-    return [ (line_no+1, m.group(1) )
-             for (line_no, line) in enumerate(txt.split('\n'))
-             for m in [INCLUDE_RE.match(line)]
-             if m is not None
-             if m.group(1) != "rts/PosixSource.h"]
+    try:
+        txt = file.read_text(encoding="utf-8")
+        return [ (line_no+1, m.group(1) )
+                 for (line_no, line) in enumerate(txt.split('\n'))
+                 for m in [INCLUDE_RE.match(line)]
+                 if m is not None
+                 if m.group(1) != "rts/PosixSource.h"]
+    except Exception as e:
+        e.add_note(f"While reading includes from {file}")
+        raise
 
 def in_rts_dir(path: Path) -> bool:
     return len(path.parts) > 0 and path.parts[0] == 'rts'
@@ -40,9 +44,14 @@ class RtsHIncludeOrderLinter(Linter):
             '"ghcplatform.h"',
         }
 
-        includes = get_includes(path)
-        headers = [x[1] for x in includes]
-        lines = path.read_text().split('\n')
+        try:
+            includes = get_includes(path)
+            headers = [x[1] for x in includes]
+            lines = path.read_text(encoding="utf-8").split('\n')
+        # #26850
+        except Exception as e:
+            e.add_note(f"Error while decoding path {path}")
+            raise e
 
         if '"PosixSource.h"' in headers:
             for line_no, header in includes:
@@ -69,18 +78,22 @@ class PrivateIncludeLinter(Linter):
 
     def lint(self, path: Path):
         private = False
-        lines = path.read_text().split('\n')
-        for line_no, include in get_includes(path):
-            if include == '"BeginPrivate.h"':
-                private = True
-            elif include == '"EndPrivate.h"':
-                private = False
-            elif private:
-                self.add_warning(Warning(
-                    path=path,
-                    line_no=line_no,
-                    line_content=lines[line_no-1],
-                    message='System header %s found inside of <BeginPrivate.h> block' % include))
+        try:
+            lines = path.read_text(encoding="utf-8").split('\n')
+            for line_no, include in get_includes(path):
+                if include == '"BeginPrivate.h"':
+                    private = True
+                elif include == '"EndPrivate.h"':
+                    private = False
+                elif private:
+                    self.add_warning(Warning(
+                        path=path,
+                        line_no=line_no,
+                        line_content=lines[line_no-1],
+                        message='System header %s found inside of <BeginPrivate.h> block' % include))
+        except Exception as e:
+            e.add_note(f"While handling {path}")
+            raise e
 
 linters = [
     RtsHIncludeOrderLinter(),
