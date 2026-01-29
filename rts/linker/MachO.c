@@ -175,7 +175,7 @@ resolveImports(
 int
 ocAllocateExtras_MachO(ObjectCode* oc)
 {
-    IF_DEBUG(linker, DEBUG_LOG("ocAllocateExtras_MachO: start\n"));
+    IF_DEBUG(linker, debugBelch("ocAllocateExtras_MachO: start\n"));
 
     if (NULL != oc->info->symCmd) {
         IF_DEBUG(linker,
