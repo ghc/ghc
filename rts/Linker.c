@@ -1415,7 +1415,7 @@ preloadObjectFile (pathchar *path)
     // We calculate the correct alignment from the header before
     // reading the file, and then we misalign image on purpose so
     // that the actual sections end up aligned again.
-   machoGetMisalignment(f, &misalignment);
+   int valid_macho = machoGetMisalignment(f, &misalignment);
    //machoGetMisalignment might fail to parse the header, but in that
    //case so will verifyAndInitOc so we leave cleanup to after verifyAndInitOc.
    image = stgMallocBytes(fileSize + misalignment, "loadObj(image)");
@@ -1504,7 +1504,7 @@ HsInt loadObj (pathchar *path)
    return r;
 }
 
-// Call the relevant VeriffyImage_* and ocInit_* functions.
+// Call the relevant VerifyImage_* and ocInit_* functions.
 // Return 1 on success.
 HsInt verifyAndInitOc (ObjectCode* oc)
 {

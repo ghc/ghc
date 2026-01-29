@@ -26,6 +26,7 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <fs_rts.h>
+#include <stdio.h>
 
 #define FAIL(...) do {\
    errorBelch("loadArchive: "__VA_ARGS__); \
@@ -33,6 +34,7 @@
 } while (0)
 
 #define DEBUG_LOG(...) IF_DEBUG(linker, debugBelch("loadArchive: " __VA_ARGS__))
+#define DEBUG_LOG_ALWAYS(...) (fprintf(stderr, "loadArchive: " __VA_ARGS__))
 
 
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
@@ -344,7 +346,7 @@ HsInt loadArchive_ (pathchar *path)
        Ignore requests to load multiple times */
     if (isAlreadyLoaded(path)) {
         IF_DEBUG(linker,
-                 debugBelch("ignoring repeated load of %" PATH_FMT "\n", path));
+                 DEBUG_LOG("ignoring repeated load of %" PATH_FMT "\n", path));
         return 1; /* success */
     }
 
@@ -365,6 +367,7 @@ HsInt loadArchive_ (pathchar *path)
     bool isThin = archive_fmt == ThinArchive;
     if(isThin) {
         DEBUG_LOG("Found thin archive.\n");
+        DEBUG_LOG_ALWAYS("Found thin archive.\n");
     }
 
     DEBUG_LOG("loading archive contents\n");
@@ -630,6 +633,7 @@ HsInt loadArchive_ (pathchar *path)
 
 
             if (0 == loadOc(oc)) {
+                errorBelch("Failed to load OC %" PATH_FMT " , aborting.\n", path);
                 stgFree(fileName);
                 fclose(f);
                 return 0;
