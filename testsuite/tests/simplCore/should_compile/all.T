@@ -570,3 +570,4 @@ test('T26682',  normal, multimod_compile, ['T26682', '-O -v0'])
 
 test('T26903', [grep_errmsg(r'reverse')], compile, ['-O -dno-typeable-binds -ddump-simpl -dsuppress-uniques -dsuppress-all'])
 
+test('T26826', normal, compile, ['-O'])
