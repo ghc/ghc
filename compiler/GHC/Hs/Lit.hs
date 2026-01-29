@@ -45,7 +45,6 @@ import Language.Haskell.Syntax.Lit
 type instance XHsChar       (GhcPass _) = SourceText
 type instance XHsCharPrim   (GhcPass _) = SourceText
 type instance XHsString     (GhcPass _) = SourceText
-type instance XHsMultilineString (GhcPass _) = SourceText
 type instance XHsStringPrim (GhcPass _) = SourceText
 type instance XHsInt        (GhcPass _) = NoExtField
 type instance XHsIntPrim    (GhcPass _) = SourceText
@@ -147,7 +146,6 @@ hsLitNeedsParens p = go
     go (HsChar {})        = False
     go (HsCharPrim {})    = False
     go (HsString {})      = False
-    go (HsMultilineString {}) = False
     go (HsStringPrim {})  = False
     go (HsInt _ x)        = p > topPrec && il_neg x
     go (HsFloatPrim {})   = False
@@ -177,7 +175,6 @@ convertLit :: XXLit (GhcPass p)~DataConCantHappen => HsLit (GhcPass p) -> HsLit 
 convertLit (HsChar a x)       = HsChar a x
 convertLit (HsCharPrim a x)   = HsCharPrim a x
 convertLit (HsString a x)     = HsString a x
-convertLit (HsMultilineString a x) = HsMultilineString a x
 convertLit (HsStringPrim a x) = HsStringPrim a x
 convertLit (HsInt a x)        = HsInt a x
 convertLit (HsIntPrim a x)    = HsIntPrim a x
@@ -212,8 +209,7 @@ Equivalently it's True if
 instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
     ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
-    ppr (HsString st s)     = pprWithSourceText st (pprHsString s)
-    ppr (HsMultilineString st s) =
+    ppr (HsString st s)     =
       case st of
         NoSourceText -> pprHsString s
         SourceText src -> vcat $ map text $ split '\n' (unpackFS src)
@@ -247,36 +243,6 @@ instance Outputable OverLitVal where
   ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))
   ppr (HsFractional f)   = ppr f
   ppr (HsIsString st s)  = pprWithSourceText st (pprHsString s)
-
--- | pmPprHsLit pretty prints literals and is used when pretty printing pattern
--- match warnings. All are printed the same (i.e., without hashes if they are
--- primitive and not wrapped in constructors if they are boxed). This happens
--- mainly for too reasons:
---  * We do not want to expose their internal representation
---  * The warnings become too messy
-pmPprHsLit :: forall p. IsPass p => HsLit (GhcPass p) -> SDoc
-pmPprHsLit (HsChar _ c)       = pprHsChar c
-pmPprHsLit (HsCharPrim _ c)   = pprHsChar c
-pmPprHsLit (HsString st s)    = pprWithSourceText st (pprHsString s)
-pmPprHsLit (HsMultilineString st s) = pprWithSourceText st (pprHsString s)
-pmPprHsLit (HsStringPrim _ s) = pprHsBytes s
-pmPprHsLit (HsInt _ i)        = integer (il_value i)
-pmPprHsLit (HsIntPrim _ i)    = integer i
-pmPprHsLit (HsWordPrim _ w)   = integer w
-pmPprHsLit (HsInt8Prim _ i)   = integer i
-pmPprHsLit (HsInt16Prim _ i)  = integer i
-pmPprHsLit (HsInt32Prim _ i)  = integer i
-pmPprHsLit (HsInt64Prim _ i)  = integer i
-pmPprHsLit (HsWord8Prim _ w)  = integer w
-pmPprHsLit (HsWord16Prim _ w) = integer w
-pmPprHsLit (HsWord32Prim _ w) = integer w
-pmPprHsLit (HsWord64Prim _ w) = integer w
-pmPprHsLit (HsFloatPrim _ f)  = ppr f
-pmPprHsLit (HsDoublePrim _ d) = ppr d
-pmPprHsLit (XLit x)           = case ghcPass @p of
-  GhcTc -> case x of
-   (HsInteger _ i _)  -> integer i
-   (HsRat f _)        -> ppr f
 
 negateOverLitVal :: OverLitVal -> OverLitVal
 negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)

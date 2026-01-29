@@ -4786,7 +4786,6 @@ promotionErr name err
 
 tyLitFromLit :: HsLit GhcRn -> Maybe (HsTyLit GhcRn)
 tyLitFromLit (HsString x str) = Just (HsStrTy x str)
-tyLitFromLit (HsMultilineString x str) = Just (HsStrTy x str)
 tyLitFromLit (HsChar x char) = Just (HsCharTy x char)
 tyLitFromLit _ = Nothing
 

@@ -3077,7 +3077,6 @@ repLiteral lit
                  HsChar _ _       -> Just charLName
                  HsCharPrim _ _   -> Just charPrimLName
                  HsString _ _     -> Just stringLName
-                 HsMultilineString _ _ -> Just stringLName
                  _                -> Nothing
 
 mk_integer :: Integer -> MetaM (HsLit GhcTc)
