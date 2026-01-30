@@ -473,6 +473,7 @@ data ForeignLabelSource
    --   data via an indirection (which the linker can relocate) and
    --   \"pseudo relocations\" which is a runtime feature to do additional
    --   relocations beyond what the Win32 native linker does.
+   --   See Note [Mingw .refptr mechanism]
    | ForeignLabelInUnknownPackage
 
    -- | Label is in the package currently being compiled.
@@ -647,6 +648,8 @@ data CmmLabelInfo
 data DynamicLinkerLabelInfo
   = CodeStub                    -- MachO: Lfoo$stub, ELF: foo@plt
   | SymbolPtr                   -- MachO: Lfoo$non_lazy_ptr, Windows: __imp_foo
+  | DataRefPtr                  -- Windows: .refptr.foo
+                                -- see Note [Mingw .refptr mechanism]
   | GotSymbolPtr                -- ELF: foo@got
   | GotSymbolOffset             -- ELF: foo@gotoff
 
@@ -1373,6 +1376,7 @@ labelDynamic this_mod platform external_dynamic_refs lbl =
             -- foreign package/DLL/DSO. Neither yes nor no is the correct
             -- answer here, because on Windows these are a distinct case
             -- that need special treatment in the code generator.
+            -- See Note [Mingw .refptr mechanism]
             ForeignLabelInUnknownPackage -> True
 
             -- Foreign label is in some named package.
@@ -1756,6 +1760,7 @@ pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
             SymbolPtr       -> char 'L' <> ppLbl <> text "$non_lazy_ptr"
             GotSymbolPtr    -> ppLbl <> text "@GOTPCREL"
             GotSymbolOffset -> ppLbl
+            _               -> panic "pprDynamicLinkerAsmLabel"
         | platformArch platform == ArchAArch64 -> ppLbl
         | otherwise -> panic "pprDynamicLinkerAsmLabel"
 
@@ -1768,8 +1773,9 @@ pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
 
       OSMinGW32 ->
           case dllInfo of
-            SymbolPtr -> text "__imp_" <> ppLbl
-            _         -> panic "pprDynamicLinkerAsmLabel"
+            SymbolPtr  -> text "__imp_" <> ppLbl
+            DataRefPtr -> text ".refptr." <> ppLbl
+            _          -> panic "pprDynamicLinkerAsmLabel"
 
       _ -> panic "pprDynamicLinkerAsmLabel"
   where
@@ -1796,6 +1802,7 @@ pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
           GotSymbolPtr    -> ppLbl <> text "@gotpcrel"
           GotSymbolOffset -> ppLbl
           SymbolPtr       -> text ".LC_" <> ppLbl
+          _               -> panic "pprDynamicLinkerAsmLabel"
 
       | platformArch platform == ArchPPC_64 ELF_V1
         || platformArch platform == ArchPPC_64 ELF_V2
@@ -1811,6 +1818,7 @@ pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
           SymbolPtr       -> text ".LC_" <> ppLbl
           GotSymbolPtr    -> ppLbl <> text "@got"
           GotSymbolOffset -> ppLbl <> text "@gotoff"
+          _               -> panic "pprDynamicLinkerAsmLabel"
 
 -- Figure out whether `symbol` may serve as an alias
 -- to `target` within one compilation unit.
