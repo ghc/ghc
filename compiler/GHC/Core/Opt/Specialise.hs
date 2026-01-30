@@ -2626,17 +2626,23 @@ specHeader subst (bndr:bndrs) (SpecType ty : args)
          -- See (MP2) in Note [Specialising polymorphic dictionaries]
          let in_scope = Core.substInScopeSet subst
              not_in_scope tv = not (tv `elemInScopeSet` in_scope)
+
+             expanded_ty = expandSomeTyVarUnfoldings not_in_scope ty
+                  -- expanded_ty: consider f @(Maybe (a{=Int})
+                  -- We don't want to abstract over `a`!  So, expand
+                  -- unfoldings of any not-in-scope tyavars
+
              free_tvs = scopedSort $ fvVarList $
                         filterFV not_in_scope  $
-                        tyCoFVsOfType ty
+                        tyCoFVsOfType expanded_ty
              subst1 = subst `Core.extendSubstInScopeList` free_tvs
 
-       ; let subst2 = Core.extendTvSubst subst1 bndr ty
+       ; let subst2 = Core.extendTvSubst subst1 bndr expanded_ty
        ; (useful, subst3, rule_bs, rule_args, spec_bs, dx, spec_args)
              <- specHeader subst2 bndrs args
        ; pure ( useful, subst3
-              , free_tvs ++ rule_bs,     Type ty : rule_args
-              , free_tvs ++ spec_bs, dx, Type ty : spec_args ) }
+              , free_tvs ++ rule_bs,     Type expanded_ty : rule_args
+              , free_tvs ++ spec_bs, dx, Type expanded_ty : spec_args ) }
 
 -- Next we have a type that we don't want to specialise. We need to perform
 -- a substitution on it (in case the type refers to 'a'). Additionally, we need
