@@ -56,11 +56,6 @@ module GHC.Internal.Numeric (
 
         lexDigits,
 
-        -- * Miscellaneous
-
-        fromRat,
-        Floating(..)
-
         ) where
 
 import GHC.Internal.Base
