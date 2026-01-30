@@ -20,12 +20,6 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Stack (
-    errorWithStackTrace,
-
-    -- * Profiling call stacks
-    currentCallStack,
-    whoCreated,
-
     -- * HasCallStack call stacks
     CallStack, HasCallStack, callStack, emptyCallStack, freezeCallStack,
     fromCallSiteList, getCallStack, popCallStack,
@@ -34,38 +28,12 @@ module GHC.Internal.Stack (
 
     -- * Source locations
     SrcLoc(..), prettySrcLoc,
-
-    -- * Internals
-    CostCentreStack,
-    CostCentre,
-    getCurrentCCS,
-    getCCSOf,
-    clearCCS,
-    ccsCC,
-    ccsParent,
-    ccLabel,
-    ccModule,
-    ccSrcSpan,
-    ccsToStrings,
-    renderStack
   ) where
 
 import GHC.Internal.Show
-import GHC.Internal.Stack.CCS
 import GHC.Internal.Stack.Types
 import GHC.Internal.Base
 import GHC.Internal.Data.OldList (intercalate)
-import GHC.Internal.Exception
-import GHC.Internal.IO (unsafeDupablePerformIO, throwIO)
-
--- | Like the function 'error', but appends a stack trace to the error
--- message if one is available.
---
--- @since base-4.7.0.0
-{-# DEPRECATED errorWithStackTrace "'error' appends the call stack now" #-}
-  -- DEPRECATED in 8.0.1
-errorWithStackTrace :: String -> a
-errorWithStackTrace x = unsafeDupablePerformIO $ throwIO (ErrorCall x)
 
 
 -- | Pop the most recent call-site off the 'CallStack'.

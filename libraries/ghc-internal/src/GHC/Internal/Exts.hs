@@ -310,7 +310,7 @@ import GHC.Internal.ArrayArray
 import GHC.Internal.Base hiding ( coerce )
 import GHC.Internal.IO (seq#)
 import GHC.Internal.Ptr
-import GHC.Internal.Stack
+import GHC.Internal.Stack.CCS
 import GHC.Internal.IsList (IsList(..)) -- for re-export
 
 import qualified GHC.Internal.Data.Coerce
