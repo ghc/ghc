@@ -27,7 +27,7 @@ module GHC.Internal.IORef (
 
 import GHC.Internal.Base
 import GHC.Internal.STRef
-import GHC.Internal.IO
+import GHC.Internal.ST
 
 -- ---------------------------------------------------------------------------
 -- IORefs
@@ -58,6 +58,9 @@ newtype IORef a = IORef (STRef RealWorld a)
   -- ^ Pointer equality.
   --
   -- @since base-4.0.0.0
+
+stToIO        :: ST RealWorld a -> IO a
+stToIO (ST m) = IO m
 
 -- |Build a new 'IORef'
 newIORef    :: a -> IO (IORef a)

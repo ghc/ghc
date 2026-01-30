@@ -49,6 +49,7 @@ module GHC.Stack
      renderStack
      ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Stack
 import GHC.Internal.Stack.CCS
 import GHC.Internal.IO

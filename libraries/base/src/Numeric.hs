@@ -48,3 +48,4 @@ module Numeric
      ) where
 
 import GHC.Internal.Numeric
+import GHC.Internal.Float
