@@ -50,8 +50,8 @@ module GHC.Internal.Control.Arrow (
     ) where
 
 import GHC.Internal.Data.Tuple ( fst, snd, uncurry )
-import GHC.Internal.Data.Either
 import GHC.Internal.Control.Monad.Fix
+import GHC.Internal.Data.Either
 import GHC.Internal.Control.Category
 import GHC.Internal.Base hiding ( (.), id )
 import GHC.Internal.Generics
@@ -456,6 +456,7 @@ class Arrow a => ArrowLoop a where
 -- | @since base-2.01
 instance ArrowLoop (->) where
     loop f b = let (c,d) = f (b,d) in c
+
 
 -- | Beware that for many monads (those for which the '>>=' operation
 -- is strict) this instance will /not/ satisfy the right-tightening law
