@@ -439,23 +439,38 @@ instance Ord CLabel where
   compare (ModuleLabel {}) _ = LT
   compare  _ (ModuleLabel{}) = GT
 
--- | Record where a foreign label is stored.
+-- | Record where the target entity referred to by a foreign label lives.
+--
+-- This information is used at the use-site of a label to determine if the
+-- target of the label lives in:
+--
+-- 1. the same (local) linker unit;
+-- 2. in a different (external) linker unit; or
+-- 3. an unknown unit (could be either local or external).
+--
 data ForeignLabelSource
 
-   -- | Label is in a named package
+   -- | The label target lives in a named Haskell unit. Whether the target
+   -- entity is local or external can be determined by comparing the local unit
+   -- to this unit id.
    = ForeignLabelInPackage UnitId
 
-   -- | Label is in some external, system package that doesn't also
-   --   contain compiled Haskell code, and is not associated with any .hi files.
-   --   We don't have to worry about Haskell code being inlined from
-   --   external packages. It is safe to treat the RTS package as "external".
+   -- | The label target lives in some external linker unit that is guaranteed
+   -- not to be a unit where Haskell code is included. Thus this label can
+   -- /always/ be considered external. It is safe to treat the RTS package as
+   -- external.
    | ForeignLabelInExternalPackage
 
-   -- | Label is in the package currently being compiled.
-   --   This is only used for creating hacky tmp labels during code generation.
-   --   Don't use it in any code that might be inlined across a package boundary
-   --   (ie, core code) else the information will be wrong relative to the
-   --   destination module.
+   -- | The label target lives somewhere, but we do not know if it is in the
+   -- local linker unit or an external one. This is the case we end up with for
+   -- Haskell FFI declarations like @foreign import ccall@.
+   | ForeignLabelInUnknownPackage
+
+   -- | The label target lives in the package currently being compiled.
+   -- This is only used for creating hacky tmp labels during code generation.
+   -- It /must not/ be used in any code that might be inlined across a package
+   -- boundary (i.e. core code) else the information will be wrong relative to
+   -- the destination module.
    | ForeignLabelInThisPackage
 
    deriving (Eq, Ord)
@@ -1358,6 +1373,11 @@ labelLinkerUnit this_mod platform external_dynamic_refs lbl =
             -- source file currently being compiled.
             ForeignLabelInThisPackage -> LinkerUnitLocal
 
+            -- Foreign label is either in the local package or it is in
+            -- some foreign package/DLL/DSO. This is the case for all
+            -- user written foreign import declarations.
+            ForeignLabelInUnknownPackage -> LinkerUnitUnknown
+
             -- Foreign label is in some named package.
             -- When compiling in the "dyn" way, each package is to be
             -- linked into its own DLL.
@@ -1723,6 +1743,7 @@ instance Outputable ForeignLabelSource where
         ForeignLabelInPackage pkgId     -> parens $ text "package: " <> ppr pkgId
         ForeignLabelInThisPackage       -> parens $ text "this package"
         ForeignLabelInExternalPackage   -> parens $ text "external package"
+        ForeignLabelInUnknownPackage    -> parens $ text "unknown package"
 
 -- -----------------------------------------------------------------------------
 -- Machine-dependent knowledge about labels.
