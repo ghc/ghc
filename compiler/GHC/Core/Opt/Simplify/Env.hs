@@ -815,8 +815,9 @@ doFloatFromRhs fe lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs 
       && want_to_float
       && can_float
   where
-     want_to_float = isTopLevel lvl || exprIsCheap rhs || exprIsExpandable rhs
-                     -- See Note [Float when cheap or expandable]
+     want_to_float = isTopLevel lvl || exprIsExpandable rhs
+                     -- See Note [Float when expandable]
+
      can_float = case ff of
                    FltLifted  -> True
                    FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
@@ -828,16 +829,29 @@ doFloatFromRhs fe lvl rec strict_bind (SimplFloats { sfLetFloats = LetFloats fs 
      floatEnabled lvl FloatNestedOnly = not (isTopLevel lvl)
      floatEnabled _ FloatEnabled = True
 
-{-
-Note [Float when cheap or expandable]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to float a let from a let if the residual RHS is
-   a) cheap, such as (\x. blah)
-   b) expandable, such as (f b) if f is CONLIKE
-But there are
-  - cheap things that are not expandable (eg \x. expensive)
-  - expandable things that are not cheap (eg (f b) where b is CONLIKE)
-so we must take the 'or' of the two.
+{- Note [Float when expandable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We float when that would leave us with a RHS that is /expandable/ (#26854).
+The whole purpose of the local-let-floating is to end up with
+   let x = rhs
+where rhs has an expandable unfolding, so that `exprIsConApp_maybe` will look
+inside `x`.
+
+Historical aside:
+
+    In the long-distant (2011) past, we made `want_to_float` true if
+      EITHER exprIsExpandable OR exprIsCheap
+    But that seems wrong: there is no point in floating for expressions that are
+    cheap but not expandable:
+      * It costs more to test
+      * It gives no benefit
+      * Very few expressions are cheap but not expandable (e.g. error calls)
+    We justified this OR by saying that there may be:
+      - cheap things that are not expandable (eg \x. expensive)
+      - expandable things that are not cheap (eg (f b) where b is CONLIKE)
+    But that's not true: (\x.expensive) is certainly expandable.
+
+End of historial aside
 -}
 
 emptyLetFloats :: LetFloats
