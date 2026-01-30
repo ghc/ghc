@@ -53,7 +53,6 @@ import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.IO (FilePath)
 import GHC.Internal.IO.Exception
 #if defined(mingw32_HOST_OS)
-import GHC.Internal.Control.Monad (unless)
 import GHC.Internal.IO.Encoding (argvEncoding)
 import GHC.Internal.Windows
 import GHC.Internal.Word
@@ -237,7 +236,7 @@ setEnv_ :: String -> String -> IO ()
 #if defined(mingw32_HOST_OS)
 setEnv_ key value = withCWString key $ \k -> withCWString value $ \v -> do
   success <- c_SetEnvironmentVariable k v
-  unless success (throwGetLastError "setEnv")
+  when (not success) (throwGetLastError "setEnv")
 
 foreign import ccall unsafe "windows.h SetEnvironmentVariableW"
   c_SetEnvironmentVariable :: LPTSTR -> LPTSTR -> IO Bool

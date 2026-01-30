@@ -1,4 +1,4 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -23,7 +23,7 @@ module GHC.Internal.System.IO.OS
 )
 where
 
-import GHC.Internal.Control.Monad (return)
+import GHC.Internal.Base (return)
 import GHC.Internal.Control.Concurrent.MVar (MVar)
 import GHC.Internal.Control.Exception (mask)
 import GHC.Internal.Data.Function (const, (.), ($))

@@ -32,7 +32,6 @@ module GHC.Internal.Stats
     , getRTSStatsEnabled
 ) where
 
-import GHC.Internal.Control.Monad
 import GHC.Internal.Int
 import GHC.Internal.Word
 import GHC.Internal.Base
@@ -204,7 +203,7 @@ type RtsTime = Int64
 getRTSStats :: IO RTSStats
 getRTSStats = do
   statsEnabled <- getRTSStatsEnabled
-  unless statsEnabled .  ioError $ IOError
+  when (not statsEnabled) .  ioError $ IOError
     Nothing
     UnsupportedOperation
     ""

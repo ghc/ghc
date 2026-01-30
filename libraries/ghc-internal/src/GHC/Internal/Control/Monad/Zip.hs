@@ -18,7 +18,7 @@
 
 module GHC.Internal.Control.Monad.Zip ( MonadZip(..) ) where
 
-import GHC.Internal.Control.Monad (liftM, liftM2, Monad(..))
+import GHC.Internal.Base (liftM, liftM2, Monad(..))
 import GHC.Internal.Data.Functor.Identity
 import qualified GHC.Internal.Data.Functor
 import GHC.Internal.Data.Monoid
