@@ -626,6 +626,8 @@ type family XHsChar x
 type family XHsCharPrim x
 type family XHsString x
 type family XHsStringPrim x
+type family XHsNatural x
+type family XHsDouble x
 type family XHsInt x
 type family XHsIntPrim x
 type family XHsWordPrim x
@@ -730,13 +732,6 @@ type family XExplicitTupleTy x
 type family XTyLit           x
 type family XWildCardTy      x
 type family XXType           x
-
--- ---------------------------------------------------------------------
--- HsTyLit type families
-type family XNumTy           x
-type family XStrTy           x
-type family XCharTy          x
-type family XXTyLit          x
 
 -- ---------------------------------------------------------------------
 -- HsForAllTelescope type families

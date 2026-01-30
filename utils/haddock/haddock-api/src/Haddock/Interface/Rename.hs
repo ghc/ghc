@@ -428,11 +428,12 @@ renameType t = case t of
   HsSpliceTy (HsUntypedSpliceNested _) _ -> error "renameType: not an top level type splice"
   HsWildCardTy _ -> pure (HsWildCardTy noAnn)
 
-renameTyLit :: HsTyLit GhcRn -> HsTyLit DocNameI
+renameTyLit :: HsLit GhcRn -> HsLit DocNameI
 renameTyLit t = case t of
-  HsNumTy _ v -> HsNumTy noExtField v
-  HsStrTy _ v -> HsStrTy noExtField v
-  HsCharTy _ v -> HsCharTy noExtField v
+  HsNatural _ v -> HsNatural noExtField v
+  HsString  _ v -> HsString  noExtField v
+  HsChar    _ v -> HsChar    noExtField v
+  _             -> error "renameTyLit: unsupported lit"
 
 renameSigType :: HsSigType GhcRn -> RnM (HsSigType DocNameI)
 renameSigType (HsSig{sig_bndrs = bndrs, sig_body = body}) = do

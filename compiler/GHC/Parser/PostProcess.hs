@@ -3702,7 +3702,8 @@ mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpac
 mkMultExpr pct t arr = HsExplicitMult (pct, EpArrow arr) t
 
 mkMultAnn :: EpToken "%" -> LHsType GhcPs -> EpArrowOrColon -> HsMultAnn GhcPs
-mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) ep
+mkMultAnn pct t@(L _ (HsTyLit _ (HsNatural _ il))) ep
+  | SourceText (unpackFS -> "1") <- il_text il
   -- See #18888 for the use of (SourceText "1") above
   = HsLinearAnn (EpPct1 pct1 ep)
   where

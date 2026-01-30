@@ -69,7 +69,7 @@ module GHC.Tc.Gen.HsType (
         HoleMode(..),
 
         -- Utils
-        tyLitFromLit, tyLitFromOverloadedLit,
+        tyLitFromOverloadedLit,
 
    ) where
 
@@ -1264,18 +1264,8 @@ tcHsType _ rn_ty@(HsStarTy _ _) exp_kind
   = checkExpKind rn_ty liftedTypeKind liftedTypeKind exp_kind
 
 --------- Literals
-tcHsType _ rn_ty@(HsTyLit _ (HsNumTy x n)) exp_kind
-  = do { when (n < 0) $
-           addErr $ TcRnNegativeNumTypeLiteral (HsNumTy x n)
-       ; checkWiredInTyCon naturalTyCon
-       ; checkExpKind rn_ty (mkNumLitTy n) naturalTy exp_kind }
-
-tcHsType _ rn_ty@(HsTyLit _ (HsStrTy _ s)) exp_kind
-  = do { checkWiredInTyCon typeSymbolKindCon
-       ; checkExpKind rn_ty (mkStrLitTy s) typeSymbolKind exp_kind }
-tcHsType _ rn_ty@(HsTyLit _ (HsCharTy _ c)) exp_kind
-  = do { checkWiredInTyCon charTyCon
-       ; checkExpKind rn_ty (mkCharLitTy c) charTy exp_kind }
+tcHsType _ rn_ty@(HsTyLit _ lit) exp_kind
+  = tc_hs_lit_ty rn_ty lit exp_kind
 
 --------- Wildcards
 
@@ -1313,6 +1303,26 @@ tcHsType _ rn_ty@(XHsType ty) exp_kind
                      (listToUFM_Directly $ map (fmap mkTyVarTy) subst_prs)
            ty' = substTy subst ty
        checkExpKind rn_ty ty' (typeKind ty') exp_kind
+
+tc_hs_lit_ty :: HsType GhcRn
+             -> HsLit GhcRn
+             -> ExpKind
+             -> TcM TcType
+tc_hs_lit_ty rn_ty (HsNatural _ lit) exp_kind
+  = do let n = il_value lit
+       -- Ensure that a type-level integer is nonnegative (#8306, #8412, #26861)
+       when (n < 0) $
+         addErr $ TcRnNegativeNumTypeLiteral lit
+       checkWiredInTyCon naturalTyCon
+       checkExpKind rn_ty (mkNumLitTy n) naturalTy exp_kind
+tc_hs_lit_ty rn_ty (HsString _ s) exp_kind
+  = do checkWiredInTyCon typeSymbolKindCon
+       checkExpKind rn_ty (mkStrLitTy s) typeSymbolKind exp_kind
+tc_hs_lit_ty rn_ty (HsChar _ c) exp_kind
+  = do checkWiredInTyCon charTyCon
+       checkExpKind rn_ty (mkCharLitTy c) charTy exp_kind
+tc_hs_lit_ty _ lit _
+  = failWithTc $ TcRnUnpromotableLit lit
 
 tc_hs_tuple_ty :: HsType GhcRn
                -> TcTyMode
@@ -4785,13 +4795,7 @@ promotionErr name err
 ************************************************************************
 -}
 
-
-tyLitFromLit :: HsLit GhcRn -> Maybe (HsTyLit GhcRn)
-tyLitFromLit (HsString x str) = Just (HsStrTy x str)
-tyLitFromLit (HsChar x char) = Just (HsCharTy x char)
-tyLitFromLit _ = Nothing
-
-tyLitFromOverloadedLit :: OverLitVal -> Maybe (HsTyLit GhcRn)
-tyLitFromOverloadedLit (HsIntegral n) = Just $ HsNumTy NoSourceText (il_value n)
-tyLitFromOverloadedLit (HsIsString _ s) = Just $ HsStrTy NoSourceText s
-tyLitFromOverloadedLit HsFractional{} = Nothing
+tyLitFromOverloadedLit :: OverLitVal -> HsLit GhcRn
+tyLitFromOverloadedLit (HsIntegral n)     = HsNatural noExtField n
+tyLitFromOverloadedLit (HsIsString src s) = HsString src s
+tyLitFromOverloadedLit (HsFractional fl)  = HsDouble noExtField fl

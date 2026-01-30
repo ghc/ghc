@@ -670,10 +670,6 @@ class (Typeable a) => ExactPrint a where
 -- Start of utility functions
 -- ---------------------------------------------------------------------
 
-printSourceText :: (Monad m, Monoid w) => SourceText -> String -> EP w m ()
-printSourceText (NoSourceText) txt   =  printStringAdvance txt >> return ()
-printSourceText (SourceText   txt) _ =  printStringAdvance (unpackFS txt) >> return ()
-
 printSourceTextAA :: (Monad m, Monoid w) => SourceText -> String -> EP w m ()
 printSourceTextAA (NoSourceText) txt   = printStringAdvanceA  txt >> return ()
 printSourceTextAA (SourceText   txt) _ = printStringAdvanceA  (unpackFS txt) >> return ()
@@ -4018,12 +4014,9 @@ instance ExactPrint (HsType GhcPs) where
     tys' <- markAnnotated tys
     c' <- markEpToken c
     return (HsExplicitTupleTy (sq', o', c') prom tys')
-  exact (HsTyLit a lit) = do
-    case lit of
-      (HsNumTy src v) -> printSourceText src (show v)
-      (HsStrTy src v) -> printSourceText src (show v)
-      (HsCharTy src v) -> printSourceText src (show v)
-    return (HsTyLit a lit)
+  exact (HsTyLit an lit) = do
+    lit' <- withPpr lit
+    return (HsTyLit an lit')
   exact t@(HsWildCardTy _) = printStringAdvance "_" >> return t
   exact x = error $ "missing match for HsType:" ++ showAst x
 
@@ -4797,6 +4790,7 @@ hsLit2String lit =
     HsCharPrim   src p   -> toSourceTextWithSuffix src p ""
     HsString     src v   -> toSourceTextWithSuffix src v ""
     HsStringPrim src v   -> toSourceTextWithSuffix src v ""
+    HsNatural    _ (IL src _ v)   -> toSourceTextWithSuffix src v ""
     HsInt        _ (IL src _ v)   -> toSourceTextWithSuffix src v ""
     HsIntPrim    src v   -> toSourceTextWithSuffix src v ""
     HsWordPrim   src v   -> toSourceTextWithSuffix src v ""
@@ -4808,6 +4802,7 @@ hsLit2String lit =
     HsWord16Prim src v   -> toSourceTextWithSuffix src v ""
     HsWord32Prim src v   -> toSourceTextWithSuffix src v ""
     HsWord64Prim src v   -> toSourceTextWithSuffix src v ""
+    HsDouble     _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl ""
     HsFloatPrim  _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl "#"
     HsDoublePrim _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl "##"
 

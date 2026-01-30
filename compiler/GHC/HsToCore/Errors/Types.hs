@@ -194,6 +194,7 @@ data ThRejectionReason
   | ThExoticStatement [Stmt GhcRn (LHsExpr GhcRn)]
   | ThExoticLiteral !(HsLit GhcRn)
   | ThExoticPattern !(Pat GhcRn)
+  | ThUnsupportedTyLit !(HsLit GhcRn)
   | ThGuardedLambdas !(Match GhcRn (LHsExpr GhcRn))
   | ThNegativeOverloadedPatterns !(Pat GhcRn)
   | ThHaddockDocumentation

@@ -30,7 +30,7 @@ module Language.Haskell.Syntax.Type (
         HsTyPat(..), LHsTyPat,
         HsTupleSort(..),
         HsContext, LHsContext,
-        HsTyLit(..),
+        HsLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), XValArg, XTypeArg, XArgPar, XXArg,
 
@@ -54,6 +54,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 import Language.Haskell.Syntax.Basic ( SrcStrictness, SrcUnpackedness )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Specificity
+import Language.Haskell.Syntax.Lit
 
 
 import GHC.Hs.Doc (LHsDoc)
@@ -63,8 +64,6 @@ import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe
 import Data.Eq
 import Data.Bool
-import Data.Char
-import Prelude (Integer)
 import Data.Ord (Ord)
 import Control.DeepSeq
 
@@ -882,7 +881,7 @@ data HsType pass
         PromotionFlag      -- whether explicitly promoted, for pretty printer
         [LHsType pass]
 
-  | HsTyLit (XTyLit pass) (HsTyLit pass)      -- A promoted numeric literal.
+  | HsTyLit (XTyLit pass) (HsLit pass)      -- A promoted literal
 
   | HsWildCardTy (XWildCardTy pass)  -- A type wildcard
       -- See Note [The wildcard story for types]
@@ -890,14 +889,6 @@ data HsType pass
   -- Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
   | XHsType
       !(XXType pass)
-
-
--- | Haskell Type Literal
-data HsTyLit pass
-  = HsNumTy  (XNumTy pass) Integer
-  | HsStrTy  (XStrTy pass) FastString
-  | HsCharTy (XCharTy pass) Char
-  | XTyLit   !(XXTyLit pass)
 
 type HsMultAnn pass = HsMultAnnOf (LHsType (NoGhcTc pass)) pass
 

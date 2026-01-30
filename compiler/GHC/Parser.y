@@ -2398,14 +2398,9 @@ atype :: { LHsType GhcPs }
         -- so you have to quote those.)
         | '[' ktype ',' comma_types1 ']'  {% do { h <- addTrailingCommaA $2 (epTok $3)
                                                 ; amsA' (sLL $1 $> $ HsExplicitListTy (NoEpTok,epTok $1,epTok $5) NotPromoted (h:$4)) }}
-        | INTEGER              { sLLa $1 $> $ HsTyLit noExtField $ HsNumTy (getINTEGERs $1)
-                                                           (il_value (getINTEGER $1)) }
-        | CHAR                 { sLLa $1 $> $ HsTyLit noExtField $ HsCharTy (getCHARs $1)
-                                                                        (getCHAR $1) }
-        | STRING               { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
-                                                                     (getSTRING  $1) }
-        | STRING_MULTI         { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGMULTIs $1)
-                                                                     (getSTRINGMULTI  $1) }
+        | INTEGER              { sL1a $1 $ HsTyLit noExtField $! HsNatural noExtField (getINTEGER  $1) }
+        | RATIONAL             { sL1a $1 $ HsTyLit noExtField $! HsDouble  noExtField (getRATIONAL $1) }
+        | literal              { sL1a $1 $ HsTyLit noExtField $! unLoc $1 }
         -- Type variables are never exported, so `M.tyvar` will be rejected by the renamer.
         -- We let it pass the parser because the renamer can generate a better error message.
         | QVARID                      {% let qname = mkQual tvName (getQVARID $1)

@@ -117,6 +117,8 @@ dsLit l = do
     HsDoublePrim _ fl -> return (Lit (LitDouble (rationalFromFractionalLit fl)))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
+    HsNatural _ i    -> return (mkNaturalExpr platform (il_value i))
+    HsDouble _ fl    -> return (mkDoubleExpr (fromRational (rationalFromFractionalLit fl)))
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
     XLit x           -> case ghcPass @p of
       GhcTc          -> case x of
@@ -447,6 +449,7 @@ getIntegralLit _ = Nothing
 -- | If 'Integral', extract the value and type of the non-overloaded literal.
 getSimpleIntegralLit :: HsLit GhcTc -> Maybe (Integer, Type)
 getSimpleIntegralLit (HsInt _ IL{ il_value = i }) = Just (i, intTy)
+getSimpleIntegralLit (HsNatural _ IL{ il_value = i }) = Just (i, naturalTy)
 getSimpleIntegralLit (HsIntPrim _ i)            = Just (i, intPrimTy)
 getSimpleIntegralLit (HsWordPrim _ i)           = Just (i, wordPrimTy)
 getSimpleIntegralLit (HsInt8Prim _ i)           = Just (i, int8PrimTy)
@@ -466,6 +469,7 @@ getSimpleIntegralLit HsStringPrim{}     = Nothing
 getSimpleIntegralLit (XLit (HsRat{}))   = Nothing
 getSimpleIntegralLit HsFloatPrim{}      = Nothing
 getSimpleIntegralLit HsDoublePrim{}     = Nothing
+getSimpleIntegralLit HsDouble{}         = Nothing
 
 -- | Extract the Char if the expression is a Char literal.
 getLHsCharLit :: LHsExpr GhcTc -> Maybe Char

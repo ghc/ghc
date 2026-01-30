@@ -36,7 +36,7 @@ module GHC.Hs.Type (
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
         HsContext, LHsContext, fromMaybeContext,
-        HsTyLit(..),
+        HsLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), numVisibleArgs, pprHsArgsApp,
         LHsTypeArg, lhsTypeArgSrcSpan,
@@ -100,6 +100,7 @@ import GHC.Core.DataCon ( SrcStrictness(..), SrcUnpackedness(..)
                         , HsSrcBang(..), HsImplBang(..)
                         )
 import GHC.Hs.Extension
+import GHC.Hs.Lit ()
 import GHC.Parser.Annotation
 
 import GHC.Base ( Multiplicity(..) )
@@ -468,11 +469,6 @@ type instance XWildCardTy      GhcTc = NoExtField
 type instance XXType           GhcPs = HsTypeGhcPsExt
 type instance XXType           GhcRn = HsCoreTy
 type instance XXType           GhcTc = DataConCantHappen
-
-type instance XNumTy         (GhcPass _) = SourceText
-type instance XStrTy         (GhcPass _) = SourceText
-type instance XCharTy        (GhcPass _) = SourceText
-type instance XXTyLit        (GhcPass _) = DataConCantHappen
 
 type HsCoreTy = Type
 
@@ -1297,11 +1293,6 @@ instance (OutputableBndrId p)
        => Outputable (HsTyPat (GhcPass p)) where
     ppr (HsTP { hstp_body = ty }) = ppr ty
 
-
-instance (OutputableBndrId p)
-       => Outputable (HsTyLit (GhcPass p)) where
-    ppr = ppr_tylit
-
 instance Outputable HsIPName where
     ppr (HsIPName n) = char '?' <> ftext n -- Ordinary implicit parameters
 
@@ -1344,11 +1335,6 @@ instance (OutputableBndrId pass) => OutputableBndr (FieldOcc (GhcPass pass)) whe
 instance (OutputableBndrId pass) => OutputableBndr (GenLocated SrcSpan (FieldOcc (GhcPass pass))) where
   pprInfixOcc  = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
-
-ppr_tylit :: (HsTyLit (GhcPass p)) -> SDoc
-ppr_tylit (HsNumTy source i) = pprWithSourceText source (integer i)
-ppr_tylit (HsStrTy source s) = pprHsStringLit source s
-ppr_tylit (HsCharTy source c) = pprWithSourceText source (text (show c))
 
 pprAnonWildCard :: SDoc
 pprAnonWildCard = char '_'

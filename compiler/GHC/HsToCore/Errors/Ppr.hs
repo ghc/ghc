@@ -182,6 +182,8 @@ instance Diagnostic DsMessage where
                -> mkMsg "Exotic literal" (ppr lit)
              ThExoticPattern pat
                -> mkMsg "Exotic pattern" (ppr pat)
+             ThUnsupportedTyLit lit
+               -> mkMsg "Unsupported type literal" (ppr lit)
              ThGuardedLambdas m
                -> mkMsg "Guarded lambdas" (pprMatch m)
              ThNegativeOverloadedPatterns pat

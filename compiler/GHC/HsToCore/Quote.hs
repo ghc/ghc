@@ -1501,16 +1501,17 @@ repTy (HsIParamTy _ n t) = do
 
 repTy ty                      = notHandled (ThExoticFormOfType ty)
 
-repTyLit :: HsTyLit (GhcPass p) -> MetaM (Core (M TH.TyLit))
-repTyLit (HsNumTy _ i) = do
-                         platform <- getPlatform
-                         rep2 numTyLitName [mkIntegerExpr platform i]
-repTyLit (HsStrTy _ s) = do { s' <- mkStringExprFS s
-                            ; rep2 strTyLitName [s']
-                            }
-repTyLit (HsCharTy _ c) = do { c' <- return (mkCharExpr c)
-                             ; rep2 charTyLitName [c']
-                             }
+repTyLit :: HsLit GhcRn -> MetaM (Core (M TH.TyLit))
+repTyLit (HsNatural _ i) = do
+  platform <- getPlatform
+  rep2 numTyLitName [mkIntegerExpr platform (il_value i)]
+repTyLit (HsString _ s) = do
+  s' <- mkStringExprFS s
+  rep2 strTyLitName [s']
+repTyLit (HsChar _ c) = do
+  c' <- return (mkCharExpr c)
+  rep2 charTyLitName [c']
+repTyLit lit = notHandled (ThUnsupportedTyLit lit)
 
 -- | Represent a type wrapped in a Maybe
 repMaybeLTy :: Maybe (LHsKind GhcRn)

@@ -49,6 +49,10 @@ data HsLit x
       -- ^ String
   | HsStringPrim (XHsStringPrim x) {- SourceText -} !ByteString
       -- ^ Packed bytes
+  | HsNatural (XHsNatural x)  IntegralLit
+      -- ^ Genuinely a @Natural@; used in types only
+  | HsDouble (XHsDouble x)  FractionalLit
+      -- ^ Genuinely a @Double@; used in type errors only
   | HsInt (XHsInt x)  IntegralLit
       -- ^ Genuinely an Int; arises from
       -- "GHC.Tc.Deriv.Generate", and from TRANSLATION
@@ -87,6 +91,10 @@ instance (Eq (XXLit x)) => Eq (HsLit x) where
   HsString{}        == _                 = False
   HsStringPrim _ x1 == HsStringPrim _ x2 = x1 == x2
   HsStringPrim{}    == _                 = False
+  HsNatural _ x1    == HsNatural _ x2    = x1 == x2
+  HsNatural{}       == _                 = False
+  HsDouble _ x1     == HsDouble _ x2     = x1 == x2
+  HsDouble{}        == _                 = False
   HsInt _ x1        == HsInt _ x2        = x1 == x2
   HsInt{}           == _                 = False
   HsIntPrim _ x1    == HsIntPrim _ x2    = x1 == x2

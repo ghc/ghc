@@ -71,6 +71,7 @@ import GHC.Driver.Flags
 import GHC.Driver.Backend
 import GHC.Hs hiding (HoleError)
 import GHC.Hs.Decls.Overlap
+import GHC.Hs.Syn.Type (hsLitType)
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Types.PromotionErr (pprTermLevelUseCtxt)
@@ -1144,6 +1145,10 @@ instance Diagnostic TcRnMessage where
                      TermVariablePE -> text "term variables cannot be promoted"
                      TypeVariablePE -> text "type variables bound in a kind signature cannot be used in the type"
           same_rec_group_msg = text "it is defined and used in the same recursive group"
+    TcRnUnpromotableLit lit
+      -> mkSimpleDecorated $
+           vcat [ text "The literal" <+> quotes (ppr lit) <+> text "cannot be promoted."
+                , text "It is of the unpromotable type" <+> quotes (ppr (hsLitType lit)) <> dot ]
     TcRnIllegalTermLevelUse simple_msg rdr name err
       -> mkSimpleDecorated $
            if simple_msg
@@ -2374,6 +2379,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnpromotableThing{}
       -> ErrorWithoutFlag
+    TcRnUnpromotableLit{}
+      -> ErrorWithoutFlag
     TcRnIllegalTermLevelUse{}
       -> ErrorWithoutFlag
     TcRnMatchesHaveDiffNumArgs{}
@@ -3040,6 +3047,8 @@ instance Diagnostic TcRnMessage where
     TcRnClassKindNotConstraint{}
       -> noHints
     TcRnUnpromotableThing{}
+      -> noHints
+    TcRnUnpromotableLit{}
       -> noHints
     TcRnIllegalTermLevelUse {}
       -> noHints

@@ -64,7 +64,7 @@ import GHC.Types.Id (idType, setIdType)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (mkVarUnqual)
 import GHC.Types.Name.Set (emptyNameSet)
-import GHC.Types.SourceText (SourceText (..))
+import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
 import GHC.Types.Unique (getUnique)
@@ -1154,10 +1154,10 @@ Remarks:
         )
         (mkScaledFunTys arg_tys res_ty)
 
-synifyTyLit :: TyLit -> HsTyLit GhcRn
-synifyTyLit (NumTyLit n) = HsNumTy NoSourceText n
-synifyTyLit (StrTyLit s) = HsStrTy NoSourceText s
-synifyTyLit (CharTyLit c) = HsCharTy NoSourceText c
+synifyTyLit :: TyLit -> HsLit GhcRn
+synifyTyLit (NumTyLit n) = HsNatural noExtField (mkIntegralLit n)
+synifyTyLit (StrTyLit s) = HsString NoSourceText s
+synifyTyLit (CharTyLit c) = HsChar NoSourceText c
 
 synifyKindSig :: Kind -> LHsKind GhcRn
 synifyKindSig k = synifyType WithinType emptyVarSet k

@@ -203,6 +203,7 @@ import GHC.Types.Name.Env (NameEnv)
 import qualified GHC.Types.Name.Occurrence as OccName
 import GHC.Types.Name.Reader
 import GHC.Types.SourceFile (HsBootOrSig(..))
+import GHC.Types.SourceText (IntegralLit)
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing (TyThing)
 import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar, CoVar, Specificity)
@@ -813,7 +814,7 @@ data TcRnMessage where
      Test cases: th/T8412
                  typecheck/should_fail/T8306
   -}
-  TcRnNegativeNumTypeLiteral :: HsTyLit GhcPs -> TcRnMessage
+  TcRnNegativeNumTypeLiteral :: IntegralLit -> TcRnMessage
 
   {-| TcRnIllegalWildcardsInConstructor is an error that occurs whenever
       the record wildcards '..' are used inside a constructor without labeled fields.
@@ -2456,6 +2457,21 @@ data TcRnMessage where
                 rename/should_fail/T16635c
   -}
   TcRnUnpromotableThing :: !Name -> !PromotionErr -> TcRnMessage
+
+  {-| TcRnUnpromotableLit is an error that occurs when the user attempts to
+      use a literal at the type level that cannot be promoted. This includes
+      primitive literals (such as unboxed integers, characters, strings, and
+      floating-point numbers) as well as boxed floating-point numbers.
+
+      Example(s):
+         type TCharPrim   = 'x'#
+         type TIntPrim    = 1#
+         type TDoublePrim = 1.0##
+         type TDouble     = 1.0
+
+      Test cases: typecheck/should_fail/T26862
+  -}
+  TcRnUnpromotableLit :: !(HsLit GhcRn) -> TcRnMessage
 
   {- | TcRnIllegalTermLevelUse is an error that occurs when the user attempts to
        use a type-level entity at the term-level.

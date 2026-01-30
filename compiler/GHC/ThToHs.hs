@@ -1972,10 +1972,10 @@ split_ty_app ty = go ty []
     go (ParensT t) as' = do { loc <- getL; go t (HsArgPar loc: as') }
     go f as           = return (f,as)
 
-cvtTyLit :: TH.TyLit -> HsTyLit (GhcPass p)
-cvtTyLit (TH.NumTyLit i) = HsNumTy NoSourceText i
-cvtTyLit (TH.StrTyLit s) = HsStrTy NoSourceText (fsLit s)
-cvtTyLit (TH.CharTyLit c) = HsCharTy NoSourceText c
+cvtTyLit :: TH.TyLit -> HsLit (GhcPass p)
+cvtTyLit (TH.NumTyLit i) = HsNatural noExtField (mkIntegralLit i)
+cvtTyLit (TH.StrTyLit s) = HsString NoSourceText (fsLit s)
+cvtTyLit (TH.CharTyLit c) = HsChar NoSourceText c
 
 {- | @cvtOpAppT x op y@ converts @op@ and @y@ and produces the operator
 application @x `op` y@. The produced tree of infix types will be right-biased,

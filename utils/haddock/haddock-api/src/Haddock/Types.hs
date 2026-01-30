@@ -889,10 +889,10 @@ data HsTypeDocNameIExt
 
   | HsRedacted  (HsType DocNameI) -- ^ contains the kind of the redacted type
 
-type instance XNumTy DocNameI = NoExtField
-type instance XStrTy DocNameI = NoExtField
-type instance XCharTy DocNameI = NoExtField
-type instance XXTyLit DocNameI = DataConCantHappen
+type instance XHsNatural DocNameI = NoExtField
+type instance XHsString DocNameI = NoExtField
+type instance XHsChar DocNameI = NoExtField
+type instance XXLit DocNameI = DataConCantHappen
 
 type instance XHsForAllVis DocNameI = NoExtField
 type instance XHsForAllInvis DocNameI = NoExtField

@@ -33,6 +33,7 @@ import GHC.Data.FastString (unpackFS)
 import GHC.Types.Name (getOccString, nameOccName, tidyNameOcc)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (rdrNameOcc)
+import GHC.Types.SourceText
 import GHC.Utils.Ppr hiding (Doc, quote)
 import qualified GHC.Utils.Ppr as Pretty
 import System.Directory
@@ -1366,10 +1367,11 @@ ppr_mono_ty (HsTyLit _ t) u = ppr_tylit t u
 ppr_mono_ty (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
 ppr_mono_ty (XHsType HsRedacted{}) _ = error "ppr_mono_ty: HsRedacted can't be used here"
 
-ppr_tylit :: HsTyLit DocNameI -> Bool -> LaTeX
-ppr_tylit (HsNumTy _ n) _ = integer n
-ppr_tylit (HsStrTy _ s) _ = text (show s)
-ppr_tylit (HsCharTy _ c) _ = text (show c)
+ppr_tylit :: HsLit DocNameI -> Bool -> LaTeX
+ppr_tylit (HsNatural _ n) _ = integer (il_value n)
+ppr_tylit (HsString  _ s) _ = text (show s)
+ppr_tylit (HsChar    _ c) _ = text (show c)
+ppr_tylit _               _ = error "ppr_tylit: unsupported lit"
 
 -- XXX: Ok in verbatim, but not otherwise
 -- XXX: Do something with Unicode parameter?

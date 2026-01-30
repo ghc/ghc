@@ -1,0 +1,90 @@
+T26862.hs:8:21: error: [GHC-51819]
+    • The literal ‘'x'#’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Char#’.
+    • In the type ‘'x'#’
+      In the type synonym declaration for ‘TCharPrim’
+
+T26862.hs:9:21: error: [GHC-51819]
+    • The literal ‘"hello"#’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Addr#’.
+    • In the type ‘"hello"#’
+      In the type synonym declaration for ‘TStringPrim’
+
+T26862.hs:10:21: error: [GHC-51819]
+    • The literal ‘1#’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Int#’.
+    • In the type ‘1#’
+      In the type synonym declaration for ‘TIntPrim’
+
+T26862.hs:11:21: error: [GHC-51819]
+    • The literal ‘1##’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Word#’.
+    • In the type ‘1##’
+      In the type synonym declaration for ‘TWordPrim’
+
+T26862.hs:12:21: error: [GHC-51819]
+    • The literal ‘1#Int8’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Int8#’.
+    • In the type ‘1#Int8’
+      In the type synonym declaration for ‘TInt8Prim’
+
+T26862.hs:13:21: error: [GHC-51819]
+    • The literal ‘1#Word8’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Word8#’.
+    • In the type ‘1#Word8’
+      In the type synonym declaration for ‘TWord8Prim’
+
+T26862.hs:14:21: error: [GHC-51819]
+    • The literal ‘1#Int16’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Int16#’.
+    • In the type ‘1#Int16’
+      In the type synonym declaration for ‘TInt16Prim’
+
+T26862.hs:15:21: error: [GHC-51819]
+    • The literal ‘1#Word16’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Word16#’.
+    • In the type ‘1#Word16’
+      In the type synonym declaration for ‘TWord16Prim’
+
+T26862.hs:16:21: error: [GHC-51819]
+    • The literal ‘1#Int32’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Int32#’.
+    • In the type ‘1#Int32’
+      In the type synonym declaration for ‘TInt32Prim’
+
+T26862.hs:17:21: error: [GHC-51819]
+    • The literal ‘1#Word32’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Word32#’.
+    • In the type ‘1#Word32’
+      In the type synonym declaration for ‘TWord32Prim’
+
+T26862.hs:18:21: error: [GHC-51819]
+    • The literal ‘1#Int64’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Int64#’.
+    • In the type ‘1#Int64’
+      In the type synonym declaration for ‘TInt64Prim’
+
+T26862.hs:19:21: error: [GHC-51819]
+    • The literal ‘1#Word64’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Word64#’.
+    • In the type ‘1#Word64’
+      In the type synonym declaration for ‘TWord64Prim’
+
+T26862.hs:20:21: error: [GHC-51819]
+    • The literal ‘1.0#’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Float#’.
+    • In the type ‘1.0#’
+      In the type synonym declaration for ‘TFloatPrim’
+
+T26862.hs:21:21: error: [GHC-51819]
+    • The literal ‘1.0##’ cannot be promoted.
+      It is of the unpromotable type ‘GHC.Internal.Prim.Double#’.
+    • In the type ‘1.0##’
+      In the type synonym declaration for ‘TDoublePrim’
+
+T26862.hs:22:21: error: [GHC-51819]
+    • The literal ‘1.0’ cannot be promoted.
+      It is of the unpromotable type ‘Double’.
+    • In the type ‘1.0’
+      In the type synonym declaration for ‘TDouble’
+

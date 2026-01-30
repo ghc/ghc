@@ -350,7 +350,7 @@ rnExpr (HsOverLabel src v)
                 , fvs ) }
   where
     hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
-                HsTyLit noExtField (HsStrTy NoSourceText v)
+                HsTyLit noExtField (HsString NoSourceText v)
 
 rnExpr (HsLit x lit) | HsString src s <- lit
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings

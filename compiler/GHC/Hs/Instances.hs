@@ -570,11 +570,6 @@ deriving instance Data (HsType GhcTc)
 
 deriving instance Data HsTypeGhcPsExt
 
--- deriving instance (DataIdLR p p) => Data (HsTyLit p)
-deriving instance Data (HsTyLit GhcPs)
-deriving instance Data (HsTyLit GhcRn)
-deriving instance Data (HsTyLit GhcTc)
-
 -- deriving instance (Data mult, DataIdLR p p) => Data (HsMultAnnOf mult p)
 deriving instance Data (HsMultAnnOf (LocatedA (HsType GhcPs)) GhcPs)
 deriving instance Data (HsMultAnnOf (LocatedA (HsType GhcRn)) GhcRn)

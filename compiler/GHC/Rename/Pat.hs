@@ -1397,10 +1397,9 @@ rn_ty_pat ty@(HsExplicitTupleTy _ prom tys) = do
   tys' <- mapM rn_lty_pat tys
   pure (HsExplicitTupleTy noExtField prom tys')
 
-rn_ty_pat tyLit@(HsTyLit src t) = do
+rn_ty_pat tyLit@(HsTyLit src lit) = do
   check_data_kinds tyLit
-  t' <- liftRn $ rnHsTyLit t
-  pure (HsTyLit src t')
+  pure (HsTyLit src (convertLit lit))
 
 rn_ty_pat (HsWildCardTy _) =
   pure (HsWildCardTy noExtField)

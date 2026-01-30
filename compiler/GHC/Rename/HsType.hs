@@ -10,7 +10,7 @@ module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
         rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType, rnHsTyLit, rnHsMultAnnWith,
+        rnHsSigType, rnHsWcType, rnHsMultAnnWith,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
         newTyVarNameRn,
         rnHsConDeclRecFields,
@@ -602,11 +602,9 @@ rnHsTyKi env sumTy@(HsSumTy x tys)
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; return (HsSumTy x tys', fvs) }
 
--- Ensure that a type-level integer is nonnegative (#8306, #8412)
-rnHsTyKi env tyLit@(HsTyLit src t)
+rnHsTyKi env tyLit@(HsTyLit src lit)
   = do { checkDataKinds env tyLit
-       ; t' <- rnHsTyLit t
-       ; return (HsTyLit src t', emptyFVs) }
+       ; return (HsTyLit src (convertLit lit), emptyFVs) }
 
 rnHsTyKi env (HsAppTy _ ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
@@ -684,15 +682,6 @@ rnHsTyKi env ty@(HsExplicitTupleTy _ ip tys)
 rnHsTyKi env (HsWildCardTy _)
   = do { checkAnonWildCard env
        ; return (HsWildCardTy noExtField, emptyFVs) }
-
-
-rnHsTyLit :: HsTyLit GhcPs -> RnM (HsTyLit GhcRn)
-rnHsTyLit (HsStrTy x s) = pure (HsStrTy x s)
-rnHsTyLit tyLit@(HsNumTy x i) = do
-  when (i < 0) $
-    addErr $ TcRnNegativeNumTypeLiteral tyLit
-  pure (HsNumTy x i)
-rnHsTyLit (HsCharTy x c) = pure (HsCharTy x c)
 
 {-
 Note [Strict level checks with ExplicitLevelImports]
