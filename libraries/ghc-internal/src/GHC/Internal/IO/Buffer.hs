@@ -77,9 +77,8 @@ import GHC.Internal.Word
 import GHC.Internal.Show
 import GHC.Internal.Real
 import GHC.Internal.List
-import GHC.Internal.ForeignPtr  (unsafeWithForeignPtr)
+import GHC.Internal.ForeignPtr
 import GHC.Internal.Foreign.C.Types
-import GHC.Internal.Foreign.ForeignPtr
 import GHC.Internal.Foreign.Storable
 
 -- Char buffers use either UTF-16 or UTF-32, with the endianness matching
