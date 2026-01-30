@@ -152,6 +152,12 @@ cmmMakeDynamicReference config referenceKind lbl
         AccessDirectly | ArchWasm32 <- platformArch platform ->
               pure $ CmmLit $ CmmLabel lbl
 
+        -- See Note [Mingw .refptr mechanism]
+        AccessViaRefPtr -> do
+              let refPtr = mkDynamicLinkerLabel DataRefPtr lbl
+              addImport refPtr
+              return $ cmmLoadBWord platform (cmmMakePicReference config refPtr)
+
         AccessDirectly -> case referenceKind of
                 -- for data, we might have to make some calculations:
               DataReference -> return $ cmmMakePicReference config lbl
@@ -244,6 +250,7 @@ ncgLabelDynamic config = labelDynamic (ncgThisModule config)
 data LabelAccessStyle
         = AccessViaStub
         | AccessViaSymbolPtr
+        | AccessViaRefPtr -- See Note [Mingw .refptr mechanism]
         | AccessDirectly
 
 howToAccessLabel :: NCGConfig -> Arch -> OS -> ReferenceKind -> CLabel -> LabelAccessStyle
@@ -270,6 +277,18 @@ howToAccessLabel :: NCGConfig -> Arch -> OS -> ReferenceKind -> CLabel -> LabelA
 -- and never use __imp_SYMBOL.
 --
 howToAccessLabel config _arch OSMinGW32 _kind lbl
+
+        -- If we have a data symbol where it is not known if it is in the same
+        -- PE or another PE, then we resort to the .refptr mechanism.
+        -- See Note [Mingw .refptr mechanism]
+        --
+        -- Note that we do this _even when_ not ncgExternalDynamicRefs, because
+        -- -fexternal-dynamic-refs is about Haskell code being built as DLLs.
+        -- But ForeignLabelInUnknownPackage is about where foreign/C symbols
+        -- come from, which can always be from external DLLs (or static libs).
+        | isForeignLabelUnknownPackage lbl
+        , not (isCFunctionLabel lbl)
+        = AccessViaRefPtr
 
         -- Assume all symbols will be in the same PE, so just access them directly.
         | not (ncgExternalDynamicRefs config)
@@ -626,6 +645,18 @@ pprImportedSymbol config importedLbl = case (arch,os) of
                    text "LC.." <> ppr_lbl lbl <> char ':',
                    text "\t.long" <+> ppr_lbl lbl ]
             _ -> empty
+
+   -- See Note [Mingw .refptr mechanism]
+   (_, OSMinGW32) -> case dynamicLinkerLabelInfo importedLbl of
+              Just (DataRefPtr, lbl)
+                -> lines_ [
+                     text "\t.section\t.rdata$.refptr." <> ppr_lbl lbl
+                       <> text ",\"dr\",discard,.refptr." <> ppr_lbl lbl,
+                     text "\t.p2align\t3",
+                     text ".globl\t" <> text ".refptr." <> ppr_lbl lbl,
+                     text ".refptr." <> ppr_lbl lbl <> char ':',
+                     text "\t.quad" <+> ppr_lbl lbl ]
+              _ -> empty
 
    -- ELF / Linux
    --
