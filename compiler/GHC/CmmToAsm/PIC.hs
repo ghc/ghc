@@ -249,13 +249,20 @@ data LabelAccessStyle
 
 howToAccessLabel :: NCGConfig -> Arch -> OS -> ReferenceKind -> CLabel -> LabelAccessStyle
 
--- Windows
--- In Windows speak, a "module" is a set of objects linked into the
--- same Portable Executable (PE) file. (both .exe and .dll files are PEs).
+-- Note [Windows dll symbol references]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In Windows speak, a "module" is a set of objects linked into the same
+-- Portable Executable (PE) file. (both .exe and .dll files are PEs).
 --
--- If we're compiling a multi-module program then symbols from other modules
--- are accessed by a symbol pointer named __imp_SYMBOL. At runtime we have the
--- following.
+-- With Windows DLLs, generally one always needs to know whether a name/symbol
+-- refers to an entity in the current module or another module. This is what
+-- the MS 'dllimport' extension is about. This is unlike ELF, where this
+-- information does not need to be known (though there are micro-optimisation
+-- opportunities by knowing).
+--
+-- If we're compiling a multi-module program (i.e. each Haskell unit as a
+-- separate .dll module) then Haskell symbols from other modules are accessed
+-- by a symbol pointer named __imp_SYMBOL. At runtime we have the following:
 --
 --   (in the local module)
 --     __imp_SYMBOL: addr of SYMBOL
