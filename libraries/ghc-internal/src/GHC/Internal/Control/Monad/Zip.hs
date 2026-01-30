@@ -25,7 +25,6 @@ import GHC.Internal.Data.Monoid
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Data.Proxy
 --import qualified Data.List.NonEmpty as NE
-import GHC.Internal.Generics
 import qualified GHC.Internal.Data.List.NonEmpty as NE
 import qualified GHC.Internal.List as List
 import GHC.Internal.Data.Maybe
@@ -114,24 +113,3 @@ instance MonadZip f => MonadZip (Alt f) where
 -- | @since 4.9.0.0
 instance MonadZip Proxy where
     mzipWith _ _ _ = Proxy
-
--- Instances for GHC.Generics
--- | @since 4.9.0.0
-instance MonadZip U1 where
-    mzipWith _ _ _ = U1
-
--- | @since 4.9.0.0
-instance MonadZip Par1 where
-    mzipWith = liftM2
-
--- | @since 4.9.0.0
-instance MonadZip f => MonadZip (Rec1 f) where
-    mzipWith f (Rec1 fa) (Rec1 fb) = Rec1 (mzipWith f fa fb)
-
--- | @since 4.9.0.0
-instance MonadZip f => MonadZip (M1 i c f) where
-    mzipWith f (M1 fa) (M1 fb) = M1 (mzipWith f fa fb)
-
--- | @since 4.9.0.0
-instance (MonadZip f, MonadZip g) => MonadZip (f :*: g) where
-    mzipWith f (x1 :*: y1) (x2 :*: y2) = mzipWith f x1 x2 :*: mzipWith f y1 y2

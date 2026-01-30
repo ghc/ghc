@@ -54,7 +54,7 @@ import GHC.Internal.Data.Either
 import GHC.Internal.Control.Monad.Fix
 import GHC.Internal.Control.Category
 import GHC.Internal.Base hiding ( (.), id )
-import GHC.Internal.Generics (Generic, Generic1)
+import GHC.Internal.Generics
 
 infixr 5 <+>
 infixr 3 ***
@@ -181,12 +181,6 @@ instance Arrow (->) where
 
 -- | Kleisli arrows of a monad.
 newtype Kleisli m a b = Kleisli { runKleisli :: a -> m b }
-
--- | @since base-4.14.0.0
-deriving instance Generic (Kleisli m a b)
-
--- | @since base-4.14.0.0
-deriving instance Generic1 (Kleisli m a)
 
 -- | @since base-4.14.0.0
 deriving instance Functor m => Functor (Kleisli m a)
@@ -471,3 +465,10 @@ instance ArrowLoop (->) where
 instance MonadFix m => ArrowLoop (Kleisli m) where
     loop (Kleisli f) = Kleisli (liftM fst . mfix . f')
       where f' x y = f (x, snd y)
+
+
+-- | @since base-4.14.0.0
+deriving instance Generic (Kleisli m a b)
+
+-- | @since base-4.14.0.0
+deriving instance Generic1 (Kleisli m a)

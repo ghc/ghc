@@ -35,11 +35,11 @@ import GHC.Internal.Data.Monoid ( Monoid, Dual(..), Sum(..), Product(..)
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Data.Tuple ( Solo(..), snd )
 import GHC.Internal.Base ( Monad, errorWithoutStackTrace, (.) )
-import GHC.Internal.Generics
 import GHC.Internal.List ( head, drop )
 import GHC.Internal.Control.Monad.ST.Imp
 import GHC.Internal.System.IO
 import GHC.Internal.Data.Functor.Identity (Identity(..))
+import GHC.Internal.Generics
 
 -- | Monads having fixed points with a \'knot-tying\' semantics.
 -- Instances of 'MonadFix' should satisfy the following laws:
@@ -146,7 +146,10 @@ instance MonadFix f => MonadFix (Alt f) where
 instance MonadFix f => MonadFix (Ap f) where
     mfix f   = Ap (mfix (getAp . f))
 
--- Instances for GHC.Generics
+-- | @since base-4.8.0.0
+instance MonadFix Identity where
+    mfix f   = Identity (fix (runIdentity . f))
+
 -- | @since base-4.9.0.0
 instance MonadFix Par1 where
     mfix f = Par1 (fix (unPar1 . f))
@@ -165,7 +168,3 @@ instance (MonadFix f, MonadFix g) => MonadFix (f :*: g) where
       where
         fstP (a :*: _) = a
         sndP (_ :*: b) = b
-
--- | @since base-4.8.0.0
-instance MonadFix Identity where
-    mfix f   = Identity (fix (runIdentity . f))
