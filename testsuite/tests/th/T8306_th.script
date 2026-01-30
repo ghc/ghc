@@ -1,0 +1,3 @@
+:set -XTemplateHaskell -XDataKinds -XMagicHash -XNegativeLiterals -XExtendedLiterals
+[t| -1 |]
+type T = $([t| -1 |])

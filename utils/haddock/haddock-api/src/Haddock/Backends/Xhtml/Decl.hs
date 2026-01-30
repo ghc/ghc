@@ -35,6 +35,7 @@ import GHC.Data.BooleanFormula
 import GHC.Exts hiding (toList)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (rdrNameOcc)
+import GHC.Types.SourceText
 import Text.XHtml hiding (name, p, quote, title)
 
 import Haddock.Backends.Xhtml.DocMarkup
@@ -1881,7 +1882,8 @@ ppr_mono_ty (HsWildCardTy _) _ _ _ = char '_'
 ppr_mono_ty (HsTyLit _ n) _ _ _ = ppr_tylit n
 ppr_mono_ty (XHsType HsRedacted{}) _ _ _ = error "ppr_mono_ty: HsRedacted can't be used here"
 
-ppr_tylit :: HsTyLit DocNameI -> Html
-ppr_tylit (HsNumTy _ n) = toHtml (show n)
-ppr_tylit (HsStrTy _ s) = toHtml (show s)
-ppr_tylit (HsCharTy _ c) = toHtml (show c)
+ppr_tylit :: HsLit DocNameI -> Html
+ppr_tylit (HsNatural _ n) = toHtml (show (il_value n))
+ppr_tylit (HsString  _ s) = toHtml (show s)
+ppr_tylit (HsChar    _ c) = toHtml (show c)
+ppr_tylit _               = error "ppr_tylit: unsupported lit"

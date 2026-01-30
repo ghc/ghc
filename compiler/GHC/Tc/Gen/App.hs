@@ -1145,12 +1145,11 @@ expr_to_type earg =
       where
         unwrap_op_tv (L _ (HsTyVar _ _ op_id)) = return op_id
         unwrap_op_tv _ = failWith $ TcRnIllformedTypeArgument (L l e)
-    go (L l (HsOverLit _ lit))
-      | Just tylit <- tyLitFromOverloadedLit (ol_val lit)
-      = return (L l (HsTyLit noExtField tylit))
+    go (L l (HsOverLit _ ol))
+      = do { let lit = tyLitFromOverloadedLit (ol_val ol)
+           ; return (L l (HsTyLit noExtField lit)) }
     go (L l (HsLit _ lit))
-      | Just tylit <- tyLitFromLit lit
-      = return (L l (HsTyLit noExtField tylit))
+      = return (L l (HsTyLit noExtField lit))
     go (L l (ExplicitTuple _ tup_args boxity))
       -- Neither unboxed tuples (#e1,e2#) nor tuple sections (e1,,e2,) can be promoted
       | isBoxed boxity

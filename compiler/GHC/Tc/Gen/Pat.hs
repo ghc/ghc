@@ -540,13 +540,11 @@ pat_to_type (ListPat _ pats)
        ; pure t }
 
 pat_to_type (LitPat _ lit)
-  | Just ty_lit <- tyLitFromLit lit
-  = do { let t = noLocA (HsTyLit noExtField ty_lit)
-      ; pure t }
-pat_to_type (NPat _ (L _ lit) _ _)
-  | Just ty_lit <- tyLitFromOverloadedLit (ol_val lit)
-  = do { let t = noLocA (HsTyLit noExtField ty_lit)
-       ; pure t}
+  = do { let t = noLocA (HsTyLit noExtField lit)
+       ; pure t }
+pat_to_type (NPat _ (L _ ol) _ _)
+  = do { let lit = tyLitFromOverloadedLit (ol_val ol)
+       ; pure $ noLocA (HsTyLit noExtField lit) }
 
 pat_to_type (ConPat _ lname (InfixCon left right))
   = do { lty <- pat_to_type (unLoc left)

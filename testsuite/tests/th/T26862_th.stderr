@@ -1,0 +1,55 @@
+<interactive>:2:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell 'x'#
+
+<interactive>:3:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell
+      "hello"#
+
+<interactive>:4:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell 1#
+
+<interactive>:5:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell 1##
+
+<interactive>:6:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell
+      1#Int8
+
+<interactive>:7:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell
+      1#Word8
+
+<interactive>:8:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell
+      1#Int16
+
+<interactive>:9:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell
+      1#Word16
+
+<interactive>:10:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell
+      1#Int32
+
+<interactive>:11:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell
+      1#Word32
+
+<interactive>:12:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell
+      1#Int64
+
+<interactive>:13:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell
+      1#Word64
+
+<interactive>:14:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell 1.0#
+
+<interactive>:15:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell
+      1.0##
+
+<interactive>:16:1: error: [GHC-65904]
+    Unsupported type literal not (yet) handled by Template Haskell 1.0
+

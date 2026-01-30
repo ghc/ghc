@@ -41,7 +41,6 @@ import GHC.Internal.Data.Traversable (traverse, sequenceA)
 import GHC.Internal.Integer
 import GHC.Internal.List (zip)
 import GHC.Internal.Real
-import GHC.Internal.Show
 import GHC.Internal.Word
 import qualified GHC.Internal.Types as Kind (Type)
 #endif
@@ -890,13 +889,8 @@ varBangType v bt = (\(b, t) -> (v, b, t)) <$> bt
 
 -- * Type Literals
 
--- MonadFail here complicates things (a lot) because it would mean we would
--- have to emit a MonadFail constraint during typechecking if there was any
--- chance the desugaring would use numTyLit, which in general is hard to
--- predict.
 numTyLit :: Quote m => Integer -> m TyLit
-numTyLit n = if n >= 0 then pure (NumTyLit n)
-                       else error ("Negative type-level number: " ++ show n)
+numTyLit n = pure (NumTyLit n)
 
 strTyLit :: Quote m => String -> m TyLit
 strTyLit s = pure (StrTyLit s)

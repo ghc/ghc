@@ -267,9 +267,7 @@ instance Ord IntegralLit where
   compare = compare `on` il_value
 
 instance Outputable IntegralLit where
-  ppr (IL (SourceText src) _ _) = ftext src
-  ppr (IL NoSourceText _ value) = text (show value)
-
+  ppr (IL src _ value) = pprWithSourceText src (integer value)
 
 -- | Compare fractional lits with small exponents for value equality but
 --   large values for syntactic equality.

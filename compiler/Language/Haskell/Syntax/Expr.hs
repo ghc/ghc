@@ -223,7 +223,7 @@ ambiguous. You have to use a qualified name. And there is no way to do
 this if both data types are declared in the same module.
 
 NB 2: The notation getField @"size" e is short for
-HsApp (HsAppType (HsVar "getField") (HsWC (HsTyLit (HsStrTy "size")) [])) e.
+HsApp (HsAppType (HsVar "getField") (HsWC (HsTyLit (HsString "size")) [])) e.
 We track the original parsed syntax via ExpandedThingRn.
 
 -}

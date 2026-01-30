@@ -56,6 +56,8 @@ testOneFile libdir fileName = do
        = ["HsString [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsStringPrim (SourceText src) c)
        = ["HsStringPrim [" ++ unpackFS src ++ "] " ++ show c]
+     doHsLit (HsNatural  _ (IL (SourceText src) _ c))
+       = ["HsNatural [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsInt  _     (IL (SourceText src) _ c))
        = ["HsInt [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsIntPrim (SourceText src) c)

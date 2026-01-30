@@ -1,0 +1,6 @@
+T26861.hs:11:23: error: [GHC-93632]
+    • Illegal literal in type (type literals must not be negative): -42
+    • In the type ‘-42’
+      In the first argument of ‘print’, namely ‘(natVis (-42))’
+      In the expression: print (natVis (-42))
+

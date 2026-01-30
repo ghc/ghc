@@ -739,7 +739,7 @@ genHsIntegralLit :: (NoAnn an) => IntegralLit -> LocatedAn an (HsExpr GhcRn)
 genHsIntegralLit = genLHsLit . HsInt noExtField
 
 genHsTyLit :: FastString -> HsType GhcRn
-genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
+genHsTyLit = HsTyLit noExtField . HsString NoSourceText
 
 genSimpleConPat :: Name -> [LPat GhcRn] -> LPat GhcRn
 -- The pattern (C p1 .. pn)
