@@ -117,6 +117,7 @@ module GHC.Cmm.CLabel (
         hasIdLabelInfo,
         isBytesLabel,
         isForeignLabel,
+        isForeignLabelUnknownPackage,
         isSomeRODataLabel,
         isStaticClosureLabel,
 
@@ -448,7 +449,32 @@ data ForeignLabelSource
    --   contain compiled Haskell code, and is not associated with any .hi files.
    --   We don't have to worry about Haskell code being inlined from
    --   external packages. It is safe to treat the RTS package as "external".
+   --
+   --   On Windows in particular, we assume the label is definately in an
+   --   external DLL and expect to link it against a __imp_* symbol. Thus it
+   --   will /not/ link correctly if the symbol is actually in the same DLL.
    | ForeignLabelInExternalPackage
+
+   -- | The label is somewhere, but we do not know if it is in this package or
+   --   an external package. This is the case we end up with for Haskell FFI
+   --   declarations like @foreign import ccall@. There is not enough
+   --   information to tell us if the label is from the same package (e.g. in
+   --   a local @cbits/blah.c@ file) or is from an external foreign library.
+   --
+   --   On ELF, this is not a problem and the symbol can be resolved without
+   --   knowing if its local or external.
+   --
+   --   On Windows/PE, this is a bit of a problem. On Windows one normally
+   --   needs to know if it's local or external since the symbol names and
+   --   ABI differ. However, GCC & LLVM have extensions to help porting Unix
+   --   software (that is used to not making these distinctions). There are a
+   --   number of useful mechanisms including \"auto import\" (to import
+   --   symbols found in DLLs automatically), a @.refptr@ mechanism to load
+   --   data via an indirection (which the linker can relocate) and
+   --   \"pseudo relocations\" which is a runtime feature to do additional
+   --   relocations beyond what the Win32 native linker does.
+   --   See Note [Mingw .refptr mechanism]
+   | ForeignLabelInUnknownPackage
 
    -- | Label is in the package currently being compiled.
    --   This is only used for creating hacky tmp labels during code generation.
@@ -600,6 +626,8 @@ data CmmLabelInfo
 data DynamicLinkerLabelInfo
   = CodeStub                    -- MachO: Lfoo$stub, ELF: foo@plt
   | SymbolPtr                   -- MachO: Lfoo$non_lazy_ptr, Windows: __imp_foo
+  | DataRefPtr                  -- Windows: .refptr.foo
+                                -- see Note [Mingw .refptr mechanism]
   | GotSymbolPtr                -- ELF: foo@got
   | GotSymbolOffset             -- ELF: foo@gotoff
 
@@ -777,6 +805,10 @@ isBytesLabel _lbl = False
 isForeignLabel :: CLabel -> Bool
 isForeignLabel (ForeignLabel _ _ _) = True
 isForeignLabel _lbl = False
+
+isForeignLabelUnknownPackage :: CLabel -> Bool
+isForeignLabelUnknownPackage (ForeignLabel _ ForeignLabelInUnknownPackage _) = True
+isForeignLabelUnknownPackage _lbl = False
 
 -- | Whether label is a static closure label (can come from haskell or cmm)
 isStaticClosureLabel :: CLabel -> Bool
@@ -1308,9 +1340,9 @@ labelDynamic this_mod platform external_dynamic_refs lbl =
 
    LocalBlockLabel _    -> False
 
-   ForeignLabel _ source _  ->
-       if os == OSMinGW32
-       then case source of
+   ForeignLabel _ source _
+     | os == OSMinGW32 ->
+          case source of
             -- Foreign label is in some un-named foreign package (or DLL).
             ForeignLabelInExternalPackage -> True
 
@@ -1318,16 +1350,23 @@ labelDynamic this_mod platform external_dynamic_refs lbl =
             -- source file currently being compiled.
             ForeignLabelInThisPackage -> False
 
+            -- Foreign label is either in the same package or is in some
+            -- foreign package/DLL/DSO. Neither yes nor no is the correct
+            -- answer here, because on Windows these are a distinct case
+            -- that need special treatment in the code generator.
+            -- See Note [Mingw .refptr mechanism]
+            ForeignLabelInUnknownPackage -> True
+
             -- Foreign label is in some named package.
             -- When compiling in the "dyn" way, each package is to be
             -- linked into its own DLL.
             ForeignLabelInPackage pkgId ->
                 external_dynamic_refs && (this_unit /= pkgId)
 
-       else -- On Mac OS X and on ELF platforms, false positives are OK,
-            -- so we claim that all foreign imports come from dynamic
-            -- libraries
-            True
+       -- On Mac OS X and on ELF platforms, false positives are OK,
+       -- so we claim that all foreign imports come from dynamic
+       -- libraries
+     | otherwise -> True
 
    CC_Label cc ->
      external_dynamic_refs && not (ccFromThisModule cc this_mod)
@@ -1678,6 +1717,7 @@ instance Outputable ForeignLabelSource where
         ForeignLabelInPackage pkgId     -> parens $ text "package: " <> ppr pkgId
         ForeignLabelInThisPackage       -> parens $ text "this package"
         ForeignLabelInExternalPackage   -> parens $ text "external package"
+        ForeignLabelInUnknownPackage    -> parens $ text "unknown package"
 
 -- -----------------------------------------------------------------------------
 -- Machine-dependent knowledge about labels.
@@ -1698,6 +1738,7 @@ pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
             SymbolPtr       -> char 'L' <> ppLbl <> text "$non_lazy_ptr"
             GotSymbolPtr    -> ppLbl <> text "@GOTPCREL"
             GotSymbolOffset -> ppLbl
+            _               -> panic "pprDynamicLinkerAsmLabel"
         | platformArch platform == ArchAArch64 -> ppLbl
         | otherwise -> panic "pprDynamicLinkerAsmLabel"
 
@@ -1710,8 +1751,9 @@ pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
 
       OSMinGW32 ->
           case dllInfo of
-            SymbolPtr -> text "__imp_" <> ppLbl
-            _         -> panic "pprDynamicLinkerAsmLabel"
+            SymbolPtr  -> text "__imp_" <> ppLbl
+            DataRefPtr -> text ".refptr." <> ppLbl
+            _          -> panic "pprDynamicLinkerAsmLabel"
 
       _ -> panic "pprDynamicLinkerAsmLabel"
   where
@@ -1738,6 +1780,7 @@ pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
           GotSymbolPtr    -> ppLbl <> text "@gotpcrel"
           GotSymbolOffset -> ppLbl
           SymbolPtr       -> text ".LC_" <> ppLbl
+          _               -> panic "pprDynamicLinkerAsmLabel"
 
       | platformArch platform == ArchPPC_64 ELF_V1
         || platformArch platform == ArchPPC_64 ELF_V2
@@ -1753,6 +1796,7 @@ pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
           SymbolPtr       -> text ".LC_" <> ppLbl
           GotSymbolPtr    -> ppLbl <> text "@got"
           GotSymbolOffset -> ppLbl <> text "@gotoff"
+          _               -> panic "pprDynamicLinkerAsmLabel"
 
 -- Figure out whether `symbol` may serve as an alias
 -- to `target` within one compilation unit.

@@ -97,8 +97,7 @@ mkSimpleLit platform = \case
    (LitNumber LitNumWord64 i)   -> CmmInt i W64
    (LitFloat r)                 -> CmmFloat r W32
    (LitDouble r)                -> CmmFloat r W64
-   (LitLabel fs fod)
-     -> let -- TODO: Literal labels might not actually be in the current package...
-            labelSrc = ForeignLabelInThisPackage
-        in CmmLabel (mkForeignLabel fs labelSrc fod)
-   other -> pprPanic "mkSimpleLit" (ppr other)
+   (LitLabel fs fod)            -> CmmLabel (mkForeignLabel fs labelSrc fod)
+                                   -- See Note [Mingw .refptr mechanism]
+                             where labelSrc = ForeignLabelInUnknownPackage
+   other                        -> pprPanic "mkSimpleLit" (ppr other)
