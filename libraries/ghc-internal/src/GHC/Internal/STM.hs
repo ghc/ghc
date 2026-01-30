@@ -28,7 +28,7 @@ import GHC.Internal.Base
 import GHC.Internal.Exception (Exception, toExceptionWithBacktrace, fromException, addExceptionContext)
 import GHC.Internal.Exception.Context (ExceptionAnnotation)
 import GHC.Internal.Exception.Type (WhileHandling(..))
-import GHC.Internal.Stack (HasCallStack)
+import GHC.Internal.Stack.Types (HasCallStack)
 
 -- TVars are shared memory locations which support atomic memory
 -- transactions.

@@ -53,7 +53,7 @@ import GHC.Internal.IO.Encoding
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.Ptr
 import GHC.Internal.Show
-import GHC.Internal.Stack
+import GHC.Internal.Stack.CCS
 import GHC.Internal.Data.List (null, partition)
 import GHC.Internal.RTS.Flags.Test
 

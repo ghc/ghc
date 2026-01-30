@@ -59,7 +59,7 @@ import GHC.Internal.Read
 import GHC.Internal.Exception
 import GHC.Internal.IO.Handle.Types
 import GHC.Internal.Stack.Types (HasCallStack)
-import {-# SOURCE #-} GHC.Internal.Stack ( withFrozenCallStack )
+import GHC.Internal.Stack ( withFrozenCallStack )
 import GHC.Internal.Foreign.C.Types
 
 import GHC.Internal.Data.Typeable ( cast )

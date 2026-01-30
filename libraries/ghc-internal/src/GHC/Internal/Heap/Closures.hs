@@ -79,7 +79,7 @@ import GHC.Internal.Generics
 import GHC.Internal.Numeric
 import GHC.Internal.Ptr
 import GHC.Internal.Unsafe.Coerce
-import GHC.Internal.Stack (HasCallStack)
+import GHC.Internal.Stack.Types (HasCallStack)
 
 ------------------------------------------------------------------------
 -- Boxes
