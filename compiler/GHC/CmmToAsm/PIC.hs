@@ -153,6 +153,12 @@ cmmMakeDynamicReference config referenceKind lbl
         AccessDirectly | ArchWasm32 <- platformArch platform ->
               pure $ CmmLit $ CmmLabel lbl
 
+        -- See Note [Mingw .refptr mechanism]
+        AccessViaRefPtr -> do
+              let refPtr = mkDynamicLinkerLabel DataRefPtr lbl
+              addImport refPtr
+              return $ cmmLoadBWord platform (cmmMakePicReference config refPtr)
+
         AccessDirectly -> case referenceKind of
                 -- for data, we might have to make some calculations:
               DataReference -> return $ cmmMakePicReference config lbl
@@ -245,17 +251,25 @@ ncgLabelDynamic config = labelDynamic (ncgThisModule config)
 data LabelAccessStyle
         = AccessViaStub
         | AccessViaSymbolPtr
+        | AccessViaRefPtr -- See Note [Mingw .refptr mechanism]
         | AccessDirectly
 
 howToAccessLabel :: NCGConfig -> Arch -> OS -> ReferenceKind -> CLabel -> LabelAccessStyle
 
--- Windows
--- In Windows speak, a "module" is a set of objects linked into the
--- same Portable Executable (PE) file. (both .exe and .dll files are PEs).
+-- Note [Windows dll symbol references]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In Windows speak, a "module" is a set of objects linked into the same
+-- Portable Executable (PE) file. (both .exe and .dll files are PEs).
 --
--- If we're compiling a multi-module program then symbols from other modules
--- are accessed by a symbol pointer named __imp_SYMBOL. At runtime we have the
--- following.
+-- With Windows DLLs, generally one always needs to know whether a name/symbol
+-- refers to an entity in the current module or another module. This is what
+-- the MS 'dllimport' extension is about. This is unlike ELF, where this
+-- information does not need to be known (though there are micro-optimisation
+-- opportunities by knowing).
+--
+-- If we're compiling a multi-module program (i.e. each Haskell unit as a
+-- separate .dll module) then Haskell symbols from other modules are accessed
+-- by a symbol pointer named __imp_SYMBOL. At runtime we have the following:
 --
 --   (in the local module)
 --     __imp_SYMBOL: addr of SYMBOL
@@ -266,11 +280,65 @@ howToAccessLabel :: NCGConfig -> Arch -> OS -> ReferenceKind -> CLabel -> LabelA
 -- To access the function at SYMBOL from our local module, we just need to
 -- dereference the local __imp_SYMBOL.
 --
--- If not compiling with -dynamic we assume that all our code will be linked
--- into the same .exe file. In this case we always access symbols directly,
--- and never use __imp_SYMBOL.
+-- If not compiling with -fexternal-dynamic-refs we assume that all our code
+-- will be linked into the same .exe file. In this case we always access
+-- Haskell symbols directly, and never use __imp_SYMBOL.
+--
+-- Note [Mingw .refptr mechanism]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- For Haskell symbols we always know exactly which unit and thus .dll module
+-- they come from. That is not the case for foreign imports: there is no user
+-- syntax for specifying where a C entity comes from and no way to accurately
+-- infer the source. We track this case using ForeignLabelInUnknownPackage.
+--
+-- Both the llvm and gnu linkers have a number of mechanisms to deal with this,
+-- since much unix C/C++ software is written without keeping track of intra vs
+-- inter module references. For functions things are simpler: the compiler can
+-- emit a direct call to a function and the linker can fix that up to either
+-- link to a local function or it can insert a trampoline to the external
+-- function (which can be done with import libraries or the linkers can do this
+-- on the fly with auto dll imports).
+--
+-- For C global data (variables or initialised constants) the situation is more
+-- tricky. There isn't a way to transparently refer to either local or external
+-- variables without cooperation of the compiler. That's where the .refptr
+-- mechanism comes in.
+--
+-- The .refptr cunning hack looks like this: when the compiler wants to read
+-- a variable 'foo' it gnerates code that looks like
+--
+--   addr <- load .rdata$.refptr.foo
+--   read addr
+--
+-- And it generates a local variable '.rdata$.refptr.foo', and it puts it into
+-- a special linker section (named '.refptr.foo') containing just that variable.
+-- The gnu/llvm linker then recognises this pattern and does the most cunning
+-- hacky bit. If the variable turns out to be local (in the same dll module)
+-- then the linker arranges for the .refptr.foo to contain the address of the
+-- local variable, and if it is note local then the linker arranges to place
+-- the local .refptr.foo variable at exactly the location in the DLL import
+-- table where the Windows DLL loader will later place the address of the
+-- external variable. That is, it aliases the local variable with an entry in
+-- the DLL import table. Though a cunning hack, it seems to be quite reliable,
+-- and it's what gcc and clang do by default on windows.
+--
+-- Since this needs compiler support as well as linker support, ghc has to do
+-- it too. At each site where we access the variable (load/store) we emit the
+-- right indirect load via the .refptr and separately we emit the declaration
+-- of the .refptr variable in its magic section.
 --
 howToAccessLabel config _arch OSMinGW32 _kind lbl
+
+        -- See Note [Mingw .refptr mechanism]
+        --
+        -- Note that we do this _even when_ not ncgExternalDynamicRefs, because
+        -- -fexternal-dynamic-refs is about Haskell code being built as DLLs.
+        -- But ForeignLabelInUnknownPackage is about where foreign/C symbols
+        -- come from, which can always be from external DLLs (or static libs).
+        | isForeignLabelUnknownPackage lbl
+        = if isCFunctionLabel lbl
+             then AccessDirectly  -- rely on auto-import or import libs
+             else AccessViaRefPtr -- use local .refptr
 
         -- Assume all symbols will be in the same PE, so just access them directly.
         | not (ncgExternalDynamicRefs config)
@@ -526,6 +594,11 @@ needImportedSymbols config
         = ncgExternalDynamicRefs config &&
           not (ncgPIC config)
 
+        -- Windows need .refptr imports for all foreign imported data
+        -- symbols, irrespective of -dynamic or not.
+        | os == OSMinGW32
+        = True
+
         | otherwise
         = False
    where
@@ -591,6 +664,9 @@ pprGotDeclaration config = case (arch,os) of
                 text ".section \".got2\",\"aw\"",
                 text ".LCTOC1 = .+32768" ]
 
+   -- Mingw .refptr mechanism does not need a GOT
+   (ArchX86_64, OSMinGW32) -> empty
+
    _ -> panic "pprGotDeclaration: no match"
  where
    platform = ncgPlatform config
@@ -628,6 +704,18 @@ pprImportedSymbol config importedLbl = case (arch,os) of
                    text "LC.." <> ppr_lbl lbl <> char ':',
                    text "\t.long" <+> ppr_lbl lbl ]
             _ -> empty
+
+   -- See Note [Mingw .refptr mechanism]
+   (_, OSMinGW32) -> case dynamicLinkerLabelInfo importedLbl of
+              Just (DataRefPtr, lbl)
+                -> lines_ [
+                     text "\t.section\t.rdata$.refptr." <> ppr_lbl lbl
+                       <> text ",\"dr\",discard,.refptr." <> ppr_lbl lbl,
+                     text "\t.p2align\t3",
+                     text ".globl\t" <> text ".refptr." <> ppr_lbl lbl,
+                     text ".refptr." <> ppr_lbl lbl <> char ':',
+                     text "\t.quad\t" <> ppr_lbl lbl ]
+              _ -> empty
 
    -- ELF / Linux
    --
