@@ -1618,127 +1618,9 @@ in this (which it previously was):
                               in g
                       False -> \x. x
             in \w. v True
--}
 
--------------------------------------
-type CheapAppFun = Id -> Arity -> Bool
-  -- Is an application of this function to n *value* args
-  -- always cheap, assuming the arguments are cheap?
-  -- True mainly of data constructors, partial applications;
-  -- but with minor variations:
-  --    isWorkFreeApp
-  --    isCheapApp
-  --    isExpandableApp
-
-exprIsCheapX :: CheapAppFun -> Bool -> CoreExpr -> Bool
-{-# INLINE exprIsCheapX #-}
--- allow specialization of exprIsCheap, exprIsWorkFree and exprIsExpandable
--- instead of having an unknown call to ok_app
--- expandable=True <=> Treat Case and Let as cheap, if their sub-expressions are.
---                     This flag is set for exprIsExpandable
-exprIsCheapX ok_app expandable e
-  = ok e
-  where
-    ok e = go 0 e
-
-    -- n is the number of value arguments
-    go n (Var v)                      = ok_app v n
-    go _ (Lit {})                     = True
-    go _ (Type {})                    = True
-    go _ (Coercion {})                = True
-    go n (Cast e _)                   = go n e
-    go n (Case scrut _ _ alts)        = not expandable && ok scrut &&
-                                        and [ go n rhs | Alt _ _ rhs <- alts ]
-    go n (Tick t e) | tickishCounts t = False
-                    | otherwise       = go n e
-    go n (Lam x e)  | isRuntimeVar x  = n==0 || go (n-1) e
-                    | otherwise       = go n e
-    go n (App f e)  | isRuntimeArg e  = go (n+1) f && ok e
-                    | otherwise       = go n f
-    go n (Let (NonRec _ r) e)         = not expandable && go n e && ok r
-    go n (Let (Rec prs) e)            = not expandable && go n e && all (ok . snd) prs
-
-      -- Case: see Note [Case expressions are work-free]
-      -- App, Let: see Note [Arguments and let-bindings exprIsCheapX]
-
---------------------
-exprIsWorkFree :: CoreExpr -> Bool
--- See Note [exprIsWorkFree]
-exprIsWorkFree e = exprIsCheapX isWorkFreeApp False e
-
---------------------
-exprIsCheap :: CoreExpr -> Bool
--- See Note [exprIsCheap]
-exprIsCheap e = exprIsCheapX isCheapApp False e
-
---------------------
-exprIsExpandable :: CoreExpr -> Bool
--- See Note [exprIsExpandable]
-exprIsExpandable e = exprIsCheapX isExpandableApp True e
-
-isWorkFreeApp :: CheapAppFun
-isWorkFreeApp fn n_val_args
-  | n_val_args == 0           -- No value args
-  = True
-  | n_val_args < idArity fn   -- Partial application
-  = True
-  | otherwise
-  = case idDetails fn of
-      DataConWorkId {} -> True  -- Even if the data constructor is strict
-                                -- See (WF1) in Note [exprIsWorkFree]
-      PrimOpId op _    -> primOpIsWorkFree op
-      _                -> False
-
-isCheapApp :: CheapAppFun
-isCheapApp fn n_val_args
-  | isWorkFreeApp fn n_val_args = True
-  | isDeadEndId fn              = True  -- See Note [isCheapApp: bottoming functions]
-  | otherwise
-  = case idDetails fn of
-      -- DataConWorkId {} -> _  -- Handled by isWorkFreeApp
-      RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
-      ClassOpId {}     -> n_val_args == 1
-      PrimOpId op _    -> primOpIsCheap op
-      _                -> False
-        -- In principle we should worry about primops
-        -- that return a type variable, since the result
-        -- might be applied to something, but I'm not going
-        -- to bother to check the number of args
-
-isExpandableApp :: CheapAppFun
-isExpandableApp fn n_val_args
-  | isWorkFreeApp fn n_val_args = True
-  | otherwise
-  = case idDetails fn of
-      -- DataConWorkId {} -> _  -- Handled by isWorkFreeApp
-      RecSelId {}  -> n_val_args == 1  -- See Note [Record selection]
-      ClassOpId {} -> n_val_args == 1
-      PrimOpId {}  -> False
-      _ | isDeadEndId fn     -> False
-          -- See Note [isExpandableApp: bottoming functions]
-        | isConLikeId fn     -> True
-        | all_args_are_preds -> True
-        | otherwise          -> False
-
-  where
-     -- See if all the arguments are PredTys (implicit params or classes)
-     -- If so we'll regard it as expandable; see Note [Expandable overloadings]
-     all_args_are_preds = all_pred_args n_val_args (idType fn)
-
-     all_pred_args n_val_args ty
-       | n_val_args == 0
-       = True
-
-       | Just (bndr, ty) <- splitPiTy_maybe ty
-       = case bndr of
-           Named {}  -> all_pred_args n_val_args ty
-           Anon _ af -> isInvisibleFunArg af && all_pred_args (n_val_args-1) ty
-
-       | otherwise
-       = False
-
-{- Note [isCheapApp: bottoming functions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [isCheapApp: bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 I'm not sure why we have a special case for bottoming
 functions in isCheapApp.  Maybe we don't need it.
 
@@ -1832,6 +1714,132 @@ So we treat the application of a function (negate in this case) to a
 *dictionary* as expandable.  In effect, every function is CONLIKE when
 it's applied only to dictionaries.
 -}
+
+-------------------------------------
+type CheapAppFun = Id -> Arity -> Bool
+  -- Is an application of this function to n *value* args
+  -- always cheap, assuming the arguments are cheap?
+  -- True mainly of data constructors, partial applications;
+  -- but with minor variations:
+  --    isWorkFreeApp
+  --    isCheapApp
+  --    isExpandableApp
+
+exprIsCheapX :: CheapAppFun -> Bool -> CoreExpr -> Bool
+{-# INLINE exprIsCheapX #-}
+-- allow specialization of exprIsCheap, exprIsWorkFree and exprIsExpandable
+-- instead of having an unknown call to ok_app
+-- expandable=True <=> Treat Case and Let as cheap, if their sub-expressions are.
+--                     This flag is set for exprIsExpandable
+exprIsCheapX ok_app expandable e
+  = ok e
+  where
+    ok e = go 0 e
+
+    -- n is the number of value arguments
+    go n (Var v)                      = ok_app v n
+    go _ (Lit {})                     = True
+    go _ (Type {})                    = True
+    go _ (Coercion {})                = True
+    go n (Cast e _)                   = go n e
+    go n (Case scrut _ _ alts)        = not expandable && ok scrut &&
+                                        and [ go n rhs | Alt _ _ rhs <- alts ]
+    go n (Tick t e) | tickishCounts t = False
+                    | otherwise       = go n e
+    go n (Lam x e)  | isRuntimeVar x  = n==0 || go (n-1) e
+                    | otherwise       = go n e
+    go n (App f e)  | isRuntimeArg e  = go (n+1) f && ok e
+                    | otherwise       = go n f
+    go n (Let (NonRec _ r) e)         = not expandable && go n e && ok r
+    go n (Let (Rec prs) e)            = not expandable && go n e && all (ok . snd) prs
+
+      -- Case: see Note [Case expressions are work-free]
+      -- App, Let: see Note [Arguments and let-bindings exprIsCheapX]
+
+--------------------
+exprIsWorkFree :: CoreExpr -> Bool
+-- See Note [exprIsWorkFree]
+exprIsWorkFree e = exprIsCheapX isWorkFreeApp False e
+
+--------------------
+exprIsCheap :: CoreExpr -> Bool
+-- See Note [exprIsCheap]
+exprIsCheap e = exprIsCheapX isCheapApp False e
+
+--------------------
+exprIsExpandable :: CoreExpr -> Bool
+-- See Note [exprIsExpandable]
+exprIsExpandable e = exprIsCheapX isExpandableApp True e
+
+isWorkFreeApp :: CheapAppFun
+isWorkFreeApp fn n_val_args
+  | n_val_args == 0           -- No value args
+  = True
+  | n_val_args < idArity fn   -- Partial application
+  = True
+  | otherwise
+  = case idDetails fn of
+      DataConWorkId {} -> True  -- Even if the data constructor is strict
+                                -- See (WF1) in Note [exprIsWorkFree]
+      PrimOpId op _    -> primOpIsWorkFree op
+      _                -> False
+
+isCheapApp :: CheapAppFun
+-- Like isWorkFreeApp, but add:
+--   - bottoming applications
+--   - cheap (rather than just work-free) primops
+--   - record selectors applied to just the record
+isCheapApp fn n_val_args
+  | isWorkFreeApp fn n_val_args = True
+  | isDeadEndId fn              = True  -- See Note [isCheapApp: bottoming functions]
+  | otherwise
+  = case idDetails fn of
+      -- DataConWorkId {} -> _  -- Handled by isWorkFreeApp
+      RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
+      ClassOpId {}     -> n_val_args == 1
+      PrimOpId op _    -> primOpIsCheap op
+      _                -> False
+        -- In principle we should worry about primops
+        -- that return a type variable, since the result
+        -- might be applied to something, but I'm not going
+        -- to bother to check the number of args
+
+isExpandableApp :: CheapAppFun
+-- Like isWorkFreeApp, but add:
+--   - record selectors applied to just the record
+--   - ConLike Ids (if not bottoming)
+--   - a function applied to dictionaries
+isExpandableApp fn n_val_args
+  | isWorkFreeApp fn n_val_args = True
+  | otherwise
+  = case idDetails fn of
+      -- DataConWorkId {} -> _  -- Handled by isWorkFreeApp
+      RecSelId {}  -> n_val_args == 1  -- See Note [Record selection]
+      ClassOpId {} -> n_val_args == 1
+      PrimOpId {}  -> False
+      _ | isDeadEndId fn     -> False
+          -- See Note [isExpandableApp: bottoming functions]
+        | isConLikeId fn     -> True
+        | all_args_are_preds -> True
+        | otherwise          -> False
+
+  where
+     -- See if all the arguments are PredTys (implicit params or classes)
+     -- If so we'll regard it as expandable; see Note [Expandable overloadings]
+     all_args_are_preds = all_pred_args n_val_args (idType fn)
+
+     all_pred_args n_val_args ty
+       | n_val_args == 0
+       = True
+
+       | Just (bndr, ty) <- splitPiTy_maybe ty
+       = case bndr of
+           Named {}  -> all_pred_args n_val_args ty
+           Anon _ af -> isInvisibleFunArg af && all_pred_args (n_val_args-1) ty
+
+       | otherwise
+       = False
+
 
 isUnaryClassId :: Id -> Bool
 -- True of (a) the method selector (classop)
@@ -3265,8 +3273,8 @@ So:
 * When we make an AbsVars list, we close over the free vars of the unfoldings
   of any tyvars in it.  So if `b{=Maybe a}` is in the list then so is `a`
 
-* `mkCoreAbsLams` (more generally `mkPolyAbsLams`) forms a lambda abstraction pushing
-   the tyvar bindings into the body:
+* `mkCoreAbsLams` (more generally `mkPolyAbsLams`) forms a lambda abstraction
+   pushing the tyvar bindings into the body:
       mkCoreAbsLams [a, b=[a], x:b] body
          = \a. \(x:[a]). let @b = [a] in
                          let x:b = x in   -- See (AFV1)
@@ -3301,8 +3309,10 @@ type TaggedAbsVars t = [TaggedBndr t]
 
 mkPolyAbsLams :: forall b. (b -> AbsVar, Var -> b -> b)
                         -> [b] -> Expr b -> Expr b
--- `mkPolyAbsLams` is polymorphic in (get,set) so that we can
--- use it for both CoreExpr and LevelledExpr
+-- `mkPolyAbsLams` is polymorphic in (get,set) so that we
+-- can use it for both CoreExpr and LevelledExpr.  See
+--     - mkCoreAbsLams
+--     - mkTaggedAbsLams
 {-# INLINE mkPolyAbsLams #-}
 mkPolyAbsLams (getter,setter) bndrs body
   = go emptyVarSet [] bndrs

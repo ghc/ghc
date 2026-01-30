@@ -823,8 +823,8 @@ andFF FltOkSpec  _          = FltOkSpec
 andFF FltLifted  flt        = flt
 
 
-doFloatFromRhs :: SimplEnv -> TopLevelFlag -> RecFlag -> Bool
-               -> [OutTyVar] -> SimplFloats -> OutExpr -> Bool
+doFloatFromRhs :: SimplEnv -> TopLevelFlag -> RecFlag -> Bool -> [OutTyVar]
+               -> SimplFloats -> OutExpr -> Bool
 -- If you change this function look also at FloatIn.noFloatIntoRhs
 doFloatFromRhs env lvl rec strict_bind tvs (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
   = not (isNilOL fs)
