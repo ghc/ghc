@@ -41,4 +41,4 @@ module Foreign.ForeignPtr.Safe
      mallocForeignPtrArray0
      ) where
 
-import GHC.Internal.Foreign.ForeignPtr.Imp
+import GHC.Internal.Foreign.ForeignPtr

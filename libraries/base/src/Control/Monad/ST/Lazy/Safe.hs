@@ -31,4 +31,4 @@ module Control.Monad.ST.Lazy.Safe
      stToIO
      ) where
 
-import GHC.Internal.Control.Monad.ST.Lazy.Imp
+import GHC.Internal.Control.Monad.ST.Lazy

@@ -1,8 +1,10 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Unsafe #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.Internal.Control.Monad.ST
+-- Module      :  GHC.Internal.Control.Monad.ST.Imp
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 --
@@ -14,10 +16,6 @@
 -- described in the PLDI \'94 paper by John Launchbury and Simon Peyton
 -- Jones /Lazy Functional State Threads/.
 --
--- References (variables) that can be used within the @ST@ monad are
--- provided by "Data.STRef", and arrays are provided by
--- [Data.Array.ST](https://hackage.haskell.org/package/array/docs/Data-Array-ST.html).
-
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Control.Monad.ST (
@@ -26,10 +24,66 @@ module GHC.Internal.Control.Monad.ST (
         runST,
         fixST,
 
-        -- * Converting 'ST' to 'IO'
+        -- * Converting 'ST' to 'Prelude.IO'
         RealWorld,              -- abstract
         stToIO,
+
+        -- * Unsafe operations
+        unsafeInterleaveST,
+        unsafeDupableInterleaveST,
+        unsafeIOToST,
+        unsafeSTToIO
     ) where
 
-import GHC.Internal.Control.Monad.ST.Imp
+import GHC.Internal.ST           ( ST, runST, unsafeInterleaveST
+                        , unsafeDupableInterleaveST )
+import GHC.Internal.Base         ( RealWorld, ($), return )
+import GHC.Internal.IO           ( stToIO, unsafeIOToST, unsafeSTToIO
+                        , unsafeDupableInterleaveIO )
+import GHC.Internal.MVar         ( readMVar, putMVar, newEmptyMVar )
+import GHC.Internal.Control.Exception.Base
+                        ( catch, throwIO, NonTermination (..)
+                        , BlockedIndefinitelyOnMVar (..) )
 
+-- | Allow the result of an 'ST' computation to be used (lazily)
+-- inside the computation.
+--
+-- Note that if @f@ is strict, @'fixST' f = _|_@.
+fixST :: (a -> ST s a) -> ST s a
+-- See Note [fixST]
+fixST k = unsafeIOToST $ do
+    m <- newEmptyMVar
+    ans <- unsafeDupableInterleaveIO
+             (readMVar m `catch` \BlockedIndefinitelyOnMVar ->
+                                    throwIO NonTermination)
+    result <- unsafeSTToIO (k ans)
+    putMVar m result
+    return result
+
+{- Note [fixST]
+   ~~~~~~~~~~~~
+For many years, we implemented fixST much like a pure fixpoint,
+using liftST:
+
+  fixST :: (a -> ST s a) -> ST s a
+  fixST k = ST $ \ s ->
+      let ans       = liftST (k r) s
+          STret _ r = ans
+      in
+      case ans of STret s' x -> (# s', x #)
+
+We knew that lazy blackholing could cause the computation to be re-run if the
+result was demanded strictly, but we thought that would be okay in the case of
+ST. However, that is not the case (see #15349). Notably, the first time
+the computation is executed, it may mutate variables that cause it to behave
+*differently* the second time it's run. That may allow it to terminate when it
+should not. More frighteningly, Arseniy Alekseyev produced a somewhat contrived
+example ( https://mail.haskell.org/pipermail/libraries/2018-July/028889.html )
+demonstrating that it can break reasonable assumptions in "trustworthy" code,
+causing a memory safety violation. So now we implement fixST much like we do
+fixIO. See also the implementation notes for fixIO. Simon Marlow wondered
+whether we could get away with an IORef instead of an MVar. I believe we
+cannot. The function passed to fixST may spark a parallel computation that
+demands the final result. Such a computation should block until the final
+result is available.
+-}

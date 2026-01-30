@@ -23,4 +23,4 @@ module Control.Monad.ST.Lazy.Unsafe
      unsafeIOToST
      ) where
 
-import GHC.Internal.Control.Monad.ST.Lazy.Imp
+import GHC.Internal.Control.Monad.ST.Lazy

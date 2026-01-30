@@ -137,8 +137,6 @@ Library
         GHC.Internal.Control.Monad.ST
         GHC.Internal.Control.Monad.Zip
         GHC.Internal.Control.Monad.ST.Lazy
-        GHC.Internal.Control.Monad.ST.Imp
-        GHC.Internal.Control.Monad.ST.Lazy.Imp
         GHC.Internal.Data.Bits
         GHC.Internal.Data.Bool
         GHC.Internal.Data.Coerce
@@ -182,8 +180,6 @@ Library
         GHC.Internal.Foreign.C.Types
         GHC.Internal.Foreign.Concurrent
         GHC.Internal.Foreign.ForeignPtr
-        GHC.Internal.Foreign.ForeignPtr.Imp
-        GHC.Internal.Foreign.ForeignPtr.Unsafe
         GHC.Internal.Foreign.Marshal.Alloc
         GHC.Internal.Foreign.Marshal.Array
         GHC.Internal.Foreign.Marshal.Error

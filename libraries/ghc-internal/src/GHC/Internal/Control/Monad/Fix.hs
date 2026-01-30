@@ -36,7 +36,7 @@ import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Data.Tuple ( Solo(..), snd )
 import GHC.Internal.Base ( Monad, errorWithoutStackTrace, (.) )
 import GHC.Internal.List ( head, drop )
-import GHC.Internal.Control.Monad.ST.Imp
+import GHC.Internal.Control.Monad.ST
 import GHC.Internal.System.IO
 import GHC.Internal.Data.Functor.Identity (Identity(..))
 import GHC.Internal.Generics

@@ -25,4 +25,4 @@ module Control.Monad.ST.Unsafe
      unsafeSTToIO
      ) where
 
-import GHC.Internal.Control.Monad.ST.Imp
+import GHC.Internal.Control.Monad.ST

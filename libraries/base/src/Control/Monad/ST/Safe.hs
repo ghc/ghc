@@ -28,4 +28,4 @@ module Control.Monad.ST.Safe
      stToIO
      ) where
 
-import GHC.Internal.Control.Monad.ST.Imp
+import GHC.Internal.Control.Monad.ST

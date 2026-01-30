@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 -- |
 --
 -- Module      :  Foreign.ForeignPtr.Unsafe
@@ -20,4 +21,4 @@ module Foreign.ForeignPtr.Unsafe
      unsafeForeignPtrToPtr
      ) where
 
-import GHC.Internal.Foreign.ForeignPtr.Unsafe
+import GHC.Internal.Foreign.ForeignPtr
