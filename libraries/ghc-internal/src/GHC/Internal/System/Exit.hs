@@ -23,8 +23,7 @@ module GHC.Internal.System.Exit
     , die
   ) where
 
-import GHC.Internal.System.IO
-
+import GHC.Internal.System.IO (hPutStrLn, stderr)
 import GHC.Internal.Base
 import GHC.Internal.IO
 import GHC.Internal.IO.Exception

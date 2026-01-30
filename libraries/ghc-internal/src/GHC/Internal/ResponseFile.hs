@@ -32,7 +32,7 @@ import GHC.Internal.Data.OldList       (filter, unlines, concat, reverse)
 import GHC.Internal.Text.Show          (show)
 import GHC.Internal.System.Environment (getArgs)
 import GHC.Internal.System.Exit        (exitFailure)
-import GHC.Internal.System.IO
+import GHC.Internal.System.IO          (readFile, hPutStrLn, stderr)
 
 {-|
 Like 'getArgs', but can also read arguments supplied via response files.
