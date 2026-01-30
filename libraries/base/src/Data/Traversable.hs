@@ -1,4 +1,7 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
 -- Module      :  Data.Traversable
@@ -85,6 +88,9 @@ module Data.Traversable (
     ) where
 
 import GHC.Internal.Data.Traversable
+import GHC.Internal.Data.Functor.Identity
+import GHC.Internal.Data.Functor.Const
+import GHC.Internal.Base
 
 -- $setup
 -- >>> import Prelude
@@ -1110,3 +1116,30 @@ import GHC.Internal.Data.Traversable
 --    by Mauro Jaskelioff and Ondrej Rypacek,
 --    in /Mathematically-Structured Functional Programming/, 2012, online at
 --    <http://arxiv.org/pdf/1202.2919>.
+
+
+-- | This function may be used as a value for `fmap` in a `Functor`
+--   instance, provided that 'traverse' is defined. (Using
+--   `fmapDefault` with a `Traversable` instance defined only by
+--   'sequenceA' will result in infinite recursion.)
+--
+-- @
+-- 'fmapDefault' f ≡ 'runIdentity' . 'traverse' ('Identity' . f)
+-- @
+fmapDefault :: forall t a b . Traversable t
+            => (a -> b) -> t a -> t b
+{-# INLINE fmapDefault #-}
+-- See Note [Function coercion] in Data.Functor.Utils.
+fmapDefault = coerce (traverse @t @Identity @a @b)
+
+-- | This function may be used as a value for `Data.Foldable.foldMap`
+-- in a `Foldable` instance.
+--
+-- @
+-- 'foldMapDefault' f ≡ 'getConst' . 'traverse' ('Const' . f)
+-- @
+foldMapDefault :: forall t m a . (Traversable t, Monoid m)
+               => (a -> m) -> t a -> m
+{-# INLINE foldMapDefault #-}
+-- See Note [Function coercion] in Data.Functor.Utils.
+foldMapDefault = coerce (traverse @t @(Const m) @a @())

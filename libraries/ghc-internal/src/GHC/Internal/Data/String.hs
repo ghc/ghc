@@ -33,7 +33,6 @@ module GHC.Internal.Data.String (
  ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Data.Functor.Const (Const (Const))
 import GHC.Internal.Data.Functor.Identity (Identity (Identity))
 import GHC.Internal.Data.OldList (lines, words, unlines, unwords)
 
@@ -105,9 +104,6 @@ ensure the good behavior of the above example remains in the future.
 instance (a ~ Char) => IsString [a] where
          -- See Note [IsString String]
     fromString xs = xs
-
--- | @since base-4.9.0.0
-deriving instance IsString a => IsString (Const a (b :: k))
 
 -- | @since base-4.9.0.0
 deriving instance IsString a => IsString (Identity a)

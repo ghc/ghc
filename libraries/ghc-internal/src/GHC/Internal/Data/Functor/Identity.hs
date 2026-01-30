@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
@@ -36,6 +37,7 @@ module GHC.Internal.Data.Functor.Identity (
 import GHC.Internal.Data.Bits (Bits, FiniteBits)
 import GHC.Internal.Data.Coerce
 import GHC.Internal.Data.Foldable
+import GHC.Internal.Data.Traversable
 import GHC.Internal.Data.Functor.Utils ((#.))
 import GHC.Internal.Foreign.Storable (Storable)
 import GHC.Internal.Ix (Ix)
@@ -89,6 +91,7 @@ newtype Identity a = Identity { runIdentity :: a }
              , RealFrac   -- ^ @since base-4.9.0.0
              , RealFloat  -- ^ @since base-4.9.0.0
              , Storable   -- ^ @since base-4.9.0.0
+             , Traversable -- ^ @since base-4.9.0.0
              )
 
 -- | This instance would be equivalent to the derived instances of the

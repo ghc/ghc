@@ -3,6 +3,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
@@ -23,6 +24,7 @@ module GHC.Internal.Data.Functor.Const (Const(..)) where
 
 import GHC.Internal.Data.Bits (Bits, FiniteBits)
 import GHC.Internal.Data.Foldable (Foldable(foldMap))
+import GHC.Internal.Data.Traversable (Traversable(..))
 import GHC.Internal.Foreign.Storable (Storable)
 
 import GHC.Internal.Ix (Ix)
@@ -34,6 +36,7 @@ import GHC.Internal.Num (Num)
 import GHC.Internal.Real (Fractional, Integral, Real, RealFrac)
 import GHC.Internal.Read (Read(readsPrec), readParen, lex)
 import GHC.Internal.Show (Show(showsPrec), showParen, showString)
+import GHC.Internal.Data.String (IsString(..))
 
 -- | The 'Const' functor.
 --
@@ -105,3 +108,12 @@ instance Monoid m => Applicative (Const m) where
 -- but guarantees that mappend for Const a b will have the same arity
 -- as the one for a; it won't create a closure to raise the arity
 -- to 2.
+
+
+-- | @since base-4.9.0.0
+deriving instance IsString a => IsString (Const a (b :: k))
+
+
+-- | @since base-4.7.0.0
+instance Traversable (Const m) where
+    traverse _ (Const m) = pure $ Const m

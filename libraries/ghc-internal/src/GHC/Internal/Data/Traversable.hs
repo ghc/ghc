@@ -32,25 +32,20 @@ module GHC.Internal.Data.Traversable (
     mapAccumL,
     mapAccumR,
     mapAccumM,
-    -- * General definitions for superclass methods
-    fmapDefault,
-    foldMapDefault,
     ) where
 
 import GHC.Internal.Data.Coerce
 import GHC.Internal.Data.Either ( Either(..) )
 import GHC.Internal.Data.Foldable
 import GHC.Internal.Data.Functor
-import GHC.Internal.Data.Functor.Const ( Const(..) )
-import GHC.Internal.Data.Functor.Identity ( Identity(..) )
 import GHC.Internal.Data.Functor.Utils ( StateL(..), StateR(..), StateT(..), (#.) )
 import GHC.Internal.Data.Monoid ( Dual(..), Sum(..), Product(..),
                      First(..), Last(..), Alt(..), Ap(..) )
 import GHC.Internal.Data.Proxy ( Proxy(..) )
 
 import GHC.Internal.Arr
-import GHC.Internal.Base ( Applicative(..), Monad(..), Monoid, Maybe(..), NonEmpty(..),
-                  ($), (.), id, flip )
+import GHC.Internal.Base ( Applicative(..), Monad(..), Maybe(..), NonEmpty(..),
+                  (.), id, flip )
 import GHC.Internal.Generics
 import qualified GHC.Internal.List as List ( foldr )
 import GHC.Internal.Tuple (Solo (..))
@@ -273,10 +268,6 @@ instance Traversable Proxy where
     sequence _ = pure Proxy
     {-# INLINE sequence #-}
 
--- | @since base-4.7.0.0
-instance Traversable (Const m) where
-    traverse _ (Const m) = pure $ Const m
-
 -- | @since base-4.8.0.0
 instance Traversable Dual where
     traverse f (Dual x) = Dual <$> f x
@@ -304,9 +295,6 @@ instance (Traversable f) => Traversable (Alt f) where
 -- | @since base-4.12.0.0
 instance (Traversable f) => Traversable (Ap f) where
     traverse f (Ap x) = Ap <$> traverse f x
-
--- | @since base-4.9.0.0
-deriving instance Traversable Identity
 
 
 -- Instances for GHC.Generics
@@ -455,29 +443,3 @@ forAccumM
   => s -> t a -> (s -> a -> m (s, b)) -> m (s, t b)
 {-# INLINE forAccumM #-}
 forAccumM s t f = mapAccumM f s t
-
--- | This function may be used as a value for `fmap` in a `Functor`
---   instance, provided that 'traverse' is defined. (Using
---   `fmapDefault` with a `Traversable` instance defined only by
---   'sequenceA' will result in infinite recursion.)
---
--- @
--- 'fmapDefault' f ≡ 'runIdentity' . 'traverse' ('Identity' . f)
--- @
-fmapDefault :: forall t a b . Traversable t
-            => (a -> b) -> t a -> t b
-{-# INLINE fmapDefault #-}
--- See Note [Function coercion] in Data.Functor.Utils.
-fmapDefault = coerce (traverse @t @Identity @a @b)
-
--- | This function may be used as a value for `Data.Foldable.foldMap`
--- in a `Foldable` instance.
---
--- @
--- 'foldMapDefault' f ≡ 'getConst' . 'traverse' ('Const' . f)
--- @
-foldMapDefault :: forall t m a . (Traversable t, Monoid m)
-               => (a -> m) -> t a -> m
-{-# INLINE foldMapDefault #-}
--- See Note [Function coercion] in Data.Functor.Utils.
-foldMapDefault = coerce (traverse @t @(Const m) @a @())
