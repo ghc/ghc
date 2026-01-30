@@ -1186,16 +1186,20 @@ RTS_SYMBOLS_PRIM
 /* See Note [Naming Scheme for Symbol Macros] */
 
 #define SymI_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
+                    (void*)(&(vvv)), STRENGTH_NORMAL, \
+                    SYM_TYPE_CODE | SYM_TYPE_RTS_DEF },
 #define SymI_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
+                    (void*)(&(vvv)), STRENGTH_NORMAL, \
+                    SYM_TYPE_DATA | SYM_TYPE_RTS_DEF },
 #define SymE_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
             (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
 #define SymE_HasDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
             (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
 
-#define SymI_NeedsProto(vvv) SymI_HasProto(vvv)
-#define SymI_NeedsDataProto(vvv) SymI_HasDataProto(vvv)
+#define SymI_NeedsProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
+                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
+#define SymI_NeedsDataProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
+                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_DATA },
 #define SymE_NeedsProto(vvv) SymE_HasProto(vvv)
 #define SymE_NeedsDataProto(vvv) SymE_HasDataProto(vvv)
 

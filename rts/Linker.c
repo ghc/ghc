@@ -232,7 +232,7 @@ static void ghciRemoveSymbolTable(StrHashTable *table, const SymbolName* key,
 static const char *
 symbolTypeString (SymType type)
 {
-    switch (type & ~(SYM_TYPE_DUP_DISCARD | SYM_TYPE_HIDDEN)) {
+    switch (type & ~(SYM_TYPE_DUP_DISCARD | SYM_TYPE_HIDDEN | SYM_TYPE_RTS_DEF)) {
         case SYM_TYPE_CODE: return "code";
         case SYM_TYPE_DATA: return "data";
         case SYM_TYPE_INDIRECT_DATA: return "indirect-data";
@@ -270,6 +270,9 @@ int ghciInsertSymbolTable(
    SymType type,
    ObjectCode *owner)
 {
+   /* mask out SYM_TYPE_RTS_DEF, see Note [RTS symbol exports] */
+   type &= ~SYM_TYPE_RTS_DEF;
+
    RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
    if (!pinfo) /* new entry */
    {
