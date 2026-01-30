@@ -627,8 +627,9 @@ HsInt loadArchive_ (pathchar *path)
 
             if(!verifyAndInitOc( oc ))
             {
-                freeObjectCode( oc );
                 IF_DEBUG(linker, ocDebugBelch(oc, "Faild to verify ... skipping."));
+                errorBelch("Faild to verify ... skipping.");
+                freeObjectCode( oc );
                 continue;
             }
 

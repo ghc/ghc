@@ -385,7 +385,7 @@ extern Elf_Word shndx_table_uninit_label;
     )
 
 #define ocDebugBelch(oc, s, ...) \
-    debugBelch("%s(%" PATH_FMT ": " s, \
+    errorBelch("%s(%" PATH_FMT ": " s, \
                __func__, \
                OC_INFORMATIVE_FILENAME(oc), \
                ##__VA_ARGS__)

@@ -1444,6 +1444,7 @@ preloadObjectFile (pathchar *path)
    oc = mkOc(STATIC_OBJECT, path, image, fileSize, true, NULL, misalignment);
 
    if (!verifyAndInitOc(oc)) {
+       freePreloadObjectFile(oc);
        freeObjectCode(oc);
        debugBelch("loadObj: Failed to verify oc.\n");
        return NULL;
