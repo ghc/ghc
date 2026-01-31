@@ -1462,10 +1462,11 @@ cvtLit (BytesPrimL (Bytes fptr off sz)) = do
              BS.packCStringLen (ptr `plusPtr` fromIntegral off, fromIntegral sz)
   force bs
   return $ HsStringPrim NoSourceText bs
-cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
-        -- cvtLit should not be called on IntegerL, RationalL
-        -- That precondition is established right here in
-        -- "GHC.ThToHs", hence panic
+-- cvtLit should not be called on IntegerL, RationalL
+-- That precondition is established right here in
+-- "GHC.ThToHs", hence panic
+cvtLit (IntegerL _) = panic "Convert.cvtLit: Unexpected literal"
+cvtLit (RationalL _) = panic "Convert.cvtLit: Unexpected literal"
 
 quotedSourceText :: String -> SourceText
 quotedSourceText s = SourceText $ fsLit $ "\"" ++ s ++ "\""
