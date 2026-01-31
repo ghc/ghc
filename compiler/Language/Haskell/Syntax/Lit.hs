@@ -79,19 +79,42 @@ data HsLit x
   | XLit !(XXLit x)
 
 instance (Eq (XXLit x)) => Eq (HsLit x) where
-  (HsChar _ x1)       == (HsChar _ x2)       = x1==x2
-  (HsCharPrim _ x1)   == (HsCharPrim _ x2)   = x1==x2
-  (HsString _ x1)     == (HsString _ x2)     = x1==x2
-  (HsStringPrim _ x1) == (HsStringPrim _ x2) = x1==x2
-  (HsInt _ x1)        == (HsInt _ x2)        = x1==x2
-  (HsIntPrim _ x1)    == (HsIntPrim _ x2)    = x1==x2
-  (HsWordPrim _ x1)   == (HsWordPrim _ x2)   = x1==x2
-  (HsInt64Prim _ x1)  == (HsInt64Prim _ x2)  = x1==x2
-  (HsWord64Prim _ x1) == (HsWord64Prim _ x2) = x1==x2
-  (HsFloatPrim _ x1)  == (HsFloatPrim _ x2)  = x1==x2
-  (HsDoublePrim _ x1) == (HsDoublePrim _ x2) = x1==x2
-  (XLit x1)           == (XLit x2)           = x1==x2
-  _                   == _                   = False
+  HsChar _ x1       == HsChar _ x2       = x1 == x2
+  HsChar{}          == _                 = False
+  HsCharPrim _ x1   == HsCharPrim _ x2   = x1 == x2
+  HsCharPrim{}      == _                 = False
+  HsString _ x1     == HsString _ x2     = x1 == x2
+  HsString{}        == _                 = False
+  HsStringPrim _ x1 == HsStringPrim _ x2 = x1 == x2
+  HsStringPrim{}    == _                 = False
+  HsInt _ x1        == HsInt _ x2        = x1 == x2
+  HsInt{}           == _                 = False
+  HsIntPrim _ x1    == HsIntPrim _ x2    = x1 == x2
+  HsIntPrim{}       == _                 = False
+  HsWordPrim _ x1   == HsWordPrim _ x2   = x1 == x2
+  HsWordPrim{}      == _                 = False
+  HsInt8Prim _ x1   == HsInt8Prim _ x2   = x1 == x2
+  HsInt8Prim{}      == _                 = False
+  HsInt16Prim _ x1  == HsInt16Prim _ x2  = x1 == x2
+  HsInt16Prim{}     == _                 = False
+  HsInt32Prim _ x1  == HsInt32Prim _ x2  = x1 == x2
+  HsInt32Prim{}     == _                 = False
+  HsInt64Prim _ x1  == HsInt64Prim _ x2  = x1 == x2
+  HsInt64Prim{}     == _                 = False
+  HsWord8Prim _ x1  == HsWord8Prim _ x2  = x1 == x2
+  HsWord8Prim{}     == _                 = False
+  HsWord16Prim _ x1 == HsWord16Prim _ x2 = x1 == x2
+  HsWord16Prim{}    == _                 = False
+  HsWord32Prim _ x1 == HsWord32Prim _ x2 = x1 == x2
+  HsWord32Prim{}    == _                 = False
+  HsWord64Prim _ x1 == HsWord64Prim _ x2 = x1 == x2
+  HsWord64Prim{}    == _                 = False
+  HsFloatPrim _ x1  == HsFloatPrim _ x2  = x1 == x2
+  HsFloatPrim{}     == _                 = False
+  HsDoublePrim _ x1 == HsDoublePrim _ x2 = x1 == x2
+  HsDoublePrim{}    == _                 = False
+  XLit x1           == XLit x2           = x1 == x2
+  XLit{}            == _                 = False
 
 -- | Haskell Overloaded Literal
 data HsOverLit p
@@ -112,18 +135,23 @@ data OverLitVal
   deriving Data
 
 instance Eq OverLitVal where
-  (HsIntegral   i1)   == (HsIntegral   i2)   = i1 == i2
-  (HsFractional f1)   == (HsFractional f2)   = f1 == f2
-  (HsIsString _ s1)   == (HsIsString _ s2)   = s1 == s2
-  _                   == _                   = False
+  HsIntegral   i1 == HsIntegral   i2 = i1 == i2
+  HsIntegral{}    == _               = False
+  HsFractional f1 == HsFractional f2 = f1 == f2
+  HsFractional{}  == _               = False
+  HsIsString _ s1 == HsIsString _ s2 = s1 == s2
+  HsIsString{}    == _               = False
 
 instance Ord OverLitVal where
-  compare (HsIntegral i1)     (HsIntegral i2)     = i1 `compare` i2
-  compare (HsIntegral _)      (HsFractional _)    = LT
-  compare (HsIntegral _)      (HsIsString _ _)    = LT
-  compare (HsFractional f1)   (HsFractional f2)   = f1 `compare` f2
-  compare (HsFractional _)    (HsIntegral   _)    = GT
-  compare (HsFractional _)    (HsIsString _ _)    = LT
-  compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `lexicalCompareFS` s2
-  compare (HsIsString _ _)    (HsIntegral   _)    = GT
-  compare (HsIsString _ _)    (HsFractional _)    = GT
+  -- HsIntegral
+  HsIntegral i1 `compare` HsIntegral i2  = i1 `compare` i2
+  HsIntegral{}  `compare` HsFractional{} = LT
+  HsIntegral{}  `compare` HsIsString{}   = LT
+  -- HsFractional
+  HsFractional{}  `compare` HsIntegral{}    = GT
+  HsFractional f1 `compare` HsFractional f2 = f1 `compare` f2
+  HsFractional{}  `compare` HsIsString{}    = LT
+  -- HsIsString
+  HsIsString{}    `compare` HsIntegral{}    = GT
+  HsIsString{}    `compare` HsFractional{}  = GT
+  HsIsString _ s1 `compare` HsIsString _ s2 = s1 `lexicalCompareFS` s2
