@@ -48,7 +48,7 @@ import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Stable
-import GHC.Internal.Conc.IO
+import GHC.Internal.Event.Thread
 import GHC.Internal.Control.Concurrent.MVar
 
 data Handler
