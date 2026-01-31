@@ -1,4 +1,4 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -23,14 +23,12 @@ module GHC.Internal.System.IO.OS
 )
 where
 
+import GHC.Internal.Base
 import GHC.Internal.Control.Monad (return)
 import GHC.Internal.Control.Concurrent.MVar (MVar)
 import GHC.Internal.Control.Exception (mask)
 import GHC.Internal.Data.Function (const, (.), ($))
 import GHC.Internal.Data.Functor (fmap)
-#if defined(mingw32_HOST_OS)
-import GHC.Internal.Data.Bool (otherwise)
-#endif
 import GHC.Internal.Data.Maybe (Maybe (Nothing), maybe)
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.Data.Maybe (Maybe (Just))

@@ -11,7 +11,7 @@ module Data.List.NubOrdSet (
   insert,
 ) where
 
-import GHC.Internal.Data.Bool (Bool(..))
+import Data.Bool (Bool(..))
 import GHC.Internal.Data.Function ((.))
 import GHC.Internal.Data.Ord (Ordering(..))
 

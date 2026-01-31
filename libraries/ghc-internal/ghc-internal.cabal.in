@@ -140,7 +140,6 @@ Library
         GHC.Internal.Control.Monad.ST.Imp
         GHC.Internal.Control.Monad.ST.Lazy.Imp
         GHC.Internal.Data.Bits
-        GHC.Internal.Data.Bool
         GHC.Internal.Data.Coerce
         GHC.Internal.Data.Data
         GHC.Internal.Data.Dynamic
