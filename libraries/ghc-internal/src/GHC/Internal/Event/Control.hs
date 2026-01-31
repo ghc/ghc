@@ -8,8 +8,7 @@
 module GHC.Internal.Event.Control
     (
     -- * Managing the IO manager
-      Signal
-    , ControlMessage(..)
+      ControlMessage(..)
     , Control
     , newControl
     , closeControl
@@ -31,7 +30,6 @@ module GHC.Internal.Event.Control
 
 import GHC.Internal.Base
 import GHC.Internal.IORef
-import GHC.Internal.Conc.Signal (Signal)
 import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.Show (Show)
 import GHC.Internal.Word (Word8)
@@ -56,7 +54,7 @@ import GHC.Internal.Foreign.C.Error (eAGAIN, eWOULDBLOCK, eBADF)
 data ControlMessage = CMsgWakeup
                     | CMsgDie
                     | CMsgSignal {-# UNPACK #-} !(ForeignPtr Word8)
-                                 {-# UNPACK #-} !Signal
+                                 {-# UNPACK #-} !CInt -- type Signal = CInt
     deriving ( Eq   -- ^ @since base-4.4.0.0
              , Show -- ^ @since base-4.4.0.0
              )
