@@ -461,11 +461,11 @@ in which @foozball@ and @quuuuuux@ have overlapping spans:
 @
 module Baz where
 
-# line 3 "Baz.hs"
+# \line 3 "Baz.hs"
 foozball :: Int
 foozball = 0
 
-# line 3 "Baz.hs"
+# \line 3 "Baz.hs"
 bar, quuuuuux :: Int
 bar = 1
 quuuuuux = 2
