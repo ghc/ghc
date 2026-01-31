@@ -24,7 +24,8 @@
 
 module GHC.Internal.Control.Monad.Fix (
         MonadFix(mfix),
-        fix
+        fix,
+        fixIO
   ) where
 
 import GHC.Internal.Data.Either
@@ -34,12 +35,15 @@ import GHC.Internal.Data.Monoid ( Monoid, Dual(..), Sum(..), Product(..)
                    , First(..), Last(..), Alt(..), Ap(..) )
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Data.Tuple ( Solo(..), snd )
-import GHC.Internal.Base ( Monad, errorWithoutStackTrace, (.) )
+import GHC.Internal.Base ( Monad, errorWithoutStackTrace, (.), return )
 import GHC.Internal.List ( head, drop )
 import GHC.Internal.Control.Monad.ST
-import GHC.Internal.System.IO
 import GHC.Internal.Data.Functor.Identity (Identity(..))
 import GHC.Internal.Generics
+import GHC.Internal.IO
+import GHC.Internal.IO.Exception
+import GHC.Internal.IO.Unsafe ()
+import GHC.Internal.MVar
 
 -- | Monads having fixed points with a \'knot-tying\' semantics.
 -- Instances of 'MonadFix' should satisfy the following laws:
@@ -97,6 +101,86 @@ instance MonadFix NonEmpty where
     where
       neHead ~(a :| _) = a
       neTail ~(_ :| as) = as
+
+-- ---------------------------------------------------------------------------
+-- fixIO
+
+-- | The implementation of 'Control.Monad.Fix.mfix' for 'IO'.
+--
+-- This operation may fail with:
+--
+-- * 'FixIOException' if the function passed to 'fixIO' inspects its argument.
+--
+-- ==== __Examples__
+--
+-- the IO-action is only executed once. The recursion is only on the values.
+--
+-- >>> take 3 <$> fixIO (\x -> putStr ":D" >> (:x) <$> readLn @Int)
+-- :D
+-- 2
+-- [2,2,2]
+--
+-- If we are strict in the value, just as with 'Data.Function.fix', we do not get termination:
+--
+-- >>> fixIO (\x -> putStr x >> pure ('x' : x))
+-- * hangs forever *
+--
+-- We can tie the knot of a structure within 'IO' using 'fixIO':
+--
+-- @
+-- data Node = MkNode Int (IORef Node)
+--
+-- foo :: IO ()
+-- foo = do
+--   p \<- fixIO (\p -> newIORef (MkNode 0 p))
+--   q <- output p
+--   r <- output q
+--   _ <- output r
+--   pure ()
+--
+-- output :: IORef Node -> IO (IORef Node)
+-- output ref = do
+--   MkNode x p <- readIORef ref
+--   print x
+--   pure p
+-- @
+--
+-- >>> foo
+-- 0
+-- 0
+-- 0
+fixIO :: (a -> IO a) -> IO a
+fixIO k = do
+    m <- newEmptyMVar
+    ans <- unsafeDupableInterleaveIO
+             (readMVar m `catch` \BlockedIndefinitelyOnMVar ->
+                                    throwIO FixIOException)
+    result <- k ans
+    putMVar m result
+    return result
+
+-- Note [Blackholing in fixIO]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We do our own explicit black holing here, because GHC's lazy
+-- blackholing isn't enough.  In an infinite loop, GHC may run the IO
+-- computation a few times before it notices the loop, which is wrong.
+--
+-- NOTE2: the explicit black-holing with an IORef ran into trouble
+-- with multiple threads (see #5421), so now we use an MVar. We used
+-- to use takeMVar with unsafeInterleaveIO. This, however, uses noDuplicate#,
+-- which is not particularly cheap. Better to use readMVar, which can be
+-- performed in multiple threads safely, and to use unsafeDupableInterleaveIO
+-- to avoid the noDuplicate cost.
+--
+-- What we'd ideally want is probably an IVar, but we don't quite have those.
+-- STM TVars look like an option at first, but I don't think they are:
+-- we'd need to be able to write to the variable in an IO context, which can
+-- only be done using 'atomically', and 'atomically' is not allowed within
+-- unsafePerformIO. We can't know if someone will try to use the result
+-- of fixIO with unsafePerformIO!
+--
+-- See also System.IO.Unsafe.unsafeFixIO.
+--
 
 -- | @since base-2.01
 instance MonadFix IO where

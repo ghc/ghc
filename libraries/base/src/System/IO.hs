@@ -185,6 +185,7 @@ module System.IO
      ) where
 
 import GHC.Internal.System.IO
+import GHC.Internal.Control.Monad.Fix (fixIO)
 
 -- $locking
 -- Implementations should enforce as far as possible, at least locally to the
