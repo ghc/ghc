@@ -49,7 +49,6 @@ import GHC.Internal.Conc.IO
 import GHC.Internal.IO.Exception
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.Windows
-import GHC.Internal.Data.Bool
 import GHC.Internal.IO.SubSystem ((<!>))
 import GHC.Internal.Foreign.Storable
 #endif
@@ -717,7 +716,7 @@ asyncReadRawBufferPtr loc !fd !buf !off !len = do
     if l == (-1)
       then let sock_errno = c_maperrno_func (fromIntegral rc)
                non_sock_errno = Errno (fromIntegral rc)
-               errno = bool non_sock_errno sock_errno (fdIsSocket fd)
+               errno = if fdIsSocket fd then sock_errno else non_sock_errno
            in  ioError (errnoToIOError loc errno Nothing Nothing)
       else return (fromIntegral l)
 
@@ -728,7 +727,7 @@ asyncWriteRawBufferPtr loc !fd !buf !off !len = do
     if l == (-1)
       then let sock_errno = c_maperrno_func (fromIntegral rc)
                non_sock_errno = Errno (fromIntegral rc)
-               errno = bool non_sock_errno sock_errno (fdIsSocket fd)
+               errno = if fdIsSocket fd then sock_errno else non_sock_errno
            in  ioError (errnoToIOError loc errno Nothing Nothing)
       else return (fromIntegral l)
 
@@ -740,7 +739,7 @@ blockingReadRawBufferPtr loc !fd !buf !off !len
         let start_ptr = buf `plusPtr` off
             recv_ret = c_safe_recv (fdFD fd) start_ptr (fromIntegral len) 0
             read_ret = c_safe_read (fdFD fd) start_ptr (fromIntegral len)
-        r <- bool read_ret recv_ret (fdIsSocket fd)
+        r <- if fdIsSocket fd then recv_ret else read_ret
         when ((fdIsSocket fd) && (r == -1)) c_maperrno
         return r
       -- We trust read() to give us the correct errno but recv(), as a
@@ -753,7 +752,7 @@ blockingWriteRawBufferPtr loc !fd !buf !off !len
         let start_ptr = buf `plusPtr` off
             send_ret = c_safe_send  (fdFD fd) start_ptr (fromIntegral len) 0
             write_ret = c_safe_write (fdFD fd) start_ptr (fromIntegral len)
-        r <- bool write_ret send_ret (fdIsSocket fd)
+        r <- if fdIsSocket fd then send_ret else write_ret
         when (r == -1) c_maperrno
         return r
       -- We don't trust write() to give us the correct errno, and

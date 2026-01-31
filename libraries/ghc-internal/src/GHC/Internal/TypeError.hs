@@ -31,8 +31,7 @@ module GHC.Internal.TypeError
   , Unsatisfiable, unsatisfiable
   ) where
 
-import GHC.Internal.Data.Bool
-import GHC.Internal.Types (TYPE, Constraint, Symbol)
+import GHC.Internal.Types (TYPE, Bool(True), Constraint, Symbol)
 
 {- Note [Custom type errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

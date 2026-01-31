@@ -50,7 +50,6 @@ module GHC.Internal.Data.Foldable (
     find
     ) where
 
-import GHC.Internal.Data.Bool
 import GHC.Internal.Data.Either
 import GHC.Internal.Data.Eq
 import GHC.Internal.Data.Functor.Utils (Max(..), Min(..), (#.))

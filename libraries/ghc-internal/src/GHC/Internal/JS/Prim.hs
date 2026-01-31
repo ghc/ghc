@@ -46,7 +46,6 @@ import           GHC.Internal.Types
 import qualified GHC.Internal.Exception as Ex
 import qualified GHC.Internal.CString as GHC
 import           GHC.Internal.IO
-import           GHC.Internal.Data.Bool
 import           GHC.Internal.Base
 import           GHC.Internal.Show
 
