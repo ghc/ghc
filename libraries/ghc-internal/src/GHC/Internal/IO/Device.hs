@@ -35,7 +35,7 @@ import GHC.Internal.Read
 import GHC.Internal.Show
 import GHC.Internal.Ptr
 import GHC.Internal.Num
-import GHC.Internal.IO
+import GHC.Internal.IO (throwIO)
 import {-# SOURCE #-} GHC.Internal.IO.Exception ( unsupportedOperation )
 
 -- | A low-level I/O provider where the data is bytes in memory.
