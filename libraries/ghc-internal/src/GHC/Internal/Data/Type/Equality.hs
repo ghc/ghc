@@ -49,7 +49,6 @@ module GHC.Internal.Data.Type.Equality (
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Enum
 import GHC.Internal.Show
-import GHC.Internal.Read
 import GHC.Internal.Base
 import GHC.Internal.Data.Type.Bool
 
@@ -106,9 +105,6 @@ deriving instance Show (a :~: b)
 deriving instance Ord  (a :~: b)
 
 -- | @since base-4.7.0.0
-deriving instance a ~ b => Read (a :~: b)
-
--- | @since base-4.7.0.0
 instance a ~ b => Enum (a :~: b) where
   toEnum 0 = Refl
   toEnum _ = errorWithoutStackTrace "GHC.Internal.Data.Type.Equality.toEnum: bad argument"
@@ -132,9 +128,6 @@ deriving instance Eq   (a :~~: b)
 deriving instance Show (a :~~: b)
 -- | @since base-4.10.0.0
 deriving instance Ord  (a :~~: b)
-
--- | @since base-4.10.0.0
-deriving instance a ~~ b => Read (a :~~: b)
 
 -- | @since base-4.10.0.0
 instance a ~~ b => Enum (a :~~: b) where

@@ -36,7 +36,6 @@ import qualified GHC.Internal.Data.Type.Equality as Eq
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Enum
 import GHC.Internal.Show
-import GHC.Internal.Read
 import GHC.Internal.Base
 
 -- | Representational equality. If @Coercion a b@ is inhabited by some terminating
@@ -83,9 +82,6 @@ deriving instance Show (Coercion a b)
 
 -- | @since base-4.7.0.0
 deriving instance Ord  (Coercion a b)
-
--- | @since base-4.7.0.0
-deriving instance Coercible a b => Read (Coercion a b)
 
 -- | @since base-4.7.0.0
 instance Coercible a b => Enum (Coercion a b) where

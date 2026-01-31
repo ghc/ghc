@@ -24,7 +24,6 @@ module GHC.Internal.Data.Proxy
 
 import GHC.Internal.Base
 import GHC.Internal.Show
-import GHC.Internal.Read
 import GHC.Internal.Enum
 import GHC.Internal.Arr
 
@@ -54,7 +53,6 @@ import GHC.Internal.Arr
 -- >>> Proxy :: Proxy complicatedStructure
 -- Proxy
 data Proxy t = Proxy deriving ( Bounded -- ^ @since base-4.7.0.0
-                              , Read    -- ^ @since base-4.7.0.0
                               )
 
 -- | A concrete, promotable proxy type, for use at the kind level.

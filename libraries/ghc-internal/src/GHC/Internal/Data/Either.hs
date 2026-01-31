@@ -34,7 +34,6 @@ module GHC.Internal.Data.Either (
 
 import GHC.Internal.Base
 import GHC.Internal.Show
-import GHC.Internal.Read
 
 -- $setup
 -- Allow the use of some Prelude functions in doctests.
@@ -127,7 +126,6 @@ Left "parse error"
 data  Either a b  =  Left a | Right b
   deriving ( Eq   -- ^ @since base-2.01
            , Ord  -- ^ @since base-2.01
-           , Read -- ^ @since base-3.0
            , Show -- ^ @since base-3.0
            )
 

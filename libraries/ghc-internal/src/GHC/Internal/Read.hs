@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving, ScopedTypeVariables, TypeOperators #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -74,6 +74,10 @@ import GHC.Internal.Arr
 import GHC.Internal.Word
 import GHC.Internal.List (filter)
 import GHC.Internal.Tuple (Solo (..))
+import GHC.Internal.Data.Type.Equality
+import GHC.Internal.Data.Type.Coercion
+import GHC.Internal.Data.Either
+import GHC.Internal.Data.Proxy
 
 
 -- | @'readParen' 'True' p@ parses what @p@ parses, but surrounded with
@@ -833,3 +837,20 @@ instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
                           ; return (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
+
+
+-- | @since base-4.7.0.0
+deriving instance a ~ b => Read (a :~: b)
+
+-- | @since base-4.10.0.0
+deriving instance a ~~ b => Read (a :~~: b)
+
+-- | @since base-4.7.0.0
+deriving instance Coercible a b => Read (Coercion a b)
+
+
+-- | @since base-3.0
+deriving instance (Read a, Read b) => Read (Either a b)
+
+-- | @since base-4.7.0.0
+deriving instance Read (Proxy s)
