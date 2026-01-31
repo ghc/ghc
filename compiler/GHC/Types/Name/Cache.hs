@@ -162,9 +162,7 @@ newNameCacheWith ut nc = NameCache (uniqueTag ut) <$> newMVar nc
 -- | This takes a tag for uniques to be generated and the list of knownKeyNames
 -- These must be initialized properly to ensure that names generated from this
 -- NameCache do not conflict with known key names.
---
--- Use `newNameCache` or `newNameCacheWith` instead
-{-# DEPRECATED initNameCache "Use newNameCache or newNameCacheWith instead" #-}
+{-# DEPRECATED initNameCache "Use `newNameCache` or `newNameCacheWith` instead" #-}
 initNameCache :: UniqueTag -> [Name] -> IO NameCache
 initNameCache c names = newNameCacheWith c (initOrigNames names)
 
