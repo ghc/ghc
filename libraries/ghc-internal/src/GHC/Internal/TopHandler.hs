@@ -37,6 +37,7 @@ module GHC.Internal.TopHandler (
 #include "HsBaseConfig.h"
 
 import GHC.Internal.Control.Exception
+import GHC.Internal.Conc.Sync (throwTo)
 import GHC.Internal.Data.Maybe
 
 import GHC.Internal.Foreign.C.Error

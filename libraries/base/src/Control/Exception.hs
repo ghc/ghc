@@ -124,6 +124,7 @@ module Control.Exception
 
 import GHC.Internal.Control.Exception
 import GHC.Internal.Exception.Type
+import GHC.Internal.Conc.Sync
 
 {- $catching
 

@@ -66,6 +66,7 @@ import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Control.Monad.Fail
 import GHC.Internal.Data.Either
 import qualified GHC.Internal.Control.Exception.Base as Exception
+import qualified GHC.Internal.Conc.Sync as Exception
 import GHC.Internal.Base
 import GHC.Internal.Conc.Sync
 import GHC.Internal.IO

@@ -49,7 +49,6 @@ module GHC.Internal.Control.Exception.Base (
         rethrowIO,
         throw,
         ioError,
-        throwTo,
 
         -- * Catching Exceptions
 
@@ -118,7 +117,6 @@ import           GHC.Internal.IO.Exception
 import           GHC.Internal.Exception.Type
 import           GHC.Internal.Show
 -- import GHC.Internal.Exception hiding ( Exception )
-import           GHC.Internal.Conc.Sync
 
 import           GHC.Internal.Data.Either
 

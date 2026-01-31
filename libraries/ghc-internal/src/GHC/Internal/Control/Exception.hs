@@ -64,7 +64,6 @@ module GHC.Internal.Control.Exception (
         throwIO,
         rethrowIO,
         ioError,
-        throwTo,
 
         -- ** The @catch@ functions
         catch,

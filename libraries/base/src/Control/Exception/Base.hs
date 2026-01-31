@@ -1,4 +1,4 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 -- |
 --
@@ -91,3 +91,4 @@ module Control.Exception.Base
      ) where
 
 import GHC.Internal.Control.Exception.Base
+import GHC.Internal.Conc.Sync (throwTo)
