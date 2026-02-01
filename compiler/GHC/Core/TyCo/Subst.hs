@@ -510,13 +510,13 @@ zipCoEnv cvs cos
 
 instance Outputable Subst where
   ppr (Subst in_scope ids tvs cvs)
-        =  text "<InScope =" <+> in_scope_doc
-        $$ text " IdSubst   =" <+> ppr ids
-        $$ text " TvSubst   =" <+> ppr tvs
-        $$ text " CvSubst   =" <+> ppr cvs
+        =  vcat [ -- text "<InScope =" <+> _in_scope_doc,
+                  text " IdSubst   =" <+> ppr ids,
+                  text " TvSubst   =" <+> ppr tvs,
+                  text " CvSubst   =" <+> ppr cvs ]
          <> char '>'
     where
-    in_scope_doc = pprVarSet (getInScopeVars in_scope) (braces . fsep . map ppr)
+      _in_scope_doc = pprVarSet (getInScopeVars in_scope) (braces . fsep . map ppr)
 
 {-
 %************************************************************************

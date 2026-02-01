@@ -598,9 +598,9 @@ sumPrimReps _ = []
 getStgArgFromTrivialArg :: HasDebugCallStack => CoreArg -> StgArg
 -- A (non-erased) trivial CoreArg corresponds to an atomic StgArg.
 -- CoreArgs may not immediately look trivial, e.g., `case e of {}` or
--- `case unsafeequalityProof of UnsafeRefl -> e` might intervene.
+-- `case unsafeEqualityProof of UnsafeRefl -> e` might intervene.
 -- Good thing we can just call `trivial_expr_fold` here.
-getStgArgFromTrivialArg e = trivial_expr_fold StgVarArg StgLitArg panic panic e
+getStgArgFromTrivialArg e = trivial_expr_fold (const True) StgVarArg StgLitArg panic panic e
   where
     panic = pprPanic "getStgArgFromTrivialArg" (ppr e)
 

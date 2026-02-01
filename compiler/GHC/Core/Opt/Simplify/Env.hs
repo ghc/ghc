@@ -854,7 +854,8 @@ doFloatFromRhs env lvl rec strict_bind tvs (SimplFloats { sfLetFloats = LetFloat
      cant_float_types
        | not (null tvs), any isTyCoVar float_bndrs
        = (pprTraceWhen (any isId float_bndrs)
-            "WARNING-TyCo: skipping abstractFloats" (ppr fs)) $
+            "WARNING-TyCo: skipping abstractFloats"
+            (text "binders" <+> ppr (fmap bindersOf fs)))
          True
        | otherwise
        = False

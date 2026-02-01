@@ -33,6 +33,7 @@ import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
                           , mkCast, exprType, exprIsHNF
                           , stripTicksTop, mkInScopeSetBndrs )
 import GHC.Core.FVs
+import GHC.Core.TyCo.FVs( someTyCoVarsOfTypeList )
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.Simplify.Env ( SimplPhase(..), isActive )
@@ -658,17 +659,17 @@ specProgram guts@(ModGuts { mg_module = this_mod
                           , se_rules  = rule_env
                           , se_dflags = dflags }
 
-             go []           = return ([], emptyUDs)
+             go []           = return (nilOL, emptyUDs)
              go (bind:binds) = do (bind', binds', uds') <- specBind TopLevel top_env bind $ \_ ->
                                                            go binds
-                                  return (bind' ++ binds', uds')
+                                  return (bind' `appOL` binds', uds')
 
              -- Specialise the bindings of this module
        ; (binds', uds) <- runSpecM (go binds)
 
        ; (spec_rules, spec_binds) <- specImports top_env uds
 
-       ; return (guts { mg_binds = spec_binds ++ binds'
+       ; return (guts { mg_binds = spec_binds ++ fromOL binds'
                       , mg_rules = spec_rules ++ local_rules }) }
 
 {-
@@ -677,7 +678,7 @@ Note [Wrap bindings returned by specImports]
 'specImports' returns a set of specialized bindings. However, these are lacking
 necessary floated dictionary bindings, which are returned by
 UsageDetails(ud_binds). These dictionaries need to be brought into scope with
-'wrapDictBinds' before the bindings returned by 'specImports' can be used. See,
+'wrapFloatBinds' before the bindings returned by 'specImports' can be used. See,
 for instance, the 'specImports' call in 'specProgram'.
 
 
@@ -763,7 +764,7 @@ specImports :: SpecEnv
 specImports top_env (MkUD { ud_binds = dict_binds, ud_calls = calls })
   | not $ gopt Opt_CrossModuleSpecialise (se_dflags top_env)
     -- See Note [Disabling cross-module specialisation]
-  = return ([], wrapDictBinds dict_binds [])
+  = return ([], wrapFloatBinds dict_binds [])
 
   | otherwise
   = do { let env_w_dict_bndrs = top_env `bringFloatedDictsIntoScope` dict_binds
@@ -771,7 +772,7 @@ specImports top_env (MkUD { ud_binds = dict_binds, ud_calls = calls })
 
              -- Make a Rec: see Note [Glom the bindings if imported functions are specialised]
              --
-             -- wrapDictBinds: don't forget to wrap the specialized bindings with
+             -- wrapFloatBinds: don't forget to wrap the specialized bindings with
              --   bindings for the needed dictionaries.
              --   See Note [Wrap bindings returned by specImports]
              --
@@ -780,9 +781,9 @@ specImports top_env (MkUD { ud_binds = dict_binds, ud_calls = calls })
        ; let (rules_for_locals, rules_for_imps) = partition isLocalRule spec_rules
              local_rule_base = extendRuleBaseList emptyRuleBase rules_for_locals
              final_binds
-               | null spec_binds = wrapDictBinds dict_binds []
+               | null spec_binds = wrapFloatBinds dict_binds []
                | otherwise       = glomValBinds $
-                                   wrapDictBinds dict_binds                          $
+                                   wrapFloatBinds dict_binds                          $
                                    map (mapBindBndrs (addRulesToId local_rule_base)) $
                                    spec_binds
 
@@ -791,10 +792,10 @@ specImports top_env (MkUD { ud_binds = dict_binds, ud_calls = calls })
 
 -- | Specialise a set of calls to imported bindings
 spec_imports :: SpecEnv          -- Passed in so that all top-level Ids are in scope
-                                 ---In-scope set includes the FloatedDictBinds
+                                 ---In-scope set includes the FloatBinds
              -> [Id]             -- Stack of imported functions being specialised
                                  -- See Note [specImport call stack]
-             -> FloatedDictBinds -- Dict bindings, used /only/ for filterCalls
+             -> FloatBinds -- Dict bindings, used /only/ for filterCalls
                                  -- See Note [Avoiding loops in specImports]
              -> CallDetails      -- Calls for imported things
              -> CoreM ( SpecEnv      -- Env contains the new rules
@@ -824,10 +825,10 @@ spec_imports env callers dict_binds calls
            ; return (env, rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
 
 spec_import :: SpecEnv               -- Passed in so that all top-level Ids are in scope
-                                     ---In-scope set includes the FloatedDictBinds
+                                     ---In-scope set includes the FloatBinds
             -> [Id]                  -- Stack of imported functions being specialised
                                      -- See Note [specImport call stack]
-            -> FloatedDictBinds      -- Dict bindings, used /only/ for filterCalls
+            -> FloatBinds      -- Dict bindings, used /only/ for filterCalls
                                      -- See Note [Avoiding loops in specImports]
             -> CallInfoSet           -- Imported function and calls for it
             -> CoreM ( SpecEnv
@@ -889,7 +890,7 @@ spec_import env callers dict_binds cis@(CIS fn _)
                                     (dict_binds `thenFDBs` dict_binds1)
                                     new_calls
 
-       ; let final_binds = wrapDictBinds dict_binds1 $
+       ; let final_binds = wrapFloatBinds dict_binds1 $
                            spec_binds2 ++ spec_binds1
 
        ; return (env, rules2 ++ rules1, final_binds) }
@@ -1161,6 +1162,20 @@ And if the call is to the same type, one specialisation is enough.
 Avoiding this recursive specialisation loop is one reason for the
 'callers' stack passed to specImports and specImport.
 
+Note [Specialisation and type-variable bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC allows let-bindings for type variables e.g.
+     a::Type = Type (Maybe b)
+We need to account for these when specialising:
+
+(STV1) The ci_fvs field of a CallInfo includes free TyVars
+
+(STV2) When dumping calls, in `deleteCallsMentioning`, we ignore
+   free tyvars when Opt_PolymorphicSpecialisation is on.
+   See (MP1) in Note [Specialising polymorphic dictionaries]
+
+(STV3) A FloatBind can be a type binding; see `bindAuxiliaryTyVars`
+
 
 ************************************************************************
 *                                                                      *
@@ -1287,8 +1302,8 @@ specLam env bndrs body
   = specExpr env body
   | otherwise
   = do { (body', uds) <- specExpr env body
-       ; let (free_uds, dumped_dbs) = dumpUDs bndrs uds
-       ; return (mkLams bndrs (wrapDictBindsE dumped_dbs body'), free_uds) }
+       ; let (free_uds, dumped_dbs) = dumpUDs env bndrs uds
+       ; return (mkLams bndrs (wrapFloatBindsE dumped_dbs body'), free_uds) }
 
 --------------
 specTickish :: SpecEnv -> CoreTickish -> CoreTickish
@@ -1313,8 +1328,8 @@ specCase env scrut case_bndr alts
     (env_alt, case_bndr') = substBndr env case_bndr
     spec_alt (Alt con args rhs)
       = do { (rhs', uds) <- specExpr env_rhs rhs
-           ; let (free_uds, dumped_dbs) = dumpUDs (case_bndr' : args') uds
-           ; return (Alt con args' (wrapDictBindsE dumped_dbs rhs'), free_uds) }
+           ; let (free_uds, dumped_dbs) = dumpUDs env (case_bndr' : args') uds
+           ; return (Alt con args' (wrapFloatBindsE dumped_dbs rhs'), free_uds) }
         where
           (env_rhs, args') = substBndrs env_alt args
 
@@ -1420,8 +1435,8 @@ End of Historical Note
 ************************************************************************
 -}
 
-bringFloatedDictsIntoScope :: SpecEnv -> FloatedDictBinds -> SpecEnv
-bringFloatedDictsIntoScope env (FDB { fdb_bndrs = dx_bndrs })
+bringFloatedDictsIntoScope :: SpecEnv -> FloatBinds -> SpecEnv
+bringFloatedDictsIntoScope env (FDB { fbs_bndrs = dx_bndrs })
   = -- pprTrace "brought into scope" (ppr dx_bndrs) $
     env {se_subst=subst'}
   where
@@ -1432,7 +1447,7 @@ specBind :: TopLevelFlag
                        -- top level binders in scope
          -> InBind
          -> (SpecEnv -> SpecM (body, UsageDetails))    -- Process the body
-         -> SpecM ( [OutBind]           -- New bindings
+         -> SpecM ( OrdList OutBind     -- New bindings
                   , body                -- Body
                   , UsageDetails)       -- And info to pass upstream
 -- Returned UsageDetails:
@@ -1448,13 +1463,13 @@ specBind top_lvl env (NonRec tv (Type rhs_ty)) do_body
 
        ; let rhs_ty' = substTy env rhs_ty
              bind' = NonRec tv' (Type rhs_ty')
-             (free_uds, dump_dbs, float_all) = dumpBindUDs True [tv'] body_uds
-             final_binds = mkDB bind' : fromOL dump_dbs
+             (free_uds, dump_dbs, float_all) = dumpBindUDs env True [tv'] body_uds
+             final_binds = unitOL (mkDB bind') `appOL` dump_dbs
 
        ; if float_all then
-              return ([], body', free_uds `snocDictBinds` final_binds)
+              return (nilOL, body', free_uds `snocFloatBinds` final_binds)
          else
-              return (map db_bind final_binds, body', free_uds) }
+              return (fmap fb_bind final_binds, body', free_uds) }
 
 specBind top_lvl env (NonRec fn rhs) do_body
   = do { (rhs', rhs_uds) <- specExpr env rhs
@@ -1486,31 +1501,30 @@ specBind top_lvl env (NonRec fn rhs) do_body
 
        ; let can_float_this_one = exprIsTopLevelBindable rhs (idType fn)
                  -- exprIsTopLevelBindable: see Note [Care with unlifted bindings]
-             (free_uds, dump_dbs, float_all) = dumpBindUDs can_float_this_one [fn4] body_uds1
+             (free_uds, dump_dbs, float_all) = dumpBindUDs env can_float_this_one [fn4] body_uds1
              all_free_uds                    = free_uds `thenUDs` rhs_uds
 
              pairs = spec_defns ++ [(fn4, rhs')]
                         -- fn4 mentions the spec_defns in its rules,
                         -- so put the latter first
 
-             final_binds :: [DictBind]
+             final_binds :: OrdList FloatBind
              -- See Note [From non-recursive to recursive]
              final_binds | not (isNilOL dump_dbs)
                          , not (null spec_defns)
-                         = [recWithDumpedDicts pairs dump_dbs]
+                         = unitOL (recWithDumpedDicts pairs dump_dbs)
                          | otherwise
-                         = [mkDB $ NonRec b r | (b,r) <- pairs]
-                           ++ fromOL dump_dbs
-
+                         = toOL [mkDB $ NonRec b r | (b,r) <- pairs]
+                           `appOL` dump_dbs
 
        ; if float_all then
              -- Rather than discard the calls mentioning the bound variables
              -- we float this (dictionary) binding along with the others
-              return ([], body', all_free_uds `snocDictBinds` final_binds)
+              return (nilOL, body', all_free_uds `snocFloatBinds` final_binds)
          else
              -- No call in final_uds mentions bound variables,
              -- so we can just leave the binding here
-              return (map db_bind final_binds, body', all_free_uds) }
+              return (fmap fb_bind final_binds, body', all_free_uds) }
 
 
 specBind top_lvl env (Rec pairs) do_body
@@ -1538,14 +1552,14 @@ specBind top_lvl env (Rec pairs) do_body
                               <- specDefns rec_env uds2 (bndrs2 `zip` rhss)
                         ; return (bndrs3, spec_defns3 ++ spec_defns2, uds3) }
 
-       ; let (final_uds, dumped_dbs, float_all) = dumpBindUDs True bndrs1 uds3
+       ; let (final_uds, dumped_dbs, float_all) = dumpBindUDs env True bndrs1 uds3
              final_bind = recWithDumpedDicts (spec_defns3 ++ zip bndrs3 rhss')
                                              dumped_dbs
 
        ; if float_all then
-              return ([], body', final_uds `snocDictBind` final_bind)
+              return (nilOL, body', final_uds `snocFloatBind` final_bind)
          else
-              return ([db_bind final_bind], body', final_uds) }
+              return (unitOL (fb_bind final_bind), body', final_uds) }
 
 
 ---------------------------
@@ -1700,21 +1714,21 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                  already_covered = alreadyCovered env' rule_bndrs fn
                                                   rule_lhs_args is_active all_rules
 
---         ; pprTrace "spec_call" (vcat
---                [ text "fun:       "  <+> ppr fn
---                , text "call info: "  <+> ppr _ci
---                , text "useful:    "  <+> ppr useful
---                , text "already_covered:"  <+> ppr already_covered
---                , text "useful:    "  <+> ppr useful
---                , text "rule_bndrs:"  <+> ppr (sep (map (pprBndr LambdaBind) rule_bndrs))
---                , text "rule_lhs_args:"  <+> ppr rule_lhs_args
---                , text "spec_bndrs:" <+> ppr (sep (map (pprBndr LambdaBind) spec_bndrs))
---                , text "dx_binds:"   <+> ppr dx_binds
---                , text "spec_args: "  <+> ppr spec_args
---                , text "rhs_bndrs"    <+> ppr (sep (map (pprBndr LambdaBind) rhs_bndrs))
---                , text "rhs_body"     <+> ppr rhs_body
---                , text "subst'" <+> ppr subst'
---                ]) $ return ()
+--          ; pprTrace "spec_call" (vcat
+--                 [ text "fun:       "  <+> ppr fn
+--                 , text "call info: "  <+> ppr _ci
+--                 , text "useful:    "  <+> ppr useful
+--                 , text "already_covered:"  <+> ppr already_covered
+--                 , text "useful:    "  <+> ppr useful
+--                 , text "rule_bndrs:"  <+> ppr (sep (map (pprBndr LambdaBind) rule_bndrs))
+--                 , text "rule_lhs_args:"  <+> ppr rule_lhs_args
+--                 , text "spec_bndrs:" <+> ppr (sep (map (pprBndr LambdaBind) spec_bndrs))
+--                 , text "dx_binds:"   <+> ppr dx_binds
+--                 , text "spec_args: "  <+> ppr spec_args
+--                 , text "rhs_bndrs"    <+> ppr (sep (map (pprBndr LambdaBind) rhs_bndrs))
+--                 , text "rhs_body"     <+> ppr rhs_body
+--                 , text "subst'" <+> ppr subst'
+--                 ]) $ return ()
 
 
            ; if not useful          -- No useful specialisation
@@ -1731,12 +1745,12 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 
            -- Make the RHS of the specialised function
            ; let spec_rhs_bndrs = spec_bndrs ++ inner_rhs_bndrs'
-                 (rhs_uds2, inner_dumped_dbs) = dumpUDs spec_rhs_bndrs $
-                                                dx_binds `consDictBinds` rhs_uds
+                 (rhs_uds2, inner_dumped_dbs) = dumpUDs env spec_rhs_bndrs $
+                                                dx_binds `consFloatBinds` rhs_uds
                  -- dx_binds comes from the arguments to the call,
                  -- and so can mention poly_qvars but no other local binders
                  spec_rhs = mkLams spec_rhs_bndrs           $
-                            wrapDictBindsE inner_dumped_dbs rhs_body'
+                            wrapFloatBindsE inner_dumped_dbs rhs_body'
                  rule_rhs_args = spec_bndrs
 
                  -- Maybe add a void arg to the specialised function,
@@ -1757,7 +1771,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                  -- The wrap_unf_body applies the original unfolding to the specialised
                  -- arguments, not forgetting to wrap the dx_binds around the outside (#22358)
                  simpl_opts = initSimpleOpts dflags
-                 wrap_unf_body body = foldr (Let . db_bind) (body `mkApps` spec_args) dx_binds
+                 wrap_unf_body body = wrapFloatBindsE dx_binds $
+                                      body `mkApps` spec_args
                  spec_unf = specUnfolding simpl_opts rule_rhs_args1 wrap_unf_body
                                           rule_lhs_args fn_unf
 
@@ -2529,10 +2544,11 @@ instance Outputable SpecArg where
   ppr UnspecType    = text "UnspecType"
   ppr UnspecArg     = text "UnspecArg"
 
-specArgsFVs :: InterestingVarFun -> [SpecArg] -> FV
--- Find the free vars of the SpecArgs that are not already in scope
-specArgsFVs interesting args
-  = filterFV interesting $
+specArgsFVs :: [SpecArg] -> VarSet
+-- Find the free vars of the SpecArgs
+specArgsFVs args
+  = fvVarSet $
+    filterFV isLocalVar $   -- Including TyVars
     foldr (unionFV . get) emptyFV args
   where
     get :: SpecArg -> FV
@@ -2607,15 +2623,15 @@ specHeader
                 -- `$sf = \spec_bndrs. let { dx_binds } in <orig-rhs> spec_arg`
               , [OutBndr]    -- spec_bndrs: Binders for $sf, and args for the RHS
                              --             of the RULE. Subset of rule_bndrs.
-              , [DictBind]   -- dx_binds:   Auxiliary dictionary bindings
+              , OrdList FloatBind  -- dx_binds:   Auxiliary dictionary bindings
               , [OutExpr]    -- spec_args:  Specialised arguments for unfolding
                              --             Same length as "Args for LHS of rule"
               )
 
 -- If we run out of binders, stop immediately
 -- See Note [Specialisation Must Preserve Sharing]
-specHeader subst [] _  = pure (False, subst, [], [], [], [], [])
-specHeader subst _  [] = pure (False, subst, [], [], [], [], [])
+specHeader subst [] _  = pure (False, subst, [], [], [], nilOL, [])
+specHeader subst _  [] = pure (False, subst, [], [], [], nilOL, [])
 
 -- We want to specialise on type 'T1', and so we must construct a substitution
 -- 'a->T1', as well as a LHS argument for the resulting RULE and unfolding
@@ -2671,20 +2687,23 @@ specHeader subst (bndr:bndrs) (_ : args)
 -- a wildcard binder to match the dictionary (See Note [Specialising Calls] for
 -- the nitty-gritty), as a LHS rule and unfolding details.
 specHeader subst (bndr:bndrs) (SpecDict dict_arg : args)
-  = do { -- Make up a fresh binder to use in the RULE
+  = do { let (tv_bndrs, tv_binds) = bindAuxiliaryTyVars subst dict_arg
+             subst1 = subst `Core.extendSubstInScopeSet` tv_bndrs
+
+         -- Make up a fresh binder to use in the RULE
          -- It might turn into a dict binding (via bindAuxiliaryDict) which we
          -- then float, so we use cloneIdBndr to get a completely fresh binder
-         u <- getUniqueM
-       ; let (subst1, bndr') = Core.cloneBndr subst u (zapIdOccInfo bndr)
+       ; u <- getUniqueM
+       ; let (subst2, bndr') = Core.cloneBndr subst1 u (zapIdOccInfo bndr)
                  -- zapIdOccInfo: see Note [Zap occ info in rule binders]
 
          -- Extend the substitution to map bndr :-> dict_arg, for use in the RHS
-       ; let (subst2, dx_bind, spec_dict) = bindAuxiliaryDict subst1 bndr bndr' dict_arg
+       ; let (subst3, dx1, spec_dict) = bindAuxiliaryDict subst2 bndr bndr' dict_arg
 
-       ; (_, subst3, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader subst2 bndrs args
+       ; (_, subst4, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader subst3 bndrs args
 
-       ; let dx' = case dx_bind of { Nothing -> dx; Just d -> d : dx }
-       ; pure ( True, subst3      -- Ha!  A useful specialisation!
+       ; let dx' = tv_binds `appOL` dx1 `appOL` dx
+       ; pure ( True, subst4      -- Ha!  A useful specialisation!
               , bndr' : rule_bs, Var bndr' : rule_es
               , spec_bs,    dx', spec_dict : spec_args ) }
 
@@ -2713,13 +2732,46 @@ specHeader subst (bndr:bndrs) (UnspecArg : args)
               , bndrs ++ spec_bs, dx, dummy_arg : spec_args ) }
 
 
+bindAuxiliaryTyVars :: Subst -> CoreExpr -> (TyVarSet, OrdList FloatBind)
+bindAuxiliaryTyVars subst dict_arg
+  = go emptyVarSet need_bind_tvs
+  where
+    go _ []
+      = (emptyVarSet, nilOL)
+    go tv_bndrs (tv:tvs)
+       | tv `elemVarSet` tv_bndrs
+       = go tv_bndrs tvs
+       | Just unf <- tyVarUnfolding_maybe tv
+       , (child_bndrs, child_binds) <- go tv_bndrs (someTyCoVarsOfTypeList needs_binding unf)
+       , let tv_bndrs1 = child_bndrs `extendVarSet` tv
+       , (rest_bndrs, rest_binds) <- go tv_bndrs1 tvs
+       = ( rest_bndrs
+         , child_binds `appOL` unitOL (mkDB (NonRec tv (Type unf)))
+                       `appOL` rest_binds )
+       | otherwise
+       = pprTrace "addTyVarBindings: unxpected 1" (ppr tv $$ ppr dict_arg) $
+         go tv_bndrs tvs
+
+    need_bind_tvs = exprSomeFreeVarsList needs_binding dict_arg
+    in_scope = substInScopeSet subst
+    needs_binding var
+      | isGlobalVar var
+      = False
+      | var `elemInScopeSet` in_scope
+      = False
+      | otherwise
+      = case tyVarUnfolding_maybe var of
+          Just {} -> True
+          Nothing -> pprPanic "addTyVarBindings: unexpected 2"
+                       (ppr var $$ ppr dict_arg)
+
 -- | Binds a dictionary argument to a fresh name, to preserve sharing
 bindAuxiliaryDict
   :: Subst
   -> InId -> OutId -> OutExpr -- Original dict binder, and the witnessing expression
-  -> ( Subst          -- Substitutes for orig_dict_id
-     , Maybe DictBind -- Auxiliary dict binding, if any
-     , OutExpr)       -- Witnessing expression (always trivial)
+  -> ( Subst            -- Substitutes for orig_dict_id
+     , OrdList FloatBind -- Auxiliary dict binding, if any
+     , OutExpr)         -- Witnessing expression (always trivial)
 bindAuxiliaryDict subst orig_dict_id fresh_dict_id dict_arg
 
   -- If the dictionary argument is trivial,
@@ -2727,7 +2779,7 @@ bindAuxiliaryDict subst orig_dict_id fresh_dict_id dict_arg
   | exprIsTrivial dict_arg
   , let subst' = Core.extendSubst subst orig_dict_id dict_arg
   = -- pprTrace "bindAuxiliaryDict:trivial" (ppr orig_dict_id <+> ppr dict_arg) $
-    (subst', Nothing, dict_arg)
+    (subst', nilOL, dict_arg)
 
   | otherwise  -- Non-trivial dictionary arg; make an auxiliary binding
   , let fresh_dict_id' = fresh_dict_id `addDictUnfolding` dict_arg
@@ -2737,7 +2789,7 @@ bindAuxiliaryDict subst orig_dict_id fresh_dict_id dict_arg
                     `Core.extendSubstInScope` fresh_dict_id'
                     -- Ensure the new unfolding is in the in-scope set
   = -- pprTrace "bindAuxiliaryDict:non-trivial" (ppr orig_dict_id <+> ppr fresh_dict_id') $
-    (subst', Just dict_bind, Var fresh_dict_id')
+    (subst', unitOL dict_bind, Var fresh_dict_id')
 
 addDictUnfolding :: Id -> CoreExpr -> Id
 -- Add unfolding for freshly-bound Ids: see Note [Make the new dictionaries interesting]
@@ -2767,34 +2819,34 @@ in the dictionary Id.
 ********************************************************************* -}
 
 data UsageDetails
-  = MkUD { ud_binds :: !FloatedDictBinds
+  = MkUD { ud_binds :: !FloatBinds
          , ud_calls :: !CallDetails }
-    -- INVARIANT: suppose bs = fdb_bndrs ud_binds
+    -- INVARIANT: suppose bs = fbs_bndrs ud_binds
     -- Then 'calls' may *mention* 'bs',
     -- but there should be no calls *for* bs
 
-data FloatedDictBinds  -- See Note [Floated dictionary bindings]
-  = FDB { fdb_binds :: !(OrdList DictBind)
+data FloatBinds  -- See Note [Floated dictionary bindings]
+  = FDB { fbs_binds :: !(OrdList FloatBind)
                -- The order is important;
                -- in ds1 `appOL` ds2, bindings in ds2 can depend on those in ds1
 
-        , fdb_bndrs :: !IdSet
-    }          -- ^ The binders of 'fdb_binds'.
+        , fbs_bndrs :: !IdSet
+    }          -- ^ The binders of 'fbs_binds'.
                -- Caches a superset of the expression
-               --   `mkVarSet (bindersOfDictBinds fdb_binds))`
+               --   `mkVarSet (bindersOfFloatBinds fbs_binds))`
                -- for later addition to an InScopeSet
 
--- | A 'DictBind' is a binding along with a cached set containing its free
+-- | A 'FloatBind' is a binding along with a cached set containing its free
 -- variables (both type variables and dictionaries). We need this set
--- in splitDictBinds, when filtering bindings to decide which are
+-- in splitFloatBinds, when filtering bindings to decide which are
 -- captured by a binder
-data DictBind = DB { db_bind :: CoreBind, db_fvs :: VarSet }
+data FloatBind = DB { fb_bind :: CoreBind, fb_fvs :: VarSet }
 
-bindersOfDictBind :: DictBind -> [Id]
-bindersOfDictBind = bindersOf . db_bind
+bindersOfFloatBind :: FloatBind -> [Id]
+bindersOfFloatBind = bindersOf . fb_bind
 
-bindersOfDictBinds :: Foldable f => f DictBind -> [Id]
-bindersOfDictBinds = bindersOfBinds . foldr ((:) . db_bind) []
+bindersOfFloatBinds :: Foldable f => f FloatBind -> [Id]
+bindersOfFloatBinds = bindersOfBinds . foldr ((:) . fb_bind) []
 
 {- Note [Floated dictionary bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2819,7 +2871,7 @@ and continue.  But then we have to add $c== to the floats, and so on.
 These all float above the binding for 'f', and now we can
 successfully specialise 'f'.
 
-So the DictBinds in (ud_binds :: OrdList DictBind) may contain
+So the FloatBinds in (ud_binds :: OrdList FloatBind) may contain
 non-dictionary bindings too.
 
 Note [Specialising polymorphic dictionaries]
@@ -2853,9 +2905,8 @@ Here are the moving parts:
         CIS wimwam (CI { ci_key = [@(ST s), dMST @s]
                        , ci_fvs = {dMST} })
       when we come to the /\s.  Instead, we simply let it continue to float
-      upwards. Hence ci_fvs is an IdSet, listing the /Ids/ that
-      are free in the call, but not the /TyVars/.  Hence using specArgFreeIds
-      in singleCall.
+      upwards. We deal with this in `deleteCallsMentioning`,
+      when `Opt_PolymorphicSpecialisation` is on
 
   NB to be fully kosher we should explicitly quantifying the CallInfo
   over 's', but we don't bother.  This would matter if there was an
@@ -2953,8 +3004,8 @@ over too many type variables. But that too is now fixed;
 see Note [Which type variables to abstract over] in that module.
 -}
 
-instance Outputable DictBind where
-  ppr (DB { db_bind = bind, db_fvs = fvs })
+instance Outputable FloatBind where
+  ppr (DB { fb_bind = bind, fb_fvs = fvs })
     = text "DB" <+> braces (sep [ text "fvs: " <+> ppr fvs
                                 , text "bind:" <+> ppr bind ])
 
@@ -2964,15 +3015,15 @@ instance Outputable UsageDetails where
                 [text "binds" <+> equals <+> ppr dbs,
                  text "calls" <+> equals <+> ppr calls]))
 
-instance Outputable FloatedDictBinds where
-  ppr (FDB { fdb_binds = binds }) = ppr binds
+instance Outputable FloatBinds where
+  ppr (FDB { fbs_binds = binds }) = ppr binds
 
 emptyUDs :: UsageDetails
 emptyUDs = MkUD { ud_binds = emptyFDBs, ud_calls = emptyDVarEnv }
 
 
-emptyFDBs :: FloatedDictBinds
-emptyFDBs = FDB { fdb_binds = nilOL, fdb_bndrs = emptyVarSet }
+emptyFDBs :: FloatBinds
+emptyFDBs = FDB { fbs_binds = nilOL, fbs_bndrs = emptyVarSet }
 
 ------------------------------------------------------------
 type CallDetails  = DIdEnv CallInfoSet
@@ -2990,9 +3041,9 @@ data CallInfo
   = CI { ci_key  :: [SpecArg]   -- Arguments of the call
                                 -- See Note [The (CI-KEY) invariant]
 
-       , ci_fvs  :: IdSet       -- Free Ids of the ci_key call
+       , ci_fvs  :: IdSet       -- All free vars of ci_key arguments
                                 -- /not/ including the main id itself, of course
-                                -- NB: excluding tyvars:
+                                -- NB: including tyvars:
                                 --     See Note [Specialising polymorphic dictionaries]
     }
 
@@ -3047,21 +3098,15 @@ getTheta = fmap piTyBinderType . filter isInvisiblePiTyBinder . filter isAnonPiT
 
 
 ------------------------------------------------------------
-singleCall :: SpecEnv -> Id -> [SpecArg] -> UsageDetails
-singleCall spec_env id args
+singleCall :: Id -> [SpecArg] -> UsageDetails
+singleCall id args
   = MkUD {ud_binds = emptyFDBs,
           ud_calls = unitDVarEnv id $ CIS id $
-                     unitBag (CI { ci_key  = args
-                                 , ci_fvs  = fvVarSet call_fvs }) }
+                     unitBag call_info }
   where
-    poly_spec = gopt Opt_PolymorphicSpecialisation (se_dflags spec_env)
-
-    -- With -fpolymorphic-specialisation, keep just local /Ids/
-    -- Otherwise, keep /all/ free vars including TyVars
-    -- See (MP1) in Note [Specialising polymorphic dictionaries]
-    -- But NB: we don't include the 'id' itself.
-    call_fvs | poly_spec = specArgsFVs isLocalId args
-             | otherwise = specArgsFVs isLocalVar args
+    call_info = CI { ci_key  = args
+                   , ci_fvs  = specArgsFVs args }
+    -- See (STV1) in Note [Specialisation and type-variable bindings]
 
 mkCallUDs :: SpecEnv -> OutExpr -> [OutExpr] -> UsageDetails
 mkCallUDs env fun args
@@ -3076,7 +3121,7 @@ mkCallUDs' env f args
   | wantCallsFor env f    -- We want it, and...
   , not (null ci_key)     -- this call site has a useful specialisation
   = -- pprTrace "mkCallUDs: keeping" _trace_doc
-    singleCall env f ci_key
+    singleCall f ci_key
 
   | otherwise  -- See also Note [Specialisations already covered]
   = -- pprTrace "mkCallUDs: discarding" _trace_doc
@@ -3352,21 +3397,21 @@ thenUDs (MkUD {ud_binds = db1, ud_calls = calls1})
   = MkUD { ud_binds       = db1    `thenFDBs`   db2
          , ud_calls       = calls1 `unionCalls`  calls2 }
 
-thenFDBs :: FloatedDictBinds -> FloatedDictBinds -> FloatedDictBinds
--- Combine FloatedDictBinds
+thenFDBs :: FloatBinds -> FloatBinds -> FloatBinds
+-- Combine FloatBinds
 -- In (dbs1 `thenFDBs` dbs2), dbs2 may mention dbs1 but not vice versa
-thenFDBs (FDB { fdb_binds = dbs1, fdb_bndrs = bs1 })
-         (FDB { fdb_binds = dbs2, fdb_bndrs = bs2 })
-  = FDB { fdb_binds = dbs1 `appOL` dbs2
-        , fdb_bndrs = bs1  `unionVarSet` bs2 }
+thenFDBs (FDB { fbs_binds = dbs1, fbs_bndrs = bs1 })
+         (FDB { fbs_binds = dbs2, fbs_bndrs = bs2 })
+  = FDB { fbs_binds = dbs1 `appOL` dbs2
+        , fbs_bndrs = bs1  `unionVarSet` bs2 }
 
 -----------------------------
-_dictBindBndrs :: OrdList DictBind -> [Id]
-_dictBindBndrs dbs = foldr ((++) . bindersOf . db_bind) [] dbs
+_dictBindBndrs :: OrdList FloatBind -> [Id]
+_dictBindBndrs dbs = foldr ((++) . bindersOf . fb_bind) [] dbs
 
--- | Construct a 'DictBind' from a 'CoreBind'
-mkDB :: CoreBind -> DictBind
-mkDB bind = DB { db_bind = bind, db_fvs = bind_fvs bind }
+-- | Construct a 'FloatBind' from a 'CoreBind'
+mkDB :: CoreBind -> FloatBind
+mkDB bind = DB { fb_bind = bind, fb_fvs = bind_fvs bind }
 
 -- | Identify the free variables of a 'CoreBind'
 bind_fvs :: CoreBind -> VarSet
@@ -3397,54 +3442,54 @@ pair_fvs (bndr, rhs) = bndr_fvs `unionVarSet` rhs_fvs
         --         whether a dictionary binding depends on an imported
         --         DFun in case we try to specialise that imported DFun
 
--- | Flatten a set of "dumped" 'DictBind's, and some other binding
+-- | Flatten a set of "dumped" 'FloatBind's, and some other binding
 -- pairs, into a single recursive binding.
-recWithDumpedDicts :: [(Id,CoreExpr)] -> OrdList DictBind -> DictBind
+recWithDumpedDicts :: [(Id,CoreExpr)] -> OrdList FloatBind -> FloatBind
 recWithDumpedDicts pairs dbs
-  = DB { db_bind = Rec bindings
-       , db_fvs = fvs `delVarSetList` map fst bindings }
+  = DB { fb_bind = Rec bindings
+       , fb_fvs = fvs `delVarSetList` map fst bindings }
   where
     (bindings, fvs) = foldr add ([], emptyVarSet)
                                 (dbs `snocOL` mkDB (Rec pairs))
-    add (DB { db_bind = bind, db_fvs = fvs }) (prs_acc, fvs_acc)
+    add (DB { fb_bind = bind, fb_fvs = fvs }) (prs_acc, fvs_acc)
       = case bind of
           NonRec b r -> ((b,r) : prs_acc, fvs')
           Rec prs1   -> (prs1 ++ prs_acc, fvs')
       where
         fvs' = fvs_acc `unionVarSet` fvs
 
-snocDictBind :: UsageDetails -> DictBind -> UsageDetails
-snocDictBind uds@MkUD{ud_binds= FDB { fdb_binds = dbs, fdb_bndrs = bs }} db
-  = uds { ud_binds = FDB { fdb_binds = dbs `snocOL` db
-                         , fdb_bndrs = bs `extendVarSetList` bindersOfDictBind db } }
+snocFloatBind :: UsageDetails -> FloatBind -> UsageDetails
+snocFloatBind uds@MkUD{ud_binds= FDB { fbs_binds = dbs, fbs_bndrs = bs }} db
+  = uds { ud_binds = FDB { fbs_binds = dbs `snocOL` db
+                         , fbs_bndrs = bs `extendVarSetList` bindersOfFloatBind db } }
 
-snocDictBinds :: UsageDetails -> [DictBind] -> UsageDetails
+snocFloatBinds :: UsageDetails -> OrdList FloatBind -> UsageDetails
 -- Add ud_binds to the tail end of the bindings in uds
-snocDictBinds uds@MkUD{ud_binds=FDB{ fdb_binds = binds, fdb_bndrs = bs }} dbs
-  = uds { ud_binds = FDB { fdb_binds = binds `appOL`        (toOL dbs)
-                         , fdb_bndrs = bs    `extendVarSetList` bindersOfDictBinds dbs } }
+snocFloatBinds uds@MkUD{ud_binds=FDB{ fbs_binds = binds, fbs_bndrs = bs }} dbs
+  = uds { ud_binds = FDB { fbs_binds = binds `appOL`            dbs
+                         , fbs_bndrs = bs    `extendVarSetList` bindersOfFloatBinds dbs } }
 
-consDictBinds :: [DictBind] -> UsageDetails -> UsageDetails
-consDictBinds dbs uds@MkUD{ud_binds=FDB{fdb_binds = binds, fdb_bndrs = bs}}
-  = uds { ud_binds = FDB{ fdb_binds = toOL dbs `appOL` binds
-                        , fdb_bndrs = bs `extendVarSetList` bindersOfDictBinds dbs } }
+consFloatBinds :: OrdList FloatBind -> UsageDetails -> UsageDetails
+consFloatBinds dbs uds@MkUD{ud_binds=FDB{fbs_binds = binds, fbs_bndrs = bs}}
+  = uds { ud_binds = FDB{ fbs_binds = dbs `appOL` binds
+                        , fbs_bndrs = bs `extendVarSetList` bindersOfFloatBinds dbs } }
 
-wrapDictBinds :: FloatedDictBinds -> [CoreBind] -> [CoreBind]
-wrapDictBinds (FDB { fdb_binds = dbs }) binds
+wrapFloatBinds :: FloatBinds -> [CoreBind] -> [CoreBind]
+wrapFloatBinds (FDB { fbs_binds = dbs }) binds
   = foldr add binds dbs
   where
-    add (DB { db_bind = bind }) binds = bind : binds
+    add (DB { fb_bind = bind }) binds = bind : binds
 
-wrapDictBindsE :: OrdList DictBind -> CoreExpr -> CoreExpr
-wrapDictBindsE dbs expr
+wrapFloatBindsE :: OrdList FloatBind -> CoreExpr -> CoreExpr
+wrapFloatBindsE dbs expr
   = foldr add expr dbs
   where
-    add (DB { db_bind = bind }) expr = Let bind expr
+    add (DB { fb_bind = bind }) expr = Let bind expr
 
 ----------------------
-dumpUDs :: [CoreBndr] -> UsageDetails -> (UsageDetails, OrdList DictBind)
+dumpUDs :: SpecEnv -> [CoreBndr] -> UsageDetails -> (UsageDetails, OrdList FloatBind)
 -- Used at binder; just dump anything mentioning the binder
-dumpUDs bndrs uds@(MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
+dumpUDs env bndrs uds@(MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
   | null bndrs = (uds, nilOL)  -- Common in case alternatives
   | otherwise  = -- pprTrace "dumpUDs" (vcat
                  --   [ text "bndrs" <+> ppr bndrs
@@ -3455,19 +3500,20 @@ dumpUDs bndrs uds@(MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
   where
     free_uds = uds { ud_binds = free_dbs, ud_calls = free_calls }
     bndr_set = mkVarSet bndrs
-    (free_dbs, dump_dbs, dump_set) = splitDictBinds orig_dbs bndr_set
+    (free_dbs, dump_dbs, dump_set) = splitFloatBinds orig_dbs bndr_set
 
     -- Delete calls:
     --   * For any binder in `bndrs`
     --   * That mention a dictionary bound in `dump_set`
     -- These variables aren't in scope "above" the binding and the `dump_dbs`,
     -- so no call should mention them.  (See #26682.)
-    free_calls = deleteCallsMentioning dump_set $
+    free_calls = deleteCallsMentioning env dump_set $
                  deleteCallsFor bndrs orig_calls
 
-dumpBindUDs :: Bool   -- Main binding can float to top
+dumpBindUDs :: SpecEnv
+            -> Bool   -- Main binding can float to top
             -> [CoreBndr] -> UsageDetails
-            -> (UsageDetails, OrdList DictBind, Bool)
+            -> (UsageDetails, OrdList FloatBind, Bool)
 -- Used at a let(rec) binding.
 -- We return a boolean indicating whether the binding itself
 --    is mentioned, directly or indirectly, by any of the ud_calls;
@@ -3475,17 +3521,17 @@ dumpBindUDs :: Bool   -- Main binding can float to top
 --    See Note [Floated dictionary bindings]
 -- If the boolean is True, then the returned ud_calls can mention `bndrs`;
 -- if False, then returned ud_calls must not mention `bndrs`
-dumpBindUDs can_float_bind bndrs (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
+dumpBindUDs env can_float_bind bndrs (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
   = ( MkUD { ud_binds = free_dbs, ud_calls = free_calls2 }
     , dump_dbs
     , can_float_bind && calls_mention_bndrs )
   where
     bndr_set = mkVarSet bndrs
-    (free_dbs, dump_dbs, dump_set) = splitDictBinds orig_dbs bndr_set
+    (free_dbs, dump_dbs, dump_set) = splitFloatBinds orig_dbs bndr_set
     free_calls1 = deleteCallsFor bndrs orig_calls
     calls_mention_bndrs = dump_set `intersectsVarSet` callDetailsFVs free_calls1
     free_calls2 | can_float_bind = free_calls1
-                | otherwise      = deleteCallsMentioning dump_set free_calls1
+                | otherwise      = deleteCallsMentioning env dump_set free_calls1
 
 callsForMe :: Id -> UsageDetails -> (UsageDetails, [CallInfo])
 callsForMe fn uds@MkUD { ud_binds = orig_dbs, ud_calls = orig_calls }
@@ -3502,22 +3548,22 @@ callsForMe fn uds@MkUD { ud_binds = orig_dbs, ud_calls = orig_calls }
                         Just cis -> filterCalls cis orig_dbs
 
 ----------------------
-filterCalls :: CallInfoSet -> FloatedDictBinds -> [CallInfo]
+filterCalls :: CallInfoSet -> FloatBinds -> [CallInfo]
 -- Remove
 --   (a) dominated calls: (MP3) in Note [Specialising polymorphic dictionaries]
 --   (b) loopy DFuns: Note [Avoiding loops (DFuns)]
-filterCalls (CIS fn call_bag) (FDB { fdb_binds = dbs })
+filterCalls (CIS fn call_bag) (FDB { fbs_binds = dbs })
   | isDFunId fn  = filter ok_call de_dupd_calls  -- Deals with (b)
   | otherwise    = de_dupd_calls
   where
     de_dupd_calls = removeDupCalls call_bag -- Deals with (a)
 
     dump_set = foldl' go (unitVarSet fn) dbs
-      -- This dump-set could also be computed by splitDictBinds
-      --   (_,_,dump_set) = splitDictBinds dbs {fn}
+      -- This dump-set could also be computed by splitFloatBinds
+      --   (_,_,dump_set) = splitFloatBinds dbs {fn}
       -- But this variant is shorter
 
-    go so_far (DB { db_bind = bind, db_fvs = fvs })
+    go so_far (DB { fb_bind = bind, fb_fvs = fvs })
        | fvs `intersectsVarSet` so_far
        = extendVarSetList so_far (bindersOf bind)
        | otherwise = so_far
@@ -3558,16 +3604,16 @@ beats_or_same (CI { ci_key = args1 }) (CI { ci_key = args2 })
     go_arg _              _              = False
 
 ----------------------
-splitDictBinds :: FloatedDictBinds -> IdSet -> (FloatedDictBinds, OrdList DictBind, IdSet)
--- splitDictBinds dbs bndrs returns
+splitFloatBinds :: FloatBinds -> IdSet -> (FloatBinds, OrdList FloatBind, IdSet)
+-- splitFloatBinds dbs bndrs returns
 --   (free_dbs, dump_dbs, dump_set)
 -- where
 --   * dump_dbs depends, transitively on bndrs
 --   * free_dbs does not depend on bndrs
 --   * dump_set = bndrs `union` bndrs(dump_dbs)
-splitDictBinds (FDB { fdb_binds = dbs, fdb_bndrs = bs }) bndr_set
-   = (FDB { fdb_binds = free_dbs
-          , fdb_bndrs = bs `minusVarSet` dump_set }
+splitFloatBinds (FDB { fbs_binds = dbs, fbs_bndrs = bs }) bndr_set
+   = (FDB { fbs_binds = free_dbs
+          , fbs_bndrs = bs `minusVarSet` dump_set }
      , dump_dbs, dump_set)
    where
     (free_dbs, dump_dbs, dump_set)
@@ -3576,7 +3622,7 @@ splitDictBinds (FDB { fdb_binds = dbs, fdb_bndrs = bs }) bndr_set
                 -- we're accumulating the set of dumped ids in dump_set
 
     split_db (free_dbs, dump_dbs, dump_idset) db
-        | DB { db_bind = bind, db_fvs = fvs } <- db
+        | DB { fb_bind = bind, fb_fvs = fvs } <- db
         , dump_idset `intersectsVarSet` fvs     -- Dump it
         = (free_dbs, dump_dbs `snocOL` db,
            extendVarSetList dump_idset (bindersOf bind))
@@ -3586,15 +3632,26 @@ splitDictBinds (FDB { fdb_binds = dbs, fdb_bndrs = bs }) bndr_set
 
 
 ----------------------
-deleteCallsMentioning :: VarSet -> CallDetails -> CallDetails
+deleteCallsMentioning :: SpecEnv -> VarSet -> CallDetails -> CallDetails
 -- Remove calls mentioning any Id in bndrs
 -- NB: The call is allowed to mention TyVars in bndrs
 --     Note [Specialising polymorphic dictionaries]
 --     ci_fvs are just the free /Ids/
-deleteCallsMentioning bndrs calls
+deleteCallsMentioning env bndrs calls
   = mapDVarEnv (ciSetFilter keep_call) calls
   where
-    keep_call (CI { ci_fvs = fvs }) = fvs `disjointVarSet` bndrs
+    keep_call (CI { ci_fvs = fvs }) = fvs `disjointVarSet` bad_bndrs
+
+    poly_spec = gopt Opt_PolymorphicSpecialisation (se_dflags env)
+
+    -- With -fpolymorphic-specialisation, we allow calls to float outside
+    -- the binding of a TyVar, so we restrict the bad_bndrs to just the Ids
+    -- See (STV2) in Note [Specialisation and type-variable bindings]
+    -- and (MP1) in Note [Specialising polymorphic dictionaries]
+    -- But NB: we don't include the 'id' itself.
+    bad_bndrs | poly_spec = filterVarSet isId bndrs
+              | otherwise = bndrs
+
 
 deleteCallsFor :: [Id] -> CallDetails -> CallDetails
 -- Remove calls *for* bndrs

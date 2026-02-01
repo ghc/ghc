@@ -143,6 +143,7 @@ exprType e = go emptyVarSet e
     --   should return (Maybe (Int,b)), having expanded out the `a`
     expand = expandTyVarUnfoldings
 
+    go :: VarSet -> CoreExpr -> Type
     go tvs (Var var)         = expand tvs $ idType var
     go tvs (Lit lit)         = expand tvs $ literalType lit
     go tvs (Coercion co)     = expand tvs $ coercionType co
@@ -1379,7 +1380,12 @@ coercionIsTrivial :: Coercion -> Bool
 coercionIsTrivial co = coercionSize co < 10    -- Try this out
 
 {-# INLINE trivial_expr_fold #-}
-trivial_expr_fold :: (Id -> r) -> (Literal -> r) -> r -> r -> CoreExpr -> r
+trivial_expr_fold :: (Coercion -> Bool)  -- Whether a coercion is trivial
+                  -> (Id -> r)           -- What to do for a Var
+                  -> (Literal -> r)      -- What to do for a Lit
+                  -> r                   -- What do to for other trivial
+                  -> r                   -- What to do for non-trivial
+                  -> CoreExpr -> r
 -- ^ The worker function for Note [exprIsTrivial] and Note [getIdFromTrivialExpr]
 -- This is meant to have the code of both functions in one place and make it
 -- easy to derive custom predicates.
@@ -1394,7 +1400,7 @@ trivial_expr_fold :: (Id -> r) -> (Literal -> r) -> r -> r -> CoreExpr -> r
 -- * Type application or abstraction
 -- * Ticks other than `tickishIsCode`
 -- * `case e of {}` an empty case
-trivial_expr_fold k_id k_lit k_triv k_not_triv = go
+trivial_expr_fold co_is_triv k_id k_lit k_triv k_not_triv = go
   where
     -- If you change this function, be sure to change
     -- SetLevels.notWorthFloating as well!
@@ -1402,14 +1408,14 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     go (Var v)                              = k_id v  -- See Note [Variables are trivial]
     go (Lit l)    | litIsTrivial l          = k_lit l
     go (Type _)                             = k_triv
-    go (Coercion co) | coercionIsTrivial co = k_triv
+    go (Coercion co) | co_is_triv co        = k_triv
     go (App f arg)
       | not (isRuntimeArg arg)              = go f
       | exprIsUnaryClassFun f               = go arg
       | otherwise                           = k_not_triv
     go (Lam b e)   | not (isRuntimeVar b)   = go e
     go (Tick t e)  | not (tickishIsCode t)  = go e              -- See Note [Tick trivial]
-    go (Cast e co) | coercionIsTrivial co   = go e
+    go (Cast e co) | co_is_triv co          = go e
     go (Let b e)   | isTyCoBind b           = go e
        -- ToDo: what about a non-triv coercion?
     go (Case e b _ as)
@@ -1420,7 +1426,7 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     go _                                  = k_not_triv
 
 exprIsTrivial :: CoreExpr -> Bool
-exprIsTrivial e = trivial_expr_fold (const True) (const True) True False e
+exprIsTrivial e = trivial_expr_fold coercionIsTrivial (const True) (const True) True False e
 
 {-
 Note [getIdFromTrivialExpr]
@@ -1441,12 +1447,12 @@ T12076lit for an example where this matters.
 
 getIdFromTrivialExpr :: HasDebugCallStack => CoreExpr -> Id
 -- See Note [getIdFromTrivialExpr]
-getIdFromTrivialExpr e = trivial_expr_fold id (const panic) panic panic e
+getIdFromTrivialExpr e = trivial_expr_fold (const True) id (const panic) panic panic e
   where
     panic = pprPanic "getIdFromTrivialExpr" (ppr e)
 
 getIdFromTrivialExpr_maybe :: CoreExpr -> Maybe Id
-getIdFromTrivialExpr_maybe e = trivial_expr_fold Just (const Nothing) Nothing Nothing e
+getIdFromTrivialExpr_maybe e = trivial_expr_fold (const True) Just (const Nothing) Nothing Nothing e
 
 {- *********************************************************************
 *                                                                      *
@@ -3299,8 +3305,6 @@ Wrinkles
          = \a. \(x:[a]). let @b = [a] in
                          reverse (x:b)
   where the /occurrence/ Var (x:b) has a different type to the /binding/ x:[a].
-  Worse
-
 -}
 
 type AbsVar        = Var
@@ -3317,26 +3321,33 @@ mkPolyAbsLams :: forall b. (b -> AbsVar, Var -> b -> b)
 mkPolyAbsLams (getter,setter) bndrs body
   = go emptyVarSet [] bndrs
   where
-    go :: TyVarSet   -- Earlier TyVar bndrs that have TyVarUnfoldings
-       -> [Bind b]   -- Accumulated impedence-matching bindings (reversed)
-       -> [b]        -- Binders, bs
-       -> Expr b     -- The resulting lambda
-    go _ binds [] = mkLets (reverse binds) body
+    wrap_bind :: Expr b -> (b,Expr b) -> Expr b
+    -- wrap_bind e (bndr, rhs)  =   (\bndr.e) rhs
+    -- Very like  let bndr=rhs in e
+    -- but, for type-bindings at least, does not require that the occurrences
+    -- of bndr have the unfolding from the let-binding
+    wrap_bind e (bndr, rhs) = App (Lam bndr e) rhs
+
+    go :: TyVarSet     -- Earlier TyVar bndrs that have TyVarUnfoldings
+       -> [(b,Expr b)] -- Accumulated impedence-matching bindings (reversed)
+       -> [b]          -- Binders, bs
+       -> Expr b       -- The resulting lambda
+    go _ binds [] = foldl wrap_bind body binds
 
     go unf_tvs binds (bndr:bndrs)
 
       | Just ty <- tyVarUnfolding_maybe var
-      = go (unf_tvs `extendVarSet` var) (NonRec bndr (Type ty) : binds) bndrs
+      = go (unf_tvs `extendVarSet` var) ((bndr, Type ty) : binds) bndrs
 
       | isTyVar var, change_ty
       , let binds' | isDeadBinder var = binds
-                   | otherwise        = NonRec bndr (Type (mkTyVarTy var1)) : binds
+                   | otherwise        = (bndr, varToCoreExpr var1) : binds
             -- Why this let-binding?
       = Lam (setter var1 bndr) (go unf_tvs binds' bndrs)
 
       | isId var, change_ty || change_unf
       , let binds' | isDeadBinder var = binds
-                   | otherwise        = NonRec bndr (varToCoreExpr id2) : binds
+                   | otherwise        = (bndr, varToCoreExpr id2) : binds
       = Lam (setter id2 bndr) (go unf_tvs binds' bndrs)
 
       | otherwise

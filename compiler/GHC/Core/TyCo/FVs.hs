@@ -6,7 +6,7 @@ module GHC.Core.TyCo.FVs
         tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet,
 
         tyCoFVsBndr, tyCoFVsVarBndr, tyCoFVsVarBndrs,
-        tyCoFVsOfType, tyCoVarsOfTypeList,
+        tyCoFVsOfType, tyCoVarsOfTypeList, someTyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
         deepTcvFolder,
 
@@ -600,6 +600,9 @@ tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
 tyCoVarsOfTypeList :: Type -> [TyCoVar]
 -- See Note [Free variables of types]
 tyCoVarsOfTypeList ty = fvVarList $ tyCoFVsOfType ty
+
+someTyCoVarsOfTypeList :: InterestingVarFun -> Type -> [TyCoVar]
+someTyCoVarsOfTypeList fv_cand ty = fvVarList $ filterFV fv_cand $ tyCoFVsOfType ty
 
 -- | Returns free variables of types, including kind variables as
 -- a deterministic set. For type synonyms it does /not/ expand the
