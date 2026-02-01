@@ -259,6 +259,7 @@ extensionName = \case
   LangExt.MultilineStrings -> "MultilineStrings"
   LangExt.ExplicitLevelImports -> "ExplicitLevelImports"
   LangExt.ImplicitStagePersistence -> "ImplicitStagePersistence"
+  LangExt.QualifiedStrings -> "QualifiedStrings"
 
 -- | Is this extension known by any other names? For example
 -- -XGeneralizedNewtypeDeriving is accepted

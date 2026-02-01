@@ -963,6 +963,8 @@ zonkExpr (HsOverLit x lit)
   = do  { lit' <- zonkOverLit lit
         ; return (HsOverLit x lit') }
 
+zonkExpr (HsQualLit _ lit) = case lit of
+
 zonkExpr (HsLam x lam_variant matches)
   = do new_matches <- zonkMatchGroup zonkLExpr matches
        return (HsLam x lam_variant new_matches)

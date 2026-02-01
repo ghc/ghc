@@ -1033,6 +1033,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
         [ toHie $ L (l2l loc :: SrcSpanAnnA) lit
         , toHieSyntax (L ospan eq)
         ]
+      QualLitPat _ _ -> []
       NPlusKPat _ n (L loc lit) _ ord _ ->
         [ toHie $ C (PatternBind scope pscope rsp) n
         , toHie $ L (l2l loc :: SrcSpanAnnA) lit
@@ -1145,6 +1146,8 @@ the typechecker:
 
   * HsOverLit, where we assign the SrcSpan of the overloaded literal
     to ol_from_fun.
+  * HsQualLit, where we return an empty list, since we rename to the qualified
+    function call entirely before the typechecking phase.
   * HsDo, where we give the SrcSpan of the entire do block to each
     ApplicativeStmt.
   * Expanded (via ExpandedThingRn) ExplicitList{}, where we give the SrcSpan of the original
@@ -1173,6 +1176,10 @@ instance HiePass p => ToHie (LocatedA (HsOverLit (GhcPass p))) where
         ]
       -- See Note [Source locations for implicit function calls]
 
+instance HiePass p => ToHie (LocatedA (HsQualLit (GhcPass p))) where
+  -- See Note [Source locations for implicit function calls]
+  toHie (L _ QualLit{}) = pure []
+
 instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
       HsVar _ (L _ var) ->
@@ -1185,6 +1192,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         [ toHie (L mspan o)
         ]
       HsLit _ _ -> []
+      HsQualLit _ _ -> []
       HsLam _ _ mg ->
         [ toHie mg
         ]

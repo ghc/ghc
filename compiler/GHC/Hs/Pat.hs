@@ -143,7 +143,8 @@ type instance XSplicePat GhcPs = NoExtField
 type instance XSplicePat GhcRn = HsUntypedSpliceResult (Pat GhcRn) -- See Note [Lifecycle of a splice] in GHC.Hs.Expr
 type instance XSplicePat GhcTc = DataConCantHappen
 
-type instance XLitPat    (GhcPass _) = NoExtField
+type instance XLitPat     (GhcPass _) = NoExtField
+type instance XQualLitPat (GhcPass _) = NoExtField
 
 type instance XNPat GhcPs = EpToken "-"
 type instance XNPat GhcRn = EpToken "-"
@@ -415,6 +416,7 @@ pprPat (AsPat _ name pat)       = hcat [pprPrefixOcc (unLoc name), char '@',
 pprPat (ViewPat _ expr pat)     = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat _ pat)           = parens (ppr pat)
 pprPat (LitPat _ s)             = ppr s
+pprPat (QualLitPat _ lit)       = ppr lit
 pprPat (NPat _ l Nothing  _)    = ppr l
 pprPat (NPat _ l (Just _) _)    = char '-' <> ppr l
 pprPat (NPlusKPat _ n k _ _ _)  = hcat [ppr_n, char '+', ppr k]
@@ -669,6 +671,7 @@ isIrrefutableHsPat is_strict irref_conLike pat = go (unLoc pat)
                            =  irref_conLike con
                            && all goL (hsConPatArgs details)
     go (LitPat {})         = False
+    go (QualLitPat {})     = False
     go (NPat {})           = False
     go (NPlusKPat {})      = False
 
@@ -744,6 +747,7 @@ isBoringHsPat = goL
               -> False
       OrPat _ pats  -> all goL pats
       LitPat {}     -> True
+      QualLitPat {} -> True
       NPat {}       -> True
       NPlusKPat {}  -> True
       SplicePat {}  -> False
@@ -1082,6 +1086,7 @@ patNeedsParens p = go @p
     go (SumPat {})       = False
     go (ListPat {})      = False
     go (LitPat _ l)      = hsLitNeedsParens p l
+    go (QualLitPat _ _)  = False
     go (NPat _ lol _ _)  = hsOverLitNeedsParens p (unLoc lol)
 
 -- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@

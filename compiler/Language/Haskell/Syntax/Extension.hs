@@ -464,6 +464,7 @@ type family XOverLabel      x
 type family XIPVar          x
 type family XOverLitE       x
 type family XLitE           x
+type family XQualLitE       x
 type family XLam            x
 type family XLamCase        x
 type family XApp            x
@@ -630,6 +631,11 @@ type family XXLit x
 type family XOverLit  x
 type family XXOverLit x
 
+-- -------------------------------------
+-- HsQualLit type families
+type family XQualLit  x
+type family XXQualLit x
+
 -- =====================================================================
 -- Type families for the HsPat extension points
 
@@ -647,6 +653,7 @@ type family XConPat      x
 type family XViewPat     x
 type family XSplicePat   x
 type family XLitPat      x
+type family XQualLitPat  x
 type family XNPat        x
 type family XNPlusKPat   x
 type family XSigPat      x

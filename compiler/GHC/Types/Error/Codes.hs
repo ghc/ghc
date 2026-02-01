@@ -276,6 +276,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrOverloadedRecordUpdateNoQualifiedFields"  = 94863
   GhcDiagnosticCode "PsErrExplicitForall"                           = 25955
   GhcDiagnosticCode "PsErrIllegalQualifiedDo"                       = 40280
+  GhcDiagnosticCode "PsErrIllegalMultilineStrings"                  = 47920
   GhcDiagnosticCode "PsErrQualifiedDoInCmd"                         = 54089
   GhcDiagnosticCode "PsErrRecordSyntaxInPatSynDecl"                 = 28021
   GhcDiagnosticCode "PsErrEmptyWhereInPatSynDecl"                   = 13248

@@ -1272,6 +1272,7 @@ collect_pat flag pat bndrs = case pat of
       -- binding pattern, so we return [].
   SumPat _ pat _ _      -> collect_lpat flag pat bndrs
   LitPat _ _            -> bndrs
+  QualLitPat {}         -> bndrs
   NPat {}               -> bndrs
   NPlusKPat _ n _ _ _ _ -> unXRec @p n : bndrs
   SigPat _ pat sig      -> case flag of

@@ -47,6 +47,7 @@ hsPatType (VarPat _ lvar)               = idType (unLoc lvar)
 hsPatType (BangPat _ pat)               = hsLPatType pat
 hsPatType (LazyPat _ pat)               = hsLPatType pat
 hsPatType (LitPat _ lit)                = hsLitType lit
+hsPatType (QualLitPat _ lit)            = case lit of
 hsPatType (AsPat _ var _)               = idType (unLoc var)
 hsPatType (ViewPat ty _ _)              = ty
 hsPatType (ListPat ty _)                = mkListTy ty
@@ -106,6 +107,7 @@ hsExprType (HsOverLabel v _) = dataConCantHappen v
 hsExprType (HsIPVar v _) = dataConCantHappen v
 hsExprType (HsOverLit _ lit) = overLitType lit
 hsExprType (HsLit _ lit) = hsLitType lit
+hsExprType (HsQualLit _ lit) = case lit of
 hsExprType (HsLam _ _ (MG { mg_ext = match_group })) = matchGroupTcType match_group
 hsExprType (HsApp _ f _) = funResultTy $ lhsExprType f
 hsExprType (HsAppType x f _) = piResultTy (lhsExprType f) x

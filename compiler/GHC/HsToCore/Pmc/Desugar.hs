@@ -137,6 +137,13 @@ desugarPat x pat = case pat of
           , is_to_list (unLoc lrhs)
           -> desugarLPat x pat
 
+        QualLitPat _ QualLit{ql_val}
+          | ViewPat ty _ _ <- expansion
+          -> case ql_val of
+            -- Desugar qualified string literals the same as RebindableSyntax
+            -- See Note [Implementation of QualifiedStrings]
+            HsQualString _ s -> mkPmLitGrds x $ PmLit ty (PmLitOverString s)
+
         _ -> desugarPat x expansion
 
     -- See Note [Desugar CoPats]
@@ -221,6 +228,9 @@ desugarPat x pat = case pat of
     core_expr <- dsLit lit
     let lit = expectJust (coreExprAsPmLit core_expr)
     mkPmLitGrds x lit
+
+  -- Uninhabited in the GhcTc phase
+  QualLitPat _ lit -> case lit of
 
   TuplePat _tys pats boxity -> do
     (vars, grdss) <- mapAndUnzipM desugarLPatV pats

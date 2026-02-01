@@ -695,6 +695,7 @@ Library
         GHC.Rename.Expr
         GHC.Rename.Fixity
         GHC.Rename.HsType
+        GHC.Rename.Lit
         GHC.Rename.Module
         GHC.Rename.Names
         GHC.Rename.Pat

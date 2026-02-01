@@ -133,6 +133,8 @@ import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.Lexer.Interface
 import qualified GHC.Parser.Lexer.String as Lexer.String
 import GHC.Parser.String
+
+import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 }
 
 -- -----------------------------------------------------------------------------
@@ -612,6 +614,10 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
   \' @char        \'                                   { tok_char }
   \' @char        \' \# / { ifExtension MagicHashBit } { tok_char }
 
+  -- QualifiedStrings
+  @qual \"\"\"             / { ifExtension QualifiedStringsBit } { tok_qstrings tok_string_multi }
+  @qual \" @stringchar* \" / { ifExtension QualifiedStringsBit } { tok_qstrings tok_string }
+
   -- Check for smart quotes and throw better errors than a plain lexical error (#21843)
   \'              \\ $unigraphic / { isSmartQuote } { smart_quote_error }
   \" @stringchar* \\ $unigraphic / { isSmartQuote } { smart_quote_error }
@@ -914,8 +920,7 @@ data Token
                                          -- Note [Literal source text] in "GHC.Types.SourceText"
 
   | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstring   SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITstringMulti SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstring   SourceText StringMeta FastString -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITrational FractionalLit
 
@@ -2164,7 +2169,7 @@ tok_string span buf len _buf2 = do
         addError err
       pure $ L span (ITprimstring src (unsafeMkByteString s))
     else
-      pure $ L span (ITstring src (mkFastString s))
+      pure $ L span (ITstring src defaultStrMeta (mkFastString s))
   where
     src = SourceText $ lexemeToFastString buf len
     endsInHash = currentChar (offsetBytes (len - 1) buf) == '#'
@@ -2208,7 +2213,8 @@ tok_string_multi startSpan startBuf _len _buf2 = do
       lexMultilineString contentLen contentStartBuf
 
   setInput i'
-  pure $ L span $ ITstringMulti src (mkFastString s)
+  let meta = defaultStrMeta{strMetaMultiline = True}
+  pure $ L span $ ITstring src meta (mkFastString s)
   where
     goContent i0 =
       case Lexer.String.alexScan i0 Lexer.String.string_multi_content of
@@ -2264,6 +2270,36 @@ tok_quoted_label span buf len _buf2 = do
     -- skip leading '#'
     src = SourceText . mkFastString . drop 1 $ lexemeToString buf len
 
+-- See Note [Implementation of QualifiedStrings]
+tok_qstrings :: Action -> Action
+tok_qstrings lex_str span0 buf0 len0 endBuf0 = do
+  let modName = ModuleName $ lexemeToFastString buf0 modNameLen
+  (src, meta, s) <- unITstring <$> lex_str strSpan strBuf strLen endBuf0
+  pure $ L span0 $ ITstring src meta{strMetaQualified = Just modName} s
+  where
+    -- The buffer/span starting at the string literal
+    (strBuf, strSpanStart) =
+      let go buf loc =
+            case nextChar buf of
+              _ | atEnd buf -> panic "tok_qstrings unexpectedly hit EOF"
+              ('"', _) -> (buf, loc)
+              (c, buf') -> go buf' (advancePsLoc loc c)
+       in go buf0 (psSpanStart span0)
+
+    -- The length of the module name + string literal, separately
+    -- Make sure to handle the trailing dot at the end of the module name
+    modNameLen = byteDiff buf0 strBuf - 1
+    strLen = len0 - modNameLen - 1
+
+    -- The span starting at the string literal
+    --
+    -- Naive RealSrcSpan manipulation is okay here because the module qualifier
+    -- is guaranteed to be on a single line
+    strSpan = mkPsSpan strSpanStart (psSpanEnd span0)
+
+    unITstring = \case
+      L _ (ITstring src meta s) -> (src, meta, s)
+      tok -> panic $ "tok_qstrings got unexpected token: " ++ show tok
 
 tok_char :: Action
 tok_char span buf len _buf2 = do
@@ -2788,6 +2824,7 @@ data ExtBits
   | RequiredTypeArgumentsBit
   | MultilineStringsBit
   | LevelImportsBit
+  | QualifiedStringsBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2872,6 +2909,7 @@ mkParserOpts extensionFlags diag_opts
       .|. RequiredTypeArgumentsBit    `xoptBit` LangExt.RequiredTypeArguments
       .|. MultilineStringsBit         `xoptBit` LangExt.MultilineStrings
       .|. LevelImportsBit             `xoptBit` LangExt.ExplicitLevelImports
+      .|. QualifiedStringsBit         `xoptBit` LangExt.QualifiedStrings
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream

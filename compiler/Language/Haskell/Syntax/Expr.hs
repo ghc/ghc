@@ -330,11 +330,13 @@ data HsExpr p
 
   | HsIPVar   (XIPVar p)
               HsIPName   -- ^ Implicit parameter (not in use after typechecking)
+
   | HsOverLit (XOverLitE p)
               (HsOverLit p)  -- ^ Overloaded literals
-
   | HsLit     (XLitE p)
               (HsLit p)      -- ^ Simple (non-overloaded) literals
+  | HsQualLit (XQualLitE p)
+              (HsQualLit p)  -- ^ Qualified literals
 
   -- | Lambda, Lambda-case, and Lambda-cases
   | HsLam     (XLam p)

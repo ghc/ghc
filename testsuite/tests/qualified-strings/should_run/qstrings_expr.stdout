@@ -1,0 +1,10 @@
+>>> "I'm a String"
+[Char]
+>>> "I'm a Text"
+Text
+>>> "I'm an ASCII bytestring: \158"
+ByteString
+>>> "I'm a UTF8 bytestring: \232\170\158"
+ByteString
+>>> "I'm a multiline\nText value\n!"
+Text

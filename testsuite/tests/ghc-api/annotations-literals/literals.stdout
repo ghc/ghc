@@ -48,7 +48,7 @@
 
 (LiteralsTest.hs:9:3,ITequal,[=]),
 
-(LiteralsTest.hs:9:5-10,ITstring (SourceText "\"\\x20\"") " ",["\x20"]),
+(LiteralsTest.hs:9:5-10,ITstring (SourceText "\"\\x20\"") (StringMeta {strMetaMultiline = False, strMetaQualified = Nothing}) " ",["\x20"]),
 
 (LiteralsTest.hs:11:1,ITsemi,[]),
 

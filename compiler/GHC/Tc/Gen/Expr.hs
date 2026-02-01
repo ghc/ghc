@@ -413,6 +413,7 @@ tricky:
   We can only take this short-cut if rebindable syntax is off; see `tcShortCutLit`.
 -}
 
+tcExpr e@HsQualLit{} _ = pprPanic "tcExpr: HsQualLit" (ppr e)
 
 {-
 ************************************************************************

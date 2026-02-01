@@ -51,9 +51,11 @@ import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
-                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit, delLocalNames, typeAppErr )
+                           , wrapGenSpan, genHsApps, genLHsApp, genLHsVar, genHsIntegralLit, delLocalNames, typeAppErr )
 import GHC.Rename.HsType
+import GHC.Rename.Lit
 import GHC.Builtin.Names
+import GHC.Builtin.Types (trueDataConName)
 
 import GHC.Types.Hint
 import GHC.Types.Name
@@ -567,6 +569,20 @@ rnPatAndThen mk (LitPat x lit)
   | otherwise = normal_lit
   where
     normal_lit = do { liftCps (rnLit lit); return (LitPat x (convertLit lit)) }
+
+rnPatAndThen _ (QualLitPat x lit) = do
+  eqExpr <- liftCpsFV $ lookupSyntaxExpr eqName
+  (lit', desugaredExpr) <- liftCpsFV $ rnQualLit lit
+  let origPat = QualLitPat x lit'
+  let inverse = desugaredExpr -- The inverse of '((expr ==) -> True)' is simply 'expr'.
+  let desugaredPat = ViewPat (Just inverse) (genLHsApp eqExpr $ noLocA desugaredExpr) truePat
+  return $ mkExpandedPat origPat desugaredPat
+ where
+  truePat = noLocA $
+    ConPat
+      noExtField
+      (noLocA $ noUserRdr trueDataConName)
+      (PrefixCon [])
 
 rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
   = do { (lit', mb_neg') <- liftCpsFV $ rnOverLit lit

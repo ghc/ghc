@@ -14,6 +14,7 @@
 module Language.Haskell.Syntax.Lit where
 
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Module.Name (ModuleName)
 
 import GHC.Types.SourceText (IntegralLit, FractionalLit, SourceText)
 
@@ -155,3 +156,37 @@ instance Ord OverLitVal where
   HsIsString{}    `compare` HsIntegral{}    = GT
   HsIsString{}    `compare` HsFractional{}  = GT
   HsIsString _ s1 `compare` HsIsString _ s2 = s1 `lexicalCompareFS` s2
+
+-- | Haskell Qualified Literal
+data HsQualLit p
+  = QualLit
+      { ql_ext :: !(XQualLit p)
+      , ql_mod :: !ModuleName
+      , ql_val :: !QualLitVal
+      }
+  | XQualLit !(XXQualLit p)
+
+instance (Eq (XXQualLit p)) => Eq (HsQualLit p) where
+  QualLit _ m1 v1 == QualLit _ m2 v2 = (m1, v1) == (m2, v2)
+  QualLit{}       == _               = False
+  XQualLit x1     == XQualLit x2     = x1 == x2
+  XQualLit{}      == _               = False
+
+instance (Ord (XXQualLit p)) => Ord (HsQualLit p) where
+  -- QualLit
+  QualLit _ m1 v1 `compare` QualLit _ m2 v2 = (m1, v1) `compare` (m2, v2)
+  QualLit{}       `compare` XQualLit{}      = LT
+  -- XQualLit
+  XQualLit{}  `compare` QualLit{}   = GT
+  XQualLit x1 `compare` XQualLit x2 = x1 `compare` x2
+
+data QualLitVal
+  = HsQualString !SourceText !FastString
+    -- ^ See Note [Implementation of QualifiedStrings]
+  deriving (Data)
+
+instance Eq QualLitVal where
+  HsQualString _ s1 == HsQualString _ s2 = s1 == s2
+
+instance Ord QualLitVal where
+  HsQualString _ s1 `compare` HsQualString _ s2 = s1 `lexicalCompareFS` s2

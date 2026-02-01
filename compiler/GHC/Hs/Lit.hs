@@ -2,6 +2,7 @@
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable, OutputableBndrId
 
@@ -21,7 +22,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr( pprExpr )
 
-import GHC.Data.FastString (unpackFS)
+import GHC.Data.FastString (FastString, unpackFS)
 import GHC.Types.Basic (PprPrec(..), topPrec )
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Types.SourceText
@@ -33,6 +34,7 @@ import GHC.Hs.Extension
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit
+import Language.Haskell.Syntax.Module.Name (moduleNameString)
 
 {-
 ************************************************************************
@@ -209,10 +211,7 @@ Equivalently it's True if
 instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
     ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
-    ppr (HsString st s)     =
-      case st of
-        NoSourceText -> pprHsString s
-        SourceText src -> vcat $ map text $ split '\n' (unpackFS src)
+    ppr (HsString st s)     = pprHsStringLit st s
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))
@@ -232,6 +231,12 @@ instance IsPass p => Outputable (HsLit (GhcPass p)) where
       GhcTc -> case x of
          (HsInteger st i _) -> pprWithSourceText st (integer i)
          (HsRat  f _)       -> ppr f
+
+pprHsStringLit :: SourceText -> FastString -> SDoc
+pprHsStringLit st s =
+  case st of
+    NoSourceText -> pprHsString s
+    SourceText src -> vcat $ map text $ split '\n' (unpackFS src)
 
 -- in debug mode, print the expression that it's resolved to, too
 instance OutputableBndrId p
@@ -260,3 +265,18 @@ instance (Eq (XXOverLit p)) => Eq (HsOverLit p) where
   (OverLit _ val1) == (OverLit _ val2) = val1 == val2
   (XOverLit  val1) == (XOverLit  val2) = val1 == val2
   _ == _ = panic "Eq HsOverLit"
+
+-- -----------------------------------------------------------------------------
+-- HsQualLit
+
+type instance XQualLit GhcPs = NoExtField
+type instance XQualLit GhcRn = LIdP GhcRn
+type instance XQualLit GhcTc = DataConCantHappen
+
+type instance XXQualLit (GhcPass _) = DataConCantHappen
+
+instance OutputableBndrId p => Outputable (HsQualLit (GhcPass p)) where
+  ppr QualLit{..} = text (moduleNameString ql_mod) <> char '.' <> ppr ql_val
+
+instance Outputable QualLitVal where
+  ppr (HsQualString st s) = pprHsStringLit st s

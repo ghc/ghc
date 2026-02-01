@@ -42,6 +42,8 @@ Language
   This is achieved by arranging that ``?foo :: T`` has a representational
   role for ``T``.
 
+- Implement ``-XQualifiedStrings`` (`proposal <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0723-qualified-strings.rst>`_)
+
 Compiler
 ~~~~~~~~
 

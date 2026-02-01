@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE ViewPatterns        #-}
 
@@ -39,6 +40,7 @@ import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice
                           , rnUntypedSpliceExpr, checkThLocalNameWithLift, checkThLocalNameNoLift )
 import GHC.Rename.HsType
+import GHC.Rename.Lit
 import GHC.Rename.Pat
 
 import GHC.Driver.DynFlags
@@ -371,6 +373,11 @@ rnExpr (HsOverLit x lit)
               Just neg ->
                  return (HsApp noExtField (noLocA neg) (noLocA (HsOverLit x lit'))
                         , fvs ) }
+
+rnExpr (HsQualLit x lit) = do
+  ((lit', desugaredExpr), fvs) <- rnQualLit lit
+  let origExpr = HsQualLit x lit'
+  return (mkExpandedExpr origExpr desugaredExpr, fvs)
 
 rnExpr (HsApp x fun arg)
   = do { (fun',fvFun) <- rnLExpr fun
@@ -2371,6 +2378,7 @@ definitelyLazyPattern (L loc pat) =
     SumPat{}        -> False
     ConPat{}        -> False -- Some PatSyns are lazy; False is conservative
     LitPat{}        -> False
+    QualLitPat{}    -> False
     NPat{}          -> False -- Some NPats are lazy; False is conservative
     NPlusKPat{}     -> False
     SplicePat{}     -> False
