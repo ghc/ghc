@@ -6,6 +6,10 @@ module GHC.Parser.String (
   lexString,
   lexMultilineString,
 
+  -- * StringMeta
+  StringMeta (..),
+  defaultStrMeta,
+
   -- * Unicode smart quote helpers
   isDoubleSmartQuote,
   isSingleSmartQuote,
@@ -16,6 +20,7 @@ import GHC.Prelude hiding (getChar)
 import Control.Arrow ((>>>))
 import Control.Monad (when)
 import Data.Char (chr, ord)
+import Data.Data (Data)
 import qualified Data.Foldable1 as Foldable1
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (listToMaybe, mapMaybe)
@@ -32,6 +37,7 @@ import GHC.Parser.CharClass (
  )
 import GHC.Parser.Errors.Types (LexErr (..))
 import GHC.Utils.Panic (panic)
+import Language.Haskell.Syntax.Module.Name (ModuleName)
 
 type BufPos = Int
 data StringLexError = StringLexError LexErr BufPos
@@ -276,6 +282,67 @@ isSingleSmartQuote = \case
   '‘' -> True
   '’' -> True
   _ -> False
+
+-- -----------------------------------------------------------------------------
+-- StringMeta
+
+data StringMeta = StringMeta
+  { strMetaMultiline  :: Bool
+  , strMetaQualified  :: Maybe ModuleName
+  }
+  deriving (Show, Data)
+
+defaultStrMeta :: StringMeta
+defaultStrMeta =
+  StringMeta
+    { strMetaMultiline = False
+    , strMetaQualified = Nothing
+    }
+
+{- Note [Implementation of QualifiedStrings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note describes the implementation of the QualifiedStrings extension
+from GHC proposal #723 (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0723-qualified-strings.rst).
+
+The extension allows users to prefix a string literal with a module qualifier,
+e.g. M."foo" which desugars to M.fromString "foo".
+
+AST representation
+------------------
+Qualified strings are represented in the Haskell AST using the 'HsQualString'
+constructor of 'QualLitVal'.
+
+Lexing & Parsing
+----------------
+When the lexer encounters a module qualifier followed immediately by a string
+(e.g., M."..." or M."""..."""), it parses it as a single unit. The qualifier
+is extracted and stored. The parser then constructs 'HsQualLit' with the module
+qualifier, and 'HsQualString' with the string content.
+
+Desugaring in renamer
+---------------------
+GHC.Rename.Expr.rnExpr desugars qualified string expressions using
+'mkExpandedExpr' to desugar the expression M."foo" into M.fromString "foo".
+
+GHC.Rename.Pat.rnPatAndThen desugars qualified string patterns using
+'mkExpandedPat' to desugar the pattern M."foo" into the view pattern
+  ( (M.fromString "foo" ==) -> True )
+
+'HsQualLit'/'QualLitPat' should not exist in any 'HsExpr GhcRn'/'HsPat GhcRn'
+values because of this desugaring, so we simply panic in all relevant locations.
+We can't simply make these constructors uninhabited
+(e.g. 'type instance XQualLitE GhcRn = DataConCantHappen')
+because we still need a 'HsExpr GhcRn' to put inside 'mkExpandedExpr'.
+
+Pattern-match overlap checking
+------------------------------
+Since qualified string patterns are desugared into view patterns, the pattern
+match checker needs help to see through the desugaring to determine coverage.
+
+In 'GHC.HsToCore.Pmc.Desugar.desugarPat', we treat qualified strings similarly
+to standard string literals for overlap checking, ensuring that
+`f M."a" = ...; f M."a" = ...` is detected as redundant.
+-}
 
 -- -----------------------------------------------------------------------------
 -- Multiline strings

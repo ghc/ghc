@@ -144,6 +144,10 @@ data Pat p
     -- Used for __non-overloaded__ literal patterns:
     -- Int#, Char#, Int, Char, String, etc.
 
+  | QualLitPat      (XQualLitPat p)
+                    (HsQualLit p)
+    -- ^ Qualified Literal Pattern
+
   | NPat            (XNPat p)            -- Overall type of pattern. Might be
                                          -- different than the literal's type
                                          -- if (==) or negate changes the type

@@ -26,8 +26,8 @@ module GHC.Builtin.Types (
 
         -- * Bool
         boolTy, boolTyCon, boolTyCon_RDR, boolTyConName,
-        trueDataCon,  trueDataConId,  true_RDR,
-        falseDataCon, falseDataConId, false_RDR,
+        trueDataCon, trueDataConName,  trueDataConId,  true_RDR,
+        falseDataCon, falseDataConName, falseDataConId, false_RDR,
         promotedFalseDataCon, promotedTrueDataCon,
 
         -- * Ordering

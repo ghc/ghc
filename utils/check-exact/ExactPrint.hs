@@ -5,9 +5,11 @@
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE MultiWayIf           #-}
 {-# LANGUAGE NamedFieldPuns       #-}
 {-# LANGUAGE RankNTypes           #-}
+{-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TupleSections        #-}
@@ -4718,6 +4720,7 @@ instance ExactPrint (Pat GhcPs) where
     splice' <- markAnnotated splice
     return (SplicePat x splice')
   exact p@(LitPat _ lit) = printStringAdvance (hsLit2String lit) >> return p
+  exact p@(QualLitPat _ lit) = printStringAdvance (hsQualLit2String lit) >> return p
   exact (NPat an ol mn z) = do
     an0 <- if (isJust mn)
       then markEpToken an
@@ -4805,6 +4808,12 @@ hsLit2String lit =
     HsDouble     _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl ""
     HsFloatPrim  _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl "#"
     HsDoublePrim _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl "##"
+
+hsQualLit2String :: HsQualLit GhcPs -> String
+hsQualLit2String QualLit{..} = moduleNameString ql_mod ++ "." ++ fromVal ql_val
+  where
+    fromVal = \case
+      HsQualString src s -> toSourceTextWithSuffix src s ""
 
 toSourceTextWithSuffix :: (Show a) => SourceText -> a -> String -> String
 toSourceTextWithSuffix (NoSourceText)    alt suffix = show alt ++ suffix

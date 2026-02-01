@@ -298,6 +298,9 @@ dsExpr (HsOverLit _ lit)
   = do { warnAboutOverflowedOverLit lit
        ; dsOverLit lit }
 
+dsExpr (HsQualLit _ lit)
+  = case lit of
+
 dsExpr e@(XExpr ext_expr_tc)
   = case ext_expr_tc of
       HsRecSelTc {} -> dsApp e

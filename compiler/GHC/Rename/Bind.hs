@@ -575,6 +575,7 @@ isOkNoBindPattern (L _ pat) =
           VarPat {} -> False
           WildPat {} -> False
           LitPat {} -> False
+          QualLitPat {} -> False
           NPat {} -> False
           NPlusKPat {} -> False
           -- Recursive cases

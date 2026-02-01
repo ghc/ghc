@@ -2,6 +2,7 @@
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable, OutputableBndrId
 
@@ -33,6 +34,7 @@ import GHC.Hs.Extension
 import Language.Haskell.Syntax.Expr ( HsExpr )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Lit
+import Language.Haskell.Syntax.Module.Name (moduleNameString)
 
 {-
 ************************************************************************
@@ -268,3 +270,18 @@ instance (Eq (XXOverLit p)) => Eq (HsOverLit p) where
   (OverLit _ val1) == (OverLit _ val2) = val1 == val2
   (XOverLit  val1) == (XOverLit  val2) = val1 == val2
   _ == _ = panic "Eq HsOverLit"
+
+-- -----------------------------------------------------------------------------
+-- HsQualLit
+
+type instance XQualLit GhcPs = NoExtField
+type instance XQualLit GhcRn = LIdP GhcRn
+type instance XQualLit GhcTc = DataConCantHappen
+
+type instance XXQualLit (GhcPass _) = DataConCantHappen
+
+instance OutputableBndrId p => Outputable (HsQualLit (GhcPass p)) where
+  ppr QualLit{..} = text (moduleNameString ql_mod) <> char '.' <> ppr ql_val
+
+instance Outputable QualLitVal where
+  ppr (HsQualString st s) = pprHsStringLit st s

@@ -1792,6 +1792,8 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsLitPV :: Located (HsLit GhcPs) -> PV (LocatedA b)
   -- | Disambiguate an overloaded literal
   mkHsOverLitPV :: LocatedAn a (HsOverLit GhcPs) -> PV (LocatedAn a b)
+  -- | Disambiguate a qualified literal
+  mkHsQualLitPV :: LocatedAn a (HsQualLit GhcPs) -> PV (LocatedAn a b)
   -- | Disambiguate a wildcard
   mkHsWildCardPV :: (NoAnn a) => SrcSpan -> PV (LocatedAn a b)
   -- | Disambiguate "a :: t" (type annotation)
@@ -1937,6 +1939,7 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsVarPV (L l v) = cmdFail (locA l) (ppr v)
   mkHsLitPV (L l a) = cmdFail l (ppr a)
   mkHsOverLitPV (L l a) = cmdFail (locA l) (ppr a)
+  mkHsQualLitPV (L l a) = cmdFail (locA l) (ppr a)
   mkHsWildCardPV l = cmdFail l (text "_")
   mkHsTySigPV l a sig _ = cmdFail (locA l) (ppr a <+> dcolon <+> ppr sig)
   mkHsExplicitListPV l xs _ = cmdFail l $
@@ -2039,6 +2042,9 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsOverLitPV (L (EpAnn l an csIn) a) = do
     !cs <- getCommentsFor (locA l)
     return $ L (EpAnn  l an (cs Semi.<> csIn)) (HsOverLit NoExtField a)
+  mkHsQualLitPV (L (EpAnn l an csIn) a) = do
+    !cs <- getCommentsFor (locA l)
+    return $ L (EpAnn l an (cs Semi.<> csIn)) (HsQualLit noExtField a)
   mkHsWildCardPV l = return $ L (noAnnSrcSpan l) (HsHole (HoleVar (L (noAnnSrcSpan l) (mkUnqual varName (fsLit "_")))))
   mkHsTySigPV l@(EpAnn anc an csIn) a sig anns = do
     !cs <- getCommentsFor (locA l)
@@ -2122,6 +2128,7 @@ instance DisambECP (PatBuilder GhcPs) where
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (PatBuilderPat (LitPat noExtField a))
   mkHsOverLitPV (L l a) = return $ L l (PatBuilderOverLit a)
+  mkHsQualLitPV (L l a) = return . L l . PatBuilderPat $ QualLitPat noExtField a
   mkHsWildCardPV l = return $ L (noAnnSrcSpan l) (PatBuilderPat (WildPat noExtField))
   mkHsTySigPV l p t anns = do
     p' <- checkLPat p

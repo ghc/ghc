@@ -267,6 +267,7 @@ module Language.Haskell.TH where
     | MultilineStrings
     | ExplicitLevelImports
     | ImplicitStagePersistence
+    | QualifiedStrings
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FamilyResultSigQ :: *
@@ -876,6 +877,7 @@ module Language.Haskell.TH.LanguageExtensions where
     | MultilineStrings
     | ExplicitLevelImports
     | ImplicitStagePersistence
+    | QualifiedStrings
 
 module Language.Haskell.TH.Lib where
   -- Safety: Safe
@@ -1619,6 +1621,7 @@ module Language.Haskell.TH.Syntax where
     | MultilineStrings
     | ExplicitLevelImports
     | ImplicitStagePersistence
+    | QualifiedStrings
   type FamilyResultSig :: *
   data FamilyResultSig = NoSig | KindSig Kind | TyVarSig (TyVarBndr ())
   type FieldExp :: *
