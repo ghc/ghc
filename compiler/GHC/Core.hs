@@ -489,6 +489,15 @@ Wrinkles:
   (which is always substituted) with the tyvar-replete-with-unfolding, rather
   than merely extending the in-scope set as we do for Ids.
 
+So: (TCL1) + (TCL2) =
+  EITHER `a` has an unfolding at its binding site,
+     and that unfolding is replicated at every occurrence site
+  OR it doesn't and the occurrences don't either.
+
+
+OR we could insist that tyvar bindings always have an unfolding, and use
+a beta-redex if not.
+
 Note [Core top-level string literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As an exception to the usual rule that top-level binders must be lifted,
