@@ -83,6 +83,9 @@ commonCabalArgs :: Stage -> Args
 commonCabalArgs stage = do
   pkg       <- getPackage
   package_id <- expr $ pkgUnitId stage pkg
+  -- We don't want to use the hash in the html documentation because it
+  -- makes it harder for non-boot packages to link to boot packages, see #26635
+  package_simple_id <- expr $ pkgSimpleIdentifier pkg
   let prefix = "${pkgroot}" ++ (if windowsHost then "" else "/..")
   mconcat [ -- Don't strip libraries when cross compiling.
             -- TODO: We need to set @--with-strip=(stripCmdPath :: Action FilePath)@,
@@ -110,7 +113,7 @@ commonCabalArgs stage = do
             --
             -- This doesn't hold if we move the @doc@ folder anywhere else.
             , arg "--htmldir"
-            , arg $ "${pkgroot}/../../doc/html/libraries/" ++ package_id
+            , arg $ "${pkgroot}/../../doc/html/libraries/" ++ package_simple_id
 
             -- These trigger a need on each dependency, so every important to need
             -- them in parallel or  it linearises the build of Ghc and GhcPkg

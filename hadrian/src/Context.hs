@@ -120,7 +120,9 @@ pkgSetupConfigFile context = pkgSetupConfigDir context <&> (-/- "setup-config")
 pkgHaddockFile :: Context -> Action FilePath
 pkgHaddockFile Context {..} = do
     root <- buildRoot
-    version <- pkgUnitId stage package
+    -- We don't want to use the hash in the html documentation because it
+    -- makes it harder for non-boot packages to link to boot packages, see #26635
+    version <- pkgSimpleIdentifier package
     return $ root -/- "doc/html/libraries" -/- version -/- pkgName package <.> "haddock"
 
 -- | Path to the registered ghc-pkg library file of a given 'Context', e.g.:
