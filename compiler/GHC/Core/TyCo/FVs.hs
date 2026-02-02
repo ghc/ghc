@@ -630,9 +630,12 @@ tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
 tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
-  | not (f v)                 = (acc_list, acc_set)
   | v `elemVarSet` bound_vars = (acc_list, acc_set)
   | v `elemVarSet` acc_set    = (acc_list, acc_set)
+  | not (f v)                 = (acc_list, acc_set) -- Do this after checking bound_vars, because
+                                                    -- maybe `f` uses the /identity/ of the tyvar,
+                                                    -- and that makes no sense for bound vars
+                                                    -- Ordering wrt `acc_set` is not important
   | otherwise = tyCoFVsOfType (tyVarKind v) f
                                emptyVarSet   -- See Note [Closing over free variable kinds]
                                (v:acc_list, extendVarSet acc_set v)
