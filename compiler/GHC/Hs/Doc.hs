@@ -50,6 +50,7 @@ import qualified GHC.Utils.Outputable as O
 import GHC.Hs.Extension
 import GHC.Types.Unique.Map
 import Data.List (sortBy)
+import Data.Function
 
 import GHC.Hs.DocString
 
@@ -88,7 +89,7 @@ instance Outputable a => Outputable (WithHsDocIdentifiers a pass) where
 instance Binary a => Binary (WithHsDocIdentifiers a GhcRn) where
   put_ bh (WithHsDocIdentifiers s ids) = do
     put_ bh s
-    put_ bh $ BinLocated <$> ids
+    put_ bh $ BinLocated <$> (sortBy  (stableNameCmp `on` getName) ids)
   get bh =
     liftA2 WithHsDocIdentifiers (get bh) (fmap unBinLocated <$> get bh)
 
