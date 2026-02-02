@@ -1368,7 +1368,7 @@ setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 -- do any tidying.
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 addErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
-o{-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
+{-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- See Note [ErrCtxtStack Manipulation]

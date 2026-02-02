@@ -396,10 +396,10 @@ data SrcSpan =
   deriving (Eq, Show) -- Show is used by GHC.Parser.Lexer, because we
                       -- derive Show for Token
 
--- Needed for HIE
+-- Needed for HIE. See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
 data GeneratedSrcSpanDetails =
     OrigSpan !RealSrcSpan -- this the span of the user written thing
-  | UnhelpfulGenerated
+  | UnhelpfulGenerated -- we do not have the original location.
   deriving (Eq, Show)
 
 data UnhelpfulSpanReason
