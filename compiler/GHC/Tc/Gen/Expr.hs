@@ -307,7 +307,7 @@ tcExpr :: HsExpr GhcRn
 --   - ones taken apart by GHC.Tc.Gen.Head.splitHsApps
 --   - ones understood by GHC.Tc.Gen.Head.tcInferAppHead_maybe
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
--- Se Note [Overview of Typechecking an XExpr]
+-- Se Note [Typechecking by expansion: overview]
 tcExpr e@(HsVar {})              res_ty = tcApp e res_ty
 tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
 tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
@@ -823,10 +823,10 @@ The rest of this Note explains how that is done.
 
 * The type checker error-stack element `GHC.Tc.Types.ErrCtxt.ErrCtxt`
   has two fields
-     data ErrCtxt = EC ErrCtxt
+     data ErrCtxt = MkErrCtxt CodeSrcFlag ErrCtxt
 
     * `CodeSrcFlag` says whether we are typechecking an expanded thing,
-      and what that expanded thing is
+      and what that expanded thing is.
     * `ErrCtxtMsgM` stores the pre-text error message itself.
 
   When called on an `XExpr`, `addLExprCtxt`, adds the user written thing

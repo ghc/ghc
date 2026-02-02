@@ -1158,7 +1158,8 @@ the typechecker:
     ApplicativeStmt.
   * Expanded (via ExpandedThingRn) ExplicitList{}, where we give the SrcSpan of the original
     list expression to the expanded expression. The 'fromListN' is assigned
-    a generated location span
+    a generated location span with location span details to be of the original list expression
+    c.f. GeneratedSrcSpan in GHC.Tc.Types.SrcLoc
 
 In order for the implicit function calls to not be confused for actual
 occurrences of functions in the source code, most of this extra information

@@ -42,7 +42,6 @@ import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
-import GHC.Tc.Types.ErrCtxt ( srcCodeOriginErrCtxMsg )
 import GHC.Tc.Types.Constraint( WantedConstraints )
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Types.Evidence
