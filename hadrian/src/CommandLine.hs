@@ -114,7 +114,7 @@ data DocArgs = DocArgs
   } deriving (Eq, Show)
 
 defaultDocArgs :: DocArgs
-defaultDocArgs = DocArgs { docsBaseUrl = "../%pkgid%" }
+defaultDocArgs = DocArgs { docsBaseUrl = "../%pkg%" }
 
 readConfigure :: Either String (CommandLineArgs -> CommandLineArgs)
 readConfigure = Left "hadrian --configure has been deprecated (see #20167). Please run ./boot; ./configure manually"
