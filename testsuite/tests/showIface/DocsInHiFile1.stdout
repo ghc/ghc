@@ -6,14 +6,14 @@ docs:
 '<>', ':=:', 'Bool'
 -}
               identifiers:
-                {DocsInHiFile.hs:2:6-9}
-                GHC.Internal.Data.Foldable.elem
-                {DocsInHiFile.hs:2:6-9}
-                elem
-                {DocsInHiFile.hs:2:14-18}
-                GHC.Internal.System.IO.print
                 {DocsInHiFile.hs:4:2-3}
                 GHC.Internal.Base.<>
+                {DocsInHiFile.hs:2:6-9}
+                GHC.Internal.Data.Foldable.elem
+                {DocsInHiFile.hs:2:14-18}
+                GHC.Internal.System.IO.print
+                {DocsInHiFile.hs:2:6-9}
+                elem
                 {DocsInHiFile.hs:4:15-18}
                 GHC.Internal.Types.Bool
        export docs:
