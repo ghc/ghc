@@ -23,6 +23,8 @@ module GHC.Types.Demand (
     lubCard, lubDmd, lubSubDmd,
     -- *** Greatest lower bound
     glbCard,
+    -- *** Unfolding combination (glb on strictness, lub on usage)
+    lubUBglbLBDmd,
     -- *** Plus
     plusCard, plusDmd, plusSubDmd,
     -- *** Multiply
@@ -49,7 +51,7 @@ module GHC.Types.Demand (
 
     -- * Demand environments
     DmdEnv(..), addVarDmdEnv, mkTermDmdEnv, nopDmdEnv, plusDmdEnv, plusDmdEnvs,
-    multDmdEnv, reuseEnv,
+    lubDmdEnv, multDmdEnv, reuseEnv,
 
     -- * Demand types
     DmdType(..), dmdTypeDepth,
@@ -863,6 +865,77 @@ lubSubDmd (Poly b1 n1) (Poly b2 n2) = Poly (lubBoxity b1 b2) (lubCard n1 n2)
 lubSubDmd sd1@Poly{}   sd2          = lubSubDmd sd2 sd1
 -- Otherwise (Call `lub` Prod) return Top
 lubSubDmd _            _            = topSubDmd
+
+{- Note [Combining demands for stable unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a function has a stable unfolding, the optimised RHS and the unfolding
+may have different demand signatures for the same arguments. This can happen
+because:
+
+  * The optimised RHS may have had transformations applied that reveal
+    strictness (e.g., inlining exposes a case on an argument).
+
+  * The optimised RHS may have had transformations applied that drop usage
+    (e.g., a rewrite rule fires that doesn't use an argument, or a seq on
+    a dictionary is dropped because dictionaries are known to terminate).
+
+When we inline the stable unfolding at a call site, we get the unfolding's
+behaviour, not the RHS's. So we must be conservative and combine the demands:
+
+  * For strictness (lower bounds): we can take the MAXIMUM (glb).
+    If the RHS reveals that an argument is strict, that strictness was
+    always there semantically - the analysis just couldn't see it in the
+    unfolding. Sound optimisations never make lazy code strict.
+
+  * For usage (upper bounds): we must take the MAXIMUM (lub).
+    If the unfolding uses an argument but the RHS doesn't, we must not
+    mark it absent, or we'll replace it with rubbish that the unfolding
+    will then try to use, causing a segfault. See #26416.
+
+So for cardinality bounds [l1..u1] from RHS and [l2..u2] from unfolding,
+we compute [max(l1,l2)..max(u1,u2)].
+
+See Note [Absence analysis for stable unfoldings and RULES] in GHC.Core.Opt.DmdAnal
+for the broader context.
+-}
+
+-- | Combine demands for stable unfolding analysis.
+-- See Note [Combining demands for stable unfoldings].
+lubUBglbLBCard :: Card -> Card -> Card
+-- Given Note [Bit vector representation for Card]:
+--   * bit 0 (strictness): take AND (glb) - 0 means strict, so 0 wins
+--   * bits 1,2 (usage): take OR (lub) - if either uses, result uses
+lubUBglbLBCard (Card a) (Card b) = Card ((a .&. b .&. 0b001) .|. ((a .|. b) .&. 0b110))
+
+-- | See Note [Combining demands for stable unfoldings].
+lubUBglbLBDmd :: Demand -> Demand -> Demand
+lubUBglbLBDmd BotDmd      dmd2        = dmd2
+lubUBglbLBDmd dmd1        BotDmd      = dmd1
+lubUBglbLBDmd (n1 :* sd1) (n2 :* sd2) =
+  lubUBglbLBCard n1 n2 :* lubUBglbLBSubDmd sd1 sd2
+
+lubUBglbLBSubDmd :: SubDemand -> SubDemand -> SubDemand
+-- Shortcuts for neutral and absorbing elements.
+lubUBglbLBSubDmd (Poly Unboxed C_10)  sd                   = sd
+lubUBglbLBSubDmd sd                   (Poly Unboxed C_10)  = sd
+lubUBglbLBSubDmd sd@(Poly Boxed C_0N) _                    = sd
+lubUBglbLBSubDmd _                    sd@(Poly Boxed C_0N) = sd
+-- Prod
+lubUBglbLBSubDmd (Prod b1 ds1) (Poly b2 n2)
+  | let !d = polyFieldDmd b2 n2
+  = mkProd (lubBoxity b1 b2) (strictMap (lubUBglbLBDmd d) ds1)
+lubUBglbLBSubDmd (Prod b1 ds1) (Prod b2 ds2)
+  | equalLength ds1 ds2
+  = mkProd (lubBoxity b1 b2) (strictZipWith lubUBglbLBDmd ds1 ds2)
+-- Handle Call
+lubUBglbLBSubDmd (Call n1 sd1) (viewCall -> Just (n2, sd2)) =
+  mkCall (lubUBglbLBCard n1 n2) (lubUBglbLBSubDmd sd1 sd2)
+-- Handle Poly
+lubUBglbLBSubDmd (Poly b1 n1) (Poly b2 n2) = Poly (lubBoxity b1 b2) (lubUBglbLBCard n1 n2)
+-- Other Poly case by commutativity
+lubUBglbLBSubDmd sd1@Poly{}   sd2          = lubUBglbLBSubDmd sd2 sd1
+-- Otherwise (Call `lubUBglbLB` Prod) return Top
+lubUBglbLBSubDmd _            _            = topSubDmd
 
 -- | Denotes '+' on 'Demand'.
 plusDmd :: Demand -> Demand -> Demand

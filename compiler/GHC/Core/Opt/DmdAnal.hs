@@ -23,7 +23,7 @@ import GHC.Core.DataCon
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingIds )
+import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingIds, idRuleVars )
 import GHC.Core.Coercion ( Coercion )
 import GHC.Core.TyCo.FVs     ( coVarsOfCos )
 import GHC.Core.TyCo.Compare ( eqType )
@@ -1113,7 +1113,8 @@ dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs
     -- might use arguments that the (optimised) RHS doesn't.
     -- Any argument with a demand absent in one but not the other can
     -- be problematic, see #26416
-    combined_rhs_dmds = combineUnfoldingDmds env rhs_sd id rhs_dmds
+    -- Also combine the DmdEnv (free variables) from the unfolding
+    (unf_fv_env, combined_rhs_dmds) = combineUnfoldingDmds env rhs_sd id rhs_env rhs_dmds
 
     (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id ww_arity
                                                       combined_rhs_dmds (de_div rhs_env) rhs'
@@ -1144,7 +1145,10 @@ dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs
                 NonRecursive -> rhs_env
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
-    rhs_env2 = rhs_env1 `plusDmdEnv` demandRootSet env (bndrRuleAndUnfoldingIds id)
+    -- The unfolding FVs are handled via unf_fv_env from combineUnfoldingDmds.
+    -- Here we only need demandRoots for RULES.
+    rhs_env2 = rhs_env1 `plusDmdEnv` unf_fv_env
+                        `plusDmdEnv` demandRootSet env (idRuleVars id)
 
     -- See Note [Lazy and unleashable free variables]
     !(!sig_env, !weak_fvs) = splitWeakDmds rhs_env2
@@ -1153,27 +1157,30 @@ splitWeakDmds :: DmdEnv -> (DmdEnv, WeakDmds)
 splitWeakDmds (DE fvs div) = (DE sig_fvs div, weak_fvs)
   where (!weak_fvs, !sig_fvs) = partitionVarEnv isWeakDmd fvs
 
--- | If there is a stable unfolding, don't let any demand be absent that
--- is also not absent in the unfolding
+-- | If there is a stable unfolding, combine argument demands and free variable
+-- demands from the unfolding with those from the RHS.
 -- See Note [Absence analysis for stable unfoldings and RULES], Wrinkle (W3).
-combineUnfoldingDmds :: AnalEnv -> SubDemand -> Id -> [Demand] -> [Demand]
-combineUnfoldingDmds env rhs_sd id rhs_dmds
+--
+-- Returns (combined DmdEnv for free variables, combined arg demands)
+-- The DmdEnv is nopDmdEnv if there's no stable unfolding.
+combineUnfoldingDmds :: AnalEnv -> SubDemand -> Id -> DmdEnv -> [Demand] -> (DmdEnv, [Demand])
+combineUnfoldingDmds env rhs_sd id rhs_fv_env rhs_dmds
   | not (isStableUnfolding unf)
-  = rhs_dmds  -- No stable unfolding, nothing to do
+  = (nopDmdEnv, rhs_dmds)  -- No stable unfolding, nothing to do
 
   | Just unf_body <- maybeUnfoldingTemplate unf
-  , let WithDmdType (DmdType _ unf_dmds) _ = dmdAnal env rhs_sd unf_body
-  , let result = go rhs_dmds unf_dmds
-  = -- pprTrace "lubUnfoldingDmds" (ppr id $$ ppr rhs_dmds $$ ppr unf_dmds $$ ppr result) $
-   result
-  | otherwise = rhs_dmds
+  , let WithDmdType (DmdType unf_fv_env unf_dmds) _ = dmdAnal env rhs_sd unf_body
+  , let combined_dmds = go rhs_dmds unf_dmds
+        -- Lub the free variable demands from unfolding with RHS
+        combined_fv_env = lubDmdEnv rhs_fv_env unf_fv_env
+  = -- pprTrace "combineUnfoldingDmds" (ppr id $$ ppr rhs_dmds $$ ppr unf_dmds $$ ppr combined_dmds) $
+   (combined_fv_env, combined_dmds)
+  | otherwise = (nopDmdEnv, rhs_dmds)
   where
     unf = realIdUnfolding id
     go rhs          []            = rhs
     go []           _             = []
-    go (AbsDmd:rhs) (u:unfs)      = u : go rhs unfs
-    go (r:rhs)      (AbsDmd:unfs) = r : go rhs unfs
-    go (r:rhs)      (_:unfs) = r : go rhs unfs
+    go (r:rhs)      (u:unfs)      = lubUBglbLBDmd r u : go rhs unfs
 
 -- | The result type after applying 'idArity' many arguments. Returns 'Nothing'
 -- when the type doesn't have exactly 'idArity' many arrows.
@@ -1555,7 +1562,7 @@ Wrinkles:
     error instead of the `really important message`.
 
   (W3) The SOLUTION above handles /free variables/ of stable unfoldings, but
-    what about /arguments/?  Consider (#25965)
+    what about /arguments/?  Consider (#26416)
 
        fromVector :: (Storable a, KnownNat n) => Vector a -> Vector a
        fromVector v = ... (uses Storable dictionary) ...
@@ -1569,9 +1576,18 @@ Wrinkles:
     dictionary, leading to a segfault!
 
     SOLUTION: in `dmdAnalRhsSig`, if the function has a stable unfolding,
-    analyse it and drop any AbsDmds which are not absent in the unfolding.
-    This is done by `combineUnfoldingDmds`.  This ensures that if the unfolding
-    uses an argument, it won't be marked as absent.
+    analyse it with `dmdAnal` and combine the resulting `DmdType` with the
+    RHS's `DmdType`. This is done by `combineUnfoldingDmds`, which:
+
+      * For argument demands: combines them using `lubUBglbLBDmd`, which takes
+        the glb (max) of lower bounds (strictness) and lub (max) of upper
+        bounds (usage). See Note [Combining demands for stable unfoldings].
+        This ensures that if the unfolding uses an argument, it won't be
+        marked as absent, while preserving any strictness the RHS reveals.
+
+      * For free variable demands: combines them using `lubDmdEnv`. This
+        replaces the `demandRoots` approach for stable unfoldings (though
+        we still use `demandRoots` for RULES via `idRuleVars`).
 
 Note [DmdAnal for DataCon wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
