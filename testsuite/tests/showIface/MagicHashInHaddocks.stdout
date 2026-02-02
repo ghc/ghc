@@ -3,10 +3,10 @@ docs:
          Just text:
                 -- | 'foo#' `Bar##` `*##`
               identifiers:
-                {MagicHashInHaddocks.hs:3:7-10}
-                foo#
                 {MagicHashInHaddocks.hs:3:14-18}
                 Bar##
+                {MagicHashInHaddocks.hs:3:7-10}
+                foo#
        export docs:
          []
        declaration docs:
