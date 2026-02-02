@@ -1728,6 +1728,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 --                 , text "rhs_bndrs"    <+> ppr (sep (map (pprBndr LambdaBind) rhs_bndrs))
 --                 , text "rhs_body"     <+> ppr rhs_body
 --                 , text "subst'" <+> ppr subst'
+--                 , text "subst_in_scope'" <+> ppr (substInScopeSet subst')
 --                 ]) $ return ()
 
 
@@ -1819,11 +1820,12 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                        , text "rule_act" <+> ppr rule_act
                                        ]
 
---           ; pprTrace "spec_call: rule" (vcat [ -- text "poly_qvars" <+> ppr poly_qvars
---                                                text "rule_bndrs" <+> ppr rule_bndrs
+--           ; pprTrace "spec_call: rule" (vcat [ text "rule_bndrs" <+> ppr rule_bndrs
 --                                              , text "rule_lhs_args" <+> ppr rule_lhs_args
 --                                              , text "all_call_args" <+> ppr all_call_args
 --                                              , ppr spec_rule ]) $
+--             return ()
+
            ; return ( spec_rule            : rules_acc
                     , (spec_fn, spec_rhs1) : pairs_acc
                     , rhs_uds2 `thenUDs` uds_acc
@@ -2703,6 +2705,11 @@ specHeader subst (bndr:bndrs) (SpecDict dict_arg : args)
        ; (_, subst4, rule_bs, rule_es, spec_bs, dx, spec_args) <- specHeader subst3 bndrs args
 
        ; let dx' = tv_binds `appOL` dx1 `appOL` dx
+--       ; pprTrace "specHeader" (vcat [ text "dict_arg" <+> ppr dict_arg
+--                                     , text "tv_bndrs" <+> ppr tv_bndrs
+--                                     , text "tv_binds" <+> ppr tv_binds
+--                                     , text "in_scope" <+> ppr (substInScopeSet subst4) ]) $
+--         return ()
        ; pure ( True, subst4      -- Ha!  A useful specialisation!
               , bndr' : rule_bs, Var bndr' : rule_es
               , spec_bs,    dx', spec_dict : spec_args ) }
@@ -2733,11 +2740,14 @@ specHeader subst (bndr:bndrs) (UnspecArg : args)
 
 
 bindAuxiliaryTyVars :: Subst -> CoreExpr -> (TyVarSet, OrdList FloatBind)
+-- (bindAuxiliaryTyVars subst dict_arg) returns bindings for any
+--    free tyvars of dict_arg that are not in scope, but have an unfolding
+-- And it return the set of precisely those tyvars, the binders of the bindings
 bindAuxiliaryTyVars subst dict_arg
   = go emptyVarSet need_bind_tvs
   where
-    go _ []
-      = (emptyVarSet, nilOL)
+    go tv_bndrs []
+      = (tv_bndrs, nilOL)
     go tv_bndrs (tv:tvs)
        | tv `elemVarSet` tv_bndrs
        = go tv_bndrs tvs
@@ -2749,11 +2759,11 @@ bindAuxiliaryTyVars subst dict_arg
          , child_binds `appOL` unitOL (mkDB (NonRec tv (Type unf)))
                        `appOL` rest_binds )
        | otherwise
-       = pprTrace "addTyVarBindings: unxpected 1" (ppr tv $$ ppr dict_arg) $
-         go tv_bndrs tvs
+       = pprPanic "addTyVarBindings: unxpected 1" (ppr tv $$ ppr dict_arg)
 
     need_bind_tvs = exprSomeFreeVarsList needs_binding dict_arg
     in_scope = substInScopeSet subst
+
     needs_binding var
       | isGlobalVar var
       = False
