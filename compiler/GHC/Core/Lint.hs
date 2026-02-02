@@ -2956,6 +2956,8 @@ lint_axiom_pair tc (ax1, ax2)
 ************************************************************************
 -}
 
+type LintLevel = Int
+
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 data LintEnv
@@ -2970,7 +2972,8 @@ data LintEnv
                   --          (b) substituting for let-bound tyvars, when we have
                   --              (let @a = Int -> Int in ...)
 
-       , le_in_vars :: VarEnv (InVar, OutType)
+       , le_level   :: LintLevel
+       , le_in_vars :: VarEnv (InVar, OutType, LintLevel)
                     -- Maps an InVar (i.e. its unique) to its binding InVar
                     --    and to its OutType
                     -- /All/ in-scope variables are here (term variables,
@@ -3325,9 +3328,11 @@ initL cfg m
                                                       "without reporting an error message") empty
   where
     vars = l_vars cfg
+    init_level = 0
     env = LE { le_flags   = l_flags cfg
              , le_subst   = mkEmptySubst (mkInScopeSetList vars)
-             , le_in_vars = mkVarEnv [ (v,(v, varType v)) | v <- vars ]
+             , le_level   = init_level
+             , le_in_vars = mkVarEnv [ (v,(v, varType v, init_level)) | v <- vars ]
              , le_joins   = emptyVarSet
              , le_loc     = []
              , le_ue_aliases = emptyNameEnv
@@ -3428,13 +3433,15 @@ addInScopeId in_id out_ty thing_inside
     in unLintM (thing_inside out_id) env' errs
 
   where
-    add env@(LE { le_in_vars = id_vars, le_joins = join_set
+    add env@(LE { le_level = level, le_in_vars = id_vars, le_joins = join_set
                 , le_ue_aliases = aliases, le_subst = subst })
       = (out_id, env1)
       where
-        env1 = env { le_in_vars = in_vars', le_joins = join_set', le_ue_aliases = aliases' }
+        level1 = level + 1
+        env1 = env { le_level = level1, le_in_vars = in_vars'
+                   , le_joins = join_set', le_ue_aliases = aliases' }
 
-        in_vars' = extendVarEnv id_vars in_id (in_id, out_ty)
+        in_vars' = extendVarEnv id_vars in_id (in_id, out_ty, level1)
         aliases' = delFromNameEnv aliases (idName in_id)
            -- aliases': when shadowing an alias, we need to make sure the
            -- Id is no longer classified as such. E.g.
@@ -3453,9 +3460,11 @@ addInScopeId in_id out_ty thing_inside
 addInScopeTyCoVar :: InTyCoVar -> OutType -> (OutTyCoVar -> LintM a) -> LintM a
 -- This function clones to avoid shadowing of TyCoVars
 addInScopeTyCoVar tcv tcv_type thing_inside
-  = LintM $ \ env@(LE { le_in_vars = in_vars, le_subst = subst }) errs ->
+  = LintM $ \ env@(LE { le_level = level, le_in_vars = in_vars, le_subst = subst }) errs ->
     let (tcv', subst') = subst_bndr subst
-        env' = env { le_in_vars = extendVarEnv in_vars tcv (tcv, tcv_type)
+        level' = level + 1
+        env' = env { le_level = level'
+                   , le_in_vars = extendVarEnv in_vars tcv (tcv, tcv_type, level')
                    , le_subst = subst' }
     in unLintM (thing_inside tcv') env' errs
   where
@@ -3475,7 +3484,7 @@ addInScopeTyCoVar tcv tcv_type thing_inside
       where
         in_scope = substInScopeSet subst
 
-getInVarEnv :: LintM (VarEnv (InId, OutType))
+getInVarEnv :: LintM (VarEnv (InId, OutType, LintLevel))
 getInVarEnv = LintM (\env errs -> fromBoxedLResult (Just (le_in_vars env), errs))
 
 extendTvSubstL :: TyVar -> Type -> LintM a -> LintM a
@@ -3521,13 +3530,21 @@ lintVarOcc v_occ
            Nothing | isGlobalId v_occ -> return (idType v_occ)
                    | otherwise        -> failWithL (text pp_what <+> quotes (ppr v_occ)
                                                     <+> text "is out of scope")
-           Just (v_bndr, out_ty) -> do { check_bad_global v_bndr
-                                       ; ensureEqTys occ_ty bndr_ty $  -- Compares InTypes
-                                         mkBndrOccTypeMismatchMsg v_occ bndr_ty occ_ty
-                                       ; return out_ty }
+           Just (v_bndr, out_ty, bind_level)
+             -> do { check_bad_global v_bndr
+                   ; ensureEqTys occ_ty bndr_ty $  -- Compares InTypes
+                     mkBndrOccTypeMismatchMsg v_occ bndr_ty occ_ty
+                   ; checkL (null bad_fvs) $
+                     mkBndrOccFreeVarMsg v_occ occ_ty bad_fvs
+                   ; return out_ty }
              where
                occ_ty  = varType v_occ
-               bndr_ty = varType v_bndr }
+               bndr_ty = varType v_bndr
+               bad_fvs = filter is_bad (tyCoVarsOfTypeList occ_ty)
+               is_bad tv = case lookupVarEnv in_var_env tv of
+                             Just (_, _, tv_level) -> tv_level > bind_level
+                             Nothing -> True
+    }
   where
     pp_what | isTyVar v_occ = "The type variable"
             | isCoVar v_occ = "The coercion variable"
@@ -3924,6 +3941,11 @@ mkBndrOccTypeMismatchMsg var bndr_ty occ_ty
   = vcat [ text "Mismatch in type between binder and occurrence"
          , text "Binder:    " <+> ppr var <+> dcolon <+> ppr bndr_ty
          , text "Occurrence:" <+> ppr var <+> dcolon <+> ppr occ_ty ]
+
+mkBndrOccFreeVarMsg :: InVar -> InType -> [TyCoVar] -> SDoc
+mkBndrOccFreeVarMsg var occ_ty bad_tvs
+  = vcat [ text "Free vars of type are shadowed:" <+> ppr bad_tvs
+         , text "Occurrence:"  <+> ppr var <+> dcolon <+> ppr occ_ty ]
 
 mkBadJoinPointRuleMsg :: JoinId -> JoinArity -> CoreRule -> SDoc
 mkBadJoinPointRuleMsg bndr join_arity rule
