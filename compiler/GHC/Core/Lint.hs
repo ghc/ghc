@@ -2957,6 +2957,12 @@ lint_axiom_pair tc (ax1, ax2)
 -}
 
 type LintLevel = Int
+-- A LintLevel tracks how many local variables are in scope. It is used to detect when
+-- the free variables in a binder's type have been shadowed (which is not allowed):
+-- Whenever we look up a variable v at an occurrence, we additionally look up all of the
+-- variables fvs free in v's type. If the LintLevel of any of the fvs is greater than
+-- that of v, we know we have a shadowed tyvar (or covar) and should issue an error.
+-- See (SIC2) in Note [Shadowing in Core] in GHC.Core
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
