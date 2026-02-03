@@ -1172,7 +1172,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp (XExpr (WrapExpr h e)) (XExpr (WrapExpr h' e')) =
       wrap h h' && exp e e'
     exp (XExpr (ExpandedThingTc _ x)) (XExpr (ExpandedThingTc _ x'))
-      = exp x x'
+      = lexp x x'
     exp (HsVar _ i) (HsVar _ i') = i == i'
     exp (HsIPVar _ i) (HsIPVar _ i') =
       -- the instance for IPName derives using the id, so follow the HsVar case

@@ -682,7 +682,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
                -- NB: it's important to use ds_res_ty and not res_ty here.
                -- Test case: T18802b.
 
-             ; tcWrapResultMono expr expr' ds_res_ty res_ty
+             ; wrapGenSpan <$> tcWrapResultMono expr expr' ds_res_ty res_ty
              -- We need to unify the result type of the expanded
              -- expression with the expected result type.
              --
@@ -840,7 +840,7 @@ tcXExpr (ExpandedThingRn o e) res_ty
    = mkExpandedTc o <$> -- necessary for hpc ticks
          -- Need to call tcExpr and not tcApp
          -- as e can be let statement which tcApp cannot gracefully handle
-         tcExpr e res_ty
+         tcMonoLExpr e res_ty
 
 -- For record selection, same as HsVar case
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty

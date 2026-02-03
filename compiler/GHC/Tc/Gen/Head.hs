@@ -23,7 +23,7 @@ module GHC.Tc.Gen.Head
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
-import {-# SOURCE #-} GHC.Tc.Gen.App( tcExprSigma )
+import {-# SOURCE #-} GHC.Tc.Gen.App( tcLExprSigma )
 
 import GHC.Prelude
 import GHC.Hs
@@ -283,7 +283,7 @@ rebuildHsApps (fun, sloc) (arg : args)
       EWrap (EPar sloc')
         -> rebuildHsApps (gHsPar lfun, sloc') args
       EWrap (EExpand o)
-        -> rebuildHsApps (mkExpandedExprTc o fun, sloc) args
+        -> rebuildHsApps (mkExpandedExprTc o (L (noAnnSrcSpan sloc) fun), sloc) args
       EWrap (EHsWrap wrap)
         -> rebuildHsApps (mkHsWrap wrap fun, sloc) args
   where
@@ -461,7 +461,7 @@ tcInferAppHead_maybe fun = case fun of
                                               -- visible type applications in the argument.
                                               -- c.f. T19167
                                               (\ (e, ds_flag, ty) -> (mkExpandedTc o e, ds_flag, ty)) <$>
-                                                 tcExprSigma False (ExpansionOrigin o) e
+                                                 tcLExprSigma False (ExpansionOrigin o) e
                                               )
       _                           -> return Nothing
 

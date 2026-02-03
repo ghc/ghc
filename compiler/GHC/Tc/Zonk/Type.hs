@@ -1095,7 +1095,7 @@ zonkExpr (XExpr (WrapExpr co_fn expr))
        return (XExpr (WrapExpr new_co_fn new_expr))
 
 zonkExpr (XExpr (ExpandedThingTc thing e))
-  = do e' <- zonkExpr e
+  = do e' <- zonkLExpr e
        return $ XExpr (ExpandedThingTc thing e')
 
 zonkExpr e@(XExpr (ConLikeTc {}))
@@ -2004,4 +2004,3 @@ Quantifying here is awkward because (a) the data type is big and (b)
 finding the free type vars of an expression is necessarily monadic
 operation. (consider /\a -> f @ b, where b is side-effected to a)
 -}
-

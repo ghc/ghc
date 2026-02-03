@@ -11,7 +11,7 @@
 
 module GHC.Tc.Gen.App
        ( tcApp
-       , tcExprSigma
+       , tcLExprSigma
        , tcExprPrag ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
@@ -173,12 +173,11 @@ Note [Instantiation variables are short lived]
 -- Very similar to tcApp, but returns a sigma (uninstantiated) type
 -- CAUTION: Any changes to tcApp should be reflected here
 -- cf. T19167. the head is an expanded expression applied to a type
--- TODO: Use runInfer for tcExprSigma?
 -- Caution: Currently we assume that the expression is compiler generated/expanded
 -- Because that is that T19167 testcase generates. This function can possibly
 -- take in the rn_expr and its location to pass into tcValArgs
-tcExprSigma :: Bool -> CtOrigin -> HsExpr GhcRn -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
-tcExprSigma inst fun_orig rn_expr
+tcLExprSigma :: Bool -> CtOrigin -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
+tcLExprSigma inst fun_orig (L loc rn_expr)
   = do { (fun@(rn_fun,fun_lspan), rn_args) <- splitHsApps rn_expr
        ; (tc_fun, ds_flag, fun_sigma) <- tcInferAppHead fun
        ; igc <- inGeneratedCode
@@ -189,7 +188,7 @@ tcExprSigma inst fun_orig rn_expr
                                            tc_fun fun_sigma rn_args
        ; tc_args <- tcValArgs DoQL (rn_fun, fun_lspan) inst_args
        ; let tc_expr = rebuildHsApps (tc_fun, fun_lspan) tc_args
-       ; return (tc_expr, ds_flag, app_res_sigma) }
+       ; return (L loc tc_expr, ds_flag, app_res_sigma) }
 
 
 {- *********************************************************************

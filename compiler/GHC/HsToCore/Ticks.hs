@@ -490,8 +490,8 @@ isCallSite :: HsExpr GhcTc -> Bool
 isCallSite HsApp{}     = True
 isCallSite HsAppType{} = True
 isCallSite HsCase{}    = True
-isCallSite (XExpr (ExpandedThingTc _ e))
-  = isCallSite e
+isCallSite (XExpr (ExpandedThingTc _ (L loc _)))
+  = isGoodSrcSpan' (locA loc)
 
 -- NB: OpApp, SectionL, SectionR are all expanded out
 isCallSite _           = False
@@ -635,7 +635,9 @@ addTickHsExpr (HsProc x pat cmdtop) =
 addTickHsExpr (XExpr (WrapExpr w e)) =
         liftM (XExpr . WrapExpr w) $
               (addTickHsExpr e)        -- Explicitly no tick on inside
-addTickHsExpr (XExpr (ExpandedThingTc o e)) = addTickHsExpanded o e
+addTickHsExpr (XExpr (ExpandedThingTc o e)) =
+        liftM (XExpr . ExpandedThingTc o) $
+              addTickHsExpanded o e
 
 addTickHsExpr e@(XExpr (ConLikeTc {})) = return e
   -- We used to do a freeVar on a pat-syn builder, but actually
@@ -658,14 +660,14 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
 
-addTickHsExpanded :: SrcCodeOrigin -> HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
+addTickHsExpanded :: SrcCodeOrigin -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
+addTickHsExpanded o (L pos e) = case o of
   -- We always want statements to get a tick, so we can step over each one.
   -- To avoid duplicates we blacklist SrcSpans we already inserted here.
-  OrigStmt (L pos _) _ -> do_tick_black pos
-  _                    -> skip
+  OrigStmt{} -> do_tick_black pos
+  _          -> skip
   where
-    skip = addTickHsExpr e
+    skip = addTickLHsExpr (L pos e)
     do_tick_black pos = do
       d <- getDensity
       case d of
@@ -673,7 +675,7 @@ addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
          TickForBreakPoints -> tick_it_black pos
          _                  -> skip
     tick_it_black pos =
-      unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
+      allocTickBox (ExpBox False) False False (locA pos)
                              (withBlackListed (locA pos) $
                                addTickHsExpr e)
 

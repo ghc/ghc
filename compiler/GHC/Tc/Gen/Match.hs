@@ -401,12 +401,7 @@ tcDoStmts doExpr@(DoExpr _) ss@(L l stmts) res_ty
           else do { expanded_expr <- expandDoStmts doExpr stmts -- Do expansion on the fly
                   ; traceTc "tcDoStmts" (ppr expanded_expr)
                   ; let orig = HsDo noExtField doExpr ss
-                  ; mkExpandedExprTc orig <$> (
-                       -- We lose the location on the first statement location in GhcTc, unfortunately.
-                       -- It is needed for get the pattern match warnings right cf. T14546d
-                       -- That location is currently recovered from the location stored in OrigStmt
-                       -- in dsExpr of ExpandedThingTc
-                        unLoc <$> tcMonoLExpr expanded_expr res_ty)
+                  ; mkExpandedExprTc orig <$> tcMonoLExpr expanded_expr res_ty
                   }
         }
 
@@ -414,7 +409,7 @@ tcDoStmts mDoExpr ss@(L _ stmts) res_ty
   = do  { expanded_expr <- expandDoStmts mDoExpr stmts -- Do expansion on the fly
         ; let orig = HsDo noExtField mDoExpr ss
         ; e' <- tcMonoLExpr expanded_expr res_ty
-        ; return (mkExpandedExprTc orig (unLoc e'))
+        ; return (mkExpandedExprTc orig e')
         }
 
 tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)

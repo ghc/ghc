@@ -667,8 +667,11 @@ data SrcCodeOrigin
   | OrigPat  (ExprLStmt GhcRn) (Pat GhcRn) -- ^ Used for failable patterns that trigger MonadFail constraints
 
 data XXExprGhcRn
-  = ExpandedThingRn { xrn_orig     :: SrcCodeOrigin   -- The original source thing to be used for error messages
-                    , xrn_expanded :: HsExpr GhcRn    -- The compiler generated, expanded thing
+  = ExpandedThingRn { xrn_orig :: SrcCodeOrigin
+                    -- , xrn_ctxt  :: ErrCtxt  -- The context in which the expanded expression originated
+                    , xrn_expanded :: LHsExpr GhcRn -- The compiler generated, expanded thing
+                                                    -- Generally it is a generated location except
+                                                    -- do statement expansions. See Note [???]
                     }
 
   | HsRecSelRn  (FieldOcc GhcRn)   -- ^ Variable pointing to record selector
@@ -682,8 +685,8 @@ mkExpandedExpr
   :: HsExpr GhcRn         -- ^ source expression
   -> HsExpr GhcRn         -- ^ expanded expression
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedExpr oExpr eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigExpr oExpr
-                                                    , xrn_expanded = eExpr })
+mkExpandedExpr oExpr {-err_msg-} eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigExpr oExpr
+                                                            , xrn_expanded = L (noAnnSrcSpan generatedSrcSpan) eExpr })
 
 -- | Build an expression using the extension constructor `XExpr`,
 --   and the two components of the expansion: original do stmt and
@@ -691,7 +694,7 @@ mkExpandedExpr oExpr eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigExpr oExpr
 mkExpandedStmt
   :: ExprLStmt GhcRn      -- ^ source statement
   -> HsDoFlavour          -- ^ source statement do flavour
-  -> HsExpr GhcRn         -- ^ expanded expression
+  -> LHsExpr GhcRn         -- ^ expanded expression
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
 mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigStmt oStmt flav
                                                          , xrn_expanded = eExpr })
@@ -703,7 +706,7 @@ data XXExprGhcTc
   | ExpandedThingTc                         -- See Note [Rebindable syntax and XXExprGhcRn]
                                             -- See Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
          { xtc_orig     :: SrcCodeOrigin        -- The original user written thing
-         , xtc_expanded :: HsExpr GhcTc }   -- The expanded typechecked expression
+         , xtc_expanded :: LHsExpr GhcTc }   -- The expanded typechecked expression
 
   | ConLikeTc
       -- ^ A 'ConLike', either a data constructor or pattern synonym
@@ -734,13 +737,13 @@ data XXExprGhcTc
 --   expanded typechecked expressions.
 mkExpandedExprTc
   :: HsExpr GhcRn           -- ^ source expression
-  -> HsExpr GhcTc           -- ^ expanded typechecked expression
+  -> LHsExpr GhcTc           -- ^ expanded typechecked expression
   -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
 mkExpandedExprTc oExpr eExpr = mkExpandedTc (OrigExpr oExpr) eExpr
 
 mkExpandedTc
   :: SrcCodeOrigin          -- ^ source, user written do statement/expression
-  -> HsExpr GhcTc           -- ^ expanded typechecked expression
+  -> LHsExpr GhcTc           -- ^ expanded typechecked expression
   -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
 mkExpandedTc o e = XExpr (ExpandedThingTc o e)
 
