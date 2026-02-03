@@ -56,6 +56,7 @@ import GHC.Prelude
 
 import GHC.Core.Coercion.Opt ( OptCoercionOpts )
 import GHC.Core.FamInstEnv ( FamInstEnv )
+import GHC.Core.SimpleOpt ( isJoinPointBinding )
 import GHC.Core.Opt.Arity ( ArityOpts(..) )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Rules.Config ( RuleOpts(..) )
@@ -854,7 +855,7 @@ isEmptyJoinFloats = isNilOL
 
 unitLetFloat :: OutBind -> LetFloats
 -- This key function constructs a singleton float with the right form
-unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
+unitLetFloat bind = assert (all (not . isJoinPointBinding) (bindersOf bind)) $
                     LetFloats (unitOL bind) (flag bind)
   where
     flag (Rec {})                = FltLifted
@@ -867,7 +868,7 @@ unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
       | otherwise                = FltCareful
 
 unitJoinFloat :: OutBind -> JoinFloats
-unitJoinFloat bind = assert (all isJoinId (bindersOf bind)) $
+unitJoinFloat bind = assert (all isJoinPointBinding (bindersOf bind)) $
                      unitOL bind
 
 mkFloatBind :: SimplEnv -> OutBind -> (SimplFloats, SimplEnv)
@@ -1123,7 +1124,7 @@ simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders
 simplRecBndrs env@(SimplEnv {}) ids
   -- See Note [Bangs in the Simplifier]
-  = assert (all (not . isJoinId) ids) $
+  = assert (all (not . isJoinPointBinding) ids) $
     do  { let (!env1, ids1) = mapAccumL substIdBndr env ids
         ; seqIds ids1 `seq` return env1 }
 
@@ -1256,7 +1257,7 @@ simplRecJoinBndrs :: SimplEnv -> [InBndr]
 -- context being pushed inward may change types
 -- See Note [Return type for join points]
 simplRecJoinBndrs env@(SimplEnv {}) ids mult res_ty
-  = assert (all isJoinId ids) $
+  = assert (all isJoinPointBinding ids) $
     do  { let (env1, ids1) = mapAccumL (simplJoinBndr mult res_ty) env ids
         ; seqIds ids1 `seq` return env1 }
 

@@ -12,6 +12,7 @@ module GHC.Core.SimpleOpt (
 
         -- ** Join points
         joinPointBinding_maybe, joinPointBindings_maybe,
+        isJoinPointBinding,
 
         -- ** Predicates on expressions
         exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
@@ -1059,33 +1060,41 @@ and again its arity increases (#15517)
 -}
 
 
--- | Returns Just (bndr,rhs) if the binding is a join point:
--- If it's a JoinId, just return it
--- If it's not yet a JoinId but is always tail-called,
---    make it into a JoinId and return it.
--- In the latter case, eta-expand the RHS if necessary, to make the
--- lambdas explicit, as is required for join points
---
--- Precondition: the InBndr has been occurrence-analysed,
---               so its OccInfo is valid
+-- | Returns @Just (bndr,rhs)@ if the binding is a join point or can be made
+-- into a join point (it is always tail called). In the latter case, eta-expand
+-- the RHS if necessary, to make the lambdas explicit, as is required for join points.
 joinPointBinding_maybe :: InBndr -> InExpr -> Maybe (InBndr, InExpr)
 joinPointBinding_maybe bndr rhs
   | not (isId bndr)
   = Nothing
 
+  -- NB: the 'OccInfo' of the 'InBndr' may have been zapped, e.g. if we
+  -- have inlined it. In this case, we may lose the join-point-hood of the
+  -- original binder. A later occurrence analysis pass may recover it.
   | isJoinId bndr
-  = Just (bndr, rhs)
+  = case tailCallInfo (idOccInfo bndr) of
+      NoTailCallInfo -> Nothing
+      AlwaysTailCalled {} -> Just (bndr, rhs)
 
   | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
   , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
   , let str_sig   = idDmdSig bndr
         str_arity = count isId bndrs  -- Strictness demands are for Ids only
-        join_bndr = bndr `asJoinId`        join_arity
+        join_bndr = bndr `asJoinId`    join_arity
                          `setIdDmdSig` etaConvertDmdSig str_arity str_sig
   = Just (join_bndr, mkLams bndrs body)
 
   | otherwise
   = Nothing
+
+isJoinPointBinding :: InBndr -> Bool
+isJoinPointBinding bndr
+  | not (isId bndr)
+  = False
+  | AlwaysTailCalled {} <- tailCallInfo (idOccInfo bndr)
+  = True
+  | otherwise
+  = False
 
 joinPointBindings_maybe :: [(InBndr, InExpr)] -> Maybe [(InBndr, InExpr)]
 joinPointBindings_maybe bndrs
@@ -1443,7 +1452,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
          in go subst' (float:floats) body (CC args mco)
 
     go subst floats (Let (NonRec bndr rhs) expr) cont
-       | not (isJoinId bndr)
+       | not (isJoinPointBinding bndr)
          -- Crucial guard! See Note [Don't float join points]
        = let rhs'            = subst_expr subst rhs
              (subst', bndr') = subst_bndr subst bndr

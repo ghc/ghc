@@ -38,7 +38,7 @@ import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , pushCoTyArg, pushCoValArg, exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
-import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
+import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe, isJoinPointBinding )
 import GHC.Core.FVs     ( mkRuleInfo {- exprsFreeIds -} )
 import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Core.Multiplicity
@@ -316,8 +316,8 @@ simplLazyBind :: TopLevelFlag -> RecFlag
 -- Precondition: Ids only, no TyVars; not a JoinId
 -- Precondition: rhs obeys the let-can-float invariant
 simplLazyBind top_lvl is_rec (bndr,unf_se) (bndr1,env) (rhs,rhs_se)
-  = assert (isId bndr )
-    assertPpr (not (isJoinId bndr)) (ppr bndr) $
+  = assert (isId bndr)
+    assertPpr (not $ isJoinPointBinding bndr) (ppr bndr) $
     -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
     do  { let   !rhs_env     = rhs_se `setInScopeFromE` env -- See Note [Bangs in the Simplifier]
                 (tvs, body) = case collectTyAndValBinders rhs of
@@ -399,7 +399,7 @@ simplAuxBind :: String
 -- Precondition: rhs satisfies the let-can-float invariant
 
 simplAuxBind _str env bndr new_rhs
-  | assertPpr (isId bndr && not (isJoinId bndr)) (ppr bndr) $
+  | assertPpr (isId bndr && not (isJoinPointBinding bndr)) (ppr bndr) $
     isDeadBinder bndr   -- Not uncommon; e.g. case (a,b) of c { (p,q) -> p }
   = return (emptyFloats env, env)    --  Here c is dead, and we avoid
                                      --  creating the binding c = (a,b)
@@ -1905,7 +1905,7 @@ simplNonRecE :: HasDebugCallStack
 -- Otherwise it may or may not satisfy it.
 
 simplNonRecE env from_what bndr (rhs, rhs_se) body cont
-  | assert (isId bndr && not (isJoinId bndr) ) $
+  | assert (isId bndr && not (isJoinPointBinding bndr)) $
     is_strict_bind
   = -- Evaluate RHS strictly
     simplExprF (rhs_se `setInScopeFromE` env) rhs
@@ -1943,7 +1943,7 @@ simplRecE :: SimplEnv
 -- Precondition: not a join-point binding
 simplRecE env pairs body cont
   = do  { let bndrs = map fst pairs
-        ; massert (all (not . isJoinId) bndrs)
+        ; massert (isNothing $ joinPointBindings_maybe pairs)
         ; env1 <- simplRecBndrs env bndrs
                 -- NB: bndrs' don't have unfoldings or rules
                 -- We add them as we go down
@@ -2051,7 +2051,7 @@ simplNonRecJoinPoint :: SimplEnv -> InId -> InExpr
                      -> InExpr -> SimplCont
                      -> SimplM (SimplFloats, OutExpr)
 simplNonRecJoinPoint env bndr rhs body cont
-   = assert (isJoinId bndr ) $
+   = assert (isJoinPointBinding bndr) $
      wrapJoinCont env cont $ \ env cont ->
      do { -- We push join_cont into the join RHS and the body;
           -- and wrap wrap_cont around the whole thing
@@ -4574,22 +4574,24 @@ simplLetUnfolding env bind_cxt id new_rhs rhs_ty arity unf
   | isStableUnfolding unf
   = simplStableUnfolding env bind_cxt id rhs_ty arity unf
 
-  | freshly_born_join_point id
-  = -- This is a tricky one!
-    -- See wrinkle (JU1) in Note [Do not add unfoldings to join points at birth]
-    return noUnfolding
-
   | isExitJoinId id
   = -- See Note [Do not inline exit join points] in GHC.Core.Opt.Exitify
     return noUnfolding
 
-  | otherwise
-  = mkLetUnfolding env (bindContextLevel bind_cxt) VanillaSrc id is_join_point new_rhs
+  | freshly_born_join_point
+  = -- This is a tricky one!
+    -- See wrinkle (JU1) in Note [Do not add unfoldings to join points at birth]
+    return noUnfolding
 
+  | otherwise
+  = mkLetUnfolding env (bindContextLevel bind_cxt) VanillaSrc id' is_join new_rhs'
   where
-    is_join_point = isJoinId id
-    freshly_born_join_point id = is_join_point && isManyOccs (idOccInfo id)
-      -- OLD: too_many_occs (OneOcc { occ_n_br = n }) = n > 10 -- See #23627
+    (id', new_rhs', is_join) =
+      case joinPointBinding_maybe id new_rhs of
+        Nothing -> (id, new_rhs, False)
+        Just (id', new_rhs') -> (id', new_rhs', True)
+    freshly_born_join_point =
+      is_join && (not (isJoinId id) || isManyOccs (idOccInfo id))
 
 -------------------
 mkLetUnfolding :: SimplEnv -> TopLevelFlag -> UnfoldingSource
