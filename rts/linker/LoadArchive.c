@@ -510,6 +510,17 @@ HsInt loadArchive_ (pathchar *path)
 
         DEBUG_LOG("Found member file `%s'\n", fileName);
         bool is_symbol_table = strcmp("", fileName) == 0;
+#if defined(OBJFORMAT_MACHO)
+        if (!is_symbol_table) {
+            /* Darwin ranlib symbol tables are named __.SYMDEF* */
+            if (strncmp(fileName, "__.SYMDEF", sizeof("__.SYMDEF")) == 0 ||
+                strncmp(fileName, "__.SYMDEF SORTED", sizeof("__.SYMDEF SORTED")) == 0 ||
+                strncmp(fileName, "__.SYMDEF_64", sizeof("__.SYMDEF_64")) == 0 ||
+                strncmp(fileName, "__.SYMDEF_64 SORTED", sizeof("__.SYMDEF_64 SORTED")) == 0) {
+                is_symbol_table = true;
+            }
+        }
+#endif
 
 /////////////////////////////////////////////////
 // We found the member file. Load it into memory.
@@ -596,6 +607,7 @@ HsInt loadArchive_ (pathchar *path)
 #endif
             if (isThin) {
                 if (!readThinArchiveMember(memberSize, path, fileName, image)) {
+                    errorBelch("Failed to read thin member %" PATH_FMT"\n", path);
                     goto fail;
                 }
             }
@@ -630,6 +642,7 @@ HsInt loadArchive_ (pathchar *path)
                 IF_DEBUG(linker, ocDebugBelch(oc, "Faild to verify ... skipping."));
                 errorBelch("Faild to verify ... skipping.");
                 freeObjectCode( oc );
+                //TODO: Unmap or free image
                 continue;
             }
 
@@ -752,4 +765,3 @@ bool isArchive (pathchar *path)
     }
     return strncmp(ARCHIVE_HEADER, buffer, sizeof(ARCHIVE_HEADER)-1) == 0;
 }
-
