@@ -213,7 +213,16 @@ newJoinId bndrs body_ty
              arity      = count isId bndrs
              -- arity: See Note [Invariants on join points] invariant 2b, in GHC.Core
              join_arity = length bndrs
-             details    = JoinId join_arity Nothing
+             details    =
+              JoinId
+                { joinIdType     = TrueJoinPoint
+                    -- NB: start off as a true join point; occurrence analysis
+                    -- may demote it to a quasi join point.
+                    --
+                    -- See Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration.
+                , joinIdArity    = join_arity
+                , joinIdCbvMarks = Nothing
+                }
              id_info    = vanillaIdInfo `setArityInfo` arity
 
        ; return (mkLocalVar details name ManyTy join_id_ty id_info) }

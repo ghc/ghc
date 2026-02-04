@@ -608,9 +608,10 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
          -- Check that a join-point binder has a valid type
          -- NB: lintIdBinder has checked that it is not top-level bound
        ; case idJoinPointHood binder of
-            NotJoinPoint    -> return ()
-            JoinPoint arity ->  checkL (isValidJoinPointType arity binder_ty)
-                                       (mkInvalidJoinPointMsg binder binder_ty)
+            NotJoinPoint -> return ()
+            JoinPoint { joinPointArity = arity }
+              -> checkL (isValidJoinPointType arity binder_ty)
+                        (mkInvalidJoinPointMsg binder binder_ty)
 
        ; when (lf_check_inline_loop_breakers flags
                && isStableUnfolding (realIdUnfolding binder)
@@ -670,9 +671,9 @@ lintRhs :: Id -> CoreExpr -> LintM (OutType, UsageEnv)
 -- NB: the Id can be Linted or not -- it's only used for
 --     its OccInfo and join-pointer-hood
 lintRhs bndr rhs
-    | JoinPoint arity <- idJoinPointHood bndr
+    | Just arity <- idJoinArity_maybe bndr
     = lintJoinLams arity (Just bndr) rhs
-    | AlwaysTailCalled arity <- tailCallInfo (idOccInfo bndr)
+    | AlwaysTailCalled { tailCallArity = arity } <- tailCallInfo (idOccInfo bndr)
     = lintJoinLams arity Nothing rhs
 
 -- Allow applications of the data constructor @StaticPtr@ at the top
@@ -914,9 +915,9 @@ lintCoreExpr (Lit lit)
        ; return (literalType lit, zeroUE) }
 
 lintCoreExpr (Cast expr co)
-  = do { (expr_ty, ue) <- markAllJoinsBad (lintCoreExpr expr)
-            -- markAllJoinsBad: see Note [Join points and casts]
-
+  = do { (expr_ty, ue) <- lintCoreExpr expr
+            -- NB: a cast turns true join points into quasi join points,
+            -- see Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration.
        ; lintCoercion co
        ; lintRole co Representational (coercionRole co)
        ; Pair from_ty to_ty <- substCoKindM co
@@ -929,14 +930,17 @@ lintCoreExpr (Tick tickish expr)
   = do { case tickish of
            Breakpoint _ _ ids -> forM_ ids $ \id -> lintIdOcc id 0
            _                  -> return ()
-       ; markAllJoinsBadIf block_joins $ lintCoreExpr expr }
+       ; expr_l <- lintCoreExpr expr
+       ; r <- markAllJoinsBadIf block_joins $ pure expr_l
+       ; pure r }
   where
-    block_joins = not (tickish `tickishScopesLike` SoftScope)
-      -- TODO Consider whether this is the correct rule. It is consistent with
-      -- the simplifier's behaviour - cost-centre-scoped ticks become part of
-      -- the continuation, and thus they behave like part of an evaluation
-      -- context, but soft-scoped and non-scoped ticks simply wrap the result
-      -- (see Simplify.simplTick).
+    block_joins
+      | ProfNote {} <- tickish
+      -- A profiling tick turns true join points into quasi join points,
+      -- see Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration.
+      = False
+      | otherwise
+      = not (tickishCanScopeJoin tickish)
 
 lintCoreExpr (Let (NonRec tv (Type ty)) body)
   | isTyVar tv
@@ -1017,22 +1021,27 @@ lintCoreExpr e@(App _ _)
 
        ; return app_pair}
   where
-    skipTick t = case collectFunSimple e of
-      (Var v) -> etaExpansionTick v t
-      _ -> tickishFloatable t
-    (fun, args, _source_ticks) = collectArgsTicks skipTick e
-      -- We must look through source ticks to avoid #21152, for example:
+    skipTick t =
+      case collectFunSimple e of
+        Var v -> canCollectArgsThroughTick v t
+        _ -> tickishFloatable t
+    (fun, args, _ticks) = collectArgsTicks skipTick e
+      -- We must look through ticks, using similar logic as CorePrep does,
+      -- otherwise we may fail to spot a saturated application.
       --
-      -- reallyUnsafePtrEquality
-      --   = \ @a ->
-      --       (src<loc> reallyUnsafePtrEquality#)
-      --         @Lifted @a @Lifted @a
+      --   1. Look through floatable ticks, as per Note [Eta expansion and source notes]
+      --      in GHC.Core.Opt.Arity. We need to do this to avoid e.g.:
       --
-      -- To do this, we use `collectArgsTicks tickishFloatable` to match
-      -- the eta expansion behaviour, as per Note [Eta expansion and source notes]
-      -- in GHC.Core.Opt.Arity.
-      -- Sadly this was not quite enough. So we now also accept things that CorePrep will allow.
-      -- See Note [Ticks and mandatory eta expansion]
+      --        reallyUnsafePtrEquality
+      --          = \ @a ->
+      --              (src<loc> reallyUnsafePtrEquality#)
+      --                @Lifted @a @Lifted @a
+      --
+      --   2. Look through profiling ticks when the head of the application must
+      --      always remain saturated (e.g. a primop or a join point), as per
+      --      Note [Ticks and mandatory eta expansion] in GHC.CoreToStg.Prep.
+      --
+      -- To do this, we use 'canCollectArgsThroughTick', as CorePrep does.
 
 lintCoreExpr (Lam var expr)
   = markAllJoinsBad $
@@ -1132,21 +1141,40 @@ checkDeadIdOcc id
 ------------------
 lintJoinBndrType :: OutType -- Type of the body
                  -> OutId   -- Possibly a join Id
-                -> LintM ()
+                 -> LintM ()
 -- Checks that the return type of a join Id matches the body
 -- E.g. join j x = rhs in body
 --      The type of 'rhs' must be the same as the type of 'body'
 lintJoinBndrType body_ty bndr
-  | JoinPoint arity <- idJoinPointHood bndr
+  | JoinPoint
+    { joinPointArity = arity
+    , joinPointCategory = join_cat
+    } <- idJoinPointHood bndr
   , let bndr_ty = idType bndr
   , (bndrs, res) <- splitPiTys bndr_ty
-  = do let msg =
-             hang (text "Join point returns different type than body")
-                2 (vcat [ text "Join bndr:" <+> ppr bndr <+> dcolon <+> ppr (idType bndr)
-                        , text "Join arity:" <+> ppr arity
-                        , text "Body type:" <+> ppr body_ty ])
-       checkL (length bndrs >= arity) msg
-       ensureEqTys body_ty (mkPiTys (drop arity bndrs) res) msg
+  = do let
+          ty_msg =
+            hang (text "Join point returns different type than body")
+              2 (vcat [ text "Join bndr:" <+> ppr bndr <+> dcolon <+> ppr (idType bndr)
+                      , text "Join arity:" <+> ppr arity
+                      , text "Body type:" <+> ppr body_ty ])
+          arity_msg =
+            hang (text "Join point is not saturated")
+              2 (vcat [ text "Join bndr:" <+> ppr bndr <+> dcolon <+> ppr (idType bndr)
+                      , text "Join arity:" <+> ppr arity
+                      , text "Arguments:" <+> ppr bndrs ])
+
+       checkL (length bndrs >= arity) arity_msg
+       case join_cat of
+         QuasiJoinPoint ->
+           -- For a quasi join point, the types might not match, because there
+           -- might be casts around the jump.
+           --
+           -- See Wrinkle [Casts and join point result types]
+           -- in Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration
+           return ()
+         TrueJoinPoint ->
+           ensureEqTys body_ty (mkPiTys (drop arity bndrs) res) ty_msg
   | otherwise
   = return ()
 
@@ -1154,14 +1182,14 @@ checkJoinOcc :: Id -> JoinArity -> LintM ()
 -- Check that if the occurrence is a JoinId, then so is the
 -- binding site, and it's a valid join Id
 checkJoinOcc var n_args
-  | JoinPoint join_arity_occ <- idJoinPointHood var
+  | Just join_arity_occ <- idJoinArity_maybe var
   = do { mb_join_arity_bndr <- lookupJoinId var
        ; case mb_join_arity_bndr of {
            NotJoinPoint -> do { join_set <- getValidJoins
                               ; addErrL (text "join set " <+> ppr join_set $$
                                 invalidJoinOcc var) } ;
 
-           JoinPoint join_arity_bndr ->
+           JoinPoint { joinPointArity = join_arity_bndr } ->
 
     do { checkL (join_arity_bndr == join_arity_occ) $
            -- Arity differs at binding site and occurrence
@@ -1334,42 +1362,8 @@ checkLinearity body_ue lam_var =
       return body_ue'
     Nothing    -> return body_ue -- A type variable
 
-{- Note [Join points and casts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-You might think that this should be OK:
-   join j x = rhs
-   in (case e of
-          A   -> alt1
-          B x -> (jump j x) |> co)
-
-You might think that, since the cast is ultimately erased, the jump to
-`j` should still be OK as a join point.  But no!  See #21716. Suppose
-
-  newtype Age = MkAge Int   -- axAge :: Age ~ Int
-  f :: Int -> ...           -- f strict in it's first argument
-
-and consider the expression
-
-  f (join j :: Bool -> Age
-          j x = (rhs1 :: Age)
-     in case v of
-         Just x  -> (j x |> axAge :: Int)
-         Nothing -> rhs2)
-
-Then, if the Simplifier pushes the strict call into the join points
-and alternatives we'll get
-
-   join j' x = f (rhs1 :: Age)
-   in case v of
-      Just x  -> j' x |> axAge
-      Nothing -> f rhs2
-
-Utterly bogus.  `f` expects an `Int` and we are giving it an `Age`.
-No no no.  Casts destroy the tail-call property.  Henc markAllJoinsBad
-in the (Cast expr co) case of lintCoreExpr.
-
-Note [No alternatives lint check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [No alternatives lint check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Case expressions with no alternatives are odd beasts, and it would seem
 like they would worth be looking at in the linter (cf #10180). We
 used to check two things:
@@ -2225,7 +2219,7 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
     lintBinders LambdaBind bndrs $ \ _ ->
     do { (lhs_ty, _) <- lintCoreArgs (fun_ty, zeroUE) args
        ; (rhs_ty, _) <- case idJoinPointHood fun of
-                     JoinPoint join_arity
+                     JoinPoint { joinPointArity = join_arity }
                        -> do { checkL (args `lengthIs` join_arity) $
                                 mkBadJoinPointRuleMsg fun join_arity rule
                                -- See Note [Rules for join points]

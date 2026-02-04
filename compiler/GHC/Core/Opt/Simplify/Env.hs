@@ -501,7 +501,8 @@ instance Outputable SimplSR where
     where
       pp_mj = case mj of
                 NotJoinPoint -> empty
-                JoinPoint n  -> parens (int n)
+                JoinPoint { joinPointCategory = join_cat, joinPointArity = n }
+                  -> ppr join_cat <> parens (int n)
 
   ppr (ContEx _tv _cv _id e) = vcat [text "ContEx" <+> ppr e {-,
                                 ppr (filter_env tv), ppr (filter_env id) -}]
@@ -1201,12 +1202,48 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
         -- Extend the substitution if the unique has changed,
         -- or there's some useful occurrence information
         -- See the notes with substTyVarBndr for the delSubstEnv
-    !new_subst | new_id /= old_id
-              = extendVarEnv id_subst old_id (DoneId new_id)
-              | otherwise
-              = delVarEnv id_subst old_id
+    !new_subst
+      | new_id /= old_id
+      = extendVarEnv id_subst old_id (DoneId new_id)
+      | otherwise
+      = delVarEnv id_subst old_id
 
     !new_in_scope = in_scope `extendInScopeSet` new_id
+
+{- Note [TailCallInfo is conservative]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The simplifier guarantees that the 'TailCallInfo' of an 'Id' is conservative in
+the following way:
+
+  - If the 'TailCallInfo' (stored in the 'OccInfo') is 'AlwaysTailCalled', then
+    this information is fully accurate:
+      - the 'Id' is always tail called,
+      - with the given join arity,
+      - with the given category (true/quasi) (see Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration)
+  - Otherwise, if the 'TailCallInfo' is 'NoTailCallInfo', then the 'Id' may or
+    may not always be tail called.
+
+This is achieved as follows:
+
+  - We run occurrence analysis before each iteration of the simplifier.
+    As a result, all 'Id's begin with accurate 'OccInfo' (including 'TailCallInfo').
+  - Whenever the simplifier performs a transformation that might invalidate
+    occurrence information, it calls 'zapFragileIdInfo'. This sets the
+    'TailCallInfo' to 'NoTailCallInfo' (among other things).
+
+  NB: it is not guaranteed that every 'InId' in the simplifier has the original
+  occurrence info from occurrence analysis, because the simplifier sometimes
+  feeds back 'OutId's as 'InId's using 'zapSubstEnv'.
+  See e.g. 'GHC.Core.Opt.Simplify.Iteration.simplInId'.
+
+On the other hand, whether an 'Id' is a 'JoinId' or not is always preserved,
+because all optimisations preserve join-point-hood (except float-out, the only
+caller of 'zapJoinId', as per Note [Zapping JoinId when floating]).
+
+This means that an 'Id' may be a 'JoinId' yet have a 'TailCallInfo' of
+'NoTailCallInfo'. In such a situation, we must be careful to preserve the
+'JoinPointHood' of the 'Id' (see e.g. 'GHC.Core.SimplOpt.joinPointBinding_maybe').
+-}
 
 ------------------------------------
 seqTyVar :: TyVar -> ()

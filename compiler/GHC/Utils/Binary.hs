@@ -133,7 +133,7 @@ import GHC.Utils.Fingerprint
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
-import GHC.Utils.Outputable( JoinPointHood(..) )
+import GHC.Utils.Outputable( JoinPointHood(..), JoinPointCategory (..) )
 import GHCi.FFI
 import GHCi.Message
 
@@ -1054,16 +1054,23 @@ instance Binary DiffTime where
     get bh = do r <- get bh
                 return $ fromRational r
 
+instance Binary JoinPointCategory where
+  put_ bh ty = put_ bh (ty == TrueJoinPoint)
+  get bh = do { true <- get bh; return $ if true then TrueJoinPoint else QuasiJoinPoint }
+
 instance Binary JoinPointHood where
     put_ bh NotJoinPoint = putByte bh 0
-    put_ bh (JoinPoint ar) = do
+    put_ bh (JoinPoint t ar) = do
         putByte bh 1
+        put_ bh t
         put_ bh ar
     get bh = do
         h <- getByte bh
         case h of
             0 -> return NotJoinPoint
-            _ -> do { ar <- get bh; return (JoinPoint ar) }
+            _ -> do t <- get bh
+                    ar <- get bh
+                    return (JoinPoint t ar)
 
 newtype EnumBinary a = EnumBinary { unEnumBinary :: a }
 instance Enum a => Binary (EnumBinary a) where

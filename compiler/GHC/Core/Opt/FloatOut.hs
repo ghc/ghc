@@ -22,7 +22,7 @@ import GHC.Driver.Flags  ( DumpFlag (..) )
 import GHC.Utils.Logger
 import GHC.Types.Id      ( Id, idType,
 --                           idArity, isDeadEndId,
-                           isJoinId, idJoinPointHood )
+                           isJoinId, idJoinArity_maybe )
 import GHC.Types.Tickish
 import GHC.Core.Opt.SetLevels
 import GHC.Types.Unique.Supply ( UniqSupply )
@@ -441,7 +441,7 @@ floatRhs :: CoreBndr
          -> LevelledExpr
          -> (FloatStats, FloatBinds, CoreExpr)
 floatRhs bndr rhs
-  | JoinPoint join_arity <- idJoinPointHood bndr
+  | Just join_arity <- idJoinArity_maybe bndr
   , Just (bndrs, body) <- try_collect join_arity rhs []
   = case bndrs of
       []                -> floatExpr rhs

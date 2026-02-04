@@ -42,7 +42,7 @@ import GHC.Core.Coercion
 import GHC.Core.Type
 import GHC.Core.TyCo.FVs    ( tyCoVarsOfMCo )
 
-import GHC.Data.Maybe( orElse )
+import GHC.Data.Maybe( orElse, isNothing )
 import GHC.Data.Graph.Directed ( SCC(..), Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq
                                , stronglyConnCompFromEdgedVerticesUniqR )
@@ -68,6 +68,7 @@ import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )
 
 import Data.List (mapAccumL)
+import qualified Data.Semigroup as Semi
 
 {-
 ************************************************************************
@@ -797,10 +798,10 @@ function call and a jump by looking at the occurrence (because the same pass
 changes the 'IdDetails' and propagates the binders to their occurrence sites).
 
 To track potential join points, we use the 'occ_tail' field of OccInfo. A value
-of `AlwaysTailCalled n` indicates that every occurrence of the variable is a
-tail call with `n` arguments (counting both value and type arguments). Otherwise
-'occ_tail' will be 'NoTailCallInfo'. The tail call info flows bottom-up with the
-rest of 'OccInfo' until it goes on the binder.
+of `AlwaysTailCalled { tailCallArity = n }` indicates that every occurrence of
+the variable is a tail call with `n` arguments (counting both value and type
+arguments). Otherwise 'occ_tail' will be 'NoTailCallInfo'. The tail call info
+flows bottom-up with the rest of 'OccInfo' until it goes on the binder.
 
 Note [Join arity prediction based on joinRhsArity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1139,7 +1140,8 @@ occAnalNonRecRhs !env lvl imp_rule_edges mb_join bndr rhs
     -- See Note [Join points and unfoldings/rules]
     unf = idUnfolding bndr
     WTUD unf_tuds unf1 = occAnalUnfolding rhs_env unf
-    adj_unf_uds = adjustTailArity mb_join unf_tuds
+    adj_unf_uds = adjustTailArity mb_join_arity unf_tuds
+    mb_join_arity = joinPointHoodArity mb_join
 
     --------- Rules ---------
     -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
@@ -1159,7 +1161,7 @@ occAnalNonRecRhs !env lvl imp_rule_edges mb_join bndr rhs
 
     adj_rule_uds :: [UsageDetails]
     adj_rule_uds = imp_rule_uds ++
-                   [ l `andUDs` adjustTailArity mb_join r
+                   [ l `andUDs` adjustTailArity mb_join_arity r
                    | (_,l,r) <- rules_w_uds ]
 
 mkNonRecRhsCtxt :: TopLevelFlag -> Id -> Unfolding -> OccEncl
@@ -1831,7 +1833,7 @@ makeNode !env imp_rule_edges bndr_set (bndr, rhs)
     unf = realIdUnfolding bndr -- realIdUnfolding: Ignore loop-breaker-ness
                                -- here because that is what we are setting!
     WTUD unf_tuds unf' = occAnalUnfolding rhs_env unf
-    adj_unf_uds = adjustTailArity (JoinPoint rhs_ja) unf_tuds
+    adj_unf_uds = adjustTailArity (Just rhs_ja) unf_tuds
       -- `rhs_ja` is `joinRhsArity rhs` and is the prediction for source MAr
       -- of Note [Join arity prediction based on joinRhsArity]
 
@@ -1846,7 +1848,7 @@ makeNode !env imp_rule_edges bndr_set (bndr, rhs)
     -- `rhs_ja` is `joinRhsArity rhs'` and is the prediction for source MAr
     -- of Note [Join arity prediction based on joinRhsArity]
     rules_w_uds :: [(CoreRule, UsageDetails, UsageDetails)]
-    rules_w_uds = [ (r,l,adjustTailArity (JoinPoint rhs_ja) rhs_wuds)
+    rules_w_uds = [ (r,l,adjustTailArity (Just rhs_ja) rhs_wuds)
                   | rule <- idCoreRules bndr
                   , let (r,l,rhs_wuds) = occAnalRule rhs_env rule ]
     rules'      = map fstOf3 rules_w_uds
@@ -2300,12 +2302,8 @@ occ_anal_lam_tail env (Cast expr co)
                     Var {} | isRhsEnv env -> markAllMany usage1
                     _ -> usage1
 
-         -- usage3: you might think this was not necessary, because of
-         -- the markAllNonTail in adjustTailUsage; but not so!  For a
-         -- join point, adjustTailUsage doesn't do this; yet if there is
-         -- a cast, we must!  Also: why markAllNonTail?  See
-         -- GHC.Core.Lint: Note Note [Join points and casts]
-         usage3 = markAllNonTail usage2
+         -- usage3: see Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration.
+         usage3 = markAllQuasiTail usage2
 
     in WUD usage3 (Cast expr' co)
 
@@ -2592,9 +2590,15 @@ occAnal env (Tick tickish body)
     WUD usage body' = occAnal env body
 
     usage'
-      | tickish `tickishScopesLike` SoftScope
-      = usage  -- For soft-scoped ticks (including SourceNotes) we don't want
-               -- to lose join-point-hood, so we don't mess with `usage` (#24078)
+      -- For soft-scoped ticks (including SourceNotes) we don't want
+      -- to lose join-point-hood, so we don't mess with `usage` (#24078)
+      | tickishCanScopeJoin tickish
+      = usage
+
+      -- For cost centres, the best we can do is to turn it into a quasi join point.
+      -- See Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration.
+      | ProfNote {} <- tickish
+      = markAllQuasiTail usage
 
       -- For a non-soft tick scope, we can inline lambdas only, so we
       -- abandon tail calls, and do markAllInsideLam too: usage_lam
@@ -2608,20 +2612,12 @@ occAnal env (Tick tickish body)
 
     usage_lam = markAllNonTail (markAllInsideLam usage)
 
-    -- TODO There may be ways to make ticks and join points play
-    -- nicer together, but right now there are problems:
-    --   let j x = ... in tick<t> (j 1)
-    -- Making j a join point may cause the simplifier to drop t
-    -- (if the tick is put into the continuation). So we don't
-    -- count j 1 as a tail call.
-    -- See #14242.
-
 occAnal env (Cast expr co)
-  = let  (WUD usage expr') = occAnal env expr
-         usage1 = addManyOccs usage (coVarsOfCo co)
-             -- usage2: see Note [Gather occurrences of coercion variables]
-         usage2 = markAllNonTail usage1
-             -- usage3: calls inside expr aren't tail calls any more
+  = let (WUD usage expr') = occAnal env expr
+        usage1 = addManyOccs usage (coVarsOfCo co)
+            -- usage1: see Note [Gather occurrences of coercion variables]
+        usage2 = markAllQuasiTail usage1
+            -- usage2: see Note [Quasi join points]
     in WUD usage2 (Cast expr' co)
 
 occAnal env app@(App _ _)
@@ -2756,7 +2752,7 @@ occAnalApp env (Var fun, args, ticks)
   --     This caused #18296
   | fun `hasKey` runRWKey
   , [t1, t2, arg]  <- args
-  , WUD usage arg' <- adjustNonRecRhs (JoinPoint 1) $ occAnalLamTail env arg
+  , WUD usage arg' <- adjustNonRecRhs (JoinPoint TrueJoinPoint 1) $ occAnalLamTail env arg
   = let app_out = mkTicks ticks $ mkApps (Var fun) [t1, t2, arg']
     in WUD usage app_out
 
@@ -3086,7 +3082,7 @@ mkRhsOccEnv :: OccEnv -> RecFlag -> OccEncl -> JoinPointHood -> Id -> CoreExpr -
 --   - Set occ_encl to specified OccEncl
 mkRhsOccEnv env@(OccEnv { occ_one_shots = ctxt_one_shots, occ_join_points = ctxt_join_points })
             is_rec encl jp_hood bndr rhs
-  | JoinPoint join_arity <- jp_hood
+  | JoinPoint { joinPointArity = join_arity } <- jp_hood
   = env { occ_encl        = OccVanilla
         , occ_one_shots   = extendOneShotsForJoinPoint is_rec join_arity rhs ctxt_one_shots
         , occ_join_points = ctxt_join_points }
@@ -3700,7 +3696,7 @@ type OccInfoEnv = IdEnv LocalOcc  -- A finite map from an expression's
 data LocalOcc  -- See Note [LocalOcc]
      = OneOccL { lo_n_br  :: {-# UNPACK #-} !BranchCount  -- Number of syntactic occurrences
                , lo_tail  :: !TailCallInfo
-                   -- Combining (AlwaysTailCalled 2) and (AlwaysTailCalled 3)
+                   -- NB: combining 'TailCallInfo's with different arities
                    -- gives NoTailCallInfo
               , lo_int_cxt :: !InterestingCxt }
 
@@ -3722,14 +3718,20 @@ localTailCallInfo (OneOccL  { lo_tail = tci }) = tci
 localTailCallInfo (ManyOccL tci)               = tci
 
 type ZappedSet = OccInfoEnv -- Values are ignored
-
 data UsageDetails
   = UD { ud_env       :: !OccInfoEnv
-       , ud_z_many    :: !ZappedSet   -- apply 'markMany' to these
-       , ud_z_in_lam  :: !ZappedSet   -- apply 'markInsideLam' to these
-       , ud_z_tail    :: !ZappedSet   -- zap tail-call info for these
+       , ud_z_many    :: !ZappedSet   -- ^ apply 'markMany' to these
+       , ud_z_in_lam  :: !ZappedSet   -- ^ apply 'markInsideLam' to these
+       , ud_z_tail    :: !ZappedSet   -- ^ zap tail-call info for these
+       , ud_z_quasi   :: !ZappedSet   -- ^ mark these as quasi tail-calls
+                                      -- See Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration
        }
   -- INVARIANT: All three zapped sets are subsets of ud_env
+
+-- Implementation remark: having two separate sets (ud_z_tail and ud_z_quasi)
+-- is significantly more efficient than having a single 'IdEnv IsTrueJoinPoint',
+-- as having to use 'strictPlusVarEnv_C' in 'combineUsageDetailsWith'
+-- hugely regresses allocations in e.g. T24471.
 
 instance Outputable UsageDetails where
   ppr ud@(UD { ud_env = env, ud_z_tail = z_tail })
@@ -3793,9 +3795,20 @@ mkOneOcc !env id int_cxt arity
   = mkSimpleDetails (unitVarEnv id occ)
 
   where
-    occ = OneOccL { lo_n_br = 1
-                  , lo_int_cxt = int_cxt
-                  , lo_tail = AlwaysTailCalled arity }
+    occ =
+      OneOccL
+        { lo_n_br = 1
+        , lo_int_cxt = int_cxt
+        , lo_tail =
+            AlwaysTailCalled
+              { tailCallArity = arity
+              , tailCallJoinPointType = TrueJoinPoint
+                 -- Start off as a true join point.
+                 -- Updated by occurrence analysis.
+                 --
+                 -- See Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration.
+              }
+        }
 
 -- Add several occurrences, assumed not to be tail calls
 add_many_occ :: Var -> OccInfoEnv -> OccInfoEnv
@@ -3833,28 +3846,35 @@ mkSimpleDetails :: OccInfoEnv -> UsageDetails
 mkSimpleDetails env = UD { ud_env       = env
                          , ud_z_many    = emptyVarEnv
                          , ud_z_in_lam  = emptyVarEnv
-                         , ud_z_tail    = emptyVarEnv }
+                         , ud_z_tail    = emptyVarEnv
+                         , ud_z_quasi   = emptyVarEnv }
 
 modifyUDEnv :: (OccInfoEnv -> OccInfoEnv) -> UsageDetails -> UsageDetails
 modifyUDEnv f uds@(UD { ud_env = env }) = uds { ud_env = f env }
 
 delBndrsFromUDs :: [Var] -> UsageDetails -> UsageDetails
 -- Delete these binders from the UsageDetails
-delBndrsFromUDs bndrs (UD { ud_env = env, ud_z_many = z_many
-                          , ud_z_in_lam  = z_in_lam, ud_z_tail = z_tail })
-  = UD { ud_env       = env      `delVarEnvList` bndrs
-       , ud_z_many    = z_many   `delVarEnvList` bndrs
-       , ud_z_in_lam  = z_in_lam `delVarEnvList` bndrs
-       , ud_z_tail    = z_tail   `delVarEnvList` bndrs }
+delBndrsFromUDs bndrs
+  (UD { ud_env      = env
+      , ud_z_many   = z_many
+      , ud_z_in_lam = z_in_lam
+      , ud_z_tail   = z_tail
+      , ud_z_quasi  = z_quasi })
+  = UD { ud_env      = env      `delVarEnvList` bndrs
+       , ud_z_many   = z_many   `delVarEnvList` bndrs
+       , ud_z_in_lam = z_in_lam `delVarEnvList` bndrs
+       , ud_z_tail   = z_tail   `delVarEnvList` bndrs
+       , ud_z_quasi  = z_quasi  `delVarEnvList` bndrs }
 
-markAllMany, markAllInsideLam, markAllNonTail, markAllManyNonTail
-  :: UsageDetails -> UsageDetails
+markAllMany, markAllInsideLam, markAllNonTail, markAllQuasiTail, markAllManyNonTail
+  :: HasDebugCallStack => UsageDetails -> UsageDetails
 markAllMany      ud@(UD { ud_env = env }) = ud { ud_z_many   = env }
 markAllInsideLam ud@(UD { ud_env = env }) = ud { ud_z_in_lam = env }
-markAllNonTail   ud@(UD { ud_env = env }) = ud { ud_z_tail   = env }
 markAllManyNonTail = markAllMany . markAllNonTail -- effectively sets to noOccInfo
 
-markAllInsideLamIf, markAllNonTailIf :: Bool -> UsageDetails -> UsageDetails
+markAllNonTail   ud@(UD { ud_env = env }) = ud { ud_z_tail  = env }
+markAllQuasiTail ud@(UD { ud_env = env }) = ud { ud_z_quasi = env }
+markAllInsideLamIf, markAllNonTailIf :: HasDebugCallStack => Bool -> UsageDetails -> UsageDetails
 
 markAllInsideLamIf  True  ud = markAllInsideLam ud
 markAllInsideLamIf  False ud = ud
@@ -3863,13 +3883,28 @@ markAllNonTailIf True  ud = markAllNonTail ud
 markAllNonTailIf False ud = ud
 
 lookupTailCallInfo :: UsageDetails -> Id -> TailCallInfo
-lookupTailCallInfo uds id
-  | UD { ud_z_tail = z_tail, ud_env = env } <- uds
-  , not (id `elemVarEnv` z_tail)
-  , Just occ <- lookupVarEnv env id
-  = localTailCallInfo occ
-  | otherwise
+lookupTailCallInfo (UD { ud_env = env, ud_z_tail = z_tail, ud_z_quasi = z_quasi }) id =
+  case localTailCallInfo <$> lookupVarEnv env id of
+    Nothing -> NoTailCallInfo
+    Just ti -> maybeZapTailCallInfo ti z_tail z_quasi (idUnique id)
+
+maybeZapTailCallInfo
+  :: TailCallInfo
+  -> ZappedSet -- ^ zap tail
+  -> ZappedSet -- ^ quasi tail
+  -> Unique
+  -> TailCallInfo
+maybeZapTailCallInfo tail_info0 no_tail quasi_tail id_unique
+  | elemVarEnvByKey id_unique no_tail
   = NoTailCallInfo
+  | elemVarEnvByKey id_unique quasi_tail
+  -- See Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration.
+  = case tail_info0 of
+      NoTailCallInfo -> NoTailCallInfo
+      atc@AlwaysTailCalled {} ->
+        atc { tailCallJoinPointType = QuasiJoinPoint }
+  | otherwise
+  = tail_info0
 
 udFreeVars :: VarSet -> UsageDetails -> VarSet
 -- Find the subset of bndrs that are mentioned in uds
@@ -3885,18 +3920,20 @@ combineUsageDetailsWith :: (Unique -> LocalOcc -> LocalOcc -> LocalOcc)
                         -> UsageDetails -> UsageDetails -> UsageDetails
 {-# INLINE combineUsageDetailsWith #-}
 combineUsageDetailsWith plus_occ_info
-    uds1@(UD { ud_env = env1, ud_z_many = z_many1, ud_z_in_lam = z_in_lam1, ud_z_tail = z_tail1 })
-    uds2@(UD { ud_env = env2, ud_z_many = z_many2, ud_z_in_lam = z_in_lam2, ud_z_tail = z_tail2 })
+    uds1@(UD { ud_env = env1, ud_z_many = z_many1, ud_z_in_lam = z_in_lam1, ud_z_tail = z_tail1, ud_z_quasi = z_quasi1 })
+    uds2@(UD { ud_env = env2, ud_z_many = z_many2, ud_z_in_lam = z_in_lam2, ud_z_tail = z_tail2, ud_z_quasi = z_quasi2 })
   | isEmptyVarEnv env1 = uds2
   | isEmptyVarEnv env2 = uds1
   | otherwise
   -- See Note [Strictness in the occurrence analyser]
   -- Using strictPlusVarEnv here speeds up the test T26425
   -- by about 10% by avoiding intermediate thunks.
-  = UD { ud_env       = strictPlusVarEnv_C_Directly plus_occ_info env1 env2
-       , ud_z_many    = strictPlusVarEnv z_many1   z_many2
-       , ud_z_in_lam  = plusVarEnv z_in_lam1 z_in_lam2
-       , ud_z_tail    = strictPlusVarEnv z_tail1   z_tail2 }
+  = UD { ud_env      = strictPlusVarEnv_C_Directly plus_occ_info env1 env2
+       , ud_z_many   = strictPlusVarEnv z_many1   z_many2
+       , ud_z_in_lam = plusVarEnv z_in_lam1 z_in_lam2
+       , ud_z_tail   = strictPlusVarEnv z_tail1 z_tail2
+       , ud_z_quasi  = strictPlusVarEnv z_quasi1 z_quasi2
+       }
 
 lookupLetOccInfo :: UsageDetails -> Id -> OccInfo
 -- Don't use locally-generated occ_info for exported (visible-elsewhere)
@@ -3914,13 +3951,14 @@ lookupOccInfoByUnique :: UsageDetails -> Unique -> OccInfo
 lookupOccInfoByUnique (UD { ud_env       = env
                           , ud_z_many    = z_many
                           , ud_z_in_lam  = z_in_lam
-                          , ud_z_tail    = z_tail })
+                          , ud_z_tail    = z_tail
+                          , ud_z_quasi   = z_quasi })
                   uniq
   = case lookupVarEnv_Directly env uniq of
       Nothing -> IAmDead
       Just (OneOccL { lo_n_br = n_br, lo_int_cxt = int_cxt
                     , lo_tail = tail_info })
-          | uniq `elemVarEnvByKey`z_many
+          | uniq `elemVarEnvByKey` z_many
           -> ManyOccs { occ_tail = mk_tail_info tail_info }
           | otherwise
           -> OneOcc { occ_in_lam  = in_lam
@@ -3933,9 +3971,7 @@ lookupOccInfoByUnique (UD { ud_env       = env
 
       Just (ManyOccL tail_info) -> ManyOccs { occ_tail = mk_tail_info tail_info }
   where
-    mk_tail_info ti
-        | uniq `elemVarEnvByKey` z_tail = NoTailCallInfo
-        | otherwise                     = ti
+    mk_tail_info ti = maybeZapTailCallInfo ti z_tail z_quasi uniq
 
 -------------------
 -- See Note [Adjusting right-hand sides]
@@ -3946,26 +3982,47 @@ adjustNonRecRhs :: JoinPointHood
 -- ^ This function concentrates shared logic between occAnalNonRecBind and the
 -- AcyclicSCC case of occAnalRec.
 -- It returns the adjusted rhs UsageDetails combined with the body usage
-adjustNonRecRhs mb_join_arity (WTUD (TUD rhs_ja uds) rhs)
+adjustNonRecRhs mb_join (WTUD (TUD rhs_ja uds) rhs)
   = WUD (adjustTailUsage exact_join rhs uds) rhs
   where
-    exact_join = mb_join_arity == JoinPoint rhs_ja
+    exact_join =
+      case mb_join of
+        NotJoinPoint -> Nothing
+        JoinPoint { joinPointArity = ja', joinPointCategory = cat } ->
+          if ja' == rhs_ja
+          then Just cat
+          else Nothing
 
-adjustTailUsage :: Bool        -- True <=> Exactly-matching join point; don't do markNonTail
+adjustTailUsage :: HasDebugCallStack
+                => Maybe JoinPointCategory
                 -> CoreExpr    -- Rhs usage, AFTER occAnalLamTail
                 -> UsageDetails
                 -> UsageDetails
-adjustTailUsage exact_join rhs uds
+adjustTailUsage mb_join rhs uds
   = -- c.f. occAnal (Lam {})
     markAllInsideLamIf (not one_shot) $
-    markAllNonTailIf (not exact_join) $
+    mb_mark_nontail $
     uds
   where
-    one_shot   = isOneShotFun rhs
+    one_shot = isOneShotFun rhs
+    mb_mark_nontail =
+      case mb_join of
+        Nothing -> markAllNonTail
+        Just join_cat ->
+          case join_cat of
+            TrueJoinPoint  -> id
+            QuasiJoinPoint ->
+              -- markAllQuasiTail: if we are inside a quasi join point, all
+              -- jumps (including of outer join points) must become quasi join point jumps.
+              -- See Wrinkle [Transitivity of quasi join points] in GHC.Core.Opt.Simplify.Iteration
+              markAllQuasiTail
 
-adjustTailArity :: JoinPointHood -> TailUsageDetails -> UsageDetails
-adjustTailArity mb_rhs_ja (TUD ja usage)
-  = markAllNonTailIf (mb_rhs_ja /= JoinPoint ja) usage
+adjustTailArity :: Maybe JoinArity -> TailUsageDetails -> UsageDetails
+adjustTailArity mb_rhs_ja (TUD ja usage) = markAllNonTailIf not_same_arity usage
+  where
+    not_same_arity = case mb_rhs_ja of
+      Nothing -> True
+      Just ja' -> ja' /= ja
 
 type IdWithOccInfo = Id
 
@@ -3996,9 +4053,9 @@ tagNonRecBinder :: TopLevelFlag           -- At top level?
 -- No-op on TyVars
 -- Precondition: OccInfo is not IAmDead
 tagNonRecBinder lvl occ bndr
-  | okForJoinPoint lvl bndr tail_call_info
-  , AlwaysTailCalled ar <- tail_call_info
-  = (setBinderOcc occ bndr,        JoinPoint ar)
+  | Just join_cat <- okForJoinPoint lvl bndr tail_call_info
+  , AlwaysTailCalled { tailCallArity = ar } <- tail_call_info
+  = (setBinderOcc occ bndr,        JoinPoint join_cat ar)
   | otherwise
   = (setBinderOcc zapped_occ bndr, NotJoinPoint)
  where
@@ -4027,7 +4084,7 @@ tagRecBinders lvl body_uds details_s
        = assertPpr (rhs_ja == joinRhsArity rhs) (ppr rhs_ja $$ ppr uds $$ ppr rhs) $
          uds
 
-     will_be_joins :: Bool
+     will_be_joins :: Maybe JoinPointCategory
      will_be_joins = decideRecJoinPointHood lvl unadj_uds bndrs
 
      -- 2. Adjust usage details of each RHS, taking into account the
@@ -4065,45 +4122,48 @@ setBinderOcc occ_info bndr
 --
 -- See Note [Invariants on join points] in "GHC.Core".
 decideRecJoinPointHood :: TopLevelFlag -> UsageDetails
-                       -> [CoreBndr] -> Bool
-decideRecJoinPointHood lvl usage bndrs
-  = all ok bndrs  -- Invariant 3: Either all are join points or none are
+                       -> [CoreBndr] -> Maybe JoinPointCategory
+decideRecJoinPointHood lvl usage = joinPointType_maybe ok
   where
     ok bndr = okForJoinPoint lvl bndr (lookupTailCallInfo usage bndr)
 
-okForJoinPoint :: TopLevelFlag -> Id -> TailCallInfo -> Bool
+okForJoinPoint :: TopLevelFlag -> Id -> TailCallInfo -> Maybe JoinPointCategory
     -- See Note [Invariants on join points]; invariants cited by number below.
     -- Invariant 2 is always satisfiable by the simplifier by eta expansion.
 okForJoinPoint lvl bndr tail_call_info
-  | isJoinId bndr        -- A current join point should still be one!
+  | isJoinId bndr
+  -- A current join point should still be one!
   = warnPprTrace lost_join "Lost join point" lost_join_doc $
-    True
-  | valid_join
-  = True
+      mb_valid_join
+    -- NB: we might downgrade 'TrueJoinPoint' to 'QuasiJoinPoint'.
   | otherwise
-  = False
+  = mb_valid_join
   where
-    valid_join | NotTopLevel <- lvl
-               , AlwaysTailCalled arity <- tail_call_info
+    mb_valid_join
+      | NotTopLevel <- lvl
+      , AlwaysTailCalled
+        { tailCallArity = arity
+        , tailCallJoinPointType = join_cat
+        } <- tail_call_info
 
-               , -- Invariant 1 as applied to LHSes of rules
-                 all (ok_rule arity) (idCoreRules bndr)
+      , -- Invariant 1 as applied to LHSes of rules
+        all (ok_rule arity) (idCoreRules bndr)
 
-                 -- Invariant 2a: stable unfoldings
-                  -- See Note [Join points and INLINE pragmas]
-               , ok_unfolding arity (realIdUnfolding bndr)
+        -- Invariant 2a: stable unfoldings
+        -- See Note [Join points and INLINE pragmas]
+      , ok_unfolding arity (realIdUnfolding bndr)
 
-                 -- Invariant 4: Satisfies polymorphism rule
-               , isValidJoinPointType arity (idType bndr)
-               = True
-               | otherwise
-               = False
+        -- Invariant 4: Satisfies polymorphism rule
+      , isValidJoinPointType arity (idType bndr)
+      = Just join_cat
+      | otherwise
+      = Nothing
 
-    lost_join | JoinPoint ja <- idJoinPointHood bndr
-              = not valid_join ||
-                (case tail_call_info of  -- Valid join but arity differs
-                   AlwaysTailCalled ja' -> ja /= ja'
-                   _                    -> False)
+    lost_join | Just ja <- idJoinArity_maybe bndr
+              = isNothing mb_valid_join ||
+                (case tail_call_info of -- Valid join but arity differs
+                   AlwaysTailCalled { tailCallArity = ja' } -> ja /= ja'
+                   _ -> False)
               | otherwise = False
 
     ok_rule _ BuiltinRule{} = False -- only possible with plugin shenanigans
@@ -4125,7 +4185,7 @@ okForJoinPoint lvl bndr tail_call_info
              , text "tc:" <+> ppr tail_call_info
              , text "rules:" <+> ppr (idCoreRules bndr)
              , case tail_call_info of
-                 AlwaysTailCalled arity ->
+                 AlwaysTailCalled { tailCallArity = arity } ->
                     vcat [ text "ok_unf:" <+> ppr (ok_unfolding arity (realIdUnfolding bndr))
                          , text "ok_type:" <+> ppr (isValidJoinPointType arity (idType bndr)) ]
                  _ -> empty ]
@@ -4188,6 +4248,6 @@ orLocalOcc (OneOccL { lo_n_br = nbr1, lo_int_cxt = int_cxt1, lo_tail = tci1 })
 orLocalOcc occ1 occ2 = andLocalOcc occ1 occ2
 
 andTailCallInfo :: TailCallInfo -> TailCallInfo -> TailCallInfo
-andTailCallInfo info@(AlwaysTailCalled arity1) (AlwaysTailCalled arity2)
-  | arity1 == arity2 = info
+andTailCallInfo (AlwaysTailCalled arity1 true1) (AlwaysTailCalled arity2 true2)
+  | arity1 == arity2 = AlwaysTailCalled arity1 (true1 Semi.<> true2)
 andTailCallInfo _ _  = NoTailCallInfo

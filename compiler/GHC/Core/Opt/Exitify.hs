@@ -45,9 +45,10 @@ import GHC.Core.Type
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Tickish ( GenTickish(..), tickishCanScopeJoin )
+
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Basic( JoinPointHood(..) )
 
 import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Misc( mapSnd )
@@ -93,23 +94,23 @@ exitifyProgram binds = map goTopLvl binds
       where
         in_scope' = in_scope `extendInScopeSet` bndr
 
-    go in_scope (Let (Rec pairs) body)
-      | is_join_rec = mkLets (exitifyRec in_scope' pairs') body'
-      | otherwise   = Let (Rec pairs') body'
+    go in_scope (Let (Rec pairs) body) =
+      case joinPointType_maybe (joinId_maybe . fst) pairs of
+        Just join_cat -> mkLets (exitifyRec join_cat in_scope' pairs') body'
+        Nothing -> Let (Rec pairs') body'
       where
-        is_join_rec = any (isJoinId . fst) pairs
         in_scope'   = in_scope `extendInScopeSetBind` (Rec pairs)
         pairs'      = mapSnd (go in_scope') pairs
         body'       = go in_scope' body
 
 
 -- | State Monad used inside `exitify`
-type ExitifyM =  State [(JoinId, CoreExpr)]
+type ExitifyM = State [(JoinId, CoreExpr)]
 
 -- | Given a recursive group of a joinrec, identifies “exit paths” and binds them as
 --   join-points outside the joinrec.
-exitifyRec :: InScopeSet -> [(Var,CoreExpr)] -> [CoreBind]
-exitifyRec in_scope pairs
+exitifyRec :: JoinPointCategory -> InScopeSet -> [(Var,CoreExpr)] -> [CoreBind]
+exitifyRec joinrec_join_cat in_scope pairs
   = [ NonRec xid rhs | (xid,rhs) <- exits ] ++ [Rec pairs']
   where
     -- We need the set of free variables of many subexpressions here, so
@@ -124,7 +125,7 @@ exitifyRec in_scope pairs
         forM ann_pairs $ \(x,rhs) -> do
             -- go past the lambdas of the join point
             let (args, body) = collectNAnnBndrs (idJoinArity x) rhs
-            body' <- go args body
+            body' <- go joinrec_join_cat args body -- (ExitQuasi2): start with JoinPointCategory of parent joinrec
             let rhs' = mkLams args body'
             return (x, rhs')
 
@@ -135,40 +136,41 @@ exitifyRec in_scope pairs
     -- variables bound on the way and lifts it out as a join point.
     --
     -- ExitifyM is a state monad to keep track of floated binds
-    go :: [Var]           -- Variables that are in-scope here, but
-                          -- not in scope at the joinrec; that is,
-                          -- we must potentially abstract over them.
-                          -- Invariant: they are kept in dependency order
+    go :: JoinPointCategory -- what kind of join point to create; see Note [Exitification and quasi join points]
+       -> [Var] -- Variables that are in-scope here, but
+                -- not in scope at the joinrec; that is,
+                -- we must potentially abstract over them.
+                -- Invariant: they are kept in dependency order
        -> CoreExprWithFVs -- Current expression in tail position
        -> ExitifyM CoreExpr
 
     -- We first look at the expression (no matter what it shape is)
     -- and determine if we can turn it into a exit join point
-    go captured ann_e
+    go exit_join_ty captured ann_e
         | -- An exit expression has no recursive calls
           let fvs = dVarSetToVarSet (freeVarsOf ann_e)
         , disjointVarSet fvs recursive_calls
-        = go_exit captured (deAnnotate ann_e) fvs
+        = go_exit exit_join_ty captured (deAnnotate ann_e) fvs
 
     -- We could not turn it into a exit join point. So now recurse
     -- into all expression where eligible exit join points might sit,
     -- i.e. into all tail-call positions:
 
     -- Case right hand sides are in tail-call position
-    go captured (_, AnnCase scrut bndr ty alts) = do
+    go exit_join_ty captured (_, AnnCase scrut bndr ty alts) = do
         alts' <- forM alts $ \(AnnAlt dc pats rhs) -> do
-            rhs' <- go (captured ++ [bndr] ++ pats) rhs
+            rhs' <- go exit_join_ty (captured ++ [bndr] ++ pats) rhs
             return (Alt dc pats rhs')
         return $ Case (deAnnotate scrut) bndr ty alts'
 
-    go captured (_, AnnLet ann_bind body)
+    go exit_join_ty captured (_, AnnLet ann_bind body)
         -- join point, RHS and body are in tail-call position
         | AnnNonRec j rhs <- ann_bind
-        , JoinPoint join_arity <- idJoinPointHood j
+        , Just join_arity <- idJoinArity_maybe j
         = do let (params, join_body) = collectNAnnBndrs join_arity rhs
-             join_body' <- go (captured ++ params) join_body
+             join_body' <- go exit_join_ty (captured ++ params) join_body
              let rhs' = mkLams params join_body'
-             body' <- go (captured ++ [j]) body
+             body' <- go exit_join_ty (captured ++ [j]) body
              return $ Let (NonRec j rhs') body'
 
         -- rec join point, RHSs and body are in tail-call position
@@ -178,30 +180,41 @@ exitifyRec in_scope pairs
              pairs' <- forM pairs $ \(j,rhs) -> do
                  let join_arity = idJoinArity j
                      (params, join_body) = collectNAnnBndrs join_arity rhs
-                 join_body' <- go (captured ++ js ++ params) join_body
+                 join_body' <- go exit_join_ty (captured ++ js ++ params) join_body
                  let rhs' = mkLams params join_body'
                  return (j, rhs')
-             body' <- go (captured ++ js) body
+             body' <- go exit_join_ty (captured ++ js) body
              return $ Let (Rec pairs') body'
 
         -- normal Let, only the body is in tail-call position
         | otherwise
-        = do body' <- go (captured ++ bindersOf bind ) body
+        = do body' <- go exit_join_ty (captured ++ bindersOf bind ) body
              return $ Let bind body'
       where bind = deAnnBind ann_bind
 
+    -- (ExitQuasi1) from Note [Exitification and quasi join points]
+    go _ captured (_, AnnCast ann_e (_, co)) = do
+        e' <- go QuasiJoinPoint captured ann_e
+        return (Cast e' co)
+    go exit_join_ty captured (_, AnnTick tickish ann_e)
+      | tickishCanScopeJoin tickish
+      = Tick tickish <$> go exit_join_ty captured ann_e
+      | ProfNote {} <- tickish
+      = Tick tickish <$> go QuasiJoinPoint captured ann_e
+
     -- Cannot be turned into an exit join point, but also has no
     -- tail-call subexpression. Nothing to do here.
-    go _ ann_e = return (deAnnotate ann_e)
+    go _ _ ann_e = return (deAnnotate ann_e)
 
     ---------------------
-    go_exit :: [Var]      -- Variables captured locally
+    go_exit :: JoinPointCategory -- what kind of join point to create; see Note [Exitification and quasi join points]
+            -> [Var]      -- Variables captured locally
             -> CoreExpr   -- An exit expression
             -> VarSet     -- Free vars of the expression
             -> ExitifyM CoreExpr
     -- go_exit deals with a tail expression that is floatable
     -- out as an exit point; that is, it mentions no recursive calls
-    go_exit captured e fvs
+    go_exit exit_join_ty captured e fvs
       -- Do not touch an expression that is already a join jump where all arguments
       -- are captured variables. See Note [Idempotency]
       -- But _do_ float join jumps with interesting arguments.
@@ -226,7 +239,7 @@ exitifyRec in_scope pairs
              let rhs   = mkLams abs_vars e
                  avoid = in_scope `extendInScopeSetList` captured
              -- Remember this binding under a suitable name
-           ; v <- addExit avoid (length abs_vars) rhs
+           ; v <- addExit avoid exit_join_ty (length abs_vars) rhs
              -- And jump to it from here
            ; return $ mkVarApps (Var v) abs_vars }
 
@@ -262,24 +275,57 @@ exitifyRec in_scope pairs
 --  * the free variables of the whole joinrec
 --  * any bound variables (captured)
 --  * any exit join points created so far.
-mkExitJoinId :: InScopeSet -> Type -> JoinArity -> ExitifyM JoinId
-mkExitJoinId in_scope ty join_arity = do
+mkExitJoinId :: InScopeSet -> Type -> JoinPointCategory -> JoinArity -> ExitifyM JoinId
+mkExitJoinId in_scope ty exit_join_ty join_arity = do
     fs <- get
     let avoid = in_scope `extendInScopeSetList` (map fst fs)
                          `extendInScopeSet` exit_id_tmpl -- just cosmetics
     return (uniqAway avoid exit_id_tmpl)
   where
-    exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique ManyTy ty
-                    `asJoinId` join_arity
+    exit_id_tmpl =
+      asJoinId (mkSysLocal (fsLit "exit") initExitJoinUnique ManyTy ty)
+        exit_join_ty join_arity
 
-addExit :: InScopeSet -> JoinArity -> CoreExpr -> ExitifyM JoinId
-addExit in_scope join_arity rhs = do
+addExit :: InScopeSet -> JoinPointCategory -> JoinArity -> CoreExpr -> ExitifyM JoinId
+addExit in_scope exit_join_ty join_arity rhs = do
     -- Pick a suitable name
     let ty = exprType rhs
-    v <- mkExitJoinId in_scope ty join_arity
+    v <- mkExitJoinId in_scope ty exit_join_ty join_arity
     fs <- get
     put ((v,rhs):fs)
     return v
+
+{- Note [Exitification and quasi join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we float an exit path, we must determine if the new exit join point
+should be a true join point or a quasi join point, in the sense of
+Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration.
+
+The new exit join point must be a quasi join point if either of the following
+conditions apply:
+
+  (ExitQuasi1) We floated the exit through a cast or a profiling tick.
+
+  (ExitQuasi2) The original joinrec was a quasi join point.
+
+Rationale for (ExitQuasi1):
+
+  Suppose we have:
+
+    joinrec j x = ... case ... of alts -> e |> co ... in ...
+
+  After exitifying 'e' to 'exit':
+
+    join exit y = e in
+    joinrec j x = ... case ... of alts -> (exit y) |> co ... in ...
+
+  Because the jump to 'exit' occurs under a cast, 'exit' must be classified
+  as a quasi join point.
+
+Rationale for (ExitQuasi2): being a quasi join point is a transitive property,
+as explained in Wrinkle [Transitivity of quasi join points]. Any join point
+that encloses a quasi join point must itself be a quasi join point.
+-}
 
 {-
 Note [Interesting expression]

@@ -1458,7 +1458,7 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
                   else lvlExpr body_env      body
        ; return (mkLams bndrs' body') }
   where
-    (bndrs, body)     | JoinPoint join_arity <- mb_join_arity
+    (bndrs, body)     | JoinPoint { joinPointArity = join_arity } <- mb_join_arity
                       = collectNAnnBndrs join_arity rhs
                       | otherwise
                       = collectAnnBndrs rhs
@@ -1888,9 +1888,14 @@ newPolyBndrs dest_lvl
     -- but we may need to adjust its arity
     dest_is_top = isTopLvl dest_lvl
     transfer_join_info bndr new_bndr
-      | JoinPoint join_arity <- idJoinPointHood bndr
+      | JoinPoint
+        { joinPointCategory = join_cat
+        , joinPointArity    = join_arity }
+          <- idJoinPointHood bndr
       , not dest_is_top
-      = new_bndr `asJoinId` join_arity + length abs_vars
+      = asJoinId new_bndr
+          join_cat
+          (join_arity + length abs_vars)
       | otherwise
       = new_bndr
 

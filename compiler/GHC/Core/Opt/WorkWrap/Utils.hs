@@ -301,8 +301,10 @@ workWrapArity :: Id -> CoreExpr -> Arity
 -- See Note [Worker/wrapper arity and join points] in DmdAnal
 workWrapArity fn rhs
   = case idJoinPointHood fn of
-      JoinPoint join_arity -> count isId $ fst $ collectNBinders join_arity rhs
-      NotJoinPoint         -> idArity fn
+      JoinPoint { joinPointArity = join_arity }
+        -> count isId $ fst $ collectNBinders join_arity rhs
+      NotJoinPoint
+        -> idArity fn
 
 {-
 Note [Always do CPR w/w]

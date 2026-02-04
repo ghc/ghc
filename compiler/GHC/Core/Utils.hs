@@ -34,7 +34,8 @@ module GHC.Core.Utils (
         exprIsTickedString, exprIsTickedString_maybe,
         exprIsTopLevelBindable,
         exprIsUnaryClassFun, isUnaryClassId,
-        altsAreExhaustive, etaExpansionTick,
+        altsAreExhaustive, canCollectArgsThroughTick,
+        cantEtaReduceFun,
 
         -- * Equality
         cheapEqExpr, cheapEqExpr', diffBinds,
@@ -2075,14 +2076,32 @@ altsAreExhaustive (Alt con1 _ _ : alts)
       -- we behave conservatively here -- I don't think it's important
       -- enough to deserve special treatment
 
--- | Should we look past this tick when eta-expanding the given function?
+-- | Should we look past this tick when collecting arguments
+-- for the given function?
 --
 -- See Note [Ticks and mandatory eta expansion]
--- Takes the function we are applying as argument.
-etaExpansionTick :: Id -> GenTickish pass -> Bool
-etaExpansionTick id t
-  = hasNoBinding id &&
-    ( tickishFloatable t || isProfTick t )
+canCollectArgsThroughTick
+  :: Id -- ^ function at the head of the application
+  -> GenTickish pass -- ^ tick we want to collect arguments past
+  -> Bool
+canCollectArgsThroughTick id t
+  =  tickishFloatable t
+  || (cantEtaReduceFun id && isProfTick t)
+
+-- | Can we eta-reduce the given function?
+-- See Note [Eta reduction soundness], criteria (B), (J), and (W).
+cantEtaReduceFun :: Id -> Bool
+cantEtaReduceFun fun
+  =    hasNoBinding fun -- (B)
+       -- Don't undersaturate functions with no binding.
+
+    || isJoinId fun    -- (J)
+       -- Don't undersaturate join points.
+       -- See Note [Invariants on join points] in GHC.Core, and #20599
+
+    || isJust (idCbvMarks_maybe fun) -- (W)
+       -- Don't undersaturate StrictWorkerIds.
+       -- See Note [CBV Function Ids: overview] in GHC.Types.Id.Info.
 
 {- Note [exprOkForSpeculation and type classes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1275,7 +1275,7 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
     is_external = isExternalName name
 
     --------- OccInfo ------------
-    robust_occ_info = zapFragileOcc (occInfo idinfo)
+    robust_occ_info = zapFragileOccInfo (occInfo idinfo)
     -- It's important to keep loop-breaker information
     -- when we are doing -fexpose-all-unfoldings
 

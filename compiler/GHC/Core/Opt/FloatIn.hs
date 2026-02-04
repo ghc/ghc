@@ -29,7 +29,7 @@ import GHC.Core.FVs
 import GHC.Core.Type
 
 import GHC.Types.Basic      ( RecFlag(..), isRec )
-import GHC.Types.Id         ( idType, isJoinId, idJoinPointHood )
+import GHC.Types.Id         ( idType, isJoinId, idJoinArity_maybe )
 import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -645,7 +645,7 @@ fiBind platform to_drop (AnnRec bindings) body_fvs
 ------------------
 fiRhs :: Platform -> RevFloatInBinds -> CoreBndr -> CoreExprWithFVs -> CoreExpr
 fiRhs platform to_drop bndr rhs
-  | JoinPoint join_arity <- idJoinPointHood bndr
+  | Just join_arity <- idJoinArity_maybe bndr
   , let (bndrs, body) = collectNAnnBndrs join_arity rhs
   = mkLams bndrs (fiExpr platform to_drop body)
   | otherwise

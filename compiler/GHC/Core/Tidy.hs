@@ -154,7 +154,7 @@ computeCbvInfo fun_id rhs
     -- When computing CbvMarks, we limit the arity of join points to
     -- the JoinArity, because that's the arity we are going to use
     -- when calling it. There may be more lambdas than that on the RHS.
-    lam_bndrs | JoinPoint join_arity <- mb_join_id
+    lam_bndrs | JoinPoint { joinPointArity = join_arity } <- mb_join_id
               = fst $ collectNBinders join_arity rhs
               | otherwise
               = fst $ collectBinders rhs

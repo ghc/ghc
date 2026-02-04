@@ -90,7 +90,6 @@ import GHC.Utils.Misc
 
 import Data.List.NonEmpty ( nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe( isJust )
 
 {-
 ************************************************************************
@@ -2834,22 +2833,6 @@ tryEtaReduce rec_ids bndrs body eval_sd
        = Just (co', t:ticks)
 
     ok_arg _ _ _ _ = Nothing
-
--- | Can we eta-reduce the given function
--- See Note [Eta reduction soundness], criteria (B), (J), and (W).
-cantEtaReduceFun :: Id -> Bool
-cantEtaReduceFun fun
-  =    hasNoBinding fun -- (B)
-       -- Don't undersaturate functions with no binding.
-
-    ||  isJoinId fun    -- (J)
-       -- Don't undersaturate join points.
-       -- See Note [Invariants on join points] in GHC.Core, and #20599
-
-    || (isJust (idCbvMarks_maybe fun)) -- (W)
-       -- Don't undersaturate StrictWorkerIds.
-       -- See Note [CBV Function Ids: overview] in GHC.Types.Id.Info.
-
 
 {- *********************************************************************
 *                                                                      *

@@ -226,8 +226,10 @@ mkSpecRule :: DynFlags -> Module -> Bool -> ActivationGhc -> SDoc
 -- Make a specialisation rule, for Specialise or SpecConstr
 mkSpecRule dflags this_mod is_auto inl_act herald fn bndrs args rhs
   = case idJoinPointHood fn of
-      JoinPoint join_arity -> etaExpandToJoinPointRule join_arity rule
-      NotJoinPoint         -> rule
+      JoinPoint { joinPointArity = join_arity }
+        -> etaExpandToJoinPointRule join_arity rule
+      NotJoinPoint
+        -> rule
   where
     rule = mkRule this_mod is_auto is_local
                   rule_name

@@ -1992,8 +1992,11 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
 
               spec_id_ty = mkLamTypes spec_lam_args spec_body_ty
               spec_arity = count isId spec_lam_args
-              spec_join_arity | isJoinId fn = JoinPoint (length spec_call_args)
-                              | otherwise   = NotJoinPoint
+              spec_join_arity
+                | Just join_cat <- joinId_maybe fn
+                = JoinPoint { joinPointCategory = join_cat, joinPointArity = length spec_call_args }
+                | otherwise
+                = NotJoinPoint
               spec_id    = setCbvCandidate $
                            mkLocalId spec_name ManyTy spec_id_ty
                              -- See Note [Transfer strictness]

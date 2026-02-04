@@ -15,7 +15,7 @@
 module GHC.Utils.Outputable (
         -- * Type classes
         Outputable(..), OutputableBndr(..), OutputableP(..),
-        BindingSite(..),  JoinPointHood(..), isJoinPoint,
+        BindingSite(..), JoinPointCategory(..), JoinPointHood(..), isJoinPoint,
 
         IsOutput(..), IsLine(..), IsDoc(..),
         HLine, HDoc,
@@ -152,6 +152,7 @@ import Data.Graph (SCC(..))
 import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Semigroup (Arg(..))
+import qualified Data.Semigroup as Semi
 import qualified Data.List.NonEmpty as NEL
 import Data.Time ( UTCTime )
 import Data.Time.Format.ISO8601
@@ -1286,9 +1287,28 @@ data BindingSite
     | LetBind     -- ^ The x in   (let x = rhs in e)
     deriving Eq
 
+-- | Is this a true join point or a quasi join point?
+--
+-- See Note [Quasi join points] in GHC.Core.Opt.Simplify.Iteration
+data JoinPointCategory
+  = TrueJoinPoint
+  | QuasiJoinPoint
+  deriving Eq
+instance Outputable JoinPointCategory where
+  ppr TrueJoinPoint = text "TrueJoinPoint"
+  ppr QuasiJoinPoint = text "QuasiJoinPoint"
+instance Semigroup JoinPointCategory where
+  TrueJoinPoint <> a = a
+  a <> TrueJoinPoint = a
+  _ <> _ = QuasiJoinPoint
+
 data JoinPointHood
-  = JoinPoint {-# UNPACK #-} !Int   -- The JoinArity (but an Int here because
-  | NotJoinPoint                    -- synonym JoinArity is defined in Types.Basic)
+  = JoinPoint
+      { joinPointCategory :: {-# UNPACK #-} !JoinPointCategory
+      , joinPointArity    :: {-# UNPACK #-} !Int
+        -- ^ The JoinArity (but an Int here because synonym JoinArity is defined in Types.Basic)
+      }
+  | NotJoinPoint
   deriving( Eq )
 
 isJoinPoint :: JoinPointHood -> Bool
@@ -1296,8 +1316,9 @@ isJoinPoint (JoinPoint {}) = True
 isJoinPoint NotJoinPoint   = False
 
 instance Outputable JoinPointHood where
-  ppr NotJoinPoint      = text "NotJoinPoint"
-  ppr (JoinPoint arity) = text "JoinPoint" <> parens (ppr arity)
+  ppr NotJoinPoint = text "NotJoinPoint"
+  ppr (JoinPoint join_cat arity) =
+    ppr join_cat <> parens (ppr arity)
 
 instance NFData JoinPointHood where
   rnf x = x `seq` ()

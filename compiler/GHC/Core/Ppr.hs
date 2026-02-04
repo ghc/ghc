@@ -138,7 +138,7 @@ ppr_binding ann (val_bdr, expr)
 
     pp_bind = case bndrIsJoin_maybe val_bdr of
                 NotJoinPoint -> pp_normal_bind
-                JoinPoint ar -> pp_join_bind ar
+                JoinPoint { joinPointArity = ar } -> pp_join_bind ar
 
     pp_normal_bind = hang pp_val_bdr 2 (equals <+> pprCoreExpr expr)
 
@@ -308,13 +308,21 @@ ppr_expr add_par (Let bind expr)
     sep [hang (keyword bind <+> char '{') 2 (ppr_bind noAnn bind <+> text "} in"),
          pprCoreExpr expr]
   where
-    keyword (NonRec b _)
-     | isJoinPoint (bndrIsJoin_maybe b) = text "join"
-     | otherwise                        = text "let"
-    keyword (Rec pairs)
-     | ((b,_):_) <- pairs
-     , isJoinPoint (bndrIsJoin_maybe b) = text "joinrec"
-     | otherwise                        = text "letrec"
+    keyword (NonRec b _) =
+      case bndrIsJoin_maybe b of
+        NotJoinPoint -> text "let"
+        JoinPoint { joinPointCategory = join_cat } ->
+          case join_cat of
+            TrueJoinPoint -> text "join"
+            QuasiJoinPoint -> text "quasijoin"
+    keyword (Rec ((b,_):_)) =
+      case bndrIsJoin_maybe b of
+        NotJoinPoint -> text "letrec"
+        JoinPoint { joinPointCategory = join_cat } ->
+          case join_cat of
+            TrueJoinPoint -> text "joinrec"
+            QuasiJoinPoint -> text "quasijoinrec"
+    keyword (Rec _) = text "letrec"
 
 ppr_expr add_par (Tick tickish expr)
   = sdocOption sdocSuppressTicks $ \case

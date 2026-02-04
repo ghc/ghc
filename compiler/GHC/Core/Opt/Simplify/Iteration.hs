@@ -39,7 +39,7 @@ import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , pushCoTyArg, pushCoValArg, exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
-import GHC.Core.FVs     ( mkRuleInfo {- exprsFreeIds -} )
+import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Core.Multiplicity
 
@@ -57,6 +57,7 @@ import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
+
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey, seqHashKey )
 
@@ -1329,7 +1330,7 @@ work. T5631 is a good example of this.
 simplJoinRhs :: SimplEnv -> InId -> InExpr -> SimplCont
              -> SimplM OutExpr
 simplJoinRhs env bndr expr cont
-  | JoinPoint arity <- idJoinPointHood bndr
+  | Just arity <- idJoinArity_maybe bndr
   =  do { let (join_bndrs, join_body) = collectNBinders arity expr
               mult = contHoleScaling cont
         ; (env', join_bndrs') <- simplLamBndrs env (map (scaleVarBy mult) join_bndrs)
@@ -1685,10 +1686,10 @@ simplCast :: SimplEnv -> InExpr -> InCoercion -> SimplCont
 simplCast env body co0 cont0
   = do  { co1   <- {-#SCC "simplCast-simplCoercion" #-} simplCoercion env co0
         ; cont1 <- {-#SCC "simplCast-addCoerce" #-}
-                   if isReflCo co1
-                   then return cont0  -- See Note [Optimising reflexivity]
-                   else addCoerce co1 True cont0
-                        -- True <=> co1 is optimised
+            if isReflCo co1
+            then return cont0 -- See Note [Optimising reflexivity]
+            else addCoerce co1 True cont0
+                 -- True <=> co1 is optimised
         ; {-#SCC "simplCast-simplExprF" #-} simplExprF env body cont1 }
   where
 
@@ -1701,18 +1702,21 @@ simplCast env body co0 cont0
         addCoerce :: OutCoercion -> Bool -> SimplCont -> SimplM SimplCont
         addCoerce co1 _ (CastIt { sc_co = co2, sc_cont = cont })  -- See Note [Optimising reflexivity]
           = addCoerce (mkTransCo co1 co2) False cont
-                      -- False: (mkTransCo co1 co2) is not fully optimised
-                      -- See Note [Avoid re-simplifying coercions]
+              -- False: (mkTransCo co1 co2) is not fully optimised
+              -- See Note [Avoid re-simplifying coercions]
 
         addCoerce co co_is_opt (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
           | Just (arg_ty', m_co') <- pushCoTyArg co arg_ty
           = {-#SCC "addCoerce-pushCoTyArg" #-}
             do { tail' <- addCoerceM m_co' co_is_opt tail
-               ; return (ApplyToTy { sc_arg_ty  = arg_ty'
-                                   , sc_cont    = tail'
-                                   , sc_hole_ty = coercionLKind co }) }
-                                        -- NB!  As the cast goes past, the
-                                        -- type of the hole changes (#16312)
+               ; return $
+                   ApplyToTy { sc_arg_ty  = arg_ty'
+                             , sc_cont    = tail'
+                             , sc_hole_ty = coercionLKind co }
+                               -- NB!  As the cast goes past, the
+                               -- type of the hole changes (#16312)
+               }
+
         -- (f |> co) e   ===>   (f (e |> co1)) |> co2
         -- where   co :: (s1->s2) ~ (t1->t2)
         --         co1 :: t1 ~ s1
@@ -1727,8 +1731,10 @@ simplCast env body co0 cont0
           = {-#SCC "addCoerce-pushCoValArg" #-}
             do { tail' <- addCoerceM m_co2 co_is_opt tail
                ; case m_co1 of {
-                   MRefl -> return (cont { sc_cont = tail'
-                                         , sc_hole_ty = coercionLKind co }) ;
+                   MRefl ->
+                    return $
+                      cont { sc_cont = tail'
+                           , sc_hole_ty = coercionLKind co } ;
                       -- See Note [Avoiding simplifying repeatedly]
 
                    MCo co1 ->
@@ -1738,17 +1744,20 @@ simplCast env body co0 cont0
                     -- to make it all consistent.  It's a bit messy.
                     -- But it isn't a common case.
                     -- Example of use: #995
-               ; return (ApplyToVal { sc_arg  = mkCast arg' co1
-                                    , sc_env  = arg_se'
-                                    , sc_dup  = dup'
-                                    , sc_cont = tail'
-                                    , sc_hole_ty = coercionLKind co }) } } }
+               ; return $
+                   ApplyToVal { sc_arg  = mkCast arg' co1
+                              , sc_env  = arg_se'
+                              , sc_dup  = dup'
+                              , sc_cont = tail'
+                              , sc_hole_ty = coercionLKind co } } } }
 
         addCoerce co co_is_opt cont
-          | isReflCo co = return cont  -- Having this at the end makes a huge
-                                       -- difference in T12227, for some reason
-                                       -- See Note [Optimising reflexivity]
-          | otherwise = return (CastIt { sc_co = co, sc_opt = co_is_opt, sc_cont = cont })
+          | isReflCo co = return cont
+            -- Having this at the end makes a huge
+            -- difference in T12227, for some reason
+            -- See Note [Optimising reflexivity]
+          | otherwise =
+            return $ CastIt { sc_co = co, sc_opt = co_is_opt, sc_cont = cont }
 
 simplLazyArg :: SimplEnvIS              -- ^ Used only for its InScopeSet
              -> DupFlag
@@ -1905,7 +1914,7 @@ simplNonRecE :: HasDebugCallStack
 -- Otherwise it may or may not satisfy it.
 
 simplNonRecE env from_what bndr (rhs, rhs_se) body cont
-  | assert (isId bndr && not (isJoinId bndr) ) $
+  | assert (isId bndr && not (isJoinId bndr)) $
     is_strict_bind
   = -- Evaluate RHS strictly
     simplExprF (rhs_se `setInScopeFromE` env) rhs
@@ -2047,62 +2056,118 @@ is a join point, and what 'cont' is, in a value of type MaybeJoinCont
 of a SpecConstr-generated RULE for a join point.
 -}
 
+joinResTy :: HasDebugCallStack => JoinArity -> Type -> Type
+joinResTy n0 ty0 = go n0 ty0
+   where
+    go 0 ty = ty
+    go n ty
+      | Just (_bndr, res_ty) <- splitPiTy_maybe ty
+      = go (n-1) res_ty
+      | otherwise
+      = pprPanic "joinResTy" $
+         vcat [ text "join arity:" <+> ppr n0
+              , text "join ty:" <+> ppr ty0
+              , text "n:" <+> ppr n
+              , text "ty:" <+> ppr ty
+              ]
+
 simplNonRecJoinPoint :: SimplEnv -> InId -> InExpr
                      -> InExpr -> SimplCont
                      -> SimplM (SimplFloats, OutExpr)
-simplNonRecJoinPoint env bndr rhs body cont
-   = assert (isJoinId bndr ) $
-     wrapJoinCont env cont $ \ env cont ->
+simplNonRecJoinPoint env0 bndr rhs body cont0
+   = assert (isJoinId bndr) $
+     wrapJoinCont do_case_case env0 bndr cont0 $
+     \ WJC { wjc_bind_env = env, wjc_bind_cont = bind_cont, wjc_body_cont = body_cont } ->
      do { -- We push join_cont into the join RHS and the body;
           -- and wrap wrap_cont around the whole thing
-        ; let mult   = contHoleScaling cont
-              res_ty = contResultType cont
+          let mult   = contHoleScaling bind_cont
+              res_ty = contResultType  bind_cont
         ; (env1, bndr1)    <- simplNonRecJoinBndr env bndr mult res_ty
-        ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Join NonRecursive cont)
-        ; (floats1, env3)  <- simplJoinBind NonRecursive cont (bndr,env) (bndr2,env2) (rhs,env)
-        ; (floats2, body') <- simplExprF env3 body cont
+        ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Join NonRecursive bind_cont)
+        ; (floats1, env3)  <- simplJoinBind NonRecursive bind_cont (bndr,env) (bndr2,env2) (rhs,env)
+        ; (floats2, body') <- simplExprF env3 body body_cont
         ; return (floats1 `addFloats` floats2, body') }
+  where
+    do_case_case
+      | Just TrueJoinPoint <- joinId_maybe bndr
+      = seCaseCase env0
+      | otherwise
+      = False
 
-
-------------------
 simplRecJoinPoint :: SimplEnv -> [(InId, InExpr)]
                   -> InExpr -> SimplCont
                   -> SimplM (SimplFloats, OutExpr)
-simplRecJoinPoint env pairs body cont
-  = wrapJoinCont env cont $ \ env cont ->
-    do { let bndrs  = map fst pairs
-             mult   = contHoleScaling cont
-             res_ty = contResultType cont
+simplRecJoinPoint env0 pairs body cont0
+  = wrapJoinCont do_case_case env0 (head bndrs) cont0 $
+    \ WJC { wjc_bind_env = env, wjc_bind_cont = bind_cont, wjc_body_cont = body_cont } ->
+    do { let mult   = contHoleScaling bind_cont
+             res_ty = contResultType  bind_cont
        ; env1 <- simplRecJoinBndrs env bndrs mult res_ty
                -- NB: bndrs' don't have unfoldings or rules
                -- We add them as we go down
-       ; (floats1, env2)  <- simplRecBind env1 (BC_Join Recursive cont) pairs
-       ; (floats2, body') <- simplExprF env2 body cont
+       ; (floats1, env2)  <- simplRecBind env1 (BC_Join Recursive bind_cont) pairs
+       ; (floats2, body') <- simplExprF env2 body body_cont
        ; return (floats1 `addFloats` floats2, body') }
+  where
+    bndrs = map fst pairs
+
+    do_case_case =
+      if all ((== Just TrueJoinPoint) . joinId_maybe) bndrs
+      then seCaseCase env0
+      else False
 
 --------------------
-wrapJoinCont :: SimplEnv -> SimplCont
-             -> (SimplEnv -> SimplCont -> SimplM (SimplFloats, OutExpr))
+
+-- | Information computed by 'wrapJoinCont'.
+data WrapJoinCont
+  = WJC
+    { wjc_bind_env :: !SimplEnv
+    , wjc_bind_cont :: !SimplCont
+    , wjc_body_cont :: !SimplCont
+    }
+
+wrapJoinCont :: Bool
+             -> SimplEnv -> InId -> SimplCont
+             -> (WrapJoinCont -> SimplM (SimplFloats, OutExpr))
              -> SimplM (SimplFloats, OutExpr)
 -- Deal with making the continuation duplicable if necessary,
 -- and with the no-case-of-case situation.
-wrapJoinCont env cont thing_inside
+wrapJoinCont do_case_case env join_bndr cont thing_inside
   | contIsStop cont        -- Common case; no need for fancy footwork
-  = thing_inside env cont
+  = thing_inside $
+    WJC { wjc_bind_env  = env
+        , wjc_bind_cont = if do_case_case then cont else no_case_case_bind_cont
+        , wjc_body_cont = cont
+        }
 
-  | not (seCaseCase env)
-    -- See Note [Join points with -fno-case-of-case]
-  = do { (floats1, expr1) <- thing_inside env (mkBoringStop (contHoleType cont))
+  | do_case_case
+    -- Normal situation: do the "case-of-case" transformation.
+    -- See Note [Join points and case-of-case].
+  = do { (floats1, cont')  <- mkDupableCont env cont
+       ; let wjc = WJC { wjc_bind_env  = env `setInScopeFromF` floats1
+                       , wjc_bind_cont = cont'
+                       , wjc_body_cont = cont'
+                       }
+       ; (floats2, result) <- thing_inside wjc
+       ; return (floats1 `addFloats` floats2, result) }
+
+  | otherwise
+    -- No "case-of-case" transformation.
+    -- See Note [Join points with -fno-case-of-case].
+  = do { let
+           wjc = WJC { wjc_bind_env  = env
+                     , wjc_bind_cont = no_case_case_bind_cont
+                     , wjc_body_cont = mkBoringStop (contHoleType cont)
+                     }
+       ; (floats1, expr1) <- thing_inside wjc
        ; let (floats2, expr2) = wrapJoinFloatsX floats1 expr1
        ; (floats3, expr3) <- rebuild (env `setInScopeFromF` floats2) expr2 cont
        ; return (floats2 `addFloats` floats3, expr3) }
-
-  | otherwise
-    -- Normal case; see Note [Join points and case-of-case]
-  = do { (floats1, cont')  <- mkDupableCont env cont
-       ; (floats2, result) <- thing_inside (env `setInScopeFromF` floats1) cont'
-       ; return (floats1 `addFloats` floats2, result) }
-
+  where
+    -- See Wrinkle [Casts and join point result types]
+    join_res_ty = joinResTy (idJoinArity join_bndr)
+                $ substTy env (idType join_bndr)
+    no_case_case_bind_cont = mkBoringStop join_res_ty
 
 --------------------
 trimJoinCont :: Id         -- Used only in error message
@@ -2113,8 +2178,16 @@ trimJoinCont :: Id         -- Used only in error message
 
 trimJoinCont _ NotJoinPoint cont
   = cont -- Not a jump
-trimJoinCont var (JoinPoint arity) cont
-  = trim arity cont
+trimJoinCont var (JoinPoint { joinPointCategory = join_cat, joinPointArity = arity }) cont0
+  | QuasiJoinPoint <- join_cat
+  -- For a quasi join point, we don't want to trim the continuation,
+  -- as the continuation may contain casts/profiling ticks that we
+  -- do not want to discard.
+  --
+  -- See Wrinkle [trimJoinCont for quasi join points].
+  = cont0
+  | otherwise
+  = trim arity cont0
   where
     trim 0 cont@(Stop {})
       = cont
@@ -2124,9 +2197,15 @@ trimJoinCont var (JoinPoint arity) cont
       = cont { sc_cont = trim (n-1) k }
     trim n cont@(ApplyToTy { sc_cont = k })
       = cont { sc_cont = trim (n-1) k } -- join arity counts types!
-    trim _ cont
-      = pprPanic "completeCall" $ ppr var $$ ppr cont
-
+    trim n cont
+      = pprPanic "trimJoinCont: not enough arguments" $
+         vcat [ text "joinId:" <+> ppr var
+              , text "JoinPointCategory: " <+> ppr join_cat
+              , text "arity:" <+> ppr arity
+              , text "missing arguments:" <+> ppr n
+              , text "orig cont:" <+> ppr cont0
+              , text "trimmed cont:" <+> ppr cont
+              ]
 
 {- Note [Join points and case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2151,14 +2230,17 @@ evaluation context E):
 
 As is evident from the example, there are two components to this behavior:
 
-  1. When entering the RHS of a join point, copy the context inside.
-  2. When a join point is invoked, discard the outer context.
+  (wrapJoinCont) When entering the RHS of a join point, copy the context inside.
+  (trimJoinCont) When a join point is invoked, discard the outer context.
 
 We need to be very careful here to remain consistent---neither part is
 optional!
 
-We need do make the continuation E duplicable (since we are duplicating it)
+We need to make the continuation E duplicable (since we are duplicating it)
 with mkDupableCont.
+
+Note that not all join points support this transformation:
+see Note [Quasi join points].
 
 
 Note [Join points with -fno-case-of-case]
@@ -2184,7 +2266,8 @@ case-of-case we may then end up with this totally bogus result
 This would be OK in the language of the paper, but not in GHC: j is no longer
 a join point.  We can only do the "push continuation into the RHS of the
 join point j" if we also push the continuation right down to the /jumps/ to
-j, so that it can evaporate there.  If we are doing case-of-case, we'll get to
+j, so that it can evaporate there (trimJoinCont). Then, if we are doing
+case-of-case, we'll get to
 
     join x = case <j-rhs> of <outer-alts> in
     case y of
@@ -2199,6 +2282,223 @@ inwards altogether at any join point.  Instead simplify the (join ... in ...)
 with a Stop continuation, and wrap the original continuation around the
 outside.  Surprisingly tricky!
 
+Note [Quasi join points]
+~~~~~~~~~~~~~~~~~~~~~~~~
+We currently classify join points into two separate categories:
+
+  - true join points,
+  - quasi join points.
+
+Definition:
+  A join point binding defines a *quasi* join point if any of the join point
+  binders occur under profiling ticks or casts.
+
+  If a join point binding is not a quasi join point, it is a *true* join point.
+
+We can push continuations into true join points, as described in
+Note [Join points and case-of-case]:
+
+  K[ join j = rhs in body ]  -->   join j = K[ rhs ] in K[ body ]
+
+This transformation is not valid if the occurrences of 'j' in 'body' appear:
+
+  1. under casts (see #14610, #21716, #26422)
+  2. under profiling ticks (see #14242, #26157, #26642, #26693)
+
+Examples
+========
+
+For example, consider (a minimisation of) the program in #26693:
+
+  join { j :: Bool -> IO (); j _ = guts }
+  in case b of
+    False -> scctick<foo> jump j True
+    True  ->              jump j False
+
+Let's try to push the application to an argument 'arg' into this expression.
+As per Note [Join points and case-of-case], we proceed by first applying the
+argument to both the join point RHS and the case alternatives:
+
+  join { j :: Bool -> IO (); j _ = guts arg ] }
+  in case b of
+    False -> (scctick<foo> jump j True) arg
+    True  ->               jump j False arg
+
+Then we rely on 'trimJoinCont' to remove the argument. In this case, this fails
+for the first branch, because 'trimJoinCont' doesn't look through profiling
+ticks. Were we to address this, it's still not clear what code we would want to
+end up with, as we don't want to misattribute profiling costs.
+We could plausibly transform to the following:
+
+  join { j :: Bool -> IO (); j scc_or_null _ = (setSCC# scc_or_null guts) arg ] }
+  in case b of
+    False -> jump j <foo> True
+    True  -> jump j null  False
+
+where `setSCC#` is a new primop that would set the current cost centre pointer
+(or no-op if the given pointer is null).
+However:
+  - this primop doesn't exist today,
+  - it requires adding an argument to the join point (hence changing its arity)
+So instead, for now, we simply disallow the case-of-case transformation for 'j'.
+
+Similarly for casts, as noted in #21716:
+
+  newtype Age = MkAge Int   -- axAge :: Age ~ Int
+  f :: Int -> ...
+
+  f (join j :: Bool -> Age
+          j x = (rhs1 :: Age)
+     in case v of
+         Just x  -> ((j x) |> axAge) :: Int
+         Nothing -> rhs2)
+
+If we try to use the case of case transformation to push 'f' inwards, we would
+get:
+
+   join j' x = f (rhs1 :: Age)
+   in case v of
+      Just x  -> (j' x |> axAge)
+      Nothing -> f rhs2
+
+which is utterly bogus, as we are now passing an argument of type 'Age' to
+'f', which expects an 'Int'.
+
+The conclusion is the same as above: we must disable the case-of-case
+transformation for join points in which the jumps are wrapped in casts.
+
+The alternative would be to implement a transformation that takes as input
+a quasi join point of the form
+
+    join { j x = blah }
+    in case e of
+      False -> j True  |> co1
+      True  -> j False |> co2
+
+and produces the true join point
+
+    join { j x co = blah |> co }
+    in case e of
+      False -> j True  co1
+      True  -> j False co2
+
+by adding a coercion argument to the join point. We don't do this currently.
+
+Implementation strategy
+=======================
+
+To figure out whether a join point is a true join point or a quasi join point,
+we proceed as follows:
+
+  1. In occurrence analysis, when we move under a cast or a profiling tick,
+     we use 'markAllQuasiTail'. This means that when we look up 'TailCallInfo'
+     for an 'Id' under a cast/profiling tick, the 'trueTailCall' field of
+     'TailCallInfo' will be 'False'. See 'lookupTailCallInfo'.
+
+  2. In the simplifier, when we come across a join point binding (in either
+     'simplNonRecJoinPoint' or 'simplRecJoinPoint'), we retrieve the information
+     of whether this is a true join point or a quasi join point using
+     'occInfoJoinPointType_maybe'.
+
+     If we are dealing with a quasi join point, we switch off the case-of-case
+     transformation.
+
+Wrinkle [trimJoinCont for quasi join points]
+
+  trimJoinCont exists only for the case-of-case transformation, so you might
+  think it is irrelevant for quasi joint points (for which we disable this
+  transformation). However, 'trimJoinCont' is still called for all join points,
+  at the end of 'simplInId'. For example, for:
+
+    quasijoin j x y = rhs
+    in ... (j 'x' False) |> co
+
+  we will get a continuation for the occurrence of 'j' of the form
+
+    ApplyToVal 'x' $ ApplyToVal False $ CastIt co Stop
+
+  We must trim the continuation to avoid duplicating the arguments to the join
+  point, but then preserve the rest of the continuation (in particular, preserving 'CastIt').
+  Hence the special logic in 'trimJoinCont' for quasi join points.
+
+Wrinkle [Casts and join point result types]
+
+  For a quasi join point, the type of the RHS of the join point binding and
+  the body type may differ due to the presence of casts, for example
+
+    co :: Int ~ Age
+
+    join j x = (rhs :: Int)
+    in ( (j 3) |> co ) :: Age
+
+  Here, the return type of 'j' is 'Int', but the body of the join point has
+  type 'Age'.
+
+  This means that, when dealing with a quasi joint-point, we must preserve
+  the original type of the join point instead of transforming the type
+  (as in Core.Opt.Simplify.Env.adjustJoinPointType). We can't use 'contHoleType'
+  to compute the result type of 'j', as 'contHoleType' will be 'Age' while
+  the result type of 'j' is 'Int'.
+
+  Instead, we compute the result type of 'j' using 'joinResTy' to get 'Int',
+  as required.
+
+Wrinkle [Transitivity of quasi join points]
+
+  Is the following Core program valid?
+
+    join
+      jt :: Int -> Bool
+      jt x = rhs
+    in
+    quasijoin
+      jq :: Int -> Bool
+      jq y = jt y
+    in case e of
+        True  -> scc<foo> (jq 3)
+        False -> False
+
+  Answer: NO. The outer join point MUST be a quasi join point.
+
+  Rationale: suppose we try to push in a continuation, as in
+  Note [Join points and case-of-case].
+  Say we have f :: Bool -> Char, and we try to push in:
+
+    f( join jt x = rhs in
+       quasijoin jq y = jt y
+       in case e of
+          True  -> scc<foo> (jq 3)
+          False -> False )
+
+    ==>
+
+    join
+      jt :: Int -> Char
+      jt x = f rhs
+    in
+      f ( quasijoin jq y = jt y :: Char
+          in case e of
+            True  -> scc<foo> (jq 3) :: Char
+            False -> False :: Bool )
+
+  This program is completely ill-typed, because we need to push in the
+  continuation but let it evaporate when it jumps to 'jt'.
+
+  Conclusion: being a quasi join point is transitive: if a join point contains
+  a quasi join point, it must itself be a quasi join point.
+
+  Another way to see this is that the inner quasi join point might end up
+  being inlined, in which case it is the outer join point which would have
+  its jumps enclosed by profiling ticks/casts.
+
+  This is achieved by the call to 'markAllQuasiTail' inside 'adjustTailUsage'
+  (called by 'adjustNonRecRhs' and by 'tagRecBinders'). This means that,
+  whenever we are inside a quasi join point, join point jumps for outer join
+  points also get marked as quasi, ensuring the outer join point also becomes a
+  quasi join point.
+
+See also Note [Exitification and quasi join points] in GHC.Core.Opt.Exitify
+for another wrinkle.
 
 ************************************************************************
 *                                                                      *
@@ -3627,9 +3927,11 @@ addBinderUnfolding env bndr unf
   = modifyInScope env (bndr `setIdUnfolding` unf)
 
 zapBndrOccInfo :: Bool -> Id -> Id
--- Consider  case e of b { (a,b) -> ... }
--- Then if we bind b to (a,b) in "...", and b is not dead,
--- then we must zap the deadness info on a,b
+-- ^ Consider:
+-- > case e of e' { (a,b) -> rhs }
+--
+-- We bind @e'@ to @(a,b)@ in @rhs@. If @e'@ is not dead,
+-- then we must zap the deadness info on @a@ and @b@.
 zapBndrOccInfo keep_occ_info pat_id
   | keep_occ_info = pat_id
   | otherwise     = zapIdOccInfo pat_id
@@ -4809,7 +5111,7 @@ simplRules env mb_new_id rules bind_cxt
                  -- binder matches that of the rule, so that pushing the
                  -- continuation into the RHS makes sense
                  join_ok = case mb_new_id of
-                             Just id | JoinPoint join_arity <- idJoinPointHood id
+                             Just id | Just join_arity <- idJoinArity_maybe id
                                      -> length args == join_arity
                              _ -> False
                  bad_join_msg = vcat [ ppr mb_new_id, ppr rule

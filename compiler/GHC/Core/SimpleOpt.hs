@@ -38,7 +38,10 @@ import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 
 import GHC.Types.Literal
 import GHC.Types.Id
-import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
+import GHC.Types.Id.Info
+  ( IdInfo(..)
+  , realUnfoldingInfo, setUnfoldingInfo, setRuleInfo
+  )
 import GHC.Types.InlinePragma ( isAlwaysActive )
 import GHC.Types.Var      ( isNonCoVarId )
 import GHC.Types.Var.Set
@@ -625,7 +628,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst, soe_opts = opt
     occ        = idOccInfo in_bndr
     in_scope   = substInScopeSet subst
 
-    out_rhs | JoinPoint join_arity <- idJoinPointHood in_bndr
+    out_rhs | Just join_arity <- idJoinArity_maybe in_bndr
             = simple_join_rhs join_arity
             | otherwise
             = simple_opt_clo in_scope clo
@@ -1058,30 +1061,45 @@ A more common case is when
 and again its arity increases (#15517)
 -}
 
-
--- | Returns Just (bndr,rhs) if the binding is a join point:
--- If it's a JoinId, just return it
--- If it's not yet a JoinId but is always tail-called,
---    make it into a JoinId and return it.
--- In the latter case, eta-expand the RHS if necessary, to make the
--- lambdas explicit, as is required for join points
+-- | Returns @Just (bndr, rhs)@ if the binding is a join point, or can be made
+-- into a join poin. Returns @Nothing@ otherwise.
 --
--- Precondition: the InBndr has been occurrence-analysed,
---               so its OccInfo is valid
+--   - If the input binder is a 'JoinId', just return it;
+--   - if it's not yet a 'JoinId' but is always tail-called,
+--     make it into a 'JoinId' and return that.
+--
+-- In the latter case, eta-expand the RHS if necessary, to make the
+-- lambdas explicit, as is required for join points.
+--
+-- Precondition: the 'TailCallInfo' of the 'InBndr' is conservative:
+--
+--  - if it says 'AlwaysTailCalled', it is definitely always tail called,
+--  - if it says 'NoTailCallInfo', then we're not sure.
+--
+-- See Note [TailCallInfo is conservative] in 'GHC.Core.Opt.Simplify.Env'.
 joinPointBinding_maybe :: InBndr -> InExpr -> Maybe (InBndr, InExpr)
 joinPointBinding_maybe bndr rhs
   | not (isId bndr)
   = Nothing
 
+  -- 'bndr' already was a join point: preserve its 'JoinPointHood',
+  -- regardless of what the 'TailCallInfo' of 'bndr' says.
+  --
+  -- See Note [TailCallInfo is conservative] in 'GHC.Core.Opt.Simplify.Env'.
   | isJoinId bndr
   = Just (bndr, rhs)
 
-  | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
+  -- 'bndr' is always tail called: make it into a join point.
+  | AlwaysTailCalled
+    { tailCallArity = join_arity
+    , tailCallJoinPointType = join_cat }
+      <- tailCallInfo (idOccInfo bndr)
   , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
   , let str_sig   = idDmdSig bndr
         str_arity = count isId bndrs  -- Strictness demands are for Ids only
-        join_bndr = bndr `asJoinId`        join_arity
-                         `setIdDmdSig` etaConvertDmdSig str_arity str_sig
+        join_bndr =
+          (asJoinId bndr join_cat join_arity)
+            `setIdDmdSig` etaConvertDmdSig str_arity str_sig
   = Just (join_bndr, mkLams bndrs body)
 
   | otherwise

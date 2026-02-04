@@ -714,10 +714,8 @@ cpeJoinPair :: CorePrepEnv -> JoinId -> CoreExpr
 -- No eta-expansion: see Note [Do not eta-expand join points] in GHC.Core.Opt.Simplify.Utils
 cpeJoinPair env bndr rhs
   = assert (isJoinId bndr) $
-    do { let join_arity = case idJoinPointHood bndr of
-                 JoinPoint join_arity -> join_arity
-                 _ -> panic "cpeJoinPair"
-             (bndrs, body)        = collectNBinders join_arity rhs
+    do { let join_arity    = idJoinArity bndr
+             (bndrs, body) = collectNBinders join_arity rhs
 
        ; (env', bndrs') <- cpCloneBndrs env bndrs
 
@@ -1052,8 +1050,8 @@ cpeApp top_env expr
             -- floating the tick which isn't optimal for perf. But this only makes
             -- a difference if we have a non-floatable tick which is somewhat rare.
             | Var vh <- head
-            , Var head' <- lookupCorePrepEnv top_env vh
-            , etaExpansionTick head' tickish
+            , Just head' <- getIdFromTrivialExpr_maybe (lookupCorePrepEnv top_env vh)
+            , canCollectArgsThroughTick head' tickish
             = (head,as')
             where
               (head,as') = go fun (AITick tickish : as)
@@ -1130,7 +1128,10 @@ cpeApp top_env expr
                  hd = getIdFromTrivialExpr_maybe e2
                  -- Determine number of required arguments. See Note [Ticks and mandatory eta expansion]
                  min_arity = case hd of
-                   Just v_hd -> if hasNoBinding v_hd then Just $! (idArity v_hd) else Nothing
+                   Just v_hd ->
+                     if cantEtaReduceFun v_hd
+                     then Just $! idArity v_hd
+                     else Nothing
                    Nothing -> Nothing
           --  ; pprTraceM "cpe_app:stricts:" (ppr v <+> ppr args $$ ppr stricts $$ ppr (idCbvMarks_maybe v))
            ; (app, floats, unsat_ticks) <- rebuild_app env args e2 emptyFloats stricts min_arity

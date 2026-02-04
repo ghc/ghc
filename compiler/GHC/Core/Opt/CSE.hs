@@ -440,7 +440,7 @@ cse_bind toplevel env_rhs env_body (in_id, in_rhs) out_id
       -- See Note [Take care with literal strings]
   = (env_body', (out_id', in_rhs))
 
-  | JoinPoint arity <- idJoinPointHood out_id
+  | Just arity <- idJoinArity_maybe out_id
       -- See Note [Look inside join-point binders]
   = let (params, in_body) = collectNBinders arity in_rhs
         (env', params') = addBinders env_rhs params

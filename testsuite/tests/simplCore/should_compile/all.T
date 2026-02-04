@@ -470,6 +470,8 @@ test('T22272', normal, multimod_compile, ['T22272', '-O -fexpose-all-unfoldings 
 # go should become a join point
 test('T22428', [grep_errmsg(r'jump go') ], compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds -dsuppress-unfoldings'])
 
+test('QuasiJoinPoints', normal, compile, ['-O -package containers'])
+
 test('T22459', normal, compile, [''])
 test('T22623', normal, multimod_compile, ['T22623', '-O -v0'])
 test('T22662', normal, compile, [''])

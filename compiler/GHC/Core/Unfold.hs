@@ -679,7 +679,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
                 = False
 
     size_up_rhs (bndr, rhs)
-      | JoinPoint join_arity <- idJoinPointHood bndr
+      | Just join_arity <- idJoinArity_maybe bndr
         -- Skip arguments to join point
       , (_bndrs, body) <- collectNBinders join_arity rhs
       = size_up body

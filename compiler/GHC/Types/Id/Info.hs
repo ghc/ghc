@@ -65,6 +65,8 @@ module GHC.Types.Id.Info (
         TailCallInfo(..),
         tailCallInfo, isAlwaysTailCalled,
 
+        JoinPointCategory(..),
+
         -- ** The RuleInfo type
         RuleInfo(..),
         emptyRuleInfo,
@@ -204,7 +206,11 @@ data IdDetails
   | CoVarId    -- ^ A coercion variable
                -- This only covers /un-lifted/ coercions, of type
                -- (t1 ~# t2) or (t1 ~R# t2), not their lifted variants
-  | JoinId JoinArity (Maybe [CbvMark])
+  | JoinId
+      { joinIdType :: JoinPointCategory
+      , joinIdArity :: JoinArity
+      , joinIdCbvMarks :: Maybe [CbvMark]
+      }
         -- ^ An 'Id' for a join point taking n arguments
         -- Note [Join points] in "GHC.Core"
         -- Can also work as a WorkerLikeId if given `CbvMark`s.
@@ -408,9 +414,9 @@ isCoVarDetails :: IdDetails -> Bool
 isCoVarDetails CoVarId = True
 isCoVarDetails _       = False
 
-isJoinIdDetails_maybe :: IdDetails -> Maybe (JoinArity, (Maybe [CbvMark]))
-isJoinIdDetails_maybe (JoinId join_arity marks) = Just (join_arity, marks)
-isJoinIdDetails_maybe _                   = Nothing
+isJoinIdDetails_maybe :: IdDetails -> Maybe (JoinPointCategory, JoinArity, Maybe [CbvMark])
+isJoinIdDetails_maybe (JoinId ty join_arity marks) = Just (ty, join_arity, marks)
+isJoinIdDetails_maybe _                            = Nothing
 
 instance Outputable IdDetails where
     ppr = pprIdDetails
@@ -433,7 +439,9 @@ pprIdDetails other     = brackets (pp other)
                               = brackets $ text "RecSel" <>
                                            ppWhen is_naughty (text "(naughty)")
    pp CoVarId                 = text "CoVarId"
-   pp (JoinId arity marks)    = text "JoinId" <> parens (int arity) <> parens (ppr marks)
+   pp (JoinId ty arity marks) = quasi <> text "JoinId" <> parens (int arity) <> parens (ppr marks)
+     where
+      quasi = case ty of { QuasiJoinPoint -> text "Quasi"; TrueJoinPoint -> empty }
 
 {-
 ************************************************************************
@@ -909,14 +917,15 @@ zapUsedOnceInfo info
                   , demandInfo     = zapUsedOnceDemand (demandInfo     info) }
 
 zapFragileInfo :: IdInfo -> Maybe IdInfo
--- ^ Zap info that depends on free variables
+-- ^ Zap fragile 'IdInfo', such as info that depends on free variables
+-- or fragile occurrence info (see 'zapFragileOccInfo').
 zapFragileInfo info@(IdInfo { occInfo = occ, realUnfoldingInfo = unf })
   = new_unf `seq`  -- The unfolding field is not (currently) strict, so we
                    -- force it here to avoid a (zapFragileUnfolding unf) thunk
                    -- which might leak space
     Just (info `setRuleInfo` emptyRuleInfo
                `setUnfoldingInfo` new_unf
-               `setOccInfo`       zapFragileOcc occ)
+               `setOccInfo`       zapFragileOccInfo occ)
   where
     new_unf = zapFragileUnfolding unf
 

@@ -1755,7 +1755,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                  -- See Note [Transfer IdDetails during specialisation]
                  spec_fn_details
                    = case idDetails fn of
-                       JoinId join_arity _ -> JoinId (join_arity - join_arity_decr) Nothing
+                       jid@JoinId { joinIdArity = join_arity } ->
+                         jid { joinIdArity = join_arity - join_arity_decr }
                        DFunId unary        -> DFunId unary
                        _                   -> VanillaId
 

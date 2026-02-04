@@ -79,7 +79,8 @@ module GHC.Types.Id (
 
         -- ** Join variables
         JoinId, JoinPointHood,
-        isJoinId, idJoinPointHood, idJoinArity,
+        isJoinId, joinId_maybe, joinPointType_maybe,
+        idJoinPointHood, idJoinArity_maybe, idJoinArity,
         asJoinId, asJoinId_maybe, zapJoinId,
 
         -- ** Inline pragma stuff
@@ -172,6 +173,8 @@ import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import qualified Data.List.NonEmpty as NE
+import qualified Data.Semigroup as Semi
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setIdUnfolding`,
@@ -565,28 +568,49 @@ isDataConId id = case Var.idDetails id of
 --
 -- See Note [CBV Function Ids: overview]
 isWorkerLikeId :: Id -> Bool
-isWorkerLikeId id = case Var.idDetails id of
-  WorkerLikeId _  -> True
-  JoinId _ Just{}   -> True
-  _                 -> False
+isWorkerLikeId id =
+  case Var.idDetails id of
+    WorkerLikeId _    -> True
+    JoinId _ _ Just{} -> True
+    _                 -> False
 
 isJoinId :: Var -> Bool
+isJoinId = isJust . joinId_maybe
+
+joinId_maybe :: Var -> Maybe JoinPointCategory
 -- It is convenient in GHC.Core.Opt.SetLevels.lvlMFE to apply isJoinId
 -- to the free vars of an expression, so it's convenient
 -- if it returns False for type variables
-isJoinId id
+joinId_maybe id
   | isId id = case Var.idDetails id of
-                JoinId {} -> True
-                _         -> False
-  | otherwise = False
+                JoinId ty _ _ -> Just ty
+                _             -> Nothing
+  | otherwise = Nothing
+
+joinPointType_maybe :: (a -> Maybe JoinPointCategory) -> [a] -> Maybe JoinPointCategory
+joinPointType_maybe f xs = do
+  xsNE <- NE.nonEmpty xs
+  Semi.sconcat <$> traverse f xsNE
+    -- traverse: either all are join points or none are
+    -- sconcat: only a 'TrueJoinPoint' if all are
 
 -- | Doesn't return strictness marks
 idJoinPointHood :: Var -> JoinPointHood
 idJoinPointHood id
- | isId id  = case Var.idDetails id of
-                JoinId arity _marks -> JoinPoint arity
-                _                   -> NotJoinPoint
+ | isId id
+ = case Var.idDetails id of
+    JoinId
+      { joinIdType  = join_cat
+      , joinIdArity = arity }
+      -> JoinPoint join_cat arity
+    _ -> NotJoinPoint
  | otherwise = NotJoinPoint
+
+idJoinArity_maybe :: Var -> Maybe JoinArity
+idJoinArity_maybe v =
+  case idJoinPointHood v of
+    JoinPoint { joinPointArity = a } -> Just a
+    NotJoinPoint -> Nothing
 
 idDataCon :: Id -> DataCon
 -- ^ Get from either the worker or the wrapper 'Id' to the 'DataCon'. Currently used only in the desugarer.
@@ -662,21 +686,22 @@ isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
 ************************************************************************
 -}
 
-idJoinArity :: JoinId -> JoinArity
-idJoinArity id = case idJoinPointHood id of
-                   JoinPoint ar -> ar
-                   NotJoinPoint -> pprPanic "idJoinArity" (ppr id)
+idJoinArity :: HasDebugCallStack => JoinId -> JoinArity
+idJoinArity id =
+  case idJoinPointHood id of
+    JoinPoint { joinPointArity = ar } -> ar
+    NotJoinPoint -> pprPanic "idJoinArity" (ppr id)
 
-asJoinId :: Id -> JoinArity -> JoinId
-asJoinId id arity
+asJoinId :: HasDebugCallStack => Id -> JoinPointCategory -> JoinArity -> JoinId
+asJoinId id cat arity
   = warnPprTrace (not (isLocalId id))
       "global id being marked as join var"  (ppr id) $
-    id `setIdDetails` JoinId arity cbv_info
+    id `setIdDetails` JoinId cat arity cbv_info
   where
    cbv_info = case Var.idDetails id of
-                 VanillaId          -> Nothing
-                 WorkerLikeId marks -> Just marks
-                 JoinId _ mb_marks  -> mb_marks
+                 VanillaId           -> Nothing
+                 WorkerLikeId marks  -> Just marks
+                 JoinId _ _ mb_marks -> mb_marks
                  _ -> pprTraceDebug "asJoinId"
                          (ppr id <+> pprIdDetails (idDetails id)) $
                       Nothing
@@ -685,22 +710,25 @@ asJoinId id arity
 
 zapJoinId :: Id -> Id
 -- May be a regular id already
-zapJoinId jid | isJoinId jid = zapIdTailCallInfo (newIdDetails `seq` jid `setIdDetails` newIdDetails)
-                                 -- Core Lint may complain if still marked
-                                 -- as AlwaysTailCalled
-              | otherwise    = jid
-              where
-                newIdDetails = case idDetails jid of
-                  -- We treat join points as CBV functions. Even after they are floated out.
-                  -- See Note [Which Ids should be CBV candidates?]
-                  JoinId _ (Just marks) -> WorkerLikeId marks
-                  JoinId _ Nothing      -> WorkerLikeId []
-                  _                     -> panic "zapJoinId: newIdDetails can only be used if Id was a join Id."
+zapJoinId jid
+  | isJoinId jid = zapIdTailCallInfo (newIdDetails `seq` jid `setIdDetails` newIdDetails)
+                   -- Core Lint may complain if still marked
+                   -- as AlwaysTailCalled
+  | otherwise    = jid
+  where
+    newIdDetails =
+      case idDetails jid of
+        -- We treat join points as CBV functions. Even after they are floated out.
+        -- See Note [Which Ids should be CBV candidates?]
+        JoinId { joinIdCbvMarks = mbMarks } -> WorkerLikeId ( fromMaybe [] mbMarks )
+        _ -> panic "zapJoinId: newIdDetails can only be used if Id was a join Id."
 
 
 asJoinId_maybe :: Id -> JoinPointHood -> Id
-asJoinId_maybe id (JoinPoint arity) = asJoinId id arity
-asJoinId_maybe id NotJoinPoint      = zapJoinId id
+asJoinId_maybe id = \case
+  NotJoinPoint -> zapJoinId id
+  JoinPoint { joinPointCategory = join_cat, joinPointArity = arity } ->
+    asJoinId id join_cat arity
 
 {-
 ************************************************************************
@@ -824,13 +852,18 @@ setIdCbvMarks id marks
       -- pprTrace "setMarks:" (ppr id <> text ":" <> ppr marks) $
       case idDetails id of
         -- good ol (likely worker) function
-        VanillaId ->      id `setIdDetails` (WorkerLikeId trimmedMarks)
-        JoinId arity _ -> id `setIdDetails` (JoinId arity (Just trimmedMarks))
+        VanillaId ->
+          id `setIdDetails` (WorkerLikeId trimmedMarks)
+        jid@JoinId {} ->
+          id `setIdDetails` jid { joinIdCbvMarks = Just trimmedMarks }
         -- Updating an existing call by value function.
-        WorkerLikeId _ -> id `setIdDetails` (WorkerLikeId trimmedMarks)
+        WorkerLikeId _ ->
+          id `setIdDetails` (WorkerLikeId trimmedMarks)
         -- Do nothing for these
-        RecSelId{} -> id
-        DFunId{} -> id
+        RecSelId{} ->
+          id
+        DFunId{} ->
+          id
         _ -> pprTrace "setIdCbvMarks: Unable to set cbv marks for" (ppr id $$
               text "marks:" <> ppr marks $$
               text "idDetails:" <> ppr (idDetails id)) id
@@ -846,10 +879,11 @@ setIdCbvMarks id marks
       trimmedMarks = dropWhileEndLE (not . isMarkedCbv) $ take (idArity id) marks
 
 idCbvMarks_maybe :: Id -> Maybe [CbvMark]
-idCbvMarks_maybe id = case idDetails id of
-  WorkerLikeId marks -> Just marks
-  JoinId _arity marks  -> marks
-  _                    -> Nothing
+idCbvMarks_maybe id =
+  case idDetails id of
+    WorkerLikeId marks                -> Just marks
+    JoinId { joinIdCbvMarks = marks } -> marks
+    _                                 -> Nothing
 
 -- Id must be called with at least this arity in order to allow arguments to
 -- be passed unlifted.
@@ -862,8 +896,10 @@ setCbvCandidate :: Id -> Id
 setCbvCandidate id =
   let details = case idDetails id of
         WorkerLikeId{}        -> Nothing
-        JoinId _arity Just{}  -> Nothing
-        JoinId arity Nothing  -> Just (JoinId arity (Just []))
+        jid@JoinId { joinIdCbvMarks = mbMarks } ->
+          case mbMarks of
+            Just {} -> Nothing
+            Nothing -> Just $ jid { joinIdCbvMarks = Just [] }
         VanillaId             -> Just $ WorkerLikeId []
         _                     -> Nothing
   in maybeModifyIdDetails details id
@@ -874,7 +910,8 @@ removeCbvCandidate :: Id -> Id
 removeCbvCandidate id =
   let details = case idDetails id of
         WorkerLikeId{}      -> Just $ VanillaId
-        JoinId arity Just{} -> Just $ JoinId arity Nothing
+        jid@( JoinId { joinIdCbvMarks = Just {} } ) ->
+          Just $ jid { joinIdCbvMarks = Nothing }
         _                   -> Nothing
   in maybeModifyIdDetails details id
 
