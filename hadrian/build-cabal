@@ -23,9 +23,52 @@ fi
 CABVERSTR=$("$CABAL" --numeric-version)
 CABVER=( ${CABVERSTR//./ } )
 
+THREADS="-j1"
+GC_THREADS=""
+SEMAPHORE=""
+
+echo "$@"
+
+# Try building hadrian in parallel. We check for -j<n>.
+# If threads > 1 we pass --semaphore to allow ghc to build more than one module in parallel
+# If threads > 4 we pass -qn as higher parallel gc thread counts can lead to slow downs
+# We only do any of thise for cabal >= 3.14, because I don't trust older versions to handle --semaphore right
+if [ "${CABVER[0]}" -gt 3 ] || [ "${CABVER[0]}" -eq 3 -a "${CABVER[1]}" -ge 14 ];
+then
+
+    for arg in "$@"; do
+        case "$arg" in
+            -j)
+                GC_THREADS="-qn4"
+                SEMAPHORE="--semaphore"
+                THREADS="-j"
+                ;;
+            -j[0-9]*)
+                threads="${arg#-j}"
+                if [[ "$threads" =~ ^[0-9]+$ ]] && [ "$threads" -ne 0 ]; then
+                    THREADS="-j${threads}"
+                    if [ $threads -ge 4 ]; then
+                      GC_THREADS="-qn4"
+                    fi
+                    if [ $threads -gt 1 ]; then
+                        SEMAPHORE="--semaphore"
+                    fi
+                fi
+                ;;
+        esac
+
+    done
+
+fi
+
+if [ "$(uname -s)" = "FreeBSD" ]; then
+    # Can't rely on posix semaphore support in free bsd.
+    SEMAPHORE=""
+fi
+
 if [ "${CABVER[0]}" -gt 2 -o "${CABVER[0]}" -eq 2 -a "${CABVER[1]}" -ge 2 ];
 then
-    "$CABAL" --project-file="$PROJ" new-build "${CABFLAGS[@]}" -j exe:hadrian
+    "$CABAL" --project-file="$PROJ" new-build "${CABFLAGS[@]}" ${THREADS} ${SEMAPHORE} --ghc-options="+RTS ${GC_THREADS} -RTS" exe:hadrian
     # use new-exec instead of new-run to make sure that the build-tools (alex & happy) are in PATH
     "$CABAL" --project-file="$PROJ" new-exec  "${CABFLAGS[@]}"    hadrian -- \
         --directory "$PWD" \
