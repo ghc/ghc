@@ -1264,8 +1264,10 @@ tcHsType _ rn_ty@(HsStarTy _ _) exp_kind
   = checkExpKind rn_ty liftedTypeKind liftedTypeKind exp_kind
 
 --------- Literals
-tcHsType _ rn_ty@(HsTyLit _ (HsNumTy _ n)) exp_kind
-  = do { checkWiredInTyCon naturalTyCon
+tcHsType _ rn_ty@(HsTyLit _ (HsNumTy x n)) exp_kind
+  = do { when (n < 0) $
+           addErr $ TcRnNegativeNumTypeLiteral (HsNumTy x n)
+       ; checkWiredInTyCon naturalTyCon
        ; checkExpKind rn_ty (mkNumLitTy n) naturalTy exp_kind }
 
 tcHsType _ rn_ty@(HsTyLit _ (HsStrTy _ s)) exp_kind
