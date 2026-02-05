@@ -21,7 +21,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Hs.Expr( pprExpr )
 
-import GHC.Data.FastString (unpackFS)
+import GHC.Data.FastString (FastString, unpackFS)
 import GHC.Types.Basic (PprPrec(..), topPrec )
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Types.SourceText
@@ -209,10 +209,7 @@ Equivalently it's True if
 instance IsPass p => Outputable (HsLit (GhcPass p)) where
     ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
     ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
-    ppr (HsString st s)     =
-      case st of
-        NoSourceText -> pprHsString s
-        SourceText src -> vcat $ map text $ split '\n' (unpackFS src)
+    ppr (HsString st s)     = pprHsStringLit st s
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
       = pprWithSourceText (il_text i) (integer (il_value i))
@@ -233,6 +230,10 @@ instance IsPass p => Outputable (HsLit (GhcPass p)) where
          (HsInteger st i _) -> pprWithSourceText st (integer i)
          (HsRat  f _)       -> ppr f
 
+pprHsStringLit :: SourceText -> FastString -> SDoc
+pprHsStringLit NoSourceText     s = pprHsString s
+pprHsStringLit (SourceText src) _ = vcat $ map text $ split '\n' (unpackFS src)
+
 -- in debug mode, print the expression that it's resolved to, too
 instance OutputableBndrId p
        => Outputable (HsOverLit (GhcPass p)) where
@@ -242,7 +243,7 @@ instance OutputableBndrId p
 instance Outputable OverLitVal where
   ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))
   ppr (HsFractional f)   = ppr f
-  ppr (HsIsString st s)  = pprWithSourceText st (pprHsString s)
+  ppr (HsIsString st s)  = pprHsStringLit st s
 
 negateOverLitVal :: OverLitVal -> OverLitVal
 negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
