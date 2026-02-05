@@ -48,6 +48,7 @@ import GHC.Utils.Logger
 import GHC.Linker.Types
 import System.IO.Unsafe (unsafeInterleaveIO)
 import GHC.Utils.Outputable
+import GHC.Types.Name.Env
 
 {- Note [Overview of persistent bytecode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -382,8 +383,13 @@ putViaBinName :: WriteBinHandle -> Name -> IO ()
 putViaBinName bh nm = case findUserDataWriter Proxy bh of
   BinaryWriter f -> f bh $ BinName nm
 
+data BytecodeNameEnv = ByteCodeNameEnv { _bytecode_next_id :: !Word64
+                                       , _bytecode_name_subst :: NameEnv Word64
+                                       }
+
 addBinNameWriter :: WriteBinHandle -> IO WriteBinHandle
-addBinNameWriter bh' =
+addBinNameWriter bh' = do
+  env_ref <- newIORef (ByteCodeNameEnv 0 emptyNameEnv)
   evaluate
     $ flip addWriterToUserData bh'
     $ BinaryWriter
@@ -394,10 +400,17 @@ addBinNameWriter bh' =
             put_ bh nm
         | otherwise -> do
             putByte bh 1
-            put_ bh
-              $ occNameFS (occName nm)
-              `appendFS` mkFastString
-                (show $ nameUnique nm)
+            key <- getBinNameKey env_ref nm
+            -- Delimit the OccName from the deterministic counter to keep the
+            -- encoding injective, avoiding collisions like "foo1" vs "foo#1".
+            put_ bh (occNameFS (occName nm) `appendFS` mkFastString ('#' : show key))
+  where
+    -- Find a deterministic key for local names. This
+    getBinNameKey ref name = do
+      atomicModifyIORef ref (\b@(ByteCodeNameEnv next subst) ->
+        case lookupNameEnv subst name of
+          Just idx -> (b, idx)
+          Nothing  -> (ByteCodeNameEnv (next + 1) (extendNameEnv subst name next), next))
 
 addBinNameReader :: HscEnv -> ReadBinHandle -> IO ReadBinHandle
 addBinNameReader HscEnv {..} bh' = do
@@ -423,9 +436,6 @@ addBinNameReader HscEnv {..} bh' = do
 
 -- Note [Serializing Names in bytecode]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- NOTE: This approach means that bytecode objects are not deterministic.
--- We need to revisit this in order to make the output deterministic.
---
 -- The bytecode related types contain various Names which we need to
 -- serialize. Unfortunately, we can't directly use the Binary instance
 -- of Name: it is only meant to be used for serializing external Names
@@ -433,9 +443,8 @@ addBinNameReader HscEnv {..} bh' = do
 --
 -- We also need to maintain the invariant that: any pair of internal
 -- Names with equal/different uniques must also be deserialized to
--- have the same equality. So normally uniques aren't supposed to be
--- serialized, but for this invariant to work, we do append uniques to
--- OccNames of internal Names, so that they can be uniquely identified
--- by OccName alone. When deserializing, we check a global cached
--- mapping from OccName to Unique, and create the real Name with the
--- right Unique if it's already deserialized at least once.
+-- have the same equality. Therefore when we write the names to the interface, we
+-- use an incrementing counter to give each local name it's own unique number. A substitution
+-- is maintained to give each occurence of the Name the same unique key. When the interface
+-- is read, a reverse mapping is used from these unique keys to a Name.
+--
