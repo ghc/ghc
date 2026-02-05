@@ -116,6 +116,7 @@ import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
 import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
 import GHC.Hs.Doc
+import GHC.Hs.Lit (pprHsStringLit)
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
@@ -1353,7 +1354,7 @@ instance (OutputableBndrId pass) => OutputableBndr (GenLocated SrcSpan (FieldOcc
 
 ppr_tylit :: (HsTyLit (GhcPass p)) -> SDoc
 ppr_tylit (HsNumTy source i) = pprWithSourceText source (integer i)
-ppr_tylit (HsStrTy source s) = pprWithSourceText source (text (show s))
+ppr_tylit (HsStrTy source s) = pprHsStringLit source s
 ppr_tylit (HsCharTy source c) = pprWithSourceText source (text (show c))
 
 pprAnonWildCard :: SDoc

@@ -1,0 +1,14 @@
+T26860ppr_overloaded.hs:8:5: error: [GHC-39999]
+    • No instance for ‘GHC.Internal.Data.String.IsString Int’
+        arising from the literal ‘"first line \
+                                      \asdf\n\
+                                      \second line"’
+    • In the expression:
+        "first line \
+            \asdf\n\
+            \second line"
+      In an equation for ‘x’:
+          x = "first line \
+                  \asdf\n\
+                  \second line"
+

@@ -1,0 +1,11 @@
+T26860ppr_tylit.hs:10:10: error: [GHC-83865]
+    • Expected a type,
+      but ‘"first line \
+                    \asdf\n\
+                    \second line"’ has kind
+      ‘GHC.Internal.Types.Symbol’
+    • In the type ‘"first line \
+                            \asdf\n\
+                            \second line"’
+      In the type synonym declaration for ‘X’
+
