@@ -138,21 +138,9 @@ scavengeTSO (StgTSO *tso)
         evacuate((StgClosure **)&tso->label);
     }
 
-    switch (ACQUIRE_LOAD(&tso->why_blocked)) {
-    case BlockedOnMVar:
-    case BlockedOnMVarRead:
-    case BlockedOnBlackHole:
-    case BlockedOnMsgThrowTo:
-    case NotBlocked:
+    if (IsBlockInfoClosure(ACQUIRE_LOAD(&tso->why_blocked))) {
         evacuate(&tso->block_info.closure);
-        break;
-    case BlockedOnRead:
-    case BlockedOnWrite:
-    case BlockedOnDelay:
-    case BlockedOnDoProc:
-        scavengeTSOIOManager(tso);
-        break;
-    default:
+    } else {
 #if defined(THREADED_RTS)
     // in the THREADED_RTS, block_info.closure must always point to a
     // valid closure, because we assume this in throwTo().  In the
@@ -160,7 +148,6 @@ scavengeTSO (StgTSO *tso)
     // BlockedOnRead/BlockedOnWrite) or a time value (BlockedOnDelay)
         ASSERT(tso->block_info.unused == END_TSO_QUEUE);
 #endif
-        break;
     }
 
     tso->dirty = gct->failed_to_evac;
