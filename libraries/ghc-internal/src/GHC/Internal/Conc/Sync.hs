@@ -593,13 +593,16 @@ threadStatus (ThreadId t) = IO $ \s ->
         -- NB. keep these in sync with rts/include/rts/Constants.h
      mk_stat 0  = ThreadRunning
      mk_stat 1  = ThreadBlocked BlockedOnMVar
-     mk_stat 2  = ThreadBlocked BlockedOnBlackHole
-     mk_stat 6  = ThreadBlocked BlockedOnSTM
+     mk_stat 2  = ThreadBlocked BlockedOnMVar -- BlockedOnMVarRead
+     mk_stat 3  = ThreadBlocked BlockedOnBlackHole
+     mk_stat 4  = ThreadBlocked BlockedOnException
+     -- 5,6,7: BlockedOn{Read,Write,Delay}
+     mk_stat 8  = ThreadBlocked BlockedOnSTM
+     mk_stat 9  = ThreadBlocked BlockedOnForeignCall
      mk_stat 10 = ThreadBlocked BlockedOnForeignCall
-     mk_stat 11 = ThreadBlocked BlockedOnForeignCall
-     mk_stat 12 = ThreadBlocked BlockedOnException
-     mk_stat 14 = ThreadBlocked BlockedOnMVar -- possibly: BlockedOnMVarRead
-     -- NB. these are hardcoded in rts/PrimOps.cmm
+     -- 11: ThreadMigrating
+     -- 12: BlockedOnDoProc
+     -- 13,14,15: unused
      mk_stat 16 = ThreadFinished
      mk_stat 17 = ThreadDied
      mk_stat _  = ThreadBlocked BlockedOnOther
