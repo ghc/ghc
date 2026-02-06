@@ -138,7 +138,7 @@ scavengeTSO (StgTSO *tso)
         evacuate((StgClosure **)&tso->label);
     }
 
-    switch (ACQUIRE_LOAD(&tso->why_blocked)) {
+    switch (UntagWhyBlocked(ACQUIRE_LOAD(&tso->why_blocked))) {
     case BlockedOnMVar:
     case BlockedOnMVarRead:
     case BlockedOnBlackHole:
