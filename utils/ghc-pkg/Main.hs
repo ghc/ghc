@@ -8,6 +8,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wno-orphans -Wno-x-partial #-}
 
 -- Fine if this comes from make/Hadrian or the pre-built base.
@@ -882,6 +883,34 @@ lookForPackageDBIn dir = do
     exists_file <- doesFileExist path_file
     if exists_file then return (Just path_file) else return Nothing
 
+{- Note [ghc-pkg database locking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's important for ghc-pkg, GHC and Hadrian to always see a consistent state for
+package databases. To ensure this, we always take a lock before reading or writing
+to a package database.
+
+The general idea is we use 'withLockedPackageDb' to lock an already existing
+database in both modes:
+
+  - In read-only mode, we take a *shared* lock before reading and unlock afterwards.
+    Locking is needed to avoid a concurrent invocation of ghc-pkg deleting files from
+    the db before we manage to read them. This occasionally happened in #22870.
+    (Note that, historically, only windows used to lock the package db during reads,
+    but the justification seemed insufficient given #22870. So now we always lock
+    even for reads. See also #16773.)
+
+  - In read-write mode, we take an **exclusive** lock on the package database.
+    However, we don't automatically release the lock after the inner action completes
+    (unless an exception occurs). Instead, either the inner action itself releases the
+    lock, or it returns it, in which case it is the caller of 'withLockedPackageDb'
+    that is responsible for releasing the lock. Typically, the exclusive lock is stored
+    in 'PackageDB', with the type informing us that we have a lock we are responsible for
+    releasing. 'updateDBCache' eventually releases it.
+
+While this setup is a bit cumbersome, it seemed to be the easiest way to ensure
+that locks are consistently held over reads/modifications of a database without
+engaging in a larger refactor of the ghc-pkg code.
+-}
 readParseDatabase :: forall mode t. Verbosity
                   -> Maybe (OsPath,Bool)
                   -> GhcPkg.DbOpenMode mode t
@@ -899,83 +928,77 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
   = do e <- tryIO $ getDirectoryContents path
        case e of
          Left err
-           | ioeGetErrorType err == InappropriateType -> do
-              -- We provide a limited degree of backwards compatibility for
-              -- old single-file style db:
-              mdb <- tryReadParseOldFileStyleDatabase verbosity
-                       mb_user_conf mode use_cache path
-              case mdb of
-                Just db -> return db
-                Nothing ->
-                  die $ "ghc no longer supports single-file style package "
-                     ++ "databases (" ++ showOsPath path ++ ") use 'ghc-pkg init'"
-                     ++ "to create the database with the correct format."
-
+           | ioeGetErrorType err == InappropriateType -> dieOnSingleFileDb path
            | otherwise -> ioError err
-         Right fs
-           | not use_cache -> ignore_cache (const $ return ())
-           | otherwise -> do
-              e_tcache <- tryIO $ getModificationTime cache
-              case e_tcache of
-                Left ex -> do
-                  whenReportCacheErrors $
-                    if isDoesNotExistError ex
-                      then
-                        -- It's fine if the cache is not there as long as the
-                        -- database is empty.
-                        when (not $ null confs) $ do
-                            warn ("WARNING: cache does not exist: " ++ showOsPath cache)
-                            warn ("ghc will fail to read this package db. " ++
-                                  recacheAdvice)
-                      else do
-                        warn ("WARNING: cache cannot be read: " ++ show ex)
-                        warn "ghc will fail to read this package db."
-                  ignore_cache (const $ return ())
-                Right tcache -> do
-                  when (verbosity >= Verbose) $ do
-                      warn ("Timestamp " ++ show tcache ++ " for " ++ showOsPath cache)
-                  -- If any of the .conf files is newer than package.cache, we
-                  -- assume that cache is out of date.
-                  cache_outdated <- (`anyM` confs) $ \conf ->
-                    (tcache <) <$> getModificationTime conf
-                  if not cache_outdated
-                      then do
-                          when (verbosity > Normal) $
-                             infoLn ("using cache: " ++ showOsPath cache)
-                          GhcPkg.readPackageDbForGhcPkg cache mode
-                            >>= uncurry mkPackageDB
-                      else do
-                          whenReportCacheErrors $ do
-                              warn ("WARNING: cache is out of date: " ++ showOsPath cache)
-                              warn ("ghc will see an old view of this " ++
-                                    "package db. " ++ recacheAdvice)
-                          ignore_cache $ \file -> do
-                            when (verbosity >= Verbose) $ do
-                              tFile <- getModificationTime file
-                              let rel = case tcache `compare` tFile of
-                                    LT -> " (NEWER than cache)"
-                                    GT -> " (older than cache)"
-                                    EQ -> " (same as cache)"
-                              warn ("Timestamp " ++ show tFile
-                                ++ " for " ++ showOsPath file ++ rel)
-            where
-                 confs = map (path </>) $ filter (os ".conf" `OsPath.isExtensionOf`) fs
+         -- Take a lock to use while we read the DB
+         Right fs -> withLockedPackageDb mode cache $ \lock -> do
+          if not use_cache
+            then ignore_cache lock (const $ return ())
+            else do
+                  e_tcache <- tryIO $ getModificationTime cache
+                  case e_tcache of
+                    Left ex -> do
+                      whenReportCacheErrors $
+                        if isDoesNotExistError ex
+                          then
+                            -- It's fine if the cache is not there as long as the
+                            -- database is empty.
+                            when (not $ null confs) $ do
+                                scache <- decodeFS cache
+                                warn ("WARNING: cache does not exist: " ++ scache)
+                                warn ("ghc will fail to read this package db. " ++
+                                      recacheAdvice)
+                          else do
+                            warn ("WARNING: cache cannot be read: " ++ show ex)
+                            warn "ghc will fail to read this package db."
+                      ignore_cache (lock) (const $ return ())
+                    Right tcache -> do
+                      when (verbosity >= Verbose) $ do
+                          scache <- decodeFS cache
+                          warn ("Timestamp " ++ show tcache ++ " for " ++ scache)
+                      -- If any of the .conf files is newer than package.cache, we
+                      -- assume that cache is out of date.
+                      cache_outdated <- (`anyM` confs) $ \conf ->
+                        (tcache <) <$> getModificationTime conf
+                      if not cache_outdated
+                          then do
+                              when (verbosity > Normal) $ do
+                                scache <- decodeFS cache
+                                infoLn ("using cache: " ++ scache)
+                              GhcPkg.readPackageDbForGhcPkg cache (modeWithLock lock mode)
+                                >>= uncurry mkPackageDB
+                          else do
+                              whenReportCacheErrors $ do
+                                  scache <- decodeFS cache
+                                  warn ("WARNING: cache is out of date: " ++ scache)
+                                  warn ("ghc will see an old view of this " ++
+                                        "package db. " ++ recacheAdvice)
+                              ignore_cache (lock) $ \file -> do
+                                when (verbosity >= Verbose) $ do
+                                  sfile <- decodeFS file
+                                  tFile <- getModificationTime file
+                                  let rel = case tcache `compare` tFile of
+                                        LT -> " (NEWER than cache)"
+                                        GT -> " (older than cache)"
+                                        EQ -> " (same as cache)"
+                                  warn ("Timestamp " ++ show tFile
+                                    ++ " for " ++ sfile ++ rel)
+                where
+                    confs = map (path </>) $ filter (isExtensionOf (os ".conf")) fs
 
-                 ignore_cache :: (OsPath -> IO ()) -> IO (PackageDB mode)
-                 ignore_cache checkTime = do
-                     -- If we're opening for modification, we need to acquire a
-                     -- lock even if we don't open the cache now, because we are
-                     -- going to modify it later.
-                     lock <- F.mapM (const $ GhcPkg.lockPackageDb cache) mode
-                     let doFile f = do checkTime f
-                                       parseSingletonPackageConf verbosity f
-                     pkgs <- mapM doFile confs
-                     mkPackageDB pkgs lock
+                    -- Read the package db, using the given lock
+                    ignore_cache :: PackageDbLock -> (OsPath -> IO ()) -> IO (PackageDB mode)
+                    ignore_cache lock checkTime = do
+                        let doFile f = do checkTime f
+                                          parseSingletonPackageConf verbosity f
+                        pkgs <- mapM doFile confs
 
-                 -- We normally report cache errors for read-only commands,
-                 -- since modify commands will usually fix the cache.
-                 whenReportCacheErrors = when $ verbosity > Normal
-                   || verbosity >= Normal && GhcPkg.isDbOpenReadMode mode
+                        mkPackageDB pkgs (modeWithLock lock mode)
+
+                    -- We normally report cache errors for read-only commands,
+                    -- since modify commands will usually fix the cache.
+                    whenReportCacheErrors = when $ verbosity > Normal
+                      || verbosity >= Normal && GhcPkg.isDbOpenReadMode mode
   where
     cache = path </> cachefilename
 
@@ -1072,74 +1095,15 @@ mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
                               Just cs@(c : _) | FilePath.isPathSeparator c -> Just cs
                               _ -> Nothing
 
--- -----------------------------------------------------------------------------
--- Workaround for old single-file style package dbs
-
--- Single-file style package dbs have been deprecated for some time, but
--- it turns out that Cabal was using them in one place. So this code is for a
--- workaround to allow older Cabal versions to use this newer ghc.
-
--- We check if the file db contains just "[]" and if so, we look for a new
--- dir-style db in path.d/, ie in a dir next to the given file.
--- We cannot just replace the file with a new dir style since Cabal still
--- assumes it's a file and tries to overwrite with 'writeFile'.
-
--- ghc itself also cooperates in this workaround
-
-tryReadParseOldFileStyleDatabase :: Verbosity -> Maybe (OsPath, Bool)
-                                 -> GhcPkg.DbOpenMode mode t -> Bool -> OsPath
-                                 -> IO (Maybe (PackageDB mode))
-tryReadParseOldFileStyleDatabase verbosity mb_user_conf
-                                 mode use_cache path = do
-  -- assumes we've already established that path exists and is not a dir
-  content <- readUtf8File path `catchIO` \_ -> return ""
-  if take 2 content == "[]"
-    then do
-      path_abs <- absolutePath path
-      let path_dir = adjustOldDatabasePath path
-      warn $ "Warning: ignoring old file-style db and trying " ++ showOsPath path_dir
-      direxists <- doesDirectoryExist path_dir
-      if direxists
-        then do
-          db <- readParseDatabase verbosity mb_user_conf mode use_cache path_dir
-          -- but pretend it was at the original location
-          return $ Just db {
-              location         = path,
-              locationAbsolute = path_abs
-            }
-         else do
-           lock <- F.forM mode $ \_ -> do
-             createDirectoryIfMissing True path_dir
-             GhcPkg.lockPackageDb $ path_dir </> cachefilename
-           return $ Just PackageDB {
-               location         = path,
-               locationAbsolute = path_abs,
-               packageDbLock    = lock,
-               packages         = []
-             }
-
-    -- if the path is not a file, or is not an empty db then we fail
-    else return Nothing
-
+-- | Just preserved to give a more informative error
 adjustOldFileStylePackageDB :: PackageDB mode -> IO (PackageDB mode)
 adjustOldFileStylePackageDB db = do
   -- assumes we have not yet established if it's an old style or not
   mcontent <- liftM Just (readUtf8File (location db)) `catchIO` \_ -> return Nothing
-  case fmap (take 2) mcontent of
+  case mcontent of
     -- it is an old style and empty db, so look for a dir kind in location.d/
-    Just "[]" -> return db {
-        location         = adjustOldDatabasePath $ location db,
-        locationAbsolute = adjustOldDatabasePath $ locationAbsolute db
-      }
-    -- it is old style but not empty, we have to bail
-    Just  _   -> die $ "ghc no longer supports single-file style package "
-                    ++ "databases (" ++ showOsPath (location db) ++ ") use 'ghc-pkg init'"
-                    ++ "to create the database with the correct format."
-    -- probably not old style, carry on as normal
+    Just _    -> dieOnSingleFileDb (location db)
     Nothing   -> return db
-
-adjustOldDatabasePath :: OsPath -> OsPath
-adjustOldDatabasePath = (<.> os "d")
 
 -- -----------------------------------------------------------------------------
 -- Creating a new package DB
@@ -2335,3 +2299,10 @@ writeUtf8File file contents = writeFileAtomic file (toUTF8LBS contents)
 -- and adapted to 'OsPath'.
 readUtf8File :: OsPath -> IO String
 readUtf8File file = (ignoreBOM . fromUTF8LBS) <$> FileIO.readFile file
+
+dieOnSingleFileDb :: OsPath -> IO a
+dieOnSingleFileDb ospath = do
+  path <- decodeFS ospath
+  die $ "ghc no longer supports single-file style package "
+      ++ "databases (" ++ path ++ ") use 'ghc-pkg init'"
+      ++ "to create the database with the correct format."
