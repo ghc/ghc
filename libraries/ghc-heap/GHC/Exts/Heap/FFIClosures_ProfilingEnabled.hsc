@@ -63,7 +63,7 @@ parseWhatNext w = case w of
                     _ -> WhatNextUnknownValue w
 
 parseWhyBlocked :: Word16 -> WhyBlocked
-parseWhyBlocked w = case w of
+parseWhyBlocked w = case untagWhyBlocked w of
                         (#const NotBlocked) -> NotBlocked
                         (#const BlockedOnMVar) -> BlockedOnMVar
                         (#const BlockedOnMVarRead) -> BlockedOnMVarRead
@@ -78,6 +78,9 @@ parseWhyBlocked w = case w of
                         (#const BlockedOnMsgThrowTo) -> BlockedOnMsgThrowTo
                         (#const ThreadMigrating) -> ThreadMigrating
                         _ -> WhyBlockedUnknownValue w
+  where
+    -- See Constants.h encoding for why_blocked
+    untagWhyBlocked why = why .&. 0x0f
 
 parseTsoFlags :: Word32 -> [TsoFlags]
 parseTsoFlags w | isSet (#const TSO_LOCKED) w = TsoLocked : parseTsoFlags (unset (#const TSO_LOCKED) w)
