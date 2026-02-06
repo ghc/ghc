@@ -56,6 +56,18 @@ Executable ghc
                  -rtsopts=all
                  "-with-rtsopts=-K512M -H -I5 -T"
 
+    -- Export RTS symbols to dynamically loaded libraries
+    -- See Note [ghc-iserv and dynamic symbol export] in utils/ghc-iserv/ghc-iserv.cabal.in
+    -- GHC loads Haskell shared libraries dynamically for TH/GHCi and these
+    -- libraries need access to RTS symbols. Without these flags, symbols
+    -- from the linked RTS are not visible to dlopen'd libraries.
+    if os(linux) || os(freebsd)
+      ghc-options: -rdynamic
+    if os(osx) || os(darwin)
+      ghc-options: -optl -Wl,-flat_namespace
+    -- Note: Windows has a hard limit of 65535 symbol exports (16-bit index).
+    -- We cannot use --export-all-symbols here as we exceed that limit.
+
     if flag(internal-interpreter)
         -- NB: this is never built by the bootstrapping GHC+libraries
         Build-depends:

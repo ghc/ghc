@@ -1,8 +1,8 @@
--- WARNING: iserv.cabal is automatically generated from iserv.cabal.in by
--- ../../configure.  Make sure you are editing iserv.cabal.in, not
--- iserv.cabal.
+-- WARNING: ghc-iserv.cabal is automatically generated from ghc-iserv.cabal.in
+-- by ../../configure.  Make sure you are editing ghc-iserv.cabal.in, not
+-- ghc-iserv.cabal.
 
-Name: iserv
+Name: ghc-iserv
 Version: @ProjectVersion@
 Copyright: XXX
 License: BSD3
@@ -45,7 +45,7 @@ cabal-version: >=1.10
 -- Using linker flags is preferred because it exports symbols from the RTS
 -- that's already linked into iserv, avoiding a second copy.
 
-Executable iserv
+Executable ghc-iserv
     Default-Language: Haskell2010
     ghc-options: -no-hs-main
 
