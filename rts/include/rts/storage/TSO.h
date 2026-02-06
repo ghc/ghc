@@ -46,19 +46,39 @@ typedef struct {
 } StgAsyncIOResult;
 #endif
 
-/* Reason for thread being blocked. See comment above struct StgTso_. */
+/* Additional information about how the thread is blocked.
+ * The tso->why_blocked is the tag for this union. */
 typedef union {
+  /* Used for generic read, for cases where block_info is a closure.
+   * Never used for writes. Use .unused below instead. */
   StgClosure *closure;
-  StgTSO *prev; // a back-link when the TSO is on the run queue (NotBlocked)
+
+  /* case NotBlocked: A back-link when the TSO is on the run queue */
+  StgTSO *prev;
+
+  /* case BlockedOnBlackHole */
   struct MessageBlackHole_ *bh;
+
+  /* case BlockedOnMsgThrowTo */
   struct MessageThrowTo_ *throwto;
+
+  /* case BlockedOnRead, BlockedOnWrite: legacy I/O managers */
   StgInt fd;    /* StgInt instead of int, so that it's the same size as the ptrs */
+
+  /* case BlockedOnRead, BlockedOnWrite: new I/O managers */
   StgAsyncIOOp *aiop;
+
+  /* case BlockedOnDelay: new I/O managers */
   StgTimeoutQueue *timeout;
+
 #if defined(mingw32_HOST_OS)
+  /* case BlockedOnRead, BlockedOnWrite, BlockedOnDoProc:
+   * used by the win32-legacy I/O manager */
   StgAsyncIOResult *async_result;
 #endif
+
 #if !defined(THREADED_RTS)
+  /* case BlockedOnDelay: used by the select I/O manager */
   StgWord target;
     // Only for the non-threaded RTS: the target time for a thread
     // blocked in threadDelay, in units of 1ms.  This is a
