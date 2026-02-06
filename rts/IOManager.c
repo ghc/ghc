@@ -782,7 +782,6 @@ bool syncIOWaitReady(Capability   *cap,
 #endif
 #if defined(IOMGR_ENABLED_POLL)
         case IO_MANAGER_POLL:
-            ASSERT(tso->why_blocked == NotBlocked);
             return syncIOWaitReadyPoll(cap, tso, rw, fd);
 #endif
         default:
