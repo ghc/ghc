@@ -57,6 +57,9 @@ dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
 dnl later CC is copied to CC_STAGE{1,2,3}
 AC_PROG_CC([cc gcc clang])
 
+dnl Portable mkdir -p (sets MKDIR_P)
+AC_PROG_MKDIR_P
+
 dnl make extensions visible to allow feature-tests to detect them lateron
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -443,7 +446,7 @@ dnl Generate ghcplatform.h
 dnl ######################################################################
 
 [
-mkdir -p include
+${MKDIR_P} include
 
 touch include/ghcplatform.h
 > include/ghcplatform.h
@@ -535,40 +538,40 @@ else
   AC_MSG_ERROR([Failed to run $DERIVE_CONSTANTS --gen-header ...])
 fi
 
-AC_MSG_CHECKING([for AutoApply.cmm])
-if $GENAPPLY include/DerivedConstants.h > AutoApply.cmm; then
+AC_MSG_CHECKING([for include/rts/AutoApply.cmm.h])
+if ${MKDIR_P} include/rts && $GENAPPLY include/DerivedConstants.h > include/rts/AutoApply.cmm.h; then
   AC_MSG_RESULT([created])
 else
   AC_MSG_RESULT([failed to create])
-  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h > AutoApply.cmm])
+  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h > include/rts/AutoApply.cmm.h])
 fi
 
-AC_MSG_CHECKING([for AutoApply_V16.cmm])
-if $GENAPPLY include/DerivedConstants.h -V16 > AutoApply_V16.cmm; then
+AC_MSG_CHECKING([for include/rts/AutoApply_V16.cmm.h])
+if ${MKDIR_P} include/rts && $GENAPPLY include/DerivedConstants.h -V16 > include/rts/AutoApply_V16.cmm.h; then
   AC_MSG_RESULT([created])
 else
   AC_MSG_RESULT([failed to create])
-  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h -V16 > AutoApply_V16.cmm])
+  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h -V16 > include/rts/AutoApply_V16.cmm.h])
 fi
 
-AC_MSG_CHECKING([for AutoApply_V32.cmm])
-if $GENAPPLY include/DerivedConstants.h -V32 > AutoApply_V32.cmm; then
+AC_MSG_CHECKING([for include/rts/AutoApply_V32.cmm.h])
+if ${MKDIR_P} include/rts && $GENAPPLY include/DerivedConstants.h -V32 > include/rts/AutoApply_V32.cmm.h; then
   AC_MSG_RESULT([created])
 else
   AC_MSG_RESULT([failed to create])
-  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h -V32 > AutoApply_V32.cmm])
+  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h -V32 > include/rts/AutoApply_V32.cmm.h])
 fi
 
-AC_MSG_CHECKING([for AutoApply_V64.cmm])
-if $GENAPPLY include/DerivedConstants.h -V64 > AutoApply_V64.cmm; then
+AC_MSG_CHECKING([for include/rts/AutoApply_V64.cmm.h])
+if ${MKDIR_P} include/rts && $GENAPPLY include/DerivedConstants.h -V64 > include/rts/AutoApply_V64.cmm.h; then
   AC_MSG_RESULT([created])
 else
   AC_MSG_RESULT([failed to create])
-  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h -V64 > AutoApply_V64.cmm])
+  AC_MSG_ERROR([Failed to run $GENAPPLY include/DerivedConstants.h -V64 > include/rts/AutoApply_V64.cmm.h])
 fi
 
 AC_MSG_CHECKING([for include/rts/EventLogConstants.h])
-if mkdir -p include/rts && $PYTHON $srcdir/gen_event_types.py --event-types-defines include/rts/EventLogConstants.h; then
+if ${MKDIR_P} include/rts && $PYTHON $srcdir/gen_event_types.py --event-types-defines include/rts/EventLogConstants.h; then
   AC_MSG_RESULT([created])
 else
   AC_MSG_RESULT([failed to create])
@@ -576,7 +579,7 @@ else
 fi
 
 AC_MSG_CHECKING([for include/rts/EventTypes.h])
-if mkdir -p include/rts && $PYTHON $srcdir/gen_event_types.py --event-types-array include/rts/EventTypes.h; then
+if ${MKDIR_P} include/rts && $PYTHON $srcdir/gen_event_types.py --event-types-array include/rts/EventTypes.h; then
   AC_MSG_RESULT([created])
 else
   AC_MSG_RESULT([failed to create])

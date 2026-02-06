@@ -38,7 +38,6 @@ StgBool isThreadBound (StgTSO* tso);
 
 // Overflow/underflow
 void threadStackOverflow  (Capability *cap, StgTSO *tso);
-W_   threadStackUnderflow (Capability *cap, StgTSO *tso);
 
 bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);
 
@@ -51,3 +50,5 @@ void printThreadQueue (StgTSO *t);
 #endif
 
 #include "EndPrivate.h"
+
+W_   threadStackUnderflow (Capability *cap, StgTSO *tso);

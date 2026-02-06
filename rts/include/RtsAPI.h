@@ -311,6 +311,13 @@ extern void hs_init_with_rtsopts (int *argc, char **argv[]);
 extern void hs_init_ghc (int *argc, char **argv[],   // program arguments
                          RtsConfig rts_config);      // RTS configuration
 
+/*
+ * Get the address of stg_interp_constr*_entry for the given constructor tag.
+ * Tag must be in range 1-7. Used by the interpreter to create info tables.
+ * See Note [Getting stg_interp_constr entry points from the RTS] in RtsStartup.c.
+ */
+extern StgFunPtr getInterpConstrEntryAddr (int tag);
+
 extern void shutdownHaskellAndExit (int exitCode, int fastExit)
     STG_NORETURN;
 

@@ -96,3 +96,15 @@ source-repository-package
   type: git
   location: https://github.com/stable-haskell/hsc2hs.git
   tag: d07eea1260894ce5fe456f881fbc62366c9eb1b7
+
+-- Suppress -Werror for libffi-clib: its upstream C code produces warnings
+-- (e.g. implicit function declarations) that -Werror promotes to build failures.
+package libffi-clib
+  ghc-options: -optc-Wno-error
+
+--
+-- Program options
+--
+
+program-options
+  ghc-options: -fhide-source-paths -j

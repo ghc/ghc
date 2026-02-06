@@ -333,6 +333,33 @@ common rts-base-config
       rts-fs,
       rts
 
+common rts-cmm-sources-base
+    if !arch(javascript)
+      -- Note: These .cmm files are thin wrappers that #include the corresponding
+      -- .cmm.h files. This ensures each sublibrary compiles them with its own
+      -- flags (-DDEBUG, -DTHREADED_RTS, etc.) applied correctly.
+      cmm-sources:
+        AutoApply.cmm
+        AutoApply_V16.cmm
+
+      if arch(x86_64)
+        cmm-sources:
+          Jumps_V32.cmm (-mavx2)
+          Jumps_V64.cmm (-mavx512f)
+          AutoApply_V32.cmm (-mavx2)
+          AutoApply_V64.cmm (-mavx512f)
+      else
+        cmm-sources:
+          Jumps_V32.cmm
+          Jumps_V64.cmm
+          AutoApply_V32.cmm
+          AutoApply_V64.cmm
+
+    -- this is required so we don't have ghc inject ghc-internal (which depends on the rts)
+    -- during the build phase of this library.
+    ghc-options: -no-ghc-internal
+
+
 common rts-c-sources-base
     if !arch(javascript)
       cmm-sources:
@@ -600,44 +627,70 @@ common rts-link-options
          ld-options: -read_only_relocs warning
 
 common rts-global-build-flags
-    ghc-options: -optc-DCOMPILING_RTS
+    ghc-options: -DCOMPILING_RTS -optc-DCOMPILING_RTS
     cpp-options: -DCOMPILING_RTS
+    cmm-options: -DCOMPILING_RTS
+    cc-options:  -DCOMPILING_RTS
     if !flag(smp)
-       ghc-options: -optc-DNOSMP
+       ghc-options: -DNOSMP -optc-DNOSMP
        cpp-options: -DNOSMP
+       cmm-options: -DNOSMP
+       cc-options:  -DNOSMP
     if flag(dynamic)
-       ghc-options: -optc-DDYNAMIC
+       ghc-options: -DDYNAMIC -optc-DDYNAMIC
        cpp-options: -DDYNAMIC
+       cmm-options: -DDYNAMIC
+       cc-options:  -DDYNAMIC
     if flag(thread-sanitizer)
       cc-options: -fsanitize=thread
       ld-options: -fsanitize=thread
     if !flag(use-system-libffi)
        ghc-options: -optc-DINTERNAL_LIBFFI
        cpp-options: -DINTERNAL_LIBFFI
+       cc-options:  -DINTERNAL_LIBFFI
 
 common rts-debug-flags
-    ghc-options: -optc-DDEBUG
+    ghc-options: -DDEBUG -optc-DDEBUG
     cpp-options: -DDEBUG -fno-omit-frame-pointer -g3 -O0
+    cmm-options: -DDEBUG
+    cc-options:  -DDEBUG -fno-omit-frame-pointer -g3 -O0
 
 common rts-threaded-flags
-    ghc-options: -optc-DTHREADED_RTS
+    ghc-options: -DTHREADED_RTS -optc-DTHREADED_RTS
     cpp-options: -DTHREADED_RTS
+    cmm-options: -DTHREADED_RTS
+    cc-options:  -DTHREADED_RTS
 
 -- the _main_ library needs to deal with all the _configure_ time stuff.
 library
     ghc-options: -this-unit-id rts -ghcversion-file=include/ghcversion.h -optc-DFS_NAMESPACE=rts
     cmm-options: -this-unit-id rts
 
+    -- [The AutoApply story]
+    --
+    -- We use GenApply to generate the AutoApply[_V{16,32,64}].cmm files.
+    -- However cabal will run the ./configure script only for the main library.
+    -- To work around this shortcoming, we'll generate .cmm.h files (same
+    -- content as .cmm), and create AutoApply*.cmm files that just
+    --
+    --   #include <rts/AutoApply_...cmm.h>
+    --
+    -- This way each sublib has it's own properly parameterized .cmm file, while
+    -- we only generate them once and stick them into the rts library.
+    --
+    -- This is a hack, and it would be great if sublibs had access to their
+    -- parent libraries auto-gen folders, however as sublibs are supposed to be
+    -- separate components, this is a non-trivial (impossible?) task to resolve.
     autogen-includes:
       ghcautoconf.h
       ghcplatform.h
       DerivedConstants.h
       rts/EventLogConstants.h
       rts/EventTypes.h
-      rts/AutoApply.cmm.h
-      rts/AutoApply_V16.cmm.h
-      rts/AutoApply_V32.cmm.h
-      rts/AutoApply_V64.cmm.h
+      AutoApply.cmm.h
+      AutoApply_V16.cmm.h
+      AutoApply_V32.cmm.h
+      AutoApply_V64.cmm.h
 
     install-includes:
       ghcautoconf.h
@@ -645,10 +698,10 @@ library
       DerivedConstants.h
       rts/EventLogConstants.h
       rts/EventTypes.h
-      rts/AutoApply.cmm.h
-      rts/AutoApply_V16.cmm.h
-      rts/AutoApply_V32.cmm.h
-      rts/AutoApply_V64.cmm.h
+      AutoApply.cmm.h
+      AutoApply_V16.cmm.h
+      AutoApply_V32.cmm.h
+      AutoApply_V64.cmm.h
 
     install-includes:
       -- Common headers for non-JS builds
@@ -722,38 +775,8 @@ library
       rts-headers,
       rts-fs
 
-    if !arch(javascript)
-      -- FIXME: by virtue of being part of the rts main library, these do not get
-      -- the flags (debug, threaded, ...) as the sub libraries.  Thus we are
-      -- likely missing -DDEBUG, -DTHREADED_RTS, etc.
-      -- One solution to this would be to turn all of these into `.h` files, and
-      -- then have the `AutoApply.cmm` in `rts-c-sources-base` include them.  This
-      -- would mean they are included in the sublibraries which will in turn apply
-      -- the sublibrary specific (c)flags.
-      autogen-cmm-sources:
-        AutoApply.cmm
-        AutoApply_V16.cmm
-
-      if flag(use-system-libffi)
-         extra-libraries: ffi
-         extra-libraries-static: ffi
-      else
-         build-depends: libffi-clib
-
-      if arch(x86_64)
-        cmm-sources:
-          Jumps_V32.cmm (-mavx2)
-          Jumps_V64.cmm (-mavx512f)
-        autogen-cmm-sources:
-          AutoApply_V32.cmm (-mavx2)
-          AutoApply_V64.cmm (-mavx512f)
-      else
-        cmm-sources:
-          Jumps_V32.cmm
-          Jumps_V64.cmm
-        autogen-cmm-sources:
-          AutoApply_V32.cmm
-          AutoApply_V64.cmm
+    if !flag(use-system-libffi) && !arch(javascript)
+      build-depends: libffi-clib
 
 common ghcjs
     import: rts-base-config
@@ -801,15 +824,13 @@ library nonthreaded-nodebug
     if arch(javascript)
       import: ghcjs
     else
-      import: rts-base-config, rts-c-sources-base, rts-link-options, rts-global-build-flags
+      import: rts-base-config, rts-cmm-sources-base, rts-c-sources-base, rts-link-options, rts-global-build-flags
 
     visibility: public
-
-    ghc-options: -optc-DRtsWay="rts_v"
-
+    ghc-options: -optc-DRtsWay="v"
 
 library threaded-nodebug
-    import: rts-base-config, rts-c-sources-base, rts-link-options, rts-global-build-flags, rts-threaded-flags
+    import: rts-base-config, rts-cmm-sources-base, rts-c-sources-base, rts-link-options, rts-global-build-flags, rts-threaded-flags
     visibility: public
     build-depends: rts
     if arch(javascript)
@@ -818,7 +839,7 @@ library threaded-nodebug
     ghc-options: -optc-DRtsWay="rts_thr"
 
 library nonthreaded-debug
-    import: rts-base-config, rts-c-sources-base, rts-link-options, rts-global-build-flags, rts-debug-flags
+    import: rts-base-config, rts-cmm-sources-base, rts-c-sources-base, rts-link-options, rts-global-build-flags, rts-debug-flags
     visibility: public
     build-depends: rts
     if arch(javascript)
@@ -827,7 +848,7 @@ library nonthreaded-debug
     ghc-options: -optc-DRtsWay="rts_v_debug"
 
 library threaded-debug
-    import: rts-base-config, rts-c-sources-base, rts-link-options, rts-global-build-flags, rts-threaded-flags, rts-debug-flags
+    import: rts-base-config, rts-cmm-sources-base, rts-c-sources-base, rts-link-options, rts-global-build-flags, rts-threaded-flags, rts-debug-flags
     visibility: public
     build-depends: rts
     if arch(javascript)
