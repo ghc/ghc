@@ -194,7 +194,6 @@ void syncIOCancelPoll(Capability *cap, StgTSO *tso)
      * We don't put the TSO back on the run queue or change the why_blocked
      * status, as that is done by removeFromQueues (in the throwTo* functions).
      */
-    tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
 }
 
 

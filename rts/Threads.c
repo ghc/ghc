@@ -97,8 +97,8 @@ createThread(Capability *cap, W_ size)
 
     // Always start with the compiled code evaluator
     tso->what_next = ThreadRunGHC;
-    tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
-    tso->why_blocked  = NotBlocked;
+    tso->block_info.prev = END_TSO_QUEUE;
+    tso->why_blocked = NotBlocked;
     tso->blocked_exceptions = END_BLOCKED_EXCEPTIONS_QUEUE;
     tso->bq = (StgBlockingQueue *)END_TSO_QUEUE;
     tso->flags = 0;
@@ -295,7 +295,6 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
     case BlockedOnMVarRead:
     {
         if (tso->_link == END_TSO_QUEUE) {
-            tso->block_info.closure = (StgClosure*)END_TSO_QUEUE;
             goto unblock;
         } else {
             return;
