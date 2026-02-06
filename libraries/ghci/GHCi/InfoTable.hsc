@@ -19,7 +19,10 @@ import Foreign
 import Foreign.C
 import GHC.Ptr
 import GHC.Exts
+#ifndef BOOTSTRAPPING
 import GHC.Exts.Heap
+import System.IO.Unsafe (unsafePerformIO)
+#endif
 import Data.ByteString (ByteString)
 import Control.Monad.Fail
 import qualified Data.ByteString as BS
@@ -258,26 +261,43 @@ byte7 w = fromIntegral (w `shiftR` 56)
 
 
 -- -----------------------------------------------------------------------------
--- read & write intfo tables
+-- read & write info tables
 
--- entry point for direct returns for created constr itbls
-foreign import ccall "&stg_interp_constr1_entry" stg_interp_constr1_entry :: EntryFunPtr
-foreign import ccall "&stg_interp_constr2_entry" stg_interp_constr2_entry :: EntryFunPtr
-foreign import ccall "&stg_interp_constr3_entry" stg_interp_constr3_entry :: EntryFunPtr
-foreign import ccall "&stg_interp_constr4_entry" stg_interp_constr4_entry :: EntryFunPtr
-foreign import ccall "&stg_interp_constr5_entry" stg_interp_constr5_entry :: EntryFunPtr
-foreign import ccall "&stg_interp_constr6_entry" stg_interp_constr6_entry :: EntryFunPtr
-foreign import ccall "&stg_interp_constr7_entry" stg_interp_constr7_entry :: EntryFunPtr
+-- Note [Dynamic lookup of stg_interp_constr entry points]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We need to look up stg_interp_constr*_entry symbols dynamically at runtime
+-- rather than using static FFI imports. Here's why:
+--
+-- In DYNAMIC=1 builds, libHSghci.so might be linked against a different copy
+-- of libHSrts.so than what ghc-iserv uses at runtime.
+-- Static FFI imports (foreign import ccall "&symbol") are resolved at library
+-- load time, BEFORE the RTS has promoted boot libraries to RTLD_GLOBAL via
+-- promoteBootLibrariesToGlobal().
+--
+-- If libHSghci.so's NEEDED entry references a different copy of libHSrts.so
+-- than what ghc-iserv uses at runtime, the FFI imports would resolve to the
+-- wrong RTS copy. When mkConInfoTable creates info tables with jump
+-- code pointing to the wrong RTS's entry points, GC crashes occur because
+-- the closures reference invalid addresses.
+--
+-- The fix: Use an RTS function (getInterpConstrEntryAddr) that returns the
+-- addresses directly from the running RTS. This is called at runtime after
+-- promoteBootLibrariesToGlobal() has run, ensuring we get the correct RTS.
+--
+-- | RTS function to get stg_interp_constr*_entry address.
+-- This returns the address directly from the running RTS, avoiding any
+-- symbol resolution issues from library loading order.
+foreign import ccall unsafe "getInterpConstrEntryAddr"
+  getInterpConstrEntryAddr :: CInt -> IO (FunPtr a)
 
+-- | Cached interpreter constructor entry points.
+-- Uses a CAF (NOINLINE + unsafePerformIO) to ensure the lookup
+-- happens once, after RTS init (when promoteBootLibrariesToGlobal has run).
+{-# NOINLINE interpConstrEntry #-}
 interpConstrEntry :: [EntryFunPtr]
-interpConstrEntry = [ error "pointer tag 0"
-                    , stg_interp_constr1_entry
-                    , stg_interp_constr2_entry
-                    , stg_interp_constr3_entry
-                    , stg_interp_constr4_entry
-                    , stg_interp_constr5_entry
-                    , stg_interp_constr6_entry
-                    , stg_interp_constr7_entry ]
+interpConstrEntry = unsafePerformIO $ do
+  entries <- mapM (\n -> getInterpConstrEntryAddr (fromIntegral n)) [1..7]
+  return (error "pointer tag 0" : entries)
 
 data StgConInfoTable = StgConInfoTable {
    conDesc   :: Ptr Word8,

@@ -1332,27 +1332,49 @@ restriction very easily.
 -- ("/usr/lib/libfoo.so"), or unqualified ("libfoo.so").  In the latter case,
 -- loadDLL is going to search the system paths to find the library.
 load_dyn :: Interp -> HscEnv -> Bool -> FilePath -> IO (Maybe (RemotePtr LoadedDLL))
-load_dyn interp hsc_env crash_early dll = do
-  r <- loadDLL interp dll
-  case r of
-    Right loaded_dll -> pure (Just loaded_dll)
-    Left err ->
-      if crash_early
-        then cmdLineErrorIO err
-        else do
-          when (diag_wopt Opt_WarnMissedExtraSharedLib diag_opts)
-            $ logMsg logger
-                (mkMCDiagnostic diag_opts (WarningWithFlag Opt_WarnMissedExtraSharedLib) Nothing)
-                  noSrcSpan $ withPprStyle defaultUserStyle (note err)
-          pure Nothing
+load_dyn interp hsc_env crash_early dll
+  -- See Note [Skip loading libc/libm on Unix]
+  -- Skip loading fundamental system libraries that are always linked into the process.
+  -- On some systems, loading these via dlopen can load a different version than what
+  -- the interpreter is linked against, causing memory corruption.
+  | isAlwaysLinkedLib platform dll = pure Nothing
+  | otherwise = do
+      r <- loadDLL interp dll
+      case r of
+        Right loaded_dll -> pure (Just loaded_dll)
+        Left err ->
+          if crash_early
+            then cmdLineErrorIO err
+            else do
+              when (diag_wopt Opt_WarnMissedExtraSharedLib diag_opts)
+                $ logMsg logger
+                    (mkMCDiagnostic diag_opts (WarningWithFlag Opt_WarnMissedExtraSharedLib) Nothing)
+                      noSrcSpan $ withPprStyle defaultUserStyle (note err)
+              pure Nothing
   where
-    diag_opts = initDiagOpts (hsc_dflags hsc_env)
+    dflags = hsc_dflags hsc_env
+    platform = targetPlatform dflags
+    diag_opts = initDiagOpts dflags
     logger = hsc_logger hsc_env
     note err = vcat $ map text
       [ err
       , "It's OK if you don't want to use symbols from it directly."
       , "(the package DLL is loaded by the system linker"
       , " which manages dependencies by itself)." ]
+
+-- | Check if a library name refers to a fundamental system library that is
+-- always linked into any process. On Unix, libc, libm, libpthread, libdl, and
+-- librt are always available. We skip loading these to avoid loading a second
+-- copy (which can happen on systems where the dynamic linker finds a different
+-- version than what was linked).
+isAlwaysLinkedLib :: Platform -> FilePath -> Bool
+isAlwaysLinkedLib platform dll
+  | platformOS platform == OSMinGW32 = False  -- Windows handles this differently
+  | otherwise = baseName `elem` alwaysLinkedLibs
+  where
+    -- Extract base library name from paths like "libc.so", "libc.so.6", "/path/to/libc.so.6"
+    baseName = takeBaseName $ takeFileName dll
+    alwaysLinkedLibs = ["libc", "libm", "libpthread", "libdl", "librt"]
 
 loadFrameworks :: Interp -> Platform -> UnitInfo -> IO ()
 loadFrameworks interp platform pkg

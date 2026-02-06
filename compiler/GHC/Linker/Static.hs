@@ -5,10 +5,12 @@ where
 
 import GHC.Prelude
 import GHC.Platform
+import GHC.Platform.Ways
 import GHC.Settings
 
 import GHC.SysTools
 import GHC.SysTools.Ar
+import GHC.SysTools.Tasks (configureRanlib, runRanlib)
 
 import GHC.Unit.Env
 import GHC.Unit.Types
@@ -81,5 +83,4 @@ linkStaticLib logger dflags unit_env o_files dep_units = do
     else writeBSDAr output_fn $ afilter (not . isBSDSymdef) ar
 
   -- run ranlib over the archive. write*Ar does *not* create the symbol index.
-  let ranlib_opts = configureRanlib dflags
-  runRanlib logger ranlib_opts [GHC.SysTools.FileOption "" output_fn]
+  runRanlib logger (configureRanlib dflags) [GHC.SysTools.FileOption "" output_fn]

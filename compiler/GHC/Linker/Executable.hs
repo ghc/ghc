@@ -3,6 +3,8 @@ module GHC.Linker.Executable
    ( linkExecutable
    , ExecutableLinkOpts (..)
    , initExecutableLinkOpts
+   , mkExtraObjToLinkIntoBinary
+   , mkNoteObjsToLinkIntoBinary
    -- RTS Opts
    , RtsOptsEnabled (..)
    -- * Link info
@@ -289,6 +291,15 @@ linkExecutable logger tmpfs opts unit_env o_files dep_units = do
                  ++ (if linkerIsGnuLd (leLinkerConfig opts) &&
                         not (leWholeArchiveHsLibs opts)
                      then ["-Wl,--gc-sections"]
+                     else [])
+
+                 -- See Note [Export dynamic symbols for GHC API programs]
+                 ++ (if leLinkMode opts /= FullyStatic &&
+                        any ((== "ghc") . unitPackageNameString) pkgs
+                     then case platformOS platform of
+                            os | osElfTarget os -> ["-rdynamic"]
+                            OSDarwin -> ["-Wl,-flat_namespace"]
+                            _ -> []
                      else [])
 
                  ++ o_files
@@ -604,5 +615,29 @@ Buck, the build system, produces paths with commas in them.
 -Xlinker doesn't have this disadvantage and as far as I can tell
 it is supported by both gcc and clang. Anecdotally nvcc supports
 -Xlinker, but not -Wl.
+-}
+
+{-
+Note [Export dynamic symbols for GHC API programs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Programs linking against the ghc package need to export symbols from
+the RTS to dynamically loaded libraries. When running GHCi or Template
+Haskell, these programs load Haskell shared libraries via dlopen() that
+reference RTS symbols like stg_INTLIKE_closure. Without exporting these
+symbols from the executable, dlopen will fail with "undefined symbol".
+
+Platform-specific solutions:
+  Linux/FreeBSD: -rdynamic (passes --export-dynamic to ld)
+  macOS: -flat_namespace (makes all symbols visible across namespaces)
+  Windows: not needed (--enable-auto-import handles this)
+
+We apply this unconditionally for non-static executables linking against the
+ghc package, regardless of whether -dynamic is passed. This is because the
+GHC API may load shared libraries at runtime (via dlopen) even when the
+executable itself wasn't compiled with -dynamic. We only skip this for
+FullyStatic executables since they won't be loading dynamic libraries.
+
+This is the same issue that ghc-iserv faces, and is documented in
+utils/ghc-iserv/ghc-iserv.cabal.in as Note [ghc-iserv and dynamic symbol export].
 -}
 

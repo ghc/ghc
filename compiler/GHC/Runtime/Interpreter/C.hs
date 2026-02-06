@@ -69,13 +69,21 @@ generateIservC logger tmpfs opts unit_env = do
           -- need it there's no alternative.
           --
           -- The Solaris linker does not support --export-dynamic option. It also
-          -- does not need it since it exports all dynamic symbols by default
+          -- does not need it since it exports all dynamic symbols by default.
+          --
+          -- On Darwin, -flat_namespace is needed so that the iserv process can
+          -- resolve symbols from dynamically loaded objects against its own
+          -- symbol table.
         , leLinkerConfig = if
             | osElfTarget os
             , os /= OSFreeBSD
             , os /= OSSolaris2
             -> (leLinkerConfig opts)
                 { linkerOptionsPost = linkerOptionsPost (leLinkerConfig opts) ++ [Option "-Wl,--export-dynamic"]
+                }
+            | os == OSDarwin
+            -> (leLinkerConfig opts)
+                { linkerOptionsPost = linkerOptionsPost (leLinkerConfig opts) ++ [Option "-Wl,-flat_namespace"]
                 }
             | otherwise
             -> leLinkerConfig opts

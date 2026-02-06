@@ -1625,8 +1625,79 @@ mkUnitState logger cfg = do
   -- it modifies the unit ids of wired in packages, but when we process
   -- package arguments we need to key against the old versions.
   --
-  (pkgs2, wired_map) <- findWiredInUnits logger prec_map pkgs1 vis_map2
-  let pkg_db = mkUnitInfoMap pkgs2
+  let wired_ids_all = rtsWayUnitId dflags : wiredInUnitIds
+      wired_ids
+        | gopt Opt_NoGhcInternal dflags = filter (/= ghcInternalUnitId) wired_ids_all
+        | otherwise                     = wired_ids_all
+  (pkgs2, wired_map) <- findWiredInUnits logger wired_ids prec_map pkgs1 vis_map2
+
+  --
+  -- Sanity check. If the rtsWayUnitId is not in the database, then we have a
+  -- problem.  The RTS is effectively missing.
+  unless (null pkgs1 || gopt Opt_NoRts dflags || anyUniqMap (== rtsWayUnitId dflags) wired_map) $ do
+    pprPanic "mkUnitState" $
+      vcat
+        [ text "debug details:"
+        , nest 2 $ vcat
+            [ text "pkgs1_count =" <+> ppr (length pkgs1)
+            , text "Opt_NoRts   =" <+> ppr (gopt Opt_NoRts dflags)
+            , text "Opt_NoGhcInternal =" <+> ppr (gopt Opt_NoGhcInternal dflags)
+            , text "ghcLink     =" <+> text (show (ghcLink dflags))
+            , text "platform    =" <+> text (show (targetPlatform dflags))
+            , text "rtsWayUnitId=" <+> ppr (rtsWayUnitId dflags)
+            , text "has_rts     =" <+> ppr (anyUniqMap (== rtsWayUnitId dflags) wired_map)
+            , text "wired_map   =" <+> ppr wired_map
+            , text "pkgs1 units (pre-wiring):" $$ nest 2 (pprWithCommas (\p -> ppr (unitId p) <+> parens (ppr (unitPackageName p))) pkgs1)
+            , text "pkgs2 units (post-wiring):" $$ nest 2 (pprWithCommas (\p -> ppr (unitId p) <+> parens (ppr (unitPackageName p))) pkgs2)
+            ]
+        ]
+      <> text "; The RTS for " <> ppr (rtsWayUnitId dflags)
+      <> text " is missing from the package database while building unit "
+      <> ppr (homeUnitId_ dflags)
+      <> text " (home units: " <> ppr (Set.toList (unitConfigHomeUnits cfg)) <> text ")."
+      <> text " Please check your installation."
+      <> text " If this target doesn't need the RTS (e.g. building a shared library), you can add -no-rts to the relevant package's ghc-options in cabal.project to bypass this check."
+
+  let pkgs3 = if gopt Opt_NoGhcInternal dflags
+         then pkgs2
+         else if gopt Opt_NoRts dflags && not (anyUniqMap (== ghcInternalUnitId) wired_map)
+              then pkgs2
+              else
+              -- At this point we should have `ghcInternalUnitId`, and the `rtsWiredUnitId dflags`.
+              -- The graph looks something like this:
+              --  ghc-internal
+              --    '- rtsWayUnitId dflags
+              --       '- rts ...
+              -- Notably the rtsWayUnitId is chosen by GHC _after_ the build plan by e.g. cabal
+              -- has been constructed.  We still need to ensure that ordering when linking
+              -- is correct. As such we'll manually make rtsWayUnitId dflags a dependency
+              -- of ghcInternalUnitId.
+
+              -- pkgs2: [UnitInfo] = [GenUnitInfo UnitId] = [GenericUnitInfo PackageId PackageName UnitId ModuleName (GenModule (GenUnit UnitId))]
+              -- GenericUnitInfo { unitId: UnitId, ..., unitAbiHash: ShortText, unitDepends: [UnitId], unitAbiDepends: [(UnitId, ShortText)], ... }
+              -- ghcInternalUnitId: UnitId
+              -- rtsWayUnitId dflags: UnitId
+                let rtsWayUnitIdHash = case [ unitAbiHash pkg | pkg <- pkgs2
+                                            , unitId pkg == rtsWayUnitId dflags] of
+                                            [] -> panic "rtsWayUnitId not found in wired-in packages"
+                                            [x] -> x
+                                            _ -> panic "rtsWayUnitId found multiple times in wired-in packages"
+                    ghcInternalUnit = case [ pkg | pkg <- pkgs2
+                                          , unitId pkg == ghcInternalUnitId ] of
+                                          [] -> panic "ghcInternalUnitId not found in wired-in packages"
+                                          [x] -> x
+                                          _ -> panic "ghcInternalUnitId found multiple times in wired-in packages"
+
+                    -- update ghcInternalUnit to depend on rtsWayUnitId dflags
+                    ghcInternalUnit' = ghcInternalUnit
+                      { unitDepends = rtsWayUnitId dflags : unitDepends ghcInternalUnit
+                      , unitAbiDepends = (rtsWayUnitId dflags, rtsWayUnitIdHash) : unitAbiDepends ghcInternalUnit
+                      }
+                in map (\pkg -> if unitId pkg == ghcInternalUnitId
+                                  then ghcInternalUnit'
+                                  else pkg) pkgs2
+
+  let pkg_db = mkUnitInfoMap pkgs3
 
   -- Update the visibility map, so we treat wired packages as visible.
   let vis_map = updateVisibilityMap wired_map vis_map2
