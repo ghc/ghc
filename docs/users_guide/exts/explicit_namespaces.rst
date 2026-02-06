@@ -86,7 +86,7 @@ However, how would one import only the data constructor? There are two options: 
   import Data.Proxy (data Proxy)     -- imports the data constructor only
   import Data.Proxy (pattern Proxy)  -- imports the data constructor only
 
-The ``data`` keyword enables the import or export a data constructor without its
+The ``data`` keyword allows a data constructor to be imported or exported without its
 parent type constructor.
 
 The ``pattern`` keyword does the same, with only a few differences:
