@@ -52,27 +52,30 @@
 #include <sys/tls.h>
 #endif
 
-/* on x86_64 we have a problem with relocating symbol references in
- * code that was compiled without -fPIC.  By default, the small memory
- * model is used, which assumes that symbol references can fit in a
- * 32-bit slot.  The system dynamic linker makes this work for
- * references to shared libraries by either (a) allocating a jump
- * table slot for code references, or (b) moving the symbol at load
- * time (and copying its contents, if necessary) for data references.
+/* On x86_64, relocating symbol references in code compiled without -fPIC
+ * requires special handling. The small memory model assumes symbol references
+ * fit in a 32-bit slot. When a reference to a symbol in a shared library
+ * exceeds this range, we can use a hack (enabled by X86_64_ELF_NONPIC_HACK)
+ * which consists in generating "jump islands" (trampolines) for code references
+ * (this happens in makeSymbolExtra()).
  *
- * We unfortunately can't tell whether symbol references are to code
- * or data.  So for now we assume they are code (the vast majority
- * are), and allocate jump-table slots.  Unfortunately this will
- * SILENTLY generate crashing code for data references.  This hack is
- * enabled by X86_64_ELF_NONPIC_HACK.
+ * For FUNCTION symbols (STT_FUNC), jump islands work correctly: the call
+ * bounces through the trampoline to reach the real function.
  *
- * One workaround is to use shared Haskell libraries. This is the case
- * when dynamically-linked GHCi is used.
+ * For DATA symbols (STT_OBJECT, STT_NOTYPE), jump islands are INCORRECT:
+ * the jump island address would be embedded as a data pointer (e.g., an info
+ * table pointer in a closure), causing the GC to interpret jump island memory
+ * as a valid info table — leading to "strange closure type" crashes.
  *
- * Another workaround is to keep the static libraries but compile them
- * with -fPIC -fexternal-dynamic-refs, because that will generate PIC
- * references to data which can be relocated. This is the case when
- * +RTS -xp is passed.
+ * We detect data references using ELF_ST_TYPE(sym.st_info) from the symbol
+ * table. When a non-function symbol overflows 32-bit range, we emit a clear
+ * error message instead of silently creating a corrupt jump island.
+ *
+ * Workarounds for data reference overflow:
+ *   - Use shared Haskell libraries (dynamically-linked GHCi)
+ *   - Compile with -fPIC -fexternal-dynamic-refs (generates GOT-based
+ *     relocations that can handle arbitrary distances)
+ *   - Use +RTS -xp (maps loaded objects into low memory)
  *
  * See bug #781
  * See thread http://www.haskell.org/pipermail/cvs-ghc/2007-September/038458.html
@@ -88,6 +91,28 @@
  *                  or defined explicitly
  * Sym*_NeedsProto: the symbol is undefined and we add a dummy
  *                  default proto extern void sym(void);
+ */
+/* Note [X86_64_ELF_NONPIC_HACK and data references]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * When a relocation overflows 32-bit range, X86_64_ELF_NONPIC_HACK creates
+ * a "jump island" (trampoline) via makeSymbolExtra(). The SymbolExtra struct
+ * (see rts/LinkerInternals.h) on x86_64 contains:
+ *
+ *   struct { uint64_t addr; uint8_t jumpIsland[8]; }
+ *
+ * where jumpIsland = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF, 0x00, 0x00 }
+ * is a `jmp *-14(%rip)` instruction that reads `addr` to reach the real symbol.
+ *
+ * For FUNCTION references (call/jmp targets), this works: the call bounces
+ * through the trampoline. For DATA references (e.g., info table pointers like
+ * _con_info), the jump island address gets embedded as a data pointer. When
+ * the GC later follows this pointer, it finds the jump island bytes instead
+ * of a valid info table, causing a "strange closure type" crash.
+ *
+ * We detect data references using ELF_ST_TYPE() on the symbol table entry.
+ * Symbols with type STT_FUNC get the jump island treatment. All other types
+ * (STT_OBJECT, STT_NOTYPE — which includes GHC's _con_info symbols) trigger
+ * a clear error message directing the user to recompile with -fPIC.
  */
 #define X86_64_ELF_NONPIC_HACK (!RtsFlags.MiscFlags.linkerAlwaysPic)
 
@@ -1765,6 +1790,21 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       {
           StgInt64 off = value - P;
           if (off != (Elf64_Sword)off && X86_64_ELF_NONPIC_HACK) {
+              /* Check symbol type: jump islands only work for code (functions).
+               * For data references (STT_OBJECT, STT_NOTYPE), the jump island
+               * address would be used as a data pointer (e.g., info table pointer),
+               * causing GC crashes ("strange closure type").
+               * See Note [X86_64_ELF_NONPIC_HACK and data references] */
+              unsigned char symtype = ELF_ST_TYPE(stab[ELF_R_SYM(info)].st_info);
+              if (symtype != STT_FUNC) {
+                  errorBelch(
+                      "R_X86_64_PC32 overflow for non-function symbol `%s' "
+                      "(type %d, distance 0x%" PRIx64 ").\n"
+                      "    Jump islands only work for code, not data references.\n"
+                      "    Recompile %s with -fPIC -fexternal-dynamic-refs.",
+                      symbol, symtype, (uint64_t)(value - P), oc->fileName);
+                  return 0;
+              }
               StgInt64 pltAddress =
                   (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
                                             -> jumpIsland;
@@ -1792,6 +1832,17 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       case COMPAT_R_X86_64_32:
       {
           if (value != (Elf64_Word)value && X86_64_ELF_NONPIC_HACK) {
+              /* See Note [X86_64_ELF_NONPIC_HACK and data references] */
+              unsigned char symtype = ELF_ST_TYPE(stab[ELF_R_SYM(info)].st_info);
+              if (symtype != STT_FUNC) {
+                  errorBelch(
+                      "R_X86_64_32 overflow for non-function symbol `%s' "
+                      "(type %d, value 0x%" PRIx64 ").\n"
+                      "    Jump islands only work for code, not data references.\n"
+                      "    Recompile %s with -fPIC -fexternal-dynamic-refs.",
+                      symbol, symtype, (uint64_t)value, oc->fileName);
+                  return 0;
+              }
               StgInt64 pltAddress =
                   (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
                                             -> jumpIsland;
@@ -1812,6 +1863,17 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       case COMPAT_R_X86_64_32S:
       {
           if ((StgInt64)value != (Elf64_Sword)value && X86_64_ELF_NONPIC_HACK) {
+              /* See Note [X86_64_ELF_NONPIC_HACK and data references] */
+              unsigned char symtype = ELF_ST_TYPE(stab[ELF_R_SYM(info)].st_info);
+              if (symtype != STT_FUNC) {
+                  errorBelch(
+                      "R_X86_64_32S overflow for non-function symbol `%s' "
+                      "(type %d, value 0x%" PRIx64 ").\n"
+                      "    Jump islands only work for code, not data references.\n"
+                      "    Recompile %s with -fPIC -fexternal-dynamic-refs.",
+                      symbol, symtype, (uint64_t)value, oc->fileName);
+                  return 0;
+              }
               StgInt64 pltAddress =
                   (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
                                             -> jumpIsland;

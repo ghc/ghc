@@ -167,9 +167,25 @@ try_again:
 #endif
 
    const int dlopen_mode = load_now ? RTLD_NOW : RTLD_LAZY;
+
+   IF_DEBUG(linker, debugBelch("loadNativeObj: about to dlopen %" PATH_FMT "\n", path));
+   IF_DEBUG(linker, debugBelch("loadNativeObj: mode = %s|RTLD_LOCAL\n",
+              load_now ? "RTLD_NOW" : "RTLD_LAZY"));
+
    hdl = dlopen(path, dlopen_mode|RTLD_LOCAL); /* see Note [RTLD_LOCAL] */
    nc->dlopen_handle = hdl;
    nc->status = OBJECT_READY;
+
+   // Save dlerror immediately - it can only be retrieved once
+   const char *dl_err = hdl ? NULL : dlerror();
+
+   IF_DEBUG(linker,
+       if (hdl) {
+           debugBelch("loadNativeObj: dlopen succeeded, handle=%p\n", hdl);
+       } else {
+           debugBelch("loadNativeObj: dlopen failed: %s\n", dl_err ? dl_err : "(unknown)");
+       }
+   );
 
 #if defined(PROFILING)
    RELEASE_LOCK(&ccs_mutex);
@@ -184,7 +200,7 @@ try_again:
        goto try_again;
      } else {
        /* dlopen failed; save the message in errmsg */
-       copyErrmsg(errmsg, dlerror());
+       copyErrmsg(errmsg, (char*)dl_err);
        goto dlopen_fail;
      }
    }

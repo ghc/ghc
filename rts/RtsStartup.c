@@ -6,6 +6,12 @@
  *
  * ---------------------------------------------------------------------------*/
 
+/* _GNU_SOURCE needed for RTLD_NOLOAD on some Linux/glibc configurations.
+ * Must be defined before any headers are included. */
+#if !defined(mingw32_HOST_OS) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
+
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "HsFFI.h"
@@ -69,6 +75,173 @@
 #if defined(HAVE_LOCALE_H)
 #include <locale.h>
 #endif
+
+/*
+ * Note [Promoting Boot Libraries to RTLD_GLOBAL]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Boot libraries (ghc-internal, RTS) are loaded by the system linker at
+ * program startup with RTLD_LOCAL (default). When user code is later
+ * dlopen'd, the dynamic linker can't see these existing copies and loads
+ * FRESH copies, causing duplicate global state.
+ *
+ * With ghc-internal, this causes GC crashes ("strange closure type")
+ * because the RTS's ghc_hs_iface pointer references info tables from
+ * the first copy, while user code uses info tables from the second copy.
+ *
+ * With the RTS, dynamically created info tables (from mkConInfoTable in
+ * GHCi) contain jumps to stg_interp_constr*_entry. These RTS symbols must
+ * be visible to dlopen'd code, otherwise the info table pointers become
+ * invalid when the RTS is loaded as a separate copy.
+ *
+ * Fix: Promote boot libraries to RTLD_GLOBAL scope early in RTS init,
+ * before any user code can trigger dlopen.
+ *
+ * This is a no-op on:
+ * - Windows (different linking model)
+ * - Systems without RTLD_NOLOAD
+ * - Static executables (symbols already global)
+ */
+#if !defined(mingw32_HOST_OS)
+#include <dlfcn.h>
+#endif
+
+#if !defined(mingw32_HOST_OS) && defined(RTLD_NOLOAD)
+/* Helper to promote a single library to RTLD_GLOBAL */
+static void promoteLibraryToGlobal(const char* name, void* symbol)
+{
+    Dl_info info;
+    if (dladdr(symbol, &info) && info.dli_fname) {
+        void* handle = dlopen(info.dli_fname, RTLD_NOW | RTLD_NOLOAD | RTLD_GLOBAL);
+        IF_DEBUG(linker,
+            if (handle) {
+                debugBelch("RTS: promoted %s (%s) to RTLD_GLOBAL\n",
+                           name, info.dli_fname);
+            }
+        );
+        (void)handle;
+    }
+}
+
+static void promoteBootLibrariesToGlobal(void)
+{
+    extern void init_ghc_hs_iface(void);
+
+    /* Promote ghc-internal - contains GHC API info tables */
+    promoteLibraryToGlobal("ghc-internal", (void*)&init_ghc_hs_iface);
+
+    /* Promote the RTS - contains stg_interp_constr*_entry and other RTS symbols
+     * that dynamically created info tables need to reference.
+     * This is essential for ghci-ext tests in DYNAMIC=1 builds. */
+    promoteLibraryToGlobal("libHSrts", (void*)&hs_init);
+}
+#endif
+
+/*
+ * Note [Getting stg_interp_constr entry points from the RTS]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The interpreter needs the addresses of stg_interp_constr*_entry symbols
+ * when creating info tables for dynamically loaded constructors.
+ *
+ * Previously, libHSghci used FFI imports to get these addresses:
+ *   foreign import ccall "&stg_interp_constr1_entry" ...
+ *
+ * However, FFI imports are resolved at library load time, BEFORE
+ * promoteBootLibrariesToGlobal() runs. On systems where libraries have
+ * unique absolute paths in their NEEDED entries, libHSghci might resolve
+ * these symbols to a different copy of libHSrts than the one ghc-iserv
+ * uses at runtime.
+ *
+ * Simply moving the address lookup to an RTS function doesn't help either,
+ * because the FFI import of getInterpConstrEntryAddr itself would also be
+ * resolved at load time to the wrong RTS copy!
+ *
+ * The fix: Use dlsym(RTLD_DEFAULT, ...) to look up symbols from the
+ * RTLD_GLOBAL namespace at runtime. After promoteBootLibrariesToGlobal()
+ * has run, RTLD_DEFAULT will find the symbols in the correct RTS.
+ *
+ * Note: On non-dynamic builds, we fall back to static symbol references
+ * since dlopen/dlsym might not be available or the symbols aren't exported.
+ */
+
+#if !defined(mingw32_HOST_OS) && defined(DYNAMIC)
+#include <dlfcn.h>
+
+/* Cache for dynamic symbol lookups */
+static StgFunPtr cached_interp_constr_entry[8] = {NULL};
+static bool interp_constr_entry_cached = false;
+
+static void cacheInterpConstrEntries(void)
+{
+    if (interp_constr_entry_cached) return;
+
+    /* Look up symbols from RTLD_DEFAULT (global namespace) */
+    cached_interp_constr_entry[1] = (StgFunPtr)dlsym(RTLD_DEFAULT, "stg_interp_constr1_entry");
+    cached_interp_constr_entry[2] = (StgFunPtr)dlsym(RTLD_DEFAULT, "stg_interp_constr2_entry");
+    cached_interp_constr_entry[3] = (StgFunPtr)dlsym(RTLD_DEFAULT, "stg_interp_constr3_entry");
+    cached_interp_constr_entry[4] = (StgFunPtr)dlsym(RTLD_DEFAULT, "stg_interp_constr4_entry");
+    cached_interp_constr_entry[5] = (StgFunPtr)dlsym(RTLD_DEFAULT, "stg_interp_constr5_entry");
+    cached_interp_constr_entry[6] = (StgFunPtr)dlsym(RTLD_DEFAULT, "stg_interp_constr6_entry");
+    cached_interp_constr_entry[7] = (StgFunPtr)dlsym(RTLD_DEFAULT, "stg_interp_constr7_entry");
+
+    interp_constr_entry_cached = true;
+}
+
+/*
+ * Get the address of stg_interp_constr*_entry for the given constructor tag.
+ * Tag must be in range 1-7.
+ *
+ * Uses dlsym(RTLD_DEFAULT, ...) to look up symbols from the global namespace,
+ * ensuring we get the correct addresses from the RTS that was promoted to
+ * RTLD_GLOBAL by promoteBootLibrariesToGlobal().
+ */
+StgFunPtr getInterpConstrEntryAddr(int tag)
+{
+    if (tag < 1 || tag > 7) {
+        barf("getInterpConstrEntryAddr: invalid tag %d (must be 1-7)", tag);
+    }
+
+    cacheInterpConstrEntries();
+
+    StgFunPtr result = cached_interp_constr_entry[tag];
+    if (result == NULL) {
+        barf("getInterpConstrEntryAddr: dlsym failed for stg_interp_constr%d_entry", tag);
+    }
+    return result;
+}
+
+#else /* Non-dynamic builds or Windows */
+
+/* Declare the stg_interp_constr*_entry symbols */
+extern StgFunPtr stg_interp_constr1_entry(void);
+extern StgFunPtr stg_interp_constr2_entry(void);
+extern StgFunPtr stg_interp_constr3_entry(void);
+extern StgFunPtr stg_interp_constr4_entry(void);
+extern StgFunPtr stg_interp_constr5_entry(void);
+extern StgFunPtr stg_interp_constr6_entry(void);
+extern StgFunPtr stg_interp_constr7_entry(void);
+
+/*
+ * Get the address of stg_interp_constr*_entry for the given constructor tag.
+ * Tag must be in range 1-7.
+ *
+ * Non-dynamic version uses static symbol references.
+ */
+StgFunPtr getInterpConstrEntryAddr(int tag)
+{
+    switch (tag) {
+        case 1: return (StgFunPtr)&stg_interp_constr1_entry;
+        case 2: return (StgFunPtr)&stg_interp_constr2_entry;
+        case 3: return (StgFunPtr)&stg_interp_constr3_entry;
+        case 4: return (StgFunPtr)&stg_interp_constr4_entry;
+        case 5: return (StgFunPtr)&stg_interp_constr5_entry;
+        case 6: return (StgFunPtr)&stg_interp_constr6_entry;
+        case 7: return (StgFunPtr)&stg_interp_constr7_entry;
+        default:
+            barf("getInterpConstrEntryAddr: invalid tag %d (must be 1-7)", tag);
+    }
+}
+
+#endif /* DYNAMIC */
 
 // Count of how many outstanding hs_init()s there have been.
 static StgWord hs_init_count = 0;
@@ -266,6 +439,12 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     setlocale(LC_CTYPE,"");
 
     init_ghc_hs_iface();
+
+#if !defined(mingw32_HOST_OS) && defined(RTLD_NOLOAD)
+    /* Promote boot libraries to RTLD_GLOBAL for dynamic code loading.
+     * See Note [Promoting Boot Libraries to RTLD_GLOBAL] */
+    promoteBootLibrariesToGlobal();
+#endif
 
     /* Initialise the stats department, phase 0 */
     initStats0();

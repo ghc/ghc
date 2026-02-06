@@ -576,6 +576,7 @@ extern char **environ;
       SymI_HasProto(hs_init)                                            \
       SymI_HasProto(hs_init_with_rtsopts)                               \
       SymI_HasProto(hs_init_ghc)                                        \
+      SymI_HasProto(getInterpConstrEntryAddr)                           \
       SymI_HasProto(hs_exit)                                            \
       SymI_HasProto(hs_exit_nowait)                                     \
       SymI_HasProto(hs_set_argv)                                        \
