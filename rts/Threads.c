@@ -366,6 +366,7 @@ migrateThread (Capability *from, StgTSO *tso, Capability *to)
     traceEventMigrateThread (from, tso, to->no);
     // ThreadMigrating tells the target cap that it needs to be added to
     // the run queue when it receives the MSG_TRY_WAKEUP.
+    tso->block_info.unused = END_TSO_QUEUE;
     tso->why_blocked = ThreadMigrating;
     tso->cap = to;
     tryWakeupThread(from, tso);

@@ -53,6 +53,10 @@ typedef union {
    * Never used for writes. Use .unused below instead. */
   StgClosure *closure;
 
+  /* For why_blocked cases where block_info is unused, this will be set to
+   * END_TSO_QUEUE, to maintain invariant that block_info.closure is valid */
+  StgTSO *unused;
+
   /* case NotBlocked: A back-link when the TSO is on the run queue */
   StgTSO *prev;
 
