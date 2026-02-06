@@ -354,7 +354,7 @@ check_target:
         StgMVar *mvar;
         StgInfoTable *info USED_IF_THREADS;
 
-        mvar = (StgMVar *)target->block_info.closure;
+        mvar = target->block_info.mvar;
 
         // ASSUMPTION: tso->block_info must always point to a
         // closure.  In the threaded RTS it does.
@@ -372,7 +372,7 @@ check_target:
         // is still blocked on the same MVar.
         if ((target->why_blocked != BlockedOnMVar
              && target->why_blocked != BlockedOnMVarRead)
-            || (StgMVar *)target->block_info.closure != mvar) {
+            || target->block_info.mvar != mvar) {
             unlockClosure((StgClosure *)mvar, info);
             goto retry;
         }
@@ -625,7 +625,7 @@ awakenBlockedExceptionQueue (Capability *cap, StgTSO *tso)
 static void
 removeFromMVarBlockedQueue (StgTSO *tso)
 {
-    StgMVar *mvar = (StgMVar*)tso->block_info.closure;
+    StgMVar *mvar = tso->block_info.mvar;
     StgMVarTSOQueue *q = (StgMVarTSOQueue*)tso->_link;
 
     if (q == (StgMVarTSOQueue*)END_TSO_QUEUE) {
