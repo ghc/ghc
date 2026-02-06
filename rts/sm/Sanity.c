@@ -779,13 +779,45 @@ checkTSO(StgTSO *tso)
            info == &stg_WHITEHOLE_info); // used to happen due to STM doing
                                          // lockTSO(), might not happen now
 
-    if (   tso->why_blocked == BlockedOnMVar
-        || tso->why_blocked == BlockedOnMVarRead
-        || tso->why_blocked == BlockedOnBlackHole
-        || tso->why_blocked == BlockedOnMsgThrowTo
-        || tso->why_blocked == NotBlocked
-        ) {
+    unsigned why_blocked = ACQUIRE_LOAD(&tso->why_blocked);
+    switch (why_blocked) {
+    case NotBlocked:
+    case BlockedOnMVar:
+    case BlockedOnMVarRead:
+    case BlockedOnBlackHole:
+    case BlockedOnMsgThrowTo:
+    case BlockedOnRead:
+    case BlockedOnWrite:
+    case BlockedOnDelay:
+        //TODO: we could be more specific and check BlockedOnMVar has an MVar,
+        // BlockedOnBlackHole has a message, BlockedOnRead has an AIOP etc.
+        ASSERT(IsBlockInfoClosure(why_blocked));
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->block_info.closure));
+        break;
+
+    case BlockedOnSTM:
+    case BlockedOnCCall:
+    case BlockedOnCCall_Interruptible:
+    case ThreadMigrating:
+#if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
+    case BlockedOnDoProc:
+#endif
+        ASSERT(!IsBlockInfoClosure(why_blocked));
+        ASSERT(tso->block_info.unused == END_TSO_QUEUE);
+        break;
+
+#if !defined(THREADED_RTS)
+    // Only these three can use BlockInfoForceNonClosure
+    case BlockedOnRead  | BlockInfoForceNonClosure:
+    case BlockedOnWrite | BlockInfoForceNonClosure:
+    case BlockedOnDelay | BlockInfoForceNonClosure:
+        ASSERT(!IsBlockInfoClosure(why_blocked));
+        break;
+#endif
+
+    default:
+        barf("checkTSO: strange tso->why_blocked: %d for TSO %"
+             FMT_StgThreadID " (%p)", why_blocked, tso->id, tso);
     }
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->bq));
