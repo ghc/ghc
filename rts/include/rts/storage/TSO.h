@@ -56,6 +56,9 @@ typedef union {
   /* case NotBlocked: A back-link when the TSO is on the run queue */
   StgTSO *prev;
 
+  /* case BlockedOnMVar, BlockedOnMVarRead: the mvar the TSO is blocked on */
+  StgMVar *mvar;
+
   /* case BlockedOnBlackHole */
   struct MessageBlackHole_ *bh;
 
