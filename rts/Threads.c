@@ -322,9 +322,6 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
     }
 
     case BlockedOnSTM:
-        tso->block_info.closure = &stg_STM_AWOKEN_closure;
-        goto unblock;
-
     case BlockedOnBlackHole:
     case ThreadMigrating:
         goto unblock;

@@ -879,18 +879,6 @@ INFO_TABLE_CONSTR(stg_GCD_CAF,0,0,0,CONSTR_NOCAF,"GCD_CAF","GCD_CAF")
 { ccall pbarf("Evaluated a CAF (%p) that was GC'd!", R1 "ptr") never returns; }
 
 /* ----------------------------------------------------------------------------
-   STM_AWOKEN
-
-   This is a static nullary constructor (like []) that we use to mark a
-   thread waiting on an STM wakeup
-   ------------------------------------------------------------------------- */
-
-INFO_TABLE_CONSTR(stg_STM_AWOKEN,0,0,0,CONSTR_NOCAF,"STM_AWOKEN","STM_AWOKEN")
-{ ccall pbarf("STM_AWOKEN object (%p) entered!", R1 "ptr") never returns; }
-
-CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
-
-/* ----------------------------------------------------------------------------
    Arrays
 
    These come in two basic flavours: arrays of data (StgArrWords) and arrays of
