@@ -163,7 +163,8 @@ executable hadrian
                        , time
                        , mtl                  >= 2.2     && < 2.4
                        , parsec               >= 3.1     && < 3.2
-                       , shake                >= 0.18.3  && < 0.20
+                         -- shake 0.19.9 has some fixes to greatly improve error messages
+                       , shake                >= 0.19.9  && < 0.20
                        , transformers         >= 0.4     && < 0.7
                        , unordered-containers >= 0.2.1   && < 0.3
                        , text                 >= 1.2     && < 3

@@ -42,3 +42,5 @@ extra-deps:
 - directory-1.3.9.0
 # Needed because process depends on directory, which has been pruned:
 - process-1.6.26.1
+# Needed stackage doesn't have the latest shake yet, which we want for better exceptions
+- shake-0.19.9
