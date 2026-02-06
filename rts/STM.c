@@ -264,7 +264,7 @@ static StgBool cond_lock_tvar(Capability *cap,
 
 static void park_tso(StgTSO *tso) {
   ASSERT(tso -> why_blocked == NotBlocked);
-  tso -> block_info.closure = (StgClosure *) END_TSO_QUEUE;
+  tso->block_info.unused = END_TSO_QUEUE;
   RELEASE_STORE(&tso -> why_blocked, BlockedOnSTM);
   TRACE("park_tso on tso=%p", tso);
 }
