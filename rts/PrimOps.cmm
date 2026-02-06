@@ -1125,10 +1125,10 @@ stg_threadStatuszh ( gcptr tso )
     // contents of block_info too, then we'd have to do some synchronisation.
 
     if (what_next == ThreadComplete) {
-        ret = 16;  // NB. magic, matches up with GHC.Conc.threadStatus
+        ret = BlockedThreadComplete;  // NB. magic, matches up with GHC.Conc.threadStatus
     } else {
         if (what_next == ThreadKilled) {
-            ret = 17;
+            ret = BlockedThreadKilled;
         } else {
             ret = why_blocked;
         }

@@ -287,6 +287,14 @@
 #define BlockedOnDoProc              12 /* Uses block_info.async_result
                                          * used by win32-legacy I/O manager */
 
+/* Reserved values, not values that why_blocked currently use. They
+ * are used in primop stg_threadStatuszh and must not overlap with
+ * other why_blocked status values. They could be changed, if the
+ * threadStatus in ghc-internal is updated too.
+ */
+#define BlockedThreadComplete 16
+#define BlockedThreadKilled   17
+
 /* Next available non-closure why_blocked tag numbers are: 13,14,15
  * For more closure tag numbers, shift up all the non-closure ones
  * and adjust the BlockInfoForceNonClosure tag and related macros.
