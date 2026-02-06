@@ -1130,7 +1130,7 @@ stg_threadStatuszh ( gcptr tso )
         if (what_next == ThreadKilled) {
             ret = BlockedThreadKilled;
         } else {
-            ret = why_blocked;
+            ret = UntagWhyBlocked(why_blocked);
         }
     }
 

@@ -255,6 +255,33 @@
  * block_info union. The comment for each tag below says which member
  * of the block_info union is used.
  *
+ * We also use the why_blocked to determine if the block_info contains
+ * a closure or not. There are three classes of tag:
+ * 1. why_blocked tags where block_info is always a closure;
+ * 2. why_blocked tags where block_info is never a closure;
+ * 3. why_blocked tags where block_info is sometimes a closure;
+ *
+ * We use the following encoding scheme for the three classes above:
+ * 1. the tag value has bits 3 and 4 unset (values 0..7);
+ * 2. the tag value has bit 3 set (values 8..15); and
+ * 3. the tag value has bit 4 set when it is not a closure and unset
+ *    when it is a closure.
+ *
+ * This scheme makes it cheap and simple to check if the GC needs to
+ * look at the block_info.closure.
+ *
+ * The reason for the encoding using 2 marker bits rather than 1 is
+ * that it minimises the cases in the code that need to use or check
+ * the tag bits. The only tags in class 3 are BlockedOn{Read,Write
+ * Delay,DoProc} which are used by in-RTS I/O managers, and the only
+ * ones that need to use block_info members that are not a closure are
+ * the legacy I/O managers select and win32-legacy. So when these I/O
+ * managers are removed then we can simplify the encoding.
+ */
+#define BlockInfoForceNonClosure 16
+#define UntagWhyBlocked(why) (why & 15)
+#define IsBlockInfoClosure(why) ((why & 24) == 0)
+/*
  * In the threaded RTS there is an invariant that the block_info union
  * is always a valid GC closure. To ensure this, the tags that use
  * block_info.unused, always set it to END_TSO_QUEUE. The non-closure
@@ -272,11 +299,11 @@
 #define BlockedOnBlackHole  3 /* Uses block_info.bh */
 #define BlockedOnMsgThrowTo 4 /* Uses block_info.throwto */
 #define BlockedOnRead       5 /* Uses block_info.aiop or uses .fd or
-                                 .async_result */
+                                 .async_result with BlockInfoForceNonClosure */
 #define BlockedOnWrite      6 /* Uses block_info.aiop or uses .fd or
-                                 .async_result */
+                                 .async_result with BlockInfoForceNonClosure */
 #define BlockedOnDelay      7 /* Uses block_info.timeout or
-                                 uses .target */
+                                 uses .target with BlockInfoForceNonClosure */
 
 #define BlockedOnSTM                  8 /* Uses block_info.unused */
 #define BlockedOnCCall                9 /* Uses block_info.unused */
