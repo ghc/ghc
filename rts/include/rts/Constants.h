@@ -250,33 +250,48 @@
 
 /*
  * Constants for the why_blocked field of a TSO
- * NB. keep these in sync with GHC/Conc/Sync.hs: threadStatus
+ *
+ * These say why the TSO is blocked, and also act as the tag for the
+ * block_info union. The comment for each tag below says which member
+ * of the block_info union is used.
+ *
+ * In the threaded RTS there is an invariant that the block_info union
+ * is always a valid GC closure. To ensure this, the tags that use
+ * block_info.unused, always set it to END_TSO_QUEUE. The non-closure
+ * why_blocked tags are only used by I/O managers on the non-threaded
+ * RTS. New in-RTS I/O managers use the AIOP and TimeoutQueue mechanism
+ * which are closures.
+ *
+ * Note: keep these in sync with GHC/Conc/Sync.hs: threadStatus
+ * Note: keep these in sync with Schedule.c: eventlogStopStatus which
+ * converts the constants here to the ones used in the eventlog.
  */
-#define NotBlocked          0
-#define BlockedOnMVar       1
-#define BlockedOnMVarRead   14 /* TODO: renumber me, see #9003 */
-#define BlockedOnBlackHole  2
-#define BlockedOnRead       3
-#define BlockedOnWrite      4
-#define BlockedOnDelay      5
-#define BlockedOnSTM        6
+#define NotBlocked          0 /* Uses block_info.prev */
+#define BlockedOnMVar       1 /* Uses block_info.mvar */
+#define BlockedOnMVarRead   2 /* Uses block_info.mvar */
+#define BlockedOnBlackHole  3 /* Uses block_info.bh */
+#define BlockedOnMsgThrowTo 4 /* Uses block_info.throwto */
+#define BlockedOnRead       5 /* Uses block_info.aiop or uses .fd or
+                                 .async_result */
+#define BlockedOnWrite      6 /* Uses block_info.aiop or uses .fd or
+                                 .async_result */
+#define BlockedOnDelay      7 /* Uses block_info.timeout or
+                                 uses .target */
 
-/* Win32 only: */
-#define BlockedOnDoProc     7
+#define BlockedOnSTM                  8 /* Uses block_info.unused */
+#define BlockedOnCCall                9 /* Uses block_info.unused */
+#define BlockedOnCCall_Interruptible 10 /* Uses block_info.unused
+                                        * Same as BlockedOnCCall but permits
+                                        * killing the worker thread */
+#define ThreadMigrating              11 /* Uses block_info.unused */
+#define BlockedOnDoProc              12 /* Uses block_info.async_result
+                                         * used by win32-legacy I/O manager */
 
-/* Only relevant for THREADED_RTS: */
-#define BlockedOnCCall      10
-#define BlockedOnCCall_Interruptible 11
-   /* same as above but permit killing the worker thread */
+/* Next available non-closure why_blocked tag numbers are: 13,14,15
+ * For more closure tag numbers, shift up all the non-closure ones
+ * and adjust the BlockInfoForceNonClosure tag and related macros.
+ * If we reach BlockInfoForceNonClosure then shift that up. */
 
-/* Involved in a message sent to tso->msg_cap */
-#define BlockedOnMsgThrowTo 12
-
-/* The thread is not on any run queues, but can be woken up
-   by tryWakeupThread() */
-#define ThreadMigrating     13
-
-/* Next number is 15.  */
 
 /*
  * These constants are returned to the scheduler by a thread that has
@@ -288,6 +303,7 @@
 #define ThreadYielding 3
 #define ThreadBlocked  4
 #define ThreadFinished 5
+/* If this is ever extended, also adjust the eventlogStopStatus mapping */
 
 /*
  * Flags for the tso->flags field.
