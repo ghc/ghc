@@ -824,7 +824,8 @@ bool syncIOWaitReady(CapIOManager *iomgr,
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
         {
-            StgWord why_blocked = rw == IORead ? BlockedOnRead : BlockedOnWrite;
+            StgWord why_blocked = (rw == IORead ? BlockedOnRead : BlockedOnWrite)
+                                | BlockInfoForceNonClosure;
             tso->block_info.fd = fd;
             RELEASE_STORE(&tso->why_blocked, why_blocked);
             appendToIOBlockedQueue(iomgr, tso);
@@ -890,7 +891,7 @@ bool syncDelay(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay)
         {
             LowResTime target = getDelayTarget(us_delay);
             tso->block_info.target = target;
-            RELEASE_STORE(&tso->why_blocked, BlockedOnDelay);
+            RELEASE_STORE(&tso->why_blocked, BlockedOnDelay | BlockInfoForceNonClosure);
             insertIntoSleepingQueue(iomgr, tso, target);
             return true;
         }
@@ -928,6 +929,7 @@ void syncDelayCancel(CapIOManager *iomgr, StgTSO *tso)
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
+            ASSERT(tso->why_blocked == (BlockedOnDelay | BlockInfoForceNonClosure));
             removeThreadFromQueue(iomgr->cap, &iomgr->sleeping_queue, tso);
             break;
 #endif
