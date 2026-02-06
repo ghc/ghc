@@ -230,7 +230,6 @@ void syncIOCancelPoll(CapIOManager *iomgr, StgTSO *tso)
      * We don't put the TSO back on the run queue or change the why_blocked
      * status, as that is done by removeFromQueues (in the throwTo* functions).
      */
-    tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
 
     /* We are in the TSO case, where the aiop was only reachable from the TSO
      * itself, and thus it is now no longer be reachable at all.
