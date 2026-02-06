@@ -655,7 +655,6 @@ function install_bindist() {
 }
 
 function test_hadrian() {
-  start_section test-hadrian "Test via Hadrian"
   check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
 
@@ -777,7 +776,6 @@ function test_hadrian() {
     info "STAGE2_TEST=$?"
 
   fi
-  end_section test-hadrian
 }
 
 function summarise_hi_files() {
