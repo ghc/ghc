@@ -160,6 +160,15 @@ Cmm
   the recompilation checker will look at to determine if a module needs to be
   recompiled.
 
+``ghc-pkg`` utility
+~~~~~~~~~~~~~~~~~~~
+
+- A slight rework how package databases are being locked should make ghc-pkg more
+  reliable when multiple invocations try to read/modify a package database at the
+  same time.
+
+- Support for single-file package dbs has been eliminated.
+
 Included libraries
 ~~~~~~~~~~~~~~~~~~
 

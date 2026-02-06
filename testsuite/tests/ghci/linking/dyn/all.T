@@ -61,8 +61,13 @@ test('T3372',
       req_process,
       extra_run_opts('"' + config.libdir + '"'),
       unless(config.have_RTS_linker, skip),
-      # Concurrent GHC sessions is fragile on Windows since we must lock the
-      # package database even for read-only access.
-      # See Note [Locking package database on Windows] in GHC.Unit.Database
-      when(opsys('mingw32'), fragile(16773))],
+      # Concurrent GHC sessions have some history with being fragile.
+      # #16773 indicated this is because we *did* lock the db on windows.
+      # After an refactor to fix another concurrent access bug #22870
+      # I'm optimistically removing the fragile tag from this. If
+      # this causes failures in CI feel free to re-instate it but do open
+      # a ticket. See Note [ghc-pkg database locking] for some info.
+
+      # when(opsys('mingw32'), fragile(16773))
+      ],
      compile_and_run, ['-package ghc'])
