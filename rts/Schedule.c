@@ -174,6 +174,8 @@ static void deleteAllThreads (void);
 static void deleteThread_(StgTSO *tso);
 #endif
 
+static inline StgThreadReturnCode eventlogStopStatus(StgWord why_blocked);
+
 /* ---------------------------------------------------------------------------
    Main scheduling loop.
 
@@ -522,13 +524,13 @@ run_thread:
 #endif
 
     if (ret == ThreadBlocked) {
-        uint16_t why_blocked = ACQUIRE_LOAD(&t->why_blocked);
+        StgWord why_blocked = ACQUIRE_LOAD(&t->why_blocked);
         if (why_blocked == BlockedOnBlackHole) {
             StgTSO *owner = blackHoleOwner(t->block_info.bh->bh);
-            traceEventStopThread(cap, t, t->why_blocked + 6,
+            traceEventStopThread(cap, t, eventlogStopStatus(why_blocked),
                                  owner != NULL ? owner->id : 0);
         } else {
-            traceEventStopThread(cap, t, t->why_blocked + 6, 0);
+            traceEventStopThread(cap, t, eventlogStopStatus(why_blocked), 0);
         }
     } else {
         if (ret == StackOverflow) {
@@ -3350,4 +3352,31 @@ void setAllocLimitKill(bool shouldKill, bool shouldHook)
 {
    allocLimitKill = shouldKill;
    allocLimitRunHook = shouldHook;
+}
+
+/* Map from the internal tso->why_blocked values to the external eventlog
+ * STOP_THREAD status field. See issue #9003 for what goes wrong if we do
+ * not handle this mapping in an intentional fashion.
+ *
+ * See Constants.h for the internal values.
+ * See docs/users_guide/eventlog-formats.rst for the external values.
+ */
+static const unsigned char thread_stop_code[] = {
+    [BlockedOnMVar]       = 7,
+    [BlockedOnMVarRead]   = 20,
+    [BlockedOnBlackHole]  = 8,
+    [BlockedOnRead]       = 9,
+    [BlockedOnWrite]      = 10,
+    [BlockedOnDelay]      = 11,
+    [BlockedOnSTM]        = 12,
+    [BlockedOnDoProc]     = 13,
+    [BlockedOnCCall]      = 16,
+    [BlockedOnCCall_Interruptible] = 17,
+    [BlockedOnMsgThrowTo] = 18,
+    [ThreadMigrating]     = 19
+};
+
+static inline StgThreadReturnCode eventlogStopStatus(StgWord why_blocked)
+{
+    return thread_stop_code[UntagWhyBlocked(why_blocked)];
 }
