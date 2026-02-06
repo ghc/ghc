@@ -4,7 +4,7 @@ packages: ./
 
 -- This essentially freezes the build plan for hadrian
 -- It would be wise to keep this up to date with the state set in .gitlab/ci.sh.
-index-state: 2025-12-19T19:24:24Z
+index-state: 2026-02-06T13:08:09Z
 
 -- Fixes bootstrapping with ghc-9.14
 allow-newer: all:base, all:ghc-bignum, all:template-haskell
