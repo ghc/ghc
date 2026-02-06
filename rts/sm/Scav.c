@@ -158,7 +158,7 @@ scavengeTSO (StgTSO *tso)
     // valid closure, because we assume this in throwTo().  In the
     // non-threaded RTS it might be a FD (for
     // BlockedOnRead/BlockedOnWrite) or a time value (BlockedOnDelay)
-        tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
+        ASSERT(tso->block_info.unused == END_TSO_QUEUE);
 #endif
         break;
     }
