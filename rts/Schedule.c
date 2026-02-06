@@ -2523,6 +2523,7 @@ suspendThread (StgRegTable *reg, bool interruptible)
 
   threadPaused(cap,tso);
 
+  tso->block_info.unused = END_TSO_QUEUE;
   if (interruptible) {
     tso->why_blocked = BlockedOnCCall_Interruptible;
   } else {
