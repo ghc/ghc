@@ -260,7 +260,20 @@ $(TOP)/ghc-config/ghc-config : $(TOP)/ghc-config/ghc-config.hs
 empty=
 space=$(empty) $(empty)
 ifeq "$(ghc_config_mk)" ""
-ghc_config_mk = $(TOP)/mk/ghcconfig$(subst $(space),_,$(subst :,_,$(subst /,_,$(subst \,_,$(TEST_HC))))).mk
+sanitized_hc := $(subst $(space),_,$(subst :,_,$(subst /,_,$(subst \,_,$(TEST_HC)))))
+# Hash the TEST_HC binary to ensure we recompute ghcconfig when the compiler changes.
+# This prevents stale config values when switching between different GHC versions.
+test_hc_hash := $(shell \
+  if command -v openssl >/dev/null 2>&1; then \
+    openssl dgst -sha256 $(TEST_HC) | awk '{print substr($$2, 1, 8)}'; \
+  elif command -v sha256sum >/dev/null 2>&1; then \
+    sha256sum $(TEST_HC) | awk '{print substr($$1, 1, 8)}'; \
+  elif command -v shasum >/dev/null 2>&1; then \
+    shasum -a 256 $(TEST_HC) | awk '{print substr($$1, 1, 8)}'; \
+  else \
+    echo "no_hash"; \
+  fi)
+ghc_config_mk = $(TOP)/mk/$(test_hc_hash)_ghcconfig$(sanitized_hc).mk
 
 $(ghc_config_mk) : $(TOP)/ghc-config/ghc-config
 	$(TOP)/ghc-config/ghc-config "$(TEST_HC)" >"$@"; if [ "$$?" != "0" ]; then $(RM) "$@"; exit 1; fi

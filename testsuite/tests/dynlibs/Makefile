@@ -80,7 +80,7 @@ T18072debug:
       -dynamic -fPIC -c T18072.hs
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072debug \
       -dynamic -shared -flink-rts -debug T18072debug/T18072.o -o T18072debug/T18072.so
-	ldd T18072debug/T18072.so | grep libHSrts | grep _debug >/dev/null
+	ldd T18072debug/T18072.so | grep libHSrts | grep -e -debug- >/dev/null
 
 .PHONY: T18072static
 T18072static:

@@ -663,7 +663,19 @@ def collect_size ( deviation, path ):
     return collect_size_func(deviation, lambda: path)
 
 def collect_size_func ( deviation, path_func ):
-    return collect_generic_stat ( 'size', deviation, lambda way: os.path.getsize(in_testdir(path_func())) )
+    # Wrap path resolution to avoid passing None/invalid paths to Path APIs.
+    def current(_way):
+        p = path_func()
+        if p is None:
+            raise StatsException("No path returned for size collection")
+        # If p looks absolute, use it directly; else resolve relative to testdir
+        pth = Path(p)
+        if not pth.is_absolute():
+            pth = in_testdir(p)
+        if not pth.exists():
+            raise StatsException(f"Path not found for size collection: {pth}")
+        return os.path.getsize(pth)
+    return collect_generic_stat ( 'size', deviation, current )
 
 def get_dir_size(path):
     total = 0
@@ -676,7 +688,7 @@ def get_dir_size(path):
                     total += get_dir_size(entry.path)
         return total
     except FileNotFoundError:
-        print("Exception: Could not find: " + path)
+        raise StatsException(f"Directory not found for size collection: {path}")
 
 def collect_size_dir ( deviation, path ):
     return collect_size_dir_func ( deviation, lambda: path )
@@ -708,7 +720,12 @@ def collect_size_ghc_pkg (deviation, library):
 # same for collect_size and find_so
 def collect_object_size (deviation, library, use_non_inplace=False):
     if use_non_inplace:
-        return collect_size_func(deviation, lambda: find_non_inplace_so(library))
+        try:
+            return collect_size_func(deviation, lambda: find_non_inplace_so(library))
+        except Exception as _:
+            # should we fail to find inplace, let's try to find non-inplace.
+            # FIXME: remove the whole inplace nonsense outright.
+            return collect_size_func(deviation, lambda: find_so(library))
     else:
         return collect_size_func(deviation, lambda: find_so(library))
 
@@ -725,21 +742,20 @@ def path_from_ghcPkg (library, field):
 
     try:
         result = subprocess.run(ghcPkgCmd, capture_output=True, shell=True)
-
         # check_returncode throws an exception if the return code is not 0.
         result.check_returncode()
-
-        # if we get here then the call worked and we have the path we split by
-        # whitespace and then return the path which becomes the second element
-        # in the array
-        return re.split(r'\s+', result.stdout.decode("utf-8"))[1]
+        out = result.stdout.decode("utf-8").strip()
+        # Expected format: "<field>: <value>" possibly spanning lines; grab text after first colon.
+        m = re.split(r"^\s*[^:]+:\s*", out, maxsplit=1, flags=re.MULTILINE)
+        if len(m) == 2:
+            val = m[1].strip().splitlines()[0].strip()
+            if val:
+                return val
+        raise StatsException(f"ghc-pkg returned no {field} for {library}. Output: {out}")
+    except subprocess.CalledProcessError as e:
+        raise StatsException(f"ghc-pkg failed for {library} {field}: {e}")
     except Exception as e:
-        message = f"""
-        Attempt to find {field} of {library} using ghc-pkg failed.
-        ghc-pkg path: {config.ghc_pkg}
-        error" {e}
-        """
-        print(message)
+        raise StatsException(f"Error parsing ghc-pkg output for {library} {field}: {e}")
 
 
 def _find_so(lib, directory, in_place):
@@ -774,8 +790,9 @@ def _find_so(lib, directory, in_place):
         to_match = r'libHS{}-\d+(\.\d+)+-ghc\S+\.' + suffix
 
     matches = []
-    # wrap this in some exception handling, hadrian test will error out because
-    # these files don't exist yet, so we pass when this occurs
+    # Robust error handling: raise a stats exception for missing directory or no match
+    if directory is None:
+        raise StatsException(f"No directory provided to find shared object for {lib}")
     try:
         for f in os.listdir(directory):
             if f.endswith(suffix):
@@ -783,12 +800,22 @@ def _find_so(lib, directory, in_place):
                 match   = re.match(pattern, f)
                 if match:
                     matches.append(match.group())
+        if not matches:
+            raise StatsException(f"Could not find shared object file for {lib} in {directory}")
         return os.path.join(directory, matches[0])
-    except:
-        failBecause('Could not find shared object file: ' + lib)
+    except FileNotFoundError:
+        raise StatsException(f"Directory not found while searching shared object for {lib}: {directory}")
+    except Exception as e:
+        raise StatsException(f"Error while searching shared object for {lib} in {directory}: {e}")
 
 def find_so(lib):
-    return _find_so(lib,path_from_ghcPkg(lib, "dynamic-library-dirs"),True)
+    try:
+        return _find_so(lib,path_from_ghcPkg(lib, "dynamic-library-dirs"),True)
+    except Exception as _:
+        # if we fail to find the inplace so, fallback to trying to find the
+        # non-inplace so indead;
+        # FIXME: This whole inplace logic needs to be ripped out!
+        return _find_so(lib,path_from_ghcPkg(lib, "dynamic-library-dirs"),False)
 
 def find_non_inplace_so(lib):
     return _find_so(lib,path_from_ghcPkg(lib, "dynamic-library-dirs"),False)
