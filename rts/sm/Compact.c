@@ -468,7 +468,7 @@ thread_TSO (StgTSO *tso)
     thread_(&tso->_link);
     thread_(&tso->global_link);
 
-    switch (ACQUIRE_LOAD(&tso->why_blocked)) {
+    switch (UntagWhyBlocked(ACQUIRE_LOAD(&tso->why_blocked))) {
     case BlockedOnMVar:
     case BlockedOnMVarRead:
     case BlockedOnBlackHole:

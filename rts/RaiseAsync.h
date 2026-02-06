@@ -56,7 +56,7 @@ void awakenBlockedExceptionQueue  (Capability *cap, StgTSO *tso);
 INLINE_HEADER int
 interruptible(StgTSO *t)
 {
-  switch (t->why_blocked) {
+  switch (UntagWhyBlocked(t->why_blocked)) {
   case BlockedOnMVar:
   case BlockedOnSTM:
   case BlockedOnMVarRead:
