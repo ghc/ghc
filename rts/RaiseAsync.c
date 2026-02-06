@@ -270,7 +270,7 @@ check_target:
 
     status = ACQUIRE_LOAD(&target->why_blocked);
 
-    switch (status) {
+    switch (UntagWhyBlocked(status)) {
     case NotBlocked:
     {
         if ((target->flags & TSO_BLOCKEX) == 0) {
@@ -667,7 +667,7 @@ removeFromMVarBlockedQueue (StgTSO *tso)
 static void
 removeFromQueues(Capability *cap, StgTSO *tso)
 {
-  switch (tso->why_blocked) {
+  switch (UntagWhyBlocked(tso->why_blocked)) {
 
   case NotBlocked:
   case ThreadMigrating:

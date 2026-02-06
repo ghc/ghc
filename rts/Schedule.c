@@ -3312,7 +3312,7 @@ resurrectThreads (StgTSO *threads)
         // Wake up the thread on the Capability it was last on
         cap = tso->cap;
 
-        switch (tso->why_blocked) {
+        switch (UntagWhyBlocked(tso->why_blocked)) {
         case BlockedOnMVar:
         case BlockedOnMVarRead:
             /* Called by GC - sched_mutex lock is currently held. */
@@ -3386,5 +3386,5 @@ static inline EventThreadStatus eventlogThreadStatus(StgThreadReturnCode ret_cod
 
 static inline EventThreadStatus eventlogThreadStatusBlocked(StgWord why_blocked)
 {
-    return thread_blocked_code[why_blocked];
+    return thread_blocked_code[UntagWhyBlocked(why_blocked)];
 }
