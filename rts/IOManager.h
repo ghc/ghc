@@ -291,11 +291,6 @@ void wakeupIOManager(void);
 void markCapabilityIOManager(evac_fn evac, void *user, Capability *cap);
 
 
-/* GC hook: scavenge I/O related tso->block_info. Used by scavengeTSO.
- */
-void scavengeTSOIOManager(StgTSO *tso);
-
-
 /* Several code paths are almost identical between read and write paths. In
  * such cases we use a shared code path with an enum to say which we're doing.
  */
