@@ -878,7 +878,7 @@ loop:
     // this information
     StgWord why_blocked = ACQUIRE_LOAD(&tso->why_blocked);
     ASSERT(why_blocked == BlockedOnMVarRead || why_blocked == BlockedOnMVar);
-    ASSERT(tso->block_info.closure == (StgClosure*)mvar);
+    ASSERT(tso->block_info.mvar == mvar);
 
     // actually perform the takeMVar
     StgStack* stack = tso->stackobj;
@@ -968,10 +968,10 @@ printThreadBlockage(StgTSO *tso)
 #endif
     break;
   case BlockedOnMVar:
-    debugBelch("is blocked on an MVar @ %p", tso->block_info.closure);
+    debugBelch("is blocked on an MVar @ %p", tso->block_info.mvar);
     break;
   case BlockedOnMVarRead:
-    debugBelch("is blocked on atomic MVar read @ %p", tso->block_info.closure);
+    debugBelch("is blocked on atomic MVar read @ %p", tso->block_info.mvar);
     break;
     break;
   case BlockedOnBlackHole:
