@@ -23,3 +23,10 @@ Executable hp2ps
        HpFile.c Marks.c Scale.c TraceElement.c
        Axes.c Dimensions.c Key.c PsFile.c Shade.c
        Utilities.c
+    ghc-options:
+        -- We do _not_ want to auto-link this against rts, base, ...
+        -- otherwise we end up with broken dependencies.  E.g. unlit
+        -- depending on libHSrts, which then depends on the libHSrts
+        -- implementation sublib, due to the -u,... flags from the
+        -- rts.
+        -no-auto-link-packages
