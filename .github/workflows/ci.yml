@@ -67,7 +67,7 @@ jobs:
 
     - name: Build the bindist (dynamic=${{ matrix.dynamic }})
       shell: devx {0}
-      run: make DYNAMIC=${{ matrix.dynamic }}
+      run: make CABAL=$PWD/_build/stage0/bin/cabal DYNAMIC=${{ matrix.dynamic }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -77,7 +77,7 @@ jobs:
 
     - name: Run the testsuite (dynamic=${{ matrix.dynamic }})
       shell: devx {0}
-      run: make test DYNAMIC=${{ matrix.dynamic }}
+      run: make test CABAL=$PWD/_build/stage0/bin/cabal DYNAMIC=${{ matrix.dynamic }}
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
