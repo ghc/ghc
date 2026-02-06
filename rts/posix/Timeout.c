@@ -67,8 +67,6 @@ void syncDelayCancelTimeout(Capability *cap, StgTSO *tso)
 
     deleteTimeoutQueue(&cap->iomgr->timeout_queue, timeout);
 
-    tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
-
     /* the timeout is no longer accessible from anywhere (except here) */
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
         updateRemembSetPushClosure(cap, (StgClosure *)timeout);
