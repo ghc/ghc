@@ -291,7 +291,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
     }
 #endif
 
-    switch (ACQUIRE_LOAD(&tso->why_blocked))
+    switch (UntagWhyBlocked(ACQUIRE_LOAD(&tso->why_blocked)))
     {
     case BlockedOnMVar:
     case BlockedOnMVarRead:
@@ -949,7 +949,7 @@ end:
 void
 printThreadBlockage(StgTSO *tso)
 {
-  switch (ACQUIRE_LOAD(&tso->why_blocked)) {
+  switch (UntagWhyBlocked(ACQUIRE_LOAD(&tso->why_blocked))) {
 #if defined(mingw32_HOST_OS)
     case BlockedOnDoProc:
     debugBelch("is blocked on proc (request: %" FMT_Word ")", tso->block_info.async_reqID);
