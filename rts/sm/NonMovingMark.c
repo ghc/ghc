@@ -1055,16 +1055,10 @@ trace_tso (MarkQueue *queue, StgTSO *tso)
     if (tso->label != NULL) {
         markQueuePushClosure_(queue, (StgClosure *) tso->label);
     }
-    switch (ACQUIRE_LOAD(&tso->why_blocked)) {
-    case BlockedOnMVar:
-    case BlockedOnMVarRead:
-    case BlockedOnBlackHole:
-    case BlockedOnMsgThrowTo:
-    case NotBlocked:
+    if (IsBlockInfoClosure(ACQUIRE_LOAD(&tso->why_blocked))) {
+        /* This also follows the block_info.prev back-link in
+         * the NotBlocked case, which may not be necessary. */
         markQueuePushClosure_(queue, tso->block_info.closure);
-        break;
-    default:
-        break;
     }
 }
 
