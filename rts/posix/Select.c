@@ -268,7 +268,7 @@ awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
        * So the (int) cast should be removed across the code base once
        * GHC requires a version of FreeBSD that has that change in it.
        */
-        switch (ACQUIRE_LOAD(&tso->why_blocked)) {
+        switch (UntagWhyBlocked(ACQUIRE_LOAD(&tso->why_blocked))) {
         case BlockedOnRead:
           {
             int fd = tso->block_info.fd;
@@ -397,7 +397,7 @@ awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
               int fd;
               enum FdState fd_state = RTS_FD_IS_BLOCKING;
 
-              switch (tso->why_blocked) {
+              switch (UntagWhyBlocked(tso->why_blocked)) {
               case BlockedOnRead:
                   fd = tso->block_info.fd;
 
