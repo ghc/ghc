@@ -28,13 +28,13 @@ then
     else
         fptools_cv_happy_version_display="none";
     fi;
-    failure_msg="Happy version == 1.20.* || >= 2.0.2 && < 2.2 is required to compile GHC. (Found: $fptools_cv_happy_version_display)"
+    failure_msg="Happy version == 1.20.* || >= 2.0.2 && < 2.3 is required to compile GHC. (Found: $fptools_cv_happy_version_display)"
     FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.20.0],
       [AC_MSG_ERROR([$failure_msg])])[]
     FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-ge],[1.21.0],
       FP_COMPARE_VERSIONS([$fptools_cv_happy_version], [-le], [2.0.1],
         [AC_MSG_ERROR([$failure_msg])])[])[]
-    FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-ge],[2.2.0],
+    FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-ge],[2.3.0],
       [AC_MSG_ERROR([$failure_msg])])[]
 fi
 HappyVersion=$fptools_cv_happy_version;
