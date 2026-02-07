@@ -1,6 +1,8 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE MultiWayIf            #-}
 {-# LANGUAGE RecursiveDo           #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DerivingVia           #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-
@@ -144,6 +146,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
+
+import GHC.Generics (Generic, Generically(..))
 
 import Control.Monad
 import Data.IORef
@@ -1267,17 +1271,8 @@ data CandidatesQTvs
          -- These are covars. Included only so that we don't repeatedly
          -- look at covars' kinds in accumulator. Not used by quantifyTyVars.
     }
-
-instance Semi.Semigroup CandidatesQTvs where
-   (DV { dv_kvs = kv1, dv_tvs = tv1, dv_cvs = cv1 })
-     <> (DV { dv_kvs = kv2, dv_tvs = tv2, dv_cvs = cv2 })
-          = DV { dv_kvs = kv1 `unionDVarSet` kv2
-               , dv_tvs = tv1 `unionDVarSet` tv2
-               , dv_cvs = cv1 `unionVarSet` cv2 }
-
-instance Monoid CandidatesQTvs where
-   mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet, dv_cvs = emptyVarSet }
-   mappend = (Semi.<>)
+  deriving (Generic)
+  deriving (Semigroup, Monoid) via Generically CandidatesQTvs
 
 instance Outputable CandidatesQTvs where
   ppr (DV {dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs })

@@ -1,4 +1,5 @@
 {-# LANGUAGE ApplicativeDo              #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE TypeFamilies               #-}
 
@@ -61,6 +62,7 @@ import {-# SOURCE #-} GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer
 import GHC.Parser.HaddockLex
 import GHC.Parser.Errors.Types
+import GHC.Generics (Generic, Generically(..))
 import GHC.Utils.Misc (mergeListsBy, filterOut, (<&&>))
 import qualified GHC.Data.Strict as Strict
 
@@ -1347,13 +1349,8 @@ data LocRange =
     { loc_range_from :: !LowerLocBound,
       loc_range_to   :: !UpperLocBound,
       loc_range_col  :: !ColumnBound }
-
-instance Semigroup LocRange where
-  LocRange from1 to1 col1 <> LocRange from2 to2 col2 =
-    LocRange (from1 <> from2) (to1 <> to2) (col1 <> col2)
-
-instance Monoid LocRange where
-  mempty = LocRange mempty mempty mempty
+  deriving (Generic)
+  deriving (Semigroup, Monoid) via Generically LocRange
 
 -- The location range from the specified position to the end of the file.
 locRangeFrom :: Strict.Maybe BufPos -> LocRange

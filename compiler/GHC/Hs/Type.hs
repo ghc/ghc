@@ -1,8 +1,8 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                        -- in module Language.Haskell.Syntax.Extension
-
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
 {-# OPTIONS_GHC -Wno-orphans #-} -- NamedThing, Outputable, OutputableBndrId
 
 {-
@@ -116,6 +116,7 @@ import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
 import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
 import GHC.Hs.Doc
+import GHC.Generics (Generic, Generically(..))
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
@@ -231,6 +232,8 @@ data HsTyPatRnBuilder =
     hstpb_imp_tvs :: Bag Name,
     hstpb_exp_tvs :: Bag Name
   }
+  deriving (Generic)
+  deriving (Semigroup, Monoid) via Generically HsTyPatRnBuilder
 
 tpBuilderExplicitTV :: Name -> HsTyPatRnBuilder
 tpBuilderExplicitTV name = mempty {hstpb_exp_tvs = unitBag name}
@@ -241,16 +244,6 @@ tpBuilderPatSig HsPSRn {hsps_nwcs, hsps_imp_tvs} =
     hstpb_nwcs = listToBag hsps_nwcs,
     hstpb_imp_tvs = listToBag hsps_imp_tvs
   }
-
-instance Semigroup HsTyPatRnBuilder where
-  HsTPRnB nwcs1 imp_tvs1 exptvs1 <> HsTPRnB nwcs2 imp_tvs2 exptvs2 =
-    HsTPRnB
-      (nwcs1    `unionBags` nwcs2)
-      (imp_tvs1 `unionBags` imp_tvs2)
-      (exptvs1  `unionBags` exptvs2)
-
-instance Monoid HsTyPatRnBuilder where
-  mempty = HsTPRnB emptyBag emptyBag emptyBag
 
 buildHsTyPatRn :: HsTyPatRnBuilder -> HsTyPatRn
 buildHsTyPatRn HsTPRnB {hstpb_nwcs, hstpb_imp_tvs, hstpb_exp_tvs} =

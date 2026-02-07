@@ -2,6 +2,8 @@
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE DerivingVia         #-}
 
 -- | Domain types used in "GHC.HsToCore.Pmc.Solver".
 -- The ultimate goal is to define 'Nabla', which models normalised refinement
@@ -68,6 +70,7 @@ import GHC.Types.CompleteMatch
 import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
                             , fractionalLitFromRational
                             , FractionalExponentBase(..))
+import GHC.Generics (Generic, Generically(..))
 
 import Numeric (fromRat)
 import Data.Ratio
@@ -104,18 +107,12 @@ instance Outputable Nabla where
 
 -- | A disjunctive bag of 'Nabla's, representing a refinement type.
 newtype Nablas = MkNablas (Bag Nabla)
+  -- deriving 'Outputable' removes `MkNablas` label
+  deriving (Generic, Outputable)
+  deriving (Semigroup, Monoid) via Generically Nablas
 
 initNablas :: Nablas
 initNablas = MkNablas (unitBag initNabla)
-
-instance Outputable Nablas where
-  ppr (MkNablas nablas) = ppr nablas
-
-instance Semigroup Nablas where
-  MkNablas l <> MkNablas r = MkNablas (l `unionBags` r)
-
-instance Monoid Nablas where
-  mempty = MkNablas emptyBag
 
 -- | The type oracle state. An 'GHC.Tc.Solver.Monad.InertSet' that we
 -- incrementally add local type constraints to, together with a sequence

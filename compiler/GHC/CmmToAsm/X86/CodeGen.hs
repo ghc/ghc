@@ -2,6 +2,8 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ParallelListComp #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
 
 -----------------------------------------------------------------------------
 --
@@ -71,6 +73,8 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.CLabel
 import GHC.Types.Tickish ( GenTickish(..) )
 import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
+
+import GHC.Generics (Generic, Generically(..))
 
 -- The rest:
 import GHC.Data.Maybe ( expectJust )
@@ -429,7 +433,7 @@ getRegisterReg _   (CmmLocal lreg) = getLocalRegReg lreg
 
 getRegisterReg platform  (CmmGlobal mid)
   = case globalRegMaybe platform $ globalRegUse_reg mid of
-        Just reg -> RegReal $ reg
+        Just reg -> RegReal reg
         Nothing  -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
         -- By this stage, the only MagicIds remaining should be the
         -- ones which map to a real machine register on this
@@ -4776,11 +4780,8 @@ data LoadArgs
   -- | The code to assign arguments to registers used for argument passing.
   , assignArgsCode :: InstrBlock
   }
-instance Semigroup LoadArgs where
-  LoadArgs a1 d1 r1 j1 <> LoadArgs a2 d2 r2 j2
-    = LoadArgs (a1 ++ a2) (d1 ++ d2) (r1 ++ r2) (j1 S.<> j2)
-instance Monoid LoadArgs where
-  mempty = LoadArgs [] [] [] nilOL
+  deriving (Generic)
+  deriving (Semigroup, Monoid) via Generically LoadArgs
 
 -- | An argument passed on the stack, either directly or by reference.
 --
