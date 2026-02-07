@@ -419,7 +419,8 @@ bindistRules = do
     , interpolateVar "CrossCompilePrefix" $ do
         crossCompiling <- interp $ getFlag CrossCompiling
         tpf <- setting TargetPlatformFull
-        pure $ if crossCompiling then tpf <> "-" else ""
+        stage <- interp getStage
+        pure $ if crossCompiling && stage < Stage2 then tpf <> "-" else ""
     , interpolateVar "LeadingUnderscore" $ yesNo <$> getTarget tgtSymbolsHaveLeadingUnderscore
     , interpolateSetting "LlvmMaxVersion" LlvmMaxVersion
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
@@ -439,12 +440,18 @@ bindistRules = do
     , interpolateVar "BaseUnitId" $ pkgUnitId Stage1 base
     , interpolateVar "GhcWithSMP" $ yesNo <$> targetSupportsSMP Stage2
     , interpolateVar "TargetPlatformFull" (setting TargetPlatformFull)
-    , interpolateVar "BuildPlatformFull" (setting BuildPlatformFull)
-    , interpolateVar "HostPlatformFull"  (setting HostPlatformFull)
+    , interpolateVar "BuildPlatformFull" $ ifM isStage3Cross (setting TargetPlatformFull) (setting BuildPlatformFull)
+    , interpolateVar "HostPlatformFull" $ ifM isStage3Cross (setting TargetPlatformFull) (setting HostPlatformFull)
     ]
   where
     interp = interpretInContext (semiEmptyTarget Stage2)
     getTarget = interp . queryTarget Stage2
+
+    -- TODO: This is a hack. It should be covered by config files
+    isStage3Cross = do
+        crossCompiling <- interp $ getFlag CrossCompiling
+        stage <- interp getStage
+        pure $ if crossCompiling && stage >= Stage2 then True else False
 
 -- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
 -- the resulting 'String' is a valid C preprocessor identifier.
