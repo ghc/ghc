@@ -417,10 +417,15 @@ bindistRules = do
   templateRule ("distrib" -/- "configure.ac") $ mconcat
     [ interpolateSetting "ConfiguredEmsdkVersion" EmsdkVersion
     , interpolateVar "CrossCompilePrefix" $ do
-        crossCompiling <- interp $ getFlag CrossCompiling
-        tpf <- setting TargetPlatformFull
-        stage <- interp getStage
-        pure $ if crossCompiling && stage < Stage2 then tpf <> "-" else ""
+        -- For a bindist, the prefix is needed only if the distributed compiler
+        -- is a cross-compiler (i.e., host != target in the bindist).
+        -- For Stage3 bindist (isStage3Cross=True), both host and target are the
+        -- target platform, so no prefix. For cross-compiler bindist (Stage1),
+        -- host != target, so we add the prefix.
+        -- Note: This template is shared by all bindist types, evaluated in Stage2 context.
+        host <- ifM isStage3Cross (setting TargetPlatformFull) (setting HostPlatformFull)
+        target <- setting TargetPlatformFull
+        pure $ if host /= target then target <> "-" else ""
     , interpolateVar "LeadingUnderscore" $ yesNo <$> getTarget tgtSymbolsHaveLeadingUnderscore
     , interpolateSetting "LlvmMaxVersion" LlvmMaxVersion
     , interpolateSetting "LlvmMinVersion" LlvmMinVersion
@@ -430,8 +435,8 @@ bindistRules = do
     , interpolateVar "TablesNextToCode" $ yesNo <$> getTarget tgtTablesNextToCode
     , interpolateVar "TargetHasLibm" $ yesNo <$> interp (staged (buildFlag TargetHasLibm))
     , interpolateVar "TargetPlatform" $ getTarget targetPlatformTriple
-    , interpolateVar "BuildPlatform"  $ interp $ queryBuild targetPlatformTriple
-    , interpolateVar "HostPlatform"   $ interp $ queryHost targetPlatformTriple
+    , interpolateVar "BuildPlatform"  $ ifM isStage3Cross (getTarget targetPlatformTriple) (interp $ queryBuild targetPlatformTriple)
+    , interpolateVar "HostPlatform"   $ ifM isStage3Cross (getTarget targetPlatformTriple) (interp $ queryHost targetPlatformTriple)
     , interpolateVar "TargetWordBigEndian" $ getTarget isBigEndian
     , interpolateVar "TargetWordSize" $ getTarget wordSize
     , interpolateVar "Unregisterised" $ yesNo <$> getTarget tgtUnregisterised
