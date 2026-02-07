@@ -27,6 +27,7 @@ test('T3231',
      [''])
 test('T4198',
      [pre_cmd('{compiler} exitminus1.c -no-hs-main -o exitminus1'),
+      extra_files(['exitminus1.c']),
       js_broken(22349),
       req_process],
      compile_and_run,

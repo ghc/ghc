@@ -31,7 +31,6 @@ import testutil
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
 from perf_notes import MetricChange, PerfStat, StatsException, AlwaysAccept, RelativeMetricAcceptanceWindow
-extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 from my_typing import *
 
@@ -1644,7 +1643,7 @@ async def test_common_work(name: TestName, opts,
                        if f.startswith(name) and not f == name and
                           not f.endswith(testdir_suffix) and
                           not os.path.splitext(f)[1] in do_not_copy)
-        for filename in (opts.extra_files + extra_src_files.get(name, [])):
+        for filename in (opts.extra_files):
             if filename.startswith('/'):
                 framework_fail(name, None,
                     'no absolute paths in extra_files please: ' + filename)
