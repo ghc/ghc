@@ -11,8 +11,6 @@ import GHC.Platform
 
 import GHC.Linker.Config
 
-import GHC.Driver.DynFlags
-
 import GHC.Unit.Types
 import GHC.Unit.State
 import GHC.Unit.Env
@@ -23,6 +21,7 @@ import GHC.Runtime.Interpreter
 
 import GHC.Utils.Exception
 import GHC.Utils.Logger
+import GHC.Driver.Session
 
 import Data.List (isPrefixOf, nub, sort, intersperse, intercalate)
 import Data.Char
