@@ -772,11 +772,12 @@ bool syncIOWaitReady(Capability   *cap,
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
         {
-            StgWord why_blocked = (rw == IORead ? BlockedOnRead : BlockedOnWrite)
-                                | BlockInfoForceNonClosure;
+            unsigned int why_blocked = (rw == IORead ? BlockedOnRead
+                                                     : BlockedOnWrite)
+                                     | BlockInfoForceNonClosure;
             tso->block_info.fd = fd;
-            RELEASE_STORE(&tso->why_blocked, why_blocked);
             appendToIOBlockedQueue(cap, tso);
+            RELEASE_STORE(&tso->why_blocked, why_blocked);
             return true;
         }
 #endif
@@ -833,8 +834,8 @@ bool syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
         {
             LowResTime target = getDelayTarget(us_delay);
             tso->block_info.target = target;
-            RELEASE_STORE(&tso->why_blocked, BlockedOnDelay | BlockInfoForceNonClosure);
             insertIntoSleepingQueue(cap, tso, target);
+            RELEASE_STORE(&tso->why_blocked, BlockedOnDelay | BlockInfoForceNonClosure);
             return true;
         }
 #endif
@@ -854,8 +855,8 @@ bool syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
              * simplifies matters, so set the status to OnDoProc and put the
              * delayed thread on the blocked_queue.
              */
-            RELEASE_STORE(&tso->why_blocked, BlockedOnDoProc);
             appendToIOBlockedQueue(cap, tso);
+            RELEASE_STORE(&tso->why_blocked, BlockedOnDoProc);
             return true;
         }
 #endif

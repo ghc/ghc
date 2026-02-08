@@ -335,8 +335,8 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
 unblock:
     // just run the thread now, if the BH is not really available,
     // we'll block again.
-    tso->why_blocked = NotBlocked;
     appendToRunQueue(cap,tso);
+    RELEASE_STORE(&tso->why_blocked, NotBlocked);
 
     // We used to set the context switch flag here, which would
     // trigger a context switch a short time in the future (at the end
@@ -368,7 +368,7 @@ migrateThread (Capability *from, StgTSO *tso, Capability *to)
     // ThreadMigrating tells the target cap that it needs to be added to
     // the run queue when it receives the MSG_TRY_WAKEUP.
     tso->block_info.unused = END_TSO_QUEUE;
-    tso->why_blocked = ThreadMigrating;
+    RELEASE_STORE(&tso->why_blocked, ThreadMigrating);
     tso->cap = to;
     tryWakeupThread(from, tso);
 }
@@ -847,7 +847,7 @@ loop:
 
     // save why_blocked here, because waking up the thread destroys
     // this information
-    StgWord why_blocked = ACQUIRE_LOAD(&tso->why_blocked);
+    unsigned int why_blocked = ACQUIRE_LOAD(&tso->why_blocked);
     ASSERT(why_blocked == BlockedOnMVarRead || why_blocked == BlockedOnMVar);
     ASSERT(tso->block_info.mvar == mvar);
 
@@ -1017,7 +1017,7 @@ printAllThreads(void)
   debugBelch("other threads:\n");
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     for (t = generations[g].threads; t != END_TSO_QUEUE; t = next) {
-      if (t->why_blocked != NotBlocked) {
+      if (RELAXED_LOAD(&t->why_blocked) != NotBlocked) {
           printThreadStatus(t);
       }
       next = t->global_link;

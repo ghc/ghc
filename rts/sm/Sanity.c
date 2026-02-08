@@ -779,7 +779,7 @@ checkTSO(StgTSO *tso)
            info == &stg_WHITEHOLE_info); // used to happen due to STM doing
                                          // lockTSO(), might not happen now
 
-    unsigned why_blocked = ACQUIRE_LOAD(&tso->why_blocked);
+    unsigned int why_blocked = ACQUIRE_LOAD(&tso->why_blocked);
     switch (why_blocked) {
     case NotBlocked:
     case BlockedOnMVar:

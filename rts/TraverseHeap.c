@@ -1243,7 +1243,7 @@ inner_loop:
         traversePushClosure(ts, (StgClosure *) tso->bq, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) tso->trec, c, sep, child_data);
 
-        StgWord why_blocked = ACQUIRE_LOAD(&tso->why_blocked);
+        unsigned int why_blocked = ACQUIRE_LOAD(&tso->why_blocked);
         if (IsBlockInfoClosure(why_blocked) && why_blocked != NotBlocked) {
             // The NotBlocked case uses block_info.prev as a TSO back link.
             // Do not follow in that case or we'll get into a loop.
