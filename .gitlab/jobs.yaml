@@ -6795,7 +6795,7 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_3-validate",
+      "BIN_DIST_NAME": "stage3-ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
