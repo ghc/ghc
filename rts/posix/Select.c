@@ -138,11 +138,10 @@ static bool wakeUpSleepingThreads (CapIOManager *iomgr, LowResTime now)
             break;
         }
         iomgr->sleeping_queue = tso->_link;
-        RELAXED_STORE(&tso->why_blocked, NotBlocked);
-        tso->_link = END_TSO_QUEUE;
         IF_DEBUG(scheduler, debugBelch("Waking up sleeping thread %"
                                        FMT_StgThreadID "\n", tso->id));
         pushOnRunQueue(iomgr->cap,tso);
+        RELEASE_STORE(&tso->why_blocked, NotBlocked);
         flag = true;
     }
     return flag;
@@ -449,7 +448,7 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
               int fd;
               enum FdState fd_state = RTS_FD_IS_BLOCKING;
 
-              switch (UntagWhyBlocked(tso->why_blocked)) {
+              switch (UntagWhyBlocked(ACQUIRE_LOAD(&tso->why_blocked))) {
               case BlockedOnRead:
                   fd = tso->block_info.fd;
 
@@ -488,9 +487,8 @@ awaitCompletedTimeoutsOrIOSelect(CapIOManager *iomgr, bool wait)
                   IF_DEBUG(scheduler,
                       debugBelch("Waking up blocked thread %" FMT_StgThreadID "\n",
                                  tso->id));
-                  tso->why_blocked = NotBlocked;
-                  tso->_link = END_TSO_QUEUE;
                   pushOnRunQueue(iomgr->cap,tso);
+                  RELEASE_STORE(&tso->why_blocked, NotBlocked);
                   break;
               case RTS_FD_IS_BLOCKING:
                   if (prev == NULL)
