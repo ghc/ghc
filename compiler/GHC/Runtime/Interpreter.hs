@@ -85,11 +85,13 @@ import GHC.Data.FastString
 
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
+import GHC.Types.Error
 
 import GHC.Utils.Panic
 import GHC.Utils.Exception as Ex
-import GHC.Utils.Outputable(brackets, ppr, showSDocUnsafe)
+import GHC.Utils.Outputable
 import GHC.Utils.Fingerprint
+import GHC.Utils.Logger (Logger, logMsg)
 
 import GHC.Unit.Module
 import GHC.Unit.Home.ModInfo
@@ -401,11 +403,11 @@ whereFrom interp ref =
     interpCmd interp (WhereFrom hval)
 
 -- | Send a Seq message to the iserv process to force a value      #2950
-seqHValue :: Interp -> UnitEnv -> ForeignHValue -> IO (EvalResult ())
-seqHValue interp unit_env ref =
+seqHValue :: Interp -> UnitEnv -> Logger -> ForeignHValue -> IO (EvalResult ())
+seqHValue interp unit_env logger ref =
   withForeignRef ref $ \hval -> do
     status <- interpCmd interp (Seq hval)
-    handleSeqHValueStatus interp unit_env status
+    handleSeqHValueStatus interp unit_env logger status
 
 evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
 evalBreakpointToId eval_break =
@@ -419,16 +421,15 @@ evalBreakpointToId eval_break =
       }
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
-handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus () -> IO (EvalResult ())
-handleSeqHValueStatus interp unit_env eval_status =
+handleSeqHValueStatus :: Interp -> UnitEnv -> Logger -> EvalStatus () -> IO (EvalResult ())
+handleSeqHValueStatus interp unit_env logger eval_status =
   case eval_status of
     (EvalBreak _ maybe_break resume_ctxt _) -> do
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
-
-      let put x = putStrLn ("*** Ignoring breakpoint " ++ (showSDocUnsafe x))
-      let nothing_case = put $ brackets . ppr $ mkGeneralSrcSpan (fsLit "<unknown>")
+      let put loc = logMsg logger MCOutput loc ("*** Ignoring breakpoint" <+> brackets (ppr loc))
+      let nothing_case = put noSrcSpan
       case maybe_break of
         Nothing -> nothing_case
           -- Nothing case - should not occur!
@@ -445,13 +446,12 @@ handleSeqHValueStatus interp unit_env eval_status =
             -- Nothing case - should not occur! We should have the appropriate
             -- breakpoint information
             Nothing -> nothing_case
-            Just modbreaks -> put . brackets . ppr =<<
-              getBreakLoc (readIModModBreaks hug) ibi modbreaks
+            Just modbreaks -> put =<< getBreakLoc (readIModModBreaks hug) ibi modbreaks
 
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do
         status <- interpCmd interp (ResumeSeq hval)
-        handleSeqHValueStatus interp unit_env status
+        handleSeqHValueStatus interp unit_env logger status
     (EvalComplete _ r) -> return r
 
 
