@@ -318,8 +318,6 @@ start:
                         }
 
                         // Terminates the run queue + this inner for-loop.
-                        tso->_link = END_TSO_QUEUE;
-                        tso->why_blocked = NotBlocked;
                         // For stg_block_async frames (read/write/doProc),
                         // write len and errCode directly to the stack.
                         // For stg_block_noregs frames (delay), nothing
@@ -329,14 +327,14 @@ start:
                             tso->stackobj->sp[2] = (W_)errCode;
                         }
                         pushOnRunQueue(&MainCapability, tso);
+                        RELEASE_STORE(&tso->why_blocked, NotBlocked);
                         break;
                     }
                     break;
-                default:
-                    if (tso->why_blocked != NotBlocked) {
-                        barf("awaitRequests: odd thread state");
-                    }
+                case NotBlocked:
                     break;
+                default:
+                    barf("awaitRequests: odd thread state");
                 }
 
                 prev = tso;
