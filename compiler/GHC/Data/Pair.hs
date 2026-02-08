@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
+
 {-
 A simple homogeneous pair type with useful Functor, Applicative, and
 Traversable instances.
@@ -20,8 +23,12 @@ import GHC.Prelude
 import GHC.Utils.Outputable
 import qualified Data.Semigroup as Semi
 
+import GHC.Generics (Generic, Generically(..))
+
 data Pair a = Pair { pFst :: a, pSnd :: a }
-  deriving (Foldable, Functor, Traversable)
+  deriving (Foldable, Functor, Traversable, Generic)
+  deriving (Semigroup, Monoid) via Generically (Pair a)
+
 -- Note that Pair is a *unary* type constructor
 -- whereas (,) is binary
 
@@ -32,13 +39,6 @@ data Pair a = Pair { pFst :: a, pSnd :: a }
 instance Applicative Pair where
   pure x = Pair x x
   (Pair f g) <*> (Pair x y) = Pair (f x) (g y)
-
-instance Semi.Semigroup a => Semi.Semigroup (Pair a) where
-  Pair a1 b1 <> Pair a2 b2 =  Pair (a1 Semi.<> a2) (b1 Semi.<> b2)
-
-instance (Semi.Semigroup a, Monoid a) => Monoid (Pair a) where
-  mempty = Pair mempty mempty
-  mappend = (Semi.<>)
 
 instance Outputable a => Outputable (Pair a) where
   ppr (Pair a b) = ppr a <+> char '~' <+> ppr b
