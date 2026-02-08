@@ -233,7 +233,6 @@ throwTo (Capability *cap,       // the Capability we hold
 uint32_t
 throwToMsg (Capability *cap, MessageThrowTo *msg)
 {
-    StgWord status;
     StgTSO *target = ACQUIRE_LOAD(&msg->target);
     Capability *target_cap;
 
@@ -268,9 +267,9 @@ check_target:
         return THROWTO_BLOCKED;
     }
 
-    status = ACQUIRE_LOAD(&target->why_blocked);
+    StgWord why_blocked = ACQUIRE_LOAD(&target->why_blocked);
 
-    switch (UntagWhyBlocked(status)) {
+    switch (UntagWhyBlocked(why_blocked)) {
     case NotBlocked:
     {
         if ((target->flags & TSO_BLOCKEX) == 0) {
@@ -370,8 +369,9 @@ check_target:
 
         // we have the MVar, let's check whether the thread
         // is still blocked on the same MVar.
-        if ((target->why_blocked != BlockedOnMVar
-             && target->why_blocked != BlockedOnMVarRead)
+        StgWord why_blocked_still = ACQUIRE_LOAD(&target->why_blocked);
+        if ((   why_blocked_still != BlockedOnMVar
+             && why_blocked_still != BlockedOnMVarRead)
             || target->block_info.mvar != mvar) {
             unlockClosure((StgClosure *)mvar, info);
             goto retry;
@@ -490,7 +490,7 @@ check_target:
         goto retry;
 
     default:
-        barf("throwTo: unrecognised why_blocked (%d)", target->why_blocked);
+        barf("throwTo: unrecognised why_blocked (%ld)", why_blocked);
     }
     barf("throwTo");
 }
@@ -667,7 +667,7 @@ removeFromMVarBlockedQueue (StgTSO *tso)
 static void
 removeFromQueues(Capability *cap, StgTSO *tso)
 {
-  switch (UntagWhyBlocked(tso->why_blocked)) {
+  switch (UntagWhyBlocked(ACQUIRE_LOAD(&tso->why_blocked))) {
 
   case NotBlocked:
   case ThreadMigrating:
@@ -721,8 +721,8 @@ removeFromQueues(Capability *cap, StgTSO *tso)
   }
 
  done:
-  RELAXED_STORE(&tso->why_blocked, NotBlocked);
   appendToRunQueue(cap, tso);
+  RELEASE_STORE(&tso->why_blocked, NotBlocked);
 }
 
 /* -----------------------------------------------------------------------------
@@ -1085,9 +1085,9 @@ done:
     IF_DEBUG(sanity, checkTSO(tso));
 
     // wake it up
-    if (tso->why_blocked != NotBlocked) {
-        tso->why_blocked = NotBlocked;
+    if (RELAXED_LOAD(&tso->why_blocked) != NotBlocked) {
         appendToRunQueue(cap,tso);
+        RELEASE_STORE(&tso->why_blocked, NotBlocked);
     }
 
     return tso;

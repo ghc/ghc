@@ -146,8 +146,9 @@ bool syncIOWaitReadyPoll(Capability *cap, StgTSO *tso,
     aiop->notify.tso     = tso;
     aiop->notify_type    = NotifyTSO;
     aiop->live           = &stg_ASYNCIO_LIVE0_closure;
-    tso->why_blocked     = rw == IORead ? BlockedOnRead : BlockedOnWrite;
     tso->block_info.aiop = aiop;
+    RELEASE_STORE(&tso->why_blocked, rw == IORead ? BlockedOnRead
+                                                  : BlockedOnWrite);
     return asyncIOWaitReadyPoll(cap, aiop, rw, fd);
 }
 
@@ -258,10 +259,9 @@ static void notifyIOCompletion(Capability *cap, StgAsyncIOOp *aiop)
                  * cap because the tso was not on the run queue of any cap and
                  * so is not subject to thread migration.
                  */
-                StgTSO *tso      = aiop->notify.tso;
-                tso->why_blocked = NotBlocked;
-                tso->_link       = END_TSO_QUEUE;
+                StgTSO *tso = aiop->notify.tso;
                 pushOnRunQueue(cap, tso);
+                RELEASE_STORE(&tso->why_blocked, NotBlocked);
             }
             break;
         }
