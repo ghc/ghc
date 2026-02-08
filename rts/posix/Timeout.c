@@ -48,8 +48,8 @@ bool syncDelayTimeout(CapIOManager *iomgr, StgTSO *tso, HsInt us_delay)
     initElemTimeoutQueue(timeout, notify, NotifyTSO, iomgr->cap->r.rCCCS);
 
     ASSERT(tso->why_blocked == NotBlocked);
-    tso->why_blocked = BlockedOnDelay;
     tso->block_info.timeout = timeout;
+    RELEASE_STORE(&tso->why_blocked, BlockedOnDelay);
 
     insertTimeoutQueue(&iomgr->timeout_queue, timeout, target);
 
@@ -116,10 +116,9 @@ static void notifyTimeoutCompletion(CapIOManager *iomgr, StgTimeout *timeout)
     switch (timeout->notify_type) {
         case NotifyTSO:
         {
-            StgTSO *tso      = timeout->notify.tso;
-            tso->why_blocked = NotBlocked;
-            tso->_link       = END_TSO_QUEUE;
+            StgTSO *tso = timeout->notify.tso;
             pushOnRunQueue(iomgr->cap, tso);
+            RELEASE_STORE(&tso->why_blocked, NotBlocked);
             break;
         }
         case NotifyMVar:

@@ -30,6 +30,15 @@ typedef StgWord64 StgThreadID;
 
 #define tsoLocked(tso) ((tso)->flags & TSO_LOCKED)
 
+/* Type for the tso->why_blocked field. See values in Constants.h.
+ *
+ * The StgThreadWhyBlocked type could be 8-bits, but for reasons
+ * unclear it is currently 32-bits. Previous comments here claimed
+ * that the smallest atomic type on AArch64 is 32-bits, but this is
+ * false.
+ */
+typedef StgWord32 StgThreadWhyBlocked;
+
 /*
  * Type returned after running a thread.  Values of this type
  * include HeapOverflow, StackOverflow etc.  See Constants.h for the
@@ -98,7 +107,21 @@ typedef union {
  * have the reason in the why_blocked field of the TSO, and some
  * further info (such as the closure the thread is blocked on, or the
  * file descriptor if the thread is waiting on I/O) in the block_info
- * field.
+ * field. See Constants.h for the why_blocked values.
+ *
+ * The why_blocked field must be updated atomically. The protocol for
+ * updating block_info and why_blocked fields together is as follows:
+ *
+ *   Writes:
+ *     - first write block_info (normal non-atomic write)
+ *     - then write why_blocked with an atomic *store release*
+ *
+ *   Reads:
+ *     - first read why_blocked with an atomic *load acquire*
+ *     - then read block_info (normal non-atomic read)
+ *
+ *   Read of only why_blocked without block_info:
+ *     - read why_blocked with an atomic *relaxed load*
  */
 
 typedef struct StgTSO_ {
@@ -148,11 +171,7 @@ typedef struct StgTSO_ {
     StgWord16               what_next;      // Values defined in Constants.h
     StgWord32               flags;          // Values defined in Constants.h
 
-    /*
-     * N.B. why_blocked only has a handful of values but must be atomically
-     * updated; the smallest width which AArch64 supports for is 32-bits.
-     */
-    StgWord32               why_blocked;    // Values defined in Constants.h
+    StgThreadWhyBlocked     why_blocked;    // Values defined in Constants.h
     StgTSOBlockInfo         block_info;     // Barrier provided by why_blocked
     StgThreadID             id;
     StgWord32               saved_errno;

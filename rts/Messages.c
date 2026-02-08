@@ -267,7 +267,8 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
         // NB. we check to make sure that the owner is not the same as
         // the current thread, since in that case it will not be on
         // the run queue.
-        if (owner->why_blocked == NotBlocked && owner->id != msg->tso->id) {
+        if (RELAXED_LOAD(&owner->why_blocked) == NotBlocked &&
+            owner->id != msg->tso->id) {
             promoteInRunQueue(cap, owner);
         }
 
@@ -328,7 +329,8 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
                       msg->tso->id, owner->id);
 
         // See above, #3838
-        if (owner->why_blocked == NotBlocked && owner->id != msg->tso->id) {
+        if (RELAXED_LOAD(&owner->why_blocked) == NotBlocked &&
+            owner->id != msg->tso->id) {
             promoteInRunQueue(cap, owner);
         }
 

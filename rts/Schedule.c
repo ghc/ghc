@@ -181,7 +181,7 @@ static void truncateRunQueue(Capability *cap);
 static StgTSO *popRunQueue (Capability *cap);
 
 static inline EventThreadStatus eventlogThreadStatus(StgThreadReturnCode ret_code);
-static inline EventThreadStatus eventlogThreadStatusBlocked(StgWord why_blocked);
+static inline EventThreadStatus eventlogThreadStatusBlocked(StgThreadWhyBlocked why_blocked);
 
 /* ---------------------------------------------------------------------------
    Main scheduling loop.
@@ -531,7 +531,7 @@ run_thread:
 #endif
 
     if (ret == ThreadBlocked) {
-        uint16_t why_blocked = ACQUIRE_LOAD(&t->why_blocked);
+        StgThreadWhyBlocked why_blocked = ACQUIRE_LOAD(&t->why_blocked);
         EventThreadStatus status = eventlogThreadStatusBlocked(why_blocked);
         StgWord32 status_detail = 0;
         if (why_blocked == BlockedOnBlackHole) {
@@ -1074,7 +1074,7 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
     //
     // and a is never equal to b given a consistent view of memory.
     //
-    if (t -> trec != NO_TREC && t -> why_blocked == NotBlocked) {
+    if (t -> trec != NO_TREC && RELAXED_LOAD(&t->why_blocked) == NotBlocked) {
         if (!stmValidateNestOfTransactions(cap, t -> trec, true)) {
             debugTrace(DEBUG_sched | DEBUG_stm,
                        "trec %p found wasting its time", t);
@@ -2508,9 +2508,9 @@ suspendThread (StgRegTable *reg, bool interruptible)
 
   tso->block_info.unused = END_TSO_QUEUE;
   if (interruptible) {
-    tso->why_blocked = BlockedOnCCall_Interruptible;
+    RELEASE_STORE(&tso->why_blocked, BlockedOnCCall_Interruptible);
   } else {
-    tso->why_blocked = BlockedOnCCall;
+    RELEASE_STORE(&tso->why_blocked, BlockedOnCCall);
   }
 
   // Hand back capability
@@ -2568,16 +2568,25 @@ resumeThread (void *task_)
     tso = incall->suspended_tso;
     incall->suspended_tso = NULL;
     incall->suspended_cap = NULL;
+
+    // we set why_blocked previously in suspendThread
+    ASSERT(tso->why_blocked == BlockedOnCCall ||
+           tso->why_blocked == BlockedOnCCall_Interruptible);
+
     // we will modify tso->_link
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
         updateRemembSetPushClosure(cap, (StgClosure *)tso->_link);
     }
     tso->_link = END_TSO_QUEUE;
+    // but no need to modify tso->block_info.prev as coincidentally
+    // it has the value we want already (since in suspendThread we set
+    // tso->block_info.unused to END_TSO_QUEUE for BlockedOnCCall).
+    ASSERT(tso->block_info.prev == END_TSO_QUEUE);
 
     traceEventRunThread(cap, tso);
 
     /* Reset blocking status */
-    tso->why_blocked  = NotBlocked;
+    RELEASE_STORE(&tso->why_blocked, NotBlocked);
 
     if ((tso->flags & TSO_BLOCKEX) == 0) {
         // avoid locking the TSO if we don't have to
@@ -2950,8 +2959,9 @@ deleteThread (StgTSO *tso)
     // The TSO must be on the run queue of the Capability we own, or
     // we must own all Capabilities.
 
-    if (tso->why_blocked != BlockedOnCCall &&
-        tso->why_blocked != BlockedOnCCall_Interruptible) {
+    StgThreadWhyBlocked why_blocked = RELAXED_LOAD(&tso->why_blocked);
+    if (why_blocked != BlockedOnCCall &&
+        why_blocked != BlockedOnCCall_Interruptible) {
         throwToSingleThreaded(tso->cap,tso,NULL);
     }
 }
@@ -2962,10 +2972,12 @@ deleteThread_(StgTSO *tso)
 { // for forkProcess only:
   // like deleteThread(), but we delete threads in foreign calls, too.
 
-    if (tso->why_blocked == BlockedOnCCall ||
-        tso->why_blocked == BlockedOnCCall_Interruptible) {
+    StgThreadWhyBlocked why_blocked = RELAXED_LOAD(&tso->why_blocked);
+    if (why_blocked == BlockedOnCCall ||
+        why_blocked == BlockedOnCCall_Interruptible) {
         tso->what_next = ThreadKilled;
         appendToRunQueue(tso->cap, tso);
+        RELEASE_STORE(&tso->why_blocked, NotBlocked);
     } else {
         deleteThread(tso);
     }
@@ -3355,7 +3367,7 @@ resurrectThreads (StgTSO *threads)
         // Wake up the thread on the Capability it was last on
         cap = tso->cap;
 
-        switch (UntagWhyBlocked(tso->why_blocked)) {
+        switch (UntagWhyBlocked(RELAXED_LOAD(&tso->why_blocked))) {
         case BlockedOnMVar:
         case BlockedOnMVarRead:
             /* Called by GC - sched_mutex lock is currently held. */
@@ -3427,7 +3439,7 @@ static inline EventThreadStatus eventlogThreadStatus(StgThreadReturnCode ret_cod
     return thread_stop_code[ret_code];
 }
 
-static inline EventThreadStatus eventlogThreadStatusBlocked(StgWord why_blocked)
+static inline EventThreadStatus eventlogThreadStatusBlocked(StgThreadWhyBlocked why_blocked)
 {
     return thread_blocked_code[UntagWhyBlocked(why_blocked)];
 }
