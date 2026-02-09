@@ -83,6 +83,9 @@ where
 import GHC.Prelude
 import GHC.Driver.Flags
 import GHC.Types.Error
+  ( MessageClass (..), Severity (..)
+  , mkLocMessageWarningGroups,getCaretDiagnostic )
+-- import GHC.Types.Error ()
 import GHC.Types.SrcLoc
 
 import qualified GHC.Utils.Ppr as Pretty
