@@ -7866,6 +7866,18 @@ pprErrCtxtMsg = \case
     -> hang (text "In a stmt of" <+> pprAStmtContext ctxt <> colon)
        2 (ppr_stmt stmt)
 
+  DoStmtErrCtxt ctxt stmt
+    -- For [ e | .. ], do not mutter about "stmts"
+    | LastStmt _ e _ _ <- (unLoc stmt)
+    , isComprehensionContext ctxt
+    -> hang (text "In the expression:") 2 (ppr e)
+    | otherwise
+    -> hang (text "In a stmt of" <+> pprAStmtContext ctxt <> colon)
+       2 (ppr_stmt (unLoc stmt))
+
+  StmtErrCtxtPat _ _ pat ->
+    hang (text "In the pattern:") 2 (ppr pat)
+
   DerivInstCtxt pred ->
     text "When deriving the instance for" <+> parens (ppr pred)
   StandaloneDerivCtxt ty ->

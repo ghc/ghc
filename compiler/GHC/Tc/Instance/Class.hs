@@ -1288,7 +1288,7 @@ warnIncompleteRecSel dflags sel_id ct_loc
 
     -- GHC.Tc.Gen.App.tcInstFun arranges that the CtOrigin of (r.x) is GetFieldOrigin,
     -- despite the expansion to (getField @"x" r)
-    isGetFieldOrigin (ExpansionOrigin (OrigExpr (HsGetField {}))) = True
+    isGetFieldOrigin (ExpansionOrigin (ExprCtxt (HsGetField {}))) = True
     isGetFieldOrigin _                   = False
 
 lookupHasFieldLabel

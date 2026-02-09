@@ -909,7 +909,7 @@ tcInstFun do_ql inst_final ds_flag (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigm
     mk_herald :: HsExpr GhcTc -> HsExpr GhcRn -> CtOrigin
     mk_herald tc_fun arg
       = case fun_orig of
-           ExpansionOrigin (OrigStmt{}) -> ExpectedTySyntax DoStmtOrigin arg
+           ExpansionOrigin (StmtErrCtxt{}) -> ExpectedTySyntax DoStmtOrigin arg
            _ -> ExpectedFunTyArg (HsExprTcThing tc_fun) arg
 
 -- Is the argument supposed to instantiate a forall?
@@ -973,8 +973,8 @@ addArgCtxt arg_no (app_head, app_head_lspan) (L arg_loc arg) thing_inside
  where
     addNthFunArgErrCtxt :: HsExpr GhcRn -> HsExpr GhcRn -> Int -> TcM a -> TcM a
     addNthFunArgErrCtxt app_head arg arg_no thing_inside
-      | XExpr (ExpandedThingRn o _) <- arg
-      = addExpansionErrCtxt o (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
+      | XExpr (ExpandedThingRn _ _) <- arg
+      = addExpansionErrCtxt (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
           thing_inside
       | otherwise
       = addErrCtxt (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
@@ -1258,7 +1258,7 @@ expr_to_type earg =
       | otherwise = not_in_scope
       where occ = occName rdr
             not_in_scope = failWith $ TcRnNotInScope NotInScope rdr
-    go (L l (XExpr (ExpandedThingRn (OrigExpr orig) _))) =
+    go (L l (XExpr (ExpandedThingRn (ExprCtxt orig) _))) =
       -- Use the original, user-written expression (before expansion).
       -- Example. Say we have   vfun :: forall a -> blah
       --          and the call  vfun (Maybe [1,2,3])

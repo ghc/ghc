@@ -1091,12 +1091,8 @@ setSrcSpan (RealSrcSpan loc _) thing_inside
 setSrcSpan _ thing_inside
   = thing_inside
 
-getSrcCodeOrigin :: TcRn (Maybe SrcCodeOrigin)
-getSrcCodeOrigin =
-  do inGenCode <- inGeneratedCode
-     if inGenCode
-       then getLclEnvSrcCodeOrigin <$> getLclEnv
-       else return Nothing
+getSrcCodeOrigin :: TcRn (Maybe ErrCtxtMsg)
+getSrcCodeOrigin = getLclEnvSrcCodeOrigin <$> getLclEnv
 
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
@@ -1346,12 +1342,12 @@ add_expr_ctxt e thing_inside
    -- because it is mentioned in the error message itself
 
       ExprWithTySig _ (L _ e') _
-        | XExpr (ExpandedThingRn o _) <- e' -> addExpansionErrCtxt o (ExprCtxt e) thing_inside
+        | XExpr (ExpandedThingRn o _) <- e' -> addExpansionErrCtxt o thing_inside
    -- There is a special case for expressions with signatures to avoid having too verbose
    -- error context. So here we flip the ErrCtxt state to expanded if the expression is expanded.
    -- c.f. RecordDotSyntaxFail9
 
-      XExpr (ExpandedThingRn o _) -> addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) thing_inside
+      XExpr (ExpandedThingRn o _) -> addExpansionErrCtxt o thing_inside
    -- Flip error ctxt into expansion mode
 
       _ -> addErrCtxt (ExprCtxt e) thing_inside
@@ -1369,23 +1365,23 @@ setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 addErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
-addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
+addErrCtxt msg = addErrCtxtM msg
 
 -- See Note [ErrCtxtStack Manipulation]
-addExpansionErrCtxt :: SrcCodeOrigin -> ErrCtxtMsg -> TcM a -> TcM a
+addExpansionErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addExpansionErrCtxt #-}   -- Note [Inlining addErrCtxt]
-addExpansionErrCtxt o msg = addExpansionErrCtxtM o (\env -> return (env, msg))
+addExpansionErrCtxt msg = addExpansionErrCtxtM msg
 
 -- | Add a message to the error context. This message may do tidying.
 --   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
-addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
+addErrCtxtM :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addErrCtxtM ctxt = pushCtxt (MkErrCtxt VanillaUserSrcCode ctxt)
 
 -- See Note [ErrCtxtStack Manipulation]
-addExpansionErrCtxtM :: SrcCodeOrigin -> (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
+addExpansionErrCtxtM :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addExpansionErrCtxtM #-}  -- Note [Inlining addErrCtxt]
-addExpansionErrCtxtM o ctxt = pushCtxt (MkErrCtxt (ExpansionCodeCtxt o) ctxt)
+addExpansionErrCtxtM ctxt = pushCtxt (MkErrCtxt ExpansionCodeCtxt ctxt)
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
@@ -1393,11 +1389,11 @@ addExpansionErrCtxtM o ctxt = pushCtxt (MkErrCtxt (ExpansionCodeCtxt o) ctxt)
 -- reported.
 addLandmarkErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxt #-}  -- Note [Inlining addErrCtxt]
-addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
+addLandmarkErrCtxt msg = addLandmarkErrCtxtM msg
 
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
-addLandmarkErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
+addLandmarkErrCtxtM :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxtM ctxt = pushCtxt (MkErrCtxt LandmarkUserSrcCode ctxt)
 
@@ -1966,14 +1962,14 @@ mkErrCtxt env ctxts
    go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
    go _ _ _   [] = return []
    go dbg n env (MkErrCtxt LandmarkUserSrcCode ctxt : ctxts)
-     = do { (env', msg) <- liftZonkM $ ctxt env
-          ; rest <- go dbg n env' ctxts
-          ; return (msg : rest) }
+     = do { -- (env', msg) <- liftZonkM $ emptyTidyEnv env
+          ; rest <- go dbg n env ctxts
+          ; return (ctxt : rest) }
    go dbg n env (MkErrCtxt _ ctxt : ctxts)
      | n < mAX_CONTEXTS -- Too verbose || dbg
-     = do { (env', msg) <- liftZonkM $ ctxt env
-          ; rest <- go dbg (n+1) env' ctxts
-          ; return (msg : rest) }
+     = do { -- (env', msg) <- liftZonkM $ emptyTidyEnv env
+          ; rest <- go dbg (n+1) env ctxts
+          ; return (ctxt : rest) }
      | otherwise
      = go dbg n env ctxts -- need to compute this for zonking
 
