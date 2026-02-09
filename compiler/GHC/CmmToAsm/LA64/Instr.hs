@@ -150,10 +150,11 @@ regUsageOfInstr platform instr = case instr of
   -- ranges, corresponding to 2 and 1 instruction implementations respectively.
   --
   -- BCOND1 is selected by default.
-  BCOND1 _ j d t           -> usage (regTarget t ++ regOp j ++ regOp d, [])
-  BCOND _ j d t            -> usage (regTarget t ++ regOp j ++ regOp d, [])
-  BEQZ j t                 -> usage (regTarget t ++ regOp j, [])
-  BNEZ j t                 -> usage (regTarget t ++ regOp j, [])
+  BCOND1 _ j d t        -> usage (regTarget t ++ regOp j ++ regOp d, [])
+  BCOND _ j d t         -> usage (regTarget t ++ regOp j ++ regOp d, [])
+  BEQZ1 o1 o2           -> usage (regOp o1 ++ regOp o2, [])
+  BEQZ j t              -> usage (regTarget t ++ regOp j, [])
+  BNEZ j t              -> usage (regTarget t ++ regOp j, [])
   -- 5. Common Memory Access Instructions --------------------------------------
   LD _ dst src             -> usage (regOp src, regOp dst)
   LDU _ dst src            -> usage (regOp src, regOp dst)
@@ -168,7 +169,17 @@ regUsageOfInstr platform instr = case instr of
   -- LDCOND dst src1 src2     -> usage (regOp src1 ++ regOp src2, regOp dst)
   -- STCOND dst src1 src2     -> usage (regOp src1 ++ regOp src2, regOp dst)
   -- 7. Atomic Memory Access Instructions --------------------------------------
+  -- In LoongArch, if the AM* atomic memory access instruction has the same register number as rd and rj,
+  -- the execution will trigger an Instruction Non-defined Exception. Here should be avoided.
   AMSWAPDB _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  AMADDDB  _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  AMANDDB  _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  AMORDB   _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  AMXORDB  _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp dst)
+  --AMCASDB  _ dst src1 src2 -> usage (regOp src1 ++ regOp src2, regOp src1 ++ regOp src2 ++ regOp dst)
+  AMCASDB  _ dst src1 src2 -> usage (regOp dst ++ regOp src1 ++ regOp src2, regOp dst)
+  LL  _ dst src1 _ -> usage (regOp src1, regOp dst)
+  SC  _ dst src1 _ -> usage (regOp src1, regOp dst)
   -- 8. Barrier Instructions ---------------------------------------------------
   DBAR _hint               -> usage ([], [])
   IBAR _hint               -> usage ([], [])
@@ -330,6 +341,7 @@ patchRegsOfInstr instr env = case instr of
     TAIL36 r t     -> TAIL36 (patchOp r) (patchTarget t)
     BCOND1 c j d t -> BCOND1 c (patchOp j) (patchOp d) (patchTarget t)
     BCOND c j d t  -> BCOND c (patchOp j) (patchOp d) (patchTarget t)
+    BEQZ1 o1 o2    -> BEQZ1 (patchOp o1) (patchOp o2)
     BEQZ j t       -> BEQZ (patchOp j) (patchTarget t)
     BNEZ j t       -> BNEZ (patchOp j) (patchTarget t)
     -- 5. Common Memory Access Instructions --------------------------------------
@@ -348,6 +360,13 @@ patchRegsOfInstr instr env = case instr of
     -- STCOND o1 o2 o3       -> STCOND  (patchOp o1)  (patchOp o2)  (patchOp o3)
     -- 7. Atomic Memory Access Instructions --------------------------------------
     AMSWAPDB f o1 o2 o3 -> AMSWAPDB f (patchOp o1) (patchOp o2) (patchOp o3)
+    AMADDDB f o1 o2 o3  -> AMADDDB f (patchOp o1) (patchOp o2) (patchOp o3)
+    AMANDDB f o1 o2 o3  -> AMANDDB f (patchOp o1) (patchOp o2) (patchOp o3)
+    AMORDB f o1 o2 o3   -> AMORDB f (patchOp o1) (patchOp o2) (patchOp o3)
+    AMXORDB f o1 o2 o3  -> AMXORDB f (patchOp o1) (patchOp o2) (patchOp o3)
+    AMCASDB f o1 o2 o3  -> AMCASDB f (patchOp o1) (patchOp o2) (patchOp o3)
+    LL f o1 o2 o3  -> LL f (patchOp o1) (patchOp o2) (patchOp o3)
+    SC f o1 o2 o3  -> SC f (patchOp o1) (patchOp o2) (patchOp o3)
     -- 8. Barrier Instructions ---------------------------------------------------
     DBAR o1             -> DBAR o1
     IBAR o1             -> IBAR o1
@@ -398,6 +417,7 @@ isJumpishInstr instr = case instr of
   TAIL36 {} -> True
   BCOND1 {} -> True
   BCOND {} -> True
+  BEQZ1 {} -> True
   BEQZ {} -> True
   BNEZ {} -> True
   _ -> False
@@ -718,6 +738,7 @@ data Instr
     | TAIL36 Operand Target
     | BCOND1 Cond Operand Operand Target
     | BCOND Cond Operand Operand Target
+    | BEQZ1 Operand Operand
     | BEQZ Operand Target
     | BNEZ Operand Target
     -- 5. Common Memory Access Instructions --------------------------------------
@@ -733,6 +754,13 @@ data Instr
     -- 6. Bound Check Memory Access Instructions ---------------------------------
     -- 7. Atomic Memory Access Instructions --------------------------------------
     | AMSWAPDB Format Operand Operand Operand
+    | AMADDDB Format Operand Operand Operand
+    | AMANDDB Format Operand Operand Operand
+    | AMORDB Format Operand Operand Operand
+    | AMXORDB Format Operand Operand Operand
+    | AMCASDB Format Operand Operand Operand
+    | LL Format Operand Operand Operand
+    | SC Format Operand Operand Operand
     -- 8. Barrier Instructions ---------------------------------------------------
     | DBAR BarrierType
     | IBAR BarrierType
@@ -839,6 +867,7 @@ instrCon i =
       TAIL36{} -> "TAIL36"
       BCOND1{} -> "BCOND1"
       BCOND{} -> "BCOND"
+      BEQZ1{} -> "BEQZ1"
       BEQZ{} -> "BEQZ"
       BNEZ{} -> "BNEZ"
       LD{} -> "LD"
@@ -851,6 +880,13 @@ instrCon i =
       STPTR{} -> "STPTR"
       PRELD{} -> "PRELD"
       AMSWAPDB{} -> "AMSWAPDB"
+      AMADDDB{} -> "AMADDDB"
+      AMANDDB{} -> "AMANDDB"
+      AMORDB{} -> "AMORDB"
+      AMXORDB{} -> "AMXORDB"
+      AMCASDB{} -> "AMCASDB"
+      LL{} -> "LL"
+      SC{} -> "SC"
       DBAR{} -> "DBAR"
       IBAR{} -> "IBAR"
       FCVT{} -> "FCVT"

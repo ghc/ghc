@@ -57,6 +57,12 @@ import Control.Monad
 import GHC.Cmm.Dataflow.Label
 import GHC.Types.Unique.DSM
 import GHC.Types.Literal.Floating
+import GHC.Unit.Types ( ghcInternalUnitId )
+
+la664Enabled :: NatM Bool
+la664Enabled = do
+  config <- getConfig
+  return (ncgLa664Enabled config)
 
 -- [General layout of an NCG]
 cmmTopCodeGen ::
@@ -1651,6 +1657,10 @@ genPrim (MO_Prefetch_Data _n) []     [_]            = return nilOL
 genPrim (MO_AtomicRead w mo)  [dst]  [addr]         = genAtomicRead w mo dst addr
 genPrim (MO_AtomicWrite w mo) []     [addr,val]     = genAtomicWrite w mo addr val
 
+genPrim (MO_AtomicRMW width amop)    [dst] [addr,n] = genLibCCall (atomicRMWLabel width amop) [dst] [addr,n]
+genPrim (MO_Cmpxchg width)   [dst]   [addr,expe,new]  = genCmpxchg width dst addr expe new
+genPrim (MO_Xchg width)      [dst]   [addr,value]     = genXchg width dst addr value
+
 genPrim mop@(MO_S_Mul2     _w) _         _          = unsupported mop
 genPrim mop@(MO_S_QuotRem  _w) _         _          = unsupported mop
 genPrim mop@(MO_U_QuotRem  _w) _         _          = unsupported mop
@@ -1674,9 +1684,6 @@ genPrim (MO_PopCnt width)    [dst]   [src]          = genLibCCall (popCntLabel w
 genPrim (MO_Pdep width)      [dst]   [src,mask]     = genLibCCall (pdepLabel width) [dst] [src,mask]
 genPrim (MO_Pext width)      [dst]   [src,mask]     = genLibCCall (pextLabel width) [dst] [src,mask]
 genPrim (MO_UF_Conv width)   [dst]   [src]          = genLibCCall (word2FloatLabel width) [dst] [src]
-genPrim (MO_AtomicRMW width amop)    [dst] [addr,n] = genLibCCall (atomicRMWLabel width amop) [dst] [addr,n]
-genPrim (MO_Cmpxchg width)   [dst]   [addr,old,new] = genLibCCall (cmpxchgLabel width) [dst] [addr,old,new]
-genPrim (MO_Xchg width)      [dst]   [addr,val]     = genLibCCall (xchgLabel width) [dst] [addr,val]
 genPrim (MO_Memcpy _align)   []   [dst,src,n]       = genLibCCall (fsLit "memcpy")  [] [dst,src,n]
 genPrim (MO_Memmove _align)  []   [dst,src,n]       = genLibCCall (fsLit "memmove") [] [dst,src,n]
 genPrim (MO_Memcmp _align)   [rst]   [dst,src,n]    = genLibCCall (fsLit "memcmp")  [rst] [dst,src,n]
@@ -1872,6 +1879,20 @@ genBitRev w dst src = do
              )
     _ -> return ( code_x `snocOL` BITREV (OpReg w dst_reg) (OpReg w reg_x))
 
+genPrimCCall
+  :: FastString
+  -> [CmmFormal]
+  -> [CmmActual]
+  -> NatM InstrBlock
+
+genPrimCCall name dsts args = do
+  config <- getConfig
+  target <-
+    cmmMakeDynamicReference config CallReference
+      $ mkCmmCodeLabel ghcInternalUnitId name
+  let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
+  genCCall target cconv dsts args
+
 -- Generate C call to the given function in libc
 genLibCCall :: FastString -> [CmmFormal] -> [CmmActual] -> NatM InstrBlock
 genLibCCall name dsts args = do
@@ -1945,6 +1966,52 @@ genAtomicWrite w mo addr val = do
              )
     _ ->  panic $ "Unexpected MemOrderAcquire on an AtomicWrite" ++ show mo
 
+genCmpxchg :: Width -> LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> NatM InstrBlock
+genCmpxchg w dst addr expe new = do
+  config <- getConfig
+  let
+    platform = ncgPlatform config
+    format = intFormat w
+
+  la664Enabled >>= \case
+
+    True -> do
+      (addr_reg, _, code_addr) <- getSomeReg addr
+      (expe_reg, _, code_expe) <- getSomeReg expe
+      (new_reg, _, code_new) <- getSomeReg new
+      let dst_reg = getRegisterReg platform (CmmLocal dst)
+      return $ code_addr `appOL` code_expe `appOL` code_new `appOL` toOL
+        [
+          -- Behave like the GCC builtin CAS operation
+          AMCASDB format (OpReg w expe_reg) (OpReg w new_reg) (OpReg w addr_reg),
+          MOV (OpReg w dst_reg) (OpReg w expe_reg)
+        ]
+
+    False ->
+      genPrimCCall (cmpxchgLabel w) [dst] [addr,expe,new]
+
+genXchg :: Width -> LocalReg -> CmmExpr -> CmmExpr -> NatM InstrBlock
+genXchg w dst addr val = do
+  config <- getConfig
+  tmp <- getNewRegNat II64
+  let
+    platform = ncgPlatform config
+    format = intFormat w
+
+  la664Enabled >>= \case
+
+    True -> do
+      (addr_reg, _, code_addr) <- getSomeReg addr
+      (val_reg, _, code_val) <- getSomeReg val
+      let dst_reg = getRegisterReg platform (CmmLocal dst)
+      return $ code_addr `appOL` code_val `appOL` toOL
+        [
+          AMSWAPDB format (OpReg w tmp) (OpReg w val_reg) (OpReg w addr_reg),
+          MOV (OpReg W64 dst_reg) (OpReg W64 tmp)
+        ]
+    False ->
+      genPrimCCall (xchgLabel w) [dst] [addr,val]
+
 -- -----------------------------------------------------------------------------
 {-
 Generating C calls
@@ -1977,6 +2044,7 @@ member of a structure or union argument, or a vector/floating-point argument
 wider than FRLEN may be passed in a GAR.
 -}
 
+-- Generate C call to the given function in ghc-prim
 genCCall
   :: CmmExpr            -- address of func call
   -> ForeignConvention  -- calling convention

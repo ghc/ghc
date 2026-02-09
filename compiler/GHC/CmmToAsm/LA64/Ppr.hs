@@ -852,6 +852,7 @@ pprInstr platform instr = case instr of
       line $ text "\tbgeu" <+> pprOp platform d <> comma <+> pprOp platform j <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
     UGT ->
       line $ text "\tbltu" <+> pprOp platform d <> comma <+> pprOp platform j <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+
     _ -> line $ text "\t" <> pprBcond c <+> pprOp platform j <> comma <+> pprOp platform d <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
 
   BCOND1 _ _ _ (TLabel _) -> panic "LA64.ppr: BCOND1: No conditional branching to TLabel!"
@@ -916,17 +917,18 @@ pprInstr platform instr = case instr of
 
   BCOND _ _ _ (TReg _) -> panic "LA64.ppr: BCOND: No conditional branching to registers!"
 
+  BEQZ1 o1 o2 | isImmOp o2 -> op2 (text "\tbeqz") o1 o2
   BEQZ j (TBlock bid) ->
     line $ text "\tbeqz" <+> pprOp platform j <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
   BEQZ j (TLabel lbl) ->
     line $ text "\tbeqz" <+> pprOp platform j <> comma <+> pprAsmLabel platform lbl
-  BEQZ _ (TReg _)     -> panic "LA64.ppr: BEQZ: No conditional branching to registers!"
+  BEQZ _ (TReg _) -> panic "LA64.ppr: BEQZ: No conditional branching to registers!"
 
   BNEZ j (TBlock bid) ->
     line $ text "\tbnez" <+> pprOp platform j <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
   BNEZ j (TLabel lbl) ->
     line $ text "\tbnez" <+> pprOp platform j <> comma <+> pprAsmLabel platform lbl
-  BNEZ _ (TReg _)     -> panic "LA64.ppr: BNEZ: No conditional branching to registers!"
+  BNEZ _ (TReg _) -> panic "LA64.ppr: BNEZ: No conditional branching to registers!"
 
   -- 5. Common Memory Access Instructions --------------------------------------
     -- LD.{B[U]/H[U]/W[U]/D}, ST.{B/H/W/D}: AddrRegImm
@@ -1020,8 +1022,29 @@ pprInstr platform instr = case instr of
   AMSWAPDB II32 o1 o2 o3 -> op3 (text "\tamswap_db.w") o1 o2 o3
   AMSWAPDB II64 o1 o2 o3 -> op3 (text "\tamswap_db.d") o1 o2 o3
     -- AM.{SWAP/ADD}[_DB].{B/H}
+  AMADDDB II8  o1 o2 o3 -> op3 (text "\tamadd_db.b") o1 o2 o3
+  AMADDDB II16 o1 o2 o3 -> op3 (text "\tamadd_db.h") o1 o2 o3
+  AMADDDB II32 o1 o2 o3 -> op3 (text "\tamadd_db.w") o1 o2 o3
+  AMADDDB II64 o1 o2 o3 -> op3 (text "\tamadd_db.d") o1 o2 o3
+
+  AMANDDB II32 o1 o2 o3 -> op3 (text "\tamand_db.w") o1 o2 o3
+  AMANDDB II64 o1 o2 o3 -> op3 (text "\tamand_db.d") o1 o2 o3
+
+  AMORDB II32 o1 o2 o3 -> op3 (text "\tamor_db.w") o1 o2 o3
+  AMORDB II64 o1 o2 o3 -> op3 (text "\tamor_db.d") o1 o2 o3
+
+  AMXORDB II32 o1 o2 o3 -> op3 (text "\tamxor_db.w") o1 o2 o3
+  AMXORDB II64 o1 o2 o3 -> op3 (text "\tamxor_db.d") o1 o2 o3
     -- AMCAS[_DB].{B/H/W/D}
+  AMCASDB II8  o1 o2 o3 -> op3 (text "\tamcas_db.b") o1 o2 o3
+  AMCASDB II16 o1 o2 o3 -> op3 (text "\tamcas_db.h") o1 o2 o3
+  AMCASDB II32 o1 o2 o3 -> op3 (text "\tamcas_db.w") o1 o2 o3
+  AMCASDB II64 o1 o2 o3 -> op3 (text "\tamcas_db.d") o1 o2 o3
     -- LL.{W/D}, SC.{W/D}
+  LL II32 o1 o2 o3 -> op3 (text "\tll.w") o1 o2 o3
+  SC II32 o1 o2 o3 -> op3 (text "\tsc.w") o1 o2 o3
+  LL II64 o1 o2 o3 -> op3 (text "\tll.d") o1 o2 o3
+  SC II64 o1 o2 o3 -> op3 (text "\tsc.d") o1 o2 o3
     -- SC.Q
     -- LL.ACQ.{W/D}, SC.REL.{W/D}
   -- 8. Barrier Instructions ---------------------------------------------------
