@@ -616,6 +616,14 @@ Other options related to interface files
     where ⟨file⟩ is the name of an interface file, dumps the contents of
     that interface in a human-readable format. See :ref:`modes`.
 
+.. ghc-flag:: --show-bytecode ⟨file⟩
+    :shortdesc: See :ref:`modes`.
+    :type: mode
+    :category: interface-files
+
+    where ⟨file⟩ is the name of a bytecode ``.gbc`` file, dumps the contents
+    in a human-readable format. See :ref:`modes`.
+
 .. _hie-options:
 
 Options related to extended interface files

@@ -417,6 +417,15 @@ The available mode flags are:
     Read the interface in ⟨file⟩ and dump it as text to ``stdout``. For
     example ``ghc --show-iface M.hi``.
 
+.. ghc-flag:: --show-bytecode ⟨file⟩
+    :shortdesc: display the contents of a bytecode file.
+    :type: mode
+    :category: modes
+
+    Read the bytecode produced by :ref:`-fwrite-byte-code <ghc-flag--fwrite-byte-code>`
+    in ⟨file⟩ and dump it as text to ``stdout``. This is useful when diffing
+    two ``.gbc`` files.
+
 .. ghc-flag:: --supported-extensions
               --supported-languages
     :shortdesc: display the supported language extensions

@@ -1,5 +1,7 @@
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -- Orphans are here since the Binary instances use an ad-hoc means of serialising
 -- names which we don't want to pollute the rest of the codebase with.
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -16,39 +18,50 @@ module GHC.ByteCode.Serialize
   , readBytecodeLib
   , decodeOnDiskModuleByteCode
   , decodeOnDiskBytecodeLib
+  , showBytecode
   )
 where
 
 import Control.Monad
+import Data.Array (Array, assocs)
+import Data.Array.Base (UArray(..))
+import Data.Array.IArray (IArray, elems)
 import Data.Binary qualified as Binary
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import Data.Foldable
 import Data.IORef
 import Data.Proxy
+import Data.Traversable
 import Data.Word
+import qualified Data.IntMap as IM
+import Foreign.Storable (Storable, sizeOf)
 import GHC.ByteCode.Types
 import GHC.Data.FastString
+import GHC.Driver.DynFlags
 import GHC.Driver.Env
+import GHC.Exts (ByteArray#, Int(I#), sizeofByteArray#)
+import GHC.HsToCore.Breakpoints (ModBreaks(..))
 import GHC.Iface.Binary
+import GHC.Linker.Types
 import GHC.Prelude
+import GHCi.Message (ConInfoTable(..))
 import GHC.Types.Name
 import GHC.Types.Name.Cache
+import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
+import GHC.Types.Error (MessageClass(MCDump))
+import GHC.Unit.Types
 import GHC.Utils.Binary
 import GHC.Utils.Exception
+import GHC.Utils.Logger
+import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.TmpFs
-import System.FilePath
-import GHC.Unit.Types
-import GHC.Driver.DynFlags
+import Numeric (showHex)
 import System.Directory
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
-import Data.Traversable
-import GHC.Utils.Logger
-import GHC.Linker.Types
+import System.FilePath
 import System.IO.Unsafe (unsafeInterleaveIO)
-import GHC.Utils.Outputable
-import GHC.Types.Name.Env
 
 {- Note [Overview of persistent bytecode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -98,6 +111,7 @@ data OnDiskModuleByteCode = OnDiskModuleByteCode { odgbc_module :: Module
                                                  , odgbc_compiled_byte_code :: CompiledByteCode
                                                  , odgbc_foreign :: [ByteString]  -- ^ Contents of object files
                                                  }
+
 
 type OnDiskBytecodeLib = BytecodeLibX (Maybe InterpreterLibraryContents)
 
@@ -447,4 +461,179 @@ addBinNameReader HscEnv {..} bh' = do
 -- use an incrementing counter to give each local name it's own unique number. A substitution
 -- is maintained to give each occurence of the Name the same unique key. When the interface
 -- is read, a reverse mapping is used from these unique keys to a Name.
---
+
+
+-- | Debugging function for displaying a .gbc file.
+showBytecode :: Logger -> HscEnv -> FilePath -> IO ()
+showBytecode logger hsc_env filename = do
+  odbco <- readOnDiskModuleByteCode hsc_env filename
+  logMsg logger MCDump noSrcSpan
+    $ withPprStyle defaultDumpStyle
+    $ pprOnDiskModuleByteCode odbco
+
+pprOnDiskModuleByteCode :: OnDiskModuleByteCode -> SDoc
+pprOnDiskModuleByteCode OnDiskModuleByteCode{..} =
+  vcat
+    [ text "module:" <+> ppr odgbc_module
+    , text "compiled bytecode:" $$ nest 2 (pprCompiledByteCodeDetailed odgbc_compiled_byte_code)
+    , text "foreign blobs:" $$ nest 2 (pprForeignBlobs odgbc_foreign)
+    ]
+
+pprForeignBlobs :: [ByteString] -> SDoc
+pprForeignBlobs blobs =
+  case zip [(0 :: Int)..] blobs of
+    [] -> text "<none>"
+    entries -> vcat $ map (\(i, blob) ->
+                 vcat [ text ("blob[" ++ show i ++ "] length " ++ show (BS.length blob))
+                      , nest 2 (pprByteString blob)
+                      ]) entries
+
+pprCompiledByteCodeDetailed :: CompiledByteCode -> SDoc
+pprCompiledByteCodeDetailed CompiledByteCode{..} =
+  vcat
+    [ text "BCOs:" $$ nest 2 (pprBCOList (elemsFlatBag bc_bcos))
+    , text "info tables:" $$ nest 2 (pprInfoTables bc_itbls)
+    , text "strings:" $$ nest 2 (pprStringLiterals bc_strs)
+    , text "breakpoints:" $$ nest 2 (maybe (text "<none>") pprInternalModBreaksDetailed bc_breaks)
+    , text "spt entries:" $$ nest 2 (pprListOrNone (map ppr bc_spt_entries))
+    ]
+
+pprBCOList :: [UnlinkedBCO] -> SDoc
+pprBCOList [] = text "<none>"
+pprBCOList bcos = vcat (map pprUnlinkedBCODetailed bcos)
+
+pprUnlinkedBCODetailed :: UnlinkedBCO -> SDoc
+pprUnlinkedBCODetailed UnlinkedBCO{..} =
+  vcat
+    [ text "BCO" <+> ppr unlinkedBCOName
+    , nest 2 $ vcat
+        [ text "arity:" <+> int unlinkedBCOArity
+        , text "instrs:" <+> pprIntegerList (wordListFromBCO unlinkedBCOInstrs)
+        , text "bitmap:" <+> pprIntegerList (wordListFromBCO unlinkedBCOBitmap)
+        , text "lits:" $$ nest 2 (pprFlatBag pprBCONPtr unlinkedBCOLits)
+        , text "ptrs:" $$ nest 2 (pprFlatBag pprBCOPtr unlinkedBCOPtrs)
+        ]
+    ]
+
+pprBCONPtr :: BCONPtr -> SDoc
+pprBCONPtr ptr = case ptr of
+  BCONPtrWord lit -> tag "word" <+> integer (toInteger lit)
+  BCONPtrLbl sym -> tag "label" <+> ppr sym
+  BCONPtrItbl nm -> tag "itbl" <+> ppr nm
+  BCONPtrAddr nm -> tag "addr" <+> ppr nm
+  BCONPtrStr bs -> tag "string" $$ nest 2 (pprByteString bs)
+  BCONPtrFS fs -> tag "fs" <+> ppr fs
+  BCONPtrFFIInfo ffi -> tag "ffi" <+> text (show ffi)
+  BCONPtrCostCentre ibi -> tag "cost-centre" <+> ppr ibi
+  where
+    tag t = text t <> colon
+
+pprBCOPtr :: BCOPtr -> SDoc
+pprBCOPtr ptr = case ptr of
+  BCOPtrName nm -> tag "name" <+> ppr nm
+  BCOPtrPrimOp op -> tag "primop" <+> ppr op
+  BCOPtrBCO bco -> tag "bco" $$ nest 2 (pprUnlinkedBCODetailed bco)
+  BCOPtrBreakArray m -> tag "break-array" <+> ppr m
+  where
+    tag t = text t <> colon
+
+pprInfoTables :: [(Name, ConInfoTable)] -> SDoc
+pprInfoTables [] = text "<none>"
+pprInfoTables entries =
+  vcat [ ppr nm <> colon <+> text (show info)
+       | (nm, info) <- entries
+       ]
+
+pprStringLiterals :: [(Name, ByteString)] -> SDoc
+pprStringLiterals [] = text "<none>"
+pprStringLiterals entries =
+  vcat [ ppr nm <> colon $$ nest 2 (pprByteString bytes)
+       | (nm, bytes) <- entries
+       ]
+
+pprFlatBag :: (a -> SDoc) -> FlatBag a -> SDoc
+pprFlatBag printer bag =
+  case elemsFlatBag bag of
+    [] -> text "<empty>"
+    xs -> vcat (map printer xs)
+
+pprInternalModBreaksDetailed :: InternalModBreaks -> SDoc
+pprInternalModBreaksDetailed InternalModBreaks{..} =
+  vcat
+    [ text "module:" <+> ppr (modBreaks_module imodBreaks_modBreaks)
+    , text "break info:" $$ nest 2 (pprBreakInfoMap imodBreaks_breakInfo)
+    , text "mod breaks:" $$ nest 2 (pprModBreaksDetailed imodBreaks_modBreaks)
+    ]
+
+pprBreakInfoMap :: IM.IntMap CgBreakInfo -> SDoc
+pprBreakInfoMap infos
+  | IM.null infos = text "<empty>"
+  | otherwise = vcat [ int ix <> colon <+> ppr info
+                     | (ix, info) <- IM.toList infos
+                     ]
+
+pprModBreaksDetailed :: ModBreaks -> SDoc
+pprModBreaksDetailed ModBreaks{..} =
+  vcat
+    [ text "locations:" $$ nest 2 (pprArrayWith (ppr . unBinSrcSpan) modBreaks_locs_)
+    , text "vars:" $$ nest 2 (pprArrayWith ppr modBreaks_vars)
+    , text "decls:" $$ nest 2 (pprArrayWith pprStringsList modBreaks_decls)
+    , text "ccs:" $$ nest 2 (pprArrayWith pprCC modBreaks_ccs)
+    ]
+
+pprCC :: (String, String) -> SDoc
+pprCC (occ, spanDesc) =
+  parens (text (show occ) <> comma <+> text (show spanDesc))
+
+pprStringsList :: [String] -> SDoc
+pprStringsList strs =
+  brackets $ fsep $ punctuate comma (map (text . show) strs)
+
+pprArrayWith :: (a -> SDoc) -> Array Int a -> SDoc
+pprArrayWith printer arr =
+  case assocs arr of
+    [] -> text "<empty>"
+    xs -> vcat [ int idx <> colon <+> printer val
+               | (idx, val) <- xs
+               ]
+
+pprByteString :: ByteString -> SDoc
+pprByteString bs
+  | BS.null bs = text "<empty>"
+  | otherwise =
+      let bytes = BS.unpack bs
+          chunks = chunked 16 (map byteHex bytes)
+      in vcat (map text chunks)
+
+chunked :: Int -> [String] -> [String]
+chunked _ [] = []
+chunked n xs =
+  unwords (take n xs) : chunked n (drop n xs)
+
+byteHex :: Word8 -> String
+byteHex w =
+  let s = showHex w ""
+  in replicate (2 - length s) '0' ++ s
+
+pprListOrNone :: [SDoc] -> SDoc
+pprListOrNone [] = text "<none>"
+pprListOrNone docs = vcat docs
+
+pprIntegerList :: [Integer] -> SDoc
+pprIntegerList ints =
+  brackets $ fsep $ punctuate comma (map integer ints)
+
+wordListFromBCO :: forall a. (Integral a, Storable a, IArray UArray a)
+                => BCOByteArray a -> [Integer]
+wordListFromBCO arr = map (toInteger . fromIntegral) (bcoByteArrayElems arr)
+
+bcoByteArrayElems :: forall a. (Storable a, IArray UArray a) => BCOByteArray a -> [a]
+bcoByteArrayElems (BCOByteArray ba#) =
+  let elemSize = sizeOf (undefined :: a)
+      lenBytes = I# (sizeofByteArray# ba#)
+      count
+        | elemSize <= 0 = 0
+        | otherwise = lenBytes `div` elemSize
+      hi = count - 1
+      ua = UArray 0 hi count ba# :: UArray Int a
+  in elems ua

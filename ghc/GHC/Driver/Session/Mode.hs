@@ -77,6 +77,7 @@ isShowGhciUsageMode _ = False
 
 data PostLoadMode
   = ShowInterface FilePath  -- ghc --show-iface
+  | ShowByteCode FilePath   -- ghc --show-bytecode
   | DoMkDependHS            -- ghc -M
   | StopBefore StopPhase    -- ghc -E | -C | -S
                             -- StopBefore StopLn is the default
@@ -100,6 +101,9 @@ showUnitsMode = mkPostLoadMode ShowPackages
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
+
+showByteCodeMode :: FilePath -> Mode
+showByteCodeMode fp = mkPostLoadMode (ShowByteCode fp)
 
 stopBeforeMode :: StopPhase -> Mode
 stopBeforeMode phase = mkPostLoadMode (StopBefore phase)
@@ -234,6 +238,8 @@ mode_flags =
       ------- interfaces ----------------------------------------------------
   [ defFlag "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
                                                "--show-iface"))
+  , defFlag "-show-bytecode" (HasArg (\f -> setMode (showByteCodeMode f)
+                                                 "--show-bytecode"))
 
       ------- primary modes ------------------------------------------------
   , defFlag "c"            (PassFlag (\f -> do setMode (stopBeforeMode NoStop) f
