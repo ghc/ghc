@@ -39,6 +39,7 @@ import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.InstEnv
 import GHC.Core.Predicate         ( isEvId )
 import GHC.Tc.Types
+import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var              ( Id, Var, EvId, varName, varType, varUnique )
 import GHC.Types.Var.Env
@@ -755,7 +756,7 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
         ExprWithTySig _ e _ -> computeLType e
         HsPragE _ _ e -> computeLType e
         XExpr (ExpandedThingTc thing e)
-          | OrigExpr (HsGetField{}) <- thing -- for record-dot-syntax
+          | ExprCtxt (HsGetField{}) <- thing -- for record-dot-syntax
           -> Just (hsExprType e)
           | otherwise -> computeType e
         XExpr (HsTick _ e) -> computeLType e

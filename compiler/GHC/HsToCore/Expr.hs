@@ -41,6 +41,7 @@ import GHC.Hs
 --     needs to see source types
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Instance.Class (lookupHasFieldLabel)
 
@@ -308,7 +309,7 @@ dsExpr e@(XExpr ext_expr_tc)
       ConLikeTc {}  -> dsApp e
 
       ExpandedThingTc o e
-        | OrigStmt (L loc _) _ <- o -- c.f. T14546d. We have lost the location of the first statement in the GhcRn -> GhcTc
+        | DoStmtErrCtxt _ (L loc _) <- o -- c.f. T14546d. We have lost the location of the first statement in the GhcRn -> GhcTc
         -> putSrcSpanDsA loc $ dsExpr e
         | otherwise -> dsExpr e
 

@@ -267,6 +267,13 @@ tcCheckMonoExpr, tcCheckMonoExprNC
 tcCheckMonoExpr   expr res_ty = tcMonoLExpr  expr (mkCheckExpType res_ty)
 tcCheckMonoExprNC expr res_ty = tcMonoLExprNC expr (mkCheckExpType res_ty)
 
+
+-- Expand the HsExpr if it is typechecked after expansions
+--  See Note [Handling overloaded and rebindable constructs]
+-- See Note [Typechecking by expansion: overview]
+expand_expr :: HsExpr GhcRn -> TcM (HsExpr GhcRn)
+expand_expr x = return x
+
 ---------------
 tcMonoLExpr, tcMonoLExprNC
     :: LHsExpr GhcRn     -- Expression to type check
@@ -275,9 +282,10 @@ tcMonoLExpr, tcMonoLExprNC
     -> TcM (LHsExpr GhcTc)
 
 tcMonoLExpr (L loc expr) res_ty
-  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
-    do  { expr' <- tcExpr expr res_ty
-        ; return (L loc expr') }
+  = do expanded_expr <- expand_expr expr
+       addLExprCtxt (locA loc) expanded_expr $  -- Note [Error contexts in generated code]
+         do  { expr' <- tcExpr expr res_ty
+             ; return (L loc expr') }
 
 tcMonoLExprNC (L loc expr) res_ty
   = setSrcSpanA loc $
@@ -670,7 +678,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
 
         ; (ds_expr, ds_res_ty, err_msg)
             <- expandRecordUpd record_expr possible_parents rbnds res_ty
-        ; addExpansionErrCtxt (OrigExpr expr) err_msg $
+        ; addExpansionErrCtxt err_msg $
           do { -- Typecheck the expanded expression.
                expr' <- tcExpr ds_expr (Check ds_res_ty)
                -- NB: it's important to use ds_res_ty and not res_ty here.

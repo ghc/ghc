@@ -37,6 +37,7 @@ import Language.Haskell.Syntax.Decls.Foreign (CType(..), Header(..))
 import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
 import Language.Haskell.Syntax.Extension (Anno)
 import Language.Haskell.Syntax.Binds.InlinePragma (ActivationX(..), InlinePragma(..))
+import GHC.Tc.Types.ErrCtxt
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -639,12 +640,17 @@ deriving instance Eq (IE GhcTc)
 
 -- ---------------------------------------------------------------------
 
-deriving instance Data SrcCodeOrigin
+instance Data ErrCtxtMsg where
+  gunfold _ _ _ = error "no gunfold for ErrCtxtMsg"
+  gfoldl _ _ _ = error "no goldl for ErrCtxtMsg"
+
+
 deriving instance Data XXExprGhcRn
+
 deriving instance Data a => Data (WithUserRdr a)
 
--- ---------------------------------------------------------------------
-
+-- -------------------------------
+--------------------------------------
 deriving instance Data XXExprGhcTc
 deriving instance Data XXPatGhcTc
 
