@@ -482,4 +482,6 @@ It stores the original statement (with location) and the expanded expression
 
 
 mkExpandedPatRn :: Pat GhcRn -> ExprLStmt GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
-mkExpandedPatRn pat stmt e = XExpr (ExpandedThingRn (OrigPat stmt pat) e)
+mkExpandedPatRn oflav pat stmt e = XExpr $ ExpandedThingRn
+                                   { xrn_orig = StmtErrCtxtPat (HsDoStmt flav) stmt pat
+                                   , xrn_expand = e}

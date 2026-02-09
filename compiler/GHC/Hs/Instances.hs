@@ -36,6 +36,7 @@ import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
 import Language.Haskell.Syntax.Extension (Anno)
 import Language.Haskell.Syntax.Binds.InlinePragma (ActivationX(..), InlinePragma(..))
+import GHC.Tc.Types.ErrCtxt
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -619,7 +620,7 @@ deriving instance Eq (IE GhcTc)
 
 -- ---------------------------------------------------------------------
 
-deriving instance Data SrcCodeOrigin
+deriving instance Data ErrCtxtMsg
 deriving instance Data XXExprGhcRn
 deriving instance Data a => Data (WithUserRdr a)
 

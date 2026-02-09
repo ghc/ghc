@@ -654,7 +654,7 @@ data CtOrigin
   | AmbiguityCheckOrigin UserTypeCtxt
   | ImplicitLiftOrigin HsImplicitLiftSplice
 
-  | ExpansionOrigin SrcCodeOrigin -- This is due to an expansion of the original thing given by SrcCodeOrigin
+  | ExpansionOrigin ErrCtxtMsg -- This is due to an expansion of the original thing given by the ErrCtxtMsg
 
   | ExpectedTySyntax !CtOrigin (HsExpr GhcRn)
 
@@ -828,11 +828,11 @@ exprCtOrigin (HsHole _)          = Shouldn'tHappenOrigin "hole expression"
 exprCtOrigin (HsForAll {})       = Shouldn'tHappenOrigin "forall telescope"    -- See Note [Types in terms]
 exprCtOrigin (HsQual {})         = Shouldn'tHappenOrigin "constraint context"  -- See Note [Types in terms]
 exprCtOrigin (HsFunArr {})       = Shouldn'tHappenOrigin "function arrow"      -- See Note [Types in terms]
-exprCtOrigin e@(ExplicitList {})  = ExpansionOrigin (OrigExpr e)
-exprCtOrigin e@(HsIf {})          = ExpansionOrigin (OrigExpr e)
-exprCtOrigin e@(HsProjection _ _) = ExpansionOrigin (OrigExpr e)
-exprCtOrigin e@(RecordUpd{})      = ExpansionOrigin (OrigExpr e)
-exprCtOrigin e@(HsGetField{})     = ExpansionOrigin (OrigExpr e)
+exprCtOrigin e@(ExplicitList {})  = ExpansionOrigin (ExprCtxt e)
+exprCtOrigin e@(HsIf {})          = ExpansionOrigin (ExprCtxt e)
+exprCtOrigin e@(HsProjection _ _) = ExpansionOrigin (ExprCtxt e)
+exprCtOrigin e@(RecordUpd{})      = ExpansionOrigin (ExprCtxt e)
+exprCtOrigin e@(HsGetField{})     = ExpansionOrigin (ExprCtxt e)
 exprCtOrigin (XExpr (ExpandedThingRn o _)) = ExpansionOrigin o
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 
@@ -872,21 +872,21 @@ pprCtOrigin (ExpansionOrigin o)
     where
       what :: SDoc
       what = case o of
-        OrigStmt{} ->
+        StmtErrCtxt{} ->
           text "a do statement"
-        OrigPat _ p ->
+        StmtErrCtxtPat _ p ->
           text "a do statement" $$
              text "with the failable pattern" <+> quotes (ppr p)
-        OrigExpr (HsGetField _ _ (L _ f)) ->
+        ExprCtxt (HsGetField _ _ (L _ f)) ->
           hsep [text "selecting the field", quotes (ppr f)]
-        OrigExpr (HsOverLabel _ l) ->
+        ExprCtxt (HsOverLabel _ l) ->
           hsep [text "the overloaded label" , quotes (char '#' <> ppr l)]
-        OrigExpr (RecordUpd{}) -> text "a record update"
-        OrigExpr (ExplicitList{}) -> text "an overloaded list"
-        OrigExpr (HsIf{}) -> text "an if-then-else expression"
-        OrigExpr (HsProjection _ p) -> text "the record selector" <+>
+        ExprCtxt (RecordUpd{}) -> text "a record update"
+        ExprCtxt (ExplicitList{}) -> text "an overloaded list"
+        ExprCtxt (HsIf{}) -> text "an if-then-else expression"
+        ExprCtxt (HsProjection _ p) -> text "the record selector" <+>
              quotes (ppr ((FieldLabelStrings $ fmap noLocA p)))
-        OrigExpr e -> text "the expression" <+> (ppr e)
+        ExprCtxt e -> text "the expression" <+> (ppr e)
 
 pprCtOrigin (GivenSCOrigin sk d blk)
   = vcat [ ctoHerald <+> pprSkolInfo sk
@@ -1105,13 +1105,13 @@ ppr_br (InstanceSigOrigin {})       = text "a type signature in an instance"
 ppr_br (AmbiguityCheckOrigin {})    = text "a type ambiguity check"
 ppr_br (ImpedanceMatching {})       = text "combining required constraints"
 ppr_br (NonLinearPatternOrigin _ pat) = hsep [text "a non-linear pattern" <+> quotes (ppr pat)]
-ppr_br (ExpansionOrigin (OrigExpr (HsOverLabel _ l))) = hsep [text "the overloaded label", quotes (char '#' <> ppr l)]
-ppr_br (ExpansionOrigin (OrigExpr (RecordUpd{}))) = text "a record update"
-ppr_br (ExpansionOrigin (OrigExpr (ExplicitList{}))) = text "an overloaded list"
-ppr_br (ExpansionOrigin (OrigExpr (HsIf{}))) = text "an if-then-else expression"
-ppr_br (ExpansionOrigin (OrigExpr e)) = text "an expression" <+> ppr e
-ppr_br (ExpansionOrigin (OrigStmt{})) = text "a do statement"
-ppr_br (ExpansionOrigin (OrigPat{})) = text "a do statement"
+ppr_br (ExpansionOrigin (ExprCtxt (HsOverLabel _ l))) = hsep [text "the overloaded label", quotes (char '#' <> ppr l)]
+ppr_br (ExpansionOrigin (ExprCtxt (RecordUpd{}))) = text "a record update"
+ppr_br (ExpansionOrigin (ExprCtxt (ExplicitList{}))) = text "an overloaded list"
+ppr_br (ExpansionOrigin (ExprCtxt (HsIf{}))) = text "an if-then-else expression"
+ppr_br (ExpansionOrigin (ExprCtxt e)) = text "an expression" <+> ppr e
+ppr_br (ExpansionOrigin (StmtErrCtxt{})) = text "a do statement"
+ppr_br (ExpansionOrigin (StmtErrCtxtPat{})) = text "a do statement"
 ppr_br (ExpectedTySyntax o _) = ppr_br o
 ppr_br (ExpectedFunTySyntaxOp{}) = text "a rebindable syntax operator"
 ppr_br (ExpectedFunTyViewPat{}) = text "a view pattern"

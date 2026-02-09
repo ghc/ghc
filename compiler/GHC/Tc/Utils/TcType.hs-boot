@@ -5,6 +5,8 @@ import GHC.Prelude ( Bool )
 import {-# SOURCE #-} GHC.Types.Var ( TcTyVar )
 import {-# SOURCE #-} GHC.Tc.Types.Origin ( FixedRuntimeRepOrigin )
 import GHC.Types.Name.Env ( NameEnv )
+import {-# SOURCE #-} GHC.Core.TyCon (TyCon)
+import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type)
 
 data MetaDetails
 
@@ -20,3 +22,6 @@ data ConcreteTvOrigin
 
 isConcreteTyVar :: TcTyVar -> Bool
 noConcreteTyVars :: ConcreteTyVars
+
+type TcTyCon = TyCon
+type TcType = Type

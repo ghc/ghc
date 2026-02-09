@@ -676,7 +676,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
 
         ; (ds_expr, ds_res_ty, err_msg)
             <- expandRecordUpd record_expr possible_parents rbnds res_ty
-        ; addExpansionErrCtxt (OrigExpr expr) err_msg $
+        ; addExpansionErrCtxt (ExprCtxt expr) err_msg $
           do { -- Typecheck the expanded expression.
                expr' <- tcExpr ds_expr (Check ds_res_ty)
                -- NB: it's important to use ds_res_ty and not res_ty here.

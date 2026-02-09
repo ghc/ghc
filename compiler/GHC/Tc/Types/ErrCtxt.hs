@@ -1,28 +1,28 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module GHC.Tc.Types.ErrCtxt
-  ( ErrCtxt (..), ErrCtxtMsg(..), ErrCtxtMsgM,  CodeSrcFlag (..), srcCodeOriginErrCtxMsg
+  ( ErrCtxt (..), ErrCtxtMsg(..), CodeSrcFlag (..)
   , UserSigType(..), FunAppCtxtFunArg(..)
   , TyConInstFlavour(..)
   )
   where
 
 import GHC.Prelude
-import GHC.Hs.Expr
+import {-# SOURCE #-} GHC.Hs.Expr (SplicePointName, HsMatchContextRn, HsStmtContextRn)
+import {-# SOURCE #-} GHC.Hs.Expr () -- for outputable instances
+import GHC.Hs.Type () -- for outputable instances
 import GHC.Hs.Extension
 
 import GHC.Parser.Annotation ( LocatedN, SrcSpanAnnA )
 
 import GHC.Tc.Errors.Types.PromotionErr ( TermLevelUseCtxt )
-import GHC.Tc.Types.Origin   ( CtOrigin, UserTypeCtxt )
-import GHC.Tc.Utils.TcType   ( TcType, TcTyCon )
-import GHC.Tc.Zonk.Monad     ( ZonkM )
+import {-# SOURCE #-} GHC.Tc.Types.Origin   ( CtOrigin, UserTypeCtxt )
+import {-# SOURCE #-} GHC.Tc.Utils.TcType   ( TcType, TcTyCon )
 
 import GHC.Types.Basic       ( TyConFlavour )
 import GHC.Types.Name        ( Name )
-import GHC.Types.SrcLoc      ( SrcSpan, unLoc )
+import GHC.Types.SrcLoc      ( SrcSpan )
 import GHC.Types.Var         ( Id, TyCoVar )
-import GHC.Types.Var.Env     ( TidyEnv )
 
 import GHC.Unit.Types ( Module, InstantiatedModule )
 
@@ -32,7 +32,7 @@ import GHC.Core.PatSyn   ( PatSyn )
 import GHC.Core.TyCon    ( TyCon )
 import GHC.Core.TyCo.Rep ( Type, ThetaType, PredType )
 
-import GHC.Unit.State ( UnitState )
+import {-# SOURCE #-} GHC.Unit.State ( UnitState ) -- Break the module graph cycle for accesing ErrCtxtMsg in GHC.Hs.Expr
 
 import GHC.Data.FastString  ( FastString )
 import GHC.Utils.Outputable ( Outputable(..) )
@@ -45,7 +45,7 @@ import qualified Data.List.NonEmpty as NE
 
 --------------------------------------------------------------------------------
 
-type ErrCtxtMsgM = TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
+-- type ErrCtxtMsgM = TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
 
 -- | Additional context to include in an error message, e.g.
 -- "In the type signature ...", "In the ambiguity check for ...", etc.
@@ -55,7 +55,7 @@ data ErrCtxt = MkErrCtxt
                  -- LandmarkUserSrcCode <=> this is a landmark context; do not
                  --                         discard it when trimming for display
 
-                 ErrCtxtMsgM
+                 ErrCtxtMsg
                  -- Monadic so that we have a chance
                  -- to deal with bound type variables just before error
                  -- message construction
@@ -63,18 +63,19 @@ data ErrCtxt = MkErrCtxt
 
 data CodeSrcFlag = VanillaUserSrcCode
                  | LandmarkUserSrcCode
-                 | ExpansionCodeCtxt SrcCodeOrigin
+                 | ExpansionCodeCtxt
 
 --------------------------------------------------------------------------------
 -- Error message contexts
 
-data UserSigType p
-  = UserLHsSigType !(LHsSigType p)
-  | UserLHsType !(LHsType p)
+data UserSigType
+  = UserLHsSigType !(LHsSigType GhcRn)
+  | UserLHsType !(LHsType GhcRn)
 
-instance OutputableBndrId p => Outputable (UserSigType (GhcPass p)) where
+instance Outputable UserSigType where
   ppr (UserLHsSigType ty) = ppr ty
   ppr (UserLHsType ty) = ppr ty
+
 
 data FunAppCtxtFunArg
   = FunAppCtxtExpr !(HsExpr GhcRn) !(HsExpr GhcRn)
@@ -104,7 +105,7 @@ data ErrCtxtMsg
   -- or a type signature, or... (see 'Sig').
   | SigCtxt !(Sig GhcRn)
   -- | In a user-written type signature.
-  | UserSigCtxt !UserTypeCtxt !(UserSigType GhcRn)
+  | UserSigCtxt !UserTypeCtxt !UserSigType
   -- | In a record update.
   | RecordUpdCtxt !(NE.NonEmpty ConLike) ![Name] ![TyCoVar]
   -- | In a class method.
@@ -175,10 +176,10 @@ data ErrCtxtMsg
   | VDQWarningCtxt !TcTyCon
 
   -- | In a statement.
-  | forall body.
-    ( Anno (StmtLR GhcRn GhcRn body) ~ SrcSpanAnnA
-    , Outputable body
-    ) => StmtErrCtxt !HsStmtContextRn !(StmtLR GhcRn GhcRn body)
+  | StmtErrCtxt !HsStmtContextRn !(ExprLStmt GhcRn)
+
+  -- | In patten of the statement. (c.f. MonadFailErrors)
+  | StmtErrCtxtPat !HsStmtContextRn !(ExprLStmt GhcRn) (Pat GhcRn)
 
   -- | In an rebindable syntax expression.
   | SyntaxNameCtxt !(HsExpr GhcRn) !CtOrigin !TcType !SrcSpan
@@ -228,9 +229,3 @@ data ErrCtxtMsg
   | MergeSignaturesCtxt !UnitState !ModuleName ![InstantiatedModule]
   -- | While checking that a module implements a Backpack signature.
   | CheckImplementsCtxt !UnitState !Module !InstantiatedModule
-
-
-srcCodeOriginErrCtxMsg :: SrcCodeOrigin -> ErrCtxtMsg
-srcCodeOriginErrCtxMsg (OrigExpr e) = ExprCtxt e
-srcCodeOriginErrCtxMsg (OrigStmt s f) = StmtErrCtxt (HsDoStmt f) (unLoc s)
-srcCodeOriginErrCtxMsg (OrigPat s _) = StmtErrCtxt (HsDoStmt (DoExpr Nothing)) (unLoc s)

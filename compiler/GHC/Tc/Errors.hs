@@ -2778,7 +2778,7 @@ isHasFieldOrigin = \case
   RecordUpdOrigin {} -> True
   RecordFieldProjectionOrigin {} -> True
   GetFieldOrigin {} -> True
-  ExpansionOrigin (OrigExpr e)
+  ExpansionOrigin (ExprCtxt e)
     | HsGetField{} <- e -> True
     | RecordUpd{} <- e -> True
     | HsProjection{} <- e -> True

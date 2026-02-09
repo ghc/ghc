@@ -213,7 +213,7 @@ setLclEnvSrcCodeOrigin ec = modifyLclCtxt (setLclCtxtSrcCodeOrigin ec)
 setLclCtxtSrcCodeOrigin :: ErrCtxt -> TcLclCtxt -> TcLclCtxt
 setLclCtxtSrcCodeOrigin ec lclCtxt
   | ecs@(MkErrCtxt (ExpansionCodeCtxt{}) _ : _) <- tcl_err_ctxt lclCtxt
-  , MkErrCtxt (ExpansionCodeCtxt OrigExpr{}) _ <- ec
+  , MkErrCtxt (ExpansionCodeCtxt ExprCtxt{}) _ <- ec
   = lclCtxt { tcl_err_ctxt =  ec : ecs }
   | MkErrCtxt (ExpansionCodeCtxt{}) _ : ecs <- tcl_err_ctxt lclCtxt
   , MkErrCtxt (ExpansionCodeCtxt{}) _ <- ec

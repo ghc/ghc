@@ -34,6 +34,7 @@ import GHC.Parser.Annotation
 
 -- others:
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.ErrCtxt
 import GHC.Types.Id.Info ( RecSelParent )
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -658,16 +659,8 @@ type instance XXExpr GhcTc = XXExprGhcTc
 *                                                                      *
 ********************************************************************* -}
 
--- | The different source constructs that we use to instantiate the "original" field
---   in an `XXExprGhcRn original expansion`
---   See Note [Handling overloaded and rebindable constructs] in `GHC.Rename.Expr`
-data SrcCodeOrigin
-  = OrigExpr (HsExpr GhcRn)                -- ^ The source, user written, expression
-  | OrigStmt (ExprLStmt GhcRn) HsDoFlavour -- ^ which kind of do-block did this statement come from
-  | OrigPat  (ExprLStmt GhcRn) (Pat GhcRn) -- ^ Used for failable patterns that trigger MonadFail constraints
-
 data XXExprGhcRn
-  = ExpandedThingRn { xrn_orig     :: SrcCodeOrigin   -- The original source thing to be used for error messages
+  = ExpandedThingRn { xrn_orig     :: ErrCtxtMsg         -- The original source thing context to be used for error messages
                     , xrn_expanded :: HsExpr GhcRn    -- The compiler generated, expanded thing
                     }
 
@@ -679,21 +672,21 @@ data XXExprGhcRn
 --   and the two components of the expansion: original expression and
 --   expanded expressions.
 mkExpandedExpr
-  :: HsExpr GhcRn         -- ^ source expression
+  :: HsExpr GhcRn         -- ^ source expression context
   -> HsExpr GhcRn         -- ^ expanded expression
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedExpr oExpr eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigExpr oExpr
+mkExpandedExpr oExpr eExpr = XExpr (ExpandedThingRn { xrn_orig = ExprCtxt oExpr
                                                     , xrn_expanded = eExpr })
 
 -- | Build an expression using the extension constructor `XExpr`,
 --   and the two components of the expansion: original do stmt and
 --   expanded expression
 mkExpandedStmt
-  :: ExprLStmt GhcRn      -- ^ source statement
-  -> HsDoFlavour          -- ^ source statement do flavour
+  :: ExprLStmt GhcRn      -- ^ source statement context
+  -> HsDoFlavour          -- ^ source statements do flavour
   -> HsExpr GhcRn         -- ^ expanded expression
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = OrigStmt oStmt flav
+mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = StmtErrCtxt (HsDoStmt flav) oStmt
                                                          , xrn_expanded = eExpr })
 
 data XXExprGhcTc
@@ -702,7 +695,7 @@ data XXExprGhcTc
 
   | ExpandedThingTc                         -- See Note [Rebindable syntax and XXExprGhcRn]
                                             -- See Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
-         { xtc_orig     :: SrcCodeOrigin        -- The original user written thing
+         { xtc_orig     :: ErrCtxtMsg        -- The original user written thing
          , xtc_expanded :: HsExpr GhcTc }   -- The expanded typechecked expression
 
   | ConLikeTc
@@ -736,10 +729,10 @@ mkExpandedExprTc
   :: HsExpr GhcRn           -- ^ source expression
   -> HsExpr GhcTc           -- ^ expanded typechecked expression
   -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedExprTc oExpr eExpr = mkExpandedTc (OrigExpr oExpr) eExpr
+mkExpandedExprTc oExpr eExpr = mkExpandedTc (ExprCtxt oExpr) eExpr
 
 mkExpandedTc
-  :: SrcCodeOrigin          -- ^ source, user written do statement/expression
+  :: ErrCtxtMsg          -- ^ source, user written do statement/expression
   -> HsExpr GhcTc           -- ^ expanded typechecked expression
   -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
 mkExpandedTc o e = XExpr (ExpandedThingTc o e)
@@ -1060,24 +1053,32 @@ ppr_expr (XExpr x) = case ghcPass @p of
   GhcRn -> ppr x
   GhcTc -> ppr x
 
-instance Outputable SrcCodeOrigin where
-  ppr thing
-    = case thing of
-        OrigExpr x    -> ppr_builder "<OrigExpr>:" x
-        OrigStmt x _  -> ppr_builder "<OrigStmt>:" x
-        OrigPat  _ x  -> ppr_builder "<OrigPat>:" x
-    where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
-
 instance Outputable XXExprGhcRn where
-  ppr (ExpandedThingRn o e) = ifPprDebug (braces $ vcat [ppr o, text ";;" , ppr e]) (ppr o)
   ppr (HsRecSelRn f)        = pprPrefixOcc f
+  ppr (ExpandedThingRn o e) = ifPprDebug (braces $ vcat [pprCtxt o, text ";;" , ppr e]) (pprCtxt o)
+    where
+      ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens x)) x
+      pprCtxt :: ErrCtxtMsg -> SDoc
+      pprCtxt (ExprCtxt e) = ppr_builder "<OrigExpr>:"  (ppr e)
+      pprCtxt (StmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
+      pprCtxt (StmtErrCtxtPat _ _ pat) = ppr_builder "<OrigPat>:" (ppr pat)
+      pprCtxt _ = empty
 
 instance Outputable XXExprGhcTc where
   ppr (WrapExpr co_fn e)
     = pprHsWrapper co_fn (\_parens -> pprExpr e)
 
   ppr (ExpandedThingTc o e)
-    = ifPprDebug (braces $ vcat [ppr o, ppr e]) (ppr o)
+    = ifPprDebug (braces $ vcat [pprCtxt o, ppr e]) (pprCtxt o)
+
+    where
+      ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens x)) x
+      pprCtxt :: ErrCtxtMsg -> SDoc
+      pprCtxt (ExprCtxt e) = ppr_builder "<OrigExpr>:"  (ppr e)
+      pprCtxt (StmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
+      pprCtxt (StmtErrCtxtPat _ _ pat) = ppr_builder "<OrigPat>:" (ppr pat)
+      pprCtxt _ = empty
+
             -- e is the expanded expression, we print the original
             -- expression (HsExpr GhcRn), not the
             -- expanded typechecked one (HsExpr GhcTc),
@@ -1125,8 +1126,8 @@ ppr_infix_expr_tc (HsTick {})                = Nothing
 ppr_infix_expr_tc (HsBinTick {})             = Nothing
 ppr_infix_expr_tc (HsRecSelTc f)            = Just (pprInfixOcc f)
 
-ppr_infix_hs_expansion :: SrcCodeOrigin -> Maybe SDoc
-ppr_infix_hs_expansion (OrigExpr e) = ppr_infix_expr e
+ppr_infix_hs_expansion :: ErrCtxtMsg -> Maybe SDoc
+ppr_infix_hs_expansion (ExprCtxt e) = ppr_infix_expr e
 ppr_infix_hs_expansion _            = Nothing
 
 pprDebugParendExpr :: (OutputableBndrId p)
@@ -1216,8 +1217,8 @@ hsExprNeedsParens prec = go
     go_x_rn (ExpandedThingRn thing _ )   = hsExpandedNeedsParens thing
     go_x_rn (HsRecSelRn{})               = False
 
-    hsExpandedNeedsParens :: SrcCodeOrigin -> Bool
-    hsExpandedNeedsParens (OrigExpr e) = hsExprNeedsParens prec e
+    hsExpandedNeedsParens :: ErrCtxtMsg -> Bool
+    hsExpandedNeedsParens (ExprCtxt e) = hsExprNeedsParens prec e
     hsExpandedNeedsParens _            = False
 
 -- | Parenthesize an expression without token information
@@ -1268,8 +1269,8 @@ isAtomicHsExpr (XExpr x)
     go_x_rn (ExpandedThingRn thing _)   = isAtomicExpandedThingRn thing
     go_x_rn (HsRecSelRn{})              = True
 
-    isAtomicExpandedThingRn :: SrcCodeOrigin -> Bool
-    isAtomicExpandedThingRn (OrigExpr e) = isAtomicHsExpr e
+    isAtomicExpandedThingRn :: ErrCtxtMsg -> Bool
+    isAtomicExpandedThingRn (ExprCtxt e) = isAtomicHsExpr e
     isAtomicExpandedThingRn _            = False
 
 isAtomicHsExpr _ = False

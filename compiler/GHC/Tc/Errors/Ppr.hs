@@ -68,11 +68,11 @@ import GHC.Core.FVs( orphNamesOfTypes )
 import GHC.CoreToIface
 
 import GHC.Driver.Flags
-import GHC.Driver.Backend
+-- import GHC.Driver.Backend
 import GHC.Hs hiding (HoleError)
 import GHC.Hs.Decls.Overlap
 
-import GHC.Tc.Errors.Types
+-- import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Types.PromotionErr (pprTermLevelUseCtxt)
 import GHC.Tc.Errors.Hole.FitTypes
 import GHC.Tc.Types.BasicTypes
@@ -109,7 +109,7 @@ import GHC.Iface.Errors.Types
 import GHC.Iface.Errors.Ppr
 import GHC.Iface.Syntax
 
-import GHC.Unit.State
+-- import GHC.Unit.State
 import GHC.Unit.Module
 
 import GHC.Data.Bag

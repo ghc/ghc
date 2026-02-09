@@ -1346,12 +1346,12 @@ add_expr_ctxt e thing_inside
    -- because it is mentioned in the error message itself
 
       ExprWithTySig _ (L _ e') _
-        | XExpr (ExpandedThingRn o _) <- e' -> addExpansionErrCtxt o (ExprCtxt e) thing_inside
+        | XExpr (ExpandedThingRn o _) <- e' -> addExpansionErrCtxt o thing_inside
    -- There is a special case for expressions with signatures to avoid having too verbose
    -- error context. So here we flip the ErrCtxt state to expanded if the expression is expanded.
    -- c.f. RecordDotSyntaxFail9
 
-      XExpr (ExpandedThingRn o _) -> addExpansionErrCtxt o (srcCodeOriginErrCtxMsg o) thing_inside
+      XExpr (ExpandedThingRn o _) -> addExpansionErrCtxt o thing_inside
    -- Flip error ctxt into expansion mode
 
       _ -> addErrCtxt (ExprCtxt e) thing_inside
@@ -1372,9 +1372,9 @@ addErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- See Note [ErrCtxtStack Manipulation]
-addExpansionErrCtxt :: SrcCodeOrigin -> ErrCtxtMsg -> TcM a -> TcM a
+addExpansionErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
 {-# INLINE addExpansionErrCtxt #-}   -- Note [Inlining addErrCtxt]
-addExpansionErrCtxt o msg = addExpansionErrCtxtM o (\env -> return (env, msg))
+addExpansionErrCtxt msg = addExpansionErrCtxtM (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
 --   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
@@ -1383,9 +1383,9 @@ addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 addErrCtxtM ctxt = pushCtxt (MkErrCtxt VanillaUserSrcCode ctxt)
 
 -- See Note [ErrCtxtStack Manipulation]
-addExpansionErrCtxtM :: SrcCodeOrigin -> (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
+addExpansionErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)) -> TcM a -> TcM a
 {-# INLINE addExpansionErrCtxtM #-}  -- Note [Inlining addErrCtxt]
-addExpansionErrCtxtM o ctxt = pushCtxt (MkErrCtxt (ExpansionCodeCtxt o) ctxt)
+addExpansionErrCtxtM ctxt = pushCtxt (MkErrCtxt ExpansionCodeCtxt ctxt)
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
