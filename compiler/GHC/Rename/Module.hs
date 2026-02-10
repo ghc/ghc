@@ -50,7 +50,7 @@ import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
 
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
-import GHC.Types.ForeignCall ( CCallTarget(..) )
+import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -423,20 +423,23 @@ rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
 --
 patchForeignImport :: Unit -> (ForeignImport GhcPs) -> (ForeignImport GhcRn)
 patchForeignImport unit (CImport ext cconv safety fs spec)
-        = CImport ext cconv safety fs (patchCImportSpec unit spec)
+        = CImport ext cconv safety (renameHeader <$> fs) (patchCImportSpec unit spec)
 
-patchCImportSpec :: Unit -> CImportSpec -> CImportSpec
-patchCImportSpec unit spec
- = case spec of
-        CFunction callTarget    -> CFunction $ patchCCallTarget unit callTarget
-        _                       -> spec
+patchCImportSpec :: Unit -> CImportSpec GhcPs -> CImportSpec GhcRn
+patchCImportSpec unit = \case
+    CFunction callTarget -> CFunction $ patchCCallTarget unit callTarget
+    CLabel    cLabel     -> CLabel cLabel
+    CWrapper             -> CWrapper
 
-patchCCallTarget :: Unit -> CCallTarget -> CCallTarget
-patchCCallTarget unit callTarget =
-  case callTarget of
-  StaticTarget src label Nothing isFun
-                              -> StaticTarget src label (Just unit) isFun
-  _                           -> callTarget
+patchCCallTarget :: Unit -> CCallTarget GhcPs -> CCallTarget GhcRn
+patchCCallTarget unit = \case
+    DynamicTarget x -> DynamicTarget x
+    StaticTarget sTxt label targetKind ->
+      let ext = StaticTargetGhc
+            { staticTargetLabel = sTxt
+            , staticTargetUnit  = TargetIsInThat unit
+            }
+      in  StaticTarget ext label targetKind
 
 {-
 *********************************************************
@@ -2026,13 +2029,17 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
 
         ; let all_fvs = fvs1 `plusFV` fvs3 `plusFV`
                         con_fvs `plusFV` sig_fvs
-        ; return ( HsDataDefn { dd_ext = noAnn, dd_cType = cType
-                              , dd_ctxt = context', dd_kindSig = m_sig'
+        ; return ( HsDataDefn { dd_ext = noAnn
+                              , dd_cType = fmap rn_ctype <$> cType
+                              , dd_ctxt = context'
+                              , dd_kindSig = m_sig'
                               , dd_cons = condecls'
                               , dd_derivs = derivs' }
                  , all_fvs )
         }
   where
+    rn_ctype :: CType GhcPs -> CType GhcRn
+    rn_ctype (CType x y z) = CType x (renameHeader <$> y) z
     h98_style = not $ anyLConIsGadt condecls  -- Note [Stupid theta]
 
     rn_derivs ds

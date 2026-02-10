@@ -72,9 +72,9 @@ dsJsFExport
                         -- from C, and its representation type
   -> CLabelString       -- The name to export to C land
   -> CCallConv
-  -> Bool               -- True => foreign export dynamic
-                        --         so invoke IO action that's hanging off
-                        --         the first argument's stable pointer
+  -> ExportLinking      -- If foreign export is dynamic
+                        -- then invoke IO action that's hanging off
+                        -- the first argument's stable pointer
   -> DsM ( CHeader      -- contents of Module_stub.h
          , CStub        -- contents of Module_stub.c
          , String       -- string describing type to pass to createAdj.
@@ -87,8 +87,9 @@ dsJsFExport fn_id co ext_name cconv isDyn = do
        (fe_arg_tys', orig_res_ty)      = tcSplitFunTys sans_foralls
        -- We must use tcSplits here, because we want to see
        -- the (IO t) in the corner of the type!
-       fe_arg_tys | isDyn     = tail fe_arg_tys'
-                  | otherwise = fe_arg_tys'
+       (fe_arg_tys, m_fn_id) = case isDyn of
+         ExportIsDynamic -> (tail fe_arg_tys', Nothing)
+         ExportIsStatic  -> (fe_arg_tys', Just fn_id)
 
        -- Look at the result type of the exported function, orig_res_ty
        -- If it's IO t, return         (t, True)
@@ -100,8 +101,7 @@ dsJsFExport fn_id co ext_name cconv isDyn = do
                                 Nothing                 -> (orig_res_ty, False)
     platform <- targetPlatform <$> getDynFlags
     return $
-      mkFExportJSBits platform ext_name
-                     (if isDyn then Nothing else Just fn_id)
+      mkFExportJSBits platform ext_name m_fn_id
                      (map scaledThing fe_arg_tys) res_ty is_IO_res_ty cconv
 
 mkFExportJSBits
@@ -227,10 +227,10 @@ idClosureText i
 dsJsImport
   :: Id
   -> Coercion
-  -> CImportSpec
+  -> CImportSpec GhcTc
   -> CCallConv
   -> Safety
-  -> Maybe Header
+  -> Maybe (Header GhcTc)
   -> DsM ([Binding], CHeader, CStub)
 dsJsImport id co (CLabel cid) _ _ _ = do
    let ty = coercionLKind co
@@ -282,7 +282,7 @@ dsJsFExportDynamic id co0 cconv = do
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
     stbl_value <- newSysLocalMDs stable_ptr_ty
-    (h_code, c_code, typestring) <- dsJsFExport id (mkRepReflCo export_ty) fe_nm cconv True
+    (h_code, c_code, typestring) <- dsJsFExport id (mkRepReflCo export_ty) fe_nm cconv ExportIsDynamic
     let
          {-
           The arguments to the external function which will
@@ -320,7 +320,7 @@ dsJsFExportDynamic id co0 cconv = do
 toJsName :: Id -> String
 toJsName i = renderWithContext defaultSDocContext (pprCode (ppr (idName i)))
 
-dsJsCall :: Id -> Coercion -> ForeignCall -> Maybe Header
+dsJsCall :: Id -> Coercion -> ForeignCall -> Maybe (Header GhcTc)
         -> DsM ([(Id, Expr TyVar)], CHeader, CStub)
 dsJsCall fn_id co (CCall (CCallSpec target cconv safety)) _mDeclHeader = do
     let
@@ -647,7 +647,11 @@ jsResultWrapper result_ty
 mkJsCall :: Unique -> FastString -> [CoreExpr] -> Type -> CoreExpr
 mkJsCall u tgt args t = mkFCall u ccall args t
   where
+    stExt = StaticTargetGhc
+        { staticTargetLabel = NoSourceText
+        , staticTargetUnit  = TargetIsInThat ghcInternalUnit
+        }
     ccall = CCall $ CCallSpec
-              (StaticTarget NoSourceText tgt (Just ghcInternalUnit) True)
+              (StaticTarget stExt tgt ForeignFunction)
               JavaScriptCallConv
               PlayRisky

@@ -197,7 +197,6 @@ import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Avail
 import GHC.Types.Hint
-import GHC.Types.ForeignCall (CLabelString)
 import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.InlinePragma (InlinePragma(..))
 import GHC.Types.Name (NamedThing(..), Name, OccName, getSrcLoc, getSrcSpan)

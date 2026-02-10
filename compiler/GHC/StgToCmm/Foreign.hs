@@ -78,20 +78,19 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
         ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
-                   StaticTarget _ _   _      False ->
-                       panic "cgForeignCall: unexpected FFI value import"
-                   StaticTarget _ lbl mPkgId True
-                     -> let labelSource
-                                = case mPkgId of
-                                        Nothing         -> ForeignLabelInThisPackage
-                                        Just pkgId      -> ForeignLabelInPackage (toUnitId pkgId)
+                    StaticTarget _ _ ForeignValue ->
+                        panic "cgForeignCall: unexpected FFI value import"
+                    StaticTarget ext lbl ForeignFunction ->
+                        let labelSource = case staticTargetUnit ext of
+                              TargetIsInThisUnit  -> ForeignLabelInThisPackage
+                              TargetIsInThat unit -> ForeignLabelInPackage $ toUnitId unit
                         in  ( unzip cmm_args
-                            , CmmLit (CmmLabel
-                                        (mkForeignLabel lbl labelSource IsFunction)))
+                            , CmmLit
+                              (CmmLabel (mkForeignLabel lbl labelSource IsFunction)))
 
-                   DynamicTarget    ->  case cmm_args of
-                                           (fn,_):rest -> (unzip rest, fn)
-                                           [] -> panic "cgForeignCall []"
+                    DynamicTarget{} -> case cmm_args of
+                       (fn,_):rest -> (unzip rest, fn)
+                       [] -> panic "cgForeignCall []"
               fc = ForeignConvention cconv arg_hints res_hints CmmMayReturn
               call_target = ForeignTarget cmm_target fc
 

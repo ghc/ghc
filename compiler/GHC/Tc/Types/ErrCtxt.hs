@@ -37,8 +37,8 @@ import GHC.Unit.State ( UnitState )
 import GHC.Data.FastString  ( FastString )
 import GHC.Utils.Outputable ( Outputable(..) )
 
-import Language.Haskell.Syntax.Basic ( FieldLabelString(..) )
 import Language.Haskell.Syntax
+import Language.Haskell.Syntax.Basic ( FieldLabelString(..) )
 import GHC.Boot.TH.Syntax qualified as TH
 
 import qualified Data.List.NonEmpty as NE

@@ -1901,10 +1901,10 @@ instance ExactPrint (ForeignExport GhcPs) where
 instance ExactPrint CExportSpec where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
-  exact (CExportStatic st lbl cconv) = do
+  exact (CExportStatic lbl cconv) = do
     debugM $ "CExportStatic starting"
     cconv' <- markAnnotated cconv
-    return (CExportStatic st lbl cconv')
+    return (CExportStatic lbl cconv')
 
 -- ---------------------------------------------------------------------
 
@@ -4445,11 +4445,13 @@ exactBang ((o,c,tk), mt) str = do
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (LocatedP CType) where
+instance Typeable p => ExactPrint (LocatedP (CType (GhcPass p))) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor = setAnchorAn
 
-  exact (L (EpAnn l (AnnPragma o c s l1 l2 t m) cs) (CType stp mh (stct,ct))) = do
+  exact (L (EpAnn l (AnnPragma o c s l1 l2 t m) cs) (CType ext mh ct)) = do
+    let stp  = cTypeSourceText ext
+        stct = cTypeOtherText  ext
     o' <- markAnnOpen'' o stp "{-# CTYPE"
     l1' <- case mh of
              Nothing -> return l1
@@ -4457,7 +4459,7 @@ instance ExactPrint (LocatedP CType) where
                printStringAtAA l1 (toSourceTextWithSuffix srcH "" "")
     l2' <- printStringAtAA l2 (toSourceTextWithSuffix stct (unpackFS ct) "")
     c' <- markEpToken c
-    return (L (EpAnn l (AnnPragma o' c' s l1' l2' t m) cs) (CType stp mh (stct,ct)))
+    return (L (EpAnn l (AnnPragma o' c' s l1' l2' t m) cs) (CType ext mh ct))
 
 -- ---------------------------------------------------------------------
 

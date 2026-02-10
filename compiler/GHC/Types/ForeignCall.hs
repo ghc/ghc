@@ -1,33 +1,112 @@
+{-# LANGUAGE TypeFamilies #-}
+{-
+Orphan 'Binary' and 'Outputable' instances for the following types:
+
+  * CCallConv
+  * CCallTarget
+  * CExportSpec
+  * CType
+  * Header
+  * Safety
+
+To be resolved at a later time, see TODO at the end of this module.
+
+-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 \section[Foreign]{Foreign calls}
 -}
 
-
 module GHC.Types.ForeignCall (
-        ForeignCall(..), isSafeForeignCall,
-        Safety(..), playSafe, playInterruptible,
+  -- * Foreign function interface declarations
+  -- ** Data-type
+  ForeignDecl(..),
+  -- ** Record synonym
+  LForeignDecl,
 
-        CExportSpec(..), CLabelString, isCLabelString, pprCLabelString,
-        CCallSpec(..),
-        CCallTarget(..), isDynamicTarget,
-        CCallConv(..), defaultCCallConv, ccallConvAttribute,
+  -- * Foreign call
+  ForeignCall(..),
+  -- ** Queries
+  isSafeForeignCall,
+  -- ** CCallSpec
+  CCallSpec(..),
 
-        Header(..), CType(..),
-    ) where
+  -- * Foreign export types
+  -- ** Data-type
+  ForeignExport(..),
+  -- ** Specification
+  CExportSpec(..),
+
+  -- * Foreign import types
+  -- ** Data-type
+  ForeignImport(..),
+  -- ** Call target
+  CCallTarget(..),
+  -- *** GHC extension point
+  StaticTargetGhc(..),
+  CCallStaticTargetUnit(..),
+  -- *** Queries
+  isDynamicTarget,
+  -- ** Foreign target kind
+  ForeignKind(..),
+  -- ** Safety
+  Safety(..),
+  -- *** Queries
+  playSafe,
+  playInterruptible,
+  -- ** Specification
+  CImportSpec(..),
+
+  -- * Foreign binding type
+  -- ** Data-type
+  CType(..),
+  -- *** Construction
+  defaultCType,
+  mkCType,
+  -- *** Conversion
+  typeCheckCType,
+  -- *** GHC extension point
+  CTypeGhc(..),
+
+  -- * General sub-types
+  -- ** CCallConv
+  CCallConv(..),
+  -- *** Default construction
+  defaultCCallConv,
+  -- *** Pretty-printing
+  ccallConvAttribute,
+  -- ** CLabelString
+  CLabelString,
+  -- *** Queries
+  isCLabelString,
+  -- *** Pretty-printing
+  pprCLabelString,
+  -- ** Header
+  Header(..),
+  -- *** Conversion
+  renameHeader,
+  typeCheckHeader,
+  ) where
 
 import GHC.Prelude
 
 import GHC.Data.FastString
+import GHC.Hs.Extension
+import GHC.Types.SourceText (SourceText(..), pprWithSourceText)
+import GHC.Unit.Types
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Unit.Module
-import GHC.Types.SourceText ( SourceText, pprWithSourceText )
+
+import Language.Haskell.Syntax.Decls.Foreign
+import Language.Haskell.Syntax.Extension
 
 import Data.Char
-import Data.Data
+import Data.Data (Data)
+import Data.Functor ((<&>))
 
 import Control.DeepSeq (NFData(..))
 
@@ -40,7 +119,7 @@ import Control.DeepSeq (NFData(..))
 -}
 
 newtype ForeignCall = CCall CCallSpec
-  deriving Eq
+  deriving (Eq)
 
 isSafeForeignCall :: ForeignCall -> Bool
 isSafeForeignCall (CCall (CCallSpec _ _ safe)) = playSafe safe
@@ -49,36 +128,6 @@ isSafeForeignCall (CCall (CCallSpec _ _ safe)) = playSafe safe
 -- but this simple printer will do for now
 instance Outputable ForeignCall where
   ppr (CCall cc)  = ppr cc
-
-data Safety
-  = PlaySafe          -- ^ Might invoke Haskell GC, or do a call back, or
-                      --   switch threads, etc.  So make sure things are
-                      --   tidy before the call. Additionally, in the threaded
-                      --   RTS we arrange for the external call to be executed
-                      --   by a separate OS thread, i.e., _concurrently_ to the
-                      --   execution of other Haskell threads.
-
-  | PlayInterruptible -- ^ Like PlaySafe, but additionally
-                      --   the worker thread running this foreign call may
-                      --   be unceremoniously killed, so it must be scheduled
-                      --   on an unbound thread.
-
-  | PlayRisky         -- ^ None of the above can happen; the call will return
-                      --   without interacting with the runtime system at all.
-                      --   Specifically:
-                      --
-                      --     * No GC
-                      --     * No call backs
-                      --     * No blocking
-                      --     * No precise exceptions
-                      --
-  deriving ( Eq, Show, Data, Enum )
-        -- Show used just for Show Lex.Token, I think
-
-instance Outputable Safety where
-  ppr PlaySafe = text "safe"
-  ppr PlayInterruptible = text "interruptible"
-  ppr PlayRisky = text "unsafe"
 
 playSafe :: Safety -> Bool
 playSafe PlaySafe = True
@@ -97,74 +146,16 @@ playInterruptible _ = False
 ************************************************************************
 -}
 
-data CExportSpec
-  = CExportStatic               -- foreign export ccall foo :: ty
-        SourceText              -- of the CLabelString.
-                                -- See Note [Pragma source text] in "GHC.Types.SourceText"
-        CLabelString            -- C Name of exported function
-        CCallConv
-  deriving Data
-
 data CCallSpec
-  =  CCallSpec  CCallTarget     -- What to call
-                CCallConv       -- Calling convention to use.
-                Safety
-  deriving( Eq )
+  =  CCallSpec
+        (CCallTarget GhcTc) -- What to call
+        CCallConv           -- Calling convention to use.
+        Safety
+  deriving (Eq)
 
--- The call target:
-
--- | How to call a particular function in C-land.
-data CCallTarget
-  -- An "unboxed" ccall# to named function in a particular package.
-  = StaticTarget
-        SourceText                -- of the CLabelString.
-                                  -- See Note [Pragma source text] in "GHC.Types.SourceText"
-        CLabelString                    -- C-land name of label.
-
-        (Maybe Unit)                    -- What package the function is in.
-                                        -- If Nothing, then it's taken to be in the current package.
-                                        -- Note: This information is only used for PrimCalls on Windows.
-                                        --       See CLabel.labelDynamic and CoreToStg.coreToStgApp
-                                        --       for the difference in representation between PrimCalls
-                                        --       and ForeignCalls. If the CCallTarget is representing
-                                        --       a regular ForeignCall then it's safe to set this to Nothing.
-
-  -- The first argument of the import is the name of a function pointer (an Addr#).
-  --    Used when importing a label as "foreign import ccall "dynamic" ..."
-        Bool                            -- True => really a function
-                                        -- False => a value; only
-                                        -- allowed in CAPI imports
-  | DynamicTarget
-
-  deriving( Eq, Data )
-
-isDynamicTarget :: CCallTarget -> Bool
-isDynamicTarget DynamicTarget = True
-isDynamicTarget _             = False
-
-{-
-Stuff to do with calling convention:
-
-ccall:          Caller allocates parameters, *and* deallocates them.
-
-See: http://www.programmersheaven.com/2/Calling-conventions
--}
-
--- any changes here should be replicated in the Callconv type in template haskell
-data CCallConv
-  = CCallConv
-  | CApiConv
-  | StdCallConv
-  | PrimCallConv
-  | JavaScriptCallConv
-  deriving (Show, Eq, Data, Enum)
-
-instance Outputable CCallConv where
-  ppr StdCallConv = text "stdcall"
-  ppr CCallConv   = text "ccall"
-  ppr CApiConv    = text "capi"
-  ppr PrimCallConv = text "prim"
-  ppr JavaScriptCallConv = text "javascript"
+isDynamicTarget :: CCallTarget p -> Bool
+isDynamicTarget DynamicTarget{} = True
+isDynamicTarget _               = False
 
 defaultCCallConv :: CCallConv
 defaultCCallConv = CCallConv
@@ -181,8 +172,6 @@ ccallConvAttribute CApiConv          = empty
 ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
 ccallConvAttribute JavaScriptCallConv = empty
 
-type CLabelString = FastString          -- A C label, completely unencoded
-
 pprCLabelString :: CLabelString -> SDoc
 pprCLabelString lbl = ftext lbl
 
@@ -196,9 +185,6 @@ isCLabelString lbl
 
 -- Printing into C files:
 
-instance Outputable CExportSpec where
-  ppr (CExportStatic _ str _) = pprCLabelString str
-
 instance Outputable CCallSpec where
   ppr (CCallSpec fun cconv safety)
     = hcat [ whenPprDebug callconv, ppr_fun fun, text " ::" ]
@@ -208,41 +194,39 @@ instance Outputable CCallSpec where
       gc_suf | playSafe safety = text "_safe"
              | otherwise       = text "_unsafe"
 
-      ppr_fun (StaticTarget st lbl mPkgId isFun)
-        = (if isFun then text "__ffi_static_ccall"
-                    else text "__ffi_static_ccall_value")
-       <> gc_suf
-       <+> (case mPkgId of
-            Nothing -> empty
-            Just pkgId -> ppr pkgId)
-       <> text ":"
-       <> ppr lbl
-       <+> (pprWithSourceText st empty)
+      ppr_fun = \case
+        DynamicTarget{} -> text "__ffi_dyn_ccall" <> gc_suf <+> text "\"\""
+        StaticTarget ext label isFun ->
+          let pCallType = case isFun of
+                ForeignValue    -> text "__ffi_static_ccall_value"
+                ForeignFunction -> text "__ffi_static_ccall"
+              pprUnit ext = case staticTargetUnit ext of
+                TargetIsInThisUnit  -> empty
+                TargetIsInThat unit -> ppr unit
+              (srcTxt, pPkgId) = (staticTargetLabel ext, pprUnit ext)
+          in pCallType
+               <> gc_suf
+               <+> pPkgId
+               <> text ":"
+               <> ppr label
+               <+> (pprWithSourceText srcTxt empty)
 
-      ppr_fun DynamicTarget
-        = text "__ffi_dyn_ccall" <> gc_suf <+> text "\"\""
+defaultCType :: String -> CType (GhcPass p)
+defaultCType =
+  CType (CTypeGhc NoSourceText NoSourceText) Nothing . fsLit
 
--- The filename for a C header file
--- See Note [Pragma source text] in "GHC.Types.SourceText"
-data Header = Header SourceText FastString
-    deriving (Eq, Data)
+mkCType :: SourceText -> SourceText -> Maybe (Header (GhcPass p)) -> FastString -> CType (GhcPass p)
+mkCType x y m =
+  CType (CTypeGhc x y) m
 
-instance Outputable Header where
-    ppr (Header st h) = pprWithSourceText st (doubleQuotes $ ppr h)
+typeCheckCType :: CType GhcRn -> CType GhcTc
+typeCheckCType (CType x y z) = CType x (typeCheckHeader <$> y) z
 
--- | A C type, used in CAPI FFI calls
-data CType = CType SourceText -- See Note [Pragma source text] in "GHC.Types.SourceText"
-                   (Maybe Header) -- header to include for this type
-                   (SourceText,FastString) -- the type itself
-    deriving (Eq, Data)
+typeCheckHeader :: Header GhcRn -> Header GhcTc
+typeCheckHeader (Header a b) = Header a b
 
-instance Outputable CType where
-    ppr (CType stp mh (stct,ct))
-      = pprWithSourceText stp (text "{-# CTYPE") <+> hDoc
-        <+> pprWithSourceText stct (doubleQuotes (ftext ct)) <+> text "#-}"
-        where hDoc = case mh of
-                     Nothing -> empty
-                     Just h -> ppr h
+renameHeader :: Header GhcPs -> Header GhcRn
+renameHeader (Header a b) = Header a b
 
 {-
 ************************************************************************
@@ -256,31 +240,6 @@ instance Binary ForeignCall where
     put_ bh (CCall aa) = put_ bh aa
     get bh = do aa <- get bh; return (CCall aa)
 
-instance Binary Safety where
-    put_ bh PlaySafe =
-            putByte bh 0
-    put_ bh PlayInterruptible =
-            putByte bh 1
-    put_ bh PlayRisky =
-            putByte bh 2
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return PlaySafe
-              1 -> return PlayInterruptible
-              _ -> return PlayRisky
-
-instance Binary CExportSpec where
-    put_ bh (CExportStatic ss aa ab) = do
-            put_ bh ss
-            put_ bh aa
-            put_ bh ab
-    get bh = do
-          ss <- get bh
-          aa <- get bh
-          ab <- get bh
-          return (CExportStatic ss aa ab)
-
 instance Binary CCallSpec where
     put_ bh (CCallSpec aa ab ac) = do
             put_ bh aa
@@ -292,24 +251,11 @@ instance Binary CCallSpec where
           ac <- get bh
           return (CCallSpec aa ab ac)
 
-instance Binary CCallTarget where
-    put_ bh (StaticTarget ss aa ab ac) = do
-            putByte bh 0
-            put_ bh ss
-            put_ bh aa
-            put_ bh ab
-            put_ bh ac
-    put_ bh DynamicTarget =
-            putByte bh 1
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do ss <- get bh
-                      aa <- get bh
-                      ab <- get bh
-                      ac <- get bh
-                      return (StaticTarget ss aa ab ac)
-              _ -> return DynamicTarget
+instance NFData ForeignCall where
+  rnf (CCall c) = rnf c
+
+instance NFData CCallSpec where
+  rnf (CCallSpec t c s) = rnf t `seq` rnf c `seq` rnf s
 
 instance Binary CCallConv where
     put_ bh CCallConv =
@@ -331,45 +277,224 @@ instance Binary CCallConv where
               3 -> return CApiConv
               _ -> return JavaScriptCallConv
 
-instance Binary CType where
-    put_ bh (CType s mh fs) = do put_ bh s
-                                 put_ bh mh
-                                 put_ bh fs
-    get bh = do s  <- get bh
-                mh <- get bh
-                fs <- get bh
-                return (CType s mh fs)
+-- |
+-- Which compilation 'Unit' is the static target in,
+-- either it is in this currently compiling compilation 'Unit',
+-- or it is in /that other/, compilation 'Unit'.
+data CCallStaticTargetUnit
+  = TargetIsInThisUnit  -- ^ In this current 'Unit'.
+  | TargetIsInThat Unit -- ^ In that other   'Unit'.
+  deriving (Data, Eq)
 
-instance Binary Header where
+data StaticTargetGhc = StaticTargetGhc
+  { staticTargetLabel :: SourceText
+  , staticTargetUnit  :: CCallStaticTargetUnit
+      -- ^ What package the function is in.
+      -- If 'TargetIsInThisUnit', then it's taken to be in the current package
+      -- Note: This information is only used for PrimCalls on Windows.
+      --       See CLabel.labelDynamic and CoreToStg.coreToStgApp
+      --       for the difference in representation between PrimCalls
+      --       and ForeignCalls. If the CCallTarget is representing
+      --       a regular ForeignCall then it's safe to set this to Nothing.
+  }
+  deriving (Data, Eq)
+
+data CTypeGhc = CTypeGhc
+  { cTypeSourceText :: SourceText
+  , cTypeOtherText  :: SourceText
+  }
+  deriving (Data, Eq)
+
+type instance XStaticTarget   GhcPs      = SourceText
+type instance XStaticTarget   GhcRn      = StaticTargetGhc
+type instance XStaticTarget   GhcTc      = StaticTargetGhc
+type instance XDynamicTarget (GhcPass p) = NoExtField
+type instance XXCCallTarget  (GhcPass p) = DataConCantHappen
+
+type instance XCType   (GhcPass p) = CTypeGhc
+type instance XXCType  (GhcPass p) = DataConCantHappen
+
+type instance XHeader  (GhcPass p) = SourceText
+type instance XXHeader (GhcPass p) = DataConCantHappen
+
+deriving instance Eq (Header (GhcPass p))
+
+instance NFData (CType (GhcPass p)) where
+    rnf (CType ext mh fs) =
+      rnf ext `seq` rnf mh `seq` rnf fs
+
+instance NFData (Header (GhcPass p)) where
+    rnf (Header s h) =
+      rnf s `seq` rnf h
+
+instance NFData CCallStaticTargetUnit where
+    rnf = \case
+      TargetIsInThisUnit  -> ()
+      TargetIsInThat unit -> rnf unit
+
+instance Binary CCallStaticTargetUnit where
+    put_ bh = \case
+      TargetIsInThisUnit  -> putByte bh 0
+      TargetIsInThat unit -> putByte bh 1 *> put_ bh unit
+
+    get bh = getByte bh >>= \case
+      0 -> pure TargetIsInThisUnit
+      _ -> TargetIsInThat <$> get bh
+
+instance NFData CTypeGhc where
+    rnf st =
+      rnf (cTypeSourceText st) `seq`
+      rnf (cTypeOtherText  st)
+
+instance Binary CTypeGhc where
+    put_ bh ct = do
+      put_ bh (cTypeSourceText ct)
+      put_ bh (cTypeOtherText  ct)
+    get bh = do
+      str1 <- get bh
+      str2  <- get bh
+      return $ CTypeGhc
+        { cTypeSourceText = str1
+        , cTypeOtherText  = str2
+        }
+
+instance NFData StaticTargetGhc where
+    rnf st =
+      rnf (staticTargetLabel st) `seq`
+      rnf (staticTargetUnit  st)
+
+instance Binary StaticTargetGhc where
+    put_ bh st = do
+      put_ bh (staticTargetLabel st)
+      put_ bh (staticTargetUnit st)
+
+    get bh = do
+      label <- get bh
+      unit  <- get bh
+      return $ StaticTargetGhc
+        { staticTargetLabel = label
+        , staticTargetUnit  = unit
+        }
+
+instance forall p. IsPass p => Eq (CCallTarget (GhcPass p)) where
+    (==) = \case
+      DynamicTarget{} -> \case
+        DynamicTarget{} -> True
+        _ -> False
+      StaticTarget x1 a1 b1 -> \case
+        StaticTarget x2 a2 b2 -> a1 == a2 && b1 == b2 && case ghcPass @p of
+          GhcPs -> x1 == x2
+          GhcRn -> x1 == x2
+          GhcTc -> x1 == x2
+        _ -> False
+
+instance forall p. IsPass p => NFData (CCallTarget (GhcPass p)) where
+    rnf = \case
+      DynamicTarget NoExtField -> ()
+      StaticTarget x a b -> rnf a `seq` rnf b `seq` case ghcPass @p of
+        GhcPs -> rnf x
+        GhcRn -> rnf x
+        GhcTc -> rnf x
+
+instance forall p. IsPass p => Binary (CCallTarget (GhcPass p)) where
+    put_ bh = \case
+      StaticTarget x a b -> do
+        putByte bh 0
+        put_ bh a
+        put_ bh b
+        case ghcPass @p of
+          GhcPs -> put_ bh x
+          GhcRn -> put_ bh x
+          GhcTc -> put_ bh x
+
+      DynamicTarget NoExtField -> putByte bh 1
+
+    get bh = do
+      h <- getByte bh
+      case h of
+        0 -> do
+          (a :: CLabelString) <- get bh
+          (b :: ForeignKind ) <- get bh
+          case ghcPass @p of
+            GhcPs -> (\x -> StaticTarget x a b) <$> get bh
+            GhcRn -> (\x -> StaticTarget x a b) <$> get bh
+            GhcTc -> (\x -> StaticTarget x a b) <$> get bh
+
+        _ -> return $ DynamicTarget NoExtField
+
+instance Binary CExportSpec where
+    put_ bh (CExportStatic aa ab) = do
+      put_ bh aa
+      put_ bh ab
+    get bh = do
+      aa <- get bh
+      ab <- get bh
+      return (CExportStatic aa ab)
+
+instance Binary (CType (GhcPass p)) where
+    put_ bh (CType ext mh fs) = do
+        put_ bh ext
+        put_ bh mh
+        put_ bh fs
+    get bh = do
+      ext <- get bh
+      mh  <- get bh
+      fs  <- get bh
+      return (CType ext mh fs)
+
+instance Binary ForeignKind where
+    put_ bh = putByte bh . \case
+      ForeignValue -> 0
+      ForeignFunction -> 1
+    get bh = getByte bh <&> \case
+      0 -> ForeignValue
+      _ -> ForeignFunction
+
+instance Binary (Header (GhcPass p)) where
     put_ bh (Header s h) = put_ bh s >> put_ bh h
-    get bh = do s <- get bh
-                h <- get bh
-                return (Header s h)
+    get bh = do
+      s <- get bh
+      h <- get bh
+      return (Header s h)
 
-instance NFData ForeignCall where
-  rnf (CCall c) = rnf c
+instance Binary Safety where
+    put_ bh = putByte bh . \case
+      PlaySafe -> 0
+      PlayInterruptible -> 1
+      PlayRisky -> 2
 
-instance NFData Safety where
-  rnf PlaySafe = ()
-  rnf PlayInterruptible = ()
-  rnf PlayRisky = ()
+    get bh = do
+            h <- getByte bh
+            case h of
+              0 -> return PlaySafe
+              1 -> return PlayInterruptible
+              _ -> return PlayRisky
 
-instance NFData CCallSpec where
-  rnf (CCallSpec t c s) = rnf t `seq` rnf c `seq` rnf s
+instance Outputable CCallConv where
+    ppr StdCallConv = text "stdcall"
+    ppr CCallConv   = text "ccall"
+    ppr CApiConv    = text "capi"
+    ppr PrimCallConv = text "prim"
+    ppr JavaScriptCallConv = text "javascript"
 
-instance NFData CCallTarget where
-  rnf (StaticTarget s a b c) = rnf s `seq` rnf a `seq` rnf b `seq` rnf c
-  rnf DynamicTarget = ()
+instance Outputable CExportSpec where
+    ppr (CExportStatic str _) = pprCLabelString str
 
-instance NFData CCallConv where
-  rnf CCallConv = ()
-  rnf StdCallConv = ()
-  rnf PrimCallConv = ()
-  rnf CApiConv = ()
-  rnf JavaScriptCallConv = ()
+instance Outputable (CType (GhcPass p)) where
+    ppr (CType ext mh ct) =
+        pprWithSourceText stp (text "{-# CTYPE") <+> hDoc <+>
+        pprWithSourceText stct (doubleQuotes (ftext ct)) <+> text "#-}"
+      where
+        stp  = cTypeSourceText ext
+        stct = cTypeOtherText  ext
+        hDoc = case mh of
+          Nothing -> empty
+          Just h -> ppr h
 
-instance NFData CType where
-  rnf (CType s mh fs) = rnf s `seq` rnf mh `seq` rnf fs
+instance Outputable (Header (GhcPass p)) where
+    ppr (Header st h) = pprWithSourceText st (doubleQuotes $ ppr h)
 
-instance NFData Header where
-  rnf (Header s h) = rnf s `seq` rnf h
+instance Outputable Safety where
+    ppr PlaySafe = text "safe"
+    ppr PlayInterruptible = text "interruptible"
+    ppr PlayRisky = text "unsafe"

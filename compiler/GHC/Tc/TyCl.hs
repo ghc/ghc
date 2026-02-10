@@ -75,6 +75,7 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Unify
 
+import GHC.Types.ForeignCall ( typeCheckCType )
 import GHC.Types.Id
 import GHC.Types.Id.Make
 import GHC.Types.Var
@@ -3598,12 +3599,11 @@ tcDataDefn err_ctxt roles_info tc_name
              { data_cons <- tcConDecls DDataType rec_tycon tc_bndrs res_kind cons
              ; tc_rhs    <- mk_tc_rhs hsc_src rec_tycon data_cons
              ; tc_rep_nm <- newTyConRepName tc_name
-
              ; return (mkAlgTyCon tc_name kind
                                   bndrs nb_eta
                                   res_kind
                                   (roles_info tc_name)
-                                  (fmap unLoc cType)
+                                  (fmap (typeCheckCType . unLoc) cType)
                                   stupid_theta tc_rhs
                                   (VanillaAlgTyCon tc_rep_nm)
                                   gadt_syntax)

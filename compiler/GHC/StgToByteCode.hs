@@ -669,8 +669,8 @@ schemeT d s p (StgOpApp (StgPrimOp op) args _ty) = do
     -- Otherwise we have to do a call to the primop wrapper instead :(
     _         -> doTailCall d s p (primOpId op) (reverse args)
 
-schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label unit)) args result_ty)
-   = generatePrimCall d s p label (Just unit) result_ty args
+schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label _)) args result_ty)
+   = generatePrimCall d s p label result_ty args
 
 schemeT d s p (StgConApp con _cn args _tys)
    -- Case 2: Unboxed tuple
@@ -1867,11 +1867,10 @@ generatePrimCall
     -> Sequel
     -> BCEnv
     -> CLabelString          -- where to call
-    -> Maybe Unit
     -> Type
     -> [StgArg]              -- args (atoms)
     -> BcM BCInstrList
-generatePrimCall d s p target _mb_unit _result_ty args
+generatePrimCall d s p target _result_ty args
  = do
      profile <- getProfile
      let
@@ -1929,13 +1928,13 @@ generateCCall
     :: StackDepth
     -> Sequel
     -> BCEnv
-    -> CCallSpec               -- where to call
+    -> CCallSpec              -- where to call
     -> Type
     -> [StgArg]              -- args (atoms)
     -> BcM BCInstrList
 generateCCall d0 s p (CCallSpec target PrimCallConv _) result_ty args
- | (StaticTarget _ label mb_unit _) <- target
- = generatePrimCall d0 s p label mb_unit result_ty args
+ | (StaticTarget _ label _) <- target
+ = generatePrimCall d0 s p label result_ty args
  | otherwise
  = panic "GHC.StgToByteCode.generateCCall: primcall convention only supports static targets"
 generateCCall d0 s p (CCallSpec target _ safety) result_ty args
@@ -2042,10 +2041,10 @@ generateCCall d0 s p (CCallSpec target _ safety) result_ty args
          maybe_static_target :: Maybe Literal
          maybe_static_target =
              case target of
-                 DynamicTarget -> Nothing
-                 StaticTarget _ _ _ False ->
+                 DynamicTarget{} -> Nothing
+                 StaticTarget _ _ ForeignValue ->
                    panic "generateCCall: unexpected FFI value import"
-                 StaticTarget _ target _ True ->
+                 StaticTarget _ target ForeignFunction ->
                    Just (LitLabel target IsFunction)
 
      let

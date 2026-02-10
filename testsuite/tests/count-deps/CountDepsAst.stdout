@@ -242,6 +242,7 @@ Language.Haskell.Syntax.Binds
 Language.Haskell.Syntax.Binds.InlinePragma
 Language.Haskell.Syntax.BooleanFormula
 Language.Haskell.Syntax.Decls
+Language.Haskell.Syntax.Decls.Foreign
 Language.Haskell.Syntax.Decls.Overlap
 Language.Haskell.Syntax.Expr
 Language.Haskell.Syntax.Extension

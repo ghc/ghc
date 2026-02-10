@@ -142,6 +142,7 @@ import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Fixity
+import GHC.Types.ForeignCall
 import GHC.Types.Hint
 import GHC.Types.InlinePragma
 import GHC.Types.SourceText
@@ -155,7 +156,6 @@ import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, sumDataCon,
                           unrestrictedFunTyCon , listTyCon_RDR, unitDataCon )
-import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )
 import GHC.Data.OrdList
@@ -229,7 +229,7 @@ mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layout annsIn
 mkTyData :: SrcSpan
          -> Bool
          -> NewOrData
-         -> Maybe (LocatedP CType)
+         -> Maybe (LocatedP (CType GhcPs))
          -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
          -> Maybe (LHsKind GhcPs)
          -> [LConDecl GhcPs]
@@ -250,7 +250,7 @@ mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
                                    tcdFixity = fixity,
                                    tcdDataDefn = defn })) }
 
-mkDataDefn :: Maybe (LocatedP CType)
+mkDataDefn :: Maybe (LocatedP (CType GhcPs))
            -> Maybe (LHsContext GhcPs)
            -> Maybe (LHsKind GhcPs)
            -> DataDefnCons (LConDecl GhcPs)
@@ -325,7 +325,7 @@ mkTyFamInstEqn loc bndrs lhs rhs annEq
 
 mkDataFamInst :: SrcSpan
               -> NewOrData
-              -> Maybe (LocatedP CType)
+              -> Maybe (LocatedP (CType GhcPs))
               -> (Maybe ( LHsContext GhcPs), HsOuterFamEqnTyVarBndrs GhcPs
                         , LHsType GhcPs)
               -> Maybe (LHsKind GhcPs)
@@ -3138,7 +3138,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
         entity'    = if nullFS entity
                         then mkExtName (unLoc v)
                         else entity
-        funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
+        funcTarget = CFunction (StaticTarget esrc entity' ForeignFunction)
         importSpec = CImport (L (l2l loc) esrc) (reLoc cconv) (reLoc safety) Nothing funcTarget
 
     returnSpec spec = return $ \tforeign -> ForD noExtField $ ForeignImport
@@ -3155,7 +3155,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
 -- that one.
 parseCImport :: LocatedE CCallConv -> LocatedE Safety -> FastString -> String
              -> Located SourceText
-             -> Maybe (ForeignImport (GhcPass p))
+             -> Maybe (ForeignImport GhcPs)
 parseCImport cconv safety nm str sourceText =
  listToMaybe $ map fst $ filter (null.snd) $
      readP_to_S parse str
@@ -3163,7 +3163,7 @@ parseCImport cconv safety nm str sourceText =
    parse = do
        skipSpaces
        r <- choice [
-          string "dynamic" >> return (mk Nothing (CFunction DynamicTarget)),
+          string "dynamic" >> return (mk Nothing (CFunction (DynamicTarget NoExtField))),
           string "wrapper" >> return (mk Nothing CWrapper),
           do optional (token "static" >> skipSpaces)
              ((mk Nothing <$> cimp nm) +++
@@ -3193,16 +3193,15 @@ parseCImport cconv safety nm str sourceText =
    id_char       c = isAlphaNum c || c == '_'
 
    cimp nm = (ReadP.char '&' >> skipSpaces >> CLabel <$> cid)
-             +++ (do isFun <- case unLoc cconv of
+             +++ (do targetKind <- case unLoc cconv of
                                CApiConv ->
-                                  option True
+                                  option ForeignFunction
                                          (do token "value"
                                              skipSpaces
-                                             return False)
-                               _ -> return True
+                                             return ForeignValue)
+                               _ -> return ForeignFunction
                      cid' <- cid
-                     return (CFunction (StaticTarget NoSourceText cid'
-                                        Nothing isFun)))
+                     return (CFunction (StaticTarget NoSourceText cid' targetKind)))
           where
             cid = return nm +++
                   (do c  <- satisfy id_first_char
@@ -3219,7 +3218,7 @@ mkExport :: Located CCallConv
 mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
  = return $ \tforeign -> ForD noExtField $
    ForeignExport { fd_e_ext = (tforeign, texport, td), fd_name = v, fd_sig_ty = ty
-                 , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic esrc entity' cconv)) }
+                 , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic entity' cconv)) }
   where
     entity' | nullFS entity = mkExtName (unLoc v)
             | otherwise     = entity

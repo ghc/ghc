@@ -158,6 +158,8 @@ import GHC.Builtin.Uniques
   ( tyConRepNameUnique
   , dataConTyRepNameUnique )
 
+import GHC.Hs.Extension (GhcTc)
+
 import GHC.Utils.Binary
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -822,7 +824,8 @@ data TyConDetails =
               -- Note that it does /not/ scope over the data
               -- constructors.
 
-        tyConCType   :: Maybe CType,-- ^ The C type that should be used
+        tyConCType :: Maybe (CType GhcTc),
+                                    -- ^ The C type that should be used
                                     -- for this type when using the FFI
                                     -- and CAPI
 
@@ -2066,18 +2069,18 @@ well be different from 'mkTyConKind binders res_kind'.
 
 -- | This is the making of an algebraic 'TyCon'.
 mkAlgTyCon :: Name
-           -> Kind              -- ^ TyCon kind
-           -> [TyConBinder]     -- ^ Binders of the 'TyCon'
-           -> Int               -- ^ Number of binders introduced by eta expansion
-           -> Kind              -- ^ Result kind
-           -> [Role]            -- ^ The roles for each TyVar
-           -> Maybe CType       -- ^ The C type this type corresponds to
-                                --   when using the CAPI FFI
-           -> [PredType]        -- ^ Stupid theta: see 'algTcStupidTheta'
-           -> AlgTyConRhs       -- ^ Information about data constructors
-           -> AlgTyConFlav      -- ^ What flavour is it?
-                                -- (e.g. vanilla, type family)
-           -> Bool              -- ^ Was the 'TyCon' declared with GADT syntax?
+           -> Kind                -- ^ TyCon kind
+           -> [TyConBinder]       -- ^ Binders of the 'TyCon'
+           -> Int                 -- ^ Number of binders introduced by eta expansion
+           -> Kind                -- ^ Result kind
+           -> [Role]              -- ^ The roles for each TyVar
+           -> Maybe (CType GhcTc) -- ^ The C type this type corresponds to
+                                  --   when using the CAPI FFI
+           -> [PredType]          -- ^ Stupid theta: see 'algTcStupidTheta'
+           -> AlgTyConRhs         -- ^ Information about data constructors
+           -> AlgTyConFlav        -- ^ What flavour is it?
+                                  -- (e.g. vanilla, type family)
+           -> Bool                -- ^ Was the 'TyCon' declared with GADT syntax?
            -> TyCon
 mkAlgTyCon name kind binders nb_eta_bndrs res_kind roles cType stupid rhs parent gadt_syn
   = mkTyCon name kind binders nb_eta_bndrs res_kind roles $
@@ -2708,7 +2711,7 @@ isImplicitTyCon (TyCon { tyConName = name, tyConDetails = details }) = go detail
        | SumTyCon {} <- rhs   = True
        | otherwise            = False
 
-tyConCType_maybe :: TyCon -> Maybe CType
+tyConCType_maybe :: TyCon -> Maybe (CType GhcTc)
 tyConCType_maybe (TyCon { tyConDetails = details })
   | AlgTyCon { tyConCType = mb_ctype} <- details = mb_ctype
   | otherwise                                    = Nothing

@@ -40,8 +40,8 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( fUNTyCon )
 import GHC.Hs.Decls.Overlap as Hs
 import GHC.Types.Basic as Hs
-import GHC.Types.InlinePragma as Hs
 import GHC.Types.ForeignCall
+import GHC.Types.InlinePragma as Hs
 import GHC.Types.Unique
 import GHC.Types.SourceText
 import GHC.Utils.Lexeme
@@ -833,10 +833,19 @@ cvtForD (ImportF callconv safety from nm ty) =
      ; if -- the prim and javascript calling conventions do not support headers
           -- and are inserted verbatim, analogous to mkImport in GHC.Parser.PostProcess
           |  callconv == TH.Prim || callconv == TH.JavaScript
-          -> mk_imp (CImport (L l $ quotedSourceText from) (L l (cvt_conv callconv)) (L l safety') Nothing
-                             (CFunction (StaticTarget (SourceText fromtxt)
-                                                      fromtxt Nothing
-                                                      True)))
+          -> mk_imp (CImport
+                      (L l $ quotedSourceText from)
+                      (L l (cvt_conv callconv))
+                      (L l safety')
+                      Nothing
+                      (CFunction
+                        (StaticTarget
+                          (SourceText fromtxt)
+                          fromtxt
+                          ForeignFunction
+                        )
+                      )
+                    )
           |  Just impspec <- parseCImport (L l (cvt_conv callconv)) (L l safety')
                                           (mkFastString (TH.nameBase nm))
                                           from (L ls $ quotedSourceText from)
@@ -864,9 +873,9 @@ cvtForD (ExportF callconv as nm ty)
         ; ls <- getL
         ; let l = l2l ls
         ; let astxt = mkFastString as
-        ; let e = CExport (L l (SourceText astxt)) (L l (CExportStatic (SourceText astxt)
-                                                astxt
-                                                (cvt_conv callconv)))
+        ; let e = CExport
+                (L l (SourceText astxt))
+                (L l (CExportStatic astxt (cvt_conv callconv)))
         ; return $ ForeignExport { fd_e_ext = noAnn
                                  , fd_name = nm'
                                  , fd_sig_ty = ty'
