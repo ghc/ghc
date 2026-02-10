@@ -562,7 +562,7 @@ data TcGblEnv
           -- is implicit rather than explicit, so we have to zap a
           -- mutable variable.
 
-        tcg_th_needed_deps :: TcRef ([Linkable], PkgsLoaded),
+        tcg_th_needed_deps :: TcRef ([LinkableWithUsage], PkgsLoaded),
           -- ^ The set of runtime dependencies required by this module
           -- See Note [Object File Dependencies]
 

@@ -88,6 +88,10 @@ import GHC.Iface.Errors.Ppr
 import Data.Functor
 import Data.Bifunctor (first)
 import GHC.Types.PkgQual
+import GHC.ByteCode.Serialize (ModuleByteCode, gbc_hash)
+import GHC.Unit.Home.Graph (lookupHugByModule)
+import GHC.Unit.Home.ModInfo (HomeModLinkable(..), HomeModInfo (..))
+import GHC.Linker.Types (linkableParts)
 
 {-
   -----------------------------------------------
@@ -190,6 +194,7 @@ data RecompReason
   | ModuleAdded (ImportLevel, UnitId, ModuleName)
   | ModuleChangedRaw ModuleName
   | ModuleChangedIface ModuleName
+  | ModuleChangedBytecode ModuleName
   | FileChanged FilePath
   | DirChanged FilePath
   | CustomReason String
@@ -224,7 +229,8 @@ instance Outputable RecompReason where
     SigsMergeChanged         -> text "Signatures to merge in changed"
     ModuleChanged m          -> ppr m <+> text "changed"
     ModuleChangedRaw m       -> ppr m <+> text "changed (raw)"
-    ModuleChangedIface m     -> ppr m <+> text "changed (interface)"
+    ModuleChangedIface m     -> ppr m <+> text "changed (bytecode)"
+    ModuleChangedBytecode m     -> ppr m <+> text "changed (interface)"
     ModuleRemoved (_st, _uid, m)   -> ppr m <+> text "removed"
     ModuleAdded (_st, _uid, m)     -> ppr m <+> text "added"
     FileChanged fp           -> text fp <+> text "changed"
@@ -718,6 +724,15 @@ needInterface mod continue
         Nothing -> return $ NeedsRecompile MustCompile
         Just iface -> liftIO $ continue iface
 
+needBytecode :: Module -> (ModuleByteCode -> IO RecompileRequired)
+             -> IfG RecompileRequired
+needBytecode mod continue
+  = do
+      mb_recomp <- tryGetBytecode mod
+      case mb_recomp of
+        Nothing -> return $ NeedsRecompile MustCompile
+        Just mbc -> liftIO $ continue mbc
+
 tryGetModIface :: String -> Module -> IfG (Maybe ModIface)
 tryGetModIface doc_msg mod
   = do  -- Load the imported interface if possible
@@ -738,6 +753,27 @@ tryGetModIface doc_msg mod
                   -- just be that the current module doesn't need that
                   -- import and it's been deleted
       Succeeded iface -> pure $ Just iface
+
+tryGetBytecode :: Module -> IfG (Maybe ModuleByteCode)
+tryGetBytecode mod
+  = do  -- Load the imported bytecode if possible
+    logger <- getLogger
+    liftIO $ trace_hi_diffs logger (text "Checking bytecode hash for module" <+> ppr mod <+> ppr (moduleUnit mod))
+
+    mb_module_bytecode <- do
+      env <- getTopEnv
+      liftIO (lookupHugByModule mod (hsc_HUG env)) >>= \ case
+        Nothing -> pure Nothing
+        Just hmi ->
+          case homeMod_bytecode (hm_linkable hmi) of
+            Nothing -> pure Nothing
+            Just gbc_linkable -> pure $ Just $ linkableParts gbc_linkable
+
+    case mb_module_bytecode of
+      Nothing -> do
+        liftIO $ trace_hi_diffs logger (sep [text "Couldn't find bytecode for module", ppr mod])
+        return Nothing
+      Just module_bytecode -> pure $ Just module_bytecode
 
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
@@ -760,14 +796,14 @@ checkModUsage _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_ha
   needInterface mod $ \iface -> do
     let reason = ModuleChangedRaw (moduleName mod)
     checkModuleFingerprint logger reason old_mod_hash (mi_mod_hash iface)
-checkModUsage _  UsageHomeModuleInterface{ usg_mod_name = mod_name
+checkModUsage _  UsageHomeModuleBytecode{ usg_mod_name = mod_name
                                                  , usg_unit_id = uid
-                                                 , usg_iface_hash = old_mod_hash } = do
+                                                 , usg_bytecode_hash = old_bytecode_hash } = do
   let mod = mkModule (RealUnit (Definite uid)) mod_name
   logger <- getLogger
-  needInterface mod $ \iface -> do
-    let reason = ModuleChangedIface mod_name
-    checkIfaceFingerprint logger reason old_mod_hash (mi_iface_hash iface)
+  needBytecode mod $ \cbc -> do
+    let reason = ModuleChangedBytecode mod_name
+    checkBytecodeFingerprint logger reason old_bytecode_hash (gbc_hash cbc)
 
 checkModUsage _ UsageHomeModule{
                                 usg_mod_name = mod_name,
@@ -1032,19 +1068,18 @@ checkModuleFingerprint logger reason old_mod_hash new_mod_hash
   = out_of_date_hash logger reason (text "  Module fingerprint has changed")
                      old_mod_hash new_mod_hash
 
-checkIfaceFingerprint
+checkBytecodeFingerprint
   :: Logger
   -> RecompReason
   -> Fingerprint
   -> Fingerprint
   -> IO RecompileRequired
-checkIfaceFingerprint logger reason old_mod_hash new_mod_hash
-  | new_mod_hash == old_mod_hash
-  = up_to_date logger (text "Iface fingerprint unchanged")
-
+checkBytecodeFingerprint logger reason old_bytecode_hash new_bytecode_hash
+  | old_bytecode_hash == new_bytecode_hash
+  = up_to_date logger (text "Bytecode fingerprint unchanged")
   | otherwise
-  = out_of_date_hash logger reason (text "  Iface fingerprint has changed")
-                     old_mod_hash new_mod_hash
+  = out_of_date_hash logger reason (text "  Bytecode fingerprint has changed")
+                     old_bytecode_hash new_bytecode_hash
 
 ------------------------
 checkEntityUsage :: Logger

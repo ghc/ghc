@@ -49,6 +49,7 @@ module GHC.Linker.Types
    , WholeCoreBindingsLinkable
    , LinkableWith(..)
    , mkModuleByteCodeLinkable
+   , mkOnlyModuleByteCodeLinkable
    , LinkablePart(..)
    , LinkableObjectSort (..)
    , linkableIsNativeCodeOnly
@@ -67,12 +68,17 @@ module GHC.Linker.Types
    , linkableFilterNative
    , partitionLinkables
 
+   , LinkableWithUsage
+   , linkableUsageObjs
+   , mkLinkablesUsage
+   , mkLinkableUsage
+
    , ModuleByteCode(..)
    )
 where
 
 import GHC.Prelude
-import GHC.Unit                ( UnitId, Module )
+import GHC.Unit                ( UnitId, Module, moduleNameString, moduleName )
 import GHC.ByteCode.Types
 import GHCi.BreakArray
 import GHCi.RemoteTypes
@@ -97,6 +103,11 @@ import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Control.Applicative ((<|>))
 import Data.Functor.Identity
+import GHC.Unit.Module.Deps (LinkableUsage (..), linkableUsageObjectPaths)
+import GHC.Fingerprint (Fingerprint)
+import qualified GHC.Data.OsPath as OsPath
+import qualified GHC.Data.FlatBag as FlatBag
+import Control.DeepSeq (NFData(..))
 
 
 {- **********************************************************************
@@ -172,10 +183,10 @@ data LoaderState = LoaderState
         -- ^ Information about bytecode objects we have loaded into the
         -- interpreter.
 
-    , bcos_loaded :: !LinkableSet
+    , bcos_loaded :: !(LinkableSet LinkableWithUsage)
         -- ^ The currently loaded interpreted modules (home package)
 
-    , objs_loaded :: !LinkableSet
+    , objs_loaded :: !(LinkableSet LinkableWithUsage)
         -- ^ And the currently-loaded compiled modules (home package)
 
     , pkgs_loaded :: !PkgsLoaded
@@ -380,19 +391,25 @@ data LinkableWith parts = Linkable
     -- ^ Files and chunks of code to link.
  } deriving (Functor, Traversable, Foldable)
 
+instance NFData a => NFData (LinkableWith a) where
+  rnf Linkable{linkableTime,linkableModule,linkableParts} =
+    rnf linkableTime `seq` rnf linkableModule `seq` rnf linkableParts `seq` ()
+
 type Linkable = LinkableWith (NonEmpty LinkablePart)
 
 type WholeCoreBindingsLinkable = LinkableWith WholeCoreBindings
 
-type LinkableSet = ModuleEnv Linkable
+type LinkableWithUsage = LinkableWith (NonEmpty LinkableUsage)
 
-mkLinkableSet :: [Linkable] -> LinkableSet
+type LinkableSet = ModuleEnv
+
+mkLinkableSet :: [Linkable] -> LinkableSet Linkable
 mkLinkableSet ls = mkModuleEnv [(linkableModule l, l) | l <- ls]
 
 -- | Union of LinkableSets.
 --
 -- In case of conflict, keep the most recent Linkable (as per linkableTime)
-unionLinkableSet :: LinkableSet -> LinkableSet -> LinkableSet
+unionLinkableSet :: LinkableSet (LinkableWith a) -> LinkableSet (LinkableWith a) -> LinkableSet (LinkableWith a)
 unionLinkableSet = plusModuleEnv_C go
   where
     go l1 l2
@@ -435,8 +452,9 @@ data LinkablePart
   | DotDLL FilePath
       -- ^ Dynamically linked library file (.so, .dll, .dylib)
 
-  | DotGBC ModuleByteCode
-    -- ^ A byte-code object, lives only in memory.
+  | DotGBC
+      -- ^ A byte-code object, lives only in memory.
+      ModuleByteCode
 
 
 -- | The in-memory representation of a bytecode object
@@ -444,14 +462,19 @@ data LinkablePart
 data ModuleByteCode = ModuleByteCode { gbc_module :: Module
                                       , gbc_compiled_byte_code :: CompiledByteCode
                                       , gbc_foreign_files :: [FilePath]  -- ^ Path to object files
+                                      , gbc_hash :: !Fingerprint
                                       }
 
 mkModuleByteCodeLinkable :: UTCTime -> ModuleByteCode -> Linkable
-mkModuleByteCodeLinkable linkable_time bco =
+mkModuleByteCodeLinkable linkable_time bco = do
   Linkable linkable_time (gbc_module bco) (pure (DotGBC bco))
 
+mkOnlyModuleByteCodeLinkable :: UTCTime -> ModuleByteCode -> LinkableWith ModuleByteCode
+mkOnlyModuleByteCodeLinkable linkable_time bco = do
+  Linkable linkable_time (gbc_module bco) bco
+
 instance Outputable ModuleByteCode where
-  ppr (ModuleByteCode mod _cbc _fos) = text "ModuleByteCode" <+> ppr mod
+  ppr (ModuleByteCode mod _cbc _fos _) = text "ModuleByteCode" <+> ppr mod
 
 instance Outputable LinkablePart where
   ppr (DotO path sort)   = text "DotO" <+> text path <+> pprSort sort
@@ -544,8 +567,8 @@ linkablePartObjectPaths = \case
 -- Contrary to linkableBCOs, this includes byte-code from LazyBCOs.
 linkablePartBCOs :: LinkablePart -> [CompiledByteCode]
 linkablePartBCOs = \case
-  DotGBC bco    -> [gbc_compiled_byte_code bco]
-  _           -> []
+  DotGBC bco -> [gbc_compiled_byte_code bco]
+  _          -> []
 
 linkableFilter :: (LinkablePart -> [LinkablePart]) -> Linkable -> Maybe Linkable
 linkableFilter f linkable = do
@@ -585,6 +608,48 @@ partitionLinkables linkables =
     mapMaybe linkableFilterNative linkables,
     mapMaybe linkableFilterByteCode linkables
   )
+
+
+mkLinkableUsage :: Linkable -> LinkableWithUsage
+mkLinkableUsage linkables = do
+  linkableUsage linkables
+  where
+    msg m = moduleNameString (moduleName m) ++ "[TH] changed"
+
+    linkableUsage lnk@Linkable{linkableParts} =
+      setLinkableParts lnk linkableParts
+
+    mkFileLinkableUsage m fp objs =
+      FileLinkableUsage
+        { flu_file = fp
+        , flu_message = Just $ msg m
+        , flu_linkable_objs = FlatBag.fromList (strictGenericLength objs) [ OsPath.unsafeEncodeUtf obj | obj <- objs  ]
+        }
+
+    mkByteCodeLinkableUsage m fp objs =
+      ByteCodeLinkableUsage
+        { bclu_module = m
+        , bclu_hash = fp
+        , bclu_linkable_objs = FlatBag.fromList (strictGenericLength objs) [ OsPath.unsafeEncodeUtf obj | obj <- objs  ]
+        }
+
+    setLinkableParts lnk@(Linkable{linkableModule}) parts =
+      lnk
+        { linkableParts = fmap (go linkableModule) parts
+        }
+
+    go :: Module -> LinkablePart -> LinkableUsage
+    go m lnkPart = case lnkPart of
+      DotO fn _ -> mkFileLinkableUsage m fn (linkablePartObjectPaths lnkPart)
+      DotA fn -> mkFileLinkableUsage m fn (linkablePartObjectPaths lnkPart)
+      DotDLL fn -> mkFileLinkableUsage m fn (linkablePartObjectPaths lnkPart)
+      DotGBC mbc -> mkByteCodeLinkableUsage m (gbc_hash mbc) (linkablePartObjectPaths lnkPart)
+
+mkLinkablesUsage :: [Linkable] -> [LinkableWithUsage]
+mkLinkablesUsage linkables = map mkLinkableUsage linkables
+
+linkableUsageObjs :: LinkableWithUsage -> [FilePath]
+linkableUsageObjs lnkWithUsage = concatMap linkableUsageObjectPaths (linkableParts lnkWithUsage)
 
 {- **********************************************************************
 

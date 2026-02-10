@@ -37,6 +37,7 @@ module GHC.Utils.Binary
    tellBinWriter,
    castBin,
    withBinBuffer,
+   withReadBinBuffer,
    freezeWriteHandle,
    shrinkBinBuffer,
    thawReadHandle,
@@ -347,6 +348,12 @@ withBinBuffer :: WriteBinHandle -> (ByteString -> IO a) -> IO a
 withBinBuffer (WriteBinMem _ ix_r _ arr_r) action = do
   ix <- readFastMutInt ix_r
   arr <- readIORef arr_r
+  action $ BS.fromForeignPtr arr 0 ix
+
+-- | Get access to the underlying buffer.
+withReadBinBuffer :: ReadBinHandle -> (ByteString -> IO a) -> IO a
+withReadBinBuffer (ReadBinMem _ ix_r _ arr) action = do
+  ix <- readFastMutInt ix_r
   action $ BS.fromForeignPtr arr 0 ix
 
 unsafeUnpackBinBuffer :: ByteString -> IO ReadBinHandle

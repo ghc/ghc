@@ -137,7 +137,7 @@ data Hooks = Hooks
   , tcForeignExportsHook   :: !(Maybe ([LForeignDecl GhcRn]
             -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)))
   , hscFrontendHook        :: !(Maybe (ModSummary -> Hsc FrontendResult))
-  , hscCompileCoreExprHook :: !(Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [Linkable], PkgsLoaded)))
+  , hscCompileCoreExprHook :: !(Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableWithUsage], PkgsLoaded)))
   , ghcPrimIfaceHook       :: !(Maybe ModIface)
   , runPhaseHook           :: !(Maybe PhaseHook)
   , runMetaHook            :: !(Maybe (MetaHook TcM))
@@ -145,7 +145,7 @@ data Hooks = Hooks
                                          -> HomePackageTable -> IO SuccessFlag))
   , runRnSpliceHook        :: !(Maybe (HsUntypedSplice GhcRn -> RnM (HsUntypedSplice GhcRn)))
   , getValueSafelyHook     :: !(Maybe (HscEnv -> Name -> Type
-                                         -> IO (Either Type (HValue, [Linkable], PkgsLoaded))))
+                                         -> IO (Either Type (HValue, [LinkableWithUsage], PkgsLoaded))))
   , createIservProcessHook :: !(Maybe (CreateProcess -> IO ProcessHandle))
   , stgToCmmHook           :: !(Maybe (StgToCmmConfig -> InfoTableProvMap -> [TyCon] -> CollectedCCs
                                  -> [CgStgTopBinding] -> CgStream CmmGroup ModuleLFInfos))

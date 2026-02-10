@@ -342,7 +342,7 @@ data Plugins = Plugins
       -- The purpose of this field is to cache the plugins so they
       -- don't have to be loaded each time they are needed.  See
       -- 'GHC.Runtime.Loader.initializePlugins'.
-  , loadedPluginDeps :: !([Linkable], PkgsLoaded)
+  , loadedPluginDeps :: !([LinkableWithUsage], PkgsLoaded)
   -- ^ The object files required by the loaded plugins
   -- See Note [Plugin dependencies]
   }

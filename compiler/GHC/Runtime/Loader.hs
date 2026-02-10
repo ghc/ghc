@@ -153,7 +153,7 @@ initializePlugins hsc_env
       ([]  , _ )  -> False -- some external plugin added
       (p:ps,s:ss) -> check_external_plugin p s && check_external_plugins ps ss
 
-loadPlugins :: HscEnv -> IO ([LoadedPlugin], [Linkable], PkgsLoaded)
+loadPlugins :: HscEnv -> IO ([LoadedPlugin], [LinkableWithUsage], PkgsLoaded)
 loadPlugins hsc_env
   = do { unless (null to_load) $
            checkExternalInterpreter hsc_env
@@ -173,7 +173,7 @@ loadPlugins hsc_env
     loadPlugin = loadPlugin' (mkVarOccFS (fsLit "plugin")) pluginTyConName hsc_env
 
 
-loadFrontendPlugin :: HscEnv -> ModuleName -> IO (FrontendPlugin, [Linkable], PkgsLoaded)
+loadFrontendPlugin :: HscEnv -> ModuleName -> IO (FrontendPlugin, [LinkableWithUsage], PkgsLoaded)
 loadFrontendPlugin hsc_env mod_name = do
     checkExternalInterpreter hsc_env
     (plugin, _iface, links, pkgs)
@@ -188,7 +188,7 @@ checkExternalInterpreter hsc_env = case interpInstance <$> hsc_interp hsc_env of
     -> throwIO (InstallationError "Plugins require -fno-external-interpreter")
   _ -> pure ()
 
-loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface, [Linkable], PkgsLoaded)
+loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface, [LinkableWithUsage], PkgsLoaded)
 loadPlugin' occ_name plugin_name hsc_env mod_name
   = do { let plugin_rdr_name = mkRdrQual mod_name occ_name
              dflags = hsc_dflags hsc_env
@@ -266,7 +266,7 @@ forceLoadTyCon hsc_env con_name = do
 -- * If the Name does not exist in the module
 -- * If the link failed
 
-getValueSafely :: HscEnv -> Name -> Type -> IO (Either Type (a, [Linkable], PkgsLoaded))
+getValueSafely :: HscEnv -> Name -> Type -> IO (Either Type (a, [LinkableWithUsage], PkgsLoaded))
 getValueSafely hsc_env val_name expected_type = do
   eith_hval <- case getValueSafelyHook hooks of
     Nothing -> getHValueSafely interp hsc_env val_name expected_type
@@ -281,7 +281,7 @@ getValueSafely hsc_env val_name expected_type = do
     logger = hsc_logger hsc_env
     hooks  = hsc_hooks hsc_env
 
-getHValueSafely :: Interp -> HscEnv -> Name -> Type -> IO (Either Type (HValue, [Linkable], PkgsLoaded))
+getHValueSafely :: Interp -> HscEnv -> Name -> Type -> IO (Either Type (HValue, [LinkableWithUsage], PkgsLoaded))
 getHValueSafely interp hsc_env val_name expected_type = do
     forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of getHValueSafely") val_name
     -- Now look up the names for the value and type constructor in the type environment

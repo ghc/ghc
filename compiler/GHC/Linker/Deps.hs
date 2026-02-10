@@ -63,7 +63,7 @@ data LinkDepsOpts = LinkDepsOpts
 
 data LinkDeps = LinkDeps
   { ldNeededLinkables :: [Linkable]
-  , ldAllLinkables    :: [Linkable]
+  , ldAllLinkables    :: [LinkableWithUsage]
   , ldUnits           :: [UnitId]
   , ldNeededUnits     :: UniqDSet UnitId
   }
@@ -126,7 +126,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
 
       return $ LinkDeps
         { ldNeededLinkables = lnks_needed
-        , ldAllLinkables    = links_got ++ lnks_needed
+        , ldAllLinkables    = links_got ++ mkLinkablesUsage lnks_needed
         , ldUnits           = pkgs_needed
         , ldNeededUnits     = pkgs_s
         }

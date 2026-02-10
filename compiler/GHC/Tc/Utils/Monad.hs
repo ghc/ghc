@@ -2259,7 +2259,7 @@ fillCoercionHole (CH { ch_ref = ref, ch_co_var = cv }) co
 recordThUse :: TcM ()
 recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
 
-recordThNeededRuntimeDeps :: [Linkable] -> PkgsLoaded -> TcM ()
+recordThNeededRuntimeDeps :: [LinkableWithUsage] -> PkgsLoaded -> TcM ()
 recordThNeededRuntimeDeps new_links new_pkgs
   = do { env <- getGblEnv
        ; updTcRef (tcg_th_needed_deps env) $ \(needed_links, needed_pkgs) ->

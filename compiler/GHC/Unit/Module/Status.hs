@@ -18,7 +18,7 @@ import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 
-import GHC.Linker.Types ( Linkable, WholeCoreBindingsLinkable, linkableIsNativeCodeOnly )
+import GHC.Linker.Types ( Linkable, WholeCoreBindingsLinkable, linkableIsNativeCodeOnly, ModuleByteCode, LinkableWith, linkableBCOs, linkableModuleByteCodes )
 
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
@@ -59,7 +59,7 @@ data RecompLinkables = RecompLinkables { recompLinkables_bytecode :: !RecompByte
                                        , recompLinkables_object   :: !(Maybe Linkable) }
 
 data RecompBytecodeLinkable
-  = NormalLinkable !(Maybe Linkable)
+  = NormalLinkable !(Maybe (LinkableWith ModuleByteCode))
   | WholeCoreBindingsLinkable !WholeCoreBindingsLinkable
 
 instance Outputable HscRecompStatus where
@@ -87,7 +87,8 @@ justBytecode :: Either Linkable WholeCoreBindingsLinkable -> RecompLinkables
 justBytecode = \case
   Left lm ->
     assertPpr (not (linkableIsNativeCodeOnly lm)) (ppr lm)
-      $ emptyRecompLinkables { recompLinkables_bytecode = NormalLinkable (Just lm) }
+      $ assertPpr (length (linkableBCOs lm) == 1) (text "Expected 1 DotGBC linkable" $$ ppr lm )
+      $ emptyRecompLinkables { recompLinkables_bytecode = NormalLinkable (Just (head (linkableModuleByteCodes lm) <$ lm)) }
   Right lm -> emptyRecompLinkables { recompLinkables_bytecode = WholeCoreBindingsLinkable lm }
 
 justObjects :: Linkable -> RecompLinkables
@@ -99,7 +100,8 @@ bytecodeAndObjects :: Either Linkable WholeCoreBindingsLinkable -> Linkable -> R
 bytecodeAndObjects either_bc o = case either_bc of
   Left bc ->
     assertPpr (not (linkableIsNativeCodeOnly bc) && linkableIsNativeCodeOnly o) (ppr bc $$ ppr o)
-      $ RecompLinkables (NormalLinkable (Just bc)) (Just o)
+      $ assertPpr (length (linkableBCOs bc) == 1) (text "Expected 1 DotGBC linkable" $$ ppr bc )
+      $ RecompLinkables (NormalLinkable (Just (head (linkableModuleByteCodes bc) <$ bc))) (Just o)
   Right bc ->
     assertPpr (linkableIsNativeCodeOnly o) (ppr o)
       $ RecompLinkables (WholeCoreBindingsLinkable bc) (Just o)

@@ -146,10 +146,10 @@ pprUsage usage@UsageDirectory{}
           ppr (usg_dir_hash usage)]
 pprUsage usage@UsageMergedRequirement{}
   = hsep [text "merged", ppr (usg_mod usage), ppr (usg_mod_hash usage)]
-pprUsage usage@UsageHomeModuleInterface{}
-  = hsep [text "implementation", ppr (usg_mod_name usage)
+pprUsage usage@UsageHomeModuleBytecode{}
+  = hsep [text "Bytecode", ppr (usg_mod_name usage)
                                , ppr (usg_unit_id usage)
-                               , ppr (usg_iface_hash usage)]
+                               , ppr (usg_bytecode_hash usage)]
 
 pprUsageImport :: Outputable mod => mod -> Fingerprint -> IsSafeImport -> SDoc
 pprUsageImport mod hash safe

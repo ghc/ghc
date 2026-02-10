@@ -22,6 +22,10 @@ module GHC.Unit.Module.Deps
    , ImportAvails (..)
    , IfaceImportLevel(..)
    , tcImportLevel
+   , LinkableUsage(..)
+   , linkableUsageObjectPaths
+   , noLinkableUsage
+   , combineLinkableUsage
    )
 where
 
@@ -49,7 +53,10 @@ import qualified Data.Set as Set
 import Data.Bifunctor
 import Control.DeepSeq
 import GHC.Types.Name.Set
-
+import GHC.ByteCode.Types (FlatBag)
+import GHC.Data.OsPath
+import qualified Data.Foldable as Foldable
+import qualified GHC.Data.OsPath as OsPath
 
 
 -- | Dependency information about ALL modules and packages below this one
@@ -372,12 +379,12 @@ data Usage
         -- we won't spot it here. If you do want to spot that, the caller
         -- should recursively add them to their useage.
   }
-  | UsageHomeModuleInterface {
+  | UsageHomeModuleBytecode {
         usg_mod_name :: ModuleName
         -- ^ Name of the module
         , usg_unit_id :: UnitId
         -- ^ UnitId of the HomeUnit the module is from
-        , usg_iface_hash :: Fingerprint
+        , usg_bytecode_hash :: Fingerprint
         -- ^ The *interface* hash of the module, not the ABI hash.
         -- This changes when anything about the interface (and hence the
         -- module) has changed.
@@ -412,7 +419,7 @@ instance NFData Usage where
   rnf (UsageFile file hash label) = rnf file `seq` rnf hash `seq` rnf label `seq` ()
   rnf (UsageDirectory dir hash label) = rnf dir `seq` rnf hash `seq` rnf label `seq` ()
   rnf (UsageMergedRequirement mod hash) = rnf mod `seq` rnf hash `seq` ()
-  rnf (UsageHomeModuleInterface mod uid hash) = rnf mod `seq` rnf uid `seq` rnf hash `seq` ()
+  rnf (UsageHomeModuleBytecode mod uid hash) = rnf mod `seq` rnf uid `seq` rnf hash `seq` ()
 
 instance Binary Usage where
     put_ bh usg@UsagePackageModule{} = do
@@ -441,11 +448,11 @@ instance Binary Usage where
         put_ bh (usg_mod      usg)
         put_ bh (usg_mod_hash usg)
 
-    put_ bh usg@UsageHomeModuleInterface{} = do
+    put_ bh usg@UsageHomeModuleBytecode{} = do
         putByte bh 4
         put_ bh (usg_mod_name usg)
         put_ bh (usg_unit_id  usg)
-        put_ bh (usg_iface_hash usg)
+        put_ bh (usg_bytecode_hash usg)
 
     put_ bh usg@UsageDirectory{} = do
         putByte bh 5
@@ -483,7 +490,7 @@ instance Binary Usage where
             mod <- get bh
             uid <- get bh
             hash <- get bh
-            return UsageHomeModuleInterface { usg_mod_name = mod, usg_unit_id = uid, usg_iface_hash = hash }
+            return UsageHomeModuleBytecode { usg_mod_name = mod, usg_unit_id = uid, usg_bytecode_hash = hash }
           5 -> do
             dp    <- get bh
             hash  <- get bh
@@ -695,3 +702,41 @@ data ImportAvails
           -- ^ Family instance modules below us in the import tree (and maybe
           -- including us for imported modules)
       }
+
+data LinkableUsage
+  = FileLinkableUsage
+    { flu_file :: !FilePath
+    , flu_message :: !(Maybe String)
+    , flu_linkable_objs :: !(FlatBag OsPath)
+    }
+  | ByteCodeLinkableUsage
+    { bclu_module :: !Module
+    , bclu_hash :: !Fingerprint
+    , bclu_linkable_objs :: !(FlatBag OsPath)
+    }
+
+instance Outputable LinkableUsage where
+  ppr = \ case
+    FileLinkableUsage fp mmsg _objs ->
+      text "FileLinkableUsage" <+> text fp <> maybe empty (\ msg -> text " " <> text msg) mmsg
+    ByteCodeLinkableUsage modl hash _objs ->
+      text "ByteCodeLinkableUsage" <+> ppr modl <+> ppr hash
+
+instance NFData LinkableUsage where
+  rnf FileLinkableUsage{} = ()
+  rnf ByteCodeLinkableUsage{} = ()
+
+linkableUsageObjectPaths :: LinkableUsage -> [FilePath]
+linkableUsageObjectPaths lnkUsage =
+  map OsPath.unsafeDecodeUtf . Foldable.toList $ linkableUsageObjectOsPaths lnkUsage
+
+linkableUsageObjectOsPaths :: LinkableUsage -> FlatBag OsPath
+linkableUsageObjectOsPaths lnkUsage = case lnkUsage of
+  FileLinkableUsage{flu_linkable_objs} -> flu_linkable_objs
+  ByteCodeLinkableUsage{bclu_linkable_objs} -> bclu_linkable_objs
+
+noLinkableUsage :: [LinkableUsage]
+noLinkableUsage = []
+
+combineLinkableUsage :: [LinkableUsage] -> [LinkableUsage] -> [LinkableUsage]
+combineLinkableUsage a b = a ++ b

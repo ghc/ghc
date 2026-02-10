@@ -14,6 +14,7 @@ module GHC.ByteCode.Serialize
   , InterpreterLibraryContents(..)
   , writeBytecodeLib
   , readBytecodeLib
+  , fingerprintModuleByteCodeContents
   , decodeOnDiskModuleByteCode
   , decodeOnDiskBytecodeLib
   )
@@ -48,6 +49,7 @@ import GHC.Utils.Logger
 import GHC.Linker.Types
 import System.IO.Unsafe (unsafeInterleaveIO)
 import GHC.Utils.Outputable
+import GHC.Utils.Fingerprint (Fingerprint, fingerprintByteString)
 
 {- Note [Overview of persistent bytecode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -94,6 +96,7 @@ See Note [Recompilation avoidance with bytecode objects]
 -- contained by 'ModuleByteCode' are stored in-memory rather than as file paths to
 -- temporary files.
 data OnDiskModuleByteCode = OnDiskModuleByteCode { odgbc_module :: Module
+                                                 , odgbc_hash :: Fingerprint
                                                  , odgbc_compiled_byte_code :: CompiledByteCode
                                                  , odgbc_foreign :: [ByteString]  -- ^ Contents of object files
                                                  }
@@ -154,7 +157,6 @@ instance Binary OnDiskBytecodeLib where
     put_ bh bytecodeLibForeign
 
 
-
 writeBytecodeLib :: BytecodeLib -> FilePath -> IO ()
 writeBytecodeLib lib path = do
   odbco <- encodeBytecodeLib lib
@@ -174,12 +176,14 @@ readBytecodeLib hsc_env path = do
 instance Binary OnDiskModuleByteCode where
   get bh = do
     odgbc_module <- get bh
+    odgbc_hash <- get bh
     odgbc_compiled_byte_code <- get bh
     odgbc_foreign <- get bh
     pure OnDiskModuleByteCode {..}
 
   put_ bh OnDiskModuleByteCode {..} = do
     put_ bh odgbc_module
+    put_ bh odgbc_hash
     put_ bh odgbc_compiled_byte_code
     put_ bh odgbc_foreign
 
@@ -197,7 +201,8 @@ decodeOnDiskModuleByteCode hsc_env odbco = do
   pure $ ModuleByteCode {
     gbc_module = odgbc_module odbco,
     gbc_compiled_byte_code = odgbc_compiled_byte_code odbco,
-    gbc_foreign_files = foreign_files
+    gbc_foreign_files = foreign_files,
+    gbc_hash = odgbc_hash odbco
    }
 
 decodeOnDiskBytecodeLib :: HscEnv -> OnDiskBytecodeLib -> IO BytecodeLib
@@ -256,7 +261,8 @@ encodeOnDiskModuleByteCode bco = do
   pure $ OnDiskModuleByteCode {
     odgbc_module = gbc_module bco,
     odgbc_compiled_byte_code = gbc_compiled_byte_code bco,
-    odgbc_foreign = foreign_contents
+    odgbc_foreign = foreign_contents,
+    odgbc_hash = gbc_hash bco
    }
 
 -- | Read a 'ModuleByteCode' from a file.
@@ -280,6 +286,15 @@ writeBinByteCode f cbc = do
   odbco <- encodeOnDiskModuleByteCode cbc
   putWithUserData QuietBinIFace NormalCompression bh odbco
   writeBinMem bh f
+
+fingerprintModuleByteCodeContents :: Module -> CompiledByteCode -> [FilePath] -> IO Fingerprint
+fingerprintModuleByteCodeContents modl cbc foreign_files = do
+  bh' <- openBinMem (1024 * 1024)
+  bh <- addBinNameWriter bh'
+  foreign_contents <- readObjectFiles foreign_files
+  putWithUserData QuietBinIFace NormalCompression bh
+    (modl, cbc, foreign_contents)
+  withBinBuffer bh (pure . fingerprintByteString)
 
 instance Binary CompiledByteCode where
   get bh = do
