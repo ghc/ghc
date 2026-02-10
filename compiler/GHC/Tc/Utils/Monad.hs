@@ -19,6 +19,7 @@ module GHC.Tc.Utils.Monad(
   setGblEnv, getLclEnv, updLclEnv, updLclCtxt, setLclEnv, restoreLclEnv,
   updTopFlags,
   getEnvs, setEnvs, updEnvs, restoreEnvs,
+  getIfaceLoadEnv,
   xoptM, doptM, goptM, woptM,
   setXOptM, setWOptM,
   unsetXOptM, unsetGOptM, unsetWOptM,
@@ -2401,12 +2402,14 @@ initIfaceTcRn thing_inside
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.
               is_instantiate = fromMaybe False (isHomeUnitInstantiating <$> mhome_unit)
+              !iface_load_env = mkIfaceLoadEnv hsc_env
         ; let { if_env = IfGblEnv {
                             if_doc = text "initIfaceTcRn",
                             if_rec_types =
                                 if is_instantiate
                                     then emptyKnotVars
-                                    else readTcRef <$> knot_vars
+                                    else readTcRef <$> knot_vars,
+                            if_load_env = Just iface_load_env
                             }
                          }
         ; setEnvs (if_env, ()) thing_inside }
@@ -2415,11 +2418,13 @@ initIfaceTcRn thing_inside
 -- call 'typecheckIface' when inside a module loop and hence 'tcIfaceGlobal'.
 initIfaceLoad :: HscEnv -> IfG a -> IO a
 initIfaceLoad hsc_env do_this
- = do let gbl_env = IfGblEnv {
+ = do let !base_hsc_env = hsc_env { hsc_type_env_vars = emptyKnotVars }
+          gbl_env = IfGblEnv {
                         if_doc = text "initIfaceLoad",
-                        if_rec_types = emptyKnotVars
+                        if_rec_types = emptyKnotVars,
+                        if_load_env = Just (mkIfaceLoadEnv base_hsc_env)
                     }
-      initTcRnIf IfaceTag (hsc_env { hsc_type_env_vars = emptyKnotVars }) gbl_env () do_this
+      initTcRnIf IfaceTag base_hsc_env gbl_env () do_this
 
 -- | This is used when we are doing to call 'typecheckModule' on an 'ModIface',
 -- if it's part of a loop with some other modules then we need to use their
@@ -2428,7 +2433,8 @@ initIfaceLoadModule :: HscEnv -> Module -> IfG a -> IO a
 initIfaceLoadModule hsc_env this_mod do_this
  = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceLoadModule",
-                        if_rec_types = readTcRef <$> knotVarsWithout this_mod (hsc_type_env_vars hsc_env)
+                        if_rec_types = readTcRef <$> knotVarsWithout this_mod (hsc_type_env_vars hsc_env),
+                        if_load_env = Just (mkIfaceLoadEnv hsc_env)
                     }
       initTcRnIf IfaceTag hsc_env gbl_env () do_this
 
@@ -2438,7 +2444,8 @@ initIfaceCheck :: SDoc -> HscEnv -> IfG a -> IO a
 initIfaceCheck doc hsc_env do_this
  = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceCheck" <+> doc,
-                        if_rec_types = readTcRef <$> hsc_type_env_vars hsc_env
+                        if_rec_types = readTcRef <$> hsc_type_env_vars hsc_env,
+                        if_load_env = Just (mkIfaceLoadEnv hsc_env)
                     }
       initTcRnIf IfaceTag hsc_env gbl_env () do_this
 
@@ -2455,6 +2462,14 @@ initIfaceLclWithSubst mod loc_doc hi_boot_file nsubst thing_inside
 
 getIfModule :: IfL Module
 getIfModule = do { env <- getLclEnv; return (if_mod env) }
+
+getIfaceLoadEnv :: IfM lcl IfaceLoadEnv
+getIfaceLoadEnv = do
+    env <- getGblEnv
+    case if_load_env env of
+      Just load_env -> pure load_env
+      Nothing -> pprPanic "getIfaceLoadEnv"
+                        (text "No interface-loading environment in" <+> if_doc env)
 
 --------------------
 failIfM :: SDoc -> IfL a

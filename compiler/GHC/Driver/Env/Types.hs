@@ -5,6 +5,7 @@ module GHC.Driver.Env.Types
   , HscEnv(..)
   , HasHscEnv(..)
   , FinderEnv(..)
+  , IfaceLoadEnv(..)
   ) where
 
 import GHC.Driver.Errors.Types ( GhcMessage )
@@ -24,6 +25,7 @@ import GHC.Unit.Env
 import GHC.Unit.State (UnitState)
 import GHC.Unit.Home
 import GHC.Unit.Home.Graph (UnitEnvGraph)
+import GHC.Unit.Types (UnitId)
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import {-# SOURCE #-} GHC.Driver.Plugins
@@ -32,6 +34,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State
 import Data.IORef
+import qualified Data.Set as Set
 import GHC.Driver.Env.KnotVars
 
 -- | The Hsc monad: Passing an environment and diagnostic state
@@ -127,6 +130,16 @@ data FinderEnv = FinderEnv
   , finder_unit_state  :: !UnitState
   , finder_unit_env    :: !UnitEnv
   , finder_home_unit   :: !(Maybe HomeUnit)
+  }
+
+data IfaceLoadEnv = IfaceLoadEnv
+  { ifle_home_unit       :: !HomeUnit
+  , ifle_home_unit_maybe :: !(Maybe HomeUnit)
+  , ifle_dflags          :: !DynFlags
+  , ifle_all_home_unit_ids :: !(Set.Set UnitId)
+  , ifle_plugins         :: !Plugins
+  , ifle_hsc_env         :: !HscEnv
+  , ifle_finder_env      :: !FinderEnv
   }
 
 class HasHscEnv m where

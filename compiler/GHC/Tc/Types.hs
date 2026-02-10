@@ -360,6 +360,10 @@ data IfGblEnv
                 -- Allows a read effect, so it can be in a mutable
                 -- variable; c.f. handling the external package type env
                 -- Nothing => interactive stuff, no loops possible
+      , if_load_env :: !(Maybe IfaceLoadEnv)
+                -- | Optional environment containing the data required for
+                -- interface loading. It is absent in situations (such as the
+                -- desugarer) where we should never attempt to load interfaces.
     }
 
 data IfLclEnv

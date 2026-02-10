@@ -3,6 +3,7 @@ module GHC.Driver.Env
    , HscEnv (..)
    , HasHscEnv (..)
    , FinderEnv(..)
+   , IfaceLoadEnv(..)
    , hsc_mod_graph
    , setModuleGraph
    , hscUpdateFlags
@@ -21,6 +22,7 @@ module GHC.Driver.Env
    , hscSetActiveUnitId
    , hscActiveUnitId
    , mkFinderEnv
+   , mkIfaceLoadEnv
    , runHsc
    , runHsc'
    , mkInteractiveHscEnv
@@ -52,7 +54,7 @@ import GHC.Driver.Errors.Types ( GhcMessage )
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Diagnostic (initDiagOpts, initPrintConfig)
 import GHC.Driver.Config.Finder (initFinderOpts)
-import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..), HasHscEnv (..), FinderEnv(..) )
+import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..), HasHscEnv (..), FinderEnv(..), IfaceLoadEnv(..) )
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
@@ -132,6 +134,17 @@ mkFinderEnv hsc_env = FinderEnv
     mapUnitEnvGraph f env =
       HUG.unitEnv_new $
         Map.fromList [ (uid, f hue) | (uid, hue) <- HUG.unitEnv_assocs env ]
+
+mkIfaceLoadEnv :: HscEnv -> IfaceLoadEnv
+mkIfaceLoadEnv hsc_env = IfaceLoadEnv
+  { ifle_home_unit       = hsc_home_unit hsc_env
+  , ifle_home_unit_maybe = hsc_home_unit_maybe hsc_env
+  , ifle_dflags          = hsc_dflags hsc_env
+  , ifle_all_home_unit_ids = hsc_all_home_unit_ids hsc_env
+  , ifle_plugins         = hsc_plugins hsc_env
+  , ifle_hsc_env         = hsc_env
+  , ifle_finder_env      = mkFinderEnv hsc_env
+  }
 
 hsc_home_unit :: HscEnv -> HomeUnit
 hsc_home_unit = ue_unsafeHomeUnit . hsc_unit_env

@@ -425,16 +425,15 @@ loadInterface :: SDoc -> Module -> WhereFrom
 -- is no longer used
 
 loadInterface doc_str mod from
-  | isHoleModule mod
-  -- Hole modules get special treatment
-  = do hsc_env <- getTopEnv
-       let home_unit = hsc_home_unit hsc_env
-       -- Redo search for our local hole module
-       loadInterface doc_str (mkHomeModule home_unit (moduleName mod)) from
-  | otherwise
   = do
-    logger <- getLogger
-    withTimingSilent logger (text "loading interface") (pure ()) $ do
+    ifle <- getIfaceLoadEnv
+    if isHoleModule mod
+      then do
+        let home_unit = ifle_home_unit ifle
+        loadInterface doc_str (mkHomeModule home_unit (moduleName mod)) from
+      else do
+        logger <- getLogger
+        withTimingSilent logger (text "loading interface") (pure ()) $ do
         {       -- Read the state
           (eps,hug) <- getEpsAndHug
         ; gbl_env <- getGblEnv
@@ -442,8 +441,7 @@ loadInterface doc_str mod from
         ; liftIO $ trace_if logger (text "Considering whether to load" <+> ppr mod <+> ppr from)
 
                 -- Check whether we have the interface already
-        ; hsc_env <- getTopEnv
-        ; let mhome_unit = ue_homeUnit (hsc_unit_env hsc_env)
+        ; let mhome_unit = ifle_home_unit_maybe ifle
         ; liftIO (lookupIfaceByModule hug (eps_PIT eps) mod) >>= \case {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
@@ -453,8 +451,7 @@ loadInterface doc_str mod from
         ; read_result <- case wantHiBootFile mhome_unit eps mod from of
                            Failed err             -> return (Failed err)
                            Succeeded hi_boot_file -> do
-                             hsc_env <- getTopEnv
-                             liftIO $ computeInterface hsc_env doc_str hi_boot_file mod
+                             liftIO $ computeInterface (ifle_hsc_env ifle) doc_str hi_boot_file mod
         ; case read_result of {
             Failed err -> do
                 { let fake_iface = emptyFullModIface mod
@@ -503,8 +500,8 @@ loadInterface doc_str mod from
         -- If you start loading HPT modules into the EPS then you get strange errors about
         -- overlapping instances.
         ; massertPpr
-              ((isOneShot (ghcMode (hsc_dflags hsc_env)))
-                || moduleUnitId mod `notElem` hsc_all_home_unit_ids hsc_env
+              ((isOneShot (ghcMode (ifle_dflags ifle)))
+                || moduleUnitId mod `notElem` ifle_all_home_unit_ids ifle
                 || mod == gHC_PRIM)
                 (text "Attempting to load home package interface into the EPS" $$ ppr (HUG.allUnits hug) $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod))
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
@@ -584,7 +581,7 @@ loadInterface doc_str mod from
 
         ; -- invoke plugins with *full* interface, not final_iface, to ensure
           -- that plugins have access to declarations, etc.
-          res <- withPlugins (hsc_plugins hsc_env) (\p -> interfaceLoadAction p) iface
+          res <- withPlugins (ifle_plugins ifle) (\p -> interfaceLoadAction p) iface
         ; return (Succeeded res)
     }}}}
 
