@@ -184,7 +184,7 @@ importDecl name
           ; Succeeded _ -> do
 
         -- Now look it up again; this time we should find it
-        { eps <- getEps
+        { eps <- getEpsIf
         ; case lookupTypeEnv (eps_PTE eps) name of
             Just thing -> return $ Succeeded thing
             Nothing    -> return $ Failed $
@@ -435,7 +435,7 @@ loadInterface doc_str mod from
         logger <- getLogger
         withTimingSilent logger (text "loading interface") (pure ()) $ do
         {       -- Read the state
-          (eps,hug) <- getEpsAndHug
+          (eps,hug) <- getEpsAndHugIf
         ; gbl_env <- getGblEnv
 
         ; liftIO $ trace_if logger (text "Considering whether to load" <+> ppr mod <+> ppr from)
@@ -456,8 +456,10 @@ loadInterface doc_str mod from
             Failed err -> do
                 { let fake_iface = emptyFullModIface mod
 
-                ; updateEps_ $ \eps ->
-                        eps { eps_PIT = extendModuleEnv (eps_PIT eps) (mi_module fake_iface) fake_iface }
+                ; updateEpsIf $ \eps ->
+                        ( eps { eps_PIT = extendModuleEnv (eps_PIT eps)
+                                                  (mi_module fake_iface) fake_iface }
+                        , () )
                         -- Not found, so add an empty iface to
                         -- the EPS map so that we don't look again
 
@@ -512,7 +514,8 @@ loadInterface doc_str mod from
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
         ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
-        ; purged_hsc_env <- getTopEnv
+        ; purged_ifle <- getTopEnv
+        ; let purged_hsc_env = ifle_hsc_env purged_ifle
 
         ; let final_iface = iface
                                & set_mi_decls     (panic "No mi_decls in PIT")
@@ -542,42 +545,44 @@ loadInterface doc_str mod from
                 = old
 
         ; warnPprTrace bad_boot "loadInterface" (ppr mod) $
-          updateEps_  $ \ eps ->
+          updateEpsIf  $ \ eps ->
            if elemModuleEnv mod (eps_PIT eps) || is_external_sig mhome_unit iface
-                then eps
+                then (eps, ())
            else if bad_boot
                 -- See Note [Loading your own hi-boot file]
-                then eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
+                then ( eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
+                     , () )
            else
-                eps {
-                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
-                  eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
-                  eps_iface_bytecode = add_bytecode (eps_iface_bytecode eps),
-                  eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
-                                                        new_eps_rules,
-                  eps_complete_matches
-                                   = eps_complete_matches eps ++ new_eps_complete_matches,
-                  eps_inst_env     = extendInstEnvList (eps_inst_env eps)
-                                                       new_eps_insts,
-                  eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
-                                                          new_eps_fam_insts,
-                  eps_ann_env      = extendAnnEnvList (eps_ann_env eps)
-                                                      new_eps_anns,
-                  eps_mod_fam_inst_env
-                                   = let
-                                       fam_inst_env =
-                                         extendFamInstEnvList emptyFamInstEnv
-                                                              new_eps_fam_insts
-                                     in
-                                     extendModuleEnv (eps_mod_fam_inst_env eps)
-                                                     mod
-                                                     fam_inst_env,
-                  eps_stats        = addEpsInStats (eps_stats eps)
-                                                   (length new_eps_decls)
-                                                   (length new_eps_insts)
-                                                   (length new_eps_rules),
-                  eps_defaults    =  extendModuleEnv (eps_defaults eps) mod new_eps_defaults
-                                                   }
+                ( eps {
+                    eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
+                    eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
+                    eps_iface_bytecode = add_bytecode (eps_iface_bytecode eps),
+                    eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
+                                                          new_eps_rules,
+                    eps_complete_matches
+                                     = eps_complete_matches eps ++ new_eps_complete_matches,
+                    eps_inst_env     = extendInstEnvList (eps_inst_env eps)
+                                                         new_eps_insts,
+                    eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
+                                                            new_eps_fam_insts,
+                    eps_ann_env      = extendAnnEnvList (eps_ann_env eps)
+                                                        new_eps_anns,
+                    eps_mod_fam_inst_env
+                                     = let
+                                         fam_inst_env =
+                                           extendFamInstEnvList emptyFamInstEnv
+                                                                new_eps_fam_insts
+                                       in
+                                       extendModuleEnv (eps_mod_fam_inst_env eps)
+                                                       mod
+                                                       fam_inst_env,
+                    eps_stats        = addEpsInStats (eps_stats eps)
+                                                     (length new_eps_decls)
+                                                     (length new_eps_insts)
+                                                     (length new_eps_rules),
+                    eps_defaults    =  extendModuleEnv (eps_defaults eps) mod new_eps_defaults
+                                                     }
+                , () )
 
         ; -- invoke plugins with *full* interface, not final_iface, to ensure
           -- that plugins have access to declarations, etc.
@@ -642,18 +647,20 @@ home-package modules however, so it's safe for the HUG to be empty.
 -- Note [Home Unit Graph space leak]
 dontLeakTheHUG :: IfL a -> IfL a
 dontLeakTheHUG thing_inside = do
-  env <- getTopEnv
+  ifle <- getTopEnv
   let
     inOneShot =
-      isOneShot (ghcMode (hsc_dflags env))
+      isOneShot (ghcMode (ifle_dflags ifle))
     cleanGblEnv gbl_env
       | inOneShot = gbl_env
       | otherwise = gbl_env { if_rec_types = emptyKnotVars }
-    cleanTopEnv hsc_env =
+    cleanTopEnv env =
 
       let
-        !maybe_type_vars | inOneShot = Just (hsc_type_env_vars env)
-                         | otherwise = Nothing
+        !maybe_type_vars
+          | inOneShot = Just (hsc_type_env_vars (ifle_hsc_env ifle))
+          | otherwise = Nothing
+        hsc_env = ifle_hsc_env env
         -- wrinkle: when we're typechecking in --backpack mode, the
         -- instantiation of a signature might reside in the HPT, so
         -- this case breaks the assumption that EPS interfaces only
@@ -688,16 +695,18 @@ dontLeakTheHUG thing_inside = do
               }
       in do
         !unit_env <- unit_env_io
+        let cleaned_hsc_env =
+              hsc_env
+                { hsc_targets      = panic "cleanTopEnv: hsc_targets"
+                , hsc_IC           = panic "cleanTopEnv: hsc_IC"
+                , hsc_type_env_vars = case maybe_type_vars of
+                                         Just vars -> vars
+                                         Nothing -> panic "cleanTopEnv: hsc_type_env_vars"
+                , hsc_unit_env     = unit_env
+                }
         -- mg_has_holes will be checked again, but nothing else about the module graph
         pure $
-          hsc_env
-                {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
-                ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
-                ,  hsc_type_env_vars = case maybe_type_vars of
-                                           Just vars -> vars
-                                           Nothing -> panic "cleanTopEnv: hsc_type_env_vars"
-                ,  hsc_unit_env     = unit_env
-                }
+          env { ifle_hsc_env = cleaned_hsc_env }
 
   updTopEnvIO cleanTopEnv $ updGblEnv cleanGblEnv $ do
   !_ <- getTopEnv        -- force the updTopEnv
@@ -738,7 +747,8 @@ computeInterface
 computeInterface hsc_env doc_str hi_boot_file mod0 = do
   massert (not (isHoleModule mod0))
   let mhome_unit  = hsc_home_unit_maybe hsc_env
-  let find_iface m = findAndReadIface hsc_env doc_str
+      load_env    = mkIfaceLoadEnv hsc_env
+      find_iface m = findAndReadIface load_env doc_str
                                       m mod0 hi_boot_file
   case getModuleInstantiation mod0 of
       (imod, Just indef)
@@ -763,7 +773,7 @@ computeInterface hsc_env doc_str hi_boot_file mod0 = do
 -- @p[A=\<A>,B=\<B>]:B@ never includes B.
 moduleFreeHolesPrecise
     :: SDoc -> Module
-    -> TcRnIf gbl lcl (MaybeErr MissingInterfaceError (UniqDSet ModuleName))
+    -> IfM lcl (MaybeErr MissingInterfaceError (UniqDSet ModuleName))
 moduleFreeHolesPrecise doc_str mod
  | moduleIsDefinite mod = return (Succeeded emptyUniqDSet)
  | otherwise =
@@ -773,7 +783,7 @@ moduleFreeHolesPrecise doc_str mod
         let insts = instUnitInsts (moduleUnit indef)
         liftIO $ trace_if logger (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
-        (eps, hpt) <- getEpsAndHug
+        (eps, hpt) <- getEpsAndHugIf
         result <- tryEpsAndHpt eps hpt
         case result `firstJust` tryDepsCache eps imod insts of
           Just r -> return (Succeeded r)
@@ -787,16 +797,18 @@ moduleFreeHolesPrecise doc_str mod
             Just ifhs  -> Just (renameFreeHoles ifhs insts)
             _otherwise -> Nothing
     readAndCache imod insts = do
-        hsc_env <- getTopEnv
-        mb_iface <- liftIO $ findAndReadIface hsc_env
+        load_env <- getTopEnv
+        mb_iface <- liftIO $ findAndReadIface load_env
                                               (text "moduleFreeHolesPrecise" <+> doc_str)
                                               imod mod NotBoot
         case mb_iface of
             Succeeded (iface, _) -> do
                 let ifhs = mi_free_holes iface
                 -- Cache it
-                updateEps_ (\eps ->
-                    eps { eps_free_holes = extendInstalledModuleEnv (eps_free_holes eps) imod ifhs })
+                updateEpsIf (\eps ->
+                    ( eps { eps_free_holes =
+                              extendInstalledModuleEnv (eps_free_holes eps) imod ifhs }
+                    , () ))
                 return (Succeeded (renameFreeHoles ifhs insts))
             Failed err -> return (Failed err)
 
@@ -875,7 +887,7 @@ See #8320.
 -}
 
 findAndReadIface
-  :: HscEnv
+  :: IfaceLoadEnv
   -> SDoc            -- ^ Reason for loading the iface (used for tracing)
   -> InstalledModule -- ^ The unique identifier of the on-disk module we're looking for
   -> Module          -- ^ The *actual* module we're looking for.  We use
@@ -883,15 +895,17 @@ findAndReadIface
                      -- module we read out.
   -> IsBootInterface -- ^ Looking for .hi-boot or .hi file
   -> IO (MaybeErr MissingInterfaceError (ModIface, ModLocation))
-findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
-
-  let profile = targetProfile dflags
-      unit_state = hsc_units hsc_env
-      name_cache = hsc_NC hsc_env
-      mhome_unit  = hsc_home_unit_maybe hsc_env
-      dflags     = hsc_dflags hsc_env
-      logger     = hsc_logger hsc_env
-      hooks      = hsc_hooks hsc_env
+findAndReadIface load_env doc_str mod wanted_mod hi_boot_file = do
+  let finder_env = ifle_finder_env load_env
+      unit_state = finder_unit_state finder_env
+      mhome_unit = finder_home_unit finder_env
+      unit_env   = finder_unit_env finder_env
+      dflags     = ifle_dflags load_env
+      profile    = targetProfile dflags
+      logger     = extractLogger load_env
+      hooks      = extractHooks load_env
+      name_cache = extractNameCache load_env
+      hug        = ue_home_unit_graph unit_env
 
 
   trace_if logger (sep [hsep [text "Reading",
@@ -903,11 +917,11 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
                      nest 4 (text "reason:" <+> doc_str)])
 
   -- Look for the file
-  mb_found <- liftIO (findExactModule (mkFinderEnv hsc_env) mod hi_boot_file)
+  mb_found <- liftIO (findExactModule finder_env mod hi_boot_file)
   case mb_found of
       InstalledFound loc -> do
           -- See Note [Home module load error]
-          if HUG.memberHugUnitId (moduleUnit mod) (hsc_HUG hsc_env)
+          if HUG.memberHugUnitId (moduleUnit mod) hug
               && not (isOneShot (ghcMode dflags))
             then return (Failed (HomeModError mod loc))
             else do

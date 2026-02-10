@@ -254,7 +254,7 @@ The monad itself has to be defined here, because it is mentioned by ErrCtxt
 type TcRnIfBase top gbl lcl = IOEnv (Env top gbl lcl)
 type TcRnIf gbl lcl = IOEnv (Env HscEnv gbl lcl)
 type TcRn       = TcRnIf TcGblEnv TcLclEnv    -- Type inference
-type IfM lcl    = TcRnIf IfGblEnv lcl         -- Iface stuff
+type IfM lcl    = TcRnIfBase IfaceLoadEnv IfGblEnv lcl         -- Iface stuff
 type IfG        = IfM ()                      --    Top level
 type IfL        = IfM IfLclEnv                --    Nested
 

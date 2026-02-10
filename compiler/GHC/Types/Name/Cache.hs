@@ -13,6 +13,7 @@ module GHC.Types.Name.Cache
   , lookupOrigNameCache
   , extendOrigNameCache'
   , extendOrigNameCache
+  , ContainsNameCache(..)
 
   -- * Known-key names
   , knownKeysOrigNameCache
@@ -117,6 +118,12 @@ data NameCache = NameCache
   { nsUniqChar :: {-# UNPACK #-} !Char -- See Note [Performance implications of UniqueTag]
   , nsNames    :: {-# UNPACK #-} !(MVar OrigNameCache)
   }
+
+instance ContainsNameCache NameCache where
+  extractNameCache = id
+
+class ContainsNameCache t where
+  extractNameCache :: t -> NameCache
 
 -- | Per-module cache of original 'OccName's given 'Name's
 type OrigNameCache   = ModuleEnv (OccEnv Name)

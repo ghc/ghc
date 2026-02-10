@@ -619,7 +619,7 @@ tcHiBootIface hsc_src mod
         -- to check consistency against, rather than just when we notice
         -- that an hi-boot is necessary due to a circular import.
         { hsc_env <- getTopEnv
-        ; read_result <- liftIO $ findAndReadIface hsc_env need
+        ; read_result <- liftIO $ findAndReadIface (mkIfaceLoadEnv hsc_env) need
                                   (fst (getModuleInstantiation mod)) mod
                                   IsBoot  -- Hi-boot file
 
@@ -1106,8 +1106,9 @@ tc_iface_decl_fingerprint ignore_prags (_version, decl)
 bumpDeclStats :: Name -> IfL ()         -- Record that one more declaration has actually been used
 bumpDeclStats name
   = do  { traceIf (text "Loading decl for" <+> ppr name)
-        ; updateEps_ (\eps -> let stats = eps_stats eps
-                              in eps { eps_stats = stats { n_decls_out = n_decls_out stats + 1 } })
+        ; updateEpsIf (\eps -> let stats = eps_stats eps
+                                in ( eps { eps_stats = stats { n_decls_out = n_decls_out stats + 1 } }
+                                   , () ))
         }
 
 tc_fd :: FunDep IfLclName -> IfL (FunDep TyVar)
@@ -2064,7 +2065,8 @@ tcIfaceGlobal name
             _ -> via_external }
   where
     via_external =  do
-        { hsc_env <- getTopEnv
+        { ifle <- getTopEnv
+        ; let hsc_env = ifle_hsc_env ifle
         ; mb_thing <- liftIO (lookupType hsc_env name)
         ; case mb_thing of {
             Just thing -> return thing ;

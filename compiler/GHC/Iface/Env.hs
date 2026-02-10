@@ -59,7 +59,7 @@ import Control.Monad
 See Also: Note [The Name Cache] in GHC.Types.Name.Cache
 -}
 
-newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
+newGlobalBinder :: (ContainsNameCache top, ContainsLogger top) => Module -> OccName -> SrcSpan -> TcRnIfBase top a b Name
 -- Used for source code and interface files, to make the
 -- Name for a thing, given its Module and OccName
 -- See Note [The Name Cache] in GHC.Types.Name.Cache
@@ -69,8 +69,8 @@ newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 -- moment when we know its Module and SrcLoc in their full glory
 
 newGlobalBinder mod occ loc
-  = do { hsc_env <- getTopEnv
-       ; name <- liftIO $ allocateGlobalBinder (hsc_NC hsc_env) mod occ loc
+  = do { top_env <- getTopEnv
+       ; name <- liftIO $ allocateGlobalBinder (extractNameCache top_env) mod occ loc
        ; traceIf (text "newGlobalBinder" <+>
                   (vcat [ ppr mod <+> ppr occ <+> ppr loc, ppr name]))
        ; return name }
@@ -124,7 +124,7 @@ allocateGlobalBinder nc mod occ loc
               let new_cache = extendOrigNameCache cache0 mod occ name
               pure (new_cache, name)
 
-ifaceExportNames :: [IfaceExport] -> TcRnIf gbl lcl [AvailInfo]
+ifaceExportNames :: [IfaceExport] -> TcRnIfBase top gbl lcl [AvailInfo]
 ifaceExportNames exports = return exports
 
 {-
@@ -175,7 +175,7 @@ externaliseName mod name
          pure (cache', name') }
 
 -- | Set the 'Module' of a 'Name'.
-setNameModule :: Maybe Module -> Name -> TcRnIf m n Name
+setNameModule :: (ContainsNameCache top, ContainsLogger top) => Maybe Module -> Name -> TcRnIfBase top m n Name
 setNameModule Nothing n = return n
 setNameModule (Just m) n =
     newGlobalBinder m (nameOccName n) (nameSrcSpan n)
@@ -254,7 +254,7 @@ extendIfaceEnvs tcvs thing_inside
 -- | Look up a top-level name from the current Iface module
 lookupIfaceTop :: OccName -> IfL Name
 lookupIfaceTop occ
-  = do  { env <- getLclEnv; lookupOrig (if_mod env) occ }
+  = do  { top_env <- getTopEnv; env <- getLclEnv; liftIO $ lookupNameCache (hsc_NC (ifle_hsc_env top_env)) (if_mod env) occ }
 
 newIfaceName :: OccName -> IfL Name
 newIfaceName occ

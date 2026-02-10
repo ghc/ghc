@@ -234,7 +234,7 @@ initDsTc thing_inside
        ; envs     <- mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
        ; e_result <- tryM $  -- need to tryM so that we don't discard
                              -- DsMessages
-                     setEnvs envs thing_inside
+                     setGblLclEnvs envs thing_inside
        ; msgs     <- liftIO $ readIORef msg_var
        ; return (msgs, case e_result of Left _  -> Nothing
                                         Right x -> Just x)
@@ -532,7 +532,8 @@ dsLookupGlobal :: Name -> DsM TyThing
 -- Very like GHC.Tc.Utils.Env.tcLookupGlobal
 dsLookupGlobal name
   = do  { env <- getGblEnv
-        ; setEnvs (ds_if_env env)
+        ; top_env <- getTopEnv
+        ; setEnvsWithTop (const (mkIfaceLoadEnv top_env)) (ds_if_env env)
                   (tcIfaceGlobal name) }
 
 dsLookupGlobalId :: Name -> DsM Id

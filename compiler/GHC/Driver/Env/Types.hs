@@ -60,6 +60,9 @@ instance ContainsHooks HscEnv where
 instance ContainsLogger HscEnv where
     extractLogger = hsc_logger
 
+instance ContainsNameCache HscEnv where
+    extractNameCache = hsc_NC
+
 instance HasLogger Hsc where
     getLogger = Hsc $ \e w -> return (hsc_logger e, w)
 
@@ -147,6 +150,18 @@ data IfaceLoadEnv = IfaceLoadEnv
   , ifle_hsc_env         :: !HscEnv
   , ifle_finder_env      :: !FinderEnv
   }
+
+instance ContainsDynFlags IfaceLoadEnv where
+  extractDynFlags = extractDynFlags . ifle_hsc_env
+
+instance ContainsHooks IfaceLoadEnv where
+  extractHooks = extractHooks . ifle_hsc_env
+
+instance ContainsLogger IfaceLoadEnv where
+  extractLogger = extractLogger . ifle_hsc_env
+
+instance ContainsNameCache IfaceLoadEnv where
+  extractNameCache = extractNameCache . ifle_hsc_env
 
 class HasHscEnv m where
     getHscEnv :: m HscEnv

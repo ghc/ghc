@@ -25,6 +25,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.Phases
 import GHC.Driver.Session
+import GHC.Types.Name.Cache (extractNameCache)
 import GHC.Driver.Ppr
 import GHC.Driver.Pipeline  ( oneShot )
 import GHC.Driver.MakeFile  ( doMkDependHS )
@@ -264,7 +265,7 @@ main' postLoadMode units dflags0 args flagWarnings = do
        ShowInterface f        -> liftIO $ showIface logger
                                                     (hsc_dflags hsc_env)
                                                     (hsc_units  hsc_env)
-                                                    (hsc_NC     hsc_env)
+                                                    (extractNameCache hsc_env)
                                                     f
        DoMake                 -> doMake units srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)

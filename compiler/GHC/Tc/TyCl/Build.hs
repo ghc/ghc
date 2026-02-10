@@ -44,9 +44,12 @@ import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Types.Name.Cache
+import GHC.Utils.Logger
 
 
-mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
+mkNewTyConRhs :: (ContainsNameCache top, ContainsLogger top)
+              => Name -> TyCon -> DataCon -> TcRnIfBase top m n AlgTyConRhs
 -- ^ Monadic because it makes a Name for the coercion TyCon
 --   We pass the Name of the parent TyCon, as well as the TyCon itself,
 --   because the latter is part of a knot, whereas the former is not.
@@ -146,7 +149,8 @@ There are other ways we could do the check (discussion on #19739):
 -}
 
 ------------------------------------------------------
-buildDataCon :: FamInstEnvs
+buildDataCon :: (ContainsNameCache top, ContainsLogger top)
+             => FamInstEnvs
             -> DataConBangOpts
             -> Name
             -> Bool                     -- Declared infix
@@ -164,7 +168,7 @@ buildDataCon :: FamInstEnvs
            -> KnotTied TyCon           -- Rep tycon
            -> NameEnv ConTag           -- Maps the Name of each DataCon to its
                                        -- ConTag
-           -> TcRnIf m n DataCon
+           -> TcRnIfBase top m n DataCon
 -- A wrapper for DataCon.mkDataCon that
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
@@ -288,7 +292,8 @@ type MethInfo       -- A temporary intermediate, to communicate
          --    only to give the right location of an ambiguity error
          --    for the generic default method, spat out by checkValidClass
 
-buildClass :: Name  -- Name of the class/tycon (they have the same Name)
+buildClass :: (ContainsNameCache top, ContainsLogger top)
+           => Name  -- Name of the class/tycon (they have the same Name)
            -> Kind
            -> [TyConBinder]                -- Of the tycon
            -> [Role]
@@ -298,7 +303,7 @@ buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> [KnotTied MethInfo]    -- Methods
            -> ClassMinimalDef        -- Minimal complete definition
            -> Bool                   -- True <=> is a unary class
-           -> TcRnIf m n Class
+           -> TcRnIfBase top m n Class
 
 buildClass tycon_name kind binders roles fds sc_theta at_items sig_stuff mindef unary_class
   = fixM  $ \ rec_clas ->       -- Only name generation inside loop
@@ -377,13 +382,10 @@ buildClass tycon_name kind binders roles fds sc_theta at_items sig_stuff mindef 
   where
     no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 
-    mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
     mk_op_item rec_clas (op_name, _, dm_spec)
       = do { dm_info <- mk_dm_info op_name dm_spec
            ; return (mkDictSelId op_name rec_clas, dm_info) }
 
-    mk_dm_info :: Name -> Maybe (DefMethSpec (SrcSpan, Type))
-               -> TcRnIf n m (Maybe (Name, DefMethSpec Type))
     mk_dm_info _ Nothing
       = return Nothing
     mk_dm_info op_name (Just VanillaDM)
@@ -393,12 +395,13 @@ buildClass tycon_name kind binders roles fds sc_theta at_items sig_stuff mindef 
       = do { dm_name <- newImplicitBinderLoc op_name mkDefaultMethodOcc loc
            ; return (Just (dm_name, GenericDM dm_ty)) }
 
-buildAbstractClass :: Name
+buildAbstractClass :: (ContainsNameCache top, ContainsLogger top)
+                   => Name
                    -> Kind
                    -> [TyConBinder]
                    -> [Role]
                    -> [FunDep TyVar]
-                   -> TcRnIf m n Class
+                   -> TcRnIfBase top m n Class
 
 buildAbstractClass tycon_name kind binders roles fds
   = fixM  $ \ rec_clas ->       -- Only name generation inside loop
@@ -413,19 +416,20 @@ buildAbstractClass tycon_name kind binders roles fds
         ; traceIf (text "buildClass" <+> ppr tycon)
         ; return result }
 
-newImplicitBinder :: Name                       -- Base name
+newImplicitBinder :: (ContainsNameCache top, ContainsLogger top)
+                  => Name                       -- Base name
                   -> (OccName -> OccName)       -- Occurrence name modifier
-                  -> TcRnIf m n Name            -- Implicit name
+                  -> TcRnIfBase top m n Name            -- Implicit name
 -- Called in GHC.Tc.TyCl.Build to allocate the implicit binders of type/class decls
 -- For source type/class decls, this is the first occurrence
 -- For iface ones, GHC.Iface.Load has already allocated a suitable name in the cache
 newImplicitBinder base_name mk_sys_occ
   = newImplicitBinderLoc base_name mk_sys_occ (nameSrcSpan base_name)
 
-newImplicitBinderLoc :: Name                       -- Base name
+newImplicitBinderLoc :: (ContainsNameCache top, ContainsLogger top) => Name                       -- Base name
                      -> (OccName -> OccName)       -- Occurrence name modifier
                      -> SrcSpan
-                     -> TcRnIf m n Name            -- Implicit name
+                     -> TcRnIfBase top m n Name            -- Implicit name
 -- Just the same, but lets you specify the SrcSpan
 newImplicitBinderLoc base_name mk_sys_occ loc
   | Just mod <- nameModule_maybe base_name
@@ -439,7 +443,7 @@ newImplicitBinderLoc base_name mk_sys_occ loc
     occ = mk_sys_occ (nameOccName base_name)
 
 -- | Make the 'TyConRepName' for this 'TyCon'
-newTyConRepName :: Name -> TcRnIf gbl lcl TyConRepName
+newTyConRepName :: (ContainsNameCache top, ContainsLogger top) => Name -> TcRnIfBase top gbl lcl TyConRepName
 newTyConRepName tc_name
   | Just mod <- nameModule_maybe tc_name
   , (mod, occ) <- tyConRepModOcc mod (nameOccName tc_name)

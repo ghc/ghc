@@ -544,7 +544,7 @@ mergeSignatures
             ctx = initSDocContext dflags defaultUserStyle
         fmap fst
          . withIfaceErr ctx
-         $ findAndReadIface hsc_env (text "mergeSignatures") im m NotBoot
+         $ findAndReadIface (mkIfaceLoadEnv hsc_env) (text "mergeSignatures") im m NotBoot
 
     -- STEP 3: Get the unrenamed exports of all these interfaces,
     -- thin it according to the export list, and do shaping on them.
@@ -967,7 +967,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     let sig_mod = mkModule (VirtUnit uid) mod_name
         isig_mod = fst (getModuleInstantiation sig_mod)
     hsc_env <- getTopEnv
-    mb_isig_iface <- liftIO $ findAndReadIface hsc_env
+    mb_isig_iface <- liftIO $ findAndReadIface (mkIfaceLoadEnv hsc_env)
                                                (text "checkImplements 2")
                                                isig_mod sig_mod NotBoot
     isig_iface <- case mb_isig_iface of
