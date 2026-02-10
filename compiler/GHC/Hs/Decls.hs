@@ -102,6 +102,7 @@ import GHC.Prelude
 
 import Language.Haskell.Syntax.Binds
 import Language.Haskell.Syntax.Decls
+import Language.Haskell.Syntax.Decls.Foreign
 import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
 import Language.Haskell.Syntax.Extension
 
@@ -1273,7 +1274,7 @@ instance OutputableBndrId p
     hang (text "foreign export" <+> ppr fexport <+> ppr n)
        2 (dcolon <+> ppr ty)
 
-instance OutputableBndrId p
+instance forall p. (IsPass p, OutputableBndrId p)
        => Outputable (ForeignImport (GhcPass p)) where
   ppr (CImport (L _ srcText) cconv safety mHeader spec) =
     ppr cconv <+> ppr safety
@@ -1285,26 +1286,30 @@ instance OutputableBndrId p
 
       pprCEntity (CLabel lbl) _ =
         doubleQuotes $ text "static" <+> pp_hdr <+> char '&' <> ppr lbl
-      pprCEntity (CFunction (StaticTarget st _lbl _ isFun)) src =
+      pprCEntity (CFunction (StaticTarget stExt _ targetKind)) src =
         if dqNeeded then doubleQuotes ce else empty
           where
+            st = case ghcPass @p of
+                    GhcPs -> stExt
+                    GhcRn -> staticTargetLabel stExt
+                    GhcTc -> staticTargetLabel stExt
             dqNeeded = (take 6 src == "static")
                     || isJust mHeader
-                    || not isFun
+                    || targetKind == ForeignValue
                     || st /= NoSourceText
             ce =
                   -- We may need to drop leading spaces first
                   (if take 6 src == "static" then text "static" else empty)
               <+> pp_hdr
-              <+> (if isFun then empty else text "value")
+              <+> (if targetKind == ForeignFunction then empty else text "value")
               <+> (pprWithSourceText st empty)
-      pprCEntity (CFunction DynamicTarget) _ =
+      pprCEntity (CFunction DynamicTarget{}) _ =
         doubleQuotes $ text "dynamic"
       pprCEntity CWrapper _ = doubleQuotes $ text "wrapper"
 
 instance OutputableBndrId p
        => Outputable (ForeignExport (GhcPass p)) where
-  ppr (CExport _ (L _ (CExportStatic _ lbl cconv))) =
+  ppr (CExport _ (L _ (CExportStatic lbl cconv))) =
     ppr cconv <+> char '"' <> ppr lbl <> char '"'
 
 {-
@@ -1478,7 +1483,7 @@ type instance Anno (FunDep (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FamilyResultSig (GhcPass p)) = EpAnnCO
 type instance Anno (FamilyDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (InjectivityAnn (GhcPass p)) = EpAnnCO
-type instance Anno CType = SrcSpanAnnP
+type instance Anno (CType (GhcPass p)) = SrcSpanAnnP
 type instance Anno (HsDerivingClause (GhcPass p)) = EpAnnCO
 type instance Anno (DerivClauseTys (GhcPass _)) = SrcSpanAnnC
 type instance Anno (StandaloneKindSig (GhcPass p)) = SrcSpanAnnA

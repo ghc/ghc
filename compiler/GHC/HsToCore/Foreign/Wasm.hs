@@ -42,7 +42,6 @@ import GHC.Types.Name
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Types.Var
-import GHC.Unit
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
@@ -52,16 +51,17 @@ data Synchronicity = Sync | Async
 dsWasmJSImport ::
   Id ->
   Coercion ->
-  CImportSpec ->
+  CImportSpec GhcTc ->
   Safety ->
   DsM ([Binding], CHeader, CStub, [Id])
-dsWasmJSImport id co (CFunction (StaticTarget _ js_src mUnitId _)) safety
-  | js_src == "wrapper" = dsWasmJSDynamicExport Async id co mUnitId
-  | js_src == "wrapper sync" = dsWasmJSDynamicExport Sync id co mUnitId
+dsWasmJSImport id co (CFunction (StaticTarget stExt js_src _)) safety
+  | js_src == "wrapper" = dsWasmJSDynamicExport Async id co unitId
+  | js_src == "wrapper sync" = dsWasmJSDynamicExport Sync id co unitId
   | otherwise = do
-      (bs, h, c) <- dsWasmJSStaticImport id co (unpackFS js_src) mUnitId sync
+      (bs, h, c) <- dsWasmJSStaticImport id co (unpackFS js_src) unitId sync
       pure (bs, h, c, [])
   where
+    unitId = staticTargetUnit stExt
     sync = case safety of
       PlayRisky -> Sync
       _ -> Async
@@ -130,9 +130,9 @@ dsWasmJSDynamicExport ::
   Synchronicity ->
   Id ->
   Coercion ->
-  Maybe Unit ->
+  CCallStaticTargetUnit ->
   DsM ([Binding], CHeader, CStub, [Id])
-dsWasmJSDynamicExport sync fn_id co mUnitId = do
+dsWasmJSDynamicExport sync fn_id co unitId = do
   sp_tycon <- dsLookupTyCon stablePtrTyConName
   let ty = coercionLKind co
       (tv_bndrs, fun_ty) = tcSplitForAllTyVarBinders ty
@@ -182,7 +182,7 @@ dsWasmJSDynamicExport sync fn_id co mUnitId = do
       adjustor_id
       (mkRepReflCo adjustor_ty)
       adjustor_js_src
-      mUnitId
+      unitId
       Sync
   mkJSCallback_id <-
     lookupGhcInternalVarId
@@ -307,10 +307,10 @@ dsWasmJSStaticImport ::
   Id ->
   Coercion ->
   String ->
-  Maybe Unit ->
+  CCallStaticTargetUnit ->
   Synchronicity ->
   DsM ([Binding], CHeader, CStub)
-dsWasmJSStaticImport fn_id co js_src' mUnitId sync = do
+dsWasmJSStaticImport fn_id co js_src' unitId sync = do
   cfun_name <- uniqueCFunName
   let ty = coercionLKind co
       (tvs, fun_ty) = tcSplitForAllInvisTyVars ty
@@ -329,7 +329,7 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId sync = do
             js_src'
   case sync of
     Sync -> do
-      rhs <- importBindingRHS mUnitId cfun_name tvs arg_tys orig_res_ty id
+      rhs <- importBindingRHS unitId cfun_name tvs arg_tys orig_res_ty id
       pure
         ( [(fn_id, Cast rhs co)],
           CHeader commonCDecls,
@@ -358,7 +358,7 @@ dsWasmJSStaticImport fn_id co js_src' mUnitId sync = do
           "unsafeDupablePerformIO"
       rhs <-
         importBindingRHS
-          mUnitId
+          unitId
           cfun_name
           tvs
           arg_tys
@@ -398,14 +398,14 @@ uniqueCFunName = do
   mkWrapperName cfun_num "ghc_wasm_jsffi" ""
 
 importBindingRHS ::
-  Maybe Unit ->
+  CCallStaticTargetUnit ->
   FastString ->
   [TyVar] ->
   [Scaled Type] ->
   Type ->
   (CoreExpr -> CoreExpr) ->
   DsM CoreExpr
-importBindingRHS mUnitId cfun_name tvs arg_tys orig_res_ty res_trans = do
+importBindingRHS unitId cfun_name tvs arg_tys orig_res_ty res_trans = do
   ccall_uniq <- newUnique
   args_unevaled <- newSysLocalsDs arg_tys
   args_evaled <- newSysLocalsDs arg_tys
@@ -459,12 +459,16 @@ importBindingRHS mUnitId cfun_name tvs arg_tys orig_res_ty res_trans = do
   let cfun_fcall =
         CCall
           ( CCallSpec
-              (StaticTarget NoSourceText cfun_name mUnitId True)
+              (StaticTarget stExt cfun_name ForeignFunction)
               CCallConv
               -- Same even for foreign import javascript unsafe, for
               -- the sake of re-entrancy.
               PlaySafe
           )
+      stExt = StaticTargetGhc
+        { staticTargetLabel = NoSourceText
+        , staticTargetUnit  = unitId
+        }
       call_app =
         mkFCall ccall_uniq cfun_fcall (map Var args_evaled) ccall_action_ty
       rhs =

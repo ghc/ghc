@@ -382,6 +382,22 @@ type family XCDefaultDecl      x
 type family XXDefaultDecl      x
 
 -- -------------------------------------
+-- CCallTarget type family
+type family XStaticTarget  x
+type family XDynamicTarget x
+type family XXCCallTarget  x
+
+-- -------------------------------------
+-- CType type family
+type family XCType  x
+type family XXCType x
+
+-- -------------------------------------
+-- Header type family
+type family XHeader  x
+type family XXHeader x
+
+-- -------------------------------------
 -- ForeignDecl type families
 type family XForeignImport     x
 type family XForeignExport     x

@@ -13,7 +13,7 @@
 -- | Abstract syntax of global declarations.
 --
 -- Definitions for: @SynDecl@ and @ConDecl@, @ClassDecl@,
--- @InstDecl@, @DefaultDecl@ and @ForeignDecl@.
+-- @InstDecl@, @DefaultDecl@.
 module Language.Haskell.Syntax.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep, FunDep(..),
@@ -53,7 +53,7 @@ module Language.Haskell.Syntax.Decls (
   SpliceDecl(..), LSpliceDecl,
   -- ** Foreign function interface declarations
   ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
-  CImportSpec(..),
+  CCallConv(..), CCallTarget(..), CExportSpec(..), CImportSpec(..), CLabelString,
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl,
   HsConDeclH98Details,
@@ -94,13 +94,12 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 import Language.Haskell.Syntax.Basic
   (LexicalFixity, Role, RuleName, TopLevelFlag)
 import Language.Haskell.Syntax.Binds
+import Language.Haskell.Syntax.Decls.Foreign
 import Language.Haskell.Syntax.Binds.InlinePragma (Activation)
 import Language.Haskell.Syntax.Decls.Overlap (OverlapMode)
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Specificity (Specificity)
 import Language.Haskell.Syntax.Type
-
-import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 
 import GHC.Data.FastString (FastString)
 import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
@@ -806,7 +805,7 @@ data HsDataDefn pass   -- The payload of a data type defn
     -- @
     HsDataDefn { dd_ext    :: XCHsDataDefn pass,
                  dd_ctxt   :: Maybe (LHsContext pass), -- ^ Context
-                 dd_cType  :: Maybe (XRec pass CType),
+                 dd_cType  :: Maybe (XRec pass (CType pass)),
                  dd_kindSig:: Maybe (LHsKind pass),
                      -- ^ Optional kind signature.
                      --
@@ -1359,86 +1358,6 @@ data DefaultDecl pass
       , defd_class    :: Maybe (LIdP pass)  -- Nothing in absence of NamedDefaults
       , defd_defaults :: [LHsType pass] }
   | XDefaultDecl !(XXDefaultDecl pass)
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Foreign function interface declaration}
-*                                                                      *
-************************************************************************
--}
-
--- foreign declarations are distinguished as to whether they define or use a
--- Haskell name
---
---  * the Boolean value indicates whether the pre-standard deprecated syntax
---   has been used
-
--- | Located Foreign Declaration
-type LForeignDecl pass = XRec pass (ForeignDecl pass)
-
--- | Foreign Declaration
-data ForeignDecl pass
-  = ForeignImport
-      { fd_i_ext  :: XForeignImport pass   -- Post typechecker, rep_ty ~ sig_ty
-      , fd_name   :: LIdP pass             -- defines this name
-      , fd_sig_ty :: LHsSigType pass       -- sig_ty
-      , fd_fi     :: ForeignImport pass }
-
-  | ForeignExport
-      { fd_e_ext  :: XForeignExport pass   -- Post typechecker, rep_ty ~ sig_ty
-      , fd_name   :: LIdP pass             -- uses this name
-      , fd_sig_ty :: LHsSigType pass       -- sig_ty
-      , fd_fe     :: ForeignExport pass }
-  | XForeignDecl !(XXForeignDecl pass)
-
-{-
-    In both ForeignImport and ForeignExport:
-        sig_ty is the type given in the Haskell code
-        rep_ty is the representation for this type, i.e. with newtypes
-               coerced away and type functions evaluated.
-    Thus if the declaration is valid, then rep_ty will only use types
-    such as Int and IO that we know how to make foreign calls with.
--}
-
--- Specification Of an imported external entity in dependence on the calling
--- convention
---
-data ForeignImport pass = -- import of a C entity
-                          --
-                          --  * the two strings specifying a header file or library
-                          --   may be empty, which indicates the absence of a
-                          --   header or object specification (both are not used
-                          --   in the case of `CWrapper' and when `CFunction'
-                          --   has a dynamic target)
-                          --
-                          --  * the calling convention is irrelevant for code
-                          --   generation in the case of `CLabel', but is needed
-                          --   for pretty printing
-                          --
-                          --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
-                          --
-                          CImport  (XCImport pass)
-                                   (XRec pass CCallConv) -- ccall
-                                   (XRec pass Safety)  -- interruptible, safe or unsafe
-                                   (Maybe Header)       -- name of C header
-                                   CImportSpec          -- details of the C entity
-                        | XForeignImport !(XXForeignImport pass)
-
--- details of an external C entity
---
-data CImportSpec = CLabel    CLabelString     -- import address of a C label
-                 | CFunction CCallTarget      -- static or dynamic function
-                 | CWrapper                   -- wrapper to expose closures
-                                              -- (former f.e.d.)
-  deriving Data
-
--- specification of an externally exported entity in dependence on the calling
--- convention
---
-data ForeignExport pass = CExport  (XCExport pass) (XRec pass CExportSpec) -- contains the calling convention
-                        | XForeignExport !(XXForeignExport pass)
-
 
 {-
 ************************************************************************

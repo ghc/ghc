@@ -13,7 +13,6 @@ import GHC.Driver.Flags (WarningFlag)
 import GHC.Hs
 import GHC.HsToCore.Pmc.Solver.Types
 import GHC.Types.Error
-import GHC.Types.ForeignCall
 import GHC.Types.Id
 import GHC.Types.InlinePragma (ActivationGhc)
 import GHC.Types.Name (Name)

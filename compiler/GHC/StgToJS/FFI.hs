@@ -181,14 +181,15 @@ genForeignCall :: HasDebugCallStack
                -> [StgArg]
                -> G (JStgStat, ExprResult)
 genForeignCall _ctx
-               (CCall (CCallSpec (StaticTarget _ tgt Nothing True)
+               (CCall (CCallSpec (StaticTarget ext tgt ForeignFunction)
                                    JavaScriptCallConv
                                    PlayRisky))
                _t
                [obj]
                args
   | tgt == hdBuildObjectStr
-  , Just pairs <- getObjectKeyValuePairs args = do
+  , Just pairs <- getObjectKeyValuePairs args
+  , TargetIsInThisUnit <- staticTargetUnit ext = do
       pairs' <- mapM (\(k,v) -> genArg v >>= \vs -> return (k, head vs)) pairs
       return ( (|=) obj (ValExpr (JHash $ listToUniqMap pairs'))
              , ExprInline
@@ -200,7 +201,7 @@ genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) t tgt args = do
   where
     isJsCc = cconv == JavaScriptCallConv
 
-    lbl | (StaticTarget _ clbl _mpkg _isFunPtr) <- ccTarget
+    lbl | (StaticTarget _ clbl _isFunPtr) <- ccTarget
             = let clbl'    = unpackFS clbl
                   hDollarS = unpackFS hdStr
               in  if | isJsCc -> clbl

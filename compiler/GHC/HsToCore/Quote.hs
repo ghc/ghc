@@ -69,8 +69,8 @@ import qualified GHC.Data.List.NonEmpty as NE
 
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
-import GHC.Types.ForeignCall
 import GHC.Types.Var
+import GHC.Types.ForeignCall
 import GHC.Types.Id
 import GHC.Types.InlinePragma
 import GHC.Types.SourceText
@@ -736,18 +736,19 @@ repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
       dec <- rep2 forImpDName [cc', s', str, name', typ']
       return (locA loc, dec)
  where
+    conv_cimportspec :: CImportSpec GhcRn -> MetaM String
     conv_cimportspec (CLabel cls)
       = notHandled (ThForeignLabel cls)
-    conv_cimportspec (CFunction DynamicTarget) = return "dynamic"
-    conv_cimportspec (CFunction (StaticTarget _ fs _ True))
+    conv_cimportspec (CFunction (DynamicTarget{})) = return "dynamic"
+    conv_cimportspec (CFunction (StaticTarget _ fs ForeignFunction))
                             = return (unpackFS fs)
-    conv_cimportspec (CFunction (StaticTarget _ _  _ False))
+    conv_cimportspec (CFunction (StaticTarget _ _ ForeignValue))
                             = panic "conv_cimportspec: values not supported yet"
     conv_cimportspec CWrapper = return "wrapper"
     -- these calling conventions do not support headers and the static keyword
     raw_cconv = cc == PrimCallConv || cc == JavaScriptCallConv
     static = case cis of
-                 CFunction (StaticTarget _ _ _ _) | not raw_cconv -> "static "
+                 CFunction (StaticTarget _ _ _) | not raw_cconv -> "static "
                  _ -> ""
     chStr = case mch of
             Just (Header _ h) | not raw_cconv -> unpackFS h ++ " "

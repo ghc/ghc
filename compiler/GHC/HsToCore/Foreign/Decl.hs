@@ -29,7 +29,6 @@ import GHC.Unit.Module
 import GHC.Core.Coercion
 
 import GHC.Cmm.CLabel
-import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Driver.DynFlags
@@ -92,8 +91,8 @@ dsForeigns' fos = do
    do_decl (ForeignExport { fd_name = L _ id
                           , fd_e_ext = co
                           , fd_fe = CExport _
-                              (L _ (CExportStatic _ ext_nm cconv)) }) = do
-      (h, c, _, ids, bs) <- dsFExport id co ext_nm cconv False
+                              (L _ (CExportStatic ext_nm cconv)) }) = do
+      (h, c, _, ids, bs) <- dsFExport id co ext_nm cconv ExportIsStatic
       return (h, c, ids, bs)
 
 {-
@@ -124,7 +123,7 @@ because it exposes the boxing to the call site.
 
 dsFImport :: Id
           -> Coercion
-          -> ForeignImport (GhcPass p)
+          -> ForeignImport GhcTc
           -> DsM ([Binding], CHeader, CStub, [Id])
 dsFImport id co (CImport _ cconv safety mHeader spec) = do
   platform <- getPlatform
@@ -165,9 +164,9 @@ dsFExport :: Id                 -- Either the exported Id,
                                 -- from C, and its representation type
           -> CLabelString       -- The name to export to C land
           -> CCallConv
-          -> Bool               -- True => foreign export dynamic
-                                --         so invoke IO action that's hanging off
-                                --         the first argument's stable pointer
+          -> ExportLinking      -- If foreign export is dynamic
+                                -- then invoke IO action that's hanging off
+                                -- the first argument's stable pointer
           -> DsM ( CHeader      -- contents of Module_stub.h
                  , CStub        -- contents of Module_stub.c
                  , String       -- string describing type to pass to createAdj.

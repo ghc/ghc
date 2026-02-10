@@ -84,7 +84,7 @@ import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.EnforceEpt.TagSig
 import GHC.Parser.Annotation (noLocA)
-import GHC.Hs.Extension ( GhcRn )
+import GHC.Hs.Extension ( GhcPass, GhcRn, GhcTc )
 import GHC.Hs.Decls.Overlap ( OverlapFlag )
 import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
 
@@ -196,7 +196,7 @@ data IfaceDecl
                 ifBinders    :: [IfaceTyConBinder],
                 ifNbEtaBinders :: Int, -- ^ number of binders introduced by eta-expansion
                 ifResKind    :: IfaceType,      -- Result kind of type constructor
-                ifCType      :: Maybe CType,    -- C type for CAPI FFI
+                ifCType      :: Maybe (CType GhcTc), -- C type for CAPI FFI
                 ifRoles      :: [Role],         -- Roles
                 ifCtxt       :: IfaceContext,   -- The "stupid theta"
                 ifCons       :: IfaceConDecls,  -- Includes new/data/data family info
@@ -1450,7 +1450,7 @@ pprIfaceDecl _ (IfaceAxiom { ifName = name, ifTyCon = tycon
   = hang (text "axiom" <+> ppr name <+> dcolon)
        2 (vcat $ unzipWith (pprAxBranch (ppr tycon)) $ zip [0..] branches)
 
-pprCType :: Maybe CType -> SDoc
+pprCType :: Maybe (CType (GhcPass p)) -> SDoc
 pprCType Nothing      = Outputable.empty
 pprCType (Just cType) = text "C type:" <+> ppr cType
 

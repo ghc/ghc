@@ -57,6 +57,7 @@ import GHC.Driver.Session (Language)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.InstEnv (is_dfun_name)
 import GHC.Hs.Decls.Overlap (OverlapMode)
+import GHC.Types.ForeignCall (CType)
 import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (RdrName (..))
@@ -831,6 +832,8 @@ type instance Anno (HsOuterTyVarBndrs Specificity DocNameI) = SrcSpanAnnA
 type instance Anno (HsSigType DocNameI) = SrcSpanAnnA
 type instance Anno (BooleanFormula DocNameI) = SrcSpanAnnL
 type instance Anno (OverlapMode DocNameI) = EpAnn AnnPragma
+type instance Anno (CType DocNameI) = EpAnn AnnPragma
+type instance Anno (Header DocNameI) = EpAnn AnnPragma
 
 type XRecCond a =
   ( XParTy a ~ (EpToken "(", EpToken ")")
@@ -924,6 +927,16 @@ type instance XCExport DocNameI = NoExtField
 
 type instance XXForeignImport DocNameI = DataConCantHappen
 type instance XXForeignExport DocNameI = DataConCantHappen
+
+type instance XStaticTarget  DocNameI = NoExtField
+type instance XDynamicTarget DocNameI = NoExtField
+type instance XXCCallTarget  DocNameI = DataConCantHappen
+
+type instance XCType  DocNameI = NoExtField
+type instance XXCType DocNameI = DataConCantHappen
+
+type instance XHeader  DocNameI = NoExtField
+type instance XXHeader DocNameI = DataConCantHappen
 
 type instance XConDeclGADT DocNameI = NoExtField
 type instance XConDeclH98 DocNameI = NoExtField

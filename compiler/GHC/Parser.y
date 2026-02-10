@@ -1680,14 +1680,14 @@ datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs
         | type                      { sL1 $1 (Nothing, mkHsOuterImplicit, $1) }
 
 
-capi_ctype :: { Maybe (LocatedP CType) }
+capi_ctype :: { Maybe (LocatedP (CType GhcPs)) }
 capi_ctype : '{-# CTYPE' STRING STRING '#-}'
-                       {% fmap Just $ amsr (sLL $1 $> (CType (getCTYPEs $1) (Just (Header (getSTRINGs $2) (getSTRING $2)))
-                                        (getSTRINGs $3,getSTRING $3)))
+                       {% fmap Just $ amsr (sLL $1 $> (mkCType (getCTYPEs $1) (getSTRINGs $3) (Just (Header (getSTRINGs $2) (getSTRING $2)))
+                                        (getSTRING $3)))
                               (AnnPragma (glR $1) (epTok $4) noAnn (glR $2) (glR $3) noAnn noAnn) }
 
            | '{-# CTYPE'        STRING '#-}'
-                       {% fmap Just $ amsr (sLL $1 $> (CType (getCTYPEs $1) Nothing (getSTRINGs $2, getSTRING $2)))
+                       {% fmap Just $ amsr (sLL $1 $> (mkCType (getCTYPEs $1) (getSTRINGs $2) Nothing (getSTRING $2)))
                               (AnnPragma (glR $1) (epTok $3) noAnn noAnn (glR $2) noAnn noAnn) }
 
            |           { Nothing }

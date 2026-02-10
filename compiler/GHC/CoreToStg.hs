@@ -554,10 +554,11 @@ mkStgApp f how_bound core_args stg_args res_ty
                           StgOpApp (StgPrimOp op) stg_args res_ty
 
       -- A call to some primitive Cmm function.
-      FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
-                                PrimCallConv _))
+      FCallId (CCall (CCallSpec
+                            (StaticTarget ext lbl ForeignFunction) PrimCallConv _))
+                            | TargetIsInThat unit <- staticTargetUnit ext
                        -> assert exactly_saturated $
-                          StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) stg_args res_ty
+                          StgOpApp (StgPrimCallOp (PrimCall lbl unit)) stg_args res_ty
 
       -- A regular foreign call.
       FCallId call     -> assert exactly_saturated $

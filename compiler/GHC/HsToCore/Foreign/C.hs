@@ -68,9 +68,9 @@ dsCFExport:: Id                 -- Either the exported Id,
                                 -- from C, and its representation type
           -> CLabelString       -- The name to export to C land
           -> CCallConv
-          -> Bool               -- True => foreign export dynamic
-                                --         so invoke IO action that's hanging off
-                                --         the first argument's stable pointer
+          -> ExportLinking      -- If foreign export is dynamic
+                                -- then invoke IO action that's hanging off
+                                -- the first argument's stable pointer
           -> DsM ( CHeader      -- contents of Module_stub.h
                  , CStub        -- contents of Module_stub.c
                  , String       -- string describing type to pass to createAdj.
@@ -83,8 +83,9 @@ dsCFExport fn_id co ext_name cconv isDyn = do
        fe_arg_tys'            = mapMaybe anonPiTyBinderType_maybe bndrs
        -- We must use tcSplits here, because we want to see
        -- the (IO t) in the corner of the type!
-       fe_arg_tys | isDyn     = tail fe_arg_tys'
-                  | otherwise = fe_arg_tys'
+       (fe_arg_tys, m_fn_id) = case isDyn of
+         ExportIsDynamic -> (tail fe_arg_tys', Nothing)
+         ExportIsStatic  -> (fe_arg_tys', Just fn_id)
 
        -- Look at the result type of the exported function, orig_res_ty
        -- If it's IO t, return         (t, True)
@@ -97,16 +98,14 @@ dsCFExport fn_id co ext_name cconv isDyn = do
 
     dflags <- getDynFlags
     return $
-      mkFExportCBits dflags ext_name
-                     (if isDyn then Nothing else Just fn_id)
-                     fe_arg_tys res_ty is_IO_res_ty cconv
+      mkFExportCBits dflags ext_name m_fn_id fe_arg_tys res_ty is_IO_res_ty cconv
 
 dsCImport :: Id
           -> Coercion
-          -> CImportSpec
+          -> CImportSpec GhcTc
           -> CCallConv
           -> Safety
-          -> Maybe Header
+          -> Maybe (Header GhcTc)
           -> DsM ([Binding], CHeader, CStub)
 dsCImport id co (CLabel cid) _ _ _ = do
    let ty  = coercionLKind co
@@ -184,7 +183,7 @@ dsCFExportDynamic id co0 cconv = do
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
     stbl_value <- newSysLocalMDs stable_ptr_ty
-    (h_code, c_code, typestring) <- dsCFExport id (mkRepReflCo export_ty) fe_nm cconv True
+    (h_code, c_code, typestring) <- dsCFExport id (mkRepReflCo export_ty) fe_nm cconv ExportIsDynamic
     let
          {-
           The arguments to the external function which will
@@ -229,7 +228,7 @@ dsCFExportDynamic id co0 cconv = do
 
 
 -- | Foreign calls
-dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
+dsFCall :: Id -> Coercion -> ForeignCall -> Maybe (Header GhcTc)
         -> DsM ([(Id, Expr TyVar)], CHeader, CStub)
 dsFCall fn_id co fcall mDeclHeader = do
     let
@@ -258,14 +257,14 @@ dsFCall fn_id co fcall mDeclHeader = do
 
     (fcall', cDoc) <-
               case fcall of
-              CCall (CCallSpec (StaticTarget _ cName mUnitId isFun)
+              CCall (CCallSpec (StaticTarget stExt cName targetKind)
                                CApiConv safety) ->
                do nextWrapperNum <- ds_next_wrapper_num <$> getGblEnv
                   wrapperName <- mkWrapperName nextWrapperNum "ghc_wrapper" (unpackFS cName)
                   let fcall' = CCall (CCallSpec
-                                      (StaticTarget NoSourceText
-                                                    wrapperName mUnitId
-                                                    True)
+                                      (StaticTarget (stExt { staticTargetLabel = NoSourceText} )
+                                                    wrapperName
+                                                    ForeignFunction)
                                       CApiConv safety)
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
@@ -274,10 +273,10 @@ dsFCall fn_id co fcall mDeclHeader = do
                                       | Header _ h <- nub headers ]
                       fun_proto = constQual <+> cResType <+> pprCconv <+> ppr wrapperName <> parens argTypes
                       cRet
-                       | isVoidRes =                   cCall
-                       | otherwise = text "return" <+> cCall
+                        | isVoidRes =                   cCall
+                        | otherwise = text "return" <+> cCall
                       cCall
-                        | isFun = ppr cName <> parens argVals
+                        | ForeignFunction <- targetKind = ppr cName <> parens argVals
                         | null arg_tys = ppr cName
                         | otherwise = panic "dsFCall: Unexpected arguments to FFI value import"
                       raw_res_ty = case tcSplitIOType_maybe io_res_ty of
@@ -329,7 +328,7 @@ dsFCall fn_id co fcall mDeclHeader = do
 toCName :: Id -> String
 toCName i = showSDocOneLine defaultSDocContext (pprCode (ppr (idName i)))
 
-toCType :: Type -> (Maybe Header, SDoc)
+toCType :: Type -> (Maybe (Header GhcTc), SDoc)
 toCType = f False
     where f voidOK t
            -- First, if we have (Ptr t) of (FunPtr t), then we need to
@@ -345,7 +344,7 @@ toCType = f False
            -- Note that we aren't looking through type synonyms or
            -- anything, as it may be the synonym that is annotated.
            | Just tycon <- tyConAppTyConPicky_maybe t
-           , Just (CType _ mHeader (_,cType)) <- tyConCType_maybe tycon
+           , Just (CType _ mHeader cType) <- tyConCType_maybe tycon
               = (mHeader, ftext cType)
            -- If we don't know a C type for this type, then try looking
            -- through one layer of type synonym etc.

@@ -39,6 +39,8 @@ import GHC.Core.TyCon (tyConResKind)
 import GHC.Driver.DynFlags (getDynFlags)
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
 import GHC.Types.Basic (TupleSort (..))
+import GHC.Types.ForeignCall (CType(..))
+import qualified GHC.Types.ForeignCall as Hs (Header(..))
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName (Exact))
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
@@ -674,12 +676,18 @@ renameDataDefn
       ( HsDataDefn
           { dd_ext = noExtField
           , dd_ctxt = lcontext'
-          , dd_cType = cType
+          , dd_cType = fmap renameCType <$> cType
           , dd_kindSig = k'
           , dd_cons = cons'
           , dd_derivs = []
           }
       )
+
+renameCType :: CType GhcRn -> CType DocNameI
+renameCType (CType _ y z) = CType NoExtField (renameHeader' <$> y) z
+
+renameHeader' :: Hs.Header GhcRn -> Hs.Header DocNameI
+renameHeader' (Hs.Header _ s) = Hs.Header NoExtField s
 
 renameCon :: ConDecl GhcRn -> RnM (ConDecl DocNameI)
 renameCon
@@ -830,10 +838,22 @@ renameForD (ForeignExport _ lname ltype x) = do
   return (ForeignExport noExtField lname' ltype' (renameForE x))
 
 renameForI :: ForeignImport GhcRn -> ForeignImport DocNameI
-renameForI (CImport _ cconv safety mHeader spec) = CImport noExtField cconv safety mHeader spec
+renameForI (CImport _ cconv safety mHeader spec) =
+    CImport noExtField cconv safety (renameHeader' <$> mHeader) (renameForISpec spec)
 
 renameForE :: ForeignExport GhcRn -> ForeignExport DocNameI
 renameForE (CExport _ spec) = CExport noExtField spec
+
+renameForISpec :: CImportSpec GhcRn -> CImportSpec DocNameI
+renameForISpec = \case
+  CLabel str -> CLabel str
+  CFunction cTarget -> CFunction $ renameCCallTarget cTarget
+  CWrapper -> CWrapper
+
+renameCCallTarget :: CCallTarget GhcRn -> CCallTarget DocNameI
+renameCCallTarget = \case
+  DynamicTarget {} -> DynamicTarget NoExtField
+  StaticTarget _ cStr fKind -> StaticTarget NoExtField cStr fKind
 
 renameInstD :: InstDecl GhcRn -> RnM (InstDecl DocNameI)
 renameInstD (ClsInstD{cid_inst = d}) = do

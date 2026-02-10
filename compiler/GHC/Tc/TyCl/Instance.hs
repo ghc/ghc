@@ -69,6 +69,7 @@ import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
+import GHC.Types.ForeignCall ( typeCheckCType )
 import GHC.Types.Id
 import GHC.Types.InlinePragma
 import GHC.Types.SourceFile
@@ -830,7 +831,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                                           ty_binders (length extra_tcbs)
                                           res_kind
                                           (map (const Nominal) ty_binders)
-                                          (fmap unLoc cType) stupid_theta
+                                          (fmap (typeCheckCType . unLoc) cType) stupid_theta
                                           tc_rhs parent
                                           gadt_syntax
                  -- We always assume that indexed types are recursive.  Why?

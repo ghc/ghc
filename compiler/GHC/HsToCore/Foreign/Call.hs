@@ -102,8 +102,11 @@ dsCCall lbl args may_gc result_ty
   = do (unboxed_args, arg_wrappers) <- mapAndUnzipM unboxArg args
        (ccall_result_ty, res_wrapper) <- boxResult result_ty
        uniq <- newUnique
-       let
-           target = StaticTarget NoSourceText lbl Nothing True
+       let stExt = StaticTargetGhc
+             { staticTargetLabel = NoSourceText
+             , staticTargetUnit  = TargetIsInThisUnit
+             }
+           target = StaticTarget stExt lbl ForeignFunction
            the_fcall    = CCall (CCallSpec target CCallConv may_gc)
            the_prim_app = mkFCall uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)

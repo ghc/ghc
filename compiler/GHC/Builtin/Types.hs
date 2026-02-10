@@ -189,6 +189,8 @@ import GHC.Core.Class     ( Class, mkClass )
 import GHC.Core.Map.Type  ( TypeMap, emptyTypeMap, extendTypeMap, lookupTypeMap )
 import qualified GHC.Core.TyCo.Rep as TyCoRep ( Type(TyConApp) )
 
+import GHC.Hs.Extension (GhcTc)
+
 import GHC.Types.TyThing
 import GHC.Types.SourceText
 import GHC.Types.Var ( VarBndr (Bndr), tyVarName )
@@ -617,7 +619,7 @@ consDataCon_RDR = nameRdrName consDataConName
 
 -- This function assumes that the types it creates have all parameters at
 -- Representational role, and that there is no kind polymorphism.
-pcTyCon :: Name -> Maybe CType -> [TyVar] -> [DataCon] -> TyCon
+pcTyCon :: Name -> Maybe (CType GhcTc) -> [TyVar] -> [DataCon] -> TyCon
 pcTyCon name cType tyvars cons
   = mkAlgTyCon name (mkTyConKind bndrs res_kind) bndrs 0 res_kind
                 (map (const Representational) tyvars)
@@ -2301,14 +2303,17 @@ int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
 *                                                                      *
 ********************************************************************* -}
 
+-- | Generic constructor for primative C Types.
+mkCTypeCon :: Name -> String -> [DataCon] -> TyCon
+mkCTypeCon cName str =
+  pcTyCon cName (Just (defaultCType str)) []
+
 charTy :: Type
 charTy = mkTyConTy charTyCon
 
 charTyCon :: TyCon
-charTyCon   = pcTyCon charTyConName
-                   (Just (CType NoSourceText Nothing
-                                  (NoSourceText,fsLit "HsChar")))
-                   [] [charDataCon]
+charTyCon = mkCTypeCon charTyConName "HsChar" [charDataCon]
+
 charDataCon :: DataCon
 charDataCon = pcDataCon charDataConName [] [charPrimTy] charTyCon
 
@@ -2327,9 +2332,8 @@ intTy :: Type
 intTy = mkTyConTy intTyCon
 
 intTyCon :: TyCon
-intTyCon = pcTyCon intTyConName
-               (Just (CType NoSourceText Nothing (NoSourceText,fsLit "HsInt")))
-                 [] [intDataCon]
+intTyCon = mkCTypeCon intTyConName "HsInt" [intDataCon]
+
 intDataCon :: DataCon
 intDataCon = pcDataCon intDataConName [] [intPrimTy] intTyCon
 
@@ -2337,9 +2341,8 @@ wordTy :: Type
 wordTy = mkTyConTy wordTyCon
 
 wordTyCon :: TyCon
-wordTyCon = pcTyCon wordTyConName
-            (Just (CType NoSourceText Nothing (NoSourceText, fsLit "HsWord")))
-               [] [wordDataCon]
+wordTyCon = mkCTypeCon wordTyConName "HsWord" [wordDataCon]
+
 wordDataCon :: DataCon
 wordDataCon = pcDataCon wordDataConName [] [wordPrimTy] wordTyCon
 
@@ -2347,10 +2350,8 @@ word8Ty :: Type
 word8Ty = mkTyConTy word8TyCon
 
 word8TyCon :: TyCon
-word8TyCon = pcTyCon word8TyConName
-                     (Just (CType NoSourceText Nothing
-                            (NoSourceText, fsLit "HsWord8"))) []
-                     [word8DataCon]
+word8TyCon = mkCTypeCon word8TyConName "HsWord8" [word8DataCon]
+
 word8DataCon :: DataCon
 word8DataCon = pcDataCon word8DataConName [] [word8PrimTy] word8TyCon
 
@@ -2358,21 +2359,16 @@ floatTy :: Type
 floatTy = mkTyConTy floatTyCon
 
 floatTyCon :: TyCon
-floatTyCon   = pcTyCon floatTyConName
-                      (Just (CType NoSourceText Nothing
-                             (NoSourceText, fsLit "HsFloat"))) []
-                      [floatDataCon]
+floatTyCon = mkCTypeCon floatTyConName "HsFloat" [floatDataCon]
+
 floatDataCon :: DataCon
-floatDataCon = pcDataCon         floatDataConName [] [floatPrimTy] floatTyCon
+floatDataCon = pcDataCon floatDataConName [] [floatPrimTy] floatTyCon
 
 doubleTy :: Type
 doubleTy = mkTyConTy doubleTyCon
 
 doubleTyCon :: TyCon
-doubleTyCon = pcTyCon doubleTyConName
-                      (Just (CType NoSourceText Nothing
-                             (NoSourceText,fsLit "HsDouble"))) []
-                      [doubleDataCon]
+doubleTyCon = mkCTypeCon doubleTyConName "HsDouble" [doubleDataCon]
 
 doubleDataCon :: DataCon
 doubleDataCon = pcDataCon doubleDataConName [] [doublePrimTy] doubleTyCon
@@ -2565,10 +2561,7 @@ boolTy :: Type
 boolTy = mkTyConTy boolTyCon
 
 boolTyCon :: TyCon
-boolTyCon = pcTyCon boolTyConName
-                    (Just (CType NoSourceText Nothing
-                           (NoSourceText, fsLit "HsBool")))
-                    [] [falseDataCon, trueDataCon]
+boolTyCon = mkCTypeCon boolTyConName "HsBool" [falseDataCon, trueDataCon]
 
 falseDataCon, trueDataCon :: DataCon
 falseDataCon = pcDataCon falseDataConName [] [] boolTyCon
