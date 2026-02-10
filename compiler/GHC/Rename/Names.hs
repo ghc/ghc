@@ -937,7 +937,7 @@ getLocalNonValBinders fixity_env
     -- Add errors if a constructor has a duplicate record field.
     add_dup_fld_errs :: IntMap FieldLabel
                      -> (Name, Maybe [Located Int])
-                     -> IOEnv (Env TcGblEnv TcLclEnv) ()
+                     -> IOEnv (Env HscEnv TcGblEnv TcLclEnv) ()
     add_dup_fld_errs all_flds (con, mb_con_flds)
       | Just con_flds <- mb_con_flds
       , let (_, dups) = removeDups (comparing unLoc) con_flds

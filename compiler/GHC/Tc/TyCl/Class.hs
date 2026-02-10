@@ -52,6 +52,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.TyCon
 
 import GHC.Driver.DynFlags
+import GHC.Driver.Env (HscEnv)
 
 import GHC.Types.Id
 import GHC.Types.Name
@@ -172,7 +173,7 @@ tcClassSigs clas sigs def_methods
                   | otherwise                               = Nothing
 
     tc_gen_sig :: ([LocatedN Name], LHsSigType GhcRn)
-                      -> IOEnv (Env TcGblEnv TcLclEnv) [(Name, (SrcSpan, Type))] -- AZ temp
+                      -> IOEnv (Env HscEnv TcGblEnv TcLclEnv) [(Name, (SrcSpan, Type))] -- AZ temp
     tc_gen_sig (op_names, gen_hs_ty)
       = do { gen_op_ty <- tcClassSigType op_names gen_hs_ty
            ; return [ (op_name, (locA loc, gen_op_ty))

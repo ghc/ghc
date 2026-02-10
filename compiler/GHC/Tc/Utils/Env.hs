@@ -365,7 +365,7 @@ tcGetInstEnvs = do { eps <- getEps
                                       , ie_local   = tcg_inst_env env
                                       , ie_visible = tcVisibleOrphanMods env }) }
 
-instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where
+instance MonadThings (IOEnv (Env HscEnv TcGblEnv TcLclEnv)) where
     lookupThing = tcLookupGlobal
 
 -- Illegal term-level use of type things

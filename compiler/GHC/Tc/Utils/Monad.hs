@@ -470,12 +470,12 @@ initTcInteractive hsc_env thing_inside
     interactive_src_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
 
 initTcRnIf :: UniqueTag              -- ^ Tag for unique supply
-           -> HscEnv
+           -> top
            -> gbl -> lcl
-           -> TcRnIf gbl lcl a
+           -> TcRnIfBase top gbl lcl a
            -> IO a
-initTcRnIf uniq_tag hsc_env gbl_env lcl_env thing_inside
-   = do { let { env = Env { env_top = hsc_env,
+initTcRnIf uniq_tag top_env gbl_env lcl_env thing_inside
+   = do { let { env = Env { env_top = top_env,
                             env_ut  = uniqueTag uniq_tag,
                             env_gbl = gbl_env,
                             env_lcl = lcl_env} }
@@ -814,13 +814,13 @@ escapeArrowScope
 ************************************************************************
 -}
 
-newUnique :: TcRnIf gbl lcl Unique
+newUnique :: TcRnIfBase top gbl lcl Unique
 newUnique
  = do { env <- getEnv
       ; let tag = env_ut env
       ; liftIO $! uniqFromTagGrimly tag }
 
-newUniqueSupply :: TcRnIf gbl lcl UniqSupply
+newUniqueSupply :: TcRnIfBase top gbl lcl UniqSupply
 newUniqueSupply
  = do { env <- getEnv
       ; let tag = env_ut env
@@ -855,7 +855,7 @@ newSysLocalIds fs tys
         ; let mkId' n (Scaled w t) = mkSysLocal fs n w t
         ; return (zipWith mkId' us tys) }
 
-instance MonadUnique (IOEnv (Env gbl lcl)) where
+instance MonadUnique (IOEnv (Env top gbl lcl)) where
         getUniqueM = newUnique
         getUniqueSupplyM = newUniqueSupply
 
@@ -2418,13 +2418,12 @@ initIfaceTcRn thing_inside
 -- call 'typecheckIface' when inside a module loop and hence 'tcIfaceGlobal'.
 initIfaceLoad :: HscEnv -> IfG a -> IO a
 initIfaceLoad hsc_env do_this
- = do let !base_hsc_env = hsc_env { hsc_type_env_vars = emptyKnotVars }
-          gbl_env = IfGblEnv {
+ = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceLoad",
                         if_rec_types = emptyKnotVars,
-                        if_load_env = Just (mkIfaceLoadEnv base_hsc_env)
+                        if_load_env = Just (mkIfaceLoadEnv hsc_env)
                     }
-      initTcRnIf IfaceTag base_hsc_env gbl_env () do_this
+      initTcRnIf IfaceTag hsc_env gbl_env () do_this
 
 -- | This is used when we are doing to call 'typecheckModule' on an 'ModIface',
 -- if it's part of a loop with some other modules then we need to use their

@@ -525,7 +525,7 @@ failDs = failM
 mkNamePprCtxDs :: DsM NamePprCtx
 mkNamePprCtxDs = ds_name_ppr_ctx <$> getGblEnv
 
-instance MonadThings (IOEnv (Env DsGblEnv DsLclEnv)) where
+instance MonadThings (IOEnv (Env HscEnv DsGblEnv DsLclEnv)) where
     lookupThing = dsLookupGlobal
 
 dsLookupGlobal :: Name -> DsM TyThing

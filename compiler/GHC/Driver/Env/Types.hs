@@ -54,6 +54,12 @@ instance HasDynFlags Hsc where
 instance ContainsDynFlags HscEnv where
     extractDynFlags h = hsc_dflags h
 
+instance ContainsHooks HscEnv where
+    extractHooks = hsc_hooks
+
+instance ContainsLogger HscEnv where
+    extractLogger = hsc_logger
+
 instance HasLogger Hsc where
     getLogger = Hsc $ \e w -> return (hsc_logger e, w)
 

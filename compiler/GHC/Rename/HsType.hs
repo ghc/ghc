@@ -42,6 +42,7 @@ module GHC.Rename.HsType (
   ) where
 
 import GHC.Prelude
+import GHC.Driver.Env (HscEnv)
 
 import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, checkThLocalTyName, checkThLocalNameNoLift )
 
@@ -1598,7 +1599,7 @@ checkPrecMatch op (MG { mg_alts = (L _ ms) })
         -- until the type checker).  So we don't want to crash on the
         -- second eqn.
 
-checkPrec :: Name -> Pat GhcRn -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
+checkPrec :: Name -> Pat GhcRn -> Bool -> IOEnv (Env HscEnv TcGblEnv TcLclEnv) ()
 checkPrec op (ConPat NoExtField op1 (InfixCon _ _)) right = do
     op_fix@(Fixity op_prec  op_dir) <- lookupFixityRn op
     op1_fix@(Fixity op1_prec op1_dir) <- lookupFixityRn (getName op1)
