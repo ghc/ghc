@@ -221,14 +221,41 @@ Thread and scheduling events
       * 11: BlockedOnDelay
       * 12: BlockedOnSTM
       * 13: BlockedOnDoProc
-      * 16: BlockedOnMsgThrowTo
+      * 14--17: unused
+      * 18: BlockedOnMsgThrowTo
+      * 19: unused
       * 20: BlockedOnMVarRead
 
    :field ThreadId: thread id of thread being blocked on (only for some status
                     values)
 
    The indicated thread has stopped running for the reason given by ``status``.
-   
+
+   Historically, the GHC-internal status codes for the reasons why threads are
+   blocked were used more-or-less directly as the status codes emitted into the
+   eventlog. This is now recognised as a mistake and the GHC internal codes and
+   these eventlog stop thread codes are now independent. We are nevertheless
+   left with some historical warts:
+
+    * 14,15: these correspond to GHC internal status codes `BlockedOnGA` and
+      `BlockedOnGA_NoSend` that are no longer used (and may never have been
+      used by any released version of GHC).
+    * 16,17: these would be used by `BlockedOnCCall` and
+      `BlockedOnCCall_Interruptible` which are GHC-internal status codes, but
+      these are never and have never been emitted into the eventlog. This has
+      caused confusion, and many versions of the `ghc-events` package support
+      these status codes. Threads blocking on foreign calls use `ForeignCall`
+      above.
+    * 19: this would be used by `ThreadMigrating` which is a GHC-internal
+      status code, but this is never emitted into the eventlog. Threads
+      migrating use a separate event `MIGRATE_THREAD`.
+    * `BlockedOnMsgGlobalise`: this is supported by versions of `ghc-events` as
+      code 18, but it appears never to have been emitted by any released version
+      of GHC. Most likely it was related to the local-heap GC experiment that
+      was never released.
+
+   Errata: previous versions of this document stated that code 16 is
+   `BlockedOnMsgThrowTo`. It appears this was always incorrect.
 
 .. event-type:: MIGRATE_THREAD
 
