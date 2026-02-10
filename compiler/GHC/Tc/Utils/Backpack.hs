@@ -281,9 +281,10 @@ implicitRequirements :: HscEnv
                      -> [(PkgQual, Located ModuleName)]
                      -> IO [ModuleName]
 implicitRequirements hsc_env normal_imports
-  = fmap concat $
+  = let finder_env = mkFinderEnv hsc_env
+    in fmap concat $
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
-        found <- findImportedModule hsc_env imp mb_pkg
+        found <- findImportedModule finder_env imp mb_pkg
         case found of
             Found _ mod | notHomeModuleMaybe mhome_unit mod ->
                 return (uniqDSetToList (moduleFreeHoles mod))
@@ -301,11 +302,12 @@ implicitRequirementsShallow
   -> IO ([ModuleName], [InstantiatedUnit])
 implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
  where
+  finder_env = mkFinderEnv hsc_env
   mhome_unit = hsc_home_unit_maybe hsc_env
 
   go acc [] = pure acc
   go (accL, accR) ((_stage, mb_pkg, L _ imp):imports) = do
-    found <- findImportedModule hsc_env imp mb_pkg
+    found <- findImportedModule finder_env imp mb_pkg
     let acc' = case found of
           Found _ mod | notHomeModuleMaybe mhome_unit mod ->
               case moduleUnit mod of

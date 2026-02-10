@@ -51,7 +51,7 @@ import GHC.Core.Type
 import GHC.Data.FastString
   ( unpackFS )
 import GHC.Driver.Env
-  ( lookupType )
+  ( lookupType, mkFinderEnv )
 import GHC.Iface.Env
   ( lookupOrig )
 import GHC.Iface.Load
@@ -157,7 +157,8 @@ ghcDiagnosticCodeTyCon mb_libDir =
      ; liftIO
 
   -- STEP 2: look up the module "GHC.Types.Error.Codes"
-  do { res <- findImportedModule hsc_env (mkModuleName "GHC.Types.Error.Codes") NoPkgQual
+  do { res <- findImportedModule (mkFinderEnv hsc_env)
+               (mkModuleName "GHC.Types.Error.Codes") NoPkgQual
      ; case res of
      { Found _ modl ->
 

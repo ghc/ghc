@@ -2,6 +2,7 @@ module GHC.Driver.Env
    ( Hsc(..)
    , HscEnv (..)
    , HasHscEnv (..)
+   , FinderEnv(..)
    , hsc_mod_graph
    , setModuleGraph
    , hscUpdateFlags
@@ -19,6 +20,7 @@ module GHC.Driver.Env
    , hscSetActiveHomeUnit
    , hscSetActiveUnitId
    , hscActiveUnitId
+   , mkFinderEnv
    , runHsc
    , runHsc'
    , mkInteractiveHscEnv
@@ -49,7 +51,8 @@ import GHC.Driver.Errors ( printOrThrowDiagnostics )
 import GHC.Driver.Errors.Types ( GhcMessage )
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Diagnostic (initDiagOpts, initPrintConfig)
-import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..), HasHscEnv (..) )
+import GHC.Driver.Config.Finder (initFinderOpts)
+import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..), HasHscEnv (..), FinderEnv(..) )
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
@@ -89,6 +92,7 @@ import GHC.Builtin.Names
 
 import Data.IORef
 import qualified Data.Set as Set
+import qualified Data.Map.Strict as Map
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env hsc = do
@@ -113,6 +117,21 @@ mkInteractiveHscEnv hsc_env =
 -- InteractiveContext before running the Hsc computation.
 runInteractiveHsc :: HscEnv -> Hsc a -> IO a
 runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
+
+mkFinderEnv :: HscEnv -> FinderEnv
+mkFinderEnv hsc_env = FinderEnv
+  { finder_cache      = hsc_FC hsc_env
+  , finder_opts       = initFinderOpts (hsc_dflags hsc_env)
+  , finder_other_opts = mapUnitEnvGraph (initFinderOpts . HUG.homeUnitEnv_dflags) (hsc_HUG hsc_env)
+  , finder_unit_state = hsc_units hsc_env
+  , finder_unit_env   = hsc_unit_env hsc_env
+  , finder_home_unit  = hsc_home_unit_maybe hsc_env
+  }
+  where
+    mapUnitEnvGraph :: (a -> b) -> HUG.UnitEnvGraph a -> HUG.UnitEnvGraph b
+    mapUnitEnvGraph f env =
+      HUG.unitEnv_new $
+        Map.fromList [ (uid, f hue) | (uid, hue) <- HUG.unitEnv_assocs env ]
 
 hsc_home_unit :: HscEnv -> HomeUnit
 hsc_home_unit = ue_unsafeHomeUnit . hsc_unit_env
@@ -450,4 +469,3 @@ hscUpdateHPT f hsc_env = hsc_env { hsc_unit_env = updateHug (HUG.unitEnv_adjust 
   where
     ue = hsc_unit_env hsc_env
     upd hue = hue { homeUnitEnv_hpt = f (homeUnitEnv_hpt hue) }
-

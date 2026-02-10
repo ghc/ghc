@@ -67,7 +67,7 @@ import Control.Monad
 import Data.Time
 import qualified Data.Map as M
 import GHC.Types.Unique.Map
-import GHC.Driver.Env
+import GHC.Driver.Env.Types (FinderEnv(..))
 import GHC.Driver.Config.Finder
 import GHC.Types.Unique.Set
 import qualified Data.List as L(sort)
@@ -174,18 +174,19 @@ getDirHash dir = do
 -- packages to find the module, if a package is specified then only
 -- that package is searched for the module.
 
-findImportedModule :: HscEnv -> ModuleName -> PkgQual -> IO FindResult
-findImportedModule hsc_env mod pkg_qual =
-  let fc        = hsc_FC hsc_env
-      mhome_unit = hsc_home_unit_maybe hsc_env
-      dflags    = hsc_dflags hsc_env
-      fopts     = initFinderOpts dflags
-  in do
-    findImportedModuleNoHsc fc fopts (hsc_unit_env hsc_env) mhome_unit mod pkg_qual
+findImportedModule :: FinderEnv -> ModuleName -> PkgQual -> IO FindResult
+findImportedModule finder_env mod pkg_qual =
+  let FinderEnv { finder_cache = fc
+                , finder_opts = fopts
+                , finder_unit_env = unit_env
+                , finder_home_unit = mhome_unit
+                } = finder_env
+  in
+    findImportedModuleNoHsc fc fopts unit_env mhome_unit mod pkg_qual
 
-findImportedModuleWithIsBoot :: HscEnv -> ModuleName -> IsBootInterface -> PkgQual -> IO FindResult
-findImportedModuleWithIsBoot hsc_env mod is_boot pkg_qual = do
-  res <- findImportedModule hsc_env mod pkg_qual
+findImportedModuleWithIsBoot :: FinderEnv -> ModuleName -> IsBootInterface -> PkgQual -> IO FindResult
+findImportedModuleWithIsBoot finder_env mod is_boot pkg_qual = do
+  res <- findImportedModule finder_env mod pkg_qual
   case (res, is_boot) of
     (Found loc mod, IsBoot) -> return (Found (addBootSuffixLocn loc) mod)
     _ -> return res
@@ -256,16 +257,18 @@ findPluginModuleNoHsc fc fopts units (Just home_unit) mod_name =
 findPluginModuleNoHsc fc fopts units Nothing mod_name =
   findExposedPluginPackageModule fc fopts units mod_name
 
-findPluginModule :: HscEnv -> ModuleName -> IO FindResult
-findPluginModule hsc_env mod_name = do
-  let fc = hsc_FC hsc_env
-  let units = hsc_units hsc_env
-  let mhome_unit = hsc_home_unit_maybe hsc_env
-  findPluginModuleNoHsc fc (initFinderOpts (hsc_dflags hsc_env)) units mhome_unit mod_name
+findPluginModule :: FinderEnv -> ModuleName -> IO FindResult
+findPluginModule finder_env mod_name =
+  let FinderEnv { finder_cache = fc
+                , finder_opts = fopts
+                , finder_unit_state = units
+                , finder_home_unit = mhome_unit
+                } = finder_env
+  in findPluginModuleNoHsc fc fopts units mhome_unit mod_name
 
 
--- | A version of findExactModule which takes the exact parts of the HscEnv it needs
--- directly.
+-- | A version of findExactModule which takes precisely the information required
+-- directly, avoiding any dependency on the full session environment.
 findExactModuleNoHsc :: FinderCache -> FinderOpts -> UnitEnvGraph FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
 findExactModuleNoHsc fc fopts other_fopts unit_state mhome_unit mod is_boot = do
   res <- case mhome_unit of
@@ -285,14 +288,15 @@ findExactModuleNoHsc fc fopts other_fopts unit_state mhome_unit mod is_boot = do
 -- where the files associated with this module live.  It is used when
 -- reading the interface for a module mentioned by another interface,
 -- for example (a "system import").
-findExactModule :: HscEnv -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
-findExactModule hsc_env mod is_boot = do
-  let dflags = hsc_dflags hsc_env
-  let fc = hsc_FC hsc_env
-  let unit_state = hsc_units hsc_env
-  let home_unit = hsc_home_unit_maybe hsc_env
-  let other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
-  findExactModuleNoHsc fc (initFinderOpts dflags) other_fopts unit_state home_unit mod is_boot
+findExactModule :: FinderEnv -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModule finder_env mod is_boot =
+  let FinderEnv { finder_cache = fc
+                , finder_opts = fopts
+                , finder_other_opts = other_fopts
+                , finder_unit_state = unit_state
+                , finder_home_unit = home_unit
+                } = finder_env
+  in findExactModuleNoHsc fc fopts other_fopts unit_state home_unit mod is_boot
 
 
 -- -----------------------------------------------------------------------------

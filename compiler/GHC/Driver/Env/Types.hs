@@ -4,6 +4,7 @@ module GHC.Driver.Env.Types
   ( Hsc(..)
   , HscEnv(..)
   , HasHscEnv(..)
+  , FinderEnv(..)
   ) where
 
 import GHC.Driver.Errors.Types ( GhcMessage )
@@ -18,8 +19,11 @@ import GHC.Types.Error ( Messages )
 import GHC.Types.Name.Cache
 import GHC.Types.Target
 import GHC.Types.TypeEnv
-import GHC.Unit.Finder.Types
+import GHC.Unit.Finder.Types (FinderCache, FinderOpts)
 import GHC.Unit.Env
+import GHC.Unit.State (UnitState)
+import GHC.Unit.Home
+import GHC.Unit.Home.Graph (UnitEnvGraph)
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import {-# SOURCE #-} GHC.Driver.Plugins
@@ -115,6 +119,15 @@ data HscEnv
         , hsc_llvm_config :: !LlvmConfigCache
                 -- ^ LLVM configuration cache.
  }
+
+data FinderEnv = FinderEnv
+  { finder_cache       :: !FinderCache
+  , finder_opts        :: !FinderOpts
+  , finder_other_opts  :: !(UnitEnvGraph FinderOpts)
+  , finder_unit_state  :: !UnitState
+  , finder_unit_env    :: !UnitEnv
+  , finder_home_unit   :: !(Maybe HomeUnit)
+  }
 
 class HasHscEnv m where
     getHscEnv :: m HscEnv

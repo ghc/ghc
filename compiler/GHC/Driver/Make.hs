@@ -308,6 +308,7 @@ warnUnknownModules hsc_env dflags mod_graph = do
   return $ final_msgs hidden_warns reexported_warns
   where
     diag_opts = initDiagOpts dflags
+    finder_env = mkFinderEnv hsc_env
 
     unit_mods :: UniqSet ModuleName
     unit_mods = mkUniqSet (map ms_mod_name
@@ -319,7 +320,7 @@ warnUnknownModules hsc_env dflags mod_graph = do
 
     hidden_warns = hidden_mods `minusUniqSet` unit_mods
 
-    lookupModule mn = findImportedModule hsc_env mn NoPkgQual
+    lookupModule mn = findImportedModule finder_env mn NoPkgQual
 
     check_reexport mn = do
       fr <- lookupModule (reexportFrom mn)

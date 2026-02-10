@@ -2296,7 +2296,7 @@ addModule files = do
       hsc_env <- GHC.getSession
       let home_unit = hsc_home_unit hsc_env
       result <- liftIO $
-        Finder.findImportedModule hsc_env m (ThisPkg (homeUnitId home_unit))
+        Finder.findImportedModule (mkFinderEnv hsc_env) m (ThisPkg (homeUnitId home_unit))
       case result of
         Found _ _ -> return True
         _ -> do reportError (GhciModuleError $ GhciModuleNotFound (moduleNameString m))

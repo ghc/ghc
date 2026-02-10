@@ -386,7 +386,7 @@ createOneShotIface verbosity flags instIfaceMap moduleNameStr = do
                   Nothing -> dflags
 
   -- We should find the module here, otherwise there would have been an error earlier.
-  res <- liftIO $ findImportedModule hsc_env moduleNm NoPkgQual
+  res <- liftIO $ findImportedModule (mkFinderEnv hsc_env) moduleNm NoPkgQual
   let hieFilePath = case res of
                       Found ml _ -> ml_hie_file ml
                       _ -> throwE "createOneShotIface: module not found"

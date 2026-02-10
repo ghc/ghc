@@ -1673,6 +1673,7 @@ findQualifiedModule pkgqual mod_name = withSession $ \hsc_env -> do
   liftIO $ trace_if logger (text "findQualifiedModule" <+> ppr mod_name <+> ppr pkgqual)
   let mhome_unit = hsc_home_unit_maybe hsc_env
   let dflags = hsc_dflags hsc_env
+  let finder_env = mkFinderEnv hsc_env
   let sec = initSourceErrorContext dflags
   case pkgqual of
     ThisPkg uid -> do
@@ -1680,14 +1681,14 @@ findQualifiedModule pkgqual mod_name = withSession $ \hsc_env -> do
       case home of
         Just m  -> return m
         Nothing -> liftIO $ do
-           res <- findImportedModule hsc_env mod_name pkgqual
+           res <- findImportedModule finder_env mod_name pkgqual
            case res of
              Found loc m | notHomeModuleMaybe mhome_unit m -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
 
     _ -> liftIO $ do
-      res <- findImportedModule hsc_env mod_name pkgqual
+      res <- findImportedModule finder_env mod_name pkgqual
       case res of
         Found _ m -> return m
         err       -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err

@@ -83,7 +83,7 @@ import GHC.Core.Reduction ( Reduction )
 import GHC.Core.TyCon     ( TyCon )
 import GHC.Core.DataCon   ( DataCon )
 import GHC.Core.Class     ( Class )
-import GHC.Driver.Env       ( HscEnv(..) )
+import GHC.Driver.Env       ( HscEnv(..), mkFinderEnv )
 import GHC.Utils.Outputable ( SDoc )
 import GHC.Core.Type        ( Kind, Type, PredType )
 import GHC.Types.Id         ( Id )
@@ -104,7 +104,7 @@ tcPluginTrace a b = unsafeTcPluginTcM (traceTc a b)
 findImportedModule :: ModuleName -> PkgQual -> TcPluginM Finder.FindResult
 findImportedModule mod_name mb_pkg = do
     hsc_env <- getTopEnv
-    tcPluginIO $ Finder.findImportedModule hsc_env mod_name mb_pkg
+    tcPluginIO $ Finder.findImportedModule (mkFinderEnv hsc_env) mod_name mb_pkg
 
 lookupOrig :: Module -> OccName -> TcPluginM Name
 lookupOrig mod = unsafeTcPluginTcM . IfaceEnv.lookupOrig mod

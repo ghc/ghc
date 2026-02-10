@@ -352,7 +352,7 @@ downsweepInstalledModules hsc_env mods = do
 
         process :: InstalledModule -> IO ModuleNodeInfo
         process i = do
-          res <- findExactModule hsc_env i NotBoot
+          res <- findExactModule (mkFinderEnv hsc_env) i NotBoot
           case res of
             InstalledFound loc -> return $ ModuleNodeFixed (installedModuleToMnk i) loc
             -- It is an internal-ish error if this happens, since we any call to this function should
@@ -565,7 +565,7 @@ loopFixedImports (key:keys) done = do
   case M.lookup nk done of
     Just {} -> loopFixedImports keys done
     Nothing -> do
-      read_result <- liftIO $ findExactModule hsc_env (mnkToInstalledModule key) (mnkIsBoot key)
+      read_result <- liftIO $ findExactModule (mkFinderEnv hsc_env) (mnkToInstalledModule key) (mnkIsBoot key)
       case read_result of
         InstalledFound loc -> do
           done' <- loopFixedModule key loc done
@@ -1359,10 +1359,12 @@ summariseModuleDispatch k hsc_env' home_unit is_boot (L _ wanted_mod) mb_pkg exc
     -- happen relative to it
     hsc_env   = hscSetActiveHomeUnit home_unit hsc_env'
 
+    finder_env = mkFinderEnv hsc_env
+
     find_it :: IO SummariseResult
 
     find_it = do
-        found <- findImportedModuleWithIsBoot hsc_env wanted_mod is_boot mb_pkg
+        found <- findImportedModuleWithIsBoot finder_env wanted_mod is_boot mb_pkg
         case found of
              Found location mod
                 | moduleUnitId mod `Set.member` hsc_all_home_unit_ids hsc_env ->

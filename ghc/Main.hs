@@ -484,9 +484,10 @@ abiHash strs = do
 
   liftIO $ do
 
-  let find_it str = do
+  let finder_env = mkFinderEnv hsc_env
+      find_it str = do
          let modname = mkModuleName str
-         r <- findImportedModule hsc_env modname NoPkgQual
+         r <- findImportedModule finder_env modname NoPkgQual
          case r of
            Found _ m -> return m
            _error    ->

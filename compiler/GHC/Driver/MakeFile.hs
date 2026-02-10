@@ -306,7 +306,7 @@ findDependency  :: HscEnv
 findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
   -- Find the module; this will be fast because
   -- we've done it once during downsweep
-  r <- findImportedModuleWithIsBoot hsc_env imp is_boot pkg
+  r <- findImportedModuleWithIsBoot (mkFinderEnv hsc_env) imp is_boot pkg
   case r of
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file
