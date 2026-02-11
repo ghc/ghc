@@ -444,10 +444,21 @@ loadInterface doc_str mod from
         ; found <- liftIO (lookupIfaceByModule scope (eps_PIT eps) mod)
         ; case found of
             Just iface -> return (Succeeded iface)
-            Nothing    -> proceed ifle mhome_unit eps scope
+            Nothing    -> loadExternalInterface ifle mhome_unit eps scope doc_str mod from
         }
-  where
-    proceed ifle mhome_unit eps scope = do
+
+-- | Load an interface that we did not already find in the PIT/HPT.
+--   This used to live inline inside 'loadInterface'.
+loadExternalInterface
+  :: IfaceLoadEnv
+  -> Maybe HomeUnit
+  -> ExternalPackageState
+  -> IfaceLoadScope
+  -> SDoc
+  -> Module
+  -> WhereFrom
+  -> IfM lcl (MaybeErr MissingInterfaceError ModIface)
+loadExternalInterface ifle mhome_unit eps scope doc_str mod from = do
         gbl_env <- getGblEnv
 
         -- READ THE MODULE IN
