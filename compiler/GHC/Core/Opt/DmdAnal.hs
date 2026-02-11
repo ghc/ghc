@@ -1105,19 +1105,13 @@ dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs
     rhs_sd = mkCalledOnceDmds ww_arity adjusted_body_sd
 
     WithDmdType rhs_dmd_ty rhs' = dmdAnal env rhs_sd rhs
-    DmdType rhs_env rhs_dmds = rhs_dmd_ty
 
-    -- See Note [Absence analysis for stable unfoldings and RULES]
-    -- If there's a stable unfolding, we need to combine argument demands
-    -- from the unfolding with those from the RHS, because the unfolding
-    -- might use arguments that the (optimised) RHS doesn't.
-    -- Any argument with a demand absent in one but not the other can
-    -- be problematic, see #26416
-    -- Also combine the DmdEnv (free variables) from the unfolding
-    (unf_fv_env, combined_rhs_dmds) = combineUnfoldingDmds env rhs_sd id rhs_env rhs_dmds
+    -- See Note [Absence analysis for stable unfoldings and RULES], Wrinkle (W3)
+    full_dmd_ty = addUnfoldingDemands env rhs_sd id rhs_dmd_ty
+    DmdType full_rhs_env combined_rhs_dmds = full_dmd_ty
 
     (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id ww_arity
-                                                      combined_rhs_dmds (de_div rhs_env) rhs'
+                                                      combined_rhs_dmds (de_div full_rhs_env) rhs'
 
     dmd_sig_arity = ww_arity + strictCallArity body_sd
     sig = mkDmdSigForArity dmd_sig_arity (DmdType sig_env final_rhs_dmds)
@@ -1141,14 +1135,13 @@ dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs
     --        we never get used-once info for FVs of recursive functions.
     --        See #14816 where we try to get rid of reuseEnv.
     rhs_env1 = case rec_flag of
-                Recursive    -> reuseEnv rhs_env
-                NonRecursive -> rhs_env
+                Recursive    -> reuseEnv full_rhs_env
+                NonRecursive -> full_rhs_env
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
-    -- The unfolding FVs are handled via unf_fv_env from combineUnfoldingDmds.
+    -- The unfolding FVs are already included in full_rhs_env via addUnfoldingDemands.
     -- Here we only need demandRoots for RULES.
-    rhs_env2 = rhs_env1 `plusDmdEnv` unf_fv_env
-                        `plusDmdEnv` demandRootSet env (idRuleVars id)
+    rhs_env2 = rhs_env1 `plusDmdEnv` demandRootSet env (idRuleVars id)
 
     -- See Note [Lazy and unleashable free variables]
     !(!sig_env, !weak_fvs) = splitWeakDmds rhs_env2
@@ -1160,27 +1153,19 @@ splitWeakDmds (DE fvs div) = (DE sig_fvs div, weak_fvs)
 -- | If there is a stable unfolding, combine argument demands and free variable
 -- demands from the unfolding with those from the RHS.
 -- See Note [Absence analysis for stable unfoldings and RULES], Wrinkle (W3).
---
--- Returns (combined DmdEnv for free variables, combined arg demands)
--- The DmdEnv is nopDmdEnv if there's no stable unfolding.
-combineUnfoldingDmds :: AnalEnv -> SubDemand -> Id -> DmdEnv -> [Demand] -> (DmdEnv, [Demand])
-combineUnfoldingDmds env rhs_sd id rhs_fv_env rhs_dmds
-  | not (isStableUnfolding unf)
-  = (nopDmdEnv, rhs_dmds)  -- No stable unfolding, nothing to do
+-- See Note [Combining demands for stable unfoldings] in GHC.Types.Demand.
+addUnfoldingDemands :: AnalEnv -> SubDemand -> Id -> DmdType -> DmdType
+addUnfoldingDemands env rhs_sd id rhs_dmd_ty
+  | isStableUnfolding unf
+  , Just unf_body <- maybeUnfoldingTemplate unf
+  , let WithDmdType unf_dmd_ty _ = dmdAnal env rhs_sd unf_body
+  = -- pprTrace "addUnfoldingDemands" (ppr id $$ ppr rhs_dmd_ty $$ ppr unf_dmd_ty) $
+    lubUBglbLBDmdType rhs_dmd_ty unf_dmd_ty
 
-  | Just unf_body <- maybeUnfoldingTemplate unf
-  , let WithDmdType (DmdType unf_fv_env unf_dmds) _ = dmdAnal env rhs_sd unf_body
-  , let combined_dmds = go rhs_dmds unf_dmds
-        -- Lub the free variable demands from unfolding with RHS
-        combined_fv_env = lubDmdEnv rhs_fv_env unf_fv_env
-  = -- pprTrace "combineUnfoldingDmds" (ppr id $$ ppr rhs_dmds $$ ppr unf_dmds $$ ppr combined_dmds) $
-   (combined_fv_env, combined_dmds)
-  | otherwise = (nopDmdEnv, rhs_dmds)
+  | otherwise
+  = rhs_dmd_ty  -- No stable unfolding, nothing to do
   where
     unf = realIdUnfolding id
-    go rhs          []            = rhs
-    go []           _             = []
-    go (r:rhs)      (u:unfs)      = lubUBglbLBDmd r u : go rhs unfs
 
 -- | The result type after applying 'idArity' many arguments. Returns 'Nothing'
 -- when the type doesn't have exactly 'idArity' many arrows.
@@ -1577,17 +1562,13 @@ Wrinkles:
 
     SOLUTION: in `dmdAnalRhsSig`, if the function has a stable unfolding,
     analyse it with `dmdAnal` and combine the resulting `DmdType` with the
-    RHS's `DmdType`. This is done by `combineUnfoldingDmds`, which:
+    RHS's `DmdType`. This is done by `addUnfoldingDemands`, which uses
+    `lubUBglbLBDmdType` to combine both argument demands and free variable
+    demands. See Note [Combining demands for stable unfoldings] in
+    GHC.Types.Demand for details of the combining operation.
 
-      * For argument demands: combines them using `lubUBglbLBDmd`, which takes
-        the glb (max) of lower bounds (strictness) and lub (max) of upper
-        bounds (usage). See Note [Combining demands for stable unfoldings].
-        This ensures that if the unfolding uses an argument, it won't be
-        marked as absent, while preserving any strictness the RHS reveals.
-
-      * For free variable demands: combines them using `lubDmdEnv`. This
-        replaces the `demandRoots` approach for stable unfoldings (though
-        we still use `demandRoots` for RULES via `idRuleVars`).
+    This replaces the `demandRoots` approach for stable unfoldings (though
+    we still use `demandRoots` for RULES via `idRuleVars`).
 
 Note [DmdAnal for DataCon wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

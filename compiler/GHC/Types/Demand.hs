@@ -57,7 +57,7 @@ module GHC.Types.Demand (
     DmdType(..), dmdTypeDepth,
     -- ** Algebra
     nopDmdType, botDmdType,
-    lubDmdType, plusDmdType, multDmdType, discardArgDmds,
+    lubDmdType, lubUBglbLBDmdType, plusDmdType, multDmdType, discardArgDmds,
     -- ** Other operations
     peelFV, findIdDemand, addDemand, splitDmdTy, deferAfterPreciseException,
 
@@ -1906,6 +1906,26 @@ lubDmdType d1 d2 = DmdType lub_fv lub_ds
     (DmdType fv2 ds2) = etaExpandDmdType n d2
     lub_ds  = zipWithEqual lubDmd ds1 ds2
     lub_fv = lubDmdEnv fv1 fv2
+
+-- | Combine two 'DmdType's for stable unfolding analysis.
+-- See Note [Combining demands for stable unfoldings].
+lubUBglbLBDmdType :: DmdType -> DmdType -> DmdType
+lubUBglbLBDmdType (DmdType fv1 ds1) (DmdType fv2 ds2)
+  = DmdType combined_fv combined_ds
+  where
+    combined_fv = lubUBglbLBDmdEnv fv1 fv2
+    combined_ds = go ds1 ds2
+    -- If lists have different lengths, keep remaining ds1 (from RHS)
+    go rhs []           = rhs
+    go []  _            = []
+    go (r:rhs) (u:unfs) = lubUBglbLBDmd r u : go rhs unfs
+
+-- | See Note [Combining demands for stable unfoldings].
+lubUBglbLBDmdEnv :: DmdEnv -> DmdEnv -> DmdEnv
+lubUBglbLBDmdEnv (DE fv1 d1) (DE fv2 d2) = DE combined_fv combined_div
+  where
+    combined_fv  = plusVarEnv_CD lubUBglbLBDmd fv1 (defaultFvDmd d1) fv2 (defaultFvDmd d2)
+    combined_div = lubDivergence d1 d2
 
 discardArgDmds :: DmdType -> DmdEnv
 discardArgDmds (DmdType fv _) = fv
