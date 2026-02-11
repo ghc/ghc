@@ -671,8 +671,8 @@ FP_CC_IGNORE_UNUSED_ARGS([$CC], [CONF_CC_OPTS_STAGE2])
 
 # CPP, CPPFLAGS
 # --with-cpp/-with-cpp-flags
-dnl Note that we must do this after setting and using the C99 CPPFLAGS, or
-dnl otherwise risk trying to configure the C99 and LD flags using -E as a CPPFLAG
+dnl Note that we must do this after setting and using the C11 CPPFLAGS, or
+dnl otherwise risk trying to configure the C11 and LD flags using -E as a CPPFLAG
 FP_CPP_CMD_WITH_ARGS([$CC_STAGE0],[CPPCmd_STAGE0],[CONF_CPP_OPTS_STAGE0])
 FP_CPP_CMD_WITH_ARGS([$CC],[CPPCmd],[CONF_CPP_OPTS_STAGE1])
 FP_CPP_CMD_WITH_ARGS([$CC],[CPPCmd],[CONF_CPP_OPTS_STAGE2])

@@ -103,7 +103,7 @@ test('T2276_ghci', [ only_ghci,
                      pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup ghciWayFlags=' + config.ghci_way_flags) ],
                    compile_and_run, ['-fobject-code T2276_ghci_c.o'])
 
-test('T2469', normal, compile_and_run, ['-optc-std=gnu99'])
+test('T2469', normal, compile_and_run, ['-optc-std=gnu11'])
 
 test('T2594', [req_c], compile_and_run, ['T2594_c.c'])
 
