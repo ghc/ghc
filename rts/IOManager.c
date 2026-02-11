@@ -772,7 +772,7 @@ bool syncIOWaitReady(Capability   *cap,
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
         {
-            StgWord why_blocked = rw == IORead ? BlockedOnRead : BlockedOnWrite
+            StgWord why_blocked = (rw == IORead ? BlockedOnRead : BlockedOnWrite)
                                 | BlockInfoForceNonClosure;
             tso->block_info.fd = fd;
             appendToIOBlockedQueue(cap, tso);
