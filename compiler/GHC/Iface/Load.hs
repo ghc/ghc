@@ -658,7 +658,7 @@ dontLeakTheHUG thing_inside = do
 
       let
         !maybe_type_vars
-          | inOneShot = Just (hsc_type_env_vars (ifle_hsc_env ifle))
+          | inOneShot = Just (ifle_type_env_vars ifle)
           | otherwise = Nothing
         hsc_env = ifle_hsc_env env
         -- wrinkle: when we're typechecking in --backpack mode, the
@@ -695,18 +695,22 @@ dontLeakTheHUG thing_inside = do
               }
       in do
         !unit_env <- unit_env_io
-        let cleaned_hsc_env =
+        let type_env_vars =
+              case maybe_type_vars of
+                Just vars -> vars
+                Nothing -> panic "cleanTopEnv: hsc_type_env_vars"
+            cleaned_hsc_env =
               hsc_env
                 { hsc_targets      = panic "cleanTopEnv: hsc_targets"
                 , hsc_IC           = panic "cleanTopEnv: hsc_IC"
-                , hsc_type_env_vars = case maybe_type_vars of
-                                         Just vars -> vars
-                                         Nothing -> panic "cleanTopEnv: hsc_type_env_vars"
+                , hsc_type_env_vars = type_env_vars
                 , hsc_unit_env     = unit_env
                 }
         -- mg_has_holes will be checked again, but nothing else about the module graph
         pure $
-          env { ifle_hsc_env = cleaned_hsc_env }
+          env { ifle_hsc_env = cleaned_hsc_env
+              , ifle_type_env_vars = type_env_vars
+              }
 
   updTopEnvIO cleanTopEnv $ updGblEnv cleanGblEnv $ do
   !_ <- getTopEnv        -- force the updTopEnv

@@ -27,6 +27,7 @@ module GHC.Tc.Utils.Monad(
   whenXOptM, unlessXOptM,
   getGhcMode,
   withoutDynamicNow,
+  withoutDynamicNowIf,
   getEpsVar,
   getEps,
   getEpsIf,
@@ -547,6 +548,9 @@ setEnvs :: (top', gbl', lcl') -> TcRnIfBase top' gbl' lcl' a -> TcRnIfBase top g
 setEnvs (top_env, gbl_env, lcl_env) thing_inside
   = setEnvsWithTop (const top_env) (gbl_env, lcl_env) thing_inside
 
+setGblLclEnvs :: (gbl', lcl')
+              -> TcRnIfBase top gbl' lcl' a
+              -> TcRnIfBase top gbl lcl a
 setGblLclEnvs = setEnvsWithTop id
 
 
@@ -659,6 +663,14 @@ getGhcMode = ghcMode <$> getDynFlags
 
 withoutDynamicNow :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 withoutDynamicNow = updTopFlags (\dflags -> dflags { dynamicNow = False})
+
+withoutDynamicNowIf :: IfM lcl a -> IfM lcl a
+withoutDynamicNowIf =
+  updTopEnv $ \ifle ->
+    let upd dflags = dflags { dynamicNow = False }
+        hsc_env' = hscUpdateFlags upd (ifle_hsc_env ifle)
+    in ifle { ifle_dflags = upd (ifle_dflags ifle)
+            , ifle_hsc_env = hsc_env' }
 
 updTopFlags :: (DynFlags -> DynFlags) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 updTopFlags f = updTopEnv (hscUpdateFlags f)

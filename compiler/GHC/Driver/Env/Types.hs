@@ -148,6 +148,7 @@ data IfaceLoadEnv = IfaceLoadEnv
   , ifle_all_home_unit_ids :: !(Set.Set UnitId)
   , ifle_plugins         :: !Plugins
   , ifle_hsc_env         :: !HscEnv
+  , ifle_type_env_vars   :: !(KnotVars (IORef TypeEnv))
   , ifle_finder_env      :: !FinderEnv
   }
 

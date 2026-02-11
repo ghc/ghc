@@ -394,7 +394,6 @@ checkVersions hsc_env mod_summary iface self_recomp
        -- readIface will have verified that the UnitId matches,
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
-       ; hsc_env <- getTopEnv
        ; if mi_sr_src_hash self_recomp /= ms_hs_hash mod_summary
             then return $ outOfDateItemBecause SourceFileChanged Nothing else do {
        ; if not (isHomeModule home_unit (mi_module iface))
@@ -421,9 +420,10 @@ checkVersions hsc_env mod_summary iface self_recomp
        -- (in which case we are done with this module) or it'll fail (in which
        -- case we'll compile the module from scratch anyhow).
 
-       when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
-          ; updateEps_ $ \eps  -> eps { eps_is_boot = mkModDeps $ dep_boot_mods (mi_deps iface) }
-       }
+       when (isOneShot (ghcMode (hsc_dflags hsc_env))) $
+         updateEpsIf $ \eps ->
+           ( eps { eps_is_boot = mkModDeps $ dep_boot_mods (mi_deps iface) }
+           , () )
        ; recomp <- checkList [checkModUsage (hsc_FC hsc_env) u
                              | u <- mi_sr_usages self_recomp]
        ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason (Just iface) ; _ -> do {
@@ -1912,7 +1912,7 @@ mkHashFun hsc_env eps name
                       -- so there's no guarantee everything is loaded.
                       -- Kind of a heinous hack.
                       initIfaceLoad hsc_env . withIfaceErr ctx
-                          $ withoutDynamicNow
+                          $ withoutDynamicNowIf
                             -- If you try and load interfaces when dynamic-too
                             -- enabled then it attempts to load the dyn_hi and hi
                             -- interface files. Backpack doesn't really care about
