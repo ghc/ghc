@@ -32,6 +32,11 @@ module GHC.Driver.Env
    , prepareAnnotations
    , discardIC
    , lookupType
+   , LookupTypeEnv(..)
+   , mkLookupTypeEnv
+   , lookupTypeWithEnv
+   , mkLookupTypeEnvForIface
+   , lookupTypeInPTEWithEnv
    , lookupIfaceByModule
    , lookupIfaceByModuleHsc
    , mainModIs
@@ -143,11 +148,14 @@ mkIfaceLoadEnv hsc_env = IfaceLoadEnv
   , ifle_all_home_unit_ids = hsc_all_home_unit_ids hsc_env
   , ifle_plugins         = hsc_plugins hsc_env
   , ifle_hsc_env         = hsc_env
+  , ifle_hooks           = hsc_hooks hsc_env
+  , ifle_logger          = hsc_logger hsc_env
   , ifle_name_cache      = hsc_NC hsc_env
   , ifle_unit_state      = hsc_units hsc_env
   , ifle_eps_cache       = ue_eps (hsc_unit_env hsc_env)
   , ifle_type_env_vars   = hsc_type_env_vars hsc_env
   , ifle_finder_env      = mkFinderEnv hsc_env
+  , ifle_hug             = hsc_HUG hsc_env
   }
 
 hsc_home_unit :: HscEnv -> HomeUnit
@@ -364,27 +372,75 @@ prepareAnnotations hsc_env mb_guts = do
 -- compiled modules in other packages that live in 'PackageTypeEnv'. Note
 -- that this does NOT look up the 'TyThing' in the module being compiled: you
 -- have to do that yourself, if desired
+data LookupTypeEnv
+  = LookupTypeEnvOneShot
+      { lte_home_unit :: !HomeUnit
+      , lte_get_pte   :: !(IO PackageTypeEnv)
+      }
+  | LookupTypeEnvMake
+      { lte_home_unit :: !HomeUnit
+      , lte_hug       :: !HomeUnitGraph
+      , lte_get_pte   :: !(IO PackageTypeEnv)
+      }
+
 lookupType :: HscEnv -> Name -> IO (Maybe TyThing)
 lookupType hsc_env name = do
    eps <- liftIO $ hscEPS hsc_env
-   let pte = eps_PTE eps
-   lookupTypeInPTE hsc_env pte name
+   lookupTypeInPTE hsc_env (eps_PTE eps) name
 
 lookupTypeInPTE :: HscEnv -> PackageTypeEnv -> Name -> IO (Maybe TyThing)
-lookupTypeInPTE hsc_env pte name = ty
-  where
-    hpt = hsc_HUG hsc_env
-    mod = assertPpr (isExternalName name) (ppr name) $
-          if isHoleName name
-            then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
-            else nameModule name
+lookupTypeInPTE hsc_env pte name =
+   lookupTypeInPTEWithEnv (mkLookupTypeEnv hsc_env pte) name
 
-    ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
-            -- in one-shot, we don't use the HPT
-            then return $! lookupNameEnv pte name
-            else HUG.lookupHugByModule mod hpt >>= \case
-             Just hm -> pure $! lookupNameEnv (md_types (hm_details hm)) name
-             Nothing -> pure $! lookupNameEnv pte name
+mkLookupTypeEnv :: HscEnv -> PackageTypeEnv -> LookupTypeEnv
+mkLookupTypeEnv hsc_env pte
+  | isOneShot (ghcMode (hsc_dflags hsc_env))
+  = LookupTypeEnvOneShot
+      { lte_home_unit = hsc_home_unit hsc_env
+      , lte_get_pte = pure pte
+      }
+  | otherwise
+  = LookupTypeEnvMake
+      { lte_home_unit = hsc_home_unit hsc_env
+      , lte_hug = hsc_HUG hsc_env
+      , lte_get_pte = pure pte
+      }
+
+mkLookupTypeEnvForIface :: IfaceLoadEnv -> LookupTypeEnv
+mkLookupTypeEnvForIface ifle
+  | isOneShot (ghcMode (ifle_dflags ifle)) =
+      LookupTypeEnvOneShot
+        { lte_home_unit = ifle_home_unit ifle
+        , lte_get_pte = eps_PTE <$> eucEPS (ifle_eps_cache ifle)
+        }
+  | otherwise =
+      LookupTypeEnvMake
+        { lte_home_unit = ifle_home_unit ifle
+        , lte_hug = ifle_hug ifle
+        , lte_get_pte = eps_PTE <$> eucEPS (ifle_eps_cache ifle)
+        }
+
+lookupTypeWithEnv :: LookupTypeEnv -> Name -> IO (Maybe TyThing)
+lookupTypeWithEnv env name = lookupTypeInPTEWithEnv env name
+
+lookupTypeInPTEWithEnv :: LookupTypeEnv -> Name -> IO (Maybe TyThing)
+lookupTypeInPTEWithEnv env name =
+    let home_unit = case env of
+                      LookupTypeEnvOneShot{ lte_home_unit = hu } -> hu
+                      LookupTypeEnvMake{ lte_home_unit = hu }    -> hu
+        mod = assertPpr (isExternalName name) (ppr name) $
+              if isHoleName name
+                then mkHomeModule home_unit (moduleName (nameModule name))
+                else nameModule name
+    in do
+      pte <- lte_get_pte env
+      case env of
+        LookupTypeEnvOneShot{} ->
+            pure $! lookupNameEnv pte name
+        LookupTypeEnvMake{ lte_hug = hug } ->
+            HUG.lookupHugByModule mod hug >>= \case
+              Just hm -> pure $! lookupNameEnv (md_types (hm_details hm)) name
+              Nothing -> pure $! lookupNameEnv pte name
 
 -- | Find the 'ModIface' for a 'Module', searching in both the loaded home
 -- and external package module information

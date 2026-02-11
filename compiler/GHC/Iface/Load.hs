@@ -451,7 +451,7 @@ loadInterface doc_str mod from
         ; read_result <- case wantHiBootFile mhome_unit eps mod from of
                            Failed err             -> return (Failed err)
                            Succeeded hi_boot_file -> do
-                             liftIO $ computeInterface (ifle_hsc_env ifle) doc_str hi_boot_file mod
+                             liftIO $ computeInterface ifle doc_str hi_boot_file mod
         ; case read_result of {
             Failed err -> do
                 { let fake_iface = emptyFullModIface mod
@@ -743,16 +743,15 @@ is_external_sig mhome_unit iface =
 -- A.hi to be up-to-date (and indeed, we MUST NOT attempt to read A.hi, unless
 -- we are actually typechecking p.)
 computeInterface
-  :: HscEnv
+  :: IfaceLoadEnv
   -> SDoc
   -> IsBootInterface
   -> Module
   -> IO (MaybeErr MissingInterfaceError (ModIface, ModLocation))
-computeInterface hsc_env doc_str hi_boot_file mod0 = do
+computeInterface ifle doc_str hi_boot_file mod0 = do
   massert (not (isHoleModule mod0))
-  let mhome_unit  = hsc_home_unit_maybe hsc_env
-      load_env    = mkIfaceLoadEnv hsc_env
-      find_iface m = findAndReadIface load_env doc_str
+  let mhome_unit  = ifle_home_unit_maybe ifle
+      find_iface m = findAndReadIface ifle doc_str
                                       m mod0 hi_boot_file
   case getModuleInstantiation mod0 of
       (imod, Just indef)
@@ -760,9 +759,9 @@ computeInterface hsc_env doc_str hi_boot_file mod0 = do
         , isHomeUnitIndefinite home_unit ->
           find_iface imod >>= \case
             Succeeded (iface0, path) ->
-              rnModIface load_env (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case
+              rnModIface ifle (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case
                 Right x   -> return (Succeeded (x, path))
-                Left errs -> throwErrors (initSourceErrorContext (hsc_dflags hsc_env)) (GhcTcRnMessage <$> errs)
+                Left errs -> throwErrors (initSourceErrorContext (ifle_dflags ifle)) (GhcTcRnMessage <$> errs)
             Failed err -> return (Failed err)
       (mod, _) -> find_iface mod
 

@@ -140,6 +140,7 @@ module GHC.Tc.Utils.Monad(
   mkIfLclEnv,
   initIfaceTcRn,
   initIfaceCheck,
+  initIfaceCheckWithLoadEnv,
   initIfaceLcl,
   initIfaceLclWithSubst,
   initIfaceLoad,
@@ -668,9 +669,7 @@ withoutDynamicNowIf :: IfM lcl a -> IfM lcl a
 withoutDynamicNowIf =
   updTopEnv $ \ifle ->
     let upd dflags = dflags { dynamicNow = False }
-        hsc_env' = hscUpdateFlags upd (ifle_hsc_env ifle)
-    in ifle { ifle_dflags = upd (ifle_dflags ifle)
-            , ifle_hsc_env = hsc_env' }
+    in ifle { ifle_dflags = upd (ifle_dflags ifle) }
 
 updTopFlags :: (DynFlags -> DynFlags) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 updTopFlags f = updTopEnv (hscUpdateFlags f)
@@ -725,9 +724,8 @@ getEpsAndHug = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
 getEpsAndHugIf :: IfM lcl (ExternalPackageState, HomeUnitGraph)
 getEpsAndHugIf = do
   iface <- getTopEnv
-  let hsc_env = ifle_hsc_env iface
-  eps <- liftIO $ hscEPS hsc_env
-  return (eps, hsc_HUG hsc_env)
+  eps <- liftIO $ eucEPS (ifle_eps_cache iface)
+  return (eps, ifle_hug iface)
 
 -- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
 -- an exception if it is an error.
@@ -2483,12 +2481,16 @@ initIfaceCheck :: SDoc -> HscEnv -> IfG a -> IO a
 -- Used when checking the up-to-date-ness of the old Iface
 -- Initialise the environment with no useful info at all
 initIfaceCheck doc hsc_env do_this
+ = initIfaceCheckWithLoadEnv doc (mkIfaceLoadEnv hsc_env) do_this
+
+initIfaceCheckWithLoadEnv :: SDoc -> IfaceLoadEnv -> IfG a -> IO a
+initIfaceCheckWithLoadEnv doc ifle do_this
  = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceCheck" <+> doc,
-                        if_rec_types = readTcRef <$> hsc_type_env_vars hsc_env,
-                        if_load_env = Just (mkIfaceLoadEnv hsc_env)
+                        if_rec_types = readTcRef <$> ifle_type_env_vars ifle,
+                        if_load_env = Just ifle
                     }
-      initTcRnIf IfaceTag (mkIfaceLoadEnv hsc_env) gbl_env () do_this
+      initTcRnIf IfaceTag ifle gbl_env () do_this
 
 initIfaceLcl :: Module -> SDoc -> IsBootInterface -> IfL a -> IfM lcl a
 initIfaceLcl mod loc_doc hi_boot_file thing_inside

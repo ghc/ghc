@@ -149,21 +149,24 @@ data IfaceLoadEnv = IfaceLoadEnv
   , ifle_all_home_unit_ids :: !(Set.Set UnitId)
   , ifle_plugins         :: !Plugins
   , ifle_hsc_env         :: !HscEnv
+  , ifle_hooks           :: !Hooks
+  , ifle_logger          :: !Logger
   , ifle_name_cache      :: !NameCache
   , ifle_unit_state      :: !UnitState
   , ifle_eps_cache       :: !ExternalUnitCache
   , ifle_type_env_vars   :: !(KnotVars (IORef TypeEnv))
   , ifle_finder_env      :: !FinderEnv
+  , ifle_hug             :: !HomeUnitGraph
   }
 
 instance ContainsDynFlags IfaceLoadEnv where
-  extractDynFlags = extractDynFlags . ifle_hsc_env
+  extractDynFlags = ifle_dflags
 
 instance ContainsHooks IfaceLoadEnv where
-  extractHooks = extractHooks . ifle_hsc_env
+  extractHooks = ifle_hooks
 
 instance ContainsLogger IfaceLoadEnv where
-  extractLogger = extractLogger . ifle_hsc_env
+  extractLogger = ifle_logger
 
 instance ContainsNameCache IfaceLoadEnv where
   extractNameCache = ifle_name_cache

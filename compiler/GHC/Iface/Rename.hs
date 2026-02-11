@@ -138,7 +138,6 @@ rnDepModules sel mods = do
     ifle <- getTopEnv
     hmap <- getHoleSubst
     let unit_state = ifle_unit_state ifle
-        hsc_env = ifle_hsc_env ifle
     -- NB: It's not necessary to test if we're doing signature renaming,
     -- because ModIface will never contain module reference for itself
     -- in these dependencies.
@@ -169,7 +168,7 @@ rnDepModules sel mods = do
         -- This mistake was bug #15594.
         let mod' = renameHoleModule unit_state hmap mod
         if isHoleModule mod
-          then do iface <- liftIO . initIfaceCheck (text "rnDepModule") hsc_env
+          then do iface <- liftIO . initIfaceCheckWithLoadEnv (text "rnDepModule") ifle
                                   $ loadSysInterface (text "rnDepModule") mod'
                   return (mod' : sel (mi_deps iface))
           else return [mod']
@@ -301,7 +300,6 @@ rnIfaceGlobal n = do
     ifle <- getTopEnv
     let unit_state = ifle_unit_state ifle
         home_unit  = ifle_home_unit ifle
-        hsc_env    = ifle_hsc_env ifle
     iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
     mb_nsubst <- fmap sh_if_shape getGblEnv
     hmap <- getHoleSubst
@@ -344,7 +342,7 @@ rnIfaceGlobal n = do
                         -- Pull out the local guy!!
                         then mkHomeModule home_unit (moduleName m')
                         else m'
-            iface <- liftIO . initIfaceCheck (text "rnIfaceGlobal") hsc_env
+            iface <- liftIO . initIfaceCheckWithLoadEnv (text "rnIfaceGlobal") ifle
                             $ loadSysInterface (text "rnIfaceGlobal") m''
             let nsubst = mkNameShape (moduleName m) (mi_exports iface)
             case maybeSubstNameShape nsubst n of
