@@ -474,14 +474,14 @@ leaving a simpler job for demand-analysis worker/wrapper.  See #19874.
 
 Wrinkles
 
-1. We must /not/ do cast w/w on
+(CWW1) We must /not/ do cast w/w on
      f = g |> co
    otherwise it'll just keep repeating forever! You might think this
    is avoided because the call to tryCastWorkerWrapper is guarded by
-   preInlineUnconditinally, but I'm worried that a loop-breaker or an
-   exported Id might say False to preInlineUnonditionally.
+   preInlineUnconditionally, but I'm worried that a loop-breaker or an
+   exported Id might say False to preInlineUnconditionally.
 
-2. We need to be careful with inline/noinline pragmas:
+(CWW2) We need to be careful with inline/noinline pragmas:
        rec { {-# NOINLINE f #-}
              f = (...g...) |> co
            ; g = ...f... }
@@ -496,15 +496,15 @@ Wrinkles
            f = $wf |> co
          ; g = ...f... }
    and that is bad: the whole point is that we want to inline that
-   cast!  We want to transfer the pagma to $wf:
+   cast!  We want to transfer the pragma to $wf:
       rec { {-# NOINLINE $wf #-}
             $wf = ...g...
           ; f = $wf |> co
           ; g = ...f... }
    c.f. Note [Worker/wrapper for NOINLINE functions] in GHC.Core.Opt.WorkWrap.
 
-3. We should still do cast w/w even if `f` is INLINEABLE.  E.g.
-      {- f: Stable unfolding = <stable-big> -}
+(CWW3) We should still do cast w/w even if `f` is INLINEABLE.  E.g.
+      {- f: Stable unfolding (arity 2) = <stable-big> -}
       f = (\xy. <big-body>) |> co
    Then we want to w/w to
       {- $wf: Stable unfolding = <stable-big> |> sym co -}
@@ -513,15 +513,43 @@ Wrinkles
    Notice that the stable unfolding moves to the worker!  Now demand analysis
    will work fine on $wf, whereas it has trouble with the original f.
    c.f. Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap.
-   This point also applies to strong loopbreakers with INLINE pragmas, see
-   wrinkle (4).
 
-4. We should /not/ do cast w/w for non-loop-breaker INLINE functions (hence
-   hasInlineUnfolding in tryCastWorkerWrapper, which responds False to
-   loop-breakers) because they'll definitely be inlined anyway, cast and
-   all. And if we do cast w/w for an INLINE function with arity zero, we get
+(CWW4) We should /not/ do cast w/w for INLINE functions (hence `hasInlineUnfolding`
+   in `tryCastWorkerWrapper`) because they'll definitely be inlined anyway, cast
+   and all.
+
+   Moreover, if we do cast w/w for an INLINE function with arity zero, we get
    something really silly: we inline that "worker" right back into the wrapper!
-   Worse than a no-op, because we have then lost the stable unfolding.
+   In fact it is Much Worse than a no-op, because we have then lost the stable
+   unfolding --- aargh (see #26903).  E.g. similar example to (CWW3)
+      {- g: Stable unfolding (arity 0) = <stable-big> -}   NB arity 0!
+      g = (\xy. <big-body>) |> co
+   If we w/w to this:
+      {- $wg: Stable unfolding (arity 0) = <stable-big> |> sym co -}
+      $wg = \xy. <big-body>
+      g = $wg |> co
+   then we'll inline $wg at the call site in `g` giving
+      {- $wg: Stable unfolding (arity 0) = <stable-big> |> sym co -}
+      $wg = \xy. <big-body>
+      g = (<stable-big> |> sym co) |> co
+   and now we'll drop `$wg` as dead and we have lost the unfolding on `g`.
+   (We could /also/ give the binding `g = $wf |> co` a stable unfolding. Then
+   things would work right; but there is also no point in doing the cast
+   worker/wrapper in the first place.)
+
+   NB: you might wonder about a loop-breaker with an INLINE pragma; after all, a
+   loop breaker won't "definitely be inlined anyway", so arguably we should not
+   disable cast w/w/ for it.  But a Rec group can /look/ recursive at an early
+   stage, and subsequently /become/ non-recursive after some simplification.
+   (This is common in instance decls; see Note [Checking for INLINE loop breakers]
+   in GHC.Core.Lint.)  So the danger is that we'll permanently lose that stable
+   unfolding that we specifically wanted (#26903).  Simple solution: disable cast
+   w/w for /any/ INLINE function.  See the defn
+   of `GHC.Types.Id.Info.hasInlineUnfolding`.
+
+   The danger is that an INLINE pragma on a genuninely-recursive function
+   will kill worker-wrapper.  Well, so be it.  They are pretty suspicious anyway;
+   see Note [Checking for INLINE loop breakers].
 
 All these wrinkles are exactly like worker/wrapper for strictness analysis:
   f is the wrapper and must inline like crazy
@@ -586,11 +614,11 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
   | BC_Let top_lvl is_rec <- bind_cxt  -- Not join points
   , not (isDFunId bndr) -- nor DFuns; cast w/w is no help, and we can't transform
                         --            a DFunUnfolding in mk_worker_unfolding
-  , not (exprIsTrivial rhs)        -- Not x = y |> co; Wrinkle 1
-  , not (hasInlineUnfolding info)  -- Not INLINE things: Wrinkle 4
-  , typeHasFixedRuntimeRep work_ty    -- Don't peel off a cast if doing so would
-                                      -- lose the underlying runtime representation.
-                                      -- See Note [Preserve RuntimeRep info in cast w/w]
+  , not (exprIsTrivial rhs)          -- Not x = y |> co; see (CWW1)
+  , not (hasInlineUnfolding info)    -- Not INLINE things: see (CWW4)
+  , typeHasFixedRuntimeRep work_ty   -- Don't peel off a cast if doing so would
+                                     -- lose the underlying runtime representation.
+                                     -- See Note [Preserve RuntimeRep info in cast w/w]
   , not (isOpaquePragma (idInlinePragma old_bndr)) -- Not for OPAQUE bindings
                                                    -- See Note [OPAQUE pragma]
   = do  { uniq <- getUniqueM
@@ -637,13 +665,13 @@ tryCastWorkerWrapper env bind_cxt old_bndr bndr (Cast rhs co)
                               `setArityInfo`      work_arity
            -- We do /not/ want to transfer OccInfo, Rules
            -- Note [Preserve strictness in cast w/w]
-           -- and Wrinkle 2 of Note [Cast worker/wrapper]
+           -- and (CWW2) of Note [Cast worker/wrapper]
 
     ----------- Worker unfolding -----------
     -- Stable case: if there is a stable unfolding we have to compose with (Sym co);
     --   the next round of simplification will do the job
     -- Non-stable case: use work_rhs
-    -- Wrinkle 3 of Note [Cast worker/wrapper]
+    -- See (CWW4) of Note [Cast worker/wrapper]
     mk_worker_unfolding top_lvl work_id work_rhs
       = case realUnfoldingInfo info of -- NB: the real one, even for loop-breakers
            unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })

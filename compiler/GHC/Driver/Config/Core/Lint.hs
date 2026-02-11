@@ -147,6 +147,12 @@ perPassFlags dflags pass
     check_lbs = case pass of
                       CoreDesugar    -> False
                       CoreDesugarOpt -> False
+
+                      -- Disable Lint warnings on the first simplifier pass, because
+                      -- there may be some INLINE knots still tied, which is tiresomely noisy
+                      CoreDoSimplify cfg
+                        | InitialPhase <- sm_phase (so_mode cfg)
+                        -> False
                       _              -> True
 
     -- See Note [Checking StaticPtrs]
