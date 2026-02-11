@@ -12,6 +12,7 @@ module GHC.Core.Opt.Simplify.Env (
 
         -- * Environments
         SimplEnv(..), StaticEnv, pprSimplEnv,
+        SimplPhase(..), isActive, simplStartPhase, simplEndPhase,
         seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
         seOptCoercionOpts, sePhase, sePlatform, sePreInline,

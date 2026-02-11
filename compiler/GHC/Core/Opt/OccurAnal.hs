@@ -36,7 +36,7 @@ import GHC.Prelude hiding ( head, init, last, tail )
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isExpandableApp,
-                          mkCastMCo, mkTicks, BinderSwapDecision(..), scrutOkForBinderSwap ) )
+                          mkCastMCo, mkTicks, BinderSwapDecision(..), scrutOkForBinderSwap )
 import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
 import GHC.Core.Type
@@ -2779,8 +2779,8 @@ occAnalApp !env (Var fun_id, [], ticks)
     !(fun', fun_id')  = lookupBndrSwap env fun_id
     !fun_uds = mkOneOcc env fun_id' int_cxt 0
     !int_cxt = case occ_encl env of
-                   OccScrut -> IsInteresting
-                   _other   -> NotInteresting
+                   OccBot -> IsInteresting
+                   _other -> NotInteresting
 
 occAnalApp env (Var fun, args, ticks)
   -- Account for join arity of runRW# continuation

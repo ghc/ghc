@@ -1574,13 +1574,16 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
   | otherwise                                = Nothing
   where
+    phase = sePhase env
+    not_final = simplEndPhase phase /= FinalPhase
+    pre_inline_unconditionally = sePreInline env
     unf = idUnfolding bndr
     extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br    = 1
                   , occ_in_lam  = NotInsideLam }
-        = isNotTopLevel top_lvl || sePhase env /= FinalPhase
+        = isNotTopLevel top_lvl || not_final
           -- Inline even top level things if not inside lambda
           -- Can reduce simplifier iterations, when something is later
           -- inlining and becomes dead
@@ -1598,7 +1601,6 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     one_occ _
       = False
 
-    pre_inline_unconditionally = sePreInline env
     active = isActive (sePhase env)
            $ inlinePragmaActivation inline_prag
              -- See Note [pre/postInlineUnconditionally in gentle mode]
