@@ -31,8 +31,8 @@
 #define __STDC_VERSION__ 0
 #endif
 
-#if !(__STDC_VERSION__ >= 199901L) && !(__cplusplus >= 201103L)
-# error __STDC_VERSION__ does not advertise C99, C++11 or later
+#if !(__STDC_VERSION__ >= 201112L) && !(__cplusplus >= 201103L)
+# error __STDC_VERSION__ does not advertise C11, C++11 or later
 #endif
 
 /*
@@ -48,10 +48,6 @@
  */
 #if !defined(IN_STG_CODE)
 # define IN_STG_CODE 1
-
-// Turn on C99 for .hc code.  This gives us the INFINITY and NAN
-// constants from math.h, which we occasionally need to use in .hc (#1861)
-# define _ISOC99_SOURCE
 
 // We need _BSD_SOURCE so that math.h defines things like gamma
 // on Linux

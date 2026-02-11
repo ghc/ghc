@@ -11,6 +11,7 @@ module GHC.Toolchain.Tools.Cc
     , compileC
     , compileAsm
     , addPlatformDepCcFlags
+    , checkC11Support
     ) where
 
 import Control.Monad
@@ -50,8 +51,12 @@ findCc archOs llvmTarget progOpt = do
     cc1 <- ignoreUnusedArgs cc0
     cc2 <- ccSupportsTarget archOs llvmTarget cc1
     checking "whether Cc works" $ checkCcWorks cc2
-    checkCcSupportsExtraViaCFlags cc2
-    return cc2
+    cc3 <- oneOf "cc doesn't support C11" $ map checkC11Support
+        [ cc2
+        , cc2 & _ccFlags %++ "-std=gnu11"
+        ]
+    checkCcSupportsExtraViaCFlags cc3
+    return cc3
 
 checkCcWorks :: Cc -> M ()
 checkCcWorks cc = withTempDir $ \dir -> do
@@ -82,6 +87,17 @@ ccSupportsTarget :: ArchOS -> String -> Cc -> M Cc
 ccSupportsTarget archOs target cc =
     checking "whether Cc supports --target" $
     supportsTarget archOs _ccProgram checkCcWorks target cc
+
+checkC11Support :: Cc -> M Cc
+checkC11Support cc = checking "for C11 support" $ withTempDir $ \dir -> do
+    let test_o = dir </> "test.o"
+    compileC cc test_o $ unlines
+        [ "#include <stdio.h>"
+        , "#if !defined __STDC_VERSION__ || __STDC_VERSION__ < 201112L"
+        , "# error \"Compiler does not advertise C11 conformance\""
+        , "#endif"
+        ]
+    return cc
 
 checkCcSupportsExtraViaCFlags :: Cc -> M ()
 checkCcSupportsExtraViaCFlags cc = checking "whether cc supports extra via-c flags" $ withTempDir $ \dir -> do

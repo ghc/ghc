@@ -56,6 +56,27 @@ else
   AC_MSG_RESULT([no])
 fi
 
+AC_MSG_CHECKING([the C-- preprocessor for C11 support])
+cat > conftest.c <<EOF
+#include <stdio.h>
+#if !defined __STDC_VERSION__ || __STDC_VERSION__ < 201112L
+# error "Compiler does not advertise C11 conformance"
+#endif
+EOF
+if "$CMM_CPP_CMD" $CMM_CPP_ARGS conftest.c -o conftest -g0 >/dev/null 2>&1; then
+  AC_MSG_RESULT([yes])
+else
+    # Try -std=gnu11
+    if "$CMM_CPP_CMD" -std=gnu11 $CMM_CPP_ARGS conftest.c -o conftest -g0 >/dev/null 2>&1; then
+      $3="-std=gnu11 $$3"
+      AC_MSG_RESULT([needs -std=gnu11])
+    else
+      AC_MSG_ERROR([C11-compatible compiler needed])
+    fi
+fi
+rm -f conftest.c conftest.o conftest
+
+
 $2="$CMM_CPP_CMD"
 $3="$$3 $CMM_CPP_ARGS"
 
