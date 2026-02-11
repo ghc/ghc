@@ -138,11 +138,11 @@ ifaceExportNames exports = return exports
 -- | Look up the 'Name' for a given 'Module' and 'OccName'.
 -- Consider alternatively using 'lookupIfaceTop' if you're in the 'IfL' monad
 -- and 'Module' is simply that of the 'ModIface' you are typechecking.
-lookupOrig :: Module -> OccName -> TcRnIf a b Name
+lookupOrig :: (ContainsLogger top, ContainsNameCache top) => Module -> OccName -> TcRnIfBase top a b Name
 lookupOrig mod occ = do
-  hsc_env <- getTopEnv
+  top_env <- getTopEnv
   traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
-  liftIO $ lookupNameCache (hsc_NC hsc_env) mod occ
+  liftIO $ lookupNameCache (extractNameCache top_env) mod occ
 
 lookupNameCache :: NameCache -> Module -> OccName -> IO Name
 -- Lookup up the (Module,OccName) in the NameCache

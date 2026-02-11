@@ -2446,14 +2446,12 @@ initIfaceTcRn thing_inside
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.
               is_instantiate = fromMaybe False (isHomeUnitInstantiating <$> mhome_unit)
-              !iface_load_env = mkIfaceLoadEnv hsc_env
         ; let { if_env = IfGblEnv {
                             if_doc = text "initIfaceTcRn",
                             if_rec_types =
                                 if is_instantiate
                                     then emptyKnotVars
-                                    else readTcRef <$> knot_vars,
-                            if_load_env = Just iface_load_env
+                                    else readTcRef <$> knot_vars
                             }
                          }
         ; setEnvsWithTop mkIfaceLoadEnv (if_env, ()) thing_inside }
@@ -2464,8 +2462,7 @@ initIfaceLoad :: HscEnv -> IfG a -> IO a
 initIfaceLoad hsc_env do_this
  = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceLoad",
-                        if_rec_types = emptyKnotVars,
-                        if_load_env = Just (mkIfaceLoadEnv hsc_env)
+                        if_rec_types = emptyKnotVars
                     }
       initTcRnIf IfaceTag (mkIfaceLoadEnv hsc_env) gbl_env () do_this
 
@@ -2476,8 +2473,7 @@ initIfaceLoadModule :: HscEnv -> Module -> IfG a -> IO a
 initIfaceLoadModule hsc_env this_mod do_this
  = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceLoadModule",
-                        if_rec_types = readTcRef <$> knotVarsWithout this_mod (hsc_type_env_vars hsc_env),
-                        if_load_env = Just (mkIfaceLoadEnv hsc_env)
+                        if_rec_types = readTcRef <$> knotVarsWithout this_mod (hsc_type_env_vars hsc_env)
                     }
       initTcRnIf IfaceTag (mkIfaceLoadEnv hsc_env) gbl_env () do_this
 
@@ -2491,8 +2487,7 @@ initIfaceCheckWithLoadEnv :: SDoc -> IfaceLoadEnv -> IfG a -> IO a
 initIfaceCheckWithLoadEnv doc ifle do_this
  = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceCheck" <+> doc,
-                        if_rec_types = readTcRef <$> ifle_type_env_vars ifle,
-                        if_load_env = Just ifle
+                        if_rec_types = readTcRef <$> ifle_type_env_vars ifle
                     }
       initTcRnIf IfaceTag ifle gbl_env () do_this
 
@@ -2511,12 +2506,7 @@ getIfModule :: IfL Module
 getIfModule = do { env <- getLclEnv; return (if_mod env) }
 
 getIfaceLoadEnv :: IfM lcl IfaceLoadEnv
-getIfaceLoadEnv = do
-    env <- getGblEnv
-    case if_load_env env of
-      Just load_env -> pure load_env
-      Nothing -> pprPanic "getIfaceLoadEnv"
-                        (text "No interface-loading environment in" <+> if_doc env)
+getIfaceLoadEnv = getTopEnv
 
 --------------------
 failIfM :: SDoc -> IfL a

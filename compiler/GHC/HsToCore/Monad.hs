@@ -389,8 +389,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
   -- See Note [Why is KnotVars not a ModuleEnv]
                              , if_rec_types = KnotVars [mod] (\that_mod -> if that_mod == mod || isInteractiveModule mod
                                                           then Just (return type_env)
-                                                          else Nothing)
-                             , if_load_env = Nothing }
+                                                          else Nothing) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
                              NotBoot
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
