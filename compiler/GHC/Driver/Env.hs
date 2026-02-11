@@ -144,6 +144,8 @@ mkIfaceLoadEnv hsc_env = IfaceLoadEnv
   , ifle_plugins         = hsc_plugins hsc_env
   , ifle_hsc_env         = hsc_env
   , ifle_name_cache      = hsc_NC hsc_env
+  , ifle_unit_state      = hsc_units hsc_env
+  , ifle_eps_cache       = ue_eps (hsc_unit_env hsc_env)
   , ifle_type_env_vars   = hsc_type_env_vars hsc_env
   , ifle_finder_env      = mkFinderEnv hsc_env
   }

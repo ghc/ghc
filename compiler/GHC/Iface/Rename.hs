@@ -135,8 +135,10 @@ rnDependencies deps0 = do
 
 rnDepModules :: (Dependencies -> [Module]) -> [Module] -> ShIfM [Module]
 rnDepModules sel mods = do
-    hsc_env <- getTopEnv
+    ifle <- getTopEnv
     hmap <- getHoleSubst
+    let unit_state = ifle_unit_state ifle
+        hsc_env = ifle_hsc_env ifle
     -- NB: It's not necessary to test if we're doing signature renaming,
     -- because ModIface will never contain module reference for itself
     -- in these dependencies.
@@ -165,7 +167,7 @@ rnDepModules sel mods = do
         -- not to do it in this case either...)
         --
         -- This mistake was bug #15594.
-        let mod' = renameHoleModule (hsc_units hsc_env) hmap mod
+        let mod' = renameHoleModule unit_state hmap mod
         if isHoleModule mod
           then do iface <- liftIO . initIfaceCheck (text "rnDepModule") hsc_env
                                   $ loadSysInterface (text "rnDepModule") mod'
@@ -195,7 +197,7 @@ initRnIface hsc_env iface insts nsubst do_this = do
             sh_if_errs = errs_var
         }
     -- Modeled off of 'initTc'
-    res <- initTcRnIf RnIfaceTag hsc_env env () $ tryM do_this
+    res <- initTcRnIf RnIfaceTag (mkIfaceLoadEnv hsc_env) env () $ tryM do_this
     msgs <- readIORef errs_var
     case res of
         Left _                               -> return (Left msgs)
@@ -225,14 +227,14 @@ data ShIfEnv = ShIfEnv {
 getHoleSubst :: ShIfM ShHoleSubst
 getHoleSubst = fmap sh_if_hole_subst getGblEnv
 
-type ShIfM = TcRnIf ShIfEnv ()
+type ShIfM = TcRnIfBase IfaceLoadEnv ShIfEnv ()
 type Rename a = a -> ShIfM a
 
 
 rnModule :: Rename Module
 rnModule mod = do
     hmap <- getHoleSubst
-    unit_state <- hsc_units <$> getTopEnv
+    unit_state <- ifle_unit_state <$> getTopEnv
     return (renameHoleModule unit_state hmap mod)
 
 rnAvailInfo :: Rename AvailInfo
@@ -296,9 +298,10 @@ rnFieldLabel fl = do
 -- be updated to account for the hole module renaming.)
 rnIfaceGlobal :: Name -> ShIfM Name
 rnIfaceGlobal n = do
-    hsc_env <- getTopEnv
-    let unit_state = hsc_units hsc_env
-        home_unit  = hsc_home_unit hsc_env
+    ifle <- getTopEnv
+    let unit_state = ifle_unit_state ifle
+        home_unit  = ifle_home_unit ifle
+        hsc_env    = ifle_hsc_env ifle
     iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
     mb_nsubst <- fmap sh_if_shape getGblEnv
     hmap <- getHoleSubst
@@ -355,7 +358,7 @@ rnIfaceGlobal n = do
 rnIfaceNeverExported :: Name -> ShIfM Name
 rnIfaceNeverExported name = do
     hmap <- getHoleSubst
-    unit_state <- hsc_units <$> getTopEnv
+    unit_state <- ifle_unit_state <$> getTopEnv
     iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
     let m = renameHoleModule unit_state hmap $ nameModule name
     -- Doublecheck that this DFun/coercion axiom was, indeed, locally defined.

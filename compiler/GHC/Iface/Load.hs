@@ -901,7 +901,7 @@ findAndReadIface
   -> IO (MaybeErr MissingInterfaceError (ModIface, ModLocation))
 findAndReadIface load_env doc_str mod wanted_mod hi_boot_file = do
   let finder_env = ifle_finder_env load_env
-      unit_state = finder_unit_state finder_env
+      unit_state = ifle_unit_state load_env
       mhome_unit = finder_home_unit finder_env
       unit_env   = finder_unit_env finder_env
       dflags     = ifle_dflags load_env

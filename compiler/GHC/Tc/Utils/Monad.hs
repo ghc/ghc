@@ -686,8 +686,7 @@ getEps = do { env <- getTopEnv; liftIO $ hscEPS env }
 getEpsIf :: IfM lcl ExternalPackageState
 getEpsIf = do
   iface <- getTopEnv
-  let hsc_env = ifle_hsc_env iface
-  liftIO $ hscEPS hsc_env
+  liftIO $ eucEPS (ifle_eps_cache iface)
 
 -- | Update the external package state.  Returns the second result of the
 -- modifier function.
@@ -705,7 +704,7 @@ updateEpsIf :: (ExternalPackageState -> (ExternalPackageState, a))
             -> IfM lcl a
 updateEpsIf upd_fn = do
   top <- getTopEnv
-  let eps_var = euc_eps (ue_eps (hsc_unit_env (ifle_hsc_env top)))
+  let ExternalUnitCache{euc_eps = eps_var} = ifle_eps_cache top
   atomicUpdMutVar' eps_var upd_fn
 
 -- | Update the external package state.

@@ -22,6 +22,7 @@ import GHC.Types.Target
 import GHC.Types.TypeEnv
 import GHC.Unit.Finder.Types (FinderCache, FinderOpts)
 import GHC.Unit.Env
+import GHC.Unit.External (ExternalUnitCache)
 import GHC.Unit.State (UnitState)
 import GHC.Unit.Home
 import GHC.Unit.Home.Graph (UnitEnvGraph)
@@ -149,6 +150,8 @@ data IfaceLoadEnv = IfaceLoadEnv
   , ifle_plugins         :: !Plugins
   , ifle_hsc_env         :: !HscEnv
   , ifle_name_cache      :: !NameCache
+  , ifle_unit_state      :: !UnitState
+  , ifle_eps_cache       :: !ExternalUnitCache
   , ifle_type_env_vars   :: !(KnotVars (IORef TypeEnv))
   , ifle_finder_env      :: !FinderEnv
   }
