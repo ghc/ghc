@@ -56,11 +56,11 @@
                       ReaderT r (ST s) (a -> b) -> ReaderT r (ST s) a -> r -> ST s b))
 "SPEC $c>> @(ST s) @_"
     forall (@s) (@r) ($dMonad :: Monad (ST s)).
-      $fMonadReaderT1 @(ST s) @r $dMonad
+      $fMonadReaderT_$c>> @(ST s) @r $dMonad
       = $fMonadAbstractIOSTReaderT_$s$c>> @s @r
 "SPEC $c>>= @(ST s) @_"
     forall (@s) (@r) ($dMonad :: Monad (ST s)).
-      $fMonadReaderT2 @(ST s) @r $dMonad
+      $fMonadReaderT1 @(ST s) @r $dMonad
       = ($fMonadAbstractIOSTReaderT2 @s @r)
         `cast` (forall (a ::~ <*>_N) (b ::~ <*>_N).
                 <ReaderT r (ST s) a>_R

@@ -179,8 +179,9 @@ several liked-named Ids bouncing around at the same time---absolute
 mischief.)
 
 Notice that we refrain from w/w'ing an INLINE function even if it is
-in a recursive group.  It might not be the loop breaker.  (We could
-test for loop-breaker-hood, but I'm not sure that ever matters.)
+in a recursive group.  It might not be the loop breaker.  (We used to
+test for loop-breaker-hood, but see (CWW4) in Note [Cast worker/wrapper]
+in GHC.Core.Opt.Simplify.Iteration.)
 
 Note [Worker/wrapper for INLINABLE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

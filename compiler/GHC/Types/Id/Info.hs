@@ -610,7 +610,12 @@ hasInlineUnfolding :: IdInfo -> Bool
 -- ^ True of a /non-loop-breaker/ Id that has a /stable/ unfolding that is
 --   (a) always inlined; that is, with an `UnfWhen` guidance, or
 --   (b) a DFunUnfolding which never needs to be inlined
-hasInlineUnfolding info = isInlineUnfolding (unfoldingInfo info)
+--
+-- Very important that this work with `realUnfoldingInfo` and so returns
+-- True even for a loop-breaker that has an INLINE pragma.
+-- See (CWW4) in Note [Cast worker/wrapper] in GHC.Core.Opt.Simplify.Iteration
+-- for discussion, and #26903 for the dire consequences of getting this wrong.
+hasInlineUnfolding info = isInlineUnfolding (realUnfoldingInfo info)
 
 setArityInfo :: IdInfo -> ArityInfo -> IdInfo
 setArityInfo info ar =

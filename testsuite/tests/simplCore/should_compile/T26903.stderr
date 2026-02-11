@@ -1,0 +1,52 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 127, types: 130, coercions: 48, joins: 0/0}
+
+$dmop
+  = (\ @a _ $dOrd xs ys ->
+       case $fOrdList_$ccompare $dOrd xs ys of {
+         __DEFAULT ->
+           reverse1 (reverse1 (reverse1 (reverse1 (++ xs ys) []) []) []) [];
+         GT -> reverse1 (reverse1 (reverse1 (reverse xs) []) []) []
+       })
+    `cast` <Co:20> :: ...
+
+$fCInt_$cop
+  = (\ xs ys ->
+       case $fOrdList_$s$ccompare xs ys of {
+         __DEFAULT ->
+           reverse1 (reverse1 (reverse1 (reverse1 (++ xs ys) []) []) []) [];
+         GT -> reverse1 (reverse1 (reverse1 (reverse xs) []) []) []
+       })
+    `cast` <Co:11> :: ...
+
+$fCInt1
+  = \ xs ys ->
+      case $fOrdList_$s$ccompare xs ys of {
+        __DEFAULT ->
+          reverse1 (reverse1 (reverse1 (reverse1 (++ xs ys) []) []) []) [];
+        GT -> reverse1 (reverse1 (reverse1 (reverse xs) []) []) []
+      }
+
+$fCInt = C:C ($fCInt1 `cast` <Co:11> :: ...)
+
+test4 = reverse1 [] []
+
+test3 = reverse1 test4 []
+
+test2 = reverse1 test3 []
+
+test1 = reverse1 test2 []
+
+test
+  = \ xs ->
+      case $fOrdList_$s$ccompare [] xs of {
+        __DEFAULT ->
+          (reverse1 (reverse1 (reverse1 (reverse1 (++ [] xs) []) []) []) [])
+          `cast` <Co:3> :: ...;
+        GT -> test1 `cast` <Co:3> :: ...
+      }
+
+
+

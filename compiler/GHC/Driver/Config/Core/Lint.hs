@@ -132,8 +132,6 @@ perPassFlags dflags pass
                       -- there may be some INLINE knots still tied, which is tiresomely noisy
                       CoreDoSimplify cfg
                         | SimplPhase InitialPhase <- sm_phase (so_mode cfg)
-                        -> True
-                        | otherwise
                         -> False
                       _              -> True
 
