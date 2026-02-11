@@ -691,6 +691,7 @@ dontLeakTheHUG thing_inside = do
           | isOneShot (ghcMode dflags') = False
           | module_graph_has_holes = True
           | otherwise = False
+        allowHomeLookups = isOneShot (ghcMode dflags')
       in do
         let new_scope
               | keepFor20509 = current_scope
@@ -716,20 +717,28 @@ dontLeakTheHUG thing_inside = do
                 , ifle_load_scope = scope
                 , ifle_module_graph_has_holes = module_graph_has_holes
                 }
-            stripFinderEnv :: FinderEnv a -> FinderEnv External
-            stripFinderEnv fe =
+            stripFinderEnv :: FinderEnv Home -> FinderEnv External
+            stripFinderEnv FinderEnv
+              { finder_cache = cache
+              , finder_opts = opts
+              , finder_unit_state = unit_state_ext
+              , finder_scope = FinderScopeHome { finder_scope_home_unit = home_unit_ext }
+              } =
               FinderEnv
-                { finder_cache = finder_cache fe
-                , finder_opts = finder_opts fe
-                , finder_unit_state = finder_unit_state fe
+                { finder_cache = cache
+                , finder_opts = opts
+                , finder_unit_state = unit_state_ext
                 , finder_scope = FinderScopeExternalOnly
+                    { finder_scope_external_home_unit =
+                        if allowHomeLookups then home_unit_ext else Nothing
+                    }
                 }
         pure $
           case finder_env of
             fe@(FinderEnv { finder_scope = FinderScopeHome{} })
               | keepFor20509 -> rebuild fe new_scope
               | otherwise -> rebuild (stripFinderEnv fe) new_scope
-            fe@(FinderEnv { finder_scope = FinderScopeExternalOnly }) ->
+            fe@(FinderEnv { finder_scope = FinderScopeExternalOnly{} }) ->
               rebuild fe new_scope
 
   updTopEnvIO cleanTopEnv $ updGblEnv cleanGblEnv $ do

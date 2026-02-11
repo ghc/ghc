@@ -78,6 +78,9 @@ import qualified Data.List.NonEmpty as NE
 type FileExt = OsString -- Filename extension
 type BaseName = OsPath  -- Basename of file
 
+emptyFinderOtherOpts :: UnitEnvGraph (UnitState, FinderOpts)
+emptyFinderOtherOpts = HUG.unitEnv_new M.empty
+
 -- -----------------------------------------------------------------------------
 -- The Finder
 
@@ -180,7 +183,9 @@ findImportedModule finder_env mod pkg_qual =
   let FinderEnv { finder_cache = fc
                 , finder_opts = fopts
                 , finder_unit_state = unit_state
-                , finder_scope = FinderScopeHome home_unit other_opts
+                , finder_scope = FinderScopeHome { finder_scope_home_unit = home_unit
+                                                 , finder_scope_other_opts = other_opts
+                                                 }
                 } = finder_env
   in findImportedModuleNoHsc fc fopts other_opts unit_state home_unit mod pkg_qual
 
@@ -304,8 +309,14 @@ findExactModule finder_env mod is_boot =
                        , finder_scope_other_opts = other_fopts
                        } ->
          findExactModuleNoHsc fc fopts other_fopts unit_state home_unit mod is_boot
-       FinderScopeExternalOnly ->
-         findPackageModule fc unit_state fopts mod
+       FinderScopeExternalOnly
+         { finder_scope_external_home_unit = home_unit_external
+         } ->
+           case home_unit_external of
+             Just hu ->
+               findExactModuleNoHsc fc fopts emptyFinderOtherOpts unit_state (Just hu) mod is_boot
+             Nothing ->
+               findPackageModule fc unit_state fopts mod
 
 
 -- -----------------------------------------------------------------------------

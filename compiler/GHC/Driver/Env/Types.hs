@@ -143,7 +143,9 @@ data FinderScope (a :: HomeOrExternal) where
       { finder_scope_home_unit  :: !(Maybe HomeUnit)
       , finder_scope_other_opts :: !(UnitEnvGraph (UnitState, FinderOpts))
       } -> FinderScope Home
-  FinderScopeExternalOnly :: FinderScope External
+  FinderScopeExternalOnly ::
+       { finder_scope_external_home_unit :: !(Maybe HomeUnit)
+       } -> FinderScope External
 
 data FinderEnv a = FinderEnv
   { finder_cache      :: !FinderCache
