@@ -157,7 +157,6 @@ data IfaceLoadEnv = IfaceLoadEnv
   , ifle_dflags          :: !DynFlags
   , ifle_all_home_unit_ids :: !(Set.Set UnitId)
   , ifle_plugins         :: !Plugins
-  , ifle_hsc_env         :: !HscEnv
   , ifle_hooks           :: !Hooks
   , ifle_logger          :: !Logger
   , ifle_name_cache      :: !NameCache

@@ -666,17 +666,16 @@ dontLeakTheHUG thing_inside = do
       | inOneShot = gbl_env
       | otherwise = gbl_env { if_rec_types = emptyKnotVars }
     cleanTopEnv env =
-
       let
-        hsc_env = ifle_hsc_env env
-        old_unit_env = hsc_unit_env hsc_env
+        finder_env = ifle_finder_env env
+        old_unit_env = finder_unit_env finder_env
         keepFor20509
          -- Wrinkle: when typechecking in --backpack mode, instantiations might
          -- rely on the HPT. Preserve access to it if the module graph
          -- currently tracks holes (see #20509).
           -- oneshot mode does not support backpack
           -- and we want to avoid prodding the hsc_mod_graph thunk
-          | isOneShot (ghcMode (hsc_dflags hsc_env)) = False
+          | isOneShot (ghcMode (ifle_dflags env)) = False
           | mgHasHoles (ue_module_graph old_unit_env) = True
           | otherwise = False
       in do

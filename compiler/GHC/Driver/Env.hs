@@ -148,7 +148,6 @@ mkIfaceLoadEnv hsc_env = IfaceLoadEnv
   , ifle_dflags          = hsc_dflags hsc_env
   , ifle_all_home_unit_ids = hsc_all_home_unit_ids hsc_env
   , ifle_plugins         = hsc_plugins hsc_env
-  , ifle_hsc_env         = hsc_env
   , ifle_hooks           = hsc_hooks hsc_env
   , ifle_logger          = hsc_logger hsc_env
   , ifle_name_cache      = hsc_NC hsc_env
