@@ -37,6 +37,7 @@ module GHC.Driver.Env
    , lookupTypeWithEnv
    , mkLookupTypeEnvForIface
    , lookupTypeInPTEWithEnv
+   , IfaceLoadScope(..)
    , lookupIfaceByModule
    , lookupIfaceByModuleHsc
    , mainModIs
@@ -59,7 +60,7 @@ import GHC.Driver.Errors.Types ( GhcMessage )
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Diagnostic (initDiagOpts, initPrintConfig)
 import GHC.Driver.Config.Finder (initFinderOpts)
-import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..), HasHscEnv (..), FinderEnv(..), IfaceLoadEnv(..) )
+import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..), HasHscEnv (..), FinderEnv(..), IfaceLoadEnv(..), IfaceLoadScope(..) )
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
@@ -155,7 +156,7 @@ mkIfaceLoadEnv hsc_env = IfaceLoadEnv
   , ifle_eps_cache       = ue_eps (hsc_unit_env hsc_env)
   , ifle_type_env_vars   = hsc_type_env_vars hsc_env
   , ifle_finder_env      = mkFinderEnv hsc_env
-  , ifle_hug             = hsc_HUG hsc_env
+  , ifle_load_scope      = IfaceLoadScopeHome (hsc_HUG hsc_env)
   }
 
 hsc_home_unit :: HscEnv -> HomeUnit
@@ -407,16 +408,18 @@ mkLookupTypeEnv hsc_env pte
       }
 
 mkLookupTypeEnvForIface :: IfaceLoadEnv -> LookupTypeEnv
-mkLookupTypeEnvForIface ifle
-  | isOneShot (ghcMode (ifle_dflags ifle)) =
+mkLookupTypeEnvForIface ifle =
+  case ifle_load_scope ifle of
+    IfaceLoadScopeHome hug
+      | not (isOneShot (ghcMode (ifle_dflags ifle))) ->
+          LookupTypeEnvMake
+            { lte_home_unit = ifle_home_unit ifle
+            , lte_hug = hug
+            , lte_get_pte = eps_PTE <$> eucEPS (ifle_eps_cache ifle)
+            }
+    _ ->
       LookupTypeEnvOneShot
         { lte_home_unit = ifle_home_unit ifle
-        , lte_get_pte = eps_PTE <$> eucEPS (ifle_eps_cache ifle)
-        }
-  | otherwise =
-      LookupTypeEnvMake
-        { lte_home_unit = ifle_home_unit ifle
-        , lte_hug = ifle_hug ifle
         , lte_get_pte = eps_PTE <$> eucEPS (ifle_eps_cache ifle)
         }
 
@@ -445,14 +448,17 @@ lookupTypeInPTEWithEnv env name =
 -- | Find the 'ModIface' for a 'Module', searching in both the loaded home
 -- and external package module information
 lookupIfaceByModule
-        :: HomeUnitGraph
+        :: IfaceLoadScope
         -> PackageIfaceTable
         -> Module
         -> IO (Maybe ModIface)
-lookupIfaceByModule hug pit mod
-  = HUG.lookupHugByModule mod hug >>= pure . \case
-       Just hm -> Just (hm_iface hm)
-       Nothing -> lookupModuleEnv pit mod
+lookupIfaceByModule cache pit mod = case cache of
+  IfaceLoadScopeHome hug ->
+    HUG.lookupHugByModule mod hug >>= pure . \case
+      Just hm -> Just (hm_iface hm)
+      Nothing -> lookupModuleEnv pit mod
+  IfaceLoadScopeExternalOnly ->
+    pure (lookupModuleEnv pit mod)
    -- If the module does come from the home package, why do we look in the PIT as well?
    -- (a) In OneShot mode, even home-package modules accumulate in the PIT
    -- (b) Even in Batch (--make) mode, there is *one* case where a home-package
@@ -463,7 +469,7 @@ lookupIfaceByModule hug pit mod
 lookupIfaceByModuleHsc :: HscEnv -> Module -> IO (Maybe ModIface)
 lookupIfaceByModuleHsc hsc_env mod = do
   eps <- hscEPS hsc_env
-  lookupIfaceByModule (hsc_HUG hsc_env) (eps_PIT eps) mod
+  lookupIfaceByModule (IfaceLoadScopeHome (hsc_HUG hsc_env)) (eps_PIT eps) mod
 
 mainModIs :: HomeUnitEnv -> Module
 mainModIs hue = mkHomeModule (expectJust $ homeUnitEnv_home_unit hue) (mainModuleNameIs (homeUnitEnv_dflags hue))

@@ -209,7 +209,7 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
         Nothing ->  do
           -- This should only happen for home package things but oneshot puts
           -- home package ifaces in the PIT.
-          miface <- lookupIfaceByModule hug pit m
+          miface <- lookupIfaceByModule (IfaceLoadScopeHome hug) pit m
           case miface of
             Nothing -> pprPanic "linkableToUsage" (ppr m)
             Just iface ->

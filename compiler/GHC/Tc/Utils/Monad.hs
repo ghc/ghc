@@ -721,11 +721,15 @@ getEpsAndHug :: TcRnIf gbl lcl (ExternalPackageState, HomeUnitGraph)
 getEpsAndHug = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
                   ; return (eps, hsc_HUG env) }
 
-getEpsAndHugIf :: IfM lcl (ExternalPackageState, HomeUnitGraph)
+-- | Like 'getEpsAndHug', but for interface loading we may be running in
+-- an "external-only" mode where @IfaceLoadEnv@ intentionally carries no
+-- @HomeUnitGraph@ (see 'dontLeakTheHUG'). In that case the caller must
+-- treat the result as having no access to home-package modules.
+getEpsAndHugIf :: IfM lcl (ExternalPackageState, IfaceLoadScope)
 getEpsAndHugIf = do
   iface <- getTopEnv
   eps <- liftIO $ eucEPS (ifle_eps_cache iface)
-  return (eps, ifle_hug iface)
+  return (eps, ifle_load_scope iface)
 
 -- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
 -- an exception if it is an error.

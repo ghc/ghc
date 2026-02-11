@@ -6,6 +6,7 @@ module GHC.Driver.Env.Types
   , HasHscEnv(..)
   , FinderEnv(..)
   , IfaceLoadEnv(..)
+  , IfaceLoadScope(..)
   ) where
 
 import GHC.Driver.Errors.Types ( GhcMessage )
@@ -27,6 +28,7 @@ import GHC.Unit.State (UnitState)
 import GHC.Unit.Home
 import GHC.Unit.Home.Graph (UnitEnvGraph)
 import GHC.Unit.Types (UnitId)
+import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import {-# SOURCE #-} GHC.Driver.Plugins
@@ -142,6 +144,13 @@ data FinderEnv = FinderEnv
   , finder_home_unit   :: !(Maybe HomeUnit)
   }
 
+-- | Describes whether interface loading is allowed to consult the
+-- home-package table (HPT) or if we're in an external-only mode (see
+-- 'dontLeakTheHUG').
+data IfaceLoadScope
+  = IfaceLoadScopeHome !HomeUnitGraph
+  | IfaceLoadScopeExternalOnly
+
 data IfaceLoadEnv = IfaceLoadEnv
   { ifle_home_unit       :: !HomeUnit
   , ifle_home_unit_maybe :: !(Maybe HomeUnit)
@@ -156,7 +165,7 @@ data IfaceLoadEnv = IfaceLoadEnv
   , ifle_eps_cache       :: !ExternalUnitCache
   , ifle_type_env_vars   :: !(KnotVars (IORef TypeEnv))
   , ifle_finder_env      :: !FinderEnv
-  , ifle_hug             :: !HomeUnitGraph
+  , ifle_load_scope      :: !IfaceLoadScope
   }
 
 instance ContainsDynFlags IfaceLoadEnv where

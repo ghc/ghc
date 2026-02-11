@@ -294,7 +294,7 @@ checkFamInstConsistency directlyImpMods
        ; let { -- Fetch the iface of a given module.  Must succeed as
                -- all directly imported modules must already have been loaded.
                modIface mod = liftIO $
-                 lookupIfaceByModule hug (eps_PIT eps) mod >>= \case
+                 lookupIfaceByModule (IfaceLoadScopeHome hug) (eps_PIT eps) mod >>= \case
                    Nothing    -> panicDoc "FamInst.checkFamInstConsistency"
                                           (ppr mod $$ ppr (HUG.allUnits hug))
                    Just iface -> pure iface
