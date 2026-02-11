@@ -104,7 +104,6 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 import GHC.Unit.State
 import GHC.Unit.Finder
-import GHC.Unit.Env
 import GHC.Unit.Home
 
 import GHC.Data.Maybe
@@ -116,7 +115,6 @@ import System.Directory
 import GHC.Driver.Env.KnotVars
 import GHC.Iface.Errors.Types
 import Data.Function ((&))
-import GHC.Unit.Module.Graph
 import qualified GHC.Unit.Home.Graph as HUG
 
 {-
@@ -667,8 +665,6 @@ dontLeakTheHUG thing_inside = do
       | otherwise = gbl_env { if_rec_types = emptyKnotVars }
     cleanTopEnv env =
       let
-        finder_env = ifle_finder_env env
-        old_unit_env = finder_unit_env finder_env
         keepFor20509
          -- Wrinkle: when typechecking in --backpack mode, instantiations might
          -- rely on the HPT. Preserve access to it if the module graph
@@ -676,14 +672,15 @@ dontLeakTheHUG thing_inside = do
           -- oneshot mode does not support backpack
           -- and we want to avoid prodding the hsc_mod_graph thunk
           | isOneShot (ghcMode (ifle_dflags env)) = False
-          | mgHasHoles (ue_module_graph old_unit_env) = True
+          | ifle_module_graph_has_holes env = True
           | otherwise = False
       in do
         let new_scope
-              | keepFor20509
-              = IfaceLoadScopeHome (ue_home_unit_graph old_unit_env)
-              | otherwise
-              = IfaceLoadScopeExternalOnly
+              | keepFor20509 = ifle_load_scope env
+              | otherwise =
+                  case ifle_load_scope env of
+                    IfaceLoadScopeHome{} -> IfaceLoadScopeExternalOnly
+                    scope -> scope
         pure $
           env { ifle_load_scope = new_scope }
 
@@ -879,13 +876,15 @@ findAndReadIface load_env doc_str mod wanted_mod hi_boot_file = do
   let finder_env = ifle_finder_env load_env
       unit_state = ifle_unit_state load_env
       mhome_unit = finder_home_unit finder_env
-      unit_env   = finder_unit_env finder_env
       dflags     = ifle_dflags load_env
       profile    = targetProfile dflags
       logger     = extractLogger load_env
       hooks      = extractHooks load_env
       name_cache = extractNameCache load_env
-      hug        = ue_home_unit_graph unit_env
+      scope      = ifle_load_scope load_env
+      hug        = case scope of
+                    IfaceLoadScopeHome h -> Just h
+                    IfaceLoadScopeExternalOnly -> Nothing
 
 
   trace_if logger (sep [hsep [text "Reading",
@@ -901,7 +900,7 @@ findAndReadIface load_env doc_str mod wanted_mod hi_boot_file = do
   case mb_found of
       InstalledFound loc -> do
           -- See Note [Home module load error]
-          if HUG.memberHugUnitId (moduleUnit mod) hug
+          if maybe False (HUG.memberHugUnitId (moduleUnit mod)) hug
               && not (isOneShot (ghcMode dflags))
             then return (Failed (HomeModError mod loc))
             else do

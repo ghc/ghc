@@ -28,7 +28,6 @@ import GHC.Unit.State (UnitState)
 import GHC.Unit.Home
 import GHC.Unit.Home.Graph (UnitEnvGraph)
 import GHC.Unit.Types (UnitId)
-import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import {-# SOURCE #-} GHC.Driver.Plugins
@@ -138,9 +137,9 @@ data HscEnv
 data FinderEnv = FinderEnv
   { finder_cache       :: !FinderCache
   , finder_opts        :: !FinderOpts
-  , finder_other_opts  :: !(UnitEnvGraph FinderOpts)
+  , finder_other_opts  :: !(UnitEnvGraph (UnitState, FinderOpts))
   , finder_unit_state  :: !UnitState
-  , finder_unit_env    :: !UnitEnv
+--  , finder_unit_env    :: !UnitEnv
   , finder_home_unit   :: !(Maybe HomeUnit)
   }
 
@@ -165,6 +164,7 @@ data IfaceLoadEnv = IfaceLoadEnv
   , ifle_type_env_vars   :: !(KnotVars (IORef TypeEnv))
   , ifle_finder_env      :: !FinderEnv
   , ifle_load_scope      :: !IfaceLoadScope
+  , ifle_module_graph_has_holes :: !Bool
   }
 
 instance ContainsDynFlags IfaceLoadEnv where

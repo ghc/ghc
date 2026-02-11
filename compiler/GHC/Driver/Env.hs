@@ -130,9 +130,10 @@ mkFinderEnv :: HscEnv -> FinderEnv
 mkFinderEnv hsc_env = FinderEnv
   { finder_cache      = hsc_FC hsc_env
   , finder_opts       = initFinderOpts (hsc_dflags hsc_env)
-  , finder_other_opts = mapUnitEnvGraph (initFinderOpts . HUG.homeUnitEnv_dflags) (hsc_HUG hsc_env)
+  , finder_other_opts = mapUnitEnvGraph
+      (\hue -> (HUG.homeUnitEnv_units hue, initFinderOpts (HUG.homeUnitEnv_dflags hue)))
+      (hsc_HUG hsc_env)
   , finder_unit_state = hsc_units hsc_env
-  , finder_unit_env   = hsc_unit_env hsc_env
   , finder_home_unit  = hsc_home_unit_maybe hsc_env
   }
   where
@@ -156,6 +157,7 @@ mkIfaceLoadEnv hsc_env = IfaceLoadEnv
   , ifle_type_env_vars   = hsc_type_env_vars hsc_env
   , ifle_finder_env      = mkFinderEnv hsc_env
   , ifle_load_scope      = IfaceLoadScopeHome (hsc_HUG hsc_env)
+  , ifle_module_graph_has_holes = mgHasHoles (hsc_mod_graph hsc_env)
   }
 
 hsc_home_unit :: HscEnv -> HomeUnit
