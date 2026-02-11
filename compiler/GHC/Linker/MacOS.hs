@@ -19,9 +19,9 @@ import GHC.SysTools.Tasks
 
 import GHC.Runtime.Interpreter
 
+import GHC.Utils.CliOption
 import GHC.Utils.Exception
 import GHC.Utils.Logger
-import GHC.Driver.Session
 
 import Data.List (isPrefixOf, nub, sort, intersperse, intercalate)
 import Data.Char
