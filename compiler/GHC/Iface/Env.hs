@@ -254,7 +254,9 @@ extendIfaceEnvs tcvs thing_inside
 -- | Look up a top-level name from the current Iface module
 lookupIfaceTop :: OccName -> IfL Name
 lookupIfaceTop occ
-  = do  { top_env <- getTopEnv; env <- getLclEnv; liftIO $ lookupNameCache (hsc_NC (ifle_hsc_env top_env)) (if_mod env) occ }
+  = do  { top_env <- getTopEnv
+        ; env <- getLclEnv
+        ; liftIO $ lookupNameCache (ifle_name_cache top_env) (if_mod env) occ }
 
 newIfaceName :: OccName -> IfL Name
 newIfaceName occ
