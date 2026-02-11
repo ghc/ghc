@@ -48,6 +48,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
    , tcIfaceAnnotations, tcIfaceCompleteMatches, tcIfaceDefaults)
 
 import GHC.Driver.Env
+import GHC.Driver.Env.Types (HomeOrExternal(..))
 import GHC.Driver.Errors.Types
 import GHC.Driver.DynFlags
 import GHC.Driver.Hooks
@@ -663,7 +664,23 @@ dontLeakTheHUG thing_inside = do
     cleanGblEnv gbl_env
       | inOneShot = gbl_env
       | otherwise = gbl_env { if_rec_types = emptyKnotVars }
-    cleanTopEnv env =
+    cleanTopEnv :: IfaceLoadEnv -> IO IfaceLoadEnv
+    cleanTopEnv IfaceLoadEnv
+      { ifle_home_unit = home_unit
+      , ifle_home_unit_maybe = home_unit_maybe
+      , ifle_dflags = dflags'
+      , ifle_all_home_unit_ids = all_home_unit_ids
+      , ifle_plugins = plugins
+      , ifle_hooks = hooks
+      , ifle_logger = logger'
+      , ifle_name_cache = name_cache'
+      , ifle_unit_state = unit_state'
+      , ifle_eps_cache = eps_cache
+      , ifle_type_env_vars = type_env_vars
+      , ifle_finder_env = finder_env
+      , ifle_load_scope = current_scope
+      , ifle_module_graph_has_holes = module_graph_has_holes
+      } =
       let
         keepFor20509
          -- Wrinkle: when typechecking in --backpack mode, instantiations might
@@ -671,18 +688,49 @@ dontLeakTheHUG thing_inside = do
          -- currently tracks holes (see #20509).
           -- oneshot mode does not support backpack
           -- and we want to avoid prodding the hsc_mod_graph thunk
-          | isOneShot (ghcMode (ifle_dflags env)) = False
-          | ifle_module_graph_has_holes env = True
+          | isOneShot (ghcMode dflags') = False
+          | module_graph_has_holes = True
           | otherwise = False
       in do
         let new_scope
-              | keepFor20509 = ifle_load_scope env
+              | keepFor20509 = current_scope
               | otherwise =
-                  case ifle_load_scope env of
+                  case current_scope of
                     IfaceLoadScopeHome{} -> IfaceLoadScopeExternalOnly
                     scope -> scope
+            rebuild :: forall b. FinderEnv b -> IfaceLoadScope -> IfaceLoadEnv
+            rebuild finder scope =
+              IfaceLoadEnv
+                { ifle_home_unit = home_unit
+                , ifle_home_unit_maybe = home_unit_maybe
+                , ifle_dflags = dflags'
+                , ifle_all_home_unit_ids = all_home_unit_ids
+                , ifle_plugins = plugins
+                , ifle_hooks = hooks
+                , ifle_logger = logger'
+                , ifle_name_cache = name_cache'
+                , ifle_unit_state = unit_state'
+                , ifle_eps_cache = eps_cache
+                , ifle_type_env_vars = type_env_vars
+                , ifle_finder_env = finder
+                , ifle_load_scope = scope
+                , ifle_module_graph_has_holes = module_graph_has_holes
+                }
+            stripFinderEnv :: FinderEnv a -> FinderEnv External
+            stripFinderEnv fe =
+              FinderEnv
+                { finder_cache = finder_cache fe
+                , finder_opts = finder_opts fe
+                , finder_unit_state = finder_unit_state fe
+                , finder_scope = FinderScopeExternalOnly
+                }
         pure $
-          env { ifle_load_scope = new_scope }
+          case finder_env of
+            fe@(FinderEnv { finder_scope = FinderScopeHome{} })
+              | keepFor20509 -> rebuild fe new_scope
+              | otherwise -> rebuild (stripFinderEnv fe) new_scope
+            fe@(FinderEnv { finder_scope = FinderScopeExternalOnly }) ->
+              rebuild fe new_scope
 
   updTopEnvIO cleanTopEnv $ updGblEnv cleanGblEnv $ do
   !_ <- getTopEnv        -- force the updTopEnv
@@ -872,10 +920,9 @@ findAndReadIface
                      -- module we read out.
   -> IsBootInterface -- ^ Looking for .hi-boot or .hi file
   -> IO (MaybeErr MissingInterfaceError (ModIface, ModLocation))
-findAndReadIface load_env doc_str mod wanted_mod hi_boot_file = do
-  let finder_env = ifle_finder_env load_env
-      unit_state = ifle_unit_state load_env
-      mhome_unit = finder_home_unit finder_env
+findAndReadIface load_env@IfaceLoadEnv { ifle_finder_env = finder_env } doc_str mod wanted_mod hi_boot_file = do
+  let unit_state = ifle_unit_state load_env
+      mhome_unit = ifle_home_unit_maybe load_env
       dflags     = ifle_dflags load_env
       profile    = targetProfile dflags
       logger     = extractLogger load_env

@@ -67,7 +67,7 @@ import Control.Monad
 import Data.Time
 import qualified Data.Map as M
 import GHC.Types.Unique.Map
-import GHC.Driver.Env.Types (FinderEnv(..))
+import GHC.Driver.Env.Types (FinderEnv(..), FinderScope(..), HomeOrExternal(..))
 import GHC.Types.Unique.Set
 import qualified Data.List as L(sort)
 import Data.List.NonEmpty ( NonEmpty (..) )
@@ -172,19 +172,19 @@ getDirHash dir = do
 -- name, this function will use the search path and the known exposed
 -- packages to find the module, if a package is specified then only
 -- that package is searched for the module.
+--
+-- This function is only called for modules compiled into the HPT.
 
-findImportedModule :: FinderEnv -> ModuleName -> PkgQual -> IO FindResult
+findImportedModule :: FinderEnv Home -> ModuleName -> PkgQual -> IO FindResult
 findImportedModule finder_env mod pkg_qual =
   let FinderEnv { finder_cache = fc
                 , finder_opts = fopts
-                , finder_home_unit = mhome_unit
                 , finder_unit_state = unit_state
-                , finder_other_opts = other_opts
+                , finder_scope = FinderScopeHome home_unit other_opts
                 } = finder_env
-  in
-    findImportedModuleNoHsc fc fopts other_opts unit_state mhome_unit mod pkg_qual
+  in findImportedModuleNoHsc fc fopts other_opts unit_state home_unit mod pkg_qual
 
-findImportedModuleWithIsBoot :: FinderEnv -> ModuleName -> IsBootInterface -> PkgQual -> IO FindResult
+findImportedModuleWithIsBoot :: FinderEnv Home -> ModuleName -> IsBootInterface -> PkgQual -> IO FindResult
 findImportedModuleWithIsBoot finder_env mod is_boot pkg_qual = do
   res <- findImportedModule finder_env mod pkg_qual
   case (res, is_boot) of
@@ -203,16 +203,12 @@ findImportedModuleNoHsc
 findImportedModuleNoHsc fc fopts other_opts unit_state  mhome_unit mod_name mb_pkg =
   case mb_pkg of
     NoPkgQual  -> unqual_import
-    ThisPkg uid | (homeUnitId <$> mhome_unit) == Just uid -> home_import
-                | Just pkg_info <- HUG.unitEnv_lookup_maybe uid other_opts -> home_pkg_import (uid, pkg_info)
-                | otherwise -> pprPanic "findImportModule" (ppr mod_name $$ ppr mb_pkg $$ ppr (homeUnitId <$> mhome_unit) $$ ppr uid $$ ppr (map fst all_opts))
+    ThisPkg uid
+      | (homeUnitId <$> mhome_unit) == Just uid -> home_import
+      | Just pkg_info <- HUG.unitEnv_lookup_maybe uid other_opts -> home_pkg_import (uid, pkg_info)
+      | otherwise -> pkg_import
     OtherPkg _ -> pkg_import
   where
-    all_opts = case mhome_unit of
-                Nothing -> map (\(uid, (_, opts)) -> (uid, opts)) other_fopts
-                Just home_unit -> (homeUnitId home_unit, fopts) : map (\(uid, (_, opts)) -> (uid, opts)) other_fopts
-
-
     home_import = case mhome_unit of
                    Just home_unit -> findHomeModule fc fopts home_unit mod_name
                    Nothing -> pure $ NoPackage (panic "findImportedModule: no home-unit")
@@ -235,9 +231,10 @@ findImportedModuleNoHsc fc fopts other_opts unit_state  mhome_unit mod_name mb_p
 
     pkg_import    = findExposedPackageModule fc fopts units  mod_name mb_pkg
 
-    unqual_import = any_home_import
-                    `orIfNotFound`
-                    findExposedPackageModule fc fopts units mod_name NoPkgQual
+    unqual_import =
+      any_home_import
+      `orIfNotFound`
+      findExposedPackageModule fc fopts units mod_name NoPkgQual
 
     units     = case mhome_unit of
                   Just home_unit
@@ -264,12 +261,12 @@ findPluginModuleNoHsc fc fopts units (Just home_unit) mod_name =
 findPluginModuleNoHsc fc fopts units Nothing mod_name =
   findExposedPluginPackageModule fc fopts units mod_name
 
-findPluginModule :: FinderEnv -> ModuleName -> IO FindResult
+findPluginModule :: FinderEnv Home -> ModuleName -> IO FindResult
 findPluginModule finder_env mod_name =
   let FinderEnv { finder_cache = fc
                 , finder_opts = fopts
                 , finder_unit_state = units
-                , finder_home_unit = mhome_unit
+                , finder_scope = FinderScopeHome mhome_unit _
                 } = finder_env
   in findPluginModuleNoHsc fc fopts units mhome_unit mod_name
 
@@ -295,15 +292,20 @@ findExactModuleNoHsc fc fopts other_fopts unit_state mhome_unit mod is_boot = do
 -- where the files associated with this module live.  It is used when
 -- reading the interface for a module mentioned by another interface,
 -- for example (a "system import").
-findExactModule :: FinderEnv -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModule :: FinderEnv a -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
 findExactModule finder_env mod is_boot =
   let FinderEnv { finder_cache = fc
                 , finder_opts = fopts
-                , finder_other_opts = other_fopts
                 , finder_unit_state = unit_state
-                , finder_home_unit = home_unit
+                , finder_scope = scope
                 } = finder_env
-  in findExactModuleNoHsc fc fopts other_fopts unit_state home_unit mod is_boot
+  in case scope of
+       FinderScopeHome { finder_scope_home_unit = home_unit
+                       , finder_scope_other_opts = other_fopts
+                       } ->
+         findExactModuleNoHsc fc fopts other_fopts unit_state home_unit mod is_boot
+       FinderScopeExternalOnly ->
+         findPackageModule fc unit_state fopts mod
 
 
 -- -----------------------------------------------------------------------------

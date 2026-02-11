@@ -3,6 +3,7 @@ module GHC.Driver.Env
    , HscEnv (..)
    , HasHscEnv (..)
    , FinderEnv(..)
+   , FinderScope(..)
    , IfaceLoadEnv(..)
    , hsc_mod_graph
    , setModuleGraph
@@ -60,7 +61,7 @@ import GHC.Driver.Errors.Types ( GhcMessage )
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Diagnostic (initDiagOpts, initPrintConfig)
 import GHC.Driver.Config.Finder (initFinderOpts)
-import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..), HasHscEnv (..), FinderEnv(..), IfaceLoadEnv(..), IfaceLoadScope(..) )
+import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..), HasHscEnv (..), FinderEnv(..), FinderScope(..), HomeOrExternal(..), IfaceLoadEnv(..), IfaceLoadScope(..) )
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
@@ -126,17 +127,19 @@ mkInteractiveHscEnv hsc_env =
 runInteractiveHsc :: HscEnv -> Hsc a -> IO a
 runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
 
-mkFinderEnv :: HscEnv -> FinderEnv
+mkFinderEnv :: HscEnv -> FinderEnv Home
 mkFinderEnv hsc_env = FinderEnv
   { finder_cache      = hsc_FC hsc_env
   , finder_opts       = initFinderOpts (hsc_dflags hsc_env)
-  , finder_other_opts = mapUnitEnvGraph
-      (\hue -> (HUG.homeUnitEnv_units hue, initFinderOpts (HUG.homeUnitEnv_dflags hue)))
-      (hsc_HUG hsc_env)
   , finder_unit_state = hsc_units hsc_env
-  , finder_home_unit  = hsc_home_unit_maybe hsc_env
+  -- TODO: If `hsc_home_unit_maybe` = Nothing then external?
+  , finder_scope      = FinderScopeHome (hsc_home_unit_maybe hsc_env) other_opts
   }
   where
+    other_opts =
+      mapUnitEnvGraph
+        (\hue -> (HUG.homeUnitEnv_units hue, initFinderOpts (HUG.homeUnitEnv_dflags hue)))
+        (hsc_HUG hsc_env)
     mapUnitEnvGraph :: (a -> b) -> HUG.UnitEnvGraph a -> HUG.UnitEnvGraph b
     mapUnitEnvGraph f env =
       HUG.unitEnv_new $

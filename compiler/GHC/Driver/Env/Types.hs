@@ -5,6 +5,8 @@ module GHC.Driver.Env.Types
   , HscEnv(..)
   , HasHscEnv(..)
   , FinderEnv(..)
+  , FinderScope(..)
+  , HomeOrExternal(..)
   , IfaceLoadEnv(..)
   , IfaceLoadScope(..)
   ) where
@@ -134,13 +136,20 @@ data HscEnv
                 -- ^ LLVM configuration cache.
  }
 
-data FinderEnv = FinderEnv
-  { finder_cache       :: !FinderCache
-  , finder_opts        :: !FinderOpts
-  , finder_other_opts  :: !(UnitEnvGraph (UnitState, FinderOpts))
-  , finder_unit_state  :: !UnitState
---  , finder_unit_env    :: !UnitEnv
-  , finder_home_unit   :: !(Maybe HomeUnit)
+data HomeOrExternal = Home | External
+
+data FinderScope (a :: HomeOrExternal) where
+  FinderScopeHome ::
+      { finder_scope_home_unit  :: !(Maybe HomeUnit)
+      , finder_scope_other_opts :: !(UnitEnvGraph (UnitState, FinderOpts))
+      } -> FinderScope Home
+  FinderScopeExternalOnly :: FinderScope External
+
+data FinderEnv a = FinderEnv
+  { finder_cache      :: !FinderCache
+  , finder_opts       :: !FinderOpts
+  , finder_unit_state :: !UnitState
+  , finder_scope      :: !(FinderScope a)
   }
 
 -- | Describes whether interface loading is allowed to consult the
@@ -150,7 +159,7 @@ data IfaceLoadScope
   = IfaceLoadScopeHome !HomeUnitGraph
   | IfaceLoadScopeExternalOnly
 
-data IfaceLoadEnv = IfaceLoadEnv
+data IfaceLoadEnv = forall a . IfaceLoadEnv
   { ifle_home_unit       :: !HomeUnit
   , ifle_home_unit_maybe :: !(Maybe HomeUnit)
   , ifle_dflags          :: !DynFlags
@@ -162,7 +171,7 @@ data IfaceLoadEnv = IfaceLoadEnv
   , ifle_unit_state      :: !UnitState
   , ifle_eps_cache       :: !ExternalUnitCache
   , ifle_type_env_vars   :: !(KnotVars (IORef TypeEnv))
-  , ifle_finder_env      :: !FinderEnv
+  , ifle_finder_env      :: !(FinderEnv a)
   , ifle_load_scope      :: !IfaceLoadScope
   , ifle_module_graph_has_holes :: !Bool
   }
