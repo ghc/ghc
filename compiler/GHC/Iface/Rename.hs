@@ -59,12 +59,12 @@ tcRnMsgMaybe do_this = do
 tcRnModIface :: [(ModuleName, Module)] -> Maybe NameShape -> ModIface -> TcM ModIface
 tcRnModIface x y z = do
     hsc_env <- getTopEnv
-    tcRnMsgMaybe $ rnModIface hsc_env x y z
+    tcRnMsgMaybe $ rnModIface (mkIfaceLoadEnv hsc_env) x y z
 
 tcRnModExports :: [(ModuleName, Module)] -> ModIface -> TcM [AvailInfo]
 tcRnModExports x y = do
     hsc_env <- getTopEnv
-    tcRnMsgMaybe $ rnModExports hsc_env x y
+    tcRnMsgMaybe $ rnModExports (mkIfaceLoadEnv hsc_env) x y
 
 failWithRn :: TcRnMessage -> ShIfM a
 failWithRn tcRnMessage = do
@@ -95,10 +95,10 @@ failWithRn tcRnMessage = do
 -- we read a declaration for {H.T} but we actually know that this
 -- should be Foo.T; then we'll also rename this (this is used
 -- when loading an interface to merge it into a requirement.)
-rnModIface :: HscEnv -> [(ModuleName, Module)] -> Maybe NameShape
+rnModIface :: IfaceLoadEnv -> [(ModuleName, Module)] -> Maybe NameShape
            -> ModIface -> IO (Either (Messages TcRnMessage) ModIface)
-rnModIface hsc_env insts nsubst iface =
-    initRnIface hsc_env iface insts nsubst $ do
+rnModIface ifle insts nsubst iface =
+    initRnIface ifle iface insts nsubst $ do
         mod <- rnModule (mi_module iface)
         sig_of <- case mi_sig_of iface of
                     Nothing -> return Nothing
@@ -123,9 +123,9 @@ rnModIface hsc_env insts nsubst iface =
 
 -- | Rename just the exports of a 'ModIface'.  Useful when we're doing
 -- shaping prior to signature merging.
-rnModExports :: HscEnv -> [(ModuleName, Module)] -> ModIface -> IO (Either (Messages TcRnMessage) [AvailInfo])
-rnModExports hsc_env insts iface
-    = initRnIface hsc_env iface insts Nothing
+rnModExports :: IfaceLoadEnv -> [(ModuleName, Module)] -> ModIface -> IO (Either (Messages TcRnMessage) [AvailInfo])
+rnModExports ifle insts iface
+    = initRnIface ifle iface insts Nothing
     $ mapM rnAvailInfo (mi_exports iface)
 
 rnDependencies :: Rename Dependencies
@@ -183,12 +183,12 @@ rnDepModules sel mods = do
 -}
 
 -- | Run a computation in the 'ShIfM' monad.
-initRnIface :: HscEnv -> ModIface -> [(ModuleName, Module)] -> Maybe NameShape
+initRnIface :: IfaceLoadEnv -> ModIface -> [(ModuleName, Module)] -> Maybe NameShape
             -> ShIfM a -> IO (Either (Messages TcRnMessage) a)
-initRnIface hsc_env iface insts nsubst do_this = do
+initRnIface ifle iface insts nsubst do_this = do
     errs_var <- newIORef emptyMessages
     let hsubst = listToUFM insts
-        rn_mod = renameHoleModule (hsc_units hsc_env) hsubst
+        rn_mod = renameHoleModule (ifle_unit_state ifle) hsubst
         env = ShIfEnv {
             sh_if_module = rn_mod (mi_module iface),
             sh_if_semantic_module = rn_mod (mi_semantic_module iface),
@@ -197,7 +197,7 @@ initRnIface hsc_env iface insts nsubst do_this = do
             sh_if_errs = errs_var
         }
     -- Modeled off of 'initTc'
-    res <- initTcRnIf RnIfaceTag (mkIfaceLoadEnv hsc_env) env () $ tryM do_this
+    res <- initTcRnIf RnIfaceTag ifle env () $ tryM do_this
     msgs <- readIORef errs_var
     case res of
         Left _                               -> return (Left msgs)
