@@ -46,7 +46,6 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 import Control.Monad
 
-import qualified Data.Semigroup as Semigroup
 import Data.Foldable ( toList )
 import Data.List ( nub )
 import qualified Data.List as List

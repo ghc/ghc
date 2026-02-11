@@ -152,7 +152,6 @@ import GHC.Generics (Generic, Generically(..))
 import Control.Monad
 import Data.IORef
 import GHC.Data.Maybe
-import qualified Data.Semigroup as Semi
 import GHC.Types.Name.Reader
 
 {-
