@@ -452,7 +452,7 @@ link' logger tmpfs fc dflags unit_env batch_attempt_linking mHscMessager hpt
 
         debugTraceMsg logger 3 (text "link: done")
 
-        -- linkBinary only returns if it succeeds
+        -- linkExecutable only returns if it succeeds
         return Succeeded
 
    | otherwise
