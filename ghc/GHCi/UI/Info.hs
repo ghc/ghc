@@ -46,6 +46,8 @@ import           GHC.Utils.Outputable
 import           GHC.Types.SrcLoc
 import           GHC.Types.Var
 import qualified GHC.Data.Strict as Strict
+import           GHC.Runtime.Loader (initializePlugins)
+import           Data.Containers.ListUtils (nubOrd)
 
 import           GHCi.UI.Exception
 
@@ -301,6 +303,13 @@ srcFilePath modSum = fromMaybe obj_fp src_fp
 getModInfo :: (GhcMonad m) => Module -> m ModInfo
 getModInfo m = do
     mod_summary <- getModSummary m
+
+    -- Update the session plugins from the module summary
+    -- and initialize them (#23110).
+    modifySession $ hscUpdateFlags $ \dynFlags -> dynFlags
+      { pluginModNames = nubOrd $ pluginModNames dynFlags ++ pluginModNames (ms_hspp_opts mod_summary) }
+    modifySessionM (liftIO . initializePlugins)
+
     p <- parseModule mod_summary
     typechecked <- typecheckModule p
     let allTypes = processAllTypeCheckedModule typechecked

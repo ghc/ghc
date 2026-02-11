@@ -332,6 +332,19 @@ test('T20803b',
      compile_fail,
      ['-package-db T20803-plugin/pkg.T20803b/local.package.conf -fplugin AddErrorPlugin -package T20803-plugin ' + config.plugin_way_flags])
 
+# Check that we run the plugins for set +c.
+# The .stdout file should contain a call to 'parsePlugin' AFTER
+# the line 'Collecting type info...'
+test('T23110'
+    , [ extra_files([ 'simple-plugin/'])
+      , only_ways(['ghci'])
+      , pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.simpleplug TOP={top}')
+      , extra_hc_opts('-package-db simple-plugin/pkg.simpleplug/local.package.conf')
+      ]
+    , ghci_script
+    , [ 'T23110.script' ]
+    )
+
 test('test-echo-in-turn',
      [extra_files(['echo-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-turn TOP={top}')],

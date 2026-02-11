@@ -1,0 +1,3 @@
+:set +c
+:load T23110.hs
+-- The key thing is that plugins should be run AFTER "Collecting type info..."

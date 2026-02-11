@@ -1,0 +1,11 @@
+parsePlugin()
+typeCheckPlugin (rn)
+interfacePlugin: GHC.Internal.Tuple
+interfacePlugin: GHC.Internal.Stack.Types
+interfacePlugin: GHC.Internal.Exception.Context
+interfacePlugin: GHC.Internal.TopHandler
+typeCheckPlugin (tc)
+Collecting type info for 1 module(s) ... 
+parsePlugin()
+typeCheckPlugin (rn)
+typeCheckPlugin (tc)
