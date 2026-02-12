@@ -960,4 +960,5 @@ test('T26582', normal, compile, [''])
 test('T26746', normal, compile, [''])
 test('T26737', normal, compile, [''])
 test('T26805a', normal, compile, [''])
+test('T24464', normal, compile, [''])
 
