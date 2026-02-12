@@ -1,0 +1,7 @@
+"All modules are star-imported"
+[5]
+Just 5
+[5]
+"A is no longer star-imported, thus 'g' is not in scope"
+[5]
+[5]

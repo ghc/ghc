@@ -2094,7 +2094,25 @@ mostly obvious.
 
     Compile all targets on GHCi startup.
     By disabling this flag you can speed up the initial start time of GHCi.
-    When targets are needed, they can be loaded by using the :ghci-cmd:`:reload`.
+    After startup, targets can be loaded and unloaded from the GHCi session
+    by using :ghci-cmd:`:reload`.
+
+.. ghc-flag:: -fimport-loaded-targets
+    :shortdesc: Add loaded modules to interactive context.
+    :type: dynamic
+    :reverse: -fno-import-loaded-targets
+    :category:
+
+    :default: off
+    :since: 9.14.2
+
+    Add all modules to the interactive context of the GHCi session after loading targets.
+    This is equivalent to calling :ghci-cmd:`:add` ``+ *⟨module⟩`` for all targets.
+
+    Note, that adding all modules to the interactive context can increase
+    memory usage noticably.
+    If disabled, only the target given last on the command line interface will be
+    added to interactive context of the GHCi session.
 
 Packages
 ~~~~~~~~
