@@ -2573,6 +2573,7 @@ fFlagsDeps = [
 
   -- load all targets on GHCi startup
   flagGhciSpec "load-initial-targets"         Opt_GhciDoLoadTargets,
+  flagGhciSpec "import-loaded-targets"        Opt_GhciImportLoadedTargets,
 
   flagSpec "helpful-errors"                   Opt_HelpfulErrors,
   flagSpec "hpc"                              Opt_Hpc,

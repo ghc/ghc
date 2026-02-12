@@ -1,0 +1,14 @@
+"No module is imported"
+import (generated) Prelude -- implicit
+"Reload all modules"
+:module +*A -- added automatically
+:module +*B -- added automatically
+[5]
+Just 5
+[5]
+"Unload all modules"
+import (generated) Prelude -- implicit
+"Reload up to A"
+:module +*A -- added automatically
+[5]
+Just 5

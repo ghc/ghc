@@ -1,0 +1,5 @@
+:show imports
+"Can access all public and private symbols of B"
+baz
+foobar
+foo
