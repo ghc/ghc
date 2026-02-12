@@ -118,6 +118,8 @@ class TestConfig:
 
         # The ways selected via the command line.
         self.cmdline_ways = [] # type: List[WayName]
+        # Extra ways requested via the command line (additive).
+        self.cmdline_extra_ways = [] # type: List[WayName]
 
         # Lists of flags for each way
         self.way_flags = {}  # type: Dict[WayName, List[str]]

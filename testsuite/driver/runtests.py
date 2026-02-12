@@ -80,6 +80,7 @@ parser.add_argument("--unexpected-output-dir", help="directory in which to place
 parser.add_argument("--target-wrapper", help="wrapper executable to use when executing binaries compiled for the target")
 parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")
 parser.add_argument("--way", action="append", help="just this way")
+parser.add_argument("--extraway", action="append", help="add this way to the default set")
 parser.add_argument("--skipway", action="append", help="skip this way")
 parser.add_argument("--threads", type=int, help="threads to run simultaneously")
 parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
@@ -145,6 +146,14 @@ if args.way:
                 config.run_ways += [way]
                 config.compile_ways += [way]
 
+if args.extraway:
+    for way in args.extraway:
+        if way not in all_ways:
+            print('WARNING: Unknown WAY %s in --extraway' % way)
+        else:
+            if way not in config.cmdline_extra_ways:
+                config.cmdline_extra_ways += [way]
+
 if args.skipway:
     for way in args.skipway:
         if way not in all_ways:
@@ -153,6 +162,8 @@ if args.skipway:
     config.other_ways = [w for w in config.other_ways if w not in args.skipway]
     config.run_ways = [w for w in config.run_ways if w not in args.skipway]
     config.compile_ways = [w for w in config.compile_ways if w not in args.skipway]
+    if config.cmdline_extra_ways:
+        config.cmdline_extra_ways = [w for w in config.cmdline_extra_ways if w not in args.skipway]
 
 config.broken_tests |= {TestName(t) for t in args.broken_test}
 

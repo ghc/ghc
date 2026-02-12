@@ -1568,10 +1568,13 @@ async def test_common_work(name: TestName, opts,
         package_conf_cache_file_start_timestamp = get_package_cache_timestamp()
 
         # All the ways we might run this test
+        allow_cmdline_extra = False
         if func == compile or func == multimod_compile:
             all_ways = config.compile_ways
+            allow_cmdline_extra = True
         elif func in [compile_and_run, multi_compile_and_run, multimod_compile_and_run]:
             all_ways = config.run_ways
+            allow_cmdline_extra = True
         elif func == ghci_script or func == ghci_multiunit_script:
             if config.have_interp:
                 all_ways = [WayName('ghci'), WayName('ghci-opt')]
@@ -1599,40 +1602,60 @@ async def test_common_work(name: TestName, opts,
             # `ignore_stdout` and `ignore_stderr` could also be helpful in cases where
             # all you need is to compare the exit code with 0.
             all_ways = config.compile_ways + config.run_ways
+            allow_cmdline_extra = True
             if needsTargetWrapper():
                 opts.skip = True
         else:
             all_ways = [WayName('normal')]
 
-        # A test itself can request extra ways by setting opts.extra_ways
-        all_ways = list(OrderedDict.fromkeys(all_ways + [way for way in opts.extra_ways if way not in all_ways]))
+        # A test itself can request extra ways by setting opts.extra_ways.
+        # Command line extra ways are handled separately (see below).
+        cmdline_extra_ways = getattr(config, 'cmdline_extra_ways', [])
+        base_all_ways = list(OrderedDict.fromkeys(all_ways + opts.extra_ways))
+        if cmdline_extra_ways and allow_cmdline_extra:
+            extra_all_ways = list(OrderedDict.fromkeys(base_all_ways + cmdline_extra_ways))
+        else:
+            extra_all_ways = base_all_ways
 
-        t.total_test_cases += len(all_ways)
+        t.total_test_cases += len(base_all_ways)
+        if cmdline_extra_ways:
+            t.total_test_cases += len(extra_all_ways)
 
         only_ways = getTestOpts().only_ways
-        ok_way = lambda way: \
-            not getTestOpts().skip \
-            and (only_ways is None
-                 or (only_ways is not None and way in only_ways)) \
-            and (config.cmdline_ways == [] or way in config.cmdline_ways) \
-            and (not (config.skip_perf_tests and isStatsTest())) \
-            and (not (config.only_perf_tests and not isStatsTest())) \
-            and way not in getTestOpts().omit_ways
 
-        # Which ways we are asked to skip
-        do_ways = list(filter (ok_way,all_ways))
+        def select_ways(all_ways, cmdline_filter):
+            ok_way = lambda way: \
+                not getTestOpts().skip \
+                and (only_ways is None
+                     or (only_ways is not None and way in only_ways)) \
+                and (cmdline_filter == [] or way in cmdline_filter) \
+                and (not (config.skip_perf_tests and isStatsTest())) \
+                and (not (config.only_perf_tests and not isStatsTest())) \
+                and way not in getTestOpts().omit_ways
 
-        # Only run all ways in slow mode.
-        # See Note [validate and testsuite speed] in `validate`
-        if config.accept:
-            # Only ever run one way
-            do_ways = do_ways[:1]
-        elif config.speed > 0:
-            # However, if we EXPLICITLY asked for a way (with extra_ways)
-            # please test it!
-            explicit_ways = list(filter(lambda way: way in opts.extra_ways, do_ways))
-            other_ways = list(filter(lambda way: way not in opts.extra_ways, do_ways))
-            do_ways = other_ways[:1] + explicit_ways
+            # Which ways we are asked to skip
+            do_ways = list(filter (ok_way,all_ways))
+
+            # Only run all ways in slow mode.
+            # See Note [validate and testsuite speed] in `validate`
+            if config.accept:
+                # Only ever run one way
+                do_ways = do_ways[:1]
+            elif config.speed > 0:
+                # However, if we EXPLICITLY asked for a way (with extra_ways)
+                # please test it!
+                explicit_ways = list(filter(lambda way: way in opts.extra_ways, do_ways))
+                other_ways = list(filter(lambda way: way not in opts.extra_ways, do_ways))
+                do_ways = other_ways[:1] + explicit_ways
+
+            return do_ways
+
+        do_ways_base = select_ways(base_all_ways, config.cmdline_ways)
+        do_ways_extra = []
+        if cmdline_extra_ways:
+            do_ways_extra = select_ways(extra_all_ways, cmdline_extra_ways)
+
+        do_ways = list(OrderedDict.fromkeys(do_ways_base + do_ways_extra))
 
         # Find all files in the source directory that this test
         # depends on. Do this only once for all ways.
@@ -1668,11 +1691,15 @@ async def test_common_work(name: TestName, opts,
         if do_ways and config.only_report_hadrian_deps:
             do_ways = []
             config.hadrian_deps |= getTestOpts().hadrian_deps
+            do_ways_base = []
+            do_ways_extra = []
 
         # Skip tests which require hadrian dependencies if we are testing
         # an out-of-tree compiler as Hadrian is unavailable. See #13897.
         if not config.in_tree_compiler and getTestOpts().hadrian_deps - {'test:ghc'}:
             do_ways = []
+            do_ways_base = []
+            do_ways_extra = []
 
         # Run the required tests...
         for way in do_ways:
@@ -1686,7 +1713,11 @@ async def test_common_work(name: TestName, opts,
                 traceback.print_exc()
                 framework_fail(name, way, traceback.format_exc())
 
-        t.n_tests_skipped += len(set(all_ways) - set(do_ways))
+        base_skipped = len(set(base_all_ways) - set(do_ways_base))
+        extra_skipped = 0
+        if cmdline_extra_ways:
+            extra_skipped = len(set(extra_all_ways) - set(do_ways_extra))
+        t.n_tests_skipped += base_skipped + extra_skipped
         if getTestOpts().expect == 'missing-lib': t.n_missing_libs += 1
 
         if config.cleanup and do_ways:
