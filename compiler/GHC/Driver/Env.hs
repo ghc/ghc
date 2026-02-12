@@ -133,7 +133,7 @@ mkFinderEnv hsc_env = FinderEnv
   , finder_opts       = initFinderOpts (hsc_dflags hsc_env)
   , finder_unit_state = hsc_units hsc_env
   -- TODO: If `hsc_home_unit_maybe` = Nothing then external?
-  , finder_scope      = FinderScopeHome (hsc_home_unit_maybe hsc_env) other_opts
+  , finder_scope      = FinderScopeHome (hsc_home_unit hsc_env) other_opts
   }
   where
     other_opts =

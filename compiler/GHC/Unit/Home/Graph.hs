@@ -161,7 +161,7 @@ data HomeUnitEnv = HomeUnitEnv
     -- (This changes a previous invariant: changed Jan 05.)
 
   , homeUnitEnv_home_unit :: !(Maybe HomeUnit)
-    -- ^ Home-unit
+    -- ^ Home-unit, this only Nothing until `initUnits` is called to populate the 'UnitState'.
   }
 
 mkHomeUnitEnv :: UnitState -> Maybe [UnitDatabase UnitId] -> DynFlags -> HomePackageTable -> Maybe HomeUnit -> HomeUnitEnv

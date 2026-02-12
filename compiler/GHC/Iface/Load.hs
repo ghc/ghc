@@ -730,7 +730,7 @@ dontLeakTheHUG thing_inside = do
                 , finder_unit_state = unit_state_ext
                 , finder_scope = FinderScopeExternalOnly
                     { finder_scope_external_home_unit =
-                        if allowHomeLookups then home_unit_ext else Nothing
+                        if allowHomeLookups then Just home_unit_ext else Nothing
                     }
                 }
         pure $

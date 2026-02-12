@@ -142,11 +142,12 @@ data HomeOrExternal = Home | External
 -- This is just so that `findImportedModule` doesn't have to deal with the external case.
 data FinderScope (a :: HomeOrExternal) where
   FinderScopeHome ::
-      { finder_scope_home_unit  :: !(Maybe HomeUnit)
+      { finder_scope_home_unit  :: !(HomeUnit)
       , finder_scope_other_opts :: !(UnitEnvGraph (UnitState, FinderOpts))
       } -> FinderScope Home
   FinderScopeExternalOnly ::
        { finder_scope_external_home_unit :: !(Maybe HomeUnit)
+       -- ^ This is Just when we are in oneshot mode and try to find home package things in the EPS
        } -> FinderScope External
 
 data FinderEnv a = FinderEnv
@@ -168,16 +169,16 @@ data IfaceLoadEnv = forall a . IfaceLoadEnv
   , ifle_home_unit_maybe :: !(Maybe HomeUnit)
   , ifle_dflags          :: !DynFlags
   , ifle_all_home_unit_ids :: !(Set.Set UnitId)
-  , ifle_plugins         :: !Plugins
-  , ifle_hooks           :: !Hooks
-  , ifle_logger          :: !Logger
-  , ifle_name_cache      :: !NameCache
-  , ifle_unit_state      :: !UnitState
-  , ifle_eps_cache       :: !ExternalUnitCache
-  , ifle_type_env_vars   :: !(KnotVars (IORef TypeEnv))
-  , ifle_finder_env      :: !(FinderEnv a)
-  , ifle_load_scope      :: !IfaceLoadScope
-  , ifle_module_graph_has_holes :: !Bool
+  , ifle_plugins         :: !Plugins -- This is just for iface load action
+  , ifle_hooks           :: !Hooks   -- Not sure
+  , ifle_logger          :: !Logger  -- It's the logger
+  , ifle_name_cache      :: !NameCache -- It's the namecache
+  , ifle_unit_state      :: !UnitState -- UnitState of home unit which started the load of external package
+  , ifle_eps_cache       :: !ExternalUnitCache -- Where external interfaces live
+  , ifle_type_env_vars   :: !(KnotVars (IORef TypeEnv)) -- This is needed when calling tcIface in oneshot mode
+  , ifle_finder_env      :: !(FinderEnv a) -- Environment needed by the finder component
+  , ifle_load_scope      :: !IfaceLoadScope -- Current loading scope (HPT vs External)
+  , ifle_module_graph_has_holes :: !Bool    -- Whether we are in some backpack session and need to leak HPTs everywhere.
   }
 
 instance ContainsDynFlags IfaceLoadEnv where
