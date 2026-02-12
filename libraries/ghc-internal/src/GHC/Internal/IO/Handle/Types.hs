@@ -157,6 +157,7 @@ data BufferList e
 data HandleType
  = ClosedHandle
  | SemiClosedHandle
+   -- ^ See the documentation of 'GHC.IO.Handle.Text.hGetContents'.
  | ReadHandle
  | WriteHandle
  | AppendHandle
