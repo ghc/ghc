@@ -1539,7 +1539,12 @@ cpeArg env dmd arg
                        arg3  = cpeEtaExpand arity arg2
                        -- See Note [Eta expansion of arguments in CorePrep]
                  ; let (arg_float, v') = mkNonRecFloat env lev v arg3
-                 ---; pprTraceM "cpeArg" (ppr arg1 $$ ppr dec $$ ppr arg2)
+                 ; pprTraceM "cpeArg" (vcat [ text "arg1" <+> ppr arg1
+                                            , text "decision" <+>  ppr dec
+                                            , text "arg2" <+> ppr arg2
+                                            , text "arity" <+> ppr arity
+                                            , text "arg3" <+> ppr arg3
+                                            ])
                  ; return (snocFloat floats2 arg_float, varToCoreExpr v') }
        }
 
@@ -1578,9 +1583,15 @@ eta_would_wreck_join _                 = False
 
 maybeSaturate :: Id -> CpeApp -> Int -> [CoreTickish] -> UniqSM CpeRhs
 maybeSaturate fn expr n_args unsat_ticks
+  | hasNoBinding fn || excess_arity > 0
+  = return $ wrapLamBody (mkTicks unsat_ticks) sat_expr
+  | otherwise
+  = return expr
+
+{-
   | hasNoBinding fn        -- There's no binding
     -- See Note [Eta expansion of hasNoBinding things in CorePrep]
-  = return $ wrapLamBody (\body -> foldr mkTick body unsat_ticks) sat_expr
+  = return $ wrapLamBody (mkTicks unsat_ticks) sat_expr
 
   | mark_arity > 0 -- A call-by-value function.
                    -- See Note [CBV Function Ids: overview]
@@ -1605,6 +1616,7 @@ maybeSaturate fn expr n_args unsat_ticks
   | otherwise
   = assert (null unsat_ticks) $
     return expr
+-}
   where
     mark_arity    = idCbvMarkArity fn
     fn_arity      = idArity fn
