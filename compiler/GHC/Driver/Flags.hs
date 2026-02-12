@@ -760,6 +760,8 @@ data GeneralFlag
 
    -- | Instruct GHCi to load all targets on startup
    | Opt_GhciDoLoadTargets
+   -- | Instruct GHCi to import all loaded targets on startup
+   | Opt_GhciImportLoadedTargets
 
    | Opt_HelpfulErrors
    | Opt_DeferTypeErrors             -- Since 7.6

@@ -2096,6 +2096,19 @@ mostly obvious.
     By disabling this flag you can speed up the initial start time of GHCi.
     When targets are needed, they can be loaded by using the :ghci-cmd:`:reload`.
 
+.. ghc-flag:: -fimport-loaded-targets
+    :shortdesc: Add loaded modules to interactive context.
+    :type: dynamic
+    :reverse: -fno-import-loaded-targets
+    :category:
+
+    :default: off
+    :since: 9.14.2
+
+    Import all modules into the GHCi session after loading targets.
+    Importing all modules increases memory usage.
+    If disabled, only a single module will be automatically imported in the GHCi session.
+
 Packages
 ~~~~~~~~
 

@@ -2416,36 +2416,44 @@ setContextAfterLoad keep_ctxt (Just graph) = do
                 GHC.topSortModuleGraph True (GHC.mkModuleGraph loaded_graph) Nothing
           in case graph' of
               [] -> setContextKeepingPackageModules keep_ctxt []
-              xs -> load_this (last xs)
-        (m:_) ->
-          load_this m
+              xs -> load_these [last xs]
+        m:ms -> do
+          flags <- GHC.getInteractiveDynFlags
+          let xs = if gopt Opt_GhciImportLoadedTargets flags
+                then m:ms
+                else [m]
+          load_these xs
  where
-   is_loaded (GHC.ModuleNode _ ms) = isLoadedModuleNode ms
-   is_loaded _ = return False
+  is_loaded (GHC.ModuleNode _ ms) = isLoadedModuleNode ms
+  is_loaded _ = return False
 
-   findTarget mds t
+  findTarget mds t
     = case mapMaybe (`matches` t) mds of
         []    -> Nothing
         (m:_) -> Just m
 
-   (GHC.ModuleNode _ summary) `matches` Target { targetId = TargetModule m }
-        = if GHC.moduleNodeInfoModuleName summary == m then Just summary else Nothing
-   (GHC.ModuleNode _ summary) `matches` Target { targetId = TargetFile f _ }
-        | Just f' <- GHC.ml_hs_file (GHC.moduleNodeInfoLocation summary)   =
-          if f == f' then Just summary else Nothing
-   _ `matches` _ = Nothing
+  (GHC.ModuleNode _ summary) `matches` Target { targetId = TargetModule m }
+      = if GHC.moduleNodeInfoModuleName summary == m then Just summary else Nothing
+  (GHC.ModuleNode _ summary) `matches` Target { targetId = TargetFile f _ }
+      | Just f' <- GHC.ml_hs_file (GHC.moduleNodeInfoLocation summary)   =
+        if f == f' then Just summary else Nothing
+  _ `matches` _ = Nothing
 
-   load_this summary | m <- GHC.moduleNodeInfoModule summary = do
-        is_interp <- GHC.moduleIsInterpreted m
-        dflags <- getDynFlags
-        let star_ok = is_interp && not (safeLanguageOn dflags)
-              -- We import the module with a * iff
-              --   - it is interpreted, and
-              --   - -XSafe is off (it doesn't allow *-imports)
-        let new_ctx | star_ok   = [mkIIModule m]
-                    | otherwise = [mkIIDecl   (GHC.moduleName m)]
-        setContextKeepingPackageModules keep_ctxt new_ctx
+  load_these summaries = do
+    new_ctx <- traverse target_to_interactive_import summaries
+    setContextKeepingPackageModules keep_ctxt new_ctx
 
+  target_to_interactive_import summary
+    | m <- GHC.moduleNodeInfoModule summary = do
+      is_interp <- GHC.moduleIsInterpreted m
+      dflags <- getDynFlags
+      let star_ok = is_interp && not (safeLanguageOn dflags)
+          -- We import the module with a * iff
+          --   - it is interpreted, and
+          --   - -XSafe is off (it doesn't allow *-imports)
+      let new_ctx | star_ok   = mkIIModule m
+                  | otherwise = mkIIDecl   (GHC.moduleName m)
+      pure new_ctx
 
 -- | Keep any package modules (except Prelude) when changing the context.
 setContextKeepingPackageModules

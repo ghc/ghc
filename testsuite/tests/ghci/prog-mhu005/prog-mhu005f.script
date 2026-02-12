@@ -1,0 +1,5 @@
+:show imports
+"By default, only one modules is imported"
+baz
+foobar
+foo

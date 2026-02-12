@@ -1,0 +1,13 @@
+import (generated) Prelude -- implicit
+"No module loaded"
+"After reloading, all modules are added to the context"
+:module +*B -- added automatically
+:module +*A -- added automatically
+68
+18
+50
+"Unload everything again"
+import (generated) Prelude -- implicit
+"Load up one module, only B is in scope"
+:module +*B -- added automatically
+50

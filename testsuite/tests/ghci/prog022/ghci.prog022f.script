@@ -1,0 +1,23 @@
+"No module is imported"
+:show imports
+f 5
+g 5
+h 5
+"Reload all modules"
+:reload
+:show imports
+f 5
+g 5
+h 5
+"Unload all modules"
+:reload none
+:show imports
+f 5
+g 5
+h 5
+"Reload up to A"
+:reload A
+:show imports
+f 5
+g 5
+h 5

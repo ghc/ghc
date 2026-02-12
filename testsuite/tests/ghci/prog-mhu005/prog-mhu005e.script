@@ -1,0 +1,5 @@
+:show imports
+"No module is imported"
+baz
+foobar
+foo
