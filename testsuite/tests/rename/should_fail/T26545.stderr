@@ -1,0 +1,3 @@
+T26545.hs:12:23: error: [GHC-88431]
+    ‘v’ is used in a static form but it is not defined at top level
+
