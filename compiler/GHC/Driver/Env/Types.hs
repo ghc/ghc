@@ -138,6 +138,8 @@ data HscEnv
 
 data HomeOrExternal = Home | External
 
+-- TODO: Not sure that this type index is worthwhile.
+-- This is just so that `findImportedModule` doesn't have to deal with the external case.
 data FinderScope (a :: HomeOrExternal) where
   FinderScopeHome ::
       { finder_scope_home_unit  :: !(Maybe HomeUnit)
