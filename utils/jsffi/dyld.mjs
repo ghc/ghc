@@ -1470,7 +1470,7 @@ async function nodeMain({ searchDirs, mainSoPath, outFd, inFd, args }) {
   );
 }
 
-const isNodeMain = isNode && import.meta.filename === process.argv[1];
+const isNodeMain = isNode && import.meta.main;
 
 // node iserv as invoked by
 // GHC.Runtime.Interpreter.Wasm.spawnWasmInterp
