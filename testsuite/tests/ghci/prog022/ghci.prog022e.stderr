@@ -1,0 +1,3 @@
+<interactive>:12:1: error: [GHC-88464]
+    Variable not in scope: g :: t0 -> t
+

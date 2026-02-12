@@ -1,0 +1,6 @@
+:module +*B -- added automatically
+:module +*A -- added automatically
+"Can access all public and private symbols of A and B"
+68
+18
+50

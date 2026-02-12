@@ -1,0 +1,9 @@
+"All modules are star-imported"
+f 5
+g 5
+h 5
+"A is no longer star-imported, thus 'g' is not in scope"
+:m A B
+f 5
+g 5
+h 5
