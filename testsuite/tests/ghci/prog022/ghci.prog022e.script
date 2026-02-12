@@ -1,0 +1,13 @@
+"All modules are star imported"
+:show imports
+:m - A B
+"We can remove the imports"
+:show imports
+"Selectively star import B and then import A"
+"'g' is not in scope"
+:m + *B
+:m + A
+:show imports
+f 5
+g 5
+h 5
