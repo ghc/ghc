@@ -1539,12 +1539,12 @@ cpeArg env dmd arg
                        arg3  = cpeEtaExpand arity arg2
                        -- See Note [Eta expansion of arguments in CorePrep]
                  ; let (arg_float, v') = mkNonRecFloat env lev v arg3
-                 ; pprTraceM "cpeArg" (vcat [ text "arg1" <+> ppr arg1
-                                            , text "decision" <+>  ppr dec
-                                            , text "arg2" <+> ppr arg2
-                                            , text "arity" <+> ppr arity
-                                            , text "arg3" <+> ppr arg3
-                                            ])
+--                 ; pprTraceM "cpeArg" (vcat [ text "arg1" <+> ppr arg1
+--                                            , text "decision" <+>  ppr dec
+--                                            , text "arg2" <+> ppr arg2
+--                                            , text "arity" <+> ppr arity
+--                                            , text "arg3" <+> ppr arg3
+--                                            ])
                  ; return (snocFloat floats2 arg_float, varToCoreExpr v') }
        }
 
