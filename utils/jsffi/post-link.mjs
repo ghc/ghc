@@ -119,7 +119,7 @@ function isMain() {
     return false;
   }
 
-  return import.meta.filename === process.argv[1];
+  return import.meta.main;
 }
 
 async function main() {
