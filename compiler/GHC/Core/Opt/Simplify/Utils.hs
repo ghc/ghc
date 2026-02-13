@@ -1044,6 +1044,10 @@ Wrinkles:
   the lambda is let-bound:
       let h = (\x.blah)
       in ...f h...
+  So we need to look through h's unfolding.
+
+  This does make parser combinators rather keen to inline; see test T17516 for
+  example.  But doing so makes the code better too, with fewer unknown calls.
 -}
 
 interestingArg :: SimplEnv -> CoreExpr -> ArgSummary
@@ -1085,10 +1089,10 @@ interestingArg env e = go env 0 e
        | n > 0         = NonTrivArg -- Saturated or unknown call
        | otherwise  -- n==0, no value arguments; look for an interesting unfolding
        = case idUnfolding v of
-           OtherCon [] -> TrivArg      -- It's evaluated, but that's all we know
-           OtherCon _  -> NonTrivArg   -- Evaluated and we know it isn't these constructors
-              -- See (IA2) in Note [Interesting arguments]
-           DFunUnfolding {} -> ValueArg   -- We konw that idArity=0
+           OtherCon [] -> NonTrivArg   -- It's evaluated, but that's all we know
+           OtherCon _  -> ValueArg     -- Evaluated and we know it isn't these constructors
+                                       -- See (IA2) in Note [Interesting arguments]
+           DFunUnfolding {} -> ValueArg   -- We know that idArity=0
            CoreUnfolding{ uf_cache = cache }
              | uf_is_conlike cache -> ValueArg    -- Includes constructor applications
              | uf_expandable cache -> NonTrivArg  -- See (IA4)
