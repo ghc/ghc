@@ -505,6 +505,17 @@ test('MultiComponentModulesRecomp',
      multiunit_compile,
      [['unitp%d' % n for n in range(20)], '-fno-code -fwrite-interface -v0'])
 
+multi_unit_cabal_home_units = ['unitHome%02d' % n for n in range(500)] # keep in sync with genMultiUnitCabal
+
+test('MultiUnitCabalImports',
+     [ collect_compiler_stats('bytes allocated',2),
+       pre_cmd('$MAKE -s --no-print-directory MultiUnitCabalPerf'),
+       extra_files(['genMultiUnitCabal', 'Setup.hs']),
+       compile_timeout_multiplier(6)
+     ],
+     multiunit_compile,
+     [multi_unit_cabal_home_units, '-package-db multi-unit-cabal/dist/package.conf.inplace/ -fno-code -fwrite-interface -v0'])
+
 test('MultiComponentModules',
      [ collect_compiler_runtime(2),
        pre_cmd('$PYTHON ./genMultiComp.py'),
