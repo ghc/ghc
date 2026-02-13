@@ -4,3 +4,6 @@ test('T26507', [ when(have_profiling(), extra_ways(['prof']))
                , when(js_arch(), skip)
 	       , exit_code(1)], compile_and_run, [''])
 
+# Stack traces shouldn't expose implementation details
+test('T15395', [ when(have_profiling(), extra_ways(['prof']))
+               , when(js_arch(), skip)], compile_and_run, [''])

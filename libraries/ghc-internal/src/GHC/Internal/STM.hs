@@ -28,7 +28,7 @@ import GHC.Internal.Base
 import GHC.Internal.Exception (Exception, toExceptionWithBacktrace, fromException, addExceptionContext)
 import GHC.Internal.Exception.Context (ExceptionAnnotation)
 import GHC.Internal.Exception.Type (WhileHandling(..))
-import GHC.Internal.Stack (HasCallStack)
+import GHC.Internal.Stack (HasCallStack, withFrozenCallStack)
 
 -- TVars are shared memory locations which support atomic memory
 -- transactions.
@@ -187,7 +187,7 @@ throwSTM e = do
     -- N.B. Typically use of unsafeIOToSTM is very much frowned upon as this
     -- is an easy way to end up with nested transactions. However, we can be
     -- certain that toExceptionWithBacktrace will not initiate a transaction.
-    se <- unsafeIOToSTM (toExceptionWithBacktrace e)
+    se <- unsafeIOToSTM (withFrozenCallStack $ toExceptionWithBacktrace e)
     STM $ raiseIO# se
 
 -- | Exception handling within STM actions.

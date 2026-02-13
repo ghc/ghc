@@ -1,0 +1,30 @@
+=== Validate stack size of 'throw' has length 1
+==== Caught exception:
+my throw error
+==== Exception Backtraces:
+- throw, called at T15395.hs:35:26 in main:Main
+
+=== Validate stack size of 'throwIO' has length 1
+==== Caught exception:
+my throwIO error
+==== Exception Backtraces:
+- throwIO, called at T15395.hs:38:17 in main:Main
+
+=== Validate stack size of 'error' has length 1
+==== Caught exception:
+plain error
+==== Exception Backtraces:
+- error, called at T15395.hs:41:15 in main:Main
+
+=== Validate stack size of 'throwSTM' has length 1
+==== Caught exception:
+my throwSTM error
+==== Exception Backtraces:
+- throwSTM, called at T15395.hs:44:31 in main:Main
+
+=== Validate stack size of 'undefined' has length 1
+==== Caught exception:
+Prelude.undefined
+==== Exception Backtraces:
+- undefined, called at T15395.hs:47:28 in main:Main
+
