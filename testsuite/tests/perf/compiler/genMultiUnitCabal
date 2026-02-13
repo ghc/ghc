@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+
+"""
+Generate a Cabal package with many modules and a collection of empty home
+units. The top home unit imports all modules from the Cabal package.
+
+The module and home unit counts can be overridden with the MODULE_COUNT and
+HOME_UNIT_COUNT environment variables.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import textwrap
+from pathlib import Path
+
+MODULE_COUNT = 3000
+HOME_UNIT_COUNT = 500
+
+PKG_DIR = Path("multi-unit-cabal")
+PKG_NAME = "multi-unit-cabal"
+PKG_VERSION = "0.1.0.0"
+
+HOME_UNIT_PREFIX = "home-unit-"
+UNIT_FILE_PREFIX = "unitHome"
+AGGREGATOR_UNIT_INDEX = 0
+AGGREGATOR_MODULE = "MultiUnitAggregator"
+
+
+def remove_if_exists(path: Path) -> None:
+    if path.is_dir():
+        shutil.rmtree(path)
+    elif path.exists():
+        path.unlink()
+
+
+def reset_generated_artifacts() -> None:
+    remove_if_exists(PKG_DIR)
+    for directory in Path(".").glob(f"{HOME_UNIT_PREFIX}*"):
+        if directory.is_dir():
+            shutil.rmtree(directory)
+    for unit_file in Path(".").glob(f"{UNIT_FILE_PREFIX}*"):
+        if unit_file.is_file():
+            unit_file.unlink()
+
+
+def module_names() -> list[str]:
+    return [f"MultiUnitMod{index:04d}" for index in range(MODULE_COUNT)]
+
+
+def write_pkg_modules(mods: list[str]) -> None:
+    PKG_DIR.mkdir()
+    for mod in mods:
+        (PKG_DIR / f"{mod}.hs").write_text(f"module {mod} where\n")
+
+
+def write_cabal_file(mods: list[str]) -> None:
+    exposed_lines = ["      " + mods[0]]
+    exposed_lines.extend([f"    , {name}" for name in mods[1:]])
+    cabal_body = textwrap.dedent(
+        f"""\
+        name: {PKG_NAME}
+        version: {PKG_VERSION}
+        build-type: Simple
+        cabal-version: >=1.10
+
+        library
+          default-language: Haskell2010
+          hs-source-dirs: .
+          build-depends: base
+          exposed-modules:
+        """
+    )
+    cabal_text = cabal_body + "\n".join(exposed_lines) + "\n"
+    (PKG_DIR / f"{PKG_NAME}.cabal").write_text(cabal_text)
+
+
+def aggregator_module_contents(mods: list[str]) -> str:
+    import_lines = "\n".join(f"import {name}" for name in mods)
+    return f"module {AGGREGATOR_MODULE} where\n{import_lines}\n"
+
+
+def aggregator_unit_name() -> str:
+    return f"{UNIT_FILE_PREFIX.lower()}-{AGGREGATOR_UNIT_INDEX:02d}"
+
+
+def write_home_units(mods: list[str]) -> None:
+    aggregator_unit_id = aggregator_unit_name()
+    for index in range(HOME_UNIT_COUNT):
+        dir_name = f"{HOME_UNIT_PREFIX}{index:02d}"
+        dir_path = Path(dir_name)
+        dir_path.mkdir()
+
+        if index == AGGREGATOR_UNIT_INDEX:
+            module_name = AGGREGATOR_MODULE
+            module_path = dir_path / f"{module_name}.hs"
+            module_path.write_text(aggregator_module_contents(mods))
+            unit_args = [
+                "-package-db",
+                "./tmp.cabal.d",
+                "-package",
+                PKG_NAME,
+                "-i",
+                f"-i./{dir_name}",
+                module_name,
+                "-this-unit-id",
+                f"{UNIT_FILE_PREFIX.lower()}-{index:02d}",
+            ]
+        else:
+            module_name = f"HomeUnit{index:02d}"
+            module_path = dir_path / f"{module_name}.hs"
+            module_path.write_text(
+                f"module {module_name} where\nimport {AGGREGATOR_MODULE}\n"
+            )
+            unit_args = [
+                "-i",
+                f"-i./{dir_name}",
+                module_name,
+                "-this-unit-id",
+                f"{UNIT_FILE_PREFIX.lower()}-{index:02d}",
+                "-package-id",
+                f"{aggregator_unit_id}",
+            ]
+
+        unit_file = Path(f"{UNIT_FILE_PREFIX}{index:02d}")
+        unit_file.write_text(" ".join(unit_args) + "\n")
+
+
+def main() -> None:
+    if MODULE_COUNT <= 0:
+        raise SystemExit("MODULE_COUNT must be positive")
+    if HOME_UNIT_COUNT <= 0:
+        raise SystemExit("HOME_UNIT_COUNT must be positive")
+
+    reset_generated_artifacts()
+    mods = module_names()
+    write_pkg_modules(mods)
+    write_cabal_file(mods)
+    write_home_units(mods)
+
+
+if __name__ == "__main__":
+    main()

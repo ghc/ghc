@@ -34,6 +34,14 @@ MultiComponentModulesRecomp:
 	'$(PYTHON)' genMultiComp.py
 	TEST_HC='$(TEST_HC)' TEST_HC_OPTS='$(TEST_HC_OPTS)' ./run
 
+MultiUnitCabalPerf:
+	./genMultiUnitCabal
+	'$(GHC_PKG)' init tmp.cabal.d
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
+	cd multi-unit-cabal && ../Setup clean
+	cd multi-unit-cabal && ../Setup configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-hc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.cabal.d --ghc-pkg-option=--force
+	cd multi-unit-cabal && ../Setup build
+
 MultiLayerModulesTH_Make_Prep:
 	./genMultiLayerModulesTH
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcThWayFlags) MultiLayerModulesPrep -v0
@@ -49,4 +57,3 @@ InstanceMatching:
 T22744:
 	./genT22744
 	'$(TEST_HC)' $(TEST_HC_OPTS) T22744.hs
-
