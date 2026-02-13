@@ -304,16 +304,25 @@ schemeTopBind :: (Id, CgStgRhs) -> BcM ProtoBCO
 schemeTopBind (id, rhs@(StgRhsCon _ dc _ _ args _))
   = do
     profile <- getProfile
-    let non_voids = addArgReps (assertNonVoidStgArgs args)
-        (_, _, args_offsets)
-                  -- Compute the expected runtime ordering for the datacon fields
-                  = mkVirtConstrOffsets profile non_voids
+    let
+      non_voids = addArgReps (assertNonVoidStgArgs args)
+      (tot_wds, --  #ptr_wds + #nonptr_wds
+       ptr_wds, --  #ptr_wds
+       nv_args_w_offsets) =
+           -- Compute the runtime ordering for the datacon fields
+           -- (Subword-sized fields are laid out contiguously, and padding is
+           -- represented as literals of value 0 with the appropriate width)
+           mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
+      contiguous_args_with_pad =
+          litsWithPaddingToLits nv_args_w_offsets
+
     return ProtoStaticCon
       { protoStaticConName = getName id
       , protoStaticCon     = dc
       , protoStaticConData = [ case a of StgLitArg l -> Left l
                                          StgVarArg i -> Right i
-                             | (NonVoid a, _) <- args_offsets ]
+                             | NonVoid a <- contiguous_args_with_pad ]
+      , protoStaticConNonPtrsSize = tot_wds - ptr_wds
       , protoStaticConExpr = rhs
       }
 schemeTopBind (id, rhs)

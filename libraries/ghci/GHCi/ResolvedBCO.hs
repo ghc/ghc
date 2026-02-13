@@ -45,7 +45,7 @@ data ResolvedBCO
         resolvedBCOBitmap :: BCOByteArray Word,         -- ^ bitmap
         resolvedBCOLits   :: BCOByteArray Word,
           -- ^ non-ptrs - subword sized entries still take up a full (host) word
-        resolvedBCOPtrs   :: (SizedSeq ResolvedBCOPtr)  -- ^ ptrs
+        resolvedBCOPtrs   :: SizedSeq ResolvedBCOPtr  -- ^ ptrs
    }
    -- | A resolved static constructor
    -- See Note [Static constructors in Bytecode]
@@ -53,7 +53,18 @@ data ResolvedBCO
         resolvedBCOIsLE          :: Bool,
         resolvedStaticConInfoPtr :: !(RemotePtr Heap.StgInfoTable),
         resolvedStaticConArity   :: {-# UNPACK #-} !Word,
+        -- ^ how many words are used for the payload of the static constructor
+        -- (size of ptrs and (packed) non-ptrs combined)
         resolvedStaticConLits    :: BCOByteArray Word,
+        -- ^ Notably, sub-word non-ptr arguments and padding have already been
+        -- packed into full words, and this array only stores the full final
+        -- words to write as the constructor payload.
+        --
+        -- This is opposed to what we do for BCO literals, where we keep
+        -- sub-word literals as full words. For static constructors, the layout
+        -- must match exactly what the NCG also expects, so we must pack
+        -- sub-words accordingly for compatibility between interpreted and
+        -- compiled code.
         resolvedStaticConPtrs    :: SizedSeq ResolvedBCOPtr,
         resolvedStaticConIsUnlifted :: Bool
    }
