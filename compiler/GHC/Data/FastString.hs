@@ -558,7 +558,7 @@ mkFastStringShortByteString sbs =
 
 -- | Create a UTF-8 encoded 'FastString' from a 'Text'
 mkFastStringText :: T.Text -> FastString
-mkFastStringText = mkFastStringByteString . T.encodeUtf8
+mkFastStringText = mkFastString . T.unpack
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
