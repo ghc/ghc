@@ -87,7 +87,7 @@ linkBCO interp pkgs_loaded bytecode_state bco_ix unl_bco = do
         return ResolvedStaticCon
           { resolvedBCOIsLE = isLittleEndian
           , resolvedStaticConInfoPtr = itbl_ptr
-          , resolvedStaticConArity = sizeFlatBag lits0 + sizeFlatBag ptrs0
+          , resolvedStaticConArity = sizeFlatBag lits0 + sizeFlatBag ptrs0 -- ARITY IS WRONG, doesn't account for packing of literals
           , resolvedStaticConLits = lits
           , resolvedStaticConPtrs = ptrs
           , resolvedStaticConIsUnlifted = unlinkedStaticConIsUnlifted
@@ -95,7 +95,7 @@ linkBCO interp pkgs_loaded bytecode_state bco_ix unl_bco = do
   where
     doLits lits0 = do
       (lits :: [Word]) <- mapM (lookupLiteral interp pkgs_loaded bytecode_state) (elemsFlatBag lits0)
-      let lits' = listArray (0 :: Int, fromIntegral (sizeFlatBag lits0)-1) lits
+      let lits' = listArray (0 :: Int, fromIntegral (sizeFlatBag lits0)-1) lits -- WRONG, doesn't account for packing.
       return $ mkBCOByteArray lits'
     doPtrs ptrs0 = addListToSS emptySS <$> do
       mapM (resolvePtr interp pkgs_loaded bytecode_state bco_ix) (elemsFlatBag ptrs0)

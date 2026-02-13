@@ -58,8 +58,8 @@ data ProtoBCO
         -- We use this to construct the right info table.
         protoStaticConData :: [Either Literal Id],
         -- ^ The static constructor pointer and non-pointer arguments, sorted
-        -- in the order they should appear at runtime (see 'mkVirtConstrOffsets').
-        -- The pointers always come first, followed by the non-pointers.
+        -- in the order they should appear at runtime (see
+        -- 'mkVirtHeapOffsetsWithPadding' in 'schemeTopBind').
         protoStaticConExpr :: CgStgRhs
         -- ^ What the static con came from, for debugging only
    }
