@@ -39,7 +39,5 @@ Exception context:
 -   catch site for throwSTM
 -   annotateCallStackIO, called at ann_frame005.hs:26:3 in main:Main
 - HasCallStack backtrace:
--   collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:170:37 in ghc-internal:GHC.Internal.Exception
--   toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/STM.hs:190:26 in ghc-internal:GHC.Internal.STM
 -   throwSTM, called at ann_frame005.hs:55:9 in main:Main
 Handler annotation not present in context

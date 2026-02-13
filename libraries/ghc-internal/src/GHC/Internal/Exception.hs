@@ -87,7 +87,7 @@ throw e =
     -- Note also the absolutely crucial `noinine` in the RHS!
     --   See Note [Hiding precise exception signature in throw]
     let se :: SomeException
-        !se = noinline (unsafePerformIO (toExceptionWithBacktrace e))
+        !se = noinline (unsafePerformIO (withFrozenCallStack $ toExceptionWithBacktrace e))
     in raise# se
 
 -- Note [Capturing the backtrace in throw]
@@ -162,7 +162,12 @@ throw e =
 -- primops which allow more precise guidance of the demand analyser's heuristic
 -- (e.g. #23847).
 
--- | @since base-4.20.0.0
+-- | Collect a Backtrace and attach it to the 'Exception'.
+--
+-- It is recommended to use 'withFrozenCallStack' when calling this function
+-- in order to avoid leaking implementation details of 'toExceptionWithBacktrace'.
+--
+--  @since base-4.20.0.0
 toExceptionWithBacktrace :: (HasCallStack, Exception e)
                          => e -> IO SomeException
 toExceptionWithBacktrace e
