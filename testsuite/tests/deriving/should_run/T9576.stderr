@@ -13,7 +13,5 @@ T9576.hs:6:31: error: [GHC-39999]
 (deferred type error)
 
 HasCallStack backtrace:
-  collectExceptionAnnotation, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:169:13 in ghc-internal:GHC.Internal.Exception
-  toExceptionWithBacktrace, called at libraries/ghc-internal/src/GHC/Internal/Exception.hs:89:42 in ghc-internal:GHC.Internal.Exception
   throw, called at libraries/ghc-internal/src/GHC/Internal/Control/Exception/Base.hs:435:30 in ghc-internal:GHC.Internal.Control.Exception.Base
 
