@@ -487,7 +487,7 @@ tcStmtsAndThen ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
   | otherwise
   = do  { (stmt', (stmts', thing)) <-
                 setSrcSpanA loc                             $
-                addErrCtxt (StmtErrCtxt ctxt stmt)          $
+                addErrCtxt (StmtErrCtxt ctxt (L loc stmt))  $
                 stmt_chk ctxt stmt res_ty                   $ \ res_ty' ->
                 popErrCtxt                                  $
                 tcStmtsAndThen ctxt stmt_chk stmts res_ty'  $

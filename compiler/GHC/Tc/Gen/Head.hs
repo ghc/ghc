@@ -1006,7 +1006,8 @@ addFunResCtxt :: HsExpr GhcTc -> [HsExprArg p]
 addFunResCtxt fun args fun_res_ty env_ty thing_inside
   = do { env_tv  <- newFlexiTyVarTy liftedTypeKind
        ; dumping <- doptM Opt_D_dump_tc_trace
-       ; addLandmarkErrCtxtM (\env -> (env, ) <$> mk_msg dumping env_tv) thing_inside }
+       ; msg <- mk_msg dumping env_tv
+       ; addLandmarkErrCtxtM msg thing_inside }
       -- NB: use a landmark error context, so that an empty context
       -- doesn't suppress some more useful context
   where
@@ -1014,13 +1015,12 @@ addFunResCtxt fun args fun_res_ty env_ty thing_inside
       = do { mb_env_ty <- readExpType_maybe env_ty
                      -- by the time the message is rendered, the ExpType
                      -- will be filled in (except if we're debugging)
-           ; fun_res' <- zonkTcType fun_res_ty
            ; env'     <- case mb_env_ty of
-                           Just env_ty -> zonkTcType env_ty
+                           Just env_ty -> return env_ty
                            Nothing     -> do { massert dumping; return env_tv }
            ; let -- See Note [Splitting nested sigma types in mismatched
                  --           function types]
-                 (_, _, fun_tau) = tcSplitNestedSigmaTys fun_res'
+                 (_, _, fun_tau) = tcSplitNestedSigmaTys fun_res_ty
                  (_, _, env_tau) = tcSplitNestedSigmaTys env'
                      -- env_ty is an ExpRhoTy, but with simple subsumption it
                      -- is not deeply skolemised, so still use tcSplitNestedSigmaTys

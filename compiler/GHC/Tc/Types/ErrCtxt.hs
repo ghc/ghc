@@ -175,10 +175,16 @@ data ErrCtxtMsg
   -- | Warning emitted when inferring use of visible dependent quantification.
   | VDQWarningCtxt !TcTyCon
 
-  -- | In a statement.
-  | StmtErrCtxt !HsStmtContextRn !(ExprLStmt GhcRn)
+  -- | In a statement
+  | forall body.
+    ( Anno (StmtLR GhcRn GhcRn body) ~ SrcSpanAnnA
+    , Outputable body
+    ) => StmtErrCtxt !HsStmtContextRn !(StmtLR GhcRn GhcRn body)
 
-  -- | In patten of the statement. (c.f. MonadFailErrors)
+  -- | In a do statement.
+  | DoStmtErrCtxt !HsStmtContextRn !(ExprLStmt GhcRn)
+
+  -- | In patten of the do statement. (c.f. MonadFailErrors)
   | StmtErrCtxtPat !HsStmtContextRn !(ExprLStmt GhcRn) (Pat GhcRn)
 
   -- | In an rebindable syntax expression.

@@ -4,4 +4,3 @@ data UnitState
 data ModuleSuggestion
 data ModuleOrigin
 data UnusableUnit
-data UnitInfo

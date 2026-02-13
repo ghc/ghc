@@ -1182,7 +1182,7 @@ applying the instance decl would show up two uses of ?x.  #8912.
 checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
 -- Assumes argument is fully zonked
 checkValidTheta ctxt theta
-  = addErrCtxtM (checkThetaCtxt ctxt theta) $
+  = addErrCtxtM (ThetaCtxt ctxt theta) $
     do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
        ; expand <- initialExpandMode
        ; check_valid_theta env ctxt expand theta }
@@ -1457,10 +1457,6 @@ Flexibility check:
   The dictionary gets type [C * (D *)]. IA0_TODO it should be
   generalized actually.
 -}
-
-checkThetaCtxt :: UserTypeCtxt -> ThetaType -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
-checkThetaCtxt ctxt theta env
-  = return (env, ThetaCtxt ctxt (tidyTypes env theta))
 
 tyConArityErr :: TyCon -> [TcType] -> TcRnMessage
 -- For type-constructor arity errors, be careful to report

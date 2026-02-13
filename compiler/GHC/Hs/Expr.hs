@@ -686,7 +686,7 @@ mkExpandedStmt
   -> HsDoFlavour          -- ^ source statements do flavour
   -> HsExpr GhcRn         -- ^ expanded expression
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = StmtErrCtxt (HsDoStmt flav) oStmt
+mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = DoStmtErrCtxt (HsDoStmt flav) oStmt
                                                          , xrn_expanded = eExpr })
 
 data XXExprGhcTc

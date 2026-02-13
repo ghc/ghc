@@ -36,7 +36,6 @@ module GHC.Tc.Types.LclEnv (
 
 import GHC.Prelude
 
-import GHC.Hs ( SrcCodeOrigin (..) )
 import GHC.Tc.Utils.TcType ( TcLevel )
 import GHC.Tc.Errors.Types ( TcRnMessage )
 
@@ -120,8 +119,8 @@ push the new expression error message on top of the stack. cf. `LclEnv.setLclCtx
 type ErrCtxtStack = [ErrCtxt]
 
 -- | Get the original source code
-get_src_code_origin :: ErrCtxtStack -> Maybe SrcCodeOrigin
-get_src_code_origin (MkErrCtxt (ExpansionCodeCtxt origSrcCode) _ : _) = Just origSrcCode
+get_src_code_origin :: ErrCtxtStack -> Maybe ErrCtxtMsg
+get_src_code_origin (MkErrCtxt ExpansionCodeCtxt e : _) = Just e
                    -- we are in generated code, due to the expansion of the original syntax origSrcCode
 get_src_code_origin _ = Nothing
                    -- we are in user code, so blame the expression in hand
@@ -203,7 +202,7 @@ setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_err_ctxt = ctxt })
 addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
 addLclEnvErrCtxt ec = setLclEnvSrcCodeOrigin ec
 
-getLclEnvSrcCodeOrigin :: TcLclEnv -> Maybe SrcCodeOrigin
+getLclEnvSrcCodeOrigin :: TcLclEnv -> Maybe ErrCtxtMsg
 getLclEnvSrcCodeOrigin = get_src_code_origin . tcl_err_ctxt . tcl_lcl_ctxt
 
 setLclEnvSrcCodeOrigin :: ErrCtxt -> TcLclEnv -> TcLclEnv
@@ -212,18 +211,18 @@ setLclEnvSrcCodeOrigin ec = modifyLclCtxt (setLclCtxtSrcCodeOrigin ec)
 -- See Note [ErrCtxtStack Manipulation]
 setLclCtxtSrcCodeOrigin :: ErrCtxt -> TcLclCtxt -> TcLclCtxt
 setLclCtxtSrcCodeOrigin ec lclCtxt
-  | ecs@(MkErrCtxt (ExpansionCodeCtxt{}) _ : _) <- tcl_err_ctxt lclCtxt
-  , MkErrCtxt (ExpansionCodeCtxt ExprCtxt{}) _ <- ec
+  | ecs@(MkErrCtxt ExpansionCodeCtxt _ : _) <- tcl_err_ctxt lclCtxt
+  , MkErrCtxt ExpansionCodeCtxt ExprCtxt{} <- ec
   = lclCtxt { tcl_err_ctxt =  ec : ecs }
-  | MkErrCtxt (ExpansionCodeCtxt{}) _ : ecs <- tcl_err_ctxt lclCtxt
-  , MkErrCtxt (ExpansionCodeCtxt{}) _ <- ec
+  | MkErrCtxt ExpansionCodeCtxt _ : ecs <- tcl_err_ctxt lclCtxt
+  , MkErrCtxt ExpansionCodeCtxt _ <- ec
   = lclCtxt { tcl_err_ctxt =  ec : ecs }
   | otherwise
   = lclCtxt { tcl_err_ctxt = ec : tcl_err_ctxt lclCtxt }
 
 lclCtxtInGeneratedCode :: TcLclCtxt -> Bool
 lclCtxtInGeneratedCode lclCtxt
-  | (MkErrCtxt (ExpansionCodeCtxt _) _ : _) <- tcl_err_ctxt lclCtxt
+  | (MkErrCtxt ExpansionCodeCtxt _ : _) <- tcl_err_ctxt lclCtxt
   = True
   | otherwise
   = False

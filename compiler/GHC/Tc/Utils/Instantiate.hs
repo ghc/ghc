@@ -67,7 +67,6 @@ import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
-import GHC.Tc.Zonk.Monad ( ZonkM )
 
 import GHC.Rename.Utils( mkRnSyntaxExpr )
 
@@ -855,7 +854,7 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
         -- case of locally-polymorphic methods.
 
     span <- getSrcSpanM
-    addErrCtxtM (syntaxNameCtxt user_nm_expr orig sigma1 span) $ do
+    addErrCtxtM (SyntaxNameCtxt user_nm_expr orig sigma1 span) $ do
 
         -- Check that the user-supplied thing has the
         -- same type as the standard one.
@@ -863,11 +862,6 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
      expr <- tcCheckPolyExpr (L (noAnnSrcSpan span) user_nm_expr) sigma1
      hasFixedRuntimeRepRes std_nm user_nm_expr sigma1
      return (std_nm, unLoc expr)
-
-syntaxNameCtxt :: HsExpr GhcRn -> CtOrigin -> Type -> SrcSpan
-               -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
-syntaxNameCtxt name orig ty loc tidy_env =
-  return (tidy_env, SyntaxNameCtxt name orig (tidyType tidy_env ty) loc)
 
 {-
 ************************************************************************

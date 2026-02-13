@@ -68,11 +68,11 @@ import GHC.Core.FVs( orphNamesOfTypes )
 import GHC.CoreToIface
 
 import GHC.Driver.Flags
--- import GHC.Driver.Backend
+import GHC.Driver.Backend
 import GHC.Hs hiding (HoleError)
 import GHC.Hs.Decls.Overlap
 
--- import GHC.Tc.Errors.Types
+import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Types.PromotionErr (pprTermLevelUseCtxt)
 import GHC.Tc.Errors.Hole.FitTypes
 import GHC.Tc.Types.BasicTypes
@@ -109,7 +109,7 @@ import GHC.Iface.Errors.Types
 import GHC.Iface.Errors.Ppr
 import GHC.Iface.Syntax
 
--- import GHC.Unit.State
+import GHC.Unit.State
 import GHC.Unit.Module
 
 import GHC.Data.Bag
@@ -7880,6 +7880,18 @@ pprErrCtxtMsg = \case
     | otherwise
     -> hang (text "In a stmt of" <+> pprAStmtContext ctxt <> colon)
        2 (ppr_stmt stmt)
+
+  DoStmtErrCtxt ctxt stmt
+    -- For [ e | .. ], do not mutter about "stmts"
+    | LastStmt _ e _ _ <- (unLoc stmt)
+    , isComprehensionContext ctxt
+    -> hang (text "In the expression:") 2 (ppr e)
+    | otherwise
+    -> hang (text "In a stmt of" <+> pprAStmtContext ctxt <> colon)
+       2 (ppr_stmt (unLoc stmt))
+
+  StmtErrCtxtPat _ _ pat ->
+    hang (text "In the pattern:") 2 (ppr pat)
 
   DerivInstCtxt pred ->
     text "When deriving the instance for" <+> parens (ppr pred)

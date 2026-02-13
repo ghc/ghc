@@ -973,8 +973,8 @@ addArgCtxt arg_no (app_head, app_head_lspan) (L arg_loc arg) thing_inside
  where
     addNthFunArgErrCtxt :: HsExpr GhcRn -> HsExpr GhcRn -> Int -> TcM a -> TcM a
     addNthFunArgErrCtxt app_head arg arg_no thing_inside
-      | XExpr (ExpandedThingRn o _) <- arg
-      = addExpansionErrCtxt o (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
+      | XExpr (ExpandedThingRn _ _) <- arg
+      = addExpansionErrCtxt (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
           thing_inside
       | otherwise
       = addErrCtxt (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $

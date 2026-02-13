@@ -66,7 +66,7 @@ import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
-import GHC.Types.Var.Env( TidyEnv, TyVarEnv, mkVarEnv, lookupVarEnv )
+import GHC.Types.Var.Env( TyVarEnv, mkVarEnv, lookupVarEnv )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -970,7 +970,7 @@ mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mo
                                           , text "insoluble" <+> ppr insoluble ])
 
        ; unless insoluble $
-         addErrCtxtM (mk_inf_msg poly_name inferred_poly_ty) $
+         addErrCtxtM (InferredTypeCtxt poly_name inferred_poly_ty) $
          do { checkEscapingKind inferred_poly_ty
                  -- See Note [Inferred type with escaping kind]
             ; checkValidType (InfSigCtxt poly_name) inferred_poly_ty }
@@ -1119,11 +1119,6 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
 
 chooseInferredQuantifiers _ _ _ _ (Just sig)
   = pprPanic "chooseInferredQuantifiers" (ppr sig)
-
-mk_inf_msg :: Name -> TcType -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
-mk_inf_msg poly_name poly_ty tidy_env
- = do { (tidy_env1, poly_ty) <- zonkTidyTcType tidy_env poly_ty
-      ; return (tidy_env1, InferredTypeCtxt poly_name poly_ty) }
 
 -- | Warn the user about polymorphic local binders that lack type signatures.
 localSigWarn :: Id -> Maybe TcIdSigInst -> TcM ()
@@ -1909,4 +1904,3 @@ NoGen is good when we have call sites, but not at top level, where the
 function may be exported.  And it's easier to grok "MonoLocalBinds" as
 applying to, well, local bindings.
 -}
-

@@ -51,6 +51,7 @@ module GHC.Tc.Types.Origin (
 import GHC.Prelude
 
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.ErrCtxt
 
 import GHC.Hs
 
@@ -836,7 +837,7 @@ exprCtOrigin e@(HsGetField{})     = ExpansionOrigin (ExprCtxt e)
 exprCtOrigin (XExpr (ExpandedThingRn o _)) = ExpansionOrigin o
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 
-srcCodeOriginCtOrigin :: HsExpr GhcRn -> Maybe SrcCodeOrigin -> CtOrigin
+srcCodeOriginCtOrigin :: HsExpr GhcRn -> Maybe ErrCtxtMsg -> CtOrigin
 srcCodeOriginCtOrigin e Nothing = exprCtOrigin e
 srcCodeOriginCtOrigin _ (Just o) = ExpansionOrigin o
 
@@ -874,7 +875,7 @@ pprCtOrigin (ExpansionOrigin o)
       what = case o of
         StmtErrCtxt{} ->
           text "a do statement"
-        StmtErrCtxtPat _ p ->
+        StmtErrCtxtPat _ _ p ->
           text "a do statement" $$
              text "with the failable pattern" <+> quotes (ppr p)
         ExprCtxt (HsGetField _ _ (L _ f)) ->
@@ -887,6 +888,7 @@ pprCtOrigin (ExpansionOrigin o)
         ExprCtxt (HsProjection _ p) -> text "the record selector" <+>
              quotes (ppr ((FieldLabelStrings $ fmap noLocA p)))
         ExprCtxt e -> text "the expression" <+> (ppr e)
+        _ -> text "shouldn't happen ExpansionOrigin pprCtOrigin"
 
 pprCtOrigin (GivenSCOrigin sk d blk)
   = vcat [ ctoHerald <+> pprSkolInfo sk
@@ -1112,6 +1114,7 @@ ppr_br (ExpansionOrigin (ExprCtxt (HsIf{}))) = text "an if-then-else expression"
 ppr_br (ExpansionOrigin (ExprCtxt e)) = text "an expression" <+> ppr e
 ppr_br (ExpansionOrigin (StmtErrCtxt{})) = text "a do statement"
 ppr_br (ExpansionOrigin (StmtErrCtxtPat{})) = text "a do statement"
+ppr_br (ExpansionOrigin{}) = text "shouldn't happen ExpansionOrigin ppr_br"
 ppr_br (ExpectedTySyntax o _) = ppr_br o
 ppr_br (ExpectedFunTySyntaxOp{}) = text "a rebindable syntax operator"
 ppr_br (ExpectedFunTyViewPat{}) = text "a view pattern"

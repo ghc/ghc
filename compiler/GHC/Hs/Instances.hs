@@ -620,13 +620,48 @@ deriving instance Eq (IE GhcTc)
 
 -- ---------------------------------------------------------------------
 
-deriving instance Data ErrCtxtMsg
-deriving instance Data XXExprGhcRn
+-- deriving instance Data ErrCtxtMsg
+-- deriving instance Data XXExprGhcRn
+con_ExpandedThingRn = mkConstr xXExprGhcRn_T "ExpandedThingRn" [] Prefix
+con_HsRecSelRn = mkConstr xXExprGhcRn_T "HsRecSelRn" [] Prefix
+xXExprGhcRn_T = mkDataType "GHC.Hs.Expr.XXExprGhcRn" []
+
+instance Data XXExprGhcRn where
+  toConstr (ExpandedThingRn{}) = con_ExpandedThingRn
+  toConstr (HsRecSelRn{}) = con_HsRecSelRn
+
+  dataTypeOf _ = xXExprGhcRn_T
+
+  gunfold k z c = error "no gunfold for XXExprGhcRn"
+  gfoldl k z c = error "no gfoldl for XXExprGhcRn"
+
 deriving instance Data a => Data (WithUserRdr a)
 
 -- ---------------------------------------------------------------------
 
-deriving instance Data XXExprGhcTc
+-- deriving instance Data XXExprGhcTc
+con_ExpandedThingTc = mkConstr xXExprGhcTc_T "ExpandedThingTc" [] Prefix
+con_WrapExpr = mkConstr xXExprGhcTc_T "WrapExpr" [] Prefix
+con_ConLikeTc = mkConstr xXExprGhcTc_T "ConLikeTc" [] Prefix
+con_HsTick = mkConstr xXExprGhcTc_T "HsTick" [] Prefix
+con_HsBinTick = mkConstr xXExprGhcTc_T "HsBinTick" [] Prefix
+con_HsRecSelTc = mkConstr xXExprGhcTc_T "HsRecSelTc" [] Prefix
+xXExprGhcTc_T = mkDataType "GHC.Hs.Expr.XXExprGhcTc" []
+
+instance Data XXExprGhcTc where
+  toConstr (ExpandedThingTc{}) = con_ExpandedThingTc
+  toConstr (WrapExpr{}) = con_WrapExpr
+  toConstr (ConLikeTc{}) = con_ConLikeTc
+  toConstr (HsTick{}) = con_HsTick
+  toConstr (HsBinTick{}) = con_HsBinTick
+  toConstr (HsRecSelTc{}) = con_HsRecSelTc
+
+  dataTypeOf _ = xXExprGhcTc_T
+
+
+  gunfold _ _ _ = error "no gunfold for XXExprGhcTc"
+  gfoldl _ _ _ = error "no gfoldl for XXExprGhcTc"
+
 deriving instance Data XXPatGhcTc
 
 -- ---------------------------------------------------------------------

@@ -47,6 +47,7 @@ import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Tickish
 import GHC.Types.ProfAuto
+import GHC.Tc.Types.ErrCtxt
 
 import Control.Monad
 import Data.List (isSuffixOf, intersperse)
@@ -414,7 +415,7 @@ addTickLHsExpr e@(L pos e0) = do
   d <- getDensity
   case d of
     TickForBreakPoints | isGoodBreakExpr e0 -> tick_it
-    TickForCoverage    | XExpr (ExpandedThingTc OrigStmt{} _) <- e0 -- expansion ticks are handled separately
+    TickForCoverage    | XExpr (ExpandedThingTc StmtErrCtxt{} _) <- e0 -- expansion ticks are handled separately
                        -> dont_tick_it
                        | otherwise -> tick_it
     TickCallSites      | isCallSite e0      -> tick_it
@@ -483,7 +484,7 @@ addTickLHsExprNever (L pos e0) = do
 -- General heuristic: expressions which are calls (do not denote
 -- values) are good break points.
 isGoodBreakExpr :: HsExpr GhcTc -> Bool
-isGoodBreakExpr (XExpr (ExpandedThingTc (OrigStmt{}) _)) = False
+isGoodBreakExpr (XExpr (ExpandedThingTc (StmtErrCtxt{}) _)) = False
 isGoodBreakExpr e = isCallSite e
 
 isCallSite :: HsExpr GhcTc -> Bool
@@ -658,11 +659,11 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
 
-addTickHsExpanded :: SrcCodeOrigin -> HsExpr GhcTc -> TM (HsExpr GhcTc)
+addTickHsExpanded :: ErrCtxtMsg -> HsExpr GhcTc -> TM (HsExpr GhcTc)
 addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
   -- We always want statements to get a tick, so we can step over each one.
   -- To avoid duplicates we blacklist SrcSpans we already inserted here.
-  OrigStmt (L pos _) _ -> do_tick_black pos
+  DoStmtErrCtxt _ (L pos _) -> do_tick_black pos
   _                    -> skip
   where
     skip = addTickHsExpr e

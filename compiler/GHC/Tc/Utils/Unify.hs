@@ -216,7 +216,7 @@ matchActualFunTy herald mb_thing err_info fun_ty
            ; return (co, arg_ty, res_ty) }
 
     ------------
-    mk_ctxt :: TcType -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
+    mk_ctxt :: TcType -> ErrCtxtMsg
     mk_ctxt _res_ty = mkFunTysMsg herald err_info
 
 {- Note [matchActualFunTy error handling]
@@ -959,15 +959,13 @@ new_check_arg_ty herald arg_pos -- Position for error messages only, 1 for first
 
 mkFunTysMsg :: CtOrigin
             -> (VisArity, TcType)
-            -> TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
+            -> ErrCtxtMsg
 -- See Note [Reporting application arity errors]
-mkFunTysMsg herald (n_vis_args_in_call, fun_ty) env
-  = do { (env', fun_ty) <- zonkTidyTcType env fun_ty
-
-       ; let (pi_ty_bndrs, _) = splitPiTys fun_ty
+mkFunTysMsg herald (n_vis_args_in_call, fun_ty)
+  = do { let (pi_ty_bndrs, _) = splitPiTys fun_ty
              n_fun_args = count isVisiblePiTyBinder pi_ty_bndrs
 
-       ; return (env', FunTysCtxt herald fun_ty n_vis_args_in_call n_fun_args) }
+       ; FunTysCtxt herald fun_ty n_vis_args_in_call n_fun_args }
 
 
 {- Note [Reporting application arity errors]
@@ -1524,15 +1522,9 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
  , isRhoExpTy ty_expected   -- TypeEqOrigin stuff (added by the _NC functions)
  = thing_inside             -- gives enough context by itself
  | otherwise
- = addErrCtxtM mk_msg thing_inside
-  where
-    mk_msg tidy_env
-      = do { (tidy_env, ty_actual)   <- zonkTidyTcType tidy_env ty_actual
-           ; ty_expected             <- readExpType ty_expected
-                   -- A worry: might not be filled if we're debugging. Ugh.
-           ; (tidy_env, ty_expected) <- zonkTidyTcType tidy_env ty_expected
-           ; return (tidy_env, SubTypeCtxt ty_expected ty_actual) }
-
+ = do ty_expected  <- readExpType ty_expected
+      addErrCtxtM (SubTypeCtxt ty_expected ty_actual) $
+        thing_inside
 
 ---------------
 tc_sub_type :: (TcType -> TcType -> TcM TcCoercionN)  -- How to unify

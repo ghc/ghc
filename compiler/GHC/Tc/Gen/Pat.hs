@@ -39,7 +39,6 @@ import GHC.Core.Multiplicity
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Zonk.TcType
 import GHC.Core.TyCo.Ppr ( pprTyVars )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
@@ -1021,7 +1020,8 @@ tcPatSig in_pat_bind sig res_ty
         ; case NE.nonEmpty sig_tvs of
             Nothing -> do {
                 -- Just do the subsumption check and return
-                  wrap <- addErrCtxtM (mk_msg sig_ty) $
+                  msg <- mk_msg res_ty sig_ty
+                ; wrap <- addErrCtxtM msg $
                           tcSubTypePat PatSigOrigin PatSigCtxt res_ty sig_ty
                 ; return (sig_ty, [], sig_wcs, wrap)
                 }
@@ -1035,18 +1035,17 @@ tcPatSig in_pat_bind sig res_ty
                 (addErr (TcRnCannotBindScopedTyVarInPatSig sig_tvs_ne))
 
               -- Now do a subsumption check of the pattern signature against res_ty
-              wrap <- addErrCtxtM (mk_msg sig_ty) $
+              msg <- mk_msg res_ty sig_ty
+              wrap <- addErrCtxtM msg $
                       tcSubTypePat PatSigOrigin PatSigCtxt res_ty sig_ty
 
               -- Phew!
               return (sig_ty, sig_tvs, sig_wcs, wrap)
        }
   where
-    mk_msg sig_ty tidy_env
-       = do { (tidy_env, sig_ty) <- zonkTidyTcType tidy_env sig_ty
-            ; res_ty <- readExpType res_ty   -- should be filled in by now
-            ; (tidy_env, res_ty) <- zonkTidyTcType tidy_env res_ty
-            ; return (tidy_env, PatSigErrCtxt sig_ty res_ty) }
+    mk_msg res_ty sig_ty
+       = do { res_ty <- readExpType res_ty   -- should be filled in by now
+            ; return $ PatSigErrCtxt sig_ty res_ty }
 
 {- *********************************************************************
 *                                                                      *
