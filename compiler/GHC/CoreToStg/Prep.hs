@@ -1583,6 +1583,8 @@ eta_would_wreck_join _                 = False
 
 maybeSaturate :: Id -> CpeApp -> Int -> [CoreTickish] -> UniqSM CpeRhs
 maybeSaturate fn expr n_args unsat_ticks
+  | isJoinId fn  -- Never eta-expand a call to a join point
+  = return expr
   | hasNoBinding fn || excess_arity > 0
   = return $ wrapLamBody (mkTicks unsat_ticks) sat_expr
   | otherwise
