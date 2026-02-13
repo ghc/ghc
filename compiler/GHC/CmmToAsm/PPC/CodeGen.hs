@@ -1204,15 +1204,13 @@ genCCall _ (PrimTarget MO_Touch) _ _
 genCCall _ (PrimTarget (MO_Prefetch_Data _)) _ _
  = return $ nilOL
 
-genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
+genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
  = do let fmt      = intFormat (max width W32)
           reg_dst  = getLocalRegReg dst
-      platform <- getPlatform
-
 
       (Amode aligned_addr align_code, maybe_unaligned_addr) <- case width of
-         W8  -> align_address platform
-         W16 -> align_address platform
+         W8  -> align_address
+         W16 -> align_address
          _   -> getAmodeIndex addr
 
       shift        <- getNewRegNat fmt
@@ -1236,12 +1234,10 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
         W8  -> do
           (n_reg, ncode) <- getSomeReg n
           let unaligned_addr = fromJust maybe_unaligned_addr
-          let inv = case platformByteOrder platform of
-                      BigEndian -> unitOL $ XOR shift shift (RIImm (ImmInt 24))
-                      LittleEndian -> nilOL
+          let inv = shift_amount platform shift
               and_mask = case amop of
                 AMO_And -> unitOL $ ORC shifted_n shifted_n shifted_mask
-                _       -> nilOL
+                _       -> nilOL -- TODO: OR/XOR
           let i = ncode `appOL` unitOL (RLWINM shift unaligned_addr 3 27 28)
                   `appOL` inv `appOL`
                   toOL [ LI mask (ImmInt 255)
@@ -1256,9 +1252,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
         W16 -> do
           (n_reg, ncode) <- getSomeReg n
           let unaligned_addr = fromJust maybe_unaligned_addr
-          let inv = case platformByteOrder platform of
-                      BigEndian -> unitOL $ XOR shift shift (RIImm (ImmInt 16))
-                      LittleEndian -> nilOL
+          let inv = shift_amount platform shift
               and_mask = case amop of
                 AMO_And -> unitOL $ ORC shifted_n shifted_n shifted_mask
                 _       -> nilOL
@@ -1335,7 +1329,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                  return ((Amode (AddrRegReg r0 reg) code) -- NB: r0 is 0 here!
                         , Nothing)
 
-           align_address platform
+           align_address
              = do
              let addr_fmt = intFormat (wordWidth platform)
              (unaligned_addr, ucode) <- getSomeReg addr
@@ -1343,6 +1337,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
              return (Amode (AddrRegReg r0 aligned_addr)
                      (ucode `snocOL` (CLRRI addr_fmt aligned_addr
                                       unaligned_addr 2)), Just unaligned_addr)
+
            getSomeRegOrImm sign
              = case n of
                  CmmLit (CmmInt i _) | Just imm <- makeImmediate width sign i
@@ -1352,11 +1347,20 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                           (n_reg, n_code) <- getSomeReg n
                           return  (RIReg n_reg, n_code)
 
-genCCall _ (PrimTarget (MO_AtomicRead width _)) [dst] [addr]
+           shift_amount platform shift
+             = let shift_amt = case width of
+                                 W8  -> 24
+                                 W16 -> 16
+                                 _   -> 0
+               in case platformByteOrder platform of
+                    BigEndian -> unitOL $ XOR shift shift
+                                 (RIImm (ImmInt shift_amt))
+                    LittleEndian -> nilOL
+
+genCCall platform (PrimTarget (MO_AtomicRead width _)) [dst] [addr]
  = do let fmt      = intFormat width
           reg_dst  = getLocalRegReg dst
           form     = if widthInBits width == 64 then DS else D
-      platform <- getPlatform
       let arch_fmt = intFormat (wordWidth platform)
       Amode addr_reg addr_code <- getAmode form addr
       lbl_end <- getBlockIdNat
