@@ -262,7 +262,9 @@ data UnlinkedBCO
         -- confused with the name of the static constructor itself
         -- ('unlinkedStaticConDataConName')
         unlinkedStaticConDataConName :: !Name,
-        unlinkedStaticConLits :: !(FlatBag BCONPtr), -- non-ptrs
+        unlinkedStaticConLits :: !(FlatBag BCONPtr),
+        -- ^ non-ptrs full words, where sub-word literals have already been
+        -- packed into full words as needed
         unlinkedStaticConPtrs :: !(FlatBag BCOPtr),  -- ptrs
         unlinkedStaticConIsUnlifted :: !Bool
    }
@@ -331,7 +333,7 @@ instance Outputable UnlinkedBCO where
       = sep [text "StaticCon", ppr nm, text "for",
              if unl then text "unlifted" else text "lifted",
              ppr dc_nm, text "with",
-             ppr (sizeFlatBag lits), text "lits",
+             ppr (sizeFlatBag lits), text "lits", parens (text "(packed) full words"),
              ppr (sizeFlatBag ptrs), text "ptrs" ]
 
 instance Binary FFIInfo where

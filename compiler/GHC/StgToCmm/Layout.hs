@@ -23,6 +23,7 @@ module GHC.StgToCmm.Layout (
         mkVirtHeapOffsetsWithPadding,
         mkVirtConstrOffsets,
         mkVirtConstrSizes,
+        litsWithPaddingToLits,
         getHpRelOffset,
 
         ArgRep(..), toArgRep, toArgRepOrV, idArgRep, argRepSizeW, -- re-exported from GHC.StgToCmm.ArgRep
@@ -66,6 +67,7 @@ import Control.Monad
 import GHC.StgToCmm.Config (stgToCmmPlatform)
 import GHC.StgToCmm.Types
 import Data.List.NonEmpty (nonEmpty)
+import GHC.Types.Literal
 
 ------------------------------------------------------------------------
 --                Call and return sequences
@@ -423,6 +425,10 @@ data FieldOffOrPadding a
     | Padding ByteOff  -- Length of padding in bytes.
               ByteOff  -- Offset in bytes.
 
+instance Outputable a => Outputable (FieldOffOrPadding a) where
+    ppr (FieldOff (NonVoid a) off) = text "Field" <+> ppr a <+> text "at offset" <+> int off
+    ppr (Padding size off) = text "Padding of size" <+> int size <+> text "at offset" <+> int off
+
 -- | Used to tell the various @mkVirtHeapOffsets@ functions what kind
 -- of header the object has.  This will be accounted for in the
 -- offsets of the fields returned.
@@ -512,6 +518,25 @@ mkVirtHeapOffsetsWithPadding profile header things =
                              , field_off
                              ]
 
+-- | Flatten a list of @'FieldOffOrPadding' StgArg@ into a list of @NonVoid StgArg@
+-- by decompose padding into zero-valued 'StgLitArgs' units of length 8, 4, 2, or 1 bytes.
+litsWithPaddingToLits :: [FieldOffOrPadding StgArg] -> [NonVoid StgArg]
+litsWithPaddingToLits = concatMap $ \case
+  FieldOff (NonVoid arg) _ -> [NonVoid arg]
+  Padding size _ -> map (NonVoid . StgLitArg) (zeroBytes size)
+  where
+    -- Make literals of value 0 for a total of n bytes of padding.
+    zeroBytes :: ByteOff -> [Literal]
+    zeroBytes n
+      | n == 0       = []
+      | n == 1       = [LitNumber LitNumWord8  0]
+      | n == 2       = [LitNumber LitNumWord16 0]
+      | n == 4       = [LitNumber LitNumWord32 0]
+      | n == 8       = [LitNumber LitNumWord64 0]
+      | testBit n 0  = LitNumber LitNumWord8  0 : zeroBytes (n-1)
+      | testBit n 1  = LitNumber LitNumWord16 0 : zeroBytes (n-2)
+      | testBit n 2  = LitNumber LitNumWord32 0 : zeroBytes (n-4)
+      | otherwise    = LitNumber LitNumWord64 0 : zeroBytes (n-8)
 
 mkVirtHeapOffsets
   :: Profile

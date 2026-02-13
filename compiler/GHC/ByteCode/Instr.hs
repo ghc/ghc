@@ -60,6 +60,14 @@ data ProtoBCO
         -- ^ The static constructor pointer and non-pointer arguments, sorted
         -- in the order they should appear at runtime (see
         -- 'mkVirtHeapOffsetsWithPadding' in 'schemeTopBind').
+        --
+        -- The non-pointer arguments are meant to be laid contiguously in
+        -- memory using the width of each literal individually. The padding is
+        -- given as Literals of value 0 with the appropriate width.
+        protoStaticConNonPtrsSize :: Int,
+        -- ^ How many words needed to store the non-pointer arguments.
+        -- Note that this may be smaller than the number of non-pointer
+        -- arguments, since subword arguments need to be packed.
         protoStaticConExpr :: CgStgRhs
         -- ^ What the static con came from, for debugging only
    }
@@ -333,11 +341,12 @@ data BCInstr
 -- Printing bytecode instructions
 
 instance Outputable ProtoBCO where
-   ppr (ProtoStaticCon nm con args origin)
+   ppr (ProtoStaticCon nm con args nonPtrsSize origin)
       = text "ProtoStaticCon" <+> ppr nm <> colon
         $$ nest 3 (pprStgRhsShort shortStgPprOpts origin)
         $$ nest 3 (text "constructor: "  <+> ppr con)
         $$ nest 3 (text "sorted args: "  <+> ppr args)
+        $$ nest 3 (text "non-ptrs (packed) size: " <+> int (fromIntegral nonPtrsSize) <+> text "words")
    ppr (ProtoBCO { protoBCOName       = name
                  , protoBCOInstrs     = instrs
                  , protoBCOBitmap     = bitmap

@@ -38,7 +38,7 @@ import GHC.Types.SptEntry
 import GHC.Types.Unique.FM
 import GHC.Unit.Types
 
-import GHC.Utils.Outputable ( Outputable(..), text, (<+>), vcat )
+import GHC.Utils.Outputable ( Outputable(..), text, (<+>), vcat, ($$) )
 import GHC.Utils.Panic
 
 import GHC.Builtin.Types.Prim ( addrPrimTy )
@@ -77,6 +77,8 @@ import GHC.Exts
 import GHC.Core.DataCon
 import GHC.Data.FlatBag
 import GHC.Types.Id
+import Data.List (unfoldr)
+import GHC.Types.RepType (typePrimRepU)
 
 
 -- -----------------------------------------------------------------------------
@@ -214,9 +216,11 @@ assembleBCO platform
             (ProtoStaticCon { protoStaticConName
                             , protoStaticCon = dc
                             , protoStaticConData = args
+                            , protoStaticConNonPtrsSize = non_ptr_words
                             }) = do
-  let ptrs    = foldr mappendFlatBag emptyFlatBag (mapMaybe idBCOArg args)
-  let nonptrs = foldr mappendFlatBag emptyFlatBag (mapMaybe litBCOArg args)
+  let fullword_args = packSubwordArgs platform args
+  let ptrs    = foldr mappendFlatBag emptyFlatBag (mapMaybe idBCOArg fullword_args)
+  let nonptrs = foldr mappendFlatBag emptyFlatBag (mapMaybe litBCOArg fullword_args)
   pure UnlinkedStaticCon
     { unlinkedStaticConName = protoStaticConName
     , unlinkedStaticConDataConName = dataConName dc
@@ -293,6 +297,50 @@ assembleBCO platform
   -- when (notNull malloced) (addFinalizer ul_bco (mapM_ zonk malloced))
 
   return ul_bco
+
+-- | Pack sub-word literals (which should appear contiguously in the argument
+-- list) into full words, and leave full-word-sized arguments alone.
+packSubwordArgs :: Platform -> [Either Literal Id] -> [Either Literal Id]
+packSubwordArgs platform = map packWord . groupWords
+  -- Group arguments into lists of total size=platform word size
+  where
+    -- Assumes packed sub-words are always ordered from largest to smallest
+    packWord :: Either [(Literal, Int{-size in bits-})] Id -> Either Literal Id
+    packWord (Right v) = Right v -- already word size
+    packWord (Left litsWithSizes) = Left $ mkLitWord platform packedValue
+      where
+        packedValue = case platformByteOrder platform of
+          BigEndian ->
+            -- For BE, we shift the accumulator left and OR the new value
+            foldl' (\acc (val, sz) -> (acc `unsafeShiftL` sz) .|. val) 0 litsWithSizes
+
+          LittleEndian ->
+            -- For LE, the first element is at shift 0, the next at shift (size of first), etc.
+            let offsets = scanl (+) 0 [ sz | (_, sz) <- litsWithSizes ]
+            in foldl' (\acc ((val, _), shift) -> acc .|. (val `unsafeShiftL` shift)) 0 (zip litsWithSizes offsets)
+
+    groupWords :: [Either Literal Id] -> [Either [(Literal, Int{-size in bits-})] Id]
+    groupWords = unfoldr step
+      where
+        step [] = Nothing
+        step (Right v:xs) = Just (Right v, xs)
+        step (Left l:xs) =
+          let (chunk, rest) = takeWord 0 [] (Left l:xs)
+          in Just (Left chunk, rest)
+
+        takeWord _ _ [] = panic "packSubwordArgs: Input does not align to 64-bit boundary"
+        takeWord !n acc (Right l:ls)
+          -- ptrs are word sized by definition, so the accumulated sub-words must already have formed a full word.
+          = assertPpr (n == ws) (text "packSubwordArgs: Word-sized argument found before accumulated sub-words formed a full word")
+            (reverse acc, Right l:ls)
+        takeWord !n acc (Left l:ls)
+          | n + s <  ws = takeWord (n+s) ((l,s*8):acc) ls
+          | n + s == ws = (reverse ((l,s*8):acc), ls)
+          | otherwise   = panic "packSubwordArgs: Element crosses 64-bit boundary"
+          where
+            s = primRepSizeB platform (typePrimRepU (literalType l))
+
+    ws = platformWordSizeInBytes platform
 
 -- | Construct a word-array containing an @StgLargeBitmap@.
 mkBitmapArray :: Word -> [StgWord] -> UArray Int Word
