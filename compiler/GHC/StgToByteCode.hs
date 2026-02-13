@@ -305,9 +305,40 @@ schemeTopBind (id, rhs@(StgRhsCon _ dc _ _ args _))
   = do
     profile <- getProfile
     let non_voids = addArgReps (assertNonVoidStgArgs args)
-        (_, _, args_offsets)
-                  -- Compute the expected runtime ordering for the datacon fields
-                  = mkVirtConstrOffsets profile non_voids
+
+    -- LAY IT OUT (similar to `cgTopRhsCon`)
+    let (tot_wds, --  #ptr_wds + #nonptr_wds
+         ptr_wds, --  #ptr_wds
+         args_offsets) =
+             -- Compute the expected runtime ordering for the datacon fields
+             mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
+
+    let
+      -- Decompose padding into units of length 8, 4, 2, or 1 bytes to
+      -- allow the implementation of mk_payload to use widthFromBytes,
+      -- which only handles these cases.
+      fix_padding (x@(Padding n off) : rest)
+        | n == 0                 = fix_padding rest
+        | n `elem` [1,2,4,8]     = x : fix_padding rest
+        | testBit n 0            = add_pad 1
+        | testBit n 1            = add_pad 2
+        | testBit n 2            = add_pad 4
+        | otherwise              = add_pad 8
+        where add_pad m = Padding m off : fix_padding (Padding (n-m) (off+m) : rest)
+      fix_padding (x : rest)     = x : fix_padding rest
+      fix_padding []             = []
+
+      mk_payload (Padding len _) = return (CmmInt 0 (widthFromBytes len))
+      mk_payload (FieldOff arg _) = do
+          amode <- getArgAmode arg
+          case amode of
+            CmmLit lit -> return lit
+            _          -> panic "GHC.StgToCmm.DataCon.cgTopRhsCon"
+
+      nonptr_wds = tot_wds - ptr_wds
+
+    payload <- mapM mk_payload (fix_padding args_offsets)
+
     return ProtoStaticCon
       { protoStaticConName = getName id
       , protoStaticCon     = dc
