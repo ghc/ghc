@@ -222,9 +222,16 @@ buildBinDistDir dirPrefix root conf@BindistConfig{..} = do
     --
     -- N.B. the ghc-pkg executable may be prefixed with a target triple
     -- (c.f. #20267).
-
-    ghcPkgName <- programName (vanillaContext executable_stage ghcPkg)
-    cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache", "--package-db", bindistFilesDir -/- "lib" -/- "package.conf.d" ]
+    --
+    -- For Stage3 cross-compilers (those that are supposed to run on the target
+    -- platform), we have to resort to a prior stage's ghc-pkg as the final
+    -- stage can naturally not be executed on our current build host.
+    if use_inplace_ghcPkg then do
+      ghcPkgName <- programName (vanillaContext executable_stage ghcPkg)
+      cmd_ (bindistFilesDir -/- "bin" -/- ghcPkgName) ["recache", "--package-db", bindistFilesDir -/- "lib" -/- "package.conf.d" ]
+    else do
+      ghcPkgPath <- builderPath $ GhcPkg Recache library_stage
+      cmd_ ghcPkgPath ["recache", "--package-db", bindistFilesDir -/- "lib" -/- "package.conf.d" ]
 
 
     need ["docs"]
