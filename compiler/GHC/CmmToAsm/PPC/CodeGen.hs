@@ -1223,21 +1223,27 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
       tmp2         <- getNewRegNat fmt
 
       let build_result =
-             let m = toOL [ AND masked_res tmp2 (RIReg shifted_mask)
-                          , ANDC masked_other tmp1 shifted_mask
-                          , OR tmp2 masked_other (RIReg masked_res)
-                          ]
-                 f = unitOL $ SR fmt reg_dst tmp2 (RIReg shift)
-                 in (m, f)
+            case amop of
+              AMO_And -> nilOL
+              AMO_Or  -> nilOL
+              AMO_Xor -> nilOL
+              _       -> toOL [ AND masked_res tmp2 (RIReg shifted_mask)
+                              , ANDC masked_other tmp1 shifted_mask
+                              , OR tmp2 masked_other (RIReg masked_res)
+                              ]
+
+      let and_mask =
+            case amop of
+              AMO_And -> unitOL $ ORC shifted_n shifted_n shifted_mask
+              AMO_Or  -> unitOL $ AND shifted_n shifted_n (RIReg shifted_mask)
+              AMO_Xor -> unitOL $ AND shifted_n shifted_n (RIReg shifted_mask)
+              _       -> nilOL
 
       (n_ri, pre_code, mid_code, post_code) <- case width of
         W8  -> do
           (n_reg, ncode) <- getSomeReg n
           let unaligned_addr = fromJust maybe_unaligned_addr
           let inv = shift_amount platform shift
-              and_mask = case amop of
-                AMO_And -> unitOL $ ORC shifted_n shifted_n shifted_mask
-                _       -> nilOL -- TODO: OR/XOR
           let i = ncode `appOL` unitOL (RLWINM shift unaligned_addr 3 27 28)
                   `appOL` inv `appOL`
                   toOL [ LI mask (ImmInt 255)
@@ -1245,17 +1251,13 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                        , SL fmt shifted_n n_reg (RIReg shift)
                        ]
                   `appOL` and_mask
-          let (insert, shift_back) = case amop of
-                AMO_And -> (nilOL, unitOL $ SR fmt reg_dst tmp2 (RIReg shift))
-                _       -> build_result
+          let insert = build_result
+          let shift_back = unitOL $ SR fmt reg_dst tmp2 (RIReg shift)
           return (RIReg shifted_n, i, insert, shift_back)
         W16 -> do
           (n_reg, ncode) <- getSomeReg n
           let unaligned_addr = fromJust maybe_unaligned_addr
           let inv = shift_amount platform shift
-              and_mask = case amop of
-                AMO_And -> unitOL $ ORC shifted_n shifted_n shifted_mask
-                _       -> nilOL
           let i = ncode `appOL` unitOL (RLWINM shift unaligned_addr 3 27 27)
                   `appOL` inv `appOL`
                   toOL [ LI mask (ImmInt 0)
@@ -1264,9 +1266,8 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                        , SL fmt shifted_n n_reg (RIReg shift)
                        ]
                   `appOL` and_mask
-          let (insert, shift_back) = case amop of
-                AMO_And -> (nilOL, unitOL $ SR fmt reg_dst tmp2 (RIReg shift))
-                _       -> build_result
+          let insert = build_result
+          let shift_back = unitOL $ SR fmt reg_dst tmp2 (RIReg shift)
           return (RIReg shifted_n, i, insert, shift_back)
         _   -> do
           (n_ri, n_code) <- case amop of
@@ -1299,7 +1300,7 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
 
       lbl_retry <- getBlockIdNat
       lbl_done <- getBlockIdNat
-      return $ pre_code `appOL` align_code
+      return $ align_code `appOL` pre_code
         `appOL` toOL [ HWSYNC
                      , BCC ALWAYS lbl_retry Nothing
 
@@ -1354,7 +1355,7 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                                  _   -> 0
                in case platformByteOrder platform of
                     BigEndian -> unitOL $ XOR shift shift
-                                 (RIImm (ImmInt shift_amt))
+                                              (RIImm (ImmInt shift_amt))
                     LittleEndian -> nilOL
 
 genCCall platform (PrimTarget (MO_AtomicRead width _)) [dst] [addr]
