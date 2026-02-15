@@ -76,7 +76,6 @@ import GHC.ThToHs
 import GHC.HsToCore.Docs
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Monad
-import GHC.IfaceToCore
 import GHC.Iface.Load
 
 import GHCi.Message

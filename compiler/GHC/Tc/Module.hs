@@ -2960,7 +2960,7 @@ tcRnGetInfo hsc_env name
        ; thing  <- tcRnLookupName' name
        ; fixity <- lookupFixityRn name
        ; (cls_insts, fam_insts) <- lookupInsts thing
-       ; let info = lookupKnownNameInfo name
+       ; let info = oldLookupKnownNameInfo name
        ; return (thing, fixity, cls_insts, fam_insts, info) }
 
 

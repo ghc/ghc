@@ -193,6 +193,7 @@ import GHC.Internal.Int (Int)
 import GHC.Internal.Num ((-))
 import GHC.List (build)
 import qualified Data.List.NubOrdSet as NubOrdSet
+import GHC.Internal.Num( Num ) -- For -frebindable-known-key-names (defaulting)
 
 inits1, tails1 :: [a] -> [NonEmpty a]
 

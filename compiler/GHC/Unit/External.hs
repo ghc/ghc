@@ -3,6 +3,7 @@ module GHC.Unit.External
    , initExternalUnitCache
    , eucEPS
    , ExternalPackageState (..)
+   , KnownKeyNameMap
    , initExternalPackageState
    , EpsStats(..)
    , addEpsInStats
@@ -30,6 +31,7 @@ import GHC.Types.Annotations ( AnnEnv, emptyAnnEnv )
 import GHC.Types.CompleteMatch
 import GHC.Types.DefaultEnv (DefaultEnv)
 import GHC.Types.TypeEnv
+import GHC.Types.Name
 import GHC.Types.Unique.DSet
 
 import GHC.Linker.Types (Linkable)
@@ -77,6 +79,7 @@ initExternalPackageState = EPS
   , eps_rule_base        = mkRuleBase builtinRules
   , -- Initialise the EPS rule pool with the built-in rules
     eps_mod_fam_inst_env = emptyModuleEnv
+  , eps_known_keys       = Nothing
   , eps_complete_matches = []
   , eps_ann_env          = emptyAnnEnv
   , eps_stats            = EpsStats
@@ -149,6 +152,8 @@ data ExternalPackageState
         --
         -- See Note [Interface Files with Core Definitions]
         eps_iface_bytecode :: !(ModuleEnv (IO Linkable)),
+
+        eps_known_keys   :: Maybe KnownKeyNameMap, -- ^ See Note [Overview of known-key names]
 
         eps_inst_env     :: !PackageInstEnv,   -- ^ The total 'InstEnv' accumulated
                                                -- from all the external-package modules

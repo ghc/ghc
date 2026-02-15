@@ -1,5 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Num
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------

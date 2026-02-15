@@ -19,18 +19,13 @@
 --
 module GHC.Builtin.Utils (
         -- * Known-key names
-        isKnownKeyName,
-        lookupKnownKeyName,
-        lookupKnownNameInfo,
+        oldIsKnownKeyName,
+        oldLookupKnownKeyName,
+        oldLookupKnownNameInfo,
 
-        -- ** Internal use
-        -- | 'knownKeyNames' is exported to seed the original name cache only;
-        -- if you find yourself wanting to look at it you might consider using
-        -- 'lookupKnownKeyName' or 'isKnownKeyName'.
-        knownKeyNames,
 
         -- * Miscellaneous
-        wiredInIds, ghcPrimIds,
+        wiredInNames, wiredInIds, ghcPrimIds,
 
         ghcPrimExports,
         ghcPrimDeclDocs,
@@ -115,12 +110,12 @@ Note [About wired-in things]
   So interface files never contain wired-in things.
 -}
 
-
 -- | This list is used to ensure that when you say "Prelude.map" in your source
 -- code, or in an interface file, you get a Name with the correct known key (See
 -- Note [Known-key names] in "GHC.Builtin.Names")
-knownKeyNames :: [Name]
-knownKeyNames
+wiredInNames :: [Name]
+-- ToDo: rename to wiredInNames
+wiredInNames
   | debugIsOn
   , Just badNamesDoc <- knownKeyNamesOkay all_names
   = pprPanic "badAllKnownKeyNames" badNamesDoc
@@ -134,6 +129,10 @@ knownKeyNames
              , map idName wiredInIds
              , map idName allThePrimOpIds
              , map (idName . primOpWrapperId) allThePrimOps
+               -- Actually the primop wrapper Ids have External Names, not WiredIn,
+               -- but we still want to populate the OrigNameCache with them
+
+             -- ToDo: get rid of these
              , basicKnownKeyNames
              , templateHaskellNames
              ]
@@ -188,29 +187,34 @@ knownKeyNamesOkay all_names
                            text ": " <>
                            brackets (pprWithCommas (ppr . nameOccName) ns)
 
+---------------  ToDo: get rid of these old-mechanism functions
+---------------        when we complete the known-key tranitition
+--------------   See #27013
+
 -- | Given a 'Unique' lookup its associated 'Name' if it corresponds to a
 -- known-key thing.
-lookupKnownKeyName :: Unique -> Maybe Name
-lookupKnownKeyName u =
-    knownUniqueName u <|> lookupUFM_Directly knownKeysMap u
+oldLookupKnownKeyName :: Unique -> Maybe Name
+oldLookupKnownKeyName u =
+    knownUniqueName u <|> lookupUFM_Directly oldKnownKeysMap u
 
+-- TODO: remove this once all knownkey names come from providers
 -- | Is a 'Name' known-key?
-isKnownKeyName :: Name -> Bool
-isKnownKeyName n =
-    isJust (knownUniqueName $ nameUnique n) || elemUFM n knownKeysMap
+oldIsKnownKeyName :: Name -> Bool
+oldIsKnownKeyName n =
+    isJust (knownUniqueName $ nameUnique n) || elemUFM n oldKnownKeysMap
 
 -- | Maps 'Unique's to known-key names.
 --
 -- The type is @UniqFM Name Name@ to denote that the 'Unique's used
 -- in the domain are 'Unique's associated with 'Name's (as opposed
 -- to some other namespace of 'Unique's).
-knownKeysMap :: UniqFM Name Name
-knownKeysMap = listToIdentityUFM knownKeyNames
+oldKnownKeysMap :: UniqFM Name Name
+oldKnownKeysMap = listToIdentityUFM wiredInNames
 
 -- | Given a 'Unique' lookup any associated arbitrary SDoc's to be displayed by
 -- GHCi's ':info' command.
-lookupKnownNameInfo :: Name -> SDoc
-lookupKnownNameInfo name = case lookupNameEnv knownNamesInfo name of
+oldLookupKnownNameInfo :: Name -> SDoc
+oldLookupKnownNameInfo name = case lookupNameEnv knownNamesInfo name of
     -- If we do find a doc, we add comment delimiters to make the output
     -- of ':info' valid Haskell.
     Nothing  -> empty

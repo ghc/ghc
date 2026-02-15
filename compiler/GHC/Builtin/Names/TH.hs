@@ -8,10 +8,9 @@ module GHC.Builtin.Names.TH where
 
 import GHC.Prelude ()
 
-import GHC.Builtin.Names( mk_known_key_name )
 import GHC.Unit.Types
-import GHC.Types.Name( Name )
-import GHC.Types.Name.Occurrence( tcName, clsName, dataName, varName, fieldName )
+import GHC.Types.Name( Name, mk_known_key_name )
+import GHC.Types.Name.Occurrence( OccName, tcName, clsName, dataName, varName, fieldName )
 import GHC.Types.Name.Reader( RdrName, nameRdrName )
 import GHC.Types.Unique ( Unique )
 import GHC.Builtin.Uniques
@@ -24,6 +23,9 @@ import Language.Haskell.Syntax.Module.Name
 --  1) Allocate a key
 --  2) Make a "Name"
 --  3) Add the name to templateHaskellNames
+
+thKnownKeyTable :: [(OccName,Unique)]
+thKnownKeyTable = []
 
 templateHaskellNames :: [Name]
 -- The names that are implicitly mentioned by ``bracket''

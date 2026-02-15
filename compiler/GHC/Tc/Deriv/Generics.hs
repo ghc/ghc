@@ -445,7 +445,7 @@ gen_Generic_fam_inst gk get_fixity loc
      ; mod <- getModule
      ; let tc_occ  = nameOccName (tyConName tycon)
            rep_occ = case gk of Gen0 -> mkGenR tc_occ; Gen1 -> mkGen1R tc_occ
-     ; rep_name <- newGlobalBinder mod rep_occ loc
+     ; rep_name <- newGlobalBinder mod rep_occ Nothing loc
 
      ; let tcv      = tyCoVarsOfTypeList inst_ty
            (tv, cv) = partition isTyVar tcv

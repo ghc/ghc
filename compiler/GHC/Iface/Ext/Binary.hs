@@ -30,6 +30,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique.FM
 import qualified GHC.Utils.Binary as Binary
 import GHC.Utils.Panic
+import GHC.Utils.Outputable
 
 import qualified Data.Array        as A
 import qualified Data.Array.IO     as A

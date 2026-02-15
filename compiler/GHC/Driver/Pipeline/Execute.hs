@@ -28,7 +28,6 @@ import GHC.Unit.Module.ModIface
 import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Unit.Module.ModSummary
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.SrcLoc
 import GHC.Driver.Main
 import GHC.Driver.Downsweep
@@ -671,12 +670,11 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   -- gather the imports and module name
   (hspp_buf,mod_name,imps,src_imps) <- do
     buf <- hGetStringBuffer input_fn
-    let imp_prelude = xopt LangExt.ImplicitPrelude dflags
-        popts = initParserOpts dflags
-        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
+    -- TODO: handle implicit knownkey names here?
+    let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
         rn_imps = fmap (\(s, rpk, lmn@(L _ mn)) -> (s, rn_pkg_qual mn rpk, lmn))
         sec = initSourceErrorContext dflags
-    eimps <- getImports popts sec imp_prelude buf input_fn (basename <.> suff)
+    eimps <- getImportEdges dflags buf input_fn (basename <.> suff)
     case eimps of
         Left errs -> throwErrors sec (GhcPsMessage <$> errs)
         Right (src_imps,imps, L _ mod_name) -> return

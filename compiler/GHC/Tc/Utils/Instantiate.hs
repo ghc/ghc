@@ -796,7 +796,7 @@ mkOverLit (HsIntegral i)
         ; return (XLit $ HsInteger  (il_text i) (il_value i) integer_ty) }
 
 mkOverLit (HsFractional r)
-  = do  { rat_ty <- tcMetaTy rationalTyConName
+  = do  { rat_ty <- tcMetaKnownKeyTy rationalTyConKey
         ; return (XLit $ HsRat r rat_ty) }
 
 mkOverLit (HsIsString src s) = return (HsString src s)

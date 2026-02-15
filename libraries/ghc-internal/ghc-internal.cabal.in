@@ -569,5 +569,9 @@ Library
     -- as it's magic.
     ghc-options: -this-unit-id ghc-internal
 
+    -- Set -frebindable-known-key-names,
+    -- since GHC.KnownKeyNames isn't available yet
+    ghc-options: -frebindable-known-key-names
+
     -- Make sure we don't accidentally regress into anti-patterns
     ghc-options: -Wcompat -Wnoncanonical-monad-instances

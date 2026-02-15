@@ -1514,7 +1514,7 @@ containsUserTypeError look_in_famapps pred =
 isUnsatisfiableCt_maybe :: Type -> Maybe ErrorMsgType
 isUnsatisfiableCt_maybe t
   | Just (tc, [msg]) <- splitTyConApp_maybe t
-  , tc `hasKey` unsatisfiableClassNameKey
+  , tc `hasKnownKey` unsatisfiableClassKey
   = Just msg
   | otherwise
   = Nothing

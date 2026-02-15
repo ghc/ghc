@@ -86,7 +86,7 @@ import GHC.Hs.Doc
 import GHC.Unit.Module.ModIface ( mi_docs )
 import GHC.Iface.Load  ( loadInterfaceForName )
 
-import GHC.Builtin.Utils (knownKeyNames)
+import GHC.Builtin.Utils (wiredInNames)
 
 import GHC.Tc.Errors.Hole.FitTypes
 import GHC.Tc.Errors.Hole.Plugin
@@ -681,7 +681,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
 
     -- BuiltInSyntax names like (:) and []
     builtIns :: EnumSet LangExt.Extension -> [Name]
-    builtIns exts = filter isBuiltInSyntax (knownKeyNames ++ infFamNames)
+    builtIns exts = filter isBuiltInSyntax (wiredInNames ++ infFamNames)
       where
         -- Tuples and sums of are not included in knownKeyName as there are infinitely many of them.
         -- See Note [Infinite families of known-key names] in GHC.Builtin.Names.

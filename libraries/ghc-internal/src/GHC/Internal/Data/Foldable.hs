@@ -6,6 +6,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Foldable
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Data.Foldable

@@ -68,7 +68,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Error
-import GHC.Utils.Unique (sameUnique)
 
 import Control.Monad.Trans.Reader
 import Data.Maybe
@@ -893,34 +892,34 @@ classArgsErr cls cls_tys = DerivErrNotAClass (mkClassPred cls cls_tys)
 -- class for which stock deriving isn't possible.
 stockSideConditions :: DerivContext -> Class -> Maybe Condition
 stockSideConditions deriv_ctxt cls
-  | sameUnique cls_key eqClassKey          = Just (cond_std `andCond` cond_args cls)
-  | sameUnique cls_key ordClassKey         = Just (cond_std `andCond` cond_args cls)
-  | sameUnique cls_key showClassKey        = Just (cond_std `andCond` cond_args cls)
-  | sameUnique cls_key readClassKey        = Just (cond_std `andCond` cond_args cls)
-  | sameUnique cls_key enumClassKey        = Just (cond_std `andCond` cond_isEnumeration)
-  | sameUnique cls_key ixClassKey          = Just (cond_std `andCond` cond_enumOrProduct cls)
-  | sameUnique cls_key boundedClassKey     = Just (cond_std `andCond` cond_enumOrProduct cls)
-  | sameUnique cls_key dataClassKey        = Just (checkFlag LangExt.DeriveDataTypeable `andCond`
-                                                   cond_vanilla `andCond`
-                                                   cond_args cls)
-  | sameUnique cls_key functorClassKey     = Just (checkFlag LangExt.DeriveFunctor `andCond`
-                                                   cond_vanilla `andCond`
-                                                   cond_functorOK True False)
-  | sameUnique cls_key foldableClassKey    = Just (checkFlag LangExt.DeriveFoldable `andCond`
-                                                   cond_vanilla `andCond`
-                                                   cond_functorOK False True)
-                                                   -- Functor/Fold/Trav works ok
-                                                   -- for rank-n types
-  | sameUnique cls_key traversableClassKey = Just (checkFlag LangExt.DeriveTraversable `andCond`
-                                                   cond_vanilla `andCond`
-                                                   cond_functorOK False False)
-  | sameUnique cls_key genClassKey         = Just (checkFlag LangExt.DeriveGeneric `andCond`
-                                                   cond_vanilla `andCond`
-                                                   cond_RepresentableOk)
-  | sameUnique cls_key gen1ClassKey        = Just (checkFlag LangExt.DeriveGeneric `andCond`
-                                                   cond_vanilla `andCond`
-                                                   cond_Representable1Ok)
-  | sameUnique cls_key liftClassKey        = Just (checkFlag LangExt.DeriveLift `andCond`
+  | cls_key == eqClassKey          = Just (cond_std `andCond` cond_args cls)
+  | cls_key == ordClassKey         = Just (cond_std `andCond` cond_args cls)
+  | cls_key == showClassKey        = Just (cond_std `andCond` cond_args cls)
+  | cls_key == readClassKey        = Just (cond_std `andCond` cond_args cls)
+  | cls_key == enumClassKey        = Just (cond_std `andCond` cond_isEnumeration)
+  | cls_key == ixClassKey          = Just (cond_std `andCond` cond_enumOrProduct cls)
+  | cls_key == boundedClassKey     = Just (cond_std `andCond` cond_enumOrProduct cls)
+  | cls_key == dataClassKey        = Just (checkFlag LangExt.DeriveDataTypeable `andCond`
+                                        cond_vanilla `andCond`
+                                        cond_args cls)
+  | cls_key == functorClassKey     = Just (checkFlag LangExt.DeriveFunctor `andCond`
+                                        cond_vanilla `andCond`
+                                        cond_functorOK True False)
+  | cls_key == foldableClassKey    = Just (checkFlag LangExt.DeriveFoldable `andCond`
+                                        cond_vanilla `andCond`
+                                        cond_functorOK False True)
+                                        -- Functor/Fold/Trav works ok
+                                        -- for rank-n types
+  | cls_key == traversableClassKey = Just (checkFlag LangExt.DeriveTraversable `andCond`
+                                        cond_vanilla `andCond`
+                                        cond_functorOK False False)
+  | cls_key == genClassKey         = Just (checkFlag LangExt.DeriveGeneric `andCond`
+                                        cond_vanilla `andCond`
+                                        cond_RepresentableOk)
+  | cls_key == gen1ClassKey        = Just (checkFlag LangExt.DeriveGeneric `andCond`
+                                        cond_vanilla `andCond`
+                                        cond_Representable1Ok)
+  | cls_key == liftClassKey        = Just (checkFlag LangExt.DeriveLift `andCond`
                                                    checkFlag LangExt.ImplicitStagePersistence `andCond`
                                                    cond_vanilla `andCond`
                                                    cond_args cls)

@@ -24,9 +24,12 @@ module GHC.Tc.Utils.Env(
         tcLookupRecSelParent,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
+        tcLookupImported_maybe,
         lookupGlobal, lookupGlobal_maybe,
         addTypecheckedBinds, addEvBinds, addTopEvBinds,
         failIllegalTyCon, failIllegalTyVar,
+
+        tcLookupKnownKeyGlobal, tcLookupKnownKeyTyCon, tcLookupKnownKeyClass,
 
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnvList,
@@ -58,8 +61,8 @@ module GHC.Tc.Utils.Env(
 
         -- Template Haskell stuff
         LevelCheckReason(..),
-        tcMetaTy, thLevelIndex,
-        isBrackLevel,
+        tcMetaTy, tcMetaKnownKeyTy,
+        thLevelIndex, isBrackLevel,
 
         -- New Ids
         newDFunName,
@@ -267,6 +270,26 @@ tcLookupGlobal name
             Succeeded thing -> return thing
             Failed msg      -> failWithTc (TcRnInterfaceError msg)
         }}}
+
+tcLookupImported_maybe :: Name -> TcM (MaybeErr IfaceMessage TyThing)
+-- Returns (Failed err) if we can't find the interface file for the thing
+tcLookupImported_maybe name
+  = do  { hsc_env <- getTopEnv
+        ; mb_thing <- liftIO (lookupType hsc_env name)
+        ; case mb_thing of
+            Just thing -> return (Succeeded thing)
+            Nothing    -> tcImportDecl_maybe name }
+
+tcImportDecl_maybe :: Name -> TcM (MaybeErr IfaceMessage TyThing)
+-- Entry point for *source-code* uses of importDecl
+tcImportDecl_maybe name
+  | Just thing <- wiredInNameTyThing_maybe name
+  = do  { when (needWiredInHomeIface thing)
+               (initIfaceTcRn (loadWiredInHomeIface name))
+                -- See Note [Loading instances for wired-in things]
+        ; return (Succeeded thing) }
+  | otherwise
+  = initIfaceTcRn (importDecl name)
 
 -- Look up only in this module's global env't. Don't look in imports, etc.
 -- Panic if it's not there.
@@ -476,6 +499,40 @@ to bring the data constructor A into scope. We thus emit the following message:
       Add ‘A’ to the import list in the import of M1
 
 ************************************************************************
+*                                                                      *
+                Looking up known-key things
+*                                                                      *
+************************************************************************
+-}
+
+tcLookupKnownKeyGlobal :: HasDebugCallStack => Unique -> TcM TyThing
+tcLookupKnownKeyGlobal uniq
+  = do { rebindable_path <- goptM Opt_RebindableKnownKeyNames
+       ; mb_rdr_env <- if rebindable_path
+                       then KKNS_InScope <$> getGlobalRdrEnv
+                       else return KKNS_FromModule
+       ; traceTc "tcLookupKnownKeyGlobal" (ppr rebindable_path $$ ppr mb_rdr_env)
+       ; mb_thing <- initIfaceTcRn (lookupKnownKeyThing mb_rdr_env uniq)
+       ; case mb_thing of
+           Succeeded thing -> return thing
+           Failed msg      -> failWithTc (TcRnInterfaceError msg) }
+
+tcLookupKnownKeyClass :: HasDebugCallStack => Unique -> TcM Class
+tcLookupKnownKeyClass uniq
+  = do { thing <- tcLookupKnownKeyGlobal uniq
+       ; case thing of
+           ATyCon tc | Just cls <- tyConClass_maybe tc
+                     -> return cls
+           _  -> wrongThingErr WrongThingClass (AGlobal thing) (getName thing) }
+
+tcLookupKnownKeyTyCon :: HasDebugCallStack => Unique -> TcM TyCon
+tcLookupKnownKeyTyCon uniq
+  = do { thing <- tcLookupKnownKeyGlobal uniq
+       ; case thing of
+           ATyCon tc -> return tc
+           _  -> wrongThingErr WrongThingClass (AGlobal thing) (getName thing) }
+
+{- *********************************************************************
 *                                                                      *
                 Extending the global environment
 *                                                                      *
@@ -932,13 +989,18 @@ tcExtendRules lcl_rules thing_inside
 ************************************************************************
 -}
 
+tcMetaKnownKeyTy :: HasDebugCallStack => Unique -> TcM Type
+tcMetaKnownKeyTy uniq
+  = do { tc <- tcLookupKnownKeyTyCon uniq
+       ; return (mkTyConTy tc) }
+
 tcMetaTy :: Name -> TcM Type
 -- Given the name of a Template Haskell data type,
 -- return the type
 -- E.g. given the name "Expr" return the type "Expr"
-tcMetaTy tc_name = do
-    t <- tcLookupTyCon tc_name
-    return (mkTyConTy t)
+tcMetaTy tc_name
+  = do { t <- tcLookupTyCon tc_name
+       ; return (mkTyConTy t) }
 
 isBrackLevel :: ThLevel -> Bool
 isBrackLevel (Brack {}) = True
@@ -988,23 +1050,23 @@ tcGetDefaultTys
                                                      , cd_provenance = DP_Builtin
                                                      , cd_warn = Nothing }
 
-        -- see Note [Named default declarations] in GHC.Tc.Gen.Default
-        ; defaults <- getDeclaredDefaultTys -- User-supplied defaults
+        -- See Note [Named default declarations] in GHC.Tc.Gen.Default
+        ; user_defaults <- getDeclaredDefaultTys -- User-supplied defaults
         ; this_module <- tcg_mod <$> getGblEnv
         ; let this_unit = moduleUnit this_module
         ; if this_unit == ghcInternalUnit
           -- see Remark [No built-in defaults in ghc-internal]
           -- in Note [Builtin class defaults] in GHC.Tc.Utils.Env
-          then return (defaults, extended_defaults)
+          then return (user_defaults, extended_defaults)
           else do
-              -- not one of the built-in units
+              -- Not one of the built-in units
               -- @default Num (Integer, Double)@, plus extensions
               { extDef <- if extended_defaults
                           then do { list_ty <- tcMetaTy listTyConName
                                   ; integer_ty <- tcMetaTy integerTyConName
-                                  ; foldableClass <- tcLookupClass foldableClassName
-                                  ; showClass <- tcLookupClass showClassName
-                                  ; eqClass <- tcLookupClass eqClassName
+                                  ; foldableClass <- tcLookupKnownKeyClass foldableClassKey
+                                  ; showClass <- tcLookupKnownKeyClass showClassKey
+                                  ; eqClass <- tcLookupKnownKeyClass eqClassKey
                                   ; pure $ defaultEnv
                                     [ builtinDefaults foldableClass [list_ty]
                                     , builtinDefaults showClass [unitTy, integer_ty, doubleTy]
@@ -1014,21 +1076,25 @@ tcGetDefaultTys
                                   -- Note [Extended defaults]
                           else pure emptyDefaultEnv
               ; ovlStr <- if ovl_strings
-                          then do { isStringClass <- tcLookupClass isStringClassName
+                          then do { isStringClass <- tcLookupKnownKeyClass isStringClassKey
                                   ; pure $ unitDefaultEnv $ builtinDefaults isStringClass [stringTy]
                                   }
                           else pure emptyDefaultEnv
               ; checkWiredInTyCon doubleTyCon
-              ; numDef <- case lookupDefaultEnv defaults numClassName of
+              ; numDef <- case lookupDefaultEnv_Directly user_defaults numClassKey of
                    Nothing -> do { integer_ty <- tcMetaTy integerTyConName
-                                 ; numClass <- tcLookupClass numClassName
-                                 ; pure $ unitDefaultEnv $ builtinDefaults numClass [integer_ty, doubleTy]
-                                 }
-                   -- The Num class is already user-defaulted, no need to construct the builtin default
-                   _ -> pure emptyDefaultEnv
+                                 ; numClass   <- tcLookupKnownKeyClass numClassKey
+                                 ; pure $ unitDefaultEnv $
+                                   builtinDefaults numClass [integer_ty, doubleTy] }
+
+                   _ -> -- The Num class is already user-defaulted, so
+                        -- no need to construct the builtin default
+                        pure emptyDefaultEnv
+
                 -- Supply the built-in defaults, but make the user-supplied defaults
-                -- override them.
-              ; let deflt_tys = mconcat [ extDef, numDef, ovlStr, defaults ]
+                -- override them.  We put the user-supplied ones last because in `mconcat`
+                -- on `DefaultEnv` the rightmost wins.
+              ; let deflt_tys = mconcat [ extDef, numDef, ovlStr, user_defaults ]
               ; return (deflt_tys, extended_defaults) } }
 
 {-
@@ -1135,7 +1201,7 @@ newDFunName clas tys loc
         ; let info_string = occNameString (getOccName clas) ++
                             concatMap (occNameString . getDFunTyKey) tys
         ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
-        ; newGlobalBinder mod dfun_occ loc }
+        ; newGlobalBinder mod dfun_occ Nothing loc }
 
 newFamInstTyConName :: LocatedN Name -> [Type] -> TcM Name
 newFamInstTyConName (L loc name) tys = mk_fam_inst_name id (locA loc) name [tys]
@@ -1150,7 +1216,7 @@ mk_fam_inst_name adaptOcc loc tc_name tyss
         ; let info_string = occNameString (getOccName tc_name) ++
                             intercalate "|" ty_strings
         ; occ   <- chooseUniqueOccTc (mkInstTyTcOcc info_string)
-        ; newGlobalBinder mod (adaptOcc occ) loc }
+        ; newGlobalBinder mod (adaptOcc occ) Nothing loc }
   where
     ty_strings = map (concatMap (occNameString . getDFunTyKey)) tyss
 
@@ -1262,8 +1328,8 @@ notFound name
        }
 
 wrongThingErr :: WrongThingSort -> TcTyThing -> Name -> TcM a
-wrongThingErr expected thing name =
-  failWithTc (TcRnTyThingUsedWrong expected thing name)
+wrongThingErr expected thing name
+  = failWithTc (TcRnTyThingUsedWrong expected thing name)
 
 {- Note [Out of scope might be a staging error]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

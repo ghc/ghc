@@ -1,5 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Num
+
 module GHC.Internal.Num (Num (..)) where
 
 -- For why this file exists

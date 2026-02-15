@@ -11,7 +11,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.Parser.Header
-   ( getImports
+   ( getImportEdges
    , mkPrelImports -- used by the renamer too
    , getOptionsFromFile
    , getOptions
@@ -24,7 +24,8 @@ import GHC.Prelude
 
 import GHC.Data.Bag
 
-import GHC.Driver.DynFlags (DynFlags)
+import GHC.Driver.DynFlags
+import GHC.Driver.Config.Parser( initParserOpts )
 import GHC.Driver.Errors.Types -- Unfortunate, needed due to the fact we throw exceptions!
 
 import GHC.Parser.Errors.Types
@@ -47,6 +48,8 @@ import GHC.Utils.Monad
 import GHC.Utils.Error
 import GHC.Utils.Exception as Exception
 
+import qualified GHC.LanguageExtensions as LangExt
+
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -63,26 +66,31 @@ import Text.Read (readPrec)
 
 ------------------------------------------------------------------------------
 
--- | Parse the imports of a source file.
+-- | Returns the dependency edges of the module graph, by
+--    * parsing the module and looking for `import` declarations
+--    * adding edges for Prelude and GHC.KnownKeyNames as required
 --
 -- Throws a 'SourceError' if parsing fails.
-getImports :: ParserOpts   -- ^ Parser options
-           -> SourceErrorContext
-           -> Bool         -- ^ Implicit Prelude?
-           -> StringBuffer -- ^ Parse this.
-           -> FilePath     -- ^ Filename the buffer came from.  Used for
-                           --   reporting parse error locations.
-           -> FilePath     -- ^ The original source filename (used for locations
-                           --   in the function result)
-           -> IO (Either
-               (Messages PsMessage)
-               ([Located ModuleName],
-                [(ImportLevel, RawPkgQual, Located ModuleName)],
-                Located ModuleName))
-              -- ^ The source imports and normal imports (with optional package
-              -- names from -XPackageImports), and the module name.
-getImports popts sec implicit_prelude buf filename source_filename = do
+getImportEdges
+  :: DynFlags
+  -> StringBuffer -- ^ Parse this.
+  -> FilePath     -- ^ Filename the buffer came from.  Used for
+                  --   reporting parse error locations.
+  -> FilePath     -- ^ The original source filename (used for locations
+                  --   in the function result)
+  -> IO (Either
+      (Messages PsMessage)
+      ([Located ModuleName],                             -- {-# SOURCE #-} imports
+       [(ImportLevel, RawPkgQual, Located ModuleName)],  -- Normal imports
+       Located ModuleName))                              -- Name of current module
+     -- ^ The source imports and normal imports (with optional package
+     -- names from -XPackageImports), and the module name.
+getImportEdges dflags buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
+      imp_prelude   = xopt LangExt.ImplicitPrelude dflags
+      rebindable_kn = gopt Opt_RebindableKnownKeyNames dflags
+      popts         = initParserOpts dflags
+      sec           = initSourceErrorContext dflags
   case unP parseHeader (initParserState popts buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
@@ -102,15 +110,18 @@ getImports popts sec implicit_prelude buf filename source_filename = do
                 mod = mb_mod `orElse` L (noAnnSrcSpan main_loc) mAIN_NAME
                 (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
-                generated_imports = mkPrelImports (unLoc mod) implicit_prelude imps
-                convImport (L _ (i :: ImportDecl GhcPs)) = (convImportLevel (ideclLevelSpec i), ideclPkgQual i, reLoc $ ideclName i)
+                generated_imports = mkPrelImports (unLoc mod) imp_prelude imps
+                convImport (L _ (i :: ImportDecl GhcPs))     = (convImportLevel (ideclLevelSpec i), ideclPkgQual i, reLoc $ ideclName i)
                 convImport_src (L _ (i :: ImportDecl GhcPs)) = (reLoc $ ideclName i)
+
+                known_key_name_edges   -- Add an edge to GHC.KnownKeyNames, unless -frebindable-known-key-names is on
+                  | rebindable_kn = []
+                  | otherwise = [(NormalLevel, NoRawPkgQual, noLoc kNOWN_KEY_NAMES)]
               in
-              return (map convImport_src src_idecls
-                     , map convImport (generated_imports ++ ord_idecls)
+              return ( map convImport_src src_idecls
+                     , known_key_name_edges ++
+                       map convImport (generated_imports ++ ord_idecls)
                      , reLoc mod)
-
-
 
 mkPrelImports :: ModuleName
               -> Bool -> [LImportDecl GhcPs]
@@ -261,7 +272,7 @@ getOptions opts sec supported buf filename
 -- The token parser is written manually because Happy can't
 -- return a partial result when it encounters a lexer error.
 -- We want to extract options before the buffer is passed through
--- CPP, so we can't use the same trick as 'getImports'.
+-- CPP, so we can't use the same trick as 'getImportEdges'.
 getOptions' :: ParserOpts
             -> SourceErrorContext
             -> [String]

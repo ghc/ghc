@@ -1,5 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Enum
+
 -- For why this file exists
 -- See Note [Semigroup stimes cycle] in GHC.Internal.Base
 

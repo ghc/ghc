@@ -24,7 +24,8 @@ module Data.Bool
      bool
      ) where
 
-import Prelude (Bool(..), (&&), (||), not, otherwise)
+import Prelude ( Bool(..), (&&), (||), not, otherwise )
+import Prelude( Num ) -- For -frebindable-known-key-names (defaulting)
 
 -- $setup
 -- >>> import Prelude

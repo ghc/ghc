@@ -13,6 +13,7 @@ module GHC.Iface.Errors.Ppr
   , missingInterfaceErrorReason
   , missingInterfaceErrorDiagnostic
   , readInterfaceErrorDiagnostic
+  , defaultIfaceMessageOpts
 
   , lookingForHerald
   , cantFindErrorX

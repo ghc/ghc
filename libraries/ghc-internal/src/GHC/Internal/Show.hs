@@ -1,6 +1,10 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, StandaloneDeriving,
              MagicHash, UnboxedTuples #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Show
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 #include "MachDeps.h"

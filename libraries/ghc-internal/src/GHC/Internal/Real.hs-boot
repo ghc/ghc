@@ -1,5 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+   -- Defines Real etc
+
 module GHC.Internal.Real (Integral (..)) where
 
 -- For why this file exists

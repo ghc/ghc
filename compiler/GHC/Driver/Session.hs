@@ -2666,7 +2666,11 @@ fFlagsDeps = [
   flagSpec "break-points"                     Opt_InsertBreakpoints,
   flagSpec "info-table-map"                   Opt_InfoTableMap,
   flagSpec "info-table-map-with-stack"        Opt_InfoTableMapWithStack,
-  flagSpec "info-table-map-with-fallback"     Opt_InfoTableMapWithFallback
+  flagSpec "info-table-map-with-fallback"     Opt_InfoTableMapWithFallback,
+
+  -- Known-key names
+  flagSpec "defines-known-key-names"          Opt_DefinesKnownKeyNames,
+  flagSpec "rebindable-known-key-names"       Opt_RebindableKnownKeyNames
   ]
   ++ fHoleFlags
 

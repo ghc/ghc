@@ -111,7 +111,7 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
       -- Get the superclass selector to select the Monad dictionary, going
       -- to be used to construct the monadWrapper.
       quote_tc <- dsLookupTyCon quoteClassName
-      monad_tc <- dsLookupTyCon monadClassName
+      monad_tc <- dsLookupKnownKeyTyCon monadClassKey
       let cls = expectJust $ tyConClass_maybe quote_tc
           monad_cls = expectJust $ tyConClass_maybe monad_tc
           -- Quote m -> Monad m
@@ -2351,6 +2351,12 @@ lookupType :: Name      -- Name of type constructor (e.g. (M TH.Exp))
 lookupType tc_name = do { tc <- lift $ dsLookupTyCon tc_name ;
                           return (mkTyConApp tc []) }
 
+lookupKnownKeyType :: Unique      -- Unique of type constructor (e.g. (M TH.Exp))
+                   -> MetaM Type  -- The type
+lookupKnownKeyType tc_key
+  = do { tc <- lift $ dsLookupKnownKeyTyCon tc_key
+       ; return (mkTyConApp tc []) }
+
 wrapGenSyms :: [GenSymBind]
             -> Core (M a) -> MetaM (Core (M a))
 -- wrapGenSyms [(nm1,id1), (nm2,id2)] y
@@ -3086,7 +3092,7 @@ mk_integer :: Integer -> MetaM (HsLit GhcTc)
 mk_integer  i = return $ XLit $ HsInteger NoSourceText i integerTy
 
 mk_rational :: FractionalLit -> MetaM (HsLit GhcTc)
-mk_rational r = do rat_ty <- lookupType rationalTyConName
+mk_rational r = do rat_ty <- lookupKnownKeyType rationalTyConKey
                    return $ XLit $ HsRat r rat_ty
 
 mk_string :: FastString -> MetaM (HsLit GhcRn)

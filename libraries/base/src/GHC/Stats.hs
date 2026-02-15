@@ -37,6 +37,7 @@ module GHC.Stats
 
 
 import Prelude (Bool,IO,Read,Show,(<$>))
+import Prelude (Num) -- For -frebindable-known-key-names (defaulting)
 
 import qualified GHC.Internal.Stats as Internal
 import GHC.Generics (Generic)

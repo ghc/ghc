@@ -68,7 +68,10 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Utils.Monad
 import GHC.Parser.PostProcess ( setRdrNameSpace )
+
 import GHC.Builtin.Types
+import GHC.Builtin.Names
+
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -79,7 +82,6 @@ import GHC.Unit.Module.ModIface
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import GHC.Builtin.Names( rOOT_MAIN )
 import GHC.Types.Basic  ( TupleSort(..), tupleSortBoxity )
 import GHC.Types.TyThing ( tyThingGREInfo )
 import GHC.Types.SrcLoc as SrcLoc
@@ -224,11 +226,11 @@ newTopSrcBinder (L loc rdr_name)
         -- the RdrName, not from the environment.  In principle, it'd be fine to
         -- have an arbitrary mixture of external core definitions in a single module,
         -- (apart from module-initialisation issues, perhaps).
-        ; newGlobalBinder rdr_mod rdr_occ (locA loc) }
+        ; newGlobalBinder rdr_mod rdr_occ Nothing (locA loc) }
 
   | otherwise
-  = do  { when (isQual rdr_name)
-                 (addErrAt (locA loc) (badQualBndrErr rdr_name))
+  = do  { when (isQual rdr_name) $
+          addErrAt (locA loc) (badQualBndrErr rdr_name)
                 -- Binders should not be qualified; if they are, and with a different
                 -- module name, we get a confusing "M.T is not in scope" error later
 
@@ -239,10 +241,30 @@ newTopSrcBinder (L loc rdr_name)
              do { uniq <- newUnique
                 ; return (mkInternalName uniq (rdrNameOcc rdr_name) (locA loc)) }
           else
-             do { this_mod <- getModule
-                ; traceRn "newTopSrcBinder" (ppr this_mod $$ ppr rdr_name $$ ppr (locA loc))
-                ; newGlobalBinder this_mod (rdrNameOcc rdr_name) (locA loc) }
+             -- Finally we get the "normal path"; an ordinary, top-level binding
+             newTopVanillaSrcBinder (rdrNameOcc rdr_name) (locA loc)
         }
+
+newTopVanillaSrcBinder :: OccName -> SrcSpan -> RnM Name
+newTopVanillaSrcBinder occ loc
+  = do { this_mod <- getModule
+
+       -- See if this bindings is for a known-key name, and if so get its Unique
+       -- See 'Defining known-key names' in GHC.Types.Name
+       ; defines_known_keys <- goptM Opt_DefinesKnownKeyNames
+       ; let mb_uniq :: Maybe Unique
+             mb_uniq | defines_known_keys = lookupOccEnv knownKeyOccMap occ
+                     | otherwise          = Nothing
+
+       ; name <- newGlobalBinder this_mod occ mb_uniq loc
+       ; traceRn "newTopSrcBinder" $
+         vcat [ text "module:" <+> ppr this_mod
+              , text "occ:" <+> ppr occ
+              , text "mb_uniq:" <+> ppr mb_uniq
+              , text "loc:" <+> ppr loc
+              , text "name:" <+> ppr name ]
+       ; return name
+       }
 
 {-
 *********************************************************

@@ -7,6 +7,9 @@
 {-# LANGUAGE UndecidableSuperClasses #-}
   -- Because of the type-variable superclasses for tuples
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Eq, Ord, etc
+
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 -- -Wno-unused-imports needed for the GHC.Internal.Tuple import below. Sigh.
 

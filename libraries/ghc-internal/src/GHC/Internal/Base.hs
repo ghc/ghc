@@ -82,6 +82,9 @@ Other Prelude modules are much easier with fewer complex dependencies.
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Monad
+
 -- -Wno-orphans is needed for things like:
 -- Orphan rule: "x# -# x#" ALWAYS forall x# :: Int# -# x# x# = 0
 {-# OPTIONS_GHC -Wno-orphans #-}

@@ -43,7 +43,7 @@ import GHC.Tc.Types.Origin ( TypedThing(..) )
 import GHC.Unit
 import GHC.Unit.Module.Warnings
 import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
-                        , monadClassName, returnMName, thenMName
+                        , monadClassKey, returnMName, thenMName
                         , semigroupClassName, sappendName
                         , monoidClassName, mappendName
                         )
@@ -57,6 +57,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Basic  ( VisArity,  TyConFlavour(..), TypeOrKind(..), NewOrData(..) )
 import GHC.Types.GREInfo (ConLikeInfo (..), ConInfo, mkConInfo, conInfoFields)
 import GHC.Types.Hint (SigLike(..))
+import GHC.Types.Unique( hasKey )
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc as SrcLoc
 
@@ -512,7 +513,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
 
                   _ -> return ()
 
-      | cls == monadClassName =
+      | cls `hasKnownKey` monadClassKey =
           forM_ mbinds $ \(L loc mbind) -> setSrcSpanA loc $
               case mbind of
                   FunBind { fun_id = L _ name

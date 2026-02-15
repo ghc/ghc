@@ -4,6 +4,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Bounded, Enum
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------

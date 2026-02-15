@@ -32,6 +32,7 @@ import GHC.Builtin.Utils
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Misc( HasDebugCallStack )
 
 import Control.Applicative
 import Control.Concurrent.MVar
@@ -90,7 +91,7 @@ So we deal with them in lookupOrigNameCache by means of isInfiniteFamilyOrigName
 
 At the same time, simple finite built-in names (`[]`, `:`, `->`) can be put in
 the OrigNameCache without any issues (they end up there because they're
-knownKeyNames). It doesn't matter that they're built-in syntax.
+wiredInNames). It doesn't matter that they're built-in syntax.
 
 One might wonder: what's the point of having any built-in syntax in the
 OrigNameCache at all?  Good question; after all,
@@ -134,12 +135,12 @@ lookupOrigNameCache nc mod occ = lookup_infinite <|> lookup_normal
       occ_env <- lookupModuleEnv nc mod
       lookupOccEnv occ_env occ
 
-extendOrigNameCache' :: OrigNameCache -> Name -> OrigNameCache
+extendOrigNameCache' :: HasDebugCallStack => OrigNameCache -> Name -> OrigNameCache
 extendOrigNameCache' nc name
   = assertPpr (isExternalName name) (ppr name) $
     extendOrigNameCache nc (nameModule name) (nameOccName name) name
 
-extendOrigNameCache :: OrigNameCache -> Module -> OccName -> Name -> OrigNameCache
+extendOrigNameCache :: HasDebugCallStack => OrigNameCache -> Module -> OccName -> Name -> OrigNameCache
 extendOrigNameCache nc mod occ name
   = extendModuleEnvWith combine nc mod (unitOccEnv occ name)
   where
@@ -199,7 +200,7 @@ updateNameCache name_cache !_mod !_occ upd_fn
 
 {-# NOINLINE knownKeysOrigNameCache #-}
 knownKeysOrigNameCache :: OrigNameCache
-knownKeysOrigNameCache = initOrigNames knownKeyNames
+knownKeysOrigNameCache = initOrigNames wiredInNames
 
 isKnownOrigName_maybe :: Module -> OccName -> Maybe Name
 isKnownOrigName_maybe = lookupOrigNameCache knownKeysOrigNameCache

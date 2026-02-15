@@ -2391,8 +2391,8 @@ initIfaceTcRn thing_inside
           -- bangs to avoid leaking the envs (#19356)
         ; let !mhome_unit = hsc_home_unit_maybe hsc_env
               !knot_vars = tcg_type_env_var tcg_env
-              -- When we are instantiating a signature, we DEFINITELY
-              -- do not want to knot tie.
+              -- When we are instantiating a signature,
+              -- we DEFINITELY do not want to knot tie.
               is_instantiate = fromMaybe False (isHomeUnitInstantiating <$> mhome_unit)
         ; let { if_env = IfGblEnv {
                             if_doc = text "initIfaceTcRn",
