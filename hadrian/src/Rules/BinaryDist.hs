@@ -123,7 +123,7 @@ installTo relocatable prefix = do
 
 
 buildBinDistDir :: FilePath -> FilePath -> BindistConfig -> Action ()
-buildBinDistDir dirPrefix root conf@BindistConfig{..} = do
+buildBinDistDir dirSuffix root conf@BindistConfig{..} = do
 
     verbosity <- getVerbosity
     -- We 'need' all binaries and libraries
@@ -153,7 +153,7 @@ buildBinDistDir dirPrefix root conf@BindistConfig{..} = do
     distDir        <- Context.distDir (vanillaContext library_stage rts)
 
     let ghcBuildDir      = root -/- stageString library_stage
-        bindistFilesDir  = root -/- "bindist" -/- dirPrefix <> ghcVersionPretty
+        bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty <> dirSuffix
         ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
         rtsIncludeDir    = distDir -/- "include"
 
@@ -326,7 +326,7 @@ bindistRules = do
 
     phony "binary-dist-dir-cross" $ buildBinDistDir "" root crossBindist
 
-    phony "binary-dist-dir-stage3" $ buildBinDistDir "stage3-" root targetBindist
+    phony "binary-dist-dir-stage3" $ buildBinDistDir "-stage3" root targetBindist
 
     let buildBinDist compressor = do
           win_host <- isWinHost
@@ -336,13 +336,13 @@ bindistRules = do
         buildBinDistReloc = buildBinDistX "reloc-binary-dist-dir" "reloc-bindist" ""
 
         buildBinDistX :: String -> FilePath -> FilePath -> Compressor -> Action ()
-        buildBinDistX target bindist_folder dirPrefix compressor = do
+        buildBinDistX target bindist_folder dirSuffix compressor = do
             need [target]
 
             version        <- setting ProjectVersion
             targetPlatform <- setting TargetPlatformFull
 
-            let ghcVersionPretty = dirPrefix <> "ghc-" ++ version ++ "-" ++ targetPlatform
+            let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform <> dirSuffix
 
             -- Finally, we create the archive <root>/bindist/ghc-X.Y.Z-platform.tar.xz
             tarPath <- builderPath (Tar Create)
@@ -359,7 +359,7 @@ bindistRules = do
 
     -- TODO: Generate these targets as well
     phony "binary-dist-cross" $ buildBinDistX "binary-dist-dir-cross" "bindist" "" Xz
-    phony "binary-dist-stage3" $ buildBinDistX "binary-dist-dir-stage3" "bindist" "stage3-" Xz
+    phony "binary-dist-stage3" $ buildBinDistX "binary-dist-dir-stage3" "bindist" "-stage3" Xz
 
     -- Prepare binary distribution configure script
     -- (generated under <ghc root>/distrib/configure by 'autoreconf')

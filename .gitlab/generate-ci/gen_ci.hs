@@ -386,7 +386,7 @@ testEnv arch opsys bc =
     , ["no_tntc"  | not (tablesNextToCode bc) ]
     , ["cross_"++triple  | Just triple <- pure $ crossTarget bc ]
     -- TODO: Is there something better than `show` for this?
-    , ["stage_" ++ show stage | Just stage <- pure (crossStage bc), Just triple <- pure (crossTarget bc), "riscv" `isInfixOf` triple ]
+    , ["stage" ++ show stage | Just stage <- pure (crossStage bc), Just triple <- pure (crossTarget bc), "riscv" `isInfixOf` triple ]
     , [flavourString (mkJobFlavour bc)]
     ]
 
