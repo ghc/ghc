@@ -2442,7 +2442,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_2-validate": {
+  "nightly-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage2-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -2453,7 +2453,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_2-validate.tar.xz",
+        "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage2-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2496,7 +2496,7 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_2-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage2-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
@@ -2504,11 +2504,11 @@
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "-e config.timeout=900",
-      "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_2-validate",
+      "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage2-validate",
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_3-validate": {
+  "nightly-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage3-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -2519,7 +2519,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_3-validate.tar.xz",
+        "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage3-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2562,7 +2562,7 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_3-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage3-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
@@ -2570,7 +2570,7 @@
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "-e config.timeout=900",
-      "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_3-validate",
+      "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage3-validate",
       "XZ_OPT": "-9"
     }
   },
@@ -6676,7 +6676,7 @@
       "TEST_ENV": "x86_64-linux-deb12-release"
     }
   },
-  "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_2-validate": {
+  "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage2-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -6687,7 +6687,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_2-validate.tar.xz",
+        "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage2-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -6713,7 +6713,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_2-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*RISC-V.*/)))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage2-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*RISC-V.*/)))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -6730,7 +6730,7 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_2-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage2-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
@@ -6738,10 +6738,10 @@
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "-e config.timeout=900",
-      "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_2-validate"
+      "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage2-validate"
     }
   },
-  "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_3-validate": {
+  "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage3-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -6752,7 +6752,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_3-validate.tar.xz",
+        "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage3-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -6778,7 +6778,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_3-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*RISC-V.*/)))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\bx86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage3-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/) || ($CI_COMMIT_BRANCH == \"master\") || ($CI_COMMIT_BRANCH =~ /ghc-[0-9]+\\.[0-9]+/)) || ($CI_MERGE_REQUEST_LABELS =~ /.*RISC-V.*/)))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -6795,7 +6795,7 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "stage3-ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage3-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp --enable-strict-ghc-toolchain-check",
       "CROSS_EMULATOR": "qemu-riscv64 -L /usr/riscv64-linux-gnu",
@@ -6803,7 +6803,7 @@
       "CROSS_TARGET": "riscv64-linux-gnu",
       "INSTALL_CONFIGURE_ARGS": "--enable-strict-ghc-toolchain-check",
       "RUNTEST_ARGS": "-e config.timeout=900",
-      "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage_3-validate"
+      "TEST_ENV": "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage3-validate"
     }
   },
   "x86_64-linux-deb12-unreg-validate": {
