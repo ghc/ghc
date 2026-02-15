@@ -1447,6 +1447,11 @@ platform_mapping = Map.map go combined_result
                 , "release-x86_64-linux-deb12-release"
                 , "release-x86_64-linux-fedora43-release"
                 , "release-x86_64-windows-release"
+                , "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage3-validate"
+                , "x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage2-validate"
+                -- TODO: Added those here for now, but do we really need RISC-V nightlies? Weekly should be fine.
+                , "nightly-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage3-validate"
+                , "nightly-x86_64-linux-deb12-riscv-cross_riscv64-linux-gnu-stage2-validate"
                 ]
 
     process sel =
