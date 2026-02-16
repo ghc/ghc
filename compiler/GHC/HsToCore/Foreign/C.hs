@@ -328,37 +328,73 @@ dsFCall fn_id co fcall mDeclHeader = do
 toCName :: Id -> String
 toCName i = showSDocOneLine defaultSDocContext (pprCode (ppr (idName i)))
 
+{- Note [Collapsing void pointer chains]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When translating Haskell types like (Ptr (Ptr Abstract)) to C types for capi
+wrappers, where Abstract has no CType annotation, naively we would produce
+"void**". This is problematic because in C, only void* has implicit conversion
+to any pointer type -- void** does NOT implicitly convert to specific_type**.
+Modern compilers (gcc, clang) treat -Wincompatible-pointer-types as an error
+by default (#26852), causing compilation failures for capi wrappers.
+
+The fix is to collapse void pointer chains: whenever the inner type of a
+Ptr/FunPtr resolves to void (i.e. the Haskell type has no known C
+representation), we return void* instead of void**, void***, etc.
+This works because void* implicitly converts to any pointer type in C.
+
+The internal helper f returns a Bool alongside the C type, indicating whether
+the result was void-based (True) or a known concrete type (False). When the
+Ptr/FunPtr case sees isVoid=True from its recursive call, it returns void*
+directly instead of appending another *.
+
+Examples:
+  Ptr Abstract              => void*
+  Ptr (Ptr Abstract)        => void*   (used to be void**)
+  Ptr (Ptr (Ptr Abstract))  => void*
+  Ptr (Ptr CInt)            => int**   (CInt has CType "int", don't collapse)
+-}
+
+-- | See Note [Collapsing void pointer chains]
 toCType :: Type -> (Maybe (Header GhcTc), SDoc)
-toCType = f False
-    where f voidOK t
-           -- First, if we have (Ptr t) of (FunPtr t), then we need to
+toCType t = case f False t of
+              (mh, _, cType) -> (mh, cType)
+    where
+      -- The Bool in the return type indicates whether the C type is
+      -- "void" due to an unknown Haskell type (True = void-based).
+      f :: Bool -> Type -> (Maybe (Header GhcTc), Bool, SDoc)
+      f voidOK t
+           -- First, if we have (Ptr t) or (FunPtr t), then we need to
            -- convert t to a C type and put a * after it. If we don't
            -- know a type for t, then "void" is fine, though.
+           -- If the inner type is void-based, we collapse the pointer
+           -- chain to just "void*". See Note [Collapsing void pointer chains].
            | Just (ptr, [t']) <- splitTyConApp_maybe t
            , tyConName ptr `elem` [ptrTyConName, funPtrTyConName]
               = case f True t' of
-                (mh, cType') ->
-                    (mh, cType' <> char '*')
+                (mh, True, _) ->
+                    (mh, True, text "void*")
+                (mh, False, cType') ->
+                    (mh, False, cType' <> char '*')
            -- Otherwise, if we have a type constructor application, then
            -- see if there is a C type associated with that constructor.
            -- Note that we aren't looking through type synonyms or
            -- anything, as it may be the synonym that is annotated.
            | Just tycon <- tyConAppTyConPicky_maybe t
            , Just (CType _ mHeader cType) <- tyConCType_maybe tycon
-              = (mHeader, ftext cType)
+              = (mHeader, False, ftext cType)
            -- If we don't know a C type for this type, then try looking
            -- through one layer of type synonym etc.
            | Just t' <- coreView t
               = f voidOK t'
-          -- Handle 'UnliftedFFITypes' argument
+           -- Handle 'UnliftedFFITypes' argument
            | Just tyCon <- tyConAppTyConPicky_maybe t
            , isPrimTyCon tyCon
            , Just cType <- ppPrimTyConStgType tyCon
-           = (Nothing, text cType)
+           = (Nothing, False, text cType)
 
            -- Otherwise we don't know the C type. If we are allowing
            -- void then return that; otherwise something has gone wrong.
-           | voidOK = (Nothing, text "void")
+           | voidOK = (Nothing, True, text "void")
            | otherwise
               = pprPanic "toCType" (ppr t)
 
