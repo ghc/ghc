@@ -3,7 +3,6 @@ module Settings.Flavours.Performance (performanceFlavour, performanceArgs) where
 import Expression
 import Flavour
 import {-# SOURCE #-} Settings.Default
-import Oracles.Flag (Flag(CrossCompiling), getFlag)
 
 -- Please update doc/flavours.md when changing this file.
 performanceFlavour :: Flavour
@@ -14,9 +13,7 @@ performanceFlavour = splitSections $ enableLateCCS $ defaultFlavour
 performanceArgs :: Args
 performanceArgs = sourceArgs SourceArgs
     { hsDefault  = pure ["-O", "+RTS", "-O64M", "-RTS"]
-    , hsLibrary  = let cross = getFlag CrossCompiling
-                   in
-                    orM [notStage0, cross] ? arg "-O2"
+    , hsLibrary  = notStage0 ? arg "-O2"
     , hsCompiler = pure ["-O2"]
     , hsGhc      = mconcat
                     [ stage0 ? arg "-O"
