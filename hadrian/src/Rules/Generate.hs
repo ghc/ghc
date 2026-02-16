@@ -490,8 +490,6 @@ generateSettings settingsFile = do
     let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
 
     settings <- traverse sequence $
-    -- ROMES:TODO: WHERE HAS CROSS COMPILING GONE?
-    -- ("cross compiling", expr $ yesNo <$> crossStage (predStage stage))
         [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit, Context.stage = predStage stage })))
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
         -- Hard-coded as Cabal queries these to determine way support and we
