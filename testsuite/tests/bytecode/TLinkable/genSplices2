@@ -1,0 +1,98 @@
+#!/bin/bash
+
+MODNAME=${1}
+NMOD=${2:-20}  # Default 20 modules
+NDEF=${3:-50} # Default 50 functions per module
+
+# Generate the modules
+for ((i=1; i<=NMOD; i++)); do
+    module_name="Module$(printf "%03d" $i)"
+    file_path="${module_name}.hs"
+
+    cat > "$file_path" << EOF
+module ${module_name} where
+
+EOF
+
+    for ((j=1; j<=NDEF; j++)); do
+        func_name="func$(printf "%03d" $j)"
+        cat >> "$file_path" << EOF
+{-# NOINLINE ${func_name} #-}
+${func_name} :: Int -> Int
+${func_name} x = x + ${j}
+
+EOF
+    done
+done
+
+# Generate imports section
+imports=""
+for ((i=1; i<=NMOD; i++)); do
+    imports="${imports}import splice Module$(printf "%03d" $i)
+"
+done
+
+# Generate the hard-coded TH expression
+# Build: Module001.func001 1 + Module001.func002 2 + ... + Module{NMOD}.func{NDEF} {NMOD*NDEF}
+expressions=""
+all_mods=""
+for ((i=1; i<=NMOD; i++)); do
+    mod_name="Module$(printf "%03d" $i)"
+    all_mods="${all_mods} ${mod_name}"
+    single_expression=""
+    count=1
+    for ((j=1; j<=NDEF; j++)); do
+        func_name="func$(printf "%03d" $j)"
+        if [ $count -gt 1 ]; then
+            single_expression="${single_expression} + "
+        fi
+        single_expression="${single_expression}${mod_name}.${func_name} ${count}"
+        ((count++))
+    done
+
+    expressions="comp$(printf "%03d" $i) = \$(lift \$ ${single_expression})\\n\\n${expressions}"
+done
+
+# Generate the TH splice file
+cat > bytecode.pkg << EOF
+name: testpkg
+version: 1.2.3.4
+id: testpkg-1.2.3.4-XXX
+key: testpkg-1.2.3.4-XXX
+license: BSD3
+copyright: (c) The Univsersity of Glasgow 2004
+maintainer: glasgow-haskell-users@haskell.org
+stability: stable
+homepage: http://www.haskell.org/ghc
+package-url: http://www.haskell.org/ghc
+description: A Test Package
+category: none
+author: simonmar@microsoft.com
+exposed: True
+exposed-modules: ${all_mods}
+import-dirs: \${pkgroot}/outdir
+library-dirs: \${pkgroot}/outdir
+include-dirs:
+bytecode-library-dirs: \${pkgroot}/outdir
+hs-libraries: testpkg-1.2.3.4-XXX
+EOF
+
+# Generate the TH splice file
+cat > "${MODNAME}".hs << EOF
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE ExplicitLevelImports #-}
+
+module ${MODNAME} where
+
+import splice Language.Haskell.TH.Syntax (Lift(..))
+import Control.Concurrent (threadDelay)
+import splice Prelude (Num(..), ($), Monad(..), pure)
+
+-- Import all generated modules
+${imports}
+
+-- Use from each module
+$(echo -e -n "${expressions}")
+
+EOF
