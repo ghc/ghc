@@ -144,6 +144,9 @@ data TimeoutIncrease = TimeoutIncrease | NoTimeoutIncrease
 data CrossEmulator
   = NoEmulator
   | NoEmulatorNeeded TimeoutIncrease
+      -- ^ Some targets (e.g. JavaScript) don't require an explicit emulator
+      -- managed by the testsuite (a shell script's shebang is used instead),
+      -- yet tests need more time to execute hence they require an increased timeout.
   | Emulator String
 
 -- | A BuildConfig records all the options which can be modified to affect the
