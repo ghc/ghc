@@ -1,0 +1,18 @@
+
+==================== Foreign export header file ====================
+
+
+
+==================== Foreign export stubs ====================
+#include "T26852.h"
+int** ghczuwrapperZC0ZCmainZCT26852ZCgetzuintzupp(void) {return get_int_pp();}
+#include "T26852.h"
+void* ghczuwrapperZC1ZCmainZCT26852ZCgetzusimple(void) {return get_simple();}
+#include "T26852.h"
+void* ghczuwrapperZC2ZCmainZCT26852ZCgetzuabstract3(void) {return get_abstract3();}
+#include "T26852.h"
+void* ghczuwrapperZC3ZCmainZCT26852ZCgetzuabstract(void) {return get_abstract();}
+#include "T26852.h"
+void ghczuwrapperZC4ZCmainZCT26852ZCblah(void* a1) {blah(a1);}
+
+
