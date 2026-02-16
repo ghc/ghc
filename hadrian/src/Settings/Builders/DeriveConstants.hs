@@ -13,7 +13,6 @@ deriveConstantsPairs =
   , ("DerivedConstants.h", "--gen-header")
   ]
 
--- MP: Why is Stage1 hard-coded here, looks wrong
 deriveConstantsBuilderArgs :: Args
 deriveConstantsBuilderArgs = builder DeriveConstants ? do
     cFlags <- includeCcArgs
