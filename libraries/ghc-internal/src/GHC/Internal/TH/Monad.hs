@@ -20,6 +20,7 @@
 -- Import "Language.Haskell.TH" or "Language.Haskell.TH.Syntax" instead!
 module GHC.Internal.TH.Monad
     ( module GHC.Internal.TH.Monad
+    , QuasiQuoter(..)
     ) where
 
 #ifdef BOOTSTRAP_TH
@@ -312,6 +313,33 @@ class Monad m => Quote m where
 
 instance Quote Q where
   newName s = Q (qNewName s)
+
+-----------------------------------------------------
+--
+--              The QuasiQuoter type
+--
+-----------------------------------------------------
+
+-- | The 'QuasiQuoter' type, a value @q@ of this type can be used
+-- in the syntax @[q| ... string to parse ...|]@.  In fact, for
+-- convenience, a 'QuasiQuoter' actually defines multiple quasiquoters
+-- to be used in different splice contexts. In the usual case of a
+-- @QuasiQuoter@ that is only intended to be used in certain splice
+-- contexts, the unused fields should just 'fail'. This is most easily
+-- accomplished using 'namedefaultQuasiQuoter' or 'defaultQuasiQuoter'.
+--
+-- This is exposed both from the @template-haskell-quasiquoter@ and @template-haskell@ packages.
+-- Consider importing it from the more stable @template-haskell-quasiquoter@ if you don't need the full breadth of the @template-haskell@ interface.
+data QuasiQuoter = QuasiQuoter {
+    -- | Quasi-quoter for expressions, invoked by quotes like @lhs = $[q|...]@
+    quoteExp  :: String -> Q Exp,
+    -- | Quasi-quoter for patterns, invoked by quotes like @f $[q|...] = rhs@
+    quotePat  :: String -> Q Pat,
+    -- | Quasi-quoter for types, invoked by quotes like @f :: $[q|...]@
+    quoteType :: String -> Q Type,
+    -- | Quasi-quoter for declarations, invoked by top-level quotes
+    quoteDec  :: String -> Q [Dec]
+    }
 
 -----------------------------------------------------
 --

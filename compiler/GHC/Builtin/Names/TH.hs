@@ -185,7 +185,7 @@ thSyn, thMonad, thLib, qqLib, liftLib :: Module
 thSyn = mkTHModule (fsLit "GHC.Internal.TH.Syntax")
 thMonad = mkTHModule (fsLit "GHC.Internal.TH.Monad")
 thLib = mkTHModule (fsLit "GHC.Internal.TH.Lib")
-qqLib = mkTHModule (fsLit "GHC.Internal.TH.Quote")
+qqLib = mkTHModule (fsLit "GHC.Internal.TH.Monad")
 liftLib = mkTHModule (fsLit "GHC.Internal.TH.Lift")
 
 
