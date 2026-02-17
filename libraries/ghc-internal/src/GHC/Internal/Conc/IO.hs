@@ -67,6 +67,10 @@ import GHC.Internal.Real ( fromIntegral )
 import GHC.Internal.System.Posix.Types
 import GHC.Internal.Types (Bool(..), Int(..), IO(..))
 
+#if defined(javascript_HOST_ARCH)
+import GHC.Internal.Base (pure)
+#endif
+
 #if defined(mingw32_HOST_OS)
 import qualified GHC.Internal.Conc.Windows as Windows
 import GHC.Internal.IO.SubSystem

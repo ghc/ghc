@@ -632,7 +632,7 @@ getTraceFlags :: IO TraceFlags
 getTraceFlags = do
 #if defined(javascript_HOST_ARCH)
   -- The JS backend does not currently have trace flags
-  pure (TraceFlags TraceNone False False False False False False False)
+  return (TraceFlags TraceNone False False False False False False False)
 #else
   let ptr = (#ptr RTS_FLAGS, TraceFlags) rtsFlagsPtr
   TraceFlags <$> (toEnum . fromIntegral

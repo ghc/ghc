@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE PolyKinds                  #-}
@@ -89,7 +88,6 @@ import GHC.Internal.Base (
   )
 import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.Enum
-import GHC.Internal.Generics
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
 import GHC.Internal.Read
@@ -153,8 +151,6 @@ newtype First a = First { getFirst :: Maybe a }
                  , Ord         -- ^ @since base-2.01
                  , Read        -- ^ @since base-2.01
                  , Show        -- ^ @since base-2.01
-                 , Generic     -- ^ @since base-4.7.0.0
-                 , Generic1    -- ^ @since base-4.7.0.0
                  , Functor     -- ^ @since base-4.8.0.0
                  , Applicative -- ^ @since base-4.8.0.0
                  , Monad       -- ^ @since base-4.8.0.0
@@ -195,8 +191,6 @@ newtype Last a = Last { getLast :: Maybe a }
                  , Ord         -- ^ @since base-2.01
                  , Read        -- ^ @since base-2.01
                  , Show        -- ^ @since base-2.01
-                 , Generic     -- ^ @since base-4.7.0.0
-                 , Generic1    -- ^ @since base-4.7.0.0
                  , Functor     -- ^ @since base-4.8.0.0
                  , Applicative -- ^ @since base-4.8.0.0
                  , Monad       -- ^ @since base-4.8.0.0
@@ -230,8 +224,6 @@ newtype Ap f a = Ap { getAp :: f a }
                  , Enum        -- ^ @since base-4.12.0.0
                  , Eq          -- ^ @since base-4.12.0.0
                  , Functor     -- ^ @since base-4.12.0.0
-                 , Generic     -- ^ @since base-4.12.0.0
-                 , Generic1    -- ^ @since base-4.12.0.0
                  , Monad       -- ^ @since base-4.12.0.0
                  , MonadFail   -- ^ @since base-4.12.0.0
                  , MonadPlus   -- ^ @since base-4.12.0.0
