@@ -34,6 +34,8 @@ import Control.Monad
 import Base
 import System.Directory.Extra (listFilesRecursive)
 import Control.Arrow (first)
+import CommandLine (cmdDebugHashInputs)
+import System.Directory (createDirectoryIfMissing)
 
 
 -- | Read a Cabal file and return the package identifier, e.g. @base-4.10.0.0-abcd@.
@@ -165,15 +167,25 @@ pkgHashOracle = void $ addOracleCache $ \(PkgHashKey (stag, pkg)) -> do
   need files
   files_hash <- liftIO (SHA256.finalize <$> hashFiles (SHA256.init) files)
 
-  return $ BS.unpack $ Base16.encode $ SHA256.hash $
-    renderPackageHashInputs $ PackageHashInputs
-    {
-       pkgHashPkgId       = name
-    ,  pkgHashComponent   = pkgType pkg
-    ,  pkgHashSourceHash  = files_hash
-    ,  pkgHashDirectDeps  = Set.fromList depsHashes
-    ,  pkgHashOtherConfig = other_config
-    }
+  let hashInputs = PackageHashInputs
+        { pkgHashPkgId       = name
+        , pkgHashComponent   = pkgType pkg
+        , pkgHashSourceHash  = files_hash
+        , pkgHashDirectDeps  = Set.fromList depsHashes
+        , pkgHashOtherConfig = other_config
+        }
+      rendered = renderPackageHashInputs hashInputs
+
+  debugHash <- cmdDebugHashInputs
+  when debugHash $ do
+    root <- buildRoot
+    let debugDir = root -/- "hash-inputs"
+        debugFile = debugDir -/- name <.> "txt"
+    liftIO $ createDirectoryIfMissing True debugDir
+    liftIO $ BS.writeFile debugFile rendered
+    putNormal $ "Hash inputs for " ++ name ++ ":\n" ++ BS.unpack rendered
+
+  return $ BS.unpack $ Base16.encode $ SHA256.hash rendered
 
 allFilesInDirectory :: FilePath -> Action [FilePath]
 allFilesInDirectory dir = liftIO $ listFilesRecursive dir

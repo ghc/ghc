@@ -1,7 +1,7 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2, lookupSkipDepends,
     cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdCompleteSetting,
-    cmdDocsArgs, cmdUnitIdHash, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
+    cmdDocsArgs, cmdUnitIdHash, cmdDebugHashInputs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
     cmdPrefix, DocArgs(..), defaultDocArgs
     ) where
 
@@ -37,7 +37,8 @@ data CommandLineArgs = CommandLineArgs
     , docsArgs       :: DocArgs
     , docTargets     :: DocTargets
     , prefix         :: Maybe FilePath
-    , completeStg    :: Maybe String }
+    , completeStg    :: Maybe String
+    , debugHashInputs :: Bool }
     deriving (Eq, Show)
 
 -- | Default values for 'CommandLineArgs'.
@@ -57,7 +58,8 @@ defaultCommandLineArgs = CommandLineArgs
     , docsArgs       = defaultDocArgs
     , docTargets     = Set.fromList [minBound..maxBound]
     , prefix         = Nothing
-    , completeStg    = Nothing }
+    , completeStg    = Nothing
+    , debugHashInputs = False }
 
 -- | These arguments are used by the `test` target.
 data TestArgs = TestArgs
@@ -142,6 +144,9 @@ readUnitIdHash :: Either String (CommandLineArgs -> CommandLineArgs)
 readUnitIdHash = Right $ \flags ->
   trace "--hash-unit-ids is deprecated. It is enabled by release flavour or +hash_unit_ids flavour transformer" $
   flags { unitIdHash = True }
+
+readDebugHashInputs :: Either String (CommandLineArgs -> CommandLineArgs)
+readDebugHashInputs = Right $ \flags -> flags { debugHashInputs = True }
 
 readProgressInfo :: String -> Either String (CommandLineArgs -> CommandLineArgs)
 readProgressInfo ms =
@@ -278,6 +283,8 @@ optDescrs =
       "Freeze Stage2 GHC."
     , Option [] ["hash-unit-ids"] (NoArg readUnitIdHash)
       "Include package hashes in unit ids."
+    , Option [] ["debug-hash-inputs"] (NoArg readDebugHashInputs)
+      "Debug: print and log hash inputs for each package."
     , Option [] ["skip-depends"] (NoArg readSkipDepends)
       "Skip rebuilding dependency information."
     , Option [] ["bignum"] (OptArg readBignum "BACKEND")
@@ -400,6 +407,9 @@ cmdBignumCheck = bignumCheck <$> cmdLineArgs
 
 cmdProgressInfo :: Action ProgressInfo
 cmdProgressInfo = progressInfo <$> cmdLineArgs
+
+cmdDebugHashInputs :: Action Bool
+cmdDebugHashInputs = debugHashInputs <$> cmdLineArgs
 
 cmdDocsArgs :: Action DocTargets
 cmdDocsArgs = docTargets <$> cmdLineArgs
