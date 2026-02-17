@@ -306,7 +306,6 @@ Library
         GHC.Internal.TH.Syntax
         GHC.Internal.TH.Lib
         GHC.Internal.TH.Lift
-        GHC.Internal.TH.Quote
         GHC.Internal.TH.Monad
         GHC.Internal.TopHandler
         GHC.Internal.TypeError

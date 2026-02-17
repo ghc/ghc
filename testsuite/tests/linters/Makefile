@@ -81,7 +81,6 @@ whitespace:
 				libraries/base/include/HsEvent.h\
 				libraries/base/include/md5.h\
 				libraries/ghc-prim/GHC/Tuple.hs\
-				libraries/template-haskell/Language/Haskell/TH/Quote.hs\
 				rts/STM.h\
 				rts/Sparks.h\
 				rts/Threads.h\

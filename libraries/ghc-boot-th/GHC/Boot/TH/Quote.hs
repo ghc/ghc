@@ -1,5 +1,5 @@
 {-# OPTIONS_HADDOCK not-home #-}
 module GHC.Boot.TH.Quote
-  (module GHC.Internal.TH.Quote) where
+  (QuasiQuoter(..)) where
 
-import GHC.Internal.TH.Quote
+import GHC.Internal.TH.Monad (QuasiQuoter(..))
