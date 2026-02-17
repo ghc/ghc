@@ -64,7 +64,6 @@ import GHC.Internal.Arr  ( Array(..), elems, numElements,
                   foldlElems', foldrElems',
                   foldl1Elems, foldr1Elems)
 import GHC.Internal.Base hiding ( foldr )
-import GHC.Internal.Generics
 import GHC.Internal.Tuple (Solo (..))
 import GHC.Internal.Num  ( Num(..) )
 
@@ -858,67 +857,6 @@ instance (Foldable f) => Foldable (Alt f) where
 -- | @since base-4.12.0.0
 instance (Foldable f) => Foldable (Ap f) where
     foldMap f = foldMap f . getAp
-
--- Instances for GHC.Generics
--- | @since base-4.9.0.0
-instance Foldable U1 where
-    foldMap _ _ = mempty
-    {-# INLINE foldMap #-}
-    fold _ = mempty
-    {-# INLINE fold #-}
-    foldr _ z _ = z
-    {-# INLINE foldr #-}
-    foldl _ z _ = z
-    {-# INLINE foldl #-}
-    foldl1 _ _ = errorWithoutStackTrace "foldl1: U1"
-    foldr1 _ _ = errorWithoutStackTrace "foldr1: U1"
-    length _   = 0
-    null _     = True
-    elem _ _   = False
-    sum _      = 0
-    product _  = 1
-
--- | @since base-4.9.0.0
-deriving instance Foldable V1
-
--- | @since base-4.9.0.0
-deriving instance Foldable Par1
-
--- | @since base-4.9.0.0
-deriving instance Foldable f => Foldable (Rec1 f)
-
--- | @since base-4.9.0.0
-deriving instance Foldable (K1 i c)
-
--- | @since base-4.9.0.0
-deriving instance Foldable f => Foldable (M1 i c f)
-
--- | @since base-4.9.0.0
-deriving instance (Foldable f, Foldable g) => Foldable (f :+: g)
-
--- | @since base-4.9.0.0
-deriving instance (Foldable f, Foldable g) => Foldable (f :*: g)
-
--- | @since base-4.9.0.0
-deriving instance (Foldable f, Foldable g) => Foldable (f :.: g)
-
--- | @since base-4.9.0.0
-deriving instance Foldable UAddr
-
--- | @since base-4.9.0.0
-deriving instance Foldable UChar
-
--- | @since base-4.9.0.0
-deriving instance Foldable UDouble
-
--- | @since base-4.9.0.0
-deriving instance Foldable UFloat
-
--- | @since base-4.9.0.0
-deriving instance Foldable UInt
-
--- | @since base-4.9.0.0
-deriving instance Foldable UWord
 
 -- Instances for Data.Ord
 -- | @since base-4.12.0.0

@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE PolyKinds                  #-}
@@ -85,7 +84,6 @@ module GHC.Internal.Data.Monoid (
 -- Push down the module in the dependency hierarchy.
 import GHC.Internal.Base hiding (Any)
 import GHC.Internal.Enum
-import GHC.Internal.Generics
 import GHC.Internal.Num
 import GHC.Internal.Read
 import GHC.Internal.Show
@@ -148,8 +146,6 @@ newtype First a = First { getFirst :: Maybe a }
                  , Ord         -- ^ @since base-2.01
                  , Read        -- ^ @since base-2.01
                  , Show        -- ^ @since base-2.01
-                 , Generic     -- ^ @since base-4.7.0.0
-                 , Generic1    -- ^ @since base-4.7.0.0
                  , Functor     -- ^ @since base-4.8.0.0
                  , Applicative -- ^ @since base-4.8.0.0
                  , Monad       -- ^ @since base-4.8.0.0
@@ -190,8 +186,6 @@ newtype Last a = Last { getLast :: Maybe a }
                  , Ord         -- ^ @since base-2.01
                  , Read        -- ^ @since base-2.01
                  , Show        -- ^ @since base-2.01
-                 , Generic     -- ^ @since base-4.7.0.0
-                 , Generic1    -- ^ @since base-4.7.0.0
                  , Functor     -- ^ @since base-4.8.0.0
                  , Applicative -- ^ @since base-4.8.0.0
                  , Monad       -- ^ @since base-4.8.0.0
@@ -225,8 +219,6 @@ newtype Ap f a = Ap { getAp :: f a }
                  , Enum        -- ^ @since base-4.12.0.0
                  , Eq          -- ^ @since base-4.12.0.0
                  , Functor     -- ^ @since base-4.12.0.0
-                 , Generic     -- ^ @since base-4.12.0.0
-                 , Generic1    -- ^ @since base-4.12.0.0
                  , Monad       -- ^ @since base-4.12.0.0
                  , MonadFail   -- ^ @since base-4.12.0.0
                  , MonadPlus   -- ^ @since base-4.12.0.0
