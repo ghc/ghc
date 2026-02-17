@@ -10570,6 +10570,26 @@ module Unsafe.Coerce where
 
 
 -- Instances:
+instance [safe] forall (f :: * -> *) (g :: * -> *). (Control.Monad.Zip.MonadZip f, Control.Monad.Zip.MonadZip g) => Control.Monad.Zip.MonadZip (f GHC.Internal.Generics.:*: g) -- Defined in ‘Control.Monad.Zip’
+instance [safe] forall (f :: * -> *). Control.Monad.Zip.MonadZip f => Control.Monad.Zip.MonadZip (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Data.Ord.Down -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Data.Semigroup.Internal.Dual -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Data.Monoid.First -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Data.Monoid.Last -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip [] -- Defined in ‘Control.Monad.Zip’
+instance [safe] forall (f :: * -> *) i (c :: GHC.Internal.Generics.Meta). Control.Monad.Zip.MonadZip f => Control.Monad.Zip.MonadZip (GHC.Internal.Generics.M1 i c f) -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Maybe.Maybe -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Base.NonEmpty -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Generics.Par1 -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Data.Semigroup.Internal.Product -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Data.Proxy.Proxy -- Defined in ‘Control.Monad.Zip’
+instance [safe] forall (f :: * -> *). Control.Monad.Zip.MonadZip f => Control.Monad.Zip.MonadZip (GHC.Internal.Generics.Rec1 f) -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip Solo -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Data.Semigroup.Internal.Sum -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip GHC.Internal.Generics.U1 -- Defined in ‘Control.Monad.Zip’
+instance Control.Monad.Zip.MonadZip Data.Complex.Complex -- Defined in ‘Data.Complex’
+instance [safe] forall (f :: * -> *) (g :: * -> *). (Control.Monad.Zip.MonadZip f, Control.Monad.Zip.MonadZip g) => Control.Monad.Zip.MonadZip (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
 instance [safe] Data.Bifoldable.Bifoldable GHC.Internal.Data.Functor.Const.Const -- Defined in ‘Data.Bifoldable’
 instance [safe] Data.Bifoldable.Bifoldable GHC.Internal.Data.Either.Either -- Defined in ‘Data.Bifoldable’
 instance [safe] forall i. Data.Bifoldable.Bifoldable (GHC.Internal.Generics.K1 i) -- Defined in ‘Data.Bifoldable’
@@ -11601,26 +11621,6 @@ instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.Last -- Defined 
 instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Control.Monad.IO.Class.MonadIO GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Control.Monad.IO.Class’
-instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Control.Monad.Zip.MonadZip f, GHC.Internal.Control.Monad.Zip.MonadZip g) => GHC.Internal.Control.Monad.Zip.MonadZip (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance forall (f :: * -> *). GHC.Internal.Control.Monad.Zip.MonadZip f => GHC.Internal.Control.Monad.Zip.MonadZip (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Semigroup.Internal.Dual -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Monoid.First -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Functor.Identity.Identity -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Monoid.Last -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip [] -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance forall (f :: * -> *) i (c :: GHC.Internal.Generics.Meta). GHC.Internal.Control.Monad.Zip.MonadZip f => GHC.Internal.Control.Monad.Zip.MonadZip (GHC.Internal.Generics.M1 i c f) -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Base.NonEmpty -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Generics.Par1 -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Semigroup.Internal.Product -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Proxy.Proxy -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance forall (f :: * -> *). GHC.Internal.Control.Monad.Zip.MonadZip f => GHC.Internal.Control.Monad.Zip.MonadZip (GHC.Internal.Generics.Rec1 f) -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip Solo -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Semigroup.Internal.Sum -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Generics.U1 -- Defined in ‘GHC.Internal.Control.Monad.Zip’
-instance GHC.Internal.Control.Monad.Zip.MonadZip Data.Complex.Complex -- Defined in ‘Data.Complex’
-instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Control.Monad.Zip.MonadZip f, GHC.Internal.Control.Monad.Zip.MonadZip g) => GHC.Internal.Control.Monad.Zip.MonadZip (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
 instance forall (a :: * -> * -> *) b c. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable b, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable c, GHC.Internal.Data.Data.Data (a b c)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedArrow a b c) -- Defined in ‘Control.Applicative’
 instance forall (m :: * -> *) a. (ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable m, ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Data.Data.Data (m a)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedMonad m a) -- Defined in ‘Control.Applicative’
 instance GHC.Internal.Data.Data.Data Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
