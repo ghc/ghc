@@ -251,7 +251,7 @@ foreign import ccall unsafe "sys/eventfd.h eventfd_write"
 
 #if defined(wasm32_HOST_ARCH)
 c_setIOManagerWakeupFd :: CInt -> IO ()
-c_setIOManagerWakeupFd _ = pure ()
+c_setIOManagerWakeupFd _ = return ()
 #else
 foreign import ccall unsafe "setIOManagerWakeupFd"
    c_setIOManagerWakeupFd :: CInt -> IO ()
