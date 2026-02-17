@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE DeriveGeneric, NoImplicitPrelude, MagicHash,
+{-# LANGUAGE NoImplicitPrelude, MagicHash,
              ExistentialQuantification, ImplicitParams #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK not-home #-}
@@ -54,7 +54,6 @@ module GHC.Internal.IO.Exception (
 import GHC.Internal.Base ( String, getTag, id, otherwise, ($), (.) )
 import GHC.Internal.Classes ( Eq(..), Ord(..), not, (&&) )
 import GHC.Internal.CString ( unpackCStringUtf8# )
-import GHC.Internal.Generics
 import GHC.Internal.List
 import GHC.Internal.Magic ( lazy )
 import GHC.Internal.Maybe ( Maybe(..) )
@@ -312,7 +311,7 @@ data ExitCode
                 -- The exact interpretation of the code is
                 -- operating-system dependent.  In particular, some values
                 -- may be prohibited (e.g. 0 on a POSIX-compliant system).
-  deriving (Eq, Ord, Read, Show, Generic)
+  deriving (Eq, Ord, Read, Show)
 
 -- | @since base-4.1.0.0
 instance Exception ExitCode

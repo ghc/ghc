@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -32,7 +31,6 @@ import GHC.Internal.Num
 import GHC.Internal.Prim (coerce)
 import GHC.Internal.Read
 import GHC.Internal.Show
-import GHC.Internal.Generics
 import GHC.Internal.Real
 import GHC.Internal.Types (Bool(..), Ordering(..))
 
@@ -97,8 +95,6 @@ newtype Dual a = Dual { getDual :: a }
                  , Read     -- ^ @since base-2.01
                  , Show     -- ^ @since base-2.01
                  , Bounded  -- ^ @since base-2.01
-                 , Generic  -- ^ @since base-4.7.0.0
-                 , Generic1 -- ^ @since base-4.7.0.0
                  )
 
 -- | @since base-4.9.0.0
@@ -137,8 +133,6 @@ instance Monad Dual where
 -- >>> appEndo computation 1
 -- 6
 newtype Endo a = Endo { appEndo :: a -> a }
-               deriving ( Generic -- ^ @since base-4.7.0.0
-                        )
 
 -- | @since base-4.9.0.0
 instance Semigroup (Endo a) where
@@ -207,7 +201,6 @@ newtype All = All { getAll :: Bool }
                  , Read    -- ^ @since base-2.01
                  , Show    -- ^ @since base-2.01
                  , Bounded -- ^ @since base-2.01
-                 , Generic -- ^ @since base-4.7.0.0
                  )
 
 -- | @since base-4.9.0.0
@@ -239,7 +232,6 @@ newtype Any = Any { getAny :: Bool }
                  , Read    -- ^ @since base-2.01
                  , Show    -- ^ @since base-2.01
                  , Bounded -- ^ @since base-2.01
-                 , Generic -- ^ @since base-4.7.0.0
                  )
 
 -- | @since base-4.9.0.0
@@ -268,8 +260,6 @@ newtype Sum a = Sum { getSum :: a }
                  , Read     -- ^ @since base-2.01
                  , Show     -- ^ @since base-2.01
                  , Bounded  -- ^ @since base-2.01
-                 , Generic  -- ^ @since base-4.7.0.0
-                 , Generic1 -- ^ @since base-4.7.0.0
                  , Num      -- ^ @since base-4.7.0.0
                  )
 
@@ -316,8 +306,6 @@ newtype Product a = Product { getProduct :: a }
                  , Read     -- ^ @since base-2.01
                  , Show     -- ^ @since base-2.01
                  , Bounded  -- ^ @since base-2.01
-                 , Generic  -- ^ @since base-4.7.0.0
-                 , Generic1 -- ^ @since base-4.7.0.0
                  , Num      -- ^ @since base-4.7.0.0
                  )
 
@@ -362,9 +350,7 @@ instance Monad Product where
 --
 -- @since base-4.8.0.0
 newtype Alt f a = Alt {getAlt :: f a}
-  deriving ( Generic     -- ^ @since base-4.8.0.0
-           , Generic1    -- ^ @since base-4.8.0.0
-           , Read        -- ^ @since base-4.8.0.0
+  deriving ( Read        -- ^ @since base-4.8.0.0
            , Show        -- ^ @since base-4.8.0.0
            , Eq          -- ^ @since base-4.8.0.0
            , Ord         -- ^ @since base-4.8.0.0

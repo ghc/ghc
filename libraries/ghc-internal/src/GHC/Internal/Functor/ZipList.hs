@@ -1,14 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveFoldable #-}
 
 module GHC.Internal.Functor.ZipList (ZipList(..)) where
 
 import GHC.Internal.Base (Alternative(..), Applicative(..), Functor(..), ($))
 import GHC.Internal.Classes (Eq, Ord)
-import GHC.Internal.Generics
 import GHC.Internal.List (repeat, zipWith)
 import GHC.Internal.Read (Read)
 import GHC.Internal.Show (Show)
@@ -42,8 +40,6 @@ newtype ZipList a = ZipList { getZipList :: [a] }
                            , Read     -- ^ @since base-4.7.0.0
                            , Functor  -- ^ @since base-2.01
                            , Foldable -- ^ @since base-4.9.0.0
-                           , Generic  -- ^ @since base-4.7.0.0
-                           , Generic1 -- ^ @since base-4.7.0.0
                            )
 
 

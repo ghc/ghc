@@ -74,10 +74,6 @@ import GHC.Internal.IO
 import GHC.Internal.Real
 import GHC.Internal.Show
 
-#if defined(javascript_HOST_ARCH)
-import GHC.Internal.Base (pure)
-#endif
-
 -- | 'RtsTime' is defined as a @StgWord64@ in @stg/Types.h@
 --
 -- @since base-4.8.2.0
@@ -632,7 +628,7 @@ getTraceFlags :: IO TraceFlags
 getTraceFlags = do
 #if defined(javascript_HOST_ARCH)
   -- The JS backend does not currently have trace flags
-  pure (TraceFlags TraceNone False False False False False False False)
+  return (TraceFlags TraceNone False False False False False False False)
 #else
   let ptr = (#ptr RTS_FLAGS, TraceFlags) rtsFlagsPtr
   TraceFlags <$> (toEnum . fromIntegral

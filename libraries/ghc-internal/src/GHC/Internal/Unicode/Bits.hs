@@ -31,8 +31,8 @@ module GHC.Internal.Unicode.Bits
     where
 
 import GHC.Internal.Bits (finiteBitSize, popCount)
-import {-# SOURCE #-} GHC.Internal.ByteOrder
 import GHC.Internal.Classes (Eq(..))
+import GHC.Internal.ByteOrder
 import GHC.Internal.Prim
 import GHC.Internal.ST
 import GHC.Internal.Base (($))
