@@ -36,7 +36,6 @@ import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Data.Ord ( Down(..) )
 import GHC.Internal.Data.Tuple ( Solo(..), snd )
 import GHC.Internal.Base ( Monad, errorWithoutStackTrace, (.) )
-import GHC.Internal.Generics
 import GHC.Internal.List ( head, drop )
 import GHC.Internal.Control.Monad.ST.Imp
 import GHC.Internal.System.IO
@@ -145,26 +144,6 @@ instance MonadFix f => MonadFix (Alt f) where
 -- | @since base-4.12.0.0
 instance MonadFix f => MonadFix (Ap f) where
     mfix f   = Ap (mfix (getAp . f))
-
--- Instances for GHC.Generics
--- | @since base-4.9.0.0
-instance MonadFix Par1 where
-    mfix f = Par1 (fix (unPar1 . f))
-
--- | @since base-4.9.0.0
-instance MonadFix f => MonadFix (Rec1 f) where
-    mfix f = Rec1 (mfix (unRec1 . f))
-
--- | @since base-4.9.0.0
-instance MonadFix f => MonadFix (M1 i c f) where
-    mfix f = M1 (mfix (unM1. f))
-
--- | @since base-4.9.0.0
-instance (MonadFix f, MonadFix g) => MonadFix (f :*: g) where
-    mfix f = (mfix (fstP . f)) :*: (mfix (sndP . f))
-      where
-        fstP (a :*: _) = a
-        sndP (_ :*: b) = b
 
 -- Instances for Data.Ord
 

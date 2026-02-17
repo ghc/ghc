@@ -44,7 +44,6 @@ import GHC.Internal.Base ( Applicative(..), Eq(..), Functor(..), Monad(..)
                 , Semigroup, Monoid, Ord(..), ($), (.) )
 import GHC.Internal.Enum (Bounded, Enum)
 import GHC.Internal.Float (Floating, RealFloat)
-import GHC.Internal.Generics (Generic, Generic1)
 import GHC.Internal.Num (Num)
 import GHC.Internal.Read (Read(..), lex, readParen)
 import GHC.Internal.Real (Fractional, Integral, Real, RealFrac)
@@ -78,8 +77,6 @@ newtype Identity a = Identity { runIdentity :: a }
              , FiniteBits -- ^ @since base-4.9.0.0
              , Floating   -- ^ @since base-4.9.0.0
              , Fractional -- ^ @since base-4.9.0.0
-             , Generic    -- ^ @since base-4.8.0.0
-             , Generic1   -- ^ @since base-4.8.0.0
              , Integral   -- ^ @since base-4.9.0.0
              , Ix         -- ^ @since base-4.9.0.0
              , Semigroup  -- ^ @since base-4.9.0.0

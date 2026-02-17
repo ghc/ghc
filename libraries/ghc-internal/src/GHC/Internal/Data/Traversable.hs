@@ -51,8 +51,7 @@ import GHC.Internal.Data.Proxy ( Proxy(..) )
 
 import GHC.Internal.Arr
 import GHC.Internal.Base ( Applicative(..), Monad(..), Monoid, Maybe(..), NonEmpty(..),
-                  ($), (.), id, flip )
-import GHC.Internal.Generics
+                  (.), id, flip, ($) )
 import qualified GHC.Internal.List as List ( foldr )
 import GHC.Internal.Tuple (Solo (..))
 
@@ -309,60 +308,6 @@ instance (Traversable f) => Traversable (Ap f) where
 -- | @since base-4.9.0.0
 deriving instance Traversable Identity
 
-
--- Instances for GHC.Generics
--- | @since base-4.9.0.0
-instance Traversable U1 where
-    traverse _ _ = pure U1
-    {-# INLINE traverse #-}
-    sequenceA _ = pure U1
-    {-# INLINE sequenceA #-}
-    mapM _ _ = pure U1
-    {-# INLINE mapM #-}
-    sequence _ = pure U1
-    {-# INLINE sequence #-}
-
--- | @since base-4.9.0.0
-deriving instance Traversable V1
-
--- | @since base-4.9.0.0
-deriving instance Traversable Par1
-
--- | @since base-4.9.0.0
-deriving instance Traversable f => Traversable (Rec1 f)
-
--- | @since base-4.9.0.0
-deriving instance Traversable (K1 i c)
-
--- | @since base-4.9.0.0
-deriving instance Traversable f => Traversable (M1 i c f)
-
--- | @since base-4.9.0.0
-deriving instance (Traversable f, Traversable g) => Traversable (f :+: g)
-
--- | @since base-4.9.0.0
-deriving instance (Traversable f, Traversable g) => Traversable (f :*: g)
-
--- | @since base-4.9.0.0
-deriving instance (Traversable f, Traversable g) => Traversable (f :.: g)
-
--- | @since base-4.9.0.0
-deriving instance Traversable UAddr
-
--- | @since base-4.9.0.0
-deriving instance Traversable UChar
-
--- | @since base-4.9.0.0
-deriving instance Traversable UDouble
-
--- | @since base-4.9.0.0
-deriving instance Traversable UFloat
-
--- | @since base-4.9.0.0
-deriving instance Traversable UInt
-
--- | @since base-4.9.0.0
-deriving instance Traversable UWord
 
 -- Instance for Data.Ord
 -- | @since base-4.12.0.0

@@ -10,11 +10,6 @@ instance MonadFail Maybe
 instance GHC.Internal.Base.MonadPlus Maybe
   -- Defined in ‘GHC.Internal.Base’
 instance Monad Maybe -- Defined in ‘GHC.Internal.Base’
-instance GHC.Internal.Generics.SingKind w =>
-         GHC.Internal.Generics.SingKind (Maybe w)
-  -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Generics.Generic (Maybe w)
-  -- Defined in ‘GHC.Internal.Generics’
 instance Semigroup w => Monoid (Maybe w)
   -- Defined in ‘GHC.Internal.Base’
 instance Read w => Read (Maybe w) -- Defined in ‘GHC.Internal.Read’
@@ -25,26 +20,18 @@ instance [safe] Ord w => Ord (Maybe w)
 instance Show w => Show (Maybe w) -- Defined in ‘GHC.Internal.Show’
 instance [safe] Eq w => Eq (Maybe w)
   -- Defined in ‘GHC.Internal.Maybe’
-instance GHC.Internal.Generics.Generic [w]
-  -- Defined in ‘GHC.Internal.Generics’
 instance Read w => Read [w] -- Defined in ‘GHC.Internal.Read’
-instance Eq w => Eq [w] -- Defined in ‘GHC.Internal.Classes’
 instance Ord w => Ord [w] -- Defined in ‘GHC.Internal.Classes’
 instance Show w => Show [w] -- Defined in ‘GHC.Internal.Show’
+instance Eq w => Eq [w] -- Defined in ‘GHC.Internal.Classes’
 instance Monoid [w] -- Defined in ‘GHC.Internal.Base’
 instance Semigroup [w] -- Defined in ‘GHC.Internal.Base’
 instance [safe] MyShow w => MyShow [w]
   -- Defined at ghci064.hs:8:10
-instance GHC.Internal.Generics.Generic [T]
-  -- Defined in ‘GHC.Internal.Generics’
 instance Monoid [T] -- Defined in ‘GHC.Internal.Base’
 instance Semigroup [T] -- Defined in ‘GHC.Internal.Base’
 instance [safe] MyShow [T] -- Defined at ghci064.hs:16:10
 instance [safe] MyShow [T] -- Defined at ghci064.hs:8:10
-instance GHC.Internal.Generics.SingKind Bool
-  -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Generics.Generic Bool
-  -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Foreign.Storable.Storable Bool
   -- Defined in ‘GHC.Internal.Foreign.Storable’
 instance GHC.Internal.Bits.Bits Bool

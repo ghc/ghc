@@ -29,7 +29,6 @@ import GHC.Internal.Ix (Ix)
 import GHC.Internal.Base
 import GHC.Internal.Enum (Bounded, Enum)
 import GHC.Internal.Float (Floating, RealFloat)
-import GHC.Internal.Generics (Generic, Generic1)
 import GHC.Internal.Num (Num)
 import GHC.Internal.Real (Fractional, Integral, Real, RealFrac)
 import GHC.Internal.Read (Read(readsPrec), readParen, lex)
@@ -57,8 +56,6 @@ newtype Const a b = Const { getConst :: a }
              , FiniteBits -- ^ @since base-4.9.0.0
              , Floating   -- ^ @since base-4.9.0.0
              , Fractional -- ^ @since base-4.9.0.0
-             , Generic    -- ^ @since base-4.9.0.0
-             , Generic1   -- ^ @since base-4.9.0.0
              , Integral   -- ^ @since base-4.9.0.0
              , Ix         -- ^ @since base-4.9.0.0
              , Semigroup  -- ^ @since base-4.9.0.0

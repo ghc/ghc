@@ -63,7 +63,6 @@ import GHC.Internal.Ptr
 import GHC.Internal.Word
 import GHC.Internal.Base
 import GHC.Internal.Enum
-import GHC.Internal.Generics (Generic)
 import GHC.Internal.IO
 import GHC.Internal.Real
 import GHC.Internal.Show
@@ -84,7 +83,6 @@ data GiveGCStats
     | SummaryGCStats
     | VerboseGCStats
     deriving ( Show -- ^ @since base-4.8.0.0
-             , Generic -- ^ @since base-4.15.0.0
              )
 
 -- | @since base-4.8.0.0
@@ -136,7 +134,6 @@ data GCFlags = GCFlags
     , numa                  :: Bool
     , numaMask              :: Word
     } deriving ( Show -- ^ @since base-4.8.0.0
-               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Parameters concerning context switching
@@ -146,7 +143,6 @@ data ConcFlags = ConcFlags
     { ctxtSwitchTime  :: RtsTime
     , ctxtSwitchTicks :: Int
     } deriving ( Show -- ^ @since base-4.8.0.0
-               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Miscellaneous parameters
@@ -169,7 +165,6 @@ data MiscFlags = MiscFlags
     , ioManager             :: IoManagerFlag
     , numIoWorkerThreads    :: Word32
     } deriving ( Show -- ^ @since base-4.8.0.0
-               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- |
@@ -206,7 +201,6 @@ data DebugFlags = DebugFlags
     , hpc            :: Bool -- ^ @c@ coverage
     , sparks         :: Bool -- ^ @r@
     } deriving ( Show -- ^ @since base-4.8.0.0
-               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Should the RTS produce a cost-center summary?
@@ -219,7 +213,6 @@ data DoCostCentres
     | CostCentresAll
     | CostCentresJSON
     deriving ( Show -- ^ @since base-4.8.0.0
-             , Generic -- ^ @since base-4.15.0.0
              )
 
 -- | @since base-4.8.0.0
@@ -245,7 +238,6 @@ data CCFlags = CCFlags
     , profilerTicks :: Int
     , msecsPerTick  :: Int
     } deriving ( Show -- ^ @since base-4.8.0.0
-               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | What sort of heap profile are we collecting?
@@ -263,7 +255,6 @@ data DoHeapProfile
     | HeapByInfoTable
     | HeapByEra -- ^ @since base-4.20.0.0
     deriving ( Show -- ^ @since base-4.8.0.0
-             , Generic -- ^ @since base-4.15.0.0
              )
 
 -- | @since base-4.8.0.0
@@ -315,7 +306,6 @@ data ProfFlags = ProfFlags
     , closureTypeSelector      :: Maybe String
     , infoTableSelector        :: Maybe String
     } deriving ( Show -- ^ @since base-4.8.0.0
-               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Is event tracing enabled?
@@ -326,7 +316,6 @@ data DoTrace
     | TraceEventLog  -- ^ send tracing events to the event log
     | TraceStderr    -- ^ send tracing events to @stderr@
     deriving ( Show -- ^ @since base-4.8.0.0
-             , Generic -- ^ @since base-4.15.0.0
              )
 
 -- | @since base-4.8.0.0
@@ -354,7 +343,6 @@ data TraceFlags = TraceFlags
     , sparksFull     :: Bool -- ^ trace spark events 100% accurately
     , user           :: Bool -- ^ trace user events (emitted from Haskell code)
     } deriving ( Show -- ^ @since base-4.8.0.0
-               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Parameters pertaining to ticky-ticky profiler
@@ -364,7 +352,6 @@ data TickyFlags = TickyFlags
     { showTickyStats :: Bool
     , tickyFile      :: Maybe FilePath
     } deriving ( Show -- ^ @since base-4.8.0.0
-               , Generic -- ^ @since base-4.15.0.0
                )
 
 -- | Parameters pertaining to parallelism
@@ -383,7 +370,6 @@ data ParFlags = ParFlags
     , setAffinity :: Bool
     }
     deriving ( Show -- ^ @since base-4.8.0.0
-             , Generic -- ^ @since base-4.15.0.0
              )
 
 -- | Parameters pertaining to Haskell program coverage (HPC)
@@ -399,7 +385,6 @@ data HpcFlags = HpcFlags
       -- written after the execution of the program.
     }
     deriving (Show -- ^ @since base-4.20.0.0
-             , Generic -- ^ @since base-4.20.0.0
              )
 -- | Parameters of the runtime system
 --
@@ -416,7 +401,6 @@ data RTSFlags = RTSFlags
     , parFlags        :: ParFlags
     , hpcFlags        :: HpcFlags
     } deriving ( Show -- ^ @since base-4.8.0.0
-               , Generic -- ^ @since base-4.15.0.0
                )
 
 foreign import ccall "&RtsFlags" rtsFlagsPtr :: Ptr RTSFlags
