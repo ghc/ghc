@@ -1619,14 +1619,28 @@ async def test_common_work(name: TestName, opts,
         # Which ways we are asked to skip
         do_ways = list(filter (ok_way,all_ways))
 
-        # Only run all ways in slow mode.
-        # See Note [validate and testsuite speed] in `validate`
         if config.accept:
-            # Only ever run one way
-            do_ways = do_ways[:1]
+            # For --accept, run the normal way and in each way that has a
+            # way-specific expected output file (e.g. T20696.stderr-ext-interp).
+            def has_way_specific_output(way: WayName) -> bool:
+                for ext in ['stdout', 'stderr']:
+                    path = in_srcdir(name + '.' + ext + '-' + way)
+                    if path.exists():
+                        return True
+                return False
+            way_specific_ways = list(filter(has_way_specific_output, do_ways))
+            do_ways = do_ways[:1] + [w for w in way_specific_ways if w not in do_ways[:1]]
+
+        # If speed=SLOW, we run all ways.
+        # If speed=NORMAL or FAST and at least one command-line way is given,
+        # we run all the command-line ways.
+        elif config.cmdline_ways:
+            pass
+
+        # Otherwise, we trim it down to:
+        #  - a single default way (typically 'normal')
+        #  - and, additionally, the test's extra ways.
         elif config.speed > 0:
-            # However, if we EXPLICITLY asked for a way (with extra_ways)
-            # please test it!
             explicit_ways = list(filter(lambda way: way in opts.extra_ways, do_ways))
             other_ways = list(filter(lambda way: way not in opts.extra_ways, do_ways))
             do_ways = other_ways[:1] + explicit_ways
