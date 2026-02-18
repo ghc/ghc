@@ -19,7 +19,7 @@ MAIN_MOD=BytecodeUsage
 linkable_bytecodelib_Prep:
 	$(LOCAL_GHC_PKG01) init $(PKGCONF01)
 	mkdir outdir
-	cd outdir && ../genSplices2 $(MAIN_MOD)
+	cd outdir && ../genSplices2 $(MAIN_MOD) 50 500
 	mv outdir/$(MAIN_MOD).hs $(MAIN_MOD).hs
 	cd outdir && $(TEST_HC) -bytecodelib -hisuf=$(ghciWayExt) $(ghciWayFlags) \
 	   -o testpkg-1.2.3.4-XXX.bytecodelib -fbyte-code -fwrite-interface -fwrite-byte-code -this-unit-id=testpkg-1.2.3.4-XXX \

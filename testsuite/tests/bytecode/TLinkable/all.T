@@ -25,6 +25,7 @@ test('TLinkable2',
 
 test('linkable_bytecodelib',
       [ extra_files(["genSplices2"])
+      , when(have_profiling(), extra_ways(['prof']))
       , normalise_errmsg_fun(normaliseDynlibNames)
       , pre_cmd('$MAKE -s --no-print-directory linkable_bytecodelib_Prep')
       , copy_files
