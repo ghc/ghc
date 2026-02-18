@@ -1,0 +1,10 @@
+T18186.hs:15:32: error: [GHC-83865]
+    • Expected a type,
+      but ‘B n 1’ has kind
+      ‘GHC.Internal.Bignum.Natural.Natural’
+    • In an expression type signature: B n 1
+      In the expression: undefined :: B n 1
+      The lambda expression ‘\ (_ :: F n) -> ...’
+      has one visible argument,
+        but its type ‘IO ()’ has none
+
