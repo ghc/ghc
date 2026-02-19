@@ -72,7 +72,7 @@ test('T14343b', normal, compile_fail, [''])
 test('T15761', normal, compile_fail, [''])
 test('T17697', normal, compile, [''])
 test('T18052a', normalise_version('ghc-internal', 'base'), compile,
-     ['-ddump-simpl -ddump-types -dno-typeable-binds -dsuppress-uniques'])
+     ['-ddump-simpl -ddump-types -dno-typeable-binds -dsuppress-uniques -dsuppress-idinfo'])
 test('T18791', normal, compile, ['-ddump-parsed-ast'])
 test('RdrNames', [ignore_stderr, req_ppr_deps], makefile_test, ['RdrNames'])
 test('StarBinderAnns', [ignore_stderr, req_ppr_deps], makefile_test, ['StarBinderAnns'])

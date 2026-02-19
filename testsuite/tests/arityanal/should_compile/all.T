@@ -22,5 +22,5 @@ test('Arity16', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump
 test('T18793', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, [dump_simpl_opts])
 test('T18870', [ only_ways(['optasm']) ], compile, ['-ddebug-output'])
 test('T18937', [ only_ways(['optasm']) ], compile, ['-ddebug-output'])
-test('T21755',  [ grep_errmsg(r'Arity=') ], compile, ['-fno-worker-wrapper' + dump_simpl_opts])
+test('T21755', [ grep_errmsg(r'Arity=') ], compile, ['-fno-worker-wrapper -dsuppress-idinfo' + dump_simpl_opts])
 test('T24296b', [ grep_errmsg(r'g f y') ], compile, ['-fpedantic-bottoms' + dump_simpl_opts])
