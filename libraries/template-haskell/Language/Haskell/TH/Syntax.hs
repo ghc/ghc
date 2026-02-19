@@ -209,7 +209,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import GHC.Lexeme ( startsVarSym, startsVarId )
 
 -- This module completely re-exports 'GHC.Boot.TH.Syntax',
--- and exports additionally functions that depend on filepath.
+-- and exports additionally functions that depend on @filepath@ or @System.IO@.
 
 -- |
 addForeignFile :: ForeignSrcLang -> String -> Q ()
@@ -217,6 +217,37 @@ addForeignFile = addForeignSource
 {-# DEPRECATED addForeignFile
                "Use 'Language.Haskell.TH.Syntax.addForeignSource' instead"
   #-} -- deprecated in 8.6
+
+-- | Emit a foreign file which will be compiled and linked to the object for
+-- the current module. Currently only languages that can be compiled with
+-- the C compiler are supported, and the flags passed as part of -optc will
+-- be also applied to the C compiler invocation that will compile them.
+--
+-- Note that for non-C languages (for example C++) @extern "C"@ directives
+-- must be used to get symbols that we can access from Haskell.
+--
+-- To get better errors, it is recommended to use #line pragmas when
+-- emitting C files, e.g.
+--
+-- > {-# LANGUAGE CPP #-}
+-- > ...
+-- > addForeignSource LangC $ unlines
+-- >   [ "#line " ++ show (__LINE__ + 1) ++ " " ++ show __FILE__
+-- >   , ...
+-- >   ]
+addForeignSource :: ForeignSrcLang -> String -> Q ()
+addForeignSource lang src = do
+  let suffix = case lang of
+                 LangC      -> "c"
+                 LangCxx    -> "cpp"
+                 LangObjc   -> "m"
+                 LangObjcxx -> "mm"
+                 LangAsm    -> "s"
+                 LangJs     -> "js"
+                 RawObject  -> "a"
+  path <- addTempFile suffix
+  runIO $ writeFile path src
+  addForeignFilePath lang path
 
 -- | The input is a filepath, which if relative is offset by the package root.
 makeRelativeToProject :: FilePath -> Q FilePath

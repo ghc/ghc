@@ -33,6 +33,7 @@ test(
     compile,
     [
         '-optc=-DC -optcxx=-DCXX -optcxx=-std=c++11'
+        + ' -package=template-haskell'
         + (' -optcxx=-stdlib=libc++' if opsys('darwin') else '')
     ],
 )

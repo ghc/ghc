@@ -284,7 +284,6 @@ Library
         GHC.Internal.Read
         GHC.Internal.Real
         GHC.Internal.Records
-        GHC.Internal.ResponseFile
         GHC.Internal.RTS.Flags
         GHC.Internal.RTS.Flags.Test
         GHC.Internal.ST
@@ -324,10 +323,8 @@ Library
         GHC.Internal.Numeric.Natural
         GHC.Internal.System.Environment
         GHC.Internal.System.Environment.Blank
-        GHC.Internal.System.Exit
         GHC.Internal.System.IO
         GHC.Internal.System.IO.Error
-        GHC.Internal.System.IO.OS
         GHC.Internal.System.Mem
         GHC.Internal.System.Mem.StableName
         GHC.Internal.System.Posix.Internals
