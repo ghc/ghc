@@ -749,7 +749,7 @@ test('T17775-viewpats-a', normal, compile, [''])
 test('T17775-viewpats-b', normal, compile_fail, [''])
 test('T17775-viewpats-c', normal, compile_fail, [''])
 test('T17775-viewpats-d', normal, compile_fail, [''])
-test('T18118', normal, multimod_compile, ['T18118', '-v0'])
+test('T18118', [ignore_stderr], multimod_compile, ['T18118', '-v0']) # 'You cannot SPECIALISE' is somewhat expected
 test('T18412', normal, compile, [''])
 test('T18470', normal, compile, [''])
 test('T18308', normal, compile, [''])
