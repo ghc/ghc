@@ -17,6 +17,10 @@ doGC = do
   performMajorGC
   threadDelay 1000 -- small delay to allow GC to run when using concurrent gc
 
+opaqueIO :: a -> IO a
+opaqueIO = pure
+{-# NOINLINE opaqueIO #-}
+
 main :: IO ()
 main = do
   let size = 4096*2
@@ -36,5 +40,6 @@ main = do
     putStrLn $ "compact_obj_bytes is: " <> show large_obj_bytes <> " but expected at least: " <> show size
     exitFailure
   -- keep them alive
-  print $ BS.length largeString
-  print $ length $ getCompact compactString
+  -- we want to prevent the compiler from computing `BS.length largeString` in advance
+  print . BS.length =<< opaqueIO largeString
+  print . length . getCompact =<< opaqueIO compactString

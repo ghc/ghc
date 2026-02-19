@@ -13,6 +13,10 @@ data BA = BA ByteArray#
 
 mblockSize = 2 ^ 20
 
+opaqueIO :: a -> IO a
+opaqueIO = pure
+{-# NOINLINE opaqueIO #-}
+
 main = do
  -- Allocate 1000 byte arrays, to get a high watermark before only keeping
  -- 100 of them.
@@ -30,7 +34,8 @@ main = do
               ++ show live ++ "/"
               ++ show mblocks)
  -- Here to retain the ba
- (length ba) `seq` return ()
+ _ <- opaqueIO ba
+ return ()
 
 mkBA =
     let (I# siz) = 2^19  -- ~0.1MB
