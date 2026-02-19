@@ -183,7 +183,6 @@ module GHC.Tc.Utils.TcType (
   coreView,
 
   tyCoVarsOfType, tyCoVarsOfTypes, closeOverKinds,
-  tyCoFVsOfType, tyCoFVsOfTypes,
   tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet, closeOverKindsDSet,
   tyCoVarsOfTypeList, tyCoVarsOfTypesList,
   noFreeVarsOfType,
@@ -234,7 +233,6 @@ import GHC.Data.Maybe
 import GHC.Data.List.SetOps ( getNth, findDupsEq )
 
 import GHC.Utils.Misc
-import GHC.Utils.EndoOS
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
@@ -1180,11 +1178,11 @@ exactTyCoVarsOfTypes :: [Type] -> TyCoVarSet
 exactTyCoVarsOfType  ty  = runTyCoVars (exact_ty ty)
 exactTyCoVarsOfTypes tys = runTyCoVars (exact_tys tys)
 
-exact_ty  :: Type       -> EndoOS TyCoVarSet
-exact_tys :: [Type]     -> EndoOS TyCoVarSet
-(exact_ty, exact_tys, _, _) = foldTyCo exactTcvFolder emptyVarSet
+exact_ty  :: Type       -> TyCoFVRes
+exact_tys :: [Type]     -> TyCoFVRes
+(exact_ty, exact_tys, _, _) = foldTyCo exactTcvFolder
 
-exactTcvFolder :: TyCoFolder TyCoVarSet (EndoOS TyCoVarSet)
+exactTcvFolder :: TyCoFolder TyCoFVRes
 exactTcvFolder = deepTcvFolder { tcf_view = coreView }
                  -- This is the key line
 

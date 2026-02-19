@@ -1763,8 +1763,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
         let { all_binds = inst_binds ++ foe_binds
 
             ; fo_gres = fi_gres `unionBags` foe_gres
-            ; fo_fvs = foldr (\gre fvs -> fvs `addOneFV` (greName gre))
-                                emptyFVs fo_gres
+            ; fo_fvs = foldr (\gre fvs -> fvs `addOneFN` (greName gre))
+                                emptyFNs fo_gres
 
             ; sig_names = mkNameSet (collectHsValBinders CollNoDictBinders hs_val_binds)
                           `minusNameSet` getTypeSigNames val_sigs
@@ -1961,7 +1961,7 @@ generateMainBinding tcg_env main_name = do
                       , tcg_binds = tcg_binds tcg_env
                                     ++ [main_bind]
                       , tcg_dus   = tcg_dus tcg_env
-                                    `plusDU` usesOnly (unitFV main_name) })
+                                    `plusDU` usesOnly (unitFN main_name) })
                     -- Record the use of 'main', so that we don't
                     -- complain about it being defined but not used
     }
@@ -2452,7 +2452,7 @@ tcUserStmt rdr_stmt@(L loc _)
   = do { (([rn_stmt], fix_env), fvs) <- checkNoErrs $
            rnStmts (HsDoStmt GhciStmtCtxt) rnExpr [rdr_stmt] $ \_ -> do
              fix_env <- getFixityEnv
-             return (fix_env, emptyFVs)
+             return (fix_env, emptyFNs)
             -- Don't try to typecheck if the renamer fails!
        ; traceRn "tcRnStmt" (vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs])
        ; rnDump rn_stmt ;

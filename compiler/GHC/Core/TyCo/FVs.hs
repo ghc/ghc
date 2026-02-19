@@ -1,26 +1,45 @@
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE MultiWayIf, PatternSynonyms #-}
 
 module GHC.Core.TyCo.FVs
-  (     shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
-        tyCoVarsOfType,        tyCoVarsOfTypes,
-        tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet,
+  (     -- FVRes and friends
+        FVRes( runFV, FVRes ),
+        addBndrFVRes, addBndrsFVRes, addBndrSelectiveFVRes, addBndrsSelectiveFVRes,
+        mapUnionFVRes, shallowUnitFVRes, deepUnitFVRes,
+        BoundVars, VarSetFVRes, DVarSetFVRes, SelectiveFVRes,
+        TyCoFVRes, DTyCoFVRes,
+        runFVTop, runFVAcc, runTyCoVars, runTyCoVarsDSet,
+        runFVSelective, runFVSelectiveList, runFVSelectiveSet,
+        InterestingVarFun,
 
-        tyCoFVsBndr, tyCoFVsVarBndr, tyCoFVsVarBndrs,
-        tyCoFVsOfType, tyCoVarsOfTypeList,
-        tyCoFVsOfTypes, tyCoVarsOfTypesList,
-        deepTcvFolder,
-
+        -- Shallow
+        shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
+        shallowTyCoVarsOfCo, shallowTyCoVarsOfCos,
         shallowTyCoVarsOfTyVarEnv, shallowTyCoVarsOfCoVarEnv,
 
-        shallowTyCoVarsOfCo, shallowTyCoVarsOfCos,
+        -- Deep
+        tyCoVarsOfType, tyCoVarsOfTypes, tyCoVarsOfTypesList,
+        tyCoVarsOfThings,
         tyCoVarsOfCo, tyCoVarsOfCos, tyCoVarsOfMCo,
+        deepTcvFolder, deepTypeFV, deepCoFV,
+
+        -- Deep, deterministic
+        tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet, tyCoVarsOfTypeList,
+        tyCoVarsOfCoDSet, tyCoVarsOfCoList,
+        tyCoVarsOfThingsDSet,
+        detTyCoVarsOfType, detTyCoVarsOfTypes, detTyCoVarsOfCo,
+
+        -- Selective
+        someTyCoVarsOfType, someTyCoVarsOfTypes,
+
+        -- CoVars only
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
-        tyCoVarsOfCoDSet,
-        tyCoFVsOfCo, tyCoFVsOfCos,
-        tyCoVarsOfCoList,
         coVarsOfCoDSet, coVarsOfCosDSet,
 
+        -- Shallow, deterministic, composable
+        tyCoFVsOfType, tyCoFVsOfCo,
+
+        -- Almost devoid
         almostDevoidCoVarOfCo,
 
         -- Injective free vars
@@ -41,11 +60,8 @@ module GHC.Core.TyCo.FVs
         occCheckExpand,
 
         -- * Closing over kinds
-        closeOverKindsDSet, closeOverKindsList,
+        closeOverKindsDSet,
         closeOverKinds,
-
-        -- * Raw materials
-        Endo(..), runTyCoVars
   ) where
 
 import GHC.Prelude
@@ -58,7 +74,6 @@ import Data.Monoid as DM ( Any(..) )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom( CoAxiomRule(..), BuiltInFamRewrite(..), coAxiomTyCon )
-import GHC.Utils.FV
 
 import GHC.Types.Var
 import GHC.Types.Unique.FM
@@ -71,6 +86,7 @@ import GHC.Utils.Misc
 import GHC.Utils.EndoOS
 
 import GHC.Data.Pair
+import GHC.Exts (oneShot)
 
 import Data.Semigroup
 
@@ -298,9 +314,99 @@ done by the Call Arity pass.
 TL;DR: check this regularly!
 -}
 
-runTyCoVars :: EndoOS TyCoVarSet -> TyCoVarSet
+
+{- *********************************************************************
+*                                                                      *
+          Free-var result type
+*                                                                      *
+********************************************************************* -}
+
+type InterestingVarFun = Var -> Bool
+
+newtype FVRes env acc = FVRes' { runFV :: env -> acc }
+  -- Caries an environment (typically empty, or a set of in-scope variables)
+  -- and a composable accumulator
+
+pattern FVRes :: (env -> acc) -> FVRes env acc
+pattern FVRes f <- FVRes' f
+      where
+        FVRes f = FVRes' (oneShot f)
+         -- oneShot: this is the core of the one-shot trick!
+         -- Note [The one-shot state monad trick] in  GHC.Utils.Monad.
+
+instance Semigroup a => Semigroup (FVRes env a) where
+  f1 <>  f2 = FVRes (\env -> runFV f1 env <> runFV f2 env)
+
+instance Monoid a => Monoid (FVRes env a) where
+  mempty  = FVRes (\_ -> mempty)
+
+addBndrFV :: (env -> env) -> FVRes env a -> FVRes env a
+{-# INLINE addBndrFV #-}
+addBndrFV upd f = FVRes (\bvs -> runFV f $! upd bvs)
+    -- Strict application to avoid making a thunk
+
+addBndrFVRes :: TyCoVar -> FVRes BoundVars a -> FVRes BoundVars a
+addBndrFVRes tcv = addBndrFV (\bvs -> extendVarSet bvs tcv)
+
+addBndrsFVRes :: [Var] -> FVRes BoundVars a -> FVRes BoundVars a
+addBndrsFVRes tcvs = addBndrFV (\bvs -> extendVarSetList bvs tcvs)
+
+addBndrSelectiveFVRes :: TyCoVar -> FVRes (f, BoundVars) a -> FVRes (f, BoundVars) a
+addBndrSelectiveFVRes tcv
+  = addBndrFV (\(f,bvs) -> let !bvs' = extendVarSet bvs tcv
+                               -- Strict let to avoid thunks
+                           in (f,bvs'))
+addBndrsSelectiveFVRes :: [Var] -> FVRes (f, BoundVars) a -> FVRes (f, BoundVars) a
+addBndrsSelectiveFVRes bs
+  = addBndrFV (\(f,bvs) -> let !bvs' = extendVarSetList bvs bs
+                               -- Strict let to avoid thunks
+                           in (f,bvs'))
+
+mapUnionFVRes :: (Foldable t, Monoid acc)
+          => (a -> FVRes env acc) -> t a -> FVRes env acc
+{-# INLINE mapUnionFVRes #-}
+mapUnionFVRes f xs = foldr (mappend . f) mempty xs
+
+
+type BoundVars = TyCoVarSet
+
+
+type VarSetFVRes    = FVRes BoundVars (EndoOS TyCoVarSet)
+type DVarSetFVRes   = FVRes BoundVars (EndoOS DTyCoVarSet)
+type SelectiveFVRes = FVRes (InterestingVarFun, BoundVars) (EndoOS DVarSet)
+-- VarSetFVRes:    collects a VarSet
+-- DVarSetFVRes:   collects a DVarSet (deterministic)
+-- SelectiveFVRes: selectively collects a DVarSet
+
+type TyCoFVRes  = VarSetFVRes
+type DTyCoFVRes = DVarSetFVRes
+
+runFVTop :: FVRes BoundVars a -> a
+{-# INLINE runFVTop #-}
+runFVTop f = runFV f emptyVarSet
+
+runFVAcc :: FVRes BoundVars (EndoOS a) -> a -> a
+{-# INLINE runFVAcc #-}
+runFVAcc f = runEndoOS (runFVTop f)
+
+runTyCoVars :: TyCoFVRes -> TyCoVarSet
 {-# INLINE runTyCoVars #-}
-runTyCoVars f = appEndoOS f emptyVarSet
+runTyCoVars f = runFVAcc f emptyVarSet
+
+runTyCoVarsDSet :: DTyCoFVRes -> DTyCoVarSet
+{-# INLINE runTyCoVarsDSet #-}
+runTyCoVarsDSet f = runFVAcc f emptyDVarSet
+
+runFVSelective :: InterestingVarFun -> SelectiveFVRes -> DVarSet
+runFVSelective interesting f
+  = runEndoOS (runFV f (interesting, emptyVarSet)) emptyDVarSet
+
+runFVSelectiveList :: InterestingVarFun -> SelectiveFVRes -> [Var]
+runFVSelectiveList interesting f = dVarSetElems (runFVSelective interesting f)
+
+runFVSelectiveSet :: InterestingVarFun -> SelectiveFVRes -> VarSet
+runFVSelectiveSet interesting f = dVarSetToVarSet (runFVSelective interesting f)
+
 
 {- *********************************************************************
 *                                                                      *
@@ -311,58 +417,70 @@ runTyCoVars f = appEndoOS f emptyVarSet
 
 tyCoVarsOfType :: Type -> TyCoVarSet
 -- The "deep" TyCoVars of the the type
-tyCoVarsOfType ty = runTyCoVars (deep_ty ty)
+tyCoVarsOfType ty = runTyCoVars (deepTypeFV ty)
 -- Alternative:
 --   tyCoVarsOfType ty = closeOverKinds (shallowTyCoVarsOfType ty)
 
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
 -- The "deep" TyCoVars of the the type
-tyCoVarsOfTypes tys = runTyCoVars (deep_tys tys)
+tyCoVarsOfTypes tys = runTyCoVars (deepTypesFV tys)
 -- Alternative:
 --   tyCoVarsOfTypes tys = closeOverKinds (shallowTyCoVarsOfTypes tys)
 
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- The "deep" TyCoVars of the the coercion
 -- See Note [Free variables of types]
-tyCoVarsOfCo co = runTyCoVars (deep_co co)
+tyCoVarsOfCo co = runTyCoVars (deepCoFV co)
 
 tyCoVarsOfMCo :: MCoercion -> TyCoVarSet
 tyCoVarsOfMCo MRefl    = emptyVarSet
 tyCoVarsOfMCo (MCo co) = tyCoVarsOfCo co
 
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-tyCoVarsOfCos cos = runTyCoVars (deep_cos cos)
+tyCoVarsOfCos cos = runTyCoVars (deepCosFV cos)
 
-deep_ty  :: Type       -> EndoOS TyCoVarSet
-deep_tys :: [Type]     -> EndoOS TyCoVarSet
-deep_co  :: Coercion   -> EndoOS TyCoVarSet
-deep_cos :: [Coercion] -> EndoOS TyCoVarSet
-(deep_ty, deep_tys, deep_co, deep_cos) = foldTyCo deepTcvFolder emptyVarSet
+tyCoVarsOfThings :: Foldable t => (a -> Type) -> t a -> TyCoVarSet
+-- Works over a collection of things from which we can extract a type
+-- See Note [Free variables of types]
+tyCoVarsOfThings get_ty things
+  = runTyCoVars $ mapUnionFVRes (deepTypeFV . get_ty) things
 
-deepTcvFolder :: TyCoFolder TyCoVarSet (EndoOS TyCoVarSet)
+deepTypeFV  :: Type       -> TyCoFVRes
+deepTypesFV :: [Type]     -> TyCoFVRes
+deepCoFV    :: Coercion   -> TyCoFVRes
+deepCosFV   :: [Coercion] -> TyCoFVRes
+(deepTypeFV, deepTypesFV, deepCoFV, deepCosFV) = foldTyCo deepTcvFolder
+
+deepTcvFolder :: TyCoFolder TyCoFVRes
 -- It's important that we use a one-shot EndoOS, to ensure that all
 -- the free-variable finders are eta-expanded.  Lacking the one-shot-ness
 -- led to some big slow downs.  See Note [The one-shot state monad trick]
 -- in GHC.Utils.Monad
 deepTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                            , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                           , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+                           , tcf_hole  = do_hole
+                           , tcf_tycobinder = addBndrFVRes }
   where
-    do_tcv is v = EndoOS do_it
-      where
-        do_it acc | v `elemVarSet` is  = acc
-                  | v `elemVarSet` acc = acc
-                  | otherwise          = appEndoOS (deep_ty (varType v)) $
-                                         acc `extendVarSet` v
+    do_tcv :: TyVar -> TyCoFVRes
+    do_tcv = deepUnitFVRes deepTypeFV
 
-    do_bndr :: TyCoVarSet -> TyVar -> ForAllTyFlag -> TyCoVarSet
-    do_bndr is tcv _ = extendVarSet is tcv
-
-    do_hole :: VarSet -> CoercionHole -> EndoOS TyCoVarSet
-    do_hole _is hole = deep_ty (varType (coHoleCoVar hole))
+    do_hole :: CoercionHole -> TyCoFVRes
+    do_hole hole = deepTypeFV (varType (coHoleCoVar hole))
                      -- We don't collect the CoercionHole itself, but we /do/
                      -- need to collect the free variables of its /kind/
                      -- See Note [CoercionHoles and coercion free variables]
+
+deepUnitFVRes :: (Type -> TyCoFVRes) -> TyCoVar -> TyCoFVRes
+-- Deal with a single TyCoVar
+-- Takes a function to find free vars of the kind
+deepUnitFVRes fvs_of_kind v
+  = FVRes (\bvs -> EndoOS (do_it bvs))
+  where
+    do_it :: BoundVars -> TyCoVarSet -> TyCoVarSet
+    do_it bvs acc | v `elemVarSet` bvs = acc
+                  | v `elemVarSet` acc = acc
+                  | otherwise          = runFVAcc (fvs_of_kind (varType v)) $
+                                         acc `extendVarSet` v
 
 {- *********************************************************************
 *                                                                      *
@@ -370,7 +488,6 @@ deepTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synon
           See Note [Shallow and deep free variables]
 *                                                                      *
 ********************************************************************* -}
-
 
 shallowTyCoVarsOfType :: Type -> TyCoVarSet
 -- See Note [Free variables of types]
@@ -399,25 +516,147 @@ shallowTyCoVarsOfCoVarEnv cos = shallowTyCoVarsOfCos (nonDetEltsUFM cos)
   -- It's OK to use nonDetEltsUFM here because we immediately
   -- forget the ordering by returning a set
 
-shallow_ty  :: Type       -> EndoOS TyCoVarSet
-shallow_tys :: [Type]     -> EndoOS TyCoVarSet
-shallow_co  :: Coercion   -> EndoOS TyCoVarSet
-shallow_cos :: [Coercion] -> EndoOS TyCoVarSet
-(shallow_ty, shallow_tys, shallow_co, shallow_cos) = foldTyCo shallowTcvFolder emptyVarSet
+shallow_ty  :: Type       -> TyCoFVRes
+shallow_tys :: [Type]     -> TyCoFVRes
+shallow_co  :: Coercion   -> TyCoFVRes
+shallow_cos :: [Coercion] -> TyCoFVRes
+(shallow_ty, shallow_tys, shallow_co, shallow_cos)
+   = foldTyCo shallowTcvFolder
 
-shallowTcvFolder :: TyCoFolder TyCoVarSet (EndoOS TyCoVarSet)
+shallowTcvFolder :: TyCoFolder TyCoFVRes
 shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                               , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                              , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+                              , tcf_hole  = do_hole
+                              , tcf_tycobinder = addBndrFVRes }
   where
-    do_tcv is v = EndoOS do_it
-      where
-        do_it acc | v `elemVarSet` is  = acc
+    do_tcv = shallowUnitFVRes
+    do_hole _  = mempty   -- Ignore coercion holes
+
+shallowUnitFVRes :: TyCoVar -> TyCoFVRes
+shallowUnitFVRes v
+  = FVRes (\bvs -> EndoOS (do_it bvs))
+  where
+    do_it bvs acc | v `elemVarSet` bvs = acc
                   | v `elemVarSet` acc = acc
                   | otherwise          = acc `extendVarSet` v
 
-    do_bndr is tcv _ = extendVarSet is tcv
-    do_hole _ _  = mempty   -- Ignore coercion holes
+
+{- *********************************************************************
+*                                                                      *
+          Deterministic, deep free vars
+*                                                                      *
+********************************************************************* -}
+
+-- | `tyCoVarsOfTypeDSet` that returns free variables of a type in a deterministic
+-- set. For explanation of why using `VarSet` is not deterministic see
+-- Note [Deterministic FV] in "GHC.Utils.FV".
+tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
+-- See Note [Free variables of types]
+tyCoVarsOfTypeDSet ty = runTyCoVarsDSet (detTyCoVarsOfType ty)
+
+-- | Returns free variables of types, including kind variables as
+-- a deterministic set. For type synonyms it does /not/ expand the
+-- synonym.
+tyCoVarsOfTypesDSet :: [Type] -> DTyCoVarSet
+-- See Note [Free variables of types]
+tyCoVarsOfTypesDSet tys = runTyCoVarsDSet (detTyCoVarsOfTypes tys)
+
+tyCoVarsOfThingsDSet :: Foldable t => (a -> Type) -> t a -> DTyCoVarSet
+-- Works over a collection of things from which we can extract a type
+-- See Note [Free variables of types]
+tyCoVarsOfThingsDSet get_ty things
+  = runTyCoVarsDSet (mapUnionFVRes (detTyCoVarsOfType . get_ty) things)
+
+-- | `tyCoVarsOfTypeList` returns free variables of a type in deterministic
+-- order. For explanation of why using `VarSet` is not deterministic see
+-- Note [Deterministic FV] in "GHC.Utils.FV".
+tyCoVarsOfTypeList :: Type -> [TyCoVar]
+-- See Note [Free variables of types]
+tyCoVarsOfTypeList ty = dVarSetElems $ tyCoVarsOfTypeDSet ty
+
+tyCoVarsOfCoDSet :: Coercion -> DTyCoVarSet
+-- See Note [Free variables of types]
+tyCoVarsOfCoDSet ty = runTyCoVarsDSet (detTyCoVarsOfCo ty)
+
+tyCoVarsOfCoList :: Coercion -> [TyCoVar]
+-- See Note [Free variables of types]
+tyCoVarsOfCoList ty = dVarSetElems $ tyCoVarsOfCoDSet ty
+
+-- | Returns free variables of types, including kind variables as
+-- a deterministically ordered list. For type synonyms it does /not/ expand the
+-- synonym.
+tyCoVarsOfTypesList :: [Type] -> [TyCoVar]
+-- See Note [Free variables of types]
+tyCoVarsOfTypesList tys = dVarSetElems $ tyCoVarsOfTypesDSet tys
+
+detTyCoVarsOfType  :: Type   -> DTyCoFVRes
+detTyCoVarsOfTypes :: [Type] -> DTyCoFVRes
+detTyCoVarsOfCo    :: Coercion -> DTyCoFVRes
+(detTyCoVarsOfType, detTyCoVarsOfTypes, detTyCoVarsOfCo, _)
+  = foldTyCo deepDetTcvFolder
+
+deepDetTcvFolder :: TyCoFolder DTyCoFVRes
+-- This one returns a /deterministic/ list
+-- See `deepTcvFolder` for the general pattern
+deepDetTcvFolder
+  = TyCoFolder { tcf_view = noView
+               , tcf_tyvar = do_tcv, tcf_covar = do_tcv
+               , tcf_hole  = do_hole
+               , tcf_tycobinder = addBndrFVRes }
+  where
+    do_tcv = deepDetUnitFVRes detTyCoVarsOfType
+    do_hole hole = detTyCoVarsOfType (varType (coHoleCoVar hole))
+
+deepDetUnitFVRes :: (Type -> DTyCoFVRes) -> TyCoVar -> DTyCoFVRes
+-- Deal with a single TyCoVar
+-- Takes a function to find free vars of the kind
+deepDetUnitFVRes fvs_of_kind v
+  = FVRes (\bvs -> EndoOS (do_it bvs))
+  where
+    do_it :: BoundVars -> DTyCoVarSet -> DTyCoVarSet
+    do_it bvs acc | v `elemVarSet` bvs  = acc
+                  | v `elemDVarSet` acc = acc
+                  | otherwise           = runFVAcc (fvs_of_kind (varType v)) $
+                                          acc `extendDVarSet` v
+
+{- *********************************************************************
+*                                                                      *
+          Selective, shallow, deterministic free vars
+*                                                                      *
+********************************************************************* -}
+
+someTyCoVarsOfType :: (TyCoVar -> Bool) -> Type -> [TyCoVar]
+someTyCoVarsOfType interesting
+  = runFVSelectiveList interesting . tyCoFVsOfType
+
+someTyCoVarsOfTypes :: (TyCoVar -> Bool) -> [Type] -> [TyCoVar]
+someTyCoVarsOfTypes interesting
+  = runFVSelectiveList interesting . mapUnionFVRes tyCoFVsOfType
+
+tyCoFVsOfType :: Type -> SelectiveFVRes
+tyCoFVsOfCo   :: Coercion -> SelectiveFVRes
+-- Returns shallow free vars
+-- See Note [Free variables of types]
+(tyCoFVsOfType, _, tyCoFVsOfCo, _) = foldTyCo selectiveTcvFolder
+
+selectiveTcvFolder :: TyCoFolder SelectiveFVRes
+-- This one takes an `InterestingVarFun`, and returns shallow free vars
+-- See `shallowTcvFolder` for the general pattern
+selectiveTcvFolder
+  = TyCoFolder { tcf_view  = noView  -- See Note [Free vars and synonyms]
+               , tcf_tyvar = do_tcv, tcf_covar = do_tcv
+               , tcf_hole  = do_hole
+               , tcf_tycobinder = addBndrSelectiveFVRes }
+  where
+    do_tcv v = FVRes (\bvs -> EndoOS (do_it bvs))
+      where
+        do_it (is_interesting,bvs) acc
+          | not (is_interesting v) = acc  -- The "selective" bit
+          | v `elemVarSet` bvs     = acc
+          | v `elemDVarSet` acc    = acc
+          | otherwise              = acc `extendDVarSet` v
+
+    do_hole hole = tyCoFVsOfType (varType (coHoleCoVar hole))
 
 
 {- *********************************************************************
@@ -425,7 +664,6 @@ shallowTcvFolder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and sy
           Free coercion variables
 *                                                                      *
 ********************************************************************* -}
-
 
 {- Note [Finding free coercion variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -453,45 +691,61 @@ coVarsOfTypes tys = runTyCoVars (deep_cv_tys tys)
 coVarsOfCo    co  = runTyCoVars (deep_cv_co co)
 coVarsOfCos   cos = runTyCoVars (deep_cv_cos cos)
 
-deep_cv_ty  :: Type       -> EndoOS CoVarSet
-deep_cv_tys :: [Type]     -> EndoOS CoVarSet
-deep_cv_co  :: Coercion   -> EndoOS CoVarSet
-deep_cv_cos :: [Coercion] -> EndoOS CoVarSet
-(deep_cv_ty, deep_cv_tys, deep_cv_co, deep_cv_cos) = foldTyCo deepCoVarFolder emptyVarSet
+type CoVarFVRes  = FVRes BoundVars (EndoOS CoVarSet)
 
-deepCoVarFolder :: TyCoFolder TyCoVarSet (EndoOS CoVarSet)
+deep_cv_ty  :: Type       -> CoVarFVRes
+deep_cv_tys :: [Type]     -> CoVarFVRes
+deep_cv_co  :: Coercion   -> CoVarFVRes
+deep_cv_cos :: [Coercion] -> CoVarFVRes
+(deep_cv_ty, deep_cv_tys, deep_cv_co, deep_cv_cos) = foldTyCo deepCoVarFolder
+
+deepCoVarFolder :: TyCoFolder CoVarFVRes
 deepCoVarFolder = TyCoFolder { tcf_view = noView
                              , tcf_tyvar = do_tyvar, tcf_covar = do_covar
-                             , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+                             , tcf_hole  = do_hole
+                             , tcf_tycobinder = addBndrFVRes }
   where
-    do_tyvar _ _  = mempty
+    do_tyvar _  = mempty
       -- This do_tyvar means we won't see any CoVars in this
       -- TyVar's kind.   This may be wrong; but it's the way it's
       -- always been.  And its awkward to change, because
       -- the tyvar won't end up in the accumulator, so
       -- we'd look repeatedly.  Blargh.
 
-    do_bndr is tcv _ = extendVarSet is tcv
+    do_covar = deepUnitFVRes deep_cv_ty
 
-    do_covar is v = EndoOS do_it
-      where
-        do_it acc | v `elemVarSet` is  = acc
-                  | v `elemVarSet` acc = acc
-                  | otherwise          = appEndoOS (deep_cv_ty (varType v)) $
-                                         acc `extendVarSet` v
-
-    do_hole is hole  = do_covar is (coHoleCoVar hole)
+    do_hole hole  = do_covar (coHoleCoVar hole)
       -- We /do/ treat a CoercionHole as a free variable
       -- See Note [CoercionHoles and coercion free variables]
 
-------- Same again, but for DCoVarSet ----------
---    But this time the free vars are shallow
-
-coVarsOfCosDSet :: [Coercion] -> DCoVarSet
-coVarsOfCosDSet cos = fvDVarSetSome isCoVar (tyCoFVsOfCos cos)
+-------------- Deterministic versions ------------------
+type DCoVarFVRes  = FVRes BoundVars (EndoOS DCoVarSet)
 
 coVarsOfCoDSet :: Coercion -> DCoVarSet
-coVarsOfCoDSet co = fvDVarSetSome isCoVar (tyCoFVsOfCo co)
+coVarsOfCoDSet co = runTyCoVarsDSet (det_co co)
+
+coVarsOfCosDSet :: [Coercion] -> DCoVarSet
+coVarsOfCosDSet cos = runTyCoVarsDSet (det_cos cos)
+
+det_ty  :: Type       -> DCoVarFVRes
+det_co  :: Coercion   -> DCoVarFVRes
+det_cos :: [Coercion] -> DCoVarFVRes
+(det_ty, _, det_co, det_cos) = foldTyCo deepDetCoVarFolder
+
+deepDetCoVarFolder :: TyCoFolder DCoVarFVRes
+-- Follows deepCoVarFolders, but returns a /deterministic/ set
+deepDetCoVarFolder = TyCoFolder { tcf_view = noView
+                                , tcf_tyvar = do_tyvar
+                                , tcf_covar = do_covar
+                                , tcf_hole  = do_hole
+                                , tcf_tycobinder = addBndrFVRes }
+  where
+    do_tyvar _  = mempty
+
+    do_covar :: CoVar -> DCoVarFVRes
+    do_covar = deepDetUnitFVRes det_ty
+
+    do_hole hole  = do_covar (coHoleCoVar hole)
 
 
 {- *********************************************************************
@@ -507,7 +761,14 @@ closeOverKinds :: TyCoVarSet -> TyCoVarSet
 -- add the deep free variables of its kind
 closeOverKinds vs = nonDetStrictFoldVarSet do_one vs vs
   where
-    do_one v acc = appEndoOS (deep_ty (varType v)) acc
+    do_one v = runFVAcc (deepTypeFV (varType v))
+
+-- | Add the kind variables free in the kinds of the tyvars in the given set.
+-- Returns a deterministic set.
+closeOverKindsDSet :: DTyVarSet -> DTyVarSet
+closeOverKindsDSet vs = nonDetStrictFoldDVarSet do_one vs vs
+  where
+    do_one v = runFVAcc (detTyCoVarsOfType (varType v))
 
 {- --------------- Alternative version 1 (using FV) ------------
 closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
@@ -562,156 +823,16 @@ close_over_kinds wl acc
 -}
 
 
-{- *********************************************************************
-*                                                                      *
-          The FV versions return deterministic results
-*                                                                      *
-********************************************************************* -}
 
--- | Given a list of tyvars returns a deterministic FV computation that
--- returns the given tyvars with the kind variables free in the kinds of the
--- given tyvars.
-closeOverKindsFV :: [TyVar] -> FV
-closeOverKindsFV tvs =
-  mapUnionFV (tyCoFVsOfType . tyVarKind) tvs `unionFV` mkFVs tvs
 
--- | Add the kind variables free in the kinds of the tyvars in the given set.
--- Returns a deterministically ordered list.
-closeOverKindsList :: [TyVar] -> [TyVar]
-closeOverKindsList tvs = fvVarList $ closeOverKindsFV tvs
+{-
+%************************************************************************
+%*                                                                      *
+        almostDevoidCoVarOfCo
+%*                                                                      *
+%************************************************************************
 
--- | Add the kind variables free in the kinds of the tyvars in the given set.
--- Returns a deterministic set.
-closeOverKindsDSet :: DTyVarSet -> DTyVarSet
-closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
-
--- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
--- set. For explanation of why using `VarSet` is not deterministic see
--- Note [Deterministic FV] in "GHC.Utils.FV".
-tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
--- See Note [Free variables of types]
-tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
-
--- | `tyCoFVsOfType` that returns free variables of a type in deterministic
--- order. For explanation of why using `VarSet` is not deterministic see
--- Note [Deterministic FV] in "GHC.Utils.FV".
-tyCoVarsOfTypeList :: Type -> [TyCoVar]
--- See Note [Free variables of types]
-tyCoVarsOfTypeList ty = fvVarList $ tyCoFVsOfType ty
-
--- | Returns free variables of types, including kind variables as
--- a deterministic set. For type synonyms it does /not/ expand the
--- synonym.
-tyCoVarsOfTypesDSet :: [Type] -> DTyCoVarSet
--- See Note [Free variables of types]
-tyCoVarsOfTypesDSet tys = fvDVarSet $ tyCoFVsOfTypes tys
-
--- | Returns free variables of types, including kind variables as
--- a deterministically ordered list. For type synonyms it does /not/ expand the
--- synonym.
-tyCoVarsOfTypesList :: [Type] -> [TyCoVar]
--- See Note [Free variables of types]
-tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
-
--- | The worker for `tyCoFVsOfType` and `tyCoFVsOfTypeList`.
--- The previous implementation used `unionVarSet` which is O(n+m) and can
--- make the function quadratic.
--- It's exported, so that it can be composed with
--- other functions that compute free variables.
--- See Note [FV naming conventions] in "GHC.Utils.FV".
---
--- Eta-expanded because that makes it run faster (apparently)
--- See Note [FV eta expansion] in "GHC.Utils.FV" for explanation.
-tyCoFVsOfType :: Type -> FV
--- See Note [Free variables of types]
-tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
-  | not (f v) = (acc_list, acc_set)
-  | v `elemVarSet` bound_vars = (acc_list, acc_set)
-  | v `elemVarSet` acc_set = (acc_list, acc_set)
-  | otherwise = tyCoFVsOfType (tyVarKind v) f
-                               emptyVarSet   -- See Note [Closing over free variable kinds]
-                               (v:acc_list, extendVarSet acc_set v)
-tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_vars acc
-                                                    -- See Note [Free vars and synonyms]
-tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
-tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
-tyCoFVsOfType (FunTy _ w arg res)  f bound_vars acc =
-  -- As per #23764, if we have 'a %m -> b', quantification order should be [a,m,b] not [m,a,b].
-  (tyCoFVsOfType arg `unionFV` tyCoFVsOfType w `unionFV` tyCoFVsOfType res) f bound_vars acc
-tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
-tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
-tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
-
-tyCoFVsBndr :: ForAllTyBinder -> FV -> FV
--- Free vars of (forall b. <thing with fvs>)
-tyCoFVsBndr (Bndr tv _) fvs = tyCoFVsVarBndr tv fvs
-
-tyCoFVsVarBndrs :: [Var] -> FV -> FV
-tyCoFVsVarBndrs vars fvs = foldr tyCoFVsVarBndr fvs vars
-
-tyCoFVsVarBndr :: Var -> FV -> FV
-tyCoFVsVarBndr var fvs
-  = tyCoFVsOfType (varType var)   -- Free vars of its type/kind
-    `unionFV` delFV var fvs       -- Delete it from the thing-inside
-
-tyCoFVsOfTypes :: [Type] -> FV
--- See Note [Free variables of types]
-tyCoFVsOfTypes (ty:tys) fv_cand in_scope acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfTypes tys) fv_cand in_scope acc
-tyCoFVsOfTypes []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
-
--- | Get a deterministic set of the vars free in a coercion
-tyCoVarsOfCoDSet :: Coercion -> DTyCoVarSet
--- See Note [Free variables of types]
-tyCoVarsOfCoDSet co = fvDVarSet $ tyCoFVsOfCo co
-
-tyCoVarsOfCoList :: Coercion -> [TyCoVar]
--- See Note [Free variables of types]
-tyCoVarsOfCoList co = fvVarList $ tyCoFVsOfCo co
-
-tyCoFVsOfMCo :: MCoercion -> FV
-tyCoFVsOfMCo mco fv_cand in_scope acc
-  = case mco of
-       MRefl  -> emptyFV fv_cand in_scope acc
-       MCo co -> tyCoFVsOfCo co fv_cand in_scope acc
-
-tyCoFVsOfCo :: Coercion -> FV
--- Extracts type and coercion variables from a coercion
--- See Note [Free variables of types]
-tyCoFVsOfCo (Refl ty) fv_cand in_scope acc
-  = tyCoFVsOfType ty fv_cand in_scope acc
-tyCoFVsOfCo (GRefl _ ty mco) fv_cand in_scope acc
-  = (tyCoFVsOfType ty `unionFV` tyCoFVsOfMCo mco) fv_cand in_scope acc
-tyCoFVsOfCo (TyConAppCo _ _ cos) fv_cand in_scope acc = tyCoFVsOfCos cos fv_cand in_scope acc
-tyCoFVsOfCo (AppCo co arg) fv_cand in_scope acc
-  = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
-tyCoFVsOfCo (ForAllCo { fco_tcv = tv, fco_kind = kind_co, fco_body = co }) fv_cand in_scope acc
-  = (tyCoFVsVarBndr tv (tyCoFVsOfCo co) `unionFV` tyCoFVsOfMCo kind_co) fv_cand in_scope acc
-tyCoFVsOfCo (FunCo { fco_mult = w, fco_arg = co1, fco_res = co2 }) fv_cand in_scope acc
-  = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2 `unionFV` tyCoFVsOfCo w) fv_cand in_scope acc
-tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
-  = tyCoFVsOfCoVar v fv_cand in_scope acc
-tyCoFVsOfCo (HoleCo {}) fv_cand in_scope acc = emptyFV fv_cand in_scope acc
-    -- Ignore holes: Note [CoercionHoles and coercion free variables]
-tyCoFVsOfCo (AxiomCo _ cs)    fv_cand in_scope acc = tyCoFVsOfCos cs  fv_cand in_scope acc
-tyCoFVsOfCo (UnivCo { uco_lty = t1, uco_rty = t2, uco_deps = deps}) fv_cand in_scope acc
-  = (tyCoFVsOfCos deps `unionFV` tyCoFVsOfType t1
-                      `unionFV` tyCoFVsOfType t2) fv_cand in_scope acc
-tyCoFVsOfCo (SymCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
-tyCoFVsOfCo (TransCo co1 co2)   fv_cand in_scope acc = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
-tyCoFVsOfCo (SelCo _ co)        fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
-tyCoFVsOfCo (LRCo _ co)         fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
-tyCoFVsOfCo (InstCo co arg)     fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
-tyCoFVsOfCo (KindCo co)         fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
-tyCoFVsOfCo (SubCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
-
-tyCoFVsOfCoVar :: CoVar -> FV
-tyCoFVsOfCoVar v fv_cand in_scope acc
-  = (unitFV v `unionFV` tyCoFVsOfType (varType v)) fv_cand in_scope acc
-
-tyCoFVsOfCos :: [Coercion] -> FV
-tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
-tyCoFVsOfCos (co:cos) fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCos cos) fv_cand in_scope acc
-
+-}
 
 ----- Whether a covar is /Almost Devoid/ in a type or coercion ----
 
@@ -894,32 +1015,8 @@ isInjectiveInType tv ty
 injectiveVarsOfType :: Bool   -- ^ Should we look under injective type families?
                               -- See Note [Coverage condition for injective type families]
                               -- in "GHC.Tc.Instance.Family".
-                    -> Type -> FV
-injectiveVarsOfType look_under_tfs = go
-  where
-    go ty | Just ty' <- rewriterView ty = go ty'
-    go (TyVarTy v)                      = unitFV v `unionFV` go (tyVarKind v)
-    go (AppTy f a)                      = go f `unionFV` go a
-    go (FunTy _ w ty1 ty2)              = go w `unionFV` go ty1 `unionFV` go ty2
-    go (TyConApp tc tys)                = go_tc tc tys
-    go (ForAllTy (Bndr tv _) ty)        = go (tyVarKind tv) `unionFV` delFV tv (go ty)
-    go LitTy{}                          = emptyFV
-    go (CastTy ty _)                    = go ty
-    go CoercionTy{}                     = emptyFV
-
-    go_tc tc tys
-      | isTypeFamilyTyCon tc
-      = if | look_under_tfs
-           , Injective flags <- tyConInjectivityInfo tc
-           -> mapUnionFV go $
-              filterByList (flags ++ repeat True) tys
-                         -- Oversaturated arguments to a tycon are
-                         -- always injective, hence the repeat True
-           | otherwise   -- No injectivity info for this type family
-           -> emptyFV
-
-      | otherwise        -- Data type, injective in all positions
-      = mapUnionFV go tys
+                    -> Type -> VarSet
+injectiveVarsOfType look_under_tfs ty = runTyCoVars (inj_vars_of_type look_under_tfs ty)
 
 -- | Returns the free variables of a 'Type' that are in injective positions.
 -- Specifically, it finds the free variables while:
@@ -934,8 +1031,38 @@ injectiveVarsOfType look_under_tfs = go
 injectiveVarsOfTypes :: Bool -- ^ look under injective type families?
                              -- See Note [Coverage condition for injective type families]
                              -- in "GHC.Tc.Instance.Family".
-                     -> [Type] -> FV
-injectiveVarsOfTypes look_under_tfs = mapUnionFV (injectiveVarsOfType look_under_tfs)
+                     -> [Type] -> VarSet
+injectiveVarsOfTypes look_under_tfs tys
+  = runTyCoVars $ mapUnionFVRes (inj_vars_of_type look_under_tfs) tys
+
+inj_vars_of_type :: Bool -> Type -> TyCoFVRes
+inj_vars_of_type look_under_tfs = go
+  where
+    go ty | Just ty' <- rewriterView ty = go ty'
+    go (TyVarTy v)                      = deepUnitFVRes go v
+    go (AppTy f a)                      = go f `mappend` go a
+    go (FunTy _ w ty1 ty2)              = go w `mappend` go ty1 `mappend` go ty2
+    go (TyConApp tc tys)                = go_tc tc tys
+    go (ForAllTy (Bndr tv _) ty)        = go (tyVarKind tv) `mappend`
+                                          addBndrFVRes tv (go ty)
+    go LitTy{}                          = mempty
+    go (CastTy ty _)                    = go ty
+    go CoercionTy{}                     = mempty
+
+    go_tc tc tys
+      | isTypeFamilyTyCon tc
+      = if | look_under_tfs
+           , Injective flags <- tyConInjectivityInfo tc
+           -> mapUnionFVRes go $
+              filterByList (flags ++ repeat True) tys
+                         -- Oversaturated arguments to a tycon are
+                         -- always injective, hence the repeat True
+           | otherwise   -- No injectivity info for this type family
+           -> mempty
+
+      | otherwise        -- Data type, injective in all positions
+      = mapUnionFVRes go tys
+
 
 
 {- *********************************************************************
@@ -947,33 +1074,33 @@ injectiveVarsOfTypes look_under_tfs = mapUnionFV (injectiveVarsOfType look_under
 
 -- | Returns the set of variables that are used invisibly anywhere within
 -- the given type. A variable will be included even if it is used both visibly
--- and invisibly. An invisible use site includes:
+-- and invisibly. An "invisible" use site includes:
 --   * In the kind of a variable
 --   * In the kind of a bound variable in a forall
 --   * In a coercion
 --   * In a Specified or Inferred argument to a function
 -- See Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep"
-invisibleVarsOfType :: Type -> FV
+invisibleVarsOfType :: Type -> VarSet
 invisibleVarsOfType = go
   where
-    go ty                 | Just ty' <- coreView ty
-                          = go ty'
-    go (TyVarTy v)        = go (tyVarKind v)
-    go (AppTy f a)        = go f `unionFV` go a
-    go (FunTy _ w ty1 ty2) =
-      -- As per #23764, order is: arg, mult, res.
-      go ty1 `unionFV` go w `unionFV` go ty2
-    go (TyConApp tc tys)  = tyCoFVsOfTypes invisibles `unionFV`
-                            invisibleVarsOfTypes visibles
+    go ty                  | Just ty' <- coreView ty
+                           = go ty'
+    go (TyVarTy v)         = go (tyVarKind v)
+    go (AppTy f a)         = go f `unionVarSet` go a
+    go (FunTy _ w ty1 ty2) = go ty1 `unionVarSet` go w `unionVarSet` go ty2
+                             -- As per #23764, order is: arg, mult, res.
+    go (TyConApp tc tys)   = tyCoVarsOfTypes invisibles `unionVarSet`
+                             invisibleVarsOfTypes visibles
       where (invisibles, visibles) = partitionInvisibleTypes tc tys
-    go (ForAllTy tvb ty)  = tyCoFVsBndr tvb $ go ty
-    go LitTy{}            = emptyFV
-    go (CastTy ty co)     = tyCoFVsOfCo co `unionFV` go ty
-    go (CoercionTy co)    = tyCoFVsOfCo co
+    go (ForAllTy (Bndr var _) ty)
+      = tyCoVarsOfType (varType var) `unionVarSet` (go ty `delVarSet` var)
+    go LitTy{}             = emptyVarSet
+    go (CastTy ty co)      = tyCoVarsOfCo co `unionVarSet` go ty
+    go (CoercionTy co)     = tyCoVarsOfCo co
 
 -- | Like 'invisibleVarsOfType', but for many types.
-invisibleVarsOfTypes :: [Type] -> FV
-invisibleVarsOfTypes = mapUnionFV invisibleVarsOfType
+invisibleVarsOfTypes :: [Type] -> VarSet
+invisibleVarsOfTypes = foldr (unionVarSet . invisibleVarsOfType) emptyVarSet
 
 
 {- *********************************************************************
@@ -983,40 +1110,41 @@ invisibleVarsOfTypes = mapUnionFV invisibleVarsOfType
 ********************************************************************* -}
 
 {-# INLINE afvFolder #-}   -- so that specialization to (const True) works
-afvFolder :: (TyCoVar -> Bool) -> TyCoFolder TyCoVarSet DM.Any
+afvFolder :: (TyCoVar -> Bool) -> TyCoFolder (FVRes TyCoVarSet DM.Any)
 -- 'afvFolder' is short for "any-free-var folder", good for checking
 -- if any free var of a type satisfies a predicate `check_fv`
 afvFolder check_fv = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                                 , tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                                , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
+                                , tcf_hole = do_hole
+                                , tcf_tycobinder = addBndrFVRes }
   where
-    do_tcv is tv = Any (not (tv `elemVarSet` is) && check_fv tv)
-    do_hole _ _  = Any False    -- I'm unsure; probably never happens
-    do_bndr is tv _ = is `extendVarSet` tv
+    do_tcv tv = FVRes $ \ bvs ->
+                Any (not (tv `elemVarSet` bvs) && check_fv tv)
+    do_hole _ = mempty    -- I'm unsure; probably never happens
 
 anyFreeVarsOfType :: (TyCoVar -> Bool) -> Type -> Bool
-anyFreeVarsOfType check_fv ty = DM.getAny (f ty)
-  where (f, _, _, _) = foldTyCo (afvFolder check_fv) emptyVarSet
+anyFreeVarsOfType check_fv ty = DM.getAny (runFVTop (f ty))
+  where (f, _, _, _) = foldTyCo (afvFolder check_fv)
 
 anyFreeVarsOfTypes :: (TyCoVar -> Bool) -> [Type] -> Bool
-anyFreeVarsOfTypes check_fv tys = DM.getAny (f tys)
-  where (_, f, _, _) = foldTyCo (afvFolder check_fv) emptyVarSet
+anyFreeVarsOfTypes check_fv tys = DM.getAny (runFVTop (f tys))
+  where (_, f, _, _) = foldTyCo (afvFolder check_fv)
 
 anyFreeVarsOfCo :: (TyCoVar -> Bool) -> Coercion -> Bool
-anyFreeVarsOfCo check_fv co = DM.getAny (f co)
-  where (_, _, f, _) = foldTyCo (afvFolder check_fv) emptyVarSet
+anyFreeVarsOfCo check_fv co = DM.getAny (runFVTop (f co))
+  where (_, _, f, _) = foldTyCo (afvFolder check_fv)
 
 noFreeVarsOfType :: Type -> Bool
-noFreeVarsOfType ty = not $ DM.getAny (f ty)
-  where (f, _, _, _) = foldTyCo (afvFolder (const True)) emptyVarSet
+noFreeVarsOfType ty = not $ DM.getAny (runFVTop (f ty))
+  where (f, _, _, _) = foldTyCo (afvFolder (const True))
 
 noFreeVarsOfTypes :: [Type] -> Bool
-noFreeVarsOfTypes tys = not $ DM.getAny (f tys)
-  where (_, f, _, _) = foldTyCo (afvFolder (const True)) emptyVarSet
+noFreeVarsOfTypes tys = not $ DM.getAny (runFVTop (f tys))
+  where (_, f, _, _) = foldTyCo (afvFolder (const True))
 
 noFreeVarsOfCo :: Coercion -> Bool
-noFreeVarsOfCo co = not $ DM.getAny (f co)
-  where (_, _, f, _) = foldTyCo (afvFolder (const True)) emptyVarSet
+noFreeVarsOfCo co = not $ DM.getAny (runFVTop (f co))
+  where (_, _, f, _) = foldTyCo (afvFolder (const True))
 
 
 {-

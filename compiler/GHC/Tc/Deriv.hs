@@ -63,7 +63,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
-import GHC.Utils.FV as FV (fvVarList, unionFV, mkFVs)
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.Bag
@@ -248,7 +247,7 @@ tcDeriving deriv_infos deriv_decls
 
         ; gbl_env <- tcExtendLocalInstEnv (map iSpec (bagToList inst_info))
                                           getGblEnv
-        ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ concat fvs)
+        ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFNs $ concat fvs)
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_aux_binds) } }
   where
     ddump_deriving :: Bag (InstInfo GhcRn) -> HsValBinds GhcRn
@@ -305,10 +304,10 @@ renameDeriv inst_infos bagBinds
     do  { (rn_aux, dus_aux) <- rnLocalValBindsRHS (mkNameSet bndrs) rn_aux_lhs
         ; (rn_inst_infos, fvs_insts) <- mapAndUnzipM rn_inst_info inst_infos
         ; return (listToBag rn_inst_infos, rn_aux,
-                  dus_aux `plusDU` usesOnly (plusFVs fvs_insts)) } }
+                  dus_aux `plusDU` usesOnly (plusFNs fvs_insts)) } }
 
   where
-    rn_inst_info :: InstInfo GhcPs -> TcM (InstInfo GhcRn, FreeVars)
+    rn_inst_info :: InstInfo GhcPs -> TcM (InstInfo GhcRn, FreeNames)
     rn_inst_info
       inst_info@(InstInfo { iSpec = inst
                           , iBinds = InstBindings
@@ -892,9 +891,9 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
                                          final_cls_tys ++ final_tc_args
                                            ++ deriv_strat_tys final_mb_deriv_strat
 
-        ; let tkvs = scopedSort $ fvVarList $
-                     unionFV (tyCoFVsOfTypes tc_args_to_keep)
-                             (FV.mkFVs deriv_tvs)
+        ; let tkvs = scopedSort $ dVarSetElems $
+                     tyCoVarsOfTypesDSet tc_args_to_keep
+                     `extendDVarSetList` deriv_tvs
               (tkvs', cls_tys', tc_args', mb_deriv_strat')
                 = propagate_subst kind_subst tkvs cls_tys
                                   tc_args_to_keep mb_deriv_strat

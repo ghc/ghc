@@ -78,7 +78,7 @@ module GHC.Core.Coercion (
 
         -- ** Free variables
         tyCoVarsOfCo, tyCoVarsOfCos, coVarsOfCo,
-        tyCoFVsOfCo, tyCoFVsOfCos, tyCoVarsOfCoDSet,
+        tyCoFVsOfCo, tyCoVarsOfCoDSet,
         coercionSize, anyFreeVarsOfCo,
 
         -- ** Substitution
@@ -2819,13 +2819,14 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
 
 has_co_hole_ty :: Type -> Monoid.Any
 (has_co_hole_ty, _, _, _)
-  = foldTyCo folder ()
+  = foldTyCo folder
   where
+    folder :: TyCoFolder Monoid.Any
     folder = TyCoFolder { tcf_view  = noView
-                        , tcf_tyvar = const2 (Monoid.Any False)
-                        , tcf_covar = const2 (Monoid.Any False)
-                        , tcf_hole  = \_ _ -> Monoid.Any True
-                        , tcf_tycobinder = const2
+                        , tcf_tyvar = const (Monoid.Any False)
+                        , tcf_covar = const (Monoid.Any False)
+                        , tcf_hole  = const (Monoid.Any True)
+                        , tcf_tycobinder = \ _ x -> x
                         }
 
 -- | Is there a coercion hole in this type?

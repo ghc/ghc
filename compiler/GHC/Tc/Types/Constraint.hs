@@ -113,6 +113,7 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.FVs
 
 import GHC.Types.Name
 import GHC.Types.Var
@@ -127,7 +128,6 @@ import GHC.Builtin.Names
 import GHC.Types.Var.Set
 import GHC.Types.Name.Reader
 
-import GHC.Utils.FV
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -793,106 +793,93 @@ boundOccNamesOfWC wc = bagToList (go_wc wc)
 ---------------- Getting free tyvars -------------------------
 
 -- | Returns free variables of constraints as a non-deterministic set
+-- This must consult only the ctPred, so that it gets *tidied* fvs if the
+-- constraint has been tidied. Tidying a constraint does not tidy the
+-- fields of the Ct, only the predicate in the CtEvidence.
 tyCoVarsOfCt :: Ct -> TcTyCoVarSet
-tyCoVarsOfCt = fvVarSet . tyCoFVsOfCt
+tyCoVarsOfCt = tyCoVarsOfType . ctPred
 
 -- | Returns free variables of constraints as a non-deterministic set
 tyCoVarsOfCtEv :: CtEvidence -> TcTyCoVarSet
-tyCoVarsOfCtEv = fvVarSet . tyCoFVsOfCtEv
+tyCoVarsOfCtEv = tyCoVarsOfType . ctEvPred
 
 -- | Returns free variables of constraints as a deterministically ordered
 -- list. See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoVarsOfCtList :: Ct -> [TcTyCoVar]
-tyCoVarsOfCtList = fvVarList . tyCoFVsOfCt
+tyCoVarsOfCtList = tyCoVarsOfTypeList . ctPred
 
 -- | Returns free variables of constraints as a deterministically ordered
 -- list. See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoVarsOfCtEvList :: CtEvidence -> [TcTyCoVar]
-tyCoVarsOfCtEvList = fvVarList . tyCoFVsOfType . ctEvPred
-
--- | Returns free variables of constraints as a composable FV computation.
--- See Note [Deterministic FV] in "GHC.Utils.FV".
-tyCoFVsOfCt :: Ct -> FV
-tyCoFVsOfCt ct = tyCoFVsOfType (ctPred ct)
-  -- This must consult only the ctPred, so that it gets *tidied* fvs if the
-  -- constraint has been tidied. Tidying a constraint does not tidy the
-  -- fields of the Ct, only the predicate in the CtEvidence.
-
--- | Returns free variables of constraints as a composable FV computation.
--- See Note [Deterministic FV] in GHC.Utils.FV.
-tyCoFVsOfCtEv :: CtEvidence -> FV
-tyCoFVsOfCtEv ct = tyCoFVsOfType (ctEvPred ct)
+tyCoVarsOfCtEvList = tyCoVarsOfTypeList . ctEvPred
 
 -- | Returns free variables of a bag of constraints as a non-deterministic
 -- set. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfCts :: Cts -> TcTyCoVarSet
-tyCoVarsOfCts = fvVarSet . tyCoFVsOfCts
+tyCoVarsOfCts = dVarSetToVarSet . runTyCoVarsDSet . tcvs_of_cts
 
 -- | Returns free variables of a bag of constraints as a deterministically
 -- ordered list. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfCtsList :: Cts -> [TcTyCoVar]
-tyCoVarsOfCtsList = fvVarList . tyCoFVsOfCts
+tyCoVarsOfCtsList = dVarSetElems . tyCoVarsOfThingsDSet ctPred
 
 -- | Returns free variables of a bag of constraints as a deterministically
 -- ordered list. See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoVarsOfCtEvsList :: [CtEvidence] -> [TcTyCoVar]
-tyCoVarsOfCtEvsList = fvVarList . tyCoFVsOfCtEvs
-
--- | Returns free variables of a bag of constraints as a composable FV
--- computation. See Note [Deterministic FV] in "GHC.Utils.FV".
-tyCoFVsOfCts :: Cts -> FV
-tyCoFVsOfCts = foldr (unionFV . tyCoFVsOfCt) emptyFV
-
--- | Returns free variables of a bag of constraints as a composable FV
--- computation. See Note [Deterministic FV] in GHC.Utils.FV.
-tyCoFVsOfCtEvs :: [CtEvidence] -> FV
-tyCoFVsOfCtEvs = foldr (unionFV . tyCoFVsOfCtEv) emptyFV
+tyCoVarsOfCtEvsList = dVarSetElems . runTyCoVarsDSet
+                      . mapUnionFVRes (detTyCoVarsOfType . ctEvPred)
 
 -- | Returns free variables of WantedConstraints as a non-deterministic
 -- set. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfWC :: WantedConstraints -> TyCoVarSet
 -- Only called on *zonked* things
-tyCoVarsOfWC = fvVarSet . tyCoFVsOfWC
+tyCoVarsOfWC = dVarSetToVarSet . tyCoVarsOfWcDSet
 
 -- | Returns free variables of WantedConstraints as a deterministically
 -- ordered list. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfWCList :: WantedConstraints -> [TyCoVar]
 -- Only called on *zonked* things
-tyCoVarsOfWCList = fvVarList . tyCoFVsOfWC
+tyCoVarsOfWCList = dVarSetElems . tyCoVarsOfWcDSet
 
 -- | Returns free variables of WantedConstraints as a composable FV
 -- computation. See Note [Deterministic FV] in "GHC.Utils.FV".
-tyCoFVsOfWC :: WantedConstraints -> FV
+tyCoVarsOfWcDSet :: WantedConstraints -> DTyCoVarSet
 -- Only called on *zonked* things
-tyCoFVsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_errors = errors })
-  = tyCoFVsOfCts simple `unionFV`
-    tyCoFVsOfBag tyCoFVsOfImplic implic `unionFV`
-    tyCoFVsOfBag tyCoFVsOfDelayedError errors
+tyCoVarsOfWcDSet = runTyCoVarsDSet . tcvs_of_wc
+
+tcvs_of_wc :: WantedConstraints -> DTyCoFVRes
+tcvs_of_wc (WC { wc_simple = simple, wc_impl = implics, wc_errors = errors })
+  = tcvs_of_cts simple               `mappend`
+    mapUnionFVRes tcvs_of_implic implics `mappend`
+    mapUnionFVRes tcvs_of_errs errors
+
+tcvs_of_cts :: Cts -> DTyCoFVRes
+tcvs_of_cts = mapUnionFVRes tcvs_of_ct
+
+tcvs_of_ct :: Ct -> DTyCoFVRes
+tcvs_of_ct ct = detTyCoVarsOfType (ctPred ct)
 
 -- | Returns free variables of Implication as a composable FV computation.
 -- See Note [Deterministic FV] in "GHC.Utils.FV".
-tyCoFVsOfImplic :: Implication -> FV
+tcvs_of_implic :: Implication -> DTyCoFVRes
 -- Only called on *zonked* things
-tyCoFVsOfImplic (Implic { ic_skols = skols
-                        , ic_given = givens
-                        , ic_wanted = wanted })
+tcvs_of_implic (Implic { ic_skols = skols
+                       , ic_given = givens
+                       , ic_wanted = wanted })
   | isEmptyWC wanted
-  = emptyFV
+  = mempty
   | otherwise
-  = tyCoFVsVarBndrs skols  $
-    tyCoFVsVarBndrs givens $
-    tyCoFVsOfWC wanted
+  = addBndrsFVRes skols  $
+    addBndrsFVRes givens $
+    tcvs_of_wc wanted
 
-tyCoFVsOfDelayedError :: DelayedError -> FV
-tyCoFVsOfDelayedError (DE_Hole hole) = tyCoFVsOfHole hole
-tyCoFVsOfDelayedError (DE_NotConcrete {}) = emptyFV
-tyCoFVsOfDelayedError (DE_Multiplicity co _) = tyCoFVsOfCo co
+tcvs_of_errs :: DelayedError -> DTyCoFVRes
+tcvs_of_errs (DE_Hole hole)         = tcvs_of_hole hole
+tcvs_of_errs (DE_NotConcrete {})    = mempty
+tcvs_of_errs (DE_Multiplicity co _) = detTyCoVarsOfCo co
 
-tyCoFVsOfHole :: Hole -> FV
-tyCoFVsOfHole (Hole { hole_ty = ty }) = tyCoFVsOfType ty
-
-tyCoFVsOfBag :: (a -> FV) -> Bag a -> FV
-tyCoFVsOfBag tvs_of = foldr (unionFV . tvs_of) emptyFV
+tcvs_of_hole :: Hole -> DTyCoFVRes
+tcvs_of_hole (Hole { hole_ty = ty }) = detTyCoVarsOfType ty
 
 {-
 ************************************************************************

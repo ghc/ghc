@@ -418,17 +418,31 @@ where we rename the inner forall.
 
 It would be /possible/ to make `exprType` more complicated, so that it does
 renaming on the fly.  But instead we impose the no-type-shadowing invariant on
-Core: the variable free in an Id's type must be in scope at all that Id's
-occurrences.   In type-system terms:
+Core terms: the variable free in an Id's type must be in scope at every
+/occurrence/ of that Id.  In type-system terms:
 
     fv(t) are not bound in G2
     -------------------------
     G1, x:t, G2 |- x : t
 
-How do we guarntee this invariant?  The main thing that might disturb it is
-/substitution/.
+How do we guarantee this invariant?  The main thing that might disturb it is
+/substitution/.  When substituting in a /term/ we need to ensure that the in-scope
+set includes:
 
-   ... TODO say more here ...
+* The /deep/ free vars of the range of the substitution
+  E.g.  When substituting  [y :-> x::a->a] into
+         /\a. ..y...
+  we should have an InScopeSet that includes `a` so that we clone the `/\a`.
+
+* The /deep/ free vars of the term in which we are substituting
+  E.g when substituting [x :-> blah] into `e`, we must ensure that if we
+  clone a binder in `e`, we don't accidentally choose a new binder that 
+  shadows a deep free var of `e`.
+
+For substitution on /types/ we don't need to use deep free variables.
+See Note [The substitution invariant] in GHC.Core.TyCo.Subst.
+Why don't wee need the deep free vars? Answer: `typeKind` can't return a
+kind that mentions any binders.  ** TODO ** beef up this explanation.
 
 Note [Core letrec invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -51,7 +51,6 @@ import GHC.Core.Coercion ( ltRole )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Utils.FV as FV
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -70,6 +69,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Reader ( mkRdrUnqual )
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Set
@@ -623,23 +623,25 @@ irExTyVars orig_tvs thing = go emptyVarSet orig_tvs
 
 markNominal :: TyVarSet   -- local variables
             -> Type -> RoleM ()
-markNominal lcls ty = let nvars = fvVarList (FV.delFVs lcls $ get_ty_vars ty) in
-                      mapM_ (updateRole Nominal) nvars
+markNominal lcls ty = mapM_ (updateRole Nominal) $
+                      nonDetVarSetElems (get_ty_vars ty `minusVarSet` lcls)
   where
      -- get_ty_vars gets all the tyvars (no covars!) from a type *without*
      -- recurring into coercions. Recall: coercions are totally ignored during
      -- role inference. See [Coercions in role inference]
-    get_ty_vars :: Type -> FV
+    get_ty_vars :: Type -> VarSet
     get_ty_vars t                 | Just t' <- coreView t -- #20999
                                   = get_ty_vars t'
-    get_ty_vars (TyVarTy tv)      = unitFV tv
-    get_ty_vars (AppTy t1 t2)     = get_ty_vars t1 `unionFV` get_ty_vars t2
-    get_ty_vars (FunTy _ w t1 t2) = get_ty_vars w `unionFV` get_ty_vars t1 `unionFV` get_ty_vars t2
-    get_ty_vars (TyConApp _ tys)  = mapUnionFV get_ty_vars tys
-    get_ty_vars (ForAllTy tvb ty) = tyCoFVsBndr tvb (get_ty_vars ty)
-    get_ty_vars (LitTy {})        = emptyFV
+    get_ty_vars (TyVarTy tv)      = unitVarSet tv
+    get_ty_vars (AppTy t1 t2)     = get_ty_vars t1 `unionVarSet` get_ty_vars t2
+    get_ty_vars (FunTy _ w t1 t2) = get_ty_vars w `unionVarSet` get_ty_vars t1
+                                                  `unionVarSet` get_ty_vars t2
+    get_ty_vars (TyConApp _ tys)  = mapUnionVarSet get_ty_vars tys
+    get_ty_vars (ForAllTy (Bndr v _) ty) = get_ty_vars (varType v) `unionVarSet`
+                                           (get_ty_vars ty `delVarSet` v)
+    get_ty_vars (LitTy {})        = emptyVarSet
     get_ty_vars (CastTy ty _)     = get_ty_vars ty
-    get_ty_vars (CoercionTy _)    = emptyFV
+    get_ty_vars (CoercionTy _)    = emptyVarSet
 
 -- like lookupRoles, but with Nominal tags at the end for oversaturated TyConApps
 lookupRolesX :: TyCon -> RoleM [Role]

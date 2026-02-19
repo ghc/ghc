@@ -65,6 +65,7 @@ import GHC.Core.Coercion
 import GHC.Core.DataCon
 import GHC.Core.TyCo.Ppr  ( pprTyVars )
 import GHC.Core.TyCo.Tidy
+import GHC.Core.TyCo.FVs
 
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
@@ -73,7 +74,6 @@ import GHC.Utils.Error  (diagReasonSeverity,  pprLocMsgEnvelope )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as O
 import GHC.Utils.Panic
-import GHC.Utils.FV ( fvVarList, unionFV )
 
 import GHC.Data.Bag
 import GHC.Data.List.SetOps ( equivClasses, nubOrdBy )
@@ -2012,10 +2012,8 @@ mkTyVarEqErr' ctxt item tv1 ty2
   = do headline_msg <- misMatchOrCND ctxt item ty1 ty2
        let ambiguity_infos = eqInfoMsgs ty1 ty2
 
-           interesting_tyvars = filter (not . noFreeVarsOfType . tyVarKind) $
-                                filter isTyVar $
-                                fvVarList $
-                                tyCoFVsOfType ty1 `unionFV` tyCoFVsOfType ty2
+           interesting_tyvars = someTyCoVarsOfTypes is_interesting [ty1,ty2]
+           is_interesting tv = isTyVar tv && not (noFreeVarsOfType (tyVarKind tv))
 
            occurs_err =
              OccursCheck

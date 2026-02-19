@@ -45,7 +45,6 @@ import GHC.Types.Var.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.FV
 
 import GHC.Data.Maybe
 
@@ -872,18 +871,18 @@ unusedInjTvsInRHS dflags tycon@(tyConInjectivityInfo -> Injective inj_list) lhs 
       inj_lhs = filterByList inj_list lhs
       lhs_vars = tyCoVarsOfTypes inj_lhs
 
-      rhs_inj_vars = fvVarSet $ injectiveVarsOfType undec_inst rhs
+      rhs_inj_vars = injectiveVarsOfType undec_inst rhs
 
       bad_vars = lhs_vars `minusVarSet` rhs_inj_vars
 
       any_bad = not $ isEmptyVarSet bad_vars
 
-      invis_vars = fvVarSet $ invisibleVarsOfTypes [mkTyConApp tycon lhs, rhs]
+      invis_vars = invisibleVarsOfTypes [mkTyConApp tycon lhs, rhs]
 
       any_invisible = any_bad && (bad_vars `intersectsVarSet` invis_vars)
       suggest_undec = any_bad &&
                       not undec_inst &&
-                      (lhs_vars `subVarSet` fvVarSet (injectiveVarsOfType True rhs))
+                      (lhs_vars `subVarSet` injectiveVarsOfType True rhs)
 
 -- When the type family is not injective in any arguments
 unusedInjTvsInRHS _ _ _ _ = (emptyVarSet, NoHasKinds, NoSuggestUndecidableInstaces)
