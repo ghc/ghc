@@ -47,11 +47,11 @@ import qualified Data.ByteString as BS
 import Data.Traversable
 import GHC.Utils.Logger
 import GHC.Linker.Types
-import System.IO.Unsafe (unsafeInterleaveIO)
+import System.IO.Unsafe (unsafeInterleaveIO, unsafePerformIO)
 import GHC.Utils.Outputable
-import GHC.Utils.Fingerprint (Fingerprint, fingerprintByteString)
+import GHC.Utils.Fingerprint (Fingerprint)
 import GHC.Types.Name.Env
-import GHC.Iface.Recomp.Binary (computeFingerprint, putNameLiterally)
+import GHC.Iface.Recomp.Binary (putNameLiterally, fingerprintBinMem)
 
 {- Note [Overview of persistent bytecode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -291,10 +291,8 @@ writeBinByteCode f cbc = do
 
 fingerprintModuleByteCodeContents :: Module -> CompiledByteCode -> [FilePath] -> IO Fingerprint
 fingerprintModuleByteCodeContents modl cbc foreign_files = do
-  bh' <- openBinMem (1024 * 1024)
-  bh <- addBinNameWriter bh'
   foreign_contents <- readObjectFiles foreign_files
-  computeFingerprint putNameLiterally (modl, cbc, foreign_contents)
+  pure $ computeFingerprint2 putNameLiterally (modl, cbc, foreign_contents)
 
 instance Binary CompiledByteCode where
   get bh = do
@@ -400,6 +398,23 @@ putViaBinName bh nm = case findUserDataWriter Proxy bh of
 data BytecodeNameEnv = ByteCodeNameEnv { _bytecode_next_id :: !Word64
                                        , _bytecode_name_subst :: NameEnv Word64
                                        }
+
+
+computeFingerprint2 :: (Binary a)
+                   => (WriteBinHandle -> Name -> IO ())
+                   -> a
+                   -> Fingerprint
+computeFingerprint2 put_nonbinding_name a = unsafePerformIO $ do
+    bh <- fmap set_user_data $ openBinMem (3*1024) -- just less than a block
+    bh' <- addBinNameWriter bh
+    put_ bh' a
+    fingerprintBinMem bh'
+  where
+    set_user_data bh = setWriterUserData bh $ mkWriterUserData
+      [ mkSomeBinaryWriter $ mkWriter put_nonbinding_name
+      , mkSomeBinaryWriter $ simpleBindingNameWriter $ mkWriter putNameLiterally
+      , mkSomeBinaryWriter $ mkWriter putFS
+      ]
 
 addBinNameWriter :: WriteBinHandle -> IO WriteBinHandle
 addBinNameWriter bh' = do
