@@ -1,0 +1,2 @@
+:load T24632.hs
+seq x ()
