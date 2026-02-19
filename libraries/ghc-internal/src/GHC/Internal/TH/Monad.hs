@@ -26,17 +26,19 @@ module GHC.Internal.TH.Monad
 import Prelude
 import Data.Data hiding (Fixity(..))
 import Data.IORef
-import System.IO.Unsafe ( unsafePerformIO )
+import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad.IO.Class (MonadIO (..))
-import System.IO        ( hPutStrLn, stderr )
+import System.IO (FilePath, hPutStrLn, stderr)
 import qualified Data.Kind as Kind (Type)
-import GHC.Types        (TYPE, RuntimeRep(..))
+import GHC.Types (TYPE, RuntimeRep(..))
 #else
 import GHC.Internal.Base hiding (NonEmpty(..),Type, Module, sequence)
 import GHC.Internal.Data.Data hiding (Fixity(..))
 import GHC.Internal.Data.Traversable
 import GHC.Internal.IORef
-import GHC.Internal.System.IO
+import GHC.Internal.IO (FilePath)
+import GHC.Internal.IO.Handle.Text (hPutStrLn)
+import GHC.Internal.IO.StdHandles (stderr)
 import GHC.Internal.Data.Foldable
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Control.Monad.IO.Class
@@ -818,38 +820,6 @@ addTempFile suffix = Q (qAddTempFile suffix)
 -- checked along with the current declaration group.
 addTopDecls :: [Dec] -> Q ()
 addTopDecls ds = Q (qAddTopDecls ds)
-
-
--- | Emit a foreign file which will be compiled and linked to the object for
--- the current module. Currently only languages that can be compiled with
--- the C compiler are supported, and the flags passed as part of -optc will
--- be also applied to the C compiler invocation that will compile them.
---
--- Note that for non-C languages (for example C++) @extern "C"@ directives
--- must be used to get symbols that we can access from Haskell.
---
--- To get better errors, it is recommended to use #line pragmas when
--- emitting C files, e.g.
---
--- > {-# LANGUAGE CPP #-}
--- > ...
--- > addForeignSource LangC $ unlines
--- >   [ "#line " ++ show (__LINE__ + 1) ++ " " ++ show __FILE__
--- >   , ...
--- >   ]
-addForeignSource :: ForeignSrcLang -> String -> Q ()
-addForeignSource lang src = do
-  let suffix = case lang of
-                 LangC      -> "c"
-                 LangCxx    -> "cpp"
-                 LangObjc   -> "m"
-                 LangObjcxx -> "mm"
-                 LangAsm    -> "s"
-                 LangJs     -> "js"
-                 RawObject  -> "a"
-  path <- addTempFile suffix
-  runIO $ writeFile path src
-  addForeignFilePath lang path
 
 -- | Same as 'addForeignSource', but expects to receive a path pointing to the
 -- foreign file instead of a 'String' of its contents. Consider using this in

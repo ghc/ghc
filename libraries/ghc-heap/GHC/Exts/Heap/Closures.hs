@@ -1,17 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE GHCForeignImportPrim #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE UnliftedFFITypes #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveTraversable #-}
--- Late cost centres introduce a thunk in the asBox function, which leads to
--- an additional wrapper being added to any value placed inside a box.
--- This can be removed once our boot compiler is no longer affected by #25212
-{-# OPTIONS_GHC -fno-prof-late  #-}
-{-# LANGUAGE NamedFieldPuns #-}
-
 module GHC.Exts.Heap.Closures (
     -- * Closures
       Closure
