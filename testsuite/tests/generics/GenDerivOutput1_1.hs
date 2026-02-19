@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# OPTIONS_GHC -ddump-deriv #-}
 
 module CanDoRep1_1 where
 

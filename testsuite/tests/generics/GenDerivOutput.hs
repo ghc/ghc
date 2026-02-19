@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveFunctor   #-}
 {-# LANGUAGE DeriveGeneric   #-}
-{-# OPTIONS_GHC -ddump-deriv #-}
 
 module GenDerivOutput where
 

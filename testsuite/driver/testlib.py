@@ -1371,6 +1371,10 @@ def multiline_grep_errmsg(needle):
         return "" if match is None else match.group(0)
     return normalise_errmsg_fun(norm)
 
+# The result of -ddump-deriv may contain INLINE pragmas depending on optimization flags.
+# We want to strip them off.
+normalise_ddump_deriv = grep_errmsg(r"^(?!\s*{-# INLINE)")
+
 def limit_stdout_lines(count):
     return normalise_fun(lambda str: "".join(str.splitlines(True)[:count]))
 

@@ -1,6 +1,6 @@
 test('GenCanDoRep0',    normal, compile, [''])
 test('GenCanDoRep1',    normal, compile, [''])
-test('GenDerivOutput',  normal, compile, ['-dsuppress-uniques'])
+test('GenDerivOutput',  [normalise_ddump_deriv], compile, ['-ddump-deriv -dsuppress-uniques'])
 
 test('GenShouldFail0',  normal, compile_fail, [''])
 test('GenCannotDoRep0_0', normal, compile_fail, [''])
@@ -31,8 +31,8 @@ test('T5462No1', [extra_files(['GFunctor/']), outputdir('out_T5462No1')]
 test('T5884', [], multimod_compile, ['T5884Other', '-v0'])
 test('GenNewtype', normal, compile_and_run, [''])
 
-test('GenDerivOutput1_0', normal, compile, ['-dsuppress-uniques'])
-test('GenDerivOutput1_1', normal, compile, ['-dsuppress-uniques'])
+test('GenDerivOutput1_0', [normalise_ddump_deriv], compile, ['-ddump-deriv -dsuppress-uniques'])
+test('GenDerivOutput1_1', [normalise_ddump_deriv], compile, ['-ddump-deriv -dsuppress-uniques'])
 
 test('T7878', [], multimod_compile, ['T7878', '-v0'])
 

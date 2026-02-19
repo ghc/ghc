@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PolyKinds #-}
-{-# OPTIONS_GHC -ddump-deriv -fprint-explicit-kinds #-}
+{-# OPTIONS_GHC -fprint-explicit-kinds #-}
 module T10604_deriving where
 
 import GHC.Generics
