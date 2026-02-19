@@ -33,12 +33,10 @@ import GHC.Core.Predicate( CanEqLHS(..), canEqLHS_maybe )
 import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare ( eqType, tcEqType, tcEqTyConAppArgs )
-import GHC.Core.TyCo.FVs     ( tyCoVarsOfCoList, tyCoFVsOfTypes )
 import GHC.Core.TyCo.Subst   ( mkTvSubst )
 import GHC.Core.Map.Type
 import GHC.Core.Multiplicity
 
-import GHC.Utils.FV( FV, fvVarList )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Types.Basic( SwapFlag(..) )
@@ -1141,13 +1139,12 @@ niFixSubst in_scope tenv
   where
     tenv_subst = mkTvSubst in_scope tenv   -- This is our starting point
 
-    range_fvs :: FV
-    range_fvs = tyCoFVsOfTypes (nonDetEltsUFM tenv)
-          -- It's OK to use nonDetEltsUFM here because the
-          -- order of range_fvs, range_tvs is immaterial
-
     range_tvs :: [TyVar]
-    range_tvs = fvVarList range_fvs
+    range_tvs = nonDetVarSetElems $
+                tyCoVarsOfTypes $
+                nonDetEltsUFM tenv
+          -- It's OK to use nonDetEltsUFM (twice) here because
+          -- the order of range_tvs is immaterial
 
     not_fixpoint  = any in_domain range_tvs
     in_domain tv  = tv `elemVarEnv` tenv
@@ -2363,7 +2360,7 @@ ty_co_match menv subst (TyVarTy tv1) co lkco rkco
     else Nothing       -- no match since tv1 matches two different coercions
 
   | tv1' `elemVarSet` me_tmpls menv           -- tv1' is a template var
-  = if any (inRnEnvR rn_env) (tyCoVarsOfCoList co)
+  = if anyFreeVarsOfCo (inRnEnvR rn_env) co
     then Nothing      -- occurs check failed
     else Just $ extendVarEnv subst tv1' $
                 castCoercionKind co (mkSymCo lkco) (mkSymCo rkco)

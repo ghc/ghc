@@ -128,7 +128,7 @@ data HsPatSigTypeScoping
 
 rnHsSigWcType :: HsDocContext
               -> LHsSigWcType GhcPs
-              -> RnM (LHsSigWcType GhcRn, FreeVars)
+              -> RnM (LHsSigWcType GhcRn, FreeNames)
 rnHsSigWcType doc (HsWC { hswc_body =
     sig_ty@(L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
   = do { free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
@@ -144,23 +144,23 @@ rnHsSigWcType doc (HsWC { hswc_body =
 rnHsPatSigType :: HsPatSigTypeScoping
                -> HsDocContext
                -> HsPatSigType GhcPs
-               -> (HsPatSigType GhcRn -> RnM (a, FreeVars))
-               -> RnM (a, FreeVars)
+               -> (HsPatSigType GhcRn -> RnM (a, FreeNames))
+               -> RnM (a, FreeNames)
 rnHsPatSigType = rnHsPatSigTyKi TypeLevel
 
 rnHsPatSigKind :: HsPatSigTypeScoping
                -> HsDocContext
                -> HsPatSigType GhcPs
-               -> (HsPatSigType GhcRn -> RnM (a, FreeVars))
-               -> RnM (a, FreeVars)
+               -> (HsPatSigType GhcRn -> RnM (a, FreeNames))
+               -> RnM (a, FreeNames)
 rnHsPatSigKind = rnHsPatSigTyKi KindLevel
 
 rnHsPatSigTyKi :: TypeOrKind
                -> HsPatSigTypeScoping
                -> HsDocContext
                -> HsPatSigType GhcPs
-               -> (HsPatSigType GhcRn -> RnM (a, FreeVars))
-               -> RnM (a, FreeVars)
+               -> (HsPatSigType GhcRn -> RnM (a, FreeNames))
+               -> RnM (a, FreeNames)
 -- Used for
 --   - Pattern type signatures, which are only allowed with ScopedTypeVariables
 --   - Signatures on binders in a RULE, which are allowed even if
@@ -182,11 +182,11 @@ rnHsPatSigTyKi level scoping ctx sig_ty thing_inside
        ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
              sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = pat_sig_ty' }
        ; (res, fvs2) <- thing_inside sig_ty'
-       ; return (res, fvs1 `plusFV` fvs2) } }
+       ; return (res, fvs1 `plusFN` fvs2) } }
   where
     pat_sig_ty = hsPatSigType sig_ty
 
-rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeVars)
+rnHsWcType :: HsDocContext -> LHsWcType GhcPs -> RnM (LHsWcType GhcRn, FreeNames)
 rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
   = do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
        ; (nwc_rdrs', _) <- partition_nwcs free_vars
@@ -197,11 +197,11 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
 
 
 rnWcBodyType :: HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
-  -> RnM ([Name], LHsType GhcRn, FreeVars)
+  -> RnM ([Name], LHsType GhcRn, FreeNames)
 rnWcBodyType = rnWcBodyTyKi TypeLevel
 
 rnWcBodyTyKi :: TypeOrKind -> HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
-         -> RnM ([Name], LHsType GhcRn, FreeVars)
+         -> RnM ([Name], LHsType GhcRn, FreeNames)
 rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
   = do { nwcs <- mapM newLocalBndrRn nwc_rdrs
        ; let env = RTKE { rtke_level = level
@@ -217,7 +217,7 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
         do { (hs_ty', fvs) <- rn_ty env hs_ty
            ; return (L loc hs_ty', fvs) }
 
-    rn_ty :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
+    rn_ty :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
     -- A lot of faff just to allow the extra-constraints wildcard to appear
     rn_ty env (HsForAllTy { hst_tele = tele, hst_body = hs_body })
       = bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
@@ -237,7 +237,7 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
            ; return (HsQualTy { hst_xqual = noExtField
                               , hst_ctxt = L cx hs_ctxt'
                               , hst_body = hs_ty' }
-                    , fvs1 `plusFV` fvs2) }
+                    , fvs1 `plusFN` fvs2) }
 
       | otherwise
       = do { (hs_ctxt', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt
@@ -245,7 +245,7 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
            ; return (HsQualTy { hst_xqual = noExtField
                               , hst_ctxt = L cx hs_ctxt'
                               , hst_body = hs_ty' }
-                    , fvs1 `plusFV` fvs2) }
+                    , fvs1 `plusFN` fvs2) }
 
 
     rn_ty env hs_ty = rnHsTyKi env hs_ty
@@ -327,7 +327,7 @@ of the HsWildCardBndrs structure, and we are done.
 rnHsSigType :: HsDocContext
             -> TypeOrKind
             -> LHsSigType GhcPs
-            -> RnM (LHsSigType GhcRn, FreeVars)
+            -> RnM (LHsSigType GhcRn, FreeNames)
 -- Used for source-language type signatures
 -- that cannot have wildcards
 rnHsSigType ctx level
@@ -355,8 +355,8 @@ rnImplicitTvOccs :: Maybe assoc
                  -> FreeKiTyVars
                  -- ^ Surface-syntax free vars that we will implicitly bind.
                  -- May have duplicates, which are removed here.
-                 -> ([Name] -> RnM (a, FreeVars))
-                 -> RnM (a, FreeVars)
+                 -> ([Name] -> RnM (a, FreeNames))
+                 -> RnM (a, FreeNames)
 rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
   = do { let implicit_vs = nubN implicit_vs_with_dups
 
@@ -439,34 +439,34 @@ isRnKindLevel (RTKE { rtke_level = KindLevel }) = True
 isRnKindLevel _                                 = False
 
 --------------
-rnLHsType  :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeVars)
+rnLHsType  :: HsDocContext -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
 rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 
-rnLHsTypes :: HsDocContext -> [LHsType GhcPs] -> RnM ([LHsType GhcRn], FreeVars)
+rnLHsTypes :: HsDocContext -> [LHsType GhcPs] -> RnM ([LHsType GhcRn], FreeNames)
 rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
 rnHsConDeclField :: HsDocContext -> HsConDeclField GhcPs
-                 -> RnM (HsConDeclField GhcRn, FreeVars)
+                 -> RnM (HsConDeclField GhcRn, FreeNames)
 rnHsConDeclField doc = rnHsConDeclFieldTyKi (mkTyKiEnv doc TypeLevel RnTypeBody)
 
 rnHsConDeclFieldTyKi :: RnTyKiEnv -> HsConDeclField GhcPs
-                     -> RnM (HsConDeclField GhcRn, FreeVars)
+                     -> RnM (HsConDeclField GhcRn, FreeNames)
 rnHsConDeclFieldTyKi env cdf@(CDF { cdf_multiplicity, cdf_type, cdf_doc }) = do
   (w , fvs_w) <- rnHsMultAnnWith (rnLHsTyKi env) cdf_multiplicity
   (ty, fvs) <- rnLHsTyKi env cdf_type
   doc <- traverse rnLHsDoc cdf_doc
-  return (cdf { cdf_multiplicity = w, cdf_type = ty, cdf_doc = doc }, fvs `plusFV` fvs_w)
+  return (cdf { cdf_multiplicity = w, cdf_type = ty, cdf_doc = doc }, fvs `plusFN` fvs_w)
 
 
-rnHsType  :: HsDocContext -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
+rnHsType  :: HsDocContext -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
 rnHsType ctxt ty = rnHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 
-rnLHsKind  :: HsDocContext -> LHsKind GhcPs -> RnM (LHsKind GhcRn, FreeVars)
+rnLHsKind  :: HsDocContext -> LHsKind GhcPs -> RnM (LHsKind GhcRn, FreeNames)
 rnLHsKind ctxt kind = rnLHsTyKi (mkTyKiEnv ctxt KindLevel RnTypeBody) kind
 
 -- renaming a type only, not a kind
 rnLHsTypeArg :: HsDocContext -> LHsTypeArg GhcPs
-                -> RnM (LHsTypeArg GhcRn, FreeVars)
+                -> RnM (LHsTypeArg GhcRn, FreeNames)
 rnLHsTypeArg ctxt (HsValArg _ ty)
    = do { (tys_rn, fvs) <- rnLHsType ctxt ty
         ; return (HsValArg noExtField tys_rn, fvs) }
@@ -474,15 +474,15 @@ rnLHsTypeArg ctxt (HsTypeArg _ ki)
    = do { (kis_rn, fvs) <- rnLHsKind ctxt ki
         ; return (HsTypeArg noExtField kis_rn, fvs) }
 rnLHsTypeArg _ (HsArgPar sp)
-   = return (HsArgPar sp, emptyFVs)
+   = return (HsArgPar sp, emptyFNs)
 
 rnLHsTypeArgs :: HsDocContext -> [LHsTypeArg GhcPs]
-                 -> RnM ([LHsTypeArg GhcRn], FreeVars)
+                 -> RnM ([LHsTypeArg GhcRn], FreeNames)
 rnLHsTypeArgs doc args = mapFvRn (rnLHsTypeArg doc) args
 
 --------------
 rnTyKiContext :: RnTyKiEnv -> LHsContext GhcPs
-              -> RnM (LHsContext GhcRn, FreeVars)
+              -> RnM (LHsContext GhcRn, FreeNames)
 rnTyKiContext env (L loc cxt)
   = do { traceRn "rncontext" (ppr cxt)
        ; let env' = env { rtke_what = RnConstraint }
@@ -490,12 +490,12 @@ rnTyKiContext env (L loc cxt)
        ; return (L loc cxt', fvs) }
 
 rnContext :: HsDocContext -> LHsContext GhcPs
-          -> RnM (LHsContext GhcRn, FreeVars)
+          -> RnM (LHsContext GhcRn, FreeNames)
 rnContext doc theta = rnTyKiContext (mkTyKiEnv doc TypeLevel RnConstraint) theta
 
 rnMaybeContext :: HsDocContext -> Maybe (LHsContext GhcPs)
-          -> RnM (Maybe (LHsContext GhcRn), FreeVars)
-rnMaybeContext _ Nothing = return (Nothing, emptyFVs)
+          -> RnM (Maybe (LHsContext GhcRn), FreeNames)
+rnMaybeContext _ Nothing = return (Nothing, emptyFNs)
 rnMaybeContext doc (Just theta)
   = do { (theta', fvs) <- rnContext doc theta
        ; return (Just theta', fvs)
@@ -503,13 +503,13 @@ rnMaybeContext doc (Just theta)
 
 
 --------------
-rnLHsTyKi  :: RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeVars)
+rnLHsTyKi  :: RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeNames)
 rnLHsTyKi env (L loc ty)
   = setSrcSpanA loc $
     do { (ty', fvs) <- rnHsTyKi env ty
        ; return (L loc ty', fvs) }
 
-rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
+rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeNames)
 
 rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
   = do { checkPolyKinds env (HsType ty)
@@ -527,7 +527,7 @@ rnHsTyKi env (HsQualTy { hst_ctxt = lctxt, hst_body = tau })
        ; (tau',  fvs2) <- rnLHsTyKi env tau
        ; return (HsQualTy { hst_xqual = noExtField, hst_ctxt = ctxt'
                           , hst_body =  tau' }
-                , fvs1 `plusFV` fvs2) }
+                , fvs1 `plusFN` fvs2) }
 
 rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
   = do { when (isRnKindLevel env && isRdrTyVar rdr_name) $
@@ -549,7 +549,7 @@ rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
 
              | otherwise -> pure ()
        ; checkPromotedDataConName env tv Prefix ip name
-       ; return (HsTyVar noAnn ip loc_name_with_rdr, unitFV name) }
+       ; return (HsTyVar noAnn ip loc_name_with_rdr, unitFN name) }
 
 rnHsTyKi env ty@(HsOpTy _ prom ty1 l_op ty2)
   = setSrcSpan (getLocA l_op) $
@@ -561,7 +561,7 @@ rnHsTyKi env ty@(HsOpTy _ prom ty1 l_op ty2)
         ; (ty2', fvs3) <- rnLHsTyKi env ty2
         ; res_ty <- mkHsOpTyRn prom (fmap (WithUserRdr op_rdr) l_op') fix ty1' ty2'
         ; checkPromotedDataConName env ty Infix prom op_name
-        ; return (res_ty, plusFVs [fvs1, fvs2, fvs3]) }
+        ; return (res_ty, plusFNs [fvs1, fvs2, fvs3]) }
 
 rnHsTyKi env (HsParTy _ ty)
   = do { (ty', fvs) <- rnLHsTyKi env ty
@@ -572,7 +572,7 @@ rnHsTyKi env (HsFunTy u mult ty1 ty2)
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
        ; (mult', w_fvs) <- rnHsMultAnnWith (rnLHsTyKi env) mult
        ; return (HsFunTy u mult' ty1' ty2'
-                , plusFVs [fvs1, fvs2, w_fvs]) }
+                , plusFNs [fvs1, fvs2, w_fvs]) }
 
 rnHsTyKi env listTy@(HsListTy x ty)
   = do { when (isRnKindLevel env) $
@@ -586,7 +586,7 @@ rnHsTyKi env (HsKindSig x ty k)
        ; (k', sig_fvs)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
        ; (ty', lhs_fvs) <- bindSigTyVarsFV (hsScopedKvs k') $
                            rnLHsTyKi env ty
-       ; return (HsKindSig x ty' k', lhs_fvs `plusFV` sig_fvs) }
+       ; return (HsKindSig x ty' k', lhs_fvs `plusFN` sig_fvs) }
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
@@ -606,19 +606,19 @@ rnHsTyKi env sumTy@(HsSumTy x tys)
 rnHsTyKi env tyLit@(HsTyLit src t)
   = do { checkDataKinds env tyLit
        ; t' <- rnHsTyLit t
-       ; return (HsTyLit src t', emptyFVs) }
+       ; return (HsTyLit src t', emptyFNs) }
 
 rnHsTyKi env (HsAppTy _ ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
-       ; return (HsAppTy noExtField ty1' ty2', fvs1 `plusFV` fvs2) }
+       ; return (HsAppTy noExtField ty1' ty2', fvs1 `plusFN` fvs2) }
 
 rnHsTyKi env (HsAppKindTy _ ty k)
   = do { kind_app <- xoptM LangExt.TypeApplications
        ; unless kind_app (addErr (typeAppErr KindLevel k))
        ; (ty', fvs1) <- rnLHsTyKi env ty
        ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
-       ; return (HsAppKindTy noExtField ty' k', fvs1 `plusFV` fvs2) }
+       ; return (HsAppKindTy noExtField ty' k', fvs1 `plusFN` fvs2) }
 
 rnHsTyKi env t@(HsIParamTy x n ty)
   = do { notInKinds env t
@@ -626,7 +626,7 @@ rnHsTyKi env t@(HsIParamTy x n ty)
        ; return (HsIParamTy x n ty', fvs) }
 
 rnHsTyKi _ (HsStarTy _ isUni)
-  = return (HsStarTy noExtField isUni, emptyFVs)
+  = return (HsStarTy noExtField isUni, emptyFNs)
 
 rnHsTyKi _ (HsSpliceTy _ sp)
   = rnSpliceType sp
@@ -642,7 +642,7 @@ rnHsTyKi env (XHsType (HsCoreTy ty))
        return (XHsType ty, fvs)
   where
     fvs_list = map getName $ tyCoVarsOfTypeList ty
-    fvs = mkFVs fvs_list
+    fvs = mkFNs fvs_list
 
     check_in_scope :: RdrName -> RnM ()
     check_in_scope rdr_name = do
@@ -667,7 +667,7 @@ rnHsTyKi env ty@(XHsType (HsRecTy {})) = do
   addErr $
     TcRnWithHsDocContext (rtke_ctxt env) $
       TcRnIllegalRecordSyntax ty
-  return (HsWildCardTy noExtField, emptyFVs) -- trick to avoid `failWithTc`
+  return (HsWildCardTy noExtField, emptyFNs) -- trick to avoid `failWithTc`
 
 rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
   = do { checkDataKinds env ty
@@ -683,7 +683,7 @@ rnHsTyKi env ty@(HsExplicitTupleTy _ ip tys)
 
 rnHsTyKi env (HsWildCardTy _)
   = do { checkAnonWildCard env
-       ; return (HsWildCardTy noExtField, emptyFVs) }
+       ; return (HsWildCardTy noExtField, emptyFNs) }
 
 
 rnHsTyLit :: HsTyLit GhcPs -> RnM (HsTyLit GhcRn)
@@ -726,11 +726,11 @@ and it is not, the program is not well-staged, otherwise it is".
 [1]: https://github.com/ghc-proposals/ghc-proposals/blob/8e4d0e9340c04b904373f9dfe5cbcebc354cd01f/proposals/0682-explicit-level-imports.rst
 -}
 
-rnHsMultAnnWith :: (LocatedA (mult GhcPs) -> RnM (LocatedA (mult GhcRn), FreeVars))
+rnHsMultAnnWith :: (LocatedA (mult GhcPs) -> RnM (LocatedA (mult GhcRn), FreeNames))
                   -> HsMultAnnOf (LocatedA (mult GhcPs)) GhcPs
-                  -> RnM (HsMultAnnOf (LocatedA (mult GhcRn)) GhcRn, FreeVars)
-rnHsMultAnnWith _rn (HsUnannotated _) = pure (HsUnannotated noExtField, emptyFVs)
-rnHsMultAnnWith _rn (HsLinearAnn _) = pure (HsLinearAnn noExtField, emptyFVs)
+                  -> RnM (HsMultAnnOf (LocatedA (mult GhcRn)) GhcRn, FreeNames)
+rnHsMultAnnWith _rn (HsUnannotated _) = pure (HsUnannotated noExtField, emptyFNs)
+rnHsMultAnnWith _rn (HsLinearAnn _) = pure (HsLinearAnn noExtField, emptyFNs)
 rnHsMultAnnWith rn (HsExplicitMult _ p)
   =  (\(mult, fvs) -> (HsExplicitMult noExtField mult, fvs)) <$> rn p
 
@@ -782,14 +782,14 @@ rnLTyVar (L loc rdr_name)
 
 --------------
 rnHsTyOp :: RnTyKiEnv -> SDoc -> LocatedN RdrName
-         -> RnM (LocatedN Name, FreeVars)
+         -> RnM (LocatedN Name, FreeNames)
 rnHsTyOp env overall_ty (L loc op)
   = do { op' <- rnTyVar env op
        ; unlessXOptM LangExt.TypeOperators $
            if (op' `hasKey` eqTyConKey) -- See [eqTyCon (~) compatibility fallback] in GHC.Rename.Env
            then addDiagnostic TcRnTypeEqualityRequiresOperators
            else addErr $ TcRnIllegalTypeOperator overall_ty op
-       ; return (L loc op', unitFV op') }
+       ; return (L loc op', unitFN op') }
 
 --------------
 checkWildCard :: RnTyKiEnv
@@ -881,8 +881,8 @@ notInKinds _ _ = return ()
 ***************************************************** -}
 
 bindSigTyVarsFV :: [Name]
-                -> RnM (a, FreeVars)
-                -> RnM (a, FreeVars)
+                -> RnM (a, FreeNames)
+                -> RnM (a, FreeNames)
 -- Used just before renaming the defn of a function
 -- with a separate type signature, to bring its tyvars into scope
 -- With no -XScopedTypeVariables, this is a no-op
@@ -899,12 +899,12 @@ bindHsQTyVars :: forall a b.
               -> Maybe (a, [Name])  -- Just _  => an associated type decl
               -> FreeKiTyVars       -- Kind variables from scope
               -> LHsQTyVars GhcPs
-              -> (LHsQTyVars GhcRn -> FreeKiTyVars -> RnM (b, FreeVars))
+              -> (LHsQTyVars GhcRn -> FreeKiTyVars -> RnM (b, FreeNames))
                   -- The FreeKiTyVars is null <=> all kind variables used in the
                   -- kind signature are bound on the left.  Reason:
                   -- the last clause of Note [CUSKs: complete user-supplied kind signatures]
                   -- in GHC.Hs.Decls
-              -> RnM (b, FreeVars)
+              -> RnM (b, FreeNames)
 
 -- See Note [bindHsQTyVars examples]
 -- (a) Bring kind variables into scope
@@ -919,10 +919,10 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
              -- all these various things are doing
              bndrs, all_implicit_kvs :: [LocatedN RdrName]
              bndrs        = mapMaybe hsLTyVarLocName hs_tv_bndrs
-             all_implicit_kvs = filterFreeVarsToBind bndrs $
+             all_implicit_kvs = filterFreeNamesToBind bndrs $
                bndr_kv_occs ++ body_kv_occs
-             body_remaining = filterFreeVarsToBind bndr_kv_occs $
-              filterFreeVarsToBind bndrs body_kv_occs
+             body_remaining = filterFreeNamesToBind bndr_kv_occs $
+              filterFreeNamesToBind bndrs body_kv_occs
 
        ; implicit_kvs <-
            case mb_assoc of
@@ -1021,7 +1021,7 @@ Then:
 * bndr_kv_occs, body_kv_occs, and implicit_kvs can contain duplicates. All
   duplicate occurrences are removed when we bind them with rnImplicitTvOccs.
 
-Finally, you may wonder why filterFreeVarsToBind removes in-scope variables
+Finally, you may wonder why filterFreeNamesToBind removes in-scope variables
 from bndr/body_kv_occs.  How can anything be in scope?  Answer:
 HsQTyVars is /also/ used (slightly oddly) for Haskell-98 syntax
 ConDecls
@@ -1118,8 +1118,8 @@ bindHsOuterTyVarBndrs :: OutputableBndrFlag flag 'Renamed
                          -- ^ @'Just' _@ => an associated type decl
                       -> FreeKiTyVars
                       -> HsOuterTyVarBndrs flag GhcPs
-                      -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
-                      -> RnM (a, FreeVars)
+                      -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeNames))
+                      -> RnM (a, FreeNames)
 bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
   case outer_bndrs of
     HsOuterImplicit{} ->
@@ -1152,8 +1152,8 @@ warn_term_var_capture lVar = do
 
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs
-                      -> (HsForAllTelescope GhcRn -> RnM (a, FreeVars))
-                      -> RnM (a, FreeVars)
+                      -> (HsForAllTelescope GhcRn -> RnM (a, FreeNames))
+                      -> RnM (a, FreeNames)
 bindHsForAllTelescope doc tele thing_inside =
   case tele of
     HsForAllVis { hsf_vis_bndrs = bndrs } ->
@@ -1167,8 +1167,8 @@ bindHsForAllTelescope doc tele thing_inside =
 
 bindHsForAllTelescopes :: HsDocContext
                        -> [HsForAllTelescope GhcPs]
-                       -> ([HsForAllTelescope GhcRn] -> RnM (a, FreeVars))
-                       -> RnM (a, FreeVars)
+                       -> ([HsForAllTelescope GhcRn] -> RnM (a, FreeNames))
+                       -> RnM (a, FreeNames)
 bindHsForAllTelescopes _ [] thing_inside =
   thing_inside []
 bindHsForAllTelescopes doc (tele:teles) thing_inside =
@@ -1208,8 +1208,8 @@ bindLHsTyVarBndrs :: (OutputableBndrFlag flag 'Renamed)
                   -> WarnUnusedForalls
                   -> Maybe a               -- Just _  => an associated type decl
                   -> [LHsTyVarBndr flag GhcPs]  -- User-written tyvars
-                  -> ([LHsTyVarBndr flag GhcRn] -> RnM (b, FreeVars))
-                  -> RnM (b, FreeVars)
+                  -> ([LHsTyVarBndr flag GhcRn] -> RnM (b, FreeNames))
+                  -> RnM (b, FreeNames)
 bindLHsTyVarBndrs doc wuf mb_assoc tv_bndrs thing_inside
   = do { when (isNothing mb_assoc) (checkShadowedRdrNames tv_names_w_loc)
        ; checkDupRdrNames tv_names_w_loc
@@ -1231,18 +1231,18 @@ bindLHsTyVarBndrs doc wuf mb_assoc tv_bndrs thing_inside
 bindLHsTyVarBndr :: HsDocContext
                  -> Maybe a   -- associated class
                  -> LHsTyVarBndr flag GhcPs
-                 -> (LHsTyVarBndr flag GhcRn -> RnM (b, FreeVars))
-                 -> RnM (b, FreeVars)
+                 -> (LHsTyVarBndr flag GhcRn -> RnM (b, FreeNames))
+                 -> RnM (b, FreeNames)
 bindLHsTyVarBndr doc mb_assoc (L loc (HsTvb x fl bvar kind)) thing_inside
   = do { (kind', fvs1) <- rnHsBndrKind doc kind
        ; (b, fvs2) <- bindHsBndrVar mb_assoc bvar $ \bvar' ->
             thing_inside (L loc (HsTvb x fl bvar' kind'))
-       ; return (b, fvs1 `plusFV` fvs2) }
+       ; return (b, fvs1 `plusFN` fvs2) }
 
 bindHsBndrVar :: Maybe a   -- associated class
               -> HsBndrVar GhcPs
-              -> (HsBndrVar GhcRn -> RnM (b, FreeVars))
-              -> RnM (b, FreeVars)
+              -> (HsBndrVar GhcRn -> RnM (b, FreeNames))
+              -> RnM (b, FreeNames)
 bindHsBndrVar mb_assoc (HsBndrVar _ lrdr@(L lv _)) thing_inside
   = do { tv_nm  <- newTyVarNameRn mb_assoc lrdr
        ; bindLocalNamesFV [tv_nm] $
@@ -1250,8 +1250,8 @@ bindHsBndrVar mb_assoc (HsBndrVar _ lrdr@(L lv _)) thing_inside
 bindHsBndrVar _ (HsBndrWildCard _) thing_inside
   = thing_inside (HsBndrWildCard noExtField)
 
-rnHsBndrKind :: HsDocContext -> HsBndrKind GhcPs -> RnM (HsBndrKind GhcRn, FreeVars)
-rnHsBndrKind _ (HsBndrNoKind _) = return (HsBndrNoKind noExtField, emptyFVs)
+rnHsBndrKind :: HsDocContext -> HsBndrKind GhcPs -> RnM (HsBndrKind GhcRn, FreeNames)
+rnHsBndrKind _ (HsBndrNoKind _) = return (HsBndrNoKind noExtField, emptyFNs)
 rnHsBndrKind doc (HsBndrKind _ kind) =
   do { sig_ok <- xoptM LangExt.KindSignatures
      ; unless sig_ok (badKindSigErr doc kind)
@@ -1354,7 +1354,7 @@ argument, build a map and look them up.
 -}
 
 rnHsConDeclRecFields :: HsDocContext -> [FieldLabel] -> [LHsConDeclRecField GhcPs]
-                -> RnM ([LHsConDeclRecField GhcRn], FreeVars)
+                -> RnM ([LHsConDeclRecField GhcRn], FreeNames)
 -- Also called from GHC.Rename.Module
 -- No wildcards can appear in record fields
 rnHsConDeclRecFields ctxt fls fields
@@ -1364,7 +1364,7 @@ rnHsConDeclRecFields ctxt fls fields
     fl_env = mkFsEnv [ (field_label $ flLabel fl, fl) | fl <- fls ]
 
 rnField :: FastStringEnv FieldLabel -> RnTyKiEnv -> LHsConDeclRecField GhcPs
-        -> RnM (LHsConDeclRecField GhcRn, FreeVars)
+        -> RnM (LHsConDeclRecField GhcRn, FreeNames)
 rnField fl_env env (L l (HsConDeclRecField _ names ty))
   = do { let new_names = map (fmap (lookupField fl_env)) names
        ; (new_ty, fvs) <- rnHsConDeclFieldTyKi env ty
@@ -1718,7 +1718,7 @@ checkPromotedDataConName env ty fixity ip name
          addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor fixity name)
 
 warnUnusedForAll :: OutputableBndrFlag flag 'Renamed
-                 => HsDocContext -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
+                 => HsDocContext -> LHsTyVarBndr flag GhcRn -> FreeNames -> TcM ()
 warnUnusedForAll doc (L loc tvb) used_names =
   case hsBndrVar tvb of
     HsBndrWildCard _ -> return ()
@@ -2211,7 +2211,7 @@ extract_hs_tv_bndrs tv_bndrs acc_vars body_vars = new_vars ++ acc_vars
   where
     new_vars
       | null tv_bndrs = body_vars
-      | otherwise = filterFreeVarsToBind tv_bndr_rdrs $ bndr_vars ++ body_vars
+      | otherwise = filterFreeNamesToBind tv_bndr_rdrs $ bndr_vars ++ body_vars
     -- NB: delete all tv_bndr_rdrs from bndr_vars as well as body_vars.
     -- See Note [Kind variable scoping]
     bndr_vars = extract_hs_tv_bndrs_kvs tv_bndrs
@@ -2253,13 +2253,13 @@ nubN = nubBy eqLocated
 
 -- | Filter out any potential implicit binders that are either
 -- already in scope, or are explicitly bound in the binder.
-filterFreeVarsToBind :: FreeKiTyVars
+filterFreeNamesToBind :: FreeKiTyVars
                      -- ^ Explicitly bound here
                      -> FreeKiTyVars
                      -- ^ Potential implicit binders
                      -> FreeKiTyVars
                      -- ^ Final implicit binders
-filterFreeVarsToBind bndrs = filterOut is_in_scope
+filterFreeNamesToBind bndrs = filterOut is_in_scope
     -- Make sure to list the binder kvs before the body kvs, as mandated by
     -- Note [Ordering of implicit variables]
   where

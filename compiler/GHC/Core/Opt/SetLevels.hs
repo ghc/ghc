@@ -92,11 +92,9 @@ import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
 import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst
 import GHC.Core.TyCo.Subst( lookupTyVar )
+import GHC.Core.TyCo.FVs
 import GHC.Core.Make    ( sortQuantVars )
-import GHC.Core.Type    ( Type, tyCoVarsOfType
-                        , mightBeUnliftedType, closeOverKindsDSet
-                        , typeHasFixedRuntimeRep
-                        )
+import GHC.Core.Type    ( Type, mightBeUnliftedType, typeHasFixedRuntimeRep )
 import GHC.Core.Multiplicity     ( pattern ManyTy )
 
 import GHC.Types.Id
@@ -122,7 +120,6 @@ import GHC.Builtin.Names      ( runRWKey )
 
 import GHC.Data.FastString
 
-import GHC.Utils.FV
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1294,7 +1291,7 @@ lvlBind env (AnnNonRec bndr rhs)
     bndr_ty    = idType bndr
     ty_fvs     = tyCoVarsOfType bndr_ty
     rhs_fvs    = freeVarsOf rhs
-    bind_fvs   = rhs_fvs `unionDVarSet` dIdFreeVars bndr
+    bind_fvs   = rhs_fvs `unionDVarSet` dBndrFreeVars bndr
     abs_vars   = abstractVars dest_lvl env bind_fvs
     dest_lvl   = destLevel env bind_fvs ty_fvs (isFunction rhs) is_bot_lam
 
@@ -1382,8 +1379,8 @@ lvlBind env (AnnRec pairs)
         -- Finding the free vars of the binding group is annoying
     bind_fvs = ((unionDVarSets [ freeVarsOf rhs | (_, rhs) <- pairs])
                 `unionDVarSet`
-                (fvDVarSet $ unionsFV [ idFVs bndr
-                                      | (bndr, (_,_)) <- pairs]))
+                (runFVSelective isLocalVar $
+                 mapUnionFVRes (\(bndr,_) -> bndrFVs bndr) pairs))
                `delDVarSetList`
                 bndrs
 
@@ -1832,7 +1829,6 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
     map zap $ sortQuantVars $
     filter abstract_me      $
     dVarSetElems            $
-    closeOverKindsDSet      $
     substDVarSet subst in_fvs
         -- NB: it's important to call abstract_me only on the OutIds the
         -- come from substDVarSet (not on fv, which is an InId)

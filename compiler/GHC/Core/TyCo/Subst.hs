@@ -138,8 +138,8 @@ type CvSubstEnv = CoVarEnv Coercion
 When calling (substTy subst ty) it should be the case that
 the in-scope set in the substitution is a superset of both:
 
-  (SIa) The free vars of the range of the substitution
-  (SIb) The free vars of ty minus the domain of the substitution
+  (SIa) The shallow free vars of the range of the substitution
+  (SIb) The shallow free vars of ty minus the domain of the substitution
 
 * Reason for (SIa). Consider
       substTy [a :-> Maybe b] (forall b. b->a)

@@ -70,7 +70,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
 import GHC.Types.Unique.Set( isEmptyUniqSet )
 
-import GHC.Utils.FV
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -2425,7 +2424,7 @@ checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
               , ppr (mkTyConApp fam_tc pats)
               , text "rhs:" <+> ppr rhs
               , text "qtvs:" <+> ppr qtvs
-              , text "rhs_fvs:" <+> ppr (fvVarSet rhs_fvs)
+              , text "rhs_fvs:" <+> ppr rhs_fvs
               , text "cpt_tvs:" <+> ppr cpt_tvs
               , text "inj_cpt_tvs:" <+> ppr inj_cpt_tvs
               , text "bad_rhs_tvs:" <+> ppr bad_rhs_tvs
@@ -2448,10 +2447,11 @@ checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
        ; check_tvs FamInstLHSUnusedBoundTyVars bad_qtvs
        }
   where
-    rhs_fvs = tyCoFVsOfType rhs
+    rhs_fvs :: DTyCoVarSet  -- Deterministic to avoid error message wobbles
+    rhs_fvs = tyCoVarsOfTypeDSet rhs
 
     cpt_tvs     = tyCoVarsOfTypes pats
-    inj_cpt_tvs = fvVarSet $ injectiveVarsOfTypes False pats
+    inj_cpt_tvs = injectiveVarsOfTypes False pats
       -- The type variables that are in injective positions.
       -- See Note [Dodgy binding sites in type family instances]
       -- NB: The False above is irrelevant, as we never have type families in
@@ -2483,10 +2483,11 @@ checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
         where
           not_bound_in_pats = not $ qtv `elemVarSet` inj_cpt_tvs
           dodgy             = not_bound_in_pats && qtv `elemVarSet` cpt_tvs
-          used_in_rhs       = qtv `elemVarSet` fvVarSet rhs_fvs
+          used_in_rhs       = qtv `elemDVarSet` rhs_fvs
 
     -- Used on RHS but not bound on LHS
-    bad_rhs_tvs = filterOut ((`elemVarSet` inj_cpt_tvs) <||> (`elem` qtvs)) (fvVarList rhs_fvs)
+    bad_rhs_tvs = filterOut ((`elemVarSet` inj_cpt_tvs) <||> (`elem` qtvs)) $
+                  dVarSetElems rhs_fvs
 
     dodgy_tvs   = cpt_tvs `minusVarSet` inj_cpt_tvs
 

@@ -44,8 +44,8 @@ import GHC.Core.Utils
 
         -- We are defining local versions
 import GHC.Core.Type hiding ( substTy )
-import GHC.Core.Coercion
-    ( tyCoFVsOfCo, mkCoVarCo, substCoVarBndr )
+import GHC.Core.Coercion( mkCoVarCo, substCoVarBndr )
+import GHC.Core.TyCo.FVs
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env as InScopeSet
@@ -588,20 +588,17 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
 
 ------------------
 substDVarSet :: HasDebugCallStack => Subst -> DVarSet -> DVarSet
+-- Apply the substitution to the vars in the set,
+-- and take the shallow free vars of the result
 substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
-  = mkDVarSet $ fst $ foldr subst_fv ([], emptyVarSet) $ dVarSetElems fvs
+  = runFVSelective isLocalVar $
+    strictFoldDVarSet (mappend . do_one) mempty fvs
   where
-  subst_fv :: Var -> ([Var], VarSet) -> ([Var], VarSet)
-  subst_fv fv acc
-     | isTyVar fv
-     , let fv_ty = lookupVarEnv tv_env fv `orElse` mkTyVarTy fv
-     = tyCoFVsOfType fv_ty (const True) emptyVarSet $! acc
-     | isCoVar fv
-     , let fv_co = lookupVarEnv cv_env fv `orElse` mkCoVarCo fv
-     = tyCoFVsOfCo fv_co (const True) emptyVarSet $! acc
-     | otherwise
-     , let fv_expr = lookupIdSubst subst fv
-     = exprLocalFVs fv_expr (const True) emptyVarSet $! acc
+  do_one :: Var -> SelectiveFVRes
+  do_one fv
+     | isTyVar fv = tyCoFVsOfType (lookupVarEnv tv_env fv `orElse` mkTyVarTy fv)
+     | isCoVar fv = tyCoFVsOfCo   (lookupVarEnv cv_env fv `orElse` mkCoVarCo fv)
+     | otherwise  = exprFVs (lookupIdSubst subst fv)
 
 ------------------
 -- | Drop free vars from the breakpoint if they have a non-variable substitution.

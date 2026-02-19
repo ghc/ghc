@@ -15,13 +15,11 @@ module GHC.Types.Name.Set (
         intersectsNameSet, disjointNameSet, intersectNameSet,
         nameSetAny, nameSetAll, nameSetElemsStable,
 
-        -- * Free variables
-        FreeVars,
-
-        -- ** Manipulating sets of free variables
-        isEmptyFVs, emptyFVs, plusFVs, plusFV,
-        mkFVs, addOneFV, unitFV, delFV, delFVs,
-        intersectFVs, intersectsFVs,
+        -- * Free names
+        FreeNames,
+        isEmptyFNs, emptyFNs, plusFNs, plusFN,
+        mkFNs, addOneFN, unitFN, delFN, delFNs,
+        intersectFNs, intersectsFNs,
 
         -- * Defs and uses
         Defs, Uses, DefUse, DefUses,
@@ -115,31 +113,31 @@ nameSetElemsStable ns =
 These synonyms are useful when we are thinking of free variables
 -}
 
-type FreeVars   = NameSet
+type FreeNames = NameSet
 
-plusFV   :: FreeVars -> FreeVars -> FreeVars
-addOneFV :: FreeVars -> Name -> FreeVars
-unitFV   :: Name -> FreeVars
-emptyFVs :: FreeVars
-plusFVs  :: [FreeVars] -> FreeVars
-mkFVs    :: [Name] -> FreeVars
-delFV    :: Name -> FreeVars -> FreeVars
-delFVs   :: [Name] -> FreeVars -> FreeVars
-intersectFVs :: FreeVars -> FreeVars -> FreeVars
-intersectsFVs :: FreeVars -> FreeVars -> Bool
+plusFN   :: FreeNames -> FreeNames -> FreeNames
+addOneFN :: FreeNames -> Name -> FreeNames
+unitFN   :: Name -> FreeNames
+emptyFNs :: FreeNames
+plusFNs  :: [FreeNames] -> FreeNames
+mkFNs    :: [Name] -> FreeNames
+delFN    :: Name -> FreeNames -> FreeNames
+delFNs   :: [Name] -> FreeNames -> FreeNames
+intersectFNs :: FreeNames -> FreeNames -> FreeNames
+intersectsFNs :: FreeNames -> FreeNames -> Bool
+isEmptyFNs :: FreeNames -> Bool
 
-isEmptyFVs :: NameSet -> Bool
-isEmptyFVs  = isEmptyNameSet
-emptyFVs    = emptyNameSet
-plusFVs     = unionNameSets
-plusFV      = unionNameSet
-mkFVs       = mkNameSet
-addOneFV    = extendNameSet
-unitFV      = unitNameSet
-delFV n s   = delFromNameSet s n
-delFVs ns s = delListFromNameSet s ns
-intersectFVs = intersectNameSet
-intersectsFVs = intersectsNameSet
+isEmptyFNs  = isEmptyNameSet
+emptyFNs    = emptyNameSet
+plusFNs     = unionNameSets
+plusFN      = unionNameSet
+mkFNs       = mkNameSet
+addOneFN    = extendNameSet
+unitFN      = unitNameSet
+delFN n s   = delFromNameSet s n
+delFNs ns s = delListFromNameSet s ns
+intersectFNs = intersectNameSet
+intersectsFNs = intersectsNameSet
 
 {-
 ************************************************************************

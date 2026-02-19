@@ -117,8 +117,8 @@ has a *left-to-right* scoping: it makes the binders in
 p1 scope over p2,p3.
 -}
 
-newtype CpsRn b = CpsRn { unCpsRn :: forall r. (b -> RnM (r, FreeVars))
-                                            -> RnM (r, FreeVars) }
+newtype CpsRn b = CpsRn { unCpsRn :: forall r. (b -> RnM (r, FreeNames))
+                                            -> RnM (r, FreeNames) }
         deriving (Functor)
         -- See Note [CpsRn monad]
 
@@ -129,18 +129,18 @@ instance Applicative CpsRn where
 instance Monad CpsRn where
   (CpsRn m) >>= mk = CpsRn (\k -> m (\v -> unCpsRn (mk v) k))
 
-runCps :: CpsRn a -> RnM (a, FreeVars)
-runCps (CpsRn m) = m (\r -> return (r, emptyFVs))
+runCps :: CpsRn a -> RnM (a, FreeNames)
+runCps (CpsRn m) = m (\r -> return (r, emptyFNs))
 
 liftCps :: RnM a -> CpsRn a
 liftCps rn_thing = CpsRn (\k -> rn_thing >>= k)
 
-liftCpsFV :: RnM (a, FreeVars) -> CpsRn a
+liftCpsFV :: RnM (a, FreeNames) -> CpsRn a
 liftCpsFV rn_thing = CpsRn (\k -> do { (v,fvs1) <- rn_thing
                                      ; (r,fvs2) <- k v
-                                     ; return (r, fvs1 `plusFV` fvs2) })
+                                     ; return (r, fvs1 `plusFN` fvs2) })
 
-liftCpsWithCont :: (forall r. (b -> RnM (r, FreeVars)) -> RnM (r, FreeVars)) -> CpsRn b
+liftCpsWithCont :: (forall r. (b -> RnM (r, FreeNames)) -> RnM (r, FreeNames)) -> CpsRn b
 liftCpsWithCont = CpsRn
 
 wrapSrcSpanCps :: (a -> CpsRn b) -> LocatedA a -> CpsRn (LocatedA b)
@@ -155,7 +155,7 @@ lookupConCps lcon_rdr@(L _ con_rdr)
   = CpsRn $ \k ->
     do { con_name <- lookupLocatedOccRnConstr lcon_rdr
        ; (r, fvs) <- k (fmap (WithUserRdr con_rdr) con_name)
-       ; return (r, addOneFV fvs (unLoc con_name)) }
+       ; return (r, addOneFN fvs (unLoc con_name)) }
     -- We add the constructor name to the free vars
     -- See Note [Patterns are uses]
 
@@ -241,7 +241,7 @@ newPatName (LamMk report_unused) rdr_name
         do { name <- newLocalBndrRn rdr_name
            ; (res, fvs) <- bindLocalNames [name] (thing_inside name)
            ; when report_unused $ warnUnusedMatches [name] fvs
-           ; return (res, name `delFV` fvs) })
+           ; return (res, name `delFN` fvs) })
 
 newPatName (LetMk is_top fix_env) rdr_name
   = CpsRn (\ thing_inside ->
@@ -419,8 +419,8 @@ There are various entry points to renaming patterns, depending on
 {-# INLINE rn_pats_general #-}
 rn_pats_general :: Traversable f => HsMatchContextRn
   -> f (LPat GhcPs)
-  -> (f (LPat GhcRn) -> RnM (r, FreeVars))
-  -> RnM (r, FreeVars)
+  -> (f (LPat GhcRn) -> RnM (r, FreeNames))
+  -> RnM (r, FreeNames)
 rn_pats_general ctxt pats thing_inside = do
   envs_before <- getRdrEnvs
 
@@ -455,15 +455,15 @@ rn_pats_general ctxt pats thing_inside = do
 
 rnPats :: HsMatchContextRn   -- For error messages and choosing if @-patterns are allowed
        -> [LPat GhcPs]
-       -> ([LPat GhcRn] -> RnM (a, FreeVars))
-       -> RnM (a, FreeVars)
+       -> ([LPat GhcRn] -> RnM (a, FreeNames))
+       -> RnM (a, FreeNames)
 rnPats = rn_pats_general
 
 rnPat :: forall a. HsMatchContextRn      -- For error messages and choosing if @-patterns are allowed
       -> LPat GhcPs
-      -> (LPat GhcRn -> RnM (a, FreeVars))
-      -> RnM (a, FreeVars)     -- Variables bound by pattern do not
-                               -- appear in the result FreeVars
+      -> (LPat GhcRn -> RnM (a, FreeNames))
+      -> RnM (a, FreeNames)     -- Variables bound by pattern do not
+                               -- appear in the result FreeNames
 rnPat
        = coerce (rn_pats_general @Identity @a)
 
@@ -480,8 +480,8 @@ applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newPatLName mk rdr)
 --   * fixities might be coming in
 rnBindPat :: NameMaker
           -> LPat GhcPs
-          -> RnM (LPat GhcRn, FreeVars)
-   -- Returned FreeVars are the free variables of the pattern,
+          -> RnM (LPat GhcRn, FreeNames)
+   -- Returned FreeNames are the free variables of the pattern,
    -- of course excluding variables bound by this pattern
 
 rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
@@ -573,7 +573,7 @@ rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
        ; mb_neg' -- See Note [Negative zero]
            <- let negative = do { (neg, fvs) <- lookupSyntax negateName
                                 ; return (Just neg, fvs) }
-                  positive = return (Nothing, emptyFVs)
+                  positive = return (Nothing, emptyFNs)
               in liftCpsFV $ case (mb_neg , mb_neg') of
                                   (Nothing, Just _ ) -> negative
                                   (Just _ , Nothing) -> negative
@@ -787,7 +787,7 @@ rnHsRecFields
     -> (SrcSpan -> RdrName -> arg)
          -- When punning, use this to build a new field
     -> HsRecFields GhcPs (LocatedA arg)
-    -> RnM ([LHsRecField GhcRn (LocatedA arg)], FreeVars)
+    -> RnM ([LHsRecField GhcRn (LocatedA arg)], FreeNames)
 
 -- This surprisingly complicated pass
 --   a) looks up the field name (possibly using disambiguation)
@@ -806,7 +806,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
        ; let all_flds | null dotdot_flds = flds1
                       | otherwise        = flds1 ++ dotdot_flds
-       ; return (all_flds, mkFVs (getFieldIds all_flds)) }
+       ; return (all_flds, mkFNs (getFieldIds all_flds)) }
   where
     mb_con = case ctxt of
                 HsRecFieldCon con  -> Just con
@@ -906,7 +906,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
 -- disambiguating the fields if necessary.
 rnHsRecUpdFields
     :: [LHsRecUpdField GhcPs GhcPs]
-    -> RnM (XLHsRecUpdLabels GhcRn, [LHsRecUpdField GhcRn GhcRn], FreeVars)
+    -> RnM (XLHsRecUpdLabels GhcRn, [LHsRecUpdField GhcRn GhcRn], FreeNames)
 rnHsRecUpdFields flds
   = do { pun_ok <- xoptM LangExt.NamedFieldPuns
 
@@ -929,21 +929,21 @@ rnHsRecUpdFields flds
          -- See Note [Disambiguating record updates]
        ; possible_parents <- lookupRecUpdFields (fld NE.:| other_flds)
        ; let  mb_unambig_lbls :: Maybe [FieldLabel]
-              fvs :: FreeVars
+              fvs :: FreeNames
               (mb_unambig_lbls, fvs) =
                case possible_parents of
                   RnRecUpdParent { rnRecUpdLabels = gres } NE.:| []
                     | let lbls = map fieldGRELabel $ NE.toList gres
-                    -> ( Just lbls, mkFVs $ map flSelector lbls)
+                    -> ( Just lbls, mkFNs $ map flSelector lbls)
                   _ -> ( Nothing
-                       , plusFVs $ map (plusFVs . map pat_syn_free_vars . NE.toList . rnRecUpdLabels)
+                       , plusFNs $ map (plusFNs . map pat_syn_free_vars . NE.toList . rnRecUpdLabels)
                                  $ NE.toList possible_parents
-                         -- See Note [Using PatSyn FreeVars]
+                         -- See Note [Using PatSyn FreeNames]
                        )
 
         -- Rename each field.
         ; (upd_flds, fvs') <- rn_flds pun_ok mb_unambig_lbls flds
-        ; let all_fvs = fvs `plusFV` fvs'
+        ; let all_fvs = fvs `plusFN` fvs'
         ; return (possible_parents, upd_flds, all_fvs) } } }
 
     where
@@ -951,15 +951,15 @@ rnHsRecUpdFields flds
       -- For an ambiguous record update involving pattern synonym record fields,
       -- we must add all the possibly-relevant field selector names to ensure that
       -- we typecheck the record update **after** we typecheck the pattern synonym
-      -- definition. See Note [Using PatSyn FreeVars].
-      pat_syn_free_vars :: FieldGlobalRdrElt -> FreeVars
+      -- definition. See Note [Using PatSyn FreeNames].
+      pat_syn_free_vars :: FieldGlobalRdrElt -> FreeNames
       pat_syn_free_vars (GRE { gre_info = info })
         | IAmRecField fld_info <- info
         , RecFieldInfo { recFieldLabel = fl, recFieldCons = cons } <- fld_info
         , uniqSetAny is_PS cons
-        = unitFV (flSelector fl)
+        = unitFN (flSelector fl)
       pat_syn_free_vars _
-        = emptyFVs
+        = emptyFNs
 
       is_PS :: ConLikeName -> Bool
       is_PS (PatSynName  {}) = True
@@ -967,8 +967,8 @@ rnHsRecUpdFields flds
 
       rn_flds :: Bool -> Maybe [FieldLabel]
               -> [LHsRecUpdField GhcPs GhcPs]
-              -> RnM ([LHsRecUpdField GhcRn GhcRn], FreeVars)
-      rn_flds _ _ [] = return ([], emptyFVs)
+              -> RnM ([LHsRecUpdField GhcRn GhcRn], FreeNames)
+      rn_flds _ _ [] = return ([], emptyFNs)
       rn_flds pun_ok mb_unambig_lbls
               ((L l (HsFieldBind { hfbLHS = L loc (FieldOcc _ f)
                                  , hfbRHS = arg
@@ -997,7 +997,7 @@ rnHsRecUpdFields flds
                                            , hfbRHS = arg''
                                            , hfbPun = pun })
              ; (flds', fvs') <- rn_flds pun_ok (tail <$> mb_unambig_lbls) flds
-             ; return (fld' : flds', fvs `plusFV` fvs') }
+             ; return (fld' : flds', fvs `plusFN` fvs') }
 
 getFieldIds :: [LHsRecField GhcRn arg] -> [Name]
 getFieldIds flds = map (hsRecFieldSel . unLoc) flds
@@ -1122,20 +1122,20 @@ Wrinkle [Out of scope constructors]
     Note that we do need (1), as (2) does not handle constructors defined in the
     current module being renamed (as those have not yet been added to the TypeEnv).
 
-Note [Using PatSyn FreeVars]
+Note [Using PatSyn FreeNames]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we are disambiguating a non-overloaded record update, as per
 Note [Disambiguating record updates], and have determined that this
 record update might involve pattern synonym record fields, it is important
 to declare usage of all these pattern synonyms record fields in the returned
-FreeVars of rnHsRecUpdFields. This ensures that the typechecker sees
+FreeNames of rnHsRecUpdFields. This ensures that the typechecker sees
 that the typechecking of the record update depends on the typechecking
 of the pattern synonym, and typechecks the pattern synonyms first.
 Not doing so caused #21898.
 
 Note that this can be removed once GHC proposal #366 is implemented,
 as we will be able to fully disambiguate the record update in the renamer,
-and can immediately declare the correct used FreeVars instead of having
+and can immediately declare the correct used FreeNames instead of having
 to over-estimate in case of ambiguity.
 
 ************************************************************************
@@ -1187,7 +1187,7 @@ can apply it explicitly. In this case it stays negative zero.  #13211
 -}
 
 rnOverLit :: (XXOverLit t ~ DataConCantHappen) => HsOverLit t ->
-             RnM ((HsOverLit GhcRn, Maybe (HsExpr GhcRn)), FreeVars)
+             RnM ((HsOverLit GhcRn, Maybe (HsExpr GhcRn)), FreeNames)
 rnOverLit origLit
   = do  { opt_NumDecimals <- xoptM LangExt.NumDecimals
         ; let { lit@(OverLit {ol_val=val})
@@ -1203,7 +1203,7 @@ rnOverLit origLit
         ; if isNegativeZeroOverLit lit'
           then do { (negate_expr, fvs2) <- lookupSyntaxExpr negateName
                   ; return ((lit' { ol_val = negateOverLitVal val }, Just negate_expr)
-                           , fvs1 `plusFV` fvs2) }
+                           , fvs1 `plusFN` fvs2) }
           else return ((lit', Nothing), fvs1) }
 
 
@@ -1239,13 +1239,13 @@ askDocContext = MkTPRnM (asks fst)
 tellTPB :: HsTyPatRnBuilder -> TPRnM ()
 tellTPB = MkTPRnM . lift . tell
 
-liftRnFV :: RnM (a, FreeVars) -> TPRnM a
+liftRnFV :: RnM (a, FreeNames) -> TPRnM a
 liftRnFV = liftTPRnCps . liftCpsFV
 
 liftRn :: RnM a -> TPRnM a
 liftRn = liftTPRnCps . liftCps
 
-liftRnWithCont :: (forall r. (b -> RnM (r, FreeVars)) -> RnM (r, FreeVars)) -> TPRnM b
+liftRnWithCont :: (forall r. (b -> RnM (r, FreeNames)) -> RnM (r, FreeNames)) -> TPRnM b
 liftRnWithCont cont = liftTPRnCps (liftCpsWithCont cont)
 
 liftTPRnCps :: CpsRn a -> TPRnM a
@@ -1255,8 +1255,8 @@ liftTPRnRaw ::
   ( forall r .
     HsDocContext ->
     OccSet ->
-    ((a, HsTyPatRnBuilder) -> RnM (r, FreeVars)) ->
-    RnM (r, FreeVars)
+    ((a, HsTyPatRnBuilder) -> RnM (r, FreeNames)) ->
+    RnM (r, FreeNames)
   ) -> TPRnM a
 liftTPRnRaw cont = MkTPRnM $ ReaderT $ \(doc_ctxt, locals) -> writerT $ liftCpsWithCont (cont doc_ctxt locals)
 
@@ -1264,8 +1264,8 @@ unTPRnRaw ::
   TPRnM a ->
   HsDocContext ->
   OccSet ->
-  ((a, HsTyPatRnBuilder) -> RnM (r, FreeVars)) ->
-  RnM (r, FreeVars)
+  ((a, HsTyPatRnBuilder) -> RnM (r, FreeNames)) ->
+  RnM (r, FreeNames)
 unTPRnRaw (MkTPRnM m) doc_ctxt locals = unCpsRn $ runWriterT $ runReaderT m (doc_ctxt, locals)
 
 wrapSrcSpanTPRnM :: (a -> TPRnM b) -> LocatedAn ann a -> TPRnM (LocatedAn ann b)
@@ -1276,7 +1276,7 @@ wrapSrcSpanTPRnM fn (L loc a) = do
 lookupTypeOccTPRnM :: RdrName -> TPRnM Name
 lookupTypeOccTPRnM rdr_name = liftRnFV $ do
   name <- lookupTypeOccRn rdr_name
-  pure (name, unitFV name)
+  pure (name, unitFN name)
 
 rn_lty_pat :: LHsType GhcPs -> TPRnM (LHsType GhcRn)
 rn_lty_pat (L l hs_ty) = do

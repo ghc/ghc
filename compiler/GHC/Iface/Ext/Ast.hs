@@ -17,39 +17,44 @@ import GHC.Utils.Outputable(ppr)
 
 import GHC.Prelude hiding ( head, init, last, tail )
 
-import GHC.Types.Avail            ( Avails )
-import GHC.Data.Bag               ( Bag, bagToList )
-import GHC.Types.Basic
-import GHC.Data.BooleanFormula
 import GHC.Core.Class             ( className, classSCSelIds )
 import GHC.Core.ConLike           ( conLikeName )
 import GHC.Core.DataCon           ( dataConWrapperType )
-import GHC.Types.FieldLabel
+import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
+import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
+import GHC.Core.InstEnv
+import GHC.Core.TyCo.FVs
+import GHC.Core.Predicate         ( isEvId )
+
 import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Utils.Monad            ( concatMapM, MonadIO(liftIO) )
-import GHC.Utils.FV               ( fvVarList, filterFV )
+
+import GHC.Types.Basic
+import GHC.Types.FieldLabel
+import GHC.Types.Avail            ( Avails )
 import GHC.Types.Id               ( isDataConId_maybe )
 import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique, wiredInNameTyThing_maybe, getName )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
 import GHC.Types.SrcLoc
-import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
-import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
-import GHC.Core.InstEnv
-import GHC.Core.Predicate         ( isEvId )
-import GHC.Tc.Types
-import GHC.Tc.Types.Evidence
 import GHC.Types.Var              ( Id, Var, EvId, varName, varType, varUnique )
 import GHC.Types.Var.Env
+
+import GHC.Tc.Types
+import GHC.Tc.Types.Evidence
+
 import GHC.Builtin.Uniques
-import GHC.Iface.Make             ( mkIfaceExports )
 import GHC.Utils.Panic
+
+import GHC.Data.Bag               ( Bag, bagToList )
+import GHC.Data.BooleanFormula
 import GHC.Data.Maybe
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
 import GHC.Data.Pair
 
+import GHC.Iface.Make             ( mkIfaceExports )
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
 
@@ -665,7 +670,7 @@ instance ToHie (Context (Located (WithUserRdr Name))) where
 
 hieEvIdsOfTerm :: EvTerm -> [EvId]
 -- Returns only EvIds satisfying relevantEvId
-hieEvIdsOfTerm tm = fvVarList (filterFV isEvId (evTermFVs tm))
+hieEvIdsOfTerm = runFVSelectiveList isEvId . evTermFVs
 
 instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))

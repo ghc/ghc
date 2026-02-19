@@ -2352,7 +2352,7 @@ lookupIfThenElse
                  ; return (Just ite) } }
 
 lookupSyntaxName :: Name                 -- ^ The standard name
-                 -> RnM (Name, FreeVars) -- ^ Possibly a non-standard name
+                 -> RnM (Name, FreeNames) -- ^ Possibly a non-standard name
 -- Lookup a Name that may be subject to Rebindable Syntax (RS).
 --
 -- - When RS is off, just return the supplied (standard) Name
@@ -2362,34 +2362,34 @@ lookupSyntaxName :: Name                 -- ^ The standard name
 lookupSyntaxName std_name
   = do { rebind <- xoptM LangExt.RebindableSyntax
        ; if not rebind
-         then return (std_name, emptyFVs)
+         then return (std_name, emptyFNs)
          else do { nm <- lookupOccRnNone (mkRdrUnqual (nameOccName std_name))
-                 ; return (nm, unitFV nm) } }
+                 ; return (nm, unitFN nm) } }
 
 lookupSyntaxExpr :: Name                          -- ^ The standard name
-                 -> RnM (HsExpr GhcRn, FreeVars)  -- ^ Possibly a non-standard name
+                 -> RnM (HsExpr GhcRn, FreeNames)  -- ^ Possibly a non-standard name
 lookupSyntaxExpr std_name
   = do { (name, fvs) <- lookupSyntaxName std_name
        ; return (genHsVar name, fvs) }
 
 lookupSyntax :: Name                             -- The standard name
-             -> RnM (SyntaxExpr GhcRn, FreeVars) -- Possibly a non-standard
+             -> RnM (SyntaxExpr GhcRn, FreeNames) -- Possibly a non-standard
                                                  -- name
 lookupSyntax std_name
   = do { (name, fvs) <- lookupSyntaxName std_name
        ; return (mkRnSyntaxExpr name, fvs) }
 
 lookupSyntaxNames :: [Name]                         -- Standard names
-     -> RnM ([HsExpr GhcRn], FreeVars) -- See comments with HsExpr.ReboundNames
+     -> RnM ([HsExpr GhcRn], FreeNames) -- See comments with HsExpr.ReboundNames
    -- this works with CmdTop, which wants HsExprs, not SyntaxExprs
 lookupSyntaxNames std_names
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then
-             return (map (mkHsVar . noLocA) std_names, emptyFVs)
+             return (map (mkHsVar . noLocA) std_names, emptyFNs)
         else
           do { usr_names <-
                  mapM (lookupOccRnNone . mkRdrUnqual . nameOccName) std_names
-             ; return (map (mkHsVar . noLocA) usr_names, mkFVs usr_names) } }
+             ; return (map (mkHsVar . noLocA) usr_names, mkFNs usr_names) } }
 
 
 {-
@@ -2407,17 +2407,17 @@ by the Opt_QualifiedDo dynamic flag.
 
 -- Lookup operations for a qualified do. If the context is not a qualified
 -- do, then use lookupSyntaxExpr. See Note [QualifiedDo].
-lookupQualifiedDo :: HsStmtContext fn -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)
+lookupQualifiedDo :: HsStmtContext fn -> Name -> RnM (SyntaxExpr GhcRn, FreeNames)
 lookupQualifiedDo ctxt std_name
   = first mkRnSyntaxExpr <$> lookupQualifiedDoName ctxt std_name
 
-lookupNameWithQualifier :: Name -> ModuleName -> RnM (Name, FreeVars)
+lookupNameWithQualifier :: Name -> ModuleName -> RnM (Name, FreeNames)
 lookupNameWithQualifier std_name modName
   = do { qname <- lookupOccRnNone (mkRdrQual modName (nameOccName std_name))
-       ; return (qname, unitFV qname) }
+       ; return (qname, unitFN qname) }
 
 -- See Note [QualifiedDo].
-lookupQualifiedDoName :: HsStmtContext fn -> Name -> RnM (Name, FreeVars)
+lookupQualifiedDoName :: HsStmtContext fn -> Name -> RnM (Name, FreeNames)
 lookupQualifiedDoName ctxt std_name
   = case qualifiedDoModuleName_maybe ctxt of
       Nothing      -> lookupSyntaxName std_name

@@ -129,7 +129,7 @@ import GHC.Builtin.Types ( unitTy, manyDataConTy )
 
 import GHC.Types.Id
 import GHC.Types.Name
-import GHC.Types.Name.Set hiding ( unitFV )
+import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Var

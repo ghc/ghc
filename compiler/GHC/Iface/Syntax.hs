@@ -1990,8 +1990,8 @@ freeNamesIfAxBranch (IfaceAxBranch { ifaxbTyVars   = tyvars
 freeNamesIfIdDetails :: IfaceIdDetails -> NameSet
 freeNamesIfIdDetails (IfRecSelId tc first_con _ fl) =
   either freeNamesIfTc freeNamesIfDecl tc &&&
-  unitFV first_con &&&
-  unitFV (flSelector fl)
+  unitFN first_con &&&
+  unitFN (flSelector fl)
 freeNamesIfIdDetails IfVanillaId         = emptyNameSet
 freeNamesIfIdDetails (IfWorkerLikeId {}) = emptyNameSet
 freeNamesIfIdDetails IfDFunId            = emptyNameSet

@@ -33,6 +33,7 @@ import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
                           , mkCast, exprType, exprIsHNF
                           , stripTicksTop, mkInScopeSetBndrs )
 import GHC.Core.FVs
+import GHC.Core.TyCo.FVs
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.Simplify.Env ( SimplPhase(..), isActive )
@@ -60,7 +61,6 @@ import GHC.Types.Error
 
 import GHC.Utils.Monad    ( foldlM )
 import GHC.Utils.Misc
-import GHC.Utils.FV
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
@@ -2508,17 +2508,17 @@ instance Outputable SpecArg where
   ppr UnspecType    = text "UnspecType"
   ppr UnspecArg     = text "UnspecArg"
 
-specArgsFVs :: InterestingVarFun -> [SpecArg] -> FV
+specArgsFVs :: InterestingVarFun -> [SpecArg] -> VarSet
 -- Find the free vars of the SpecArgs that are not already in scope
 specArgsFVs interesting args
-  = filterFV interesting $
-    foldr (unionFV . get) emptyFV args
+  = runFVSelectiveSet interesting $
+    mapUnionFVRes get args
   where
-    get :: SpecArg -> FV
+    get :: SpecArg -> SelectiveFVRes
     get (SpecType ty)   = tyCoFVsOfType ty
     get (SpecDict dx)   = exprFVs dx
-    get UnspecType      = emptyFV
-    get UnspecArg       = emptyFV
+    get UnspecType      = mempty
+    get UnspecArg       = mempty
 
 isSpecDict :: SpecArg -> Bool
 isSpecDict (SpecDict {}) = True
@@ -2605,8 +2605,8 @@ specHeader subst (bndr:bndrs) (SpecType ty : args)
          -- See (MP2) in Note [Specialising polymorphic dictionaries]
          let in_scope = Core.substInScopeSet subst
              not_in_scope tv = not (tv `elemInScopeSet` in_scope)
-             free_tvs = scopedSort $ fvVarList $
-                        filterFV not_in_scope  $
+             free_tvs = scopedSort $
+                        runFVSelectiveList not_in_scope  $
                         tyCoFVsOfType ty
              subst1 = subst `Core.extendSubstInScopeList` free_tvs
 
@@ -3025,7 +3025,7 @@ singleCall spec_env id args
   = MkUD {ud_binds = emptyFDBs,
           ud_calls = unitDVarEnv id $ CIS id $
                      unitBag (CI { ci_key  = args
-                                 , ci_fvs  = fvVarSet call_fvs }) }
+                                 , ci_fvs  = call_fvs }) }
   where
     poly_spec = gopt Opt_PolymorphicSpecialisation (se_dflags spec_env)
 
@@ -3350,8 +3350,8 @@ bind_fvs (Rec prs)         = rhs_fvs `delVarSetList` (map fst prs)
 
 pair_fvs :: (Id, CoreExpr) -> VarSet
 pair_fvs (bndr, rhs) = exprSomeFreeVars interesting rhs
-                       `unionVarSet` idFreeVars bndr
-        -- idFreeVars: don't forget variables mentioned in
+                       `unionVarSet` bndrFreeVars bndr
+        -- bndrFreeVars: don't forget variables mentioned in
         -- the rules of the bndr.  C.f. OccAnal.addRuleUsage
         -- Also tyvars mentioned in its type; they may not appear
         -- in the RHS

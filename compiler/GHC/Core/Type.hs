@@ -159,7 +159,7 @@ module GHC.Core.Type (
         liftedTypeKind, unliftedTypeKind,
 
         -- * Type free variables
-        tyCoFVsOfType, tyCoFVsBndr, tyCoFVsVarBndr, tyCoFVsVarBndrs,
+        tyCoFVsOfType,
         tyCoVarsOfType, tyCoVarsOfTypes,
         tyCoVarsOfTypeDSet,
         coVarsOfType,
@@ -171,7 +171,7 @@ module GHC.Core.Type (
         typeSize, occCheckExpand,
 
         -- ** Closing over kinds
-        closeOverKindsDSet, closeOverKindsList,
+        closeOverKindsDSet,
         closeOverKinds,
 
         -- * Forcing evaluation of types
@@ -266,7 +266,6 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isConcreteTyVar )
 
 -- others
 import GHC.Utils.Misc
-import GHC.Utils.FV
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
@@ -2883,8 +2882,7 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
           = splitAt n_args tc_binders
         result_kind  = mkTyConKind remaining_binders tc_res_kind
         result_vars  = tyCoVarsOfType result_kind
-        dropped_vars = fvVarSet $
-                       mapUnionFV injective_vars_of_binder dropped_binders
+        dropped_vars = mapUnionVarSet injective_vars_of_binder dropped_binders
 
     in not (subVarSet result_vars dropped_vars)
   where
@@ -2894,15 +2892,15 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
     -- Returns the variables that would be fixed by knowing a TyConBinder. See
     -- Note [When does a tycon application need an explicit kind signature?]
     -- for a more detailed explanation of what this function does.
-    injective_vars_of_binder :: TyConBinder -> FV
+    injective_vars_of_binder :: TyConBinder -> VarSet
     injective_vars_of_binder (Bndr tv vis) =
       case vis of
         AnonTCB        -> injectiveVarsOfType False -- conservative choice
                                               (varType tv)
         NamedTCB argf  | source_of_injectivity argf
-                       -> unitFV tv `unionFV`
+                       -> unitVarSet tv `unionVarSet`
                           injectiveVarsOfType False (varType tv)
-        _              -> emptyFV
+        _              -> emptyVarSet
 
     source_of_injectivity Required  = True
     source_of_injectivity Specified = spec_inj_pos

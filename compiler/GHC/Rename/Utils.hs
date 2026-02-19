@@ -108,10 +108,10 @@ bindLocalNames names
     in lcl_env { tcl_th_bndrs = th_bndrs'
                , tcl_rdr      = rdr_env' }
 
-bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
+bindLocalNamesFV :: [Name] -> RnM (a, FreeNames) -> RnM (a, FreeNames)
 bindLocalNamesFV names enclosed_scope
   = do  { (result, fvs) <- bindLocalNames names enclosed_scope
-        ; return (result, delFVs names fvs) }
+        ; return (result, delFNs names fvs) }
 
 delLocalNames :: [Name] -> RnM a -> RnM a
 delLocalNames names
@@ -329,19 +329,19 @@ addNoNestedForallsContextsErr ctxt what lty =
 -}
 
 -- A useful utility
-addFvRn :: FreeVars -> RnM (thing, FreeVars) -> RnM (thing, FreeVars)
+addFvRn :: FreeNames -> RnM (thing, FreeNames) -> RnM (thing, FreeNames)
 addFvRn fvs1 thing_inside = do { (res, fvs2) <- thing_inside
-                               ; return (res, fvs1 `plusFV` fvs2) }
+                               ; return (res, fvs1 `plusFN` fvs2) }
 
-mapFvRn :: Traversable f => (a -> RnM (b, FreeVars)) -> f a -> RnM (f b, FreeVars)
+mapFvRn :: Traversable f => (a -> RnM (b, FreeNames)) -> f a -> RnM (f b, FreeNames)
 mapFvRn f xs = do
     stuff <- mapM f xs
     case unzip stuff of
-        (ys, fvs_s) -> return (ys, foldl' (flip plusFV) emptyFVs fvs_s)
-{-# SPECIALIZE mapFvRn :: (a -> RnM (b, FreeVars)) -> [a] -> RnM ([b], FreeVars) #-}
+        (ys, fvs_s) -> return (ys, foldl' (flip plusFN) emptyFNs fvs_s)
+{-# SPECIALIZE mapFvRn :: (a -> RnM (b, FreeNames)) -> [a] -> RnM ([b], FreeNames) #-}
 
-mapMaybeFvRn :: (a -> RnM (b, FreeVars)) -> Maybe a -> RnM (Maybe b, FreeVars)
-mapMaybeFvRn _ Nothing = return (Nothing, emptyFVs)
+mapMaybeFvRn :: (a -> RnM (b, FreeNames)) -> Maybe a -> RnM (Maybe b, FreeNames)
+mapMaybeFvRn _ Nothing = return (Nothing, emptyFNs)
 mapMaybeFvRn f (Just x) = do { (y, fvs) <- f x; return (Just y, fvs) }
 
 {-
@@ -374,7 +374,7 @@ warnUnusedTopBinds gres
 -- | Checks to see if we need to warn for -Wunused-record-wildcards or
 -- -Wredundant-record-wildcards
 checkUnusedRecordWildcard :: SrcSpan
-                          -> FreeVars
+                          -> FreeNames
                           -> Maybe [ImplicitFieldBinders]
                           -> RnM ()
 checkUnusedRecordWildcard _ _ Nothing     = return ()
@@ -412,14 +412,14 @@ warnRedundantRecordWildcard = addDiagnostic TcRnRedundantRecordWildcard
 --
 -- The `..` pattern binds `x` but it is not used in the RHS so we issue
 -- a warning.
-warnUnusedRecordWildcard :: [Name] -> FreeVars -> RnM ()
+warnUnusedRecordWildcard :: [Name] -> FreeNames -> RnM ()
 warnUnusedRecordWildcard ns used_names = do
   let used = filter (`elemNameSet` used_names) ns
   traceRn "warnUnused" (ppr ns $$ ppr used_names $$ ppr used)
   warnIf (null used) (TcRnUnusedRecordWildcard ns)
 
 -- | Emit a deprecation message whenever one of the implicit record wild
---   card field binders was used in FreeVars.
+--   card field binders was used in FreeNames.
 --
 -- @
 --   module A where
@@ -434,12 +434,12 @@ warnUnusedRecordWildcard ns used_names = do
 -- Even though both `x` and `y` have deprecations, only `x`
 -- will be deprecated since only its implicit variable is used in the RHS.
 deprecateUsedRecordWildcard :: [ImplicitFieldBinders]
-                            -> FreeVars -> RnM ()
+                            -> FreeNames -> RnM ()
 deprecateUsedRecordWildcard dotdot_fields_binders fvs
   = mapM_ depr_field_binders dotdot_fields_binders
   where
     depr_field_binders (ImplicitFieldBinders {..})
-      = when (mkFVs implFlBndr_binders `intersectsFVs` fvs) $ do
+      = when (mkFNs implFlBndr_binders `intersectsFNs` fvs) $ do
           env <- getGlobalRdrEnv
           let gre = fromJust $ lookupGRE_Name env implFlBndr_field
                 -- Must be in the env since it was instantiated
@@ -448,12 +448,12 @@ deprecateUsedRecordWildcard dotdot_fields_binders fvs
 
 
 warnUnusedLocalBinds, warnUnusedMatches, warnUnusedTypePatterns
-  :: [Name] -> FreeVars -> RnM ()
+  :: [Name] -> FreeNames -> RnM ()
 warnUnusedLocalBinds   = check_unused UnusedNameLocalBind
 warnUnusedMatches      = check_unused UnusedNameMatch
 warnUnusedTypePatterns = check_unused UnusedNameTypePattern
 
-check_unused :: UnusedNameProv -> [Name] -> FreeVars -> RnM ()
+check_unused :: UnusedNameProv -> [Name] -> FreeNames -> RnM ()
 check_unused prov bound_names used_names
   = warnUnused prov (filterOut (`elemNameSet` used_names) bound_names)
 
