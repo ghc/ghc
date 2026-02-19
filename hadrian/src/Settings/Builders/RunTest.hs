@@ -23,8 +23,6 @@ import Settings.Program
 import qualified Context.Type
 
 import GHC.Toolchain.Target
-import Debug.Trace
-
 
 -- | Extra flags to send to the Haskell compiler to run tests.
 runTestGhcFlags :: Stage -> Action String
@@ -182,8 +180,6 @@ outOfTreeCompilerArgs = do
     wordsize    <- show . read @Int <$> getTestSetting TestWORDSIZE
     rtsWay      <- getTestSetting TestRTSWay
     let debugged = "debug" `isInfixOf` rtsWay
-
-    traceShowM (os, arch, platform)
 
     llc_cmd   <- getTestSetting TestLLC
     have_llvm <- (allowHaveLLVM arch &&) <$> liftIO (isJust <$> findExecutable llc_cmd)
