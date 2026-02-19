@@ -7072,7 +7072,7 @@ module GHC.Exts where
     {-# MINIMAL #-}
 
 module GHC.Fingerprint where
-  -- Safety: Safe
+  -- Safety: Trustworthy
   type Fingerprint :: *
   data Fingerprint = Fingerprint {-# UNPACK #-} !GHC.Internal.Word.Word64 {-# UNPACK #-} !GHC.Internal.Word.Word64
   fingerprint0 :: Fingerprint

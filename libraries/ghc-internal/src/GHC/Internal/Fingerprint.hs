@@ -16,23 +16,22 @@ module GHC.Internal.Fingerprint (
         fingerprintData,
         fingerprintString,
         fingerprintFingerprints,
-        getFileHash
+        fingerprintBufferedStream
    ) where
 
 import GHC.Internal.IO
 import GHC.Internal.Base
 import GHC.Internal.Bits
 import GHC.Internal.Num
+import GHC.Internal.Data.Maybe
 import GHC.Internal.List
 import GHC.Internal.Real
 import GHC.Internal.Word
-import GHC.Internal.Show
 import GHC.Internal.Ptr
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.Foreign.Storable
-import GHC.Internal.System.IO
 
 import GHC.Internal.Fingerprint.Type
 
@@ -71,40 +70,26 @@ fingerprintString str = unsafeDupablePerformIO $
                     fromIntegral (w32 `shiftR` 8),
                     fromIntegral w32]
 
--- | Computes the hash of a given file.
--- This function loops over the handle, running in constant memory.
---
--- @since base-4.7.0.0
-getFileHash :: FilePath -> IO Fingerprint
-getFileHash path = withBinaryFile path ReadMode $ \h ->
+-- | Reads data in chunks and computes its hash.
+-- This function runs in constant memory.
+fingerprintBufferedStream :: (Ptr Word8 -> Int -> IO (Maybe Int))
+                          -> IO Fingerprint
+fingerprintBufferedStream readChunk =
   allocaBytes SIZEOF_STRUCT_MD5CONTEXT $ \pctxt -> do
     c_MD5Init pctxt
-
-    processChunks h (\buf size -> c_MD5Update pctxt buf (fromIntegral size))
-
+    allocaBytes _BUFSIZE $ \arrPtr ->
+      let loop = do
+            maybeRemainderSize <- readChunk arrPtr _BUFSIZE
+            c_MD5Update pctxt
+                        arrPtr
+                        (fromIntegral (fromMaybe _BUFSIZE maybeRemainderSize))
+            when (isNothing maybeRemainderSize) loop
+      in loop
     allocaBytes 16 $ \pdigest -> do
       c_MD5Final pdigest pctxt
       peek (castPtr pdigest :: Ptr Fingerprint)
-
   where
     _BUFSIZE = 4096
-
-    -- Loop over _BUFSIZE sized chunks read from the handle,
-    -- passing the callback a block of bytes and its size.
-    processChunks :: Handle -> (Ptr Word8 -> Int -> IO ()) -> IO ()
-    processChunks h f = allocaBytes _BUFSIZE $ \arrPtr ->
-
-      let loop = do
-            count <- hGetBuf h arrPtr _BUFSIZE
-            eof <- hIsEOF h
-            when (count /= _BUFSIZE && not eof) $ errorWithoutStackTrace $
-              "GHC.Internal.Fingerprint.getFileHash: only read " ++ show count ++ " bytes"
-
-            f arrPtr count
-
-            when (not eof) loop
-
-      in loop
 
 data MD5Context
 
