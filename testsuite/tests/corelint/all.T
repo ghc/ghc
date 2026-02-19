@@ -1,4 +1,5 @@
 
+test('T15907', only_ways(['normal']), multimod_compile, ['T15907', '-O -dannot-lint -v0'])
 test('T21115', normal, compile_fail, [''])
 test('T21115b', req_th, compile_fail, ['-dsuppress-uniques -dsuppress-all'])
 test('T21152', normal, compile, ['-g3'])
