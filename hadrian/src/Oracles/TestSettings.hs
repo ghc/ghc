@@ -14,7 +14,6 @@ import Oracles.Setting (topDirectory, setting, ProjectSetting(..), crossStage)
 import Packages
 import Settings.Program (programContext)
 import Hadrian.Oracles.Path
---import System.Directory (makeAbsolute)
 
 testConfigFile :: Action FilePath
 testConfigFile = buildRoot <&> (-/- "test/ghcconfig")
