@@ -23,7 +23,7 @@ import GHC.Core.DataCon
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingIds )
+import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingVars )
 import GHC.Core.Coercion ( Coercion )
 import GHC.Core.TyCo.FVs     ( coVarsOfCos )
 import GHC.Core.TyCo.Compare ( eqType )
@@ -112,23 +112,27 @@ dmdAnalProgram opts fam_envs rules binds
     -- orphan RULES
     keep_alive_roots env ids = plusDmdEnvs (map (demandRoot env) (filter is_root ids))
 
-    is_root :: Id -> Bool
-    is_root id = isExportedId id || elemVarSet id rule_fvs
+    is_root :: Var -> Bool
+    is_root v = isId v && (isExportedId v || elemVarSet v rule_fvs)
 
     rule_fvs :: IdSet
     rule_fvs = rulesRhsFreeIds rules
 
 demandRoot :: AnalEnv -> Id -> DmdEnv
 -- See Note [Absence analysis for stable unfoldings and RULES]
-demandRoot env id = fst (dmdAnalStar env topDmd (Var id))
+demandRoot env id = assertPpr (isId id) (ppr id) $
+                    fst (dmdAnalStar env topDmd (Var id))
 
-demandRoots :: AnalEnv -> [Id] -> DmdEnv
+demandRootSet :: AnalEnv -> VarSet -> DmdEnv
 -- See Note [Absence analysis for stable unfoldings and RULES]
-demandRoots env roots = plusDmdEnvs (map (demandRoot env) roots)
+demandRootSet env ids
+  = nonDetStrictFoldVarSet do_one nopDmdEnv ids
+    -- It's OK to use a non-deterministic fold because plusDmdType is commutative
+  where
+    do_one :: Var -> DmdEnv -> DmdEnv
+    do_one v acc | not (isId v) = acc
+                 | otherwise    = demandRoot env v `plusDmdEnv` acc
 
-demandRootSet :: AnalEnv -> IdSet -> DmdEnv
-demandRootSet env ids = demandRoots env (nonDetEltsUniqSet ids)
-  -- It's OK to use nonDetEltsUniqSet here because plusDmdType is commutative
 
 -- | We attach useful (e.g. not 'topDmd') 'idDemandInfo' to top-level bindings
 -- that satisfy this function.
@@ -353,7 +357,7 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = WithDmdType final_ty (R (NonRec 
     (rhs_ty, rhs')     = dmdAnalStar env id_dmd' rhs
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
-    rule_fvs           = bndrRuleAndUnfoldingIds id
+    rule_fvs           = bndrRuleAndUnfoldingVars id
     final_ty           = body_ty' `plusDmdType` rhs_ty `plusDmdType` demandRootSet env rule_fvs
 
 -- | Let bindings can be processed in two ways:
@@ -1021,6 +1025,7 @@ dmdTransform env var sd
   = -- pprTraceWith "dmdTransform:DataCon" (\ty -> ppr con $$ ppr sd $$ ppr ty) $
     dmdTransformDataConSig (dataConRepStrictness con) sd
   -- See Note [DmdAnal for DataCon wrappers]
+
   | Just rhs <- dataConWrapUnfolding_maybe var
   , WithDmdType dmd_ty _rhs' <- dmdAnal env sd rhs
   = dmd_ty
@@ -1056,7 +1061,7 @@ dmdTransform env var sd
   --   * Lambda binders
   --   * Case and constructor field binders
   | otherwise
-  = -- pprTrace "dmdTransform:other" (vcat [ppr var, ppr boxity, ppr sd]) $
+  = -- pprTrace "dmdTransform:other" (vcat [ppr var, ppr sd]) $
     noArgsDmdType (addVarDmdEnv nopDmdEnv var (C_11 :* sd))
 
 {- *********************************************************************
@@ -1136,7 +1141,7 @@ dmdAnalRhsSig top_lvl rec_flag env let_sd id rhs
                 NonRecursive -> rhs_env
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
-    rhs_env2 = rhs_env1 `plusDmdEnv` demandRootSet env (bndrRuleAndUnfoldingIds id)
+    rhs_env2 = rhs_env1 `plusDmdEnv` demandRootSet env (bndrRuleAndUnfoldingVars id)
 
     -- See Note [Lazy and unleashable free variables]
     !(!sig_env, !weak_fvs) = splitWeakDmds rhs_env2
