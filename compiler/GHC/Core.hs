@@ -436,7 +436,7 @@ set includes:
 
 * The /deep/ free vars of the term in which we are substituting
   E.g when substituting [x :-> blah] into `e`, we must ensure that if we
-  clone a binder in `e`, we don't accidentally choose a new binder that 
+  clone a binder in `e`, we don't accidentally choose a new binder that
   shadows a deep free var of `e`.
 
 For substitution on /types/ we don't need to use deep free variables.

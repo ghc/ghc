@@ -1983,7 +1983,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
                                 -- As per #23764, ordering is [arg, w, res]
 
     go_ty (TyConApp _ tys)  = go_tys tys
-    go_ty (ForAllTy (Bndr tv vis) inner)
+    go_ty (ForAllTy (Bndr tv _) inner)
       = go_ty (varType tv) `mappend` tycobinder tv (go_ty inner)
 
     -- See Note [Use explicit recursion in foldTyCo]
