@@ -2243,13 +2243,13 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
   where
     rule_doc = text "Rule" <+> doubleQuotes (ftext name) <> colon
 
-    lhs_fvs = exprsFreeVars args
-    rhs_fvs = exprFreeVars rhs
+    lhs_fvs = deepExprsFreeVarsDSet args  -- Matching binds deeply
+    rhs_fvs = exprFreeVarsDSet rhs
 
     is_bad_bndr :: Var -> Bool
     -- See Note [Unbound RULE binders] in GHC.Core.Rules
-    is_bad_bndr bndr = not (bndr `elemVarSet` lhs_fvs)
-                    && bndr `elemVarSet` rhs_fvs
+    is_bad_bndr bndr = not (bndr `elemDVarSet` lhs_fvs)
+                    && bndr `elemDVarSet` rhs_fvs
                     && isNothing (isReflCoVar_maybe bndr)
 
 

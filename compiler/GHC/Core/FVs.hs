@@ -18,10 +18,11 @@ module GHC.Core.FVs (
         exprFreeIdsList,  exprsFreeIdsList,
         bindFreeVars,
 
-        -- * Selective free variables of expressions
+        -- * Selective shallow free variables of expressions
         InterestingVarFun,
         exprSomeFreeVars, exprsSomeFreeVars,
-        exprSomeFreeVarsList, exprsSomeFreeVarsList,
+        exprSomeFreeVarsList, exprsSomeFreeVarsList, exprsSomeFreeVarsDSet,
+        deepExprsFreeVarsDSet,
 
         -- * Free variables of Rules, Vars and Ids
         bndrTypeTyCoFVs, bndrFVs, dBndrFreeVars,
@@ -101,8 +102,21 @@ exprFreeVars = dVarSetToVarSet . exprFreeVarsDSet
 exprFreeVarsDSet :: CoreExpr -> DVarSet
 exprFreeVarsDSet = runFVSelective isLocalVar . exprFVs
 
+-- | Find all locally-defined free Ids or type variables in several expressions
+-- returning a non-deterministic set.
+exprsFreeVars :: [CoreExpr] -> VarSet
+exprsFreeVars = dVarSetToVarSet . exprsFreeVarsDSet
+
+-- | Find all locally-defined free Ids or type variables in several expressions
+-- returning a deterministically ordered list.
+exprsFreeVarsList :: [CoreExpr] -> [Var]
+exprsFreeVarsList = runFVSelectiveList isLocalVar . exprsFVs
+
 exprsFreeVarsDSet :: [CoreExpr] -> DVarSet
 exprsFreeVarsDSet = runFVSelective isLocalVar . exprsFVs
+
+deepExprsFreeVarsDSet :: [CoreExpr] -> DVarSet
+deepExprsFreeVarsDSet = closeOverKindsDSet . exprsFreeVarsDSet
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a deterministically ordered list.
@@ -135,16 +149,6 @@ exprFreeIdsList = dVarSetElems . exprFreeIdsDSet
 -- returning a deterministically ordered list.
 exprsFreeIdsList :: [CoreExpr] -> [Id]   -- Find all locally-defined free Ids
 exprsFreeIdsList = dVarSetElems . exprsFreeIdsDSet
-
--- | Find all locally-defined free Ids or type variables in several expressions
--- returning a non-deterministic set.
-exprsFreeVars :: [CoreExpr] -> VarSet
-exprsFreeVars = dVarSetToVarSet . exprsFreeVarsDSet
-
--- | Find all locally-defined free Ids or type variables in several expressions
--- returning a deterministically ordered list.
-exprsFreeVarsList :: [CoreExpr] -> [Var]
-exprsFreeVarsList = runFVSelectiveList isLocalVar . exprsFVs
 
 -- | Find all locally defined free Ids in a binding group
 bindFreeVars :: CoreBind -> VarSet

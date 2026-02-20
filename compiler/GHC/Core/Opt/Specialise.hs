@@ -2509,7 +2509,7 @@ instance Outputable SpecArg where
   ppr UnspecArg     = text "UnspecArg"
 
 specArgsFVs :: InterestingVarFun -> [SpecArg] -> VarSet
--- Find the free vars of the SpecArgs that are not already in scope
+-- Find the shallow deep free vars of the SpecArgs that are not already in scope
 specArgsFVs interesting args
   = runFVSelectiveSet interesting $
     mapUnionFVRes get args
@@ -2601,13 +2601,13 @@ specHeader subst _  [] = pure (False, subst, [], [], [], [], [])
 -- details.
 specHeader subst (bndr:bndrs) (SpecType ty : args)
   = do { -- Find free_tvs, the type variables to add to the binders for the rule
-         -- Namely those free in `ty` that aren't in scope
+         -- Namely those deeply free in `ty` that aren't in scope
          -- See (MP2) in Note [Specialising polymorphic dictionaries]
          let in_scope = Core.substInScopeSet subst
              not_in_scope tv = not (tv `elemInScopeSet` in_scope)
              free_tvs = scopedSort $
-                        runFVSelectiveList not_in_scope  $
-                        tyCoFVsOfType ty
+                        filter not_in_scope  $
+                        tyCoVarsOfTypeList ty
              subst1 = subst `Core.extendSubstInScopeList` free_tvs
 
        ; let subst2 = Core.extendTvSubst subst1 bndr ty

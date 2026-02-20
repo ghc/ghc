@@ -990,7 +990,9 @@ dsSpec_help poly_nm poly_id poly_rhs spec_inl orig_bndrs ds_call
              is_local v = v `elemVarSet` locals
 
              -- Find `rule_bndrs`: (S2) of Note [Desugaring new-form SPECIALISE pragmas]
-             rule_bndrs = scopedSort (exprsSomeFreeVarsList is_local rule_lhs_args)
+             -- We have to do closeOverKinds beccause exprsSomeFreeVars is shallow
+             rule_bndrs = scopedSort $ dVarSetElems $ closeOverKindsDSet $
+                          exprsSomeFreeVarsDSet is_local rule_lhs_args
 
              -- getRenamings: (S3) of  Note [Desugaring new-form SPECIALISE pragmas]
              rn_binds     = getRenamings orig_bndrs binds rule_bndrs
