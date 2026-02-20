@@ -20,7 +20,6 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Unicode (
-        unicodeVersion,
         GeneralCategory (..), generalCategory,
         isAscii, isLatin1, isControl,
         isAsciiUpper, isAsciiLower,
@@ -36,7 +35,6 @@ import GHC.Internal.Real
 import GHC.Internal.Enum ( Enum (..), Bounded (..) )
 import GHC.Internal.Ix ( Ix (..) )
 import GHC.Internal.Num
-import GHC.Internal.Unicode.Version
 import qualified GHC.Internal.Unicode.Char.DerivedCoreProperties as DCP
 import qualified GHC.Internal.Unicode.Char.UnicodeData.GeneralCategory as GC
 import qualified GHC.Internal.Unicode.Char.UnicodeData.SimpleLowerCaseMapping as C
