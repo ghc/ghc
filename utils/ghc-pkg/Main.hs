@@ -875,31 +875,30 @@ lookForPackageDBIn dir = do
 
 {- Note [ghc-pkg database locking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's important for ghc-pkg, GHC and hadrian to always see a consistent state for
-package databases. To ensure this we generally tacke a lock both for reading and
-writing to the package database.
+It's important for ghc-pkg, GHC and Hadrian to always see a consistent state for
+package databases. To ensure this, we always take a lock before reading or writing
+to a package database.
 
-The general idea is we use `withLockedPackageDb` to lock an already existing
-database in both modes. Which behaves differently for reads and modify.
+The general idea is we use 'withLockedPackageDb' to lock an already existing
+database in both modes:
 
-In read mode we take a shared lock before we start reading, run the argument to
-withLockedPackageDb and simply unlock the DB after. We need to lock it to avoid
-concurrent invocations from deleting files from the db before we managed to read
-them. This occasionally happened in #22870. Not that historically we only used
-to lock the package db during reads on windows, for reasons that seem to have been
-bogus given the existence of #22870. And it was partially discussed in #16773.
+  - In read-only mode, we take a *shared* lock before reading and unlock afterwards.
+    Locking is needed to avoid a concurrent invocation of ghc-pkg deleting files from
+    the db before we manage to read them. This occasionally happened in #22870.
+    (Note that, historically, we used to only lock the package db during reads on
+     Windows, but the justification seemed insufficient given #22870. See also #16773.)
 
-When modifying a package database we also use withLockedPackageDb but we take
-an *exclusive* lock and most importantly we don't unlock the DB after the action
-has run unless an exception occurs.
-Instead the action we are must ensure the lock is either freed, or returned
-as part of the result to be freed later by the caller of withLockedPackageDB.
-Typically by storing it inside either a `DbOpenMode` or `PackageDB`.
+  - In read-write mode, we take an **exclusive** lock on the package database.
+    However, we don't automatically release the lock after the inner action completes
+    (unless an exception occurs). Instead, either the inner action itself releases the
+    lock, or it returns it, in which case it is the caller of 'withLockedPackageDb'
+    that is responsible for releasing the lock. Typically, the exclusive lock is stored
+    in 'PackageDB', with the type informing us that we have a lock we are responsible for
+    releasing. 'updateDBCache' eventually releases it.
 
-While this setup is a bit cumbersome it seemed to be the easiest way to ensure
+While this setup is a bit cumbersome, it seemed to be the easiest way to ensure
 that locks are consistently held over reads/modifications of a database without
 engaging in a larger refactor of the ghc-pkg code.
-
 -}
 readParseDatabase :: forall mode t. Verbosity
                   -> Maybe (FilePath,Bool)
@@ -923,7 +922,7 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
          -- Take a lock to use while we read the DB
          Right fs -> withLockedPackageDb mode cache $ \lock -> do
           if not use_cache
-            then ignore_cache (lock) (const $ return ())
+            then ignore_cache lock (const $ return ())
             else do
                   e_tcache <- tryIO $ getModificationTime cache
                   case e_tcache of

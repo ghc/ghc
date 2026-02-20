@@ -317,17 +317,29 @@ data DbInstUnitId
 -- | Represents a lock of a package db.
 newtype PackageDbLock = PackageDbLock Handle
 
--- | Run the action under a lock, then return the result.
--- If the mode is R/W the *caller* needs to either free the lock or pass it
--- on to code that will.
+-- | Take a lock on the package database and then run the action.
 --
--- If an exception is raised the lock is released.
+--   - In read-only mode, this takes and releases a shared lock.
+--   - In read-write mode, this takes an exclusive lock, and the caller
+--     must arrange for this lock to be released:
+--
+--        - either the inner action releases it, or
+--        - the inner action returns the lock and the caller
+--          of 'withLockedPackageDb' is responsible for releasing it.
+--
+-- If an exception escapes the inner action, the lock is released.
+--
+-- See Note [ghc-pkg database locking] in ghc-pkg/Main.hs
 withLockedPackageDb :: DbOpenMode m t -> FilePath -> (PackageDbLock -> IO a) -> IO a
-withLockedPackageDb mode file act = do
-   lock <- lockPackageDbWith (lock_mode mode) file
-   r <- act lock `onException` unlockPackageDb lock
-   when (isDbOpenReadMode mode ) $ unlockPackageDb lock
-   pure r
+withLockedPackageDb mode file =
+  bracket_for_mode
+    (lockPackageDbWith (lock_mode mode) file)
+    unlockPackageDb
+  where
+    bracket_for_mode = 
+      case mode of
+        DbOpenReadOnly  -> bracket
+        DbOpenReadWrite -> bracketOnError
   where
    lock_mode :: DbOpenMode m t -> LockMode
    lock_mode DbOpenReadOnly = SharedLock
@@ -529,8 +541,8 @@ headerMagic = BS.Char8.pack "\0ghcpkg\0"
 
 -- | Feed a 'Get' decoder with data chunks from a file.
 --
--- The file is already locked when we call this. We only need to pass it on
--- if we are in R/W mode.
+-- Requires a lock (either shared or exclusive) on the package database,
+-- which it returns unchanged.
 decodeFromFile :: FilePath -> DbOpenMode mode PackageDbLock -> Get pkgs ->
                   IO (pkgs, DbOpenMode mode PackageDbLock)
 decodeFromFile file mode decoder = case mode of
