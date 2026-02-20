@@ -44,3 +44,4 @@ module GHC.Unicode
      ) where
 
 import GHC.Internal.Unicode
+import GHC.Internal.Unicode.Version

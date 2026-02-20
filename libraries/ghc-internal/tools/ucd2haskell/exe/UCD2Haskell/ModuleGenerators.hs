@@ -144,7 +144,7 @@ genUnicodeVersion outdir = do
       , "(unicodeVersion)"
       , "where"
       , ""
-      , "import {-# SOURCE #-} GHC.Internal.Data.Version"
+      , "import GHC.Internal.Data.Version"
       , ""
       , "-- | Version of Unicode standard used by @base@:"
       , "-- [" <> BB.string7 version <> "](https://www.unicode.org/versions/Unicode" <> BB.string7 version <> "/)."

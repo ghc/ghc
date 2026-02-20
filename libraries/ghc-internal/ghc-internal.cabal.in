@@ -316,6 +316,7 @@ Library
         GHC.Internal.TypeNats
         GHC.Internal.TypeNats.Internal
         GHC.Internal.Unicode
+        GHC.Internal.Unicode.Version
         GHC.Internal.Weak
         GHC.Internal.Weak.Finalize
         GHC.Internal.Word
@@ -381,7 +382,6 @@ Library
         GHC.Internal.Unicode.Char.UnicodeData.SimpleLowerCaseMapping
         GHC.Internal.Unicode.Char.UnicodeData.SimpleTitleCaseMapping
         GHC.Internal.Unicode.Char.UnicodeData.SimpleUpperCaseMapping
-        GHC.Internal.Unicode.Version
         GHC.Internal.System.Environment.ExecutablePath
 
 
