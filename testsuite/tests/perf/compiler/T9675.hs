@@ -1,4 +1,4 @@
-module T6975 where
+module T9675 where
 data Foo = Foo
   { field1 :: Int -> Int
   , field2 :: Int -> Int
