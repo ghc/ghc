@@ -1,4 +1,8 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
+
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -- |
 --
@@ -24,3 +28,12 @@ module Data.String
      ) where
 
 import GHC.Internal.Data.String
+
+import GHC.Internal.Data.Functor.Const (Const (Const))
+import GHC.Internal.Data.Functor.Identity (Identity (Identity))
+
+-- | @since base-4.9.0.0
+deriving instance IsString a => IsString (Const a (b :: k))
+
+-- | @since base-4.9.0.0
+deriving instance IsString a => IsString (Identity a)

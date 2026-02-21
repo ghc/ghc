@@ -1673,7 +1673,7 @@ module Data.Semigroup where
   stimesMonoid :: forall b a. (GHC.Internal.Real.Integral b, GHC.Internal.Base.Monoid a) => b -> a -> a
 
 module Data.String where
-  -- Safety: Safe
+  -- Safety: Trustworthy
   type IsString :: * -> Constraint
   class IsString a where
     fromString :: String -> a
@@ -11805,8 +11805,8 @@ instance GHC.Internal.Data.Foldable.Foldable Data.Semigroup.First -- Defined in 
 instance GHC.Internal.Data.Foldable.Foldable Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Data.Foldable.Foldable Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Data.Foldable.Foldable Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
-instance forall a k (b :: k). GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.String’
-instance forall a. GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.String’
+instance forall a k (b :: k). GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘Data.String’
+instance forall a. GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘Data.String’
 instance forall a. (a ~ GHC.Internal.Types.Char) => GHC.Internal.Data.String.IsString [a] -- Defined in ‘GHC.Internal.Data.String’
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Functor.ZipList.ZipList -- Defined in ‘GHC.Internal.Functor.ZipList’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Data.Traversable.Traversable f, GHC.Internal.Data.Traversable.Traversable g) => GHC.Internal.Data.Traversable.Traversable (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Data.Traversable’
