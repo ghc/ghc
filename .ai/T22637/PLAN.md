@@ -2,6 +2,24 @@
 
 Status: mutable working plan
 
+## Process rule
+- Update this file and `.ai/T22637/REPORT.md` as work progresses.
+- Step status vocabulary: `pending`, `in_progress`, `done`, `blocked`.
+- Before code edits, mark exactly one step `in_progress`.
+- After each meaningful change or test run, add a short entry to `REPORT.md`.
+- When a step reaches `done`, create an intermediate commit if the diff is coherent.
+
+## Command runbook
+1. Baseline state:
+   - `git status --short`
+2. Edit + compile loop (as needed):
+   - `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
+3. Inspect changed files:
+   - `git status --short`
+   - `git diff -- .ai/T22637 compiler/GHC/Tc/Errors/Types.hs compiler/GHC/Types/Error/Codes.hs compiler/GHC/Rename/Bind.hs compiler/GHC/Tc/Errors/Ppr.hs testsuite/tests/rename/should_fail testsuite/tests/parser/should_fail`
+4. Final check:
+   - Ensure outputs match `.ai/T22637/EXPECTED.md`.
+
 ## Implementation plan
 1. Add new diagnostic constructor and error code.
    - `compiler/GHC/Tc/Errors/Types.hs`
@@ -38,7 +56,5 @@ Status: mutable working plan
    - Status: pending
 
 6. Run targeted tests.
-   - `hadrian/build -q -q test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
-   - fallback: `--test-compiler=stage2`
+   - `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
    - Status: pending
-
