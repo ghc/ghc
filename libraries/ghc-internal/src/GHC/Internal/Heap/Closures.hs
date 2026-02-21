@@ -5,7 +5,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveTraversable #-}
 -- Late cost centres introduce a thunk in the asBox function, which leads to
 -- an additional wrapper being added to any value placed inside a box.
 -- This can be removed once our boot compiler is no longer affected by #25212
@@ -69,8 +68,7 @@ in the profiling way. (#15197)
 import GHC.Internal.Heap.ProfInfo.Types
 
 import GHC.Internal.Data.Bits
-import GHC.Internal.Data.Foldable (Foldable, toList)
-import GHC.Internal.Data.Traversable (Traversable)
+import GHC.Internal.Data.Foldable (toList)
 import GHC.Internal.Int
 import GHC.Internal.Num
 import GHC.Internal.Real
@@ -383,7 +381,7 @@ data GenClosure b
     -- or an Int#).
   |  UnknownTypeWordSizedPrimitive
         { wordVal :: !Word }
-  deriving (Show, Generic, Functor, Foldable, Traversable)
+  deriving (Show, Generic)
 
 -- | Get the info table for a heap closure, or Nothing for a prim value
 --
@@ -500,7 +498,7 @@ data GenStgStackClosure b = GenStgStackClosure
       , ssc_stack_size      :: !Word32 -- ^ stack size in *words*
       , ssc_stack           :: ![GenStackFrame b]
       }
-  deriving (Foldable, Functor, Generic, Show, Traversable)
+  deriving (Generic, Show)
 
 type StackField = GenStackField Box
 
@@ -510,7 +508,7 @@ data GenStackField b
     = StackWord !Word
     -- | A pointer field
     | StackBox  !b
-  deriving (Foldable, Functor, Generic, Show, Traversable)
+  deriving (Generic, Show)
 
 type StackFrame = GenStackFrame Box
 
@@ -579,7 +577,7 @@ data GenStackFrame b =
       { info_tbl            :: !StgInfoTable
       , annotation          :: !b
       }
-  deriving (Foldable, Functor, Generic, Show, Traversable)
+  deriving (Generic, Show)
 
 data PrimType
   = PInt
