@@ -101,6 +101,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Var
 import GHC.Types.Var.Set
+import GHC.Types.Var.FV
 import GHC.Types.Unique.Set   ( nonDetStrictFoldUniqSet )
 import GHC.Types.Unique.DSet  ( getUniqDSet )
 import GHC.Types.Var.Env
@@ -1380,7 +1381,7 @@ lvlBind env (AnnRec pairs)
     bind_fvs = ((unionDVarSets [ freeVarsOf rhs | (_, rhs) <- pairs])
                 `unionDVarSet`
                 (runFVSelective isLocalVar $
-                 mapUnionFVRes (\(bndr,_) -> bndrFVs bndr) pairs))
+                 mapUnionFV (\(bndr,_) -> bndrFVs bndr) pairs))
                `delDVarSetList`
                 bndrs
 

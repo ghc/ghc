@@ -23,7 +23,6 @@ import GHC.Core.DataCon           ( dataConWrapperType )
 import GHC.Core.Type              ( Type, ForAllTyFlag(..) )
 import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.InstEnv
-import GHC.Core.TyCo.FVs
 import GHC.Core.Predicate         ( isEvId )
 
 import GHC.Hs
@@ -40,6 +39,7 @@ import GHC.Types.Name.Reader      ( RecFieldInfo(..), WithUserRdr(..) )
 import GHC.Types.SrcLoc
 import GHC.Types.Var              ( Id, Var, EvId, varName, varType, varUnique )
 import GHC.Types.Var.Env
+import GHC.Types.Var.FV
 
 import GHC.Tc.Types
 import GHC.Tc.Types.Evidence

@@ -159,11 +159,8 @@ module GHC.Core.Type (
         liftedTypeKind, unliftedTypeKind,
 
         -- * Type free variables
-        tyCoFVsOfType,
-        tyCoVarsOfType, tyCoVarsOfTypes,
-        tyCoVarsOfTypeDSet,
-        coVarsOfType,
-        coVarsOfTypes,
+        tyCoVarsOfType, tyCoVarsOfTypes, tyCoVarsOfTypeDSet,
+        coVarsOfType, coVarsOfTypes,
 
         anyFreeVarsOfType, anyFreeVarsOfTypes,
         noFreeVarsOfType,

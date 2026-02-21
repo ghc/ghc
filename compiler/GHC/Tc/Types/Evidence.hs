@@ -64,7 +64,6 @@ import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep (UnivCoProvenance(..))
-import GHC.Core.TyCo.FVs
 import GHC.Core.TyCon
 import GHC.Core.Make    ( mkWildCase, mkRuntimeErrorApp, tYPE_ERROR_ID )
 import GHC.Core.Class   ( classTyCon )
@@ -80,6 +79,7 @@ import GHC.Types.Var
 import GHC.Types.Id( idType )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.Var.FV
 import GHC.Types.Basic
 
 import GHC.Builtin.Names
@@ -1318,25 +1318,25 @@ nestedEvIdsOfTerm :: EvTerm -> VarSet
 -- Returns only EvIds satisfying relevantEvId
 nestedEvIdsOfTerm = runFVSelectiveSet isNestedEvId . evTermFVs
 
-evTermFVs :: EvTerm -> SelectiveFVRes
+evTermFVs :: EvTerm -> SelectiveFV
 evTermFVs (EvExpr e)         = exprFVs e
 evTermFVs (EvTypeable _ ev)  = evFVsOfTypeable ev
 evTermFVs (EvFun { et_tvs = tvs, et_given = given
                  , et_binds = tc_ev_binds, et_body = v })
   = case tc_ev_binds of
       TcEvBinds {}  -> mempty  -- See Note [Free vars of EvFun]
-      EvBinds binds -> addBndrsFV bndrs fvs
+      EvBinds binds -> addBndrsSelectiveFV bndrs fvs
         where
           fvs = foldr (mappend . evTermFVs . eb_rhs) (unitFV v) binds
           bndrs = foldr ((:) . eb_lhs) (tvs ++ given) binds
 
-evTermFVss :: [EvTerm] -> SelectiveFVRes
-evTermFVss = mapUnionFVRes evTermFVs
+evTermFVss :: [EvTerm] -> SelectiveFV
+evTermFVss = mapUnionFV evTermFVs
 
-evFVsOfTypeable :: EvTypeable -> SelectiveFVRes
+evFVsOfTypeable :: EvTypeable -> SelectiveFV
 evFVsOfTypeable ev =
   case ev of
-    EvTypeableTyCon _ e      -> mapUnionFVRes evTermFVs e
+    EvTypeableTyCon _ e      -> mapUnionFV evTermFVs e
     EvTypeableTyApp e1 e2    -> evTermFVss [e1,e2]
     EvTypeableTrFun em e1 e2 -> evTermFVss [em,e1,e2]
     EvTypeableTyLit e        -> evTermFVs e

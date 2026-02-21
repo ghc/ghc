@@ -43,7 +43,8 @@ import qualified Data.Set as Set
 import GHC hiding (HsTypeGhcPsExt (..))
 import GHC.Builtin.Types (liftedRepTy)
 import GHC.Core.TyCo.Rep (Type (..))
-import GHC.Core.Type (binderVar, isRuntimeRepVar)
+import GHC.Core.TyCo.FVs ( deepDetTypesFV )
+import GHC.Core.Type (isRuntimeRepVar)
 import GHC.Data.StringBuffer (StringBuffer)
 import qualified GHC.Data.StringBuffer as S
 import GHC.Driver.Session
@@ -52,17 +53,11 @@ import GHC.Types.Name
 import GHC.Types.SrcLoc (advanceSrcLoc)
 import GHC.Types.SourceText (SourceText(..))
 import GHC.Types.Var
-  ( Specificity
-  , TyVarBinder
-  , VarBndr (..)
-  , isInvisibleForAllTyFlag
-  , tyVarKind
-  , updateTyVarKind
-  )
-import GHC.Types.Var.Env (TyVarEnv, elemVarEnv, emptyVarEnv, extendVarEnv)
-import GHC.Types.Var.Set (VarSet, emptyVarSet)
-import GHC.Utils.FV as FV
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Var.FV
 import GHC.Utils.Outputable (Outputable, SDocContext, ppr)
+import GHC.Utils.EndoOS
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic (panic)
 
@@ -86,6 +81,7 @@ filterSigNames p orig@(SpecSig _ n _ _) = ifTrueJust (p $ unLoc n) orig
 filterSigNames p orig@(InlineSig _ n _) = ifTrueJust (p $ unLoc n) orig
 filterSigNames p (FixSig _ (FixitySig ns_spec ns ty)) =
   case filter (p . unLoc) ns of
+
     [] -> Nothing
     filtered -> Just (FixSig noAnn (FixitySig ns_spec filtered ty))
 filterSigNames _ orig@(MinimalSig _ _) = Just orig
@@ -817,66 +813,14 @@ isTypeHidden expInfo = typeHidden
 -- | Get free type variables in a 'Type' in their order of appearance.
 -- See [Ordering of implicit variables].
 orderedFVs
-  :: VarSet
-  -- ^ free variables to ignore
-  -> [Type]
-  -- ^ types to traverse (in order) looking for free variables
-  -> [TyVar]
-  -- ^ free type variables, in the order they appear in
-orderedFVs vs tys =
-  reverse . fst $ tyCoFVsOfTypes' tys (const True) vs ([], emptyVarSet)
-
--- See the "Free variables of types and coercions" section in 'TyCoRep', or
--- check out Note [Free variables of types]. The functions in this section
--- don't output type variables in the order they first appear in in the 'Type'.
---
--- For example, 'tyCoVarsOfTypeList' reports an incorrect order for the type
--- of 'const :: a -> b -> a':
---
--- >>> import GHC.Types.Name
--- >>> import TyCoRep
--- >>> import GHC.Builtin.Types.Prim
--- >>> import GHC.Types.Var
--- >>> a = TyVarTy alphaTyVar
--- >>> b = TyVarTy betaTyVar
--- >>> constTy = mkFunTys [a, b] a
--- >>> map (getOccString . tyVarName) (tyCoVarsOfTypeList constTy)
--- ["b","a"]
---
--- However, we want to reuse the very optimized traversal machinery there, so
--- so we make our own `tyCoFVsOfType'`, `tyCoFVsBndr'`, and `tyCoVarsOfTypes'`.
--- All these do differently is traverse in a different order and ignore
--- coercion variables.
-
--- | Just like 'tyCoFVsOfType', but traverses type variables in reverse order
--- of  appearance.
-tyCoFVsOfType' :: Type -> FV
-tyCoFVsOfType' (TyVarTy v) a b c = (FV.unitFV v `unionFV` tyCoFVsOfType' (tyVarKind v)) a b c
-tyCoFVsOfType' (TyConApp _ tys) a b c = tyCoFVsOfTypes' tys a b c
-tyCoFVsOfType' (LitTy{}) a b c = emptyFV a b c
-tyCoFVsOfType' (AppTy fun arg) a b c = (tyCoFVsOfType' arg `unionFV` tyCoFVsOfType' fun) a b c
-tyCoFVsOfType' (FunTy _ w arg res) a b c =
-  ( tyCoFVsOfType' res
-      `unionFV` tyCoFVsOfType' w
-      `unionFV` tyCoFVsOfType' arg
-  )
-    a
-    b
-    c
-tyCoFVsOfType' (ForAllTy bndr ty) a b c = tyCoFVsBndr' bndr (tyCoFVsOfType' ty) a b c
-tyCoFVsOfType' (CastTy ty _) a b c = (tyCoFVsOfType' ty) a b c
-tyCoFVsOfType' (CoercionTy _) a b c = emptyFV a b c
-
--- | Just like 'tyCoFVsOfTypes', but traverses type variables in reverse order
--- of appearance.
-tyCoFVsOfTypes' :: [Type] -> FV
-tyCoFVsOfTypes' (ty : tys) fv_cand in_scope acc = (tyCoFVsOfTypes' tys `unionFV` tyCoFVsOfType' ty) fv_cand in_scope acc
-tyCoFVsOfTypes' [] fv_cand in_scope acc = emptyFV fv_cand in_scope acc
-
--- | Just like 'tyCoFVsBndr', but traverses type variables in reverse order of
--- appearance.
-tyCoFVsBndr' :: TyVarBinder -> FV -> FV
-tyCoFVsBndr' (Bndr tv _) fvs = FV.delFV tv fvs `unionFV` tyCoFVsOfType' (tyVarKind tv)
+  :: VarSet  -- ^ Free variables to ignore
+  -> [Type]  -- ^ Types to traverse (in order) looking for free variables
+  -> [TyVar] -- ^ Free type variables, /in the order in which they appear/
+orderedFVs ignore_tvs tys
+  = dVarSetElems (runEndoOS (runFV get_fvs ignore_tvs) emptyDVarSet)
+  where
+    get_fvs :: DVarSetFV
+    get_fvs = deepDetTypesFV tys
 
 -------------------------------------------------------------------------------
 

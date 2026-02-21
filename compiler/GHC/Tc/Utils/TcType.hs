@@ -219,16 +219,17 @@ import {-# SOURCE #-} GHC.Tc.Types.Origin
   ( SkolemInfo, unkSkol
   , FixedRuntimeRepOrigin, FixedRuntimeRepContext )
 
--- others:
+import GHC.Types.Var.FV
 import GHC.Types.Name as Name
             -- We use this to make dictionaries for type literals.
             -- Perhaps there's a better way to do this?
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.Basic
+
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( coercibleClass, eqClass, heqClass, unitTyConKey
                          , listTyCon, constraintKind )
-import GHC.Types.Basic
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps ( getNth, findDupsEq )
 
@@ -1178,11 +1179,11 @@ exactTyCoVarsOfTypes :: [Type] -> TyCoVarSet
 exactTyCoVarsOfType  ty  = runTyCoVars (exact_ty ty)
 exactTyCoVarsOfTypes tys = runTyCoVars (exact_tys tys)
 
-exact_ty  :: Type       -> TyCoFVRes
-exact_tys :: [Type]     -> TyCoFVRes
+exact_ty  :: Type       -> TyCoFV
+exact_tys :: [Type]     -> TyCoFV
 (exact_ty, exact_tys, _, _) = foldTyCo exactTcvFolder
 
-exactTcvFolder :: TyCoFolder TyCoFVRes
+exactTcvFolder :: TyCoFolder TyCoFV
 exactTcvFolder = deepTcvFolder { tcf_view = coreView }
                  -- This is the key line
 

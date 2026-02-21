@@ -101,6 +101,7 @@ import GHC.Types.Id( idType )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Var.FV
 import GHC.Types.Basic
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
@@ -3572,20 +3573,20 @@ mkOccFolders :: Name -> (TcType -> Bool, TcCoercion -> Bool)
 mkOccFolders lhs_tv = ( getAny . runFVTop . check_ty
                       , getAny . runFVTop . check_co)
   where
-    check_ty :: Type -> FVRes BoundVars Any
+    check_ty :: Type -> FV BoundVars Any
     !(check_ty, _, check_co, _) = foldTyCo occ_folder
 
-    occ_folder :: TyCoFolder (FVRes BoundVars Any)
+    occ_folder :: TyCoFolder (FV BoundVars Any)
     occ_folder = TyCoFolder { tcf_view  = noView  -- Don't expand synonyms
                             , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                             , tcf_hole  = do_hole
-                            , tcf_tycobinder = addBndrFVRes }
+                            , tcf_tycobinder = addBndrFV }
 
-    do_tcv v = (FVRes $ \ bvs ->
+    do_tcv v = (MkFV $ \ bvs ->
                 Any (not (v `elemVarSet` bvs) && tyVarName v == lhs_tv))
                `mappend` check_ty (varType v)
 
-    do_hole _hole = FVRes $ \ _bvs -> DM.Any True  -- Reject coercion holes
+    do_hole _hole = MkFV $ \ _bvs -> DM.Any True  -- Reject coercion holes
 
 {- *********************************************************************
 *                                                                      *

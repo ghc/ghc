@@ -54,6 +54,7 @@ import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Var.FV
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
@@ -2512,10 +2513,10 @@ specArgsFVs :: InterestingVarFun -> [SpecArg] -> VarSet
 -- Find the shallow deep free vars of the SpecArgs that are not already in scope
 specArgsFVs interesting args
   = runFVSelectiveSet interesting $
-    mapUnionFVRes get args
+    mapUnionFV get args
   where
-    get :: SpecArg -> SelectiveFVRes
-    get (SpecType ty)   = tyCoFVsOfType ty
+    get :: SpecArg -> SelectiveFV
+    get (SpecType ty)   = shallowSelTypeFV ty
     get (SpecDict dx)   = exprFVs dx
     get UnspecType      = mempty
     get UnspecArg       = mempty
