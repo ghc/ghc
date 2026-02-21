@@ -74,6 +74,7 @@
 - 2026-02-21 | Code style should match surrounding code in touched files.
 - 2026-02-21 | Prefer intermediate logical commits over one final commit.
 - 2026-02-21 | Start-of-task workflow should trigger/suggest saving Hadrian command approval.
+- 2026-02-21 | Improve conflicting-inline error rendering to list all conflicting pragmas (kind + location), not just locations.
 
 ## Open risks
 - None identified for the scoped diagnostics change; behavior change is covered by targeted regression tests.

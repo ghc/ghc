@@ -18,6 +18,8 @@ Fix misleading diagnostics for conflicting inline pragmas.
   - `NE.NonEmpty (LocatedN RdrName, InlinePragma GhcPs)`
 - Render message heading as:
   - `Conflicting pragmas for ‘<name>’`
+- Render conflicting-inline details by listing all conflicting pragmas
+  (pragma kind + source location), not locations alone.
 - Keep `TcRnDuplicateSigDecl` wording duplicate-focused.
 
 ## Test requirements
@@ -46,6 +48,8 @@ Fix misleading diagnostics for conflicting inline pragmas.
   - `TcRnDuplicateSigDecl` for true duplicates.
   - `TcRnConflictingInlineSigDecl` for mixed inline kinds.
 - Pretty-printer has dedicated branch for `TcRnConflictingInlineSigDecl`.
+- Conflicting-inline pretty-printer output includes every conflicting pragma
+  with kind and location.
 - Tests updated:
   - `testsuite/tests/rename/should_fail/T22637.{hs,stderr}`
   - `testsuite/tests/rename/should_fail/rnfail048.stderr`
