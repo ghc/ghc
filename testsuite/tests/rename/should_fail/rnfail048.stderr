@@ -1,9 +1,9 @@
-
 rnfail048.hs:11:12: error: [GHC-43895]
     Conflicting pragmas for ‘foo’
-    at rnfail048.hs:6:17-19
-       rnfail048.hs:7:18-20
-       rnfail048.hs:8:14-16
-       rnfail048.hs:9:15-17
-       rnfail048.hs:10:16-18
-       rnfail048.hs:11:12-14
+    Pragmas:
+      NOINLINE at rnfail048.hs:6:17-19
+      NOINLINE at rnfail048.hs:7:18-20
+      NOINLINE at rnfail048.hs:8:14-16
+      INLINE at rnfail048.hs:9:15-17
+      INLINE at rnfail048.hs:10:16-18
+      INLINE at rnfail048.hs:11:12-14

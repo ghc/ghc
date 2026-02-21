@@ -65,3 +65,9 @@ Status: mutable working plan
 6. Run targeted tests.
   - `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
   - Status: done
+
+7. Improve conflicting-inline diagnostic details.
+   - `compiler/GHC/Tc/Errors/Ppr.hs`
+   - list each conflicting inline pragma kind with its source location.
+   - update affected stderr baselines.
+   - Status: done

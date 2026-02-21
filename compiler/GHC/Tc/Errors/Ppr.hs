@@ -96,6 +96,7 @@ import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.InlinePragma (inlinePragmaSpec)
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
@@ -1461,10 +1462,15 @@ instance Diagnostic TcRnMessage where
       nest 4 (interpp'SP guards)
     TcRnConflictingInlineSigDecl pairs@((L _ name, _) :| _) -> mkSimpleDecorated $
       vcat [ text "Conflicting pragmas for" <+> quotes (ppr name)
-           , text "at" <+> vcat (map ppr $ sortBy leftmost_smallest
-                                         $ map (getLocA . fst)
-                                         $ NE.toList pairs)
+           , text "Pragmas:"
+           , nest 2 $ vcat
+               [ ppr (inlinePragmaSpec pragma) <+> text "at" <+> ppr (locA loc)
+               | (L loc _, pragma) <- sorted_pairs
+               ]
            ]
+      where
+        sorted_pairs =
+          sortBy (leftmost_smallest `on` (getLocA . fst)) (NE.toList pairs)
     TcRnDuplicateSigDecl pairs@((L _ name, sig) :| _) -> mkSimpleDecorated $
       vcat [ text "Duplicate" <+> what_it_is
             <> text "s for" <+> quotes (ppr name)

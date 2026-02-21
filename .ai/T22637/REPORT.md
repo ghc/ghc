@@ -14,6 +14,7 @@
 - `compiler/GHC/Tc/Errors/Types.hs`
 - `compiler/GHC/Types/Error/Codes.hs`
 - `testsuite/tests/parser/should_fail/OpaqueParseFail4.stderr`
+- `testsuite/tests/parser/should_fail/all.T`
 - `testsuite/tests/rename/should_fail/all.T`
 - `testsuite/tests/rename/should_fail/rnfail048.stderr`
 - `testsuite/tests/rename/should_fail/T22637.hs`
@@ -27,12 +28,16 @@
 - Added dedicated pretty-printing + diagnostic metadata branches for conflicting-inline diagnostics.
 - Added regression test `T22637` and registered it in rename `should_fail` tests.
 - Updated stderr baselines for `rnfail048`, `OpaqueParseFail4`, and `T22637`.
+- Refined conflicting-inline rendering to list each conflicting pragma kind with location.
+- Updated affected stderr baselines to match the new pragma-detail format.
 
 ## Tests run
 - `hadrian/build -q -q -j3 --no-build test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"` (pass)
 - `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"` (initial run: fail, `T22637.stderr` column mismatch)
 - `hadrian/build -q -q -j3 --no-build test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"` (pass after fixing `T22637.stderr`)
 - `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"` (pass)
+- `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"` (step 7 iteration: fail, missing imports/type mismatch + stderr updates required)
+- `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"` (pass after fixing `Ppr` and stderr baselines)
 
 ## Notes / decisions
 - Use separate diagnostics:
@@ -64,6 +69,11 @@
 - 2026-02-21 02:40Z | step6 | reran targeted tests (`--no-build`) | N/A | pass
 - 2026-02-21 02:40Z | step6 | reran targeted tests (full command) | N/A | pass
 - 2026-02-21 02:40Z | plan | marked steps 5-6 done | .ai/T22637/PLAN.md | updated
+- 2026-02-21 03:01Z | plan | added step 7 and set `in_progress` for conflicting-inline detail rendering | .ai/T22637/PLAN.md | updated
+- 2026-02-21 03:09Z | step7 | updated conflicting-inline message to list pragma kind + location | compiler/GHC/Tc/Errors/Ppr.hs | done
+- 2026-02-21 03:09Z | step7 | updated `rnfail048`, `OpaqueParseFail4`, `T22637` stderr baselines to new format | testsuite/tests/{rename/should_fail/rnfail048.stderr,rename/should_fail/T22637.stderr,parser/should_fail/OpaqueParseFail4.stderr} | done
+- 2026-02-21 03:09Z | step7 | reran targeted tests and confirmed clean pass | N/A | pass
+- 2026-02-21 03:09Z | plan | marked step 7 done | .ai/T22637/PLAN.md | updated
 
 ## Decision log (append-only)
 - 2026-02-21 | Keep duplicate and conflicting diagnostics separate.
