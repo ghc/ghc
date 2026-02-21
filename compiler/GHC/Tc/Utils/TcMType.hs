@@ -1565,7 +1565,7 @@ against any specification -- just suboptimal and confounding to users.
 
 Note [Recurring into kinds for candidateQTyVars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-First, read Note [Closing over free variable kinds] in GHC.Core.TyCo.FVs, paying
+First, read Note [Computing deep free variables] in GHC.Core.TyCo.FVs, paying
 attention to the end of the Note about using an empty bound set when
 traversing a variable's kind.
 
@@ -1582,7 +1582,7 @@ type inference, which is seeded by the renamer and its insistence to
 use different Uniques for different variables. (In contrast, the Core
 functions work on the output of optimizations, which may introduce
 shadowing.) Without shadowing, the problem studied by
-Note [Closing over free variable kinds] in GHC.Core.TyCo.FVs cannot happen.
+Note [Computing deep free variables] in GHC.Core.TyCo.FVs cannot happen.
 
 Why it is necessary:
 Wiping the bound set would be just plain wrong here. Consider
@@ -1593,7 +1593,7 @@ We really don't want to think k1 and k2 are free here. (It's true that we'll
 never be able to fill in `hole`, but we don't want to go off the rails just
 because we have an insoluble coercion hole.) So: why is it wrong to wipe
 the bound variables here but right in Core? Because the final statement
-in Note [Closing over free variable kinds] in GHC.Core.TyCo.FVs is wrong: not
+in Note [Computing deep free variables] in GHC.Core.TyCo.FVs is wrong: not
 every variable is either free or bound. A variable can be a hole, too!
 The reasoning in that Note then breaks down.
 

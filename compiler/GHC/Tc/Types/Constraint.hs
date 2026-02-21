@@ -117,6 +117,7 @@ import GHC.Core.TyCo.FVs
 
 import GHC.Types.Name
 import GHC.Types.Var
+import GHC.Types.Var.FV
 
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
@@ -809,7 +810,7 @@ tyCoVarsOfCtList :: Ct -> [TcTyCoVar]
 tyCoVarsOfCtList = tyCoVarsOfTypeList . ctPred
 
 -- | Returns free variables of constraints as a deterministically ordered
--- list. See Note [Deterministic FV] in GHC.Utils.FV.
+-- list. See Note [Deterministic FV] in GHC.Types.Var.FV.
 tyCoVarsOfCtEvList :: CtEvidence -> [TcTyCoVar]
 tyCoVarsOfCtEvList = tyCoVarsOfTypeList . ctEvPred
 
@@ -819,49 +820,49 @@ tyCoVarsOfCts :: Cts -> TcTyCoVarSet
 tyCoVarsOfCts = dVarSetToVarSet . runTyCoVarsDSet . tcvs_of_cts
 
 -- | Returns free variables of a bag of constraints as a deterministically
--- ordered list. See Note [Deterministic FV] in "GHC.Utils.FV".
+-- ordered list. See Note [Deterministic FV] in "GHC.Types.Var.FV".
 tyCoVarsOfCtsList :: Cts -> [TcTyCoVar]
 tyCoVarsOfCtsList = dVarSetElems . tyCoVarsOfThingsDSet ctPred
 
 -- | Returns free variables of a bag of constraints as a deterministically
--- ordered list. See Note [Deterministic FV] in GHC.Utils.FV.
+-- ordered list. See Note [Deterministic FV] in GHC.Types.Var.FV.
 tyCoVarsOfCtEvsList :: [CtEvidence] -> [TcTyCoVar]
 tyCoVarsOfCtEvsList = dVarSetElems . runTyCoVarsDSet
-                      . mapUnionFVRes (detTyCoVarsOfType . ctEvPred)
+                      . mapUnionFV (deepDetTypeFV . ctEvPred)
 
 -- | Returns free variables of WantedConstraints as a non-deterministic
--- set. See Note [Deterministic FV] in "GHC.Utils.FV".
+-- set. See Note [Deterministic FV] in "GHC.Types.Var.FV".
 tyCoVarsOfWC :: WantedConstraints -> TyCoVarSet
 -- Only called on *zonked* things
 tyCoVarsOfWC = dVarSetToVarSet . tyCoVarsOfWcDSet
 
 -- | Returns free variables of WantedConstraints as a deterministically
--- ordered list. See Note [Deterministic FV] in "GHC.Utils.FV".
+-- ordered list. See Note [Deterministic FV] in "GHC.Types.Var.FV".
 tyCoVarsOfWCList :: WantedConstraints -> [TyCoVar]
 -- Only called on *zonked* things
 tyCoVarsOfWCList = dVarSetElems . tyCoVarsOfWcDSet
 
 -- | Returns free variables of WantedConstraints as a composable FV
--- computation. See Note [Deterministic FV] in "GHC.Utils.FV".
+-- computation. See Note [Deterministic FV] in "GHC.Types.Var.FV".
 tyCoVarsOfWcDSet :: WantedConstraints -> DTyCoVarSet
 -- Only called on *zonked* things
 tyCoVarsOfWcDSet = runTyCoVarsDSet . tcvs_of_wc
 
-tcvs_of_wc :: WantedConstraints -> DTyCoFVRes
+tcvs_of_wc :: WantedConstraints -> DTyCoFV
 tcvs_of_wc (WC { wc_simple = simple, wc_impl = implics, wc_errors = errors })
   = tcvs_of_cts simple               `mappend`
-    mapUnionFVRes tcvs_of_implic implics `mappend`
-    mapUnionFVRes tcvs_of_errs errors
+    mapUnionFV tcvs_of_implic implics `mappend`
+    mapUnionFV tcvs_of_errs errors
 
-tcvs_of_cts :: Cts -> DTyCoFVRes
-tcvs_of_cts = mapUnionFVRes tcvs_of_ct
+tcvs_of_cts :: Cts -> DTyCoFV
+tcvs_of_cts = mapUnionFV tcvs_of_ct
 
-tcvs_of_ct :: Ct -> DTyCoFVRes
-tcvs_of_ct ct = detTyCoVarsOfType (ctPred ct)
+tcvs_of_ct :: Ct -> DTyCoFV
+tcvs_of_ct ct = deepDetTypeFV (ctPred ct)
 
 -- | Returns free variables of Implication as a composable FV computation.
--- See Note [Deterministic FV] in "GHC.Utils.FV".
-tcvs_of_implic :: Implication -> DTyCoFVRes
+-- See Note [Deterministic FV] in "GHC.Types.Var.FV".
+tcvs_of_implic :: Implication -> DTyCoFV
 -- Only called on *zonked* things
 tcvs_of_implic (Implic { ic_skols = skols
                        , ic_given = givens
@@ -869,17 +870,17 @@ tcvs_of_implic (Implic { ic_skols = skols
   | isEmptyWC wanted
   = mempty
   | otherwise
-  = addBndrsFVRes skols  $
-    addBndrsFVRes givens $
+  = addBndrsFV skols  $
+    addBndrsFV givens $
     tcvs_of_wc wanted
 
-tcvs_of_errs :: DelayedError -> DTyCoFVRes
+tcvs_of_errs :: DelayedError -> DTyCoFV
 tcvs_of_errs (DE_Hole hole)         = tcvs_of_hole hole
 tcvs_of_errs (DE_NotConcrete {})    = mempty
-tcvs_of_errs (DE_Multiplicity co _) = detTyCoVarsOfCo co
+tcvs_of_errs (DE_Multiplicity co _) = deepDetCoFV co
 
-tcvs_of_hole :: Hole -> DTyCoFVRes
-tcvs_of_hole (Hole { hole_ty = ty }) = detTyCoVarsOfType ty
+tcvs_of_hole :: Hole -> DTyCoFV
+tcvs_of_hole (Hole { hole_ty = ty }) = deepDetTypeFV ty
 
 {-
 ************************************************************************

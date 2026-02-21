@@ -48,6 +48,7 @@ import GHC.Core.Coercion( mkCoVarCo, substCoVarBndr )
 import GHC.Core.TyCo.FVs
 
 import GHC.Types.Var.Set
+import GHC.Types.Var.FV
 import GHC.Types.Var.Env as InScopeSet
 import GHC.Types.Id
 import GHC.Types.Name     ( Name )
@@ -594,10 +595,10 @@ substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
   = runFVSelective isLocalVar $
     strictFoldDVarSet (mappend . do_one) mempty fvs
   where
-  do_one :: Var -> SelectiveFVRes
+  do_one :: Var -> SelectiveFV
   do_one fv
-     | isTyVar fv = tyCoFVsOfType (lookupVarEnv tv_env fv `orElse` mkTyVarTy fv)
-     | isCoVar fv = tyCoFVsOfCo   (lookupVarEnv cv_env fv `orElse` mkCoVarCo fv)
+     | isTyVar fv = shallowSelTypeFV (lookupVarEnv tv_env fv `orElse` mkTyVarTy fv)
+     | isCoVar fv = shallowSelCoFV   (lookupVarEnv cv_env fv `orElse` mkCoVarCo fv)
      | otherwise  = exprFVs (lookupIdSubst subst fv)
 
 ------------------

@@ -952,6 +952,7 @@ Library
         GHC.Types.Var
         GHC.Types.Var.Env
         GHC.Types.Var.Set
+        GHC.Types.Var.FV
         GHC.Unit
         GHC.Unit.Env
         GHC.Unit.External
@@ -993,7 +994,6 @@ Library
         GHC.Utils.EndoOS
         GHC.Utils.Exception
         GHC.Utils.Fingerprint
-        GHC.Utils.FV
         GHC.Utils.GlobalVars
         GHC.Utils.IO.Unsafe
         GHC.Utils.Json

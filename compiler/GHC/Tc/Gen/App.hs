@@ -37,7 +37,6 @@ import GHC.Core.DataCon ( dataConConcreteTyVars, isNewDataCon, dataConOrigArgTys
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
-import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Subst ( substTyWithInScope )
 import GHC.Core.Type
 import GHC.Core.Coercion
@@ -47,6 +46,7 @@ import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.Names
 
 import GHC.Types.Var
+import GHC.Types.Var.FV
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
@@ -2081,7 +2081,7 @@ foldQLInstVars check_tv ty
   where
     (do_ty, _, _, _) = foldTyCo folder
 
-    folder :: TyCoFolder (FVRes () a)
+    folder :: TyCoFolder (FV () a)
     folder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                                              -- in GHC.Core.TyCo.FVs
                         , tcf_tyvar = do_tv, tcf_covar = mempty
@@ -2092,8 +2092,8 @@ foldQLInstVars check_tv ty
     do_hole hole = do_ty (coVarKind (coHoleCoVar hole))
                      -- See (MIV2) in Note [Monomorphise instantiation variables]
 
-    do_tv :: TcTyVar -> FVRes () a
-    do_tv tv | isQLInstTyVar tv = FVRes $ \_ -> check_tv tv
+    do_tv :: TcTyVar -> FV () a
+    do_tv tv | isQLInstTyVar tv = MkFV $ \_ -> check_tv tv
              | otherwise        = mempty
 
 {- *********************************************************************
