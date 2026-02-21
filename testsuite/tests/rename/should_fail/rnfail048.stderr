@@ -7,3 +7,6 @@ rnfail048.hs:11:12: error: [GHC-43895]
       INLINE at rnfail048.hs:9:15-17
       INLINE at rnfail048.hs:10:16-18
       INLINE at rnfail048.hs:11:12-14
+   |
+11 | {-# INLINE foo #-}
+   |            ^^^

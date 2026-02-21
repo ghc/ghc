@@ -18,8 +18,17 @@ Fix misleading diagnostics for conflicting inline pragmas.
   - `NE.NonEmpty (LocatedN RdrName, InlinePragma GhcPs)`
 - Render message heading as:
   - `Conflicting pragmas for ‘<name>’`
-- Render conflicting-inline details by listing all conflicting pragmas
-  (pragma kind + source location), not locations alone.
+- Render conflicting-inline details in the same style shown in issue #22637:
+  - keep the location block (`at ...`)
+  - then print a source excerpt block introduced by `|`
+  - include one source line per conflicting pragma, e.g.
+    - `6 | {-# INLINEABLE bar #-}`
+    - `7 | {-# NOINLINE bar #-}`
+- Do not use the `Pragmas:` summary-list format for conflicting-inline details.
+- Formatting must depend on diagnostics flags:
+  - with `-fno-diagnostics-show-caret`: show headline + `at ...` locations only (no source excerpt block)
+  - with `-fdiagnostics-show-caret`: include the source excerpt block with conflicting pragma lines
+- Even with `-fdiagnostics-show-caret`, do **not** print a caret marker line (`^`) for this diagnostic.
 - Keep `TcRnDuplicateSigDecl` wording duplicate-focused.
 
 ## Test requirements
@@ -49,7 +58,11 @@ Fix misleading diagnostics for conflicting inline pragmas.
   - `TcRnConflictingInlineSigDecl` for mixed inline kinds.
 - Pretty-printer has dedicated branch for `TcRnConflictingInlineSigDecl`.
 - Conflicting-inline pretty-printer output includes every conflicting pragma
-  with kind and location.
+  with the issue-#22637 source-excerpt style (line-numbered pragma lines under `|`),
+  not a `Pragmas:` kind/location list.
+- Output obeys diagnostics flags:
+  - `-fno-diagnostics-show-caret` => no source excerpt block
+  - `-fdiagnostics-show-caret` => include source excerpt block, but no `^` caret line
 - Tests updated:
   - `testsuite/tests/rename/should_fail/T22637.{hs,stderr}`
   - `testsuite/tests/rename/should_fail/rnfail048.stderr`

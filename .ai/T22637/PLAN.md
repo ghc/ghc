@@ -71,3 +71,14 @@ Status: mutable working plan
    - list each conflicting inline pragma kind with its source location.
    - update affected stderr baselines.
    - Status: done
+
+8. Render conflicting pragmas with issue-#22637 source-excerpt style.
+   - `compiler/GHC/Tc/Errors/Ppr.hs`
+   - replace `Pragmas:` kind/location list with the issue-#22637 format:
+     - keep `at ...` locations
+     - then print source excerpt lines under `|`, one per conflicting pragma.
+   - update affected stderr baselines:
+     - `testsuite/tests/rename/should_fail/T22637.stderr`
+     - `testsuite/tests/rename/should_fail/rnfail048.stderr`
+     - `testsuite/tests/parser/should_fail/OpaqueParseFail4.stderr`
+   - Status: pending

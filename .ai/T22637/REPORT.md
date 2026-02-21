@@ -1,7 +1,7 @@
 # REPORT: GHC issue #22637
 
 ## Summary
-- Completed.
+- In progress (new requirement added after prior completion).
 - Added a dedicated conflicting-inline diagnostic (`TcRnConflictingInlineSigDecl`) with an inline-specific payload.
 - Kept `TcRnDuplicateSigDecl` for true duplicates only.
 - Updated renamer routing, pretty-printing, and stderr baselines accordingly.
@@ -38,6 +38,7 @@
 - `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"` (pass)
 - `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"` (step 7 iteration: fail, missing imports/type mismatch + stderr updates required)
 - `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"` (pass after fixing `Ppr` and stderr baselines)
+- `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4"` (pass after swapping per-test diagnostics-show-caret modes and updating baselines)
 
 ## Notes / decisions
 - Use separate diagnostics:
@@ -74,6 +75,9 @@
 - 2026-02-21 03:09Z | step7 | updated `rnfail048`, `OpaqueParseFail4`, `T22637` stderr baselines to new format | testsuite/tests/{rename/should_fail/rnfail048.stderr,rename/should_fail/T22637.stderr,parser/should_fail/OpaqueParseFail4.stderr} | done
 - 2026-02-21 03:09Z | step7 | reran targeted tests and confirmed clean pass | N/A | pass
 - 2026-02-21 03:09Z | plan | marked step 7 done | .ai/T22637/PLAN.md | updated
+- 2026-02-21 03:18Z | requirement | inspected issue #22637 and updated docs to require its concrete source-excerpt style (`at ...` + `|` + line-numbered pragma lines) | .ai/T22637/{TASK.md,EXPECTED.md,PLAN.md} | updated
+- 2026-02-21 03:18Z | requirement | updated task contract to require verbatim conflicting pragmas and no `Pragmas:` list format | .ai/T22637/{TASK.md,EXPECTED.md,PLAN.md} | updated
+- 2026-02-21 04:32Z | tests | swapped caret-mode coverage (`OpaqueParseFail4` default, `rnfail048` with `-fdiagnostics-show-caret`) and updated stderr | testsuite/tests/{parser/should_fail/all.T,parser/should_fail/OpaqueParseFail4.stderr,rename/should_fail/all.T,rename/should_fail/rnfail048.stderr} | done
 
 ## Decision log (append-only)
 - 2026-02-21 | Keep duplicate and conflicting diagnostics separate.
@@ -85,6 +89,7 @@
 - 2026-02-21 | Prefer intermediate logical commits over one final commit.
 - 2026-02-21 | Start-of-task workflow should trigger/suggest saving Hadrian command approval.
 - 2026-02-21 | Improve conflicting-inline error rendering to list all conflicting pragmas (kind + location), not just locations.
+- 2026-02-21 | New requirement (from issue #22637): conflicting pragma errors should keep `at ...` locations and also show line-numbered pragma source lines under `|`; no `Pragmas:` summary list.
 
 ## Open risks
 - None identified for the scoped diagnostics change; behavior change is covered by targeted regression tests.
