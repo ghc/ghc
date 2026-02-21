@@ -28,12 +28,16 @@ Fix misleading diagnostics for conflicting inline pragmas.
 - Formatting must depend on diagnostics flags:
   - with `-fno-diagnostics-show-caret`: show headline + `at ...` locations only (no source excerpt block)
   - with `-fdiagnostics-show-caret`: include the source excerpt block with conflicting pragma lines
+- In show-caret mode, keep `|` gutters visually aligned between the custom conflicting-pragma excerpt block and the caret excerpt block.
 - Keep `TcRnDuplicateSigDecl` wording duplicate-focused.
 
 ## Test requirements
 - Add a regression test using `INLINE` + `NOINLINE` for the same identifier (expected to remain illegal).
 - Update existing mixed-inline stderr baselines impacted by message changes.
 - Align stderr text with `.ai/T22637/EXPECTED.md`.
+- The current user-edited `.stderr` files are the baseline for formatting/content.
+- Do not change those `.stderr` files in other ways; especially do not add additional lines.
+- Caret lines are optional if they simplify implementation, but avoid any other `.stderr` churn.
 - Use targeted test run command:
   - `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
 
@@ -62,6 +66,7 @@ Fix misleading diagnostics for conflicting inline pragmas.
 - Output obeys diagnostics flags:
   - `-fno-diagnostics-show-caret` => no source excerpt block
   - `-fdiagnostics-show-caret` => include source excerpt block (caret marker output is allowed)
+- In show-caret output for this diagnostic, `|` gutter columns are aligned across excerpt blocks.
 - Tests updated:
   - `testsuite/tests/rename/should_fail/T22637.{hs,stderr}`
   - `testsuite/tests/rename/should_fail/rnfail048.stderr`

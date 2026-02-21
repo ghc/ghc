@@ -3,6 +3,11 @@
 These are target diagnostics for stderr baselines touched by this task.
 Exact line/column spans may vary; keep core wording stable.
 
+## baseline lock
+- Treat the currently user-edited `.stderr` files as the source of truth.
+- Do not alter those `.stderr` files beyond optional caret lines.
+- Do not add additional lines to `.stderr` files.
+
 ## flag-dependent rendering
 - With `-fno-diagnostics-show-caret`:
   - include headline + `at ...` locations only
@@ -10,6 +15,7 @@ Exact line/column spans may vary; keep core wording stable.
 - With `-fdiagnostics-show-caret`:
   - include source excerpt lines (`|` block) containing conflicting pragma lines
   - caret marker lines may be present
+  - `|` gutters from the custom excerpt block and caret excerpt block should be visually aligned
 
 ## issue #22637 verbatim example
 Ideally it would say something like:

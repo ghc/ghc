@@ -9,6 +9,7 @@ Status: mutable working plan
 - After each meaningful change or test run, add a short entry to `REPORT.md`.
 - When a step reaches `done`, create an intermediate commit if the diff is coherent.
 - If command output must be redirected to a log file, write logs under `/tmp` (for example: `/tmp/T22637-<name>.log`).
+- Preserve user-edited `.stderr` baselines; only optional caret lines are allowed, and do not add additional `.stderr` lines.
 
 ## Command runbook
 1. Permission bootstrap (first action):

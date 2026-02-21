@@ -83,6 +83,10 @@
 - 2026-02-21 04:26Z | requirement | added the issue #22637 "Ideally it would say something like" example verbatim to EXPECTED.md | .ai/T22637/EXPECTED.md | updated
 - 2026-02-21 04:32Z | requirement | changed conflicting-inline payload contract from `InlinePragma` to `Sig` and added plan step 9 | .ai/T22637/{TASK.md,PLAN.md,REPORT.md} | updated
 - 2026-02-21 04:36Z | workflow | set log redirection policy to use `/tmp` paths for command logs | .ai/T22637/PLAN.md | updated
+- 2026-02-21 04:47Z | formatting | aligned caret excerpt `|` gutter with conflicting-pragma excerpt for GHC-43895 and updated stderr baselines | compiler/GHC/Utils/Logger.hs, testsuite/tests/rename/should_fail/{T22637.stderr,rnfail048.stderr} | done
+- 2026-02-21 04:47Z | step6 | reran targeted tests after alignment change | /tmp/T22637-align-pipes-final.log | pass
+- 2026-02-21 04:47Z | requirement | recorded explicit pipe-alignment requirement in task docs | .ai/T22637/{TASK.md,EXPECTED.md} | updated
+- 2026-02-21 05:04Z | requirement | recorded user baseline lock for `.stderr` files: no non-caret changes and no added lines | .ai/T22637/{TASK.md,EXPECTED.md,PLAN.md,REPORT.md} | updated
 
 ## Decision log (append-only)
 - 2026-02-21 | Keep duplicate and conflicting diagnostics separate.
@@ -98,6 +102,8 @@
 - 2026-02-21 | Superseding requirement: caret suppression is removed; in `-fdiagnostics-show-caret` mode, caret markers are allowed.
 - 2026-02-21 | Superseding requirement: use `Sig` payload for `TcRnConflictingInlineSigDecl` instead of `InlinePragma` payload.
 - 2026-02-21 | Workflow decision: redirected command logs should be written under `/tmp` instead of `.ai/T22637`.
+- 2026-02-21 | Show-caret formatting requirement: keep `|` gutters aligned between the custom conflicting-pragma excerpt and caret excerpt blocks.
+- 2026-02-21 | User decision: keep current user-edited `.stderr` files as baseline; optional carets allowed, but no other `.stderr` changes and no added lines.
 
 ## Open risks
 - None identified for the scoped diagnostics change; behavior change is covered by targeted regression tests.
