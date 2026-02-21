@@ -1,8 +1,8 @@
 T22637.hs:7:14: error: [GHC-43895]
     Conflicting pragmas for ‘f’
-    Pragmas:
-      INLINE at T22637.hs:6:12
-      NOINLINE at T22637.hs:7:14
+    at T22637.hs:6:12
+       T22637.hs:7:14
   |
+6 | {-# INLINE f #-}
 7 | {-# NOINLINE f #-}
-  |              ^
+  |

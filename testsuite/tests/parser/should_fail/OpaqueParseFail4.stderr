@@ -1,5 +1,4 @@
 OpaqueParseFail4.hs:6:12: error: [GHC-43895]
     Conflicting pragmas for ‘f’
-    Pragmas:
-      OPAQUE at OpaqueParseFail4.hs:5:12
-      INLINE at OpaqueParseFail4.hs:6:12
+    at OpaqueParseFail4.hs:5:12
+       OpaqueParseFail4.hs:6:12
