@@ -8,6 +8,7 @@ Status: mutable working plan
 - Before code edits, mark exactly one step `in_progress`.
 - After each meaningful change or test run, add a short entry to `REPORT.md`.
 - When a step reaches `done`, create an intermediate commit if the diff is coherent.
+- If command output must be redirected to a log file, write logs under `/tmp` (for example: `/tmp/T22637-<name>.log`).
 
 ## Command runbook
 1. Permission bootstrap (first action):
@@ -31,7 +32,7 @@ Status: mutable working plan
 1. Add new diagnostic constructor and error code.
    - `compiler/GHC/Tc/Errors/Types.hs`
    - `compiler/GHC/Types/Error/Codes.hs`
-   - shape: inline-specific payload (e.g. `NE.NonEmpty (LocatedN RdrName, InlinePragma GhcPs)`).
+   - shape: `Sig` payload (e.g. `NE.NonEmpty (LocatedN RdrName, Sig GhcPs)`).
    - Status: done
 
 2. Split duplicate-vs-conflict reporting in renamer.
@@ -77,8 +78,16 @@ Status: mutable working plan
    - replace `Pragmas:` kind/location list with the issue-#22637 format:
      - keep `at ...` locations
      - then print source excerpt lines under `|`, one per conflicting pragma.
+     - when `-fdiagnostics-show-caret` is enabled, caret marker output is allowed.
    - update affected stderr baselines:
      - `testsuite/tests/rename/should_fail/T22637.stderr`
      - `testsuite/tests/rename/should_fail/rnfail048.stderr`
      - `testsuite/tests/parser/should_fail/OpaqueParseFail4.stderr`
+   - Status: in_progress
+
+9. Switch conflicting-inline diagnostic payload from `InlinePragma` to `Sig`.
+   - `compiler/GHC/Tc/Errors/Types.hs`
+   - `compiler/GHC/Rename/Bind.hs`
+   - `compiler/GHC/Tc/Errors/Ppr.hs`
+   - keep same rendered message style and behavior.
    - Status: pending

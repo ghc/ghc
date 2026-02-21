@@ -2,7 +2,7 @@
 
 ## Summary
 - In progress (new requirement added after prior completion).
-- Added a dedicated conflicting-inline diagnostic (`TcRnConflictingInlineSigDecl`) with an inline-specific payload.
+- Added a dedicated conflicting-inline diagnostic (`TcRnConflictingInlineSigDecl`); payload requirement is now changed to `Sig`.
 - Kept `TcRnDuplicateSigDecl` for true duplicates only.
 - Updated renamer routing, pretty-printing, and stderr baselines accordingly.
 
@@ -78,6 +78,11 @@
 - 2026-02-21 03:18Z | requirement | inspected issue #22637 and updated docs to require its concrete source-excerpt style (`at ...` + `|` + line-numbered pragma lines) | .ai/T22637/{TASK.md,EXPECTED.md,PLAN.md} | updated
 - 2026-02-21 03:18Z | requirement | updated task contract to require verbatim conflicting pragmas and no `Pragmas:` list format | .ai/T22637/{TASK.md,EXPECTED.md,PLAN.md} | updated
 - 2026-02-21 04:32Z | tests | swapped caret-mode coverage (`OpaqueParseFail4` default, `rnfail048` with `-fdiagnostics-show-caret`) and updated stderr | testsuite/tests/{parser/should_fail/all.T,parser/should_fail/OpaqueParseFail4.stderr,rename/should_fail/all.T,rename/should_fail/rnfail048.stderr} | done
+- 2026-02-21 04:32Z | plan | marked step 8 `in_progress` for issue-#22637 source-excerpt formatting and no-caret behavior | .ai/T22637/PLAN.md | updated
+- 2026-02-21 05:07Z | requirement | removed "no actual caret" requirement; show-caret mode may include caret markers again | .ai/T22637/{TASK.md,EXPECTED.md,PLAN.md} | updated
+- 2026-02-21 04:26Z | requirement | added the issue #22637 "Ideally it would say something like" example verbatim to EXPECTED.md | .ai/T22637/EXPECTED.md | updated
+- 2026-02-21 04:32Z | requirement | changed conflicting-inline payload contract from `InlinePragma` to `Sig` and added plan step 9 | .ai/T22637/{TASK.md,PLAN.md,REPORT.md} | updated
+- 2026-02-21 04:36Z | workflow | set log redirection policy to use `/tmp` paths for command logs | .ai/T22637/PLAN.md | updated
 
 ## Decision log (append-only)
 - 2026-02-21 | Keep duplicate and conflicting diagnostics separate.
@@ -90,6 +95,9 @@
 - 2026-02-21 | Start-of-task workflow should trigger/suggest saving Hadrian command approval.
 - 2026-02-21 | Improve conflicting-inline error rendering to list all conflicting pragmas (kind + location), not just locations.
 - 2026-02-21 | New requirement (from issue #22637): conflicting pragma errors should keep `at ...` locations and also show line-numbered pragma source lines under `|`; no `Pragmas:` summary list.
+- 2026-02-21 | Superseding requirement: caret suppression is removed; in `-fdiagnostics-show-caret` mode, caret markers are allowed.
+- 2026-02-21 | Superseding requirement: use `Sig` payload for `TcRnConflictingInlineSigDecl` instead of `InlinePragma` payload.
+- 2026-02-21 | Workflow decision: redirected command logs should be written under `/tmp` instead of `.ai/T22637`.
 
 ## Open risks
 - None identified for the scoped diagnostics change; behavior change is covered by targeted regression tests.

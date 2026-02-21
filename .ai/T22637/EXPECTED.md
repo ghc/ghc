@@ -9,7 +9,20 @@ Exact line/column spans may vary; keep core wording stable.
   - do not include source excerpt lines
 - With `-fdiagnostics-show-caret`:
   - include source excerpt lines (`|` block) containing conflicting pragma lines
-  - do **not** include a caret marker line (`^`)
+  - caret marker lines may be present
+
+## issue #22637 verbatim example
+Ideally it would say something like:
+
+```text
+Test.hs:7:14: error:
+    Invalid pragma combination for ‘bar’
+    at Test.hs:6:16-18
+       Test.hs:7:14-16
+  |
+6 | {-# INLINEABLE bar #-}
+7 | {-# NOINLINE bar #-}
+```
 
 ## testsuite/tests/rename/should_fail/T22637.stderr
 - Must report conflicting inline pragmas (not duplicate).
@@ -21,7 +34,7 @@ Exact line/column spans may vary; keep core wording stable.
   - include conflicting pragma lines as line-numbered source lines, e.g.
     - `6 | {-# INLINE f #-}`
     - `7 | {-# NOINLINE f #-}`
-  - no caret marker line (`^`)
+  - caret marker line(s) may be present
   - do **not** use a `Pragmas:` summary list
 - Test source should combine:
   - `{-# INLINE f #-}`
@@ -35,7 +48,7 @@ Exact line/column spans may vary; keep core wording stable.
   - keep an `at ...` location block
   - include a source excerpt block starting with `|`
   - include each conflicting pragma as a line-numbered source line
-  - no caret marker line (`^`)
+  - caret marker line(s) may be present
   - do **not** use a `Pragmas:` summary list
 
 ## testsuite/tests/parser/should_fail/OpaqueParseFail4.stderr
