@@ -16,6 +16,8 @@
 - Regression should use `INLINE` + `NOINLINE`.
 - Preferred test command:
   - `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
+- Optional smoke-check command:
+  - `hadrian/build -q -q -j3 --no-build test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
 - Workflow update: agents should update `.ai/T22637/PLAN.md` and `.ai/T22637/REPORT.md` as progress is made.
 
 ## Progress log (append-only)
@@ -31,6 +33,7 @@
 - 2026-02-21 | Agents must keep PLAN/REPORT updated during execution.
 - 2026-02-21 | Code style should match surrounding code in touched files.
 - 2026-02-21 | Prefer intermediate logical commits over one final commit.
+- 2026-02-21 | Start-of-task workflow should trigger/suggest saving Hadrian command approval.
 
 ## Final handoff checklist
 - Final summary written.

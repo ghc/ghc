@@ -33,6 +33,7 @@ Fix misleading diagnostics for conflicting inline pragmas.
 ## Workflow requirement
 - As implementation progresses, agents must keep `.ai/T22637/PLAN.md` and `.ai/T22637/REPORT.md` up to date.
 - Code style requirement: fit in with surrounding code style and local conventions in each edited file.
+- At task start, trigger command-permission approval for the Hadrian test prefix before doing implementation work.
 
 ## Definition Of Done
 - Build compiles after code edits relevant to diagnostics.

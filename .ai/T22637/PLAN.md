@@ -10,14 +10,21 @@ Status: mutable working plan
 - When a step reaches `done`, create an intermediate commit if the diff is coherent.
 
 ## Command runbook
-1. Baseline state:
+1. Permission bootstrap (first action):
+   - Trigger approval request using:
+     - `hadrian/build -q -q -j3 --no-build test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
+   - Ask user to save approval rule for future sessions with prefix:
+     - `["hadrian/build","-q","-q","-j3","test"]`
+2. Baseline state:
    - `git status --short`
-2. Edit + compile loop (as needed):
+3. Optional smoke-check command shape:
+   - `hadrian/build -q -q -j3 --no-build test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
+4. Edit + compile loop (as needed):
    - `hadrian/build -q -q -j3 test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
-3. Inspect changed files:
+5. Inspect changed files:
    - `git status --short`
    - `git diff -- .ai/T22637 compiler/GHC/Tc/Errors/Types.hs compiler/GHC/Types/Error/Codes.hs compiler/GHC/Rename/Bind.hs compiler/GHC/Tc/Errors/Ppr.hs testsuite/tests/rename/should_fail testsuite/tests/parser/should_fail`
-4. Final check:
+6. Final check:
    - Ensure outputs match `.ai/T22637/EXPECTED.md`.
 
 ## Implementation plan
