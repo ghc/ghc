@@ -1219,57 +1219,54 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
       shifted_mask <- getNewRegNat fmt
       shifted_n    <- getNewRegNat fmt
       tmp1         <- getNewRegNat fmt
-      masked_res   <- getNewRegNat fmt
-      masked_other <- getNewRegNat fmt
       tmp2         <- getNewRegNat fmt
 
-      let build_result =
-            case amop of
-              AMO_And -> nilOL
-              AMO_Or  -> nilOL
-              AMO_Xor -> nilOL
-              _       -> toOL [ AND masked_res tmp2 (RIReg shifted_mask)
-                              , ANDC masked_other tmp1 shifted_mask
-                              , OR tmp2 masked_other (RIReg masked_res)
+      let handle_value = do
+            (n_reg, ncode) <- getSomeReg n
+            let unaligned_addr = fromJust maybe_unaligned_addr
+            let inv = shift_amount platform shift
+            let mask_end = case width of
+                  W8  -> 28
+                  W16 -> 27
+                  _   -> 0
+            let mask_value = case width of
+                  W8  -> unitOL $ LI mask (ImmInt 255)
+                  W16 -> toOL [ LI mask (ImmInt 0)
+                              , OR mask mask (RIImm (ImmInt 65535))
                               ]
+                  _   -> nilOL
+            let and_mask =
+                  case amop of
+                    AMO_And -> unitOL $ ORC shifted_n shifted_n shifted_mask
+                    AMO_Or  -> unitOL $ AND shifted_n shifted_n (RIReg shifted_mask)
+                    AMO_Xor -> unitOL $ AND shifted_n shifted_n (RIReg shifted_mask)
+                    _       -> nilOL
 
-      let and_mask =
-            case amop of
-              AMO_And -> unitOL $ ORC shifted_n shifted_n shifted_mask
-              AMO_Or  -> unitOL $ AND shifted_n shifted_n (RIReg shifted_mask)
-              AMO_Xor -> unitOL $ AND shifted_n shifted_n (RIReg shifted_mask)
-              _       -> nilOL
+            let i = ncode
+                    `appOL` unitOL (RLWINM shift unaligned_addr 3 27 mask_end)
+                    `appOL` inv `appOL` mask_value `appOL`
+                    toOL [ SL fmt shifted_mask mask (RIReg shift)
+                         , SL fmt shifted_n n_reg (RIReg shift)
+                         ]
+                    `appOL` and_mask
+            insert <-  case amop of
+                         AMO_And -> return nilOL
+                         AMO_Or  -> return nilOL
+                         AMO_Xor -> return nilOL
+                         _       -> do
+                           masked_res   <- getNewRegNat fmt
+                           masked_other <- getNewRegNat fmt
+                           return $ toOL [ AND masked_res tmp2 (RIReg shifted_mask)
+                                         , ANDC masked_other tmp1 shifted_mask
+                                         , OR tmp2 masked_other (RIReg masked_res)
+                                         ]
+
+            let shift_back = unitOL $ SR fmt reg_dst tmp2 (RIReg shift)
+            return (RIReg shifted_n, i, insert, shift_back)
 
       (n_ri, pre_code, mid_code, post_code) <- case width of
-        W8  -> do
-          (n_reg, ncode) <- getSomeReg n
-          let unaligned_addr = fromJust maybe_unaligned_addr
-          let inv = shift_amount platform shift
-          let i = ncode `appOL` unitOL (RLWINM shift unaligned_addr 3 27 28)
-                  `appOL` inv `appOL`
-                  toOL [ LI mask (ImmInt 255)
-                       , SL fmt shifted_mask mask (RIReg shift)
-                       , SL fmt shifted_n n_reg (RIReg shift)
-                       ]
-                  `appOL` and_mask
-          let insert = build_result
-          let shift_back = unitOL $ SR fmt reg_dst tmp2 (RIReg shift)
-          return (RIReg shifted_n, i, insert, shift_back)
-        W16 -> do
-          (n_reg, ncode) <- getSomeReg n
-          let unaligned_addr = fromJust maybe_unaligned_addr
-          let inv = shift_amount platform shift
-          let i = ncode `appOL` unitOL (RLWINM shift unaligned_addr 3 27 27)
-                  `appOL` inv `appOL`
-                  toOL [ LI mask (ImmInt 0)
-                       , OR mask mask (RIImm (ImmInt 65535))
-                       , SL fmt shifted_mask mask (RIReg shift)
-                       , SL fmt shifted_n n_reg (RIReg shift)
-                       ]
-                  `appOL` and_mask
-          let insert = build_result
-          let shift_back = unitOL $ SR fmt reg_dst tmp2 (RIReg shift)
-          return (RIReg shifted_n, i, insert, shift_back)
+        W8  -> handle_value
+        W16 -> handle_value
         _   -> do
           (n_ri, n_code) <- case amop of
             AMO_Add  -> getSomeRegOrImm True
@@ -1283,7 +1280,7 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
             AMO_And  -> getSomeRegOrImm False
             AMO_Or   -> getSomeRegOrImm False
             AMO_Xor  -> getSomeRegOrImm False
-            _        -> do (n_reg, n_code) <- getSomeReg n
+            AMO_Nand -> do (n_reg, n_code) <- getSomeReg n
                            return (RIReg n_reg, n_code)
           return (n_ri, n_code, nilOL, unitOL $ MR reg_dst tmp2)
 
