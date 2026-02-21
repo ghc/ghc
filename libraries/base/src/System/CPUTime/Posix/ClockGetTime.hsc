@@ -40,6 +40,23 @@ withTimespec action =
         u_nsec <- (#peek struct timespec,tv_nsec) p_ts :: IO CLong
         return (r, cTimeToInteger u_sec * 1e12 + fromIntegral u_nsec * 1e3)
 
+#if defined(__wasi__)
+-- WASI defines clockid_t as 'const struct __clockid *' (a pointer type),
+-- unlike the integer clockid_t on POSIX platforms (Linux, macOS, etc.).
+-- We use 'Ptr ()' (void pointer) to match the WASI ABI; C allows implicit
+-- conversion between void* and any other pointer type.
+foreign import capi unsafe "time.h clock_getres"  clock_getres  :: Ptr () -> Ptr Timespec -> IO CInt
+foreign import capi unsafe "time.h clock_gettime" clock_gettime :: Ptr () -> Ptr Timespec -> IO CInt
+
+#if HAVE_DECL_CLOCK_PROCESS_CPUTIME_ID
+foreign import capi unsafe "time.h value CLOCK_PROCESS_CPUTIME_ID" cLOCK_PROCESS_CPUTIME_ID :: Ptr ()
+#else
+foreign import capi unsafe "time.h value CLOCK_MONOTONIC" cLOCK_PROCESS_CPUTIME_ID :: Ptr ()
+#endif // HAVE_DECL_CLOCK_PROCESS_CPUTIME_ID
+
+#else
+-- Standard POSIX platforms (Linux, macOS, FreeBSD, …) use clockid_t as an
+-- integer type (typically 'int' or 'long').
 foreign import capi unsafe "time.h clock_getres"  clock_getres  :: CUIntPtr -> Ptr Timespec -> IO CInt
 foreign import capi unsafe "time.h clock_gettime" clock_gettime :: CUIntPtr -> Ptr Timespec -> IO CInt
 
@@ -48,6 +65,8 @@ foreign import capi unsafe "time.h value CLOCK_PROCESS_CPUTIME_ID" cLOCK_PROCESS
 #else
 foreign import capi unsafe "time.h value CLOCK_MONOTONIC" cLOCK_PROCESS_CPUTIME_ID :: CUIntPtr
 #endif // HAVE_DECL_CLOCK_PROCESS_CPUTIME_ID
+
+#endif // __wasi__
 
 #else
 
