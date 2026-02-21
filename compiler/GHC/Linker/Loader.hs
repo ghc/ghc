@@ -178,8 +178,8 @@ getLoaderState :: Interp -> IO (Maybe LoaderState)
 getLoaderState interp = readMVar (loader_state (interpLoader interp))
 
 
-emptyLoaderState :: DynFlags -> LoaderState
-emptyLoaderState dflags = LoaderState
+emptyLoaderState :: UnitEnv -> DynFlags -> LoaderState
+emptyLoaderState unit_env dflags = LoaderState
    { linker_env = LinkerEnv
      { closure_env = emptyNameEnv
      , itbl_env    = emptyNameEnv
@@ -199,14 +199,16 @@ emptyLoaderState dflags = LoaderState
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = let addToUDFM' (k, v) m = addToUDFM m k v
-                    in foldr addToUDFM' emptyUDFM [
-                      (rtsUnitId, (LoadedPkgInfo rtsUnitId [] [] [] emptyUniqDSet))
-                    -- FIXME? Should this be the rtsWayUnitId of the current ghc, or the one
-                    --        for the target build? I think target-build seems right, but I'm
-                    --        not fully convinced.
-                    , (rtsWayUnitId dflags, (LoadedPkgInfo (rtsWayUnitId dflags) [] [] [] emptyUniqDSet))
-                    ]
+  where deps = getUnitDepends unit_env rtsUnitId
+        pkg_to_dfm unit_id = (unit_id, (LoadedPkgInfo unit_id [] [] [] emptyUniqDSet))
+        init_pkgs = let addToUDFM' (k, v) m = addToUDFM m k v
+                    in foldr addToUDFM' emptyUDFM $ [
+                      pkg_to_dfm rtsUnitId,
+                      -- FIXME? Should this be the rtsWayUnitId of the current ghc, or the one
+                      --        for the target build? I think target-build seems right, but I'm
+                      --        not fully convinced.
+                      pkg_to_dfm (rtsWayUnitId dflags)
+                    ] ++ fmap pkg_to_dfm deps
 
 extendLoadedEnv :: Interp -> [(Name,ForeignHValue)] -> IO ()
 extendLoadedEnv interp new_bindings =
@@ -346,7 +348,7 @@ initLoaderState interp hsc_env = do
 reallyInitLoaderState :: Interp -> HscEnv -> IO LoaderState
 reallyInitLoaderState interp hsc_env = do
   -- Initialise the linker state
-  let pls0 = emptyLoaderState (hsc_dflags hsc_env)
+  let pls0 = emptyLoaderState (hsc_unit_env hsc_env) (hsc_dflags hsc_env)
 
   case platformArch (targetPlatform (hsc_dflags hsc_env)) of
     -- FIXME: we don't initialize anything with the JS interpreter.
@@ -1206,12 +1208,6 @@ loadPackage interp hsc_env pkg
             dirs      = libraryDirsForWay' is_dyn pkg
 
         let hs_libs   = map ST.unpack $ Packages.unitLibraries pkg
-            -- The FFI GHCi import lib isn't needed as
-            -- GHC.Linker.Loader + rts/Linker.c link the
-            -- interpreted references to FFI to the compiled FFI.
-            -- We therefore filter it out so that we don't get
-            -- duplicate symbol errors.
-            hs_libs'  =  filter ("HSffi" /=) hs_libs
 
         -- Because of slight differences between the GHC dynamic linker and
         -- the native system linker some packages have to link with a
@@ -1231,7 +1227,7 @@ loadPackage interp hsc_env pkg
         dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
 
         hs_classifieds
-           <- mapM (locateLib interp hsc_env True  dirs_env gcc_paths) hs_libs'
+           <- mapM (locateLib interp hsc_env True  dirs_env gcc_paths) hs_libs
         extra_classifieds
            <- mapM (locateLib interp hsc_env False dirs_env gcc_paths) extra_libs
         let classifieds = hs_classifieds ++ extra_classifieds

@@ -1,5 +1,5 @@
 {-# LANGUAGE UnboxedTuples, MagicHash #-}
-module Main where
+module T23142 where
 
 import GHC.IO
 import GHC.Exts

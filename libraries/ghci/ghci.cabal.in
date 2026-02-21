@@ -31,6 +31,10 @@ Flag bootstrap
         Default: False
         Manual: True
 
+flag use-system-libffi
+  default: False
+  manual: True
+
 source-repository head
     type:     git
     location: https://gitlab.haskell.org/ghc/ghc.git

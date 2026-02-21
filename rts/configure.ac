@@ -184,6 +184,7 @@ AC_CHECK_FUNCS([dlinfo])
 
 FP_CHECK_PTHREAD_LIB
 
+
 dnl --------------------------------------------------
 dnl * Miscellaneous feature tests
 dnl --------------------------------------------------

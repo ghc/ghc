@@ -31,6 +31,7 @@ extra-source-files:
     posix/ticker/Setitimer.c
     posix/ticker/TimerCreate.c
     posix/ticker/TimerFd.c
+    wasm/WasmGlobalRegs.S
     -- headers files that are not installed by the rts package but only used to
     -- build the rts C code
     xxhash.h
@@ -247,14 +248,16 @@ extra-tmp-files:
     config.log
     config.status
 
+-- WASM GlobalRegs source file, needed at executable link time
+-- See Note [WASM GlobalRegs Linking] in rts/wasm/WasmGlobalRegs.S
+data-files:
+    wasm/WasmGlobalRegs.S
+
 source-repository head
     type:     git
     location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   rts
 
-flag libm
-  default: False
-  manual: True
 flag librt
   default: False
   manual: True
@@ -560,6 +563,9 @@ common rts-c-sources-base
                   win32/veh_excn.c
     elif arch(wasm32)
       asm-sources: wasm/Wasm.S
+      -- Note: WasmGlobalRegs.S is NOT included in RTS build
+      -- It's compiled on-demand and injected during executable linking
+      -- See Note [WASM GlobalRegs Linking] in rts/wasm/WasmGlobalRegs.S
       c-sources: wasm/StgRun.c
                  wasm/GetTime.c
                  wasm/OSMem.c
@@ -586,17 +592,21 @@ common rts-link-options
     if flag(use-system-libffi)
        extra-libraries: ffi
        extra-libraries-static: ffi
-    else
+    if !flag(use-system-libffi) && !arch(javascript) && !arch(wasm32)
        build-depends: libffi-clib
 
     if os(linux)
        extra-libraries: c
-    if flag(libm)
-       extra-libraries: m
+       extra-libraries-static: c
     if flag(librt)
        extra-libraries: rt
+       extra-libraries-static: rt
     if os(windows)
        extra-libraries:
+          wsock32 gdi32 winmm
+          dbghelp
+          psapi
+       extra-libraries-static:
           wsock32 gdi32 winmm
           dbghelp
           psapi
@@ -604,12 +614,16 @@ common rts-link-options
        cc-options: -D_WIN32_WINNT=0x06010000
     if flag(need-atomic)
        extra-libraries: atomic
+       extra-libraries-static: atomic
     if flag(libbfd)
        extra-libraries: bfd iberty
+       extra-libraries-static: bfd iberty
     if flag(libdw)
        extra-libraries: elf dw
+       extra-libraries-static: elf dw
     if flag(libnuma)
        extra-libraries: numa
+       extra-libraries-static: numa
     if flag(libzstd)
        if flag(static-libzstd)
           if os(darwin)
@@ -618,6 +632,7 @@ common rts-link-options
              extra-libraries: :libzstd.a
        else
           extra-libraries: zstd
+       extra-libraries-static: zstd
 
     if os(osx)
       ld-options: "-Wl,-search_paths_first"
@@ -687,10 +702,10 @@ library
       DerivedConstants.h
       rts/EventLogConstants.h
       rts/EventTypes.h
-      AutoApply.cmm.h
-      AutoApply_V16.cmm.h
-      AutoApply_V32.cmm.h
-      AutoApply_V64.cmm.h
+      rts/AutoApply.cmm.h
+      rts/AutoApply_V16.cmm.h
+      rts/AutoApply_V32.cmm.h
+      rts/AutoApply_V64.cmm.h
 
     install-includes:
       ghcautoconf.h
@@ -698,10 +713,10 @@ library
       DerivedConstants.h
       rts/EventLogConstants.h
       rts/EventTypes.h
-      AutoApply.cmm.h
-      AutoApply_V16.cmm.h
-      AutoApply_V32.cmm.h
-      AutoApply_V64.cmm.h
+      rts/AutoApply.cmm.h
+      rts/AutoApply_V16.cmm.h
+      rts/AutoApply_V32.cmm.h
+      rts/AutoApply_V64.cmm.h
 
     install-includes:
       -- Common headers for non-JS builds
@@ -775,7 +790,7 @@ library
       rts-headers,
       rts-fs
 
-    if !flag(use-system-libffi) && !arch(javascript)
+    if !flag(use-system-libffi) && !arch(javascript) && !arch(wasm32)
       build-depends: libffi-clib
 
 common ghcjs

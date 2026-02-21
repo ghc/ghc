@@ -172,10 +172,27 @@ TIMING_DIR := $(BUILD_DIR)/timing
 # Metrics directory for CPU/memory CSV data
 METRICS_DIR := $(BUILD_DIR)/metrics
 
+# Stamp files — Make uses these to know a stage is complete.
+# Phony targets like `stage2` always re-run their recipe, which causes `test`
+# (which depends on `stage2`) to re-execute the entire build even when nothing
+# changed. File-based stamps let Make skip already-completed stages.
+STAGE0_STAMP := $(BUILD_DIR)/.stamp-stage0
+STAGE1_STAMP := $(BUILD_DIR)/.stamp-stage1
+STAGE2_STAMP := $(BUILD_DIR)/.stamp-stage2
+
+# Stamp fallback rules: if a stamp doesn't exist, invoke the corresponding
+# stage via recursive make. The stage recipe touches the stamp on success.
+# Because there are no prerequisites, Make won't re-run these when the stamp
+# file already exists — which is the whole point: `test: $(STAGE2_STAMP)` will
+# skip the build if stage2 already completed.
+$(STAGE0_STAMP): ; @$(MAKE) stable-cabal
+$(STAGE1_STAMP): ; @$(MAKE) stage1
+$(STAGE2_STAMP): ; @$(MAKE) stage2
+
 # HOST_PLATFROM is always from the bootstrap compiler
 HOST_PLATFORM := $(shell $(GHC0) --print-host-platform)
 
-CABAL      := $(BUILD_DIR)/cabal/bin/cabal$(EXE_EXT)
+CABAL      ?= $(BUILD_DIR)/cabal/bin/cabal$(EXE_EXT)
 
 STAGE1_PATH := $(let STAGE,stage1,$(STORE_DIR)/host/$(HOST_PLATFORM))
 STAGE2_PATH := $(let STAGE,stage2,$(STORE_DIR)/host/$(HOST_PLATFORM))
@@ -301,13 +318,15 @@ define CABAL_BUILD
 	$(call CABAL_BUILD_WITH,$(CABAL))
 endef
 
-define CABAL_BUILD_STAGE0
+define CABAL_INSTALL_STAGE0
 	$(CABAL0) \
 		--store-dir $(call NORMALIZE_FP,$(CURDIR)/$(STORE_DIR)) \
 		--logs-dir $(call NORMALIZE_FP,$(CURDIR)/$(LOGS_DIR)) \
-	build \
-		--project-file cabal.project.$(STAGE) \
+	install \
+		--installdir $(dir $(CABAL)) \
 		--builddir $(call NORMALIZE_FP,$(CURDIR)/$(STAGE_DIR)) \
+		--project-file cabal.project.$(STAGE) \
+		--overwrite-policy=always --install-method=copy \
 		$(CABAL_ARGS)
 endef
 
@@ -521,17 +540,19 @@ all: stage2
 # | (_| (_| | |_) | (_| | |_____| | | | \__ \ || (_| | | |
 #  \___\__,_|_.__/ \__,_|_|     |_|_| |_|___/\__\__,_|_|_|
 
-.PHONY: $(CABAL)
-$(CABAL): STAGE=stage0
-$(CABAL):
+# TODO: Building cabal-install from source as part of the Makefile is a
+# temporary workaround. We should eventually require cabal to be provided
+# externally (e.g. via ghcup) and drop this target entirely.
+.PHONY: stable-cabal
+stable-cabal: STAGE=stage0
+stable-cabal:
+ifeq (,$(USE_SYSTEM_CABAL))
 	$(call PHASE_START,cabal)
-	$(call LOG,Building $@)
-	$(CABAL_BUILD_STAGE0) --with-compiler $(GHC0) cabal-install:exe:cabal
-	@mkdir -p $(@D)
-	@cp $$($(CABAL0) list-bin -v0 -j --with-compiler $(GHC0) --project-file=cabal.project.stage0 --builddir=$(CURDIR)/$(STAGE_DIR) cabal-install:exe:cabal | $(CYGPATH)) $@
+	$(call LOG,Building $(CABAL))
+	$(CABAL_INSTALL_STAGE0) --with-compiler $(GHC0) cabal-install:exe:cabal
 	$(call PHASE_END_OK,cabal)
-
-stage0 : $(CABAL)
+	@touch $(STAGE0_STAMP)
+endif
 
 #  ____  _                     _
 # / ___|| |_ __ _  __ _  ___  / |
@@ -569,7 +590,7 @@ STAGE1_CABAL_BUILD = \
 	--ghc-options "-ghcversion-file=$(call NORMALIZE_FP,$(CURDIR)/rts/include/ghcversion.h)"
 
 stage1: STAGE=stage1
-stage1: $(CABAL) $(CONFIGURE_SCRIPTS) $(CONFIGURED_FILES) cabal.project.stage1 cabal.project.common libraries/ghc-boot-th-next | hackage
+stage1: stable-cabal $(CONFIGURE_SCRIPTS) $(CONFIGURED_FILES) cabal.project.stage1 cabal.project.common libraries/ghc-boot-th-next | hackage
 	$(call PHASE_START,stage1)
 	$(call LOG,Starting build of $(STAGE))
 
@@ -590,6 +611,7 @@ endif
 
 	$(call LOG,Finished building $(STAGE))
 	$(call PHASE_END_OK,stage1)
+	@touch $(STAGE1_STAMP)
 
 $(addprefix $(STAGE1_PATH)/bin/,$(STAGE1_EXECUTABLES)) : stage1
 
@@ -689,7 +711,7 @@ STAGE2_CABAL_BUILD = \
 
 stage2: STAGE=stage2
 stage2: TARGET_PLATFORM:=$(HOST_PLATFORM)
-stage2: $(GHC1) $(CABAL) $(CONFIGURE_SCRIPTS) $(CONFIGURED_FILES) cabal.project.stage2 cabal.project.stage2.settings cabal.project.common libraries/ghc-boot-th-next | stage1
+stage2: $(GHC1) stable-cabal $(CONFIGURE_SCRIPTS) $(CONFIGURED_FILES) cabal.project.stage2 cabal.project.stage2.settings cabal.project.common libraries/ghc-boot-th-next | stage1
 	$(call PHASE_START,stage2)
 	$(call LOG,Starting build of $(STAGE))
 
@@ -752,6 +774,7 @@ endif
 	$(call LOG,Finished building $(STAGE) in $(DIST_DIR))
 	$(call PHASE_END_OK,stage2.dist)
 	$(call PHASE_END_OK,stage2)
+	@touch $(STAGE2_STAMP)
 
 $(addprefix $(STAGE2_PATH)/bin/,$(STAGE2_EXECUTABLES)) : stage2
 
@@ -1009,19 +1032,19 @@ $(DIST_DIR)/ghc.tar.gz: stage2
 		lib/$(HOST_PLATFORM)
 	@echo "::endgroup::"
 
-$(DIST_DIR)/cabal.tar.gz: $(CABAL)
+$(DIST_DIR)/cabal.tar.gz: stable-cabal
 	@echo "::group::Creating cabal.tar.gz..."
 	@mkdir -p $(DIST_DIR)/bin
-	@cp $< $(DIST_DIR)/bin/
+	@cp $(CABAL) $(DIST_DIR)/bin/
 	@tar czf $@ \
 		--directory=$(DIST_DIR) \
 		bin/cabal
 	@echo "::endgroup::"
 
-$(DIST_DIR)/haskell-toolchain.tar.gz: $(CABAL) stage2 stage3-javascript-unknown-ghcjs
+$(DIST_DIR)/haskell-toolchain.tar.gz: stable-cabal stage2 stage3-javascript-unknown-ghcjs
 	@echo "::group::Creating haskell-toolchain.tar.gz..."
 	@mkdir -p $(DIST_DIR)/bin
-	@cp $< $(DIST_DIR)/bin/
+	@cp $(CABAL) $(DIST_DIR)/bin/
 	@tar czf $@ \
 		--directory=$(DIST_DIR) \
 		$(foreach exe,$(STAGE2_EXECUTABLES),bin/$(exe)$(EXE_EXT)) \
@@ -1103,8 +1126,11 @@ libraries/ghc-boot-th-next: \
 clean-cabal: clean-stage0
 clean-stage0:
 	@echo "::group::Cleaning build artifacts..."
+ifeq (,$(USE_SYSTEM_CABAL))
 	rm -rf $(BUILD_DIR)/cabal
+endif
 	rm -rf $(BUILD_DIR)/stage0
+	rm -f $(STAGE0_STAMP)
 	@echo "::endgroup::"
 
 clean: clean-stage1 clean-stage2 clean-stage3
@@ -1113,11 +1139,13 @@ clean: clean-stage1 clean-stage2 clean-stage3
 clean-stage1:
 	@echo "::group::Cleaning stage1 build artifacts..."
 	rm -rf $(BUILD_DIR)/stage1
+	rm -f $(STAGE1_STAMP)
 	@echo "::endgroup::"
 
 clean-stage2:
 	@echo "::group::Cleaning stage2 build artifacts..."
 	rm -rf $(BUILD_DIR)/stage2
+	rm -f $(STAGE2_STAMP)
 	@echo "::endgroup::"
 
 clean-stage3:
@@ -1163,7 +1191,7 @@ testsuite-timeout:
 
 # --- Test Target ---
 
-test: stage2 testsuite-timeout
+test: $(STAGE2_STAMP) testsuite-timeout
 	$(call PHASE_START,test)
 	@echo "::group::Running tests with THREADS=$(THREADS)" >&2
 	# If any required tool is missing, testsuite logic will skip related tests.
