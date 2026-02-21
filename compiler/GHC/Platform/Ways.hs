@@ -146,7 +146,7 @@ wayGeneralFlags :: Platform -> Way -> [GeneralFlag]
 wayGeneralFlags _ (WayCustom {}) = []
 wayGeneralFlags _ WayThreaded = []
 wayGeneralFlags _ WayDebug    = []
-wayGeneralFlags _ WayDyn      = [Opt_PIC, Opt_ExternalDynamicRefs]
+wayGeneralFlags _ WayDyn = [Opt_PIC, Opt_ExternalDynamicRefs]
     -- We could get away without adding -fPIC when compiling the
     -- modules of a program that is to be linked with -dynamic; the
     -- program itself does not need to be position-independent, only
@@ -154,6 +154,10 @@ wayGeneralFlags _ WayDyn      = [Opt_PIC, Opt_ExternalDynamicRefs]
     -- .so before loading the .so using the system linker.  Since only
     -- PIC objects can be linked into a .so, we have to compile even
     -- modules of the main program with -fPIC when using -dynamic.
+    --
+    -- Note: For WASM, this is especially important as dyld.mjs can
+    -- only load PIC objects for GHCi/Template Haskell. WASM executables
+    -- handle GlobalRegs differently - see GHC.Linker.Executable.mkWasmGlobalRegsObj
 wayGeneralFlags _ WayProf     = []
 
 -- | Turn these flags off when enabling this way

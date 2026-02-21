@@ -29,6 +29,8 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import GHC.Data.FastString
+import GHC.Data.ShortText qualified as ST
+import GHC.Types.SrcLoc (noSrcSpan)
 
 import GHC.Driver.Session
 import GHC.Driver.DynFlags
@@ -205,6 +207,7 @@ linkExecutable logger tmpfs opts unit_env o_files dep_units = do
 
     extraLinkObj <- maybeToList <$> mkExtraObjToLinkIntoBinary logger tmpfs opts unit_state
     noteLinkObjs <- mkNoteObjsToLinkIntoBinary logger tmpfs opts unit_env dep_units
+    wasmGlobalRegsObj <- maybeToList <$> mkWasmGlobalRegsObj logger tmpfs opts unit_env
 
     let
       (pre_hs_libs, post_hs_libs)
@@ -297,6 +300,7 @@ linkExecutable logger tmpfs opts unit_env o_files dep_units = do
                  ++ pkg_lib_path_opts
                  ++ extraLinkObj
                  ++ noteLinkObjs
+                 ++ wasmGlobalRegsObj
                  -- See Note [RTS/ghc-internal interface]
                  -- (-u<sym> must come before -lghc-internal...!)
                  ++ (if ghcInternalUnitId `elem` map unitId pkgs
@@ -441,6 +445,66 @@ mkNoteObjsToLinkIntoBinary logger tmpfs opts unit_env dep_packages = do
                  <> sectionType platform "progbits" <> char '\n'
             else Outputable.empty
         ]
+
+-- | Compile WASM GlobalRegs on-demand for executable linking
+--
+-- WASM executables (both static and dynamic) need STG GlobalRegs injected
+-- at link time. These cannot be in the RTS because they would get linked
+-- into libraries and conflict with dyld.mjs (which supplies GlobalRegs for
+-- GHCi/Template Haskell at runtime).
+--
+-- This function compiles rts/wasm/WasmGlobalRegs.S to WasmGlobalRegs.o
+-- on-demand during executable linking and returns the path.
+--
+-- See Note [WASM GlobalRegs Linking] in rts/wasm/WasmGlobalRegs.S
+mkWasmGlobalRegsObj :: Logger -> TmpFs -> ExecutableLinkOpts -> UnitEnv -> IO (Maybe FilePath)
+mkWasmGlobalRegsObj logger tmpfs opts unit_env
+  | ArchWasm32 <- platformArch platform = do
+      let unit_state = ue_homeUnitState unit_env
+      let rts_info = unsafeLookupUnit unit_state rtsUnit
+
+      -- Search for WasmGlobalRegs.S in multiple locations:
+      -- 1. PRIMARY: Package data directory (proper Cabal mechanism)
+      -- 2. FALLBACK: Relative to RTS library directory (in-tree builds)
+      -- 3. DEVELOPMENT: Source tree fallback
+      let rts_lib_dirs = collectLibraryDirs (leWays opts) [rts_info]
+          search_paths =
+            [ -- PRIMARY: Package data directory (installed by Cabal data-files)
+              -- e.g., <datadir>/wasm/WasmGlobalRegs.S
+              ST.unpack data_dir </> "wasm" </> "WasmGlobalRegs.S"
+            | Just data_dir <- [unitDataDir rts_info]
+            ] ++
+            [ -- FALLBACK: Relative to library directory (in-tree builds)
+              -- e.g., <libdir>/../wasm/WasmGlobalRegs.S
+              lib_dir </> ".." </> "wasm" </> "WasmGlobalRegs.S"
+            | lib_dir <- rts_lib_dirs
+            ] ++
+            [ -- DEVELOPMENT: Source tree fallback
+              "rts" </> "wasm" </> "WasmGlobalRegs.S"
+            ]
+
+      -- Find first existing path
+      found_paths <- filterM doesFileExist search_paths
+      case found_paths of
+        (wasm_source:_) -> do
+          -- Compile WasmGlobalRegs.S to WasmGlobalRegs.o
+          -- Use "S" (uppercase) so clang runs the C preprocessor on the file,
+          -- expanding CPP macros such as W_ (#define W_ i32) and processing
+          -- the #include directives for ghcconfig.h / DerivedConstants.h.
+          -- Using "s" (lowercase) would skip CPP and leave W_ unexpanded,
+          -- causing "Unknown type in .globaltype directive: W_" errors.
+          obj <- mkExtraObj logger tmpfs (leTempDir opts) (leCcConfig opts) unit_state "S"
+                   =<< readFile wasm_source
+          return (Just obj)
+        [] -> do
+          -- Source file not found - this is a build configuration error
+          let msg = "WASM executable linking requires rts/wasm/WasmGlobalRegs.S but file not found.\n" ++
+                    "Searched in:\n" ++ unlines (map ("  - " ++) search_paths)
+          logMsg logger errorDiagnostic noSrcSpan $ text msg
+          return Nothing
+  | otherwise = return Nothing
+  where
+    platform = ue_platform unit_env
 
 data LinkInfo = LinkInfo
   { liPkgLinkOpts :: UnitLinkOpts
