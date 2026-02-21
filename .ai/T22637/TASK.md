@@ -19,7 +19,6 @@ Fix misleading diagnostics for conflicting inline pragmas.
 - Update existing mixed-inline stderr baselines impacted by message changes.
 - Use targeted test run command:
   - `hadrian/build -q -q test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
-  - fallback: `--test-compiler=stage2` if stage1 is unavailable.
 
 ## Non-goals
 - Do not change language legality of pragma combinations in this patch.
