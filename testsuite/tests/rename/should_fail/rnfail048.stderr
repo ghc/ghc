@@ -1,6 +1,6 @@
 
-rnfail048.hs:11:12: error: [GHC-31744]
-    Duplicate INLINE pragmas for ‘foo’
+rnfail048.hs:11:12: error: [GHC-43895]
+    Conflicting pragmas for ‘foo’
     at rnfail048.hs:6:17-19
        rnfail048.hs:7:18-20
        rnfail048.hs:8:14-16
