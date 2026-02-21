@@ -98,14 +98,15 @@
  *
  * This is a no-op on:
  * - Windows (different linking model)
+ * - WASM/WASI (no dynamic linking support: dladdr/Dl_info unavailable)
  * - Systems without RTLD_NOLOAD
  * - Static executables (symbols already global)
  */
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && !defined(wasm32_HOST_ARCH)
 #include <dlfcn.h>
 #endif
 
-#if !defined(mingw32_HOST_OS) && defined(RTLD_NOLOAD)
+#if !defined(mingw32_HOST_OS) && !defined(wasm32_HOST_ARCH) && defined(RTLD_NOLOAD)
 /* Helper to promote a single library to RTLD_GLOBAL */
 static void promoteLibraryToGlobal(const char* name, void* symbol)
 {
