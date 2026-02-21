@@ -188,6 +188,12 @@ asmTellDataSection ty_word def_syms sym DataSection {..} = do
   when (getUnique sym `memberUniqueSet` def_syms) $ asmTellDefSym sym
   asmTellSectionHeader sec_name
   asmTellAlign dataSectionAlignment
+  -- The LLVM WASM assembler requires .size for every data symbol. Although some
+  -- symbols (e.g. stg_WHITEHOLE_info) also appear in funcTypes because Cmm's
+  -- lookupName misclassifies bare unimported names as CmmCode labels, we rely on
+  -- asm_functypes in asmTellEverything to suppress .functype for any symbol that
+  -- is already defined as a data section. The assembler therefore sees the symbol
+  -- purely as DATA, and .size is both required and harmless.
   asmTellTabLine asm_size
   asmTellLine $ asm_sym <> ":"
   for_ dataSectionContents $ asmTellDataSectionContent ty_word
@@ -549,8 +555,18 @@ asmTellEverything ty_word WasmCodeGenState {..} = do
   asmTellTargetFeatures
   where
     asm_functypes = do
+      -- Emit .functype only for symbols that are:
+      --   * known to be functions (in funcTypes), AND
+      --   * not defined locally (not in funcBodies, those get their own entry), AND
+      --   * not defined as data sections in this module (not in dataSections).
+      -- The last exclusion handles the case where a symbol like stg_WHITEHOLE_info
+      -- ends up in funcTypes because Cmm's lookupName defaults unimported bare
+      -- names to mkCmmCodeLabel (CodeLabel -> SymFunc), but the symbol is actually
+      -- a data section defined in the same Cmm file via INFO_TABLE/CLOSURE/etc.
+      -- Emitting .functype for such symbols would make wasm-ld see them as
+      -- FUNCTION, conflicting with the DATA classification in C object files.
       for_
-        (detEltsUniqMap $ funcTypes `minusUniqMap` funcBodies)
+        (detEltsUniqMap $ (funcTypes `minusUniqMap` funcBodies) `minusUniqMap` dataSections)
         (uncurry asmTellFuncType)
       asmTellLF
 
