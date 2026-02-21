@@ -1,5 +1,7 @@
-
 T22637.hs:7:14: error: [GHC-43895]
     Conflicting pragmas for ‘f’
     at T22637.hs:6:12
        T22637.hs:7:14
+  |
+7 | {-# NOINLINE f #-}
+  |              ^
