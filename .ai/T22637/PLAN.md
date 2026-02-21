@@ -1,0 +1,44 @@
+# PLAN: GHC issue #22637
+
+Status: mutable working plan
+
+## Implementation plan
+1. Add new diagnostic constructor and error code.
+   - `compiler/GHC/Tc/Errors/Types.hs`
+   - `compiler/GHC/Types/Error/Codes.hs`
+   - shape: inline-specific payload (e.g. `NE.NonEmpty (LocatedN RdrName, InlinePragma GhcPs)`).
+   - Status: pending
+
+2. Split duplicate-vs-conflict reporting in renamer.
+   - `compiler/GHC/Rename/Bind.hs`
+   - keep existing generic duplicate handling for non-inline sigs.
+   - route mixed inline kinds to new conflicting-inline diagnostic.
+   - keep same-kind inline duplicates as `TcRnDuplicateSigDecl`.
+   - Status: pending
+
+3. Add pretty-printing for new diagnostic.
+   - `compiler/GHC/Tc/Errors/Ppr.hs`
+   - wording: `Conflicting pragmas for ‘f’` with source locations.
+   - leave `TcRnDuplicateSigDecl` duplicate-focused.
+   - Status: pending
+
+4. Update diagnostics docs/comments.
+   - `compiler/GHC/Tc/Errors/Types.hs`
+   - duplicate examples remain true duplicates only.
+   - add conflicting-inline examples under new constructor.
+   - Status: pending
+
+5. Tests.
+   - add `testsuite/tests/rename/should_fail/T22637.hs`
+   - add `testsuite/tests/rename/should_fail/T22637.stderr`
+   - register in `testsuite/tests/rename/should_fail/all.T`
+   - update:
+     - `testsuite/tests/rename/should_fail/rnfail048.stderr`
+     - `testsuite/tests/parser/should_fail/OpaqueParseFail4.stderr`
+   - Status: pending
+
+6. Run targeted tests.
+   - `hadrian/build -q -q test --flavour=quickest --test-compiler=stage1 --only="rnfail048 OpaqueParseFail4 T22637"`
+   - fallback: `--test-compiler=stage2`
+   - Status: pending
+
