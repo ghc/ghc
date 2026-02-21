@@ -251,6 +251,7 @@ import GHC.Generics ( Generic )
 import qualified Data.Set as Set
 
 data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
+                                       , tcOptsShowCaret   :: !Bool -- ^ Whether caret diagnostics are enabled
                                        , tcOptsIfaceOpts   :: !IfaceMessageOpts
                                        }
 
@@ -3171,7 +3172,7 @@ data TcRnMessage where
                  rename/should_fail/T22637
   -}
   TcRnConflictingInlineSigDecl
-    :: NE.NonEmpty (LocatedN RdrName, InlinePragma GhcPs)
+    :: NE.NonEmpty (LocatedN RdrName, Sig GhcPs)
     -> TcRnMessage
 
   {-| TcRnMisplacedSigDecl is an error triggered by the pragma application

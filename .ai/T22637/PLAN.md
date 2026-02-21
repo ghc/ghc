@@ -84,11 +84,11 @@ Status: mutable working plan
      - `testsuite/tests/rename/should_fail/T22637.stderr`
      - `testsuite/tests/rename/should_fail/rnfail048.stderr`
      - `testsuite/tests/parser/should_fail/OpaqueParseFail4.stderr`
-   - Status: in_progress
+   - Status: done
 
 9. Switch conflicting-inline diagnostic payload from `InlinePragma` to `Sig`.
    - `compiler/GHC/Tc/Errors/Types.hs`
    - `compiler/GHC/Rename/Bind.hs`
    - `compiler/GHC/Tc/Errors/Ppr.hs`
    - keep same rendered message style and behavior.
-   - Status: pending
+   - Status: done

@@ -469,12 +469,17 @@ decorateDiagnostic logflags msg_class srcSpan msg = addCaret
       addCaret :: IO SDoc
       addCaret = do
         caretDiagnostic <-
-            if log_show_caret logflags
+            if log_show_caret logflags && show_caret_for msg_class
             then getCaretDiagnostic msg_class srcSpan
             else pure empty
         return $ getPprStyle $ \style ->
           withPprStyle (setStyleColoured True style)
             (message $+$ caretDiagnostic $+$ blankLine)
+
+      -- Conflicting-inline diagnostics render their own source excerpt.
+      show_caret_for :: MessageClass -> Bool
+      show_caret_for (MCDiagnostic _ _ (Just (DiagnosticCode "GHC" 43895))) = False
+      show_caret_for _                                                       = True
 
 -- | Like 'defaultLogActionHPutStrDoc' but appends an extra newline.
 defaultLogActionHPrintDoc :: LogFlags -> Bool -> Handle -> SDoc -> IO ()

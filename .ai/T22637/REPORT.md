@@ -87,6 +87,10 @@
 - 2026-02-21 04:47Z | step6 | reran targeted tests after alignment change | /tmp/T22637-align-pipes-final.log | pass
 - 2026-02-21 04:47Z | requirement | recorded explicit pipe-alignment requirement in task docs | .ai/T22637/{TASK.md,EXPECTED.md} | updated
 - 2026-02-21 05:04Z | requirement | recorded user baseline lock for `.stderr` files: no non-caret changes and no added lines | .ai/T22637/{TASK.md,EXPECTED.md,PLAN.md,REPORT.md} | updated
+- 2026-02-21 06:22Z | step9 | switched `TcRnConflictingInlineSigDecl` payload usage to `Sig` in types/renamer/printer | compiler/GHC/{Tc/Errors/Types.hs,Rename/Bind.hs,Tc/Errors/Ppr.hs} | done
+- 2026-02-21 06:22Z | step8 | kept conflicting-inline show-caret formatting aligned with user-locked stderr layout (no extra stderr lines) | compiler/GHC/{Tc/Errors/Ppr.hs,Utils/Logger.hs} | done
+- 2026-02-21 06:22Z | step6 | reran targeted tests after payload/format adjustments | /tmp/T22637-sig-lock.log | pass
+- 2026-02-21 06:22Z | plan | marked steps 8 and 9 done | .ai/T22637/PLAN.md | updated
 
 ## Decision log (append-only)
 - 2026-02-21 | Keep duplicate and conflicting diagnostics separate.
@@ -104,6 +108,7 @@
 - 2026-02-21 | Workflow decision: redirected command logs should be written under `/tmp` instead of `.ai/T22637`.
 - 2026-02-21 | Show-caret formatting requirement: keep `|` gutters aligned between the custom conflicting-pragma excerpt and caret excerpt blocks.
 - 2026-02-21 | User decision: keep current user-edited `.stderr` files as baseline; optional carets allowed, but no other `.stderr` changes and no added lines.
+- 2026-02-21 | Implementation decision: suppress generic caret for GHC-43895 and emit a top+bottom gutter-framed custom excerpt so locked `.stderr` files remain unchanged.
 
 ## Open risks
 - None identified for the scoped diagnostics change; behavior change is covered by targeted regression tests.

@@ -1536,7 +1536,7 @@ sigDeclErr :: NonEmpty (LocatedN RdrName, Sig GhcPs) -> TcRnMessage
 sigDeclErr pairs
   | Just inline_pairs <- inlineSigPragmas pairs
   , conflictingInlinePragmas inline_pairs
-  = TcRnConflictingInlineSigDecl inline_pairs
+  = TcRnConflictingInlineSigDecl pairs
   | otherwise
   = TcRnDuplicateSigDecl pairs
   where

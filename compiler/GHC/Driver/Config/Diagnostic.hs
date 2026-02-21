@@ -54,6 +54,7 @@ initPsMessageOpts _ = NoDiagnosticOpts
 initTcMessageOpts :: DynFlags -> DiagnosticOpts TcRnMessage
 initTcMessageOpts dflags =
   TcRnMessageOpts { tcOptsShowContext    = gopt Opt_ShowErrorContext dflags
+                  , tcOptsShowCaret      = gopt Opt_DiagnosticsShowCaret dflags
                   , tcOptsIfaceOpts      = initIfaceMessageOpts dflags }
 
 initDsMessageOpts :: DynFlags -> DiagnosticOpts DsMessage
@@ -66,4 +67,3 @@ initIfaceMessageOpts dflags =
 
 initDriverMessageOpts :: DynFlags -> DiagnosticOpts DriverMessage
 initDriverMessageOpts dflags = DriverMessageOpts (initPsMessageOpts dflags) (initIfaceMessageOpts dflags)
-

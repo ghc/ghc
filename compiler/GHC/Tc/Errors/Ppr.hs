@@ -96,7 +96,7 @@ import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Types.InlinePragma (inlinePragmaSpec)
+import GHC.Types.InlinePragma (pprInlineDebug)
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
@@ -144,6 +144,7 @@ import Data.Bifunctor
 
 defaultTcRnMessageOpts :: TcRnMessageOpts
 defaultTcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext = True
+                                         , tcOptsShowCaret = True
                                          , tcOptsIfaceOpts = defaultDiagnosticOpts @IfaceMessage }
 
 instance HasDefaultDiagnosticOpts TcRnMessageOpts where
@@ -1461,16 +1462,45 @@ instance Diagnostic TcRnMessage where
       text "accepting non-standard pattern guards" $$
       nest 4 (interpp'SP guards)
     TcRnConflictingInlineSigDecl pairs@((L _ name, _) :| _) -> mkSimpleDecorated $
-      vcat [ text "Conflicting pragmas for" <+> quotes (ppr name)
-           , text "Pragmas:"
-           , nest 2 $ vcat
-               [ ppr (inlinePragmaSpec pragma) <+> text "at" <+> ppr (locA loc)
-               | (L loc _, pragma) <- sorted_pairs
-               ]
-           ]
+      vcat $
+        [ text "Conflicting pragmas for" <+> quotes (ppr name)
+        , text "at" <+> vcat (map (ppr . first_of3) conflicting_pragmas)
+        ] ++ [text margin_bar
+              $$ vcat (map (pp_pragma_line margin_width) conflicting_pragmas)
+              $$ text margin_bar
+             | tcOptsShowCaret opts ]
       where
+        sorted_pairs :: [(LocatedN RdrName, Sig GhcPs)]
         sorted_pairs =
           sortBy (leftmost_smallest `on` (getLocA . fst)) (NE.toList pairs)
+
+        conflicting_pragmas :: [(SrcSpan, String, SDoc)]
+        conflicting_pragmas =
+          [ (locA loc, line_no (locA loc), pragma_doc rdr_name sig)
+          | (L loc rdr_name, sig) <- sorted_pairs
+          ]
+
+        margin_width :: Int
+        margin_width = foldr max 1 [length n | (_, n, _) <- conflicting_pragmas]
+
+        margin_bar :: String
+        margin_bar = replicate margin_width ' ' ++ " |"
+
+        pp_pragma_line :: Int -> (SrcSpan, String, SDoc) -> SDoc
+        pp_pragma_line width (_, n, pragma_doc) =
+          text (replicate (width - length n) ' ' ++ n ++ " | ") <> pragma_doc
+
+        pragma_doc :: RdrName -> Sig GhcPs -> SDoc
+        pragma_doc rdr_name (InlineSig _ _ pragma) =
+          text "{-#" <+> pprInlineDebug pragma <+> ppr rdr_name <+> text "#-}"
+        pragma_doc _ sig = ppr sig
+
+        line_no :: SrcSpan -> String
+        line_no (RealSrcSpan real_span _) = show (srcSpanStartLine real_span)
+        line_no _                         = "?"
+
+        first_of3 :: (a, b, c) -> a
+        first_of3 (a, _, _) = a
     TcRnDuplicateSigDecl pairs@((L _ name, sig) :| _) -> mkSimpleDecorated $
       vcat [ text "Duplicate" <+> what_it_is
             <> text "s for" <+> quotes (ppr name)
