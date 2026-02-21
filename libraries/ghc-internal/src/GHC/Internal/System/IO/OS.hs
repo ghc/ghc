@@ -23,7 +23,9 @@ module GHC.Internal.System.IO.OS
 )
 where
 
-import GHC.Internal.Base
+#if defined(mingw32_HOST_OS)
+import GHC.Internal.Base (otherwise)
+#endif
 import GHC.Internal.Control.Monad (return)
 import GHC.Internal.Control.Concurrent.MVar (MVar)
 import GHC.Internal.Control.Exception (mask)
