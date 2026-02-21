@@ -35,6 +35,10 @@ Fix misleading diagnostics for conflicting inline pragmas.
 - Code style requirement: fit in with surrounding code style and local conventions in each edited file.
 - At task start, trigger command-permission approval for the Hadrian test prefix before doing implementation work.
 
+## Workspace constraints
+- There is an unrelated dirty workspace entry at `libraries/libffi-clib`.
+- Do not modify, stage, revert, or include `libraries/libffi-clib` in T22637 commits.
+
 ## Definition Of Done
 - Build compiles after code edits relevant to diagnostics.
 - New constructor `TcRnConflictingInlineSigDecl` exists with inline-specific payload.
