@@ -966,6 +966,11 @@
 // See Note [Update remembered set] in NonMovingMark.c.
 
 #if defined(THREADED_RTS)
+// nonmoving_write_barrier_enabled is a C data variable (StgWord). Declare it
+// as CLOSURE so the WASM NCG classifies it as a data symbol, not a function.
+// Without this, bare 'import NAME' in Cmm defaults to ForeignLabel IsFunction,
+// causing wasm-ld "symbol type mismatch" errors at link time.
+import CLOSURE nonmoving_write_barrier_enabled;
 #define IF_NONMOVING_WRITE_BARRIER_ENABLED                     \
     if (W_[nonmoving_write_barrier_enabled] != 0) (likely: False)
 #else

@@ -17,8 +17,11 @@ import AcquireSRWLockExclusive;
 import ReleaseSRWLockExclusive;
 
 #if defined(PROF_SPIN)
-import whitehole_lockClosure_spin;
-import whitehole_lockClosure_yield;
+// These are C data variables (volatile StgWord64 in Stats.c). Use CLOSURE so
+// the WASM NCG treats them as data symbols, not functions. Plain 'import NAME'
+// defaults to ForeignLabel IsFunction, causing wasm-ld type mismatch errors.
+import CLOSURE whitehole_lockClosure_spin;
+import CLOSURE whitehole_lockClosure_yield;
 #endif
 
 #if !defined(UnregisterisedCompiler)
