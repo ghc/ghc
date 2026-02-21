@@ -1530,7 +1530,29 @@ rnSrcFixityDecl sig_ctxt = rn_decl
 
 dupSigDeclErr :: NonEmpty (LocatedN RdrName, Sig GhcPs) -> RnM ()
 dupSigDeclErr pairs@((L loc _, _) :| _)
-  = addErrAt (locA loc) $ TcRnDuplicateSigDecl pairs
+  = addErrAt (locA loc) $ sigDeclErr pairs
+
+sigDeclErr :: NonEmpty (LocatedN RdrName, Sig GhcPs) -> TcRnMessage
+sigDeclErr pairs
+  | Just inline_pairs <- inlineSigPragmas pairs
+  , conflictingInlinePragmas inline_pairs
+  = TcRnConflictingInlineSigDecl inline_pairs
+  | otherwise
+  = TcRnDuplicateSigDecl pairs
+  where
+    inlineSigPragmas
+      :: NonEmpty (LocatedN RdrName, Sig GhcPs)
+      -> Maybe (NonEmpty (LocatedN RdrName, InlinePragma GhcPs))
+    inlineSigPragmas = traverse $ \case
+      (name, InlineSig _ _ pragma) -> Just (name, pragma)
+      _                            -> Nothing
+
+    conflictingInlinePragmas
+      :: NonEmpty (LocatedN RdrName, InlinePragma GhcPs)
+      -> Bool
+    conflictingInlinePragmas ((_, pragma) :| pragmas) =
+      let inline_spec = inlinePragmaSpec pragma
+      in any ((/= inline_spec) . inlinePragmaSpec . snd) pragmas
 
 misplacedSigErr :: LSig GhcRn -> RnM ()
 misplacedSigErr (L loc sig)

@@ -1459,6 +1459,12 @@ instance Diagnostic TcRnMessage where
     TcRnNonStdGuards (NonStandardGuards guards) -> mkSimpleDecorated $
       text "accepting non-standard pattern guards" $$
       nest 4 (interpp'SP guards)
+    TcRnConflictingInlineSigDecl pairs@((L _ name, _) :| _) -> mkSimpleDecorated $
+      vcat [ text "Conflicting pragmas for" <+> quotes (ppr name)
+           , text "at" <+> vcat (map ppr $ sortBy leftmost_smallest
+                                         $ map (getLocA . fst)
+                                         $ NE.toList pairs)
+           ]
     TcRnDuplicateSigDecl pairs@((L _ name, sig) :| _) -> mkSimpleDecorated $
       vcat [ text "Duplicate" <+> what_it_is
             <> text "s for" <+> quotes (ppr name)
@@ -2470,6 +2476,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnNonStdGuards{}
       -> WarningWithoutFlag
+    TcRnConflictingInlineSigDecl{}
+      -> ErrorWithoutFlag
     TcRnDuplicateSigDecl{}
       -> ErrorWithoutFlag
     TcRnMisplacedSigDecl{}
@@ -3143,6 +3151,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnNonStdGuards{}
       -> [suggestExtension LangExt.PatternGuards]
+    TcRnConflictingInlineSigDecl{}
+      -> noHints
     TcRnDuplicateSigDecl{}
       -> noHints
     TcRnMisplacedSigDecl{}

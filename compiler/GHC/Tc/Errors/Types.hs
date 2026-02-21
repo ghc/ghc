@@ -3133,7 +3133,7 @@ data TcRnMessage where
   TcRnNonStdGuards :: NonStandardGuards -> TcRnMessage
 
   {-| TcRnDuplicateSigDecl is an error triggered by two or more
-      signatures for one entity.
+      duplicate signatures for one entity.
 
      Examples:
 
@@ -3141,23 +3141,38 @@ data TcRnMessage where
        f :: Int -> Bool
        f _ = True
 
-       g x = x
-       {-# INLINE g #-}
-       {-# NOINLINE g #-}
-
        pattern P = ()
        {-# COMPLETE P #-}
        {-# COMPLETE P #-}
 
      Test cases: module/mod68
-                 parser/should_fail/OpaqueParseFail4
                  patsyn/should_fail/T12165
-                 rename/should_fail/rnfail048
                  rename/should_fail/T5589
                  rename/should_fail/T7338
                  rename/should_fail/T7338a
   -}
   TcRnDuplicateSigDecl :: NE.NonEmpty (LocatedN RdrName, Sig GhcPs) -> TcRnMessage
+
+  {-| TcRnConflictingInlineSigDecl is an error triggered by conflicting
+      inline pragmas for one entity.
+
+     Examples:
+
+       g x = x
+       {-# INLINE g #-}
+       {-# NOINLINE g #-}
+
+       h x = x
+       {-# OPAQUE h #-}
+       {-# INLINE h #-}
+
+     Test cases: parser/should_fail/OpaqueParseFail4
+                 rename/should_fail/rnfail048
+                 rename/should_fail/T22637
+  -}
+  TcRnConflictingInlineSigDecl
+    :: NE.NonEmpty (LocatedN RdrName, InlinePragma GhcPs)
+    -> TcRnMessage
 
   {-| TcRnMisplacedSigDecl is an error triggered by the pragma application
       in the wrong context, like `MINIMAL` applied to a function or
