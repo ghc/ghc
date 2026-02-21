@@ -140,7 +140,7 @@ buildPackage root fp = do
   ways <- interpretInContext ctx getLibraryWays
   let hasVanilla = elem vanilla ways
       hasDynamic = elem dynamic ways
-  support <- targetSupportsGhciObjects stage
+  support <- targetSupportsSharedLibs stage
   when ((hasVanilla && hasDynamic) &&
         support && way == vanilla) $ do
     stamp <- (pkgStampFile (ctx { way = dynamic }))

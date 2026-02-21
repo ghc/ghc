@@ -1,11 +1,8 @@
-{-# LANGUAGE MultiWayIf #-}
-
 module Oracles.Flag (
     Flag (..), flag, getFlag,
     BuildFlag(..), buildFlag,
     targetRTSLinkerOnlySupportsSharedLibs,
     targetSupportsSharedLibs,
-    targetSupportsGhciObjects,
     targetSupportsThreadedRts,
     targetSupportsSMP,
     useLibdw,
@@ -85,14 +82,6 @@ buildFlag f st =
 -- | Get a configuration setting.
 getFlag :: Flag -> Expr c b Bool
 getFlag = expr . flag
-
--- | Does the target platform support object merging (and therefore we can build GHCi objects
--- when appropriate).
-targetSupportsGhciObjects :: Stage -> Action Bool
-targetSupportsGhciObjects stage = do
-  has_merge_objs <- isJust <$> queryTargetTarget stage tgtMergeObjs
-  only_shared_libs <- targetRTSLinkerOnlySupportsSharedLibs stage
-  pure $ has_merge_objs && not only_shared_libs
 
 targetRTSLinkerOnlySupportsSharedLibs :: Stage -> Action Bool
 targetRTSLinkerOnlySupportsSharedLibs s =
