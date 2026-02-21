@@ -6,22 +6,19 @@
 --
 -----------------------------------------------------------------------------
 
-{- Note [FFI for the JS-Backend]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [FFI for the JS-Backend and WASM-Backend]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   The JS-backend does not use GHC's native rts, as such you might think that it
-   doesn't require ghci. However, that is not true, because we need ghci in
-   order to interoperate with iserv even if we do not use any of the FFI stuff
-   in this file. So obviously we do not require libffi, but we still need to be
-   able to build ghci in order for the JS-Backend to supply its own iserv
-   interop solution. Thus we bite the bullet and wrap all the unneeded bits in a
-   CPP conditional compilation blocks that detect the JS-backend. A necessary
-   evil to be sure; notice that the only symbols remaining the JS_HOST_ARCH case
-   are those that are explicitly exported by this module and set to error if
-   they are every used.
+   Neither the JS-backend nor the WASM-backend use libffi: the JS-backend has
+   no native RTS, and the WASM/WASI target does not provide libffi in its sysroot
+   (libffi's WASM support is Emscripten-only).  Both backends still need to build
+   the ghci library in order to interoperate with iserv even if the FFI machinery
+   in this file is never exercised.  So we wrap all the libffi-dependent bits in
+   CPP guards that exclude both backends.  The only symbols that remain in the
+   guarded-out case are the exported stubs, which error if called at runtime.
 -}
 
-#if !defined(javascript_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH) && !defined(wasm32_HOST_ARCH)
 -- See Note [FFI_GO_CLOSURES workaround] in ghc_ffi.h
 -- We can't include ghc_ffi.h here as we must build with stage0
 #if defined(darwin_HOST_OS)
@@ -42,7 +39,7 @@ module GHCi.FFI
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
-#if !defined(javascript_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH) && !defined(wasm32_HOST_ARCH)
 import Control.Exception
 import Foreign.C
 #endif
@@ -70,7 +67,7 @@ prepForeignCall
     -> FFIType            -- result type
     -> IO (Ptr C_ffi_cif) -- token for making calls (must be freed by caller)
 
-#if !defined(javascript_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH) && !defined(wasm32_HOST_ARCH)
 prepForeignCall arg_types result_type = do
   let n_args = length arg_types
   arg_arr <- mallocArray n_args
@@ -91,7 +88,7 @@ prepForeignCall _ _ =
 
 
 freeForeignCallInfo :: Ptr C_ffi_cif -> IO ()
-#if !defined(javascript_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH) && !defined(wasm32_HOST_ARCH)
 freeForeignCallInfo p = do
   free ((#ptr ffi_cif, arg_types) p)
   free p
@@ -102,7 +99,7 @@ freeForeignCallInfo _ =
 
 data C_ffi_cif
 
-#if !defined(javascript_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH) && !defined(wasm32_HOST_ARCH)
 data C_ffi_type
 
 strError :: C_ffi_status -> String

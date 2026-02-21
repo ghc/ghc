@@ -96,6 +96,16 @@ library
         ghc-heap         >= 9.10.1 && <=@ProjectVersionMunged@,
         transformers     >= 0.5 && < 0.7
 
+    -- libffi is not available on JS (no native RTS) or WASM/WASI (libffi's
+    -- WASM support is Emscripten-only; the WASI sysroot has no libffi).
+    -- See Note [FFI for the JS-Backend and WASM-Backend] in GHCi/FFI.hsc.
+    if !arch(javascript) && !arch(wasm32)
+      if flag(use-system-libffi)
+         extra-libraries: ffi
+         extra-libraries-static: ffi
+      else
+         build-depends: libffi-clib
+
     if impl(ghc > 9.10)
         -- ghc-internal is only available (and required) when building
         -- with a compiler that itself provides the ghc-internal
