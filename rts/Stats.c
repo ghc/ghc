@@ -163,6 +163,7 @@ initStats0(void)
         .mutator_elapsed_ns = 0,
         .gc_cpu_ns = 0,
         .gc_elapsed_ns = 0,
+        .gc_sync_elapsed_ns = 0,
         .cpu_ns = 0,
         .elapsed_ns = 0,
         .nonmoving_gc_cpu_ns = 0,
@@ -288,6 +289,8 @@ stat_endExit(void)
     RELEASE_LOCK(&stats_mutex);
 }
 
+// This is only called in the threaded RTS. On non-threaded RTS `gc_sync_start_elapsed`
+// is conditonally set in `stat_startGC`.
 void
 stat_startGCSync (gc_thread *gct)
 {
@@ -433,6 +436,11 @@ stat_startGC (Capability *cap, gc_thread *gct)
     }
 
     gct->gc_start_elapsed = getProcessElapsedTime();
+#if !defined(THREADED_RTS)
+    // Non-threaded RTS has no sync phase. Initializing in this way makes the
+    // calculated statistics correctly read zero.
+    gct->gc_sync_start_elapsed = gct->gc_start_elapsed;
+#endif
 
     // Post EVENT_GC_START with the same timestamp as used for stats
     // (though converted from Time=StgInt64 to EventTimestamp=StgWord64).
@@ -548,6 +556,7 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
     }
     stats.gc_cpu_ns += stats.gc.cpu_ns;
     stats.gc_elapsed_ns += stats.gc.elapsed_ns;
+    stats.gc_sync_elapsed_ns += stats.gc.sync_elapsed_ns;
 
     if (gen == RtsFlags.GcFlags.generations-1) { // major GC?
         stats.major_gcs++;
@@ -915,6 +924,8 @@ static void report_summary(const RTSSummaryStats* sum)
     statsPrintf("  GC      time  %7.3fs  (%7.3fs elapsed)\n",
                 TimeToSecondsDbl(stats.gc_cpu_ns),
                 TimeToSecondsDbl(stats.gc_elapsed_ns));
+    statsPrintf("  GC SYNC time            (%7.3fs elapsed)\n",
+                TimeToSecondsDbl(stats.gc_sync_elapsed_ns));
     if (RtsFlags.GcFlags.useNonmoving) {
         statsPrintf(
                 "  CONC GC time  %7.3fs  (%7.3fs elapsed)\n",
@@ -1069,6 +1080,7 @@ static void report_machine_readable (const RTSSummaryStats * sum)
             TimeToSecondsDbl(stats.mutator_elapsed_ns));
     MR_STAT("GC_cpu_seconds", "f", TimeToSecondsDbl(stats.gc_cpu_ns));
     MR_STAT("GC_wall_seconds", "f", TimeToSecondsDbl(stats.gc_elapsed_ns));
+    MR_STAT("GC_sync_wall_seconds", "f", TimeToSecondsDbl(stats.gc_sync_elapsed_ns));
 
     // end backward compatibility
 

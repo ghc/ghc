@@ -111,6 +111,8 @@ data RTSStats = RTSStats {
   , gc_cpu_ns :: RtsTime
     -- | Total elapsed time used by the GC
   , gc_elapsed_ns :: RtsTime
+    -- | Total elapsed time used during GC synchronization
+  , gc_sync_elapsed_ns :: RtsTime
     -- | Total CPU time (at the previous GC)
   , cpu_ns :: RtsTime
     -- | Total elapsed time (at the previous GC)
@@ -234,6 +236,7 @@ getRTSStats = do
     mutator_elapsed_ns <- (# peek RTSStats, mutator_elapsed_ns) p
     gc_cpu_ns <- (# peek RTSStats, gc_cpu_ns) p
     gc_elapsed_ns <- (# peek RTSStats, gc_elapsed_ns) p
+    gc_sync_elapsed_ns <- (# peek RTSStats, gc_sync_elapsed_ns) p
     cpu_ns <- (# peek RTSStats, cpu_ns) p
     elapsed_ns <- (# peek RTSStats, elapsed_ns) p
     nonmoving_gc_sync_cpu_ns <- (# peek RTSStats, nonmoving_gc_sync_cpu_ns) p

@@ -6590,6 +6590,7 @@ module GHC.Stats.Experimental where
                 mutator_elapsed_ns :: RtsTime,
                 gc_cpu_ns :: RtsTime,
                 gc_elapsed_ns :: RtsTime,
+                gc_sync_elapsed_ns :: RtsTime,
                 cpu_ns :: RtsTime,
                 elapsed_ns :: RtsTime,
                 nonmoving_gc_sync_cpu_ns :: RtsTime,
