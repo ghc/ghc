@@ -705,26 +705,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 debugBelch("stg_apply_interp_info" );
             } else if (c == (StgWord)&stg_ret_t_info) {
                 debugBelch("stg_ret_t_info" );
-            } else if (c == (StgWord)&stg_ctoi_t0_info) {
-                debugBelch("stg_ctoi_t0_info" );
-            } else if (c == (StgWord)&stg_ctoi_t1_info) {
-                debugBelch("stg_ctoi_t1_info" );
-            } else if (c == (StgWord)&stg_ctoi_t2_info) {
-                debugBelch("stg_ctoi_t2_info" );
-            } else if (c == (StgWord)&stg_ctoi_t3_info) {
-                debugBelch("stg_ctoi_t3_info" );
-            } else if (c == (StgWord)&stg_ctoi_t4_info) {
-                debugBelch("stg_ctoi_t4_info" );
-            } else if (c == (StgWord)&stg_ctoi_t5_info) {
-                debugBelch("stg_ctoi_t5_info" );
-            } else if (c == (StgWord)&stg_ctoi_t6_info) {
-                debugBelch("stg_ctoi_t6_info" );
-            } else if (c == (StgWord)&stg_ctoi_t7_info) {
-                debugBelch("stg_ctoi_t7_info" );
-            } else if (c == (StgWord)&stg_ctoi_t8_info) {
-                debugBelch("stg_ctoi_t8_info" );
-            /* there are more stg_ctoi_tN_info frames,
-               but we don't print them all */
+            } else if (c == (StgWord)&stg_ctoi_t_info) {
+                debugBelch("stg_ctoi_t_info" );
             } else {
                 debugBelch("RET_BCO");
             }

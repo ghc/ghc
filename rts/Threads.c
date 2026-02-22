@@ -114,6 +114,8 @@ createThread(Capability *cap, W_ size)
 
     ASSIGN_Int64((W_*)&(tso->alloc_limit), 0);
 
+    tso->ctoi_tuple_spill_words = 0;
+
     tso->trec = NO_TREC;
     tso->label = NULL;
 
@@ -1053,3 +1055,38 @@ printThreadQueue(StgTSO *t)
 }
 
 #endif /* DEBUG */
+
+/*
+ * restoreStackInvariants: restore stack invariants
+ *
+ * This should be called after restoring a captured stack from
+ * sp .. sp + words
+ */
+void
+restoreStackInvariants(StgTSO *tso, StgPtr sp, StgWord words)
+{
+    StgPtr end = sp + words;
+    StgPtr frame = sp;
+
+    /*
+       Restore ctoi_tuple_spill_words invariants after adding stack:
+
+         - set the saved value in the last stg_ctoi_t frame to the current
+              tso->ctoi_tuple_spill_words
+         - set tso->ctoi_tuple_spill_words to the value in the first stg_ctoi_t frame
+
+       See Note [GHCi unboxed tuples stack spills] in StgMiscClosures.cmm.
+     */
+     StgPtr first_ctoi_frame = NULL, last_ctoi_frame = NULL;
+     while (frame < end) {
+        if (*(StgWord*)frame == (StgWord)&stg_ctoi_t_info) {
+            if(first_ctoi_frame == NULL) first_ctoi_frame = frame;
+            last_ctoi_frame = frame;
+        }
+        frame += stack_frame_sizeW((StgClosure *)frame);
+    }
+    if(last_ctoi_frame != NULL) {
+        last_ctoi_frame[CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET] = tso->ctoi_tuple_spill_words;
+        tso->ctoi_tuple_spill_words = first_ctoi_frame[CTOI_TUPLE_INFO_OFFSET] >> 24;
+    }
+}

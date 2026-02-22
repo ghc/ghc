@@ -200,6 +200,8 @@ stg_CONTINUATION_apply // explicit stack
   Sp_adj(-new_stack_words);
   prim %memcpy(Sp, p, WDS(new_stack_words), SIZEOF_W);
 
+  ccall restoreStackInvariants(CurrentTSO "ptr", Sp "ptr", new_stack_words);
+
   TICK_UNKNOWN_CALL();
   TICK_SLOW_CALL_fast_v();
 

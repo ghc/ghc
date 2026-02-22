@@ -476,6 +476,7 @@ wanteds os = concat
           ,closureField  Both "StgTSO"      "alloc_limit"
           ,closureField_ Both "StgTSO_cccs" "StgTSO" "prof.cccs"
           ,closureField  Both "StgTSO"      "stackobj"
+          ,closureField  Both "StgTSO"      "ctoi_tuple_spill_words"
 
           ,closureField       Both "StgStack" "sp"
           ,closureFieldOffset Both "StgStack" "stack"

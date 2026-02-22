@@ -1149,7 +1149,7 @@ doCase d s p scrut bndr alts
         ctoi_frame_header_w :: WordOff
         ctoi_frame_header_w
           | ubx_tuple_frame =
-              if profiling then 5 else 4
+              if profiling then 6 else 5
           | otherwise = 2
 
         -- The size of the ret_*_info frame header, whose frame returns the
@@ -1293,10 +1293,12 @@ doCase d s p scrut bndr alts
         -- case-of-case expressions, which is the only time we can be compiling a
         -- case expression with s /= 0.
 
-        -- unboxed tuples get two more words, the second is a pointer (tuple_bco)
+        -- unboxed tuples get extra words:
+        --   call_info, tuple_BCO, old_spill, CCCS (profiling only).
+        -- tuple_BCO at position 1 is a pointer.
         (extra_pointers, extra_slots)
-           | ubx_tuple_frame && profiling = ([1], 3) -- call_info, tuple_BCO, CCCS
-           | ubx_tuple_frame              = ([1], 2) -- call_info, tuple_BCO
+           | ubx_tuple_frame && profiling = ([1], 4) -- call_info, tuple_BCO, old_spill, CCCS
+           | ubx_tuple_frame              = ([1], 3) -- call_info, tuple_BCO, old_spill
            | otherwise                    = ([], 0)
 
         bitmap_size :: WordOff
@@ -1535,13 +1537,11 @@ for the call and and a stack offset. The layout is as follows:
                list is active. Bit 1 for the
                second register in the list and so on.
 
-  - bit 24-31: Unsigned byte indicating the stack offset
+  - bit 24+:   Unsigned value indicating the stack offset
                of the continuation in words. For tuple returns
                this is the number of words returned on the
                stack. For primcalls this field is unused, since
                we don't jump to a continuation.
-
-The upper 32 bits on 64 bit platforms are currently unused.
 
 If a register is smaller than a word on the stack (for example a
 single precision float on a 64 bit system), then the stack slot
@@ -1551,8 +1551,8 @@ is padded to a whole word.
 
     If a tuple is returned in three registers and an additional two
     words on the stack, then three bits in the register bitmap
-    (bits 0-23) would be set. And bit 24-31 would be
-    00000010 (two in binary).
+    (bits 0-23) would be set. And the stack offset (bits 24+) would
+    encode the value two.
 
     The values on the stack before a call to POP_ARG_REGS would
     be as follows:
@@ -1580,7 +1580,7 @@ is padded to a whole word.
 
     At this point all the arguments are in place and we are ready
     to jump to the continuation, the location (offset from Sp) of
-    which is found by inspecting the value of bits 24-31. In this
+    which is found by inspecting the value of bits 24+. In this
     case the offset is two words.
 
 On x86_64, the double precision (Dn) and single precision
@@ -1734,9 +1734,11 @@ Note [unboxed tuple bytecodes and tuple_BCO]
      * tuple_BCO: see below
 
   The interpreter pushes these onto the stack when the PUSH_ALTS_TUPLE
-  instruction is executed, followed by stg_ctoi_tN_info, with N depending
-  on the number of stack words used by the tuple in the GHC native calling
-  convention. N is derived from call_info.
+  instruction is executed, followed by stg_ctoi_t_info. It also saves
+  the old ctoi_tuple_spill_words value from the TSO in the frame and sets
+  the TSO field to the number of stack words used by the tuple in the
+  GHC native calling convention. This spill count is derived from
+  call_info.
 
   For example if we expect a tuple with three words on the stack, the stack
   looks as follows after PUSH_ALTS_TUPLE:
@@ -1747,12 +1749,13 @@ Note [unboxed tuple bytecodes and tuple_BCO]
       cont_free_var_2
       ...
       cont_free_var_n
+      old_spill
       call_info
       tuple_BCO
       cont_BCO
-      stg_ctoi_t3_info <- Sp
+      stg_ctoi_t_info  <- Sp
 
-  If the tuple is returned by object code, stg_ctoi_t3 will deal with
+  If the tuple is returned by object code, stg_ctoi_t will deal with
   adjusting the stack pointer and converting the tuple to the bytecode
   calling convention. See Note [GHCi unboxed tuples stack spills] for more
   details.

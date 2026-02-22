@@ -186,6 +186,15 @@ typedef struct StgTSO_ {
      */
     StgWord32  tot_stack_size;
 
+    /*
+     * The number of stack words spilled by the current stg_ctoi_t
+     * frame. This is used by stg_ctoi_t to handle tuple returns from compiled
+     * to interpreted code.
+     *
+     * See Note [GHCi unboxed tuples stack spills] in StgMiscClosures.cmm
+     */
+    StgWord    ctoi_tuple_spill_words;
+
 #if defined(TICKY_TICKY)
     /* TICKY-specific stuff would go here. */
 #endif

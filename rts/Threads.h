@@ -40,6 +40,10 @@ StgBool isThreadBound (StgTSO* tso);
 void threadStackOverflow  (Capability *cap, StgTSO *tso);
 W_   threadStackUnderflow (Capability *cap, StgTSO *tso);
 
+#define CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET 4
+#define CTOI_TUPLE_INFO_OFFSET 2
+void restoreStackInvariants(StgTSO *tso, StgPtr sp, StgWord words);
+
 #if defined(DEBUG)
 void printThreadBlockage (StgTSO *tso);
 void printThreadStatus (StgTSO *t);

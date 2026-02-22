@@ -488,11 +488,11 @@ bciStackUse PUSH_BCO{}            = 1
 bciStackUse (PUSH_ALTS bco _)     = 2 {- profiling only, restore CCCS -} +
                                     3 + protoBCOStackUse bco
 bciStackUse (PUSH_ALTS_TUPLE bco info _) =
-   -- (tuple_bco, call_info word, cont_bco, stg_ctoi_t)
+   -- (old_spill, tuple_bco, call_info word, cont_bco, stg_ctoi_t)
    -- tuple
    -- (call_info, tuple_bco, stg_ret_t)
    1 {- profiling only -} +
-   7 + fromIntegral (nativeCallSize info) + protoBCOStackUse bco
+   8 + fromIntegral (nativeCallSize info) + protoBCOStackUse bco
 bciStackUse (PUSH_PAD8)           = 1  -- overapproximation
 bciStackUse (PUSH_PAD16)          = 1  -- overapproximation
 bciStackUse (PUSH_PAD32)          = 1  -- overapproximation on 64bit arch
