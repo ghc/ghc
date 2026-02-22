@@ -457,6 +457,11 @@ StgClosure *captureContinuationAndAbort(Capability *cap, StgTSO *tso, StgPromptT
       }
     }
 
+    // see Note [GHCi unboxed tuples stack spills]
+    if (info_ptr == &stg_ctoi_t_info) {
+      tso->ctoi_tuple_spill_words = frame[CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET];
+    }
+
     // Advance to the next frame.
     frame += stack_frame_sizeW((StgClosure *)frame);
   }
