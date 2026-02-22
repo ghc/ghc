@@ -1,0 +1,492 @@
+-- Stress test definitions for unboxed tuples in the bytecode interpreter.
+--
+-- See Note [Unboxed tuple stress test] for an overview.
+
+-- Note [Unboxed tuple stress test]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- This test exercises the marshalling of unboxed tuples between
+-- native code and the bytecode interpreter. It systematically tests
+-- various tuple sizes around key boundaries (register capacity,
+-- small frame limit), different element types (pointers, Int#,
+-- Double#, Float#, Word64#, sub-word types), mixed type combinations,
+-- and void components.
+--
+-- For each tuple type, a NOINLINE producer and consumer are defined.
+-- The main test calls each through all four combinations of
+-- bytecode/native producer x bytecode/native consumer.
+--
+-- Key boundaries on x86_64:
+--   - 6 vanilla registers for pointers and non-pointer words
+--   - 6 float/double registers
+--   - small_tuple_frame: nativeCallStackSpillSize <= mAX_SMALL_TUPLE_CTOI
+--   - generic stg_ctoi_t frame for larger spills
+
+-- ============================================================
+-- Pure pointer tuples
+-- ============================================================
+
+{-# NOINLINE p2 #-}
+p2 :: a -> a -> (# a, a #)
+p2 x1 x2 = (# x1, x2 #)
+
+{-# NOINLINE p2_a #-}
+p2_a :: (a -> a -> (# a, a #)) -> a -> a -> (a, a)
+p2_a f x1 x2 = case f x1 x2 of (# y1, y2 #) -> (y1, y2)
+
+{-# NOINLINE p7 #-}
+p7 :: a -> a -> a -> a -> a -> a -> a
+   -> (# a, a, a, a, a, a, a #)
+p7 x1 x2 x3 x4 x5 x6 x7 =
+    (# x1, x2, x3, x4, x5, x6, x7 #)
+
+{-# NOINLINE p7_a #-}
+p7_a :: (a -> a -> a -> a -> a -> a -> a
+     -> (# a, a, a, a, a, a, a #))
+     -> a -> a -> a -> a -> a -> a -> a
+     -> (a, a, a, a, a, a, a)
+p7_a f x1 x2 x3 x4 x5 x6 x7 =
+    case f x1 x2 x3 x4 x5 x6 x7 of
+      (# y1, y2, y3, y4, y5, y6, y7 #) ->
+        (y1, y2, y3, y4, y5, y6, y7)
+
+-- ============================================================
+-- Pure Int# tuples
+-- ============================================================
+
+{-# NOINLINE n2 #-}
+n2 :: Int -> Int -> (# Int#, Int# #)
+n2 (I# x1) (I# x2) = (# x1, x2 #)
+
+{-# NOINLINE n2_a #-}
+n2_a :: (Int -> Int -> (# Int#, Int# #)) -> Int -> Int -> (Int, Int)
+n2_a f x1 x2 = case f x1 x2 of (# y1, y2 #) -> (I# y1, I# y2)
+
+{-# NOINLINE n7 #-}
+n7 :: Int -> Int -> Int -> Int -> Int -> Int -> Int
+   -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int# #)
+n7 (I# x1) (I# x2) (I# x3) (I# x4) (I# x5) (I# x6) (I# x7) =
+    (# x1, x2, x3, x4, x5, x6, x7 #)
+
+{-# NOINLINE n7_a #-}
+n7_a :: (Int -> Int -> Int -> Int -> Int -> Int -> Int
+     -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int# #))
+     -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+     -> (Int, Int, Int, Int, Int, Int, Int)
+n7_a f x1 x2 x3 x4 x5 x6 x7 =
+    case f x1 x2 x3 x4 x5 x6 x7 of
+      (# y1, y2, y3, y4, y5, y6, y7 #) ->
+        (I# y1, I# y2, I# y3, I# y4, I# y5, I# y6, I# y7)
+
+type TN15 = Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+         -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+         -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#
+            ,  Int#, Int#, Int#, Int#, Int#, Int#, Int# #)
+
+{-# NOINLINE n15 #-}
+n15 :: TN15
+n15 (I# x1) (I# x2) (I# x3) (I# x4) (I# x5) (I# x6) (I# x7) (I# x8)
+    (I# x9) (I# x10) (I# x11) (I# x12) (I# x13) (I# x14) (I# x15) =
+    (# x1, x2, x3, x4, x5, x6, x7, x8
+    ,  x9, x10, x11, x12, x13, x14, x15 #)
+
+{-# NOINLINE n15_a #-}
+n15_a :: TN15
+      -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+      -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+      -> ((Int,Int,Int,Int,Int),(Int,Int,Int,Int,Int),(Int,Int,Int,Int,Int))
+n15_a f x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 =
+    case f x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 of
+      (# y1, y2, y3, y4, y5, y6, y7, y8
+       , y9, y10, y11, y12, y13, y14, y15 #) ->
+        ( (I# y1, I# y2, I# y3, I# y4, I# y5)
+        , (I# y6, I# y7, I# y8, I# y9, I# y10)
+        , (I# y11, I# y12, I# y13, I# y14, I# y15) )
+
+-- ============================================================
+-- Pure Double# tuples
+-- ============================================================
+
+{-# NOINLINE d7 #-}
+d7 :: Double -> Double -> Double -> Double
+   -> Double -> Double -> Double
+   -> (# Double#, Double#, Double#, Double#
+      ,  Double#, Double#, Double# #)
+d7 (D# x1) (D# x2) (D# x3) (D# x4) (D# x5) (D# x6) (D# x7) =
+    (# x1, x2, x3, x4, x5, x6, x7 #)
+
+{-# NOINLINE d7_a #-}
+d7_a :: (Double -> Double -> Double -> Double
+     -> Double -> Double -> Double
+     -> (# Double#, Double#, Double#, Double#
+        ,  Double#, Double#, Double# #))
+     -> Double -> Double -> Double -> Double
+     -> Double -> Double -> Double
+     -> (Double, Double, Double, Double, Double, Double, Double)
+d7_a f x1 x2 x3 x4 x5 x6 x7 =
+    case f x1 x2 x3 x4 x5 x6 x7 of
+      (# y1, y2, y3, y4, y5, y6, y7 #) ->
+        (D# y1, D# y2, D# y3, D# y4, D# y5, D# y6, D# y7)
+
+-- ============================================================
+-- Pure Float# tuples
+-- ============================================================
+
+{-# NOINLINE fl7 #-}
+fl7 :: Float -> Float -> Float -> Float
+    -> Float -> Float -> Float
+    -> (# Float#, Float#, Float#, Float#
+       ,  Float#, Float#, Float# #)
+fl7 (F# x1) (F# x2) (F# x3) (F# x4) (F# x5) (F# x6) (F# x7) =
+    (# x1, x2, x3, x4, x5, x6, x7 #)
+
+{-# NOINLINE fl7_a #-}
+fl7_a :: (Float -> Float -> Float -> Float
+      -> Float -> Float -> Float
+      -> (# Float#, Float#, Float#, Float#
+         ,  Float#, Float#, Float# #))
+      -> Float -> Float -> Float -> Float
+      -> Float -> Float -> Float
+      -> (Float, Float, Float, Float, Float, Float, Float)
+fl7_a f x1 x2 x3 x4 x5 x6 x7 =
+    case f x1 x2 x3 x4 x5 x6 x7 of
+      (# y1, y2, y3, y4, y5, y6, y7 #) ->
+        (F# y1, F# y2, F# y3, F# y4, F# y5, F# y6, F# y7)
+
+-- ============================================================
+-- Pure Word64# tuples
+-- ============================================================
+
+{-# NOINLINE w7 #-}
+w7 :: Word64 -> Word64 -> Word64 -> Word64
+   -> Word64 -> Word64 -> Word64
+   -> (# Word64#, Word64#, Word64#, Word64#
+      ,  Word64#, Word64#, Word64# #)
+w7 (W64# x1) (W64# x2) (W64# x3) (W64# x4)
+   (W64# x5) (W64# x6) (W64# x7) =
+    (# x1, x2, x3, x4, x5, x6, x7 #)
+
+{-# NOINLINE w7_a #-}
+w7_a :: (Word64 -> Word64 -> Word64 -> Word64
+     -> Word64 -> Word64 -> Word64
+     -> (# Word64#, Word64#, Word64#, Word64#
+        ,  Word64#, Word64#, Word64# #))
+     -> Word64 -> Word64 -> Word64 -> Word64
+     -> Word64 -> Word64 -> Word64
+     -> (Word64, Word64, Word64, Word64, Word64, Word64, Word64)
+w7_a f x1 x2 x3 x4 x5 x6 x7 =
+    case f x1 x2 x3 x4 x5 x6 x7 of
+      (# y1, y2, y3, y4, y5, y6, y7 #) ->
+        (W64# y1, W64# y2, W64# y3, W64# y4,
+         W64# y5, W64# y6, W64# y7)
+
+-- ============================================================
+-- Mixed pointer + Int# tuples (interleaved)
+-- ============================================================
+
+-- 6 elements: 3 pointers + 3 Int#
+{-# NOINLINE mpi6 #-}
+mpi6 :: Int -> Int -> Int -> Int -> Int -> Int
+     -> (# Int, Int#, Int, Int#, Int, Int# #)
+mpi6 x1 (I# x2) x3 (I# x4) x5 (I# x6) =
+    (# x1, x2, x3, x4, x5, x6 #)
+
+{-# NOINLINE mpi6_a #-}
+mpi6_a :: (Int -> Int -> Int -> Int -> Int -> Int
+       -> (# Int, Int#, Int, Int#, Int, Int# #))
+       -> Int -> Int -> Int -> Int -> Int -> Int
+       -> (Int, Int, Int, Int, Int, Int)
+mpi6_a f x1 x2 x3 x4 x5 x6 =
+    case f x1 x2 x3 x4 x5 x6 of
+      (# y1, y2, y3, y4, y5, y6 #) ->
+        (y1, I# y2, y3, I# y4, y5, I# y6)
+
+-- ============================================================
+-- Mixed pointer + Double# tuples (interleaved)
+-- ============================================================
+
+-- 6 elements: 3 pointers + 3 Double#
+{-# NOINLINE mpd6 #-}
+mpd6 :: Int -> Double -> Int -> Double -> Int -> Double
+     -> (# Int, Double#, Int, Double#, Int, Double# #)
+mpd6 x1 (D# x2) x3 (D# x4) x5 (D# x6) =
+    (# x1, x2, x3, x4, x5, x6 #)
+
+{-# NOINLINE mpd6_a #-}
+mpd6_a :: (Int -> Double -> Int -> Double -> Int -> Double
+       -> (# Int, Double#, Int, Double#, Int, Double# #))
+       -> Int -> Double -> Int -> Double -> Int -> Double
+       -> (Int, Double, Int, Double, Int, Double)
+mpd6_a f x1 x2 x3 x4 x5 x6 =
+    case f x1 x2 x3 x4 x5 x6 of
+      (# y1, y2, y3, y4, y5, y6 #) ->
+        (y1, D# y2, y3, D# y4, y5, D# y6)
+
+-- ============================================================
+-- Mixed all types: pointer + Int# + Double# + Float#
+-- ============================================================
+
+-- 8 elements: 2 of each type, interleaved
+{-# NOINLINE mall8 #-}
+mall8 :: Int -> Int -> Double -> Float -> Int -> Int -> Double -> Float
+      -> (# Int, Int#, Double#, Float#, Int, Int#, Double#, Float# #)
+mall8 x1 (I# x2) (D# x3) (F# x4) x5 (I# x6) (D# x7) (F# x8) =
+    (# x1, x2, x3, x4, x5, x6, x7, x8 #)
+
+{-# NOINLINE mall8_a #-}
+mall8_a :: (Int -> Int -> Double -> Float -> Int -> Int -> Double -> Float
+        -> (# Int, Int#, Double#, Float#, Int, Int#, Double#, Float# #))
+        -> Int -> Int -> Double -> Float -> Int -> Int -> Double -> Float
+        -> (Int, Int, Double, Float, Int, Int, Double, Float)
+mall8_a f x1 x2 x3 x4 x5 x6 x7 x8 =
+    case f x1 x2 x3 x4 x5 x6 x7 x8 of
+      (# y1, y2, y3, y4, y5, y6, y7, y8 #) ->
+        (y1, I# y2, D# y3, F# y4, y5, I# y6, D# y7, F# y8)
+
+-- ============================================================
+-- Sub-word types: Word8#, Word16#, Word32#
+-- ============================================================
+
+{-# NOINLINE sub5 #-}
+sub5 :: Word8 -> Word16 -> Word32 -> Int -> Int
+     -> (# Word8#, Word16#, Word32#, Int#, Int #)
+sub5 (W8# x1) (W16# x2) (W32# x3) (I# x4) x5 =
+    (# x1, x2, x3, x4, x5 #)
+
+{-# NOINLINE sub5_a #-}
+sub5_a :: (Word8 -> Word16 -> Word32 -> Int -> Int
+       -> (# Word8#, Word16#, Word32#, Int#, Int #))
+       -> Word8 -> Word16 -> Word32 -> Int -> Int
+       -> (Word8, Word16, Word32, Int, Int)
+sub5_a f x1 x2 x3 x4 x5 =
+    case f x1 x2 x3 x4 x5 of
+      (# y1, y2, y3, y4, y5 #) ->
+        (W8# y1, W16# y2, W32# y3, I# y4, y5)
+
+-- ============================================================
+-- Void components: (# #) interleaved with real values
+-- ============================================================
+
+{-# NOINLINE vd6 #-}
+vd6 :: Int -> Int -> Int
+    -> (# Int, (# #), Int, (# #), Int#, (# #) #)
+vd6 x1 x2 (I# x3) = (# x1, (# #), x2, (# #), x3, (# #) #)
+
+{-# NOINLINE vd6_a #-}
+vd6_a :: (Int -> Int -> Int
+      -> (# Int, (# #), Int, (# #), Int#, (# #) #))
+      -> Int -> Int -> Int
+      -> (Int, Int, Int)
+vd6_a f x1 x2 x3 =
+    case f x1 x2 x3 of
+      (# y1, _, y3, _, y5, _ #) -> (y1, y3, I# y5)
+
+-- ============================================================
+-- Recursive step functions
+-- ============================================================
+
+-- 4-element mixed step: each element incremented by a different amount
+-- ptr: +1, Int#: +2, Double#: +0.5, Double#: +1.5
+{-# NOINLINE rec_step4 #-}
+rec_step4 :: Int -> Int -> Double -> Double
+          -> (# Int, Int#, Double#, Double# #)
+rec_step4 x1 (I# x2) (D# x3) (D# x4) =
+    (# x1 + 1, x2 +# 2#, x3 +## 0.5##, x4 +## 1.5## #)
+
+{-# NOINLINE rec_step4_a #-}
+rec_step4_a :: (Int -> Int -> Double -> Double
+            -> (# Int, Int#, Double#, Double# #))
+            -> Int -> Int -> Double -> Double
+            -> (Int, Int, Double, Double)
+rec_step4_a f x1 x2 x3 x4 =
+    case f x1 x2 x3 x4 of
+      (# y1, y2, y3, y4 #) -> (y1, I# y2, D# y3, D# y4)
+
+-- ============================================================
+-- Large tuples: boundary and stress sizes
+-- ============================================================
+
+-- 14 Int#: exactly stg_ctoi_t8 (last small frame, spill = 8 words on x86_64)
+type TN14 = Int -> Int -> Int -> Int -> Int -> Int -> Int
+         -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+         -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#
+            ,  Int#, Int#, Int#, Int#, Int#, Int#, Int# #)
+
+{-# NOINLINE n14 #-}
+n14 :: TN14
+n14 (I# x1) (I# x2) (I# x3) (I# x4) (I# x5) (I# x6) (I# x7)
+    (I# x8) (I# x9) (I# x10) (I# x11) (I# x12) (I# x13) (I# x14) =
+    (# x1, x2, x3, x4, x5, x6, x7
+    ,  x8, x9, x10, x11, x12, x13, x14 #)
+
+{-# NOINLINE n14_a #-}
+n14_a :: TN14
+      -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+      -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+      -> ((Int,Int,Int,Int,Int,Int,Int),(Int,Int,Int,Int,Int,Int,Int))
+n14_a f x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 =
+    case f x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 of
+      (# y1, y2, y3, y4, y5, y6, y7
+       , y8, y9, y10, y11, y12, y13, y14 #) ->
+        ( (I# y1, I# y2, I# y3, I# y4, I# y5, I# y6, I# y7)
+        , (I# y8, I# y9, I# y10, I# y11, I# y12, I# y13, I# y14) )
+
+-- 20 Int#: generic frame, large spill, all non-pointer
+type TN20 = Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+         -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+         -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#
+            ,  Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #)
+
+{-# NOINLINE n20 #-}
+n20 :: TN20
+n20 (I# x1) (I# x2) (I# x3) (I# x4) (I# x5)
+    (I# x6) (I# x7) (I# x8) (I# x9) (I# x10)
+    (I# x11) (I# x12) (I# x13) (I# x14) (I# x15)
+    (I# x16) (I# x17) (I# x18) (I# x19) (I# x20) =
+    (# x1, x2, x3, x4, x5, x6, x7, x8, x9, x10
+    ,  x11, x12, x13, x14, x15, x16, x17, x18, x19, x20 #)
+
+{-# NOINLINE n20_a #-}
+n20_a :: TN20
+      -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+      -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+      -> ((Int,Int,Int,Int,Int),(Int,Int,Int,Int,Int)
+         ,(Int,Int,Int,Int,Int),(Int,Int,Int,Int,Int))
+n20_a f x1 x2 x3 x4 x5 x6 x7 x8 x9 x10
+        x11 x12 x13 x14 x15 x16 x17 x18 x19 x20 =
+    case f x1 x2 x3 x4 x5 x6 x7 x8 x9 x10
+           x11 x12 x13 x14 x15 x16 x17 x18 x19 x20 of
+      (# y1, y2, y3, y4, y5, y6, y7, y8, y9, y10
+       , y11, y12, y13, y14, y15, y16, y17, y18, y19, y20 #) ->
+        ( (I# y1, I# y2, I# y3, I# y4, I# y5)
+        , (I# y6, I# y7, I# y8, I# y9, I# y10)
+        , (I# y11, I# y12, I# y13, I# y14, I# y15)
+        , (I# y16, I# y17, I# y18, I# y19, I# y20) )
+
+-- 32 Int#: very large generic frame, spill = 26 words
+type TN32 = Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+         -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+         -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+         -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+         -> (# Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#
+            ,  Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#
+            ,  Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int#
+            ,  Int#, Int#, Int#, Int#, Int#, Int#, Int#, Int# #)
+
+{-# NOINLINE n32 #-}
+n32 :: TN32
+n32 (I# x1)  (I# x2)  (I# x3)  (I# x4)  (I# x5)  (I# x6)  (I# x7)  (I# x8)
+    (I# x9)  (I# x10) (I# x11) (I# x12) (I# x13) (I# x14) (I# x15) (I# x16)
+    (I# x17) (I# x18) (I# x19) (I# x20) (I# x21) (I# x22) (I# x23) (I# x24)
+    (I# x25) (I# x26) (I# x27) (I# x28) (I# x29) (I# x30) (I# x31) (I# x32) =
+    (# x1,  x2,  x3,  x4,  x5,  x6,  x7,  x8
+    ,  x9,  x10, x11, x12, x13, x14, x15, x16
+    ,  x17, x18, x19, x20, x21, x22, x23, x24
+    ,  x25, x26, x27, x28, x29, x30, x31, x32 #)
+
+{-# NOINLINE n32_a #-}
+n32_a :: TN32
+      -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+      -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+      -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+      -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+      -> ((Int,Int,Int,Int,Int,Int,Int,Int)
+         ,(Int,Int,Int,Int,Int,Int,Int,Int)
+         ,(Int,Int,Int,Int,Int,Int,Int,Int)
+         ,(Int,Int,Int,Int,Int,Int,Int,Int))
+n32_a f x1  x2  x3  x4  x5  x6  x7  x8
+        x9  x10 x11 x12 x13 x14 x15 x16
+        x17 x18 x19 x20 x21 x22 x23 x24
+        x25 x26 x27 x28 x29 x30 x31 x32 =
+    case f x1  x2  x3  x4  x5  x6  x7  x8
+           x9  x10 x11 x12 x13 x14 x15 x16
+           x17 x18 x19 x20 x21 x22 x23 x24
+           x25 x26 x27 x28 x29 x30 x31 x32 of
+      (# y1,  y2,  y3,  y4,  y5,  y6,  y7,  y8
+       , y9,  y10, y11, y12, y13, y14, y15, y16
+       , y17, y18, y19, y20, y21, y22, y23, y24
+       , y25, y26, y27, y28, y29, y30, y31, y32 #) ->
+        ( (I# y1,  I# y2,  I# y3,  I# y4,  I# y5,  I# y6,  I# y7,  I# y8)
+        , (I# y9,  I# y10, I# y11, I# y12, I# y13, I# y14, I# y15, I# y16)
+        , (I# y17, I# y18, I# y19, I# y20, I# y21, I# y22, I# y23, I# y24)
+        , (I# y25, I# y26, I# y27, I# y28, I# y29, I# y30, I# y31, I# y32) )
+
+-- 32 mixed: 8 groups of (Int, Int#, Double#, Float#), all register classes
+-- spill = 14 words (10 vanilla + 2 double + 2 float)
+type TMIX32 = Int -> Int -> Double -> Float
+           -> Int -> Int -> Double -> Float
+           -> Int -> Int -> Double -> Float
+           -> Int -> Int -> Double -> Float
+           -> Int -> Int -> Double -> Float
+           -> Int -> Int -> Double -> Float
+           -> Int -> Int -> Double -> Float
+           -> Int -> Int -> Double -> Float
+           -> (# Int, Int#, Double#, Float#
+              ,  Int, Int#, Double#, Float#
+              ,  Int, Int#, Double#, Float#
+              ,  Int, Int#, Double#, Float#
+              ,  Int, Int#, Double#, Float#
+              ,  Int, Int#, Double#, Float#
+              ,  Int, Int#, Double#, Float#
+              ,  Int, Int#, Double#, Float# #)
+
+{-# NOINLINE mix32 #-}
+mix32 :: TMIX32
+mix32 x1  (I# x2)  (D# x3)  (F# x4)
+      x5  (I# x6)  (D# x7)  (F# x8)
+      x9  (I# x10) (D# x11) (F# x12)
+      x13 (I# x14) (D# x15) (F# x16)
+      x17 (I# x18) (D# x19) (F# x20)
+      x21 (I# x22) (D# x23) (F# x24)
+      x25 (I# x26) (D# x27) (F# x28)
+      x29 (I# x30) (D# x31) (F# x32) =
+    (# x1,  x2,  x3,  x4
+    ,  x5,  x6,  x7,  x8
+    ,  x9,  x10, x11, x12
+    ,  x13, x14, x15, x16
+    ,  x17, x18, x19, x20
+    ,  x21, x22, x23, x24
+    ,  x25, x26, x27, x28
+    ,  x29, x30, x31, x32 #)
+
+{-# NOINLINE mix32_a #-}
+mix32_a :: TMIX32
+        -> Int -> Int -> Double -> Float
+        -> Int -> Int -> Double -> Float
+        -> Int -> Int -> Double -> Float
+        -> Int -> Int -> Double -> Float
+        -> Int -> Int -> Double -> Float
+        -> Int -> Int -> Double -> Float
+        -> Int -> Int -> Double -> Float
+        -> Int -> Int -> Double -> Float
+        -> ((Int,Int,Double,Float)
+           ,(Int,Int,Double,Float)
+           ,(Int,Int,Double,Float)
+           ,(Int,Int,Double,Float)
+           ,(Int,Int,Double,Float)
+           ,(Int,Int,Double,Float)
+           ,(Int,Int,Double,Float)
+           ,(Int,Int,Double,Float))
+mix32_a f x1  x2  x3  x4  x5  x6  x7  x8
+          x9  x10 x11 x12 x13 x14 x15 x16
+          x17 x18 x19 x20 x21 x22 x23 x24
+          x25 x26 x27 x28 x29 x30 x31 x32 =
+    case f x1  x2  x3  x4  x5  x6  x7  x8
+           x9  x10 x11 x12 x13 x14 x15 x16
+           x17 x18 x19 x20 x21 x22 x23 x24
+           x25 x26 x27 x28 x29 x30 x31 x32 of
+      (# y1,  y2,  y3,  y4
+       , y5,  y6,  y7,  y8
+       , y9,  y10, y11, y12
+       , y13, y14, y15, y16
+       , y17, y18, y19, y20
+       , y21, y22, y23, y24
+       , y25, y26, y27, y28
+       , y29, y30, y31, y32 #) ->
+        ( (y1,  I# y2,  D# y3,  F# y4)
+        , (y5,  I# y6,  D# y7,  F# y8)
+        , (y9,  I# y10, D# y11, F# y12)
+        , (y13, I# y14, D# y15, F# y16)
+        , (y17, I# y18, D# y19, F# y20)
+        , (y21, I# y22, D# y23, F# y24)
+        , (y25, I# y26, D# y27, F# y28)
+        , (y29, I# y30, D# y31, F# y32) )
