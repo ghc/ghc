@@ -240,6 +240,8 @@ typedef struct _RTSStats {
   Time gc_cpu_ns;
     // Total elapsed time used by the GC
   Time gc_elapsed_ns;
+    // Total elapsed time used during GC synchronization
+  Time gc_sync_elapsed_ns;
     // Total CPU time (at the previous GC)
   Time cpu_ns;
     // Total elapsed time (at the previous GC)

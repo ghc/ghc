@@ -26,6 +26,7 @@
 -- proposal
 -- #289](https://github.com/haskell/core-libraries-committee/issues/289). These
 -- declarations are now instead available from the @ghc-experimental@ package.
+-- @ghc-experimental@ contains additional metrics not added to the API here.
 
 module GHC.Stats
     ( -- * Runtime statistics
