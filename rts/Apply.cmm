@@ -719,6 +719,8 @@ for:
     goto for;
   }
 
+  ccall restoreStackInvariants(CurrentTSO "ptr", Sp "ptr", Words);
+
   // Off we go!
   TICK_ENT_VIA_NODE();
 
@@ -775,6 +777,8 @@ for:
     i = i + 1;
     goto for;
   }
+
+  ccall restoreStackInvariants(CurrentTSO "ptr", Sp "ptr", Words);
 
   // Off we go!
   TICK_ENT_VIA_NODE();

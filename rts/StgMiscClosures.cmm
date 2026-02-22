@@ -230,25 +230,22 @@ INFO_TABLE_RET( stg_ctoi_V, RET_BCO )
        spilled_2
        spilled_3   <- Sp
 
-   This makes it difficult to write a procedure that can handle tuples of
-   any size.
+   stg_ctoi_t reads the number of spilled words from the
+   ctoi_tuple_spill_words field in the TSO to skip over the spilled data
+   on the stack. This field is set by the interpreter when pushing
+   the stg_ctoi_t frame (bci_PUSH_ALTS_T instruction). The old
+   value of the TSO field is saved in the frame itself, to handle
+   nested tuple returns correctly.
 
-   To get around this, we use a Cmm procedure that adjusts the stack pointer
-   to skip over the tuple:
-
-       ...
-       stg_ctoi_t3  (advances Sp by 3 words, then calls stg_ctoi_t)
-       spilled_1
-       spilled_2
-       spilled_3    <- Sp
-
-   When stg_ctoi_t is called, the stack looks like:
+   When stg_ctoi_t has adjusted Sp and read the frame, the stack
+   looks like:
 
        ...
+       old_spill
        tuple_BCO
        tuple_info
        cont_BCO     (continuation in bytecode)
-       stg_ctoi_t3  <- Sp
+       stg_ctoi_t   <- Sp
        spilled_1
        spilled_2
        spilled_3
@@ -258,10 +255,11 @@ INFO_TABLE_RET( stg_ctoi_V, RET_BCO )
    stack looks as follows:
 
        ...
+       old_spill
        tuple_BCO
        tuple_info
        cont_BCO
-       stg_ctoi_t3
+       stg_ctoi_t
        spilled_1
        spilled_2
        spilled_3
@@ -279,108 +277,52 @@ INFO_TABLE_RET( stg_ctoi_V, RET_BCO )
 
    At this point we can safely jump to the interpreter.
 
+   We maintain the following invariants around the spill info:
+
+     - tso->ctoi_tuple_spill_words == (frame[CTOI_TUPLE_INFO_OFFSET] >> 24)
+       where frame is the topmost stg_ctoi_t frame on the tso's stack.
+     - for each stg_ctoi_t frame, ctoi_t_frame[CTOI_OLD_TUPLE_SPILL_WORDS_OFFSET]
+       is equal to previous_ctoi_t_frame[CTOI_TUPLE_INFO_OFFSET] >> 24
+
+   This affects unwinding/capturing/restoring the stack for exceptions
+   and continuations.
  */
-
-#define MK_STG_CTOI_T(N) INFO_TABLE_RET( \
-  stg_ctoi_t ## N, RET_BCO ) \
-  { Sp_adj(N); jump stg_ctoi_t SCALAR_ARG_REGS; }
-
-MK_STG_CTOI_T(0)
-MK_STG_CTOI_T(1)
-MK_STG_CTOI_T(2)
-MK_STG_CTOI_T(3)
-MK_STG_CTOI_T(4)
-MK_STG_CTOI_T(5)
-MK_STG_CTOI_T(6)
-MK_STG_CTOI_T(7)
-MK_STG_CTOI_T(8)
-MK_STG_CTOI_T(9)
-
-MK_STG_CTOI_T(10)
-MK_STG_CTOI_T(11)
-MK_STG_CTOI_T(12)
-MK_STG_CTOI_T(13)
-MK_STG_CTOI_T(14)
-MK_STG_CTOI_T(15)
-MK_STG_CTOI_T(16)
-MK_STG_CTOI_T(17)
-MK_STG_CTOI_T(18)
-MK_STG_CTOI_T(19)
-
-MK_STG_CTOI_T(20)
-MK_STG_CTOI_T(21)
-MK_STG_CTOI_T(22)
-MK_STG_CTOI_T(23)
-MK_STG_CTOI_T(24)
-MK_STG_CTOI_T(25)
-MK_STG_CTOI_T(26)
-MK_STG_CTOI_T(27)
-MK_STG_CTOI_T(28)
-MK_STG_CTOI_T(29)
-
-MK_STG_CTOI_T(30)
-MK_STG_CTOI_T(31)
-MK_STG_CTOI_T(32)
-MK_STG_CTOI_T(33)
-MK_STG_CTOI_T(34)
-MK_STG_CTOI_T(35)
-MK_STG_CTOI_T(36)
-MK_STG_CTOI_T(37)
-MK_STG_CTOI_T(38)
-MK_STG_CTOI_T(39)
-
-MK_STG_CTOI_T(40)
-MK_STG_CTOI_T(41)
-MK_STG_CTOI_T(42)
-MK_STG_CTOI_T(43)
-MK_STG_CTOI_T(44)
-MK_STG_CTOI_T(45)
-MK_STG_CTOI_T(46)
-MK_STG_CTOI_T(47)
-MK_STG_CTOI_T(48)
-MK_STG_CTOI_T(49)
-
-MK_STG_CTOI_T(50)
-MK_STG_CTOI_T(51)
-MK_STG_CTOI_T(52)
-MK_STG_CTOI_T(53)
-MK_STG_CTOI_T(54)
-MK_STG_CTOI_T(55)
-MK_STG_CTOI_T(56)
-MK_STG_CTOI_T(57)
-MK_STG_CTOI_T(58)
-MK_STG_CTOI_T(59)
-
-MK_STG_CTOI_T(60)
-MK_STG_CTOI_T(61)
-MK_STG_CTOI_T(62)
 
 /*
   Convert a tuple return value to be used in bytecode.
 
   See Note [GHCi and native call registers] for information on how
   values are moved between the stack and registers.
+
+  See Note [GHCi unboxed tuples stack spills] for the stack layout.
  */
 
-stg_ctoi_t
-    /* explicit stack */
+INFO_TABLE_RET( stg_ctoi_t, RET_BCO )
 {
-
-    W_ tuple_info, tuple_stack;
+    W_ tuple_spill, tuple_info;
     P_ tuple_BCO;
+    W_ old_spill;
+
+    /* read number of spilled stack words from the TSO */
+    tuple_spill = StgTSO_ctoi_tuple_spill_words(CurrentTSO);
+
+    /* skip over tuple data on the stack */
+    Sp = Sp + WDS(tuple_spill);
 
     tuple_info = Sp(2); /* tuple information word */
     tuple_BCO  = Sp(3); /* bytecode object that returns the tuple in
                            the interpreter */
+    old_spill  = Sp(4); /* saved ctoi_tuple_spill_words from TSO */
 
 #if defined(PROFILING)
-    CCCS = Sp(4);
+    CCCS = Sp(5);
 #endif
 
-    /* number of words spilled on stack */
-    tuple_stack  = (tuple_info >> 24) & 0xff;
+    /* restore old spill count in the TSO */
+    StgTSO_ctoi_tuple_spill_words(CurrentTSO) = old_spill;
 
-    Sp = Sp - WDS(tuple_stack);
+    /* move Sp back down to include spilled data */
+    Sp = Sp - WDS(tuple_spill);
 
     PUSH_SCALAR_ARG_REGS(tuple_info);
 
@@ -401,7 +343,7 @@ INFO_TABLE_RET( stg_ret_t, RET_BCO )
     Sp_adj(3);
 
     /* number of words spilled on stack */
-    tuple_stack  = (tuple_info >> 24) & 0xff;
+    tuple_stack  = tuple_info >> 24;
 
     POP_SCALAR_ARG_REGS(tuple_info);
 
