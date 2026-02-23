@@ -13,10 +13,6 @@ package *
   executable-profiling: False
   executable-static: False
 
-if !os(windows)
-  package *
-    library-for-ghci: True
-
 package haddock-api
   flags: +in-ghc-tree
 
@@ -83,3 +79,11 @@ package text
 
 program-options
   ghc-options: -fhide-source-paths -j
+
+constraints:
+  -- because allow-newer doesn't play well with the automatic os-string flag
+  , any.unix +os-string
+  , any.directory +os-string
+  , any.file-io +os-string
+  , any.process +os-string
+  , any.Win32 +os-string
