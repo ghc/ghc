@@ -22,13 +22,13 @@ install graphviz on your system.
 
   - `make`:
 
-    1. ``inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` "GHC.Parser"``
-    2. ``inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` "GHC.Parser" --dot``
+    1. ``inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` ghc "GHC.Parser"``
+    2. ``inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` ghc "GHC.Parser" --dot``
 
   - `hadrian`:
 
-    1. ``_build/stage1/bin/count-deps `_build/stage1/bin/ghc --print-libdir` "GHC.Parser"``
-    2. ``_build/stage1/bin/count-deps `_build/stage1/bin/ghc --print-libdir` "GHC.Parser" --dot``
+    1. ``_build/stage1/bin/count-deps `_build/stage1/bin/ghc --print-libdir` ghc "GHC.Parser"``
+    2. ``_build/stage1/bin/count-deps `_build/stage1/bin/ghc --print-libdir` ghc "GHC.Parser" --dot``
 
 ## Rendering dependency graphs
 
