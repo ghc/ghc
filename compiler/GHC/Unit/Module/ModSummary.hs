@@ -46,7 +46,7 @@ import GHC.Types.PkgQual
 import GHC.Types.Basic
 
 import GHC.Data.Maybe
-import GHC.Data.OsPath (OsPath)
+import GHC.Data.OsPath ( OsPath )
 import GHC.Data.StringBuffer ( StringBuffer )
 
 import GHC.Utils.Fingerprint
@@ -214,7 +214,7 @@ findTarget ms ts =
         = ms_mod_name summary == m && ms_unitid summary == unitId
     summary `matches` Target { targetId = TargetFile f _, targetUnitId = unitid }
         | Just f' <- ml_hs_file (ms_location summary)
-        = f == f'  && ms_unitid summary == unitid
+        = f == f' && ms_unitid summary == unitid
     _ `matches` _
         = False
 

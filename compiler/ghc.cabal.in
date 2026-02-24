@@ -125,6 +125,7 @@ Library
                    containers >= 0.6.2.1 && < 0.9,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1.5 && < 1.6,
+                   file-io    >= 0.1.5 && < 0.3,
                    os-string  >= 2.0.1 && < 2.1,
                    hpc        >= 0.6 && < 0.8,
                    transformers >= 0.5 && < 0.7,

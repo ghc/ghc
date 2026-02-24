@@ -79,7 +79,13 @@ module GHC (
         ModuleGraph, emptyMG, mapMG, mkModuleGraph, mgModSummaries,
         mgLookupModule,
         ModSummary(..), ms_mod_name, ModLocation(..),
-        pattern ModLocation,
+        ml_hs_file,
+        ml_hi_file,
+        ml_dyn_hi_file,
+        ml_obj_file,
+        ml_dyn_obj_file,
+        ml_hie_file,
+        ml_bytecode_file,
         getModSummary,
         getModuleGraph,
         isLoaded,
@@ -457,6 +463,7 @@ import System.Environment ( getEnv, getProgName )
 import System.Exit      ( exitWith, ExitCode(..) )
 import System.FilePath
 import System.IO.Error  ( isDoesNotExistError )
+import GHC.Data.OsPath (OsPath)
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import Foreign.C
@@ -1575,12 +1582,12 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- a module by using 'getModSummary'
 --
 -- XXX: Explain pre-conditions
-getModuleSourceAndFlags :: ModSummary -> IO (String, StringBuffer, DynFlags)
+getModuleSourceAndFlags :: ModSummary -> IO (OsPath, StringBuffer, DynFlags)
 getModuleSourceAndFlags m = do
-  case ml_hs_file $ ms_location m of
+  case ml_hs_file_ospath $ ms_location m of
     Nothing -> throwIO $ mkApiErr (ms_hspp_opts m) (text "No source available for module " <+> ppr (ms_mod m))
     Just sourceFile -> do
-        source <- hGetStringBuffer sourceFile
+        source <- hGetStringBufferOsPath sourceFile
         return (sourceFile, source, ms_hspp_opts m)
 
 
@@ -1592,7 +1599,7 @@ getModuleSourceAndFlags m = do
 getTokenStream :: ModSummary -> IO [Located Token]
 getTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
-  let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
+  let startLoc = mkRealSrcLoc (mkFastStringOsString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
     PFailed pst -> throwErrors (initSourceErrorContext dflags) (GhcPsMessage <$> getPsErrorMessages pst)
@@ -1603,7 +1610,7 @@ getTokenStream mod = do
 getRichTokenStream :: ModSummary -> IO [(Located Token, String)]
 getRichTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
-  let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
+  let startLoc = mkRealSrcLoc (mkFastStringOsString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
     PFailed pst -> throwErrors (initSourceErrorContext dflags) (GhcPsMessage <$> getPsErrorMessages pst)

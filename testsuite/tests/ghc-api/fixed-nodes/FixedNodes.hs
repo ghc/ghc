@@ -31,7 +31,7 @@ convertToFixed (ModuleNodeCompile ms) =
   -- with the module summary information
   let modName = ms_mod_name ms
       modLoc = ms_location ms
-  in ModuleNodeFixed (msKey ms) (ms_location ms) { ml_hs_file = Nothing}
+  in ModuleNodeFixed (msKey ms) (ms_location ms) { ml_hs_file_ospath = Nothing }
 
 
 -- | Load a module graph and report the result
