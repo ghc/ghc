@@ -14,9 +14,14 @@ import System.Environment
 import GHC.Unit.Module.Deps
 import GHC.Unit.State
 import GHC.Unit.Info
+import GHC.Unit.Types
 import GHC.Data.FastString
 import Data.Map.Strict qualified as Map
+import Data.Map.Lazy qualified as Lazy.Map
 import Data.Set qualified as Set
+import Data.Maybe
+import Data.List (maximumBy)
+import Data.Ord (comparing)
 
 -- Example invocation:
 --  inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` ghc "GHC.Parser"
@@ -24,8 +29,13 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [libdir, packageName, modName, "--dot"] -> printDeps libdir packageName modName True
-    [libdir, packageName, modName] -> printDeps libdir packageName modName False
+    [libdir, packageName, "--dot"] -> printDeps libdir packageName Nothing True
+    [libdir, packageName, "--crit-path"] -> do
+      modgraph <- calcDeps Nothing packageName libdir
+      let modgraph' = Map.map (map gwib_mod . filter ((/=) IsBoot . gwib_isBoot)) modgraph
+      mapM_ putStrLn $ criticalPath modgraph'
+    [libdir, packageName, modName, "--dot"] -> printDeps libdir packageName (Just modName) True
+    [libdir, packageName, modName] -> printDeps libdir packageName (Just modName) False
     _ -> fail "usage: count-deps libdir package module [--dot]"
 
 dotSpec :: String -> Map.Map String [String] -> String
@@ -35,23 +45,23 @@ dotSpec name g =
   where
     f acc k ns = acc ++ concat ["  " ++ show k ++ " -> " ++ show n ++ ";\n" | n <- ns]
 
-printDeps :: String -> String -> String -> Bool -> IO ()
+printDeps :: String -> String -> Maybe String -> Bool -> IO ()
 printDeps libdir packageName modName dot = do
   modGraph <-
-    Map.map (map moduleNameString) .
-      Map.mapKeys moduleNameString <$> calcDeps (Just modName) packageName libdir
+    Map.map (map (moduleNameString . gwib_mod)) .
+      Map.mapKeys (moduleNameString) <$> calcDeps modName packageName libdir
   if not dot then
     do
       let modules = Map.keys modGraph
-      putStrLn $ "Found " ++ modName ++ " module dependencies"
+      putStrLn $ "Found " ++ fromMaybe "" modName ++ " module dependencies"
       forM_ modules putStrLn
   else
     -- * Copy the digraph output to a file ('deps.dot' say)
     -- * To render it, use a command along the lines of
     --   'tred deps.dot > deps-tred.dot && dot -Tpdf -o deps.pdf deps-tred.dot'
-    putStr $ dotSpec modName modGraph
+    putStr $ dotSpec (fromMaybe "" modName) modGraph
 
-calcDeps :: Maybe String -> String -> FilePath -> IO (Map.Map ModuleName [ModuleName])
+calcDeps :: Maybe String -> String -> FilePath -> IO (Map.Map ModuleName [ModuleNameWithIsBoot])
 calcDeps mmodName packageName libdir =
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     runGhc (Just libdir) $ do
@@ -75,7 +85,7 @@ calcDeps mmodName packageName libdir =
     -- Source imports are only guaranteed to show up in the 'mi_deps'
     -- of modules that import them directly and don’t propagate
     -- transitively so we loop.
-    loop :: UnitId -> HscEnv -> Map.Map ModuleName [ModuleName] -> [ModuleName] -> Ghc (Map.Map ModuleName [ModuleName])
+    loop :: UnitId -> HscEnv -> Map.Map ModuleName [ModuleNameWithIsBoot] -> [ModuleName] -> Ghc (Map.Map ModuleName [ModuleNameWithIsBoot])
     loop unitId env modules (m : ms) =
       if m `Map.member` modules
         then loop unitId env modules ms
@@ -83,11 +93,36 @@ calcDeps mmodName packageName libdir =
           mi <- liftIO $ hscGetModuleInterface env (mkModule unitId m)
           let deps = modDeps mi
           modules <- return $ Map.insert m [] modules
-          loop unitId env (Map.insert m deps modules) $ ms ++ filter (not . (`Map.member` modules)) deps
+          loop unitId env (Map.insert m deps modules) $ ms ++ filter (not . (`Map.member` modules)) (map gwib_mod deps)
     loop _ _ modules [] = return modules
 
     mkModule :: UnitId -> ModuleName -> Module
     mkModule unitId = Module (RealUnit $ Definite unitId)
 
-    modDeps :: ModIface -> [ModuleName]
-    modDeps mi = map (gwib_mod . (\(_, _, mn) -> mn)) $ Set.toList $ dep_direct_mods (mi_deps mi)
+    modDeps :: ModIface -> [ModuleNameWithIsBoot]
+    modDeps mi = map (\(_, _, mn) -> mn) $ Set.toList $ dep_direct_mods (mi_deps mi)
+
+criticalPath :: Map.Map ModuleName [ModuleName] -> [String]
+criticalPath modules = crit top
+  where
+    -- Calculate the rank of each module
+    -- The rank of a vertex v is the maximum rank of its children + 1
+    -- We crucially use laziness to give us a nice memoized construction.
+    rank :: Map.Map ModuleName Int
+    rank = Lazy.Map.fromList
+      [ (k, 1 + safeMax (mapMaybe (\d -> Map.lookup d rank) deps))
+        | (k, deps) <- Map.toList modules
+      ]
+    top = fst . maximumBy (comparing snd) $ Lazy.Map.toList rank
+    -- The critical path starts with the module of highest rank
+    -- and then we walk down the tree taking the module of maximum rank at each step.
+    crit x = case deps of
+       [] -> []
+       _ ->
+         let m = fst (maximumBy (comparing snd) depsRank)
+         in moduleNameString m:crit m
+      where
+        depsRank = map (\n -> (n, fromMaybe 0 (Map.lookup n rank))) deps
+        deps = fromMaybe [] $ Map.lookup x modules
+    safeMax [] = 0
+    safeMax xs = maximum xs

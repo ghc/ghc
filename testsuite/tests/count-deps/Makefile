@@ -23,3 +23,8 @@ count-deps-parser:
 count-deps-ast:
 	$(COUNT_DEPS) $(LIBDIR) "ghc" "Language.Haskell.Syntax" | tee out
 	cat out | tail -n +2 | wc -l > SIZE
+
+.PHONY: count-deps-critical-path-ghc-internal
+count-deps-critical-path-ghc-internal:
+	$(COUNT_DEPS) $(LIBDIR) "ghc-internal" | tee out
+	cat out | tail -n +2 | wc -l > SIZE
