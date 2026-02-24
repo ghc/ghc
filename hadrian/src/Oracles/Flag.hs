@@ -96,7 +96,7 @@ arSupportsAtFile stage = Toolchain.arSupportsAtFile . tgtAr <$> targetStage stag
 targetSupportsSharedLibs :: Stage -> Action Bool
 targetSupportsSharedLibs stage = do
     windows       <- isWinTarget stage
-    ppc_linux     <- (&&) <$> anyTargetArch stage [ ArchPPC ] <*> anyTargetOs stage [ OSLinux ]
+    ppc_linux     <- (&&) <$> anyTargetArch stage [ ArchPPC ] <*> anyTargetOs stage [ OSLinux ]
     solaris       <- (&&) <$> anyTargetArch stage [ ArchX86 ] <*> anyTargetOs stage [ OSSolaris2 ]
     javascript    <- anyTargetArch stage [ ArchJavaScript ]
     return $ not (windows || javascript || ppc_linux || solaris)
