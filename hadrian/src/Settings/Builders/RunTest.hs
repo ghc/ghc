@@ -105,6 +105,7 @@ allowHaveLLVM = not . (`elem` ["wasm32", "javascript"])
 --
 inTreeCompilerArgs :: Stage -> Action TestCompilerArgs
 inTreeCompilerArgs stg = do
+    -- TODO: executable and library stage would be clearer
     cross <- crossStage stg
     let ghcStage = succStage stg
         pkgCacheStage = if cross then ghcStage else stg
@@ -142,7 +143,7 @@ inTreeCompilerArgs stg = do
     pkgConfCacheFile <- System.FilePath.normalise . (top -/-)
                     <$> (packageDbPath (PackageDbLoc pkgCacheStage Final) <&> (-/- "package.cache"))
     libdir           <- System.FilePath.normalise . (top -/-)
-                    <$> stageLibPath stg
+                    <$> stageLibPath pkgCacheStage
 
     -- For this information, we need to query ghc --info, however, that would
     -- require building ghc, which we don't want to do here. Therefore, the

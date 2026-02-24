@@ -316,8 +316,10 @@ timeoutProgBuilder = do
 needTestsuitePackages :: Stage -> Action ()
 needTestsuitePackages stg = do
   allpkgs <- packages <$> flavour
-  -- TODO: This used to force the packages to Stage1. Check if the tuple dance is still useful now.
-  libpkgs <- map (stg,) . filter isLibrary <$> allpkgs stg
+  isCross <- crossStage stg
+  -- In cross case, the libraries are one stage ahead
+  let libraryStage = if isCross then succStage stg else stg
+  libpkgs <- map (libraryStage,) . filter isLibrary <$> allpkgs libraryStage
   -- And the executables of the current stage
   exepkgs <- map (stg,) . filter isProgram <$> allpkgs stg
   -- Don't require lib:ghc or lib:cabal when testing the stage1 compiler
@@ -326,7 +328,19 @@ needTestsuitePackages stg = do
   -- Unfortunately, we still need the liba
   let pkgs = filter (\(_,p) -> not $ (pkgName p `elem` ["ghc", "Cabal"]) && isStage0 stg)
                     (libpkgs ++ exepkgs ++ [ (stg,timeout) | windowsHost ])
+
   need =<< mapM (uncurry pkgFile) pkgs
+  when isCross $ do
+    jsTarget <- isJsTarget (succStage stg)
+    wasmTarget <- isWasmTarget (succStage stg)
+    libPath <- stageLibPath stg
+    let jsDeps
+          | jsTarget  = ["ghc-interp.js"]
+          | otherwise = []
+        wasmDeps
+          | wasmTarget = ["dyld.mjs", "post-link.mjs", "prelude.mjs"]
+          | otherwise  = []
+    need $ map (libPath -/-) (jsDeps ++ wasmDeps)
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc
