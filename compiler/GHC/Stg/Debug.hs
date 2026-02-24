@@ -87,7 +87,7 @@ recordInfo :: Id -> StgExpr -> M ()
 recordInfo bndr new_rhs = do
   modLoc <- asks rModLocation
   let
-    thisFile = maybe nilFS mkFastString $ ml_hs_file modLoc
+    thisFile = maybe nilFS mkFastStringOsString $ ml_hs_file_ospath modLoc
     -- A span from the ticks surrounding the new_rhs
     best_span = quickSourcePos thisFile new_rhs
     -- A back-up span if the bndr had a source position, many do not (think internally generated ids)

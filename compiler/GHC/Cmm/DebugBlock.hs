@@ -33,7 +33,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Reg ( pprGlobalReg, pprGlobalRegUse )
 import GHC.Cmm.Utils
-import GHC.Data.FastString ( LexicalFastString, nilFS, mkFastString )
+import GHC.Data.FastString ( LexicalFastString, nilFS, mkFastStringOsString )
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -156,7 +156,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
       rangeRating (span, _)
         | srcSpanFile span == thisFile = 1
         | otherwise                    = 2 :: Int
-      thisFile = maybe nilFS mkFastString $ ml_hs_file modLoc
+      thisFile = maybe nilFS mkFastStringOsString $ ml_hs_file_ospath modLoc
 
       -- Returns block tree for this scope as well as all nested
       -- scopes. Note that if there are multiple blocks in the (exact)

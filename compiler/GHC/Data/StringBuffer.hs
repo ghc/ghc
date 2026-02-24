@@ -21,6 +21,7 @@ module GHC.Data.StringBuffer
          -- * Creation\/destruction
         hGetStringBuffer,
         hGetStringBufferBlock,
+        hGetStringBufferOsPath,
         hPutStringBuffer,
         appendStringBuffers,
         stringToStringBuffer,
@@ -76,6 +77,8 @@ import GHC.Exts
 
 import Foreign
 import GHC.ForeignPtr (unsafeWithForeignPtr)
+import GHC.Data.OsPath (OsPath)
+import qualified System.File.OsPath as FileIO
 
 -- -----------------------------------------------------------------------------
 -- The StringBuffer type
@@ -111,6 +114,15 @@ instance Show StringBuffer where
 hGetStringBuffer :: FilePath -> IO StringBuffer
 hGetStringBuffer fname = do
    h <- openBinaryFile fname ReadMode
+   hGetStringBufferHandle h
+
+hGetStringBufferOsPath :: OsPath -> IO StringBuffer
+hGetStringBufferOsPath fname = do
+   h <- FileIO.openBinaryFile fname ReadMode
+   hGetStringBufferHandle h
+
+hGetStringBufferHandle :: Handle -> IO StringBuffer
+hGetStringBufferHandle h = do
    size_i <- hFileSize h
    offset_i <- skipBOM h size_i 0  -- offset is 0 initially
    let size = fromIntegral $ size_i - offset_i

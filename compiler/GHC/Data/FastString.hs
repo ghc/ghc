@@ -77,6 +77,7 @@ module GHC.Data.FastString
         mkFastStringBytes,
         mkFastStringByteList,
         mkFastString#,
+        mkFastStringOsString,
 
         -- ** Deconstruction
         unpackFS,           -- :: FastString -> String
@@ -147,6 +148,8 @@ import GHC.Conc.Sync    (sharedCAF)
 
 import GHC.Exts
 import GHC.IO
+import System.OsString.Internal.Types
+import Data.Type.Coercion (coerceWith)
 
 -- | Gives the Modified UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS, fastStringToByteString :: FastString -> ByteString
@@ -546,6 +549,14 @@ mkFastStringByteString bs =
 mkFastStringShortByteString :: ShortByteString -> FastString
 mkFastStringShortByteString sbs =
   inlinePerformIO $ mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+
+-- | Create a 'FastString' from an 'OsString', without copying.
+mkFastStringOsString :: OsString -> FastString
+mkFastStringOsString os = mkFastStringShortByteString $
+  -- Using 'OsPath''s 'unOS' here will unfortunately lead to cyclic dependencies
+  case coercionToPlatformTypes of
+    Left (_, windowsStringEv) ->  unWS $ coerceWith windowsStringEv os
+    Right (_, posixStringEv) -> unPS $ coerceWith posixStringEv os
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString

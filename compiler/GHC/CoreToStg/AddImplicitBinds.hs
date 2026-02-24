@@ -135,15 +135,16 @@ tick_it :: Bool -> ModLocation -> Name -> CoreExpr -> CoreExpr
 -- If we want to generate debug info, we put a source note on the
 -- worker. This is useful, especially for heap profiling.
 tick_it generate_debug_info mod_loc name
-  | not generate_debug_info               = id
+  | not generate_debug_info                = id
   | RealSrcSpan span _ <- nameSrcSpan name = tick span
-  | Just file <- ml_hs_file mod_loc       = tick (span1 file)
-  | otherwise                             = tick (span1 "???")
+  | Just file <- ml_hs_file_ospath mod_loc = tick (span2 file)
+  | otherwise                              = tick (span1 "???")
   where
     tick span  = Tick $ SourceNote span $
                  LexicalFastString $ mkFastString $
                  renderWithContext defaultSDocContext $ ppr name
-    span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
+    span1 str = realSrcLocSpan $ mkRealSrcLoc (mkFastString str) 1 1
+    span2 file = realSrcLocSpan $ mkRealSrcLoc (mkFastStringOsString file) 1 1
 
 
 
