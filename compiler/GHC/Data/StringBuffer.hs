@@ -21,6 +21,7 @@ module GHC.Data.StringBuffer
          -- * Creation\/destruction
         hGetStringBuffer,
         hGetStringBufferBlock,
+        hGetStringBufferOsPath,
         hPutStringBuffer,
         appendStringBuffers,
         stringToStringBuffer,
@@ -56,17 +57,19 @@ module GHC.Data.StringBuffer
 import GHC.Prelude
 
 import GHC.Data.FastString
+import GHC.Data.OsPath (OsPath)
+import GHC.Fingerprint
 import GHC.Utils.Encoding
+import GHC.Utils.Exception (bracket_)
 import GHC.Utils.IO.Unsafe
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Exception      ( bracket_ )
-import GHC.Fingerprint
 
 import Data.Maybe
+import GHC.IO.Encoding.Failure (CodingFailureMode (IgnoreCodingFailure))
+import GHC.IO.Encoding.UTF8 (mkUTF8)
+import System.File.OsPath qualified as FileIO
 import System.IO
-import System.IO.Unsafe         ( unsafePerformIO )
-import GHC.IO.Encoding.UTF8     ( mkUTF8 )
-import GHC.IO.Encoding.Failure  ( CodingFailureMode(IgnoreCodingFailure) )
+import System.IO.Unsafe (unsafePerformIO)
 
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString as BS
@@ -111,6 +114,15 @@ instance Show StringBuffer where
 hGetStringBuffer :: FilePath -> IO StringBuffer
 hGetStringBuffer fname = do
    h <- openBinaryFile fname ReadMode
+   hGetStringBufferHandle h
+
+hGetStringBufferOsPath :: OsPath -> IO StringBuffer
+hGetStringBufferOsPath fname = do
+   h <- FileIO.openBinaryFile fname ReadMode
+   hGetStringBufferHandle h
+
+hGetStringBufferHandle :: Handle -> IO StringBuffer
+hGetStringBufferHandle h = do
    size_i <- hFileSize h
    offset_i <- skipBOM h size_i 0  -- offset is 0 initially
    let size = fromIntegral $ size_i - offset_i

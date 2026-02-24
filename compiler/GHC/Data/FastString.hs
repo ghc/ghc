@@ -77,6 +77,7 @@ module GHC.Data.FastString
         mkFastStringBytes,
         mkFastStringByteList,
         mkFastString#,
+        mkFastStringOsString,
 
         -- ** Deconstruction
         unpackFS,           -- :: FastString -> String
@@ -134,12 +135,14 @@ import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Char8    as BSC
 import qualified Data.ByteString.Unsafe   as BS
 import qualified Data.ByteString.Short    as SBS
-import GHC.Data.ShortText (ShortText(..))
-import Foreign.C
-import System.IO
 import Data.Data
 import Data.IORef
 import Data.Semigroup as Semi
+import Data.Type.Coercion (coerceWith)
+import Foreign.C
+import GHC.Data.ShortText (ShortText (..))
+import System.IO
+import System.OsString.Internal.Types
 
 import Foreign
 
@@ -546,6 +549,14 @@ mkFastStringByteString bs =
 mkFastStringShortByteString :: ShortByteString -> FastString
 mkFastStringShortByteString sbs =
   inlinePerformIO $ mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+
+-- | Create a 'FastString' from an 'OsString', without copying.
+mkFastStringOsString :: OsString -> FastString
+mkFastStringOsString os = mkFastStringShortByteString $
+  -- Using 'OsPath''s 'unOS' here will unfortunately lead to cyclic dependencies
+  case coercionToPlatformTypes of
+    Left (_, windowsStringEv) -> unWS $ coerceWith windowsStringEv os
+    Right (_, posixStringEv) -> unPS $ coerceWith posixStringEv os
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
