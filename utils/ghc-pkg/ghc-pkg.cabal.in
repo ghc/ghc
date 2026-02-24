@@ -25,6 +25,7 @@ Executable ghc-pkg
                    process    >= 1   && < 1.7,
                    containers,
                    filepath,
+                   file-io,
                    Cabal,
                    Cabal-syntax,
                    binary,
