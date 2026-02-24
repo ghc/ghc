@@ -1692,6 +1692,8 @@ mkUnitState logger unit cfg index cache0 = do
                 -- likely to actually happen.
                 return (updateVisibilityMap wired_map plugin_vis_map2)
 
+  pure ()
+
   ((_, _), cache) <-
     computeProviders index cache0 logger unit cfg vis_map plugin_vis_map initial_dbs pkg_db (mkUnusableModuleNameProvidersMap unusable)
 
@@ -1993,6 +1995,7 @@ queryFindOriginShared cache _unit state name isPlugin =
       if isPlugin
         then pluginUnitVisibilityMap state
         else unitVisibilityMap state
+    visibility_extended = defaultVisibility state `plusUniqMap` visibility
 
     providersMap =
       lookupUniqMap providerSource name
@@ -2002,7 +2005,7 @@ queryFindOriginShared cache _unit state name isPlugin =
         (providers, _) -> providers
 
     base =
-      applyVisibility state visibility <$> providersMap
+      applyVisibility state visibility_extended <$> providersMap
 
     overrides =
       fromMaybe emptyUniqMap $
@@ -2022,9 +2025,10 @@ queryModuleProvidersShared ::
 queryModuleProvidersShared cache _unit state =
   overrides `plusUniqMap` computed
   where
-    computed = mapUniqMap (applyVisibility state visibility) providerSource
+    computed = mapUniqMap (applyVisibility state visibility_extended) providerSource
 
     visibility = unitVisibilityMap state
+    visibility_extended = defaultVisibility state `plusUniqMap` visibility
 
     providerSource =
       case cache of
@@ -2033,6 +2037,14 @@ queryModuleProvidersShared cache _unit state =
     overrides = unitOverrides visibility unusable_map providerSource
 
     unusable_map = mkUnusableModuleNameProvidersMap (unusableUnits state)
+
+defaultVisibility :: UnitState -> VisibilityMap
+defaultVisibility state =
+  listToUniqMap
+    [ (mkUnit pkg, mempty)
+    | (_, pkg) <- nonDetUniqMapToList (unitInfoMap state)
+    , unitIsIndefinite pkg || null (unitInstantiations pkg)
+    ]
 
 data UnitIndexQuery =
   UnitIndexQuery {

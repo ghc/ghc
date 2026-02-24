@@ -64,6 +64,9 @@ import GHC.Unit.External
 import GHC.Unit.Finder
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModSummary
+import GHC.Unit.State
+import Data.IORef
+import GHC.Types.Unique.Map (nonDetKeysUniqMap)
 
 import GHC.Linker.Types
 
@@ -432,8 +435,9 @@ compileExe lunit = do
         when (failed ok) (liftIO $ exitWith (ExitFailure 1))
 
 -- | Register a new virtual unit database containing a single unit
-addUnit :: GhcMonad m => UnitInfo -> m ()
+addUnit :: UnitInfo -> BkpM ()
 addUnit u = do
+    env <- getEnv
     hsc_env <- getSession
     logger <- getLogger
     let dflags0 = hsc_dflags hsc_env
@@ -447,7 +451,9 @@ addUnit u = do
                , unitDatabaseUnits = [u]
                }
          in return (dbs ++ [newdb]) -- added at the end because ordering matters
-    (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 ue_index (Just newdbs) (hsc_all_home_unit_ids hsc_env)
+    cache0 <- liftIO $ readIORef (bkp_unit_cache env)
+    (cache1, (dbs,unit_state,home_unit,mconstants)) <-
+      liftIO $ initUnitsWithCache logger dflags0 ue_index (Just newdbs) (hsc_all_home_unit_ids hsc_env) cache0
 
     -- update platform constants
     dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
@@ -463,9 +469,10 @@ addUnit u = do
                     (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags (ue_hpt old_unit_env) (Just home_unit))
           , ue_eps       = ue_eps old_unit_env
           , ue_module_graph = ue_module_graph old_unit_env
-          , ue_index
+          , ue_index = newUnitIndex cache1
           }
     setSession $ hscSetFlags dflags $ hsc_env { hsc_unit_env = unit_env }
+    liftIO $ writeIORef (bkp_unit_cache env) cache1
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()
 compileInclude n (i, uid) = do
@@ -500,7 +507,9 @@ data BkpEnv
         -- | When a package we are compiling includes another package
         -- which has not been compiled, we bump the level and compile
         -- that.
-        bkp_level :: Int
+        bkp_level :: Int,
+        -- | Shared unit providers cache for incremental unit additions.
+        bkp_unit_cache :: IORef SharedModuleProviders
     }
 
 -- Blah, to get rid of the default instance for IOEnv
@@ -550,11 +559,13 @@ getEpsGhc = do
 initBkpM :: FilePath -> [LHsUnit HsComponentId] -> BkpM a -> Ghc a
 initBkpM file bkp m =
   reifyGhc $ \session -> do
+    cache_ref <- liftIO $ newIORef emptySharedProviders
     let env = BkpEnv {
         bkp_session = session,
         bkp_table = Map.fromList [(hsComponentId (unLoc (hsunitName (unLoc u))), u) | u <- bkp],
         bkp_filename = file,
-        bkp_level = 0
+        bkp_level = 0,
+        bkp_unit_cache = cache_ref
       }
     runIOEnv env m
 

@@ -14,6 +14,7 @@ import GHC.Data.FastString
 import GHC.Unit
 import GHC.Unit.Env
 import qualified GHC.Unit.Home.Graph as HUG
+import qualified Data.Set as Set
 
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -73,12 +74,12 @@ mkNamePprCtx :: Outputable info => PromotionTickContext -> UnitEnv -> UnitIndexQ
 mkNamePprCtx ptc unit_env index env
  = QueryQualify
       (mkQualName env)
-      (mkQualModule unit_state index home_unit)
+      (mkQualModule unit_state index home_unit_ids)
       (mkQualPackage unit_state)
       (mkPromTick ptc env)
   where
   unit_state = ue_homeUnitState unit_env
-  home_unit = ue_homeUnit unit_env
+  home_unit_ids = HUG.allUnits (ue_home_unit_graph unit_env)
 
 mkQualName :: Outputable info => GlobalRdrEnvX info -> QueryQualifyName
 mkQualName env = qual_name where
@@ -216,10 +217,14 @@ Side note (int-index):
 -- | Creates a function for formatting modules based on two heuristics:
 -- (1) if the module is the current module, don't qualify, and (2) if there
 -- is only one exposed package which exports this module, don't qualify.
-mkQualModule :: UnitState -> UnitIndexQuery -> Maybe HomeUnit -> QueryQualifyModule
-mkQualModule unit_state index mhome_unit mod
-     | Just home_unit <- mhome_unit
-     , isHomeModule home_unit mod = False
+mkQualModule :: UnitState -> UnitIndexQuery -> Set.Set UnitId -> QueryQualifyModule
+mkQualModule unit_state index home_unit_ids mod
+      -- Check whether the unit of the module is in the HomeUnitGraph.
+      -- If it is, then we consider this 'mod' to be "local" and don't
+      -- want to qualify it.
+     | Just uid <- unitId_m
+     , uid `Set.member` home_unit_ids
+     = False
 
      | [(_, pkgconfig)] <- lookup,
        mkUnit pkgconfig == moduleUnit mod
@@ -228,7 +233,12 @@ mkQualModule unit_state index mhome_unit mod
      = False
 
      | otherwise = True
-     where lookup = lookupModuleInAllUnits unit_state index (moduleName mod)
+     where
+       lookup = lookupModuleInAllUnits unit_state index (moduleName mod)
+       unitId_m =
+         case moduleUnit mod of
+           RealUnit (Definite uid) -> Just uid
+           _ -> Nothing
 
 -- | Creates a function for formatting packages based on two heuristics:
 -- (1) don't qualify if the package in question is "main", and (2) only qualify

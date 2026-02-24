@@ -994,6 +994,11 @@ getBuildMap = gets buildDep
 
 getDependencies :: [NodeKey] -> BuildMap -> [BuildResult]
 getDependencies direct_deps build_map =
+  pprTrace "getDependencies"
+    (vcat
+      [ text "direct_deps:" <+> ppr direct_deps
+      , text "build_map keys:" <+> ppr (M.keys build_map)
+      ]) $
   strictMap (expectJust . flip M.lookup build_map) direct_deps
 
 type BuildM a = StateT BuildLoopState IO a
