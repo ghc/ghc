@@ -258,8 +258,10 @@ deepUnitFV fvs_of_kind v
     do_it :: BoundVars -> TyCoVarSet -> TyCoVarSet
     do_it bvs acc | v `elemVarSet` bvs = acc
                   | v `elemVarSet` acc = acc
-                  | otherwise          = runFVAcc (fvs_of_kind (varType v)) $
-                                         acc `extendVarSet` v
+                  | otherwise          = runFVAcc (fvs_of_kind (varType v)) acc
+                                         `extendVarSet` v
+                  -- Left-to-right: add the kind variables to the
+                  --                accumulator before v itself
 
 {- *********************************************************************
 *                                                                      *
@@ -395,8 +397,10 @@ deepDetUnitFV fvs_of_kind v
     do_it :: BoundVars -> DTyCoVarSet -> DTyCoVarSet
     do_it bvs acc | v `elemVarSet` bvs  = acc
                   | v `elemDVarSet` acc = acc
-                  | otherwise           = runFVAcc (fvs_of_kind (varType v)) $
-                                          acc `extendDVarSet` v
+                  | otherwise           = runFVAcc (fvs_of_kind (varType v)) acc
+                                          `extendDVarSet` v
+                  -- Left-to-right: add the kind variables to the
+                  --                accumulator before v itself
 
 {- *********************************************************************
 *                                                                      *
