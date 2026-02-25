@@ -152,3 +152,10 @@ T25191:
 	"$(TEST_HC)" -c T25191_foo2.c -o foo2.o -v0
 	"$(TEST_HC)" T25191.hs -v0
 	./T25191
+
+.PHONY: T6107
+T6107:
+	"$(TEST_HC)" -c T6107_sym1.s -o T6107_sym1.o -v0
+	"$(TEST_HC)" -c T6107_sym2.s -o T6107_sym2.o -v0
+	"$(TEST_HC)" $(TEST_HC_OPTS) T6107.hs -o T6107 -v0
+	./T6107

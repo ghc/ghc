@@ -961,7 +961,11 @@ ocGetNames_ELF ( ObjectCode* oc )
            for (size_t j = 0; j < symTab->n_symbols; j++) {
                ElfSymbol *symbol = &symTab->symbols[j];
                if (SHN_COMMON == symTab->symbols[j].elf_sym->st_shndx) {
-                   common_size += symbol->elf_sym->st_size;
+                   /* Skip COMMON symbols already defined by a previously-loaded
+                    * object; we will reuse the existing allocation. */
+                   if (!lookupStrHashTable(symhash, symTab->symbols[j].name)) {
+                       common_size += symbol->elf_sym->st_size;
+                   }
                }
            }
       }
@@ -1006,17 +1010,35 @@ ocGetNames_ELF ( ObjectCode* oc )
                /* Figure out if we want to add it; if so, set ad to its
                   address.  Otherwise leave ad == NULL. */
 
+               bool common_already_defined = false;
                if (shndx == SHN_COMMON) {
                    isLocal = false;
-                   CHECK(common_used < common_size);
-                   CHECK(common_mem);
-                   symbol->addr = (void*)((uintptr_t)common_mem + common_used);
-                   common_used += symbol->elf_sym->st_size;
-                   CHECK(common_used <= common_size);
-
-                   IF_DEBUG(linker_verbose,
-                            debugBelch("COMMON symbol, size %llu name %s allocated at %p\n",
-                                       (long long unsigned int) symbol->elf_sym->st_size, nm, symbol->addr));
+                   RtsSymbolInfo *existing = lookupStrHashTable(symhash, nm);
+                   if (existing != NULL) {
+                       /* COMMON symbol already allocated by a previously-loaded
+                        * object; reuse that address so relocations resolve to
+                        * the same storage. */
+                       if(symbol->elf_sym->st_size > existing->size) {
+                           barf("linker: trying to link COMMON symbols %s with incompatible sizes: previous size %llu, new size %llu\n",
+                                   nm,
+                                   (long long unsigned int) existing->size,
+                                   (long long unsigned int) symbol->elf_sym->st_size);
+                       }
+                       symbol->addr = existing->value;
+                       common_already_defined = true;
+                       IF_DEBUG(linker_verbose,
+                                debugBelch("COMMON symbol, size %llu name %s reusing address %p\n",
+                                           (long long unsigned int) symbol->elf_sym->st_size, nm, symbol->addr));
+                   } else {
+                       CHECK(common_used < common_size);
+                       CHECK(common_mem);
+                       symbol->addr = (void*)((uintptr_t)common_mem + common_used);
+                       common_used += symbol->elf_sym->st_size;
+                       CHECK(common_used <= common_size);
+                       IF_DEBUG(linker_verbose,
+                                debugBelch("COMMON symbol, size %llu name %s allocated at %p\n",
+                                           (long long unsigned int) symbol->elf_sym->st_size, nm, symbol->addr));
+                   }
 
                    /* Pointless to do addProddableBlock() for this area,
                       since the linker should never poke around in it. */
@@ -1080,13 +1102,13 @@ ocGetNames_ELF ( ObjectCode* oc )
                if (symbol->addr != NULL) {
                    CHECK(nm != NULL);
                    /* Acquire! */
-                   if (!isLocal) {
+                   if (!isLocal && !common_already_defined) {
 
                        if (isWeak == HS_BOOL_TRUE) {
                            setWeakSymbol(oc, nm);
                        }
                        if (!ghciInsertSymbolTable(oc->fileName, symhash,
-                                                  nm, symbol->addr, isWeak, sym_type, oc)
+                                                  nm, symbol->addr, isWeak, sym_type, symbol->elf_sym->st_size, oc)
                            ) {
                            goto fail;
                        }

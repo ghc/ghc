@@ -181,3 +181,11 @@ test('T25191',
       when(opsys('mingw32'), expect_broken(25191)) # not supported in the PE linker yet
      ],
      makefile_test, ['T25191'])
+
+
+# Test that COMMON symbols from multiple object files are merged correctly
+test('T6107',
+     [req_rts_linker,
+      extra_files(['T6107_sym1.s', 'T6107_sym2.s'])
+     ],
+     makefile_test, ['T6107'])
