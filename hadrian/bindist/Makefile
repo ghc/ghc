@@ -90,6 +90,7 @@ lib/settings : config.mk
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Relative Global Package DB", "package.conf.d")' >> $@
 	@echo ',("base unit-id", "$(BaseUnitId)")' >> $@
+	@echo ',("LibDir", "$$topdir")' >> $@
 	@echo "]" >> $@
 
 lib/targets/default.target : config.mk default.target

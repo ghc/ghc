@@ -3649,7 +3649,6 @@ compilerInfo dflags
        -- Whether or not GHC was compiled using -prof
        ("GHC Profiled",                showBool hostIsProfiled),
        ("Debug on",                    showBool debugIsOn),
-       ("LibDir",                      topDir dflags),
        -- This is always an absolute path, unlike "Relative Global Package DB" which is
        -- in the settings file.
        ("Global Package DB",           globalPackageDatabasePath dflags)
