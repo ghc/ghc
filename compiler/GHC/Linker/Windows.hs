@@ -16,6 +16,7 @@ import System.Directory
 
 data ManifestOpts = ManifestOpts
   { manifestEmbed :: !Bool    -- ^ Should the manifest be embedded in the binary with Windres
+  , manifestLongPathAware :: !Bool
   , manifestTempdir :: TempDir
   , manifestWindresConfig :: WindresConfig
   , manifestObjectSuf :: String
@@ -24,6 +25,7 @@ data ManifestOpts = ManifestOpts
 initManifestOpts :: DynFlags -> ManifestOpts
 initManifestOpts dflags = ManifestOpts
   { manifestEmbed = gopt Opt_EmbedManifest dflags
+  , manifestLongPathAware = gopt Opt_WinLongPathAware dflags
   , manifestTempdir = tmpDir dflags
   , manifestWindresConfig = configureWindres dflags
   , manifestObjectSuf = objectSuf dflags
@@ -37,21 +39,7 @@ maybeCreateManifest
    -> IO [FilePath] -- ^ extra objects to embed, maybe
 maybeCreateManifest logger tmpfs opts exe_filename = do
    let manifest_filename = exe_filename <.> "manifest"
-       manifest =
-         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\
-         \  <assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">\n\
-         \  <assemblyIdentity version=\"1.0.0.0\"\n\
-         \     processorArchitecture=\"X86\"\n\
-         \     name=\"" ++ dropExtension exe_filename ++ "\"\n\
-         \     type=\"win32\"/>\n\n\
-         \  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">\n\
-         \    <security>\n\
-         \      <requestedPrivileges>\n\
-         \        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>\n\
-         \        </requestedPrivileges>\n\
-         \       </security>\n\
-         \  </trustInfo>\n\
-         \</assembly>\n"
+       manifest = manifestContents (manifestLongPathAware opts) exe_filename
 
    writeFile manifest_filename manifest
 
@@ -80,3 +68,36 @@ maybeCreateManifest logger tmpfs opts exe_filename = do
          removeFile manifest_filename
 
          return [rc_obj_filename]
+
+manifestContents :: Bool -> FilePath -> String
+manifestContents longPathAware exe_filename =
+  unlines $
+    [ "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+    , "  <assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">"
+    , "  <assemblyIdentity version=\"1.0.0.0\""
+    , "     processorArchitecture=\"X86\""
+    , "     name=\"" ++ dropExtension exe_filename ++ "\""
+    , "     type=\"win32\"/>"
+    , "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">"
+    , "    <security>"
+    , "      <requestedPrivileges>"
+    , "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>"
+    , "      </requestedPrivileges>"
+    , "    </security>"
+    , "  </trustInfo>"
+    ]
+    ++
+    (
+      if longPathAware
+        then
+          [ "  <application xmlns=\"urn:schemas-microsoft-com:asm.v3\">"
+          , "    <windowsSettings xmlns:ws2=\"http://schemas.microsoft.com/SMI/2016/WindowsSettings\">"
+          , "      <ws2:longPathAware>true</ws2:longPathAware>"
+          , "    </windowsSettings>"
+          , "  </application>"
+          ]
+        else
+          []
+    ) ++
+    [ "  </assembly>"
+    ]

@@ -2525,6 +2525,7 @@ fFlagsDeps = [
   flagSpec "eager-blackholing"                Opt_EagerBlackHoling,
   flagSpec "orig-thunk-info"                  Opt_OrigThunkInfo,
   flagSpec "embed-manifest"                   Opt_EmbedManifest,
+  flagSpec "win-aware-long-paths"             Opt_WinLongPathAware,
   flagSpec "enable-rewrite-rules"             Opt_EnableRewriteRules,
   flagSpec "enable-th-splice-warnings"        Opt_EnableThSpliceWarnings,
   flagSpec "error-spans"                      Opt_ErrorSpans,

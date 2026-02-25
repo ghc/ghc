@@ -1430,6 +1430,32 @@ for example).
     See also :ghc-flag:`-pgmwindres ⟨cmd⟩` (:ref:`replacing-phases`) and
     :ghc-flag:`-optwindres ⟨option⟩` (:ref:`forcing-options-through`).
 
+.. ghc-flag:: -fwin-aware-long-paths
+    :shortdesc: Declare the linked binary to be long path aware on Windows.
+    :reverse: -fno-win-aware-long-paths
+    :type: dynamic
+    :category: linking
+
+    :default: on
+
+    :since: 9.14.2
+
+    Declare in the manifest file that GHC generates when linking a binary on Windows
+    to be aware of long paths.
+
+    Windows paths usually have a `MAX_PATH <https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation>`__
+    limit of 260 characters.
+    This limitation can be lifted by opting into enabling long paths in various
+    ways, see `Enable long paths in Windows 10 and later`_.
+
+    To invoke the compiled program with long paths, the Windows manifest needs
+    to declare that the program is aware of long paths and can handle them
+    appropriately.
+
+    :ghc-flag:`-fno-embed-manifest` also implies :ghc-flag:`-fno-win-aware-long-paths`.
+
+    .. _Enable long paths in Windows 10 and later: https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=registry#enable-long-paths-in-windows-10-version-1607-and-later
+
 .. ghc-flag:: -fno-shared-implib
     :shortdesc: Don't generate an import library for a DLL (Windows only)
     :type: dynamic

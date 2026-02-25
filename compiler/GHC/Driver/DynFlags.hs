@@ -1210,6 +1210,7 @@ defaultFlags settings
   = [ Opt_AutoLinkPackages,
       Opt_DiagnosticsShowCaret,
       Opt_EmbedManifest,
+      Opt_WinLongPathAware,
       Opt_FamAppCache,
       Opt_GenManifest,
       Opt_GhciHistory,

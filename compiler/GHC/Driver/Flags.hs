@@ -744,6 +744,7 @@ data GeneralFlag
    | Opt_PrintBindContents
    | Opt_GenManifest
    | Opt_EmbedManifest
+   | Opt_WinLongPathAware
    | Opt_SharedImplib
    | Opt_BuildingCabalPackage
    | Opt_IgnoreDotGhci
