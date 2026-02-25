@@ -17,4 +17,4 @@ module Data.Eq
     (Eq(..)
      ) where
 
-import GHC.Internal.Data.Eq
+import GHC.Internal.Classes (Eq(..))

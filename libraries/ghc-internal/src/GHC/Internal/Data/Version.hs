@@ -36,8 +36,8 @@ module GHC.Internal.Data.Version (
         makeVersion
   ) where
 
+import GHC.Internal.Classes          ( Eq(..) )
 import GHC.Internal.Data.Functor     ( Functor(..) )
-import GHC.Internal.Data.Eq
 import GHC.Internal.Int              ( Int )
 import GHC.Internal.Data.List        ( map, sort, concat, concatMap, intersperse, (++) )
 import GHC.Internal.Data.Ord

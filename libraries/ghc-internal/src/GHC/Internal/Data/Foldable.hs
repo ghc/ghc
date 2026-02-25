@@ -51,7 +51,6 @@ module GHC.Internal.Data.Foldable (
     ) where
 
 import GHC.Internal.Data.Either
-import GHC.Internal.Data.Eq
 import GHC.Internal.Data.Functor.Utils (Max(..), Min(..), (#.))
 import qualified GHC.Internal.List as List
 import GHC.Internal.Data.Maybe

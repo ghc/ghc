@@ -112,7 +112,6 @@ module GHC.Internal.Data.Data (
 
 import GHC.Internal.Data.Functor.Const
 import GHC.Internal.Data.Either
-import GHC.Internal.Data.Eq
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Monoid
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
