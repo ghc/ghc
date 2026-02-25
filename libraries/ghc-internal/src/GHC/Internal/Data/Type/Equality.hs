@@ -46,11 +46,13 @@ module GHC.Internal.Data.Type.Equality (
   type (==)
   ) where
 
+import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Enum
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Show
 import GHC.Internal.Read
-import GHC.Internal.Base
+import GHC.Internal.Types (Bool(..), Type, type (~), type (~~))
 import GHC.Internal.Data.Type.Bool
 
 infix 4 :~:, :~~:

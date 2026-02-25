@@ -49,8 +49,16 @@ module GHC.Internal.IO (
         mkUserError
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base ( String, return, unIO, ($) )
+import GHC.Internal.Classes ( Eq )
+import GHC.Internal.Magic ( lazy )
+import GHC.Internal.Maybe ( Maybe(..) )
+import GHC.Internal.Prim (
+    RealWorld, State#, catch#, getMaskingState#, maskAsyncExceptions#,
+    maskUninterruptible#, raiseIO#, unmaskAsyncExceptions#,
+  )
 import GHC.Internal.ST
+import GHC.Internal.Types ( Char, IO(..) )
 import GHC.Internal.Exception
 import GHC.Internal.Exception.Type (NoBacktrace(..), whileHandling, WhileHandling(..), HasExceptionContext, ExceptionWithContext(..))
 import GHC.Internal.Show

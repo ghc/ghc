@@ -63,7 +63,11 @@ module GHC.Internal.Numeric (
 
         ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (ord, otherwise, return, unsafeChr, ($), (.), (++))
+import GHC.Internal.Classes (Eq(..), Ord(..), (&&), (||))
+import GHC.Internal.Err (error, errorWithoutStackTrace)
+import GHC.Internal.Maybe (Maybe(..))
+import GHC.Internal.Prim (seq)
 import GHC.Internal.Read
 import GHC.Internal.Real
 import GHC.Internal.Float
@@ -71,6 +75,7 @@ import GHC.Internal.Num
 import GHC.Internal.Show
 import GHC.Internal.Text.ParserCombinators.ReadP( ReadP, readP_to_S, pfail )
 import qualified GHC.Internal.Text.Read.Lex as L
+import GHC.Internal.Types (Bool(..), Char(..), Int)
 
 -- $setup
 -- >>> import Prelude

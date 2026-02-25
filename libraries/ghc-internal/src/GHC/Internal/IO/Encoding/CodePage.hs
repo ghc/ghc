@@ -19,10 +19,15 @@ module GHC.Internal.IO.Encoding.CodePage(
 import GHC.Internal.Types ()
 
 #else
-import GHC.Internal.Base
+import GHC.Internal.Base (otherwise, return, ($), (.), (++))
+import GHC.Internal.Classes (Eq(..), Ord(..), (&&))
 import GHC.Internal.Show
 import GHC.Internal.Num
 import GHC.Internal.Enum
+import GHC.Internal.Prim (
+    chr#, indexInt16OffAddr#, indexWord8OffAddr#, int16ToInt#,
+  )
+import GHC.Internal.Types (Char(..), Int(..), IO)
 import GHC.Internal.Word
 import GHC.Internal.IO (unsafePerformIO)
 import GHC.Internal.IO.Encoding.Failure

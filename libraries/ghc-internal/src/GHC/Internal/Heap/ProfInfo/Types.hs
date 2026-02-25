@@ -2,7 +2,10 @@
 
 module GHC.Internal.Heap.ProfInfo.Types where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String)
+import GHC.Internal.Classes (Eq, Ord)
+import GHC.Internal.Maybe
+import GHC.Internal.Types (Bool, Int)
 import GHC.Internal.Word
 import GHC.Internal.Generics
 import GHC.Internal.Show

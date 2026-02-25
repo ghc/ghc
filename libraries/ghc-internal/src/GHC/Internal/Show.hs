@@ -49,11 +49,27 @@ module GHC.Internal.Show
   )
         where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, NonEmpty(..), Void, minInt, ord, otherwise, quotRemInt, unsafeChr,
+    ($), (.), (++),
+  )
+import GHC.Internal.Classes (Eq(..), Ord(..), (&&))
+import GHC.Internal.CString (unpackCString#, unpackCStringUtf8#)
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.List ((!!), foldr1, break)
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
 import GHC.Internal.Stack.Types
+import GHC.Internal.Prim (
+    Int#, Word#, chr#, ltWord#, negateInt#, ord#, quotRemInt#, quotRemWord#,
+    word2Int#, (+#), (==#), (<#), (<=#), (>#), (>=#),
+  )
 import GHC.Internal.Tuple (Solo (..))
+import GHC.Internal.Types (
+    Bool, Char(..), Int(..), KindRep(..), Levity(..), Module(..), Ordering(..),
+    RuntimeRep(..), TrName(..), TyCon(..), TypeLitSort(..), VecCount(..),
+    VecElem(..), Word(..), isTrue#,
+  )
 
 
 -- | The @shows@ functions return a function that prepends the

@@ -53,9 +53,22 @@ module GHC.Internal.Storable
 
 import GHC.Internal.Stable ( StablePtr(..) )
 import GHC.Internal.Int
+import GHC.Internal.Prim (
+    readAddrOffAddr#, readAddrOffAddr#, readDoubleOffAddr#, readFloatOffAddr#,
+    readInt16OffAddr#, readInt32OffAddr#, readInt64OffAddr#, readInt8OffAddr#,
+    readIntOffAddr#, readStablePtrOffAddr#, readWideCharOffAddr#,
+    readWord16OffAddr#, readWord32OffAddr#, readWord64OffAddr#,
+    readWord8OffAddr#, readWordOffAddr#, writeAddrOffAddr#, writeAddrOffAddr#,
+    writeDoubleOffAddr#, writeFloatOffAddr#, writeInt16OffAddr#,
+    writeInt32OffAddr#, writeInt64OffAddr#, writeInt8OffAddr#, writeIntOffAddr#,
+    writeStablePtrOffAddr#, writeWideCharOffAddr#, writeWord16OffAddr#,
+    writeWord32OffAddr#, writeWord64OffAddr#, writeWord8OffAddr#,
+    writeWordOffAddr#,
+  )
+import GHC.Internal.Types (Char(..), Float(..), Double(..), IO(..))
 import GHC.Internal.Word
 import GHC.Internal.Ptr
-import GHC.Internal.Base
+import GHC.Internal.Base ( ($) )
 
 readWideCharOffPtr  :: Ptr Char          -> Int -> IO Char
 readIntOffPtr       :: Ptr Int           -> Int -> IO Int

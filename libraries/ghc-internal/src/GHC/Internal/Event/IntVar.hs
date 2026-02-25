@@ -9,8 +9,12 @@ module GHC.Internal.Event.IntVar
     , writeIntVar
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (return, ($))
 import GHC.Internal.Bits
+import GHC.Internal.Prim (
+    MutableByteArray#, RealWorld, newByteArray#, readIntArray#, writeIntArray#,
+  )
+import GHC.Internal.Types (Int(..), IO(..))
 
 data IntVar = IntVar (MutableByteArray# RealWorld)
 

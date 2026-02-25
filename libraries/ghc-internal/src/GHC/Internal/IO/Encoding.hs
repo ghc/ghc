@@ -36,7 +36,8 @@ module GHC.Internal.IO.Encoding (
         argvEncoding
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String, return, ($))
+import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.IO.Exception
 import GHC.Internal.IO.Buffer
 import GHC.Internal.IO.Encoding.Failure
@@ -52,6 +53,8 @@ import qualified GHC.Internal.IO.Encoding.UTF8   as UTF8
 import qualified GHC.Internal.IO.Encoding.UTF16  as UTF16
 import qualified GHC.Internal.IO.Encoding.UTF32  as UTF32
 import GHC.Internal.List
+import GHC.Internal.Maybe (Maybe(..))
+import GHC.Internal.Types (IO(..))
 import GHC.Internal.Word
 
 import GHC.Internal.Data.IORef

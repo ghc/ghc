@@ -104,9 +104,11 @@ import GHC.Internal.Data.Type.Equality
 import GHC.Internal.Data.Either
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Proxy
+import GHC.Internal.Err (error)
 import GHC.Internal.Fingerprint.Type
 import GHC.Internal.Show
-import GHC.Internal.Base
+import GHC.Internal.Types (TyCon, Type)
+import GHC.Internal.Base (Void, fmap, otherwise, ($), (++))
 
 -- | A quantified type representation.
 type TypeRep = I.SomeTypeRep

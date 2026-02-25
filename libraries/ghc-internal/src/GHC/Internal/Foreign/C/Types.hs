@@ -88,12 +88,12 @@ module GHC.Internal.Foreign.C.Types
         , CFile,        CFpos,     CJmpBuf
         ) where
 
+import GHC.Internal.Classes          ( Eq, Ord )
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Data.Bits        ( Bits(..), FiniteBits(..) )
 import GHC.Internal.Int              ( Int8,  Int16,  Int32,  Int64  )
 import GHC.Internal.Word             ( Word8, Word16, Word32, Word64 )
 
-import GHC.Internal.Base
 import GHC.Internal.Float
 import GHC.Internal.Enum
 import GHC.Internal.Real

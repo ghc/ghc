@@ -23,7 +23,7 @@ module GHC.Internal.Data.Type.Bool (
   If, type (&&), type (||), Not
   ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Types (Bool(..))
 
 -- This needs to be in base because (&&) is used in Data.Type.Equality.
 -- The other functions do not need to be in base, but seemed to be appropriate

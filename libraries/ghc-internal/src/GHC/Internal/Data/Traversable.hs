@@ -50,10 +50,11 @@ import GHC.Internal.Data.Ord ( Down(..) )
 import GHC.Internal.Data.Proxy ( Proxy(..) )
 
 import GHC.Internal.Arr
-import GHC.Internal.Base ( Applicative(..), Monad(..), Monoid, Maybe(..), NonEmpty(..),
+import GHC.Internal.Base ( Applicative(..), Monad(..), Monoid, NonEmpty(..),
                   ($), (.), id, flip )
 import GHC.Internal.Generics
 import qualified GHC.Internal.List as List ( foldr )
+import GHC.Internal.Maybe ( Maybe(..) )
 import GHC.Internal.Tuple (Solo (..))
 
 -- $setup

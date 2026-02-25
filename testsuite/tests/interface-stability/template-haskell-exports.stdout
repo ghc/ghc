@@ -1996,7 +1996,7 @@ instance forall flag. GHC.Internal.Classes.Eq flag => GHC.Internal.Classes.Eq (G
 instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Eq GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.LanguageExtensions’
-instance GHC.Internal.Classes.Eq GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
+instance [safe] GHC.Internal.Classes.Eq GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
 instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Syntax’
@@ -2117,7 +2117,7 @@ instance forall flag. GHC.Internal.Generics.Generic (GHC.Internal.TH.Syntax.TyVa
 instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Generics.Generic GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.LanguageExtensions’
-instance GHC.Internal.Generics.Generic GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
+instance [safe] GHC.Internal.Generics.Generic GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
 instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Syntax’
@@ -2177,7 +2177,7 @@ instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined
 instance GHC.Internal.Show.Show GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.LanguageExtensions’
 instance GHC.Internal.Show.Show GHC.Boot.TH.Ppr.ForallVisFlag -- Defined in ‘GHC.Boot.TH.Ppr’
 instance [safe] GHC.Internal.Show.Show GHC.Boot.TH.PprLib.Doc -- Defined in ‘GHC.Boot.TH.PprLib’
-instance GHC.Internal.Show.Show GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
+instance [safe] GHC.Internal.Show.Show GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Addr# -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Lift’

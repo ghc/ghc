@@ -34,9 +34,11 @@ module GHC.Internal.StableName (
   eqStableName
   ) where
 
-import GHC.Internal.IO           ( IO(..) )
-import GHC.Internal.Base         ( ($), Eq((==)), Bool(..), Int(..), StableName#, makeStableName#
-                        , eqStableName#, stableNameToInt# )
+import GHC.Internal.Base ( ($) )
+import GHC.Internal.Classes ( Eq(..) )
+import GHC.Internal.Prim ( StableName#, makeStableName#, stableNameToInt# )
+import GHC.Internal.Prim.PtrEq ( eqStableName# )
+import GHC.Internal.Types ( Bool(..), Int(..), IO(..) )
 
 -----------------------------------------------------------------------------
 -- Stable Names

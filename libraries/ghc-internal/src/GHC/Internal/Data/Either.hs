@@ -32,8 +32,13 @@ module GHC.Internal.Data.Either (
    partitionEithers,
  ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    Applicative(..), Functor(..), Monad(..), Semigroup(..), foldr, otherwise,
+  )
+import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Show
+import GHC.Internal.Types (Bool(..))
 import GHC.Internal.Read
 
 -- $setup

@@ -54,8 +54,10 @@ module GHC.Internal.TypeNats
 
   ) where
 
-import GHC.Internal.Base( Eq(..), Functor(..), Ord(..), WithDict(..), (.), otherwise
-               , Void, errorWithoutStackTrace, (++))
+import GHC.Internal.Base(Functor(..), (.), otherwise, Void, (++))
+import GHC.Internal.Classes(Eq(..), Ord(..))
+import GHC.Internal.Err(errorWithoutStackTrace)
+import GHC.Internal.Magic.Dict(WithDict(..))
 import GHC.Internal.Types
 import GHC.Internal.Bignum.Natural(Natural)
 import GHC.Internal.Show(Show(..), appPrec, appPrec1, showParen, showString)

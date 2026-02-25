@@ -13,7 +13,10 @@ module GHC.Internal.Profiling ( -- * Cost Centre Profiling
                      , requestTickyCounterSamples
                      )where
 
-import GHC.Internal.Base
+import GHC.Internal.Types (IO)
+
+-- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
+import GHC.Internal.Tuple ()
 
 -- | Stop attributing ticks to cost centres. Allocations will still be
 -- attributed.

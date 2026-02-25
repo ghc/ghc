@@ -168,11 +168,36 @@ module GHC.Internal.Float
 
 import GHC.Internal.Data.Maybe
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String, id, otherwise, (.))
 import GHC.Internal.Bits
+import GHC.Internal.Classes (
+    Eq(..), Ord(..), eqFloat, eqDouble, not, (&&), (||),
+  )
 import GHC.Internal.List
 import GHC.Internal.Enum
+import GHC.Internal.Err (errorWithoutStackTrace)
+import GHC.Internal.Prim (
+    Float#, Double#, Int#, Word32#, Word64#, acosDouble#, acosFloat#,
+    acoshDouble#, acoshFloat#, and#, asinDouble#, asinFloat#, asinhDouble#,
+    asinhFloat#, atanDouble#, atanFloat#, atanhDouble#, atanhFloat#,
+    castDoubleToWord64#, castFloatToWord32#, castWord32ToFloat#,
+    castWord64ToDouble#, cosDouble#, cosFloat#, coshDouble#, coshFloat#,
+    decodeFloat_Int#, divideFloat#, double2Float#, eqWord#, expDouble#,
+    expFloat#, expm1Double#, expm1Float#, fabsDouble#, fabsFloat#,
+    float2Double#, geFloat#, gtFloat#, gtWord#, int2Float#, int2Double#,
+    int2Word#, int64ToInt#, leFloat#, log1pDouble#, log1pFloat#, logDouble#,
+    logFloat#, ltFloat#, ltWord#, minusFloat#, minusWord#, negateDouble#,
+    negateFloat#, negateInt#, plusFloat#, powerFloat#, sinDouble#, sinFloat#,
+    sinhDouble#, sinhFloat#, sqrtDouble#, sqrtFloat#, tanDouble#, tanFloat#,
+    tanhDouble#, tanhFloat#, timesFloat#, uncheckedIShiftRA#, uncheckedShiftL#,
+    word2Float#, word2Double#, word2Int#, word64ToWord#,
+    (+#), (+##), (-#), (-##), (*##), (**##), (/##), (<#), (<##), (<=#), (<=##),
+    (>#), (>##), (>=#), (>=##),
+  )
 import GHC.Internal.Show
+import GHC.Internal.Types (
+    Bool(..), Double(..), Float(..), Int(..), Ordering(..), isTrue#,
+  )
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Word

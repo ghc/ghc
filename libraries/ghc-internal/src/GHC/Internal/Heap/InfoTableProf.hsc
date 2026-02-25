@@ -11,19 +11,21 @@ module GHC.Internal.Heap.InfoTableProf
 #define PROFILING
 #include "Rts.h"
 
-import GHC.Internal.Base
+import GHC.Internal.Base (return)
 import GHC.Internal.Real
 import GHC.Internal.Enum
+import GHC.Internal.Types (Int, IO)
 
 import GHC.Internal.Heap.InfoTable.Types
 #if !defined(TABLES_NEXT_TO_CODE)
 import GHC.Internal.Heap.Constants
 import GHC.Internal.Data.Functor ((<$>))
-import GHC.Internal.Data.Maybe
+import GHC.Internal.Data.Maybe (Maybe(..), fromJust)
 import GHC.Internal.Num (negate)
 #else
 import GHC.Internal.Data.Either
 import GHC.Internal.Foreign.Marshal.Array
+import GHC.Internal.Maybe (Maybe(..))
 #endif
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable

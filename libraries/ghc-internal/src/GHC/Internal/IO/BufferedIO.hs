@@ -21,13 +21,15 @@ module GHC.Internal.IO.BufferedIO (
         readBuf, readBufNonBlocking, writeBuf, writeBufNonBlocking
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (return, ($))
 import GHC.Internal.Ptr
 import GHC.Internal.Word
 import GHC.Internal.Num
 import GHC.Internal.IO.Device as IODevice
 import GHC.Internal.IO.Device as RawIO
 import GHC.Internal.IO.Buffer
+import GHC.Internal.Maybe (Maybe(..))
+import GHC.Internal.Types (Int, IO)
 
 -- | The purpose of 'BufferedIO' is to provide a common interface for I/O
 -- devices that can read and write data through a buffer.  Devices that

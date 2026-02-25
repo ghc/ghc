@@ -53,8 +53,9 @@ module GHC.Internal.Stack (
 import GHC.Internal.Show
 import GHC.Internal.Stack.CCS
 import GHC.Internal.Stack.Types
-import GHC.Internal.Base
+import GHC.Internal.Base (String, foldr, map, ($), (.), (++))
 import GHC.Internal.Data.OldList (intercalate)
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Exception
 import GHC.Internal.IO (unsafeDupablePerformIO, throwIO)
 

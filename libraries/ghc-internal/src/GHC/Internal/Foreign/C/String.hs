@@ -103,14 +103,23 @@ import GHC.Internal.Foreign.Storable
 import GHC.Internal.Word
 
 import GHC.Internal.Char
+import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.List
 import GHC.Internal.Real
 import GHC.Internal.Num
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, flip, ord, otherwise, return, unsafeChr, ($), (.), (>>=),
+  )
+import GHC.Internal.Prim (seq)
+import GHC.Internal.Types (Bool, Char, Int, IO)
 
 import {-# SOURCE #-} GHC.Internal.IO.Encoding
 import qualified GHC.Internal.Foreign.C.String.Encoding as GHC
 import GHC.Internal.Foreign.C.String.Encoding (CString, CStringLen)
+
+#if defined(mingw32_HOST_OS)
+import GHC.Internal.Classes ((&&))
+#endif
 
 -----------------------------------------------------------------------------
 -- Strings

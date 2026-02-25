@@ -62,8 +62,12 @@ import GHC.Internal.Data.Functor.Const (Const(..))
 import GHC.Internal.Data.Typeable (Typeable)
 import GHC.Internal.Data.Data (Data)
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    Alternative(..), Applicative(..), Functor(..), Monad(..), MonadPlus(..),
+    ap, const, liftA, liftA3, liftM, liftM2, thenA, (.), (<**>),
+  )
 import GHC.Internal.Functor.ZipList (ZipList(..))
+import GHC.Internal.Types
 import GHC.Generics
 
 -- $setup

@@ -10,9 +10,14 @@ module GHC.Internal.Event.Unique
     , newUnique
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base(($), (.))
+import GHC.Internal.Classes(Eq, Ord)
 import GHC.Internal.Num(Num)
 import GHC.Internal.Show(Show(..))
+import GHC.Internal.Prim (
+    MutableByteArray#, RealWorld, newByteArray#, fetchAddIntArray#,
+  )
+import GHC.Internal.Types(Int(..), IO(..))
 
 #include "MachDeps.h"
 

@@ -155,7 +155,9 @@ import GHC.Internal.MVar ( MVar(..), newEmptyMVar, newMVar, takeMVar, putMVar,
                 )
 import qualified GHC.Internal.MVar
 import GHC.Internal.Weak
-import GHC.Internal.Base
+import GHC.Internal.Base ( return, ($), (>>=) )
+import GHC.Internal.Prim ( mkWeak# )
+import GHC.Internal.Types ( IO(..) )
 
 import GHC.Internal.Control.Exception.Base
 

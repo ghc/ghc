@@ -2,7 +2,7 @@
 
 module GHC.Internal.Stack where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String)
 import GHC.Internal.Stack.Types (HasCallStack, CallStack, SrcLoc)
 
 prettyCallStackLines :: CallStack -> [String]

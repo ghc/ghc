@@ -18,7 +18,8 @@ module GHC.Internal.Control.Monad.IO.Class (
     MonadIO(..)
   ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (Monad, id)
+import GHC.Internal.Types (IO)
 
 -- | Monads in which 'IO' computations may be embedded.
 -- Any monad built by applying a sequence of monad transformers to the

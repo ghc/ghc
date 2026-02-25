@@ -41,13 +41,18 @@ module GHC.Internal.Conc.Windows
        , module GHC.Internal.Event.Windows.ConsoleEvent
        ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (($))
 import qualified GHC.Internal.Conc.POSIX as POSIX
 import qualified GHC.Internal.Event.Windows.Thread as WINIO
 import GHC.Internal.Event.Windows.ConsoleEvent
 import GHC.Internal.IO.SubSystem ((<!>))
+import GHC.Internal.Prim (
+    MutableByteArray#, RealWorld, mutableByteArrayContents#,
+  )
+import GHC.Internal.Prim.Ext (asyncDoProc#, asyncRead#, asyncWrite#)
 import GHC.Internal.Ptr
 import GHC.Internal.STM
+import GHC.Internal.Types (Bool, Int(..), IO(..))
 
 -- ----------------------------------------------------------------------------
 -- Thread waiting

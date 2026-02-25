@@ -18,7 +18,7 @@
 
 module GHC.Internal.IO.IOMode (IOMode(..)) where
 
-import GHC.Internal.Base
+import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.Show
 import GHC.Internal.Read
 import GHC.Internal.Arr

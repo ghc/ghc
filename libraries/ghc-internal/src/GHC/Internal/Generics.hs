@@ -741,10 +741,11 @@ import GHC.Internal.Types
 -- Needed for instances
 import GHC.Internal.Ix      ( Ix )
 import GHC.Internal.Base    ( Alternative(..), Applicative(..), Functor(..)
-                   , Monad(..), MonadPlus(..), NonEmpty(..), String, coerce
+                   , Monad(..), MonadPlus(..), NonEmpty(..), String
                    , Semigroup(..), Monoid(..), Void )
 import GHC.Internal.Classes ( Eq(..), Ord(..) )
 import GHC.Internal.Enum    ( Bounded, Enum )
+import GHC.Internal.Prim    ( coerce )
 import GHC.Internal.Read    ( Read(..) )
 import GHC.Internal.Show    ( Show(..), showString, showChar, showParen, appPrec )
 import GHC.Internal.Stack.Types ( SrcLoc(..) )

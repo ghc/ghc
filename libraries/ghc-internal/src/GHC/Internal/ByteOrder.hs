@@ -25,7 +25,7 @@ module GHC.Internal.ByteOrder
 -- Required for WORDS_BIGENDIAN
 #include <ghcautoconf.h>
 
-import GHC.Internal.Base
+import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.Enum
 import GHC.Internal.Generics (Generic)
 import GHC.Internal.Text.Read

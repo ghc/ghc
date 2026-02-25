@@ -29,11 +29,14 @@ module GHC.Internal.Event.Control
 #include <ghcplatform.h>
 #include "EventConfig.h"
 
-import GHC.Internal.Base
+import GHC.Internal.Base (fmap, otherwise, pure, return, when, ($), (.))
+import GHC.Internal.Classes (Eq(..), (&&))
 import GHC.Internal.IORef
 import GHC.Internal.Conc.Signal (Signal)
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.Show (Show)
+import GHC.Internal.Types (Bool(..), Int, IO)
 import GHC.Internal.Word (Word8)
 import GHC.Internal.Foreign.C.Error (throwErrnoIfMinus1_, throwErrno, getErrno)
 import GHC.Internal.Foreign.C.Types (CInt(..), CSize(..))

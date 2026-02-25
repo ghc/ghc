@@ -105,15 +105,21 @@ import GHC.Internal.Ptr
 import GHC.Internal.Word
 import GHC.Internal.Data.OldList (deleteBy)
 import qualified GHC.Internal.Event.Array    as A
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    Semigroup(..), String, Monoid(..), const, fmap, otherwise, return, when,
+    ($), (.), (++), (>>=), (=<<), (>>),
+  )
+import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
 import GHC.Internal.Conc.Bound
 import GHC.Internal.Conc.Sync
+import GHC.Internal.Err (error, undefined)
 import GHC.Internal.IO
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Bits
 import GHC.Internal.Stable
 import GHC.Internal.Enum (maxBound)
+import GHC.Internal.Types (Bool(..), Int)
 import GHC.Internal.Windows
 import GHC.Internal.List (null)
 import GHC.Internal.Text.Show

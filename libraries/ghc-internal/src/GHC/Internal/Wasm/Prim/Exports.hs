@@ -30,13 +30,17 @@ module GHC.Internal.Wasm.Prim.Exports (
   js_promiseReject
 ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (join, pure, ($), (*>), (=<<))
 import GHC.Internal.Exception.Type
 import GHC.Internal.IO
 import GHC.Internal.IORef
 import GHC.Internal.Int
+import GHC.Internal.Prim (
+    RealWorld, StablePtr#, State#, fork#, makeStablePtr#, mkWeakNoFinalizer#,
+  )
 import GHC.Internal.Stable
 import GHC.Internal.TopHandler (flushStdHandles)
+import GHC.Internal.Types (Any, Bool, Char, Double, Float)
 import GHC.Internal.Wasm.Prim.Types
 import GHC.Internal.Word
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# )

@@ -6,7 +6,7 @@ module GHC.Internal.Fingerprint (
         fingerprintFingerprints
   ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String)
 import GHC.Internal.Fingerprint.Type
 
 fingerprintFingerprints :: [Fingerprint] -> Fingerprint

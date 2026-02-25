@@ -19,13 +19,15 @@ module GHC.Internal.Fingerprint (
         fingerprintBufferedStream
    ) where
 
+import GHC.Internal.Err (undefined)
 import GHC.Internal.IO
-import GHC.Internal.Base
+import GHC.Internal.Base (String, ord, when, ($))
 import GHC.Internal.Bits
 import GHC.Internal.Num
 import GHC.Internal.Data.Maybe
 import GHC.Internal.List
 import GHC.Internal.Real
+import GHC.Internal.Types (Int)
 import GHC.Internal.Word
 import GHC.Internal.Ptr
 import GHC.Internal.Foreign.C.Types

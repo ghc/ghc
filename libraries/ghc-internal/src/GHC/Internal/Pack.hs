@@ -22,8 +22,11 @@ module GHC.Internal.Pack
        )
         where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (otherwise)
+import GHC.Internal.Classes (Eq(..))
+import GHC.Internal.CString (unpackCString#)
 import GHC.Internal.Ptr
+import GHC.Internal.Types (Char)
 
 unpackCString :: Ptr a -> [Char]
 unpackCString a@(Ptr addr)

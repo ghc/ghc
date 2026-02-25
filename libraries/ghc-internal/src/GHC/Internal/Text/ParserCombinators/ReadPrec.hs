@@ -61,8 +61,13 @@ import qualified GHC.Internal.Text.ParserCombinators.ReadP as ReadP
   , pfail
   )
 
+import GHC.Internal.Classes ( Ord(..) )
 import GHC.Internal.Num( Num(..) )
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    Alternative(..), Applicative(..), Functor(..), Monad(..), MonadPlus(..),
+    String, ap, foldr, liftM2,
+  )
+import GHC.Internal.Types ( Char, Int )
 
 import GHC.Internal.Control.Monad.Fail
 

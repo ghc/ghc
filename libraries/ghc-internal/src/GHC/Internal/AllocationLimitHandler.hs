@@ -13,12 +13,17 @@ module GHC.Internal.AllocationLimitHandler
   , disableAllocationLimitFor
   )
   where
-import GHC.Internal.Base
+import GHC.Internal.Base (pure, ($))
 import GHC.Internal.Conc.Sync (ThreadId(..))
 import GHC.Internal.Data.IORef (IORef, readIORef, writeIORef, newIORef)
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.IO (unsafePerformIO)
 import GHC.Internal.Int (Int64(..))
+import GHC.Internal.Maybe (Maybe(..))
+import GHC.Internal.Prim (
+    Int64#, RealWorld, State#, ThreadId#, setOtherThreadAllocationCounter#,
+  )
+import GHC.Internal.Types (IO(..))
 
 
 {-# NOINLINE allocationLimitHandler #-}

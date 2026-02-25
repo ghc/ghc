@@ -39,11 +39,13 @@ module GHC.Internal.System.Environment.Blank
       unsetEnv,
   ) where
 
+import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.List (elem, null, takeWhile)
 import GHC.Internal.Foreign.C.String
-import GHC.Internal.Base
+import GHC.Internal.Base (String, otherwise, return, ($))
 #if defined(mingw32_HOST_OS)
+import GHC.Internal.Base ((.))
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Windows
 import GHC.Internal.Control.Monad
@@ -59,6 +61,7 @@ import GHC.Internal.IO.Exception
 import GHC.Internal.System.IO.Error
 import GHC.Internal.Control.Exception.Base
 import GHC.Internal.Data.Maybe
+import GHC.Internal.Types (Bool(..), IO)
 
 import GHC.Internal.System.Environment
     (

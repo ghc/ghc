@@ -32,15 +32,20 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import GHC.Exts (TYPE)
 import Prelude hiding (Applicative(..))
 #else
-import GHC.Internal.Base hiding (NonEmpty (..), Type, Module, inline)
+import GHC.Internal.Base (
+    String, flip, liftA, liftA2, map, mapM, pure, ($), (.), (<*>), (>>=),
+  )
 import GHC.Internal.Data.Foldable
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.NonEmpty (NonEmpty(..))
 import GHC.Internal.Data.Traversable (traverse, sequenceA)
+import GHC.Internal.Err (error)
 import GHC.Internal.Integer
 import GHC.Internal.List (zip)
+import GHC.Internal.Prim (TYPE)
 import GHC.Internal.Real
+import GHC.Internal.Types (Char, Int)
 import GHC.Internal.Word
 import qualified GHC.Internal.Types as Kind (Type)
 #endif

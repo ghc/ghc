@@ -49,9 +49,11 @@ import GHC.Internal.Data.Type.Equality
 import GHC.Internal.Type.Reflection
 import GHC.Internal.Data.Maybe
 
-import GHC.Internal.Base
+import GHC.Internal.Base (otherwise, (.), (++))
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Show
 import GHC.Internal.Exception
+import GHC.Internal.Types (Type)
 
 -------------------------------------------------------------
 --

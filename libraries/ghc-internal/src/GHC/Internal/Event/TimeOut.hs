@@ -26,7 +26,7 @@ module GHC.Internal.Event.TimeOut
     ) where
 
 import GHC.Internal.IO
-import GHC.Internal.Base
+import GHC.Internal.Classes (Eq, Ord)
 
 import qualified GHC.Internal.Event.PSQ as Q
 import GHC.Internal.Event.Unique (Unique)

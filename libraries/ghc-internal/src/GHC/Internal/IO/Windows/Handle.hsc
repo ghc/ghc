@@ -59,11 +59,18 @@ import GHC.Internal.Data.Bits ((.|.), (.&.), shiftL)
 import GHC.Internal.Data.Functor ((<$>))
 import GHC.Internal.Data.Typeable
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    const, flip, fmap, liftM2, otherwise, return, when,
+    ($), ($!), (.), (=<<), (>>),
+  )
+import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
+import GHC.Internal.Data.Maybe (Maybe(..))
 import GHC.Internal.Enum
+import GHC.Internal.Err (error, undefined)
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.List
+import GHC.Internal.Types (Bool(..), Int)
 import GHC.Internal.Word (Word8, Word16, Word64)
 
 import GHC.Internal.IO hiding (mask)

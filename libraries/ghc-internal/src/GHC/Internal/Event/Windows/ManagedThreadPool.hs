@@ -27,14 +27,16 @@ module GHC.Internal.Event.Windows.ManagedThreadPool
   , monitorThreadPool
   ) where
 
+import GHC.Internal.Base (return, ($))
 import GHC.Internal.Control.Concurrent.MVar
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Base
+import GHC.Internal.Err (undefined)
 import GHC.Internal.Num ((-), (+))
 import qualified GHC.Internal.Event.Array as A
 import GHC.Internal.IO.Handle.Internals (debugIO)
 import GHC.Internal.Conc.Sync (ThreadId(..))
 import GHC.Internal.RTS.Flags.Test
+import GHC.Internal.Types (Int, IO)
 
 ------------------------------------------------------------------------
 -- Thread spool manager

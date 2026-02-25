@@ -110,6 +110,7 @@ module GHC.Internal.Data.Data (
 
 ------------------------------------------------------------------------------
 
+import GHC.Internal.Classes (Eq(..), not)
 import GHC.Internal.Data.Functor.Const
 import GHC.Internal.Data.Either
 import GHC.Internal.Data.Maybe
@@ -119,13 +120,19 @@ import GHC.Internal.Data.Ord
 import GHC.Internal.Data.List (findIndex)
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Data.Version( Version(..) )
-import GHC.Internal.Base hiding (Any, IntRep, FloatRep, NonEmpty(..))
+import GHC.Internal.Base (
+    Monad(..), MonadPlus(..), String, Void, const, id, ($), (.),
+  )
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.List
 import GHC.Internal.Num
 import GHC.Internal.Read
 import GHC.Internal.Show
 import GHC.Internal.Tuple (Solo (..))
 import GHC.Internal.Text.Read( reads )
+import GHC.Internal.Types (
+    Bool(..), Char, Coercible, Float, Double, Type, type (~), type (~~),
+  )
 
 -- Imports for the instances
 import GHC.Internal.Data.Functor.Identity -- So we can give Data instance for Identity

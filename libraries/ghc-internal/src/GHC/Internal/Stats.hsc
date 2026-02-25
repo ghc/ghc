@@ -34,8 +34,10 @@ module GHC.Internal.Stats
 
 import GHC.Internal.Control.Monad
 import GHC.Internal.Int
+import GHC.Internal.Maybe ( Maybe(..) )
+import GHC.Internal.Types ( Bool, IO )
 import GHC.Internal.Word
-import GHC.Internal.Base
+import GHC.Internal.Base ( ($), (.) )
 import GHC.Internal.Generics (Generic)
 import GHC.Internal.Read ( Read )
 import GHC.Internal.Show ( Show )

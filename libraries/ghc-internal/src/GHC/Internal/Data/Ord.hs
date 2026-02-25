@@ -24,16 +24,22 @@ module GHC.Internal.Data.Ord (
    clamp,
  ) where
 
+import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.Data.Bits (Bits, FiniteBits, complement)
 import GHC.Internal.Foreign.Storable (Storable)
 import GHC.Internal.Ix (Ix)
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    Applicative(..), Functor(..), Monad(..), Monoid, Semigroup, otherwise,
+    ($), (.),
+  )
 import GHC.Internal.Enum (Bounded(..), Enum(..))
 import GHC.Internal.Float (Floating, RealFloat)
 import GHC.Internal.Num
+import GHC.Internal.Prim (coerce)
 import GHC.Internal.Read
 import GHC.Internal.Real (Fractional, Real, RealFrac)
 import GHC.Internal.Show
+import GHC.Internal.Types (Ordering(..))
 
 -- $setup
 -- >>> import Prelude

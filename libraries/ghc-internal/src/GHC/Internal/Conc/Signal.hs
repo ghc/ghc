@@ -9,8 +9,10 @@ module GHC.Internal.Conc.Signal
         , runHandlersPtr
         ) where
 
+import GHC.Internal.Classes (Eq(..), not)
 import GHC.Internal.Control.Concurrent.MVar (MVar, newMVar, withMVar)
 import GHC.Internal.Data.Dynamic (Dynamic)
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Foreign.C.Types (CInt)
 import GHC.Internal.Foreign.ForeignPtr (ForeignPtr, newForeignPtr)
 import GHC.Internal.Foreign.StablePtr (castPtrToStablePtr, castStablePtrToPtr,
@@ -18,12 +20,14 @@ import GHC.Internal.Foreign.StablePtr (castPtrToStablePtr, castStablePtrToPtr,
 import GHC.Internal.Foreign.Ptr (Ptr, castPtr)
 import GHC.Internal.Foreign.Marshal.Alloc (finalizerFree)
 import GHC.Internal.Arr (inRange)
-import GHC.Internal.Base
+import GHC.Internal.Base (return, ($))
 import GHC.Internal.Conc.Sync (myThreadId, labelThread, forkIO)
 import GHC.Internal.IO (mask_, unsafePerformIO)
 import GHC.Internal.IOArray (IOArray, boundsIOArray, newIOArray,
                     unsafeReadIOArray, unsafeWriteIOArray)
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Real (fromIntegral)
+import GHC.Internal.Types (Int, IO)
 import GHC.Internal.Word (Word8)
 
 ------------------------------------------------------------------------

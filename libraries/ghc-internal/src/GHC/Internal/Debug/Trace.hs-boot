@@ -40,8 +40,9 @@ module GHC.Internal.Debug.Trace (
         traceMarkerIO,
   ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (Applicative, String)
 import GHC.Internal.Show
+import GHC.Internal.Types (IO)
 
 traceIO :: String -> IO ()
 

@@ -4,9 +4,10 @@ module GHC.Internal.Wasm.Prim.Conc (
   threadDelay
 ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (pure, ($))
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.Stable
+import GHC.Internal.Types (Int, IO)
 
 {-
 

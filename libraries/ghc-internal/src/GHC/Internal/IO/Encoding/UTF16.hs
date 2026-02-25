@@ -39,13 +39,21 @@ module GHC.Internal.IO.Encoding.UTF16 (
   utf16le_encode,
   ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    Monad(..), const, ord, otherwise, unIO, unsafeChr, ($),
+  )
+import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
 import GHC.Internal.Real
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
 -- import GHC.Internal.IO
 import GHC.Internal.IO.Buffer
 import GHC.Internal.IO.Encoding.Failure
 import GHC.Internal.IO.Encoding.Types
+import GHC.Internal.Prim (
+    chr#, uncheckedIShiftL#, word2Int#, word16ToWord#, (+#), (-#),
+  )
+import GHC.Internal.Types (Bool(..), Char(..), Int, IO)
 import GHC.Internal.Word
 import GHC.Internal.Data.Bits
 import GHC.Internal.IORef

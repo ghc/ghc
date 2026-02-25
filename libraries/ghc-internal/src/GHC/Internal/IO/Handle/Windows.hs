@@ -24,7 +24,7 @@ module GHC.Internal.IO.Handle.Windows (
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Typeable
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String, fmap, otherwise, return, ($))
 import GHC.Internal.MVar
 import GHC.Internal.IO
 import GHC.Internal.IO.BufferedIO hiding (flushWriteBuffer)
@@ -35,6 +35,7 @@ import GHC.Internal.IO.IOMode
 import GHC.Internal.IO.Handle.Types
 import GHC.Internal.IO.Handle.Internals
 import qualified GHC.Internal.IO.Windows.Handle as Win
+import GHC.Internal.Types (Bool(..))
 
 -- ---------------------------------------------------------------------------
 -- Standard Handles

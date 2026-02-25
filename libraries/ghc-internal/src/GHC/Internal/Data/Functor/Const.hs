@@ -26,11 +26,15 @@ import GHC.Internal.Data.Foldable (Foldable(foldMap))
 import GHC.Internal.Foreign.Storable (Storable)
 
 import GHC.Internal.Ix (Ix)
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    Applicative(..), Functor(..), Monoid(..), Semigroup(..), ($), (.),
+  )
+import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.Enum (Bounded, Enum)
 import GHC.Internal.Float (Floating, RealFloat)
 import GHC.Internal.Generics (Generic, Generic1)
 import GHC.Internal.Num (Num)
+import GHC.Internal.Prim (coerce)
 import GHC.Internal.Real (Fractional, Integral, Real, RealFrac)
 import GHC.Internal.Read (Read(readsPrec), readParen, lex)
 import GHC.Internal.Show (Show(showsPrec), showParen, showString)

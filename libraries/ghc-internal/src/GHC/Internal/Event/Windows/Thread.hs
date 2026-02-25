@@ -7,11 +7,12 @@ module GHC.Internal.Event.Windows.Thread (
     registerDelay,
 ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (return, ($), (>>))
 import GHC.Internal.Event.Windows
 import GHC.Internal.IO
 import GHC.Internal.MVar
 import GHC.Internal.STM
+import GHC.Internal.Types (Bool(..), Int)
 
 ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning = wakeupIOManager

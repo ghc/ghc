@@ -213,8 +213,11 @@ firstComment files = map ("-- " ++) $
     ] ++ map takeFileName files
 
 theImports :: [String]
-theImports = map ("import " ++ )
-    ["GHC.Internal.Prim", "GHC.Internal.Base", "GHC.Internal.Word"]
+theImports =
+    [ "import GHC.Internal.Prim (Addr#)"
+    , "import GHC.Internal.Types (Char, Int)"
+    , "import GHC.Internal.Word"
+    ]
 
 theTypes :: [String]
 theTypes = [ "data ConvArray a = ConvArray Addr#"

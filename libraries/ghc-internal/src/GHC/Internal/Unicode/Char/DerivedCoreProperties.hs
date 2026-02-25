@@ -17,8 +17,10 @@ module GHC.Internal.Unicode.Char.DerivedCoreProperties
 (isUppercase , isLowercase)
 where
 
-import GHC.Internal.Base (Bool, Char, Ord(..), (&&), ord)
+import GHC.Internal.Base (ord)
+import GHC.Internal.Classes (Ord(..), (&&))
 import GHC.Internal.Unicode.Bits (lookupBit64)
+import GHC.Internal.Types (Bool, Char)
 
 {-# INLINE isUppercase #-}
 isUppercase :: Char -> Bool

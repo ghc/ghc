@@ -61,13 +61,23 @@ module GHC.Internal.Float.RealFracMethods
 
 import GHC.Internal.Bignum.Integer
 
-import GHC.Internal.Base hiding (uncheckedIShiftRA64#, uncheckedIShiftL64#)
+import GHC.Internal.Base (otherwise)
+import GHC.Internal.Classes (Ord(..))
 import GHC.Internal.Num () -- instance Num Integer
                            -- (We could remove uses with a little effort)
+import GHC.Internal.Prim (
+    Int#, eqFloat#, decodeFloat_Int#, double2Int#, float2Int#, int2Float#,
+    int2Double#, int2Word#, ltFloat#, minusFloat#, negateFloat#, negateDouble#,
+    negateInt#, uncheckedIShiftL#, uncheckedIShiftRA#, uncheckedIShiftRL#,
+    (+#), (-#), (<#), (>#), (-##), (==##), (<##),
+  )
+import GHC.Internal.Types (Double(..), Float(..), Int(..), isTrue#)
 
 #if WORD_SIZE_IN_BITS < 64
 
-import GHC.Internal.Base (uncheckedIShiftRA64#, uncheckedIShiftL64#)
+import GHC.Internal.Prim (
+    negateInt64#, subInt64#, uncheckedIShiftRA64#, uncheckedIShiftL64#,
+  )
 
 #define TO64 integerToInt64#
 #define FROM64 integerFromInt64#

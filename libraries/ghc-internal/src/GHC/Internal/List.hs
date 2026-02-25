@@ -43,10 +43,18 @@ module GHC.Internal.List (
 
  ) where
 
+import GHC.Internal.Classes (Eq(..), Ord(..), (&&), (||))
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Base
+import GHC.Internal.Err (error)
+import GHC.Internal.Base (
+    String, augment, build, const, id, foldr, map, otherwise,
+    ($), ($!), (.), (++),
+  )
+import GHC.Internal.Magic (oneShot)
 import GHC.Internal.Num (Num(..))
+import GHC.Internal.Types (Bool(..), Int, List)
 import GHC.Internal.Bignum.Integer (Integer)
+import GHC.Internal.Prim (seq)
 import GHC.Internal.Stack.Types (HasCallStack)
 
 infixl 9  !?, !!

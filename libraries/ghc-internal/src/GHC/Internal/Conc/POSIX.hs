@@ -45,18 +45,26 @@ module GHC.Internal.Conc.POSIX
        ) where
 
 import GHC.Internal.Data.Bits (shiftR)
-import GHC.Internal.Base
+import GHC.Internal.Base (fmap, foldr, otherwise, return, when, ($))
+import GHC.Internal.Classes (Eq(..), Ord(..), not)
 import GHC.Internal.Clock
 import GHC.Internal.Conc.Sync
 import GHC.Internal.Conc.POSIX.Const
+import GHC.Internal.Data.Maybe (Maybe(..))
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Event.Windows.ConsoleEvent
 import GHC.Internal.IO (unsafePerformIO)
 import GHC.Internal.IORef
 import GHC.Internal.MVar
 import GHC.Internal.Num (Num(..))
+import GHC.Internal.Prim (
+    MutableByteArray#, RealWorld, delay#, mutableByteArrayContents#,
+  )
+import GHC.Internal.Prim.Ext (asyncDoProc#, asyncRead#, asyncWrite#)
 import GHC.Internal.Ptr
 import GHC.Internal.Real (div, fromIntegral)
 import GHC.Internal.STM (TVar, atomically, newTVar, writeTVar)
+import GHC.Internal.Types (Bool(..), Int(..), IO(..))
 import GHC.Internal.Word (Word32, Word64)
 import GHC.Internal.Windows
 

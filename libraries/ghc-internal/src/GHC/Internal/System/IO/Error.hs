@@ -89,12 +89,13 @@ import GHC.Internal.Control.Exception.Base
 import GHC.Internal.Data.Either
 import GHC.Internal.Data.Maybe
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String, mplus, otherwise, return, ($), (.))
 import GHC.Internal.Exception.Type
 import GHC.Internal.IO
 import GHC.Internal.IO.Exception
 import GHC.Internal.IO.Handle.Types
 import GHC.Internal.Text.Show
+import GHC.Internal.Types (Bool(..))
 
 -- | The construct 'tryIOError' @comp@ exposes IO errors which occur within a
 -- computation, and which are not fully handled.

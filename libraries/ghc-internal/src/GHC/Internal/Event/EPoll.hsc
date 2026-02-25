@@ -25,7 +25,8 @@ import qualified GHC.Internal.Event.Internal as E
 
 #include "EventConfig.h"
 #if !defined(HAVE_EPOLL)
-import GHC.Internal.Base
+import GHC.Internal.Err (errorWithoutStackTrace)
+import GHC.Internal.Types (Bool(..), IO)
 
 new :: IO E.Backend
 new = errorWithoutStackTrace "EPoll back end not implemented for this platform"
@@ -37,7 +38,9 @@ available = False
 
 #include <sys/epoll.h>
 
+import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.Data.Bits (Bits, FiniteBits, (.|.), (.&.))
+import GHC.Internal.Err (undefined)
 import GHC.Internal.Word (Word32)
 import GHC.Internal.Foreign.C.Error (eNOENT, getErrno, throwErrno,
                         throwErrnoIfMinus1, throwErrnoIfMinus1_)
@@ -45,12 +48,14 @@ import GHC.Internal.Foreign.C.Types (CInt(..))
 import GHC.Internal.Foreign.Marshal.Utils (with)
 import GHC.Internal.Foreign.Ptr (Ptr)
 import GHC.Internal.Foreign.Storable (Storable(..))
-import GHC.Internal.Base
+import GHC.Internal.Base (Monoid(..), fmap, otherwise, return, when, ($), (.))
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Real (fromIntegral, div)
 import GHC.Internal.Show (Show)
 import GHC.Internal.System.Posix.Internals (c_close, setCloseOnExec)
 import GHC.Internal.System.Posix.Types (Fd(..))
+import GHC.Internal.Types (Bool(..), Int, IO)
 
 import qualified GHC.Internal.Event.Array    as A
 import           GHC.Internal.Event.Internal (Timeout(..))

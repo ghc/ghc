@@ -223,8 +223,10 @@ import GHC.Internal.Data.OldList hiding
       mapAccumR, maximum, maximumBy, minimum, minimumBy,
       length, notElem, null, or, product, sum )
 
-import GHC.Internal.Base ( Bool(..), Eq((==)), otherwise )
+import GHC.Internal.Base (otherwise)
+import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.List (List)
+import GHC.Internal.Types (Bool(..))
 
 -- | The 'isSubsequenceOf' function takes two lists and returns 'True' if all
 -- the elements of the first list occur, in order, in the second. The

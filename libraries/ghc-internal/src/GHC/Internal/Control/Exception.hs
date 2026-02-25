@@ -121,8 +121,9 @@ module GHC.Internal.Control.Exception (
 import GHC.Internal.Control.Exception.Base
 import GHC.Internal.Exception.Type (ExceptionWithContext(..), whileHandling)
 
-import GHC.Internal.Base
-import GHC.Internal.IO (interruptible)
+import GHC.Internal.Base (Functor(..), foldr, return, ($), (.))
+import GHC.Internal.IO (IO, interruptible)
+import GHC.Internal.Maybe (Maybe(..))
 
 -- | You need this when using 'catches'.
 data Handler a = forall e . Exception e => Handler (e -> IO a)

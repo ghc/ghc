@@ -39,9 +39,14 @@ import Foreign.C.Types
 import GHC.Ptr          ( Ptr, plusPtr )
 import GHC.Generics     ( Generic )
 #else
-import GHC.Internal.Base hiding (NonEmpty(..),Type, Module, sequence)
+import GHC.Internal.Base (
+    Functor, String, return, otherwise, ($), ($!), (++), (<>),
+  )
+import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
 import GHC.Internal.Data.NonEmpty (NonEmpty(..))
 import GHC.Internal.Data.Traversable
+import GHC.Internal.Err (error)
+import GHC.Internal.Types (Bool(..), Char, Int, IO, Ordering(..))
 import GHC.Internal.Word
 import GHC.Internal.Generics (Generic)
 import GHC.Internal.Show
@@ -52,6 +57,7 @@ import GHC.Internal.Foreign.Ptr
 import GHC.Internal.ForeignPtr
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.String
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.List (dropWhile, break, replicate, reverse, last)

@@ -30,6 +30,7 @@ module GHC.Internal.System.Environment
       getEnvironment,
   ) where
 
+import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Data.Maybe (maybe)
 import GHC.Internal.Ptr
 import GHC.Internal.Foreign.C.Types
@@ -44,14 +45,21 @@ import qualified GHC.Internal.Foreign.C.String.Encoding as Enc
 import GHC.Internal.System.IO.Error (mkIOError)
 import GHC.Internal.Control.Exception.Base (bracket_, throwIO)
 #if defined(mingw32_HOST_OS)
+import GHC.Internal.Base (fmap)
+import GHC.Internal.Classes (Ord(..))
 import GHC.Internal.Control.Exception.Base (bracket)
+import GHC.Internal.Err (undefined)
 #endif
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, liftM, map, mapM, otherwise, return, ($), (.), (++), (>>=),
+  )
 import GHC.Internal.List (null, elem, takeWhile, break)
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
 import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.IO (FilePath)
 import GHC.Internal.IO.Exception
+import GHC.Internal.Types (Bool(..), Char, IO)
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.Control.Monad (unless)
 import GHC.Internal.IO.Encoding (argvEncoding)

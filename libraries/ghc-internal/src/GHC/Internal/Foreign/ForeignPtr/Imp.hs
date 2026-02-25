@@ -51,9 +51,11 @@ module GHC.Internal.Foreign.ForeignPtr.Imp
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable ( Storable(sizeOf) )
 
-import GHC.Internal.Base
+import GHC.Internal.Base ( return )
+import GHC.Internal.Err ( undefined )
 import GHC.Internal.Num
 import GHC.Internal.ForeignPtr
+import GHC.Internal.Types ( Int, IO )
 
 newForeignPtr :: FinalizerPtr a -> Ptr a -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign pointer, and

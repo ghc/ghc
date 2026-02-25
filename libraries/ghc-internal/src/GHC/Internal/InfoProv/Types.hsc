@@ -17,9 +17,12 @@ module GHC.Internal.InfoProv.Types
     , lookupIPE
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String, fmap, return, unIO, ($), (++), (=<<))
+import GHC.Internal.Classes (Eq)
 import GHC.Internal.Enum
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Real (fromIntegral)
+import GHC.Internal.Types (IO(..))
 import GHC.Internal.Word (Word32)
 import GHC.Internal.Show (Show)
 import GHC.Internal.Ptr (Ptr(..), plusPtr)

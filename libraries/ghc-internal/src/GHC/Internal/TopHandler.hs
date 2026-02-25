@@ -39,16 +39,21 @@ module GHC.Internal.TopHandler (
 import GHC.Internal.Control.Exception
 import GHC.Internal.Data.Maybe
 
+import GHC.Internal.Classes (Eq(..), Ord(..), (&&))
 import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.String
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, const, failIO, otherwise, pure, return, ($), (++), (>>),
+  )
 import GHC.Internal.Conc.Sync hiding (throwTo)
+import GHC.Internal.Prim (Weak#, seq)
 import GHC.Internal.Real
 import GHC.Internal.IO
 import GHC.Internal.IO.Handle
 import GHC.Internal.IO.StdHandles
 import GHC.Internal.IO.Exception
+import GHC.Internal.Types (Int)
 import GHC.Internal.Weak
 import GHC.Internal.Weak.Finalize
 import GHC.Internal.IO.Handle.Types ()

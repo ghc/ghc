@@ -37,13 +37,14 @@ module GHC.Internal.Control.Monad.ST.Imp (
 
 import GHC.Internal.ST           ( ST, runST, unsafeInterleaveST
                         , unsafeDupableInterleaveST )
-import GHC.Internal.Base         ( RealWorld, ($), return )
+import GHC.Internal.Base         ( ($), return )
 import GHC.Internal.IO           ( stToIO, unsafeIOToST, unsafeSTToIO
                         , unsafeDupableInterleaveIO )
 import GHC.Internal.MVar         ( readMVar, putMVar, newEmptyMVar )
 import GHC.Internal.Control.Exception.Base
                         ( catch, throwIO, NonTermination (..)
                         , BlockedIndefinitelyOnMVar (..) )
+import GHC.Internal.Prim         ( RealWorld )
 
 -- | Allow the result of an 'ST' computation to be used (lazily)
 -- inside the computation.

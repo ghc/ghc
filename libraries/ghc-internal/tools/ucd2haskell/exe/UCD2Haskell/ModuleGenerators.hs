@@ -234,7 +234,7 @@ genSimpleCaseMappingModule moduleName funcName field =
         , "(" <> funcName <> ")"
         , "where"
         , ""
-        , "import GHC.Internal.Base (Char)"
+        , "import GHC.Internal.Types (Char)"
         , ""
         ]
     genSign =
@@ -313,8 +313,10 @@ genCorePropertiesModule moduleName isProp = Fold step initial done
         , "(" <> unwordsBB (intersperse "," (map prop2FuncName exports)) <> ")"
         , "where"
         , ""
-        , "import GHC.Internal.Base (Bool, Char, Ord(..), (&&), ord)"
+        , "import GHC.Internal.Base (ord)"
+        , "import GHC.Internal.Classes (Ord(..), (&&))"
         , "import GHC.Internal.Unicode.Bits (lookupBit64)"
+        , "import GHC.Internal.Types (Bool, Char)"
         , ""
         ]
 

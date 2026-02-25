@@ -46,12 +46,22 @@ module GHC.Internal.Arr (
         unsafeFreezeSTArray, unsafeThawSTArray,
     ) where
 
+import GHC.Internal.Classes (Eq(..), Ord(..), (&&))
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Num
 import GHC.Internal.ST
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    Applicative(..), Functor(..), otherwise, ($), ($!), (.),
+  )
 import GHC.Internal.List
 import GHC.Internal.Ix
+import GHC.Internal.Prim (
+    Array#, MutableArray#, coerce, indexArray#, newArray#, readArray#, seq,
+    unsafeFreezeArray#, unsafeThawArray#, writeArray#, (+#), (-#), (==#),
+  )
+import GHC.Internal.Prim.PtrEq (sameMutableArray#)
 import GHC.Internal.Show
+import GHC.Internal.Types (Bool, Int(..), Ordering(..), isTrue#)
 
 infixl 9  !, //
 

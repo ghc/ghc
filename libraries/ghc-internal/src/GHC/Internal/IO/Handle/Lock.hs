@@ -14,9 +14,10 @@ module GHC.Internal.IO.Handle.Lock (
 #include "HsBaseConfig.h"
 
 import GHC.Internal.Data.Functor (void)
-import GHC.Internal.Base
+import GHC.Internal.Base (($))
 import GHC.Internal.IO.Handle.Lock.Common (LockMode(..), FileLockingNotSupported(..))
 import GHC.Internal.IO.Handle.Types (Handle)
+import GHC.Internal.Types (Bool(..), IO)
 
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.IO.Handle.Lock.Windows

@@ -54,14 +54,20 @@ module GHC.Internal.RTS.Flags
 #include "Rts.h"
 #include "rts/Flags.h"
 
+import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Data.Functor ((<$>))
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Foreign.Marshal.Utils
 import GHC.Internal.Foreign.Storable
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Ptr
+import GHC.Internal.Types (Bool(..), Double, Int)
 import GHC.Internal.Word
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, otherwise, pure, return, (.), (++), (<*>), (=<<),
+  )
 import GHC.Internal.Enum
 import GHC.Internal.Generics (Generic)
 import GHC.Internal.IO

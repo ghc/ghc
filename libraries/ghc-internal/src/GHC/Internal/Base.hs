@@ -16,7 +16,7 @@ GHC.Internal.Prim        Has no implementation.  It defines built-in things, and
                          The source file is GHC.Internal.Prim.hi-boot, which is just
                          copied to make GHC.Internal.Prim.hi
 
-GHC.Internal.Base        Classes: Eq, Ord, Functor, Monad
+GHC.Internal.Base        Classes: Functor, Monad
                 Types:   List, (), Int, Bool, Ordering, Char, String, NonEmpty
 
 GHC.Internal.Data.Tuple      Types: tuples, plus instances for GHC.Internal.Base classes
@@ -103,21 +103,7 @@ Other Prelude modules are much easier with fewer complex dependencies.
 
 #include "MachDeps.h"
 
-module GHC.Internal.Base
-        (
-        module GHC.Internal.Base,
-        module GHC.Internal.Classes,
-        module GHC.Internal.CString,
-        module GHC.Internal.Magic,
-        module GHC.Internal.Magic.Dict,
-        module GHC.Internal.Types,
-        module GHC.Internal.Prim,         -- Re-export GHC.Internal.Prim, GHC.Internal.Prim.Ext,
-        module GHC.Internal.Prim.Ext,     -- GHC.Internal.Prim.PtrEq and [boot] GHC.Internal.Err
-        module GHC.Internal.Prim.PtrEq,   -- to avoid lots of people having to
-        module GHC.Internal.Err,          -- import these modules explicitly
-        module GHC.Internal.Maybe
-  )
-        where
+module GHC.Internal.Base where
 
 import GHC.Internal.Types hiding (
   Unit#,
@@ -321,14 +307,11 @@ import GHC.Internal.Classes hiding (
   )
 import GHC.Internal.CString
 import GHC.Internal.Magic
-import GHC.Internal.Magic.Dict
 import GHC.Internal.Prim hiding (dataToTagSmall#, dataToTagLarge#, whereFrom#)
   -- Hide dataToTag# ops because they are expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
   -- be exposed from base (not even GHC.Exts)
 
-import GHC.Internal.Prim.Ext
-import GHC.Internal.Prim.PtrEq
 import GHC.Internal.Err
 import GHC.Internal.Maybe
 import {-# SOURCE #-} GHC.Internal.IO (mkUserError, mplusIO)

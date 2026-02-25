@@ -23,10 +23,13 @@ module GHC.Internal.Event.Windows.ConsoleEvent (
   win32ConsoleHandler
 ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (return, ($))
+import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.Conc.Sync
+import GHC.Internal.Data.Maybe (Maybe(..))
 import GHC.Internal.Enum (Enum)
-import GHC.Internal.IO (unsafePerformIO)
+import GHC.Internal.Err (errorWithoutStackTrace)
+import GHC.Internal.IO (IO, unsafePerformIO)
 import GHC.Internal.MVar
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Read (Read)

@@ -34,10 +34,17 @@ import GHC.Internal.TH.Monad
 import qualified GHC.Internal.TH.Lib as Lib (litE)  -- See wrinkle (W4) of Note [Tracking dependencies on primitives]
 
 import GHC.Internal.Data.Either
-import GHC.Internal.Base hiding (NonEmpty(..), Type, Module, inline)
+import GHC.Internal.Base (String, Void, map, mapM, ord, return, (.))
+import GHC.Internal.CString (unpackCString#)
 import GHC.Internal.Data.NonEmpty (NonEmpty(..))
 import GHC.Internal.Integer
+import GHC.Internal.Maybe (Maybe(..))
+import GHC.Internal.Prim (Addr#, Char#, Double#, Float#, Int#, TYPE, Word#)
 import GHC.Internal.Real
+import GHC.Internal.Types (
+    Bool(..), Char(..), Float(..), Double(..), Levity(..), RuntimeRep(..),
+    type (~),
+  )
 import GHC.Internal.Word
 import GHC.Internal.Int
 import GHC.Internal.Natural

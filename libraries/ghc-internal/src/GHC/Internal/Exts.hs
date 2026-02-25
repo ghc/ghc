@@ -168,7 +168,41 @@ import GHC.Internal.Prim hiding ( coerce, dataToTagSmall#, dataToTagLarge#, wher
   -- GHC-internal reasons in the near future, and shouldn't
   -- be exposed from base (not even GHC.Exts)
   -- whereFrom# is similarly internal.
+import GHC.Internal.Prim.PtrEq (
+    reallyUnsafePtrEquality,
+    unsafePtrEquality#,
+    eqStableName#,
+    sameArray#,
+    sameMutableArray#,
+    sameSmallArray#,
+    sameSmallMutableArray#,
+    sameByteArray#,
+    sameMutableByteArray#,
+    sameMVar#,
+    sameMutVar#,
+    sameTVar#,
+    samePromptTag#,
+  )
 
+import GHC.Internal.Classes ( Eq(..) )
+import GHC.Internal.CString (
+    unpackCString#,
+    unpackAppendCString#,
+    unpackFoldrCString#,
+    unpackCStringUtf8#,
+    unpackNBytes#,
+    cstringLength#,
+  )
+import GHC.Internal.Magic (
+    DataToTag(..),
+    inline,
+    noinline,
+    lazy,
+    oneShot,
+    considerAccessible,
+    runRW#,
+  )
+import GHC.Internal.Magic.Dict (WithDict(..))
 import GHC.Internal.Types
   hiding ( IO   -- Exported from "GHC.IO"
          , Type -- Exported from "Data.Kind"
@@ -305,10 +339,14 @@ import GHC.Internal.Types
          Sum62#,
          Sum63#,
   )
-import qualified GHC.Internal.Prim.Ext
+import GHC.Internal.Prim.Ext
 import GHC.Internal.ArrayArray
-import GHC.Internal.Base hiding ( coerce )
-import GHC.Internal.IO (seq#)
+import GHC.Internal.Base (
+    augment, breakpoint, breakpointCond, build, iShiftL#, iShiftRA#, iShiftRL#,
+    shiftL#, shiftRL#, otherwise,
+  )
+import GHC.Internal.Err ( errorWithoutStackTrace )
+import GHC.Internal.IO ( IO, seq# )
 import GHC.Internal.Ptr
 import GHC.Internal.Stack
 import GHC.Internal.IsList (IsList(..)) -- for re-export

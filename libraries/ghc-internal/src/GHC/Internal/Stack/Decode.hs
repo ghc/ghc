@@ -29,10 +29,17 @@ module GHC.Internal.Stack.Decode (
   )
 where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String, mapM, pure, ($), (.), (<*>))
+import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Err (error)
 import GHC.Internal.Show
+import GHC.Internal.Prim (
+    Addr#, Int#, StackSnapshot#, Word#, Word32#, int2Word#,
+  )
 import GHC.Internal.Real
+import GHC.Internal.Types (Any, Bool(..), Int(..), IO)
 import GHC.Internal.Word
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
 import GHC.Internal.Data.Bits
 import GHC.Internal.Data.Functor

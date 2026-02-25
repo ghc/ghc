@@ -93,19 +93,33 @@ import GHC.Internal.Foreign.C.String
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Foreign.StablePtr
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, failIO, fmap, otherwise, return, ($), (.), (++),
+  )
+import GHC.Internal.Classes ( Eq(..), Ord(..) )
 import {-# SOURCE #-} GHC.Internal.IO.Handle ( hFlush )
 import {-# SOURCE #-} GHC.Internal.IO.StdHandles ( stdout )
 import GHC.Internal.Encoding.UTF8
+import GHC.Internal.Err ( error )
 import GHC.Internal.Int
 import GHC.Internal.IO
 import GHC.Internal.IO.Exception
 import GHC.Internal.Exception
 import GHC.Internal.IORef
+import GHC.Internal.Magic ( lazy )
+import GHC.Internal.Maybe ( Maybe(..) )
 import GHC.Internal.MVar
+import GHC.Internal.Prim (
+    Array#, ByteArray#, ThreadId#, TYPE, fork#, forkOn#, getSpark#, indexArray#,
+    killThread#, labelThread#, listThreads#, mkWeakNoFinalizer#, myThreadId#,
+    numSparks#, par#, seq, setThreadAllocationCounter#, sizeofArray#,
+    threadLabel#, threadStatus#, yield#, (+#), (==#), (/=#),
+  )
+import GHC.Internal.Prim.Ext ( getThreadAllocationCounter# )
 import GHC.Internal.Ptr
 import GHC.Internal.Real         ( fromIntegral )
 import GHC.Internal.Show         ( Show(..), showParen, showString )
+import GHC.Internal.Types ( Bool, Ordering(..), UnliftedRep, isTrue# )
 import GHC.Internal.Weak
 import GHC.Internal.Word
 

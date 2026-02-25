@@ -177,9 +177,13 @@ import GHC.Internal.Data.Traversable ( Traversable(..) )
 import GHC.Internal.Data.Tuple
 
 import GHC.Internal.Base hiding ( foldr, mapM, sequence )
+import GHC.Internal.Classes
+import GHC.Internal.Err
 import GHC.Internal.Text.Read
 import GHC.Internal.Enum
 import GHC.Internal.Num
+import GHC.Internal.Prim (seq)
 import GHC.Internal.Real
 import GHC.Internal.Float
 import GHC.Internal.Show
+import GHC.Internal.Types

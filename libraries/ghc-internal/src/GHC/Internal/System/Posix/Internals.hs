@@ -48,10 +48,17 @@ import GHC.Internal.Data.Maybe
 import GHC.Internal.System.IO.Error
 #endif
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, otherwise, pure, return, when, ($), (++), (>>=),
+  )
 import GHC.Internal.Bits
+import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
+import GHC.Internal.CString (cstringLength#)
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Num
+import GHC.Internal.Prim (yield#)
 import GHC.Internal.Real
+import GHC.Internal.Types (Bool(..), Int(..))
 import GHC.Internal.Word
 import GHC.Internal.IO
 import GHC.Internal.IO.IOMode

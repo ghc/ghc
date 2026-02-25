@@ -55,9 +55,14 @@ import GHC.Internal.System.IO.Error
 import GHC.Internal.Data.Either (Either(..))
 import GHC.Internal.Data.Maybe
 
+import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&))
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.IORef
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, otherwise, pure, return, when, ($), ($!), (>>),
+  )
 import GHC.Internal.Real
+import GHC.Internal.Types (Bool(..), Char, Int(..))
 import GHC.Internal.Word
 import GHC.Internal.Ptr
 import GHC.Internal.Num

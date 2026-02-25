@@ -32,8 +32,8 @@ module GHC.Internal.TypeNats.Internal
   , CmpNat
   ) where
 
-import GHC.Internal.Base(Ordering)
 import GHC.Internal.Bignum.Natural(Natural)
+import GHC.Internal.Types(Ordering)
 
 -- | Comparison of type-level naturals, as a function.
 --

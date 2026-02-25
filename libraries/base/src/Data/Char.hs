@@ -52,11 +52,14 @@ module Data.Char
     , readLitChar
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (ord, otherwise, (++))
+import GHC.Internal.Classes
 import GHC.Internal.Char
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.Show
 import GHC.Internal.Read (readLitChar, lexLitChar)
+import GHC.Internal.Types
 import GHC.Internal.Unicode
 import GHC.Internal.Num
 

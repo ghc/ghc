@@ -14,11 +14,13 @@ module GHC.Weak.Finalize
 
 import GHC.Internal.Weak.Finalize
 
-import GHC.Internal.Base
+import GHC.Internal.Base (return, (++))
 import GHC.Internal.Exception
 import GHC.Internal.IO (catchException)
 import GHC.Internal.IO.Handle.Types (Handle)
 import GHC.Internal.IO.Handle.Text (hPutStrLn)
+import GHC.Internal.Prim (Array#, State#, RealWorld)
+import GHC.Internal.Types (Int, IO)
 
 
 {-# DEPRECATED runFinalizerBatch

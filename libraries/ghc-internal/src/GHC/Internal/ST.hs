@@ -24,7 +24,12 @@ module GHC.Internal.ST (
         liftST, unsafeInterleaveST, unsafeDupableInterleaveST
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    Applicative(..), Functor(..), Monad(..), Monoid(..), Semigroup(..),
+    ap, liftM2, ($),
+  )
+import GHC.Internal.Magic (runRW#)
+import GHC.Internal.Prim (State#, noDuplicate#)
 import GHC.Internal.Show
 
 default ()

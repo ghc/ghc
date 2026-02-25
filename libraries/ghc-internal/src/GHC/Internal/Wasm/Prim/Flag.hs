@@ -5,7 +5,7 @@ module GHC.Internal.Wasm.Prim.Flag
   )
 where
 
-import GHC.Internal.Base
+import GHC.Internal.Types (Bool)
 
 -- | If the current wasm module has any JSFFI functionality linked in,
 -- this would be 'True' at runtime and 'False' otherwise. If this is

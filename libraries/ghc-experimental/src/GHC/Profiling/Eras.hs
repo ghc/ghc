@@ -6,7 +6,7 @@ module GHC.Profiling.Eras ( setUserEra
                      , incrementUserEra
                      ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Types
 
 -- | Set the heap profiling era, setting the era to 0 will stop closures being
 -- counted.

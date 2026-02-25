@@ -64,7 +64,11 @@ import GHC.Internal.IO.Handle.Internals
 import GHC.Internal.IO.Handle.Text
 import qualified GHC.Internal.IO.BufferedIO as Buffered
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, const, fmap, otherwise, pure, return, when, ($), (.), (++),
+  )
+import GHC.Internal.Classes ( Eq(..), Ord(..), not, (&&) )
+import GHC.Internal.Err ( errorWithoutStackTrace )
 import GHC.Internal.Exception
 import GHC.Internal.MVar
 import GHC.Internal.IORef
@@ -73,6 +77,7 @@ import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Typeable
+import GHC.Internal.Types (Bool(..), Char, Int)
 
 
 -- ---------------------------------------------------------------------------

@@ -21,8 +21,9 @@ module GHC.Internal.JS.Foreign.Callback
 
 import           GHC.Internal.JS.Prim
 
+import           GHC.Internal.Classes (Eq(..))
+import           GHC.Internal.Types (Any, Bool, Int, IO)
 import           GHC.Internal.Unsafe.Coerce
-import           GHC.Internal.Base
 
 data OnBlocked = ContinueAsync | ThrowWouldBlock deriving (Eq)
 

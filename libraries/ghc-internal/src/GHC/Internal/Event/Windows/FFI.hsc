@@ -71,7 +71,9 @@ module GHC.Internal.Event.Windows.FFI (
 #include "winio_structs.h"
 
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Base
+import GHC.Internal.Base (String, fmap, return, ($), (.), (++), (>>=))
+import GHC.Internal.Classes (Eq(..), Ord, (||))
+import GHC.Internal.Err (undefined)
 import GHC.Internal.Num ((*))
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Marshal.Utils
@@ -82,6 +84,7 @@ import GHC.Internal.Word
 import GHC.Internal.Stable
 import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.Show
+import GHC.Internal.Types (Bool(..), IO)
 import GHC.Internal.Windows
 import qualified GHC.Internal.Event.Array as A
 import qualified GHC.Internal.Windows     as Win32

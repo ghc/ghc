@@ -27,7 +27,7 @@ import Foreign hiding (newArray)
 import Unsafe.Coerce (unsafeCoerce)
 import GHC.Arr          ( Array(..) )
 import GHC.Exts   hiding ( BCO, mkApUpd0#, newBCO# )
-import GHC.Internal.Base ( BCO, mkApUpd0#, newBCO# )
+import GHC.Internal.Prim ( BCO, mkApUpd0#, newBCO# )
 import GHC.IO
 import Control.Exception ( ErrorCall(..) )
 

@@ -20,9 +20,13 @@ module GHC.Internal.Stack.CloneStack (
   ) where
 
 import GHC.Internal.MVar
-import GHC.Internal.Base
+import GHC.Internal.Base (($))
 import GHC.Internal.Conc.Sync
+import GHC.Internal.Prim (
+    RealWorld, StackSnapshot#, StablePtr#, State#, ThreadId#,
+  )
 import GHC.Internal.Stable
+import GHC.Internal.Types (IO(..))
 
 -- | A frozen snapshot of the state of an execution stack.
 --

@@ -11,9 +11,10 @@ import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Ptr
-import GHC.Internal.Base
+import GHC.Internal.Base ( String, liftM, mapM, ($), (>>=) )
 import GHC.Internal.Real ( fromIntegral )
 import GHC.Internal.IO.Encoding
+import GHC.Internal.Types ( IO )
 
 -- | Computation 'getFullArgs' is the "raw" version of
 -- 'GHC.Internal.System.Environment.getArgs', similar to @argv@ in other languages. It

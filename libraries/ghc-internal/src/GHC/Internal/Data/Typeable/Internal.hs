@@ -87,18 +87,32 @@ module GHC.Internal.Data.Typeable.Internal (
     trLiftedRep
   ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, Void, foldr, id, map, ord, otherwise, ($), (.), (++),
+  )
+import GHC.Internal.Classes ( Eq(..), Ord(..), (||) )
+import GHC.Internal.CString ( unpackCStringUtf8# )
 import qualified GHC.Internal.Arr as A
 import GHC.Internal.Data.Either (Either (..))
 import GHC.Internal.Data.Type.Equality
+import GHC.Internal.Err (error, errorWithoutStackTrace)
 import GHC.Internal.List ( splitAt, foldl', elem, replicate, length )
+import GHC.Internal.Magic ( inline )
+import GHC.Internal.Magic.Dict ( WithDict(..) )
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Unicode (isDigit)
 import GHC.Internal.Num ((-), (+), (*))
 import GHC.Internal.Word
+import GHC.Internal.Prim (Addr#, Int#, FUN, TYPE, proxy#, seq, (-#))
 import GHC.Internal.Show
 import GHC.Internal.TypeLits ( KnownChar, charVal', KnownSymbol, symbolVal'
                     , TypeError, ErrorMessage(..) )
 import GHC.Internal.TypeNats ( KnownNat, Nat, natVal' )
+import GHC.Internal.Types (
+    Bool(..), Char, Constraint, Int(..), KindBndr, KindRep(..), Levity(..),
+    Module(..), Multiplicity(..), Ordering(..), RuntimeRep(..), TyCon(..),
+    Symbol, TrName(..), Type, TypeLitSort(..), VecCount(..), VecElem(..),
+  )
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce )
 
 import GHC.Internal.Fingerprint.Type

@@ -25,7 +25,10 @@ module GHC.Internal.IO.Unsafe (
     noDuplicate,
   ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (($), (>>))
+import GHC.Internal.Magic (lazy, runRW#)
+import GHC.Internal.Prim (noDuplicate#)
+import GHC.Internal.Types (IO(..))
 
 {-
 Note [unsafePerformIO and strictness]

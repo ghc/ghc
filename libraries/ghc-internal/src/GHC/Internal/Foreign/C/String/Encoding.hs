@@ -55,10 +55,16 @@ import GHC.Internal.Show ( show )
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.ForeignPtr
 
+import GHC.Internal.Classes (Eq(..), Ord(..), (&&))
 import GHC.Internal.Debug
+import GHC.Internal.Err (undefined)
 import GHC.Internal.List
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, const, fmap, liftM, otherwise, pure, return, when, ($), (.), (>>=),
+  )
+import GHC.Internal.Types (Bool(..), Char, Int)
 
 import GHC.Internal.IO
 import GHC.Internal.IO.Exception

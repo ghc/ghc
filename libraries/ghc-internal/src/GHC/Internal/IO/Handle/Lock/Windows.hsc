@@ -16,6 +16,8 @@ import GHC.Internal.Types ()
 
 #include <windows.h>
 
+import GHC.Internal.Base (String, otherwise, return, (>>=))
+import GHC.Internal.Classes (Eq(..), not, (&&))
 import GHC.Internal.Data.Bits
 import GHC.Internal.Data.Function
 import GHC.Internal.IO.Handle.Windows (handleToHANDLE)
@@ -23,7 +25,6 @@ import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Marshal.Utils
-import GHC.Internal.Base
 import qualified GHC.Internal.Event.Windows as Mgr
 import GHC.Internal.Event.Windows (LPOVERLAPPED, withOverlapped)
 import GHC.Internal.IO.FD
@@ -31,6 +32,7 @@ import GHC.Internal.IO.Handle.FD
 import GHC.Internal.IO.Handle.Types (Handle)
 import GHC.Internal.IO.Handle.Lock.Common (LockMode(..))
 import GHC.Internal.IO.SubSystem
+import GHC.Internal.Types (Bool(..), IO)
 import GHC.Internal.Windows
 
 lockImpl :: Handle -> String -> LockMode -> Bool -> IO Bool

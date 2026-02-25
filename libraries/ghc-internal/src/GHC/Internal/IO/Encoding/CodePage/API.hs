@@ -20,7 +20,11 @@ import GHC.Internal.Data.Bits
 import GHC.Internal.Data.Either
 import GHC.Internal.Word
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, const, fmap, otherwise, return, when, ($), (.), (>>),
+  )
+import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
+import GHC.Internal.Err (errorWithoutStackTrace, undefined)
 import GHC.Internal.List
 import GHC.Internal.IO.Buffer
 import GHC.Internal.IO.Encoding.Failure
@@ -29,6 +33,7 @@ import GHC.Internal.IO.Encoding.UTF16
 import GHC.Internal.Num
 import GHC.Internal.Show
 import GHC.Internal.Real
+import GHC.Internal.Types (Bool(..), Char, Int, IO(..), Ordering(..))
 import GHC.Internal.Windows hiding (LPCSTR)
 import GHC.Internal.ForeignPtr (castForeignPtr)
 

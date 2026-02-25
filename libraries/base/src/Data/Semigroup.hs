@@ -105,9 +105,14 @@ module Data.Semigroup (
   , ArgMax
   ) where
 
-import           GHC.Internal.Base hiding (Any, NonEmpty(..))
+import           GHC.Internal.Base (
+    Applicative(..), Functor(..), Monad(..), Monoid(..), Semigroup(..),
+    otherwise, (.),
+  )
+import           GHC.Internal.Classes
 import           GHC.Internal.Enum
 import           GHC.Internal.Show
+import           GHC.Internal.Prim (coerce)
 import           GHC.Internal.Read
 import           GHC.Internal.Num
 import           GHC.Internal.Real

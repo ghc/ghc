@@ -38,8 +38,10 @@ import GHC.Internal.Data.OldList (foldl', filter, intercalate, null)
 import GHC.Internal.Data.Bits ((.|.), (.&.))
 import GHC.Internal.Data.Semigroup.Internal (stimesMonoid)
 
-import GHC.Internal.Base
+import GHC.Internal.Base (Monoid(..), Semigroup(..), otherwise, ($), (.), (++))
+import GHC.Internal.Classes (Eq(..), not)
 import GHC.Internal.Show (Show(..))
+import GHC.Internal.Types (Bool, Int)
 import GHC.Internal.Word (Word64)
 
 -- | An I\/O event.

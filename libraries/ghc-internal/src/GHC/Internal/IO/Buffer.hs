@@ -69,10 +69,13 @@ module GHC.Internal.IO.Buffer (
     charSize,
  ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String, otherwise, return, ($))
+import GHC.Internal.Classes (Eq(..), Ord(..), (&&), (||))
+import GHC.Internal.Err (errorWithoutStackTrace)
 -- import GHC.Internal.IO
 import GHC.Internal.Num
 import GHC.Internal.Ptr
+import GHC.Internal.Types (Bool(..), Char, Int, IO)
 import GHC.Internal.Word
 import GHC.Internal.Show
 import GHC.Internal.Real

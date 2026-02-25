@@ -19,10 +19,12 @@ module GHC.Internal.IsList
   ( IsList(..)
   ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (NonEmpty(..), String, id)
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Functor.ZipList (ZipList(..))
 import GHC.Internal.Stack
 import GHC.Internal.Data.Version ( Version(..), makeVersion )
+import GHC.Internal.Types (Int)
 
 -- | The 'IsList' class and its methods are intended to be used in
 --   conjunction with the OverloadedLists extension.

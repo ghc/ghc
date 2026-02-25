@@ -42,7 +42,9 @@ Note: this #include is inside a Haskell comment
       by GHC
 -}
 
-import GHC.Internal.Base
+import GHC.Internal.Base (otherwise, return, ($), (>>))
+import GHC.Internal.Data.Maybe (Maybe(..))
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Ptr
@@ -50,6 +52,7 @@ import GHC.Internal.Foreign.Storable
 import GHC.Internal.Stable
 import GHC.Internal.Conc.IO
 import GHC.Internal.Control.Concurrent.MVar
+import GHC.Internal.Types (Bool, IO)
 
 data Handler
  = Default

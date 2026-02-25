@@ -78,7 +78,10 @@ module GHC.Internal.Windows (
         nullHANDLE,
     ) where
 
+import GHC.Internal.Classes (Eq(..), not)
 import GHC.Internal.Data.Bits (finiteBitSize, shiftL, shiftR, (.|.), (.&.))
+import GHC.Internal.Err (undefined)
+import GHC.Internal.Types (Bool(..))
 import GHC.Internal.Unicode (isSpace)
 import GHC.Internal.Data.OldList
 import GHC.Internal.Data.Maybe

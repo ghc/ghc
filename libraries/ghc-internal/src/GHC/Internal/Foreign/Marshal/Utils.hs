@@ -58,8 +58,14 @@ import GHC.Internal.Foreign.Storable         ( Storable(poke) )
 import GHC.Internal.Foreign.Marshal.Alloc    ( malloc, alloca )
 import GHC.Internal.Word                 ( Word8(..) )
 
+import GHC.Internal.Classes ( Eq(..) )
 import GHC.Internal.Num
-import GHC.Internal.Base
+import GHC.Internal.Base ( otherwise, return, ($) )
+import GHC.Internal.Prim (
+    coerce, copyAddrToAddr#, copyAddrToAddrNonOverlapping#, setAddrRange#,
+    word2Int#, word8ToWord#,
+  )
+import GHC.Internal.Types ( Bool(..), Int(..), IO(..) )
 
 -- combined allocation and marshalling
 -- -----------------------------------

@@ -65,9 +65,14 @@ module GHC.Internal.Exception
     , SrcLoc(..), prettySrcLoc
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String, otherwise, return, ($))
+import GHC.Internal.Classes (Eq, Ord)
+import GHC.Internal.Err (error)
+import GHC.Internal.Magic (noinline)
+import GHC.Internal.Prim (TYPE, raise#)
 import GHC.Internal.Show
 import GHC.Internal.Stack.Types
+import GHC.Internal.Types (IO, RuntimeRep)
 import GHC.Internal.IO.Unsafe
 import {-# SOURCE #-} GHC.Internal.Stack (prettyCallStackLines, prettyCallStack, prettySrcLoc, withFrozenCallStack)
 import {-# SOURCE #-} GHC.Internal.Exception.Backtrace (collectExceptionAnnotation)

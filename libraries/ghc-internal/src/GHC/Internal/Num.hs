@@ -34,9 +34,15 @@ where
 import qualified GHC.Internal.Natural
 import qualified GHC.Internal.Integer
 
-import GHC.Internal.Base
+import GHC.Internal.Classes (eqInt, geInt, ltInt)
+import GHC.Internal.Base (id, otherwise)
 import GHC.Internal.Bignum.Integer
 import GHC.Internal.Bignum.Natural
+import GHC.Internal.Prim (
+    int2Word#, minusWord#, negateInt#, plusWord#, timesWord#, word2Int#,
+    (+#), (-#), (*#),
+  )
+import GHC.Internal.Types (Int(..), Word(..))
 
 infixl 7  *
 infixl 6  +, -

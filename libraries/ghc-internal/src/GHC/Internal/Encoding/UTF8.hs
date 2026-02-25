@@ -42,8 +42,17 @@ module GHC.Internal.Encoding.UTF8
     ) where
 
 import GHC.Internal.Types
-import GHC.Internal.Base
+import GHC.Internal.Base (Monad(..), String, ord, otherwise, ($))
+import GHC.Internal.Classes (Ord(..), (&&))
 import GHC.Internal.IO
+import GHC.Internal.Magic (runRW#)
+import GHC.Internal.Prim (
+    Addr#, ByteArray#, Char#, Int#, State#, Word#, Word8#, andI#, chr#, gtWord#,
+    indexWord8Array#, indexWord8OffAddr#, ltWord#, newByteArray#, orI#,
+    plusAddr#, sizeofByteArray#, uncheckedIShiftL#, unsafeFreezeByteArray#,
+    writeWord8Array#, writeWord8OffAddr#, word2Int#, word8ToWord#, wordToWord8#,
+    (+#), (-#), (<#), (<=#), (>=#),
+  )
 import GHC.Internal.ST
 import GHC.Internal.Word
 import GHC.Internal.ForeignPtr

@@ -33,20 +33,27 @@ import System.IO (FilePath, hPutStrLn, stderr)
 import qualified Data.Kind as Kind (Type)
 import GHC.Types (TYPE, RuntimeRep(..))
 #else
-import GHC.Internal.Base hiding (NonEmpty(..),Type, Module, sequence)
+import GHC.Internal.Base (
+    Applicative(..), Functor(..), Monad(..), Monoid(..), Semigroup(..), String,
+    flip, id, (.), (++),
+  )
+import GHC.Internal.Classes (not)
 import GHC.Internal.Data.Data hiding (Fixity(..))
 import GHC.Internal.Data.Traversable
 import GHC.Internal.IORef
-import GHC.Internal.IO (FilePath)
+import GHC.Internal.IO (IO, FilePath)
 import GHC.Internal.IO.Handle.Text (hPutStrLn)
 import GHC.Internal.IO.StdHandles (stderr)
 import GHC.Internal.Data.Foldable
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Control.Monad.IO.Class
 import GHC.Internal.Control.Monad.Fail
+import GHC.Internal.Maybe (Maybe)
 import GHC.Internal.Num
 import GHC.Internal.IO.Unsafe
+import GHC.Internal.Prim (TYPE)
 import qualified GHC.Internal.Types as Kind (Type)
+import GHC.Internal.Types (Bool(..), RuntimeRep)
 #endif
 import GHC.Internal.ForeignSrcLang
 import GHC.Internal.LanguageExtensions

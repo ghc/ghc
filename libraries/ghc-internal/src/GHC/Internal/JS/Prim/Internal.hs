@@ -13,8 +13,10 @@ module GHC.Internal.JS.Prim.Internal ( blockedIndefinitelyOnMVar
 import           GHC.Internal.Control.Exception
 
 import           GHC.Internal.JS.Prim
-import           GHC.Internal.Base
+import           GHC.Internal.Base (otherwise, return, (=<<))
+import           GHC.Internal.Maybe (Maybe(..))
 import           GHC.Internal.Show
+import           GHC.Internal.Types (IO)
 
 wouldBlock :: SomeException
 wouldBlock = toException WouldBlockException

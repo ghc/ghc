@@ -32,10 +32,11 @@ module GHC.Internal.Data.String (
  , unwords
  ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String)
 import GHC.Internal.Data.Functor.Const (Const (Const))
 import GHC.Internal.Data.Functor.Identity (Identity (Identity))
 import GHC.Internal.Data.List (lines, words, unlines, unwords)
+import GHC.Internal.Types (Char, type (~))
 
 -- | `IsString` is used in combination with the @-XOverloadedStrings@
 -- language extension to convert the literals to different string types.

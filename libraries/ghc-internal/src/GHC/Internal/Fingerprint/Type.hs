@@ -20,7 +20,8 @@
 
 module GHC.Internal.Fingerprint.Type (Fingerprint(..)) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String, (++))
+import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.List (length, replicate)
 import GHC.Internal.Num
 import GHC.Internal.Show

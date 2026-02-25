@@ -34,11 +34,14 @@ module GHC.Internal.IO.SubSystem (
   isWindowsNativeIO
  ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (when)
+import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Show
 import GHC.Internal.Enum
+import GHC.Internal.Types (Bool(..), IO)
 
 #if defined(mingw32_HOST_OS)
+import GHC.Internal.Base (($))
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable

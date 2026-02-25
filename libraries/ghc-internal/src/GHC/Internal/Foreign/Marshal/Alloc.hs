@@ -65,17 +65,24 @@ module GHC.Internal.Foreign.Marshal.Alloc (
   finalizerFree
 ) where
 
+import GHC.Internal.Classes                  ( Eq(..), not )
 import GHC.Internal.Data.Bits                ( Bits, (.&.) )
 import GHC.Internal.Data.Maybe
+import GHC.Internal.Err                      ( undefined )
 import GHC.Internal.Foreign.C.Types          ( CSize(..) )
 import GHC.Internal.Foreign.Storable         ( Storable(sizeOf,alignment) )
 import GHC.Internal.Foreign.ForeignPtr       ( FinalizerPtr )
 import GHC.Internal.IO.Exception
 import GHC.Internal.Num
+import GHC.Internal.Prim (
+    byteArrayContents#, keepAlive#, newAlignedPinnedByteArray#,
+    newPinnedByteArray#, unsafeFreezeByteArray#,
+  )
 import GHC.Internal.Real
 import GHC.Internal.Show
 import GHC.Internal.Ptr
-import GHC.Internal.Base
+import GHC.Internal.Base                     ( String, return, ($), (++) )
+import GHC.Internal.Types                    ( Bool, Int(..), IO(..) )
 
 -- exported functions
 -- ------------------

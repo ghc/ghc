@@ -41,7 +41,6 @@ module GHC.Internal.Heap.Closures (
     , asBox
     ) where
 
-import GHC.Internal.Base
 import GHC.Internal.Show
 
 import GHC.Internal.Heap.Constants
@@ -68,12 +67,18 @@ in the profiling way. (#15197)
 
 import GHC.Internal.Heap.ProfInfo.Types
 
+import GHC.Internal.Base (Functor, String, pure, (++))
+import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.Data.Bits
 import GHC.Internal.Data.Foldable (Foldable, toList)
 import GHC.Internal.Data.Traversable (Traversable)
+import GHC.Internal.Err (error)
 import GHC.Internal.Int
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
+import GHC.Internal.Prim (Int#, Word#, closureSize#)
 import GHC.Internal.Real
+import GHC.Internal.Types (Any, Bool(..), Float, Double, IO)
 import GHC.Internal.Word
 import GHC.Internal.Generics
 import GHC.Internal.Numeric

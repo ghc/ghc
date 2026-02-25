@@ -38,8 +38,10 @@ module GHC.Internal.Conc.Bound
 
 #if !defined(SUPPORT_BOUND_THREADS)
 
-import GHC.Internal.Base
+import GHC.Internal.Base (pure)
+import GHC.Internal.Err (error)
 import GHC.Internal.Conc.Sync (ThreadId)
+import GHC.Internal.Types (Bool(..), IO)
 
 forkOS :: IO () -> IO ThreadId
 forkOS _ = error "forkOS not supported on this architecture"
@@ -61,17 +63,21 @@ rtsSupportsBoundThreads = False
 
 #else
 
+import GHC.Internal.Classes (Eq(..))
+import GHC.Internal.Err (undefined)
 import GHC.Internal.Foreign.StablePtr
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Control.Monad.Fail
 import GHC.Internal.Data.Either
 import qualified GHC.Internal.Control.Exception.Base as Exception
-import GHC.Internal.Base
+import GHC.Internal.Base (otherwise, return, when, ($), (++), (>>=), (>>))
 import GHC.Internal.Conc.Sync
 import GHC.Internal.IO
 import GHC.Internal.Exception
 import GHC.Internal.IORef
 import GHC.Internal.MVar
+import GHC.Internal.Prim (isCurrentThreadBound#, (/=#))
+import GHC.Internal.Types (Bool(..), isTrue#)
 
 -- | 'True' if bound threads are supported.
 -- If @rtsSupportsBoundThreads@ is 'False', 'isCurrentThreadBound'

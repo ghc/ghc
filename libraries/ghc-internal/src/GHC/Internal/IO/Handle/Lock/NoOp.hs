@@ -2,10 +2,11 @@
 
 module GHC.Internal.IO.Handle.Lock.NoOp where
 
-import GHC.Internal.Base
-import GHC.Internal.IO (throwIO)
+import GHC.Internal.Base (String)
+import GHC.Internal.IO (IO, throwIO)
 import GHC.Internal.IO.Handle.Lock.Common
 import GHC.Internal.IO.Handle.Types (Handle)
+import GHC.Internal.Types (Bool)
 
 -- | No-op implementation.
 lockImpl :: Handle -> String -> LockMode -> Bool -> IO Bool

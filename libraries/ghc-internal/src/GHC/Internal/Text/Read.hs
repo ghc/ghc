@@ -44,7 +44,9 @@ module GHC.Internal.Text.Read (
 
  ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String, id, return)
+import GHC.Internal.Err (errorWithoutStackTrace)
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Read
 import GHC.Internal.Data.Either
 import GHC.Internal.Text.ParserCombinators.ReadP as P

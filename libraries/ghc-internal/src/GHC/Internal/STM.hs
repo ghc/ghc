@@ -24,11 +24,22 @@ module GHC.Internal.STM
         , writeTVar
         ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    Alternative(..), Applicative(..), Functor(..), Monad(..), MonadPlus(..),
+    Monoid(..), Semigroup(..), ap, liftM2, ($), (.),
+  )
+import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Exception (Exception, toExceptionWithBacktrace, fromException, addExceptionContext)
 import GHC.Internal.Exception.Context (ExceptionAnnotation)
 import GHC.Internal.Exception.Type (WhileHandling(..))
+import GHC.Internal.Maybe (Maybe(..))
+import GHC.Internal.Prim (
+    RealWorld, State#, TVar#, atomically#, catch#, catchRetry#, catchSTM#,
+    newTVar#, raiseIO#, readTVar#, readTVarIO#, retry#, writeTVar#,
+  )
+import GHC.Internal.Prim.PtrEq (sameTVar#)
 import GHC.Internal.Stack (HasCallStack, withFrozenCallStack)
+import GHC.Internal.Types (IO(..), isTrue#)
 
 -- TVars are shared memory locations which support atomic memory
 -- transactions.

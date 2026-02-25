@@ -139,7 +139,10 @@ module GHC.Base
     ) where
 
 import GHC.Internal.Base hiding ( NonEmpty(..) )
+import GHC.Internal.Classes
+import GHC.Internal.CString
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
+import GHC.Internal.Magic.Dict ( WithDict(..) )
 import GHC.Prim hiding
   (
   -- Hide dataToTag# ops because they are expected to break for
@@ -392,6 +395,7 @@ import GHC.Prim.Ext
 import GHC.Prim.PtrEq
 import GHC.Internal.Err
 import GHC.Internal.IO (seq#)
+import GHC.Internal.Magic
 import GHC.Internal.Maybe
 import GHC.Types hiding (
   Unit#,

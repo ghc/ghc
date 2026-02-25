@@ -27,7 +27,10 @@ module GHC.Internal.IO.Device (
         SeekMode(..)
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base ( return )
+import GHC.Internal.Classes ( Eq, Ord )
+import GHC.Internal.Maybe ( Maybe )
+import GHC.Internal.Types ( Bool(..), Int )
 import GHC.Internal.Word
 import GHC.Internal.Arr
 import GHC.Internal.Enum

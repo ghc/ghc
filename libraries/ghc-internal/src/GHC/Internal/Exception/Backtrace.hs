@@ -5,11 +5,14 @@
 
 module GHC.Internal.Exception.Backtrace where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    String, const, flip, fmap, otherwise, return, ($), (.), (>>=),
+  )
 import GHC.Internal.Data.OldList
 import GHC.Internal.IORef
 import GHC.Internal.IO.Unsafe (unsafePerformIO)
 import GHC.Internal.Exception.Context
+import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Ptr
 import GHC.Internal.Data.Maybe (fromMaybe, mapMaybe)
 import GHC.Internal.Stack.Types as GHC.Stack (CallStack, HasCallStack)
@@ -18,6 +21,7 @@ import qualified GHC.Internal.ExecutionStack.Internal as ExecStack
 import qualified GHC.Internal.Stack.CloneStack as CloneStack
 import qualified GHC.Internal.Stack.Decode as CloneStack
 import qualified GHC.Internal.Stack.CCS as CCS
+import GHC.Internal.Types (Bool(..), Int, IO)
 
 -- | How to collect a backtrace when an exception is thrown.
 data BacktraceMechanism

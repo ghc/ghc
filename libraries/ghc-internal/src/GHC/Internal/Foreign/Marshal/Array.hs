@@ -72,9 +72,13 @@ import GHC.Internal.Foreign.Storable (Storable(alignment,sizeOf,peekElemOff,poke
 import GHC.Internal.Foreign.Marshal.Alloc (mallocBytes, callocBytes, allocaBytesAligned, reallocBytes)
 import GHC.Internal.Foreign.Marshal.Utils (copyBytes, moveBytes)
 
+import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Err (undefined)
 import GHC.Internal.Num
 import GHC.Internal.List
-import GHC.Internal.Base
+import GHC.Internal.Base (const, otherwise, return, ($), (.))
+import GHC.Internal.Prim ((+#))
+import GHC.Internal.Types (Int(..), IO)
 
 {- Note [Specialising array operations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

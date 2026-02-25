@@ -20,14 +20,21 @@
 -- @since base-4.11.0.0
 module GHC.Internal.Data.Semigroup.Internal where
 
-import GHC.Internal.Base hiding (Any)
+import GHC.Internal.Base (
+    Alternative(..), Applicative(..), Functor(..), Monad(..), MonadPlus(..),
+    Monoid(..), Semigroup(..), id, otherwise, (.),
+  )
+import GHC.Internal.Classes (Eq(..), Ord(..), (&&), (||))
 import GHC.Internal.Enum
+import GHC.Internal.Err (errorWithoutStackTrace)
 import qualified GHC.Internal.List as List
 import GHC.Internal.Num
+import GHC.Internal.Prim (coerce)
 import GHC.Internal.Read
 import GHC.Internal.Show
 import GHC.Internal.Generics
 import GHC.Internal.Real
+import GHC.Internal.Types (Bool(..), Ordering(..))
 
 -- | This is a valid definition of 'stimes' for an idempotent 'Semigroup'.
 --

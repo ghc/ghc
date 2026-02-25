@@ -32,12 +32,15 @@ module GHC.Internal.Data.Type.Coercion
   , TestCoercion(..)
   ) where
 
+import GHC.Internal.Classes (Eq, Ord)
+import GHC.Internal.Err (errorWithoutStackTrace)
 import qualified GHC.Internal.Data.Type.Equality as Eq
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Enum
+import GHC.Internal.Prim (coerce)
 import GHC.Internal.Show
+import GHC.Internal.Types (Coercible)
 import GHC.Internal.Read
-import GHC.Internal.Base
 
 -- | Representational equality. If @Coercion a b@ is inhabited by some terminating
 -- value, then the type @a@ has the same underlying representation as the type @b@.

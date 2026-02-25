@@ -20,7 +20,10 @@ module GHC.Internal.Unsafe.Coerce
   ) where
 
 import GHC.Internal.Arr (amap) -- For amap/unsafeCoerce rule
-import GHC.Internal.Base
+import GHC.Internal.Base (map)
+import GHC.Internal.Err (error)
+import GHC.Internal.Prim (TYPE)
+import GHC.Internal.Types (Levity(..), RuntimeRep(..), Type)
 
 {- Note [Implementing unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

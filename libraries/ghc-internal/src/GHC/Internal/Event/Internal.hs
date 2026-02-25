@@ -20,11 +20,15 @@ module GHC.Internal.Event.Internal
     , exchangePtr
     ) where
 
+import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Foreign.C.Error (eINTR, getErrno, throwErrno)
 import GHC.Internal.System.Posix.Types (Fd)
-import GHC.Internal.Base
+import GHC.Internal.Base (String, return, ($))
+import GHC.Internal.Maybe (Maybe)
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Event.Internal.Types
+import GHC.Internal.Prim (atomicExchangeAddrAddr#)
+import GHC.Internal.Types (Bool, Int, IO(..))
 
 import GHC.Internal.Ptr (Ptr(..))
 

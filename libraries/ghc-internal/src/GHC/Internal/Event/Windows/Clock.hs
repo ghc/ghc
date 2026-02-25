@@ -14,8 +14,10 @@ module GHC.Internal.Event.Windows.Clock (
 import qualified GHC.Internal.Event.Windows.FFI as FFI
 
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Base
+import GHC.Internal.Base (Monad(..), fmap, liftM, ($!))
+import GHC.Internal.Err (undefined)
 import GHC.Internal.Real
+import GHC.Internal.Types (Double, IO)
 
 -- | Monotonic clock
 newtype Clock = Clock (IO Seconds)

@@ -62,10 +62,21 @@ module GHC.Internal.Bits (
 
 #include "MachDeps.h"
 
+import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
 import GHC.Internal.Data.Maybe
+import GHC.Internal.Err (error, errorWithoutStackTrace)
 import GHC.Internal.Num
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    iShiftL#, iShiftRA#, otherwise, shiftL#, shiftRL#, ($),
+  )
+import GHC.Internal.Prim (
+    and#, andI#, clz#, ctz#, int2Word#, negateInt#, not#, notI#, or#, orI#,
+    popCnt#, uncheckedIShiftL#, uncheckedIShiftRA#, uncheckedIShiftRL#,
+    uncheckedShiftL#, uncheckedShiftRL#, word2Int#, xor#, xorI#,
+    (-#), (==#), (>=#)
+  )
 import GHC.Internal.Real
+import GHC.Internal.Types (Bool(..), Int(..), Word(..), isTrue#)
 
 infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`
 infixl 7 .&.

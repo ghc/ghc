@@ -40,10 +40,13 @@ import GHC.Internal.Foreign.C.String
 import GHC.Internal.Foreign.C.String.Encoding as GHC
 import GHC.Internal.Foreign.Storable
 
-import GHC.Internal.Base
+import GHC.Internal.Base ( String, otherwise, return, ($), (++), (=<<) )
+import GHC.Internal.Classes ( Eq(..), (&&) )
+import GHC.Internal.Prim ( clearCCS##, getCCSOf##, getCurrentCCS## )
 import GHC.Internal.Ptr
 import GHC.Internal.IO.Encoding
 import GHC.Internal.List ( concatMap, reverse )
+import GHC.Internal.Types ( IO(..) )
 
 #define PROFILING
 #include "Rts.h"

@@ -16,9 +16,11 @@
 {-# OPTIONS_GHC -fomit-interface-pragmas #-}
 module GHC.Internal.StaticPtr.Internal (makeStatic) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (($), (++))
+import GHC.Internal.Err (error)
 import GHC.Internal.StaticPtr(StaticPtr)
 import GHC.Internal.Text.Show
+import GHC.Internal.Types (Int)
 
 -- 'makeStatic' should never be called by the user.
 -- See Note [Grand plan for static forms] in StaticPtrTable.

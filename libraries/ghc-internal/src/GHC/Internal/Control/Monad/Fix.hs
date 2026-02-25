@@ -38,7 +38,8 @@ import GHC.Internal.Data.Monoid ( Monoid, Dual(..), Sum(..), Product(..)
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Data.Ord ( Down(..) )
 import GHC.Internal.Data.Tuple ( Solo(..), fst, snd )
-import GHC.Internal.Base ( IO, Monad, errorWithoutStackTrace, (.), return, liftM )
+import GHC.Internal.Base ( Monad, (.), return, liftM )
+import GHC.Internal.Err ( errorWithoutStackTrace )
 import GHC.Internal.Generics
 import GHC.Internal.List ( head, drop )
 import GHC.Internal.Control.Monad.ST.Imp
@@ -50,6 +51,7 @@ import GHC.Internal.IO.Exception
 import GHC.Internal.TH.Monad
 import GHC.Internal.Control.Exception
 import GHC.Internal.Control.Arrow
+import GHC.Internal.Types ( IO )
 
 -- | Monads having fixed points with a \'knot-tying\' semantics.
 -- Instances of 'MonadFix' should satisfy the following laws:

@@ -46,10 +46,13 @@ module GHC.Internal.Word (
     eqWord64, neWord64, gtWord64, geWord64, ltWord64, leWord64
     ) where
 
+import GHC.Internal.Classes (
+    Eq(..), Ord(..), (&&), eqWord, neWord, geWord, gtWord, leWord, ltWord,
+  )
 import GHC.Internal.Data.Maybe
 
 import GHC.Internal.Prim
-import GHC.Internal.Base
+import GHC.Internal.Base (build, otherwise, shiftL#, shiftRL#, shift_mask, (.))
 
 import GHC.Internal.Bits
 import GHC.Internal.Enum
@@ -57,6 +60,7 @@ import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Ix
 import GHC.Internal.Show
+import GHC.Internal.Types (Bool(..), Float, Double, Int(..), Word(..), isTrue#)
 
 ------------------------------------------------------------------------
 -- type Word8

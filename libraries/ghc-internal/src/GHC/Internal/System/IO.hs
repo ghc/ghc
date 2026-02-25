@@ -221,10 +221,15 @@ module GHC.Internal.System.IO (
 
 import GHC.Internal.Control.Exception.Base
 
+import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.Data.Bits
 import GHC.Internal.Data.Maybe
+import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Foreign.C.Error
 #if defined(mingw32_HOST_OS)
+import GHC.Internal.Base (fmap)
+import GHC.Internal.Classes (not, (||))
+import GHC.Internal.Err (undefined)
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Marshal.Alloc
@@ -240,7 +245,7 @@ import GHC.Internal.Foreign.C.Types
 import GHC.Internal.System.Posix.Internals
 import GHC.Internal.System.Posix.Types
 
-import GHC.Internal.Base
+import GHC.Internal.Base (String, failIO, otherwise, return, ($), (.), (>>=))
 import GHC.Internal.List
 #if !defined(mingw32_HOST_OS)
 import GHC.Internal.IORef
@@ -257,6 +262,7 @@ import GHC.Internal.IO.Encoding
 import GHC.Internal.Text.Read
 import GHC.Internal.IO.StdHandles
 import GHC.Internal.Show
+import GHC.Internal.Types (Bool(..), Char, Int)
 -----------------------------------------------------------------------------
 -- Standard IO
 

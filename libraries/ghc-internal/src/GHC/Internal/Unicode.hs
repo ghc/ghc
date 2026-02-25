@@ -30,11 +30,13 @@ module GHC.Internal.Unicode (
         toUpper, toLower, toTitle
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base ( ord, otherwise, (.) )
+import GHC.Internal.Classes ( Eq(..), Ord(..), (&&), (||) )
 import GHC.Internal.Real
 import GHC.Internal.Enum ( Enum (..), Bounded (..) )
 import GHC.Internal.Ix ( Ix (..) )
 import GHC.Internal.Num
+import GHC.Internal.Types ( Bool(..), Char, Word )
 import qualified GHC.Internal.Unicode.Char.DerivedCoreProperties as DCP
 import qualified GHC.Internal.Unicode.Char.UnicodeData.GeneralCategory as GC
 import qualified GHC.Internal.Unicode.Char.UnicodeData.SimpleLowerCaseMapping as C

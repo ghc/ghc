@@ -7,9 +7,10 @@ module GHC.Internal.Clock
     , getMonotonicTimeNSec
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base (return)
 import GHC.Internal.Real
 import GHC.Internal.Word
+import GHC.Internal.Types (Double, IO)
 import GHC.Internal.Float () -- for Num Double instance
 #if defined(javascript_HOST_ARCH)
 import GHC.Internal.Num

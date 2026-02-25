@@ -17,7 +17,8 @@ import qualified GHC.Internal.Event.Internal as E
 
 #include "EventConfig.h"
 #if !defined(HAVE_KQUEUE)
-import GHC.Internal.Base
+import GHC.Internal.Err (errorWithoutStackTrace)
+import GHC.Internal.Types (Bool(..), IO)
 
 new :: IO E.Backend
 new = errorWithoutStackTrace "KQueue back end not implemented for this platform"
@@ -27,9 +28,12 @@ available = False
 {-# INLINE available #-}
 #else
 
+import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.Data.Bits (Bits(..), FiniteBits(..))
+import GHC.Internal.Err (errorWithoutStackTrace, undefined)
 import GHC.Internal.Int
-import GHC.Internal.Data.Maybe ( catMaybes )
+import GHC.Internal.Data.Maybe (Maybe(..), catMaybes)
+import GHC.Internal.Types (Bool(..), Int, IO)
 import GHC.Internal.Word (Word16, Word32)
 import GHC.Internal.Foreign.C.Error (throwErrnoIfMinus1, eINTR, eINVAL,
                         eNOTSUP, getErrno, throwErrno)
@@ -38,7 +42,9 @@ import GHC.Internal.Foreign.Marshal.Alloc (alloca)
 import GHC.Internal.Foreign.Marshal.Array (withArrayLen)
 import GHC.Internal.Foreign.Ptr (Ptr, nullPtr)
 import GHC.Internal.Foreign.Storable (Storable(..))
-import GHC.Internal.Base
+import GHC.Internal.Base (
+    Semigroup(..), fmap, map, otherwise, return, when, ($), (.), (++), (>>),
+  )
 import GHC.Internal.Enum (toEnum)
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Real (quotRem, fromIntegral)
