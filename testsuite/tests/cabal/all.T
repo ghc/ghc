@@ -5,6 +5,7 @@ def ignore_warnings(str):
     return re.sub(r'Warning:.*\n', '', str)
 
 test('ghcpkg01', [extra_files(['test.pkg', 'test2.pkg', 'test3.pkg'])], makefile_test, [])
+test('ghcpkg10', [extra_files(['test.pkg', 'test2.pkg', 'test3.pkg'])], makefile_test, [])
 
 # Use ignore_stderr to prevent (when HADDOCK_DOCS=NO):
 #  warning: haddock-interfaces .. doesn't exist or isn't a file

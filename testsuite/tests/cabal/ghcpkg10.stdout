@@ -1,0 +1,50 @@
+asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf/zxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcv/uiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiop/qwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwer/local20.package.conf
+    (no packages)
+Reading package info from "test.pkg" ... done.
+name:            testpkg
+version:         1.2.3.4
+visibility:      public
+id:              testpkg-1.2.3.4-XXX
+key:             testpkg-1.2.3.4-XXX
+license:         BSD3
+copyright:       (c) The Univsersity of Glasgow 2004
+maintainer:      glasgow-haskell-users@haskell.org
+author:          simonmar@microsoft.com
+stability:       stable
+homepage:        http://www.haskell.org/ghc
+package-url:     http://www.haskell.org/ghc
+description:     A Test Package
+category:        none
+exposed:         True
+exposed-modules: A
+hidden-modules:  B C.D
+import-dirs:     /usr/local/lib/testpkg "c:/Program Files/testpkg"
+library-dirs:    /usr/local/lib/testpkg "c:/Program Files/testpkg"
+hs-libraries:    testpkg-1.2.3.4-XXX
+include-dirs:    /usr/local/include/testpkg "c:/Program Files/testpkg"
+pkgroot: 
+
+name:            testpkg
+version:         1.2.3.4
+visibility:      public
+id:              testpkg-1.2.3.4-XXX
+key:             testpkg-1.2.3.4-XXX
+license:         BSD3
+copyright:       (c) The Univsersity of Glasgow 2004
+maintainer:      glasgow-haskell-users@haskell.org
+author:          simonmar@microsoft.com
+stability:       stable
+homepage:        http://www.haskell.org/ghc
+package-url:     http://www.haskell.org/ghc
+description:     A Test Package
+category:        none
+exposed:         True
+exposed-modules: A
+hidden-modules:  B C.D
+import-dirs:     /usr/local/lib/testpkg "c:/Program Files/testpkg"
+library-dirs:    /usr/local/lib/testpkg "c:/Program Files/testpkg"
+hs-libraries:    testpkg-1.2.3.4-XXX
+include-dirs:    /usr/local/include/testpkg "c:/Program Files/testpkg"
+pkgroot: 
+
+import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
