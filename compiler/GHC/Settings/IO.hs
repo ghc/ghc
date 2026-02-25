@@ -148,7 +148,7 @@ initSettings top_dir = do
 
   baseUnitId <- getSetting_raw "base unit-id"
 
-  lib_top_dir <- getSetting "Lib TopDir"
+  lib_dir <- getSetting "LibDir"
 
   return $ Settings
     { sGhcNameVersion = GhcNameVersion
@@ -161,7 +161,7 @@ initSettings top_dir = do
       , fileSettings_ghciUsagePath  = ghci_usage_msg_path
       , fileSettings_toolDir        = mtool_dir
       , fileSettings_topDir         = top_dir
-      , fileSettings_libTopDir      = lib_top_dir
+      , fileSettings_libDir         = lib_dir
       , fileSettings_globalPackageDatabase = globalpkgdb_path
       }
 

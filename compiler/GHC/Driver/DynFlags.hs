@@ -60,7 +60,7 @@ module GHC.Driver.DynFlags (
 
         -- ** System tool settings and locations
         programName, projectVersion,
-        ghcUsagePath, ghciUsagePath, topDir, libTopDir, toolDir,
+        ghcUsagePath, ghciUsagePath, topDir, libDir, toolDir,
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
 
@@ -1506,8 +1506,8 @@ ghciUsagePath         :: DynFlags -> FilePath
 ghciUsagePath dflags = fileSettings_ghciUsagePath $ fileSettings dflags
 topDir                :: DynFlags -> FilePath
 topDir dflags = fileSettings_topDir $ fileSettings dflags
-libTopDir                :: DynFlags -> FilePath
-libTopDir dflags = fileSettings_libTopDir $ fileSettings dflags
+libDir                :: DynFlags -> FilePath
+libDir dflags = fileSettings_libDir $ fileSettings dflags
 toolDir               :: DynFlags -> Maybe FilePath
 toolDir dflags = fileSettings_toolDir $ fileSettings dflags
 extraGccViaCFlags     :: DynFlags -> [String]

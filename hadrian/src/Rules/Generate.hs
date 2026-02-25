@@ -507,7 +507,7 @@ generateSettings settingsFile = do
         , ("RTS ways",  unwords . map show . Set.toList <$> getRtsWays)
         , ("Relative Global Package DB", pure rel_pkg_db)
         , ("base unit-id", pure base_unit_id)
-        , ("Lib TopDir", pure lib_topDir)
+        , ("LibDir", pure lib_topDir)
         ]
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
     pure $ case settings of

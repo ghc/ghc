@@ -184,7 +184,7 @@ data FileSettings = FileSettings
   , fileSettings_toolDir               :: Maybe FilePath -- ditto
   , fileSettings_topDir                :: FilePath       -- ditto
   , fileSettings_globalPackageDatabase :: FilePath
-  , fileSettings_libTopDir             :: FilePath
+  , fileSettings_libDir                :: FilePath
   }
 
 

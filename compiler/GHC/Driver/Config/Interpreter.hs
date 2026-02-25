@@ -17,8 +17,8 @@ import System.Directory
 
 initInterpOpts :: DynFlags -> IO InterpOpts
 initInterpOpts dflags = do
-  wasm_dyld <- makeAbsolute $ libTopDir dflags </> "dyld.mjs"
-  js_interp <- makeAbsolute $ libTopDir dflags </> "ghc-interp.js"
+  wasm_dyld <- makeAbsolute $ libDir dflags </> "dyld.mjs"
+  js_interp <- makeAbsolute $ libDir dflags </> "ghc-interp.js"
   pure $ InterpOpts
     { interpExternal = gopt Opt_ExternalInterpreter dflags
     , interpProg = pgm_i dflags
