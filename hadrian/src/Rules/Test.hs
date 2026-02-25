@@ -328,19 +328,7 @@ needTestsuitePackages stg = do
   -- Unfortunately, we still need the liba
   let pkgs = filter (\(_,p) -> not $ (pkgName p `elem` ["ghc", "Cabal"]) && isStage0 stg)
                     (libpkgs ++ exepkgs ++ [ (stg,timeout) | windowsHost ])
-
   need =<< mapM (uncurry pkgFile) pkgs
-  when isCross $ do
-    jsTarget <- isJsTarget (succStage stg)
-    wasmTarget <- isWasmTarget (succStage stg)
-    libPath <- stageLibPath stg
-    let jsDeps
-          | jsTarget  = ["ghc-interp.js"]
-          | otherwise = []
-        wasmDeps
-          | wasmTarget = ["dyld.mjs", "post-link.mjs", "prelude.mjs"]
-          | otherwise  = []
-    need $ map (libPath -/-) (jsDeps ++ wasmDeps)
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc
