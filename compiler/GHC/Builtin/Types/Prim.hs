@@ -82,6 +82,7 @@ module GHC.Builtin.Types.Prim(
         stableNamePrimTyCon,            mkStableNamePrimTy,
         compactPrimTyCon,               compactPrimTy,
         bcoPrimTyCon,                   bcoPrimTy,
+        strictTyCon, strictPrimTyCon,                mkStrictPrimTy,
         weakPrimTyCon,                  mkWeakPrimTy,
         threadIdPrimTyCon,              threadIdPrimTy,
         stackSnapshotPrimTyCon,         stackSnapshotPrimTy,
@@ -272,6 +273,7 @@ exposedPrimTyCons
     , int32PrimTyCon
     , int64PrimTyCon
     , bcoPrimTyCon
+    , strictPrimTyCon
     , weakPrimTyCon
     , mutableArrayPrimTyCon
     , mutableByteArrayPrimTyCon
@@ -310,7 +312,7 @@ charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int3
   smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName,
   tVarPrimTyConName, stablePtrPrimTyConName,
   stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName,
-  weakPrimTyConName, threadIdPrimTyConName,
+  strictPrimTyConName, weakPrimTyConName, threadIdPrimTyConName,
   eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName,
   stackSnapshotPrimTyConName, promptTagPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
@@ -347,6 +349,7 @@ stableNamePrimTyConName       = mkPrimTc (fsLit "StableName#") stableNamePrimTyC
 compactPrimTyConName          = mkPrimTc (fsLit "Compact#") compactPrimTyConKey compactPrimTyCon
 stackSnapshotPrimTyConName    = mkPrimTc (fsLit "StackSnapshot#") stackSnapshotPrimTyConKey stackSnapshotPrimTyCon
 bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTyCon
+strictPrimTyConName           = mkPrimTc (fsLit "Strict#") strictPrimTyConKey strictPrimTyCon
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
 promptTagPrimTyConName        = mkPrimTc (fsLit "PromptTag#") promptTagPrimTyConKey promptTagPrimTyCon
@@ -1413,6 +1416,12 @@ weakPrimTyCon = pcPrimTyCon_LevPolyLastArg weakPrimTyConName [Representational] 
 mkWeakPrimTy :: Type -> Type
 mkWeakPrimTy v = TyConApp weakPrimTyCon [getLevity v, v]
 
+strictPrimTyCon :: TyCon
+strictPrimTyCon = pcPrimTyCon strictPrimTyConName [Representational] unliftedRepTy
+
+mkStrictPrimTy :: Type -> Type
+mkStrictPrimTy v = TyConApp strictPrimTyCon [v]
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1448,6 +1457,11 @@ promptTagPrimTyCon = pcPrimTyCon promptTagPrimTyConName [Representational] unlif
 
 mkPromptTagPrimTy :: Type -> Type
 mkPromptTagPrimTy v = TyConApp promptTagPrimTyCon [v]
+
+---------------
+
+strictTyCon :: TyCon
+strictTyCon = pcPrimTyCon strictPrimTyConName [Representational] unliftedRepTy
 
 {-
 ************************************************************************

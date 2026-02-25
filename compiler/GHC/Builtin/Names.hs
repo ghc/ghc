@@ -1729,7 +1729,7 @@ addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey,
     int64PrimTyConKey, int64TyConKey,
     integerTyConKey, naturalTyConKey,
     listTyConKey, foreignObjPrimTyConKey, maybeTyConKey,
-    weakPrimTyConKey, mutableArrayPrimTyConKey,
+    strictPrimTyConKey, weakPrimTyConKey, mutableArrayPrimTyConKey,
     mutableByteArrayPrimTyConKey, orderingTyConKey, mVarPrimTyConKey,
     ratioTyConKey, rationalTyConKey, realWorldTyConKey, stablePtrPrimTyConKey,
     stablePtrTyConKey, eqTyConKey, heqTyConKey,
@@ -1769,6 +1769,7 @@ mutableArrayPrimTyConKey                = mkPreludeTyConUnique 30
 mutableByteArrayPrimTyConKey            = mkPreludeTyConUnique 31
 orderingTyConKey                        = mkPreludeTyConUnique 32
 mVarPrimTyConKey                        = mkPreludeTyConUnique 33
+strictPrimTyConKey                      = mkPreludeTyConUnique 34
 -- ioPortPrimTyConKey (34) was killed
 ratioTyConKey                           = mkPreludeTyConUnique 35
 rationalTyConKey                        = mkPreludeTyConUnique 36

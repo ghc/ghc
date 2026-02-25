@@ -983,6 +983,7 @@ ppType (TyApp (TyCon "Array#") [x])             = "mkArrayPrimTy " ++ ppType x
 ppType (TyApp (TyCon "SmallArray#") [x])        = "mkSmallArrayPrimTy " ++ ppType x
 
 
+ppType (TyApp (TyCon "Strict#")     [x]) = "mkStrictPrimTy " ++ ppType x
 ppType (TyApp (TyCon "Weak#")       [x]) = "mkWeakPrimTy " ++ ppType x
 ppType (TyApp (TyCon "StablePtr#")  [x]) = "mkStablePtrPrimTy " ++ ppType x
 ppType (TyApp (TyCon "StableName#") [x]) = "mkStableNamePrimTy " ++ ppType x

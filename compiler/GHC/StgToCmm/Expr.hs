@@ -66,6 +66,18 @@ cgExpr  :: CgStgExpr -> FCode ReturnKind
 
 cgExpr (StgApp fun args)     = cgIdApp fun args
 
+cgExpr (StgOpApp (StgPrimOp ToStrictOp) [StgVarArg a] _res_ty) = do
+  platform <- getPlatform
+  emitComment (mkFastString "toStrict#")
+
+  a_eval_reg <- newTemp (bWord platform)
+  _ <- withSequel (AssignTo [a_eval_reg] False) (cgIdApp a [])
+  let a_eval_expr = CmmReg (CmmLocal a_eval_reg)
+      -- tag1 = cmmConstrTag1 platform a_eval_expr
+
+  -- subtract 1 because we need to return a zero-indexed tag
+  emitReturn [a_eval_expr]
+
 -- dataToTagSmall# :: a_levpoly -> Int#
 -- See Note [DataToTag overview] in GHC.Tc.Instance.Class,
 -- particularly wrinkles H3 and DTW4

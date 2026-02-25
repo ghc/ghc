@@ -503,6 +503,7 @@ rewriteOpApp (StgOpApp op args res_ty) = case op of
   -- Should we just use cbv marks for DataToTag?
   op@(StgPrimOp primOp)
     | primOp == DataToTagSmallOp || primOp == DataToTagLargeOp
+    || primOp == ToStrictOp
     -- see Note [Rewriting primop arguments]
     -> (StgOpApp op) <$!> rewriteArgs args <*> pure res_ty
     | marks <- primOpCbv primOp

@@ -252,6 +252,27 @@ section "The word size story."
          so are not available in this case.}
 
 ------------------------------------------------------------------------
+section "Strict#"
+        {Evaluated value wrapper.}
+------------------------------------------------------------------------
+
+primtype Strict# a
+
+primop   FromStrictOp  "fromStrict#"   GenPrimOp   Strict# a -> a
+   with
+      code_size = 0
+      cheap = True
+      work_free = True
+      strictness  = { \ _arity -> mkClosedDmdSig [ evalDmd ] topDiv }
+
+
+primop   ToStrictOp  "toStrict#"   GenPrimOp   a -> Strict# a
+   with
+      code_size = 0
+      cheap = True
+      strictness  = { \ _arity -> mkClosedDmdSig [ evalDmd ] topDiv }
+
+------------------------------------------------------------------------
 section "Char#"
         {Operations on 31-bit characters.}
 ------------------------------------------------------------------------

@@ -340,6 +340,13 @@ emitPrimOp cfg primop =
   ReallyUnsafePtrEqualityOp -> \[arg1, arg2] -> opIntoRegs $ \[res] ->
     emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq platform) [arg1,arg2])
 
+  FromStrictOp -> \[arg1] -> opIntoPtrReg $ \res ->
+    emitAssign (CmmLocal res) (arg1)
+
+  ToStrictOp -> \[arg1] -> opIntoPtrReg $ \res -> do
+    !_ <- panic "Should be handled by cgExpr like DataToTagOp"
+    emitAssign (CmmLocal res) (arg1)
+
 --  #define addrToHValuezh(r,a) r=(P_)a
   AddrToAnyOp -> \[arg] -> opIntoRegs $ \[res] ->
     emitAssign (CmmLocal res) arg
@@ -1862,6 +1869,15 @@ emitPrimOp cfg primop =
               pure regs
     f regs
     pure $ map (CmmReg . CmmLocal) regs
+
+  opIntoPtrReg
+    :: (LocalReg -- where to put the results
+        -> FCode ())
+    -> PrimopCmmEmit
+  opIntoPtrReg f = PrimopCmmEmit_Internal $ \_res_ty -> do
+    reg <- newTemp (gcWord platform)
+    f reg
+    pure $ [CmmReg (CmmLocal reg)]
 
   alwaysExternal = \_ -> PrimopCmmEmit_External
   -- Note [QuotRem optimization]
