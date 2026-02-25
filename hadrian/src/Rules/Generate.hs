@@ -26,6 +26,7 @@ import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Platform.ArchOS
 import qualified Data.Set as Set
 import UserSettings (finalStage)
+import Hadrian.Oracles.Path
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -467,6 +468,8 @@ generateSettings :: FilePath -> Expr String
 generateSettings settingsFile = do
     ctx <- getContext
     stage <- getStage
+    let ghcStage = predStage stage
+    isCrossStage <- expr $ crossStage ghcStage
 
     package_db_path <- expr $ do
       let get_pkg_db stg = packageDbPath (PackageDbLoc stg Final)
@@ -486,7 +489,13 @@ generateSettings settingsFile = do
         Stage2 -> pkgUnitId Stage1 base
         Stage3 -> pkgUnitId Stage2 base
 
+    rel_lib_topDir :: FilePath <- expr $ buildRoot <&> (-/- stageString (if isCrossStage then stage else ghcStage) -/- "lib")
     let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
+        make_absolute rel_path = do
+          abs_path <- liftIO (makeAbsolute rel_path)
+          fixAbsolutePathOnWindows abs_path
+
+    lib_topDir :: FilePath <- expr $ make_absolute rel_lib_topDir
 
     settings <- traverse sequence $
         [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit, Context.stage = predStage stage })))
@@ -497,6 +506,7 @@ generateSettings settingsFile = do
         , ("RTS ways",  unwords . map show . Set.toList <$> getRtsWays)
         , ("Relative Global Package DB", pure rel_pkg_db)
         , ("base unit-id", pure base_unit_id)
+        , ("LibDir", pure lib_topDir)
         ]
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
     pure $ case settings of
