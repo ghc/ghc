@@ -111,6 +111,7 @@ Library
         , Data.Monoid
         , Data.Ord
         , Data.Proxy
+        , Data.RealFloat
         , Data.STRef
         , Data.STRef.Strict
         , Data.String

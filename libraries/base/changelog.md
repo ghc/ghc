@@ -9,6 +9,7 @@
   * Add `Data.List.NonEmpty.mapMaybe`. ([CLC proposal #337](https://github.com/haskell/core-libraries-committee/issues/337))
   * Fix issues with toRational for types capable to represent infinite and not-a-number values ([CLC proposal #338](https://github.com/haskell/core-libraries-committee/issues/338))
   * Ensure that `rationalToFloat` and `rationalToDouble` always inline in the end. ([CLC proposal #356](https://github.com/haskell/core-libraries-committee/issues/356))
+  * Add new `Data.RealFloat` module re-exporting `RealFloat` from `GHC.Float`
   * Modify the implementation of `Data.List.sortOn` to use `(>)` instead of `compare`. ([CLC proposal #332](https://github.com/haskell/core-libraries-committee/issues/332))
   * Add `thenA` and `thenM`. ([CLC proposal #351](https://github.com/haskell/core-libraries-committee/issues/351))
   * Fix bug where `naturalAndNot` was incorrectly truncating results ([CLC proposal #350](github.com/haskell/core-libraries-committee/issues/350))

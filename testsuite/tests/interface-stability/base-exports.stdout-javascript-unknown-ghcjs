@@ -1597,6 +1597,26 @@ module Data.Ratio where
   denominator :: forall a. Ratio a -> a
   numerator :: forall a. Ratio a -> a
 
+module Data.RealFloat where
+  -- Safety: Safe
+  type RealFloat :: * -> Constraint
+  class (GHC.Internal.Real.RealFrac a, GHC.Internal.Float.Floating a) => RealFloat a where
+    floatRadix :: a -> GHC.Internal.Bignum.Integer.Integer
+    floatDigits :: a -> GHC.Internal.Types.Int
+    floatRange :: a -> (GHC.Internal.Types.Int, GHC.Internal.Types.Int)
+    decodeFloat :: a -> (GHC.Internal.Bignum.Integer.Integer, GHC.Internal.Types.Int)
+    encodeFloat :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Types.Int -> a
+    exponent :: a -> GHC.Internal.Types.Int
+    significand :: a -> a
+    scaleFloat :: GHC.Internal.Types.Int -> a -> a
+    isNaN :: a -> GHC.Internal.Types.Bool
+    isInfinite :: a -> GHC.Internal.Types.Bool
+    isDenormalized :: a -> GHC.Internal.Types.Bool
+    isNegativeZero :: a -> GHC.Internal.Types.Bool
+    isIEEE :: a -> GHC.Internal.Types.Bool
+    atan2 :: a -> a -> a
+    {-# MINIMAL floatRadix, floatDigits, floatRange, decodeFloat, encodeFloat, isNaN, isInfinite, isDenormalized, isNegativeZero, isIEEE #-}
+
 module Data.STRef where
   -- Safety: Safe
   type role STRef nominal representational
@@ -11982,6 +12002,8 @@ instance forall k (f :: k -> *) (a :: k). GHC.Internal.Enum.Enum (f a) => GHC.In
 instance forall k (f :: k -> *) (a :: k). GHC.Internal.Enum.Enum (f a) => GHC.Internal.Enum.Enum (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. (GHC.Internal.Enum.Enum a, GHC.Internal.Enum.Bounded a, GHC.Internal.Classes.Eq a) => GHC.Internal.Enum.Enum (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Enum.Enum (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
+instance GHC.Internal.Enum.Enum GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
+instance GHC.Internal.Enum.Enum GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Enum.Enum a => GHC.Internal.Enum.Enum (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
@@ -12021,8 +12043,6 @@ instance GHC.Internal.Enum.Enum GHC.Internal.Foreign.C.Types.CUSeconds -- Define
 instance GHC.Internal.Enum.Enum GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Enum.Enum GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Enum.Enum GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
-instance GHC.Internal.Enum.Enum GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
-instance GHC.Internal.Enum.Enum GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Enum.Enum GHC.Internal.Generics.Associativity -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Enum.Enum GHC.Internal.Generics.DecidedStrictness -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Enum.Enum GHC.Internal.Generics.SourceStrictness -- Defined in ‘GHC.Internal.Generics’
@@ -12071,18 +12091,18 @@ instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Flo
 instance forall a b. GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (Data.Functor.Contravariant.Op a b) -- Defined in ‘Data.Functor.Contravariant’
 instance forall a. GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance forall a. GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
-instance GHC.Internal.Float.Floating GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
-instance GHC.Internal.Float.Floating GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Float.Floating GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Float.Floating GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
+instance GHC.Internal.Float.Floating GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
+instance GHC.Internal.Float.Floating GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance forall k a (b :: k). GHC.Internal.Float.RealFloat a => GHC.Internal.Float.RealFloat (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Float.RealFloat (f (g a)) => GHC.Internal.Float.RealFloat (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.RealFloat (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.RealFloat (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
-instance GHC.Internal.Float.RealFloat GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
-instance GHC.Internal.Float.RealFloat GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Float.RealFloat GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Float.RealFloat GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
+instance GHC.Internal.Float.RealFloat GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
+instance GHC.Internal.Float.RealFloat GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance forall k a (b :: k). GHC.Internal.Foreign.Storable.Storable a => GHC.Internal.Foreign.Storable.Storable (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Foreign.Storable.Storable a => GHC.Internal.Foreign.Storable.Storable (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
 instance forall a. GHC.Internal.Foreign.Storable.Storable a => GHC.Internal.Foreign.Storable.Storable (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
@@ -12411,6 +12431,8 @@ instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (GHC.Internal.
 instance forall (f :: * -> *) a. (GHC.Internal.Base.Applicative f, GHC.Internal.Num.Num a) => GHC.Internal.Num.Num (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Num.Num (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
+instance GHC.Internal.Num.Num GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
+instance GHC.Internal.Num.Num GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Num.Num a => GHC.Internal.Num.Num (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Num.Num GHC.Internal.Word.Word16 -- Defined in ‘GHC.Internal.Word’
@@ -12445,8 +12467,6 @@ instance GHC.Internal.Num.Num GHC.Internal.Foreign.C.Types.CULong -- Defined in 
 instance GHC.Internal.Num.Num GHC.Internal.Foreign.C.Types.CUSeconds -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Num.Num GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Num.Num GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
-instance GHC.Internal.Num.Num GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
-instance GHC.Internal.Num.Num GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Num.Num GHC.Internal.Types.Int -- Defined in ‘GHC.Internal.Num’
 instance GHC.Internal.Num.Num GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Num’
 instance GHC.Internal.Num.Num GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Num’
@@ -12588,10 +12608,10 @@ instance forall a b. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractio
 instance forall a. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance forall a. GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Real.Fractional (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
-instance GHC.Internal.Real.Fractional GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
-instance GHC.Internal.Real.Fractional GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Real.Fractional GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Real.Fractional GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
+instance GHC.Internal.Real.Fractional GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
+instance GHC.Internal.Real.Fractional GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance forall k a (b :: k). GHC.Internal.Real.Integral a => GHC.Internal.Real.Integral (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Real.Integral (f (g a)) => GHC.Internal.Real.Integral (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Real.Integral (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
@@ -12643,6 +12663,8 @@ instance GHC.Internal.Real.Real GHC.Internal.Bignum.Integer.Integer -- Defined i
 instance GHC.Internal.Real.Real GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Real’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Real.Real (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
 instance GHC.Internal.Real.Real GHC.Internal.Types.Word -- Defined in ‘GHC.Internal.Real’
+instance GHC.Internal.Real.Real GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
+instance GHC.Internal.Real.Real GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Real.Real GHC.Internal.Word.Word16 -- Defined in ‘GHC.Internal.Word’
 instance GHC.Internal.Real.Real GHC.Internal.Word.Word32 -- Defined in ‘GHC.Internal.Word’
 instance GHC.Internal.Real.Real GHC.Internal.Word.Word64 -- Defined in ‘GHC.Internal.Word’
@@ -12675,18 +12697,16 @@ instance GHC.Internal.Real.Real GHC.Internal.Foreign.C.Types.CULong -- Defined i
 instance GHC.Internal.Real.Real GHC.Internal.Foreign.C.Types.CUSeconds -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Real.Real GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Real.Real GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
-instance GHC.Internal.Real.Real GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
-instance GHC.Internal.Real.Real GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance forall k a (b :: k). GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.RealFrac (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Real.RealFrac (f (g a)) => GHC.Internal.Real.RealFrac (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.Functor.Identity’
 instance forall a. GHC.Internal.Real.RealFrac a => GHC.Internal.Real.RealFrac (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.Real.RealFrac (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
-instance GHC.Internal.Real.RealFrac GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
-instance GHC.Internal.Real.RealFrac GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Real.RealFrac GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Real.RealFrac GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
+instance GHC.Internal.Real.RealFrac GHC.Internal.Foreign.C.Types.CDouble -- Defined in ‘GHC.Internal.Foreign.C.Types’
+instance GHC.Internal.Real.RealFrac GHC.Internal.Foreign.C.Types.CFloat -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance forall k a (b :: k). GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Functor.ZipList.ZipList a) -- Defined in ‘GHC.Internal.Functor.ZipList’
 instance GHC.Internal.Show.Show GHC.Internal.Conc.Sync.BlockReason -- Defined in ‘GHC.Internal.Conc.Sync’
@@ -12800,6 +12820,8 @@ instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Inter
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Data.Ord.Down a) -- Defined in ‘GHC.Internal.Data.Ord’
 instance GHC.Internal.Show.Show GHC.Internal.Real.FractionalExponentBase -- Defined in ‘GHC.Internal.Real’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Real’
+instance GHC.Internal.Show.Show GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
+instance GHC.Internal.Show.Show GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance forall a b. (GHC.Internal.Show.Show a, GHC.Internal.Show.Show b) => GHC.Internal.Show.Show (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Show.Show a => GHC.Internal.Show.Show (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
@@ -12848,8 +12870,6 @@ instance forall a. GHC.Internal.Show.Show (GHC.Internal.Foreign.C.ConstPtr.Const
 instance forall a b. (GHC.Internal.Ix.Ix a, GHC.Internal.Show.Show a, GHC.Internal.Show.Show b) => GHC.Internal.Show.Show (GHC.Internal.Arr.Array a b) -- Defined in ‘GHC.Internal.Arr’
 instance GHC.Internal.Show.Show GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
 instance GHC.Internal.Show.Show GHC.Internal.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Internal.Fingerprint.Type’
-instance GHC.Internal.Show.Show GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
-instance GHC.Internal.Show.Show GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Show.Show (f p), GHC.Internal.Show.Show (g p)) => GHC.Internal.Show.Show ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Show.Show (f p), GHC.Internal.Show.Show (g p)) => GHC.Internal.Show.Show ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Internal.Show.Show (f (g p)) => GHC.Internal.Show.Show ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Generics’
