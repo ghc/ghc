@@ -1599,6 +1599,9 @@ module Data.Ratio where
 
 module Data.RealFloat where
   -- Safety: Safe
+  pattern Infinity :: forall a. RealFloat a => a
+  pattern NaN :: forall a. RealFloat a => a
+  pattern NegInfinity :: forall a. RealFloat a => a
   type RealFloat :: * -> Constraint
   class (GHC.Internal.Real.RealFrac a, GHC.Internal.Float.Floating a) => RealFloat a where
     floatRadix :: a -> GHC.Internal.Bignum.Integer.Integer
