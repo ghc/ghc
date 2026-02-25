@@ -469,7 +469,8 @@ generateSettings :: FilePath -> Expr String
 generateSettings settingsFile = do
     ctx <- getContext
     stage <- getStage
-    isCrossStage <- expr $ crossStage stage
+    let ghcStage = predStage stage
+    isCrossStage <- expr $ crossStage ghcStage
 
     package_db_path <- expr $ do
       let get_pkg_db stg = packageDbPath (PackageDbLoc stg Final)
@@ -489,7 +490,7 @@ generateSettings settingsFile = do
         Stage2 -> pkgUnitId Stage1 base
         Stage3 -> pkgUnitId Stage2 base
 
-    rel_lib_topDir :: FilePath <- expr $ buildRoot <&> (-/- stageString (if isCrossStage then stage else predStage stage) -/- "lib")
+    rel_lib_topDir :: FilePath <- expr $ buildRoot <&> (-/- stageString (if isCrossStage then stage else ghcStage) -/- "lib")
     let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
         make_absolute rel_path = do
           abs_path <- liftIO (makeAbsolute rel_path)
