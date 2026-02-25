@@ -1421,8 +1421,13 @@ ocGetNames_MachO(ObjectCode* oc)
                 if((oc->info->nlist[i].n_type & N_TYPE) == N_UNDF
                     && (oc->info->nlist[i].n_value != 0))
                 {
-                    commonSize += oc->info->nlist[i].n_value;
                     oc->n_symbols++;
+                    /* Only allocate space for COMMON symbols not already
+                     * defined by a previously-loaded object. */
+                    SymbolName *nm_c = oc->info->macho_symbols[i].name;
+                    if (!lookupStrHashTable(symhash, nm_c)) {
+                        commonSize += oc->info->nlist[i].n_value;
+                    }
                 }
                 else if((oc->info->nlist[i].n_type & N_TYPE) == N_SECT)
                     oc->n_symbols++;
@@ -1436,7 +1441,7 @@ ocGetNames_MachO(ObjectCode* oc)
      */
     IF_DEBUG(linker, debugBelch("ocGetNames_MachO: %d external symbols\n",
                                 oc->n_symbols));
-    oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(Symbol_t),
+    oc->symbols = stgCallocBytes(oc->n_symbols, sizeof(Symbol_t),
                                    "ocGetNames_MachO(oc->symbols)");
 
     if (oc->info->symCmd) {
@@ -1467,6 +1472,7 @@ ocGetNames_MachO(ObjectCode* oc)
                                                  , addr
                                                  , HS_BOOL_FALSE
                                                  , sym_type
+                                                 , 0
                                                  , oc);
 
                             oc->symbols[curSymbol].name = nm;
@@ -1488,8 +1494,10 @@ ocGetNames_MachO(ObjectCode* oc)
     }
 
     /* setup the common storage */
-    commonStorage = stgCallocBytes(1,commonSize,"ocGetNames_MachO(common symbols)");
-    commonCounter = (unsigned long)commonStorage;
+    if (commonSize > 0) {
+        commonStorage = stgCallocBytes(1, commonSize, "ocGetNames_MachO(common symbols)");
+        commonCounter = (unsigned long)commonStorage;
+    }
 
     if (oc->info->symCmd) {
         for (size_t i = 0; i < oc->info->n_macho_symbols; i++) {
@@ -1499,22 +1507,47 @@ ocGetNames_MachO(ObjectCode* oc)
              && (nlist->n_type & N_EXT)
              && (nlist->n_value != 0)) {
                 unsigned long sz = nlist->n_value;
-
-                nlist->n_value = commonCounter;
-
-                /* also set the final address to the macho_symbol */
-                oc->info->macho_symbols[i].addr = (void*)commonCounter;
                 /* TODO: Figure out how to determine this from object */
                 SymType sym_type = SYM_TYPE_CODE;
 
-                IF_DEBUG(linker_verbose, debugBelch("ocGetNames_MachO: inserting common symbol: %s\n", nm));
-                ghciInsertSymbolTable(oc->fileName, symhash, nm,
-                                       (void*)commonCounter, HS_BOOL_FALSE, sym_type, oc);
-                oc->symbols[curSymbol].name = nm;
-                oc->symbols[curSymbol].addr = oc->info->macho_symbols[i].addr;
-                curSymbol++;
+                RtsSymbolInfo *existing = lookupStrHashTable(symhash, nm);
+                if (existing != NULL) {
+                    /* COMMON symbol already allocated by a previously-loaded
+                     * object; reuse that address so relocations resolve to
+                     * the same storage. */
+                    if (sz > existing->size) {
+                        barf("linker: trying to link COMMON symbols %s with"
+                             " incompatible sizes: previous size %llu,"
+                             " new size %lu\n",
+                             nm,
+                             (long long unsigned int) existing->size,
+                             sz);
+                    }
+                    nlist->n_value = (unsigned long)existing->value;
+                    oc->info->macho_symbols[i].addr = existing->value;
+                    IF_DEBUG(linker_verbose,
+                             debugBelch("ocGetNames_MachO: COMMON symbol %s"
+                                        " reusing address %p\n",
+                                        nm, existing->value));
+                    /* Don't add to oc->symbols: not the owner */
+                } else {
+                    nlist->n_value = commonCounter;
+                    /* also set the final address to the macho_symbol */
+                    oc->info->macho_symbols[i].addr = (void*)commonCounter;
 
-                commonCounter += sz;
+                    IF_DEBUG(linker_verbose,
+                             debugBelch("ocGetNames_MachO: inserting common symbol: %s\n", nm));
+                    ghciInsertSymbolTable(oc->fileName, symhash, nm,
+                                         (void*)commonCounter, HS_BOOL_FALSE,
+                                         sym_type,
+                                         sz, oc);
+                    oc->symbols[curSymbol].name = nm;
+                    oc->symbols[curSymbol].addr = oc->info->macho_symbols[i].addr;
+                    oc->symbols[curSymbol].type = sym_type;
+                    curSymbol++;
+
+                    commonCounter += sz;
+                }
             }
         }
     }
