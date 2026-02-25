@@ -802,7 +802,7 @@ readUnitDatabase logger cfg conf_file = do
       if cache_exists
         then do
           debugTraceMsg logger 2 $ text "Using binary package database:" <+> ppr filename
-          readPackageDbForGhc (OsPath.unsafeDecodeUtf filename)
+          readPackageDbForGhc filename
         else do
           -- If there is no package.cache file, we check if the database is not
           -- empty by inspecting if the directory contains any .conf file. If it

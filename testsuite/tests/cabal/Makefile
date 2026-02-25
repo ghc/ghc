@@ -79,6 +79,25 @@ ghcpkg04 :
 	@: # testpkg-1.2.3.4 and newtestpkg-2.0 are both exposed now
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONF04) -c ghcpkg04.hs || true
 
+PKGCONF20=local20.package.conf
+LOCAL_GHC_PKG20 = '$(GHC_PKG)' --no-user-package-db
+
+DIR1=asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdf
+DIR2=zxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcvzxcv
+DIR3=uiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiopuiop
+DIR4=qwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwerqwer
+WDIR=$(DIR1)/$(DIR2)/$(DIR3)/$(DIR4)
+.PHONY: ghcpkg10
+ghcpkg10 :
+	@mkdir -p $(WDIR)
+	@rm -rf $(WDIR)/$(PKGCONF20)
+	$(LOCAL_GHC_PKG20) -f $(WDIR)/$(PKGCONF20) init $(WDIR)/$(PKGCONF20)
+	$(LOCAL_GHC_PKG20) -f $(WDIR)/$(PKGCONF20) list
+	$(LOCAL_GHC_PKG20) -f $(WDIR)/$(PKGCONF20) register --force test.pkg 2>/dev/null
+	$(LOCAL_GHC_PKG20) -f $(WDIR)/$(PKGCONF20) describe testpkg         | $(STRIP_PKGROOT)
+	$(LOCAL_GHC_PKG20) -f $(WDIR)/$(PKGCONF20) describe testpkg-1.2.3.4 | $(STRIP_PKGROOT)
+	$(LOCAL_GHC_PKG20) -f $(WDIR)/$(PKGCONF20) field testpkg-1.2.3.4 import-dirs
+
 # Test stacking of package.confs (also #2441)
 PKGCONF05a=local05a.package.conf
 PKGCONF05b=local05b.package.conf

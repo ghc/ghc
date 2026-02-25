@@ -1,0 +1,15 @@
+section: ghc-pkg
+synopsis: Improve ``ghc-pkg``'s support for long paths on windows.
+issues: #26960
+mrs: !15584
+
+description: {
+    ``ghc-pkg`` can't handle working with file paths longer than the MAX_PATH
+    restrictions on windows as it is not using UNC file paths by default.
+
+    By using UNC file paths whenever possible, we improve ``ghc-pkg`` on windows.
+    Note, this still requires the user to enable the use of long paths in order to opt-in
+    this behaviour on older windows machines.
+}
+
+
