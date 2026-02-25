@@ -19,7 +19,6 @@
 module GHC.Internal.Control.Monad.Zip ( MonadZip(..) ) where
 
 import GHC.Internal.Control.Monad (liftM, liftM2, Monad(..))
-import GHC.Internal.Data.Functor.Identity
 import qualified GHC.Internal.Data.Functor
 import GHC.Internal.Data.Monoid
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
@@ -72,11 +71,6 @@ instance MonadZip NonEmpty where
   mzip     = NE.zip
   mzipWith = NE.zipWith
   munzip   = GHC.Internal.Data.Functor.unzip
-
--- | @since 4.8.0.0
-instance MonadZip Identity where
-    mzipWith                 = liftM2
-    munzip (Identity (a, b)) = (Identity a, Identity b)
 
 -- | @since 4.15.0.0
 instance MonadZip Solo where

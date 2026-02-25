@@ -148,8 +148,6 @@ Library
         GHC.Internal.Data.Foldable
         GHC.Internal.Data.Function
         GHC.Internal.Data.Functor
-        GHC.Internal.Data.Functor.Const
-        GHC.Internal.Data.Functor.Identity
         GHC.Internal.Data.Functor.Utils
         GHC.Internal.Data.IORef
         GHC.Internal.Data.List
