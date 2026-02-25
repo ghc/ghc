@@ -268,6 +268,7 @@ int ghciInsertSymbolTable(
    SymbolAddr* data,
    SymStrength strength,
    SymType type,
+   unsigned long size,
    ObjectCode *owner)
 {
    RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
@@ -278,6 +279,7 @@ int ghciInsertSymbolTable(
       pinfo->owner = owner;
       pinfo->strength = strength;
       pinfo->type = type;
+      pinfo->size = size;
       insertStrHashTable(table, key, pinfo);
       return 1;
    }
@@ -290,6 +292,7 @@ int ghciInsertSymbolTable(
             pinfo->owner = owner;
             pinfo->strength = strength;
             pinfo->type = type;
+            pinfo->size = size;
             return 1;
        }
        /* We were asked to discard the symbol on duplicates, do so quietly.  */
@@ -318,6 +321,7 @@ int ghciInsertSymbolTable(
        /* The existing symbol is weak with a zero value; replace it with the new symbol. */
        pinfo->value = data;
        pinfo->owner = owner;
+       pinfo->size = size;
        return 1;
    }
    else if (strength == STRENGTH_WEAK)
@@ -336,6 +340,7 @@ int ghciInsertSymbolTable(
       pinfo->value = data;
       pinfo->owner = owner;
       pinfo->strength = strength;
+      pinfo->size = size;
       return 1;
    }
    else if (  pinfo->owner
@@ -360,6 +365,7 @@ int ghciInsertSymbolTable(
            pinfo->value = data;
            pinfo->owner = owner;
            pinfo->strength = strength;
+           pinfo->size = size;
        }
 
        return 1;
@@ -477,7 +483,7 @@ initLinker_ (int retain_cafs)
         IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
         if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
                                     symhash, sym->lbl, sym->addr,
-                                    sym->strength, sym->type, NULL)) {
+                                    sym->strength, sym->type, 0, NULL)) {
             barf("ghciInsertSymbolTable failed");
         }
     }
@@ -495,7 +501,7 @@ initLinker_ (int retain_cafs)
             IF_DEBUG(linker, debugBelch("initLinker: inserting extra rts symbol %s, %p\n", sym->lbl, sym->addr));
             if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
                                         symhash, sym->lbl, sym->addr,
-                                        sym->strength, sym->type, NULL)) {
+                                        sym->strength, sym->type, 0, NULL)) {
                 barf("ghciInsertSymbolTable failed");
             }
         }
@@ -506,7 +512,7 @@ initLinker_ (int retain_cafs)
     if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"), symhash,
                                 MAYBE_LEADING_UNDERSCORE_STR("newCAF"),
                                 retain_cafs ? newRetainedCAF : newGCdCAF,
-                                HS_BOOL_FALSE, SYM_TYPE_CODE, NULL)) {
+                                HS_BOOL_FALSE, SYM_TYPE_CODE, 0, NULL)) {
         barf("ghciInsertSymbolTable failed");
     }
 
@@ -778,7 +784,7 @@ HsBool removeLibrarySearchPath(HsPtr dll_path_index)
 HsInt insertSymbol(pathchar* obj_name, SymbolName* key, SymbolAddr* data)
 {
     return ghciInsertSymbolTable(obj_name, symhash, key, data, HS_BOOL_FALSE,
-                                 SYM_TYPE_CODE, NULL);
+                                 SYM_TYPE_CODE, 0, NULL);
 }
 
 /* -----------------------------------------------------------------------------
@@ -1613,7 +1619,7 @@ int ocTryLoad (ObjectCode* oc) {
             && !ghciInsertSymbolTable(oc->fileName, symhash, symbol.name,
                                       symbol.addr,
                                       isSymbolWeak(oc, symbol.name),
-                                      symbol.type, oc)) {
+                                      symbol.type, 0, oc)) {
             return 0;
         }
     }
