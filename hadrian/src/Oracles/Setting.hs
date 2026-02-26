@@ -7,7 +7,6 @@ module Oracles.Setting (
     -- * Helpers
     ghcCanonVersion, cmdLineLengthLimit, targetSupportsRPaths, topDirectory,
     libsuf, ghcVersionStage, bashPath, targetStage, crossStage, queryTarget, queryTargetTarget,
-    isHostStage,
 
     -- ** Target platform things
     anyTargetOs, anyTargetArch, anyHostOs,
@@ -233,25 +232,25 @@ libsuf st way
 
 -- | Build libraries for this `Stage` targetting this `Target`
 --
--- For example, we want to build RTS with stage1 for the host target as we
--- produce a host executable with stage1 (which cross-compiles to stage2).
+-- For example, for cross-compilers we want to build RTS with Stage1 for the
+-- host target as we produce a host executable with Stage1 (which
+-- cross-compiles to Stage2).
+--
+-- For non-cross-compilers we can directly use the final target for Stage1.
+--
+-- The algorithm is:
+--  Stage0    -> Host
+--  Stage1    -> Target, if not cross, Host otherwise
+--  >= Stage2 -> Target
 targetStage :: Stage -> Action Target
 targetStage Stage0 {} = getHostTarget
-targetStage stage | isHostStage stage = do
-  -- MP: If we are not cross compiling then we should use the target file in order to
-  -- build things for the host, in particular we want to use the configured values for the
-  -- target for building the RTS (ie are we using Libffi for adjustors, and the wordsize)
-  -- TODO: Use "flag CrossCompiling"
+targetStage Stage1 = do
    ht <- getHostTarget
    tt <- getTargetTarget
    if targetPlatformTriple ht == targetPlatformTriple tt
      then return tt
      else return ht
 targetStage _ = getTargetTarget
-
-isHostStage :: Stage -> Bool
-isHostStage stage | stage <= Stage1 = True
-isHostStage _ = False
 
 queryTarget :: Stage -> (Target -> a) -> Expr c b a
 queryTarget s f = expr (f <$> targetStage s)
