@@ -178,6 +178,7 @@ buildDataCon fam_envs dc_bang_opts src_name declared_infix prom_info src_bangs
         -- code, which (for Haskell source anyway) will be in the DataName name
         -- space, and puts it into the VarName name space
 
+        ; platform <- getPlatform
         ; traceIf (text "buildDataCon 1" <+> ppr src_name)
         ; us <- newUniqueSupply
         ; let stupid_ctxt = mkDataConStupidTheta rep_tycon (map scaledThing arg_tys) univ_tvs
@@ -192,7 +193,7 @@ buildDataCon fam_envs dc_bang_opts src_name declared_infix prom_info src_bangs
                                    stupid_ctxt dc_wrk dc_rep
               dc_wrk = mkDataConWorkId work_name data_con
               (dc_rep, impl_bangs, str_marks) =
-                 initUs_ us (mkDataConRep dc_bang_opts fam_envs wrap_name data_con)
+                 initUs_ us (mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con)
 
         ; traceIf (text "buildDataCon 2" <+> ppr src_name)
         ; return data_con }

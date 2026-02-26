@@ -228,7 +228,7 @@ ubxSumRepType constrs0
       rep :: [PrimRep] -> SortedSlotTys
       rep ty = sort (map primRepSlot ty)
 
-      -- constructors start at 1, pick an appropriate slot size for the tag
+      -- constructors are 1-based, pick an appropriate slot size for the tag
       tag_slot | length constrs0 < 256        = Word8Slot
                | length constrs0 < 65536      = Word16Slot
                -- we use 2147483647 instead of 4294967296 to avoid

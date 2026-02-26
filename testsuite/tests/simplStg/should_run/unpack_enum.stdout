@@ -1,0 +1,55 @@
+### toggle_off_off
+BoxToggle Off Off
+size: 2
+
+### toggle_on_on
+BoxToggle On On
+size: 2
+
+### toggle_off_on
+BoxToggle Off On
+size: 2
+
+### color_first
+BoxColor Red Red
+size: 2
+
+### color_last
+BoxColor Purple Purple
+size: 2
+
+### color_mixed
+BoxColor Green Yellow
+size: 2
+
+### proxy
+BoxProxy PB PC
+size: 2
+
+### e255_first
+BoxE255 E255_0 E255_0
+size: 2
+
+### e255_last
+BoxE255 E255_254 E255_254
+size: 2
+
+### e255_mixed
+BoxE255 E255_0 E255_254
+size: 2
+
+### e256_first
+BoxE256 E256_0 E256_0
+size: 2
+
+### e256_last
+BoxE256 E256_255 E256_255
+size: 2
+
+### e256_mixed
+BoxE256 E256_0 E256_255
+size: 2
+
+### boundary_size_check
+e256 (5 x Word16#) larger than e255 (5 x Word8#): True
+

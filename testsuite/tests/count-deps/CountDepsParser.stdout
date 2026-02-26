@@ -1,6 +1,7 @@
 Found GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
+GHC.Builtin.PrimOps.Ids
 GHC.Builtin.Types
 GHC.Builtin.Types.Literals
 GHC.Builtin.Types.Prim
@@ -8,6 +9,7 @@ GHC.Builtin.Uniques
 GHC.Cmm.BlockId
 GHC.Cmm.CLabel
 GHC.Cmm.Dataflow.Label
+GHC.Cmm.MachOp
 GHC.Cmm.Type
 GHC.CmmToAsm.CFG.Weight
 GHC.Core
@@ -26,6 +28,7 @@ GHC.Core.Map.Type
 GHC.Core.Multiplicity
 GHC.Core.Opt.Arity
 GHC.Core.Opt.CallerCC.Types
+GHC.Core.Opt.ConstantFold
 GHC.Core.Opt.OccurAnal
 GHC.Core.PatSyn
 GHC.Core.Ppr
@@ -137,6 +140,7 @@ GHC.Parser.Types
 GHC.Platform
 GHC.Platform.Constants
 GHC.Platform.Profile
+GHC.Platform.Tag
 GHC.Platform.Ways
 GHC.Prelude
 GHC.Prelude.Basic

@@ -95,6 +95,11 @@ import Data.List        ( zipWith4 )
 import GHC.StgToCmm.Types (LambdaFormInfo(..))
 import GHC.Runtime.Heap.Layout (ArgDescr(ArgUnknown))
 
+import GHC.Builtin.PrimOps.Ids (primOpId)
+import GHC.Builtin.PrimOps (PrimOp(..))
+import GHC.Platform (Platform)
+import GHC.Platform.Tag (isSmallFamily)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -783,12 +788,13 @@ data BangOpts = BangOpts
   , bang_opt_unbox_small   :: !Bool -- ^ Unbox small strict fields
   }
 
-mkDataConRep :: DataConBangOpts
+mkDataConRep :: Platform
+             -> DataConBangOpts
              -> FamInstEnvs
              -> Name
              -> DataCon
              -> UniqSM (DataConRep, [HsImplBang], [StrictnessMark])
-mkDataConRep dc_bang_opts fam_envs wrap_name data_con
+mkDataConRep platform dc_bang_opts fam_envs wrap_name data_con
   | not wrapper_reqd
   = return (NoDataConRep, arg_ibangs, rep_strs)
 
@@ -905,12 +911,12 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
                                         -- detect this later (see test T2334A)
       | otherwise
       = case dc_bang_opts of
-          SrcBangOpts bang_opts -> zipWith (dataConSrcToImplBang bang_opts fam_envs)
+          SrcBangOpts bang_opts -> zipWith (dataConSrcToImplBang platform bang_opts fam_envs)
                                     orig_arg_tys orig_bangs
           FixedBangOpts bangs   -> bangs
 
     (rep_tys_w_strs, wrappers)
-      = unzip (zipWith dataConArgRep all_arg_tys (ev_ibangs ++ arg_ibangs))
+      = unzip (zipWith (dataConArgRep platform) all_arg_tys (ev_ibangs ++ arg_ibangs))
 
     (unboxers, boxers) = unzip wrappers
     (rep_tys, rep_strs) = unzip (concat rep_tys_w_strs)
@@ -1149,24 +1155,25 @@ newLocal name_stem (Scaled w ty) =
 -- never on the field of a newtype constructor.
 -- See @Note [HsImplBangs for newtypes]@.
 dataConSrcToImplBang
-   :: BangOpts
+   :: Platform
+   -> BangOpts
    -> FamInstEnvs
    -> Scaled Type
    -> HsSrcBang
    -> HsImplBang
 
-dataConSrcToImplBang bang_opts fam_envs arg_ty
+dataConSrcToImplBang platform bang_opts fam_envs arg_ty
                      (HsSrcBang ann unpk NoSrcStrict)
   | bang_opt_strict_data bang_opts -- StrictData => strict field
-  = dataConSrcToImplBang bang_opts fam_envs arg_ty
+  = dataConSrcToImplBang platform bang_opts fam_envs arg_ty
                   (HsSrcBang ann unpk SrcStrict)
   | otherwise -- no StrictData => lazy field
   = HsLazy
 
-dataConSrcToImplBang _ _ _ (HsSrcBang _ _ SrcLazy)
+dataConSrcToImplBang _ _ _ _ (HsSrcBang _ _ SrcLazy)
   = HsLazy
 
-dataConSrcToImplBang bang_opts fam_envs arg_ty
+dataConSrcToImplBang platform bang_opts fam_envs arg_ty
                      (HsSrcBang _ unpk_prag SrcStrict)
   | isUnliftedType (scaledThing arg_ty)
     -- NB: non-newtype data constructors can't have representation-polymorphic fields
@@ -1179,7 +1186,7 @@ dataConSrcToImplBang bang_opts fam_envs arg_ty
         arg_ty' = case mb_co of
                     { Just redn -> scaledSet arg_ty (reductionReducedType redn)
                     ; Nothing   -> arg_ty }
-  , shouldUnpackArgTy bang_opts unpk_prag fam_envs arg_ty'
+  , shouldUnpackArgTy platform bang_opts unpk_prag fam_envs arg_ty'
   = if bang_opt_unbox_disable bang_opts
     then HsStrict True -- Not unpacking because of -O0
                        -- See Note [Detecting useless UNPACK pragmas] in GHC.Core.DataCon
@@ -1193,23 +1200,24 @@ dataConSrcToImplBang bang_opts fam_envs arg_ty
 -- | Wrappers/Workers and representation following Unpack/Strictness
 -- decisions
 dataConArgRep
-  :: Scaled Type
+  :: Platform
+  -> Scaled Type
   -> HsImplBang
   -> ([(Scaled Type,StrictnessMark)] -- Rep types
      ,(Unboxer,Boxer))
 
-dataConArgRep arg_ty HsLazy
+dataConArgRep _ arg_ty HsLazy
   = ([(arg_ty, NotMarkedStrict)], (unitUnboxer, unitBoxer))
 
-dataConArgRep arg_ty (HsStrict _)
+dataConArgRep _ arg_ty (HsStrict _)
   = ([(arg_ty, MarkedStrict)], (unitUnboxer, unitBoxer)) -- Seqs are inserted in STG
 
-dataConArgRep arg_ty (HsUnpack Nothing)
-  = dataConArgUnpack arg_ty
+dataConArgRep platform arg_ty (HsUnpack Nothing)
+  = dataConArgUnpack platform arg_ty
 
-dataConArgRep (Scaled w _) (HsUnpack (Just co))
+dataConArgRep platform (Scaled w _) (HsUnpack (Just co))
   | let co_rep_ty = coercionRKind co
-  , (rep_tys, wrappers) <- dataConArgUnpack (Scaled w co_rep_ty)
+  , (rep_tys, wrappers) <- dataConArgUnpack platform (Scaled w co_rep_ty)
   = (rep_tys, wrapCo co co_rep_ty wrappers)
 
 
@@ -1334,18 +1342,91 @@ problem entirely by treating sums and products differently here.
 -}
 
 dataConArgUnpack
-   :: Scaled Type
+   :: Platform
+   -> Scaled Type
    ->  ( [(Scaled Type, StrictnessMark)]   -- Rep types
        , (Unboxer, Boxer) )
-dataConArgUnpack scaledTy@(Scaled _ arg_ty)
+dataConArgUnpack platform scaledTy@(Scaled _ arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
   = assert (not (isNewTyCon tc)) $
     case tyConDataCons tc of
       [con] -> dataConArgUnpackProduct scaledTy tc_args con
+      cons | all (null . dataConOrigArgTys) cons
+            -> dataConArgUnpackEnum platform scaledTy tc_args cons
       cons  -> dataConArgUnpackSum scaledTy tc_args cons
   | otherwise
   = pprPanic "dataConArgUnpack" (ppr arg_ty)
     -- An interface file specified Unpacked, but we couldn't unpack it
+
+{- Note [UNPACK for enum types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a strict field has an enumeration type (all constructors are nullary),
+we unpack it to a single narrow primitive word rather than an unboxed sum.
+
+For example, given:
+   data Color = Red | Green | Blue
+   data Foo = MkFoo {-# UNPACK #-} !Color
+
+the worker for MkFoo will have a Word8# field.
+
+Avoiding the intermediate unboxed sum allows us to use branchless conversion
+operations DataToTag and TagToEnum.
+-}
+
+dataConArgUnpackEnum
+  :: Platform
+  -> Scaled Type
+  -> [Type]
+  -> [DataCon]
+  -> ( [(Scaled Type, StrictnessMark)]   -- Rep types
+      , (Unboxer, Boxer) )
+dataConArgUnpackEnum platform (Scaled arg_mult ty) _tc_args cons =
+  ( [ (scaled_enum_ty, MarkedStrict) ] -- See Note [UNPACK for enum types]
+  , ( unboxer, boxer ) )
+  where
+    !enum_sum_arity = length cons
+    conv op e = App (Var (primOpId op)) e
+
+    conv_tag_levpoly op e = App (mkTyApps (Var (primOpId op)) [getLevity ty, ty]) e
+
+    (enum_ty, unbox_convert, box_convert)
+       | enum_sum_arity < 256   = (word8PrimTy, conv WordToWord8Op, conv Word8ToWordOp)
+       | enum_sum_arity < 65536 = (word16PrimTy, conv WordToWord16Op, conv Word16ToWordOp)
+       | otherwise              = (wordPrimTy, id, id)
+    scaled_enum_ty = Scaled arg_mult enum_ty
+
+    datatotag_op
+       | isSmallFamily platform enum_sum_arity = DataToTagSmallOp
+       | otherwise                             = DataToTagLargeOp
+
+    -- Tags are 1-based: add 1 to 0-based DataToTag result
+    add_one e = App (App (Var (primOpId IntAddOp)) e)
+                    (Lit (LitNumber LitNumInt 1))
+    -- Subtract 1 to convert back to 0-based for TagToEnum
+    sub_one e = App (App (Var (primOpId IntSubOp)) e)
+                    (Lit (LitNumber LitNumInt 1))
+
+    unboxer v = do enum_rep_id <- newLocal (fsLit "unbx_enum") scaled_enum_ty
+                   let unbox_fn body
+                              = mkSingleAltCase
+                                    (unbox_convert (App (Var (primOpId IntToWordOp))
+                                                        (add_one (conv_tag_levpoly datatotag_op (Var v)))))
+                                    enum_rep_id
+                                    DEFAULT
+                                    []
+                                    body
+                   return ([enum_rep_id], unbox_fn)
+
+    boxer = Boxer $ \ subst -> do
+                let ty' = TcType.substTyUnchecked subst ty
+                    conv_tag' op e = App (mkTyApps (Var (primOpId op)) [ty']) e
+                enum_rep_id <- newLocal (fsLit "bx_enum")
+                                        (TcType.substScaledTyUnchecked subst scaled_enum_ty)
+                let box_fn = conv_tag'
+                               TagToEnumOp
+                               (sub_one (App (Var (primOpId WordToIntOp))
+                                             (box_convert (Var enum_rep_id))))
+                return ([enum_rep_id], box_fn)
 
 dataConArgUnpackProduct
   :: Scaled Type
@@ -1452,13 +1533,13 @@ mkUbxSumAltTy :: [Type] -> Type
 mkUbxSumAltTy [ty] = ty
 mkUbxSumAltTy tys  = mkTupleTy Unboxed tys
 
-shouldUnpackArgTy :: BangOpts -> SrcUnpackedness -> FamInstEnvs -> Scaled Type -> Bool
+shouldUnpackArgTy :: Platform -> BangOpts -> SrcUnpackedness -> FamInstEnvs -> Scaled Type -> Bool
 -- True if we ought to unpack the UNPACK the argument type
 -- See Note [Recursive unboxing]
 -- We look "deeply" inside rather than relying on the DataCons
 -- we encounter on the way, because otherwise we might well
 -- end up relying on ourselves!
-shouldUnpackArgTy bang_opts prag fam_envs arg_ty
+shouldUnpackArgTy platform bang_opts prag fam_envs arg_ty
   | Just data_cons <- unpackable_type_datacons (scaledThing arg_ty)
   , all ok_con data_cons                -- Returns True only if we can't get a
                                         -- loop involving these data cons
@@ -1534,7 +1615,7 @@ shouldUnpackArgTy bang_opts prag fam_envs arg_ty
              || (bang_opt_unbox_small bang_opts
                  && is_small_rep)  -- See Note [Unpack one-wide fields]
       where
-        (rep_tys, _) = dataConArgUnpack arg_ty
+        (rep_tys, _) = dataConArgUnpack platform arg_ty
 
         -- Takes in the list of reps used to represent the dataCon after it's unpacked
         -- and tells us if they can fit into 8 bytes. See Note [Unpack one-wide fields]
