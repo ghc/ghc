@@ -105,50 +105,49 @@ allowHaveLLVM = not . (`elem` ["wasm32", "javascript"])
 --
 inTreeCompilerArgs :: Stage -> Action TestCompilerArgs
 inTreeCompilerArgs stg = do
-    -- TODO: executable and library stage would be clearer
     cross <- crossStage stg
-    let ghcStage = succStage stg
-        pkgCacheStage = if cross then ghcStage else stg
+    let executableStage = succStage stg
+        libraryStage = if cross then executableStage else stg
     (hasDynamicRts, hasThreadedRts) <- do
-      ways <- interpretInContext (vanillaContext ghcStage rts) getRtsWays
+      ways <- interpretInContext (vanillaContext executableStage rts) getRtsWays
       return (dynamic `elem` ways, threaded `elem` ways)
-    hasDynamic          <- (wayUnit Dynamic) . Context.Type.way <$> (programContext stg ghc)
-    leadingUnderscore   <- queryTargetTarget ghcStage tgtSymbolsHaveLeadingUnderscore
-    withInterpreter     <- ghcWithInterpreter ghcStage
-    unregisterised      <- queryTargetTarget ghcStage tgtUnregisterised
-    tables_next_to_code <- queryTargetTarget ghcStage tgtTablesNextToCode
-    targetWithSMP       <- targetSupportsSMP ghcStage
-    interpForceDyn      <- targetRTSLinkerOnlySupportsSharedLibs ghcStage
+    hasDynamic          <- wayUnit Dynamic . Context.Type.way <$> programContext stg ghc
+    leadingUnderscore   <- queryTargetTarget executableStage tgtSymbolsHaveLeadingUnderscore
+    withInterpreter     <- ghcWithInterpreter executableStage
+    unregisterised      <- queryTargetTarget executableStage tgtUnregisterised
+    tables_next_to_code <- queryTargetTarget executableStage tgtTablesNextToCode
+    targetWithSMP       <- targetSupportsSMP executableStage
+    interpForceDyn      <- targetRTSLinkerOnlySupportsSharedLibs executableStage
 
-    debugAssertions     <- ghcDebugAssertions <$> flavour <*> pure ghcStage
-    debugged            <- ghcDebugged        <$> flavour <*> pure ghcStage
-    profiled            <- ghcProfiled        <$> flavour <*> pure ghcStage
+    debugAssertions     <- ghcDebugAssertions <$> flavour <*> pure executableStage
+    debugged            <- ghcDebugged        <$> flavour <*> pure executableStage
+    profiled            <- ghcProfiled        <$> flavour <*> pure executableStage
 
     os          <- queryHostTarget queryOS
-    arch        <- queryTargetTarget ghcStage queryArch
+    arch        <- queryTargetTarget executableStage queryArch
     let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64", "wasm32", "riscv64", "loongarch64"]
     let withNativeCodeGen
           | unregisterised = False
           | arch `elem` codegen_arches = True
           | otherwise = False
-    platform    <- queryTargetTarget ghcStage targetPlatformTriple
-    wordsize    <- show @Int . (*8) <$> queryTargetTarget ghcStage (wordSize2Bytes . tgtWordSize)
+    platform    <- queryTargetTarget executableStage targetPlatformTriple
+    wordsize    <- show @Int . (*8) <$> queryTargetTarget executableStage (wordSize2Bytes . tgtWordSize)
 
-    llc_cmd   <- queryTargetTarget ghcStage tgtLlc
-    llvm_as_cmd <- queryTargetTarget ghcStage tgtLlvmAs
+    llc_cmd   <- queryTargetTarget executableStage tgtLlc
+    llvm_as_cmd <- queryTargetTarget executableStage tgtLlvmAs
     let have_llvm = allowHaveLLVM arch && all isJust [llc_cmd, llvm_as_cmd]
 
     top         <- topDirectory
 
     pkgConfCacheFile <- System.FilePath.normalise . (top -/-)
-                    <$> (packageDbPath (PackageDbLoc pkgCacheStage Final) <&> (-/- "package.cache"))
+                    <$> (packageDbPath (PackageDbLoc libraryStage Final) <&> (-/- "package.cache"))
     libdir           <- System.FilePath.normalise . (top -/-)
-                    <$> stageLibPath pkgCacheStage
+                    <$> stageLibPath libraryStage
 
     -- For this information, we need to query ghc --info, however, that would
     -- require building ghc, which we don't want to do here. Therefore, the
     -- logic from `platformHasRTSLinker` is duplicated here.
-    let rtsLinker = not $ arch `elem` ["powerpc", "powerpc64", "powerpc64le", "s390x", "loongarch64", "javascript"]
+    let rtsLinker = arch `notElem` ["powerpc", "powerpc64", "powerpc64le", "s390x", "loongarch64", "javascript"]
 
     return TestCompilerArgs{..}
 
