@@ -90,9 +90,10 @@ commonCabalArgs stage = do
             -- we might have issues with stripping on Windows, as I can't see a
             -- consumer of 'stripCmdPath'.
             -- TODO: See https://github.com/snowleopard/hadrian/issues/549.
-            -- TODO: MP should check per-stage rather than a global CrossCompiling, but not going to cause bugs
-              flag CrossCompiling ? pure [ "--disable-executable-stripping"
-                                         , "--disable-library-stripping" ]
+            -- Do not try to strip cross-compiled libs, we can't do this, yet.
+            andM [flag CrossCompiling, pure (stage >= Stage2)] ?
+                pure [ "--disable-executable-stripping"
+                     , "--disable-library-stripping" ]
             -- We don't want to strip the debug RTS
             , S.package rts ? pure [ "--disable-executable-stripping"
                                   , "--disable-library-stripping" ]
