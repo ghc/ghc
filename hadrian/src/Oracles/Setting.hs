@@ -253,7 +253,7 @@ isHostStage :: Stage -> Bool
 isHostStage stage | stage <= Stage1 = True
 isHostStage _ = False
 
-queryTarget :: Stage -> (Target -> a) -> (Expr c b a)
+queryTarget :: Stage -> (Target -> a) -> Expr c b a
 queryTarget s f = expr (f <$> targetStage s)
 
 queryTargetTarget :: Stage -> (Target -> a) -> Action a
