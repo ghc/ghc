@@ -514,13 +514,13 @@ pat_to_type (EmbTyPat _ (HsTP x t)) =
 pat_to_type (VarPat _ lname)  =
   do { tell (tpBuilderExplicitTV (unLoc lname))
      ; return b }
-  where b = noLocA (HsTyVar noAnn NotPromoted $ fmap noUserRdr lname)
+  where b = noLocA (HsTyVar noExtField NotPromoted $ fmap noUserRdr lname)
 pat_to_type (WildPat _) = return b
   where b = noLocA (HsWildCardTy noExtField)
 pat_to_type (SigPat _ pat sig_ty)
   = do { t <- pat_to_type (unLoc pat)
        ; let { !(HsPS x_hsps k) = sig_ty
-             ; b = noLocA (HsKindSig noAnn t k) }
+             ; b = noLocA (HsKindSig noExtField t k) }
        ; tell (tpBuilderPatSig x_hsps)
        ; return b }
 pat_to_type (ParPat _ pat)
@@ -554,7 +554,7 @@ pat_to_type (ConPat _ lname (InfixCon left right))
        ; let { t = noLocA (HsOpTy noExtField NotPromoted lty lname rty)}
        ; pure t }
 pat_to_type (ConPat _ lname (PrefixCon args))
-  = do { let { appHead = noLocA (HsTyVar noAnn NotPromoted lname) }
+  = do { let { appHead = noLocA (HsTyVar noExtField NotPromoted lname) }
        ; foldM apply_arg appHead args }
       where
         apply_arg :: LHsType GhcRn -> LPat GhcRn -> WriterT HsTyPatRnBuilder TcM (LHsType GhcRn)

@@ -2049,7 +2049,7 @@ gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
 
         mk_ty_pat :: VarBndr TyVar Specificity -> LPat GhcPs
         mk_ty_pat (Bndr tv spec) = noLocA $ InvisPat (noAnn, spec) $ mkHsTyPat $
-          nlHsTyVar NotPromoted $ getRdrName tv
+          noLocA $ HsTyVar noAnn NotPromoted (noLocA (getRdrName tv))
 
         meth_RDR = getRdrName meth_id
         loc_meth_RDR = L locn meth_RDR
@@ -2247,9 +2247,9 @@ genAuxBindSpecSig loc spec = case spec of
   DerivMaxTag _ _
     -> mk_sig (L (noAnnSrcSpan loc) (XHsType (HsCoreTy intTy)))
   DerivDataDataType _ _ _
-    -> mk_sig (nlHsTyVar NotPromoted dataType_RDR)
+    -> mk_sig (noLocA $ HsTyVar noAnn NotPromoted (noLocA dataType_RDR))
   DerivDataConstr _ _ _
-    -> mk_sig (nlHsTyVar NotPromoted constr_RDR)
+    -> mk_sig (noLocA $ HsTyVar noAnn NotPromoted (noLocA constr_RDR))
   where
     mk_sig = mkHsWildCardBndrs . L (noAnnSrcSpan loc) . mkHsImplicitSigType
 

@@ -370,7 +370,7 @@ rebuildHsApps (fun, ctxt) (arg : args)
       EValArg { ea_arg = arg, ea_ctxt = ctxt' }
         -> rebuildHsApps (HsApp noExtField lfun arg, ctxt') args
       ETypeArg { ea_hs_ty = hs_ty, ea_ty_arg = ty, ea_ctxt = ctxt' }
-        -> rebuildHsApps (HsAppType ty lfun hs_ty, ctxt') args
+        -> rebuildHsApps (HsAppType ty lfun (fromLHsWcTypeRn hs_ty), ctxt') args
       EPrag ctxt' p
         -> rebuildHsApps (HsPragE noExtField p lfun, ctxt') args
       EWrap (EPar ctxt')
@@ -642,7 +642,7 @@ tyConOfET fam_inst_envs ty0 = tyConOf fam_inst_envs =<< checkingExpType_maybe ty
 *                                                                      *
 ********************************************************************* -}
 
-tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType (NoGhcTc GhcRn)
+tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType GhcRn
               -> TcM (HsExpr GhcTc, TcSigmaType)
 tcExprWithSig expr hs_ty
   = do { sig_info <- checkNoErrs $  -- Avoid error cascade

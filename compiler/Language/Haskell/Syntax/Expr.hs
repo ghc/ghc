@@ -348,7 +348,7 @@ data HsExpr p
 
   | HsAppType (XAppTypeE p) -- After typechecking: the type argument
               (LHsExpr p)
-              (LHsWcType (NoGhcTc p))  -- ^ Visible type application
+              (LHsWcType p)  -- ^ Visible type application
        --
        -- Explicit type argument; e.g  f @Int x y
        -- NB: Has wildcards, but no implicit quantification
@@ -504,7 +504,7 @@ data HsExpr p
   -- Embed the syntax of types into expressions.
   -- Used with @RequiredTypeArguments@, e.g. @fn (type (Int -> Bool))@.
   | HsEmbTy   (XEmbTy p)
-              (LHsWcType (NoGhcTc p))
+              (LHsWcType p)
 
    -- | Holes in expressions, i.e. '_'.
    -- See Note [Holes in expressions] in GHC.Tc.Types.Constraint.

@@ -22,6 +22,11 @@ module GHC.Hs.Type (
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsTypeGhcPsExt(..),
+        noLHsTypeGhcTc,
+        noHsTypeGhcTc,
+        noLHsWcTypeGhcTc,
+        noLHsSigWcTypeGhcTc,
+        fromLHsWcTypeRn,
         HsForAllTelescope(..), EpAnnForallVis, EpAnnForallInvis,
         HsTyVarBndr(..), LHsTyVarBndr, AnnTyVarBndr(..),
         HsBndrKind(..),
@@ -424,19 +429,53 @@ and the same principle could be applied to foralls:
 except the `forall _.` example is rejected by checkForAllTelescopeWildcardBndrs.
 -}
 
-type instance XForAllTy        (GhcPass _) = NoExtField
-type instance XQualTy          (GhcPass _) = NoExtField
-type instance XTyVar           (GhcPass _) = EpToken "'"
-type instance XAppTy           (GhcPass _) = NoExtField
-type instance XFunTy           (GhcPass _) = NoExtField
-type instance XListTy          (GhcPass _) = AnnParen
-type instance XTupleTy         (GhcPass _) = AnnParen
-type instance XSumTy           (GhcPass _) = AnnParen
-type instance XOpTy            (GhcPass _) = NoExtField
-type instance XParTy           (GhcPass _) = (EpToken "(", EpToken ")")
-type instance XIParamTy        (GhcPass _) = TokDcolon
-type instance XStarTy          (GhcPass _) = NoExtField
-type instance XKindSig         (GhcPass _) = TokDcolon
+type instance XForAllTy GhcPs = NoExtField
+type instance XForAllTy GhcRn = NoExtField
+type instance XForAllTy GhcTc = DataConCantHappen
+
+type instance XQualTy GhcPs = NoExtField
+type instance XQualTy GhcRn = NoExtField
+type instance XQualTy GhcTc = DataConCantHappen
+
+type instance XTyVar GhcPs = EpToken "'"
+type instance XTyVar GhcRn = NoExtField
+type instance XTyVar GhcTc = DataConCantHappen
+
+type instance XAppTy (GhcPass p) = NoExtField
+
+type instance XFunTy GhcPs = NoExtField
+type instance XFunTy GhcRn = NoExtField
+type instance XFunTy GhcTc = DataConCantHappen
+
+type instance XListTy GhcPs  = AnnParen
+type instance XListTy GhcRn  = NoExtField
+type instance XListTy GhcTc  = DataConCantHappen
+
+type instance XTupleTy GhcPs = AnnParen
+type instance XTupleTy GhcRn = NoExtField
+type instance XTupleTy GhcTc = DataConCantHappen
+
+type instance XSumTy GhcPs = AnnParen
+type instance XSumTy GhcRn = NoExtField
+type instance XSumTy GhcTc = DataConCantHappen
+
+type instance XOpTy GhcPs  = NoExtField
+type instance XOpTy GhcRn  = NoExtField
+type instance XOpTy GhcTc  = DataConCantHappen
+
+type instance XParTy (GhcPass p) = (EpToken "(", EpToken ")")
+
+type instance XIParamTy GhcPs  = TokDcolon
+type instance XIParamTy GhcRn  = NoExtField
+type instance XIParamTy GhcTc  = DataConCantHappen
+
+type instance XStarTy GhcPs  = NoExtField
+type instance XStarTy GhcRn  = NoExtField
+type instance XStarTy GhcTc  = DataConCantHappen
+
+type instance XKindSig GhcPs  = TokDcolon
+type instance XKindSig GhcRn  = NoExtField
+type instance XKindSig GhcTc  = DataConCantHappen
 
 type instance XAppKindTy       GhcPs = EpToken "@"
 type instance XAppKindTy       GhcRn = NoExtField
@@ -444,29 +483,34 @@ type instance XAppKindTy       GhcTc = NoExtField
 
 type instance XSpliceTy        GhcPs = NoExtField
 type instance XSpliceTy        GhcRn = HsUntypedSpliceResult (LHsType GhcRn)
-type instance XSpliceTy        GhcTc = Kind
+type instance XSpliceTy        GhcTc = DataConCantHappen
 
-type instance XDocTy           (GhcPass _) = NoExtField
+type instance XDocTy GhcPs  = NoExtField
+type instance XDocTy GhcRn  = NoExtField
+type instance XDocTy GhcTc  = DataConCantHappen
+
 type instance XConDeclField    (GhcPass _) = ((EpaLocation, EpToken "#-}", EpaLocation), SourceText)
 type instance XXConDeclRecField   (GhcPass _) = DataConCantHappen
 
 type instance XExplicitListTy  GhcPs = (EpToken "'", EpToken "[", EpToken "]")
 type instance XExplicitListTy  GhcRn = NoExtField
-type instance XExplicitListTy  GhcTc = Kind
+type instance XExplicitListTy  GhcTc = DataConCantHappen
 
 type instance XExplicitTupleTy GhcPs = (EpToken "'", EpToken "(", EpToken ")")
 type instance XExplicitTupleTy GhcRn = NoExtField
-type instance XExplicitTupleTy GhcTc = [Kind]
+type instance XExplicitTupleTy GhcTc = DataConCantHappen
 
-type instance XTyLit           (GhcPass _) = NoExtField
+type instance XTyLit GhcPs  = NoExtField
+type instance XTyLit GhcRn  = NoExtField
+type instance XTyLit GhcTc  = DataConCantHappen
 
 type instance XWildCardTy      GhcPs = EpToken "_"
 type instance XWildCardTy      GhcRn = NoExtField
-type instance XWildCardTy      GhcTc = NoExtField
+type instance XWildCardTy      GhcTc = DataConCantHappen
 
 type instance XXType           GhcPs = HsTypeGhcPsExt
 type instance XXType           GhcRn = HsCoreTy
-type instance XXType           GhcTc = DataConCantHappen
+type instance XXType           GhcTc = HsType GhcRn
 
 type instance XNumTy         (GhcPass _) = SourceText
 type instance XStrTy         (GhcPass _) = SourceText
@@ -494,6 +538,48 @@ data HsTypeGhcPsExt
   | HsRecTy     (AnnList ())
                 [LHsConDeclRecField GhcPs]
     -- See Note [Parsing data type declarations]
+
+fromLHsWcTypeRn :: LHsWcType GhcRn -> LHsWcType GhcTc
+fromLHsWcTypeRn (HsWC x b) = HsWC x (fmap XHsType b)
+
+noLHsWcTypeGhcTc :: LHsWcType GhcTc -> LHsWcType GhcRn
+noLHsWcTypeGhcTc (HsWC x b) = HsWC x (noLHsTypeGhcTc b)
+
+noLHsSigWcTypeGhcTc :: LHsSigWcType GhcTc -> LHsSigWcType GhcRn
+noLHsSigWcTypeGhcTc (HsWC x b) = HsWC x (fmap noHsSigTypeGhcTc b)
+
+noHsSigTypeGhcTc :: HsSigType GhcTc -> HsSigType GhcRn
+noHsSigTypeGhcTc (HsSig x bndrs b) = HsSig x (noHsOuterTyVarBndrsGhcTc bndrs) (noLHsTypeGhcTc b)
+
+noHsOuterTyVarBndrsGhcTc :: HsOuterTyVarBndrs flag GhcTc -> HsOuterTyVarBndrs flag GhcRn
+noHsOuterTyVarBndrsGhcTc (HsOuterImplicit x) = HsOuterImplicit (map getName x)
+noHsOuterTyVarBndrsGhcTc (HsOuterExplicit _ bndrs) = HsOuterExplicit noExtField bndrs
+
+noLHsTypeGhcTc :: LHsType GhcTc -> LHsType GhcRn
+noLHsTypeGhcTc = fmap noHsTypeGhcTc
+
+noHsTypeGhcTc :: HsType GhcTc -> HsType GhcRn
+noHsTypeGhcTc (HsForAllTy x _ _) = dataConCantHappen x
+noHsTypeGhcTc (HsQualTy x _ _) = dataConCantHappen x
+noHsTypeGhcTc (HsTyVar x _ _) = dataConCantHappen x
+noHsTypeGhcTc (HsAppTy x a b) = HsAppTy x (noLHsTypeGhcTc a) (noLHsTypeGhcTc b)
+noHsTypeGhcTc (HsAppKindTy x a b) = HsAppKindTy x (noLHsTypeGhcTc a) (noLHsTypeGhcTc b)
+noHsTypeGhcTc (HsFunTy x _ _ _) = dataConCantHappen x
+noHsTypeGhcTc (HsListTy x _) = dataConCantHappen x
+noHsTypeGhcTc (HsTupleTy x _ _) = dataConCantHappen x
+noHsTypeGhcTc (HsSumTy x _) = dataConCantHappen x
+noHsTypeGhcTc (HsOpTy x _ _ _ _) = dataConCantHappen x
+noHsTypeGhcTc (HsParTy x a) = HsParTy x (noLHsTypeGhcTc a)
+noHsTypeGhcTc (HsIParamTy x _ _) = dataConCantHappen x
+noHsTypeGhcTc (HsStarTy x _) = dataConCantHappen x
+noHsTypeGhcTc (HsKindSig x _ _) = dataConCantHappen x
+noHsTypeGhcTc (HsSpliceTy x _) = dataConCantHappen x
+noHsTypeGhcTc (HsDocTy x _ _) = dataConCantHappen x
+noHsTypeGhcTc (HsExplicitListTy x _ _) = dataConCantHappen x
+noHsTypeGhcTc (HsExplicitTupleTy x _ _) = dataConCantHappen x
+noHsTypeGhcTc (HsTyLit x _) = dataConCantHappen x
+noHsTypeGhcTc (HsWildCardTy x) = dataConCantHappen x
+noHsTypeGhcTc (XHsType x) = x
 
 {- Note [Parsing data type declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -535,7 +621,7 @@ type instance XExplicitMult _ GhcTc = Mult
 type instance XXMultAnnOf   _ (GhcPass _) = DataConCantHappen
 
 multAnnToHsType :: HsMultAnn GhcRn -> Maybe (LHsType GhcRn)
-multAnnToHsType = expandHsMultAnnOf (HsTyVar noAnn NotPromoted . fmap noUserRdr)
+multAnnToHsType = expandHsMultAnnOf (HsTyVar noExtField NotPromoted . fmap noUserRdr)
 
 -- | Convert an multiplicity annotation into its corresponding multiplicity.
 -- If no annotation was written, `Nothing` is returned.
@@ -687,10 +773,9 @@ ignoreParens ty                   = ty
 mkAnonWildCardTy :: EpToken "_" -> HsType GhcPs
 mkAnonWildCardTy tok = HsWildCardTy tok
 
-mkHsOpTy :: (Anno (IdOccGhcP p) ~ SrcSpanAnnN)
-         => PromotionFlag
-         -> LHsType (GhcPass p) -> LocatedN (IdOccP (GhcPass p))
-         -> LHsType (GhcPass p) -> HsType (GhcPass p)
+mkHsOpTy :: PromotionFlag
+         -> LHsType GhcPs -> LocatedN RdrName
+         -> LHsType GhcPs -> HsType GhcPs
 mkHsOpTy prom ty1 op ty2 = HsOpTy noExtField prom ty1 op ty2
 
 mkHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
@@ -1489,6 +1574,7 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsBangTy _ b ty -> ppr b <> ppr_mono_lty ty
     HsRecTy _ flds  -> pprHsConDeclRecFields flds
   GhcRn -> ppr t
+  GhcTc -> ppr_mono_ty t
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId p)
@@ -1548,6 +1634,7 @@ hsTypeNeedsParens p = go_hs_ty
         HsBangTy{}  -> p > topPrec
         HsRecTy{}   -> False
       GhcRn -> go_core_ty t
+      GhcTc -> hsTypeNeedsParens p t
 
     go_core_ty (TyVarTy{})    = False
     go_core_ty (AppTy{})      = p >= appPrec

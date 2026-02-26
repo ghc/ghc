@@ -826,7 +826,7 @@ tcFamTyPats fam_tc hs_pats
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    lhs_fun   = noLocA (HsTyVar noAnn NotPromoted (noLocA $ noUserRdr fam_name))
+    lhs_fun   = noLocA (HsTyVar noExtField NotPromoted (noLocA $ noUserRdr fam_name))
 
 {- Note [tcFamTyPats: zonking the result kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1541,7 +1541,7 @@ splitHsAppTys hs_ty = go (noLocA hs_ty) []
     go (L _  (HsAppKindTy _ ty k)) as = go ty (HsTypeArg noExtField k : as)
     go (L sp (HsParTy _ f))        as = go f (HsArgPar (locA sp) : as)
     go (L _  (HsOpTy _ prom l op@(L sp _) r)) as
-      = ( L (l2l sp) (HsTyVar noAnn prom op)
+      = ( L (l2l sp) (HsTyVar noExtField prom op)
         , HsValArg noExtField l : HsValArg noExtField r : as )
     go f as = (f, as)
 

@@ -1127,7 +1127,7 @@ expr_to_type earg =
       --   variables and constructors (regardless of their namespace)
       --   are mapped directly, without modification.
       do { detect_puns lname
-         ; return (L l (HsTyVar noAnn NotPromoted lname)) }
+         ; return (L l (HsTyVar noExtField NotPromoted lname)) }
     go (L l (HsApp _ lhs rhs)) =
       do { lhs' <- go lhs
          ; rhs' <- go rhs
@@ -1163,7 +1163,7 @@ expr_to_type earg =
     go (L l (ExprWithTySig _ e sig_ty)) =
       do { t <- go e
          ; sig_ki <- (unwrap_sig <=< unwrap_wc) sig_ty
-         ; return (L l (HsKindSig noAnn t sig_ki)) }
+         ; return (L l (HsKindSig noExtField t sig_ki)) }
       where
         unwrap_sig :: LHsSigType GhcRn -> TcM (LHsType GhcRn)
         unwrap_sig (L _ (HsSig _ HsOuterImplicit{hso_ximplicit=bndrs} body))

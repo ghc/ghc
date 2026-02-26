@@ -1194,8 +1194,12 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         ]
       HsAppType _ expr sig ->
         [ toHie expr
-        , toHie $ TS (ResolvedScopes []) sig
+        , toHie $ TS (ResolvedScopes []) sig'
         ]
+        where sig' :: LHsWcType GhcRn
+              sig' = case hiePass @p of
+                        HieRn -> sig
+                        HieTc -> noLHsWcTypeGhcTc sig
       OpApp _ a b c ->
         [ toHie a
         , toHie b
@@ -1266,8 +1270,12 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         ]
       ExprWithTySig _ expr sig ->
         [ toHie expr
-        , toHie $ TS (ResolvedScopes [mkScope expr]) sig
+        , toHie $ TS (ResolvedScopes [mkScope expr]) sig'
         ]
+        where sig' :: LHsSigWcType GhcRn
+              sig' = case hiePass @p of
+                        HieRn -> sig
+                        HieTc -> sig -- noLHsSigWcTypeGhcTc sig
       ArithSeq enum _ info ->
         [ toHie info
         , whenPostTcGen @p $ toHie (L mspan enum)
@@ -1283,8 +1291,12 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         [ toHie expr
         ]
       HsEmbTy _ ty ->
-        [ toHie $ TS (ResolvedScopes []) ty
+        [ toHie $ TS (ResolvedScopes []) ty'
         ]
+        where ty' :: LHsWcType GhcRn
+              ty' = case hiePass @p of
+                        HieRn -> ty
+                        HieTc -> noLHsWcTypeGhcTc ty
       HsQual _ ctx body ->
         [ toHie ctx
         , toHie body

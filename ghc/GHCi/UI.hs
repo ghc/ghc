@@ -2004,13 +2004,13 @@ defineMacro overwrite s
             expr <- GHC.parseExpr definition
             -- > ghciStepIO . definition :: String -> IO String
             let stringTy :: LHsType GhcPs
-                stringTy = nlHsTyVar NotPromoted stringTyCon_RDR
+                stringTy = noLocA $ HsTyVar noAnn NotPromoted (noLocA stringTyCon_RDR)
                 ioM :: LHsType GhcPs -- AZ
-                ioM = nlHsTyVar NotPromoted (getRdrName ioTyConName) `nlHsAppTy` stringTy
+                ioM = noLocA (HsTyVar noAnn NotPromoted (noLocA (getRdrName ioTyConName))) `nlHsAppTy` stringTy
                 body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
                                            `mkHsApp` (nlHsPar expr)
                 tySig = mkHsWildCardBndrs $ noLocA $ mkHsImplicitSigType $
-                        nlHsFunTy stringTy ioM
+                        noLocA $ HsFunTy noExtField (HsUnannotated (EpArrow noAnn)) stringTy ioM
                 new_expr = L (getLoc expr) $ ExprWithTySig noAnn body tySig
             hv <- GHC.compileParsedExprRemote new_expr
 
@@ -2074,12 +2074,12 @@ cmdCmd str = handleSourceError printErrAndMaybeExit $ do
 getGhciStepIO :: GHC.GhcMonad m => m (LHsExpr GhcPs)
 getGhciStepIO = do
   ghciTyConName <- GHC.getGHCiMonad
-  let stringTy = nlHsTyVar NotPromoted stringTyCon_RDR
-      ghciM = nlHsTyVar NotPromoted (getRdrName ghciTyConName) `nlHsAppTy` stringTy
-      ioM = nlHsTyVar NotPromoted (getRdrName ioTyConName) `nlHsAppTy` stringTy
+  let stringTy = noLocA $ HsTyVar noAnn NotPromoted (noLocA stringTyCon_RDR)
+      ghciM = noLocA (HsTyVar noAnn NotPromoted (noLocA (getRdrName ghciTyConName))) `nlHsAppTy` stringTy
+      ioM = noLocA (HsTyVar noAnn NotPromoted (noLocA (getRdrName ioTyConName))) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)
       tySig = mkHsWildCardBndrs $ noLocA $ mkHsImplicitSigType $
-              nlHsFunTy ghciM ioM
+              noLocA $ HsFunTy noExtField (HsUnannotated (EpArrow noAnn)) ghciM ioM
   return $ noLocA $ ExprWithTySig noAnn body tySig
 
 -----------------------------------------------------------------------------

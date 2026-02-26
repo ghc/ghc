@@ -332,7 +332,7 @@ lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsTypeArg GhcRn]
 lHsQTyVarsToTypes tvs =
   [ HsValArg noExtField $ noLocA (case hsLTyVarName tv of
       Nothing -> HsWildCardTy noExtField
-      Just nm -> HsTyVar noAnn NotPromoted (noLocA $ noUserRdr nm))
+      Just nm -> HsTyVar noExtField NotPromoted (noLocA $ noUserRdr nm))
   | tv <- hsq_explicit tvs
   ]
 

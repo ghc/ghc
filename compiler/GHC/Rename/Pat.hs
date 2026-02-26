@@ -1303,14 +1303,14 @@ rn_ty_pat_var lrdr@(L l rdr) = do
 -- For the difference between `rn_ty_pat` and `rnHsTyKi` see Note [CpsRn monad]
 -- and Note [Implicit and explicit type variable binders]
 rn_ty_pat :: HsType GhcPs -> TPRnM (HsType GhcRn)
-rn_ty_pat tv@(HsTyVar an prom lrdr) = do
+rn_ty_pat tv@(HsTyVar _ prom lrdr) = do
   L l (WithUserRdr _ name) <- rn_ty_pat_var lrdr
   when (isDataConName name && not (isKindName name)) $
     -- Any use of a promoted data constructor name (that is not specifically
     -- exempted by isKindName) is illegal without the use of DataKinds.
     -- See Note [Checking for DataKinds] in GHC.Tc.Validity.
     check_data_kinds tv
-  pure (HsTyVar an prom (L l $ WithUserRdr (unLoc lrdr) name))
+  pure (HsTyVar noExtField prom (L l $ WithUserRdr (unLoc lrdr) name))
 
 rn_ty_pat (HsForAllTy an tele body) = liftTPRnRaw $ \ctxt locals thing_inside ->
   bindHsForAllTelescope ctxt tele $ \tele' -> do
@@ -1345,17 +1345,17 @@ rn_ty_pat (HsFunTy an mult lhs rhs) = do
   rhs' <- rn_lty_pat rhs
   pure (HsFunTy an mult' lhs' rhs')
 
-rn_ty_pat (HsListTy an ty) = do
+rn_ty_pat (HsListTy _ ty) = do
   ty' <- rn_lty_pat ty
-  pure (HsListTy an ty')
+  pure (HsListTy noExtField ty')
 
-rn_ty_pat (HsTupleTy an con tys) = do
+rn_ty_pat (HsTupleTy _ con tys) = do
   tys' <- mapM rn_lty_pat tys
-  pure (HsTupleTy an con tys')
+  pure (HsTupleTy noExtField con tys')
 
-rn_ty_pat (HsSumTy an tys) = do
+rn_ty_pat (HsSumTy _ tys) = do
   tys' <- mapM rn_lty_pat tys
-  pure (HsSumTy an tys')
+  pure (HsSumTy noExtField tys')
 
 rn_ty_pat (HsOpTy _ prom ty1 l_op ty2) = do
   ty1' <- rn_lty_pat ty1
@@ -1371,9 +1371,9 @@ rn_ty_pat (HsParTy an ty) = do
   ty' <- rn_lty_pat ty
   pure (HsParTy an ty')
 
-rn_ty_pat (HsIParamTy an n ty) = do
+rn_ty_pat (HsIParamTy _ n ty) = do
   ty' <- rn_lty_pat ty
-  pure (HsIParamTy an n ty')
+  pure (HsIParamTy noExtField n ty')
 
 rn_ty_pat (HsStarTy an unicode) =
   pure (HsStarTy an unicode)
@@ -1405,7 +1405,7 @@ rn_ty_pat tyLit@(HsTyLit src t) = do
 rn_ty_pat (HsWildCardTy _) =
   pure (HsWildCardTy noExtField)
 
-rn_ty_pat (HsKindSig an ty ki) = do
+rn_ty_pat (HsKindSig _ ty ki) = do
   ctxt <- askDocContext
   kind_sigs_ok <- liftRn $ xoptM LangExt.KindSignatures
   unless kind_sigs_ok (liftRn $ badKindSigErr ctxt ki)
@@ -1413,7 +1413,7 @@ rn_ty_pat (HsKindSig an ty ki) = do
                       rnHsPatSigKind AlwaysBind ctxt (HsPS noAnn ki)
   ty' <- rn_lty_pat ty
   tellTPB (tpBuilderPatSig hsps)
-  pure (HsKindSig an ty' ki')
+  pure (HsKindSig noExtField ty' ki')
 
 rn_ty_pat (HsSpliceTy _ splice) = do
   res <- liftRnFV $ rnSpliceTyPat splice

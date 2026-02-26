@@ -549,7 +549,7 @@ rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
 
              | otherwise -> pure ()
        ; checkPromotedDataConName env tv Prefix ip name
-       ; return (HsTyVar noAnn ip loc_name_with_rdr, unitFV name) }
+       ; return (HsTyVar noExtField ip loc_name_with_rdr, unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy _ prom ty1 l_op ty2)
   = setSrcSpan (getLocA l_op) $
@@ -574,33 +574,33 @@ rnHsTyKi env (HsFunTy u mult ty1 ty2)
        ; return (HsFunTy u mult' ty1' ty2'
                 , plusFVs [fvs1, fvs2, w_fvs]) }
 
-rnHsTyKi env listTy@(HsListTy x ty)
+rnHsTyKi env listTy@(HsListTy _ ty)
   = do { when (isRnKindLevel env) $
            checkDataKinds env listTy
        ; (ty', fvs) <- rnLHsTyKi env ty
-       ; return (HsListTy x ty', fvs) }
+       ; return (HsListTy noExtField ty', fvs) }
 
-rnHsTyKi env (HsKindSig x ty k)
+rnHsTyKi env (HsKindSig _ ty k)
   = do { kind_sigs_ok <- xoptM LangExt.KindSignatures
        ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) k)
        ; (k', sig_fvs)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
        ; (ty', lhs_fvs) <- bindSigTyVarsFV (hsScopedKvs k') $
                            rnLHsTyKi env ty
-       ; return (HsKindSig x ty' k', lhs_fvs `plusFV` sig_fvs) }
+       ; return (HsKindSig noExtField ty' k', lhs_fvs `plusFV` sig_fvs) }
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
-rnHsTyKi env tupleTy@(HsTupleTy x tup_con tys)
+rnHsTyKi env tupleTy@(HsTupleTy _ tup_con tys)
   = do { when (isRnKindLevel env) $
            checkDataKinds env tupleTy
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
-       ; return (HsTupleTy x tup_con tys', fvs) }
+       ; return (HsTupleTy noExtField tup_con tys', fvs) }
 
-rnHsTyKi env sumTy@(HsSumTy x tys)
+rnHsTyKi env sumTy@(HsSumTy _ tys)
   = do { when (isRnKindLevel env) $
            checkDataKinds env sumTy
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
-       ; return (HsSumTy x tys', fvs) }
+       ; return (HsSumTy noExtField tys', fvs) }
 
 -- Ensure that a type-level integer is nonnegative (#8306, #8412)
 rnHsTyKi env tyLit@(HsTyLit src t)
@@ -620,10 +620,10 @@ rnHsTyKi env (HsAppKindTy _ ty k)
        ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
        ; return (HsAppKindTy noExtField ty' k', fvs1 `plusFV` fvs2) }
 
-rnHsTyKi env t@(HsIParamTy x n ty)
+rnHsTyKi env t@(HsIParamTy _ n ty)
   = do { notInKinds env t
        ; (ty', fvs) <- rnLHsTyKi env ty
-       ; return (HsIParamTy x n ty', fvs) }
+       ; return (HsIParamTy noExtField n ty', fvs) }
 
 rnHsTyKi _ (HsStarTy _ isUni)
   = return (HsStarTy noExtField isUni, emptyFVs)
