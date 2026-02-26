@@ -217,7 +217,6 @@ testEnv stg = do
 
     top             <- topDirectory
     pythonPath      <- builderPath Python
-    -- MP: TODO wrong, should use the ccPath and ccFlags from the bindist we are testing.
     ccPath          <- queryTargetTarget stg (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
     ccFlags         <- queryTargetTarget stg (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
     ghcFlags        <- runTestGhcFlags stg
