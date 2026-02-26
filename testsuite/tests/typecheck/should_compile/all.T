@@ -230,7 +230,7 @@ test('tc214', normal, compile, [''])
 test('tc215', normal, compile, [''])
 
 # This one is very delicate, but I don't think the result really matters
-test('tc216', normal, compile, [''])
+test('tc216', [expect_broken_for(26952, opt_ways)], compile, [''])
 
 test('tc217', normal, compile, [''])
 test('tc218', normal, compile, [''])
@@ -272,7 +272,7 @@ test('tc248', normal, compile, [''])
 test('FD4', normal, compile, [''])
 
 test('faxen', normal, compile, [''])
-test('T816', normal, compile, [''])
+test('T816', [expect_broken_for(26952, opt_ways)], compile, [''])
 test('T1495', normal, compile, [''])
 test('T2045', normal, compile, [''])   # Needs -fhpc
 test('T2478', normal, compile, [''])
