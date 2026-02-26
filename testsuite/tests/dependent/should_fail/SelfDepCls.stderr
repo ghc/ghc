@@ -1,0 +1,6 @@
+SelfDepCls.hs:3:15: error: [GHC-86934]
+    • Class ‘C’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In the kind ‘C’
+      In the class declaration for ‘C’
+

@@ -1,7 +1,44 @@
-
-NoBlockArgumentsFailArrowCmds.hs:7:27: error: [GHC-12178]
+NoBlockArgumentsFailArrowCmds.hs:9:27: error: [GHC-12178]
     Unexpected lambda command in function application:
         \ () -> () >- returnA
     Suggested fixes:
       • Use parentheses.
       • Perhaps you intended to use the ‘BlockArguments’ extension
+
+NoBlockArgumentsFailArrowCmds.hs:13:9: error: [GHC-92971]
+    Unexpected case command in function application:
+        case x of
+          False -> 0 >- returnA
+          True -> 1 >- returnA
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use the ‘BlockArguments’ extension
+
+NoBlockArgumentsFailArrowCmds.hs:19:9: error: [GHC-97005]
+    Unexpected if command in function application:
+        if x then 1 >- returnA else 0 >- returnA
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use the ‘BlockArguments’ extension
+
+NoBlockArgumentsFailArrowCmds.hs:24:9: error: [GHC-70526]
+    Unexpected let command in function application:
+        let y = x + 1 in (x, y) >- returnA
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use the ‘BlockArguments’ extension
+
+NoBlockArgumentsFailArrowCmds.hs:27:25: error: [GHC-77808]
+    Unexpected do command in function application:
+        do x >- returnA
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use the ‘BlockArguments’ extension
+
+NoBlockArgumentsFailArrowCmds.hs:30:22: error: [GHC-04807]
+    Unexpected proc expression in function application:
+        proc x -> (* 2) -< x + 1
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use the ‘BlockArguments’ extension
+

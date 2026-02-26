@@ -1,0 +1,6 @@
+TH_EmptyLamCases.hs:7:6: error: [GHC-91745]
+    • \cases expression with no alternatives
+      When splicing a TH expression: \cases
+{}
+    • In the untyped splice: $(lamCasesE [])
+

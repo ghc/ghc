@@ -1,0 +1,37 @@
+NoBlockArgumentsFail4.hs:8:18: error: [GHC-25037]
+    Unexpected case expression in function application:
+        case x of
+          False -> 0
+          True -> 1
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use the ‘BlockArguments’ extension
+
+NoBlockArgumentsFail4.hs:12:22: error: [GHC-01239]
+    Unexpected if expression in function application:
+        if x then 1 else 0
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use the ‘BlockArguments’ extension
+
+NoBlockArgumentsFail4.hs:14:17: error: [GHC-90355]
+    Unexpected let expression in function application:
+        let y = x + 1 in (x, y)
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use the ‘BlockArguments’ extension
+
+NoBlockArgumentsFail4.hs:16:12: error: [GHC-52095]
+    Unexpected do block in function application:
+        do x
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use the ‘BlockArguments’ extension
+
+NoBlockArgumentsFail4.hs:18:13: error: [GHC-67630]
+    Unexpected mdo block in function application:
+        mdo x
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use the ‘BlockArguments’ extension
+

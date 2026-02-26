@@ -1,0 +1,4 @@
+patsyn_where_fail3.hs:5:9: error: [GHC-13248]
+    Pattern synonym 'where' clause cannot be empty
+    In the pattern synonym declaration for:  P
+

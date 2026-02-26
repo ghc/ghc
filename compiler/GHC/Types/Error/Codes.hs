@@ -261,7 +261,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrLazyPatWithoutSpace"                      = 27207
   GhcDiagnosticCode "PsErrBangPatWithoutSpace"                      = 95644
   GhcDiagnosticCode "PsErrInvalidInfixHole"                         = 45106
-  GhcDiagnosticCode "PsErrExpectedHyphen"                           = 44524
+  GhcDiagnosticCode "PsErrExpectedHyphen"                           = Outdated 44524
   GhcDiagnosticCode "PsErrSpaceInSCC"                               = 76176
   GhcDiagnosticCode "PsErrEmptyDoubleQuotes"                        = 11861
   GhcDiagnosticCode "PsErrLambdaCase"                               = 51179
@@ -575,7 +575,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnOrPatBindsVariables"                       = 81303
   GhcDiagnosticCode "TcRnIllegalKind"                               = 64861
   GhcDiagnosticCode "TcRnUnexpectedPatSigType"                      = 74097
-  GhcDiagnosticCode "TcRnIllegalKindSignature"                      = 91382
+  GhcDiagnosticCode "TcRnIllegalKindSignature"                      = Outdated 91382   -- superseded by TcRnKindSignaturesDisabled
   GhcDiagnosticCode "TcRnDataKindsError"                            = 68567
 
   GhcDiagnosticCode "TcRnIllegalHsigDefaultMethods"                 = 93006

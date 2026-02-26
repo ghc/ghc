@@ -89,6 +89,7 @@ test('mod67', normal, compile_fail, [''])
 test('mod68', normal, compile_fail, [''])
 test('mod69', normal, compile_fail, [''])
 test('mod70', normal, compile_fail, [''])
+test('mod70b', normal, compile_fail, [''])
 test('mod71', normal, compile_fail, [''])
 test('mod72', normal, compile_fail, [''])
 

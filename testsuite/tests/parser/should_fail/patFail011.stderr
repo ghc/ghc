@@ -1,0 +1,2 @@
+patFail011.hs:3:4: error: [GHC-08195] Not a record constructor: a
+

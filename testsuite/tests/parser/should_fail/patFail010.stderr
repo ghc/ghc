@@ -1,0 +1,3 @@
+patFail010.hs:3:6: error: [GHC-45106]
+    Invalid infix hole, expected an infix operator
+

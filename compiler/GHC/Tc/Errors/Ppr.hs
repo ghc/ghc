@@ -1776,9 +1776,6 @@ instance Diagnostic TcRnMessage where
            hang (text "Illegal type signature:" <+> quotes (ppr ty))
               2 (text "Type signatures are only allowed in patterns with ScopedTypeVariables")
 
-    TcRnIllegalKindSignature ty
-      -> mkSimpleDecorated $ text "Illegal kind signature:" <+> quotes (ppr ty)
-
     TcRnUnusedQuantifiedTypeVar doc tyVar
       -> mkSimpleDecorated $
            vcat [ text "Unused quantified type variable" <+> quotes (ppr tyVar)
@@ -2590,8 +2587,6 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnexpectedPatSigType{}
       -> ErrorWithoutFlag
-    TcRnIllegalKindSignature{}
-      -> ErrorWithoutFlag
     TcRnUnusedQuantifiedTypeVar{}
       -> WarningWithFlag Opt_WarnUnusedForalls
     TcRnDataKindsError{}
@@ -3275,8 +3270,6 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnexpectedPatSigType{}
       -> [suggestExtension LangExt.ScopedTypeVariables]
-    TcRnIllegalKindSignature{}
-      -> [suggestExtension LangExt.KindSignatures]
     TcRnUnusedQuantifiedTypeVar{}
       -> noHints
     TcRnDataKindsError{}

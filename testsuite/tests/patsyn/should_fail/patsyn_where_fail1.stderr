@@ -1,0 +1,4 @@
+patsyn_where_fail1.hs:6:3: error: [GHC-28021]
+    Record syntax not supported for pattern synonym declarations:
+    P {head = x}
+

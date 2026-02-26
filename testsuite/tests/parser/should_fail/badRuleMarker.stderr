@@ -1,0 +1,3 @@
+badRuleMarker.hs:3:13: error: [GHC-50396]
+    Invalid rule activation marker
+

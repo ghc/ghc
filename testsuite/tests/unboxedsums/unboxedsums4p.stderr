@@ -1,0 +1,3 @@
+unboxedsums4p.hs:3:3: error: [GHC-16863]
+    Boxed sums not supported: ( 10 | )
+

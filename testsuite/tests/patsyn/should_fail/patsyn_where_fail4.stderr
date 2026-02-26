@@ -1,0 +1,4 @@
+patsyn_where_fail4.hs:7:3: error: [GHC-65536]
+    Pattern synonym 'where' clause must contain a single binding:
+    wrap x = [x]
+

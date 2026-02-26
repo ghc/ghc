@@ -1,0 +1,5 @@
+TH_EmptyMultiIf.hs:7:6: error: [GHC-63930]
+    • Multi-way if-expression with no alternatives
+      When splicing a TH expression: if {}
+    • In the untyped splice: $(multiIfE [])
+

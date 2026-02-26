@@ -1,0 +1,6 @@
+NoDoAndIfThenElseArrowCmds.hs:9:24: error: [GHC-18910]
+    Unexpected semi-colons in conditional:
+        if True; then () >- returnA; else () >- returnA
+    Suggested fix:
+      Perhaps you intended to use the ‘DoAndIfThenElse’ extension
+

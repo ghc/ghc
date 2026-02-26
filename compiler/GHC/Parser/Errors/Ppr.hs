@@ -193,8 +193,6 @@ instance Diagnostic PsMessage where
            $$ text "Did you mean to add a space after the '!'?"
     PsErrInvalidInfixHole
       -> mkSimpleDecorated $ text "Invalid infix hole, expected an infix operator"
-    PsErrExpectedHyphen
-      -> mkSimpleDecorated $ text "Expected a hyphen"
     PsErrSpaceInSCC
       -> mkSimpleDecorated $ text "Spaces are not allowed in SCCs"
     PsErrEmptyDoubleQuotes _th_on
@@ -241,20 +239,20 @@ instance Diagnostic PsMessage where
              $$ text "qualified 'do' is not supported in commands."
     PsErrRecordSyntaxInPatSynDecl pat
       -> mkSimpleDecorated $
-           text "record syntax not supported for pattern synonym declarations:"
+           text "Record syntax not supported for pattern synonym declarations:"
            $$ ppr pat
     PsErrEmptyWhereInPatSynDecl patsyn_name
       -> mkSimpleDecorated $
-           text "pattern synonym 'where' clause cannot be empty"
+           text "Pattern synonym 'where' clause cannot be empty"
            $$ text "In the pattern synonym declaration for: "
               <+> ppr (patsyn_name)
     PsErrInvalidWhereBindInPatSynDecl patsyn_name decl
       -> mkSimpleDecorated $
-           text "pattern synonym 'where' clause must bind the pattern synonym's name"
+           text "Pattern synonym 'where' clause must bind the pattern synonym's name"
            <+> quotes (ppr patsyn_name) $$ ppr decl
     PsErrNoSingleWhereBindInPatSynDecl _patsyn_name decl
       -> mkSimpleDecorated $
-           text "pattern synonym 'where' clause must contain a single binding:"
+           text "Pattern synonym 'where' clause must contain a single binding:"
            $$ ppr decl
     PsErrDeclSpliceNotAtTopLevel d
       -> mkSimpleDecorated $
@@ -611,7 +609,6 @@ instance Diagnostic PsMessage where
     PsErrLazyPatWithoutSpace{}                    -> ErrorWithoutFlag
     PsErrBangPatWithoutSpace{}                    -> ErrorWithoutFlag
     PsErrInvalidInfixHole                         -> ErrorWithoutFlag
-    PsErrExpectedHyphen                           -> ErrorWithoutFlag
     PsErrSpaceInSCC                               -> ErrorWithoutFlag
     PsErrEmptyDoubleQuotes{}                      -> ErrorWithoutFlag
     PsErrLambdaCase{}                             -> ErrorWithoutFlag
@@ -752,7 +749,6 @@ instance Diagnostic PsMessage where
     PsErrLazyPatWithoutSpace{}                    -> noHints
     PsErrBangPatWithoutSpace{}                    -> noHints
     PsErrInvalidInfixHole                         -> noHints
-    PsErrExpectedHyphen                           -> noHints
     PsErrSpaceInSCC                               -> noHints
     PsErrEmptyDoubleQuotes th_on | th_on          -> [SuggestThQuotationSyntax]
                                  | otherwise      -> noHints

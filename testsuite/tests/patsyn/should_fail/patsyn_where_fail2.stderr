@@ -1,0 +1,4 @@
+patsyn_where_fail2.hs:6:3: error: [GHC-24737]
+    Pattern synonym 'where' clause must bind the pattern synonym's name ‘P’
+    Just x = [x]
+

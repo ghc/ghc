@@ -425,9 +425,6 @@ data PsMessage
                                [LHsTypeArg GhcPs]
                                !SDoc
 
-   -- | Expected a hyphen
-   | PsErrExpectedHyphen
-
    -- | Found a space in a SCC
    | PsErrSpaceInSCC
 

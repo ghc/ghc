@@ -2509,16 +2509,6 @@ data TcRnMessage where
   -}
   TcRnUnexpectedPatSigType :: HsPatSigType GhcPs -> TcRnMessage
 
-  {-| TcRnIllegalKindSignature is an error occurring when there is
-      a kind signature without -XKindSignatures extension
-
-      Examples:
-        data Foo (a :: Nat) = ....
-
-      Test case: parser/should_fail/readFail036
-  -}
-  TcRnIllegalKindSignature :: HsType GhcPs -> TcRnMessage
-
   {-| TcRnDataKindsError is an error occurring when there is
       an illegal type or kind, probably required -XDataKinds
       and is used without the enabled extension.

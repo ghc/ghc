@@ -1,0 +1,3 @@
+unpack_data_con.hs:3:10: error: [GHC-40845]
+    {-# UNPACK #-} cannot be applied to a data constructor.
+
