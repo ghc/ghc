@@ -415,8 +415,7 @@ isOptional target = \case
     Alex     -> True
     -- Most ar implemententions no longer need ranlib, but some still do
     Ranlib {}   -> not $ Toolchain.arNeedsRanlib (tgtAr target)
-    -- TODO: Use stage argument
-    JsCpp  {}    -> not $ (archOS_arch . tgtArchOs) target == ArchJavaScript -- ArchWasm32 too?
+    JsCpp  {}   -> (archOS_arch . tgtArchOs) target /= ArchJavaScript -- ArchWasm32 too?
     _        -> False
 
 -- | Determine the location of a system 'Builder'.
