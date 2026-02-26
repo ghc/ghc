@@ -31,7 +31,7 @@ import GHC.Toolchain.Tools.Ranlib
 import GHC.Toolchain.Tools.Nm
 import GHC.Toolchain.Tools.MergeObjs
 import GHC.Toolchain.Tools.Readelf
-import GHC.Toolchain.NormaliseTriple (normaliseTriple)
+import GHC.Toolchain.NormaliseTriple (normaliseTriple, normaliseLlvmTarget)
 import Text.Read (readMaybe)
 
 data Opts = Opts
@@ -424,8 +424,9 @@ ldOverrideWhitelist a =
 mkTarget :: Opts -> M Target
 mkTarget opts = do
     normalised_triple <- normaliseTriple (fromMaybe (error "missing --triple") (optTriple opts))
-    -- Use Llvm target if specified, otherwise use triple as llvm target
-    let tgtLlvmTarget = fromMaybe normalised_triple (optLlvmTriple opts)
+    -- Use Llvm target if specified, otherwise use triple as llvm target.
+    -- Normalise for platform conventions (e.g. aarch64-apple-* -> arm64-apple-*).
+    let tgtLlvmTarget = normaliseLlvmTarget $ fromMaybe normalised_triple (optLlvmTriple opts)
 
     (archOs, tgtVendor) <- do
       cc0 <- findBasicCc (optCc opts)
