@@ -18,7 +18,7 @@ import Settings.Builders.Common
 import qualified Data.Set    as Set
 import Flavour
 import qualified Context.Type as C
-import System.Directory (findExecutable)
+import System.Directory (canonicalizePath, findExecutable)
 import Settings.Program
 import qualified Context.Type
 
@@ -186,7 +186,7 @@ outOfTreeCompilerArgs = do
     have_llvm <- (allowHaveLLVM arch &&) <$> liftIO (isJust <$> findExecutable llc_cmd)
     profiled <- getBooleanSetting TestGhcProfiled
 
-    pkgConfCacheFile <- getTestSetting TestGhcPackageDb <&> (</> "package.cache")
+    pkgConfCacheFile <- liftIO . canonicalizePath =<< (getTestSetting TestGhcPackageDb <&> (</> "package.cache"))
     libdir <- getTestSetting TestGhcLibDir
 
     rtsLinker <- getBooleanSetting TestGhcWithRtsLinker
