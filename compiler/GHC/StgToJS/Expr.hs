@@ -307,9 +307,9 @@ genBody :: HasDebugCallStack
          -> StgReg
          -> [Id]
          -> CgStgExpr
-         -> Type
+         -> StgKind
          -> G JStgStat
-genBody ctx startReg args e typ = do
+genBody ctx startReg args e kind = do
   -- load arguments into local variables
   la <- do
     args' <- concatMapM genIdArgI args
@@ -320,7 +320,7 @@ genBody ctx startReg args e typ = do
 
   -- compute PrimReps and their number of slots required to return the result of
   -- i applied to args.
-  let res_vars = resultSize typ
+  let res_vars = resultSize kind
 
   -- compute typed expressions for each slot and assign registers
   let go_var regs = \case
@@ -337,6 +337,12 @@ genBody ctx startReg args e typ = do
   (e, _r) <- genExpr ctx' e
 
   return $ la <> lav <> e <> returnStack
+
+-- TODO: move to a proper place
+stgKindPrimRep :: StgKind -> [PrimRep]
+stgKindPrimRep (MkStgKind kind) = case kindPrimRep_maybe kind of
+  Just rs -> rs
+  r -> pprPanic "stgKindPrimRep" (ppr r)
 
 -- | Find the result type after applying the function to the arguments
 --
@@ -361,12 +367,12 @@ genBody ctx startReg args e typ = do
 -- In case of failure to determine the type, we default to LiftedRep as it's
 -- probably what it is.
 --
-resultSize :: HasDebugCallStack => Type -> [(PrimRep, Int)]
-resultSize ty = result
+resultSize :: HasDebugCallStack => StgKind -> [(PrimRep, Int)]
+resultSize kind = result
   where
     result       = result_reps `zip` result_slots
     result_slots = fmap (slotCount . primRepSize) result_reps
-    result_reps  = typePrimRep ty
+    result_reps  = stgKindPrimRep kind
 
 -- | Ensure that the set of identifiers has valid 'RuntimeRep's. This function
 -- returns a no-op when 'csRuntimeAssert' in 'StgToJSConfig' is False.

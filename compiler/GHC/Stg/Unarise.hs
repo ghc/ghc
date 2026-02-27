@@ -494,7 +494,7 @@ unariseBinding rho top_level (StgRec xrhss)
   = StgRec <$> mapM (\(x, rhs) -> (x,) <$> unariseRhs rho top_level rhs) xrhss
 
 unariseRhs :: UnariseEnv -> Bool -> StgRhs -> UniqSM StgRhs
-unariseRhs rho top_level (StgRhsClosure ext ccs update_flag args expr typ)
+unariseRhs rho top_level (StgRhsClosure ext ccs update_flag args expr kind)
   = do (rho', args1) <- unariseFunArgBinders rho args
        expr' <- unariseExpr rho' expr
        -- Unarisation can lead to a StgRhsClosure becoming a StgRhsCon.
@@ -515,7 +515,7 @@ unariseRhs rho top_level (StgRhsClosure ext ccs update_flag args expr typ)
        let mk_rhs = MkStgRhs
             { rhs_args = args1
             , rhs_expr = expr'
-            , rhs_type = typ
+            , rhs_kind = kind
             , rhs_is_join = update_flag == JumpedTo
             }
        if | top_level
@@ -527,7 +527,7 @@ unariseRhs rho top_level (StgRhsClosure ext ccs update_flag args expr typ)
           -> pure rhs_con
 
           | otherwise
-          -> pure (StgRhsClosure ext ccs update_flag args1 expr' typ)
+          -> pure (StgRhsClosure ext ccs update_flag args1 expr' kind)
 
 unariseRhs rho _top (StgRhsCon ccs con mu ts args typ)
   = assert (not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
