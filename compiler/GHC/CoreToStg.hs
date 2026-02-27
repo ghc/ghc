@@ -566,7 +566,7 @@ mkStgApp f how_bound core_args stg_args res_ty
 
       -- A regular foreign call.
       FCallId call     -> assert exactly_saturated $
-                          StgOpApp (StgFCallOp call (idType f)) stg_args res_kind
+                          StgOpApp (StgFCallOp call (collectStgFArgTypes (idType f))) stg_args res_kind
 
       TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,stg_args)
 

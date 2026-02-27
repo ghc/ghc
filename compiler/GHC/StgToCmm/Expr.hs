@@ -688,6 +688,7 @@ isSimpleOp (StgPrimOp op) stg_args                  = do
     -- See Note [Inlining out-of-line primops and heap checks]
     return $! shouldInlinePrimOp cfg op arg_exprs
 isSimpleOp (StgPrimCallOp _) _                           = return False
+isSimpleOp (StgTagToEnumOp _) _ = return True
 
 -----------------
 chooseReturnBndrs :: Id -> AltType -> [CgStgAlt] -> [NonVoid Id]

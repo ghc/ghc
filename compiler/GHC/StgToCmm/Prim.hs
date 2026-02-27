@@ -36,6 +36,7 @@ import GHC.Stg.Syntax
 import GHC.Cmm
 import GHC.Unit         ( rtsUnit )
 import GHC.Core.Type    ( typeKind )
+import GHC.Core.TyCon ( isEnumerationTyCon )
 import GHC.Cmm.CLabel
 import GHC.Cmm.Info     ( closureInfoPtr )
 import GHC.Cmm.Utils
@@ -84,6 +85,22 @@ cgOpApp (StgPrimCallOp primcall) args _res_ty
   = do  { cmm_args <- getNonVoidArgAmodes args
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
+        
+-- tagToEnum# is special: we need to pull the constructor
+-- out of the table, and perform an appropriate return.
+cgOpApp (StgTagToEnumOp tyc) args _ = do
+  amodes <- getNonVoidArgAmodes args
+  case amodes of
+    [amode] -> do
+      -- If you're reading this code in the attempt to figure
+      -- out why the compiler panic'ed here, it is probably because
+      -- you used tagToEnum# in a non-monomorphic setting, e.g.,
+      --         intToTg :: Enum a => Int -> a ; intToTg (I# x#) = tagToEnum# x#
+      -- That won't work.
+      massert (isEnumerationTyCon tyc)
+      platform <- getPlatform
+      emitReturn [tagToClosure platform tyc amode]
+    _ -> pprPanic "cgOpApp: tagToEnum# should be applied to exactly one argument" (ppr args)
 
 cmmPrimOpApp :: StgToCmmConfig -> PrimOp -> [CmmExpr] -> Maybe StgKind -> FCode ReturnKind
 cmmPrimOpApp cfg primop cmm_args mres_ty =
