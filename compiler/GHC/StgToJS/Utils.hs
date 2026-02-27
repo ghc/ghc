@@ -13,10 +13,12 @@ module GHC.StgToJS.Utils
   , slotCount
   , varSize
   , typeSize
+  , stgKindSize
   , isVoid
   , isMultiVar
   , idJSRep
   , typeJSRep
+  , stgKindJSRep
   , unaryTypeJSRep
   , primRepToJSRep
   , primOrVoidRepToJSRep
@@ -180,6 +182,9 @@ jsRepSlots LongV = TwoSlots -- hi, low
 jsRepSlots AddrV = TwoSlots -- obj/array, offset
 jsRepSlots _     = OneSlot
 
+stgKindSize :: StgKind -> Int
+stgKindSize = sum . map varSize . stgKindJSRep
+
 typeSize :: Type -> Int
 typeSize t = sum . map varSize . typeJSRep $ t
 
@@ -198,6 +203,11 @@ idJSRep = typeJSRep . idType
 
 typeJSRep :: HasDebugCallStack => Type -> [JSRep]
 typeJSRep t = map primRepToJSRep (typePrimRep t)
+
+stgKindJSRep :: HasDebugCallStack => StgKind -> [JSRep]
+stgKindJSRep (MkStgKind k) = case kindPrimRep_maybe k of
+  Just rs -> map primRepToJSRep rs
+  Nothing -> pprPanic "kindJSRep" (ppr k)
 
 -- only use if you know it's not an unboxed tuple
 unaryTypeJSRep :: HasDebugCallStack => UnaryType -> JSRep

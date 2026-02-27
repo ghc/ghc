@@ -92,6 +92,8 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import Control.Monad
 import Control.Arrow ((&&&))
+import GHC.Builtin.Types (boolTyCon)
+import GHC.Utils.Outputable ((<+>))
 
 -- | Evaluate an expression in the given expression context (continuation)
 genExpr :: HasDebugCallStack => ExprCtx -> CgStgExpr -> G (JStgStat, ExprResult)
@@ -105,12 +107,14 @@ genExpr ctx stg = case stg of
     as <- concatMapM genArg args
     c <- genCon ctx con as
     return (c, ExprInline)
-  StgOpApp (StgFCallOp f _) args t
-    -> genForeignCall ctx f t (concatMap typex_expr $ ctxTarget ctx) args
-  StgOpApp (StgPrimOp op) args t
-    -> genPrimOp ctx op args t
-  StgOpApp (StgPrimCallOp c) args t
-    -> genPrimCall ctx c args t
+  StgOpApp (StgFCallOp f _) args k
+    -> genForeignCall ctx f k (concatMap typex_expr $ ctxTarget ctx) args
+  StgOpApp (StgPrimOp op) args _k
+    -> genPrimOp ctx op args
+  StgOpApp (StgPrimCallOp c) args k
+    -> genPrimCall ctx c args k
+  StgOpApp (StgTagToEnumOp tyc) [arg] _k -> genTagToEnumOp ctx tyc arg
+  StgOpApp op@(StgTagToEnumOp _) args k -> pprPanic "genExpr: StgTagToEnumOp not applied to exactly one argument" (ppr op <+> ppr args <+> ppr (getStgKind k))
   StgCase e b at alts
     -> genCase ctx b e at alts (liveVars $ stgExprLive False stg)
   StgLet _ b e -> do
@@ -1103,14 +1107,20 @@ allocDynAll haveDecl middle cls = do
 -- | Generate a primop. This function wraps around the real generator
 -- 'GHC.StgToJS.genPrim', handling the 'ExprCtx' and all arguments before
 -- generating the primop.
-genPrimOp :: ExprCtx -> PrimOp -> [StgArg] -> Type -> G (JStgStat, ExprResult)
-genPrimOp ctx op args t = do
+genPrimOp :: ExprCtx -> PrimOp -> [StgArg] -> G (JStgStat, ExprResult)
+genPrimOp ctx op args = do
   as <- concatMapM genArg args
   prof <- csProf <$> getSettings
   bound <- csBoundsCheck <$> getSettings
-  let prim_gen = withTag "h$PRM" $ genPrim prof bound t op (concatMap typex_expr $ ctxTarget ctx) as
+  let prim_gen = withTag "h$PRM" $ genPrim prof bound op (concatMap typex_expr $ ctxTarget ctx) as
   -- fixme: should we preserve/check the primreps?
   jsm <- liftIO initJSM
   return $ case runJSM jsm prim_gen of
              PrimInline s -> (s, ExprInline)
              PRPrimCall s -> (s, ExprCont)
+
+genTagToEnumOp :: ExprCtx -> TyCon -> StgArg -> State.StateT GenState IO (JStgStat, ExprResult)
+genTagToEnumOp ctx tyc arg = do
+  [tag] <- genArg arg
+  let [v] = concatMap typex_expr $ ctxTarget ctx
+  pure (v |= if tyc == boolTyCon then IfExpr tag true_ false_ else app hdTagToEnum [tag], ExprInline)

@@ -612,6 +612,11 @@ schemeE d s p (StgCase scrut _ _ []) = schemeE d s p scrut
 schemeE d s p (StgCase scrut bndr _ alts)
    = doCase d s p scrut bndr alts
 
+stgKindPrimRepU :: StgKind -> PrimOrVoidRep
+stgKindPrimRepU (MkStgKind kind) = case kindPrimRep_maybe kind of
+  Just [] -> VoidRep
+  Just [r] -> NVRep r
+  r -> pprPanic "stgKindPrimRepU" (ppr r)
 
 {-
    Ticked Expressions
@@ -655,9 +660,9 @@ schemeT d s p app
    = implement_tagToId d s p arg constr_names
 
    -- Case 1
-schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _ty) args result_ty)
+schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _ty) args kind)
    = if isSupportedCConv ccall_spec
-      then generateCCall d s p ccall_spec result_ty args
+      then generateCCall d s p ccall_spec kind args
       else unsupportedCConvException
 
 schemeT d s p (StgOpApp (StgPrimOp op) args _ty) = do
@@ -669,8 +674,8 @@ schemeT d s p (StgOpApp (StgPrimOp op) args _ty) = do
     -- Otherwise we have to do a call to the primop wrapper instead :(
     _         -> doTailCall d s p (primOpId op) (reverse args)
 
-schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label _)) args result_ty)
-   = generatePrimCall d s p label result_ty args
+schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label _)) args _reps)
+   = generatePrimCall d s p label args
 
 schemeT d s p (StgConApp con _cn args _tys)
    -- Case 2: Unboxed tuple
@@ -1867,10 +1872,9 @@ generatePrimCall
     -> Sequel
     -> BCEnv
     -> CLabelString          -- where to call
-    -> Type
     -> [StgArg]              -- args (atoms)
     -> BcM BCInstrList
-generatePrimCall d s p target _result_ty args
+generatePrimCall d s p target  args
  = do
      profile <- getProfile
      let
@@ -1929,15 +1933,15 @@ generateCCall
     -> Sequel
     -> BCEnv
     -> CCallSpec              -- where to call
-    -> Type
+    -> StgKind
     -> [StgArg]              -- args (atoms)
     -> BcM BCInstrList
-generateCCall d0 s p (CCallSpec target PrimCallConv _) result_ty args
+generateCCall d0 s p (CCallSpec target PrimCallConv _) _result_kind args
  | (StaticTarget _ label _) <- target
- = generatePrimCall d0 s p label result_ty args
+ = generatePrimCall d0 s p label args
  | otherwise
  = panic "GHC.StgToByteCode.generateCCall: primcall convention only supports static targets"
-generateCCall d0 s p (CCallSpec target _ safety) result_ty args
+generateCCall d0 s p (CCallSpec target _ safety) result_kind args
  = do
      profile <- getProfile
 
@@ -2001,7 +2005,7 @@ generateCCall d0 s p (CCallSpec target _ safety) result_ty args
          -- d_after_args is the stack depth once the args are on.
 
          -- Get the result rep.
-         r_rep = maybe_getCCallReturnRep result_ty
+         r_rep = stgKindPrimRepU result_kind
          {-
          Because the Haskell stack grows down, the a_reps refer to
          lowest to highest addresses in that order.  The args for the call
@@ -2165,38 +2169,22 @@ mkDummyLiteral platform pr
 --
 -- to  VoidRep
 
-maybe_getCCallReturnRep :: Type -> PrimOrVoidRep
-maybe_getCCallReturnRep fn_ty
-   = let
-       (_a_tys, r_ty) = splitFunTys (dropForAlls fn_ty)
-     in
-       case typePrimRep r_ty of
-         [] -> VoidRep
-         [rep] -> NVRep rep
-
-                 -- if it was, it would be impossible to create a
-                 -- valid return value placeholder on the stack
-         _ -> pprPanic "maybe_getCCallReturn: can't handle:"
-                         (pprType fn_ty)
-
 maybe_is_tagToEnum_call :: CgStgExpr -> Maybe (StgArg, [Name])
 -- Detect and extract relevant info for the tagToEnum kludge.
-maybe_is_tagToEnum_call (StgOpApp (StgPrimOp TagToEnumOp) args t)
+maybe_is_tagToEnum_call (StgOpApp (StgTagToEnumOp tyc) args t)
   | [v] <- args
-  = Just (v, extract_constr_Names t)
+  = Just (v, extract_constr_Names tyc)
   | otherwise
   = pprPanic "StgToByteCode: tagToEnum#"
      $ text "Expected exactly one arg, but actual args are:" <+> ppr args
   where
-    extract_constr_Names ty
-           | rep_ty <- unwrapType ty
-           , Just tyc <- tyConAppTyCon_maybe rep_ty
-           , isBoxedDataTyCon tyc
+    extract_constr_Names tyc
+           | isBoxedDataTyCon tyc
            = map (getName . dataConWorkId) (tyConDataCons tyc)
            -- NOTE: use the worker name, not the source name of
            -- the DataCon.  See "GHC.Core.DataCon" for details.
            | otherwise
-           = pprPanic "maybe_is_tagToEnum_call.extract_constr_Ids" (ppr ty)
+           = pprPanic "maybe_is_tagToEnum_call.extract_constr_Ids" (ppr tyc)
 maybe_is_tagToEnum_call _ = Nothing
 
 {- -----------------------------------------------------------------------------

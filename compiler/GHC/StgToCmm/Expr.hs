@@ -114,7 +114,7 @@ cgExpr (StgOpApp (StgPrimOp DataToTagLargeOp) [StgVarArg a] _res_ty) = do
   emitReturn [CmmReg $ CmmLocal result_reg]
 
 
-cgExpr (StgOpApp op args ty) = cgOpApp op args ty
+cgExpr (StgOpApp op args kind) = cgOpApp op args kind
 cgExpr (StgConApp con mn args _) = cgConApp con mn args
 cgExpr (StgTick t e)         = cgTick t >> cgExpr e
 cgExpr (StgLit lit)          = do cmm_expr <- cgLit lit

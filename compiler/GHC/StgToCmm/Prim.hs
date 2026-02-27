@@ -35,8 +35,7 @@ import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 import GHC.Cmm
 import GHC.Unit         ( rtsUnit )
-import GHC.Core.Type    ( Type, tyConAppTyCon_maybe )
-import GHC.Core.TyCon
+import GHC.Core.Type    ( typeKind )
 import GHC.Cmm.CLabel
 import GHC.Cmm.Info     ( closureInfoPtr )
 import GHC.Cmm.Utils
@@ -68,32 +67,32 @@ might be a Haskell closure pointer, we don't want to evaluate it. -}
 ----------------------------------
 cgOpApp :: StgOp        -- The op
         -> [StgArg]     -- Arguments
-        -> Type         -- Result type (always an unboxed tuple)
+        -> StgKind      -- Kind (always unboxed tuple)
         -> FCode ReturnKind
 
 -- Foreign calls
-cgOpApp (StgFCallOp fcall ty) stg_args res_ty
-  = cgForeignCall fcall ty stg_args res_ty
+cgOpApp (StgFCallOp fcall ty) stg_args res_kind
+  = cgForeignCall fcall ty stg_args res_kind
       -- See Note [Foreign call results]
 
-cgOpApp (StgPrimOp primop) args res_ty = do
+cgOpApp (StgPrimOp primop) args kind = do
     cfg <- getStgToCmmConfig
     cmm_args <- getNonVoidArgAmodes args
-    cmmPrimOpApp cfg primop cmm_args (Just res_ty)
+    cmmPrimOpApp cfg primop cmm_args (Just kind)
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
   = do  { cmm_args <- getNonVoidArgAmodes args
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
 
-cmmPrimOpApp :: StgToCmmConfig -> PrimOp -> [CmmExpr] -> Maybe Type -> FCode ReturnKind
+cmmPrimOpApp :: StgToCmmConfig -> PrimOp -> [CmmExpr] -> Maybe StgKind -> FCode ReturnKind
 cmmPrimOpApp cfg primop cmm_args mres_ty =
   case emitPrimOp cfg primop cmm_args of
     PrimopCmmEmit_Internal f ->
       let
-         -- if the result type isn't explicitly given, we directly use the
-         -- result type of the primop.
-         res_ty = fromMaybe (primOpResultType primop) mres_ty
+         -- if the result kind isn't explicitly given, we directly use the
+         -- result kind of the primop.
+         res_ty = fromMaybe (MkStgKind (typeKind (primOpResultType primop))) mres_ty
       in emitReturn =<< f res_ty
     PrimopCmmEmit_External -> do
       let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
@@ -1669,18 +1668,9 @@ emitPrimOp cfg primop =
     then Left (MO_S_Mul2     (wordWidth platform))
     else Right genericIntMul2Op
 
-  -- tagToEnum# is special: we need to pull the constructor
-  -- out of the table, and perform an appropriate return.
-  TagToEnumOp -> \[amode] -> PrimopCmmEmit_Internal $ \res_ty -> do
-    -- If you're reading this code in the attempt to figure
-    -- out why the compiler panic'ed here, it is probably because
-    -- you used tagToEnum# in a non-monomorphic setting, e.g.,
-    --         intToTg :: Enum a => Int -> a ; intToTg (I# x#) = tagToEnum# x#
-    -- That won't work.
-    let tycon = fromMaybe (pprPanic "tagToEnum#: Applied to non-concrete type" (ppr res_ty)) (tyConAppTyCon_maybe res_ty)
-    massert (isEnumerationTyCon tycon)
-    platform <- getPlatform
-    pure [tagToClosure platform tycon amode]
+  -- tagToEnum# is removed in CoreToStg and rewritten to a special StgTagToEnumOp
+  -- See Note [?]
+  TagToEnumOp -> panic "emitPrimOp: TagToEnumOp should have been gone by now" 
 
 -- Out of line primops.
 -- TODO compiler need not know about these
@@ -1838,7 +1828,7 @@ emitPrimOp cfg primop =
     :: ([LocalReg] -- where to put the results
         -> FCode ())
     -> PrimopCmmEmit
-  opIntoRegs f = PrimopCmmEmit_Internal $ \res_ty -> do
+  opIntoRegs f = PrimopCmmEmit_Internal $ \res_kind -> do
     regs <- case result_info of
       ReturnsVoid -> pure []
       ReturnsPrim rep
@@ -1846,7 +1836,7 @@ emitPrimOp cfg primop =
               pure [reg]
 
       ReturnsTuple
-        -> do (regs, _hints) <- newUnboxedTupleRegs res_ty
+        -> do (regs, _hints) <- newUnboxedTupleRegs (getStgKind res_kind)
               pure regs
     f regs
     pure $ map (CmmReg . CmmLocal) regs
@@ -1918,8 +1908,7 @@ data PrimopCmmEmit
   -- (presumably) C--.
   = PrimopCmmEmit_External
   -- | Real primop turned into inline C--.
-  | PrimopCmmEmit_Internal (Type -- the return type, some primops are specialized to it
-                            -> FCode [CmmExpr]) -- just for TagToEnum for now
+  | PrimopCmmEmit_Internal (StgKind -> FCode [CmmExpr])
 
 type GenericOp = [CmmFormal] -> [CmmActual] -> FCode ()
 
