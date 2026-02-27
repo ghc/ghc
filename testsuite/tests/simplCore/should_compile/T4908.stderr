@@ -4,45 +4,29 @@ Result size of Tidy Core
   = {terms: 65, types: 35, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T4908.$trModule4 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 20 0}]
-T4908.$trModule4 = "main"#
+$trModule1 :: Addr#
+[GblId, Unf=OtherCon []]
+$trModule1 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T4908.$trModule3 :: TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T4908.$trModule3 = GHC.Internal.Types.TrNameS T4908.$trModule4
+$trModule2 :: TrName
+[GblId, Unf=OtherCon []]
+$trModule2 = GHC.Internal.Types.TrNameS $trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T4908.$trModule2 :: Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T4908.$trModule2 = "T4908"#
+$trModule3 :: Addr#
+[GblId, Unf=OtherCon []]
+$trModule3 = "T4908"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T4908.$trModule1 :: TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T4908.$trModule1 = GHC.Internal.Types.TrNameS T4908.$trModule2
+$trModule4 :: TrName
+[GblId, Unf=OtherCon []]
+$trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T4908.$trModule :: Module
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T4908.$trModule
-  = GHC.Internal.Types.Module T4908.$trModule3 T4908.$trModule1
+T4908.$trModule [InlPrag=[~]] :: Module
+[GblId, Unf=OtherCon []]
+T4908.$trModule = GHC.Internal.Types.Module $trModule2 $trModule4
 
 Rec {
 -- RHS size: {terms: 19, types: 5, coercions: 0, joins: 0/0}

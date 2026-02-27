@@ -20,65 +20,65 @@ DATA CONSTRUCTORS
   K2 :: forall a. a -> T2 a
   K1 :: forall a. a -> T1 a
 Dependent modules: []
-Dependent packages: [(normal, base-4.21.0.0)]
+Dependent packages: [(normal, base-4.22.0.0)]
 
 ==================== Typechecker ====================
-Roles1.$tcT7
+Roles1.$tcT7 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       178606230775360129#Word64 14564382578551945561#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "T7"#) 1# $krep
-Roles1.$tc'K7
+Roles1.$tc'K7 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       15901479081375327280#Word64 4842873210599704617#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "'K7"#) 3# $krep
-Roles1.$tcT6
+Roles1.$tcT6 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       7244893995195634045#Word64 6882827069359931041#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "T6"#) 1# $krep
-Roles1.$tc'K6
+Roles1.$tc'K6 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       13928703131159360198#Word64 9274401506945696896#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "'K6"#) 2# $krep
-Roles1.$tcT5
+Roles1.$tcT5 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       12033401645911719002#Word64 6369139038321702301#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "T5"#) 0#
       GHC.Internal.Types.krep$*Arr*
-Roles1.$tc'K5
+Roles1.$tc'K5 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       5548842497263642061#Word64 18349261927117571882#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "'K5"#) 1# $krep
-Roles1.$tcT4
+Roles1.$tcT4 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       15834077582937152787#Word64 17059037094835388922#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "T4"#) 0# $krep
-Roles1.$tc'K4
+Roles1.$tc'K4 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       10188453925450404995#Word64 4762093850599364042#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "'K4"#) 2# $krep
-Roles1.$tcT3
+Roles1.$tcT3 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       13341737262627465733#Word64 14527452670364737316#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "T3"#) 1# $krep
-Roles1.$tc'K3
+Roles1.$tc'K3 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       14534968069054730342#Word64 6860808298964464185#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "'K3"#) 2# $krep
-Roles1.$tcT2
+Roles1.$tcT2 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       12900773996789723956#Word64 9313087549503346504#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "T2"#) 0#
       GHC.Internal.Types.krep$*Arr*
-Roles1.$tc'K2
+Roles1.$tc'K2 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       11054915488163123841#Word64 10799789256744079155#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "'K2"#) 1# $krep
-Roles1.$tcT1
+Roles1.$tcT1 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       13228660854624297872#Word64 14494320157476678712#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "T1"#) 0#
       GHC.Internal.Types.krep$*Arr*
-Roles1.$tc'K1
+Roles1.$tc'K1 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       1265606750138351672#Word64 7033043930969109074#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "'K1"#) 1# $krep
@@ -118,7 +118,7 @@ $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepTyConApp Roles1.$tcT2 ((:) $krep [])
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepTyConApp Roles1.$tcT1 ((:) $krep [])
-Roles1.$trModule
+Roles1.$trModule [InlPrag=[~]]
   = GHC.Internal.Types.Module
       (GHC.Internal.Types.TrNameS "main"#)
       (GHC.Internal.Types.TrNameS "Roles1"#)

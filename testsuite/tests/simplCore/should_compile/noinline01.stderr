@@ -9,25 +9,24 @@ Noinline01.g :: GHC.Internal.Types.Bool
 [GblId] =
     \u [] Noinline01.f GHC.Internal.Types.False;
 
-Noinline01.$trModule4 :: GHC.Internal.Prim.Addr#
+$trModule1 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []] =
     "main"#;
 
-Noinline01.$trModule3 :: GHC.Internal.Types.TrName
+$trModule2 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []] =
-    GHC.Internal.Types.TrNameS! [Noinline01.$trModule4];
+    GHC.Internal.Types.TrNameS! [$trModule1];
 
-Noinline01.$trModule2 :: GHC.Internal.Prim.Addr#
+$trModule3 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []] =
     "Noinline01"#;
 
-Noinline01.$trModule1 :: GHC.Internal.Types.TrName
+$trModule4 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []] =
-    GHC.Internal.Types.TrNameS! [Noinline01.$trModule2];
+    GHC.Internal.Types.TrNameS! [$trModule3];
 
-Noinline01.$trModule :: GHC.Internal.Types.Module
+Noinline01.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
 [GblId, Unf=OtherCon []] =
-    GHC.Internal.Types.Module! [Noinline01.$trModule3
-                                Noinline01.$trModule1];
+    GHC.Internal.Types.Module! [$trModule2 $trModule4];
 
 

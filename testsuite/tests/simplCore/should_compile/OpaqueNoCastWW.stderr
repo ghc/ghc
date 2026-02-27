@@ -62,7 +62,7 @@ $trModule4 :: GHC.Internal.Types.TrName
 $trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-OpaqueNoCastWW.$trModule :: GHC.Internal.Types.Module
+OpaqueNoCastWW.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
 [GblId, Unf=OtherCon []]
 OpaqueNoCastWW.$trModule
   = GHC.Internal.Types.Module $trModule2 $trModule4
@@ -105,7 +105,7 @@ $tcSigned2 :: GHC.Internal.Types.TrName
 $tcSigned2 = GHC.Internal.Types.TrNameS $tcSigned1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-OpaqueNoCastWW.$tcSigned :: GHC.Internal.Types.TyCon
+OpaqueNoCastWW.$tcSigned [InlPrag=[~]] :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 OpaqueNoCastWW.$tcSigned
   = GHC.Internal.Types.TyCon
@@ -148,7 +148,7 @@ $tc'S2 :: GHC.Internal.Types.TrName
 $tc'S2 = GHC.Internal.Types.TrNameS $tc'S1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-OpaqueNoCastWW.$tc'S :: GHC.Internal.Types.TyCon
+OpaqueNoCastWW.$tc'S [InlPrag=[~]] :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 OpaqueNoCastWW.$tc'S
   = GHC.Internal.Types.TyCon

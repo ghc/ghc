@@ -17,30 +17,29 @@ Par01.depth
 end Rec }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-Par01.$trModule4 :: GHC.Internal.Prim.Addr#
+$trModule1 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
-Par01.$trModule4 = "main"#
+$trModule1 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-Par01.$trModule3 :: GHC.Internal.Types.TrName
+$trModule2 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []]
-Par01.$trModule3 = GHC.Internal.Types.TrNameS Par01.$trModule4
+$trModule2 = GHC.Internal.Types.TrNameS $trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-Par01.$trModule2 :: GHC.Internal.Prim.Addr#
+$trModule3 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []]
-Par01.$trModule2 = "Par01"#
+$trModule3 = "Par01"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-Par01.$trModule1 :: GHC.Internal.Types.TrName
+$trModule4 :: GHC.Internal.Types.TrName
 [GblId, Unf=OtherCon []]
-Par01.$trModule1 = GHC.Internal.Types.TrNameS Par01.$trModule2
+$trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-Par01.$trModule :: GHC.Internal.Types.Module
+Par01.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
 [GblId, Unf=OtherCon []]
-Par01.$trModule
-  = GHC.Internal.Types.Module Par01.$trModule3 Par01.$trModule1
+Par01.$trModule = GHC.Internal.Types.Module $trModule2 $trModule4
 
 
 

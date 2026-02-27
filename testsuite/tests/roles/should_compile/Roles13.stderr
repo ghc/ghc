@@ -37,7 +37,7 @@ $trModule4 :: GHC.Internal.Types.TrName
 $trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-Roles13.$trModule :: GHC.Internal.Types.Module
+Roles13.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
 [GblId, Unf=OtherCon []]
 Roles13.$trModule = GHC.Internal.Types.Module $trModule2 $trModule4
 
@@ -65,7 +65,7 @@ $tcAge2 :: GHC.Internal.Types.TrName
 $tcAge2 = GHC.Internal.Types.TrNameS $tcAge1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-Roles13.$tcAge :: GHC.Internal.Types.TyCon
+Roles13.$tcAge [InlPrag=[~]] :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tcAge
   = GHC.Internal.Types.TyCon
@@ -99,7 +99,7 @@ $tc'MkAge2 :: GHC.Internal.Types.TrName
 $tc'MkAge2 = GHC.Internal.Types.TrNameS $tc'MkAge1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-Roles13.$tc'MkAge :: GHC.Internal.Types.TyCon
+Roles13.$tc'MkAge [InlPrag=[~]] :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tc'MkAge
   = GHC.Internal.Types.TyCon
@@ -121,7 +121,7 @@ $tcWrap2 :: GHC.Internal.Types.TrName
 $tcWrap2 = GHC.Internal.Types.TrNameS $tcWrap1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-Roles13.$tcWrap :: GHC.Internal.Types.TyCon
+Roles13.$tcWrap [InlPrag=[~]] :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tcWrap
   = GHC.Internal.Types.TyCon
@@ -162,7 +162,7 @@ $tc'MkWrap2 :: GHC.Internal.Types.TrName
 $tc'MkWrap2 = GHC.Internal.Types.TrNameS $tc'MkWrap1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-Roles13.$tc'MkWrap :: GHC.Internal.Types.TyCon
+Roles13.$tc'MkWrap [InlPrag=[~]] :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tc'MkWrap
   = GHC.Internal.Types.TyCon

@@ -191,6 +191,7 @@ mkModIdBindings
        ; mod_nm        <- newGlobalBinder mod (mkVarOccFS (fsLit "$trModule")) loc
        ; trModuleTyCon <- tcLookupTyCon trModuleTyConName
        ; let mod_id = mkExportedVanillaId mod_nm (mkTyConApp trModuleTyCon [])
+                      `setInlinePragma` neverInlinePragma
        ; mod_bind      <- mkVarBind mod_id <$> mkModIdRHS mod
 
        ; tcg_env <- tcExtendGlobalValEnv [mod_id] getGblEnv
@@ -241,6 +242,7 @@ todoForTyCons mod mod_id tycons = do
     trTyConTy <- mkTyConTy <$> tcLookupTyCon trTyConTyConName
     let mk_rep_id :: TyConRepName -> Id
         mk_rep_id rep_name = mkExportedVanillaId rep_name trTyConTy
+                             `setInlinePragma` neverInlinePragma
 
     let typeable_tycons :: [TypeableTyCon]
         typeable_tycons =

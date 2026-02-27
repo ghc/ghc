@@ -29,7 +29,7 @@ $trModule4 :: GHC.Internal.Types.TrName
 $trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T2431.$trModule :: GHC.Internal.Types.Module
+T2431.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
 [GblId, Unf=OtherCon []]
 T2431.$trModule = GHC.Internal.Types.Module $trModule2 $trModule4
 
@@ -49,7 +49,7 @@ $tc:~:2 :: GHC.Internal.Types.TrName
 $tc:~:2 = GHC.Internal.Types.TrNameS $tc:~:1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T2431.$tc:~: :: GHC.Internal.Types.TyCon
+T2431.$tc:~: [InlPrag=[~]] :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 T2431.$tc:~:
   = GHC.Internal.Types.TyCon
@@ -91,7 +91,7 @@ $tc'Refl2 :: GHC.Internal.Types.TrName
 $tc'Refl2 = GHC.Internal.Types.TrNameS $tc'Refl1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T2431.$tc'Refl :: GHC.Internal.Types.TyCon
+T2431.$tc'Refl [InlPrag=[~]] :: GHC.Internal.Types.TyCon
 [GblId, Unf=OtherCon []]
 T2431.$tc'Refl
   = GHC.Internal.Types.TyCon

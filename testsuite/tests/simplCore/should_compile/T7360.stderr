@@ -63,45 +63,29 @@ fun2
        })
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$trModule4 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 20 0}]
-T7360.$trModule4 = "main"#
+$trModule1 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule1 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$trModule3 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T7360.$trModule3 = GHC.Internal.Types.TrNameS T7360.$trModule4
+$trModule2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule2 = GHC.Internal.Types.TrNameS $trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$trModule2 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T7360.$trModule2 = "T7360"#
+$trModule3 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule3 = "T7360"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$trModule1 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T7360.$trModule1 = GHC.Internal.Types.TrNameS T7360.$trModule2
+$trModule4 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T7360.$trModule :: GHC.Internal.Types.Module
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T7360.$trModule
-  = GHC.Internal.Types.Module T7360.$trModule3 T7360.$trModule1
+T7360.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
+[GblId, Unf=OtherCon []]
+T7360.$trModule = GHC.Internal.Types.Module $trModule2 $trModule4
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep :: GHC.Internal.Types.KindRep
@@ -112,140 +96,104 @@ $krep
       (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tcFoo2 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 20 0}]
-T7360.$tcFoo2 = "Foo"#
+$tcFoo1 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$tcFoo1 = "Foo"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tcFoo1 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T7360.$tcFoo1 = GHC.Internal.Types.TrNameS T7360.$tcFoo2
+$tcFoo2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tcFoo2 = GHC.Internal.Types.TrNameS $tcFoo1
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T7360.$tcFoo :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T7360.$tcFoo [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T7360.$tcFoo
   = GHC.Internal.Types.TyCon
       1581370841583180512#Word64
       13291578023368289311#Word64
       T7360.$trModule
-      T7360.$tcFoo1
+      $tcFoo2
       0#
       GHC.Internal.Types.krep$*
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-T7360.$tc'Foo4 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+$krep1 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-T7360.$tc'Foo4
+$krep1
   = GHC.Internal.Types.KindRepTyConApp
       T7360.$tcFoo (GHC.Internal.Types.[] @GHC.Internal.Types.KindRep)
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo6 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T7360.$tc'Foo6 = "'Foo1"#
+$tc'Foo4 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$tc'Foo4 = "'Foo1"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo5 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T7360.$tc'Foo5 = GHC.Internal.Types.TrNameS T7360.$tc'Foo6
+$tc'Foo5 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tc'Foo5 = GHC.Internal.Types.TrNameS $tc'Foo4
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo1 :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T7360.$tc'Foo1 [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T7360.$tc'Foo1
   = GHC.Internal.Types.TyCon
       3986951253261644518#Word64
       2515097940992351150#Word64
       T7360.$trModule
-      T7360.$tc'Foo5
+      $tc'Foo5
       0#
-      T7360.$tc'Foo4
+      $krep1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo8 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T7360.$tc'Foo8 = "'Foo2"#
+$tc'Foo6 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$tc'Foo6 = "'Foo2"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo7 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T7360.$tc'Foo7 = GHC.Internal.Types.TrNameS T7360.$tc'Foo8
+$tc'Foo7 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tc'Foo7 = GHC.Internal.Types.TrNameS $tc'Foo6
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo2 :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T7360.$tc'Foo2 [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T7360.$tc'Foo2
   = GHC.Internal.Types.TyCon
       17325079864060690428#Word64
       2969742457748208427#Word64
       T7360.$trModule
-      T7360.$tc'Foo7
+      $tc'Foo7
       0#
-      T7360.$tc'Foo4
+      $krep1
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo9 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
+$krep2 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
-T7360.$tc'Foo9 = GHC.Internal.Types.KindRepFun $krep T7360.$tc'Foo4
+$krep2 = GHC.Internal.Types.KindRepFun $krep $krep1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo11 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T7360.$tc'Foo11 = "'Foo3"#
+$tc'Foo8 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$tc'Foo8 = "'Foo3"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo10 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T7360.$tc'Foo10 = GHC.Internal.Types.TrNameS T7360.$tc'Foo11
+$tc'Foo9 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$tc'Foo9 = GHC.Internal.Types.TrNameS $tc'Foo8
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo3 :: GHC.Internal.Types.TyCon
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
+T7360.$tc'Foo3 [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+[GblId, Unf=OtherCon []]
 T7360.$tc'Foo3
   = GHC.Internal.Types.TyCon
       3674231676522181654#Word64
       2694749919371021431#Word64
       T7360.$trModule
-      T7360.$tc'Foo10
+      $tc'Foo9
       0#
-      T7360.$tc'Foo9
+      $krep2
 
 
 

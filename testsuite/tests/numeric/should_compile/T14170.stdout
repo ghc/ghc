@@ -4,45 +4,29 @@ Result size of Tidy Core
   = {terms: 17, types: 6, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-NatVal.$trModule4 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 20 0}]
-NatVal.$trModule4 = "main"#
+$trModule1 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule1 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-NatVal.$trModule3 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-NatVal.$trModule3 = GHC.Internal.Types.TrNameS NatVal.$trModule4
+$trModule2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule2 = GHC.Internal.Types.TrNameS $trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-NatVal.$trModule2 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-NatVal.$trModule2 = "NatVal"#
+$trModule3 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule3 = "NatVal"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-NatVal.$trModule1 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-NatVal.$trModule1 = GHC.Internal.Types.TrNameS NatVal.$trModule2
+$trModule4 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-NatVal.$trModule :: GHC.Internal.Types.Module
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-NatVal.$trModule
-  = GHC.Internal.Types.Module NatVal.$trModule3 NatVal.$trModule1
+NatVal.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
+[GblId, Unf=OtherCon []]
+NatVal.$trModule = GHC.Internal.Types.Module $trModule2 $trModule4
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 foo :: Integer

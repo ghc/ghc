@@ -13,7 +13,7 @@ f = \ (@a) (@b) _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] ->
       GHC.Internal.Types.True
 
 -- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
-T13032.$trModule :: GHC.Internal.Types.Module
+T13032.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,

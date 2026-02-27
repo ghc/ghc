@@ -1,27 +1,27 @@
-T16029.$trModule4 :: GHC.Internal.Prim.Addr#
-T16029.$trModule3 :: GHC.Internal.Types.TrName
-T16029.$trModule2 :: GHC.Internal.Prim.Addr#
-T16029.$trModule1 :: GHC.Internal.Types.TrName
-T16029.$trModule :: GHC.Internal.Types.Module
+$trModule1 :: GHC.Internal.Prim.Addr#
+$trModule2 :: GHC.Internal.Types.TrName
+$trModule3 :: GHC.Internal.Prim.Addr#
+$trModule4 :: GHC.Internal.Types.TrName
+T16029.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
 $krep :: GHC.Internal.Types.KindRep
-T16029.$tcS2 :: GHC.Internal.Prim.Addr#
-T16029.$tcS1 :: GHC.Internal.Types.TrName
-T16029.$tcS :: GHC.Internal.Types.TyCon
+$tcS1 :: GHC.Internal.Prim.Addr#
+$tcS2 :: GHC.Internal.Types.TrName
+T16029.$tcS [InlPrag=[~]] :: GHC.Internal.Types.TyCon
 $krep1 :: GHC.Internal.Types.KindRep
 $krep2 :: GHC.Internal.Types.KindRep
-T16029.$tc'MkS1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
-T16029.$tc'MkS3 :: GHC.Internal.Prim.Addr#
-T16029.$tc'MkS2 :: GHC.Internal.Types.TrName
-T16029.$tc'MkS :: GHC.Internal.Types.TyCon
-T16029.$tcT2 :: GHC.Internal.Prim.Addr#
-T16029.$tcT1 :: GHC.Internal.Types.TrName
-T16029.$tcT :: GHC.Internal.Types.TyCon
 $krep3 :: GHC.Internal.Types.KindRep
+$tc'MkS1 :: GHC.Internal.Prim.Addr#
+$tc'MkS2 :: GHC.Internal.Types.TrName
+T16029.$tc'MkS [InlPrag=[~]] :: GHC.Internal.Types.TyCon
+$tcT1 :: GHC.Internal.Prim.Addr#
+$tcT2 :: GHC.Internal.Types.TrName
+T16029.$tcT [InlPrag=[~]] :: GHC.Internal.Types.TyCon
 $krep4 :: GHC.Internal.Types.KindRep
-T16029.$tc'MkT1 [InlPrag=[~]] :: GHC.Internal.Types.KindRep
-T16029.$tc'MkT3 :: GHC.Internal.Prim.Addr#
-T16029.$tc'MkT2 :: GHC.Internal.Types.TrName
-T16029.$tc'MkT :: GHC.Internal.Types.TyCon
+$krep5 :: GHC.Internal.Types.KindRep
+$krep6 :: GHC.Internal.Types.KindRep
+$tc'MkT1 :: GHC.Internal.Prim.Addr#
+$tc'MkT2 :: GHC.Internal.Types.TrName
+T16029.$tc'MkT [InlPrag=[~]] :: GHC.Internal.Types.TyCon
   :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
   = \ (ww :: GHC.Internal.Prim.Int#) ->
 g2 [InlPrag=[2]] :: T -> Int -> Int

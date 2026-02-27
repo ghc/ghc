@@ -4,7 +4,7 @@ Result size of Desugar (after optimization)
   = {terms: 36, types: 13, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
-T16615.$trModule :: GHC.Internal.Types.Module
+T16615.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,

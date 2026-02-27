@@ -4,45 +4,29 @@ Result size of Tidy Core
   = {terms: 36, types: 15, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T3717.$trModule4 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 20 0}]
-T3717.$trModule4 = "main"#
+$trModule1 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule1 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T3717.$trModule3 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T3717.$trModule3 = GHC.Internal.Types.TrNameS T3717.$trModule4
+$trModule2 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule2 = GHC.Internal.Types.TrNameS $trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T3717.$trModule2 :: GHC.Internal.Prim.Addr#
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 30 0}]
-T3717.$trModule2 = "T3717"#
+$trModule3 :: GHC.Internal.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule3 = "T3717"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T3717.$trModule1 :: GHC.Internal.Types.TrName
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T3717.$trModule1 = GHC.Internal.Types.TrNameS T3717.$trModule2
+$trModule4 :: GHC.Internal.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule4 = GHC.Internal.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T3717.$trModule :: GHC.Internal.Types.Module
-[GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 10}]
-T3717.$trModule
-  = GHC.Internal.Types.Module T3717.$trModule3 T3717.$trModule1
+T3717.$trModule [InlPrag=[~]] :: GHC.Internal.Types.Module
+[GblId, Unf=OtherCon []]
+T3717.$trModule = GHC.Internal.Types.Module $trModule2 $trModule4
 
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
