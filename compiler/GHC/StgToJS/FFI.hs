@@ -41,9 +41,9 @@ import Data.Char
 import Data.Monoid
 import qualified Data.List as L
 
-genPrimCall :: ExprCtx -> PrimCall -> [StgArg] -> Type -> G (JStgStat, ExprResult)
-genPrimCall ctx (PrimCall lbl _) args t = do
-  j <- parseFFIPattern False False False (unpackFS hdStr ++ unpackFS lbl) t (concatMap typex_expr $ ctxTarget ctx) args
+genPrimCall :: ExprCtx -> PrimCall -> [StgArg] -> StgKind -> G (JStgStat, ExprResult)
+genPrimCall ctx (PrimCall lbl _) args k = do
+  j <- parseFFIPattern False False False (unpackFS hdStr ++ unpackFS lbl) k (concatMap typex_expr $ ctxTarget ctx) args
   return (j, ExprInline)
 
 -- | generate the actual call
@@ -65,13 +65,13 @@ parseFFIPattern :: Bool  -- ^ catch exception and convert them to haskell except
                 -> Bool  -- ^ async (only valid with javascript calling conv)
                 -> Bool  -- ^ using javascript calling convention
                 -> String
-                -> Type
+                -> StgKind
                 -> [JStgExpr]
                 -> [StgArg]
                 -> G JStgStat
-parseFFIPattern catchExcep async jscc pat t es as
+parseFFIPattern catchExcep async jscc pat k es as
   | catchExcep = do
-      c <- parseFFIPatternA async jscc pat t es as
+      c <- parseFFIPatternA async jscc pat k es as
       -- Generate:
       --  try {
       --    `c`;
@@ -79,22 +79,22 @@ parseFFIPattern catchExcep async jscc pat t es as
       --    return h$throwJSException(except);
       --  }
       return (TryStat c exceptStr (ReturnStat (ApplExpr hdThrowJSException [except])) mempty)
-  | otherwise  = parseFFIPatternA async jscc pat t es as
+  | otherwise  = parseFFIPatternA async jscc pat k es as
 
 parseFFIPatternA :: Bool  -- ^ async
                  -> Bool  -- ^ using JavaScript calling conv
                  -> String
-                 -> Type
+                 -> StgKind
                  -> [JStgExpr]
                  -> [StgArg]
                  -> G JStgStat
 -- async calls get an extra callback argument
 -- call it with the result
-parseFFIPatternA True True pat t es as  = do
+parseFFIPatternA True True pat k es as  = do
   cb <- freshIdent
   x  <- freshIdent
   d  <- freshIdent
-  stat <- parseFFIPattern' (Just (toJExpr cb)) True pat t es as
+  stat <- parseFFIPattern' (Just (toJExpr cb)) True pat k es as
   return $ mconcat
     [ x  ||= (toJExpr (jhFromList [(mv, null_)]))
     , cb ||= ApplExpr hdMkForeignCallback [toJExpr x]
@@ -111,7 +111,7 @@ parseFFIPatternA True True pat t es as  = do
             , copyResult (toJExpr d)
             ])
     ]
-    where nrst = typeSize t
+    where nrst = stgKindSize k
           copyResult d = assignAllEqual es (map (IdxExpr d . toJExpr) [0..nrst-1])
 parseFFIPatternA _async javascriptCc pat t es as =
   parseFFIPattern' Nothing javascriptCc pat t es as
@@ -121,15 +121,15 @@ parseFFIPatternA _async javascriptCc pat t es as =
 parseFFIPattern' :: Maybe JStgExpr -- ^ Nothing for sync, Just callback for async
                  -> Bool           -- ^ javascript calling convention used
                  -> String         -- ^ pattern called
-                 -> Type           -- ^ return type
+                 -> StgKind        -- ^ return type
                  -> [JStgExpr]     -- ^ expressions to return in (may be more than necessary)
                  -> [StgArg]       -- ^ arguments
                  -> G JStgStat
-parseFFIPattern' callback javascriptCc pat t ret args
+parseFFIPattern' callback javascriptCc pat k ret args
   | not javascriptCc = mkApply pat
   | otherwise = mkApply pat
   where
-    tgt = take (typeSize t) ret
+    tgt = take (stgKindSize k) ret
     -- automatic apply, build call and result copy
     mkApply f
       | Just cb <- callback = do
@@ -176,7 +176,7 @@ genFFIArg isJavaScriptCc a@(StgVarArg i)
 genForeignCall :: HasDebugCallStack
                => ExprCtx
                -> ForeignCall
-               -> Type
+               -> StgKind
                -> [JStgExpr]
                -> [StgArg]
                -> G (JStgStat, ExprResult)
@@ -195,9 +195,12 @@ genForeignCall _ctx
              , ExprInline
              )
 
-genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) t tgt args = do
-  emitForeign (ctxSrcSpan ctx) lbl safety cconv (map showArgType args) (showType t)
-  (,exprResult) <$> parseFFIPattern catchExcep async isJsCc (unpackFS lbl) t tgt' args
+genForeignCall ctx (CCall (CCallSpec ccTarget cconv safety)) k tgt args = do
+  -- TODO: the 'unknown' here was originally the type constructor shown by 'showType'
+  -- but now we don't have access to that any more. I'm not sure if this is necessary
+  -- for the JS back end.
+  emitForeign (ctxSrcSpan ctx) lbl safety cconv (map showArgType args) unknown
+  (,exprResult) <$> parseFFIPattern catchExcep async isJsCc (unpackFS lbl) k tgt' args
   where
     isJsCc = cconv == JavaScriptCallConv
 

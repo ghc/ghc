@@ -92,6 +92,7 @@ import Control.Monad
 import qualified Data.Map.Strict as Map
 import qualified Data.IntMap.Strict as I
 import qualified Data.Semigroup (Semigroup(..))
+import GHC.Builtin.Names (tupleRepDataConKey)
 
 --------------------------------------------------------------------------
 --
@@ -320,20 +321,22 @@ assignTemp e = do { platform <- getPlatform
                   ; emitAssign (CmmLocal reg) e
                   ; return reg }
 
-newUnboxedTupleRegs :: Type -> FCode ([LocalReg], [ForeignHint])
+newUnboxedTupleRegs :: Kind -> FCode ([LocalReg], [ForeignHint])
 -- Choose suitable local regs to use for the components
 -- of an unboxed tuple that we are about to return to
 -- the Sequel.  If the Sequel is a join point, using the
 -- regs it wants will save later assignments.
-newUnboxedTupleRegs res_ty
-  = assert (isUnboxedTupleType res_ty) $
+newUnboxedTupleRegs res_kind
+  -- TODO: clean up this messy assert. It is basically isUnboxedTupleType, but then for kinds.
+  = assert (Just True == ((\x -> tyConAppTyCon x `hasKey` tupleRepDataConKey) <$> (kindRep_maybe res_kind))) $
     do  { platform <- getPlatform
         ; sequel <- getSequel
         ; regs <- choose_regs platform sequel
         ; massert (regs `equalLength` reps)
         ; return (regs, map primRepForeignHint reps) }
   where
-    reps = typePrimRep res_ty
+    -- FIXME: this is partial
+    Just reps = kindPrimRep_maybe res_kind
     choose_regs _ (AssignTo regs _) = return regs
     choose_regs platform _          = mapM (newTemp . primRepCmmType platform) reps
 

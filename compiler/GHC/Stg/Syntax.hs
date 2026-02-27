@@ -14,6 +14,8 @@ generation.
 -}
 
 module GHC.Stg.Syntax (
+        StgKind(..),
+
         StgArg(..),
 
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
@@ -93,6 +95,9 @@ import GHC.Builtin.PrimOps ( PrimOp, PrimCall )
 import Data.ByteString ( ByteString )
 import Data.Data   ( Data )
 import Data.List   ( intersperse )
+import GHC.Tc.Utils.TcType (Kind)
+
+newtype StgKind = MkStgKind { getStgKind :: Kind }
 
 {-
 ************************************************************************
@@ -266,7 +271,7 @@ for the details of this transformation.
 
   | StgOpApp    StgOp    -- Primitive op or foreign call
                 [StgArg] -- Saturated.
-                Type     -- Result type
+                StgKind  -- Result kind
                          -- We need to know this so that we can
                          -- assign result registers
 
@@ -717,6 +722,8 @@ data StgOp
         -- itself, is needed by the stg-to-cmm pass to determine the offset to
         -- apply to unlifted boxed arguments in GHC.StgToCmm.Foreign. See Note
         -- [Unlifted boxed arguments to foreign calls]
+
+  | StgTagToEnumOp TyCon
 
 {-
 ************************************************************************

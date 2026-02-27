@@ -24,23 +24,21 @@ import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
 import GHC.StgToJS.Symbols
 
-import GHC.Core.Type
-
 import GHC.Builtin.PrimOps
 import GHC.Tc.Utils.TcType (isBoolTy)
 import GHC.Utils.Encoding (zEncodeString)
 
 import GHC.Data.FastString
 import GHC.Utils.Outputable (renderWithContext, defaultSDocContext, ppr)
+import GHC.Utils.Panic (panic)
 
 genPrim :: Bool     -- ^ Profiling (cost-centres) enabled
         -> Bool     -- ^ Array bounds-checking enabled
-        -> Type
         -> PrimOp   -- ^ the primitive operation
         -> [JStgExpr]  -- ^ where to store the result
         -> [JStgExpr]  -- ^ arguments
         -> JSM PrimRes
-genPrim prof bound ty op = case op of
+genPrim prof bound op = case op of
   CharGtOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= if10 (x .>. y)
   CharGeOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= if10 (x .>=. y)
   CharEqOp        -> \[r] [x,y] -> pure $ PrimInline $ r |= if10 (x .===. y)
@@ -226,51 +224,51 @@ genPrim prof bound ty op = case op of
   Int32ToIntOp       -> \[r] [x]   -> pure $ PrimInline $ r |= x
   IntToInt32Op       -> \[r] [x]   -> pure $ PrimInline $ r |= x
 
-  Int32NegOp         -> \rs  xs    -> genPrim prof bound ty IntNegOp rs xs
-  Int32AddOp         -> \rs  xs    -> genPrim prof bound ty IntAddOp rs xs
-  Int32SubOp         -> \rs  xs    -> genPrim prof bound ty IntSubOp rs xs
-  Int32MulOp         -> \rs  xs    -> genPrim prof bound ty IntMulOp rs xs
-  Int32QuotOp        -> \rs  xs    -> genPrim prof bound ty IntQuotOp rs xs
-  Int32RemOp         -> \rs  xs    -> genPrim prof bound ty IntRemOp rs xs
-  Int32QuotRemOp     -> \rs  xs    -> genPrim prof bound ty IntQuotRemOp rs xs
+  Int32NegOp         -> \rs  xs    -> genPrim prof bound IntNegOp rs xs
+  Int32AddOp         -> \rs  xs    -> genPrim prof bound IntAddOp rs xs
+  Int32SubOp         -> \rs  xs    -> genPrim prof bound IntSubOp rs xs
+  Int32MulOp         -> \rs  xs    -> genPrim prof bound IntMulOp rs xs
+  Int32QuotOp        -> \rs  xs    -> genPrim prof bound IntQuotOp rs xs
+  Int32RemOp         -> \rs  xs    -> genPrim prof bound IntRemOp rs xs
+  Int32QuotRemOp     -> \rs  xs    -> genPrim prof bound IntQuotRemOp rs xs
 
-  Int32EqOp          -> \rs  xs    -> genPrim prof bound ty IntEqOp rs xs
-  Int32GeOp          -> \rs  xs    -> genPrim prof bound ty IntGeOp rs xs
-  Int32GtOp          -> \rs  xs    -> genPrim prof bound ty IntGtOp rs xs
-  Int32LeOp          -> \rs  xs    -> genPrim prof bound ty IntLeOp rs xs
-  Int32LtOp          -> \rs  xs    -> genPrim prof bound ty IntLtOp rs xs
-  Int32NeOp          -> \rs  xs    -> genPrim prof bound ty IntNeOp rs xs
+  Int32EqOp          -> \rs  xs    -> genPrim prof bound IntEqOp rs xs
+  Int32GeOp          -> \rs  xs    -> genPrim prof bound IntGeOp rs xs
+  Int32GtOp          -> \rs  xs    -> genPrim prof bound IntGtOp rs xs
+  Int32LeOp          -> \rs  xs    -> genPrim prof bound IntLeOp rs xs
+  Int32LtOp          -> \rs  xs    -> genPrim prof bound IntLtOp rs xs
+  Int32NeOp          -> \rs  xs    -> genPrim prof bound IntNeOp rs xs
 
-  Int32SraOp         -> \rs  xs    -> genPrim prof bound ty IntSraOp rs xs
-  Int32SrlOp         -> \rs  xs    -> genPrim prof bound ty IntSrlOp rs xs
-  Int32SllOp         -> \rs  xs    -> genPrim prof bound ty IntSllOp rs xs
+  Int32SraOp         -> \rs  xs    -> genPrim prof bound IntSraOp rs xs
+  Int32SrlOp         -> \rs  xs    -> genPrim prof bound IntSrlOp rs xs
+  Int32SllOp         -> \rs  xs    -> genPrim prof bound IntSllOp rs xs
 
 ------------------------------ Word32 -------------------------------------------
 
   Word32ToWordOp     -> \[r] [x]   -> pure $ PrimInline $ r |= x
   WordToWord32Op     -> \[r] [x]   -> pure $ PrimInline $ r |= x
 
-  Word32AddOp        -> \rs  xs    -> genPrim prof bound ty WordAddOp rs xs
-  Word32SubOp        -> \rs  xs    -> genPrim prof bound ty WordSubOp rs xs
-  Word32MulOp        -> \rs  xs    -> genPrim prof bound ty WordMulOp rs xs
-  Word32QuotOp       -> \rs  xs    -> genPrim prof bound ty WordQuotOp rs xs
-  Word32RemOp        -> \rs  xs    -> genPrim prof bound ty WordRemOp rs xs
-  Word32QuotRemOp    -> \rs  xs    -> genPrim prof bound ty WordQuotRemOp rs xs
+  Word32AddOp        -> \rs  xs    -> genPrim prof bound WordAddOp rs xs
+  Word32SubOp        -> \rs  xs    -> genPrim prof bound WordSubOp rs xs
+  Word32MulOp        -> \rs  xs    -> genPrim prof bound WordMulOp rs xs
+  Word32QuotOp       -> \rs  xs    -> genPrim prof bound WordQuotOp rs xs
+  Word32RemOp        -> \rs  xs    -> genPrim prof bound WordRemOp rs xs
+  Word32QuotRemOp    -> \rs  xs    -> genPrim prof bound WordQuotRemOp rs xs
 
-  Word32EqOp         -> \rs  xs    -> genPrim prof bound ty WordEqOp rs xs
-  Word32GeOp         -> \rs  xs    -> genPrim prof bound ty WordGeOp rs xs
-  Word32GtOp         -> \rs  xs    -> genPrim prof bound ty WordGtOp rs xs
-  Word32LeOp         -> \rs  xs    -> genPrim prof bound ty WordLeOp rs xs
-  Word32LtOp         -> \rs  xs    -> genPrim prof bound ty WordLtOp rs xs
-  Word32NeOp         -> \rs  xs    -> genPrim prof bound ty WordNeOp rs xs
+  Word32EqOp         -> \rs  xs    -> genPrim prof bound WordEqOp rs xs
+  Word32GeOp         -> \rs  xs    -> genPrim prof bound WordGeOp rs xs
+  Word32GtOp         -> \rs  xs    -> genPrim prof bound WordGtOp rs xs
+  Word32LeOp         -> \rs  xs    -> genPrim prof bound WordLeOp rs xs
+  Word32LtOp         -> \rs  xs    -> genPrim prof bound WordLtOp rs xs
+  Word32NeOp         -> \rs  xs    -> genPrim prof bound WordNeOp rs xs
 
-  Word32AndOp        -> \rs xs     -> genPrim prof bound ty WordAndOp rs xs
-  Word32OrOp         -> \rs xs     -> genPrim prof bound ty WordOrOp rs xs
-  Word32XorOp        -> \rs xs     -> genPrim prof bound ty WordXorOp rs xs
-  Word32NotOp        -> \rs xs     -> genPrim prof bound ty WordNotOp rs xs
+  Word32AndOp        -> \rs xs     -> genPrim prof bound WordAndOp rs xs
+  Word32OrOp         -> \rs xs     -> genPrim prof bound WordOrOp rs xs
+  Word32XorOp        -> \rs xs     -> genPrim prof bound WordXorOp rs xs
+  Word32NotOp        -> \rs xs     -> genPrim prof bound WordNotOp rs xs
 
-  Word32SllOp        -> \rs xs     -> genPrim prof bound ty WordSllOp rs xs
-  Word32SrlOp        -> \rs xs     -> genPrim prof bound ty WordSrlOp rs xs
+  Word32SllOp        -> \rs xs     -> genPrim prof bound WordSllOp rs xs
+  Word32SrlOp        -> \rs xs     -> genPrim prof bound WordSrlOp rs xs
 
 ------------------------------ Int64 --------------------------------------------
 
@@ -411,17 +409,17 @@ genPrim prof bound ty op = case op of
 
   PopCnt32Op  -> \[r] [x]     -> pure $ PrimInline $ r |= app hdPopCnt32Str [x]
   PopCnt64Op  -> \[r] [x1,x2] -> pure $ PrimInline $ r |= app hdPopCnt64Str [x1,x2]
-  PopCntOp    -> \[r] [x]     -> genPrim prof bound ty PopCnt32Op [r] [x]
+  PopCntOp    -> \[r] [x]     -> genPrim prof bound PopCnt32Op [r] [x]
   Pdep8Op     -> \[r] [s,m]   -> pure $ PrimInline $ r |= app hdPDep8Str  [s,m]
   Pdep16Op    -> \[r] [s,m]   -> pure $ PrimInline $ r |= app hdPDep16Str [s,m]
   Pdep32Op    -> \[r] [s,m]   -> pure $ PrimInline $ r |= app hdPDep32Str [s,m]
   Pdep64Op    -> \[ra,rb] [sa,sb,ma,mb] -> pure $ PrimInline $ appT [ra,rb] hdPDep64Str [sa,sb,ma,mb]
-  PdepOp      -> \rs xs                 -> genPrim prof bound ty Pdep32Op rs xs
+  PdepOp      -> \rs xs                 -> genPrim prof bound Pdep32Op rs xs
   Pext8Op     -> \[r] [s,m] -> pure $ PrimInline $ r |= app hdPExit8Str  [s,m]
   Pext16Op    -> \[r] [s,m] -> pure $ PrimInline $ r |= app hdPExit16Str [s,m]
   Pext32Op    -> \[r] [s,m] -> pure $ PrimInline $ r |= app hdPExit32Str [s,m]
   Pext64Op    -> \[ra,rb] [sa,sb,ma,mb] -> pure $ PrimInline $ appT [ra,rb] hdPExit64Str [sa,sb,ma,mb]
-  PextOp      -> \rs xs     -> genPrim prof bound ty Pext32Op rs xs
+  PextOp      -> \rs xs     -> genPrim prof bound Pext32Op rs xs
 
   ClzOp       -> \[r]   [x]     -> pure $ PrimInline $ r |= app  hdClz32Str [x]
   Clz8Op      -> \[r]   [x]     -> pure $ PrimInline $ r |= app  hdClz8Str  [x]
@@ -443,9 +441,9 @@ genPrim prof bound ty op = case op of
             `BOr` ((BAnd x (Int 0xFF0000)) .>>. (Int 8))
             `BOr` (x .>>>. (Int 24)))
   BSwap64Op   -> \[r1,r2] [x,y] -> pure $ PrimInline $ appT [r1,r2] hdBSwap64Str [x,y]
-  BSwapOp     -> \[r] [x]       -> genPrim prof bound ty BSwap32Op [r] [x]
+  BSwapOp     -> \[r] [x]       -> genPrim prof bound BSwap32Op [r] [x]
 
-  BRevOp      -> \[r] [w] -> genPrim prof bound ty BRev32Op [r] [w]
+  BRevOp      -> \[r] [w] -> genPrim prof bound BRev32Op [r] [w]
   BRev8Op     -> \[r] [w] -> pure $ PrimInline $ r |= (app hdReverseWordStr [w] .>>>. Int 24)
   BRev16Op    -> \[r] [w] -> pure $ PrimInline $ r |= (app hdReverseWordStr [w] .>>>. Int 16)
   BRev32Op    -> \[r] [w] -> pure $ PrimInline $ r |= app  hdReverseWordStr [w]
@@ -766,7 +764,7 @@ genPrim prof bound ty op = case op of
                           , postIncrS tmp
                           ]
                 ]
-  SetAddrRangeOp -> \[] xs@[_a,_o,_n,_v] -> genPrim prof bound ty SetByteArrayOp [] xs
+  SetAddrRangeOp -> \[] xs@[_a,_o,_n,_v] -> genPrim prof bound SetByteArrayOp [] xs
 
   AtomicReadByteArrayOp_Int  -> \[r]   [a,i]   -> pure $ PrimInline $ bnd_ix32 bound a i $ r |= read_i32 a i
   AtomicWriteByteArrayOp_Int -> \[]    [a,i,v] -> pure $ PrimInline $ bnd_ix32 bound a i $ write_i32 a i v
@@ -1031,10 +1029,7 @@ genPrim prof bound ty op = case op of
       [ stack .! PreInc sp |= global (identFS hdDataToTagEntryStr)
       , returnS (app hdEntryStr [d])
       ]
-  TagToEnumOp -> \[r] [tag] -> pure $ PrimInline $
-    if isBoolTy ty
-    then r |= IfExpr tag true_ false_
-    else r |= app hdTagToEnum [tag]
+  TagToEnumOp -> panic "TagToEnumOp should not have survived to this point!"
 
 ------------------------------ Bytecode operations ------------------------------
 

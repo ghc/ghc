@@ -54,6 +54,7 @@ import GHC.Utils.Panic
 import GHC.Data.FastString
 
 import Control.Monad (ap)
+import GHC.Tc.Utils.TcType (tcTyConAppTyCon)
 
 {- Note [Live vs free]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -569,22 +570,25 @@ mkStgApp f how_bound core_args stg_args res_ty
            else
               StgConApp dc NoNumber stg_args []
 
+      -- We rewrite the TagToEnum primop to a special StgTagToEnumOp which contains information about the type constructor
+      PrimOpId TagToEnumOp _ -> StgOpApp (StgTagToEnumOp (tcTyConAppTyCon res_ty)) stg_args res_kind
+
       -- Some primitive operator that might be implemented as a library call.
       -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
       -- we require that primop applications be saturated.
       PrimOpId op _    -> -- assertPpr saturated (ppr f <+> ppr stg_args) $
-                          StgOpApp (StgPrimOp op) stg_args res_ty
+                          StgOpApp (StgPrimOp op) stg_args res_kind
 
       -- A call to some primitive Cmm function.
       FCallId (CCall (CCallSpec
                             (StaticTarget ext lbl ForeignFunction) PrimCallConv _))
                             | TargetIsInThat unit <- staticTargetUnit ext
                        -> assert exactly_saturated $
-                          StgOpApp (StgPrimCallOp (PrimCall lbl unit)) stg_args res_ty
+                          StgOpApp (StgPrimCallOp (PrimCall lbl unit)) stg_args res_kind
 
       -- A regular foreign call.
       FCallId call     -> assert exactly_saturated $
-                          StgOpApp (StgFCallOp call (idType f)) stg_args res_ty
+                          StgOpApp (StgFCallOp call (idType f)) stg_args res_kind
 
       TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,stg_args)
 
@@ -600,6 +604,7 @@ mkStgApp f how_bound core_args stg_args res_ty
     f_arity    = stgArity f how_bound
     n_val_args = length stg_args  -- StgArgs are all value arguments
     exactly_saturated  = f_arity == n_val_args
+    res_kind = MkStgKind (typeKind res_ty)
 
 
 -- Given Core arguments to an unboxed sum datacon, return the 'PrimRep's

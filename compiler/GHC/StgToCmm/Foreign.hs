@@ -69,13 +69,13 @@ import Control.Monad
 cgForeignCall :: ForeignCall            -- the op
               -> Type                   -- type of foreign function
               -> [StgArg]               -- x,y    arguments
-              -> Type                   -- result type
+              -> StgKind                -- result kind
               -> FCode ReturnKind
 
-cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
+cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_kind
   = do  { cmm_args <- getFCallArgs stg_args typ
         -- ; traceM $ show cmm_args
-        ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
+        ; (res_regs, res_hints) <- newUnboxedTupleRegs (getStgKind res_kind)
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
                     StaticTarget _ _ ForeignValue ->
