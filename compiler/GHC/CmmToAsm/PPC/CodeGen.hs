@@ -1205,6 +1205,139 @@ genCCall _ (PrimTarget MO_Touch) _ _
 genCCall _ (PrimTarget (MO_Prefetch_Data _)) _ _
  = return $ nilOL
 
+genCCall platform (PrimTarget (MO_AtomicRMW W64 amop)) [dst] [addr, n]
+  | not $ target32Bit platform
+  = do let fmt      = intFormat W64
+           reg_dst  = getLocalRegReg dst
+       Amode reg_addr addr_code <- getAmodeIndex addr
+       (n_ri, n_code) <- case amop of
+         AMO_Add  -> getSomeRegOrImm True n
+         AMO_Sub  -> case n of
+           CmmLit (CmmInt i _) | Just imm <- makeImmediate W64 True (-i)
+                   -> return (RIImm imm, nilOL)
+           _       -> do (n_reg, n_code) <- getSomeReg n
+                         return  (RIReg n_reg, n_code)
+         AMO_And  -> getSomeRegOrImm False n
+         AMO_Or   -> getSomeRegOrImm False n
+         AMO_Xor  -> getSomeRegOrImm False n
+         AMO_Nand -> do (n_reg, n_code) <- getSomeReg n
+                        return (RIReg n_reg, n_code)
+
+       tmp <- getNewRegNat fmt
+
+       let instr = case amop of
+             AMO_Add  -> ADD reg_dst tmp n_ri
+             AMO_Sub  -> case n_ri of
+               RIReg n_reg -> SUBF reg_dst n_reg tmp
+               RIImm _     -> ADD  reg_dst tmp n_ri
+             AMO_And  -> AND reg_dst tmp n_ri
+             AMO_Or   -> OR  reg_dst tmp n_ri
+             AMO_Xor  -> XOR reg_dst tmp n_ri
+             AMO_Nand -> case n_ri of
+               RIReg n_reg -> NAND reg_dst tmp n_reg
+               _           -> panic "PPC NCG: No NAND immediate"
+       lbl_retry <- getBlockIdNat
+       lbl_done <- getBlockIdNat
+       return $ addr_code `appOL` n_code
+        `appOL` toOL [ HWSYNC
+                     , BCC ALWAYS lbl_retry Nothing
+
+                     , NEWBLOCK lbl_retry
+                     , LDR fmt tmp reg_addr
+                     ]
+        `snocOL` instr
+        `appOL` toOL [ STC fmt reg_dst reg_addr
+                     , BCC NE lbl_retry (Just False)
+                     , BCC ALWAYS lbl_done Nothing
+
+                     , NEWBLOCK lbl_done
+                     , ISYNC
+                     ]
+         where
+           getAmodeIndex (CmmMachOp (MO_Add _) [x, y])
+             = do
+                 (regX, codeX) <- getSomeReg x
+                 (regY, codeY) <- getSomeReg y
+                 return $ Amode (AddrRegReg regX regY) (codeX `appOL` codeY)
+
+           getAmodeIndex other
+             = do
+                 (reg, code) <- getSomeReg other
+                 return $ Amode (AddrRegReg r0 reg) code -- NB: r0 is 0 here!
+
+           getSomeRegOrImm sign (CmmLit (CmmInt i _))
+             | Just imm <- makeImmediate W64 sign i
+             = return (RIImm imm, nilOL)
+           getSomeRegOrImm _ n
+             = do (n_reg, n_code) <- getSomeReg n
+                  return  (RIReg n_reg, n_code)
+
+genCCall _ (PrimTarget (MO_AtomicRMW W32 amop)) [dst] [addr, n]
+  = do let fmt      = intFormat W32
+           reg_dst  = getLocalRegReg dst
+       Amode reg_addr addr_code <- getAmodeIndex addr
+       (n_ri, n_code) <- case amop of
+         AMO_Add  -> getSomeRegOrImm True n
+         AMO_Sub  -> case n of
+           CmmLit (CmmInt i _) | Just imm <- makeImmediate W32 True (-i)
+                   -> return (RIImm imm, nilOL)
+           _       -> do (n_reg, n_code) <- getSomeReg n
+                         return  (RIReg n_reg, n_code)
+         AMO_And  -> getSomeRegOrImm False n
+         AMO_Or   -> getSomeRegOrImm False n
+         AMO_Xor  -> getSomeRegOrImm False n
+         AMO_Nand -> do (n_reg, n_code) <- getSomeReg n
+                        return (RIReg n_reg, n_code)
+
+       tmp <- getNewRegNat fmt
+
+       let instr = case amop of
+             AMO_Add  -> ADD reg_dst tmp n_ri
+             AMO_Sub  -> case n_ri of
+               RIReg n_reg -> SUBF reg_dst n_reg tmp
+               RIImm _     -> ADD  reg_dst tmp n_ri
+             AMO_And  -> AND reg_dst tmp n_ri
+             AMO_Or   -> OR  reg_dst tmp n_ri
+             AMO_Xor  -> XOR reg_dst tmp n_ri
+             AMO_Nand -> case n_ri of
+               RIReg n_reg -> NAND reg_dst tmp n_reg
+               _           -> panic "PPC NCG: No NAND immediate"
+       lbl_retry <- getBlockIdNat
+       lbl_done <- getBlockIdNat
+       return $ addr_code `appOL` n_code
+        `appOL` toOL [ HWSYNC
+                     , BCC ALWAYS lbl_retry Nothing
+
+                     , NEWBLOCK lbl_retry
+                     , LDR fmt tmp reg_addr
+                     ]
+        `snocOL` instr
+        `appOL` toOL [ STC fmt reg_dst reg_addr
+                     , BCC NE lbl_retry (Just False)
+                     , BCC ALWAYS lbl_done Nothing
+
+                     , NEWBLOCK lbl_done
+                     , ISYNC
+                     ]
+         where
+           getAmodeIndex (CmmMachOp (MO_Add _) [x, y])
+             = do
+                 (regX, codeX) <- getSomeReg x
+                 (regY, codeY) <- getSomeReg y
+                 return $ Amode (AddrRegReg regX regY) (codeX `appOL` codeY)
+
+           getAmodeIndex other
+             = do
+                 (reg, code) <- getSomeReg other
+                 return $ Amode (AddrRegReg r0 reg) code -- NB: r0 is 0 here!
+
+           getSomeRegOrImm sign (CmmLit (CmmInt i _))
+             | Just imm <- makeImmediate W32 sign i
+             = return (RIImm imm, nilOL)
+           getSomeRegOrImm _ n
+             = do (n_reg, n_code) <- getSomeReg n
+                  return  (RIReg n_reg, n_code)
+
 genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
  = do let fmt      = intFormat (max width W32)
           reg_dst  = getLocalRegReg dst
@@ -1269,7 +1402,7 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
         W16 -> handle_value
         _   -> do
           (n_ri, n_code) <- case amop of
-            AMO_Add  -> getSomeRegOrImm True
+            AMO_Add  -> getSomeRegOrImm True n
             AMO_Sub  -> case n of
                  CmmLit (CmmInt i _) | Just imm <- makeImmediate width True (-i)
                     -> return (RIImm imm, nilOL)
@@ -1277,9 +1410,9 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                     -> do
                           (n_reg, n_code) <- getSomeReg n
                           return  (RIReg n_reg, n_code)
-            AMO_And  -> getSomeRegOrImm False
-            AMO_Or   -> getSomeRegOrImm False
-            AMO_Xor  -> getSomeRegOrImm False
+            AMO_And  -> getSomeRegOrImm False n
+            AMO_Or   -> getSomeRegOrImm False n
+            AMO_Xor  -> getSomeRegOrImm False n
             AMO_Nand -> do (n_reg, n_code) <- getSomeReg n
                            return (RIReg n_reg, n_code)
           return (n_ri, n_code, nilOL, unitOL $ MR reg_dst tmp2)
@@ -1337,14 +1470,12 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                      (ucode `snocOL` (CLRRI addr_fmt aligned_addr
                                       unaligned_addr 2)), Just unaligned_addr)
 
-           getSomeRegOrImm sign
-             = case n of
-                 CmmLit (CmmInt i _) | Just imm <- makeImmediate width sign i
-                    -> return (RIImm imm, nilOL)
-                 _
-                    -> do
-                          (n_reg, n_code) <- getSomeReg n
-                          return  (RIReg n_reg, n_code)
+           getSomeRegOrImm sign (CmmLit (CmmInt i _))
+             | Just imm <- makeImmediate width sign i
+             = return (RIImm imm, nilOL)
+           getSomeRegOrImm _ n
+             = do (n_reg, n_code) <- getSomeReg n
+                  return  (RIReg n_reg, n_code)
 
            shift_amount platform shift
              = let shift_amt = case width of
