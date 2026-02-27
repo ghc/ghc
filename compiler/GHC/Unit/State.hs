@@ -1389,10 +1389,11 @@ mergeDatabases logger = foldM merge (emptyUniqMap, emptyUniqMap) . zip [1..]
     merge (pkg_map, prec_map) (i, UnitDatabase db_path db) = do
       debugTraceMsg logger 2 $
           text "loading package database" <+> ppr db_path
-      forM_ (Set.toList override_set) $ \pkg ->
-          debugTraceMsg logger 2 $
-              text "package" <+> ppr pkg <+>
-              text "overrides a previously defined package"
+      when (log_verbosity (logFlags logger) >= 2) $
+        forM_ (Set.toList override_set) $ \pkg ->
+            debugTraceMsg logger 2 $
+                text "package" <+> ppr pkg <+>
+                text "overrides a previously defined package"
       return (pkg_map', prec_map')
      where
       db_map = mk_pkg_map db
