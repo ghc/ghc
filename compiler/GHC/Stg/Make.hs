@@ -11,7 +11,6 @@ import GHC.Prelude
 import GHC.Unit.Module
 
 import GHC.Core.DataCon
-import GHC.Core.Type (Type)
 
 import GHC.Stg.Syntax
 import GHC.Stg.Utils (stripStgTicksTop)
@@ -27,7 +26,7 @@ import GHC.Types.Tickish
 data MkStgRhs = MkStgRhs
   { rhs_args :: [Id]     -- ^ Empty for thunks
   , rhs_expr :: StgExpr  -- ^ RHS expression
-  , rhs_type :: Type     -- ^ RHS type (only used in the JS backend: layering violation)
+  , rhs_kind :: StgKind  -- ^ RHS kind (only used in the JS backend: layering violation)
   , rhs_is_join :: !Bool -- ^ Is it a RHS for a join-point?
   }
 
@@ -37,7 +36,7 @@ data MkStgRhs = MkStgRhs
 mkTopStgRhs :: (Module -> DataCon -> [StgArg] -> Bool)
             -> Bool -> Module -> CollectedCCs
             -> Id -> MkStgRhs -> (StgRhs, CollectedCCs)
-mkTopStgRhs allow_toplevel_con_app opt_AutoSccsOnIndividualCafs this_mod ccs bndr mk_rhs@(MkStgRhs bndrs rhs typ _)
+mkTopStgRhs allow_toplevel_con_app opt_AutoSccsOnIndividualCafs this_mod ccs bndr mk_rhs@(MkStgRhs bndrs rhs kind _)
   -- try to make a StgRhsCon first
   | Just rhs_con <- mkTopStgRhsCon_maybe (allow_toplevel_con_app this_mod) mk_rhs
   = ( rhs_con, ccs )
@@ -47,20 +46,20 @@ mkTopStgRhs allow_toplevel_con_app opt_AutoSccsOnIndividualCafs this_mod ccs bnd
     ( StgRhsClosure noExtFieldSilent
                     dontCareCCS
                     ReEntrant
-                    bndrs rhs typ
+                    bndrs rhs kind
     , ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | opt_AutoSccsOnIndividualCafs
   = ( StgRhsClosure noExtFieldSilent
                     caf_ccs
-                    upd_flag [] rhs typ
+                    upd_flag [] rhs kind
     , collectCC caf_cc caf_ccs ccs )
 
   | otherwise
   = ( StgRhsClosure noExtFieldSilent
                     all_cafs_ccs
-                    upd_flag [] rhs typ
+                    upd_flag [] rhs kind
     , ccs )
 
   where
@@ -82,7 +81,7 @@ mkTopStgRhs allow_toplevel_con_app opt_AutoSccsOnIndividualCafs this_mod ccs bnd
 -- Generate a non-top-level RHS. Cost-centre is always currentCCS,
 -- see Note [Cost-centre initialization plan].
 mkStgRhs :: Id -> MkStgRhs -> StgRhs
-mkStgRhs bndr mk_rhs@(MkStgRhs bndrs rhs typ is_join)
+mkStgRhs bndr mk_rhs@(MkStgRhs bndrs rhs kind is_join)
   -- try to make a StgRhsCon first
   | Just rhs_con <- mkStgRhsCon_maybe mk_rhs
   = rhs_con
@@ -90,7 +89,7 @@ mkStgRhs bndr mk_rhs@(MkStgRhs bndrs rhs typ is_join)
   | otherwise
   = StgRhsClosure noExtFieldSilent
                   currentCCS
-                  upd_flag bndrs rhs typ
+                  upd_flag bndrs rhs kind
   where
     upd_flag | is_join                             = JumpedTo
              | not (null bndrs)                    = ReEntrant
@@ -151,22 +150,22 @@ isPAP env _               = False
 
 -- | Try to make a non top-level StgRhsCon if appropriate
 mkStgRhsCon_maybe :: MkStgRhs -> Maybe StgRhs
-mkStgRhsCon_maybe (MkStgRhs bndrs rhs typ is_join)
+mkStgRhsCon_maybe (MkStgRhs bndrs rhs kind is_join)
   | [] <- bndrs
   , not is_join
   , (ticks, StgConApp con mn args _) <- stripStgTicksTop (not . tickishIsCode) rhs
-  = Just (StgRhsCon currentCCS con mn ticks args typ)
+  = Just (StgRhsCon currentCCS con mn ticks args kind)
 
   | otherwise = Nothing
 
 
 -- | Try to make a top-level StgRhsCon if appropriate
 mkTopStgRhsCon_maybe :: (DataCon -> [StgArg] -> Bool) -> MkStgRhs -> Maybe StgRhs
-mkTopStgRhsCon_maybe allow_static_con_app (MkStgRhs bndrs rhs typ is_join)
+mkTopStgRhsCon_maybe allow_static_con_app (MkStgRhs bndrs rhs kind is_join)
   | [] <- bndrs
   , not is_join -- shouldn't happen at top-level
   , (ticks, StgConApp con mn args _) <- stripStgTicksTop (not . tickishIsCode) rhs
   , allow_static_con_app con args
-  = Just (StgRhsCon dontCareCCS con mn ticks args typ)
+  = Just (StgRhsCon dontCareCCS con mn ticks args kind)
 
   | otherwise = Nothing

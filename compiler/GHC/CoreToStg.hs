@@ -748,7 +748,7 @@ coreToMkStgRhs bndr expr = do
     let mk_rhs = MkStgRhs
           { rhs_args = bndrs
           , rhs_expr = body'
-          , rhs_type = exprType body
+          , rhs_kind = MkStgKind (typeKind (exprType body))
           , rhs_is_join = isJoinId bndr
           }
     pure mk_rhs

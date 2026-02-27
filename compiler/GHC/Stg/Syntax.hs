@@ -425,7 +425,7 @@ data GenStgRhs pass
         [BinderP pass]     -- ^ arguments; if empty, then not a function;
                            --   as above, order is important.
         (GenStgExpr pass)  -- ^ body
-        Type               -- ^ result type
+        StgKind            -- ^ result kind
 
 {-
 An example may be in order.  Consider:
@@ -455,7 +455,7 @@ important):
         ConstructorNumber
         [StgTickish]
         [StgArg]        -- Saturated Args. See Note [Constructor applications in STG]
-        Type            -- Type, for rewriting to an StgRhsClosure
+        StgKind         -- Kind, for rewriting to an StgRhsClosure
 
 -- | Like 'GHC.Hs.Extension.NoExtField', but with an 'Outputable' instance that
 -- returns 'empty'.
