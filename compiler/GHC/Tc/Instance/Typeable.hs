@@ -53,6 +53,7 @@ The overall plan is this:
 
 1. Generate a binding for each module p:M
    (done in GHC.Tc.Instance.Typeable by mkModIdBindings)
+       {-# NOINLINE M.$trModule #-}
        M.$trModule :: GHC.Unit.Module
        M.$trModule = Module "p" "M"
    ("tr" is short for "type representation"; see GHC.Types)
@@ -63,6 +64,7 @@ The overall plan is this:
    Record the Name M.$trModule in the tcg_tr_module field of TcGblEnv
 
 2. Generate a binding for every data type declaration T in module M,
+       {-# NOINLINE M.$tcT #-}
        M.$tcT :: GHC.Types.TyCon
        M.$tcT = TyCon ...fingerprint info...
                       $trModule
@@ -115,12 +117,8 @@ There are many wrinkles:
   representations for TyCon and Module.  See GHC.Types
   Note [Runtime representation of modules and tycons]
 
-* The KindReps can unfortunately get quite large. Moreover, the simplifier will
-  float out various pieces of them, resulting in numerous top-level bindings.
-  Consequently we mark the KindRep bindings as noinline, ensuring that the
-  float-outs don't make it into the interface file. This is important since
-  there is generally little benefit to inlining KindReps and they would
-  otherwise strongly affect compiler performance.
+* The unfoldings can get quite big, so we use NOINLINE to control it.
+  See Note [NOINLINE on generated Typeable bindings]
 
 * In general there are lots of things of kind *, * -> *, and * -> * -> *. To
   reduce the number of bindings we need to produce, we generate their KindReps
@@ -138,6 +136,158 @@ There are many wrinkles:
   type-definition time is non-trivial and Typeable isn't very widely used. This
   is discussed in #13261.
 
+-}
+
+{- Note [NOINLINE on generated Typeable bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The short story is that we annotate all the generated Typeable bindings with
+(the equivalent of) a NOINLINE pragma. This avoids an explosion of exported
+top-level exported bindings.
+
+For the long story, consider the following module "M" in a package "pkg":
+
+    module M (Foo(..), Bar(..)) where
+
+    data Bar = MkBar
+    data Foo (k :: Bar) = MkFoo
+
+For this module, the generated module name binding starts out (-ddump-ds-preopt)
+looking like this:
+
+    M.$trModule :: GHC.Unit.Module
+    M.$trModule = GHC.Types.Module
+                    (GHC.Types.TrNameS "pkg"#)
+                    (GHC.Types.TrNameS "M"#)
+
+but after the simplifier runs (-ddump-simpl), it will look like this:
+
+    M.$trModule  = M.$trModule3 M.$trModule1
+    M.$trModule1 = GHC.Types.TrNameS M.$trModule2
+    M.$trModule2 = "M"#
+    M.$trModule3 = GHC.Types.TrNameS M.$trModule4
+    M.$trModule4 = "pkg"#
+
+While for the data types, there are a lot more bindings, and the explosion of
+them after the simplifier is even greater.
+
+For Bar, the generated TyCon binding starts out looking like:
+
+    M.$tcBar =
+      GHC.Types.TyCon
+        12132242703551041979#Word64
+        4299988877040426036#Word64
+        M.$trModule
+        (GHC.Types.TrNameS "Bar"#)
+        0#
+        GHC.Types.krep$*    -- reuse "built-in" kind rep from GHC.Types
+
+But we will *also* get a TcCon binding for the promoted type 'MkBar
+
+    M.$tc'MkBar =
+      GHC.Types.TyCon
+        10085502217043517326#Word64
+        15241743887701645856#Word64
+        M.$trModule
+        (GHC.Types.TrNameS "'MkBar"#)
+        0#
+        $krep_axs
+
+which needs a locally defined kind representation:
+
+    $krep_axs = GHC.Types.KindRepTyConApp M.$tcBar []
+
+For the data type with the more complex kind, the generated TyCon binding for
+Foo and the promoted 'MkFoo look like:
+
+    M.$tcFoo =
+      GHC.Types.TyCon
+        13551215831514624777#Word64
+        7693314462125512072#Word64
+        M.$trModule
+        (GHC.Types.TrNameS "Foo"#)
+        0#
+        $krep_axr
+
+    $krep_axr = GHC.Types.KindRepFun $krep_axs GHC.Types.krep$*
+
+    M.$tc'MkFoo =
+      GHC.Types.TyCon
+        16689947533794933931#Word64
+        14421717338642533175#Word64
+        M.$trModule
+        (GHC.Types.TrNameS "'MkFoo"#)
+        1#
+        $krep_axt
+
+    $krep_axt = GHC.Types.KindRepTyConApp M.$tcFoo [$krep_axu]
+    $krep_axu = GHC.Types.$WKindRepVar (GHC.Types.I# 0#)
+
+After the simplifier runs and floats everything out, we get a lot of bindings:
+
+M.$tcBar  = ...
+M.$tcBar1 = ...
+M.$tcBar2 = ...
+M.$tcBar3 = ...
+
+M.$tc'MkBar  = ...
+M.$tc'MkBar1 = ...
+M.$tc'MkBar2 = ...
+M.$tc'MkBar3 = ...
+
+M.$tcFoo  = ...
+M.$tcFoo1 = ...
+M.$tcFoo2 = ...
+M.$tcFoo3 = ...
+
+M.$tc'MkFoo  = ...
+M.$tc'MkFoo1 = ...
+M.$tc'MkFoo2 = ...
+M.$tc'MkFoo3 = ...
+
+M.$krep_rxB  = ...
+M.$krep1_rxC = ...
+
+The simplifier has floated everything out. This is good because it means we end
+up with fully static data and no code (which is compact and can be kept in the
+read-only section of object files). On the other hand, there are now a *lot* of
+top level names. Each one is fairly small, so the get chosen to have their
+unfoldings exposed. This means all the top level names must be exported from
+the module because they all get mentioned (transitively) in the unfoldings.
+
+Our original module with two data types and no functions ends up with 23
+exported names, and corresponding unfoldings! The benefit of exposing all these
+unfoldings is minimal: there is generally little benefit to inlining TyCons,
+KindReps, TrNames etc. The Typeable representations get used for comparisons,
+but this does not benefit greatly from inlining.
+
+On the other hand, the cost to the compiler is substantial. This is a lot of
+information to manage and put into the interface files. And if the unfoldings
+are used at call sites, this costs further compile time, for little runtime
+benefit.
+
+Furthermore, there is the number of linker symbols to consider. For example, in
+the ghc-internal package, exposing all the unfoldings results in over 10% more
+dynamic linker symbols being exported from the DSO (.so file). This has a time
+cost at static link time and dynamic link time (program startup), and a space
+cost. On Windows in particular, there is a hard limit of 64k on the number of
+symbols that can be exported from a DLL.
+
+The solution is simple: annotate all the generated Typeable bindings with
+(the equivalent of) a NOINLINE pragma. The simplifier still floats everything
+out to the top level so that we end up with fully static data, but only the
+original generated names get exported (without their unfoldings). For the
+example module M above, that is just the 5 original names, rather than 23. So
+only 5 entries in the interface files, and only 5 linker symbols. In the GHC
+compiler performance test suite this is enough in some tests to shave 10-20%
+off of bytes allocated and peak memory use, and enough to improve the geometric
+mean by several percent.
+
+We use neverInlinePragma, which is technically a {-# INLINE [~] #-} pragma.
+We use it in:
+ * mkModIdBindings for the module name binding;
+ * todoForTyCons for the TyCon bindings;
+ * getKindRep for kind representation bindings.
 -}
 
 -- | Generate the Typeable bindings for a module. This is the only
@@ -192,6 +342,7 @@ mkModIdBindings
        ; trModuleTyCon <- tcLookupTyCon trModuleTyConName
        ; let mod_id = mkExportedVanillaId mod_nm (mkTyConApp trModuleTyCon [])
                       `setInlinePragma` neverInlinePragma
+                   -- See Note [NOINLINE on generated Typeable bindings]
        ; mod_bind      <- mkVarBind mod_id <$> mkModIdRHS mod
 
        ; tcg_env <- tcExtendGlobalValEnv [mod_id] getGblEnv
@@ -243,6 +394,7 @@ todoForTyCons mod mod_id tycons = do
     let mk_rep_id :: TyConRepName -> Id
         mk_rep_id rep_name = mkExportedVanillaId rep_name trTyConTy
                              `setInlinePragma` neverInlinePragma
+                          -- See Note [NOINLINE on generated Typeable bindings]
 
     let typeable_tycons :: [TypeableTyCon]
         typeable_tycons =
@@ -554,8 +706,7 @@ getKindRep stuff@(Stuff {..}) in_scope = go
 
         -- We need to construct a new KindRep binding
       | otherwise
-      = do -- Place a NOINLINE pragma on KindReps since they tend to be quite
-           -- large and bloat interface files.
+      = do -- See Note [NOINLINE on generated Typeable bindings]
            rep_bndr <- (`setInlinePragma` neverInlinePragma)
                    <$> newSysLocalId (fsLit "$krep") ManyTy (mkTyConTy kindRepTyCon)
 
