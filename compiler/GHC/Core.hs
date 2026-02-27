@@ -409,7 +409,7 @@ Consider applying `exprType` to this term:
 where we have genuine shadowing: both lambdas bind the same a.  Remember: every
 occurrence of `x` is just a copy of the binder (x::[a]), and ditto `y`.
 
-Now what does `exprType` return for that term?  It will return the bogus type
+Now what does `exprType` return for that term?  It will return the incorrect type
 
         forall a. [a] -> forall a. a -> ([a],a)
 
