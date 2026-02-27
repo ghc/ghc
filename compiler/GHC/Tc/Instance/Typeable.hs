@@ -53,7 +53,7 @@ The overall plan is this:
 
 1. Generate a binding for each module p:M
    (done in GHC.Tc.Instance.Typeable by mkModIdBindings)
-       {-# NOINLINE M.$trModule #-}
+       {-# NOINLINE M.$trModule #-}    -- See (GPT5) below
        M.$trModule :: GHC.Unit.Module
        M.$trModule = Module "p" "M"
    ("tr" is short for "type representation"; see GHC.Types)
@@ -64,7 +64,7 @@ The overall plan is this:
    Record the Name M.$trModule in the tcg_tr_module field of TcGblEnv
 
 2. Generate a binding for every data type declaration T in module M,
-       {-# NOINLINE M.$tcT #-}
+       {-# NOINLINE M.$tcT #-}    -- See (GPT5) below
        M.$tcT :: GHC.Types.TyCon
        M.$tcT = TyCon ...fingerprint info...
                       $trModule
@@ -98,44 +98,47 @@ The overall plan is this:
 
 There are many wrinkles:
 
-* The timing of when we produce this bindings is rather important: they must be
-  defined after the rest of the module has been typechecked since we need to be
-  able to lookup Module and TyCon in the type environment and we may be
-  currently compiling GHC.Types (where they are defined).
+  (GPT1) The timing of when we produce this bindings is rather important: they
+         must be defined after the rest of the module has been typechecked
+         since we need to be able to lookup Module and TyCon in the type
+         environment and we may be currently compiling GHC.Types (where they
+         are defined).
 
-* GHC.Prim doesn't have any associated object code, so we need to put the
-  representations for types defined in this module elsewhere. We chose this
-  place to be GHC.Types. GHC.Tc.Instance.Typeable.mkPrimTypeableTodos is responsible for
-  injecting the bindings for the GHC.Prim representations when compiling
-  GHC.Types.
+  (GPT2) GHC.Prim doesn't have any associated object code, so we need to put
+         the representations for types defined in this module elsewhere. We
+         chose this place to be GHC.Types.
+         GHC.Tc.Instance.Typeable.mkPrimTypeableTodos is responsible for
+         injecting the bindings for the GHC.Prim representations when compiling
+         GHC.Types.
 
-* TyCon.tyConRepModOcc is responsible for determining where to find
-  the representation binding for a given type. This is where we handle
-  the special case for GHC.Prim.
+  (GPT3) TyCon.tyConRepModOcc is responsible for determining where to find the
+         representation binding for a given type. This is where we handle the
+         special case for GHC.Prim.
 
-* To save space and reduce dependencies, we need use quite low-level
-  representations for TyCon and Module.  See GHC.Types
-  Note [Runtime representation of modules and tycons]
+  (GPT4) To save space and reduce dependencies, we need use quite low-level
+         representations for TyCon and Module.  See GHC.Types
+         Note [Runtime representation of modules and tycons]
 
-* The unfoldings can get quite big, so we use NOINLINE to control it.
-  See Note [NOINLINE on generated Typeable bindings]
+  (GPT5) The unfoldings can get quite big, so we use NOINLINE to control it.
+         See Note [NOINLINE on generated Typeable bindings].
 
-* In general there are lots of things of kind *, * -> *, and * -> * -> *. To
-  reduce the number of bindings we need to produce, we generate their KindReps
-  once in GHC.Types. These are referred to as "built-in" KindReps below.
+  (GPT6) In general there are lots of things of kind *, * -> *, and * -> * -> *.
+         To reduce the number of bindings we need to produce, we generate their
+         KindReps once in GHC.Types. These are referred to as "built-in"
+         KindReps below.
 
-* Even though KindReps aren't inlined, this scheme still has more of an effect on
-  compilation time than I'd like. This is especially true in the case of
-  families of type constructors (e.g. tuples and unboxed sums). The problem is
-  particularly bad in the case of sums, since each arity-N tycon brings with it
-  N promoted datacons, each with a KindRep whose size also scales with N.
-  Consequently we currently simply don't allow sums to be Typeable.
+  (GPT7) Even though KindReps aren't inlined, this scheme still has more of an
+         effect on compilation time than I'd like. This is especially true in
+         the case of families of type constructors (e.g. tuples and unboxed
+         sums). The problem is particularly bad in the case of sums, since each
+         arity-N tycon brings with it N promoted datacons, each with a KindRep
+         whose size also scales with N. Consequently we currently simply don't
+         allow sums to be Typeable.
 
-  In general we might consider moving some or all of this generation logic back
-  to the solver since the performance hit we take in doing this at
-  type-definition time is non-trivial and Typeable isn't very widely used. This
-  is discussed in #13261.
-
+         In general we might consider moving some or all of this generation
+         logic back to the solver since the performance hit we take in doing
+         this at type-definition time is non-trivial and Typeable isn't very
+         widely used. This is discussed in #13261.
 -}
 
 {- Note [NOINLINE on generated Typeable bindings]
