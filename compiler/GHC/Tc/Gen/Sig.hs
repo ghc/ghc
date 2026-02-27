@@ -50,6 +50,7 @@ import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env
 
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 

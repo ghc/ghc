@@ -58,6 +58,7 @@ import GHC.Tc.Instance.Family
 import GHC.Tc.Types.ErrCtxt ( TyConInstFlavour(..) )
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 
 import GHC.Builtin.Types ( oneDataConTy,  unitTy, makeRecoveryTyCon, manyDataConTy )
 
