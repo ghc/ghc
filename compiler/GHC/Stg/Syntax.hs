@@ -774,10 +774,10 @@ data StgOp
   | StgPrimCallOp PrimCall
 
   | StgFCallOp ForeignCall [StgFArgType]
-        -- The foreign argument types, which are obtained from the foreign 
+        -- The foreign argument types, which are obtained from the foreign
         -- import declaration itself, areneeded by the stg-to-cmm pass to
-        -- determine the offset to apply to unlifted boxed arguments in 
-        -- GHC.StgToCmm.Foreign. 
+        -- determine the offset to apply to unlifted boxed arguments in
+        -- GHC.StgToCmm.Foreign.
         -- See Note [Unlifted boxed arguments to foreign calls]
 
   | StgTagToEnumOp TyCon

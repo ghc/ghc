@@ -85,7 +85,7 @@ cgOpApp (StgPrimCallOp primcall) args _res_ty
   = do  { cmm_args <- getNonVoidArgAmodes args
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
-        
+
 -- tagToEnum# is special: we need to pull the constructor
 -- out of the table, and perform an appropriate return.
 cgOpApp (StgTagToEnumOp tyc) args _ = do
@@ -1687,7 +1687,7 @@ emitPrimOp cfg primop =
 
   -- tagToEnum# is removed in CoreToStg and rewritten to a special StgTagToEnumOp
   -- See Note [?]
-  TagToEnumOp -> panic "emitPrimOp: TagToEnumOp should have been gone by now" 
+  TagToEnumOp -> panic "emitPrimOp: TagToEnumOp should have been gone by now"
 
 -- Out of line primops.
 -- TODO compiler need not know about these
