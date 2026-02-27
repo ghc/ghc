@@ -184,7 +184,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence (EvBindsVar)
 import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
-                           , UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing
+                           , TyVarBndrs, TypedThing
                            , FixedRuntimeRepOrigin(..), InstanceWhat )
 import GHC.Tc.Types.CtLoc( CtLoc, ctLocOrigin, SubGoalDepth )
 import GHC.Tc.Types.Rank (Rank)

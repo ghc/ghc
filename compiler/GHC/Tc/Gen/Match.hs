@@ -52,6 +52,7 @@ import GHC.Tc.Gen.Bind
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( UserTypeCtxt( GenSigCtxt ), pprUserTypeCtxt )
 import GHC.Tc.Types.Evidence
 import GHC.Rename.Env ( irrefutableConLikeTc )
 

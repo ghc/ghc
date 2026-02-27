@@ -76,6 +76,8 @@ import GHC.Tc.Types.CtLoc
   , tyConAppRoleExplanation, appTyRoleExplanation
   )
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( UserTypeCtxt(..), ReportRedundantConstraints(..)
+                           , pprUserTypeCtxt  )
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Utils.TcMType qualified as TcM
 

@@ -41,6 +41,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
+import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint( WantedConstraints )
 import GHC.Tc.Utils.TcType as TcType

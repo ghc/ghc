@@ -33,6 +33,7 @@ import GHC.Tc.Zonk.Type
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( redundantConstraintsSpan )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Instance.Family
 import GHC.Tc.Utils.Instantiate
