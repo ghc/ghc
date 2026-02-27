@@ -1,0 +1,166 @@
+.. _release-9-12-4:
+
+Version 9.12.4
+==============
+
+The significant changes to the various parts of the compiler are listed in the
+following sections. See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.12>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+Compiler
+~~~~~~~~
+
+- Fixed a bug in CSE where the in-scope set was not properly maintained (:ghc-ticket:`25468`)
+- Fixed ``matchExpectedFunTys`` to use ``tcMkScaledFunTys`` (:ghc-ticket:`26277`)
+- Fixed ``parenBreakableList`` usage in ``ppHsContext`` for better pretty-printing of contexts
+- Improved error messages for bad record updates to allow out-of-scope data constructors (:ghc-ticket:`26391`)
+- Fixed a missing InVar->OutVar lookup in ``SetLevels`` (:ghc-ticket:`26681`)
+- Fixed split sections on Windows (:ghc-ticket:`26696`, :ghc-ticket:`26494`)
+- Fixed split sections for the LLVM backend (:ghc-ticket:`26770`)
+- Don't re-use stack slots for growing registers (:ghc-ticket:`26668`)
+- Fixed cast worker/wrapper incorrectly firing on INLINE functions (:ghc-ticket:`26903`)
+- Fixed non-determinism in ``TyLitMap`` by using deterministic maps for strings (:ghc-ticket:`26846`)
+- Fixed non-determinism in ``WithHsDocIdentifiers`` binary instance by using a stable sort (:ghc-ticket:`26858`)
+- Added ``-mcmodel=medium`` module flag to generated LLVM IR on LoongArch
+- Pass the ``mcmodel=medium`` parameter to CC via GHC on LoongArch
+- Pass the ``+evex512`` attribute to LLVM 18+ when ``-mavx512f`` is set (:ghc-ticket:`26410`)
+- Improved error handling in ``getPackageArchives`` (:ghc-ticket:`26383`)
+- Fixed a shadowing bug in implicit parameters (:ghc-ticket:`26451`)
+- Fixed a subtle bug in ``GHC.Core.Utils.mkTick`` that could generate type-incorrect code (:ghc-ticket:`26772`)
+- Fixed a long-standing interaction between ticks and casts in ``Eliminate Identity Cases``
+- ``NamedDefaults``: require the class to be standard or have an in-scope default declaration (:ghc-ticket:`25775`, :ghc-ticket:`25778`)
+
+Runtime System
+~~~~~~~~~~~~~~
+
+- Fixed a deadlock with eventlog flush interval and RTS shutdown (:ghc-ticket:`26573`)
+- Fixed eager black holes: record mutated closure and fix assertion (:ghc-ticket:`26495`)
+- Fixed object file format detection in ``loadArchive`` (:ghc-ticket:`26630`)
+- Use ``INFO_TABLE_CONSTR`` for ``stg_dummy_ret_closure`` (:ghc-ticket:`26745`)
+- Fixed lost wakeups in ``threadPaused`` for threads blocked on black holes (:ghc-ticket:`26324`)
+- Fixed ``stg_AP_STACK`` to push the correct update frame (:ghc-ticket:`26324`)
+- Fixed potential loop in heap reservation logic on certain kernels (:ghc-ticket:`26151`)
+- Don't use CAS without ``PARALLEL_GC`` on
+- Switch prim to use modern atomic compiler builtins (:ghc-ticket:`26729`)
+- Removed obsolete ``CC_SUPPORTS_TLS``, ``HAS_VISIBILITY_HIDDEN``, ``COMPILING_WINDOWS_DLL``,
+  and ``__GNUC__``-related logic
+- Removed the ``-O3`` pragma hack in ``Hash.c``
+- Removed unnecessary Cabal flags
+
+Code Generation
+~~~~~~~~~~~~~~~
+
+- NCG for PPC: add pattern for ``CmmRegOff`` to ``iselExpr64`` (:ghc-ticket:`26828`)
+- PPC NCG: Use libcall for 64-bit ``cmpxchg`` on 32-bit PowerPC (:ghc-ticket:`23969`)
+
+Bytecode Compiler
+~~~~~~~~~~~~~~~~~
+
+- Use 32 bits for breakpoint index (:ghc-ticket:`26325`)
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- Expose ``Backtraces`` constructor and fields (:ghc-ticket:`26049`)
+- Store ``StackTrace`` and ``StackSnapshot`` in ``Backtraces``, deferring decoding until display
+- Evaluate backtraces for ``error`` exceptions at the moment they are thrown
+  (`CLC proposal #383 <https://github.com/haskell/core-libraries-committee/issues/383>`__,
+  :ghc-ticket:`26751`)
+
+``ghc-experimental`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Fixed ``GHC.Exception.Backtrace.Experimental`` module
+- Added ability to customise the collection of exception annotations
+
+``ghc-pkg``
+~~~~~~~~~~~~
+
+- Removed ``traceId`` from ``ghc-pkg`` executable
+
+``ghc-toolchain``
+~~~~~~~~~~~~~~~~~
+
+- Dropped ``ld.gold`` from merge object command
+
+Packaging and Build System
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Added ``hpc`` to release script
+- Use a response file to invoke GHC when analysing dependencies
+- Fixed ``GHC.Platform.Host`` generation for cross stage1 (:ghc-ticket:`26449`)
+- Fixed runtime error during ``users_guide`` build with Sphinx 9.1.0 (:ghc-ticket:`26810`)
+- Added ``ghc-{experimental,internal}.cabal`` to the list of dependencies of the doc target (:ghc-ticket:`26738`)
+- Updated ``libffi`` to 3.5.2
+- Bumped ``directory`` submodule to 1.3.10.1
+- Bumped ``exceptions`` submodule to 0.10.12
+- Bumped ``file-io`` submodule to 0.1.6
+- Bumped ``filepath`` submodule to 1.5.5.0
+- Bumped ``haskeline`` submodule to 0.8.4.1
+- Bumped ``mtl`` submodule to 2.3.2
+- Bumped ``os-string`` submodule to 2.0.10
+- Bumped ``text`` submodule to 2.1.4
+- Bumped ``transformers`` submodule to 0.6.3.0
+- Bumped ``unix`` submodule to 2.8.8.0
+- Bumped ``Win32`` submodule to 2.14.2.1
+
+Wasm Backend
+~~~~~~~~~~~~
+
+- Fixed dyld handling for forward declared ``GOT.func`` items (:ghc-ticket:`26430`)
+- Ensure ``setKeepCAFs()`` is called in GHCi (:ghc-ticket:`26106`)
+- Prevent bundlers from resolving ``import("node:timers")``
+- Use ``import.meta.main`` for proper distinction of Node.js main modules (:ghc-ticket:`26916`)
+
+Included libraries
+~~~~~~~~~~~~~~~~~~
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    compiler/ghc.cabal:                                  The compiler itself
+    libraries/array/array.cabal:                         Dependency of ``ghc`` library
+    libraries/base/base.cabal:                           Core library
+    libraries/binary/binary.cabal:                       Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:               Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:                   Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:     Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:    Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:                     Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:                 Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:               Dependency of ``ghc`` and ``haskeline`` library
+    libraries/file-io/file-io.cabal:                     Dependency of ``directory`` library
+    libraries/filepath/filepath.cabal:                   Dependency of ``ghc`` library
+    libraries/ghc-boot/ghc-boot.cabal:                   Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal:             Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal:             Core library
+    libraries/ghc-experimental/ghc-experimental.cabal:   Core library
+    libraries/ghc-heap/ghc-heap.cabal:                   GHC heap-walking library
+    libraries/ghci/ghci.cabal:                           The REPL interface
+    libraries/ghc-internal/ghc-internal.cabal:           Core library
+    libraries/ghc-platform/ghc-platform.cabal:           Internal library
+    libraries/ghc-prim/ghc-prim.cabal:                   Core library
+    libraries/haskeline/haskeline.cabal:                 Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                             Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal:             Core library
+    libraries/mtl/mtl.cabal:                             Dependency of ``Cabal`` library
+    libraries/os-string/os-string.cabal:                 Dependency of ``filepath`` library
+    libraries/parsec/parsec.cabal:                       Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:                       Dependency of ``ghc`` library
+    libraries/process/process.cabal:                     Dependency of ``ghc`` library
+    libraries/semaphore-compat/semaphore-compat.cabal:   Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                             Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:   Core library
+    libraries/terminfo/terminfo.cabal:                   Dependency of ``haskeline`` library
+    libraries/text/text.cabal:                           Dependency of ``Cabal`` library
+    libraries/time/time.cabal:                           Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal:           Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:                           Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:                         Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:                         Dependency of ``haddock`` executable
+    utils/haddock/haddock-api/haddock-api.cabal:         Dependency of ``haddock`` executable
+    utils/haddock/haddock-library/haddock-library.cabal: Dependency of ``haddock`` executable

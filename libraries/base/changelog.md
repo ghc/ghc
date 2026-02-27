@@ -1,7 +1,9 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.21.2.0 *TBA*
-  * Evaluate backtraces for "error" exceptions at the moment they are thrown. ([CLC proposal #383](https://github.com/haskell/core-libraries-committee/issues/383))
+## 4.21.2.0 *March 2026*
+  * Expose `Backtraces` constructor and fields ([CLC proposal #199](https://github.com/haskell/core-libraries-committee/issues/199), [#26049](https://gitlab.haskell.org/ghc/ghc/-/issues/26049))
+  * Store `StackTrace` and `StackSnapshot` in `Backtraces`, deferring decoding until display
+  * Evaluate backtraces for "error" exceptions at the moment they are thrown ([CLC proposal #383](https://github.com/haskell/core-libraries-committee/issues/383), [#26751](https://gitlab.haskell.org/ghc/ghc/-/issues/26751))
 
 ## 4.21.1.0 *Sept 2024*
   * Fix incorrect results of `integerPowMod` when the base is 0 and the exponent is negative, and `integerRecipMod` when the modulus is zero ([#26017](https://gitlab.haskell.org/ghc/ghc/-/issues/26017)).
