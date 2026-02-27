@@ -21,6 +21,7 @@ import GHC.Driver.Session
 import GHC.Tc.Errors.Types
 import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( UserTypeCtxt(..) )
 import GHC.Tc.Deriv.Infer
 import GHC.Tc.Deriv.Utils
 import GHC.Tc.Deriv.Generate
@@ -695,7 +696,7 @@ deriveStandalone (L loc (DerivDecl (warn, _) deriv_ty mb_lderiv_strat overlap_mo
   = setSrcSpanA loc                       $
     addErrCtxt (StandaloneDerivCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
-       ; let ctxt = GHC.Tc.Types.Origin.InstDeclCtxt True
+       ; let ctxt = GHC.Tc.Types.ErrCtxt.InstDeclCtxt True
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr mb_lderiv_strat, ppr deriv_ty]
        ; (mb_lderiv_strat, via_tvs) <- tcDerivStrategy mb_lderiv_strat

@@ -38,6 +38,7 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate( newFamInst, tcSuperSkolTyVars )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
+import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad

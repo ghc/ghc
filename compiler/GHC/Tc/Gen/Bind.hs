@@ -35,6 +35,7 @@ import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Solver

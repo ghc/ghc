@@ -38,6 +38,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Class( AssocInstInfo(..), isNotAssociated )

@@ -7703,11 +7703,17 @@ pprErrCtxtMsg = \case
      make_lines_msg [last]  = ppr last <> dot
      make_lines_msg [l1,l2] = l1 $$ text "and" <+> l2 <> dot
      make_lines_msg (l:ls)  = l <> comma $$ make_lines_msg ls
+
   PatSigErrCtxt sig_ty res_ty ->
     vcat [ hang (text "When checking that the pattern signature:")
               4 (ppr sig_ty)
-         , nest 2 (hang (text "fits the type of its context:")
-                      2 (ppr res_ty)) ]
+         , nest 2 (hang (text "fits the type of its context:") 2 pp_res_ty) ]
+    where
+      -- Zonking will have turned Infer into Check
+      pp_res_ty = case res_ty of
+                    Check ty -> ppr ty
+                    Infer ir -> text "OOPS" <+> ppr ir
+
   PatCtxt pat ->
     hang (text "In the pattern:") 2 (ppr pat)
   PatSynDeclCtxt name ->

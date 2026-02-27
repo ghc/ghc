@@ -26,6 +26,7 @@ import GHC.Tc.Instance.Class ( matchGlobalInst, ClsInstResult(..), AssocInstInfo
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint ( userTypeError_maybe )
