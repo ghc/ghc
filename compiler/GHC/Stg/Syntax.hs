@@ -16,6 +16,9 @@ generation.
 module GHC.Stg.Syntax (
         StgKind(..),
 
+        StgFArgType(..),
+        collectStgFArgTypes,
+
         StgArg(..),
 
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
@@ -77,7 +80,7 @@ import GHC.Types.CostCentre ( CostCentreStack )
 import GHC.Core     ( AltCon )
 import GHC.Core.DataCon
 import GHC.Core.TyCon    ( PrimRep(..), PrimOrVoidRep(..), TyCon )
-import GHC.Core.Type     ( Type )
+import GHC.Core.Type     ( Type, tyConAppTyCon )
 import GHC.Core.Ppr( {- instances -} )
 
 import GHC.Types.ForeignCall ( ForeignCall )
@@ -85,7 +88,7 @@ import GHC.Types.Id
 import GHC.Types.Tickish     ( StgTickish )
 import GHC.Types.Var.Set
 import GHC.Types.Literal     ( Literal, literalType )
-import GHC.Types.RepType ( typePrimRep, typePrimRep1, typePrimRepU, typePrimRep_maybe )
+import GHC.Types.RepType ( typePrimRep, typePrimRep1, typePrimRepU, typePrimRep_maybe, unwrapType )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
@@ -96,6 +99,14 @@ import Data.ByteString ( ByteString )
 import Data.Data   ( Data )
 import Data.List   ( intersperse )
 import GHC.Tc.Utils.TcType (Kind)
+import GHC.Core.TyCo.Rep (Type(..))
+import GHC.Builtin.Types.Prim
+    ( arrayPrimTyCon,
+      byteArrayPrimTyCon,
+      mutableArrayPrimTyCon,
+      mutableByteArrayPrimTyCon,
+      smallArrayPrimTyCon,
+      smallMutableArrayPrimTyCon )
 
 newtype StgKind = MkStgKind { getStgKind :: Kind }
 
@@ -701,6 +712,51 @@ isUpdatable SingleEntry = False
 isUpdatable Updatable   = True
 isUpdatable JumpedTo    = False
 
+-- The minimum amount of information needed to determine
+-- the offset to apply to an argument to a foreign call.
+-- See Note [Unlifted boxed arguments to foreign calls]
+data StgFArgType
+  = StgPlainType
+  | StgArrayType
+  | StgSmallArrayType
+  | StgByteArrayType
+
+-- From a function, extract information needed to determine
+-- the offset of each argument when used as a C FFI argument.
+-- See Note [Unlifted boxed arguments to foreign calls]
+collectStgFArgTypes :: Type -> [StgFArgType]
+collectStgFArgTypes = go []
+  where
+    -- Skip foralls
+    go bs (ForAllTy _ res) = go bs res
+    go bs (AppTy{}) = reverse bs
+    go bs (TyConApp{}) = reverse bs
+    go bs (LitTy{}) = reverse bs
+    go bs (TyVarTy{}) = reverse bs
+    go  _ (CastTy{}) = panic "myCollectTypeArgs: CastTy"
+    go  _ (CoercionTy{}) = panic "myCollectTypeArgs: CoercionTy"
+    go bs (FunTy {ft_arg = arg, ft_res=res}) =
+      go (typeToStgFArgType arg:bs) res
+
+-- Choose the offset based on the type. For anything other
+-- than an unlifted boxed type, there is no offset.
+-- See Note [Unlifted boxed arguments to foreign calls]
+typeToStgFArgType :: Type -> StgFArgType
+typeToStgFArgType typ
+  | tycon == arrayPrimTyCon = StgArrayType
+  | tycon == mutableArrayPrimTyCon = StgArrayType
+  | tycon == smallArrayPrimTyCon = StgSmallArrayType
+  | tycon == smallMutableArrayPrimTyCon = StgSmallArrayType
+  | tycon == byteArrayPrimTyCon = StgByteArrayType
+  | tycon == mutableByteArrayPrimTyCon = StgByteArrayType
+  | otherwise = StgPlainType
+  where
+  -- Should be a tycon app, since this is a foreign call. We look
+  -- through newtypes so the offset does not change if a user replaces
+  -- a type in a foreign function signature with a representationally
+  -- equivalent newtype.
+  tycon = tyConAppTyCon (unwrapType typ)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -717,11 +773,12 @@ data StgOp
 
   | StgPrimCallOp PrimCall
 
-  | StgFCallOp ForeignCall Type
-        -- The Type, which is obtained from the foreign import declaration
-        -- itself, is needed by the stg-to-cmm pass to determine the offset to
-        -- apply to unlifted boxed arguments in GHC.StgToCmm.Foreign. See Note
-        -- [Unlifted boxed arguments to foreign calls]
+  | StgFCallOp ForeignCall [StgFArgType]
+        -- The foreign argument types, which are obtained from the foreign 
+        -- import declaration itself, areneeded by the stg-to-cmm pass to
+        -- determine the offset to apply to unlifted boxed arguments in 
+        -- GHC.StgToCmm.Foreign. 
+        -- See Note [Unlifted boxed arguments to foreign calls]
 
   | StgTagToEnumOp TyCon
 
@@ -915,6 +972,8 @@ pprStgOp :: StgOp -> SDoc
 pprStgOp (StgPrimOp  op)   = ppr op
 pprStgOp (StgPrimCallOp op)= ppr op
 pprStgOp (StgFCallOp op _) = ppr op
+-- TODO: how do we want to pretty print this?
+pprStgOp (StgTagToEnumOp tyc) = text "TagToEnumOp" <+> ppr tyc
 
 instance Outputable StgOp where
   ppr = pprStgOp

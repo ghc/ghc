@@ -48,7 +48,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
-import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
 import GHC.Builtin.Uniques
 import GHC.Data.FastString
@@ -2220,7 +2219,7 @@ mkDummyLiteral platform pr
 
 maybe_is_tagToEnum_call :: CgStgExpr -> Maybe (StgArg, [Name])
 -- Detect and extract relevant info for the tagToEnum kludge.
-maybe_is_tagToEnum_call (StgOpApp (StgTagToEnumOp tyc) args t)
+maybe_is_tagToEnum_call (StgOpApp (StgTagToEnumOp tyc) args _)
   | [v] <- args
   = Just (v, extract_constr_Names tyc)
   | otherwise

@@ -1121,6 +1121,8 @@ genPrimOp ctx op args = do
 
 genTagToEnumOp :: ExprCtx -> TyCon -> StgArg -> State.StateT GenState IO (JStgStat, ExprResult)
 genTagToEnumOp ctx tyc arg = do
-  [tag] <- genArg arg
-  let [v] = concatMap typex_expr $ ctxTarget ctx
-  pure (v |= if tyc == boolTyCon then IfExpr tag true_ false_ else app hdTagToEnum [tag], ExprInline)
+  tags <- genArg arg
+  case (tags, concatMap typex_expr $ ctxTarget ctx) of
+    ([tag], [v]) ->
+      pure (v |= if tyc == boolTyCon then IfExpr tag true_ false_ else app hdTagToEnum [tag], ExprInline)
+    _ -> pprPanic "genTagToEnumOp: should be applied to exactly one argument and have one result" (ppr ctx <+> ppr tyc <+> ppr arg)

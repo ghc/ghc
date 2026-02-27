@@ -42,7 +42,6 @@ import GHC.Cmm.Reg ( GlobalArgRegs(..) )
 import GHC.Cmm.Utils
 import GHC.Cmm.Graph
 import GHC.Cmm.CallConv
-import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
@@ -53,8 +52,6 @@ import GHC.Types.Basic
 import GHC.Types.Unique.DSM
 import GHC.Unit.Types
 
-import GHC.Core.TyCo.Rep
-import GHC.Builtin.Types.Prim
 import GHC.Utils.Misc (zipEqual)
 
 import Control.Monad
@@ -67,13 +64,13 @@ import Control.Monad
 -- Precondition: the length of the arguments list is the same as the
 -- arity of the foreign function.
 cgForeignCall :: ForeignCall            -- the op
-              -> Type                   -- type of foreign function
+              -> [StgFArgType]
               -> [StgArg]               -- x,y    arguments
               -> StgKind                -- result kind
               -> FCode ReturnKind
 
-cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_kind
-  = do  { cmm_args <- getFCallArgs stg_args typ
+cgForeignCall (CCall (CCallSpec target cconv safety)) arg_tys stg_args res_kind
+  = do  { cmm_args <- getFCallArgs stg_args arg_tys
         -- ; traceM $ show cmm_args
         ; (res_regs, res_hints) <- newUnboxedTupleRegs (getStgKind res_kind)
         ; let ((call_args, arg_hints), cmm_target)
@@ -711,15 +708,15 @@ closureField profile off = off + fixedHdrSize profile
 
 getFCallArgs ::
      [StgArg]
-  -> Type -- the type of the foreign function
+  -> [StgFArgType]
   -> FCode [(CmmExpr, ForeignHint)]
 -- (a) Drop void args
 -- (b) Add foreign-call shim code
 -- It's (b) that makes this differ from getNonVoidArgAmodes
 -- Precondition: args and typs have the same length
 -- See Note [Unlifted boxed arguments to foreign calls]
-getFCallArgs args typ
-  = do  { mb_cmms <- mapM get (zipEqual args (collectStgFArgTypes typ))
+getFCallArgs args arg_tys
+  = do  { mb_cmms <- mapM get (zipEqual args arg_tys)
         ; return (catMaybes mb_cmms) }
   where
     get (arg,typ)
@@ -734,15 +731,6 @@ getFCallArgs args typ
         arg_reps = typePrimRep arg_ty
         hint     = typeForeignHint arg_ty
 
--- The minimum amount of information needed to determine
--- the offset to apply to an argument to a foreign call.
--- See Note [Unlifted boxed arguments to foreign calls]
-data StgFArgType
-  = StgPlainType
-  | StgArrayType
-  | StgSmallArrayType
-  | StgByteArrayType
-
 -- See Note [Unlifted boxed arguments to foreign calls]
 add_shim :: Profile -> StgFArgType -> CmmExpr -> CmmExpr
 add_shim profile ty expr = case ty of
@@ -752,39 +740,3 @@ add_shim profile ty expr = case ty of
   StgByteArrayType  -> cmmOffsetB platform expr (arrWordsHdrSize profile)
   where
     platform = profilePlatform profile
-
--- From a function, extract information needed to determine
--- the offset of each argument when used as a C FFI argument.
--- See Note [Unlifted boxed arguments to foreign calls]
-collectStgFArgTypes :: Type -> [StgFArgType]
-collectStgFArgTypes = go []
-  where
-    -- Skip foralls
-    go bs (ForAllTy _ res) = go bs res
-    go bs (AppTy{}) = reverse bs
-    go bs (TyConApp{}) = reverse bs
-    go bs (LitTy{}) = reverse bs
-    go bs (TyVarTy{}) = reverse bs
-    go  _ (CastTy{}) = panic "myCollectTypeArgs: CastTy"
-    go  _ (CoercionTy{}) = panic "myCollectTypeArgs: CoercionTy"
-    go bs (FunTy {ft_arg = arg, ft_res=res}) =
-      go (typeToStgFArgType arg:bs) res
-
--- Choose the offset based on the type. For anything other
--- than an unlifted boxed type, there is no offset.
--- See Note [Unlifted boxed arguments to foreign calls]
-typeToStgFArgType :: Type -> StgFArgType
-typeToStgFArgType typ
-  | tycon == arrayPrimTyCon = StgArrayType
-  | tycon == mutableArrayPrimTyCon = StgArrayType
-  | tycon == smallArrayPrimTyCon = StgSmallArrayType
-  | tycon == smallMutableArrayPrimTyCon = StgSmallArrayType
-  | tycon == byteArrayPrimTyCon = StgByteArrayType
-  | tycon == mutableByteArrayPrimTyCon = StgByteArrayType
-  | otherwise = StgPlainType
-  where
-  -- Should be a tycon app, since this is a foreign call. We look
-  -- through newtypes so the offset does not change if a user replaces
-  -- a type in a foreign function signature with a representationally
-  -- equivalent newtype.
-  tycon = tyConAppTyCon (unwrapType typ)
