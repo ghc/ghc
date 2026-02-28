@@ -526,6 +526,7 @@ addTickHsExpr e@(HsOverLabel{})         = return e
 addTickHsExpr e@(HsLit {})              = return e
 addTickHsExpr e@(HsQualLit {})          = return e
 addTickHsExpr e@(HsEmbTy {})            = return e
+addTickHsExpr e@(HsStar {})             = return e
 addTickHsExpr e@(HsHole {})             = return e
 addTickHsExpr e@(HsQual {})             = return e
 addTickHsExpr e@(HsForAll {})           = return e

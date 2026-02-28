@@ -2350,7 +2350,7 @@ atype :: { LHsType GhcPs }
         | tyvar %shift                   {% amsA' (sL1 $1 (HsTyVar noAnn NotPromoted $1)) }      -- (See Note [Unit tuples])
         | '_'   %shift                   { sL1a $1 $ mkAnonWildCardTy (epTok $1) }
         | '*'                            {% do { warnStarIsType (getLoc $1)
-                                               ; return $ sL1a $1 (HsStarTy noExtField (isUnicode $1)) } }
+                                               ; return $ sL1a $1 (HsStarTy (epUniTok $1)) } }
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | PREFIX_TILDE atype             {% amsA' (sLL $1 $> (mkBangTy (glR $1) SrcLazy $2)) }
@@ -2889,18 +2889,29 @@ exp_gen(IEXP) :: { ECP }
         -- Embed types into expressions and patterns for required type arguments
         | 'type' atype             { ECP $ mkHsEmbTyPV (comb2 $1 $>) (epTok $1) $2 }
 
+infixexp2s :: { ECP }
+infixexp2s
+        : infixexp2 %shift { $1 }
+        | '*'              { ECP $ mkStarPV (epUniTok $1) }
+
 infixexp2 :: { ECP }
         : infixexp %shift       { $1 }
 
+        | '*' '->' infixexp2s   { ECP $
+                                  mkStarPV (epUniTok $1) >>= \ $1 ->
+                                  unECP $3    >>= \ $3 ->
+                                  let arr = HsUnannotated (EpArrow (epUniTok $2))
+                                  in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $3 }
+
         -- View patterns and function arrows
-        | infixexp '->' infixexp2
+        | infixexp '->' infixexp2s
                                 { ECP $
                                   withArrowParsingMode' $ \mode ->
                                   unECP $1 >>= \ $1 ->
                                   unECP $3 >>= \ $3 ->
                                   let arr = HsUnannotated (EpArrow (epUniTok $2))
                                   in mkHsArrowPV (comb2 $1 $>) mode $1 arr $3 }
-        | infixexp expmult '->'  infixexp2
+        | infixexp expmult '->'  infixexp2s
                                 { ECP $
                                   unECP $1         >>= \ $1 ->
                                   $2               >>= \ $2 ->
@@ -2908,20 +2919,20 @@ infixexp2 :: { ECP }
                                   hintLinear (getLoc $2) >>
                                   let arr = (unLoc $2) (epUniTok $3)
                                   in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $4 }
-        | infixexp      '->.' infixexp2
+        | infixexp      '->.' infixexp2s
                                 { ECP $
                                   hintLinear (getLoc $2) >>
                                   unECP $1 >>= \ $1 ->
                                   unECP $3 >>= \ $3 ->
                                   let arr = HsLinearAnn (EpLolly (epTok $2))
                                   in mkHsArrowPV (comb2 $1 $>) ArrowIsFunType $1 arr $3 }
-        | expcontext    '=>'  infixexp2
+        | expcontext    '=>'  infixexp2s
                                 { ECP $
                                         $1 >>= \ $1 ->
                                   unECP $3 >>= \ $3 ->
                                   mkQualPV (comb2 $1 $>) (addTrailingDarrowC $1 $2 emptyComments) $3}
 
-        | forall_telescope infixexp2
+        | forall_telescope infixexp2s
                                 { ECP $
                                   unECP $2 >>= \ $2 ->
                                   mkHsForallPV (comb2 $1 $>) (unLoc $1) $2 }
@@ -4103,7 +4114,7 @@ special_id
 
 special_sym :: { Located FastString }
 special_sym : '.'       { sL1 $1 (fsLit ".") }
-            | '*'       { sL1 $1 (starSym (isUnicode $1)) }
+            | '*'       { sL1 $1 (starSym (isUnicodeSyntax $1)) }
 
 -----------------------------------------------------------------------------
 -- Data constructors

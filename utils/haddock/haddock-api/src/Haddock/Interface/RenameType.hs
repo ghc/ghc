@@ -97,7 +97,7 @@ renameType (HsQualTy x lctxt lt) =
     <$> renameLContext lctxt
     <*> renameLType lt
 renameType (HsTyVar x ip name) = HsTyVar x ip <$> renameLNameOcc name
-renameType t@(HsStarTy _ _) = pure t
+renameType t@(HsStarTy _) = pure t
 renameType (HsAppTy x lf la) = HsAppTy x <$> renameLType lf <*> renameLType la
 renameType (HsAppKindTy x lt lk) = HsAppKindTy x <$> renameLType lt <*> renameLKind lk
 renameType (HsFunTy x w la lr) = HsFunTy x <$> renameHsMultAnn w <*> renameLType la <*> renameLType lr

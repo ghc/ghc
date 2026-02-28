@@ -373,6 +373,9 @@ type instance XEmbTy         GhcTc = DataConCantHappen
   -- A free-standing HsEmbTy is an error.
   -- Valid usages are immediately desugared into Type.
 
+type instance XStar          GhcPs = TokStar
+type instance XStar          GhcRn = TokStar
+type instance XStar          GhcTc = DataConCantHappen
 
 {-
 Note [Holes in expressions]
@@ -1090,6 +1093,9 @@ ppr_expr (HsStatic _ e)
 ppr_expr (HsEmbTy _ ty)
   = hsep [text "type", ppr ty]
 
+ppr_expr (HsStar _)
+  = starLit
+
 ppr_expr (HsQual _ ctxt ty)
   = sep [ppr_context ctxt, ppr_lexpr ty]
   where
@@ -1249,6 +1255,7 @@ hsExprNeedsParens prec = go
     go (HsProjection{})               = True
     go (HsGetField{})                 = False
     go (HsEmbTy{})                    = prec > topPrec
+    go (HsStar{})                     = prec >= starPrec
     go (HsHole{})                     = False
     go (HsForAll{})                   = prec >= funPrec
     go (HsQual{})                     = prec >= funPrec
