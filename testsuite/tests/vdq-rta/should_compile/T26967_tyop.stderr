@@ -1,0 +1,12 @@
+T26967_tyop.hs:11:7: warning: [GHC-21887] [-Wstar-binder (in -Wdefault)]
+    Found binding occurrence of ‘*’ yet StarIsType is enabled.
+    Suggested fix:
+      To use (or export) this operator in modules with StarIsType,
+          including the definition module, you must qualify it.
+
+T26967_tyop.hs:11:7: warning: [GHC-39567] [-Wstar-is-type (in -Wdefault)]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+

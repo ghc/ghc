@@ -855,9 +855,7 @@ data HsType pass
       -- ^
       -- > (?x :: ty)
 
-  | HsStarTy            (XStarTy pass)
-                        Bool             -- Is this the Unicode variant?
-                                         -- Note [HsStarTy]
+  | HsStarTy            (XStarTy pass)  -- Note [HsStarTy]
 
   | HsKindSig           (XKindSig pass)
                         (LHsType pass)  -- (ty :: kind)

@@ -112,6 +112,7 @@ module GHC.Parser.PostProcess (
         ecpFromPat,
         ArrowParsingMode(..),
         withArrowParsingMode, withArrowParsingMode',
+        mkStarPV,
         setTelescopeBndrsNameSpace,
         PatBuilder,
 
@@ -1128,8 +1129,10 @@ checkTyClHdr is_cls ty
     goL cs (L l ty) acc ops cps fix = go cs l ty acc ops cps fix
 
     -- workaround to define '*' despite StarIsType
-    go cs ll (HsParTy an (L l (HsStarTy _ isUni))) acc ops' cps' fix
+    go cs ll (HsParTy an (L l (HsStarTy tok))) acc ops' cps' fix
       = do { addPsMessage (locA l) PsWarnStarBinder
+           ; let isUni = case tok of { NoEpUniTok    -> NormalSyntax
+                                     ; EpUniTok _ iu -> iu }
            ; let name = mkOccNameFS tcClsName (starSym isUni)
            ; let a' = newAnns ll l an
            ; return (L a' (Unqual name), acc, fix
@@ -2316,6 +2319,11 @@ withArrowParsingMode cont = do
 withArrowParsingMode' :: DisambECP b => (forall lhs. DisambECP lhs => ArrowParsingMode lhs b -> PV (LocatedA b)) -> PV (LocatedA b)
 withArrowParsingMode' = withArrowParsingMode
 
+mkStarPV :: DisambECP b => TokStar -> PV (LocatedA b)
+mkStarPV tok = do
+  warnStarIsType (locA tok)
+  unECP $ ecpFromExp $ L (l2l tok) (HsStar tok)
+
 -- When a forall-type occurs in term syntax, forall-bound variables should
 -- inhabit the term namespace `varName` rather than the usual `tvName`.
 -- See Note [Types in terms].
@@ -3449,7 +3457,7 @@ failSpliceOrQuoteTwice lvl =
       EpAnnLevelSplice tok -> getEpTokenSrcSpan tok
       EpAnnLevelQuote tok -> getEpTokenSrcSpan tok
 
-warnStarIsType :: SrcSpan -> P ()
+warnStarIsType :: MonadP m => SrcSpan -> m ()
 warnStarIsType span = addPsMessage span PsWarnStarIsType
 
 failOpFewArgs :: MonadP m => LocatedN RdrName -> m a
@@ -3734,9 +3742,9 @@ epTokenWidenR (EpTok EpaDelta{}) _ =
 -----------------------------------------------------------------------------
 -- Token symbols
 
-starSym :: Bool -> FastString
-starSym True = fsLit "★"
-starSym False = fsLit "*"
+starSym :: IsUnicodeSyntax -> FastString
+starSym UnicodeSyntax = fsLit "★"
+starSym NormalSyntax  = fsLit "*"
 
 -----------------------------------------
 -- Bits and pieces for RecordDotSyntax.

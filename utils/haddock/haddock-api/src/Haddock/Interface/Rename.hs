@@ -374,7 +374,7 @@ renameType t = case t of
     ltype' <- renameLType ltype
     return (HsQualTy{hst_xqual = noAnn, hst_ctxt = lcontext', hst_body = ltype'})
   HsTyVar _ ip (L l n) -> return . HsTyVar noAnn ip . L l =<< renameName (getName n)
-  HsStarTy _ isUni -> return (HsStarTy noAnn isUni)
+  HsStarTy _ -> return (HsStarTy noAnn)
   HsAppTy _ a b -> do
     a' <- renameLType a
     b' <- renameLType b
