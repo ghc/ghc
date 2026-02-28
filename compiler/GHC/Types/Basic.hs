@@ -66,7 +66,7 @@ module GHC.Types.Basic (
         noOneShotInfo, hasNoOneShotInfo, isOneShotInfo,
         bestOneShot, worstOneShot,
 
-        OccInfo(..), noOccInfo, seqOccInfo, zapFragileOcc, isOneOcc,
+        OccInfo(..), noOccInfo, seqOccInfo, zapFragileOccInfo, isOneOcc,
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker, isManyOccs,
         isNoOccInfo, strongLoopBreaker, weakLoopBreaker,
 
@@ -980,10 +980,13 @@ isOneOcc :: OccInfo -> Bool
 isOneOcc (OneOcc {}) = True
 isOneOcc _           = False
 
-zapFragileOcc :: OccInfo -> OccInfo
--- Keep only the most robust data: deadness, loop-breaker-hood
-zapFragileOcc (OneOcc {}) = noOccInfo
-zapFragileOcc occ         = zapOccTailCallInfo occ
+-- | Keep only the most robust occurrence info: deadness, loop-breaker-hood.
+--
+-- In particular, it zaps 'TailCallInfo': see Note [JoinId vs TailCallInfo]
+-- in 'GHC.Core.Opt.Simplify.Env'.
+zapFragileOccInfo :: OccInfo -> OccInfo
+zapFragileOccInfo (OneOcc {}) = noOccInfo
+zapFragileOccInfo occ         = zapOccTailCallInfo occ
 
 instance Outputable OccInfo where
   -- only used for debugging; never parsed.  KSW 1999-07

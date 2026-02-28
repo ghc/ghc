@@ -375,7 +375,7 @@ We don't float lets inwards past an SCC.
 -}
 
 fiExpr platform to_drop (_, AnnTick tickish expr)
-  | tickish `tickishScopesLike` SoftScope
+  | tickishHasSoftScope tickish
   = Tick tickish (fiExpr platform to_drop expr)
 
   | otherwise -- Wimp out for now - we could push values in

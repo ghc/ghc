@@ -365,25 +365,28 @@ floatExpr lam@(Lam (TB _ lam_spec) _)
     (add_to_stats fs floats, floats, mkLams bndrs body') }
 
 floatExpr (Tick tickish expr)
-  | tickish `tickishScopesLike` SoftScope -- not scoped, can just float
+  -- If possible, float out past the tick
+  | let float_out_of_tick
+          -- See Note [Floating past breakpoints]
+          | Breakpoint{} <- tickish
+          = True
+          | otherwise
+          -- We can float code out of non-scoped ticks
+          = tickishHasNoScope tickish
+  , float_out_of_tick
   = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
     (fs, floating_defns, Tick tickish expr') }
 
-  | not (tickishCounts tickish) || tickishCanSplit tickish
-  = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
-    let -- Annotate bindings floated outwards past an scc expression
-        -- with the cc.  We mark that cc as "duplicated", though.
-        annotated_defns = wrapTick (mkNoCount tickish) floating_defns
+  -- We can't move code out of the tick
+  | otherwise
+  = assert (not (tickishCounts tickish) || tickishCanSplit tickish) $
+    case (floatExpr expr)    of { (fs, floating_defns, expr') ->
+        -- Wrap floated code with the correct tick scope, but using 'mkNoCount'
+        -- to ensure we don't duplicate counters.
+    let annotated_defns = wrapTick (mkNoCount tickish) floating_defns
     in
     (fs, annotated_defns, Tick tickish expr') }
 
-  -- See Note [Floating past breakpoints]
-  | Breakpoint{} <- tickish
-  = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
-    (fs, floating_defns, Tick tickish expr') }
-
-  | otherwise
-  = pprPanic "floatExpr tick" (ppr tickish)
 
 floatExpr (Cast expr co)
   = case (floatExpr expr) of { (fs, floating_defns, expr') ->
@@ -661,7 +664,8 @@ partitionByLevel (Level major minor) (FB tops defns)
 
 wrapTick :: CoreTickish -> FloatBinds -> FloatBinds
 wrapTick t (FB tops defns)
-  = FB (mapBag wrap_bind tops)
+  = assert (not $ tickishCounts t) $
+    FB (mapBag wrap_bind tops)
        (M.map (M.map wrap_defns) defns)
   where
     wrap_defns = mapBag wrap_one
@@ -672,10 +676,13 @@ wrapTick t (FB tops defns)
     wrap_one (FloatLet bind)      = FloatLet (wrap_bind bind)
     wrap_one (FloatCase e b c bs) = FloatCase (maybe_tick e) b c bs
 
-    maybe_tick e | exprIsHNF e = tickHNFArgs t e
-                 | otherwise   = mkTick t e
-      -- we don't need to wrap a tick around an HNF when we float it
-      -- outside a tick: that is an invariant of the tick semantics
+    maybe_tick
+      -- We don't need to wrap an SCC tick around HNFs that we floated out of
+      -- the SCC, as that is an invariant of the semantics for SCCs.
       -- Conversely, inlining of HNFs inside an SCC is allowed, and
       -- indeed the HNF we're floating here might well be inlined back
       -- again, and we don't want to end up with duplicate ticks.
+      | tickishPlace t == PlaceCostCentre
+      = mkTickNoHNF t
+      | otherwise
+      = mkTick t

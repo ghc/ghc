@@ -106,6 +106,7 @@ import Data.List.NonEmpty ( NonEmpty(..), groupWith, nonEmpty )
 import Data.Maybe
 import Data.IntMap.Strict ( IntMap )
 import qualified Data.IntMap.Strict as IntMap ( lookup, keys, empty, fromList )
+import GHC.Types.Unique.Map
 
 {-
 Note [Core Lint guarantee]
@@ -914,8 +915,8 @@ lintCoreExpr (Lit lit)
        ; return (literalType lit, zeroUE) }
 
 lintCoreExpr (Cast expr co)
-  = do { (expr_ty, ue) <- markAllJoinsBad (lintCoreExpr expr)
-            -- markAllJoinsBad: see Note [Join points and casts]
+  = do { (expr_ty, ue) <- markAllJoinsUnderCast (lintCoreExpr expr)
+            -- markAllJoinsUnderCast: see Note [Linting join points with casts or ticks]
 
        ; lintCoercion co
        ; lintRole co Representational (coercionRole co)
@@ -929,14 +930,7 @@ lintCoreExpr (Tick tickish expr)
   = do { case tickish of
            Breakpoint _ _ ids -> forM_ ids $ \id -> lintIdOcc id 0
            _                  -> return ()
-       ; markAllJoinsBadIf block_joins $ lintCoreExpr expr }
-  where
-    block_joins = not (tickish `tickishScopesLike` SoftScope)
-      -- TODO Consider whether this is the correct rule. It is consistent with
-      -- the simplifier's behaviour - cost-centre-scoped ticks become part of
-      -- the continuation, and thus they behave like part of an evaluation
-      -- context, but soft-scoped and non-scoped ticks simply wrap the result
-      -- (see Simplify.simplTick).
+       ; markAllJoinsUnderTick tickish $ lintCoreExpr expr }
 
 lintCoreExpr (Let (NonRec tv (Type ty)) body)
   | isTyVar tv
@@ -1017,22 +1011,16 @@ lintCoreExpr e@(App _ _)
 
        ; return app_pair}
   where
-    skipTick t = case collectFunSimple e of
-      (Var v) -> etaExpansionTick v t
-      _ -> tickishFloatable t
-    (fun, args, _source_ticks) = collectArgsTicks skipTick e
-      -- We must look through source ticks to avoid #21152, for example:
+    skipTick t =
+      case collectFunSimple e of
+        Var v -> canCollectArgsThroughTick v t
+        _ -> tickishFloatable t
+    (fun, args, _ticks) = collectArgsTicks skipTick e
+      -- We must look through ticks, otherwise we may fail to spot a
+      -- saturated application. We use 'canCollectArgsThroughTicks', which is
+      -- the same predicate that Core Prep uses.
       --
-      -- reallyUnsafePtrEquality
-      --   = \ @a ->
-      --       (src<loc> reallyUnsafePtrEquality#)
-      --         @Lifted @a @Lifted @a
-      --
-      -- To do this, we use `collectArgsTicks tickishFloatable` to match
-      -- the eta expansion behaviour, as per Note [Eta expansion and source notes]
-      -- in GHC.Core.Opt.Arity.
-      -- Sadly this was not quite enough. So we now also accept things that CorePrep will allow.
-      -- See Note [Ticks and mandatory eta expansion]
+      -- See Note [Ticks and mandatory eta expansion] in GHC.CoreToStg.Prep.
 
 lintCoreExpr (Lam var expr)
   = markAllJoinsBad $
@@ -1131,7 +1119,7 @@ checkDeadIdOcc id
 ------------------
 lintJoinBndrType :: OutType -- Type of the body
                  -> OutId   -- Possibly a join Id
-                -> LintM ()
+                 -> LintM ()
 -- Checks that the return type of a join Id matches the body
 -- E.g. join j x = rhs in body
 --      The type of 'rhs' must be the same as the type of 'body'
@@ -1139,13 +1127,29 @@ lintJoinBndrType body_ty bndr
   | JoinPoint arity <- idJoinPointHood bndr
   , let bndr_ty = idType bndr
   , (bndrs, res) <- splitPiTys bndr_ty
-  = do let msg =
-             hang (text "Join point returns different type than body")
-                2 (vcat [ text "Join bndr:" <+> ppr bndr <+> dcolon <+> ppr (idType bndr)
-                        , text "Join arity:" <+> ppr arity
-                        , text "Body type:" <+> ppr body_ty ])
-       checkL (length bndrs >= arity) msg
-       ensureEqTys body_ty (mkPiTys (drop arity bndrs) res) msg
+  = do let
+          ty_msg =
+            hang (text "Join point returns different type than body")
+              2 (vcat [ text "Join bndr:" <+> ppr bndr <+> dcolon <+> ppr (idType bndr)
+                      , text "Join arity:" <+> ppr arity
+                      , text "Body type:" <+> ppr body_ty ])
+          arity_msg =
+            hang (text "Join point is not saturated")
+              2 (vcat [ text "Join bndr:" <+> ppr bndr <+> dcolon <+> ppr (idType bndr)
+                      , text "Join arity:" <+> ppr arity
+                      , text "Arguments:" <+> ppr bndrs ])
+
+       mb_join_info <- lookupJoinId bndr
+       case mb_join_info of
+         Nothing ->
+          pprPanic "lintJoinBndrType: valid join marked bad" (ppr bndr)
+         Just (_, occ_info) -> do
+           checkL (length bndrs >= arity) arity_msg
+
+           -- See Note [Linting join points with casts or ticks] for why
+           -- we skip this check if there is an intervening cast.
+           unless (occ_info == JoinOccUnderCast) $
+             ensureEqTys body_ty (mkPiTys (drop arity bndrs) res) ty_msg
   | otherwise
   = return ()
 
@@ -1156,11 +1160,11 @@ checkJoinOcc var n_args
   | JoinPoint join_arity_occ <- idJoinPointHood var
   = do { mb_join_arity_bndr <- lookupJoinId var
        ; case mb_join_arity_bndr of {
-           NotJoinPoint -> do { join_set <- getValidJoins
-                              ; addErrL (text "join set " <+> ppr join_set $$
-                                invalidJoinOcc var) } ;
+           Nothing -> do { valid_joins <- getValidJoins
+                         ; addErrL (text "valid joins:" <+> ppr valid_joins $$
+                           invalidJoinOcc var) } ;
 
-           JoinPoint join_arity_bndr ->
+           Just (join_arity_bndr, _join_occ) ->
 
     do { checkL (join_arity_bndr == join_arity_occ) $
            -- Arity differs at binding site and occurrence
@@ -1333,39 +1337,34 @@ checkLinearity body_ue lam_var =
       return body_ue'
     Nothing    -> return body_ue -- A type variable
 
-{- Note [Join points and casts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-You might think that this should be OK:
-   join j x = rhs
-   in (case e of
-          A   -> alt1
-          B x -> (jump j x) |> co)
+{- Note [Linting join points with casts or ticks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As per Note [Join points, casts, and ticks] in GHC.Core, we have to be careful
+when a cast or tick occurs in between a join point binding and a corresponding
+join point occurrence.
 
-You might think that, since the cast is ultimately erased, the jump to
-`j` should still be OK as a join point.  But no!  See #21716. Suppose
+Generally speaking:
 
-  newtype Age = MkAge Int   -- axAge :: Age ~ Int
-  f :: Int -> ...           -- f strict in it's first argument
+  - The simplifier cannot handle intervening casts or non-soft-scope ticks, so
+    we must check for that to avoid producing invalid Core.
+  - However, as per (JCT3), Core Prep **can** produce join points with
+    intervening casts or non-soft-scope ticks, which means we must expect them.
 
-and consider the expression
+Casts present an additional challenge. Consider for example:
 
-  f (join j :: Bool -> Age
-          j x = (rhs1 :: Age)
-     in case v of
-         Just x  -> (j x |> axAge :: Int)
-         Nothing -> rhs2)
+    join { j :: Bool -> Age; j x = (blah :: Age) }
+    in case e of
+      False -> j True |> (co1 :: Age ~ Int)
+      True  -> other :: Int
 
-Then, if the Simplifier pushes the strict call into the join points
-and alternatives we'll get
+It is **not** the case that the type of 'blah' is the same as the type of
+the body of the join point binding! Indeed:
 
-   join j' x = f (rhs1 :: Age)
-   in case v of
-      Just x  -> j' x |> axAge
-      Nothing -> f rhs2
+  - RHS of the join-point binding: blah :: Age
+  - The body of the join point has type Int.
 
-Utterly bogus.  `f` expects an `Int` and we are giving it an `Age`.
-No no no.  Casts destroy the tail-call property.  Henc markAllJoinsBad
-in the (Cast expr co) case of lintCoreExpr.
+So we skip the 'exprType(join_rhs) == exprType(join_body)' check when casts
+occur in between.
 
 Note [No alternatives lint check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2977,9 +2976,10 @@ data LintEnv
                     --    type variables, and coercion variables)
                     -- Used at an occurrence of the InVar
 
-       , le_joins :: IdSet     -- Join points in scope that are valid
-                               -- A subset of the InScopeSet in le_subst
-                               -- See Note [Join points]
+       , le_joins :: UniqMap Id JoinOcc
+           -- ^ Join points in scope that are valid
+           -- A subset of the InScopeSet in le_subst
+           -- See Note [Join points]
 
        , le_ue_aliases :: NameEnv UsageEnv
              -- See Note [Linting linearity]
@@ -2999,6 +2999,7 @@ data LintFlags
        , lf_check_linearity :: Bool    -- ^ See Note [Linting linearity]
        , lf_check_fixed_rep :: Bool    -- ^ See Note [Checking for representation polymorphism]
        , lf_check_rubbish_lits :: Bool -- ^ See Note [Checking for rubbish literals]
+       , lf_allow_weak_joins :: Bool -- ^ See Note [Linting join points with casts or ticks]
     }
 
 -- See Note [Checking StaticPtrs]
@@ -3307,6 +3308,20 @@ data LintLocInfo
   | InCo   Coercion     -- Inside a coercion
   | InAxiom (CoAxiom Branched)   -- Inside a CoAxiom
 
+-- | Does this join point 'Id' occur inside a cast?
+--
+-- See Note [Linting join points with casts or ticks].
+data JoinOcc
+  -- | A normal occurrence of a 'JoinId'.
+  = NormalJoinOcc
+  -- | An occurrence of a 'JoinId' with an intervening cast between the
+  -- join point binder definition and the jump.
+  | JoinOccUnderCast
+  deriving stock Eq
+instance Outputable JoinOcc where
+  ppr NormalJoinOcc = text "Normal"
+  ppr JoinOccUnderCast = text "UnderCast"
+
 data LintConfig = LintConfig
   { l_diagOpts   :: !DiagOpts         -- ^ Diagnostics opts
   , l_platform   :: !Platform         -- ^ Target platform
@@ -3328,7 +3343,7 @@ initL cfg m
     env = LE { le_flags   = l_flags cfg
              , le_subst   = mkEmptySubst (mkInScopeSetList vars)
              , le_in_vars = mkVarEnv [ (v,(v, varType v)) | v <- vars ]
-             , le_joins   = emptyVarSet
+             , le_joins   = emptyUniqMap
              , le_loc     = []
              , le_ue_aliases = emptyNameEnv
              , le_platform = l_platform cfg
@@ -3428,11 +3443,11 @@ addInScopeId in_id out_ty thing_inside
     in unLintM (thing_inside out_id) env' errs
 
   where
-    add env@(LE { le_in_vars = id_vars, le_joins = join_set
+    add env@(LE { le_in_vars = id_vars, le_joins = valid_joins
                 , le_ue_aliases = aliases, le_subst = subst })
       = (out_id, env1)
       where
-        env1 = env { le_in_vars = in_vars', le_joins = join_set', le_ue_aliases = aliases' }
+        env1 = env { le_in_vars = in_vars', le_joins = valid_joins', le_ue_aliases = aliases' }
 
         in_vars' = extendVarEnv id_vars in_id (in_id, out_ty)
         aliases' = delFromNameEnv aliases (idName in_id)
@@ -3446,9 +3461,9 @@ addInScopeId in_id out_ty thing_inside
         out_id | isEmptyTCvSubst subst = in_id
                | otherwise             = setIdType in_id out_ty
 
-        join_set'
-          | isJoinId out_id = extendVarSet join_set in_id -- Overwrite with new arity
-          | otherwise       = delVarSet    join_set in_id -- Remove any existing binding
+        valid_joins'
+          | isJoinId out_id = addToUniqMap   valid_joins in_id NormalJoinOcc -- Overwrite with new arity
+          | otherwise       = delFromUniqMap valid_joins in_id -- Remove any existing binding
 
 addInScopeTyCoVar :: InTyCoVar -> OutType -> (OutTyCoVar -> LintM a) -> LintM a
 -- This function clones to avoid shadowing of TyCoVars
@@ -3485,13 +3500,35 @@ extendTvSubstL tv ty m
 
 markAllJoinsBad :: LintM a -> LintM a
 markAllJoinsBad m
-  = LintM $ \ env errs -> unLintM m (env { le_joins = emptyVarSet }) errs
+  = LintM $ \ env errs -> unLintM m (env { le_joins = emptyUniqMap }) errs
+
+-- | Mark all join points as occurring under a tick.
+--
+-- See Note [Linting join points with casts or ticks].
+markAllJoinsUnderTick :: CoreTickish -> LintM a -> LintM a
+markAllJoinsUnderTick tick m
+  = LintM $ \ env errs ->
+    let env' = if tickishHasSoftScope tick || lf_allow_weak_joins (le_flags env)
+               then env
+               else env { le_joins = emptyUniqMap }
+    in unLintM m env' errs
+
+-- | Mark all join points as occurring under a cast.
+--
+-- See Note [Linting join points with casts or ticks].
+markAllJoinsUnderCast :: LintM a -> LintM a
+markAllJoinsUnderCast m
+  = LintM $ \ env errs ->
+    let !env' = if lf_allow_weak_joins (le_flags env)
+                then env { le_joins = fmap (const JoinOccUnderCast) (le_joins env) }
+                else env { le_joins = emptyUniqMap }
+    in unLintM m env' errs
 
 markAllJoinsBadIf :: Bool -> LintM a -> LintM a
 markAllJoinsBadIf True  m = markAllJoinsBad m
 markAllJoinsBadIf False m = m
 
-getValidJoins :: LintM IdSet
+getValidJoins :: LintM (UniqMap Id JoinOcc)
 getValidJoins = LintM (\ env errs -> fromBoxedLResult (Just (le_joins env), errs))
 
 getSubst :: LintM Subst
@@ -3552,14 +3589,14 @@ lintVarOcc v_occ
       | otherwise
       = return ()
 
-lookupJoinId :: Id -> LintM JoinPointHood
+lookupJoinId :: Id -> LintM (Maybe (JoinArity, JoinOcc))
 -- Look up an Id which should be a join point, valid here
 -- If so, return its arity, if not return Nothing
 lookupJoinId id
-  = do { join_set <- getValidJoins
-       ; case lookupVarSet join_set id of
-            Just id' -> return (idJoinPointHood id')
-            Nothing  -> return NotJoinPoint }
+  = do { valid_joins <- getValidJoins
+       ; case lookupUniqMap valid_joins id of
+            Just join_occ -> return $ Just (idJoinArity id, join_occ)
+            Nothing       -> return Nothing }
 
 addAliasUE :: OutId -> UsageEnv -> LintM a -> LintM a
 addAliasUE id ue thing_inside = LintM $ \ env errs ->

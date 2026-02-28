@@ -814,9 +814,9 @@ prepareRhs env top_lvl occ rhs0
         = return (emptyLetFloats, Var fun)
 
     anfise (Tick t rhs)
-        -- We want to be able to float bindings past this
-        -- tick. Non-scoping ticks don't care.
-        | tickishScoped t == NoScope
+        -- We want to be able to float bindings past this tick.
+        -- Non-scoping ticks don't care.
+        | tickishHasNoScope t
         = do { (floats, rhs') <- anfise rhs
              ; return (floats, Tick t rhs') }
 
@@ -1413,7 +1413,7 @@ simplTick env tickish expr cont
   -- bottom, then rebuildCall will discard the continuation.
 
 --------------------------
---  | tickishScoped tickish && not (tickishCounts tickish)
+--  | not (tickishHasNoScope tickish) && not (tickishCounts tickish)
 --  = simplExprF env expr (TickIt tickish cont)
 -- XXX: we cannot do this, because the simplifier assumes that
 -- the context can be pushed into a case with a single branch. e.g.
@@ -1425,12 +1425,11 @@ simplTick env tickish expr cont
 -- simplifier iterations that necessary in some cases.
 --------------------------
 
-  -- For unscoped or soft-scoped ticks, we are allowed to float in new
-  -- cost, so we simply push the continuation inside the tick.  This
-  -- has the effect of moving the tick to the outside of a case or
-  -- application context, allowing the normal case and application
-  -- optimisations to fire.
-  | tickish `tickishScopesLike` SoftScope
+  -- For soft-scoped ticks, we are allowed to float in new cost, so we simply
+  -- push the continuation inside the tick.  This has the effect of moving the
+  -- tick to the outside of a case or application context, allowing the normal
+  -- 'case' and 'application' optimisations to fire.
+  | tickishHasSoftScope tickish
   = do { (floats, expr') <- simplExprF env expr cont
        ; return (floats, mkTick tickish expr')
        }
@@ -1459,14 +1458,14 @@ simplTick env tickish expr cont
       _other -> Nothing
    where (ticks, expr0) = stripTicksTop movable (Tick tickish expr)
          movable t      = not (tickishCounts t) ||
-                          t `tickishScopesLike` NoScope ||
+                          tickishHasNoScope t ||
                           tickishCanSplit t
          tickScrut e    = foldr mkTick e ticks
          -- Alternatives get annotated with all ticks that scope in some way,
          -- but we don't want to count entries.
          tickAlt (Alt c bs e) = Alt c bs (foldr mkTick e ts_scope)
          ts_scope         = map mkNoCount $
-                            filter (not . (`tickishScopesLike` NoScope)) ticks
+                            filter (not . tickishHasNoScope) ticks
 
   no_floating_past_tick =
     do { let (inc,outc) = splitCont cont
@@ -2180,15 +2179,14 @@ evaluation context E):
 
 As is evident from the example, there are two components to this behavior:
 
-  1. When entering the RHS of a join point, copy the context inside.
-  2. When a join point is invoked, discard the outer context.
+  (wrapJoinCont) When entering the RHS of a join point, copy the context inside.
+  (trimJoinCont) When a join point is invoked, discard the outer context.
 
 We need to be very careful here to remain consistent---neither part is
 optional!
 
-We need do make the continuation E duplicable (since we are duplicating it)
+We need to make the continuation E duplicable (since we are duplicating it)
 with mkDupableCont.
-
 
 Note [Join points with -fno-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2213,7 +2211,8 @@ case-of-case we may then end up with this totally bogus result
 This would be OK in the language of the paper, but not in GHC: j is no longer
 a join point.  We can only do the "push continuation into the RHS of the
 join point j" if we also push the continuation right down to the /jumps/ to
-j, so that it can evaporate there.  If we are doing case-of-case, we'll get to
+j, so that it can evaporate there (trimJoinCont). Then, if we are doing
+case-of-case, we'll get to:
 
     join x = case <j-rhs> of <outer-alts> in
     case y of
@@ -3656,9 +3655,11 @@ addBinderUnfolding env bndr unf
   = modifyInScope env (bndr `setIdUnfolding` unf)
 
 zapBndrOccInfo :: Bool -> Id -> Id
--- Consider  case e of b { (a,b) -> ... }
--- Then if we bind b to (a,b) in "...", and b is not dead,
--- then we must zap the deadness info on a,b
+-- ^ Consider:
+-- > case e of e' { (a,b) -> rhs }
+--
+-- We bind @e'@ to @(a,b)@ in @rhs@. If @e'@ is not dead,
+-- then we must zap the deadness info on @a@ and @b@.
 zapBndrOccInfo keep_occ_info pat_id
   | keep_occ_info = pat_id
   | otherwise     = zapIdOccInfo pat_id

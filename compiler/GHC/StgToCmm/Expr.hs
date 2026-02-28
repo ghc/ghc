@@ -1273,5 +1273,5 @@ cgTick tick
            ProfNote   cc t p -> emitSetCCC cc t p
            HpcTick    m n    -> emit (mkTickBox platform m n)
            SourceNote s n    -> emitTick $ SourceNote s n
-           _other            -> return () -- ignore
+           Breakpoint {}     -> return () -- ignore
        }

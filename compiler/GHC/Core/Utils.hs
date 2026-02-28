@@ -34,7 +34,8 @@ module GHC.Core.Utils (
         exprIsTickedString, exprIsTickedString_maybe,
         exprIsTopLevelBindable,
         exprIsUnaryClassFun, isUnaryClassId,
-        altsAreExhaustive, etaExpansionTick,
+        altsAreExhaustive,
+        canCollectArgsThroughTick, cantEtaReduceFun,
 
         -- * Equality
         cheapEqExpr, cheapEqExpr', diffBinds,
@@ -680,7 +681,7 @@ mergeCaseAlts :: CoreExpr -> Id -> [CoreAlt] -> Maybe ([CoreBind], [CoreAlt])
 mergeCaseAlts scrut outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
   | Just (joins, inner_alts) <- go deflt_rhs
   , Just aux_binds <- mk_aux_binds joins
-  = Just ( aux_binds ++ joins, mergeAlts outer_alts inner_alts )
+  = Just (aux_binds ++ joins, mergeAlts outer_alts inner_alts )
                 -- NB: mergeAlts gives priority to the left
                 --      case x of
                 --        A -> e1
@@ -727,7 +728,7 @@ mergeCaseAlts scrut outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
       , Just tc  <- tyConAppTyCon_maybe type_arg
       , Just (dc1:dcs) <- tyConDataCons_maybe tc   -- At least one data constructor
       , dcs `lengthAtMost` 3  -- Arbitrary
-      = return ( [], mk_alts dc1 dcs)
+      = return ([], mk_alts dc1 dcs)
       where
         mk_lit dc = mkLitIntUnchecked $ toInteger $ dataConTagZ dc
         mk_rhs dc = Var (dataConWorkId dc)
@@ -748,11 +749,16 @@ mergeCaseAlts scrut outer_bndr (Alt DEFAULT _ deflt_rhs : outer_alts)
       | otherwise
       = Nothing
 
-    -- We don't want ticks to get in the way; just push them inwards.
-    -- (This happens when you add SourceTicks e.g. GHC.Num.Integer.integerLt#)
+    -- Push ticks **inwards** (when possible).
+    -- See (MC5) in Note [Merge Nested Cases].
     go (Tick t body)
-      = do { (joins, alts) <- go body
-           ; return (joins, [Alt con bs (Tick t rhs) | Alt con bs rhs <- alts]) }
+      = do { (joins, alts) <- go body -- (MC4): any join points inside are floated out of the tick.
+
+             -- Abort if this would put a non-soft-scope tick in between
+             -- a join point binding and its jumps. See (MC6).
+           ; guard $ null joins || tickishHasSoftScope t
+           ; return (joins, [Alt con bs (mkTick t rhs) | Alt con bs rhs <- alts])
+           }
 
     go _ = Nothing
 
@@ -974,12 +980,74 @@ Wrinkles
 
       So `mergeCaseAlts` floats out any join points. It doesn't float out
       non-join-points unless the /outer/ case has just one alternative; doing
-      so would risk more allocation
+      so would risk more allocation.
+
+      Note also that `mergeCaseAlts` floats join points out of ticks, for which
+      we need to be extra careful; see (MC6).
 
       Floating out join points isn't entirely straightforward.
       See Note [Floating join points out of DEFAULT alternatives]
 
-(MC5) See Note [Cascading case merge]
+(MC5) We want to move ticks out of the way if possible, to prevent them from
+      inhibiting optimisation. For example, say we have:
+
+        case expensive of r {
+          C1 -> rhs1; -- happy path
+          _  -> scctick<doEdgeCase> (case r of { C2 -> rhs2; C3 -> rhs3 })
+        }
+
+      In this situation, we push the "doEdgeCase" tick **inwards** and proceed
+      to merge cases, like so:
+
+        case expensive of
+          C1 -> rhs1
+          C2 -> scctick<doEdgeCase> rhs2
+          C3 -> scctick<doEdgeCase> rhs3
+
+      This preserves the tick semantics (see Note [Scoping ticks and counting ticks]
+      in GHC.Types.Tickish), because this transformation:
+
+        1. preserves counts,
+        2. does not move cost in or out of the tick scope.
+
+      (1) is clear: we will tick 'doEdgeCase' exactly in the C2/C3 alternatives,
+      and we won't otherwise.
+      For (2), recall that case is strict in Core. We already evaluated 'expensive',
+      so re-scrutinising 'r' is free.
+
+      This means that, perhaps surprisingly, this transformation is valid for
+      **all** ticks, including non-floatable ones.
+
+      In contrast, we would not want to move the tick outwards, because this:
+
+        - will lead to additional counting of 'doEdgeCase' in the 'C1' (happy path) case,
+        - risks attributing the cost of evaluating 'expensive' to 'doEdgeCase'.
+
+(MC6) There is a dangerous interaction between (MC4) and (MC5), which can lead
+      to invalid Core (as reported in #26642, #26929). Suppose we have:
+
+        case f x of r ->
+          scctick<foo>
+            join j y = rhs in
+            case r of { C1 -> j 1; C2 -> bar }
+
+      If we naively carried out (MC4) and (MC5) together, this would result in:
+
+        join j y = rhs in
+          case f x of
+            C1 -> scctick<foo> (j 1)
+            C2 -> scctick<foo> bar
+
+      This has moved the tick in between the join point binding 'j' and the
+      join point jump, which is invalid as per Note [Join points, casts, and ticks]
+      in GHC.Core. The simplifier cannot deal with such Core, resulting in #26642.
+
+      The solution: abort whenever we would position a non-soft-scope tick
+      inside a join point in this manner.
+      An alternative would be to float the tick outwards, but as we saw in (MC5)
+      this risks a grave misattribution of profiling costs, so we don't do that.
+
+(MC7) See Note [Cascading case merge]
 
 See also Note [Example of case-merging and caseRules] in GHC.Core.Opt.Simplify.Utils
 
@@ -2076,14 +2144,31 @@ altsAreExhaustive (Alt con1 _ _ : alts)
       -- we behave conservatively here -- I don't think it's important
       -- enough to deserve special treatment
 
--- | Should we look past this tick when eta-expanding the given function?
+-- | Should we look past this tick when collecting arguments
+-- for the given function?
 --
 -- See Note [Ticks and mandatory eta expansion]
--- Takes the function we are applying as argument.
-etaExpansionTick :: Id -> GenTickish pass -> Bool
-etaExpansionTick id t
-  = hasNoBinding id &&
-    ( tickishFloatable t || isProfTick t )
+canCollectArgsThroughTick
+  :: Id -- ^ function at the head of the application
+  -> GenTickish pass -- ^ tick we want to collect arguments past
+  -> Bool
+canCollectArgsThroughTick id t
+  = tickishFloatable t || cantEtaReduceFun id
+
+-- | Can we eta-reduce the given function?
+-- See Note [Eta reduction soundness], criteria (B), (J), and (W).
+cantEtaReduceFun :: Id -> Bool
+cantEtaReduceFun fun
+  =    hasNoBinding fun -- (B)
+       -- Don't undersaturate functions with no binding.
+
+    || isJoinId fun    -- (J)
+       -- Don't undersaturate join points.
+       -- See Note [Invariants on join points] in GHC.Core, and #20599
+
+    || isJust (idCbvMarks_maybe fun) -- (W)
+       -- Don't undersaturate StrictWorkerIds.
+       -- See Note [CBV Function Ids: overview] in GHC.Types.Id.Info.
 
 {- Note [exprOkForSpeculation and type classes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

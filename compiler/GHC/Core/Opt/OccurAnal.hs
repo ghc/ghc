@@ -27,7 +27,7 @@ core expression with (hopefully) improved usage information.
 
 module GHC.Core.Opt.OccurAnal (
     occurAnalysePgm,
-    occurAnalyseExpr,
+    occurAnalyseExpr, occurAnalyseExpr_Prep,
     zapLambdaBndrs
   ) where
 
@@ -84,6 +84,15 @@ occurAnalyseExpr :: CoreExpr -> CoreExpr
 occurAnalyseExpr expr = expr'
   where
     WUD _ expr' = occAnal initOccEnv expr
+
+-- | A version of 'occurAnalyseExpr' suitable for CorePrep.
+--
+-- Different from 'occurAnalyseExpr' due to (JCT3)
+-- in Note [Join points, casts, and ticks] in GHC.Core.
+occurAnalyseExpr_Prep :: CoreExpr -> CoreExpr
+occurAnalyseExpr_Prep expr = expr'
+  where
+    WUD _ expr' = occAnal (initOccEnv { occ_allow_weak_joins = True }) expr
 
 occurAnalysePgm :: Module         -- Used only in debug output
                 -> (Id -> Bool)         -- Active unfoldings
@@ -2300,12 +2309,8 @@ occ_anal_lam_tail env (Cast expr co)
                     Var {} | isRhsEnv env -> markAllMany usage1
                     _ -> usage1
 
-         -- usage3: you might think this was not necessary, because of
-         -- the markAllNonTail in adjustTailUsage; but not so!  For a
-         -- join point, adjustTailUsage doesn't do this; yet if there is
-         -- a cast, we must!  Also: why markAllNonTail?  See
-         -- GHC.Core.Lint: Note Note [Join points and casts]
-         usage3 = markAllNonTail usage2
+         -- usage3: see (JCT1) in Note [Join points, casts, and ticks] in GHC.Core.
+         usage3 = markAllNonTail_CastOrTick env usage2
 
     in WUD usage3 (Cast expr' co)
 
@@ -2587,42 +2592,39 @@ But it is not necessary to gather CoVars from the types of other binders.
 -}
 
 occAnal env (Tick tickish body)
-  = WUD usage' (Tick tickish body')
+  = WUD usage2 (Tick tickish body')
   where
     WUD usage body' = occAnal env body
 
-    usage'
-      | tickish `tickishScopesLike` SoftScope
-      = usage  -- For soft-scoped ticks (including SourceNotes) we don't want
-               -- to lose join-point-hood, so we don't mess with `usage` (#24078)
+    usage1
+      -- We don't want to lose join-point-hood. We can move soft-scoped ticks
+      -- out of the way, so don't mess with `usage` (#24078).
+      | tickishHasSoftScope tickish
+      = usage
 
-      -- For a non-soft tick scope, we can inline lambdas only, so we
-      -- abandon tail calls, and do markAllInsideLam too: usage_lam
+      -- Otherwise, we can inline lambdas only, so use 'markAllInsideLam'.
+      | otherwise
+      = markAllNonTail_CastOrTick env $ markAllInsideLam usage
+        -- markAllNonTail_CastOrTick: abandon tail calls.
+        -- See (JCT2) in Note [Join points, casts, and ticks] in GHC.Core.
 
+    usage2
       | Breakpoint _ _ ids <- tickish
       = -- Never substitute for any of the Ids in a Breakpoint
-        addManyOccs usage_lam (mkVarSet ids)
+        addManyOccs usage1 (mkVarSet ids)
 
       | otherwise
-      = usage_lam
-
-    usage_lam = markAllNonTail (markAllInsideLam usage)
-
-    -- TODO There may be ways to make ticks and join points play
-    -- nicer together, but right now there are problems:
-    --   let j x = ... in tick<t> (j 1)
-    -- Making j a join point may cause the simplifier to drop t
-    -- (if the tick is put into the continuation). So we don't
-    -- count j 1 as a tail call.
-    -- See #14242.
+      = usage1
 
 occAnal env (Cast expr co)
-  = let  (WUD usage expr') = occAnal env expr
-         usage1 = addManyOccs usage (coVarsOfCo co)
-             -- usage2: see Note [Gather occurrences of coercion variables]
-         usage2 = markAllNonTail usage1
-             -- usage3: calls inside expr aren't tail calls any more
-    in WUD usage2 (Cast expr' co)
+  = let
+      WUD usage expr' = occAnal env expr
+      -- usage1: see Note [Gather occurrences of coercion variables]
+      usage1 = addManyOccs usage (coVarsOfCo co)
+      -- usage2: see (JCT1) in Note [Join points, casts, and ticks] in GHC.Core.
+      usage2 = markAllNonTail_CastOrTick env usage1
+    in
+      WUD usage2 (Cast expr' co)
 
 occAnal env app@(App _ _)
   = occAnalApp env (collectArgsTicks tickishFloatable app)
@@ -2936,6 +2938,11 @@ data OccEnv
            , occ_rule_act   :: ActivationGhc -> Bool  -- Which rules are active
              -- See Note [Finding rule RHS free vars]
 
+           , occ_allow_weak_joins :: !Bool
+              -- ^ Allow a join point jump to occur inside casts or profiling ticks?
+              --
+              -- See (JCT3) in Note [Join points, casts, and ticks] in GHC.Core.Opt.
+
            -- See Note [The binder-swap substitution]
            -- If  x :-> (y, co)  is in the env,
            -- then please replace x by (y |> mco)
@@ -3003,6 +3010,8 @@ initOccEnv
            , occ_unf_act   = \_ -> True
            , occ_rule_act  = \_ -> True
 
+           , occ_allow_weak_joins = False
+
            , occ_join_points = emptyVarEnv
            , occ_bs_env = emptyVarEnv
            , occ_bs_rng = emptyVarSet
@@ -3025,6 +3034,15 @@ setScrutCtxt !env alts
      -- 'interesting_alts' is True if the case has at least one
      -- non-default alternative.  That in turn influences
      -- pre/postInlineUnconditionally.  Grep for "occ_int_cxt"!
+
+-- | Mark occurrences under a cast/non-soft-scope tick as non-tail-called,
+-- except if 'occ_allow_weak_joins = True'.
+--
+-- See Note [Join points, casts, and ticks] in GHC.Core.
+markAllNonTail_CastOrTick :: OccEnv -> UsageDetails -> UsageDetails
+markAllNonTail_CastOrTick env =
+  markAllNonTailIf
+    (not $ occ_allow_weak_joins env)
 
 {- Note [The OccEnv for a right hand side]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4075,7 +4093,10 @@ okForJoinPoint :: TopLevelFlag -> Id -> TailCallInfo -> Bool
     -- See Note [Invariants on join points]; invariants cited by number below.
     -- Invariant 2 is always satisfiable by the simplifier by eta expansion.
 okForJoinPoint lvl bndr tail_call_info
-  | isJoinId bndr        -- A current join point should still be one!
+  -- A current join point should still be one!
+  --
+  -- See Note [JoinId vs TailCallInfo] in GHC.Core.SimpleOpt.
+  | isJoinId bndr
   = warnPprTrace lost_join "Lost join point" lost_join_doc $
     True
   | valid_join

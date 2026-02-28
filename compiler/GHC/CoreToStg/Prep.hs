@@ -39,7 +39,8 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.DataCon
-import GHC.Core.Opt.OccurAnal
+import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr_Prep )
+import GHC.Core.SimpleOpt ( joinPointBinding_maybe, joinPointBindings_maybe )
 
 import GHC.Data.Maybe
 import GHC.Data.OrdList
@@ -575,7 +576,18 @@ cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
                    Maybe CoreBind) -- Just bind' <=> returned new bind; no float
                                    -- Nothing <=> added bind' to floats instead
 cpeBind top_lvl env (NonRec bndr rhs)
-  | not (isJoinId bndr)
+  -- A join point.
+  -- NB: use 'joinPointBinding_maybe' instead of 'isJoinId' as per the plan
+  -- described in (JCT3) in Note [Join points, casts, and ticks].
+  | Just (bndr, rhs) <- joinPointBinding_maybe bndr rhs
+  = assert (not (isTopLevel top_lvl)) $ -- can't have top-level join point; see Note [Join points and floating]
+    do { (_, bndr1) <- cpCloneBndr env bndr
+       ; (bndr2, rhs1) <- cpeJoinPair env bndr1 rhs
+       ; return (extendCorePrepEnv env bndr bndr2,
+                 emptyFloats,
+                 Just (NonRec bndr2 rhs1)) }
+
+  | otherwise
   = do { (env1, bndr1) <- cpCloneBndr env bndr
        ; let dmd = idDemandInfo bndr
              lev = typeLevity (idType bndr)
@@ -594,16 +606,23 @@ cpeBind top_lvl env (NonRec bndr rhs)
 
        ; return (env2, floats1, Nothing) }
 
-  | otherwise -- A join point; see Note [Join points and floating]
-  = assert (not (isTopLevel top_lvl)) $ -- can't have top-level join point
-    do { (_, bndr1) <- cpCloneBndr env bndr
-       ; (bndr2, rhs1) <- cpeJoinPair env bndr1 rhs
-       ; return (extendCorePrepEnv env bndr bndr2,
-                 emptyFloats,
-                 Just (NonRec bndr2 rhs1)) }
-
 cpeBind top_lvl env (Rec pairs)
-  | not (isJoinId (head bndrs))
+  -- A recursive join point.
+  -- NB: use 'joinPointBindings_maybe' instead of 'isJoinId' as per the plan
+  -- described in (JCT3) in Note [Join points, casts, and ticks].
+  | Just pairs <- joinPointBindings_maybe pairs
+  , let (bndrs, rhss) = unzip pairs
+  = do { (env, bndrs1) <- cpCloneBndrs env bndrs
+       ; let env' = enterRecGroupRHSs env bndrs1
+       ; pairs1 <- zipWithM (cpeJoinPair env') bndrs1 rhss
+
+       ; let bndrs2 = map fst pairs1
+       -- use env below, so that we reset cpe_rec_ids
+       ; return (extendCorePrepEnvList env (bndrs `zip` bndrs2),
+                 emptyFloats,
+                 Just (Rec pairs1)) }
+  | otherwise
+  , let (bndrs, rhss) = unzip pairs
   = do { (env, bndrs1) <- cpCloneBndrs env bndrs
        ; let env' = enterRecGroupRHSs env bndrs1
        ; stuff <- zipWithM (cpePair top_lvl Recursive topDmd Lifted env')
@@ -626,19 +645,9 @@ cpeBind top_lvl env (Rec pairs)
                            (Float (Rec all_pairs) LetBound TopLvlFloatable),
                  Nothing) }
 
-  | otherwise -- See Note [Join points and floating]
-  = do { (env, bndrs1) <- cpCloneBndrs env bndrs
-       ; let env' = enterRecGroupRHSs env bndrs1
-       ; pairs1 <- zipWithM (cpeJoinPair env') bndrs1 rhss
-
-       ; let bndrs2 = map fst pairs1
-       -- use env below, so that we reset cpe_rec_ids
-       ; return (extendCorePrepEnvList env (bndrs `zip` bndrs2),
-                 emptyFloats,
-                 Just (Rec pairs1)) }
   where
-    (bndrs, rhss) = unzip pairs
-
+    -- See Note [Join points and floating]
+    --
     -- Flatten all the floats, and the current
     -- group into a single giant Rec
     add_float (Float bind bound _) prs2
@@ -653,7 +662,6 @@ cpeBind top_lvl env (Rec pairs)
           Rec prs1 -> prs1 ++ prs2
     add_float f _ = pprPanic "cpeBind" (ppr f)
 
-
 ---------------
 cpePair :: TopLevelFlag -> RecFlag -> Demand -> Levity
         -> CorePrepEnv -> OutId -> CoreExpr
@@ -661,7 +669,7 @@ cpePair :: TopLevelFlag -> RecFlag -> Demand -> Levity
 -- Used for all bindings
 -- The binder is already cloned, hence an OutId
 cpePair top_lvl is_rec dmd lev env0 bndr rhs
-  = assert (not (isJoinId bndr)) $ -- those should use cpeJoinPair
+  = assert (isNothing $ joinPointBinding_maybe bndr rhs) $ -- those should use cpeJoinPair
     do { (floats1, rhs1) <- cpeRhsE env rhs
 
        -- See if we are allowed to float this stuff out of the RHS
@@ -926,7 +934,7 @@ rhsToBody :: CorePrepEnv -> CpeRhs -> UniqSM (Floats, CpeBody)
 -- Remove top level lambdas by let-binding
 
 rhsToBody env (Tick t expr)
-  | tickishScoped t == NoScope  -- only float out of non-scoped annotations
+  | tickishHasNoScope t -- only float out of non-scoped annotations
   = do { (floats, expr') <- rhsToBody env expr
        ; return (floats, mkTick t expr') }
 
@@ -984,43 +992,74 @@ instance Outputable ArgInfo where
 
 {- Note [Ticks and mandatory eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Something like
-    `foo x = ({-# SCC foo #-} tagToEnum#) x :: Bool`
-caused a compiler panic in #20938. Why did this happen?
-The simplifier will eta-reduce the rhs giving us a partial
-application of tagToEnum#. The tick is then pushed inside the
-type argument. That is we get
-    `(Tick<foo> tagToEnum#) @Bool`
+We must look through ticks when they get in the way of seeing the arguments to
+'Id's that cannot be eta-reduced.
+
+For example, we may have
+
+  myReallyUnsafePtrEquality
+      = \ @a x y ->
+          (src<loc> reallyUnsafePtrEquality#)
+            @Lifted @a @Lifted @a x y
+
+If we don't move the SourceNote out of the way, this looks like an unsaturated
+occurrence of the PrimOp "reallyUnsafePtrEquality#", which we cannot generate
+code for.
+
+Moreover, we must also move out non-floatable ticks. Case in point: #20938,
+of the form:
+
+    foo x = ({-# SCC foo #-} tagToEnum#) x :: Bool
+
+If we don't look past the tick "foo", the simplifier will eta-reduce the RHS,
+giving us a partial application of 'tagToEnum#'. The tick is then pushed inside
+the type argument, resulting in:
+
+    (Tick<foo> tagToEnum#) @Bool
+
 CorePrep would go on to see a undersaturated tagToEnum# application
-and eta expand the expression under the tick. Giving us:
+and eta-expand the expression under the tick. Giving us:
+
     (Tick<scc> (\forall a. x -> tagToEnum# @a x) @Bool
-Suddenly tagToEnum# is applied to a polymorphic type and the code generator
+
+Suddenly, 'tagToEnum#' is applied to a polymorphic type and the code generator
 panics as it needs a concrete type to determine the representation.
 
-The problem in my eyes was that the tick covers a partial application
-of a primop. There is no clear semantic for such a construct as we can't
-partially apply a primop since they do not have bindings.
-We fix this by expanding the scope of such ticks slightly to cover the body
-of the eta-expanded expression.
+The problem was that the tick covered a partial application of a primop.
+There is no clear semantic for such a construct: we can't partially apply a
+primop, since primops do not have bindings.
 
-We do this by:
-* Checking if an application is headed by a primOpish thing.
-* If so we collect floatable ticks and usually but also profiling ticks
-  along with regular arguments.
-* When rebuilding the application we check if any profiling ticks appear
-  before the primop is fully saturated.
-* If the primop isn't fully satured we eta expand the primop application
-  and scope the tick to scope over the body of the saturated expression.
+To fix this, we expand the scope of ticks slightly to cover the body
+of the eta-expanded expression, even when the tick isn't normally floatable.
 
-Going back to #20938 this means starting with
-    `(Tick<foo> tagToEnum#) @Bool`
-we check if the function head is a primop (yes). This means we collect the
-profiling tick like if it was floatable. Giving us
-    (tagToEnum#, [CpeTick foo, CpeApp @Bool]).
+This is achieved by using 'GHC.Core.Utils.canCollectArgsThroughTick', which
+responds 'True' in the following two situations:
+
+  - The tick is floatable (i.e. satisfies 'tickishFloatable'), meaning that it
+    is OK to float it out slightly, moving in more code under it.
+    See also Note [Eta expansion and source notes] in GHC.Core.Opt.Arity.
+  - The tick is around an application that is headed by an 'Id' that cannot be
+    undersaturated, such as a PrimOp (see 'GHC.Core.Utils.cantEtaReduceFun').
+
+This solves #20938. Indeed, starting with
+
+    (scctick<foo> tagToEnum#) @Bool
+
+we see that the head of the application is 'tagToEnum#', which is a PrimOp and
+thus satisfies 'hasNoBinding = True'. As a result, we collect the profiling tick
+as if it was floatable, resulting in
+
+    (tagToEnum#, [CpeTick foo, CpeApp @Bool])
+
 cpe_app filters out the tick as a underscoped tick on the expression
-`tagToEnum# @Bool`. During eta expansion we then put that tick back onto the
-body of the eta-expansion lambdas. Giving us `\x -> Tick<foo> (tagToEnum# @Bool x)`.
+`tagToEnum# @Bool`. During eta-expansion, we put that tick back onto the
+body of the eta-expansion lambda, resulting in
+
+  \x -> scctick<foo> (tagToEnum# @Bool x)
+
+which is unproblematic.
 -}
+
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- May return a CpeRhs (instead of CpeApp) because of saturating primops
 cpeApp top_env expr
@@ -1045,15 +1084,14 @@ cpeApp top_env expr
         go (Cast fun co)      as
             = go fun (AICast co : as)
         go (Tick tickish fun) as
-            -- Profiling ticks are slightly less strict so we expand their scope
-            -- if they cover partial applications of things like primOps.
-            -- See Note [Ticks and mandatory eta expansion]
-            -- Here we look inside `fun` before we make the final decision about
-            -- floating the tick which isn't optimal for perf. But this only makes
-            -- a difference if we have a non-floatable tick which is somewhat rare.
+            -- Try to move a tick out of the way, if:
+            --   - the tick can be floated out of the way ('tickishFloatable'), or
+            --   - the tick must be moved out of the way because it stands in between
+            --     an 'Id' that must be saturated and some of its arguments;
+            --     see Note [Ticks and mandatory eta expansion].
             | Var vh <- head
-            , Var head' <- lookupCorePrepEnv top_env vh
-            , etaExpansionTick head' tickish
+            , Just head' <- getIdFromTrivialExpr_maybe (lookupCorePrepEnv top_env vh)
+            , canCollectArgsThroughTick head' tickish
             = (head,as')
             where
               (head,as') = go fun (AITick tickish : as)
@@ -1130,7 +1168,10 @@ cpeApp top_env expr
                  hd = getIdFromTrivialExpr_maybe e2
                  -- Determine number of required arguments. See Note [Ticks and mandatory eta expansion]
                  min_arity = case hd of
-                   Just v_hd -> if hasNoBinding v_hd then Just $! (idArity v_hd) else Nothing
+                   Just v_hd ->
+                     if cantEtaReduceFun v_hd
+                     then Just $! idArity v_hd
+                     else Nothing
                    Nothing -> Nothing
           --  ; pprTraceM "cpe_app:stricts:" (ppr v <+> ppr args $$ ppr stricts $$ ppr (idCbvMarks_maybe v))
            ; (app, floats, unsat_ticks) <- rebuild_app env args e2 emptyFloats stricts min_arity
@@ -2293,8 +2334,8 @@ deFloatTop floats
     get b _  = pprPanic "deFloatTop" (ppr b)
 
     -- See Note [Dead code in CorePrep]
-    get_bind (NonRec x e) = NonRec x (occurAnalyseExpr e)
-    get_bind (Rec xes)    = Rec [(x, occurAnalyseExpr e) | (x, e) <- xes]
+    get_bind (NonRec x e) = NonRec x (occurAnalyseExpr_Prep e)
+    get_bind (Rec xes)    = Rec [(x, occurAnalyseExpr_Prep e) | (x, e) <- xes]
 
 ---------------------------------------------------------------------------
 

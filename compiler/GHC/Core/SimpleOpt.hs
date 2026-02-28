@@ -437,7 +437,7 @@ simple_app env e@(Lam {}) []
 
 simple_app env (Tick t e) as
   -- Okay to do "(Tick t e) x ==> Tick t (e x)"?
-  | t `tickishScopesLike` SoftScope
+  | tickishHasSoftScope t
   = mkTick t $ simple_app env e as
 
 -- (let x = e in b) a1 .. an  =>  let x = e in (b a1 .. an)
@@ -1059,23 +1059,33 @@ and again its arity increases (#15517)
 -}
 
 
--- | Returns Just (bndr,rhs) if the binding is a join point:
--- If it's a JoinId, just return it
--- If it's not yet a JoinId but is always tail-called,
---    make it into a JoinId and return it.
--- In the latter case, eta-expand the RHS if necessary, to make the
--- lambdas explicit, as is required for join points
+-- | Returns @Just (bndr, rhs)@ if the binding is a join point, or can be made
+-- into a join poin. Returns @Nothing@ otherwise.
 --
--- Precondition: the InBndr has been occurrence-analysed,
---               so its OccInfo is valid
+--   - If the input binder is a 'JoinId', just return it;
+--   - if it's not yet a 'JoinId' but is always tail-called,
+--     make it into a 'JoinId' and return that.
+--
+-- In the latter case, eta-expand the RHS if necessary, to make the
+-- lambdas explicit, as is required for join points.
+--
+-- Precondition: the 'TailCallInfo' of the 'InBndr' is conservative:
+--
+--  - if it says 'AlwaysTailCalled', it is definitely always tail called,
+--  - if it says 'NoTailCallInfo', then we're not sure.
+--
+-- See Note [JoinId vs TailCallInfo].
 joinPointBinding_maybe :: InBndr -> InExpr -> Maybe (InBndr, InExpr)
 joinPointBinding_maybe bndr rhs
   | not (isId bndr)
   = Nothing
 
+  -- Being a JoinId is robust: preserve that. See Note [JoinId vs TailCallInfo].
   | isJoinId bndr
   = Just (bndr, rhs)
 
+  -- If the 'TailCallInfo' of 'bndr' says 'AlwaysTailCalled', then we know for
+  -- sure that it can be made into a join point.
   | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
   , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
   , let str_sig   = idDmdSig bndr
@@ -1091,6 +1101,48 @@ joinPointBindings_maybe :: [(InBndr, InExpr)] -> Maybe [(InBndr, InExpr)]
 joinPointBindings_maybe bndrs
   = mapM (uncurry joinPointBinding_maybe) bndrs
 
+{- Note [JoinId vs TailCallInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Occurrence information is /fundamentally fragile/; that is, it may
+  be invalidated by the Simplifier.
+  Example 1:
+      \y -> let x = y in ...x..x...
+    Here `y` is marked "occurs exactly once" but, after inlining `x`,
+    `y` now occurs many times.
+  Example 2:
+     f (let h x = ... in case y of { True -> h 1; False -> h 2 })
+  Here `h` is tail-called; but if `f` is strict we could transform to
+     let h x = ... in
+     case y of { True -> f (h 1); False -> f (h 2) }
+  Now `h` is not tail called any more.
+
+  Exception: Dead things (with no occurrences) usually stay dead.
+  There are exceptions e.g.
+      case x of y { (a,b) -> case y of (p,q) -> p }
+  Here `a` and `b` look dead, but we may well transform to
+      case x of y { (a,b) -> a }
+
+  Because occurrence info is fragile, we recompute occurrence info
+  (including tail call info) before each run of the Simplifier.
+
+  Whenever the simplifier performs a transformation that **might** invalidate
+  occurrence information, it calls 'zapFragileIdInfo'. This sets the
+  'TailCallInfo' to 'NoTailCallInfo' (among other things).
+
+* Being a JoinId is /robust/, and is rigorously maintained by the
+  Simplifier.  In Example 2 above, if `h` was marked as a JoinId,
+  that transformation would not have happened.  Instead we'd have
+  transformed to
+     let h x = f (...) in
+     case y of { True -> h 1; False -> h 2 }
+
+  The Simplifier takes an Id whose occurrences are marked as
+  `AlwaysTailCalled` and turns it into robust `JoinId`. This is
+  done by `joinPointBinding_maybe`.
+
+  There is one exception: float-out, the only caller of 'zapJoinId'.
+  See Note [Zapping JoinId when floating].
+-}
 
 {- *********************************************************************
 *                                                                      *

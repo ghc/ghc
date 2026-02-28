@@ -6,9 +6,8 @@ module GHC.Types.Tickish (
   CoreTickish, StgTickish, CmmTickish,
   XTickishId,
   tickishCounts,
-  TickishScoping(..),
-  tickishScoped,
-  tickishScopesLike,
+  tickishHasNoScope,
+  tickishHasSoftScope,
   tickishFloatable,
   tickishCanSplit,
   mkNoCount,
@@ -206,103 +205,177 @@ instance Binary BreakpointId where
 
 --------------------------------------------------------------------------------
 
--- | A "counting tick" (where tickishCounts is True) is one that
+-- | A "counting tick" (for which 'tickishCounts' is True) is one that
 -- counts evaluations in some way.  We cannot discard a counting tick,
--- and the compiler should preserve the number of counting ticks as
--- far as possible.
+-- and the compiler should preserve the number of counting ticks (as
+-- far as possible).
 --
--- However, we still allow the simplifier to increase or decrease
--- sharing, so in practice the actual number of ticks may vary, except
--- that we never change the value from zero to non-zero or vice versa.
+-- See Note [Counting ticks]
 tickishCounts :: GenTickish pass -> Bool
-tickishCounts n@ProfNote{} = profNoteCount n
-tickishCounts HpcTick{}    = True
-tickishCounts Breakpoint{} = True
-tickishCounts _            = False
+tickishCounts = \case
+  ProfNote { profNoteCount = counts } -> counts
+  HpcTick {}                          -> True
+  Breakpoint {}                       -> True
+  SourceNote {}                       -> False
 
+-- | Is this a non-scoping tick, for which we don't care about precisely
+-- the extent of code that the tick encompasses?
+--
+-- See Note [Scoped ticks]
+tickishHasNoScope :: GenTickish pass -> Bool
+tickishHasNoScope = \case
+  ProfNote { profNoteScope = scopes } -> not scopes
+  HpcTick {}                          -> True
+  Breakpoint {}                       -> False
+  SourceNote {}                       -> False
 
--- | Specifies the scoping behaviour of ticks. This governs the
--- behaviour of ticks that care about the covered code and the cost
--- associated with it. Important for ticks relating to profiling.
-data TickishScoping =
-    -- | No scoping: The tick does not care about what code it
-    -- covers. Transformations can freely move code inside as well as
-    -- outside without any additional annotation obligations
-    NoScope
+-- | A "tick with soft scoping" (for which 'tickishHasSoftScope' is True) is
+-- one that either does not scope at all (for which 'tickishHasNoScope' is True),
+-- or that has a "soft" scope: we allow new code to be floated into to the scope,
+-- as long as all code that was covered remains covered.
+--
+-- See Note [Scoped ticks]
+tickishHasSoftScope :: GenTickish pass -> Bool
+tickishHasSoftScope = \case
+  ProfNote { profNoteScope = scopes } -> not scopes
+  HpcTick {}                          -> True
+  Breakpoint {}                       -> False
+  SourceNote {}                       -> True
 
-    -- | Soft scoping: We want all code that is covered to stay
-    -- covered.  Note that this scope type does not forbid
-    -- transformations from happening, as long as all results of
-    -- the transformations are still covered by this tick or a copy of
-    -- it. For example
-    --
-    --   let x = tick<...> (let y = foo in bar) in baz
-    --     ===>
-    --   let x = tick<...> bar; y = tick<...> foo in baz
-    --
-    -- Is a valid transformation as far as "bar" and "foo" is
-    -- concerned, because both still are scoped over by the tick.
-    --
-    -- Note though that one might object to the "let" not being
-    -- covered by the tick any more. However, we are generally lax
-    -- with this - constant costs don't matter too much, and given
-    -- that the "let" was effectively merged we can view it as having
-    -- lost its identity anyway.
-    --
-    -- Also note that this scoping behaviour allows floating a tick
-    -- "upwards" in pretty much any situation. For example:
-    --
-    --   case foo of x -> tick<...> bar
-    --     ==>
-    --   tick<...> case foo of x -> bar
-    --
-    -- While this is always legal, we want to make a best effort to
-    -- only make us of this where it exposes transformation
-    -- opportunities.
-  | SoftScope
+{- Note [Scoping ticks and counting ticks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ticks have two independent attributes:
 
-    -- | Cost centre scoping: We don't want any costs to move to other
-    -- cost-centre stacks. This means we not only want no code or cost
-    -- to get moved out of their cost centres, but we also object to
-    -- code getting associated with new cost-centre ticks - or
-    -- changing the order in which they get applied.
-    --
-    -- A rule of thumb is that we don't want any code to gain new
-    -- annotations. However, there are notable exceptions, for
-    -- example:
-    --
-    --   let f = \y -> foo in tick<...> ... (f x) ...
-    --     ==>
-    --   tick<...> ... foo[x/y] ...
-    --
-    -- In-lining lambdas like this is always legal, because inlining a
-    -- function does not change the cost-centre stack when the
-    -- function is called.
-  | CostCentreScope
+  * Whether the tick /counts/.
+    Counting ticks are used when we want a counter to be bumped, e.g. counting
+    how many times a function is called.
 
-  deriving (Eq)
+    See Note [Counting ticks]
 
--- | Returns the intended scoping rule for a Tickish
-tickishScoped :: GenTickish pass -> TickishScoping
-tickishScoped n@ProfNote{}
-  | profNoteScope n        = CostCentreScope
-  | otherwise              = NoScope
-tickishScoped HpcTick{}    = NoScope
-tickishScoped Breakpoint{} = CostCentreScope
-   -- Breakpoints are scoped: eventually we're going to do call
-   -- stacks, but also this helps prevent the simplifier from moving
-   -- breakpoints around and changing their result type (see #1531).
-tickishScoped SourceNote{} = SoftScope
+  * What kind of /scope/ the tick has:
+     * Cost-centre scope: you cannot move a redex into the scope of the tick,
+                          nor can you float a redex out.
+     * Soft scope: you can move a redex /into/ the scope of a tick,
+                   but you cannot float a redex /out/
+     * No scope: there are no restrictions on floating in or out.
 
--- | Returns whether the tick scoping rule is at least as permissive
--- as the given scoping rule.
-tickishScopesLike :: GenTickish pass -> TickishScoping -> Bool
-tickishScopesLike t scope = tickishScoped t `like` scope
-  where NoScope         `like` _               = True
-        _               `like` NoScope         = False
-        SoftScope       `like` _               = True
-        _               `like` SoftScope       = False
-        CostCentreScope `like` _               = True
+     See Note [Scoped ticks]
+
+Note [Counting ticks]
+~~~~~~~~~~~~~~~~~~~~
+The following ticks count:
+  - ProfNote ticks with profNoteCounts = True
+  - HPC ticks
+  - Breakpoints
+
+Going past a counting tick implies bumping a counter.
+Generally, the simplifier attempts to preserve counts when transforming
+programs and moving ticks, for example by transforming:
+
+  case <tick> e of
+    alt1 -> rhs1
+    alt2 -> rhs2
+
+to
+
+  case e of
+    alt1 -> <tick> rhs1
+    alt2 -> <tick> rhs2
+
+which preserves the total count (as exactly one branch of the case
+will be taken).
+
+However, we still allow the simplifier to increase or decrease
+sharing, so in practice the actual number of ticks may vary, except
+that we never change the value from zero to non-zero or vice-versa.
+
+Note [Scoped ticks]
+~~~~~~~~~~~~~~~~~~~~
+The following ticks are scoped:
+  - ProfNote ticks with profNoteScope = True
+  - Breakpoints
+  - Source notes
+
+A scoped tick is one that scopes over a portion of code. For example,
+an SCC anotation sets the cost centre for the code within; any allocations
+within that piece of code should get attributed to that cost centre.
+
+When the simplifier deals with a scoping tick, it ensures that all code that
+was covered remains covered. For example
+
+  let x = tick<...> (let y = foo in bar) in baz
+    ===>
+  let x = tick<...> bar; y = tick<...> foo in baz
+
+is a valid transformation as far as "bar" and "foo" are concerned, because
+both still are scoped over by the tick. One might object to the "let" not
+being covered by the tick any more. However, we are generally lax with this;
+constant costs don't matter too much, and given that the "let" was effectively
+merged we can view it as having lost its identity anyway.
+
+Perhaps surprisingly, breakpoints are considered to be scoped, because we
+don't want the simplifier to move them around, changing their result type (see #1531).
+
+We specifically forbid floating code outside of a scoping tick, as cost
+associated with the floated-out code would no longer be attributed to the
+appropriate scope.
+
+Whether we are allowed to float in additional cost depends on the tick:
+
+  Cost-centre scope ticks
+    - ProfNote with profNoteScope = True
+    - Breakpoints
+
+    A tick with cost-centre scope is one for which we can neither move
+    redexes into or move redexes outside of the tick. For example, we don't
+    want profiling costs to move to other cost-centre stacks.
+    Morever, we also object to changing the order in which such ticks
+    are applied.
+
+    A rule of thumb is that we don't want any code to gain new
+    lexically-enclosing ticks. For example, we should not transform:
+
+      f (scctick<foo> a)  ==>  scctick<foo> (f a)
+
+    as this would attribute the cost of evaluating the application 'f a'
+    to the cost centre 'foo'.
+
+    However, there are notable exceptions, for example:
+
+      let f = \y -> foo in tick<...> ... (f x) ...
+        ==>
+      tick<...> ... foo[x/y] ...
+
+    Inlining lambdas like this is always legal, because inlining a function
+    does not change the cost-centre stack when the function is called.
+
+  Soft scope ticks
+    - Source notes
+
+    A tick with soft scope is one for which we can move redexes inside the
+    tick, but cannot float redexes outside the tick. This is a slightly more
+    lenient notion of scoping than cost-centres, and is used only for source
+    note ticks (they are used to provide DWARF debug symbols, and for those
+    it matters less if code from outside gets moved under the tick).
+
+    Examples:
+
+      - FloatIn (GHC.Core.Opt.FloatIn.fiExpr)
+
+          let x = rhs in <tick> body
+            ==>
+          <tick> (let x = rhs in body)
+
+      - Moving a tick outside of a case or of an application
+        (GHC.Core.Opt.Simplify.Iteration.simplTick)
+
+          case <tick> e of alts  ==>  <tick> case e of alts
+
+          (<tick> e1) e2         ==>  <tick> (e1 e2)
+
+    While these transformations are legal, we want to make a best effort to
+    only make use of them where it exposes transformation opportunities.
+-}
 
 -- | Returns @True@ for ticks that can be floated upwards easily even
 -- where it might change execution counts, such as:
@@ -311,12 +384,11 @@ tickishScopesLike t scope = tickishScoped t `like` scope
 --     ==>
 --   tick<...> (Just foo)
 --
--- This is a combination of @tickishSoftScope@ and
--- @tickishCounts@. Note that in principle splittable ticks can become
--- floatable using @mkNoTick@ -- even though there's currently no
--- tickish for which that is the case.
+-- This is a combination of @tickishHasSoftScope@ and @tickishCounts@.
+-- Note that in principle splittable ticks can become floatable using @mkNoTick@,
+-- even though there's currently no tickish for which that is the case.
 tickishFloatable :: GenTickish pass -> Bool
-tickishFloatable t = t `tickishScopesLike` SoftScope && not (tickishCounts t)
+tickishFloatable t = tickishHasSoftScope t && not (tickishCounts t)
 
 -- | Returns @True@ for a tick that is both counting /and/ scoping and
 -- can be split into its (tick, scope) parts using 'mkNoScope' and
@@ -334,7 +406,7 @@ mkNoCount n@ProfNote{}                = let n' = n {profNoteCount = False}
 mkNoCount _                           = panic "mkNoCount: Undefined split!"
 
 mkNoScope :: GenTickish pass -> GenTickish pass
-mkNoScope n | tickishScoped n == NoScope  = n
+mkNoScope n | tickishHasNoScope n         = n
             | not (tickishCanSplit n)     = panic "mkNoScope: Cannot split!"
 mkNoScope n@ProfNote{}                    = let n' = n {profNoteScope = False}
                                             in assert (profNoteCount n) n'
@@ -357,7 +429,9 @@ mkNoScope _                               = panic "mkNoScope: Undefined split!"
 -- translate the code as if it found the latter.
 tickishIsCode :: GenTickish pass -> Bool
 tickishIsCode SourceNote{} = False
-tickishIsCode _tickish     = True  -- all the rest for now
+tickishIsCode ProfNote{}   = True
+tickishIsCode Breakpoint{} = True
+tickishIsCode HpcTick{}    = True
 
 isProfTick :: GenTickish pass -> Bool
 isProfTick ProfNote{} = True

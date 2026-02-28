@@ -914,14 +914,15 @@ zapUsedOnceInfo info
                   , demandInfo     = zapUsedOnceDemand (demandInfo     info) }
 
 zapFragileInfo :: IdInfo -> Maybe IdInfo
--- ^ Zap info that depends on free variables
+-- ^ Zap fragile 'IdInfo', such as info that depends on free variables
+-- or fragile occurrence info (see 'zapFragileOccInfo').
 zapFragileInfo info@(IdInfo { occInfo = occ, realUnfoldingInfo = unf })
   = new_unf `seq`  -- The unfolding field is not (currently) strict, so we
                    -- force it here to avoid a (zapFragileUnfolding unf) thunk
                    -- which might leak space
     Just (info `setRuleInfo` emptyRuleInfo
                `setUnfoldingInfo` new_unf
-               `setOccInfo`       zapFragileOcc occ)
+               `setOccInfo`       zapFragileOccInfo occ)
   where
     new_unf = zapFragileUnfolding unf
 

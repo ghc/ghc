@@ -115,7 +115,8 @@ perPassFlags dflags pass
                , lf_check_inline_loop_breakers = check_lbs
                , lf_check_static_ptrs          = check_static_ptrs
                , lf_check_linearity            = check_linearity
-               , lf_check_rubbish_lits         = check_rubbish }
+               , lf_check_rubbish_lits         = check_rubbish
+               , lf_allow_weak_joins           = allow_weak_joins }
   where
     -- See Note [Checking for global Ids]
     check_globals = case pass of
@@ -152,6 +153,11 @@ perPassFlags dflags pass
                       CorePrep -> True
                       _        -> False
 
+    -- See Note [Linting join points with casts or ticks] in GHC.Core.Lint
+    allow_weak_joins = case pass of
+                      CorePrep -> True
+                      _        -> False
+
 initLintConfig :: DynFlags -> [Var] -> LintConfig
 initLintConfig dflags vars =LintConfig
   { l_diagOpts = initDiagOpts dflags
@@ -168,4 +174,5 @@ defaultLintFlags dflags = LF { lf_check_global_ids = False
                              , lf_report_unsat_syns = True
                              , lf_check_fixed_rep = True
                              , lf_check_rubbish_lits = True
+                             , lf_allow_weak_joins = False
                              }

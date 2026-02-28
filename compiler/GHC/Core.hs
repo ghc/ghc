@@ -1035,6 +1035,143 @@ tail position: A cast changes the type, but the type must be the same. But
 operationally, casts are vacuous, so this is a bit unfortunate! See #14610 for
 ideas how to fix this.
 
+Note [Join points, casts, and ticks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Point (1) of Note [Invariants on join points] says that a join point
+must always be tail called.  But what precisely does "tail called" mean
+in the presence of (a) casts and (b) ticks?
+
+Example (CAST)
+  let j x = rhs in
+  case y of { True -> j 1 |> co; False -> j 2 }
+
+Example (TICK)
+  let j x = rhs in
+  case y of { True -> <tick t> (j 1); False -> j 2 }
+
+Answer: in Core:
+
+  (JCT1) A tail call cannot be under a cast.
+
+    Thus, in (CAST), `j` is not a join point.
+
+  (JCT2) A tail call cannot be under a cost-centre-scoped tick.
+
+    Thus, in  (TICK), `j` is a join point only if tick `t` has soft scope
+    (as per Note [Scoping ticks and counting ticks] in GHC.Tickish).
+
+The Big Reason for these choices is that the Simplifier moves the continuation
+into the RHS of a join point, as explained in Note [Join points and case-of-case]
+in GHC.Core.Opt.Simplify.Iteration:
+
+   K[ join j x = rhs in body ]  -->  join j x = K[rhs] in K[body]
+
+and K then evaporates when it encounters the tail call:
+
+   K[jump j v]  -->  jump j v
+
+These transformations:
+  * Are ill-typed if the tail is under a cast, hence (JCT1)
+  * Change cost semantics if the tick has cost-centre scope, hence (JCT2)
+
+The occurrence analyser is careful not to treat an occurrence as a tail call if
+it falls under (JCT1) or (JCT2), by using 'markAllNonTail'.
+
+However, during /code generation/ the key thing about a join point is that
+  * The binding does no allocation
+  * A tail call can be implemented by "adjust stack pointer and jump".
+
+This code-gen strategy works fine even if the "tail call" occurs under
+/arbitrary/ ticks and casts.  Hence:
+
+(JCT3) In CorePrep, the occurrence analyser is called with a special flag that
+   /does/ treat `j` as tail-called in Example (CAST) and Example (TICK).
+   Core Prep then uses 'joinPointBinding_maybe', which turns always-tail-called
+   let bindings into join points, thus recovering join-point-hood.
+
+See also Note [Linting join points with casts or ticks] in GHC.Core.Lint.
+
+Examples
+========
+
+  Join point jumps under ticks (#14242, #26157, #26642, #26693)
+  ============================
+  In #26693 we had:
+
+    join { j :: Bool -> Int -> IO (); j _ = guts }
+    in case b of
+      False -> scc<foo> jump j True
+      True  ->          jump j False
+
+  If we try to push the application to an argument 'arg :: Int' into this
+  expression, we first get:
+
+    join { j :: Bool -> IO (); j _ = guts arg ] }
+    in case b of
+      False -> (scc<foo> jump j True) arg
+      True  ->           jump j False arg
+
+  We then rely on 'trimJoinCont' to remove the argument. In this case, this fails
+  for the first branch, because 'trimJoinCont' doesn't look through profiling
+  ticks. Were we to address this, it's still not clear what code we would want to
+  end up with, as we don't want to misattribute profiling costs.
+  We could plausibly transform to the following:
+
+    join { j :: Bool -> IO (); j scc_or_null _ = (setSCC# scc_or_null guts) arg ] }
+    in case b of
+      False -> jump j <foo> True
+      True  -> jump j null  False
+
+  where `setSCC#` is a new primop that would set the current cost centre pointer
+  (or no-op if the given pointer is null). However:
+    - this primop doesn't exist today,
+    - it requires adding an argument to the join point (hence changing its arity)
+
+  Note that soft scope ticks are floated out by the simplifier (see the
+  'tickishHasSoftScope' guard in 'GHC.Core.Opt.Simplify.Iteration.simplTick'),
+  so don't suffer from the same problem.
+
+  Join point jumps under casts (#14610, #21716, #26422)
+  ============================
+  Consider:
+
+    newtype Age = MkAge Int   -- axAge :: Age ~ Int
+    f :: Int -> ...
+
+    f (join j :: Bool -> Age
+            j x = (rhs1 :: Age)
+       in case v of
+           Just x  -> ((j x) |> axAge) :: Int
+           Nothing -> rhs2)
+
+  If we try to use the case of case transformation to push 'f' inwards, we would
+  get:
+
+     join j' x = f (rhs1 :: Age)
+     in case v of
+        Just x  -> (j' x |> axAge)
+        Nothing -> f rhs2
+
+  which is utterly bogus, as we are now passing an argument of type 'Age' to
+  'f', which expects an 'Int'.
+
+  The alternative would be to implement a transformation of the form
+
+      join { j x = blah }
+      in case e of
+        False -> j True  |> co1
+        True  -> j False |> co2
+
+    ====>
+
+      join { j x co = blah |> co }
+      in case e of
+        False -> j True  co1
+        True  -> j False co2
+
+  by adding a coercion argument to the join point. We don't do this currently.
+
+
 Note [Strict fields in Core]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In Core, evaluating a data constructor worker evaluates its strict fields.
