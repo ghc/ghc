@@ -7,14 +7,14 @@ T10403.hs:16:7: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
 
 T10403.hs:16:12: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘(t -> b) -> f t -> H f’
-      Where: ‘b’, ‘t’, ‘f’ are rigid type variables bound by
+      Where: ‘t’, ‘b’, ‘f’ are rigid type variables bound by
                the inferred type of h1 :: Functor f => (t -> b) -> f t -> H f
                at T10403.hs:18:1-41
     • In the type signature: h1 :: _ => _
 
 T10403.hs:20:7: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘(t -> b) -> f t -> H f’
-      Where: ‘b’, ‘t’, ‘f’ are rigid type variables bound by
+      Where: ‘t’, ‘b’, ‘f’ are rigid type variables bound by
                the inferred type of h2 :: (t -> b) -> f t -> H f
                at T10403.hs:23:1-41
     • In the type signature: h2 :: _
