@@ -749,7 +749,12 @@ tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
 
 -- | Get the free vars of types in scoped order
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
-tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
+tyCoVarsOfTypesWellScoped tys
+--  = pprTrace "tyCoVarsOfTypesWellScoped"
+--      (vcat [ ppr tys
+--            , ppr (tyCoVarsOfTypesList tys)
+--            , ppr (scopedSort (tyCoVarsOfTypesList tys)) ]) $
+  = scopedSort (tyCoVarsOfTypesList tys)
 
 
 {- *********************************************************************

@@ -2024,6 +2024,12 @@ mkTyVarEqErr' ctxt item tv1 ty2
                { mismatchMsg       = headline_msg
                , cannotUnifyReason = occurs_err }
 
+--       pprTrace "mkTyVarEqErr" (vcat
+--          [ text "interesting" <+> pprTyVars interesting_tyvars
+--          , text "tv1" <+> ppr tv1
+--          , text "free tvs1" <+> pprTyVars (tyCoVarsOfTypeList ty1)
+--          , text "ty2" <+> ppr ty2
+--          , text "free tvs2" <+> pprTyVars (tyCoVarsOfTypeList ty2) ]) $
        return main_msg
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
