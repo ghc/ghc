@@ -1285,6 +1285,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       HsEmbTy _ ty ->
         [ toHie $ TS (ResolvedScopes []) ty
         ]
+      HsStar _ -> []
       HsQual _ ctx body ->
         [ toHie ctx
         , toHie body
@@ -1944,7 +1945,7 @@ instance ToHie (LocatedA (HsType GhcRn)) where
         ]
       HsTyLit _ _ -> []
       HsWildCardTy _ -> []
-      HsStarTy _ _ -> []
+      HsStarTy _ -> []
       XHsType _ -> []
 
 instance (ToHie tm, ToHie ty) => ToHie (HsArg (GhcPass p) tm ty) where

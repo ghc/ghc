@@ -506,6 +506,10 @@ data HsExpr p
   | HsEmbTy   (XEmbTy p)
               (LHsWcType (NoGhcTc p))
 
+  -- | The @*@ syntax standing for 'Data.Kind.Type',
+  -- enabled by the the @StarIsType@ extension.
+  | HsStar    (XStar p)
+
    -- | Holes in expressions, i.e. '_'.
    -- See Note [Holes in expressions] in GHC.Tc.Types.Constraint.
   | HsHole (XHole p)

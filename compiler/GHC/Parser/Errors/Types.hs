@@ -129,7 +129,7 @@ data PsMessage
    -- | Found binding occurrence of "*" while StarIsType is enabled
    | PsWarnStarBinder
 
-   -- | Using "*" for "Type" without StarIsType enabled
+   -- | Using "*" for "Type", relying on the legacy extension StarIsType
    | PsWarnStarIsType
 
    -- | Pre qualified import with 'WarnPrepositiveQualifiedModule' enabled

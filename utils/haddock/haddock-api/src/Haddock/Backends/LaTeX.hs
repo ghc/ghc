@@ -1364,7 +1364,7 @@ ppr_mono_ty (HsDocTy _ ty _) unicode =
   ppr_mono_lty ty unicode
 ppr_mono_ty (HsWildCardTy _) _ = char '_'
 ppr_mono_ty (HsTyLit _ t) u = ppr_tylit t u
-ppr_mono_ty (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
+ppr_mono_ty (HsStarTy _) unicode = starSymbol unicode
 ppr_mono_ty (XHsType HsRedacted{}) _ = error "ppr_mono_ty: HsRedacted can't be used here"
 
 ppr_tylit :: HsLit DocNameI -> Bool -> LaTeX

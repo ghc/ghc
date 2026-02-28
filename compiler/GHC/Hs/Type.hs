@@ -117,7 +117,6 @@ import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
 import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
 import GHC.Hs.Doc
-import GHC.Hs.Lit (pprHsStringLit)
 import GHC.Generics (Generic, Generically(..))
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
@@ -437,7 +436,7 @@ type instance XSumTy           (GhcPass _) = AnnParen
 type instance XOpTy            (GhcPass _) = NoExtField
 type instance XParTy           (GhcPass _) = (EpToken "(", EpToken ")")
 type instance XIParamTy        (GhcPass _) = TokDcolon
-type instance XStarTy          (GhcPass _) = NoExtField
+type instance XStarTy          (GhcPass _) = TokStar
 type instance XKindSig         (GhcPass _) = TokDcolon
 
 type instance XAppKindTy       GhcPs = EpToken "@"
@@ -1452,7 +1451,7 @@ ppr_mono_ty (HsExplicitTupleTy _ prom tys)
 ppr_mono_ty (HsTyLit _ t)       = ppr t
 ppr_mono_ty (HsWildCardTy {})   = char '_'
 
-ppr_mono_ty (HsStarTy _ isUni)  = char (if isUni then '★' else '*')
+ppr_mono_ty (HsStarTy _)        = starLit
 
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty)
   = hsep [ppr_mono_lty fun_ty, ppr_mono_lty arg_ty]

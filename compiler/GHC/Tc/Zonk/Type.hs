@@ -1087,6 +1087,7 @@ zonkExpr (HsEmbTy x _) = dataConCantHappen x
 zonkExpr (HsQual x _ _) = dataConCantHappen x
 zonkExpr (HsForAll x _ _) = dataConCantHappen x
 zonkExpr (HsFunArr x _ _ _) = dataConCantHappen x
+zonkExpr (HsStar x) = dataConCantHappen x
 
 zonkExpr (XExpr (WrapExpr co_fn expr))
   = runZonkBndrT (zonkCoFn co_fn) $ \ new_co_fn ->

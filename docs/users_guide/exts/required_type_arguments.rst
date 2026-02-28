@@ -285,8 +285,10 @@ type arguments::
 
 A few limitations apply:
 
-* The ``*`` syntax of :extension:`StarIsType` is not available due to a
-  conflict with the multiplication operator.
+* The ``*`` syntax of :extension:`StarIsType` is only partially available due to a
+  conflict with the multiplication operator. Concretely, a ``*`` will only be parsed
+  as the kind ``Type`` when it occurs as a direct argument to ``->``,
+  e.g. ``* -> * -> *`` or ``* -> Constraint``, but not in ``(*)``, ``Maybe *``, or ``Either * Bool``.
   What to do instead: use ``Type`` from the ``Data.Kind`` module.
 
 * The ``'`` syntax of :extension:`DataKinds` is not available due to a conflict

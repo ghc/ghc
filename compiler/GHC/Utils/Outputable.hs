@@ -38,7 +38,7 @@ module GHC.Utils.Outputable (
         arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lambda,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
-        blankLine, forAllLit, bullet, ellipsis,
+        blankLine, forAllLit, starLit, bullet, ellipsis,
         ($+$),
         cat, fcat,
         hang, hangNotEmpty, punctuate, punctuateFinal,
@@ -804,6 +804,9 @@ rbrace     = char '}'
 
 forAllLit :: SDoc
 forAllLit = unicodeSyntax (char '∀') (text "forall")
+
+starLit :: SDoc
+starLit = unicodeSyntax (char '★') (char '*')
 
 bullet :: SDoc
 bullet = unicode (char '•') (char '*')

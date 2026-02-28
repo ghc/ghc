@@ -1800,8 +1800,7 @@ pprTyTcApp ctxt_prec tc tys =
 ppr_kind_type :: PprPrec -> SDoc
 ppr_kind_type ctxt_prec = sdocOption sdocStarIsType $ \case
    False -> pprPrefixOcc liftedTypeKindTyConName
-   True  -> maybeParen ctxt_prec starPrec $
-              unicodeSyntax (char '★') (char '*')
+   True  -> maybeParen ctxt_prec starPrec starLit
 
 -- | Pretty-print a type-level equality.
 -- Returns (Just doc) if the argument is a /saturated/ application

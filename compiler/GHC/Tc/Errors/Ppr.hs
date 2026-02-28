@@ -7650,6 +7650,7 @@ pprTypeSyntaxName TypeKeywordSyntax     = "keyword" <+> quotes "type"
 pprTypeSyntaxName ForallTelescopeSyntax = "forall telescope"
 pprTypeSyntaxName ContextArrowSyntax    = "context arrow (=>)"
 pprTypeSyntaxName FunctionArrowSyntax   = "function type arrow (->)"
+pprTypeSyntaxName StarKindSyntax        = "kind" <+> quotes starLit
 
 --------------------------------------------------------------------------------
 -- ErrCtxt
