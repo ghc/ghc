@@ -1136,15 +1136,11 @@ expr_to_type earg =
       do { lhs' <- go lhs
          ; rhs' <- unwrap_wc rhs
          ; return (L l (HsAppKindTy noExtField lhs' rhs')) }
-    go (L l e@(OpApp _ lhs op rhs)) =
+    go (L l (OpApp _ lhs op rhs)) =
       do { lhs' <- go lhs
          ; op'  <- go op
          ; rhs' <- go rhs
-         ; op_id <- unwrap_op_tv op'
-         ; return (L l (HsOpTy noExtField NotPromoted lhs' op_id rhs')) }
-      where
-        unwrap_op_tv (L _ (HsTyVar _ _ op_id)) = return op_id
-        unwrap_op_tv _ = failWith $ TcRnIllformedTypeArgument (L l e)
+         ; return (L l (HsOpTy noExtField lhs' op' rhs')) }
     go (L l (HsOverLit _ ol))
       = do { let lit = tyLitFromOverloadedLit (ol_val ol)
            ; return (L l (HsTyLit noExtField lit)) }

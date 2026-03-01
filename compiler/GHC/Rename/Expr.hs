@@ -50,7 +50,6 @@ import GHC.Unit.Module ( isInteractiveModule )
 
 import GHC.Types.Basic (TypeOrKind (TypeLevel))
 import GHC.Types.FieldLabel
-import GHC.Types.Fixity
 import GHC.Types.Id.Make
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -401,12 +400,7 @@ rnExpr (OpApp _ e1 op e2)
         -- we used to avoid fixity stuff, but we can't easily tell any
         -- more, so I've removed the test.  Adding HsPars in GHC.Tc.Deriv.Generate
         -- should prevent bad things happening.
-        ; fixity <- case op' of
-              L _ (HsVar _ (L _ (WithUserRdr _ n))) -> lookupFixityRn n
-              L _ (XExpr (HsRecSelRn f)) -> lookupFieldFixityRn f
-              _ -> return (Fixity minPrecedence InfixL)
-                   -- c.f. lookupFixity for unbound
-
+        ; fixity <- lookupExprFixityRn op'
         ; lexical_negation <- xoptM LangExt.LexicalNegation
         ; let negation_handling | lexical_negation = KeepNegationIntact
                                 | otherwise = ReassociateNegation

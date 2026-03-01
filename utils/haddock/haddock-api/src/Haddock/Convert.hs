@@ -842,7 +842,8 @@ synifyType _ boundTvs (TyConApp tc tys) =
                   | L _ (HsExplicitListTy _ IsPromoted tTy') <- stripKindSig tTy ->
                       noLocA $ HsExplicitListTy noExtField IsPromoted (hTy : tTy')
                   | otherwise ->
-                      noLocA $ HsOpTy noExtField IsPromoted hTy (noLocA $ noUserRdr $ getName tc) tTy
+                      let tyop = noLocA $ HsTyVar noAnn IsPromoted (noLocA $ noUserRdr $ getName tc)
+                      in noLocA $ HsOpTy noExtField hTy tyop tTy
       -- ditto for implicit parameter tycons
       | tc `hasKey` ipClassKey
       , [name, ty] <- tys
@@ -854,9 +855,8 @@ synifyType _ boundTvs (TyConApp tc tys) =
           noLocA $
             HsOpTy
               noExtField
-              NotPromoted
               (synifyType WithinType boundTvs ty1)
-              (noLocA $ noUserRdr eqTyConName)
+              (noLocA $ HsTyVar noAnn NotPromoted (noLocA $ noUserRdr eqTyConName))
               (synifyType WithinType boundTvs ty2)
       -- and infix type operators
       | isSymOcc (nameOccName (getName tc))
@@ -864,9 +864,8 @@ synifyType _ boundTvs (TyConApp tc tys) =
           mk_app_tys
             ( HsOpTy
                 noExtField
-                prom
                 (synifyType WithinType boundTvs ty1)
-                (noLocA $ noUserRdr $ getName tc)
+                (noLocA $ HsTyVar noAnn prom (noLocA $ noUserRdr $ getName tc))
                 (synifyType WithinType boundTvs ty2)
             )
             tys_rest

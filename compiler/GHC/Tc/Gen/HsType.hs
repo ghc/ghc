@@ -103,7 +103,7 @@ import GHC.Core.TyCo.Ppr
 import GHC.Builtin.Types.Prim
 import GHC.Types.Error
 import GHC.Types.Name.Env
-import GHC.Types.Name.Reader( WithUserRdr(..), lookupLocalRdrOcc )
+import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Core.TyCon
@@ -1146,8 +1146,9 @@ tcHsType _ (HsSpliceTy (HsUntypedSpliceNested n) s) _ = pprPanic "tcHsType: inva
 tcHsType mode (HsFunTy _ mult ty1 ty2) exp_kind
   = tc_fun_type mode mult ty1 ty2 exp_kind
 
-tcHsType mode (HsOpTy _ _ ty1 (L _ (WithUserRdr _ op)) ty2) exp_kind
-  | op `hasKey` unrestrictedFunTyConKey
+tcHsType mode (HsOpTy _ ty1 tyop ty2) exp_kind
+  | L _ (HsTyVar _ _ op) <- tyop
+  , unLocWithUserRdr op `hasKey` unrestrictedFunTyConKey
   = tc_fun_type mode (HsUnannotated noExtField) ty1 ty2 exp_kind
 
 --------- Foralls
@@ -1531,12 +1532,15 @@ splitHsAppTys_maybe hs_ty
     is_app :: HsType GhcRn -> Bool
     is_app (HsAppKindTy {})        = True
     is_app (HsAppTy {})            = True
-    is_app (HsOpTy _ _ _ (L _ (WithUserRdr _ op)) _)
-      = not (op `hasKey` unrestrictedFunTyConKey)
+    is_app (HsOpTy _ _ tyop _)
+      | L _ (HsTyVar _ _ op) <- tyop
+      , unLocWithUserRdr op `hasKey` unrestrictedFunTyConKey
       -- I'm not sure why this funTyConKey test is necessary
       -- Can it even happen?  Perhaps for   t1 `(->)` t2
       -- but then maybe it's ok to treat that like a normal
       -- application rather than using the special rule for HsFunTy
+      = False
+    is_app (HsOpTy {})             = True
     is_app (HsTyVar {})            = True
     is_app (HsParTy _ (L _ ty))    = is_app ty
     is_app _                       = False
@@ -1552,9 +1556,8 @@ splitHsAppTys hs_ty = go (noLocA hs_ty) []
     go (L _  (HsAppTy _ f a))      as = go f (HsValArg noExtField a : as)
     go (L _  (HsAppKindTy _ ty k)) as = go ty (HsTypeArg noExtField k : as)
     go (L sp (HsParTy _ f))        as = go f (HsArgPar (locA sp) : as)
-    go (L _  (HsOpTy _ prom l op@(L sp _) r)) as
-      = ( L (l2l sp) (HsTyVar noAnn prom op)
-        , HsValArg noExtField l : HsValArg noExtField r : as )
+    go (L _  (HsOpTy _ l tyop r))  as =
+      (tyop, HsValArg noExtField l : HsValArg noExtField r : as)
     go f as = (f, as)
 
 ---------------------------

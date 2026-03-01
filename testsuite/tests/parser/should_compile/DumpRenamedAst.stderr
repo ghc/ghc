@@ -335,7 +335,6 @@
                      []))
                    (HsOpTy
                     (NoExtField)
-                    (NotPromoted)
                     (L
                      (EpAnn
                       (EpaSpan { DumpRenamedAst.hs:13:11 })
@@ -360,14 +359,24 @@
                     (L
                      (EpAnn
                       (EpaSpan { DumpRenamedAst.hs:13:13 })
-                      (NameAnnTrailing
+                      (AnnListItem
                        [])
                       (EpaComments
                        []))
-                     (WithUserRdr
-                      (Exact
-                       {Name: :})
-                      {Name: :}))
+                     (HsTyVar
+                      (NoEpTok)
+                      (NotPromoted)
+                      (L
+                       (EpAnn
+                        (EpaSpan { DumpRenamedAst.hs:13:13 })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         []))
+                       (WithUserRdr
+                        (Exact
+                         {Name: :})
+                        {Name: :}))))
                     (L
                      (EpAnn
                       (EpaSpan { DumpRenamedAst.hs:13:15-16 })

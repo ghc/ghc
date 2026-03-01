@@ -806,13 +806,13 @@ data HsType pass
       , hst_ctxt  :: LHsContext pass  -- Context C => blah
       , hst_body  :: LHsType pass }
 
+  -- | Type variable, type constructor, or (promoted) data constructor.
+  --
+  -- Includes named wildcards (such as @_foo@), but not bare wildcards @_@.
   | HsTyVar  (XTyVar pass)
-              PromotionFlag    -- Whether explicitly promoted,
-                               -- for the pretty printer
-             (LIdOccP pass)
-                  -- Type variable, type constructor, or data constructor
-                  -- see Note [Promotions (HsTyVar)]
-                  -- See Note [Located RdrNames] in GHC.Hs.Expr
+              PromotionFlag    -- ^ Whether explicitly promoted, for the pretty printer.
+                               -- See Note [Promotions (HsTyVar)]
+             (LIdOccP pass)    -- ^ See Note [Located RdrNames] in GHC.Hs.Expr
 
   | HsAppTy             (XAppTy pass)
                         (LHsType pass)
@@ -838,9 +838,9 @@ data HsType pass
                         [LHsType pass]  -- Element types (length gives arity)
 
   | HsOpTy              (XOpTy pass)
-                        PromotionFlag    -- Whether explicitly promoted,
-                                         -- for the pretty printer
-                        (LHsType pass) (LIdOccP pass) (LHsType pass)
+                        (LHsType pass)  -- ^ First argument
+                        (LHsType pass)  -- ^ Operator (always a @HsTyVar@ or a @HsWildCardTy@)
+                        (LHsType pass)  -- ^ Second argument
 
   | HsParTy             (XParTy pass)
                         (LHsType pass)   -- See Note [Parens in HsSyn] in GHC.Hs.Expr

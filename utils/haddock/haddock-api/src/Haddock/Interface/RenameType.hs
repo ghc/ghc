@@ -104,8 +104,8 @@ renameType (HsFunTy x w la lr) = HsFunTy x <$> renameHsMultAnn w <*> renameLType
 renameType (HsListTy x lt) = HsListTy x <$> renameLType lt
 renameType (HsTupleTy x srt lt) = HsTupleTy x srt <$> mapM renameLType lt
 renameType (HsSumTy x lt) = HsSumTy x <$> mapM renameLType lt
-renameType (HsOpTy x f la lop lb) =
-  HsOpTy x <$> pure f <*> renameLType la <*> renameLNameOcc lop <*> renameLType lb
+renameType (HsOpTy x la lop lb) =
+  HsOpTy x <$> renameLType la <*> renameLType lop <*> renameLType lb
 renameType (HsParTy x lt) = HsParTy x <$> renameLType lt
 renameType (HsIParamTy x ip lt) = HsIParamTy x ip <$> renameLType lt
 renameType (HsKindSig x lt lk) = HsKindSig x <$> renameLType lt <*> pure lk

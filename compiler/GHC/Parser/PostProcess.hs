@@ -1140,8 +1140,8 @@ checkTyClHdr is_cls ty
 
     go cs l (HsTyVar _ _ ltc@(L _ tc)) acc ops cps fix
       | isRdrTc tc               = return (ltc, acc, fix, (reverse ops), cps, cs Semi.<> comments l)
-    go cs l (HsOpTy _ _ t1 ltc@(L _ tc) t2) acc ops cps _fix
-      | isRdrTc tc               = return (ltc, lhs:rhs:acc, Infix, (reverse ops), cps, cs Semi.<> comments l)
+    go cs l (HsOpTy _ t1 tyop t2) acc ops cps _fix
+      = goL (cs Semi.<> comments l) tyop (lhs:rhs:acc) ops cps Infix
       where lhs = HsValArg noExtField t1
             rhs = HsValArg noExtField t2
     go cs l (HsParTy (o,c) ty)    acc ops cps fix = goL (cs Semi.<> comments l) ty acc (o:ops) (c:cps) fix
@@ -2409,7 +2409,7 @@ class DisambTD b where
   -- | Disambiguate @f \@t@ (visible kind application)
   mkHsAppKindTyPV :: LocatedA b -> EpToken "@" -> LHsType GhcPs -> PV (LocatedA b)
   -- | Disambiguate @f \# x@ (infix operator)
-  mkHsOpTyPV :: PromotionFlag -> LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> PV (LocatedA b)
+  mkHsOpTyPV :: LHsType GhcPs -> LHsType GhcPs -> LHsType GhcPs -> PV (LocatedA b)
   -- | Disambiguate @{-\# UNPACK \#-} t@ (unpack/nounpack pragma)
   mkUnpackednessPV :: Located UnpackednessPragma -> LocatedA b -> PV (LocatedA b)
 
@@ -2417,8 +2417,8 @@ instance DisambTD (HsType GhcPs) where
   mkHsAppTyHeadPV = return
   mkHsAppTyPV t1 t2 = return (mkHsAppTy t1 t2)
   mkHsAppKindTyPV t at ki = return (mkHsAppKindTy at t ki)
-  mkHsOpTyPV prom t1 op t2 = do
-    let (L l ty) = mkLHsOpTy prom t1 op t2
+  mkHsOpTyPV t1 tyop t2 = do
+    let (L l ty) = mkLHsOpTy t1 tyop t2
     !cs <- getCommentsFor (locA l)
     return (L (addCommentsToEpAnn l cs) ty)
   mkUnpackednessPV = addUnpackednessP
@@ -2460,11 +2460,11 @@ instance DisambTD DataConBuilder where
     addFatalError $ mkPlainErrorMsgEnvelope (getEpTokenSrcSpan at) $
                       (PsErrUnexpectedKindAppInDataCon (unLoc lhs) (unLoc ki))
 
-  mkHsOpTyPV prom lhs tc rhs = do
+  mkHsOpTyPV lhs op@(L _ (HsTyVar _ prom tc)) rhs = do
       check_no_ops (unLoc rhs)  -- check the RHS because parsing type operators is right-associative
       data_con <- eitherToP $ tyConToDataCon tc
       !cs <- getCommentsFor (locA l)
-      checkNotPromotedDataCon prom data_con
+      checkNotPromotedDataCon (getLocA op) prom data_con
       return $ L (addCommentsToEpAnn l cs) (InfixDataConBuilder lhs data_con rhs)
     where
       l = combineLocsA lhs rhs
@@ -2473,6 +2473,9 @@ instance DisambTD DataConBuilder where
         addError $ mkPlainErrorMsgEnvelope (locA l) $
                      (PsErrInvalidInfixDataCon (unLoc lhs) (unLoc tc) (unLoc rhs))
       check_no_ops _ = return ()
+  mkHsOpTyPV _ (L l (HsWildCardTy _)) _ =
+    addFatalError $ mkPlainErrorMsgEnvelope (getHasLoc l) $ PsErrInvalidInfixHole
+  mkHsOpTyPV _ op _ = pprPanic "mkHsOpTyPV: impossible type operator" (ppr op)
 
   mkUnpackednessPV unpk constr_stuff
     | L _ (InfixDataConBuilder lhs data_con rhs) <- constr_stuff
@@ -2488,7 +2491,7 @@ instance DisambTD DataConBuilder where
 tyToDataConBuilder :: LHsType GhcPs -> PV (LocatedA DataConBuilder)
 tyToDataConBuilder (L l (HsTyVar _ prom v)) = do
   data_con <- eitherToP $ tyConToDataCon v
-  checkNotPromotedDataCon prom data_con
+  checkNotPromotedDataCon (locA l) prom data_con
   return $ L l (PrefixDataConBuilder nilOL data_con)
 tyToDataConBuilder (L l (HsTupleTy _ HsBoxedOrConstraintTuple ts)) = do
   let data_con = L (l2l l) (getRdrName (tupleDataCon Boxed (length ts)))
@@ -2501,10 +2504,14 @@ tyToDataConBuilder t =
                     (PsErrInvalidDataCon (unLoc t))
 
 -- | Rejects declarations such as @data T = 'MkT@ (note the leading tick).
-checkNotPromotedDataCon :: PromotionFlag -> LocatedN RdrName -> PV ()
-checkNotPromotedDataCon NotPromoted _ = return ()
-checkNotPromotedDataCon IsPromoted (L l name) =
-  addError $ mkPlainErrorMsgEnvelope (locA l) $
+checkNotPromotedDataCon
+  :: SrcSpan          -- ^ The enclosing SrcSpan containing the tick
+  -> PromotionFlag
+  -> LocatedN RdrName
+  -> PV ()
+checkNotPromotedDataCon _   NotPromoted _ = return ()
+checkNotPromotedDataCon loc IsPromoted (L _ name) =
+  addError $ mkPlainErrorMsgEnvelope loc $
     PsErrIllegalPromotionQuoteDataCon name
 
 mkUnboxedSumCon :: LHsType GhcPs -> ConTag -> Arity -> (LocatedN RdrName, HsConDeclH98Details GhcPs)
@@ -3460,12 +3467,15 @@ failSpliceOrQuoteTwice lvl =
 warnStarIsType :: MonadP m => SrcSpan -> m ()
 warnStarIsType span = addPsMessage span PsWarnStarIsType
 
-failOpFewArgs :: MonadP m => LocatedN RdrName -> m a
-failOpFewArgs (L loc op) =
+failOpFewArgs :: MonadP m => LHsType GhcPs -> m a
+failOpFewArgs (L _ (HsTyVar _ _ (L loc op))) =
   do { star_is_type <- getBit StarIsTypeBit
      ; let is_star_type = if star_is_type then StarIsType else StarIsNotType
      ; addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
          (PsErrOpFewArgs is_star_type op) }
+failOpFewArgs (L l (HsWildCardTy _)) =
+  addFatalError $ mkPlainErrorMsgEnvelope (getHasLoc l) $ PsErrInvalidInfixHole
+failOpFewArgs op = pprPanic "failOpFewArgs: impossible type operator" (ppr op)
 
 requireExplicitNamespaces :: MonadP m => ExplicitNamespaceKeyword -> m ()
 requireExplicitNamespaces kw = do
@@ -3701,10 +3711,10 @@ mkSumOrTuplePat l Boxed a@Sum{} _ =
     addFatalError $
       mkPlainErrorMsgEnvelope (locA l) $ PsErrUnsupportedBoxedSumPat a
 
-mkLHsOpTy :: PromotionFlag -> LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> LHsType GhcPs
-mkLHsOpTy prom x op y =
+mkLHsOpTy :: LHsType GhcPs -> LHsType GhcPs -> LHsType GhcPs -> LHsType GhcPs
+mkLHsOpTy x op y =
   let loc = locA x `combineSrcSpans` locA op `combineSrcSpans` locA y
-  in L (noAnnSrcSpan loc) (mkHsOpTy prom x op y)
+  in L (noAnnSrcSpan loc) (HsOpTy noExtField x op y)
 
 mkMultExpr :: EpToken "%" -> LHsExpr GhcPs -> TokRarrow -> HsMultAnnOf (LHsExpr GhcPs) GhcPs
 mkMultExpr pct t@(L _ (HsOverLit _ (OverLit _ (HsIntegral (IL (SourceText (unpackFS -> "1")) _ 1))))) arr

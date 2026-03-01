@@ -11,7 +11,8 @@ module GHC.Rename.Fixity
    , lookupFixityRn
    , lookupFixityRn_help
    , lookupFieldFixityRn
-   , lookupTyFixityRn
+   , lookupExprFixityRn
+   , lookupTypeFixityRn
    ) where
 
 import GHC.Prelude
@@ -26,6 +27,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Types.Fixity.Env
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Name.Reader
 import GHC.Types.Fixity
 import GHC.Types.SrcLoc
 
@@ -198,8 +200,19 @@ lookupFixityRn_help name
     doc = text "Checking fixity for" <+> ppr name
 
 ---------------
-lookupTyFixityRn :: LocatedN Name -> RnM Fixity
-lookupTyFixityRn = lookupFixityRn . unLoc
-
 lookupFieldFixityRn :: FieldOcc GhcRn -> RnM Fixity
 lookupFieldFixityRn (FieldOcc _ n) = lookupFixityRn (unLoc n)
+
+lookupExprFixityRn :: LHsExpr GhcRn -> RnM Fixity
+lookupExprFixityRn e =
+  case e of
+    L _ (HsVar _ op) -> lookupFixityRn (unLocWithUserRdr op)
+    L _ (XExpr (HsRecSelRn f)) -> lookupFieldFixityRn f
+    _ -> return (Fixity minPrecedence InfixL)
+    -- c.f. lookupFixity for unbound
+
+lookupTypeFixityRn :: LHsType GhcRn -> RnM Fixity
+lookupTypeFixityRn t =
+  case t of
+    L _ (HsTyVar _ _ op) -> lookupFixityRn (unLocWithUserRdr op)
+    _ -> return (Fixity minPrecedence InfixL)

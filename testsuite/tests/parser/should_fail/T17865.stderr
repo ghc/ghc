@@ -1,9 +1,8 @@
-
-T17865.hs:3:11: error: [GHC-80236]
+T17865.hs:3:10: error: [GHC-80236]
     Illegal promotion quote mark in the declaration of
     data/newtype constructor MkT
 
-T17865.hs:5:13: error: [GHC-80236]
+T17865.hs:5:11: error: [GHC-80236]
     Illegal promotion quote mark in the declaration of
     data/newtype constructor MkT'
 
@@ -14,3 +13,4 @@ T17865.hs:7:16: error: [GHC-80236]
 T17865.hs:9:17: error: [GHC-80236]
     Illegal promotion quote mark in the declaration of
     data/newtype constructor (:>$)
+
