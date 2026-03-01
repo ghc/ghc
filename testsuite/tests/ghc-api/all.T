@@ -79,3 +79,5 @@ test('T26910', [ extra_run_opts(f'"{config.libdir}"')
                , when(arch('wasm32') or arch('javascript'), skip)
                ], compile_and_run, ['-package ghc -package template-haskell'])
 test('TypeMapStringLiteral', normal, compile_and_run, ['-package ghc'])
+
+test('T25121_status', normal, compile_and_run, ['-package ghc'])
