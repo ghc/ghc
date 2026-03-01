@@ -213,7 +213,7 @@ mk_fail_block doFlav pat stmt e (Just (SyntaxExprRn fail_op)) =
 
           fail_op_expr :: DynFlags -> LPat GhcRn -> HsExpr GhcRn -> LHsExpr GhcRn
           fail_op_expr dflags pat@(L pat_lspan _) fail_op
-            = L pat_lspan $ mkExpandedPatRn doFlav (unLoc pat) stmt $ genHsApp fail_op (mk_fail_msg_expr dflags pat)
+            = L pat_lspan $ mkExpandedPatRn doFlav pat stmt $ genHsApp fail_op (mk_fail_msg_expr dflags pat)
 
           mk_fail_msg_expr :: DynFlags -> LPat GhcRn -> LHsExpr GhcRn
           mk_fail_msg_expr dflags pat
@@ -481,7 +481,7 @@ It stores the original statement (with location) and the expanded expression
 -}
 
 
-mkExpandedPatRn :: HsDoFlavour -> Pat GhcRn -> ExprLStmt GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
+mkExpandedPatRn :: HsDoFlavour -> LPat GhcRn -> ExprLStmt GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
 mkExpandedPatRn flav pat stmt e = XExpr $ ExpandedThingRn
                                    { xrn_orig = StmtErrCtxtPat (HsDoStmt flav) stmt pat
                                    , xrn_expanded = e}

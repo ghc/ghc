@@ -430,6 +430,7 @@ tcInferAppHead :: (HsExpr GhcRn, SrcSpan)
 --   * A bare identifier (just look it up)
 --     This case also covers a record selector HsRecSel
 --   * An expression with a type signature (e :: ty)
+--   * An XExpr where 'f' is actually an expanded out expression
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 --
 -- Note that [] and (,,) are both HsVar:
@@ -452,6 +453,8 @@ tcInferAppHead_maybe :: HsExpr GhcRn
                      -> TcM (Maybe (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType))
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- Returns Nothing for a complicated head
+-- XExpr's although complicated needs to be looked through, useful for QL things when
+-- the argument is an XExpr
 tcInferAppHead_maybe fun = case fun of
       HsVar _ nm                  -> Just <$> with_get_ds (tcInferId nm)
       ExprWithTySig _ e hs_ty     -> Just <$> with_get_ds (tcExprWithSig e hs_ty)

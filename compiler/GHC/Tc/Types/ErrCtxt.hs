@@ -340,7 +340,7 @@ data ErrCtxtMsg
   | DoStmtErrCtxt !HsStmtContextRn !(ExprLStmt GhcRn)
 
   -- | In patten of the do statement. (c.f. MonadFailErrors)
-  | StmtErrCtxtPat !HsStmtContextRn !(ExprLStmt GhcRn) (Pat GhcRn)
+  | StmtErrCtxtPat !HsStmtContextRn !(ExprLStmt GhcRn) (LPat GhcRn)
 
   -- | In an rebindable syntax expression.
   | SyntaxNameCtxt !(HsExpr GhcRn) !CtOrigin !TcType !SrcSpan
