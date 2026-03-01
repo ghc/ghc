@@ -1,11 +1,11 @@
 
 ==================== Tidy Core rules ====================
 "USPEC $cop1 @T @_"
-    forall (@a) ($dD :: D a) ($dEq :: Eq (T a)).
+    forall (@a) ($dEq :: Eq (T a)) ($dD :: D a).
       $fCTYPEfa_$cop1 @T @a $dEq $dD
       = \ _ [Occ=Dead] -> I# 3#
 "USPEC $fCTYPEfa @T @_"
-    forall (@a) ($dD :: D a) ($dEq :: Eq (T a)).
+    forall (@a) ($dEq :: Eq (T a)) ($dD :: D a).
       $fCTYPEfa @T @a $dEq $dD
       = $fCTYPEfa_$s$fCTYPEfa @a $dD
 

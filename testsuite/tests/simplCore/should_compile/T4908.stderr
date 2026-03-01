@@ -31,14 +31,14 @@ T4908.$trModule = GHC.Internal.Types.Module $trModule2 $trModule4
 Rec {
 -- RHS size: {terms: 19, types: 5, coercions: 0, joins: 0/0}
 T4908.f_$s$wf [InlPrag=[2], Occ=LoopBreaker]
-  :: Int -> Int# -> Int# -> (# #)
-[GblId, Arity=3, Str=<A><ML><1L>, Unf=OtherCon []]
+  :: Int# -> Int -> Int# -> (# #)
+[GblId, Arity=3, Str=<1L><A><ML>, Unf=OtherCon []]
 T4908.f_$s$wf
-  = \ (sc :: Int) (sc1 :: Int#) (sc2 :: Int#) ->
-      case sc2 of ds {
+  = \ (sc :: Int#) (sc1 :: Int) (sc2 :: Int#) ->
+      case sc of ds {
         __DEFAULT ->
-          case sc1 of ds1 {
-            __DEFAULT -> T4908.f_$s$wf sc ds1 (-# ds 1#);
+          case sc2 of ds1 {
+            __DEFAULT -> T4908.f_$s$wf (-# ds 1#) sc1 ds1;
             0# -> GHC.Internal.Types.(##)
           };
         0# -> GHC.Internal.Types.(##)
@@ -62,7 +62,7 @@ f [InlPrag=[2]] :: Int -> (Int, Int) -> Bool
                      case b of { I# ds2 [Occ=Once1!] ->
                      case ds2 of ds3 [Occ=Once1] {
                        __DEFAULT ->
-                         case T4908.f_$s$wf a ds3 (-# ds1 1#) of { (# #) ->
+                         case T4908.f_$s$wf (-# ds1 1#) a ds3 of { (# #) ->
                          GHC.Internal.Types.True
                          };
                        0# -> GHC.Internal.Types.True
@@ -80,7 +80,7 @@ f = \ (ds :: Int) (x :: (Int, Int)) ->
           case b of { I# ds2 ->
           case ds2 of ds3 {
             __DEFAULT ->
-              case T4908.f_$s$wf a ds3 (-# ds1 1#) of { (# #) ->
+              case T4908.f_$s$wf (-# ds1 1#) a ds3 of { (# #) ->
               GHC.Internal.Types.True
               };
             0# -> GHC.Internal.Types.True
