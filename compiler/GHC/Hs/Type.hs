@@ -1440,7 +1440,7 @@ ppr_mono_ty (HsSpliceTy ext s)    =
       GhcRn | HsUntypedSpliceTop _ t  <- ext -> ppr t
       GhcTc -> pprUntypedSplice True Nothing s
 ppr_mono_ty (HsExplicitListTy _ prom tys)
-  | isPromoted prom = quote $ brackets (maybeAddSpace tys $ interpp'SP tys)
+  | isPromoted prom = quote $ brackets (spaceIfSingleQuote $ interpp'SP tys)
   | otherwise       = brackets (interpp'SP tys)
 ppr_mono_ty (HsExplicitTupleTy _ prom tys)
     -- Special-case unary boxed tuples so that they are pretty-printed as
@@ -1448,7 +1448,7 @@ ppr_mono_ty (HsExplicitTupleTy _ prom tys)
   | [ty] <- tys
   = quote_tuple prom $ sep [text (mkTupleStr Boxed dataName 1), ppr_mono_lty ty]
   | otherwise
-  = quote_tuple prom $ parens (maybeAddSpace tys $ interpp'SP tys)
+  = quote_tuple prom $ parens (spaceIfSingleQuote $ interpp'SP tys)
 ppr_mono_ty (HsTyLit _ t)       = ppr t
 ppr_mono_ty (HsWildCardTy {})   = char '_'
 
@@ -1546,45 +1546,6 @@ hsTypeNeedsParens p = go_hs_ty
     go_core_ty (LitTy{})      = False
     go_core_ty (CastTy t _)   = go_core_ty t
     go_core_ty (CoercionTy{}) = False
-
-maybeAddSpace :: [LHsType (GhcPass p)] -> SDoc -> SDoc
--- See Note [Printing promoted type constructors]
--- in GHC.Iface.Type.  This code implements the same
--- logic for printing HsType
-maybeAddSpace tys doc
-  | (ty : _) <- tys
-  , lhsTypeHasLeadingPromotionQuote ty = space <> doc
-  | otherwise                          = doc
-
-lhsTypeHasLeadingPromotionQuote :: LHsType (GhcPass p) -> Bool
-lhsTypeHasLeadingPromotionQuote ty
-  = goL ty
-  where
-    goL (L _ ty) = go ty
-
-    go (HsForAllTy{})        = False
-    go (HsQualTy{ hst_ctxt = ctxt, hst_body = body})
-      | (L _ (c:_)) <- ctxt = goL c
-      | otherwise            = goL body
-    go (HsTyVar _ p _)       = isPromoted p
-    go (HsFunTy _ _ arg _)   = goL arg
-    go (HsListTy{})          = False
-    go (HsTupleTy{})         = False
-    go (HsSumTy{})           = False
-    go (HsOpTy _ _ t1 _ _)   = goL t1
-    go (HsKindSig _ t _)     = goL t
-    go (HsIParamTy{})        = False
-    go (HsSpliceTy{})        = False
-    go (HsExplicitListTy _ p _) = isPromoted p
-    go (HsExplicitTupleTy{}) = True
-    go (HsTyLit{})           = False
-    go (HsWildCardTy{})      = False
-    go (HsStarTy{})          = False
-    go (HsAppTy _ t _)       = goL t
-    go (HsAppKindTy _ t _)   = goL t
-    go (HsParTy{})           = False
-    go (HsDocTy _ t _)       = goL t
-    go (XHsType{})           = False
 
 -- | @'parenthesizeHsType' p ty@ checks if @'hsTypeNeedsParens' p ty@ is
 -- true, and if so, surrounds @ty@ with an 'HsParTy'. Otherwise, it simply
