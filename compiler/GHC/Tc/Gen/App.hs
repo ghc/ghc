@@ -20,6 +20,7 @@ import GHC.Hs
 
 import GHC.Tc.Gen.Head
 import GHC.Tc.Errors.Types
+import GHC.Tc.Errors.Ppr
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
@@ -275,7 +276,7 @@ tcApp works like this:
 2. Use tcInferAppHead to infer the type of the function,
      as an (uninstantiated) TcSigmaType
    There are special cases for
-     HsVar, HsRecSel, and ExprWithTySig
+     HsVar, HsRecSel, and ExprWithTySig and XExpr
    Otherwise, delegate back to tcExpr, which
      infers an (instantiated) TcRhoType
 
@@ -2050,6 +2051,7 @@ mk_origin fun_lspan_arg rn_fun_arg rn_fun
   = return $ exprCtOrigin rn_fun_arg
   | otherwise
   = do { code_orig <- getSrcCodeOrigin
+       ; traceTc "mk_origin" (case (pprErrCtxtMsg <$> code_orig) of { Just e -> e; _ -> text "Nothing"})
        ; return $ srcCodeOriginCtOrigin rn_fun code_orig
        }
 

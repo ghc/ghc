@@ -211,11 +211,12 @@ setLclEnvSrcCodeOrigin ec = modifyLclCtxt (setLclCtxtSrcCodeOrigin ec)
 -- See Note [ErrCtxtStack Manipulation]
 setLclCtxtSrcCodeOrigin :: ErrCtxt -> TcLclCtxt -> TcLclCtxt
 setLclCtxtSrcCodeOrigin ec lclCtxt
-  | ecs@(MkErrCtxt ExpansionCodeCtxt _ : _) <- tcl_err_ctxt lclCtxt
-  , MkErrCtxt ExpansionCodeCtxt ExprCtxt{} <- ec
-  = lclCtxt { tcl_err_ctxt =  ec : ecs }
-  | MkErrCtxt ExpansionCodeCtxt _ : ecs <- tcl_err_ctxt lclCtxt
-  , MkErrCtxt ExpansionCodeCtxt _ <- ec
+  -- | ecs@(MkErrCtxt ExpansionCodeCtxt _ : _) <- tcl_err_ctxt lclCtxt
+  -- , MkErrCtxt ExpansionCodeCtxt ExprCtxt{} <- ec
+  -- = lclCtxt { tcl_err_ctxt =  ec : ecs }
+  -- never stack 2 statement error contexts on top of each other
+  | MkErrCtxt _ DoStmtErrCtxt{} : ecs <- tcl_err_ctxt lclCtxt
+  , MkErrCtxt _ DoStmtErrCtxt{} <- ec
   = lclCtxt { tcl_err_ctxt =  ec : ecs }
   | otherwise
   = lclCtxt { tcl_err_ctxt = ec : tcl_err_ctxt lclCtxt }

@@ -455,7 +455,7 @@ data CtOrigin
       -- `ty1` to `ty2`.
 
   | DefaultOrigin       -- Typechecking a default decl
-  | DoStmtOrigin            -- Arising from a do expression
+  | DoStmtOrigin            -- Arising from a do statement
   | DoPatOrigin (LPat GhcRn) -- Arising from a failable pattern in
                              -- a do expression
   | MCompOrigin         -- Arising from a monad comprehension
@@ -690,12 +690,22 @@ exprCtOrigin e@(HsIf {})          = ExpansionOrigin (ExprCtxt e)
 exprCtOrigin e@(HsProjection _ _) = ExpansionOrigin (ExprCtxt e)
 exprCtOrigin e@(RecordUpd{})      = ExpansionOrigin (ExprCtxt e)
 exprCtOrigin e@(HsGetField{})     = ExpansionOrigin (ExprCtxt e)
-exprCtOrigin (XExpr (ExpandedThingRn o _)) = ExpansionOrigin o
+exprCtOrigin (XExpr (ExpandedThingRn o _)) = errCtxtCtOrigin o
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 
 srcCodeOriginCtOrigin :: HsExpr GhcRn -> Maybe ErrCtxtMsg -> CtOrigin
 srcCodeOriginCtOrigin e Nothing = exprCtOrigin e
-srcCodeOriginCtOrigin _ (Just o) = ExpansionOrigin o
+srcCodeOriginCtOrigin _ (Just o) = errCtxtCtOrigin o
+
+
+errCtxtCtOrigin :: ErrCtxtMsg -> CtOrigin
+errCtxtCtOrigin (ExprCtxt e) = exprCtOrigin e
+errCtxtCtOrigin (FunAppCtxt (FunAppCtxtExpr _ e) _) = exprCtOrigin e
+errCtxtCtOrigin (StmtErrCtxt{}) = DoStmtOrigin
+errCtxtCtOrigin (DoStmtErrCtxt{}) = DoStmtOrigin
+errCtxtCtOrigin (StmtErrCtxtPat _ _ p) = DoPatOrigin p
+errCtxtCtOrigin _ = Shouldn'tHappenOrigin "errCtxtCtOrigin"
+
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
@@ -731,6 +741,8 @@ pprCtOrigin (ExpansionOrigin o)
       what = case o of
         StmtErrCtxt{} ->
           text "a do statement"
+        DoStmtErrCtxt{} ->
+          text "a do statement"
         StmtErrCtxtPat _ _ p ->
           text "a do statement" $$
              text "with the failable pattern" <+> quotes (ppr p)
@@ -744,6 +756,7 @@ pprCtOrigin (ExpansionOrigin o)
         ExprCtxt (HsProjection _ p) -> text "the record selector" <+>
              quotes (ppr ((FieldLabelStrings $ fmap noLocA p)))
         ExprCtxt e -> text "the expression" <+> (ppr e)
+        RecordUpdCtxt{} -> text "a record update"
         _ -> text "shouldn't happen ExpansionOrigin pprCtOrigin"
 
 pprCtOrigin (GivenSCOrigin sk d blk)
