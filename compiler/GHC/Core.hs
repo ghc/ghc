@@ -2047,6 +2047,8 @@ type CoreExpr = Expr CoreBndr
 type CoreArg  = Arg  CoreBndr
 -- | Binding groups where binders are 'CoreBndr's
 type CoreBind = Bind CoreBndr
+-- | A compilation unit represented as a sequence of Core binding groups.
+newtype CoreCompUnit = CoreCompUnit [CoreBind]
 -- | Case alternatives where binders are 'CoreBndr's
 type CoreAlt  = Alt  CoreBndr
 
