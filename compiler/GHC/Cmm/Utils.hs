@@ -41,7 +41,7 @@ module GHC.Cmm.Utils(
 
         -- Tagging
         cmmTagMask, cmmPointerMask, cmmUntag, cmmIsTagged, cmmIsNotTagged,
-        cmmConstrTag1, mAX_PTR_TAG, tAG_MASK,
+        cmmConstrTag1,
 
         -- Overlap and usage
         regsOverlap, globalRegsOverlap, regUsedIn, globalRegUsedIn,
@@ -67,6 +67,7 @@ import GHC.Core.TyCon     ( PrimRep(..), PrimElemRep(..) )
 import GHC.Types.RepType  ( NvUnaryType, SlotTy (..), typePrimRepU )
 
 import GHC.Platform
+import GHC.Platform.Tag (tAG_MASK)
 import GHC.Runtime.Heap.Layout
 import GHC.Cmm
 import GHC.Cmm.BlockId
@@ -379,12 +380,6 @@ cmmMkAssign platform expr uq =
 --      Tagging
 --
 ---------------------------------------------------
-
-tAG_MASK :: Platform -> Int
-tAG_MASK platform = (1 `shiftL` pc_TAG_BITS (platformConstants platform)) - 1
-
-mAX_PTR_TAG :: Platform -> Int
-mAX_PTR_TAG = tAG_MASK
 
 -- Tag bits mask
 cmmTagMask, cmmPointerMask :: Platform -> CmmExpr

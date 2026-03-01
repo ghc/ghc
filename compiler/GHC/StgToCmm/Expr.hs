@@ -35,7 +35,8 @@ import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
-import GHC.Cmm.Utils ( cmmTagMask, mkWordCLit, mAX_PTR_TAG )
+import GHC.Cmm.Utils ( cmmTagMask, mkWordCLit )
+import GHC.Platform.Tag ( mAX_PTR_TAG )
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Types.ForeignCall

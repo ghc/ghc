@@ -675,6 +675,7 @@ Library
         GHC.Platform.NoRegs
         GHC.Platform.PPC
         GHC.Platform.Profile
+        GHC.Platform.Tag
         GHC.Platform.Reg
         GHC.Platform.Reg.Class
         GHC.Platform.Reg.Class.NoVectors

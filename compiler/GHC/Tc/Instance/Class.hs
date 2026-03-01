@@ -52,7 +52,7 @@ import GHC.Core.Class
 import GHC.Core.Utils( mkCast )
 import GHC.Core ( Expr(..), mkConApp )
 
-import GHC.StgToCmm.Closure ( isSmallFamily )
+import GHC.Platform.Tag ( isSmallFamily )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
