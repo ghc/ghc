@@ -1,0 +1,127 @@
+Extension fields @GhcPs
+-----------------------
+X(Var) mismatch
+  >>> NoExtField
+  <<< EpToken "'"
+X(LitE) match = NoExtField
+X(Par) match = ((EpToken "("),(EpToken ")"))
+X(App) match = NoExtField
+X(AppTypeE) match = EpToken "@"
+X(OpApp) match = NoExtField
+X(ForAll) match = NoExtField
+X(Qual) match = NoExtField
+X(Star) match = EpUniToken "*" "\9733"
+X(FunArr) match = NoExtField
+X(ExprWithTySig) match = EpUniToken "::" "\8759"
+X(UntypedSplice) match = NoExtField
+X(ExplicitList) mismatch
+  >>> AnnList ()
+  <<< ((EpToken "'"),(EpToken "["),(EpToken "]"))
+X(ExplicitTuple) mismatch
+  >>> ((EpaLocation' [GenLocated (EpaLocation' NoComments) EpaComment]),(EpaLocation' [GenLocated (EpaLocation' NoComments) EpaComment]))
+  <<< ((EpToken "'"),(EpToken "("),(EpToken ")"))
+X(Hole) mismatch
+  >>> HoleKind
+  <<< EpToken "_"
+
+Extension fields @GhcRn
+-----------------------
+X(Var) mismatch
+  >>> NoExtField
+  <<< EpToken "'"
+X(LitE) match = NoExtField
+X(Par) mismatch
+  >>> NoExtField
+  <<< ((EpToken "("),(EpToken ")"))
+X(App) match = NoExtField
+X(AppTypeE) match = NoExtField
+X(OpApp) mismatch
+  >>> Fixity
+  <<< NoExtField
+X(ForAll) match = NoExtField
+X(Qual) match = NoExtField
+X(Star) match = EpUniToken "*" "\9733"
+X(FunArr) match = NoExtField
+X(ExprWithTySig) mismatch
+  >>> NoExtField
+  <<< EpUniToken "::" "\8759"
+X(UntypedSplice) mismatch
+  >>> HsUntypedSpliceResult (HsExpr (GhcPass 'Renamed))
+  <<< HsUntypedSpliceResult (GenLocated (EpAnn AnnListItem) (HsType (GhcPass 'Renamed)))
+X(ExplicitList) match = NoExtField
+X(ExplicitTuple) match = NoExtField
+X(Hole) mismatch
+  >>> HoleKind
+  <<< NoExtField
+
+Extension fields @GhcTc
+-----------------------
+X(Var) mismatch
+  >>> NoExtField
+  <<< EpToken "'"
+X(LitE) match = NoExtField
+X(Par) mismatch
+  >>> NoExtField
+  <<< ((EpToken "("),(EpToken ")"))
+X(App) match = NoExtField
+X(AppTypeE) mismatch
+  >>> Type
+  <<< NoExtField
+X(OpApp) mismatch
+  >>> DataConCantHappen
+  <<< NoExtField
+X(ForAll) mismatch
+  >>> DataConCantHappen
+  <<< NoExtField
+X(Qual) mismatch
+  >>> DataConCantHappen
+  <<< NoExtField
+X(Star) mismatch
+  >>> DataConCantHappen
+  <<< EpUniToken "*" "\9733"
+X(FunArr) mismatch
+  >>> DataConCantHappen
+  <<< NoExtField
+X(ExprWithTySig) mismatch
+  >>> NoExtField
+  <<< EpUniToken "::" "\8759"
+X(UntypedSplice) mismatch
+  >>> DataConCantHappen
+  <<< Type
+X(ExplicitList) match = Type
+X(ExplicitTuple) mismatch
+  >>> NoExtField
+  <<< [Type]
+X(Hole) mismatch
+  >>> (HoleKind,HoleExprRef)
+  <<< NoExtField
+
+Direct fields
+-------------
+Fields(Var) mismatch
+  >>> GenLocated (EpAnn NameAnn) RdrName -> HsExpr P
+  <<< PromotionFlag -> GenLocated (EpAnn NameAnn) RdrName -> HsExpr P
+Fields(LitE) match = HsLit P -> HsExpr P
+Fields(Par) match = GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+Fields(App) match = GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+Fields(AppTypeE) mismatch
+  >>> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsWildCardBndrs P (GenLocated (EpAnn AnnListItem) (HsExpr P)) -> HsExpr P
+  <<< GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+Fields(OpApp) mismatch
+  >>> GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+  <<< PromotionFlag -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn NameAnn) RdrName -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+Fields(ForAll) match = HsForAllTelescope P -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+Fields(Qual) match = GenLocated (EpAnn AnnContext) [GenLocated (EpAnn AnnListItem) (HsExpr P)] -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+Fields(Star) match = HsExpr P
+Fields(FunArr) match = HsMultAnnOf (GenLocated (EpAnn AnnListItem) (HsExpr P)) P -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+Fields(ExprWithTySig) mismatch
+  >>> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsWildCardBndrs P (GenLocated (EpAnn AnnListItem) (HsSigType P)) -> HsExpr P
+  <<< GenLocated (EpAnn AnnListItem) (HsExpr P) -> GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsExpr P
+Fields(UntypedSplice) match = HsUntypedSplice P -> HsExpr P
+Fields(ExplicitList) mismatch
+  >>> [GenLocated (EpAnn AnnListItem) (HsExpr P)] -> HsExpr P
+  <<< PromotionFlag -> [GenLocated (EpAnn AnnListItem) (HsExpr P)] -> HsExpr P
+Fields(ExplicitTuple) mismatch
+  >>> [HsTupArg P] -> Boxity -> HsExpr P
+  <<< PromotionFlag -> [GenLocated (EpAnn AnnListItem) (HsExpr P)] -> HsExpr P
+Fields(Hole) match = HsExpr P
