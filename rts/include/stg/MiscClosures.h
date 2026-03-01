@@ -97,6 +97,15 @@ RTS_RET(stg_ctoi_L1);
 RTS_RET(stg_ctoi_V);
 
 RTS_RET(stg_ctoi_t);
+RTS_RET(stg_ctoi_t0);
+RTS_RET(stg_ctoi_t1);
+RTS_RET(stg_ctoi_t2);
+RTS_RET(stg_ctoi_t3);
+RTS_RET(stg_ctoi_t4);
+RTS_RET(stg_ctoi_t5);
+RTS_RET(stg_ctoi_t6);
+RTS_RET(stg_ctoi_t7);
+RTS_RET(stg_ctoi_t8);
 
 RTS_RET(stg_primcall);
 RTS_RET(stg_apply_interp);

@@ -474,6 +474,15 @@ extern char **environ;
       SymI_HasDataProto(stg_ret_l_info)                                     \
       SymI_HasDataProto(stg_ret_t_info)                                     \
       SymI_HasDataProto(stg_ctoi_t_info)                                    \
+      SymI_HasDataProto(stg_ctoi_t0_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t1_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t2_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t3_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t4_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t5_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t6_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t7_info)                                   \
+      SymI_HasDataProto(stg_ctoi_t8_info)                                   \
       SymI_HasDataProto(stg_primcall_info)                                  \
       SymI_HasDataProto(stg_gc_prim_p)                                      \
       SymI_HasDataProto(stg_gc_prim_pp)                                     \
