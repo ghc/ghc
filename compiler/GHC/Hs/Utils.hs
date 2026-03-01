@@ -632,7 +632,7 @@ nlHsTyConApp :: forall p a. IsSrcSpanAnn p a
 nlHsTyConApp prom fixity tycon tys
   | Infix <- fixity
   , HsValArg _ ty1 : HsValArg _ ty2 : rest <- tys
-  = foldl' mk_app (noLocA $ HsOpTy noExtField prom ty1 (noLocA tycon) ty2) rest
+  = foldl' mk_app (noLocA $ mkHsOpTy prom ty1 (noLocA tycon) ty2) rest
   | otherwise
   = foldl' mk_app (nlHsTyVar prom $ forgetUserRdr @p tycon) tys
   where

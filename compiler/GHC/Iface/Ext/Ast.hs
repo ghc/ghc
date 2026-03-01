@@ -1921,9 +1921,9 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsSumTy _ tys ->
         [ toHie tys
         ]
-      HsOpTy _ _prom a op b ->
+      HsOpTy _ a op b ->
         [ toHie a
-        , toHie $ C Use op
+        , toHie op
         , toHie b
         ]
       HsParTy _ a ->

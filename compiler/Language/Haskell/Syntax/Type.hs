@@ -838,9 +838,9 @@ data HsType pass
                         [LHsType pass]  -- Element types (length gives arity)
 
   | HsOpTy              (XOpTy pass)
-                        PromotionFlag    -- Whether explicitly promoted,
-                                         -- for the pretty printer
-                        (LHsType pass) (LIdOccP pass) (LHsType pass)
+                        (LHsType pass)
+                        (LHsType pass)
+                        (LHsType pass)
 
   | HsParTy             (XParTy pass)
                         (LHsType pass)   -- See Note [Parens in HsSyn] in GHC.Hs.Expr

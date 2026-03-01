@@ -1345,17 +1345,15 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode =
   hsep [ppr_mono_lty fun_ty unicode, ppr_mono_lty arg_ty unicode]
 ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode =
   hsep [ppr_mono_lty fun_ty unicode, atSign <> ppr_mono_lty arg_ki unicode]
-ppr_mono_ty (HsOpTy _ prom ty1 op ty2) unicode =
-  ppr_mono_lty ty1 unicode <+> ppr_op_prom <+> ppr_mono_lty ty2 unicode
+ppr_mono_ty (HsOpTy _ ty1 tyop ty2) unicode
+  | Just pp_op <- ppr_infix_ty tyop
+  = pp_ty1 <+> pp_op <+> pp_ty2
+  | otherwise
+  = let pp_op = ppr_mono_lty tyop unicode
+    in hsep [hsep [pp_op, pp_ty1], pp_ty2]
   where
-    ppr_op_prom
-      | isPromoted prom =
-          char '\'' <> ppr_op
-      | otherwise =
-          ppr_op
-    ppr_op
-      | isSymOcc (getOccName op) = ppLDocName op
-      | otherwise = char '`' <> ppLDocName op <> char '`'
+    pp_ty1 = ppr_mono_lty ty1 unicode
+    pp_ty2 = ppr_mono_lty ty2 unicode
 ppr_mono_ty (HsParTy _ ty) unicode =
   parens (ppr_mono_lty ty unicode)
 --  = ppr_mono_lty ty unicode
@@ -1366,6 +1364,18 @@ ppr_mono_ty (HsWildCardTy _) _ = char '_'
 ppr_mono_ty (HsTyLit _ t) u = ppr_tylit t u
 ppr_mono_ty (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
 ppr_mono_ty (XHsType HsRedacted{}) _ = error "ppr_mono_ty: HsRedacted can't be used here"
+
+ppr_infix_ty :: LHsType DocNameI -> Maybe LaTeX
+ppr_infix_ty (L _ (HsTyVar _ prom op)) = Just pp_op_prom
+  where
+    pp_op_prom
+      | isPromoted prom = char '\'' <> pp_op
+      | otherwise = pp_op
+    pp_op
+      | isSymOcc (getOccName op) = ppLDocName op
+      | otherwise = char '`' <> ppLDocName op <> char '`'
+ppr_infix_ty (L _ (HsWildCardTy _)) = Just (text "`_`")
+ppr_infix_ty _ = Nothing
 
 ppr_tylit :: HsLit DocNameI -> Bool -> LaTeX
 ppr_tylit (HsNatural _ n) _ = integer (il_value n)

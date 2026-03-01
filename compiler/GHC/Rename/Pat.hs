@@ -1314,6 +1314,16 @@ rn_ty_pat_var lrdr@(L l rdr) = do
       name <- lookupTypeOccTPRnM rdr
       pure (L l $ WithUserRdr rdr name)
 
+rn_tyop_pat :: LHsType GhcPs -> TPRnM (LHsType GhcRn)
+rn_tyop_pat tyop
+  | L l (HsTyVar ann prom l_op) <- tyop
+  = do l_op' <- rn_ty_pat_var l_op
+       let op_name = getName l_op'
+       when (isDataConName op_name && not (isPromoted prom)) $
+         liftRn $ addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Infix op_name)
+       return (L l $ HsTyVar ann prom l_op')
+  | otherwise = rn_lty_pat tyop
+
 -- | Rename type patterns
 --
 -- For the difference between `rn_ty_pat` and `rnHsTyKi` see Note [CpsRn monad]
@@ -1373,15 +1383,13 @@ rn_ty_pat (HsSumTy an tys) = do
   tys' <- mapM rn_lty_pat tys
   pure (HsSumTy an tys')
 
-rn_ty_pat (HsOpTy _ prom ty1 l_op ty2) = do
+rn_ty_pat (HsOpTy _ ty1 tyop ty2) = do
   ty1' <- rn_lty_pat ty1
-  l_op' <- rn_ty_pat_var l_op
+  tyop' <- rn_tyop_pat tyop
   ty2' <- rn_lty_pat ty2
-  fix  <- liftRn $ lookupTyFixityRn $ fmap getName l_op'
-  let op_name = getName l_op'
-  when (isDataConName op_name && not (isPromoted prom)) $
-    liftRn $ addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Infix op_name)
-  liftRn $ mkHsOpTyRn prom l_op' fix ty1' ty2'
+  liftRn $ do
+    fix <- lookupTypeFixityRn tyop'
+    mkHsOpTyRn tyop' fix ty1' ty2'
 
 rn_ty_pat (HsParTy an ty) = do
   ty' <- rn_lty_pat ty

@@ -54,7 +54,7 @@ import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV
                          , typeAppErr, newLocalBndrRn, checkDupRdrNames
                          , checkShadowedRdrNames )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
-                         , lookupTyFixityRn )
+                         , lookupTypeFixityRn )
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr ( pprHsDocContext )
@@ -67,7 +67,6 @@ import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
-import GHC.Types.Error
 
 import GHC.Utils.Misc
 import GHC.Types.Fixity ( compareFixity, negateFixity )
@@ -551,16 +550,13 @@ rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
        ; checkPromotedDataConName env tv Prefix ip name
        ; return (HsTyVar noAnn ip loc_name_with_rdr, unitFV name) }
 
-rnHsTyKi env ty@(HsOpTy _ prom ty1 l_op ty2)
-  = setSrcSpan (getLocA l_op) $
-    do  { let op_rdr = unLoc l_op
-        ; (l_op', fvs1) <- rnHsTyOp env (ppr ty) l_op
-        ; let op_name = unLoc l_op'
-        ; fix   <- lookupTyFixityRn l_op'
+rnHsTyKi env ty@(HsOpTy _ ty1 tyop ty2)
+  = setSrcSpan (getLocA tyop) $
+    do  { (tyop', fvs1) <- rnHsTyOp env ty tyop
+        ; fix <- lookupTypeFixityRn tyop'
         ; (ty1', fvs2) <- rnLHsTyKi env ty1
         ; (ty2', fvs3) <- rnLHsTyKi env ty2
-        ; res_ty <- mkHsOpTyRn prom (fmap (WithUserRdr op_rdr) l_op') fix ty1' ty2'
-        ; checkPromotedDataConName env ty Infix prom op_name
+        ; res_ty <- mkHsOpTyRn tyop' fix ty1' ty2'
         ; return (res_ty, plusFVs [fvs1, fvs2, fvs3]) }
 
 rnHsTyKi env (HsParTy _ ty)
@@ -770,15 +766,20 @@ rnLTyVar (L loc rdr_name)
        ; return (L loc tyvar) }
 
 --------------
-rnHsTyOp :: RnTyKiEnv -> SDoc -> LocatedN RdrName
-         -> RnM (LocatedN Name, FreeVars)
-rnHsTyOp env overall_ty (L loc op)
+rnHsTyOp :: RnTyKiEnv -> HsType GhcPs -> LHsType GhcPs
+         -> RnM (LHsType GhcRn, FreeVars)
+rnHsTyOp env overall_ty tyop
+  | L l (HsTyVar ann prom (L loc op)) <- tyop
   = do { op' <- rnTyVar env op
        ; unlessXOptM LangExt.TypeOperators $
            if (op' `hasKey` eqTyConKey) -- See [eqTyCon (~) compatibility fallback] in GHC.Rename.Env
            then addDiagnostic TcRnTypeEqualityRequiresOperators
-           else addErr $ TcRnIllegalTypeOperator overall_ty op
-       ; return (L loc op', unitFV op') }
+           else addErr $ TcRnIllegalTypeOperator (ppr overall_ty) op
+       ; checkPromotedDataConName env overall_ty Infix prom op'
+       ; let tyop' = L l (HsTyVar ann prom (L loc (WithUserRdr op op')))
+       ; return (tyop', unitFV op') }
+  | otherwise
+  = rnLHsTyKi env tyop
 
 --------------
 checkWildCard :: RnTyKiEnv
@@ -1400,33 +1401,33 @@ precedence and does not require rearrangement.
 
 ---------------
 -- Building (ty1 `op1` (ty2a `op2` ty2b))
-mkHsOpTyRn :: PromotionFlag
-           -> LocatedN (WithUserRdr Name) -> Fixity -> LHsType GhcRn -> LHsType GhcRn
+mkHsOpTyRn :: LHsType GhcRn
+           -> Fixity -> LHsType GhcRn -> LHsType GhcRn
            -> RnM (HsType GhcRn)
 
-mkHsOpTyRn prom1 op1 fix1 ty1 (L loc2 (HsOpTy _ prom2 ty2a op2 ty2b))
-  = do  { fix2 <- lookupTyFixityRn (fmap getName op2)
-        ; mk_hs_op_ty prom1 op1 fix1 ty1 prom2 op2 fix2 ty2a ty2b loc2 }
+mkHsOpTyRn tyop1 fix1 ty1 (L loc2 (HsOpTy _ ty2a tyop2 ty2b))
+  = do  { fix2 <- lookupTypeFixityRn tyop2
+        ; mk_hs_op_ty tyop1 fix1 ty1 tyop2 fix2 ty2a ty2b loc2 }
 
-mkHsOpTyRn prom1 op1 _ ty1 ty2              -- Default case, no rearrangement
-  = return (HsOpTy noExtField prom1 ty1 op1 ty2)
+mkHsOpTyRn tyop _ ty1 ty2              -- Default case, no rearrangement
+  = return (HsOpTy noExtField ty1 tyop ty2)
 
 ---------------
-mk_hs_op_ty :: PromotionFlag -> LocatedN (WithUserRdr Name) -> Fixity -> LHsType GhcRn
-            -> PromotionFlag -> LocatedN (WithUserRdr Name) -> Fixity -> LHsType GhcRn
+mk_hs_op_ty :: LHsType GhcRn -> Fixity -> LHsType GhcRn
+            -> LHsType GhcRn -> Fixity -> LHsType GhcRn
             -> LHsType GhcRn -> SrcSpanAnnA
             -> RnM (HsType GhcRn)
-mk_hs_op_ty prom1 op1 fix1 ty1 prom2 op2 fix2 ty2a ty2b loc2
-  | nofix_error     = do { precParseErr (NormalOp (unLoc op1),fix1)
-                                        (NormalOp (unLoc op2),fix2)
+mk_hs_op_ty tyop1 fix1 ty1 tyop2 fix2 ty2a ty2b loc2
+  | nofix_error     = do { precParseErr (get_tyop tyop1,fix1)
+                                        (get_tyop tyop2,fix2)
                          ; return (ty1 `op1ty` (L loc2 (ty2a `op2ty` ty2b))) }
   | associate_right = return (ty1 `op1ty` (L loc2 (ty2a `op2ty` ty2b)))
   | otherwise       = do { -- Rearrange to ((ty1 `op1` ty2a) `op2` ty2b)
-                           new_ty <- mkHsOpTyRn prom1 op1 fix1 ty1 ty2a
+                           new_ty <- mkHsOpTyRn tyop1 fix1 ty1 ty2a
                          ; return (noLocA new_ty `op2ty` ty2b) }
   where
-    lhs `op1ty` rhs = HsOpTy noExtField prom1 lhs op1 rhs
-    lhs `op2ty` rhs = HsOpTy noExtField prom2 lhs op2 rhs
+    lhs `op1ty` rhs = HsOpTy noExtField lhs tyop1 rhs
+    lhs `op2ty` rhs = HsOpTy noExtField lhs tyop2 rhs
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
 
@@ -1492,6 +1493,11 @@ get_op (L _ (HsVar _ n))                 = NormalOp (unLoc n)
 get_op (L _ (HsHole (HoleVar (L _ uv)))) = UnboundOp uv
 get_op (L _ (XExpr (HsRecSelRn fld)))    = RecFldOp fld
 get_op other                             = pprPanic "get_op" (ppr other)
+
+get_tyop :: LHsType GhcRn -> OpName
+get_tyop (L _ (HsTyVar _ _ n))  = NormalOp (unLoc n)
+get_tyop (L _ (HsWildCardTy _)) = UnboundOp (Unqual (mkVarOcc "_"))
+get_tyop other                  = pprPanic "get_tyop" (ppr other)
 
 -- Parser left-associates everything, but
 -- derived instances may have correctly-associated things to
@@ -2119,8 +2125,8 @@ extract_lty (L _ ty) acc
                                      extract_hs_mult_ann m $ -- See Note [Ordering of implicit variables]
                                      extract_lty ty2 acc
       HsIParamTy _ _ ty           -> extract_lty ty acc
-      HsOpTy _ _ ty1 tv ty2       -> extract_lty ty1 $
-                                     extract_tv tv $
+      HsOpTy _ ty1 op ty2         -> extract_lty ty1 $
+                                     extract_lty op $
                                      extract_lty ty2 acc
       HsParTy _ ty                -> extract_lty ty acc
       HsSpliceTy {}               -> acc  -- Type splices mention no tvs
