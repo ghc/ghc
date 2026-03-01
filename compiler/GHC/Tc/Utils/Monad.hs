@@ -1330,27 +1330,28 @@ addLExprCtxt lspan e thing_inside
   = setSrcSpan lspan $ add_expr_ctxt e thing_inside
   | otherwise   -- no op in generated code
   = thing_inside
+    where
+       add_expr_ctxt :: HsExpr GhcRn -> TcRn a -> TcRn a
+       add_expr_ctxt e thing_inside
+         = case e of
+             -- The HsHole special case addresses situations like
+             --    f x = _
+             -- when we don't want to say "In the expression: _",
+             -- because it is mentioned in the error message itself
+             HsHole{} -> thing_inside
 
--- | !Caution!: Users should not call add_expr_ctxt, they ought to use addLExprCtxt
-add_expr_ctxt :: HsExpr GhcRn -> TcRn a -> TcRn a
-add_expr_ctxt e thing_inside
-  = case e of
-      HsHole{} -> thing_inside
-   -- The HsHole special case addresses situations like
-   --    f x = _
-   -- when we don't want to say "In the expression: _",
-   -- because it is mentioned in the error message itself
+             -- There is a special case for expressions with signatures to avoid having too verbose
+             -- error context. So here we flip the ErrCtxt state to expanded if the expression is expanded.
+             -- c.f. RecordDotSyntaxFail9
+             ExprWithTySig _ (L _ e') _
+               | XExpr (ExpandedThingRn o _) <- e' -> addExpansionErrCtxt o thing_inside
 
-      ExprWithTySig _ (L _ e') _
-        | XExpr (ExpandedThingRn o _) <- e' -> addExpansionErrCtxt o thing_inside
-   -- There is a special case for expressions with signatures to avoid having too verbose
-   -- error context. So here we flip the ErrCtxt state to expanded if the expression is expanded.
-   -- c.f. RecordDotSyntaxFail9
+             -- Flip error ctxt into expansion mode
+             XExpr (ExpandedThingRn o _) -> addExpansionErrCtxt o thing_inside
 
-      XExpr (ExpandedThingRn o _) -> addExpansionErrCtxt o thing_inside
-   -- Flip error ctxt into expansion mode
+             _ -> addErrCtxt (ExprCtxt e) thing_inside
 
-      _ -> addErrCtxt (ExprCtxt e) thing_inside
+
 
 
 getErrCtxt :: TcM [ErrCtxt]
