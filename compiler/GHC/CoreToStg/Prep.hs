@@ -244,17 +244,23 @@ corePrepPgm logger cp_cfg pgm_cfg
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\a -> a `seqList` ()) $ do
     let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
+        top_binds = case binds of
+          [CoreCompUnit unit_binds] -> unit_binds
+          _ ->
+            pprPanic "corePrepPgm"
+              (text "Expected a single compilation unit after tidy, got"
+               <+> int (length binds))
 
     us <- mkSplitUniqSupply StgTag
     let
         floats = initUs_ us $
-                 corePrepTopBinds initialCorePrepEnv binds
+                 corePrepTopBinds initialCorePrepEnv top_binds
         binds_out = deFloatTop floats
 
     endPassIO logger (cpPgm_endPassConfig pgm_cfg)
-              binds_out []
+              (singletonCoreProgram binds_out) []
 
-    return binds_out
+    return (singletonCoreProgram binds_out)
 
 corePrepExpr :: Logger -> CorePrepConfig -> CoreExpr -> IO CoreExpr
 corePrepExpr logger config expr = do

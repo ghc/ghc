@@ -341,7 +341,8 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
              ptc = initPromotionTickContext (hsc_dflags hsc_env)
              bindsToIds (NonRec v _)   = [v]
              bindsToIds (Rec    binds) = map fst binds
-             ids = concatMap bindsToIds binds
+             ids = concatMap compUnitIds binds
+             compUnitIds (CoreCompUnit unit_binds) = concatMap bindsToIds unit_binds
        ; ds_complete_matches <- traverse (lookupCompleteMatch type_env hsc_env) =<<
             localAndImportedCompleteMatches local_complete_matches eps
        ; let

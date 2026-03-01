@@ -779,7 +779,7 @@ specConstrProgram guts
   = do { env0 <- initScEnv guts
        ; us   <- getUniqueSupplyM
        ; let (_usg, binds', warnings) = initUs_ us $
-                              scTopBinds env0 (mg_binds guts)
+                              scTopCompUnits env0 (mg_binds guts)
 
        ; when (not (null warnings)) $ diagnostic WarningWithoutFlag (warn_msg warnings)
 
@@ -791,6 +791,13 @@ specConstrProgram guts
                         text "which resulted in no specialization being generated for these functions:" $$
                         nest 2 (vcat (map ppr warnings)) $$
                         (text "If this is expected you might want to increase -fmax-forced-spec-args to force specialization anyway.")
+scTopCompUnits :: ScEnv -> CoreProgram -> UniqSM (ScUsage, CoreProgram, [SpecFailWarning])
+scTopCompUnits _env [] = return (nullUsage, [], [])
+scTopCompUnits env (CoreCompUnit unit_binds:units) = do
+  (unit_usg, unit_binds', unit_warnings) <- scTopBinds env unit_binds
+  (units_usg, units', units_warnings) <- scTopCompUnits env units
+  return (unit_usg `combineUsage` units_usg, CoreCompUnit unit_binds' : units', unit_warnings ++ units_warnings)
+
 scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind], [SpecFailWarning])
 scTopBinds _env []     = return (nullUsage, [], [])
 scTopBinds env  (b:bs) = do { (usg, b', bs', warnings) <- scBind TopLevel env b $
@@ -1007,11 +1014,13 @@ initScEnv guts
                        sc_vals        = emptyVarEnv,
                        sc_annotations = anns }) }
   where
-    init_subst = mkEmptySubst $ mkInScopeSetBndrs (mg_binds guts)
+    init_subst = mkEmptySubst $ foldl' addCompUnitBndrs emptyInScopeSet (mg_binds guts)
         -- Acccount for top-level bindings that are not in dependency order;
         -- see Note [Glomming] in GHC.Core.Opt.OccurAnal
         -- Easiest thing is to bring all the top level binders into scope at once,
         -- as if  at once, as if all the top-level decls were mutually recursive.
+    addCompUnitBndrs scope (CoreCompUnit unit_binds) =
+      scope `extendInScopeSetBndrs` unit_binds
 
 data HowBound = RecFun  -- These are the recursive functions for which
                         -- we seek interesting call patterns

@@ -18,6 +18,7 @@ Printing of Core syntax
 module GHC.Core.Ppr (
         pprCoreExpr, pprParendExpr,
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
+        pprCoreCompUnit, pprCoreProgram,
         pprCoreBindingWithSize, pprCoreBindingsWithSize,
         pprCoreBinder, pprCoreBinders, pprId, pprIds,
         pprRule, pprRules, pprOptCo,
@@ -64,6 +65,12 @@ pprParendExpr   :: OutputableBndr b => Expr b  -> SDoc
 
 pprCoreBindings = pprTopBinds noAnn
 pprCoreBinding  = pprTopBind noAnn
+
+pprCoreCompUnit :: CoreCompUnit -> SDoc
+pprCoreCompUnit (CoreCompUnit binds) = pprCoreBindings binds
+
+pprCoreProgram :: CoreProgram -> SDoc
+pprCoreProgram = vcat . map pprCoreCompUnit
 
 pprCoreBindingsWithSize :: [CoreBind] -> SDoc
 pprCoreBindingWithSize  :: CoreBind  -> SDoc

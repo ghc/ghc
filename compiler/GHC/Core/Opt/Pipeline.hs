@@ -25,7 +25,7 @@ import GHC.Core
 import GHC.Core.SimpleOpt (simpleOptPgm)
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( RuleBase, ruleCheckProgram, getRules )
-import GHC.Core.Ppr     ( pprCoreBindings, pprRules )
+import GHC.Core.Ppr     ( pprCoreProgram, pprRules )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( lintAnnots )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
@@ -539,7 +539,7 @@ doCorePass pass guts = do
 
 printCore :: Logger -> CoreProgram -> IO ()
 printCore logger binds
-    = Logger.logDumpMsg logger "Print Core" (pprCoreBindings binds)
+    = Logger.logDumpMsg logger "Print Core" (pprCoreProgram binds)
 
 ruleCheckPass :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
 ruleCheckPass current_phase pat guts = do
@@ -567,7 +567,12 @@ dmdAnal logger before_ww dflags fam_envs rules binds = do
   Logger.putDumpFileMaybe logger Opt_D_dump_dmd_signatures "Demand signatures" FormatText $
     dumpIdInfoOfProgram (hasPprDebug dflags) (ppr . zapDmdEnvSig . dmdSigInfo) binds_plus_dmds
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
-  seqBinds binds_plus_dmds `seq` return binds_plus_dmds
+  seqCompUnits binds_plus_dmds `seq` return binds_plus_dmds
+  where
+    seqCompUnits :: CoreProgram -> ()
+    seqCompUnits [] = ()
+    seqCompUnits (CoreCompUnit unit_binds:units) =
+      seqBinds unit_binds `seq` seqCompUnits units
 
 
 -- | Simple optimization after desugaring.
@@ -584,6 +589,6 @@ desugarOpt dflags logger mod binds rules = liftIO $ do
   let !(ds_binds, ds_rules_for_imps, occ_anald_binds) = simpleOptPgm simpl_opts mod binds rules
 
   putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
-    FormatCore (pprCoreBindings occ_anald_binds $$ pprRules ds_rules_for_imps )
+    FormatCore (pprCoreProgram occ_anald_binds $$ pprRules ds_rules_for_imps )
 
   pure (ds_binds, ds_rules_for_imps)

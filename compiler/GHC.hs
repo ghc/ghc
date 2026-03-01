@@ -404,6 +404,7 @@ import GHC.Core.DataCon
 import GHC.Core.FamInstEnv ( FamInst, famInstEnvElts, orphNamesOfFamInst )
 import GHC.Core.InstEnv
 import GHC.Core
+import GHC.Core.Ppr ( pprCoreProgram )
 
 import GHC.Data.Maybe
 
@@ -1415,7 +1416,7 @@ instance Outputable CoreModule where
    ppr (CoreModule {cm_module = mn, cm_types = te, cm_binds = cb,
                     cm_safe = sf})
     = text "%module" <+> ppr mn <+> parens (ppr sf) <+> ppr te
-      $$ vcat (map ppr cb)
+      $$ pprCoreProgram cb
 
 -- | This is the way to get access to the Core bindings corresponding
 -- to a module. 'compileToCore' parses, typechecks, and
@@ -1475,12 +1476,14 @@ compileCore simplify fn = do
         }
         gutsToCoreModule safe_mode (Right mg) = CoreModule {
           cm_module  = mg_module mg,
-          cm_types   = typeEnvFromEntities (bindersOfBinds (mg_binds mg))
+          cm_types   = typeEnvFromEntities (concatMap unitBinders (mg_binds mg))
                                            (mg_tcs mg) (mg_patsyns mg)
                                            (mg_fam_insts mg),
           cm_binds   = mg_binds mg,
           cm_safe    = safe_mode
          }
+          where
+            unitBinders (CoreCompUnit unit_binds) = bindersOfBinds unit_binds
 
 isDictonaryId :: Id -> Bool
 isDictonaryId id = isDictTy (idType id)

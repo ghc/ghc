@@ -652,11 +652,11 @@ specProgram guts@(ModGuts { mg_module = this_mod
               -- accidentally re-use a unique that's already in use
               -- Easiest thing is to do it all at once, as if all the top-level
               -- decls were mutually recursive
-       ; let top_env = SE { se_subst = Core.mkEmptySubst $
-                                       mkInScopeSetBndrs binds
+       ; let top_env = SE { se_subst = Core.mkEmptySubst in_scope
                           , se_module = this_mod
                           , se_rules  = rule_env
                           , se_dflags = dflags }
+             in_scope = mkInScopeSetBndrs (concatMap coreCompUnitBinds binds)
 
              go []           = return ([], emptyUDs)
              go (bind:binds) = do (bind', binds', uds') <- specBind TopLevel top_env bind $ \_ ->
@@ -664,11 +664,14 @@ specProgram guts@(ModGuts { mg_module = this_mod
                                   return (bind' ++ binds', uds')
 
              -- Specialise the bindings of this module
-       ; (binds', uds) <- runSpecM (go binds)
+             go_comp_unit (CoreCompUnit unit_binds) = do
+               (unit_binds', uds) <- go unit_binds
+               return (CoreCompUnit unit_binds', uds)
+       ; (binds', uds) <- runSpecM (mapAndCombineSM go_comp_unit binds)
 
        ; (spec_rules, spec_binds) <- specImports top_env uds
 
-       ; return (guts { mg_binds = spec_binds ++ binds'
+       ; return (guts { mg_binds = CoreCompUnit spec_binds : binds'
                       , mg_rules = spec_rules ++ local_rules }) }
 
 {-
