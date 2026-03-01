@@ -1251,7 +1251,8 @@ do_return_nonpointer:
                  things on the stack. Therefore we store the CCCS inside the
                  stg_ctoi_t frame.
 
-                 If we have a tuple being returned, the stack looks like this:
+                 If we have a tuple being returned, the stack looks like this
+                 for the generic stg_ctoi_t frame:
 
                      ...
                      <CCCS>           <- to restore, Sp offset <next frame + 5 words>
@@ -1266,10 +1267,15 @@ do_return_nonpointer:
                      tuple_info
                      tuple_BCO
                      stg_ret_t        <- Sp
+
+                 Small frames (stg_ctoi_tN) omit the old_spill slot,
+                 so CCCS is at offset <next frame + 4 words>.
                */
 
               if(SpW(0) == (W_)&stg_ret_t_info) {
-                  cap->r.rCCCS = (CostCentreStack*)ReadSpW(offset + 5);
+                  StgWord cccs_offset =
+                      (ReadSpW(offset) == (W_)&stg_ctoi_t_info) ? 5 : 4;
+                  cap->r.rCCCS = (CostCentreStack*)ReadSpW(offset + cccs_offset);
               }
 #endif
 
@@ -2287,16 +2293,40 @@ run_BCO:
             Sp_subW(1);
 #endif
 
-            /* Save old ctoi_tuple_spill_words from TSO, then set the new value.
-               See Note [GHCi unboxed tuples stack spills] in
+            /* See Note [GHCi unboxed tuples stack spills] in
                StgMiscClosures.cmm */
-            SpW(-1) = cap->r.rCurrentTSO->ctoi_tuple_spill_words;
-            SpW(-2) = BCO_PTR(o_tuple_bco);
-            SpW(-3) = tuple_info;
-            SpW(-4) = BCO_PTR(o_bco);
-            SpW(-5) = (W_)&stg_ctoi_t_info;
-            Sp_subW(5);
-            cap->r.rCurrentTSO->ctoi_tuple_spill_words = tuple_stack_words;
+            if (tuple_stack_words <= MAX_SMALL_TUPLE_CTOI) {
+                /* Use a small info table that encodes the spill
+                   count statically, avoiding access to
+                   TSO->ctoi_tuple_spill_words entirely.
+                   The frame is one word smaller than stg_ctoi_t
+                   (no old_spill slot). */
+                static const StgInfoTable *const ctoi_t_small[] = {
+                    &stg_ctoi_t0_info, &stg_ctoi_t1_info,
+                    &stg_ctoi_t2_info, &stg_ctoi_t3_info,
+                    &stg_ctoi_t4_info, &stg_ctoi_t5_info,
+                    &stg_ctoi_t6_info, &stg_ctoi_t7_info,
+                    &stg_ctoi_t8_info
+                };
+                _Static_assert(sizeof(ctoi_t_small) / sizeof(ctoi_t_small[0])
+                    == MAX_SMALL_TUPLE_CTOI + 1,
+                    "ctoi_t_small must have MAX_SMALL_TUPLE_CTOI + 1 entries");
+                SpW(-1) = BCO_PTR(o_tuple_bco);
+                SpW(-2) = tuple_info;
+                SpW(-3) = BCO_PTR(o_bco);
+                SpW(-4) = (W_)ctoi_t_small[tuple_stack_words];
+                Sp_subW(4);
+            } else {
+                /* Generic path: save/restore ctoi_tuple_spill_words
+                   via the TSO */
+                SpW(-1) = cap->r.rCurrentTSO->ctoi_tuple_spill_words;
+                SpW(-2) = BCO_PTR(o_tuple_bco);
+                SpW(-3) = tuple_info;
+                SpW(-4) = BCO_PTR(o_bco);
+                SpW(-5) = (W_)&stg_ctoi_t_info;
+                Sp_subW(5);
+                cap->r.rCurrentTSO->ctoi_tuple_spill_words = tuple_stack_words;
+            }
             NEXT_INSTRUCTION;
         }
 

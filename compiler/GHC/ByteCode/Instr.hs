@@ -488,11 +488,12 @@ bciStackUse PUSH_BCO{}            = 1
 bciStackUse (PUSH_ALTS bco _)     = 2 {- profiling only, restore CCCS -} +
                                     3 + protoBCOStackUse bco
 bciStackUse (PUSH_ALTS_TUPLE bco info _) =
-   -- (old_spill, tuple_bco, call_info word, cont_bco, stg_ctoi_t)
-   -- tuple
-   -- (call_info, tuple_bco, stg_ret_t)
+   -- ctoi frame: small (4 words) or generic (5 words, with old_spill)
+   -- + tuple data + ret_t frame (3 words)
    1 {- profiling only -} +
-   8 + fromIntegral (nativeCallSize info) + protoBCOStackUse bco
+   ctoi_frame + 3 + fromIntegral (nativeCallSize info) + protoBCOStackUse bco
+   where ctoi_frame | nativeCallStackSpillSize info <= mAX_SMALL_TUPLE_CTOI = 4
+                    | otherwise                                             = 5
 bciStackUse (PUSH_PAD8)           = 1  -- overapproximation
 bciStackUse (PUSH_PAD16)          = 1  -- overapproximation
 bciStackUse (PUSH_PAD32)          = 1  -- overapproximation on 64bit arch

@@ -1128,7 +1128,7 @@ doCase d s p scrut bndr alts
         -- 'Simple' tuples with at most one non-void component,
         -- like (# Word# #) or (# Int#, State# RealWorld #) do not have a
         -- tuple return frame. This is because (# foo #) and (# foo, Void# #)
-        -- have the same runtime rep. We have more efficient specialized
+        -- have the same runtime rep. We have more efficient small
         -- return frames for the situations with one non-void element.
 
         non_void_arg_reps = typeArgReps platform bndr_ty
@@ -1146,8 +1146,17 @@ doCase d s p scrut bndr alts
         -- When an alt is entered, it assumes the returned value is
         -- on top of the itbl; see Note [Return convention for non-tuple values]
         -- for details.
+        -- Whether this tuple return uses a small stg_ctoi_tN frame
+        -- (no old_spill slot, no TSO access) instead of the generic
+        -- stg_ctoi_t frame.
+        small_tuple_frame :: Bool
+        small_tuple_frame =
+          ubx_tuple_frame && nativeCallStackSpillSize call_info <= mAX_SMALL_TUPLE_CTOI
+
         ctoi_frame_header_w :: WordOff
         ctoi_frame_header_w
+          | small_tuple_frame =
+              if profiling then 5 else 4
           | ubx_tuple_frame =
               if profiling then 6 else 5
           | otherwise = 2
@@ -1293,10 +1302,14 @@ doCase d s p scrut bndr alts
         -- case-of-case expressions, which is the only time we can be compiling a
         -- case expression with s /= 0.
 
-        -- unboxed tuples get extra words:
-        --   call_info, tuple_BCO, old_spill, CCCS (profiling only).
+        -- unboxed tuples get extra words in the ctoi frame after the
+        -- info pointer and cont_BCO:
+        --   call_info, tuple_BCO, [old_spill], [CCCS]
         -- tuple_BCO at position 1 is a pointer.
+        -- Small frames (stg_ctoi_tN) omit the old_spill slot.
         (extra_pointers, extra_slots)
+           | small_tuple_frame && profiling = ([1], 3) -- call_info, tuple_BCO, CCCS
+           | small_tuple_frame              = ([1], 2) -- call_info, tuple_BCO
            | ubx_tuple_frame && profiling = ([1], 4) -- call_info, tuple_BCO, old_spill, CCCS
            | ubx_tuple_frame              = ([1], 3) -- call_info, tuple_BCO, old_spill
            | otherwise                    = ([], 0)

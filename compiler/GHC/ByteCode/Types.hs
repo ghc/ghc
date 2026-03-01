@@ -6,6 +6,8 @@
 --  (c) The University of Glasgow 2002-2006
 --
 
+#include "Bytecodes.h"
+
 -- | Bytecode assembler types
 module GHC.ByteCode.Types
   ( CompiledByteCode(..), seqCompiledByteCode
@@ -13,6 +15,7 @@ module GHC.ByteCode.Types
   , FFIInfo(..)
   , RegBitmap(..)
   , NativeCallType(..), NativeCallInfo(..), voidTupleReturnInfo, voidPrimCallInfo
+  , mAX_SMALL_TUPLE_CTOI
   , ByteOff(..), WordOff(..), HalfWord(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
@@ -159,6 +162,12 @@ voidTupleReturnInfo = NativeCallInfo NativeTupleReturn 0 emptyRegSet 0
 
 voidPrimCallInfo :: NativeCallInfo
 voidPrimCallInfo = NativeCallInfo NativePrimCall 0 emptyRegSet 0
+
+-- | Maximum nativeCallStackSpillSize for which we use a small
+-- stg_ctoi_tN frame (no old_spill slot, no TSO access) instead of
+-- the generic stg_ctoi_t frame.
+mAX_SMALL_TUPLE_CTOI :: WordOff
+mAX_SMALL_TUPLE_CTOI = MAX_SMALL_TUPLE_CTOI
 
 type ItblEnv = NameEnv (Name, ItblPtr)
 type AddrEnv = NameEnv (Name, AddrPtr)

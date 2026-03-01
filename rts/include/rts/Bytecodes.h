@@ -232,4 +232,10 @@
    cases. */
 #define INTERP_STACK_CHECK_THRESH 50
 
+/* Maximum nativeCallStackSpillSize for which we use a small stg_ctoi_tN
+   frame (no old_spill slot, no TSO access) instead of the generic
+   stg_ctoi_t frame.  Must match the stg_ctoi_tN definitions in
+   StgMiscClosures.cmm. */
+#define MAX_SMALL_TUPLE_CTOI    8
+
 /*-------------------------------------------------------------------------*/

@@ -335,6 +335,59 @@ INFO_TABLE_RET( stg_ctoi_t, RET_BCO )
     jump stg_yield_to_interpreter [];
 }
 
+/*
+  Small versions of stg_ctoi_t for small spill counts (0..MAX_SMALL_TUPLE_CTOI
+  words).
+
+  These avoid accessing TSO->ctoi_tuple_spill_words entirely, since the
+  spill count is known statically from the info table.
+
+  The frame layout is one word smaller than stg_ctoi_t, omitting
+  the old_spill slot:
+
+      CCCS               (profiling only)
+      tuple_BCO
+      tuple_info
+      cont_BCO
+      stg_ctoi_tN_info   (N = spill count, words)
+
+  Exception unwinding code and restoreStackInvariants only match
+  stg_ctoi_t_info, so these frames are correctly skipped.
+
+  See Note [GHCi unboxed tuples stack spills] for the general design.
+ */
+
+#if defined(PROFILING)
+#define CTOI_TN_RESTORE_CCS  CCCS = Sp(4);
+#else
+#define CTOI_TN_RESTORE_CCS
+#endif
+
+#define STG_CTOI_TN_BODY(n)                       \
+    W_ tuple_info;                                 \
+    P_ tuple_BCO;                                  \
+    Sp = Sp + WDS(n);                              \
+    tuple_info = Sp(2);                            \
+    tuple_BCO  = Sp(3);                            \
+    CTOI_TN_RESTORE_CCS                            \
+    Sp = Sp - WDS(n);                              \
+    PUSH_SCALAR_ARG_REGS(tuple_info);              \
+    Sp_adj(-3);                                    \
+    Sp(2) = tuple_info;                            \
+    Sp(1) = tuple_BCO;                             \
+    Sp(0) = stg_ret_t_info;                        \
+    jump stg_yield_to_interpreter [];
+
+INFO_TABLE_RET( stg_ctoi_t0, RET_BCO ) { STG_CTOI_TN_BODY(0) }
+INFO_TABLE_RET( stg_ctoi_t1, RET_BCO ) { STG_CTOI_TN_BODY(1) }
+INFO_TABLE_RET( stg_ctoi_t2, RET_BCO ) { STG_CTOI_TN_BODY(2) }
+INFO_TABLE_RET( stg_ctoi_t3, RET_BCO ) { STG_CTOI_TN_BODY(3) }
+INFO_TABLE_RET( stg_ctoi_t4, RET_BCO ) { STG_CTOI_TN_BODY(4) }
+INFO_TABLE_RET( stg_ctoi_t5, RET_BCO ) { STG_CTOI_TN_BODY(5) }
+INFO_TABLE_RET( stg_ctoi_t6, RET_BCO ) { STG_CTOI_TN_BODY(6) }
+INFO_TABLE_RET( stg_ctoi_t7, RET_BCO ) { STG_CTOI_TN_BODY(7) }
+INFO_TABLE_RET( stg_ctoi_t8, RET_BCO ) { STG_CTOI_TN_BODY(8) }
+
 INFO_TABLE_RET( stg_ret_t, RET_BCO )
 {
     W_ tuple_info, tuple_stack;
