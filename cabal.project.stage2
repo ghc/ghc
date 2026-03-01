@@ -1,9 +1,13 @@
--- Configuration common to all stages
-import: cabal.project.common
-import: cabal.project.stage2.settings
+allow-boot-library-installs: True
+benchmarks: False
+tests: False
 
 -- Disable Hackage, we explicitly include the packages we need.
 active-repositories: :none
+
+-- Import configure/generated feature toggles (dynamic, etc.) if present.
+-- A default file is kept in-tree; configure will overwrite with substituted values.
+import: cabal.project.stage2.settings
 
 packages:
   -- RTS
@@ -38,15 +42,44 @@ packages:
   utils/ghc-iserv
   utils/ghc-pkg
   utils/ghc-toolchain
-  utils/haddock
-  utils/haddock/haddock-api
-  utils/haddock/haddock-library
   utils/hp2ps
   utils/runghc
   utils/unlit
+  utils/haddock
+  utils/haddock/haddock-api
+  utils/haddock/haddock-library
 
   -- The following are packages available on Hackage but included as submodules
-  -- https://hackage.haskell.org/package/hsc2hs-0.68.10/hsc2hs-0.68.10.tar.gz
+  libraries/array
+  libraries/binary
+  libraries/bytestring
+  libraries/Cabal/Cabal
+  libraries/Cabal/Cabal-syntax
+  libraries/containers/containers
+  libraries/deepseq
+  libraries/directory
+  libraries/exceptions
+  libraries/file-io
+  libraries/filepath
+  libraries/haskeline
+  libraries/hpc
+  libraries/libffi-clib
+  libraries/mtl
+  libraries/os-string
+  libraries/parsec
+  libraries/pretty
+  libraries/process
+  libraries/semaphore-compat
+  libraries/stm
+  libraries/terminfo
+  libraries/text
+  libraries/time
+  libraries/transformers
+  libraries/unix
+  libraries/Win32
+  libraries/xhtml
+  utils/hpc
+  -- hsc2hs: see source-repository-package below
 
   https://hackage.haskell.org/package/Win32-2.14.2.1/Win32-2.14.2.1.tar.gz
   https://hackage.haskell.org/package/array-0.5.8.0/array-0.5.8.0.tar.gz
@@ -84,55 +117,6 @@ packages:
   https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
   https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
 
--- wip/andrea/local-store
-source-repository-package
-  type: git
-  location: https://github.com/stable-haskell/Cabal.git
-  tag: d7bf2ce3f9a7da4640833ddc5bb7740d2557b6a7
-  subdir: Cabal
-          Cabal-syntax
-
-source-repository-package
-  type: git
-  location: https://github.com/stable-haskell/hpc-bin.git
-  tag: 5923da3fe77993b7afc15b5163cffcaa7da6ecf5
-
-if !os(windows)
-  packages:
-    https://hackage.haskell.org/package/terminfo-0.4.1.7/terminfo-0.4.1.7.tar.gz
-
-allow-newer: hsc2hs:*
-           , Win32:*
-           , array:*
-           , binary:*
-           , bytestring:*
-           , containers:*
-           , deepseq:*
-           , directory:*
-           , exceptions:*
-           , file-io:*
-           , filepath:*
-           , haskeline:*
-           , hpc:*
-           , libffi-clib:*
-           , mtl:*
-           , os-string:*
-           , parsec:*
-           , pretty:*
-           , process:*
-           , semaphore-compat:*
-           , stm:*
-		   , terminfo:*
-           , text:*
-           , time:*
-           , transformers:*
-           , unix:*
-           , xhtml:*
-
-if !os(windows)
-  package *
-    library-for-ghci: True
-
 --
 -- Constraints
 --
@@ -148,8 +132,28 @@ constraints:
 -- Package level configuration
 --
 
+package haddock-api
+  flags: +in-ghc-tree
+
+if !os(windows)
+  packages:
+    libraries/terminfo
+
+package *
+  library-vanilla: True
+  -- shared/executable-dynamic now controlled by Makefile (DYNAMIC variable)
+  -- so we do not pin them here; default (static) remains when DYNAMIC=0.
+  executable-profiling: False
+  executable-static: False
+
+if !os(windows)
+  package *
+    library-for-ghci: True
+
+import: cabal.project.rts
+
 package libffi-clib
-  ghc-options: -no-rts -optc-Wno-error
+  ghc-options: -no-rts
 
 -- We end up injecting the following depednency:
 --
@@ -196,12 +200,15 @@ package ghc-internal
   flags: +bignum-native
   ghc-options: -no-rts
 
-package rts
-  ghc-options: -no-rts
-  flags: +tables-next-to-code
+package text
+  flags: -simdutf
 
-package rts-headers
-  ghc-options: -no-rts
+-- TODO: What is this? Why do we need _in-ghc-tree_ here?
+package hsc2hs
+  flags: +in-ghc-tree
+
+package haskeline
+  flags: -terminfo
 
 package rts-fs
   ghc-options: -no-rts
@@ -212,3 +219,10 @@ source-repository-package
   type: git
   location: https://github.com/stable-haskell/hsc2hs.git
   tag: d07eea1260894ce5fe456f881fbc62366c9eb1b7
+
+--
+-- Program options
+--
+
+program-options
+  ghc-options: -fhide-source-paths -j
