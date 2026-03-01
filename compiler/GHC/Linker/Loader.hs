@@ -95,6 +95,8 @@ import GHC.Linker.Deps
 import GHC.Linker.MacOS
 import GHC.Linker.Dynamic
 import GHC.Linker.Types
+import GHC.Linker.Unit
+import GHC.Linker.ArchivePrelink
 
 -- Standard libraries
 import Control.Monad
@@ -808,11 +810,19 @@ loadObjects interp hsc_env pls objs = do
         let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
             wanted_objs              = concatMap linkableFiles new_objs
+            logger                   = hsc_logger hsc_env
+            dflags                   = hsc_dflags hsc_env
+            tmpfs                    = hsc_tmpfs hsc_env
 
         if interpreterDynamic interp
             then do pls2 <- dynLoadObjs interp hsc_env pls1 wanted_objs
                     return (pls2, Succeeded)
-            else do mapM_ (loadObj interp) wanted_objs
+            else do
+                    -- Prelink large archives before loading (see Note [Archive Prelinking])
+                    objs_to_load <- mapM (prelinkIfNeeded logger tmpfs dflags) wanted_objs
+
+                    -- Load objects (prelinked or original)
+                    mapM_ (loadObj interp) objs_to_load
 
                     -- Link them all together
                     ok <- resolveObjs interp
@@ -824,6 +834,26 @@ loadObjects interp hsc_env pls objs = do
                       else do
                             pls2 <- unload_wkr interp [] pls1
                             return (pls2, Failed)
+  where
+    -- | Check if an object/archive should be prelinked, and if so, prelink it.
+    -- Returns the path to load (either prelinked object or original path).
+    -- Fallback to original path on any error.
+    prelinkIfNeeded :: Logger -> TmpFs -> DynFlags -> FilePath -> IO FilePath
+    prelinkIfNeeded logger tmpfs dflags obj_path = do
+      should_prelink <- shouldPrelinkArchive dflags obj_path
+      if should_prelink
+        then do
+          debugTraceMsg logger 3 $ text "Checking if prelinking needed:" <+> text obj_path
+          m_prelinked <- prelinkArchive logger tmpfs dflags obj_path
+          case m_prelinked of
+            Just prelinked -> do
+              debugTraceMsg logger 2 $ text "Using prelinked object:" <+> text prelinked
+              return prelinked
+            Nothing -> do
+              debugTraceMsg logger 3 $ text "Prelinking failed or skipped, using original"
+              return obj_path
+        else
+          return obj_path
 
 
 -- | Create a shared library containing the given object files and load it.

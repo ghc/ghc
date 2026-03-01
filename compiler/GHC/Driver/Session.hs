@@ -635,6 +635,47 @@ setHiDir      f d = d { hiDir      = Just f}
 setHieDir     f d = d { hieDir     = Just f}
 setStubDir    f d = d { stubDir    = Just f
                       , includePaths = addGlobalInclude (includePaths d) [f] }
+
+-- | Set the archive prelinking size threshold from a string like "5m", "10M", "1024"
+-- Accepts: plain bytes (e.g., "1024"), kilobytes ("5k"), megabytes ("5m")
+-- Suffixes are case-insensitive
+setPrelinkArchiveThreshold :: String -> DynFlags -> Either String DynFlags
+setPrelinkArchiveThreshold str d =
+  case parseSize str of
+    Left err -> Left err
+    Right size -> Right $ d { prelinkArchiveThreshold = Just size }
+  where
+    parseSize :: String -> Either String Word64
+    parseSize s =
+      let (numStr, suffix) = span (\c -> c `elem` "0123456789") s
+      in case reads numStr of
+           [(n, "")] ->
+             case map toLower suffix of
+               "" -> Right n
+               "k" -> Right (n * 1024)
+               "m" -> Right (n * 1024 * 1024)
+               "g" -> Right (n * 1024 * 1024 * 1024)
+               _ -> Left $ "Invalid size suffix in -fprelink-archives=" ++ str ++
+                          ". Valid suffixes: k, m, g (case-insensitive)"
+           _ -> Left $ "Invalid size number in -fprelink-archives=" ++ str
+
+    toLower :: Char -> Char
+    toLower c | c >= 'A' && c <= 'Z' = toEnum (fromEnum c + 32)
+              | otherwise = c
+
+setPrelinkCacheDir :: FilePath -> DynFlags -> DynFlags
+setPrelinkCacheDir dir d = d { prelinkCacheDir = Just dir }
+
+-- | Disable archive prelinking
+disablePrelinkArchives :: DynFlags -> DynFlags
+disablePrelinkArchives d = d { prelinkArchiveThreshold = Nothing }
+
+-- | Wrapper for setPrelinkArchiveThreshold that works with DynP monad
+setPrelinkArchiveThresholdM :: String -> DynFlags -> DynP DynFlags
+setPrelinkArchiveThresholdM str d =
+  case setPrelinkArchiveThreshold str d of
+    Left err -> addErr err >> return d
+    Right d' -> return d'
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
   -- \#included from the .hc file when compiling via C (i.e. unregisterised
   -- builds).
@@ -1241,6 +1282,15 @@ dynamic_flags_deps = [
         (noArg (\d -> d { ghcLink=LinkMergedObj }))
   , make_ord_flag defGhcFlag "dynload"            (hasArg parseDynLibLoaderMode)
   , make_ord_flag defGhcFlag "dylib-install-name" (hasArg setDylibInstallName)
+
+        -------- Archive Prelinking -----------------------------------------
+        -- See Note [Archive Prelinking] in GHC.Driver.DynFlags
+  , make_ord_flag defGhcFlag "prelink-archives"
+        (sepArgM setPrelinkArchiveThresholdM)
+  , make_ord_flag defGhcFlag "prelink-cache"
+        (hasArg setPrelinkCacheDir)
+  , make_ord_flag defGhcFlag "no-prelink-archives"
+        (noArg disablePrelinkArchives)
 
         ------- Libraries ---------------------------------------------------
   , make_ord_flag defFlag "L"   (Prefix addLibraryPath)
@@ -2862,6 +2912,9 @@ hasArg fn = HasArg (upd . fn)
 
 sepArg :: (String -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 sepArg fn = SepArg (upd . fn)
+
+sepArgM :: (String -> DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
+sepArgM fn = SepArg (\s -> updM (fn s))
 
 intSuffix :: (Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffix fn = IntSuffix (\n -> upd (fn n))

@@ -478,8 +478,45 @@ data DynFlags = DynFlags {
     -- 'Int' because it can be used to test uniques in decreasing order.
 
   -- | Temporary: CFG Edge weights for fast iterations
-  cfgWeights            :: Weights
+  cfgWeights            :: Weights,
+
+  -- | Archive prelinking configuration
+  -- See Note [Archive Prelinking]
+  prelinkArchiveThreshold :: Maybe Word64,
+    -- ^ Size threshold in bytes for prelinking archives.
+    --   Nothing = prelinking disabled
+    --   Just n = prelink archives larger than n bytes
+  prelinkCacheDir         :: Maybe FilePath
+    -- ^ Persistent cache directory for prelinked objects.
+    --   Nothing = use per-session temp files only
+    --   Just dir = store prelinked objects in dir for reuse across sessions
 }
+
+-- Note [Archive Prelinking]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Historically, GHC generated prelinked objects (.o files) at build time
+-- for use with GHCi. This was slow and disk-intensive. Instead, we now
+-- create prelinked objects on-demand when the internal linker loads large
+-- static archives.
+--
+-- When loading an archive (.a file), instead of loading each member object
+-- individually, we use 'ld -r' to merge all members into a single object.
+-- This provides several benefits:
+--
+-- 1. Faster loading: Fewer objects for the RTS linker to process
+-- 2. Fewer system calls: Single loadObj instead of many
+-- 3. Better relocation handling: 'ld -r' resolves internal relocations
+-- 4. On-demand: Only prelink when actually needed
+-- 5. Cacheable: Optional persistent cache for reuse across sessions
+--
+-- Configuration:
+-- - prelinkArchiveThreshold: Size threshold (default 5MB). Archives larger
+--   than this are prelinked on first load. Set to Nothing to disable.
+-- - prelinkCacheDir: Optional persistent cache directory. If set, prelinked
+--   objects are cached here for reuse across GHC sessions. If Nothing, temp
+--   files are used and discarded after the session.
+--
+-- See also: GHC.Linker.ArchivePrelink
 
 class HasDynFlags m where
     getDynFlags :: m DynFlags
@@ -740,7 +777,14 @@ defaultDynFlags mySettings =
 
         reverseErrors = False,
         maxErrors     = Nothing,
-        cfgWeights    = defaultWeights
+        cfgWeights    = defaultWeights,
+
+        -- Archive prelinking defaults
+        -- Default threshold: 5MB (5 * 1024 * 1024 bytes)
+        -- This avoids prelinking overhead for small archives while fixing
+        -- "strange closure type" crashes for large archives in DYNAMIC=1 builds
+        prelinkArchiveThreshold = Just (5 * 1024 * 1024),
+        prelinkCacheDir         = Nothing  -- No persistent cache by default
       }
 
 type FatalMessager = String -> IO ()
