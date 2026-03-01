@@ -185,6 +185,7 @@ import GHC.Core.Rules
 import GHC.Core.Stats
 import GHC.Core.LateCC
 import GHC.Core.LateCC.Types
+import GHC.Core.Ppr            ( pprCoreProgram )
 
 
 import GHC.CoreToStg.Prep( CorePrepPgmConfig, corePrepPgm, corePrepExpr )
@@ -1179,7 +1180,7 @@ compileWholeCoreBindings ::
 compileWholeCoreBindings hsc_env type_env wcb = do
   core_binds <- typecheck
   (stubs, foreign_files) <- decode_foreign
-  gen_bytecode core_binds stubs foreign_files
+  gen_bytecode (singletonCoreProgram core_binds) stubs foreign_files
   where
     typecheck = do
       types_var <- newIORef type_env
@@ -2008,7 +2009,8 @@ hscGenHardCode hsc_env cgguts mod_loc output_filename = do
           addLateCostCenters logger late_cc_config binds_with_implicits
 
         when (dopt Opt_D_dump_late_cc dflags || dopt Opt_D_verbose_core2core dflags) $
-          putDumpFileMaybe logger Opt_D_dump_late_cc "LateCC" FormatCore (vcat (map ppr late_cc_binds))
+          putDumpFileMaybe logger Opt_D_dump_late_cc "LateCC" FormatCore
+            (pprCoreProgram late_cc_binds)
 
         -------------------
         -- RUN LATE PLUGINS
@@ -2593,8 +2595,14 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 
     let tcs = filterOut isImplicitTyCon (mg_tcs simpl_mg)
         patsyns = mg_patsyns simpl_mg
+        core_binds_flat = case core_binds of
+          [CoreCompUnit unit_binds] -> unit_binds
+          _ ->
+            pprPanic "hscInteractive"
+              (text "Expected a single compilation unit after tidy, got"
+               <+> int (length core_binds))
 
-        ext_ids = [ id | id <- bindersOfBinds core_binds
+        ext_ids = [ id | id <- bindersOfBinds core_binds_flat
                        , isExternalName (idName id)
                        , not (isDFunId id || isImplicitId id) ]
             -- We only need to keep around the external bindings
@@ -2749,7 +2757,13 @@ hscTidy hsc_env guts = do
       (pprRulesForUser tidy_rules)
 
   -- Print one-line size info
-  let cs = coreBindsStats all_tidy_binds
+  let tidy_binds_flat = case all_tidy_binds of
+        [CoreCompUnit unit_binds] -> unit_binds
+        _ ->
+          pprPanic "hscTidy"
+            (text "Expected a single compilation unit after tidy, got"
+             <+> int (length all_tidy_binds))
+      cs = coreBindsStats tidy_binds_flat
   putDumpFileMaybe logger Opt_D_dump_core_stats "Core Stats"
     FormatText
     (text "Tidy size (terms,types,coercions)"
@@ -2837,7 +2851,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
                    for_bytecode
                    this_mod
                    this_loc
-                   [NonRec binding_id prepd_expr]
+                   (singletonCoreProgram [NonRec binding_id prepd_expr])
 
   let (stg_binds, _stg_deps) = unzip stg_binds_with_deps
 

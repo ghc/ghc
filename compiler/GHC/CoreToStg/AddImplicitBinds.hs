@@ -24,6 +24,7 @@ import GHC.Types.Id.Make( mkDictSelRhs )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 
 
@@ -90,7 +91,13 @@ partial applications. But it's easier to let them through.
 addImplicitBinds :: CorePrepPgmConfig -> ModLocation
                  -> [TyCon] -> CoreProgram -> IO CoreProgram
 addImplicitBinds pgm_cfg mod_loc tycons binds
-  = return (implicit_binds ++ binds)
+  = case binds of
+      [CoreCompUnit unit_binds] ->
+        return (singletonCoreProgram (implicit_binds ++ unit_binds))
+      _ ->
+        pprPanic "addImplicitBinds"
+          (text "Expected a single compilation unit after tidy, got"
+           <+> int (length binds))
   where
     gen_debug_info = cpPgm_generateDebugInfo pgm_cfg
     implicit_binds = concatMap (mkImplicitBinds gen_debug_info mod_loc) tycons
@@ -144,7 +151,5 @@ tick_it generate_debug_info mod_loc name
                  LexicalFastString $ mkFastString $
                  renderWithContext defaultSDocContext $ ppr name
     span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
-
-
 
 

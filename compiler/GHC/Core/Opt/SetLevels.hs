@@ -262,9 +262,16 @@ setLevels :: FloatOutSwitches
           -> [LevelledBind]
 
 setLevels float_lams binds us
-  = initLvl us (do_them binds)
+  = initLvl us (do_program binds)
   where
     env = initialEnv float_lams binds
+
+    do_program :: CoreProgram -> LvlM [LevelledBind]
+    do_program [] = return []
+    do_program (CoreCompUnit unit_binds:units) =
+      do { unit_binds' <- do_them unit_binds
+         ; units' <- do_program units
+         ; return (unit_binds' ++ units') }
 
     do_them :: [CoreBind] -> LvlM [LevelledBind]
     do_them [] = return []
@@ -1726,12 +1733,16 @@ initialEnv float_lams binds
        , le_subst     = mkEmptySubst in_scope_toplvl
        , le_env       = emptyVarEnv }
   where
-    in_scope_toplvl = emptyInScopeSet `extendInScopeSetBndrs` binds
+    in_scope_toplvl =
+      foldl' addCompUnitBndrs emptyInScopeSet binds
       -- The Simplifier (see Note [Glomming] in GHC.Core.Opt.OccurAnal) and
       -- the specialiser (see Note [Top level scope] in GHC.Core.Opt.Specialise)
       -- may both produce top-level bindings where an early binding refers
       -- to a later one.  So here we put all the top-level binders in scope before
       -- we start, to satisfy the lookupIdSubst invariants (#20200 and #20294)
+
+    addCompUnitBndrs in_scope (CoreCompUnit unit_binds) =
+      in_scope `extendInScopeSetBndrs` unit_binds
 
 addLvl :: Level -> VarEnv Level -> OutVar -> VarEnv Level
 addLvl dest_lvl env v' = extendVarEnv env v' dest_lvl

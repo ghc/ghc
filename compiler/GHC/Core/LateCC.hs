@@ -21,6 +21,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.RepType (mightBeFunTy)
 
 -- | Late cost center insertion logic used by the driver
@@ -33,6 +34,12 @@ addLateCostCenters ::
   -- ^ The program
   -> IO (CoreProgram, LateCCState (Strict.Maybe SrcSpan))
 addLateCostCenters logger LateCCConfig{..} core_binds = do
+    let core_binds_checked = case core_binds of
+          [CoreCompUnit _] -> core_binds
+          _ ->
+            pprPanic "addLateCostCenters"
+              (text "Expected a single compilation unit after tidy, got"
+               <+> int (length core_binds))
 
     -- If top-level late CCs are enabled via either -fprof-late or
     -- -fprof-late-overloaded, add them
@@ -44,14 +51,15 @@ addLateCostCenters logger LateCCConfig{..} core_binds = do
           withTiming
             logger
             (text "LateTopLevelCCs" <+> brackets (ppr this_mod))
-            (\(binds, late_cc_state) -> seqBinds binds `seq` late_cc_state `seq` ())
+            (\(binds, late_cc_state) ->
+              seqCompUnits binds `seq` late_cc_state `seq` ())
             $ {-# SCC lateTopLevelCCs #-} do
               pure $
                 doLateCostCenters
                   lateCCConfig_env
                   (initLateCCState ())
                   (topLevelBindsCC top_level_cc_pred)
-                  core_binds
+                  core_binds_checked
 
     -- If overloaded call CCs are enabled via -fprof-late-overloaded-calls, add
     -- them
@@ -60,7 +68,8 @@ addLateCostCenters logger LateCCConfig{..} core_binds = do
         withTiming
             logger
             (text "LateOverloadedCallsCCs" <+> brackets (ppr this_mod))
-            (\(binds, late_cc_state) -> seqBinds binds `seq` late_cc_state `seq` ())
+            (\(binds, late_cc_state) ->
+              seqCompUnits binds `seq` late_cc_state `seq` ())
             $ {-# SCC lateoverloadedCallsCCs #-} do
               pure $
                 doLateCostCenters
@@ -76,6 +85,11 @@ addLateCostCenters logger LateCCConfig{..} core_binds = do
 
     return (late_cc_binds, late_cc_state)
   where
+    seqCompUnits :: CoreProgram -> ()
+    seqCompUnits [] = ()
+    seqCompUnits (CoreCompUnit unit_binds:units) =
+      seqBinds unit_binds `seq` seqCompUnits units
+
     top_level_cc_pred :: CoreExpr -> Bool
     top_level_cc_pred =
         case lateCCConfig_whichBinds of

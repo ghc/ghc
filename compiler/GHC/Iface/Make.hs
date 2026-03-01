@@ -328,7 +328,7 @@ mkIface_ hsc_env
 
         simplified_core =
           if gopt Opt_WriteIfSimplifiedCore dflags
-          then Just (IfaceSimplifiedCore [ toIfaceTopBind b | b <- core_prog ] emptyIfaceForeign)
+          then Just (IfaceSimplifiedCore (map toIfaceTopBind core_binds_flat) emptyIfaceForeign)
           else Nothing
         decls  = [ tyThingToIfaceDecl entity
                  | entity <- entities,
@@ -356,6 +356,12 @@ mkIface_ hsc_env
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
         icomplete_matches = map mkIfaceCompleteMatch complete_matches
+        core_binds_flat = case core_prog of
+          [CoreCompUnit unit_binds] -> unit_binds
+          _ ->
+            pprPanic "mkIface_"
+              (text "Expected a single compilation unit after tidy, got"
+               <+> int (length core_prog))
         !rdrs = mkIfaceTopEnv rdr_env
 
     emptyPartialModIface this_mod
