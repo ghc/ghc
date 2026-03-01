@@ -3965,11 +3965,11 @@ instance ExactPrint (HsType GhcPs) where
     tys' <- markAnnotated tys
     an1 <- markClosingParen an0
     return (HsSumTy an1 tys')
-  exact (HsOpTy x promoted t1 lo t2) = do
+  exact (HsOpTy x t1 lo t2) = do
     t1' <- markAnnotated t1
     lo' <- markAnnotated lo
     t2' <- markAnnotated t2
-    return (HsOpTy x promoted t1' lo' t2')
+    return (HsOpTy x t1' lo' t2')
   exact (HsParTy (o,c) ty) = do
     o' <- markEpToken o
     ty' <- markAnnotated ty

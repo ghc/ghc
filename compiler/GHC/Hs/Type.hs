@@ -683,11 +683,12 @@ ignoreParens ty                   = ty
 mkAnonWildCardTy :: EpToken "_" -> HsType GhcPs
 mkAnonWildCardTy tok = HsWildCardTy tok
 
-mkHsOpTy :: (Anno (IdOccGhcP p) ~ SrcSpanAnnN)
+mkHsOpTy :: (Anno (IdOccGhcP p) ~ EpAnn a)
          => PromotionFlag
-         -> LHsType (GhcPass p) -> LocatedN (IdOccP (GhcPass p))
+         -> LHsType (GhcPass p) -> LIdOccP (GhcPass p)
          -> LHsType (GhcPass p) -> HsType (GhcPass p)
-mkHsOpTy prom ty1 op ty2 = HsOpTy noExtField prom ty1 op ty2
+mkHsOpTy prom ty1 op ty2 = HsOpTy noExtField ty1 tyop ty2
+  where tyop = L (l2l op) $ HsTyVar noAnn prom op
 
 mkHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 mkHsAppTy t1 t2 = addCLocA t1 t2 (HsAppTy noExtField t1 t2)
@@ -745,7 +746,7 @@ hsTyGetAppHead_maybe = go
     go (L _ (HsTyVar _ _ ln))    = Just ln
     go (L _ (HsAppTy _ l _))     = go l
     go (L _ (HsAppKindTy _ t _)) = go t
-    go (L _ (HsOpTy _ _ _ ln _)) = Just ln
+    go (L _ (HsOpTy _ _ op _))   = go op
     go (L _ (HsParTy _ t))       = go t
     go (L _ (HsKindSig _ t _))   = go t
     go _                         = Nothing
@@ -1457,9 +1458,14 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty)
   = hsep [ppr_mono_lty fun_ty, ppr_mono_lty arg_ty]
 ppr_mono_ty (HsAppKindTy _ ty k)
   = ppr_mono_lty ty <+> char '@' <> ppr_mono_lty k
-ppr_mono_ty (HsOpTy _ prom ty1 (L _ op) ty2)
-  = sep [ ppr_mono_lty ty1
-        , sep [pprOccWithTick Infix prom op, ppr_mono_lty ty2 ] ]
+ppr_mono_ty (HsOpTy _ ty1 tyop ty2)
+  | Just pp_op <- ppr_infix_ty tyop
+  = sep [pp_ty1, sep [pp_op, pp_ty2]]
+  | otherwise  -- This shouldn't happen unless the user constructs weird ASTs via the GHC API
+  = hang (ppr tyop) 2 (sep [pp_ty1, pp_ty2])
+  where
+    pp_ty1 = ppr_mono_lty ty1
+    pp_ty2 = ppr_mono_lty ty2
 ppr_mono_ty (HsParTy _ ty)
   = parens (ppr_mono_lty ty)
   -- Put the parens in where the user did
@@ -1475,6 +1481,11 @@ ppr_mono_ty (XHsType t) = case ghcPass @p of
     HsBangTy _ b ty -> ppr b <> ppr_mono_lty ty
     HsRecTy _ flds  -> pprHsConDeclRecFields flds
   GhcRn -> ppr t
+
+ppr_infix_ty :: (OutputableBndrId p) => LHsType (GhcPass p) -> Maybe SDoc
+ppr_infix_ty (L _ (HsTyVar _ prom (L _ op))) = Just (pprOccWithTick Infix prom op)
+ppr_infix_ty (L _ (HsWildCardTy _)) = Just (text "`_`")
+ppr_infix_ty _ = Nothing
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId p)

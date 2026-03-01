@@ -549,7 +549,7 @@ pat_to_type (NPat _ (L _ ol) _ _)
 pat_to_type (ConPat _ lname (InfixCon left right))
   = do { lty <- pat_to_type (unLoc left)
        ; rty <- pat_to_type (unLoc right)
-       ; let { t = noLocA (HsOpTy noExtField NotPromoted lty lname rty)}
+       ; let { t = noLocA (mkHsOpTy NotPromoted lty lname rty)}
        ; pure t }
 pat_to_type (ConPat _ lname (PrefixCon args))
   = do { let { appHead = noLocA (HsTyVar noAnn NotPromoted lname) }

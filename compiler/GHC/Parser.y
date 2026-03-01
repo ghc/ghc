@@ -2316,15 +2316,14 @@ infixtype :: { forall b. DisambTD b => PV (LocatedA b) }
         : ftype %shift                  { $1 }
         | ftype tyop infixtype          { $1 >>= \ $1 ->
                                           $3 >>= \ $3 ->
-                                          do { let (op, prom) = $2
-                                             ; when (looksLikeMult $1 op $3) $ hintLinear (getLocA op)
-                                             ; mkHsOpTyPV prom $1 op $3 } }
+                                          do { when (looksLikeMult $1 $2 $3) $ hintLinear (getLocA $2)
+                                             ; mkHsOpTyPV $1 $2 $3 } }
         | unpackedness infixtype        { $2 >>= \ $2 ->
                                           mkUnpackednessPV $1 $2 }
 
 ftype :: { forall b. DisambTD b => PV (LocatedA b) }
         : atype                         { mkHsAppTyHeadPV $1 }
-        | tyop                          { failOpFewArgs (fst $1) }
+        | tyop                          { failOpFewArgs $1 }
         | ftype tyarg                   { $1 >>= \ $1 ->
                                           mkHsAppTyPV $1 $2 }
         | ftype PREFIX_AT atype         { $1 >>= \ $1 ->
@@ -2334,15 +2333,12 @@ tyarg :: { LHsType GhcPs }
         : atype                         { $1 }
         | unpackedness atype            {% addUnpackednessP $1 $2 }
 
-tyop :: { (LocatedN RdrName, PromotionFlag) }
-        : qtyconop                      { ($1, NotPromoted) }
-        | tyvarop                       { ($1, NotPromoted) }
-        | SIMPLEQUOTE qconop            {% do { op <- amsr (sLL $1 $> (unLoc $2))
-                                                           (NameAnnQuote (epTok $1) (gl $2) [])
-                                              ; return (op, IsPromoted) } }
-        | SIMPLEQUOTE varop             {% do { op <- amsr (sLL $1 $> (unLoc $2))
-                                                           (NameAnnQuote (epTok $1) (gl $2) [])
-                                              ; return (op, IsPromoted) } }
+tyop :: { LHsType GhcPs }
+        : qtyconop                      { sL1a $1 (HsTyVar noAnn NotPromoted $1) }
+        | tyvarop                       { sL1a $1 (HsTyVar noAnn NotPromoted $1) }
+        | SIMPLEQUOTE qconop            { sLLa $1 $> (HsTyVar (epTok $1) IsPromoted $2) }
+        | SIMPLEQUOTE varop             { sLLa $1 $> (HsTyVar (epTok $1) IsPromoted $2) }
+        | '`' '_' '`'                   { sLLa $1 $> (mkAnonWildCardTy (epTok $2)) }   -- TODO: reuse hole_op (blocked on #27111)
 
 atype :: { LHsType GhcPs }
         : ntgtycon                       {% amsA' (sL1 $1 (HsTyVar noAnn NotPromoted $1)) }      -- Not including unit tuples
@@ -4464,12 +4460,12 @@ hintLinear span = do
   unless linearEnabled $ addError $ mkPlainErrorMsgEnvelope span $ PsErrLinearFunction
 
 -- Does this look like (a %m)?
-looksLikeMult :: LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> Bool
-looksLikeMult ty1 l_op ty2
-  | Unqual op_name <- unLoc l_op
+looksLikeMult :: LHsType GhcPs -> LHsType GhcPs -> LHsType GhcPs -> Bool
+looksLikeMult ty1 tyop ty2
+  | HsTyVar _ _ (L _ (Unqual op_name)) <- unLoc tyop
   , occNameFS op_name == fsLit "%"
   , Strict.Just ty1_pos <- getBufSpan (getLocA ty1)
-  , Strict.Just pct_pos <- getBufSpan (getLocA l_op)
+  , Strict.Just pct_pos <- getBufSpan (getLocA tyop)
   , Strict.Just ty2_pos <- getBufSpan (getLocA ty2)
   , bufSpanEnd ty1_pos /= bufSpanStart pct_pos
   , bufSpanEnd pct_pos == bufSpanStart ty2_pos

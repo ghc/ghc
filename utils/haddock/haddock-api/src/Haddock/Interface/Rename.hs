@@ -399,11 +399,11 @@ renameType t = case t of
     return (HsAppTy noAnn lhs rhs)
   HsTupleTy _ b ts -> return . HsTupleTy noAnn b =<< mapM renameLType ts
   HsSumTy _ ts -> HsSumTy noAnn <$> mapM renameLType ts
-  HsOpTy _ prom a (L loc op) b -> do
-    op' <- renameName (getName op)
+  HsOpTy _ a op b -> do
+    op' <- renameLType op
     a' <- renameLType a
     b' <- renameLType b
-    return (HsOpTy noAnn prom a' (L loc op') b')
+    return (HsOpTy noAnn a' op' b')
   HsParTy _ ty -> return . (HsParTy noAnn) =<< renameLType ty
   HsKindSig _ ty k -> do
     ty' <- renameLType ty

@@ -388,7 +388,6 @@
                    []))
                  (HsOpTy
                   (NoExtField)
-                  (NotPromoted)
                   (L
                    (EpAnn
                     (EpaSpan { DumpParsedAst.hs:11:11 })
@@ -411,12 +410,22 @@
                   (L
                    (EpAnn
                     (EpaSpan { DumpParsedAst.hs:11:13 })
-                    (NameAnnTrailing
+                    (AnnListItem
                      [])
                     (EpaComments
                      []))
-                   (Exact
-                    {Name: :}))
+                   (HsTyVar
+                    (NoEpTok)
+                    (NotPromoted)
+                    (L
+                     (EpAnn
+                      (EpaSpan { DumpParsedAst.hs:11:13 })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       []))
+                     (Exact
+                      {Name: :}))))
                   (L
                    (EpAnn
                     (EpaSpan { DumpParsedAst.hs:11:15-16 })
