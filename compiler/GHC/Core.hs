@@ -115,6 +115,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import {-# SOURCE #-} GHC.Core.Subst (deShadowBinds)
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -2048,8 +2049,22 @@ type CoreExpr = Expr CoreBndr
 type CoreArg  = Arg  CoreBndr
 -- | Binding groups where binders are 'CoreBndr's
 type CoreBind = Bind CoreBndr
--- | A compilation unit represented as a sequence of Core binding groups plus
--- rules created while optimizing that unit.
+
+-- | A compilation unit is a set of bindings and associated rules that can be compiled independently.
+--
+-- Note [Compilation Units]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
+-- Essentially these are independent sets of bindings yet still from the same module.
+-- Their order matters and their top level ids can shadow each other.
+--
+-- This means if we want to combine units into one we have to deal with that shadowing.
+-- We do so by substituting over them and their associated rules, done in deShadowBinds.
+--
+-- This means flattenCoreProgram doesn't preserve the identiy of binds, and once
+-- units have been combined we can't keep using the old units as their uniques
+-- won't match. This is we we don't use flattenCoreProgram for pretty printing
+-- for example.
+
 data CoreCompUnit
   = CoreCompUnit
       { coreCompUnitBinds :: [CoreBind]
@@ -2059,7 +2074,7 @@ data CoreCompUnit
 type CoreAlt  = Alt  CoreBndr
 
 flattenCoreProgram :: CoreProgram -> [CoreBind]
-flattenCoreProgram = concatMap coreCompUnitBinds
+flattenCoreProgram = concatMap coreCompUnitBinds . deShadowBinds
 
 singletonCoreProgram :: [CoreBind] -> CoreProgram
 singletonCoreProgram binds = [CoreCompUnit binds []]
