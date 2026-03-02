@@ -281,7 +281,10 @@ getCoreToDo dflags hpt_rule_base extra_vars
                 -- spectral/minimax; see XXX
 
 
-        runWhen cse CoreCSE,
+        runWhen cse $ CoreDoPasses [
+          runWhen split_core CoreMerge,
+          CoreCSE,
+          runWhen split_core CoreSplit],
                 -- We want CSE to follow the final full-laziness pass, because it may
                 -- succeed in commoning up things floated out by full laziness.
                 -- CSE used to rely on the no-shadowing invariant, but it doesn't any more
@@ -473,6 +476,9 @@ doCorePass pass guts = do
 
     CoreSplit                 -> {-# SCC "CoreSplit" #-}
                                  updateBinds (concatMap (occurSplitPgm (mg_module guts) (mg_rules guts)))
+
+    CoreMerge                 -> {-# SCC "CoreMerge" #-}
+                                 updateBinds (singletonCoreProgram . flattenCoreProgram)
 
     CoreDoSimplify opts       -> {-# SCC "Simplify" #-}
                                  liftIOWithCount $ simplifyPgm logger (hsc_unit_env hsc_env) name_ppr_ctx opts guts
