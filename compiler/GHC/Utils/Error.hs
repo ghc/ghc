@@ -463,7 +463,7 @@ withTiming' logger what force_result prtimings action
 
 debugTraceMsg :: Logger -> Int -> SDoc -> IO ()
 debugTraceMsg logger val msg =
-   when (log_verbosity (logFlags logger) >= val) $
+   when (logVerbAtLeast logger val) $
       logInfo logger (withPprStyle defaultDumpStyle msg)
 {-# INLINE debugTraceMsg #-}  -- see Note [INLINE conditional tracing utilities]
 

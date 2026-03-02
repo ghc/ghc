@@ -1279,7 +1279,7 @@ pprReason pref reason = case reason of
         nest 2 (hsep (map ppr deps))
 
 reportCycles :: Logger -> [SCC UnitInfo] -> IO ()
-reportCycles logger sccs = mapM_ report sccs
+reportCycles logger sccs = when (logVerbAtLeast logger 2) $ mapM_ report sccs
   where
     report (AcyclicSCC _) = return ()
     report (CyclicSCC vs) =
@@ -1288,7 +1288,7 @@ reportCycles logger sccs = mapM_ report sccs
             nest 2 (hsep (map (ppr . unitId) vs))
 
 reportUnusable :: Logger -> UnusableUnits -> IO ()
-reportUnusable logger pkgs = mapM_ report (nonDetUniqMapToList pkgs)
+reportUnusable logger pkgs = when (logVerbAtLeast logger 2) $ mapM_ report (nonDetUniqMapToList pkgs)
   where
     report (ipid, (_, reason)) =
        debugTraceMsg logger 2 $
@@ -1389,7 +1389,7 @@ mergeDatabases logger = foldM merge (emptyUniqMap, emptyUniqMap) . zip [1..]
     merge (pkg_map, prec_map) (i, UnitDatabase db_path db) = do
       debugTraceMsg logger 2 $
           text "loading package database" <+> ppr db_path
-      when (log_verbosity (logFlags logger) >= 2) $
+      when (logVerbAtLeast logger 2) $
         forM_ (Set.toList override_set) $ \pkg ->
             debugTraceMsg logger 2 $
                 text "package" <+> ppr pkg <+>
