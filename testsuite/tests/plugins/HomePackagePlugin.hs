@@ -9,10 +9,18 @@ plugin = defaultPlugin {
 
 install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 install _options todos = do
-    return $ (CoreDoPluginPass "String replacement" $ bindsOnlyPass stringReplacementPass) : todos
+    return $ CoreDoPluginPass "String replacement" corePass : todos
+  where
+    corePass guts = do
+      binds' <- stringReplacementPass (mg_binds guts)
+      pure guts { mg_binds = binds' }
 
-stringReplacementPass :: [CoreBind] -> CoreM [CoreBind]
-stringReplacementPass binds = return $ map replaceInBind binds
+stringReplacementPass :: CoreProgram -> CoreM CoreProgram
+stringReplacementPass binds = return $ map replaceInCompUnit binds
+
+replaceInCompUnit :: CoreCompUnit -> CoreCompUnit
+replaceInCompUnit (CoreCompUnit binds rules)
+  = CoreCompUnit (map replaceInBind binds) rules
 
 replaceInBind :: CoreBind -> CoreBind
 replaceInBind (NonRec b e) = NonRec b (replaceInExpr e)

@@ -40,12 +40,18 @@ editCoreBinding early modName pgm = do
     putStrLn $
       bool "late " "early " early ++ "plugin running on module " ++
       moduleNameString modName
-    pure $ go pgm
+    pure $ go_program pgm
   where
-    go :: [CoreBind] -> [CoreBind]
-    go (Rec ps : bs) = Rec (map (uncurry (go_bind (,))) ps) : go bs
-    go (NonRec v e : bs) = go_bind NonRec v e : go bs
-    go [] = []
+    go_program :: CoreProgram -> CoreProgram
+    go_program = map go_comp_unit
+
+    go_comp_unit :: CoreCompUnit -> CoreCompUnit
+    go_comp_unit (CoreCompUnit binds rules) = CoreCompUnit (go_binds binds) rules
+
+    go_binds :: [CoreBind] -> [CoreBind]
+    go_binds (Rec ps : bs) = Rec (map (uncurry (go_bind (,))) ps) : go_binds bs
+    go_binds (NonRec v e : bs) = go_bind NonRec v e : go_binds bs
+    go_binds [] = []
 
     go_bind c v e
       | occNameString (getOccName v) == "testBinding"

@@ -18,7 +18,8 @@ install _ todo = do
 pass :: ModGuts -> CoreM ModGuts
 pass g = do
           dflags <- getDynFlags
-          mapM_ (printAnn dflags g) (mg_binds g) >> return g
+          mapM_ (printAnn dflags g) (concatMap coreCompUnitBinds (mg_binds g))
+          return g
   where printAnn :: DynFlags -> ModGuts -> CoreBind -> CoreM ()
         printAnn dflags guts (NonRec b _) = lookupAnn dflags guts b
         printAnn dflags guts (Rec ps) = mapM_ (lookupAnn dflags guts . fst) ps
