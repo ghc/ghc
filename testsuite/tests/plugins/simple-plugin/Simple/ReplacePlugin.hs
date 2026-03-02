@@ -33,8 +33,12 @@ install options todos = do
         return $ CoreDoPluginPass "Replace wiz with woz" (fixGuts rep) : todos
 
 fixGuts :: Id -> ModGuts -> CoreM ModGuts
-fixGuts rep guts = pure $ guts { mg_binds = fmap fix_bind (mg_binds guts) }
+fixGuts rep guts = pure $ guts { mg_binds = map fix_comp_unit (mg_binds guts) }
   where
+    fix_comp_unit :: CoreCompUnit -> CoreCompUnit
+    fix_comp_unit (CoreCompUnit binds rules)
+      = CoreCompUnit (fmap fix_bind binds) rules
+
     fix_bind (NonRec b e) = NonRec b (fix_expr e)
     fix_bind (Rec bes)    = Rec (fmap (second fix_expr) bes)
 

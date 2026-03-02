@@ -49,7 +49,16 @@ mainPass guts = do
     (_, anns) <- getAnnotations deserializeWithData guts :: CoreM (ModuleEnv [ReplaceWith], NameEnv [ReplaceWith])
     -- Var's have the same uniques as their names. Making a cast from NameEnv to VarEnv safe.
     let anns' = unsafeCastUFMKey anns :: VarEnv [ReplaceWith]
-    bindsOnlyPass (mapM (changeBind anns' Nothing)) guts
+    binds' <- changeProgram anns' (mg_binds guts)
+    pure guts { mg_binds = binds' }
+
+changeProgram :: VarEnv [ReplaceWith] -> CoreProgram -> CoreM CoreProgram
+changeProgram anns = mapM (changeCompUnit anns)
+
+changeCompUnit :: VarEnv [ReplaceWith] -> CoreCompUnit -> CoreM CoreCompUnit
+changeCompUnit anns (CoreCompUnit binds rules) = do
+    binds' <- mapM (changeBind anns Nothing) binds
+    pure (CoreCompUnit binds' rules)
 
 changeBind :: VarEnv [ReplaceWith] -> Maybe String -> CoreBind -> CoreM CoreBind
 changeBind anns mb_replacement (NonRec b e) = changeBindPr anns mb_replacement b e >>= (return . uncurry NonRec)
