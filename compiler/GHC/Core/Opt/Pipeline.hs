@@ -43,6 +43,7 @@ import GHC.Core.Opt.DmdAnal
 import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
 import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
+import GHC.Core.Opt.OccurAnal    ( occurSplitPgm )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
 import GHC.Core.LateCC.TopLevelBinds (topLevelBindsCCMG)
@@ -140,6 +141,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
     late_dmd_anal = gopt Opt_LateDmdAnal                  dflags
     late_specialise = gopt Opt_LateSpecialise             dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
+    split_core    = gopt Opt_SplitCore                    dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
     profiling     = ways dflags `hasWay` WayProf
@@ -191,6 +193,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- We always perform a run of the simple optimizer after desugaring to
         -- remove really bad code
         CoreDesugarOpt,
+        runWhen split_core CoreSplit,
 
         -- We want to do the static argument transform before full laziness as it
         -- may expose extra opportunities to float things outwards. However, to fix
@@ -467,6 +470,9 @@ doCorePass pass guts = do
   case pass of
     CoreDesugarOpt            -> {-# SCC "DesugarOpt" #-}
                                  updateBindsAndRulesM (desugarOpt dflags logger (mg_module guts))
+
+    CoreSplit                 -> {-# SCC "CoreSplit" #-}
+                                 updateBinds (concatMap (occurSplitPgm (mg_module guts) (mg_rules guts)))
 
     CoreDoSimplify opts       -> {-# SCC "Simplify" #-}
                                  liftIOWithCount $ simplifyPgm logger (hsc_unit_env hsc_env) name_ppr_ctx opts guts

@@ -28,6 +28,7 @@ core expression with (hopefully) improved usage information.
 module GHC.Core.Opt.OccurAnal (
     occurAnalysePgm,
     occurAnalyseCompUnit,
+    occurSplitPgm,
     occurAnalyseExpr, occurAnalyseExpr_Prep,
     zapLambdaBndrs
   ) where
@@ -68,12 +69,12 @@ import GHC.Utils.Misc
 import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )
 
-import Data.List (mapAccumL)
+import Data.List (findIndex, mapAccumL)
 
 {-
 ************************************************************************
 *                                                                      *
-    occurAnalysePgm, occurAnalyseExpr
+    occurAnalysePgm, occurAnalyseExpr, occurSplitPgm
 *                                                                      *
 ************************************************************************
 
@@ -95,11 +96,85 @@ occurAnalyseExpr_Prep expr = expr'
   where
     WUD _ expr' = occAnal (initOccEnv { occ_allow_weak_joins = True }) expr
 
+occurSplitPgm :: Module -> [CoreRule] -> CoreCompUnit -> [CoreCompUnit]
+occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
+  = zipWith mk_comp_unit comp_pairs [0..]
+  where
+    CoreCompUnit occ_binds _ =
+      occurAnalyseCompUnit mod (const True) (const True) imp_rules
+        (CoreCompUnit unit_binds unit_rules)
+
+    pairs = flattenBinds occ_binds
+    bndrs    = map fst pairs
+    bndr_set = mkVarSet bndrs
+
+    imp_rule_edges :: ImpRuleEdges
+    imp_rule_edges = mkImpRuleEdges imp_rules
+
+    dir_nodes :: [Node Unique (Id, CoreExpr)]
+    dir_nodes = map mk_dir_node pairs
+
+    mk_dir_node (bndr, rhs)
+      = DigraphNode { node_payload = (bndr, rhs)
+                    , node_key = varUnique bndr
+                    , node_dependencies = nonDetKeysUniqSet deps
+                    }
+      where
+        deps = dep_fvs `intersectVarSet` bndr_set
+
+        dep_fvs = exprFreeIds rhs
+                  `unionVarSet` bndrRuleAndUnfoldingIds bndr
+                  `unionVarSet` localRuleDeps bndr
+                  `unionVarSet` impRuleDeps bndr
+
+        impRuleDeps b = foldr unionVarSet emptyVarSet [ vs | (_, vs) <- lookupImpRules imp_rule_edges b ]
+
+        localRuleDeps b = foldr unionVarSet emptyVarSet
+          [ (exprsFreeIds args `delVarSetList` ru_bndrs) `unionVarSet` (exprFreeIds ru_rhs `delVarSetList` ru_bndrs)
+          | Rule { ru_fn, ru_bndrs, ru_args = args, ru_rhs } <- unit_rules
+          , idName b == ru_fn
+          ]
+
+    incoming_edges :: UniqFM Unique [Unique]
+    incoming_edges = foldr add_incoming emptyUFM dir_nodes
+      where
+        add_incoming DigraphNode { node_key = src, node_dependencies = dests } incoming
+          = foldr (\dest acc -> addToUFM_C (++) acc dest [src]) incoming dests
+    -- TODO: AI Garbage? -
+    -- We probably really should just do this on a undirected graph instead.
+    undir_nodes :: [Node Unique (Id, CoreExpr)]
+    undir_nodes =
+      [ node { node_dependencies = node_dependencies node ++ lookupWithDefaultUFM incoming_edges [] (node_key node) }
+      | node <- dir_nodes
+      ]
+
+    comp_pairs :: [[(Id, CoreExpr)]]
+    comp_pairs = map scc_payloads (stronglyConnCompFromEdgedVerticesUniq undir_nodes)
+
+    component_bndrs :: [[Id]]
+    component_bndrs = map (map fst) comp_pairs
+
+    mk_comp_unit prs i = CoreCompUnit (mk_comp_binds prs) (component_rules i)
+
+    mk_comp_binds [pr] = [NonRec (fst pr) (snd pr)]
+    mk_comp_binds prs  = [Rec prs]
+
+    component_rules i = [ rule | rule <- unit_rules, rule_comp_index rule == i ]
+
+    rule_comp_index rule
+      = case findIndex (\ids -> any (\b -> idName b == ruleIdName rule) ids) component_bndrs of
+          Just i  -> i
+          Nothing -> pprPanic "occurSplitPgm"
+                     (text "No matching compilation component for rule" <+> ppr rule)
+
+    scc_payloads (AcyclicSCC p) = [p]
+    scc_payloads (CyclicSCC ps) = ps
+
 occurAnalyseCompUnit
   :: Module
   -> (Id -> Bool)
   -> (ActivationGhc -> Bool)
-  -> [CoreRule]
+  -> [CoreRule] -- Local rules for imported modules.
   -> CoreCompUnit -> CoreCompUnit
 occurAnalyseCompUnit this_mod active_unf active_rule imp_rules (CoreCompUnit unit_binds unit_rules)
   | isEmptyDetails final_usage
@@ -124,13 +199,7 @@ occurAnalyseCompUnit this_mod active_unf active_rule imp_rules (CoreCompUnit uni
     -- imp_rule_edges maps a top-level local binder 'f' to the RHS free vars
     -- of any IMP-RULE where 'f' appears on the LHS
     imp_rule_edges :: ImpRuleEdges
-    imp_rule_edges = foldr (plusVarEnv_C (++)) emptyVarEnv
-                           [ mapVarEnv (const [(act,rhs_fvs)]) $ getUniqSet $
-                             exprsFreeIds args `delVarSetList` bndrs
-                           | Rule { ru_act = act, ru_bndrs = bndrs
-                                   , ru_args = args, ru_rhs = rhs } <- imp_rules
-                                   -- Not BuiltinRules; see Note [Plugin rules]
-                           , let rhs_fvs = exprFreeIds rhs `delVarSetList` bndrs ]
+    imp_rule_edges = mkImpRuleEdges imp_rules
 
     go_unit :: [CoreBind] -> OccEnv -> WithUsageDetails [CoreBind]
     go_unit [] _ = WUD emptyDetails []
@@ -192,6 +261,16 @@ type ImpRuleEdges = IdEnv [(ActivationGhc, VarSet)]
 
 noImpRuleEdges :: ImpRuleEdges
 noImpRuleEdges = emptyVarEnv
+
+mkImpRuleEdges :: [CoreRule] -> ImpRuleEdges
+mkImpRuleEdges imp_rules
+  = foldr (plusVarEnv_C (++)) emptyVarEnv
+          [ mapVarEnv (const [(act,rhs_fvs)]) $ getUniqSet $
+            exprsFreeIds args `delVarSetList` bndrs
+          | Rule { ru_act = act, ru_bndrs = bndrs
+                  , ru_args = args, ru_rhs = rhs } <- imp_rules
+                  -- Not BuiltinRules; see Note [Plugin rules]
+          , let rhs_fvs = exprFreeIds rhs `delVarSetList` bndrs ]
 
 lookupImpRules :: ImpRuleEdges -> Id -> [(ActivationGhc, VarSet)]
 lookupImpRules imp_rule_edges bndr

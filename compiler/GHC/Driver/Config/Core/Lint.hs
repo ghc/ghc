@@ -91,6 +91,7 @@ coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec_constr
 coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse
 coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds_preopt
 coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
+coreDumpFlag CoreSplit                = Just Opt_D_dump_split_core
 coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
 coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
 

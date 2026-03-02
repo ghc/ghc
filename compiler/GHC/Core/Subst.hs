@@ -329,8 +329,6 @@ substBind subst (Rec pairs)
 deShadowBinds :: [CoreBind] -> [CoreBind]
 deShadowBinds binds = snd (mapAccumL substBind emptySubst binds)
 
-
-
 {-
 ************************************************************************
 *                                                                      *
