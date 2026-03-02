@@ -189,19 +189,23 @@ simpleOptPgm :: SimpleOpts
              -> (CoreProgram, [CoreRule], CoreProgram)
 -- See Note [The simple optimiser]
 simpleOptPgm opts this_mod binds rules =
-    (reverse binds', rules', occ_anald_binds)
+    (reverse comp_units', rules', occ_anald_binds)
   where
     occ_anald_binds  = occurAnalysePgm this_mod
                           (\_ -> True)  {- All unfoldings active -}
                           (\_ -> False) {- No rules active -}
                           rules binds
 
-    (final_env, binds') = foldl' do_one (emptyEnv opts, []) occ_anald_binds
+    (final_env, comp_units') = foldl' do_unit (emptyEnv opts, []) occ_anald_binds
     final_subst = soe_subst final_env
 
     rules' = substRulesForImportedIds final_subst rules
              -- We never unconditionally inline into rules,
              -- hence paying just a substitution
+
+    do_unit (env, comp_units') (CoreCompUnit unit_binds unit_rules)
+      = let (env', unit_binds') = foldl' do_one (env, []) unit_binds
+        in (env', CoreCompUnit (reverse unit_binds') unit_rules : comp_units')
 
     do_one (env, binds') bind
       = case simple_opt_bind env bind TopLevel of

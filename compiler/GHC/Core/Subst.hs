@@ -326,7 +326,12 @@ substBind subst (Rec pairs)
 -- [Aug 09] This function is not used in GHC at the moment, but seems so
 --          short and simple that I'm going to leave it here
 deShadowBinds :: CoreProgram -> CoreProgram
-deShadowBinds binds = snd (mapAccumL substBind emptySubst binds)
+deShadowBinds = map deShadowCompUnit
+  where
+    deShadowCompUnit (CoreCompUnit binds unit_rules) =
+      let (subst, binds') = mapAccumL substBind emptySubst binds
+          rules' = map (substRule subst (\n -> n)) unit_rules
+      in CoreCompUnit binds' rules'
 
 {-
 ************************************************************************

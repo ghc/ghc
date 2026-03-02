@@ -2596,7 +2596,12 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     let tcs = filterOut isImplicitTyCon (mg_tcs simpl_mg)
         patsyns = mg_patsyns simpl_mg
         core_binds_flat = case core_binds of
-          [CoreCompUnit unit_binds] -> unit_binds
+          [CoreCompUnit unit_binds unit_rules]
+            | null unit_rules -> unit_binds
+            | otherwise ->
+                pprPanic "hscInteractive"
+                  (text "Expected no compilation-unit rules after tidy, got"
+                   <+> int (length unit_rules))
           _ ->
             pprPanic "hscInteractive"
               (text "Expected a single compilation unit after tidy, got"
@@ -2758,7 +2763,12 @@ hscTidy hsc_env guts = do
 
   -- Print one-line size info
   let tidy_binds_flat = case all_tidy_binds of
-        [CoreCompUnit unit_binds] -> unit_binds
+        [CoreCompUnit unit_binds unit_rules]
+          | null unit_rules -> unit_binds
+          | otherwise ->
+              pprPanic "hscTidy"
+                (text "Expected no compilation-unit rules after tidy, got"
+                 <+> int (length unit_rules))
         _ ->
           pprPanic "hscTidy"
             (text "Expected a single compilation unit after tidy, got"

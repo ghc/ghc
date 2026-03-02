@@ -78,8 +78,12 @@ import Data.List (mapAccumL)
 import GHC.Data.FastString
 
 doStaticArgs :: UniqSupply -> CoreProgram -> CoreProgram
-doStaticArgs us binds = snd $ mapAccumL sat_bind_threaded_us us binds
+doStaticArgs us comp_units = snd $ mapAccumL sat_comp_unit_threaded_us us comp_units
   where
+    sat_comp_unit_threaded_us us (CoreCompUnit binds unit_rules) =
+      let (us', binds') = mapAccumL sat_bind_threaded_us us binds
+      in (us', CoreCompUnit binds' unit_rules)
+
     sat_bind_threaded_us us bind =
         let (us1, us2) = splitUniqSupply us
         in (us1, fst $ runSAT us2 (satBind bind emptyUniqSet))

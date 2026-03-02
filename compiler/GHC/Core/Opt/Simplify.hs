@@ -190,27 +190,28 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                     <+> int max_iterations <+> text "iterations"
                     <+> (brackets $ hsep $ punctuate comma $
                          map (int . simplCountN) (reverse counts_so_far)))
-                 2 (text "Size =" <+> ppr (coreBindsStats binds))) $
+                 2 (text "Size =" <+> ppr (coreBindsStats bind_list))) $
 
                 -- Subtract 1 from iteration_no to get the
                 -- number of iterations we actually completed
         return ( "Simplifier bailed out", iteration_no - 1
                , totalise counts_so_far
-               , guts_no_binds { mg_binds = binds, mg_rules = local_rules } )
+               , guts_no_binds { mg_binds = [CoreCompUnit bind_list unit_rules], mg_rules = local_rules } )
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
-      | let sz = coreBindsSize binds
+      | let sz = coreBindsSize bind_list
       , () <- sz `seq` ()     -- Force it
       = do {
                 -- Occurrence analysis
            let { tagged_binds = {-# SCC "OccAnal" #-}
                      occurAnalysePgm this_mod active_unf active_rule
                                      local_rules binds
+               ; tagged_bind_list = concatMap coreCompUnitBinds tagged_binds
                } ;
            Logger.putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
                      FormatCore
-                     (pprCoreBindings tagged_binds);
+                     (pprCoreBindings tagged_bind_list);
 
                 -- read_eps_rules:
                 -- We need to read rules from the EPS regularly because simplification can
@@ -238,25 +239,26 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                 ; simpl_env = mkSimplEnv mode fam_envs } ;
 
                 -- Simplify the program
-           ((binds1, rules1), counts1) <-
+           ((binds1, rules1, unit_rules1), counts1) <-
              initSmpl logger read_rule_env top_env_cfg sz $
                do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
-                                      simplTopBinds simpl_env tagged_binds
+                                      simplTopBinds simpl_env tagged_bind_list
 
                       -- Apply the substitution to rules defined in this module
                       -- for imported Ids.  Eg  RULE map my_f = blah
                       -- If we have a substitution my_f :-> other_f, we'd better
                       -- apply it to the rule to, or it'll never match
                   ; rules1 <- simplImpRules env1 local_rules
+                  ; unit_rules1 <- simplImpRules env1 unit_rules
 
-                  ; return (getTopFloatBinds floats, rules1) } ;
+                  ; return (getTopFloatBinds floats, rules1, unit_rules1) } ;
 
                 -- Stop if nothing happened; don't dump output
                 -- See Note [Which transformations are innocuous] in GHC.Core.Opt.Stats
            if isZeroSimplCount counts1 then
                 return ( "Simplifier reached fixed point", iteration_no
                        , totalise (counts1 : counts_so_far)  -- Include "free" ticks
-                       , guts_no_binds { mg_binds = binds1, mg_rules = rules1 } )
+                       , guts_no_binds { mg_binds = [CoreCompUnit binds1 unit_rules1], mg_rules = rules1 } )
            else do {
                 -- Short out indirections
                 -- We do this *after* at least one run of the simplifier
@@ -269,15 +271,18 @@ simplifyPgm logger unit_env name_ppr_ctx opts
            let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
 
                 -- Dump the result of this iteration
-           dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts1 binds2 rules1 ;
+           dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts1
+             [CoreCompUnit binds2 unit_rules1] rules1 ;
 
            for_ (so_pass_result_cfg opts) $ \pass_result_cfg ->
-             lintPassResult logger pass_result_cfg binds2 ;
+             lintPassResult logger pass_result_cfg [CoreCompUnit binds2 unit_rules1] rules1 ;
 
                 -- Loop
-           do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
+           do_iteration (iteration_no + 1) (counts1:counts_so_far) [CoreCompUnit binds2 unit_rules1] rules1
            } }
       where
+        bind_list = concatMap coreCompUnitBinds binds
+        unit_rules = concatMap cu_rules binds
         -- Remember the counts_so_far are reversed
         totalise :: [SimplCount] -> SimplCount
         totalise = foldr (\c acc -> acc `plusSimplCount` c)
@@ -433,7 +438,7 @@ x_exported, and therefore carry the tick anyway.
 
 type IndEnv = IdEnv (Id, [CoreTickish]) -- Maps local_id -> exported_id, ticks
 
-shortOutIndirections :: CoreProgram -> CoreProgram
+shortOutIndirections :: [CoreBind] -> [CoreBind]
 shortOutIndirections binds
   | isEmptyVarEnv ind_env = binds
   | no_need_to_flatten    = binds'                      -- See Note [Rules and indirection-zapping]

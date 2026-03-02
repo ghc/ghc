@@ -415,9 +415,10 @@ data RuleEnv
 mkRuleEnv :: ModGuts -> RuleBase -> RuleBase -> RuleEnv
 mkRuleEnv (ModGuts { mg_module = this_mod
                    , mg_deps   = deps
-                   , mg_rules  = local_rules })
+                   , mg_rules  = local_rules
+                   , mg_binds  = local_binds })
           eps_rules hpt_rules
-  = RuleEnv { re_local_rules   = mkRuleBase local_rules
+  = RuleEnv { re_local_rules   = mkRuleBase (local_rules ++ concatMap cu_rules local_binds)
             , re_home_rules    = hpt_rules
             , re_eps_rules     = eps_rules
             , re_visible_orphs = mkModuleSet vis_orphs }
@@ -1921,11 +1922,15 @@ ruleCheckProgram ropts curr_phase rule_pat rules binds
                        , rc_ropts     = ropts
                        , rc_in_scope  = emptyInScopeSet }
 
-    results = go env binds
+    results = go_program env binds
 
-    go _   []           = emptyBag
-    go env (bind:binds) = let (env', ds) = ruleCheckBind env bind
-                          in ds `unionBags` go env' binds
+    go_program _   [] = emptyBag
+    go_program env (CoreCompUnit unit_binds _:units) =
+      go_unit env unit_binds `unionBags` go_program env units
+
+    go_unit _   [] = emptyBag
+    go_unit env (bind:binds) = let (env', ds) = ruleCheckBind env bind
+                               in ds `unionBags` go_unit env' binds
 
 data RuleCheckEnv = RuleCheckEnv
     { rc_is_active :: ActivationGhc -> Bool

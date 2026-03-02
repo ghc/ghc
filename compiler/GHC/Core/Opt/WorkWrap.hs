@@ -72,7 +72,10 @@ info for exported values).
 wwTopBinds :: WwOpts -> UniqSupply -> CoreProgram -> CoreProgram
 
 wwTopBinds ww_opts us top_binds
-  = initUs_ us $ concatMapM (wwBind ww_opts) top_binds
+  = initUs_ us $ mapM wwCompUnit top_binds
+  where
+    wwCompUnit (CoreCompUnit binds unit_rules) =
+      (\binds' -> CoreCompUnit binds' unit_rules) <$> concatMapM (wwBind ww_opts) binds
 
 {-
 ************************************************************************

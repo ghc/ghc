@@ -23,6 +23,7 @@ import GHC.Types.Demand
 import GHC.Utils.Misc
 
 import Control.Arrow ( first, second )
+import Data.List (mapAccumL)
 import Data.List.NonEmpty ( NonEmpty (..) )
 
 
@@ -433,9 +434,12 @@ choice, and hence Call Arity sets the call arity for join points as well.
 -- Main entry point
 
 callArityAnalProgram :: CoreProgram -> CoreProgram
-callArityAnalProgram binds = binds'
+callArityAnalProgram comp_units = snd (mapAccumL callArityCompUnit [] comp_units)
   where
-    (_, binds') = callArityTopLvl [] emptyVarSet binds
+    callArityCompUnit exported (CoreCompUnit binds unit_rules)
+      = let (_ae, binds') = callArityTopLvl exported emptyVarSet binds
+            exported' = filter isExportedId (bindersOfBinds binds') ++ exported
+        in (exported', CoreCompUnit binds' unit_rules)
 
 -- See Note [Analysing top-level binds]
 callArityTopLvl :: [Var] -> VarSet -> [CoreBind] -> (CallArityRes, [CoreBind])

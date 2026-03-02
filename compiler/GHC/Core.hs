@@ -9,7 +9,7 @@
 module GHC.Core (
         -- * Main data types
         Expr(..), Alt(..), Bind(..), AltCon(..), Arg,
-        CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
+        CoreCompUnit(..), CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
 
         -- * In/Out type synonyms
@@ -35,6 +35,7 @@ module GHC.Core (
         varToCoreExpr, varsToCoreExprs,
 
         mkBinds,
+        flattenCoreProgram, singletonCoreProgram,
 
         isId, cmpAltCon, cmpAlt, ltAlt,
 
@@ -2016,9 +2017,9 @@ cmpAltCon con1 con2 = pprPanic "cmpAltCon" (ppr con1 $$ ppr con2)
 Note [CoreProgram]
 ~~~~~~~~~~~~~~~~~~
 The top level bindings of a program, a CoreProgram, are represented as
-a list of CoreBind
+a list of compilation units, where each compilation unit is a list of CoreBind.
 
- * Later bindings in the list can refer to earlier ones, but not vice
+ * Later bindings in a compilation unit can refer to earlier ones, but not vice
    versa.  So this is OK
       NonRec { x = 4 }
       Rec { p = ...q...x...
@@ -2036,7 +2037,7 @@ a list of CoreBind
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
-type CoreProgram = [CoreBind]   -- See Note [CoreProgram]
+type CoreProgram = [CoreCompUnit]   -- See Note [CoreProgram]
 
 -- | The common case for the type of binders and variables when
 -- we are manipulating the Core language within GHC
@@ -2047,10 +2048,21 @@ type CoreExpr = Expr CoreBndr
 type CoreArg  = Arg  CoreBndr
 -- | Binding groups where binders are 'CoreBndr's
 type CoreBind = Bind CoreBndr
--- | A compilation unit represented as a sequence of Core binding groups.
-newtype CoreCompUnit = CoreCompUnit [CoreBind]
+-- | A compilation unit represented as a sequence of Core binding groups plus
+-- rules created while optimizing that unit.
+data CoreCompUnit
+  = CoreCompUnit
+      { coreCompUnitBinds :: [CoreBind]
+      , cu_rules          :: [CoreRule]
+      }
 -- | Case alternatives where binders are 'CoreBndr's
 type CoreAlt  = Alt  CoreBndr
+
+flattenCoreProgram :: CoreProgram -> [CoreBind]
+flattenCoreProgram = concatMap coreCompUnitBinds
+
+singletonCoreProgram :: [CoreBind] -> CoreProgram
+singletonCoreProgram binds = [CoreCompUnit binds []]
 
 {-
 ************************************************************************

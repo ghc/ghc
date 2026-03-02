@@ -50,7 +50,10 @@ addCallerCostCentres guts = do
 
 doCoreProgram :: Env -> CoreProgram -> CoreProgram
 doCoreProgram env binds = flip evalState newCostCentreState $ do
-    mapM (doBind env) binds
+    mapM doCompUnit binds
+  where
+    doCompUnit (CoreCompUnit comp_unit_binds unit_rules) =
+      (\binds' -> CoreCompUnit binds' unit_rules) <$> mapM (doBind env) comp_unit_binds
 
 doBind :: Env -> CoreBind -> M CoreBind
 doBind env (NonRec b rhs) = NonRec b <$> doExpr (addParent b env) rhs
@@ -126,4 +129,3 @@ needsCallSiteCostCentre env i =
             Nothing -> True
         checkFunc =
             occNameMatches (ccfFuncName ccf) (getOccName i)
-

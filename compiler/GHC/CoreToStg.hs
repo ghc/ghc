@@ -250,7 +250,8 @@ coreToStg opts@CoreToStgOpts
   = (pgm'', denv, final_ccs)
   where
     (_, (local_ccs, local_cc_stacks), pgm')
-      = coreTopBindsToStg opts this_mod emptyVarEnv emptyCollectedCCs pgm
+      = coreTopBindsToStg opts this_mod emptyVarEnv emptyCollectedCCs
+          (concatMap coreCompUnitBinds pgm)
 
     -- See Note [Mapping Info Tables to Source Positions]
     (!pgm'', !denv)
@@ -275,7 +276,7 @@ coreTopBindsToStg
     -> Module
     -> IdEnv HowBound           -- environment for the bindings
     -> CollectedCCs
-    -> CoreProgram
+    -> [CoreBind]
     -> (IdEnv HowBound, CollectedCCs, [StgTopBinding])
 
 coreTopBindsToStg _      _        env ccs []

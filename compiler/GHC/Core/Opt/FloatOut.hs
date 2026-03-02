@@ -140,7 +140,7 @@ floatOutwards logger float_sws us pgm
                         int ntlets, text " Lets floated elsewhere; from ",
                         int lams,   text " Lambda groups"]);
 
-        return (bagToList (unionManyBags binds_s'))
+        return (singletonCoreProgram (bagToList (unionManyBags binds_s')))
     }
 
 floatTopBind :: LevelledBind -> (FloatStats, Bag CoreBind)

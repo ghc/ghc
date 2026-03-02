@@ -793,10 +793,10 @@ specConstrProgram guts
                         (text "If this is expected you might want to increase -fmax-forced-spec-args to force specialization anyway.")
 scTopCompUnits :: ScEnv -> CoreProgram -> UniqSM (ScUsage, CoreProgram, [SpecFailWarning])
 scTopCompUnits _env [] = return (nullUsage, [], [])
-scTopCompUnits env (CoreCompUnit unit_binds:units) = do
+scTopCompUnits env (CoreCompUnit unit_binds unit_rules:units) = do
   (unit_usg, unit_binds', unit_warnings) <- scTopBinds env unit_binds
   (units_usg, units', units_warnings) <- scTopCompUnits env units
-  return (unit_usg `combineUsage` units_usg, CoreCompUnit unit_binds' : units', unit_warnings ++ units_warnings)
+  return (unit_usg `combineUsage` units_usg, CoreCompUnit unit_binds' unit_rules : units', unit_warnings ++ units_warnings)
 
 scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind], [SpecFailWarning])
 scTopBinds _env []     = return (nullUsage, [], [])
@@ -1019,7 +1019,7 @@ initScEnv guts
         -- see Note [Glomming] in GHC.Core.Opt.OccurAnal
         -- Easiest thing is to bring all the top level binders into scope at once,
         -- as if  at once, as if all the top-level decls were mutually recursive.
-    addCompUnitBndrs scope (CoreCompUnit unit_binds) =
+    addCompUnitBndrs scope (CoreCompUnit unit_binds _) =
       scope `extendInScopeSetBndrs` unit_binds
 
 data HowBound = RecFun  -- These are the recursive functions for which

@@ -47,8 +47,11 @@ actually float any bindings downwards from the top-level.
 -}
 
 floatInwards :: Platform -> CoreProgram -> CoreProgram
-floatInwards platform binds = map (fi_top_bind platform) binds
+floatInwards platform = map floatCompUnit
   where
+    floatCompUnit (CoreCompUnit binds unit_rules) =
+      CoreCompUnit (map (fi_top_bind platform) binds) unit_rules
+
     fi_top_bind platform (NonRec binder rhs)
       = NonRec binder (fiExpr platform [] (freeVars rhs))
     fi_top_bind platform (Rec pairs)

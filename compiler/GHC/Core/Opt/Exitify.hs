@@ -60,13 +60,18 @@ import Control.Monad
 -- | Traverses the AST, simply to find all joinrecs and call 'exitify' on them.
 -- The really interesting function is exitifyRec
 exitifyProgram :: CoreProgram -> CoreProgram
-exitifyProgram binds = map goTopLvl binds
+exitifyProgram comp_units = map exitifyCompUnit comp_units
   where
+    exitifyCompUnit (CoreCompUnit binds unit_rules) =
+      CoreCompUnit (map goTopLvl binds) unit_rules
+
     goTopLvl (NonRec v e) = NonRec v (go in_scope_toplvl e)
     goTopLvl (Rec pairs) = Rec (map (second (go in_scope_toplvl)) pairs)
       -- Top-level bindings are never join points
 
-    in_scope_toplvl = emptyInScopeSet `extendInScopeSetBndrs` binds
+    in_scope_toplvl =
+      emptyInScopeSet `extendInScopeSetBndrs`
+      concatMap coreCompUnitBinds comp_units
 
     go :: InScopeSet -> CoreExpr -> CoreExpr
     go _    e@(Var{})       = e

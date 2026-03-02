@@ -92,8 +92,13 @@ addImplicitBinds :: CorePrepPgmConfig -> ModLocation
                  -> [TyCon] -> CoreProgram -> IO CoreProgram
 addImplicitBinds pgm_cfg mod_loc tycons binds
   = case binds of
-      [CoreCompUnit unit_binds] ->
-        return (singletonCoreProgram (implicit_binds ++ unit_binds))
+      [CoreCompUnit unit_binds unit_rules]
+        | null unit_rules ->
+            return (singletonCoreProgram (implicit_binds ++ unit_binds))
+        | otherwise ->
+            pprPanic "addImplicitBinds"
+              (text "Expected no compilation-unit rules after tidy, got"
+               <+> int (length unit_rules))
       _ ->
         pprPanic "addImplicitBinds"
           (text "Expected a single compilation unit after tidy, got"
@@ -151,5 +156,4 @@ tick_it generate_debug_info mod_loc name
                  LexicalFastString $ mkFastString $
                  renderWithContext defaultSDocContext $ ppr name
     span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
-
 

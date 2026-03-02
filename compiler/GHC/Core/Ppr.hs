@@ -67,7 +67,8 @@ pprCoreBindings = pprTopBinds noAnn
 pprCoreBinding  = pprTopBind noAnn
 
 pprCoreCompUnit :: CoreCompUnit -> SDoc
-pprCoreCompUnit (CoreCompUnit binds) = pprCoreBindings binds
+pprCoreCompUnit (CoreCompUnit binds unit_rules) =
+  pprCoreBindings binds $$ pprRules unit_rules
 
 pprCoreProgram :: CoreProgram -> SDoc
 pprCoreProgram = vcat . map pprCoreCompUnit

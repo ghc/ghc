@@ -2989,7 +2989,8 @@ isJoinBind _                  = False
 dumpIdInfoOfProgram :: Bool -> (IdInfo -> SDoc) -> CoreProgram -> SDoc
 dumpIdInfoOfProgram dump_locals ppr_id_info binds = vcat (map printId ids)
   where
-  ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
+  ids = sortBy (stableNameCmp `on` getName)
+        (concatMap getIds (concatMap coreCompUnitBinds binds))
   getIds (NonRec i _) = [ i ]
   getIds (Rec bs)     = map fst bs
   -- By default only include full info for exported ids, unless we run in the verbose

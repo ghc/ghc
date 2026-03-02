@@ -1483,7 +1483,7 @@ compileCore simplify fn = do
           cm_safe    = safe_mode
          }
           where
-            unitBinders (CoreCompUnit unit_binds) = bindersOfBinds unit_binds
+            unitBinders (CoreCompUnit unit_binds _) = bindersOfBinds unit_binds
 
 isDictonaryId :: Id -> Bool
 isDictonaryId id = isDictTy (idType id)

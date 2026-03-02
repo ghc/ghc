@@ -664,15 +664,15 @@ specProgram guts@(ModGuts { mg_module = this_mod
                                   return (bind' ++ binds', uds')
 
              -- Specialise the bindings of this module
-             go_comp_unit (CoreCompUnit unit_binds) = do
+             go_comp_unit (CoreCompUnit unit_binds unit_rules) = do
                (unit_binds', uds) <- go unit_binds
-               return (CoreCompUnit unit_binds', uds)
+               return (CoreCompUnit unit_binds' unit_rules, uds)
        ; (binds', uds) <- runSpecM (mapAndCombineSM go_comp_unit binds)
 
        ; (spec_rules, spec_binds) <- specImports top_env uds
 
-       ; return (guts { mg_binds = CoreCompUnit spec_binds : binds'
-                      , mg_rules = spec_rules ++ local_rules }) }
+       ; return (guts { mg_binds = CoreCompUnit spec_binds spec_rules : binds'
+                      , mg_rules = local_rules }) }
 
 {-
 Note [Wrap bindings returned by specImports]

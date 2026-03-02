@@ -105,12 +105,19 @@ and the level of @h@ is zero (NB not one).
 -}
 
 liberateCase :: LibCaseOpts -> CoreProgram -> CoreProgram
-liberateCase opts binds = do_prog (initLiberateCaseEnv opts) binds
+liberateCase opts comp_units = snd (do_prog (initLiberateCaseEnv opts) comp_units)
   where
-    do_prog _   [] = []
-    do_prog env (bind:binds) = bind' : do_prog env' binds
-                             where
-                               (env', bind') = libCaseBind env bind
+    do_prog env [] = (env, [])
+    do_prog env (CoreCompUnit binds unit_rules:units) =
+      let (env', binds') = do_unit env binds
+          (env'', units') = do_prog env' units
+      in (env'', CoreCompUnit binds' unit_rules : units')
+
+    do_unit env [] = (env, [])
+    do_unit env (bind:binds) =
+      let (env', bind') = libCaseBind env bind
+          (env'', binds') = do_unit env' binds
+      in (env'', bind' : binds')
 
 initLiberateCaseEnv :: LibCaseOpts -> LibCaseEnv
 initLiberateCaseEnv opts = LibCaseEnv
