@@ -410,6 +410,7 @@ pprInstr platform instr = case instr of
   SXTB o1 o2       -> op2 (text "\tsxtb") o1 o2
   UXTB o1 o2       -> op2 (text "\tuxtb") o1 o2
   SXTH o1 o2       -> op2 (text "\tsxth") o1 o2
+  SXTW o1 o2       -> op2 (text "\tsxtw") o1 o2
   UXTH o1 o2       -> op2 (text "\tuxth") o1 o2
 
   -- 3. Logical and Move Instructions ------------------------------------------

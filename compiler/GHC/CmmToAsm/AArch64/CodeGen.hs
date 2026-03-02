@@ -1501,7 +1501,7 @@ signExtendReg w w' r =
       W64 -> noop
       W32
         | w' == W32 -> noop
-        | otherwise -> extend SXTH
+        | otherwise -> extend SXTW
       W16           -> extend SXTH
       W8            -> extend SXTB
       _             -> panic "intOp"
@@ -1972,7 +1972,7 @@ genCCall target dest_regs arg_regs = do
                   -- the low 2w' of lo contains the full multiplication;
                   -- eg: int8 * int8 -> int16 result
                   -- so lo is in the last w of the register, and hi is in the second w.
-                  SMULL (OpReg w' lo) (OpReg w' reg_a) (OpReg w' reg_b) `snocOL`
+                  SMULL (OpReg w' lo) (OpReg W32 reg_a) (OpReg W32 reg_b) `snocOL`
                   -- Make sure we hold onto the sign bits for dst_needed
                   ASR (OpReg w' hi) (OpReg w' lo)    (OpImm (ImmInt $ widthInBits w)) `appOL`
                   -- lo can now be truncated so we can get at it's top bit easily.

@@ -258,3 +258,6 @@ test('T25364', normal, compile_and_run, [''])
 test('T26061', normal, compile_and_run, [''])
 test('T24016', normal, compile_and_run, ['-O1 -fPIC'])
 test('T26537', [js_broken(26558), compile_timeout_multiplier(5)], compile_and_run, ['-O2 -fregs-graph'])
+
+# AArch64-specific runtime tests
+test('aarch64-sxtw-run', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])

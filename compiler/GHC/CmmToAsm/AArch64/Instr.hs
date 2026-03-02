@@ -101,6 +101,7 @@ regUsageOfInstr platform instr = case instr of
   SXTB dst src             -> usage (regOp src, regOp dst)
   UXTB dst src             -> usage (regOp src, regOp dst)
   SXTH dst src             -> usage (regOp src, regOp dst)
+  SXTW dst src             -> usage (regOp src, regOp dst)
   UXTH dst src             -> usage (regOp src, regOp dst)
   CLZ  dst src             -> usage (regOp src, regOp dst)
   RBIT dst src             -> usage (regOp src, regOp dst)
@@ -263,6 +264,7 @@ patchRegsOfInstr instr env = case instr of
     SXTB o1 o2       -> SXTB (patchOp o1) (patchOp o2)
     UXTB o1 o2       -> UXTB (patchOp o1) (patchOp o2)
     SXTH o1 o2       -> SXTH (patchOp o1) (patchOp o2)
+    SXTW o1 o2       -> SXTW (patchOp o1) (patchOp o2)
     UXTH o1 o2       -> UXTH (patchOp o1) (patchOp o2)
     CLZ o1 o2        -> CLZ  (patchOp o1) (patchOp o2)
     RBIT o1 o2       -> RBIT (patchOp o1) (patchOp o2)
@@ -616,8 +618,7 @@ data Instr
     | UXTB Operand Operand
     | SXTH Operand Operand
     | UXTH Operand Operand
-    -- | SXTW Operand Operand
-    -- | SXTX Operand Operand
+    | SXTW Operand Operand
     | PUSH_STACK_FRAME
     | POP_STACK_FRAME
     -- 1. Arithmetic Instructions ----------------------------------------------
@@ -758,6 +759,7 @@ instrCon i =
       SXTB{} -> "SXTB"
       UXTB{} -> "UXTB"
       SXTH{} -> "SXTH"
+      SXTW{} -> "SXTW"
       UXTH{} -> "UXTH"
       PUSH_STACK_FRAME{} -> "PUSH_STACK_FRAME"
       POP_STACK_FRAME{} -> "POP_STACK_FRAME"
