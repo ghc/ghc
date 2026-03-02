@@ -116,6 +116,7 @@ import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Decls.Overlap ( OverlapMode(..) )
 import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
+import Language.Haskell.Syntax.UTF8
 
 import GHC.Prelude.Basic
 
@@ -2036,3 +2037,6 @@ instance Outputable (OverlapMode p) where
   ppr (Incoherent   _) = text "[incoherent]"
   ppr (NonCanonical _) = text "[noncanonical]"
   ppr (XOverlapMode _) = text "[user TTG extension]"
+
+instance Outputable TextUTF8 where
+  ppr = text . decodeUTF8

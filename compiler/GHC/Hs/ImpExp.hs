@@ -17,6 +17,7 @@ module GHC.Hs.ImpExp
     , module GHC.Hs.ImpExp
     ) where
 
+import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Syntax.ImpExp
@@ -39,7 +40,6 @@ import GHC.Unit.Module.Warnings
 
 import Data.Data
 import Data.Maybe
-import GHC.Hs.Doc (LHsDoc)
 
 
 {-
@@ -144,6 +144,10 @@ simpleImportDecl mn = ImportDecl {
     }
 
 instance (OutputableBndrId p
+         , Outputable
+             (GenLocated
+               (Anno (WithHsDocIdentifiers (HsDocString (GhcPass p)) (GhcPass p)))
+               (WithHsDocIdentifiers (HsDocString (GhcPass p)) (GhcPass p)))
          , Outputable (Anno (IE (GhcPass p)))
          , Outputable (ImportDeclPkgQual (GhcPass p)))
        => Outputable (ImportDecl (GhcPass p)) where
@@ -353,10 +357,10 @@ replaceWrappedName (IEData    r (L l _)) n = IEData    r (L l n)
 replaceLWrappedName :: LIEWrappedName GhcPs -> IdP GhcRn -> LIEWrappedName GhcRn
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
 
-exportDocstring :: LHsDoc pass -> SDoc
+exportDocstring :: Outputable (LHsDoc (GhcPass p)) => LHsDoc (GhcPass p) -> SDoc
 exportDocstring doc = braces (text "docstring: " <> ppr doc)
 
-instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
+instance (OutputableBndrId p, Outputable (LHsDoc (GhcPass p)))  => Outputable (IE (GhcPass p)) where
     ppr ie@(IEVar       _     var doc) =
       sep $ catMaybes [ ppr <$> ieDeprecation ie
                       , Just $ ppr (unLoc var)

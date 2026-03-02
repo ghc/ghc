@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+
 module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
   EpToken(..), EpUniToken(..),
@@ -32,6 +34,7 @@ module GHC.Parser.Annotation (
   SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnN,
   SrcSpanAnnLC, SrcSpanAnnLW, SrcSpanAnnLS, SrcSpanAnnLI,
   LocatedE,
+  IsSrcSpanAnn,
 
   -- ** Annotation data types used in 'GenLocated'
 
@@ -94,16 +97,33 @@ import Data.Data
 import Data.Function (on)
 import Data.List (sortBy)
 import Data.Semigroup
+import Data.Void
 import GHC.Data.FastString
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import GHC.Types.Name
+import GHC.Types.Name.Reader (RdrName)
 import GHC.Types.SrcLoc
-import GHC.Hs.DocString
+--import GHC.Hs.DocString
+import GHC.Types.Var (Id)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
 import GHC.Types.SourceText (SourceText (NoSourceText))
+
+import GHC.Hs.Extension
+
+import Language.Haskell.Syntax.Doc
+import Language.Haskell.Syntax.Extension (Anno)
+
+type instance Anno Id      = SrcSpanAnnN
+type instance Anno Name    = SrcSpanAnnN
+type instance Anno RdrName = SrcSpanAnnN
+
+type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ EpAnn a,
+                          Anno (IdOccGhcP p) ~ EpAnn a,
+                          NoAnn a,
+                          IsPass p)
 
 {-
 Note [exact print annotations]
@@ -308,17 +328,45 @@ data EpaComment =
     -- and the start of this location is used for the spacing when
     -- exact printing the comment.
     }
-    deriving (Eq, Data, Show)
+    deriving (Eq, Show)
+
+instance Data EpaComment where
+  gunfold _ _ _ = undefined
+  toConstr = undefined
+  dataTypeOf = undefined
 
 data EpaCommentTok =
   -- Documentation annotations
-    EpaDocComment      HsDocString -- ^ a docstring that can be pretty printed using pprHsDocString
+    EpaDocComment (HsDocString Void) -- ^ a docstring that can be pretty printed using pprHsDocString
   | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
   | EpaLineComment     String     -- ^ comment starting by "--"
   | EpaBlockComment    String     -- ^ comment in {- -}
-    deriving (Eq, Data, Show)
+    deriving (Eq, Show)
+    -- TODO: add back the Data and Show instance
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in GHC.Parser.Lexer and bringing it in here would create a loop
+
+instance {-# OVERLAPPING #-} Eq (HsDocString Void) where
+  (==) = \case
+       MultiLineDocString   _ a1 b1 -> \case
+         MultiLineDocString _ a2 b2 -> a1 == a2 && length b1 == length b2
+         _ -> False
+       NestedDocString    _ a1 b1 -> \case
+         NestedDocString  _ a2 b2 -> a1 == a2
+         _ -> False
+       GeneratedDocString   _ a1 -> \case
+         GeneratedDocString _ a2 -> a1 == a2
+         _ -> False
+       XHsDocString _ -> \case
+         XHsDocString _ -> True
+         _ -> False
+
+instance {-# OVERLAPPING #-} Show (HsDocString Void) where
+  show = \case
+    MultiLineDocString _ a b -> unwords ["MultiLineDocString", show a ]
+    NestedDocString    _ a b -> unwords ["NestedDocString"   , show a ]
+    GeneratedDocString _ a   -> unwords ["GeneratedDocString", show a ]
+    XHsDocString       _     -> "XHsDocString"
 
 instance Outputable EpaComment where
   ppr x = text (show x)
@@ -389,7 +437,6 @@ data EpAnn ann
            }
         deriving (Data, Eq, Functor)
 -- See Note [XRec and Anno in the AST]
-
 
 spanAsAnchor :: SrcSpan -> (EpaLocation' a)
 spanAsAnchor ss  = EpaSpan ss
@@ -537,7 +584,7 @@ data AnnList a
       al_trailing  :: ![TrailingAnn] -- ^ items appearing after the
                                      -- list, such as '=>' for a
                                      -- context
-      } deriving (Data,Eq)
+      } deriving (Data, Eq)
 
 data AnnListBrackets
   = ListParens (EpToken "(")         (EpToken ")")
@@ -569,7 +616,6 @@ data AnnContext
       ac_open      :: [EpToken "("], -- ^ zero or more opening parentheses.
       ac_close     :: [EpToken ")"]  -- ^ zero or more closing parentheses.
       } deriving (Data)
-
 
 -- ---------------------------------------------------------------------
 -- Annotations for names
@@ -648,7 +694,7 @@ data AnnPragma
       apr_loc2      :: EpaLocation,
       apr_type      :: EpToken "type",
       apr_module    :: EpToken "module"
-      } deriving (Data,Eq)
+      } deriving (Data, Eq)
 
 -- ---------------------------------------------------------------------
 

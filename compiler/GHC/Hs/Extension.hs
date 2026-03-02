@@ -21,7 +21,7 @@ import GHC.Types.Var
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Types.SrcLoc (GenLocated(..), unLoc)
 import GHC.Utils.Panic
-import GHC.Parser.Annotation
+--import GHC.Parser.Annotation
 
 {-
 Note [IsPass]
@@ -92,16 +92,18 @@ type instance XRec (GhcPass p) a = XRecGhc a
 -- but pass-independent, source location
 type XRecGhc a = GenLocated (Anno a) a
 
-type instance Anno RdrName = SrcSpanAnnN
-type instance Anno Name    = SrcSpanAnnN
-type instance Anno Id      = SrcSpanAnnN
+--type instance Anno RdrName = SrcSpanAnnN
+--type instance Anno Name    = SrcSpanAnnN
+--type instance Anno Id      = SrcSpanAnnN
 
 type instance Anno (WithUserRdr a) = Anno a
 
+{-
 type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ EpAnn a,
                           Anno (IdOccGhcP p) ~ EpAnn a,
                           NoAnn a,
                           IsPass p)
+-}
 
 instance UnXRec (GhcPass p) where
   unXRec = unLoc

@@ -26,6 +26,7 @@ import GHC.Types.Basic (PprPrec(..), topPrec )
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Types.SourceText
 import GHC.Core.Type
+import GHC.Parser.Annotation ( {- type instance Anno Id -} )
 import GHC.Utils.Misc (split)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)

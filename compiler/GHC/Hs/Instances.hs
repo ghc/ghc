@@ -35,6 +35,7 @@ import GHC.Data.BooleanFormula (BooleanFormula(..))
 import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Decls.Foreign (CType(..), Header(..))
 import Language.Haskell.Syntax.Decls.Overlap (OverlapMode(..))
+import Language.Haskell.Syntax.Doc (HsDocString(..), WithHsDocIdentifiers(..))
 import Language.Haskell.Syntax.Extension (Anno)
 import Language.Haskell.Syntax.Binds.InlinePragma (ActivationX(..), InlinePragma(..))
 
@@ -629,9 +630,9 @@ deriving instance Eq (IEWholeNamespaceExt GhcRn)
 deriving instance Eq (IEWholeNamespaceExt GhcTc)
 
 -- deriving instance (DataId name)             => Data (IE name)
-deriving instance Data (IE GhcPs)
-deriving instance Data (IE GhcRn)
-deriving instance Data (IE GhcTc)
+deriving instance Data (Anno (WithHsDocIdentifiers (HsDocString GhcPs) GhcPs)) => Data (IE GhcPs)
+deriving instance Data (Anno (WithHsDocIdentifiers (HsDocString GhcRn) GhcRn)) => Data (IE GhcRn)
+deriving instance Data (Anno (WithHsDocIdentifiers (HsDocString GhcTc) GhcTc)) => Data (IE GhcTc)
 
 -- deriving instance (Eq name, Eq (IdP name)) => Eq (IE name)
 deriving instance Eq (IE GhcPs)
@@ -669,3 +670,13 @@ deriving instance Data (InlinePragma GhcTc)
 deriving instance Data (OverlapMode GhcPs)
 deriving instance Data (OverlapMode GhcRn)
 deriving instance Data (OverlapMode GhcTc)
+
+
+-- deriving instance Data (HsDocString p)
+deriving instance Data (HsDocString GhcPs)
+deriving instance Data (HsDocString GhcRn)
+deriving instance Data (HsDocString GhcTc)
+
+deriving instance Data a => Data (WithHsDocIdentifiers a GhcPs)
+deriving instance Data a => Data (WithHsDocIdentifiers a GhcRn)
+deriving instance Data a => Data (WithHsDocIdentifiers a GhcTc)

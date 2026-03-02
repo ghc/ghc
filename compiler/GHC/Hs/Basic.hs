@@ -14,7 +14,7 @@ import GHC.Prelude
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
 import GHC.Types.Name
-import GHC.Parser.Annotation
+--import GHC.Parser.Annotation
 import GHC.Utils.Misc ((<||>))
 
 import Data.Data (Data)
@@ -86,8 +86,8 @@ instance Binary FixityDirection where
 -- @
 data NamespaceSpecifier
   = NoNamespaceSpecifier
-  | TypeNamespaceSpecifier (EpToken "type")
-  | DataNamespaceSpecifier (EpToken "data")
+  | TypeNamespaceSpecifier () -- (EpToken "type")
+  | DataNamespaceSpecifier () --(EpToken "data")
   deriving (Eq, Data)
 
 -- | Check if namespace specifiers overlap, i.e. if they are equal or

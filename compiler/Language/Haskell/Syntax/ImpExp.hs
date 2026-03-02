@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Language.Haskell.Syntax.ImpExp ( module Language.Haskell.Syntax.ImpExp, IsBootInterface(..) ) where
 
+import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name
 import Language.Haskell.Syntax.ImpExp.IsBoot ( IsBootInterface(..) )
@@ -13,7 +14,7 @@ import Data.String (String)
 import Data.Int (Int)
 
 import Control.DeepSeq
-import {-# SOURCE #-} GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
+--import {-# SOURCE #-} GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 
 {-
 ************************************************************************

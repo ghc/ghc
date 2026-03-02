@@ -1028,6 +1028,7 @@ Library
         Language.Haskell.Syntax.Decls
         Language.Haskell.Syntax.Decls.Foreign
         Language.Haskell.Syntax.Decls.Overlap
+        Language.Haskell.Syntax.Doc
         Language.Haskell.Syntax.Expr
         Language.Haskell.Syntax.Extension
         Language.Haskell.Syntax.ImpExp
@@ -1037,6 +1038,7 @@ Library
         Language.Haskell.Syntax.Pat
         Language.Haskell.Syntax.Specificity
         Language.Haskell.Syntax.Type
+        Language.Haskell.Syntax.UTF8
 
     autogen-modules: GHC.Platform.Constants
                      GHC.Settings.Config

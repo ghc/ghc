@@ -32,6 +32,7 @@ import GHC.Data.EnumSet (EnumSet)
 import GHC.Types.Avail
 import GHC.Types.Name.Set
 import GHC.Driver.Flags
+import GHC.Parser.Annotation
 
 import Control.DeepSeq
 import Data.Data
@@ -49,29 +50,15 @@ import Data.Function
 
 import GHC.Hs.DocString
 
+import Language.Haskell.Syntax.Doc
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Module.Name
 
--- | A docstring with the (probable) identifiers found in it.
-type HsDoc = WithHsDocIdentifiers HsDocString
+deriving instance Eq a => Eq (WithHsDocIdentifiers a GhcPs)
+deriving instance Eq a => Eq (WithHsDocIdentifiers a GhcRn)
+deriving instance Eq a => Eq (WithHsDocIdentifiers a GhcTc)
 
--- | Annotate a value with the probable identifiers found in it
--- These will be used by haddock to generate links.
---
--- The identifiers are bundled along with their location in the source file.
--- This is useful for tooling to know exactly where they originate.
---
--- This type is currently used in two places - for regular documentation comments,
--- with 'a' set to 'HsDocString', and for adding identifier information to
--- warnings, where 'a' is 'StringLiteral'
-data WithHsDocIdentifiers a pass = WithHsDocIdentifiers
-  { hsDocString      :: !a
-  , hsDocIdentifiers :: ![Located (IdP pass)]
-  }
-
-deriving instance (Data pass, Data (IdP pass), Data a) => Data (WithHsDocIdentifiers a pass)
-deriving instance (Eq (IdP pass), Eq a) => Eq (WithHsDocIdentifiers a pass)
-instance (NFData (IdP pass), NFData a) => NFData (WithHsDocIdentifiers a pass) where
+instance (NFData (LIdP (GhcPass pass)), NFData a) => NFData (WithHsDocIdentifiers a (GhcPass pass)) where
   rnf (WithHsDocIdentifiers d i) = rnf d `seq` rnf i
 
 -- | For compatibility with the existing @-ddump-parsed' output, we only show
@@ -81,12 +68,26 @@ instance (NFData (IdP pass), NFData a) => NFData (WithHsDocIdentifiers a pass) w
 instance Outputable a => Outputable (WithHsDocIdentifiers a pass) where
   ppr (WithHsDocIdentifiers s _ids) = ppr s
 
-instance Binary a => Binary (WithHsDocIdentifiers a GhcRn) where
+{-
+instance forall a . (Binary a, Binary (Anno Name)) => Binary (WithHsDocIdentifiers a (GhcRn)) where
   put_ bh (WithHsDocIdentifiers s ids) = do
     put_ bh s
-    put_ bh $ BinLocated <$> (sortBy  (stableNameCmp `on` getName) ids)
+    put_ bh $ BinGenLocated <$> ids
+--    put_ bh ids
   get bh =
-    liftA2 WithHsDocIdentifiers (get bh) (fmap unBinLocated <$> get bh)
+    liftA2 (WithHsDocIdentifiers :: a -> [LIdP (GhcPass p)] -> WithHsDocIdentifiers a (GhcPass p)) (get bh) (fmap unBinGenLocated <$> get bh)
+-}
+{-
+ids = [GenLocated (Anno Name) Name]
+    = [GenLocated (SrcSpanAnnN) Name]
+    = [GenLocated (EpAnn NameAnn) Name]
+
+
+[LIdP GhcRn] = [XRec GhcRn (IdP GhcRn)]
+             = [XRec GhcRn (IdGhcP 'Renamed)]
+             = [XRec GhcRn Name]
+-}
+
 
 -- | Extract a mapping from the lexed identifiers to the names they may
 -- correspond to.
@@ -98,22 +99,21 @@ hsDocIds (WithHsDocIdentifiers _ ids) = mkNameSet $ map unLoc ids
 -- and will come either before or after depending on how it was written
 -- i.e it will come after the thing if it is a '-- ^' or '{-^' and before
 -- otherwise.
-pprWithDoc :: LHsDoc name -> SDoc -> SDoc
+pprWithDoc :: LHsDoc (GhcPass name) -> SDoc -> SDoc
 pprWithDoc doc = pprWithDocString (hsDocString $ unLoc doc)
 
 -- | See 'pprWithHsDoc'
-pprMaybeWithDoc :: Maybe (LHsDoc name) -> SDoc -> SDoc
+pprMaybeWithDoc :: Maybe (LHsDoc (GhcPass name)) -> SDoc -> SDoc
 pprMaybeWithDoc Nothing    = id
 pprMaybeWithDoc (Just doc) = pprWithDoc doc
 
 -- | Print a doc with its identifiers, useful for debugging
-pprHsDocDebug :: (Outputable (IdP name)) => HsDoc name -> SDoc
+pprHsDocDebug :: HsDoc (GhcPass name) -> SDoc
 pprHsDocDebug (WithHsDocIdentifiers s ids) =
     vcat [ text "text:" $$ nest 2 (pprHsDocString s)
-         , text "identifiers:" $$ nest 2 (vcat (map pprLocatedAlways ids))
+--         , text "identifiers:" $$ nest 2 (vcat (map pprLocatedAlways ids))
          ]
-
-type LHsDoc pass = Located (HsDoc pass)
+-- XRec p (IdP p)
 
 -- | A simplified version of 'HsImpExp.IE'.
 data DocStructureItem
@@ -136,6 +136,7 @@ data DocStructureItem
                             -- ^ Invariant: This list of Avails must be sorted
                             -- to guarantee interface file determinism.
 
+{-
 instance Binary DocStructureItem where
   put_ bh = \case
     DsiSectionHeading level doc -> do
@@ -165,6 +166,7 @@ instance Binary DocStructureItem where
       3 -> DsiExports <$> get bh
       4 -> DsiModExport <$> get bh <*> get bh
       _ -> fail "instance Binary DocStructureItem: Invalid tag"
+-}
 
 instance Outputable DocStructureItem where
   ppr = \case
@@ -185,8 +187,8 @@ instance Outputable DocStructureItem where
 
 instance NFData DocStructureItem where
   rnf = \case
-    DsiSectionHeading level doc -> rnf level `seq` rnf doc
-    DsiDocChunk doc -> rnf doc
+    DsiSectionHeading level !doc -> rnf level -- `seq` rnf doc
+    DsiDocChunk !doc -> () -- rnf doc
     DsiNamedChunkRef name -> rnf name
     DsiExports avails -> rnf avails
     DsiModExport mod_names avails -> rnf mod_names `seq` rnf avails
@@ -220,10 +222,16 @@ data Docs = Docs
 
 instance NFData Docs where
   rnf (Docs mod_hdr exps decls args structure named_chunks haddock_opts language extentions)
+{-
     = rnf mod_hdr `seq` rnf exps `seq` rnf decls `seq` rnf args `seq` rnf structure `seq` rnf named_chunks
     `seq` rnf haddock_opts `seq` rnf language `seq` rnf extentions
     `seq` ()
+-}
+    = rnf structure
+    `seq` rnf haddock_opts `seq` rnf language `seq` rnf extentions
+    `seq` ()
 
+{-
 instance Binary Docs where
   put_ bh docs = do
     put_ bh (docs_mod_hdr docs)
@@ -255,6 +263,7 @@ instance Binary Docs where
               , docs_language = language
               , docs_extensions = exts
               }
+-}
 
 instance Outputable Docs where
   ppr docs =

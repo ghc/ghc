@@ -1410,7 +1410,7 @@ data DocDecl pass
   | DocCommentNamed String (LHsDoc pass)
   | DocGroup Int (LHsDoc pass)
 
-deriving instance (Data pass, Data (IdP pass)) => Data (DocDecl pass)
+--deriving instance (Data pass, Data (IdP pass)) => Data (DocDecl pass)
 
 docDeclDoc :: DocDecl pass -> LHsDoc pass
 docDeclDoc (DocCommentNext d) = d

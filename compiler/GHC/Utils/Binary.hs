@@ -103,7 +103,7 @@ module GHC.Utils.Binary
    getGenericSymtab, putGenericSymTab,
    getGenericSymbolTable, putGenericSymbolTable,
    -- * Newtype wrappers
-   BinSpan(..), BinSrcSpan(..), BinLocated(..),
+   BinSpan(..), BinSrcSpan(..), BinLocated(..), BinGenLocated(..),
    -- * Newtypes for types that have canonically more than one valid encoding
    BindingName(..),
    simpleBindingNameWriter,
@@ -121,6 +121,7 @@ import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Binds.InlinePragma
 import Language.Haskell.Syntax.Module.Name (ModuleName(..))
 import Language.Haskell.Syntax.ImpExp.IsBoot (IsBootInterface(..))
+import Language.Haskell.Syntax.UTF8
 
 import {-# SOURCE #-} GHC.Types.Name (Name)
 import GHC.Data.FastString
@@ -1905,6 +1906,18 @@ instance Binary a => Binary (BinLocated a) where
             x <- get bh
             return $ BinLocated (L l x)
 
+newtype BinGenLocated l a = BinGenLocated { unBinGenLocated :: GenLocated l a }
+
+instance (Binary a, Binary l) => Binary (BinGenLocated l a) where
+    put_ bh (BinGenLocated (L l x)) = do
+            put_ bh l
+            put_ bh x
+
+    get bh = do
+            l <- get bh
+            x <- get bh
+            return $ BinGenLocated (L l x)
+
 newtype BinSpan = BinSpan { unBinSpan :: RealSrcSpan }
 
 -- See Note [Source Location Wrappers]
@@ -2097,3 +2110,8 @@ instance Binary RuleMatchInfo where
       h <- getByte bh
       if h == 1 then pure ConLike
                 else pure FunLike
+
+instance Binary TextUTF8 where
+  put_ bh = putSBS bh . bytesUTF8
+
+  get = fmap unsafeFromShortByteString . getSBS
