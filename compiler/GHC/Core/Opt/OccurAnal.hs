@@ -27,6 +27,7 @@ core expression with (hopefully) improved usage information.
 
 module GHC.Core.Opt.OccurAnal (
     occurAnalysePgm,
+    occurAnalyseCompUnit,
     occurAnalyseExpr, occurAnalyseExpr_Prep,
     zapLambdaBndrs
   ) where
@@ -94,50 +95,34 @@ occurAnalyseExpr_Prep expr = expr'
   where
     WUD _ expr' = occAnal (initOccEnv { occ_allow_weak_joins = True }) expr
 
-occurAnalysePgm :: Module         -- Used only in debug output
-                -> (Id -> Bool)         -- Active unfoldings
-                -> (ActivationGhc -> Bool) -- Active rules
-                -> [CoreRule]           -- Local rules for imported Ids
-                -> CoreProgram -> CoreProgram
-occurAnalysePgm this_mod active_unf active_rule imp_rules binds
+occurAnalyseCompUnit
+  :: Module
+  -> (Id -> Bool)
+  -> (ActivationGhc -> Bool)
+  -> [CoreRule]
+  -> CoreCompUnit -> CoreCompUnit
+occurAnalyseCompUnit this_mod active_unf active_rule imp_rules (CoreCompUnit unit_binds unit_rules)
   | isEmptyDetails final_usage
-  = occ_anald_binds
+  = CoreCompUnit occ_anald_unit_binds unit_rules
 
-  | otherwise   -- See Note [Glomming]
-  = warnPprTrace True "Glomming in" (hang (ppr this_mod <> colon) 2 (ppr final_usage))
-    occ_anald_glommed_binds
+  | otherwise
+  = warnPprTrace True "Glomming in comp unit" (hang (ppr this_mod <> colon) 2 (ppr final_usage))
+    (CoreCompUnit occ_anald_glommed_binds unit_rules)
   where
     init_env = initOccEnv { occ_rule_act = active_rule
                           , occ_unf_act  = active_unf }
 
-    WUD program_usage occ_anald_binds = go_program binds init_env
-    final_usage = program_usage `andUDs` initial_uds
+    WUD unit_usage occ_anald_unit_binds = go_unit unit_binds init_env
+    final_usage = unit_usage `andUDs` initial_uds
+
     WUD _ occ_anald_glommed_binds =
-      let WUD _ glommed_binds = occAnalRecBind init_env TopLevel
-                                               imp_rule_edges
-                                               (flattenBinds (concatMap coreCompUnitBinds binds))
-                                               initial_uds
-          glommed_rules = concatMap cu_rules binds
-      in WUD emptyDetails [CoreCompUnit glommed_binds glommed_rules]
-          -- It's crucial to re-analyse the glommed-together bindings
-          -- so that we establish the right loop breakers. Otherwise
-          -- we can easily create an infinite loop (#9583 is an example)
-          --
-          -- Also crucial to re-analyse the /original/ bindings
-          -- in case the first pass accidentally discarded as dead code
-          -- a binding that was actually needed (albeit before its
-          -- definition site).  #17724 threw this up.
+      occAnalRecBind init_env TopLevel imp_rule_edges (flattenBinds unit_binds) initial_uds
 
     initial_uds = addManyOccs emptyDetails (rulesFreeVars imp_rules)
-    -- The RULES declarations keep things alive!
+      -- The RULES declarations keep things alive!
 
-    -- imp_rule_edges maps a top-level local binder 'f' to the
-    -- RHS free vars of any IMP-RULE, a local RULE for an imported function,
-    -- where 'f' appears on the LHS
-    --   e.g.  RULE foldr f = blah
-    --         imp_rule_edges contains f :-> fvs(blah)
-    -- We treat such RULES as extra rules for 'f'
-    -- See Note [Preventing loops due to imported functions rules]
+    -- imp_rule_edges maps a top-level local binder 'f' to the RHS free vars
+    -- of any IMP-RULE where 'f' appears on the LHS
     imp_rule_edges :: ImpRuleEdges
     imp_rule_edges = foldr (plusVarEnv_C (++)) emptyVarEnv
                            [ mapVarEnv (const [(act,rhs_fvs)]) $ getUniqSet $
@@ -147,17 +132,50 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
                                    -- Not BuiltinRules; see Note [Plugin rules]
                            , let rhs_fvs = exprFreeIds rhs `delVarSetList` bndrs ]
 
-    go_program :: CoreProgram -> OccEnv -> WithUsageDetails CoreProgram
-    go_program [] _ = WUD emptyDetails []
-    go_program (CoreCompUnit unit_binds unit_rules : units) env
-      = let WUD unit_uds unit_binds' = go_unit unit_binds env
-            WUD units_uds units' = go_program units env
-        in WUD (unit_uds `andUDs` units_uds) (CoreCompUnit unit_binds' unit_rules : units')
-
     go_unit :: [CoreBind] -> OccEnv -> WithUsageDetails [CoreBind]
-    go_unit []           _   = WUD emptyDetails []
-    go_unit (bind:unit_binds) env = occAnalBind env TopLevel
-                                     imp_rule_edges bind (go_unit unit_binds) (++)
+    go_unit [] _ = WUD emptyDetails []
+    go_unit (bind:binds) env = occAnalBind env TopLevel
+                                 imp_rule_edges bind (go_unit binds) (++)
+  -- occurrence analyse and potentially reorder in dep order the core bindings
+
+occurAnalysePgm :: Module         -- Used only in debug output
+                -> (Id -> Bool)         -- Active unfoldings
+                -> (ActivationGhc -> Bool) -- Active rules
+                -> [CoreRule]           -- Local rules for imported Ids
+                -> CoreProgram -> CoreProgram
+occurAnalysePgm this_mod active_unf active_rule imp_rules binds
+  | Just err_doc <- crossCompUnitRefs binds
+  = pprPanic "occurAnalysePgm" err_doc
+  | otherwise
+  = map (occurAnalyseCompUnit this_mod active_unf active_rule imp_rules) binds
+  where
+    -- This is a bit shit code the AI come up with.
+    -- I think we can just check that each unit doesn't have any
+    -- local free variables at the end.
+    -- But not wrong so will fix this later.
+    crossCompUnitRefs :: CoreProgram -> Maybe SDoc
+    crossCompUnitRefs units = go 1 unit_infos
+      where
+        unit_infos = [ (unit_bndrs, unit_fvs)
+                     | CoreCompUnit unit_binds unit_rules <- units
+                     , let unit_bndrs = mkVarSet (bindersOfBinds unit_binds)
+                     , let unit_fvs = foldr unionVarSet (rulesFreeVars unit_rules)
+                                             (map bindFreeVars unit_binds)
+                     ]
+        all_bndrs = foldr unionVarSet emptyVarSet [ unit_bndrs | (unit_bndrs, _) <- unit_infos ]
+
+        go :: Int -> [(VarSet, VarSet)] -> Maybe SDoc
+        go _ [] = Nothing
+        go n ((unit_bndrs, unit_fvs):rest)
+          | isEmptyVarSet cross_unit_refs = go (n + 1) rest
+          | otherwise = Just $
+              text "cross-compilation-unit references are not allowed"
+              $$ text "compilation unit index:" <+> int n
+              $$ text "offending binders:" <+> ppr cross_unit_refs
+          where
+            cross_unit_refs = (unit_fvs `minusVarSet` unit_bndrs)
+                              `intersectVarSet`
+                              (all_bndrs `minusVarSet` unit_bndrs)
 
 {- *********************************************************************
 *                                                                      *
