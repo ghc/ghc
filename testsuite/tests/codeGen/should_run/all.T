@@ -261,3 +261,5 @@ test('T26537', [js_broken(26558), compile_timeout_multiplier(5)], compile_and_ru
 
 # AArch64-specific runtime tests
 test('aarch64-sxtw-run', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
+test('aarch64-ushr-subword-run', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
+test('aarch64-subword-ops', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])

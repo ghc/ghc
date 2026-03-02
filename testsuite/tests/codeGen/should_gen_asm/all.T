@@ -31,3 +31,5 @@ is_aarch64_codegen = [
 # AArch64-specific tests
 test('aarch64-sxtw', is_aarch64_codegen, compile_grep_asm, ['hs', True, '-O'])
 test('aarch64-sxtw-mul2', is_aarch64_codegen, compile_grep_asm, ['cmm', True, ''])
+test('aarch64-ushr-subword', is_aarch64_codegen, compile_grep_asm, ['hs', True, '-O'])
+test('aarch64-shl-subword', is_aarch64_codegen, compile_grep_asm, ['hs', True, '-O'])
