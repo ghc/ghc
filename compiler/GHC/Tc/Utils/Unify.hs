@@ -1882,6 +1882,24 @@ the LHS vs the new RHS. And vice-versa (if it's the RHS that is a FunTy).
 
 See T11305 and T26225 for examples of when this is important.
 
+Wrinkle [tc_sub_type_deep occurs check]
+
+  In #26823 we had
+
+    alpha   <= a -> alpha
+
+  this is an occurs check failure, but if we naively follow the plan described
+  in this Note, we would do the following:
+
+    create fresh metavariables beta, gamma
+    unify alpha := beta -> gamma
+    decompose  "beta -> gamma <= a -> (beta -> gamma)", obtaining
+      a <= beta  and  gamma <= beta -> gamma
+    recur with gamma <= beta -> gamma
+
+  This caused an infinite loop! So we insert a simple occurs check to prevent
+  the infinite loop.
+
 Note [Deep subsumption and required foralls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A required forall, (forall a -> ty) behaves like a "rho-type", one with no
@@ -2005,21 +2023,27 @@ tc_sub_type_deep pos unify inst_orig ctxt ty_actual ty_expected
                af2 exp_mult exp_arg exp_res
 
     -- See Note [FunTy vs non-FunTy case in tc_sub_type_deep]
-    go1 (FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }) ty_e
+    go1 ty_a@(FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }) ty_e
       | isVisibleFunArg af1
-      = do { exp_mult <- newMultiplicityVar
+      = do { occurs <- occ_check ty_e ty_a
+             -- Wrinkle [tc_sub_type_deep occurs check]
+           ; if occurs then just_unify ty_a ty_e else
+        do { exp_mult <- newMultiplicityVar
            ; exp_arg  <- newOpenFlexiTyVarTy -- NB: no FRR check needed; we might not need to eta-expand
            ; exp_res  <- newOpenFlexiTyVarTy
            ; let exp_funTy = FunTy { ft_af = af1, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res }
            ; unify_wrap <- just_unify exp_funTy ty_e
            ; fun_wrap <- go_fun af1 act_mult act_arg act_res af1 exp_mult exp_arg exp_res
            ; return $ unify_wrap <.> fun_wrap
-             -- unify_wrap :: exp_funTy ~> ty_e
-             -- fun_wrap :: ty_a ~> exp_funTy
-           }
-    go1 ty_a (FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
+             -- unify_wrap :: exp_funTy ~~> ty_e
+             -- fun_wrap :: ty_a ~~> exp_funTy
+           } }
+    go1 ty_a ty_e@(FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
       | isVisibleFunArg af2
-      = do { act_mult <- newMultiplicityVar
+      = do { occurs <- occ_check ty_a ty_e
+             -- Wrinkle [tc_sub_type_deep occurs check]
+           ; if occurs then just_unify ty_a ty_e else
+        do { act_mult <- newMultiplicityVar
            ; act_arg  <- newOpenFlexiTyVarTy -- NB: no FRR check needed; we might not need to eta-expand
            ; act_res  <- newOpenFlexiTyVarTy
            ; let act_funTy = FunTy { ft_af = af2, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }
@@ -2027,15 +2051,25 @@ tc_sub_type_deep pos unify inst_orig ctxt ty_actual ty_expected
            ; unify_wrap <- just_unify ty_a act_funTy
            ; fun_wrap <- go_fun af2 act_mult act_arg act_res af2 exp_mult exp_arg exp_res
            ; return $ fun_wrap <.> unify_wrap
-             -- unify_wrap :: ty_a ~> act_funTy
-             -- fun_wrap :: act_funTy ~> ty_e
-           }
+             -- unify_wrap :: ty_a ~~> act_funTy
+             -- fun_wrap :: act_funTy ~~> ty_e
+           }}
 
     -- Otherwise, revert to unification.
     go1 ty_a ty_e = just_unify ty_a ty_e
 
     just_unify ty_a ty_e = do { cow <- unify ty_a ty_e
                               ; return (mkWpCastN cow) }
+
+    -- See Wrinkle [tc_sub_type_deep occurs check]
+    occ_check :: TcType -> TcType -> TcM Bool
+    occ_check ty1 ty2
+      | Just tv1 <- getTyVar_maybe ty1
+      = do { z_ty2 <- liftZonkM $ zonkTcType ty2
+           ; return $ tv1 `elemVarSet` tyCoVarsOfType z_ty2
+           }
+      | otherwise
+      = return False
 
     -- FunTy/FunTy case: this is where we insert any necessary eta-expansions.
     go_fun :: FunTyFlag -> Mult -> TcType -> TcType -- actual FunTy
