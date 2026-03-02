@@ -115,7 +115,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import {-# SOURCE #-} GHC.Core.Subst (deShadowBinds)
+import {-# SOURCE #-} GHC.Core.Subst (deShadowCompUnits)
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -2058,7 +2058,7 @@ type CoreBind = Bind CoreBndr
 -- Their order matters and their top level ids can shadow each other.
 --
 -- This means if we want to combine units into one we have to deal with that shadowing.
--- We do so by substituting over them and their associated rules, done in deShadowBinds.
+-- We do so by substituting over them and their associated rules, done in deShadowCompUnits.
 --
 -- This means flattenCoreProgram doesn't preserve the identiy of binds, and once
 -- units have been combined we can't keep using the old units as their uniques
@@ -2073,8 +2073,18 @@ data CoreCompUnit
 -- | Case alternatives where binders are 'CoreBndr's
 type CoreAlt  = Alt  CoreBndr
 
-flattenCoreProgram :: CoreProgram -> [CoreBind]
-flattenCoreProgram = deShadowBinds . concatMap coreCompUnitBinds
+flattenCoreProgram :: CoreProgram -> CoreProgram
+flattenCoreProgram [comp_unit] = [comp_unit]
+flattenCoreProgram prog =
+  [ CoreCompUnit
+      { coreCompUnitBinds = concatMap coreCompUnitBinds prog'
+      , cu_rules = concatMap cu_rules prog'
+      }
+  ]
+  where
+    prog' = deShadowCompUnits prog
+
+
 
 singletonCoreProgram :: [CoreBind] -> CoreProgram
 singletonCoreProgram binds = [CoreCompUnit binds []]
