@@ -268,7 +268,7 @@ setLevels float_lams binds us
 
     do_program :: CoreProgram -> LvlM [LevelledBind]
     do_program [] = return []
-    do_program (CoreCompUnit unit_binds:units) =
+    do_program (CoreCompUnit unit_binds _:units) =
       do { unit_binds' <- do_them unit_binds
          ; units' <- do_program units
          ; return (unit_binds' ++ units') }
@@ -1741,7 +1741,7 @@ initialEnv float_lams binds
       -- to a later one.  So here we put all the top-level binders in scope before
       -- we start, to satisfy the lookupIdSubst invariants (#20200 and #20294)
 
-    addCompUnitBndrs in_scope (CoreCompUnit unit_binds) =
+    addCompUnitBndrs in_scope (CoreCompUnit unit_binds _) =
       in_scope `extendInScopeSetBndrs` unit_binds
 
 addLvl :: Level -> VarEnv Level -> OutVar -> VarEnv Level

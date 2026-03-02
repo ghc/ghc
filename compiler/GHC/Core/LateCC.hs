@@ -35,7 +35,12 @@ addLateCostCenters ::
   -> IO (CoreProgram, LateCCState (Strict.Maybe SrcSpan))
 addLateCostCenters logger LateCCConfig{..} core_binds = do
     let core_binds_checked = case core_binds of
-          [CoreCompUnit _] -> core_binds
+          [CoreCompUnit _ unit_rules]
+            | null unit_rules -> core_binds
+            | otherwise ->
+                pprPanic "addLateCostCenters"
+                  (text "Expected no compilation-unit rules after tidy, got"
+                   <+> int (length unit_rules))
           _ ->
             pprPanic "addLateCostCenters"
               (text "Expected a single compilation unit after tidy, got"
@@ -87,7 +92,7 @@ addLateCostCenters logger LateCCConfig{..} core_binds = do
   where
     seqCompUnits :: CoreProgram -> ()
     seqCompUnits [] = ()
-    seqCompUnits (CoreCompUnit unit_binds:units) =
+    seqCompUnits (CoreCompUnit unit_binds _:units) =
       seqBinds unit_binds `seq` seqCompUnits units
 
     top_level_cc_pred :: CoreExpr -> Bool

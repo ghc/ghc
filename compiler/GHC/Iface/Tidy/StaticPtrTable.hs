@@ -167,17 +167,23 @@ data StaticPtrOpts = StaticPtrOpts
 sptCreateStaticBinds :: StaticPtrOpts -> Module -> CoreProgram
                      -> IO ([SptEntry], Maybe CStub, CoreProgram)
 sptCreateStaticBinds opts this_mod binds = do
-      (fps, binds') <- evalStateT (go [] [] binds) 0
+      (fps, binds') <- evalStateT (go_comp_units [] [] binds) 0
       let cstub
             | opt_gen_cstub opts = Just (sptModuleInitCode (opt_platform opts) this_mod fps)
             | otherwise          = Nothing
       return (fps, cstub, binds')
   where
-    go fps bs xs = case xs of
+    go_comp_units fps comp_units xs = case xs of
+      [] -> return (reverse fps, reverse comp_units)
+      CoreCompUnit unit_binds unit_rules : xs' -> do
+        (fps', unit_binds') <- go_binds [] [] unit_binds
+        go_comp_units (reverse fps' ++ fps) (CoreCompUnit unit_binds' unit_rules : comp_units) xs'
+
+    go_binds fps bs xs = case xs of
       []        -> return (reverse fps, reverse bs)
       bnd : xs' -> do
         (fps', bnd') <- replaceStaticBind bnd
-        go (reverse fps' ++ fps) (bnd' : bs) xs'
+        go_binds (reverse fps' ++ fps) (bnd' : bs) xs'
 
     -- Generates keys and replaces 'makeStatic' with 'StaticPtr'.
     --

@@ -52,13 +52,15 @@ endPassHscEnvIO hsc_env name_ppr_ctx pass binds rules
 
 -- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
 lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> WarnsAndErrs
-lintCoreBindings dflags coreToDo vars -- binds
-  = lintCoreBindings' $ LintConfig
+lintCoreBindings dflags coreToDo vars binds
+  = lintCoreBindings'
+      (LintConfig
       { l_diagOpts = initDiagOpts dflags
       , l_platform = targetPlatform dflags
       , l_flags    = perPassFlags dflags coreToDo
       , l_vars     = vars
-      }
+      })
+      binds [] False
 
 initEndPassConfig :: DynFlags -> [Var] -> NamePprCtx -> CoreToDo -> EndPassConfig
 initEndPassConfig dflags extra_vars name_ppr_ctx pass = EndPassConfig
@@ -106,7 +108,13 @@ initLintPassResultConfig dflags extra_vars pass = LintPassResultConfig
   , lpr_makeLintFlags = perPassFlags dflags pass
   , lpr_passPpr = ppr pass
   , lpr_localsInScope = extra_vars
+  , lpr_checkImpRulesNoLocals = checkImpRulesNoLocals pass
   }
+
+checkImpRulesNoLocals :: CoreToDo -> Bool
+checkImpRulesNoLocals CoreTidy = False
+checkImpRulesNoLocals CorePrep = False
+checkImpRulesNoLocals _        = True
 
 perPassFlags :: DynFlags -> CoreToDo -> LintFlags
 perPassFlags dflags pass

@@ -404,15 +404,19 @@ tidyProgram opts (ModGuts { mg_module           = mod
                           , mg_boot_exports     = boot_exports
                           }) = do
 
-  (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds imp_rules
-  let (trimmed_binds, trimmed_rules) = findExternalRules opts binds imp_rules unfold_env
+  let cu_rules_in_binds = concatMap cu_rules binds
+      all_imp_rules = imp_rules ++ cu_rules_in_binds
+      binds_flat = flattenCoreProgram binds
+  (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds_flat all_imp_rules
+  let (trimmed_binds, trimmed_rules) = findExternalRules opts binds_flat all_imp_rules unfold_env
 
   (tidy_env, tidy_binds) <- tidyTopBinds unfold_env boot_exports tidy_occ_env trimmed_binds
 
   -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
-  (spt_entries, mcstub, tidy_binds') <- case opt_static_ptr_opts opts of
-    Nothing    -> pure ([], Nothing, tidy_binds)
-    Just sopts -> sptCreateStaticBinds sopts mod tidy_binds
+  (spt_entries, mcstub, tidy_binds_prog) <- case opt_static_ptr_opts opts of
+    Nothing    -> pure ([], Nothing, singletonCoreProgram tidy_binds)
+    Just sopts -> sptCreateStaticBinds sopts mod (singletonCoreProgram tidy_binds)
+  let tidy_binds' = flattenCoreProgram tidy_binds_prog
 
   -- pprTraceM "trimmed_rules" (ppr trimmed_rules)
 
@@ -455,13 +459,13 @@ tidyProgram opts (ModGuts { mg_module           = mod
 
       local_ccs
         | opt_collect_ccs opts
-              = collectCostCentres mod tidy_binds' tidy_rules
+              = collectCostCentres mod (singletonCoreProgram tidy_binds') tidy_rules
         | otherwise
               = S.empty
 
   return (CgGuts { cg_module        = mod
                  , cg_tycons        = alg_tycons
-                 , cg_binds         = tidy_binds'
+                 , cg_binds         = singletonCoreProgram tidy_binds'
                  , cg_ccs           = S.toList local_ccs
                  , cg_foreign       = all_foreign_stubs
                  , cg_foreign_files = foreign_files
@@ -492,7 +496,8 @@ tidyProgram opts (ModGuts { mg_module           = mod
 -- unfoldings.
 collectCostCentres :: Module -> CoreProgram -> [CoreRule] -> S.Set CostCentre
 collectCostCentres mod_name binds rules
-  = {-# SCC collectCostCentres #-} foldl' go_bind (go_rules S.empty) binds
+  = {-# SCC collectCostCentres #-}
+    foldl' go_bind (go_rules S.empty) (flattenCoreProgram binds)
   where
     go cs e = case e of
       Var{} -> cs
@@ -1174,8 +1179,8 @@ tidyTopName mod name_cache maybe_ref occ_env id
 tidyTopBinds :: UnfoldEnv
              -> NameSet
              -> TidyOccEnv
-             -> CoreProgram
-             -> IO (TidyEnv, CoreProgram)
+             -> [CoreBind]
+             -> IO (TidyEnv, [CoreBind])
 
 tidyTopBinds unfold_env boot_exports init_occ_env binds
   = do let result = tidy init_env binds

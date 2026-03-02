@@ -37,7 +37,10 @@ doLateCostCenters
   -- ^ Bindings to consider
   -> (CoreProgram, LateCCState s)
 doLateCostCenters env state method binds =
-    runLateCC env state $ mapM method binds
+    runLateCC env state $ mapM doCompUnit binds
+  where
+    doCompUnit (CoreCompUnit comp_unit_binds unit_rules) =
+      (\binds' -> CoreCompUnit binds' unit_rules) <$> mapM method comp_unit_binds
 
 -- | Evaluate late cost centre insertion
 runLateCC :: LateCCEnv -> LateCCState s -> LateCCM s a -> (a, LateCCState s)
@@ -77,4 +80,3 @@ insertCC cc_name cc_loc expr = do
           s { lateCCState_ccs = S.insert cc (lateCCState_ccs s)
             }
     return $ mkTick note expr
-

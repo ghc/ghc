@@ -77,6 +77,7 @@ import GHC.Types.InlinePragma
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Types.Unique.FM ( isNullUFM, sizeUFM )
+import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
@@ -353,7 +354,7 @@ endPassIO logger cfg binds rules
                         (renderWithContext defaultSDocContext (ep_prettyPass cfg))
                         (ep_passDetails cfg) binds rules
        ; for_ (ep_lintPassResult cfg) $ \lp_cfg ->
-           lintPassResult logger lp_cfg binds
+           lintPassResult logger lp_cfg binds rules
        }
   where
     mb_flag = case ep_dumpFlag cfg of
@@ -381,14 +382,15 @@ dumpPassResult logger dump_core_sizes name_ppr_ctx mb_flag hdr extra_info binds 
        }
 
   where
-    size_doc = sep [text "Result size of" <+> text hdr, nest 2 (equals <+> ppr (coreBindsStats binds))]
+    flattened_binds = concatMap coreCompUnitBinds binds
+    size_doc = sep [text "Result size of" <+> text hdr, nest 2 (equals <+> ppr (coreBindsStats flattened_binds))]
 
     dump_doc  = vcat [ nest 2 extra_info
                      , size_doc
                      , blankLine
                      , if dump_core_sizes
-                        then pprCoreBindingsWithSize binds
-                        else pprCoreBindings         binds
+                        then pprCoreBindingsWithSize flattened_binds
+                        else pprCoreBindings         flattened_binds
                      , ppUnless (null rules) pp_rules ]
     pp_rules = vcat [ blankLine
                     , text "------ Local rules for imported ids --------"
@@ -408,11 +410,12 @@ data LintPassResultConfig = LintPassResultConfig
   , lpr_makeLintFlags    :: !LintFlags
   , lpr_passPpr          :: !SDoc
   , lpr_localsInScope    :: ![Var]
+  , lpr_checkImpRulesNoLocals :: !Bool
   }
 
 lintPassResult :: Logger -> LintPassResultConfig
-               -> CoreProgram -> IO ()
-lintPassResult logger cfg binds
+               -> CoreProgram -> [CoreRule] -> IO ()
+lintPassResult logger cfg binds rules
   = do { let warns_and_errs = lintCoreBindings'
                (LintConfig
                 { l_diagOpts = lpr_diagOpts cfg
@@ -421,12 +424,14 @@ lintPassResult logger cfg binds
                 , l_vars     = lpr_localsInScope cfg
                 })
                binds
+               rules
+               (lpr_checkImpRulesNoLocals cfg)
        ; Err.showPass logger $
            "Core Linted result of " ++
            renderWithContext defaultSDocContext (lpr_passPpr cfg)
        ; displayLintResults logger
                             (lpr_passPpr cfg)
-                            (pprCoreBindings binds) warns_and_errs
+                            (pprCoreBindings (concatMap coreCompUnitBinds binds)) warns_and_errs
        }
 
 displayLintResults :: Logger
@@ -456,11 +461,11 @@ lint_banner string pass = text "*** Core Lint"      <+> text string
                           <+> text "***"
 
 -- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
-lintCoreBindings' :: LintConfig -> CoreProgram -> WarnsAndErrs
+lintCoreBindings' :: LintConfig -> CoreProgram -> [CoreRule] -> Bool -> WarnsAndErrs
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreBindings' cfg binds
+lintCoreBindings' cfg binds imp_rules check_imp_rules_no_locals
   = initL cfg $
     addLoc TopLevelBindings           $
     do { -- Check that all top-level binders are distinct
@@ -471,11 +476,15 @@ lintCoreBindings' cfg binds
          -- Check for External top level binders with the same M.n name
        ; checkL (null ext_dups) (dupExtVars ext_dups)
 
+         -- Before tidy, mg_rules should not mention local binders.
+       ; when check_imp_rules_no_locals $
+           mapM_ lintImpRule imp_rules
+
          -- Typecheck the bindings
        ; lintRecBindings TopLevel all_pairs $ \_ ->
          return () }
   where
-    all_pairs = flattenBinds binds
+    all_pairs = flattenBinds (concatMap coreCompUnitBinds binds)
      -- Put all the top-level binders in scope at the start
      -- This is because rewrite rules can bring something
      -- into use 'unexpectedly'; see Note [Glomming] in "GHC.Core.Opt.OccurAnal"
@@ -492,6 +501,16 @@ lintCoreBindings' cfg binds
     ext_dups = snd $ removeDupsOn ord_ext $
                filter isExternalName $ map Var.varName binders
     ord_ext n = (nameModule n, nameOccName n)
+
+    local_bndr_set = mkVarSet binders
+
+    lintImpRule rule =
+      case filter (`elemVarSet` local_bndr_set) (nonDetEltsUniqSet (ruleFreeVars rule)) of
+        [] -> return ()
+        bad_ids ->
+          addErrL (hang (text "mg_rules contains local Ids before tidy:")
+                         2 (ppr rule)
+                   $$ nest 2 (text "Local Ids:" <+> ppr bad_ids))
 
 {-
 ************************************************************************
@@ -4007,8 +4026,8 @@ lintAnnots pname pass guts = {-# SCC "lintAnnots" #-} do
       nguts' <- withoutAnnots pass guts
       -- Finally compare the resulting bindings
       liftIO $ Err.showPass logger "Annotation linting - comparison"
-      let binds = flattenBinds $ mg_binds nguts
-          binds' = flattenBinds $ mg_binds nguts'
+      let binds = flattenBinds (concatMap coreCompUnitBinds (mg_binds nguts))
+          binds' = flattenBinds (concatMap coreCompUnitBinds (mg_binds nguts'))
           (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'
       when (not (null diffs)) $ GHC.Core.Opt.Monad.putMsg $ vcat
         [ lint_banner "warning" pname
@@ -4035,8 +4054,10 @@ withoutAnnots pass guts = do
       nukeAnnotsBind bind = case bind of
         Rec bs     -> Rec $ map (\(b,e) -> (b, nukeTicks e)) bs
         NonRec b e -> NonRec b $ nukeTicks e
+      nukeAnnotsCompUnit (CoreCompUnit binds unit_rules) =
+        CoreCompUnit (map nukeAnnotsBind binds) unit_rules
       nukeAnnotsMod mg@ModGuts{mg_binds=binds}
-        = mg{mg_binds = map nukeAnnotsBind binds}
+        = mg { mg_binds = map nukeAnnotsCompUnit binds }
   -- Perform pass with all changes applied. Drop the simple count so it doesn't
   -- effect the total also
   dropSimplCount $ withoutFlag $ pass (nukeAnnotsMod guts)

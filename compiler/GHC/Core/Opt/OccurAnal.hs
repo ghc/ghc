@@ -110,11 +110,15 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
     init_env = initOccEnv { occ_rule_act = active_rule
                           , occ_unf_act  = active_unf }
 
-    WUD final_usage occ_anald_binds = go binds init_env
-    WUD _ occ_anald_glommed_binds = occAnalRecBind init_env TopLevel
-                                                    imp_rule_edges
-                                                    (flattenBinds binds)
-                                                    initial_uds
+    WUD program_usage occ_anald_binds = go_program binds init_env
+    final_usage = program_usage `andUDs` initial_uds
+    WUD _ occ_anald_glommed_binds =
+      let WUD _ glommed_binds = occAnalRecBind init_env TopLevel
+                                               imp_rule_edges
+                                               (flattenBinds (concatMap coreCompUnitBinds binds))
+                                               initial_uds
+          glommed_rules = concatMap cu_rules binds
+      in WUD emptyDetails [CoreCompUnit glommed_binds glommed_rules]
           -- It's crucial to re-analyse the glommed-together bindings
           -- so that we establish the right loop breakers. Otherwise
           -- we can easily create an infinite loop (#9583 is an example)
@@ -143,10 +147,17 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
                                    -- Not BuiltinRules; see Note [Plugin rules]
                            , let rhs_fvs = exprFreeIds rhs `delVarSetList` bndrs ]
 
-    go :: [CoreBind] -> OccEnv -> WithUsageDetails [CoreBind]
-    go []           _   = WUD initial_uds []
-    go (bind:binds) env = occAnalBind env TopLevel
-                           imp_rule_edges bind (go binds) (++)
+    go_program :: CoreProgram -> OccEnv -> WithUsageDetails CoreProgram
+    go_program [] _ = WUD emptyDetails []
+    go_program (CoreCompUnit unit_binds unit_rules : units) env
+      = let WUD unit_uds unit_binds' = go_unit unit_binds env
+            WUD units_uds units' = go_program units env
+        in WUD (unit_uds `andUDs` units_uds) (CoreCompUnit unit_binds' unit_rules : units')
+
+    go_unit :: [CoreBind] -> OccEnv -> WithUsageDetails [CoreBind]
+    go_unit []           _   = WUD emptyDetails []
+    go_unit (bind:unit_binds) env = occAnalBind env TopLevel
+                                     imp_rule_edges bind (go_unit unit_binds) (++)
 
 {- *********************************************************************
 *                                                                      *

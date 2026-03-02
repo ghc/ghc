@@ -209,13 +209,16 @@ deSugar hsc_env
                                                  rules_for_locals (fromOL all_prs)
 
               ds_binds = combineEvBinds ds_ev_binds final_prs
+              ds_program = [ CoreCompUnit [] []
+                           , CoreCompUnit ds_binds []
+                           ]
         -- Notice that we put the whole lot in a big Rec, even the foreign binds
         -- When compiling PrelFloat, which defines data Float = F# Float#
         -- we want F# to be in scope in the foreign marshalling code!
         -- You might think it doesn't matter, but the simplifier brings all top-level
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
-        ; endPassHscEnvIO hsc_env name_ppr_ctx CoreDesugar ds_binds ds_rules_for_imps
+        ; endPassHscEnvIO hsc_env name_ppr_ctx CoreDesugar ds_program ds_rules_for_imps
 
         ; let pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
               home_unit = hsc_home_unit hsc_env
@@ -258,7 +261,7 @@ deSugar hsc_env
                 mg_boot_exports = bootExports self_boot,
                 mg_patsyns      = patsyns,
                 mg_rules        = ds_rules_for_imps,
-                mg_binds        = ds_binds,
+                mg_binds        = ds_program,
                 mg_foreign      = ds_fords,
                 mg_foreign_files = foreign_files,
                 mg_hpc_info     = ds_hpc_info,

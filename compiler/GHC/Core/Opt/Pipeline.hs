@@ -571,7 +571,7 @@ dmdAnal logger before_ww dflags fam_envs rules binds = do
   where
     seqCompUnits :: CoreProgram -> ()
     seqCompUnits [] = ()
-    seqCompUnits (CoreCompUnit unit_binds:units) =
+    seqCompUnits (CoreCompUnit unit_binds _:units) =
       seqBinds unit_binds `seq` seqCompUnits units
 
 

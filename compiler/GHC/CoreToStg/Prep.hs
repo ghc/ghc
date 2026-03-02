@@ -245,7 +245,12 @@ corePrepPgm logger cp_cfg pgm_cfg
                (\a -> a `seqList` ()) $ do
     let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
         top_binds = case binds of
-          [CoreCompUnit unit_binds] -> unit_binds
+          [CoreCompUnit unit_binds unit_rules]
+            | null unit_rules -> unit_binds
+            | otherwise ->
+                pprPanic "corePrepPgm"
+                  (text "Expected no compilation-unit rules after tidy, got"
+                   <+> int (length unit_rules))
           _ ->
             pprPanic "corePrepPgm"
               (text "Expected a single compilation unit after tidy, got"

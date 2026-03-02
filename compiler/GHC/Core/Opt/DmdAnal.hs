@@ -92,28 +92,36 @@ data DmdResult a b = R !a !b
 -- [Stamp out space leaks in demand analysis])
 dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> CoreProgram
 dmdAnalProgram opts fam_envs rules binds
-  = getAnnotated $ go (emptyAnalEnv opts fam_envs) binds
+  = getAnnotated $ go_program (emptyAnalEnv opts fam_envs) [] binds
   where
+    go_program _ _ [] = WithDmdType nopDmdType []
+    go_program env exported (CoreCompUnit unit_binds unit_rules:units)
+      = let WithDmdType _unit_ty unit_binds' = go_unit env exported unit_binds
+            exported' = filter isExportedId (bindersOfBinds unit_binds') ++ exported
+            WithDmdType _units_ty units' = go_program env exported' units
+        in WithDmdType nopDmdType (CoreCompUnit unit_binds' unit_rules : units')
+
     -- See Note [Analysing top-level bindings]
     -- and Note [Why care for top-level demand annotations?]
-    go _   []     = WithDmdType nopDmdType []
-    go env (b:bs) = cons_up $ dmdAnalBind TopLevel env topSubDmd b anal_body
+    go_unit _ _ [] = WithDmdType nopDmdType []
+    go_unit env exported (b:bs) = cons_up $ dmdAnalBind TopLevel env topSubDmd b anal_body
       where
         anal_body env'
-          | WithDmdType body_ty bs' <- go env' bs
-          = WithDmdType (body_ty `plusDmdType` keep_alive_roots env' (bindersOf b)) bs'
+          | WithDmdType body_ty bs' <- go_unit env' exported bs
+          = WithDmdType (body_ty `plusDmdType` keep_alive_roots exported env' (bindersOf b)) bs'
 
     cons_up :: WithDmdType (DmdResult b [b]) -> WithDmdType [b]
     cons_up (WithDmdType dmd_ty (R b' bs')) = WithDmdType dmd_ty (b' : bs')
 
-    keep_alive_roots :: AnalEnv -> [Id] -> DmdEnv
+    keep_alive_roots :: [Id] -> AnalEnv -> [Id] -> DmdEnv
     -- See Note [Absence analysis for stable unfoldings and RULES]
     -- Here we keep alive "roots", e.g., exported ids and stuff mentioned in
     -- orphan RULES
-    keep_alive_roots env ids = plusDmdEnvs (map (demandRoot env) (filter is_root ids))
+    keep_alive_roots exported env ids =
+      plusDmdEnvs (map (demandRoot env) (filter (is_root exported) ids))
 
-    is_root :: Id -> Bool
-    is_root id = isExportedId id || elemVarSet id rule_fvs
+    is_root :: [Id] -> Id -> Bool
+    is_root exported id = isExportedId id || id `elem` exported || elemVarSet id rule_fvs
 
     rule_fvs :: IdSet
     rule_fvs = rulesRhsFreeIds rules

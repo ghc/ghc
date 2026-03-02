@@ -357,7 +357,12 @@ mkIface_ hsc_env
         annotations = map mkIfaceAnnotation anns
         icomplete_matches = map mkIfaceCompleteMatch complete_matches
         core_binds_flat = case core_prog of
-          [CoreCompUnit unit_binds] -> unit_binds
+          [CoreCompUnit unit_binds unit_rules]
+            | null unit_rules -> unit_binds
+            | otherwise ->
+                pprPanic "mkIface_"
+                  (text "Expected no compilation-unit rules after tidy, got"
+                   <+> int (length unit_rules))
           _ ->
             pprPanic "mkIface_"
               (text "Expected a single compilation unit after tidy, got"
