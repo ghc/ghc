@@ -1549,6 +1549,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_spec_constr)
   , make_ord_flag defGhcFlag "ddump-split-core"
         (setDumpFlag Opt_D_dump_split_core)
+  , make_ord_flag defGhcFlag "ddump-merge-core"
+        (setDumpFlag Opt_D_dump_merge_core)
   , make_ord_flag defGhcFlag "ddump-prep"
         (setDumpFlag Opt_D_dump_prep)
   , make_ord_flag defGhcFlag "ddump-late-cc"

@@ -61,6 +61,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDesugarOpt -- Simple optimisation after desugaring
 
   | CoreSplit -- Split the code into multiple compilation units.
+  | CoreMerge -- Merge compilation units into a single unit.
 
   | CoreTidy
   | CorePrep
@@ -86,6 +87,7 @@ instance Outputable CoreToDo where
   ppr CoreDesugar              = text "Desugar (before optimization)"
   ppr CoreDesugarOpt           = text "Desugar (after optimization)"
   ppr CoreSplit{}              = text "CoreSplit"
+  ppr CoreMerge{}              = text "CoreMerge"
   ppr CoreTidy                 = text "Tidy Core"
   ppr CoreAddCallerCcs         = text "Add caller cost-centres"
   ppr CoreAddLateCcs           = text "Add late core cost-centres"

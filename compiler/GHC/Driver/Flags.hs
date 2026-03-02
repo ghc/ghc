@@ -478,6 +478,7 @@ data DumpFlag
    | Opt_D_dump_spec
    | Opt_D_dump_spec_constr
    | Opt_D_dump_split_core
+   | Opt_D_dump_merge_core
    | Opt_D_dump_prep
    | Opt_D_dump_late_cc
    | Opt_D_dump_stg_from_core -- ^ Initial STG (CoreToStg output)
