@@ -1685,8 +1685,9 @@ emitPrimOp cfg primop =
     then Left (MO_S_Mul2     (wordWidth platform))
     else Right genericIntMul2Op
 
-  -- tagToEnum# is removed in CoreToStg and rewritten to a special StgTagToEnumOp
-  -- See Note [?]
+  -- 'tagToEnum#' is removed in CoreToStg and rewritten to a special 
+  -- 'StgTagToEnumOp' from GHC.Stg.Syntax instead.
+  -- See Note [tagToEnum# in STG] in GHC.Stg.Syntax
   TagToEnumOp -> panic "emitPrimOp: TagToEnumOp should have been gone by now"
 
 -- Out of line primops.

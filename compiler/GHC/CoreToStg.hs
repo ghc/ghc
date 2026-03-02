@@ -548,8 +548,11 @@ mkStgApp f how_bound core_args stg_args res_ty
            else
               StgConApp dc NoNumber stg_args []
 
-      -- We rewrite the TagToEnum primop to a special StgTagToEnumOp which contains information about the type constructor
-      PrimOpId TagToEnumOp _ -> StgOpApp (StgTagToEnumOp (tcTyConAppTyCon res_ty)) stg_args res_kind
+      -- We rewrite the 'tagToEnum#' primop to a special 'StgTagToEnumOp' which 
+      -- stores the type constructor information. See Note [tagToEnum# in STG]
+      -- in GHC.Stg.Syntax.
+      PrimOpId TagToEnumOp _ -> 
+        StgOpApp (StgTagToEnumOp (tcTyConAppTyCon res_ty)) stg_args res_kind
 
       -- Some primitive operator that might be implemented as a library call.
       -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps

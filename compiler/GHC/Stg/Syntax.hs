@@ -766,6 +766,30 @@ StgOp
 
 An StgOp allows us to group together PrimOps and ForeignCalls. It's quite useful
 to move these around together, notably in StgOpApp and COpStmt.
+
+Note [tagToEnum# in STG]
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+STG is untyped, but 'tagToEnum#' needs type information, so we make it a special
+STG operation which stores the type constructor information alongside it.
+
+This happens in three main steps throughout the compiler:
+
+1. The type checker ensures 'tagToEnum#' is applied to a concrete type.
+2. When converting Core to STG, we rewrite the 'tagToEnum#' primop to a special
+   'StgTagToEnumOp' along with the type constructor info (the 'TyCon').
+3. This information is used for code generation in the back end.
+
+At run-time, the 'tagToEnum#' operation converts an integer to a constructor of
+an enumeration data type. Given an integer, it produces a pointer to a data
+constructor. Hence, we need information about where the constructors are stored
+in memory.
+
+To preserve this information we desugar the 'tagToEnum#' primop into a special
+'StgTagToEnumOp' which has an extra field to store the type constructor
+information. This desugaring happens when converting Core to STG, which is the
+last moment that we still have access to the type information.
+
 -}
 
 data StgOp
@@ -780,7 +804,7 @@ data StgOp
         -- GHC.StgToCmm.Foreign.
         -- See Note [Unlifted boxed arguments to foreign calls]
 
-  | StgTagToEnumOp TyCon
+  | StgTagToEnumOp TyCon -- See Note [tagToEnum# in STG]
 
 {-
 ************************************************************************
