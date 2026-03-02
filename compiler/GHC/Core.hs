@@ -2074,7 +2074,7 @@ data CoreCompUnit
 type CoreAlt  = Alt  CoreBndr
 
 flattenCoreProgram :: CoreProgram -> [CoreBind]
-flattenCoreProgram = concatMap coreCompUnitBinds . deShadowBinds
+flattenCoreProgram = deShadowBinds . concatMap coreCompUnitBinds
 
 singletonCoreProgram :: [CoreBind] -> CoreProgram
 singletonCoreProgram binds = [CoreCompUnit binds []]

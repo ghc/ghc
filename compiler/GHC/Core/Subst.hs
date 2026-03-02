@@ -12,7 +12,8 @@ module GHC.Core.Subst (
         TvSubstEnv, IdSubstEnv, InScopeSet,
 
         -- ** Substituting into expressions and related types
-        deShadowBinds, substRuleInfo, substRulesForImportedIds,
+        deShadowBinds,
+        substRuleInfo, substRulesForImportedIds,
         substTyUnchecked, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
         lookupIdSubst, lookupIdSubst_maybe, substIdType, substIdOcc,
@@ -39,7 +40,6 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.FVs
-import {-# SOURCE #-} GHC.Core.Opt.OccurAnal (occurAnalyseCompUnit)
 import GHC.Core.Seq
 import GHC.Core.Utils
 
@@ -51,13 +51,11 @@ import GHC.Core.Coercion
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env as InScopeSet
 import GHC.Types.Id
-import GHC.Types.Basic    ( RecFlag(..) )
-import GHC.Types.Name     ( Name, isExternalName, nameModule )
+import GHC.Types.Name     ( Name )
 import GHC.Types.Var
 import GHC.Types.Tickish
 import GHC.Types.Id.Info
 import GHC.Types.Unique.Supply
-import GHC.Unit.Module    ( Module )
 
 import GHC.Builtin.Names
 import GHC.Data.Maybe
@@ -328,51 +326,8 @@ substBind subst (Rec pairs)
 --
 -- [Aug 09] This function is not used in GHC at the moment, but seems so
 --          short and simple that I'm going to leave it here
-deShadowBinds :: CoreProgram -> CoreProgram
-deShadowBinds = deShadowCompUnits
-
-deShadowCompUnits :: [CoreCompUnit] -> [CoreCompUnit]
-deShadowCompUnits [comp_unit] = [comp_unit]
-deShadowCompUnits comp_units = go emptySubst comp_units
-  -- This is fairly inefficient, often there won't be conflicts
-  -- for a unit and in those cases we can just do nothing.
-  --
-  -- We also need to run OccAnal on the compilation units
-  -- before substituting. Otherwise imagine we have:
-  --
-  --    u1: [x1], subst: []
-  --    u2: [x1], subst: [x1->x1_u2]
-  --
-  -- Now if the third unit looks like: u3: [x2 = ... x1 ..., x1 = ...]
-  -- we will replace the first occurence of x1 with x1_u2 despite the intended
-  -- reference was u3_x1!
-  where
-    depSortCompUnit :: CoreCompUnit -> CoreCompUnit
-    depSortCompUnit comp_unit@(CoreCompUnit binds unit_rules)
-      | Just this_mod <- compUnitModule comp_unit
-      = occurAnalyseCompUnit this_mod (const True) (const True) []
-          (CoreCompUnit (mkBinds Recursive (flattenBinds binds)) unit_rules)
-      | otherwise
-      = comp_unit
-
-    compUnitModule :: CoreCompUnit -> Maybe Module
-    compUnitModule (CoreCompUnit binds unit_rules)
-      = case [ nameModule n
-             | b <- bindersOfBinds binds
-             , let n = idName b
-             , isExternalName n
-             ] of
-          (m:_) -> Just m
-          []    -> firstJusts (map ruleModule unit_rules)
-
-    go :: Subst -> [CoreCompUnit] -> [CoreCompUnit]
-    go _ [] = []
-    go subst (comp_unit : units) =
-      let CoreCompUnit binds unit_rules = depSortCompUnit comp_unit
-          (subst', binds') = mapAccumL substBind subst binds
-          unit_rules' = map (substRule subst' (\n -> n)) unit_rules
-          units' = go subst' units
-      in CoreCompUnit binds' unit_rules' : units'
+deShadowBinds :: [CoreBind] -> [CoreBind]
+deShadowBinds binds = snd (mapAccumL substBind emptySubst binds)
 
 
 

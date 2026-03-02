@@ -1,5 +1,5 @@
 module GHC.Core.Subst where
 
-import {-# SOURCE #-} GHC.Core (CoreProgram)
+import {-# SOURCE #-} GHC.Core (CoreBind)
 
-deShadowBinds :: CoreProgram -> CoreProgram
+deShadowBinds :: [CoreBind] -> [CoreBind]
