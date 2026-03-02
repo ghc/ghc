@@ -1547,6 +1547,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_spec)
   , make_ord_flag defGhcFlag "ddump-spec-constr"
         (setDumpFlag Opt_D_dump_spec_constr)
+  , make_ord_flag defGhcFlag "ddump-split-core"
+        (setDumpFlag Opt_D_dump_split_core)
   , make_ord_flag defGhcFlag "ddump-prep"
         (setDumpFlag Opt_D_dump_prep)
   , make_ord_flag defGhcFlag "ddump-late-cc"
@@ -2619,6 +2621,7 @@ fFlagsDeps = [
   flagSpec "inline-generics"                  Opt_InlineGenerics,
   flagSpec "inline-generics-aggressively"     Opt_InlineGenericsAggressively,
   flagSpec "static-argument-transformation"   Opt_StaticArgumentTransformation,
+  flagSpec "split-core"                       Opt_SplitCore,
   flagSpec "strictness"                       Opt_Strictness,
   flagSpec "use-rpaths"                       Opt_RPath,
   flagSpec "write-interface"                  Opt_WriteInterface,

@@ -60,6 +60,8 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDesugar    -- Right after desugaring, no simple optimisation yet!
   | CoreDesugarOpt -- Simple optimisation after desugaring
 
+  | CoreSplit -- Split the code into multiple compilation units.
+
   | CoreTidy
   | CorePrep
   | CoreAddCallerCcs
@@ -83,6 +85,7 @@ instance Outputable CoreToDo where
   ppr CoreCSE                  = text "Common sub-expression"
   ppr CoreDesugar              = text "Desugar (before optimization)"
   ppr CoreDesugarOpt           = text "Desugar (after optimization)"
+  ppr CoreSplit{}              = text "CoreSplit"
   ppr CoreTidy                 = text "Tidy Core"
   ppr CoreAddCallerCcs         = text "Add caller cost-centres"
   ppr CoreAddLateCcs           = text "Add late core cost-centres"

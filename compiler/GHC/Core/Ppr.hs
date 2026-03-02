@@ -68,7 +68,9 @@ pprCoreBinding  = pprTopBind noAnn
 
 pprCoreCompUnit :: CoreCompUnit -> SDoc
 pprCoreCompUnit (CoreCompUnit binds unit_rules) =
-  pprCoreBindings binds $$ pprRules unit_rules
+  text "-- Start of new compilation unit"
+  $$ pprCoreBindings binds
+  $$ pprRules unit_rules
 
 pprCoreProgram :: CoreProgram -> SDoc
 pprCoreProgram = vcat . map pprCoreCompUnit

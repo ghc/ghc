@@ -477,6 +477,7 @@ data DumpFlag
    | Opt_D_dump_simpl_iterations
    | Opt_D_dump_spec
    | Opt_D_dump_spec_constr
+   | Opt_D_dump_split_core
    | Opt_D_dump_prep
    | Opt_D_dump_late_cc
    | Opt_D_dump_stg_from_core -- ^ Initial STG (CoreToStg output)
@@ -640,6 +641,7 @@ data GeneralFlag
    | Opt_InlineGenerics
    | Opt_InlineGenericsAggressively
    | Opt_StaticArgumentTransformation
+   | Opt_SplitCore
    | Opt_CSE
    | Opt_StgCSE
    | Opt_StgLiftLams
