@@ -326,12 +326,21 @@ substBind subst (Rec pairs)
 -- [Aug 09] This function is not used in GHC at the moment, but seems so
 --          short and simple that I'm going to leave it here
 deShadowBinds :: CoreProgram -> CoreProgram
-deShadowBinds = map deShadowCompUnit
+deShadowBinds = deShadowCompUnits
+
+deShadowCompUnits :: [CoreCompUnit] -> [CoreCompUnit]
+deShadowCompUnits [comp_unit] = [comp_unit]
+deShadowCompUnits comp_units = go emptySubst comp_units
   where
-    deShadowCompUnit (CoreCompUnit binds unit_rules) =
-      let (subst, binds') = mapAccumL substBind emptySubst binds
-          rules' = map (substRule subst (\n -> n)) unit_rules
-      in CoreCompUnit binds' rules'
+    go :: Subst -> [CoreCompUnit] -> [CoreCompUnit]
+    go _ [] = []
+    go subst (CoreCompUnit binds unit_rules : units) =
+      let (subst', binds') = mapAccumL substBind subst binds
+          unit_rules' = map (substRule subst' (\n -> n)) unit_rules
+          units' = go subst' units
+      in CoreCompUnit binds' unit_rules' : units'
+
+
 
 {-
 ************************************************************************
