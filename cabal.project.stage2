@@ -1,29 +1,34 @@
-package-dbs: clear, global
-
--- Import configure/generated feature toggles (dynamic, etc.) if present.
--- A default file is kept in-tree; configure will overwrite with substituted values.
+-- Configuration common to all stages
+import: cabal.project.common
 import: cabal.project.stage2.settings
 
+-- Disable Hackage, we explicitly include the packages we need.
+active-repositories: :none
+
 packages:
+  -- RTS
   rts-headers
   rts-fs
   rts
 
-  libraries/ghc-prim
-  libraries/ghc-internal
-  libraries/ghc-experimental
-  libraries/base
+  -- Compiler
   compiler
   ghc
-  libraries/ghc-platform
-  libraries/ghc-compact
+
+  -- Internal libraries
+  libraries/base
   libraries/ghc-bignum
-  libraries/integer-gmp
   libraries/ghc-boot
   libraries/ghc-boot-th
+  libraries/ghc-compact
+  libraries/ghc-experimental
   libraries/ghc-heap
+  libraries/ghc-internal
+  libraries/ghc-platform
+  libraries/ghc-prim
   libraries/ghci
-  libraries/stm
+  libraries/integer-gmp
+  libraries/system-cxx-std-lib
   libraries/template-haskell
 
   -- Internal tools
@@ -41,12 +46,7 @@ packages:
   utils/unlit
 
   -- The following are packages available on Hackage but included as submodules
-  libraries/Cabal/Cabal
-  libraries/Cabal/Cabal-syntax
-
-  libraries/system-cxx-std-lib
-  utils/hpc
-  https://hackage.haskell.org/package/hsc2hs-0.68.10/hsc2hs-0.68.10.tar.gz
+  -- https://hackage.haskell.org/package/hsc2hs-0.68.10/hsc2hs-0.68.10.tar.gz
 
   https://hackage.haskell.org/package/Win32-2.14.2.1/Win32-2.14.2.1.tar.gz
   https://hackage.haskell.org/package/array-0.5.8.0/array-0.5.8.0.tar.gz
@@ -78,11 +78,24 @@ packages:
   https://hackage.haskell.org/package/unix-2.8.8.0/unix-2.8.8.0.tar.gz
   https://hackage.haskell.org/package/xhtml-3000.2.2.1/xhtml-3000.2.2.1.tar.gz
 
-  libraries/Cabal/Cabal-syntax
-  libraries/Cabal/Cabal
+  -- These would be on Hackage but we include them as direct URLs
+  -- (Hackage is disabled by `active-repositories: :none`)
   https://hackage.haskell.org/package/alex-3.5.2.0/alex-3.5.2.0.tar.gz
   https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
   https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
+
+-- wip/andrea/local-store
+source-repository-package
+  type: git
+  location: https://github.com/stable-haskell/Cabal.git
+  tag: d7bf2ce3f9a7da4640833ddc5bb7740d2557b6a7
+  subdir: Cabal
+          Cabal-syntax
+
+source-repository-package
+  type: git
+  location: https://github.com/stable-haskell/hpc-bin.git
+  tag: 5923da3fe77993b7afc15b5163cffcaa7da6ecf5
 
 if !os(windows)
   packages:
@@ -120,12 +133,9 @@ if !os(windows)
   package *
     library-for-ghci: True
 
--- project-rts
--- project-ghc
-benchmarks: False
-tests: False
-allow-boot-library-installs: True
-active-repositories: :none
+--
+-- Constraints
+--
 
 constraints:
   -- we do not want to use the rts-headers from stage1
@@ -134,89 +144,12 @@ constraints:
   -- I cannot write build:* but ghc-internal is enough to do the job.
   , build:any.ghc-internal installed
 
-package *
-  library-vanilla: True
-  library-for-ghci: True
-  -- shared/executable-dynamic now controlled by Makefile (DYNAMIC variable)
-  -- so we do not pin them here; default (static) remains when DYNAMIC=0.
-  executable-profiling: False
-  executable-static: False
-
--- Maybe we should fix this with some import
-if os(linux)
-  package rts
-    ghc-options: "-optc-DProjectVersion=\"914\""
-    ghc-options: "-optc-DRtsWay=\"v\""
-    ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-linux\""
-    ghc-options: "-optc-DHostArch=\"x86_64\""
-    ghc-options: "-optc-DHostOS=\"linux\""
-    ghc-options: "-optc-DHostVendor=\"unknown\""
-    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
-    ghc-options: "-optc-DBuildArch=\"FIXME\""
-    ghc-options: "-optc-DBuildOS=\"FIXME\""
-    ghc-options: "-optc-DBuildVendor=\"FIXME\""
-    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
-    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
-    ghc-options: "-optc-DFS_NAMESPACE=rts"
-    flags: +tables-next-to-code
-
-if os(darwin)
-  package rts
-    ghc-options: "-optc-DProjectVersion=\"914\""
-    ghc-options: "-optc-DRtsWay=\"v\""
-    ghc-options: "-optc-DHostPlatform=\"aarch64-apple-darwin\""
-    ghc-options: "-optc-DHostArch=\"aarch64\""
-    ghc-options: "-optc-DHostOS=\"darwin\""
-    ghc-options: "-optc-DHostVendor=\"unknown\""
-    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
-    ghc-options: "-optc-DBuildArch=\"FIXME\""
-    ghc-options: "-optc-DBuildOS=\"FIXME\""
-    ghc-options: "-optc-DBuildVendor=\"FIXME\""
-    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
-    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
-    ghc-options: "-optc-DFS_NAMESPACE=rts"
-    flags: +tables-next-to-code +leading-underscore
-	ld-options: -undefined warning
-
-if os(freebsd)
-  package rts
-    ghc-options: "-optc-DProjectVersion=\"914\""
-    ghc-options: "-optc-DRtsWay=\"v\""
-    ghc-options: "-optc-DHostPlatform=\"x86_64-portbld-freebsd\""
-    ghc-options: "-optc-DHostArch=\"x86_64\""
-    ghc-options: "-optc-DHostOS=\"freebsd\""
-    ghc-options: "-optc-DHostVendor=\"unknown\""
-    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
-    ghc-options: "-optc-DBuildArch=\"FIXME\""
-    ghc-options: "-optc-DBuildOS=\"FIXME\""
-    ghc-options: "-optc-DBuildVendor=\"FIXME\""
-    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
-    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
-    ghc-options: "-optc-DFS_NAMESPACE=rts"
-    flags: +tables-next-to-code +leading-underscore
-
-program-options
-  ghc-options: -fhide-source-paths -j
-
--- project-boot-libs
-benchmarks: False
-tests: False
-allow-boot-library-installs: True
-active-repositories: :none
-
--- (removed duplicate global package * stanza; first one applies already)
-
-package rts-headers
-  ghc-options: -no-rts
-
-package rts-fs
-  ghc-options: -no-rts
-
-package rts
-  ghc-options: -no-rts
+--
+-- Package level configuration
+--
 
 package libffi-clib
-  ghc-options: -no-rts
+  ghc-options: -no-rts -optc-Wno-error
 
 -- We end up injecting the following depednency:
 --
@@ -249,32 +182,33 @@ package libffi-clib
 --        throughout the session. See
 --          GHC.Unit.State:mkUnitState
 --
-package ghc-internal
-  ghc-options: -no-rts
 
 package ghc
   flags: +build-tool-depends +internal-interpreter
+
+package ghc-bin
+  flags: +internal-interpreter
 
 package ghci
   flags: +internal-interpreter
 
 package ghc-internal
   flags: +bignum-native
+  ghc-options: -no-rts
 
-package text
-  flags: -simdutf
+package rts
+  ghc-options: -no-rts
+  flags: +tables-next-to-code
 
-program-options
-  ghc-options: -fhide-source-paths -j
+package rts-headers
+  ghc-options: -no-rts
 
-package ghc-bin
-  flags: +internal-interpreter -threaded
+package rts-fs
+  ghc-options: -no-rts
 
-package hsc2hs
-  flags: +in-ghc-tree
-
-package haskeline
-  flags: -terminfo
-
-program-options
-  ghc-options: -fhide-source-paths -j
+-- hsc2hs with batch cross-compilation support
+-- https://github.com/stable-haskell/hsc2hs/tree/feat/batch-cross-compilation
+source-repository-package
+  type: git
+  location: https://github.com/stable-haskell/hsc2hs.git
+  tag: d07eea1260894ce5fe456f881fbc62366c9eb1b7

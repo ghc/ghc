@@ -34,9 +34,6 @@ packages:
   utils/deriveConstants
 
   -- The following are packages available on Hackage but included as submodules
-  libraries/Cabal/Cabal
-  libraries/Cabal/Cabal-syntax
-
   https://hackage.haskell.org/package/array-0.5.8.0/array-0.5.8.0.tar.gz
   https://hackage.haskell.org/package/binary-0.8.9.3/binary-0.8.9.3.tar.gz
   https://hackage.haskell.org/package/bytestring-0.12.2.0/bytestring-0.12.2.0.tar.gz
@@ -66,6 +63,13 @@ packages:
   https://hackage.haskell.org/package/alex-3.5.2.0/alex-3.5.2.0.tar.gz
   https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
   https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
+
+source-repository-package
+  type: git
+  location: https://github.com/stable-haskell/Cabal.git
+  tag: d7bf2ce3f9a7da4640833ddc5bb7740d2557b6a7
+  subdir: Cabal
+          Cabal-syntax
 
 allow-newer: array:*
            , binary:*
@@ -163,8 +167,18 @@ package *
   --             objects of have GHC pre-link excessively large archives on-demand.
   library-for-ghci: False
 
+-- libffi-clib: only needed for native builds; WASM/WASI uses the system
+-- libffi stub from wasi-sdk instead (see +use-system-libffi on package rts).
 package libffi-clib
   ghc-options: -no-rts
+
+-- WASM/WASI-specific overrides:
+-- - shared: True is required for GHCi/TH via dyld.mjs
+-- - +use-system-libffi is already set unconditionally on package rts above,
+--   but we keep this block for clarity and future conditional changes.
+if os(wasi)
+  package *
+    shared: True
 
 package ghc
   flags: +build-tool-depends +internal-interpreter

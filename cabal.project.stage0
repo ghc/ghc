@@ -1,6 +1,14 @@
-packages:
-    ./libraries/Cabal/Cabal
-    ./libraries/Cabal/Cabal-syntax
-    ./libraries/Cabal/cabal-install
-    ./libraries/Cabal/cabal-install-solver
-    ./libraries/hackage-security/hackage-security
+source-repository-package
+  type: git
+  location: https://github.com/stable-haskell/Cabal.git
+  tag: d7bf2ce3f9a7da4640833ddc5bb7740d2557b6a7
+  subdir: Cabal
+          Cabal-syntax
+          cabal-install
+          cabal-install-solver
+
+source-repository-package
+  type: git
+  location: https://github.com/stable-haskell/hackage-security.git
+  tag: baaad2e189a8203966f7d3f752a348f02eefd1b2
+  subdir: hackage-security
