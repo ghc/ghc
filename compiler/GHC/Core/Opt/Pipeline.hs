@@ -478,7 +478,7 @@ doCorePass pass guts = do
                                  updateBinds (concatMap (occurSplitPgm (mg_module guts) (mg_rules guts)))
 
     CoreMerge                 -> {-# SCC "CoreMerge" #-}
-                                 updateBinds (singletonCoreProgram . flattenCoreProgram)
+                                 updateBinds flattenCoreProgram
 
     CoreDoSimplify opts       -> {-# SCC "Simplify" #-}
                                  liftIOWithCount $ simplifyPgm logger (hsc_unit_env hsc_env) name_ppr_ctx opts guts
