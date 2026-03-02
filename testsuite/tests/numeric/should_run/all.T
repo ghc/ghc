@@ -45,6 +45,7 @@ test('arith016', normal, compile_and_run, [''])
 test('arith017', normal, compile_and_run, [''])
 test('arith018', normal, compile_and_run, [''])
 test('arith019', normal, compile_and_run, [''])
+test('arith020', normal, compile_and_run, [''])
 test('expfloat', normal, compile_and_run, [''])
 
 test('FloatFnInverses', normal, compile_and_run, [''])
