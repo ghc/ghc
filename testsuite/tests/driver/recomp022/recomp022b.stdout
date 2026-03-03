@@ -1,0 +1,5 @@
+[1 of 3] Compiling A                ( src/A.hs, src/A.o, src/A.gbc )
+[2 of 3] Compiling B                ( src/B.hs, src/B.o, src/B.gbc )
+[3 of 3] Compiling C                ( src/C.hs, src/C.o, src/C.gbc )
+[1 of 3] Compiling A                ( src/A.hs, src/A.o, src/A.gbc ) [Source file changed]
+[2 of 3] Compiling B                ( src/B.hs, src/B.o, src/B.gbc ) [A changed (bytecode)]

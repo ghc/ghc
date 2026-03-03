@@ -52,8 +52,11 @@ getLeakIndicators hsc_env =
       return $ LeakModIndicators{..}
   where
     mkWeakLinkables :: HomeModLinkable -> IO [Maybe (Weak Linkable)]
-    mkWeakLinkables (HomeModLinkable mbc mo) =
-      mapM (\ln -> traverse (flip mkWeakPtr Nothing <=< evaluate) ln) [mbc, mo]
+    mkWeakLinkables hml =
+      mapM (\ln -> traverse (flip mkWeakPtr Nothing <=< evaluate) ln)
+        [ homeModLinkableByteCode hml
+        , homeModLinkableObject hml
+        ]
 
 -- | Look at the LeakIndicators collected by an earlier call to
 -- `getLeakIndicators`, and print messasges if any of them are still
