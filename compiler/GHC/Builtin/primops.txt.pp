@@ -46,7 +46,7 @@
 -- * The primitives are listed in this file, primops.txt.pp.
 --   It goes through CPP, which creates primops.txt.
 --   It is then consumed by the utility program genprimopcode, which produces
---   the following three types of files.
+--   the following types of files.
 --
 --   1. The files with extension .hs-incl.
 --      They can be found by grepping for hs-incl.
@@ -71,12 +71,7 @@
 --      Additionally, we pattern match on PrimOp when generating Cmm in
 --      GHC/StgToCmm/Prim.hs.
 --
---   2. The dummy Prim.hs file, which is used for Haddock and
---      contains descriptions taken from primops.txt.pp.
---      All definitions are replaced by placeholders.
---      See Note [GHC.Prim Docs] in GHC.Builtin.Utils.
---
---   3. The module PrimopWrappers.hs, which wraps every call for GHCi;
+--   2. The module PrimopWrappers.hs, which wraps every call for GHCi;
 --      see Note [Primop wrappers] in GHC.Builtin.Primops for details.
 --
 -- * This file does not list internal-only equality types

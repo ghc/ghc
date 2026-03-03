@@ -24,6 +24,5 @@ main = do
                       "--primop-vector-maps"  -> "hmmm"
                       "--primop-vector-paper"  -> "hmmm"
                       "--make-haskell-wrappers" -> "123512"
-                      "--make-haskell-source"  -> "as;dg"
                       "--make-latex-doc" -> "adghiw"
                       _ -> error "Should not happen, known_args out of sync?"
