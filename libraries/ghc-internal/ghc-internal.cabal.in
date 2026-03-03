@@ -357,7 +357,6 @@ Library
         GHC.Internal.Types
 
     autogen-modules:
-        GHC.Internal.Prim
         GHC.Internal.PrimopWrappers
 
     other-modules:
