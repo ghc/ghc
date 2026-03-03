@@ -1,3 +1,9 @@
+RnStaticPointersFail02.hs:5:5: error: [GHC-39999]
+    • No instance for ‘ghc-internal-9.1500.0:GHC.Internal.Data.Typeable.Internal.Typeable
+                         t0’
+        arising from a static form
+    • In the expression: static T
+      In an equation for ‘f’: f = static T
 
 RnStaticPointersFail02.hs:5:12: error: [GHC-01928]
     • Illegal term-level use of the type constructor ‘T’
@@ -5,3 +11,4 @@ RnStaticPointersFail02.hs:5:12: error: [GHC-01928]
     • In the body of a static form: T
       In the expression: static T
       In an equation for ‘f’: f = static T
+

@@ -1,0 +1,12 @@
+T19966.hs:11:7: error: [GHC-88464]
+    • Data constructor not in scope: I
+    • In an equation for ‘ex1’: ex1 = I
+(deferred type error)
+T19966.hs:18:7: warning: [GHC-01928] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
+    Data constructor out of scope: ‘Bool’.
+    NB: the type constructor ‘Bool’ cannot appear in this position.
+(deferred type error)
+T19966.hs:29:13: warning: [GHC-01928] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
+    • Illegal term-level use of the type variable ‘a’
+    • bound at T19966.hs:28:15
+(deferred type error)

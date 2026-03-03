@@ -45,6 +45,8 @@ module GHC.Tc.Utils.TcMType (
   emitWantedEqs, emitNewExprHole,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
 
+  newExprHoleRef,
+
   newCoercionHole, fillCoercionHole, isFilledCoercionHole,
   checkCoercionHole,
 
@@ -313,6 +315,12 @@ emitNewExprHole occ ty
                          , hole_loc  = loc }
        ; emitHole hole
        ; return her }
+
+newExprHoleRef :: Type -> EvTerm -> TcM HoleExprRef
+newExprHoleRef ty ev
+  = do { u <- newUnique
+       ; ref <- newTcRef ev
+       ; return $ HER ref ty u }
 
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys

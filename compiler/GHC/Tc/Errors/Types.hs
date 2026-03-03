@@ -2495,6 +2495,8 @@ data TcRnMessage where
   TcRnIllegalTermLevelUse
     :: !Bool -- ^ should we give a simple "out of scope" message,
              -- instead of a full-blown "Illegal term level use" message?
+
+    -> !DiagnosticReason
     -> !RdrName -- ^ the user-written identifier
     -> !Name    -- ^ the type-level 'Name' we resolved it to
     -> !TermLevelUseErr

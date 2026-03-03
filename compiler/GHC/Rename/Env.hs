@@ -424,7 +424,7 @@ lookupConstructorInfo qcon@(WithUserRdr _ con_name)
        ; case info of
             IAmConLike con_info -> return con_info
             UnboundGRE          -> return $ ConInfo (ConIsData []) ConHasPositionalArgs
-            IAmTyCon {}         -> failIllegalTyCon WL_ConLike qcon
+            IAmTyCon {}         -> failWithTc =<< mkIllegalTyConMessage ErrorWithoutFlag WL_ConLike qcon
             _ -> pprPanic "lookupConstructorInfo: not a ConLike" $
                       vcat [ text "name:" <+> ppr con_name ]
        }

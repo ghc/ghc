@@ -69,7 +69,7 @@ import GHC.Core.TyCo.Tidy
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
 
-import GHC.Utils.Error  (diagReasonSeverity,  pprLocMsgEnvelope )
+import GHC.Utils.Error  (diagReasonSeverity)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as O
 import GHC.Utils.Panic
@@ -1387,11 +1387,9 @@ mkErrorTerm ct_loc ty ctxt msg supp hints
                   hints
          -- This will be reported at runtime, so we always want "error:" in the report, never "warning:"
        ; dflags <- getDynFlags
-       ; let err_msg = pprLocMsgEnvelope (initTcMessageOpts dflags) msg
-             err_str = showSDoc dflags $
-                       err_msg $$ text "(deferred type error)"
-
-       ; return $ evDelayedError ty err_str }
+       ; let msg_opts = initTcMessageOpts dflags
+             err_msg  = showSDoc dflags $ pprDeferredTypeError msg_opts msg
+       ; return $ evDelayedError ty err_msg }
 
 tryReporters :: SolverReportErrCtxt -> [ReporterSpec] -> [ErrorItem] -> TcM (SolverReportErrCtxt, [ErrorItem])
 -- Use the first reporter in the list whose predicate says True

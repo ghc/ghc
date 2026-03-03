@@ -26,7 +26,7 @@ module GHC.Tc.Utils.Env(
         tcLookupLocatedClass, tcLookupAxiom,
         lookupGlobal, lookupGlobal_maybe,
         addTypecheckedBinds, addEvBinds, addTopEvBinds,
-        failIllegalTyCon, failIllegalTyVar,
+        mkIllegalTyConMessage, mkIllegalTyVarMessage,
 
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnvList,
@@ -145,6 +145,7 @@ import Control.Monad
 import Data.IORef
 import Data.List          ( intercalate )
 import qualified Data.List.NonEmpty as NE
+
 
 {- *********************************************************************
 *                                                                      *
@@ -296,7 +297,7 @@ tcLookupConLike qname@(WithUserRdr _ name) = do
     thing <- tcLookupGlobal name
     case thing of
         AConLike cl -> return cl
-        ATyCon  {}  -> failIllegalTyCon WL_ConLike qname
+        ATyCon  {}  -> failWithTc =<< mkIllegalTyConMessage ErrorWithoutFlag WL_ConLike qname
         _           -> wrongThingErr WrongThingConLike (AGlobal thing) name
 
 tcLookupRecSelParent :: HsRecUpdParent GhcRn -> TcM RecSelParent
@@ -383,29 +384,30 @@ instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where
     lookupThing = tcLookupGlobal
 
 -- Illegal term-level use of type things
-failIllegalTyCon :: WhatLooking -> WithUserRdr Name -> TcM a
-failIllegalTyVar :: WithUserRdr Name -> TcM a
-(failIllegalTyCon, failIllegalTyVar) = (fail_tycon, fail_tyvar)
+mkIllegalTyConMessage :: DiagnosticReason -> WhatLooking -> WithUserRdr Name -> TcM TcRnMessage
+mkIllegalTyVarMessage :: DiagnosticReason -> WithUserRdr Name -> TcM TcRnMessage
+(mkIllegalTyConMessage, mkIllegalTyVarMessage) = (fail_tycon, fail_tyvar)
   where
-    fail_tycon what_looking (WithUserRdr rdr tc_nm) = do
+    fail_tycon reason what_looking (WithUserRdr rdr tc_nm) = do
       gre <- getGlobalRdrEnv
       let mb_gre = lookupGRE_Name gre tc_nm
           err = case greInfo <$> mb_gre of
             Just (IAmTyCon ClassFlavour) -> ClassTE
             _ -> TyConTE
-      fail_with_msg what_looking dataName rdr tc_nm (TermLevelUseGRE <$> mb_gre) err
+      fail_with_msg reason what_looking dataName rdr tc_nm (TermLevelUseGRE <$> mb_gre) err
 
-    fail_tyvar (WithUserRdr rdr nm) =
-      fail_with_msg WL_Term varName rdr nm (Just TermLevelUseTyVar) TyVarTE
+    fail_tyvar reason (WithUserRdr rdr nm) =
+      fail_with_msg reason WL_Term varName rdr nm (Just TermLevelUseTyVar) TyVarTE
 
-    fail_with_msg what_looking whatName rdr nm pprov err = do
-      required_type_arguments <- xoptM LangExt.RequiredTypeArguments
-      (imp_errs, hints) <- get_suggestions required_type_arguments what_looking whatName rdr
+    fail_with_msg :: DiagnosticReason -> WhatLooking -> NameSpace -> RdrName -> Name
+                  -> Maybe TermLevelUseCtxt -> TermLevelUseErr -> TcM TcRnMessage
+    fail_with_msg reason what_looking whatName rdr nm pprov err = do
+      (imp_errs, hints) <- get_suggestions what_looking whatName rdr
       hfdc <- getHoleFitDispConfig
       unit_state <- hsc_units <$> getTopEnv
       let
         want_simple = want_simple_msg hints
-        msg = TcRnIllegalTermLevelUse want_simple rdr nm err
+        msg = TcRnIllegalTermLevelUse want_simple reason rdr nm err
         info = ErrInfo { errInfoContext =
                            if want_simple
                            then []
@@ -415,9 +417,11 @@ failIllegalTyVar :: WithUserRdr Name -> TcM a
                              NE.nonEmpty imp_errs
                        , errInfoHints = hints
                        }
-      failWithTc $ TcRnMessageWithInfo unit_state (mkDetailedMessage info msg)
+        msg_w_info = TcRnMessageWithInfo unit_state (mkDetailedMessage info msg)
+      return msg_w_info
 
-    get_suggestions required_type_arguments what_looking ns rdr = do
+    get_suggestions what_looking ns rdr = do
+      required_type_arguments <- xoptM LangExt.RequiredTypeArguments
       show_helpful_errors <- goptM Opt_HelpfulErrors
       if not show_helpful_errors || (required_type_arguments && isVarNameSpace ns)
       then return ([], [])  -- See Note [Suppress hints with RequiredTypeArguments]
@@ -460,7 +464,7 @@ rather than:
 
 This was reported in #23982.
 
-To achieve this, in 'failIllegalTyCon' and 'failIllegalTyVar', we include a
+To achieve this, in 'mkIllegalTyConMessage' and 'mkIllegalTyVarMessage', we include a
 little heuristic to decide whether to emit an "out of scope" message rather than
 an "illegal term-level use" message: when we have a term to suggest to the user,
 then give the simpler "out of scope" error message.
