@@ -53,6 +53,7 @@ module GHC.IO.Handle
      hGetEcho,
      hIsTerminalDevice,
      hSetNewlineMode,
+     hGetNewlineMode,
      Newline(..),
      NewlineMode(..),
      nativeNewline,

@@ -120,7 +120,7 @@ import GHC.Internal.System.Posix.Types ( Fd )
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.Types
-import GHC.Internal.System.IO
+import System.IO
 import GHC.Internal.Data.Functor ( void )
 import GHC.Internal.Int ( Int64 )
 #else

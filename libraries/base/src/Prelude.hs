@@ -165,7 +165,7 @@ module Prelude (
   ) where
 
 import GHC.Internal.Control.Monad
-import GHC.Internal.System.IO
+import System.IO
 import GHC.Internal.System.IO.Error
 import qualified GHC.Internal.Data.List as List
 import GHC.Internal.Data.Either

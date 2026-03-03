@@ -48,6 +48,15 @@ holes3.hs:11:15: error: [GHC-88464]
         y :: [a]
         z :: [a] -> [a]
         f :: forall {p}. p
+        appendFile :: FilePath -> String -> IO ()
+        getChar :: IO Char
+        getContents :: IO String
+        getLine :: IO String
+        interact :: (String -> String) -> IO ()
+        putChar :: Char -> IO ()
+        putStr :: String -> IO ()
+        readFile :: FilePath -> IO String
+        writeFile :: FilePath -> String -> IO ()
         otherwise :: Bool
         (&&) :: Bool -> Bool -> Bool
         not :: Bool -> Bool
@@ -61,16 +70,7 @@ holes3.hs:11:15: error: [GHC-88464]
         showChar :: Char -> ShowS
         showParen :: Bool -> ShowS -> ShowS
         showString :: String -> ShowS
-        appendFile :: FilePath -> String -> IO ()
-        getChar :: IO Char
-        getContents :: IO String
-        getLine :: IO String
-        interact :: (String -> String) -> IO ()
-        putChar :: Char -> IO ()
-        putStr :: String -> IO ()
         putStrLn :: String -> IO ()
-        readFile :: FilePath -> IO String
-        writeFile :: FilePath -> String -> IO ()
         EQ :: Ordering
         GT :: Ordering
         LT :: Ordering
