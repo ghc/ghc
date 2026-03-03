@@ -3408,11 +3408,7 @@ mkPolyAbsLams (getter,setter) bndrs body
   = go emptyVarSet [] bndrs
   where
     wrap_bind :: Expr b -> (b,Expr b) -> Expr b
-    -- wrap_bind e (bndr, rhs)  =   (\bndr.e) rhs
-    -- Very like  let bndr=rhs in e
-    -- but, for type-bindings at least, does not require that the occurrences
-    -- of bndr have the unfolding from the let-binding
-    wrap_bind e (bndr, rhs) = App (Lam bndr e) rhs
+    wrap_bind e (bndr, rhs) = Let (NonRec bndr rhs) e
 
     go :: TyVarSet     -- Earlier TyVar bndrs that have TyVarUnfoldings
        -> [(b,Expr b)] -- Accumulated impedence-matching bindings (reversed)

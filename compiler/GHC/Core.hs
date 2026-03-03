@@ -465,8 +465,8 @@ TL;DR: we relaxed the let/app invariant to become the let-can-float invariant.
 
 Note [Type and coercion lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We allow
-   let @a = TYPE ty in ...
+We allow non-recursive type lets:
+   let a = TYPE ty in ...
 and similarly for coercions.
 
    TODO: fill this out
@@ -475,7 +475,7 @@ Wrinkles:
 
 (TCL1) In a type let (Let @a = TYPE ty in body), we do /not/ insist that
   the binder `a` has a TyVarUnfolding.  But if it does not, then `body`
-  must be well-typed without paying atention to the binding. More precisely,
+  must be well-typed without paying attention to the binding. More precisely,
        let @a = TYPE ty in body
   where `a` has no TyVarUnfolding, is well-typed iff
        (/\a. body) ty
@@ -489,14 +489,31 @@ Wrinkles:
   (which is always substituted) with the tyvar-replete-with-unfolding, rather
   than merely extending the in-scope set as we do for Ids.
 
+(TCL3) In the output of the desugarer it is very convenient to allow
+      let a = <type> in ...a....
+  where the occurrences of `a` do /not/ have an unfolding, but yet it is essential
+  to substitute <type> for `a` when Linting.  Why?  When compiling nested pattern
+  matching we may combine patterns
+      K @a1 (co1 :: a1 ~ T) pat1 -> e1
+      K @a2 (co2 :: a2 ~ T) pat2 -> e2
+  to get a single, shared pattern, something like
+      K @a1 (co1 :: a1 ~ T) x -> let { a2 = a1; co2 = co1 } in
+                                 case x of
+                                   pat1 -> e1
+                                   pat2 -> e2
+  The bindings { a2=a1; co2=co1 } just make the binders in the two patterns line
+  up.  But for this to be Lint-correct we must actually substitute `a1` for `a2`.
+
+  So, in the ouptut of the desugarer only, if there is no unfolding on the binder,
+  we just extend the subustitution.
+
+  It's a bit of a hack, but the first roun dof simplification esablishes (TCL1) or
+  (TCL2).
+
 So: (TCL1) + (TCL2) =
   EITHER `a` has an unfolding at its binding site,
      and that unfolding is replicated at every occurrence site
   OR it doesn't and the occurrences don't either.
-
-
-OR we could insist that tyvar bindings always have an unfolding, and use
-a beta-redex if not.
 
 Note [Core top-level string literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

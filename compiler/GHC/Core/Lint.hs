@@ -236,8 +236,6 @@ in GHC.Core.Opt.WorkWrap.Utils.  (Maybe there are other "clients" of this featur
   for this purpose -- it contains only TyCoVars.  Instead we have a separate
   le_ids for the in-scope Id binders.
 
-Sigh.  We might want to explore getting rid of type-let!
-
 Note [Bad unsafe coercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 For discussion see https://gitlab.haskell.org/ghc/ghc/wikis/bad-unsafe-coercions
@@ -571,23 +569,31 @@ lintLetExpr :: TyVarSet   -- Enclosing let-bound tyvars, all with unfoldings
 lintLetExpr tvs (Let (NonRec tv (Type rhs_ty)) body)
   | isTyVar tv
   =     -- See Note [Linting type lets]
-    do  { case tyVarUnfolding_maybe tv of
-             Nothing     -> return () -- See GHC.Core Note [Type and coercion lets] wrinkle (TCL1)
-             Just unf_ty -> -- These comparisons compare InTypes, which is fine
-                            do { ensureEqTys (tyVarKind tv) (typeKind rhs_ty) $
-                                 tv_err unf_ty "Let-bound tyvar kind incompatible with RHS:"
-                               ; ensureEqTys unf_ty rhs_ty $
-                                 tv_err unf_ty "Let-bound tyvar unfolding not same as RHS:" }
+    do { -- Lint the RHS type
+         rhs_ty' <- addLoc (RhsOf tv) $ lintTypeAndSubst rhs_ty
 
-        ; addLoc (RhsOf tv) $ lintType rhs_ty
+       ; lintTyCoBndr tv $ \ tv' ->
+    do { -- Check that the RHS has the same kind as the tyvar
+          addLoc (RhsOf tv) $
+          lintTyKind tv' rhs_ty'
 
-        ; lintTyCoBndr tv     $ \ tv' ->
-          addLoc (BodyOfLet tv) $
-          lintLetExpr (tvs `extendVarSet` tv') body }
+        -- Check the unfolding
+        -- See GHC.Core Note [Type and coercion lets] wrinkle (TCL1)
+        ; case tyVarUnfolding_maybe tv' of
+             Nothing      -> return ()
+             Just unf_ty' -> ensureEqTys unf_ty' rhs_ty' $
+                             tv_err tv' unf_ty' rhs_ty'
+
+          -- Check the body
+        ; extendTvLetSubst tv rhs_ty' $
+          addLoc (BodyOfLet tv)     $
+          lintLetExpr (tvs `extendVarSet` tv') body
+     } }
   where
-    tv_err unf_ty msg = hang (text msg  <+> pprTyVarWithKind tv)
-                           2 (vcat [ text "Unfolding:" <+> ppr unf_ty
-                                   , text "RHS:      " <+> ppr rhs_ty ])
+    tv_err tv unf_ty rhs_ty = hang (text  "Let-bound tyvar unfolding not same as RHS:"
+                                    <+> pprTyVarWithKind tv)
+                                 2 (vcat [ text "Unfolding:" <+> ppr unf_ty
+                                         , text "RHS:      " <+> ppr rhs_ty ])
 
 lintLetExpr tvs (Let (NonRec bndr rhs) body)
   | isId bndr
@@ -3087,6 +3093,7 @@ data LintFlags
        , lf_check_fixed_rep :: Bool    -- ^ See Note [Checking for representation polymorphism]
        , lf_check_rubbish_lits :: Bool -- ^ See Note [Checking for rubbish literals]
        , lf_allow_weak_joins :: Bool -- ^ See Note [Linting join points with casts or ticks]
+       , lf_inline_type_lets   :: Bool -- ^ See Note [Linting type lets] XXX TODO
     }
 
 -- See Note [Checking StaticPtrs]
@@ -3520,10 +3527,12 @@ getLintFlags :: LintM LintFlags
 getLintFlags = LintM $ \ env errs -> fromBoxedLResult (Just (le_flags env), errs)
 
 updLintFlags :: (LintFlags -> LintFlags) -> LintM a -> LintM a
-updLintFlags upd_flags thing_inside
-  = LintM $ \env errs ->
-    let env' = env { le_flags = upd_flags (le_flags env) }
-    in unLintM thing_inside env' errs
+updLintFlags upd_flags
+  = updLintEnv (\env -> env { le_flags = upd_flags (le_flags env) })
+
+updLintEnv :: (LintEnv -> LintEnv) -> LintM a -> LintM a
+updLintEnv upd thing_inside
+  = LintM $ \env errs -> unLintM thing_inside (upd env) errs
 
 checkL :: Bool -> SDoc -> LintM ()
 checkL True  _   = return ()
@@ -3648,6 +3657,17 @@ addInScopeTyCoVar tcv tcv_type thing_inside
         tcv3 = case tyVarUnfolding_maybe tcv of
                  Just unf_ty -> setTyVarUnfolding tcv2 (substTy subst unf_ty)
                  Nothing     -> tcv2
+
+extendTvLetSubst :: TyVar -> Type -> LintM a -> LintM a
+extendTvLetSubst tv ty thing_inside
+  | isJust (tyVarUnfolding_maybe tv)
+  = thing_inside
+  | otherwise
+  = do { flags <- getLintFlags
+       ; if (lf_inline_type_lets flags)
+         then updLintEnv (\ env -> env { le_subst = Type.extendTvSubst (le_subst env) tv ty })
+                         thing_inside
+         else thing_inside }
 
 getInVarEnv :: LintM (VarEnv (InId, OutVar))
 getInVarEnv = LintM (\env errs -> fromBoxedLResult (Just (le_in_vars env), errs))
@@ -3779,7 +3799,7 @@ checkBndrOccCompatibility in_bndr v_occ
 sameUnfolding :: InVar   -- Binder
               -> InVar    -- Occurrence
               -> LintM Bool
--- Check that any unfolding in the /occurence/ is the same as that in the /binder/
+-- Check that any unfolding in the /occurrence/ is the same as that in the /binder/
 -- An unfolding in the occurrence is optional for Ids, but compulsory for type-let-boud
 -- TyVars.  Somewhat lazily, we only check the latter.
 -- We also just compare them as InTypes (as we do the type of the variable);
