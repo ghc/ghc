@@ -2700,30 +2700,16 @@ occAnal env (Tick tickish body)
       = usage1
 
 occAnal env (Cast expr co)
-<<<<<<< HEAD
   = let
-      WUD usage expr' = occAnal env expr
+      WUD expr_uds expr' = occAnal env expr
       -- usage1: see Note [Gather occurrences of coercion variables]
-      usage1 = addManyOccs usage (coVarsOfCo co)
+      co_uds = occAnalCo co
+      -- co_uds: see Note [Gather occurrences of coercion variables]
+
+      usage2 = markAllNonTail_CastOrTick env (expr_uds `addTyCoOccs` co_uds)
       -- usage2: see (JCT1) in Note [Join points, casts, and ticks] in GHC.Core.
-      usage2 = markAllNonTail_CastOrTick env usage1
     in
       WUD usage2 (Cast expr' co)
-||||||| parent of 81fa469f00 (Add type-lets into Core)
-  = let  (WUD usage expr') = occAnal env expr
-         usage1 = addManyOccs usage (coVarsOfCo co)
-             -- usage2: see Note [Gather occurrences of coercion variables]
-         usage2 = markAllNonTail usage1
-             -- usage3: calls inside expr aren't tail calls any more
-    in WUD usage2 (Cast expr' co)
-=======
-  = let  (WUD expr_uds expr') = occAnal env expr
-         co_uds = occAnalCo co
-             -- co_uds: see Note [Gather occurrences of coercion variables]
-         uds = markAllNonTail (expr_uds `addTyCoOccs` co_uds)
-             -- markAllNonTail: calls inside expr aren't tail calls any more
-    in WUD uds (Cast expr' co)
->>>>>>> 81fa469f00 (Add type-lets into Core)
 
 occAnal env app@(App _ _)
   = occAnalApp env (collectArgsTicks tickishFloatable app)

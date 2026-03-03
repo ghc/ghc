@@ -158,18 +158,15 @@ perPassFlags dflags pass
                       CorePrep -> True
                       _        -> False
 
-<<<<<<< HEAD
     -- See Note [Linting join points with casts or ticks] in GHC.Core.Lint
     allow_weak_joins = case pass of
                       CorePrep -> True
                       _        -> False
-||||||| parent of 687f3662c2 (More wibbles)
-=======
+
     -- See Note [Linting type lets] in GHC.Core.Lint
     inline_type_lets = case pass of
                           CoreDesugar -> True
                           _ -> False
->>>>>>> 687f3662c2 (More wibbles)
 
 initLintConfig :: DynFlags -> [Var] -> LintConfig
 initLintConfig dflags vars =LintConfig
@@ -187,10 +184,6 @@ defaultLintFlags dflags = LF { lf_check_global_ids = False
                              , lf_report_unsat_syns = True
                              , lf_check_fixed_rep = True
                              , lf_check_rubbish_lits = True
-<<<<<<< HEAD
                              , lf_allow_weak_joins = False
-||||||| parent of 687f3662c2 (More wibbles)
-=======
                              , lf_inline_type_lets = False
->>>>>>> 687f3662c2 (More wibbles)
                              }
