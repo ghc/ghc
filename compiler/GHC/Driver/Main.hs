@@ -297,8 +297,7 @@ import GHC.Cmm.Config (CmmConfig)
 import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
-
-import GHC.ByteCode.Serialize
+import qualified GHC.ByteCode.Serialize as ByteCode
 
 {- **********************************************************************
 %*                                                                      *
@@ -973,23 +972,22 @@ checkObjects dflags mb_old_linkable summary = do
 -- | Check to see if we can reuse the old linkable, by this point we will
 -- have just checked that the old interface matches up with the source hash, so
 -- no need to check that again here
-checkByteCodeInMemory :: HscEnv -> ModSummary -> Maybe Linkable -> IO (MaybeValidated Linkable)
+checkByteCodeInMemory :: HscEnv -> ModSummary -> Maybe (LinkableWith ModuleByteCode) -> IO (MaybeValidated (LinkableWith ModuleByteCode))
 checkByteCodeInMemory hsc_env mod_sum mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
-      | not (linkableIsNativeCodeOnly old_linkable)
       -- If `-fwrite-byte-code` is enabled, then check that the .gbc file is
       -- up-to-date with the linkable we have in our hand.
       -- If ms_bytecode_date is Nothing, then the .gbc file does not exist yet.
       -- Otherwise, check that the date matches the linkable date exactly.
-      , if gopt Opt_WriteByteCode (hsc_dflags hsc_env)
+      | if gopt Opt_WriteByteCode (hsc_dflags hsc_env)
           then maybe False (linkableTime old_linkable ==) (ms_bytecode_date mod_sum)
           else True
       -> return $ (UpToDateItem old_linkable)
     _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
 -- | Load bytecode from a ".gbc" object file if it exists and is up-to-date
-checkByteCodeFromObject :: HscEnv -> ModSummary -> IO (MaybeValidated Linkable)
+checkByteCodeFromObject :: HscEnv -> ModSummary -> IO (MaybeValidated (LinkableWith ModuleByteCode))
 checkByteCodeFromObject hsc_env mod_sum = do
   let
     obj_fn = ml_bytecode_file (ms_location mod_sum)
@@ -1001,8 +999,8 @@ checkByteCodeFromObject hsc_env mod_sum = do
           -- Don't force this if we reuse the linkable already loaded into memory, but we have to check
           -- that the one we have on disk would be suitable as well.
           linkable <- unsafeInterleaveIO $ do
-            bco <- readBinByteCode hsc_env obj_fn
-            return $ mkModuleByteCodeLinkable obj_date bco
+            bco <- ByteCode.readBinByteCode hsc_env obj_fn
+            return $ mkOnlyModuleByteCodeLinkable obj_date bco
           return $ UpToDateItem linkable
     _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
@@ -1086,7 +1084,7 @@ loadIfaceByteCodeLazy ::
   ModIface ->
   ModLocation ->
   TypeEnv ->
-  IO (Maybe Linkable)
+  IO (Maybe (LinkableWith ModuleByteCode))
 loadIfaceByteCodeLazy hsc_env iface location type_env =
   case iface_core_bindings iface location of
     Nothing -> return Nothing
@@ -1094,8 +1092,9 @@ loadIfaceByteCodeLazy hsc_env iface location type_env =
       Just <$> compile wcb
   where
     compile decls = do
-      bco <- unsafeInterleaveIO $ compileWholeCoreBindings hsc_env type_env decls
-      linkable $ NE.singleton (DotGBC bco)
+      bco <- unsafeInterleaveIO $ do
+          compileWholeCoreBindings hsc_env type_env decls
+      linkable bco
 
     linkable parts = do
       if_time <- modificationTimeIfExists (ml_hi_file_ospath location)
@@ -1136,14 +1135,14 @@ initWholeCoreBindings hsc_env iface details (RecompLinkables bc o) = do
   where
     type_env = md_types details
 
-    go :: RecompBytecodeLinkable -> IO (Maybe Linkable)
+    go :: RecompBytecodeLinkable -> IO (Maybe (LinkableWith ModuleByteCode))
     go (NormalLinkable l) = pure l
     go (WholeCoreBindingsLinkable wcbl) =
       fmap Just $ for wcbl $ \wcb -> do
         add_iface_to_hpt iface details hsc_env
-        bco <- unsafeInterleaveIO $
-                       compileWholeCoreBindings hsc_env type_env wcb
-        pure $ NE.singleton (DotGBC bco)
+        bco <- unsafeInterleaveIO $ do
+            compileWholeCoreBindings hsc_env type_env wcb
+        pure bco
 
 -- | Hydrate interface Core bindings and compile them to bytecode.
 --
@@ -2205,7 +2204,7 @@ generateAndWriteByteCode hsc_env cgguts mod_location = do
   -- See Note [-fwrite-byte-code is not the default]
   when (gopt Opt_WriteByteCode dflags) $ do
     let bc_path = ml_bytecode_file mod_location
-    writeBinByteCode bc_path comp_bc
+    ByteCode.writeBinByteCode bc_path comp_bc
   return comp_bc
 
 {-
@@ -2220,20 +2219,20 @@ make user's opt into writing the files.
 -}
 
 -- | Generate a 'ModuleByteCode' and write it to disk if `-fwrite-byte-code` is enabled.
-generateAndWriteByteCodeLinkable :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO Linkable
+generateAndWriteByteCodeLinkable :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO (LinkableWith ModuleByteCode)
 generateAndWriteByteCodeLinkable hsc_env cgguts mod_location = do
   bco_object <- generateAndWriteByteCode hsc_env cgguts mod_location
   -- Either, get the same time as the .gbc file if it exists, or just the current time.
   -- It's important the time of the linkable matches the time of the .gbc file for recompilation
   -- checking.
   bco_time <- maybe getCurrentTime pure =<< modificationTimeIfExists (ml_bytecode_file_ospath mod_location)
-  return $ mkModuleByteCodeLinkable bco_time bco_object
+  return $ mkOnlyModuleByteCodeLinkable bco_time bco_object
 
 mkModuleByteCode :: HscEnv -> Module -> ModLocation -> CgInteractiveGuts -> IO ModuleByteCode
 mkModuleByteCode hsc_env mod mod_location cgguts = do
   bcos <- hscGenerateByteCode hsc_env cgguts mod_location
   objs <- outputAndCompileForeign hsc_env mod mod_location (cgi_foreign_files cgguts) (cgi_foreign cgguts)
-  return $! ModuleByteCode mod bcos objs
+  ByteCode.mkModuleByteCode mod bcos objs
 
 -- | Generate a fresh 'ModuleByteCode' for a given module but do not write it to disk.
 generateFreshByteCodeLinkable :: HscEnv
@@ -2755,13 +2754,13 @@ hscTidy hsc_env guts = do
 %*                                                                      *
 %********************************************************************* -}
 
-hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [Linkable], PkgsLoaded)
+hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 hscCompileCoreExpr hsc_env loc expr =
   case hscCompileCoreExprHook (hsc_hooks hsc_env) of
       Nothing -> hscCompileCoreExpr' hsc_env loc expr
       Just h  -> h                   hsc_env loc expr
 
-hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [Linkable], PkgsLoaded)
+hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   {- Simplify it -}
   -- Question: should we call SimpleOpt.simpleOptExpr here instead?
@@ -2847,8 +2846,9 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
 
       {- load it -}
       bco_time <- getCurrentTime
+      mbc <- ByteCode.mkModuleByteCode this_mod bcos []
       (mods_needed, units_needed) <- loadDecls interp hsc_env srcspan $
-        Linkable bco_time this_mod $ NE.singleton $ DotGBC (ModuleByteCode this_mod bcos [])
+        Linkable bco_time this_mod $ NE.singleton (DotGBC mbc)
       -- Get the foreign reference to the name we should have just loaded.
       mhvs <- lookupFromLoadedEnv interp (idName binding_id)
       {- Get the HValue for the root -}
@@ -2864,7 +2864,7 @@ jsCodeGen
   -> Module
   -> [(CgStgTopBinding,IdSet)]
   -> Id
-  -> IO (ForeignHValue, [Linkable], PkgsLoaded)
+  -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
   let logger           = hsc_logger hsc_env
       tmpfs            = hsc_tmpfs hsc_env
