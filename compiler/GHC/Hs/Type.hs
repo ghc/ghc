@@ -117,7 +117,6 @@ import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
 import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
 import GHC.Hs.Doc
-import GHC.Hs.Lit (pprHsStringLit)
 import GHC.Generics (Generic, Generically(..))
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
