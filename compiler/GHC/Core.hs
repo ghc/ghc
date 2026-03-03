@@ -466,34 +466,56 @@ TL;DR: we relaxed the let/app invariant to become the let-can-float invariant.
 Note [Type and coercion lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow non-recursive type lets:
-   let a = TYPE ty in ...
-and similarly for coercions.
+   let a = TYPE (Maybe Int) in <body>
+and similarly for coercions.  We support this as follows:
 
-   TODO: fill this out
+(TCL1) A let-bound TyVar `a` usually (see (TLC1) has an /unfolding/, equal to the
+  RHS of the let-binding.
+
+(TCL2) If you use `-fprint-tyvar-unfoldings` you can see the unfolding at every
+  occurrence of `a`, printed like this: a{=Maybe Int}
+
+(TCL3) All functions that pattern-match on types can "look through" the unfolding
+  of a TyVar, just as they look through type synonyms.  See the use of
+  `tyVarUnfolding_maybe` in `GHC.Core.Type.coreView`.
+
+(TCL4) General invariant: if `a` is let-bound, a=<type>, then every /occurrence/
+  of `a` (as well as the binder) has an unfolding `rhs`.  Reason: all occurrences
+  must behave like <type>, without referring to any environment.
+
+  Consider a beta-redex  ((/\a. blah) ty) in the Simplifier.  We may turn that into
+         let @a{=ty} = ty in blah
+  To ensure the invariant, we extend the ambient /substitution/ with the
+  tyvar-replete-with-unfolding, rather than merely extending the in-scope set
+  as we do for Ids.
+
+  Excpetion: see (TCLW1).
+
+(TCL5) A lambda-bound or case-bound type variable never has an unfolding.
+
+(TCL6) Let-bindings for type or coercion variables can be top-level.  If mentioned
+  in an exposed unfolding, such top-level TyCo bindings must be serialised into
+  the interface file.
 
 Wrinkles:
 
-(TCL1) In a type let (Let @a = TYPE ty in body), we do /not/ insist that
-  the binder `a` has a TyVarUnfolding.  But if it does not, then `body`
-  must be well-typed without paying attention to the binding. More precisely,
+(TCLW1) In a type let (Let @a = TYPE ty in body), we do /not/ insist that
+  the binder `a` has a TyVarUnfolding.  But if it does not, then the occurrences
+  of `a` in `body` should not have an unfolding, and `body` must be well-typed
+  without paying attention to the binding. More precisely,
        let @a = TYPE ty in body
   where `a` has no TyVarUnfolding, is well-typed iff
        (/\a. body) ty
   is well-typed.  This is used during worker/wrapper, which creates type-lets.
   See GHC.Core.Opt.WorkWrap.Utils.mkAppsBeta.
 
-(TCL2) Consider a beta-redex  ((/\a. blah) ty).  We may turn that into
-         let @a = ty in blah
-  and it's crucial that /every/ occurrence of `a` in `blah` is replaced by
-  `a{=ty}` with an unfolding.  To ensure that, we extend the /substitution/
-  (which is always substituted) with the tyvar-replete-with-unfolding, rather
-  than merely extending the in-scope set as we do for Ids.
+  So: (TCL4) + (TCLW1): an occurrence has an unfolding iff the binder does
 
-(TCL3) In the output of the desugarer it is very convenient to allow
+(TCLW2) In the output of the desugarer /only/, it is very convenient to allow
       let a = <type> in ...a....
-  where the occurrences of `a` do /not/ have an unfolding, but yet it is essential
-  to substitute <type> for `a` when Linting.  Why?  When compiling nested pattern
-  matching we may combine patterns
+  where neither the binding nor the occurrences of `a` have an unfolding, but yet
+  it is essential to substitute <type> for `a` when Linting.  Why?  When compiling
+  nested pattern matching we may combine patterns:
       K @a1 (co1 :: a1 ~ T) pat1 -> e1
       K @a2 (co2 :: a2 ~ T) pat2 -> e2
   to get a single, shared pattern, something like
@@ -507,13 +529,7 @@ Wrinkles:
   So, in the ouptut of the desugarer only, if there is no unfolding on the binder,
   we just extend the subustitution.
 
-  It's a bit of a hack, but the first roun dof simplification esablishes (TCL1) or
-  (TCL2).
-
-So: (TCL1) + (TCL2) =
-  EITHER `a` has an unfolding at its binding site,
-     and that unfolding is replicated at every occurrence site
-  OR it doesn't and the occurrences don't either.
+  It's a bit of a hack, but the first round of simplification establishes (TCL4).
 
 Note [Core top-level string literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

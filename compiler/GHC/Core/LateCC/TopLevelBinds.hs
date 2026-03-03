@@ -9,6 +9,7 @@ import GHC.Core
 import GHC.Core.Opt.Monad
 import GHC.Driver.DynFlags
 import GHC.Types.Id
+import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Unit.Module.ModGuts
 
@@ -108,10 +109,12 @@ topLevelBindsCC pred core_bind =
       -- Not a constructor worker.
       -- Cost centres on constructor workers are pretty much useless so we don't emit them
       -- if we are looking at the rhs of a constructor binding.
-      | isNothing (isDataConId_maybe bndr)
+      | isNonCoVarId bndr
+      , isNothing (isDataConId_maybe bndr)
       , pred rhs
       = addCC bndr rhs
-      | otherwise = pure rhs
+      | otherwise
+      = pure rhs
 
     -- We want to put the cost centre below the lambda as we only care about
     -- executions of the RHS. Note that the lambdas might be hidden under ticks
