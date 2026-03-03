@@ -210,10 +210,12 @@ Library
         GHC.Builtin.Uniques
         GHC.Builtin.Utils
         GHC.ByteCode.Asm
+        GHC.ByteCode.Binary
         GHC.ByteCode.Breakpoints
         GHC.ByteCode.InfoTable
         GHC.ByteCode.Instr
         GHC.ByteCode.Linker
+        GHC.ByteCode.Recomp.Binary
         GHC.ByteCode.Serialize
         GHC.ByteCode.Types
         GHC.Cmm

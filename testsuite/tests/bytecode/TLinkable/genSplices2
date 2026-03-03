@@ -1,0 +1,243 @@
+#!/bin/bash
+
+MODNAME=${1}
+NMOD=${2:-20}  # Default 20 modules
+
+IFS='' read -r -d '' MODULE_CONTENT <<"EOF"
+-- Custom data types
+data Tree a = Leaf a | Branch (Tree a) (Tree a) | Empty
+data Status = Ok Int | Err String | Pending
+data Color = Red | Green | Blue | RGB Int Int Int
+data Expr = Lit Int | Add Expr Expr | Mul Expr Expr | Var String
+data Continuation a = Cont { runCont :: (a -> Result) -> Result }
+data Result = Done Int | Fail String | Step (() -> Result)
+
+-- Tree operations with deep pattern matching
+treeSum :: Tree Int -> Int
+treeSum Empty = 0
+treeSum (Leaf x) = x
+treeSum (Branch l r) = case (treeSum l, treeSum r) of
+  (0, 0) -> 0
+  (x, 0) -> x
+  (0, y) -> y
+  (x, y) -> x + y
+
+-- Expression evaluator with nested cases
+evalExpr :: Expr -> Int
+evalExpr (Lit n) = n
+evalExpr (Add e1 e2) =
+  case evalExpr e1 of
+    0 -> evalExpr e2
+    x -> case evalExpr e2 of
+      0 -> x
+      y -> x + y
+evalExpr (Mul e1 e2) =
+  case (evalExpr e1, evalExpr e2) of
+    (0, _) -> 0
+    (_, 0) -> 0
+    (1, y) -> y
+    (x, 1) -> x
+    (x, y) -> x * y
+
+-- Continuation-based computation
+contMap :: (a -> b) -> Continuation a -> Continuation b
+contMap f (Cont g) = Cont $ \h -> g (\x -> h (f x))
+
+contBind :: Continuation a -> (a -> Continuation b) -> Continuation b
+contBind (Cont g) f = Cont $ \h -> g (\x -> runCont (f x) h)
+
+contReturn :: a -> Continuation a
+contReturn x = Cont $ \f -> f x
+
+expectSuccess :: Result -> Int
+expectSuccess r = case r of
+  Done i -> i
+  Fail err -> error err
+  Step _ -> error "Expected Done but got Step"
+
+-- Complex control flow with continuations
+chainComputations :: [Int] -> Continuation Int
+chainComputations [] = contReturn 0
+chainComputations (x:xs) =
+  contBind (contReturn x) $ \n ->
+    case n of
+      0 -> chainComputations xs
+      val -> contBind (chainComputations xs) $ \rest ->
+        contReturn (val + rest)
+
+-- Status processing with deep nesting
+processStatus :: Status -> String
+processStatus (Ok n) =
+  case n of
+    0 -> "zero"
+    1 -> "one"
+    x | x < 0 -> "negative"
+      | x > 100 -> "large"
+      | otherwise -> case x `mod` 2 of
+          0 -> "even"
+          1 -> "odd"
+processStatus (Err msg) =
+  case msg of
+    [] -> "empty error"
+    [c] -> "single char: " ++ [c]
+    _ -> case take 5 msg of
+      "CRIT:" -> "critical"
+      "WARN:" -> "warning"
+      _ -> "unknown"
+processStatus Pending = "waiting"
+
+-- Color manipulation with pattern matching
+colorValue :: Color -> Int
+colorValue Red = 0xFF0000
+colorValue Green = 0x00FF00
+colorValue Blue = 0x0000FF
+colorValue (RGB r g b) =
+  case (r, g, b) of
+    (0, 0, 0) -> 0
+    (255, 255, 255) -> 0xFFFFFF
+    (r', g', b') | r' == g' && g' == b' -> r' * 0x010101
+                 | otherwise -> r' * 0x10000 + g' * 0x100 + b'
+
+-- Complex recursive function with accumulator
+foldTree :: (a -> b -> b) -> b -> Tree a -> b
+foldTree f acc Empty = acc
+foldTree f acc (Leaf x) = f x acc
+foldTree f acc (Branch l r) =
+  let leftAcc = foldTree f acc l
+  in case leftAcc of
+       _ -> foldTree f leftAcc r
+
+-- Mutual recursion with pattern matching
+evenSum :: [Int] -> Int
+oddSum :: [Int] -> Int
+evenSum [] = 0
+evenSum (x:xs) = case x `mod` 2 of
+  0 -> x + oddSum xs
+  _ -> oddSum xs
+oddSum [] = 0
+oddSum (x:xs) = case x `mod` 2 of
+  1 -> x + evenSum xs
+  _ -> evenSum xs
+
+-- The predictable top-level functions that will be referenced in TH splice
+func001 :: Int -> Int
+func001 x = treeSum (Branch (Leaf x) (Leaf (x + 1)))
+
+func002 :: Int -> Int
+func002 x = evalExpr (Add (Lit x) (Mul (Lit 2) (Lit 3)))
+
+func003 :: Int -> Int
+func003 x = expectSuccess $ runCont (chainComputations [x, x+1, x+2]) Done
+
+func004 :: Int -> Int
+func004 x = case processStatus (Ok x) of
+  "large" -> x * 2
+  "even" -> x `div` 2
+  "odd" -> x * 3 + 1
+  _ -> x
+
+func005 :: Int -> Int
+func005 x = colorValue (RGB x (x `mod` 256) ((x * 2) `mod` 256))
+
+func006 :: Int -> Int
+func006 x = evenSum [x, x+1, x+2, x+3, x+4]
+
+func007 :: Int -> Int
+func007 x = foldTree (+) x (Branch (Leaf 1) (Branch (Leaf 2) (Leaf 3)))
+
+func008 :: Int -> Int
+func008 x = case colorValue (RGB x 0 0) of
+  0 -> 0
+  v | v > 0x800000 -> v `div` 2
+    | otherwise -> v * 2
+
+func009 :: Int -> Int
+func009 x = expectSuccess $ runCont (contMap (+x) (contReturn 42)) Done
+
+func010 :: Int -> Int
+func010 x = evalExpr (Mul (Add (Lit x) (Lit 1)) (Add (Lit x) (Lit 2)))
+EOF
+
+# Generate the modules
+for ((i=1; i<=NMOD; i++)); do
+    module_name="Module$(printf "%03d" $i)"
+    file_path="${module_name}.hs"
+
+    cat > "$file_path" << EOF
+module ${module_name} where
+
+${MODULE_CONTENT}
+EOF
+done
+
+# Generate imports section
+imports=""
+for ((i=1; i<=NMOD; i++)); do
+    imports="${imports}import splice Module$(printf "%03d" $i)
+"
+done
+
+# Generate the hard-coded TH expression
+# Build: Module001.func001 1 + Module001.func002 2 + ... + Module{NMOD}.func{x} {NMOD*10}
+expressions=""
+all_mods=""
+for ((i=1; i<=NMOD; i++)); do
+    mod_name="Module$(printf "%03d" $i)"
+    all_mods="${all_mods} ${mod_name}"
+    single_expression=""
+    count=1
+    for ((j=1; j<=10; j++)); do
+        func_name="func$(printf "%03d" $j)"
+        if [ $count -gt 1 ]; then
+            single_expression="${single_expression} + "
+        fi
+        single_expression="${single_expression}${mod_name}.${func_name} ${count}"
+        ((count++))
+    done
+
+    expressions="comp$(printf "%03d" $i) = \$(lift \$ ${single_expression})\\n\\n${expressions}"
+done
+
+# Generate the TH splice file
+cat > bytecode.pkg << EOF
+name: testpkg
+version: 1.2.3.4
+id: testpkg-1.2.3.4-XXX
+key: testpkg-1.2.3.4-XXX
+license: BSD3
+copyright: (c) The Univsersity of Glasgow 2004
+maintainer: glasgow-haskell-users@haskell.org
+stability: stable
+homepage: http://www.haskell.org/ghc
+package-url: http://www.haskell.org/ghc
+description: A Test Package
+category: none
+author: simonmar@microsoft.com
+exposed: True
+exposed-modules: ${all_mods}
+import-dirs: \${pkgroot}/outdir
+library-dirs: \${pkgroot}/outdir
+include-dirs:
+bytecode-library-dirs: \${pkgroot}/outdir
+hs-libraries: testpkg-1.2.3.4-XXX
+EOF
+
+# Generate the TH splice file
+cat > "${MODNAME}".hs << EOF
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE ExplicitLevelImports #-}
+
+module ${MODNAME} where
+
+import splice Language.Haskell.TH.Syntax (Lift(..))
+import Control.Concurrent (threadDelay)
+import splice Prelude (Num(..), ($), Monad(..), pure)
+
+-- Import all generated modules
+${imports}
+
+-- Use from each module
+$(echo -e -n "${expressions}")
+
+EOF

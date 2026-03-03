@@ -228,7 +228,7 @@ lookupFromLoadedEnv interp name = do
 -- | Load the module containing the given Name and get its associated 'HValue'.
 --
 -- Throws a 'ProgramError' if loading fails or the name cannot be found.
-loadName :: Interp -> HscEnv -> Name -> IO (ForeignHValue, [Linkable], PkgsLoaded)
+loadName :: Interp -> HscEnv -> Name -> IO (ForeignHValue, [LinkableUsage], PkgsLoaded)
 loadName interp hsc_env name = do
   initLoaderState interp hsc_env
   modifyLoaderState interp $ \pls0 -> do
@@ -258,7 +258,7 @@ loadDependencies
   -> LoaderState
   -> SrcSpan
   -> [Module]
-  -> IO (LoaderState, SuccessFlag, [Linkable], PkgsLoaded) -- ^ returns the set of linkables required
+  -> IO (LoaderState, SuccessFlag, [LinkableUsage], PkgsLoaded) -- ^ returns the set of linkables required
 -- When called, the loader state must have been initialized (see `initLoaderState`)
 loadDependencies interp hsc_env pls span needed_mods = do
    let opts = initLinkDepsOpts hsc_env
@@ -645,7 +645,7 @@ initLinkDepsOpts hsc_env = opts
     dflags = hsc_dflags hsc_env
 
     ldLoadByteCode mod locn = do
-      bytecode_linkable <-  findBytecodeLinkableMaybe hsc_env mod locn
+      bytecode_linkable <-  findBytecodeLinkableMaybe hsc_env locn
       case bytecode_linkable of
         Nothing -> findWholeCoreBindings hsc_env mod
         Just bco -> return (Just bco)
@@ -659,19 +659,14 @@ findWholeCoreBindings hsc_env mod = do
       sequence (lookupModuleEnv eps_iface_bytecode mod)
 
 
-findBytecodeLinkableMaybe :: HscEnv -> Module -> ModLocation -> IO (Maybe Linkable)
-findBytecodeLinkableMaybe hsc_env mod locn = do
+findBytecodeLinkableMaybe :: HscEnv -> ModLocation -> IO (Maybe Linkable)
+findBytecodeLinkableMaybe hsc_env locn = do
   let bytecode_fn    = ml_bytecode_file locn
       bytecode_fn_os = ml_bytecode_file_ospath locn
   maybe_bytecode_time <- modificationTimeIfExists bytecode_fn_os
   case maybe_bytecode_time of
     Nothing -> return Nothing
     Just bytecode_time -> do
-      -- Also load the interface, for reasons to do with recompilation avoidance.
-      -- See Note [Recompilation avoidance with bytecode objects]
-      _ <- initIfaceLoad hsc_env $
-             loadInterface (text "get_reachable_nodes" <+> parens (ppr mod))
-                 mod ImportBySystem
       bco <- readBinByteCode hsc_env bytecode_fn
       return $ Just $ mkModuleByteCodeLinkable bytecode_time bco
 
@@ -723,7 +718,7 @@ get_reachable_nodes hsc_env mods
   ********************************************************************* -}
 
 -- | Load the dependencies of a linkable, and then load the linkable itself.
-loadDecls :: Interp -> HscEnv -> SrcSpan -> Linkable -> IO ([Linkable], PkgsLoaded)
+loadDecls :: Interp -> HscEnv -> SrcSpan -> Linkable -> IO ([LinkableUsage], PkgsLoaded)
 loadDecls interp hsc_env span linkable = do
     -- Initialise the linker (if it's not been done already)
     initLoaderState interp hsc_env
@@ -823,7 +818,7 @@ loadModuleLinkables interp hsc_env pls keep_spec linkables
     (objs, bcos) = partitionLinkables linkables
 
 
-linkableInSet :: Linkable -> LinkableSet -> Bool
+linkableInSet :: Linkable -> LinkableSet LinkableUsage -> Bool
 linkableInSet l objs_loaded =
   case lookupModuleEnv objs_loaded (linkableModule l) of
         Nothing -> False
@@ -952,17 +947,17 @@ dynLoadObjs interp hsc_env pls objs = do
                         then addWay WayProf
                         else id
 
-rmDupLinkables :: LinkableSet    -- Already loaded
-               -> [Linkable]    -- New linkables
-               -> (LinkableSet,  -- New loaded set (including new ones)
+rmDupLinkables :: LinkableSet LinkableUsage  -- ^ Already loaded
+               -> [Linkable]    -- ^ New linkables
+               -> (LinkableSet LinkableUsage,  -- New loaded set (including new ones)
                    [Linkable])  -- New linkables (excluding dups)
 rmDupLinkables already ls
   = go already [] ls
   where
-    go already extras [] = (already, extras)
-    go already extras (l:ls)
+    go !already extras [] = (already, extras)
+    go !already extras (l:ls)
         | linkableInSet l already = go already     extras     ls
-        | otherwise               = go (extendModuleEnv already (linkableModule l) l) (l:extras) ls
+        | otherwise               = go (extendModuleEnv already (linkableModule l) $! mkLinkableUsage l) (l:extras) ls
 
 {- **********************************************************************
 
@@ -1115,7 +1110,7 @@ unload_wkr interp pls@LoaderState{..}  = do
 
   -- If we unloaded any object files at all, we need to purge the cache
   -- of lookupSymbol results.
-  when (not (null (filter (not . null . linkableObjs) linkables_to_unload))) $
+  when (not (null (filter (not . null . linkableUsageObjs) linkables_to_unload))) $
     purgeLookupSymbolCache interp
 
   let !new_pls = pls { bco_loader_state = modifyHomePackageBytecodeState bco_loader_state $ \_ -> emptyBytecodeState,
@@ -1125,7 +1120,7 @@ unload_wkr interp pls@LoaderState{..}  = do
 
   return new_pls
   where
-    unloadObjs :: Linkable -> IO ()
+    unloadObjs :: LinkableUsage -> IO ()
     unloadObjs lnk
       | interpreterDynamic interp = return ()
         -- We don't do any cleanup when linking objects with the
@@ -1133,7 +1128,7 @@ unload_wkr interp pls@LoaderState{..}  = do
         -- not much benefit.
 
       | otherwise
-      = mapM_ (unloadObj interp) (linkableObjs lnk)
+      = mapM_ (unloadObj interp) (linkableUsageObjs lnk)
                 -- The components of a BCO linkable may contain
                 -- dot-o files (generated from C stubs).
                 --

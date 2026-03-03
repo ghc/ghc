@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# Generate NMOD Haskell modules, each with NDEF NOINLINE functions
+# Usage: ./genSplices <MODNAME> <NMOD> <NDEF>
+
+MODNAME=${1}
+NMOD=${2:-20}  # Default 20 modules
+NDEF=${3:-50} # Default 50 functions per module
+
+# Generate the modules
+for ((i=1; i<=NMOD; i++)); do
+    module_name="Module$(printf "%03d" $i)"
+    file_path="${module_name}.hs"
+
+    cat > "$file_path" << EOF
+module ${module_name} where
+
+EOF
+
+    for ((j=1; j<=NDEF; j++)); do
+        func_name="func$(printf "%03d" $j)"
+        cat >> "$file_path" << EOF
+{-# NOINLINE ${func_name} #-}
+${func_name} :: Int -> Int
+${func_name} x = x + ${j}
+
+EOF
+    done
+done
+
+# Generate imports section
+imports=""
+for ((i=1; i<=NMOD; i++)); do
+    imports="${imports}import splice Module$(printf "%03d" $i)
+"
+done
+
+# Generate the hard-coded TH expression
+# Build: Module001.func001 1 + Module001.func002 2 + ... + Module{NMOD}.func{NDEF} {NMOD*NDEF}
+expression=""
+count=1
+for ((i=1; i<=NMOD; i++)); do
+    mod_name="Module$(printf "%03d" $i)"
+    for ((j=1; j<=NDEF; j++)); do
+        func_name="func$(printf "%03d" $j)"
+        if [ $count -gt 1 ]; then
+            expression="${expression} + "
+        fi
+        expression="${expression}${mod_name}.${func_name} ${count}"
+        ((count++))
+    done
+done
+
+# Generate the TH splice file
+cat > "${MODNAME}".hs << EOF
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE ExplicitLevelImports #-}
+
+module ${MODNAME} where
+
+import splice Language.Haskell.TH.Syntax (Lift(..))
+import Control.Concurrent (threadDelay)
+import splice Prelude (Num(..), ($), Monad(..), pure)
+
+-- Import all generated modules
+${imports}
+-- Hard-coded splice that references ALL functions from ALL modules
+result :: Int
+result = \$(lift \$ ${expression})
+
+result_test :: IO Int
+result_test = \$( [| threadDelay 1_000_000 >> pure 50 |] )
+
+main :: IO ()
+main = do
+    putStrLn \$ "Result: " ++ show result
+    putStrLn . ("Other result: " ++) . show =<< result_test
+EOF
