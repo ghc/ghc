@@ -1569,7 +1569,7 @@ cpeArg :: CorePrepEnv -> Demand
        -> CoreArg -> UniqSM (Floats, CpeArg)
 cpeArg env dmd arg
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
-       ; let arg_ty = exprType arg1
+       ; let arg_ty = exprType arg
              lev    = typeLevity arg_ty
              dec    = wantFloatLocal NonRecursive dmd lev floats1 arg1
        ; (floats2, arg2) <- executeFloatDecision env dec floats1 arg1

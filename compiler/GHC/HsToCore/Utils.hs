@@ -245,6 +245,8 @@ wrapBinds [] e = e
 wrapBinds ((new,old):prs) e = wrapBind new old (wrapBinds prs e)
 
 wrapBind :: Var -> Var -> CoreExpr -> CoreExpr
+-- Used only to line up varaibles when combining case patterns,
+-- in GHC.HsToCore.Match.Constructor and GHC.HsToCore.Match.Literal
 wrapBind new old body   -- NB: this function must deal with term
   | new==old    = body  -- variables, type variables or coercion variables
   | otherwise   = Let (NonRec new (varToCoreExpr old)) body
