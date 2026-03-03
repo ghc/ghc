@@ -42,6 +42,8 @@ compilerVersion = Version [major, minor] []
 -- | The full version of 'compilerName' with which the program was compiled
 -- or is being interpreted. It includes the major, minor, revision and an additional
 -- identifier, generally in the form "<year><month><day>".
+--
+-- @since 4.15.0.0
 fullCompilerVersion :: Version
 fullCompilerVersion = Version version []
   where
