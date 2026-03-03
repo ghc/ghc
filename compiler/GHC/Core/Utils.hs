@@ -304,58 +304,58 @@ mkCast expr co
 ********************************************************************* -}
 
 -- | Wraps the given expression in the source annotation, dropping the
--- annotation if possible.
+-- annotation if possible.  So
+--   mkTick t e = Tick t e
+-- except that we may optimise by pushing `t` inwards or dropping it
 mkTick :: CoreTickish -> CoreExpr -> CoreExpr
-mkTick t orig_expr = mkTick' id orig_expr
+mkTick t orig_expr = mkTick' orig_expr
  where
   -- Some ticks (cost-centres) can be split in two, with the
   -- non-counting part having laxer placement properties.
-  canSplit = tickishCanSplit t && tickishPlace (mkNoCount t) /= tickishPlace t
+  can_split = tickishCanSplit t
 
-  -- mkTick' handles floating of ticks *into* the expression.
-  mkTick' :: (CoreExpr -> CoreExpr) -- Apply before adding tick (float with)
-                                    -- Always a composition of (Tick t) wrappers
-          -> CoreExpr               -- Current expression
-          -> CoreExpr
-          -- So in the call (mkTick' rest e), the expression
-          --   (rest e)
-          -- has the same type as e
-          -- Returns an expression equivalent to (Tick t (rest e))
-  mkTick' rest expr = case expr of
-    -- Float ticks into unsafe coerce the same way we would do with a cast.
-    Case scrut bndr ty alts@[Alt ac abs _rhs]
-      | Just rhs <- isUnsafeEqualityCase scrut bndr alts
-      -> Case scrut bndr ty [Alt ac abs (mkTick' rest rhs)]
+  stop_here e = Tick t e   -- Just wrap `t` around the current expression
+                           -- That's the default option!
 
-    -- Cost centre ticks should never be reordered relative to each
-    -- other. Therefore we can stop whenever two collide.
+  -- mkTick' handles floating of tick `t` *into* the expression.
+  mkTick' :: CoreExpr -> CoreExpr
+  mkTick' expr = case expr of
     Tick t2 e
-      | ProfNote{} <- t2, ProfNote{} <- t -> Tick t $ rest expr
+      | ProfNote { profNoteCC = cc1, profNoteCount = cnt1, profNoteScope = scope1 } <- t
+      , ProfNote { profNoteCC = cc2, profNoteCount = cnt2, profNoteScope = scope2 } <- t2
+      ->
+        -- If the two ticks share the same cost centre and at most one of them
+        -- counts, then we can merge the two.
+        if cc1 == cc2 && (not cnt1 || not cnt2)
+        then
+          let t' = ProfNote { profNoteCC    = cc1
+                            , profNoteCount = cnt1 || cnt2
+                            , profNoteScope = scope1 || scope2
+                            }
+          in mkTick t' e
+        else
+          -- Cost centre ticks for different cost centres should never be reordered
+          -- relative to each other. Therefore we can stop whenever two collide.
+          stop_here expr
 
-    -- Otherwise we assume that ticks of different placements float
-    -- through each other.
-      | tickishPlace t2 /= tickishPlace t -> Tick t2 $ mkTick' rest e
+      | tickishPlace t2 /= tickishPlace t
+      -> -- Otherwise, we assume that ticks of different
+         -- placements float through each other.
+         Tick t2 $ mkTick' e
 
-    -- For annotations this is where we make sure to not introduce
-    -- redundant ticks.
-      | tickishContains t t2              -> mkTick' rest e  -- Drop t2
-      | tickishContains t2 t              -> rest e          -- Drop t
-      | otherwise                         -> mkTick' (rest . Tick t2) e
+      -- For source note ticks, this is where we make sure to
+      -- not introduce redundant ticks.
+      | tickishContains t t2 -> mkTick' e  -- Drop t2
+      | tickishContains t2 t -> expr       -- Drop t
 
-    -- Ticks don't care about types, so we just float all ticks
-    -- through them. Note that it's not enough to check for these
-    -- cases top-level. While mkTick will never produce Core with type
-    -- expressions below ticks, such constructs can be the result of
-    -- unfoldings. We therefore make an effort to put everything into
-    -- the right place no matter what we start with.
-    Cast e co   -> mkCast (mkTick' rest e) co
-    Coercion co -> Tick t $ rest (Coercion co)
+      | otherwise
+      -> stop_here expr   -- Always safe
 
     Lam x e
       -- Always float through type lambdas. Even for non-type lambdas,
       -- floating is allowed for all but the most strict placement rule.
       | not (isRuntimeVar x) || tickishPlace t /= PlaceRuntime
-      -> Lam x $ mkTick' rest e
+      -> Lam x $ mkTick' e
 
       -- If it is both counting and scoped, we split the tick into its
       -- two components, often allowing us to keep the counting tick on
@@ -363,26 +363,41 @@ mkTick t orig_expr = mkTick' id orig_expr
       -- The point of this is that the counting tick can probably be
       -- floated, and the lambda may then be in a position to be
       -- beta-reduced.
-      | canSplit
-      -> Tick (mkNoScope t) $ rest $ Lam x $ mkTick (mkNoCount t) e
+      | can_split
+      -> Tick (mkNoScope t) $ Lam x $ mkTick (mkNoCount t) e
 
     App f arg
       -- Always float through type applications.
       | not (isRuntimeArg arg)
-      -> App (mkTick' rest f) arg
+      -> App (mkTick' f) arg
 
       -- We can also float through constructor applications, placement
       -- permitting. Again we can split.
-      | isSaturatedConApp expr && (tickishPlace t==PlaceCostCentre || canSplit)
+      | isSaturatedConApp expr
+      , tickishPlace t == PlaceCostCentre || can_split
       -> if tickishPlace t == PlaceCostCentre
-         then rest $ tickHNFArgs t expr
-         else Tick (mkNoScope t) $ rest $ tickHNFArgs (mkNoCount t) expr
+         then tickHNFArgs t expr
+         else Tick (mkNoScope t) $ tickHNFArgs (mkNoCount t) expr
+
+    -- Ticks don't care about types, so we just float all ticks
+    -- through them. Note that it's not enough to check for these
+    -- cases at the top-level. While mkTick will never produce Core with type
+    -- expressions below ticks, such constructs can be the result of
+    -- unfoldings. We therefore make an effort to put everything into
+    -- the right place no matter what we start with.
+    Cast e co   -> mkCast (mkTick' e) co
+
+    -- Float ticks into 'unsafeCoerce' the same way we would do with a cast.
+    Case scrut bndr ty alts@[Alt ac abs _rhs]
+      | Just rhs <- isUnsafeEqualityCase scrut bndr alts
+      -> Case scrut bndr ty [Alt ac abs (mkTick' rhs)]
 
     Var x
-      | notFunction && tickishPlace t == PlaceCostCentre
-      -> rest expr  -- Drop t
-      | notFunction && canSplit
-      -> Tick (mkNoScope t) $ rest expr
+      | notFunction
+      , tickishPlace t == PlaceCostCentre || can_split
+      -> if tickishPlace t == PlaceCostCentre
+         then expr -- Drop tick t entirely
+         else Tick (mkNoScope t) expr
       where
         -- SCCs can be eliminated on variables provided the variable
         -- is not a function.  In these cases the SCC makes no difference:
@@ -392,12 +407,24 @@ mkTick t orig_expr = mkTick' id orig_expr
         -- when the function is called, so we must retain those.
         notFunction = not (isFunTy (idType x))
 
+    Coercion co
+      -- Make sure to drop SCCs around coercions, to avoid generating Core
+      -- of the form 'let co = scc<foo> <Int>_N' (which Core Lint isn't happy with).
+      -- See #26941.
+      | tickishPlace t == PlaceCostCentre
+      -> Coercion co -- Drop tick t entirely
+      | can_split
+      -> Tick (mkNoScope t) expr
+
     Lit{}
       | tickishPlace t == PlaceCostCentre
-      -> rest expr   -- Drop t
+      -> expr   -- Drop tick t entirely
+      | can_split
+      -> Tick (mkNoScope t) expr
 
-    -- Catch-all: Annotate where we stand
-    _any -> Tick t $ rest expr
+    -- Catch-all: Annotate where we stand.
+    -- Used for Type, Let, most Cases
+    _any -> Tick t expr
 
 mkTicks :: [CoreTickish] -> CoreExpr -> CoreExpr
 mkTicks ticks expr = foldr mkTick expr ticks

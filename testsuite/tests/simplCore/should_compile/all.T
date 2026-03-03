@@ -568,6 +568,8 @@ test('T26117', [grep_errmsg(r'==')], compile, ['-O -ddump-simpl -dsuppress-uniqu
 test('T26349',  normal, compile, ['-O -ddump-rules'])
 test('T26681',  normal, compile, ['-O'])
 
+test('T26941', [extra_files(['T26941_aux.hs']), req_profiling], multimod_compile, ['T26941', '-v0 -O -prof'])
+
 # T26709: we expect three `case` expressions not four
 test('T26709', [grep_errmsg(r'case')],
        multimod_compile,
