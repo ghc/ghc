@@ -10,8 +10,7 @@ T9497a-run.hs:2:8: error: [GHC-88464]
         main :: IO () (bound at T9497a-run.hs:2:1)
         readLn :: forall a. Read a => IO a
           with readLn @()
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.System.IO’))
+          (imported from ‘Prelude’ (and originally defined in ‘System.IO’))
         mempty :: forall a. Monoid a => a
           with mempty @(IO ())
           (imported from ‘Prelude’

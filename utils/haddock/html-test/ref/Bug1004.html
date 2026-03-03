@@ -627,13 +627,13 @@
 			  >liftReadsPrec</a
 			  > :: (<a href="#" title="Data.Int"
 			  >Int</a
-			  > -&gt; <a href="#" title="Prelude"
+			  > -&gt; <a href="#" title="Text.ParserCombinators.ReadP"
 			  >ReadS</a
-			  > a) -&gt; <a href="#" title="Prelude"
+			  > a) -&gt; <a href="#" title="Text.ParserCombinators.ReadP"
 			  >ReadS</a
 			  > [a] -&gt; <a href="#" title="Data.Int"
 			  >Int</a
-			  > -&gt; <a href="#" title="Prelude"
+			  > -&gt; <a href="#" title="Text.ParserCombinators.ReadP"
 			  >ReadS</a
 			  > (<a href="#" title="Bug1004"
 			  >Product</a
@@ -645,11 +645,11 @@
 			  >liftReadList</a
 			  > :: (<a href="#" title="Data.Int"
 			  >Int</a
-			  > -&gt; <a href="#" title="Prelude"
+			  > -&gt; <a href="#" title="Text.ParserCombinators.ReadP"
 			  >ReadS</a
-			  > a) -&gt; <a href="#" title="Prelude"
+			  > a) -&gt; <a href="#" title="Text.ParserCombinators.ReadP"
 			  >ReadS</a
-			  > [a] -&gt; <a href="#" title="Prelude"
+			  > [a] -&gt; <a href="#" title="Text.ParserCombinators.ReadP"
 			  >ReadS</a
 			  > [<a href="#" title="Bug1004"
 			  >Product</a
@@ -735,15 +735,15 @@
 			  >liftShowsPrec</a
 			  > :: (<a href="#" title="Data.Int"
 			  >Int</a
-			  > -&gt; a -&gt; <a href="#" title="Prelude"
+			  > -&gt; a -&gt; <a href="#" title="Text.Show"
 			  >ShowS</a
-			  >) -&gt; ([a] -&gt; <a href="#" title="Prelude"
+			  >) -&gt; ([a] -&gt; <a href="#" title="Text.Show"
 			  >ShowS</a
 			  >) -&gt; <a href="#" title="Data.Int"
 			  >Int</a
 			  > -&gt; <a href="#" title="Bug1004"
 			  >Product</a
-			  > f g a -&gt; <a href="#" title="Prelude"
+			  > f g a -&gt; <a href="#" title="Text.Show"
 			  >ShowS</a
 			  > <a href="#" class="selflink"
 			  >#</a
@@ -753,13 +753,13 @@
 			  >liftShowList</a
 			  > :: (<a href="#" title="Data.Int"
 			  >Int</a
-			  > -&gt; a -&gt; <a href="#" title="Prelude"
+			  > -&gt; a -&gt; <a href="#" title="Text.Show"
 			  >ShowS</a
-			  >) -&gt; ([a] -&gt; <a href="#" title="Prelude"
+			  >) -&gt; ([a] -&gt; <a href="#" title="Text.Show"
 			  >ShowS</a
 			  >) -&gt; [<a href="#" title="Bug1004"
 			  >Product</a
-			  > f g a] -&gt; <a href="#" title="Prelude"
+			  > f g a] -&gt; <a href="#" title="Text.Show"
 			  >ShowS</a
 			  > <a href="#" class="selflink"
 			  >#</a
@@ -2563,15 +2563,15 @@
 		      ></span
 		      > <span class="breakable"
 		      >(<span class="unbreakable"
-			><a href="#" title="Prelude"
+			><a href="#" title="Text.Read"
 			  >Read</a
 			  > (f a)</span
 			>, <span class="unbreakable"
-			><a href="#" title="Prelude"
+			><a href="#" title="Text.Read"
 			  >Read</a
 			  > (g a)</span
 			>)</span
-		      > =&gt; <a href="#" title="Prelude"
+		      > =&gt; <a href="#" title="Text.Read"
 		      >Read</a
 		      > (<a href="#" title="Bug1004"
 		      >Product</a
@@ -2603,7 +2603,7 @@
 			  >readsPrec</a
 			  > :: <a href="#" title="Data.Int"
 			  >Int</a
-			  > -&gt; <a href="#" title="Prelude"
+			  > -&gt; <a href="#" title="Text.ParserCombinators.ReadP"
 			  >ReadS</a
 			  > (<a href="#" title="Bug1004"
 			  >Product</a
@@ -2613,7 +2613,7 @@
 			><p class="src"
 			><a href="#"
 			  >readList</a
-			  > :: <a href="#" title="Prelude"
+			  > :: <a href="#" title="Text.ParserCombinators.ReadP"
 			  >ReadS</a
 			  > [<a href="#" title="Bug1004"
 			  >Product</a
@@ -2651,15 +2651,15 @@
 		      ></span
 		      > <span class="breakable"
 		      >(<span class="unbreakable"
-			><a href="#" title="Prelude"
+			><a href="#" title="Text.Show"
 			  >Show</a
 			  > (f a)</span
 			>, <span class="unbreakable"
-			><a href="#" title="Prelude"
+			><a href="#" title="Text.Show"
 			  >Show</a
 			  > (g a)</span
 			>)</span
-		      > =&gt; <a href="#" title="Prelude"
+		      > =&gt; <a href="#" title="Text.Show"
 		      >Show</a
 		      > (<a href="#" title="Bug1004"
 		      >Product</a
@@ -2693,7 +2693,7 @@
 			  >Int</a
 			  > -&gt; <a href="#" title="Bug1004"
 			  >Product</a
-			  > f g a -&gt; <a href="#" title="Prelude"
+			  > f g a -&gt; <a href="#" title="Text.Show"
 			  >ShowS</a
 			  > <a href="#" class="selflink"
 			  >#</a
@@ -2713,7 +2713,7 @@
 			  >showList</a
 			  > :: [<a href="#" title="Bug1004"
 			  >Product</a
-			  > f g a] -&gt; <a href="#" title="Prelude"
+			  > f g a] -&gt; <a href="#" title="Text.Show"
 			  >ShowS</a
 			  > <a href="#" class="selflink"
 			  >#</a

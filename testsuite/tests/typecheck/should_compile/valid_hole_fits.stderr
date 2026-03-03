@@ -230,15 +230,14 @@ valid_hole_fits.hs:41:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
       Valid hole fits include
         ps :: String -> IO () (defined at valid_hole_fits.hs:9:1)
         System.IO.putStr :: String -> IO ()
-          (imported qualified from ‘System.IO’ at valid_hole_fits.hs:4:29-34
-           (and originally defined in ‘GHC.Internal.System.IO’))
+          (imported qualified from ‘System.IO’ at valid_hole_fits.hs:4:29-34)
         System.IO.putStrLn :: String -> IO ()
           (imported qualified from ‘System.IO’ at valid_hole_fits.hs:4:37-44
            (and originally defined in ‘GHC.Internal.System.IO’))
         readIO :: forall a. Read a => String -> IO a
           with readIO @()
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Internal.System.IO’))
+           (and originally defined in ‘System.IO’))
         fail :: forall (m :: * -> *) a.
                 (MonadFail m, GHC.Internal.Stack.Types.HasCallStack) =>
                 String -> m a

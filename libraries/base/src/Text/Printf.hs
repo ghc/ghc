@@ -99,7 +99,7 @@ import GHC.Internal.Data.List (stripPrefix)
 import GHC.Internal.Word
 import GHC.Internal.Numeric
 import GHC.Internal.Numeric.Natural
-import GHC.Internal.System.IO
+import System.IO
 
 -- $setup
 -- >>> import Prelude

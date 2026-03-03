@@ -8012,6 +8012,7 @@ module GHC.IO.Handle where
   hGetEcho :: Handle -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
   hGetEncoding :: Handle -> GHC.Internal.Types.IO (GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding)
   hGetLine :: Handle -> GHC.Internal.Types.IO GHC.Internal.Base.String
+  hGetNewlineMode :: Handle -> GHC.Internal.Types.IO NewlineMode
   hGetPosn :: Handle -> GHC.Internal.Types.IO HandlePosn
   hIsClosed :: Handle -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
   hIsEOF :: Handle -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
@@ -10163,7 +10164,7 @@ module System.Exit where
   exitWith :: forall a. ExitCode -> GHC.Internal.Types.IO a
 
 module System.IO where
-  -- Safety: Safe
+  -- Safety: Trustworthy
   type BufferMode :: *
   data BufferMode = NoBuffering | LineBuffering | BlockBuffering (GHC.Internal.Maybe.Maybe GHC.Internal.Types.Int)
   type FilePath :: *
