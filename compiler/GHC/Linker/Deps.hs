@@ -63,7 +63,7 @@ data LinkDepsOpts = LinkDepsOpts
 
 data LinkDeps = LinkDeps
   { ldNeededLinkables :: [Linkable]
-  , ldAllLinkables    :: [Linkable]
+  , ldAllLinkables    :: [LinkableUsage]
   , ldUnits           :: [UnitId]
   , ldNeededUnits     :: UniqDSet UnitId
   }
@@ -123,13 +123,19 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
         --     This will either be in the HPT or (in the case of one-shot
         --     compilation) we may need to use maybe_getFileLinkable
       lnks_needed <- mapM (get_linkable (ldObjSuffix opts)) mods_needed
+      let
+        lnks_needed_usages = mkLinkablesUsage lnks_needed
+        new_link_deps lnks = LinkDeps
+          { ldNeededLinkables = lnks_needed
+          , ldAllLinkables    = lnks
+          , ldUnits           = pkgs_needed
+          , ldNeededUnits     = pkgs_s
+          }
+        -- Make sure we do not retain 'Linkable' by evaluating '[LinkableUsage]'
+        link_deps =
+          seqList lnks_needed_usages (new_link_deps (links_got ++ lnks_needed_usages))
 
-      return $ LinkDeps
-        { ldNeededLinkables = lnks_needed
-        , ldAllLinkables    = links_got ++ lnks_needed
-        , ldUnits           = pkgs_needed
-        , ldNeededUnits     = pkgs_s
-        }
+      return link_deps
   where
     unit_env = ldUnitEnv opts
     relevant_mods = filterOut isInteractiveModule mods

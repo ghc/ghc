@@ -18,7 +18,7 @@ import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 
-import GHC.Linker.Types ( Linkable, WholeCoreBindingsLinkable, linkableIsNativeCodeOnly )
+import GHC.Linker.Types ( Linkable, WholeCoreBindingsLinkable, linkableIsNativeCodeOnly, ModuleByteCode, LinkableWith )
 
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
@@ -59,7 +59,7 @@ data RecompLinkables = RecompLinkables { recompLinkables_bytecode :: !RecompByte
                                        , recompLinkables_object   :: !(Maybe Linkable) }
 
 data RecompBytecodeLinkable
-  = NormalLinkable !(Maybe Linkable)
+  = NormalLinkable !(Maybe (LinkableWith ModuleByteCode))
   | WholeCoreBindingsLinkable !WholeCoreBindingsLinkable
 
 instance Outputable HscRecompStatus where
@@ -83,11 +83,9 @@ emptyRecompLinkables = RecompLinkables (NormalLinkable Nothing) Nothing
 safeCastHomeModLinkable :: HomeModLinkable -> RecompLinkables
 safeCastHomeModLinkable (HomeModLinkable bc o) = RecompLinkables (NormalLinkable bc) o
 
-justBytecode :: Either Linkable WholeCoreBindingsLinkable -> RecompLinkables
+justBytecode :: Either (LinkableWith ModuleByteCode) WholeCoreBindingsLinkable -> RecompLinkables
 justBytecode = \case
-  Left lm ->
-    assertPpr (not (linkableIsNativeCodeOnly lm)) (ppr lm)
-      $ emptyRecompLinkables { recompLinkables_bytecode = NormalLinkable (Just lm) }
+  Left lm -> emptyRecompLinkables { recompLinkables_bytecode = NormalLinkable (Just lm) }
   Right lm -> emptyRecompLinkables { recompLinkables_bytecode = WholeCoreBindingsLinkable lm }
 
 justObjects :: Linkable -> RecompLinkables
@@ -95,10 +93,10 @@ justObjects lm =
   assertPpr (linkableIsNativeCodeOnly lm) (ppr lm)
     $ emptyRecompLinkables { recompLinkables_object = Just lm }
 
-bytecodeAndObjects :: Either Linkable WholeCoreBindingsLinkable -> Linkable -> RecompLinkables
+bytecodeAndObjects :: Either (LinkableWith ModuleByteCode) WholeCoreBindingsLinkable -> Linkable -> RecompLinkables
 bytecodeAndObjects either_bc o = case either_bc of
   Left bc ->
-    assertPpr (not (linkableIsNativeCodeOnly bc) && linkableIsNativeCodeOnly o) (ppr bc $$ ppr o)
+    assertPpr (linkableIsNativeCodeOnly o) (ppr o)
       $ RecompLinkables (NormalLinkable (Just bc)) (Just o)
   Right bc ->
     assertPpr (linkableIsNativeCodeOnly o) (ppr o)

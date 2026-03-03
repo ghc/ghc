@@ -430,7 +430,7 @@ link' hsc_env batch_attempt_linking mHscMessager hpt
                 let obj_files = concatMap linkableObjs linkables
                 in action obj_files
             linkBytecodeLinkable action =
-              checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink checkBytecodeLibraryLinkingNeeded homeMod_bytecode $ \linkables ->
+              checkLinkablesUpToDate hsc_env mHscMessager home_mods pkg_deps staticLink checkBytecodeLibraryLinkingNeeded homeModLinkableByteCode $ \linkables ->
                 let bytecode = concatMap linkableModuleByteCodes linkables
                 in action bytecode
 
