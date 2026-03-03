@@ -215,6 +215,7 @@ Library
         GHC.ByteCode.InfoTable
         GHC.ByteCode.Instr
         GHC.ByteCode.Linker
+        GHC.ByteCode.Recomp.Binary
         GHC.ByteCode.Serialize
         GHC.ByteCode.Types
         GHC.Cmm

@@ -18,11 +18,12 @@ import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 
-import GHC.Linker.Types ( Linkable, WholeCoreBindingsLinkable, linkableIsNativeCodeOnly )
+import GHC.Linker.Types ( Linkable, WholeCoreBindingsLinkable, linkableIsNativeCodeOnly, ModuleByteCode, LinkableWith, linkableModuleByteCodes )
 
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Stack.Types (HasCallStack)
 
 -- | Status of a module in incremental compilation
 data HscRecompStatus
@@ -59,7 +60,7 @@ data RecompLinkables = RecompLinkables { recompLinkables_bytecode :: !RecompByte
                                        , recompLinkables_object   :: !(Maybe Linkable) }
 
 data RecompBytecodeLinkable
-  = NormalLinkable !(Maybe Linkable)
+  = NormalLinkable !(Maybe (LinkableWith ModuleByteCode))
   | WholeCoreBindingsLinkable !WholeCoreBindingsLinkable
 
 instance Outputable HscRecompStatus where
@@ -86,8 +87,11 @@ safeCastHomeModLinkable (HomeModLinkable bc o) = RecompLinkables (NormalLinkable
 justBytecode :: Either Linkable WholeCoreBindingsLinkable -> RecompLinkables
 justBytecode = \case
   Left lm ->
+    let
+      mbc = expectSingletonGbcLinkable lm
+    in
     assertPpr (not (linkableIsNativeCodeOnly lm)) (ppr lm)
-      $ emptyRecompLinkables { recompLinkables_bytecode = NormalLinkable (Just lm) }
+      $ emptyRecompLinkables { recompLinkables_bytecode = NormalLinkable (Just mbc) }
   Right lm -> emptyRecompLinkables { recompLinkables_bytecode = WholeCoreBindingsLinkable lm }
 
 justObjects :: Linkable -> RecompLinkables
@@ -98,8 +102,17 @@ justObjects lm =
 bytecodeAndObjects :: Either Linkable WholeCoreBindingsLinkable -> Linkable -> RecompLinkables
 bytecodeAndObjects either_bc o = case either_bc of
   Left bc ->
-    assertPpr (not (linkableIsNativeCodeOnly bc) && linkableIsNativeCodeOnly o) (ppr bc $$ ppr o)
-      $ RecompLinkables (NormalLinkable (Just bc)) (Just o)
+    let
+      mbc = expectSingletonGbcLinkable bc
+    in
+      assertPpr (not (linkableIsNativeCodeOnly bc) && linkableIsNativeCodeOnly o) (ppr bc $$ ppr o)
+        $ RecompLinkables (NormalLinkable (Just mbc)) (Just o)
   Right bc ->
     assertPpr (linkableIsNativeCodeOnly o) (ppr o)
       $ RecompLinkables (WholeCoreBindingsLinkable bc) (Just o)
+
+expectSingletonGbcLinkable :: HasCallStack => Linkable -> LinkableWith ModuleByteCode
+expectSingletonGbcLinkable lm = case linkableModuleByteCodes lm of
+  [] -> pprPanic "Expected 1 DotGBC in Linkable" (ppr lm)
+  [mbc] -> mbc <$ lm
+  _ -> pprPanic "Expected 1 DotGBC in Linkable" (ppr lm)

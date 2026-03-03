@@ -2,11 +2,11 @@
 {-# LANGUAGE RecordWildCards #-}
 -- Orphans are here since the Binary instances use an ad-hoc means of serialising
 -- names which we don't want to pollute the rest of the codebase with.
-{-# OPTIONS_GHC -Wno-orphans #-}
 {- | This module implements the serialization of bytecode objects to and from disk.
 -}
 module GHC.ByteCode.Serialize
-  ( writeBinByteCode, readBinByteCode, ModuleByteCode(..)
+  ( writeBinByteCode, readBinByteCode
+  , ModuleByteCode(..)
   , BytecodeLibX(..)
   , BytecodeLib
   , OnDiskBytecodeLib
@@ -14,26 +14,34 @@ module GHC.ByteCode.Serialize
   , InterpreterLibraryContents(..)
   , writeBytecodeLib
   , readBytecodeLib
+  , mkModuleByteCode
+  , fingerprintModuleByteCodeContents
   , decodeOnDiskModuleByteCode
   , decodeOnDiskBytecodeLib
   )
 where
 
-import Control.Monad
-import GHC.Driver.Env
-import GHC.Iface.Binary
 import GHC.Prelude
+
+import GHC.ByteCode.Binary
+import GHC.ByteCode.Types
+import GHC.ByteCode.Recomp.Binary (computeFingerprint)
+import GHC.Driver.Env
+import GHC.Driver.DynFlags
+import GHC.Iface.Binary
+import GHC.Iface.Recomp.Binary (putNameLiterally)
+import GHC.Linker.Types
+import GHC.Unit.Types
 import GHC.Utils.Binary
 import GHC.Utils.TmpFs
-import System.FilePath
-import GHC.Driver.DynFlags
-import System.Directory
+import GHC.Utils.Logger
+import GHC.Utils.Fingerprint (Fingerprint)
+
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Traversable
-import GHC.Utils.Logger
-import GHC.Linker.Types
-import GHC.ByteCode.Binary
+import System.Directory
+import System.FilePath
 
 {- Note [Overview of persistent bytecode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -85,7 +93,7 @@ writeBytecodeLib lib path = do
 readBytecodeLib :: HscEnv -> FilePath -> IO OnDiskBytecodeLib
 readBytecodeLib hsc_env path = do
   bh' <- readBinMem path
-  bh <- addBinNameReader hsc_env bh'
+  bh <- addBinNameReader (hsc_NC hsc_env) bh'
   res <- getWithUserData (hsc_NC hsc_env) bh
   pure res
 
@@ -103,7 +111,8 @@ decodeOnDiskModuleByteCode hsc_env odbco = do
   pure $ ModuleByteCode {
     gbc_module = odgbc_module odbco,
     gbc_compiled_byte_code = odgbc_compiled_byte_code odbco,
-    gbc_foreign_files = foreign_files
+    gbc_foreign_files = foreign_files,
+    gbc_hash = odgbc_hash odbco
    }
 
 decodeOnDiskBytecodeLib :: HscEnv -> OnDiskBytecodeLib -> IO BytecodeLib
@@ -162,7 +171,8 @@ encodeOnDiskModuleByteCode bco = do
   pure $ OnDiskModuleByteCode {
     odgbc_module = gbc_module bco,
     odgbc_compiled_byte_code = gbc_compiled_byte_code bco,
-    odgbc_foreign = foreign_contents
+    odgbc_foreign = foreign_contents,
+    odgbc_hash = gbc_hash bco
    }
 
 -- | Read a 'ModuleByteCode' from a file.
@@ -174,7 +184,7 @@ readBinByteCode hsc_env f = do
 readOnDiskModuleByteCode :: HscEnv -> FilePath -> IO OnDiskModuleByteCode
 readOnDiskModuleByteCode hsc_env f = do
   bh' <- readBinMem f
-  bh <- addBinNameReader hsc_env bh'
+  bh <- addBinNameReader (hsc_NC hsc_env) bh'
   getWithUserData (hsc_NC hsc_env) bh
 
 -- | Write a 'ModuleByteCode' to a file.
@@ -186,3 +196,13 @@ writeBinByteCode f cbc = do
   odbco <- encodeOnDiskModuleByteCode cbc
   putWithUserData QuietBinIFace NormalCompression bh odbco
   writeBinMem bh f
+
+mkModuleByteCode :: Module -> CompiledByteCode -> [FilePath] -> IO ModuleByteCode
+mkModuleByteCode modl cbc foreign_files = do
+  !bcos_hash <- fingerprintModuleByteCodeContents modl cbc foreign_files
+  return $! ModuleByteCode modl cbc foreign_files bcos_hash
+
+fingerprintModuleByteCodeContents :: Module -> CompiledByteCode -> [FilePath] -> IO Fingerprint
+fingerprintModuleByteCodeContents modl cbc foreign_files = do
+  foreign_contents <- readObjectFiles foreign_files
+  pure $ computeFingerprint putNameLiterally (modl, cbc, foreign_contents)

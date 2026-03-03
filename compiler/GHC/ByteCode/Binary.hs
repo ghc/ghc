@@ -20,7 +20,6 @@ import GHC.Prelude
 
 import GHC.ByteCode.Types
 import GHC.Data.FastString
-import GHC.Driver.Env.Types (HscEnv(..))
 import GHC.Types.Name
 import GHC.Types.Name.Cache
 import GHC.Types.Name.Env
@@ -30,6 +29,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Exception
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
+import GHC.Utils.Fingerprint (Fingerprint)
 
 import Control.Monad
 import Data.Binary qualified as Binary
@@ -47,6 +47,7 @@ import System.IO.Unsafe (unsafeInterleaveIO)
 -- contained by 'ModuleByteCode' are stored in-memory rather than as file paths to
 -- temporary files.
 data OnDiskModuleByteCode = OnDiskModuleByteCode { odgbc_module :: Module
+                                                 , odgbc_hash :: Fingerprint
                                                  , odgbc_compiled_byte_code :: CompiledByteCode
                                                  , odgbc_foreign :: [ByteString]  -- ^ Contents of object files
                                                  }
@@ -94,6 +95,20 @@ instance Binary InterpreterLibraryContents where
     putByte bh 1
     put_ bh contents
 
+instance Binary OnDiskModuleByteCode where
+  get bh = do
+    odgbc_hash <- get bh
+    odgbc_module <- get bh
+    odgbc_compiled_byte_code <- get bh
+    odgbc_foreign <- get bh
+    pure OnDiskModuleByteCode {..}
+
+  put_ bh OnDiskModuleByteCode {..} = do
+    put_ bh odgbc_hash
+    put_ bh odgbc_module
+    put_ bh odgbc_compiled_byte_code
+    put_ bh odgbc_foreign
+
 instance Binary OnDiskBytecodeLib where
   get bh = do
     bytecodeLibUnitId <- get bh
@@ -105,18 +120,6 @@ instance Binary OnDiskBytecodeLib where
     put_ bh bytecodeLibUnitId
     put_ bh bytecodeLibFiles
     put_ bh bytecodeLibForeign
-
-instance Binary OnDiskModuleByteCode where
-  get bh = do
-    odgbc_module <- get bh
-    odgbc_compiled_byte_code <- get bh
-    odgbc_foreign <- get bh
-    pure OnDiskModuleByteCode {..}
-
-  put_ bh OnDiskModuleByteCode {..} = do
-    put_ bh odgbc_module
-    put_ bh odgbc_compiled_byte_code
-    put_ bh odgbc_foreign
 
 instance Binary CompiledByteCode where
   get bh = do
@@ -252,8 +255,8 @@ addBinNameWriter bh' = do
           Just idx -> (b, idx)
           Nothing  -> (ByteCodeNameEnv (next + 1) (extendNameEnv subst name next), next))
 
-addBinNameReader :: HscEnv -> ReadBinHandle -> IO ReadBinHandle
-addBinNameReader HscEnv {hsc_NC} bh' = do
+addBinNameReader :: NameCache -> ReadBinHandle -> IO ReadBinHandle
+addBinNameReader nc bh' = do
   env_ref <- newIORef emptyOccEnv
   pure $ flip addReaderToUserData bh' $ BinaryReader $ \bh -> do
     t <- getByte bh
@@ -266,7 +269,7 @@ addBinNameReader HscEnv {hsc_NC} bh' = do
         -- We don't want to get a new unique from the NameCache each time we
         -- see a name.
         nm' <- unsafeInterleaveIO $ do
-          u <- takeUniqFromNameCache hsc_NC
+          u <- takeUniqFromNameCache nc
           evaluate $ mkInternalName u occ noSrcSpan
         fmap BinName $ atomicModifyIORef' env_ref $ \env ->
           case lookupOccEnv env occ of
