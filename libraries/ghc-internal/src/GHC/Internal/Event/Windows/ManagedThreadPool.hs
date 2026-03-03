@@ -31,7 +31,6 @@ import GHC.Internal.Control.Concurrent.MVar
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Base
 import GHC.Internal.Num ((-), (+))
-import GHC.Internal.Real (fromIntegral)
 import qualified GHC.Internal.Event.Array as A
 import GHC.Internal.IO.Handle.Internals (debugIO)
 import GHC.Internal.Conc.Sync (ThreadId(..))
