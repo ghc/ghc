@@ -31,7 +31,7 @@ linkBytecodeLib hsc_env gbcs = do
 
   on_disk_bcos <- mapM (readBinByteCode hsc_env) bytecodeObjects
 
-  let (all_cbcs, foreign_stubs) = unzip [ (bs, fs) | ModuleByteCode _m bs fs <- on_disk_bcos ++ gbcs]
+  let (all_cbcs, foreign_stubs) = unzip [ (bs, fs) | ModuleByteCode _m bs fs _hash <- on_disk_bcos ++ gbcs]
 
   interpreter_foreign_lib <- mkInterpreterLib hsc_env (concat foreign_stubs ++ objectFiles)
 
