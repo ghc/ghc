@@ -246,12 +246,39 @@ ghcPrimExports
    | tc <- exposedPrimTyCons, let n = tyConName tc ]
 
 ghcPrimDeclDocs :: Docs
-ghcPrimDeclDocs = emptyDocs { docs_decls = listToUniqMap $ mapMaybe findName primOpDocs }
+ghcPrimDeclDocs = emptyDocs
+  { docs_decls = listToUniqMap $ mapMaybe declDoc primOpDocs
+  , docs_structure = buildStructure primOpDocs
+  }
   where
-    findName (nameStr, doc)
-      | Just name <- lookupFsEnv ghcPrimNames nameStr
-      = Just (name, [WithHsDocIdentifiers (mkGeneratedHsDocString doc) []])
-      | otherwise = Nothing
+    declDoc (PrimOpDecl fs doc)
+      | not (null doc)
+      , Just name <- lookupFsEnv ghcPrimNames fs
+      = Just (name, [mkHsDoc doc])
+    declDoc _ = Nothing
+
+    buildStructure [] = []
+    buildStructure (PrimOpSection title desc : rest) =
+        DsiSectionHeading 1 (mkHsDoc title)
+      : [DsiDocChunk (mkHsDoc desc) | not (null desc)]
+     ++ buildStructure rest
+    buildStructure items =
+      let (decls, rest) = span isDecl items
+          avails = mapMaybe declAvail decls
+      in  [DsiExports (DefinitelyDeterministicAvails avails) | not (null avails)]
+       ++ buildStructure rest
+
+    isDecl (PrimOpDecl {}) = True
+    isDecl _               = False
+
+    declAvail (PrimOpDecl fs _)
+      | Just name <- lookupFsEnv ghcPrimNames fs
+      = Just $ if isTyConName name
+               then AvailTC name [name]
+               else Avail name
+    declAvail _ = Nothing
+
+    mkHsDoc s = WithHsDocIdentifiers (mkGeneratedHsDocString s) []
 
 ghcPrimNames :: FastStringEnv Name
 ghcPrimNames
@@ -287,18 +314,13 @@ ghcPrimFixities = fixities
 {-
 Note [GHC.Prim Docs]
 ~~~~~~~~~~~~~~~~~~~~
-For haddocks of GHC.Prim we generate a dummy haskell file (gen_hs_source) that
-contains the type signatures and the comments (but no implementations)
-specifically for consumption by haddock.
+GHCi's :doc command and Haddock read from ModIface's. GHC.Prim has a wired-in
+iface whose docs are populated from primops.txt.
 
-GHCi's :doc command reads directly from ModIface's though, and GHC.Prim has a
-wired-in iface that has nothing to do with the above haskell file. The code
-below converts primops.txt into an intermediate form that would later be turned
-into a proper DeclDocMap.
-
-We output the docs as a list of pairs (name, docs). We use stringy names here
-because mapping names to "Name"s is difficult for things like primtypes and
-pseudoops.
+genprimopcode --wired-in-docs generates the primOpDocs list (included as
+primop-docs.hs-incl), which contains section headers (PrimOpSection) and
+per-declaration documentation (PrimOpDecl). We use stringy names because
+mapping names to "Name"s is difficult for things like primtypes and pseudoops.
 
 Note [GHC.Prim Deprecations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

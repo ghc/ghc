@@ -666,11 +666,19 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
 -- See Note [GHC.Prim Docs] in GHC.Builtin.Utils
 gen_wired_in_docs :: Info -> String
 gen_wired_in_docs (Info _ entries)
-  = "primOpDocs =\n  [ " ++ intercalate "\n  , " (catMaybes $ map mkDoc $ concatMap desugarVectorSpec entries) ++ "\n  ]\n"
+  = "primOpDocs =\n  [ "
+    ++ intercalate "\n  , " (concatMap mkEntry desugared)
+    ++ "\n  ]\n"
     where
-      mkDoc po | Just poName <- getName po
-               , not $ null $ desc po = Just $ "(fsLit " ++ show poName ++ "," ++ show (desc po) ++ ")"
-               | otherwise = Nothing
+      desugared = concatMap desugarVectorSpec entries
+
+      mkEntry :: Entry -> [String]
+      mkEntry (Section{title = t, desc = d}) =
+        ["PrimOpSection " ++ show t ++ " " ++ show d]
+      mkEntry po
+        | Just poName <- getName po
+        = ["PrimOpDecl (fsLit " ++ show poName ++ ") " ++ show (desc po)]
+        | otherwise = []
 
 -- See Note [GHC.Prim Deprecations] in GHC.Builtin.Utils
 gen_wired_in_deprecations :: Info -> String

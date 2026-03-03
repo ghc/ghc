@@ -17,7 +17,7 @@ module GHC.Builtin.PrimOps (
 
         primOpOutOfLine, primOpCodeSize,
         primOpOkForSpeculation, primOpOkToDiscard,
-        primOpIsWorkFree, primOpIsCheap, primOpFixity, primOpDocs, primOpDeprecations,
+        primOpIsWorkFree, primOpIsCheap, primOpFixity, primOpDocs, PrimOpDoc(..), primOpDeprecations,
         primOpIsDiv, primOpIsReallyInline,
 
         PrimOpEffect(..), primOpEffect,
@@ -166,7 +166,13 @@ primOpFixity :: PrimOp -> Maybe Fixity
 See Note [GHC.Prim Docs] in GHC.Builtin.Utils
 -}
 
-primOpDocs :: [(FastString, String)]
+data PrimOpDoc
+  = -- | Section header with title and description
+    PrimOpSection String String
+  | -- | Documentation for a named declaration
+    PrimOpDecl FastString String
+
+primOpDocs :: [PrimOpDoc]
 #include "primop-docs.hs-incl"
 
 primOpDeprecations :: [(OccName, FastString)]
