@@ -1,0 +1,20 @@
+T12694.hs:5:7: error: [GHC-25897]
+    • Could not deduce ‘a ~ b’
+      from the context: Bool ~ Int
+        bound by the type signature for:
+                   f :: forall a b. (Bool ~ Int) => a -> b
+        at T12694.hs:4:1-25
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a b. (Bool ~ Int) => a -> b
+        at T12694.hs:4:1-25
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a b. (Bool ~ Int) => a -> b
+        at T12694.hs:4:1-25
+    • In the expression: x
+      In an equation for ‘f’: f x = x
+    • Relevant bindings include
+        x :: a (bound at T12694.hs:5:3)
+        f :: a -> b (bound at T12694.hs:5:1)
+
