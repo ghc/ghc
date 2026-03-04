@@ -407,7 +407,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
   let (binds_flat, cu_rules_in_binds) = splitSingleCompUnit "tidyProgram" binds
       all_imp_rules = imp_rules ++ cu_rules_in_binds
   (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds_flat all_imp_rules
-  let (trimmed_binds, trimmed_rules) = findExternalRules opts binds_flat all_imp_rules unfold_env
+  let (trimmed_binds, trimmed_rules) = findExternalRules opts mod binds_flat all_imp_rules unfold_env
 
   (tidy_env, tidy_binds) <- tidyTopBinds unfold_env boot_exports tidy_occ_env trimmed_binds
 
@@ -1010,15 +1010,16 @@ We discard auto-rules by default, but keep them if -fkeep-auto-rules is on.
 -}
 
 findExternalRules :: TidyOpts
+                  -> Module
                   -> [CoreBind]
                   -> [CoreRule] -- Local rules for imported fns
                   -> UnfoldEnv  -- Ids that are exported, so we need their rules
                   -> ([CoreBind], [CoreRule])
 -- See Note [Finding external rules]
-findExternalRules opts binds imp_id_rules unfold_env
+findExternalRules opts this_mod binds imp_id_rules unfold_env
   = (trimmed_binds, filter keep_rule all_rules)
   where
-    imp_rules | opt_expose_rules opts = filter expose_rule imp_id_rules
+    imp_rules | opt_expose_rules opts = filter (\r -> isFullyImpRule this_mod r && expose_rule r) imp_id_rules
               | otherwise             = []
     imp_user_rule_fvs = mapUnionVarSet user_rule_rhs_fvs imp_rules
 

@@ -108,6 +108,7 @@ import GHC.Runtime.Interpreter (interpreterProfiled)
 ************************************************************************
 -}
 
+{-# OPAQUE deSugar #-}
 -- | Main entry point to the desugarer.
 deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages DsMessage, Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
@@ -204,13 +205,16 @@ deSugar hsc_env
 
      do {       -- Add export flags to bindings
           keep_alive <- readIORef keep_var
-        ; let (rules_for_locals, ds_rules_for_imps) = partition isLocalRule all_rules
+        ; let (rules_for_locals, ds_rules_for_imp_lhs) = partition isLocalRule all_rules
+              (ds_rules_for_imps, rules_for_comp_unit) = partition (isFullyImpRule mod) ds_rules_for_imp_lhs
               final_prs = addExportFlagsAndRules bcknd export_set keep_alive
                                                  rules_for_locals (fromOL all_prs)
 
-              ds_binds = combineEvBinds ds_ev_binds final_prs
+        ; pprTraceM "DumpDsRules" (ppr (ds_rules_for_imp_lhs, ds_rules_for_imps, rules_for_comp_unit))
+
+        ; let ds_binds = combineEvBinds ds_ev_binds final_prs
               ds_program = [ CoreCompUnit [] []
-                           , CoreCompUnit ds_binds []
+                           , CoreCompUnit ds_binds rules_for_comp_unit
                            ]
         -- Notice that we put the whole lot in a big Rec, even the foreign binds
         -- When compiling PrelFloat, which defines data Float = F# Float#
