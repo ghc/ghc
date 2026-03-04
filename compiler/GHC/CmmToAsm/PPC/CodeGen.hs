@@ -1207,136 +1207,10 @@ genCCall _ (PrimTarget (MO_Prefetch_Data _)) _ _
 
 genCCall platform (PrimTarget (MO_AtomicRMW W64 amop)) [dst] [addr, n]
   | not $ target32Bit platform
-  = do let fmt      = intFormat W64
-           reg_dst  = getLocalRegReg dst
-       Amode reg_addr addr_code <- getAmodeIndex addr
-       (n_ri, n_code) <- case amop of
-         AMO_Add  -> getSomeRegOrImm True n
-         AMO_Sub  -> case n of
-           CmmLit (CmmInt i _) | Just imm <- makeImmediate W64 True (-i)
-                   -> return (RIImm imm, nilOL)
-           _       -> do (n_reg, n_code) <- getSomeReg n
-                         return  (RIReg n_reg, n_code)
-         AMO_And  -> getSomeRegOrImm False n
-         AMO_Or   -> getSomeRegOrImm False n
-         AMO_Xor  -> getSomeRegOrImm False n
-         AMO_Nand -> do (n_reg, n_code) <- getSomeReg n
-                        return (RIReg n_reg, n_code)
-
-       tmp <- getNewRegNat fmt
-
-       let instr = case amop of
-             AMO_Add  -> ADD reg_dst tmp n_ri
-             AMO_Sub  -> case n_ri of
-               RIReg n_reg -> SUBF reg_dst n_reg tmp
-               RIImm _     -> ADD  reg_dst tmp n_ri
-             AMO_And  -> AND reg_dst tmp n_ri
-             AMO_Or   -> OR  reg_dst tmp n_ri
-             AMO_Xor  -> XOR reg_dst tmp n_ri
-             AMO_Nand -> case n_ri of
-               RIReg n_reg -> NAND reg_dst tmp n_reg
-               _           -> panic "PPC NCG: No NAND immediate"
-       lbl_retry <- getBlockIdNat
-       lbl_done <- getBlockIdNat
-       return $ addr_code `appOL` n_code
-        `appOL` toOL [ HWSYNC
-                     , BCC ALWAYS lbl_retry Nothing
-
-                     , NEWBLOCK lbl_retry
-                     , LDR fmt tmp reg_addr
-                     ]
-        `snocOL` instr
-        `appOL` toOL [ STC fmt reg_dst reg_addr
-                     , BCC NE lbl_retry (Just False)
-                     , BCC ALWAYS lbl_done Nothing
-
-                     , NEWBLOCK lbl_done
-                     , ISYNC
-                     ]
-         where
-           getAmodeIndex (CmmMachOp (MO_Add _) [x, y])
-             = do
-                 (regX, codeX) <- getSomeReg x
-                 (regY, codeY) <- getSomeReg y
-                 return $ Amode (AddrRegReg regX regY) (codeX `appOL` codeY)
-
-           getAmodeIndex other
-             = do
-                 (reg, code) <- getSomeReg other
-                 return $ Amode (AddrRegReg r0 reg) code -- NB: r0 is 0 here!
-
-           getSomeRegOrImm sign (CmmLit (CmmInt i _))
-             | Just imm <- makeImmediate W64 sign i
-             = return (RIImm imm, nilOL)
-           getSomeRegOrImm _ n
-             = do (n_reg, n_code) <- getSomeReg n
-                  return  (RIReg n_reg, n_code)
+  = atomicRMW W64 amop dst addr n
 
 genCCall _ (PrimTarget (MO_AtomicRMW W32 amop)) [dst] [addr, n]
-  = do let fmt      = intFormat W32
-           reg_dst  = getLocalRegReg dst
-       Amode reg_addr addr_code <- getAmodeIndex addr
-       (n_ri, n_code) <- case amop of
-         AMO_Add  -> getSomeRegOrImm True n
-         AMO_Sub  -> case n of
-           CmmLit (CmmInt i _) | Just imm <- makeImmediate W32 True (-i)
-                   -> return (RIImm imm, nilOL)
-           _       -> do (n_reg, n_code) <- getSomeReg n
-                         return  (RIReg n_reg, n_code)
-         AMO_And  -> getSomeRegOrImm False n
-         AMO_Or   -> getSomeRegOrImm False n
-         AMO_Xor  -> getSomeRegOrImm False n
-         AMO_Nand -> do (n_reg, n_code) <- getSomeReg n
-                        return (RIReg n_reg, n_code)
-
-       tmp <- getNewRegNat fmt
-
-       let instr = case amop of
-             AMO_Add  -> ADD reg_dst tmp n_ri
-             AMO_Sub  -> case n_ri of
-               RIReg n_reg -> SUBF reg_dst n_reg tmp
-               RIImm _     -> ADD  reg_dst tmp n_ri
-             AMO_And  -> AND reg_dst tmp n_ri
-             AMO_Or   -> OR  reg_dst tmp n_ri
-             AMO_Xor  -> XOR reg_dst tmp n_ri
-             AMO_Nand -> case n_ri of
-               RIReg n_reg -> NAND reg_dst tmp n_reg
-               _           -> panic "PPC NCG: No NAND immediate"
-       lbl_retry <- getBlockIdNat
-       lbl_done <- getBlockIdNat
-       return $ addr_code `appOL` n_code
-        `appOL` toOL [ HWSYNC
-                     , BCC ALWAYS lbl_retry Nothing
-
-                     , NEWBLOCK lbl_retry
-                     , LDR fmt tmp reg_addr
-                     ]
-        `snocOL` instr
-        `appOL` toOL [ STC fmt reg_dst reg_addr
-                     , BCC NE lbl_retry (Just False)
-                     , BCC ALWAYS lbl_done Nothing
-
-                     , NEWBLOCK lbl_done
-                     , ISYNC
-                     ]
-         where
-           getAmodeIndex (CmmMachOp (MO_Add _) [x, y])
-             = do
-                 (regX, codeX) <- getSomeReg x
-                 (regY, codeY) <- getSomeReg y
-                 return $ Amode (AddrRegReg regX regY) (codeX `appOL` codeY)
-
-           getAmodeIndex other
-             = do
-                 (reg, code) <- getSomeReg other
-                 return $ Amode (AddrRegReg r0 reg) code -- NB: r0 is 0 here!
-
-           getSomeRegOrImm sign (CmmLit (CmmInt i _))
-             | Just imm <- makeImmediate W32 sign i
-             = return (RIImm imm, nilOL)
-           getSomeRegOrImm _ n
-             = do (n_reg, n_code) <- getSomeReg n
-                  return  (RIReg n_reg, n_code)
+  = atomicRMW W32 amop dst addr n
 
 genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
  = do let fmt      = intFormat (max width W32)
@@ -1345,7 +1219,7 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
       (Amode aligned_addr align_code, maybe_unaligned_addr) <- case width of
          W8  -> align_address
          W16 -> align_address
-         _   -> getAmodeIndex addr
+         _   -> panic "PPC: AtomicRMW illegal width"
 
       shift        <- getNewRegNat fmt
       mask         <- getNewRegNat fmt
@@ -1400,22 +1274,7 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
       (n_ri, pre_code, mid_code, post_code) <- case width of
         W8  -> handle_value
         W16 -> handle_value
-        _   -> do
-          (n_ri, n_code) <- case amop of
-            AMO_Add  -> getSomeRegOrImm True n
-            AMO_Sub  -> case n of
-                 CmmLit (CmmInt i _) | Just imm <- makeImmediate width True (-i)
-                    -> return (RIImm imm, nilOL)
-                 _
-                    -> do
-                          (n_reg, n_code) <- getSomeReg n
-                          return  (RIReg n_reg, n_code)
-            AMO_And  -> getSomeRegOrImm False n
-            AMO_Or   -> getSomeRegOrImm False n
-            AMO_Xor  -> getSomeRegOrImm False n
-            AMO_Nand -> do (n_reg, n_code) <- getSomeReg n
-                           return (RIReg n_reg, n_code)
-          return (n_ri, n_code, nilOL, unitOL $ MR reg_dst tmp2)
+        _   -> panic "PPC: AtomicRMW illegal width"
 
       let instr = case amop of
             AMO_Add  -> ADD tmp2 tmp1 n_ri
@@ -1449,18 +1308,6 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
         `appOL` post_code
 
         where
-           getAmodeIndex (CmmMachOp (MO_Add _) [x, y])
-             = do
-                 (regX, codeX) <- getSomeReg x
-                 (regY, codeY) <- getSomeReg y
-                 return ((Amode (AddrRegReg regX regY) (codeX `appOL` codeY))
-                        , Nothing)
-           getAmodeIndex other
-             = do
-                 (reg, code) <- getSomeReg other
-                 return ((Amode (AddrRegReg r0 reg) code) -- NB: r0 is 0 here!
-                        , Nothing)
-
            align_address
              = do
              let addr_fmt = intFormat (wordWidth platform)
@@ -1470,18 +1317,11 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                      (ucode `snocOL` (CLRRI addr_fmt aligned_addr
                                       unaligned_addr 2)), Just unaligned_addr)
 
-           getSomeRegOrImm sign (CmmLit (CmmInt i _))
-             | Just imm <- makeImmediate width sign i
-             = return (RIImm imm, nilOL)
-           getSomeRegOrImm _ n
-             = do (n_reg, n_code) <- getSomeReg n
-                  return  (RIReg n_reg, n_code)
-
            shift_amount platform shift
              = let shift_amt = case width of
                                  W8  -> 24
                                  W16 -> 16
-                                 _   -> 0
+                                 _   -> panic "PPC: AtomicRMW illegal width"
                in case platformByteOrder platform of
                     BigEndian -> unitOL $ XOR shift shift
                                               (RIImm (ImmInt shift_amt))
@@ -2865,6 +2705,79 @@ coerceFP2Int' (ArchPPC_64 _) _ toRep x = do
     return (Any (intFormat toRep) code')
 
 coerceFP2Int' _ _ _ _ = panic "PPC.CodeGen.coerceFP2Int: unknown arch"
+
+atomicRMW :: Width ->
+             AtomicMachOp ->
+             LocalReg ->   -- destination
+             CmmExpr ->    -- address
+             CmmExpr ->    -- operand
+             NatM InstrBlock
+atomicRMW width amop dst addr n
+  = do let fmt      = intFormat width
+           reg_dst  = getLocalRegReg dst
+       Amode reg_addr addr_code <- getAmodeIndex addr
+       (n_ri, n_code) <- case amop of
+         AMO_Add  -> getSomeRegOrImm True n
+         AMO_Sub  -> case n of
+           CmmLit (CmmInt i _) | Just imm <- makeImmediate width True (-i)
+                   -> return (RIImm imm, nilOL)
+           _       -> do (n_reg, n_code) <- getSomeReg n
+                         return  (RIReg n_reg, n_code)
+         AMO_And  -> getSomeRegOrImm False n
+         AMO_Or   -> getSomeRegOrImm False n
+         AMO_Xor  -> getSomeRegOrImm False n
+         AMO_Nand -> do (n_reg, n_code) <- getSomeReg n
+                        return (RIReg n_reg, n_code)
+
+       tmp <- getNewRegNat fmt
+
+       let instr = case amop of
+             AMO_Add  -> ADD reg_dst tmp n_ri
+             AMO_Sub  -> case n_ri of
+               RIReg n_reg -> SUBF reg_dst n_reg tmp
+               RIImm _     -> ADD  reg_dst tmp n_ri
+             AMO_And  -> AND reg_dst tmp n_ri
+             AMO_Or   -> OR  reg_dst tmp n_ri
+             AMO_Xor  -> XOR reg_dst tmp n_ri
+             AMO_Nand -> case n_ri of
+               RIReg n_reg -> NAND reg_dst tmp n_reg
+               _           -> panic "PPC NCG: No NAND immediate"
+       lbl_retry <- getBlockIdNat
+       lbl_done <- getBlockIdNat
+       return $ addr_code `appOL` n_code
+        `appOL` toOL [ HWSYNC
+                     , BCC ALWAYS lbl_retry Nothing
+
+                     , NEWBLOCK lbl_retry
+                     , LDR fmt tmp reg_addr
+                     ]
+        `snocOL` instr
+        `appOL` toOL [ STC fmt reg_dst reg_addr
+                     , BCC NE lbl_retry (Just False)
+                     , BCC ALWAYS lbl_done Nothing
+
+                     , NEWBLOCK lbl_done
+                     , ISYNC
+                     ]
+         where
+           getAmodeIndex (CmmMachOp (MO_Add _) [x, y])
+             = do
+                 (regX, codeX) <- getSomeReg x
+                 (regY, codeY) <- getSomeReg y
+                 return $ Amode (AddrRegReg regX regY) (codeX `appOL` codeY)
+
+           getAmodeIndex other
+             = do
+                 (reg, code) <- getSomeReg other
+                 return $ Amode (AddrRegReg r0 reg) code -- NB: r0 is 0 here!
+
+           getSomeRegOrImm sign (CmmLit (CmmInt i _))
+             | Just imm <- makeImmediate width sign i
+             = return (RIImm imm, nilOL)
+           getSomeRegOrImm _ n
+             = do (n_reg, n_code) <- getSomeReg n
+                  return  (RIReg n_reg, n_code)
+
 
 -- Note [.LCTOC1 in PPC PIC code]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
