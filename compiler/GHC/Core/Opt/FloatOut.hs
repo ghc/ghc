@@ -120,7 +120,7 @@ Well, maybe.  We don't do this at the moment.
 floatOutwards :: Logger
               -> FloatOutSwitches
               -> UniqSupply
-              -> CoreProgram -> IO CoreProgram
+              -> [CoreBind] -> IO [CoreBind]
 
 floatOutwards logger float_sws us pgm
   = do {
@@ -140,7 +140,7 @@ floatOutwards logger float_sws us pgm
                         int ntlets, text " Lets floated elsewhere; from ",
                         int lams,   text " Lambda groups"]);
 
-        return (singletonCoreProgram (bagToList (unionManyBags binds_s')))
+        return (bagToList (unionManyBags binds_s'))
     }
 
 floatTopBind :: LevelledBind -> (FloatStats, Bag CoreBind)
