@@ -67,13 +67,21 @@ pprCoreBindings = pprTopBinds noAnn
 pprCoreBinding  = pprTopBind noAnn
 
 pprCoreCompUnit :: CoreCompUnit -> SDoc
-pprCoreCompUnit (CoreCompUnit binds unit_rules) =
-  text "-- Start of new compilation unit"
-  $$ pprCoreBindings binds
-  $$ pprRules unit_rules
+pprCoreCompUnit = pprCoreCompUnitWithHeader True
 
 pprCoreProgram :: CoreProgram -> SDoc
-pprCoreProgram = vcat . map pprCoreCompUnit
+pprCoreProgram [comp_unit] = pprCoreCompUnitWithHeader False comp_unit
+pprCoreProgram comp_units  = vcat (map pprCoreCompUnit comp_units)
+
+pprCoreCompUnitWithHeader :: Bool -> CoreCompUnit -> SDoc
+pprCoreCompUnitWithHeader include_header (CoreCompUnit binds unit_rules) =
+  pp_header
+  $$ pprCoreBindings binds
+  $$ pprRules unit_rules
+  where
+    pp_header
+      | include_header = text "-- Start of new compilation unit"
+      | otherwise      = empty
 
 pprCoreBindingsWithSize :: [CoreBind] -> SDoc
 pprCoreBindingWithSize  :: CoreBind  -> SDoc
