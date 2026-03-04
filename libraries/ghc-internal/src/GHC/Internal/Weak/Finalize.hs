@@ -4,26 +4,17 @@
 {-# LANGUAGE Unsafe #-}
 
 module GHC.Internal.Weak.Finalize
-    ( -- * Handling exceptions
-      -- | When an exception is thrown by a finalizer called by the
-      -- garbage collector, GHC calls a global handler which can be set with
-      -- 'setFinalizerExceptionHandler'. Note that any exceptions thrown by
-      -- this handler will be ignored.
-      setFinalizerExceptionHandler
-    , getFinalizerExceptionHandler
-    , printToHandleFinalizerExceptionHandler
-      -- * Internal
+    ( getFinalizerExceptionHandler
     , runFinalizerBatch
+    , finalizerExceptionHandler
     ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Exception
-import GHC.Internal.IORef
-import {-# SOURCE #-} GHC.Internal.Conc.Sync (labelThreadByteArray#, myThreadId)
-import GHC.Internal.IO (catchException, unsafePerformIO)
-import {-# SOURCE #-} GHC.Internal.IO.Handle.Types (Handle)
-import {-# SOURCE #-} GHC.Internal.IO.Handle.Text (hPutStrLn)
-import GHC.Internal.Encoding.UTF8 (utf8EncodeByteArray#)
+import GHC.Internal.Conc.Sync ( labelThreadByteArray#, myThreadId )
+import GHC.Internal.Encoding.UTF8 ( utf8EncodeByteArray# )
+import GHC.Internal.Exception ( SomeException(..) )
+import GHC.Internal.IO ( catchException, unsafePerformIO )
+import GHC.Internal.IORef ( IORef, newIORef, readIORef )
 
 data ByteArray = ByteArray ByteArray#
 
@@ -75,20 +66,3 @@ finalizerExceptionHandler = unsafePerformIO $ newIORef (const $ return ())
 -- @since base-4.18.0.0
 getFinalizerExceptionHandler :: IO (SomeException -> IO ())
 getFinalizerExceptionHandler = readIORef finalizerExceptionHandler
-
--- | Set the global action called to report exceptions thrown by weak pointer
--- finalizers to the user.
---
--- @since base-4.18.0.0
-setFinalizerExceptionHandler :: (SomeException -> IO ()) -> IO ()
-setFinalizerExceptionHandler = writeIORef finalizerExceptionHandler
-
--- | An exception handler for 'Handle' finalization that prints the error to
--- the given 'Handle', but doesn't rethrow it.
---
--- @since base-4.18.0.0
-printToHandleFinalizerExceptionHandler :: Handle -> SomeException -> IO ()
-printToHandleFinalizerExceptionHandler hdl se =
-    hPutStrLn hdl msg `catchException` (\(SomeException _) -> return ())
-  where
-    msg = "Exception during weak pointer finalization (ignored): " ++ displayException se ++ "\n"
