@@ -404,9 +404,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
                           , mg_boot_exports     = boot_exports
                           }) = do
 
-  let flat_binds_prog = flattenCoreProgram binds
-      binds_flat = concatMap coreCompUnitBinds flat_binds_prog
-      cu_rules_in_binds = concatMap cu_rules flat_binds_prog
+  let (binds_flat, cu_rules_in_binds) = splitSingleCompUnit "tidyProgram" binds
       all_imp_rules = imp_rules ++ cu_rules_in_binds
   (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds_flat all_imp_rules
   let (trimmed_binds, trimmed_rules) = findExternalRules opts binds_flat all_imp_rules unfold_env
@@ -417,7 +415,11 @@ tidyProgram opts (ModGuts { mg_module           = mod
   (spt_entries, mcstub, tidy_binds_prog) <- case opt_static_ptr_opts opts of
     Nothing    -> pure ([], Nothing, singletonCoreProgram tidy_binds)
     Just sopts -> sptCreateStaticBinds sopts mod (singletonCoreProgram tidy_binds)
-  let tidy_binds' = concatMap coreCompUnitBinds (flattenCoreProgram tidy_binds_prog)
+  let (tidy_binds', tidy_cu_rules) = splitSingleCompUnit "tidyProgram (post static ptr)" tidy_binds_prog
+  when (not (null tidy_cu_rules)) $
+    pprPanic "tidyProgram"
+      (text "Expected no compilation-unit rules after tidy, got"
+       <+> int (length tidy_cu_rules))
 
   -- pprTraceM "trimmed_rules" (ppr trimmed_rules)
 
@@ -498,8 +500,10 @@ tidyProgram opts (ModGuts { mg_module           = mod
 collectCostCentres :: Module -> CoreProgram -> [CoreRule] -> S.Set CostCentre
 collectCostCentres mod_name binds rules
   = {-# SCC collectCostCentres #-}
-    foldl' go_bind (go_rules S.empty) (concatMap coreCompUnitBinds (flattenCoreProgram binds))
+    foldl' go_bind (go_rules S.empty) bind_list
   where
+    (bind_list, _) = splitSingleCompUnit "collectCostCentres" binds
+
     go cs e = case e of
       Var{} -> cs
       Lit{} -> cs
@@ -534,6 +538,13 @@ collectCostCentres mod_name binds rules
 
     get_rhs Rule { ru_rhs } = Just ru_rhs
     get_rhs BuiltinRule {} = Nothing
+
+splitSingleCompUnit :: String -> CoreProgram -> ([CoreBind], [CoreRule])
+splitSingleCompUnit _ [CoreCompUnit unit_binds unit_rules] = (unit_binds, unit_rules)
+splitSingleCompUnit who comp_units =
+  pprPanic who
+    (text "Expected a single compilation unit, got"
+     <+> int (length comp_units))
 
 --------------------------
 trimId :: Bool -> Id -> Id
