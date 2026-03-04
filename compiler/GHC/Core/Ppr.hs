@@ -80,7 +80,7 @@ pprCoreCompUnitWithHeader include_header (CoreCompUnit binds unit_rules) =
   $$ pprRules unit_rules
   where
     pp_header
-      | include_header = text "-- Start of new compilation unit"
+      | include_header = text "=== Start of new compilation unit"
       | otherwise      = empty
 
 pprCoreBindingsWithSize :: [CoreBind] -> SDoc

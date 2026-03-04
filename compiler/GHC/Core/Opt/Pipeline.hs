@@ -481,7 +481,20 @@ doCorePass pass guts = do
                                  updateBinds (concatMap (occurSplitPgm (mg_module guts) (mg_rules guts)))
 
     CoreMerge                 -> {-# SCC "CoreMerge" #-}
-                                 updateBinds flattenCoreProgram
+                                 do { let binds_before = mg_binds guts
+                                          binds_after  = flattenCoreProgram binds_before
+                                    ; liftIO $
+                                        Logger.putDumpFileMaybe logger Opt_D_dump_split_core
+                                          "Core before merge"
+                                          FormatCore
+                                          (vcat [ text "Compilation units:" <+> int (length binds_before)
+                                                , pprCoreProgram binds_before ])
+                                    ; liftIO $
+                                        Logger.putDumpFileMaybe logger Opt_D_dump_split_core
+                                          "Core after merge"
+                                          FormatCore
+                                          (pprCoreProgram binds_after)
+                                    ; return $ guts { mg_binds = binds_after } }
 
     CoreDoSimplify opts       -> {-# SCC "Simplify" #-}
                                  liftIOWithCount $ simplifyPgm logger (hsc_unit_env hsc_env) name_ppr_ctx opts guts
