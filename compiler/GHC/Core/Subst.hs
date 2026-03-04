@@ -333,7 +333,7 @@ deShadowBinds :: [CoreBind] -> [CoreBind]
 deShadowBinds binds = snd (mapAccumL substBind emptySubst binds)
 
 deShadowCompUnits :: [CoreCompUnit] -> [CoreCompUnit]
-deShadowCompUnits [comp_unit] = [comp_unit]
+-- deShadowCompUnits [comp_unit] = [comp_unit]
 deShadowCompUnits comp_units = go emptySubst comp_units
   -- We need to run OccAnal on the compilation units
   -- before substituting to dependency sort the bindings.
@@ -371,6 +371,7 @@ deShadowCompUnits comp_units = go emptySubst comp_units
           (subst', binds') = mapAccumL substBind subst binds
           unit_rules' = map (substRule subst' id) unit_rules
           units' = go subst' units
+
       in CoreCompUnit binds' unit_rules' : units'
 
 {-

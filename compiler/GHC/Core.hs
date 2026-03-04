@@ -2102,7 +2102,9 @@ data CoreCompUnit
 type CoreAlt  = Alt  CoreBndr
 
 flattenCoreProgram :: CoreProgram -> CoreProgram
-flattenCoreProgram [comp_unit] = [comp_unit]
+-- There is some bug with sloppy let recs that requires
+-- us to run occAnal to fix so no shortcuts :(
+-- flattenCoreProgram [comp_unit] = [comp_unit]
 flattenCoreProgram prog =
   [ CoreCompUnit
       { coreCompUnitBinds = concatMap coreCompUnitBinds prog'
