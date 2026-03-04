@@ -268,10 +268,10 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
           eps <- ueEPS unit_env ;
            let  { -- base_rule_env contains
                   --    (a) home package rules, fixed across all iterations
-                  --    (b) local rules (substituted) from `local_rules` arg to do_iteration
+                  --    (b) local rules (substituted), including unit rules from `binds`
                   -- Forcing base_rule_env to avoid unnecessary allocations.
                   -- Not doing so results in +25.6% allocations of LargeRecord.
-                ; !base_rule_env = updLocalRules hpt_rule_env local_rules
+                ; !base_rule_env = updLocalRules hpt_rule_env (local_rules ++ unit_rules)
 
                 ; read_eps_rules :: IO PackageRuleBase
                 ; read_eps_rules = eps_rule_base <$> ueEPS unit_env
