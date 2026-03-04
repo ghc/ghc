@@ -101,7 +101,9 @@ Stage2 GHC.
 
 * `--skip-depends`: skips rebuilding Haskell module dependency files.
 
-* `--bignum={native,gmp,check-gmp,ffi}`: choose which bignum implementation to use. The default is `gmp`.
+* `--bignum={native,gmp,check-gmp,ffi}`: **Deprecated.** Use the `+native_bignum` flavour
+  transformer instead (e.g. `--flavour=default+native_bignum`). When building for the
+  JavaScript target, the native bignum backend is enabled automatically.
 
 * `--color` and `--no-color`: choose whether to use colors when printing build
 progress info. By default, Hadrian tries to determine if the terminal supports

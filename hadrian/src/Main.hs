@@ -34,6 +34,13 @@ main = do
     -- Provide access to command line arguments and some user settings through
     -- Shake's type-indexed map 'shakeExtra'.
     argsMap <- CommandLine.cmdLineArgsMap
+    case CommandLine.lookupBignum argsMap of
+      Just _ -> hPutStrLn stderr $ unlines
+        [ "Warning: --bignum is deprecated."
+        , "  Use the '+native_bignum' flavour transformer instead (e.g. --flavour=default+native_bignum)."
+        , "  When building for the JavaScript target, native bignum is now enabled automatically."
+        ]
+      Nothing -> return ()
     let extra = insertExtra UserSettings.buildProgressColour
               $ insertExtra UserSettings.successColour
               $ argsMap

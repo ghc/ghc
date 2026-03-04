@@ -30,6 +30,7 @@ import Settings.Flavours.Release
 import Hadrian.Oracles.TextFile
 import GHC.Toolchain.Target
 import GHC.Platform.ArchOS
+import Oracles.Setting (isJsTarget)
 
 getExtraArgs :: Args
 getExtraArgs = expr flavour >>= extraArgs
@@ -44,9 +45,7 @@ getRtsWays :: Ways
 getRtsWays = expr flavour >>= rtsWays
 
 getBignumBackend :: Expr String
-getBignumBackend = expr $ cmdBignum >>= \case
-   Nothing -> bignumBackend <$> flavour
-   Just b  -> pure b
+getBignumBackend = bignumBackend <$> expr flavour
 
 getBignumCheck :: Expr Bool
 getBignumCheck = expr $ cmdBignum >>= \case
@@ -90,9 +89,17 @@ flavour = do
       $ "failed to apply key-value settings:\n\t" ++ unlines (map (" - " ++) settingErrs) ++
         "\t   Entries should look something like \"stage1.containers.ghc.hs.opts += -Werror\""
 
+    -- Handle --bignum (deprecated) and JS auto-detection
+    bignumTweak <- cmdBignum >>= \case
+        Just "native"  -> return useNativeBignum
+        Just b         -> return $ \f -> f { bignumBackend = b }
+        Nothing        -> do
+          js <- isJsTarget
+          return $ if js then useNativeBignum else id
+
     case parseFlavour flavours flavourTransformers flavourName of
       Left err -> fail err
-      Right f -> return $ flagsTweak (tweak f)
+      Right f -> return $ bignumTweak (flagsTweak (tweak f))
 
 -- TODO: switch to Set Package as the order of packages should not matter?
 -- Otherwise we have to keep remembering to sort packages from time to time.

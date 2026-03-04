@@ -1,5 +1,6 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2, lookupSkipDepends,
+    lookupBignum,
     cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdCompleteSetting,
     cmdDocsArgs, cmdUnitIdHash, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
     cmdPrefix, DocArgs(..), defaultDocArgs
@@ -388,6 +389,9 @@ lookupFreeze2 = freeze2 . lookupExtra defaultCommandLineArgs
 
 lookupSkipDepends :: Map.HashMap TypeRep Dynamic -> Bool
 lookupSkipDepends = skipDepends . lookupExtra defaultCommandLineArgs
+
+lookupBignum :: Map.HashMap TypeRep Dynamic -> Maybe String
+lookupBignum = bignum . lookupExtra defaultCommandLineArgs
 
 cmdUnitIdHash :: Action Bool
 cmdUnitIdHash = unitIdHash <$> cmdLineArgs
