@@ -11,12 +11,14 @@ def junit(t: TestRun) -> ET.ElementTree:
                               package = 'ghc',
                               tests = str(t.total_tests),
                               failures = str(len(t.unexpected_failures)
+                                             + len(t.unexpected_reordered_failures)
                                              + len(t.unexpected_stat_failures)
                                              + len(t.unexpected_passes)),
                               errors = str(len(t.framework_failures)),
                               timestamp = datetime.now().isoformat())
 
     for res_type, group in [('stat failure', t.unexpected_stat_failures),
+                            ('unexpected failure - reordered output', t.unexpected_reordered_failures),
                             ('unexpected failure', t.unexpected_failures),
                             ('unexpected pass', t.unexpected_passes),
                             ('fragile failure', t.fragile_failures)]:
@@ -49,4 +51,3 @@ def junit(t: TestRun) -> ET.ElementTree:
                                  name = '%s(%s)' % (tr.testname, tr.way))
 
     return ET.ElementTree(testsuites)
-

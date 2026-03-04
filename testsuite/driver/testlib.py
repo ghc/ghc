@@ -1712,7 +1712,7 @@ async def do_test(name: TestName,
     test_n = len(allTestNames)
     progress_args = [ full_name, t.total_tests, test_n,
         [len(t.unexpected_passes),
-         len(t.unexpected_failures),
+         len(t.unexpected_failures) + len(t.unexpected_reordered_failures),
          len(t.framework_failures)]]
     # For n = [0..100] - Report every test
     #     n = [100..1000] - Report every 10 tests
@@ -1823,7 +1823,10 @@ async def do_test(name: TestName,
                 tr = TestResult(directory, name, reason, way,
                                 stdout=result.stdout,
                                 stderr=result.stderr)
-                t.unexpected_failures.append(tr)
+                if is_unexpected_reordered_failure(name, way, reason):
+                    t.unexpected_reordered_failures.append(tr)
+                else:
+                    t.unexpected_failures.append(tr)
         else:
             t.n_expected_failures += 1
 
@@ -2829,6 +2832,61 @@ async def compare_outputs(
 
             return False
 
+def _normalised_outputs(expected_file: Path,
+                        actual_file: Path,
+                        normaliser: OutputNormalizer) -> Tuple[str, str]:
+    expected_path = in_srcdir(expected_file)
+    actual_path = in_testdir(actual_file)
+    expected = normaliser(read_no_crs(expected_path)) if expected_path.exists() else ''
+    actual = normaliser(read_no_crs(actual_path))
+    return expected, actual
+
+def _sorted_lines(s: str) -> str:
+    return '\n'.join(sorted(s.splitlines()))
+
+def _is_reordered_output_mismatch(expected_file: Path,
+                                  actual_file: Path,
+                                  normaliser: OutputNormalizer,
+                                  whitespace_normaliser: OutputNormalizer=lambda x: x) -> bool:
+    expected, actual = _normalised_outputs(expected_file, actual_file, normaliser)
+    # First, mirror the real mismatch predicate used by compare_outputs.
+    if whitespace_normaliser(expected) == whitespace_normaliser(actual):
+        return False
+    # Then check whether the normalised outputs only differ by line order.
+    return _sorted_lines(expected) == _sorted_lines(actual)
+
+def is_unexpected_reordered_failure(name: TestName, way: WayName, reason: str) -> bool:
+    opts = getTestOpts()
+
+    if reason == 'bad stdout':
+        return _is_reordered_output_mismatch(
+            find_expected_file(name, 'stdout', way),
+            add_suffix(name, 'run.stdout'),
+            join_normalisers(normalise_output, opts.extra_normaliser))
+
+    if reason == 'bad stderr':
+        return _is_reordered_output_mismatch(
+            find_expected_file(name, 'stderr', way),
+            add_suffix(name, 'run.stderr'),
+            join_normalisers(normalise_errmsg, opts.extra_errmsg_normaliser),
+            whitespace_normaliser=normalise_whitespace)
+
+    if reason == 'stderr mismatch':
+        return _is_reordered_output_mismatch(
+            find_expected_file(name, 'stderr', way),
+            add_suffix(name, 'comp.stderr'),
+            join_normalisers(opts.extra_errmsg_normaliser, normalise_errmsg),
+            whitespace_normaliser=getattr(opts, "whitespace_normaliser", normalise_whitespace))
+
+    if reason == 'ghc.stderr mismatch':
+        return _is_reordered_output_mismatch(
+            find_expected_file(name, 'ghc.stderr', way),
+            add_suffix(name, 'comp.stderr'),
+            join_normalisers(opts.extra_errmsg_normaliser, normalise_errmsg),
+            whitespace_normaliser=getattr(opts, "whitespace_normaliser", normalise_whitespace))
+
+    return False
+
 # Checks that each line from pattern_file is present in actual_file as
 # a substring or regex pattern depending on is_substring.
 def grep_output(normaliser: OutputNormalizer, pattern_file, actual_file, is_substring: bool=True):
@@ -3489,10 +3547,11 @@ def summary(t: TestRun, file: TextIO, color=False) -> None:
 
     file.write('\n')
     printUnexpectedTests(file,
-        [t.unexpected_passes, t.unexpected_failures,
+        [t.unexpected_passes, t.unexpected_failures, t.unexpected_reordered_failures,
          t.unexpected_stat_failures, t.framework_failures])
 
     if len(t.unexpected_failures) > 0 or \
+        len(t.unexpected_reordered_failures) > 0 or \
         len(t.unexpected_stat_failures) > 0 or \
         len(t.unexpected_passes) > 0 or \
         len(t.framework_failures) > 0:
@@ -3527,6 +3586,8 @@ def summary(t: TestRun, file: TextIO, color=False) -> None:
                + ' unexpected passes\n'
                + repr(len(t.unexpected_failures)).rjust(8)
                + ' unexpected failures\n'
+               + repr(len(t.unexpected_reordered_failures)).rjust(8)
+               + ' unexpected failure - reordered output\n'
                + repr(len(t.unexpected_stat_failures)).rjust(8)
                + ' unexpected stat failures\n'
                + repr(len(t.fragile_failures) + len(t.fragile_passes)).rjust(8)
@@ -3540,6 +3601,10 @@ def summary(t: TestRun, file: TextIO, color=False) -> None:
     if t.unexpected_failures:
         file.write('Unexpected failures:\n')
         printTestInfosSummary(file, t.unexpected_failures)
+
+    if t.unexpected_reordered_failures:
+        file.write('Unexpected failure - reordered output:\n')
+        printTestInfosSummary(file, t.unexpected_reordered_failures)
 
     if t.unexpected_stat_failures:
         file.write('Unexpected stat failures:\n')

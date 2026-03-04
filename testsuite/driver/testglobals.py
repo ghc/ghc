@@ -286,7 +286,8 @@ class TestResult:
     """
     A result from the execution of a test. These live in the expected_passes,
     framework_failures, framework_warnings, unexpected_passes,
-    unexpected_failures, unexpected_stat_failures lists of TestRun.
+    unexpected_failures, unexpected_reordered_failures,
+    unexpected_stat_failures lists of TestRun.
     """
     __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr'
     def __init__(self,
@@ -326,6 +327,7 @@ class TestRun:
        self.expected_passes = [] # type: List[TestResult]
        self.unexpected_passes = [] # type: List[TestResult]
        self.unexpected_failures = [] # type: List[TestResult]
+       self.unexpected_reordered_failures = [] # type: List[TestResult]
        self.unexpected_stat_failures = [] # type: List[TestResult]
 
        # Results from tests that have been marked as fragile
