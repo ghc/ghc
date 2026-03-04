@@ -666,29 +666,17 @@ data DynamicSpecData = DynamicSpecData
 -- | Specialise calls to type-class overloaded functions occurring in a program.
 specProgram' :: StaticSpecInput -> DynamicSpecData -> CoreM DynamicSpecData
 specProgram' static dyn
-  = do { dflags   <- getDynFlags
+  = do { dflags <- getDynFlags
 
-              -- We need to start with a Subst that knows all the things
-              -- that are in scope, so that the substitution engine doesn't
-              -- accidentally re-use a unique that's already in use
-              -- Easiest thing is to do it all at once, as if all the top-level
-              -- decls were mutually recursive
        ; let top_env = SE { se_subst = Core.mkEmptySubst in_scope
                           , se_module = this_mod
                           , se_rules  = rule_env
                           , se_dflags = dflags }
              in_scope = mkInScopeSetBndrs (concatMap coreCompUnitBinds binds)
 
-             go []           = return ([], emptyUDs)
-             go (bind:binds) = do (bind', binds', uds') <- specBind TopLevel top_env bind $ \_ ->
-                                                           go binds
-                                  return (bind' ++ binds', uds')
-
-             -- Specialise the bindings of this module
-             go_comp_unit (CoreCompUnit unit_binds unit_rules) = do
-               (unit_binds', uds) <- go unit_binds
-               return (CoreCompUnit unit_binds' unit_rules, uds)
-       ; (binds', uds) <- runSpecM (mapAndCombineSM go_comp_unit binds)
+       ; unit_results <- mapM (specCompUnit static top_env) binds
+       ; let (binds', udss) = unzip unit_results
+             uds            = foldr thenUDs emptyUDs udss
 
        ; (spec_rules, spec_binds) <- specImports top_env uds
 
@@ -697,10 +685,21 @@ specProgram' static dyn
            , dsd_local_rules = local_rules
            } }
   where
-    this_mod = ssi_module static
-    rule_env = ssi_rule_env static
-    binds = dsd_binds dyn
+    this_mod    = ssi_module static
+    rule_env    = ssi_rule_env static
+    binds       = dsd_binds dyn
     local_rules = dsd_local_rules dyn
+
+-- | Specialise calls to type-class overloaded functions occurring in a program.
+specCompUnit :: StaticSpecInput -> SpecEnv -> CoreCompUnit -> CoreM (CoreCompUnit, UsageDetails)
+specCompUnit _static top_env (CoreCompUnit unit_binds unit_rules)
+  = do { (unit_binds', uds) <- runSpecM (go unit_binds)
+       ; return (CoreCompUnit unit_binds' unit_rules, uds) }
+  where
+    go []           = return ([], emptyUDs)
+    go (bind:binds) = do (bind', binds', uds') <- specBind TopLevel top_env bind $ \_ ->
+                                                  go binds
+                         return (bind' ++ binds', uds')
 
 {-
 Note [Wrap bindings returned by specImports]
