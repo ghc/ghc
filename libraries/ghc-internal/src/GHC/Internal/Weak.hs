@@ -24,19 +24,9 @@ module GHC.Internal.Weak (
         mkWeak,
         deRefWeak,
         finalize,
-
-        -- * Handling exceptions
-        -- | When an exception is thrown by a finalizer called by the
-        -- garbage collector, GHC calls a global handler which can be set with
-        -- 'setFinalizerExceptionHandler'. Note that any exceptions thrown by
-        -- this handler will be ignored.
-        setFinalizerExceptionHandler,
-        getFinalizerExceptionHandler,
-        printToHandleFinalizerExceptionHandler
     ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Weak.Finalize
 
 {-|
 A weak pointer object with a key and a value.  The value has type @v@.

@@ -91,6 +91,7 @@ module System.Mem.Weak (
 
 import Prelude
 import GHC.Internal.Weak
+import GHC.Weak
 
 -- | A specialised version of 'mkWeak', where the key and the value are
 -- the same object:

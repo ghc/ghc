@@ -14,9 +14,14 @@ module GHC.Weak.Finalize
 
 import GHC.Internal.Weak.Finalize
 
--- These imports can be removed once runFinalizerBatch is removed,
--- as can MagicHash above.
-import GHC.Internal.Base (Int, Array#, IO, State#, RealWorld)
+import GHC.Internal.Base
+import GHC.Internal.Exception
+import GHC.Internal.IORef
+import GHC.Internal.Conc.Sync (labelThreadByteArray#, myThreadId)
+import GHC.Internal.IO (catchException, unsafePerformIO)
+import GHC.Internal.IO.Handle.Types (Handle)
+import GHC.Internal.IO.Handle.Text (hPutStrLn)
+import GHC.Internal.Encoding.UTF8 (utf8EncodeByteArray#)
 
 
 {-# DEPRECATED runFinalizerBatch
@@ -36,3 +41,13 @@ runFinalizerBatch :: Int
                   -> Array# (State# RealWorld -> State# RealWorld)
                   -> IO ()
 runFinalizerBatch = GHC.Internal.Weak.Finalize.runFinalizerBatch
+
+-- | An exception handler for 'Handle' finalization that prints the error to
+-- the given 'Handle', but doesn't rethrow it.
+--
+-- @since base-4.18.0.0
+printToHandleFinalizerExceptionHandler :: Handle -> SomeException -> IO ()
+printToHandleFinalizerExceptionHandler hdl se =
+    hPutStrLn hdl msg `catchException` (\(SomeException _) -> return ())
+  where
+    msg = "Exception during weak pointer finalization (ignored): " ++ displayException se ++ "\n"
