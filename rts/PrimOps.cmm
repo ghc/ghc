@@ -2351,7 +2351,8 @@ stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I32);
     %release StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I32;
 
-    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
+    ccall appendToIOBlockedQueue(Capability_iomgr(MyCapability()) "ptr",
+                                 CurrentTSO "ptr");
     jump stg_block_async();
 #endif
 }
@@ -2377,7 +2378,8 @@ stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I32);
     %release StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I32;
 
-    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
+    ccall appendToIOBlockedQueue(Capability_iomgr(MyCapability()) "ptr",
+                                 CurrentTSO "ptr");
     jump stg_block_async();
 #endif
 }
@@ -2403,7 +2405,8 @@ stg_asyncDoProczh ( W_ proc, W_ param )
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I32);
     %release StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I32;
 
-    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
+    ccall appendToIOBlockedQueue(Capability_iomgr(MyCapability()) "ptr",
+                                 CurrentTSO "ptr");
     jump stg_block_async();
 #endif
 }
