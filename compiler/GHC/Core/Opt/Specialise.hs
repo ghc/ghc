@@ -640,12 +640,33 @@ Hence, the invariant is this:
 
 -- | Specialise calls to type-class overloaded functions occurring in a program.
 specProgram :: ModGuts -> CoreM ModGuts
-specProgram guts@(ModGuts { mg_module = this_mod
-                          , mg_rules  = local_rules
-                          , mg_binds  = binds })
+specProgram guts = do
+  rule_env <- initRuleEnv guts
+  let static = StaticSpecInput
+        { ssi_module = mg_module guts
+        , ssi_rule_env = rule_env
+        }
+      dyn = DynamicSpecData
+        { dsd_binds = mg_binds guts
+        , dsd_local_rules = mg_rules guts
+        }
+  dyn' <- specProgram' static dyn
+  pure guts { mg_binds = dsd_binds dyn', mg_rules = dsd_local_rules dyn' }
+
+data StaticSpecInput = StaticSpecInput
+  { ssi_module   :: !Module
+  , ssi_rule_env :: !RuleEnv
+  }
+
+data DynamicSpecData = DynamicSpecData
+  { dsd_binds       :: !CoreProgram
+  , dsd_local_rules :: ![CoreRule]
+  }
+
+-- | Specialise calls to type-class overloaded functions occurring in a program.
+specProgram' :: StaticSpecInput -> DynamicSpecData -> CoreM DynamicSpecData
+specProgram' static dyn
   = do { dflags   <- getDynFlags
-       ; rule_env <- initRuleEnv guts
-                     -- See Note [Fire rules in the specialiser]
 
               -- We need to start with a Subst that knows all the things
               -- that are in scope, so that the substitution engine doesn't
@@ -671,8 +692,15 @@ specProgram guts@(ModGuts { mg_module = this_mod
 
        ; (spec_rules, spec_binds) <- specImports top_env uds
 
-       ; return (guts { mg_binds = CoreCompUnit spec_binds spec_rules : binds'
-                      , mg_rules = local_rules }) }
+       ; return DynamicSpecData
+           { dsd_binds = CoreCompUnit spec_binds spec_rules : binds'
+           , dsd_local_rules = local_rules
+           } }
+  where
+    this_mod = ssi_module static
+    rule_env = ssi_rule_env static
+    binds = dsd_binds dyn
+    local_rules = dsd_local_rules dyn
 
 {-
 Note [Wrap bindings returned by specImports]
