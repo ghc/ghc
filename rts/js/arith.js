@@ -9,17 +9,8 @@ function h$logArith() { h$log.apply(h$log,arguments); }
 #endif
 
 #define UN(x) ((x)>>>0)
-#define W32(x) (BigInt(x))
-#define I32(x) (BigInt(x))
 #define W64(h,l) ((BigInt(h) << BigInt(32)) | BigInt(l>>>0))
-#define W64h(x) (Number(x >> BigInt(32)) >>> 0)
-#define W64l(x) (Number(BigInt.asUintN(32, x)) >>> 0)
 #define I64(h,l) ((BigInt(h) << BigInt(32)) | BigInt(l>>>0))
-#define I64h(x) (Number(x >> BigInt(32))|0)
-#define I64l(x) (Number(BigInt.asUintN(32,x)) >>> 0)
-#define RETURN_I64(x) RETURN_UBX_TUP2(I64h(x), I64l(x))
-#define RETURN_W64(x) RETURN_UBX_TUP2(W64h(x), W64l(x))
-#define RETURN_W32(x) return Number(x)
 
 
 // N.B. 64-bit numbers are represented by two JS numbers,
@@ -27,20 +18,88 @@ function h$logArith() { h$log.apply(h$log,arguments); }
 // See Note [StgToJS design] in GHC.StgToJS for details on
 // number representation.
 
+// Internal helper: unsigned 64-bit division and remainder.
+// Inputs ah,al,bh,bl are all unsigned 32-bit.
+// Returns qh; sets h$ret1=ql, h$ret2=rh, h$ret3=rl.
+function h$quotRemWord64(ah, al, bh, bl) {
+  // Re-apply >>>0 to make Uint32 types explicit for JIT optimisation,
+  // rather than relying on callers to have done so.
+  ah >>>= 0; al >>>= 0; bh >>>= 0; bl >>>= 0;
+  if (bh === 0 && bl === 0) throw new Error("divide by zero");
+  var qh, ql, rh, rl;
+  if (bh === 0) {
+    // 32-bit divisor: long division in base 2^16
+    qh   = Math.floor(ah / bl) >>> 0;
+    var r0   = ah - qh * bl;
+    var a1   = r0 * 65536 + (al >>> 16);
+    var q1   = Math.floor(a1 / bl);
+    var r1   = a1 - q1 * bl;
+    var a2   = r1 * 65536 + (al & 0xFFFF);
+    var q2   = Math.floor(a2 / bl);
+    ql  = (q1 * 65536 + q2) >>> 0;
+    rl  = (a2 - q2 * bl) >>> 0;
+    rh  = 0;
+  } else {
+    // 64-bit divisor >= 2^32: quotient fits in 32 bits
+    qh = 0;
+    // Float approximation; error < 1 since q < 2^32 and relative fp error < 2^-52
+    var ql_f = Math.floor((ah * 4294967296 + al) / (bh * 4294967296 + bl));
+    if (ql_f > 4294967295) ql_f = 4294967295;
+    ql = ql_f >>> 0;
+    // Compute ql * b exactly once (two 32x32->64-bit products)
+    var m1h = h$mul2Word32(ql, bl); var m1l = h$ret1;
+    var m2h = h$mul2Word32(ql, bh); var m2l = h$ret1;
+    var qbs = m1h + m2l;  // high word sum; may overflow uint32
+    var qbh = qbs >>> 0;
+    var qbl = m1l;
+
+    // At most 1 decrease: if ql*b > a, subtract b and decrement ql.
+    // Subtracting b from the (possibly truncated) 64-bit product gives
+    // exactly (ql-1)*b because (ql-1)*b < 2^64.
+    //
+    // ql*b is a 96-bit value spread over m2h (bits 95-64), qbh (63-32),
+    // qbl (31-0).  The condition has four sub-cases:
+    //   m2h > 0          : ql*b >= 2^64 > a  (overflow into bits above 64)
+    //   qbs > 4294967295 : m1h+m2l overflows 32 bits, so ql*b >= 2^64 > a
+    //                      (qbs is a JS double so the overflow is visible
+    //                      before the >>>0 truncation stored in qbh)
+    //   qbh > ah         : high words settle it; ql*b > a
+    //   qbh === ah && qbl > al : high words tie; low words settle it
+    if (m2h > 0 || qbs > 4294967295 || qbh > ah || (qbh === ah && qbl > al)) {
+      ql = (ql - 1) >>> 0;
+      var dl = qbl - bl; qbl = dl >>> 0;
+      qbh = (qbh - bh - (dl !== qbl ? 1 : 0)) >>> 0;
+    }
+
+    // Remainder = a - ql*b
+    var drl = al - qbl;
+    rl = drl >>> 0;
+    rh = (ah - qbh - (drl !== rl ? 1 : 0)) >>> 0;
+
+    // At most 1 increase: if remainder >= b, subtract b and increment ql.
+    if (rh > bh || (rh === bh && rl >= bl)) {
+      ql = (ql + 1) >>> 0;
+      var drl2 = rl - bl;
+      rl  = drl2 >>> 0;
+      rh  = (rh - bh - (drl2 !== rl ? 1 : 0)) >>> 0;
+    }
+  }
+  h$ret1 = ql; h$ret2 = rh; h$ret3 = rl;
+  return qh;
+}
+
 function h$hs_quotWord64(h1,l1,h2,l2) {
-  var a = W64(h1,l1);
-  var b = W64(h2,l2);
-  var r = BigInt.asUintN(64, a / b);
-  TRACE_ARITH("Word64: " + a + " / " + b + " ==> " + r)
-  RETURN_W64(r);
+  var qh = h$quotRemWord64(h1>>>0,l1>>>0,h2>>>0,l2>>>0);
+  var ql = h$ret1;
+  TRACE_ARITH("Word64: " + W64(h1,l1) + " / " + W64(h2,l2) + " ==> " + W64(qh,ql))
+  RETURN_UBX_TUP2(qh,ql);
 }
 
 function h$hs_remWord64(h1,l1,h2,l2) {
-  var a = W64(h1,l1);
-  var b = W64(h2,l2);
-  var r = BigInt.asUintN(64, a % b);
-  TRACE_ARITH("Word64: " + a + " % " + b + " ==> " + r)
-  RETURN_W64(r);
+  h$quotRemWord64(h1>>>0,l1>>>0,h2>>>0,l2>>>0);
+  var rh = h$ret2, rl = h$ret3;
+  TRACE_ARITH("Word64: " + W64(h1,l1) + " % " + W64(h2,l2) + " ==> " + W64(rh,rl))
+  RETURN_UBX_TUP2(rh,rl);
 }
 
 function h$hs_timesWord64(h1,l1,h2,l2) {
@@ -84,19 +143,55 @@ function h$hs_timesInt64(h1,l1,h2,l2) {
 }
 
 function h$hs_quotInt64(h1,l1,h2,l2) {
-  var a = I64(h1,l1);
-  var b = I64(h2,l2);
-  var r = BigInt.asIntN(64, a / b);
-  TRACE_ARITH("Int64: " + a + " / " + b + " ==> " + r)
-  RETURN_I64(r);
+  // Determine sign: result negative iff operands have different signs
+  var neg = (h1 < 0) !== (h2 < 0);
+  // Absolute value of (h1,l1)
+  var ah, al;
+  if (h1 >= 0) { ah = h1 >>> 0; al = l1 >>> 0; }
+  else { al = (-l1) >>> 0; ah = (al === 0 ? -h1 : ~h1) >>> 0; }
+  // Absolute value of (h2,l2)
+  var bh, bl;
+  if (h2 >= 0) { bh = h2 >>> 0; bl = l2 >>> 0; }
+  else { bl = (-l2) >>> 0; bh = (bl === 0 ? -h2 : ~h2) >>> 0; }
+  // Unsigned quotient
+  var qh = h$quotRemWord64(ah, al, bh, bl);
+  var ql = h$ret1;
+  // Apply sign
+  if (neg) {
+    var nql = (-ql) >>> 0;
+    var nqh = (nql === 0 ? -qh : ~qh) | 0;
+    TRACE_ARITH("Int64: " + I64(h1,l1) + " / " + I64(h2,l2) + " ==> " + I64(nqh,nql))
+    RETURN_UBX_TUP2(nqh, nql);
+  } else {
+    TRACE_ARITH("Int64: " + I64(h1,l1) + " / " + I64(h2,l2) + " ==> " + I64(qh|0,ql))
+    RETURN_UBX_TUP2(qh | 0, ql);
+  }
 }
 
 function h$hs_remInt64(h1,l1,h2,l2) {
-  var a = I64(h1,l1);
-  var b = I64(h2,l2);
-  var r = BigInt.asIntN(64, a % b);
-  TRACE_ARITH("Int64: " + a + " % " + b + " ==> " + r)
-  RETURN_I64(r);
+  // Remainder sign follows dividend
+  var neg_a = h1 < 0;
+  // Absolute value of (h1,l1)
+  var ah, al;
+  if (h1 >= 0) { ah = h1 >>> 0; al = l1 >>> 0; }
+  else { al = (-l1) >>> 0; ah = (al === 0 ? -h1 : ~h1) >>> 0; }
+  // Absolute value of (h2,l2)
+  var bh, bl;
+  if (h2 >= 0) { bh = h2 >>> 0; bl = l2 >>> 0; }
+  else { bl = (-l2) >>> 0; bh = (bl === 0 ? -h2 : ~h2) >>> 0; }
+  // Unsigned remainder
+  h$quotRemWord64(ah, al, bh, bl);
+  var rh = h$ret2, rl = h$ret3;
+  // Apply sign of dividend
+  if (neg_a) {
+    var nrl = (-rl) >>> 0;
+    var nrh = (nrl === 0 ? -rh : ~rh) | 0;
+    TRACE_ARITH("Int64: " + I64(h1,l1) + " % " + I64(h2,l2) + " ==> " + I64(nrh,nrl))
+    RETURN_UBX_TUP2(nrh, nrl);
+  } else {
+    TRACE_ARITH("Int64: " + I64(h1,l1) + " % " + I64(h2,l2) + " ==> " + I64(rh|0,rl))
+    RETURN_UBX_TUP2(rh | 0, rl);
+  }
 }
 
 function h$hs_plusInt64(h1,l1,h2,l2) {
@@ -287,37 +382,44 @@ function h$mul2Word32(l1,l2) {
 }
 
 function h$quotWord32(n,d) {
-  var a = W32(n);
-  var b = W32(d);
-  var r = BigInt.asUintN(32, a / b);
-  TRACE_ARITH("Word32: " + a + " / " + b + " ==> " + r)
-  RETURN_W32(r);
+  if ((d>>>0) === 0) throw new Error("divide by zero");
+  var r = Math.floor((n>>>0) / (d>>>0));
+  TRACE_ARITH("Word32: " + (n>>>0) + " / " + (d>>>0) + " ==> " + r)
+  return r;
 }
 
 function h$remWord32(n,d) {
-  var a = W32(n);
-  var b = W32(d);
-  var r = BigInt.asUintN(32, a % b);
-  TRACE_ARITH("Word32: " + a + " % " + b + " ==> " + r)
-  RETURN_W32(r);
+  if ((d>>>0) === 0) throw new Error("divide by zero");
+  var r = (n>>>0) % (d>>>0);
+  TRACE_ARITH("Word32: " + (n>>>0) + " % " + (d>>>0) + " ==> " + r)
+  return r;
 }
 
 function h$quotRemWord32(n,d) {
-  var a = W32(n);
-  var b = W32(d);
-  var q = BigInt.asUintN(32, a / b);
-  var r = BigInt.asUintN(32, a % b);
-  TRACE_ARITH("Word32: " + a + " `quotRem` " + b + " ==> (" + q + ", " + r + ")")
-  RETURN_UBX_TUP2(Number(q),Number(r));
+  var nu = n>>>0, du = d>>>0;
+  if (du === 0) throw new Error("divide by zero");
+  var q = Math.floor(nu / du);
+  var r = nu % du;
+  TRACE_ARITH("Word32: " + nu + " `quotRem` " + du + " ==> (" + q + ", " + r + ")")
+  RETURN_UBX_TUP2(q, r);
 }
 
+// Divide the 64-bit unsigned value (nh*2^32 + nl) by 32-bit unsigned d.
+// Precondition: quotient fits in 32 bits (nh < d).
 function h$quotRem2Word32(nh,nl,d) {
-  var a = W64(nh,nl);
-  var b = W32(d);
-  var q = BigInt.asUintN(32, a / b);
-  var r = BigInt.asUintN(32, a % b);
-  TRACE_ARITH("Word32: " + a + " `quotRem2` " + b + " ==> (" + q + ", " + r + ")")
-  RETURN_UBX_TUP2(Number(q),Number(r));
+  var dv  = d>>>0;
+  if (dv === 0) throw new Error("divide by zero");
+  var nh_u = nh>>>0;
+  // Long division in base 2^16 (all intermediate values <= 2^48, exact in double)
+  var a1  = nh_u * 65536 + ((nl>>>0) >>> 16);
+  var q1  = Math.floor(a1 / dv);
+  var r1  = a1 - q1 * dv;
+  var a2  = r1 * 65536 + ((nl>>>0) & 0xFFFF);
+  var q2  = Math.floor(a2 / dv);
+  var q   = (q1 * 65536 + q2) >>> 0;
+  var r   = (a2 - q2 * dv) >>> 0;
+  TRACE_ARITH("Word32: " + W64(nh,nl) + " `quotRem2` " + dv + " ==> (" + q + ", " + r + ")")
+  RETURN_UBX_TUP2(q, r);
 }
 
 function h$wordAdd2(l1,l2) {
