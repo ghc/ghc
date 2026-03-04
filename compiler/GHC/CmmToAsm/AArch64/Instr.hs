@@ -114,7 +114,7 @@ regUsageOfInstr platform instr = case instr of
   LSL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   LSR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   MOV dst src              -> usage (regOp src, regOp dst)
-  MOVK dst src             -> usage (regOp src, regOp dst)
+  MOVK dst src             -> usage (regOp src ++ regOp dst, regOp dst)
   MOVZ dst src             -> usage (regOp src, regOp dst)
   MVN dst src              -> usage (regOp src, regOp dst)
   ORR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
