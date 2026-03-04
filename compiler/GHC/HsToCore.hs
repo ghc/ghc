@@ -210,7 +210,7 @@ deSugar hsc_env
               final_prs = addExportFlagsAndRules bcknd export_set keep_alive
                                                  rules_for_locals (fromOL all_prs)
 
-        ; pprTraceM "DumpDsRules" (ppr (ds_rules_for_imp_lhs, ds_rules_for_imps, rules_for_comp_unit))
+        -- ; pprTraceM "DumpDsRules" (ppr (ds_rules_for_imp_lhs, ds_rules_for_imps, rules_for_comp_unit))
 
         ; let ds_binds = combineEvBinds ds_ev_binds final_prs
               ds_program = [ CoreCompUnit [] []

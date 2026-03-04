@@ -69,6 +69,7 @@ import GHC.Utils.Misc
 import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )
 
+import qualified Data.IntSet as IntSet
 import Data.List (findIndex, mapAccumL)
 
 {-
@@ -130,8 +131,8 @@ occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
         impRuleDeps b = foldr unionVarSet emptyVarSet [ vs | (_, vs) <- lookupImpRules imp_rule_edges b ]
 
         localRuleDeps b = foldr unionVarSet emptyVarSet
-          [ (exprsFreeIds args `delVarSetList` ru_bndrs) `unionVarSet` (exprFreeIds ru_rhs `delVarSetList` ru_bndrs)
-          | Rule { ru_fn, ru_bndrs, ru_args = args, ru_rhs } <- unit_rules
+          [ ruleFreeVars rule
+          | rule@Rule { ru_fn } <- unit_rules
           , idName b == ru_fn
           ]
 
@@ -162,10 +163,28 @@ occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
     component_rules i = [ rule | rule <- unit_rules, rule_comp_index rule == i ]
 
     rule_comp_index rule
-      = case findIndex (\ids -> any (\b -> idName b == ruleIdName rule) ids) component_bndrs of
-          Just i  -> i
-          Nothing -> pprPanic "occurSplitPgm"
-                     (text "No matching compilation component for rule" <+> ppr rule)
+      = case rule_component_indices of
+          [i] -> i
+          []  -> head_component
+          is  -> pprPanic "occurSplitPgm"
+                 (text "Rule free vars span multiple components"
+                  $$ text "rule:" <+> ppr rule
+                  $$ text "components:" <+> ppr is)
+      where
+        rule_component_indices :: [Int]
+        rule_component_indices = IntSet.toList $ IntSet.fromList
+          [ i
+          | (ids, i) <- zip component_bndrs [0..]
+          , not (isEmptyVarSet (rule_fvs `intersectVarSet` mkVarSet ids))
+          ]
+
+        rule_fvs = ruleFreeVars rule
+
+        head_component
+          = case findIndex (\ids -> any (\b -> idName b == ruleIdName rule) ids) component_bndrs of
+              Just i  -> i
+              Nothing -> pprPanic "occurSplitPgm"
+                         (text "No matching compilation component for rule" <+> ppr rule)
 
     scc_payloads (AcyclicSCC p) = [p]
     scc_payloads (CyclicSCC ps) = ps
