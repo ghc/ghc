@@ -556,7 +556,14 @@ checkNativeLibraryLinkingNeeded staticLink _ dflags unit_env linkables pkg_deps 
       unit_state = ue_homeUnitState unit_env
       arch_os    = platformArchOS platform
       exe_file   = exeFileName arch_os staticLink (outputFile_ dflags)
-  exe_file_os <- SysOsPath.encodeFS exe_file
+      -- For the JS backend, exe_file is a directory (*.jsexe).  A directory's
+      -- mtime on Linux is only updated when entries are created/deleted, not
+      -- when existing files are overwritten.  jsLink always overwrites out.js,
+      -- so use that as the mtime sentinel instead.
+      exe_time_file
+        | ArchJavaScript <- platformArch platform = exe_file </> "out.js"
+        | otherwise                               = exe_file
+  exe_file_os <- SysOsPath.encodeFS exe_time_file
   e_exe_time <- modificationTimeIfExists exe_file_os
   case e_exe_time of
     Nothing  -> return $ NeedsRecompile MustCompile

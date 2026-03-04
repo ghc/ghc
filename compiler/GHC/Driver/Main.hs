@@ -106,8 +106,6 @@ module GHC.Driver.Main
 
 import GHC.Prelude
 
-import GHC.Platform
-
 import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -259,8 +257,6 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import GHC.Utils.Touch
 
-import qualified GHC.LanguageExtensions as LangExt
-
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.OsPath (unsafeEncodeUtf)
@@ -295,8 +291,8 @@ import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
 import GHC.Stg.EnforceEpt.TagSig (seqTagSig)
 import GHC.StgToCmm.Utils (IPEStats)
+import GHC.Types.Unique.DSet ( uniqDSetToList )
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.DFM
 import GHC.Cmm.Config (CmmConfig)
 import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
@@ -854,14 +850,6 @@ hscRecompStatus
            , IsBoot <- isBootSummary mod_summary -> do
                msg UpToDate
                return $ HscUpToDate checked_iface emptyRecompLinkables
-
-           -- Always recompile with the JS backend when TH is enabled until
-           -- #23013 is fixed.
-           | ArchJavaScript <- platformArch (targetPlatform lcl_dflags)
-           , xopt LangExt.TemplateHaskell lcl_dflags
-           -> do
-              msg $ needsRecompileBecause THWithJS
-              return $ HscRecompNeeded $ Just $ mi_iface_hash $ checked_iface
 
            | otherwise -> do
                -- Check the status of all the linkable types we might need.
@@ -2910,7 +2898,7 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
   initLoaderState interp hsc_env
 
   -- Take lock for the actual work.
-  (dep_linkables, needed_units) <- modifyLoaderState interp $ \pls -> do
+  (dep_linkables, needed_units, this_pkgs_loaded) <- modifyLoaderState interp $ \pls -> do
     let link_opts = initLinkDepsOpts hsc_env
 
     -- Find what packages and linkables are required
@@ -2921,11 +2909,14 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
     let objs = mapMaybe linkableFilterNative (ldNeededLinkables deps)
         (objs_loaded', _new_objs) = rmDupLinkables (objs_loaded pls) objs
 
-    -- FIXME: we should make the JS linker load new_objs here, instead of
-    -- on-demand.
-
-    let pls' = pls { objs_loaded = objs_loaded' }
-    pure (pls', (ldAllLinkables deps, ldUnits deps))
+    -- Compute LoadedPkgInfo metadata for recompilation avoidance.
+    -- We don't call loadPackages' because the JS interpreter doesn't load
+    -- native .o/.so files; we only need the transitive-dep metadata.
+    (_, pkgs_almost_loaded) <-
+      loadMoreUnits hsc_env (ldUnits deps) (pkgs_loaded pls)
+    let this_pkgs_loaded = filterNeededPkgsLoaded (ldNeededUnits deps) pkgs_almost_loaded
+        pls' = pls { objs_loaded = objs_loaded', pkgs_loaded = pkgs_almost_loaded }
+    pure (pls', (ldAllLinkables deps, uniqDSetToList (ldNeededUnits deps), this_pkgs_loaded))
 
 
   let foreign_stubs    = NoStubs
@@ -2950,11 +2941,7 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
   binding_fref <- withJSInterp i $ \inst ->
                     mkForeignRef href (freeReallyRemoteRef inst href)
 
-  -- FIXME: we don't report needed units because we would have to find a way to
-  -- build a meaningful LoadedPkgInfo (see the mess in
-  -- GHC.Linker.Loader.{loadPackage,loadPackages'}).
-  let pkgs_loaded = emptyUDFM
-  return (castForeignRef binding_fref, dep_linkables, pkgs_loaded)
+  return (castForeignRef binding_fref, dep_linkables, this_pkgs_loaded)
 
 
 {- **********************************************************************

@@ -36,6 +36,8 @@ module GHC.Linker.Loader
    , initLinkDepsOpts
    , getGccSearchDirectory
    , mkDynLoadLib
+   , loadMoreUnits
+   , filterNeededPkgsLoaded
    )
 where
 
@@ -252,6 +254,20 @@ loadName interp hsc_env name = do
                                        (ppr sym_to_find)
                         return (pls,(r, links, pkgs))
 
+-- | Restrict a 'PkgsLoaded' map to the packages directly needed and their
+-- full transitive closure (via 'loaded_pkg_trans_deps').
+filterNeededPkgsLoaded :: UniqDSet UnitId -> PkgsLoaded -> PkgsLoaded
+filterNeededPkgsLoaded directly_needed all_pkgs_loaded =
+  udfmRestrictKeys all_pkgs_loaded $ getUniqDSet trans_pkgs_needed
+  where
+    trans_pkgs_needed =
+      unionManyUniqDSets
+        (directly_needed :
+          [ loaded_pkg_trans_deps pkg
+          | pkg_id <- uniqDSetToList directly_needed
+          , Just pkg <- [lookupUDFM all_pkgs_loaded pkg_id]
+          ])
+
 loadDependencies
   :: Interp
   -> HscEnv
@@ -271,12 +287,7 @@ loadDependencies interp hsc_env pls span needed_mods = do
    -- Link the packages and modules required
    pls1 <- loadPackages' interp hsc_env (ldUnits deps) pls
    (pls2, succ) <- loadExternalModuleLinkables interp hsc_env pls1 (ldNeededLinkables deps)
-   let this_pkgs_loaded = udfmRestrictKeys all_pkgs_loaded $ getUniqDSet trans_pkgs_needed
-       all_pkgs_loaded = pkgs_loaded pls2
-       trans_pkgs_needed = unionManyUniqDSets (this_pkgs_needed : [ loaded_pkg_trans_deps pkg
-                                                                  | pkg_id <- uniqDSetToList this_pkgs_needed
-                                                                  , Just pkg <- [lookupUDFM all_pkgs_loaded pkg_id]
-                                                                  ])
+   let this_pkgs_loaded = filterNeededPkgsLoaded this_pkgs_needed (pkgs_loaded pls2)
    return (pls2, succ, ldAllLinkables deps, this_pkgs_loaded)
 
 
@@ -1170,17 +1181,26 @@ loadPackages interp hsc_env new_pkgs = do
   modifyLoaderState_ interp $ \pls ->
     loadPackages' interp hsc_env new_pkgs pls
 
-loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
-loadPackages' interp hsc_env new_pks pls = do
-  (reverse -> pkgs_info_list, pkgs_almost_loaded) <-
-    downsweep
-      ([], pkgs_loaded pls)
-      new_pks
-  loadPackage interp hsc_env pkgs_info_list (pls { pkgs_loaded = pkgs_almost_loaded })
+-- | Compute 'LoadedPkgInfo' metadata (with transitive deps) for new packages,
+-- without loading any native libraries. Used for recompilation-avoidance
+-- tracking and as the first pass of 'loadPackages''.
+--
+-- The returned '[UnitInfo]' list is an accumulated *reverse* topologically
+-- sorted list of new packages. The returned 'PkgsLoaded' is populated with
+-- placeholder 'LoadedPkgInfo' for new packages (empty artifact fields, correct
+-- 'loaded_pkg_trans_deps').
+loadMoreUnits
+  :: HscEnv
+  -> [UnitId]     -- ^ New packages to process (not yet in PkgsLoaded)
+  -> PkgsLoaded   -- ^ Existing loaded packages (used for memoization)
+  -> IO ([UnitInfo], PkgsLoaded)
+  -- ^ Reverse topologically-sorted new package infos + updated PkgsLoaded
+loadMoreUnits hsc_env new_pks pkgs_loaded_init =
+  downsweep ([], pkgs_loaded_init) new_pks
   where
     -- The downsweep process takes an initial 'PkgsLoaded' and uses it
     -- to memoize new packages to load when recursively downsweeping
-    -- the dependencies. The returned 'PkgsLoaded' is popularized with
+    -- the dependencies. The returned 'PkgsLoaded' is populated with
     -- placeholder 'LoadedPkgInfo' for new packages yet to be loaded,
     -- which need to be modified later to fill in the missing fields.
     --
@@ -1220,6 +1240,12 @@ loadPackages' interp hsc_env new_pks pls = do
       | otherwise =
           throwGhcExceptionIO
             (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
+
+loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
+loadPackages' interp hsc_env new_pks pls = do
+  (reverse -> pkgs_info_list, pkgs_almost_loaded) <-
+    loadMoreUnits hsc_env new_pks (pkgs_loaded pls)
+  loadPackage interp hsc_env pkgs_info_list (pls { pkgs_loaded = pkgs_almost_loaded })
 
 
 loadPackage :: Interp -> HscEnv -> [UnitInfo] -> LoaderState -> IO LoaderState
