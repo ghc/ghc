@@ -39,7 +39,6 @@ import GHC.Prelude
 
 import GHC.Unit.Module   ( Module )
 import GHC.Unit.Module.Env
-import GHC.Unit.Module.ModGuts( ModGuts(..) )
 import GHC.Unit.Module.Deps( Dependencies(..) )
 
 import GHC.Driver.DynFlags( DynFlags )
@@ -412,12 +411,8 @@ data RuleEnv
               , re_visible_orphs :: !ModuleSet
               }
 
-mkRuleEnv :: ModGuts -> RuleBase -> RuleBase -> RuleEnv
-mkRuleEnv (ModGuts { mg_module = this_mod
-                   , mg_deps   = deps
-                   , mg_rules  = local_rules
-                   , mg_binds  = local_binds })
-          eps_rules hpt_rules
+mkRuleEnv :: Module -> Dependencies -> [CoreRule] -> CoreProgram -> RuleBase -> RuleBase -> RuleEnv
+mkRuleEnv this_mod deps local_rules local_binds eps_rules hpt_rules
   = RuleEnv { re_local_rules   = mkRuleBase (local_rules ++ concatMap cu_rules local_binds)
             , re_home_rules    = hpt_rules
             , re_eps_rules     = eps_rules

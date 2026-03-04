@@ -2050,20 +2050,34 @@ type CoreArg  = Arg  CoreBndr
 -- | Binding groups where binders are 'CoreBndr's
 type CoreBind = Bind CoreBndr
 
--- | A compilation unit is a set of bindings and associated rules that can be compiled independently.
---
--- Note [Compilation Units]
--- ~~~~~~~~~~~~~~~~~~~~~~~~
--- Essentially these are independent sets of bindings yet still from the same module.
--- Their order matters and their top level ids can shadow each other.
---
--- This means if we want to combine units into one we have to deal with that shadowing.
--- We do so by substituting over them and their associated rules, done in deShadowCompUnits.
---
--- This means flattenCoreProgram doesn't preserve the identiy of binds, and once
--- units have been combined we can't keep using the old units as their uniques
--- won't match. This is we we don't use flattenCoreProgram for pretty printing
--- for example.
+{-
+Note [Compilation Units]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Essentially these are independent sets of bindings yet still from the same module.
+Their order matters and their top level ids can shadow each other.
+
+The basic goal is to be able to compile multiple such units independently. This
+seems trivial but there are a number of wrinkles:
+
+W1: For CSE we want to combine all bindings into one unit in order to common up
+common rhss.
+
+W2: Optimization passes might generate top level binders in different unit that share
+the same unique. This means in order to combine units we have to substitute over them
+as we go.
+
+W3: When we substitute over the code we can't just substitute over the binders, we
+also have to substitute over the Rules.
+
+W4: In order to be able to substitute over rules they need to be associated with
+a compilation unit each.
+
+This means flattenCoreProgram doesn't preserve the identiy of binds, and once
+units have been combined we can't keep using the old units as their uniques
+won't match. This is we we don't use flattenCoreProgram for pretty printing
+for example.
+-}
+
 
 data CoreCompUnit
   = CoreCompUnit

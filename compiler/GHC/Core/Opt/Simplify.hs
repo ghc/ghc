@@ -31,6 +31,8 @@ import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Unit.Env ( UnitEnv, ueEPS )
 import GHC.Unit.External
+import GHC.Unit.Module (Module)
+import GHC.Unit.Module.Deps (Dependencies)
 import GHC.Unit.Module.ModGuts
 
 import GHC.Types.Id
@@ -133,6 +135,33 @@ data SimplifyOpts = SimplifyOpts
   , so_top_env_cfg     :: !TopEnvConfig
   }
 
+data StaticSimplInput = StaticSimplInput
+  { ssi_module       :: !Module
+  , ssi_deps         :: !Dependencies
+  , ssi_fam_inst_env :: !FamInstEnv
+  }
+
+data DynamicSimplData = DynamicSimplData
+  { dsd_binds :: !CoreProgram
+  , dsd_rules :: ![CoreRule]
+  }
+
+splitModGuts :: ModGuts -> (StaticSimplInput, DynamicSimplData)
+splitModGuts guts =
+  ( StaticSimplInput
+      { ssi_module       = mg_module guts
+      , ssi_deps         = mg_deps guts
+      , ssi_fam_inst_env = mg_fam_inst_env guts
+      }
+  , DynamicSimplData
+      { dsd_binds = mg_binds guts
+      , dsd_rules = mg_rules guts
+      }
+  )
+
+makeGuts :: ModGuts -> StaticSimplInput -> DynamicSimplData -> ModGuts
+makeGuts guts _static dyn = guts { mg_binds = dsd_binds dyn, mg_rules = dsd_rules dyn }
+
 simplifyPgm :: Logger
             -> UnitEnv
             -> NamePprCtx                -- For dumping
@@ -140,12 +169,23 @@ simplifyPgm :: Logger
             -> ModGuts
             -> IO (SimplCount, ModGuts)  -- New bindings
 
-simplifyPgm logger unit_env name_ppr_ctx opts
-            guts@(ModGuts { mg_module = this_mod
-                          , mg_binds = binds, mg_rules = local_rules
-                          , mg_fam_inst_env = fam_inst_env })
+simplifyPgm logger unit_env name_ppr_ctx opts guts = do
+  let (static, dyn) = splitModGuts guts
+  (count, dyn_out) <- simplifyPgm' logger unit_env name_ppr_ctx opts static dyn
+  pure (count, makeGuts guts static dyn_out)
+
+simplifyPgm' :: Logger
+            -> UnitEnv
+            -> NamePprCtx                -- For dumping
+            -> SimplifyOpts
+            -> StaticSimplInput
+            -> DynamicSimplData
+            -> IO (SimplCount, DynamicSimplData)  -- New bindings
+
+simplifyPgm' logger unit_env name_ppr_ctx opts
+            static dyn
   = do { (termination_msg, it_count, counts_out, guts')
-            <- do_iteration 1 [] binds local_rules
+            <- do_iteration 1 [] (dsd_binds dyn) (dsd_rules dyn)
 
         ; when (logHasDumpFlag logger Opt_D_verbose_core2core
                 && logHasDumpFlag logger Opt_D_dump_simpl_stats) $
@@ -159,18 +199,22 @@ simplifyPgm logger unit_env name_ppr_ctx opts
         ; return (counts_out, guts')
     }
   where
+    this_mod = ssi_module static
+    deps = ssi_deps static
+    fam_inst_env = ssi_fam_inst_env static
     dump_core_sizes = so_dump_core_sizes opts
     mode            = so_mode opts
     max_iterations  = so_iterations opts
     top_env_cfg     = so_top_env_cfg opts
     active_rule     = activeRule mode
     active_unf      = activeUnfolding mode
-    -- Note the bang in !guts_no_binds.  If you don't force `guts_no_binds`
+    -- Note the bang in !dyn_no_binds.  If you don't force `dyn_no_binds`
     -- the old bindings are retained until the end of all simplifier iterations
-    !guts_no_binds = guts { mg_binds = [], mg_rules = [] }
+    !dyn_no_binds = DynamicSimplData { dsd_binds = [], dsd_rules = [] }
 
     hpt_rule_env :: RuleEnv
-    hpt_rule_env = mkRuleEnv guts emptyRuleBase (so_hpt_rules opts)
+    hpt_rule_env = mkRuleEnv this_mod deps (dsd_rules dyn) (dsd_binds dyn)
+                             emptyRuleBase (so_hpt_rules opts)
                    -- emptyRuleBase: no EPS rules yet; we will update
                    -- them on each iteration to pick up the most up to date set
 
@@ -178,7 +222,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                  -> [SimplCount] -- Counts from earlier iterations, reversed
                  -> CoreProgram  -- Bindings
                  -> [CoreRule]   -- Local rules for imported Ids
-                 -> IO (String, Int, SimplCount, ModGuts)
+                 -> IO (String, Int, SimplCount, DynamicSimplData)
 
     do_iteration iteration_no counts_so_far binds local_rules
         -- iteration_no is the number of the iteration we are
@@ -196,7 +240,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
                 -- number of iterations we actually completed
         return ( "Simplifier bailed out", iteration_no - 1
                , totalise counts_so_far
-               , guts_no_binds { mg_binds = [CoreCompUnit bind_list unit_rules], mg_rules = local_rules } )
+               , dyn_no_binds { dsd_binds = [CoreCompUnit bind_list unit_rules], dsd_rules = local_rules } )
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
@@ -258,7 +302,7 @@ simplifyPgm logger unit_env name_ppr_ctx opts
            if isZeroSimplCount counts1 then
                 return ( "Simplifier reached fixed point", iteration_no
                        , totalise (counts1 : counts_so_far)  -- Include "free" ticks
-                       , guts_no_binds { mg_binds = [CoreCompUnit binds1 unit_rules1], mg_rules = rules1 } )
+                       , dyn_no_binds { dsd_binds = [CoreCompUnit binds1 unit_rules1], dsd_rules = rules1 } )
            else do {
                 -- Short out indirections
                 -- We do this *after* at least one run of the simplifier
