@@ -1925,6 +1925,8 @@ as such you shouldn't need to set any of them explicitly. A flag
     :type: dynamic
     :category: optimization
 
+    :default: off
+
     Disabling this flag prevents a W/W split if the only benefit would be call-by-value
     for some arguments.
 
