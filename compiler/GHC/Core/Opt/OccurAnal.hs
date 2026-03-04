@@ -99,7 +99,16 @@ occurAnalyseExpr_Prep expr = expr'
 
 occurSplitPgm :: Module -> [CoreRule] -> CoreCompUnit -> [CoreCompUnit]
 occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
-  = zipWith mk_comp_unit comp_pairs [0..]
+  =
+    -- pprTrace "occurSplitPgm"
+    -- ( vcat [
+    --     text "imp",
+    --     ppr imp_rules,
+    --     text "unit",
+    --     ppr (unit_rules, unit_binds)
+    --   ]
+    -- )
+    zipWith mk_comp_unit comp_pairs [0..]
   where
     CoreCompUnit occ_binds _ =
       occurAnalyseCompUnit mod (const True) (const True) imp_rules
@@ -121,7 +130,11 @@ occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
                     , node_dependencies = nonDetKeysUniqSet deps
                     }
       where
-        deps = dep_fvs `intersectVarSet` bndr_set
+        deps = traced_fvs `intersectVarSet` bndr_set
+
+        traced_fvs = -- pprTrace "occurSplitPgm: binder fvs before unit assignment"
+                     -- (ppr bndr $$ text "fvs:" <+> ppr dep_fvs)
+                      dep_fvs
 
         dep_fvs = exprFreeIds rhs
                   `unionVarSet` bndrRuleAndUnfoldingIds bndr
@@ -212,13 +225,18 @@ occurAnalyseCompUnit this_mod active_unf active_rule imp_rules (CoreCompUnit uni
     WUD _ occ_anald_glommed_binds =
       occAnalRecBind init_env TopLevel imp_rule_edges (flattenBinds unit_binds) initial_uds
 
-    initial_uds = addManyOccs emptyDetails (rulesFreeVars imp_rules)
+    initial_uds = addManyOccs emptyDetails (rulesFreeVars all_imp_rules)
       -- The RULES declarations keep things alive!
 
     -- imp_rule_edges maps a top-level local binder 'f' to the RHS free vars
     -- of any IMP-RULE where 'f' appears on the LHS
     imp_rule_edges :: ImpRuleEdges
-    imp_rule_edges = mkImpRuleEdges imp_rules
+    imp_rule_edges = mkImpRuleEdges all_imp_rules
+
+    -- Keep compilation-unit rules whose head is imported in scope too;
+    -- they behave like mg_rules for dead-code liveness.
+    all_imp_rules :: [CoreRule]
+    all_imp_rules = imp_rules ++ filter (not . isLocalRule) unit_rules
 
     go_unit :: [CoreBind] -> OccEnv -> WithUsageDetails [CoreBind]
     go_unit [] _ = WUD emptyDetails []
