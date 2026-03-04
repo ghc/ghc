@@ -408,7 +408,7 @@ dumpPassResult logger dump_core_sizes name_ppr_ctx mb_flag hdr extra_info binds 
      $$ pprRules unit_rules
       where
         pp_header
-          | include_header = text "-- Start of new compilation unit"
+          | include_header = text "=== Start of new compilation unit"
           | otherwise      = empty
 
 {-
