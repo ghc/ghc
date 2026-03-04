@@ -1,0 +1,7 @@
+T15588.hs:18:9: error: [GHC-25897]
+    • Couldn't match kind ‘j’ with ‘True’
+      Expected kind ‘Proxy j’,
+        but ‘_ :: Proxy True’ has kind ‘Proxy True’
+    • In the first argument of ‘IfK’, namely ‘(_ :: Proxy True)’
+      In the type family declaration for ‘IfK’
+
