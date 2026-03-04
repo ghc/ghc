@@ -227,6 +227,7 @@ test('T9509',
 test('T12603',
      normal,
      makefile_test, ['T12603'])
+test('T12640', [grep_errmsg(r'force-inline')], compile, ['-O2 -ddump-rule-firings'])
 test('T12877', normal, makefile_test, ['T12877'])
 test('T13027', normal, compile, [''])
 test('T13025',
