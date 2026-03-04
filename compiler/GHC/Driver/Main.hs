@@ -2910,7 +2910,7 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
   initLoaderState interp hsc_env
 
   -- Take lock for the actual work.
-  (dep_linkables, dep_units) <- modifyLoaderState interp $ \pls -> do
+  (dep_linkables, needed_units) <- modifyLoaderState interp $ \pls -> do
     let link_opts = initLinkDepsOpts hsc_env
 
     -- Find what packages and linkables are required
@@ -2924,13 +2924,8 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
     -- FIXME: we should make the JS linker load new_objs here, instead of
     -- on-demand.
 
-    -- FIXME: we don't report needed units because we would have to find a way
-    -- to build a meaningful LoadedPkgInfo (see the mess in
-    -- GHC.Linker.Loader.{loadPackage,loadPackages'}). Detecting what to load
-    -- and actually loading (using the native interpreter) are intermingled, so
-    -- we can't directly reuse this code.
     let pls' = pls { objs_loaded = objs_loaded' }
-    pure (pls', (ldAllLinkables deps, emptyUDFM {- ldNeededUnits deps -}) )
+    pure (pls', (ldAllLinkables deps, ldUnits deps))
 
 
   let foreign_stubs    = NoStubs
@@ -2945,7 +2940,7 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
   -- link code containing binding "id_sym = expr", using id_sym as root
   withJSInterp i $ \inst -> do
     let roots = mkExportedModFuns this_mod [id_sym]
-    jsLinkObject logger tmpfs tmp_dir js_config unit_env inst out_obj roots
+    jsLinkObject logger tmpfs tmp_dir js_config unit_env inst out_obj roots needed_units
 
   -- look up "id_sym" closure and create a StablePtr (HValue) from it
   href <- lookupClosure interp (IFaststringSymbol id_sym) >>= \case
@@ -2955,7 +2950,11 @@ jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
   binding_fref <- withJSInterp i $ \inst ->
                     mkForeignRef href (freeReallyRemoteRef inst href)
 
-  return (castForeignRef binding_fref, dep_linkables, dep_units)
+  -- FIXME: we don't report needed units because we would have to find a way to
+  -- build a meaningful LoadedPkgInfo (see the mess in
+  -- GHC.Linker.Loader.{loadPackage,loadPackages'}).
+  let pkgs_loaded = emptyUDFM
+  return (castForeignRef binding_fref, dep_linkables, pkgs_loaded)
 
 
 {- **********************************************************************

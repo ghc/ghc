@@ -30,8 +30,8 @@ test('T25127_infix', normal, compile, [''])
 
 test('T22326_th_dump1', req_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T23739_th_dump1', req_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
-test('T22326_th_pprint1', [req_th, js_broken(24886)], compile, [''])
-test('T23739_th_pprint1', [req_th, js_broken(24886)], compile, [''])
+test('T22326_th_pprint1', req_th, compile, [''])
+test('T23739_th_pprint1', req_th, compile, [''])
 test('T23738_th', req_th, compile, [''])
 
 test('T24159_viewpat', normal, compile, [''])

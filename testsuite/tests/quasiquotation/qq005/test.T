@@ -5,6 +5,6 @@ test('qq005',
       # profiling ways, due to the TH use, so for now we just
       # omit the profiling ways
       omit_ways(prof_ways),
-      req_interp],
+      req_th],
 	multimod_compile_and_run,
 	['Main', ''])
