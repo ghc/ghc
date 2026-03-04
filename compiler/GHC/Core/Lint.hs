@@ -389,18 +389,26 @@ dumpPassResult logger dump_core_sizes name_ppr_ctx mb_flag hdr extra_info binds 
                      , size_doc
                      , blankLine
                      , if dump_core_sizes
-                        then vcat (map pprCompUnitWithSize binds)
+                        then pprCompUnitsWithSize binds
                         else pprCoreProgram binds
                      , ppUnless (null rules) pp_rules ]
     pp_rules = vcat [ blankLine
                     , text "------ Local rules for imported ids --------"
                     , pprRules rules ]
 
-    pprCompUnitWithSize :: CoreCompUnit -> SDoc
-    pprCompUnitWithSize (CoreCompUnit unit_binds unit_rules)
-      = text "-- Start of new compilation unit"
+    pprCompUnitsWithSize :: CoreProgram -> SDoc
+    pprCompUnitsWithSize [comp_unit] = pprCompUnitWithSize False comp_unit
+    pprCompUnitsWithSize comp_units  = vcat (map (pprCompUnitWithSize True) comp_units)
+
+    pprCompUnitWithSize :: Bool -> CoreCompUnit -> SDoc
+    pprCompUnitWithSize include_header (CoreCompUnit unit_binds unit_rules)
+      = pp_header
      $$ pprCoreBindingsWithSize unit_binds
      $$ pprRules unit_rules
+      where
+        pp_header
+          | include_header = text "-- Start of new compilation unit"
+          | otherwise      = empty
 
 {-
 ************************************************************************

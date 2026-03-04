@@ -338,7 +338,10 @@ getCoreToDo dflags hpt_rule_base extra_vars
         maybe_rule_check FinalPhase,
 
         add_caller_ccs,
-        add_late_ccs
+        add_late_ccs,
+
+        -- Tidy expects a single compilation unit.
+        CoreMerge
      ]
 
     -- Remove 'CoreDoNothing' and flatten 'CoreDoPasses' for clarity.
