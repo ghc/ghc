@@ -18,7 +18,7 @@ module GHC.Core.Lint (
     LintConfig (..),
     WarnsAndErrs,
 
-    lintCoreBindings', lintUnfolding,
+    lintCoreProgram', lintUnfolding,
     lintPassResult, lintExpr,
     lintAnnots, lintAxioms,
 
@@ -39,6 +39,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Origin
   ( FixedRuntimeRepOrigin(..) )
 import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module (Module)
 import GHC.Platform
 
 import GHC.Core
@@ -430,7 +431,7 @@ data LintPassResultConfig = LintPassResultConfig
 lintPassResult :: Logger -> LintPassResultConfig
                -> CoreProgram -> [CoreRule] -> IO ()
 lintPassResult logger cfg binds rules
-  = do { let warns_and_errs = lintCoreBindings'
+  = do { let warns_and_errs = lintCoreProgram'
                (LintConfig
                 { l_diagOpts = lpr_diagOpts cfg
                 , l_platform = lpr_platform cfg
@@ -475,13 +476,65 @@ lint_banner string pass = text "*** Core Lint"      <+> text string
                           <+> text "***"
 
 -- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
-lintCoreBindings' :: LintConfig -> CoreProgram -> [CoreRule] -> Bool -> WarnsAndErrs
+lintCoreProgram' :: LintConfig -> CoreProgram -> [CoreRule] -> Bool -> WarnsAndErrs
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreBindings' cfg binds imp_rules check_imp_rules_no_locals
+lintCoreProgram' cfg comp_units imp_rules check_imp_rules_no_locals
   = initL cfg $
     addLoc TopLevelBindings           $
+    do {
+         -- Before tidy, mg_rules should not mention local binders.
+       ; when check_imp_rules_no_locals $
+           mapM_ (lintImpRule this_module) imp_rules
+
+         -- Typecheck the bindings
+       ; mapM_ (\unit -> lintCoreCompUnit unit check_imp_rules_no_locals) comp_units
+       ; pure () }
+  where
+    -- TERRIBLE HACK.
+    -- Maybe not worth linting this, or just pass Module around ...
+    this_module :: Maybe Module
+    this_module = listToMaybe (mapMaybe compUnitModule comp_units)
+
+    compUnitModule :: CoreCompUnit -> Maybe Module
+    compUnitModule (CoreCompUnit binds unit_rules)
+      = case [ nameModule n
+             | b <- bindersOfBinds binds
+             , let n = idName b
+             , isExternalName n
+             ] of
+          (m:_) -> Just m
+          []    -> listToMaybe (mapMaybe ruleModule unit_rules)
+
+    lintImpRule :: Maybe Module -> CoreRule -> LintM ()
+    lintImpRule mb_this_module rule =
+      case bad_ids of
+        [] -> pure ()
+        _  -> addErrL (hang (text "mg_rules contains local Ids before tidy:")
+                             2 (ppr rule)
+                      $$ nest 2 (text "Local Ids:" <+> ppr bad_ids))
+      where
+        bad_ids = filter is_bad_id (nonDetEltsUniqSet (ruleFreeVars rule))
+
+        is_bad_id id
+          | isLocalId id
+          = True
+          | let n = idName id, isExternalName n
+          = case mb_this_module of
+              Just this_mod -> nameModule n == this_mod
+              Nothing       -> False
+          | otherwise
+          = True
+
+
+-- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
+lintCoreCompUnit :: CoreCompUnit -> Bool -> LintM ()
+--   Returns (warnings, errors)
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism]
+lintCoreCompUnit (CoreCompUnit binds unit_rules) check_imp_rules_no_locals
+  = addLoc TopLevelBindings           $
     do { -- Check that all top-level binders are distinct
          -- We do not allow  [NonRec x=1, NonRec y=x, NonRec x=2]
          -- because of glomming; see Note [Glomming] in GHC.Core.Opt.OccurAnal
@@ -492,13 +545,15 @@ lintCoreBindings' cfg binds imp_rules check_imp_rules_no_locals
 
          -- Before tidy, mg_rules should not mention local binders.
        ; when check_imp_rules_no_locals $
-           mapM_ lintImpRule imp_rules
+           mapM_ lintUnitRule unit_rules
 
          -- Typecheck the bindings
-       ; lintRecBindings TopLevel all_pairs $ \_ ->
-         return () }
+         -- Typecheck the bindings
+       ; (_,_usg_env) <- lintRecBindings TopLevel all_pairs $ \_ ->
+            return ()
+       ; pure ()  }
   where
-    all_pairs = flattenBinds (concatMap coreCompUnitBinds binds)
+    all_pairs = flattenBinds binds
      -- Put all the top-level binders in scope at the start
      -- This is because rewrite rules can bring something
      -- into use 'unexpectedly'; see Note [Glomming] in "GHC.Core.Opt.OccurAnal"
@@ -518,13 +573,37 @@ lintCoreBindings' cfg binds imp_rules check_imp_rules_no_locals
 
     local_bndr_set = mkVarSet binders
 
-    lintImpRule rule =
-      case filter (`elemVarSet` local_bndr_set) (nonDetEltsUniqSet (ruleFreeVars rule)) of
-        [] -> return ()
-        bad_ids ->
-          addErrL (hang (text "mg_rules contains local Ids before tidy:")
-                         2 (ppr rule)
-                   $$ nest 2 (text "Local Ids:" <+> ppr bad_ids))
+    -- TERRIBLE HACK.
+    -- Maybe not worth linting this, or just pass Module around ...
+    this_module :: Maybe Module
+    this_module = case [ nameModule n
+                       | b <- binders
+                       , let n = idName b
+                       , isExternalName n
+                       ] of
+                    (m:_) -> Just m
+                    []    -> listToMaybe (mapMaybe ruleModule unit_rules)
+
+    lintUnitRule rule =
+      case bad_ids of
+        [] -> pure ()
+        _  -> addErrL (hang (text "compilation-unit rules contain out-of-unit local Ids:")
+                             2 (ppr rule)
+                      $$ nest 2 (text "Bad Ids:" <+> ppr bad_ids))
+      where
+        bad_ids = filter is_bad_id (nonDetEltsUniqSet (ruleFreeVars rule))
+
+        is_bad_id id
+          | id `elemVarSet` local_bndr_set
+          = False
+          | isLocalId id
+          = True
+          | let n = idName id, isExternalName n
+          = case this_module of
+              Just this_mod -> nameModule n == this_mod
+              Nothing       -> False
+          | otherwise
+          = True
 
 {-
 ************************************************************************

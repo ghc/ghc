@@ -53,7 +53,7 @@ endPassHscEnvIO hsc_env name_ppr_ctx pass binds rules
 -- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
 lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> WarnsAndErrs
 lintCoreBindings dflags coreToDo vars binds
-  = lintCoreBindings'
+  = lintCoreProgram'
       (LintConfig
       { l_diagOpts = initDiagOpts dflags
       , l_platform = targetPlatform dflags
