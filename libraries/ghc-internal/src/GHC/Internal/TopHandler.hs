@@ -50,6 +50,8 @@ import GHC.Internal.IO.Handle
 import GHC.Internal.IO.StdHandles
 import GHC.Internal.IO.Exception
 import GHC.Internal.Weak
+import GHC.Internal.Weak.Finalize
+import GHC.Internal.IO.Handle.Types ()
 
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.ConsoleHandler as GHC.ConsoleHandler

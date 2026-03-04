@@ -29,3 +29,5 @@ module GHC.Weak
      ) where
 
 import GHC.Internal.Weak
+import GHC.Internal.Weak.Finalize
+import GHC.Weak.Finalize
