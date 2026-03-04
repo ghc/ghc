@@ -18,6 +18,7 @@ import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Literal
 import GHC.Types.Unique
+import GHC.Unit.Module
 import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
 import GHC.Runtime.Heap.Layout ( StgWord )
@@ -258,6 +259,9 @@ data BCInstr
    -- Breakpoints
    | BRK_FUN          !InternalBreakpointId
 
+   -- HPC ticks
+   | BCI_HPC_TICK     !Module !Int  -- module, tick index
+
 #if MIN_VERSION_rts(1,0,3)
    -- | A "meta"-instruction for recording the name of a BCO for debugging purposes.
    -- These are ignored by the interpreter but helpfully printed by the disassmbler.
@@ -452,6 +456,7 @@ instance Outputable BCInstr where
                              = text "BRK_FUN" <+> text "<breakarray>"
                                <+> ppr info_mod <+> ppr infox
                                <+> text "<cc>"
+   ppr (BCI_HPC_TICK mod ix) = text "BCI_HPC_TICK" <+> ppr mod <+> ppr ix
 #if MIN_VERSION_rts(1,0,3)
    ppr (BCO_NAME nm)         = text "BCO_NAME" <+> text (show nm)
 #endif
@@ -577,6 +582,7 @@ bciStackUse OP_INDEX_ADDR{}         = 0
 
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0
+bciStackUse BCI_HPC_TICK{}        = 0
 
 -- These insns actually reduce stack use, but we need the high-tide level,
 -- so can't use this info.  Not that it matters much.

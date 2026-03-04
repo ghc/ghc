@@ -400,6 +400,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
                           , mg_deps             = deps
                           , mg_foreign          = foreign_stubs
                           , mg_foreign_files    = foreign_files
+                          , mg_hpc_info         = hpc_info
                           , mg_modBreaks        = modBreaks
                           , mg_boot_exports     = boot_exports
                           }) = do
@@ -469,6 +470,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
                  -- It seems that this field just gets used to write a comment
                  -- in C codegen, so it's value doesn't affect an important result.
                  , cg_dep_pkgs      = S.map snd (dep_direct_pkgs deps)
+                 , cg_hpc_info      = hpc_info
                  , cg_modBreaks     = modBreaks
                  , cg_spt_entries   = spt_entries
                  }

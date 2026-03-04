@@ -184,6 +184,11 @@ resolvePtr interp pkgs_loaded bco_loader_state bco_ix ptr = case ptr of
     withForeignRef (expectJust (lookupBreakArrayBytecodeState bco_loader_state tick_mod)) $
       \ba -> pure $ ResolvedBCOPtrBreakArray ba
 
+  BCOPtrHpcTickArray hpc_mod ->
+    case lookupHpcTickArrayBytecodeState bco_loader_state hpc_mod of
+      Just ptr -> pure $ ResolvedBCOStaticPtr (toRemotePtr (castPtr ptr))
+      Nothing  -> pprPanic "GHC.ByteCode.Linker: no HPC tick array for module" (ppr hpc_mod)
+
 -- | Look up the address of a Haskell symbol in the currently
 -- loaded units.
 --

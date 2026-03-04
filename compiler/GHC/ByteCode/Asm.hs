@@ -109,9 +109,10 @@ assembleBCOs
   -> [TyCon]
   -> [(Name, ByteString)]
   -> Maybe InternalModBreaks
+  -> Maybe HpcTickInfo
   -> [SptEntry]
   -> IO CompiledByteCode
-assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
+assembleBCOs profile proto_bcos tycons top_strs modbreaks hpc_info spt_entries = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   let itbls = mkITbls profile tycons
@@ -122,6 +123,7 @@ assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
     , bc_strs = top_strs
     , bc_breaks = modbreaks
     , bc_spt_entries = spt_entries
+    , bc_hpc_info = hpc_info
     }
 
 -- Note [Allocating string literals]
@@ -854,6 +856,13 @@ assembleI platform i = case i of
     np               <- lit1 $ BCONPtrCostCentre ibi
     emit_ bci_BRK_FUN [ Op p1, Op info_addr, Op info_unitid_addr
                       , SmallOp ix_hi, SmallOp ix_lo, Op np ]
+
+  BCI_HPC_TICK tick_mod tick_ix -> do
+    p1 <- ptr $ BCOPtrHpcTickArray tick_mod
+    let ixW32 = fromIntegral tick_ix :: Word32
+        ix_hi = fromIntegral (ixW32 `shiftR` 16)
+        ix_lo = fromIntegral (ixW32 .&. 0xffff)
+    emit_ bci_HPC_TICK [ Op p1, SmallOp ix_hi, SmallOp ix_lo ]
 
 #if MIN_VERSION_rts(1,0,3)
   BCO_NAME name            -> do np <- lit1 (BCONPtrStr name)

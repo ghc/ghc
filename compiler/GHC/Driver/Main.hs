@@ -221,6 +221,7 @@ import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
+import GHC.Types.HpcInfo
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Graph
@@ -1196,9 +1197,16 @@ compileWholeCoreBindings hsc_env type_env wcb = do
       (tmpDir (hsc_dflags hsc_env)) wcb_foreign
 
     gen_bytecode core_binds stubs foreign_files = do
-      let cgi_guts = CgInteractiveGuts wcb_module core_binds
-                      (typeEnvTyCons type_env) stubs foreign_files
-                      Nothing []
+      let cgi_guts = CgInteractiveGuts
+                      { cgi_module = wcb_module
+                      , cgi_binds = core_binds
+                      , cgi_tycons = typeEnvTyCons type_env
+                      , cgi_foreign = stubs
+                      , cgi_foreign_files = foreign_files
+                      , cgi_hpc_info = emptyHpcInfo
+                      , cgi_modBreaks = Nothing
+                      , cgi_spt_entries = []
+                      }
       trace_if logger (text "Generating ByteCode for" <+> ppr wcb_module)
       mkModuleByteCode hsc_env wcb_module wcb_mod_location cgi_guts
 
@@ -2146,13 +2154,14 @@ data CgInteractiveGuts = CgInteractiveGuts { cgi_module :: Module
                                            , cgi_tycons :: [TyCon]
                                            , cgi_foreign :: ForeignStubs
                                            , cgi_foreign_files :: [(ForeignSrcLang, FilePath)]
+                                           , cgi_hpc_info :: HpcInfo
                                            , cgi_modBreaks ::  Maybe ModBreaks
                                            , cgi_spt_entries :: [SptEntry]
                                            }
 
 mkCgInteractiveGuts :: CgGuts -> CgInteractiveGuts
-mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_foreign_files, cg_modBreaks, cg_spt_entries}
-  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_foreign_files cg_modBreaks cg_spt_entries
+mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_foreign_files, cg_hpc_info, cg_modBreaks, cg_spt_entries}
+  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_foreign_files cg_hpc_info cg_modBreaks cg_spt_entries
 
 hscInteractive :: HscEnv
                -> CgInteractiveGuts
@@ -2180,6 +2189,7 @@ hscGenerateByteCode hsc_env cgguts location = do
                cgi_module   = this_mod,
                cgi_binds    = core_binds,
                cgi_tycons   = tycons,
+               cgi_hpc_info = hpc_info,
                cgi_modBreaks = mod_breaks,
                cgi_spt_entries = spt_entries } = cgguts
 
@@ -2207,7 +2217,7 @@ hscGenerateByteCode hsc_env cgguts location = do
     let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
     -----------------  Generate byte code ------------------
-    byteCodeGen hsc_env this_mod stg_binds tycons mod_breaks spt_entries
+    byteCodeGen hsc_env this_mod stg_binds tycons hpc_info mod_breaks spt_entries
 
 -- | Generate a byte code object linkable and write it to a file if `-fwrite-byte-code` is enabled.
 generateAndWriteByteCode :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO ModuleByteCode
@@ -2854,6 +2864,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
                 this_mod
                 stg_binds
                 []
+                emptyHpcInfo
                 Nothing -- modbreaks
                 [] -- spt entries
 

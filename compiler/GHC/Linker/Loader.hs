@@ -133,7 +133,12 @@ import GHC.Driver.Downsweep
 import qualified GHC.Runtime.Interpreter as GHCi
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Map.Strict as M
-import Foreign.Ptr (nullPtr)
+import Foreign.Ptr (Ptr, nullPtr)
+import Foreign.Marshal.Array (mallocArray)
+import Foreign.Marshal.Utils (fillBytes)
+import Foreign.Storable (sizeOf)
+import Foreign.C.String (CString, withCString)
+import Data.Word (Word32, Word64)
 import GHC.ByteCode.Serialize
 
 -- Note [Linkers and loaders]
@@ -999,9 +1004,10 @@ dynLinkCompiledByteCode interp pkgs_loaded whole_bytecode_state traverse_bytecod
           ae2 <- foldlM (\env cbc -> allocateTopStrings interp (bc_strs cbc) env) (addr_env le1) cbcs
           be2 <- allocateBreakArrays interp (breakarray_env lb1) (catMaybes $ map bc_breaks cbcs)
           ce2 <- allocateCCS         interp (ccs_env lb1)        (catMaybes $ map bc_breaks cbcs)
+          he2 <- allocateHpcTickArrays (bco_hpc_tickarrays bytecode_state) (catMaybes $ map bc_hpc_info cbcs)
           let le2 = le1 { itbl_env = ie2, addr_env = ae2 }
           let lb2 = lb1 { breakarray_env = be2, ccs_env = ce2 }
-          return $! bytecode_state { bco_linker_env = le2, bco_linked_breaks = lb2 }
+          return $! bytecode_state { bco_linker_env = le2, bco_linked_breaks = lb2, bco_hpc_tickarrays = he2 }
 
         -- NB: Important to pass the whole bytecode loader state to linkSomeBCOs so that you can find Names in local
         -- and external packages.
@@ -1857,3 +1863,29 @@ allocateCCS interp ce mbss
         mbss
 
   | otherwise = pure ce
+
+-- | Allocate HPC tick arrays for bytecode modules and register them with the
+-- RTS HPC infrastructure.
+allocateHpcTickArrays ::
+  ModuleEnv (Ptr Word64) ->
+  [HpcTickInfo] ->
+  IO (ModuleEnv (Ptr Word64))
+allocateHpcTickArrays =
+  foldlM $ \env (HpcTickInfo hpc_mod tick_count hash_no) -> do
+    if not $ elemModuleEnv hpc_mod env then do
+      -- Allocate the tick array (zero-initialized)
+      tick_arr <- mallocArray tick_count
+      fillBytes tick_arr 0 (tick_count * sizeOf (0 :: Word64))
+      -- Register with the RTS HPC infrastructure
+      let mod_name = moduleNameString (moduleName hpc_mod)
+      withCString mod_name $ \c_mod_name ->
+        c_hs_hpc_module c_mod_name
+          (fromIntegral tick_count)
+          (fromIntegral hash_no)
+          tick_arr
+      evaluate $ extendModuleEnv env hpc_mod tick_arr
+    else
+      return env
+
+foreign import ccall "hs_hpc_module"
+  c_hs_hpc_module :: CString -> Word32 -> Word32 -> Ptr Word64 -> IO ()

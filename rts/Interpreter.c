@@ -1739,7 +1739,7 @@ run_BCO:
             &&lbl_bci_TESTEQ_W8 - &&lbl_bci_DEFAULT,
             &&lbl_bci_PRIMCALL - &&lbl_bci_DEFAULT,
             &&lbl_bci_BCO_NAME - &&lbl_bci_DEFAULT,
-            &&lbl_bci_DEFAULT - &&lbl_bci_DEFAULT,
+            &&lbl_bci_HPC_TICK - &&lbl_bci_DEFAULT,
             &&lbl_bci_OP_ADD_64 - &&lbl_bci_DEFAULT,
             &&lbl_bci_OP_SUB_64 - &&lbl_bci_DEFAULT,
             &&lbl_bci_OP_AND_64 - &&lbl_bci_DEFAULT,
@@ -2877,6 +2877,14 @@ run_BCO:
         INSTRUCTION(bci_BCO_NAME):
             bciPtr++;
             NEXT_INSTRUCTION;
+
+        INSTRUCTION(bci_HPC_TICK): {
+            W_ arg_tickarray = BCO_GET_LARGE_ARG;
+            W_ tick_index    = BCO_READ_NEXT_32;
+            StgWord64 *tixArr = (StgWord64*) BCO_PTR(arg_tickarray);
+            tixArr[tick_index]++;
+            NEXT_INSTRUCTION;
+        }
 
         INSTRUCTION(bci_SWIZZLE): {
             W_ stkoff = BCO_GET_LARGE_ARG;

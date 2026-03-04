@@ -65,6 +65,7 @@ import GHC.Data.FlatBag as FlatBag
 import GHC.Data.OrdList
 import GHC.Data.Maybe
 import GHC.Types.Tickish
+import GHC.Types.HpcInfo
 import GHC.Types.SptEntry
 import GHC.ByteCode.Breakpoints
 
@@ -104,10 +105,11 @@ byteCodeGen :: HscEnv
             -> Module
             -> [CgStgTopBinding]
             -> [TyCon]
+            -> HpcInfo
             -> Maybe ModBreaks
             -> [SptEntry]
             -> IO CompiledByteCode
-byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
+byteCodeGen hsc_env this_mod binds tycs hpc_info mb_modBreaks spt_entries
    = withTiming logger
                 (text "GHC.StgToByteCode"<+>brackets (ppr this_mod))
                 (const ()) $ do
@@ -133,7 +135,11 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
         let mod_breaks = case mb_modBreaks of
              Nothing -> Nothing
              Just mb -> Just $ mkInternalModBreaks this_mod breakInfo mb
-        cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries
+            bc_hpc = case hpc_info of
+              HpcInfo tickCount hashNo ->
+                Just (HpcTickInfo this_mod tickCount hashNo)
+              NoHpcInfo -> Nothing
+        cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks bc_hpc spt_entries
 
         -- Squash space leaks in the CompiledByteCode.  This is really
         -- important, because when loading a set of modules into GHCi
@@ -602,6 +608,11 @@ schemeE d s p (StgLet _ext binds body) = do
 schemeE _d _s _p (StgTick (Breakpoint _ bp_id _) _rhs)
    = pprPanic "schemeE: Breakpoint without let binding:"
         (ppr bp_id <+> text "forgot to run bcPrep?")
+
+-- Emit HPC tick instructions
+schemeE d s p (StgTick (HpcTick mod ix) rhs) = do
+    code <- schemeE d s p rhs
+    return (BCI_HPC_TICK mod ix `consOL` code)
 
 -- ignore other kinds of tick
 schemeE d s p (StgTick _ rhs) = schemeE d s p rhs

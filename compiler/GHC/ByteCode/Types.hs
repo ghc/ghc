@@ -19,6 +19,9 @@ module GHC.ByteCode.Types
   , AddrEnv, AddrPtr(..)
   , FlatBag, sizeFlatBag, fromSmallArray, elemsFlatBag
 
+  -- * HPC tick info for bytecode
+  , HpcTickInfo(..)
+
   -- * Mod Breaks
   , ModBreaks (..), BreakpointId(..), BreakTickIndex
 
@@ -76,7 +79,21 @@ data CompiledByteCode = CompiledByteCode
     -- ^ Static pointer table entries which should be loaded along with the
     -- BCOs. See Note [Grand plan for static forms] in
     -- "GHC.Iface.Tidy.StaticPtrTable".
+
+  , bc_hpc_info :: !(Maybe HpcTickInfo)
+    -- ^ HPC tick information for this module, if compiled with -fhpc.
+    -- Used by the loader to allocate and register HPC tick arrays.
   }
+
+-- | HPC tick information for a bytecode module
+data HpcTickInfo = HpcTickInfo
+  { hpcTickInfoModule    :: !Module
+  , hpcTickInfoTickCount :: !Int
+  , hpcTickInfoHash      :: !Int
+  }
+
+instance NFData HpcTickInfo where
+  rnf (HpcTickInfo m c h) = m `seq` rnf c `seq` rnf h
 
 -- | A libffi ffi_cif function prototype.
 data FFIInfo = FFIInfo { ffiInfoArgs :: ![FFIType], ffiInfoRet :: !FFIType }
@@ -92,6 +109,7 @@ seqCompiledByteCode CompiledByteCode{..} =
   rnf bc_bcos `seq`
   rnf bc_itbls `seq`
   rnf bc_strs `seq`
+  rnf bc_hpc_info `seq`
   case bc_breaks of
     Nothing -> ()
     Just ibks -> seqInternalModBreaks ibks
@@ -265,6 +283,8 @@ data BCOPtr
   | BCOPtrBCO    !UnlinkedBCO
   | BCOPtrBreakArray !Module
     -- ^ Converted to the actual 'BreakArray' remote pointer at link-time
+  | BCOPtrHpcTickArray !Module
+    -- ^ Converted to the HPC tick array pointer at link-time
 
 instance NFData BCOPtr where
   rnf (BCOPtrBCO bco) = rnf bco

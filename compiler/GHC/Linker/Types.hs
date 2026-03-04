@@ -20,6 +20,7 @@ module GHC.Linker.Types
    , modifyBytecodeLoaderState
    , lookupNameBytecodeState
    , lookupBreakArrayBytecodeState
+   , lookupHpcTickArrayBytecodeState
    , lookupInfoTableBytecodeState
    , lookupAddressBytecodeState
    , lookupCCSBytecodeState
@@ -97,6 +98,8 @@ import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Control.Applicative ((<|>))
 import Data.Functor.Identity
+import Data.Word (Word64)
+import Foreign.Ptr (Ptr)
 
 
 {- **********************************************************************
@@ -192,6 +195,8 @@ data BytecodeState = BytecodeState
         -- ^ Current global mapping from Names to their true values
         , bco_linked_breaks :: !LinkedBreaks
         -- ^ Mapping from loaded modules to their breakpoint arrays
+        , bco_hpc_tickarrays :: !(ModuleEnv (Ptr Word64))
+        -- ^ HPC tick arrays for bytecode modules, keyed by module
         }
 
 -- | The 'BytecodeLoaderState' captures all the information about bytecode loaded
@@ -218,6 +223,12 @@ lookupBreakArrayBytecodeState :: BytecodeLoaderState -> Module -> Maybe (Foreign
 lookupBreakArrayBytecodeState (BytecodeLoaderState home_package external_package) break_mod = do
   lookupModuleEnv (breakarray_env (bco_linked_breaks home_package)) break_mod
   <|> lookupModuleEnv (breakarray_env (bco_linked_breaks external_package)) break_mod
+
+-- | Look up an HPC tick array pointer in the bytecode loader state.
+lookupHpcTickArrayBytecodeState :: BytecodeLoaderState -> Module -> Maybe (Ptr Word64)
+lookupHpcTickArrayBytecodeState (BytecodeLoaderState home_package external_package) hpc_mod = do
+  lookupModuleEnv (bco_hpc_tickarrays home_package) hpc_mod
+  <|> lookupModuleEnv (bco_hpc_tickarrays external_package) hpc_mod
 
 -- | Look up an info table in the bytecode loader state.
 lookupInfoTableBytecodeState :: BytecodeLoaderState -> Name -> Maybe (Name, ItblPtr)
@@ -247,6 +258,7 @@ emptyBytecodeState :: BytecodeState
 emptyBytecodeState = BytecodeState
     { bco_linker_env = emptyLinkerEnv
     , bco_linked_breaks = emptyLinkedBreaks
+    , bco_hpc_tickarrays = emptyModuleEnv
     }
 
 
