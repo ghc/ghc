@@ -254,7 +254,8 @@ initRuleEnv :: ModGuts -> CoreM RuleEnv
 initRuleEnv guts
   = do { hpt_rules <- getHomeRuleBase
        ; eps_rules <- getExternalRuleBase
-       ; return (mkRuleEnv guts eps_rules hpt_rules) }
+       ; return (mkRuleEnv (mg_module guts) (mg_deps guts) (mg_rules guts) (mg_binds guts)
+                           eps_rules hpt_rules) }
 
 getExternalRuleBase :: CoreM RuleBase
 getExternalRuleBase = eps_rule_base <$> get_eps
