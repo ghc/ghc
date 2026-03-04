@@ -570,6 +570,12 @@ optionally specify a phase number, thus:
 -  "``NOINLINE[~k] f``" means: be willing to inline ``f`` until phase
    ``k``, but from phase ``k`` onwards do not inline it.
 
+-  "``INLINEABLE[k] f``" means: do not inline ``f`` until phase ``k``, but
+   from phase ``k`` onwards GHC is free to inline it.
+
+-  "``INLINEABLE[~k] f``" means: GHC is free to inline ``f`` until phase
+   ``k``, but from phase ``k`` onwards do not inline it.
+
 The same information is summarised here:
 
 .. code-block:: none
@@ -579,6 +585,8 @@ The same information is summarised here:
       {-# INLINE   [~2] f #-}  --      Yes                No
       {-# NOINLINE [2]  f #-}  --      No                 Maybe
       {-# NOINLINE [~2] f #-}  --      Maybe              No
+      {-# INLINEABLE [2]  f #-} --     No                 Maybe
+      {-# INLINEABLE [~2] f #-} --     Maybe              No
 
       {-# INLINE   f #-}       --      Yes                Yes
       {-# NOINLINE f #-}       --      No                 No
