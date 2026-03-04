@@ -4,6 +4,7 @@ import {-# SOURCE #-} GHC.Types.Var
 
 data Expr a
 data Bind b
+data CoreRule
 
 type CoreBndr = Var
 

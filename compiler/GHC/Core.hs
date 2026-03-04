@@ -90,7 +90,7 @@ module GHC.Core (
         -- ** Operations on 'CoreRule's
         ruleArity, ruleName, ruleIdName, ruleActivation,
         setRuleIdName, ruleModule,
-        isBuiltinRule, isLocalRule, isAutoRule,
+        isBuiltinRule, isLocalRule, isFullyImpRule, isAutoRule,
     ) where
 
 import GHC.Prelude
@@ -110,6 +110,7 @@ import GHC.Core.DataCon
 import GHC.Unit.Module
 import GHC.Types.Basic
 import GHC.Types.Unique.Set
+import GHC.Types.Var.Set (allVarSet)
 
 import GHC.Utils.Binary
 import GHC.Utils.Misc
@@ -124,6 +125,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Word
 
 import Control.DeepSeq
+import {-# SOURCE #-} GHC.Core.FVs (ruleFreeVars)
 
 infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`, `App`, `mkCoApps`
 -- Left associative, so that we can say (f `mkTyApps` xs `mkVarApps` ys)
@@ -1504,6 +1506,18 @@ ruleIdName = ru_fn
 isLocalRule :: CoreRule -> Bool
 isLocalRule (BuiltinRule {})               = False
 isLocalRule (Rule { ru_local = is_local }) = is_local
+
+
+isFullyImpRule :: Module -> CoreRule -> Bool
+isFullyImpRule this_module rule =
+  let rule_fvs = ruleFreeVars rule in
+  allVarSet (varFromImportedModule this_module) rule_fvs
+
+varFromImportedModule :: Module -> Var -> Bool
+varFromImportedModule this_module v
+  = case nameModule_maybe (GHC.Types.Var.varName v) of
+      Just mod -> mod /= this_module
+      Nothing  -> False
 
 -- | Set the 'Name' of the 'GHC.Types.Id.Id' at the head of the rule left hand side
 setRuleIdName :: Name -> CoreRule -> CoreRule
