@@ -293,6 +293,16 @@ its :pragma:`RULES` have had a chance to fire. The warning flag
 :ghc-flag:`-Winline-rule-shadowing` (see :ref:`options-sanity`) warns about
 this situation.
 
+All of this applies similarly to :pragma:`INLINABLE` (also accepted as
+``INLINABLE``; see :ref:`inline-noinline-pragma`). As with
+the other pragmas, you can use explicit :ref:`phase-control` to delay
+inlining so that a :pragma:`RULES` rewrite has an opportunity to match first.
+
+The key difference from :pragma:`INLINE` (see :ref:`inline-pragma`) is that
+:pragma:`INLINABLE` does not guarantee inlining, leaving the inlining decision
+to GHC's usual heuristics. Use :pragma:`INLINE` when your RULE setup relies
+on inlining happening reliably, and :pragma:`INLINABLE` otherwise.
+
 .. _conlike:
 
 How rules interact with ``CONLIKE`` pragmas
@@ -528,4 +538,3 @@ Controlling what's going on in rewrite rules
    see how to write rules that will do fusion and yet give an efficient
    program even if fusion doesn't happen. More rules in
    ``GHC/List.hs``.
-
