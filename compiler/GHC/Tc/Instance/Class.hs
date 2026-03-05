@@ -20,7 +20,7 @@ import GHC.Tc.Instance.Typeable
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.CtLoc
-import GHC.Tc.Types.Origin ( InstanceWhat (..), SafeOverlapping, CtOrigin(GetFieldOrigin) )
+import GHC.Tc.Types.Origin ( InstanceWhat (..), SafeOverlapping, isHasFieldOrigin )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcLookupDataFamInst, FamInstEnvs )
 
 import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
@@ -1275,8 +1275,8 @@ warnIncompleteRecSel :: DynFlags -> Id -> CtLoc -> TcM ()
 -- Warn about incomplete record selectors
 -- See (IRS6) in Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
 warnIncompleteRecSel dflags sel_id ct_loc
-  | not (isGetFieldOrigin (ctLocOrigin ct_loc))
-      -- isGetFieldOrigin: see (IRS7) in
+  | not $ isHasFieldOrigin (ctLocOrigin ct_loc)
+      -- isHasFieldOrigin: see (IRS7) in
       -- Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
   , RecSelId { sel_cons = RSI { rsi_undef = fallible_cons } } <- idDetails sel_id
   , not (null fallible_cons)
@@ -1287,11 +1287,6 @@ warnIncompleteRecSel dflags sel_id ct_loc
   = return ()
   where
     maxCons = maxUncoveredPatterns dflags
-
-    -- GHC.Tc.Gen.App.tcInstFun arranges that the CtOrigin of (r.x) is GetFieldOrigin,
-    -- despite the expansion to (getField @"x" r)
-    isGetFieldOrigin (GetFieldOrigin {}) = True
-    isGetFieldOrigin _                   = False
 
 lookupHasFieldLabel
   :: FamInstEnvs -> GlobalRdrEnv -> [Type]

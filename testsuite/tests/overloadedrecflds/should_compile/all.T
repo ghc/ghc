@@ -30,6 +30,7 @@ test('T21720', req_th, compile, [''])
 test('T21898', normal, compile, [''])
 test('T22160', [extra_files(['T22160_A.hs', 'T22160_B.hs', 'T22160_C.hs'])]
              , multimod_compile, ['T22160_A T22160_B T22160_C T22160', '-v0'])
+test('T26686', normal, compile, [''])
 test('DupFldFixity3', normal, compile, [''])
 test('overloadedrecflds10'
     , [extra_files(['OverloadedRecFlds10_A.hs', 'OverloadedRecFlds10_B.hs', 'OverloadedRecFlds10_C.hs'])]

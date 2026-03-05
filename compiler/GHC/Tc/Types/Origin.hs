@@ -24,6 +24,7 @@ module GHC.Tc.Types.Origin (
   pprCtOrigin, pprCtOriginBriefly,
   isGivenOrigin, isWantedWantedFunDepOrigin,
   isWantedSuperclassOrigin,
+  foldMapCtOrigin, isHasFieldOrigin,
   ClsInstOrQC(..), NakedScFlag(..), NonLinearPatternReason(..),
   HsImplicitLiftSplice(..),
   StandaloneDeriv,
@@ -59,6 +60,8 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Hs
 
+import GHC.Builtin.Names (getFieldName)
+
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
@@ -88,6 +91,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.Kind as Hs
 import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.Semigroup as Semi
 
 {- *********************************************************************
 *                                                                      *
@@ -744,7 +748,7 @@ exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
 exprCtOrigin (OpApp _ _ op _)     = lexprCtOrigin op
 exprCtOrigin (NegApp _ e _)       = lexprCtOrigin e
 exprCtOrigin (HsPar _ e)          = lexprCtOrigin e
-exprCtOrigin (HsProjection _ _)   = SectionOrigin
+exprCtOrigin (HsProjection _ (f :| _)) = GetFieldOrigin (field_label $ unLoc $ dfoLabel f)
 exprCtOrigin (SectionL _ _ _)     = SectionOrigin
 exprCtOrigin (SectionR _ _ _)     = SectionOrigin
 exprCtOrigin (ExplicitTuple {})   = Shouldn'tHappenOrigin "explicit tuple"
@@ -1000,6 +1004,92 @@ pprNonLinearPatternReason PatternSynonymReason = parens (text "pattern synonyms 
 pprNonLinearPatternReason ViewPatternReason = parens (text "view patterns aren't linear")
 pprNonLinearPatternReason OtherPatternReason = empty
 
+{- *********************************************************************
+*                                                                      *
+                     Recursing through CtOrigin
+*                                                                      *
+********************************************************************* -}
+
+-- | Fold over a 'CtOrigin', looking through all recursive
+-- occurrences of 'CtOrigin' within 'CtOrigin'.
+foldMapCtOrigin :: forall m. Semigroup m => (CtOrigin -> m) -> CtOrigin -> m
+foldMapCtOrigin f = go
+  where
+    go :: CtOrigin -> m
+    go orig =
+      case orig of
+        KindEqOrigin _ _ o _ -> recur o
+        CycleBreakerOrigin o -> recur o
+        WantedSuperclassOrigin _ o -> recur o
+        ScOrigin cls_or_qc _sc_flag ->
+          case cls_or_qc of
+            IsQC _ o -> recur o
+            IsClsInst -> f orig
+        FunDepOrigin1 _ o1 _ _ o2 _ -> f orig Semi.<> go o1 Semi.<> go o2
+        FunDepOrigin2 _ o _ _ -> recur o
+        InjTFOrigin1 _ o1 _ _ o2 _ -> f orig Semi.<> go o1 Semi.<> go o2
+
+        -- Explicit pattern match on remaining constructors, in order to get
+        -- better pattern-match warnings when constructors are changed or
+        -- added/removed. This isn't entirely fool-proof, as someone may still
+        -- change the type of one of the fields and hide a 'CtOrigin' inside.
+        --
+        -- This approach was chosen instead of using 'syb'/'GHC.Generics',
+        -- because those would require deriving 'Data.Data'/'Generic' on
+        -- a huge number of datatypes.
+        GivenOrigin {} -> f orig
+        GivenSCOrigin {} -> f orig
+        OccurrenceOf {} -> f orig
+        OccurrenceOfRecSel {} -> f orig
+        AppOrigin {} -> f orig
+        SpecPragOrigin {} -> f orig
+        TypeEqOrigin {}-> f orig
+        IPOccOrigin {} -> f orig
+        OverLabelOrigin {} -> f orig
+        LiteralOrigin {} -> f orig
+        NegateOrigin {} -> f orig
+        ArithSeqOrigin {} -> f orig
+        AssocFamPatOrigin {} -> f orig
+        SectionOrigin {} -> f orig
+        GetFieldOrigin {} -> f orig
+        TupleOrigin {} -> f orig
+        ExprSigOrigin {} -> f orig
+        PatSigOrigin {} -> f orig
+        PatOrigin {} -> f orig
+        ProvCtxtOrigin {} -> f orig
+        RecordUpdOrigin {} -> f orig
+        ViewPatOrigin {} -> f orig
+        DerivOrigin {} -> f orig
+        DerivOriginDC {} -> f orig
+        DerivOriginCoerce {}  -> f orig
+        DefaultOrigin {} -> f orig
+        DoOrigin {} -> f orig
+        DoPatOrigin {} -> f orig
+        MCompOrigin {} -> f orig
+        MCompPatOrigin {} -> f orig
+        ProcOrigin {} -> f orig
+        ArrowCmdOrigin {} -> f orig
+        AnnOrigin {} -> f orig
+        ExprHoleOrigin {} -> f orig
+        TypeHoleOrigin {} -> f orig
+        PatCheckOrigin {} -> f orig
+        ListOrigin {} -> f orig
+        IfThenElseOrigin {} -> f orig
+        BracketOrigin {} -> f orig
+        StaticOrigin {} -> f orig
+        ImpedanceMatching {} -> f orig
+        Shouldn'tHappenOrigin {} -> f orig
+        InstProvidedOrigin {} -> f orig
+        NonLinearPatternOrigin {} -> f orig
+        OmittedFieldOrigin {} -> f orig
+        UsageEnvironmentOf {} -> f orig
+        FRROrigin {} -> f orig
+        InstanceSigOrigin {} -> f orig
+        AmbiguityCheckOrigin {} -> f orig
+        ImplicitLiftOrigin {} -> f orig
+
+      where
+        recur o = f orig Semi.<> go o
 
 {- *********************************************************************
 *                                                                      *
@@ -1025,6 +1115,30 @@ isPushCallStackOrigin_maybe orig               = Just orig_fs
   --      but we can perhaps improve it in the light of user feedback
   where
     orig_fs = mkFastString (showSDocUnsafe (pprCtOriginBriefly orig))
+
+{- *********************************************************************
+*                                                                      *
+                       HasField and CtOrigin
+*                                                                      *
+********************************************************************* -}
+
+-- | Does this constraint arise from GHC internal mechanisms that desugar to
+-- usage of the 'HasField' typeclass (e.g. OverloadedRecordDot, etc)?
+--
+-- Used to avoid emitting a poor "incomplete record selector" warning directly
+-- in typechecker, in cases when the desugarer will be able to emit a better
+-- error message, due to having better pattern match checking information.
+-- See (IRS7) in Note [Detecting incomplete record selectors]
+-- in GHC.HsToCore.Pmc
+isHasFieldOrigin :: CtOrigin -> Bool
+isHasFieldOrigin = Semi.getAny . foldMapCtOrigin (Semi.Any . go)
+  where
+    go orig = case orig of
+      OccurrenceOf n -> n == getFieldName
+      OccurrenceOfRecSel {} -> True
+      GetFieldOrigin {} -> True
+      RecordUpdOrigin {} -> True
+      _ -> False
 
 {-
 ************************************************************************
