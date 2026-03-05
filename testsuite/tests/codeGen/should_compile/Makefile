@@ -80,3 +80,6 @@ T17648:
 
 T25166:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O2 -dno-typeable-binds -ddump-cmm T25166.hs | awk '/foo_closure/{flag=1}/}]/{flag=0}flag'
+
+T25650:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O2 -dno-typeable-binds -ddump-cmm T25650.hs | awk '/baz_foo_closure|baz_bar_closure/{flag=1}/}]/{flag=0}flag'

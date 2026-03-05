@@ -143,7 +143,7 @@ stg2stg logger extra_vars opts this_mod binds
           StgUnarise -> do
             us <- getUniqueSupplyM
             liftIO (stg_linter False "Pre-unarise" binds)
-            let binds' = {-# SCC "StgUnarise" #-} unarise us (stgPipeline_allowTopLevelConApp opts this_mod) binds
+            let binds' = {-# SCC "StgUnarise" #-} unarise (stgPlatform opts) us (stgPipeline_allowTopLevelConApp opts this_mod) binds
             liftIO (dump_when Opt_D_dump_stg_unarised "Unarised STG:" binds')
             liftIO (stg_linter True "Unarise" binds')
             return binds'
