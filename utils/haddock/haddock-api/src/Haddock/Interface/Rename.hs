@@ -439,7 +439,7 @@ renameType t = case t of
 
 renameTyLit :: HsLit GhcRn -> HsLit DocNameI
 renameTyLit t = case t of
-  HsNatural _ v -> HsNatural noExtField v
+  HsNatural _ v -> HsNatural noExtField $ v { il_text = NoExtField }
   HsString  _ v -> HsString  noExtField v
   HsChar    _ v -> HsChar    noExtField v
   _             -> error "renameTyLit: unsupported lit"

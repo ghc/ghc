@@ -3155,10 +3155,10 @@ checkNewOrData span name is_type_data = curry $ \ case
 --
 mkImport :: Located CCallConv
          -> Located Safety
-         -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
+         -> (Located (StringLiteral GhcPs), LocatedN RdrName, LHsSigType GhcPs)
          -> (EpToken "import", TokDcolon)
          -> P (EpToken "foreign" -> HsDecl GhcPs)
-mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td) =
+mkImport cconv safety (L loc sLit, v, ty) (timport, td) =
     case unLoc cconv of
       CCallConv          -> returnSpec =<< mkCImport
       CApiConv           -> do
@@ -3170,6 +3170,8 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) (timport, td)
       PrimCallConv       -> mkOtherImport
       JavaScriptCallConv -> mkOtherImport
   where
+    esrc = stringLitSourceText sLit
+    entity = sl_fs sLit
     -- Parse a C-like entity string of the following form:
     --   "[static] [chname] [&] [cid]" | "dynamic" | "wrapper"
     -- If 'cid' is missing, the function name 'v' is used instead as symbol
@@ -3266,17 +3268,19 @@ parseCImport cconv safety nm str sourceText =
 -- construct a foreign export declaration
 --
 mkExport :: Located CCallConv
-         -> (Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)
+         -> (Located (StringLiteral GhcPs), LocatedN RdrName, LHsSigType GhcPs)
          -> ( EpToken "export", TokDcolon)
          -> P (EpToken "foreign" -> HsDecl GhcPs)
-mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty) (texport, td)
+mkExport (L lc cconv) (L le sLit, v, ty) (texport, td)
  = return $ \tforeign -> ForD noExtField $
    ForeignExport { fd_e_ext = (tforeign, texport, td), fd_name = v, fd_sig_ty = ty
                  , fd_fe = CExport (L (l2l le) esrc) (L (l2l lc) (CExportStatic entity' cconv))
                  , fd_modifiers = [] }
   where
-    entity' | nullFS entity = mkExtName (unLoc v)
-            | otherwise     = entity
+    esrc = stringLitSourceText sLit
+    entity' = case sl_fs sLit of
+      entity | nullFS entity -> mkExtName (unLoc v)
+      entity -> entity
 
 -- Supplying the ext_name in a foreign decl is optional; if it
 -- isn't there, the Haskell name is assumed. Note that no transformation

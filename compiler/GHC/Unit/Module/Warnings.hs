@@ -51,6 +51,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Hs.Doc
 import GHC.Hs.Extension
+import GHC.Hs.Lit
 import GHC.Parser.Annotation
 
 import GHC.Utils.Outputable
@@ -136,7 +137,9 @@ warningTxtCategory _ = defaultWarningCategory
 
 
 -- | The message that the WarningTxt was specified to output
-warningTxtMessage :: WarningTxt (GhcPass p) -> [LocatedE (WithHsDocIdentifiers StringLiteral (GhcPass p))]
+warningTxtMessage ::
+  WarningTxt (GhcPass p) ->
+  [LocatedE (WithHsDocIdentifiers (StringLiteral (GhcPass p)) (GhcPass p))]
 warningTxtMessage (WarningTxt  _ _ m) = m
 warningTxtMessage (DeprecatedTxt _ m) = m
 
@@ -147,7 +150,7 @@ warningTxtSame w1 w2
   && literal_message w1 == literal_message w2
   && same_type
   where
-    literal_message :: WarningTxt (GhcPass p) -> [StringLiteral]
+    literal_message :: WarningTxt (GhcPass p) -> [StringLiteral (GhcPass p)]
     literal_message = map (hsDocString . unLoc) . warningTxtMessage
     same_type | DeprecatedTxt {} <- w1, DeprecatedTxt {} <- w2 = True
               | WarningTxt    {} <- w1, WarningTxt {} <- w2    = True
@@ -162,7 +165,7 @@ type instance XXWarningTxt         (GhcPass _) = DataConCantHappen
 type instance XInWarningCategory   (GhcPass _) = (EpToken "in", SourceText)
 type instance XXInWarningCategory  (GhcPass _) = DataConCantHappen
 
-type instance Anno (WithHsDocIdentifiers StringLiteral pass) = EpaLocation
+type instance Anno (WithHsDocIdentifiers (StringLiteral pass) pass) = EpaLocation
 type instance Anno (InWarningCategory (GhcPass pass)) = EpaLocation
 type instance Anno (WarningCategory) = EpaLocation
 type instance Anno (WarningTxt (GhcPass pass)) = SrcSpanAnnP
@@ -200,7 +203,7 @@ instance Outputable (WarningTxt (GhcPass pass)) where
           NoSourceText   -> pp_ws ds
           SourceText src -> ftext src <+> pp_ws ds <+> text "#-}"
 
-pp_ws :: [LocatedE (WithHsDocIdentifiers StringLiteral pass)] -> SDoc
+pp_ws :: [LocatedE (WithHsDocIdentifiers (StringLiteral (GhcPass p)) (GhcPass p))] -> SDoc
 pp_ws [l] = ppr $ unLoc l
 pp_ws ws
   = text "["

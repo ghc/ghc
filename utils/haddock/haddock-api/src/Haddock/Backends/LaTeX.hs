@@ -33,7 +33,6 @@ import GHC.Data.FastString (unpackFS)
 import GHC.Types.Name (getOccString, nameOccName, tidyNameOcc)
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (rdrNameOcc)
-import GHC.Types.SourceText
 import GHC.Utils.Ppr hiding (Doc, quote)
 import qualified GHC.Utils.Ppr as Pretty
 import System.Directory

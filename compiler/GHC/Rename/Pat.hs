@@ -63,7 +63,6 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 import GHC.Types.Basic
-import GHC.Types.SourceText
 
 import GHC.Data.FastString ( uniqCompareFS )
 import GHC.Data.List.SetOps( removeDups )
@@ -1178,14 +1177,14 @@ rnLit _ = return ()
 -- Integer-looking literal.
 -- We only convert numbers where the exponent is between 0 and 100 to avoid
 -- converting huge numbers and incurring long compilation times. See #15646.
-generalizeOverLitVal :: OverLitVal -> OverLitVal
+generalizeOverLitVal :: OverLitVal GhcPs -> OverLitVal GhcRn
 generalizeOverLitVal (HsFractional fl@(FL {fl_text=src,fl_neg=neg,fl_exp=e}))
     | e >= -100 && e <= 100
     , let val = rationalFromFractionalLit fl
     , denominator val == 1 = HsIntegral (IL {il_text=src,il_neg=neg,il_value=numerator val})
-generalizeOverLitVal lit = lit
+generalizeOverLitVal lit = rnOverLitVal lit
 
-isNegativeZeroOverLit :: (XXOverLit t ~ DataConCantHappen) => HsOverLit t -> Bool
+isNegativeZeroOverLit :: HsOverLit (GhcPass p) -> Bool
 isNegativeZeroOverLit lit
  = case ol_val lit of
         HsIntegral i    -> 0 == il_value i && il_neg i
@@ -1207,26 +1206,30 @@ in this case return not only literal itself but also negateName so that users
 can apply it explicitly. In this case it stays negative zero.  #13211
 -}
 
-rnOverLit :: (XXOverLit t ~ DataConCantHappen) => HsOverLit t ->
+rnOverLit :: HsOverLit GhcPs ->
              RnM ((HsOverLit GhcRn, Maybe (HsExpr GhcRn)), FreeNames)
 rnOverLit origLit
   = do  { opt_NumDecimals <- xoptM LangExt.NumDecimals
-        ; let { lit@(OverLit {ol_val=val})
-            | opt_NumDecimals = origLit {ol_val = generalizeOverLitVal (ol_val origLit)}
-            | otherwise       = origLit
-          }
+        ; let val
+                | opt_NumDecimals = generalizeOverLitVal $ ol_val origLit
+                | otherwise = rnOverLitVal $ ol_val origLit
         ; let std_name = hsOverLitName val
         ; (from_thing_name, fvs1) <- lookupSyntaxName std_name
         ; loc <- getSrcSpanM -- See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
         ; let rebindable = from_thing_name /= std_name
-              lit' = lit { ol_ext = OverLitRn { ol_rebindable = rebindable
-                                              , ol_from_fun = L (noAnnSrcSpan loc) from_thing_name } }
+              lit' :: HsOverLit GhcRn
+              lit' = OverLit
+                { ol_ext = OverLitRn
+                    { ol_rebindable = rebindable
+                    , ol_from_fun = L (noAnnSrcSpan loc) from_thing_name
+                    }
+                , ol_val = val
+                }
         ; if isNegativeZeroOverLit lit'
           then do { (negate_expr, fvs2) <- lookupSyntaxExpr negateName
                   ; return ((lit' { ol_val = negateOverLitVal val }, Just negate_expr)
                            , fvs1 `plusFN` fvs2) }
           else return ((lit', Nothing), fvs1) }
-
 
 rnHsTyPat :: HsDocContext
           -> HsTyPat GhcPs

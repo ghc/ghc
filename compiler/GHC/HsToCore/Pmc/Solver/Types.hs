@@ -68,9 +68,9 @@ import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.InertSet (InertSet, emptyInertSet)
 import GHC.Tc.Utils.TcType (isStringTy, topTcLevel)
 import GHC.Types.CompleteMatch
-import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
-                            , fractionalLitFromRational
-                            , FractionalExponentBase(..))
+import GHC.Types.SourceText
+import GHC.Hs.Extension (GhcTc)
+import GHC.Hs.Lit
 import GHC.Generics (Generic, Generically(..))
 
 import Numeric (fromRat)
@@ -385,7 +385,7 @@ data PmLitValue
 
   -- Overloaded literals
   | PmLitOverInt Int {- How often Negated? -} Integer
-  | PmLitOverRat Int {- How often Negated? -} FractionalLit
+  | PmLitOverRat Int {- How often Negated? -} (FractionalLit GhcTc)
   | PmLitOverString FastString
 
 -- | Syntactic equality.
@@ -678,7 +678,7 @@ overloadPmLit :: Type -> PmLit -> Maybe PmLit
 overloadPmLit ty (PmLit _ v) = PmLit ty <$> go v
   where
     go (PmLitInt i)          = Just (PmLitOverInt 0 i)
-    go (PmLitRat r)          = Just $! PmLitOverRat 0 $! fractionalLitFromRational r
+    go (PmLitRat r)          = Just $! PmLitOverRat 0 $! mkFractionalLitFromRational r
     go (PmLitString s)
       | ty `eqType` stringTy = Just v
       | otherwise            = Just (PmLitOverString s)

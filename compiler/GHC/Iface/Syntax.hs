@@ -87,6 +87,7 @@ import GHC.Parser.Annotation (noLocA)
 import GHC.Hs.Extension ( GhcPass, GhcRn, GhcTc )
 import GHC.Hs.Decls.Overlap ( OverlapFlag )
 import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
+import GHC.Hs.Lit ( StringLiteral(..) )
 
 import GHC.Utils.Lexeme (isLexSym)
 import GHC.Utils.Fingerprint
@@ -667,11 +668,11 @@ fromIfaceWarningTxt = \case
     IfWarningTxt src mb_cat strs -> WarningTxt src (noLocA . fromWarningCategory <$> mb_cat) (noLocA <$> map fromIfaceStringLiteralWithNames strs)
     IfDeprecatedTxt src strs -> DeprecatedTxt src (noLocA <$> map fromIfaceStringLiteralWithNames strs)
 
-fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers StringLiteral GhcRn
+fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers (StringLiteral GhcRn) GhcRn
 fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLoc names)
 
-fromIfaceStringLiteral :: IfaceStringLiteral -> StringLiteral
-fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st fs Nothing
+fromIfaceStringLiteral :: IfaceStringLiteral -> StringLiteral (GhcPass p)
+fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st fs
 
 
 {-

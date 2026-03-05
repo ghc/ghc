@@ -38,7 +38,6 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Type
 import GHC.Data.Maybe
-import GHC.Types.SourceText (FractionalLit(..))
 import Control.Monad (zipWithM, replicateM)
 import Data.List (elemIndex)
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -248,7 +247,7 @@ desugarPat x pat = case pat of
     pm_lit <- case olit of
       OverLit{ ol_val = val, ol_ext = OverLitTc { ol_rebindable = rebindable } }
         | not rebindable
-        , Just expr <- shortCutLit platform val ty
+        , Just (expr, _) <- shortCutLit platform val ty
         -> coreExprAsPmLit <$> dsExpr expr
         | not rebindable
         , (HsFractional f) <- val

@@ -129,7 +129,6 @@ import GHC.Core.UsageEnv
 import GHC.Types.Var
 import GHC.Types.Id as Id
 import GHC.Types.Name
-import GHC.Types.SourceText
 import GHC.Types.Var.Set
 
 import GHC.Builtin.Types
@@ -151,6 +150,7 @@ import GHC.Generics (Generic, Generically(..))
 
 import Control.Monad
 import Data.IORef
+import Data.Functor ((<&>))
 import GHC.Data.Maybe
 import GHC.Types.Name.Reader
 
@@ -2285,60 +2285,86 @@ to short-cut the process for built-in types.  We can do this in two places;
 -}
 
 tcShortCutLit :: HsOverLit GhcRn -> ExpRhoType -> TcM (Maybe (HsOverLit GhcTc))
-tcShortCutLit lit@(OverLit { ol_val = val, ol_ext = OverLitRn rebindable _}) exp_res_ty
+tcShortCutLit (OverLit { ol_val = val, ol_ext = OverLitRn rebindable _}) exp_res_ty
   | not rebindable
   , Just res_ty <- checkingExpType_maybe exp_res_ty
   = do { dflags <- getDynFlags
        ; let platform = targetPlatform dflags
-       ; case shortCutLit platform val res_ty of
-            Just expr -> return $ Just $
-                         lit { ol_ext = OverLitTc False expr res_ty }
-            Nothing   -> return Nothing }
+       ; return $ shortCutLit platform val res_ty <&> \(expr, hsVal) ->
+              let lit' :: HsOverLit GhcTc
+                  lit' = OverLit
+                    { ol_ext = OverLitTc False expr res_ty
+                    , ol_val = hsVal
+                    }
+              in  lit'
+       }
   | otherwise
   = return Nothing
 
-shortCutLit :: Platform -> OverLitVal -> TcType -> Maybe (HsExpr GhcTc)
+-- | Takes an overloaded literal of either 'GhcPs' or 'GhcRn' pass and
+-- does two operations:
+--   1. Lifts the overloaded liter into a Haskell expression
+--   2. Type-checks the overloaded literal value.
+--
+-- The both results are lazily returned because:
+--   * Every call site requires the 'HsExpr GhcTc' result.
+--   * Some call sites requires the 'OverLitVal GhcTc' result.
+shortCutLit :: Platform -> OverLitVal (GhcPass p) -> TcType -> Maybe (HsExpr GhcTc, OverLitVal GhcTc)
 shortCutLit platform val res_ty
   = case val of
-      HsIntegral int_lit    -> go_integral int_lit
       HsFractional frac_lit -> go_fractional frac_lit
-      HsIsString s src      -> go_string   s src
+      HsIntegral    int_lit -> go_integral    int_lit
+      HsIsString    str_lit -> go_string      str_lit
   where
-    go_integral int@(IL src neg i)
+    go_integral iLit@(IL src neg i)
       | isIntTy res_ty  && platformInIntRange  platform i
-      = Just (HsLit noExtField (HsInt noExtField int))
+      = Just (HsLit noExtField (HsInt noExtField iLit'), HsIntegral iLit')
       | isWordTy res_ty && platformInWordRange platform i
-      = Just (mkLit wordDataCon (HsWordPrim src i))
+      = Just (mkLit wordDataCon (HsWordPrim src i), HsIntegral iLit')
       | isIntegerTy res_ty
-      = Just (HsLit noExtField (XLit $ HsInteger src i res_ty))
+      = Just (HsLit noExtField (XLit $ HsInteger src i res_ty), HsIntegral iLit')
       | otherwise
-      = go_fractional (integralFractionalLit neg i)
+      = (\(x,_) -> (x, HsIntegral iLit')) <$>
+          go_fractional (mkFractionalLitFromInteger neg i)
         -- The 'otherwise' case is important
         -- Consider (3 :: Float).  Syntactically it looks like an IntLit,
         -- so we'll call shortCutIntLit, but of course it's a float
         -- This can make a big difference for programs with a lot of
         -- literals, compiled without -O
+      where
+        iLit' = tcIntegralLit iLit
 
-    go_fractional f
-      | isFloatTy res_ty && valueInRange  = Just (mkLit floatDataCon  (HsFloatPrim noExtField f))
-      | isDoubleTy res_ty && valueInRange = Just (mkLit doubleDataCon (HsDoublePrim noExtField f))
-      | otherwise                         = Nothing
+    go_fractional fLit
+      | valueInRange && isFloatTy  res_ty
+      = Just (mkLit floatDataCon  (HsFloatPrim  noExtField fLit'), HsFractional fLit')
+      | valueInRange && isDoubleTy res_ty
+      = Just (mkLit doubleDataCon (HsDoublePrim noExtField fLit'), HsFractional fLit')
+      | otherwise
+      = Nothing
       where
         valueInRange =
-          case f of
-            FL { fl_exp = e } -> (-100) <= e && e <= 100
+          let e = fl_exp fLit
+          in  (-100) <= e && e <= 100
             -- We limit short-cutting Fractional Literals to when their power of 10
             -- is less than 100, which ensures desugaring isn't slow.
 
-    go_string src s
-      | isStringTy res_ty = Just (HsLit noExtField (HsString src s))
-      | otherwise         = Nothing
+        fLit' = tcFractionalLit fLit
+
+    go_string sLit
+      | not $ isStringTy res_ty = Nothing
+      | otherwise = Just (HsLit noExtField hsStr, sLit')
+      where
+        sLit' = HsIsString $ tcStringLit sLit
+        hsStr = HsString
+          (stringLitSourceText sLit)
+          (sl_fs sLit)
+
 
 mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc
 mkLit con lit = HsApp noExtField (nlHsDataCon con) (nlHsLit lit)
 
 ------------------------------
-hsOverLitName :: OverLitVal -> Name
+hsOverLitName :: OverLitVal (GhcPass p)  -> Name
 -- Get the canonical 'fromX' name for a particular OverLitVal
 hsOverLitName (HsIntegral {})   = fromIntegerName
 hsOverLitName (HsFractional {}) = fromRationalName

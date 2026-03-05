@@ -208,7 +208,7 @@ The moving parts are here:
 -}
 
 -- | See Note [FractionalLit representation]
-dsFractionalLitToRational :: FractionalLit -> Type -> DsM CoreExpr
+dsFractionalLitToRational :: FractionalLit GhcTc -> Type -> DsM CoreExpr
 dsFractionalLitToRational fl@FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = base } ty
   -- We compute "small" rationals here and now
   | abs exp <= 100
@@ -251,8 +251,8 @@ dsOverLit (OverLit { ol_val = val, ol_ext = OverLitTc rebindable witness ty }) =
   dflags <- getDynFlags
   let platform = targetPlatform dflags
   case shortCutLit platform val ty of
-    Just expr | not rebindable -> dsExpr expr        -- Note [Literal short cut]
-    _                          -> dsExpr witness
+    Just (expr, _) | not rebindable -> dsExpr expr -- Note [Literal short cut]
+    _                               -> dsExpr witness
 
 {-
 Note [Literal short cut]
@@ -582,7 +582,7 @@ tidyNPat (OverLit (OverLitTc False _ ty) val) mb_neg _eq outer_ty
 
     mb_str_lit :: Maybe FastString
     mb_str_lit = case (mb_neg, val) of
-                   (Nothing, HsIsString _ s) -> Just s
+                   (Nothing, HsIsString s) -> Just $ sl_fs s
                    _ -> Nothing
 
 tidyNPat over_lit mb_neg eq outer_ty

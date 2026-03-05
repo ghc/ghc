@@ -35,7 +35,6 @@ import GHC.Data.BooleanFormula
 import GHC.Exts hiding (toList)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (rdrNameOcc)
-import GHC.Types.SourceText
 import Text.XHtml hiding (name, p, quote, title)
 
 import Haddock.Backends.Xhtml.DocMarkup

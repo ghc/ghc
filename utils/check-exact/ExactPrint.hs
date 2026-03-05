@@ -18,7 +18,7 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns         #-}
-{-# LANGUAGE UndecidableInstances  #-} -- For the (StmtLR GhcPs GhcPs (LocatedA (body GhcPs))) ExactPrint instance
+{-# LANGUAGE UndecidableInstances #-} -- For the (StmtLR GhcPs GhcPs (LocatedA (body GhcPs))) ExactPrint instance
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-incomplete-record-updates #-}
 
 -- We switch off specialisation in this module. Otherwise we get lots of functions
@@ -731,11 +731,6 @@ printStringAdvanceA str = printStringAtAA (EpaDelta noSrcSpan (SameLine 0) []) s
 
 printStringAtAA :: (Monad m, Monoid w) => EpaLocation -> String -> EP w m EpaLocation
 printStringAtAA el str = printStringAtAAC CaptureComments el str
-
-printStringAtNC :: (Monad m, Monoid w) => NoCommentsLocation -> String -> EP w m NoCommentsLocation
-printStringAtNC el str = do
-  el' <- printStringAtAAC NoCaptureComments (noCommentsToEpaLocation el) str
-  return (epaToNoCommentsLocation el')
 
 printStringAtAAC :: (Monad m, Monoid w)
   => CaptureComments -> EpaLocation -> String -> EP w m EpaLocation
@@ -1652,8 +1647,9 @@ instance ExactPrint (ImportDecl GhcPs) where
         _ -> return ann1
     ann3 <-
       case mpkg of
-       RawPkgQual (StringLiteral src' v _) ->
-         printStringAtMLocL ann2 limportDeclAnnPackage (sourceTextToString src' (show v))
+       RawPkgQual srcTxt fstStr ->
+         printStringAtMLocL ann2 limportDeclAnnPackage $
+           sourceTextToString srcTxt (show fstStr)
        _ -> return ann2
     modname' <- markAnnotated modname
 
@@ -1967,14 +1963,58 @@ exactNsSpec (DataNamespaceSpecifier data_) = do
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint StringLiteral where
+instance Typeable p => ExactPrint (StringLiteral (GhcPass p)) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (StringLiteral src fs mcomma) = do
-    printSourceTextAA src (show (unpackFS fs))
-    mcomma' <- mapM (\r -> printStringAtNC r ",") mcomma
-    return (StringLiteral src fs mcomma')
+  exact sLit = do
+    let fstStr = sl_fs sLit
+        srcTxt = stringLitSourceText sLit
+    printSourceTextAA srcTxt (show (unpackFS fstStr))
+    return (StringLiteral srcTxt fstStr)
+
+{-
+instance ExactPrint (LocatedN (StringLiteral (GhcPass p))) where
+  getAnnotationEntry (L sann _) = fromAnn sann
+  setAnnotationAnchor = setAnchorAn
+
+  exact (L (EpAnn anc ann cs) n) = do
+    ann' <-
+      case ann of
+        NameAnn a l t -> do
+          mn <- markName a (Just (l,n))
+          case mn of
+            (a', (Just (l',_n))) -> do
+              return (NameAnn a' l' t)
+            _ -> error "ExactPrint (LocatedN StringLiteral)"
+        NameAnnCommas a commas t -> do
+          a0 <- markNameAdornmentO a
+          commas' <- forM commas markEpToken
+          a1 <- markNameAdornmentC a0
+          return (NameAnnCommas a1 commas' t)
+        NameAnnBars (o,c) bars t -> do
+          o' <- markEpToken o
+          bars' <- mapM markEpToken bars
+          c' <- markEpToken c
+          return (NameAnnBars (o',c') bars' t)
+        NameAnnOnly a t -> do
+          (a',_) <- markName a Nothing
+          return (NameAnnOnly a' t)
+        NameAnnRArrow o nl c t -> do
+          o' <- mapM markEpToken o
+          nl' <- markEpUniToken nl
+          c' <- mapM markEpToken c
+          return (NameAnnRArrow o' nl' c' t)
+        NameAnnQuote q name t -> do
+          debugM $ "NameAnnQuote"
+          q' <- markEpToken q
+          (L name' _) <- markAnnotated (L name n)
+          return (NameAnnQuote q' name' t)
+        NameAnnTrailing t -> do
+          _anc' <- printUnicode anc n
+          return (NameAnnTrailing t)
+    return (L (EpAnn anc ann' cs) n)
+-}
 
 -- ---------------------------------------------------------------------
 
@@ -2688,7 +2728,11 @@ instance ExactPrint (Sig GhcPs) where
   exact (SCCFunSig ((o,c),src) ln ml) = do
     o' <- markAnnOpen'' o src "{-# SCC"
     ln' <- markAnnotated ln
-    ml' <- markAnnotated ml
+    ml' <- case ml of
+      Nothing -> return Nothing
+      Just (L loc sl) -> do
+        L loc' _ <- markAnnotated (L loc (mkVarUnqual (sl_fs sl)))
+        return . Just $ L loc' sl
     c' <- markEpToken c
     return (SCCFunSig ((o',c'),src) ln' ml')
 
@@ -2875,11 +2919,7 @@ instance ExactPrint (HsExpr GhcPs) where
     = printStringAdvance ("?" ++ unpackFS n) >> return x
 
   exact x@(HsOverLit _an ol) = do
-    let str = case ol_val ol of
-                HsIntegral   (IL src _ _) -> src
-                HsFractional (FL { fl_text = src }) -> src
-                HsIsString src _          -> src
-    case str of
+    case getOverloadedLiteralSourceText $ ol_val ol of
       SourceText s -> printStringAdvance (unpackFS s) >> return ()
       NoSourceText -> withPpr x >> return ()
     return x
@@ -3201,7 +3241,7 @@ instance ExactPrint (HsPragE GhcPs) where
 
   exact (HsPragSCC (AnnPragma o c s l1 l2 t m,st) sl) = do
     o' <- markAnnOpen'' o st  "{-# SCC"
-    l1' <- printStringAtAA l1 (sourceTextToString (sl_st sl) (unpackFS $ sl_fs sl))
+    l1' <- printStringAtAA l1 (sourceTextToString (stringLitSourceText sl) (unpackFS $ sl_fs sl))
     c' <- markEpToken c
     return (HsPragSCC (AnnPragma o' c' s l1' l2 t m,st) sl)
 
@@ -4801,15 +4841,15 @@ instance ExactPrint (HsOverLit GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact ol =
-    let str = case ol_val ol of
-                HsIntegral   (IL src _ _) -> src
-                HsFractional (FL{ fl_text = src }) -> src
-                HsIsString src _ -> src
-    in
-      case str of
-        SourceText s -> printStringAdvance (unpackFS s) >> return ol
-        NoSourceText -> return ol
+  exact ol = case getOverloadedLiteralSourceText $ ol_val ol of
+    SourceText s -> printStringAdvance (unpackFS s) >> return ol
+    NoSourceText -> return ol
+
+getOverloadedLiteralSourceText :: OverLitVal (GhcPass p) -> SourceText
+getOverloadedLiteralSourceText = \case
+  HsIntegral   iLit -> il_text iLit
+  HsFractional fLit -> fl_text fLit
+  HsIsString   sLit -> stringLitSourceText sLit
 
 -- ---------------------------------------------------------------------
 
@@ -4820,8 +4860,6 @@ hsLit2String lit =
     HsCharPrim   src p   -> toSourceTextWithSuffix src p ""
     HsString     src v   -> toSourceTextWithSuffix src v ""
     HsStringPrim src v   -> toSourceTextWithSuffix src v ""
-    HsNatural    _ (IL src _ v)   -> toSourceTextWithSuffix src v ""
-    HsInt        _ (IL src _ v)   -> toSourceTextWithSuffix src v ""
     HsIntPrim    src v   -> toSourceTextWithSuffix src v ""
     HsWordPrim   src v   -> toSourceTextWithSuffix src v ""
     HsInt8Prim   src v   -> toSourceTextWithSuffix src v ""
@@ -4832,15 +4870,17 @@ hsLit2String lit =
     HsWord16Prim src v   -> toSourceTextWithSuffix src v ""
     HsWord32Prim src v   -> toSourceTextWithSuffix src v ""
     HsWord64Prim src v   -> toSourceTextWithSuffix src v ""
-    HsDouble     _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl ""
-    HsFloatPrim  _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl "#"
-    HsDoublePrim _ fl@(FL{fl_text = src })   -> toSourceTextWithSuffix src fl "##"
+    HsFloatPrim  _ fl@(FL{fl_text = src }) -> toSourceTextWithSuffix src fl "#"
+    HsDouble     _ fl@(FL{fl_text = src }) -> toSourceTextWithSuffix src fl ""
+    HsDoublePrim _ fl@(FL{fl_text = src }) -> toSourceTextWithSuffix src fl "##"
+    HsNatural    _ il@(IL{il_text = src }) -> toSourceTextWithSuffix src (il_value il) ""
+    HsInt        _ il@(IL{il_text = src }) -> toSourceTextWithSuffix src (il_value il) ""
 
 hsQualLit2String :: HsQualLit GhcPs -> String
 hsQualLit2String QualLit{..} = moduleNameString ql_mod ++ "." ++ fromVal ql_val
   where
     fromVal = \case
-      HsQualString src s -> toSourceTextWithSuffix src s ""
+      HsQualString src fs -> toSourceTextWithSuffix src fs ""
 
 toSourceTextWithSuffix :: (Show a) => SourceText -> a -> String -> String
 toSourceTextWithSuffix (NoSourceText)    alt suffix = show alt ++ suffix
