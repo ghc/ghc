@@ -1,2 +1,2 @@
-import (generated) Prelude -- implicit
+import (implicit) Prelude -- implicit
 "No module is imported"

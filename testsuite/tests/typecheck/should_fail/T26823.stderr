@@ -10,7 +10,7 @@ T26823.hs:12:14: error: [GHC-25897]
             !size = 8
             !vecAli = size
             !rem = off `rem` vecAli
-            !start = if rem == 0 then off else off + (vecAli - rem)
+            ....
     • Relevant bindings include
         rem :: a0 -> a0 -> t (bound at T26823.hs:12:6)
         off :: a0 (bound at T26823.hs:8:6)

@@ -2,7 +2,7 @@
 :module +*A -- added automatically
 :module +*B -- added automatically
 "We can remove the imports"
-import (generated) Prelude -- implicit
+import (implicit) Prelude -- implicit
 "Selectively star import B and then import A"
 "'g' is not in scope"
 :module +*B
