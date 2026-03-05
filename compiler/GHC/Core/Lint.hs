@@ -398,18 +398,23 @@ dumpPassResult logger dump_core_sizes name_ppr_ctx mb_flag hdr extra_info binds 
                     , pprRules rules ]
 
     pprCompUnitsWithSize :: CoreProgram -> SDoc
-    pprCompUnitsWithSize [comp_unit] = pprCompUnitWithSize False comp_unit
-    pprCompUnitsWithSize comp_units  = vcat (map (pprCompUnitWithSize True) comp_units)
+    pprCompUnitsWithSize comp_units
+      = vcat [ pprCompUnitWithSize i n comp_unit
+             | (i, comp_unit) <- zip [1..] comp_units ]
+      where
+        n = length comp_units
 
-    pprCompUnitWithSize :: Bool -> CoreCompUnit -> SDoc
-    pprCompUnitWithSize include_header (CoreCompUnit unit_binds unit_rules)
-      = pp_header
+    pprCompUnitWithSize :: Int -> Int -> CoreCompUnit -> SDoc
+    pprCompUnitWithSize i n (CoreCompUnit unit_binds unit_rules)
+      = pprCompUnitHeader i n
      $$ pprCoreBindingsWithSize unit_binds
      $$ pprRules unit_rules
-      where
-        pp_header
-          | include_header = text "=== Start of new compilation unit"
-          | otherwise      = empty
+
+    pprCompUnitHeader :: Int -> Int -> SDoc
+    pprCompUnitHeader i n
+      = text "=== Start of new compilation unit"
+        <+> parens (int i <> char '/' <> int n)
+        <+> text "==="
 
 {-
 ************************************************************************
@@ -446,7 +451,7 @@ lintPassResult logger cfg binds rules
            renderWithContext defaultSDocContext (lpr_passPpr cfg)
        ; displayLintResults logger
                             (lpr_passPpr cfg)
-                            (pprCoreBindings (concatMap coreCompUnitBinds binds)) warns_and_errs
+                            (pprCoreProgram binds) warns_and_errs
        }
 
 displayLintResults :: Logger

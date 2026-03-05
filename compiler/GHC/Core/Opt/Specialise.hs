@@ -667,35 +667,29 @@ data DynamicSpecData = DynamicSpecData
 specProgram' :: StaticSpecInput -> DynamicSpecData -> CoreM DynamicSpecData
 specProgram' static dyn
   = do { dflags <- getDynFlags
-
-       ; let top_env = SE { se_subst = Core.mkEmptySubst in_scope
-                          , se_module = this_mod
-                          , se_rules  = rule_env
-                          , se_dflags = dflags }
-             in_scope = mkInScopeSetBndrs (concatMap coreCompUnitBinds binds)
-
-       ; unit_results <- mapM (specCompUnit static top_env) binds
-       ; let (binds', udss) = unzip unit_results
-             uds            = foldr thenUDs emptyUDs udss
-
-       ; (spec_rules, spec_binds) <- specImports top_env uds
+       ; units' <- mapM (specCompUnit static dflags) units
 
        ; return DynamicSpecData
-           { dsd_binds = CoreCompUnit spec_binds spec_rules : binds'
+           { dsd_binds = units'
            , dsd_local_rules = local_rules
            } }
   where
-    this_mod    = ssi_module static
-    rule_env    = ssi_rule_env static
-    binds       = dsd_binds dyn
+    units       = dsd_binds dyn
     local_rules = dsd_local_rules dyn
 
 -- | Specialise calls to type-class overloaded functions occurring in a program.
-specCompUnit :: StaticSpecInput -> SpecEnv -> CoreCompUnit -> CoreM (CoreCompUnit, UsageDetails)
-specCompUnit _static top_env (CoreCompUnit unit_binds unit_rules)
+specCompUnit :: StaticSpecInput -> DynFlags -> CoreCompUnit -> CoreM CoreCompUnit
+specCompUnit static dflags (CoreCompUnit unit_binds unit_rules)
   = do { (unit_binds', uds) <- runSpecM (go unit_binds)
-       ; return (CoreCompUnit unit_binds' unit_rules, uds) }
+       ; (spec_rules, spec_binds) <- specImports top_env uds
+       ; return (CoreCompUnit (spec_binds ++ unit_binds') (spec_rules ++ unit_rules)) }
   where
+    top_env = SE { se_subst = Core.mkEmptySubst in_scope
+                 , se_module = ssi_module static
+                 , se_rules  = ssi_rule_env static
+                 , se_dflags = dflags }
+    in_scope = mkInScopeSetBndrs unit_binds
+
     go []           = return ([], emptyUDs)
     go (bind:binds) = do (bind', binds', uds') <- specBind TopLevel top_env bind $ \_ ->
                                                   go binds
