@@ -1,0 +1,46 @@
+name: Build and release
+
+on:
+  push:
+    tags: ['*']
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches:
+      - stable-ghc-9.14
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  pull-requests: read
+  contents: write
+
+jobs:
+  release-workflow:
+    uses: ./.github/workflows/reusable-release.yml
+    with:
+      branches: '["${{ github.ref }}"]'
+
+  release:
+    name: release
+    needs: [ "release-workflow" ]
+    runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: artifacts-*
+          merge-multiple: true
+          path: ./out
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            ./out/*
+

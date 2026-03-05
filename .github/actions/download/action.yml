@@ -1,0 +1,25 @@
+name: 'Download artifact'
+description: 'Download artifacts with normalized names'
+inputs:
+  name:
+    required: true
+    type: string
+  path:
+    required: true
+    type: string
+
+runs:
+  using: "composite"
+  steps:
+    - name: Normalise name
+      run: |
+        name=${{ inputs.name }}
+        echo "NAME=${name//\//_}" >> "$GITHUB_ENV"
+      shell: bash
+
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ env.NAME }}
+        path: ${{ inputs.path }}
+

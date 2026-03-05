@@ -1,0 +1,33 @@
+name: 'Upload artifact'
+description: 'Upload artifacts with normalized names'
+inputs:
+  if-no-files-found:
+    default: 'error'
+    type: string
+  name:
+    required: true
+    type: string
+  path:
+    required: true
+    type: string
+  retention-days:
+    default: 0
+    type: number
+
+runs:
+  using: "composite"
+  steps:
+    - name: Normalise name
+      run: |
+        name=${{ inputs.name }}
+        echo "NAME=${name//\//_}" >> "$GITHUB_ENV"
+      shell: bash
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        if-no-files-found: ${{ inputs.if-no-files-found }}
+        retention-days: ${{ inputs.retention-days }}
+        name: ${{ env.NAME }}
+        path: ${{ inputs.path }}
+

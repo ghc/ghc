@@ -17,6 +17,9 @@ on:
       cabal:
         type: string
         default: 3.14.2.0
+      dynamic:
+        type: string
+        default: 1
       test:
         type: boolean
         default: true
@@ -39,6 +42,10 @@ env:
   GHCUP_MSYS2_ENV: CLANG64
   MSYSTEM: CLANG64
   CHERE_INVOKING: 1
+  # dynamic
+  DYNAMIC: ${{ inputs.dynamic }}
+  # stage0 cabal cache
+  CABAL_CACHE_PATH: _build/cabal/bin
 
 jobs:
   tool-output:
@@ -90,6 +97,12 @@ jobs:
     container:
       image: ${{ matrix.platform.image }}
     steps:
+      # needed for patchelf
+      - if: matrix.platform.image == 'rockylinux:8'
+        name: Install EPEL
+        run: |
+          dnf install -y epel-release
+
       - name: Install requirements
         shell: sh
         run: |
@@ -138,9 +151,20 @@ jobs:
           ./emsdk install ${{ env.EMSDK_VERSION }}
           ./emsdk activate ${{ env.EMSDK_VERSION }}
 
+      - name: Cache stage0 cabal binary
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CABAL_CACHE_PATH }}
+          key: cabal-${{ vars.CACHE_VERSION || 'v1' }}-${{ matrix.platform.ARTIFACT }}-${{ hashFiles('cabal.project.stage0') }}
+
       - name: Run build
         run: &build |
           set -eux
+
+          # Skip building cabal if a cached binary already exists
+          if [ -x "${{ env.CABAL_CACHE_PATH }}/cabal" ]; then
+            export USE_SYSTEM_CABAL=1
+          fi
 
           # On windows, we use msys2 shell, which does not by default inherit the windows PATHs.
           # So although the ghcup action sets the PATH, it's not visible. We don't want to use
@@ -203,6 +227,12 @@ jobs:
           ref: ${{ matrix.branch }}
           submodules: recursive
 
+      - name: Cache stage0 cabal binary
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CABAL_CACHE_PATH }}
+          key: cabal-${{ vars.CACHE_VERSION || 'v1' }}-${{ matrix.platform.ARTIFACT }}-${{ hashFiles('cabal.project.stage0') }}
+
       # debian 11 ships with make 4.3, but we need 4.4
       - if: matrix.platform.ARTIFACT == 'aarch64-linux-deb11'
         uses: docker://arm64v8/debian:11
@@ -224,6 +254,7 @@ jobs:
               ghcup --no-verbose install ghc --set --install-targets '${{ env.GHC_TARGETS }}' ${{ env.GHC_VERSION }} &&
               ghcup --no-verbose install cabal --set ${{ env.CABAL_VERSION }} &&
               cabal update &&
+              if [ -x ${{ env.CABAL_CACHE_PATH }}/cabal ]; then export USE_SYSTEM_CABAL=1; fi &&
               make _build/dist/ghc.tar.gz _build/dist/cabal.tar.gz _build/dist/tests.tar.gz &&
               cd _build/dist &&
               mv ghc.tar.gz ghc-$(bin/ghc --numeric-version)-${{ matrix.platform.ARTIFACT }}.tar.gz &&
@@ -244,6 +275,7 @@ jobs:
               ghcup --no-verbose install ghc --set --install-targets '${{ env.GHC_TARGETS }}' ${{ env.GHC_VERSION }} &&
               ghcup --no-verbose install cabal --set ${{ env.CABAL_VERSION }} &&
               cabal update &&
+              if [ -x ${{ env.CABAL_CACHE_PATH }}/cabal ]; then export USE_SYSTEM_CABAL=1; fi &&
               make _build/dist/ghc.tar.gz _build/dist/cabal.tar.gz _build/dist/tests.tar.gz &&
               cd _build/dist &&
               mv ghc.tar.gz ghc-$(bin/ghc --numeric-version)-${{ matrix.platform.ARTIFACT }}.tar.gz &&
@@ -292,6 +324,12 @@ jobs:
           echo "/usr/local/opt/gnu-sed/libexec/gnubin" >> $GITHUB_PATH
           echo "/usr/local/opt/make/libexec/gnubin" >> $GITHUB_PATH
           echo "/usr/local/opt/libtool/libexec/gnubin" >> $GITHUB_PATH
+
+      - name: Cache stage0 cabal binary
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CABAL_CACHE_PATH }}
+          key: cabal-${{ vars.CACHE_VERSION || 'v1' }}-${{ env.ARTIFACT }}-${{ hashFiles('cabal.project.stage0') }}
 
       - name: Install emscripten
         run : *emscripten
@@ -342,8 +380,11 @@ jobs:
           echo "/opt/homebrew/opt/make/libexec/gnubin" >> $GITHUB_PATH
           echo "/opt/homebrew/opt/libtool/libexec/gnubin" >> $GITHUB_PATH
 
-      - name: Install emscripten
-        run : *emscripten
+      - name: Cache stage0 cabal binary
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CABAL_CACHE_PATH }}
+          key: cabal-${{ vars.CACHE_VERSION || 'v1' }}-${{ env.ARTIFACT }}-${{ hashFiles('cabal.project.stage0') }}
 
       - name: Run build
         run: *build
@@ -393,10 +434,17 @@ jobs:
         run: ghcup --no-verbose install ghc --set --install-targets "${{ env.GHC_TARGETS }}" "${{ env.GHC_VERSION }}"
         shell: pwsh
 
+      - name: Cache stage0 cabal binary
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CABAL_CACHE_PATH }}
+          key: cabal-${{ vars.CACHE_VERSION || 'v1' }}-${{ env.ARTIFACT }}-${{ hashFiles('cabal.project.stage0') }}
+
       - name: Run build
         run: *build
         env:
           MAKE: make
+          DYNAMIC: 0
 
       - if: always()
         name: Upload artifact
@@ -464,8 +512,18 @@ jobs:
         run : |
           sudo pkg install -y emscripten
 
+      - name: Cache stage0 cabal binary
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CABAL_CACHE_PATH }}
+          key: cabal-${{ vars.CACHE_VERSION || 'v1' }}-${{ env.ARTIFACT }}-${{ hashFiles('cabal.project.stage0') }}
+
       - name: Run build
         run: |
+          set -eux
+          if [ -x "${{ env.CABAL_CACHE_PATH }}/cabal" ]; then
+            export USE_SYSTEM_CABAL=1
+          fi
           which ghc
           ghc --info
           cabal update

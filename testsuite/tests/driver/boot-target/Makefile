@@ -1,3 +1,7 @@
+TOP=../../..
+include $(TOP)/mk/boilerplate.mk
+include $(TOP)/mk/test.mk
+
 boot1:
 	'$(TEST_HC)' -c A.hs-boot B.hs
 

@@ -57,23 +57,23 @@ jobs:
       shell: devx {0}
       run: cabal update
 
-    # The Makefile will run configure (and boot 😞), we also need to create a
-    # synthetic package before running configure.  Once this nuissance is fixed
+    # The Makefile will run configure (and boot), we also need to create a
+    # synthetic package before running configure.  Once this nuisance is fixed
     # we can do proper configure + make again. Until then... we have to live
     # with the hack of running everything from the make target.
     # - name: Configure the build
     #   shell: devx {0}
     #   run: ./configure
 
-    - name: Build the bindist (dynamic=${{ matrix.dynamic }})
+    - name: Build (dynamic=${{ matrix.dynamic }})
       shell: devx {0}
       run: make CABAL=$PWD/_build/stage0/bin/cabal DYNAMIC=${{ matrix.dynamic }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.plat }}-dynamic${{ matrix.dynamic }}-bindist
-        path: _build/bindist
+        name: ${{ matrix.plat }}-dynamic${{ matrix.dynamic }}-dist
+        path: _build/dist
 
     - name: Run the testsuite (dynamic=${{ matrix.dynamic }})
       shell: devx {0}
