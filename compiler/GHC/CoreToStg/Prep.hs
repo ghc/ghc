@@ -1569,9 +1569,8 @@ cpeArg :: CorePrepEnv -> Demand
        -> CoreArg -> UniqSM (Floats, CpeArg)
 cpeArg env dmd arg
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
-       ; let arg_ty = exprType arg
-             lev    = typeLevity arg_ty
-             dec    = wantFloatLocal NonRecursive dmd lev floats1 arg1
+       ; let lev = typeLevity (exprType arg1)
+             dec = wantFloatLocal NonRecursive dmd lev floats1 arg1
        ; (floats2, arg2) <- executeFloatDecision env dec floats1 arg1
                 -- Else case: arg1 might have lambdas, and we can't
                 --            put them inside a wrapBinds
@@ -1581,7 +1580,13 @@ cpeArg env dmd arg
        -- see Note [ANF-ising literal string arguments]
        ; if exprIsTrivial arg2
          then return (floats2, arg2)
-         else do { v <- (`setIdDemandInfo` dmd) <$> newVar env arg_ty
+         else do { let arg_ty = exprType arg2
+                       -- NB: arg_ty might not be same as (exprType arg1) because
+                       --     the latter has the floats wrapped around it
+                       -- E.g.   let a = Int in id @a{=Int} 3
+                       --     exprType arg1 will be `a`, but if we didn't float then
+                       --     exprType arg2 will be `Int`
+                 ; v <- (`setIdDemandInfo` dmd) <$> newVar env arg_ty
                        -- See Note [Pin demand info on floats]
                  ; let arity = cpeArgArity env dec floats1 arg2
                        arg3  = cpeEtaExpand arity arg2
