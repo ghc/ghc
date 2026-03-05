@@ -703,38 +703,24 @@ stg_block_throwto (P_ tso, P_ exception)
 }
 
 #if defined(mingw32_HOST_OS)
-INFO_TABLE_RET ( stg_block_async, RET_SMALL, W_ info_ptr, W_ ares )
+INFO_TABLE_RET ( stg_block_async, RET_SMALL, W_ info_ptr, W_ len, W_ errCode )
     return ()
 {
-    W_ len, errC;
-
-    len = TO_W_(StgAsyncIOResult_len(ares));
-    errC = TO_W_(StgAsyncIOResult_errCode(ares));
-    ccall free(ares "ptr");
-    return (len, errC);
+    return (len, errCode);
 }
 
 stg_block_async
 {
-    Sp_adj(-2);
+    W_ eintr;
+    (eintr) = ccall rts_EINTR();
+
+    // Fill the stack frame with values that indicate that the operation
+    // has been interrupted. The IO manager will overwrite these with the
+    // actual results if the async operation completes.
+    Sp_adj(-3);
     Sp(0) = stg_block_async_info;
-    BLOCK_GENERIC;
-}
-
-/* Used by threadDelay implementation; it would be desirable to get rid of
- * this free()'ing void return continuation.
- */
-INFO_TABLE_RET ( stg_block_async_void, RET_SMALL, W_ info_ptr, W_ ares )
-    return ()
-{
-    ccall free(ares "ptr");
-    return ();
-}
-
-stg_block_async_void
-{
-    Sp_adj(-2);
-    Sp(0) = stg_block_async_void_info;
+    Sp(1) = -1;                    // len:     -1 indicates error
+    Sp(2) = eintr;                 // errCode: interrupted
     BLOCK_GENERIC;
 }
 

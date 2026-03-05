@@ -926,7 +926,7 @@ printThreadBlockage(StgTSO *tso)
   switch (ACQUIRE_LOAD(&tso->why_blocked)) {
 #if defined(mingw32_HOST_OS)
     case BlockedOnDoProc:
-    debugBelch("is blocked on proc (request: %u)", tso->block_info.async_result->reqID);
+    debugBelch("is blocked on proc (request: %" FMT_Word ")", tso->block_info.async_reqID);
     break;
 #endif
 #if !defined(THREADED_RTS)

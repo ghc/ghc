@@ -8,16 +8,19 @@
  *       For the WINIO manager see base in the GHC.Event modules.
  */
 
-#if !defined(THREADED_RTS)
 
 #include "Rts.h"
+#include <errno.h>
+#include "win32/AsyncMIO.h"
+
+#if !defined(THREADED_RTS)
+
 #include "RtsUtils.h"
 #include <windows.h>
 #include <stdio.h>
 #include "Schedule.h"
 #include "Capability.h"
 #include "IOManagerInternals.h"
-#include "win32/AsyncMIO.h"
 #include "win32/MIOManager.h"
 
 /*
@@ -299,14 +302,9 @@ start:
                 case BlockedOnRead:
                 case BlockedOnWrite:
                 case BlockedOnDoProc:
-                    if (tso->block_info.async_result->reqID == rID) {
-                        // Found the thread blocked waiting on request;
-                        // stodgily fill
-                        // in its result block.
-                        tso->block_info.async_result->len =
-                          completedTable[i].len;
-                        tso->block_info.async_result->errCode =
-                          completedTable[i].errCode;
+                    if (tso->block_info.async_reqID == rID) {
+                        HsInt len     = completedTable[i].len;
+                        HsInt errCode = completedTable[i].errCode;
 
                         // Drop the matched TSO from blocked_queue
                         if (prev) {
@@ -322,11 +320,14 @@ start:
                         // Terminates the run queue + this inner for-loop.
                         tso->_link = END_TSO_QUEUE;
                         tso->why_blocked = NotBlocked;
-                        // save the StgAsyncIOResult in the
-                        // stg_block_async_info stack frame, because
-                        // the block_info field will be overwritten by
-                        // pushOnRunQueue().
-                        tso->stackobj->sp[1] = (W_)tso->block_info.async_result;
+                        // For stg_block_async frames (read/write/doProc),
+                        // write len and errCode directly to the stack.
+                        // For stg_block_noregs frames (delay), nothing
+                        // to write.
+                        if (tso->stackobj->sp[0] == (W_)&stg_block_async_info) {
+                            tso->stackobj->sp[1] = (W_)len;
+                            tso->stackobj->sp[2] = (W_)errCode;
+                        }
                         pushOnRunQueue(&MainCapability, tso);
                         break;
                     }
@@ -389,3 +390,8 @@ resetAbandonRequestWait( void )
 }
 
 #endif /* !defined(THREADED_RTS) */
+
+HsInt rts_EINTR(void)
+{
+    return EINTR;
+}
