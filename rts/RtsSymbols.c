@@ -30,6 +30,7 @@
 #include <shfolder.h> /* SHGetFolderPathW */
 #include "IOManager.h"
 #include "win32/AsyncWinIO.h"
+#include "win32/AsyncMIO.h"
 #endif
 
 #if defined(openbsd_HOST_OS)
@@ -168,6 +169,7 @@ extern char **environ;
       SymI_HasProto(__stdio_common_vswprintf_s)          \
       SymI_HasProto(__stdio_common_vswprintf)            \
       SymI_HasProto(_errno)                              \
+      SymI_HasProto(rts_EINTR)                           \
       /* see Note [Symbols for MinGW's printf] */        \
       SymI_HasProto(_lock_file)                          \
       SymI_HasProto(_unlock_file)                        \
