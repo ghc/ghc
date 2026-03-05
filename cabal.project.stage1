@@ -1,4 +1,7 @@
 index-state: 2025-10-26T19:17:08Z
+allow-boot-library-installs: True
+benchmarks: False
+tests: False
 
 packages:
   -- NOTE: we need rts-headers, because the _newly_ built compiler depends
@@ -10,38 +13,50 @@ packages:
   rts-headers
   rts-fs
 
-  -- other packages.
+  -- Compiler
   ghc
   compiler
+
+  -- Internal libraries
+  libraries/ghc-boot
+  libraries/ghc-boot-th-next
+  libraries/ghci
+  libraries/ghc-platform
+  libraries/libffi-clib
+
+  -- Internal tools
+  utils/deriveConstants
+  utils/genapply
+  utils/genprimopcode
+  utils/ghc-pkg
+  utils/ghc-toolchain
+  utils/ghc-toolchain/exe
+  utils/unlit
+
+  -- The following are packages available on Hackage but included as submodules
+  libraries/Cabal/Cabal
+  libraries/Cabal/Cabal-syntax
   libraries/directory
   libraries/file-io
   libraries/filepath
-  libraries/ghc-platform
-  libraries/ghc-boot
-  libraries/ghc-boot-th-next
-  libraries/ghc-heap
-  libraries/ghci
   libraries/os-string
   libraries/process
   libraries/semaphore-compat
---  libraries/time
   libraries/unix
   libraries/Win32
-  libraries/Cabal/Cabal-syntax
-  libraries/Cabal/Cabal
-  utils/ghc-pkg
   utils/hsc2hs
-  utils/unlit
-  utils/genprimopcode
-  utils/genapply
-  utils/deriveConstants
-  utils/ghc-toolchain
-  utils/ghc-toolchain/exe
 
 
-benchmarks: False
-tests: False
-allow-boot-library-installs: True
+--
+-- Constraints
+--
+
+constraints:
+  template-haskell <= 2.22
+
+--
+-- Package level configuration
+--
 
 package *
   library-vanilla: True
@@ -66,8 +81,9 @@ package ghc-boot-th-next
 package hsc2hs
   flags: +in-ghc-tree
 
-constraints:
-  template-haskell <= 2.22
+--
+-- Program options
+--
 
 program-options
   ghc-options: -fhide-source-paths -j

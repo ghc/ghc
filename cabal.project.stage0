@@ -1,0 +1,6 @@
+packages:
+    ./libraries/Cabal/Cabal
+    ./libraries/Cabal/Cabal-syntax
+    ./libraries/Cabal/cabal-install
+    ./libraries/Cabal/cabal-install-solver
+    ./libraries/hackage-security/hackage-security

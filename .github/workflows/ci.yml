@@ -1,30 +1,45 @@
 name: CI
 
-# Trigger the workflow on push or pull request, but only for the master branch
 on:
   pull_request:
-    types:
-      - opened
-      - synchronize
+    types: [opened, synchronize]
   push:
-    branches: [master]
-
+    branches: [stable-ghc-9.14, stable-master]
   workflow_dispatch:
 
 jobs:
   cabal:
-    name: ${{ matrix.plat }} / ghc ${{ matrix.ghc }}
-    runs-on: "${{ fromJSON('{\"x86_64-linux\": \"ubuntu-24.04\", \"aarch64-linux\": \"ubuntu-24.04-arm\", \"x86_64-darwin\": \"macos-latest\", \"aarch64-darwin\": \"macos-latest\"}')[matrix.plat] }}"
-
     strategy:
       fail-fast: false
       matrix:
-        plat:
-          - x86_64-linux
-          # - aarch64-linux  # disabled: waiting for devx images to be fixed
-          # - x86_64-darwin  # disabled: waiting for devx images to be fixed
-          - aarch64-darwin
-        ghc: ['98'] # bootstrapping compiler
+        include:
+          - plat: x86_64-linux
+            runner: ubuntu-24.04
+            ghc: '98'
+            dynamic: 0
+          - plat: x86_64-linux
+            runner: ubuntu-24.04
+            ghc: '98'
+            dynamic: 1
+          # - plat: aarch64-linux  # disabled: waiting for devx images to be fixed
+          #   runner: ubuntu-24.04-arm
+          #   ghc: '98'
+          #   dynamic: 0
+          # - plat: aarch64-linux
+          #   runner: ubuntu-24.04-arm
+          #   ghc: '98'
+          #   dynamic: 1
+          - plat: aarch64-darwin
+            runner: macos-latest
+            ghc: '98'
+            dynamic: 0
+          - plat: aarch64-darwin
+            runner: macos-latest
+            ghc: '98'
+            dynamic: 1
+
+    name: "${{ matrix.plat }} / ghc ${{ matrix.ghc }} / dynamic=${{ matrix.dynamic }}"
+    runs-on: ${{ matrix.runner }}
 
     steps:
     - uses: actions/checkout@v4
@@ -50,25 +65,25 @@ jobs:
     #   shell: devx {0}
     #   run: ./configure
 
-    - name: Build the bindist
+    - name: Build the bindist (dynamic=${{ matrix.dynamic }})
       shell: devx {0}
-      run: make CABAL=$PWD/_build/stage0/bin/cabal
+      run: make DYNAMIC=${{ matrix.dynamic }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.plat }}-bindist
+        name: ${{ matrix.plat }}-dynamic${{ matrix.dynamic }}-bindist
         path: _build/bindist
 
-    - name: Run the testsuite
+    - name: Run the testsuite (dynamic=${{ matrix.dynamic }})
       shell: devx {0}
-      run: make test CABAL=$PWD/_build/stage0/bin/cabal
+      run: make test DYNAMIC=${{ matrix.dynamic }}
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }} # upload test results even if the testsuite failed to pass
       with:
-        name: ${{ matrix.plat }}-testsuite-results
+        name: ${{ matrix.plat }}-dynamic${{ matrix.dynamic }}-testsuite-results
         path: |
           _build/test-perf.csv
           _build/test-summary.txt

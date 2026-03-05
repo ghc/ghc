@@ -21,103 +21,108 @@ import System.Environment
 import Control.Monad
 import Data.Char
 import GHC.ResponseFile
+import Distribution.System (Platform(..))
 
 main :: IO ()
 main = defaultMainWithHooks ghcHooks
   where
     ghcHooks = simpleUserHooks
-      { postConf = \args cfg pd lbi -> do
+      { confHook = \(gpd, hbi) cfg -> do
+          let verbosity = fromFlagOrDefault minBound (configVerbosity cfg)
+          lbi <- confHook simpleUserHooks (gpd, hbi) cfg
+          gitCommitId <- lookupEnv "GIT_COMMIT_ID" >>= \case
+            Just str -> return str
+            Nothing -> do
+              (git, progdb) <- requireProgram verbosity (simpleProgram "git") defaultProgramDb
+              getProgramOutput verbosity git ["rev-parse", "HEAD"]
+          info verbosity $ "Git Commit Id = " ++ gitCommitId
+          let cfs = configFlags lbi
+              cPa = configProgramArgs cfs ++ [("ghc", ["-D GIT_COMMIT_ID=" ++ gitCommitId])]
+          return lbi { configFlags = cfs { configProgramArgs = cPa } }
+
+      , postConf = \args cfg pd lbi -> do
           let verbosity = fromFlagOrDefault minBound (configVerbosity cfg)
           ghcAutogen verbosity lbi
           postConf simpleUserHooks args cfg pd lbi
       }
 
 ghcAutogen :: Verbosity -> LocalBuildInfo -> IO ()
-ghcAutogen verbosity lbi@LocalBuildInfo{..} = do
+ghcAutogen verbosity lbi@LocalBuildInfo {hostPlatform, pkgDescrFile} = do
+#if MIN_VERSION_Cabal(3,14,0)
+  let fromSymPath = interpretSymbolicPathLBI lbi
+#else
+  let fromSymPath = id
+#endif
+
   -- Get compiler/ root directory from the cabal file
-  let Just compilerRoot = takeDirectory <$> pkgDescrFile
+  let Just compilerRoot = takeDirectory . fromSymPath <$> pkgDescrFile
 
   let platformHostFile = "GHC/Platform/Host.hs"
-      platformHostPath = autogenPackageModulesDir lbi </> platformHostFile
-      ghcVersionFile = "GHC/Version.hs"
-      ghcVersionPath = autogenPackageModulesDir lbi </> ghcVersionFile
-
-  -- Get compiler settings
-  settings <- lookupEnv "HADRIAN_SETTINGS" >>= \case
-    Just settings -> pure $ Left $ read settings
-    Nothing -> do
-      (ghc,withPrograms) <- requireProgram normal ghcProgram withPrograms
-      Right . read <$> getProgramOutput normal ghc ["--info"]
-
+      platformHostPath = fromSymPath (autogenPackageModulesDir lbi) </> platformHostFile
   -- Write GHC.Platform.Host
   createDirectoryIfMissingVerbose verbosity True (takeDirectory platformHostPath)
-  rewriteFileEx verbosity platformHostPath (generatePlatformHostHs settings)
 
-  -- Write GHC.Version
-  createDirectoryIfMissingVerbose verbosity True (takeDirectory ghcVersionPath)
-  rewriteFileEx verbosity ghcVersionPath (generateVersionHs settings)
+  -- hostPlatform is listed in LocalBuildInfo as "the platform we are building for"
+  let Platform arch os = hostPlatform
 
--- | Takes either a list of hadrian generated settings, or a list of settings from ghc --info,
--- and keys in both lists, and looks up the value in the appropriate list
-getSetting :: Either [(String,String)] [(String,String)] -> String -> String -> Either String String
-getSetting settings kh kr = case settings of
-  Left settings -> go settings kh
-  Right settings -> go settings kr
-  where
-    go settings k =  case lookup k settings of
-      Nothing -> Left (show k ++ " not found in settings: " ++ show settings)
-      Just v -> Right v
-
-generatePlatformHostHs :: Either [(String,String)] [(String,String)] -> String
-generatePlatformHostHs settings = either error id $ do
-    let getSetting' = getSetting settings
-    cHostPlatformArch <- getSetting' "hostPlatformArch" "target arch"
-    cHostPlatformOS   <- getSetting' "hostPlatformOS"   "target os"
-    return $ unlines
+  rewriteFileEx verbosity platformHostPath $
+    unlines
         [ "module GHC.Platform.Host where"
         , ""
         , "import GHC.Platform.ArchOS"
+        , "import Distribution.System hiding (Arch, OS)"
         , ""
         , "hostPlatformArch :: Arch"
-        , "hostPlatformArch = " ++ cHostPlatformArch
+        , "hostPlatformArch = toArch " ++ show arch
         , ""
         , "hostPlatformOS   :: OS"
-        , "hostPlatformOS   = " ++ cHostPlatformOS
+        , "hostPlatformOS   = toOS " ++ show os
         , ""
         , "hostPlatformArchOS :: ArchOS"
         , "hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS"
-        ]
-
-generateVersionHs :: Either [(String,String)] [(String,String)] -> String
-generateVersionHs settings = either error id $ do
-    let getSetting' = getSetting settings
-    cProjectGitCommitId <- getSetting' "cProjectGitCommitId" "Project Git commit id"
-    cProjectVersion     <- getSetting' "cProjectVersion"     "Project version"
-    cProjectVersionInt  <- getSetting' "cProjectVersionInt"  "Project Version Int"
-
-    cProjectPatchLevel  <- getSetting' "cProjectPatchLevel"  "Project Patch Level"
-    cProjectPatchLevel1 <- getSetting' "cProjectPatchLevel1" "Project Patch Level1"
-    cProjectPatchLevel2 <- getSetting' "cProjectPatchLevel2" "Project Patch Level2"
-    return $ unlines
-        [ "module GHC.Version where"
         , ""
-        , "import Prelude -- See Note [Why do we import Prelude here?]"
+        , "toArch I386 = ArchX86"
+        , "toArch X86_64 = ArchX86_64"
+        , "toArch PPC = ArchPPC"
+        , "toArch PPC64 = ArchPPC_64 ELF_V1"
+        , "toArch PPC64LE = ArchPPC_64 ELF_V2"
+        , "toArch Sparc = ArchUnknown -- ?"
+        , "toArch Sparc64 = ArchUnknown -- ?"
+        , "toArch Arm = ArchARM ARMv7 [] SOFT -- ?"
+        , "toArch AArch64 = ArchAArch64"
+        , "toArch Mips = ArchUnknown -- ?"
+        , "toArch SH = ArchUnknown -- ?"
+        , "toArch IA64 = ArchUnknown -- ?"
+        , "toArch S390 = ArchUnknown -- ?"
+        , "toArch S390X = ArchUnknown -- ?"
+        , "toArch Alpha = ArchAlpha"
+        , "toArch Hppa = ArchUnknown -- ?"
+        , "toArch Rs6000 = ArchUnknown -- ?"
+        , "toArch M68k = ArchUnknown -- ?"
+        , "toArch Vax = ArchUnknown -- ?"
+        , "toArch RISCV64 = ArchRISCV64"
+        , "toArch LoongArch64 = ArchLoongArch64"
+        , "toArch JavaScript = ArchJavaScript"
+        , "toArch Wasm32 = ArchWasm32"
+        , "toArch (OtherArch _) = ArchUnknown"
         , ""
-        , "cProjectGitCommitId   :: String"
-        , "cProjectGitCommitId   = " ++ show cProjectGitCommitId
-        , ""
-        , "cProjectVersion       :: String"
-        , "cProjectVersion       = " ++ show cProjectVersion
-        , ""
-        , "cProjectVersionInt    :: String"
-        , "cProjectVersionInt    = " ++ show cProjectVersionInt
-        , ""
-        , "cProjectPatchLevel    :: String"
-        , "cProjectPatchLevel    = " ++ show cProjectPatchLevel
-        , ""
-        , "cProjectPatchLevel1   :: String"
-        , "cProjectPatchLevel1   = " ++ show cProjectPatchLevel1
-        , ""
-        , "cProjectPatchLevel2   :: String"
-        , "cProjectPatchLevel2   = " ++ show cProjectPatchLevel2
+        , "toOS Linux = OSLinux"
+        , "toOS Windows = OSMinGW32"
+        , "toOS OSX = OSDarwin"
+        , "toOS FreeBSD = OSFreeBSD"
+        , "toOS OpenBSD = OSOpenBSD"
+        , "toOS NetBSD = OSNetBSD"
+        , "toOS DragonFly = OSDragonFly"
+        , "toOS Solaris = OSSolaris2"
+        , "toOS AIX = OSAIX"
+        , "toOS HPUX = OSUnknown -- ?"
+        , "toOS IRIX = OSUnknown -- ?"
+        , "toOS HaLVM = OSUnknown -- ?"
+        , "toOS Hurd = OSHurd"
+        , "toOS IOS = OSUnknown -- ?"
+        , "toOS Android = OSUnknown -- ?"
+        , "toOS Ghcjs = OSGhcjs"
+        , "toOS Wasi = OSWasi"
+        , "toOS Haiku = OSHaiku"
+        , "toOS (OtherOS _) = OSUnknown"
         ]

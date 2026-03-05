@@ -1,4 +1,4 @@
-cabal-version:  3.0
+cabal-version:  3.12
 
 -- WARNING: ghc-boot.cabal is automatically generated from ghc-boot.cabal.in by
 -- ../../configure.  Make sure you are editing ghc-boot.cabal.in, not
@@ -28,7 +28,7 @@ build-type:     Custom
 extra-source-files: changelog.md
 
 custom-setup
-    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.18, directory, filepath
+    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.18, Cabal-syntax >= 3.6 && <3.18, directory, filepath
 
 source-repository head
     type:     git
@@ -72,12 +72,16 @@ Library
 
     -- but done by Hadrian
     autogen-modules:
-            GHC.Version
+            PackageInfo_ghc_boot
             GHC.Platform.Host
+
+    other-modules:
+            PackageInfo_ghc_boot
 
     build-depends: base       >= 4.7 && < 4.23,
                    binary     == 0.8.*,
                    bytestring >= 0.10 && < 0.13,
+                   Cabal-syntax >= 3.6 && <3.18,
                    containers >= 0.5 && < 0.9,
                    directory  >= 1.2 && < 1.4,
                    filepath   >= 1.3 && < 1.6,

@@ -212,6 +212,7 @@ utils/unlit/fs.*
 libraries/ghc-internal/include/fs.h
 libraries/ghc-internal/cbits/fs.c
 missing-win32-tarballs
+cabal.project.stage2.settings
 
 /extra-gcc-opts
 /sdistprep
@@ -220,8 +221,7 @@ missing-win32-tarballs
 VERSION
 GIT_COMMIT_ID
 
-/libraries/ghc-boot-th-next/.synth-stamp
-/libraries/ghc-boot-th-next/ghc-boot-th-next.cabal.in
+/libraries/ghc-boot-th-next/*
 
 # -------------------------------------------------------------------------------------
 # when using a docker image, one can mount the source code directory as the home folder
@@ -230,9 +230,6 @@ GIT_COMMIT_ID
 .ghc
 .bash_history
 .gitconfig
-
-# Should be equal to testdir_suffix from testsuite/driver/testlib.py.
-*.run
 
 # -----------------------------------------------------------------------------
 # ghc.nix

@@ -6,6 +6,11 @@ detect_cpu_count () {
         CPUS="$NUMBER_OF_PROCESSORS"
     fi
 
+    # macOS / BSD — use absolute path to avoid PATH issues in nix devx shell
+    if [ "$CPUS" = "" ]; then
+        CPUS=`/usr/sbin/sysctl -n hw.ncpu 2>/dev/null`
+    fi
+
     if [ "$CPUS" = "" ]; then
         # Linux
         CPUS=`getconf _NPROCESSORS_ONLN 2>/dev/null`

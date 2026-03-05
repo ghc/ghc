@@ -1,0 +1,51 @@
+-- NOTE: Yes. The strings have to be escaped like this.
+ 
+package rts
+  ghc-options: "-optc-DProjectVersion=\"914\""
+  ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+  ghc-options: "-optc-DBuildArch=\"FIXME\""
+  ghc-options: "-optc-DBuildOS=\"FIXME\""
+  ghc-options: "-optc-DBuildVendor=\"FIXME\""
+  ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+  ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+  ghc-options: "-optc-DFS_NAMESPACE=rts"
+  ghc-options: -no-rts
+  flags: +tables-next-to-code
+
+if os(linux)
+  package rts
+    ghc-options: "-optc-DHostArch=\"x86_64\""
+    ghc-options: "-optc-DHostOS=\"linux\""
+    ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-linux\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+
+if os(darwin)
+  package rts
+    ghc-options: "-optc-DHostArch=\"aarch64\""
+    ghc-options: "-optc-DHostOS=\"darwin\""
+    ghc-options: "-optc-DHostPlatform=\"aarch64-apple-darwin\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    flags: +leading-underscore
+
+if os(freebsd)
+  package rts
+    ghc-options: "-optc-DHostArch=\"x86_64\""
+    ghc-options: "-optc-DHostOS=\"freebsd\""
+    ghc-options: "-optc-DHostPlatform=\"x86_64-portbld-freebsd\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+
+if os(wasi)
+  package rts
+    ghc-options: "-optc-DHostArch=\"wasm32\""
+    ghc-options: "-optc-DHostOS=\"unknown\""
+    ghc-options: "-optc-DHostPlatform=\"wasm32-wasi\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: -optl-Wl,--export-dynamic
+    ghc-options: -optc-fvisibility=default
+    ghc-options: -optc-fvisibility-inlines-hidden
+
+package rts-headers
+  ghc-options: -no-rts
+
+package rts-fs
+  ghc-options: -no-rts

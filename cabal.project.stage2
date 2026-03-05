@@ -1,81 +1,92 @@
-package-dbs: clear, global
+allow-boot-library-installs: True
+benchmarks: False
+tests: False
+
+-- Disable Hackage, we explicitly include the packages we need.
+active-repositories: :none
 
 -- Import configure/generated feature toggles (dynamic, etc.) if present.
 -- A default file is kept in-tree; configure will overwrite with substituted values.
 import: cabal.project.stage2.settings
 
 packages:
+  -- RTS
   rts-headers
   rts-fs
   rts
 
-  libraries/ghc-prim
-  libraries/ghc-internal
-  libraries/ghc-experimental
-  libraries/base
+  -- Compiler
   compiler
   ghc
-  libraries/ghc-platform
-  libraries/ghc-compact
+
+  -- Internal libraries
+  libraries/base
   libraries/ghc-bignum
-  libraries/integer-gmp
   libraries/ghc-boot
   libraries/ghc-boot-th
+  libraries/ghc-compact
+  libraries/ghc-experimental
   libraries/ghc-heap
+  libraries/ghc-internal
+  libraries/ghc-platform
+  libraries/ghc-prim
   libraries/ghci
-  libraries/stm
-  libraries/template-haskell
-  libraries/hpc
+  libraries/integer-gmp
   libraries/system-cxx-std-lib
+  libraries/template-haskell
+
+  -- Internal tools
+  utils/deriveConstants
+  utils/genapply
+  utils/genprimopcode
+  utils/ghc-iserv
+  utils/ghc-pkg
+  utils/ghc-toolchain
+  utils/hp2ps
+  utils/runghc
+  utils/unlit
+
+  -- The following are packages available on Hackage but included as submodules
   libraries/array
   libraries/binary
   libraries/bytestring
+  libraries/Cabal/Cabal
+  libraries/Cabal/Cabal-syntax
   libraries/containers/containers
   libraries/deepseq
   libraries/directory
   libraries/exceptions
   libraries/file-io
   libraries/filepath
+  libraries/haskeline
+  libraries/hpc
+  libraries/libffi-clib
   libraries/mtl
   libraries/os-string
   libraries/parsec
   libraries/pretty
   libraries/process
   libraries/semaphore-compat
+  libraries/stm
+  libraries/terminfo
   libraries/text
   libraries/time
   libraries/transformers
   libraries/unix
-  libraries/xhtml
   libraries/Win32
+  libraries/xhtml
+  utils/hpc
+  utils/hsc2hs
 
-  libraries/Cabal/Cabal-syntax
-  libraries/Cabal/Cabal
+  -- These would be on Hackage but we include them as direct URLs
+  -- (Hackage is disabled by `active-repositories: :none`)
   https://hackage.haskell.org/package/alex-3.5.2.0/alex-3.5.2.0.tar.gz
   https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
   https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
 
-  utils/genprimopcode
-  utils/deriveConstants
-  utils/ghc-pkg
-  utils/hsc2hs
-  utils/unlit
-  utils/ghc-toolchain
-
-  libraries/haskeline
-  libraries/terminfo
-  utils/hp2ps
-  utils/hpc
-  utils/ghc-iserv
-  utils/genapply
-  utils/runghc
-
--- project-rts
--- project-ghc
-benchmarks: False
-tests: False
-allow-boot-library-installs: True
-active-repositories: :none
+--
+-- Constraints
+--
 
 constraints:
   -- we do not want to use the rts-headers from stage1
@@ -83,6 +94,10 @@ constraints:
   -- All build dependencies should be installed, i.e. from stage1.
   -- I cannot write build:* but ghc-internal is enough to do the job.
   , build:any.ghc-internal installed
+
+--
+-- Package level configuration
+--
 
 package *
   library-vanilla: True
@@ -92,61 +107,9 @@ package *
   executable-profiling: False
   executable-static: False
 
--- Maybe we should fix this with some import
-if os(linux)
-  package rts
-    ghc-options: "-optc-DProjectVersion=\"914\""
-    ghc-options: "-optc-DRtsWay=\"v\""
-    ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-linux\""
-    ghc-options: "-optc-DHostArch=\"x86_64\""
-    ghc-options: "-optc-DHostOS=\"linux\""
-    ghc-options: "-optc-DHostVendor=\"unknown\""
-    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
-    ghc-options: "-optc-DBuildArch=\"FIXME\""
-    ghc-options: "-optc-DBuildOS=\"FIXME\""
-    ghc-options: "-optc-DBuildVendor=\"FIXME\""
-    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
-    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
-    ghc-options: "-optc-DFS_NAMESPACE=rts"
-    flags: +tables-next-to-code
+import: cabal.project.rts
 
-if os(darwin)
-  package rts
-    ghc-options: "-optc-DProjectVersion=\"914\""
-    ghc-options: "-optc-DRtsWay=\"v\""
-    ghc-options: "-optc-DHostPlatform=\"aarch64-apple-darwin\""
-    ghc-options: "-optc-DHostArch=\"aarch64\""
-    ghc-options: "-optc-DHostOS=\"darwin\""
-    ghc-options: "-optc-DHostVendor=\"unknown\""
-    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
-    ghc-options: "-optc-DBuildArch=\"FIXME\""
-    ghc-options: "-optc-DBuildOS=\"FIXME\""
-    ghc-options: "-optc-DBuildVendor=\"FIXME\""
-    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
-    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
-    ghc-options: "-optc-DFS_NAMESPACE=rts"
-    flags: +tables-next-to-code +leading-underscore
-	ld-options: -undefined warning
-
-
-program-options
-  ghc-options: -fhide-source-paths -j
-
--- project-boot-libs
-benchmarks: False
-tests: False
-allow-boot-library-installs: True
-active-repositories: :none
-
--- (removed duplicate global package * stanza; first one applies already)
-
-package rts-headers
-  ghc-options: -no-rts
-
-package rts-fs
-  ghc-options: -no-rts
-
-package rts
+package libffi-clib
   ghc-options: -no-rts
 
 -- We end up injecting the following depednency:
@@ -180,32 +143,33 @@ package rts
 --        throughout the session. See
 --          GHC.Unit.State:mkUnitState
 --
-package ghc-internal
-  ghc-options: -no-rts
 
 package ghc
   flags: +build-tool-depends +internal-interpreter
+
+package ghc-bin
+  flags: +internal-interpreter -threaded
 
 package ghci
   flags: +internal-interpreter
 
 package ghc-internal
   flags: +bignum-native
+  ghc-options: -no-rts
 
 package text
   flags: -simdutf
 
-program-options
-  ghc-options: -fhide-source-paths -j
-
-package ghc-bin
-  flags: +internal-interpreter -threaded
-
+-- TODO: What is this? Why do we need _in-ghc-tree_ here?
 package hsc2hs
   flags: +in-ghc-tree
 
 package haskeline
   flags: -terminfo
+
+--
+-- Program options
+--
 
 program-options
   ghc-options: -fhide-source-paths -j
