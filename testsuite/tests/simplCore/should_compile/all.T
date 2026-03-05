@@ -190,6 +190,7 @@ test('T9400', only_ways(['optasm']), compile, ['-O0 -ddump-simpl -dsuppress-uniq
 test('T9441a', [only_ways(['optasm']), check_errmsg(r'f1 = f2') ], compile, ['-ddump-simpl -dsuppress-ticks'])
 test('T9441b', [only_ways(['optasm']), check_errmsg(r'Rec {') ], compile, ['-ddump-simpl'])
 test('T9441c', [only_ways(['optasm']), check_errmsg(r'Rec {') ], compile, ['-ddump-simpl'])
+test('T9445', only_ways(['optasm']), compile, ['-Wno-missing-methods'])
 test('T9583', only_ways(['optasm']), compile, [''])
 test('T9565', only_ways(['optasm']), compile, [''])
 test('T5821', only_ways(['optasm']), compile, [''])
