@@ -885,8 +885,9 @@ database in both modes:
   - In read-only mode, we take a *shared* lock before reading and unlock afterwards.
     Locking is needed to avoid a concurrent invocation of ghc-pkg deleting files from
     the db before we manage to read them. This occasionally happened in #22870.
-    (Note that, historically, we used to only lock the package db during reads on
-     Windows, but the justification seemed insufficient given #22870. See also #16773.)
+    (Note that, historically, only windows used to lock the package db during reads,
+    but the justification seemed insufficient given #22870. So now we always lock
+    even for reads. See also #16773.)
 
   - In read-write mode, we take an **exclusive** lock on the package database.
     However, we don't automatically release the lock after the inner action completes
@@ -970,20 +971,13 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
                 where
                     confs = map (path </>) $ filter (".conf" `isSuffixOf`) fs
 
-                    -- Read the package db, potentially locking the .cache file for r/w mode.
+                    -- Read the package db, using the given lock
                     ignore_cache :: PackageDbLock -> (FilePath -> IO ()) -> IO (PackageDB mode)
                     ignore_cache lock checkTime = do
-                        -- If we're opening for modification, we need to acquire a
-                        -- lock even if we don't open the cache now, because we are
-                        -- going to modify it later.
-
-                        -- mode' <- F.mapM (const $ GhcPkg.lockPackageDb cache) mode
-
                         let doFile f = do checkTime f
                                           parseSingletonPackageConf verbosity f
                         pkgs <- mapM doFile confs
 
-                        -- mkPackageDB pkgs mode'
                         mkPackageDB pkgs (modeWithLock lock mode)
 
                     -- We normally report cache errors for read-only commands,
