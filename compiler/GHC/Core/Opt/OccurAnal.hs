@@ -121,6 +121,17 @@ occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
     imp_rule_edges :: ImpRuleEdges
     imp_rule_edges = mkImpRuleEdges imp_rules
 
+    -- If a unit rule mentions multiple local binders, they must end up in
+    -- the same component; otherwise the rule cannot be attached to any one
+    -- split unit without creating cross-unit references.
+    rule_fv_edges :: IdEnv VarSet
+    rule_fv_edges
+      = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
+          [ mapVarEnv (const local_rule_fvs) (getUniqSet local_rule_fvs)
+          | rule <- unit_rules
+          , let local_rule_fvs = ruleFreeVars rule `intersectVarSet` bndr_set
+          ]
+
     dir_nodes :: [Node Unique (Id, CoreExpr)]
     dir_nodes = map mk_dir_node pairs
 
@@ -143,11 +154,7 @@ occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
 
         impRuleDeps b = foldr unionVarSet emptyVarSet [ vs | (_, vs) <- lookupImpRules imp_rule_edges b ]
 
-        localRuleDeps b = foldr unionVarSet emptyVarSet
-          [ ruleFreeVars rule
-          | rule@Rule { ru_fn } <- unit_rules
-          , idName b == ru_fn
-          ]
+        localRuleDeps b = lookupVarEnv rule_fv_edges b `orElse` emptyVarSet
 
     incoming_edges :: UniqFM Unique [Unique]
     incoming_edges = foldr add_incoming emptyUFM dir_nodes
@@ -182,7 +189,10 @@ occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
           is  -> pprPanic "occurSplitPgm"
                  (text "Rule free vars span multiple components"
                   $$ text "rule:" <+> ppr rule
-                  $$ text "components:" <+> ppr is)
+                  $$ text "components:" <+> ppr is
+                  $$ text "rule_fvs:" <+> ppr rule_fvs
+                  $$ vcat [ text "component" <+> int i <> colon <+> ppr hits
+                          | (i, hits) <- component_hits ])
       where
         rule_component_indices :: [Int]
         rule_component_indices = IntSet.toList $ IntSet.fromList
@@ -192,6 +202,11 @@ occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
           ]
 
         rule_fvs = ruleFreeVars rule
+        component_hits =
+          [ (i, rule_fvs `intersectVarSet` mkVarSet ids)
+          | (ids, i) <- zip component_bndrs [0..]
+          , not (isEmptyVarSet (rule_fvs `intersectVarSet` mkVarSet ids))
+          ]
 
         head_component
           = case findIndex (\ids -> any (\b -> idName b == ruleIdName rule) ids) component_bndrs of
