@@ -86,7 +86,6 @@ executable hadrian
                        , Rules.Documentation
                        , Rules.Generate
                        , Rules.Gmp
-                       , Rules.Libffi
                        , Rules.Library
                        , Rules.Lint
                        , Rules.Nofib

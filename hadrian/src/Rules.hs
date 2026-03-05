@@ -21,7 +21,6 @@ import qualified Rules.Dependencies
 import qualified Rules.Documentation
 import qualified Rules.Generate
 import qualified Rules.Gmp
-import qualified Rules.Libffi
 import qualified Rules.Library
 import qualified Rules.Program
 import qualified Rules.Register
@@ -87,7 +86,7 @@ packageTargets includeGhciLib stage pkg = do
     then return [] -- Skip inactive packages.
     else if isLibrary pkg
         then do -- Collect all targets of a library package.
-            let pkgWays = if pkg == rts then getRtsWays else getLibraryWays
+            let pkgWays = if pkg `elem` [rts, libffi] then getRtsWays else getLibraryWays
             ways  <- interpretInContext context pkgWays
             libs  <- mapM (\w -> pkgLibraryFile (Context stage pkg w (error "unused"))) (Set.toList ways)
             more  <- Rules.Library.libraryTargets includeGhciLib context
@@ -133,7 +132,6 @@ buildRules = do
     Rules.Generate.generateRules
     Rules.Generate.templateRules
     Rules.Gmp.gmpRules
-    Rules.Libffi.libffiRules
     Rules.Library.libraryRules
     Rules.Rts.rtsRules
     packageRules

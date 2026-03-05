@@ -258,6 +258,9 @@ flag libm
 flag librt
   default: False
   manual: True
+flag use-system-libffi
+  default: False
+  manual: True
 flag libffi-adjustors
   default: False
   manual: True
@@ -553,8 +556,11 @@ common rts-c-sources-base
                   posix/TTY.c
 
 common rts-link-options
-    extra-libraries: ffi
-    extra-libraries-static: ffi
+    if flag(use-system-libffi)
+       extra-libraries: ffi
+       extra-libraries-static: ffi
+    else
+       build-depends: libffi-clib
 
     if os(linux)
        extra-libraries: c
@@ -605,6 +611,9 @@ common rts-global-build-flags
     if flag(thread-sanitizer)
       cc-options: -fsanitize=thread
       ld-options: -fsanitize=thread
+    if !flag(use-system-libffi)
+       ghc-options: -optc-DINTERNAL_LIBFFI
+       cpp-options: -DINTERNAL_LIBFFI
 
 common rts-debug-flags
     ghc-options: -optc-DDEBUG
@@ -724,6 +733,12 @@ library
       autogen-cmm-sources:
         AutoApply.cmm
         AutoApply_V16.cmm
+
+      if flag(use-system-libffi)
+         extra-libraries: ffi
+         extra-libraries-static: ffi
+      else
+         build-depends: libffi-clib
 
       if arch(x86_64)
         cmm-sources:

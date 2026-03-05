@@ -10,7 +10,6 @@ import Packages
 import Settings.Builders.Common
 import Settings.Warnings
 import qualified Context as Context
-import Rules.Libffi (libffiName)
 import qualified Data.Set as Set
 import Data.Version.Extra
 
@@ -106,9 +105,6 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     context <- getContext
     distPath <- expr (Context.distDynDir context)
 
-    useSystemFfi <- expr (flag UseSystemFfi)
-    buildPath <- getBuildPath
-    libffiName' <- libffiName
     debugged <- buildingCompilerStage' . ghcDebugged =<< expr flavour
 
     osxTarget <- expr isOsxTarget
@@ -126,17 +122,6 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             where
                 metaOrigin | osxTarget = "@loader_path"
                            | otherwise = "$ORIGIN"
-
-        -- TODO: an alternative would be to generalize by linking with extra
-        -- bundled libraries, but currently the rts is the only use case. It is
-        -- a special case when `useSystemFfi == True`: the ffi library files
-        -- are not actually bundled with the rts. Perhaps ffi should be part of
-        -- rts's extra libraries instead of extra bundled libraries in that
-        -- case. Care should be take as to not break the make build.
-        rtsFfiArg = package rts ? not useSystemFfi ? mconcat
-            [ arg ("-L" ++ buildPath)
-            , arg ("-l" ++ libffiName')
-            ]
 
         -- This is the -rpath argument that is required for the bindist scenario
         -- to work. Indeed, when you install a bindist, the actual executables
@@ -166,7 +151,6 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , (not (nonHsMainPackage pkg) && not (isLibrary pkg)) ? arg "-rtsopts"
             , pure [ "-l" ++ lib    | lib    <- libs    ]
             , pure [ "-L" ++ libDir | libDir <- libDirs ]
-            , rtsFfiArg
             , osxTarget ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
               arg "-debug"

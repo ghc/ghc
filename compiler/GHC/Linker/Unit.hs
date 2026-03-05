@@ -6,6 +6,7 @@ module GHC.Linker.Unit
    , collectArchives
    , getUnitLinkOpts
    , getLibs
+   , getUnitDepends
    )
 where
 
@@ -103,4 +104,10 @@ getLibs namever ways unit_env pkgs = do
     let candidates = [ (l </> f, f) | l <- collectLibraryDirs ways [p]
                                     , f <- (\n -> "lib" ++ n ++ ".a") <$> unitHsLibs namever ways p ]
     filterM (doesFileExist . fst) candidates
+
+getUnitDepends :: HasDebugCallStack => UnitEnv -> UnitId -> [UnitId]
+getUnitDepends unit_env pkg =
+    let unit_state = ue_homeUnitState unit_env
+        unit_info = unsafeLookupUnitId unit_state pkg
+    in (unitDepends unit_info)
 

@@ -18,7 +18,6 @@ import Hadrian.Haskell.Cabal.Type (PackageData(version))
 import Hadrian.Haskell.Cabal
 import Hadrian.Oracles.Cabal (readPackageData)
 import Packages
-import Rules.Libffi
 import Settings
 import Target
 import Utilities
@@ -58,7 +57,6 @@ rtsDependencies = do
     stage   <- getStage
     rtsPath <- expr (rtsBuildPath stage)
     jsTarget <- expr isJsTarget
-    useSystemFfi <- expr (flag UseSystemFfi)
 
     let -- headers common to native and JS RTS
         common_headers =
@@ -70,7 +68,6 @@ rtsDependencies = do
             [ "rts" -/- "EventTypes.h"
             , "rts" -/- "EventLogConstants.h"
             ]
-            ++ (if useSystemFfi then [] else libffiHeaderFiles)
         headers
           | jsTarget  = common_headers
           | otherwise = common_headers ++ native_headers

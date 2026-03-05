@@ -32,6 +32,7 @@ packages:
   libraries/exceptions
   libraries/file-io
   libraries/filepath
+  libraries/libffi-clib
   libraries/mtl
   libraries/os-string
   libraries/parsec
@@ -212,6 +213,9 @@ package rts-fs
   ghc-options: -no-rts
 
 package rts
+  ghc-options: -no-rts
+
+package libffi-clib
   ghc-options: -no-rts
 
 package ghc

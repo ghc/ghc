@@ -1,4 +1,4 @@
-module Rules.Library (libraryRules, needLibrary, libraryTargets) where
+module Rules.Library (libraryRules, needLibrary, libraryTargets, LibDyn(..), parseGhcPkgLibDyn) where
 
 import Hadrian.BuildPath
 import Hadrian.Haskell.Cabal
@@ -36,7 +36,7 @@ libraryRules = do
         root -/- "stage*/lib/**/libHS*-*.dll"   %> registerDynamicLib root "dll"
         root -/- "stage*/lib/**/*.a"            %> registerStaticLib  root
         root -/- "**/HS*-*.o"   %> buildGhciLibO root
-        root -/- "**/HS*-*.p_o" %> buildGhciLibO root
+        root -/- "**/HS*-*.*_o" %> buildGhciLibO root
 
 -- * 'Action's for building libraries
 
