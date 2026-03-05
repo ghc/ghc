@@ -57,6 +57,7 @@ import GHC.Types.Id.Info
 import GHC.Types.InlinePragma ( ActivationGhc, isAlwaysActive )
 import GHC.Types.Basic
 import GHC.Types.Tickish
+import GHC.Types.Name (isExternalName, nameModule)
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var
@@ -69,8 +70,9 @@ import GHC.Utils.Misc
 import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )
 
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
-import Data.List (findIndex, mapAccumL)
+import Data.List (mapAccumL)
 
 {-
 ************************************************************************
@@ -97,7 +99,9 @@ occurAnalyseExpr_Prep expr = expr'
   where
     WUD _ expr' = occAnal (initOccEnv { occ_allow_weak_joins = True }) expr
 
-occurSplitPgm :: Module -> [CoreRule] -> CoreCompUnit -> [CoreCompUnit]
+-- After optimizations a rule might no longer reference binders from this module.
+-- In these cases we return them here and then add them to mg_rules.
+occurSplitPgm :: Module -> [CoreRule] -> CoreCompUnit -> ([CoreCompUnit], [CoreRule])
 occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
   =
     -- pprTrace "occurSplitPgm"
@@ -108,7 +112,7 @@ occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
     --     ppr (unit_rules, unit_binds)
     --   ]
     -- )
-    zipWith mk_comp_unit comp_pairs [0..]
+    (zipWith mk_comp_unit comp_pairs [0..], rules_for_imps)
   where
     CoreCompUnit occ_binds _ =
       occurAnalyseCompUnit mod (const True) (const True) imp_rules
@@ -180,17 +184,24 @@ occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
     mk_comp_binds [pr] = [NonRec (fst pr) (snd pr)]
     mk_comp_binds prs  = [Rec prs]
 
-    component_rules i = [ rule | rule <- unit_rules, rule_comp_index rule == i ]
+    (component_rule_map, rules_for_imps) = foldr assign_rule (IntMap.empty, []) unit_rules
+
+    assign_rule rule (rule_map, imp_rules_acc)
+      = case rule_comp_index rule of
+          Just i  -> (IntMap.insertWith (++) i [rule] rule_map, imp_rules_acc)
+          Nothing -> (rule_map, rule : imp_rules_acc)
+
+    component_rules i = IntMap.findWithDefault [] i component_rule_map
 
     rule_comp_index rule
       = case rule_component_indices of
-          [i] -> i
-          []  -> head_component
+          [i] -> Just i
+          []  -> Nothing
           is  -> pprPanic "occurSplitPgm"
                  (text "Rule free vars span multiple components"
                   $$ text "rule:" <+> ppr rule
                   $$ text "components:" <+> ppr is
-                  $$ text "rule_fvs:" <+> ppr rule_fvs
+                  $$ text "rule_fvs:" <+> pprVarsWithModule (nonDetEltsUniqSet rule_fvs)
                   $$ vcat [ text "component" <+> int i <> colon <+> ppr hits
                           | (i, hits) <- component_hits ])
       where
@@ -198,24 +209,29 @@ occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
         rule_component_indices = IntSet.toList $ IntSet.fromList
           [ i
           | (ids, i) <- zip component_bndrs [0..]
-          , not (isEmptyVarSet (rule_fvs `intersectVarSet` mkVarSet ids))
+          , not (isEmptyVarSet (local_rule_fvs `intersectVarSet` mkVarSet ids))
           ]
 
         rule_fvs = ruleFreeVars rule
+        local_rule_fvs = rule_fvs `intersectVarSet` bndr_set
         component_hits =
-          [ (i, rule_fvs `intersectVarSet` mkVarSet ids)
+          [ (i, local_rule_fvs `intersectVarSet` mkVarSet ids)
           | (ids, i) <- zip component_bndrs [0..]
-          , not (isEmptyVarSet (rule_fvs `intersectVarSet` mkVarSet ids))
+          , not (isEmptyVarSet (local_rule_fvs `intersectVarSet` mkVarSet ids))
           ]
-
-        head_component
-          = case findIndex (\ids -> any (\b -> idName b == ruleIdName rule) ids) component_bndrs of
-              Just i  -> i
-              Nothing -> pprPanic "occurSplitPgm"
-                         (text "No matching compilation component for rule" <+> ppr rule)
 
     scc_payloads (AcyclicSCC p) = [p]
     scc_payloads (CyclicSCC ps) = ps
+
+    pprVarsWithModule :: [Var] -> SDoc
+    pprVarsWithModule vars = braces (fsep (punctuate comma (map pprVarWithModule vars)))
+
+    pprVarWithModule :: Var -> SDoc
+    pprVarWithModule v
+      | isExternalName n = ppr v <+> parens (ppr (nameModule n))
+      | otherwise        = ppr v
+      where
+        n = varName v
 
 occurAnalyseCompUnit
   :: Module
