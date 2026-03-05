@@ -7,6 +7,9 @@ on:
     branches: [stable-ghc-9.14, stable-master]
   workflow_dispatch:
 
+env:
+  CABAL_CACHE_PATH: _build/cabal/bin
+
 jobs:
   cabal:
     strategy:
@@ -53,6 +56,13 @@ jobs:
         minimal: true
         ghc: true
 
+    - name: Cache stage0 cabal binary
+      id: cabal-cache
+      uses: actions/cache@v5
+      with:
+        path: ${{ env.CABAL_CACHE_PATH }}
+        key: cabal-${{ vars.CACHE_VERSION || 'v1' }}-${{ matrix.plat }}-${{ hashFiles('cabal.project.stage0') }}
+
     - name: Update hackage
       shell: devx {0}
       run: cabal update
@@ -65,9 +75,18 @@ jobs:
     #   shell: devx {0}
     #   run: ./configure
 
+    - name: Start metrics collection
+      shell: bash  # bash (not devx): metrics tools use absolute paths to system binaries
+      run: ./mk/collect-metrics.sh start _build/metrics 0.5
+
     - name: Build (dynamic=${{ matrix.dynamic }})
       shell: devx {0}
-      run: make CABAL=$PWD/_build/stage0/bin/cabal DYNAMIC=${{ matrix.dynamic }}
+      run: make QUIET=1 DYNAMIC=${{ matrix.dynamic }} ${{ steps.cabal-cache.outputs.cache-hit == 'true' && 'USE_SYSTEM_CABAL=1' || '' }}
+
+    - name: Display build timings
+      if: ${{ !cancelled() }}
+      shell: devx {0}
+      run: make timing-summary
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -75,16 +94,140 @@ jobs:
         name: ${{ matrix.plat }}-dynamic${{ matrix.dynamic }}-dist
         path: _build/dist
 
+    - name: Upload build logs and timing
+      uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: ${{ matrix.plat }}-dynamic${{ matrix.dynamic }}-build-logs
+        path: |
+          _build/logs/
+          _build/timing/
+
     - name: Run the testsuite (dynamic=${{ matrix.dynamic }})
       shell: devx {0}
-      run: make test CABAL=$PWD/_build/stage0/bin/cabal DYNAMIC=${{ matrix.dynamic }}
+      run: make test QUIET=1 DYNAMIC=${{ matrix.dynamic }} ${{ steps.cabal-cache.outputs.cache-hit == 'true' && 'USE_SYSTEM_CABAL=1' || '' }}
+
+    - name: Stop metrics collection
+      if: ${{ !cancelled() }}
+      shell: bash  # bash (not devx): metrics tools use absolute paths to system binaries
+      run: ./mk/collect-metrics.sh stop _build/metrics
+
+    - name: Display test timings
+      if: ${{ !cancelled() }}
+      shell: devx {0}
+      run: make timing-summary
+
+    - name: Generate metrics plots
+      if: ${{ !cancelled() }}
+      continue-on-error: true
+      shell: bash
+      run: |
+        # Generate separate build and test SVG plots.
+        # Use bash (not devx) because nix is not available inside the devx shell.
+        PYTHON_MPL=$(nix build --impure --no-link --print-out-paths \
+          --expr 'let pkgs = (builtins.getFlake "nixpkgs").legacyPackages.${builtins.currentSystem}; in pkgs.python3.withPackages (ps: [ps.matplotlib])')
+        "$PYTHON_MPL/bin/python3" ./mk/plot-metrics.py _build/metrics _build/timing _build/metrics/metrics
+
+    - name: Upload metrics plots to R2
+      if: ${{ !cancelled() }}
+      continue-on-error: true
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.R2_METRICS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_METRICS_SECRET_ACCESS_KEY }}
+        R2_ENDPOINT: ${{ secrets.R2_METRICS_ENDPOINT }}
+        R2_PUBLIC_URL: ${{ vars.R2_METRICS_PUBLIC_URL }}
+        R2_BUCKET: ${{ vars.R2_METRICS_BUCKET_NAME }}
+      shell: bash
+      run: |
+        RUN_ID="${{ github.run_id }}"
+        PLAT="${{ matrix.plat }}"
+        DYN="${{ matrix.dynamic }}"
+
+        export AWS_ENDPOINT_URL="${R2_ENDPOINT}"
+        export AWS_DEFAULT_REGION=auto
+
+        # Use bash (not devx) because nix is not available inside the devx shell.
+        AWSCLI=$(nix build --no-link --print-out-paths nixpkgs#awscli2)
+        AWS="$AWSCLI/bin/aws"
+
+        # Upload build plot if it exists
+        if [[ -f "_build/metrics/metrics-build.svg" ]]; then
+          BUILD_PATH="runs/${RUN_ID}/${PLAT}-dynamic${DYN}-build.svg"
+          "$AWS" s3 cp _build/metrics/metrics-build.svg "s3://${R2_BUCKET}/${BUILD_PATH}" --content-type 'image/svg+xml' || echo "Failed to upload build plot (non-fatal)"
+          echo "BUILD_PLOT_URL=${R2_PUBLIC_URL}/${BUILD_PATH}" >> $GITHUB_ENV
+        fi
+
+        # Upload test plot if it exists
+        if [[ -f "_build/metrics/metrics-test.svg" ]]; then
+          TEST_PATH="runs/${RUN_ID}/${PLAT}-dynamic${DYN}-test.svg"
+          "$AWS" s3 cp _build/metrics/metrics-test.svg "s3://${R2_BUCKET}/${TEST_PATH}" --content-type 'image/svg+xml' || echo "Failed to upload test plot (non-fatal)"
+          echo "TEST_PLOT_URL=${R2_PUBLIC_URL}/${TEST_PATH}" >> $GITHUB_ENV
+        fi
+
+    - name: Write metrics summary
+      if: ${{ !cancelled() }}
+      shell: devx {0}
+      run: |
+        echo "## Build Metrics Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Embed build plot if available
+        if [[ -n "${BUILD_PLOT_URL:-}" ]]; then
+          echo "### Build Phases (CPU & Memory)" >> $GITHUB_STEP_SUMMARY
+          echo "<img src=\"${BUILD_PLOT_URL}\" alt=\"Build Metrics\" width=\"100%\">" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Embed test plot if available
+        if [[ -n "${TEST_PLOT_URL:-}" ]]; then
+          echo "### Test Phase (CPU & Memory)" >> $GITHUB_STEP_SUMMARY
+          echo "<img src=\"${TEST_PLOT_URL}\" alt=\"Test Metrics\" width=\"100%\">" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "### Phase Timings" >> $GITHUB_STEP_SUMMARY
+        echo "| Phase | Duration | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|----------|--------|" >> $GITHUB_STEP_SUMMARY
+
+        # Auto-discover phases from timing files (summary.txt is generated
+        # by timing-summary.sh with ordered top-level + sub-phases)
+        make timing-summary 2>/dev/null || true
+        if [[ -f "_build/timing/summary.txt" ]]; then
+          while read -r phase dur status; do
+            mins=$((dur / 60))
+            secs=$((dur % 60))
+            status_str="OK"
+            [[ "$status" == "1" ]] && status_str="FAIL"
+            # Indent sub-phases (contain a dot) with leading spaces
+            if [[ "$phase" == *.* ]]; then
+              echo "| &nbsp;&nbsp;$phase | ${mins}m ${secs}s | $status_str |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| **$phase** | **${mins}m ${secs}s** | $status_str |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done < "_build/timing/summary.txt"
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        # Add memory stats from metrics
+        if [[ -f "_build/metrics/metrics.csv" ]]; then
+          max_mem=$(awk -F',' 'NR>1 {if($3>max) max=$3} END {printf "%.1f", max/1024}' _build/metrics/metrics.csv)
+          echo "**Peak Memory:** ${max_mem} GB" >> $GITHUB_STEP_SUMMARY
+        fi
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
-      if: ${{ !cancelled() }} # upload test results even if the testsuite failed to pass
+      if: ${{ !cancelled() }}
       with:
         name: ${{ matrix.plat }}-dynamic${{ matrix.dynamic }}-testsuite-results
         path: |
           _build/test-perf.csv
           _build/test-summary.txt
           _build/test-junit.xml
+          _build/timing/
+
+    - name: Upload metrics
+      uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: ${{ matrix.plat }}-dynamic${{ matrix.dynamic }}-metrics
+        path: |
+          _build/metrics/
