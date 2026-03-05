@@ -27,11 +27,6 @@ import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
 import GHC.Types.Basic
 
-import GHC.Types.SourceText
-    ( FractionalLit,
-      IntegralLit(il_value),
-      negateFractionalLit,
-      integralFractionalLit )
 import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Hs.Syn.Type
@@ -1001,7 +996,7 @@ data PatGroup
   | PgCon DataCon       -- Constructor patterns (incl list, tuple)
   | PgSyn PatSyn [Type] -- See Note [Pattern synonym groups]
   | PgLit Literal       -- Literal patterns
-  | PgN   FractionalLit -- Overloaded numeric literals;
+  | PgN   (FractionalLit GhcTc) -- Overloaded numeric literals;
                         -- see Note [Don't use Literal for PgN]
   | PgOverS FastString  -- Overloaded string literals
   | PgNpK Integer       -- n+k patterns
@@ -1278,14 +1273,15 @@ patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
 patGroup _ (NPat _ (L _ (OverLit {ol_val=oval})) mb_neg _) =
   case (oval, isJust mb_neg) of
-    (HsIntegral   i, is_neg) -> PgN (integralFractionalLit is_neg (if is_neg
-                                                                    then negate (il_value i)
-                                                                    else il_value i))
+    (HsIntegral   i, is_neg) -> PgN (mkFractionalLitFromInteger is_neg
+                                  (if is_neg
+                                   then negate (il_value i)
+                                   else il_value i))
     (HsFractional f, is_neg)
       | is_neg    -> PgN $! negateFractionalLit f
       | otherwise -> PgN f
-    (HsIsString _ s, _) -> assert (isNothing mb_neg) $
-                            PgOverS s
+    (HsIsString s, _) -> assert (isNothing mb_neg) $
+                            PgOverS (sl_fs s)
 patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
   case oval of
    HsIntegral i -> PgNpK (il_value i)

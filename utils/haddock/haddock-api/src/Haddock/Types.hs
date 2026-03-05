@@ -976,9 +976,11 @@ type instance XDataDecl DocNameI = NoExtField
 type instance XSynDecl DocNameI = NoExtField
 type instance XFamDecl DocNameI = NoExtField
 type instance XOverlapMode DocNameI = NoExtField
+type instance XIntegralLit DocNameI = NoExtField
 type instance XXHsDataDefn DocNameI = DataConCantHappen
 type instance XXFamilyDecl DocNameI = DataConCantHappen
 type instance XXOverlapMode DocNameI = DataConCantHappen
+type instance XXIntegralLit DocNameI = DataConCantHappen
 type instance XXTyClDecl DocNameI = DataConCantHappen
 
 type instance XHsWC DocNameI _ = NoExtField

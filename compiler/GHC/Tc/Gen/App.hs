@@ -2399,4 +2399,4 @@ tcTagToEnum (tc_fun, fun_ctxt) tc_args res_ty
 ********************************************************************* -}
 
 tcExprPrag :: HsPragE GhcRn -> HsPragE GhcTc
-tcExprPrag (HsPragSCC x1 ann) = HsPragSCC x1 ann
+tcExprPrag (HsPragSCC x1 ann) = HsPragSCC x1 (tcStringLit ann)

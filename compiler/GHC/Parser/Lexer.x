@@ -122,6 +122,8 @@ import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Types.InlinePragma ( InlineSpec(..), RuleMatchInfo(..))
 import GHC.Hs.Doc
+import GHC.Hs.Extension (GhcPs)
+import GHC.Hs.Lit
 
 import GHC.Parser.CharClass
 
@@ -913,7 +915,7 @@ data Token
   | ITqvarsym (FastString,FastString)
   | ITqconsym (FastString,FastString)
 
-  | ITdupipvarid   FastString   -- GHC extension: implicit param: ?x
+  | ITdupipvarid            FastString   -- GHC extension: implicit param: ?x
   | ITlabelvarid SourceText FastString   -- Overloaded label: #x
                                          -- The SourceText is required because we can
                                          -- have a string literal as a label
@@ -921,8 +923,9 @@ data Token
 
   | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITstring   SourceText StringMeta FastString -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITrational FractionalLit
+  | ITstringMulti SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITinteger  (IntegralLit   GhcPs)
+  | ITrational (FractionalLit GhcPs)
 
   | ITprimchar   SourceText Char     -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITprimstring SourceText ByteString -- Note [Literal source text] in "GHC.Types.SourceText"
@@ -936,8 +939,8 @@ data Token
   | ITprimword16 SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITprimword32 SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITprimword64 SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
-  | ITprimfloat  FractionalLit
-  | ITprimdouble FractionalLit
+  | ITprimfloat  (FractionalLit GhcPs)
+  | ITprimdouble (FractionalLit GhcPs)
 
   -- Template Haskell extension tokens
   | ITopenExpQuote HasE IsUnicodeSyntax --  [| or [e|
@@ -1978,15 +1981,15 @@ tok_primdouble   str = ITprimdouble $! readFractionalLit str
 tok_prim_hex_float  str = ITprimfloat $! readHexFractionalLit str
 tok_prim_hex_double str = ITprimdouble $! readHexFractionalLit str
 
-readFractionalLit, readHexFractionalLit :: String -> FractionalLit
+readFractionalLit, readHexFractionalLit :: String -> FractionalLit GhcPs
 readHexFractionalLit = readFractionalLitX readHexSignificandExponentPair Base2
 readFractionalLit = readFractionalLitX readSignificandExponentPair Base10
 
 readFractionalLitX :: (String -> (Integer, Integer))
                    -> FractionalExponentBase
-                   -> String -> FractionalLit
+                   -> String -> FractionalLit GhcPs
 readFractionalLitX readStr b str =
-  mkSourceFractionalLit str is_neg i e b
+  mkFractionalLitFromText str is_neg i e b
   where
     is_neg = case str of
                     '-' : _ -> True

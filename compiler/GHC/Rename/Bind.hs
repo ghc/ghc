@@ -1138,7 +1138,8 @@ renameSig ctxt sig@(PatSynSig _ vs ty)
 
 renameSig ctxt sig@(SCCFunSig (_, st) v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
-        ; return (SCCFunSig (noAnn, st) new_v s, emptyFVs) }
+        ; let new_s = fmap rnStringLit <$> s
+        ; return (SCCFunSig (noAnn, st) new_v new_s, emptyFVs) }
 
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
@@ -1153,7 +1154,6 @@ renameSig _ctxt (CompleteMatchSig (_, s) bf mty)
          addErrCtxt (SigCtxt rn_sig) $ failWithTc TcRnOrphanCompletePragma
 
        return (rn_sig, emptyFVs)
-
 
 checkSpecESigShape :: LHsExpr GhcPs -> RnM RdrName
 -- Checks the shape of a SPECIALISE

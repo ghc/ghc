@@ -55,7 +55,6 @@ import GHC.Core.PatSyn
 
 import GHC.Driver.Session
 
-import GHC.Types.SourceText
 import GHC.Types.Name hiding (varName)
 import GHC.Types.CostCentre
 import GHC.Types.Id

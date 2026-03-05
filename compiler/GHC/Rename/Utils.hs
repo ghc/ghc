@@ -52,7 +52,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.SourceFile
-import GHC.Types.SourceText ( SourceText(..), IntegralLit )
+import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Unit.Module.ModIface
@@ -735,7 +735,7 @@ genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) (mkEmptyWildCardBnd
 genLHsLit :: (NoAnn an) => HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
 genLHsLit = wrapGenSpan . HsLit noExtField
 
-genHsIntegralLit :: (NoAnn an) => IntegralLit -> LocatedAn an (HsExpr GhcRn)
+genHsIntegralLit :: (NoAnn an) => IntegralLit GhcRn -> LocatedAn an (HsExpr GhcRn)
 genHsIntegralLit = genLHsLit . HsInt noExtField
 
 genHsTyLit :: FastString -> HsType GhcRn

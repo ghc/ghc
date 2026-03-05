@@ -76,7 +76,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.DataCon ( isSrcStrict )
 
 import Control.Monad
-import Control.Arrow ( first )
+import Data.Bifunctor ( first )
 import Data.Foldable ( toList, for_ )
 import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty )
 import Data.Maybe ( isNothing, fromMaybe, mapMaybe, maybeToList )
@@ -324,11 +324,19 @@ rnWarningTxt (WarningTxt st mb_cat wst) = do
         addErrAt (locA loc) (TcRnInvalidWarningCategory cat)
       pure . Just $ L x (InWarningCategory y (L loc cat))
   wst' <- traverse (traverse rnHsDoc) wst
-  pure (WarningTxt st mb_cat' wst')
+  pure . WarningTxt st mb_cat' $ fmap rnWithHsDocIdentifiers <$> wst'
 
 rnWarningTxt (DeprecatedTxt st wst) = do
   wst' <- traverse (traverse rnHsDoc) wst
-  pure (DeprecatedTxt st wst')
+  pure . DeprecatedTxt st $ fmap rnWithHsDocIdentifiers <$> wst'
+
+rnWithHsDocIdentifiers ::
+  WithHsDocIdentifiers (StringLiteral GhcPs) GhcRn ->
+  WithHsDocIdentifiers (StringLiteral GhcRn) GhcRn
+rnWithHsDocIdentifiers ids = WithHsDocIdentifiers
+  { hsDocString      = rnStringLit $ hsDocString ids
+  , hsDocIdentifiers = hsDocIdentifiers ids
+  }
 
 rnLWarningTxt :: LWarningTxt GhcPs -> RnM (LWarningTxt GhcRn)
 rnLWarningTxt (L loc warn) = L loc <$> rnWarningTxt warn

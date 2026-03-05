@@ -80,6 +80,7 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Parser.Annotation
 import GHC.Hs.Doc
 import GHC.Hs.Extension (GhcPass)
+import GHC.Hs.Lit
 import GHC.Unit.Module.ModIface (IfaceExport)
 import GHC.Unit.Module.Warnings
 
@@ -272,7 +273,7 @@ ghcPrimWarns = WarnSome
   []
   where
     mk_txt msg =
-      DeprecatedTxt NoSourceText [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText msg Nothing) []]
+      DeprecatedTxt NoSourceText [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText msg) []]
     mk_decl_dep (occ, msg) = (occ, mk_txt msg)
 
 ghcPrimFixities :: [(OccName,Fixity)]

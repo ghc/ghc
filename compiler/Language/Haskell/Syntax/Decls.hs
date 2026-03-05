@@ -98,13 +98,13 @@ import Language.Haskell.Syntax.Decls.Foreign
 import Language.Haskell.Syntax.Binds.InlinePragma (Activation)
 import Language.Haskell.Syntax.Decls.Overlap (OverlapMode)
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Lit (StringLiteral)
 import Language.Haskell.Syntax.Specificity (Specificity)
 import Language.Haskell.Syntax.Type
 
 import GHC.Data.FastString (FastString)
 import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 import GHC.Hs.Doc (WithHsDocIdentifiers)
-import GHC.Types.SourceText (StringLiteral)
 
 import Control.DeepSeq
 import Control.Monad
@@ -1384,7 +1384,6 @@ data RuleDecl pass
        { rd_ext  :: XHsRule pass
            -- ^ After renamer, free-vars from the LHS and RHS
        , rd_name :: XRec pass RuleName
-           -- ^ Note [Pragma source text] in "GHC.Types.SourceText"
        , rd_act   :: Activation pass
        , rd_bndrs :: RuleBndrs pass
        , rd_lhs   :: XRec pass (HsExpr pass)
@@ -1510,13 +1509,13 @@ data RoleAnnotDecl pass
 data WarningTxt pass
    = DeprecatedTxt
       (XDeprecatedTxt pass)
-      [XRec pass (WithHsDocIdentifiers StringLiteral pass)]
+      [XRec pass (WithHsDocIdentifiers (StringLiteral pass) pass)]
    | WarningTxt
        (XWarningTxt pass)
        (Maybe (XRec pass (InWarningCategory pass)))
            -- ^ Warning category attached to this WARNING pragma, if any;
            -- see Note [Warning categories]
-       [XRec pass (WithHsDocIdentifiers StringLiteral pass)]
+       [XRec pass (WithHsDocIdentifiers (StringLiteral pass) pass)]
    | XWarningTxt !(XXWarningTxt pass)
   deriving Generic
 

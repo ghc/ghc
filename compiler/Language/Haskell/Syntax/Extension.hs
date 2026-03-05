@@ -654,6 +654,11 @@ type family XXOverLit x
 type family XQualLit  x
 type family XXQualLit x
 
+-- -------------------------------------
+-- QualLitVal type families
+type family XQualLitString  x
+type family XXQualLitVal x
+
 -- =====================================================================
 -- Type families for the HsPat extension points
 
@@ -797,7 +802,20 @@ type family XIEType p
 type family XIEData p
 type family XXIEWrappedName p
 
+-- -------------------------------------
+-- FractionalLit type families
+type family XFractionalLit  x
+type family XXFractionalLit x
 
+-- -------------------------------------
+-- IntegralLit type families
+type family XIntegralLit  x
+type family XXIntegralLit x
+
+-- -------------------------------------
+-- StringLit type families
+type family XStringLit  x
+type family XXStringLit x
 
 -- =====================================================================
 -- Misc

@@ -24,7 +24,6 @@ import GHC.Parser.Lexer as Lexer
   , lexer
   )
 import qualified GHC.Types.Error as E
-import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Utils.Error (pprLocMsgEnvelopeDefault)
 import GHC.Utils.Outputable (SDocContext, text, ($$))
@@ -33,6 +32,8 @@ import GHC.Utils.Panic (panic)
 
 import Haddock.Backends.Hyperlinker.Types as T
 import Haddock.GhcUtils
+
+import Language.Haskell.Syntax.Lit
 
 -- | Turn source code string into a stream of more descriptive tokens.
 --
@@ -322,6 +323,7 @@ classify tok =
     ITlabelvarid{} -> TkUnknown
     ITchar{} -> TkChar
     ITstring{} -> TkString
+    ITstringMulti{} -> TkString
     ITinteger{} -> TkNumber
     ITrational{} -> TkNumber
     ITprimchar{} -> TkChar

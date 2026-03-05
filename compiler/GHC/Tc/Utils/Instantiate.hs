@@ -783,23 +783,30 @@ newNonTrivialOverloadedLit
                       \_ _ -> return ()
         ; let L _ witness = mkHsSyntaxApps (l2l loc) fi' [nlHsLit hs_lit]
         ; res_ty <- readExpType res_ty
-        ; return (lit { ol_ext = OverLitTc { ol_rebindable = rebindable
-                                           , ol_witness = witness
-                                           , ol_type = res_ty } }) }
+        ; return (OverLit
+            { ol_ext = OverLitTc
+                { ol_rebindable = rebindable
+                , ol_witness = witness
+                , ol_type = res_ty
+                }
+            , ol_val = tcOverLitVal val
+            })
+        }
   where
     orig = LiteralOrigin lit
 
 ------------
-mkOverLit :: OverLitVal -> TcM (HsLit GhcTc)
+mkOverLit :: OverLitVal GhcRn -> TcM (HsLit GhcTc)
 mkOverLit (HsIntegral i)
   = do  { integer_ty <- tcMetaTy integerTyConName
         ; return (XLit $ HsInteger  (il_text i) (il_value i) integer_ty) }
 
 mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName
-        ; return (XLit $ HsRat r rat_ty) }
+        ; return (XLit $ HsRat (tcFractionalLit r) rat_ty) }
 
-mkOverLit (HsIsString src s) = return (HsString src s)
+mkOverLit (HsIsString sLit)
+  = return $ HsString (stringLitSourceText sLit) (sl_fs sLit)
 
 {-
 ************************************************************************

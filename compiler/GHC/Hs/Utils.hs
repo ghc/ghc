@@ -317,8 +317,8 @@ nlParPat p = noLocA (gParPat p)
 -- These are the bits of syntax that contain rebindable names
 -- See GHC.Rename.Env.lookupSyntax
 
-mkHsIntegral   :: IntegralLit -> HsOverLit GhcPs
-mkHsFractional :: FractionalLit -> HsOverLit GhcPs
+mkHsIntegral   :: IntegralLit   GhcPs -> HsOverLit GhcPs
+mkHsFractional :: FractionalLit GhcPs -> HsOverLit GhcPs
 mkHsIsString   :: SourceText -> FastString -> HsOverLit GhcPs
 mkHsDo         :: HsDoFlavour -> LocatedLW [ExprLStmt GhcPs] -> HsExpr GhcPs
 mkHsDoAnns     :: HsDoFlavour -> LocatedLW [ExprLStmt GhcPs] -> AnnList EpaLocation -> HsExpr GhcPs
@@ -370,9 +370,9 @@ mkRecStmt anns stmts  = (emptyRecStmt' anns :: StmtLR (GhcPass idL) GhcPs bodyR)
                              { recS_stmts = stmts }
 
 
-mkHsIntegral     i  = OverLit noExtField (HsIntegral       i)
-mkHsFractional   f  = OverLit noExtField (HsFractional     f)
-mkHsIsString src s  = OverLit noExtField (HsIsString   src s)
+mkHsIntegral     i = OverLit noExtField (HsIntegral   i)
+mkHsFractional   f = OverLit noExtField (HsFractional f)
+mkHsIsString src s = OverLit noExtField (HsIsString (StringLiteral src s))
 
 mkHsDo     ctxt stmts      = HsDo noAnn ctxt stmts
 mkHsDoAnns ctxt stmts anns = HsDo anns  ctxt stmts

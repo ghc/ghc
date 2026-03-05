@@ -486,12 +486,32 @@ deriving instance Data (HsOverLit GhcPs)
 deriving instance Data (HsOverLit GhcRn)
 deriving instance Data (HsOverLit GhcTc)
 
+deriving instance Data (OverLitVal GhcPs)
+deriving instance Data (OverLitVal GhcRn)
+deriving instance Data (OverLitVal GhcTc)
+
 deriving instance Data OverLitRn
 deriving instance Data OverLitTc
 
 deriving instance Data (HsQualLit GhcPs)
 deriving instance Data (HsQualLit GhcRn)
 deriving instance Data (HsQualLit GhcTc)
+
+deriving instance Data (QualLitVal GhcPs)
+deriving instance Data (QualLitVal GhcRn)
+deriving instance Data (QualLitVal GhcTc)
+
+deriving instance Data (FractionalLit GhcPs)
+deriving instance Data (FractionalLit GhcRn)
+deriving instance Data (FractionalLit GhcTc)
+
+deriving instance Data (IntegralLit GhcPs)
+deriving instance Data (IntegralLit GhcRn)
+deriving instance Data (IntegralLit GhcTc)
+
+deriving instance Data (StringLiteral GhcPs)
+deriving instance Data (StringLiteral GhcRn)
+deriving instance Data (StringLiteral GhcTc)
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Pat ------------------------------------
