@@ -13,6 +13,12 @@ package *
   executable-profiling: False
   executable-static: False
 
+-- Cabal-syntax needs -O0 to avoid simplifier tick exhaustion in
+-- Distribution.PackageDescription.FieldGrammar. The backported simplifier
+-- fixes (#26323, #26903) cause a near-infinite simplifier loop in this module.
+package Cabal-syntax
+  ghc-options: -O0
+
 package haddock-api
   flags: +in-ghc-tree
 
