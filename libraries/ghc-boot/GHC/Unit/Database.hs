@@ -345,9 +345,8 @@ withLockedPackageDb mode file =
   where
     bracket_for_mode =
       case mode of
-        DbOpenReadOnly  -> bracket
+        DbOpenReadOnly    -> bracket
         DbOpenReadWrite{} -> bracketOnError
-
     lock_mode :: DbOpenMode m t -> LockMode
     lock_mode DbOpenReadOnly = SharedLock
     lock_mode DbOpenReadWrite{} = ExclusiveLock
@@ -412,6 +411,14 @@ data DbMode = DbReadOnly | DbReadWrite deriving Eq
 -- | 'DbOpenMode' holds a value of type @t@ but only in 'DbReadWrite' mode.  So
 -- it is like 'Maybe' but with a type argument for the mode to enforce that the
 -- mode is used consistently.
+--
+-- We use the argument to DbOpenReadWrite only when modifying the DB for two uses:
+-- * Storing the Din two cases:
+-- When modifying the DB however the lock is meant to outlive
+-- intermittent read operations. Which is why for writes we typically store the lock in DbOpenMode.
+-- and pass it along the call path.
+--
+-- See Note [ghc-pkg database locking] and withLockedPackageDb
 data DbOpenMode (mode :: DbMode) t where
   DbOpenReadOnly  ::      DbOpenMode 'DbReadOnly t
   DbOpenReadWrite :: t -> DbOpenMode 'DbReadWrite t
@@ -437,7 +444,7 @@ isDbOpenReadMode = \case
 --
 readPackageDbForGhc :: OsPath -> IO [DbUnitInfo]
 readPackageDbForGhc file = do
-   hPutStrLn stderr $ "readPackageDbForGhc:" ++ show file
+   -- hPutStrLn stderr $ "readPackageDbForGhc:" ++ show file
    withLockedPackageDb DbOpenReadOnly file $ \_ -> do
       decodeFromFile file DbOpenReadOnly getDbForGhc >>= \case
          (pkgs, DbOpenReadOnly) -> return pkgs
@@ -457,10 +464,7 @@ readPackageDbForGhc file = do
 --
 -- The incoming mode carries the exclusive lock if we are in R/W mode.
 --
--- If we open the package db in read only mode, we get its contents. Otherwise
--- we additionally receive a PackageDbLock that represents a lock on the
--- database, so that we can safely update it later.
---
+-- Returns the lock on the db as-is.
 readPackageDbForGhcPkg :: Binary pkgs => OsPath -> DbOpenMode mode PackageDbLock ->
                           IO (pkgs, DbOpenMode mode PackageDbLock)
 readPackageDbForGhcPkg file mode =
@@ -552,15 +556,9 @@ headerMagic = BS.Char8.pack "\0ghcpkg\0"
 -- which it returns unchanged.
 decodeFromFile :: OsPath -> DbOpenMode mode PackageDbLock -> Get pkgs ->
                   IO (pkgs, DbOpenMode mode PackageDbLock)
-decodeFromFile file mode decoder = case mode of
-   -- DB is locked with shared access already, we just do the read.
-  DbOpenReadOnly -> do
-      (, DbOpenReadOnly) <$> decodeFileContents
-  DbOpenReadWrite{} -> do
-    -- When we open the package db in read/write mode, we receive an exclusive lock
-    -- on the database via the mode and return it so we can keep it for the duration of the
-    -- update.
-    -- If an exception is raised the caller releases the lock.
+decodeFromFile file mode decoder =
+   -- Return incoming lock together with the result.
+   -- See Note [ghc-pkg database locking]
       (, mode) <$> decodeFileContents
   where
     decodeFileContents = FileIO.withBinaryFile file ReadMode $ \hnd ->
