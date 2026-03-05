@@ -1,0 +1,211 @@
+package-dbs: clear, global
+
+-- Import configure/generated feature toggles (dynamic, etc.) if present.
+-- A default file is kept in-tree; configure will overwrite with substituted values.
+import: cabal.project.stage2.settings
+
+packages:
+  rts-headers
+  rts-fs
+  rts
+
+  libraries/ghc-prim
+  libraries/ghc-internal
+  libraries/ghc-experimental
+  libraries/base
+  compiler
+  ghc
+  libraries/ghc-platform
+  libraries/ghc-compact
+  libraries/ghc-bignum
+  libraries/integer-gmp
+  libraries/ghc-boot
+  libraries/ghc-boot-th
+  libraries/ghc-heap
+  libraries/ghci
+  libraries/stm
+  libraries/template-haskell
+  libraries/hpc
+  libraries/system-cxx-std-lib
+  libraries/array
+  libraries/binary
+  libraries/bytestring
+  libraries/containers/containers
+  libraries/deepseq
+  libraries/directory
+  libraries/exceptions
+  libraries/file-io
+  libraries/filepath
+  libraries/mtl
+  libraries/os-string
+  libraries/parsec
+  libraries/pretty
+  libraries/process
+  libraries/semaphore-compat
+  libraries/text
+  libraries/time
+  libraries/transformers
+  libraries/unix
+  libraries/xhtml
+  libraries/Win32
+
+  libraries/Cabal/Cabal-syntax
+  libraries/Cabal/Cabal
+  https://hackage.haskell.org/package/alex-3.5.2.0/alex-3.5.2.0.tar.gz
+  https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
+  https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
+
+  utils/genprimopcode
+  utils/deriveConstants
+  utils/ghc-pkg
+  utils/hsc2hs
+  utils/unlit
+  utils/ghc-toolchain
+
+  libraries/haskeline
+  libraries/terminfo
+  utils/hp2ps
+  utils/hpc
+  utils/ghc-iserv
+  utils/genapply
+  utils/runghc
+
+-- project-rts
+-- project-ghc
+benchmarks: False
+tests: False
+allow-boot-library-installs: True
+active-repositories: :none
+
+constraints:
+  -- we do not want to use the rts-headers from stage1
+  rts-headers source, rts-fs source
+  -- All build dependencies should be installed, i.e. from stage1.
+  -- I cannot write build:* but ghc-internal is enough to do the job.
+  , build:any.ghc-internal installed
+
+package *
+  library-vanilla: True
+  library-for-ghci: True
+  -- shared/executable-dynamic now controlled by Makefile (DYNAMIC variable)
+  -- so we do not pin them here; default (static) remains when DYNAMIC=0.
+  executable-profiling: False
+  executable-static: False
+
+-- Maybe we should fix this with some import
+if os(linux)
+  package rts
+    ghc-options: "-optc-DProjectVersion=\"914\""
+    ghc-options: "-optc-DRtsWay=\"v\""
+    ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-linux\""
+    ghc-options: "-optc-DHostArch=\"x86_64\""
+    ghc-options: "-optc-DHostOS=\"linux\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+    ghc-options: "-optc-DBuildArch=\"FIXME\""
+    ghc-options: "-optc-DBuildOS=\"FIXME\""
+    ghc-options: "-optc-DBuildVendor=\"FIXME\""
+    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+    ghc-options: "-optc-DFS_NAMESPACE=rts"
+    flags: +tables-next-to-code
+
+if os(darwin)
+  package rts
+    ghc-options: "-optc-DProjectVersion=\"914\""
+    ghc-options: "-optc-DRtsWay=\"v\""
+    ghc-options: "-optc-DHostPlatform=\"aarch64-apple-darwin\""
+    ghc-options: "-optc-DHostArch=\"aarch64\""
+    ghc-options: "-optc-DHostOS=\"darwin\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+    ghc-options: "-optc-DBuildArch=\"FIXME\""
+    ghc-options: "-optc-DBuildOS=\"FIXME\""
+    ghc-options: "-optc-DBuildVendor=\"FIXME\""
+    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+    ghc-options: "-optc-DFS_NAMESPACE=rts"
+    flags: +tables-next-to-code +leading-underscore
+	ld-options: -undefined warning
+
+
+program-options
+  ghc-options: -fhide-source-paths -j
+
+-- project-boot-libs
+benchmarks: False
+tests: False
+allow-boot-library-installs: True
+active-repositories: :none
+
+-- (removed duplicate global package * stanza; first one applies already)
+
+package rts-headers
+  ghc-options: -no-rts
+
+package rts-fs
+  ghc-options: -no-rts
+
+package rts
+  ghc-options: -no-rts
+
+-- We end up injecting the following depednency:
+--
+--   ghc-internal
+--    '- rts:<sublib>
+--     '- rts
+--
+-- Because the ghc-internal package depends on the
+-- rts implementation (in the sublib), however GHC
+-- is responsible for dependency injecting the right
+-- implementation.
+--
+-- During the bootsrap phase of building GHC, there
+-- is a race condition where ghc-bin depends on
+-- the rts:<sublib> and also on ghc-internal, hence
+-- we can occationally end up in the state where we
+-- try to build the ghc-internal library, while the
+-- rts:<sublib> isn't yet built.
+--
+-- Modelling this in cabal properly is hard. Relying
+-- on chance to build it in the right sequence is
+-- also bad. Disabling this check outright in ghc
+-- is bad because under all circumstances (except
+-- bootstrapping) this is an essential dependency that
+-- must exist.
+--
+-- MAYBE: a better option is to push this check to
+--        the link time only. However we then don't
+--        have the ghc-internal available earlier
+--        throughout the session. See
+--          GHC.Unit.State:mkUnitState
+--
+package ghc-internal
+  ghc-options: -no-rts
+
+package ghc
+  flags: +build-tool-depends +internal-interpreter
+
+package ghci
+  flags: +internal-interpreter
+
+package ghc-internal
+  flags: +bignum-native
+
+package text
+  flags: -simdutf
+
+program-options
+  ghc-options: -fhide-source-paths -j
+
+package ghc-bin
+  flags: +internal-interpreter -threaded
+
+package hsc2hs
+  flags: +in-ghc-tree
+
+package haskeline
+  flags: -terminfo
+
+program-options
+  ghc-options: -fhide-source-paths -j

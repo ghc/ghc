@@ -1,0 +1,223 @@
+package-dbs: clear, global
+
+
+packages:
+  rts-headers
+  rts-fs
+  rts
+
+  libraries/ghc-prim
+  libraries/ghc-internal
+  libraries/ghc-experimental
+  libraries/base
+  compiler
+  libraries/ghc-platform
+  libraries/ghc-compact
+  libraries/ghc-bignum
+  libraries/integer-gmp
+  libraries/ghc-boot
+  libraries/ghc-boot-th
+  libraries/ghc-heap
+  libraries/ghci
+  libraries/stm
+  libraries/template-haskell
+  libraries/hpc
+  libraries/system-cxx-std-lib
+  libraries/array
+  libraries/binary
+  libraries/bytestring
+  libraries/containers/containers
+  libraries/deepseq
+  libraries/directory
+  libraries/exceptions
+  libraries/file-io
+  libraries/filepath
+  libraries/mtl
+  libraries/os-string
+  libraries/parsec
+  libraries/pretty
+  libraries/process
+  libraries/semaphore-compat
+  libraries/text
+  libraries/time
+  libraries/transformers
+  libraries/unix
+  libraries/xhtml
+  libraries/Win32
+
+  libraries/Cabal/Cabal-syntax
+  libraries/Cabal/Cabal
+  https://hackage.haskell.org/package/alex-3.5.2.0/alex-3.5.2.0.tar.gz
+  https://hackage.haskell.org/package/happy-2.1.5/happy-2.1.5.tar.gz
+  https://hackage.haskell.org/package/happy-lib-2.1.5/happy-lib-2.1.5.tar.gz
+
+  utils/genprimopcode
+  utils/deriveConstants
+
+-- project-rts
+benchmarks: False
+tests: False
+allow-boot-library-installs: True
+active-repositories: :none
+
+constraints:
+  build:any.ghc-internal installed,
+  -- for some reason cabal things these are already installed for the target,
+  -- although they only exist in the build compiler package db
+  Cabal source,
+  Cabal-syntax source,
+  array source,
+  base source,
+  binary source,
+  bytestring source,
+  containers source,
+  deepseq source,
+  directory source,
+  exceptions source,
+  file-io source,
+  filepath source,
+  ghc-bignum source,
+  hpc source,
+  integer-gmp source,
+  mtl source,
+  os-string source,
+  parsec source,
+  pretty source,
+  process source,
+  rts source,
+  rts-headers source,
+  rts-fs source,
+  stm source,
+  system-cxx-std-lib source,
+  template-haskell source,
+  text source,
+  time source,
+  transformers source,
+  unix source,
+  xhtml source,
+  Win32 source
+
+
+package *
+  library-vanilla: True
+  shared: False
+  executable-profiling: False
+  executable-dynamic: False
+  executable-static: False
+  -- library-for-ghci will cause a `ld -r` call to create pre-linked objects.
+  -- This helps the internal linker when trying to link (.a) archives with massive
+  -- displacements. In that case the displacement can be in excess of what
+  -- is possible to relocate, and the linker fails. Pre-linking the objects helps with
+  -- this (and linking performance, as we need to process fewer relocations).
+  -- 
+  -- For some cross targets like JavaScript, this will fail as the $LD -r invocation
+  -- might not be properly supported.
+  --
+  --   fs.o: file not recognized: file format not recognized
+  --
+  -- Thus for cross compilers, we outright disable this here. The primary offending
+  -- library is libHSghc, which can easily be 150MB+
+  --
+  -- TODO: this is rather fragile, and should be fixed properly by making pre-linked
+  --             objects of have GHC pre-link excessively large archives on-demand.
+  library-for-ghci: False
+
+if os(wasi)
+  package *
+    shared: True
+  package rts
+    ghc-options: "-optc-DProjectVersion=\"913\""
+    ghc-options: "-optc-DRtsWay=\"v\""
+    ghc-options: "-optc-DHostPlatform=\"wasm32-wasi\""
+    ghc-options: "-optc-DHostArch=\"wasm32\""
+    ghc-options: "-optc-DHostOS=\"unknown\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+    ghc-options: "-optc-DBuildArch=\"FIXME\""
+    ghc-options: "-optc-DBuildOS=\"FIXME\""
+    ghc-options: "-optc-DBuildVendor=\"FIXME\""
+    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+    ghc-options: "-optc-DFS_NAMESPACE=rts"
+    ghc-options: "-optl-Wl,--export-dynamic"
+    ghc-options: "-optc-fvisibility=default"
+    ghc-options: "-optc-fvisibility-inlines-hidden"
+    flags: -tables-next-to-code
+
+-- Maybe we should fix this with some import
+if os(linux)
+  package rts
+    ghc-options: "-optc-DProjectVersion=\"913\""
+    ghc-options: "-optc-DRtsWay=\"v\""
+    ghc-options: "-optc-DHostPlatform=\"x86_64-unknown-linux\""
+    ghc-options: "-optc-DHostArch=\"x86_64\""
+    ghc-options: "-optc-DHostOS=\"linux\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+    ghc-options: "-optc-DBuildArch=\"FIXME\""
+    ghc-options: "-optc-DBuildOS=\"FIXME\""
+    ghc-options: "-optc-DBuildVendor=\"FIXME\""
+    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+    ghc-options: "-optc-DFS_NAMESPACE=rts"
+    flags: +tables-next-to-code
+
+if os(darwin)
+  package rts
+    ghc-options: "-optc-DProjectVersion=\"913\""
+    ghc-options: "-optc-DRtsWay=\"v\""
+    ghc-options: "-optc-DHostPlatform=\"aarch64-apple-darwin\""
+    ghc-options: "-optc-DHostArch=\"aarch64\""
+    ghc-options: "-optc-DHostOS=\"darwin\""
+    ghc-options: "-optc-DHostVendor=\"unknown\""
+    ghc-options: "-optc-DBuildPlatform=\"FIXME\""
+    ghc-options: "-optc-DBuildArch=\"FIXME\""
+    ghc-options: "-optc-DBuildOS=\"FIXME\""
+    ghc-options: "-optc-DBuildVendor=\"FIXME\""
+    ghc-options: "-optc-DGhcUnregisterised=\"FIXME\""
+    ghc-options: "-optc-DTablesNextToCode=\"FIXME\""
+    ghc-options: "-optc-DFS_NAMESPACE=rts"
+    flags: +tables-next-to-code +leading-underscore
+
+program-options
+  ghc-options: -fhide-source-paths -j
+
+-- project-boot-libs
+benchmarks: False
+tests: False
+allow-boot-library-installs: True
+active-repositories: :none
+
+package rts-headers
+  ghc-options: -no-rts
+
+package rts-fs
+  ghc-options: -no-rts
+
+package rts
+  ghc-options: -no-rts
+
+package ghc
+  flags: +build-tool-depends +internal-interpreter
+
+package ghci
+  flags: +internal-interpreter
+
+package ghc-internal
+  flags: +bignum-native
+
+package text
+  flags: -simdutf
+
+program-options
+  ghc-options: -fhide-source-paths -j
+
+-- project-ghc
+benchmarks: False
+tests: False
+
+package hsc2hs
+  flags: +in-ghc-tree
+
+program-options
+  ghc-options: -fhide-source-paths -j
