@@ -97,6 +97,7 @@ import Data.Ord           ( comparing )
 import Data.Either        ( partitionEithers )
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Semigroup as Semi
 
 {-
 ************************************************************************
@@ -2714,14 +2715,33 @@ hasFieldInfo_maybe rdr_env fam_inst_envs item
 
   -- (HF2e) It's a custom HasField constraint, not the one from GHC.Records.
   | Just (tc, _) <- splitTyConApp_maybe (errorItemPred item)
-  , getOccString tc == "HasField"
-  , isHasFieldOrigin (errorItemOrigin item)
-  = return $ Just $ CustomHasField tc
+  = do { rebindable_syntax <- xoptM LangExt.RebindableSyntax
+       ; return $
+           if want_custom_hasfield_msg tc rebindable_syntax
+           then Just $ CustomHasField tc
+           else Nothing
+       }
 
   | otherwise
   = return Nothing
 
   where
+
+    orig = errorItemOrigin item
+
+    want_custom_hasfield_msg tc rebindable_syntax
+      | getOccString tc == "HasField"
+      = Semi.getAny $ foldMapCtOrigin (Semi.Any . is_has_field) orig
+      | otherwise
+      = False
+      where
+        -- Handle custom 'getField'/'setField' with RebindableSyntax.
+        is_has_field (OccurrenceOf n)
+          | rebindable_syntax
+          , getOccString n `elem` ["getField", "setField"]
+          = True
+        is_has_field o
+          = isHasFieldOrigin o
 
     get_parent_nm :: Name -> TcM (Maybe (Either PatSyn TyCon))
     get_parent_nm nm =
@@ -2761,22 +2781,6 @@ hasField_maybe pred =
     _ -> Nothing
   -- NB: we deliberately don't handle rebound 'HasField' (with -XRebindableSyntax),
   -- as GHC only has built-in instances for the built-in 'HasField' class.
-
--- | Does this constraint arise from GHC internal mechanisms that desugar to
--- usage of the 'HasField' typeclass (e.g. OverloadedRecordDot, etc)?
---
--- Just used heuristically to decide whether to print an informative message to
--- the user (see (H2e) in Note [Error messages for unsolved HasField constraints]).
-isHasFieldOrigin :: CtOrigin -> Bool
-isHasFieldOrigin = \case
-  OccurrenceOf n ->
-    -- A heuristic...
-    getOccString n `elem` ["getField", "setField"]
-  OccurrenceOfRecSel {} -> True
-  RecordUpdOrigin {} -> True
-  RecordFieldProjectionOrigin {} -> True
-  GetFieldOrigin {} -> True
-  _ -> False
 
 -----------------------
 -- relevantBindings looks at the value environment and finds values whose

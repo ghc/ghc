@@ -375,6 +375,10 @@ Finally, there are two more items addressing -XOverloadedRecordDot:
   the (IRS6) warning in the typechecker for a `HasField` constraint that
   arises from a record-dot HsGetField occurrence.  Happily, this is easy to do
   by looking at its `CtOrigin`. Tested in T24891.
+
+  The same applies for record field projection operators such as (.fld) and
+  (.fld1.fld2), which have different 'CtOrigin's. The 'isHasFieldOrigin'
+  function catches those as well. Tested in T26686.
 -}
 
 pmcRecSel :: Id       -- ^ Id of the selector
