@@ -633,10 +633,8 @@ void scavengeTSOIOManager(StgTSO *tso)
 #endif
 
             /* case IO_MANAGER_WIN32_LEGACY:
-             * BlockedOn{Read,Write,DoProc} uses block_info.async_result
-             * The StgAsyncIOResult async_result is allocated on the C heap.
-             * It'd probably be better if it used the GC heap. If it did we'd
-             * scavenge it here.
+             * BlockedOn{Read,Write,DoProc} uses block_info.async_reqID
+             * which is a plain integer, so nothing to scavenge.
              */
 
         default:
@@ -846,7 +844,7 @@ void syncIOCancel(Capability *cap, StgTSO *tso)
         case IO_MANAGER_WIN32_LEGACY:
             removeThreadFromDeQueue(cap, &cap->iomgr->blocked_queue_hd,
                                          &cap->iomgr->blocked_queue_tl, tso);
-            abandonWorkRequest(tso->block_info.async_result->reqID);
+            abandonWorkRequest(tso->block_info.async_reqID);
             break;
 #endif
         default:
@@ -885,12 +883,7 @@ bool syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
              * would make the primops more consistent.
              */
         {
-            StgAsyncIOResult *ares = stgMallocBytes(sizeof(StgAsyncIOResult),
-                                                    "syncDelay");
-            ares->reqID   = addDelayRequest(us_delay);
-            ares->len     = 0;
-            ares->errCode = 0;
-            tso->block_info.async_result = ares;
+            tso->block_info.async_reqID = addDelayRequest(us_delay);
 
             /* Having all async-blocked threads reside on the blocked_queue
              * simplifies matters, so set the status to OnDoProc and put the

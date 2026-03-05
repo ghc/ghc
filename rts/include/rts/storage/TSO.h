@@ -37,15 +37,6 @@ typedef StgWord64 StgThreadID;
  */
 typedef unsigned int StgThreadReturnCode;
 
-#if defined(mingw32_HOST_OS)
-/* results from an async I/O request + its request ID. */
-typedef struct {
-  unsigned int reqID;
-  int          len;
-  int          errCode;
-} StgAsyncIOResult;
-#endif
-
 /* Reason for thread being blocked. See comment above struct StgTso_. */
 typedef union {
   StgClosure *closure;
@@ -57,7 +48,7 @@ typedef union {
   StgAsyncIOOp *aiop;
   StgTimeoutQueue *timeout;
 #if defined(mingw32_HOST_OS)
-  StgAsyncIOResult *async_result;
+  StgWord async_reqID;
 #endif
 #if !defined(THREADED_RTS)
   StgWord target;

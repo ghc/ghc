@@ -27,3 +27,4 @@ extern int awaitRequests(bool wait);
 
 extern void abandonRequestWait(void);
 extern void resetAbandonRequestWait(void);
+extern HsInt rts_EINTR(void);

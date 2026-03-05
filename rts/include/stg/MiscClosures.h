@@ -379,8 +379,6 @@ RTS_RET(stg_block_putmvar);
 #if defined(mingw32_HOST_OS)
 RTS_FUN_DECL(stg_block_async);
 RTS_RET(stg_block_async);
-RTS_FUN_DECL(stg_block_async_void);
-RTS_RET(stg_block_async_void);
 #endif
 RTS_FUN_DECL(stg_block_stmwait);
 RTS_FUN_DECL(stg_block_throwto);

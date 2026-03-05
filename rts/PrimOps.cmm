@@ -2255,18 +2255,7 @@ stg_delayzh ( W_ us_delay )
     (ok) = ccall syncDelay(MyCapability() "ptr", CurrentTSO "ptr", us_delay);
 
     if (ok != 0::CBool) (likely: True) {
-        /* Annoyingly, we cannot be consistent with how we wait and resume the
-         * blocked thread. The reason is that the win32 legacy I/O manager
-         * allocates a StgAsyncIOResult struct on the C heap which has to be
-         * freed when the thread resumes. It's a bit awkward to arrange to
-         * allocate it on the GC heap instead, so that's how it is for now.
-         * Sigh.
-         */
-#if defined(mingw32_HOST_OS)
-        jump stg_block_async_void();
-#else
         jump stg_block_noregs();
-#endif
     } else {
         jump stg_raisezh(HsIface_heapOverflow_closure(W_[ghc_hs_iface]));
     }
@@ -2276,21 +2265,14 @@ stg_delayzh ( W_ us_delay )
 #if defined(mingw32_HOST_OS)
 stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
 {
-    W_ ares;
     CInt reqID;
 
 #if defined(THREADED_RTS)
     ccall sbarf("asyncRead# on threaded RTS") never returns;
 #else
 
-    /* could probably allocate this on the heap instead */
-    ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
-                                        "stg_asyncReadzh");
     (reqID) = ccall addIORequest(fd, 0/*FALSE*/,is_sock,len,buf "ptr");
-    StgAsyncIOResult_reqID(ares)   = reqID;
-    StgAsyncIOResult_len(ares)     = 0;
-    StgAsyncIOResult_errCode(ares) = 0;
-    StgTSO_block_info(CurrentTSO)  = ares;
+    StgTSO_block_info(CurrentTSO) = reqID;
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I32);
     %release StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I32;
@@ -2302,21 +2284,14 @@ stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
 
 stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
 {
-    W_ ares;
     CInt reqID;
 
 #if defined(THREADED_RTS)
     ccall sbarf("asyncWrite# on threaded RTS") never returns;
 #else
 
-    ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
-                                        "stg_asyncWritezh");
     (reqID) = ccall addIORequest(fd, 1/*TRUE*/,is_sock,len,buf "ptr");
-
-    StgAsyncIOResult_reqID(ares)   = reqID;
-    StgAsyncIOResult_len(ares)     = 0;
-    StgAsyncIOResult_errCode(ares) = 0;
-    StgTSO_block_info(CurrentTSO)  = ares;
+    StgTSO_block_info(CurrentTSO) = reqID;
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I32);
     %release StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I32;
@@ -2328,21 +2303,14 @@ stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
 
 stg_asyncDoProczh ( W_ proc, W_ param )
 {
-    W_ ares;
     CInt reqID;
 
 #if defined(THREADED_RTS)
     ccall sbarf("asyncDoProc# on threaded RTS") never returns;
 #else
 
-    /* could probably allocate this on the heap instead */
-    ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
-                                        "stg_asyncDoProczh");
     (reqID) = ccall addDoProcRequest(proc "ptr",param "ptr");
-    StgAsyncIOResult_reqID(ares)   = reqID;
-    StgAsyncIOResult_len(ares)     = 0;
-    StgAsyncIOResult_errCode(ares) = 0;
-    StgTSO_block_info(CurrentTSO) = ares;
+    StgTSO_block_info(CurrentTSO) = reqID;
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I32);
     %release StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I32;

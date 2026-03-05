@@ -627,12 +627,7 @@ wanteds os = concat
            -- Note that this conditional part only affects the C headers.
            -- That's important, as it means we get the same PlatformConstants
            -- type on all platforms.
-          ,if os == Just Windows
-           then concat [structSize  C "StgAsyncIOResult"
-                       ,structField C "StgAsyncIOResult" "reqID"
-                       ,structField C "StgAsyncIOResult" "len"
-                       ,structField C "StgAsyncIOResult" "errCode"]
-           else []
+          ,[]
 
            -- struct HsIface
           ,structField C "HsIface" "Z0T_closure"
@@ -759,9 +754,6 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                      "",
                      "#define PROFILING",
                      "#define THREADED_RTS",
-                     -- We need to define this if we want StgAsyncIOResult
-                     -- struct to be present after CPP
-                     --
                      -- FIXME: rts/PosixSource.h should include ghcplatform.h
                      -- which should set this. There is a mismatch host/target
                      -- again...
