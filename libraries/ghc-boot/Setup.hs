@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE CPP #-}
 module Main where
 
 import Distribution.Simple
@@ -10,6 +10,9 @@ import Distribution.Verbosity
 import Distribution.Simple.Program
 import Distribution.Simple.Utils
 import Distribution.Simple.Setup
+#if MIN_VERSION_Cabal(3,14,0)
+import Distribution.Simple.LocalBuildInfo (interpretSymbolicPathLBI)
+#endif
 
 import System.IO
 import System.Directory

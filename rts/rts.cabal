@@ -594,13 +594,13 @@ common rts-link-options
          ld-options: -read_only_relocs warning
 
 common rts-global-build-flags
-    ghc-options: -DCOMPILING_RTS
+    ghc-options: -optc-DCOMPILING_RTS
     cpp-options: -DCOMPILING_RTS
     if !flag(smp)
-       ghc-options: -DNOSMP
+       ghc-options: -optc-DNOSMP
        cpp-options: -DNOSMP
     if flag(dynamic)
-       ghc-options: -DDYNAMIC
+       ghc-options: -optc-DDYNAMIC
        cpp-options: -DDYNAMIC
     if flag(thread-sanitizer)
       cc-options: -fsanitize=thread
@@ -611,7 +611,7 @@ common rts-debug-flags
     cpp-options: -DDEBUG -fno-omit-frame-pointer -g3 -O0
 
 common rts-threaded-flags
-    ghc-options: -DTHREADED_RTS
+    ghc-options: -optc-DTHREADED_RTS
     cpp-options: -DTHREADED_RTS
 
 -- the _main_ library needs to deal with all the _configure_ time stuff.
@@ -625,6 +625,10 @@ library
       DerivedConstants.h
       rts/EventLogConstants.h
       rts/EventTypes.h
+      rts/AutoApply.cmm.h
+      rts/AutoApply_V16.cmm.h
+      rts/AutoApply_V32.cmm.h
+      rts/AutoApply_V64.cmm.h
 
     install-includes:
       ghcautoconf.h
@@ -632,6 +636,10 @@ library
       DerivedConstants.h
       rts/EventLogConstants.h
       rts/EventTypes.h
+      rts/AutoApply.cmm.h
+      rts/AutoApply_V16.cmm.h
+      rts/AutoApply_V32.cmm.h
+      rts/AutoApply_V64.cmm.h
 
     install-includes:
       -- Common headers for non-JS builds
@@ -782,7 +790,7 @@ library nonthreaded-nodebug
 
     visibility: public
 
-    ghc-options: -optc-DRtsWay="v"
+    ghc-options: -optc-DRtsWay="rts_v"
 
 
 library threaded-nodebug
@@ -792,6 +800,8 @@ library threaded-nodebug
     if arch(javascript)
       buildable: False
 
+    ghc-options: -optc-DRtsWay="rts_thr"
+
 library nonthreaded-debug
     import: rts-base-config, rts-c-sources-base, rts-link-options, rts-global-build-flags, rts-debug-flags
     visibility: public
@@ -799,12 +809,16 @@ library nonthreaded-debug
     if arch(javascript)
       buildable: False
 
+    ghc-options: -optc-DRtsWay="rts_v_debug"
+
 library threaded-debug
     import: rts-base-config, rts-c-sources-base, rts-link-options, rts-global-build-flags, rts-threaded-flags, rts-debug-flags
     visibility: public
     build-depends: rts
     if arch(javascript)
       buildable: False
+
+    ghc-options: -optc-DRtsWay="rts_thr_debug"
 
 -- Note [Undefined symbols in the RTS]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
