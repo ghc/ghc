@@ -260,6 +260,7 @@ test('T21651',
        when(opsys('mingw32'),skip), # uses POSIX pipes
        when(opsys('darwin'),extra_run_opts('8 12 2000 100')),
        unless(opsys('darwin'),extra_run_opts('8 12 2000 200')), # darwin runners complain of too many open files
+       when(opsys('darwin'),fragile(21651)), # times out on aarch64-darwin CI runners
        req_target_smp,
        req_ghc_smp
      ],
