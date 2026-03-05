@@ -12,7 +12,7 @@ module GHC.StgToCmm.TagCheck
   ( emitTagAssertion, emitArgTagCheck, checkArg, whenCheckTags,
     checkArgStatic, checkFunctionArgTags,checkConArgsStatic,checkConArgsDyn) where
 
-#include "ClosureTypes.h"
+#include "rts/storage/ClosureTypes.h"
 
 import GHC.Prelude
 

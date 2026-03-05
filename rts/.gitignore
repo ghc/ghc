@@ -8,7 +8,6 @@
 /package.conf.inplace.raw
 /package.conf.install
 /package.conf.install.raw
-/fs.*
 
 /aclocal.m4
 /autom4te.cache/
@@ -20,3 +19,5 @@
 /ghcautoconf.h.autoconf.in
 /ghcautoconf.h.autoconf
 /include/ghcautoconf.h
+
+/rts.buildinfo

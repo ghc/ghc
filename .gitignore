@@ -95,7 +95,6 @@ _darcs/
 /ghc/stage1/
 /ghc/stage2/
 /ghc/stage3/
-/utils/iserv/stage2*/
 
 # -----------------------------------------------------------------------------
 # specific generated files
@@ -202,7 +201,7 @@ _darcs/
 /testsuite_summary*.txt
 /testsuite*.xml
 /testlog*
-/utils/iserv/iserv.cabal
+/utils/ghc-iserv/ghc-iserv.cabal
 /utils/iserv-proxy/iserv-proxy.cabal
 /utils/remote-iserv/remote-iserv.cabal
 /utils/mkUserGuidePart/mkUserGuidePart.cabal
