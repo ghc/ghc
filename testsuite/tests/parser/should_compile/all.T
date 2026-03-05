@@ -116,6 +116,7 @@ test('DumpParsedAst',      normal, compile, ['-dsuppress-uniques -ddump-parsed-a
 test('DumpParsedAstComments',  normal, compile, ['-dsuppress-uniques -ddump-parsed-ast -dkeep-comments'])
 test('DumpRenamedAst',     normal, compile, ['-dsuppress-uniques -ddump-rn-ast'])
 test('DumpTypecheckedAst', normal, compile, ['-dsuppress-uniques -ddump-tc-ast'])
+test('T12002', normal, compile, [''])
 test('T12045e', normal, compile, [''])
 test('T13087', normal, compile, [''])
 test('T13747', normal, compile, [''])
