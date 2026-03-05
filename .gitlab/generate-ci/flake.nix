@@ -2,6 +2,7 @@
   description = "GHC CI Generator";
 
   inputs.flake-utils.url = "github:numtide/flake-utils";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
 
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
@@ -9,7 +10,7 @@
       {
         packages = rec {
           # The Haskell generator executable
-          generate-ci = pkgs.haskellPackages.callCabal2nix "generate-ci" ./. {};
+          generate-ci = pkgs.haskell.packages.ghc912.callCabal2nix "generate-ci" ./. {};
 
 
           # Wrapper scripts

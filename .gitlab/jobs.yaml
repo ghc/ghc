@@ -20,13 +20,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-darwin-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-darwin-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-darwin-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -46,6 +56,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -87,13 +98,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-alpine3_23-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-alpine3_23-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-alpine3_23-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-alpine3_23:$DOCKER_REV",
     "needs": [
@@ -113,6 +134,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -151,13 +173,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -177,6 +209,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -214,13 +247,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12:$DOCKER_REV",
     "needs": [
@@ -240,6 +283,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -277,13 +321,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb12-wine-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb12-wine-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
     "needs": [
@@ -303,6 +357,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -361,13 +416,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb12-wine-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb12-wine-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
     "needs": [
@@ -387,6 +452,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -445,13 +511,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -471,6 +547,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -508,13 +585,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -534,6 +621,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -571,13 +659,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-alpine3_23-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-alpine3_23-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-alpine3_23-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-alpine3_23:$DOCKER_REV",
     "needs": [
@@ -597,6 +695,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -635,13 +734,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -661,6 +770,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -698,13 +808,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-deb12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-deb12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-deb12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb12:$DOCKER_REV",
     "needs": [
@@ -724,6 +844,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -761,13 +882,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -787,6 +918,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -824,13 +956,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-darwin-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-darwin-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-darwin-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -850,6 +992,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -892,13 +1035,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-alpine3_23-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-alpine3_23-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-alpine3_23-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-alpine3_23:$DOCKER_REV",
     "needs": [
@@ -918,6 +1071,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -957,13 +1111,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -983,6 +1147,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1021,13 +1186,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12:$DOCKER_REV",
     "needs": [
@@ -1047,6 +1222,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1085,13 +1261,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb12-wine-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb12-wine-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
     "needs": [
@@ -1111,6 +1297,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1170,13 +1357,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb12-wine-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb12-wine-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb12-wine-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12-wine:$DOCKER_REV",
     "needs": [
@@ -1196,6 +1393,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1255,13 +1453,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -1281,6 +1489,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1319,13 +1528,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -1345,6 +1564,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1383,13 +1603,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-alpine3_23-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-alpine3_23-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-alpine3_23-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-alpine3_23:$DOCKER_REV",
     "needs": [
@@ -1409,6 +1639,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1448,13 +1679,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -1474,6 +1715,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1512,13 +1754,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-deb12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-deb12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-deb12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb12:$DOCKER_REV",
     "needs": [
@@ -1538,6 +1790,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1576,13 +1829,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -1602,6 +1865,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1640,13 +1904,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-darwin-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-darwin-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-darwin-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -1666,6 +1940,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1711,13 +1986,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-freebsd14-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-freebsd14-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-freebsd14-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -1736,6 +2021,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1778,13 +2064,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
     "needs": [
@@ -1804,6 +2100,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1843,13 +2140,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
     "needs": [
@@ -1869,6 +2176,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1908,13 +2216,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_23-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_23-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_23-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_23:$DOCKER_REV",
     "needs": [
@@ -1934,6 +2252,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -1973,13 +2292,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_23-wasm:$DOCKER_REV",
     "needs": [
@@ -1999,6 +2328,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2040,13 +2370,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_23-wasm:$DOCKER_REV",
     "needs": [
@@ -2066,6 +2406,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2107,13 +2448,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_23-wasm:$DOCKER_REV",
     "needs": [
@@ -2133,6 +2484,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2174,13 +2526,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb11-emsdk-closure-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb11-emsdk-closure-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb11-emsdk-closure-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11-emsdk-closure:$DOCKER_REV",
     "needs": [
@@ -2200,6 +2562,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2241,13 +2604,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -2267,6 +2640,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2305,13 +2679,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -2331,6 +2715,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2369,13 +2754,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV",
     "needs": [
@@ -2395,6 +2790,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2433,13 +2829,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -2459,6 +2865,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2500,13 +2907,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -2526,6 +2943,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2564,13 +2982,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -2590,6 +3018,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2628,13 +3057,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -2654,6 +3093,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2693,13 +3133,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -2719,6 +3169,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2757,13 +3208,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-riscv-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-riscv-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-riscv-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13-riscv:$DOCKER_REV",
     "needs": [
@@ -2783,6 +3244,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2824,13 +3286,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -2850,6 +3322,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2888,13 +3361,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -2914,6 +3397,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -2952,13 +3436,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -2978,6 +3472,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3016,13 +3511,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -3042,6 +3547,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3080,13 +3586,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -3106,6 +3622,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3146,13 +3663,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -3172,6 +3699,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3210,13 +3738,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -3236,6 +3774,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3274,13 +3813,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -3300,6 +3849,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3339,13 +3889,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -3365,6 +3925,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3403,13 +3964,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -3429,6 +4000,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3467,13 +4039,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -3493,6 +4075,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3533,13 +4116,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-rocky8-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-rocky8-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-rocky8-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-rocky8:$DOCKER_REV",
     "needs": [
@@ -3559,6 +4152,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3597,13 +4191,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-ubuntu22_04-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-ubuntu22_04-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-ubuntu22_04-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu22_04:$DOCKER_REV",
     "needs": [
@@ -3623,6 +4227,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3661,13 +4266,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-ubuntu24_04-loongarch-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-ubuntu24_04-loongarch-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-ubuntu24_04-loongarch-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu24_04-loongarch:$DOCKER_REV",
     "needs": [
@@ -3687,6 +4302,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3728,13 +4344,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-ubuntu24_04-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-ubuntu24_04-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-ubuntu24_04-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu24_04:$DOCKER_REV",
     "needs": [
@@ -3754,6 +4380,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3791,10 +4418,13 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "no-caching",
-      "paths": []
-    },
+    "cache": [
+      {
+        "key": "no-caching",
+        "paths": [],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -3855,10 +4485,13 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "no-caching",
-      "paths": []
-    },
+    "cache": [
+      {
+        "key": "no-caching",
+        "paths": [],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -3920,13 +4553,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-darwin-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-darwin-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-darwin-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -3946,6 +4589,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -3989,13 +4633,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-alpine3_23-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-alpine3_23-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-alpine3_23-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-alpine3_23:$DOCKER_REV",
     "needs": [
@@ -4015,6 +4669,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4055,13 +4710,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -4081,6 +4746,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4120,13 +4786,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb12:$DOCKER_REV",
     "needs": [
@@ -4146,6 +4822,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4185,13 +4862,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "aarch64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "aarch64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "aarch64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -4211,6 +4898,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4250,13 +4938,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-alpine3_23-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-alpine3_23-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-alpine3_23-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-alpine3_23:$DOCKER_REV",
     "needs": [
@@ -4276,6 +4974,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4316,13 +5015,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -4342,6 +5051,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4381,13 +5091,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-deb12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-deb12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-deb12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb12:$DOCKER_REV",
     "needs": [
@@ -4407,6 +5127,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4446,13 +5167,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "i386-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "i386-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "i386-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -4472,6 +5203,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4511,13 +5243,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-darwin-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-darwin-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-darwin-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -4537,6 +5279,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4583,13 +5326,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-freebsd14-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-freebsd14-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-freebsd14-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -4608,6 +5361,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4651,13 +5405,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
     "needs": [
@@ -4677,6 +5441,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4717,13 +5482,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
     "needs": [
@@ -4743,6 +5518,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4783,13 +5559,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_23-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_23-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_23-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_23:$DOCKER_REV",
     "needs": [
@@ -4809,6 +5595,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4849,13 +5636,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -4875,6 +5672,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4914,13 +5712,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -4940,6 +5748,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -4979,13 +5788,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV",
     "needs": [
@@ -5005,6 +5824,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5044,13 +5864,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -5070,6 +5900,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5109,13 +5940,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -5135,6 +5976,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5174,13 +6016,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -5200,6 +6052,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5239,13 +6092,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -5265,6 +6128,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5305,13 +6169,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-rocky8-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-rocky8-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-rocky8-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-rocky8:$DOCKER_REV",
     "needs": [
@@ -5331,6 +6205,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5370,13 +6245,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-ubuntu22_04-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-ubuntu22_04-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-ubuntu22_04-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu22_04:$DOCKER_REV",
     "needs": [
@@ -5396,6 +6281,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5435,13 +6321,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-ubuntu24_04-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-ubuntu24_04-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-ubuntu24_04-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu24_04:$DOCKER_REV",
     "needs": [
@@ -5461,6 +6357,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5499,10 +6396,13 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "no-caching",
-      "paths": []
-    },
+    "cache": [
+      {
+        "key": "no-caching",
+        "paths": [],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -5564,10 +6464,13 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "no-caching",
-      "paths": []
-    },
+    "cache": [
+      {
+        "key": "no-caching",
+        "paths": [],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -5630,13 +6533,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-darwin-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-darwin-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-darwin-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -5656,6 +6569,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5700,13 +6614,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-freebsd14-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-freebsd14-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-freebsd14-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -5725,6 +6649,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5766,13 +6691,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
     "needs": [
@@ -5792,6 +6727,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5830,13 +6766,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
     "needs": [
@@ -5856,6 +6802,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5894,13 +6841,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_23-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_23-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_23-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_23:$DOCKER_REV",
     "needs": [
@@ -5920,6 +6877,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -5958,13 +6916,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_23-wasm:$DOCKER_REV",
     "needs": [
@@ -5984,6 +6952,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6024,13 +6993,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_23-wasm:$DOCKER_REV",
     "needs": [
@@ -6051,6 +7030,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6091,13 +7071,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-alpine3_23-wasm-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_23-wasm:$DOCKER_REV",
     "needs": [
@@ -6118,6 +7108,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6158,13 +7149,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb11-emsdk-closure-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb11-emsdk-closure-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb11-emsdk-closure-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11-emsdk-closure:$DOCKER_REV",
     "needs": [
@@ -6184,6 +7185,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6224,13 +7226,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -6250,6 +7262,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6287,13 +7300,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb11-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb11-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb11-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV",
     "needs": [
@@ -6313,6 +7336,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6350,13 +7374,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb12-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb12-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb12-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb12:$DOCKER_REV",
     "needs": [
@@ -6376,6 +7410,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6413,13 +7448,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -6439,6 +7484,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6479,13 +7525,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -6505,6 +7561,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6542,13 +7599,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -6569,6 +7636,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6606,13 +7674,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -6632,6 +7710,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6670,13 +7749,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -6696,6 +7785,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6733,13 +7823,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-riscv-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-riscv-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-riscv-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13-riscv:$DOCKER_REV",
     "needs": [
@@ -6759,6 +7859,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6799,13 +7900,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -6825,6 +7936,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6862,13 +7974,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -6888,6 +8010,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6925,13 +8048,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -6951,6 +8084,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -6988,13 +8122,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -7014,6 +8158,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7051,13 +8196,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -7078,6 +8233,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7117,13 +8273,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-deb13-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-deb13-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-deb13-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV",
     "needs": [
@@ -7143,6 +8309,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7180,13 +8347,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -7206,6 +8383,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7243,13 +8421,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -7269,6 +8457,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7307,13 +8496,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -7333,6 +8532,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7370,13 +8570,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -7396,6 +8606,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7433,13 +8644,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-fedora43-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-fedora43-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-fedora43-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora43:$DOCKER_REV",
     "needs": [
@@ -7459,6 +8680,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7498,13 +8720,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-rocky8-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-rocky8-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-rocky8-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-rocky8:$DOCKER_REV",
     "needs": [
@@ -7524,6 +8756,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7561,13 +8794,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-ubuntu22_04-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-ubuntu22_04-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-ubuntu22_04-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu22_04:$DOCKER_REV",
     "needs": [
@@ -7587,6 +8830,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7624,13 +8868,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-ubuntu24_04-loongarch-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-ubuntu24_04-loongarch-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-ubuntu24_04-loongarch-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu24_04-loongarch:$DOCKER_REV",
     "needs": [
@@ -7650,6 +8904,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7690,13 +8945,23 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "x86_64-linux-ubuntu24_04-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
+    "cache": [
+      {
+        "key": "x86_64-linux-ubuntu24_04-$CI_COMMIT_SHA",
+        "paths": [
+          "./build-cache"
+        ],
+        "when": "on_failure"
+      },
+      {
+        "key": "x86_64-linux-ubuntu24_04-$CACHE_REV",
+        "paths": [
+          "cabal-cache",
+          "toolchain"
+        ],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu24_04:$DOCKER_REV",
     "needs": [
@@ -7716,6 +8981,7 @@
       ".gitlab/ci.sh setup",
       ".gitlab/ci.sh configure",
       ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh save_built_ghc",
       ".gitlab/ci.sh test_hadrian"
     ],
     "stage": "full-build",
@@ -7752,10 +9018,13 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "no-caching",
-      "paths": []
-    },
+    "cache": [
+      {
+        "key": "no-caching",
+        "paths": [],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [
@@ -7815,10 +9084,13 @@
       },
       "when": "always"
     },
-    "cache": {
-      "key": "no-caching",
-      "paths": []
-    },
+    "cache": [
+      {
+        "key": "no-caching",
+        "paths": [],
+        "when": "on_success"
+      }
+    ],
     "dependencies": [],
     "image": null,
     "needs": [

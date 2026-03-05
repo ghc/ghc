@@ -18,6 +18,7 @@ if [ ! -d "$TOP/.gitlab" ]; then
 fi
 
 CABAL_CACHE="$TOP/${CABAL_CACHE:-cabal-cache}"
+BUILD_CACHE="$TOP/${BUILD_CACHE:-build-cache}"
 
 source "$TOP/.gitlab/common.sh"
 
@@ -53,6 +54,7 @@ Common Modes:
   configure         Run ./configure.
   clean             Clean the tree
   shell             Run an interactive shell with a configured build environment.
+  save_built_ghc    Save a built ghc to the cache for restoring after a spuriously failed test.
   save_test_output  Generate unexpected-test-output.tar.gz
   save_cache        Preserve the cabal cache
   build_hadrian     Build GHC via the Hadrian build system
@@ -245,9 +247,17 @@ function cabal_update() {
 # Extract GHC toolchain
 function setup() {
   if [ -d "$CABAL_CACHE" ]; then
+      info "Cabal cache exists."
       info "Extracting cabal cache from $CABAL_CACHE to $CABAL_DIR..."
       mkdir -p "$CABAL_DIR"
       cp -Rf "$CABAL_CACHE"/* "$CABAL_DIR"
+  fi
+
+  if [ -d "$BUILD_CACHE" ]; then
+      info "Build cache exists."
+      info "Extracting build cache from $BUILD_CACHE to $BUILD_DIR..."
+      mkdir -p "$BUILD_DIR"
+      cp -Rf "$BUILD_CACHE"/* "$BUILD_DIR"
   fi
 
   case $toolchain_source in
@@ -553,6 +563,11 @@ function check_release_build() {
 
 function build_hadrian() {
   start_section build-hadrian "Build via Hadrian"
+
+  if [ -d "$BUILD_DIR" ]; then
+    info "Build directory already exists - assuming this is a pure test run with an already built GHC"
+    return 0
+  fi
 
   if [ -z "${BIN_DIST_NAME:-}" ]; then
     fail "BIN_DIST_NAME not set"
@@ -898,6 +913,13 @@ function save_test_output() {
     tar -czf unexpected-test-output.tar.gz unexpected-test-output
 }
 
+function save_built_ghc {
+   info "GHC successfully built - saving the compiler to be restored when test fails spuriously"
+   rm -Rf "$BUILD_CACHE"
+   cp -Rf "$BUILD_DIR" "$BUILD_CACHE"
+   info "saved $BUILD_DIR to $BUILD_CACHE"
+}
+
 function save_cache () {
   info "Storing cabal cache from $CABAL_DIR to $CABAL_CACHE..."
   rm -Rf "$CABAL_CACHE"
@@ -1053,6 +1075,8 @@ else
   esac
 fi
 
+export BUILD_DIR="$TOP/_build"
+
 case "$(uname)" in
   MSYS_*|MINGW*)
     exe=".exe"
@@ -1140,6 +1164,7 @@ case ${1:-help} in
   compare_interfaces_of) shift; compare_interfaces_of "$@" ;;
   clean) clean ;;
   save_test_output) save_test_output ;;
+  save_built_ghc) save_built_ghc ;;
   save_cache) save_cache ;;
   shell) shift; shell "$@" ;;
   *) fail "unknown mode $1" ;;

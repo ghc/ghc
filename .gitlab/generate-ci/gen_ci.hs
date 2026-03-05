@@ -1,15 +1,18 @@
 #!/usr/bin/env cabal
+{-# LANGUAGE GHC2024 #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeData #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# OPTIONS_GHC -Wno-ambiguous-fields #-}
 
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# HLINT ignore "Use camelCase" #-}
-{-# LANGUAGE DerivingStrategies #-}
 
 import Data.Aeson as A
 import qualified Data.Map as Map
@@ -521,16 +524,13 @@ distroVariables _ _ = mempty
 data Cache
   = Cache { cacheKey   :: String
           , cachePaths :: [String]
-          }
-
--- The cache doesn't depend on the BuildConfig because we only cache the cabal store.
-mkCacheKey :: Arch -> Opsys -> String
-mkCacheKey arch opsys = archName arch <> "-" <> opsysName opsys <> "-$CACHE_REV"
+          , when       :: When }
 
 instance ToJSON Cache where
   toJSON Cache {..} = object
     [ "key" A..= cacheKey
     , "paths" A..= cachePaths
+    , "when" A..= when
     ]
 
 -----------------------------------------------------------------------------
@@ -541,7 +541,7 @@ data Artifacts
   = Artifacts { artifactPaths :: [String]
               , junitReport   :: String
               , expireIn      :: String
-              , artifactsWhen :: ArtifactsWhen
+              , artifactsWhen :: When
               }
 
 instance ToJSON Artifacts where
@@ -554,12 +554,12 @@ instance ToJSON Artifacts where
     , "when" A..= artifactsWhen
     ]
 
-data ArtifactsWhen = ArtifactsOnSuccess | ArtifactsOnFailure | ArtifactsAlways
+data When = WhenOnSuccess | WhenOnFailure | WhenAlways
 
-instance ToJSON ArtifactsWhen where
-  toJSON ArtifactsOnSuccess = "on_success"
-  toJSON ArtifactsOnFailure = "on_failure"
-  toJSON ArtifactsAlways    = "always"
+instance ToJSON When where
+  toJSON WhenOnSuccess = "on_success"
+  toJSON WhenOnFailure = "on_failure"
+  toJSON WhenAlways    = "always"
 
 ---------------------------------------------------------------------
 -- Rules, when do we run a job
@@ -636,11 +636,11 @@ instance ToJSON OnOffRules where
   toJSON rules = toJSON
       [object $
         [ "if" A..= and_all (map one_rule (enumRules rules))
-        , "when" A..= toJSON (when rules)
+        , "when" A..= toJSON rules.when
         ] ++
         -- Necessary to stop manual jobs stopping pipeline progress
         -- https://docs.gitlab.com/ee/ci/yaml/#rulesallow_failure
-        [ "allow_failure" A..= True | when rules == Manual ]
+        [ "allow_failure" A..= True | rules.when == Manual ]
       ]
     where
       one_rule (OnOffRule onoff r) = ruleToCond onoff r
@@ -790,6 +790,24 @@ validateRuleString LoongArch64  = labelString "loongarch"
 -- The Job type
 ---------------------------------------------------------------------
 
+type data Slots = MoreSlots Slots | NoSlots
+type Four = MoreSlots (MoreSlots (MoreSlots (MoreSlots NoSlots)))
+
+data AtMostFour (n :: Slots) a where
+  FourSlotsRemaining :: AtMostFour Four a
+  TakeSlot :: AtMostFour (MoreSlots n) a -> a -> AtMostFour n a
+infixl 5 `TakeSlot`
+data SomeAtMostFour a where Hide :: AtMostFour n a -> SomeAtMostFour a
+
+safToList :: SomeAtMostFour a -> [a]
+safToList (Hide l) = go l where
+  go :: AtMostFour n a -> [a]
+  go FourSlotsRemaining = []
+  go (xs `TakeSlot` x) = x : go xs
+
+instance ToJSON a => ToJSON (SomeAtMostFour a) where
+  toJSON = toJSON . safToList
+
 -- | A 'Job' is the description of a single job in a gitlab pipeline. The
 -- job contains all the information about how to do the build but can be further
 -- modified with information about when to run jobs, which variables to set for
@@ -805,7 +823,9 @@ data Job
         , jobVariables :: Variables
         , jobDependencies :: [String]
         , jobArtifacts :: Artifacts
-        , jobCache :: Cache
+        -- | "You can have at most 4 caches, per job"
+        --   - https://docs.gitlab.com/ci/caching/
+        , jobCache :: SomeAtMostFour Cache
         , jobRules :: OnOffRules
         , jobPlatform  :: (Arch, Opsys)
         }
@@ -860,6 +880,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
         [ ".gitlab/ci.sh setup"
         , ".gitlab/ci.sh configure"
         , ".gitlab/ci.sh build_hadrian"
+        , ".gitlab/ci.sh save_built_ghc"
         , ".gitlab/ci.sh test_hadrian"
         ]
 
@@ -930,19 +951,29 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       , artifactPaths = [binDistName arch opsys buildConfig ++ ".tar.xz"
                         ,"junit.xml"
                         ,"unexpected-test-output.tar.gz"]
-      , artifactsWhen = ArtifactsAlways
+      , artifactsWhen = WhenAlways
       }
 
     jobCache
         -- N.B. We have temporarily disabled cabal-install store caching on
         -- Windows due to #21347.
       | Windows <- opsys =
-          Cache { cachePaths = [], cacheKey = "no-caching" }
-      | otherwise = Cache
-          { cachePaths = [ "cabal-cache", "toolchain" ]
-          , cacheKey = mkCacheKey arch opsys
+          Hide $ FourSlotsRemaining `TakeSlot` Cache { cachePaths = [], cacheKey = "no-caching", when = WhenOnSuccess }
+      | otherwise = Hide $ FourSlotsRemaining `TakeSlot` Cache
+            { cachePaths = [ "cabal-cache", "toolchain" ]
+            , cacheKey = intercalate "-" [archName arch, opsysName opsys, "$CACHE_REV"]
+            , when = WhenOnSuccess
+            } `TakeSlot` Cache
+            { cachePaths = [ "./build-cache" ]
+            -- NOTE: The intention for the build directory cache is that if a testsuite run
+            -- fails spuriously, we want to pick up a built ghc - this cache is more granular
+            -- than the manually incremented $CACHE_REV and is only valid for a specific
+            -- commit hash, which is specified by the variable $CI_COMMIT_SHA which is automatically
+            -- inserted by gitlab ci.
+            , cacheKey = intercalate "-" [archName arch, opsysName opsys, "$CI_COMMIT_SHA"]
+            , when = WhenOnFailure
+            }
 
-          }
 
     jobAllowFailure = False
     jobStage = "full-build"
