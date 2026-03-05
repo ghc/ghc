@@ -7,6 +7,7 @@ import GHC.Prelude hiding (EQ)
 import GHC.CmmToAsm.AArch64.Instr
 import GHC.CmmToAsm.AArch64.Regs
 import GHC.CmmToAsm.AArch64.Cond
+import GHC.CmmToAsm.AArch64.Peephole (peephole)
 import GHC.CmmToAsm.Ppr
 import GHC.CmmToAsm.Format
 import GHC.Platform.Reg
@@ -115,10 +116,11 @@ pprBasicBlock platform with_dwarf info_env (BasicBlock blockid instrs)
       else empty
     )
   where
-    -- Filter out identity moves. E.g. mov x18, x18 will be dropped.
-    optInstrs = filter f instrs
-      where f (MOV o1 o2) | o1 == o2 = False
-            f _ = True
+    -- Post-register-allocation peephole optimizer.
+    -- Rewrites instruction sequences to use AArch64-specific instructions
+    -- like LDP/STP, eliminates redundant moves and extensions, and fuses
+    -- CMP+CSET+CB{N}Z into BCOND.
+    optInstrs = peephole instrs
 
     asmLbl = blockLbl blockid
     maybe_infotable c = case mapLookup blockid info_env of
@@ -420,6 +422,7 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 || isFloatOp o2 -> op2 (text "\tfmov") o1 o2
     | otherwise                    -> op2 (text "\tmov") o1 o2
   MOVK o1 o2    -> op2 (text "\tmovk") o1 o2
+  MOVN o1 o2    -> op2 (text "\tmovn") o1 o2
   MOVZ o1 o2    -> op2 (text "\tmovz") o1 o2
   MVN o1 o2     -> op2 (text "\tmvn") o1 o2
   ORR o1 o2 o3  -> op3 (text "\torr") o1 o2 o3
@@ -442,6 +445,9 @@ pprInstr platform instr = case instr of
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
   CSET o c  -> line $ text "\tcset" <+> pprOp platform o <> comma <+> pprCond c
+  CSEL o1 o2 o3 c -> line $ text "\tcsel" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprCond c
+  CSINC o1 o2 o3 c -> line $ text "\tcsinc" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprCond c
+  CSNEG o1 o2 o3 c -> line $ text "\tcsneg" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprCond c
 
   CBZ o (TBlock bid) -> line $ text "\tcbz" <+> pprOp platform o <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
   CBZ o (TLabel lbl) -> line $ text "\tcbz" <+> pprOp platform o <> comma <+> pprAsmLabel platform lbl
@@ -450,6 +456,14 @@ pprInstr platform instr = case instr of
   CBNZ o (TBlock bid) -> line $ text "\tcbnz" <+> pprOp platform o <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
   CBNZ o (TLabel lbl) -> line $ text "\tcbnz" <+> pprOp platform o <> comma <+> pprAsmLabel platform lbl
   CBNZ _ (TReg _)     -> panic "AArch64.ppr: No conditional (cbnz) branching to registers!"
+
+  TBZ o bit (TBlock bid) -> line $ text "\ttbz" <+> pprOp platform o <> comma <+> char '#' <> int bit <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+  TBZ o bit (TLabel lbl) -> line $ text "\ttbz" <+> pprOp platform o <> comma <+> char '#' <> int bit <> comma <+> pprAsmLabel platform lbl
+  TBZ _ _ (TReg _)       -> panic "AArch64.ppr: No conditional (tbz) branching to registers!"
+
+  TBNZ o bit (TBlock bid) -> line $ text "\ttbnz" <+> pprOp platform o <> comma <+> char '#' <> int bit <> comma <+> pprAsmLabel platform (mkLocalBlockLabel (getUnique bid))
+  TBNZ o bit (TLabel lbl) -> line $ text "\ttbnz" <+> pprOp platform o <> comma <+> char '#' <> int bit <> comma <+> pprAsmLabel platform lbl
+  TBNZ _ _ (TReg _)       -> panic "AArch64.ppr: No conditional (tbnz) branching to registers!"
 
   -- 7. Load and Store Instructions --------------------------------------------
   -- NOTE: GHC may do whacky things where it only load the lower part of an
@@ -480,6 +494,16 @@ pprInstr platform instr = case instr of
         op_adrp o1 (adrp') $$
         op_ldr o1 (ldr') $$
         op_add o1 (check_off off)
+
+  -- Fold small offsets (pointer tags 1-7) into the @pageoff relocation,
+  -- saving one instruction per tagged closure reference.
+  -- Safe because closures are 8-byte aligned (max pageoff 4088) and
+  -- tags are at most 7, so 4088+7=4095 fits in 12 bits without
+  -- crossing a page boundary.
+  LDR _f o1 (OpImm (ImmIndex lbl off)) | off > 0, off <= 7 ->
+    let (adrp', add') = op_adrp_reloc_local $ pprAsmLabel platform lbl in
+    op_adrp o1 adrp' $$
+    op_add o1 (add' <> text " + " <> int off)
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
     let (adrp', add') = op_adrp_reloc_local $ pprAsmLabel platform lbl in
@@ -514,6 +538,9 @@ pprInstr platform instr = case instr of
     op2 (text "\tldrh") o1 o2
   LDR _f o1 o2 -> op2 (text "\tldr") o1 o2
   LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
+
+  STP _f o1 o2 o3 -> op3 (text "\tstp") o1 o2 o3
+  LDP _f o1 o2 o3 -> op3 (text "\tldp") o1 o2 o3
 
   -- 8. Synchronization Instructions -------------------------------------------
   DMBISH DmbLoadStore -> line $ text "\tdmb ish"

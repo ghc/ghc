@@ -17,7 +17,7 @@ import Data.Word
 import GHC.Platform.Regs
 import GHC.CmmToAsm.AArch64.Instr
 import GHC.CmmToAsm.AArch64.Regs
-import GHC.CmmToAsm.AArch64.Cond
+import GHC.CmmToAsm.AArch64.Cond (Cond(..), invertCond)
 
 import GHC.CmmToAsm.CPrim
 import GHC.Cmm.DebugBlock
@@ -418,13 +418,12 @@ which will then be transalted to one of the immediate encodings implicitly.
 For example mov x1, #0x10000 is allowed but will be assembled to movz x1, #0x1, lsl #16
 -}
 
--- | Move (wide immediate)
+-- | Move (wide immediate) for MOVZ.
 -- Allows for 16bit immediate which can be shifted by 0/16/32/48 bits.
--- Used with MOVZ,MOVN, MOVK
+-- Used with MOVZ. Only handles non-negative values.
 -- See Note [Aarch64 immediates]
 getMovWideImm :: Integer -> Width -> Maybe Operand
 getMovWideImm n w
-  -- TODO: Handle sign extension/negatives
   | n <= 0
   = Nothing
   -- Fits in 16 bits
@@ -449,6 +448,57 @@ getMovWideImm n w
     truncated = narrowU w n
     sized_n = fromIntegral truncated :: Word64
     trailing_zeros = countTrailingZeros sized_n
+
+-- | Move (wide immediate) for MOVN.
+-- MOVN writes NOT(imm16 << shift) to the register. This is optimal for
+-- values where the bitwise complement has a single non-zero 16-bit halfword.
+-- Returns the operand for the MOVN instruction.
+-- See Note [Aarch64 immediates]
+getMovNImm :: Integer -> Width -> Maybe Operand
+getMovNImm n w
+  | inverted_n < 2^(16 :: Int)
+  = Just $ OpImm (ImmInteger (fromIntegral inverted_n))
+  | inv_trailing_zeros >= 16 && inverted_n < 2^(32 :: Int)
+  = Just $ OpImmShift (ImmInteger (fromIntegral (inverted_n `shiftR` 16))) SLSL 16
+  | inv_trailing_zeros >= 32 && inverted_n < 2^(48 :: Int)
+  = Just $ OpImmShift (ImmInteger (fromIntegral (inverted_n `shiftR` 32))) SLSL 32
+  | inv_trailing_zeros >= 48
+  = Just $ OpImmShift (ImmInteger (fromIntegral (inverted_n `shiftR` 48))) SLSL 48
+  | otherwise
+  = Nothing
+  where
+    -- Complement within the register width
+    truncated = narrowU w n
+    mask = case w of
+      W32 -> 0xFFFFFFFF
+      W64 -> 0xFFFFFFFFFFFFFFFF
+      _   -> (1 `shiftL` widthInBits w) - 1
+    inverted_n = (complement truncated) .&. mask :: Integer
+    inv_trailing_zeros = countTrailingZeros (fromIntegral inverted_n :: Word64)
+
+-- | Check if an integer is a power of 2. Returns the bit position if so.
+-- Used for TBZ/TBNZ pattern matching.
+-- We convert to Word64 for countTrailingZeros since Integer lacks FiniteBits.
+isPowerOf2 :: Integer -> Maybe Int
+isPowerOf2 n
+  | n > 0, n .&. (n - 1) == 0 = Just (countTrailingZeros (fromIntegral n :: Word64))
+  | otherwise = Nothing
+
+-- | Count non-0x0000 halfwords in a value (for MOVZ cost estimation)
+movzCost :: Word64 -> Int
+movzCost w = length $ filter (/= 0) halfwords
+  where halfwords = [ w .&. 0xFFFF
+                    , (w `shiftR` 16) .&. 0xFFFF
+                    , (w `shiftR` 32) .&. 0xFFFF
+                    , (w `shiftR` 48) .&. 0xFFFF ]
+
+-- | Count non-0xFFFF halfwords in a value (for MOVN cost estimation)
+movnCost :: Word64 -> Int
+movnCost w = length $ filter (/= 0xFFFF) halfwords
+  where halfwords = [ w .&. 0xFFFF
+                    , (w `shiftR` 16) .&. 0xFFFF
+                    , (w `shiftR` 32) .&. 0xFFFF
+                    , (w `shiftR` 48) .&. 0xFFFF ]
 
 -- | Arithmetic(immediate)
 --  Allows for 12bit immediates which can be shifted by 0 or 12 bits.
@@ -653,6 +703,12 @@ getRegister' config plat expr
                    , Just imm_op <- getMovWideImm i w -> do
           return (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOVZ (OpReg w dst) imm_op)))
 
+        -- MOVN for negative values: MOVN writes NOT(imm16 << shift).
+        -- This handles common negative values like -1, -4, -8, etc. in a
+        -- single instruction instead of a 2-4 instruction MOVZ+MOVK chain.
+        CmmInt i w | Just imm_op <- getMovNImm i w -> do
+          return (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOVN (OpReg w dst) imm_op)))
+
         CmmInt i w | isNbitEncodeable 16 i, i >= 0 -> do
           return (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg W16 dst) (OpImm (ImmInteger i)))))
 
@@ -663,26 +719,75 @@ getRegister' config plat expr
                                                   $ MOV (OpReg W32 dst) (OpImm (ImmInt half0))
                                                   , MOVK (OpReg W32 dst) (OpImmShift (ImmInt half1) SLSL 16)
                                                   ]))
-        -- fallback for W32
+
+        -- Smart constant materialization: choose between MOVZ+MOVK and
+        -- MOVN+MOVK based on which needs fewer instructions.
+        -- MOVZ is better when most halfwords are 0x0000.
+        -- MOVN is better when most halfwords are 0xFFFF (common for negatives).
         CmmInt i W32 -> do
-          let  half0 = fromIntegral (fromIntegral i :: Word16)
-               half1 = fromIntegral (fromIntegral (i `shiftR` 16) :: Word16)
-          return (Any (intFormat W32) (\dst -> toOL [ annExpr expr
-                                                    $ MOV (OpReg W32 dst) (OpImm (ImmInt half0))
-                                                    , MOVK (OpReg W32 dst) (OpImmShift (ImmInt half1) SLSL 16)
-                                                    ]))
-        -- anything else
+          let unsigned = narrowU W32 i
+              word = fromIntegral unsigned :: Word64
+              half0 = fromIntegral (word .&. 0xFFFF) :: Int
+              half1 = fromIntegral ((word `shiftR` 16) .&. 0xFFFF) :: Int
+          return $ if movnCost word < movzCost word
+            then Any (intFormat W32) $ \dst ->
+              -- Use MOVN + MOVK: fewer instructions for values with many 0xFFFF halfwords
+              let inv = (complement word) .&. 0xFFFFFFFF
+                  halves = [(half0, 0 :: Int), (half1, 16)]
+                  -- Pick the first non-0xFFFF halfword for the MOVN base
+                  (base_inv, base_shift) = case [ (fromIntegral ((inv `shiftR` s) .&. 0xFFFF) :: Int, s)
+                                                 | (h, s) <- halves, h /= 0xFFFF ] of
+                    (x:_) -> x
+                    []    -> (fromIntegral (inv .&. 0xFFFF), 0)  -- all 0xFFFF: handled by getMovNImm above
+                  movn_op = if base_shift == 0 then OpImm (ImmInt base_inv)
+                            else OpImmShift (ImmInt base_inv) SLSL base_shift
+                  movk_fixups = [ MOVK (OpReg W32 dst) (OpImmShift (ImmInt h) SLSL s)
+                                | (h, s) <- halves
+                                , s /= base_shift
+                                , h /= 0xFFFF ]
+              in annExpr expr (MOVN (OpReg W32 dst) movn_op) `consOL` toOL movk_fixups
+            else Any (intFormat W32) $ \dst ->
+              toOL [ annExpr expr $ MOV (OpReg W32 dst) (OpImm (ImmInt half0))
+                   , MOVK (OpReg W32 dst) (OpImmShift (ImmInt half1) SLSL 16) ]
+
+        -- W64: smart constant materialization
         CmmInt i W64 -> do
-          let  half0 = fromIntegral (fromIntegral i :: Word16)
-               half1 = fromIntegral (fromIntegral (i `shiftR` 16) :: Word16)
-               half2 = fromIntegral (fromIntegral (i `shiftR` 32) :: Word16)
-               half3 = fromIntegral (fromIntegral (i `shiftR` 48) :: Word16)
-          return (Any (intFormat W64) (\dst -> toOL [ annExpr expr
-                                                    $ MOV (OpReg W64 dst) (OpImm (ImmInt half0))
-                                                    , MOVK (OpReg W64 dst) (OpImmShift (ImmInt half1) SLSL 16)
-                                                    , MOVK (OpReg W64 dst) (OpImmShift (ImmInt half2) SLSL 32)
-                                                    , MOVK (OpReg W64 dst) (OpImmShift (ImmInt half3) SLSL 48)
-                                                    ]))
+          let unsigned = narrowU W64 i
+              word = fromIntegral unsigned :: Word64
+              half0 = fromIntegral (word .&. 0xFFFF) :: Int
+              half1 = fromIntegral ((word `shiftR` 16) .&. 0xFFFF) :: Int
+              half2 = fromIntegral ((word `shiftR` 32) .&. 0xFFFF) :: Int
+              half3 = fromIntegral ((word `shiftR` 48) .&. 0xFFFF) :: Int
+          return $ if movnCost word < movzCost word
+            then Any (intFormat W64) $ \dst ->
+              -- Use MOVN + MOVK chain
+              let inv = complement word
+                  halves = [(half0, 0 :: Int), (half1, 16), (half2, 32), (half3, 48)]
+                  (base_inv, base_shift) = case [ (fromIntegral ((inv `shiftR` s) .&. 0xFFFF) :: Int, s)
+                                                 | (h, s) <- halves, h /= 0xFFFF ] of
+                    (x:_) -> x
+                    []    -> (fromIntegral (inv .&. 0xFFFF), 0)
+                  movn_op = if base_shift == 0 then OpImm (ImmInt base_inv)
+                            else OpImmShift (ImmInt base_inv) SLSL base_shift
+                  movk_fixups = [ MOVK (OpReg W64 dst) (OpImmShift (ImmInt h) SLSL s)
+                                | (h, s) <- halves
+                                , s /= base_shift
+                                , h /= 0xFFFF ]
+              in annExpr expr (MOVN (OpReg W64 dst) movn_op) `consOL` toOL movk_fixups
+            else Any (intFormat W64) $ \dst ->
+              -- MOVZ+MOVK path: skip zero halfwords since MOVZ zeroes them.
+              -- Pick the first non-zero halfword for MOVZ, then MOVK the rest.
+              let all_halves = [(half0, 0 :: Int), (half1, 16), (half2, 32), (half3, 48)]
+                  (base_h, base_s) = case [(h,s) | (h,s) <- all_halves, h /= 0] of
+                    (x:_) -> x
+                    []    -> (0, 0)  -- all zero: single MOVZ #0
+                  movz_op = if base_s == 0 then OpImm (ImmInt base_h)
+                            else OpImmShift (ImmInt base_h) SLSL base_s
+                  movk_fixups = [ MOVK (OpReg W64 dst) (OpImmShift (ImmInt h) SLSL s)
+                                | (h, s) <- all_halves
+                                , s /= base_s
+                                , h /= 0 ]
+              in annExpr expr (MOVZ (OpReg W64 dst) movz_op) `consOL` toOL movk_fixups
         CmmInt _i rep -> do
           (op, imm_code) <- litToImm' lit
           return (Any (intFormat rep) (\dst -> imm_code `snocOL` annExpr expr (MOV (OpReg rep dst) op)))
@@ -1544,6 +1649,31 @@ genCondJump bid expr = do
         (reg_x, _format_x, code_x) <- getSomeReg x
         return $ code_x `snocOL`  (annExpr expr (CBNZ (OpReg w reg_x) (TBlock bid)))
 
+      -- TBZ/TBNZ: test single bit and branch.
+      -- Matches: (x & (1 << bit)) == 0  →  TBZ x, #bit, label
+      -- Matches: (x & (1 << bit)) /= 0  →  TBNZ x, #bit, label
+      CmmMachOp (MO_Eq _) [CmmMachOp (MO_And w) [x, CmmLit (CmmInt mask _)], CmmLit (CmmInt 0 _)]
+        | Just bit <- isPowerOf2 mask
+        , bit < widthInBits w -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ code_x `snocOL` annExpr expr (TBZ (OpReg w reg_x) bit (TBlock bid))
+
+      CmmMachOp (MO_Ne _) [CmmMachOp (MO_And w) [x, CmmLit (CmmInt mask _)], CmmLit (CmmInt 0 _)]
+        | Just bit <- isPowerOf2 mask
+        , bit < widthInBits w -> do
+          (reg_x, _format_x, code_x) <- getSomeReg x
+          return $ code_x `snocOL` annExpr expr (TBNZ (OpReg w reg_x) bit (TBlock bid))
+
+      -- Sign bit test: x < 0  →  TBNZ x, #(width-1), label (sign bit set)
+      CmmMachOp (MO_S_Lt w) [x, CmmLit (CmmInt 0 _)] -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        return $ code_x `snocOL` annExpr expr (TBNZ (OpReg w reg_x) (widthInBits w - 1) (TBlock bid))
+
+      -- Sign bit test: x >= 0  →  TBZ x, #(width-1), label (sign bit clear)
+      CmmMachOp (MO_S_Ge w) [x, CmmLit (CmmInt 0 _)] -> do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        return $ code_x `snocOL` annExpr expr (TBZ (OpReg w reg_x) (widthInBits w - 1) (TBlock bid))
+
       -- Generic case.
       CmmMachOp mop [x, y] -> do
 
@@ -1598,20 +1728,14 @@ genCondJump bid expr = do
           _ -> pprPanic "AArch64.genCondJump:case mop: " (text $ show expr)
       _ -> pprPanic "AArch64.genCondJump: " (text $ show expr)
 
--- A conditional jump with at least +/-128M jump range
+-- | A conditional jump with at least +/-128M jump range.
+-- Uses condition inversion to save one instruction and one label:
+--   Before: BCOND cond jmp; B skip; jmp: B far; skip:  (3 insns, 2 labels)
+--   After:  BCOND !cond skip; B far; skip:              (2 insns, 1 label)
 genCondFarJump :: MonadGetUnique m => Cond -> Target -> m InstrBlock
 genCondFarJump cond far_target = do
   skip_lbl_id <- newBlockId
-  jmp_lbl_id <- newBlockId
-
-  -- TODO: We can improve this by inverting the condition
-  -- but it's not quite trivial since we don't know if we
-  -- need to consider float orderings.
-  -- So we take the hit of the additional jump in the false
-  -- case for now.
-  return $ toOL [ BCOND cond (TBlock jmp_lbl_id)
-                , B (TBlock skip_lbl_id)
-                , NEWBLOCK jmp_lbl_id
+  return $ toOL [ BCOND (invertCond cond) (TBlock skip_lbl_id)
                 , B far_target
                 , NEWBLOCK skip_lbl_id]
 
@@ -2182,15 +2306,22 @@ genCCall target dest_regs arg_regs = do
         -- Prefetch
         MO_Prefetch_Data _n -> return nilOL -- Prefetch hint.
 
-        -- Memory copy/set/move/cmp, with alignment for optimization
-
-        -- TODO Optimize and use e.g. quad registers to move memory around instead
-        -- of offloading this to memcpy. For small memcpys we can utilize
-        -- the 128bit quad registers in NEON to move block of bytes around.
-        -- Might also make sense of small memsets? Use xzr? What's the function
-        -- call overhead?
+        -- Memory copy/set/move/cmp, with alignment for optimization.
+        -- For small, known-size copies/sets we emit inline load/store
+        -- sequences using paired registers (STP/LDP), avoiding the
+        -- function call overhead (~15-20 cycles for save/restore/branch).
+        MO_Memcpy  align
+          | [dst, src, CmmLit (CmmInt n _)] <- arg_regs
+          , n >= 0, n <= 64
+          -> inlineMemcpy dst src (fromIntegral n) align
         MO_Memcpy  _align   -> mkCCall "memcpy"
+
+        MO_Memset  align
+          | [dst, val, CmmLit (CmmInt n _)] <- arg_regs
+          , n >= 0, n <= 64
+          -> inlineMemset dst val (fromIntegral n) align
         MO_Memset  _align   -> mkCCall "memset"
+
         MO_Memmove _align   -> mkCCall "memmove"
         MO_Memcmp  _align   -> mkCCall "memcmp"
 
@@ -2247,6 +2378,130 @@ genCCall target dest_regs arg_regs = do
           mkForeignLabel name ForeignLabelInThisPackage IsFunction
       let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
       genCCall (ForeignTarget target cconv) dest_regs arg_regs
+
+    -- | Generate inline load/store sequence for small memcpy.
+    -- For copies up to 64 bytes, we emit LDR/STR (or LDP/STP for 16-byte
+    -- chunks) instead of calling memcpy. The peephole optimizer will
+    -- further merge adjacent LDR/STR into LDP/STP pairs.
+    --
+    -- AArch64 single-register LDR/STR instructions handle unaligned
+    -- addresses without faulting, so we always use the widest available
+    -- single-register operation regardless of the stated alignment.
+    -- Only LDP/STP require natural alignment (8-byte for the II64 pair),
+    -- so we gate the 16-byte paired path on align >= 8.
+    inlineMemcpy :: CmmExpr -> CmmExpr -> Int -> Int -> NatM InstrBlock
+    inlineMemcpy dst_expr src_expr n align = do
+      (dst_reg, _fmt_d, code_d) <- getSomeReg dst_expr
+      (src_reg, _fmt_s, code_s) <- getSomeReg src_expr
+      tmp1 <- getNewRegNat II64
+      tmp2 <- getNewRegNat II64
+      let -- Generate copy instructions for the remaining bytes at the given offset.
+          -- We greedily pick the widest operation that fits the remaining size:
+          --   16 bytes: LDP/STP (paired, needs align >= 8)
+          --    8 bytes: LDR/STR II64 (unaligned ok)
+          --    4 bytes: LDR/STR II32 (unaligned ok)
+          --    2 bytes: LDR/STR II16 (unaligned ok)
+          --    1 byte:  LDR/STR II8
+          go :: Int -> Int -> OrdList Instr
+          go off remaining
+            | remaining <= 0 = nilOL
+            -- 16-byte chunk using LDP/STP (requires 8-byte alignment)
+            | remaining >= 16, align >= 8 =
+                toOL [ LDP II64 (OpReg W64 tmp1) (OpReg W64 tmp2)
+                                (OpAddr (AddrRegImm src_reg (ImmInt off)))
+                     , STP II64 (OpReg W64 tmp1) (OpReg W64 tmp2)
+                                (OpAddr (AddrRegImm dst_reg (ImmInt off)))
+                     ] `appOL` go (off + 16) (remaining - 16)
+            -- 8-byte chunk (AArch64 LDR/STR handles unaligned)
+            | remaining >= 8 =
+                toOL [ LDR II64 (OpReg W64 tmp1) (OpAddr (AddrRegImm src_reg (ImmInt off)))
+                     , STR II64 (OpReg W64 tmp1) (OpAddr (AddrRegImm dst_reg (ImmInt off)))
+                     ] `appOL` go (off + 8) (remaining - 8)
+            -- 4-byte chunk
+            | remaining >= 4 =
+                toOL [ LDR II32 (OpReg W32 tmp1) (OpAddr (AddrRegImm src_reg (ImmInt off)))
+                     , STR II32 (OpReg W32 tmp1) (OpAddr (AddrRegImm dst_reg (ImmInt off)))
+                     ] `appOL` go (off + 4) (remaining - 4)
+            -- 2-byte chunk
+            | remaining >= 2 =
+                toOL [ LDR II16 (OpReg W16 tmp1) (OpAddr (AddrRegImm src_reg (ImmInt off)))
+                     , STR II16 (OpReg W16 tmp1) (OpAddr (AddrRegImm dst_reg (ImmInt off)))
+                     ] `appOL` go (off + 2) (remaining - 2)
+            -- 1-byte chunk
+            | otherwise =
+                toOL [ LDR II8 (OpReg W8 tmp1) (OpAddr (AddrRegImm src_reg (ImmInt off)))
+                     , STR II8 (OpReg W8 tmp1) (OpAddr (AddrRegImm dst_reg (ImmInt off)))
+                     ] `appOL` go (off + 1) (remaining - 1)
+      return $ code_d `appOL` code_s `appOL` go 0 n
+
+    -- | Generate inline store sequence for small memset.
+    -- For sets up to 64 bytes, we emit stores using a register holding the
+    -- fill value. For zero fills, we emit MOVZ tmp, #0 and let the post-RA
+    -- peephole optimizer convert STR tmp → STR xzr. We cannot use
+    -- RealRegSingle (-1) (xzr) directly in pre-RA code because the linear
+    -- register allocator's FreeRegs uses Word32 bitmaps that overflow on
+    -- negative register indices.
+    inlineMemset :: CmmExpr -> CmmExpr -> Int -> Int -> NatM InstrBlock
+    inlineMemset dst_expr val_expr n align = do
+      (dst_reg, _fmt_d, code_d) <- getSomeReg dst_expr
+      (val_reg, _fmt_v, code_v) <- getSomeReg val_expr
+      -- Splat the byte value across all 8 bytes of a register.
+      -- For zero, we materialize zero in a virtual register. The post-RA
+      -- peephole will optimize STR of a zero-valued register to STR xzr.
+      -- For non-zero, we replicate the byte: val | val<<8 | val<<16 | ...
+      tmp <- getNewRegNat II64
+      let -- Check if the value is a constant zero
+          isZero = case val_expr of
+            CmmLit (CmmInt 0 _) -> True
+            _                   -> False
+          -- The register to use for storing (zero in tmp, or splatted value)
+          (store_reg, splat_code)
+            | isZero    = (tmp, unitOL $ MOVZ (OpReg W64 tmp) (OpImm (ImmInt 0)))
+            | otherwise =
+                -- Replicate byte across 64-bit register:
+                -- ORR tmp, val, val LSL #8
+                -- ORR tmp, tmp, tmp LSL #16
+                -- ORR tmp, tmp, tmp LSL #32
+                (tmp, toOL
+                  [ ORR (OpReg W64 tmp) (OpReg W64 val_reg)
+                        (OpRegShift W64 val_reg SLSL 8)
+                  , ORR (OpReg W64 tmp) (OpReg W64 tmp)
+                        (OpRegShift W64 tmp SLSL 16)
+                  , ORR (OpReg W64 tmp) (OpReg W64 tmp)
+                        (OpRegShift W64 tmp SLSL 32)
+                  ])
+          -- Generate stores at offset.  See inlineMemcpy for alignment
+          -- rationale: AArch64 single-register STR handles unaligned
+          -- addresses, only STP requires natural alignment.
+          go :: Int -> Int -> OrdList Instr
+          go off remaining
+            | remaining <= 0 = nilOL
+            -- 16-byte chunk using STP (requires 8-byte alignment)
+            | remaining >= 16, align >= 8 =
+                unitOL (STP II64 (OpReg W64 store_reg) (OpReg W64 store_reg)
+                                 (OpAddr (AddrRegImm dst_reg (ImmInt off))))
+                `appOL` go (off + 16) (remaining - 16)
+            -- 8-byte chunk (AArch64 STR handles unaligned)
+            | remaining >= 8 =
+                unitOL (STR II64 (OpReg W64 store_reg)
+                                 (OpAddr (AddrRegImm dst_reg (ImmInt off))))
+                `appOL` go (off + 8) (remaining - 8)
+            -- 4-byte chunk
+            | remaining >= 4 =
+                unitOL (STR II32 (OpReg W32 store_reg)
+                                 (OpAddr (AddrRegImm dst_reg (ImmInt off))))
+                `appOL` go (off + 4) (remaining - 4)
+            -- 2-byte chunk
+            | remaining >= 2 =
+                unitOL (STR II16 (OpReg W16 store_reg)
+                                 (OpAddr (AddrRegImm dst_reg (ImmInt off))))
+                `appOL` go (off + 2) (remaining - 2)
+            -- 1-byte chunk
+            | otherwise =
+                unitOL (STR II8 (OpReg W8 store_reg)
+                                (OpAddr (AddrRegImm dst_reg (ImmInt off))))
+                `appOL` go (off + 1) (remaining - 1)
+      return $ code_d `appOL` code_v `appOL` splat_code `appOL` go 0 n
 
     -- TODO: Optimize using paired stores and loads (STP, LDP). It is
     -- automatically done by the allocator for us. However it's not optimal,
@@ -2470,12 +2725,20 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       -- pprTrace "lblMap" (ppr lblMap) $ basic_blocks
 
   where
-    -- 2^18, 19 bit immediate with one bit is reserved for the sign
-    max_jump_dist = 2^(18::Int) - 1 :: Int
+    -- 2^18, 19 bit immediate with one bit is reserved for the sign (for BCOND)
+    max_bcond_jump_dist = 2^(18::Int) - 1 :: Int
+    -- 2^13, 14 bit immediate with one bit reserved for sign (for TBZ/TBNZ/CBZ/CBNZ)
+    max_tbz_jump_dist = 2^(13::Int) - 1 :: Int
+    -- Use the more conservative distance for the overall check
+    max_jump_dist = max_tbz_jump_dist :: Int
     -- Currently all inline info tables fit into 64 bytes.
     max_info_size     = 16 :: Int
-    long_bc_jump_size =  3 :: Int
+    -- After condition inversion optimization: BCOND !cond skip; B far; skip:
+    long_bc_jump_size =  2 :: Int
+    -- CBZ/CBNZ far: CMP op, #0; BCOND !cond skip; B far; skip:
     long_bz_jump_size =  4 :: Int
+    -- TBZ/TBNZ far: TBNZ/TBZ (inverted) skip; B far; skip:
+    long_tb_jump_size =  2 :: Int
 
     -- Replace out of range conditional jumps with unconditional jumps.
     replace_blk :: LabelMap Int -> Int -> GenBasicBlock Instr -> UniqDSM (Int, [GenBasicBlock Instr])
@@ -2501,13 +2764,16 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
               pure (idx, ANN ann instr':instrs')
             (idx,[]) -> pprPanic "replace_jump" (text "empty return list for " <+> ppr idx)
         BCOND cond t
-          -> case target_in_range m t pos of
+          -> case target_in_range m t pos max_bcond_jump_dist of
               InRange -> pure (pos+long_bc_jump_size,[instr])
               NotInRange far_target -> do
                 jmp_code <- genCondFarJump cond far_target
                 pure (pos+long_bc_jump_size, fromOL jmp_code)
         CBZ op t -> long_zero_jump op t EQ
         CBNZ op t -> long_zero_jump op t NE
+        -- TBZ/TBNZ have 14-bit range (±32KB), same expansion strategy as CBZ/CBNZ
+        TBZ op bit t -> long_tbz_jump op bit t EQ
+        TBNZ op bit t -> long_tbz_jump op bit t NE
         instr
           | isMetaInstr instr -> pure (pos,[instr])
           | otherwise -> pure (pos+1, [instr])
@@ -2515,33 +2781,49 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
       where
         -- cmp_op: EQ = CBZ, NEQ = CBNZ
         long_zero_jump op t cmp_op =
-          case target_in_range m t pos of
+          case target_in_range m t pos max_tbz_jump_dist of
               InRange -> pure (pos+long_bz_jump_size,[instr])
               NotInRange far_target -> do
                 jmp_code <- genCondFarJump cmp_op far_target
-                -- TODO: Fix zero reg so we can use it here
                 pure (pos + long_bz_jump_size, CMP op (OpImm (ImmInt 0)) : fromOL jmp_code)
 
+        -- TBZ/TBNZ far jump: use condition inversion.
+        -- TBZ reg, #bit, far  →  TBNZ reg, #bit, skip; B far; skip:
+        -- TBNZ reg, #bit, far →  TBZ reg, #bit, skip; B far; skip:
+        -- The inverted TBZ/TBNZ always targets the skip label which is
+        -- only 1 instruction away, well within the 14-bit range.
+        long_tbz_jump op bit t _cmp_op =
+          case target_in_range m t pos max_tbz_jump_dist of
+              InRange -> pure (pos+long_tb_jump_size,[instr])
+              NotInRange far_target -> do
+                skip_lbl <- newBlockId
+                let inverted = case instr of
+                      TBZ {}  -> TBNZ op bit (TBlock skip_lbl)
+                      TBNZ {} -> TBZ op bit (TBlock skip_lbl)
+                      _       -> panic "long_tbz_jump: not TBZ/TBNZ"
+                pure (pos + long_tb_jump_size,
+                      [inverted, B far_target, NEWBLOCK skip_lbl])
 
-    target_in_range :: LabelMap Int -> Target -> Int -> BlockInRange
-    target_in_range m target src =
+
+    target_in_range :: LabelMap Int -> Target -> Int -> Int -> BlockInRange
+    target_in_range m target src max_dist =
       case target of
         (TReg{}) -> InRange
-        (TBlock bid) -> block_in_range m src bid
+        (TBlock bid) -> block_in_range m src bid max_dist
         (TLabel clbl)
           | Just bid <- maybeLocalBlockLabel clbl
-          -> block_in_range m src bid
+          -> block_in_range m src bid max_dist
           | otherwise
           -- Maybe we should be pessimistic here, for now just fixing intra proc jumps
           -> InRange
 
-    block_in_range :: LabelMap Int -> Int -> BlockId -> BlockInRange
-    block_in_range m src_pos dest_lbl =
+    block_in_range :: LabelMap Int -> Int -> BlockId -> Int -> BlockInRange
+    block_in_range m src_pos dest_lbl max_dist =
       case mapLookup dest_lbl m of
         Nothing       ->
           pprTrace "not in range" (ppr dest_lbl) $
             NotInRange (TBlock dest_lbl)
-        Just dest_pos -> if abs (dest_pos - src_pos) < max_jump_dist
+        Just dest_pos -> if abs (dest_pos - src_pos) < max_dist
           then InRange
           else NotInRange (TBlock dest_lbl)
 
@@ -2567,11 +2849,13 @@ makeFarBranches {- only used when debugging -} _platform statics basic_blocks = 
         Nothing           -> 0 :: Int
         Just _info_static -> max_info_size
 
-    -- These jumps have a 19bit immediate as offset which is quite
-    -- limiting so we potentially have to expand them into
-    -- multiple instructions.
+    -- These jumps have limited immediate offsets:
+    -- BCOND: 19-bit (±1MB), CBZ/CBNZ: 19-bit, TBZ/TBNZ: 14-bit (±32KB).
+    -- We potentially have to expand them into multiple instructions.
     is_expandable_jump i = case i of
       CBZ{}   -> Just long_bz_jump_size
       CBNZ{}  -> Just long_bz_jump_size
+      TBZ{}   -> Just long_tb_jump_size
+      TBNZ{}  -> Just long_tb_jump_size
       BCOND{} -> Just long_bc_jump_size
       _ -> Nothing

@@ -271,6 +271,7 @@ Library
         GHC.CmmToAsm.AArch64.CodeGen
         GHC.CmmToAsm.AArch64.Cond
         GHC.CmmToAsm.AArch64.Instr
+        GHC.CmmToAsm.AArch64.Peephole
         GHC.CmmToAsm.AArch64.Ppr
         GHC.CmmToAsm.AArch64.RegInfo
         GHC.CmmToAsm.AArch64.Regs

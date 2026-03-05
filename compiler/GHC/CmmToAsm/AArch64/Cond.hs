@@ -1,6 +1,11 @@
-module GHC.CmmToAsm.AArch64.Cond  where
+module GHC.CmmToAsm.AArch64.Cond
+  ( Cond(..)
+  , invertCond
+  )
+where
 
 import GHC.Prelude hiding (EQ)
+import GHC.Utils.Panic (panic)
 
 -- https://developer.arm.com/documentation/den0024/a/the-a64-instruction-set/data-processing-instructions/conditional-instructions
 
@@ -70,3 +75,29 @@ data Cond
     | VS     -- oVerflow set
     | VC     -- oVerflow clear
     deriving Eq
+
+-- | Invert a condition code. Used for far branch optimization where we
+-- invert the condition and skip over an unconditional far jump, saving
+-- one instruction and one label per far branch.
+invertCond :: Cond -> Cond
+invertCond ALWAYS = panic "invertCond: cannot invert ALWAYS"
+invertCond EQ     = NE
+invertCond NE     = EQ
+invertCond SLT    = SGE
+invertCond SLE    = SGT
+invertCond SGE    = SLT
+invertCond SGT    = SLE
+invertCond ULT    = UGE
+invertCond ULE    = UGT
+invertCond UGE    = ULT
+invertCond UGT    = ULE
+invertCond OLT    = UOGE  -- ordered LT → unordered GE (NaN becomes true)
+invertCond OLE    = UOGT  -- ordered LE → unordered GT
+invertCond OGE    = UOLT  -- ordered GE → unordered LT
+invertCond OGT    = UOLE  -- ordered GT → unordered LE
+invertCond UOLT   = OGE   -- unordered LT → ordered GE
+invertCond UOLE   = OGT   -- unordered LE → ordered GT
+invertCond UOGE   = OLT   -- unordered GE → ordered LT
+invertCond UOGT   = OLE   -- unordered GT → ordered LE
+invertCond VS     = VC
+invertCond VC     = VS

@@ -115,6 +115,7 @@ regUsageOfInstr platform instr = case instr of
   LSR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   MOV dst src              -> usage (regOp src, regOp dst)
   MOVK dst src             -> usage (regOp src, regOp dst)
+  MOVN dst src             -> usage (regOp src, regOp dst)
   MOVZ dst src             -> usage (regOp src, regOp dst)
   MVN dst src              -> usage (regOp src, regOp dst)
   ORR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -128,13 +129,20 @@ regUsageOfInstr platform instr = case instr of
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
   CSET dst _               -> usage ([], regOp dst)
+  CSEL dst src1 src2 _     -> usage (regOp src1 ++ regOp src2, regOp dst)
+  CSINC dst src1 src2 _    -> usage (regOp src1 ++ regOp src2, regOp dst)
+  CSNEG dst src1 src2 _    -> usage (regOp src1 ++ regOp src2, regOp dst)
   CBZ src _                -> usage (regOp src, [])
   CBNZ src _               -> usage (regOp src, [])
+  TBZ src _ _              -> usage (regOp src, [])
+  TBNZ src _ _             -> usage (regOp src, [])
   -- 7. Load and Store Instructions --------------------------------------------
   STR _ src dst            -> usage (regOp src ++ regOp dst, [])
   STLR _ src dst           -> usage (regOp src ++ regOp dst, [])
   LDR _ dst src            -> usage (regOp src, regOp dst)
   LDAR _ dst src           -> usage (regOp src, regOp dst)
+  STP _ src1 src2 dst      -> usage (regOp src1 ++ regOp src2 ++ regOp dst, [])
+  LDP _ dst1 dst2 src      -> usage (regOp src, regOp dst1 ++ regOp dst2)
 
   -- 8. Synchronization Instructions -------------------------------------------
   DMBISH _                 -> usage ([], [])
@@ -271,6 +279,7 @@ patchRegsOfInstr instr env = case instr of
     LSR o1 o2 o3   -> LSR  (patchOp o1) (patchOp o2) (patchOp o3)
     MOV o1 o2      -> MOV  (patchOp o1) (patchOp o2)
     MOVK o1 o2     -> MOVK (patchOp o1) (patchOp o2)
+    MOVN o1 o2     -> MOVN (patchOp o1) (patchOp o2)
     MOVZ o1 o2     -> MOVZ (patchOp o1) (patchOp o2)
     MVN o1 o2      -> MVN  (patchOp o1) (patchOp o2)
     ORR o1 o2 o3   -> ORR  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -284,14 +293,21 @@ patchRegsOfInstr instr env = case instr of
 
     -- 5. Atomic Instructions --------------------------------------------------
     -- 6. Conditional Instructions ---------------------------------------------
-    CSET o c       -> CSET (patchOp o) c
-    CBZ o l        -> CBZ (patchOp o) l
-    CBNZ o l       -> CBNZ (patchOp o) l
+    CSET o c        -> CSET (patchOp o) c
+    CSEL o1 o2 o3 c -> CSEL (patchOp o1) (patchOp o2) (patchOp o3) c
+    CSINC o1 o2 o3 c -> CSINC (patchOp o1) (patchOp o2) (patchOp o3) c
+    CSNEG o1 o2 o3 c -> CSNEG (patchOp o1) (patchOp o2) (patchOp o3) c
+    CBZ o l         -> CBZ (patchOp o) l
+    CBNZ o l        -> CBNZ (patchOp o) l
+    TBZ o b l       -> TBZ (patchOp o) b l
+    TBNZ o b l      -> TBNZ (patchOp o) b l
     -- 7. Load and Store Instructions ------------------------------------------
     STR f o1 o2    -> STR f (patchOp o1) (patchOp o2)
     STLR f o1 o2   -> STLR f (patchOp o1) (patchOp o2)
     LDR f o1 o2    -> LDR f (patchOp o1) (patchOp o2)
     LDAR f o1 o2   -> LDAR f (patchOp o1) (patchOp o2)
+    STP f o1 o2 o3 -> STP f (patchOp o1) (patchOp o2) (patchOp o3)
+    LDP f o1 o2 o3 -> LDP f (patchOp o1) (patchOp o2) (patchOp o3)
 
     -- 8. Synchronization Instructions -----------------------------------------
     DMBISH c       -> DMBISH c
@@ -333,6 +349,8 @@ isJumpishInstr instr = case instr of
     ANN _ i -> isJumpishInstr i
     CBZ{} -> True
     CBNZ{} -> True
+    TBZ{} -> True
+    TBNZ{} -> True
     J{} -> True
     J_TBL{} -> True
     B{} -> True
@@ -347,6 +365,8 @@ jumpDestsOfInstr :: Instr -> [BlockId]
 jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
 jumpDestsOfInstr (CBZ _ t) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (CBNZ _ t) = [ id | TBlock id <- [t]]
+jumpDestsOfInstr (TBZ _ _ t) = [ id | TBlock id <- [t]]
+jumpDestsOfInstr (TBNZ _ _ t) = [ id | TBlock id <- [t]]
 jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
 jumpDestsOfInstr (J_TBL ids _mbLbl _r) = catMaybes ids
 jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
@@ -374,6 +394,8 @@ patchJumpInstr instr patchF
         ANN d i -> ANN d (patchJumpInstr i patchF)
         CBZ r (TBlock bid) -> CBZ r (TBlock (patchF bid))
         CBNZ r (TBlock bid) -> CBNZ r (TBlock (patchF bid))
+        TBZ r b (TBlock bid) -> TBZ r b (TBlock (patchF bid))
+        TBNZ r b (TBlock bid) -> TBNZ r b (TBlock (patchF bid))
         J (TBlock bid) -> J (TBlock (patchF bid))
         J_TBL ids mbLbl r -> J_TBL (map (fmap patchF) ids) mbLbl r
         B (TBlock bid) -> B (TBlock (patchF bid))
@@ -660,7 +682,7 @@ data Instr
     | LSR Operand Operand Operand -- rd = rn ≫ rm  or rd = rn ≫ #i, i is 6 bits
     | MOV Operand Operand -- rd = rn  or  rd = #i
     | MOVK Operand Operand
-    -- | MOVN Operand Operand
+    | MOVN Operand Operand -- rd = ~(imm16 << shift), move wide with NOT
     | MOVZ Operand Operand
     | MVN Operand Operand -- rd = ~rn
     | ORR Operand Operand Operand -- rd = rn | op2
@@ -670,12 +692,22 @@ data Instr
     | STLR Format Operand Operand -- stlr Xn, address-mode // Xn -> *addr
     | LDR Format Operand Operand -- ldr Xn, address-mode // Xn <- *addr
     | LDAR Format Operand Operand -- ldar Xn, address-mode // Xn <- *addr
+    -- Paired load/store: transfer two registers in a single operation,
+    -- using one decode slot instead of two.
+    | STP Format Operand Operand Operand -- stp Xt1, Xt2, [addr] // Xt1,Xt2 -> *addr
+    | LDP Format Operand Operand Operand -- ldp Xt1, Xt2, [addr] // Xt1,Xt2 <- *addr
 
     -- Conditional instructions
     | CSET Operand Cond   -- if(cond) op <- 1 else op <- 0
+    | CSEL Operand Operand Operand Cond  -- csel dst, src1, src2, cond: dst = cond ? src1 : src2
+    | CSINC Operand Operand Operand Cond -- csinc dst, src1, src2, cond: dst = cond ? src1 : src2+1
+    | CSNEG Operand Operand Operand Cond -- csneg dst, src1, src2, cond: dst = cond ? src1 : -src2
 
     | CBZ Operand Target  -- if op == 0, then branch.
     | CBNZ Operand Target -- if op /= 0, then branch.
+    -- Test bit and branch: more efficient than AND+CMP+BCOND for single-bit tests
+    | TBZ Operand Int Target  -- tbz reg, #bit, label: branch if bit is zero
+    | TBNZ Operand Int Target -- tbnz reg, #bit, label: branch if bit is nonzero
     -- Branching.
     | J Target            -- like B, but only generated from genJump. Used to distinguish genJumps from others.
     | J_TBL [Maybe BlockId] (Maybe CLabel) Reg -- A jump instruction with data for switch/jump tables
@@ -758,6 +790,7 @@ instrCon i =
       LSR{} -> "LSR"
       MOV{} -> "MOV"
       MOVK{} -> "MOVK"
+      MOVN{} -> "MOVN"
       MOVZ{} -> "MOVZ"
       MVN{} -> "MVN"
       ORR{} -> "ORR"
@@ -765,9 +798,16 @@ instrCon i =
       STLR{} -> "STLR"
       LDR{} -> "LDR"
       LDAR{} -> "LDAR"
+      STP{} -> "STP"
+      LDP{} -> "LDP"
       CSET{} -> "CSET"
+      CSEL{} -> "CSEL"
+      CSINC{} -> "CSINC"
+      CSNEG{} -> "CSNEG"
       CBZ{} -> "CBZ"
       CBNZ{} -> "CBNZ"
+      TBZ{} -> "TBZ"
+      TBNZ{} -> "TBNZ"
       J{} -> "J"
       J_TBL {} -> "J_TBL"
       B{} -> "B"
