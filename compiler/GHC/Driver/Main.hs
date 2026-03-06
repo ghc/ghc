@@ -2845,7 +2845,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
 
   case interp of
     -- always generate JS code for the JS interpreter (no bytecode!)
-    Interp (ExternalInterp (ExtJS i)) _ _ ->
+    Interp { interpInstance = ExternalInterp (ExtJS i) } ->
       jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id
 
     _ -> do
