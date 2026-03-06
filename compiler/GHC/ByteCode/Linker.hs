@@ -42,6 +42,7 @@ import qualified GHC.Types.Id as Id
 import GHC.Types.Unique.DFM
 
 -- Standard libraries
+import Control.Concurrent
 import Data.Array.Unboxed
 import Foreign.Ptr
 import GHC.Exts
@@ -87,9 +88,12 @@ lookupLiteral interp pkgs_loaded bytecode_state ptr = case ptr of
   BCONPtrStr bs -> do
     RemotePtr p <- fmap head $ interpCmd interp $ MallocStrings [bs]
     pure $ fromIntegral p
-  BCONPtrFS fs -> do
-    RemotePtr p <- fmap head $ interpCmd interp $ MallocStrings [bytesFS fs]
-    pure $ fromIntegral p
+  BCONPtrFS fs -> modifyMVar (interpStringCache interp) $ \fs_env ->
+    case lookupFsEnv fs_env fs of
+      Just (RemotePtr p) -> pure (fs_env, fromIntegral p)
+      Nothing -> do
+        rp@(RemotePtr p) <- fmap head $ interpCmd interp $ MallocStrings [bytesFS fs]
+        pure (extendFsEnv fs_env fs rp, fromIntegral p)
   BCONPtrFFIInfo (FFIInfo {..}) -> do
     RemotePtr p <- interpCmd interp $ PrepFFI ffiInfoArgs ffiInfoRet
     pure $ fromIntegral p
