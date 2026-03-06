@@ -19,7 +19,6 @@ module GHC.Tc.Errors.Ppr
   , TcRnMessageOpts(..)
   , pprTyThingUsedWrong
   , pprUntouchableVariable
-  , pprDeferredTypeError
 
   --
   , mismatchMsg_ExpectedActuals
@@ -124,7 +123,6 @@ import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Error
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -1151,7 +1149,7 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            vcat [ text "The literal" <+> quotes (ppr lit) <+> text "cannot be promoted."
                 , text "It is of the unpromotable type" <+> quotes (ppr (hsLitType lit)) <> dot ]
-    TcRnIllegalTermLevelUse simple_msg _ rdr name err
+    TcRnIllegalTermLevelUse simple_msg rdr name err _
       -> mkSimpleDecorated $
            if simple_msg
            then
@@ -2380,8 +2378,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnpromotableLit{}
       -> ErrorWithoutFlag
-    TcRnIllegalTermLevelUse _ reason _ _ _
-      -> reason -- Error, or a Warning if we are deferring type errors
+    TcRnIllegalTermLevelUse _ _ _ _ reason
+      -> reason
     TcRnMatchesHaveDiffNumArgs{}
       -> ErrorWithoutFlag
     TcRnCannotBindScopedTyVarInPatSig{}
@@ -4461,11 +4459,6 @@ pprUntouchableVariable tv (Implic { ic_given = given, ic_info = skol_info, ic_en
         , nest 2 $ text "inside the constraints:" <+> pprEvVarTheta given
         , nest 2 $ text "bound by" <+> ppr skol_info
         , nest 2 $ text "at" <+> ppr (getCtLocEnvLoc env) ]
-
-pprDeferredTypeError :: DiagnosticOpts TcRnMessage -> MsgEnvelope TcRnMessage -> SDoc
-pprDeferredTypeError opts msg =
-  pprLocMsgEnvelope opts msg $$
-  text "(deferred type error)"
 
 -- | Which invisible bits of types should be displayed to the user when
 -- rendering a 'MismatchMsg'?

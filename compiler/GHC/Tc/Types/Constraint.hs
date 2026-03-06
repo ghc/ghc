@@ -50,6 +50,7 @@ module GHC.Tc.Types.Constraint (
 
         -- Holes
         Hole(..), HoleSort(..), isOutOfScopeHole,
+        ExprHoleVariant(..),
         DelayedError(..), NotConcreteError(..),
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
@@ -409,9 +410,12 @@ data Hole
            -- might get reported to the user if reducing type families in a
            -- hole type loops.
 
+data ExprHoleVariant
+  = ExprHoleUnbound
+  | ExprHoleBoundToType TcType
 
 -- | Used to indicate which sort of hole we have.
-data HoleSort = ExprHole HoleExprRef
+data HoleSort = ExprHole ExprHoleVariant HoleExprRef
                  -- ^ Either an out-of-scope variable or a "true" hole in an
                  -- expression (TypedHoles).
                  -- The HoleExprRef says where to write the
@@ -425,7 +429,7 @@ data HoleSort = ExprHole HoleExprRef
                  -- Note [Do not simplify ConstraintHoles] in GHC.Tc.Solver.
 
 instance Outputable Hole where
-  ppr (Hole { hole_sort = ExprHole ref
+  ppr (Hole { hole_sort = ExprHole _ ref
             , hole_occ  = occ
             , hole_ty   = ty })
     = parens $ (braces $ ppr occ <> colon <> ppr ref) <+> dcolon <+> ppr ty
@@ -435,9 +439,9 @@ instance Outputable Hole where
     = braces $ ppr occ <> colon <> ppr ty
 
 instance Outputable HoleSort where
-  ppr (ExprHole ref) = text "ExprHole:" <+> ppr ref
-  ppr TypeHole       = text "TypeHole"
-  ppr ConstraintHole = text "ConstraintHole"
+  ppr (ExprHole _ ref) = text "ExprHole:" <+> ppr ref
+  ppr TypeHole         = text "TypeHole"
+  ppr ConstraintHole   = text "ConstraintHole"
 
 -- | Why did we require that a certain type be concrete?
 data NotConcreteError

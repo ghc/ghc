@@ -586,7 +586,7 @@ findValidHoleFits :: TidyEnv        -- ^ The tidy_env for zonking
                   -- the hole.
                   -> Hole
                   -> TcM (TidyEnv, ValidHoleFits)
-findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
+findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _ _
                                                    , hole_loc  = ct_loc
                                                    , hole_ty   = hole_ty }) =
   do { rdr_env <- getGlobalRdrEnv

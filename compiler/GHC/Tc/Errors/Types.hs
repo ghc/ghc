@@ -2495,11 +2495,10 @@ data TcRnMessage where
   TcRnIllegalTermLevelUse
     :: !Bool -- ^ should we give a simple "out of scope" message,
              -- instead of a full-blown "Illegal term level use" message?
-
-    -> !DiagnosticReason
     -> !RdrName -- ^ the user-written identifier
     -> !Name    -- ^ the type-level 'Name' we resolved it to
     -> !TermLevelUseErr
+    -> !DiagnosticReason   -- ^ Whether to defer this error or fail
     -> TcRnMessage
 
   {-| TcRnMatchesHaveDiffNumArgs is an error occurring when something has matches
@@ -5956,6 +5955,7 @@ data HoleError
   --
   -- Test cases: T9177a.
   = OutOfScopeHole
+
   -- | Report a typed hole, or wildcard, with additional information.
   | HoleError HoleSort
               [TcTyVar]                     -- Other type variables which get computed on the way.

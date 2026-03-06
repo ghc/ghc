@@ -3,7 +3,6 @@
 
 module T19966 where
 
-import Control.Exception (evaluate)
 import Data.Proxy
 
 -- "I" is out of scope, but we accept the definition

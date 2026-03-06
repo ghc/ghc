@@ -399,15 +399,13 @@ mkIllegalTyVarMessage :: DiagnosticReason -> WithUserRdr Name -> TcM TcRnMessage
     fail_tyvar reason (WithUserRdr rdr nm) =
       fail_with_msg reason WL_Term varName rdr nm (Just TermLevelUseTyVar) TyVarTE
 
-    fail_with_msg :: DiagnosticReason -> WhatLooking -> NameSpace -> RdrName -> Name
-                  -> Maybe TermLevelUseCtxt -> TermLevelUseErr -> TcM TcRnMessage
     fail_with_msg reason what_looking whatName rdr nm pprov err = do
       (imp_errs, hints) <- get_suggestions what_looking whatName rdr
       hfdc <- getHoleFitDispConfig
       unit_state <- hsc_units <$> getTopEnv
       let
         want_simple = want_simple_msg hints
-        msg = TcRnIllegalTermLevelUse want_simple reason rdr nm err
+        msg = TcRnIllegalTermLevelUse want_simple rdr nm err reason
         info = ErrInfo { errInfoContext =
                            if want_simple
                            then []
@@ -417,8 +415,7 @@ mkIllegalTyVarMessage :: DiagnosticReason -> WithUserRdr Name -> TcM TcRnMessage
                              NE.nonEmpty imp_errs
                        , errInfoHints = hints
                        }
-        msg_w_info = TcRnMessageWithInfo unit_state (mkDetailedMessage info msg)
-      return msg_w_info
+      return $ TcRnMessageWithInfo unit_state (mkDetailedMessage info msg)
 
     get_suggestions what_looking ns rdr = do
       required_type_arguments <- xoptM LangExt.RequiredTypeArguments

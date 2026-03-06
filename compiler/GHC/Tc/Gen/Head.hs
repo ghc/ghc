@@ -39,12 +39,11 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Tc.Errors.Types
-import GHC.Tc.Errors.Ppr ( pprDeferredTypeError )
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
-import GHC.Tc.Types.Constraint( WantedConstraints )
+import GHC.Tc.Types.Constraint( WantedConstraints, ExprHoleVariant(..) )
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Zonk.TcType
@@ -68,8 +67,6 @@ import GHC.Types.Error
 import GHC.Builtin.Names
 
 import GHC.Driver.DynFlags
-import GHC.Driver.Ppr (showSDoc)
-import GHC.Driver.Config.Diagnostic (initTcMessageOpts)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
@@ -802,7 +799,7 @@ tcInferId lname@(L loc (WithUserRdr rdr id_name))
   = tc_infer_id lname
 
 tc_infer_id :: LocatedN (WithUserRdr Name) -> TcM (HsExpr GhcTc, TcSigmaType)
-tc_infer_id (L loc qnm@(WithUserRdr rdr id_name))
+tc_infer_id (L loc (WithUserRdr rdr id_name))
  = do { thing <- tcLookup id_name
       ; (expr,ty) <- case thing of
              ATcId { tct_id = id }
@@ -816,9 +813,8 @@ tc_infer_id (L loc qnm@(WithUserRdr rdr id_name))
 
              AGlobal (AConLike cl) -> tcInferConLike cl
 
-             (tcTyThingTyCon_maybe -> Just _)
-                        -> defer_or_fail $ \reason -> mkIllegalTyConMessage reason WL_Term qnm
-             ATyVar _ _ -> defer_or_fail $ \reason -> mkIllegalTyVarMessage reason qnm
+             (tcTyThingTyCon_maybe -> Just tc) -> mk_hole (mkTyConTy tc)
+             ATyVar _ tv -> mk_hole (mkTyVarTy tv)
 
              _ -> failWithTc $ TcRnExpectedValueId thing
 
@@ -827,26 +823,12 @@ tc_infer_id (L loc qnm@(WithUserRdr rdr id_name))
   where
     return_id id = return (mkHsVar (L loc id), idType id)
 
-    defer_or_fail :: (DiagnosticReason -> TcM TcRnMessage) -> TcM (HsExpr GhcTc, TcSigmaType)
-    defer_or_fail mk_msg = do
-      defer_out_of_scope <- goptM Opt_DeferOutOfScopeVariables
-      let reason | defer_out_of_scope = WarningWithFlag Opt_WarnDeferredOutOfScopeVariables
-                 | otherwise = ErrorWithoutFlag
-      msg <- mk_msg reason
-      addDiagnosticTc msg
-      msg_to_hole msg
-
-    msg_to_hole :: TcRnMessage -> TcM (HsExpr GhcTc, TcType)
-    msg_to_hole msg = do
-      dflags <- getDynFlags
-      let lrdr = L loc rdr
-      msg_envelope <- mkTcRnMessage (locA loc) msg
-      let msg_opts = initTcMessageOpts dflags
-          err_msg  = showSDoc dflags $ pprDeferredTypeError msg_opts msg_envelope
-      ty  <- newOpenFlexiTyVarTy
-      her <- newExprHoleRef ty (evDelayedError ty err_msg)
-      tcEmitBindingUsage bottomUE   -- Holes fit any usage environment (#18491)
-      return (HsHole (HoleVar lrdr, her), ty)
+    mk_hole :: TcType -> TcM (HsExpr GhcTc, TcSigmaType)
+    mk_hole ty
+      = do { hole_ty <- newOpenFlexiTyVarTy
+           ; her <- emitNewExprHole (ExprHoleBoundToType ty) rdr hole_ty
+           ; tcEmitBindingUsage bottomUE   -- Holes fit any usage environment (#18491)
+           ; return (HsHole (HoleVar (L loc rdr), her), hole_ty) }
 
 {- Note [Overview of assertions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

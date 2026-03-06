@@ -1,16 +1,16 @@
-T19966.hs:11:7: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
+T19966.hs:10:7: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
     Data constructor not in scope: I
 
-T19966.hs:18:7: warning: [GHC-01928] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
+T19966.hs:17:7: warning: [GHC-01928] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
     • Data constructor out of scope: ‘Bool’.
       NB: the type constructor ‘Bool’ cannot appear in this position.
     • In the expression: Bool
       In an equation for ‘ex2’: ex2 = Bool
-    Suggested fix: Perhaps use ‘Boo1’ (line 21)
+    Suggested fix: Perhaps use ‘Boo1’ (line 20)
 
-T19966.hs:29:13: warning: [GHC-01928] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
+T19966.hs:28:13: warning: [GHC-01928] [-Wdeferred-out-of-scope-variables (in -Wdefault)]
     • Illegal term-level use of the type variable ‘a’
-    • bound at T19966.hs:28:15
+    • bound at T19966.hs:27:1
     • In the first argument of ‘not’, namely ‘a’
       In the expression: not a
       In an equation for ‘ex3’: ex3 _ = not a

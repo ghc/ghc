@@ -51,6 +51,7 @@ import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.Constraint
 import GHC.Tc.Errors.Types hiding (HoleError)
 
 import GHC.Core.Multiplicity
@@ -322,9 +323,8 @@ tcExpr (XExpr e)                 res_ty = tcXExpr e res_ty
 -- Others might simply be variables that accidentally have no binding site.
 tcExpr (HsHole (HoleVar locc@(L _ occ))) res_ty
   = do { ty <- expTypeToType res_ty    -- Allow Int# etc (#12531)
-       ; her <- emitNewExprHole occ ty
-       ; tcEmitBindingUsage bottomUE   -- Holes fit any usage environment
-                                       -- (#18491)
+       ; her <- emitNewExprHole ExprHoleUnbound occ ty
+       ; tcEmitBindingUsage bottomUE   -- Holes fit any usage environment (#18491)
        ; return (HsHole (HoleVar locc, her))
        }
 tcExpr (HsHole HoleError) _ =

@@ -45,8 +45,6 @@ module GHC.Tc.Utils.TcMType (
   emitWantedEqs, emitNewExprHole,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
 
-  newExprHoleRef,
-
   newCoercionHole, fillCoercionHole, isFilledCoercionHole,
   checkCoercionHole,
 
@@ -300,27 +298,22 @@ emitWantedEvVar origin ty
        ; return new_cv }
 
 -- | Emit a new wanted expression hole
-emitNewExprHole :: RdrName         -- of the hole
+emitNewExprHole :: ExprHoleVariant
+                -> RdrName         -- of the hole
                 -> Type -> TcM HoleExprRef
-emitNewExprHole occ ty
+emitNewExprHole variant occ ty
   = do { u <- newUnique
        ; ref <- newTcRef (pprPanic "unfilled unbound-variable evidence" (ppr u))
        ; let her = HER ref ty u
 
        ; loc <- getCtLocM (ExprHoleOrigin (Just occ)) (Just TypeLevel)
 
-       ; let hole = Hole { hole_sort = ExprHole her
+       ; let hole = Hole { hole_sort = ExprHole variant her
                          , hole_occ  = occ
                          , hole_ty   = ty
                          , hole_loc  = loc }
        ; emitHole hole
        ; return her }
-
-newExprHoleRef :: Type -> EvTerm -> TcM HoleExprRef
-newExprHoleRef ty ev
-  = do { u <- newUnique
-       ; ref <- newTcRef ev
-       ; return $ HER ref ty u }
 
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys

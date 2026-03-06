@@ -28,14 +28,13 @@ import GHC.Tc.Errors.Ppr
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Utils.Env (tcLookupId, tcLookupDataCon)
+import GHC.Tc.Utils.Env
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Instance.Family
-import GHC.Tc.Utils.Instantiate
 import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits, getHoleFitDispConfig )
 
 import GHC.Types.Name
@@ -63,13 +62,14 @@ import GHC.Core.Class (className)
 import GHC.Core.ConLike (isExistentialRecordField, ConLike (..))
 import GHC.Core.Coercion
 import GHC.Core.DataCon
+import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr  ( pprTyVars )
 import GHC.Core.TyCo.Tidy
 
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
 
-import GHC.Utils.Error  (diagReasonSeverity)
+import GHC.Utils.Error  (diagReasonSeverity,  pprLocMsgEnvelope )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as O
 import GHC.Utils.Panic
@@ -1353,7 +1353,8 @@ addDeferredBinding ctxt supp hints msg (EI { ei_evdest = Just dest
                                            , ei_loc = loc })
   -- if evdest is Just, then the constraint was from a wanted
   | deferringAnyBindings ctxt
-  = do { err_tm <- mkErrorTerm loc item_ty ctxt msg supp hints
+  = do { msg <- mkErrorReport (ctLocEnv loc) msg (Just ctxt) supp hints
+       ; err_tm <- mkErrorTerm item_ty msg
        ; let ev_binds_var = cec_binds ctxt
 
        ; case dest of
@@ -1370,26 +1371,24 @@ addDeferredBinding _ _ _ _ _ = return ()    -- Do not set any evidence for Given
 mkSolverErrorTerm :: CtLoc -> Type  -- of the error term
                   -> SolverReport -> TcM EvTerm
 mkSolverErrorTerm ct_loc ty err
-  = mkErrorTerm ct_loc ty (reportContext . sr_important_msg $ err)
-                          (TcRnSolverReport (sr_important_msg err) ErrorWithoutFlag)
-                          (sr_supplementary err)
-                          (sr_hints err)
-
-mkErrorTerm :: CtLoc -> Type  -- of the error term
-            -> SolverReportErrCtxt -> TcRnMessage
-            -> [SupplementaryInfo] -> [GhcHint] -> TcM EvTerm
-mkErrorTerm ct_loc ty ctxt msg supp hints
   = do { msg <- mkErrorReport
                   (ctLocEnv ct_loc)
-                  msg
-                  (Just $ ctxt)
-                  supp
-                  hints
+                  (TcRnSolverReport (sr_important_msg err) ErrorWithoutFlag)
+                  (Just $ reportContext $ sr_important_msg err)
+                  (sr_supplementary err)
+                  (sr_hints err)
          -- This will be reported at runtime, so we always want "error:" in the report, never "warning:"
-       ; dflags <- getDynFlags
-       ; let msg_opts = initTcMessageOpts dflags
-             err_msg  = showSDoc dflags $ pprDeferredTypeError msg_opts msg
-       ; return $ evDelayedError ty err_msg }
+       ; mkErrorTerm ty msg
+       }
+
+mkErrorTerm :: Type -> MsgEnvelope TcRnMessage -> TcM EvTerm
+mkErrorTerm ty msg =
+    do { dflags <- getDynFlags
+       ; let err_msg = pprLocMsgEnvelope (initTcMessageOpts dflags) msg
+             err_str = showSDoc dflags $
+                       err_msg $$ text "(deferred type error)"
+
+       ; return $ evDelayedError ty err_str }
 
 tryReporters :: SolverReportErrCtxt -> [ReporterSpec] -> [ErrorItem] -> TcM (SolverReportErrCtxt, [ErrorItem])
 -- Use the first reporter in the list whose predicate says True
@@ -1551,6 +1550,22 @@ See also 'reportUnsolved'.
 ----------------
 -- | Constructs a new hole error, unless this is deferred. See Note [Constructing Hole Errors].
 mkHoleError :: NameEnv Type -> [ErrorItem] -> SolverReportErrCtxt -> Hole -> TcM (MsgEnvelope TcRnMessage)
+mkHoleError _ _ ctxt hole
+  | ExprHole (ExprHoleBoundToType t) (HER ref ref_ty _) <- hole_sort hole
+  = setCtLocM (hole_loc hole) $
+    do { let reason = cec_out_of_scope_holes ctxt
+       ; msg <- case t of
+           TyVarTy tv     -> mkIllegalTyVarMessage reason (WithUserRdr rdr (tyVarName tv))
+           TyConApp tc [] -> mkIllegalTyConMessage reason WL_Term (WithUserRdr rdr (tyConName tc))
+           _              -> pprPanic "mkHoleError" (ppr t)
+       ; msg <- mkErrorReport lcl_env msg (Just ctxt) [] noHints
+       ; when (deferringAnyBindings ctxt) $ do
+           err_tm <- mkErrorTerm ref_ty msg
+           writeMutVar ref err_tm
+       ; return msg }
+  where
+    rdr = hole_occ hole
+    lcl_env = ctLocEnv (hole_loc hole)
 mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_sort = sort, hole_occ = occ, hole_loc = ct_loc })
   | isOutOfScopeHole hole
   = do { (imp_errs, hints)
@@ -1586,7 +1601,7 @@ mkHoleError lcl_name_cache tidy_simples ctxt
 
        ; show_hole_constraints <- goptM Opt_ShowHoleConstraints
        ; let relevant_cts
-               | ExprHole _ <- sort, show_hole_constraints
+               | ExprHole _ _ <- sort, show_hole_constraints
                = givenConstraints ctxt
                | otherwise
                = []
@@ -1596,8 +1611,8 @@ mkHoleError lcl_name_cache tidy_simples ctxt
                               then validHoleFits ctxt tidy_simples hole
                               else return (ctxt, noValidHoleFits)
        ; (grouped_skvs, other_tvs) <- liftZonkM $ zonkAndGroupSkolTvs hole_ty
-       ; let reason | ExprHole _ <- sort = cec_expr_holes ctxt
-                    | otherwise          = cec_type_holes ctxt
+       ; let reason | ExprHole _ _ <- sort = cec_expr_holes ctxt
+                    | otherwise            = cec_type_holes ctxt
              err  = SolverReportWithCtxt ctxt
                   $ ReportHoleError hole
                   $ HoleError sort other_tvs grouped_skvs
@@ -1650,7 +1665,7 @@ maybeAddDeferredBindings :: Hole
                          -> TcM ()
 maybeAddDeferredBindings hole report = do
   case hole_sort hole of
-    ExprHole (HER ref ref_ty _) -> do
+    ExprHole _ (HER ref ref_ty _) -> do
       -- Only add bindings for holes in expressions
       -- not for holes in partial type signatures
       -- cf. addDeferredBinding
