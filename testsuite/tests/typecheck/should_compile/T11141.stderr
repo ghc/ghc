@@ -1,0 +1,4 @@
+T11141.hs:8:20: warning: [GHC-63397] [-Wname-shadowing (in -Wall)]
+    This binding for ‘a’ shadows the existing binding
+      bound at T11141.hs:7:10
+
