@@ -331,7 +331,7 @@ rnExpr (HsVar _ (L l v))
             -> rnExpr (ExplicitList noAnn [])
 
             | otherwise
-            -> do { res_expr <- checkThLocalNameWithLift (L (l2l l) (WithUserRdr v nm))
+            -> do { res_expr <- checkThLocalNameWithLift (L l (WithUserRdr v nm))
                   ; return (res_expr, unitFV nm) }
         }}}
 

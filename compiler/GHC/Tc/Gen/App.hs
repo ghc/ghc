@@ -1179,6 +1179,19 @@ expr_to_type earg =
       = do { t <- go (L l e)
            ; let splice_result' = HsUntypedSpliceTop finalizers t
            ; return (L l (HsSpliceTy splice_result' splice)) }
+    -- If T2T gets passed a typed splice and this splice was implicitly lifted, we revert the lifting
+    -- and instead try to T2T the variable without lifting and splicing it first.
+    -- This allows us to work around situations where a variable was not correctly identified as
+    -- as type variable and thus implicitly lifted before T2T.
+    -- This is to accomodate for moving the code that does implicit lifting to the renamer.
+    go (L l (HsTypedSplice _splice_result splice))
+      | XTypedSplice HsImplicitLiftSplice
+        { implicit_lift_lid = lid
+        , implicit_lift_bind_lvl = bind_lvls
+        , implicit_lift_used_lvl = used_lvl } <- splice
+      , L lnm (WithUserRdr _ nm) <- lid
+      = do { addDiagnosticAt (locA lnm) (TcRnBadlyLevelledType nm bind_lvls used_lvl)
+           ; go (L l (HsVar noExtField lid)) }
     go (L l (HsHole (HoleVar (L _ rdr))))
       | isUnderscore occ = return (L l (HsWildCardTy noExtField))
       | startsWithUnderscore occ =

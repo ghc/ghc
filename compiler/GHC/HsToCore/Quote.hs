@@ -166,7 +166,7 @@ dsBracket (HsBracketTc { hsb_wrap = mb_wrap, hsb_splices = splices, hsb_quote = 
       PatBr _ p   -> runOverloaded $ do { MkC p1  <- repTopP p   ; return p1 }
       TypBr _ t   -> runOverloaded $ do { MkC t1  <- repLTy t    ; return t1 }
       DecBrG _ gp -> runOverloaded $ do { MkC ds1 <- repTopDs gp ; return ds1 }
-      DecBrL {}   -> panic "dsUntypedBracket: unexpected DecBrL"
+      DecBrL {}   -> panic "dsBracket: unexpected DecBrL"
   where
     wrap = expectJust mb_wrap  -- Not used in VarBr case
       -- In the overloaded case we have to get given a wrapper, it is just
@@ -1481,7 +1481,7 @@ repTy (HsKindSig _ t k)     = do
                                 t1 <- repLTy t
                                 k1 <- repLTy k
                                 repTSig t1 k1
-repTy (HsSpliceTy (HsUntypedSpliceNested n) _) = rep_splice n
+repTy (HsSpliceTy (HsUntypedSpliceNested n) _) = rep_splice False n
 repTy t@(HsSpliceTy (HsUntypedSpliceTop _ _) _) = pprPanic "repTy: top level splice" (ppr t)
 repTy (HsExplicitListTy _ _ tys) = do
                                     tys1 <- repLTys tys
@@ -1532,13 +1532,17 @@ repRole (L _ Nothing)                 = rep2_nw inferRName []
 -- See Note [How brackets and nested splices are handled] in GHC.Tc.Gen.Splice
 -- We return a CoreExpr of any old type; the context should know
 
-rep_splice :: Name -> MetaM (Core a)
-rep_splice splice_name
+rep_splice :: Bool -> Name -> MetaM (Core a)
+rep_splice b splice_name
  = do { mb_val <- lift $ dsLookupMetaEnv splice_name
        ; case mb_val of
            Just (DsSplice e) -> do { e' <- lift $ dsExpr e
                                    ; return (MkC e') }
-           _ -> pprPanic "HsSplice" (ppr splice_name) }
+           -- If a splice was recorded to be pending but was later
+           -- discovered to not be splicable, we cannot return a corresponding
+           -- core expr here
+           Nothing -> return (pprPanic "HsSplice: looked at reverted pending splice" (ppr splice_name <+> text "typed:" <+> ppr b))
+           Just _ -> pprPanic "HsSplice" (ppr splice_name <+> text "typed:" <+> ppr b) }
                         -- Should not happen; statically checked
 
 -----------------------------------------------------------------------------
@@ -1701,8 +1705,8 @@ repE (ArithSeq _ _ aseq) =
                              ds3 <- repLE e3
                              repFromThenTo ds1 ds2 ds3
 
-repE (HsTypedSplice (HsTypedSpliceNested n) _) = rep_splice n
-repE (HsUntypedSplice (HsUntypedSpliceNested n) _)  = rep_splice n
+repE (HsTypedSplice (HsTypedSpliceNested n) _) = rep_splice True n
+repE (HsUntypedSplice (HsUntypedSpliceNested n) _)  = rep_splice False n
 repE e@(HsUntypedSplice (HsUntypedSpliceTop _ _) _) = pprPanic "repE: top level splice" (ppr e)
 repE e@(HsTypedSplice HsTypedSpliceTop _) = pprPanic "repE: top level splice" (ppr e)
 repE (HsStatic _ e)        = repLE e >>= rep2 staticEName . (:[]) . unC
@@ -2223,7 +2227,7 @@ repP (EmbTyPat _ t) = do { t' <- repLTy (hstp_body t)
 repP (InvisPat _ t) = do { t' <- repLTy (hstp_body t)
                          ; repPinvis t' }
 repP (OrPat _ ps) = do { ps' <- repLPs1 ps; repPor ps' }
-repP (SplicePat (HsUntypedSpliceNested n) _) = rep_splice n
+repP (SplicePat (HsUntypedSpliceNested n) _) = rep_splice False n
 repP p@(SplicePat (HsUntypedSpliceTop _ _) _) = pprPanic "repP: top level splice" (ppr p)
 repP other = notHandled (ThExoticPattern other)
 
