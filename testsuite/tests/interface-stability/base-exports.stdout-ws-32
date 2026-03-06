@@ -9453,7 +9453,7 @@ module GHC.Word where
   uncheckedShiftRL64# :: GHC.Internal.Prim.Word64# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Word64#
 
 module Numeric where
-  -- Safety: Safe
+  -- Safety: Trustworthy
   type Floating :: * -> Constraint
   class GHC.Internal.Real.Fractional a => Floating a where
     pi :: a
