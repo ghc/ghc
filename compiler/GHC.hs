@@ -378,6 +378,7 @@ import GHC.Hs
 import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
+import GHC.Data.FastString.Env
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Rename.Names (renamePkgQual, renameRawPkgQual)
 
@@ -714,6 +715,8 @@ setTopSessionDynFlags dflags = do
   logger  <- getLogger
   lookup_cache  <- liftIO $ mkInterpSymbolCache
 
+  fs_cache <- liftIO $ newMVar emptyFsEnv
+
   -- see Note [Target code interpreter]
   interp <- if
     -- Wasm dynamic linker
@@ -746,7 +749,7 @@ setTopSessionDynFlags dflags = do
                   wasmInterpHsSoSuffix = way_tag ++ dynLibSuffix (ghcNameVersion dflags),
                   wasmInterpUnitState = ue_homeUnitState $ hsc_unit_env hsc_env
                 }
-        pure $ Just $ Interp (ExternalInterp $ ExtWasm $ ExtInterpState cfg s) loader lookup_cache
+        pure $ Just $ Interp (ExternalInterp $ ExtWasm $ ExtInterpState cfg s) loader lookup_cache fs_cache
 
     -- JavaScript interpreter
     | ArchJavaScript <- platformArch (targetPlatform dflags)
@@ -764,7 +767,7 @@ setTopSessionDynFlags dflags = do
               , jsInterpFinderOpts  = initFinderOpts dflags
               , jsInterpFinderCache = hsc_FC hsc_env
               }
-         return (Just (Interp (ExternalInterp (ExtJS (ExtInterpState cfg s))) loader lookup_cache))
+         return (Just (Interp (ExternalInterp (ExtJS (ExtInterpState cfg s))) loader lookup_cache fs_cache))
 
     -- external interpreter
     | gopt Opt_ExternalInterpreter dflags
@@ -793,7 +796,7 @@ setTopSessionDynFlags dflags = do
             }
          s <- liftIO $ newMVar InterpPending
          loader <- liftIO Loader.uninitializedLoader
-         return (Just (Interp (ExternalInterp (ExtIServ (ExtInterpState conf s))) loader lookup_cache))
+         return (Just (Interp (ExternalInterp (ExtIServ (ExtInterpState conf s))) loader lookup_cache fs_cache))
 
     -- Internal interpreter
     | otherwise
@@ -801,7 +804,7 @@ setTopSessionDynFlags dflags = do
 #if defined(HAVE_INTERNAL_INTERPRETER)
      do
       loader <- liftIO Loader.uninitializedLoader
-      return (Just (Interp InternalInterp loader lookup_cache))
+      return (Just (Interp InternalInterp loader lookup_cache fs_cache))
 #else
       return Nothing
 #endif
