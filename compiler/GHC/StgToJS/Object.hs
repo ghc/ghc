@@ -72,7 +72,6 @@ import           Data.List (sortOn)
 import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as M
-import           Data.Word
 import           Data.Semigroup
 import           System.IO
 
