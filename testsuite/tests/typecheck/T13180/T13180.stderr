@@ -1,0 +1,12 @@
+[1 of 3] Compiling T13180[boot]     ( T13180.hs-boot, T13180.o-boot )
+[2 of 3] Compiling T13180A          ( T13180A.hs, T13180A.o )
+[3 of 3] Compiling T13180           ( T13180.hs, T13180.o )
+T13180.hs-boot:3:1: error: [GHC-15843]
+    • Type constructor ‘T’ has conflicting definitions in the module
+      and its hs-boot file.
+      Main module: type T :: *
+                   type T = Int
+        Boot file: type T :: *
+                   data T
+    • In the type synonym declaration for ‘T’
+
