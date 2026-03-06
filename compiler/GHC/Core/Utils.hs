@@ -3360,14 +3360,14 @@ So:
 
 * `AbsVars` is a list of free variables, in dependency order, to abstract.
   Some of them may be tyvars-with-unfoldings. For example
-      vs = [a, b=[a], x:b]
+      vs = [a, b{=[a]}, x:b{=[a]}]
 
 * When we make an AbsVars list, we close over the free vars of the unfoldings
-  of any tyvars in it.  So if `b{=Maybe a}` is in the list then so is `a`
+  of any tyvars in it.  So if `b{=[a]}` is in the list then so is `a`
 
 * `mkCoreAbsLams` (more generally `mkPolyAbsLams`) forms a lambda abstraction
    pushing the tyvar bindings into the body:
-      mkCoreAbsLams [a, b=[a], x:b] body
+      mkCoreAbsLams [a, b{=[a]}, x:b{=[a]}] body
          = \a. \(x:[a]). let @b = [a] in
                          let x:b = x in   -- See (AFV1)
                          body
@@ -3389,7 +3389,7 @@ Wrinkles
   Why do we need that funny (non-recursive!) `x:b = x` binding?
   Answer: without it we'd have this:
          = \a. \(x:[a]). let @b = [a] in
-                         reverse (x:b)
+                         reverse (x:b{=[a]})
   where the /occurrence/ Var (x:b) has a different type to the /binding/ x:[a].
 -}
 
@@ -3423,13 +3423,13 @@ mkPolyAbsLams (getter,setter) bndrs body
 
       | isTyVar var, change_ty
       , let binds' | isDeadBinder var = binds
-                   | otherwise        = (bndr, varToCoreExpr var1) : binds
+                   | otherwise        = binds -- (bndr, varToCoreExpr var1) : binds
             -- Why this let-binding?
       = Lam (setter var1 bndr) (go unf_tvs binds' bndrs)
 
       | isId var, change_ty || change_unf
       , let binds' | isDeadBinder var = binds
-                   | otherwise        = (bndr, varToCoreExpr id2) : binds
+                   | otherwise        = binds -- (bndr, varToCoreExpr id2) : binds
       = Lam (setter id2 bndr) (go unf_tvs binds' bndrs)
 
       | otherwise

@@ -3775,9 +3775,10 @@ checkBndrOccCompatibility in_bndr v_occ
 
        -- Check that binder and occurrence have same type
        -- See Note [Occurrence should have the same type as binder]
-       ;  checkL (pickyEqType occ_ty in_bndr_ty) $  -- Compares InTypes
-          hang (text "Mismatch in type between binder and occurrence")
-             2 extra_info
+--        ;  checkL (pickyEqType occ_ty in_bndr_ty) $  -- Compares InTypes
+       ; ensureEqTys occ_ty in_bndr_ty $
+         hang (text "Mismatch in type between binder and occurrence")
+            2 extra_info
 
        ; checkLM (sameUnfolding in_bndr v_occ) $
          hang (text "Mismatch in type-let unfolding between binder and occurrence")
