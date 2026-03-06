@@ -41,7 +41,6 @@ test dir' = do
 
   -- cleanup
   mapM_ killThread [interrupter, deleter, closer]
-  removeDirectoryRecursive dir
 
   either throwIO (const $ putStrLn "No failures observed - success") result
 
