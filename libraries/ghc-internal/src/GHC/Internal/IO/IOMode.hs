@@ -20,7 +20,6 @@ module GHC.Internal.IO.IOMode (IOMode(..)) where
 
 import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.Show
-import GHC.Internal.Read
 import GHC.Internal.Arr
 import GHC.Internal.Enum
 
@@ -30,7 +29,6 @@ data IOMode      =  ReadMode | WriteMode | AppendMode | ReadWriteMode
                              , Ord  -- ^ @since base-4.2.0.0
                              , Ix   -- ^ @since base-4.2.0.0
                              , Enum -- ^ @since base-4.2.0.0
-                             , Read -- ^ @since base-4.2.0.0
                              , Show -- ^ @since base-4.2.0.0
                              )
 

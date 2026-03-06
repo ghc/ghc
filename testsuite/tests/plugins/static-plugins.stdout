@@ -1,6 +1,7 @@
 ==pure.0
 parsePlugin()
 interfacePlugin: Prelude
+interfacePlugin: System.IO
 interfacePlugin: GHC.Internal.Base
 interfacePlugin: GHC.Internal.Data.NonEmpty
 interfacePlugin: GHC.Internal.Float

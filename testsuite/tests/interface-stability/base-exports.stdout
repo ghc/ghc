@@ -12540,16 +12540,16 @@ instance GHC.Internal.Read.Read GHC.Internal.Generics.SourceStrictness -- Define
 instance GHC.Internal.Read.Read GHC.Internal.Generics.SourceUnpackedness -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Read.Read (GHC.Internal.Generics.U1 p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Read.Read (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Read.Read GHC.Internal.IO.Device.SeekMode -- Defined in ‘GHC.Internal.IO.Device’
-instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.BufferMode -- Defined in ‘GHC.Internal.IO.Handle.Types’
-instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.Newline -- Defined in ‘GHC.Internal.IO.Handle.Types’
-instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.NewlineMode -- Defined in ‘GHC.Internal.IO.Handle.Types’
-instance GHC.Internal.Read.Read GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
 instance [safe] GHC.Internal.Read.Read GHC.Stats.GCDetails -- Defined in ‘GHC.Stats’
 instance [safe] GHC.Internal.Read.Read GHC.Stats.RTSStats -- Defined in ‘GHC.Stats’
 instance GHC.Internal.Read.Read GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Internal.Read.Read GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Read.Read GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.BufferMode -- Defined in ‘System.IO’
+instance GHC.Internal.Read.Read GHC.Internal.IO.IOMode.IOMode -- Defined in ‘System.IO’
+instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.Newline -- Defined in ‘System.IO’
+instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.NewlineMode -- Defined in ‘System.IO’
+instance GHC.Internal.Read.Read GHC.Internal.IO.Device.SeekMode -- Defined in ‘System.IO’
 instance forall a k (b :: k). GHC.Internal.Real.Fractional a => GHC.Internal.Real.Fractional (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Real.Fractional (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
 instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Internal.Real.Fractional (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
