@@ -94,7 +94,9 @@ flavour = do
         Just "native"  -> return useNativeBignum
         Just b         -> return $ \f -> f { bignumBackend = b }
         Nothing        -> do
-          js <- isJsTarget
+          -- Adjust for JS backend if that is the final target (target of stage
+          -- >= Stage2).
+          js <- isJsTarget Stage2
           return $ if js then useNativeBignum else id
 
     case parseFlavour flavours flavourTransformers flavourName of
