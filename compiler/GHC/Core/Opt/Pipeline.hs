@@ -14,7 +14,7 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
 import GHC.Driver.Config (initSimpleOpts)
-import GHC.Driver.Config.Core.Lint ( endPass )
+import GHC.Driver.Config.Core.Lint ( endPass, initLintConfig )
 import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
 import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyOpts, initSimplMode, initGentleSimplMode )
 import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
@@ -27,7 +27,7 @@ import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( RuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreProgram, pprRules )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
-import GHC.Core.Lint    ( lintAnnots )
+import GHC.Core.Lint    ( lintAnnots, lintCoreProgram', displayLintResults )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Opt.Simplify ( simplifyExpr, simplifyPgm )
 import GHC.Core.Opt.Simplify.Monad
@@ -43,7 +43,7 @@ import GHC.Core.Opt.DmdAnal
 import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
 import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
-import GHC.Core.Opt.Split        ( splitCompUnit )
+import GHC.Core.Opt.Split        ( splitCompUnit, checkNameClashes )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
 import GHC.Core.LateCC.TopLevelBinds (topLevelBindsCCMG)
@@ -457,6 +457,7 @@ doCorePass pass guts = do
   dflags    <- getDynFlags
   us        <- getUniqueSupplyM
   p_fam_env <- getPackageFamInstEnv
+  let extra_vars = interactiveInScope (hsc_IC hsc_env)
   let platform = targetPlatform dflags
   let fam_envs = (p_fam_env, mg_fam_inst_env guts)
   let updateBinds  f = return $ guts { mg_binds = f (mg_binds guts) }
@@ -485,7 +486,9 @@ doCorePass pass guts = do
 
     CoreMerge                 -> {-# SCC "CoreMerge" #-}
                                  do { let binds_before = mg_binds guts
+                                          _ = checkNameClashes binds_before
                                           binds_after  = flattenCoreProgram binds_before
+                                          _ = checkNameClashes binds_after
                                     ; liftIO $
                                         Logger.putDumpFileMaybe logger Opt_D_dump_split_core
                                           "Core before merge"
@@ -497,6 +500,16 @@ doCorePass pass guts = do
                                           "Core after merge"
                                           FormatCore
                                           (pprCoreProgram binds_after)
+                                    ; liftIO $ do
+                                        let warns_and_errs = lintCoreProgram'
+                                              (initLintConfig dflags extra_vars)
+                                              binds_after
+                                              (mg_rules guts)
+                                              True
+                                        displayLintResults logger
+                                          (text "CoreMerge after flattenCoreProgram")
+                                          (pprCoreProgram binds_after)
+                                          warns_and_errs
                                     ; let minimal_things = defaultSimpleOpts
                                               { so_inline = False
                                               , so_uf_opts = unfoldingOpts dflags }
@@ -505,6 +518,7 @@ doCorePass pass guts = do
                                               (mg_module guts)
                                               binds_after
                                               (mg_rules guts)
+                                          _ = checkNameClashes binds_w_unfolds
                                     ; liftIO $
                                         Logger.putDumpFileMaybe logger Opt_D_dump_split_core
                                           "Core after re-attaching unfolds"

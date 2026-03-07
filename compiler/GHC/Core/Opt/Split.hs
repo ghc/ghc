@@ -2,6 +2,7 @@
 
 module GHC.Core.Opt.Split
   ( splitCompUnit
+  , checkNameClashes
   ) where
 
 import GHC.Prelude hiding ( head, init, last )
@@ -181,7 +182,9 @@ pprVarWithModule v
 -- In these cases we return them here and then add them to mg_rules.
 splitCompUnit :: Module -> [CoreRule] -> CoreCompUnit -> ([CoreCompUnit], [CoreRule])
 splitCompUnit this_module imp_rules unit
-  = (map mk_comp_unit components_with_rules, rules_for_imps ++ rules_without_component)
+  = let comp_units = map mk_comp_unit components_with_rules
+    in checkNameClashes comp_units `seq`
+       (comp_units, rules_for_imps ++ rules_without_component)
   where
     CoreCompUnit occ_binds unit_rules =
       occurAnalyseCompUnit this_module (const True) (const True) imp_rules unit
@@ -210,3 +213,21 @@ splitCompUnit this_module imp_rules unit
       assignLocalRules unit_rules_local binder_components
 
     mk_comp_unit (_, binds, rules) = CoreCompUnit binds rules
+
+checkNameClashes :: [CoreCompUnit] -> ()
+checkNameClashes comp_units
+  | null dup_bndrs = ()
+  | otherwise
+  = pprPanic "checkNameClashes"
+      ( text "Duplicate top-level binders across split compilation units"
+     $$ ppr dup_bndrs )
+  where
+    all_bndrs = concatMap (bindersOfBinds . coreCompUnitBinds) comp_units
+
+    dup_bndrs :: [Var]
+    dup_bndrs = go emptyVarSet all_bndrs
+
+    go _    [] = []
+    go seen (b:bs)
+      | b `elemVarSet` seen = b : go seen bs
+      | otherwise           = go (extendVarSet seen b) bs
