@@ -2842,7 +2842,21 @@ def _normalised_outputs(expected_file: Path,
     return expected, actual
 
 def _sorted_lines(s: str) -> str:
-    return '\n'.join(sorted(s.splitlines()))
+    return '\n'.join(sorted(_drop_split_comp_unit_headers(s.splitlines())))
+
+def _drop_split_comp_unit_headers(lines: List[str]) -> List[str]:
+    kept: List[str] = []
+    i = 0
+    while i < len(lines):
+        # Ignore an empty line immediately followed by the split-core unit header.
+        if i + 1 < len(lines) \
+           and lines[i] == '' \
+           and lines[i + 1].startswith('=== Start of new compilation unit'):
+            i += 2
+            continue
+        kept.append(lines[i])
+        i += 1
+    return kept
 
 def _is_reordered_output_mismatch(expected_file: Path,
                                   actual_file: Path,
