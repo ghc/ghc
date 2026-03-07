@@ -996,13 +996,31 @@ getRegister' config plat expr
                 NEG (OpReg w' dst) (OpReg w' reg') `appOL`
                 truncateReg w' w dst
 
-        ss_conv from to reg code =
+        ss_conv from to reg code
+          -- Widening: use the canonical sign-extend instructions
+          -- (SXTB, SXTH, SXTW) rather than raw SBFM, so that the
+          -- assembly output matches what signExtendReg would produce.
+          -- Note: SXTW/SXTH/SXTB require the source operand to use
+          -- the source register width (Wn), not the destination width.
+          | from < to =
+            let w_dst = opRegWidth to
+                w_src = opRegWidth from
+                ext = case from of
+                        W8  -> SXTB
+                        W16 -> SXTH
+                        W32 -> SXTW
+                        _   -> panic "ss_conv: unsupported widening"
+            in return $ Any (intFormat to) $ \dst ->
+                code `snocOL`
+                ext (OpReg w_dst dst) (OpReg w_src reg) `appOL`
+                truncateReg w_dst to dst
+          -- Narrowing or same-width: extract the lower bits via SBFM
+          -- and truncate to the target width.
+          | otherwise =
             let w' = opRegWidth (max from to)
             in return $ Any (intFormat to) $ \dst ->
                 code `snocOL`
                 SBFM (OpReg w' dst) (OpReg w' reg) (OpImm (ImmInt 0)) (toImm (min from to)) `appOL`
-                -- At this point an 8- or 16-bit value would be sign-extended
-                -- to 32-bits. Truncate back down the final width.
                 truncateReg w' to dst
 
     -- Dyadic machops:
@@ -1533,7 +1551,9 @@ signExtendReg w w' r =
     noop = return (r, nilOL)
     extend instr = do
         r' <- getNewRegNat II64
-        return (r', unitOL $ instr (OpReg w' r') (OpReg w' r))
+        -- Source operand uses the source register width (Wn) since
+        -- SXTW/SXTH/SXTB expect e.g. "sxtw Xd, Wn" not "sxtw Xd, Xn".
+        return (r', unitOL $ instr (OpReg w' r') (OpReg (opRegWidth w) r))
 
 -- | Instructions to truncate the value in the given register from width @w@
 -- down to width @w'@.
