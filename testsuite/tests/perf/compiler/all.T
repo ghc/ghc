@@ -680,6 +680,12 @@ test ('T13253-spj',
       ],
       compile,
       ['-v0 -O'])
+test ('T13820',
+      [ collect_compiler_stats('peak_megabytes_allocated', 5),
+        collect_compiler_stats('bytes allocated', 2),
+      ],
+      compile,
+      ['-v0'])
 test ('T14766',
       [ collect_compiler_stats('bytes allocated',2),
         pre_cmd('python3 genT14766.py > T14766.hs'),
