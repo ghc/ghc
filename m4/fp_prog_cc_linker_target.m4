@@ -8,7 +8,7 @@
 #      a linker
 AC_DEFUN([FP_PROG_CC_LINKER_TARGET],
 [
-    AC_MSG_CHECKING([whether $CC used as a linker understands --target])
+    AC_MSG_CHECKING([whether $1 used as a linker understands --target])
 
     echo 'int foo() { return 0; }' > conftest1.c
     echo 'int main() { return 0; }' > conftest2.c
@@ -20,7 +20,7 @@ AC_DEFUN([FP_PROG_CC_LINKER_TARGET],
         # See Note [Don't pass --target to emscripten toolchain] in GHC.Toolchain.Program
         CONF_CC_SUPPORTS_TARGET=NO
         AC_MSG_RESULT([no])
-    elif "$CC" $$3 --target=$LlvmTarget -o conftest conftest1.o conftest2.o;
+    elif "$1" $$3 --target=$LlvmTarget -o conftest conftest1.o conftest2.o;
     then
         $3="--target=$LlvmTarget $$3"
         AC_MSG_RESULT([yes])
