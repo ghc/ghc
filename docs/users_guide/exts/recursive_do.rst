@@ -56,7 +56,7 @@ or equivalently
 
 As you can guess ``justOnes`` will evaluate to ``Just [-1,-1,-1,...``.
 
-GHC's implementation the mdo-notation closely follows the original
+GHC's implementation of the mdo-notation closely follows the original
 translation as described in the paper `A recursive do for
 Haskell <https://leventerkok.github.io/papers/recdo.pdf>`__, which
 in turn is based on the work `Value Recursion in Monadic
