@@ -1,0 +1,10 @@
+T26349.hs:4:1: warning: [GHC-69441]
+    RULE left-hand side too complicated to desugar
+      Optimised lhs: / (ds :: forall b. IO b -> IO b) ->
+                       mapTCMT @(*) @IO @IO @a ds
+      Orig lhs: (/ (@a) (ds :: forall b. IO b -> IO b) ->
+                   mapTCMT @(*) @IO @IO @a (/ (@b) -> ds @b))
+                  @a
+
+
+==================== Tidy Core rules ====================
