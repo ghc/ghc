@@ -794,9 +794,12 @@ specConstrProgram guts
 scTopCompUnits :: ScEnv -> CoreProgram -> UniqSM (ScUsage, CoreProgram, [SpecFailWarning])
 scTopCompUnits _env [] = return (nullUsage, [], [])
 scTopCompUnits env (CoreCompUnit unit_binds unit_rules:units) = do
-  (unit_usg, unit_binds', unit_warnings) <- scTopBinds env unit_binds
-  (units_usg, units', units_warnings) <- scTopCompUnits env units
-  return (unit_usg `combineUsage` units_usg, CoreCompUnit unit_binds' unit_rules : units', unit_warnings ++ units_warnings)
+  let unit_env = initScCompUnitEnv env unit_binds
+  (_unit_usg, unit_binds', unit_warnings) <- scTopBinds unit_env unit_binds
+  (_units_usg, units', units_warnings) <- scTopCompUnits env units
+  -- Before CoreMerge, different compilation units may legitimately reuse the
+  -- same top-level Id/Unique, so we must not combine ScUsage across units.
+  return (nullUsage, CoreCompUnit unit_binds' unit_rules : units', unit_warnings ++ units_warnings)
 
 scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind], [SpecFailWarning])
 scTopBinds _env []     = return (nullUsage, [], [])
@@ -1009,18 +1012,19 @@ initScEnv guts
        ; this_mod  <- getModule
        ; return (SCE { sc_opts        = initScOpts dflags this_mod,
                        sc_force       = False,
-                       sc_subst       = init_subst,
+                       sc_subst       = mkEmptySubst emptyInScopeSet,
                        sc_how_bound   = emptyVarEnv,
                        sc_vals        = emptyVarEnv,
                        sc_annotations = anns }) }
+
+initScCompUnitEnv :: ScEnv -> [InBind] -> ScEnv
+initScCompUnitEnv env unit_binds
+  = env { sc_subst = mkEmptySubst in_scope }
   where
-    init_subst = mkEmptySubst $ foldl' addCompUnitBndrs emptyInScopeSet (mg_binds guts)
-        -- Acccount for top-level bindings that are not in dependency order;
-        -- see Note [Glomming] in GHC.Core.Opt.OccurAnal
-        -- Easiest thing is to bring all the top level binders into scope at once,
-        -- as if  at once, as if all the top-level decls were mutually recursive.
-    addCompUnitBndrs scope (CoreCompUnit unit_binds _) =
-      scope `extendInScopeSetBndrs` unit_binds
+    in_scope = emptyInScopeSet `extendInScopeSetBndrs` unit_binds
+      -- Account for top-level bindings that are not in dependency order;
+      -- see Note [Glomming] in GHC.Core.Opt.OccurAnal.
+      -- Crucially, only add binders from the current compilation unit.
 
 data HowBound = RecFun  -- These are the recursive functions for which
                         -- we seek interesting call patterns
@@ -1443,7 +1447,8 @@ scBind top_lvl env (NonRec bndr rhs) do_body
     -- but found some regressions (see !8135).  So I backed off.
   = do { (rhs_usage, rhs', ws_rhs)   <- scExpr env rhs
 
-       -- At top level, we've already put all binders into scope; see initScEnv
+       -- At top level, we've already put the current compilation unit's
+       -- binders into scope; see initScCompUnitEnv.
        -- Hence no need to call `extendBndr`. But we still want to
        -- extend the `ValueEnv` to record the value of this binder.
        ; let body_env = extendValEnv env bndr (isValue (sc_vals env) rhs')
@@ -1491,7 +1496,8 @@ scBind top_lvl env (Rec prs) do_body
 
     (rhs_env1,bndrs') | isTopLevel top_lvl = (env, bndrs)
                       | otherwise          = extendRecBndrs env bndrs
-       -- At top level, we've already put all binders into scope; see initScEnv
+       -- At top level, we've already put the current compilation unit's
+       -- binders into scope; see initScCompUnitEnv.
 
     rhs_env2 = extendHowBound rhs_env1 bndrs' RecFun
 

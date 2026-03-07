@@ -240,7 +240,7 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
                 -- number of iterations we actually completed
         return ( "Simplifier bailed out", iteration_no - 1
                , totalise counts_so_far
-               , dyn_no_binds { dsd_binds = [CoreCompUnit bind_list unit_rules], dsd_rules = local_rules } )
+               , dyn_no_binds { dsd_binds = binds, dsd_rules = local_rules } )
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
@@ -282,27 +282,17 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
                 ; fam_envs = (eps_fam_inst_env eps, fam_inst_env)
                 ; simpl_env = mkSimplEnv mode fam_envs } ;
 
-                -- Simplify the program
-           ((binds1, rules1, unit_rules1), counts1) <-
+                -- Simplify each compilation unit independently
+           ((binds1, rules1), counts1) <-
              initSmpl logger read_rule_env top_env_cfg sz $
-               do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
-                                      simplTopBinds simpl_env tagged_bind_list
-
-                      -- Apply the substitution to rules defined in this module
-                      -- for imported Ids.  Eg  RULE map my_f = blah
-                      -- If we have a substitution my_f :-> other_f, we'd better
-                      -- apply it to the rule to, or it'll never match
-                  ; rules1 <- simplImpRules env1 local_rules
-                  ; unit_rules1 <- simplImpRules env1 unit_rules
-
-                  ; return (getTopFloatBinds floats, rules1, unit_rules1) } ;
+               simpl_comp_units simpl_env local_rules tagged_binds ;
 
                 -- Stop if nothing happened; don't dump output
                 -- See Note [Which transformations are innocuous] in GHC.Core.Opt.Stats
            if isZeroSimplCount counts1 then
                 return ( "Simplifier reached fixed point", iteration_no
                        , totalise (counts1 : counts_so_far)  -- Include "free" ticks
-                       , dyn_no_binds { dsd_binds = [CoreCompUnit binds1 unit_rules1], dsd_rules = rules1 } )
+                       , dyn_no_binds { dsd_binds = binds1, dsd_rules = rules1 } )
            else do {
                 -- Short out indirections
                 -- We do this *after* at least one run of the simplifier
@@ -312,17 +302,19 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
                 --
                 -- ToDo: alas, this means that indirection-shorting does not happen at all
                 --       if the simplifier does nothing (not common, I know, but unsavoury)
-           let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
+           let { binds2 = {-# SCC "ZapInd" #-}
+                          [ CoreCompUnit (shortOutIndirections unit_binds) unit_rules'
+                          | CoreCompUnit unit_binds unit_rules' <- binds1 ] } ;
 
                 -- Dump the result of this iteration
            dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts1
-             [CoreCompUnit binds2 unit_rules1] rules1 ;
+             binds2 rules1 ;
 
            for_ (so_pass_result_cfg opts) $ \pass_result_cfg ->
-             lintPassResult logger pass_result_cfg [CoreCompUnit binds2 unit_rules1] rules1 ;
+             lintPassResult logger pass_result_cfg binds2 rules1 ;
 
                 -- Loop
-           do_iteration (iteration_no + 1) (counts1:counts_so_far) [CoreCompUnit binds2 unit_rules1] rules1
+           do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
            } }
       where
         bind_list = concatMap coreCompUnitBinds binds
@@ -331,6 +323,29 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
         totalise :: [SimplCount] -> SimplCount
         totalise = foldr (\c acc -> acc `plusSimplCount` c)
                          (zeroSimplCount $ logHasDumpFlag logger Opt_D_dump_simpl_stats)
+
+    -- Keep top-level in-scope sets per-unit until CoreMerge.
+    simpl_comp_units
+      :: SimplEnv
+      -> [CoreRule]
+      -> CoreProgram
+      -> SimplM (CoreProgram, [CoreRule])
+    simpl_comp_units simpl_env rules0 units0 = go rules0 [] units0
+      where
+        go !rules acc [] = return (reverse acc, rules)
+        go !rules acc (CoreCompUnit unit_binds unit_rules' : rest) = do
+          (floats, env1) <- {-# SCC "SimplTopBindsUnit" #-}
+                            simplTopBinds simpl_env unit_binds
+
+          -- Apply substitutions from this unit to imported-head rules and
+          -- the unit's own rules.
+          rules1 <- simplImpRules env1 rules
+          unit_rules1 <- simplImpRules env1 unit_rules'
+
+          let unit_binds1 = getTopFloatBinds floats
+              unit1 = CoreCompUnit unit_binds1 unit_rules1
+
+          go rules1 (unit1 : acc) rest
 
 dump_end_iteration :: Logger -> Bool -> NamePprCtx -> Int
                    -> SimplCount -> CoreProgram -> [CoreRule] -> IO ()
