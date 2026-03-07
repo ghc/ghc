@@ -393,6 +393,7 @@ Library
         GHC.Core.Opt.Simplify.Utils
         GHC.Core.Opt.SpecConstr
         GHC.Core.Opt.Specialise
+        GHC.Core.Opt.Split
         GHC.Core.Opt.StaticArgs
         GHC.Core.Opt.Stats
         GHC.Core.Opt.WorkWrap

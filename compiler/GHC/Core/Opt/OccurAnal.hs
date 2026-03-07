@@ -28,7 +28,6 @@ core expression with (hopefully) improved usage information.
 module GHC.Core.Opt.OccurAnal (
     occurAnalysePgm,
     occurAnalyseCompUnit,
-    occurSplitPgm,
     occurAnalyseExpr, occurAnalyseExpr_Prep,
     zapLambdaBndrs
   ) where
@@ -57,7 +56,6 @@ import GHC.Types.Id.Info
 import GHC.Types.InlinePragma ( ActivationGhc, isAlwaysActive )
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Types.Name (isExternalName, nameModule)
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var
@@ -70,14 +68,12 @@ import GHC.Utils.Misc
 import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )
 
-import qualified Data.IntMap.Strict as IntMap
-import qualified Data.IntSet as IntSet
 import Data.List (mapAccumL)
 
 {-
 ************************************************************************
 *                                                                      *
-    occurAnalysePgm, occurAnalyseExpr, occurSplitPgm
+    occurAnalysePgm, occurAnalyseExpr
 *                                                                      *
 ************************************************************************
 
@@ -98,140 +94,6 @@ occurAnalyseExpr_Prep :: CoreExpr -> CoreExpr
 occurAnalyseExpr_Prep expr = expr'
   where
     WUD _ expr' = occAnal (initOccEnv { occ_allow_weak_joins = True }) expr
-
--- After optimizations a rule might no longer reference binders from this module.
--- In these cases we return them here and then add them to mg_rules.
-occurSplitPgm :: Module -> [CoreRule] -> CoreCompUnit -> ([CoreCompUnit], [CoreRule])
-occurSplitPgm mod imp_rules (CoreCompUnit unit_binds unit_rules)
-  =
-    -- pprTrace "occurSplitPgm"
-    -- ( vcat [
-    --     text "imp",
-    --     ppr imp_rules,
-    --     text "unit",
-    --     ppr (unit_rules, unit_binds)
-    --   ]
-    -- )
-    (zipWith mk_comp_unit comp_pairs [0..], rules_for_imps)
-  where
-    CoreCompUnit occ_binds _ =
-      occurAnalyseCompUnit mod (const True) (const True) imp_rules
-        (CoreCompUnit unit_binds unit_rules)
-
-    pairs = flattenBinds occ_binds
-    bndrs    = map fst pairs
-    bndr_set = mkVarSet bndrs
-
-    imp_rule_edges :: ImpRuleEdges
-    imp_rule_edges = mkImpRuleEdges imp_rules
-
-    -- If a unit rule mentions multiple local binders, they must end up in
-    -- the same component; otherwise the rule cannot be attached to any one
-    -- split unit without creating cross-unit references.
-    rule_fv_edges :: IdEnv VarSet
-    rule_fv_edges
-      = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
-          [ mapVarEnv (const local_rule_fvs) (getUniqSet local_rule_fvs)
-          | rule <- unit_rules
-          , let local_rule_fvs = ruleFreeVars rule `intersectVarSet` bndr_set
-          ]
-
-    dir_nodes :: [Node Unique (Id, CoreExpr)]
-    dir_nodes = map mk_dir_node pairs
-
-    mk_dir_node (bndr, rhs)
-      = DigraphNode { node_payload = (bndr, rhs)
-                    , node_key = varUnique bndr
-                    , node_dependencies = nonDetKeysUniqSet deps
-                    }
-      where
-        deps = traced_fvs `intersectVarSet` bndr_set
-
-        traced_fvs = -- pprTrace "occurSplitPgm: binder fvs before unit assignment"
-                     -- (ppr bndr $$ text "fvs:" <+> ppr dep_fvs)
-                      dep_fvs
-
-        dep_fvs = exprFreeIds rhs
-                  `unionVarSet` bndrRuleAndUnfoldingIds bndr
-                  `unionVarSet` localRuleDeps bndr
-                  `unionVarSet` impRuleDeps bndr
-
-        impRuleDeps b = foldr unionVarSet emptyVarSet [ vs | (_, vs) <- lookupImpRules imp_rule_edges b ]
-
-        localRuleDeps b = lookupVarEnv rule_fv_edges b `orElse` emptyVarSet
-
-    incoming_edges :: UniqFM Unique [Unique]
-    incoming_edges = foldr add_incoming emptyUFM dir_nodes
-      where
-        add_incoming DigraphNode { node_key = src, node_dependencies = dests } incoming
-          = foldr (\dest acc -> addToUFM_C (++) acc dest [src]) incoming dests
-    -- TODO: AI Garbage? -
-    -- We probably really should just do this on a undirected graph instead.
-    undir_nodes :: [Node Unique (Id, CoreExpr)]
-    undir_nodes =
-      [ node { node_dependencies = node_dependencies node ++ lookupWithDefaultUFM incoming_edges [] (node_key node) }
-      | node <- dir_nodes
-      ]
-
-    comp_pairs :: [[(Id, CoreExpr)]]
-    comp_pairs = map scc_payloads (stronglyConnCompFromEdgedVerticesUniq undir_nodes)
-
-    component_bndrs :: [[Id]]
-    component_bndrs = map (map fst) comp_pairs
-
-    mk_comp_unit prs i = CoreCompUnit (mk_comp_binds prs) (component_rules i)
-
-    mk_comp_binds [pr] = [NonRec (fst pr) (snd pr)]
-    mk_comp_binds prs  = [Rec prs]
-
-    (component_rule_map, rules_for_imps) = foldr assign_rule (IntMap.empty, []) unit_rules
-
-    assign_rule rule (rule_map, imp_rules_acc)
-      = case rule_comp_index rule of
-          Just i  -> (IntMap.insertWith (++) i [rule] rule_map, imp_rules_acc)
-          Nothing -> (rule_map, rule : imp_rules_acc)
-
-    component_rules i = IntMap.findWithDefault [] i component_rule_map
-
-    rule_comp_index rule
-      = case rule_component_indices of
-          [i] -> Just i
-          []  -> Nothing
-          is  -> pprPanic "occurSplitPgm"
-                 (text "Rule free vars span multiple components"
-                  $$ text "rule:" <+> ppr rule
-                  $$ text "components:" <+> ppr is
-                  $$ text "rule_fvs:" <+> pprVarsWithModule (nonDetEltsUniqSet rule_fvs)
-                  $$ vcat [ text "component" <+> int i <> colon <+> ppr hits
-                          | (i, hits) <- component_hits ])
-      where
-        rule_component_indices :: [Int]
-        rule_component_indices = IntSet.toList $ IntSet.fromList
-          [ i
-          | (ids, i) <- zip component_bndrs [0..]
-          , not (isEmptyVarSet (local_rule_fvs `intersectVarSet` mkVarSet ids))
-          ]
-
-        rule_fvs = ruleFreeVars rule
-        local_rule_fvs = rule_fvs `intersectVarSet` bndr_set
-        component_hits =
-          [ (i, local_rule_fvs `intersectVarSet` mkVarSet ids)
-          | (ids, i) <- zip component_bndrs [0..]
-          , not (isEmptyVarSet (local_rule_fvs `intersectVarSet` mkVarSet ids))
-          ]
-
-    scc_payloads (AcyclicSCC p) = [p]
-    scc_payloads (CyclicSCC ps) = ps
-
-    pprVarsWithModule :: [Var] -> SDoc
-    pprVarsWithModule vars = braces (fsep (punctuate comma (map pprVarWithModule vars)))
-
-    pprVarWithModule :: Var -> SDoc
-    pprVarWithModule v
-      | isExternalName n = ppr v <+> parens (ppr (nameModule n))
-      | otherwise        = ppr v
-      where
-        n = varName v
 
 occurAnalyseCompUnit
   :: Module

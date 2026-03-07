@@ -43,7 +43,7 @@ import GHC.Core.Opt.DmdAnal
 import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
 import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
-import GHC.Core.Opt.OccurAnal    ( occurSplitPgm )
+import GHC.Core.Opt.Split        ( splitCompUnit )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
 import GHC.Core.LateCC.TopLevelBinds (topLevelBindsCCMG)
@@ -478,7 +478,7 @@ doCorePass pass guts = do
                                  updateBindsAndRulesM (desugarOpt dflags logger (mg_module guts))
 
     CoreSplit                 -> {-# SCC "CoreSplit" #-}
-                                 do { let split_res = map (occurSplitPgm (mg_module guts) (mg_rules guts)) (mg_binds guts)
+                                 do { let split_res = map (splitCompUnit (mg_module guts) (mg_rules guts)) (mg_binds guts)
                                           binds' = concatMap fst split_res
                                           rules' = mg_rules guts ++ concatMap snd split_res
                                     ; return guts { mg_binds = binds', mg_rules = rules' } }
