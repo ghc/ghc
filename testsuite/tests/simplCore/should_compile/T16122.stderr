@@ -1,0 +1,23 @@
+f = \ x ->
+      case x of { D# ds1 ->
+      case {__ffi_static_ccall_unsafe ghc-internal:rintDouble :: Double#
+                                                      -> State# RealWorld
+                                                      -> (# State# RealWorld, Double# #)}
+             ds1 realWorld#
+      of
+      { (# _, ds3 #) ->
+      I64# (intToInt64# (double2Int# ds3))
+      }
+      }
+
+g = \ x ->
+      case x of { D# ds1 ->
+      case {__ffi_static_ccall_unsafe ghc-internal:rintDouble :: Double#
+                                                      -> State# RealWorld
+                                                      -> (# State# RealWorld, Double# #)}
+             ds1 realWorld#
+      of
+      { (# _, ds3 #) ->
+      I64# (intToInt64# (double2Int# ds3))
+      }
+      }

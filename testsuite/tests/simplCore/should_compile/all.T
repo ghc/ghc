@@ -295,6 +295,10 @@ test('T15631',
      normal,
      makefile_test, ['T15631'])
 test('T15673', normal, compile, ['-O'])
+test('T16122', [when(wordsize(32), skip)],
+     multimod_compile_filter,
+     ['T16122', '-O -ddump-simpl -dsuppress-all -dsuppress-uniques -dno-typeable-binds',
+      "sed -n '/^f = /,/^$/p;/^g = /,/^$/p'"])
 test('T16288', normal, multimod_compile, ['T16288B', '-O -dcore-lint -v0'])
 test('T16348', normal, compile, ['-O'])
 test('T16918', normal, compile, ['-O'])
