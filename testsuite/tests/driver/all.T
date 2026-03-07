@@ -1,3 +1,6 @@
+def normalise_enabled_cpu_target(msg):
+    return re.sub(r'"target":"[^"]+"', '"target":"TARGET"', msg)
+
 test('driver011', [extra_files(['A011.hs'])], makefile_test, ['test011'])
 
 test('driver012', [extra_files(['A012.hs'])], makefile_test, ['test012'])
@@ -222,6 +225,36 @@ test('T9938B', [], makefile_test, [])
 
 test('T9963', exit_code(1), run_command,
      ['{compiler} --interactive -ignore-dot-ghci --print-libdir'])
+
+test('print_enabled_cpu_features',
+     [unless(arch('x86_64') or arch('i386'), skip),
+      normalise_fun(normalise_enabled_cpu_target)],
+     run_command,
+     ['{compiler} --print-enabled-cpu-features'])
+
+test('print_enabled_cpu_features_avx2',
+     [unless(arch('x86_64') or arch('i386'), skip),
+      normalise_fun(normalise_enabled_cpu_target)],
+     run_command,
+     ['{compiler} -mavx2 --print-enabled-cpu-features'])
+
+test('print_enabled_cpu_features_bmi2',
+     [unless(arch('x86_64') or arch('i386'), skip),
+      normalise_fun(normalise_enabled_cpu_target)],
+     run_command,
+     ['{compiler} -mbmi2 --print-enabled-cpu-features'])
+
+test('print_enabled_cpu_features_fma',
+     [unless(arch('x86_64') or arch('i386'), skip),
+      normalise_fun(normalise_enabled_cpu_target)],
+     run_command,
+     ['{compiler} -mfma --print-enabled-cpu-features'])
+
+test('print_enabled_cpu_features_avx512',
+     [unless(arch('x86_64'), skip),
+      normalise_fun(normalise_enabled_cpu_target)],
+     run_command,
+     ['{compiler} -mavx512dq -mavx512vl --print-enabled-cpu-features'])
 
 test('T10219', normal, run_command,
      # `-x hspp` in make mode should work.

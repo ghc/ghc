@@ -196,6 +196,7 @@ module GHC.Driver.Session (
 
         -- * Compiler configuration suitable for display to the user
         compilerInfo,
+        showEnabledCpuFeatures,
 
         targetHasRTSWays,
 
@@ -277,6 +278,7 @@ import GHC.Utils.TmpFs
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
 import GHC.Utils.Error (emptyDiagOpts, logInfo)
+import GHC.Utils.Json
 import GHC.Settings
 import GHC.CmmToAsm.CFG.Weight
 import GHC.Core.Opt.CallerCC
@@ -3534,6 +3536,104 @@ picPOpts :: DynFlags -> [String]
 picPOpts dflags
  | gopt Opt_PIC dflags = ["-U__PIC__", "-D__PIC__"]
  | otherwise           = []
+
+showEnabledCpuFeatures :: DynFlags -> String
+showEnabledCpuFeatures dflags = showSDocUnsafe $ renderJSON $ JSObject
+  [ ("tag", JSString "enabled-cpu-features")
+  , ("version", JSInt 1)
+  , ("target", JSString (platformMisc_targetPlatformString (platformMisc dflags)))
+  , ("features", JSArray (map JSString features))
+  , ("as_m_flags", JSArray (map JSString asMFlags))
+  ]
+  where
+    (features, asMFlags) = enabledCpuFeatures dflags
+
+enabledCpuFeatures :: DynFlags -> ([String], [String])
+enabledCpuFeatures dflags = case platformArch (targetPlatform dflags) of
+  ArchX86_64 -> x86FeaturesAndFlags dflags
+  ArchX86    -> x86FeaturesAndFlags dflags
+  ArchAArch64 ->
+    ( [ "FMA" | isFmaEnabled dflags ]
+    , []
+    )
+  ArchLoongArch64 ->
+    ( [ "LA664" | isLa664Enabled dflags ]
+    , [ "-mla664" | la664 dflags ]
+    )
+  _ ->
+    ([], [])
+
+x86FeaturesAndFlags :: DynFlags -> ([String], [String])
+x86FeaturesAndFlags dflags =
+  ( [ "SSE2"     | isSse2Enabled platform ]
+ ++ [ "SSE3"     | isSse3Enabled dflags ]
+ ++ [ "SSSE3"    | isSsse3Enabled dflags ]
+ ++ [ "SSE4.1"   | isSse4_1Enabled dflags ]
+ ++ [ "SSE4.2"   | isSse4_2Enabled dflags ]
+ ++ [ "AVX"      | isAvxEnabled dflags ]
+ ++ [ "AVX2"     | isAvx2Enabled dflags ]
+ ++ [ "AVX512F"  | isAvx512fEnabled dflags ]
+ ++ [ "AVX512BW" | isAvx512bwEnabled dflags ]
+ ++ [ "AVX512CD" | isAvx512cdEnabled dflags ]
+ ++ [ "AVX512DQ" | isAvx512dqEnabled dflags ]
+ ++ [ "AVX512ER" | isAvx512erEnabled dflags ]
+ ++ [ "AVX512PF" | isAvx512pfEnabled dflags ]
+ ++ [ "AVX512VL" | isAvx512vlEnabled dflags ]
+ ++ [ "BMI1"     | isBmiEnabled dflags ]
+ ++ [ "BMI2"     | isBmi2Enabled dflags ]
+ ++ [ "FMA"      | isFmaEnabled dflags ]
+ ++ [ "GFNI"     | isGfniEnabled dflags ]
+  , x86AsMFlags dflags
+  )
+  where
+    platform = targetPlatform dflags
+
+x86AsMFlags :: DynFlags -> [String]
+x86AsMFlags dflags =
+     avx512Flags
+  ++ vectorFlags
+  ++ bmiFlags
+  ++ fmaFlags
+  ++ gfniFlags
+  where
+    avx512Extensions =
+      [ ("-mavx512bw", avx512bw dflags)
+      , ("-mavx512cd", avx512cd dflags)
+      , ("-mavx512dq", avx512dq dflags)
+      , ("-mavx512er", avx512er dflags)
+      , ("-mavx512pf", avx512pf dflags)
+      , ("-mavx512vl", avx512vl dflags)
+      ]
+
+    hasAvx512Extension = any snd avx512Extensions
+    hasAvx512 = avx512f dflags || hasAvx512Extension
+
+    avx512Flags =
+      [ "-mavx512f" | avx512f dflags && not hasAvx512Extension ]
+      ++ [ flag | (flag, True) <- avx512Extensions ]
+
+    vectorFlags
+      | hasAvx512 = []
+      | otherwise =
+          case sseAvxVersion dflags of
+            Just AVX2  -> ["-mavx2"]
+            Just AVX1  -> ["-mavx"]
+            Just SSE42 -> ["-msse4.2"]
+            Just SSE4  -> ["-msse4"]
+            Just SSSE3 -> ["-mssse3"]
+            Just SSE3  -> ["-msse3"]
+            _          -> []
+
+    bmiFlags = case bmiVersion dflags of
+      Just BMI2 -> ["-mbmi2"]
+      Just BMI1 -> ["-mbmi"]
+      Nothing   -> []
+
+    fmaFlags
+      | fma dflags && not hasAvx512 = ["-mfma"]
+      | otherwise = []
+
+    gfniFlags = [ "-mgfni" | gfni dflags ]
 
 -- -----------------------------------------------------------------------------
 -- Compiler Info
