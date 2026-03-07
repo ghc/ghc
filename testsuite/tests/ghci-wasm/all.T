@@ -10,3 +10,5 @@ test('T26430', [
   extra_hc_opts('-L. -lT26430B')]
 , compile_and_run, ['']
 )
+
+test('T26998', [], compile_and_run, [''])
