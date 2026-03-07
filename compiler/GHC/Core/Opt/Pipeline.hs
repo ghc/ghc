@@ -22,7 +22,7 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
-import GHC.Core.SimpleOpt (simpleOptPgm)
+import GHC.Core.SimpleOpt (simpleOptPgm, defaultSimpleOpts, so_inline, so_uf_opts)
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( RuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreProgram, pprRules )
@@ -497,7 +497,22 @@ doCorePass pass guts = do
                                           "Core after merge"
                                           FormatCore
                                           (pprCoreProgram binds_after)
-                                    ; return $ guts { mg_binds = binds_after } }
+                                    ; let minimal_things = defaultSimpleOpts
+                                              { so_inline = False
+                                              , so_uf_opts = unfoldingOpts dflags }
+                                          (binds_w_unfolds, rules_for_imps, occ_anald_binds) = simpleOptPgm
+                                              minimal_things
+                                              (mg_module guts)
+                                              binds_after
+                                              (mg_rules guts)
+                                    ; liftIO $
+                                        Logger.putDumpFileMaybe logger Opt_D_dump_split_core
+                                          "Core after re-attaching unfolds"
+                                          FormatCore
+                                          (pprCoreProgram occ_anald_binds)
+
+                                    ; return $ guts { mg_binds = binds_w_unfolds
+                                                    , mg_rules = rules_for_imps } }
 
     CoreDoSimplify opts       -> {-# SCC "Simplify" #-}
                                  liftIOWithCount $ simplifyPgm logger (hsc_unit_env hsc_env) name_ppr_ctx opts guts
