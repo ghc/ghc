@@ -35,6 +35,7 @@ test('T4851', normal, compile, [''])
 
 test('T5908', normal, compile, [''])
 test('T10112', normal, compile, [''])
+test('T10381', normal, compile, [''])
 test('T11216', normal, compile, [''])
 test('T11216A', normal, compile, [''])
 test('T12080', normal, compile, [''])
