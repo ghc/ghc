@@ -320,7 +320,11 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- in wheel-sieve1), and I'm guessing that SpecConstr can too
         -- And CSE is a very cheap pass. So it seems worth doing here.
         runWhen ((liberate_case || spec_constr) && cse) $ CoreDoPasses
-           [ CoreCSE, simplify "post-final-cse" ],
+           [ runWhen split_core CoreMerge
+           , CoreCSE
+           , runWhen split_core CoreSplit
+           , simplify "post-final-cse"
+           ],
 
         ---------  End of -O2 passes --------------
 
