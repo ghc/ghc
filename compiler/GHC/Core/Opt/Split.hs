@@ -17,6 +17,7 @@ import GHC.Data.Maybe (orElse)
 
 import GHC.Types.Unique.Set
 import GHC.Types.Name (Name, isExternalName, nameModule)
+import GHC.Types.Name.Set (NameSet, isEmptyNameSet)
 import GHC.Types.Id (isDFunId, realIdUnfolding)
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -61,6 +62,43 @@ Now we introduce edges:
 * After this we split the graph into independent components.
 
 * As the last step we assign each unit rule to a unit from which it mentions variables
+
+Note [Goal of core splitting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The goal of core splitting is to determine multiple independent fragmanets (units) within
+the current module. This means after core splitting there most be no way for any
+binder in one build unit to reference a binder in another unit.
+
+If there is *any* connection between two local binders we have to put both those
+binders into the same unit.
+
+Sources of units are:
+
+Unfoldings: A unfolding creates a dependency between it's binder and all id's that
+are mentioned by it's unfolding. This is similarly true for DFuns.
+
+RULES: The function the RULE matches on has dependencies with all binders it mentions
+on both the LHS and RHS.
+
+We have to build a transitive closure of those dependencies. Concretely if some
+binder foo depends on bar through a unfolding/RULE then we have to also analyze bar.
+
+This is because of import loops. Consider for example:
+
+```
+A:fa1 = B.foo
+A:fa2
+
+B:foo = ... C.baz ...
+
+C:baz = ... {-# SOURCE #-} A.fa2
+```
+
+Here despite `B.foo` being imported it can bring the local binder `fa.2` into
+scope. So we must ensure `fa1` and fa2 end up in the same compilation unit.
+
+But for now I think I will just disable splitting if there is a boot module.
+
 -}
 
 data DepGraphNode
@@ -233,8 +271,10 @@ pprVarWithModule v
 
 -- After optimizations a rule might no longer reference binders from this module.
 -- In these cases we return them here and then add them to mg_rules.
-splitCompUnit :: Module -> [CoreRule] -> CoreCompUnit -> ([CoreCompUnit], [CoreRule])
-splitCompUnit this_module imp_rules unit
+splitCompUnit :: Module -> NameSet -> [CoreRule] -> CoreCompUnit -> ([CoreCompUnit], [CoreRule])
+splitCompUnit this_module boot_exported imp_rules unit
+  | not boot_exported_is_empty = single_comp_unit
+  | otherwise
   = let comp_units = map mk_comp_unit components_with_rules
         result = (comp_units, rules_for_imps ++ rules_without_component)
     in -- pprTrace "CoreSplitTrace" (pprSplitTrace comp_units) $
@@ -270,6 +310,10 @@ splitCompUnit this_module imp_rules unit
       assignLocalRules unit_rules_local binder_components
 
     mk_comp_unit (_, binds, rules) = CoreCompUnit binds rules
+
+    boot_exported_is_empty = isEmptyNameSet boot_exported
+
+    single_comp_unit = ([unit], [])
 
 checkNameClashes :: [CoreCompUnit] -> ()
 checkNameClashes comp_units
