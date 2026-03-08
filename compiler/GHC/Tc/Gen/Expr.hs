@@ -1068,7 +1068,7 @@ tcSynArgE orig op sigma_ty syn_ty thing_inside
                -- fixed RuntimeRep, as needed to call mkWpFun.
            ; return (result, match_wrapper <.> fun_wrap) }
       where
-        herald = ExpectedFunTySyntaxOp 1 orig op
+        herald = ExpectedFunTySyntaxOp orig op
 
     go rho_ty (SynType the_ty)
       = do { wrap   <- tcSubTypePat orig GenSigCtxt the_ty rho_ty
@@ -1097,7 +1097,7 @@ tcSynArgA orig op sigma_ty arg_shapes res_shape thing_inside
               thing_inside (arg_results ++ res_results) (map scaledMult arg_tys ++ arg_res_mults)
        ; return (result, match_wrapper, arg_wrappers, res_wrapper) }
   where
-    herald = ExpectedFunTySyntaxOp (length arg_shapes) orig op
+    herald = ExpectedFunTySyntaxOp orig op
 
     tc_syn_args_e :: [TcSigmaTypeFRR] -> [SyntaxOpType]
                   -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a)
@@ -1849,4 +1849,3 @@ checkMissingFields con_like rbinds arg_tys
     field_strs = conLikeImplBangs con_like
 
     fl `elemField` flds = any (\ fl' -> flSelector fl == fl') flds
-

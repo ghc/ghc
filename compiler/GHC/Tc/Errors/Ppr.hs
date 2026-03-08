@@ -7798,6 +7798,7 @@ pprErrCtxtMsg = \case
 
     | otherwise
     -> empty
+      -- text "Debug" <+> vcat [ppr fun, ppr n_val_args, ppr res_fun, ppr res_env, ppr n_fun, ppr n_env]
     where
       not_fun ty   -- ty is definitely not an arrow type,
                    -- and cannot conceivably become one

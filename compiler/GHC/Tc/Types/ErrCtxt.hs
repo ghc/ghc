@@ -21,7 +21,7 @@ import GHC.Hs.Extension
 import GHC.Parser.Annotation ( LocatedN, SrcSpanAnnA )
 
 import GHC.Tc.Errors.Types.PromotionErr ( TermLevelUseCtxt )
-import {-# SOURCE #-} GHC.Tc.Types.Origin   ( CtOrigin )
+import {-# SOURCE #-} GHC.Tc.Types.Origin   ( CtOrigin, ExpectedFunTyCtxt )
 import GHC.Tc.Utils.TcType   ( TcType, TcTyCon, ExpType )
 
 import GHC.Types.Basic       ( TyConFlavour )
@@ -283,7 +283,7 @@ data ErrCtxtMsg
   -- | In a function application.
   | FunAppCtxt !FunAppCtxtFunArg !Int
   -- | In a function call.
-  | FunTysCtxt !CtOrigin !Type !Int !Int
+  | FunTysCtxt !ExpectedFunTyCtxt !Type !Int !Int
   -- | In the result of a function call.
   | FunResCtxt !(HsExpr GhcTc) !Int !Type !Type !Int !Int
   -- | In the declaration of a type constructor.
