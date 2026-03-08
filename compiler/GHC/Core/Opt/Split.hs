@@ -18,11 +18,9 @@ import GHC.Data.Maybe (orElse)
 import GHC.Types.Unique.Set
 import GHC.Types.Name (Name, isExternalName, nameModule)
 import GHC.Types.Name.Set (NameSet, isEmptyNameSet)
-import GHC.Types.Id (isDFunId, realIdUnfolding)
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var
-import GHC.Types.Name.Env
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -138,42 +136,7 @@ bindNode local_top_bndrs bind =
 
 bindSplitFreeVars :: VarSet -> CoreBind -> VarSet
 bindSplitFreeVars local_top_bndrs bind =
-  close_over_imported_unfoldings (bindMentionedVars bind `unionVarSet` bindBndrInfoVars bind)
-  where
-    local_name_env :: NameEnv Var
-    local_name_env = mkNameEnv [ (varName v, v) | v <- nonDetEltsUniqSet local_top_bndrs ]
-
-    close_over_imported_unfoldings fvs = go emptyVarSet fvs
-
-    go !seen !fvs =
-      case pick_new_import (fvs `minusVarSet` seen) of
-        Nothing -> fvs
-        Just v  ->
-          let unfolding_fvs = localizeLocalRefs (unfoldingRefs v)
-              local_unfolding_fvs = unfolding_fvs `intersectVarSet` local_top_bndrs
-          in go (extendVarSet seen v) (fvs `unionVarSet` local_unfolding_fvs `unionVarSet` unfolding_fvs)
-
-    pick_new_import vars =
-      find pickable (nonDetEltsUniqSet vars)
-
-    pickable v = isId v && isDFunId v && not (v `elemVarSet` local_top_bndrs)
-
-    unfoldingRefs v =
-      case realIdUnfolding v of
-        BootUnfolding -> emptyVarSet
-        unf ->
-          case maybeUnfoldingTemplate unf of
-            Just rhs -> exprSomeFreeVars (const True) rhs
-            Nothing  -> emptyVarSet
-
-    localizeLocalRefs :: VarSet -> VarSet
-    localizeLocalRefs vars = mkVarSet (map localizeVar (nonDetEltsUniqSet vars))
-
-    localizeVar :: Var -> Var
-    localizeVar v =
-      case lookupNameEnv local_name_env (varName v) of
-        Just local_v -> local_v
-        Nothing      -> v
+  (bindMentionedVars bind `unionVarSet` bindBndrInfoVars bind) `intersectVarSet` local_top_bndrs
 
 bindMentionedVars :: CoreBind -> VarSet
 bindMentionedVars (NonRec _ rhs) = exprSomeFreeVars (const True) rhs
