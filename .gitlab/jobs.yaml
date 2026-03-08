@@ -228,7 +228,7 @@
     ],
     "rules": [
       {
-        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && ((\"true\" == \"true\")))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
+        "if": "((($ONLY_JOBS) && ($ONLY_JOBS =~ /.*\\baarch64-linux-deb12-validate(\\s|$).*/)) || (($ONLY_JOBS == null) && (\"disabled\" != \"disabled\"))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
