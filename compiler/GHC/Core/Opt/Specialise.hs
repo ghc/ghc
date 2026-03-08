@@ -65,6 +65,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Unit.Module( Module )
+import GHC.Unit.Module.Deps ( Dependencies )
 import GHC.Unit.Module.ModGuts
 import GHC.Core.Unfold
 
@@ -641,10 +642,9 @@ Hence, the invariant is this:
 -- | Specialise calls to type-class overloaded functions occurring in a program.
 specProgram :: ModGuts -> CoreM ModGuts
 specProgram guts = do
-  rule_env <- initRuleEnv guts
   let static = StaticSpecInput
         { ssi_module = mg_module guts
-        , ssi_rule_env = rule_env
+        , ssi_deps   = mg_deps guts
         }
       dyn = DynamicSpecData
         { dsd_binds = mg_binds guts
@@ -655,7 +655,7 @@ specProgram guts = do
 
 data StaticSpecInput = StaticSpecInput
   { ssi_module   :: !Module
-  , ssi_rule_env :: !RuleEnv
+  , ssi_deps     :: !Dependencies
   }
 
 data DynamicSpecData = DynamicSpecData
@@ -680,20 +680,26 @@ specProgram' static dyn
 -- | Specialise calls to type-class overloaded functions occurring in a program.
 specCompUnit :: StaticSpecInput -> DynFlags -> CoreCompUnit -> CoreM CoreCompUnit
 specCompUnit static dflags (CoreCompUnit unit_binds unit_rules)
-  = do { (unit_binds', uds) <- runSpecM (go unit_binds)
+  = do { hpt_rules <- getHomeRuleBase
+       ; eps_rules <- getExternalRuleBase
+       ; let rule_env = mkRuleEnv (ssi_module static) (ssi_deps static) [] [unit]
+                                  eps_rules hpt_rules
+             top_env = SE { se_subst = Core.mkEmptySubst in_scope
+                          , se_module = ssi_module static
+                          , se_rules  = rule_env
+                          , se_dflags = dflags }
+       ; (unit_binds', uds) <- runSpecM (go top_env unit_binds)
        ; (spec_rules, spec_binds) <- specImports top_env uds
        ; return (CoreCompUnit (spec_binds ++ unit_binds') (spec_rules ++ unit_rules)) }
   where
-    top_env = SE { se_subst = Core.mkEmptySubst in_scope
-                 , se_module = ssi_module static
-                 , se_rules  = ssi_rule_env static
-                 , se_dflags = dflags }
+    unit = CoreCompUnit unit_binds unit_rules
     in_scope = mkInScopeSetBndrs unit_binds
 
-    go []           = return ([], emptyUDs)
-    go (bind:binds) = do (bind', binds', uds') <- specBind TopLevel top_env bind $ \_ ->
-                                                  go binds
-                         return (bind' ++ binds', uds')
+    go _ []           = return ([], emptyUDs)
+    go env (bind:binds)
+      = do (bind', binds', uds') <- specBind TopLevel env bind $ \_ ->
+                                     go env binds
+           return (bind' ++ binds', uds')
 
 {-
 Note [Wrap bindings returned by specImports]

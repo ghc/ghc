@@ -13,7 +13,7 @@ module GHC.Core.Subst (
 
         -- ** Substituting into expressions and related types
         deShadowBinds, deShadowCompUnits,
-        substRuleInfo, substRulesForImportedIds,
+        substRule, substRuleInfo, substRulesForImportedIds,
         substTyUnchecked, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
         lookupIdSubst, lookupIdSubst_maybe, substIdType, substIdOcc,

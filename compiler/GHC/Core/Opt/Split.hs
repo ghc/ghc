@@ -16,6 +16,7 @@ import GHC.Data.Maybe (orElse)
 
 import GHC.Types.Unique.Set
 import GHC.Types.Name (isExternalName, nameModule)
+import GHC.Types.Id (realIdUnfolding)
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var
@@ -27,6 +28,7 @@ import GHC.Unit.Module (Module)
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
+import Data.List (find)
 
 {- Note [Splitting core programs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -82,16 +84,50 @@ maybeRuleEdges this_module rule =
   where
     local_fvs = filter (varFromModule this_module) (nonDetEltsUniqSet (ruleFreeVars rule))
 
-bindNode :: CoreBind -> ([DepGraphNode], [Edge])
-bindNode bind =
+bindNode :: VarSet -> CoreBind -> ([DepGraphNode], [Edge])
+bindNode local_top_bndrs bind =
   case bindersOf bind of
     []       -> ([], [])
     key:rest ->
-      let intern_edges = map (\v -> (key, v)) rest
-          ext_edges = map (\v -> (key, v)) (nonDetEltsUniqSet (bindFreeVars bind))
+      let split_fvs = bindSplitFreeVars local_top_bndrs bind
+          intern_edges = map (\v -> (key, v)) rest
+          ext_edges = map (\v -> (key, v)) (nonDetEltsUniqSet split_fvs)
           node = BindNode key bind
           pseudo_nodes = map PseudoNode rest
       in (node : pseudo_nodes, intern_edges ++ ext_edges)
+
+bindSplitFreeVars :: VarSet -> CoreBind -> VarSet
+bindSplitFreeVars local_top_bndrs bind =
+  close_over_imported_unfoldings (bindMentionedVars bind `unionVarSet` bindBndrInfoVars bind)
+  where
+    close_over_imported_unfoldings fvs = go emptyVarSet fvs
+
+    go !seen !fvs =
+      case pick_new_import (fvs `minusVarSet` seen) of
+        Nothing -> fvs
+        Just v  ->
+          let unfolding_fvs = unfoldingRefs v
+              local_unfolding_fvs = unfolding_fvs `intersectVarSet` local_top_bndrs
+          in go (extendVarSet seen v) (fvs `unionVarSet` local_unfolding_fvs `unionVarSet` unfolding_fvs)
+
+    pick_new_import vars =
+      find pickable (nonDetEltsUniqSet vars)
+
+    pickable v = isId v && not (v `elemVarSet` local_top_bndrs)
+
+    unfoldingRefs v =
+      case maybeUnfoldingTemplate (realIdUnfolding v) of
+        Just rhs -> exprSomeFreeVars (const True) rhs
+        Nothing  -> emptyVarSet
+
+bindMentionedVars :: CoreBind -> VarSet
+bindMentionedVars (NonRec _ rhs) = exprSomeFreeVars (const True) rhs
+bindMentionedVars (Rec prs)      = exprsSomeFreeVars (const True) (map snd prs)
+
+bindBndrInfoVars :: CoreBind -> VarSet
+bindBndrInfoVars bind =
+  mkVarSet $
+    concatMap (dVarSetElems . bndrRuleAndUnfoldingVarsDSet) (bindersOf bind)
 
 type Edges = IdEnv [Var]
 
@@ -196,9 +232,11 @@ splitCompUnit this_module imp_rules unit
        $$ ppr top_level_bndrs )
       top_level_bndrs
 
+    local_top_bndrs = mkVarSet checked_bndrs
+
     (bind_nodes, bind_edges)
       = checked_bndrs `seq`
-        foldr (\b (ns, es) -> let (ns', es') = bindNode b in (ns' ++ ns, es' ++ es))
+        foldr (\b (ns, es) -> let (ns', es') = bindNode local_top_bndrs b in (ns' ++ ns, es' ++ es))
               ([], [])
               occ_binds
 

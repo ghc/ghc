@@ -205,7 +205,8 @@ simpleOptPgm opts this_mod binds rules =
 
     do_unit (env, comp_units') (CoreCompUnit unit_binds unit_rules)
       = let (env', unit_binds') = foldl' do_one (env, []) unit_binds
-        in (env', CoreCompUnit (reverse unit_binds') unit_rules : comp_units')
+            unit_rules' = map (substRule (soe_subst env') id) unit_rules
+        in (env', CoreCompUnit (reverse unit_binds') unit_rules' : comp_units')
 
     do_one (env, binds') bind
       = case simple_opt_bind env bind TopLevel of

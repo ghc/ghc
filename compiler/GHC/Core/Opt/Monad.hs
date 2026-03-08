@@ -16,7 +16,7 @@ module GHC.Core.Opt.Monad (
 
     -- ** Reading from the monad
     getModule,
-    initRuleEnv, getExternalRuleBase,
+    initRuleEnv, getHomeRuleBase, getExternalRuleBase,
     getDynFlags, getPackageFamInstEnv,
     getInteractiveContext,
     getUniqTag,

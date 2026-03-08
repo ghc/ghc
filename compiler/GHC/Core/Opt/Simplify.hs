@@ -10,6 +10,7 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Core
+import GHC.Core.FVs (ruleFreeVars)
 import GHC.Core.Rules
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
@@ -38,10 +39,10 @@ import GHC.Unit.Module.ModGuts
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
-import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Tickish
 import GHC.Types.Unique.FM
+import GHC.Types.Var.Set
 
 import Control.Monad
 import Data.Foldable ( for_ )
@@ -327,24 +328,42 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
 
         go !rules acc !counts [] = return ((reverse acc, rules), counts)
         go !rules acc !counts (CoreCompUnit unit_binds unit_rules' : rest) = do
-          let !base_rule_env = updLocalRules hpt_rule_env (rules ++ unit_rules')
+          let unit_bndrs = mkVarSet (bindersOfBinds unit_binds)
+              (visible_rules, hidden_rules) = partitionVisibleImpRules unit_bndrs rules
+              !base_rule_env = updLocalRules hpt_rule_env (visible_rules ++ unit_rules')
               read_eps_rules = eps_rule_base <$> ueEPS unit_env
               read_rule_env = updExternalPackageRules base_rule_env <$> read_eps_rules
 
-          ((unit1, rules1), counts1) <-
+          ((unit1, visible_rules1), counts1) <-
             initSmpl logger read_rule_env top_env_cfg sz $ do
               (floats, env1) <- {-# SCC "SimplTopBindsUnit" #-}
                                 simplTopBinds simpl_env unit_binds
 
               -- Apply substitutions from this unit to imported-head rules and
               -- the unit's own rules. Keep each unit's local rules separate.
-              rules1 <- simplImpRules env1 rules
+              visible_rules1 <- simplImpRules env1 visible_rules
               unit_rules1 <- simplImpRules env1 unit_rules'
 
               let unit_binds1 = getTopFloatBinds floats
-              pure (CoreCompUnit unit_binds1 unit_rules1, rules1)
+              pure (CoreCompUnit unit_binds1 unit_rules1, visible_rules1)
 
+          let rules1 = visible_rules1 ++ hidden_rules
           go rules1 (unit1 : acc) (counts `plusSimplCount` counts1) rest
+
+    partitionVisibleImpRules :: VarSet -> [CoreRule] -> ([CoreRule], [CoreRule])
+    partitionVisibleImpRules unit_bndrs = foldr go_rule ([], [])
+      where
+        go_rule rule (visible, hidden)
+          | rule_mentions_unit = (rule : visible, hidden)
+          | rule_has_local_fvs = (visible, rule : hidden)
+          | otherwise          = (rule : visible, hidden)
+          where
+            local_fvs = ruleFreeVars rule `intersectVarSet` all_local_bndrs
+            rule_has_local_fvs = not (isEmptyVarSet local_fvs)
+            rule_mentions_unit = not (isEmptyVarSet (local_fvs `intersectVarSet` unit_bndrs))
+
+    all_local_bndrs :: VarSet
+    all_local_bndrs = mkVarSet (bindersOfBinds (concatMap coreCompUnitBinds (dsd_binds dyn)))
 
 dump_end_iteration :: Logger -> Bool -> NamePprCtx -> Int
                    -> SimplCount -> CoreProgram -> [CoreRule] -> IO ()
