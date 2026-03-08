@@ -112,6 +112,13 @@ test('T149',
      ],
      makefile_test, ['T149'])
 
+test ('T1216',
+      [collect_stats('bytes allocated',5),
+       only_ways(['normal'])
+       ],
+      compile_and_run,
+      ['-O'])
+
 test('T5113',
      [collect_stats('bytes allocated',5),
       only_ways(['normal'])
