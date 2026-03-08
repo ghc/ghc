@@ -380,18 +380,18 @@ body/rest of the module.
 -}
 
 cseProgram :: CoreProgram -> CoreProgram
-cseProgram comp_units
-  = snd (mapAccumL cse_comp_unit init_env comp_units)
-  where
-    init_env  = emptyCSEnv $
-                mkInScopeSetList (bindersOfBinds (concatMap coreCompUnitBinds comp_units))
-                -- Put all top-level binders into scope; it is possible to have
-                -- forward references.  See Note [Glomming] in GHC.Core.Opt.OccurAnal
-                -- Missing this caused #25468
+cseProgram = map cseCoreCompUnit
 
-    cse_comp_unit env (CoreCompUnit binds unit_rules)
-      = let (env', binds') = mapAccumL (cseBind TopLevel) env binds
-        in (env', CoreCompUnit binds' unit_rules)
+cseCoreCompUnit :: CoreCompUnit -> CoreCompUnit
+cseCoreCompUnit (CoreCompUnit unit_binds unit_rules)
+  = CoreCompUnit binds' unit_rules
+  where
+    init_env = emptyCSEnv $
+               mkInScopeSetList (bindersOfBinds unit_binds)
+               -- Put all top-level binders in this compilation unit into
+               -- scope; it is possible to have forward references.
+               -- See Note [Glomming] in GHC.Core.Opt.OccurAnal.
+    (_env', binds') = mapAccumL (cseBind TopLevel) init_env unit_binds
 
 cseBind :: TopLevelFlag -> CSEnv -> CoreBind -> (CSEnv, CoreBind)
 cseBind toplevel env (NonRec b e)
