@@ -643,6 +643,7 @@ data GeneralFlag
    | Opt_InlineGenericsAggressively
    | Opt_StaticArgumentTransformation
    | Opt_SplitCore
+   | Opt_SplitCSE
    | Opt_CSE
    | Opt_StgCSE
    | Opt_StgLiftLams

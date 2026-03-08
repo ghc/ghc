@@ -142,6 +142,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
     late_specialise = gopt Opt_LateSpecialise             dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     split_core    = gopt Opt_SplitCore                    dflags
+    split_cse     = gopt Opt_SplitCSE                     dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
     profiling     = ways dflags `hasWay` WayProf
@@ -282,9 +283,9 @@ getCoreToDo dflags hpt_rule_base extra_vars
 
 
         runWhen cse $ CoreDoPasses [
-          runWhen split_core CoreMerge,
+          runWhen (split_core && not split_cse) CoreMerge,
           CoreCSE,
-          runWhen split_core CoreSplit],
+          runWhen (split_core && not split_cse) CoreSplit],
                 -- We want CSE to follow the final full-laziness pass, because it may
                 -- succeed in commoning up things floated out by full laziness.
                 -- CSE used to rely on the no-shadowing invariant, but it doesn't any more
@@ -320,9 +321,9 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- in wheel-sieve1), and I'm guessing that SpecConstr can too
         -- And CSE is a very cheap pass. So it seems worth doing here.
         runWhen ((liberate_case || spec_constr) && cse) $ CoreDoPasses
-           [ runWhen split_core CoreMerge
+           [ runWhen (split_core && not split_cse) CoreMerge
            , CoreCSE
-           , runWhen split_core CoreSplit
+           , runWhen (split_core && not split_cse) CoreSplit
            , simplify "post-final-cse"
            ],
 
