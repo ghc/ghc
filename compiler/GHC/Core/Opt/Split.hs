@@ -10,16 +10,18 @@ import GHC.Prelude hiding ( head, init, last )
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Opt.OccurAnal (occurAnalyseCompUnit)
+import GHC.Core.Stats (coreBindsSize)
 
 import GHC.Data.Graph.Directed (SCC(..), Node(..), stronglyConnCompFromEdgedVerticesUniq)
 import GHC.Data.Maybe (orElse)
 
 import GHC.Types.Unique.Set
-import GHC.Types.Name (isExternalName, nameModule)
-import GHC.Types.Id (realIdUnfolding)
+import GHC.Types.Name (Name, isExternalName, nameModule)
+import GHC.Types.Id (isDFunId, realIdUnfolding)
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var
+import GHC.Types.Name.Env
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -100,25 +102,40 @@ bindSplitFreeVars :: VarSet -> CoreBind -> VarSet
 bindSplitFreeVars local_top_bndrs bind =
   close_over_imported_unfoldings (bindMentionedVars bind `unionVarSet` bindBndrInfoVars bind)
   where
+    local_name_env :: NameEnv Var
+    local_name_env = mkNameEnv [ (varName v, v) | v <- nonDetEltsUniqSet local_top_bndrs ]
+
     close_over_imported_unfoldings fvs = go emptyVarSet fvs
 
     go !seen !fvs =
       case pick_new_import (fvs `minusVarSet` seen) of
         Nothing -> fvs
         Just v  ->
-          let unfolding_fvs = unfoldingRefs v
+          let unfolding_fvs = localizeLocalRefs (unfoldingRefs v)
               local_unfolding_fvs = unfolding_fvs `intersectVarSet` local_top_bndrs
           in go (extendVarSet seen v) (fvs `unionVarSet` local_unfolding_fvs `unionVarSet` unfolding_fvs)
 
     pick_new_import vars =
       find pickable (nonDetEltsUniqSet vars)
 
-    pickable v = isId v && not (v `elemVarSet` local_top_bndrs)
+    pickable v = isId v && isDFunId v && not (v `elemVarSet` local_top_bndrs)
 
     unfoldingRefs v =
-      case maybeUnfoldingTemplate (realIdUnfolding v) of
-        Just rhs -> exprSomeFreeVars (const True) rhs
-        Nothing  -> emptyVarSet
+      case realIdUnfolding v of
+        BootUnfolding -> emptyVarSet
+        unf ->
+          case maybeUnfoldingTemplate unf of
+            Just rhs -> exprSomeFreeVars (const True) rhs
+            Nothing  -> emptyVarSet
+
+    localizeLocalRefs :: VarSet -> VarSet
+    localizeLocalRefs vars = mkVarSet (map localizeVar (nonDetEltsUniqSet vars))
+
+    localizeVar :: Var -> Var
+    localizeVar v =
+      case lookupNameEnv local_name_env (varName v) of
+        Just local_v -> local_v
+        Nothing      -> v
 
 bindMentionedVars :: CoreBind -> VarSet
 bindMentionedVars (NonRec _ rhs) = exprSomeFreeVars (const True) rhs
@@ -219,8 +236,10 @@ pprVarWithModule v
 splitCompUnit :: Module -> [CoreRule] -> CoreCompUnit -> ([CoreCompUnit], [CoreRule])
 splitCompUnit this_module imp_rules unit
   = let comp_units = map mk_comp_unit components_with_rules
-    in checkNameClashes comp_units `seq`
-       (comp_units, rules_for_imps ++ rules_without_component)
+        result = (comp_units, rules_for_imps ++ rules_without_component)
+    in -- pprTrace "CoreSplitTrace" (pprSplitTrace comp_units) $
+       checkNameClashes comp_units `seq`
+       result
   where
     CoreCompUnit occ_binds unit_rules =
       occurAnalyseCompUnit this_module (const True) (const True) imp_rules unit
@@ -269,3 +288,24 @@ checkNameClashes comp_units
     go seen (b:bs)
       | b `elemVarSet` seen = b : go seen bs
       | otherwise           = go (extendVarSet seen b) bs
+
+pprSplitTrace :: [CoreCompUnit] -> SDoc
+pprSplitTrace comp_units =
+  text (show (length comp_units))
+  <+> text "Unit; CoreSizes:"
+  <+> pprIntList sizes
+  <> semi
+  <+> text "RelativeSize:"
+  <+> pprPercentList rel_sizes
+  where
+    sizes = map (coreBindsSize . coreCompUnitBinds) comp_units
+    total_size = sum sizes
+    rel_sizes
+      | total_size == 0 = replicate (length sizes) 0
+      | otherwise       = map (\sz -> (100 * sz) `div` total_size) sizes
+
+pprIntList :: [Int] -> SDoc
+pprIntList xs = brackets (hcat (punctuate comma (map int xs)))
+
+pprPercentList :: [Int] -> SDoc
+pprPercentList xs = brackets (hcat (punctuate comma [ int x <> char '%' | x <- xs ]))
