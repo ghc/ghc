@@ -181,17 +181,16 @@ So currently we have
 
 cprAnalProgram :: Logger -> FamInstEnvs -> CoreProgram -> IO CoreProgram
 cprAnalProgram logger fam_envs comp_units = do
-  let env            = emptyAnalEnv fam_envs
-  let binds_plus_cpr = snd $ mapAccumL cprAnalTopCompUnit env comp_units
+  let binds_plus_cpr = map (cprAnalCompUnit (emptyAnalEnv fam_envs)) comp_units
   putDumpFileMaybe logger Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
     dumpIdInfoOfProgram False (ppr . cprSigInfo) binds_plus_cpr
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds (concatMap coreCompUnitBinds binds_plus_cpr) `seq` return binds_plus_cpr
 
-cprAnalTopCompUnit :: AnalEnv -> CoreCompUnit -> (AnalEnv, CoreCompUnit)
-cprAnalTopCompUnit env (CoreCompUnit binds unit_rules)
-  = let (env', binds') = mapAccumL cprAnalTopBind env binds
-    in (env', CoreCompUnit binds' unit_rules)
+cprAnalCompUnit :: AnalEnv -> CoreCompUnit -> CoreCompUnit
+cprAnalCompUnit env (CoreCompUnit binds unit_rules)
+  = let (_, binds') = mapAccumL cprAnalTopBind env binds
+    in CoreCompUnit binds' unit_rules
 
 -- Analyse a (group of) top-level binding(s)
 cprAnalTopBind :: AnalEnv

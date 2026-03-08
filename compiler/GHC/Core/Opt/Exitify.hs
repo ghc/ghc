@@ -69,6 +69,7 @@ exitifyProgram comp_units = map exitifyCompUnit comp_units
     goTopLvl (Rec pairs) = Rec (map (second (go in_scope_toplvl)) pairs)
       -- Top-level bindings are never join points
 
+    --Slightly suspicious
     in_scope_toplvl =
       emptyInScopeSet `extendInScopeSetBndrs`
       concatMap coreCompUnitBinds comp_units

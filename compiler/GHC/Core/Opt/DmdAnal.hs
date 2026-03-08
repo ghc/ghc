@@ -92,14 +92,11 @@ data DmdResult a b = R !a !b
 -- [Stamp out space leaks in demand analysis])
 dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> CoreProgram
 dmdAnalProgram opts fam_envs rules binds
-  = getAnnotated $ go_program (emptyAnalEnv opts fam_envs) [] binds
+  = map dmd_anal_comp_unit binds
   where
-    go_program _ _ [] = WithDmdType nopDmdType []
-    go_program env exported (CoreCompUnit unit_binds unit_rules:units)
-      = let WithDmdType _unit_ty unit_binds' = go_unit env exported unit_binds
-            exported' = filter isExportedId (bindersOfBinds unit_binds') ++ exported
-            WithDmdType _units_ty units' = go_program env exported' units
-        in WithDmdType nopDmdType (CoreCompUnit unit_binds' unit_rules : units')
+    dmd_anal_comp_unit (CoreCompUnit unit_binds unit_rules)
+      = let WithDmdType _unit_ty unit_binds' = go_unit (emptyAnalEnv opts fam_envs) [] unit_binds
+        in CoreCompUnit unit_binds' unit_rules
 
     -- See Note [Analysing top-level bindings]
     -- and Note [Why care for top-level demand annotations?]

@@ -434,12 +434,11 @@ choice, and hence Call Arity sets the call arity for join points as well.
 -- Main entry point
 
 callArityAnalProgram :: CoreProgram -> CoreProgram
-callArityAnalProgram comp_units = snd (mapAccumL callArityCompUnit [] comp_units)
+callArityAnalProgram = map callArityCompUnit
   where
-    callArityCompUnit exported (CoreCompUnit binds unit_rules)
-      = let (_ae, binds') = callArityTopLvl exported emptyVarSet binds
-            exported' = filter isExportedId (bindersOfBinds binds') ++ exported
-        in (exported', CoreCompUnit binds' unit_rules)
+    callArityCompUnit (CoreCompUnit binds unit_rules)
+      = let (_ae, binds') = callArityTopLvl [] emptyVarSet binds
+        in CoreCompUnit binds' unit_rules
 
 -- See Note [Analysing top-level binds]
 callArityTopLvl :: [Var] -> VarSet -> [CoreBind] -> (CallArityRes, [CoreBind])
