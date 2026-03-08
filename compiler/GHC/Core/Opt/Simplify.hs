@@ -271,21 +271,12 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
                   --    (b) local rules (substituted), including unit rules from `binds`
                   -- Forcing base_rule_env to avoid unnecessary allocations.
                   -- Not doing so results in +25.6% allocations of LargeRecord.
-                ; !base_rule_env = updLocalRules hpt_rule_env (local_rules ++ unit_rules)
-
-                ; read_eps_rules :: IO PackageRuleBase
-                ; read_eps_rules = eps_rule_base <$> ueEPS unit_env
-
-                ; read_rule_env :: IO RuleEnv
-                ; read_rule_env = updExternalPackageRules base_rule_env <$> read_eps_rules
-
                 ; fam_envs = (eps_fam_inst_env eps, fam_inst_env)
                 ; simpl_env = mkSimplEnv mode fam_envs } ;
 
                 -- Simplify each compilation unit independently
            ((binds1, rules1), counts1) <-
-             initSmpl logger read_rule_env top_env_cfg sz $
-               simpl_comp_units simpl_env local_rules tagged_binds ;
+             simpl_comp_units simpl_env local_rules tagged_binds sz ;
 
                 -- Stop if nothing happened; don't dump output
                 -- See Note [Which transformations are innocuous] in GHC.Core.Opt.Stats
@@ -318,7 +309,6 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
            } }
       where
         bind_list = concatMap coreCompUnitBinds binds
-        unit_rules = concatMap cu_rules binds
         -- Remember the counts_so_far are reversed
         totalise :: [SimplCount] -> SimplCount
         totalise = foldr (\c acc -> acc `plusSimplCount` c)
@@ -329,23 +319,32 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
       :: SimplEnv
       -> [CoreRule]
       -> CoreProgram
-      -> SimplM (CoreProgram, [CoreRule])
-    simpl_comp_units simpl_env rules0 units0 = go rules0 [] units0
+      -> Int
+      -> IO ((CoreProgram, [CoreRule]), SimplCount)
+    simpl_comp_units simpl_env rules0 units0 sz = go rules0 [] zero_counts units0
       where
-        go !rules acc [] = return (reverse acc, rules)
-        go !rules acc (CoreCompUnit unit_binds unit_rules' : rest) = do
-          (floats, env1) <- {-# SCC "SimplTopBindsUnit" #-}
-                            simplTopBinds simpl_env unit_binds
+        zero_counts = zeroSimplCount $ logHasDumpFlag logger Opt_D_dump_simpl_stats
 
-          -- Apply substitutions from this unit to imported-head rules and
-          -- the unit's own rules.
-          rules1 <- simplImpRules env1 rules
-          unit_rules1 <- simplImpRules env1 unit_rules'
+        go !rules acc !counts [] = return ((reverse acc, rules), counts)
+        go !rules acc !counts (CoreCompUnit unit_binds unit_rules' : rest) = do
+          let !base_rule_env = updLocalRules hpt_rule_env (rules ++ unit_rules')
+              read_eps_rules = eps_rule_base <$> ueEPS unit_env
+              read_rule_env = updExternalPackageRules base_rule_env <$> read_eps_rules
 
-          let unit_binds1 = getTopFloatBinds floats
-              unit1 = CoreCompUnit unit_binds1 unit_rules1
+          ((unit1, rules1), counts1) <-
+            initSmpl logger read_rule_env top_env_cfg sz $ do
+              (floats, env1) <- {-# SCC "SimplTopBindsUnit" #-}
+                                simplTopBinds simpl_env unit_binds
 
-          go rules1 (unit1 : acc) rest
+              -- Apply substitutions from this unit to imported-head rules and
+              -- the unit's own rules. Keep each unit's local rules separate.
+              rules1 <- simplImpRules env1 rules
+              unit_rules1 <- simplImpRules env1 unit_rules'
+
+              let unit_binds1 = getTopFloatBinds floats
+              pure (CoreCompUnit unit_binds1 unit_rules1, rules1)
+
+          go rules1 (unit1 : acc) (counts `plusSimplCount` counts1) rest
 
 dump_end_iteration :: Logger -> Bool -> NamePprCtx -> Int
                    -> SimplCount -> CoreProgram -> [CoreRule] -> IO ()
