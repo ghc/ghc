@@ -5,6 +5,7 @@ import GHC.Utils.Misc ( HasDebugCallStack )
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type )
 
 data CtOrigin
+data ExpectedFunTyCtxt
 data SkolemInfoAnon
 data SkolemInfo
 data FixedRuntimeRepContext

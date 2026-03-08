@@ -114,7 +114,7 @@ tcFunBindMatches ctxt fun_name mult matches invis_pat_tys exp_ty
   = assertPpr (funBindPrecondition matches) (pprMatches matches) $
     do  {  -- Check that they all have the same no of arguments
           arity <- checkArgCounts matches
-        ; let herald = ExpectedFunTyMatches arity (NameThing fun_name) matches
+        ; let herald = ExpectedFunTyMatches (NameThing fun_name) matches
         ; traceTc "tcFunBindMatches 1" (ppr fun_name $$ ppr mult $$ ppr exp_ty $$ ppr arity)
 
         ; (wrap_fun, r)

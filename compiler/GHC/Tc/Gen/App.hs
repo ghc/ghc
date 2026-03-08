@@ -907,10 +907,10 @@ tcInstFun do_ql inst_final ds_flag (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigm
 
            ; return (mkScaled mult_ty arg_nu) }
 
-    mk_herald :: HsExpr GhcTc -> HsExpr GhcRn -> CtOrigin
+    mk_herald :: HsExpr GhcTc -> HsExpr GhcRn -> ExpectedFunTyCtxt
     mk_herald tc_fun arg
       = case fun_orig of
-           ExpansionOrigin (StmtErrCtxt{}) -> ExpectedTySyntax DoStmtOrigin arg
+           DoStmtOrigin -> ExpectedTySyntax DoStmtOrigin arg
            _ -> ExpectedFunTyArg (HsExprTcThing tc_fun) arg
 
 -- Is the argument supposed to instantiate a forall?
