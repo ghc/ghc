@@ -1,0 +1,9 @@
+work/pkgB/B.hi
+Declaration for g
+Unfolding of g:
+  f ErrorWithoutFlag
+                           Can't find interface-file declaration for variable f
+                             Probable cause: bug in .hi-boot file, or inconsistent .hi file
+                             Use -ddump-if-trace to get an idea of which file caused the error
+<no location info>:
+    Cannot continue after interface file error
