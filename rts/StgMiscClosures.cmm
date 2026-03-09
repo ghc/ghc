@@ -47,6 +47,7 @@ import CLOSURE stg_ret_v_info;
 /* See Note [Original thunk info table frames] in GHC.StgToCmm.Bind. */
 INFO_TABLE_RET (stg_orig_thunk_info_frame, RET_SMALL,
                 W_ info_ptr,
+                PROF_HDR_FIELDS(W_, p1, p2)
                 W_ thunk_info_ptr)
     /* no args => explicit stack */
 {
