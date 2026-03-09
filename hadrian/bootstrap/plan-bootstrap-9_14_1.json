@@ -2,23 +2,19 @@
   "builtin": [
     {
       "package": "rts",
-      "version": "1.0.2"
-    },
-    {
-      "package": "ghc-prim",
-      "version": "0.13.0"
-    },
-    {
-      "package": "ghc-bignum",
-      "version": "1.3"
+      "version": "1.0.3"
     },
     {
       "package": "ghc-internal",
-      "version": "9.1201.0"
+      "version": "9.1401.0"
+    },
+    {
+      "package": "ghc-prim",
+      "version": "0.13.1"
     },
     {
       "package": "base",
-      "version": "4.21.0.0"
+      "version": "4.22.0.0"
     },
     {
       "package": "array",
@@ -34,11 +30,11 @@
     },
     {
       "package": "ghc-boot-th",
-      "version": "9.12.1"
+      "version": "9.14.1"
     },
     {
       "package": "template-haskell",
-      "version": "2.23.0.0"
+      "version": "2.24.0.0"
     },
     {
       "package": "bytestring",
@@ -46,11 +42,11 @@
     },
     {
       "package": "containers",
-      "version": "0.7"
+      "version": "0.8"
     },
     {
       "package": "binary",
-      "version": "0.8.9.2"
+      "version": "0.8.9.3"
     },
     {
       "package": "transformers",
@@ -66,11 +62,11 @@
     },
     {
       "package": "exceptions",
-      "version": "0.10.9"
+      "version": "0.10.11"
     },
     {
       "package": "os-string",
-      "version": "2.0.7"
+      "version": "2.0.8"
     },
     {
       "package": "filepath",
@@ -78,11 +74,11 @@
     },
     {
       "package": "time",
-      "version": "1.14"
+      "version": "1.15"
     },
     {
       "package": "unix",
-      "version": "2.8.6.0"
+      "version": "2.8.8.0"
     },
     {
       "package": "file-io",
@@ -90,27 +86,27 @@
     },
     {
       "package": "directory",
-      "version": "1.3.9.0"
+      "version": "1.3.10.0"
     },
     {
       "package": "text",
-      "version": "2.1.2"
+      "version": "2.1.3"
     },
     {
       "package": "parsec",
-      "version": "3.1.17.0"
+      "version": "3.1.18.0"
     },
     {
       "package": "Cabal-syntax",
-      "version": "3.14.1.0"
+      "version": "3.16.0.0"
     },
     {
       "package": "process",
-      "version": "1.6.25.0"
+      "version": "1.6.26.1"
     },
     {
       "package": "Cabal",
-      "version": "3.14.1.0"
+      "version": "3.16.0.0"
     }
   ],
   "dependencies": [
