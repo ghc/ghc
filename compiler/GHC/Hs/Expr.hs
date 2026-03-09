@@ -1064,6 +1064,7 @@ instance Outputable XXExprGhcRn where
       pprCtxt (ExprCtxt e) = ppr_builder "<OrigExpr>:"  (ppr e)
       pprCtxt (StmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
       pprCtxt (StmtErrCtxtPat _ _ pat) = ppr_builder "<OrigPat>:" (ppr pat)
+      pprCtxt (FunAppCtxt (FunAppCtxtExpr _ e) _) = ppr_builder "<FunAppCtxt>:"  (ppr e)
       pprCtxt _ = empty
 
 instance Outputable XXExprGhcTc where
@@ -1079,6 +1080,7 @@ instance Outputable XXExprGhcTc where
       pprCtxt (ExprCtxt e) = ppr_builder "<OrigExpr>:"  (ppr e)
       pprCtxt (StmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
       pprCtxt (StmtErrCtxtPat _ _ pat) = ppr_builder "<OrigPat>:" (ppr pat)
+      pprCtxt (FunAppCtxt (FunAppCtxtExpr _ e) _) = ppr_builder "<FunAppCtxt>:"  (ppr e)
       pprCtxt _ = empty
 
             -- e is the expanded expression, we print the original

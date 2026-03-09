@@ -49,7 +49,7 @@ module GHC.Tc.Zonk.TcType
   , tidyCt, tidyEvVar, tidyDelayedError
 
     -- ** Zonk & tidy
-  , zonkTidyTcType, zonkTidyTcTypes
+  , zonkTidyTcType, zonkTidyTcTypes, zonkTidyErrCtxtMsg
   , zonkTidyOrigin, zonkTidyOrigins
   , zonkTidyFRRInfos
 
@@ -793,3 +793,171 @@ tidyFRROrigin env (FixedRuntimeRepOrigin ty orig)
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
 tidyEvVar env var = updateIdTypeAndMult (tidyType env) var
   -- No need for tidyOpenType because all the free tyvars are already tidied
+
+
+
+{-
+Zonk ErrCtxtMsg
+-}
+
+zonkTidyErrCtxtMsg :: TidyEnv -> ErrCtxtMsg -> ZonkM (TidyEnv, ErrCtxtMsg)
+zonkTidyErrCtxtMsg env e@(ExprCtxt{}) = return (env, e)
+zonkTidyErrCtxtMsg env (ThetaCtxt ctxt theta_ty) = do
+  (env', theta_ty') <- zonkTidyTcTypes env theta_ty
+  return $ (env', ThetaCtxt ctxt theta_ty')
+-- zonkTidyErrCtxtMsg env (QuantifiedCtCtxt ty) = do
+--   (env', ty') <- zonkTidyTcTypes env ty
+--   return $ QuantifiedCtCtxt ty'
+zonkTidyErrCtxtMsg env (InferredTypeCtxt n ty) = do
+  (env', ty') <- zonkTidyTcType env ty
+  return $ (env', InferredTypeCtxt n ty')
+-- zonkTidyErrCtxtMsg (RecordUpdCtxt n1 n2 tys) = do
+--   tys' <- lift $ mapM zonkTcTypeToType tys
+--   return $ RecordUpdCtxt n1 n2 tys'
+zonkTidyErrCtxtMsg env (ClassOpCtxt n ty) = do
+  (env', ty') <- zonkTidyTcType env ty
+  return $ (env', ClassOpCtxt n ty')
+zonkTidyErrCtxtMsg env (MethSigCtxt n ty1 ty2) = do
+  (env', ty1) <- zonkTidyTcType env ty1
+  (env', ty2) <- zonkTidyTcType env ty2
+  return $ (env',  MethSigCtxt n ty1 ty2)
+-- zonkTidyErrCtxtMsg (PatSigErrCtxt ty exp_ty) = do
+--   ty' <- lift $ zonkTcTypeToType ty
+--   exp_ty' <- lift $ readExpType_maybe exp_ty
+--   case exp_ty' of
+--      Nothing -> error "zonkTidyErrCtxtMsg PatSingErrCtxt"
+--      Just exp_ty' -> do
+--        exp_ty' <- lift $ zonkTcTypeToType exp_ty'
+--        return $ PatSigErrCtxt ty' exp_ty'
+
+zonkTidyErrCtxtMsg env e@(FunAppCtxt{}) = return (env, e)
+zonkTidyErrCtxtMsg env (FunTysCtxt ctxt ty i1 i2) = do
+  (env', ty') <- zonkTidyTcType env ty
+  return $ (env', FunTysCtxt ctxt ty' i1 i2)
+zonkTidyErrCtxtMsg env (FunResCtxt e i1 ty1 ty2 i2 i3) = do
+  (env', ty1') <- zonkTidyTcType env ty1
+  (env', ty2') <- zonkTidyTcType env ty2
+  return $ (env', FunResCtxt e i1 ty1' ty2' i2 i3)
+zonkTidyErrCtxtMsg env p = return (env, p)
+{-
+  -- or a type signature, or... (see 'Sig').
+  | SigCtxt !(Sig GhcRn)
+  -- | In a user-written type signature.
+  | UserSigCtxt !UserTypeCtxt !UserSigType
+
+  -- | In a pattern.
+  | PatCtxt !(Pat GhcRn)
+  -- | In a pattern synonym declaration.
+  | PatSynDeclCtxt !Name
+  -- | In a pattern matching context, e.g. a equation for a function binding,
+  -- or a case alternative, ...
+  | MatchCtxt !HsMatchContextRn
+  -- | In a match in a pattern matching context,
+  -- either for an expression or for an arrow command.
+  | forall body. (Outputable body)
+  => MatchInCtxt !(Match GhcRn body)
+  -- | In the declaration of a type constructor.
+  | TyConDeclCtxt !Name !(TyConFlavour TyCon)
+  -- | In a type or data family instance (or default instance).
+  | TyConInstCtxt !Name !TyConInstFlavour
+  -- | In the declaration of a data constructor.
+  | DataConDefCtxt !(NE.NonEmpty (LocatedN Name))
+  -- | In the result type of a data constructor.
+  | DataConResTyCtxt !(NE.NonEmpty (LocatedN Name))
+  -- | In the equations for a closed type family.
+  | ClosedFamEqnCtxt !TyCon
+  -- | In the expansion of a type synonym.
+  | TySynErrCtxt !TyCon
+  -- | In a role annotation.
+  | RoleAnnotErrCtxt !Name
+  -- | In an arrow command.
+  | CmdCtxt !(HsCmd GhcRn)
+  -- | In an instance declaration.
+  | InstDeclErrCtxt !(Either (LHsType GhcRn) PredType)
+  -- | In a default declaration.
+  | DefaultDeclErrCtxt { ddec_in_type_list :: !Bool }
+  -- | In the body of a static form.
+  | StaticFormCtxt !(LHsExpr GhcRn)
+  -- | In a pattern binding.
+  | forall p. OutputableBndrId p
+  => PatMonoBindsCtxt !(LPat (GhcPass p)) !(GRHSs GhcRn (LHsExpr GhcRn))
+  -- | In a foreign import/export declaration.
+  | ForeignDeclCtxt !(ForeignDecl GhcRn)
+  -- | In a record field.
+  | FieldCtxt !FieldLabelString
+  -- | In a type.
+  | TypeCtxt !(LHsType GhcRn)
+  -- | In a kind.
+  | KindCtxt !(LHsKind GhcRn)
+  -- | In an ambiguity check.
+  | AmbiguityCheckCtxt !UserTypeCtxt !Bool
+
+  -- | In a term-level use of a 'Name'.
+  | TermLevelUseCtxt !Name !TermLevelUseCtxt
+
+  -- | When checking the type of the @main@ function.
+  | MainCtxt !Name
+  -- | Warning emitted when inferring use of visible dependent quantification.
+  | VDQWarningCtxt !TcTyCon
+
+  -- | In a statement
+  | forall body.
+    ( Anno (StmtLR GhcRn GhcRn body) ~ SrcSpanAnnA
+    , Outputable body
+    ) => StmtErrCtxt !HsStmtContextRn !(StmtLR GhcRn GhcRn body)
+
+  -- | In a do statement.
+  | DoStmtErrCtxt !HsStmtContextRn !(ExprLStmt GhcRn)
+
+  -- | In patten of the do statement. (c.f. MonadFailErrors)
+  | StmtErrCtxtPat !HsStmtContextRn !(ExprLStmt GhcRn) (LPat GhcRn)
+
+  -- | In an rebindable syntax expression.
+  | SyntaxNameCtxt !(HsExpr GhcRn) !CtOrigin !TcType !SrcSpan
+  -- | In a RULE.
+  | RuleCtxt !FastString
+  -- | In a subtype check.
+  | SubTypeCtxt !TcType !TcType
+
+  -- | In an export.
+  | forall p. OutputableBndrId p
+  => ExportCtxt (IE (GhcPass p))
+  -- | In an export of a pattern synonym.
+  | PatSynExportCtxt !PatSyn
+  -- | In an export of a pattern synonym record field.
+  | PatSynRecSelExportCtxt !PatSyn !Name
+
+  -- | In an annotation.
+  | forall p. OutputableBndrId p
+  => AnnCtxt (AnnDecl (GhcPass p))
+
+  -- | In a specialise pragma.
+  | SpecPragmaCtxt !(Sig GhcRn)
+
+  -- | In a deriving clause.
+  | DerivInstCtxt !PredType
+  -- | In a standalone deriving clause.
+  | StandaloneDerivCtxt !(LHsSigWcType GhcRn)
+  -- | When typechecking the body of a derived instance.
+  | DerivBindCtxt !Id !Class ![Type]
+
+  -- | In an untyped Template Haskell quote.
+  | UntypedTHBracketCtxt !(HsQuote GhcPs)
+  -- | In a typed Template Haskell quote.
+  | forall p. OutputableBndrId p
+  => TypedTHBracketCtxt !(LHsExpr (GhcPass p))
+  -- | In an untyped Template Haskell splice or quasi-quote.
+  | UntypedSpliceCtxt !(HsUntypedSplice GhcPs)
+  -- | In a typed Template Haskell splice.
+  | forall p. OutputableBndrId p
+  => TypedSpliceCtxt !(Maybe SplicePointName) !(HsTypedSplice (GhcPass p))
+  -- | In the result of a typed Template Haskell splice.
+  | TypedSpliceResultCtxt !(LHsExpr GhcTc)
+  -- | In an argument to the Template Haskell @reifyInstances@ function.
+  | ReifyInstancesCtxt !TH.Name ![TH.Type]
+
+  -- | While merging Backpack signatures.
+  | MergeSignaturesCtxt !UnitState !ModuleName ![InstantiatedModule]
+  -- | While checking that a module implements a Backpack signature.
+  | CheckImplementsCtxt !UnitState !Module !InstantiatedModule
+-}
