@@ -29,6 +29,7 @@ import GHC.Core.TyCo.FVs     ( coVarsOfCos )
 import GHC.Core.TyCo.Compare ( eqType )
 import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.FamInstEnv
+import GHC.Core.Opt.CompUnit (parMapCompUnits)
 import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Core.Opt.WorkWrap.Utils
 
@@ -92,7 +93,7 @@ data DmdResult a b = R !a !b
 -- [Stamp out space leaks in demand analysis])
 dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> CoreProgram
 dmdAnalProgram opts fam_envs rules binds
-  = map dmd_anal_comp_unit binds
+  = parMapCompUnits dmd_anal_comp_unit binds
   where
     dmd_anal_comp_unit (CoreCompUnit unit_binds unit_rules)
       = let WithDmdType _unit_ty unit_binds' = go_unit (emptyAnalEnv opts fam_envs) [] unit_binds

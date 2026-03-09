@@ -38,6 +38,7 @@ Now `t` is no longer in a recursive function, and good things happen!
 import GHC.Prelude
 import GHC.Builtin.Uniques
 import GHC.Core
+import GHC.Core.Opt.CompUnit (parMapCompUnits)
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -60,7 +61,7 @@ import Control.Monad
 -- | Traverses the AST, simply to find all joinrecs and call 'exitify' on them.
 -- The really interesting function is exitifyRec
 exitifyProgram :: CoreProgram -> CoreProgram
-exitifyProgram comp_units = map exitifyCompUnit comp_units
+exitifyProgram comp_units = parMapCompUnits exitifyCompUnit comp_units
   where
     exitifyCompUnit (CoreCompUnit binds unit_rules) =
       CoreCompUnit (map goTopLvl binds) unit_rules

@@ -23,6 +23,7 @@ import GHC.Platform
 
 import GHC.Core
 import GHC.Core.Opt.Arity( isOneShotBndr )
+import GHC.Core.Opt.CompUnit (parMapCompUnits)
 import GHC.Core.Make hiding ( wrapFloats )
 import GHC.Core.Utils
 import GHC.Core.FVs
@@ -47,7 +48,7 @@ actually float any bindings downwards from the top-level.
 -}
 
 floatInwards :: Platform -> CoreProgram -> CoreProgram
-floatInwards platform = map floatCompUnit
+floatInwards platform = parMapCompUnits floatCompUnit
   where
     floatCompUnit (CoreCompUnit binds unit_rules) =
       CoreCompUnit (map (fi_top_bind platform) binds) unit_rules

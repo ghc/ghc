@@ -33,6 +33,7 @@ import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.Seq
 import GHC.Core.TyCon
+import GHC.Core.Opt.CompUnit (parMapCompUnits)
 import GHC.Core.Opt.WorkWrap.Utils
 
 import GHC.Data.Graph.UnVar -- for UnVarSet
@@ -181,7 +182,7 @@ So currently we have
 
 cprAnalProgram :: Logger -> FamInstEnvs -> CoreProgram -> IO CoreProgram
 cprAnalProgram logger fam_envs comp_units = do
-  let binds_plus_cpr = map (cprAnalCompUnit (emptyAnalEnv fam_envs)) comp_units
+  let binds_plus_cpr = parMapCompUnits (cprAnalCompUnit (emptyAnalEnv fam_envs)) comp_units
   putDumpFileMaybe logger Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
     dumpIdInfoOfProgram False (ppr . cprSigInfo) binds_plus_cpr
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal

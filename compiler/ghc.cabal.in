@@ -375,6 +375,7 @@ Library
         GHC.Core.Opt.ConstantFold
         GHC.Core.Opt.CprAnal
         GHC.Core.Opt.CSE
+        GHC.Core.Opt.CompUnit
         GHC.Core.Opt.DmdAnal
         GHC.Core.Opt.Exitify
         GHC.Core.Opt.FloatIn

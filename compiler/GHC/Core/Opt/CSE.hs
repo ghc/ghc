@@ -22,6 +22,7 @@ import GHC.Types.Basic
 import GHC.Types.InlinePragma
 import GHC.Types.Tickish
 import GHC.Core.Map.Expr
+import GHC.Core.Opt.CompUnit (parMapCompUnits)
 import GHC.Utils.Misc   ( filterOut, equalLength )
 import GHC.Utils.Panic
 import Data.Functor.Identity ( Identity (..) )
@@ -380,7 +381,7 @@ body/rest of the module.
 -}
 
 cseProgram :: CoreProgram -> CoreProgram
-cseProgram = map cseCoreCompUnit
+cseProgram = parMapCompUnits cseCoreCompUnit
 
 cseCoreCompUnit :: CoreCompUnit -> CoreCompUnit
 cseCoreCompUnit (CoreCompUnit unit_binds unit_rules)

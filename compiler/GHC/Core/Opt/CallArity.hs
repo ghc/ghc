@@ -17,6 +17,7 @@ import GHC.Types.Basic
 import GHC.Core
 import GHC.Types.Id
 import GHC.Core.Opt.Arity ( typeArity )
+import GHC.Core.Opt.CompUnit (parMapCompUnits)
 import GHC.Core.Utils ( exprIsCheap, exprIsTrivial )
 import GHC.Data.Graph.UnVar
 import GHC.Types.Demand
@@ -434,7 +435,7 @@ choice, and hence Call Arity sets the call arity for join points as well.
 -- Main entry point
 
 callArityAnalProgram :: CoreProgram -> CoreProgram
-callArityAnalProgram = map callArityCompUnit
+callArityAnalProgram = parMapCompUnits callArityCompUnit
   where
     callArityCompUnit (CoreCompUnit binds unit_rules)
       = let (_ae, binds') = callArityTopLvl [] emptyVarSet binds

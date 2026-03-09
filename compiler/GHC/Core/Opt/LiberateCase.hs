@@ -13,6 +13,7 @@ module GHC.Core.Opt.LiberateCase
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.Opt.CompUnit (parMapCompUnits)
 import GHC.Core.Unfold
 import GHC.Core.Opt.Simplify.Inline
 import GHC.Builtin.Types ( unitDataConId )
@@ -105,7 +106,7 @@ and the level of @h@ is zero (NB not one).
 -}
 
 liberateCase :: LibCaseOpts -> CoreProgram -> CoreProgram
-liberateCase opts = map liberateCaseCompUnit
+liberateCase opts = parMapCompUnits liberateCaseCompUnit
   where
     liberateCaseCompUnit (CoreCompUnit binds unit_rules) =
       CoreCompUnit (snd (do_unit (initLiberateCaseEnv opts) binds)) unit_rules
