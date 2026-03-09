@@ -9,7 +9,7 @@
 --
 -- It is also strict: see the (<>) method in he Semigroup instance
 
-module GHC.Utils.EndoOS( EndoOS(EndoOS, runEndoOS ), foldEndoOS ) where
+module GHC.Utils.EndoOS( EndoOS(EndoOS, runEndoOS ) ) where
 
 import GHC.Prelude
 
@@ -40,6 +40,3 @@ pattern EndoOS f <- EndoOS' f
         EndoOS f = EndoOS' (oneShot f)
          -- oneShot: this is the core of the one-shot trick!
          -- Note [The one-shot state monad trick] in  GHC.Utils.Monad.
-
-foldEndoOS :: Foldable t => (a -> Endo b) -> t a -> Endo b
-foldEndoOS f xs = foldr ((<>) . f) mempty xs

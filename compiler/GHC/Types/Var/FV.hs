@@ -136,9 +136,9 @@ type InterestingVarFun = Var -> Bool
 
 type BoundVars = TyCoVarSet
 
-type VarSetFV    = FV BoundVars (EndoOS TyCoVarSet)
-type DVarSetFV   = FV BoundVars (EndoOS DTyCoVarSet)
-type SelectiveFV = FV (InterestingVarFun, BoundVars) (EndoOS DVarSet)
+type VarSetFV     = FV BoundVars (EndoOS TyCoVarSet)
+type DVarSetFV    = FV BoundVars (EndoOS DTyCoVarSet)
+type SelectiveDFV = FV (InterestingVarFun, BoundVars) (EndoOS DVarSet)
 -- VarSetFV:    collects a VarSet
 -- DVarSetFV:   collects a DVarSet (deterministic)
 -- SelectiveFV: selectively collects a DVarSet
