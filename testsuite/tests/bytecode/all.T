@@ -9,3 +9,8 @@ test('T25975', extra_ways(ghci_ways), compile_and_run,
 # Nullary data constructors
 test('T26216', extra_files(["T26216_aux.hs"]), ghci_script, ['T26216.script'])
 
+
+# SLIDE across stack chunk boundary (#27001)
+test('T27001', [extra_files(['T27001.hs']), req_interp],
+     run_command,
+     ['{compiler} -e main -O -fno-unoptimized-core-for-interpreter T27001.hs'])
