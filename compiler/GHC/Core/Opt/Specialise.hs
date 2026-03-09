@@ -2515,7 +2515,7 @@ specArgsFVs interesting args
   = runFVSelectiveSet interesting $
     mapUnionFV get args
   where
-    get :: SpecArg -> SelectiveFV
+    get :: SpecArg -> SelectiveDFV
     get (SpecType ty)   = shallowSelTypeFV ty
     get (SpecDict dx)   = exprFVs dx
     get UnspecType      = mempty

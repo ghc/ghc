@@ -3564,44 +3564,45 @@ getInScope = LintM (\ env errs -> fromBoxedLResult (Just (substInScopeSet $ le_s
 
 lintVarOcc :: InVar -> LintM OutType
 -- Used at an occurrence of a variable: term variables, type variables, and coercion variables
--- Checks two things:
--- a) that it is in scope
--- b) that the InType at the ocurrences matches the InType at the binding site
+-- Checks
+--   - that it is in scope
+--   - that it is not a GlobalId bound by a LocalId
+--   - that the InType at the ocurrence matches the InType at the binding site
+--   - that the variables free in its type are not shadowed at the occurrence site
 lintVarOcc v_occ
+  | isGlobalId v_occ
+  = return (idType v_occ)
+  | otherwise
   = do { in_var_env <- getInVarEnv
        ; case lookupVarEnv in_var_env v_occ of
-           Nothing | isGlobalId v_occ -> return (idType v_occ)
-                   | otherwise        -> failWithL (text pp_what <+> quotes (ppr v_occ)
-                                                    <+> text "is out of scope")
+           Nothing -> failWithL (text pp_what <+> quotes (ppr v_occ)
+                                 <+> text "is out of scope")
            Just (v_bndr, out_ty, bind_level)
-             -> do { check_bad_global v_bndr
-                   ; ensureEqTys occ_ty bndr_ty $  -- Compares InTypes
-                     mkBndrOccTypeMismatchMsg v_occ bndr_ty occ_ty
-                   ; checkL (null bad_fvs) $
-                     mkBndrOccFreeVarMsg v_occ occ_ty bad_fvs
+             -> do { let bndr_ty = idType v_bndr
+                   ; check_bad_global v_bndr
+                   ; check_occ_type_match bndr_ty
+                   ; check_occ_type_scope in_var_env bndr_ty bind_level
                    ; return out_ty }
-             where
-               occ_ty  = varType v_occ
-               bndr_ty = varType v_bndr
-               bad_fvs = filter is_bad (tyCoVarsOfTypeList occ_ty)
-               is_bad tv = case lookupVarEnv in_var_env tv of
-                             Just (_, _, tv_level) -> tv_level > bind_level
-                             Nothing -> True
+
     }
   where
+    occ_ty :: InType
+    occ_ty = idType v_occ
+
     pp_what | isTyVar v_occ = "The type variable"
             | isCoVar v_occ = "The coercion variable"
             | otherwise     = "The value variable"
 
-       -- 'check_bad_global' checks for the case where an /occurrence/ is
-       -- a GlobalId, but there is an enclosing binding fora a LocalId.
-       -- NB: the in-scope variables are mostly LocalIds, checked by lintIdBndr,
-       --     but GHCi adds GlobalIds from the interactive context.  These
-       --     are fine; hence the test (isLocalId id == isLocalId v)
-       -- NB: when compiling Control.Exception.Base, things like absentError
-       --     are defined locally, but appear in expressions as (global)
-       --     wired-in Ids after worker/wrapper
-       --     So we simply disable the test in this case
+    check_bad_global :: InVar -> LintM ()
+    -- 'check_bad_global' checks for the case where an /occurrence/ is
+    -- a GlobalId, but there is an enclosing binding for a LocalId.
+    -- NB: the in-scope variables are mostly LocalIds, checked by lintIdBndr,
+    --     but GHCi adds GlobalIds from the interactive context.  These
+    --     are fine; hence the test (isLocalId id == isLocalId v)
+    -- NB: when compiling Control.Exception.Base, things like absentError
+    --     are defined locally, but appear in expressions as (global)
+    --     wired-in Ids after worker/wrapper
+    --     So we simply disable the test in this case
     check_bad_global v_bndr
       | isGlobalId v_occ
       , isLocalId v_bndr
@@ -3611,6 +3612,28 @@ lintVarOcc v_occ
                                , hang (text "binder    :") 2 $ pprBndr LetBind v_bndr ])
       | otherwise
       = return ()
+
+    check_occ_type_match :: InType -> LintM ()
+    -- Check that the type in /binder/ and the type in the /occurrence/ are the same
+    check_occ_type_match bndr_ty
+      = ensureEqTys bndr_ty occ_ty $  -- Compares InTypes
+        mkBndrOccTypeMismatchMsg v_occ bndr_ty occ_ty
+
+    check_occ_type_scope :: VarEnv (InVar,OutType,LintLevel) -> InType -> LintLevel -> LintM ()
+    -- Check that the free vars of the binder's type
+    -- are not shadowed at the occurrence site
+    check_occ_type_scope in_var_env bndr_ty bind_level
+      = checkL (null bad_fvs) $
+        mkBndrOccFreeVarMsg v_occ occ_ty bad_fvs
+      where
+        bad_fvs :: [InVar]
+        bad_fvs = filter is_bad (tyCoVarsOfTypeList bndr_ty)
+
+        is_bad :: InVar -> Bool
+        -- True of a variable bound inside bind_level
+        is_bad v = case lookupVarEnv in_var_env v of
+                      Just (_, _, v_level) -> v_level > bind_level
+                      Nothing -> True
 
 lookupJoinId :: Id -> LintM (Maybe (JoinArity, JoinOcc))
 -- Look up an Id which should be a join point, valid here

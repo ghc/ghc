@@ -595,7 +595,7 @@ substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
   = runFVSelective isLocalVar $
     strictFoldDVarSet (mappend . do_one) mempty fvs
   where
-  do_one :: Var -> SelectiveFV
+  do_one :: Var -> SelectiveDFV
   do_one fv
      | isTyVar fv = shallowSelTypeFV (lookupVarEnv tv_env fv `orElse` mkTyVarTy fv)
      | isCoVar fv = shallowSelCoFV   (lookupVarEnv cv_env fv `orElse` mkCoVarCo fv)

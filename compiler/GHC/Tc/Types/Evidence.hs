@@ -1318,7 +1318,7 @@ nestedEvIdsOfTerm :: EvTerm -> VarSet
 -- Returns only EvIds satisfying relevantEvId
 nestedEvIdsOfTerm = runFVSelectiveSet isNestedEvId . evTermFVs
 
-evTermFVs :: EvTerm -> SelectiveFV
+evTermFVs :: EvTerm -> SelectiveDFV
 evTermFVs (EvExpr e)         = exprFVs e
 evTermFVs (EvTypeable _ ev)  = evFVsOfTypeable ev
 evTermFVs (EvFun { et_tvs = tvs, et_given = given
@@ -1330,10 +1330,10 @@ evTermFVs (EvFun { et_tvs = tvs, et_given = given
           fvs = foldr (mappend . evTermFVs . eb_rhs) (unitFV v) binds
           bndrs = foldr ((:) . eb_lhs) (tvs ++ given) binds
 
-evTermFVss :: [EvTerm] -> SelectiveFV
+evTermFVss :: [EvTerm] -> SelectiveDFV
 evTermFVss = mapUnionFV evTermFVs
 
-evFVsOfTypeable :: EvTypeable -> SelectiveFV
+evFVsOfTypeable :: EvTypeable -> SelectiveDFV
 evFVsOfTypeable ev =
   case ev of
     EvTypeableTyCon _ e      -> mapUnionFV evTermFVs e

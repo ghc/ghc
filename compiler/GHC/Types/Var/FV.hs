@@ -3,7 +3,7 @@
 -- | Utilities for efficiently and deterministically computing free variables.
 module GHC.Types.Var.FV (
         FV( runFV, MkFV ),
-        BoundVars, VarSetFV, DVarSetFV, SelectiveFV,
+        BoundVars, VarSetFV, DVarSetFV, SelectiveDFV,
         TyCoFV, DTyCoFV,
         runFVTop, runFVAcc, runTyCoVars, runTyCoVarsDSet,
         runFVSelective, runFVSelectiveList, runFVSelectiveSet,
@@ -139,9 +139,9 @@ type BoundVars = TyCoVarSet
 type VarSetFV     = FV BoundVars (EndoOS TyCoVarSet)
 type DVarSetFV    = FV BoundVars (EndoOS DTyCoVarSet)
 type SelectiveDFV = FV (InterestingVarFun, BoundVars) (EndoOS DVarSet)
--- VarSetFV:    collects a VarSet
--- DVarSetFV:   collects a DVarSet (deterministic)
--- SelectiveFV: selectively collects a DVarSet
+-- VarSetFV:     collects a VarSet
+-- DVarSetFV:    collects a DVarSet (deterministic)
+-- SelectiveDFV: selectively collects a DVarSet
 -- Why EndoOS? See (FV1) in Note [Finding free variables]
 
 type TyCoFV  = VarSetFV
@@ -219,12 +219,12 @@ runTyCoVarsDSet :: DTyCoFV -> DTyCoVarSet
 {-# INLINE runTyCoVarsDSet #-}
 runTyCoVarsDSet f = runFVAcc f emptyDVarSet
 
-runFVSelective :: InterestingVarFun -> SelectiveFV -> DVarSet
+runFVSelective :: InterestingVarFun -> SelectiveDFV -> DVarSet
 runFVSelective interesting f
   = runEndoOS (runFV f (interesting, emptyVarSet)) emptyDVarSet
 
-runFVSelectiveList :: InterestingVarFun -> SelectiveFV -> [Var]
+runFVSelectiveList :: InterestingVarFun -> SelectiveDFV -> [Var]
 runFVSelectiveList interesting f = dVarSetElems (runFVSelective interesting f)
 
-runFVSelectiveSet :: InterestingVarFun -> SelectiveFV -> VarSet
+runFVSelectiveSet :: InterestingVarFun -> SelectiveDFV -> VarSet
 runFVSelectiveSet interesting f = dVarSetToVarSet (runFVSelective interesting f)

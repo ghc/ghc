@@ -404,37 +404,46 @@ Note [No type-shadowing in Core]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider applying `exprType` to this term:
 
-           /\a. \(x::[a]).  /\a. \(y::a). (x,y)
+       /\ a. \(x :: a). /\a. x
 
 where we have genuine shadowing: both lambdas bind the same a.  Remember: every
-occurrence of `x` is just a copy of the binder (x::[a]), and ditto `y`.
+occurrence of `x` is just a copy of the binder (x::[a]).
 
 Now what does `exprType` return for that term?  It will return the incorrect type
-
-        forall a. [a] -> forall a. a -> ([a],a)
-
-whereas the correct type is: forall a. [a] -> forall b. b -> ([a],b)
+        forall a. a -> forall a. a
+whereas the correct type is:
+        forall a. a -> forall b. a
 where we rename the inner forall.
 
-It would be /possible/ to make `exprType` more complicated, so that it does
-renaming on the fly.  But instead we impose the no-type-shadowing invariant on
-Core terms: the variable free in an Id's type must be in scope at every
-/occurrence/ of that Id.  In type-system terms:
+A similar problem occurs for types.  consider
+   forall (a :: RuntimeRep). Int -> forall (x :: TYPE a).
+                                    forall (a :: RunTimeRep). x
+This is a well-kinded type, in an environment-based scheme.  But `typeKind`
+will panic, because the kind of the body of a forall must not mention
+the forall'd variable.
 
-    fv(t) are not bound in G2
-    -------------------------
-    G1, x:t, G2 |- x : t
+It might be possible to make `exprType` and `typeKind`` more complicated, so that
+they do renaming on the fly.  But instead we impose
 
-How do we guarantee this invariant?  The main thing that might disturb it is
-/substitution/.  When substituting in a /term/ we need to ensure that the in-scope
-set includes:
+INVARIANT (NoTypeShadowing):
+  In every Core term (Expr) and core type (Type),
+  the variable free in a binder's type must be in scope
+  at every /occurrence/ of that variable.  In type-system terms:
+
+        fv(t) are not bound in G2
+        -------------------------
+        G1, x:t, G2 |- x : t
+
+How do we guarantee (NoTypeShadowing)?  The main thing that might
+disturb it is /substitution/.  When substituting in a term or type we
+need to ensure that the in-scope set includes:
 
 * The /deep/ free vars of the range of the substitution
   E.g.  When substituting  [y :-> x::a->a] into
          /\a. ..y...
   we should have an InScopeSet that includes `a` so that we clone the `/\a`.
 
-* The /deep/ free vars of the term in which we are substituting
+* The /deep/ free vars of the term/type in which we are substituting
   E.g when substituting [x :-> blah] into `e`, we must ensure that if we
   clone a binder in `e`, we don't accidentally choose a new binder that
   shadows a deep free var of `e`.

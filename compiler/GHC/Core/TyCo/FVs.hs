@@ -4,12 +4,12 @@ module GHC.Core.TyCo.FVs
   (     -- Shallow
         shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
         shallowTyCoVarsOfCo, shallowTyCoVarsOfCos,
-        shallowTyCoVarsOfTyVarEnv, shallowTyCoVarsOfCoVarEnv,
 
         -- Deep
         tyCoVarsOfType, tyCoVarsOfTypes, tyCoVarsOfTypesList,
         tyCoVarsOfThings,
         tyCoVarsOfCo, tyCoVarsOfCos, tyCoVarsOfMCo,
+        tyCoVarsOfTyVarEnv, tyCoVarsOfCoVarEnv,
         deepTcvFolder, deepTypeFV, deepTypesFV, deepCoFV,
 
         -- Deep, deterministic
@@ -223,6 +223,20 @@ tyCoVarsOfThings :: Foldable t => (a -> Type) -> t a -> TyCoVarSet
 tyCoVarsOfThings get_ty things
   = runTyCoVars $ mapUnionFV (deepTypeFV . get_ty) things
 
+-- | Returns free variables of types, including kind variables as
+-- a non-deterministic set. For type synonyms it does /not/ expand the
+-- synonym.
+tyCoVarsOfTyVarEnv :: TyVarEnv Type -> TyCoVarSet
+-- See Note [Shallow and deep free variables]of types]
+tyCoVarsOfTyVarEnv tys = tyCoVarsOfTypes (nonDetEltsUFM tys)
+  -- It's OK to use nonDetEltsUFM here because we immediately
+  -- forget the ordering by returning a set
+
+tyCoVarsOfCoVarEnv :: CoVarEnv Coercion -> TyCoVarSet
+tyCoVarsOfCoVarEnv cos = tyCoVarsOfCos (nonDetEltsUFM cos)
+  -- It's OK to use nonDetEltsUFM here because we immediately
+  -- forget the ordering by returning a set
+
 deepTypeFV  :: Type       -> TyCoFV
 deepTypesFV :: [Type]     -> TyCoFV
 deepCoFV    :: Coercion   -> TyCoFV
@@ -282,20 +296,6 @@ shallowTyCoVarsOfCo co = runTyCoVars (shallowCoFV co)
 
 shallowTyCoVarsOfCos :: [Coercion] -> TyCoVarSet
 shallowTyCoVarsOfCos cos = runTyCoVars (shallowCosFV cos)
-
--- | Returns free variables of types, including kind variables as
--- a non-deterministic set. For type synonyms it does /not/ expand the
--- synonym.
-shallowTyCoVarsOfTyVarEnv :: TyVarEnv Type -> TyCoVarSet
--- See Note [Shallow and deep free variables]of types]
-shallowTyCoVarsOfTyVarEnv tys = shallowTyCoVarsOfTypes (nonDetEltsUFM tys)
-  -- It's OK to use nonDetEltsUFM here because we immediately
-  -- forget the ordering by returning a set
-
-shallowTyCoVarsOfCoVarEnv :: CoVarEnv Coercion -> TyCoVarSet
-shallowTyCoVarsOfCoVarEnv cos = shallowTyCoVarsOfCos (nonDetEltsUFM cos)
-  -- It's OK to use nonDetEltsUFM here because we immediately
-  -- forget the ordering by returning a set
 
 shallowTypeFV  :: Type       -> TyCoFV
 shallowTypesFV :: [Type]     -> TyCoFV
@@ -416,13 +416,13 @@ someTyCoVarsOfTypes :: (TyCoVar -> Bool) -> [Type] -> [TyCoVar]
 someTyCoVarsOfTypes interesting
   = runFVSelectiveList interesting . mapUnionFV shallowSelTypeFV
 
-shallowSelTypeFV :: Type -> SelectiveFV
-shallowSelCoFV   :: Coercion -> SelectiveFV
+shallowSelTypeFV :: Type -> SelectiveDFV
+shallowSelCoFV   :: Coercion -> SelectiveDFV
 -- Returns shallow free vars
 -- See Note [Shallow and deep free variables]
 (shallowSelTypeFV, _, shallowSelCoFV, _) = foldTyCo selectiveTcvFolder
 
-selectiveTcvFolder :: TyCoFolder SelectiveFV
+selectiveTcvFolder :: TyCoFolder SelectiveDFV
 -- This one takes an `InterestingVarFun`, and returns shallow free vars
 -- See `shallowTcvFolder` for the general pattern
 selectiveTcvFolder

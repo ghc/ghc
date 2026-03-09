@@ -155,7 +155,7 @@ exprsFreeIdsList = dVarSetElems . exprsFreeIdsDSet
 bindFreeVars :: CoreBind -> VarSet
 bindFreeVars = runFVSelectiveSet isLocalVar . bind_fvs
 
-bind_fvs :: CoreBind -> SelectiveFV
+bind_fvs :: CoreBind -> SelectiveDFV
 bind_fvs (NonRec b r) = rhs_fvs (b,r)
 bind_fvs (Rec prs)    = addBndrsSelectiveFV (map fst prs) $
                         mapUnionFV rhs_fvs prs
@@ -200,17 +200,17 @@ exprsSomeFreeVarsDSet :: InterestingVarFun -- ^ Says which 'Var's are interestin
                       -> DVarSet
 exprsSomeFreeVarsDSet fv_cand = runFVSelective fv_cand . exprsFVs
 
-addCoreBndrFV :: CoreBndr -> SelectiveFV -> SelectiveFV
+addCoreBndrFV :: CoreBndr -> SelectiveDFV -> SelectiveDFV
 addCoreBndrFV bndr fvr
   = bndrTypeTyCoFVs bndr `mappend`
         -- Include type variables in the binder's type
         --      (not just Ids; coercion variables too!)
     addBndrSelectiveFV bndr fvr
 
-addCoreBndrsFV :: [CoreBndr] -> SelectiveFV -> SelectiveFV
+addCoreBndrsFV :: [CoreBndr] -> SelectiveDFV -> SelectiveDFV
 addCoreBndrsFV bndrs fv = foldr addCoreBndrFV fv bndrs
 
-unitFV :: Var -> SelectiveFV
+unitFV :: Var -> SelectiveDFV
 -- Deals with an occurrence
 -- Shallow: does not look at the kind
 unitFV v = MkFV (\bvs -> EndoOS (do_it bvs))
@@ -221,10 +221,10 @@ unitFV v = MkFV (\bvs -> EndoOS (do_it bvs))
       | v `elemDVarSet` acc    = acc
       | otherwise              = acc `extendDVarSet` v
 
-exprsFVs :: [CoreExpr] -> SelectiveFV
+exprsFVs :: [CoreExpr] -> SelectiveDFV
 exprsFVs = mapUnionFV exprFVs
 
-exprFVs :: CoreExpr -> SelectiveFV
+exprFVs :: CoreExpr -> SelectiveDFV
 exprFVs (Type ty)       = shallowSelTypeFV ty
 exprFVs (Coercion co)   = shallowSelCoFV co
 exprFVs (Var var)       = unitFV var
@@ -245,18 +245,18 @@ exprFVs (Let (Rec pairs) body)
     mapUnionFV rhs_fvs pairs `mappend` exprFVs body
 
 ---------
-rhs_fvs :: (Id, CoreExpr) -> SelectiveFV
+rhs_fvs :: (Id, CoreExpr) -> SelectiveDFV
 rhs_fvs (bndr, rhs) = exprFVs rhs `mappend`
                       bndrRuleAndUnfoldingFVs bndr
         -- Treat any RULES as extra RHSs of the binding
 
 ---------
-tickish_fvs :: CoreTickish -> SelectiveFV
+tickish_fvs :: CoreTickish -> SelectiveDFV
 tickish_fvs (Breakpoint _ _ ids) = mapUnionFV unitFV ids
 tickish_fvs _ = mempty
 
 ---------
-bndrTypeTyCoFVs :: Var -> SelectiveFV
+bndrTypeTyCoFVs :: Var -> SelectiveDFV
 -- Find the free variables of a binder.
 -- In the case of ids, don't forget the multiplicity field!
 bndrTypeTyCoFVs var
@@ -279,7 +279,7 @@ dBndrFreeVars :: Id -> DVarSet
 -- Shallow free vars
 dBndrFreeVars id = runFVSelective isLocalVar $ bndrFVs id
 
-bndrFVs :: Id -> SelectiveFV
+bndrFVs :: Id -> SelectiveDFV
 -- Shallow free vars of types, rules, and inlining
 bndrFVs id = assert (isId id) $
              bndrTypeTyCoFVs id `mappend`
@@ -291,7 +291,7 @@ bndrRuleAndUnfoldingVarsDSet = runFVSelective isLocalVar . bndrRuleAndUnfoldingF
 bndrRuleAndUnfoldingVars :: Id -> VarSet
 bndrRuleAndUnfoldingVars = dVarSetToVarSet . bndrRuleAndUnfoldingVarsDSet
 
-bndrRuleAndUnfoldingFVs :: Id -> SelectiveFV
+bndrRuleAndUnfoldingFVs :: Id -> SelectiveDFV
 bndrRuleAndUnfoldingFVs id
   | isId id   = idRuleFVs id `mappend` idUnfoldingFVs id
   | otherwise = mempty
@@ -299,7 +299,7 @@ bndrRuleAndUnfoldingFVs id
 idRuleVars :: Id -> VarSet  -- Does *not* include CoreUnfolding vars
 idRuleVars = dVarSetToVarSet . ruleInfoFreeVars . idSpecialisation
 
-idRuleFVs :: Id -> SelectiveFV
+idRuleFVs :: Id -> SelectiveDFV
 idRuleFVs id = assert (isId id) $
                strictFoldDVarSet (mappend . unitFV) mempty $
                ruleInfoFreeVars (idSpecialisation id)
@@ -312,14 +312,14 @@ idUnfoldingVars :: Id -> VarSet
 -- we might get out-of-scope variables
 idUnfoldingVars = runFVSelectiveSet isLocalVar . idUnfoldingFVs
 
-idUnfoldingFVs :: Id -> SelectiveFV
+idUnfoldingFVs :: Id -> SelectiveDFV
 idUnfoldingFVs id = stableUnfoldingFVs (realIdUnfolding id) `orElse` mempty
 
 stableUnfoldingVars :: Unfolding -> Maybe VarSet
 stableUnfoldingVars unf = fmap (runFVSelectiveSet isLocalVar) $
                           stableUnfoldingFVs unf
 
-stableUnfoldingFVs :: Unfolding -> Maybe SelectiveFV
+stableUnfoldingFVs :: Unfolding -> Maybe SelectiveDFV
 stableUnfoldingFVs unf
   = case unf of
       CoreUnfolding { uf_tmpl = rhs, uf_src = src }
@@ -498,7 +498,7 @@ data RuleFVsFrom
 
 -- | Those locally-defined variables free in the left and/or right hand sides
 -- of the rule, depending on the first argument.
-ruleFVs :: RuleFVsFrom -> CoreRule -> SelectiveFV
+ruleFVs :: RuleFVsFrom -> CoreRule -> SelectiveDFV
 ruleFVs !_   (BuiltinRule {}) = mempty
 ruleFVs from (Rule { ru_fn = _do_not_include
                      -- See Note [Rule free var hack]
@@ -513,7 +513,7 @@ ruleFVs from (Rule { ru_fn = _do_not_include
 
 -- | Those locally-defined variables free in the left and/or right hand sides
 -- from several rules, depending on the first argument.
-rulesFVs :: RuleFVsFrom -> [CoreRule] -> SelectiveFV
+rulesFVs :: RuleFVsFrom -> [CoreRule] -> SelectiveDFV
 rulesFVs from = mapUnionFV (ruleFVs from)
 
 -- | Those variables free in the right hand side of a rule returned as a
