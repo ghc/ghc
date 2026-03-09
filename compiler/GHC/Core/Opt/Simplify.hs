@@ -45,6 +45,8 @@ import GHC.Types.Tickish
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Set
 
+import Control.Concurrent (forkIO, killThread, newEmptyMVar, putMVar, takeMVar)
+import Control.Exception (SomeException, mask, throwIO, try)
 import Control.Monad
 import Data.Foldable ( for_ )
 
@@ -196,7 +198,7 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
         ; let fam_envs = (eps_fam_inst_env eps, fam_inst_env)
               simpl_env = mkSimplEnv mode fam_envs
 
-        ; unit_results <- mapM (simplify_unit hpt_rule_env simpl_env shared_rules) units0
+        ; unit_results <- run_units (simplify_unit hpt_rule_env simpl_env shared_rules) units0
         ; let (units1, unit_infos, unit_counts) = unzip3 unit_results
               counts_out = foldr plusSimplCount zero_counts unit_counts
               dyn_out = dyn_no_binds { dsd_binds = units1, dsd_rules = shared_rules }
@@ -227,6 +229,39 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
     !dyn_no_binds = DynamicSimplData { dsd_binds = [], dsd_rules = [] }
 
     zero_counts = zeroSimplCount $ logHasDumpFlag logger Opt_D_dump_simpl_stats
+
+    run_units :: (CoreCompUnit -> IO a) -> [CoreCompUnit] -> IO [a]
+    run_units f units
+      | parallel_units = mapParallelIO f units
+      | otherwise      = mapM f units
+      where
+        parallel_units = length units > 1 && not disable_parallel
+
+        disable_parallel =
+             logHasDumpFlag logger Opt_D_dump_occur_anal
+          || logHasDumpFlag logger Opt_D_dump_simpl_iterations
+
+    mapParallelIO :: (a -> IO b) -> [a] -> IO [b]
+    mapParallelIO f xs = mask $ \restore -> do
+      workers <- forM xs $ \x -> do
+        result_var <- newEmptyMVar
+        tid <- forkIO $ do
+          result <- try (restore (f x))
+          putMVar result_var result
+        pure (tid, result_var)
+
+      let kill_workers = mapM_ (killThread . fst) workers
+
+      let wait_workers [] = pure []
+          wait_workers ((_, result_var):rest) = do
+            result <- takeMVar result_var
+            case result of
+              Left err -> do
+                kill_workers
+                throwIO (err :: SomeException)
+              Right y -> (y :) <$> wait_workers rest
+
+      wait_workers workers
 
     simplify_unit
       :: RuleEnv
