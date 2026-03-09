@@ -1063,9 +1063,10 @@ instance Outputable XXExprGhcRn where
       pprCtxt :: ErrCtxtMsg -> SDoc
       pprCtxt (ExprCtxt e) = ppr_builder "<OrigExpr>:"  (ppr e)
       pprCtxt (StmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
+      pprCtxt (DoStmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
       pprCtxt (StmtErrCtxtPat _ _ pat) = ppr_builder "<OrigPat>:" (ppr pat)
       pprCtxt (FunAppCtxt (FunAppCtxtExpr _ e) _) = ppr_builder "<FunAppCtxt>:"  (ppr e)
-      pprCtxt _ = empty
+      pprCtxt _ = ppr_builder "<MiscErrCtxtMsg>:" empty
 
 instance Outputable XXExprGhcTc where
   ppr (WrapExpr co_fn e)
@@ -1079,9 +1080,10 @@ instance Outputable XXExprGhcTc where
       pprCtxt :: ErrCtxtMsg -> SDoc
       pprCtxt (ExprCtxt e) = ppr_builder "<OrigExpr>:"  (ppr e)
       pprCtxt (StmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
+      pprCtxt (DoStmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
       pprCtxt (StmtErrCtxtPat _ _ pat) = ppr_builder "<OrigPat>:" (ppr pat)
       pprCtxt (FunAppCtxt (FunAppCtxtExpr _ e) _) = ppr_builder "<FunAppCtxt>:"  (ppr e)
-      pprCtxt _ = empty
+      pprCtxt _ = ppr_builder "<MiscErrCtxtMsg>:" empty
 
             -- e is the expanded expression, we print the original
             -- expression (HsExpr GhcRn), not the
