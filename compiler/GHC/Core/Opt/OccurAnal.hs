@@ -1908,7 +1908,7 @@ mkLoopBreakerNodes !env lvl body_uds details_s
               -- Note [Deterministic SCC] in GHC.Data.Graph.Directed.
       where
         simple_nd = SND { snd_bndr = new_bndr, snd_rhs = rhs, snd_score = score }
-        score  = nodeScore env new_bndr lb_deps nd
+        score  = nodeScore env new_bndr inl_fvs lb_deps nd
         lb_deps = extendFvs_ rule_fv_env inl_fvs
         -- See Note [Loop breaker dependencies]
 
@@ -1942,20 +1942,24 @@ group { f1 = e1; ...; fn = en } are:
 ------------------------------------------
 nodeScore :: OccEnv
           -> Id        -- Binder with new occ-info
-          -> VarSet    -- Loop-breaker dependencies
+          -> VarSet    -- Free vars of the RHS
+          -> VarSet    -- Same, but extended with rule_fv_env
           -> NodeDetails
           -> NodeScore
-nodeScore !env new_bndr lb_deps
+nodeScore !env new_bndr inl_fvs lb_deps
           (ND { nd_bndr = old_bndr, nd_rhs = WTUD _ bind_rhs })
 
   | not (isId old_bndr)     -- A type or coercion variable is never a loop breaker
   = (100, 0, False)
 
-  | old_bndr `elemVarSet` lb_deps  -- Self-recursive things are great loop breakers
-  = (0, 0, True)                   -- See Note [Self-recursion and loop breakers]
-
   | not (occ_unf_act env old_bndr) -- A binder whose inlining is inactive (e.g. has
   = (0, 0, True)                   -- a NOINLINE pragma) makes a great loop breaker
+
+  | old_bndr `elemVarSet` inl_fvs  -- Self-recursive things are great loop breakers
+  = (0, 0, True)                   -- See Note [Self-recursion and loop breakers]
+
+  | old_bndr `elemVarSet` lb_deps  -- Recursive via a RULE
+  = (1, 0, is_lb)                  -- See Note [Self-recursion and loop breakers]
 
   | exprIsTrivial rhs
   = mk_score 10  -- Practically certain to be inlined
@@ -1981,13 +1985,13 @@ nodeScore !env new_bndr lb_deps
 
   | isStableUnfolding old_unf
   , can_unfold
-  = mk_score 3
+  = mk_score 4
 
   | isOneOcc (idOccInfo new_bndr)
-  = mk_score 2  -- Likely to be inlined
+  = mk_score 3  -- Likely to be inlined
 
   | can_unfold  -- The Id has some kind of unfolding
-  = mk_score 1
+  = mk_score 2
 
   | otherwise
   = (0, 0, is_lb)
@@ -1996,7 +2000,8 @@ nodeScore !env new_bndr lb_deps
     mk_score :: Int -> NodeScore
     mk_score rank = (rank, rhs_size, is_lb)
 
-    -- is_lb: see Note [Loop breakers, node scoring, and stability]
+    -- is_lb: was it a loop-breaker in the last iteration?
+    -- See Note [Loop breakers, node scoring, and stability]
     is_lb = isStrongLoopBreaker (idOccInfo old_bndr)
 
     old_unf = realIdUnfolding old_bndr
