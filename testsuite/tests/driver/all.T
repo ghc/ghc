@@ -314,6 +314,12 @@ test('MultiRootsErr', normal, multimod_compile_fail, ['MultiRootsErr', 'MultiRoo
 test('patch-level2', normal, compile, ['-Wcpp-undef'])
 test('T16476a', normal, makefile_test, [])
 test('T16476b', normal, makefile_test, [])
+
+# Test that GHC can handle an empty preprocessor response file.
+# This used to cause GHC to hang indefinitely: #18177
+test('T18177', [pre_cmd('touch cpp-args')], compile,
+     ['-v0 -fforce-recomp -fhpc -optP@cpp-args -optP-DX'])
+
 test('T20569', extra_files(["T20569/"]), makefile_test, [])
 test('T21866', normal, multimod_compile, ['T21866','-no-link'])
 test('T21349', extra_files(['T21349']), makefile_test, [])
