@@ -271,6 +271,24 @@ See also Note [Width of parameters] for some more motivation.
 #define WITHIN_CHUNK_BOUNDS_W(n, s)  \
     (RTS_LIKELY(((StgWord*) Sp_plusW(n)) < ((s)->stack + (s)->stack_size - sizeofW(StgUnderflowFrame))))
 
+/* Note [Checking for underflow frames]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   We look at the stack slot at offset sizeof(StgUnderflowFrame) from
+   the start of the chunk to check if we're in the first check chunk.
+   Every non-first stack chunk has an underflow frame header at that offset.
+
+   We really should change this check, since this stack slot in the first
+   chunk may not be the start of a stack frame and could in theory contain
+   an arbitrary value.
+
+   In practice we're unlikely to have interpreted frames that low on the stack.
+ */
+#define IS_UNDERFLOW_FRAME(info) \
+    ((info) == &stg_stack_underflow_frame_d_info ||   \
+     (info) == &stg_stack_underflow_frame_v16_info || \
+     (info) == &stg_stack_underflow_frame_v32_info || \
+     (info) == &stg_stack_underflow_frame_v64_info)
 
 #define W64_TO_WDS(n) ((n * sizeof(StgWord64) / sizeof(StgWord)))
 
@@ -681,11 +699,9 @@ slow_spw(void *Sp, StgStack *cur_stack, StgWord offset_words){
     frame = (StgUnderflowFrame*)(cur_stack->stack + cur_stack->stack_size
                - sizeofW(StgUnderflowFrame));
 
-    // 2a. Check it is an underflow frame (the top stack chunk won't have one).
-    if( frame->info == &stg_stack_underflow_frame_d_info
-       || frame->info == &stg_stack_underflow_frame_v16_info
-       || frame->info == &stg_stack_underflow_frame_v32_info
-       || frame->info == &stg_stack_underflow_frame_v64_info )
+    // 2a. Check it is an underflow frame (the first stack chunk won't have one).
+    //     See Note [Checking for underflow frames]
+    if( IS_UNDERFLOW_FRAME(frame->info) )
     {
 
       INTERP_TICK(it_underflow_lookups);
@@ -702,9 +718,11 @@ slow_spw(void *Sp, StgStack *cur_stack, StgWord offset_words){
     }
     // 2b. Access the element if there is no underflow frame, it must be right
     // at the top of the stack.
-    else {
-        // Not actually in the underflow case
+    else if(Sp_plusW(offset_words) < (StgPtr)(cur_stack->stack + cur_stack->stack_size)) {
+        // Still inside the stack chunk
         return Sp_plusW(offset_words);
+    } else {
+        barf("slow_spw: offset_words %d is out of bounds", (int)offset_words);
     }
   }
 }
@@ -2425,8 +2443,39 @@ run_BCO:
              *           =>
              * a_1 ... a_n, k
              */
-            while(n-- > 0) {
-                SpW(n+by) = ReadSpW(n);
+            if (n == 0 || WITHIN_CAP_CHUNK_BOUNDS_W(n - 1 + by)) {
+                while(n-- > 0) {
+                    SpW(n+by) = ReadSpW(n);
+                }
+            } else {
+                // We write across a chunk boundary: Use safe access
+                while(n-- > 0) {
+                    *((StgWord*)SafeSpWP(n+by)) = ReadSpW(n);
+                }
+            }
+
+            // If we SLIDE Sp past the chunk bounds we need to handle the underflow
+            // (possibly multiple times)
+            while (!WITHIN_CAP_CHUNK_BOUNDS_W(by)) {
+                StgStack *stk = cap->r.rCurrentTSO->stackobj;
+                StgUnderflowFrame *uf = (StgUnderflowFrame*)
+                    (stk->stack + stk->stack_size
+                     - sizeofW(StgUnderflowFrame));
+                // See Note [Checking for underflow frames]
+                if (IS_UNDERFLOW_FRAME(uf->info)) {
+                    W_ sp_to_uf = (StgWord*)uf - (StgWord*)Sp;
+                    Sp = (StgPtr)uf;
+                    SAVE_STACK_POINTERS;
+                    threadStackUnderflow(cap, cap->r.rCurrentTSO);
+                    LOAD_STACK_POINTERS;
+                    by -= sp_to_uf;
+                } else if (Sp_plusW(by) < (StgPtr)(stk->stack + stk->stack_size)) {
+                    // we're within the first stack chunk, this chunk has
+                    // no underflow frame
+                    break;
+                } else {
+                    barf("bci_SLIDE: Sp+by outside stack bounds");
+                }
             }
             Sp_addW(by);
             INTERP_TICK(it_slides);
