@@ -29,7 +29,6 @@ import GHC.Unit.Module (Module)
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
-import Data.List (find)
 
 {- Note [Splitting core programs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -158,13 +157,13 @@ splitCoreBinders nodes edges =
   ]
   where
     key_set = mkVarSet (map depNodeKey nodes)
-    undirected_edges = foldr add_edge emptyVarEnv (edges ++ map reverse_edge edges)
+    undirected_edges = foldr add_edge_pair emptyVarEnv edges
 
     add_edge :: Edge -> Edges -> Edges
     add_edge (src, dst) env = extendVarEnv_C (++) env src [dst]
 
-    reverse_edge :: Edge -> Edge
-    reverse_edge (src, dst) = (dst, src)
+    add_edge_pair :: Edge -> Edges -> Edges
+    add_edge_pair (src, dst) env = add_edge (src, dst) (add_edge (dst, src) env)
 
     mk_graph_node node
       = DigraphNode
@@ -193,7 +192,7 @@ assignLocalRules unit_rules binder_components =
       = foldr assign_rule (IntMap.empty, []) unit_rules
 
     assign_rule rule (rule_map, no_comp_rules)
-      = case rule_comp_indices rule of
+      = case IntMap.keys comp_hits of
           [i] -> (IntMap.insertWith (++) i [rule] rule_map, no_comp_rules)
           []  -> (rule_map, rule : no_comp_rules)
           is  -> pprPanic "splitCompUnit"
@@ -201,26 +200,29 @@ assignLocalRules unit_rules binder_components =
                 $$ text "rule:" <+> ppr rule
                 $$ text "components:" <+> ppr is
                 $$ text "rule_fvs:" <+> pprVarsWithModule (nonDetEltsUniqSet (ruleFreeVars rule))
-                $$ vcat [ text "component" <+> int i <> colon <+> ppr hits
-                        | (i, hits) <- comp_hits rule ] )
+                $$ vcat [ text "component" <+> int i <> colon <+> pprVarsWithModule hits
+                        | (i, hits) <- IntMap.toAscList comp_hits ] )
+      where
+        comp_hits = ruleComponentHits rule
 
-    rule_comp_indices rule
-      = IntSet.toList $ IntSet.fromList
-          [ i
-          | ((bndrs, _), i) <- zip binder_components [0..]
-          , not (isEmptyVarSet (ruleFreeVars rule `intersectVarSet` bndrs))
-          ]
+    ruleComponentHits rule =
+      foldr add_fv_hit IntMap.empty (nonDetEltsUniqSet (ruleFreeVars rule))
 
-    comp_hits rule =
-      [ (i, ruleFreeVars rule `intersectVarSet` bndrs)
-      | ((bndrs, _), i) <- zip binder_components [0..]
-      , not (isEmptyVarSet (ruleFreeVars rule `intersectVarSet` bndrs))
-      ]
+    add_fv_hit v hits =
+      case lookupVarEnv binder_component_map v of
+        Just i  -> IntMap.insertWith (++) i [v] hits
+        Nothing -> hits
 
     components_with_rules =
       [ (bndrs, binds, IntMap.findWithDefault [] i component_rule_map)
-      | ((bndrs, binds), i) <- zip binder_components [0..]
+      | ((bndrs, binds), i) <- zip binder_components [0 :: Int ..]
       ]
+
+    binder_component_map =
+      foldr add_component emptyVarEnv (zip binder_components [0 :: Int ..])
+
+    add_component ((bndrs, _), i) env =
+      foldr (\v env' -> extendVarEnv env' v i) env (nonDetEltsUniqSet bndrs)
 
 pprVarsWithModule :: [Var] -> SDoc
 pprVarsWithModule vars = braces (fsep (punctuate comma (map pprVarWithModule vars)))
@@ -256,11 +258,9 @@ splitCompUnit this_module boot_exported imp_rules unit
 
     local_top_bndrs = mkVarSet checked_bndrs
 
-    (bind_nodes, bind_edges)
-      = checked_bndrs `seq`
-        foldr (\b (ns, es) -> let (ns', es') = bindNode local_top_bndrs b in (ns' ++ ns, es' ++ es))
-              ([], [])
-              occ_binds
+    bind_node_info = checked_bndrs `seq` map (bindNode local_top_bndrs) occ_binds
+    bind_nodes = concatMap fst bind_node_info
+    bind_edges = concatMap snd bind_node_info
 
     rule_edge_pairs = [ (r, maybeRuleEdges this_module r) | r <- unit_rules ]
     rule_edges = concat [ es | (_, Just es) <- rule_edge_pairs ]
