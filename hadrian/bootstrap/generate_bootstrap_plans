@@ -3,14 +3,14 @@ PATH+=:$PWD/jq-bin/bin
 
 ghcs_nix="https://gitlab.haskell.org/bgamari/ghcs-nix/-/archive/master/ghcs-nix-master.tar.gz"
 
-nix build -f "$ghcs_nix" ghc-9_6_7 -o boot_ghc
+nix build --extra-substituters https://ghc.cachix.org --extra-trusted-public-keys ghc.cachix.org-1:a751hwq9ydeP3Nr6h84iA9zSjxg9Z3uznqi4YBGjsiw= -f "$ghcs_nix" ghc-9_12_2 -o boot_ghc
 cabal build --with-ghc-pkg $PWD/boot_ghc/bin/ghc-pkg -w $PWD/boot_ghc/bin/ghc hadrian-bootstrap-gen
 
 run() {
   local ver="$1"
   local drv="ghc-$ver"
   echo "$ver"
-  nix build -f "$ghcs_nix" $drv
+  nix build --extra-substituters https://ghc.cachix.org --extra-trusted-public-keys ghc.cachix.org-1:a751hwq9ydeP3Nr6h84iA9zSjxg9Z3uznqi4YBGjsiw= -f "$ghcs_nix" $drv
   (cd ../; rm -r dist-newstyle; cabal build --dry-run hadrian --flags=-selftest -w bootstrap/result/bin/ghc)
   jq --sort-keys < ../dist-newstyle/cache/plan.json > "plan-$ver.json"
   cabal run --with-ghc-pkg $PWD/boot_ghc/bin/ghc-pkg -w $PWD/boot_ghc/bin/ghc -v0 hadrian-bootstrap-gen -- "plan-$ver.json" | jq --sort-keys | tee "plan-bootstrap-$ver.json"
@@ -21,3 +21,4 @@ run "9_10_2"
 run "9_10_3"
 run "9_12_1"
 run "9_12_2"
+run "9_14_1"
