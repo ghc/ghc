@@ -13,7 +13,9 @@ where
 
 import GHC.Prelude
 
+import GHC.Conc (par, pseq)
 import GHC.Core
+import GHC.Core.Seq (seqBinds)
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.Type
@@ -72,10 +74,20 @@ info for exported values).
 wwTopBinds :: WwOpts -> UniqSupply -> CoreProgram -> CoreProgram
 
 wwTopBinds ww_opts us top_binds
-  = initUs_ us $ mapM wwCompUnit top_binds
+  = go top_binds
   where
+    go [] = []
+    go (unit:units) =
+      unit' `par` (units' `pseq` (unit' : units'))
+      where
+        unit' = forceCompUnit (initUs_ us (wwCompUnit unit))
+        units' = go units
+
     wwCompUnit (CoreCompUnit binds unit_rules) =
       (\binds' -> CoreCompUnit binds' unit_rules) <$> concatMapM (wwBind ww_opts) binds
+
+    forceCompUnit unit@(CoreCompUnit unit_binds _) =
+      seqBinds unit_binds `seq` unit
 
 {-
 ************************************************************************
