@@ -13,7 +13,7 @@ import GHC.Core
 import GHC.Core.FVs (ruleFreeVars)
 import GHC.Core.Rules
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
-import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
+import GHC.Core.Opt.OccurAnal ( occurAnalyseCompUnit, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop )
 import GHC.Core.Lint    ( LintPassResultConfig, dumpPassResult, lintPassResult )
@@ -29,6 +29,7 @@ import GHC.Utils.Error  ( withTiming )
 import GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
+import GHC.Utils.Panic (panic, pprPanic)
 
 import GHC.Unit.Env ( UnitEnv, ueEPS )
 import GHC.Unit.External
@@ -185,19 +186,31 @@ simplifyPgm' :: Logger
 
 simplifyPgm' logger unit_env name_ppr_ctx opts
             static dyn
-  = do { (termination_msg, it_count, counts_out, guts')
-            <- do_iteration 1 [] (dsd_binds dyn) (dsd_rules dyn)
+  = do { let (shared_rules, units0)
+                 | [_] <- dsd_binds dyn = (dsd_rules dyn, dsd_binds dyn)
+                 | otherwise = distributeLocalRules (dsd_binds dyn) (dsd_rules dyn)
+             hpt_rule_env = mkRuleEnv this_mod deps shared_rules units0
+                                      emptyRuleBase (so_hpt_rules opts)
+
+        ; eps <- ueEPS unit_env
+        ; let fam_envs = (eps_fam_inst_env eps, fam_inst_env)
+              simpl_env = mkSimplEnv mode fam_envs
+
+        ; unit_results <- mapM (simplify_unit hpt_rule_env simpl_env shared_rules) units0
+        ; let (units1, unit_infos, unit_counts) = unzip3 unit_results
+              counts_out = foldr plusSimplCount zero_counts unit_counts
+              dyn_out = dyn_no_binds { dsd_binds = units1, dsd_rules = shared_rules }
 
         ; when (logHasDumpFlag logger Opt_D_verbose_core2core
                 && logHasDumpFlag logger Opt_D_dump_simpl_stats) $
           logDumpMsg logger
                   "Simplifier statistics for following pass"
-                  (vcat [text termination_msg <+> text "after" <+> ppr it_count
-                                              <+> text "iterations",
+                  (vcat [text "Simplifier finished per-unit iterations"
+                            <+> ppr (map snd unit_infos),
                          blankLine,
                          pprSimplCount counts_out])
 
-        ; return (counts_out, guts')
+        ; return (counts_out, dyn_out)
     }
   where
     this_mod = ssi_module static
@@ -213,154 +226,112 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
     -- the old bindings are retained until the end of all simplifier iterations
     !dyn_no_binds = DynamicSimplData { dsd_binds = [], dsd_rules = [] }
 
-    hpt_rule_env :: RuleEnv
-    hpt_rule_env = mkRuleEnv this_mod deps (dsd_rules dyn) (dsd_binds dyn)
-                             emptyRuleBase (so_hpt_rules opts)
-                   -- emptyRuleBase: no EPS rules yet; we will update
-                   -- them on each iteration to pick up the most up to date set
+    zero_counts = zeroSimplCount $ logHasDumpFlag logger Opt_D_dump_simpl_stats
 
-    do_iteration :: Int -- Counts iterations
-                 -> [SimplCount] -- Counts from earlier iterations, reversed
-                 -> CoreProgram  -- Bindings
-                 -> [CoreRule]   -- Local rules for imported Ids
-                 -> IO (String, Int, SimplCount, DynamicSimplData)
-
-    do_iteration iteration_no counts_so_far binds local_rules
-        -- iteration_no is the number of the iteration we are
-        -- about to begin, with '1' for the first
-      | iteration_no > max_iterations   -- Stop if we've run out of iterations
-      = warnPprTrace (debugIsOn && (max_iterations > 2))
-            "Simplifier bailing out"
-            ( hang (ppr this_mod <> text ", after"
-                    <+> int max_iterations <+> text "iterations"
-                    <+> (brackets $ hsep $ punctuate comma $
-                         map (int . simplCountN) (reverse counts_so_far)))
-                 2 (text "Size =" <+> ppr (coreBindsStats bind_list))) $
-
-                -- Subtract 1 from iteration_no to get the
-                -- number of iterations we actually completed
-        return ( "Simplifier bailed out", iteration_no - 1
-               , totalise counts_so_far
-               , dyn_no_binds { dsd_binds = binds, dsd_rules = local_rules } )
-
-      -- Try and force thunks off the binds; significantly reduces
-      -- space usage, especially with -O.  JRS, 000620.
-      | let sz = coreBindsSize bind_list
-      , () <- sz `seq` ()     -- Force it
-      = do {
-                -- Occurrence analysis
-           let { tagged_binds = {-# SCC "OccAnal" #-}
-                     occurAnalysePgm this_mod active_unf active_rule
-                                     local_rules binds
-               ; tagged_bind_list = concatMap coreCompUnitBinds tagged_binds
-               } ;
-           Logger.putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
-                     FormatCore
-                     (pprCoreBindings tagged_bind_list);
-
-                -- read_eps_rules:
-                -- We need to read rules from the EPS regularly because simplification can
-                -- poke on IdInfo thunks, which in turn brings in new rules
-                -- behind the scenes.  Otherwise there's a danger we'll simply
-                -- miss the rules for Ids hidden inside imported inlinings
-                -- Hence just before attempting to match a rule we read the EPS
-                -- value (via read_rule_env) and then combine it with the existing rule base.
-                -- See `GHC.Core.Opt.Simplify.Monad.getSimplRules`.
-          eps <- ueEPS unit_env ;
-           let  { -- base_rule_env contains
-                  --    (a) home package rules, fixed across all iterations
-                  --    (b) local rules (substituted), including unit rules from `binds`
-                  -- Forcing base_rule_env to avoid unnecessary allocations.
-                  -- Not doing so results in +25.6% allocations of LargeRecord.
-                ; fam_envs = (eps_fam_inst_env eps, fam_inst_env)
-                ; simpl_env = mkSimplEnv mode fam_envs } ;
-
-                -- Simplify each compilation unit independently
-           ((binds1, rules1), counts1) <-
-             simpl_comp_units simpl_env local_rules tagged_binds sz ;
-
-                -- Stop if nothing happened; don't dump output
-                -- See Note [Which transformations are innocuous] in GHC.Core.Opt.Stats
-           if isZeroSimplCount counts1 then
-                return ( "Simplifier reached fixed point", iteration_no
-                       , totalise (counts1 : counts_so_far)  -- Include "free" ticks
-                       , dyn_no_binds { dsd_binds = binds1, dsd_rules = rules1 } )
-           else do {
-                -- Short out indirections
-                -- We do this *after* at least one run of the simplifier
-                -- because indirection-shorting uses the export flag on *occurrences*
-                -- and that isn't guaranteed to be ok until after the first run propagates
-                -- stuff from the binding site to its occurrences
-                --
-                -- ToDo: alas, this means that indirection-shorting does not happen at all
-                --       if the simplifier does nothing (not common, I know, but unsavoury)
-           let { binds2 = {-# SCC "ZapInd" #-}
-                          [ CoreCompUnit (shortOutIndirections unit_binds) unit_rules'
-                          | CoreCompUnit unit_binds unit_rules' <- binds1 ] } ;
-
-                -- Dump the result of this iteration
-           dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts1
-             binds2 rules1 ;
-
-           for_ (so_pass_result_cfg opts) $ \pass_result_cfg ->
-             lintPassResult logger pass_result_cfg binds2 rules1 ;
-
-                -- Loop
-           do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
-           } }
-      where
-        bind_list = concatMap coreCompUnitBinds binds
-        -- Remember the counts_so_far are reversed
-        totalise :: [SimplCount] -> SimplCount
-        totalise = foldr (\c acc -> acc `plusSimplCount` c)
-                         (zeroSimplCount $ logHasDumpFlag logger Opt_D_dump_simpl_stats)
-
-    -- Keep top-level in-scope sets per-unit until CoreMerge.
-    simpl_comp_units
-      :: SimplEnv
+    simplify_unit
+      :: RuleEnv
+      -> SimplEnv
       -> [CoreRule]
-      -> CoreProgram
-      -> Int
-      -> IO ((CoreProgram, [CoreRule]), SimplCount)
-    simpl_comp_units simpl_env rules0 units0 sz = go rules0 [] zero_counts units0
+      -> CoreCompUnit
+      -> IO (CoreCompUnit, (String, Int), SimplCount)
+    simplify_unit hpt_rule_env simpl_env shared_rules unit0
+      = do_iteration 1 [] unit0
       where
-        zero_counts = zeroSimplCount $ logHasDumpFlag logger Opt_D_dump_simpl_stats
+        do_iteration :: Int -> [SimplCount] -> CoreCompUnit
+                     -> IO (CoreCompUnit, (String, Int), SimplCount)
+        do_iteration iteration_no counts_so_far unit
+          | iteration_no > max_iterations
+          = warnPprTrace (debugIsOn && (max_iterations > 2))
+                "Simplifier bailing out"
+                ( hang (ppr this_mod <> text ", after"
+                        <+> int max_iterations <+> text "iterations"
+                        <+> (brackets $ hsep $ punctuate comma $
+                             map (int . simplCountN) (reverse counts_so_far)))
+                     2 (text "Size =" <+> ppr (coreBindsStats bind_list))) $
+            return ( unit
+                   , ("Simplifier bailed out", iteration_no - 1)
+                   , totalise counts_so_far )
 
-        go !rules acc !counts [] = return ((reverse acc, rules), counts)
-        go !rules acc !counts (CoreCompUnit unit_binds unit_rules' : rest) = do
-          let unit_bndrs = mkVarSet (bindersOfBinds unit_binds)
-              (visible_rules, hidden_rules) = partitionVisibleImpRules unit_bndrs rules
-              !base_rule_env = updLocalRules hpt_rule_env (visible_rules ++ unit_rules')
-              read_eps_rules = eps_rule_base <$> ueEPS unit_env
-              read_rule_env = updExternalPackageRules base_rule_env <$> read_eps_rules
+          | let sz = coreBindsSize bind_list
+          , () <- sz `seq` ()
+          = do
+              let CoreCompUnit tagged_binds tagged_rules =
+                    {-# SCC "OccAnal" #-}
+                    occurAnalyseCompUnit this_mod active_unf active_rule shared_rules unit
 
-          ((unit1, visible_rules1), counts1) <-
-            initSmpl logger read_rule_env top_env_cfg sz $ do
-              (floats, env1) <- {-# SCC "SimplTopBindsUnit" #-}
-                                simplTopBinds simpl_env unit_binds
+              Logger.putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
+                        FormatCore
+                        (pprCoreBindings tagged_binds)
 
-              -- Apply substitutions from this unit to imported-head rules and
-              -- the unit's own rules. Keep each unit's local rules separate.
-              visible_rules1 <- simplImpRules env1 visible_rules
-              unit_rules1 <- simplImpRules env1 unit_rules'
+              let !base_rule_env = updLocalRules hpt_rule_env (shared_rules ++ tagged_rules)
+                  read_eps_rules = eps_rule_base <$> ueEPS unit_env
+                  read_rule_env = updExternalPackageRules base_rule_env <$> read_eps_rules
 
-              let unit_binds1 = getTopFloatBinds floats
-              pure (CoreCompUnit unit_binds1 unit_rules1, visible_rules1)
+              (unit1, counts1) <-
+                initSmpl logger read_rule_env top_env_cfg sz $ do
+                  (floats, env1) <- {-# SCC "SimplTopBindsUnit" #-}
+                                    simplTopBinds simpl_env tagged_binds
 
-          let rules1 = visible_rules1 ++ hidden_rules
-          go rules1 (unit1 : acc) (counts `plusSimplCount` counts1) rest
+                  unit_rules1 <- simplImpRules env1 tagged_rules
 
-    partitionVisibleImpRules :: VarSet -> [CoreRule] -> ([CoreRule], [CoreRule])
-    partitionVisibleImpRules unit_bndrs = foldr go_rule ([], [])
+                  let unit_binds1 = getTopFloatBinds floats
+                  pure (CoreCompUnit unit_binds1 unit_rules1)
+
+              if isZeroSimplCount counts1 then
+                return ( unit1
+                       , ("Simplifier reached fixed point", iteration_no)
+                       , totalise (counts1 : counts_so_far) )
+              else do
+                let unit2 =
+                      CoreCompUnit (shortOutIndirections (coreCompUnitBinds unit1))
+                                   (cu_rules unit1)
+
+                dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts1
+                  [unit2] shared_rules
+
+                for_ (so_pass_result_cfg opts) $ \pass_result_cfg ->
+                  lintPassResult logger pass_result_cfg [unit2] shared_rules
+
+                do_iteration (iteration_no + 1) (counts1 : counts_so_far) unit2
+          where
+            bind_list = coreCompUnitBinds unit
+
+        totalise :: [SimplCount] -> SimplCount
+        totalise = foldr (\c acc -> acc `plusSimplCount` c) zero_counts
+
+    distributeLocalRules
+      :: CoreProgram
+      -> [CoreRule]
+      -> ([CoreRule], CoreProgram)
+    distributeLocalRules units rules = foldr distribute_rule ([], units) rules
       where
-        go_rule rule (visible, hidden)
-          | rule_mentions_unit = (rule : visible, hidden)
-          | rule_has_local_fvs = (visible, rule : hidden)
-          | otherwise          = (rule : visible, hidden)
+        binder_unit_map = foldr add_unit emptyVarEnv (zip [0 :: Int ..] units)
+
+        add_unit (i, CoreCompUnit unit_binds _) env =
+          foldr (\v env' -> extendVarEnv env' v i) env (bindersOfBinds unit_binds)
+
+        distribute_rule rule (shared_rules, units_acc)
+          | null unit_indices = (rule : shared_rules, units_acc)
+          | [i] <- unit_indices = (shared_rules, addRuleToUnit i rule units_acc)
+          | otherwise = pprPanic "simplifyPgm'"
+              ( text "Local imported-head rule spans multiple compilation units"
+             $$ text "rule:" <+> ppr rule
+             $$ text "units:" <+> ppr unit_indices )
           where
             local_fvs = ruleFreeVars rule `intersectVarSet` all_local_bndrs
-            rule_has_local_fvs = not (isEmptyVarSet local_fvs)
-            rule_mentions_unit = not (isEmptyVarSet (local_fvs `intersectVarSet` unit_bndrs))
+            unit_indices = nonDetStrictFoldVarSet add_hit [] local_fvs
+
+            add_hit v hits = case lookupVarEnv binder_unit_map v of
+              Nothing -> hits
+              Just i
+                | i `elem` hits -> hits
+                | otherwise     -> i : hits
+
+        addRuleToUnit 0 rule (CoreCompUnit unit_binds unit_rules : units_acc) =
+          CoreCompUnit unit_binds (rule : unit_rules) : units_acc
+        addRuleToUnit n rule (unit : units_acc) =
+          unit : addRuleToUnit (n - 1) rule units_acc
+        addRuleToUnit _ _ [] = panic "distributeLocalRules"
 
     all_local_bndrs :: VarSet
     all_local_bndrs = mkVarSet (bindersOfBinds (concatMap coreCompUnitBinds (dsd_binds dyn)))
