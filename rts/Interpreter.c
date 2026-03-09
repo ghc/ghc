@@ -170,8 +170,113 @@ tag functions as tag inference currently doesn't rely on those being properly ta
 #define Sp_addW(n)   (Sp = Sp_plusW(n))
 #define Sp_subW(n)   (Sp = Sp_minusW(n))
 
-#define SpW(n)       (*(StgWord*)(Sp_plusW(n)))
-#define SpB(n)       (*(StgWord*)(Sp_plusB(n)))
+// Assumes stack location is within stack chunk bounds
+#define SpW(n)      (*(StgWord*)(Sp_plusW(n)))
+#define SpW64(n)    (*(StgWord*)(Sp_plusW64(n)))
+
+#define WITHIN_CAP_CHUNK_BOUNDS_W(n)  WITHIN_CHUNK_BOUNDS_W(n, cap->r.rCurrentTSO->stackobj)
+
+#define WITHIN_CHUNK_BOUNDS_W(n, s)  \
+    (RTS_LIKELY(((StgWord*) Sp_plusW(n)) < ((s)->stack + (s)->stack_size - sizeofW(StgUnderflowFrame))))
+
+/* Note [Checking for underflow frames]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   We look at the stack slot at offset sizeof(StgUnderflowFrame) from
+   the start of the chunk to check if we're in the first check chunk.
+   Every non-first stack chunk has an underflow frame header at that offset.
+
+   We really should change this check, since this stack slot in the first
+   chunk may not be the start of a stack frame and could in theory contain
+   an arbitrary value.
+
+   In practice we're unlikely to have interpreted frames that low on the stack.
+ */
+#define IS_UNDERFLOW_FRAME(info) \
+    ((info) == &stg_stack_underflow_frame_d_info ||   \
+     (info) == &stg_stack_underflow_frame_v16_info || \
+     (info) == &stg_stack_underflow_frame_v32_info || \
+     (info) == &stg_stack_underflow_frame_v64_info)
+
+#define W64_TO_WDS(n) ((n * sizeof(StgWord64) / sizeof(StgWord)))
+
+// Always safe to use - Return the value at the address
+#define ReadSpW(n)       (*((StgWord*)   SafeSpWP(n)))
+//Argument is offset in multiples of word64
+#define ReadSpW64(n)     (*((StgWord64*) SafeSpWP(W64_TO_WDS(n))))
+// Perhaps confusingly this still reads a full word, merely the offset is in bytes.
+#define ReadSpB(n)       (*((StgWord*)   SafeSpBP(n)))
+
+/* Note [PUSH_L underflow]
+   ~~~~~~~~~~~~~~~~~~~~~~~
+BCOs can be nested, resulting in nested BCO stack frames where the inner most
+stack frame can refer to variables stored on earlier stack frames via the
+PUSH_L instruction.
+
+|---------|
+|  BCO_1  | -<-┐
+|---------|
+ .........     |
+|---------|    | PUSH_L <n>
+|  BCO_N  | ->-┘
+|---------|
+
+Here BCO_N is syntactically nested within the code for BCO_1 and will result
+in code that references the prior stack frame of BCO_1 for some of it's local
+variables. If a stack overflow happens between the creation of the stack frame
+for BCO_1 and BCO_N the RTS might move BCO_N to a new stack chunk while leaving
+BCO_1 in place, invalidating a simple offset based reference to the outer stack
+frames.
+Therefore `SafeSpW` first performs a bounds check to ensure that accesses onto
+the stack will succeed. If the target address would not be a valid location for
+the current stack chunk then `slow_sp` function is called, which dereferences
+the underflow frame to adjust the offset before performing the lookup.
+
+               ┌->--x   |  CHK_1  |
+|  CHK_2  |    |    |   |---------|
+|---------|    |    └-> |  BCO_1  |
+| UD_FLOW | -- x        |---------|
+|---------|    |
+| ......  |    |
+|---------|    | PUSH_L <n>
+|  BCO_ N | ->-┘
+|---------|
+
+To keep things simpler all accesses to the stack which might go beyond the stack
+chunk go through one of the ReadSP* or SafeSP* macros.
+When writing to the stack there is no need for checks, we ensured we have space
+in the current chunk ahead of time. So there we use SpW and it's variants which
+omit the stack bounds check.
+
+See ticket #25750
+
+*/
+
+// Returns a pointer to the stack location.
+#define SafeSpWP(n)      \
+  ( ((WITHIN_CAP_CHUNK_BOUNDS_W(n)) ? Sp_plusW(n) : slow_spw(Sp, cap->r.rCurrentTSO->stackobj, n)))
+#define SafeSpBP(off_w)      \
+  ( (WITHIN_CAP_CHUNK_BOUNDS_W((1+(off_w))/sizeof(StgWord))) ? \
+        Sp_plusB(off_w) : \
+        (void*)((ptrdiff_t)((ptrdiff_t)(off_w) % (ptrdiff_t)sizeof(StgWord)) + (StgWord8*)slow_spw(Sp, cap->r.rCurrentTSO->stackobj, (off_w)/sizeof(StgWord))) \
+    )
+
+
+
+/* Note [Interpreter subword primops]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general the interpreter stack is host-platform word aligned.
+We keep with this convention when evaluating primops for simplicity.
+
+This means:
+
+* All arguments are pushed extended to word size.
+* Results are written to the stack extended to word size.
+
+The only exception are constructor allocations where we push unaligned subwords
+on the stack which are cleaned up by the PACK instruction afterwards.
+
+*/
 
 STATIC_INLINE StgPtr
 allocate_NONUPD (Capability *cap, int n_words)
@@ -307,6 +412,52 @@ StgClosure * copyPAP  (Capability *cap, StgPAP *oldpap)
 }
 
 #endif
+
+// See Note [PUSH_L underflow] for in which situations this
+// slow lookup is needed
+// Returns a pointer to the stack location.
+static void*
+slow_spw(void *Sp, StgStack *cur_stack, StgWord offset_words){
+  // 1. If in range, simply return ptr+offset_words pointing into the current stack chunk
+  if (WITHIN_CHUNK_BOUNDS_W(offset_words, cur_stack)) {
+    return Sp_plusW(offset_words);
+  }
+  // 2. Not in this stack chunk, so access the underflow frame.
+  else {
+    StgWord stackWords;
+    StgUnderflowFrame *frame;
+    StgStack *new_stack;
+
+    frame = (StgUnderflowFrame*)(cur_stack->stack + cur_stack->stack_size
+               - sizeofW(StgUnderflowFrame));
+
+    // 2a. Check it is an underflow frame (the first stack chunk won't have one).
+    //     See Note [Checking for underflow frames]
+    if( IS_UNDERFLOW_FRAME(frame->info) )
+    {
+
+      INTERP_TICK(it_underflow_lookups);
+
+      new_stack = (StgStack*)frame->next_chunk;
+
+      // How many words were on the stack
+      stackWords = (StgWord *)frame - (StgWord *) Sp;
+      ASSERT(offset_words > stackWords);
+
+      // Recursive, in the very unlikely case we have to traverse two
+      // stack chunks.
+      return slow_spw(new_stack->sp, new_stack, offset_words-stackWords);
+    }
+    // 2b. Access the element if there is no underflow frame, it must be right
+    // at the top of the stack.
+    else if(Sp_plusW(offset_words) < (StgPtr)(cur_stack->stack + cur_stack->stack_size)) {
+        // Still inside the stack chunk
+        return Sp_plusW(offset_words);
+    } else {
+        barf("slow_spw: offset_words %d is out of bounds", (int)offset_words);
+    }
+  }
+}
 
 // Compute the pointer tag for the constructor and tag the pointer;
 // see Note [Data constructor dynamic tags] in GHC.StgToCmm.Closure.
@@ -1629,9 +1780,44 @@ run_BCO:
         case bci_SLIDE: {
             W_ n  = BCO_GET_LARGE_ARG;
             W_ by = BCO_GET_LARGE_ARG;
-            /* a_1, .. a_n, b_1, .. b_by, s => a_1, .. a_n, s */
-            while(n-- > 0) {
-                SpW(n+by) = SpW(n);
+            /*
+             * a_1 ... a_n, b_1 ... b_by, k
+             *           =>
+             * a_1 ... a_n, k
+             */
+            if (n == 0 || WITHIN_CAP_CHUNK_BOUNDS_W(n - 1 + by)) {
+                while(n-- > 0) {
+                    SpW(n+by) = ReadSpW(n);
+                }
+            } else {
+                // We write across a chunk boundary: Use safe access
+                while(n-- > 0) {
+                    *((StgWord*)SafeSpWP(n+by)) = ReadSpW(n);
+                }
+            }
+
+            // If we SLIDE Sp past the chunk bounds we need to handle the underflow
+            // (possibly multiple times)
+            while (!WITHIN_CAP_CHUNK_BOUNDS_W(by)) {
+                StgStack *stk = cap->r.rCurrentTSO->stackobj;
+                StgUnderflowFrame *uf = (StgUnderflowFrame*)
+                    (stk->stack + stk->stack_size
+                     - sizeofW(StgUnderflowFrame));
+                // See Note [Checking for underflow frames]
+                if (IS_UNDERFLOW_FRAME(uf->info)) {
+                    W_ sp_to_uf = (StgWord*)uf - (StgWord*)Sp;
+                    Sp = (StgPtr)uf;
+                    SAVE_STACK_POINTERS;
+                    threadStackUnderflow(cap, cap->r.rCurrentTSO);
+                    LOAD_STACK_POINTERS;
+                    by -= sp_to_uf;
+                } else if (Sp_plusW(by) < (StgPtr)(stk->stack + stk->stack_size)) {
+                    // we're within the first stack chunk, this chunk has
+                    // no underflow frame
+                    break;
+                } else {
+                    barf("bci_SLIDE: Sp+by outside stack bounds");
+                }
             }
             Sp_addW(by);
             INTERP_TICK(it_slides);
