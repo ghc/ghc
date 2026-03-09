@@ -1961,18 +1961,20 @@ mkErrCtxt env ctxts
  = go False 0 env ctxts -- regular error ctx
  where
    go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
-   go _ _ _   [] = return []
+   go _ _ _ [] = return []
    go dbg n env (MkErrCtxt LandmarkUserSrcCode ctxt : ctxts)
-     = do { -- (env', msg) <- liftZonkM $ emptyTidyEnv env
-          ; rest <- go dbg n env ctxts
-          ; return (ctxt : rest) }
+     = do { (env', msg) <- liftZonkM $ zonkTidyErrCtxtMsg env ctxt
+          ; rest <- go dbg n env' ctxts
+          ; return (msg : rest) }
    go dbg n env (MkErrCtxt _ ctxt : ctxts)
      | n < mAX_CONTEXTS -- Too verbose || dbg
-     = do { -- (env', msg) <- liftZonkM $ emptyTidyEnv env
-          ; rest <- go dbg (n+1) env ctxts
-          ; return (ctxt : rest) }
-     | otherwise
-     = go dbg n env ctxts -- need to compute this for zonking
+     = do { (env', msg) <- liftZonkM $ zonkTidyErrCtxtMsg env ctxt
+          ; rest <- go dbg (n+1) env' ctxts
+          ; return (msg : rest) }
+     | otherwise  -- need to compute this for zonking
+     = do { (env', _) <- liftZonkM $ zonkTidyErrCtxtMsg env ctxt
+          ; go dbg n env' ctxts
+          }
 
 
 mAX_CONTEXTS :: Int     -- No more than this number of non-landmark contexts
