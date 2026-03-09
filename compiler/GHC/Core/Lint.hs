@@ -3353,7 +3353,7 @@ initL cfg m
     env = LE { le_flags   = l_flags cfg
              , le_subst   = mkEmptySubst (mkInScopeSetList vars)
              , le_level   = init_level
-             , le_in_vars = mkVarEnv [ (v,(v, varType v)) | v <- vars ]
+             , le_in_vars = mkVarEnv [ (v,(v, varType v, init_level)) | v <- vars ]
              , le_joins   = emptyUniqMap
              , le_loc     = []
              , le_ue_aliases = emptyNameEnv
