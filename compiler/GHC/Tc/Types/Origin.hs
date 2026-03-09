@@ -431,7 +431,7 @@ data CtOrigin
   | ProvCtxtOrigin      -- The "provided" context of a pattern synonym signature
         (PatSynBind GhcRn GhcRn) -- Information about the pattern synonym, in
                                  -- particular the name and the right-hand side
-  | RecordUpdOrigin (LHsRecUpdFields GhcRn)
+  | RecordUpdOrigin
   | ViewPatOrigin
 
   -- | 'ScOrigin' is used only for the Wanted constraints for the
@@ -623,7 +623,7 @@ exprCtOrigin (HsFunArr {})        = Shouldn'tHappenOrigin "function arrow"      
 exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIf {})            = IfThenElseOrigin
 exprCtOrigin (HsProjection _ p)   = RecordFieldProjectionOrigin (FieldLabelStrings $ fmap noLocA p)
-exprCtOrigin (RecordUpd _ _ flds) = RecordUpdOrigin flds
+exprCtOrigin (RecordUpd{})        = RecordUpdOrigin
 exprCtOrigin (HsGetField _ _ f)   = GetFieldOrigin (fmap field_label $ dfoLabel (unLoc f))
 exprCtOrigin (XExpr (ExpandedThingRn o _)) = errCtxtCtOrigin o
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
@@ -639,6 +639,7 @@ errCtxtCtOrigin (FunAppCtxt (FunAppCtxtExpr _ e) _) = exprCtOrigin e
 errCtxtCtOrigin (StmtErrCtxt{}) = DoStmtOrigin
 errCtxtCtOrigin (DoStmtErrCtxt{}) = DoStmtOrigin
 errCtxtCtOrigin (StmtErrCtxtPat _ _ p) = DoPatOrigin p
+errCtxtCtOrigin (RecordUpdCtxt{}) = RecordUpdOrigin
 errCtxtCtOrigin _ = Shouldn'tHappenOrigin "errCtxtCtOrigin"
 
 
@@ -1168,8 +1169,8 @@ pprFixedRuntimeRepContext FRRBindStmtGuard
   = sep [ text "The body of the bind statement" ]
 pprFixedRuntimeRepContext (FRRArrow arrowContext)
   = pprFRRArrowContext arrowContext
-pprFixedRuntimeRepContext (FRRExpectedFunTy funTyOrig _)
-  = pprExpectedFunTyHerald funTyOrig
+pprFixedRuntimeRepContext (FRRExpectedFunTy funTyOrig i)
+  = pprExpectedFunTyCtxt funTyOrig i
 pprFixedRuntimeRepContext (FRRDeepSubsumption is_exp pos mb_fun)
   = hsep [ text "The", what, text "type of the"
          , ppr (Argument pos)
