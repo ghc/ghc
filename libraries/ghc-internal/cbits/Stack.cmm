@@ -8,9 +8,11 @@
 // developed.
 #if defined(StgStack_marking)
 
-// Returns the next stackframe's StgStack* and offset in it. And, an indicator
-// if this frame is the last one (`hasNext` bit.)
-// (StgStack*, StgWord, StgWord) advanceStackFrameLocationzh(StgStack* stack, StgWord offsetWords)
+// Returns the next stackframe location as
+//   (# (# #) | (# StgStack*, StgWord #) #)
+// flattened to its runtime representation:
+//   (tag, StgStack*, StgWord)
+// where tag 1 means no next frame and tag 2 means the payload is present.
 advanceStackFrameLocationzh (P_ stack, W_ offsetWords) {
   W_ frameSize;
   (frameSize) = ccall stackFrameSize(stack, offsetWords);
@@ -27,27 +29,30 @@ advanceStackFrameLocationzh (P_ stack, W_ offsetWords) {
   stackSizeInBytes = WDS(stackSize);
   stackBottom = stackSizeInBytes + stackArrayPtr;
 
+  W_ tag, newOffsetWords;
   P_ newStack;
-  W_ newOffsetWords, hasNext;
   if(nextClosurePtr < stackBottom) (likely: True) {
+    tag = 2;
     newStack = stack;
     newOffsetWords = offsetWords + frameSize;
-    hasNext = 1;
   } else {
     P_ underflowFrameStack;
     (underflowFrameStack) = ccall getUnderflowFrameStack(stack, offsetWords);
     if (underflowFrameStack == NULL) (likely: True) {
-      newStack = NULL;
-      newOffsetWords = NULL;
-      hasNext = NULL;
+      // The empty alternative still has dead payload slots in the flattened
+      // sum representation, so the pointer field must contain a valid closure
+      // pointer rather than NULL.
+      tag = 1;
+      newStack = stack;
+      newOffsetWords = 0;
     } else {
+      tag = 2;
       newStack = underflowFrameStack;
-      newOffsetWords = NULL;
-      hasNext = 1;
+      newOffsetWords = 0;
     }
   }
 
-  return (newStack, newOffsetWords, hasNext);
+  return (tag, newStack, newOffsetWords);
 }
 
 // (StgWord, StgWord) getSmallBitmapzh(StgStack* stack, StgWord offsetWords)
