@@ -59,14 +59,17 @@ compilePackage rs = do
       -- When building dynamically we depend on the static rule if shared libs
       -- are supported, because it will add the -dynamic-too flag when
       -- compiling to build the dynamic files alongside the static files
-      ( root -/- "**/build/**/*.dyn_o" :& root -/- "**/build/**/*.dyn_hi" :& Nil )
+      forM_ wayPats $ \wayPat -> ( root -/- ("**/build/**/*." ++ wayPat ++ "dyn_o") :& root -/- ("**/build/**/*." ++ wayPat ++ "dyn_hi") :& Nil )
         &%> \ ( dyn_o :& _dyn_hi :& _ ) -> do
           p <- platformSupportsSharedLibs
           if p
             then do
+               b <- parsePath (parseBuildObject root) "<object file path parser>" dyn_o
+               let ctx = objectContext b
+                   way = removeWayUnit Dynamic $ C.way ctx
                -- We `need` ".o/.hi" because GHC is called with `-dynamic-too`
                -- and builds ".dyn_o/.dyn_hi" too.
-               changed <- needHasChanged [dyn_o -<.> "o", dyn_o -<.> "hi"]
+               changed <- needHasChanged [dyn_o -<.> osuf way, dyn_o -<.> hisuf way]
 
                -- If for some reason a previous Hadrian execution has been
                -- interrupted after the rule for .o/.hi generation has completed
