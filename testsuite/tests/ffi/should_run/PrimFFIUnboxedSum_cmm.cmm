@@ -1,0 +1,9 @@
+#include "Cmm.h"
+
+sumWord(W_ w) {
+  if (w == 0) {
+    return (1, 0);
+  } else {
+    return (2, w + 1);
+  }
+}
