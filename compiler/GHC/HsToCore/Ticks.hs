@@ -417,6 +417,8 @@ addTickLHsExpr e@(L pos e0) = do
     TickForBreakPoints | isGoodBreakExpr e0 -> tick_it
     TickForCoverage    | XExpr (ExpandedThingTc StmtErrCtxt{} _) <- e0 -- expansion ticks are handled separately
                        -> dont_tick_it
+                       | XExpr (ExpandedThingTc DoStmtErrCtxt{} _) <- e0 -- expansion ticks are handled separately
+                       -> dont_tick_it
                        | otherwise -> tick_it
     TickCallSites      | isCallSite e0      -> tick_it
     _other             -> dont_tick_it
@@ -485,6 +487,7 @@ addTickLHsExprNever (L pos e0) = do
 -- values) are good break points.
 isGoodBreakExpr :: HsExpr GhcTc -> Bool
 isGoodBreakExpr (XExpr (ExpandedThingTc (StmtErrCtxt{}) _)) = False
+isGoodBreakExpr (XExpr (ExpandedThingTc (DoStmtErrCtxt{}) _)) = False
 isGoodBreakExpr e = isCallSite e
 
 isCallSite :: HsExpr GhcTc -> Bool
