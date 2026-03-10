@@ -704,9 +704,6 @@ rnStringLit = convertStringLit
 
 -- |
 -- Change the GHC pass from the current 'Pass' to the 'Typechecked' pass.
--- This function can safely accept any GHC 'Pass; as the input,
--- because 'Typechecked' is the final 'Pass'. Note that this permits the
--- "no-op" of going from 'Typechecked' to 'Typechecked'.
 {-# INLINE[1] tcStringLit #-}
 {-# RULES "tcStringLit/id" tcStringLit = id #-}
 tcStringLit :: StringLiteral (GhcPass p) -> StringLiteral GhcTc
