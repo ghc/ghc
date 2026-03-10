@@ -6,6 +6,7 @@ import Control.Exception
 import System.IO
 import System.Exit
 import System.Process
+import GHC.Conc (threadStatus, ThreadStatus(..), BlockReason(..))
 import GHC.IO.Handle.FD
 
 main = do
@@ -22,7 +23,14 @@ main = do
                 putMVar passed True
              else print e
              throwIO e
-      threadDelay 1000
+      let waitUntilBlocked = do
+            st <- threadStatus opener
+            case st of
+              ThreadBlocked BlockedOnForeignCall -> return ()
+              ThreadFinished -> return ()
+              ThreadDied     -> return ()
+              _              -> threadDelay 100 >> waitUntilBlocked
+      waitUntilBlocked
       forkIO $ killThread opener
       forkIO $ do
         threadDelay (10^6)
