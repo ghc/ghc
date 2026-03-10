@@ -1484,7 +1484,7 @@ pprExpectedFunTyCtxt funTy_origin i =
   case funTy_origin of
     ExpectedFunTySyntaxOp orig op ->
       vcat [ sep [ the_arg_of
-                 , text "The rebindable syntax operator"
+                 , text "the rebindable syntax operator"
                  , quotes (ppr op) ]
            , nest 2 (ppr orig) ]
     ExpectedTySyntax orig arg ->
