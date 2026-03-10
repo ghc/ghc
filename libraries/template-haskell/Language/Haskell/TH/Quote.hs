@@ -23,7 +23,6 @@ module Language.Haskell.TH.Quote
   ) where
 
 import GHC.Boot.TH.Monad
-import GHC.Boot.TH.Quote
 import Language.Haskell.TH.Syntax (dataToQa, dataToExpQ, dataToPatQ)
 
 
