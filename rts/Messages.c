@@ -135,7 +135,7 @@ loop:
     }
     else if(i == &stg_MSG_CLONE_STACK_info){
         MessageCloneStack *cloneStackMessage = (MessageCloneStack*) m;
-        handleCloneStackMessage(cloneStackMessage);
+        handleCloneStackMessage(cap, cloneStackMessage);
     }
     else
     {
