@@ -66,6 +66,7 @@ import GHC.Types.Unique.Supply ( UniqueTag(..) )
 
 import Control.Monad
 import GHC.Unit.Module
+import GHC.Conc (getNumCapabilities)
 
 {-
 ************************************************************************
@@ -484,7 +485,8 @@ doCorePass pass guts = do
                                  updateBindsAndRulesM (desugarOpt dflags logger (mg_module guts))
 
     CoreSplit                 -> {-# SCC "CoreSplit" #-}
-                                 do { let split_res = map (splitCompUnit (mg_module guts) (mg_boot_exports guts) (mg_rules guts)) (mg_binds guts)
+                                 do { n_threads <- liftIO getNumCapabilities
+                                    ; let split_res = map (splitCompUnit n_threads (mg_module guts) (mg_boot_exports guts) (mg_rules guts)) (mg_binds guts)
                                           binds' = concatMap fst split_res
                                           rules' = mg_rules guts ++ concatMap snd split_res
                                     ; return guts { mg_binds = binds', mg_rules = rules' } }

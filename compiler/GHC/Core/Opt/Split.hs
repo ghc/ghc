@@ -27,6 +27,8 @@ import GHC.Utils.Panic
 
 import GHC.Unit.Module (Module)
 
+import Data.List (foldl', sortOn)
+import Data.Ord (Down(..))
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
 
@@ -236,11 +238,11 @@ pprVarWithModule v
 
 -- After optimizations a rule might no longer reference binders from this module.
 -- In these cases we return them here and then add them to mg_rules.
-splitCompUnit :: Module -> NameSet -> [CoreRule] -> CoreCompUnit -> ([CoreCompUnit], [CoreRule])
-splitCompUnit this_module boot_exported imp_rules unit
+splitCompUnit :: Int -> Module -> NameSet -> [CoreRule] -> CoreCompUnit -> ([CoreCompUnit], [CoreRule])
+splitCompUnit n_threads this_module boot_exported imp_rules unit
   | not boot_exported_is_empty = single_comp_unit
   | otherwise
-  = let comp_units = map mk_comp_unit components_with_rules
+  = let comp_units = combineCompUnits max_units (map mk_comp_unit components_with_rules)
         result = (comp_units, rules_for_imps ++ rules_without_component)
     in -- pprTrace "CoreSplitTrace" (pprSplitTrace comp_units) $
        checkNameClashes comp_units `seq`
@@ -275,8 +277,59 @@ splitCompUnit this_module boot_exported imp_rules unit
     mk_comp_unit (_, binds, rules) = CoreCompUnit binds rules
 
     boot_exported_is_empty = isEmptyNameSet boot_exported
+    max_units = max 1 (2 * n_threads)
 
     single_comp_unit = ([unit], [])
+
+combineCompUnits :: Int -> [CoreCompUnit] -> [CoreCompUnit]
+combineCompUnits max_units units
+  | length units <= max_units = units
+  | otherwise = map finishBucket (IntMap.elems final_buckets)
+  where
+    initial_buckets =
+      IntMap.fromDistinctAscList
+        [ (i, Bucket 0 [] [])
+        | i <- [0 .. max_units - 1]
+        ]
+
+    final_buckets =
+      foldl' assignUnit initial_buckets sorted_units
+
+    sorted_units =
+      sortOn (Down . unitSize . snd) (zip [0 :: Int ..] units)
+
+    assignUnit buckets (_, unit) =
+      IntMap.adjust (addUnit unit) target_bucket buckets
+      where
+        target_bucket = smallestBucket buckets
+
+    smallestBucket buckets =
+      case IntMap.toAscList buckets of
+        [] -> panic "combineCompUnits.smallestBucket: empty bucket map"
+        b : bs -> fst (foldl' choose_bucket b bs)
+
+    choose_bucket best@(i1, b1) candidate@(i2, b2)
+      | (bucketSize b2, i2) < (bucketSize b1, i1) = candidate
+      | otherwise                                  = best
+
+    finishBucket (Bucket _ binds_acc rules_acc) =
+      CoreCompUnit (reverse binds_acc) (reverse rules_acc)
+
+    unitSize = coreBindsSize . coreCompUnitBinds
+
+data Bucket = Bucket
+  { bucketSize  :: !Int
+  , bucketBinds :: [CoreBind]
+  , bucketRules :: [CoreRule]
+  }
+
+addUnit :: CoreCompUnit -> Bucket -> Bucket
+addUnit (CoreCompUnit binds rules) (Bucket sz binds_acc rules_acc) =
+  Bucket
+    { bucketSize = sz + coreBindsSize binds
+    , bucketBinds = foldl' (flip (:)) binds_acc binds
+    , bucketRules = foldl' (flip (:)) rules_acc rules
+    }
 
 checkNameClashes :: [CoreCompUnit] -> ()
 checkNameClashes comp_units
