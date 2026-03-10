@@ -17,7 +17,7 @@ void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar);
 #include "BeginPrivate.h"
 
 #if defined(THREADED_RTS)
-void handleCloneStackMessage(MessageCloneStack *msg);
+void handleCloneStackMessage(Capability *cap, MessageCloneStack *msg);
 #endif
 
 #include "EndPrivate.h"
