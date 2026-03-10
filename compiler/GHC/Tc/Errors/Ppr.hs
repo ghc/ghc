@@ -7884,8 +7884,7 @@ pprErrCtxtMsg = \case
     -> hang (text "In a stmt of" <+> pprAStmtContext ctxt <> colon)
        2 (ppr_stmt (unLoc stmt))
 
-  StmtErrCtxtPat _ _ pat ->
-    hang (text "In the pattern:") 2 (ppr pat)
+  StmtErrCtxtPat{} -> empty
 
   DerivInstCtxt pred ->
     text "When deriving the instance for" <+> parens (ppr pred)

@@ -805,9 +805,6 @@ zonkTidyErrCtxtMsg env e@(ExprCtxt{}) = return (env, e)
 zonkTidyErrCtxtMsg env (ThetaCtxt ctxt theta_ty) = do
   (env', theta_ty') <- zonkTidyTcTypes env theta_ty
   return $ (env', ThetaCtxt ctxt theta_ty')
--- zonkTidyErrCtxtMsg env (QuantifiedCtCtxt ty) = do
---   (env', ty') <- zonkTidyTcTypes env ty
---   return $ QuantifiedCtCtxt ty'
 zonkTidyErrCtxtMsg env (InferredTypeCtxt n ty) = do
   (env', ty') <- zonkTidyTcType env ty
   return $ (env', InferredTypeCtxt n ty')
@@ -826,4 +823,7 @@ zonkTidyErrCtxtMsg env (FunResCtxt e i1 ty1 ty2 i2 i3) = do
   (env', ty1') <- zonkTidyTcType env ty1
   (env', ty2') <- zonkTidyTcType env' ty2
   return $ (env', FunResCtxt e i1 ty1' ty2' i2 i3)
+-- zonkTidyErrCtxtMsg env (PatSigErrCtxt sig_ty res_ty) = do
+--   (env', sig_ty) <- zonkTidyTcType env sig_ty
+--   (env', res_ty) <- zonkZidy
 zonkTidyErrCtxtMsg env p = return (env, p)

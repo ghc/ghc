@@ -638,7 +638,7 @@ errCtxtCtOrigin (ExprCtxt e) = exprCtOrigin e
 errCtxtCtOrigin (FunAppCtxt (FunAppCtxtExpr _ e) _) = exprCtOrigin e
 errCtxtCtOrigin (StmtErrCtxt{}) = DoStmtOrigin
 errCtxtCtOrigin (DoStmtErrCtxt{}) = DoStmtOrigin
-errCtxtCtOrigin (StmtErrCtxtPat _ _ p) = DoPatOrigin p
+errCtxtCtOrigin (StmtErrCtxtPat p) = DoPatOrigin p
 errCtxtCtOrigin (RecordUpdCtxt{}) = RecordUpdOrigin
 errCtxtCtOrigin _ = Shouldn'tHappenOrigin "errCtxtCtOrigin"
 
@@ -1484,11 +1484,11 @@ pprExpectedFunTyCtxt funTy_origin i =
   case funTy_origin of
     ExpectedFunTySyntaxOp orig op ->
       vcat [ sep [ the_arg_of
-                 , text "the rebindable syntax operator"
+                 , text "The rebindable syntax operator"
                  , quotes (ppr op) ]
            , nest 2 (ppr orig) ]
     ExpectedTySyntax orig arg ->
-      vcat [ text "the expression" <+> quotes (ppr arg)
+      vcat [ text "The expression" <+> quotes (ppr arg)
            , nest 2 (ppr orig) ]
     ExpectedFunTyViewPat expr ->
       vcat [ the_arg_of <+> text "the view pattern"
