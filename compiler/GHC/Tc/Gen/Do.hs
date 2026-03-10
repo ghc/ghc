@@ -106,7 +106,7 @@ expand_do_stmts doFlavour (stmt@(L loc (BindStmt xbsrn pat e)): lstmts)
 --    -------------------------------------------------------
 --       pat <- e ; stmts   ~~> (>>=) e f
   = do expand_stmts_expr <- expand_do_stmts doFlavour lstmts
-       failable_expr <- mk_failable_expr doFlavour pat stmt expand_stmts_expr fail_op
+       failable_expr <- mk_failable_expr doFlavour pat expand_stmts_expr fail_op
        let expansion = genHsExpApps bind_op  -- (>>=)
                        [ e
                        , failable_expr ]
@@ -177,9 +177,9 @@ expand_do_stmts doFlavour
 expand_do_stmts _ stmts = pprPanic "expand_do_stmts: impossible happened" $ (ppr stmts)
 
 -- checks the pattern `pat` for irrefutability which decides if we need to wrap it with a fail block
-mk_failable_expr :: HsDoFlavour -> LPat GhcRn -> ExprLStmt GhcRn -> LHsExpr GhcRn
+mk_failable_expr :: HsDoFlavour -> LPat GhcRn -> LHsExpr GhcRn
                  -> FailOperator GhcRn -> TcM (LHsExpr GhcRn)
-mk_failable_expr doFlav lpat stmt expr fail_op =
+mk_failable_expr doFlav lpat expr fail_op =
   do { is_strict <- xoptM LangExt.Strict
      ; hscEnv <- getTopEnv
      ; rdrEnv <- getGlobalRdrEnv
@@ -191,16 +191,16 @@ mk_failable_expr doFlav lpat stmt expr fail_op =
      ; if irrf_pat -- don't wrap with fail block if
                    -- the pattern is irrefutable
        then return $ genHsLamDoExp doFlav [lpat] expr
-       else wrapGenSpan <$> mk_fail_block doFlav lpat stmt expr fail_op
+       else wrapGenSpan <$> mk_fail_block doFlav lpat expr fail_op
      }
 
 -- | Makes the fail block with a given fail_op
 -- mk_fail_block pat rhs fail builds
 -- \x. case x of {pat -> rhs; _ -> fail "Pattern match failure..."}
 mk_fail_block :: HsDoFlavour
-              -> LPat GhcRn -> ExprLStmt GhcRn
+              -> LPat GhcRn
               -> LHsExpr GhcRn -> FailOperator GhcRn -> TcM (HsExpr GhcRn)
-mk_fail_block doFlav pat stmt e (Just (SyntaxExprRn fail_op)) =
+mk_fail_block doFlav pat e (Just (SyntaxExprRn fail_op)) =
   do  dflags <- getDynFlags
       return $ HsLam noAnn LamCases $ mkMatchGroup (doExpansionOrigin doFlav) -- \
                 (wrapGenSpan [ genHsCaseAltDoExp doFlav pat e                 --  pat -> expr
@@ -218,10 +218,10 @@ mk_fail_block doFlav pat stmt e (Just (SyntaxExprRn fail_op)) =
           mk_fail_msg_expr :: DynFlags -> LPat GhcRn -> LHsExpr GhcRn
           mk_fail_msg_expr dflags pat
             = nlHsLit $ mkHsString $ showPpr dflags $
-              text "Pattern match failure in" <+> pprHsDoFlavour (DoExpr Nothing)
+              text "Pattern match failure in" <+> pprHsDoFlavour doFlav
                    <+> text "at" <+> ppr (getLocA pat)
 
-mk_fail_block _ _ _ _ _ = pprPanic "mk_fail_block: impossible happened" empty
+mk_fail_block _ _ _ _ = pprPanic "mk_fail_block: impossible happened" empty
 
 
 {- Note [Expanding HsDo with XXExprGhcRn]
