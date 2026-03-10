@@ -165,7 +165,9 @@ extern IOManagerType iomgr_type;
  * in the base library to tell us which style of I/O manager we are using: one
  * that uses the Windows native API HANDLEs, or one that uses Posix style fds.
  */
+#include "EndPrivate.h"
 extern bool rts_IOManagerIsWin32Native;
+#include "BeginPrivate.h"
 #endif
 
 

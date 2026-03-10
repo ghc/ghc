@@ -1,0 +1,4 @@
+LIBRARY libHSghc-internal-9.1500.0-ghc9.15.20260202.dll
+
+EXPORTS
+    init_ghc_hs_iface

@@ -39,6 +39,7 @@ data BuildInfo = BuildInfo {
     buildOptions :: [CmdOption],
     -- | Resources to be acquired.
     buildResources :: [(Resource, Int)] }
+  deriving Show
 
 class ShakeValue b => Builder b where
     -- | The path to a builder.

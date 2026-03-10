@@ -296,7 +296,7 @@ instance H.Builder Builder where
         _ -> error $ "Builder " ++ show builder ++ " can not be asked!"
 
     runBuilderWith :: Builder -> BuildInfo -> Action ()
-    runBuilderWith builder BuildInfo {..} = do
+    runBuilderWith builder buildinfo@BuildInfo {..} = do
         path <- builderPath builder
         withResources buildResources $ do
             verbosity <- getVerbosity
@@ -357,7 +357,7 @@ instance H.Builder Builder where
                   runGhcWithResponse path buildArgs buildInputs
 
                 Ghc LinkHs _ -> do
-                  runGhcWithResponse path buildArgs buildInputs
+                  runGhcWithResponse path ["-v"] buildArgs
 
                 HsCpp    -> captureStdout
 

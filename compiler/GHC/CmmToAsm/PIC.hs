@@ -544,6 +544,9 @@ needImportedSymbols config
         = ncgExternalDynamicRefs config &&
           not (ncgPIC config)
 
+        | os == OSMinGW32
+        = True
+
         | otherwise
         = False
    where
@@ -607,6 +610,8 @@ pprGotDeclaration config = case (arch,os) of
                 -- See Note [.LCTOC1 in PPC PIC code]
                 text ".section \".got2\",\"aw\"",
                 text ".LCTOC1 = .+32768" ]
+
+   (ArchX86_64, OSMinGW32) -> empty
 
    _ -> panic "pprGotDeclaration: no match"
  where

@@ -131,6 +131,21 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                  -- This lets us link against DLLs without needing an "import library"
                  ++ [Option "-Wl,--enable-auto-import"]
 
+                 -- Disable MinGW pseudo-relocations. Paeudo relocations is a
+                 -- feature of the mingw linkers and runtime support libs, to
+                 -- allow greater compatibility with unix software that does
+                 -- not declare which (data) symbols are from external DLLs.
+                 -- We should not need this feature since we _should_ be doing
+                 -- this properly. If we get it wrong then the pseudo
+                 -- relocations feature masks the problem and tries to make it
+                 -- work automagically. When it doesn't work automagically then
+                 -- debugging the issue is very tricky! So when the linker says
+                 -- we would need them, it is better to get an error at source,
+                 -- so we can fix it.
+                 -- ++ [Option "-Wl,--disable-runtime-pseudo-reloc"]
+                 -- TODO: for now, experimenting with allowing pseudo relocs
+                 -- for the top level con apps
+
                  ++ extra_ld_inputs
                  ++ map Option (
                     lib_path_opts

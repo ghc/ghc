@@ -137,12 +137,25 @@ allowTopLevelConApp
   -> [StgArg]
   -> Bool
 allowTopLevelConApp platform ext_dyn_refs this_mod con args
+
+  -- On Windows, always disallow top-level ConApps generally. We don't
+  -- want to do it differently for static vs dynamic since otherwise we
+  -- generate .hi and .dyn_hi files that do not match. And if we allow
+  -- it, we require pseudo-relocations which we're trying to avoid. It
+  -- may be worth trying this and allowing pseudo-relocations. Also
+  -- worth checking reliably if all of the references are within the
+  -- same DLL, in which case it'd be ok. But such a test must not
+  -- depend on whether we're doing dynamic or static linking.
+--  | platformOS platform == OSMinGW32 = False
+  | platformOS platform == OSMinGW32 = True -- try the reverse for now
+
+
   -- we're not using dynamic linking
   | not ext_dyn_refs = True
   -- if the target OS is Windows, we only allow top-level ConApps if they don't
   -- reference external names (Windows DLLs have a problem with static cross-DLL
   -- refs)
-  | platformOS platform == OSMinGW32 = not is_external_con_app
+--  | platformOS platform == OSMinGW32 = not is_external_con_app
   -- otherwise, allowed
   -- Sylvain: shouldn't this be False when (ext_dyn_refs && is_external_con_app)?
   | otherwise = True

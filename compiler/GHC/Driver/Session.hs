@@ -1110,7 +1110,8 @@ dynamic_flags_deps = [
 #if defined(linux_HOST_OS)
                               addOptl "-rdynamic"
 #elif defined(mingw32_HOST_OS)
-                              addOptl "-Wl,--export-all-symbols"
+--                              addOptl "-Wl,--export-all-symbols"
+                              id
 #else
     -- ignored for compat w/ gcc:
                               id
