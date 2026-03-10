@@ -129,6 +129,10 @@ But we must take care (see #14880):
    free variables. This is plain wrong. We must instead compute that b is free
    and then conclude that b's kind is free.
 
+   BUT: there is no worry here any more because of Invariant (NoTypeShadowing).
+        in GHC.Core.   In the example, the `forall k` shadows the `k` in
+        b's kind, which is now illegal and checked by Lint.
+
 An obvious first approach is to compute the /shallow/ free variables of the type,
 and /then/ close over kinds.   But that turns out not to be very efficient.
 Fortunately, there is a simpler way, which works with the accumulating
@@ -139,18 +143,20 @@ GHC.Types.Var.FV.  At an occurrence of a variable (a::k)
 
 * Check if `a` is already in the accumulator; if so, ignore it because we have
   deal with its kind already. Also pre-checking set membership before inserting
-  ends up not only being faster,
+  allocates less than just inserting, because the no-op case of insertion does
+  allocation.
 
 * Otherwise add `a` to the accumulator,
   AND add on the free vars of its kind `k`.
   BUT in this latter step, start with an empty BoundVars set.
 
-This twist is implemented in `deepUnitFV`
+The "start with an empty BoundVars set" is implemented in `deepUnitFV`.  It's
+not /necessary/ to zap the BoundVars set, because of Invariant (NoTypeShadowing).
+But it's a tiny bit more efficient because the BoundVars set is smaller.
 
-So now consider:
-
+Side note: the free-variable binder would still work even without (NoTypeShadowing).
+Consider:
     forall k. b -> k
-
 where b :: k->Type is free; but of course, it's a different k! When looking at
 b -> k we'll have k in the bound-var set. So we'll ignore the k. But suppose
 this is our first encounter with b; we want the free vars of its kind. But we
@@ -537,8 +543,6 @@ deepDetCoVarFolder = TyCoFolder { tcf_view = noView
 *                                                                      *
 ********************************************************************* -}
 
-------------- Closing over kinds -----------------
-
 closeOverKinds :: TyCoVarSet -> TyCoVarSet
 -- For each element of the input set,
 -- add the deep free variables of its kind
@@ -553,60 +557,6 @@ closeOverKindsDSet vs = nonDetStrictFoldDVarSet do_one vs vs
   where
     do_one v = runFVAcc (deepDetTypeFV (varType v))
 
-{- --------------- Alternative version 1 (using FV) ------------
-closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
--}
-
-{- ---------------- Alternative version 2 -------------
-
--- | Add the kind variables free in the kinds of the tyvars in the given set.
--- Returns a non-deterministic set.
-closeOverKinds :: TyCoVarSet -> TyCoVarSet
-closeOverKinds vs
-   = go vs vs
-  where
-    go :: VarSet   -- Work list
-       -> VarSet   -- Accumulator, always a superset of wl
-       -> VarSet
-    go wl acc
-      | isEmptyVarSet wl = acc
-      | otherwise        = go wl_kvs (acc `unionVarSet` wl_kvs)
-      where
-        k v inner_acc = ty_co_vars_of_type (varType v) acc inner_acc
-        wl_kvs = nonDetFoldVarSet k emptyVarSet wl
-        -- wl_kvs = union of shallow free vars of the kinds of wl
-        --          but don't bother to collect vars in acc
-
--}
-
-{- ---------------- Alternative version 3 -------------
--- | Add the kind variables free in the kinds of the tyvars in the given set.
--- Returns a non-deterministic set.
-closeOverKinds :: TyVarSet -> TyVarSet
-closeOverKinds vs = close_over_kinds vs emptyVarSet
-
-
-close_over_kinds :: TyVarSet  -- Work list
-                 -> TyVarSet  -- Accumulator
-                 -> TyVarSet
--- Precondition: in any call (close_over_kinds wl acc)
---  for every tv in acc, the shallow kind-vars of tv
---  are either in the work list wl, or in acc
--- Postcondition: result is the deep free vars of (wl `union` acc)
-close_over_kinds wl acc
-  = nonDetFoldVarSet do_one acc wl
-  where
-    do_one :: Var -> TyVarSet -> TyVarSet
-    -- (do_one v acc) adds v and its deep free-vars to acc
-    do_one v acc | v `elemVarSet` acc
-                 = acc
-                 | otherwise
-                 = close_over_kinds (shallowTyCoVarsOfType (varType v)) $
-                   acc `extendVarSet` v
--}
-
-
-
 
 {-
 %************************************************************************
@@ -614,7 +564,6 @@ close_over_kinds wl acc
         almostDevoidCoVarOfCo
 %*                                                                      *
 %************************************************************************
-
 -}
 
 ----- Whether a covar is /Almost Devoid/ in a type or coercion ----
