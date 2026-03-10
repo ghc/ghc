@@ -587,6 +587,14 @@ test('cloneMyStack_retBigStackFrame', [req_c, extra_files(['cloneStackLib.c']), 
 
 test('cloneThreadStack', [req_c, only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c']), req_ghc_with_threaded_rts], compile_and_run, ['cloneStackLib.c -threaded'])
 
+test('cloneThreadStackMigrating',
+  [ ignore_stdout
+  , only_ways(['threaded1'])
+  , extra_ways(['threaded1'])
+  , extra_run_opts('+RTS -N -DS -RTS')
+  , req_ghc_with_threaded_rts
+  ], compile_and_run, ['-threaded -debug -rtsopts'])
+
 test('decodeMyStack',
   [ omit_ghci, js_broken(22261) # cloneMyStack# not yet implemented
   , when(ghc_with_ipe(), skip) # IPE builds can change decoded stack output.

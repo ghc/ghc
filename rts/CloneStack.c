@@ -84,15 +84,31 @@ void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar) {
   sendMessage(srcCapability, tso->cap, (Message *)msg);
 }
 
-void handleCloneStackMessage(MessageCloneStack *msg){
-  StgStack* newStackClosure = cloneStack(msg->tso->cap, msg->tso->stackobj);
+// The cap argument is the capability which is handling the CloneStack message
+void handleCloneStackMessage(Capability *cap, MessageCloneStack *msg){
+  // We must check that the current owner of the thread we want to clone the stack for
+  // is still this capability.
+  Capability *owner = RELAXED_LOAD(&msg->tso->cap);
+  if (owner != cap) {
+    // The target TSO may have migrated after the message was queued on the old
+    // capability. In that case we must forward the request to the current
+    // owner; otherwise we would race with another capability mutating the
+    // stack while we clone it.
+    sendMessage(cap, owner, (Message *)msg);
+    return;
+  }
+
+  // At this point the executing capability owns the TSO, so it is the only
+  // capability that may safely inspect the live stack and the one whose
+  // allocator we must use for the cloned StgStack closure.
+  StgStack* newStackClosure = cloneStack(cap, msg->tso->stackobj);
 
   // Lift StackSnapshot# to StackSnapshot by applying it's constructor.
   // This is necessary because performTryPutMVar() puts the closure onto the
   // stack for evaluation and stacks can not be evaluated (entered).
-  HaskellObj result = rts_apply(msg->tso->cap, StackSnapshot_constructor_closure, (HaskellObj) newStackClosure);
+  HaskellObj result = rts_apply(cap, StackSnapshot_constructor_closure, (HaskellObj) newStackClosure);
 
-  bool putMVarWasSuccessful = performTryPutMVar(msg->tso->cap, msg->result, result);
+  bool putMVarWasSuccessful = performTryPutMVar(cap, msg->result, result);
 
   if(!putMVarWasSuccessful) {
     barf("Can't put stack cloning result into MVar.");
