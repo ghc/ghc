@@ -175,7 +175,7 @@ extern char **environ;
       SymI_HasProto(stg_asyncWritezh)                    \
       SymI_HasProto(stg_asyncDoProczh)                   \
       SymI_HasProto(rts_InstallConsoleEvent)             \
-      SymI_HasProto(rts_IOManagerIsWin32Native)          \
+      SymI_HasDataProto(rts_IOManagerIsWin32Native)          \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_NeedsProto(__mingw_module_is_dll)             \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
@@ -925,7 +925,7 @@ extern char **environ;
       SymI_HasProto(freeExecPage)                                       \
       SymI_HasProto(getAllocations)                                     \
       SymI_HasProto(revertCAFs)                                         \
-      SymI_HasProto(RtsFlags)                                           \
+      SymI_HasDataProto(RtsFlags)                                           \
       SymI_NeedsDataProto(rts_breakpoint_io_action)                     \
       SymI_NeedsDataProto(rts_stop_next_breakpoint)                     \
       SymI_NeedsDataProto(rts_stop_on_exception)                        \
@@ -936,9 +936,9 @@ extern char **environ;
       SymI_NeedsProto(rts_enableStopAfterReturn)                        \
       SymI_NeedsProto(rts_disableStopAfterReturn)                       \
       SymI_HasProto(stopTimer)                                          \
-      SymI_HasProto(n_capabilities)                                     \
-      SymI_HasProto(max_n_capabilities)                                 \
-      SymI_HasProto(enabled_capabilities)                               \
+      SymI_HasDataProto(n_capabilities)                                     \
+      SymI_HasDataProto(max_n_capabilities)                                 \
+      SymI_HasDataProto(enabled_capabilities)                               \
       SymI_HasDataProto(stg_traceEventzh)                                   \
       SymI_HasDataProto(stg_traceMarkerzh)                                  \
       SymI_HasDataProto(stg_traceBinaryEventzh)                             \

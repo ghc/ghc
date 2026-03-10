@@ -138,10 +138,13 @@ allowTopLevelConApp
 allowTopLevelConApp platform ext_dyn_refs this_mod con args
   -- we're not using dynamic linking
   | not ext_dyn_refs = True
+{- For now, try always using top level constructor applications, and rely on pseudo-relocations to make this work.
+   We might want to have a flag to control this behaviour, because using pseudo-relocations can be incompatible with some security restrictions apparently. But note that dynamic top level con apps increases symbol exports a lot.
   -- if the target OS is Windows, we only allow top-level ConApps if they don't
   -- reference external names (Windows DLLs have a problem with static cross-DLL
   -- refs)
   | platformOS platform == OSMinGW32 = not is_external_con_app
+-}
   -- otherwise, allowed
   -- Sylvain: shouldn't this be False when (ext_dyn_refs && is_external_con_app)?
   | otherwise = True
