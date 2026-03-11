@@ -639,12 +639,11 @@ deriving instance Eq (IE GhcRn)
 deriving instance Eq (IE GhcTc)
 
 -- ---------------------------------------------------------------------
--- TODO: I think we still need instances for StmtCtxt, ExprCtxt and PatCtxt ctors of ErrCtxtMsg
-instance Data ErrCtxtMsg where
-  gunfold _ _ _ = error "no gunfold for ErrCtxtMsg"
+instance Data HsCtxt where
+  gunfold _ _ _ = error "no gunfold for HsCtxt"
   gfoldl _ k z = k z
-  toConstr = error "no toConstr for ErrCtxtMsg"
-  dataTypeOf = error "no dataTypeOf for ErrCtxtMsg"
+  toConstr = error "no toConstr for HsCtxt"
+  dataTypeOf = error "no dataTypeOf for HsCtxt"
 
 deriving instance Data XXExprGhcRn
 

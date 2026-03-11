@@ -628,12 +628,12 @@ exprCtOrigin (HsGetField _ _ f)   = GetFieldOrigin (fmap field_label $ dfoLabel 
 exprCtOrigin (XExpr (ExpandedThingRn o _)) = errCtxtCtOrigin o
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 
-srcCodeOriginCtOrigin :: HsExpr GhcRn -> Maybe ErrCtxtMsg -> CtOrigin
+srcCodeOriginCtOrigin :: HsExpr GhcRn -> Maybe HsCtxt -> CtOrigin
 srcCodeOriginCtOrigin e Nothing = exprCtOrigin e
 srcCodeOriginCtOrigin _ (Just o) = errCtxtCtOrigin o
 
 
-errCtxtCtOrigin :: ErrCtxtMsg -> CtOrigin
+errCtxtCtOrigin :: HsCtxt -> CtOrigin
 errCtxtCtOrigin (ExprCtxt e) = exprCtOrigin e
 errCtxtCtOrigin (FunAppCtxt (FunAppCtxtExpr _ e) _) = exprCtOrigin e
 errCtxtCtOrigin (StmtErrCtxt{}) = DoStmtOrigin

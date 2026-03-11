@@ -1091,7 +1091,7 @@ setSrcSpan (RealSrcSpan loc _) thing_inside
 setSrcSpan _ thing_inside
   = thing_inside
 
-getSrcCodeOrigin :: TcRn (Maybe ErrCtxtMsg)
+getSrcCodeOrigin :: TcRn (Maybe HsCtxt)
 getSrcCodeOrigin = getLclEnvSrcCodeOrigin <$> getLclEnv
 
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
@@ -1364,23 +1364,23 @@ setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 -- | Add a fixed message to the error context. This message should not
 -- do any tidying.
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
-addErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
+addErrCtxt :: HsCtxt -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
 addErrCtxt msg = addErrCtxtM msg
 
 -- See Note [ErrCtxtStack Manipulation]
-addExpansionErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
+addExpansionErrCtxt :: HsCtxt -> TcM a -> TcM a
 {-# INLINE addExpansionErrCtxt #-}   -- Note [Inlining addErrCtxt]
 addExpansionErrCtxt msg = addExpansionErrCtxtM msg
 
 -- | Add a message to the error context. This message may do tidying.
 --   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
-addErrCtxtM :: ErrCtxtMsg -> TcM a -> TcM a
+addErrCtxtM :: HsCtxt -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addErrCtxtM ctxt = pushCtxt (MkErrCtxt VanillaUserSrcCode ctxt)
 
 -- See Note [ErrCtxtStack Manipulation]
-addExpansionErrCtxtM :: ErrCtxtMsg -> TcM a -> TcM a
+addExpansionErrCtxtM :: HsCtxt -> TcM a -> TcM a
 {-# INLINE addExpansionErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addExpansionErrCtxtM ctxt = pushCtxt (MkErrCtxt ExpansionCodeCtxt ctxt)
 
@@ -1388,13 +1388,13 @@ addExpansionErrCtxtM ctxt = pushCtxt (MkErrCtxt ExpansionCodeCtxt ctxt)
 -- message is always sure to be reported, even if there is a lot of
 -- context. It also doesn't count toward the maximum number of contexts
 -- reported.
-addLandmarkErrCtxt :: ErrCtxtMsg -> TcM a -> TcM a
+addLandmarkErrCtxt :: HsCtxt -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxt #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxt msg = addLandmarkErrCtxtM msg
 
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
-addLandmarkErrCtxtM :: ErrCtxtMsg -> TcM a -> TcM a
+addLandmarkErrCtxtM :: HsCtxt -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxtM ctxt = pushCtxt (MkErrCtxt LandmarkUserSrcCode ctxt)
 
@@ -1899,7 +1899,7 @@ addDiagnosticTcM (env0, msg)
 
 -- | A variation of 'addDiagnostic' that takes a function to produce a 'TcRnDsMessage'
 -- given some additional context about the diagnostic.
-addDetailedDiagnostic :: ([ErrCtxtMsg] -> TcRnMessage) -> TcM ()
+addDetailedDiagnostic :: ([HsCtxt] -> TcRnMessage) -> TcM ()
 addDetailedDiagnostic mkMsg = do
   loc <- getSrcSpanM
   name_ppr_ctx <- getNamePprCtx
@@ -1950,7 +1950,7 @@ add_err_tcm tidy_env msg loc ctxt
       ; add_long_err_at loc $
           mkDetailedMessage (ErrInfo err_ctxt Nothing noHints) msg }
 
-mkErrCtxt :: TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
+mkErrCtxt :: TidyEnv -> [ErrCtxt] -> TcM [HsCtxt]
 -- Tidy the error info, trimming excessive contexts
 mkErrCtxt env ctxts
 --  = do
@@ -1960,19 +1960,19 @@ mkErrCtxt env ctxts
 --          else go dbg 0 env ctxts
  = go False 0 env ctxts -- regular error ctx
  where
-   go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [ErrCtxtMsg]
+   go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [HsCtxt]
    go _ _ _ [] = return []
    go dbg n env (MkErrCtxt LandmarkUserSrcCode ctxt : ctxts)
-     = do { (env', msg) <- liftZonkM $ zonkTidyErrCtxtMsg env ctxt
+     = do { (env', msg) <- liftZonkM $ zonkTidyHsCtxt env ctxt
           ; rest <- go dbg n env' ctxts
           ; return (msg : rest) }
    go dbg n env (MkErrCtxt _ ctxt : ctxts)
      | n < mAX_CONTEXTS -- Too verbose || dbg
-     = do { (env', msg) <- liftZonkM $ zonkTidyErrCtxtMsg env ctxt
+     = do { (env', msg) <- liftZonkM $ zonkTidyHsCtxt env ctxt
           ; rest <- go dbg (n+1) env' ctxts
           ; return (msg : rest) }
      | otherwise  -- need to compute this for zonking
-     = do { (env', _) <- liftZonkM $ zonkTidyErrCtxtMsg env ctxt
+     = do { (env', _) <- liftZonkM $ zonkTidyHsCtxt env ctxt
           ; go dbg n env' ctxts
           }
 

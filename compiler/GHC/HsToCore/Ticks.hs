@@ -663,7 +663,7 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
 
-addTickHsExpanded :: ErrCtxtMsg -> HsExpr GhcTc -> TM (HsExpr GhcTc)
+addTickHsExpanded :: HsCtxt -> HsExpr GhcTc -> TM (HsExpr GhcTc)
 addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
   -- We always want statements to get a tick, so we can step over each one.
   -- To avoid duplicates we blacklist SrcSpans we already inserted here.

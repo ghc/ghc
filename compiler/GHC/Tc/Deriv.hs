@@ -180,7 +180,7 @@ data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
                              -- See @Note [Scoped tyvars in a TcTyCon]@ in
                              -- "GHC.Core.TyCon".
                            , di_clauses :: [LHsDerivingClause GhcRn]
-                           , di_ctxt    :: ErrCtxtMsg -- ^ error context
+                           , di_ctxt    :: HsCtxt -- ^ error context
                            }
 
 {-
@@ -523,7 +523,7 @@ deriveClause :: TyCon
              -> Maybe (LDerivStrategy GhcRn)
              -> LocatedC [LHsSigType GhcRn]
                 -- ^ The location refers to the @(Show, Eq)@ part of @deriving (Show, Eq)@.
-             -> ErrCtxtMsg
+             -> HsCtxt
              -> TcM [EarlyDerivSpec]
 deriveClause rep_tc scoped_tvs mb_lderiv_strat (L loc deriv_preds) err_ctxt
   = setSrcSpanA loc $
@@ -2361,4 +2361,3 @@ derivingThingErrMechanism mechanism why
     newtype_deriving
       = if isDerivSpecNewtype mechanism then YesGeneralizedNewtypeDeriving
                                         else NoGeneralizedNewtypeDeriving
-

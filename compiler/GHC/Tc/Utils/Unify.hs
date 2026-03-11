@@ -60,8 +60,8 @@ module GHC.Tc.Utils.Unify (
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Tc.Errors.Types ( ErrCtxtMsg(..) )
-import GHC.Tc.Errors.Ppr   ( pprErrCtxtMsg )
+import GHC.Tc.Errors.Types ( HsCtxt(..) )
+import GHC.Tc.Errors.Ppr   ( pprHsCtxt )
 import GHC.Tc.Utils.Concrete
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
@@ -218,7 +218,7 @@ matchActualFunTy herald mb_thing err_info fun_ty
            ; return (co, arg_ty, res_ty) }
 
     ------------
-    mk_ctxt :: TcType -> ErrCtxtMsg
+    mk_ctxt :: TcType -> HsCtxt
     mk_ctxt _res_ty = mkFunTysMsg herald err_info
 
 {- Note [matchActualFunTy error handling]
@@ -961,7 +961,7 @@ new_check_arg_ty herald arg_pos -- Position for error messages only, 1 for first
 
 mkFunTysMsg :: ExpectedFunTyCtxt
             -> (VisArity, TcType)
-            -> ErrCtxtMsg
+            -> HsCtxt
 -- See Note [Reporting application arity errors]
 mkFunTysMsg herald (n_vis_args_in_call, fun_ty)
   = do { let (pi_ty_bndrs, _) = splitPiTys fun_ty
@@ -2707,7 +2707,7 @@ uType_defer (UE { u_loc = loc, u_defer = ref
                 vcat ( ppr role
                      : debugPprType ty1
                      : debugPprType ty2
-                     : map pprErrCtxtMsg err_ctxt )
+                     : map pprHsCtxt err_ctxt )
             ; traceTc "utype_defer2" (ppr co) }
 
        ; return co }

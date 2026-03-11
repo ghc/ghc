@@ -49,7 +49,7 @@ module GHC.Tc.Zonk.TcType
   , tidyCt, tidyEvVar, tidyDelayedError
 
     -- ** Zonk & tidy
-  , zonkTidyTcType, zonkTidyTcTypes, zonkTidyErrCtxtMsg
+  , zonkTidyTcType, zonkTidyTcTypes, zonkTidyHsCtxt
   , zonkTidyOrigin, zonkTidyOrigins
   , zonkTidyFRRInfos
 
@@ -797,30 +797,30 @@ tidyEvVar env var = updateIdTypeAndMult (tidyType env) var
   -- No need for tidyOpenType because all the free tyvars are already tidied
 
 
-zonkTidyErrCtxtMsg :: TidyEnv -> ErrCtxtMsg -> ZonkM (TidyEnv, ErrCtxtMsg)
-zonkTidyErrCtxtMsg env e@(ExprCtxt{}) = return (env, e)
-zonkTidyErrCtxtMsg env (ThetaCtxt ctxt theta_ty) = do
+zonkTidyHsCtxt :: TidyEnv -> HsCtxt -> ZonkM (TidyEnv, HsCtxt)
+zonkTidyHsCtxt env e@(ExprCtxt{}) = return (env, e)
+zonkTidyHsCtxt env (ThetaCtxt ctxt theta_ty) = do
   (env', theta_ty') <- zonkTidyTcTypes env theta_ty
   return $ (env', ThetaCtxt ctxt theta_ty')
-zonkTidyErrCtxtMsg env (InferredTypeCtxt n ty) = do
+zonkTidyHsCtxt env (InferredTypeCtxt n ty) = do
   (env', ty') <- zonkTidyTcType env ty
   return $ (env', InferredTypeCtxt n ty')
-zonkTidyErrCtxtMsg env (ClassOpCtxt n ty) = do
+zonkTidyHsCtxt env (ClassOpCtxt n ty) = do
   (env', ty') <- zonkTidyTcType env ty
   return $ (env', ClassOpCtxt n ty')
-zonkTidyErrCtxtMsg env (MethSigCtxt n ty1 ty2) = do
+zonkTidyHsCtxt env (MethSigCtxt n ty1 ty2) = do
   (env', ty1) <- zonkTidyTcType env ty1
   (env', ty2) <- zonkTidyTcType env' ty2
   return $ (env',  MethSigCtxt n ty1 ty2)
-zonkTidyErrCtxtMsg env e@(FunAppCtxt{}) = return (env, e)
-zonkTidyErrCtxtMsg env (FunTysCtxt ctxt ty i1 i2) = do
+zonkTidyHsCtxt env e@(FunAppCtxt{}) = return (env, e)
+zonkTidyHsCtxt env (FunTysCtxt ctxt ty i1 i2) = do
   (env', ty') <- zonkTidyTcType env ty
   return $ (env', FunTysCtxt ctxt ty' i1 i2)
-zonkTidyErrCtxtMsg env (FunResCtxt e i1 ty1 ty2 i2 i3) = do
+zonkTidyHsCtxt env (FunResCtxt e i1 ty1 ty2 i2 i3) = do
   (env', ty1') <- zonkTidyTcType env ty1
   (env', ty2') <- zonkTidyTcType env' ty2
   return $ (env', FunResCtxt e i1 ty1' ty2' i2 i3)
-zonkTidyErrCtxtMsg env (PatSigErrCtxt sig_ty res_ty) = do
+zonkTidyHsCtxt env (PatSigErrCtxt sig_ty res_ty) = do
   (env', sig_ty') <- zonkTidyTcType env sig_ty
   (env', res_ty') <-
     case res_ty of
@@ -828,7 +828,7 @@ zonkTidyErrCtxtMsg env (PatSigErrCtxt sig_ty res_ty) = do
       Infer (IR {ir_ref = ref}) -> do -- inlining readExpTyp_maybe to avoid module dep loops
         mb_ty <- liftIO $ readIORef ref
         case mb_ty of
-          Nothing -> error "zonkTidyErrCtxtMsg PatSigErrCtxt"
+          Nothing -> error "zonkTidyHsCtxt PatSigErrCtxt"
           Just ty -> zonkTidyTcType env' ty
   return (env', PatSigErrCtxt sig_ty' (Check res_ty'))
-zonkTidyErrCtxtMsg env p = return (env, p)
+zonkTidyHsCtxt env p = return (env, p)
