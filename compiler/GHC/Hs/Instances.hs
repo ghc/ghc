@@ -642,7 +642,7 @@ deriving instance Eq (IE GhcTc)
 -- TODO: I think we still need instances for StmtCtxt, ExprCtxt and PatCtxt ctors of ErrCtxtMsg
 instance Data ErrCtxtMsg where
   gunfold _ _ _ = error "no gunfold for ErrCtxtMsg"
-  gfoldl _ _ _ = error "no gfoldl for ErrCtxtMsg"
+  gfoldl _ k z = k z
   toConstr = error "no toConstr for ErrCtxtMsg"
   dataTypeOf = error "no dataTypeOf for ErrCtxtMsg"
 
