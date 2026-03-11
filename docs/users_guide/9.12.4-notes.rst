@@ -30,17 +30,30 @@ Compiler
 - Fixed a subtle bug in ``GHC.Core.Utils.mkTick`` that could generate type-incorrect code (:ghc-ticket:`26772`)
 - Fixed a long-standing interaction between ticks and casts in ``Eliminate Identity Cases``
 - ``NamedDefaults``: require the class to be standard or have an in-scope default declaration (:ghc-ticket:`25775`, :ghc-ticket:`25778`)
+- ``NamedDefaults``: allow named defaults for poly-kinded unary classes such as ``Typeable`` (:ghc-ticket:`25882`)
+- Improved compiler performance by making ``OccAnal`` stricter, reducing residency and improving compile times
+- Fixed two critical Cmm register bugs affecting spill/reload behavior with vector types (:ghc-ticket:`26542`, :ghc-ticket:`26550`)
+- Fixed the order of spill/reload instructions in the native code generator (:ghc-ticket:`26537`)
+- Fixed five register allocation bugs relating to register formats, preventing data corruption when spilling and reloading vector registers (:ghc-ticket:`26411`, :ghc-ticket:`26526`)
+- Fixed PPC NCG shift right operations at smaller than word sizes (:ghc-ticket:`26519`)
+- Fixed associated type family changes not triggering recompilation in dependent modules (:ghc-ticket:`26183`)
+- Fixed data family instance type class instance changes not triggering recompilation (:ghc-ticket:`26705`)
+- Fixed negative type literals bypassing the renamer check via ``RequiredTypeArguments``, causing the compiler to hang (:ghc-ticket:`26861`)
+- Fixed scoping errors in the type-class specialiser (:ghc-ticket:`26682`)
+- Fixed sign extension and casting for LLVM bit manipulation operations (:ghc-ticket:`20645`, :ghc-ticket:`26109`)
+- Fixed LLVM linking of Intel BMI intrinsics ``pdep{8,16}`` and ``pext{8,16}`` (:ghc-ticket:`26065`)
 
 Runtime System
 ~~~~~~~~~~~~~~
 
 - Fixed a deadlock with eventlog flush interval and RTS shutdown (:ghc-ticket:`26573`)
-- Fixed eager black holes: record mutated closure and fix assertion (:ghc-ticket:`26495`)
+- Handle 16-bit overflow of ELF section header string table (:ghc-ticket:`26603`)
 - Fixed object file format detection in ``loadArchive`` (:ghc-ticket:`26630`)
 - Use ``INFO_TABLE_CONSTR`` for ``stg_dummy_ret_closure`` (:ghc-ticket:`26745`)
 - Fixed lost wakeups in ``threadPaused`` for threads blocked on black holes (:ghc-ticket:`26324`)
 - Fixed ``stg_AP_STACK`` to push the correct update frame (:ghc-ticket:`26324`)
 - Fixed potential loop in heap reservation logic on certain kernels (:ghc-ticket:`26151`)
+- The runtime linker now supports COMMON symbols (:ghc-ticket:`6107`)
 - Don't use CAS without ``PARALLEL_GC`` on
 - Switch prim to use modern atomic compiler builtins (:ghc-ticket:`26729`)
 - Removed obsolete ``CC_SUPPORTS_TLS``, ``HAS_VISIBILITY_HIDDEN``, ``COMPILING_WINDOWS_DLL``,
@@ -63,6 +76,7 @@ Bytecode Compiler
 ~~~~~~~~~~~~~~~~
 
 - Expose ``Backtraces`` constructor and fields (:ghc-ticket:`26049`)
+- Added ``@since`` annotation to ``System.Info.fullCompilerVersion`` (:ghc-ticket:`26973`)
 - Store ``StackTrace`` and ``StackSnapshot`` in ``Backtraces``, deferring decoding until display
 - Evaluate backtraces for ``error`` exceptions at the moment they are thrown
   (`CLC proposal #383 <https://github.com/haskell/core-libraries-committee/issues/383>`__,
