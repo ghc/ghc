@@ -2683,11 +2683,11 @@ tcSpecInst _  _ = panic "tcSpecInst"
 ************************************************************************
 -}
 
-instDeclCtxt1 :: LHsSigType GhcRn -> ErrCtxtMsg
+instDeclCtxt1 :: LHsSigType GhcRn -> HsCtxt
 instDeclCtxt1 hs_inst_ty
   = InstDeclErrCtxt $ Left $ getLHsInstDeclHead hs_inst_ty
 
-instDeclCtxt2 :: Type -> ErrCtxtMsg
+instDeclCtxt2 :: Type -> HsCtxt
 instDeclCtxt2 dfun_ty
   = InstDeclErrCtxt $ Right $ head_ty
   where

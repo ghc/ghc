@@ -1,7 +1,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module GHC.Tc.Types.ErrCtxt
-  ( ErrCtxt (..), ErrCtxtMsg(..), CodeSrcFlag (..)
+  ( ErrCtxt (..), HsCtxt(..), CodeSrcFlag (..)
   , UserSigType(..), FunAppCtxtFunArg(..)
   , TyConInstFlavour(..)
 
@@ -37,7 +37,7 @@ import GHC.Core.PatSyn   ( PatSyn )
 import GHC.Core.TyCon    ( TyCon )
 import GHC.Core.TyCo.Rep ( Type, ThetaType, PredType )
 
-import {-# SOURCE #-} GHC.Unit.State ( UnitState ) -- Break the module graph cycle for accesing ErrCtxtMsg in GHC.Hs.Expr
+import {-# SOURCE #-} GHC.Unit.State ( UnitState ) -- Break the module graph cycle for accesing HsCtxt in GHC.Hs.Expr
 
 import GHC.Data.FastString  ( FastString )
 import GHC.Utils.Outputable
@@ -200,7 +200,7 @@ isSigMaybe _                = Nothing
 ********************************************************************* -}
 --------------------------------------------------------------------------------
 
--- type ErrCtxtMsgM = TidyEnv -> ZonkM (TidyEnv, ErrCtxtMsg)
+-- type HsCtxtM = TidyEnv -> ZonkM (TidyEnv, HsCtxt)
 
 -- | Additional context to include in an error message, e.g.
 -- "In the type signature ...", "In the ambiguity check for ...", etc.
@@ -210,7 +210,7 @@ data ErrCtxt = MkErrCtxt
                  -- LandmarkUserSrcCode <=> this is a landmark context; do not
                  --                         discard it when trimming for display
 
-                 ErrCtxtMsg
+                 HsCtxt
                  -- Monadic so that we have a chance
                  -- to deal with bound type variables just before error
                  -- message construction
@@ -247,7 +247,7 @@ data TyConInstFlavour
 
 -- | The "context" of an error message, e.g. "In the expression <...>",
 -- "In the pattern <...>", or "In the equations for closed type family <...>".
-data ErrCtxtMsg
+data HsCtxt
   -- | In an expression.
   = ExprCtxt !(HsExpr GhcRn)
   -- | In a user-written context.

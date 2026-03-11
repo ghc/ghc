@@ -119,7 +119,7 @@ push the new expression error message on top of the stack. cf. `LclEnv.setLclCtx
 type ErrCtxtStack = [ErrCtxt]
 
 -- | Get the original source code
-get_src_code_origin :: ErrCtxtStack -> Maybe ErrCtxtMsg
+get_src_code_origin :: ErrCtxtStack -> Maybe HsCtxt
 get_src_code_origin (MkErrCtxt ExpansionCodeCtxt e : _) = Just e
                    -- we are in generated code, due to the expansion of the original syntax origSrcCode
 get_src_code_origin _ = Nothing
@@ -202,7 +202,7 @@ setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_err_ctxt = ctxt })
 addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
 addLclEnvErrCtxt ec = setLclEnvSrcCodeOrigin ec
 
-getLclEnvSrcCodeOrigin :: TcLclEnv -> Maybe ErrCtxtMsg
+getLclEnvSrcCodeOrigin :: TcLclEnv -> Maybe HsCtxt
 getLclEnvSrcCodeOrigin = get_src_code_origin . tcl_err_ctxt . tcl_lcl_ctxt
 
 setLclEnvSrcCodeOrigin :: ErrCtxt -> TcLclEnv -> TcLclEnv

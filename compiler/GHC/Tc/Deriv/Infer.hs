@@ -17,7 +17,7 @@ where
 import GHC.Prelude
 
 import GHC.Tc.Deriv.Utils
-import GHC.Tc.Errors.Types ( ErrCtxtMsg(..) )
+import GHC.Tc.Errors.Types ( HsCtxt(..) )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Deriv.Functor

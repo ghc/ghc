@@ -9,7 +9,7 @@
 module GHC.Tc.Errors.Ppr
   ( pprTypeDoesNotHaveFixedRuntimeRep
   , pprScopeError
-  , pprErrCtxtMsg
+  , pprHsCtxt
   --
   , tidySkolemInfo
   , tidySkolemInfoAnon
@@ -188,12 +188,12 @@ instance Diagnostic TcRnMessage where
     TcRnTypeDoesNotHaveFixedRuntimeRep ty prov err_ctxt
       -> mkDecorated $
           (pprTypeDoesNotHaveFixedRuntimeRep ty prov)
-          : map pprErrCtxtMsg err_ctxt
+          : map pprHsCtxt err_ctxt
     TcRnImplicitLift id_or_name err_ctxt
       -> mkDecorated $
            ( text "The variable" <+> quotes (ppr id_or_name) <+>
              text "is implicitly lifted in the TH quotation"
-           ) : map pprErrCtxtMsg err_ctxt
+           ) : map pprHsCtxt err_ctxt
     TcRnUnusedPatternBinds bind
       -> mkDecorated [hang (text "This pattern-binding binds no variables:") 2 (ppr bind)]
     TcRnDodgyImports (DodgyImportsEmptyParent ie ns_spec gre)
@@ -3657,7 +3657,7 @@ messageWithInfoDiagnosticMessage :: UnitState
                                  -> DecoratedSDoc
 messageWithInfoDiagnosticMessage unit_state (ErrInfo {..}) show_ctxt important =
   let ctxt = pprWithUnitState unit_state
-           $ vcat $ map pprErrCtxtMsg  [ ctx | ctx <- errInfoContext, show_ctxt ]
+           $ vcat $ map pprHsCtxt  [ ctx | ctx <- errInfoContext, show_ctxt ]
 
       supp = case errInfoSupplementary of
         Nothing -> empty
@@ -7660,8 +7660,8 @@ pprTyConInstFlavour
       }
   ) = (if is_dflt then text "default" else empty) <+> ppr flav <+> text "instance"
 
-pprErrCtxtMsg :: ErrCtxtMsg -> SDoc
-pprErrCtxtMsg = \case
+pprHsCtxt :: HsCtxt -> SDoc
+pprHsCtxt = \case
   ExprCtxt expr
     -> hang (text "In the expression:")
        2 (ppr (stripParensHsExpr expr))

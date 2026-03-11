@@ -464,17 +464,17 @@ badDmPrag :: TcId -> Sig GhcRn -> TcM ()
 badDmPrag sel_id prag
   = addErrTc (TcRnDefaultMethodForPragmaLacksBinding sel_id prag)
 
-instDeclCtxt1 :: LHsSigType GhcRn -> ErrCtxtMsg
+instDeclCtxt1 :: LHsSigType GhcRn -> HsCtxt
 instDeclCtxt1 hs_inst_ty
   = InstDeclErrCtxt (Left $ getLHsInstDeclHead hs_inst_ty)
 
-instDeclCtxt2 :: Type -> ErrCtxtMsg
+instDeclCtxt2 :: Type -> HsCtxt
 instDeclCtxt2 dfun_ty
   = instDeclCtxt3 cls tys
   where
     (_,_,cls,tys) = tcSplitDFunTy dfun_ty
 
-instDeclCtxt3 :: Class -> [Type] -> ErrCtxtMsg
+instDeclCtxt3 :: Class -> [Type] -> HsCtxt
 instDeclCtxt3 cls cls_tys
   = InstDeclErrCtxt (Right $ mkClassPred cls cls_tys)
 

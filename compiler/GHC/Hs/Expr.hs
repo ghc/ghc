@@ -661,7 +661,7 @@ type instance XXExpr GhcTc = XXExprGhcTc
 ********************************************************************* -}
 
 data XXExprGhcRn
-  = ExpandedThingRn { xrn_orig     :: ErrCtxtMsg         -- The original source thing context to be used for error messages
+  = ExpandedThingRn { xrn_orig     :: HsCtxt         -- The original source thing context to be used for error messages
                     , xrn_expanded :: HsExpr GhcRn    -- The compiler generated, expanded thing
                     }
 
@@ -696,7 +696,7 @@ data XXExprGhcTc
 
   | ExpandedThingTc                         -- See Note [Rebindable syntax and XXExprGhcRn]
                                             -- See Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
-         { xtc_orig     :: ErrCtxtMsg        -- The original user written thing
+         { xtc_orig     :: HsCtxt        -- The original user written thing
          , xtc_expanded :: HsExpr GhcTc }   -- The expanded typechecked expression
 
   | ConLikeTc
@@ -733,7 +733,7 @@ mkExpandedExprTc
 mkExpandedExprTc oExpr eExpr = mkExpandedTc (ExprCtxt oExpr) eExpr
 
 mkExpandedTc
-  :: ErrCtxtMsg          -- ^ source, user written do statement/expression
+  :: HsCtxt          -- ^ source, user written do statement/expression
   -> HsExpr GhcTc           -- ^ expanded typechecked expression
   -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
 mkExpandedTc o e = XExpr (ExpandedThingTc o e)
@@ -1060,13 +1060,13 @@ instance Outputable XXExprGhcRn where
   ppr (ExpandedThingRn o e) = ifPprDebug (braces $ vcat [pprCtxt o, text ";;" , ppr e]) (pprCtxt o)
     where
       ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens x)) x
-      pprCtxt :: ErrCtxtMsg -> SDoc
+      pprCtxt :: HsCtxt -> SDoc
       pprCtxt (ExprCtxt e) = ppr_builder "<OrigExpr>:"  (ppr e)
       pprCtxt (StmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
       pprCtxt (DoStmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
       pprCtxt (StmtErrCtxtPat pat) = ppr_builder "<OrigPat>:" (ppr pat)
       pprCtxt (FunAppCtxt (FunAppCtxtExpr _ e) _) = ppr_builder "<FunAppCtxt>:"  (ppr e)
-      pprCtxt _ = ppr_builder "<MiscErrCtxtMsg>:" empty
+      pprCtxt _ = ppr_builder "<MiscHsCtxt>:" empty
 
 instance Outputable XXExprGhcTc where
   ppr (WrapExpr co_fn e)
@@ -1077,13 +1077,13 @@ instance Outputable XXExprGhcTc where
 
     where
       ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens x)) x
-      pprCtxt :: ErrCtxtMsg -> SDoc
+      pprCtxt :: HsCtxt -> SDoc
       pprCtxt (ExprCtxt e) = ppr_builder "<OrigExpr>:"  (ppr e)
       pprCtxt (StmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
       pprCtxt (DoStmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
       pprCtxt (StmtErrCtxtPat pat) = ppr_builder "<OrigPat>:" (ppr pat)
       pprCtxt (FunAppCtxt (FunAppCtxtExpr _ e) _) = ppr_builder "<FunAppCtxt>:"  (ppr e)
-      pprCtxt _ = ppr_builder "<MiscErrCtxtMsg>:" empty
+      pprCtxt _ = ppr_builder "<MiscHsCtxt>:" empty
 
             -- e is the expanded expression, we print the original
             -- expression (HsExpr GhcRn), not the
@@ -1132,7 +1132,7 @@ ppr_infix_expr_tc (HsTick {})                = Nothing
 ppr_infix_expr_tc (HsBinTick {})             = Nothing
 ppr_infix_expr_tc (HsRecSelTc f)            = Just (pprInfixOcc f)
 
-ppr_infix_hs_expansion :: ErrCtxtMsg -> Maybe SDoc
+ppr_infix_hs_expansion :: HsCtxt -> Maybe SDoc
 ppr_infix_hs_expansion (ExprCtxt e) = ppr_infix_expr e
 ppr_infix_hs_expansion _            = Nothing
 
@@ -1224,7 +1224,7 @@ hsExprNeedsParens prec = go
     go_x_rn (ExpandedThingRn thing _ )   = hsExpandedNeedsParens thing
     go_x_rn (HsRecSelRn{})               = False
 
-    hsExpandedNeedsParens :: ErrCtxtMsg -> Bool
+    hsExpandedNeedsParens :: HsCtxt -> Bool
     hsExpandedNeedsParens (ExprCtxt e) = hsExprNeedsParens prec e
     hsExpandedNeedsParens _            = False
 
@@ -1276,7 +1276,7 @@ isAtomicHsExpr (XExpr x)
     go_x_rn (ExpandedThingRn thing _)   = isAtomicExpandedThingRn thing
     go_x_rn (HsRecSelRn{})              = True
 
-    isAtomicExpandedThingRn :: ErrCtxtMsg -> Bool
+    isAtomicExpandedThingRn :: HsCtxt -> Bool
     isAtomicExpandedThingRn (ExprCtxt e) = isAtomicHsExpr e
     isAtomicExpandedThingRn _            = False
 

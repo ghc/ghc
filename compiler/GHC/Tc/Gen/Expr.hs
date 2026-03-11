@@ -825,11 +825,11 @@ The rest of this Note explains how that is done.
 
 * The type checker error-stack element `GHC.Tc.Types.ErrCtxt.ErrCtxt`
   has two fields
-     data ErrCtxt = MkErrCtxt CodeSrcFlag ErrCtxt
+     data ErrCtxt = MkErrCtxt CodeSrcFlag ErrCtxtMsg
 
     * `CodeSrcFlag` says whether we are typechecking an expanded thing,
       and what that expanded thing is.
-    * `ErrCtxtMsgM` stores the pre-text error message itself.
+    * `ErrCtxtMsg` stores the text error message itself.
 
   When called on an `XExpr`, `addLExprCtxt`, adds the user written thing
   `ue`, and the error message provided by the caller on the `ErrCtxtStack` See
@@ -1386,7 +1386,7 @@ expandRecordUpd :: LHsExpr GhcRn
                            -- Expanded record update expression
                         , TcType
                            -- result type of expanded record update
-                        , ErrCtxtMsg
+                        , HsCtxt
                            -- error context to push when typechecking
                            -- the expanded code
                         )

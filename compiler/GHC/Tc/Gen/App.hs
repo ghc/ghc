@@ -2050,7 +2050,7 @@ mk_origin fun_lspan_arg rn_fun_arg rn_fun
   = return $ exprCtOrigin rn_fun_arg
   | otherwise
   = do { code_orig <- getSrcCodeOrigin
-       ; traceTc "mk_origin" (case (pprErrCtxtMsg <$> code_orig) of { Just e -> e; _ -> text "Nothing"})
+       ; traceTc "mk_origin" (case (pprHsCtxt <$> code_orig) of { Just e -> e; _ -> text "Nothing"})
        ; return $ srcCodeOriginCtOrigin rn_fun code_orig
        }
 

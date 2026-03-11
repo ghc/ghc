@@ -170,7 +170,7 @@ module GHC.Tc.Errors.Types (
   , TypeCannotBeMarshaledReason(..)
 
   -- * Error contexts
-  , ErrCtxtMsg(..)
+  , HsCtxt(..)
   ) where
 
 import GHC.Prelude
@@ -290,7 +290,7 @@ existence of these two types, which for now remain a "necessary evil".
 -- | The majority of TcRn messages come with extra context about the error,
 -- and this newtype captures it. See Note [Migrating TcM Messages].
 data ErrInfo = ErrInfo {
-    errInfoContext :: ![ErrCtxtMsg]
+    errInfoContext :: ![HsCtxt]
     -- ^ Extra context associated to the error.
   , errInfoSupplementary :: !(Maybe (HoleFitDispConfig, [SupplementaryInfo]))
     -- ^ Extra supplementary info associated to the error.
@@ -446,7 +446,7 @@ data TcRnMessage where
   -}
   TcRnTypeDoesNotHaveFixedRuntimeRep :: !Type
                                      -> !FixedRuntimeRepProvenance
-                                     -> ![ErrCtxtMsg] -- Extra info accumulated in the TcM monad
+                                     -> ![HsCtxt] -- Extra info accumulated in the TcM monad
                                      -> TcRnMessage
 
   {-| TcRnImplicitLift is a warning (controlled with -Wimplicit-lift) that occurs when
@@ -458,7 +458,7 @@ data TcRnMessage where
 
      Test cases: th/T17804
   -}
-  TcRnImplicitLift :: Name -> ![ErrCtxtMsg] -> TcRnMessage
+  TcRnImplicitLift :: Name -> ![HsCtxt] -> TcRnMessage
 
   {-| TcRnUnusedPatternBinds is a warning (controlled with -Wunused-pattern-binds)
       that occurs if a pattern binding binds no variables at all, unless it is a
@@ -6170,7 +6170,7 @@ data FixedRuntimeRepErrorInfo
 
 -- | An error message context, for errors in the renamer.
 --
--- TODO: this should probably get merged in some way with 'ErrCtxtMsg',
+-- TODO: this should probably get merged in some way with 'HsCtxt',
 -- but that's a battle for another day.
 data HsDocContext
   = TypeSigCtx [LocatedN RdrName]
