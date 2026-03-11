@@ -120,6 +120,8 @@ workflow:
       DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13-ghc9_10:$DOCKER_REV"
     - GHC_VERSION: 9.12.2
       DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13-ghc9_12:$DOCKER_REV"
+    - GHC_VERSION: 9.14.1
+      DOCKER_IMAGE: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13-ghc9_14:$DOCKER_REV"
 
 # Allow linters to fail on draft MRs.
 # This must be explicitly transcluded in lint jobs which
