@@ -605,9 +605,19 @@ void checkHeapChain (bdescr *bd)
                 ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
                 p += size;
 
-                /* skip over slop, see Note [slop on the heap] */
-                while (p < bd->free &&
-                       (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR(*p))) { p++; }
+                /* skip slop; loop because an array may have been shrunk
+                   multiple times.  See Note [slop on the heap] in Storage.c
+                   and Note [shrink-array slop marker] in PrimOps.cmm. */
+                while (p < bd->free) {
+                    if (!*p) {
+                        p++;
+                    } else if (*p == (StgWord)(-1)) {
+                        StgWord skip = *(p + 1);
+                        p += 2 + skip;
+                    } else {
+                        break;
+                    }
+                }
             }
         }
     }
@@ -1013,9 +1023,9 @@ static void checkGeneration (generation *gen,
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // heap sanity checking doesn't work with SMP for two reasons:
     //
-    //   * We can't zero the slop. However, we can sanity-check the heap after a
+    //   * We can't mark the slop. However, we can sanity-check the heap after a
     //     major gc, because there is no slop. See also Updates.h and Note
-    //     [zeroing slop when overwriting closures].
+    //     [marking slop when overwriting immutable closures].
     //
     //   * The nonmoving collector may be mutating its large object lists,
     //     unless we were in fact called by the nonmoving collector.

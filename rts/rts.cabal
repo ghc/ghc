@@ -473,7 +473,7 @@ library
                  TSANUtils.c
                  WSDeque.c
                  Weak.c
-                 ZeroSlop.c
+                 MarkSlop.c
                  eventlog/EventLog.c
                  eventlog/EventLogWriter.c
                  hooks/FlagDefaults.c

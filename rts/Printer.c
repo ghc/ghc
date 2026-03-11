@@ -1001,8 +1001,19 @@ findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
             if (UNTAG_CONST_CLOSURE((StgClosure*)*q) == (const StgClosure *)p) {
                 if (i < arr_size) {
                     for (r = bd->start; r < bd->free; r = end) {
-                        // skip over zeroed-out slop
-                        while (*r == 0) r++;
+                        // skip over marked slop; loop because an array
+                        // may have been shrunk multiple times.
+                        // See Note [shrink-array slop marker] in PrimOps.cmm.
+                        while (r < bd->free) {
+                            if (!*r) {
+                                r++;
+                            } else if (*r == (StgWord)(-1)) {
+                                StgWord skip = *(r + 1);
+                                r += 2 + skip;
+                            } else {
+                                break;
+                            }
+                        }
                         if (!LOOKS_LIKE_CLOSURE_PTR(r)) {
                             debugBelch("%p found at %p, no closure at %p\n",
                                        p, q, r);

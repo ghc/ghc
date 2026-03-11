@@ -383,7 +383,7 @@ threadPaused(Capability *cap, StgTSO *tso)
                     }
                 }
 
-                // zero out the slop so that the sanity checker can tell
+                // mark the slop so that the sanity checker can tell
                 // where the next closure is. N.B. We mustn't do this until we have
                 // pushed the free variables to the update remembered set above.
                 OVERWRITING_CLOSURE_SIZE(bh, closure_sizeW_(bh, INFO_PTR_TO_STRUCT(bh_info)));

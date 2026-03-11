@@ -1663,9 +1663,42 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
     case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY: {
         StgSmallMutArrPtrs *arr = (StgSmallMutArrPtrs *) p;
-        for (StgWord i = 0; i < arr->ptrs; i++) {
-            StgClosure **field = &arr->payload[i];
-            markQueuePushClosure(queue, ACQUIRE_LOAD(field), field);
+        StgWord n = arr->ptrs;
+        if (n == 0) break;
+
+        for (StgWord i = 0; i < n; i++) {
+            StgClosure *c = ACQUIRE_LOAD(&arr->payload[i]);
+            // If NULL or -1, we know the rest is slop
+            if (c == NULL || c == (StgClosure *)(-1)) break;
+            // A valid skip count at position i must satisfy
+            //   i + skip <= n-1  (sentinel at i-1, count at i, skip more words)
+            // i.e. skip < n-i.  If c is out of that range it cannot be a skip
+            // count, so we must have read a valid closure pointer.
+            bool maybe_slop_count = (StgWord)c < n - i;
+            if (maybe_slop_count && i != 0) {
+                // Otherwise re-read the previous element: the mutator may have
+                // written -1 there after we last saw it, making the current
+                // word the skip count rather than a valid closure pointer.
+                //
+                // The ACQUIRE_LOAD of payload[i] above synchronizes with the
+                // RELEASE_STORE in writeSlopMarker, so a RELAXED_LOAD suffices
+                // here; see Note [Slop marker memory ordering] in
+                // rts/include/rts/storage/ClosureMacros.h.
+                if (RELAXED_LOAD(&arr->payload[i-1]) == (StgClosure *)(-1)) break;
+            }
+
+            // Track origin so indirections reached through array elements get
+            // short-cut (see Note [Origin references in the nonmoving
+            // collector] in NonMovingMark.h), but only when c cannot be a skip
+            // count, i.e. c >= n-i.
+            // The collapse rewrites the cell with a CAS that fires only if it
+            // still holds c; restricting to c >= n-i guarantees c differs from
+            // any skip count the mutator could write at this cell while
+            // concurrently shrinking the array, so the CAS can never clobber a
+            // slop marker. Real heap addresses are far above n, so in practice
+            // every element is still short-cut.
+            StgClosure **origin = maybe_slop_count ? NULL : &arr->payload[i];
+            markQueuePushClosure(queue, c, origin);
         }
         break;
     }

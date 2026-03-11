@@ -2026,7 +2026,7 @@ static void normaliseRtsOpts (void)
 
 #if !defined(PROFILING) && !defined(DEBUG)
     // The mark-region collector is incompatible with heap census unless
-    // we zero slop of blackhole'd thunks, which doesn't happen in the
+    // we mark slop of blackhole'd thunks, which doesn't happen in the
     // vanilla way. See #9666.
     if (RtsFlags.ProfFlags.doHeapProfile && RtsFlags.GcFlags.sweep) {
         barf("The mark-region collector can only be used with profiling\n"

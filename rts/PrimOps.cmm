@@ -216,8 +216,31 @@ stg_isMutableByteArrayWeaklyPinnedzh ( gcptr mba )
  *    point if it's an older generation block, the mutator won't
  *    allocate into those blocks anyway.
  *
- * If check fails, fall back to the conservative code path: just zero the slop
+ * If check fails, fall back to the conservative code path: just mark the slop
  * and return when shrinking, or allocate a new array when growing.
+ */
+
+/* Note [shrink-array slop marker]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * When shrinkSmallMutableArray# or shrinkMutableByteArray# creates n words of
+ * slop at address `slop_start`, we write an O(1) marker so that the heap
+ * census (heapCensus in ProfHeap.c) and the sanity checker (checkHeapChain in
+ * Sanity.c) can skip over the slop without reading stale heap pointers.
+ *
+ * The marker scheme (let n = number of slop words):
+ *
+ *   n == 0  nothing written (no slop)
+ *   n == 1  slop[0] = 0
+ *   n >= 2  slop[0] = (StgWord)(-1)   -- sentinel (0xFFFF...FFFF)
+ *           slop[1] = n - 2           -- words remaining after the two-word header
+ *
+ * The sentinel value (StgWord)(-1) is safe because info-table pointers always
+ * live in the text segment; 0xFFFF...FFFF is never a valid info pointer.
+ *
+ * An array may be shrunk multiple times, leaving consecutive slop regions.
+ * Traversal code must therefore loop over all slop regions before advancing
+ * to the next live closure.  See the while-loops in heapCensusBlock (ProfHeap.c)
+ * and checkHeapChain (Sanity.c).
  */
 
 // shrink size of MutableByteArray in-place
@@ -236,7 +259,11 @@ stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
    bd = Bdescr(mba);
    if (bdescr_free(bd) != mba + WDS(old_wds) ||
        (bd != StgRegTable_rCurrentAlloc(BaseReg) && bd != Capability_pinned_object_block(MyCapability()))) {
-       OVERWRITING_CLOSURE_MUTABLE(mba, new_wds);
+       /* fall-back: not at end of nursery block; write slop marker.
+          See Note [shrink-array slop marker] */
+       W_ n;
+       n = old_wds - new_wds;
+       foreign "C" stg_writeSlopMarker(mba + WDS(new_wds) "ptr", n);
        StgArrBytes_bytes(mba) = new_size;
        // No need to call PROF_HEADER_CREATE. See Note [LDV profiling and resizing arrays]
        return ();
@@ -321,8 +348,16 @@ again:
      }
    }
 
-   OVERWRITING_CLOSURE_MUTABLE(mba, (BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) +
-                                     new_size));
+   /* Write slop marker. See Note [shrink-array slop marker] */
+   W_ old_size_sma, n_sma, slop_start;
+   old_size_sma = StgSmallMutArrPtrs_ptrs(mba);
+   n_sma = old_size_sma - new_size;
+   slop_start = mba + SIZEOF_StgSmallMutArrPtrs + WDS(new_size);
+   foreign "C" stg_writeSlopMarker(slop_start "ptr", n_sma);
+
+   // No ordering needed: the concurrent mark thread bounds the slop with the
+   // marker's own release/acquire (Note [Slop marker memory ordering]), not
+   // with this store, and reading the new size it never scans the slop.
    StgSmallMutArrPtrs_ptrs(mba) = new_size;
    // No need to call PROF_HEADER_CREATE. See Note [LDV profiling and resizing arrays]
 

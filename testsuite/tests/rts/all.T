@@ -702,3 +702,11 @@ test('T27123', [when(have_profiling(), extra_ways(['prof']))], compile_and_run, 
 test('T27434',
      extra_ways(['compacting_gc']),
      compile_and_run, [''])
+
+test('T19048',
+     [ omit_ghci
+     , no_check_hp
+     , js_skip
+     , extra_run_opts('+RTS -hT -i0 -RTS')
+     ],
+     compile_and_run, ['-O -rtsopts'])

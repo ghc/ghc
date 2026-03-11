@@ -659,15 +659,9 @@
 #if defined(PROFILING) || defined(DEBUG)
 #define OVERWRITING_CLOSURE_SIZE(c, size) foreign "C" stg_overwritingClosureSize(c "ptr", size)
 #define OVERWRITING_CLOSURE(c) foreign "C" stg_overwritingClosure(c "ptr")
-#define OVERWRITING_CLOSURE_MUTABLE(c, off) foreign "C" stg_overwritingMutableClosureOfs(c "ptr", off)
 #else
 #define OVERWRITING_CLOSURE_SIZE(c, size) /* nothing */
 #define OVERWRITING_CLOSURE(c) /* nothing */
-/* This is used to zero slop after shrunk arrays. It is important that we do
- * this whenever profiling is enabled as described in Note [slop on the heap]
- * in Storage.c. */
-#define OVERWRITING_CLOSURE_MUTABLE(c, off) \
-    if (TO_W_(RtsFlags_ProfFlags_doHeapProfile(RtsFlags)) != 0) { foreign "C" stg_overwritingMutableClosureOfs(c "ptr", off); }
 #endif
 
 #define IS_STACK_CLEAN(stack) \

@@ -1033,29 +1033,30 @@ accountAllocation(Capability *cap, W_ n)
  *
  *   During GC the RTS overwrites closures with forwarding pointers, this can
  *   leave slop behind depending on the size of the closure being
- *   overwritten. See Note [zeroing slop when overwriting closures].
+ *   overwritten. See Note [marking slop when overwriting immutable closures].
  *
- * Under various ways we actually zero slop so we can linearly scan over blocks
- * of closures. This trick is used by the sanity checking code and the heap
- * profiler, see Note [skipping slop in the heap profiler].
+ * To allow the heap profiler and sanity checker to linearly scan over heap
+ * blocks, slop must be identifiable without reading stale heap pointers.
+ * See Note [skipping slop in the heap profiler]
  *
- * In general we zero:
+ * Shrunk-array slop has a further, concurrent reader: the non-moving GC mark
+ * thread scans SmallMutArrPtrs payloads while the mutator may be shrinking
+ * them, so it must identify the slop with the right memory ordering. See Note
+ * [Slop marker memory ordering] in ClosureMacros.h.
  *
+ * For pinned/large-object alignment slop we use explicit zeroing:
  *  - Pinned object alignment slop, see MEMSET_SLOP_W in allocatePinned.
  *  - Large object alignment slop, see MEMSET_SLOP_W in allocatePinned.
- *  - Shrunk array slop, see OVERWRITING_CLOSURE_MUTABLE.
  *
- * Note that this is necessary even in the vanilla (e.g. non-profiling) RTS
- * since the user may trigger a heap census via +RTS -hT, which can be used
- * even when not linking against the profiled RTS. Failing to zero slop
- * due to array shrinking has resulted in a few nasty bugs (#17572, #9666).
- * However, since array shrink may result in large amounts of slop (unlike
- * alignment), we take care to only zero such slop when heap profiling or DEBUG
- * are enabled.
+ * For shrunk-array slop we write an O(1) marker in all build modes.
+ * See Note [shrink-array slop marker] in PrimOps.cmm for the encoding.
+ * This replaces the old approach of zeroing the entire slop region, which was a
+ * no-op in vanilla (non-profiling, non-debug) builds and caused heap-census
+ * crashes (#19048, #17572, #9666).
  *
- * When performing LDV profiling or using a (single threaded) debug RTS we zero
- * slop even when overwriting immutable closures, see Note [zeroing slop when
- * overwriting closures].
+ * When performing LDV profiling or using a (single threaded) debug RTS we mark
+ * slop even when overwriting immutable closures, see Note [marking slop when
+ * overwriting immutable closures].
  */
 
 /*

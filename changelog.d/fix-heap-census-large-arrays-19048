@@ -1,0 +1,6 @@
+section: rts
+synopsis: Correctly mark slop bytes when shrinking large arrays.
+  Heap census no longer traverses garbage-collected closures when profiling
+  is off.
+issues: #19048
+mrs: !15685

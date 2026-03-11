@@ -1317,20 +1317,37 @@ heapCensusBlock(Census *census, bdescr *bd)
 
         p += size;
 
-        /* skip over slop, see Note [slop on the heap] */
-        while (p < bd->free && !*p) p++;
-        /* Note [skipping slop in the heap profiler]
-         * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-         * We make sure to zero slop that can remain after a major GC so
-         * here we can assume any slop words we see until the block's free
-         * pointer are zero. Since info pointers are always nonzero we can
-         * use this to scan for the next valid heap closure.
-         *
-         * Note that not all types of slop are relevant here, only the ones
-         * that can remain after major GC. So essentially just large objects
-         * and pinned objects. All other closures will have been packed nice
-         * and tight into fresh blocks.
-         */
+        /* skip over slop (zero words from large/pinned objects, or
+           shrink-array slop markers); loop because an array may have been
+           shrunk multiple times, leaving consecutive slop regions.
+           See Note [slop on the heap] and Note [shrink-array slop marker]
+           in PrimOps.cmm.
+
+           Note [skipping slop in the heap profiler]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+           Slop left behind after major GC comes in two forms:
+
+            1. Zero words: alignment padding for large/pinned objects.
+               We zero these explicitly (see MEMSET_SLOP_W in allocatePinned).
+
+            2. Shrink-array slop markers: written by stg_shrinkMutableByteArrayzh
+               and stg_shrinkSmallMutableArrayzh in all build modes.  A single-word
+               slop region is represented as a zero word; a multi-word region begins
+               with the sentinel (StgWord)(-1) followed by a count of additional
+               words.  See Note [shrink-array slop marker] in PrimOps.cmm.
+
+           Because an array can be shrunk multiple times, we loop until we
+           see a word that looks like a valid info pointer. */
+        while (p < bd->free) {
+            if (!*p) {
+                p++;
+            } else if (*p == (StgWord)(-1)) {
+                StgWord skip = *(p + 1);
+                p += 2 + skip;
+            } else {
+                break;
+            }
+        }
     }
 }
 
