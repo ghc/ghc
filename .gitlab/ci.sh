@@ -737,7 +737,7 @@ function test_hadrian() {
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
     install_bindist _build/bindist/ghc-*/ "$instdir"
 
-    if [[ "${WINDOWS_HOST}" == "no" ]] && [ -z "${CROSS_TARGET:-}" ]
+    if [[ "${CI_JOB_NAME}" != *"windows"* ]] && [ -z "${CROSS_TARGET:-}" ]
     then
       run_hadrian \
         test \
@@ -920,7 +920,16 @@ function save_test_output() {
 function save_cache () {
   info "Storing cabal cache from $CABAL_DIR to $CABAL_CACHE..."
   rm -Rf "$CABAL_CACHE"
-  cp -Rf "$CABAL_DIR" "$CABAL_CACHE"
+  if [[ "${CI_JOB_NAME}" == *"darwin"* ]]; then
+    # -a makes APFS behave like a COW file system
+    # From man CP(1)
+    # copy files using clonefile(2). 
+    # Note that if clonefile(2) is not supported for the target filesystem, 
+    # then cp will fallback to using copyfile(2) instead to ensure the copy still succeeds.
+    cp -Rcf "$CABAL_DIR" "$CABAL_CACHE"
+  else
+    cp -Rf "$CABAL_DIR" "$CABAL_CACHE"
+  fi
 }
 
 function clean() {
@@ -1024,11 +1033,12 @@ case "$(uname)" in
     exe=".exe"
     # N.B. cabal-install expects CABAL_DIR to be a Windows path
     CABAL_DIR="$(cygpath -w "$CABAL_DIR")"
-    WINDOWS_HOST="yes"
+    ;;
+  Darwin*)
+    exe=""
     ;;
   *)
     exe=""
-    WINDOWS_HOST="no"
     ;;
 esac
 
