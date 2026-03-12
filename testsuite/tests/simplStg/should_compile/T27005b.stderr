@@ -1,0 +1,16 @@
+
+==================== CodeGenAnal STG: ====================
+(T27005b.f, <TagFun[TagTuple[TagEPT]]>) =
+    {} \r [(x, <TagVal[TagDunno]>)]
+        case x of (x1, <TagVal[TagEPT]>) {
+        __DEFAULT -> GHC.Internal.Types.MkSolo# [x1];
+        };
+
+(T27005b.g, <TagFun[TagEPT]>) =
+    {} \r [(h, <TagVal[TagDunno]>)]
+        case T27005b.f h of (ds, <TagVal[TagEPT]>) {
+        GHC.Internal.Types.MkSolo# (ipv, <TagVal[TagEPT]>) ->
+        case ipv of (x, <TagVal[TagEPT]>) { __DEFAULT -> (,) [x x]; };
+        };
+
+

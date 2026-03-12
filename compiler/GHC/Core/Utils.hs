@@ -2979,7 +2979,7 @@ tag inference we get:
     Str=<1L><ML>,
     Unf=OtherCon []] =
         {} \r [x y]
-            case x<TagProper> of x' [Occ=Once1] {
+            case x<TagVal[TagEPT]> of x' [Occ=Once1] {
               __DEFAULT ->
                   case y of y' [Occ=Once1] {
                   __DEFAULT ->
@@ -3004,8 +3004,8 @@ Here comes the tricky part: If we make $wloop strict in both x/y and we get:
     Str=<1L><!L>,
     Unf=OtherCon []] =
         {} \r [x y]
-            case y<TagProper> of y' [Occ=Once1] { __DEFAULT ->
-            case x<TagProper> of x' [Occ=Once1] {
+            case y<TagVal[TagEPT]> of y' [Occ=Once1] { __DEFAULT ->
+            case x<TagVal[TagEPT]> of x' [Occ=Once1] {
               __DEFAULT ->
                   case Find.$wmyPred y' of pred_y [Occ=Once1] {
                   __DEFAULT ->

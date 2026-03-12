@@ -42,9 +42,6 @@ A pointer is Evaluated and Properly Tagged (EPT) when the pointer
 
 A binder is EPT when all the runtime pointers it binds are EPT.
 
-Note that a lifted EPT pointer will never point to a thunk, nor will it be
-tagged `000` (meaning "might be a thunk").
-
 See https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/haskell-execution/pointer-tagging
 for more information on pointer tagging.
 
@@ -59,11 +56,15 @@ Examples:
 * In practice, GHC also guarantees that strict fields (and others) are EPT;
   see Note [EPT enforcement].
 
-Caveat:
-Currently, the proper tag for builtin *unlifted* data types such as `Array#` is
-not `001` but `000`, which is not a proper tag for lifted data.
-This means that UnliftedRep is not a proper sub-rep of LiftedRep.
-SG thinks it would be good to fix this; see #21792.
+Wrinkles:
+
+EPT1:  The proper tag for builtin *unlifted* data types such as `Array#` is
+       not `001` but `000`, which is not a proper tag for lifted data.
+       This means that UnliftedRep is not a proper sub-rep of LiftedRep.
+       SG thinks it would be good to fix this; see #21792.
+EPT2:  The proper tag for PAPs is `000`, so there are values from lifted data types
+       that are EPT with a zero tag.
+EPT3:  Non-pointer values don't have a tag at all, but we still treat them as EPT.
 
 Note [EPT enforcement]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -251,18 +252,39 @@ might destroy the EPT Invariant, hence we need to enforce the EPT invariant
 
 {- Note [TagInfo of functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The purpose of tag inference is really to figure out when we don't have to enter
-value closures. There the meaning of the tag is fairly obvious.
-For functions we never make use of the tag info so we have two choices:
-* Treat them as TagDunno
-* Treat them as TagProper (as they *are* tagged with their arity) and be really
-  careful to make sure we still enter them when needed.
-As it makes little difference for runtime performance I've treated functions as TagDunno in a few places where
-it made the code simpler. But besides implementation complexity there isn't any reason
-why we couldn't be more rigorous in dealing with functions.
+'TagFun' represents an evaluated function and carries the return-value TagInfo
+for saturated calls. See Note [TagSig and TagInfo] in GHC.Stg.EnforceEpt.TagSig.
 
-NB: It turned in #21193 that PAPs get tag zero, so the tag check can't be omitted for functions.
-So option two isn't really an option without reworking this anyway.
+Join points (StgLetNoEscape) are treated like functions: they are jumped to,
+never entered via a closure pointer. Even nullary join points get TagFun
+rather than TagVal TagDunno, so their return-value info flows through.
+
+Additionally we also special case bottoming functions.
+See Note [Bottom functions are TagBottoming].
+
+Function values when properly tagged have either their arity, 1 for very large
+arities, or zero for PAPs (#21193) as tag. However the runtime currently doesn't
+maintain the EPT status of function pointers. So while we keep track of
+evaluated function binders using 'TagFun' this has a weaker guarantee than for
+values. For functions it only represents a pointer to an evaluated function, but
+doesn't give any guarantee about the function's pointer tag.
+
+Sadly because PAPs get tag zero (#21193), other issues in the RTS (#21193) and
+the potential of over/underapplication of arguments, even evaluated function
+binders still require inspection of their closure before they can be applied.
+That is, even if we have
+
+    case f of f' -> ... f' x ...
+
+the code for `f' x` can't be made meaningfully more efficient by knowing `f'` is
+already evaluated.
+
+However tracking evaluation status for functions is still worthwhile, as we rely
+on the EPT pass to force strict constructor fields. For an application
+`StrictJust f` we would usually insert an eval of `f` around the constructor
+application. However if we infer `f` to be already evaluated we can avoid this,
+which was a significant performance benefit in #27005. Similarly we can still
+turn redundant eval-cases on functions into a no-op.
 
 Note [EPT enforcement debugging]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -351,7 +373,6 @@ type InferExtEq i = ( XLet i ~ XLet 'InferTaggedBinders
 
 inferTags :: Bool -> [GenStgTopBinding 'CodeGen] -> [GenStgTopBinding 'InferTaggedBinders]
 inferTags for_bytecode binds =
-  -- pprTrace "Binds" (pprGenStgTopBindings shortStgPprOpts $ binds) $
   snd (mapAccumL inferTagTopBind (initEnv for_bytecode) binds)
 
 -----------------------
@@ -379,18 +400,20 @@ inferTagExpr env (StgApp fun args)
     !fun_arity = idArity fun
     info
          -- It's important that we check for bottoms before all else.
-         -- See Note [Bottom functions are TagTagged] and #24806 for why.
+         -- See Note [Bottom functions are TagBottoming] and #24806 for why.
          | isDeadEndAppSig (idDmdSig fun) (length args)
-         = TagTagged
+         = TagBottoming
 
          | fun_arity == 0 -- Unknown arity => Thunk or unknown call
          = TagDunno
 
-         | Just (TagSig res_info) <- tagSigInfo (idInfo fun)
+         -- Imported function with known return tag
+         | Just (TagFun res_info) <- tagSigInfo (idInfo fun)
          , fun_arity == length args  -- Saturated
          = res_info
 
-         | Just (TagSig res_info) <- lookupSig env fun
+         -- Local function with known return tag
+         | Just res_info <- lookupReturnInfo env fun
          , fun_arity == length args  -- Saturated
          = res_info
 
@@ -402,7 +425,7 @@ inferTagExpr env (StgConApp con cn args tys)
   = (inferConTag env con args, StgConApp con cn args tys)
 
 inferTagExpr _ (StgLit l)
-  = (TagTagged, StgLit l)
+  = (TagEPT, StgLit l)
 
 inferTagExpr env (StgTick tick body)
   = (info, StgTick tick body')
@@ -436,7 +459,7 @@ inferTagExpr in_env (StgCase scrut bndr ty alts)
         mk_bndr :: BinderP p -> TagInfo -> (Id, TagSig)
         mk_bndr tup_bndr tup_info =
             --  pprTrace "mk_ubx_bndr_info" ( ppr bndr <+> ppr info ) $
-            (getBinderId in_env tup_bndr, TagSig tup_info)
+            (getBinderId in_env tup_bndr, TagVal tup_info)
         -- no case binder in alt_env here, unboxed tuple binders are dead after unarise
         alt_env = extendSigEnv in_env bndrs'
         (info, rhs') = inferTagExpr alt_env rhs
@@ -468,16 +491,16 @@ inferTagExpr in_env (StgCase scrut bndr ty alts)
                   , let (alt_env,bndrs') = addAltBndrInfo case_env con bndrs
                         (info, rhs') = inferTagExpr alt_env rhs
                   ]
-        alt_info = foldr combineAltInfo TagTagged infos
+        alt_info = foldr combineAltInfo TagBottoming infos
     in ( alt_info, StgCase scrut' bndr' ty alts')
   where
     -- Single unboxed tuple alternative
     scrut_infos bndrs = case scrut_info of
-      TagTagged -> Just $ replicate (length bndrs) TagProper
+      TagBottoming -> Just $ replicate (length bndrs) TagBottoming
       TagTuple infos -> Just infos
       _ -> Nothing
     (scrut_info, scrut') = inferTagExpr in_env scrut
-    bndr' = (getBinderId in_env bndr, TagSig TagProper)
+    bndr' = (getBinderId in_env bndr, TagVal TagEPT)
 
 -- Compute binder sigs based on the constructors strict fields.
 -- NB: Not used if we have tuple info from the scrutinee.
@@ -493,7 +516,7 @@ addAltBndrInfo env (DataAlt con) bndrs
     mk_bndr :: (BinderP p -> StrictnessMark -> (Id, TagSig))
     mk_bndr bndr mark
       | isUnliftedType (idType id) || isMarkedStrict mark
-      = (id, TagSig TagProper)
+      = (id, TagVal TagEPT)
       | otherwise
       = noSig env bndr
         where
@@ -513,7 +536,7 @@ inferTagBind in_env (StgNonRec bndr rhs)
     (env', StgNonRec (id, out_sig) rhs')
   where
     id   = getBinderId in_env bndr
-    (in_sig,rhs') = inferTagRhs id in_env rhs
+    (in_sig, rhs') = inferTagRhs id in_env rhs
     out_sig = mkLetSig in_env in_sig
     env' = extendSigEnv in_env [(id, out_sig)]
 
@@ -526,13 +549,12 @@ inferTagBind in_env (StgRec pairs)
     init_sigs         = map (initSig) $ zip in_ids rhss
     (out_env, pairs') = go in_env init_sigs rhss
 
-    go :: forall q. (OutputableInferPass q , InferExtEq q) => TagEnv q -> [TagSig] -> [GenStgRhs q]
-                 -> (TagSigEnv, [((Id,TagSig), GenStgRhs 'InferTaggedBinders)])
+    go :: forall q. (OutputableInferPass q , InferExtEq q)
+       => TagEnv q -> [TagSig] -> [GenStgRhs q]
+       -> (TagSigEnv, [((Id,TagSig), GenStgRhs 'InferTaggedBinders)])
     go go_env in_sigs go_rhss
-      --   | pprTrace "go" (ppr in_ids $$ ppr in_sigs $$ ppr out_sigs $$ ppr rhss') False
-      --  = undefined
        | in_sigs == out_sigs = (te_env rhs_env, out_bndrs `zip` rhss')
-       | otherwise     = go env' out_sigs rhss'
+       | otherwise           = go env' out_sigs rhss'
        where
          in_bndrs = in_ids `zip` in_sigs
          out_bndrs = map updateBndr in_bndrs -- TODO: Keeps in_ids alive
@@ -542,25 +564,28 @@ inferTagBind in_env (StgRec pairs)
 
          anaRhs :: Id -> GenStgRhs q -> (TagSig, GenStgRhs 'InferTaggedBinders)
          anaRhs bnd rhs =
-            let (sig_rhs,rhs') = inferTagRhs bnd rhs_env rhs
+            let (sig_rhs, rhs') = inferTagRhs bnd rhs_env rhs
             in (mkLetSig go_env sig_rhs, rhs')
 
 
          updateBndr :: (Id,TagSig) -> (Id,TagSig)
          updateBndr (v,sig) = (setIdTagSig v sig, sig)
 
+-- Initial signature for the fixpoint loop.
 initSig :: forall p. (Id, GenStgRhs p) -> TagSig
--- Initial signature for the fixpoint loop
-initSig (_bndr, StgRhsCon {})               = TagSig TagTagged
-initSig (bndr, StgRhsClosure _ _ _ _ _ _) =
-  fromMaybe defaultSig (idTagSig_maybe bndr)
-  where defaultSig = (TagSig TagTagged)
+initSig (_bndr, StgRhsCon {})
+  = TagVal TagBottoming
+initSig (bndr, StgRhsClosure _ _ _ bndrs _ _)
+  | notNull bndrs || isJoinId bndr
+  = fromMaybe (TagFun TagBottoming) (idTagSig_maybe bndr)
+  | otherwise  -- thunk
+  = fromMaybe (TagVal TagBottoming) (idTagSig_maybe bndr)
 
-{- Note [Bottom functions are TagTagged]
+{- Note [Bottom functions are TagBottoming]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have a function with two branches with one
 being bottom, and the other returning a tagged
-unboxed tuple what is the result? We give it TagTagged!
+unboxed tuple what is the result? We give it TagBottoming!
 To answer why consider this function:
 
 foo :: Bool -> (# Bool, Bool #)
@@ -575,7 +600,7 @@ branches are tagged.
 This is safe because the function is still always called/entered as long
 as it's applied to arguments. Since the function will never return we can give
 it safely any tag sig we like.
-So we give it TagTagged, as it allows the combined tag sig of the case expression
+So we give it TagBottoming, as it allows the combined tag sig of the case expression
 to be the combination of all non-bottoming branches.
 
 NB: After the analysis is done we go back to treating bottoming functions as
@@ -593,13 +618,20 @@ inferTagRhs :: forall p.
   -> GenStgRhs p -- ^
   -> (TagSig, GenStgRhs 'InferTaggedBinders)
 inferTagRhs bnd_id in_env (StgRhsClosure ext cc upd bndrs body typ)
-  | isDeadEndId bnd_id && (notNull) bndrs
-  -- See Note [Bottom functions are TagTagged]
-  = (TagSig TagTagged, StgRhsClosure ext cc upd out_bndrs body' typ)
-  | otherwise
-  = --pprTrace "inferTagRhsClosure" (ppr (_top, _grp_ids, env,info')) $
-    (TagSig info', StgRhsClosure ext cc upd out_bndrs body' typ)
+  | isDeadEndId bnd_id && is_fun_or_join
+  -- See Note [Bottom functions are TagBottoming]
+  = ( TagFun TagBottoming
+    , StgRhsClosure ext cc upd out_bndrs body' typ)
+  | is_fun_or_join
+  = ( TagFun info
+    , StgRhsClosure ext cc upd out_bndrs body' typ)
+  | otherwise  -- thunk (never a join point)
+  = ( TagVal TagDunno
+    , StgRhsClosure ext cc upd out_bndrs body' typ)
   where
+    -- Join points are treated like functions. See Note [TagInfo of functions]
+    is_fun_or_join = notNull bndrs || isJoinId bnd_id
+
     out_bndrs
       | Just marks <- idCbvMarks_maybe bnd_id
       -- Sometimes an we eta-expand foo with additional arguments after ww, and we also trim
@@ -610,37 +642,29 @@ inferTagRhs bnd_id in_env (StgRhsClosure ext cc upd bndrs body typ)
 
     env' = extendSigEnv in_env out_bndrs
     (info, body') = inferTagExpr env' body
-    info'
-      -- It's a thunk
-      | null bndrs
-      = TagDunno
-      -- TODO: We could preserve tuple fields for thunks
-      -- as well. But likely not worth the complexity.
-
-      | otherwise  = info
 
     mkArgSig :: BinderP p -> CbvMark -> (Id,TagSig)
     mkArgSig bndp mark =
       let id = getBinderId in_env bndp
           tag = case mark of
-            MarkedCbv -> TagProper
+            MarkedCbv -> TagEPT
             _
-              | isUnliftedType (idType id) -> TagProper
+              | isUnliftedType (idType id) -> TagEPT
               | otherwise -> TagDunno
-      in (id, TagSig tag)
+      in (id, TagVal tag)
 
 inferTagRhs _ env _rhs@(StgRhsCon cc con cn ticks args typ)
 -- Constructors, which have untagged arguments to strict fields
 -- become thunks. We encode this by giving changing RhsCon nodes the info TagDunno
   = --pprTrace "inferTagRhsCon" (ppr grp_ids) $
-    (TagSig (inferConTag env con args), StgRhsCon cc con cn ticks args typ)
+    (TagVal (inferConTag env con args), StgRhsCon cc con cn ticks args typ)
 
 -- Adjust let semantics to the targeted backend.
 -- See Note [EPT enforcement for interpreted code]
 mkLetSig :: TagEnv p -> TagSig -> TagSig
 mkLetSig env in_sig
-  | for_bytecode = TagSig TagDunno
-  | otherwise = in_sig
+  | for_bytecode = TagVal TagDunno
+  | otherwise    = in_sig
   where
     for_bytecode = te_bytecode env
 
@@ -648,52 +672,53 @@ mkLetSig env in_sig
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @inferConTag@ will infer the proper tag signature for a binding who's RHS is a constructor
 or a StgConApp expression.
-Usually these will simply be TagProper. But there are exceptions.
+Usually these will simply be TagEPT. But there are exceptions.
 If any of the fields in the constructor are strict, but any argument to these
 fields is not tagged then we will have to case on the argument before storing
 in the constructor. Which means for let bindings the RHS turns into a thunk
 which obviously is no longer properly tagged.
 For example we might start with:
 
-    let x<TagDunno> = f ...
-    let c<TagProper> = StrictPair x True
+    let x<TagVal[TagDunno]> = f ...
+    let c<TagVal[TagEPT]> = StrictPair x True
 
 But we know during the rewrite stage x will need to be evaluated in the RHS
 of `c` so we will infer:
 
-    let x<TagDunno> = f ...
-    let c<TagDunno> = StrictPair x True
+    let x<TagVal[TagDunno]> = f ...
+    let c<TagVal[TagDunno]> = StrictPair x True
 
 Which in the rewrite stage will then be rewritten into:
 
-    let x<TagDunno> = f ...
-    let c<TagDunno> = case x of x' -> StrictPair x' True
+    let x<TagVal[TagDunno]> = f ...
+    let c<TagVal[TagDunno]> = case x of x' -> StrictPair x' True
 
 The other exception is unboxed tuples. These will get a TagTuple
 signature with a list of TagInfo about their individual binders
 as argument. As example:
 
-    let c<TagProper> = True
-    let x<TagDunno> = ...
-    let f<?> z = case z of z'<TagProper> -> (# c, x #)
+    let c<TagVal[TagEPT]> = True
+    let x<TagVal[TagDunno]> = ...
+    let f<?> z = case z of z'<TagVal[TagEPT]> -> (# c, x #)
 
-Here we will infer for f the Signature <TagTuple[TagProper,TagDunno]>.
+Here we will infer for f the Signature <TagFun[TagTuple[TagEPT,TagDunno]]>.
 This information will be used if we scrutinize a saturated application of
 `f` in order to determine the taggedness of the result.
 That is for `case f x of (# r1,r2 #) -> rhs` we can infer
-r1<TagProper> and r2<TagDunno> which allows us to skip all tag checks on `r1`
+r1<TagVal[TagEPT]> and r2<TagVal[TagDunno]> which allows us to skip all tag checks on `r1`
 in `rhs`.
 
 Things get a bit more complicated with nesting:
 
-    let closeFd<TagTuple[...]> = ...
+    let closeFd<TagFun[...]> = ...
     let f x = ...
         case x of
           _ -> Solo# closeFd
 
-The "natural" signature for the Solo# branch in `f` would be <TagTuple[TagTuple[...]]>.
-But we flatten this out to <TagTuple[TagDunno]> for the time being as it improves compile
-time and there doesn't seem to huge benefit to doing differently.
+We only keep track of function return types for bindings, not values:
+TagInfo has no constructor for "function with return info". Therefore the
+signature of `f` becomes <TagFun[TagTuple[TagEPT]]>. We lose the information
+about the return type of `closeFd`.
 
   -}
 
@@ -711,7 +736,7 @@ inferConTag env con args
     --     text "info:" <> ppr info) $
     info
   where
-    info = if any arg_needs_eval strictArgs then TagDunno else TagProper
+    info = if any arg_needs_eval strictArgs then TagDunno else TagEPT
     strictArgs = zipEqual args (dataConRuntimeRepStrictness con) :: ([(StgArg, StrictnessMark)])
     arg_needs_eval (arg,strict)
       -- lazy args
@@ -720,10 +745,10 @@ inferConTag env con args
       -- banged args need to be tagged, or require eval
       = not (isTaggedInfo tag)
 
-    flatten_arg_tag (TagTagged) = TagProper
-    flatten_arg_tag (TagProper ) = TagProper
-    flatten_arg_tag (TagTuple _) = TagDunno -- See Note [Constructor TagSigs]
-    flatten_arg_tag (TagDunno) = TagDunno
+    flatten_arg_tag TagBottoming    = TagEPT
+    flatten_arg_tag TagEPT          = TagEPT
+    flatten_arg_tag (TagTuple _)    = TagDunno -- See Note [Constructor TagSigs]
+    flatten_arg_tag TagDunno        = TagDunno
 
 
 collectExportInfo :: [GenStgTopBinding 'InferTaggedBinders] -> NameEnv TagSig
@@ -736,15 +761,14 @@ collectExportInfo binds =
     collect (StgTopLifted bnd) =
       case bnd of
         StgNonRec (id,sig) _rhs
-          | TagSig TagDunno <- sig -> []
+          | TagVal TagDunno     <- sig -> []
+          | TagVal TagBottoming <- sig -> []
           | otherwise -> [(idName id,sig)]
         StgRec bnds -> collectRec bnds
 
     collectRec :: [(BinderP 'InferTaggedBinders, rhs)] -> [(Name,TagSig)]
     collectRec [] = []
-    collectRec (bnd:bnds)
-      | (p,_rhs)  <- bnd
-      , (id,sig) <- p
-      , TagSig TagDunno <- sig
-      = (idName id,sig) : collectRec bnds
-      | otherwise = collectRec bnds
+    collectRec (((id,sig), _rhs) : bnds)
+      | TagVal TagDunno     <- sig = collectRec bnds
+      | TagVal TagBottoming <- sig = collectRec bnds
+      | otherwise                  = (idName id, sig) : collectRec bnds
