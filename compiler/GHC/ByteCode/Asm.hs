@@ -855,6 +855,12 @@ assembleI platform i = case i of
     emit_ bci_BRK_FUN [ Op p1, Op info_addr, Op info_unitid_addr
                       , SmallOp ix_hi, SmallOp ix_lo, Op np ]
 
+  HPC_TICK lbl ix -> do
+    p <- lit1 (BCONPtrLbl lbl)
+    let ix_hi = fromIntegral (ix `shiftR` 16)
+        ix_lo = fromIntegral (ix .&. 0xffff)
+    emit_ bci_HPC_TICK [Op p, SmallOp ix_hi, SmallOp ix_lo]
+
 #if MIN_VERSION_rts(1,0,3)
   BCO_NAME name            -> do np <- lit1 (BCONPtrStr name)
                                  emit_ bci_BCO_NAME [Op np]
