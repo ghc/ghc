@@ -59,6 +59,7 @@ import GHC.Internal.TH.Syntax
 -----------------------------------------------------
 
 class (MonadIO m, MonadFail m) => Quasi m where
+  qRunQ :: Q a -> m a
   -- | Fresh names. See 'newName'.
   qNewName :: String -> m Name
 
@@ -149,6 +150,7 @@ class (MonadIO m, MonadFail m) => Quasi m where
 --  type environment, so reification isn't going to
 --  work.
 instance Quasi IO where
+  qRunQ (Q m) = m id metaHandlersIO
   qNewName = newNameIO
 
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
@@ -180,8 +182,123 @@ instance Quasi IO where
   qGetDoc _             = badIO "getDoc"
   qAddDependentDirectory _ = badIO "AddDependentDirectory"
 
+metaHandlersIO :: MetaHandlers IO
+metaHandlersIO  = MetaHandlers {
+   mNewName = newNameIO
+  , mReport = \b msg ->
+     if b then
+       hPutStrLn stderr ("Template Haskell error: " ++ msg)
+     else
+       hPutStrLn stderr ("Template Haskell error: " ++ msg) -- TODO: should this be different from above?
+  , mLookupName           = \ _ _ -> badIO "lookupName"
+  , mReify                = \_ -> badIO "reify"
+  , mReifyFixity          = \_ -> badIO "reifyFixity"
+  , mReifyType            = \_ -> badIO "reifyFixity"
+  , mReifyInstances       = \_ _ -> badIO "reifyInstances"
+  , mReifyRoles           = \_ -> badIO "reifyRoles"
+  , mReifyAnnotations     = \_ -> badIO "reifyAnnotations"
+  , mReifyModule          = \_ -> badIO "reifyModule"
+  , mReifyConStrictness   = \_ -> badIO "reifyConStrictness"
+  , mLocation             = badIO "currentLocation"
+  , mRecover              = \_ _ -> badIO "recover" -- Maybe we could fix this?
+  , mGetPackageRoot       = badIO "getProjectRoot"
+  , mAddDependentFile     = \_ -> badIO "addDependentFile"
+  , mAddTempFile          = \_ -> badIO "addTempFile"
+  , mAddTopDecls          = \_ -> badIO "addTopDecls"
+  , mAddForeignFilePath   = \_ _ -> badIO "addForeignFilePath"
+  , mAddModFinalizer      = \_ -> badIO "addModFinalizer"
+  , mAddCorePlugin        = \_ -> badIO "addCorePlugin"
+  , mGetQ                 = badIO "getQ"
+  , mPutQ                 = \_ -> badIO "putQ"
+  , mIsExtEnabled         = \_ -> badIO "isExtEnabled"
+  , mExtsEnabled          = badIO "extsEnabled"
+  , mPutDoc               = \_ _ -> badIO "putDoc"
+  , mGetDoc               = \_ -> badIO "getDoc"
+  , mAddDependentDirectory = \_ -> badIO "AddDependentDirectory"
+  }
+
 instance Quote IO where
   newName = newNameIO
+
+data MetaHandlers m = MetaHandlers {
+    -- | Fresh names. See 'newName'.
+    mNewName :: String -> m Name
+
+    ------- Error reporting and recovery -------
+    -- | Report an error (True) or warning (False)
+    -- ...but carry on; use 'fail' to stop. See 'report'.
+    , mReport  :: Bool -> String -> m ()
+
+    -- | See 'recover'.
+    , mRecover :: forall a. Q a -- ^ the error handler
+            -> Q a -- ^ action which may fail
+            -> m a -- ^ Recover from the monadic 'fail'
+
+    ------- Inspect the type-checker's environment -------
+    -- | True <=> type namespace, False <=> value namespace. See 'lookupName'.
+    , mLookupName :: Bool -> String -> m (Maybe Name)
+    -- | See 'reify'.
+    , mReify          :: Name -> m Info
+    -- | See 'reifyFixity'.
+    , mReifyFixity    :: Name -> m (Maybe Fixity)
+    -- | See 'reifyType'.
+    , mReifyType      :: Name -> m Type
+    -- | Is (n tys) an instance? Returns list of matching instance Decs (with
+    -- empty sub-Decs) Works for classes and type functions. See 'reifyInstances'.
+    , mReifyInstances :: Name -> [Type] -> m [Dec]
+    -- | See 'reifyRoles'.
+    , mReifyRoles         :: Name -> m [Role]
+    -- | See 'reifyAnnotations'.
+    , mReifyAnnotations   :: forall a. Data a => AnnLookup -> m [a]
+    -- | See 'reifyModule'.
+    , mReifyModule        :: Module -> m ModuleInfo
+    -- | See 'reifyConStrictness'.
+    , mReifyConStrictness :: Name -> m [DecidedStrictness]
+
+    -- | See 'location'.
+    , mLocation :: m Loc
+
+    -- | See 'getPackageRoot'.
+    , mGetPackageRoot :: m FilePath
+
+    -- | See 'addDependentFile'.
+    , mAddDependentFile :: FilePath -> m ()
+
+    -- | See 'addDependentDirectory'.
+    , mAddDependentDirectory :: FilePath -> m ()
+
+    -- | See 'addTempFile'.
+    , mAddTempFile :: String -> m FilePath
+
+    -- | See 'addTopDecls'.
+    , mAddTopDecls :: [Dec] -> m ()
+
+    -- | See 'addForeignFilePath'.
+    , mAddForeignFilePath :: ForeignSrcLang -> String -> m ()
+
+    -- | See 'addModFinalizer'.
+    , mAddModFinalizer :: Q () -> m ()
+
+    -- | See 'addCorePlugin'.
+    , mAddCorePlugin :: String -> m ()
+
+    -- | See 'getQ'.
+    , mGetQ :: forall a. Typeable a => m (Maybe a)
+
+    -- | See 'putQ'.
+    , mPutQ :: forall a. Typeable a => a -> m ()
+
+    -- | See 'isExtEnabled'.
+    , mIsExtEnabled :: Extension -> m Bool
+    -- | See 'extsEnabled'.
+    , mExtsEnabled :: m [Extension]
+
+    -- | See 'putDoc'.
+    , mPutDoc :: DocLoc -> String -> m ()
+    -- | See 'getDoc'.
+    , mGetDoc :: DocLoc -> m (Maybe String)
+  }
+
 
 newNameIO :: String -> IO Name
 newNameIO s = do { n <- atomicModifyIORef' counter (\x -> (x + 1, x))
@@ -213,7 +330,7 @@ counter = unsafePerformIO (newIORef 0)
 -- inversion](https://en.wikipedia.org/wiki/Dependency_inversion_principle),
 -- providing an abstract interface for the user which is later concretely
 -- fufilled by an concrete 'Quasi' instance, internal to GHC.
-newtype Q a = Q { unQ :: forall m. Quasi m => m a }
+newtype Q a = Q { unQ :: forall m. (forall x. m x -> IO x) -> MetaHandlers m -> IO a }
 
 -- | \"Runs\" the 'Q' monad. Normal users of Template Haskell
 -- should not need this function, as the splice brackets @$( ... )@
@@ -227,22 +344,22 @@ newtype Q a = Q { unQ :: forall m. Quasi m => m a }
 -- simply fail at runtime. Indeed, the only operations guaranteed to succeed
 -- are 'newName', 'runIO', 'reportError' and 'reportWarning'.
 runQ :: Quasi m => Q a -> m a
-runQ (Q m) = m
+runQ = qRunQ
 
 instance Monad Q where
-  Q m >>= k  = Q (m >>= \x -> unQ (k x))
+  Q m >>= k  = Q $ \r h -> (m r h >>= \x -> unQ (k x) r h)
   (>>) = (*>)
 
 instance MonadFail Q where
-  fail s     = report True s >> Q (fail "Q monad failure")
+  fail s     = report True s >> Q (\_ _ -> fail "Q monad failure")
 
 instance Functor Q where
-  fmap f (Q x) = Q (fmap f x)
+  fmap f (Q x) = Q $ \r h -> fmap f (x r h)
 
 instance Applicative Q where
-  pure x = Q (pure x)
-  Q f <*> Q x = Q (f <*> x)
-  Q m *> Q n = Q (m *> n)
+  pure x = Q $ \_ _ -> pure x
+  Q f <*> Q x = Q $ \r h -> (f r h <*> x r h)
+  Q m *> Q n = Q $ \r h -> (m r h *> n r h)
 
 -- | @since 2.17.0.0
 instance Semigroup a => Semigroup (Q a) where
@@ -311,8 +428,17 @@ class Monad m => Quote m where
   -}
   newName :: String -> m Name
 
+runHandler :: (forall m. MetaHandlers m -> m a) -> Q a
+runHandler op = Q $ \r h -> r (op h)
+
+runHandler1 :: (forall m. MetaHandlers m -> a -> m b) -> a -> Q b
+runHandler1 op = \x -> Q $ \r h -> r (op h x)
+
+runHandler2 :: (forall m. MetaHandlers m -> a -> b -> m c) -> a -> b -> Q c
+runHandler2 op = \x y -> Q $ \r h -> r (op h x y)
+
 instance Quote Q where
-  newName s = Q (qNewName s)
+  newName = runHandler1 mNewName
 
 -----------------------------------------------------
 --
@@ -510,7 +636,7 @@ joinCode = flip bindCode id
 -- | Report an error (True) or warning (False),
 -- but carry on; use 'fail' to stop.
 report  :: Bool -> String -> Q ()
-report b s = Q (qReport b s)
+report b s = runHandler2 mReport b s
 {-# DEPRECATED report "Use reportError or reportWarning instead" #-} -- deprecated in 7.6
 
 -- | Report an error to the user, but allow the current splice's computation to carry on. To abort the computation, use 'fail'.
@@ -525,20 +651,20 @@ reportWarning = report False
 recover :: Q a -- ^ handler to invoke on failure
         -> Q a -- ^ computation to run
         -> Q a
-recover (Q r) (Q m) = Q (qRecover r m)
+recover rec main = Q $ \r h -> r $ mRecover h rec main
 
 -- We don't export lookupName; the Bool isn't a great API
 -- Instead we export lookupTypeName, lookupValueName
 lookupName :: Bool -> String -> Q (Maybe Name)
-lookupName ns s = Q (qLookupName ns s)
+lookupName ns s = runHandler2 mLookupName ns s
 
 -- | Look up the given name in the (type namespace of the) current splice's scope. See "Language.Haskell.TH.Syntax#namelookup" for more details.
 lookupTypeName :: String -> Q (Maybe Name)
-lookupTypeName  s = Q (qLookupName True s)
+lookupTypeName  s = runHandler2 mLookupName True s
 
 -- | Look up the given name in the (value namespace of the) current splice's scope. See "Language.Haskell.TH.Syntax#namelookup" for more details.
 lookupValueName :: String -> Q (Maybe Name)
-lookupValueName s = Q (qLookupName False s)
+lookupValueName s = runHandler2 mLookupName False s
 
 {-
 Note [Name lookup]
@@ -613,7 +739,7 @@ To ensure we get information about @D@-the-value, use 'lookupValueName':
 and to get information about @D@-the-type, use 'lookupTypeName'.
 -}
 reify :: Name -> Q Info
-reify v = Q (qReify v)
+reify v = runHandler1 mReify v
 
 {- | @reifyFixity nm@ attempts to find a fixity declaration for @nm@. For
 example, if the function @foo@ has the fixity declaration @infixr 7 foo@, then
@@ -622,7 +748,7 @@ example, if the function @foo@ has the fixity declaration @infixr 7 foo@, then
 'Nothing', so you may assume @bar@ has 'defaultFixity'.
 -}
 reifyFixity :: Name -> Q (Maybe Fixity)
-reifyFixity nm = Q (qReifyFixity nm)
+reifyFixity nm = runHandler1 mReifyFixity nm
 
 {- | @reifyType nm@ attempts to find the type or kind of @nm@. For example,
 @reifyType 'not@   returns @Bool -> Bool@, and
@@ -630,7 +756,7 @@ reifyFixity nm = Q (qReifyFixity nm)
 This works even if there's no explicit signature and the type or kind is inferred.
 -}
 reifyType :: Name -> Q Type
-reifyType nm = Q (qReifyType nm)
+reifyType nm = runHandler1 mReifyType nm
 
 {- | Template Haskell is capable of reifying information about types and
 terms defined in previous declaration groups. Top-level declaration splices break up
@@ -722,7 +848,7 @@ has some discussion around this.
 
 -}
 reifyInstances :: Name -> [Type] -> Q [InstanceDec]
-reifyInstances cls tys = Q (qReifyInstances cls tys)
+reifyInstances cls tys = runHandler2 mReifyInstances cls tys
 
 {- | @reifyRoles nm@ returns the list of roles associated with the parameters
 (both visible and invisible) of
@@ -741,20 +867,20 @@ and @reifyRoles Proxy@, we will get @['NominalR', 'PhantomR']@. The 'NominalR' i
 the role of the invisible @k@ parameter. Kind parameters are always nominal.
 -}
 reifyRoles :: Name -> Q [Role]
-reifyRoles nm = Q (qReifyRoles nm)
+reifyRoles nm = runHandler1 mReifyRoles nm
 
 -- | @reifyAnnotations target@ returns the list of annotations
 -- associated with @target@.  Only the annotations that are
 -- appropriately typed is returned.  So if you have @Int@ and @String@
 -- annotations for the same target, you have to call this function twice.
 reifyAnnotations :: Data a => AnnLookup -> Q [a]
-reifyAnnotations an = Q (qReifyAnnotations an)
+reifyAnnotations an = runHandler1 mReifyAnnotations an
 
 -- | @reifyModule mod@ looks up information about module @mod@.  To
 -- look up the current module, call this function with the return
 -- value of 'Language.Haskell.TH.Lib.thisModule'.
 reifyModule :: Module -> Q ModuleInfo
-reifyModule m = Q (qReifyModule m)
+reifyModule m = runHandler1 mReifyModule m
 
 -- | @reifyConStrictness nm@ looks up the strictness information for the fields
 -- of the constructor with the name @nm@. Note that the strictness information
@@ -769,7 +895,7 @@ reifyModule m = Q (qReifyModule m)
 -- circumstances, but it would return @['DecidedStrict', DecidedStrict]@ if the
 -- @-XStrictData@ language extension was enabled.
 reifyConStrictness :: Name -> Q [DecidedStrictness]
-reifyConStrictness n = Q (qReifyConStrictness n)
+reifyConStrictness n = runHandler1 mReifyConStrictness n
 
 -- | Is the list of instances returned by 'reifyInstances' nonempty?
 --
@@ -782,7 +908,7 @@ isInstance nm tys = do { decs <- reifyInstances nm tys
 
 -- | The location at which this computation is spliced.
 location :: Q Loc
-location = Q qLocation
+location = runHandler mLocation
 
 -- |The 'runIO' function lets you run an I\/O computation in the 'Q' monad.
 -- Take care: you are guaranteed the ordering of calls to 'runIO' within
@@ -792,7 +918,7 @@ location = Q qLocation
 -- necessarily flushed when the compiler finishes running, so you should
 -- flush them yourself.
 runIO :: IO a -> Q a
-runIO m = Q (qRunIO m)
+runIO m = Q $ \_ _ -> m
 
 -- | Get the package root for the current package which is being compiled.
 -- This can be set explicitly with the -package-root flag but is normally
@@ -804,7 +930,7 @@ runIO m = Q (qRunIO m)
 -- change directory when compiling files but instead set the -package-root flag
 -- appropriately.
 getPackageRoot :: Q FilePath
-getPackageRoot = Q qGetPackageRoot
+getPackageRoot = runHandler mGetPackageRoot
 
 -- | Record external directories that runIO is using (dependent upon).
 -- The compiler can then recognize that it should re-compile the Haskell file
@@ -823,7 +949,7 @@ getPackageRoot = Q qGetPackageRoot
 --   * The state of the directory is read at the interface generation time,
 --     not at the time of the function call.
 addDependentDirectory :: FilePath -> Q ()
-addDependentDirectory dp = Q (qAddDependentDirectory dp)
+addDependentDirectory dp = runHandler1 mAddDependentDirectory dp
 
 -- | Record external files that runIO is using (dependent upon).
 -- The compiler can then recognize that it should re-compile the Haskell file
@@ -837,17 +963,17 @@ addDependentDirectory dp = Q (qAddDependentDirectory dp)
 --
 --   * The dependency is based on file content, not a modification time
 addDependentFile :: FilePath -> Q ()
-addDependentFile fp = Q (qAddDependentFile fp)
+addDependentFile fp = runHandler1 mAddDependentFile fp
 
 -- | Obtain a temporary file path with the given suffix. The compiler will
 -- delete this file after compilation.
 addTempFile :: String -> Q FilePath
-addTempFile suffix = Q (qAddTempFile suffix)
+addTempFile suffix = runHandler1 mAddTempFile suffix
 
 -- | Add additional top-level declarations. The added declarations will be type
 -- checked along with the current declaration group.
 addTopDecls :: [Dec] -> Q ()
-addTopDecls ds = Q (qAddTopDecls ds)
+addTopDecls ds = runHandler1 mAddTopDecls ds
 
 -- | Same as 'addForeignSource', but expects to receive a path pointing to the
 -- foreign file instead of a 'String' of its contents. Consider using this in
@@ -856,7 +982,7 @@ addTopDecls ds = Q (qAddTopDecls ds)
 -- This is a good alternative to 'addForeignSource' when you are trying to
 -- directly link in an object file.
 addForeignFilePath :: ForeignSrcLang -> FilePath -> Q ()
-addForeignFilePath lang fp = Q (qAddForeignFilePath lang fp)
+addForeignFilePath lang fp = runHandler2 mAddForeignFilePath lang fp
 
 -- | Add a finalizer that will run in the Q monad after the current module has
 -- been type checked. This only makes sense when run within a top-level splice.
@@ -865,7 +991,7 @@ addForeignFilePath lang fp = Q (qAddForeignFilePath lang fp)
 -- 'reify' is able to find the local definitions when executed inside the
 -- finalizer.
 addModFinalizer :: Q () -> Q ()
-addModFinalizer act = Q (qAddModFinalizer (unQ act))
+addModFinalizer act = runHandler1 mAddModFinalizer act
 
 -- | Adds a core plugin to the compilation pipeline.
 --
@@ -875,7 +1001,7 @@ addModFinalizer act = Q (qAddModFinalizer (unQ act))
 -- to tell the compiler that we needed to compile first a plugin module in the
 -- current package.
 addCorePlugin :: String -> Q ()
-addCorePlugin plugin = Q (qAddCorePlugin plugin)
+addCorePlugin plugin = runHandler1 mAddCorePlugin plugin
 
 -- | Get state from the 'Q' monad. The state maintained by 'Q' is isomorphic to
 -- a type-indexed finite map. That is,
@@ -889,20 +1015,20 @@ addCorePlugin plugin = Q (qAddCorePlugin plugin)
 -- Note that the state is local to the Haskell module in which the Template
 -- Haskell expression is executed.
 getQ :: Typeable a => Q (Maybe a)
-getQ = Q qGetQ
+getQ = runHandler mGetQ
 
 -- | Replace the state in the 'Q' monad. Note that the state is local to the
 -- Haskell module in which the Template Haskell expression is executed.
 putQ :: Typeable a => a -> Q ()
-putQ x = Q (qPutQ x)
+putQ x = runHandler1 mPutQ x
 
 -- | Determine whether the given language extension is enabled in the 'Q' monad.
 isExtEnabled :: Extension -> Q Bool
-isExtEnabled ext = Q (qIsExtEnabled ext)
+isExtEnabled ext = runHandler1 mIsExtEnabled ext
 
 -- | List all enabled language extensions.
 extsEnabled :: Q [Extension]
-extsEnabled = Q qExtsEnabled
+extsEnabled = runHandler mExtsEnabled
 
 -- | Add Haddock documentation to the specified location. This will overwrite
 -- any documentation at the location if it already exists. This will reify the
@@ -921,19 +1047,20 @@ extsEnabled = Q qExtsEnabled
 -- Adding documentation to anything outside of the current module will cause an
 -- error.
 putDoc :: DocLoc -> String -> Q ()
-putDoc t s = Q (qPutDoc t s)
+putDoc t s = runHandler2 mPutDoc t s
 
 -- | Retrieves the Haddock documentation at the specified location, if one
 -- exists.
 -- It can be used to read documentation on things defined outside of the current
 -- module, provided that those modules were compiled with the @-haddock@ flag.
 getDoc :: DocLoc -> Q (Maybe String)
-getDoc n = Q (qGetDoc n)
+getDoc n = runHandler1 mGetDoc n
 
 instance MonadIO Q where
   liftIO = runIO
 
 instance Quasi Q where
+  qRunQ               = id
   qNewName            = newName
   qReport             = report
   qRecover            = recover

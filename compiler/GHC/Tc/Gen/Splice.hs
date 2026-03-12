@@ -138,6 +138,7 @@ import qualified GHC.LanguageExtensions as LangExt
 -- THSyntax gives access to internal functions and data types
 import qualified GHC.Boot.TH.Syntax as TH
 import qualified GHC.Boot.TH.Monad  as TH
+import GHC.Boot.TH.Monad  (MetaHandlers(..))
 import qualified GHC.Boot.TH.Ppr    as TH
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
@@ -1139,7 +1140,7 @@ convertAnnotationWrapper fhv = do
 -}
 
 runQuasi :: TH.Q a -> TcM a
-runQuasi act = TH.runQ act
+runQuasi (TH.Q act) = unliftIOEnv $ \runInIO -> liftIO $ act runInIO metaHandlersTcM
 
 runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 runRemoteModFinalizers (ThModFinalizers finRefs) = do
@@ -1466,68 +1467,12 @@ when showing an error message.
 To call runQ in the Tc monad, we need to make TcM an instance of Quasi:
 -}
 
-instance TH.Quasi TcM where
-  qNewName s = do { u <- newUnique
-                  ; let i = toInteger (getKey u)
-                  ; return (TH.mkNameU s i) }
+report :: Bool -> [Char] -> TcM ()
+report True msg  = seqList msg $ addErr        $ TcRnTHError $ ReportCustomQuasiError True  msg
+report False msg = seqList msg $ addDiagnostic $ TcRnTHError $ ReportCustomQuasiError False msg
 
-  -- 'msg' is forced to ensure exceptions don't escape,
-  -- see Note [Exceptions in TH]
-  qReport True msg  = seqList msg $ addErr        $ TcRnTHError $ ReportCustomQuasiError True  msg
-  qReport False msg = seqList msg $ addDiagnostic $ TcRnTHError $ ReportCustomQuasiError False msg
-
-  qLocation :: TcM TH.Loc
-  qLocation = do { m <- getModule
-                 ; l <- getSrcSpanM
-                 ; r <- case l of
-                        UnhelpfulSpan _ -> pprPanic "qLocation: Unhelpful location"
-                                                    (ppr l)
-                        RealSrcSpan s _ -> return s
-                 ; return (TH.Loc { TH.loc_filename = unpackFS (srcSpanFile r)
-                                  , TH.loc_module   = moduleNameString (moduleName m)
-                                  , TH.loc_package  = unitString (moduleUnit m)
-                                  , TH.loc_start = (srcSpanStartLine r, srcSpanStartCol r)
-                                  , TH.loc_end = (srcSpanEndLine   r, srcSpanEndCol   r) }) }
-
-  qLookupName       = lookupName
-  qReify            = reify
-  qReifyFixity nm   = lookupThName nm >>= reifyFixity
-  qReifyType        = reifyTypeOfThing
-  qReifyInstances   = reifyInstances
-  qReifyRoles       = reifyRoles
-  qReifyAnnotations = reifyAnnotations
-  qReifyModule      = reifyModule
-  qReifyConStrictness nm = do { nm' <- lookupThName nm
-                              ; dc  <- tcLookupDataCon nm'
-                              ; let bangs = dataConImplBangs dc
-                              ; return (map reifyDecidedStrictness bangs) }
-
-        -- For qRecover, discard error messages if
-        -- the recovery action is chosen.  Otherwise
-        -- we'll only fail higher up.
-  qRecover recover main = tryTcDiscardingErrs recover main
-
-  qGetPackageRoot = do
-    dflags <- getDynFlags
-    return $ fromMaybe "." (workingDirectory dflags)
-
-  qAddDependentFile fp = do
-    ref <- fmap tcg_dependent_files getGblEnv
-    dep_files <- readTcRef ref
-    writeTcRef ref (fp:dep_files)
-
-  qAddDependentDirectory dp = do
-    ref <- fmap tcg_dependent_dirs getGblEnv
-    dep_dirs <- readTcRef ref
-    writeTcRef ref (dp:dep_dirs)
-
-  qAddTempFile suffix = do
-    dflags <- getDynFlags
-    logger <- getLogger
-    tmpfs  <- hsc_tmpfs <$> getTopEnv
-    liftIO $ newTempName logger tmpfs (tmpDir dflags) TFL_GhcSession suffix
-
-  qAddTopDecls thds = do
+addTopDecls :: [TH.Dec] -> TcM ()
+addTopDecls thds = do
       exts <- fmap extensionFlags getDynFlags
       l <- getSrcSpanM
       th_origin <- getThSpliceOrigin
@@ -1555,52 +1500,13 @@ instance TH.Quasi TcM where
       bindName :: RdrName -> TcM ()
       bindName (Exact n)
         = do { th_topnames_var <- fmap tcg_th_topnames getGblEnv
-             ; updTcRef th_topnames_var (\ns -> extendNameSet ns n)
-             }
+            ; updTcRef th_topnames_var (\ns -> extendNameSet ns n)
+            }
 
       bindName name = addErr $ TcRnTHError $ THNameError $ NonExactName name
 
-  qAddForeignFilePath lang fp = do
-    var <- fmap tcg_th_foreign_files getGblEnv
-    updTcRef var ((lang, fp) :)
-
-  qAddModFinalizer fin = do
-      r <- liftIO $ mkRemoteRef fin
-      fref <- liftIO $ mkForeignRef r (freeRemoteRef r)
-      addModFinalizerRef fref
-
-  qAddCorePlugin plugin = do
-      hsc_env <- getTopEnv
-      let fc        = hsc_FC hsc_env
-      let home_unit = hsc_home_unit hsc_env
-      let dflags    = hsc_dflags hsc_env
-      let fopts     = initFinderOpts dflags
-      r <- liftIO $ findHomeModule fc fopts home_unit (mkModuleName plugin)
-      let err = TcRnTHError $ AddInvalidCorePlugin plugin
-      case r of
-        Found {} -> addErr err
-        FoundMultiple {} -> addErr err
-        _ -> return ()
-      th_coreplugins_var <- tcg_th_coreplugins <$> getGblEnv
-      updTcRef th_coreplugins_var (plugin:)
-
-  qGetQ :: forall a. Typeable a => TcM (Maybe a)
-  qGetQ = do
-      th_state_var <- fmap tcg_th_state getGblEnv
-      th_state <- readTcRef th_state_var
-      -- See #10596 for why we use a scoped type variable here.
-      return (Map.lookup (typeRep (Proxy :: Proxy a)) th_state >>= fromDynamic)
-
-  qPutQ x = do
-      th_state_var <- fmap tcg_th_state getGblEnv
-      updTcRef th_state_var (\m -> Map.insert (typeOf x) (toDyn x) m)
-
-  qIsExtEnabled = xoptM
-
-  qExtsEnabled =
-    EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
-
-  qPutDoc doc_loc s = do
+putDoc :: TH.DocLoc -> String -> TcM ()
+putDoc doc_loc s = do
     th_doc_var <- tcg_th_docs <$> getGblEnv
     resolved_doc_loc <- resolve_loc doc_loc
     is_local <- checkLocalName resolved_doc_loc
@@ -1622,14 +1528,128 @@ instance TH.Quasi TcM where
       checkLocalName (InstDoc n) = nameIsLocalOrFrom <$> getModule <*> pure n
       checkLocalName ModuleDoc = pure True
 
-
-  qGetDoc (TH.DeclDoc n) = lookupThName n >>= lookupDeclDoc
-  qGetDoc (TH.InstDoc t) = lookupThInstName t >>= lookupDeclDoc
-  qGetDoc (TH.ArgDoc n i) = lookupThName n >>= lookupArgDoc i
-  qGetDoc TH.ModuleDoc = do
+getDoc :: TH.DocLoc -> TcM (Maybe String)
+getDoc (TH.DeclDoc n) = lookupThName n >>= lookupDeclDoc
+getDoc (TH.InstDoc t) = lookupThInstName t >>= lookupDeclDoc
+getDoc (TH.ArgDoc n i) = lookupThName n >>= lookupArgDoc i
+getDoc TH.ModuleDoc = do
     df <- getDynFlags
     docs <- getGblEnv >>= extractDocs df
     return (renderHsDocString . hsDocString <$> (docs_mod_hdr =<< docs))
+
+getQ :: forall a. Typeable a => TcM (Maybe a)
+getQ = do
+    th_state_var <- fmap tcg_th_state getGblEnv
+    th_state <- readTcRef th_state_var
+    -- See #10596 for why we use a scoped type variable here.
+    return (Map.lookup (typeRep (Proxy :: Proxy a)) th_state >>= fromDynamic)
+
+location :: TcM TH.Loc
+location = do { m <- getModule
+              ; l <- getSrcSpanM
+              ; r <- case l of
+                      UnhelpfulSpan _ -> pprPanic "qLocation: Unhelpful location"
+                                                  (ppr l)
+                      RealSrcSpan s _ -> return s
+              ; return (TH.Loc { TH.loc_filename = unpackFS (srcSpanFile r)
+                                , TH.loc_module   = moduleNameString (moduleName m)
+                                , TH.loc_package  = unitString (moduleUnit m)
+                                , TH.loc_start = (srcSpanStartLine r, srcSpanStartCol r)
+                                , TH.loc_end = (srcSpanEndLine   r, srcSpanEndCol   r) }) }
+
+metaHandlersTcM :: TH.MetaHandlers TcM
+metaHandlersTcM = TH.MetaHandlers {
+    mNewName = \s -> do { u <- newUnique
+                    ; let i = toInteger (getKey u)
+                    ; return (TH.mkNameU s i) }
+
+    -- 'msg' is forced to ensure exceptions don't escape,
+    -- see Note [Exceptions in TH]
+    , mReport = report
+
+    , mLocation = location
+
+    , mLookupName       = lookupName
+    , mReify            = reify
+    , mReifyFixity      = \nm -> lookupThName nm >>= reifyFixity
+    , mReifyType        = reifyTypeOfThing
+    , mReifyInstances   = reifyInstances
+    , mReifyRoles       = reifyRoles
+    , mReifyAnnotations = reifyAnnotations
+    , mReifyModule      = reifyModule
+    , mReifyConStrictness = \nm -> do { nm' <- lookupThName nm
+                                      ; dc  <- tcLookupDataCon nm'
+                                      ; let bangs = dataConImplBangs dc
+                                      ; return (map reifyDecidedStrictness bangs) }
+
+          -- For qRecover, discard error messages if
+          -- the recovery action is chosen.  Otherwise
+          -- we'll only fail higher up.
+          -- NB: extremely subtle!!! TODO: write up note
+          -- tryTcDiscardingErrs manipulates the reader env so we need to be careful we don't sneak in the outside env
+    , mRecover = \recover main -> tryTcDiscardingErrs (runQuasi recover) (runQuasi main)
+
+    , mGetPackageRoot = do
+        dflags <- getDynFlags
+        return $ fromMaybe "." (workingDirectory dflags)
+
+    , mAddDependentFile = \fp -> do
+        ref <- fmap tcg_dependent_files getGblEnv
+        dep_files <- readTcRef ref
+        writeTcRef ref (fp:dep_files)
+
+    , mAddDependentDirectory = \dp -> do
+        ref <- fmap tcg_dependent_dirs getGblEnv
+        dep_dirs <- readTcRef ref
+        writeTcRef ref (dp:dep_dirs)
+
+    , mAddTempFile = \suffix -> do
+        dflags <- getDynFlags
+        logger <- getLogger
+        tmpfs  <- hsc_tmpfs <$> getTopEnv
+        liftIO $ newTempName logger tmpfs (tmpDir dflags) TFL_GhcSession suffix
+
+    , mAddTopDecls = addTopDecls
+
+    , mAddForeignFilePath = \lang fp -> do
+        var <- fmap tcg_th_foreign_files getGblEnv
+        updTcRef var ((lang, fp) :)
+
+    , mAddModFinalizer = \fin -> do
+        r <- liftIO $ mkRemoteRef fin
+        fref <- liftIO $ mkForeignRef r (freeRemoteRef r)
+        addModFinalizerRef fref
+
+    , mAddCorePlugin = \plugin -> do
+        hsc_env <- getTopEnv
+        let fc        = hsc_FC hsc_env
+        let home_unit = hsc_home_unit hsc_env
+        let dflags    = hsc_dflags hsc_env
+        let fopts     = initFinderOpts dflags
+        r <- liftIO $ findHomeModule fc fopts home_unit (mkModuleName plugin)
+        let err = TcRnTHError $ AddInvalidCorePlugin plugin
+        case r of
+          Found {} -> addErr err
+          FoundMultiple {} -> addErr err
+          _ -> return ()
+        th_coreplugins_var <- tcg_th_coreplugins <$> getGblEnv
+        updTcRef th_coreplugins_var (plugin:)
+
+    , mGetQ = getQ
+
+    , mPutQ = \x -> do
+        th_state_var <- fmap tcg_th_state getGblEnv
+        updTcRef th_state_var (\m -> Map.insert (typeOf x) (toDyn x) m)
+
+    , mIsExtEnabled = xoptM
+
+    , mExtsEnabled =
+        EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
+
+    , mPutDoc = putDoc
+
+    , mGetDoc = getDoc
+  }
 
 -- | Looks up documentation for a declaration in first the current module,
 -- otherwise tries to find it in another module via 'hscGetModuleInterface'.
@@ -1795,7 +1815,7 @@ runTH ty fhv = do
       -- Remote GHCi, see Note [Remote Template Haskell] in
       -- libraries/ghci/GHCi/TH.hs.
       rstate <- getTHState inst
-      loc <- TH.qLocation
+      loc <- location
       -- run a remote TH request
       r <- liftIO $
         withForeignRef rstate $ \state_hv ->
@@ -1911,32 +1931,32 @@ wrapTHResult tcm = do
 
 handleTHMessage :: THMessage a -> TcM a
 handleTHMessage msg = case msg of
-  NewName a -> wrapTHResult $ TH.qNewName a
-  Report b str -> wrapTHResult $ TH.qReport b str
-  LookupName b str -> wrapTHResult $ TH.qLookupName b str
-  Reify n -> wrapTHResult $ TH.qReify n
-  ReifyFixity n -> wrapTHResult $ TH.qReifyFixity n
-  ReifyType n -> wrapTHResult $ TH.qReifyType n
-  ReifyInstances n ts -> wrapTHResult $ TH.qReifyInstances n ts
-  ReifyRoles n -> wrapTHResult $ TH.qReifyRoles n
+  NewName a -> wrapTHResult $ runQuasi $ TH.newName a
+  Report b str -> wrapTHResult $ runQuasi $ TH.report b str
+  LookupName b str -> wrapTHResult $ runQuasi $ TH.lookupName b str
+  Reify n -> wrapTHResult $ runQuasi $ TH.reify n
+  ReifyFixity n -> wrapTHResult $ runQuasi $ TH.reifyFixity n
+  ReifyType n -> wrapTHResult $ runQuasi $ TH.reifyType n
+  ReifyInstances n ts -> wrapTHResult $ runQuasi $ TH.reifyInstances n ts
+  ReifyRoles n -> wrapTHResult $ runQuasi $ TH.reifyRoles n
   ReifyAnnotations lookup tyrep ->
     wrapTHResult $ (map B.pack <$> getAnnotationsByTypeRep lookup tyrep)
-  ReifyModule m -> wrapTHResult $ TH.qReifyModule m
-  ReifyConStrictness nm -> wrapTHResult $ TH.qReifyConStrictness nm
-  GetPackageRoot -> wrapTHResult $ TH.qGetPackageRoot
-  AddDependentFile f -> wrapTHResult $ TH.qAddDependentFile f
-  AddDependentDirectory d -> wrapTHResult $ TH.qAddDependentDirectory d
-  AddTempFile s -> wrapTHResult $ TH.qAddTempFile s
+  ReifyModule m -> wrapTHResult $ runQuasi $ TH.reifyModule m
+  ReifyConStrictness nm -> wrapTHResult $ runQuasi $ TH.reifyConStrictness nm
+  GetPackageRoot -> wrapTHResult $ runQuasi $ TH.getPackageRoot
+  AddDependentFile f -> wrapTHResult $ runQuasi $ TH.addDependentFile f
+  AddDependentDirectory d -> wrapTHResult $ runQuasi $ TH.addDependentDirectory d
+  AddTempFile s -> wrapTHResult $ runQuasi $ TH.addTempFile s
   AddModFinalizer r -> do
     interp <- hscInterp <$> getTopEnv
     wrapTHResult $ liftIO (mkFinalizedHValue interp r) >>= addModFinalizerRef
-  AddCorePlugin str -> wrapTHResult $ TH.qAddCorePlugin str
-  AddTopDecls decs -> wrapTHResult $ TH.qAddTopDecls decs
-  AddForeignFilePath lang str -> wrapTHResult $ TH.qAddForeignFilePath lang str
-  IsExtEnabled ext -> wrapTHResult $ TH.qIsExtEnabled ext
-  ExtsEnabled -> wrapTHResult $ TH.qExtsEnabled
-  PutDoc l s -> wrapTHResult $ TH.qPutDoc l s
-  GetDoc l -> wrapTHResult $ TH.qGetDoc l
+  AddCorePlugin str -> wrapTHResult $ runQuasi $ TH.addCorePlugin str
+  AddTopDecls decs -> wrapTHResult $ runQuasi $ TH.addTopDecls decs
+  AddForeignFilePath lang str -> wrapTHResult $ runQuasi $ TH.addForeignFilePath lang str
+  IsExtEnabled ext -> wrapTHResult $ runQuasi $ TH.isExtEnabled ext
+  ExtsEnabled -> wrapTHResult $ runQuasi $ TH.extsEnabled
+  PutDoc l s -> wrapTHResult $ runQuasi $ TH.putDoc l s
+  GetDoc l -> wrapTHResult $ runQuasi $ TH.getDoc l
   FailIfErrs -> wrapTHResult failIfErrsM
   _ -> panic ("handleTHMessage: unexpected message " ++ show msg)
 

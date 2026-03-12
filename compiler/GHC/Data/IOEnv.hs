@@ -29,7 +29,7 @@ module GHC.Data.IOEnv (
 
         -- I/O operations
         IORef, newMutVar, readMutVar, writeMutVar, updMutVar,
-        atomicUpdMutVar, atomicUpdMutVar'
+        atomicUpdMutVar, atomicUpdMutVar', unliftIOEnv
   ) where
 
 import GHC.Prelude
@@ -258,3 +258,10 @@ updEnv upd (IOEnv m) = IOEnv (\ env -> m (upd env))
 updEnvIO :: (env -> IO env') -> IOEnv env' a -> IOEnv env a
 {-# INLINE updEnvIO #-}
 updEnvIO upd (IOEnv m) = IOEnv (\ env -> m =<< upd env)
+
+unliftIOEnv :: forall env b. ((forall a. IOEnv env a -> IO a) -> IO b) -> IOEnv env b
+unliftIOEnv k = IOEnv $ \env ->
+  let
+    unlift :: forall a. IOEnv env a -> IO a
+    unlift (IOEnv m) = m env
+  in k unlift
