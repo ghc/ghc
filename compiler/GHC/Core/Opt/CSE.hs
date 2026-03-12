@@ -25,6 +25,7 @@ import GHC.Core.Map.Expr
 import GHC.Core.Opt.CompUnit (parMapCompUnits)
 import GHC.Utils.Misc   ( filterOut, equalLength )
 import GHC.Utils.Panic
+import GHC.Utils.Logger (Logger)
 import Data.Functor.Identity ( Identity (..) )
 import Data.List        ( mapAccumL )
 
@@ -380,8 +381,8 @@ body/rest of the module.
 ************************************************************************
 -}
 
-cseProgram :: CoreProgram -> CoreProgram
-cseProgram = parMapCompUnits cseCoreCompUnit
+cseProgram :: Logger -> CoreProgram -> CoreProgram
+cseProgram logger = parMapCompUnits logger "CommonSubExpr" cseCoreCompUnit
 
 cseCoreCompUnit :: CoreCompUnit -> CoreCompUnit
 cseCoreCompUnit (CoreCompUnit unit_binds unit_rules)

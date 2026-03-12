@@ -539,13 +539,13 @@ doCorePass pass guts = do
                                  liftIOWithCount $ simplifyPgm logger (hsc_unit_env hsc_env) name_ppr_ctx opts guts
 
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
-                                 updateBinds cseProgram
+                                 updateBinds (cseProgram logger)
 
     CoreLiberateCase          -> {-# SCC "LiberateCase" #-}
-                                 updateBinds (liberateCase (initLiberateCaseOpts dflags))
+                                 updateBinds (liberateCase logger (initLiberateCaseOpts dflags))
 
     CoreDoFloatInwards        -> {-# SCC "FloatInwards" #-}
-                                 updateBinds (floatInwards platform)
+                                 updateBinds (floatInwards logger platform)
 
     CoreDoFloatOutwards f     -> {-# SCC "FloatOutwards" #-}
                                  updateBindsM $ \units -> liftIO $
@@ -558,10 +558,10 @@ doCorePass pass guts = do
                                  updateBinds (doStaticArgs us)
 
     CoreDoCallArity           -> {-# SCC "CallArity" #-}
-                                 updateBinds callArityAnalProgram
+                                 updateBinds (callArityAnalProgram logger)
 
     CoreDoExitify             -> {-# SCC "Exitify" #-}
-                                 updateBinds exitifyProgram
+                                 updateBinds (exitifyProgram logger)
 
     CoreDoDemand before_ww    -> {-# SCC "DmdAnal" #-}
                                  updateBindsM (liftIO . dmdAnal logger before_ww dflags fam_envs (mg_rules guts))
@@ -634,7 +634,7 @@ dmdAnal logger before_ww dflags fam_envs rules binds = do
                , dmd_unbox_width     = dmdUnboxWidth dflags
                , dmd_max_worker_args = maxWorkerArgs dflags
                }
-      binds_plus_dmds = dmdAnalProgram opts fam_envs rules binds
+      binds_plus_dmds = dmdAnalProgram logger opts fam_envs rules binds
   Logger.putDumpFileMaybe logger Opt_D_dump_dmd_signatures "Demand signatures" FormatText $
     dumpIdInfoOfProgram (hasPprDebug dflags) (ppr . zapDmdEnvSig . dmdSigInfo) binds_plus_dmds
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal

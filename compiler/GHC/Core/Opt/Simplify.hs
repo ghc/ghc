@@ -13,6 +13,7 @@ import GHC.Core
 import GHC.Core.FVs (ruleFreeVars)
 import GHC.Core.Rules
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
+import GHC.Core.Opt.CompUnit (coreCompUnitTimingDoc, forceCompUnit)
 import GHC.Core.Opt.OccurAnal ( occurAnalyseCompUnit, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop )
@@ -230,16 +231,32 @@ simplifyPgm' logger unit_env name_ppr_ctx opts
 
     zero_counts = zeroSimplCount $ logHasDumpFlag logger Opt_D_dump_simpl_stats
 
-    run_units :: (CoreCompUnit -> IO a) -> [CoreCompUnit] -> IO [a]
+    run_units
+      :: (CoreCompUnit -> IO (CoreCompUnit, (String, Int), SimplCount))
+      -> [CoreCompUnit]
+      -> IO [(CoreCompUnit, (String, Int), SimplCount)]
     run_units f units
-      | parallel_units = mapParallelIO f units
+      | parallel_units = mapParallelIO timed_f (zip [1 :: Int ..] units)
       | otherwise      = mapM f units
       where
+        total_units = length units
         parallel_units = length units > 1 && not disable_parallel
 
         disable_parallel =
              logHasDumpFlag logger Opt_D_dump_occur_anal
           || logHasDumpFlag logger Opt_D_dump_simpl_iterations
+
+        timed_f (unit_no, unit)
+          | logHasDumpFlag logger Opt_D_dump_timings
+          = withTiming logger
+              (coreCompUnitTimingDoc "Simplify" unit_no total_units unit)
+              force_unit_result
+              (f unit)
+          | otherwise
+          = f unit
+
+        force_unit_result (unit', _, count) =
+          forceCompUnit unit' `seq` count `seq` ()
 
     mapParallelIO :: (a -> IO b) -> [a] -> IO [b]
     mapParallelIO f xs = mask $ \restore -> do

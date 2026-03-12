@@ -35,6 +35,7 @@ import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Var.Set
 
+import GHC.Utils.Logger (Logger)
 import GHC.Utils.Misc
 import GHC.Utils.Panic.Plain
 
@@ -47,8 +48,8 @@ Top-level interface function, @floatInwards@.  Note that we do not
 actually float any bindings downwards from the top-level.
 -}
 
-floatInwards :: Platform -> CoreProgram -> CoreProgram
-floatInwards platform = parMapCompUnits floatCompUnit
+floatInwards :: Logger -> Platform -> CoreProgram -> CoreProgram
+floatInwards logger platform = parMapCompUnits logger "FloatInwards" floatCompUnit
   where
     floatCompUnit (CoreCompUnit binds unit_rules) =
       CoreCompUnit (map (fi_top_bind platform) binds) unit_rules

@@ -19,6 +19,7 @@ import GHC.Core.Opt.Simplify.Inline
 import GHC.Builtin.Types ( unitDataConId )
 import GHC.Types.Id
 import GHC.Types.Var.Env
+import GHC.Utils.Logger (Logger)
 import GHC.Utils.Misc    ( notNull )
 
 {-
@@ -105,8 +106,8 @@ and the level of @h@ is zero (NB not one).
 ************************************************************************
 -}
 
-liberateCase :: LibCaseOpts -> CoreProgram -> CoreProgram
-liberateCase opts = parMapCompUnits liberateCaseCompUnit
+liberateCase :: Logger -> LibCaseOpts -> CoreProgram -> CoreProgram
+liberateCase logger opts = parMapCompUnits logger "LiberateCase" liberateCaseCompUnit
   where
     liberateCaseCompUnit (CoreCompUnit binds unit_rules) =
       CoreCompUnit (snd (do_unit (initLiberateCaseEnv opts) binds)) unit_rules

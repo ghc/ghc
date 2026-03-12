@@ -314,6 +314,7 @@ pprVarWithModule v
 -- In these cases we return them here and then add them to mg_rules.
 splitCompUnit :: Int -> Module -> NameSet -> [CoreRule] -> CoreCompUnit -> ([CoreCompUnit], [CoreRule])
 splitCompUnit n_threads this_module boot_exported _imp_rules unit
+  | n_threads <= 1 = single_comp_unit
   | not boot_exported_is_empty = single_comp_unit
   | unifying_rule : _ <- unifying_rules
   = pprTrace "splitCompUnit"
@@ -359,7 +360,7 @@ splitCompUnit n_threads this_module boot_exported _imp_rules unit
     mk_comp_unit (_, binds, rules) = CoreCompUnit binds rules
 
     boot_exported_is_empty = isEmptyNameSet boot_exported
-    max_units = max 1 (2 * n_threads)
+    max_units = n_threads + 1
 
     single_comp_unit = ([unit], [])
 

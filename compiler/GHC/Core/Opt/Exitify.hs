@@ -39,6 +39,7 @@ import GHC.Prelude
 import GHC.Builtin.Uniques
 import GHC.Core
 import GHC.Core.Opt.CompUnit (parMapCompUnits)
+import GHC.Utils.Logger (Logger)
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -60,8 +61,8 @@ import Control.Monad
 
 -- | Traverses the AST, simply to find all joinrecs and call 'exitify' on them.
 -- The really interesting function is exitifyRec
-exitifyProgram :: CoreProgram -> CoreProgram
-exitifyProgram comp_units = parMapCompUnits exitifyCompUnit comp_units
+exitifyProgram :: Logger -> CoreProgram -> CoreProgram
+exitifyProgram logger comp_units = parMapCompUnits logger "Exitify" exitifyCompUnit comp_units
   where
     exitifyCompUnit (CoreCompUnit binds unit_rules) =
       CoreCompUnit (map goTopLvl binds) unit_rules

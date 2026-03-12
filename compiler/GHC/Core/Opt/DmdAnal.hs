@@ -38,6 +38,7 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 
 import GHC.Types.Unique.Set
+import GHC.Utils.Logger (Logger)
 import GHC.Types.Unique.MemoFun
 import GHC.Types.RepType
 import GHC.Types.ForeignCall ( isSafeForeignCall )
@@ -91,9 +92,9 @@ data DmdResult a b = R !a !b
 --
 -- Note: use `seqBinds` on the result to avoid leaks due to laziness (cf Note
 -- [Stamp out space leaks in demand analysis])
-dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> CoreProgram
-dmdAnalProgram opts fam_envs rules binds
-  = parMapCompUnits dmd_anal_comp_unit binds
+dmdAnalProgram :: Logger -> DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> CoreProgram
+dmdAnalProgram logger opts fam_envs rules binds
+  = parMapCompUnits logger "DmdAnal" dmd_anal_comp_unit binds
   where
     dmd_anal_comp_unit (CoreCompUnit unit_binds unit_rules)
       = let WithDmdType _unit_ty unit_binds' = go_unit (emptyAnalEnv opts fam_envs) [] unit_binds
