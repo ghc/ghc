@@ -7,10 +7,10 @@ data Tup2 a b = Tup2 !a !b
 -- All branches of go return either two properly tagged values *or* are bottom.
 -- This means we should see something like:
 --
---      (T24806.$wgo, <TagTuple[TagProper, TagProper]>) =
+--      (T24806.$wgo, <TagFun[TagTuple[TagEPT, TagEPT]]>) =
 --
 -- in the dump output.
--- See Note [Bottom functions are TagTagged] for details why.
+-- See Note [Bottom functions are TagBottoming] for details why.
 go :: List a1 -> List a2 -> Tup2 (List a2) (List a2)
 go Nil ys = Tup2 ys Nil
 go (Cons _ xs) ys = case ys of

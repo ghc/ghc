@@ -7,5 +7,5 @@ x = x
 f :: a -> (# Int, a #)
 -- Adapted from a TODO in EnforceEpt.
 -- f's tag signature should indicate that the second component
--- of its result is properly tagged: TagTuple[TagDunno,TagProper]
+-- of its result is properly tagged: TagTuple[TagDunno,TagEPT]
 f g = case g of !g' -> (# x, g' #)

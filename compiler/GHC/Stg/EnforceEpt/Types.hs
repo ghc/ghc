@@ -35,15 +35,23 @@ type InferStgExpr       = GenStgExpr       'InferTaggedBinders
 type InferStgRhs        = GenStgRhs        'InferTaggedBinders
 type InferStgAlt        = GenStgAlt        'InferTaggedBinders
 
+-- | Combine TagInfo from the alternatives of a case expression.
+-- Note that this operates at the value level: case alternatives return
+-- values. See Note [TagSig and TagInfo].
 combineAltInfo :: TagInfo -> TagInfo -> TagInfo
-combineAltInfo TagDunno         _              = TagDunno
-combineAltInfo _                TagDunno       = TagDunno
-combineAltInfo (TagTuple {})    TagProper      = TagDunno  -- This can happen with rep-polymorphic result, see #26107
-combineAltInfo TagProper       (TagTuple {})   = TagDunno  -- This can happen with rep-polymorphic result, see #26107
-combineAltInfo TagProper        TagProper      = TagProper
+combineAltInfo TagBottoming    ti              = ti
+combineAltInfo ti              TagBottoming    = ti
+combineAltInfo TagDunno        TagDunno        = TagDunno
+combineAltInfo TagDunno        TagEPT          = TagDunno
+combineAltInfo TagDunno        (TagTuple {})   = TagDunno
+combineAltInfo TagEPT          TagDunno        = TagDunno
+combineAltInfo (TagTuple {})   TagDunno        = TagDunno
+combineAltInfo TagEPT          TagEPT          = TagEPT
+-- TagEPT/TagTuple are incompatible (can arise with rep-polymorphic
+-- results, see #26107); fall through to TagDunno.
+combineAltInfo TagEPT          (TagTuple {})   = TagDunno
+combineAltInfo (TagTuple {})   TagEPT          = TagDunno
 combineAltInfo (TagTuple is1)  (TagTuple is2)  = TagTuple (zipWithEqual combineAltInfo is1 is2)
-combineAltInfo (TagTagged)      ti             = ti
-combineAltInfo ti               TagTagged      = ti
 
 type TagSigEnv = IdEnv TagSig
 data TagEnv p = TE { te_env :: TagSigEnv
@@ -75,48 +83,58 @@ makeTagged env = TE { te_env = te_env env
 
 noSig :: TagEnv p -> BinderP p -> (Id, TagSig)
 noSig env bndr
-  | isUnliftedType (idType var) = (var, TagSig TagProper)
-  | otherwise = (var, TagSig TagDunno)
+  | isUnliftedType (idType var) = (var, TagVal TagEPT)
+  | otherwise = (var, TagVal TagDunno)
   where
     var = getBinderId env bndr
 
--- | Look up a sig in the given env
-lookupSig :: TagEnv p -> Id -> Maybe TagSig
-lookupSig env fun = lookupVarEnv (te_env env) fun
+-- | Look up the return-value tag of a function for saturated call analysis.
+-- Returns 'Just retInfo' if the function binding has a 'TagFun' signature,
+-- 'Nothing' otherwise.
+lookupReturnInfo :: TagEnv p -> Id -> Maybe TagInfo
+lookupReturnInfo env fun = case lookupVarEnv (te_env env) fun of
+  Just (TagFun ret_info) -> Just ret_info
+  Just (TagVal _)        -> Nothing
+  Nothing                -> Nothing
 
--- | Look up a sig in the env or derive it from information
--- in the arg itself.
+-- | Look up a value-level tag for an argument: either from the env (where
+-- a function-typed argument flattens to TagEPT — its closure is tagged)
+-- or derived from information on the variable itself.
 lookupInfo :: TagEnv p -> StgArg -> TagInfo
 lookupInfo env (StgVarArg var)
   -- Nullary data constructors like True, False
   | Just dc <- isDataConWorkId_maybe var
   , isNullaryRepDataCon dc
   , not for_bytecode
-  = TagProper
+  = TagEPT
 
   | isUnliftedType (idType var)
-  = TagProper
+  = TagEPT
 
-  -- Variables in the environment.
-  | Just (TagSig info) <- lookupVarEnv (te_env env) var
-  = info
+  -- Variables in the environment. A function binding flattens to TagEPT
+  -- since a function closure pointer is properly tagged; its return info
+  -- is not relevant when the function is used as a value.
+  | Just sig <- lookupVarEnv (te_env env) var
+  = case sig of
+      TagVal info -> info
+      TagFun _    -> TagEPT
 
   | Just lf_info <- idLFInfo_maybe var
   , not for_bytecode
   =   case lf_info of
           -- Function, tagged (with arity)
           LFReEntrant {}
-              -> TagProper
+              -> TagEPT
           -- Thunks need to be entered.
           LFThunk {}
               -> TagDunno
           -- Constructors, already tagged.
           LFCon {}
-              -> TagProper
+              -> TagEPT
           LFUnknown {}
               -> TagDunno
           LFUnlifted {}
-              -> TagProper
+              -> TagEPT
           -- Shouldn't be possible. I don't think we can export letNoEscapes
           LFLetNoEscape {} -> panic "LFLetNoEscape exported"
 
@@ -126,19 +144,13 @@ lookupInfo env (StgVarArg var)
     for_bytecode = te_bytecode env
 
 lookupInfo _ (StgLitArg {})
-  = TagProper
+  = TagEPT
 
 isDunnoSig :: TagSig -> Bool
-isDunnoSig (TagSig TagDunno) = True
-isDunnoSig (TagSig TagProper) = False
-isDunnoSig (TagSig TagTuple{}) = False
-isDunnoSig (TagSig TagTagged{}) = False
+isDunnoSig (TagVal TagDunno) = True
+isDunnoSig _                 = False
 
-isTaggedInfo :: TagInfo -> Bool
-isTaggedInfo TagProper = True
-isTaggedInfo TagTagged = True
-isTaggedInfo _         = False
-
+-- | Extend the tag environment.
 extendSigEnv :: TagEnv p -> [(Id,TagSig)] -> TagEnv p
 extendSigEnv env@(TE { te_env = sig_env }) bndrs
   = env { te_env = extendVarEnvList sig_env bndrs }

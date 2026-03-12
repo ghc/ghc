@@ -8,7 +8,7 @@ T14895.go
 [GblId, Arity=2, Str=<MC(1,L)><1L>, Unf=OtherCon []] =
     {} \r [f ds]
         case ds of wild {
-          GHC.Internal.Data.Either.Left e [Occ=Once1] -> wild<TagProper>;
+          GHC.Internal.Data.Either.Left e [Occ=Once1] -> wild<TagVal[TagEPT]>;
           GHC.Internal.Data.Either.Right a1 [Occ=Once1] ->
               let {
                 go_sat [Occ=Once1] :: b

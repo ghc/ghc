@@ -239,14 +239,14 @@ For this reason we assert that we are running in interactive mode if a lookup fa
 -}
 isTagged :: Id -> RM Bool
 isTagged v
-    -- See Note [Bottom functions are TagTagged]
+    -- See Note [Bottom functions are TagBottoming]
     | isDeadEndId v = pure False
     | otherwise = do
     this_mod <- getMod
     -- See Note [Tag inference for interactive contexts]
     let lookupDefault v = assertPpr (isInteractiveModule this_mod)
                                     (text "unknown Id:" <> ppr this_mod <+> ppr v)
-                                    (TagSig TagDunno)
+                                    (TagVal TagDunno)
     case nameIsLocalOrFrom this_mod (idName v) of
         True
             | definitelyUnliftedType (idType v)
@@ -257,12 +257,11 @@ isTagged v
                 !s <- getMap
                 let !sig = lookupWithDefaultUFM s (lookupDefault v) v
                 return $ case sig of
-                    TagSig info ->
-                        case info of
-                            TagDunno -> False
-                            TagProper -> True
-                            TagTagged -> True
-                            TagTuple _ -> True -- Consider unboxed tuples tagged.
+                    TagFun _             -> True  -- function closure is tagged
+                    TagVal TagDunno      -> False
+                    TagVal TagEPT        -> True
+                    TagVal TagBottoming  -> True
+                    TagVal (TagTuple _)  -> True  -- Consider unboxed tuples tagged.
         -- Imported
         False -> return $!
                 -- Determine whether it is tagged from the LFInfo of the imported id.
@@ -279,7 +278,7 @@ isTagged v
                         -> True
                     LFUnknown {}
                         -> False
-                    LFUnlifted {}
+                    LFUnlifted {}  -- Unboxed, tagging irrelevant
                         -> True
                     LFLetNoEscape {}
                     -- Shouldn't be possible. I don't think we can export letNoEscapes
@@ -385,7 +384,7 @@ rewriteArg  (lit@StgLitArg{}) = return lit
 rewriteId :: Id -> RM Id
 rewriteId v = do
     !is_tagged <- isTagged v
-    if is_tagged then return $! setIdTagSig v (TagSig TagProper)
+    if is_tagged then return $! setIdTagSig v (TagVal TagEPT)
                  else return v
 
 rewriteExpr :: GenStgExpr 'InferTaggedBinders -> RM (GenStgExpr 'CodeGen)
