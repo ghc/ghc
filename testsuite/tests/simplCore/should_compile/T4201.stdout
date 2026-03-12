@@ -1,4 +1,4 @@
-  [HasNoCafRefs, TagSig: <TagProper>, LambdaFormInfo: LFReEntrant 1,
-   Arity: 1, Strictness: <1!A>, CPR: 1,
-   Unfolding: Core: <vanilla>
-              bof `cast` (Sym N:Foo %<'GHC.Types.Many>_N ->_R <T>_R)]
+  lift :: Foo -> T
+  [HasNoCafRefs, TagSig: <TagFun[TagEPT]>,
+   LambdaFormInfo: LFReEntrant 1, Arity: 1, Strictness: <1!A>, CPR: 1,
+   Unfolding: Core: <vanilla> bof `cast` (Sym N:Foo ->_R <T>_R)]

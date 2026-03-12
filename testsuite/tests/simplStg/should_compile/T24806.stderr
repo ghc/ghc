@@ -1,99 +1,77 @@
 
 ==================== CodeGenAnal STG: ====================
-lvl6 :: GHC.Prim.Addr#
+lvl6 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []] =
     "T24806.hs"#;
 
-lvl4 :: GHC.Prim.Addr#
+lvl4 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []] =
     "T24806"#;
 
-lvl2 :: GHC.Prim.Addr#
+lvl2 :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []] =
     "main"#;
 
-lvl :: GHC.Prim.Addr#
+lvl :: GHC.Internal.Prim.Addr#
 [GblId, Unf=OtherCon []] =
     "undefined"#;
 
-(T24806.$WTup2, <TagProper>) =
-    {} \r [(conrep, <TagDunno>) (conrep1, <TagDunno>)]
-        case conrep of (conrep2, <TagProper>) {
-        __DEFAULT ->
-        case conrep1 of (conrep3, <TagProper>) {
-        __DEFAULT -> T24806.Tup2 [conrep2 conrep3];
-        };
-        };
+(T24806.Tup2, <TagFun[TagDunno]>) =
+    {} \r [(eta, <TagVal[TagDunno]>) (eta, <TagVal[TagDunno]>)] T24806.Tup2 [eta eta];
 
-(T24806.$WCons, <TagProper>) =
-    {} \r [(conrep, <TagDunno>) (conrep1, <TagDunno>)]
-        case conrep1 of (conrep2, <TagProper>) {
-        __DEFAULT -> T24806.Cons [conrep conrep2];
-        };
+(T24806.Nil, <TagVal[TagEPT]>) = T24806.Nil! [];
 
-(lvl1, <TagDunno>) = {} \u [] GHC.CString.unpackCString# lvl;
+(T24806.Cons, <TagFun[TagDunno]>) =
+    {} \r [(eta, <TagVal[TagDunno]>) (eta, <TagVal[TagDunno]>)] T24806.Cons [eta eta];
 
-(lvl3, <TagDunno>) = {} \u [] GHC.CString.unpackCString# lvl2;
+(lvl1, <TagVal[TagDunno]>) =
+    {} \u [] GHC.Internal.CString.unpackCString# lvl;
 
-(lvl5, <TagDunno>) = {} \u [] GHC.CString.unpackCString# lvl4;
+(lvl3, <TagVal[TagDunno]>) =
+    {} \u [] GHC.Internal.CString.unpackCString# lvl2;
 
-(lvl7, <TagDunno>) = {} \u [] GHC.CString.unpackCString# lvl6;
+(lvl5, <TagVal[TagDunno]>) =
+    {} \u [] GHC.Internal.CString.unpackCString# lvl4;
 
-(lvl8, <TagProper>) = GHC.Types.I#! [17#];
+(lvl7, <TagVal[TagDunno]>) =
+    {} \u [] GHC.Internal.CString.unpackCString# lvl6;
 
-(lvl9, <TagProper>) = GHC.Types.I#! [12#];
+(lvl8, <TagVal[TagEPT]>) =
+    GHC.Internal.Stack.Types.SrcLoc! [lvl3 lvl5 lvl7 17# 12# 17# 21#];
 
-(lvl10, <TagProper>) = GHC.Types.I#! [21#];
-
-(lvl11, <TagProper>) =
-    GHC.Internal.Stack.Types.SrcLoc! [lvl3
-                                      lvl5
-                                      lvl7
-                                      lvl8
-                                      lvl9
-                                      lvl8
-                                      lvl10];
-
-(lvl12, <TagProper>) =
+(lvl9, <TagVal[TagEPT]>) =
     GHC.Internal.Stack.Types.PushCallStack! [lvl1
-                                             lvl11
+                                             lvl8
                                              GHC.Internal.Stack.Types.EmptyCallStack];
 
-(lvl13, <TagDunno>) = {} \u [] GHC.Internal.Err.undefined lvl12;
-
-(T24806.Tup2, <TagDunno>) =
-    {} \r [(eta, <TagDunno>) (eta, <TagDunno>)] T24806.Tup2 [eta eta];
-
-(T24806.Nil, <TagProper>) = T24806.Nil! [];
+(lvl10, <TagVal[TagDunno]>) = {} \u [] GHC.Internal.Err.undefined lvl9;
 
 Rec {
-(T24806.$wgo, <TagTuple[TagProper, TagProper]>) =
-    {} \r [(ds, <TagProper>) (ys, <TagProper>)]
-        case ds of (wild, <TagProper>) {
+(T24806.$wgo, <TagFun[TagTuple[TagEPT, TagEPT]]>) =
+    {} \r [(ds, <TagVal[TagEPT]>) (ys, <TagVal[TagEPT]>)]
+        case ds of (wild, <TagVal[TagEPT]>) {
           T24806.Nil ->
-              case ys of (conrep, <TagProper>) {
-              __DEFAULT -> (#,#) [conrep T24806.Nil];
+              case ys of (wild1, <TagVal[TagEPT]>) {
+              __DEFAULT -> (#,#) [wild1 T24806.Nil];
               };
-          T24806.Cons (ds1, <TagDunno>) (xs, <TagProper>) ->
-              case ys of (wild1, <TagProper>) {
-                T24806.Nil -> lvl13;
-                T24806.Cons (y, <TagDunno>) (ys', <TagProper>) ->
-                    case T24806.$wgo xs ys' of (wild2, <TagProper>) {
-                    (#,#) (ww, <TagProper>) (ww1, <TagProper>) ->
-                    let { (sat, <TagProper>) = T24806.Cons! [y ww1];
-                    } in  (#,#) [ww sat];
+          T24806.Cons (ds1, <TagVal[TagDunno]>) (xs, <TagVal[TagEPT]>) ->
+              case ys of (wild1, <TagVal[TagEPT]>) {
+                T24806.Nil -> lvl10;
+                T24806.Cons (y, <TagVal[TagDunno]>) (ys', <TagVal[TagEPT]>) ->
+                    case T24806.$wgo xs ys' of (wild2, <TagVal[TagEPT]>) {
+                    (#,#) (ww, <TagVal[TagEPT]>) (ww1, <TagVal[TagEPT]>) ->
+                    let { ($wgo_sat, <TagVal[TagEPT]>) = T24806.Cons! [y ww1];
+                    } in  (#,#) [ww $wgo_sat];
                     };
               };
         };
 end Rec }
 
-(T24806.go, <TagProper>) =
-    {} \r [(ds, <TagDunno>) (ys, <TagDunno>)]
-        case T24806.$wgo ds ys of (wild, <TagProper>) {
-        (#,#) (ww, <TagProper>) (ww1, <TagProper>) -> T24806.Tup2 [ww ww1];
+(T24806.go, <TagFun[TagEPT]>) =
+    {} \r [(ds, <TagVal[TagDunno]>) (ys, <TagVal[TagDunno]>)]
+        case T24806.$wgo ds ys of (wild, <TagVal[TagEPT]>) {
+        (#,#) (ww, <TagVal[TagEPT]>) (ww1, <TagVal[TagEPT]>) ->
+        T24806.Tup2 [ww ww1];
         };
-
-(T24806.Cons, <TagDunno>) =
-    {} \r [(eta, <TagDunno>) (eta, <TagDunno>)] T24806.Cons [eta eta];
 
 
