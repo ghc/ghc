@@ -1,5 +1,7 @@
 {-# LANGUAGE Safe #-}
 
+{-# LANGUAGE StandaloneDeriving #-}
+
 -- |
 --
 -- Module      :  GHC.ByteOrder
@@ -20,3 +22,14 @@ module GHC.ByteOrder
      ) where
 
 import GHC.Internal.ByteOrder
+
+import Text.Read
+
+{-NOTE:
+    The following instance is technically an orphan, but practically it is not,
+    since ordinary users should not use @ghc-internal@ directly and thus get
+    'ByteOrder' only through this module.
+-}
+
+-- | @since base-4.11.0.0
+deriving instance Read ByteOrder

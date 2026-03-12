@@ -12554,7 +12554,7 @@ instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CULong -- Defined i
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CUSeconds -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CUShort -- Defined in ‘GHC.Internal.Foreign.C.Types’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CWchar -- Defined in ‘GHC.Internal.Foreign.C.Types’
-instance GHC.Internal.Read.Read GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
+instance [safe] GHC.Internal.Read.Read GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Read.Read (f p), GHC.Internal.Read.Read (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Read.Read (f p), GHC.Internal.Read.Read (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Internal.Read.Read (f (g p)) => GHC.Internal.Read.Read ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Generics’
