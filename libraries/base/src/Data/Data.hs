@@ -99,3 +99,38 @@ module Data.Data (
 
 import GHC.Internal.Data.Data
 import Data.Typeable
+
+import GHC.Real (toRational)
+import GHC.Float (Double)
+import Data.Eq ((==))
+import Data.Function ((.))
+import Data.Maybe (Maybe (Nothing, Just))
+import Data.List (filter)
+import Data.String (String)
+import Text.Read (Read, reads)
+
+-- | Lookup a constructor via a string
+readConstr :: DataType -> String -> Maybe Constr
+readConstr dt str =
+      case dataTypeRep dt of
+        AlgRep cons -> idx cons
+        IntRep      -> mkReadCon (\i -> (mkPrimCon dt str (IntConstr i)))
+        FloatRep    -> mkReadCon ffloat
+        CharRep     -> mkReadCon (\c -> (mkPrimCon dt str (CharConstr c)))
+        NoRep       -> Nothing
+  where
+
+    -- Read a value and build a constructor
+    mkReadCon :: Read t => (t -> Constr) -> Maybe Constr
+    mkReadCon f = case (reads str) of
+                    [(t,"")] -> Just (f t)
+                    _ -> Nothing
+
+    -- Traverse list of algebraic datatype constructors
+    idx :: [Constr] -> Maybe Constr
+    idx cons = case filter ((==) str . showConstr) cons of
+                [] -> Nothing
+                hd : _ -> Just hd
+
+    ffloat :: Double -> Constr
+    ffloat =  mkPrimCon dt str . FloatConstr . toRational
