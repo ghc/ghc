@@ -12525,7 +12525,7 @@ instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (Data.Semi
 instance forall a. GHC.Internal.Read.Read a => GHC.Internal.Read.Read (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
 instance forall m. GHC.Internal.Read.Read m => GHC.Internal.Read.Read (Data.Semigroup.WrappedMonoid m) -- Defined in ‘Data.Semigroup’
 instance forall k (a :: k) (b :: k). Coercible a b => GHC.Internal.Read.Read (GHC.Internal.Data.Type.Coercion.Coercion a b) -- Defined in ‘GHC.Internal.Data.Type.Coercion’
-instance GHC.Internal.Read.Read GHC.Internal.Data.Version.Version -- Defined in ‘GHC.Internal.Data.Version’
+instance [safe] GHC.Internal.Read.Read GHC.Internal.Data.Version.Version -- Defined in ‘Data.Version’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.Ptr.IntPtr -- Defined in ‘GHC.Internal.Foreign.Ptr’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.Ptr.WordPtr -- Defined in ‘GHC.Internal.Foreign.Ptr’
 instance GHC.Internal.Read.Read GHC.Internal.Foreign.C.Types.CBool -- Defined in ‘GHC.Internal.Foreign.C.Types’
