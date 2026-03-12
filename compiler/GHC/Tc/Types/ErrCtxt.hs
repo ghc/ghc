@@ -4,6 +4,7 @@ module GHC.Tc.Types.ErrCtxt
   ( ErrCtxt (..), HsCtxt(..), CodeSrcFlag (..)
   , UserSigType(..), FunAppCtxtFunArg(..)
   , TyConInstFlavour(..)
+  , isHsCtxtLandmark
 
   -- * UserTypeCtxt
   , UserTypeCtxt(..), pprUserTypeCtxt, isSigMaybe
@@ -387,3 +388,10 @@ data HsCtxt
   | MergeSignaturesCtxt !UnitState !ModuleName ![InstantiatedModule]
   -- | While checking that a module implements a Backpack signature.
   | CheckImplementsCtxt !UnitState !Module !InstantiatedModule
+
+
+isHsCtxtLandmark :: HsCtxt -> Bool
+isHsCtxtLandmark (DerivBindCtxt{}) = True
+isHsCtxtLandmark (FunResCtxt{}) = True
+isHsCtxtLandmark (VDQWarningCtxt{}) = True
+isHsCtxtLandmark _ = False

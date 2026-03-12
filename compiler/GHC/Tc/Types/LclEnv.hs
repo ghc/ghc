@@ -118,16 +118,15 @@ push the new expression error message on top of the stack. cf. `LclEnv.setLclCtx
 -- See Note [ErrCtxtStack Manipulation]
 type ErrCtxtStack = [ErrCtxt]
 
--- | Get the original source code
-get_src_code_origin :: ErrCtxtStack -> Maybe HsCtxt
-get_src_code_origin (MkErrCtxt ExpansionCodeCtxt e : _) = Just e
-                   -- we are in generated code, due to the expansion of the original syntax origSrcCode
-get_src_code_origin _ = Nothing
-                   -- we are in user code, so blame the expression in hand
+-- | Get the top of the error message stack
+get_src_code_origin :: ErrCtxtStack -> HsCtxt
+get_src_code_origin (MkErrCtxt _ e : _) = e
+get_src_code_origin _ = error "get_src_code_origin: oops! Empty error message stack"
 
 data TcLclCtxt
   = TcLclCtxt {
         tcl_loc         :: RealSrcSpan,     -- Source span
+        tcl_in_gen_code :: Bool,            -- Are we type checking a generated expression?
         tcl_err_ctxt    :: ErrCtxtStack,    -- See Note [ErrCtxtStack Manipulation]
         tcl_tclvl       :: TcLevel,
         tcl_bndrs       :: TcBinderStack,   -- Used for reporting relevant bindings,
@@ -202,7 +201,7 @@ setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_err_ctxt = ctxt })
 addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
 addLclEnvErrCtxt ec = setLclEnvSrcCodeOrigin ec
 
-getLclEnvSrcCodeOrigin :: TcLclEnv -> Maybe HsCtxt
+getLclEnvSrcCodeOrigin :: TcLclEnv -> HsCtxt
 getLclEnvSrcCodeOrigin = get_src_code_origin . tcl_err_ctxt . tcl_lcl_ctxt
 
 setLclEnvSrcCodeOrigin :: ErrCtxt -> TcLclEnv -> TcLclEnv
@@ -218,15 +217,8 @@ setLclCtxtSrcCodeOrigin ec lclCtxt
   | otherwise
   = lclCtxt { tcl_err_ctxt = ec : tcl_err_ctxt lclCtxt }
 
-lclCtxtInGeneratedCode :: TcLclCtxt -> Bool
-lclCtxtInGeneratedCode lclCtxt
-  | (MkErrCtxt ExpansionCodeCtxt _ : _) <- tcl_err_ctxt lclCtxt
-  = True
-  | otherwise
-  = False
-
 lclEnvInGeneratedCode :: TcLclEnv -> Bool
-lclEnvInGeneratedCode =  lclCtxtInGeneratedCode . tcl_lcl_ctxt
+lclEnvInGeneratedCode =  tcl_in_gen_code . tcl_lcl_ctxt
 
 getLclEnvBinderStack :: TcLclEnv -> TcBinderStack
 getLclEnvBinderStack = tcl_bndrs . tcl_lcl_ctxt

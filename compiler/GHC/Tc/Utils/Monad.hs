@@ -63,7 +63,7 @@ module GHC.Tc.Utils.Monad(
   -- * Error management
   getSrcCodeOrigin,
   getSrcSpanM, getRealSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
-  inGeneratedCode,
+  inGeneratedCode, setInGeneratedCode,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,
@@ -422,6 +422,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_lcl_ctxt   = TcLclCtxt {
                 tcl_loc        = loc,
                 -- tcl_loc should be over-ridden very soon!
+                tcl_in_gen_code = False,
                 tcl_err_ctxt   = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topLevel,
@@ -525,7 +526,7 @@ updLclEnv upd = updEnv (\ env@(Env { env_lcl = lcl }) ->
                           env { env_lcl = upd lcl })
 
 updLclCtxt :: (TcLclCtxt -> TcLclCtxt) -> TcRnIf gbl TcLclEnv a -> TcRnIf gbl TcLclEnv a
-updLclCtxt upd = updLclEnv (modifyLclCtxt upd)
+updLclCtxt = updLclEnv . modifyLclCtxt
 
 setLclEnv :: lcl' -> TcRnIf gbl lcl' a -> TcRnIf gbl lcl a
 setLclEnv lcl_env = updEnv (\ env -> env { env_lcl = lcl_env })
@@ -1086,12 +1087,16 @@ inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- See Note [Error contexts in generated code]
 setSrcSpan (RealSrcSpan loc _) thing_inside
-  = updLclCtxt (\env -> env { tcl_loc = loc }) thing_inside
-
+  = updLclCtxt (\ctxt -> ctxt {tcl_loc = loc, tcl_in_gen_code = False}) thing_inside
+setSrcSpan (GeneratedSrcSpan{}) thing_inside
+  = setInGeneratedCode $ thing_inside
 setSrcSpan _ thing_inside
   = thing_inside
 
-getSrcCodeOrigin :: TcRn (Maybe HsCtxt)
+setInGeneratedCode :: TcRn a -> TcRn a
+setInGeneratedCode thing_inside = updLclCtxt (\env -> env { tcl_in_gen_code = True }) thing_inside
+
+getSrcCodeOrigin :: TcRn HsCtxt
 getSrcCodeOrigin = getLclEnvSrcCodeOrigin <$> getLclEnv
 
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
@@ -1359,7 +1364,6 @@ setErrCtxt :: [ErrCtxt] -> TcM a -> TcM a
 {-# INLINE setErrCtxt #-}   -- Note [Inlining addErrCtxt]
 setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 
--- | Add a message to the error context. This message may not do any tidying.
 --   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 addErrCtxt :: HsCtxt -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}  -- Note [Inlining addErrCtxt]
@@ -1368,7 +1372,7 @@ addErrCtxt ctxt = pushCtxt (MkErrCtxt VanillaUserSrcCode ctxt)
 -- See Note [ErrCtxtStack Manipulation]
 addExpansionErrCtxt :: HsCtxt -> TcM a -> TcM a
 {-# INLINE addExpansionErrCtxt #-}  -- Note [Inlining addErrCtxt]
-addExpansionErrCtxt ctxt = pushCtxt (MkErrCtxt ExpansionCodeCtxt ctxt)
+addExpansionErrCtxt ctxt thing_inside = setInGeneratedCode $ pushCtxt (MkErrCtxt ExpansionCodeCtxt ctxt) thing_inside
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
@@ -1942,11 +1946,11 @@ mkErrCtxt env ctxts
  where
    go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [HsCtxt]
    go _ _ _ [] = return []
-   go dbg n env (MkErrCtxt LandmarkUserSrcCode ctxt : ctxts)
+   go dbg n env (MkErrCtxt _ ctxt : ctxts)
+     | isHsCtxtLandmark ctxt
      = do { (env', msg) <- liftZonkM $ zonkTidyHsCtxt env ctxt
           ; rest <- go dbg n env' ctxts
           ; return (msg : rest) }
-   go dbg n env (MkErrCtxt _ ctxt : ctxts)
      | n < mAX_CONTEXTS -- Too verbose || dbg
      = do { (env', msg) <- liftZonkM $ zonkTidyHsCtxt env ctxt
           ; rest <- go dbg (n+1) env' ctxts

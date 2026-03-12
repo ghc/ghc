@@ -174,10 +174,8 @@ Note [Instantiation variables are short lived]
 -- Very similar to tcApp, but returns a sigma (uninstantiated) type
 -- CAUTION: Any changes to tcApp should be reflected here
 -- cf. T19167. the head is an expanded expression applied to a type
--- TODO: Use runInfer for tcExprSigma?
 -- Caution: Currently we assume that the expression is compiler generated/expanded
--- Because that is that T19167 testcase generates. This function can possibly
--- take in the rn_expr and its location to pass into tcValArgs
+-- Because that is what T19167 test case expects.
 tcExprSigma :: Bool -> CtOrigin -> HsExpr GhcRn -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
 tcExprSigma inst fun_orig rn_expr
   = do { (fun@(rn_fun,fun_lspan), rn_args) <- splitHsApps rn_expr
@@ -416,9 +414,9 @@ tcApp rn_expr exp_res_ty
        -- If the head of the function is user written
        -- then it can be used in the error message
        -- If it is generated code location span, blame it on the
-       -- source code origin stored in the lclEnv.
+       -- origin that can be retrived from the top of the error ctxt stack.
        -- See Note [Error contexts in generated code]
-       ; fun_orig <- mk_origin fun_lspan rn_fun rn_fun
+       ; fun_orig <- mk_origin fun_lspan rn_fun
 
        ; traceTc "tcApp:inferAppHead" $
          vcat [ text "tc_fun:" <+> ppr tc_fun
@@ -1978,7 +1976,7 @@ quickLookArg1 pos app_lspan (fun, fun_lspan) larg@(L arg_loc arg) sc_arg_ty@(Sca
     do { let arg_tc_head = (tc_fun_arg_head, fun_lspan_arg)
        ; do_ql <- wantQuickLook rn_fun_arg
 
-       ; arg_orig <- mk_origin fun_lspan_arg rn_fun_arg fun
+       ; arg_orig <- mk_origin fun_lspan_arg rn_fun_arg
        ; ((inst_args, app_res_rho), wanted)
              <- captureConstraints $
                 tcInstFun do_ql True ds_flag_arg (arg_orig, rn_fun_arg, fun_lspan_arg) tc_fun_arg_head fun_sigma_arg_head rn_args
@@ -2043,15 +2041,15 @@ maybe_update_err_ctxt fun_lspan_arg rn_fun_arg thing_inside
 
 mk_origin :: SrcSpan       -- SrcSpan of the argument
           -> HsExpr GhcRn  -- The head of the expression application chain
-          -> HsExpr GhcRn  -- Fallback expression to appear in the error message
           -> TcM CtOrigin
-mk_origin fun_lspan_arg rn_fun_arg rn_fun
-  | not (isGeneratedSrcSpan fun_lspan_arg)
-  = return $ exprCtOrigin rn_fun_arg
-  | otherwise
+mk_origin fun_lspan rn_fun
+  | not (isGeneratedSrcSpan fun_lspan)
+  = return $ exprCtOrigin rn_fun
+  | otherwise -- if the location is generated,
+              -- the best we can do is to approximate by looking on top of the error message stack
   = do { code_orig <- getSrcCodeOrigin
-       ; traceTc "mk_origin" (case (pprHsCtxt <$> code_orig) of { Just e -> e; _ -> text "Nothing"})
-       ; return $ srcCodeOriginCtOrigin rn_fun code_orig
+       ; traceTc "mk_origin" (pprHsCtxt code_orig)
+       ; return $ srcCodeOriginCtOrigin code_orig
        }
 
 

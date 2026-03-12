@@ -269,7 +269,7 @@ tcCheckMonoExprNC expr res_ty = tcMonoLExprNC expr (mkCheckExpType res_ty)
 
 
 -- Expand the HsExpr if it is typechecked after expansions
---  See Note [Handling overloaded and rebindable constructs]
+-- See Note [Handling overloaded and rebindable constructs]
 -- See Note [Typechecking by expansion: overview]
 expand_expr :: HsExpr GhcRn -> TcM (HsExpr GhcRn)
 expand_expr x = return x
