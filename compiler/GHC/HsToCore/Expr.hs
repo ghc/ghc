@@ -309,7 +309,7 @@ dsExpr e@(XExpr ext_expr_tc)
       ConLikeTc {}  -> dsApp e
 
       ExpandedThingTc o e
-        | DoStmtErrCtxt _ (L loc _) <- o -- c.f. T14546d. We have lost the location of the first statement in the GhcRn -> GhcTc
+        | StmtErrCtxt _ (L loc _) <- o -- c.f. T14546d. We have lost the location of the first statement in the GhcRn -> GhcTc
         -> putSrcSpanDsA loc $ dsExpr e
         | otherwise -> dsExpr e
 

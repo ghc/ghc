@@ -1012,7 +1012,7 @@ addFunResCtxt fun args fun_res_ty env_ty thing_inside
   = do { env_tv  <- newFlexiTyVarTy liftedTypeKind
        ; dumping <- doptM Opt_D_dump_tc_trace
        ; msg <- mk_msg dumping env_tv
-       ; addLandmarkErrCtxtM msg thing_inside }
+       ; addLandmarkErrCtxt msg thing_inside }
       -- NB: use a landmark error context, so that an empty context
       -- doesn't suppress some more useful context
   where

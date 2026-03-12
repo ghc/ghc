@@ -975,7 +975,7 @@ mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mo
                                           , text "insoluble" <+> ppr insoluble ])
 
        ; unless insoluble $
-         addErrCtxtM (InferredTypeCtxt poly_name inferred_poly_ty) $
+         addErrCtxt (InferredTypeCtxt poly_name inferred_poly_ty) $
          do { checkEscapingKind inferred_poly_ty
                  -- See Note [Inferred type with escaping kind]
             ; checkValidType (InfSigCtxt poly_name) inferred_poly_ty }

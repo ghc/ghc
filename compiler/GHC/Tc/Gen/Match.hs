@@ -488,7 +488,7 @@ tcStmtsAndThen ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
   | otherwise
   = do  { (stmt', (stmts', thing)) <-
                 setSrcSpanA loc                             $
-                addErrCtxt (StmtErrCtxt ctxt stmt)  $
+                addErrCtxt (StmtErrCtxt ctxt (L loc stmt))  $
                 stmt_chk ctxt stmt res_ty                   $ \ res_ty' ->
                 popErrCtxt                                  $
                 tcStmtsAndThen ctxt stmt_chk stmts res_ty'  $
@@ -1239,7 +1239,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                     , ..
                     }, pat_ty, exp_ty)
       = setSrcSpan (combineSrcSpans (getLocA pat) (getLocA rhs)) $
-        addErrCtxt (StmtErrCtxt ctxt (mkRnBindStmt pat rhs))   $
+        addErrCtxt (StmtErrCtxt ctxt (L (getLoc rhs) $ mkRnBindStmt pat rhs))   $
         do { rhs'      <- tcCheckMonoExprNC rhs exp_ty
            ; (pat', _) <- tcCheckPat (StmtCtxt ctxt) pat (unrestricted pat_ty) $
                           return ()

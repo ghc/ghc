@@ -1183,7 +1183,7 @@ applying the instance decl would show up two uses of ?x.  #8912.
 checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
 -- Assumes argument is fully zonked
 checkValidTheta ctxt theta
-  = addErrCtxtM (ThetaCtxt ctxt theta) $
+  = addErrCtxt (ThetaCtxt ctxt theta) $
     do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
        ; expand <- initialExpandMode
        ; check_valid_theta env ctxt expand theta }
