@@ -22,3 +22,4 @@ test('inferTags001', normal, multimod_compile_and_run, ['inferTags001', 'inferTa
 test('T22042', [extra_files(['T22042a.hs']),only_ways('normal'),unless(have_dynamic(), skip)], makefile_test, ['T22042'])
 test('T23783', normal, multimod_compile_and_run, ['T23783', '-O -v0'])
 test('unpack_enum', normal, compile_and_run, [''])
+test('T27005a', normal, compile_and_run, [''])
