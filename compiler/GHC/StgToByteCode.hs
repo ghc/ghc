@@ -20,6 +20,7 @@ import GHC.ByteCode.Types
 
 import GHC.Cmm.CallConv
 import GHC.Cmm.Expr
+import GHC.Cmm.CLabel (mkHpcTicksLabel, pprCLabel)
 import GHC.Cmm.Reg ( GlobalArgRegs(..) )
 import GHC.Cmm.Node
 import GHC.Cmm.Utils
@@ -73,6 +74,7 @@ import Data.List ( genericReplicate, intersperse
 import Foreign hiding (shiftL, shiftR)
 import Control.Monad
 import Data.Char
+import Data.Word
 
 import GHC.Unit.Module
 
@@ -602,6 +604,11 @@ schemeE d s p (StgLet _ext binds body) = do
 schemeE _d _s _p (StgTick (Breakpoint _ bp_id _) _rhs)
    = pprPanic "schemeE: Breakpoint without let binding:"
         (ppr bp_id <+> text "forgot to run bcPrep?")
+
+schemeE d s p (StgTick (HpcTick mod ix) rhs) = do
+   platform <- profilePlatform <$> getProfile
+   rhs_code <- schemeE d s p rhs
+   pure (unitOL (HPC_TICK (mkHpcTickLabel platform mod) (fromIntegral ix)) `appOL` rhs_code)
 
 -- ignore other kinds of tick
 schemeE d s p (StgTick _ rhs) = schemeE d s p rhs
@@ -2766,6 +2773,10 @@ getLastBreakTick = BcM $ \env st ->
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
+
+mkHpcTickLabel :: Platform -> Module -> FastString
+mkHpcTickLabel platform mod =
+  fsLit (showSDocOneLine defaultSDocContext (pprCLabel platform (mkHpcTicksLabel mod)))
 
 -- Dehydrating CgBreakInfo
 
