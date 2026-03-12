@@ -1,36 +1,46 @@
+<!--
+
 This is the template to be used to create release tracking tickets.  To make a new release:
 
 * **Milestone**.  Create a new Gitlab milestone for the release.  We refer to it here as **TODO milestone**.
-* **Tracking ticket**.  Create a new Gitlab issue, the tracking ticket; copy this template into it; and fill in the **TODO**s. 
+* **Tracking ticket**.  Create a new Gitlab issue, the tracking ticket, use this template.
 
 In the template, those items marked with *major-only* can be ignored for minor releases.
 
-# The template to copy/paste starts here!
+-->
 
-This is the release checklist for the **TODO milestone**. *(When filling in the template, make that "**TODO milestone**" into a link to the milestone, and delete this sentence.)*
+This is the release checklist for the **TODO milestone**. 
 
-See the milestone for the planned release schedule, and other details. See https://gitlab.haskell.org/ghc/ghc-hq/-/blob/main/release-management.mkd for release policies.
+<!--
+    *(When filling in the template, make that "**TODO milestone**" into a link to the milestone, and delete this sentence.)*
+-->
 
-See #16816 for the template that this ticket was derived from.
+See the milestone for the planned release schedule, and other details. See [GHC HQ - Release Management](https://gitlab.haskell.org/ghc/ghc-hq/-/blob/main/release-management.mkd) for release policies.
 
-# Pre-fork checklist (*major-only*)
+This template is part of the ghc repository at `.gitlab/issue_templates/release_tracking.md`.
 
-When forking a new release branch for a new major release series (e.g. `ghc-9.0`),  please check the following:
+<!-- 
+  Pre-fork checklist is MAJOR ONLY
+-->
+# Pre-fork checklist
+
+
+When forking a new release branch for a new major release series (e.g. `ghc-9.14`),  please check the following:
 
 * [ ] Add the release to the [status page](https://gitlab.haskell.org/ghc/ghc/-/wikis/GHC-Status), including a link to the milestone.
 * [ ] Verify that the platform support documentation is up-to-date with reality:
   * https://gitlab.haskell.org/ghc/ghc/-/wikis/platforms/windows
   * https://gitlab.haskell.org/ghc/ghc/-/wikis/platforms/
 * [ ] Remove the release notes for the previous release (e.g. `docs/users_guide/8.6.*-notes.rst`)
-* [ ] In `configure.ac` update `MinBootGhcVersion` to be the major version of the last supported bootstrap compiler. We currently guarantee bootstrapping with the last two major releases; therefore, when preparing, e.g., GHC 9.4 you should set `MinBootGhcVersion` to `9.0`.
-* [ ] Create the new branch: `git branch ghc-9.0`
-* [ ] In the new branch bump the version number in `configure.ac` to, e.g., `9.0`
-* [ ] In `master` bump the version number in `configure.ac` to that of the next development series, e.g., `9.1` and ensure that `MinBootGhcVersion` is set correctly
+* [ ] In `configure.ac` update `MinBootGhcVersion` to be the major version of the last supported bootstrap compiler. We currently guarantee bootstrapping with the last two major releases; therefore, when preparing, e.g., GHC `9.14` you should set `MinBootGhcVersion` to `9.10`.
+* [ ] Create the new branch: `git branch ghc-9.14`
+* [ ] In the new branch bump the version number in `configure.ac` to, e.g., `9.14`
+* [ ] In `master` bump the version number in `configure.ac` to that of the next development series, e.g., `9.15` and ensure that `MinBootGhcVersion` is set correctly
 * [ ] Verify that package versions have been bumped as necessary under PVP:
    * [ ] `base`
    * [ ] `template-haskell`
    * [ ] `ghc-prim`
-* [ ] Tag this `master` commit as, e.g., `ghc-9.1-start`
+* [ ] Tag this `master` commit as, e.g., `ghc-9.14-start`
 * [ ] Push all of the above tags and branches
 * [ ] Create a new worksheet in the GHC submodule tracking spreadsheet (ask in `#ghc` for a link), populate the "current" and "desired" version columns, and send an email to submodule maintainers and `ghc-releases@haskell.org` asking them to notify us of their needs
 * [ ] After forking, remove release notes from `master` and start a new set of release notes for the next release
@@ -41,29 +51,46 @@ When forking a new release branch for a new major release series (e.g. `ghc-9.0`
 
 * [ ] Ensure that the Haddock (haddock-library, haddock-api) version numbers have been appropriately bumped.
 * [ ] Ensure that submodules are on released tags (the below is produced using [this script](https://gitlab.haskell.org/bgamari/ghc-utils/blob/master/rel-eng/submod-release-summary.py)):
-   * [ ] `libraries/Cabal`: version *todo*
-   * [ ] `libraries/Win32`: version *todo*
-   * [ ] `libraries/binary`: version *todo*
-   * [ ] `libraries/bytestring`: version *todo*
-   * [ ] `libraries/containers`: version *todo*
-   * [ ] `libraries/deepseq`: version *todo*
-   * [ ] `libraries/directory`: version *todo*
-   * [ ] `libraries/filepath`: version *todo*
-   * [ ] `libraries/haskeline`: version *todo*
-   * [ ] `libraries/mtl`: version *todo*
-   * [ ] `libraries/parsec`: version *todo*
-   * [ ] `libraries/pretty`: version *todo*
-   * [ ] `libraries/process`: version *todo*
-   * [ ] `libraries/terminfo`: version *todo*
-   * [ ] `libraries/text`: version *todo*
-   * [ ] `libraries/time`: version *todo*
-   * [ ] `libraries/transformers`: version *todo*
-   * [ ] `libraries/unix`: version *todo*
-   * [ ] `libraries/xhtml`: version *todo*
-   * [ ] `utils/haddock`: version *todo*
-   * [ ] `utils/hsc2hs`: version *todo*
+    * [ ] `libraries/Cabal`: version *todo*
+    * [ ] `libraries/Win32`: version *todo*
+    * [ ] `libraries/array`: version *todo*
+    * [ ] `libraries/binary`: version *todo*
+    * [ ] `libraries/bytestring`: version *todo*
+    * [ ] `libraries/containers`: version *todo*
+    * [ ] `libraries/deepseq`: version *todo*
+    * [ ] `libraries/directory`: version *todo*
+    * [ ] `libraries/exceptions`: version *todo*
+    * [ ] `libraries/file-io`: version *todo*
+    * [ ] `libraries/filepath`: version *todo*
+    * [ ] `libraries/haskeline`: version *todo*
+    * [ ] `libraries/hpc`: version *todo*
+    * [ ] `libraries/libffi-clib`: version *todo*
+    * [ ] `libraries/mtl`: version *todo*
+    * [ ] `libraries/os-string`: version *todo*
+    * [ ] `libraries/parsec`: version *todo*
+    * [ ] `libraries/pretty`: version *todo*
+    * [ ] `libraries/process`: version *todo*
+    * [ ] `libraries/semaphore-compat`: version *todo*
+    * [ ] `libraries/stm`: version *todo*
+    * [ ] `libraries/template-haskell-lift`: version *todo*
+    * [ ] `libraries/template-haskell-quasiquoter`: version *todo*
+    * [ ] `libraries/terminfo`: version *todo*
+    * [ ] `libraries/text`: version *todo*
+    * [ ] `libraries/time`: version *todo*
+    * [ ] `libraries/transformers`: version *todo*
+    * [ ] `libraries/unix`: version *todo*
+    * [ ] `libraries/xhtml`: version *todo*
+    * [ ] `utils/hpc`: version *todo*
+    * [ ] `utils/hsc2hs`: version *todo*
+* [ ] Announce the boot lib versions that are planned to be included in the next release on the
+      [Boot libraries maintainers mailing list](mailto:ghc-boot-libraries@haskell.org), then allow for appropriate amount of grace time 
+      for boot library maintainers to include revisions.
 * [ ] Ensure that all of the versions above are newer than the ones for older major releases and incorporate any patch updates 
-* [ ] Notify stakeholders of release progress: `Julian Ospald <hasufell@posteo.de>, GHC releases <ghc-releases@haskell.org>, GHC developers <ghc-devs@haskell.org>`
+* [ ] Notify stakeholders of release progress, **including timeline, reason, what to look out for, platform tier changes, build platform changes, Bindist Changes** [^1]:
+   * [ ] [Julian Ospald](mailto:hasufell@posteo.de)
+   * [ ] [GHC releases](mailto:ghc-releases@haskell.org)
+   * [ ] [GHC developers](mailto:ghc-devs@haskell.org)
+   * [ ] [GHC users](mailto:glasgow-haskell-users@haskell.org)
 * [ ] Non-released submodules up-to-date:
    * [ ] `nofib` (upstream: ghc/nofib>)
    * [ ] `libffi-tarballs` (upstream: ghc/libffi-tarballs>)
@@ -86,15 +113,20 @@ When forking a new release branch for a new major release series (e.g. `ghc-9.0`
 
 # Release candidate checklist
 
-* [ ] Announce on: `GHC developers <ghc-devs@haskell.org>, GHC releases <ghc-releases@haskell.org>, GHC users <glasgow-haskell-users@haskell.org>` and the matrix ecosystem channel.
+* Announce on:
+   * [ ] [GHC developers](mailto:ghc-devs@haskell.org)
+   * [ ] [GHC releases](mailto:ghc-releases@haskell.org), 
+   * [ ] [GHC users](mailto:glasgow-haskell-users@haskell.org)
 * [ ] For minor releases: Ask stackage maintainers to test the release candidate.
+* Give grace time
+
 
 # Release checklist
 
 * [ ] Ensure that the [Migration](https://gitlab.haskell.org/ghc/ghc/wikis/migration/) page is up-to-date
-* [ ] Push a provision provisional release commit to trigger the release builds using `git push -o ci.variable="RELEASE_JOB=yes"`
+* [ ] Push a provisional release commit to trigger the release builds using `git push -o ci.variable="RELEASE_JOB=yes"`
 * [ ] Wait until builds finish; verify that they finished successfully
-* [ ] Write down a link to the release pipeline here: <URL>
+* [ ] Write down a link to the release pipeline here: <!-- URL -->
 * [ ] Fetch release artifacts:
   ```bash
   $ mkdir $VERSION
@@ -143,10 +175,16 @@ When forking a new release branch for a new major release series (e.g. `ghc-9.0`
    * [ ] Look over changes locally
    * [ ] Add release announcement to [GHC blog](https://gitlab.haskell.org/ghc/homepage/tree/master/blog). Be sure to link to the Migration guide.
    * [ ] Push changes to `master`
-* [ ] Announce on: `GHC developers <ghc-devs@haskell.org>, GHC releases <ghc-releases@haskell.org>, GHC users <glasgow-haskell-users@haskell.org>, Haskell Cafe <haskell-cafe@haskell.org>`
-   * Mention sponsors
-   * Mention ghc/ghc-hq>
-   * Link to release notes and migration guide
+* [ ] Announce on: 
+   * [ ] [GHC developers](mailto:ghc-devs@haskell.org)
+   * [ ] [GHC releases](mailto:ghc-releases@haskell.org), 
+   * [ ] [Boot libraries maintainers](mailto:ghc-boot-libraries@haskell.org)
+   * [ ] [GHC users](mailto:glasgow-haskell-users@haskell.org)
+   * [ ] adjacent matrix channels: #haskell-releases:matrix.org, #GHC:matrix.org, #ghc-devs:matrix.org
+   * [ ] [Haskell Cafe](mailto:haskell-cafe@haskell.org)
+   * [ ] Mention sponsors
+   * [ ] Mention ghc / ghc-hq
+   * [ ] Link to release notes and migration guide
 * [ ] Announce on: [Haskell Discourse](https://discourse.haskell.org/), [/r/haskell](https://reddit.com/r/haskell), [/m/haskell](https://kbin.social/m/haskell)
 * [ ] When releasing the latest version, update `latest` symlink on `downloads.haskell.org`, e.g. `ln -sfT 9.6.3 latest` if 9.6 was the latest major series.
 
@@ -159,3 +197,7 @@ When forking a new release branch for a new major release series (e.g. `ghc-9.0`
 * [ ] Update the [VersionHistory](https://gitlab.haskell.org/ghc/ghc/wikis/commentary/libraries/version-history) wiki page
 * [ ] Set `RELEASE=NO`
 * [ ] Create a release tracking ticket for the next release using the template in #16816
+
+[^1]: Build platform changes are major changes to how GHC is being built from sources.
+      Bindist changes are significant changes to the toolchains, changes to the layout of the bindists or changes to the user facing installation procedure.
+      Platform tier changes are changes that move platforms up or down a tier or drop a given platform from the tierlist.
