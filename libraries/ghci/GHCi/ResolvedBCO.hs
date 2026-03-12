@@ -9,17 +9,29 @@ module GHCi.ResolvedBCO
   , mkBCOByteArray
   ) where
 
+#include "MachDeps.h"
+
 import Prelude -- See note [Why do we import Prelude here?]
 import GHC.Data.SizedSeq
 import GHCi.RemoteTypes
 import GHCi.BreakArray
 
-import Data.Binary
+#if SIZEOF_HSWORD == 4
+import Control.Monad
+import Data.Array.Base (foldrArray, listArray)
+import Data.ByteString.Builder.Extra
+import Foreign.Storable
+#endif
+
+import Data.Binary (Binary(..))
+import Data.Binary.Get
+import Data.Binary.Put
+import Data.ByteString.Short (ShortByteString(..))
+import Data.Word
 import GHC.Generics
 
-import Foreign.Storable
 import GHC.Exts
-import Data.Array.Base (IArray, UArray(..))
+import Data.Array.Base (UArray(..))
 
 
 #include "MachDeps.h"
@@ -58,14 +70,26 @@ data BCOByteArray a
         getBCOByteArray :: !ByteArray#
   }
 
+#if SIZEOF_HSWORD == 4
 fromBCOByteArray :: forall a . Storable a => BCOByteArray a -> UArray Int a
 fromBCOByteArray (BCOByteArray ba#) = UArray 0 (n - 1) n ba#
   where
     len# = sizeofByteArray# ba#
     n = (I# len#) `div` sizeOf (undefined :: a)
+#endif
 
 mkBCOByteArray :: UArray Int a -> BCOByteArray a
 mkBCOByteArray (UArray _ _ _ arr) = BCOByteArray arr
+
+-- | Directly serialize 'BCOByteArray' payload without iterating over
+-- individual elements, assuming 'BCOByteArray' element type is a
+-- fixed-width type like 'Word16' that doesn't depend on host word
+-- size. See Note [BCOByteArray serialization] for more explanation.
+unsafePutFixedWidthBCOByteArray :: BCOByteArray a -> Put
+unsafePutFixedWidthBCOByteArray (BCOByteArray ba#) = put $ SBS ba#
+
+unsafeGetFixedWidthBCOByteArray :: Get (BCOByteArray a)
+unsafeGetFixedWidthBCOByteArray = (\(SBS ba#) -> BCOByteArray ba#) <$> get
 
 instance Show (BCOByteArray Word16) where
   showsPrec _ _ = showString "BCOByteArray Word16"
@@ -89,10 +113,46 @@ instance Binary ResolvedBCO where
   get = ResolvedBCO <$> get <*> get <*> get <*> get <*> get <*> get
 
 -- See Note [BCOByteArray serialization]
-instance (Binary a, Storable a, IArray UArray a) => Binary (BCOByteArray a) where
-  put = put . fromBCOByteArray
-  get = mkBCOByteArray <$> get
+instance Binary (BCOByteArray Word16) where
+  put = unsafePutFixedWidthBCOByteArray
+  get = unsafeGetFixedWidthBCOByteArray
 
+-- Word size depends on host, which is tricky when host/target word
+-- sizes differ. We always serialize `BCOByteArray Word` as
+-- `BCOByteArray Word64`.
+instance Binary (BCOByteArray Word) where
+#if SIZEOF_HSWORD == 8
+  -- 64-bit fast path. `BCOByteArray` is directly serialized via the
+  -- `Binary ShortByteString` instance, which serializes the `Int`
+  -- bytelength first (via `Int64` transparently), then copies the
+  -- buffer.
+  put = unsafePutFixedWidthBCOByteArray
+
+  get = unsafeGetFixedWidthBCOByteArray
+#else
+  -- 32-bit slow path. Pretend it's a `BCOByteArray Word64` and handle
+  -- the bytelength & buffer elements directly.
+  --
+  -- Regarding endianness: the bytelength is serialized via the
+  -- `Binary Int` instance, which is serialized as `Int64` via
+  -- big-endian. The payload follows host-endianness. This doesn't
+  -- work when host/target has different endianness, but we don't
+  -- support that setup yet anyway.
+  put ba32@(BCOByteArray ba32#) =
+    put len64 *>
+    putBuilder
+      (foldrArray (\w32 acc -> word64Host (fromIntegral w32) <> acc) mempty arr32)
+    where
+      len32# = sizeofByteArray# ba32#
+      len64 = I# len32# * 2
+      arr32 = fromBCOByteArray ba32
+
+  get = do
+    len64 <- get
+    let len = len64 `div` 8
+    w32s <- replicateM len (fromIntegral <$> getWord64host)
+    pure $ mkBCOByteArray $ listArray (0, len - 1) w32s
+#endif
 
 data ResolvedBCOPtr
   = ResolvedBCORef {-# UNPACK #-} !Int
@@ -124,12 +184,17 @@ instance Binary ResolvedBCOPtr
 -- The root issue here is the usage of platform sized integer types in
 -- BCO (and any messages we pass between ghc/iserv really), we should
 -- do what we already do for RemotePtr: always use Word64 instead of
--- Word. But that takes much more work, and there's an easier
--- mitigation: keep BCOByteArray as ByteArray#, but serialize it as
--- UArray, given the Binary instances are independent of platform word
--- size and endianness, so each Word/Int is always serialized as
--- 64-bit big-endian Word64/Int64, and the entire UArray is serialized
--- as a list (length+elements).
+-- Word.
+--
+-- When we serialize `BCOByteArray Word16`, element is fixed width on
+-- 32/64-bit host, so we can directly serialize the buffer per se. For
+-- `BCOByteArray Word`, we must always serialize it as `BCOByteArray
+-- Word64`, and hence it has fast-path/slow-path decided at
+-- compile-time, see comments of `instance Binary (BCOByteArray Word)`
+-- for explanation. These are the only two `Binary` instances we ever
+-- use, so to avoid unnecessary complexity, we're fine with flexible
+-- instances here, instead of generalizing to any element type that
+-- may be fixed-width or not.
 --
 -- Since we erase the metadata in UArray, we need to find a way to
 -- calculate the item count by dividing the ByteArray# length with
