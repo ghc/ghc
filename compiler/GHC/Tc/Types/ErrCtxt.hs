@@ -334,10 +334,7 @@ data HsCtxt
   | forall body.
     ( Anno (StmtLR GhcRn GhcRn body) ~ SrcSpanAnnA
     , Outputable body
-    ) => StmtErrCtxt !HsStmtContextRn !(StmtLR GhcRn GhcRn body)
-
-  -- | In a do statement.
-  | DoStmtErrCtxt !HsStmtContextRn !(ExprLStmt GhcRn)
+    ) => StmtErrCtxt !HsStmtContextRn !(LStmtLR GhcRn GhcRn body)
 
   -- | In patten of the do statement. (c.f. MonadFailErrors)
   | StmtErrCtxtPat (LPat GhcRn)

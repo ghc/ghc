@@ -853,7 +853,7 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
         -- case of locally-polymorphic methods.
 
     span <- getSrcSpanM
-    addErrCtxtM (SyntaxNameCtxt user_nm_expr orig sigma1 span) $ do
+    addErrCtxt (SyntaxNameCtxt user_nm_expr orig sigma1 span) $ do
 
         -- Check that the user-supplied thing has the
         -- same type as the standard one.

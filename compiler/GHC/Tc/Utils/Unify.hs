@@ -207,7 +207,7 @@ matchActualFunTy herald mb_thing err_info fun_ty
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
-    go ty = addErrCtxtM (mk_ctxt ty) (defer ty)
+    go ty = addErrCtxt (mk_ctxt ty) (defer ty)
 
     ------------
     defer fun_ty
@@ -933,7 +933,7 @@ matchExpectedFunTys herald ctx arity (Check top_ty) thing_inside
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
     check n_req rev_pat_tys res_ty
-      = addErrCtxtM (mkFunTysMsg herald (arity, top_ty))  $
+      = addErrCtxt (mkFunTysMsg herald (arity, top_ty))  $
         defer n_req rev_pat_tys res_ty
 
     ------------
@@ -1525,7 +1525,7 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
  = thing_inside             -- gives enough context by itself
  | otherwise
  = do ty_expected  <- readExpType ty_expected
-      addErrCtxtM (SubTypeCtxt ty_expected ty_actual) $
+      addErrCtxt (SubTypeCtxt ty_expected ty_actual) $
         thing_inside
 
 ---------------

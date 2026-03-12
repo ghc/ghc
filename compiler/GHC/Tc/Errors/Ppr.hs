@@ -7868,16 +7868,7 @@ pprHsCtxt = \case
 
   StmtErrCtxt ctxt stmt
     -- For [ e | .. ], do not mutter about "stmts"
-    | LastStmt _ e _ _ <- stmt
-    , isComprehensionContext ctxt
-    -> hang (text "In the expression:") 2 (ppr e)
-    | otherwise
-    -> hang (text "In a stmt of" <+> pprAStmtContext ctxt <> colon)
-       2 (ppr_stmt stmt)
-
-  DoStmtErrCtxt ctxt stmt
-    -- For [ e | .. ], do not mutter about "stmts"
-    | LastStmt _ e _ _ <- (unLoc stmt)
+    | (L _ (LastStmt _ e _ _)) <- stmt
     , isComprehensionContext ctxt
     -> hang (text "In the expression:") 2 (ppr e)
     | otherwise

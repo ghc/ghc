@@ -687,7 +687,7 @@ mkExpandedStmt
   -> HsDoFlavour          -- ^ source statements do flavour
   -> HsExpr GhcRn         -- ^ expanded expression
   -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = DoStmtErrCtxt (HsDoStmt flav) oStmt
+mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = StmtErrCtxt (HsDoStmt flav) oStmt
                                                          , xrn_expanded = eExpr })
 
 data XXExprGhcTc
@@ -1063,7 +1063,6 @@ instance Outputable XXExprGhcRn where
       pprCtxt :: HsCtxt -> SDoc
       pprCtxt (ExprCtxt e) = ppr_builder "<OrigExpr>:"  (ppr e)
       pprCtxt (StmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
-      pprCtxt (DoStmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
       pprCtxt (StmtErrCtxtPat pat) = ppr_builder "<OrigPat>:" (ppr pat)
       pprCtxt (FunAppCtxt (FunAppCtxtExpr _ e) _) = ppr_builder "<FunAppCtxt>:"  (ppr e)
       pprCtxt _ = ppr_builder "<MiscHsCtxt>:" empty
@@ -1080,7 +1079,6 @@ instance Outputable XXExprGhcTc where
       pprCtxt :: HsCtxt -> SDoc
       pprCtxt (ExprCtxt e) = ppr_builder "<OrigExpr>:"  (ppr e)
       pprCtxt (StmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
-      pprCtxt (DoStmtErrCtxt _ stmt) = ppr_builder "<OrigStmt>:" (ppr stmt)
       pprCtxt (StmtErrCtxtPat pat) = ppr_builder "<OrigPat>:" (ppr pat)
       pprCtxt (FunAppCtxt (FunAppCtxtExpr _ e) _) = ppr_builder "<FunAppCtxt>:"  (ppr e)
       pprCtxt _ = ppr_builder "<MiscHsCtxt>:" empty

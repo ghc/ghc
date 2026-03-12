@@ -1021,7 +1021,7 @@ tcPatSig in_pat_bind sig res_ty
         ; case NE.nonEmpty sig_tvs of
             Nothing -> do {
                 -- Just do the subsumption check and return
-                ; wrap <- addErrCtxtM (PatSigErrCtxt sig_ty res_ty) $
+                ; wrap <- addErrCtxt (PatSigErrCtxt sig_ty res_ty) $
                           tcSubTypePat PatSigOrigin PatSigCtxt res_ty sig_ty
                 ; return (sig_ty, [], sig_wcs, wrap)
                 }
@@ -1035,7 +1035,7 @@ tcPatSig in_pat_bind sig res_ty
                 (addErr (TcRnCannotBindScopedTyVarInPatSig sig_tvs_ne))
 
               -- Now do a subsumption check of the pattern signature against res_ty
-              wrap <- addErrCtxtM (PatSigErrCtxt sig_ty res_ty) $
+              wrap <- addErrCtxt (PatSigErrCtxt sig_ty res_ty) $
                       tcSubTypePat PatSigOrigin PatSigCtxt res_ty sig_ty
 
               -- Phew!

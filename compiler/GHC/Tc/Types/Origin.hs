@@ -637,7 +637,6 @@ errCtxtCtOrigin :: HsCtxt -> CtOrigin
 errCtxtCtOrigin (ExprCtxt e) = exprCtOrigin e
 errCtxtCtOrigin (FunAppCtxt (FunAppCtxtExpr _ e) _) = exprCtOrigin e
 errCtxtCtOrigin (StmtErrCtxt{}) = DoStmtOrigin
-errCtxtCtOrigin (DoStmtErrCtxt{}) = DoStmtOrigin
 errCtxtCtOrigin (StmtErrCtxtPat p) = DoPatOrigin p
 errCtxtCtOrigin (RecordUpdCtxt{}) = RecordUpdOrigin
 errCtxtCtOrigin _ = Shouldn'tHappenOrigin "errCtxtCtOrigin"

@@ -87,9 +87,9 @@ module GHC.Tc.Utils.Monad(
   ifErrsM, failIfErrsM,
 
   -- * Context management for the type checker
-  getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
-  addLExprCtxt, addExpansionErrCtxt, addExpansionErrCtxtM,
-  addLandmarkErrCtxtM, popErrCtxt, getCtLocM, setCtLocM, mkCtLocEnv,
+  getErrCtxt, setErrCtxt, addErrCtxt, addLandmarkErrCtxt,
+  addLExprCtxt, addExpansionErrCtxt,
+  popErrCtxt, getCtLocM, setCtLocM, mkCtLocEnv,
 
   -- * Diagnostic message generation (type checker)
   addErrTc,
@@ -1352,8 +1352,6 @@ addLExprCtxt lspan e thing_inside
              _ -> addErrCtxt (ExprCtxt e) thing_inside
 
 
-
-
 getErrCtxt :: TcM [ErrCtxt]
 getErrCtxt = do { env <- getLclEnv; return (getLclEnvErrCtxt env) }
 
@@ -1361,28 +1359,16 @@ setErrCtxt :: [ErrCtxt] -> TcM a -> TcM a
 {-# INLINE setErrCtxt #-}   -- Note [Inlining addErrCtxt]
 setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 
--- | Add a fixed message to the error context. This message should not
--- do any tidying.
--- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
+-- | Add a message to the error context. This message may not do any tidying.
+--   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 addErrCtxt :: HsCtxt -> TcM a -> TcM a
-{-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
-addErrCtxt msg = addErrCtxtM msg
+{-# INLINE addErrCtxt #-}  -- Note [Inlining addErrCtxt]
+addErrCtxt ctxt = pushCtxt (MkErrCtxt VanillaUserSrcCode ctxt)
 
 -- See Note [ErrCtxtStack Manipulation]
 addExpansionErrCtxt :: HsCtxt -> TcM a -> TcM a
-{-# INLINE addExpansionErrCtxt #-}   -- Note [Inlining addErrCtxt]
-addExpansionErrCtxt msg = addExpansionErrCtxtM msg
-
--- | Add a message to the error context. This message may do tidying.
---   See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
-addErrCtxtM :: HsCtxt -> TcM a -> TcM a
-{-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
-addErrCtxtM ctxt = pushCtxt (MkErrCtxt VanillaUserSrcCode ctxt)
-
--- See Note [ErrCtxtStack Manipulation]
-addExpansionErrCtxtM :: HsCtxt -> TcM a -> TcM a
-{-# INLINE addExpansionErrCtxtM #-}  -- Note [Inlining addErrCtxt]
-addExpansionErrCtxtM ctxt = pushCtxt (MkErrCtxt ExpansionCodeCtxt ctxt)
+{-# INLINE addExpansionErrCtxt #-}  -- Note [Inlining addErrCtxt]
+addExpansionErrCtxt ctxt = pushCtxt (MkErrCtxt ExpansionCodeCtxt ctxt)
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
@@ -1390,13 +1376,7 @@ addExpansionErrCtxtM ctxt = pushCtxt (MkErrCtxt ExpansionCodeCtxt ctxt)
 -- reported.
 addLandmarkErrCtxt :: HsCtxt -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxt #-}  -- Note [Inlining addErrCtxt]
-addLandmarkErrCtxt msg = addLandmarkErrCtxtM msg
-
--- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
--- and tidying.
-addLandmarkErrCtxtM :: HsCtxt -> TcM a -> TcM a
-{-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
-addLandmarkErrCtxtM ctxt = pushCtxt (MkErrCtxt LandmarkUserSrcCode ctxt)
+addLandmarkErrCtxt ctxt = pushCtxt (MkErrCtxt LandmarkUserSrcCode ctxt)
 
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 pushCtxt :: ErrCtxt -> TcM a -> TcM a
