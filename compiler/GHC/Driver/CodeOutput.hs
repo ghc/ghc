@@ -276,14 +276,15 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
      NoStubs ->
         return (False, Nothing)
 
-     ForeignStubs (CHeader h_code) (CStub c_code _ _) -> do
+     ForeignStubs (CHeader h_code) cstub -> do
         let
-            stub_c_output_d = pprCode c_code
+            stub_c_output_d = pprCode (getCStub cstub $$ pprCStubInitFiniDecls platform cstub)
             stub_c_output_w = showSDoc dflags stub_c_output_d
 
             -- Header file protos for "foreign export"ed functions.
             stub_h_output_d = pprCode h_code
             stub_h_output_w = showSDoc dflags stub_h_output_d
+            platform = targetPlatform dflags
 
         putDumpFileMaybe logger Opt_D_dump_foreign
                       "Foreign export header file"
@@ -342,6 +343,28 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
  where
    cplusplus_hdr = "#if defined(__cplusplus)\nextern \"C\" {\n#endif\n"
    cplusplus_ftr = "#if defined(__cplusplus)\n}\n#endif\n"
+
+pprCStubInitFiniDecls :: Platform -> CStub -> SDoc
+pprCStubInitFiniDecls platform cstub =
+  vcat (zipWith (pprInitOrFiniDecl ".init_array") [0 :: Int ..] (getInitializers cstub))
+  $$ vcat (zipWith (pprInitOrFiniDecl ".fini_array") [0 :: Int ..] (getFinalizers cstub))
+  where
+    pprInitOrFiniDecl :: String -> Int -> CLabel -> SDoc
+    pprInitOrFiniDecl section_name n lbl =
+      vcat
+        [ hsep [text "extern void", pprCLabel platform lbl, text "(void);"]
+        , hsep [ text "static void (*"
+               <> text "__ghc_init_fini_"
+               <> int n
+               <> text ")(void)"
+               , text "__attribute__((used, section("
+                 <> doubleQuotes (text section_name)
+                 <> text ")))"
+               , equals
+               , pprCLabel platform lbl
+               <> semi
+               ]
+        ]
 
 
 -- It is more than likely that the stubs file will
