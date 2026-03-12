@@ -9,15 +9,15 @@ import GHC.Prelude hiding ( head, init, last )
 
 import GHC.Core
 import GHC.Core.FVs
-import GHC.Core.Opt.OccurAnal (occurAnalyseCompUnit)
+import GHC.Core.Ppr (pprRule)
 import GHC.Core.Stats (coreBindsSize)
 
 import GHC.Data.Graph.Directed (SCC(..), Node(..), stronglyConnCompFromEdgedVerticesUniq)
-import GHC.Data.Maybe (orElse)
+import GHC.Data.Maybe (mapMaybe, orElse)
 
 import GHC.Types.Unique.Set
 import GHC.Types.Name (Name, isExternalName, nameModule)
-import GHC.Types.Name.Set (NameSet, isEmptyNameSet)
+import GHC.Types.Name.Set (NameSet, elemNameSet, isEmptyNameSet, mkNameSet)
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var
@@ -98,6 +98,57 @@ scope. So we must ensure `fa1` and fa2 end up in the same compilation unit.
 
 But for now I think I will just disable splitting if there is a boot module.
 
+--------------------------------
+
+Another wrinkle involving rules:
+Consider this:
+
+module A where
+
+{-# INLINE[1] foo #-}
+A.f1 x = 42
+A.f2 = A.f1
+-------------------
+module B where
+
+{-# RULES "rule-foo-bar" forall x. A.f1 x = bar x #-}
+
+foo x = A.f2 x
+
+bar x = 16
+
+
+Here rule-foo-bar only mentions one local binder so naively we would assume foo and bar are independent as the rule doesn't connect any two local binders directly.
+However consider this sequence of events:
+
+foo x = A.f2 x
+
+=> inline f2
+foo x = A.f1 x
+
+=> fire rule
+foo x = bar x
+
+
+Suddenly those two binders are not so independent anymore! The main point here is we might need to follow arbitrarily
+deep chains of imported unfoldings to avoid this. But doing so I think is prohibitively expensive especially if we don't
+know if we can actually uncover much parallelism for doing so.
+Where does this leave us?
+
+If a rule mentions zero local binders we can ignore it.
+If a rule mentions a local binder on both sides it's just an edge between those two binders. (easy)
+If a rule mentions a local binder on the lhs we can ignore it.
+If a rule mentions a single local binder on the rhs then unless we do a deep traversal of imported unfoldings we have to
+treat any imported bindings as potentially linking back to that local binder. (hard)
+
+We could the simple thing and say such a rule just makes splitting core unviable and compile any module with such a rule as a
+single compilation unit. And while rules of the last kind are rare specialzation rules are a notable exception:
+In particular if we have: imported :: C a => a -> T2 and {-# SPECIALISE imported :: T1 -> T2 #-} GHC translates this to a
+RULE `imported @T1 $dCT1 = $simported`; The exact shape the last point is talking about!
+It's unclear how to handle this. Do the unfolding traversel only if there are such rules? Might still be quite expensive.
+Especially with aggressive unfolding flags it could end up inspecting every unfolding in a project! Just give up on parallelism
+if there are such rules? Specialization pragmas aren't that rare, so seems like a big loss. Tricky!
+
 -}
 
 data DepGraphNode
@@ -122,6 +173,29 @@ maybeRuleEdges this_module rule =
     _   -> Just (zip local_fvs (drop 1 local_fvs))
   where
     local_fvs = filter (varFromModule this_module) (nonDetEltsUniqSet (ruleFreeVars rule))
+
+data UnifyingRule = UnifyingRule
+  { unifyingRule       :: !CoreRule
+  , unifyingRuleRhsFvs :: ![Var]
+  }
+
+findUnifyingRule :: VarSet -> NameSet -> CoreRule -> Maybe UnifyingRule
+findUnifyingRule local_top_bndrs local_top_names rule
+  | lhs_has_no_local_binder && not (null rhs_local_fvs)
+  = Just (UnifyingRule rule rhs_local_fvs)
+  | otherwise
+  = Nothing
+  where
+    lhs_local_fvs = ruleLhsFreeIds rule `intersectVarSet` local_top_bndrs
+    lhs_has_no_local_binder =
+      isEmptyVarSet lhs_local_fvs && not (ruleHeadIsLocal local_top_names rule)
+
+    rhs_local_fvs =
+      nonDetEltsUniqSet (ruleRhsFreeVars rule `intersectVarSet` local_top_bndrs)
+
+ruleHeadIsLocal :: NameSet -> CoreRule -> Bool
+ruleHeadIsLocal local_top_names Rule { ru_fn = fn } = fn `elemNameSet` local_top_names
+ruleHeadIsLocal _               BuiltinRule {}      = False
 
 bindNode :: VarSet -> CoreBind -> ([DepGraphNode], [Edge])
 bindNode local_top_bndrs bind =
@@ -199,7 +273,7 @@ assignLocalRules unit_rules binder_components =
           []  -> (rule_map, rule : no_comp_rules)
           is  -> pprPanic "splitCompUnit"
                  ( text "Rule free vars span multiple components"
-                $$ text "rule:" <+> ppr rule
+                $$ text "rule:" <+> pprRule rule
                 $$ text "components:" <+> ppr is
                 $$ text "rule_fvs:" <+> pprVarsWithModule (nonDetEltsUniqSet (ruleFreeVars rule))
                 $$ vcat [ text "component" <+> int i <> colon <+> pprVarsWithModule hits
@@ -239,8 +313,14 @@ pprVarWithModule v
 -- After optimizations a rule might no longer reference binders from this module.
 -- In these cases we return them here and then add them to mg_rules.
 splitCompUnit :: Int -> Module -> NameSet -> [CoreRule] -> CoreCompUnit -> ([CoreCompUnit], [CoreRule])
-splitCompUnit n_threads this_module boot_exported imp_rules unit
+splitCompUnit n_threads this_module boot_exported _imp_rules unit
   | not boot_exported_is_empty = single_comp_unit
+  | unifying_rule : _ <- unifying_rules
+  = pprTrace "splitCompUnit"
+      ( text "Not splitting build unit due to unifying rule"
+     $$ text "rule:" <+> pprRule (unifyingRule unifying_rule)
+     $$ text "local rhs binders:" <+> pprVarsWithModule (unifyingRuleRhsFvs unifying_rule) )
+      single_comp_unit
   | otherwise
   = let comp_units = combineCompUnits max_units (map mk_comp_unit components_with_rules)
         result = (comp_units, rules_for_imps ++ rules_without_component)
@@ -248,10 +328,9 @@ splitCompUnit n_threads this_module boot_exported imp_rules unit
        checkNameClashes comp_units `seq`
        result
   where
-    CoreCompUnit occ_binds unit_rules =
-      occurAnalyseCompUnit this_module (const True) (const True) imp_rules unit
+    CoreCompUnit unit_binds unit_rules = unit
 
-    top_level_bndrs = bindersOfBinds occ_binds
+    top_level_bndrs = bindersOfBinds unit_binds
     checked_bndrs =
       assertPpr (all isLocalVar top_level_bndrs)
         ( text "splitCompUnit: non-local top-level binder(s)"
@@ -259,8 +338,9 @@ splitCompUnit n_threads this_module boot_exported imp_rules unit
       top_level_bndrs
 
     local_top_bndrs = mkVarSet checked_bndrs
+    local_top_names = mkNameSet (map varName checked_bndrs)
 
-    bind_node_info = checked_bndrs `seq` map (bindNode local_top_bndrs) occ_binds
+    bind_node_info = checked_bndrs `seq` map (bindNode local_top_bndrs) unit_binds
     bind_nodes = concatMap fst bind_node_info
     bind_edges = concatMap snd bind_node_info
 
@@ -268,6 +348,8 @@ splitCompUnit n_threads this_module boot_exported imp_rules unit
     rule_edges = concat [ es | (_, Just es) <- rule_edge_pairs ]
     rules_for_imps = [ r | (r, Nothing) <- rule_edge_pairs ]
     unit_rules_local = [ r | (r, Just _) <- rule_edge_pairs ]
+    unifying_rules =
+      mapMaybe (findUnifyingRule local_top_bndrs local_top_names) unit_rules
 
     all_edges = bind_edges ++ rule_edges
     binder_components = splitCoreBinders bind_nodes all_edges
