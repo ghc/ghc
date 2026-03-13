@@ -2776,7 +2776,7 @@ tickFS = fsLit "ticked"
 
 mkHpcTickLabel :: Platform -> Module -> FastString
 mkHpcTickLabel platform mod =
-  fsLit (showSDocOneLine defaultSDocContext (pprCLabel platform (mkHpcTicksLabel mod)))
+  fsLit (showSDocOneLine defaultSDocContext (pprCode (pprCLabel platform (mkHpcTicksLabel mod))))
 
 -- Dehydrating CgBreakInfo
 
