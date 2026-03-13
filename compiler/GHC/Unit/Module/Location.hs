@@ -138,3 +138,5 @@ pattern ModLocation
           , ml_dyn_obj_file_ospath = unsafeEncodeUtf ml_dyn_obj_file
           , ml_hie_file_ospath = unsafeEncodeUtf ml_hie_file
           }
+
+{-# complete ModLocation #-}
