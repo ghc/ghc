@@ -1216,10 +1216,11 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
  = do let fmt      = intFormat (max width W32)
           reg_dst  = getLocalRegReg dst
 
-      (Amode aligned_addr align_code, maybe_unaligned_addr) <- case width of
-         W8  -> align_address
-         W16 -> align_address
-         _   -> panic "PPC: AtomicRMW illegal width"
+
+      let addr_fmt = intFormat (wordWidth platform)
+      (unaligned_addr, ucode) <- getSomeReg addr
+      aligned_addr <- getNewRegNat addr_fmt
+      let amode = AddrRegReg r0 aligned_addr
 
       shift        <- getNewRegNat fmt
       mask         <- getNewRegNat fmt
@@ -1230,7 +1231,6 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
 
       let handle_value = do
             (n_reg, ncode) <- getSomeReg n
-            let unaligned_addr = fromJust maybe_unaligned_addr
             let inv = shift_amount platform shift
             let mask_end = case width of
                   W8  -> 28
@@ -1271,10 +1271,7 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
             let shift_back = unitOL $ SR fmt reg_dst tmp2 (RIReg shift)
             return (RIReg shifted_n, i, insert, shift_back)
 
-      (n_ri, pre_code, mid_code, post_code) <- case width of
-        W8  -> handle_value
-        W16 -> handle_value
-        _   -> panic "PPC: AtomicRMW illegal width"
+      (n_ri, pre_code, mid_code, post_code) <- handle_value
 
       let instr = case amop of
             AMO_Add  -> ADD tmp2 tmp1 n_ri
@@ -1290,15 +1287,17 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
 
       lbl_retry <- getBlockIdNat
       lbl_done <- getBlockIdNat
-      return $ align_code `appOL` pre_code
+      return $ ucode
+        `snocOL` (CLRRI addr_fmt aligned_addr unaligned_addr 2)
+        `appOL` pre_code
         `appOL` toOL [ HWSYNC
                      , BCC ALWAYS lbl_retry Nothing
 
                      , NEWBLOCK lbl_retry
-                     , LDR fmt tmp1 aligned_addr
+                     , LDR fmt tmp1 amode
                      ]
         `snocOL` instr `appOL` mid_code
-        `appOL` toOL [ STC fmt tmp2 aligned_addr
+        `appOL` toOL [ STC fmt tmp2 amode
                      , BCC NE lbl_retry (Just False)
                      , BCC ALWAYS lbl_done Nothing
 
