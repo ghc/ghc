@@ -16,12 +16,9 @@ import GHC.Internal.Weak.Finalize
 
 import GHC.Internal.Base
 import GHC.Internal.Exception
-import GHC.Internal.IORef
-import GHC.Internal.Conc.Sync (labelThreadByteArray#, myThreadId)
-import GHC.Internal.IO (catchException, unsafePerformIO)
+import GHC.Internal.IO (catchException)
 import GHC.Internal.IO.Handle.Types (Handle)
 import GHC.Internal.IO.Handle.Text (hPutStrLn)
-import GHC.Internal.Encoding.UTF8 (utf8EncodeByteArray#)
 
 
 {-# DEPRECATED runFinalizerBatch
