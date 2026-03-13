@@ -179,7 +179,7 @@ import GHC.Internal.Data.Tuple
 import GHC.Internal.Base hiding ( foldr, mapM, sequence )
 import GHC.Internal.Classes
 import GHC.Internal.Err
-import GHC.Internal.Text.Read
+import Text.Read
 import GHC.Internal.Enum
 import GHC.Internal.Num
 import GHC.Internal.Prim (seq)

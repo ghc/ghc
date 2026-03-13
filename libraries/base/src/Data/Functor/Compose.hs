@@ -35,7 +35,7 @@ import GHC.Internal.Data.Foldable (Foldable(..))
 import GHC.Internal.Data.Monoid (Sum(..), All(..), Any(..), Product(..))
 import GHC.Internal.Data.Type.Equality (TestEquality(..), (:~:)(..))
 import GHC.Generics (Generic, Generic1)
-import GHC.Internal.Text.Read (Read(..), ReadPrec, readListDefault, readListPrecDefault)
+import Text.Read (Read(..), ReadPrec, readListDefault, readListPrecDefault)
 import Prelude
 
 infixr 9 `Compose`

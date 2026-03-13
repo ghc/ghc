@@ -329,7 +329,6 @@ Library
         GHC.Internal.System.Posix.Types
         GHC.Internal.Text.ParserCombinators.ReadP
         GHC.Internal.Text.ParserCombinators.ReadPrec
-        GHC.Internal.Text.Read
         GHC.Internal.Text.Read.Lex
         GHC.Internal.Text.Show
         GHC.Internal.Type.Reflection

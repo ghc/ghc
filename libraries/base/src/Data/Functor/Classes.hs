@@ -85,7 +85,7 @@ import GHC.Internal.Read (expectP, list, paren, readField)
 import GHC.Internal.Show (appPrec)
 
 import GHC.Internal.Text.ParserCombinators.ReadPrec (ReadPrec, readPrec_to_S, readS_to_Prec, pfail)
-import GHC.Internal.Text.Read (Read(..), parens, prec, step, reset)
+import Text.Read (Read(..), parens, prec, step, reset)
 import GHC.Internal.Text.Read.Lex (Lexeme(..))
 import GHC.Internal.Text.Show (showListWith)
 import Prelude
