@@ -2081,14 +2081,10 @@ stg_newBCOzh ( P_ instrs,
     StgBCO_size(bco)       = HALF_W_(words);
 
     // Copy the arity/bitmap info into the BCO
-    W_ i;
-    i = 0;
-for:
-    if (i < BYTE_ARR_WDS(bitmap_arr)) {
-        StgBCO_bitmap(bco,i) = StgArrBytes_payload(bitmap_arr,i);
-        i = i + 1;
-        goto for;
-    }
+    prim %memcpy(bco + SIZEOF_StgBCO,
+                 BYTE_ARR_CTS(bitmap_arr),
+                 WDS(BYTE_ARR_WDS(bitmap_arr)),
+                 SIZEOF_W);
 
     return (bco);
 }
