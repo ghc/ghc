@@ -605,7 +605,7 @@ function make_install_destdir() {
 
   mkdir -p "$destdir"
   mkdir -p "$instdir"
-  run "$MAKE" DESTDIR="$destdir" install || fail "make install failed"
+  run "$MAKE" DESTDIR="$destdir" install -j"$cores" || fail "make install failed"
   # check for empty dir portably
   # https://superuser.com/a/667100
   if find "$instdir" -mindepth 1 -maxdepth 1 | read; then
@@ -899,8 +899,8 @@ function save_cache () {
   if [[ "${CI_JOB_NAME}" == *"darwin"* ]]; then
     # -a makes APFS behave like a COW file system
     # From man CP(1)
-    # copy files using clonefile(2). 
-    # Note that if clonefile(2) is not supported for the target filesystem, 
+    # copy files using clonefile(2).
+    # Note that if clonefile(2) is not supported for the target filesystem,
     # then cp will fallback to using copyfile(2) instead to ensure the copy still succeeds.
     cp -Rcf "$CABAL_DIR" "$CABAL_CACHE"
   else

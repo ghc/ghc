@@ -499,7 +499,7 @@ hadrian-multi:
         || tar -xf ghc-x86_64-linux-deb13-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
-      make install
+      make install -j$CPUS
       popd
       rm -Rf tmp
     - export HC=$root/bin/ghc
@@ -1005,7 +1005,7 @@ perf-nofib:
       tar -xf ../ghc-x86_64-linux-fedora43-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
-      make install
+      make install -j$CPUS
       popd
       rm -Rf tmp
     - export PATH=$root/bin:$PATH
@@ -1047,7 +1047,7 @@ perf:
         || tar -xf ghc-x86_64-linux-deb13-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
-      make install
+      make install -j$CPUS
       popd
       rm -Rf tmp
     - export BOOT_HC=$(which ghc)
@@ -1087,7 +1087,7 @@ abi-test:
         || tar -xf ghc-x86_64-linux-deb13-release.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
-      make install
+      make install -j$CPUS
       popd
       rm -Rf tmp
     - export BOOT_HC=$(which ghc)
