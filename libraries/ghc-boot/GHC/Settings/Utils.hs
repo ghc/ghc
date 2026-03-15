@@ -3,6 +3,7 @@ module GHC.Settings.Utils where
 import Prelude -- See Note [Why do we import Prelude here?]
 
 import Data.Char (isSpace)
+import Data.Either (fromRight)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -45,7 +46,10 @@ getTargetArchOS target = tgtArchOs target
 getGlobalPackageDb :: FilePath -> RawSettings -> Either String FilePath
 getGlobalPackageDb settingsFile settings = do
   rel_db <- getRawSetting settingsFile settings "Relative Global Package DB"
-  return (dropFileName settingsFile </> rel_db)
+  let top_dir = dropFileName settingsFile
+      lib_dir  = (top_dir </>) $ fromRight "." $
+                   getRawFilePathSetting top_dir settingsFile settings "LibDir"
+  return (lib_dir </> rel_db)
 
 --------------------------------------------------------------------------------
 -- lib/settings

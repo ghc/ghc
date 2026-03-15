@@ -1,0 +1,18 @@
+section: packaging
+synopsis: Added a new optional configuration setting for `LibDir` to support inplace
+  stage2 cross-compilers where binaries and libraries are in different stage
+  directories.
+issues: #19174
+mrs: !15716
+
+description: {
+  Previously, `libDir` was always derived from `topDir`, which does not work
+  for inplace stage2 cross-compilers where executables live in `_build/stage1/`
+  but libraries live in `_build/stage2/`. A new optional `LibDir` setting in the
+  `settings` file allows overriding this. When absent (e.g. in bindists),
+  `libDir` defaults to `topDir`, preserving relocatability.
+
+  The global package database path is now resolved relative to `libDir`
+  (which may differ from `topDir` when `LibDir` is set). This affects inplace
+  cross-compiler builds but is transparent to normal and bindist builds.
+}
