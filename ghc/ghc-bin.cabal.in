@@ -22,6 +22,11 @@ Flag internal-interpreter
     Default: False
     Manual: True
 
+Flag interpreter
+    Description: Build with interpreter support, both internal and external.
+    Default: False
+    Manual: True
+
 Flag threaded
     Description: Link the ghc executable against the threaded RTS
     Default: True
@@ -56,7 +61,7 @@ Executable ghc
                  -rtsopts=all
                  "-with-rtsopts=-K512M -H -I5 -T"
 
-    if flag(internal-interpreter)
+    if flag(interpreter)
         -- NB: this is never built by the bootstrapping GHC+libraries
         Build-depends:
             deepseq        >= 1.4 && < 1.6,
@@ -65,7 +70,7 @@ Executable ghc
             haskeline      == 0.8.*,
             exceptions     == 0.10.*,
             time           >= 1.8 && < 1.16
-        CPP-Options: -DHAVE_INTERNAL_INTERPRETER
+        CPP-Options: -DHAVE_INTERPRETER
         Other-Modules:
             GHCi.Leak
             GHCi.UI
@@ -81,6 +86,9 @@ Executable ghc
             RecordWildCards
             UnboxedTuples
             ViewPatterns
+
+    if flag(internal-interpreter)
+       CPP-Options: -DHAVE_INTERNAL_INTERPRETER
 
     if flag(threaded)
       ghc-options: -threaded
