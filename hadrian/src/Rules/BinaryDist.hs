@@ -14,6 +14,7 @@ import qualified System.Directory.Extra as IO
 import Data.Either
 import qualified Data.Set as Set
 import Oracles.Flavour
+import Rules.Generate (generateSettings)
 
 {-
 Note [Binary distributions]
@@ -218,6 +219,17 @@ bindistRules = do
                   IO.createFileLink version_prog versioned_runhaskell_path
 
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
+
+      -- Regenerate settings file without LibDir. For bindists, LibDir should
+      -- be derived from topdir at runtime such that the GHC binary is
+      -- relocatable. The package DB is always at "package.conf.d" relative to
+      -- the lib dir, matching the known bindist layout.
+        let bindistSettings = bindistFilesDir -/- "lib" -/- "settings"
+            bindistContext = vanillaContext Stage1 compiler
+        bindistSettingsContent <- interpretInContext bindistContext $
+            generateSettings bindistSettings False "package.conf.d"
+        writeFile' bindistSettings bindistSettingsContent
+
         copyDirectory (rtsIncludeDir)         bindistFilesDir
         when windowsHost $ createGhcii (bindistFilesDir -/- "bin")
 

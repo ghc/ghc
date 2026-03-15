@@ -1,7 +1,7 @@
 module Rules.Generate (
     isGeneratedCmmFile, compilerDependencies, generatePackageCode,
     generateRules, copyRules, generatedDependencies,
-    templateRules
+    templateRules, generateSettings
     ) where
 
 import Development.Shake.FilePath
@@ -256,8 +256,21 @@ generateRules = do
 
     forM_ allStages $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
-            go gen file = generate file (semiEmptyTarget (succStage stage)) gen
-        (prefix -/- "settings") %> \out -> go (generateSettings out) out
+            -- Stage0 compiler builds Stage1, Stage1 -> Stage2, etc.
+            buildStage = succStage stage
+            go gen file = generate file (semiEmptyTarget buildStage) gen
+        (prefix -/- "settings") %> \out -> do
+            let get_pkg_db stg = packageDbPath (PackageDbLoc stg Final)
+            pkgDb <- case buildStage of
+                Stage0 {} -> error "Unable to generate settings for stage0. This should never be reached."
+                Stage1 -> get_pkg_db Stage1
+                Stage2 -> get_pkg_db Stage1
+                Stage3 -> get_pkg_db Stage2
+            -- addTrailingPathSeparator needed: makeRelativeNoSysLink uses
+            -- splitPath where "lib" and "lib/" are distinct components.
+            let lib_topDir = addTrailingPathSeparator prefix
+                relPkgDb = makeRelativeNoSysLink lib_topDir pkgDb
+            go (generateSettings out True relPkgDb) out
         (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr getTargetTarget) out
 
   where
@@ -460,18 +473,16 @@ ghcWrapper stage  = do
     return $ unwords $ map show $ [ ghcPath ]
                                ++ [ "$@" ]
 
-generateSettings :: FilePath -> Expr String
-generateSettings settingsFile = do
+-- | Generate settings file, optionally including @LibDir@.
+--
+-- @rel_pkg_db@: package DB path relative to the lib dir (e.g.
+-- "package.conf.d"). Callers supply the correct relative path. For bindists
+-- the layout is known statically; for in-tree builds callers compute it. For
+-- bindists, we omit @LibDir@ so it defaults to @topDir@ at runtime.
+generateSettings :: FilePath -> Bool -> FilePath -> Expr String
+generateSettings settingsFile includeLibDir rel_pkg_db = do
     ctx <- getContext
     stage <- getStage
-
-    package_db_path <- expr $ do
-      let get_pkg_db stg = packageDbPath (PackageDbLoc stg Final)
-      case stage of
-        Stage0 {} -> error "Unable to generate settings for stage0"
-        Stage1 -> get_pkg_db Stage1
-        Stage2 -> get_pkg_db Stage1
-        Stage3 -> get_pkg_db Stage2
 
     -- The unit-id of the base package which is always linked against (#25382)
     base_unit_id <- expr $ do
@@ -481,15 +492,24 @@ generateSettings settingsFile = do
         Stage2 -> pkgUnitId Stage1 base
         Stage3 -> pkgUnitId Stage2 base
 
-    let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
+    let -- E.g. the Stage2 compiler lives in _build/stage1
+        -- So, we need to decrement the stage to get the correct directory
+        stage_dir_stage = predStage stage
+
+    -- addTrailingPathSeparator is needed because makeRelativeNoSysLink uses
+    -- splitPath internally, where "lib" and "lib/" are distinct components.
+    lib_topDir :: FilePath <- expr $ addTrailingPathSeparator <$> stageLibPath stage_dir_stage
+    let rel_lib_topDir = makeRelativeNoSysLink (dropFileName settingsFile) lib_topDir
 
     settings <- traverse sequence $
-        [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
-        , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
-        , ("Relative Global Package DB", pure rel_pkg_db)
-        , ("base unit-id", pure base_unit_id)
-        ]
+          [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
+          , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
+          , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
+          , ("Relative Global Package DB", pure rel_pkg_db)
+          , ("base unit-id", pure base_unit_id)
+          ]
+          ++ ([("LibDir", pure rel_lib_topDir) | includeLibDir])
+
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
     pure $ case settings of
         [] -> "[]"

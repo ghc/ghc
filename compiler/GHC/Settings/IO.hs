@@ -28,6 +28,7 @@ import GHC.Toolchain.Program
 import GHC.Toolchain
 import GHC.Data.Maybe
 import Data.Bifunctor (Bifunctor(second))
+import Data.Either (fromRight)
 
 data SettingsError
   = SettingsError_MissingData String
@@ -117,12 +118,6 @@ initSettings top_dir = do
                           then ["-fwrapv", "-fno-builtin"]
                           else []
 
-  -- The package database is either a relative path to the location of the settings file
-  -- OR an absolute path.
-  -- In case the path is absolute then top_dir </> abs_path == abs_path
-  --         the path is relative then top_dir </> rel_path == top_dir </> rel_path
-  globalpkgdb_path <- installed <$> getSetting "Relative Global Package DB"
-
   let ghc_usage_msg_path  = installed "ghc-usage.txt"
       ghci_usage_msg_path = installed "ghci-usage.txt"
 
@@ -148,6 +143,19 @@ initSettings top_dir = do
 
   baseUnitId <- getSetting_raw "base unit-id"
 
+  -- LibDir is optional. If not set, derive it from topDir. This allows
+  -- bindists to work without explicitly setting LibDir, but gives us the
+  -- option to override it for inplace test compilers (the "stage2
+  -- cross-compiler" scenario). If LibDir is a relative path, it is
+  -- interpreted relative to topDir.
+  let lib_dir = installed $ fromRight "." $
+                  getRawFilePathSetting top_dir settingsFile mySettings "LibDir"
+
+  -- The package database is either a relative path to lib_dir OR an absolute path.
+  -- In case the path is absolute then lib_dir </> abs_path == abs_path
+  --         the path is relative then lib_dir </> rel_path == lib_dir </> rel_path
+  globalpkgdb_path <- (lib_dir </>) <$> getSetting "Relative Global Package DB"
+
   return $ Settings
     { sGhcNameVersion = GhcNameVersion
       { ghcNameVersion_programName = "ghc"
@@ -159,6 +167,7 @@ initSettings top_dir = do
       , fileSettings_ghciUsagePath  = ghci_usage_msg_path
       , fileSettings_toolDir        = mtool_dir
       , fileSettings_topDir         = top_dir
+      , fileSettings_libDir         = lib_dir
       , fileSettings_globalPackageDatabase = globalpkgdb_path
       }
 
