@@ -1,7 +1,7 @@
 module Rules.Generate (
     isGeneratedCmmFile, compilerDependencies, generatePackageCode,
     generateRules, copyRules, generatedDependencies,
-    templateRules
+    templateRules, generateSettings
     ) where
 
 import Development.Shake.FilePath
@@ -25,6 +25,7 @@ import Utilities
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Platform.ArchOS
 import Settings.Program (ghcWithInterpreter)
+import Hadrian.Oracles.Path
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -257,7 +258,7 @@ generateRules = do
     forM_ allStages $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
             go gen file = generate file (semiEmptyTarget (succStage stage)) gen
-        (prefix -/- "settings") %> \out -> go (generateSettings out) out
+        (prefix -/- "settings") %> \out -> go (generateSettings out True) out
         (prefix -/- "targets" -/- "default.target") %> \out -> go (show <$> expr getTargetTarget) out
 
   where
@@ -459,8 +460,10 @@ ghcWrapper stage  = do
     return $ unwords $ map show $ [ ghcPath ]
                                ++ [ "$@" ]
 
-generateSettings :: FilePath -> Expr String
-generateSettings settingsFile = do
+-- | Generate settings file, optionally including LibDir.
+-- For bindists, we omit LibDir so it defaults to topdir at runtime.
+generateSettings :: FilePath -> Bool -> Expr String
+generateSettings settingsFile includeLibDir = do
     ctx <- getContext
     stage <- getStage
 
@@ -481,14 +484,26 @@ generateSettings settingsFile = do
         Stage3 -> pkgUnitId Stage2 base
 
     let rel_pkg_db = makeRelativeNoSysLink (dropFileName settingsFile) package_db_path
+        make_absolute rel_path = do
+          abs_path <- liftIO (makeAbsolute rel_path)
+          fixAbsolutePathOnWindows abs_path
+
+        -- E.g. the Stage2 compiler lives in _build/stage1
+        -- So, we need to decrement the stage to get the correct directory
+        stage_dir_stage = predStage stage
+
+    rel_lib_topDir :: FilePath <- expr $ stageLibPath stage_dir_stage
+    lib_topDir :: FilePath <- expr $ make_absolute rel_lib_topDir
 
     settings <- traverse sequence $
-        [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
-        , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
-        , ("Relative Global Package DB", pure rel_pkg_db)
-        , ("base unit-id", pure base_unit_id)
-        ]
+          [ ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
+          , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter (predStage stage))
+          , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
+          , ("Relative Global Package DB", pure rel_pkg_db)
+          , ("base unit-id", pure base_unit_id)
+          ]
+          ++ ([("LibDir", pure lib_topDir) | includeLibDir])
+
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
     pure $ case settings of
         [] -> "[]"

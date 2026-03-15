@@ -3548,9 +3548,9 @@ compilerInfo dflags
       ("Project name",                 cProjectName)
       -- Next come the settings, so anything else can be overridden
       -- in the settings file (as "lookup" uses the first match for the
-      -- key)
+      -- key). We filter out LibDir from rawSettings to avoid duplication.
      : map (fmap expandDirectories)
-           (rawSettings dflags)
+           (filter ((/= "LibDir") . fst) (rawSettings dflags))
      ++
       [("C compiler command", queryCmd $ ccProgram . tgtCCompiler),
        ("C compiler flags", queryFlags $ ccProgram . tgtCCompiler),
@@ -3651,7 +3651,7 @@ compilerInfo dflags
        -- Whether or not GHC was compiled using -prof
        ("GHC Profiled",                showBool hostIsProfiled),
        ("Debug on",                    showBool debugIsOn),
-       ("LibDir",                      topDir dflags),
+       ("LibDir",                      libDir dflags),
        -- This is always an absolute path, unlike "Relative Global Package DB" which is
        -- in the settings file.
        ("Global Package DB",           globalPackageDatabasePath dflags)

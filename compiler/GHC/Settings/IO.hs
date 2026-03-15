@@ -28,6 +28,7 @@ import GHC.Toolchain.Program
 import GHC.Toolchain
 import GHC.Data.Maybe
 import Data.Bifunctor (Bifunctor(second))
+import Data.Either (fromRight)
 
 data SettingsError
   = SettingsError_MissingData String
@@ -148,6 +149,13 @@ initSettings top_dir = do
 
   baseUnitId <- getSetting_raw "base unit-id"
 
+  -- LibDir is optional. If not set, derive it from topDir. This allows
+  -- bindists to work without explicitly setting LibDir, but gives us the
+  -- option to override it for inplace test compilers (the "stage2
+  -- cross-compiler" scenario).
+  let lib_dir = fromRight top_dir $
+                  getRawFilePathSetting top_dir settingsFile mySettings "LibDir"
+
   return $ Settings
     { sGhcNameVersion = GhcNameVersion
       { ghcNameVersion_programName = "ghc"
@@ -159,6 +167,7 @@ initSettings top_dir = do
       , fileSettings_ghciUsagePath  = ghci_usage_msg_path
       , fileSettings_toolDir        = mtool_dir
       , fileSettings_topDir         = top_dir
+      , fileSettings_libDir         = lib_dir
       , fileSettings_globalPackageDatabase = globalpkgdb_path
       }
 

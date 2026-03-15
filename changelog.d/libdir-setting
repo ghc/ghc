@@ -1,0 +1,15 @@
+section: packaging
+synopsis: Added a new configuration setting for `LibDir` to support inplace
+  stage2 cross-compilers where binaries and libraries are in different stage
+  directories.
+issues: #19174
+mrs: !15716
+
+description: {
+  Previously, the `libDir` was always derived from `topDir`, which won't work
+  for inplace stage2 cross-compilers where executables are in `_build/stage1/`
+  and libraries are in `_build/stage2/`. Now, `LibDir` can be set, but is by
+  default derived from `topDir`. This facilitates the mentioned behaviour
+  while leaving the binary distribution code untouched. This is a refactoring
+  step that does not change actual behaviour.
+}
