@@ -844,6 +844,14 @@ primOpRules nm = \case
 
    -- Misc
 
+   -- See Note [Constant folding for Addr# equality]
+   AddrEqOp   -> mkPrimOpRule nm 2 [ equalArgs >> (trueValInt <$> getPlatform)
+                                   , match_litAddr_eq True
+                                   ]
+   AddrNeOp   -> mkPrimOpRule nm 2 [ equalArgs >> (falseValInt <$> getPlatform)
+                                   , match_litAddr_eq False
+                                   ]
+
    AddrAddOp  -> mkPrimOpRule nm 2 [ rightIdentityPlatform zeroi ]
 
    SparkOp    -> mkPrimOpRule nm 4 [ sparkRule ]
@@ -966,6 +974,39 @@ cmpOp cmp env = go
       | nt1 /= nt2 = Nothing
       | otherwise  = done (i1 `cmp` i2)
     go _               _               = Nothing
+
+--------------------------
+
+-- Note [Constant folding for Addr# equality]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We constant-fold (eqAddr# "foo"# "bar"#) when both arguments are string
+-- literals with *different* byte content.  Because the bytes differ, the two
+-- literals cannot reside at the same address, so the result is definitely
+-- False (or True for neAddr#).
+--
+-- We use exprIsLiteral_maybe (via isLiteral) rather than binaryLit/cmpOp,
+-- because string literals are frequently floated out to the top level as CAF
+-- bindings.  That turns them into variables, and we must look through those
+-- variable unfoldings to recover the underlying LitString.
+--
+-- When both literals have the *same* byte content we do NOT fold to True.
+-- Two distinct literal occurrences in the source may end up at different
+-- addresses in the object file (the linker is not required to merge them),
+-- so pointer equality is not guaranteed by equal content alone.  The
+-- equalArgs already handles the case where both arguments are the *same*
+-- expression (provably the same pointer).
+
+match_litAddr_eq :: Bool  -- ^ True  <=> eqAddr#  (fold different-content to False)
+                          --   False <=> neAddr#  (fold different-content to True)
+                 -> RuleM CoreExpr
+-- See Note [Constant folding for Addr# equality]
+match_litAddr_eq is_eq = do
+  platform  <- getPlatform
+  [e1, e2]  <- getArgs
+  LitString s1 <- isLiteral e1
+  LitString s2 <- isLiteral e2
+  guard (s1 /= s2)
+  return $ if is_eq then falseValInt platform else trueValInt platform
 
 --------------------------
 

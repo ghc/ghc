@@ -1,0 +1,15 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 10, types: 4, coercions: 0, joins: 0/0}
+
+a = I# 0#
+
+b = I# 1#
+
+c = b
+
+d = a
+
+
+
