@@ -153,6 +153,9 @@ toolTargets = [ cabalSyntax
               , filepath
               , fileio
               , osString
+              -- os-string/filepath now depend on them
+              , thLift
+              , thQuasiquoter
               -- , ghc     -- # depends on ghc library
               -- , runGhc  -- # depends on ghc library
               , ghcBoot
@@ -200,4 +203,3 @@ dirMap = do
       cd <- readContextData c
       ids <- liftIO $ mapM canonicalizePath [pkgPath p </> i | i <- srcDirs cd]
       return $ map (,(p, modules cd ++ otherModules cd)) ids
-
