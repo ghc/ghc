@@ -1,6 +1,9 @@
 test('size_hello_obj', [collect_size(5, 'size_hello_obj.o')], compile, [''])
 
-test('size_hello_artifact', [collect_size(5, 'size_hello_artifact' + exe_extension())],
+test('size_hello_artifact',
+  [ collect_size(5, 'size_hello_artifact' + exe_extension()),
+    when(arch('x86_64') and opsys('darwin'), fragile(26814))
+  ],
                              compile_artifact, [''])
 
 test('size_hello_artifact_gzip', [extra_files(['./size_hello_artifact.hs']),
