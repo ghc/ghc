@@ -24,6 +24,8 @@ module GHC.Rename.Utils (
         genSimpleFunBind, genFunBind,
         genHsLamDoExp, genHsCaseAltDoExp, genSimpleMatch, genHsLet,
 
+        mkExpandedRn, mkExpandedExpr, mkExpandedStmt, mkExpandedLExpr, mkExpandedTc, mkExpandedExprTc,
+
         mkRnSyntaxExpr,
 
         newLocalBndrRn, newLocalBndrsRn,
@@ -45,7 +47,6 @@ import GHC.Core.Type
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
--- import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -816,3 +817,50 @@ genSimpleMatch ctxt pats rhs
   = wrapGenSpan $
     Match { m_ext = noExtField, m_ctxt = ctxt, m_pats = noLocA pats
           , m_grhss = unguardedGRHSs generatedSrcSpan rhs noAnn }
+
+
+-- | Build an expression using the extension constructor `XExpr`,
+--   and the two components of the expansion: original expression and
+--   expanded expressions.
+mkExpandedExpr
+  :: HsExpr GhcRn         -- ^ source expression context
+  -> HsExpr GhcRn         -- ^ expanded expression
+  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedExpr oExpr eExpr = mkExpandedRn (ExprCtxt oExpr) (wrapGenSpan eExpr)
+
+mkExpandedLExpr
+  :: HsExpr GhcRn         -- ^ source expression context
+  -> LHsExpr GhcRn         -- ^ expanded expression
+  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedLExpr oExpr eExpr = mkExpandedRn (ExprCtxt oExpr) eExpr
+
+-- | Build an expression using the extension constructor `XExpr`,
+--   and the two components of the expansion: original do stmt and
+--   expanded expression
+mkExpandedStmt
+  :: ExprLStmt GhcRn      -- ^ source statement context
+  -> HsDoFlavour          -- ^ source statements do flavour
+  -> HsExpr GhcRn         -- ^ expanded expression
+  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedStmt oStmt flav eExpr = mkExpandedRn (StmtErrCtxt (HsDoStmt flav) oStmt) (wrapGenSpan eExpr)
+
+mkExpandedRn
+  :: HsCtxt          -- ^ source, user written do statement/expression
+  -> LHsExpr GhcRn           -- ^ expanded typechecked expression
+  -> HsExpr GhcRn           -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedRn orig expr = XExpr (ExpandedThingRn orig expr)
+
+-- | Build a 'XXExprGhcRn' out of an extension constructor,
+--   and the two components of the expansion: original and
+--   expanded typechecked expressions.
+mkExpandedExprTc
+  :: HsExpr GhcRn           -- ^ source expression
+  -> HsExpr GhcTc           -- ^ expanded typechecked expression
+  -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedExprTc oExpr eExpr = mkExpandedTc (ExprCtxt oExpr) (wrapGenSpan eExpr)
+
+mkExpandedTc
+  :: HsCtxt          -- ^ source, user written do statement/expression
+  -> LHsExpr GhcTc           -- ^ expanded typechecked expression
+  -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedTc o e = XExpr (ExpandedThingTc o e)

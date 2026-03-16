@@ -105,7 +105,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
-import GHC.Types.SrcLoc (unLoc)
+import GHC.Types.SrcLoc (unLoc, GenLocated (..))
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -2082,7 +2082,7 @@ getDeepSubsumptionFlag_DataConHead app_head =
     go app_head
      | XExpr (ConLikeTc (RealDataCon {})) <- app_head
      = Deep TopSub
-     | XExpr (ExpandedThingTc _ f) <- app_head
+     | XExpr (ExpandedThingTc _ (L _ f)) <- app_head
      = go f
      | XExpr (WrapExpr _ f) <- app_head
      = go f

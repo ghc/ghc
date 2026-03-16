@@ -29,6 +29,8 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Hs.Syn.Type
 
+import GHC.Rename.Utils (mkExpandedTc, mkExpandedExprTc)
+
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Bind( chooseInferredQuantifiers )
 import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig )
@@ -460,12 +462,12 @@ tcInferAppHead_maybe fun = case fun of
       ExprWithTySig _ e hs_ty     -> Just <$> with_get_ds (tcExprWithSig e hs_ty)
       HsOverLit _ lit             -> Just <$> with_get_ds (tcInferOverLit lit)
       XExpr (HsRecSelRn f)        -> Just <$> with_get_ds (tcInferRecSelId f)
-      XExpr (ExpandedThingRn o e) -> Just <$> (
+      XExpr (ExpandedThingRn o (L loc e)) -> setSrcSpan (locA loc) $ Just <$>  (
                                               -- We do not want to instantiate the type of the head as there may be
                                               -- visible type applications in the argument.
                                               -- c.f. T19167
-                                              (\ (e, ds_flag, ty) -> (mkExpandedTc o e, ds_flag, ty)) <$>
-                                                 tcExprSigma False (errCtxtCtOrigin o) e
+                                              (\ (e, ds_flag, ty) -> (mkExpandedTc o (L loc e), ds_flag, ty)) <$>
+                                                  tcExprSigma False (errCtxtCtOrigin o) e
                                               )
       _                           -> return Nothing
 

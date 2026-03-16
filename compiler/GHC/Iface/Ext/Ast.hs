@@ -757,8 +757,8 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
         HsPragE _ _ e -> computeLType e
         XExpr (ExpandedThingTc thing e)
           | ExprCtxt (HsGetField{}) <- thing -- for record-dot-syntax
-          -> Just (hsExprType e)
-          | otherwise -> computeType e
+          -> Just (lhsExprType e)
+          | otherwise -> computeLType e
         XExpr (HsTick _ e) -> computeLType e
         XExpr (HsBinTick _ _ e) -> computeLType e
         e -> Just (hsExprType e)
@@ -1354,7 +1354,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
             -> [ toHie $ L mspan a
                , toHie (L mspan w) ]
           ExpandedThingTc _ e
-            -> [ toHie (L mspan e) ]
+            -> [ toHie e ]
           ConLikeTc con
             -> [ toHie $ C Use $ L mspan $ conLikeName con ]
           HsTick _ expr

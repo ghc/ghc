@@ -1097,7 +1097,7 @@ zonkExpr (XExpr (WrapExpr co_fn expr))
        return (XExpr (WrapExpr new_co_fn new_expr))
 
 zonkExpr (XExpr (ExpandedThingTc thing e))
-  = do e' <- zonkExpr e
+  = do e' <- zonkLExpr e
        return $ XExpr (ExpandedThingTc thing e')
 
 zonkExpr e@(XExpr (ConLikeTc {}))

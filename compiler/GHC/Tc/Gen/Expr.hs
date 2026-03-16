@@ -36,6 +36,7 @@ import GHC.Rename.Env         ( addUsedGRE, getUpdFieldLbls )
 
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
+import GHC.Tc.Gen.Do
 import GHC.Tc.Gen.Bind        ( tcLocalBinds )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
@@ -91,6 +92,8 @@ import GHC.Data.Maybe
 
 import Control.Monad
 import qualified Data.List.NonEmpty as NE
+
+import qualified GHC.LanguageExtensions as LangExt
 
 {-
 ************************************************************************
@@ -267,13 +270,6 @@ tcCheckMonoExpr, tcCheckMonoExprNC
 tcCheckMonoExpr   expr res_ty = tcMonoLExpr  expr (mkCheckExpType res_ty)
 tcCheckMonoExprNC expr res_ty = tcMonoLExprNC expr (mkCheckExpType res_ty)
 
-
--- Expand the HsExpr if it is typechecked after expansions
--- See Note [Handling overloaded and rebindable constructs]
--- See Note [Typechecking by expansion: overview]
-expand_expr :: HsExpr GhcRn -> TcM (HsExpr GhcRn)
-expand_expr x = return x
-
 ---------------
 tcMonoLExpr, tcMonoLExprNC
     :: LHsExpr GhcRn     -- Expression to type check
@@ -282,8 +278,7 @@ tcMonoLExpr, tcMonoLExprNC
     -> TcM (LHsExpr GhcTc)
 
 tcMonoLExpr (L loc expr) res_ty
-  = do expanded_expr <- expand_expr expr
-       addLExprCtxt (locA loc) expanded_expr $  -- Note [Error contexts in generated code]
+  = do addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
          do  { expr' <- tcExpr expr res_ty
              ; return (L loc expr') }
 
@@ -562,7 +557,20 @@ tcExpr (HsMultiIf _ alts) res_ty
        ; res_ty <- readExpType res_ty
        ; return (HsMultiIf res_ty alts') }
 
-tcExpr (HsDo _ do_or_lc stmts) res_ty
+tcExpr expr@(HsDo _ do_or_lc stmts) res_ty
+  | DoExpr{} <- do_or_lc
+  -- ApplicativeDo are typechecked using tcDoStmts
+  = do isApplicativeDo <- xoptM LangExt.ApplicativeDo
+       if isApplicativeDo
+         then tcDoStmts do_or_lc stmts res_ty
+         -- Expand expression on the fly otherwise
+         -- See Note [Typechecking by expansion: overview]
+         else do { expr' <- tcExpandExpr expr
+                 ; tcExpr expr' res_ty }
+  | MDoExpr{} <- do_or_lc
+  = do expr' <- tcExpandExpr expr
+       tcExpr expr' res_ty
+  | otherwise
   = tcDoStmts do_or_lc stmts res_ty
 
 tcExpr (HsProc x pat cmd) res_ty
@@ -679,7 +687,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
 
         ; (ds_expr, ds_res_ty, err_msg)
             <- expandRecordUpd record_expr possible_parents rbnds res_ty
-        ; addExpansionErrCtxt err_msg $
+        ; setInGeneratedCode $ addErrCtxt err_msg $
           do { -- Typecheck the expanded expression.
                expr' <- tcExpr ds_expr (Check ds_res_ty)
                -- NB: it's important to use ds_res_ty and not res_ty here.
@@ -777,12 +785,12 @@ directly, it's much easier to
 
 Example: record updates.  The typechecker looks like this:
 
-   tcExpr e@(RecordUpd{}) rho = do { ee <- expandExpr e
-                                   ; tcExpr ee rho }
+   tcExpr e@(HsDo{}) rho = do { ee <- expandExpr e
+                              ; tcExpr ee rho }
 
-The `expandExpr` replaces the record update (e { x = rhs })
+The `expandExpr` replaces the HsDo { x <- e1; return x }
 with something like
-   case e of { MkT a b _ d -> MkT a b rhs d }
+   e1 >>= \ x -> x
 and we then typecheck the latter.
 
 See also Note [Handling overloaded and rebindable constructs]
@@ -799,8 +807,9 @@ The rest of this Note explains how that is done.
                                        , xrn_expanded = ee } ))
   where `ee` is the expansion of the user written thing `ue`
 
-* The type checker context has 2 key fields that describe the context:
+* The type checker context has 3 key fields that describe the context:
      TcLclCtxt { tcl_loc      :: RealSrcSpan
+               , tcl_in_gen_code :: Bool
                , tcl_err_ctxt :: [ErrCtxt]
                , ... }
   Note `tcl_loc` always points to a real place in the source code,
@@ -809,8 +818,12 @@ The rest of this Note explains how that is done.
   The `tcl_err_ctxt` is a stack of contexts, each saying something
   like "In the expression: x+y" or "In the record update: r { x=2 }"
 
+  The `tcl_in_gen_code` is a boolean that keeps track of whether
+  the current expression being typechecked is compiler generated
+  or user generated.
+
 * Now, when
-      tcMonoLHsExpr :: LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
+      tcMonoLExpr :: LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
   gets a located expression, it does 2 things:
     * Calls `addLExprCtxt` to perform error context management
     * Calls `tcExpr` to typecheck the expression.
@@ -840,7 +853,7 @@ tcXExpr (ExpandedThingRn o e) res_ty
    = mkExpandedTc o <$> -- necessary for hpc ticks
          -- Need to call tcExpr and not tcApp
          -- as e can be let statement which tcApp cannot gracefully handle
-         tcExpr e res_ty
+         tcMonoLExpr e res_ty
 
 -- For record selection, same as HsVar case
 tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
@@ -1847,3 +1860,14 @@ checkMissingFields con_like rbinds arg_tys
     field_strs = conLikeImplBangs con_like
 
     fl `elemField` flds = any (\ fl' -> flSelector fl == fl') flds
+
+
+-- Expands the expression on the fly
+-- See Note [Handling overloaded and rebindable constructs]
+-- See Note [Typechecking by expansion: overview]
+tcExpandExpr :: HsExpr GhcRn -> TcM (HsExpr GhcRn)
+tcExpandExpr orig_expr@(HsDo _ flav (L _ stmts))
+  = do { expanded_expr <- expandDoStmts flav stmts
+       ; return (mkExpandedLExpr orig_expr expanded_expr) }
+
+tcExpandExpr e = return e
