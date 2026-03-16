@@ -661,34 +661,13 @@ type instance XXExpr GhcTc = XXExprGhcTc
 ********************************************************************* -}
 
 data XXExprGhcRn
-  = ExpandedThingRn { xrn_orig     :: HsCtxt         -- The original source thing context to be used for error messages
-                    , xrn_expanded :: HsExpr GhcRn    -- The compiler generated, expanded thing
-                    }
+  = ExpandedThingRn { xrn_orig     :: HsCtxt           -- The original source thing context to be used for error messages
+                    , xrn_expanded :: LHsExpr GhcRn }  -- The compiler generated, expanded thing
+                                                       -- This is located because of do statements (TODO ANI : Add Note)
 
   | HsRecSelRn  (FieldOcc GhcRn)   -- ^ Variable pointing to record selector
                            -- See Note [Non-overloaded record field selectors] and
                            -- Note [Record selectors in the AST]
-
--- | Build an expression using the extension constructor `XExpr`,
---   and the two components of the expansion: original expression and
---   expanded expressions.
-mkExpandedExpr
-  :: HsExpr GhcRn         -- ^ source expression context
-  -> HsExpr GhcRn         -- ^ expanded expression
-  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedExpr oExpr eExpr = XExpr (ExpandedThingRn { xrn_orig = ExprCtxt oExpr
-                                                    , xrn_expanded = eExpr })
-
--- | Build an expression using the extension constructor `XExpr`,
---   and the two components of the expansion: original do stmt and
---   expanded expression
-mkExpandedStmt
-  :: ExprLStmt GhcRn      -- ^ source statement context
-  -> HsDoFlavour          -- ^ source statements do flavour
-  -> HsExpr GhcRn         -- ^ expanded expression
-  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedStmt oStmt flav eExpr = XExpr (ExpandedThingRn { xrn_orig = StmtErrCtxt (HsDoStmt flav) oStmt
-                                                         , xrn_expanded = eExpr })
 
 data XXExprGhcTc
   = WrapExpr        -- Type and evidence application and abstractions
@@ -696,8 +675,9 @@ data XXExprGhcTc
 
   | ExpandedThingTc                         -- See Note [Rebindable syntax and XXExprGhcRn]
                                             -- See Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
-         { xtc_orig     :: HsCtxt        -- The original user written thing
-         , xtc_expanded :: HsExpr GhcTc }   -- The expanded typechecked expression
+         { xtc_orig     :: HsCtxt           -- The original user written thing
+         , xtc_expanded :: LHsExpr GhcTc }  -- The expanded typechecked expression
+                                            -- This is located because of do statements (TODO ANI: Add NOTE)
 
   | ConLikeTc
       -- ^ A 'ConLike', either a data constructor or pattern synonym
@@ -721,22 +701,6 @@ data XXExprGhcTc
   | HsRecSelTc  (FieldOcc GhcTc) -- ^ Variable pointing to record selector
                              -- See Note [Non-overloaded record field selectors] and
                              -- Note [Record selectors in the AST]
-
-
--- | Build a 'XXExprGhcRn' out of an extension constructor,
---   and the two components of the expansion: original and
---   expanded typechecked expressions.
-mkExpandedExprTc
-  :: HsExpr GhcRn           -- ^ source expression
-  -> HsExpr GhcTc           -- ^ expanded typechecked expression
-  -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedExprTc oExpr eExpr = mkExpandedTc (ExprCtxt oExpr) eExpr
-
-mkExpandedTc
-  :: HsCtxt          -- ^ source, user written do statement/expression
-  -> HsExpr GhcTc           -- ^ expanded typechecked expression
-  -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedTc o e = XExpr (ExpandedThingTc o e)
 
 {- *********************************************************************
 *                                                                      *
