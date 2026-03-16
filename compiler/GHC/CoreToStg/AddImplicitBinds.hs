@@ -10,7 +10,7 @@ import GHC.Prelude
 
 import GHC.CoreToStg.Prep( CorePrepPgmConfig(..) )
 
-import GHC.Unit( ModLocation(..) )
+import GHC.Unit( ModLocation(..), ml_hs_file )
 
 import GHC.Core
 import GHC.Core.DataCon( DataCon, dataConWorkId, dataConWrapId )
