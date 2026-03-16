@@ -853,7 +853,7 @@ hscRecompStatus
            | otherwise -> do
                -- Check the status of all the linkable types we might need.
                -- 1. The in-memory linkable we had at hand.
-               bc_in_memory_linkable <- checkByteCodeInMemory hsc_env mod_summary (homeModLinkableByteCode old_linkable)
+               bc_in_memory_linkable <- checkByteCodeInMemory hsc_env mod_summary (homeMod_bytecode old_linkable)
                -- 2. The bytecode object file
                bc_obj_linkable <- checkByteCodeFromObject hsc_env mod_summary
                -- 3. Bytecode from an interface's whole core bindings.
@@ -972,23 +972,22 @@ checkObjects dflags mb_old_linkable summary = do
 -- | Check to see if we can reuse the old linkable, by this point we will
 -- have just checked that the old interface matches up with the source hash, so
 -- no need to check that again here
-checkByteCodeInMemory :: HscEnv -> ModSummary -> Maybe Linkable -> IO (MaybeValidated Linkable)
+checkByteCodeInMemory :: HscEnv -> ModSummary -> Maybe (LinkableWith ModuleByteCode) -> IO (MaybeValidated (LinkableWith ModuleByteCode))
 checkByteCodeInMemory hsc_env mod_sum mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
-      | not (linkableIsNativeCodeOnly old_linkable)
       -- If `-fwrite-byte-code` is enabled, then check that the .gbc file is
       -- up-to-date with the linkable we have in our hand.
       -- If ms_bytecode_date is Nothing, then the .gbc file does not exist yet.
       -- Otherwise, check that the date matches the linkable date exactly.
-      , if gopt Opt_WriteByteCode (hsc_dflags hsc_env)
+      | if gopt Opt_WriteByteCode (hsc_dflags hsc_env)
           then maybe False (linkableTime old_linkable ==) (ms_bytecode_date mod_sum)
           else True
       -> return $ (UpToDateItem old_linkable)
     _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
 -- | Load bytecode from a ".gbc" object file if it exists and is up-to-date
-checkByteCodeFromObject :: HscEnv -> ModSummary -> IO (MaybeValidated Linkable)
+checkByteCodeFromObject :: HscEnv -> ModSummary -> IO (MaybeValidated (LinkableWith ModuleByteCode))
 checkByteCodeFromObject hsc_env mod_sum = do
   let
     obj_fn = ml_bytecode_file (ms_location mod_sum)
@@ -1001,7 +1000,7 @@ checkByteCodeFromObject hsc_env mod_sum = do
           -- that the one we have on disk would be suitable as well.
           linkable <- unsafeInterleaveIO $ do
             bco <- ByteCode.readBinByteCode hsc_env obj_fn
-            return $ mkModuleByteCodeLinkable obj_date bco
+            return $ mkOnlyModuleByteCodeLinkable obj_date bco
           return $ UpToDateItem linkable
     _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 
