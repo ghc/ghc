@@ -630,7 +630,7 @@ exprCtOrigin (HsIf {})            = IfThenElseOrigin
 exprCtOrigin (HsProjection _ p)   = RecordFieldProjectionOrigin (FieldLabelStrings $ fmap noLocA p)
 exprCtOrigin (RecordUpd{})        = RecordUpdOrigin
 exprCtOrigin (HsGetField _ _ f)   = GetFieldOrigin (fmap field_label $ dfoLabel (unLoc f))
-exprCtOrigin (XExpr (ExpandedThingRn o _)) = errCtxtCtOrigin o
+exprCtOrigin (XExpr (ExpandedThingRn (HSE o _))) = errCtxtCtOrigin o
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 
 srcCodeOriginCtOrigin :: HsCtxt -> CtOrigin

@@ -1244,7 +1244,7 @@ expr_to_type earg =
       | otherwise = not_in_scope
       where occ = occName rdr
             not_in_scope = failWith $ TcRnNotInScope NotInScope rdr
-    go (L l (XExpr (ExpandedThingRn (ExprCtxt orig) _))) =
+    go (L l (XExpr (ExpandedThingRn (HSE (ExprCtxt orig) _)))) =
       -- Use the original, user-written expression (before expansion).
       -- Example. Say we have   vfun :: forall a -> blah
       --          and the call  vfun (Maybe [1,2,3])
@@ -1966,7 +1966,7 @@ quickLookArg1 pos app_lspan (fun, fun_lspan) larg@(L _ arg) sc_arg_ty@(Scaled _ 
              <- captureConstraints $
                 tcInstFun do_ql True ds_flag_arg (arg_orig, rn_fun_arg, fun_lspan_arg) tc_fun_arg_head fun_sigma_arg_head rn_args
                 -- We must capture type-class and equality constraints here, but
-                -- not equality constraints.  See (QLA6) in Note [Quick Look at
+                -- not usage information.  See (QLA6) in Note [Quick Look at
                 -- value arguments]
 
        ; traceTc "quickLookArg 2" $

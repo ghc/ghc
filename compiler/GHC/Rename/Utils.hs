@@ -847,8 +847,9 @@ mkExpandedStmt oStmt flav eExpr = mkExpandedRn (StmtErrCtxt (HsDoStmt flav) oStm
 mkExpandedRn
   :: HsCtxt          -- ^ source, user written do statement/expression
   -> LHsExpr GhcRn           -- ^ expanded typechecked expression
-  -> HsExpr GhcRn           -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedRn orig expr = XExpr (ExpandedThingRn orig expr)
+  -> HsExpr GhcRn          -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedRn o e = XExpr (ExpandedThingRn (HSE o e))
+
 
 -- | Build a 'XXExprGhcRn' out of an extension constructor,
 --   and the two components of the expansion: original and
@@ -862,5 +863,5 @@ mkExpandedExprTc oExpr eExpr = mkExpandedTc (ExprCtxt oExpr) (wrapGenSpan eExpr)
 mkExpandedTc
   :: HsCtxt          -- ^ source, user written do statement/expression
   -> LHsExpr GhcTc           -- ^ expanded typechecked expression
-  -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
-mkExpandedTc o e = XExpr (ExpandedThingTc o e)
+  -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcTc'
+mkExpandedTc o e = XExpr (ExpandedThingTc (HSE o e))

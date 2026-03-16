@@ -755,7 +755,7 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
         RecordCon con_expr _ _ -> computeType con_expr
         ExprWithTySig _ e _ -> computeLType e
         HsPragE _ _ e -> computeLType e
-        XExpr (ExpandedThingTc thing e)
+        XExpr (ExpandedThingTc (HSE thing e))
           | ExprCtxt (HsGetField{}) <- thing -- for record-dot-syntax
           -> Just (lhsExprType e)
           | otherwise -> computeLType e
@@ -1353,7 +1353,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
           WrapExpr w a
             -> [ toHie $ L mspan a
                , toHie (L mspan w) ]
-          ExpandedThingTc _ e
+          ExpandedThingTc (HSE _ e)
             -> [ toHie e ]
           ConLikeTc con
             -> [ toHie $ C Use $ L mspan $ conLikeName con ]

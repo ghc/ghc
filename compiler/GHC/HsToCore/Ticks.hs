@@ -415,7 +415,7 @@ addTickLHsExpr e@(L pos e0) = do
   d <- getDensity
   case d of
     TickForBreakPoints | isGoodBreakExpr e0 -> tick_it
-    TickForCoverage    | XExpr (ExpandedThingTc StmtErrCtxt{} _) <- e0 -- expansion ticks are handled separately
+    TickForCoverage    | XExpr (ExpandedThingTc (HSE StmtErrCtxt{} _)) <- e0 -- expansion ticks are handled separately
                        -> dont_tick_it
                        | otherwise -> tick_it
     TickCallSites      | isCallSite e0      -> tick_it
@@ -484,14 +484,14 @@ addTickLHsExprNever (L pos e0) = do
 -- General heuristic: expressions which are calls (do not denote
 -- values) are good break points.
 isGoodBreakExpr :: HsExpr GhcTc -> Bool
-isGoodBreakExpr (XExpr (ExpandedThingTc (StmtErrCtxt{}) _)) = False
+isGoodBreakExpr (XExpr (ExpandedThingTc (HSE StmtErrCtxt{} _))) = False -- Expansion ticks are handled separately
 isGoodBreakExpr e = isCallSite e
 
 isCallSite :: HsExpr GhcTc -> Bool
 isCallSite HsApp{}     = True
 isCallSite HsAppType{} = True
 isCallSite HsCase{}    = True
-isCallSite (XExpr (ExpandedThingTc _ e))
+isCallSite (XExpr (ExpandedThingTc (HSE _ e)))
   = isCallSite (unLoc e)
 
 -- NB: OpApp, SectionL, SectionR are all expanded out
@@ -638,7 +638,7 @@ addTickHsExpr (HsProc x pat cmdtop) =
 addTickHsExpr (XExpr (WrapExpr w e)) =
         liftM (XExpr . WrapExpr w) $
               (addTickHsExpr e)        -- Explicitly no tick on inside
-addTickHsExpr (XExpr (ExpandedThingTc o e)) = addTickHsExpanded o e
+addTickHsExpr (XExpr (ExpandedThingTc hse)) = addTickHsExpanded hse
 
 addTickHsExpr e@(XExpr (ConLikeTc {})) = return e
   -- We used to do a freeVar on a pat-syn builder, but actually
@@ -661,8 +661,8 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
 
-addTickHsExpanded :: HsCtxt -> LHsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
+addTickHsExpanded :: HsExpansion GhcTc -> TM (HsExpr GhcTc)
+addTickHsExpanded (HSE o e) = liftM (XExpr . ExpandedThingTc . HSE o) $ case o of
   -- We always want statements to get a tick, so we can step over each one.
   -- To avoid duplicates we blacklist SrcSpans we already inserted here.
   StmtErrCtxt _ (L pos _) -> do_tick_black pos
