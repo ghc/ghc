@@ -2265,19 +2265,6 @@ Some programs have a /lot/ of data constructors in the source program
 valuable.
 -}
 
-simplInVar :: SimplEnv -> InVar -> SimplM OutExpr
--- Look up an InVar in the environment
-simplInVar env var
-  -- Why $! ? See Note [Bangs in the Simplifier]
-  | isTyVar var = return $! Type $! (substTyVar env var)
-  | isCoVar var = return $! Coercion $! (substCoVar env var)
-  | otherwise
-  = case substId env var of
-        ContEx tvs cvs ids e -> let env' = setSubstEnv env tvs cvs ids
-                                in simplExpr env' e
-        DoneId var1          -> return (Var var1)
-        DoneEx e _           -> return e
-
 simplInId :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplInId env var cont
   | Just dc <- isDataConWorkId_maybe var
@@ -3066,25 +3053,6 @@ may be a result of 'seq' so we *definitely* don't want to drop those.
 I don't really know how to improve this situation.
 
 
-Note [FloatBinds from constructor wrappers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have FloatBinds coming from the constructor wrapper
-(as in Note [exprIsConApp_maybe on data constructors with wrappers]),
-we cannot float past them. We'd need to float the FloatBind
-together with the simplify floats, unfortunately the
-simplifier doesn't have case-floats. The simplest thing we can
-do is to wrap all the floats here. The next iteration of the
-simplifier will take care of all these cases and lets.
-
-Given data T = MkT !Bool, this allows us to simplify
-case $WMkT b of { MkT x -> f x }
-to
-case b of { b' -> f b' }.
-
-We could try and be more clever (like maybe wfloats only contain
-let binders, so we could float them). But the need for the
-extra complication is not clear.
-
 Note [Do not duplicate constructor applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this (#20125)
@@ -3129,7 +3097,7 @@ rebuildCase env scrut case_bndr alts cont
   = do  { tick (KnownBranch case_bndr)
         ; case findAlt (LitAlt lit) alts of
             Nothing             -> missingAlt env case_bndr alts cont
-            Just (Alt _ bs rhs) -> simple_rhs env [] scrut bs rhs }
+            Just (Alt _ bs rhs) -> simple_rhs env scrut bs rhs }
 
   | Just (in_scope', wfloats, con, ty_args, other_args)
       <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
@@ -3137,58 +3105,26 @@ rebuildCase env scrut case_bndr alts cont
         -- as well as when it's an explicit constructor application
   , let env0 = setInScopeSet env in_scope'
   = do  { tick (KnownBranch case_bndr)
-        ; let scaled_wfloats = map scale_float wfloats
-              -- case_bndr_unf: see Note [Do not duplicate constructor applications]
+        ; let -- case_bndr_unf: see Note [Do not duplicate constructor applications]
               case_bndr_rhs | exprIsTrivial scrut = scrut
                             | otherwise           = con_app
               con_app = Var (dataConWorkId con) `mkTyApps` ty_args
                                                 `mkApps`   other_args
-        ; case findAlt (DataAlt con) alts of
+        ; wrapDataConFloats env wfloats case_bndr cont $
+          case findAlt (DataAlt con) alts of
             Nothing                   -> missingAlt env0 case_bndr alts cont
-            Just (Alt DEFAULT bs rhs) -> simple_rhs env0 scaled_wfloats case_bndr_rhs bs rhs
-            Just (Alt _       bs rhs) -> knownCon env0 scrut scaled_wfloats con ty_args
+            Just (Alt DEFAULT bs rhs) -> simple_rhs env0 case_bndr_rhs bs rhs
+            Just (Alt _       bs rhs) -> knownCon env0 scrut con
                                                   other_args case_bndr bs rhs cont
         }
   where
-    simple_rhs env wfloats case_bndr_rhs bs rhs =
+    simple_rhs env case_bndr_rhs bs rhs =
       assert (null bs) $
       do { (floats1, env') <- simplAuxBind "rebuildCase" env case_bndr case_bndr_rhs
              -- scrut is a constructor application,
              -- hence satisfies let-can-float invariant
          ; (floats2, expr') <- simplExprF env' rhs cont
-         ; case wfloats of
-             [] -> return (floats1 `addFloats` floats2, expr')
-             _ -> return
-               -- See Note [FloatBinds from constructor wrappers]
-                   ( emptyFloats env,
-                     GHC.Core.Make.wrapFloats wfloats $
-                     wrapFloats (floats1 `addFloats` floats2) expr' )}
-
-    -- This scales case floats by the multiplicity of the continuation hole (see
-    -- Note [Scaling in case-of-case]).  Let floats are _not_ scaled, because
-    -- they are aliases anyway.
-    scale_float (GHC.Core.Make.FloatCase scrut case_bndr con vars) =
-      let
-        scale_id id = scaleVarBy holeScaling id
-      in
-      GHC.Core.Make.FloatCase scrut (scale_id case_bndr) con (map scale_id vars)
-    scale_float f = f
-
-    holeScaling = contHoleScaling cont `mkMultMul` idMult case_bndr
-     -- We are in the following situation
-     --   case[p] case[q] u of { D x -> C v } of { C x -> w }
-     -- And we are producing case[??] u of { D x -> w[x\v]}
-     --
-     -- What should the multiplicity `??` be? In order to preserve the usage of
-     -- variables in `u`, it needs to be `pq`.
-     --
-     -- As an illustration, consider the following
-     --   case[Many] case[1] of { C x -> C x } of { C x -> (x, x) }
-     -- Where C :: A %1 -> T is linear
-     -- If we were to produce a case[1], like the inner case, we would get
-     --   case[1] of { C x -> (x, x) }
-     -- Which is ill-typed with respect to linearity. So it needs to be a
-     -- case[Many].
+         ; return (floats1 `addFloats` floats2, expr') }
 
 --------------------------------------------------
 --      2. Eliminate the case if scrutinee is evaluated
@@ -3737,29 +3673,81 @@ and then
         f (h v)
 
 All this should happen in one sweep.
+
+Note [FloatBinds from constructor wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have FloatBinds coming from the constructor wrapper
+(as in Note [exprIsConApp_maybe on data constructors with wrappers]),
+we cannot float past them. We'd need to float the FloatBind
+together with the simplify floats, unfortunately the
+simplifier doesn't have case-floats. The simplest thing we can
+do is to wrap all the floats here. The next iteration of the
+simplifier will take care of all these cases and lets.
+
+Given data T = MkT !Bool, this allows us to simplify
+case $WMkT b of { MkT x -> f x }
+to
+case b of { b' -> f b' }.
+
+We could try and be more clever (like maybe wfloats only contain
+let binders, so we could float them). But the need for the
+extra complication is not clear.
 -}
 
+wrapDataConFloats :: SimplEnv -> [FloatBind] -> InId -> SimplCont
+                 -> SimplM (SimplFloats, OutExpr)
+                 -> SimplM (SimplFloats, OutExpr)
+-- See Note [FloatBinds from constructor wrappers]
+wrapDataConFloats env wfloats case_bndr cont thing_inside
+  | null wfloats
+  = thing_inside
+  | otherwise
+  = do { (floats, expr) <- thing_inside
+       ; return ( emptyFloats env
+                , GHC.Core.Make.wrapFloats (map scale_float wfloats) $
+                  wrapFloats floats expr ) }
+  where
+    -- scale_float scales case-floats by the multiplicity of the continuation hole
+    -- (see Note [Scaling in case-of-case]).
+    -- Let floats are _not_ scaled, because they are aliases anyway.
+    scale_float (GHC.Core.Make.FloatCase scrut case_bndr con vars)
+      = GHC.Core.Make.FloatCase scrut (scale_id case_bndr) con (map scale_id vars)
+    scale_float flt@(GHC.Core.Make.FloatLet {})
+      = flt
+
+    scale_id id = scaleVarBy holeScaling id
+
+    holeScaling = contHoleScaling cont `mkMultMul` idMult case_bndr
+     -- We are in the following situation
+     --   case[p] case[q] u of { D x -> C v } of { C x -> w }
+     -- And we are producing case[??] u of { D x -> w[x\v]}
+     --
+     -- What should the multiplicity `??` be? In order to preserve the usage of
+     -- variables in `u`, it needs to be `pq`.
+     --
+     -- As an illustration, consider the following
+     --   case[Many] case[1] of { C x -> C x } of { C x -> (x, x) }
+     -- Where C :: A %1 -> T is linear
+     -- If we were to produce a case[1], like the inner case, we would get
+     --   case[1] of { C x -> (x, x) }
+     -- Which is ill-typed with respect to linearity. So it needs to be a
+     -- case[Many].
+
+
 knownCon :: SimplEnv
-         -> OutExpr                                           -- The scrutinee
-         -> [FloatBind] -> DataCon -> [OutType] -> [OutExpr]  -- The scrutinee (in pieces)
-         -> InId -> [InBndr] -> InExpr                        -- The alternative
+         -> OutExpr                            -- The scrutinee
+         -> DataCon -> [OutExpr]               -- The scrutinee (in pieces)
+         -> InId -> [InBndr] -> InExpr         -- The alternative
          -> SimplCont
          -> SimplM (SimplFloats, OutExpr)
 
-knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
-  = do  { (floats1, env1)  <- bind_args env bs dc_args
+knownCon env scrut dc dc_args case_bndr alt_bndrs rhs cont
+  = do  { (floats1, env1)  <- bind_args env alt_bndrs dc_args
         ; (floats2, env2)  <- bind_case_bndr env1
         ; (floats3, expr') <- simplExprF env2 rhs cont
-        ; case dc_floats of
-            [] ->
-              return (floats1 `addFloats` floats2 `addFloats` floats3, expr')
-            _ ->
-              return ( emptyFloats env
-               -- See Note [FloatBinds from constructor wrappers]
-                     , GHC.Core.Make.wrapFloats dc_floats $
-                       wrapFloats (floats1 `addFloats` floats2 `addFloats` floats3) expr') }
+        ; return (floats1 `addFloats` floats2 `addFloats` floats3, expr') }
   where
-    zap_occ = zapBndrOccInfo (isDeadBinder bndr)    -- bndr is an InId
+    zap_occ = zapBndrOccInfo (isDeadBinder case_bndr)    -- case_bndr is an InId
 
                   -- Ugh!
     bind_args env' [] _  = return (emptyFloats env', env')
@@ -3784,28 +3772,32 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
            ; return (floats1 `addFloats` floats2, env3) }
 
     bind_args _ _ _ =
-      pprPanic "bind_args" $ ppr dc $$ ppr bs $$ ppr dc_args $$
+      pprPanic "bind_args" $ ppr dc $$ ppr alt_bndrs $$ ppr dc_args $$
                              text "scrut:" <+> ppr scrut
 
-       -- It's useful to bind bndr to scrut, rather than to a fresh
+       -- It's useful to bind case_bndr to scrut, rather than to a fresh
        -- binding      x = Con arg1 .. argn
        -- because very often the scrut is a variable, so we avoid
        -- creating, and then subsequently eliminating, a let-binding
        -- BUT, if scrut is a not a variable, we must be careful
        -- about duplicating the arg redexes; in that case, make
        -- a new con-app from the args
+    con_app :: InExpr
+    con_app = mkConApp2 dc (tyConAppArgs (idType case_bndr)) alt_bndrs
+
     bind_case_bndr env
-      | isDeadBinder bndr   = return (emptyFloats env, env)
-      | exprIsTrivial scrut = return (emptyFloats env
-                                     , extendIdSubst env bndr (DoneEx scrut NotJoinPoint))
-                              -- See Note [Do not duplicate constructor applications]
-      | otherwise           = do { dc_args <- mapM (simplInVar env) bs
-                                         -- dc_ty_args are already OutTypes,
-                                         -- but bs are InBndrs
-                                 ; let con_app = Var (dataConWorkId dc)
-                                                 `mkTyApps` dc_ty_args
-                                                 `mkApps`   dc_args
-                                 ; simplAuxBind "case-bndr" env bndr con_app }
+      | exprIsTrivial scrut
+      = -- See Note [Do not duplicate constructor applications]
+        return ( emptyFloats env
+               , extendIdSubst env case_bndr (DoneEx scrut NotJoinPoint))
+
+      | Just env' <- preInlineUnconditionally env NotTopLevel case_bndr con_app env
+      = return (emptyFloats env', env')
+
+      | otherwise
+      = do { (env1, case_bndr1)    <- simplNonRecBndr env case_bndr
+           ; simplLazyBind NotTopLevel NonRecursive
+                           (case_bndr,env) (case_bndr1,env1) (con_app,env) }
 
 -------------------
 missingAlt :: SimplEnv -> Id -> [InAlt] -> SimplCont
