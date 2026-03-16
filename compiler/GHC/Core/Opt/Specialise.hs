@@ -3251,6 +3251,12 @@ case we can clearly specialise. But there are wrinkles:
    in point is constraint tuples (% d1, .., dn %); a constraint N-tuple is a class
    with N superclasses and no methods.
 
+   So if there are no methods, we recursively call interestingDict on the
+   superclasses.  Whe recurse? If we have
+         \d1 d2.  f (CTuple d1 d2)
+   then `d1 and `d2` are uninteresting dictionaries, and hence so is (CTuple d1 d2).
+   See discussion on #26831.
+
 (ID7) A unary (single-method) class is currently represented by (meth |> co).  We
    will unwrap the cast (see (ID5)) and then want to reply "yes" if the method
    has any struture.  We rather arbitrarily use `exprIsHNF` for this.  (We plan a
