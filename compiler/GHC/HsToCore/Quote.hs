@@ -1739,7 +1739,7 @@ repE e@(XExpr (ExpandedThingRn o x))
   | ExprCtxt e <- o
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
        ; if rebindable_on  -- See Note [Quotation and rebindable syntax]
-         then repE x
+         then repLE x
          else repE e }
   | otherwise
   = notHandled (ThExpressionForm e)

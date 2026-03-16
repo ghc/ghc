@@ -88,7 +88,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Context management for the type checker
   getErrCtxt, setErrCtxt, addErrCtxt,
-  addLExprCtxt, addExpansionErrCtxt,
+  addLExprCtxt,
   popErrCtxt, getCtLocM, setCtLocM, mkCtLocEnv,
 
   -- * Diagnostic message generation (type checker)
@@ -1316,11 +1316,16 @@ problem.
 
 Note [Error contexts in generated code]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* If the `SrcSpan` is a `RealSrcSpan`, `setSrcSpan` updates the `tcl_loc`,
-  and makes the `ErrCtxStack` a `UserCodeCtxt`
-* it is a no-op otherwise
 
-So, it's better to do a `setSrcSpan` /before/ `addErrCtxt`.
+* addLExpr updates updates the ErrCtxt stored in LclEnv with the following logic
+  - If the `SrcSpan` is a `RealSrcSpan`, `setSrcSpan` updates the `tcl_loc` to the given value
+    and sets `tcl_in_gen_code` to `False`. Meaning we are not type checking a compiler generated
+    expression. And thus it can add the expression on to the ErrCtxt Stack
+  - If the `SrcSpan` is a GeneratedSrcSpan then `tcl_in_gen_code` is set to `True`, meaning
+    the expression in hand is compiler generated, and hence it is not added on to the stack.
+
+This ensures that the error messages do not leak compiler generated expressions which can
+be confusing to the users.
 
 - See Note [Rebindable syntax and XXExprGhcRn] in `GHC.Hs.Expr` for
 more discussion of this fancy footwork
@@ -1329,33 +1334,32 @@ relation with pattern-match checks
 - See Note [ErrCtxtStack Manipulation] in `GHC.Tc.Types.LclEnv` for info about `ErrCtxtStack`
 -}
 
+-- See Note [Error contexts in generated code]
 addLExprCtxt :: SrcSpan -> HsExpr GhcRn -> TcRn a -> TcRn a
 addLExprCtxt lspan e thing_inside
-  | not (isGeneratedSrcSpan lspan)
   = setSrcSpan lspan $ add_expr_ctxt e thing_inside
-  | otherwise   -- no op in generated code
-  = thing_inside
     where
-       add_expr_ctxt :: HsExpr GhcRn -> TcRn a -> TcRn a
-       add_expr_ctxt e thing_inside
-         = case e of
-             -- The HsHole special case addresses situations like
-             --    f x = _
-             -- when we don't want to say "In the expression: _",
-             -- because it is mentioned in the error message itself
-             HsHole{} -> thing_inside
+      add_expr_ctxt :: HsExpr GhcRn -> TcRn a -> TcRn a
+      add_expr_ctxt e thing_inside
+         = do { igc <- inGeneratedCode
+              ; if igc -- generated
+                then thing_inside
+                else case e of
+                       -- The HsHole special case addresses situations like
+                       --    f x = _
+                       -- when we don't want to say "In the expression: _",
+                       -- because it is mentioned in the error message itself
+                       HsHole{} -> thing_inside
 
-             -- There is a special case for expressions with signatures to avoid having too verbose
-             -- error context. So here we flip the ErrCtxt state to expanded if the expression is expanded.
-             -- c.f. RecordDotSyntaxFail9
-             ExprWithTySig _ (L _ e') _
-               | XExpr (ExpandedThingRn o _) <- e' -> addExpansionErrCtxt o thing_inside
+                     -- There is a special case for expressions with signatures to avoid having too verbose
+                     -- error context. c.f. RecordDotSyntaxFail9
+                     -- Add the original HsCtxt if we are typechecking an expanded expression
+                       ExprWithTySig _ (L _ e') _
+                         | XExpr (ExpandedThingRn o _) <- e' -> addErrCtxt o thing_inside
+                       XExpr (ExpandedThingRn o _) -> addErrCtxt o thing_inside
 
-             -- Flip error ctxt into expansion mode
-             XExpr (ExpandedThingRn o _) -> addExpansionErrCtxt o thing_inside
-
-             _ -> addErrCtxt (ExprCtxt e) thing_inside
-
+                       _ -> addErrCtxt (ExprCtxt e) thing_inside
+              }
 
 getErrCtxt :: TcM [ErrCtxt]
 getErrCtxt = do { env <- getLclEnv; return (getLclEnvErrCtxt env) }
@@ -1368,11 +1372,6 @@ setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 addErrCtxt :: HsCtxt -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}  -- Note [Inlining addErrCtxt]
 addErrCtxt ctxt = pushCtxt ctxt
-
--- See Note [ErrCtxtStack Manipulation]
-addExpansionErrCtxt :: HsCtxt -> TcM a -> TcM a
-{-# INLINE addExpansionErrCtxt #-}  -- Note [Inlining addErrCtxt]
-addExpansionErrCtxt ctxt thing_inside = setInGeneratedCode $ pushCtxt ctxt thing_inside
 
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 pushCtxt :: ErrCtxt -> TcM a -> TcM a

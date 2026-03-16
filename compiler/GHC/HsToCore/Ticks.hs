@@ -492,7 +492,7 @@ isCallSite HsApp{}     = True
 isCallSite HsAppType{} = True
 isCallSite HsCase{}    = True
 isCallSite (XExpr (ExpandedThingTc _ e))
-  = isCallSite e
+  = isCallSite (unLoc e)
 
 -- NB: OpApp, SectionL, SectionR are all expanded out
 isCallSite _           = False
@@ -660,14 +660,14 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
 
-addTickHsExpanded :: HsCtxt -> HsExpr GhcTc -> TM (HsExpr GhcTc)
+addTickHsExpanded :: HsCtxt -> LHsExpr GhcTc -> TM (HsExpr GhcTc)
 addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
   -- We always want statements to get a tick, so we can step over each one.
   -- To avoid duplicates we blacklist SrcSpans we already inserted here.
   StmtErrCtxt _ (L pos _) -> do_tick_black pos
   _                    -> skip
   where
-    skip = addTickHsExpr e
+    skip = addTickLHsExpr e
     do_tick_black pos = do
       d <- getDensity
       case d of
@@ -675,9 +675,9 @@ addTickHsExpanded o e = liftM (XExpr . ExpandedThingTc o) $ case o of
          TickForBreakPoints -> tick_it_black pos
          _                  -> skip
     tick_it_black pos =
-      unLoc <$> allocTickBox (ExpBox False) False False (locA pos)
+      allocTickBox (ExpBox False) False False (locA pos)
                              (withBlackListed (locA pos) $
-                               addTickHsExpr e)
+                               addTickHsExpr (unLoc e))
 
 addTickTupArg :: HsTupArg GhcTc -> TM (HsTupArg GhcTc)
 addTickTupArg (Present x e)  = do { e' <- addTickLHsExpr e
