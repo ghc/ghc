@@ -385,6 +385,14 @@ test('ListTuplePunsPpr', normal, ghci_script, ['ListTuplePunsPpr.script'])
 test('ListTuplePunsPprNoAbbrevTuple', [expect_broken(23135), limit_stdout_lines(13)], ghci_script, ['ListTuplePunsPprNoAbbrevTuple.script'])
 test('T24459', normal, ghci_script, ['T24459.script'])
 test('T24632', normal, ghci_script, ['T24632.script'])
+test('bytecodeIPE',
+     [ expect_broken(27039)
+     , extra_hc_opts('-finfo-table-map')
+     , extra_files(['bytecodeIPE.hs'])
+     , req_rts_linker
+     , when(arch('wasm32') or arch('javascript'), skip)
+     ],
+     ghci_script, ['bytecodeIPE.script'])
 
 # Test package renaming in GHCi session
 test('GhciPackageRename',
