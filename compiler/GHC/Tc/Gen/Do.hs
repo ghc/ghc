@@ -45,8 +45,8 @@ import Data.List ((\\))
 --   so that they can be typechecked.
 --   See Note [Expanding HsDo with XXExprGhcRn] below for `HsDo` specific commentary
 --   and Note [Handling overloaded and rebindable constructs] for high level commentary
-expandDoStmts :: HsDoFlavour -> [ExprLStmt GhcRn] -> TcM (LHsExpr GhcRn)
-expandDoStmts doFlav stmts = expand_do_stmts doFlav stmts
+expandDoStmts :: HsDoFlavour -> XRec GhcRn [ExprLStmt GhcRn] -> TcM (HsExpansion GhcRn)
+expandDoStmts doFlav lstmts@(L _ stmts) = HSE (ExprCtxt (HsDo noExtField doFlav lstmts)) <$> expand_do_stmts doFlav stmts
 
 -- | The main work horse for expanding do block statements into applications of binds and thens
 --   See Note [Expanding HsDo with XXExprGhcRn]
@@ -234,7 +234,7 @@ See Note [Handling overloaded and rebindable constructs] in GHC.Rename.Expr
 To disabmiguate desugaring (`HsExpr GhcTc -> Core.Expr`) we use the phrase expansion
 (`HsExpr GhcRn -> HsExpr GhcRn`)
 
-This expansion is done right before typechecking and after renaming
+This expansion is done after renaming and before typechecking
 See Part 2. of Note [Doing XXExprGhcRn in the Renamer vs Typechecker] in `GHC.Rename.Expr`
 
 Historical note START
@@ -423,10 +423,10 @@ It stores the original statement (with location) and the expanded expression
       ‹ExpandedThingRn do { e1; e2; e3 }›                        -- Original Do Expression
                                                                  -- Expanded Do Expression
           (‹ExpandedThingRn e1›                                  -- Original Statement
-               ({(>>) ‹ExpandedThingRn e1› e1}                           -- Expanded Expression
+               ({(>>) e1}                           -- Expanded Expression
                       (‹ExpandedThingRn e2›
-                         ({(>>) ‹ExpandedThingRn e2› e2}
-                                (‹ExpandedThingRn e3› {e3})))))
+                         ({(>>) e2}
+                             (‹ExpandedThingRn e3› {e3})))))
 
   * Whenever the typechecker steps through an `ExpandedThingRn`,
     we push the original statement in the error context, set the error location to the
@@ -481,6 +481,4 @@ It stores the original statement (with location) and the expanded expression
 
 
 mkExpandedPatRn :: LPat GhcRn -> HsExpr GhcRn -> HsExpr GhcRn
-mkExpandedPatRn pat e = XExpr $ ExpandedThingRn
-                                   { xrn_orig = StmtErrCtxtPat pat
-                                   , xrn_expanded = wrapGenSpan e}
+mkExpandedPatRn pat e = mkExpandedRn (StmtErrCtxtPat pat) (wrapGenSpan e)
