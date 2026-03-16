@@ -35,7 +35,7 @@ where
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoFRRNC
-                                       , tcMonoLExprNC, tcMonoLExpr, tcExpr
+                                       , tcMonoLExprNC, tcExpr
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
                                        , tcCheckPolyExpr, tcPolyLExpr )
 
@@ -44,7 +44,6 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Pat
-import GHC.Tc.Gen.Do
 import GHC.Tc.Gen.Head( tcCheckId )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
@@ -391,32 +390,14 @@ tcDoStmts MonadComp (L l stmts) res_ty
         ; res_ty <- readExpType res_ty
         ; return (HsDo res_ty MonadComp (L l stmts')) }
 
-tcDoStmts ctxt@GhciStmtCtxt _ _ = pprPanic "tcDoStmts" (pprHsDoFlavour ctxt)
 
-tcDoStmts doExpr@(DoExpr _) ss@(L l stmts) res_ty
-  = do  { isApplicativeDo <- xoptM LangExt.ApplicativeDo
-        ; if isApplicativeDo
-          then do { stmts' <- tcStmts (HsDoStmt doExpr) tcDoStmt stmts res_ty
-                  ; res_ty <- readExpType res_ty
-                  ; return (HsDo res_ty doExpr (L l stmts')) }
-          else do { expanded_expr <- expandDoStmts doExpr stmts -- Do expansion on the fly
-                  ; traceTc "tcDoStmts" (ppr expanded_expr)
-                  ; let orig = HsDo noExtField doExpr ss
-                  ; mkExpandedExprTc orig <$> (
-                       -- We lose the location on the first statement location in GhcTc, unfortunately.
-                       -- It is needed for get the pattern match warnings right cf. T14546d
-                       -- That location is currently recovered from the location stored in OrigStmt
-                       -- in dsExpr of ExpandedThingTc
-                        unLoc <$> tcMonoLExpr expanded_expr res_ty)
-                  }
-        }
+tcDoStmts doExpr@(DoExpr _) (L l stmts) res_ty
+  = do { stmts' <- tcStmts (HsDoStmt doExpr) tcDoStmt stmts res_ty
+       ; res_ty <- readExpType res_ty
+       ; return (HsDo res_ty doExpr (L l stmts')) }
 
-tcDoStmts mDoExpr ss@(L _ stmts) res_ty
-  = do  { expanded_expr <- expandDoStmts mDoExpr stmts -- Do expansion on the fly
-        ; let orig = HsDo noExtField mDoExpr ss
-        ; e' <- tcMonoLExpr expanded_expr res_ty
-        ; return (mkExpandedExprTc orig (unLoc e'))
-        }
+-- NB: ghcistmts should fail, MDoExpr is handled by expansions
+tcDoStmts ctxt _ _ = pprPanic "tcDoStmts" (pprHsDoFlavour ctxt)
 
 tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
 tcBody body res_ty

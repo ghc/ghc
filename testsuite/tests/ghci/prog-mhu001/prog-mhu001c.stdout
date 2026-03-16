@@ -9,6 +9,7 @@ e/E.hs:(15,3)-(15,6): GHC.Internal.Types.Int -> GHC.Internal.Base.String
 e/E.hs:(22,3)-(22,6): E.E -> GHC.Internal.Base.String
 e/E.hs:(25,3)-(25,10): GHC.Internal.Base.String -> GHC.Internal.Types.IO ()
 e/E.hs:(25,12)-(25,37): GHC.Internal.Base.String
+e/E.hs:(25,3)-(25,37): GHC.Internal.Types.IO ()
 e/E.hs:(24,16)-(25,37): GHC.Internal.Types.IO ()
 e/E.hs:(19,9)-(19,9): E.E
 e/E.hs:(5,7)-(5,8): GHC.Internal.Bignum.Integer.Integer
