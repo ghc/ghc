@@ -122,8 +122,6 @@ data LinuxDistro
   | Ubuntu2404LoongArch64
   | Ubuntu2404
   | Ubuntu2204
-  | Ubuntu2004
-  | Ubuntu1804
   | Alpine312
   | Alpine323
   | AlpineWasm
@@ -326,8 +324,6 @@ distroName Debian13Riscv = "deb13-riscv"
 distroName Debian12Wine  = "deb12-wine"
 distroName Fedora43      = "fedora43"
 distroName Ubuntu2404LoongArch64 = "ubuntu24_04-loongarch"
-distroName Ubuntu1804    = "ubuntu18_04"
-distroName Ubuntu2004    = "ubuntu20_04"
 distroName Ubuntu2204    = "ubuntu22_04"
 distroName Ubuntu2404    = "ubuntu24_04"
 distroName Alpine312     = "alpine3_12"
@@ -1193,9 +1189,7 @@ debian_i386 =
 
 ubuntu_x86 :: [JobGroup Job]
 ubuntu_x86 =
-  [ disableValidate (standardBuilds Amd64 (Linux Ubuntu1804))
-  , disableValidate (standardBuilds Amd64 (Linux Ubuntu2004))
-  , disableValidate (standardBuilds Amd64 (Linux Ubuntu2204))
+  [ disableValidate (standardBuilds Amd64 (Linux Ubuntu2204))
   , disableValidate (standardBuilds Amd64 (Linux Ubuntu2404))
   ]
 

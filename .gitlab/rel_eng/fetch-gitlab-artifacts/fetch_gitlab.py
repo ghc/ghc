@@ -21,8 +21,6 @@ def job_triple(job_name):
         'release-x86_64-linux-rocky8-release': 'x86_64-rocky8-linux',
         'release-x86_64-linux-ubuntu24_04-release': 'x86_64-ubuntu24_04-linux',
         'release-x86_64-linux-ubuntu22_04-release': 'x86_64-ubuntu22_04-linux',
-        'release-x86_64-linux-ubuntu20_04-release': 'x86_64-ubuntu20_04-linux',
-        'release-x86_64-linux-ubuntu18_04-release': 'x86_64-ubuntu18_04-linux',
         'release-x86_64-linux-fedora43-release': 'x86_64-fedora43-linux',
         'release-x86_64-linux-fedora43-release+debug_info': 'x86_64-fedora43-linux-dwarf',
         'release-x86_64-linux-deb13-release': 'x86_64-deb13-linux',
