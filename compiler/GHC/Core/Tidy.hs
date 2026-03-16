@@ -165,6 +165,7 @@ computeCbvInfo fun_id rhs
                 map mkMark val_args
 
     cbv_bndr | any isMarkedCbv cbv_marks
+               -- isMarkedCbv: see (CBV2) in Note [CBV Function Ids: overview]
              = cbv_marks `seqList` setIdCbvMarks fun_id cbv_marks
                -- seqList: avoid retaining the original rhs
 
@@ -176,6 +177,7 @@ computeCbvInfo fun_id rhs
     -- We don't set CBV marks on functions which take unboxed tuples or sums as
     -- arguments.  Doing so would require us to compute the result of unarise
     -- here in order to properly determine argument positions at runtime.
+    -- See (CBV1) in Note [CBV Function Ids: overview]
     --
     -- In practice this doesn't matter much. Most "interesting" functions will
     -- get a W/W split which will eliminate unboxed tuple arguments, and unboxed

@@ -852,7 +852,7 @@ idCbvMarks_maybe id = case idDetails id of
   _                    -> Nothing
 
 -- Id must be called with at least this arity in order to allow arguments to
--- be passed unlifted.
+-- be passed unlifted.  Return 0 if there are no CBV marks.
 idCbvMarkArity :: Id -> Arity
 idCbvMarkArity fn = maybe 0 length (idCbvMarks_maybe fn)
 

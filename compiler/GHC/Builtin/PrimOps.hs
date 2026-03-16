@@ -807,15 +807,22 @@ the former has an additional type binder. Hmmm....
 
 Note [Eta expanding primops]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 STG requires that primop applications be saturated. This makes code generation
 significantly simpler since otherwise we would need to define a calling
 convention for curried applications that can accommodate representation
 polymorphism.
 
-To ensure saturation, CorePrep eta expands all primop applications as
-described in Note [Eta expansion of hasNoBinding things in CorePrep] in
+To ensure saturation, CorePrep eta expands all primop applications
+as described in Note [Eta expansion of unsaturated calls] in
 GHC.Core.Prep.
+
+Side note: this decision is somewhat in flux: see comments with `hasNoBinding`.
+The question is: do we generate a trivial wrapper for each primop
+   (+#) x y = (+#) x y
+and now we can call that wrapper unsaturated.  But in practice we
+might never call it because in practice Prep eta-expands all partial
+applications!
+
 
 Historical Note:
 
