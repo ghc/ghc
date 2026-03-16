@@ -29,7 +29,7 @@ convertToFixed :: ModuleNodeInfo -> ModuleNodeInfo
 convertToFixed (ModuleNodeCompile ms) =
   let modName = ms_mod_name ms
       modLoc = ms_location ms
-  in ModuleNodeFixed (msKey ms) (ms_location ms) { ml_hs_file = Nothing}
+  in ModuleNodeFixed (msKey ms) (ms_location ms) { ml_hs_file_ospath = Nothing }
 
 -- | Test a module graph and report if it matches expected invariant violations
 testModuleGraph :: String -> ModuleGraph -> [ModuleGraphInvariantError] -> Ghc ()

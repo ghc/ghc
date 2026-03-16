@@ -79,7 +79,13 @@ module GHC (
         ModuleGraph, emptyMG, mapMG, mkModuleGraph, mgModSummaries,
         mgLookupModule,
         ModSummary(..), ms_mod_name, ModLocation(..),
-        pattern ModLocation,
+        ml_hs_file,
+        ml_hi_file,
+        ml_dyn_hi_file,
+        ml_obj_file,
+        ml_dyn_obj_file,
+        ml_hie_file,
+        ml_bytecode_file,
         getModSummary,
         getModuleGraph,
         isLoaded,
@@ -1575,7 +1581,7 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- a module by using 'getModSummary'
 --
 -- XXX: Explain pre-conditions
-getModuleSourceAndFlags :: ModSummary -> IO (String, StringBuffer, DynFlags)
+getModuleSourceAndFlags :: ModSummary -> IO (FilePath, StringBuffer, DynFlags)
 getModuleSourceAndFlags m = do
   case ml_hs_file $ ms_location m of
     Nothing -> throwIO $ mkApiErr (ms_hspp_opts m) (text "No source available for module " <+> ppr (ms_mod m))
