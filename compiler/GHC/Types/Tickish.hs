@@ -17,6 +17,7 @@ module GHC.Types.Tickish (
   TickishPlacement(..),
   tickishPlace,
   tickishContains,
+  combineTickish_maybe,
 
   -- * Breakpoint tick identifiers
   BreakpointId(..), BreakTickIndex
@@ -261,8 +262,12 @@ Ticks have two independent attributes:
 
      See Note [Scoped ticks]
 
+Note that profiling notes which both count and scope can be split into two
+separate ticks, one that counts and doesn't scope and one that scopes and doesn't
+count; see 'tickishCanSplit', 'mkNoCount' and 'mkNoScope'.
+
 Note [Counting ticks]
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 The following ticks count:
   - ProfNote ticks with profNoteCounts = True
   - HPC ticks
@@ -290,7 +295,7 @@ sharing, so in practice the actual number of ticks may vary, except
 that we never change the value from zero to non-zero or vice-versa.
 
 Note [Scoped ticks]
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 The following ticks are scoped:
   - ProfNote ticks with profNoteScope = True
   - Breakpoints
@@ -375,6 +380,44 @@ Whether we are allowed to float in additional cost depends on the tick:
 
     While these transformations are legal, we want to make a best effort to
     only make use of them where it exposes transformation opportunities.
+
+Note [Tickish placement]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The placement behaviour of ticks (i.e. which terms we want the tick to be placed
+around in the AST) is governed by 'TickishPlacement'. We generally try to push
+ticks inwards until they end up placed around the kind of term expected by their
+placement rules.
+
+From most restrictive to least restrictive placement rules:
+
+  - PlaceRuntime: counting ticks.
+
+    Ticks with 'PlaceRuntime' placement want to be placed on run-time expressions.
+    They can be moved through pure compile-time constructs such as other ticks,
+    casts or type lambdas.
+
+    This is the most restrictive placement rule for ticks, as all tickishs have
+    in common that they want to track runtime processes.
+
+    Any tick that counts (see Note [Counting ticks]) has 'PlaceRuntime' placement.
+
+  - PlaceNonLam: source notes.
+
+    Like PlaceRuntime, but we can also float the tick through value lambdas.
+    This makes sense where there is little difference between annotating the
+    lambda and annotating the lambda's code.
+
+  - PlaceCostCentre: non-counting profiling ticks.
+
+    In addition to floating through lambdas, cost-centre style tickishs can also
+    be moved from constructors and non-function variables. For example:
+
+       let x = scc<...> C (scc<...> y) (scc<...> 3) in ...
+
+    Neither the constructor application, the variable or the literal are likely
+    to have any cost worth mentioning. And even if 'y' names a thunk, the call
+    would not care about the evaluation context. Therefore, removing all
+    annotations in the above example is safe.
 -}
 
 -- | Returns @True@ for ticks that can be floated upwards easily even
@@ -441,35 +484,19 @@ isProfTick _          = False
 -- annotating for example using @mkTick@. If we find that we want to
 -- put a tickish on an expression ruled out here, we try to float it
 -- inwards until we find a suitable expression.
+--
+-- See Note [Tickish placement].
 data TickishPlacement =
 
-    -- | Place ticks exactly on run-time expressions. We can still
-    -- move the tick through pure compile-time constructs such as
-    -- other ticks, casts or type lambdas. This is the most
-    -- restrictive placement rule for ticks, as all tickishs have in
-    -- common that they want to track runtime processes. The only
-    -- legal placement rule for counting ticks.
-    -- NB: We generally try to move these as close to the relevant
-    -- runtime expression as possible. This means they get pushed through
-    -- tyoe arguments. E.g. we create `(tick f) @Bool` instead of `tick (f @Bool)`.
+    -- | Place ticks exactly on run-time expressions, moving them through pure
+    -- compile-time constructs such as other ticks, casts or type lambdas.
     PlaceRuntime
 
-    -- | As @PlaceRuntime@, but we float the tick through all
-    -- lambdas. This makes sense where there is little difference
-    -- between annotating the lambda and annotating the lambda's code.
+    -- | As @PlaceRuntime@, but also allow to float the tick through all lambdas.
   | PlaceNonLam
 
-    -- | In addition to floating through lambdas, cost-centre style
-    -- tickishs can also be moved from constructors, non-function
-    -- variables and literals. For example:
-    --
-    --   let x = scc<...> C (scc<...> y) (scc<...> 3) in ...
-    --
-    -- Neither the constructor application, the variable or the
-    -- literal are likely to have any cost worth mentioning. And even
-    -- if y names a thunk, the call would not care about the
-    -- evaluation context. Therefore removing all annotations in the
-    -- above example is safe.
+    -- | As 'PlaceNonLam', but also float through constructors, non-function
+    -- variables and literals.
   | PlaceCostCentre
 
   deriving (Eq,Show)
@@ -477,7 +504,9 @@ data TickishPlacement =
 instance Outputable TickishPlacement where
   ppr = text . show
 
--- | Placement behaviour we want for the ticks
+-- | Placement behaviour we want for the ticks.
+--
+-- See Note [Tickish placement].
 tickishPlace :: GenTickish pass -> TickishPlacement
 tickishPlace n@ProfNote{}
   | profNoteCount n        = PlaceRuntime
@@ -485,6 +514,43 @@ tickishPlace n@ProfNote{}
 tickishPlace HpcTick{}     = PlaceRuntime
 tickishPlace Breakpoint{}  = PlaceRuntime
 tickishPlace SourceNote{}  = PlaceNonLam
+
+-- | Merge two ticks into one, if that is possible.
+--
+-- Examples:
+--
+--  - combine two source note ticks if one contains the other,
+--  - combine a non-counting profiling tick with a non-scoping profiling tick
+--    for the same cost centre
+--  - combine two equal breakpoint ticks or HPC ticks
+combineTickish_maybe :: Eq (GenTickish pass)
+                   => GenTickish pass -> GenTickish pass -> Maybe (GenTickish pass)
+combineTickish_maybe
+  (ProfNote { profNoteCC = cc1, profNoteCount = cnt1, profNoteScope = scope1 })
+  (ProfNote { profNoteCC = cc2, profNoteCount = cnt2, profNoteScope = scope2 })
+    | cc1 == cc2
+    , not cnt1 || not cnt2
+    = Just $ ProfNote { profNoteCC    = cc1
+                      , profNoteCount = cnt1 || cnt2
+                      , profNoteScope = scope1 || scope2
+                      }
+combineTickish_maybe t1@(SourceNote sp1 n1) t2@(SourceNote sp2 n2)
+  | n1 == n2
+  , sp1 `containsSpan` sp2
+  = Just t1
+  | n1 == n2
+  , sp2 `containsSpan` sp1
+  = Just t2
+  -- NB: it would be possible to use 'combineRealSrcSpans' instead,
+  -- but that has the risk of combining many source note ticks into a single
+  -- tick with a huge source span.
+combineTickish_maybe t1@(HpcTick {}) t2@(HpcTick {})
+  | t1 == t2
+  = Just t1
+combineTickish_maybe t1@(Breakpoint {}) t2@(Breakpoint {})
+  | t1 == t2
+  = Just t1
+combineTickish_maybe _ _ = Nothing
 
 -- | Returns whether one tick "contains" the other one, therefore
 -- making the second tick redundant.
