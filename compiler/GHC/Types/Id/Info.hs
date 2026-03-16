@@ -210,6 +210,7 @@ data IdDetails
         -- Can also work as a WorkerLikeId if given `CbvMark`s.
         -- See Note [CBV Function Ids: overview]
         -- The [CbvMark] is always empty (and ignored) until after Tidy.
+
   | WorkerLikeId [CbvMark]
         -- ^ An 'Id' for a worker like function, which might expect some arguments to be
         -- passed both evaluated and tagged.
@@ -217,8 +218,10 @@ data IdDetails
         -- aren't used unapplied.
         -- See Note [CBV Function Ids: overview]
         -- See Note [EPT enforcement]
-        -- The [CbvMark] is always empty (and ignored) until after Tidy for ids from the current
-        -- module.
+        -- Invariants:
+        --   - the [CbvMark] is always empty (and ignored) until after Tidy
+        --     for ids from the current module
+        --   - If non-empty, at least is isMarkedCbbv; see (CBV2)
 
 data RecSelInfo
   = RSI { rsi_def   :: [ConLike]   -- Record selector defined for these
@@ -297,9 +300,7 @@ Here's how it all works:
   to identify strict arguments.  See Note [Call-by-value for worker args] for
   how a worker guarantees to be strict in strict datacon fields.
 
-  TODO: We currently don't do this for arguments that are unboxed sums or tuples,
-  because then we'd have to predict the result of unarisation. But it would be nice to
-  do so. See `computeCbvInfo`.
+  See (CBV1) and (CBV2).
 
 * During CorePrep calls to CBV Ids are eta expanded.
   See `GHC.CoreToStg.Prep.maybeSaturate`.
@@ -318,6 +319,16 @@ Here's how it all works:
 
 * Imported functions may be CBV, and then there is no point in eta-reducing
   them; we'll just have to eta-expand later; see GHC.Core.Opt.Arity.cantEtaReduceFun.
+
+Wrinkles
+
+(CBV1) We do not set the CBV-marks for a function that takes an unboxed sum or tuple,
+  as an argument, because then we'd have to predict the result of unarisation.
+  It would be nice to do so in future. See `computeCbvInfo`.
+
+(CBV2) We do not set CBV-marks if none of them are `isMarkedCbv`.  Why not?
+  Because if none are CBV then there is nothing special to do for this function;
+  in particular, we don't need to saturate its calls.  See `computeCbvInfo`.
 
 *** SPJ really? Andreas? ****
 We only use this for workers and specialized versions of SpecConstr

@@ -105,7 +105,7 @@ import GHC.Core             ( AltCon(..) )
 import GHC.Core.Type
 import GHC.Core.Lint        ( lintMessage )
 
-import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel, isMarkedCbv )
+import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
 import GHC.Types.CostCentre ( isCurrentCCS )
 import GHC.Types.Id
 import GHC.Types.Var.Set
@@ -123,12 +123,9 @@ import GHC.Unit.Module            ( Module )
 import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 
 import Control.Monad
-import Data.Maybe
-import GHC.Utils.Misc
 import GHC.Core.Multiplicity (scaledThing)
 import GHC.Settings (Platform)
 import GHC.Core.TyCon (primRepCompatible, primRepsCompatible)
-import GHC.Utils.Panic.Plain (panic)
 
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    => Platform
@@ -174,36 +171,37 @@ lintStgTopBindings platform logger diag_opts opts extra_vars this_mod unarised w
     lint_bind (StgTopStringLit v _) = return [v]
 
 lintStgConArg :: StgArg -> LintM ()
-lintStgConArg arg = do
-  unarised <- lf_unarised <$> getLintFlags
-  when unarised $ case stgArgRep_maybe arg of
-    -- Note [Post-unarisation invariants], invariant 4
-    Just [_] -> pure ()
-    badRep   -> addErrL $
-      text "Non-unary constructor arg: " <> ppr arg $$
-      text "Its PrimReps are: " <> ppr badRep
+lintStgConArg arg
+  = do { lintStgArg arg
 
-  case arg of
-    StgLitArg _ -> pure ()
-    StgVarArg v -> lintStgVar v
+       ; unarised <- lf_unarised <$> getLintFlags
+       ; when unarised $ case stgArgRep_maybe arg of
+           -- Note [Post-unarisation invariants], invariant 4
+           Just [_] -> pure ()
+           badRep   -> addErrL $
+             text "Non-unary constructor arg: " <> ppr arg $$
+             text "Its PrimReps are: " <> ppr badRep }
 
 lintStgFunArg :: StgArg -> LintM ()
-lintStgFunArg arg = do
-  unarised <- lf_unarised <$> getLintFlags
-  when unarised $ case stgArgRep_maybe arg of
-    -- Note [Post-unarisation invariants], invariant 3
-    Just []  -> pure ()
-    Just [_] -> pure ()
-    badRep   -> addErrL $
-      text "Function arg is not unary or void: " <> ppr arg $$
-      text "Its PrimReps are: " <> ppr badRep
+lintStgFunArg arg
+  = do { lintStgArg arg
 
-  case arg of
-    StgLitArg _ -> pure ()
-    StgVarArg v -> lintStgVar v
+       ; unarised <- lf_unarised <$> getLintFlags
+       ; when unarised $ case stgArgRep_maybe arg of
+           -- Note [Post-unarisation invariants], invariant 3
+           Just []  -> pure ()
+           Just [_] -> pure ()
+           badRep   -> addErrL $
+             text "Function arg is not unary or void: " <> ppr arg $$
+             text "Its PrimReps are: " <> ppr badRep }
 
-lintStgVar :: Id -> LintM ()
-lintStgVar id = checkInScope id
+lintStgArg :: StgArg -> LintM ()
+lintStgArg (StgLitArg _) = pure ()
+lintStgArg (StgVarArg v) = do { lintStgVarOcc v
+                              ; lintAppCbvMarks v [] }
+
+lintStgVarOcc :: Id -> LintM ()
+lintStgVarOcc id = checkInScope id
 
 lintStgBinds
     :: (OutputablePass a, BinderP a ~ Id)
@@ -275,13 +273,11 @@ lintStgExpr :: (OutputablePass a, BinderP a ~ Id) => GenStgExpr a -> LintM ()
 
 lintStgExpr (StgLit _) = return ()
 
-lintStgExpr e@(StgApp fun args) = do
-  lintStgVar fun
-  mapM_ lintStgFunArg args
-  lintAppCbvMarks e
-  lintStgAppReps fun args
-
-
+lintStgExpr (StgApp fun args)
+  = do { lintStgVarOcc fun
+       ; mapM_ lintStgFunArg args
+       ; lintAppCbvMarks fun args
+       ; lintStgAppReps fun args }
 
 lintStgExpr app@(StgConApp con _n args _arg_tys) = do
     -- unboxed sums should vanish during unarise
@@ -413,22 +409,20 @@ lintStgAppReps fun args = do
 
   match_args actual_arg_reps fun_arg_tys_reps
 
-lintAppCbvMarks :: OutputablePass pass
-                => GenStgExpr pass -> LintM ()
-lintAppCbvMarks e@(StgApp fun args) = do
-  lf <- getLintFlags
-  when (lf_unarised lf) $ do
+lintAppCbvMarks :: Id -> [StgArg] -> LintM ()
+lintAppCbvMarks fun args
+  | idCbvMarkArity fun > length args
     -- A function which expects a unlifted argument as n'th argument
     -- always needs to be applied to n arguments.
     -- See Note [CBV Function Ids: overview].
-    let marks = fromMaybe [] $ idCbvMarks_maybe fun
-    when (length (dropWhileEndLE (not . isMarkedCbv) marks) > length args) $ do
-      addErrL $ hang (text "Undersatured cbv marked ID in App" <+> ppr e ) 2 $
-        (text "marks" <> ppr marks $$
-        text "args" <> ppr args $$
-        text "arity" <> ppr (idArity fun) $$
-        text "join_arity" <> ppr (idJoinPointHood fun))
-lintAppCbvMarks _ = panic "impossible - lintAppCbvMarks"
+  = addErrL $ hang (text "Undersatured cbv marked ID in App" <+> ppr fun)
+                 2 (vcat [ text "marks" <> ppr (idCbvMarks_maybe fun)
+                         , text "args" <> ppr args
+                         , text "arity" <> ppr (idArity fun)
+                         , text "join_arity" <> ppr (idJoinPointHood fun) ])
+
+  | otherwise
+  = return ()
 
 {-
 ************************************************************************

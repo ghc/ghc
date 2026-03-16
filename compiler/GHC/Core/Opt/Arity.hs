@@ -2551,9 +2551,6 @@ This reduces clutter, sometimes a lot. See Note [Do not eta-expand PAPs]
 in GHC.Core.Opt.Simplify.Utils, where we are careful not to eta-expand
 a PAP.  If eta-expanding is bad, then eta-reducing is good!
 
-Also the code generator likes eta-reduced PAPs; see GHC.CoreToStg.Prep
-Note [No eta reduction needed in rhsToBody].
-
 But note that we don't want to eta-reduce
      \x y.  f <expensive> x y
 to
