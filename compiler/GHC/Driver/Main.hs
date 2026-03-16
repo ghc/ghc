@@ -2435,8 +2435,8 @@ myCoreToStg :: Logger -> DynFlags -> [Var]
                   , CollectedCCs -- CAF cost centre info (declared and used)
                   , StgCgInfos )
 myCoreToStg logger dflags ic_inscope for_bytecode this_mod ml prepd_binds = do
-    let (stg_binds, denv, cost_centre_info)
-         = {-# SCC "Core2Stg" #-}
+    (stg_binds, denv, cost_centre_info)
+       <- {-# SCC "Core2Stg" #-}
            coreToStg (initCoreToStgOpts dflags) this_mod ml prepd_binds
 
     (stg_binds_with_fvs,stg_cg_info)

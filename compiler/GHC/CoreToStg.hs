@@ -39,6 +39,8 @@ import GHC.Types.Basic  ( Arity, TypeOrConstraint(..) )
 import GHC.Types.Literal
 import GHC.Types.ForeignCall
 import GHC.Types.IPE
+import GHC.Types.Unique.Supply
+import GHC.Types.Unique
 
 import GHC.Unit.Module
 import GHC.Platform        ( Platform )
@@ -49,297 +51,309 @@ import GHC.Utils.Outputable
 import GHC.Utils.Monad
 import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Utils.Panic
+import GHC.Data.FastString
 
 import Control.Monad (ap)
 
--- Note [Live vs free]
--- ~~~~~~~~~~~~~~~~~~~
---
--- The two are not the same. Liveness is an operational property rather
--- than a semantic one. A variable is live at a particular execution
--- point if it can be referred to directly again. In particular, a dead
--- variable's stack slot (if it has one):
---
---           - should be stubbed to avoid space leaks, and
---           - may be reused for something else.
---
--- There ought to be a better way to say this. Here are some examples:
---
---         let v = [q] \[x] -> e
---         in
---         ...v...  (but no q's)
---
--- Just after the `in', v is live, but q is dead. If the whole of that
--- let expression was enclosed in a case expression, thus:
---
---         case (let v = [q] \[x] -> e in ...v...) of
---                 alts[...q...]
---
--- (ie `alts' mention `q'), then `q' is live even after the `in'; because
--- we'll return later to the `alts' and need it.
---
--- Let-no-escapes make this a bit more interesting:
---
---         let-no-escape v = [q] \ [x] -> e
---         in
---         ...v...
---
--- Here, `q' is still live at the `in', because `v' is represented not by
--- a closure but by the current stack state.  In other words, if `v' is
--- live then so is `q'. Furthermore, if `e' mentions an enclosing
--- let-no-escaped variable, then its free variables are also live if `v' is.
+{- Note [Live vs free]
+~~~~~~~~~~~~~~~~~~~~~~
+The two are not the same. Liveness is an operational property rather
+than a semantic one. A variable is live at a particular execution
+point if it can be referred to directly again. In particular, a dead
+variable's stack slot (if it has one):
 
--- Note [What are these SRTs all about?]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- Consider the Core program,
---
---     fibs = go 1 1
---       where go a b = let c = a + c
---                      in c : go b c
---     add x = map (\y -> x*y) fibs
---
--- In this case we have a CAF, 'fibs', which is quite large after evaluation and
--- has only one possible user, 'add'. Consequently, we want to ensure that when
--- all references to 'add' die we can garbage collect any bit of 'fibs' that we
--- have evaluated.
---
--- However, how do we know whether there are any references to 'fibs' still
--- around? Afterall, the only reference to it is buried in the code generated
--- for 'add'. The answer is that we record the CAFs referred to by a definition
--- in its info table, namely a part of it known as the Static Reference Table
--- (SRT).
---
--- Since SRTs are so common, we use a special compact encoding for them in: we
--- produce one table containing a list of CAFs in a module and then include a
--- bitmap in each info table describing which entries of this table the closure
--- references.
---
--- See also: commentary/rts/storage/gc/CAFs on the GHC Wiki.
+          - should be stubbed to avoid space leaks, and
+          - may be reused for something else.
 
--- Note [What is a non-escaping let]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- NB: Nowadays this is recognized by the occurrence analyser by turning a
--- "non-escaping let" into a join point. The following is then an operational
--- account of join points.
---
--- Consider:
---
---     let x = fvs \ args -> e
---     in
---         if ... then x else
---            if ... then x else ...
---
--- `x' is used twice (so we probably can't unfold it), but when it is
--- entered, the stack is deeper than it was when the definition of `x'
--- happened.  Specifically, if instead of allocating a closure for `x',
--- we saved all `x's fvs on the stack, and remembered the stack depth at
--- that moment, then whenever we enter `x' we can simply set the stack
--- pointer(s) to these remembered (compile-time-fixed) values, and jump
--- to the code for `x'.
---
--- All of this is provided x is:
---   1. non-updatable;
---   2. guaranteed to be entered before the stack retreats -- ie x is not
---      buried in a heap-allocated closure, or passed as an argument to
---      something;
---   3. all the enters have exactly the right number of arguments,
---      no more no less;
---   4. all the enters are tail calls; that is, they return to the
---      caller enclosing the definition of `x'.
---
--- Under these circumstances we say that `x' is non-escaping.
---
--- An example of when (4) does not hold:
---
---     let x = ...
---     in case x of ...alts...
---
--- Here, `x' is certainly entered only when the stack is deeper than when
--- `x' is defined, but here it must return to ...alts... So we can't just
--- adjust the stack down to `x''s recalled points, because that would lost
--- alts' context.
---
--- Things can get a little more complicated.  Consider:
---
---     let y = ...
---     in let x = fvs \ args -> ...y...
---     in ...x...
---
--- Now, if `x' is used in a non-escaping way in ...x..., and `y' is used in a
--- non-escaping way in ...y..., then `y' is non-escaping.
---
--- `x' can even be recursive!  Eg:
---
---     letrec x = [y] \ [v] -> if v then x True else ...
---     in
---         ...(x b)...
+There ought to be a better way to say this. Here are some examples:
 
--- Note [Cost-centre initialization plan]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- Previously `coreToStg` was initializing cost-centre stack fields as `noCCS`,
--- and the fields were then fixed by a separate pass `stgMassageForProfiling`.
--- We now initialize these correctly. The initialization works like this:
---
---   - For non-top level bindings always use `currentCCS`.
---
---   - For top-level bindings, check if the binding is a CAF
---
---     - CAF:      If -fcaf-all is enabled, create a new CAF just for this CAF
---                 and use it. Note that these new cost centres need to be
---                 collected to be able to generate cost centre initialization
---                 code, so `coreToTopStgRhs` now returns `CollectedCCs`.
---
---                 If -fcaf-all is not enabled, use "all CAFs" cost centre.
---
---     - Non-CAF:  Top-level (static) data is not counted in heap profiles; nor
---                 do we set CCCS from it; so we just slam in
---                 dontCareCostCentre.
+        let v = [q] \[x] -> e
+        in
+        ...v...  (but no q's)
 
--- Note [Coercion tokens]
--- ~~~~~~~~~~~~~~~~~~~~~~
--- In coreToStgArgs, we drop type arguments completely, but we replace
--- coercions with a special coercionToken# placeholder. Why? Consider:
---
---   f :: forall a. Int ~# Bool -> a
---   f = /\a. \(co :: Int ~# Bool) -> error "impossible"
---
--- If we erased the coercion argument completely, we’d end up with just
--- f = error "impossible", but then f `seq` () would be ⊥!
---
--- This is an artificial example, but back in the day we *did* treat
--- coercion lambdas like type lambdas, and we had bug reports as a
--- result. So now we treat coercion lambdas like value lambdas, but we
--- treat coercions themselves as zero-width arguments — coercionToken#
--- has representation VoidRep — which gets the best of both worlds.
---
--- (For the gory details, see also the (unpublished) paper, “Practical
--- aspects of evidence-based compilation in System FC.”)
+Just after the `in', v is live, but q is dead. If the whole of that
+let expression was enclosed in a case expression, thus:
 
--- Note [Saturation of data constructors in STG]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- We guarantee that `StgConApp` is an exactly-saturated application of a data
--- constructor worker.
---
--- * If the data constructor is /under/-saturated we just fall through to build
---   a `StgApp`.  Remember, data constructor workers have a regular top-level definition
---   (injected by GHC.CoreToStg.Prep.mkDataConWorkers) so we can partially apply
---   that function.
---
--- * If the data constructor is /over/-saturated, which can happen (see #23865) we again
---   fall through to `StgApp`.  That will fail horribly at runtime (by applying data
---   constructor to an argument) but it should be in dead code, and at least the compiler
---   itself won't crash.  (We could inject an error-thunk instead.)
+        case (let v = [q] \[x] -> e in ...v...) of
+                alts[...q...]
 
+(ie `alts' mention `q'), then `q' is live even after the `in'; because
+we'll return later to the `alts' and need it.
+
+Let-no-escapes make this a bit more interesting:
+
+        let-no-escape v = [q] \ [x] -> e
+        in
+        ...v...
+
+Here, `q' is still live at the `in', because `v' is represented not by
+a closure but by the current stack state.  In other words, if `v' is
+live then so is `q'. Furthermore, if `e' mentions an enclosing
+let-no-escaped variable, then its free variables are also live if `v' is.
+
+Note [What are these SRTs all about?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider the Core program,
+
+    fibs = go 1 1
+      where go a b = let c = a + c
+                     in c : go b c
+    add x = map (\y -> x*y) fibs
+
+In this case we have a CAF, 'fibs', which is quite large after evaluation and
+has only one possible user, 'add'. Consequently, we want to ensure that when
+all references to 'add' die we can garbage collect any bit of 'fibs' that we
+have evaluated.
+
+However, how do we know whether there are any references to 'fibs' still
+around? Afterall, the only reference to it is buried in the code generated
+for 'add'. The answer is that we record the CAFs referred to by a definition
+in its info table, namely a part of it known as the Static Reference Table
+(SRT).
+
+Since SRTs are so common, we use a special compact encoding for them in: we
+produce one table containing a list of CAFs in a module and then include a
+bitmap in each info table describing which entries of this table the closure
+references.
+
+See also: commentary/rts/storage/gc/CAFs on the GHC Wiki.
+
+Note [What is a non-escaping let]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+NB: Nowadays this is recognized by the occurrence analyser by turning a
+"non-escaping let" into a join point. The following is then an operational
+account of join points.
+
+Consider:
+
+    let x = fvs \ args -> e
+    in
+        if ... then x else
+           if ... then x else ...
+
+`x' is used twice (so we probably can't unfold it), but when it is
+entered, the stack is deeper than it was when the definition of `x'
+happened.  Specifically, if instead of allocating a closure for `x',
+we saved all `x's fvs on the stack, and remembered the stack depth at
+that moment, then whenever we enter `x' we can simply set the stack
+pointer(s) to these remembered (compile-time-fixed) values, and jump
+to the code for `x'.
+
+All of this is provided x is:
+  1. non-updatable;
+  2. guaranteed to be entered before the stack retreats -- ie x is not
+     buried in a heap-allocated closure, or passed as an argument to
+     something;
+  3. all the enters have exactly the right number of arguments,
+     no more no less;
+  4. all the enters are tail calls; that is, they return to the
+     caller enclosing the definition of `x'.
+
+Under these circumstances we say that `x' is non-escaping.
+
+An example of when (4) does not hold:
+
+    let x = ...
+    in case x of ...alts...
+
+Here, `x' is certainly entered only when the stack is deeper than when
+`x' is defined, but here it must return to ...alts... So we can't just
+adjust the stack down to `x''s recalled points, because that would lost
+alts' context.
+
+Things can get a little more complicated.  Consider:
+
+    let y = ...
+    in let x = fvs \ args -> ...y...
+    in ...x...
+
+Now, if `x' is used in a non-escaping way in ...x..., and `y' is used in a
+non-escaping way in ...y..., then `y' is non-escaping.
+
+`x' can even be recursive!  Eg:
+
+    letrec x = [y] \ [v] -> if v then x True else ...
+    in
+        ...(x b)...
+
+Note [Cost-centre initialization plan]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Previously `coreToStg` was initializing cost-centre stack fields as `noCCS`,
+and the fields were then fixed by a separate pass `stgMassageForProfiling`.
+We now initialize these correctly. The initialization works like this:
+
+  - For non-top level bindings always use `currentCCS`.
+
+  - For top-level bindings, check if the binding is a CAF
+
+    - CAF:      If -fcaf-all is enabled, create a new CAF just for this CAF
+                and use it. Note that these new cost centres need to be
+                collected to be able to generate cost centre initialization
+                code, so `coreToTopStgRhs` now returns `CollectedCCs`.
+
+                If -fcaf-all is not enabled, use "all CAFs" cost centre.
+
+    - Non-CAF:  Top-level (static) data is not counted in heap profiles; nor
+                do we set CCCS from it; so we just slam in
+                dontCareCostCentre.
+
+Note [Coercion tokens]
+~~~~~~~~~~~~~~~~~~~~~~
+In coreToStgArgs, we drop type arguments completely, but we replace
+coercions with a special coercionToken# placeholder. Why? Consider:
+
+  f :: forall a. Int ~# Bool -> a
+  f = /\a. \(co :: Int ~# Bool) -> error "impossible"
+
+If we erased the coercion argument completely, we’d end up with just
+f = error "impossible", but then f `seq` () would be ⊥!
+
+This is an artificial example, but back in the day we *did* treat
+coercion lambdas like type lambdas, and we had bug reports as a
+result. So now we treat coercion lambdas like value lambdas, but we
+treat coercions themselves as zero-width arguments — coercionToken#
+has representation VoidRep — which gets the best of both worlds.
+
+(For the gory details, see also the (unpublished) paper, “Practical
+aspects of evidence-based compilation in System FC.”)
+
+Note [Saturation of data constructors in STG]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We guarantee that `StgConApp` is an exactly-saturated application of a data
+constructor worker.
+
+* If the data constructor is /under/-saturated we just fall through to build
+  a `StgApp`.  Remember, data constructor workers have a regular top-level definition
+  (injected by GHC.CoreToStg.Prep.mkDataConWorkers) so we can partially apply
+  that function.
+
+* If the data constructor is /over/-saturated, which can happen (see #23865) we again
+  fall through to `StgApp`.  That will fail horribly at runtime (by applying data
+  constructor to an argument) but it should be in dead code, and at least the compiler
+  itself won't crash.  (We could inject an error-thunk instead.)
+
+Note [Naked lambdas in coreToStgExpr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f x = case x of
+           True  -> \y. y+x
+           False -> blah
+If `f` is not eta expanded (which would have happened in Prep if it was
+going to happen at all, the code for f must allocate a closure for the
+(\y. y+x).  So the STG code we want has
+
+     True -> let pap = \y. y+x
+             in pap
+
+The Lam case of `coreToStgExpr` deals with adding this `StgLet`. It's the
+main reason we need a unique supply in the monad.
+
+Historical note: in the past, Prep guaranteed there would be no such naked
+lambdas, so we didn't need a unique supply at all. But that proved too hard
+in the end (see Note [Eta expansion and the CorePrep invariants]) so we
+just deal with it here; it's very easy.
+-}
 
 -- --------------------------------------------------------------
 -- Setting variable info: top-level, binds, RHSs
 -- --------------------------------------------------------------
 
 
-coreToStg :: CoreToStgOpts -> Module -> ModLocation -> CoreProgram
-          -> ([StgTopBinding], InfoTableProvMap, CollectedCCs)
-coreToStg opts@CoreToStgOpts
-  { coreToStg_ways = ways
-  , coreToStg_AutoSccsOnIndividualCafs = opt_AutoSccsOnIndividualCafs
-  , coreToStg_InfoTableMap = opt_InfoTableMap
-  , coreToStg_stgDebugOpts = stgDebugOpts
-  } this_mod ml pgm
-  = (pgm'', denv, final_ccs)
-  where
-    (_, (local_ccs, local_cc_stacks), pgm')
-      = coreTopBindsToStg opts this_mod emptyVarEnv emptyCollectedCCs pgm
+coreToStg :: CoreToStgOpts -> Module -> ModLocation
+          -> CoreProgram
+          -> IO ([StgTopBinding], InfoTableProvMap, CollectedCCs)
+coreToStg opts this_mod ml pgm
+  = do { us <- mkSplitUniqSupply StgTag
+       ; let (_, (local_ccs, local_cc_stacks), pgm')
+                = initCts opts us $
+                  coreTopBindsToStg opts this_mod emptyCollectedCCs pgm
 
-    -- See Note [Mapping Info Tables to Source Positions]
-    (!pgm'', !denv)
-      | opt_InfoTableMap
-      = collectDebugInformation stgDebugOpts ml pgm'
-      | otherwise = (pgm', emptyInfoTableProvMap)
+             -- See Note [Mapping Info Tables to Source Positions]
+             (!pgm'', !denv)
+               | opt_InfoTableMap
+               = collectDebugInformation stgDebugOpts ml pgm'
+               | otherwise = (pgm', emptyInfoTableProvMap)
+
+             final_ccs
+               | prof && opt_AutoSccsOnIndividualCafs
+               = (local_ccs,local_cc_stacks)  -- don't need "all CAFs" CC
+               | prof
+               = (all_cafs_cc:local_ccs, all_cafs_ccs:local_cc_stacks)
+               | otherwise
+               = emptyCollectedCCs
+
+      ; return (pgm'', denv, final_ccs) }
+  where
+    CoreToStgOpts { coreToStg_ways = ways
+                  , coreToStg_AutoSccsOnIndividualCafs = opt_AutoSccsOnIndividualCafs
+                  , coreToStg_InfoTableMap = opt_InfoTableMap
+                  , coreToStg_stgDebugOpts = stgDebugOpts }
+       = opts
 
     prof = hasWay ways WayProf
-
-    final_ccs
-      | prof && opt_AutoSccsOnIndividualCafs
-      = (local_ccs,local_cc_stacks)  -- don't need "all CAFs" CC
-      | prof
-      = (all_cafs_cc:local_ccs, all_cafs_ccs:local_cc_stacks)
-      | otherwise
-      = emptyCollectedCCs
-
     (all_cafs_cc, all_cafs_ccs) = getAllCAFsCC this_mod
 
 coreTopBindsToStg
     :: CoreToStgOpts
     -> Module
-    -> IdEnv HowBound           -- environment for the bindings
     -> CollectedCCs
     -> CoreProgram
-    -> (IdEnv HowBound, CollectedCCs, [StgTopBinding])
+    -> CtsM (IdEnv HowBound, CollectedCCs, [StgTopBinding])
 
-coreTopBindsToStg _      _        env ccs []
-  = (env, ccs, [])
-coreTopBindsToStg opts this_mod env ccs (b:bs)
+coreTopBindsToStg _ _ ccs []
+  = do { env <- getCtsEnv
+       ; return (env, ccs, []) }
+
+coreTopBindsToStg opts this_mod ccs (b:bs)
   | NonRec _ rhs <- b, isTyCoArg rhs
-  = coreTopBindsToStg opts this_mod env1 ccs1 bs
+  = coreTopBindsToStg opts this_mod ccs bs
   | otherwise
-  = (env2, ccs2, b':bs')
-  where
-    (env1, ccs1, b' ) = coreTopBindToStg opts this_mod env ccs b
-    (env2, ccs2, bs') = coreTopBindsToStg opts this_mod env1 ccs1 bs
+  = do { (env1, ccs1, b' ) <- coreTopBindToStg opts this_mod ccs b
+       ; (env2, ccs2, bs') <- setCtsEnv env1 $
+                              coreTopBindsToStg opts this_mod ccs1 bs
+      ; return (env2, ccs2, b':bs') }
 
 coreTopBindToStg
         :: CoreToStgOpts
         -> Module
-        -> IdEnv HowBound
         -> CollectedCCs
         -> CoreBind
-        -> (IdEnv HowBound, CollectedCCs, StgTopBinding)
+        -> CtsM (IdEnv HowBound, CollectedCCs, StgTopBinding)
 
-coreTopBindToStg _ _ env ccs (NonRec id e)
+coreTopBindToStg _ _ ccs (NonRec id e)
   | Just str <- exprIsTickedString_maybe e
   -- top-level string literal
   -- See Note [Core top-level string literals] in GHC.Core
-  = let
-        env' = extendVarEnv env id how_bound
-        how_bound = LetBound TopLet 0
-    in (env', ccs, StgTopStringLit id str)
+  = do { env <- getCtsEnv
+       ; let env' = extendVarEnv env id how_bound
+             how_bound = LetBound TopLet 0
+       ; return (env', ccs, StgTopStringLit id str) }
 
-coreTopBindToStg opts@CoreToStgOpts
-  { coreToStg_platform = platform
-  } this_mod env ccs (NonRec id rhs)
-  = let
-        env'      = extendVarEnv env id how_bound
-        how_bound = LetBound TopLet $! manifestArity rhs
+coreTopBindToStg opts this_mod ccs (NonRec id rhs)
+  = do { (ccs', (id', stg_rhs)) <- coreToTopStgRhs opts this_mod ccs (id,rhs)
 
-        (ccs', (id', stg_rhs)) =
-            initCts platform env $
-              coreToTopStgRhs opts this_mod ccs (id,rhs)
+       ; env <- getCtsEnv
+       ; let env'      = extendVarEnv env id how_bound
+             how_bound = LetBound TopLet $! manifestArity rhs
+             bind      = StgTopLifted $ StgNonRec id' stg_rhs
+       ; return (env', ccs', bind) }
 
-        bind = StgTopLifted $ StgNonRec id' stg_rhs
-    in
-      -- NB: previously the assertion printed 'rhs' and 'bind'
-      --     as well as 'id', but that led to a black hole
-      --     where printing the assertion error tripped the
-      --     assertion again!
-    (env', ccs', bind)
-
-coreTopBindToStg opts@CoreToStgOpts
-  { coreToStg_platform = platform
-  } this_mod env ccs (Rec pairs)
+coreTopBindToStg opts this_mod ccs (Rec pairs)
   = assert (not (null pairs)) $
-    let
-        extra_env' = [ (b, LetBound TopLet $! manifestArity rhs)
-                     | (b, rhs) <- pairs ]
-        env' = extendVarEnvList env extra_env'
+    do { env <- getCtsEnv
+       ; let extra_env' = [ (b, LetBound TopLet $! manifestArity rhs)
+                          | (b, rhs) <- pairs ]
+             env' = extendVarEnvList env extra_env'
 
-        -- generate StgTopBindings and CAF cost centres created for CAFs
-        (ccs', stg_rhss)
-          = initCts platform env' $ mapAccumLM (coreToTopStgRhs opts this_mod) ccs pairs
-        bind = StgTopLifted $ StgRec stg_rhss
-    in
-    (env', ccs', bind)
+       -- Generate StgTopBindings and CAF cost centres created for CAFs
+       ; (ccs', stg_rhss) <- setCtsEnv env' $
+                             mapAccumLM (coreToTopStgRhs opts this_mod) ccs pairs
+       ; let bind = StgTopLifted $ StgRec stg_rhss
+
+       ; return (env', ccs', bind) }
 
 coreToTopStgRhs
         :: CoreToStgOpts
@@ -420,16 +434,24 @@ coreToStgExpr expr@(App _ _)
       res_ty                  = exprType expr
       (app_head, args, ticks) = myCollectArgs expr res_ty
 
-coreToStgExpr expr@(Lam _ _)
-  = let
-        (args, body) = myCollectBinders expr
-    in
-    case filterStgBinders args of
-
-      [] -> coreToStgExpr body
-
-      _ -> pprPanic "coretoStgExpr" $
-        text "Unexpected value lambda:" $$ ppr expr
+coreToStgExpr expr@(Lam {})
+  | null val_bndrs
+  = coreToStgExpr body
+  | otherwise
+  = -- See Note [Naked lambdas in coreToStgExpr]
+    do { body' <- extendVarEnvCts [ (a, LambdaBound) | a <- val_bndrs ] $
+                  coreToStgExpr body
+       ; uniq <- getCtsUnique
+       ; let body_ty = exprType body
+             fun_ty  = mkLamTypes val_bndrs body_ty
+                       -- This type is a bit ill-formed but it doesn't matter
+             rhs = StgRhsClosure noExtFieldSilent currentCCS
+                                 ReEntrant val_bndrs body' body_ty
+             tmp_fun = mkSysLocal (fsLit "pap") uniq ManyTy fun_ty
+       ; return (StgLet noExtFieldSilent (StgNonRec tmp_fun rhs) $
+                 StgApp tmp_fun []) }
+  where
+    (val_bndrs, body) = myCollectBinders NotJoinPoint expr
 
 coreToStgExpr (Tick tick expr)
   = do
@@ -710,12 +732,11 @@ coreToStgRhs (bndr, rhs) = do
 -- coreToStgExpr that can handle value lambdas.
 coreToMkStgRhs :: HasDebugCallStack => Id -> CoreExpr -> CtsM MkStgRhs
 coreToMkStgRhs bndr expr = do
-  let (args, body) = myCollectBinders expr
-  let args'        = filterStgBinders args
-  extendVarEnvCts [ (a, LambdaBound) | a <- args' ] $ do
+  let (bndrs, body) = myCollectBinders (idJoinPointHood bndr) expr
+  extendVarEnvCts [ (a, LambdaBound) | a <- bndrs ] $ do
     body' <- coreToStgExpr body
     let mk_rhs = MkStgRhs
-          { rhs_args = args'
+          { rhs_args = bndrs
           , rhs_expr = body'
           , rhs_type = exprType body
           , rhs_is_join = isJoinId bndr
@@ -733,7 +754,7 @@ coreToMkStgRhs bndr expr = do
 newtype CtsM a = CtsM
     { unCtsM :: Platform -- Needed for checking for bad coercions in coreToStgArgs
              -> IdEnv HowBound
-             -> a
+             -> UniqSM a
     }
     deriving (Functor)
 
@@ -769,20 +790,22 @@ data LetInfo
 
 -- The std monad functions:
 
-initCts :: Platform -> IdEnv HowBound -> CtsM a -> a
-initCts platform env m = unCtsM m platform env
-
+initCts :: CoreToStgOpts -> UniqSupply -> CtsM a -> a
+initCts opts us cts_m
+  = initUs_ us $
+    unCtsM cts_m (coreToStg_platform opts) emptyVarEnv
 
 
 {-# INLINE thenCts #-}
 {-# INLINE returnCts #-}
 
 returnCts :: a -> CtsM a
-returnCts e = CtsM $ \_ _ -> e
+returnCts e = CtsM $ \_ _ -> return e
 
 thenCts :: CtsM a -> (a -> CtsM b) -> CtsM b
-thenCts m k = CtsM $ \platform env
-  -> unCtsM (k (unCtsM m platform env)) platform env
+thenCts m k = CtsM $ \platform env ->
+              do { v <- unCtsM m platform env
+                 ; unCtsM (k v) platform env }
 
 instance Applicative CtsM where
     pure = returnCts
@@ -792,9 +815,18 @@ instance Monad CtsM where
     (>>=)  = thenCts
 
 getPlatform :: CtsM Platform
-getPlatform = CtsM const
+getPlatform = CtsM $ \platform _ -> return platform
 
 -- Functions specific to this monad:
+
+setCtsEnv :: IdEnv HowBound -> CtsM a -> CtsM a
+setCtsEnv env thing = CtsM $ \platform _ -> unCtsM thing platform env
+
+getCtsEnv :: CtsM (IdEnv HowBound)
+getCtsEnv = CtsM $ \_ env -> return env
+
+getCtsUnique :: CtsM Unique
+getCtsUnique = CtsM $ \_ _ -> getUniqueM
 
 extendVarEnvCts :: [(Id, HowBound)] -> CtsM a -> CtsM a
 extendVarEnvCts ids_w_howbound expr
@@ -802,7 +834,7 @@ extendVarEnvCts ids_w_howbound expr
    -> unCtsM expr platform (extendVarEnvList env ids_w_howbound)
 
 lookupVarCts :: Id -> CtsM HowBound
-lookupVarCts v = CtsM $ \_ env -> lookupBinding env v
+lookupVarCts v = CtsM $ \_ env -> return (lookupBinding env v)
 
 lookupBinding :: IdEnv HowBound -> Id -> HowBound
 lookupBinding env v = case lookupVarEnv env v of
@@ -814,13 +846,26 @@ lookupBinding env v = case lookupVarEnv env v of
 filterStgBinders :: [Var] -> [Var]
 filterStgBinders bndrs = filter isId bndrs
 
-myCollectBinders :: Expr Var -> ([Var], Expr Var)
-myCollectBinders expr
+myCollectBinders :: JoinPointHood -> Expr Var -> ([Var], Expr Var)
+-- Collect the binders from a lambda:
+--   * Dropping type lambdas
+--   * Stopping at join-point arity
+myCollectBinders NotJoinPoint expr
   = go [] expr
   where
-    go bs (Lam b e)          = go (b:bs) e
-    go bs (Cast e _)         = go bs e
-    go bs e                  = (reverse bs, e)
+    go bs (Lam b e) | isRuntimeVar b = go (b:bs) e
+                    | otherwise      = go bs     e
+    go bs (Cast e _)                 = go bs e
+    go bs e                          = (reverse bs, e)
+
+myCollectBinders (JoinPoint n) expr
+  = go n [] expr
+  where
+    go n bs e | n==0                   = (reverse bs, e)
+    go n bs (Lam b e) | isRuntimeVar b = go (n-1) (b:bs) e
+                      | otherwise      = go (n-1) bs     e
+    go n bs (Cast e _)                 = go n bs e
+    go _ bs e                          = (reverse bs, e)
 
 -- | If the argument expression is (potential chain of) 'App', return the head
 -- of the app chain, and collect ticks/args along the chain.
