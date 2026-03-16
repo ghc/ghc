@@ -2082,7 +2082,7 @@ getDeepSubsumptionFlag_DataConHead app_head =
     go app_head
      | XExpr (ConLikeTc (RealDataCon {})) <- app_head
      = Deep TopSub
-     | XExpr (ExpandedThingTc _ (L _ f)) <- app_head
+     | XExpr (ExpandedThingTc (HSE _ (L _ f))) <- app_head
      = go f
      | XExpr (WrapExpr _ f) <- app_head
      = go f

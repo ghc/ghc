@@ -316,7 +316,8 @@ tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
 tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
 tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
 
-tcExpr (XExpr e')                res_ty = tcXExpr e' res_ty
+tcExpr (XExpr (ExpandedThingRn hse)) res_ty = tcHsExpansion hse res_ty
+tcExpr e@(XExpr{})               res_ty = tcApp e res_ty
 
 -- Typecheck an occurrence of an unbound Id
 --
@@ -557,7 +558,7 @@ tcExpr (HsMultiIf _ alts) res_ty
        ; res_ty <- readExpType res_ty
        ; return (HsMultiIf res_ty alts') }
 
-tcExpr expr@(HsDo _ do_or_lc stmts) res_ty
+tcExpr (HsDo _ do_or_lc stmts) res_ty
   | DoExpr{} <- do_or_lc
   -- ApplicativeDo are typechecked using tcDoStmts
   = do isApplicativeDo <- xoptM LangExt.ApplicativeDo
@@ -565,12 +566,14 @@ tcExpr expr@(HsDo _ do_or_lc stmts) res_ty
          then tcDoStmts do_or_lc stmts res_ty
          -- Expand expression on the fly otherwise
          -- See Note [Typechecking by expansion: overview]
-         else do { expr' <- tcExpandExpr expr
-                 ; tcExpr expr' res_ty }
+         else do { hse <- expandDoStmts do_or_lc stmts
+                 ; tcHsExpansion hse res_ty }
   | MDoExpr{} <- do_or_lc
-  = do expr' <- tcExpandExpr expr
-       tcExpr expr' res_ty
+  = do hse <- expandDoStmts do_or_lc stmts
+       tcHsExpansion hse res_ty
   | otherwise
+  -- ListComp, MonadComp are handled by tcDoStmts
+  -- GHCiStmts are handled completely separate
   = tcDoStmts do_or_lc stmts res_ty
 
 tcExpr (HsProc x pat cmd) res_ty
@@ -686,7 +689,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
 
         ; (ds_expr, ds_res_ty, err_msg)
             <- expandRecordUpd record_expr possible_parents rbnds res_ty
-        ; setInGeneratedCode $ addErrCtxt err_msg $
+        ; addErrCtxt err_msg $
           do { -- Typecheck the expanded expression.
                expr' <- tcExpr ds_expr (Check ds_res_ty)
                -- NB: it's important to use ds_res_ty and not res_ty here.
@@ -815,7 +818,11 @@ The rest of this Note explains how that is done.
   hence `RealSrcSpan`.
 
   The `tcl_err_ctxt` is a stack of contexts, each saying something
-  like "In the expression: x+y" or "In the record update: r { x=2 }"
+  like "In the expression: x+y" or "In second argument of `$` namely 'r { x=2 }'"
+
+  The `tcl_in_gen_code` is a boolean that keeps track of whether
+  the current expression being typechecked is compiler generated
+  or user generated.
 
   The `tcl_in_gen_code` is a boolean that keeps track of whether
   the current expression being typechecked is compiler generated
@@ -847,16 +854,12 @@ The rest of this Note explains how that is done.
 
 -}
 
-tcXExpr :: XXExprGhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
-tcXExpr (ExpandedThingRn o e) res_ty
+tcHsExpansion :: HsExpansion GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcHsExpansion (HSE o e) res_ty
    = mkExpandedTc o <$> -- necessary for hpc ticks
          -- Need to call tcExpr and not tcApp
          -- as e can be let statement which tcApp cannot gracefully handle
          tcMonoLExpr e res_ty
-
--- For record selection, same as HsVar case
-tcXExpr xe res_ty = tcApp (XExpr xe) res_ty
-
 
 {-
 ************************************************************************

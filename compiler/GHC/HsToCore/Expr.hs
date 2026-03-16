@@ -307,7 +307,7 @@ dsExpr e@(XExpr ext_expr_tc)
       WrapExpr {}   -> dsApp e
       ConLikeTc {}  -> dsApp e
 
-      ExpandedThingTc _ e -> dsLExpr e
+      ExpandedThingTc (HSE _ e) -> dsLExpr e
 
       -- Hpc Support
       HsTick tickish e -> do
