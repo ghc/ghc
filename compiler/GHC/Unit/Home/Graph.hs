@@ -231,13 +231,13 @@ transitiveHomeDeps :: UnitId -> HomeUnitGraph -> Maybe [UnitId]
 transitiveHomeDeps uid hug = case lookupHugUnitId uid hug of
   Nothing -> Nothing
   Just hue -> Just $
-    Set.toList (loop (Set.singleton uid) (homeUnitDepends (homeUnitEnv_units hue)))
+    Set.toList (loop (Set.singleton uid) (Set.toList (homeUnitDepends (homeUnitEnv_units hue))))
     where
       loop acc [] = acc
       loop acc (uid:uids)
         | uid `Set.member` acc = loop acc uids
         | otherwise =
-          let hue = homeUnitDepends
+          let hue = Set.toList . homeUnitDepends
                     . homeUnitEnv_units
                     . expectJust
                     $ lookupHugUnitId uid hug
@@ -359,7 +359,7 @@ unitEnv_assocs (UnitEnvGraph x) = Map.assocs x
 hugSCCs :: HomeUnitGraph -> [SCC UnitId]
 hugSCCs hug = sccs where
   mkNode :: (UnitId, HomeUnitEnv) -> Node UnitId UnitId
-  mkNode (uid, hue) = DigraphNode uid uid (homeUnitDepends (homeUnitEnv_units hue))
+  mkNode (uid, hue) = DigraphNode uid uid (Set.toList (homeUnitDepends (homeUnitEnv_units hue)))
   nodes = map mkNode (Map.toList $ unitEnv_graph hug)
 
   sccs = stronglyConnCompFromEdgedVerticesOrd nodes
