@@ -180,7 +180,8 @@ runQinGHCiQ (TH.Q m) = GHCiQ $ \sRef -> m (runInIO sRef) metaHandlersGHCiQ
     runInIO sRef (GHCiQ m) = m sRef
 
 metaHandlersGHCiQ = TH.MetaHandlers {
-    mNewName = \str -> ghcCmd (NewName str)
+    mFail = fail
+  , mNewName = \str -> ghcCmd (NewName str)
   , mReport = \isError msg -> ghcCmd (Report isError msg)
 
   -- See Note [TH recover with -fexternal-interpreter] in GHC.Tc.Gen.Splice

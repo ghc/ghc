@@ -184,7 +184,8 @@ instance Quasi IO where
 
 metaHandlersIO :: MetaHandlers IO
 metaHandlersIO  = MetaHandlers {
-   mNewName = newNameIO
+    mFail = fail
+  , mNewName = newNameIO
   , mReport = \b msg ->
      if b then
        hPutStrLn stderr ("Template Haskell error: " ++ msg)
@@ -221,8 +222,9 @@ instance Quote IO where
   newName = newNameIO
 
 data MetaHandlers m = MetaHandlers {
+    mFail :: forall a. String -> m a
     -- | Fresh names. See 'newName'.
-    mNewName :: String -> m Name
+    , mNewName :: String -> m Name
 
     ------- Error reporting and recovery -------
     -- | Report an error (True) or warning (False)
@@ -351,7 +353,7 @@ instance Monad Q where
   (>>) = (*>)
 
 instance MonadFail Q where
-  fail s     = report True s >> Q (\_ _ -> fail "Q monad failure")
+  fail s     = report True s >> Q (\r h -> r $ mFail h "Q monad failure")
 
 instance Functor Q where
   fmap f (Q x) = Q $ \r h -> fmap f (x r h)

@@ -1559,9 +1559,10 @@ location = do { m <- getModule
 
 metaHandlersTcM :: TH.MetaHandlers TcM
 metaHandlersTcM = TH.MetaHandlers {
-    mNewName = \s -> do { u <- newUnique
-                    ; let i = toInteger (getKey u)
-                    ; return (TH.mkNameU s i) }
+    mFail = fail
+    , mNewName = \s -> do { u <- newUnique
+                      ; let i = toInteger (getKey u)
+                      ; return (TH.mkNameU s i) }
 
     -- 'msg' is forced to ensure exceptions don't escape,
     -- see Note [Exceptions in TH]
