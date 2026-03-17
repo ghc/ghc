@@ -1070,6 +1070,7 @@ data WarningFlag =
    | Opt_WarnDeprecatedTypeAbstractions              -- Since 9.10
    | Opt_WarnDefaultedExceptionContext               -- Since 9.10
    | Opt_WarnViewPatternSignatures                   -- Since 9.12
+   | Opt_WarnSemaphoreOpenFailure                   -- Since 10.0.1
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1187,6 +1188,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnDeprecatedTypeAbstractions              -> "deprecated-type-abstractions" :| []
   Opt_WarnDefaultedExceptionContext               -> "defaulted-exception-context" :| []
   Opt_WarnViewPatternSignatures                   -> "view-pattern-signatures" :| []
+  Opt_WarnSemaphoreOpenFailure                   -> "semaphore-open-failure" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -1328,7 +1330,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnInconsistentFlags,
         Opt_WarnDataKindsTC,
         Opt_WarnTypeEqualityOutOfScope,
-        Opt_WarnViewPatternSignatures
+        Opt_WarnViewPatternSignatures,
+        Opt_WarnSemaphoreOpenFailure
       ]
 
 -- | Things you get with -W

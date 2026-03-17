@@ -288,6 +288,20 @@ instance Outputable GhcHint where
         (hsep [text "deriving", ppr strat, text "instance", ppr deriv_sig])
     SuggestParenthesizePatternRHS
       -> text "Parenthesize the RHS of the view pattern"
+    SuggestUpgradeForSemaphoreVersionMismatch target required
+      -> case target of
+           UpgradeCabalInstall ->
+                 text "The cabal-install jobserver uses an older semaphore protocol."
+              $$ (text "Upgrade cabal-install to a version that supports semaphore protocol v"
+                  <> int required <> text " to resolve this.")
+           UpgradeJobserver ->
+                 text "The jobserver uses an older semaphore protocol."
+              $$ (text "Upgrade it to a version that supports semaphore protocol v"
+                  <> int required <> text " to resolve this.")
+           UpgradeGHC ->
+                 text "The jobserver uses a newer semaphore protocol than this GHC."
+              $$ (text "Upgrade GHC to a version that supports semaphore protocol v"
+                  <> int required <> text " to resolve this.")
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

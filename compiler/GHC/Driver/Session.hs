@@ -273,6 +273,8 @@ import GHC.Parser.Lexer (mkParserOpts, initParserState, P(..), ParseResult(..))
 
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
+import System.Semaphore ( getSemaphoreProtocolVersion, semaphoreVersion )
+
 import Data.IORef
 import Control.Arrow ((&&&))
 import Control.Monad
@@ -2349,6 +2351,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnDeprecatedTypeAbstractions -> warnSpec x
   Opt_WarnDefaultedExceptionContext -> warnSpec x
   Opt_WarnViewPatternSignatures -> warnSpec x
+  Opt_WarnSemaphoreOpenFailure -> warnSpec x
 
 warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]
 warningGroupsDeps = map mk warningGroups
@@ -3417,6 +3420,8 @@ compilerInfo dflags
        ("Support dynamic-too",         showBool $ not isWindows),
        -- Whether or not we support the @-j@ flag with @--make@.
        ("Support parallel --make",     "YES"),
+       -- The semaphore protocol version supported by @-jsem@.
+       ("Semaphore version",           show (getSemaphoreProtocolVersion semaphoreVersion)),
        -- Whether or not we support "Foo from foo-0.1-XXX:Foo" syntax in
        -- installed package info.
        ("Support reexported-modules",  "YES"),
