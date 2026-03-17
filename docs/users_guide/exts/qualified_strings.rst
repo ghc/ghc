@@ -15,3 +15,10 @@ The ``-XQualifiedStrings`` extension allows string literals to be qualified usin
 This allows more precise control over the ``fromString`` function than :extension:`OverloadedStrings`, which overloads all string literals for an entire module.
 
 If :extension:`MultilineStrings` is also enabled, ``M."""test"""`` will also work, desugaring the multiline string first, then the qualified string literal.
+
+Laws
+~~~~
+
+If the following expression typechecks, it should hold:
+
+* ``Data.String.fromString "str" == M."str"``
