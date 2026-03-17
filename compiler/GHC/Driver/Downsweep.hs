@@ -56,7 +56,7 @@ import GHC.Data.Graph.Directed
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
 import qualified GHC.Data.Maybe as M
-import GHC.Data.OsPath     ( unsafeEncodeUtf )
+import GHC.Data.OsPath     ( OsPath, unsafeEncodeUtf )
 import GHC.Data.StringBuffer
 import GHC.Data.Graph.Directed.Reachability
 import qualified GHC.LanguageExtensions as LangExt
@@ -216,9 +216,9 @@ downsweep hsc_env diag_wrapper msg old_summaries excl_mods allow_dup_roots = do
     -- file was used in.
     -- Reuse these if we can because the most expensive part of downsweep is
     -- reading the headers.
-    old_summary_map :: M.Map (UnitId, FilePath) ModSummary
+    old_summary_map :: M.Map (UnitId, OsPath) ModSummary
     old_summary_map =
-      M.fromList [((ms_unitid ms, msHsFilePath ms), ms) | ms <- old_summaries]
+      M.fromList [((ms_unitid ms, msHsFileOsPath ms), ms) | ms <- old_summaries]
 
     -- Dependencies arising on a unit (backpack and module linking deps)
     unitModuleNodes :: [ModuleGraphNode] -> UnitId -> HomeUnitEnv -> [Either (Messages DriverMessage) ModuleGraphNode]
@@ -384,7 +384,7 @@ data DownsweepMode = DownsweepUseCompile | DownsweepUseFixed
 -- This function will start at the given roots, and traverse downwards to find
 -- all the dependencies, all the way to the leaf units.
 downsweepFromRootNodes :: HscEnv
-                  -> M.Map (UnitId, FilePath) ModSummary
+                  -> M.Map (UnitId, OsPath) ModSummary
                   -> [ModuleName]
                   -> Bool
                   -> DownsweepMode -- ^ Whether to create fixed or compile nodes for dependencies
@@ -442,7 +442,7 @@ type DownsweepM a = ReaderT DownsweepEnv IO a
 data DownsweepEnv = DownsweepEnv {
       downsweep_hsc_env :: HscEnv
     , _downsweep_mode :: DownsweepMode
-    , _downsweep_old_summaries :: M.Map (UnitId, FilePath) ModSummary
+    , _downsweep_old_summaries :: M.Map (UnitId, OsPath) ModSummary
     , _downsweep_excl_mods :: [ModuleName]
 }
 
@@ -715,7 +715,7 @@ linkNodes summaries uid hue =
 
 getRootSummary ::
   [ModuleName] ->
-  M.Map (UnitId, FilePath) ModSummary ->
+  M.Map (UnitId, OsPath) ModSummary ->
   HscEnv ->
   Target ->
   IO (Either DriverMessages ModSummary)
@@ -1183,7 +1183,7 @@ mkRootMap summaries = Map.fromListWith (flip (++))
 summariseFile
         :: HscEnv
         -> HomeUnit
-        -> M.Map (UnitId, FilePath) ModSummary    -- old summaries
+        -> M.Map (UnitId, OsPath) ModSummary    -- old summaries
         -> FilePath                     -- source file name
         -> Maybe Phase                  -- start phase
         -> Maybe (StringBuffer,UTCTime)
@@ -1192,7 +1192,7 @@ summariseFile
 summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
         -- we can use a cached summary if one is available and the
         -- source file hasn't changed,
-   | Just old_summary <- M.lookup (homeUnitId home_unit, src_fn) old_summaries
+   | Just old_summary <- M.lookup (homeUnitId home_unit, src_fn_os) old_summaries
    = do
         let location = ms_location $ old_summary
 
@@ -1213,6 +1213,7 @@ summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
   where
     -- change the main active unit so all operations happen relative to the given unit
     hsc_env = hscSetActiveHomeUnit home_unit hsc_env'
+    src_fn_os = unsafeEncodeUtf src_fn
     -- src_fn does not necessarily exist on the filesystem, so we need to
     -- check what kind of target we are dealing with
     get_src_hash = case maybe_buf of
@@ -1302,7 +1303,7 @@ data SummariseResult =
 -- --make mode.
 summariseModule :: HscEnv
                 -> HomeUnit
-                -> M.Map (UnitId, FilePath) ModSummary
+                -> M.Map (UnitId, OsPath) ModSummary
                 -> IsBootInterface
                 -> Located ModuleName
                 -> PkgQual
@@ -1382,7 +1383,7 @@ summariseModuleDispatch k hsc_env' home_unit is_boot (L _ wanted_mod) mb_pkg exc
 -- for it and potentially compile it.
 summariseModuleWithSource
           :: HomeUnit
-          -> M.Map (UnitId, FilePath) ModSummary
+          -> M.Map (UnitId, OsPath) ModSummary
           -- ^ Map of old summaries
           -> IsBootInterface    -- True <=> a {-# SOURCE #-} import
           -> Maybe (StringBuffer, UTCTime)
@@ -1411,7 +1412,7 @@ summariseModuleWithSource home_unit old_summary_map is_boot maybe_buf hsc_env lo
   where
     dflags    = hsc_dflags hsc_env
     new_summary_cache_check loc mod src_fn h
-      | Just old_summary <- Map.lookup ((toUnitId (moduleUnit mod), src_fn)) old_summary_map =
+      | Just old_summary <- Map.lookup ((toUnitId (moduleUnit mod), src_fn_os)) old_summary_map =
 
          -- check the hash on the source file, and
          -- return the cached summary if it hasn't changed.  If the
@@ -1422,6 +1423,8 @@ summariseModuleWithSource home_unit old_summary_map is_boot maybe_buf hsc_env lo
            Nothing    ->
                checkSummaryHash hsc_env (new_summary loc mod src_fn) old_summary loc h
       | otherwise = new_summary loc mod src_fn h
+      where
+        src_fn_os = unsafeEncodeUtf src_fn
 
     new_summary :: ModLocation
                   -> Module
