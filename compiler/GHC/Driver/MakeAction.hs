@@ -28,16 +28,39 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.Messager
 import GHC.Driver.MakeSem
 
+#if defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH)
+import System.Semaphore
+  ( SemaphoreIdentifier )
+#else
+import System.Semaphore
+  ( SemaphoreError, SemaphoreIdentifier )
+#endif
+
+#if !(defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH))
+import GHC.Driver.Config.Diagnostic ( initDiagOpts, initPrintConfig )
+import GHC.Driver.Errors ( printOrThrowDiagnostics )
+import GHC.Types.Error ( singleMessage )
+import GHC.Types.SrcLoc ( noSrcSpan )
+import GHC.Utils.Error ( mkPlainMsgEnvelope )
+#endif
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
+#if defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH)
+import Control.Concurrent ( ThreadId, killThread, forkIOWithUnmask )
+#else
 import Control.Concurrent ( newQSem, waitQSem, signalQSem, ThreadId, killThread, forkIOWithUnmask )
+#endif
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
 import Control.Monad
 import qualified Control.Monad.Catch as MC
 
+#if defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH)
+import GHC.Conc ( getNumProcessors )
+#else
 import GHC.Conc ( getNumProcessors, getNumCapabilities, setNumCapabilities )
+#endif
 import Control.Monad.Trans.Reader
 import GHC.Driver.Pipeline.LogQueue
 import Control.Concurrent.STM
@@ -49,7 +72,7 @@ mkWorkerLimit :: DynFlags -> IO WorkerLimit
 mkWorkerLimit dflags =
   case parMakeCount dflags of
     Nothing -> pure $ num_procs 1
-    Just (ParMakeSemaphore h) -> pure (JSemLimit (SemaphoreName h))
+    Just (ParMakeSemaphore h) -> pure (JSemLimit h)
     Just ParMakeNumProcessors -> num_procs <$> getNumProcessors
     Just (ParMakeThisMany n) -> pure $ num_procs n
   where
@@ -65,8 +88,8 @@ isWorkerLimitSequential (JSemLimit {})         = False
 data WorkerLimit
   = NumProcessorsLimit Int
   | JSemLimit
-    SemaphoreName
-      -- ^ Semaphore name to use
+    SemaphoreIdentifier
+      -- ^ Semaphore identifier from @-jsem@
   deriving Eq
 
 -- | Environment used when compiling a module
@@ -106,6 +129,7 @@ runSeqPipelines plugin_hsc_env diag_wrapper mHscMessager all_pipelines =
                     }
   in runAllPipelines (NumProcessorsLimit 1) env all_pipelines
 
+#if !(defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH))
 runNjobsAbstractSem :: Int -> (AbstractSem -> IO a) -> IO a
 runNjobsAbstractSem n_jobs action = do
   compile_sem <- newQSem n_jobs
@@ -122,17 +146,26 @@ runNjobsAbstractSem n_jobs action = do
     resetNumCapabilities = set_num_caps n_capabilities
   MC.bracket_ updNumCapabilities resetNumCapabilities $ action asem
 
-runWorkerLimit :: WorkerLimit -> (AbstractSem -> IO a) -> IO a
-#if defined(wasm32_HOST_ARCH)
-runWorkerLimit _ action = do
+#endif
+
+runWorkerLimit :: Logger -> DynFlags -> WorkerLimit -> (AbstractSem -> IO a) -> IO a
+#if defined(wasm32_HOST_ARCH) || defined(javascript_HOST_ARCH)
+runWorkerLimit _logger _dflags _ action = do
   lock <- newMVar ()
   action $ AbstractSem (takeMVar lock) (putMVar lock ())
 #else
-runWorkerLimit worker_limit action = case worker_limit of
+runWorkerLimit logger dflags worker_limit action = case worker_limit of
     NumProcessorsLimit n_jobs ->
       runNjobsAbstractSem n_jobs action
-    JSemLimit sem ->
-      runJSemAbstractSem sem action
+    JSemLimit sem_ident -> do
+      result <- MC.try @_ @SemaphoreError $ runJSemAbstractSem sem_ident action
+      case result of
+        Right a -> return a
+        Left err -> do
+          let diag = DriverSemaphoreOpenFailure (checkBuildingCabalPackage dflags) err
+              msg  = singleMessage $ mkPlainMsgEnvelope (initDiagOpts dflags) noSrcSpan diag
+          printOrThrowDiagnostics logger (initPrintConfig dflags) (initDiagOpts dflags) (GhcDriverMessage <$> msg)
+          runNjobsAbstractSem 1 action
 #endif
 
 -- | Build and run a pipeline
@@ -159,7 +192,7 @@ runParPipelines worker_limit plugin_hsc_env diag_wrapper mHscMessager all_pipeli
   thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger plugin_hsc_env)
   let thread_safe_hsc_env = plugin_hsc_env { hsc_logger = thread_safe_logger }
 
-  runWorkerLimit worker_limit $ \abstract_sem -> do
+  runWorkerLimit (hsc_logger plugin_hsc_env) (hsc_dflags plugin_hsc_env) worker_limit $ \abstract_sem -> do
     let env = MakeEnv { hsc_env = thread_safe_hsc_env
                       , withLogger = withParLog log_queue_queue_var
                       , compile_sem = abstract_sem

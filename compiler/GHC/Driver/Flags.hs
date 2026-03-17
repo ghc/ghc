@@ -1115,6 +1115,7 @@ data WarningFlag =
    | Opt_WarnUnusableUnpackPragmas                   -- ^ @since 9.14
    | Opt_WarnPatternNamespaceSpecifier               -- ^ @since 9.14
    | Opt_WarnUnrecognisedModifiers                   -- ^ @since 10.0
+   | Opt_WarnSemaphoreOpenFailure                   -- Since 10.0.1
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1237,6 +1238,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnUnusableUnpackPragmas                   -> "unusable-unpack-pragmas" :| []
   Opt_WarnPatternNamespaceSpecifier               -> "pattern-namespace-specifier" :| []
   Opt_WarnUnrecognisedModifiers                   -> "unrecognised-modifiers" :| []
+  Opt_WarnSemaphoreOpenFailure                   -> "semaphore-open-failure" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -1383,7 +1385,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnDeprecatedPragmas,
         Opt_WarnRuleLhsEqualities,
         Opt_WarnUnusableUnpackPragmas,
-        Opt_WarnUnrecognisedModifiers
+        Opt_WarnUnrecognisedModifiers,
+        Opt_WarnSemaphoreOpenFailure
       ]
 
 -- | Things you get with @-W@.
