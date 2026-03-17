@@ -1,6 +1,8 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ImplicitPrelude #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | Small-array
 module GHC.Data.SmallArray
@@ -13,8 +15,14 @@ module GHC.Data.SmallArray
   , indexSmallArray
   , sizeofSmallArray
   , listToArray
+  , smallArrayFromList
+  , smallArrayToList
   , mapSmallArray
   , foldMapSmallArray
+  , replicateSmallArrayIO
+  , mapSmallArrayIO
+  , mapSmallArrayM_
+  , imapSmallArrayM_
   , rnfSmallArray
 
   -- * IO Operations
@@ -26,18 +34,30 @@ module GHC.Data.SmallArray
 where
 
 import GHC.Exts
-import GHC.Prelude
 import GHC.IO
 import GHC.ST
-import GHC.Utils.Binary
 import Control.DeepSeq
+import Control.Monad
+import Data.Binary
 import Data.Foldable
+import Data.List (unfoldr)
 
 data SmallArray a = SmallArray (SmallArray# a)
 
 data SmallMutableArray s a = SmallMutableArray (SmallMutableArray# s a)
 
 type SmallMutableArrayIO a = SmallMutableArray RealWorld a
+
+instance Binary a => Binary (SmallArray a) where
+  put sa = put (sizeofSmallArray sa) *> foldMapSmallArray put sa
+
+  get = do
+    n <- get
+    smallArrayFromList <$> replicateM n get
+
+
+instance Show a => Show (SmallArray a) where
+  showsPrec p = showsPrec p . smallArrayToList
 
 newSmallArray
   :: Int  -- ^ size
@@ -142,6 +162,45 @@ foldMapSmallArray f sa = go 0
       | i < n = f (indexSmallArray sa i) `mappend` go (i + 1)
       | otherwise = mempty
 
+-- | Execute the 'IO' action the given number of times and store the
+-- results in a 'SmallArray'.
+{-# INLINE replicateSmallArrayIO #-}
+replicateSmallArrayIO :: Int -> IO a -> IO (SmallArray a)
+replicateSmallArrayIO n m = do
+  arr <- newSmallArrayIO n undefined
+  let go i
+        | i < n = do
+            writeSmallArrayIO arr i =<< m
+            go $ succ i
+        | otherwise = pure ()
+  go 0
+  unsafeFreezeSmallArrayIO arr
+
+-- | Apply the 'IO' action to every element, producing a new
+-- 'SmallArray'.
+{-# INLINE mapSmallArrayIO #-}
+mapSmallArrayIO :: (a -> IO b) -> SmallArray a -> IO (SmallArray b)
+mapSmallArrayIO f sa = do
+  ma <- newSmallArrayIO (sizeofSmallArray sa) undefined
+  flip imapSmallArrayM_ sa $ \i v -> writeSmallArrayIO ma i =<< f v
+  unsafeFreezeSmallArrayIO ma
+
+-- | Apply the monadic action to every element, ignoring the results.
+{-# INLINE mapSmallArrayM_ #-}
+mapSmallArrayM_ :: Applicative f => (a -> f b) -> SmallArray a -> f ()
+mapSmallArrayM_ f = imapSmallArrayM_ (\_ v -> f v)
+
+-- | Apply the monadic action to every element and its index, ignoring
+-- the results.
+{-# INLINE imapSmallArrayM_ #-}
+imapSmallArrayM_ :: Applicative f => (Int -> a -> f b) -> SmallArray a -> f ()
+imapSmallArrayM_ f sa = go 0
+  where
+    n = sizeofSmallArray sa
+    go i
+      | i < n = f i (indexSmallArray sa i) *> go (succ i)
+      | otherwise = pure ()
+
 -- | Force the elements of the given 'SmallArray'
 --
 rnfSmallArray :: NFData a => SmallArray a -> ()
@@ -169,16 +228,27 @@ listToArray (I# size) index_of value_of xs = runST $ ST \s ->
       s'' -> case unsafeFreezeSmallArray# ma s'' of
         (# s''', a #) -> (# s''', SmallArray a #)
 
-instance (Binary a) => Binary (SmallArray a) where
-  get bh = do
-    len <- get bh
-    ma <- newSmallArrayIO len undefined
-    for_ [0 .. len - 1] $ \i -> do
-      a <- get bh
-      writeSmallArrayIO ma i a
-    unsafeFreezeSmallArrayIO ma
+-- | Construct a 'SmallArray' from a list. This is different from
+-- 'listToArray' since the list elements fill the 'SmallArray'
+-- sequentially without recalculating the indices or remapping to
+-- other element types.
+{-# INLINE smallArrayFromList #-}
+smallArrayFromList :: [a] -> SmallArray a
+smallArrayFromList vs = runST $ ST $ \s0 ->
+  case newSmallArray (length vs) undefined s0 of
+    (# s1, ma #) ->
+      case foldlM (\i v -> ST $ \s0 ->
+        case writeSmallArray ma i v s0 of
+          s1 -> (# s1, succ i #)) 0 vs of
+            ST m -> case m s1 of
+              (# s2, _ #) -> unsafeFreezeSmallArray ma s2
 
-  put_ bh sa = do
-    let len = sizeofSmallArray sa
-    put_ bh len
-    for_ [0 .. len - 1] $ \i -> put_ bh $ sa `indexSmallArray` i
+-- | Construct a list from a 'SmallArray'.
+{-# INLINE smallArrayToList #-}
+smallArrayToList :: SmallArray a -> [a]
+smallArrayToList sa = unfoldr go 0
+  where
+    n = sizeofSmallArray sa
+    go i
+      | i < n = Just (indexSmallArray sa i, succ i)
+      | otherwise = Nothing

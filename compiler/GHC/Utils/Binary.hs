@@ -132,6 +132,7 @@ import GHC.Data.FastMutInt
 import GHC.Utils.Fingerprint
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import GHC.Data.SmallArray
 import qualified GHC.Data.Strict as Strict
 import GHC.Utils.Outputable( JoinPointHood(..) )
 import GHCi.FFI
@@ -974,6 +975,15 @@ instance (Ix a, Binary a, Binary b) => Binary (Array a b) where
         bounds <- get bh
         xs <- get bh
         return $ listArray bounds xs
+
+instance Binary a => Binary (SmallArray a) where
+    put_ bh sa = do
+        put_ bh $ sizeofSmallArray sa
+        mapSmallArrayM_ (put_ bh) sa
+
+    get bh = do
+        n <- get bh
+        replicateSmallArrayIO n $ get bh
 
 instance (Binary a, Binary b) => Binary (a,b) where
     put_ bh (a,b) = do put_ bh a; put_ bh b

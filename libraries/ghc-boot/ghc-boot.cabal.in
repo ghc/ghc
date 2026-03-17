@@ -45,7 +45,7 @@ Flag bootstrap
         Manual: True
 
 Library
-    default-language: Haskell2010
+    default-language: GHC2024
     other-extensions: DeriveGeneric, RankNTypes, ScopedTypeVariables
     default-extensions: NoImplicitPrelude
 
@@ -53,6 +53,7 @@ Library
             GHC.BaseDir
             GHC.Data.ShortText
             GHC.Data.SizedSeq
+            GHC.Data.SmallArray
             GHC.Utils.Encoding
             GHC.Utils.Encoding.UTF8
             GHC.LanguageExtensions
