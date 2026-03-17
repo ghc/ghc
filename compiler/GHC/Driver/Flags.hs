@@ -714,6 +714,7 @@ data WarningFlag =
    | Opt_WarnDataKindsTC                             -- Since 9.10
    | Opt_WarnDeprecatedTypeAbstractions              -- Since 9.10
    | Opt_WarnDefaultedExceptionContext               -- Since 9.10
+   | Opt_WarnSemaphoreOpenFailure                    -- Since 9.10.4
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -830,6 +831,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnDataKindsTC                             -> "data-kinds-tc" :| []
   Opt_WarnDeprecatedTypeAbstractions              -> "deprecated-type-abstractions" :| []
   Opt_WarnDefaultedExceptionContext               -> "defaulted-exception-context" :| []
+  Opt_WarnSemaphoreOpenFailure                    -> "semaphore-open-failure" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -970,7 +972,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnTypeEqualityRequiresOperators,
         Opt_WarnInconsistentFlags,
         Opt_WarnDataKindsTC,
-        Opt_WarnTypeEqualityOutOfScope
+        Opt_WarnTypeEqualityOutOfScope,
+        Opt_WarnSemaphoreOpenFailure
       ]
 
 -- | Things you get with -W

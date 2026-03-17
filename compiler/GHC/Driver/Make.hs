@@ -66,6 +66,9 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.Main
 import GHC.Driver.MakeSem
 
+import System.Semaphore
+  ( SemaphoreError, SemaphoreIdentifier )
+
 import GHC.Parser.Header
 
 import GHC.Iface.Load      ( cannotFindModule )
@@ -665,7 +668,7 @@ mkWorkerLimit :: DynFlags -> IO WorkerLimit
 mkWorkerLimit dflags =
   case parMakeCount dflags of
     Nothing -> pure $ num_procs 1
-    Just (ParMakeSemaphore h) -> pure (JSemLimit (SemaphoreName h))
+    Just (ParMakeSemaphore h) -> pure (JSemLimit h)
     Just ParMakeNumProcessors -> num_procs <$> getNumProcessors
     Just (ParMakeThisMany n) -> pure $ num_procs n
   where
@@ -681,8 +684,8 @@ isWorkerLimitSequential (JSemLimit {})         = False
 data WorkerLimit
   = NumProcessorsLimit Int
   | JSemLimit
-    SemaphoreName
-      -- ^ Semaphore name to use
+    SemaphoreIdentifier
+      -- ^ Semaphore identifier from @-jsem@
   deriving Eq
 
 -- | Generalized version of 'load' which also supports a custom
@@ -2900,12 +2903,19 @@ runNjobsAbstractSem n_jobs action = do
     resetNumCapabilities = set_num_caps n_capabilities
   MC.bracket_ updNumCapabilities resetNumCapabilities $ action asem
 
-runWorkerLimit :: WorkerLimit -> (AbstractSem -> IO a) -> IO a
-runWorkerLimit worker_limit action = case worker_limit of
+runWorkerLimit :: Logger -> DynFlags -> WorkerLimit -> (AbstractSem -> IO a) -> IO a
+runWorkerLimit logger dflags worker_limit action = case worker_limit of
     NumProcessorsLimit n_jobs ->
       runNjobsAbstractSem n_jobs action
-    JSemLimit sem ->
-      runJSemAbstractSem sem action
+    JSemLimit sem_ident -> do
+      result <- MC.try @_ @SemaphoreError $ runJSemAbstractSem sem_ident action
+      case result of
+        Right a -> return a
+        Left err -> do
+          let diag = DriverSemaphoreOpenFailure (checkBuildingCabalPackage dflags) err
+              msg  = singleMessage $ mkPlainMsgEnvelope (initDiagOpts dflags) noSrcSpan diag
+          printOrThrowDiagnostics logger (initPrintConfig dflags) (initDiagOpts dflags) (GhcDriverMessage <$> msg)
+          runNjobsAbstractSem 1 action
 
 -- | Build and run a pipeline
 runParPipelines :: WorkerLimit -- ^ How to limit work parallelism
@@ -2931,7 +2941,7 @@ runParPipelines worker_limit plugin_hsc_env diag_wrapper mHscMessager all_pipeli
   thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger plugin_hsc_env)
   let thread_safe_hsc_env = plugin_hsc_env { hsc_logger = thread_safe_logger }
 
-  runWorkerLimit worker_limit $ \abstract_sem -> do
+  runWorkerLimit (hsc_logger plugin_hsc_env) (hsc_dflags plugin_hsc_env) worker_limit $ \abstract_sem -> do
     let env = MakeEnv { hsc_env = thread_safe_hsc_env
                       , withLogger = withParLog log_queue_queue_var
                       , compile_sem = abstract_sem

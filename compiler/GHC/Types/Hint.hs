@@ -10,6 +10,7 @@ module GHC.Types.Hint (
   , SimilarName(..)
   , StarIsType(..)
   , UntickedPromotedThing(..)
+  , SemaphoreUpgradeTarget(..)
   , pprUntickedConstructor, isBareSymbol
   , suggestExtension
   , suggestExtensionWithInfo
@@ -476,6 +477,28 @@ data GhcHint
 
   {-| Suggest binding explicitly; e.g   data T @k (a :: F k) = .... -}
   | SuggestBindTyVarExplicitly Name
+
+  {-| Suggest upgrading either the @-jsem@ jobserver or GHC itself to
+      support the given semaphore protocol version.
+
+      Triggered by 'GHC.Driver.Errors.Types.DriverSemaphoreOpenFailure'
+      carrying a 'System.Semaphore.SemaphoreIncompatibleVersion'.
+  -}
+  | SuggestUpgradeForSemaphoreVersionMismatch !SemaphoreUpgradeTarget !Int
+    -- ^ The 'Int' is the required protocol version.
+
+-- | What the user should upgrade to resolve an @-jsem@ semaphore
+--   protocol version mismatch.
+data SemaphoreUpgradeTarget
+  = UpgradeCabalInstall
+    -- ^ Jobserver is @cabal-install@ (we are building a Cabal package)
+    --   and speaks an older protocol than GHC.
+  | UpgradeJobserver
+    -- ^ Jobserver (not @cabal-install@) speaks an older protocol than
+    --   GHC.
+  | UpgradeGHC
+    -- ^ Jobserver speaks a newer protocol than GHC.
+  deriving (Eq, Show)
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

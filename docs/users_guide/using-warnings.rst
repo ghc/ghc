@@ -2611,6 +2611,23 @@ of ``-W(no-)*``.
     evidence is available. As this behavior may result in dropped exception context
     this warning is provided to give notice when defaulting occurs.
 
+.. ghc-flag:: -Wsemaphore-open-failure
+    :shortdesc: warn when GHC cannot open the ``-jsem`` semaphore.
+    :type: dynamic
+    :reverse: -Wno-semaphore-open-failure
+    :category:
+
+    :since: 9.10.4
+
+    Warn when GHC is invoked with :ghc-flag:`-jsem` but the semaphore
+    cannot be opened (e.g. the socket does not exist, the protocol
+    version is incompatible, or a system error occurred).  When this
+    occurs, GHC ignores ``-jsem`` and compiles modules sequentially.
+
+    A common cause is ``cabal-install`` and GHC being built against
+    different versions of the ``semaphore-compat`` library; upgrading
+    both to versions that use the same protocol resolves the mismatch.
+
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)

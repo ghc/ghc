@@ -1,0 +1,30 @@
+section: compiler
+issues: #25087
+mrs: !15729
+synopsis:
+  Update to semaphore-compat 2.0.0 (``-jsem`` protocol v2)
+description:
+  On Linux and other POSIX platforms, GHC's ``-jsem`` jobserver client
+  now speaks v2 of the semaphore-compat protocol, which uses Unix
+  domain sockets in place of POSIX named semaphores. This avoids the
+  libc-ABI issues that affected the old implementation. Windows is
+  unaffected and continues to use the v1 protocol (Win32 named
+  semaphores); its reported protocol version remains v1.
+
+  When GHC receives a ``-jsem`` name whose protocol version it does not
+  support, it now emits a ``-Wsemaphore-version-mismatch`` warning and
+  falls back to ``-j1`` rather than crashing. ``ghc --info`` exposes the
+  supported version in a new ``"Semaphore version"`` entry so
+  cabal-install can detect a mismatch before invoking GHC.
+
+  Users on a ``cabal-install`` that predates the v2 update will continue
+  to build successfully, but on Linux/POSIX will lose the cross-process
+  ``-jsem`` coordination and fall back to ``-j1`` per GHC invocation.
+  To recover full parallelism, upgrade to a ``cabal-install`` that
+  supports protocol v2.
+
+  See also:
+
+  - the `GHC proposal amendment <https://github.com/ghc-proposals/ghc-proposals/pull/673>`_
+  - the `cabal-install patch <https://github.com/haskell/cabal/pull/11628>`_
+  - the `semaphore-compat library MR <https://gitlab.haskell.org/ghc/semaphore-compat/-/merge_requests/8>`_

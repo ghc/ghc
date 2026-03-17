@@ -260,6 +260,20 @@ instance Outputable GhcHint where
     SuggestBindTyVarExplicitly tv
       -> text "bind" <+> quotes (ppr tv)
          <+> text "explicitly with" <+> quotes (char '@' <> ppr tv)
+    SuggestUpgradeForSemaphoreVersionMismatch target required
+      -> case target of
+           UpgradeCabalInstall ->
+                 text "The cabal-install jobserver uses an older semaphore protocol."
+              $$ (text "Upgrade cabal-install to a version that supports semaphore protocol v"
+                  <> int required <> text " to resolve this.")
+           UpgradeJobserver ->
+                 text "The jobserver uses an older semaphore protocol."
+              $$ (text "Upgrade it to a version that supports semaphore protocol v"
+                  <> int required <> text " to resolve this.")
+           UpgradeGHC ->
+                 text "The jobserver uses a newer semaphore protocol than this GHC."
+              $$ (text "Upgrade GHC to a version that supports semaphore protocol v"
+                  <> int required <> text " to resolve this.")
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

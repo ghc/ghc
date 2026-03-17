@@ -318,6 +318,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DriverPackageTrustIgnored"                     = 83552
   GhcDiagnosticCode "DriverUnrecognisedFlag"                        = 93741
   GhcDiagnosticCode "DriverDeprecatedFlag"                          = 53692
+  GhcDiagnosticCode "DriverSemaphoreOpenFailure"                    = 19877
 
   -- Constraint solver diagnostic codes
   GhcDiagnosticCode "BadTelescope"                                  = 97739
