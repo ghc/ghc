@@ -1623,8 +1623,11 @@ there are three reasons we might want to eta-expand:
 
 * Must eta-expand: if `f` is a `hasNoBinding` function, we must saturate
   it, because the function has no (curried) binding to call. Currently
-  this includes: foreign calls, unboxed tuple/sum constructors, and
-  representation-polymorphic primitives such as 'coerce' and 'unsafeCoerce#'.
+  this includes:
+     - foreign calls,
+     - unboxed tuple/sum constructors
+     - representation-polymorphic primitives such as 'coerce' and 'unsafeCoerce#'
+     - primops (for now anyway; see comments in `hasNoBinding`)
 
 * Must eta-expand: if `f` has a call-by-value calling convention, we /must/
   call it with evaluated arguments.  The back end deals with adding the
