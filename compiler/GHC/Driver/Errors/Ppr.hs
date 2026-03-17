@@ -28,6 +28,8 @@ import GHC.Types.Hint
 import GHC.Types.SrcLoc
 import Data.Version
 
+import System.Semaphore
+  ( SemaphoreError(..), getSemaphoreProtocolVersion )
 import Language.Haskell.Syntax.Decls (RuleDecl(..))
 import GHC.Tc.Errors.Types (TcRnMessage)
 import GHC.HsToCore.Errors.Types (DsMessage)
@@ -93,6 +95,20 @@ instance Diagnostic GhcMessage where
 
 instance HasDefaultDiagnosticOpts DriverMessageOpts where
   defaultOpts = DriverMessageOpts (defaultDiagnosticOpts @PsMessage) (defaultDiagnosticOpts @IfaceMessage)
+
+pprSemaphoreError :: SemaphoreError -> SDoc
+pprSemaphoreError = \case
+  SemaphoreAlreadyExists nm ->
+    text "a semaphore named" <+> quotes (text nm) <+> text "already exists"
+  SemaphoreDoesNotExist nm ->
+    text "no semaphore named" <+> quotes (text nm)
+  SemaphoreIncompatibleVersion got want ->
+    text "protocol version mismatch (got v"
+    <> int (getSemaphoreProtocolVersion got)
+    <> text ", supported v"
+    <> int (getSemaphoreProtocolVersion want) <> text ")"
+  SemaphoreOtherError ioe ->
+    text (show ioe)
 
 instance Diagnostic DriverMessage where
   type DiagnosticOpts DriverMessage = DriverMessageOpts
@@ -282,6 +298,10 @@ instance Diagnostic DriverMessage where
             ++ " and "
             ++ llvmVersionStr supportedLlvmVersionUpperBound
             ++ ") and reinstall GHC to ensure -fllvm works")
+    DriverSemaphoreOpenFailure _ err
+      -> mkSimpleDecorated $
+        text "Failed to open -jsem semaphore:" <+> pprSemaphoreError err <>
+        text "; ignoring -jsem and compiling sequentially."
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -353,6 +373,8 @@ instance Diagnostic DriverMessage where
       -> ErrorWithoutFlag
     DriverNoConfiguredLLVMToolchain
       -> WarningWithoutFlag
+    DriverSemaphoreOpenFailure {}
+      -> WarningWithFlag Opt_WarnSemaphoreOpenFailure
 
   diagnosticHints = \case
     DriverUnknownMessage m
@@ -425,6 +447,20 @@ instance Diagnostic DriverMessage where
     DriverInstantiationNodeInDependencyGeneration {}
       -> noHints
     DriverNoConfiguredLLVMToolchain
+      -> noHints
+    DriverSemaphoreOpenFailure buildingCabal (SemaphoreIncompatibleVersion received supported)
+      | received < supported
+      -> let required = getSemaphoreProtocolVersion supported
+             target = case buildingCabal of
+               YesBuildingCabalPackage -> UpgradeCabalInstall
+               NoBuildingCabalPackage  -> UpgradeJobserver
+         in [SuggestUpgradeForSemaphoreVersionMismatch target required]
+      | received > supported
+      -> [SuggestUpgradeForSemaphoreVersionMismatch
+            UpgradeGHC (getSemaphoreProtocolVersion received)]
+      | otherwise
+      -> noHints
+    DriverSemaphoreOpenFailure {}
       -> noHints
 
   diagnosticCode = constructorCode @GHC

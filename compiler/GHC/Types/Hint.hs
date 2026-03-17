@@ -12,6 +12,7 @@ module GHC.Types.Hint (
   , StarIsType(..)
   , UntickedPromotedThing(..)
   , AssumedDerivingStrategy(..)
+  , SemaphoreUpgradeTarget(..)
   , SigLike(..)
   , pprUntickedConstructor, isBareSymbol
   , suggestExtension
@@ -513,6 +514,29 @@ data GhcHint
 
   {-| Suggest using the `data` keyword -}
   | SuggestDataKeyword
+
+  {-| Suggest upgrading either the @-jsem@ jobserver or GHC itself to
+      support the given semaphore protocol version.
+
+      Triggered by 'GHC.Driver.Errors.Types.DriverSemaphoreOpenFailure'
+      carrying a 'System.Semaphore.SemaphoreIncompatibleVersion'.
+  -}
+  | SuggestUpgradeForSemaphoreVersionMismatch !SemaphoreUpgradeTarget !Int
+    -- ^ The 'Int' is the required protocol version.
+
+-- | What the user should upgrade to resolve an @-jsem@ semaphore
+--   protocol version mismatch.
+data SemaphoreUpgradeTarget
+  = UpgradeCabalInstall
+    -- ^ Jobserver is @cabal-install@ (we are building a Cabal package)
+    --   and speaks an older protocol than GHC.
+  | UpgradeJobserver
+    -- ^ Jobserver (not @cabal-install@) speaks an older protocol than
+    --   GHC.
+  | UpgradeGHC
+    -- ^ Jobserver speaks a newer protocol than GHC.
+  deriving (Eq, Show)
+
 
 -- | The deriving strategy that was assumed when not explicitly listed in the
 --   source. This is used solely by the missing-deriving-strategies warning.

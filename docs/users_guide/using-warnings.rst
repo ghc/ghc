@@ -2706,6 +2706,24 @@ of ``-W(no-)*``.
 
         import Data.List.NonEmpty (data (:|))
 
+.. ghc-flag:: -Wsemaphore-open-failure
+    :shortdesc: warn when GHC cannot open the ``-jsem`` semaphore.
+    :type: dynamic
+    :reverse: -Wno-semaphore-open-failure
+    :category:
+
+    :since: 9.14.2
+
+    Warn when GHC is invoked with :ghc-flag:`-jsem` but the semaphore
+    cannot be opened (e.g. the socket does not exist, the protocol
+    version is incompatible, or a system error occurred).  When this
+    occurs, GHC ignores ``-jsem`` and compiles modules sequentially.
+
+    A common cause is ``cabal-install`` and GHC being built against
+    different versions of the ``semaphore-compat`` library; upgrading
+    both to versions that use the same protocol resolves the mismatch.
+
+
 ----
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
