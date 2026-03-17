@@ -149,10 +149,6 @@ werror =
             -- unix has many unused imports
           , package unix
               ? mconcat [arg "-Wwarn=unused-imports", arg "-Wwarn=unused-top-binds"]
-            -- semaphore-compat relies on sem_getvalue as provided by unix, which is
-            -- not implemented on Darwin and therefore throws a deprecation warning
-          , package semaphoreCompat
-              ? mconcat [arg "-Wwarn=deprecations"]
           ]
     , builder Ghc
         ? package rts
