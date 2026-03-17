@@ -91,12 +91,17 @@ stgify :: ModSummary -> ModGuts -> Ghc [StgTopBinding]
 stgify summary guts = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
-    prepd_binds <- liftIO $ do
+    liftIO $ do
       cp_cfg <- initCorePrepConfig hsc_env
-      corePrepPgm (hsc_logger hsc_env) cp_cfg (initCorePrepPgmConfig dflags (interactiveInScope $ hsc_IC hsc_env)) this_mod core_binds
-    return $ fstOf3 $ coreToStg (initCoreToStgOpts dflags) (ms_mod summary) (ms_location summary) prepd_binds
-  where this_mod = mg_module guts
-        core_binds = mg_binds guts
+      prepd_binds <- corePrepPgm (hsc_logger hsc_env) cp_cfg
+                       (initCorePrepPgmConfig dflags (interactiveInScope $ hsc_IC hsc_env))
+                       this_mod core_binds
+      (binds, _, _) <- coreToStg (initCoreToStgOpts dflags) (ms_mod summary)
+                                 (ms_location summary) prepd_binds
+      return binds
+  where
+    this_mod = mg_module guts
+    core_binds = mg_binds guts
 
 slurpCmm :: HscEnv -> FilePath -> IO (CmmGroup)
 slurpCmm hsc_env filename = runHsc hsc_env $ do
