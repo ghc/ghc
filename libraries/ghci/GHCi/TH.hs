@@ -119,7 +119,7 @@ initQState :: Pipe -> QState
 initQState p = QState M.empty Nothing p
 
 -- | The monad in which we run TH computations on the server
-newtype GHCiQ a = GHCiQ { runGHCiQ :: QState -> IO (a, QState) }
+newtype GHCiQ a = GHCiQ { runGHCiQ :: IORef QState -> IO a }
 
 -- | The exception thrown by "fail" in the GHCiQ monad
 data GHCiQException = GHCiQException QState String
@@ -128,52 +128,56 @@ data GHCiQException = GHCiQException QState String
 instance Exception GHCiQException
 
 instance Functor GHCiQ where
-  fmap f (GHCiQ s) = GHCiQ $ fmap (\(x,s') -> (f x,s')) . s
+  fmap f (GHCiQ m) = GHCiQ $ fmap f . m
 
 instance Applicative GHCiQ where
   f <*> a = GHCiQ $ \s ->
-    do (f',s')  <- runGHCiQ f s
-       (a',s'') <- runGHCiQ a s'
-       return (f' a', s'')
-  pure x = GHCiQ (\s -> return (x,s))
+    do f'  <- runGHCiQ f s
+       a' <- runGHCiQ a s
+       return $ f' a'
+  pure x = GHCiQ $ \_ -> return x
 
 instance Monad GHCiQ where
   m >>= f = GHCiQ $ \s ->
-    do (m', s')  <- runGHCiQ m s
-       (a,  s'') <- runGHCiQ (f m') s'
-       return (a, s'')
+    do m'  <- runGHCiQ m s
+       a <- runGHCiQ (f m') s
+       return a
 
 instance MonadFail GHCiQ where
-  fail err  = GHCiQ $ \s -> throwIO (GHCiQException s err)
+  fail err  = GHCiQ $ \sRef -> readIORef sRef >>= \s -> throwIO (GHCiQException s err)
 
 getState :: GHCiQ QState
-getState = GHCiQ $ \s -> return (s,s)
+getState = GHCiQ $ \sRef -> readIORef sRef
 
 noLoc :: TH.Loc
 noLoc = TH.Loc "<no file>" "<no package>" "<no module>" (0,0) (0,0)
 
 -- | Send a 'THMessage' to GHC and return the result.
 ghcCmd :: Binary a => THMessage (THResult a) -> GHCiQ a
-ghcCmd m = GHCiQ $ \s -> do
+ghcCmd m = GHCiQ $ \sRef -> do
+  s <- readIORef sRef
   r <- remoteTHCall (qsPipe s) m
   case r of
     THException str -> throwIO (GHCiQException s str)
-    THComplete res -> return (res, s)
+    THComplete res -> return res
 
 instance MonadIO GHCiQ where
-  liftIO m = GHCiQ $ \s -> fmap (,s) m
+  liftIO m = GHCiQ $ \_ -> m
 
 instance TH.Quasi GHCiQ where
   qNewName str = ghcCmd (NewName str)
   qReport isError msg = ghcCmd (Report isError msg)
 
   -- See Note [TH recover with -fexternal-interpreter] in GHC.Tc.Gen.Splice
-  qRecover (GHCiQ h) a = GHCiQ $ \s -> mask $ \unmask -> do
+  qRecover (GHCiQ h) a = GHCiQ $ \sRef -> mask $ \unmask -> do
+    s <- readIORef sRef
     remoteTHCall (qsPipe s) StartRecover
-    e <- try $ unmask $ runGHCiQ (a <* ghcCmd FailIfErrs) s
+    e <- try $ unmask $ runGHCiQ (a <* ghcCmd FailIfErrs) sRef
     remoteTHCall (qsPipe s) (EndRecover (isLeft e))
     case e of
-      Left GHCiQException{} -> h s
+      Left GHCiQException{} ->
+        -- in case of error, restore the state to the start of the `recover` block.
+        newIORef s >>= h
       Right r -> return r
   qLookupName isType occ = ghcCmd (LookupName isType occ)
   qReify name = ghcCmd (Reify name)
@@ -200,15 +204,16 @@ instance TH.Quasi GHCiQ where
   qAddTempFile suffix = ghcCmd (AddTempFile suffix)
   qAddTopDecls decls = ghcCmd (AddTopDecls decls)
   qAddForeignFilePath lang fp = ghcCmd (AddForeignFilePath lang fp)
-  qAddModFinalizer fin = GHCiQ (\s -> mkRemoteRef fin >>= return . (, s)) >>=
+  qAddModFinalizer fin = GHCiQ (\_ -> mkRemoteRef fin) >>=
                          ghcCmd . AddModFinalizer
   qAddCorePlugin str = ghcCmd (AddCorePlugin str)
-  qGetQ = GHCiQ $ \s ->
+  qGetQ = do
+    s <- getState
     let lookup :: forall a. Typeable a => Map TypeRep Dynamic -> Maybe a
         lookup m = fromDynamic =<< M.lookup (typeOf (undefined::a)) m
-    in return (lookup (qsMap s), s)
-  qPutQ k = GHCiQ $ \s ->
-    return ((), s { qsMap = M.insert (typeOf k) (toDyn k) (qsMap s) })
+    return $ lookup (qsMap s)
+  qPutQ k = GHCiQ $ \sRef ->
+    modifyIORef' sRef (\s -> s { qsMap = M.insert (typeOf k) (toDyn k) (qsMap s) })
   qIsExtEnabled x = ghcCmd (IsExtEnabled x)
   qExtsEnabled = ghcCmd ExtsEnabled
   qPutDoc l s = ghcCmd (PutDoc l s)
@@ -231,7 +236,8 @@ runModFinalizerRefs pipe rstate qrefs = do
   qs <- mapM localRef qrefs
   qstateref <- localRef rstate
   qstate <- readIORef qstateref
-  _ <- runGHCiQ (TH.runQ $ sequence_ qs) qstate { qsPipe = pipe }
+  qstate' <- newIORef $ qstate { qsPipe = pipe }
+  _ <- runGHCiQ (TH.runQ $ sequence_ qs) qstate'
   return ()
 
 -- | The implementation of the 'RunTH' message
@@ -267,8 +273,6 @@ runTHQ
   -> IO ByteString
 runTHQ pipe rstate mb_loc ghciq = do
   qstateref <- localRef rstate
-  qstate <- readIORef qstateref
-  let st = qstate { qsLocation = mb_loc, qsPipe = pipe }
-  (r,new_state) <- runGHCiQ (TH.runQ ghciq) st
-  writeIORef qstateref new_state
+  modifyIORef' qstateref (\qstate -> qstate { qsLocation = mb_loc, qsPipe = pipe })
+  r <- runGHCiQ (TH.runQ ghciq) qstateref
   return $! LB.toStrict (runPut (put r))
