@@ -464,9 +464,12 @@ run_thread:
         // we've done the GC.  The thread running here might just be
         // the IO manager thread that handle_tick() woke up via
         // wakeUpRts().
+	// TODO: we may want to change this for in-RTS I/O managers.
         break;
     default:
         setRecentActivity(ACTIVITY_YES);
+	// avoid doing this if we were already in ACTIVITY_YES
+	// since setting it is an atomic cas, so is expensive.
     }
 
     traceEventRunThread(cap, t);

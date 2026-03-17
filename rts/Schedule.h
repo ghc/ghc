@@ -82,6 +82,43 @@ INLINE_HEADER enum SchedState getSchedState(void)
     return (enum SchedState) SEQ_CST_LOAD_ALWAYS(&sched_state);
 }
 
+/* Note [Recent activity]
+  ~~~~~~~~~~~~~~~~~~~~~~~
+
+Initial state: ACTIVITY_YES, in initScheduler
+
+In state ACTIVITY_YES:
+ - transition to ACTIVITY_MAYBE_NO, in Timer.c handle_tick()
+ - transition to ACTIVITY_YES if scheduler runs thread
+   (This transition uses setRecentActivity unnecessarily!)
+
+In state ACTIVITY_MAYBE_NO:
+ - transition to ACTIVITY_INACTIVE, if idle GC is on, in Timer.c handle_tick()
+   and also calls wakeUpRts() to interrupt I/O manager sleeping
+ - transition to ACTIVITY_DONE_GC, if idle GC is off, in Timer.c handle_tick()
+   and also calls stopTimer()
+ - transition to ACTIVITY_YES if scheduler runs thread
+ - transition to ACTIVITY_YES is GC completes
+   (perhaps the timer went off during GC and transitioned to ACTIVITY_MAYBE_NO
+    but still threads would be runnable)
+
+In state ACTIVITY_INACTIVE:
+ - remain in ACTIVITY_INACTIVE if the scheduler runs thread
+   (this is for behaviour in the library I/O managers, and could be avoided
+    for the in-RTS ones)
+ - transition to ACTIVITY_DONE_GC if scheduler has no runnable threads
+   performs deadlock detection GC, which calls stopTimer()
+   done in scheduleDoGC
+
+In state ACTIVITY_DONE_GC:
+ - transition to ACTIVITY_YES if scheduler runs thread
+   and call startTimer()
+
+Note that in the state ACTIVITY_DONE_GC, the timer is off. It is turned off on
+the transition to ACTIVITY_DONE_GC, in handle_tick() and turned on again in
+the transition to ACTIVITY_YES in the scheduler.
+
+
 /*
  * flag that tracks whether we have done any execution in this time
  * slice, and controls the disabling of the interval timer.
