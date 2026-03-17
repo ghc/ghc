@@ -72,6 +72,7 @@ import GHC.Driver.Config.Finder
 import GHC.Types.Unique.Set
 import qualified Data.List as L(sort)
 import Data.List.NonEmpty ( NonEmpty (..) )
+import qualified Data.Set as Set (toList)
 import qualified System.Directory as SD
 import qualified System.OsPath as OsPath
 import qualified Data.List.NonEmpty as NE
@@ -241,7 +242,7 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
                   Nothing -> ue_homeUnitState ue
                   Just home_unit -> HUG.homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
     hpt_deps :: [UnitId]
-    hpt_deps  = homeUnitDepends units
+    hpt_deps  = Set.toList (homeUnitDepends units)
     other_fopts  = map (\uid -> (uid, initFinderOpts (homeUnitEnv_dflags (ue_findHomeUnitEnv uid ue)))) hpt_deps
 
 -- | Locate a plugin module requested by the user, for a compiler
