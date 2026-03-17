@@ -164,60 +164,68 @@ ghcCmd m = GHCiQ $ \sRef -> do
 instance MonadIO GHCiQ where
   liftIO m = GHCiQ $ \s -> m
 
-instance TH.Quasi GHCiQ where
-  qNewName str = ghcCmd (NewName str)
-  qReport isError msg = ghcCmd (Report isError msg)
-
-  -- See Note [TH recover with -fexternal-interpreter] in GHC.Tc.Gen.Splice
-  qRecover (GHCiQ h) a = GHCiQ $ \sRef -> mask $ \unmask -> do
-    s <- readIORef sRef
-    remoteTHCall (qsPipe s) StartRecover
-    e <- try $ unmask $ runGHCiQ (a <* ghcCmd FailIfErrs) sRef
-    remoteTHCall (qsPipe s) (EndRecover (isLeft e))
-    case e of
-      Left GHCiQException{} ->
-        -- in case of error, restore the state to the start of the `recover` block.
-        newIORef s >>= h
-      Right r -> return r
-  qLookupName isType occ = ghcCmd (LookupName isType occ)
-  qReify name = ghcCmd (Reify name)
-  qReifyFixity name = ghcCmd (ReifyFixity name)
-  qReifyType name = ghcCmd (ReifyType name)
-  qReifyInstances name tys = ghcCmd (ReifyInstances name tys)
-  qReifyRoles name = ghcCmd (ReifyRoles name)
-
   -- To reify annotations, we send GHC the AnnLookup and also the
   -- TypeRep of the thing we're looking for, to avoid needing to
   -- serialize irrelevant annotations.
-  qReifyAnnotations :: forall a . Data a => TH.AnnLookup -> GHCiQ [a]
-  qReifyAnnotations lookup =
+reifyAnnotations :: forall a . Data a => TH.AnnLookup -> GHCiQ [a]
+reifyAnnotations lookup =
     map (deserializeWithData . B.unpack) <$>
       ghcCmd (ReifyAnnotations lookup typerep)
     where typerep = typeOf (undefined :: a)
 
-  qReifyModule m = ghcCmd (ReifyModule m)
-  qReifyConStrictness name = ghcCmd (ReifyConStrictness name)
-  qLocation = fromMaybe noLoc . qsLocation <$> getState
-  qGetPackageRoot        = ghcCmd GetPackageRoot
-  qAddDependentFile file = ghcCmd (AddDependentFile file)
-  qAddDependentDirectory dir = ghcCmd (AddDependentDirectory dir)
-  qAddTempFile suffix = ghcCmd (AddTempFile suffix)
-  qAddTopDecls decls = ghcCmd (AddTopDecls decls)
-  qAddForeignFilePath lang fp = ghcCmd (AddForeignFilePath lang fp)
-  qAddModFinalizer fin = GHCiQ (\s -> mkRemoteRef fin) >>=
+runQinGHCiQ :: TH.Q a -> GHCiQ a
+runQinGHCiQ (TH.Q m) = GHCiQ $ \sRef -> m (runInIO sRef) metaHandlersGHCiQ
+  where
+    runInIO :: IORef QState -> GHCiQ a -> IO a
+    runInIO sRef (GHCiQ m) = m sRef
+
+metaHandlersGHCiQ = TH.MetaHandlers {
+    mNewName = \str -> ghcCmd (NewName str)
+  , mReport = \isError msg -> ghcCmd (Report isError msg)
+
+  -- See Note [TH recover with -fexternal-interpreter] in GHC.Tc.Gen.Splice
+  , mRecover = \h a -> GHCiQ $ \sRef -> mask $ \unmask -> do
+      s <- readIORef sRef
+      remoteTHCall (qsPipe s) StartRecover
+      e <- try $ unmask $ runGHCiQ (runQinGHCiQ a <* ghcCmd FailIfErrs) sRef
+      remoteTHCall (qsPipe s) (EndRecover (isLeft e))
+      case e of
+        Left GHCiQException{} ->
+          -- in case of error, restore the state to the start of the `recover` block.
+          newIORef s >>= runGHCiQ (runQinGHCiQ h)
+        Right r -> return r
+  , mLookupName = \isType occ -> ghcCmd (LookupName isType occ)
+  , mReify = \name -> ghcCmd (Reify name)
+  , mReifyFixity = \name -> ghcCmd (ReifyFixity name)
+  , mReifyType = \name -> ghcCmd (ReifyType name)
+  , mReifyInstances = \name tys -> ghcCmd (ReifyInstances name tys)
+  , mReifyRoles = \name -> ghcCmd (ReifyRoles name)
+
+  , mReifyAnnotations = reifyAnnotations
+  , mReifyModule = \m -> ghcCmd (ReifyModule m)
+  , mReifyConStrictness = \name -> ghcCmd (ReifyConStrictness name)
+  , mLocation = fromMaybe noLoc . qsLocation <$> getState
+  , mGetPackageRoot = ghcCmd GetPackageRoot
+  , mAddDependentFile = \file -> ghcCmd (AddDependentFile file)
+  , mAddDependentDirectory = \dir -> ghcCmd (AddDependentDirectory dir)
+  , mAddTempFile = \suffix -> ghcCmd (AddTempFile suffix)
+  , mAddTopDecls = \decls -> ghcCmd (AddTopDecls decls)
+  , mAddForeignFilePath = \lang fp -> ghcCmd (AddForeignFilePath lang fp)
+  , mAddModFinalizer = \fin -> GHCiQ (\s -> mkRemoteRef fin) >>=
                          ghcCmd . AddModFinalizer
-  qAddCorePlugin str = ghcCmd (AddCorePlugin str)
-  qGetQ = do
+  , mAddCorePlugin = \str -> ghcCmd (AddCorePlugin str)
+  , mGetQ = do
     s <- getState
     let lookup :: forall a. Typeable a => Map TypeRep Dynamic -> Maybe a
         lookup m = fromDynamic =<< M.lookup (typeOf (undefined::a)) m
     return $ lookup (qsMap s)
-  qPutQ k = GHCiQ $ \sRef ->
-    modifyIORef' sRef (\s -> s { qsMap = M.insert (typeOf k) (toDyn k) (qsMap s) })
-  qIsExtEnabled x = ghcCmd (IsExtEnabled x)
-  qExtsEnabled = ghcCmd ExtsEnabled
-  qPutDoc l s = ghcCmd (PutDoc l s)
-  qGetDoc l = ghcCmd (GetDoc l)
+  , mPutQ = \k -> GHCiQ $ \sRef ->
+      modifyIORef' sRef (\s -> s { qsMap = M.insert (typeOf k) (toDyn k) (qsMap s) })
+  , mIsExtEnabled = \x -> ghcCmd (IsExtEnabled x)
+  , mExtsEnabled = ghcCmd ExtsEnabled
+  , mPutDoc = \l s -> ghcCmd (PutDoc l s)
+  , mGetDoc = \l -> ghcCmd (GetDoc l)
+}
 
 -- | The implementation of the 'StartTH' message: create
 -- a new IORef QState, and return a RemoteRef to it.
@@ -237,7 +245,7 @@ runModFinalizerRefs pipe rstate qrefs = do
   qstateref <- localRef rstate
   qstate <- readIORef qstateref
   qstate' <- newIORef $ qstate { qsPipe = pipe }
-  _ <- runGHCiQ (TH.runQ $ sequence_ qs) qstate'
+  _ <- runGHCiQ (runQinGHCiQ $ sequence_ qs) qstate'
   return ()
 
 -- | The implementation of the 'RunTH' message
@@ -274,5 +282,5 @@ runTHQ
 runTHQ pipe rstate mb_loc ghciq = do
   qstateref <- localRef rstate
   modifyIORef' qstateref (\qstate -> qstate { qsLocation = mb_loc, qsPipe = pipe })
-  r <- runGHCiQ (TH.runQ ghciq) qstateref
+  r <- runGHCiQ (runQinGHCiQ ghciq) qstateref
   return $! LB.toStrict (runPut (put r))
