@@ -1,6 +1,7 @@
 packages: ./
           ../utils/ghc-toolchain/
           ../libraries/ghc-platform/
+          ../libraries/semaphore-compat/
 
 -- This essentially freezes the build plan for hadrian
 -- It would be wise to keep this up to date with the state set in .gitlab/ci.sh.

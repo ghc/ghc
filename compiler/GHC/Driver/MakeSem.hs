@@ -439,7 +439,7 @@ jobserverLoop opts sjs@(Jobserver { jobs = jobs_tvar })
 -- | Create a new jobserver using the given semaphore handle.
 makeJobserver :: SemaphoreName -> IO (AbstractSem, IO ())
 makeJobserver sem_name = do
-  semaphore <- openSemaphore sem_name
+  semaphore <- openSemaphore sem_name >>= either MC.throwM pure
   let
     init_jobs =
       Jobs { tokensOwned = 1

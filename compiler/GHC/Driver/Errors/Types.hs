@@ -419,6 +419,23 @@ data DriverMessage where
 
   DriverMissingLinkableForModule :: ![Module] -> DriverMessage
 
+  {-| DriverSemaphoreVersionMismatch is a warning that occurs when GHC
+      receives a @-jsem@ semaphore name whose protocol version is incompatible
+      with the version this GHC supports.  GHC ignores @-jsem@ and compiles
+      sequentially.
+
+      The first field is the received version (or 1 for unversioned names),
+      the second is the version this GHC supports.
+  -}
+  DriverSemaphoreVersionMismatch :: !Int -> !Int -> DriverMessage
+
+  {-| DriverSemaphoreOpenFailure is a warning that occurs when GHC fails to
+      open the semaphore specified by @-jsem@ (e.g. the socket does not exist
+      or a system error occurred).  GHC ignores @-jsem@ and compiles
+      sequentially.
+  -}
+  DriverSemaphoreOpenFailure :: !String -> DriverMessage
+
 deriving instance Generic DriverMessage
 
 data DriverMessageOpts =

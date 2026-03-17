@@ -28,6 +28,16 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.Messager
 import GHC.Driver.MakeSem
 
+import System.Semaphore
+  ( SemaphoreError(..)
+  , semaphoreVersion, versionsAreCompatible, parseSemaphoreName )
+
+import GHC.Driver.Config.Diagnostic ( initDiagOpts, initPrintConfig )
+import GHC.Driver.Errors ( printOrThrowDiagnostics )
+import GHC.Driver.Errors.Types ( DriverMessage(..), GhcMessage(..) )
+import GHC.Types.Error ( singleMessage )
+import GHC.Types.SrcLoc ( noSrcSpan )
+import GHC.Utils.Error ( mkPlainMsgEnvelope )
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
@@ -122,17 +132,34 @@ runNjobsAbstractSem n_jobs action = do
     resetNumCapabilities = set_num_caps n_capabilities
   MC.bracket_ updNumCapabilities resetNumCapabilities $ action asem
 
-runWorkerLimit :: WorkerLimit -> (AbstractSem -> IO a) -> IO a
+runWorkerLimit :: Logger -> DynFlags -> WorkerLimit -> (AbstractSem -> IO a) -> IO a
 #if defined(wasm32_HOST_ARCH)
-runWorkerLimit _ action = do
+runWorkerLimit _logger _dflags _ action = do
   lock <- newMVar ()
   action $ AbstractSem (takeMVar lock) (putMVar lock ())
 #else
-runWorkerLimit worker_limit action = case worker_limit of
+runWorkerLimit logger dflags worker_limit action = case worker_limit of
     NumProcessorsLimit n_jobs ->
       runNjobsAbstractSem n_jobs action
     JSemLimit sem ->
-      runJSemAbstractSem sem action
+      let received_ver = case parseSemaphoreName (getSemaphoreName sem) of
+            Just (ver, _) -> ver
+            Nothing       -> 1
+      in if versionsAreCompatible received_ver semaphoreVersion
+         then do
+           result <- MC.try $ runJSemAbstractSem sem action
+           case result of
+             Right a -> return a
+             Left (err :: SemaphoreError) -> do
+               let diag = DriverSemaphoreOpenFailure (show err)
+                   msg  = singleMessage $ mkPlainMsgEnvelope (initDiagOpts dflags) noSrcSpan diag
+               printOrThrowDiagnostics logger (initPrintConfig dflags) (initDiagOpts dflags) (GhcDriverMessage <$> msg)
+               runNjobsAbstractSem 1 action
+         else do
+           let diag = DriverSemaphoreVersionMismatch received_ver semaphoreVersion
+               msg  = singleMessage $ mkPlainMsgEnvelope (initDiagOpts dflags) noSrcSpan diag
+           printOrThrowDiagnostics logger (initPrintConfig dflags) (initDiagOpts dflags) (GhcDriverMessage <$> msg)
+           runNjobsAbstractSem 1 action
 #endif
 
 -- | Build and run a pipeline
@@ -159,7 +186,7 @@ runParPipelines worker_limit plugin_hsc_env diag_wrapper mHscMessager all_pipeli
   thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger plugin_hsc_env)
   let thread_safe_hsc_env = plugin_hsc_env { hsc_logger = thread_safe_logger }
 
-  runWorkerLimit worker_limit $ \abstract_sem -> do
+  runWorkerLimit (hsc_logger plugin_hsc_env) (hsc_dflags plugin_hsc_env) worker_limit $ \abstract_sem -> do
     let env = MakeEnv { hsc_env = thread_safe_hsc_env
                       , withLogger = withParLog log_queue_queue_var
                       , compile_sem = abstract_sem

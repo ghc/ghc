@@ -16,6 +16,7 @@ packages:
 - '.'
 - '../utils/ghc-toolchain'
 - '../libraries/ghc-platform'
+- '../libraries/semaphore-compat'
 
 nix:
   enable: false

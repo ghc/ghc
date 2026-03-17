@@ -230,6 +230,10 @@ packageArgs = do
         , package hpcBin
           ? builder (Cabal Flags) ? arg "-build-tool-depends"
 
+        ------------------------------ semaphore-compat ----------------------------
+        , package semaphoreCompat
+          ? builder (Cabal Flags) ? arg "-build-testing"
+
         ]
 
 ghcInternalArgs :: Args

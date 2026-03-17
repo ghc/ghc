@@ -170,6 +170,7 @@ executable hadrian
                        , base16-bytestring    >= 0.1.1 && < 1.1.0.0
                        , ghc-platform
                        , ghc-toolchain
+                       , semaphore-compat
     ghc-options:       -Wall
                        -Wincomplete-record-updates
                        -Wredundant-constraints

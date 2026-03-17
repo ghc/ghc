@@ -797,7 +797,14 @@ There are two kinds of participants in the GHC Jobserver protocol:
 
     Perform compilation in parallel when possible, coordinating with other
     processes through the semaphore ⟨sem⟩ (specified as a string).
-    Error if the semaphore doesn't exist.
+
+    If the semaphore's protocol version is incompatible, GHC emits a
+    :ghc-flag:`-Wsemaphore-version-mismatch` warning and compiles
+    sequentially.  If the semaphore cannot be opened for other reasons
+    (e.g. the socket does not exist), GHC emits a
+    :ghc-flag:`-Wsemaphore-open-failure` warning and compiles
+    sequentially.  In both cases GHC uses only the implicit token
+    inherited from the parent process.
 
     Use of ``-jsem`` will override use of :ghc-flag:`-j[⟨n⟩]`,
     and vice-versa.

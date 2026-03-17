@@ -25,6 +25,7 @@ import Utilities
 import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
 import GHC.Platform.ArchOS
 import Settings.Program (ghcWithInterpreter)
+import System.Semaphore (semaphoreVersion)
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -483,6 +484,7 @@ generateSettings settingsFile = do
         , ("RTS ways", escapeArgs . map show . Set.toList <$> getRtsWays)
         , ("Relative Global Package DB", pure rel_pkg_db)
         , ("base unit-id", pure base_unit_id)
+        , ("Semaphore version", pure (show semaphoreVersion))
         ]
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
     pure $ case settings of

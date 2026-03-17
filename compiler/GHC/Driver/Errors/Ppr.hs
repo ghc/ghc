@@ -282,6 +282,15 @@ instance Diagnostic DriverMessage where
       -> mkSimpleDecorated $
         vcat [ text "The following modules are missing a linkable which is needed for creating a library:"
              , nest 2 $ hcat (map ppr mods) ]
+    DriverSemaphoreVersionMismatch received supported
+      -> mkSimpleDecorated $
+        text "Semaphore version mismatch (received v" <> int received <>
+        text ", this GHC supports v" <> int supported <>
+        text "); ignoring -jsem and compiling sequentially."
+    DriverSemaphoreOpenFailure reason
+      -> mkSimpleDecorated $
+        text "Failed to open -jsem semaphore:" <+> text reason <>
+        text "; ignoring -jsem and compiling sequentially."
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -355,6 +364,10 @@ instance Diagnostic DriverMessage where
       -> WarningWithoutFlag
     DriverMissingLinkableForModule {}
       -> ErrorWithoutFlag
+    DriverSemaphoreVersionMismatch {}
+      -> WarningWithFlag Opt_WarnSemaphoreVersionMismatch
+    DriverSemaphoreOpenFailure {}
+      -> WarningWithFlag Opt_WarnSemaphoreOpenFailure
 
   diagnosticHints = \case
     DriverUnknownMessage m
@@ -429,6 +442,15 @@ instance Diagnostic DriverMessage where
     DriverNoConfiguredLLVMToolchain
       -> noHints
     DriverMissingLinkableForModule {}
+      -> noHints
+    DriverSemaphoreVersionMismatch received _supported
+      | received < _supported
+      -> [UnknownHint (text "The parent process (e.g. cabal-install) uses an older semaphore protocol."
+           $$ text "Upgrading cabal-install may resolve this." :: SDoc)]
+      | otherwise
+      -> [UnknownHint (text "The parent process (e.g. cabal-install) uses a newer semaphore protocol."
+           $$ text "Upgrading GHC may resolve this." :: SDoc)]
+    DriverSemaphoreOpenFailure {}
       -> noHints
 
   diagnosticCode = constructorCode @GHC

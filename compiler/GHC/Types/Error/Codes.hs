@@ -402,6 +402,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DriverInstantiationNodeInDependencyGeneration" = 74284
   GhcDiagnosticCode "DriverNoConfiguredLLVMToolchain"               = 66599
   GhcDiagnosticCode "DriverMissingLinkableForModule"                = 47338
+  GhcDiagnosticCode "DriverSemaphoreVersionMismatch"                = 56206
+  GhcDiagnosticCode "DriverSemaphoreOpenFailure"                    = 19877
 
   -- Constraint solver diagnostic codes
   GhcDiagnosticCode "BadTelescope"                                  = 97739
