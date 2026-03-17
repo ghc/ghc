@@ -1566,12 +1566,12 @@ maybeSaturate :: Id -> CpeApp
 maybeSaturate fn expr n_args unsat_ticks
   | isJoinId fn  -- Never eta-expand a call to a join point
                  -- See Note [Do not eta-expand join points]
-  = assertPpr (n_args >= mark_arity) (ppr expr) $
+  = assertPpr (not must_eta_expand) (ppr expr) $
     -- assertPpr: check that all arguments that need to be passed cbv
     -- are visible, so the backend can evalaute them if required
     expr
 
-  | hasNoBinding fn || (n_args > 0 && excess_arity > 0)
+  | must_eta_expand || desirable_to_eta_expand
     -- n_args > 0: do not eta-expand a naked variable!
   = wrapLamBody (mkTicks unsat_ticks) $
     cpeEtaExpand excess_arity expr
@@ -1580,6 +1580,15 @@ maybeSaturate fn expr n_args unsat_ticks
   = expr
 
   where
+    must_eta_expand
+      =  (hasNoBinding fn && fn_arity > n_args)
+            -- hasNoBinding functions must be saturated
+      || (mark_arity > n_args)
+            -- CBV functions must be CBV-saturated
+
+    desirable_to_eta_expand = fn_arity > n_args && n_args > 0
+       -- n_args > 0: do not eta-expand a naked variable unless we have to
+
     mark_arity   = idCbvMarkArity fn
     fn_arity     = idArity fn
     excess_arity = (max fn_arity mark_arity) - n_args
