@@ -280,6 +280,8 @@ ghcInternalArgs = package ghcInternal ? do
 libffiPackageArgs :: Args
 libffiPackageArgs = package libffi ? do
     rtsWays <- getRtsWays
+    -- noise when compiling libffi sources
+    let cArgs = mconcat [ arg "-Wno-deprecated-declarations" ]
     mconcat
         [ builder (Cabal Flags) ? mconcat
           [ any (wayUnit Profiling) rtsWays `cabalFlag` "profiling"
@@ -287,6 +289,8 @@ libffiPackageArgs = package libffi ? do
           , any (wayUnit Dynamic) rtsWays   `cabalFlag` "dynamic"
           , any (wayUnit Threaded) rtsWays  `cabalFlag` "threaded"
           ]
+        , builder (Cc (FindCDependencies CDep)) ? cArgs
+        , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         ]
 
 -- | RTS-specific command line arguments.
