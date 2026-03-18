@@ -647,6 +647,9 @@ instance Data HsCtxt where
 
 deriving instance Data XXExprGhcRn
 
+deriving instance Data (HsExpansion GhcRn)
+deriving instance Data (HsExpansion GhcTc)
+
 deriving instance Data a => Data (WithUserRdr a)
 
 -- -------------------------------

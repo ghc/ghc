@@ -1089,7 +1089,7 @@ setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 setSrcSpan (RealSrcSpan loc _) thing_inside
   = updLclCtxt (\ctxt -> ctxt {tcl_loc = loc, tcl_in_gen_code = False}) thing_inside
 setSrcSpan (GeneratedSrcSpan{}) thing_inside
-  = setInGeneratedCode $ thing_inside
+  = updLclCtxt (\ctxt -> ctxt {tcl_in_gen_code = True}) thing_inside
 setSrcSpan _ thing_inside
   = thing_inside
 
@@ -1355,8 +1355,8 @@ addLExprCtxt lspan e thing_inside
                      -- error context. c.f. RecordDotSyntaxFail9
                      -- Add the original HsCtxt if we are typechecking an expanded expression
                        ExprWithTySig _ (L _ e') _
-                         | XExpr (ExpandedThingRn o _) <- e' -> addErrCtxt o thing_inside
-                       XExpr (ExpandedThingRn o _) -> addErrCtxt o thing_inside
+                         | XExpr (ExpandedThingRn (HSE o _)) <- e' -> addErrCtxt o thing_inside
+                       XExpr (ExpandedThingRn (HSE o _)) -> addErrCtxt o thing_inside
 
                        _ -> addErrCtxt (ExprCtxt e) thing_inside
               }
