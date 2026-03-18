@@ -353,7 +353,6 @@ module Language.Haskell.TH where
   type Pred = Type
   type PredQ :: *
   type PredQ = Q Pred
-  type role Q nominal
   type Q :: * -> *
   newtype Q a = ...
   type Quote :: (* -> *) -> Constraint
@@ -1700,11 +1699,11 @@ module Language.Haskell.TH.Syntax where
   data Pragma = InlineP Name Inline RuleMatch Phases | OpaqueP Name | SpecialiseEP (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp (GHC.Internal.Maybe.Maybe Inline) Phases | SpecialiseInstP Type | RuleP GHC.Internal.Base.String (GHC.Internal.Maybe.Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases | AnnP AnnTarget Exp | LineP GHC.Internal.Types.Int GHC.Internal.Base.String | CompleteP [Name] (GHC.Internal.Maybe.Maybe Name) | SCCP Name (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
   type Pred :: *
   type Pred = Type
-  type role Q nominal
   type Q :: * -> *
-  newtype Q a = Q {unQ :: forall (m :: * -> *). Quasi m => m a}
+  newtype Q a = ...
   type Quasi :: (* -> *) -> Constraint
   class (GHC.Internal.Control.Monad.IO.Class.MonadIO m, GHC.Internal.Control.Monad.Fail.MonadFail m) => Quasi m where
+    qRunQ :: forall a. Q a -> m a
     qNewName :: GHC.Internal.Base.String -> m Name
     qReport :: GHC.Internal.Types.Bool -> GHC.Internal.Base.String -> m ()
     qRecover :: forall a. m a -> m a -> m a
@@ -1733,7 +1732,7 @@ module Language.Haskell.TH.Syntax where
     qExtsEnabled :: m [Extension]
     qPutDoc :: DocLoc -> GHC.Internal.Base.String -> m ()
     qGetDoc :: DocLoc -> m (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
-    {-# MINIMAL qNewName, qReport, qRecover, qLookupName, qReify, qReifyFixity, qReifyType, qReifyInstances, qReifyRoles, qReifyAnnotations, qReifyModule, qReifyConStrictness, qLocation, qGetPackageRoot, qAddDependentFile, qAddDependentDirectory, qAddTempFile, qAddTopDecls, qAddForeignFilePath, qAddModFinalizer, qAddCorePlugin, qGetQ, qPutQ, qIsExtEnabled, qExtsEnabled, qPutDoc, qGetDoc #-}
+    {-# MINIMAL qRunQ, qNewName, qReport, qRecover, qLookupName, qReify, qReifyFixity, qReifyType, qReifyInstances, qReifyRoles, qReifyAnnotations, qReifyModule, qReifyConStrictness, qLocation, qGetPackageRoot, qAddDependentFile, qAddDependentDirectory, qAddTempFile, qAddTopDecls, qAddForeignFilePath, qAddModFinalizer, qAddCorePlugin, qGetQ, qPutQ, qIsExtEnabled, qExtsEnabled, qPutDoc, qGetDoc #-}
   type Quote :: (* -> *) -> Constraint
   class GHC.Internal.Base.Monad m => Quote m where
     newName :: GHC.Internal.Base.String -> m Name
@@ -1881,6 +1880,7 @@ module Language.Haskell.TH.Syntax where
   trueName :: Name
   tupleDataName :: GHC.Internal.Types.Int -> Name
   tupleTypeName :: GHC.Internal.Types.Int -> Name
+  unQ :: forall a. Q a -> forall (m :: * -> *). Quasi m => m a
   unTypeCode :: forall (r :: GHC.Internal.Types.RuntimeRep) (a :: TYPE r) (m :: * -> *). Quote m => Code m a -> m Exp
   unTypeQ :: forall (r :: GHC.Internal.Types.RuntimeRep) (a :: TYPE r) (m :: * -> *). Quote m => m (TExp a) -> m Exp
   unboxedSumDataName :: SumAlt -> SumArity -> Name
