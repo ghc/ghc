@@ -18,10 +18,9 @@ import Prelude -- See note [Why do we import Prelude here?]
 import GHCi.ResolvedBCO
 import GHCi.RemoteTypes
 import GHCi.BreakArray
-import GHC.Data.SizedSeq
+import GHC.Data.SmallArray
 
 import System.IO (fixIO)
-import Control.Monad
 import Data.Array.Base
 import Foreign hiding (newArray)
 import Unsafe.Coerce (unsafeCoerce)
@@ -72,9 +71,6 @@ createBCO arr bco
 linkBCO' :: Array Int HValue -> ResolvedBCO -> IO BCO
 linkBCO' arr ResolvedBCO{..} = do
   let
-      ptrs   = ssElts resolvedBCOPtrs
-      n_ptrs = sizeSS resolvedBCOPtrs
-
       !(I# arity#)  = resolvedBCOArity
 
       !(EmptyArr empty#) = emptyArr -- See Note [BCO empty array]
@@ -83,7 +79,7 @@ linkBCO' arr ResolvedBCO{..} = do
       bitmap_barr = barr (getBCOByteArray resolvedBCOBitmap)
       literals_barr = barr (getBCOByteArray resolvedBCOLits)
 
-  PtrsArr marr <- mkPtrsArray arr n_ptrs ptrs
+  PtrsArr marr <- mkPtrsArray arr resolvedBCOPtrs
   IO $ \s ->
     case unsafeFreezeArray# marr s of { (# s, arr #) ->
     case newBCO insns_barr literals_barr arr arity# bitmap_barr of { IO io ->
@@ -92,24 +88,25 @@ linkBCO' arr ResolvedBCO{..} = do
 
 
 -- we recursively link any sub-BCOs while making the ptrs array
-mkPtrsArray :: Array Int HValue -> Word -> [ResolvedBCOPtr] -> IO PtrsArr
-mkPtrsArray arr n_ptrs ptrs = do
-  marr <- newPtrsArray (fromIntegral n_ptrs)
+mkPtrsArray :: Array Int HValue -> SmallArray ResolvedBCOPtr -> IO PtrsArr
+mkPtrsArray arr ptrs = do
+  let n_ptrs = sizeofSmallArray ptrs
+  marr <- newPtrsArray n_ptrs
   let
-    fill (ResolvedBCORef n) i =
+    fill i (ResolvedBCORef n) =
       writePtrsArrayHValue i (arr ! n) marr  -- must be lazy!
-    fill (ResolvedBCOPtr r) i = do
+    fill i (ResolvedBCOPtr r) = do
       hv <- localRef r
       writePtrsArrayHValue i hv marr
-    fill (ResolvedBCOStaticPtr r) i = do
+    fill i (ResolvedBCOStaticPtr r) = do
       writePtrsArrayPtr i (fromRemotePtr r)  marr
-    fill (ResolvedBCOPtrBCO bco) i = do
+    fill i (ResolvedBCOPtrBCO bco) = do
       bco <- linkBCO' arr bco
       writePtrsArrayBCO i bco marr
-    fill (ResolvedBCOPtrBreakArray r) i = do
+    fill i (ResolvedBCOPtrBreakArray r) = do
       BA mba <- localRef r
       writePtrsArrayMBA i mba marr
-  zipWithM_ fill ptrs [0..]
+  imapSmallArrayM_ fill ptrs
   return marr
 
 data PtrsArr = PtrsArr (MutableArray# RealWorld HValue)
