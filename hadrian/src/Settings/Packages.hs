@@ -377,9 +377,6 @@ rtsPackageArgs = package rts ? do
           , inputs ["**/Jumps_V32.c"] ? pure [ "-mavx2"    | x86 ]
           , inputs ["**/Jumps_V64.c"] ? pure [ "-mavx512f" | x86 ]
 
-          -- inlining warnings happen in Compact
-          , inputs ["**/Compact.c"] ? arg "-Wno-inline"
-
           -- emits warnings about call-clobbered registers on x86_64
           , inputs [ "**/StgCRun.c"
                    , "**/win32/ConsoleHandler.c", "**/win32/ThrIOManager.c"] ? arg "-w"
@@ -446,7 +443,6 @@ rtsWarnings = mconcat
     , arg "-Wstrict-prototypes"
     , arg "-Wmissing-prototypes"
     , arg "-Wmissing-declarations"
-    , arg "-Winline"
     , arg "-Wpointer-arith"
     , arg "-Wmissing-noreturn"
     , arg "-Wnested-externs"
