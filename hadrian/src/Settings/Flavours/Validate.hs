@@ -8,7 +8,7 @@ import {-# SOURCE #-} Settings.Default
 
 -- Please update doc/flavours.md when changing this file.
 validateFlavour :: Flavour
-validateFlavour = enableLinting $ quickValidateFlavour
+validateFlavour = enableLinting $ werror $ quickValidateFlavour
     { name = "validate"
     , extraArgs = validateArgs <> defaultHaddockExtraArgs
     , ghcDebugAssertions = (<= Stage1)
