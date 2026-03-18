@@ -6545,6 +6545,15 @@ module GHC.Stack.Annotation.Experimental where
   annotateStackString :: forall b. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Base.String -> b -> b
   annotateStackStringIO :: forall b. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Base.String -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
 
+module GHC.Stack.Decode.Experimental where
+  -- Safety: None
+  type StackEntry :: *
+  data StackEntry = StackEntry {functionName :: GHC.Internal.Base.String, moduleName :: GHC.Internal.Base.String, srcLoc :: GHC.Internal.Base.String, closureType :: GHC.Internal.ClosureTypes.ClosureType}
+  decodeStackWithFrameUnpack :: forall a. (GHC.Internal.Stack.Decode.StackFrameLocation -> GHC.Internal.Types.IO a) -> GHC.Internal.Stack.CloneStack.StackSnapshot -> GHC.Internal.Types.IO (GHC.Internal.Heap.InfoTable.Types.StgInfoTable, [a])
+  decodeStackWithIpe :: GHC.Internal.Stack.CloneStack.StackSnapshot -> GHC.Internal.Types.IO [(GHC.Internal.Heap.Closures.StackFrame, GHC.Internal.Maybe.Maybe GHC.Internal.InfoProv.Types.InfoProv)]
+  prettyStackEntry :: StackEntry -> GHC.Internal.Base.String
+  prettyStackFrameWithIpe :: (GHC.Internal.Heap.Closures.StackFrame, GHC.Internal.Maybe.Maybe GHC.Internal.InfoProv.Types.InfoProv) -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String
+
 module GHC.Stats.Experimental where
   -- Safety: Safe
   type GCDetails :: *
@@ -11184,6 +11193,7 @@ instance GHC.Internal.Classes.Eq GHC.Internal.Base.Void -- Defined in ‘GHC.Int
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.MaskingState -- Defined in ‘GHC.Internal.IO’
 instance GHC.Internal.Classes.Eq GHC.Internal.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
+instance GHC.Internal.Classes.Eq GHC.Internal.Stack.Decode.StackEntry -- Defined in ‘GHC.Internal.Stack.Decode’
 instance GHC.Internal.Classes.Ord GHC.Internal.Types.Bool -- Defined in ‘GHC.Internal.Classes’
 instance GHC.Internal.Classes.Ord GHC.Internal.Types.Char -- Defined in ‘GHC.Internal.Classes’
 instance GHC.Internal.Classes.Ord GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Classes’
@@ -11281,6 +11291,8 @@ instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TickyFlags -- Defined in 
 instance GHC.Internal.Show.Show GHC.Internal.RTS.Flags.TraceFlags -- Defined in ‘GHC.Internal.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
 instance GHC.Internal.Show.Show GHC.Stack.Annotation.Experimental.CallStackAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
+instance GHC.Internal.Show.Show GHC.Internal.Stack.Decode.Pointerness -- Defined in ‘GHC.Internal.Stack.Decode’
+instance GHC.Internal.Show.Show GHC.Internal.Stack.Decode.StackEntry -- Defined in ‘GHC.Internal.Stack.Decode’
 instance GHC.Internal.Show.Show GHC.Internal.Stats.GCDetails -- Defined in ‘GHC.Internal.Stats’
 instance GHC.Internal.Show.Show GHC.Internal.Stats.RTSStats -- Defined in ‘GHC.Internal.Stats’
 instance GHC.Internal.Stack.Annotation.StackAnnotation GHC.Stack.Annotation.Experimental.CallStackAnnotation -- Defined in ‘GHC.Stack.Annotation.Experimental’
