@@ -11,7 +11,9 @@ module Language.Haskell.TH.Syntax (
     Exp (..),
     Match (..),
     Clause (..),
-    Q (..),
+    Q,
+    -- backwards compatibility
+    Language.Haskell.TH.Syntax.unQ,
     Pat (..),
     Stmt (..),
     Con (..),
@@ -499,3 +501,6 @@ reassociate the tree as necessary.
 -- Subsumed by the more general 'SpecialiseEP' constructor.
 pattern SpecialiseP :: Name -> Type -> (Maybe Inline) -> Phases -> Pragma
 pattern SpecialiseP nm ty inl phases = SpecialiseEP Nothing [] (SigE (VarE nm) ty) inl phases
+
+unQ :: Q a -> (forall m. Quasi m => m a)
+unQ m =  runQ m
