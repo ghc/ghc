@@ -63,7 +63,7 @@ module GHC.Tc.Utils.Monad(
   -- * Error management
   getSrcCodeOrigin,
   getSrcSpanM, getRealSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
-  inGeneratedCode, setInGeneratedCode,
+  inGeneratedCode,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,
@@ -1086,15 +1086,13 @@ inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- See Note [Error contexts in generated code]
+-- NB: This is the only place where tcl_in_gen_code is modified
 setSrcSpan (RealSrcSpan loc _) thing_inside
   = updLclCtxt (\ctxt -> ctxt {tcl_loc = loc, tcl_in_gen_code = False}) thing_inside
 setSrcSpan (GeneratedSrcSpan{}) thing_inside
   = updLclCtxt (\ctxt -> ctxt {tcl_in_gen_code = True}) thing_inside
 setSrcSpan _ thing_inside
   = thing_inside
-
-setInGeneratedCode :: TcRn a -> TcRn a
-setInGeneratedCode thing_inside = updLclCtxt (\env -> env { tcl_in_gen_code = True }) thing_inside
 
 getSrcCodeOrigin :: TcRn HsCtxt
 getSrcCodeOrigin = getLclEnvSrcCodeOrigin <$> getLclEnv
@@ -1316,6 +1314,7 @@ problem.
 
 Note [Error contexts in generated code]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* setSrcSpan is the only place that modifies `tcl_in_gen_code`
 
 * addLExpr updates updates the ErrCtxt stored in LclEnv with the following logic
   - If the `SrcSpan` is a `RealSrcSpan`, `setSrcSpan` updates the `tcl_loc` to the given value
@@ -1325,7 +1324,8 @@ Note [Error contexts in generated code]
     the expression in hand is compiler generated, and hence it is not added on to the stack.
 
 This ensures that the error messages do not leak compiler generated expressions which can
-be confusing to the users.
+be confusing to the users as they never appear in the original source code
+
 
 - See Note [Rebindable syntax and XXExprGhcRn] in `GHC.Hs.Expr` for
 more discussion of this fancy footwork
