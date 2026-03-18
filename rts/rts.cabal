@@ -118,6 +118,7 @@ library
       install-includes: HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
                         ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                         DerivedConstants.h
+                        rts/Types.h
                         stg/MachRegs.h
                         stg/MachRegs/arm32.h
                         stg/MachRegs/arm64.h
