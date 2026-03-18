@@ -1,5 +1,8 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -O -fno-omit-interface-pragmas #-}
+  -- There are SPECIALIZE pragmas in GHC.Core.Map.Type that require
+  -- the ability to inline some functions here
 
 {-
 (c) The University of Glasgow 2006

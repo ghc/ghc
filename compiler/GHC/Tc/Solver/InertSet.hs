@@ -1,4 +1,7 @@
 {-# LANGUAGE MultiWayIf #-}
+{-# OPTIONS_GHC -O -fno-omit-interface-pragmas #-}
+  -- There is a SPECIALIZE pragma in GHC.Tc.Solver.Monad that requires
+  -- the ability to inline forAllCycleBreakerBindings_ some functions here
 
 module GHC.Tc.Solver.InertSet (
     -- * The work list
@@ -2174,4 +2177,3 @@ Wrong!  The level-check ensures that the inner implicit parameter wins.
 (Actually I think that the order in which the work-list is processed means
 that this chain of events won't happen, but that's very fragile.)
 -}
-
