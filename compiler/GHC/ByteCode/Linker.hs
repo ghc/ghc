@@ -29,7 +29,7 @@ import GHC.Unit.Types
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
-import GHC.Data.SizedSeq
+import GHC.Data.SmallArray
 
 import GHC.Linker.Types
 
@@ -43,7 +43,10 @@ import GHC.Types.Unique.DFM
 
 -- Standard libraries
 import Control.Concurrent
-import Data.Array.Unboxed
+import Control.Monad
+import Data.Array.Base
+import Data.Array.IO.Internals
+import Data.Functor
 import Foreign.Ptr
 import GHC.Exts
 
@@ -62,15 +65,18 @@ linkBCO interp pkgs_loaded bytecode_state bco_ix
            (UnlinkedBCO _ arity insns bitmap lits0 ptrs0) = do
   -- fromIntegral Word -> Word64 should be a no op if Word is Word64
   -- otherwise it will result in a cast to longlong on 32bit systems.
-  (lits :: [Word]) <- mapM (fmap fromIntegral . lookupLiteral interp pkgs_loaded bytecode_state) (elemsFlatBag lits0)
-  ptrs <- mapM (resolvePtr interp pkgs_loaded bytecode_state bco_ix) (elemsFlatBag ptrs0)
-  let lits' = listArray (0 :: Int, fromIntegral (sizeFlatBag lits0)-1) lits
+  litsMut <- unsafeNewArray_ (0, fromIntegral (sizeFlatBag lits0) - 1)
+  foldM_ (\(!i) lit -> (unsafeWrite litsMut i =<< lookupLiteral interp pkgs_loaded bytecode_state lit) $> succ i) 0 lits0
+  lits <- unsafeFreezeIOUArray litsMut
+  ptrsMut <- newSmallArrayIO (fromIntegral (sizeFlatBag ptrs0)) undefined
+  foldM_ (\(!i) ptr -> (writeSmallArrayIO ptrsMut i =<< resolvePtr interp pkgs_loaded bytecode_state bco_ix ptr) $> succ i) 0 ptrs0
+  ptrs <- unsafeFreezeSmallArrayIO ptrsMut
   return $ ResolvedBCO { resolvedBCOIsLE   = isLittleEndian
                        , resolvedBCOArity  = arity
                        , resolvedBCOInstrs = insns
                        , resolvedBCOBitmap = bitmap
-                       , resolvedBCOLits   = mkBCOByteArray lits'
-                       , resolvedBCOPtrs   = addListToSS emptySS ptrs
+                       , resolvedBCOLits   = mkBCOByteArray lits
+                       , resolvedBCOPtrs   = ptrs
                        }
 
 lookupLiteral :: Interp -> PkgsLoaded -> BytecodeLoaderState -> BCONPtr -> IO Word
