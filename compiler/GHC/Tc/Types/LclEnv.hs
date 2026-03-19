@@ -21,9 +21,9 @@ module GHC.Tc.Types.LclEnv (
   , setLclEnvTypeEnv
   , modifyLclEnvTcLevel
 
-  , getLclEnvSrcCodeOrigin
-  , setLclEnvSrcCodeOrigin
-  , setLclCtxtSrcCodeOrigin
+  , getLclEnvHsCtxt
+  , setLclEnvHsCtxt
+  , setLclCtxtHsCtxt
   , lclEnvInGeneratedCode
 
   , addLclEnvErrCtxt
@@ -110,7 +110,7 @@ This data structure keeps track of two things:
 In the current design, if the top of the ErrCtxtStack is an ExpansionCodeCtxt
 i.e. we are currently typechecking a compiler generated expression, and we encounter
 an XExpr, then we _replace_ the top of the stack with the new XExpr. Otherwise, we
-push the new expression error message on top of the stack. cf. `LclEnv.setLclCtxtSrcCodeOrigin`
+push the new expression error message on top of the stack. cf. `LclEnv.setLclCtxtHsCtxt`
 
 -}
 
@@ -119,9 +119,9 @@ push the new expression error message on top of the stack. cf. `LclEnv.setLclCtx
 type ErrCtxtStack = [ErrCtxt]
 
 -- | Get the top of the error message stack
-get_src_code_origin :: ErrCtxtStack -> HsCtxt
-get_src_code_origin (e : _) = e
-get_src_code_origin _ = error "get_src_code_origin: oops! Empty error message stack"
+get_err_ctxt_stack_head :: ErrCtxtStack -> HsCtxt
+get_err_ctxt_stack_head (e : _) = e
+get_err_ctxt_stack_head _ = error "get_err_ctxt_stack_head: oops! Empty error message stack"
 
 data TcLclCtxt
   = TcLclCtxt {
@@ -199,17 +199,17 @@ setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_err_ctxt = ctxt })
 
 -- See Note [ErrCtxtStack Manipulation]
 addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
-addLclEnvErrCtxt ec = setLclEnvSrcCodeOrigin ec
+addLclEnvErrCtxt ec = setLclEnvHsCtxt ec
 
-getLclEnvSrcCodeOrigin :: TcLclEnv -> HsCtxt
-getLclEnvSrcCodeOrigin = get_src_code_origin . tcl_err_ctxt . tcl_lcl_ctxt
+getLclEnvHsCtxt :: TcLclEnv -> HsCtxt
+getLclEnvHsCtxt = get_err_ctxt_stack_head . tcl_err_ctxt . tcl_lcl_ctxt
 
-setLclEnvSrcCodeOrigin :: ErrCtxt -> TcLclEnv -> TcLclEnv
-setLclEnvSrcCodeOrigin ec = modifyLclCtxt (setLclCtxtSrcCodeOrigin ec)
+setLclEnvHsCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
+setLclEnvHsCtxt ec = modifyLclCtxt (setLclCtxtHsCtxt ec)
 
 -- See Note [ErrCtxtStack Manipulation]
-setLclCtxtSrcCodeOrigin :: ErrCtxt -> TcLclCtxt -> TcLclCtxt
-setLclCtxtSrcCodeOrigin ec lclCtxt
+setLclCtxtHsCtxt :: ErrCtxt -> TcLclCtxt -> TcLclCtxt
+setLclCtxtHsCtxt ec lclCtxt
   -- never stack 2 statement error contexts on top of each other
   | StmtErrCtxt{} : ecs <- tcl_err_ctxt lclCtxt
   , StmtErrCtxt{} <- ec
