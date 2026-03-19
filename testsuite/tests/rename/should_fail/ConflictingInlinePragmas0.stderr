@@ -4,5 +4,7 @@ ConflictingInlinePragmas0.hs:7:14: error: [GHC-43895]
        ConflictingInlinePragmas0.hs:7:14
   |
 3 | {-# INLINE f #-}
-7 | {-# NOINLINE f #-}
+  |            ^
   |
+7 | {-# NOINLINE f #-}
+  |              ^

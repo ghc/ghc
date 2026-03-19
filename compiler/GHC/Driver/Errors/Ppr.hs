@@ -85,6 +85,18 @@ instance Diagnostic GhcMessage where
     GhcUnknownMessage m
       -> diagnosticHints m
 
+  diagnosticSourceSpans = \case
+    GhcPsMessage m
+      -> diagnosticSourceSpans m
+    GhcTcRnMessage m
+      -> diagnosticSourceSpans m
+    GhcDsMessage m
+      -> diagnosticSourceSpans m
+    GhcDriverMessage m
+      -> diagnosticSourceSpans m
+    GhcUnknownMessage m
+      -> diagnosticSourceSpans m
+
   diagnosticCode = constructorCode @GHC
 
 instance HasDefaultDiagnosticOpts DriverMessageOpts where
@@ -430,5 +442,13 @@ instance Diagnostic DriverMessage where
       -> noHints
     DriverMissingLinkableForModule {}
       -> noHints
+
+  diagnosticSourceSpans = \case
+    DriverUnknownMessage m
+      -> diagnosticSourceSpans m
+    DriverPsHeaderMessage m
+      -> diagnosticSourceSpans m
+    _ ->
+      Nothing
 
   diagnosticCode = constructorCode @GHC

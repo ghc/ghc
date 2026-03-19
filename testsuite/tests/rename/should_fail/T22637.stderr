@@ -4,5 +4,7 @@ T22637.hs:7:14: error: [GHC-43895]
        T22637.hs:7:14
   |
 6 | {-# INLINE f #-}
-7 | {-# NOINLINE f #-}
+  |            ^
   |
+7 | {-# NOINLINE f #-}
+  |              ^
