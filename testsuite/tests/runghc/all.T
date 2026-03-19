@@ -4,6 +4,8 @@ test('T8601', req_interp, makefile_test, [])
 
 test('T11247', [req_interp, expect_broken(11247)], makefile_test, [])
 
+test('T16145', req_interp, makefile_test, [])
+
 test('T6132', [],
      compile, [''])
 

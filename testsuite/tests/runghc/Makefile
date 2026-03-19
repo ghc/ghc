@@ -23,6 +23,11 @@ T11247:
 	-'$(RUNGHC)' foo.
 	-'$(RUNGHC)' foo.bar
 
+# runghc should honour -osuf for dependencies too (#16145).
+T16145:
+	'$(RUNGHC)' -- -fobject-code -osuf=hs.o T16145
+	printf '%s\n' *.hi *.o *.hs | LC_ALL=C sort
+
 T17171a:
 	'$(RUNGHC)' --ghc-arg=-Wall T17171a.hs
 T17171b:
