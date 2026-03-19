@@ -6,6 +6,9 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TupleSections #-}
+
 module GHC.CmmToAsm.X86.Ppr (
         pprNatCmmDecl,
         pprInstr,
@@ -35,6 +38,7 @@ import GHC.Cmm.InitFini
 import GHC.Cmm.DebugBlock (pprUnwindTable)
 
 import GHC.Types.Basic (Alignment, mkAlignment, alignmentBytes)
+import GHC.Types.Literal.Floating
 import GHC.Types.Unique ( pprUniqueAlways )
 
 import GHC.Utils.Outputable
@@ -42,6 +46,8 @@ import GHC.Utils.Panic
 
 import Data.List ( intersperse )
 import Data.Word
+import GHC.Float (castDoubleToWord64, castFloatToWord32)
+import qualified Data.List.NonEmpty as NE
 
 -- Note [Subsections Via Symbols]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -492,8 +498,8 @@ pprImm platform = \case
    ImmCLbl l           -> pprAsmLabel platform l
    ImmIndex l i        -> pprAsmLabel platform l <> char '+' <> int i
    ImmLit s            -> ftext s
-   ImmFloat f          -> float $ fromRational f
-   ImmDouble d         -> double $ fromRational d
+   ImmFloat f          -> float f
+   ImmDouble d         -> double d
    ImmConstantSum a b  -> pprImm platform a <> char '+' <> pprImm platform b
    ImmConstantDiff a b -> pprImm platform a <> char '-' <> lparen <> pprImm platform b <> rparen
 
@@ -575,37 +581,62 @@ pprAlignForSection platform seg = line $
 
 pprDataItem :: forall doc. IsDoc doc => NCGConfig -> CmmLit -> doc
 pprDataItem config lit =
-  let (itemFmt, items) = itemFormatAndItems (cmmTypeFormat $ cmmLitType platform lit)
-  in line $ itemFmt <> hsep (punctuate comma (items lit))
+  vcat $ map ppr_one $ NE.groupWith fst $
+    lit_items (cmmTypeFormat $ cmmLitType platform lit) lit
     where
-        platform = ncgPlatform config
+      platform = ncgPlatform config
 
-        pprLitImm, pprII64AsII32x2 :: CmmLit -> [Line doc]
-        pprLitImm = (:[]) . pprImm platform . litToImm
-        pprII64AsII32x2 (CmmInt x _)
-          = [ int (fromIntegral (fromIntegral x :: Word32))
-            , int (fromIntegral (fromIntegral (x `shiftR` 32) :: Word32)) ]
-        pprII64AsII32x2 x
-          = pprPanic "X86 pprDataItem II64" (ppr x)
+      ppr_one :: NE.NonEmpty (Format, Line doc) -> doc
+      ppr_one ((fmt, i1) NE.:| is) =
+        line $ ppr_fmt fmt <> hsep (punctuate comma $ i1 : map snd is)
 
-        itemFormatAndItems :: Format -> (Line doc, CmmLit -> [Line doc])
-        itemFormatAndItems = \case
-          II8  -> ( text "\t.byte\t", pprLitImm )
-          II16 -> ( text "\t.word\t", pprLitImm )
-          II32 -> ( text "\t.long\t", pprLitImm )
-          II64 ->
-            case platformOS platform of
-              OSDarwin
-                | target32Bit platform
-                -> ( text "\t.long\t", pprII64AsII32x2 )
-              _ -> ( text "\t.quad\t", pprLitImm )
-          FF32 -> ( text "\t.float\t", pprLitImm )
-          FF64 -> ( text "\t.double\t", pprLitImm )
-          VecFormat _ sFmt ->
-            let (fmtTxt, pprElt) = itemFormatAndItems (scalarFormatFormat sFmt)
-            in (fmtTxt, \ case { CmmVec elts -> pprElt =<< elts
-                               ; x -> pprPanic "X86 pprDataItem VecFormat" (ppr x)
-                               })
+      pprAsII32x2 :: CmmLit -> [Line doc]
+      pprAsII32x2 (CmmInt x _)
+        = [ int (fromIntegral (fromIntegral x :: Word32))
+          , int (fromIntegral (fromIntegral (x `shiftR` 32) :: Word32)) ]
+      pprAsII32x2 x
+        = pprPanic "X86 pprDataItem II64" (ppr x)
+
+      ppr_lit :: CmmLit -> Line doc
+      ppr_lit = pprImm platform . litToImm
+
+      ppr_fmt :: Format -> Line doc
+      ppr_fmt = \case
+        II8  -> text "\t.byte\t"
+        II16 -> text "\t.word\t"
+        II32 -> text "\t.long\t"
+        II64 -> text "\t.quad\t"
+        FF32 -> text "\t.float\t"
+        FF64 -> text "\t.double\t"
+        _ -> panic "pprDataItem: non-scalar format"
+
+      lit_items :: Format -> CmmLit -> [(Format, Line doc)]
+      lit_items fmt lit = case fmt of
+        II64
+          | OSDarwin <- platformOS platform
+          , target32Bit platform
+          -> (II32, ) <$> pprAsII32x2 lit
+        FF32
+          | CmmFloat f _ <- lit
+          , litFloatingIsNonStandardNaN LitFloat f
+          , let w32 = castFloatToWord32 (litFloatingToHostFloat f)
+          -> [(II32, ppr_lit (CmmInt (fromIntegral w32) W32))]
+        FF64
+          | CmmFloat f _ <- lit
+          , litFloatingIsNonStandardNaN LitDouble f
+          , let w64 = castDoubleToWord64 (litFloatingToHostDouble f)
+                ilit = CmmInt (fromIntegral w64) W64
+          -> if | OSDarwin <- platformOS platform
+                , target32Bit platform
+                -> (II32, ) <$> pprAsII32x2 ilit
+                | otherwise
+                -> [(II64, ppr_lit ilit)]
+        VecFormat _ sFmt
+          | CmmVec elts <- lit
+          -> concatMap (lit_items (scalarFormatFormat sFmt)) elts
+          | otherwise
+          -> pprPanic "X86 pprDataItem VecFormat" (ppr lit)
+        _ -> [(fmt, ppr_lit lit)]
 
 asmComment :: IsLine doc => doc -> doc
 asmComment c = whenPprDebug $ text "# " <> c

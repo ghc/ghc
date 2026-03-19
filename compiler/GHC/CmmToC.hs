@@ -42,6 +42,7 @@ import GHC.Cmm.Switch
 import GHC.Cmm.InitFini
 
 import GHC.Types.ForeignCall
+import GHC.Types.Literal.Floating
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
@@ -499,7 +500,7 @@ machOpNeedsCast platform mop args
     -- See Note [Zero-extending sub-word signed results]
   | signedOp mop
   , res_ty <- machOpResultType platform mop args
-  , not $ isFloatType res_ty -- only integer operations, not MO_SF_Conv
+  , not $ isFloatType res_ty -- only integer operations, not MO_SF_Round
   , let w = typeWidth res_ty
   , w < wordWidth platform
   = cast_it w
@@ -583,8 +584,9 @@ pprLit :: Platform -> CmmLit -> SDoc
 pprLit platform lit = case lit of
     CmmInt i rep      -> pprHexVal platform i rep
 
-    CmmFloat f w       -> parens (machRep_F_CType w) <> str
-        where d = fromRational f :: Double
+    CmmFloat f fty       -> parens (machRep_F_CType w) <> str
+        where w = litFloatingTypeWidth fty
+              d = litFloatingToHostDouble f
               str | isInfinite d && d < 0 = text "-INFINITY"
                   | isInfinite d          = text "INFINITY"
                   | isNaN d               = text "NAN"
@@ -648,10 +650,10 @@ staticLitsToWords platform = go . foldMap decomposeMultiWord
     -- Decompose multi-word or floating-point literals into multiple
     -- single-word (or smaller) literals.
     decomposeMultiWord :: CmmLit -> [CmmLit]
-    decomposeMultiWord (CmmFloat n W64)
+    decomposeMultiWord (CmmFloat n LitDouble)
       | W32 <- wordWidth platform = decomposeMultiWord (doubleToWord64 n)
       | otherwise = [doubleToWord64 n]
-    decomposeMultiWord (CmmFloat n W32)
+    decomposeMultiWord (CmmFloat n LitFloat)
       = [floatToWord32 n]
     decomposeMultiWord (CmmInt n W64)
       | W32 <- wordWidth platform
@@ -1526,11 +1528,13 @@ pprStringInCStyle s = doubleQuotes (text (concatMap charToC (BS.unpack s)))
 -- This is a hack to turn the floating point numbers into ints that we
 -- can safely initialise to static locations.
 
-floatToWord32 :: Rational -> CmmLit
-floatToWord32 r = CmmInt (toInteger (castFloatToWord32 (fromRational r))) W32
+floatToWord32 :: LitFloating -> CmmLit
+floatToWord32 r = CmmInt (toInteger (castFloatToWord32 f)) W32
+  where  f = litFloatingToHostFloat r
 
-doubleToWord64 :: Rational -> CmmLit
-doubleToWord64 r = CmmInt (toInteger (castDoubleToWord64 (fromRational r))) W64
+doubleToWord64 :: LitFloating -> CmmLit
+doubleToWord64 r = CmmInt (toInteger (castDoubleToWord64 d)) W64
+  where  d = litFloatingToHostDouble r
 
 -- ---------------------------------------------------------------------------
 -- Utils

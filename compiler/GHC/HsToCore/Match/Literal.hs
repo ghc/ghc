@@ -113,8 +113,8 @@ dsLit l = do
 
     -- This can be slow for very large literals. See Note [FractionalLit representation]
     -- and #15646
-    HsFloatPrim  _ fl -> return (Lit (LitFloat (rationalFromFractionalLit fl)))
-    HsDoublePrim _ fl -> return (Lit (LitDouble (rationalFromFractionalLit fl)))
+    HsFloatPrim  _ fl -> return (mkFloatLit  (rationalFromFractionalLit fl))
+    HsDoublePrim _ fl -> return (mkDoubleLit (rationalFromFractionalLit fl))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
     HsNatural _ i    -> return (mkNaturalExpr platform (il_value i))

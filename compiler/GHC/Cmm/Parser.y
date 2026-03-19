@@ -868,7 +868,7 @@ expr    :: { CmmParse CmmExpr }
 
 expr0   :: { CmmParse CmmExpr }
         : INT   maybe_ty         { return (CmmLit (CmmInt $1 (typeWidth $2))) }
-        | FLOAT maybe_ty         { return (CmmLit (CmmFloat $1 (typeWidth $2))) }
+        | FLOAT maybe_ty         { return (CmmLit (mkCmmFloatLit $1 (typeWidth $2))) }
         | STRING                 { do s <- code (newStringCLit $1);
                                       return (CmmLit s) }
         | reg                    { $1 }

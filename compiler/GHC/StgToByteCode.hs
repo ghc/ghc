@@ -35,6 +35,7 @@ import GHC.Types.Id
 import GHC.Types.ForeignCall
 import GHC.Core
 import GHC.Types.Literal
+import GHC.Types.Literal.Floating
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Core.Type
@@ -1260,8 +1261,8 @@ doCase d s p scrut bndr alts
               LitNumber LitNumWord32 w -> DiscrW32 (fromInteger w)
               LitNumber LitNumWord64 w -> DiscrW64 (fromInteger w)
               LitNumber LitNumBigNat _ -> unsupported
-              LitFloat r               -> DiscrF (fromRational r)
-              LitDouble r              -> DiscrD (fromRational r)
+              LitFloating LitFloat  x  -> DiscrF (litFloatingToHostFloat  x)
+              LitFloating LitDouble x  -> DiscrD (litFloatingToHostDouble x)
               LitChar i                -> DiscrI (ord i)
               LitString {}             -> unsupported
               LitRubbish {}            -> unsupported
@@ -2145,8 +2146,8 @@ mkDummyLiteral platform pr
         Int64Rep    -> mkLitInt64 0
         Word64Rep   -> mkLitWord64 0
         AddrRep     -> LitNullAddr
-        DoubleRep   -> LitDouble 0
-        FloatRep    -> LitFloat 0
+        DoubleRep   -> mkLitDouble 0
+        FloatRep    -> mkLitFloat  0
         BoxedRep _  -> LitNullAddr
         VecRep{}    -> pprPanic "mkDummyLiteral" (ppr pr)
 
@@ -2383,8 +2384,8 @@ pushLiteral padded lit =
 
      case lit of
         LitLabel {}     -> code AddrRep
-        LitFloat {}     -> code FloatRep
-        LitDouble {}    -> code DoubleRep
+        LitFloating LitFloat  _ -> code FloatRep
+        LitFloating LitDouble _ -> code DoubleRep
         LitChar {}      -> code WordRep
         LitNullAddr     -> code AddrRep
         LitString {}    -> code AddrRep

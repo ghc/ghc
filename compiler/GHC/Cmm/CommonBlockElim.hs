@@ -19,15 +19,16 @@ import Data.Functor.Classes (liftEq)
 import Data.Maybe (mapMaybe)
 import qualified Data.List as List
 import Data.Word
+import GHC.Float (castFloatToWord32)
 import qualified Data.Map as M
 import qualified GHC.Data.TrieMap as TM
+import GHC.Types.Literal.Floating
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import GHC.Utils.Word64 (truncateWord64ToWord32)
 import Control.Arrow (first, second)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
-import GHC.Real (infinity,notANumber)
 
 -- -----------------------------------------------------------------------------
 -- Eliminate common blocks
@@ -166,12 +167,9 @@ hash_block block =
 
         hash_lit :: CmmLit -> Word32
         hash_lit (CmmInt i _) = fromInteger i
-        hash_lit (CmmFloat r _)
-          -- handle these special cases as `truncate` fails on non-fractional numbers (#26229)
-          | r == infinity   = 9999999
-          | r == -infinity  = 9999998
-          | r == notANumber = 6666666
-          | otherwise       = truncate r
+        hash_lit (CmmFloat r _) =
+          -- NB: don't use 'truncate' as this fails on NaN/Infinity (#26229)
+          castFloatToWord32 $ litFloatingToHostFloat r
         hash_lit (CmmVec ls) = hash_list hash_lit ls
         hash_lit (CmmLabel _) = 119 -- ugh
         hash_lit (CmmLabelOff _ i) = cvt $ 199 + i
@@ -186,7 +184,7 @@ hash_block block =
 
         cvt = fromInteger . toInteger
 
-        -- Since we are hashing, we can savely downcast Word64 to Word32 here.
+        -- Since we are hashing, we can safely downcast Word64 to Word32 here.
         -- Although a different hashing function may be more effective.
         hash_unique :: Uniquable a => a -> Word32
         hash_unique = truncateWord64ToWord32 . getKey . getUnique

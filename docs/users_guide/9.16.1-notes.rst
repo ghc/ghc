@@ -106,6 +106,14 @@ See :ghc-ticket:`25345`.
 - Add several options for x86 extensions: :ghc-flag:`-mavx512bw`,
   :ghc-flag:`-mavx512dq`, :ghc-flag:`-mavx512vl`, and :ghc-flag:`-mgfni`.
 
+- Improved treatment of floating-point in constant folding. GHC will now
+  preserve the sign of zero and NaN payloads during constant folding,
+  fixing :ghc-ticket:`9811` and :ghc-ticket:`21227`.
+
+  As a side effect, ``x + 0`` will no longer be constant-folded to ``x``, because
+  ``-0 + 0 = 0``, where ``-0`` is the IEEE-754 negative zero floating point
+  constant. Instead, it is ``x + -0`` that is constant-folded to ``x``.
+
 GHCi
 ~~~~
 

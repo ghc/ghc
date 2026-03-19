@@ -79,6 +79,7 @@ import GHC.Generics (Generic, Generically(..))
 -- The rest:
 import GHC.Data.Maybe ( expectJust )
 import GHC.Types.ForeignCall ( CCallConv(..) )
+import GHC.Types.Literal.Floating
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
@@ -1223,10 +1224,11 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
         vector_float_negate_avx l w expr = do
           let fmt :: Format
               mask :: CmmLit
-              (fmt, mask) = case w of
-                       W32 -> (VecFormat l FmtFloat , CmmInt (bit 31) w) -- TODO: these should be negative 0 floating point literals,
-                       W64 -> (VecFormat l FmtDouble, CmmInt (bit 63) w) -- but we don't currently have those in Cmm.
-                       _ -> panic "AVX floating-point negation: elements must be FF32 or FF64"
+              (fmt, mask) =
+                case w of
+                  W32 -> (VecFormat l FmtFloat , CmmFloat ( floatToLitFloating (-0)) LitFloat)
+                  W64 -> (VecFormat l FmtDouble, CmmFloat (doubleToLitFloating (-0)) LitDouble)
+                  _ -> panic "AVX floating-point negation: elements must be FF32 or FF64"
           (maskReg, maskCode) <- getSomeReg (CmmLit $ CmmVec $ replicate l mask)
           (reg, exp) <- getSomeReg expr
           let code dst = maskCode `appOL`
@@ -1239,10 +1241,11 @@ getRegister' platform is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
         vector_float_negate_sse l w expr = do
           let fmt :: Format
               mask :: CmmLit
-              (fmt, mask) = case w of
-                       W32 -> (VecFormat l FmtFloat , CmmInt (bit 31) w) -- Same comment as for vector_float_negate_avx,
-                       W64 -> (VecFormat l FmtDouble, CmmInt (bit 63) w) -- these should be -0.0 CmmFloat values.
-                       _ -> panic "SSE floating-point negation: elements must be FF32 or FF64"
+              (fmt, mask) =
+                case w of
+                  W32 -> (VecFormat l FmtFloat , CmmFloat ( floatToLitFloating (-0)) LitFloat)
+                  W64 -> (VecFormat l FmtDouble, CmmFloat (doubleToLitFloating (-0)) LitDouble)
+                  _ -> panic "SSE floating-point negation: elements must be FF32 or FF64"
           (maskReg, maskCode) <- getSomeReg (CmmLit $ CmmVec $ replicate l mask)
           (reg, exp) <- getSomeReg expr
           let code dst = maskCode `appOL`
@@ -3323,10 +3326,6 @@ getRegister' platform is32Bit (CmmLit lit) = do
   -- which means that we assume that loading a literal into a register
   -- will not clobber any other registers.
 
-  -- TODO: this function mishandles floating-point negative zero,
-  -- because -0.0 == 0.0 returns True and because we represent CmmFloat as
-  -- Rational, which can't properly represent negative zero.
-
   if
     -- Zero: use XOR.
     | isZeroLit lit
@@ -3390,7 +3389,7 @@ getRegister' platform is32Bit (CmmLit lit) = do
       fmt = cmmTypeFormat cmmTy
       float_or_floatvec = isFloatOrFloatVecFormat fmt
       isZeroLit (CmmInt i _) = i == 0
-      isZeroLit (CmmFloat f _) = f == 0 -- TODO: mishandles negative zero
+      isZeroLit (CmmFloat f _) = isPositiveZeroLF f
       isZeroLit (CmmVec fs) = all isZeroLit fs
       isZeroLit _ = False
 
@@ -3743,7 +3742,8 @@ isSuitableFloatingPointLit :: CmmLit -> Bool
 isSuitableFloatingPointLit = isJust . isSuitableFloatingPointLit_maybe
 
 isSuitableFloatingPointLit_maybe :: CmmLit -> Maybe Width
-isSuitableFloatingPointLit_maybe (CmmFloat f w) = w <$ guard (f /= 0.0)
+isSuitableFloatingPointLit_maybe (CmmFloat f fty) =
+  litFloatingTypeWidth fty <$ guard (not (isPositiveZeroLF f))
 isSuitableFloatingPointLit_maybe _ = Nothing
 
 getRegOrMem :: CmmExpr -> NatM (Operand, InstrBlock)

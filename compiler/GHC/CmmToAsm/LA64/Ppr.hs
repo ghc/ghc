@@ -20,6 +20,7 @@ import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Utils.Outputable
 import GHC.Types.Basic (Alignment, alignmentBytes, mkAlignment)
 import GHC.Utils.Panic
+import GHC.Types.Literal.Floating
 
 pprNatCmmDecl :: forall doc. (IsDoc doc) => NCGConfig -> NatCmmDecl RawCmmStatics Instr -> doc
 
@@ -234,11 +235,11 @@ pprDataItem config lit
         ppr_item II64 _ = [text "\t.quad\t"  <> pprDataImm platform imm]
 
         ppr_item FF32  (CmmFloat r _)
-           = let bs = floatToBytes (fromRational r)
+           = let bs = floatToBytes (litFloatingToHostFloat r)
              in  map (\b -> text "\t.byte\t" <> int (fromIntegral b)) bs
 
         ppr_item FF64 (CmmFloat r _)
-           = let bs = doubleToBytes (fromRational r)
+           = let bs = doubleToBytes (litFloatingToHostDouble r)
              in  map (\b -> text "\t.byte\t" <> int (fromIntegral b)) bs
 
         ppr_item _ _ = pprPanic "pprDataItem:ppr_item" (text $ show lit)
@@ -252,8 +253,8 @@ pprDataImm _ (ImmInteger i) = integer i
 pprDataImm p (ImmCLbl l)    = pprAsmLabel p l
 pprDataImm p (ImmIndex l i) = pprAsmLabel p l <> char '+' <> int i
 pprDataImm _ (ImmLit s)     = ftext s
-pprDataImm _ (ImmFloat f) = float (fromRational f)
-pprDataImm _ (ImmDouble d) = double (fromRational d)
+pprDataImm _ (ImmFloat f)   = float f
+pprDataImm _ (ImmDouble d)  = double d
 
 pprDataImm p (ImmConstantSum a b) = pprDataImm p a <> char '+' <> pprDataImm p b
 pprDataImm p (ImmConstantDiff a b) = pprDataImm p a <> char '-'
@@ -274,8 +275,8 @@ pprOpImm platform imm = case imm of
   ImmInt i -> int i
   ImmInteger i -> integer i
   ImmCLbl l -> char '=' <> pprAsmLabel platform l
-  ImmFloat f -> float (fromRational f)
-  ImmDouble d -> double (fromRational d)
+  ImmFloat f -> float f
+  ImmDouble d -> double d
   _ -> pprPanic "LA64.Ppr.pprOpImm" (text "Unsupported immediate for instruction operands:" <+> (text . show) imm)
 
 negOp :: Operand -> Operand

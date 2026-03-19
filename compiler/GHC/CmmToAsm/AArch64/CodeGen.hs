@@ -56,6 +56,7 @@ import GHC.Float
 
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
+import GHC.Types.Literal.Floating
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -682,14 +683,13 @@ getRegister' config plat expr
           return (Any (intFormat rep) (\dst -> imm_code `snocOL` annExpr expr (MOV (OpReg rep dst) op)))
 
         -- floatToBytes (fromRational f)
-        CmmFloat 0 w   -> do
+        CmmFloat f fty | isPositiveZeroLF f -> do
+          let w = litFloatingTypeWidth fty
           (op, imm_code) <- litToImm' lit
           return (Any (floatFormat w) (\dst -> imm_code `snocOL` annExpr expr (MOV (OpReg w dst) op)))
 
-        CmmFloat _f W8  -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (pdoc plat expr)
-        CmmFloat _f W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (pdoc plat expr)
-        CmmFloat f W32 -> do
-          let word = castFloatToWord32 (fromRational f) :: Word32
+        CmmFloat f LitFloat -> do
+          let word = castFloatToWord32 (litFloatingToHostFloat f) :: Word32
               half0 = fromIntegral (fromIntegral word :: Word16)
               half1 = fromIntegral (fromIntegral (word `shiftR` 16) :: Word16)
           tmp <- getNewRegNat (intFormat W32)
@@ -698,8 +698,8 @@ getRegister' config plat expr
                                                       , MOVK (OpReg W32 tmp) (OpImmShift (ImmInt half1) SLSL 16)
                                                       , MOV (OpReg W32 dst) (OpReg W32 tmp)
                                                       ]))
-        CmmFloat f W64 -> do
-          let word = castDoubleToWord64 (fromRational f) :: Word64
+        CmmFloat f LitDouble -> do
+          let word = castDoubleToWord64 (litFloatingToHostDouble f) :: Word64
               half0 = fromIntegral (fromIntegral word :: Word16)
               half1 = fromIntegral (fromIntegral (word `shiftR` 16) :: Word16)
               half2 = fromIntegral (fromIntegral (word `shiftR` 32) :: Word16)
@@ -712,7 +712,6 @@ getRegister' config plat expr
                                                       , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half3) SLSL 48)
                                                       , MOV (OpReg W64 dst) (OpReg W64 tmp)
                                                       ]))
-        CmmFloat _f _w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (pdoc plat expr)
         CmmVec _ -> vectorsNeedLlvm
         CmmLabel _lbl -> do
           (op, imm_code) <- litToImm' lit

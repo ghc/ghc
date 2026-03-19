@@ -729,14 +729,15 @@ getRegister' _ _ (CmmLit (CmmInt i rep))
     in
         return (Any (intFormat rep) code)
 
-getRegister' config _ (CmmLit (CmmFloat f frep)) = do
+getRegister' config _ (CmmLit (CmmFloat f fty)) = do
     lbl <- getNewLabelNat
     dynRef <- cmmMakeDynamicReference config DataReference lbl
     Amode addr addr_code <- getAmode D dynRef
-    let format = floatFormat frep
+    let frep = litFloatingTypeWidth fty
+        format = floatFormat frep
         code dst =
             LDATA (Section ReadOnlyData lbl)
-                  (CmmStaticsRaw lbl [CmmStaticLit (CmmFloat f frep)])
+                  (CmmStaticsRaw lbl [CmmStaticLit (CmmFloat f fty)])
             `consOL` (addr_code `snocOL` LD format dst addr)
     return (Any format code)
 

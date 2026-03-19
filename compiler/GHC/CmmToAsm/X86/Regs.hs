@@ -58,6 +58,7 @@ import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Utils.Panic
 import GHC.Platform
+import GHC.Types.Literal.Floating
 
 -- | regSqueeze_class reg
 --      Calculate the maximum number of register colors that could be
@@ -107,8 +108,8 @@ data Imm
   | ImmCLbl     CLabel      -- AbstractC Label (with baggage)
   | ImmLit      FastString
   | ImmIndex    CLabel Int
-  | ImmFloat    Rational
-  | ImmDouble   Rational
+  | ImmFloat    !Float
+  | ImmDouble   !Double
   | ImmConstantSum Imm Imm
   | ImmConstantDiff Imm Imm
 
@@ -121,8 +122,8 @@ litToImm (CmmInt i w)        = ImmInteger (narrowS w i)
                 -- narrow to the width: a CmmInt might be out of
                 -- range, but we assume that ImmInteger only contains
                 -- in-range values.  A signed value should be fine here.
-litToImm (CmmFloat f W32)    = ImmFloat f
-litToImm (CmmFloat f W64)    = ImmDouble f
+litToImm (CmmFloat f LitFloat)  = ImmFloat  (litFloatingToHostFloat  f)
+litToImm (CmmFloat f LitDouble) = ImmDouble (litFloatingToHostDouble f)
 litToImm (CmmLabel l)        = ImmCLbl l
 litToImm (CmmLabelOff l off) = ImmIndex l off
 litToImm (CmmLabelDiffOff l1 l2 off _)

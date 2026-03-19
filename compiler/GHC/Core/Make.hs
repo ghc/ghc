@@ -276,13 +276,15 @@ mkNaturalExpr platform w
   | platformInWordRange platform w = mkCoreConApps naturalNSDataCon [mkWordLit platform w]
   | otherwise                      = mkCoreConApps naturalNBDataCon [Lit (mkLitBigNat w)]
 
--- | Create a 'CoreExpr' which will evaluate to the given @Float@
-mkFloatExpr :: Float -> CoreExpr
-mkFloatExpr f = mkCoreConApps floatDataCon [mkFloatLitFloat f]
+-- | Create a 'CoreExpr' which will evaluate to a
+-- (lifted) @Float@ approximating the given @Rational@
+mkFloatExpr  :: Rational -> CoreExpr
+mkFloatExpr  r = mkCoreConApps floatDataCon  [mkFloatLit  r]
 
--- | Create a 'CoreExpr' which will evaluate to the given @Double@
-mkDoubleExpr :: Double -> CoreExpr
-mkDoubleExpr d = mkCoreConApps doubleDataCon [mkDoubleLitDouble d]
+-- | Create a 'CoreExpr' which will evaluate to a
+-- (lifted) @Double@ approximating the given @Rational@
+mkDoubleExpr :: Rational -> CoreExpr
+mkDoubleExpr r = mkCoreConApps doubleDataCon [mkDoubleLit r]
 
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Char@

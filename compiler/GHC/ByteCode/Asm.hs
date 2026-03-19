@@ -32,6 +32,7 @@ import GHC.Runtime.Heap.Layout ( fromStgWord, StgWord )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Literal
+import GHC.Types.Literal.Floating
 import GHC.Types.Unique.DSet
 import GHC.Types.SptEntry
 import GHC.Types.Unique.FM
@@ -869,8 +870,8 @@ assembleI platform i = case i of
     literal :: Literal -> m Word
     literal (LitLabel fs _)   = litlabel fs
     literal LitNullAddr       = word 0
-    literal (LitFloat r)      = float (fromRational r)
-    literal (LitDouble r)     = double (fromRational r)
+    literal (LitFloating LitFloat  x) = float  (litFloatingToHostFloat  x)
+    literal (LitFloating LitDouble x) = double (litFloatingToHostDouble x)
     literal (LitChar c)       = int (ord c)
     literal (LitString bs)    = lit1 (BCONPtrStr bs)
        -- LitString requires a zero-terminator when emitted

@@ -30,6 +30,7 @@ import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Prof ( costCentreFrom )
 
 import GHC.Types.Basic
+import GHC.Types.Literal.Floating
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph
 import GHC.Stg.Syntax
@@ -2769,7 +2770,11 @@ doVecPackOp ty es dst = do
     zero :: CmmLit
     zero
       | isFloatType (vecElemType ty)
-      = CmmFloat 0 w
+      = let fty = case w of
+                    W32 -> LitFloat
+                    W64 -> LitDouble
+                    _ -> pprPanic "doVecPackOp FloatVec" (ppr w)
+        in CmmFloat (rationalToLitFloating 0) fty
       | otherwise
       = CmmInt 0 w
 

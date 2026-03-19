@@ -916,6 +916,7 @@ Library
         GHC.Types.Id.Info
         GHC.Types.Id.Make
         GHC.Types.Literal
+        GHC.Types.Literal.Floating
         GHC.Types.Meta
         GHC.Types.Name
         GHC.Types.Name.Cache

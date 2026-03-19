@@ -57,6 +57,7 @@ import GHC.Data.Maybe
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Types.Literal
+import GHC.Types.Literal.Floating
 import GHC.Core
 import GHC.Core.TyCo.Compare( eqType, nonDetCmpType )
 import GHC.Core.Map.Expr
@@ -656,8 +657,10 @@ literalToPmLit :: Type -> Literal -> Maybe PmLit
 literalToPmLit ty l = PmLit ty <$> go l
   where
     go (LitChar c)       = Just (PmLitChar c)
-    go (LitFloat r)      = Just (PmLitRat r)
-    go (LitDouble r)     = Just (PmLitRat r)
+    go (LitFloating _ f) = Just (PmLitRat (unsafeLitFloatingToRational f))
+      -- 'unsafeLitFloatingToRational' is OK here because there is no
+      -- way to write NaN/Infinity as patterns, and we are OK with
+      -- equating -0.0 with +0.0.
     go (LitString s)     = Just (PmLitString (mkFastStringByteString s))
     go (LitNumber _ i)   = Just (PmLitInt i)
     go _                 = Nothing
@@ -703,9 +706,7 @@ coreExprAsPmLit e = case collectArgs e of
     , dataConName dc == ratioDataConName
     , Just (PmLit _ (PmLitInt n)) <- coreExprAsPmLit n_arg
     , Just (PmLit _ (PmLitInt d)) <- coreExprAsPmLit d_arg
-    -- HACK: just assume we have a literal double. This case only occurs for
-    --       overloaded lits anyway, so we immediately override type information
-    -> literalToPmLit (exprType e) (mkLitDouble (n % d))
+    -> Just (PmLit (exprType e) (PmLitRat (n % d)))
 
   (Var x, args)
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]

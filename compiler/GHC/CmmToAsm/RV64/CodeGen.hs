@@ -9,7 +9,6 @@ where
 
 import Control.Monad
 import Data.Maybe
-import Data.Word
 import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
@@ -55,6 +54,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Types.Literal.Floating
 
 -- For an overview of an NCG's structure, see Note [General layout of an NCG]
 
@@ -576,13 +576,12 @@ getRegister' config plat expr =
           -- sign-extended on load!
           let imm = OpImm . ImmInteger $ narrowU w i
            in pure (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg w dst) imm)))
-        CmmFloat 0 w -> do
-          let op = litToImm' lit
+        CmmFloat f fty | isPositiveZeroLF f -> do
+          let w = litFloatingTypeWidth fty
+              op = litToImm' lit
           pure (Any (floatFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg w dst) op)))
-        CmmFloat _f W8 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (pdoc plat expr)
-        CmmFloat _f W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (pdoc plat expr)
-        CmmFloat f W32 -> do
-          let word = castFloatToWord32 (fromRational f) :: Word32
+        CmmFloat f LitFloat -> do
+          let word = castFloatToWord32 (litFloatingToHostFloat f)
           intReg <- getNewRegNat (intFormat W32)
           return
             ( Any
@@ -595,8 +594,8 @@ getRegister' config plat expr =
                       ]
                 )
             )
-        CmmFloat f W64 -> do
-          let word = castDoubleToWord64 (fromRational f) :: Word64
+        CmmFloat f LitDouble -> do
+          let word = castDoubleToWord64 (litFloatingToHostDouble f)
           intReg <- getNewRegNat (intFormat W64)
           return
             ( Any
@@ -609,7 +608,6 @@ getRegister' config plat expr =
                       ]
                 )
             )
-        CmmFloat _f _w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (pdoc plat expr)
         CmmVec _lits -> pprPanic "getRegister' (CmmLit:CmmVec): " (pdoc plat expr)
         CmmLabel lbl -> do
           let op = OpImm (ImmCLbl lbl)

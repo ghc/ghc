@@ -1249,8 +1249,8 @@ integerToFloatName, integerToDoubleName,
   rationalToFloatName, rationalToDoubleName :: Name
 integerToFloatName   = varQual gHC_INTERNAL_FLOAT (fsLit "integerToFloat#") integerToFloatIdKey
 integerToDoubleName  = varQual gHC_INTERNAL_FLOAT (fsLit "integerToDouble#") integerToDoubleIdKey
-rationalToFloatName  = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToFloat") rationalToFloatIdKey
-rationalToDoubleName = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToDouble") rationalToDoubleIdKey
+rationalToFloatName  = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToFloat#") rationalToFloatIdKey
+rationalToDoubleName = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToDouble#") rationalToDoubleIdKey
 
 -- Class Ix
 ixClassName :: Name

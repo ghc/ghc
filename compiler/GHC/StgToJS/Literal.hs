@@ -20,15 +20,16 @@ import GHC.StgToJS.Types
 import GHC.StgToJS.Linker.Utils (decodeModifiedUTF8)
 
 import GHC.Types.Literal
+import GHC.Types.Literal.Floating
 import GHC.Types.Basic
 import GHC.Types.RepType
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
-import GHC.Float
 
 import Data.Bits as Bits
 import Data.Char (ord)
+import GHC.Float (float2Double)
 
 -- | Generate JS expressions for a Literal
 --
@@ -58,8 +59,8 @@ genLit = \case
     LitNumWord32  -> return [ toU32Expr v ]
     LitNumWord64  -> return [ toU32Expr (Bits.shiftR v 32), toU32Expr v ]
     LitNumBigNat  -> panic "genLit: unexpected BigNat that should have been removed in CorePrep"
-  LitFloat r               -> return [ toJExpr (r2f r) ]
-  LitDouble r              -> return [ toJExpr (r2d r) ]
+  LitFloating LitFloat r     -> return [ toJExpr (float2Double $ litFloatingToHostFloat r) ]
+  LitFloating LitDouble r    -> return [ toJExpr (litFloatingToHostDouble r) ]
   LitLabel name fod
     | fod == IsFunction      -> return [ ApplExpr hdMkFunctionPtr
                                                   [global (mkRawSymbol True name)]
@@ -111,8 +112,8 @@ genStaticLit = \case
     LitNumWord32  -> return [ toU32Lit v ]
     LitNumWord64  -> return [ toU32Lit (v `Bits.shiftR` 32), toU32Lit v ]
     LitNumBigNat  -> panic "genStaticLit: unexpected BigNat that should have been removed in CorePrep"
-  LitFloat r               -> return [ DoubleLit . SaneDouble . r2f $ r ]
-  LitDouble r              -> return [ DoubleLit . SaneDouble . r2d $ r ]
+  LitFloating LitFloat r   -> return [ DoubleLit . SaneDouble $ float2Double $ litFloatingToHostFloat r ]
+  LitFloating LitDouble r  -> return [ DoubleLit . SaneDouble $ litFloatingToHostDouble r ]
   LitLabel name fod        -> return [ LabelLit (fod == IsFunction) (mkRawSymbol True name)
                                      , IntLit 0 ]
   LitRubbish _ rep ->
@@ -141,9 +142,3 @@ toU32Expr i = Int (i Bits..&. 0xFFFFFFFF) .>>>. 0
 -- make an unsigned 32 bit number from this unsigned one, lower 32 bits
 toU32Lit :: Integer -> StaticLit
 toU32Lit i = IntLit (i Bits..&. 0xFFFFFFFF)
-
-r2d :: Rational -> Double
-r2d = realToFrac
-
-r2f :: Rational -> Double
-r2f = float2Double . realToFrac

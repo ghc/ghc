@@ -187,6 +187,8 @@ test('T14619', normal, compile_and_run, [''])
 test('T14754', normal, compile_and_run, [''])
 test('T14346', only_ways(['threaded1','threaded2']), compile_and_run, ['-O -threaded'])
 test('T14251', normal, compile_and_run, [''])
+test('T9811', [extra_ways(['optasm']), js_skip], compile_and_run, [''])
+test('T21227', [extra_ways(['optasm']), js_skip], compile_and_run, [''])
 
 # These actually used to fail with all optimisation settings, but adding -O just
 # to make sure

@@ -21,6 +21,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Platform
+import GHC.Types.Literal.Floating
 
 import Data.Maybe
 import GHC.Float
@@ -67,35 +68,30 @@ cmmMachOpFoldM _ (MO_VF_Broadcast lg _w) exprs =
 cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
   | MO_WF_Bitcast width <- op = case width of
       W32 | res <- castWord32ToFloat (fromInteger x)
-          -- Since we store float literals as Rationals
-          -- we must check for the usual tricky cases first
-          , not (isNegativeZero res || isNaN res || isInfinite res)
-          -- (round-tripping subnormals is not a problem)
-          , !res_rat <- toRational res
-            -> Just (CmmLit (CmmFloat res_rat W32))
-
+          -> Just (CmmLit (CmmFloat (floatToLitFloating res) LitFloat))
       W64 | res <- castWord64ToDouble (fromInteger x)
-          -- Since we store float literals as Rationals
-          -- we must check for the usual tricky cases first
-          , not (isNegativeZero res || isNaN res || isInfinite res)
-          -- (round-tripping subnormals is not a problem)
-          , !res_rat <- toRational res
-            -> Just (CmmLit (CmmFloat res_rat W64))
-
+          -> Just (CmmLit (CmmFloat (doubleToLitFloating res) LitDouble))
       _ -> Nothing
   | otherwise
   = Just $! case op of
       MO_S_Neg _ -> CmmLit (CmmInt (narrowS rep (-x)) rep)
       MO_Not _   -> CmmLit (CmmInt (complement x) rep)
 
-        -- these are interesting: we must first narrow to the
-        -- "from" type, in order to truncate to the correct size.
-        -- The final narrow/widen to the destination type
-        -- is implicit in the CmmLit.
-      MO_SF_Round _frm to -> CmmLit (CmmFloat (fromInteger x) to)
+      -- these are interesting: we must first narrow to the
+      -- "from" type, in order to truncate to the correct size.
+      -- The final narrow/widen to the destination type
+      -- is implicit in the CmmLit.
       MO_SS_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
       MO_UU_Conv  from to -> CmmLit (CmmInt (narrowU from x) to)
       MO_XX_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
+
+      MO_SF_Round from to ->
+        -- No ExcessPrecision for Cmm constant folding, so narrow appropriately.
+        let (f, fty) = case to of
+                  W32 -> ( floatToLitFloating (fromInteger $ narrowS from x), LitFloat)
+                  W64 -> (doubleToLitFloating (fromInteger $ narrowS from x), LitDouble)
+                  _ -> pprPanic "MO_SF_Round" (ppr to)
+        in CmmLit (CmmFloat f fty)
 
       MO_F_Neg{}          -> invalidArgPanic
       MO_FS_Truncate{}    -> invalidArgPanic

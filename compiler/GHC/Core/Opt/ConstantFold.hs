@@ -34,6 +34,7 @@ import GHC.Float
 import GHC.Types.Id.Make ( unboxedUnitExpr )
 import GHC.Types.Id
 import GHC.Types.Literal
+import GHC.Types.Literal.Floating
 import GHC.Types.Name.Occurrence ( occNameFS )
 import GHC.Types.Tickish
 import GHC.Types.Name ( Name, nameOccName )
@@ -656,9 +657,7 @@ primOpRules nm = \case
       [ unaryLit $ \_env -> \case
          LitNumber _ n
              | v <- castWord64ToDouble (fromInteger n)
-             -- we can't represent those float literals in Core until #18897 is fixed
-             , not (isNaN v || isInfinite v || isNegativeZero v)
-             -> Just (mkDoubleLitDouble v)
+             -> Just (Lit $ LitFloating LitDouble $ doubleToLitFloating v)
          _   -> Nothing
       ]
 
@@ -666,21 +665,19 @@ primOpRules nm = \case
       [ unaryLit $ \_env -> \case
           LitNumber _ n
               | v <- castWord32ToFloat (fromInteger n)
-              -- we can't represent those float literals in Core until #18897 is fixed
-              , not (isNaN v || isInfinite v || isNegativeZero v)
-              -> Just (mkFloatLitFloat v)
+              -> Just (Lit $ LitFloating LitFloat $ floatToLitFloating v)
           _   -> Nothing
       ]
 
    CastDoubleToWord64Op -> mkPrimOpRule nm 1
       [ unaryLit $ \_env -> \case
-         LitDouble n -> Just (mkWord64LitWord64 (castDoubleToWord64 (fromRational n)))
+         LitFloating LitDouble n -> Just (mkWord64LitWord64 (castDoubleToWord64 (litFloatingToHostDouble n)))
          _           -> Nothing
       ]
 
    CastFloatToWord32Op -> mkPrimOpRule nm 1
       [ unaryLit $ \_env -> \case
-          LitFloat n -> Just (mkWord32LitWord32 (castFloatToWord32 (fromRational n)))
+          LitFloating LitFloat n -> Just (mkWord32LitWord32 (castFloatToWord32 (litFloatingToHostFloat n)))
           _          -> Nothing
       ]
 
@@ -690,40 +687,40 @@ primOpRules nm = \case
                                             guard (litFitsInChar lit)
                                             liftLit intToCharLit
                                        , semiInversePrimOp OrdOp ]
-   FloatToIntOp    -> mkPrimOpRule nm 1 [ liftLit floatToIntLit ]
-   IntToFloatOp    -> mkPrimOpRule nm 1 [ liftLit intToFloatLit ]
-   DoubleToIntOp   -> mkPrimOpRule nm 1 [ liftLit doubleToIntLit ]
-   IntToDoubleOp   -> mkPrimOpRule nm 1 [ liftLit intToDoubleLit ]
+   FloatToIntOp    -> mkPrimOpRule nm 1 [ unaryLit floatingTruncateOp ]
+   IntToFloatOp    -> mkPrimOpRule nm 1 [ liftLit (intToFloatingOp LitFloat) ]
+   DoubleToIntOp   -> mkPrimOpRule nm 1 [ unaryLit floatingTruncateOp ]
+   IntToDoubleOp   -> mkPrimOpRule nm 1 [ liftLit (intToFloatingOp LitDouble) ]
    -- SUP: Not sure what the standard says about precision in the following 2 cases
-   FloatToDoubleOp -> mkPrimOpRule nm 1 [ liftLit floatToDoubleLit ]
-   DoubleToFloatOp -> mkPrimOpRule nm 1 [ liftLit doubleToFloatLit ]
+   FloatToDoubleOp -> mkPrimOpRule nm 1 [ unaryLit (floatingResizeOp LitDouble)]
+   DoubleToFloatOp -> mkPrimOpRule nm 1 [ unaryLit (floatingResizeOp LitFloat)]
 
    -- Float
-   FloatAddOp        -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (+))
-                                          , identity zerof ]
-   FloatSubOp        -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (-))
+   FloatAddOp        -> mkPrimOpRule nm 2 [ binaryLit (floatingOp2 (+))
+                                          , identity negzerof ] -- identity for addition is -0.0 (#21227)
+   FloatSubOp        -> mkPrimOpRule nm 2 [ binaryLit (floatingOp2 (-))
                                           , rightIdentity zerof ]
-   FloatMulOp        -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (*))
+   FloatMulOp        -> mkPrimOpRule nm 2 [ binaryLit (floatingOp2 (*))
                                           , identity onef
-                                          , strengthReduction twof FloatAddOp  ]
+                                          , strengthReduction twof FloatAddOp ]
    FloatFMAdd        -> mkPrimOpRule nm 3 (fmaRules FMAdd  W32)
    FloatFMSub        -> mkPrimOpRule nm 3 (fmaRules FMSub  W32)
    FloatFNMAdd       -> mkPrimOpRule nm 3 (fmaRules FNMAdd W32)
    FloatFNMSub       -> mkPrimOpRule nm 3 (fmaRules FNMSub W32)
 
              -- zeroElem zerof doesn't hold because of NaN
-   FloatDivOp        -> mkPrimOpRule nm 2 [ guardFloatDiv >> binaryLit (floatOp2 (/))
+   FloatDivOp        -> mkPrimOpRule nm 2 [ binaryLit (floatingOp2 (/))
                                           , rightIdentity onef ]
    FloatNegOp        -> mkPrimOpRule nm 1 [ unaryLit negOp
                                           , semiInversePrimOp FloatNegOp ]
-   FloatDecode_IntOp -> mkPrimOpRule nm 1 [ unaryLit floatDecodeOp ]
+   FloatDecode_IntOp -> mkPrimOpRule nm 1 [ unaryLit floatingDecodeOp ]
 
    -- Double
-   DoubleAddOp          -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (+))
-                                             , identity zerod ]
-   DoubleSubOp          -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (-))
+   DoubleAddOp          -> mkPrimOpRule nm 2 [ binaryLit (floatingOp2 (+))
+                                             , identity negzerod ] -- identity for addition is -0.0 (#21227)
+   DoubleSubOp          -> mkPrimOpRule nm 2 [ binaryLit (floatingOp2 (-))
                                              , rightIdentity zerod ]
-   DoubleMulOp          -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (*))
+   DoubleMulOp          -> mkPrimOpRule nm 2 [ binaryLit (floatingOp2 (*))
                                              , identity oned
                                              , strengthReduction twod DoubleAddOp  ]
    DoubleFMAdd          -> mkPrimOpRule nm 3 (fmaRules FMAdd  W64)
@@ -731,11 +728,11 @@ primOpRules nm = \case
    DoubleFNMAdd         -> mkPrimOpRule nm 3 (fmaRules FNMAdd W64)
    DoubleFNMSub         -> mkPrimOpRule nm 3 (fmaRules FNMSub W64)
               -- zeroElem zerod doesn't hold because of NaN
-   DoubleDivOp          -> mkPrimOpRule nm 2 [ guardDoubleDiv >> binaryLit (doubleOp2 (/))
+   DoubleDivOp          -> mkPrimOpRule nm 2 [ binaryLit (floatingOp2 (/))
                                              , rightIdentity oned ]
    DoubleNegOp          -> mkPrimOpRule nm 1 [ unaryLit negOp
                                              , semiInversePrimOp DoubleNegOp ]
-   DoubleDecode_Int64Op -> mkPrimOpRule nm 1 [ unaryLit doubleDecodeOp ]
+   DoubleDecode_Int64Op -> mkPrimOpRule nm 1 [ unaryLit floatingDecodeOp ]
 
    -- Relational operators, equality
 
@@ -883,7 +880,7 @@ mkRelOpRule nm cmp extra
 {- Note [Rules for floating-point comparisons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We need different rules for floating-point values because for floats
-it is not true that x = x (for NaNs); so we do not want the equal_rule
+it is not true that x == x (for NaNs); so we do not want the equal_rule
 rule that mkRelOpRule uses.
 
 Note also that, in the case of equality/inequality, we do /not/
@@ -943,25 +940,28 @@ oneI64  = mkLitInt64  1
 zeroW64 = mkLitWord64 0
 oneW64  = mkLitWord64 1
 
-zerof, onef, twof, zerod, oned, twod :: Literal
+zerof, onef, twof, zerod, oned, twod, negzerof, negzerod :: Literal
 zerof = mkLitFloat 0.0
 onef  = mkLitFloat 1.0
 twof  = mkLitFloat 2.0
 zerod = mkLitDouble 0.0
 oned  = mkLitDouble 1.0
 twod  = mkLitDouble 2.0
+negzerof = LitFloating LitFloat  $ floatToLitFloating (-0.0)
+negzerod = LitFloating LitDouble $ doubleToLitFloating (-0.0)
 
-cmpOp :: Platform -> (forall a . Ord a => a -> a -> Bool)
+cmpOp :: (forall a . Ord a => a -> a -> Bool) -> RuleOpts
       -> Literal -> Literal -> Maybe CoreExpr
-cmpOp platform cmp = go
+cmpOp cmp env = go
   where
-    done True  = Just $ trueValInt  platform
-    done False = Just $ falseValInt platform
+    done True  = Just $ trueValInt  (roPlatform env)
+    done False = Just $ falseValInt (roPlatform env)
 
     -- These compares are at different types
     go (LitChar i1)   (LitChar i2)   = done (i1 `cmp` i2)
-    go (LitFloat i1)  (LitFloat i2)  = done (i1 `cmp` i2)
-    go (LitDouble i1) (LitDouble i2) = done (i1 `cmp` i2)
+    go (LitFloating lft1 i1) (LitFloating lft2 i2)
+      | lft1 == lft2
+      = done (litFloatingComparisonOp (roCFPrecision lft1 env) cmp i1 i2)
     go (LitNumber nt1 i1) (LitNumber nt2 i2)
       | nt1 /= nt2 = Nothing
       | otherwise  = done (i1 `cmp` i2)
@@ -970,11 +970,9 @@ cmpOp platform cmp = go
 --------------------------
 
 negOp :: RuleOpts -> Literal -> Maybe CoreExpr  -- Negate
-negOp env = \case
-   (LitFloat 0.0)  -> Nothing  -- can't represent -0.0 as a Rational
-   (LitFloat f)    -> Just (mkFloatVal env (-f))
-   (LitDouble 0.0) -> Nothing
-   (LitDouble d)   -> Just (mkDoubleVal env (-d))
+negOp env lit = case  lit  of
+   (LitFloating prec f) -> Just $ Lit $ LitFloating prec $
+          litFloatingUnaryOp (roCFPrecision prec env) negate f
    (LitNumber nt i)
       | litNumIsSigned nt -> Just (Lit (mkLitNumberWrap (roPlatform env) nt (-i)))
    _ -> Nothing
@@ -1142,37 +1140,48 @@ shiftRule lit_num_ty shift_op = do
     _ -> mzero
 
 --------------------------
-floatOp2 :: (Rational -> Rational -> Rational)
-         -> RuleOpts -> Literal -> Literal
-         -> Maybe (Expr CoreBndr)
-floatOp2 op env (LitFloat f1) (LitFloat f2)
-  = Just (mkFloatVal env (f1 `op` f2))
-floatOp2 _ _ _ _ = Nothing
+floatingOp2 :: (forall t. Fractional t => t -> t -> t)
+            -> RuleOpts -> Literal -> Literal
+            -> Maybe (Expr CoreBndr)
+floatingOp2 op env (LitFloating lft1 v1) (LitFloating lft2 v2)
+  | lft1 == lft2
+  , prec <- roCFPrecision lft1 env
+  = Just (Lit (LitFloating lft1 (litFloatingBinaryOp prec op v1 v2)))
+floatingOp2 _ _ _ _ = Nothing
+
+floatingTruncateOp :: RuleOpts -> Literal -> Maybe CoreExpr
+floatingTruncateOp env (LitFloating lft f)
+  = Just (mkIntLitWrap platform (truncateLitFloating precision f))
+  where  platform  = roPlatform env
+         precision = roCFPrecision lft env
+floatingTruncateOp _ _ = Nothing
+
+floatingResizeOp :: LitFloatingType -> RuleOpts -> Literal -> Maybe CoreExpr
+floatingResizeOp tarTy env (LitFloating _srcTy f)
+  = Just (Lit (LitFloating tarTy (litFloatingUnaryOp precision id f)))
+  where  precision = roCFPrecision tarTy env
+floatingResizeOp _ _ _ = Nothing
+
+intToFloatingOp :: LitFloatingType -> Literal -> Literal
+intToFloatingOp LitFloat  (LitNumber _ i) = mkLitFloat  (toRational i)
+intToFloatingOp LitDouble (LitNumber _ i) = mkLitDouble (toRational i)
+intToFloatingOp _ lit = pprPanic "intToFloatingOp: bad literal" (ppr lit)
 
 --------------------------
-floatDecodeOp :: RuleOpts -> Literal -> Maybe CoreExpr
-floatDecodeOp env (LitFloat ((decodeFloat . fromRational @Float) -> (m, e)))
-  = Just $ mkCoreUnboxedTuple [ mkIntVal (roPlatform env) (toInteger m)
-                              , mkIntVal (roPlatform env) (toInteger e) ]
-floatDecodeOp _   _
-  = Nothing
-
---------------------------
-doubleOp2 :: (Rational -> Rational -> Rational)
-          -> RuleOpts -> Literal -> Literal
-          -> Maybe (Expr CoreBndr)
-doubleOp2 op env (LitDouble f1) (LitDouble f2)
-  = Just (mkDoubleVal env (f1 `op` f2))
-doubleOp2 _ _ _ _ = Nothing
-
---------------------------
-doubleDecodeOp :: RuleOpts -> Literal -> Maybe CoreExpr
-doubleDecodeOp env (LitDouble ((decodeFloat . fromRational @Double) -> (m, e)))
-  = Just $ mkCoreUnboxedTuple [ Lit (mkLitInt64Wrap (toInteger m))
-                              , mkIntVal platform (toInteger e) ]
+floatingDecodeOp :: RuleOpts -> Literal -> Maybe CoreExpr
+floatingDecodeOp env (LitFloating srcTy f)
+  = Just $ mkCoreUnboxedTuple
+              [ Lit (mkLitMant m)
+              , mkIntVal platform (toInteger e) ]
   where
     platform = roPlatform env
-doubleDecodeOp _   _
+    (m, e) = decodeLitFloating srcTy platform f
+    mkLitMant
+      | LitFloat  <- srcTy
+      = mkLitIntWrap platform
+      | LitDouble <- srcTy
+      = mkLitInt64Wrap
+floatingDecodeOp _   _
   = Nothing
 
 --------------------------
@@ -1180,63 +1189,48 @@ doubleDecodeOp _   _
 -- | Constant folding rules for fused multiply-add operations.
 fmaRules :: FMASign -> Width -> [RuleM CoreExpr]
 fmaRules signs width =
-     [ fmaLit signs width
-     , fmaZero_z signs width
-     , fmaOne signs width ]
+  [ fmaLit    signs width
+  , fmaZero_z signs width
+  , fmaOne    signs width ]
 
 -- | Compute @a * b + c@ when @a@, @b@, @c@ are all literals.
 fmaLit :: FMASign -> Width -> RuleM CoreExpr
 fmaLit signs width = do
   env <- getRuleOpts
   [Lit l1, Lit l2, Lit l3] <- getArgs
-  liftMaybe $
-    op env
-      (convFloating env l1)
-      (convFloating env l2)
-      (convFloating env l3)
+  liftMaybe $ op env l1 l2 l3
 
   where
-    op env l1 l2 l3 =
-      case width of
-        W32
-          | LitFloat x <- l1
-          , LitFloat y <- l2
-          , LitFloat z <- l3
-          -> Just $ mkFloatVal env $
-            case signs of
-              FMAdd  -> x * y + z
-              FMSub  -> x * y - z
-              FNMAdd -> negate ( x * y ) + z
-              FNMSub -> negate ( x * y ) - z
-        W64
-          | LitDouble x <- l1
-          , LitDouble y <- l2
-          , LitDouble z <- l3
-          -> Just $ mkDoubleVal env $
-            case signs of
-              FMAdd  -> x * y + z
-              FMSub  -> x * y - z
-              FNMAdd -> negate ( x * y ) + z
-              FNMSub -> negate ( x * y ) - z
-        _ -> Nothing
+    fty = case width of { W32 -> LitFloat; W64 -> LitDouble; _ -> panic "fmaLit: non float" }
+    op env l1 l2 l3
+      | LitFloating _ l1' <- l1
+      , LitFloating _ l2' <- l2
+      , LitFloating _ l3' <- l3
+      = Just $ Lit $ LitFloating fty $
+        litFloatingTernaryOp (roCFPrecision fty env) fn l1' l2' l3'
+      | otherwise
+      = Nothing
+    fn :: Fractional t => t -> t -> t -> t
+    fn x y z =
+      case signs of
+        FMAdd  -> x * y + z
+        FMSub  -> x * y - z
+        FNMAdd -> negate ( x * y ) + z
+        FNMSub -> negate ( x * y ) - z
 
 -- | @x * y + 0 = x * y@.
 fmaZero_z :: FMASign -> Width -> RuleM CoreExpr
 fmaZero_z signs width = do
   [x, y, Lit z] <- getArgs
   let
-    -- TODO: we should additionally check the sign of z.
-    -- FMAdd, FNMAdd: should be -0.0.
-    -- FMSub, FNMSub: should be +0.0.
-    ok =
-      case width of
-        W32
-          | LitFloat 0 <- z
-          -> True
-        W64
-          | LitDouble 0 <- z
-          -> True
-        _ -> False
+    ok
+      | LitFloating _ zf <- z
+      , isZeroLF zf
+      = if signs `elem` [ FMAdd, FNMAdd ]
+        then not $ isPositiveZeroLF zf
+        else isPositiveZeroLF zf
+      | otherwise
+      = False
     neg = case width of
       W32 ->  FloatNegOp
       W64 -> DoubleNegOp
@@ -1258,28 +1252,30 @@ fmaOne :: FMASign -> Width -> RuleM CoreExpr
 fmaOne signs width = do
   [x, y, z] <- getArgs
   let
-    posNegOne_maybe :: Rational -> Maybe Bool
+    posNegOne_maybe :: LitFloating -> Maybe Bool
     posNegOne_maybe i
-      | i == 1
+      | i == rationalToLitFloating 1
       = Just False
-      | i == -1
+      | i == rationalToLitFloating (-1)
       = Just True
       | otherwise
       = Nothing
     ok =
       case width of
         W32
-          | Lit (LitFloat i) <- x
+          | Lit (LitFloating LitFloat i) <- x
           , Just sgn <- posNegOne_maybe i
           -> Just (sgn, y)
-          | Lit (LitFloat i) <- y
+          | Lit (LitFloating LitFloat i) <- y
           , Just sgn <- posNegOne_maybe i
           -> Just (sgn, x)
         W64
-          | Lit (LitDouble i) <- x
+          | Lit (LitFloating LitDouble i) <- x
+          , isFiniteLF i
           , Just sgn <- posNegOne_maybe i
           -> Just (sgn, y)
-          | Lit (LitDouble i) <- y
+          | Lit (LitFloating LitDouble i) <- y
+          , isFiniteLF i
           , Just sgn <- posNegOne_maybe i
           -> Just (sgn, x)
         _ -> Nothing
@@ -1682,6 +1678,12 @@ getWordSize = platformWordSize <$> getPlatform
 getRuleOpts :: RuleM RuleOpts
 getRuleOpts = RuleM $ \rule_opts _ _ _ -> Just rule_opts
 
+roCFPrecision :: LitFloatingType -> RuleOpts -> ConstantFoldingPrecision
+roCFPrecision ty opts
+  | roExcessRationalPrecision opts = ExcessPrecision
+  | LitFloat  <- ty = FloatPrecision
+  | LitDouble <- ty = DoublePrecision
+
 liftMaybe :: Maybe a -> RuleM a
 liftMaybe Nothing = mzero
 liftMaybe (Just x) = return x
@@ -1779,18 +1781,16 @@ unaryLit :: (RuleOpts -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
 unaryLit op = do
   env <- getRuleOpts
   [Lit l] <- getArgs
-  liftMaybe $ op env (convFloating env l)
+  liftMaybe $ op env l
 
 binaryLit :: (RuleOpts -> Literal -> Literal -> Maybe CoreExpr) -> RuleM CoreExpr
 binaryLit op = do
   env <- getRuleOpts
   [Lit l1, Lit l2] <- getArgs
-  liftMaybe $ op env (convFloating env l1) (convFloating env l2)
+  liftMaybe $ op env l1 l2
 
 binaryCmpLit :: (forall a . Ord a => a -> a -> Bool) -> RuleM CoreExpr
-binaryCmpLit op = do
-  platform <- getPlatform
-  binaryLit (\_ -> cmpOp platform op)
+binaryCmpLit op = binaryLit (cmpOp op)
 
 leftIdentity :: Literal -> RuleM CoreExpr
 leftIdentity id_lit = leftIdentityPlatform (const id_lit)
@@ -1886,34 +1886,6 @@ ctz = lift_bits_op @a (fromIntegral . countTrailingZeros)
 clz :: forall a. (Num a, FiniteBits a) => RuleM CoreExpr
 clz = lift_bits_op @a (fromIntegral . countLeadingZeros)
 
--- When excess precision is not requested, cut down the precision of the
--- Rational value to that of Float/Double. We confuse host architecture
--- and target architecture here, but it's convenient (and wrong :-).
-convFloating :: RuleOpts -> Literal -> Literal
-convFloating env (LitFloat  f) | not (roExcessRationalPrecision env) =
-   LitFloat  (toRational (fromRational f :: Float ))
-convFloating env (LitDouble d) | not (roExcessRationalPrecision env) =
-   LitDouble (toRational (fromRational d :: Double))
-convFloating _ l = l
-
-guardFloatDiv :: RuleM ()
-guardFloatDiv = do
-  [Lit (LitFloat f1), Lit (LitFloat f2)] <- getArgs
-  guard $ (f1 /=0 || f2 > 0) -- see Note [negative zero]
-       && f2 /= 0            -- avoid NaN and Infinity/-Infinity
-
-guardDoubleDiv :: RuleM ()
-guardDoubleDiv = do
-  [Lit (LitDouble d1), Lit (LitDouble d2)] <- getArgs
-  guard $ (d1 /=0 || d2 > 0) -- see Note [negative zero]
-       && d2 /= 0            -- avoid NaN and Infinity/-Infinity
--- Note [negative zero]
--- ~~~~~~~~~~~~~~~~~~~~
--- Avoid (0 / -d), otherwise 0/(-1) reduces to
--- zero, but we might want to preserve the negative zero here which
--- is representable in Float/Double but not in (normalised)
--- Rational. (#3676) Perhaps we should generate (0 :% (-1)) instead?
-
 strengthReduction :: Literal -> PrimOp -> RuleM CoreExpr
 strengthReduction two_lit add_op = do -- Note [Strength reduction]
   arg <- msum [ do [arg, Lit mult_lit] <- getArgs
@@ -1954,10 +1926,6 @@ gtVal = Var ordGTDataConId
 
 mkIntVal :: Platform -> Integer -> Expr CoreBndr
 mkIntVal platform i = Lit (mkLitInt platform i)
-mkFloatVal :: RuleOpts -> Rational -> Expr CoreBndr
-mkFloatVal env f = Lit (convFloating env (LitFloat  f))
-mkDoubleVal :: RuleOpts -> Rational -> Expr CoreBndr
-mkDoubleVal env d = Lit (convFloating env (LitDouble d))
 
 matchPrimOpId :: PrimOp -> Id -> RuleM ()
 matchPrimOpId op id = do
@@ -2217,8 +2185,8 @@ builtinBignumRules =
   , integer_to_lit "Integer -> Int# (wrap)"    integerToIntName    mkIntLitWrap
   , integer_to_lit "Integer -> Word64# (wrap)" integerToWord64Name (\_ -> mkWord64LitWord64 . fromInteger)
   , integer_to_lit "Integer -> Int64# (wrap)"  integerToInt64Name  (\_ -> mkInt64LitInt64 . fromInteger)
-  , integer_to_lit "Integer -> Float#"         integerToFloatName  (\_ -> mkFloatLitFloat . fromInteger)
-  , integer_to_lit "Integer -> Double#"        integerToDoubleName (\_ -> mkDoubleLitDouble . fromInteger)
+  , integer_to_lit "Integer -> Float#"         integerToFloatName  (\_ -> mkFloatLit  . fromInteger)
+  , integer_to_lit "Integer -> Double#"        integerToDoubleName (\_ -> mkDoubleLit . fromInteger)
 
   , integer_to_natural "Integer -> Natural (clamp)" integerToNaturalClampName False True
   , integer_to_natural "Integer -> Natural (wrap)"  integerToNaturalName      False False
@@ -2301,12 +2269,14 @@ builtinBignumRules =
   , divop_both "naturalQuotRem" naturalQuotRemName quotRem mkNaturalExpr
 
     -- conversions from Rational for Float/Double literals
-  , rational_to "rationalToFloat"  rationalToFloatName  mkFloatExpr
-  , rational_to "rationalToDouble" rationalToDoubleName mkDoubleExpr
+  , rational_to "rationalToFloat#"  rationalToFloatName  LitFloat
+  , rational_to "rationalToDouble#" rationalToDoubleName LitDouble
 
     -- conversions from Integer for Float/Double literals
-  , integer_encode_float "integerEncodeFloat"  integerEncodeFloatName  mkFloatLitFloat
-  , integer_encode_float "integerEncodeDouble" integerEncodeDoubleName mkDoubleLitDouble
+  , integer_encode_float "integerEncodeFloat"  integerEncodeFloatName
+      encodeLitFloat  LitFloat
+  , integer_encode_float "integerEncodeDouble" integerEncodeDoubleName
+      encodeLitDouble LitDouble
   ]
   where
     mkRule str name nargs f = BuiltinRule
@@ -2457,27 +2427,30 @@ builtinBignumRules =
       platform <- getPlatform
       pure $ mkCoreUnboxedTuple [mk_lit platform r, mk_lit platform s]
 
-    integer_encode_float :: RealFloat a => String -> Name -> (a -> CoreExpr) -> CoreRule
-    integer_encode_float str name mk_lit = mkRule str name 2 $ do
+    integer_encode_float :: String -> Name -> (Integer -> Int -> LitFloating) -> LitFloatingType -> CoreRule
+    integer_encode_float str name encode_fun destType = mkRule str name 2 $ do
       [a0,a1] <- getArgs
       x <- isIntegerLiteral a0
       y <- isNumberLiteral a1
       -- check that y (a target Int) is in the host Int range
-      guard (y <= fromIntegral (maxBound :: Int))
-      pure (mk_lit $ encodeFloat x (fromInteger y))
+      yInt <- liftMaybe (toIntegralSized y :: Maybe Int)
+      pure $ Lit $ LitFloating destType $ encode_fun x yInt
 
-    rational_to :: RealFloat a => String -> Name -> (a -> CoreExpr) -> CoreRule
-    rational_to str name mk_lit = mkRule str name 2 $ do
-      -- This turns `rationalToFloat n d` where `n` and `d` are literals into
-      -- a literal Float (and similarly for Double).
+    rational_to :: String -> Name -> LitFloatingType -> CoreRule
+    rational_to str name destType = mkRule str name 2 $ do
+      -- This turns `rationalToFloat# n d` where `n` and `d` are literals into
+      -- a literal Float# (and similarly for Double#).
       [a0,a1] <- getArgs
       n <- isIntegerLiteral a0
       d <- isIntegerLiteral a1
-      -- it's important to not match d == 0, because that may represent a
-      -- literal "0/0" or similar, and we can't produce a literal value for
-      -- NaN or +-Inf
-      guard (d /= 0)
-      pure $ mk_lit (fromRational (n % d))
+      env <- getRuleOpts
+      pure $ Lit $ LitFloating destType $
+        if d /= 0
+        then rationalToLitFloating (n % d)
+        else
+          let n' = rationalToLitFloating (fromInteger $ signum n)
+              d' = rationalToLitFloating 0
+          in litFloatingBinaryOp (roCFPrecision destType env) (/) n' d'
 
 
 ---------------------------------------------------

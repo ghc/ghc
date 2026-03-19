@@ -28,8 +28,8 @@ module GHC.Core (
         mkWord8Lit,
         mkWord32LitWord32, mkWord64LitWord64, mkInt64LitInt64,
         mkCharLit, mkStringLit,
-        mkFloatLit, mkFloatLitFloat,
-        mkDoubleLit, mkDoubleLitDouble,
+        mkFloatLit,
+        mkDoubleLit,
 
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
         varToCoreExpr, varsToCoreExprs,
@@ -2173,22 +2173,12 @@ mkStringLit s = Lit (mkLitString s)
 -- | Create a machine single precision literal expression of type @Float#@ from a @Rational@.
 -- If you want an expression of type @Float@ use 'GHC.Core.Make.mkFloatExpr'
 mkFloatLit :: Rational -> Expr b
--- | Create a machine single precision literal expression of type @Float#@ from a @Float@.
--- If you want an expression of type @Float@ use 'GHC.Core.Make.mkFloatExpr'
-mkFloatLitFloat :: Float -> Expr b
-
-mkFloatLit      f = Lit (mkLitFloat f)
-mkFloatLitFloat f = Lit (mkLitFloat (toRational f))
+mkFloatLit f = Lit (mkLitFloat f)
 
 -- | Create a machine double precision literal expression of type @Double#@ from a @Rational@.
 -- If you want an expression of type @Double@ use 'GHC.Core.Make.mkDoubleExpr'
 mkDoubleLit :: Rational -> Expr b
--- | Create a machine double precision literal expression of type @Double#@ from a @Double@.
--- If you want an expression of type @Double@ use 'GHC.Core.Make.mkDoubleExpr'
-mkDoubleLitDouble :: Double -> Expr b
-
-mkDoubleLit       d = Lit (mkLitDouble d)
-mkDoubleLitDouble d = Lit (mkLitDouble (toRational d))
+mkDoubleLit d = Lit (mkLitDouble d)
 
 -- | Bind all supplied binding groups over an expression in a nested let expression. Assumes
 -- that the rhs satisfies the let-can-float invariant.  Prefer to use

@@ -21,6 +21,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.InitFini
 
+import GHC.Types.Literal.Floating
 import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Platform
 import GHC.Utils.Outputable
@@ -222,11 +223,11 @@ pprDataItem platform lit
         ppr_item II64 _ = [text "\t.quad\t"  <> pprImm platform imm]
 
         ppr_item FF32  (CmmFloat r _)
-           = let bs = floatToBytes (fromRational r)
+           = let bs = floatToBytes (litFloatingToHostFloat r)
              in  map (\b -> text "\t.byte\t" <> int (fromIntegral b)) bs
 
         ppr_item FF64 (CmmFloat r _)
-           = let bs = doubleToBytes (fromRational r)
+           = let bs = doubleToBytes (litFloatingToHostDouble r)
              in  map (\b -> text "\t.byte\t" <> int (fromIntegral b)) bs
 
         ppr_item _ _ = pprPanic "pprDataItem:ppr_item" (text $ show lit)
@@ -240,11 +241,11 @@ pprImm _ (ImmLit s)     = ftext s
 
 -- TODO: See pprIm below for why this is a bad idea!
 pprImm _ (ImmFloat f)
-  | f == 0 = text "wzr"
-  | otherwise = float (fromRational f)
+  | f == 0 && not (isNegativeZero f) = text "wzr"
+  | otherwise = float f
 pprImm _ (ImmDouble d)
-  | d == 0 = text "xzr"
-  | otherwise = double (fromRational d)
+  | d == 0 && not (isNegativeZero d) = text "xzr"
+  | otherwise = double d
 
 pprImm p (ImmConstantSum a b) = pprImm p a <> char '+' <> pprImm p b
 pprImm p (ImmConstantDiff a b) = pprImm p a <> char '-'
@@ -278,10 +279,10 @@ pprIm platform im = case im of
   --
   -- We could also just turn them into statics :-/ Which is what the
   -- PowerPC backend does.
-  ImmFloat f | f == 0 -> text "wzr"
-  ImmFloat f -> char '#' <> float (fromRational f)
-  ImmDouble d | d == 0 -> text "xzr"
-  ImmDouble d -> char '#' <> double (fromRational d)
+  ImmFloat f | isPositiveZero f -> text "wzr"
+  ImmFloat f -> char '#' <> float f
+  ImmDouble d | isPositiveZero d -> text "xzr"
+  ImmDouble d -> char '#' <> double d
   -- =<lbl> pseudo instruction!
   ImmCLbl l    -> char '=' <> pprAsmLabel platform l
   ImmIndex l o -> text "[=" <> pprAsmLabel platform l <> comma <+> char '#' <> int o <> char ']'

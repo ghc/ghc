@@ -13,6 +13,7 @@ module GHC.Cmm.Type
     , widthInBits, widthInBytes, widthInLog, widthFromBytes
     , wordWidth, halfWordWidth, cIntWidth
     , halfWordMask
+    , litFloatingTypeWidth
     , narrowU, narrowS
     , rEP_CostCentreStack_mem_alloc
     , rEP_CostCentreStack_scc_count
@@ -36,6 +37,7 @@ where
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Types.Literal.Floating ( LitFloatingType(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
@@ -271,6 +273,10 @@ widthInLog W128 = 4
 widthInLog W256 = 5
 widthInLog W512 = 6
 
+litFloatingTypeWidth :: LitFloatingType -> Width
+litFloatingTypeWidth = \case
+  LitFloat  -> W32
+  LitDouble -> W64
 
 -- widening / narrowing
 

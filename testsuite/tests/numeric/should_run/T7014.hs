@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE NegativeLiterals #-}
 
 module Main where
 
@@ -50,10 +51,11 @@ test_rem :: Int -> Int
 test_rem x = x `rem` 1
 
 test_addf1 :: Float -> Float
-test_addf1 x = x + 0
+test_addf1 x = x + -0
+  -- NB: x + 0 is not always equal to x, as -0 + 0 = 0
 
 test_addf2 :: Float -> Float
-test_addf2 x = 0 + x
+test_addf2 x = -0 + x
 
 test_subf :: Float -> Float
 test_subf x = x - 0

@@ -36,6 +36,7 @@ import GHC.Generics (Generic, Generically(..))
 import GHC.Types.ForeignCall
 import GHC.Types.Unique.DSM
 import GHC.Types.Unique
+import GHC.Types.Literal.Floating
 
 import GHC.Utils.Outputable
 import qualified GHC.Utils.Panic as Panic
@@ -2224,16 +2225,13 @@ genLit opt (CmmInt i w)
         --                 ]
     in return (mkIntLit width i, nilOL, [])
 
-genLit _ (CmmFloat r W32)
-  = return (LMLitVar $ LMFloatLit (widenFp (fromRational r :: Float)) (widthToLlvmFloat W32),
+genLit _ (CmmFloat r LitFloat)
+  = return (LMLitVar $ LMFloatLit (widenFp $ litFloatingToHostFloat r) (widthToLlvmFloat W32),
               nilOL, [])
 
-genLit _ (CmmFloat r W64)
-  = return (LMLitVar $ LMFloatLit (fromRational r :: Double) (widthToLlvmFloat W64),
+genLit _ (CmmFloat r LitDouble)
+  = return (LMLitVar $ LMFloatLit (litFloatingToHostDouble r) (widthToLlvmFloat W64),
               nilOL, [])
-
-genLit _ (CmmFloat _r _w)
-  = panic "genLit (CmmLit:CmmFloat), unsupported float lit"
 
 genLit opt (CmmVec ls)
   = do llvmLits <- mapM toLlvmLit ls

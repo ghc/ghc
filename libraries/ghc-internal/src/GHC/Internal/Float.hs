@@ -494,19 +494,24 @@ instance  Fractional Float  where
     recip x             =  1.0 / x
 
 rationalToFloat :: Integer -> Integer -> Float
-{-# INLINE [0] rationalToFloat #-}
+{-# INLINE rationalToFloat #-}
+rationalToFloat n d = F# (rationalToFloat# n d)
+
+rationalToFloat# :: Integer -> Integer -> Float#
 -- Re INLINE pragma, see Note [realToFrac natural-to-float]
-rationalToFloat n 0
-    | n == 0        = 0/0
-    | n < 0         = (-1)/0
-    | otherwise     = 1/0
-rationalToFloat n d
-    | n == 0        = encodeFloat 0 0
-    | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
-    | otherwise     = fromRat'' minEx mantDigs n d
+{-# INLINE [0] rationalToFloat# #-}
+rationalToFloat# n 0
+    | n == 0        = 0.0#  `divideFloat#` 0.0#
+    | n < 0         = -1.0# `divideFloat#` 0.0#
+    | otherwise     = 1.0#  `divideFloat#` 0.0#
+rationalToFloat# n d
+    | n == 0        = unwrap (encodeFloat 0 0)
+    | n < 0         = unwrap (negate (fromRat'' minEx mantDigs (-n) d))
+    | otherwise     = unwrap (fromRat'' minEx mantDigs n d)
       where
         minEx       = FLT_MIN_EXP
         mantDigs    = FLT_MANT_DIG
+        unwrap (F# f#) = f#
 
 -- | @since base-2.01
 --
@@ -746,19 +751,24 @@ instance  Fractional Double  where
     recip x             =  1.0 / x
 
 rationalToDouble :: Integer -> Integer -> Double
-{-# INLINE [0] rationalToDouble #-}
+{-# INLINE rationalToDouble #-}
+rationalToDouble n d = D# (rationalToDouble# n d)
+
+rationalToDouble# :: Integer -> Integer -> Double#
+{-# INLINE [0] rationalToDouble# #-}
 -- Re INLINE pragma, see Note [realToFrac natural-to-float]
-rationalToDouble n 0
-    | n == 0        = 0/0
-    | n < 0         = (-1)/0
-    | otherwise     = 1/0
-rationalToDouble n d
-    | n == 0        = encodeFloat 0 0
-    | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
-    | otherwise     = fromRat'' minEx mantDigs n d
+rationalToDouble# n 0
+    | n == 0        = 0.0##  /## 0.0##
+    | n < 0         = -1.0## /## 0.0##
+    | otherwise     = 1.0##  /## 0.0##
+rationalToDouble# n d
+    | n == 0        = unwrap (encodeFloat 0 0)
+    | n < 0         = unwrap (negate (fromRat'' minEx mantDigs (-n) d))
+    | otherwise     = unwrap (fromRat'' minEx mantDigs n d)
       where
         minEx       = DBL_MIN_EXP
         mantDigs    = DBL_MANT_DIG
+        unwrap (D# d#) = d#
 
 -- | @since base-2.01
 instance  Floating Double  where

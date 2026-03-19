@@ -190,6 +190,7 @@ GHC.Types.Id.Info
 GHC.Types.Id.Make
 GHC.Types.InlinePragma
 GHC.Types.Literal
+GHC.Types.Literal.Floating
 GHC.Types.Name
 GHC.Types.Name.Env
 GHC.Types.Name.Occurrence

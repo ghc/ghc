@@ -16,6 +16,7 @@ import GHC.Platform.Regs
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
+import GHC.Types.Literal.Floating
 
 -- TODO: Should this include the zero register?
 allMachRegNos   :: [RegNo]
@@ -63,8 +64,8 @@ data Imm
   | ImmCLbl     CLabel      -- AbstractC Label (with baggage)
   | ImmLit      FastString
   | ImmIndex    CLabel Int
-  | ImmFloat    Rational
-  | ImmDouble   Rational
+  | ImmFloat    !Float
+  | ImmDouble   !Double
   | ImmConstantSum Imm Imm
   | ImmConstantDiff Imm Imm
   deriving (Eq, Show)
@@ -80,8 +81,8 @@ litToImm (CmmInt i w)        = ImmInteger (narrowS w i)
                 -- in-range values.  A signed value should be fine here.
                 -- AK: We do call this with out of range values, however
                 -- it just truncates as we would expect.
-litToImm (CmmFloat f W32)    = ImmFloat f
-litToImm (CmmFloat f W64)    = ImmDouble f
+litToImm (CmmFloat f LitFloat)  = ImmFloat  (litFloatingToHostFloat  f)
+litToImm (CmmFloat f LitDouble) = ImmDouble (litFloatingToHostDouble f)
 litToImm (CmmLabel l)        = ImmCLbl l
 litToImm (CmmLabelOff l off) = ImmIndex l off
 litToImm (CmmLabelDiffOff l1 l2 off _)

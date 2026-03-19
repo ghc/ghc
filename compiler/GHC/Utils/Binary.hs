@@ -167,6 +167,7 @@ import System.IO.Error          ( mkIOError, eofErrorType )
 import Type.Reflection          ( Typeable, SomeTypeRep(..) )
 import qualified Type.Reflection as Refl
 import GHC.Real                 ( Ratio(..) )
+import GHC.Float
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import GHC.ByteOrder
@@ -930,6 +931,18 @@ instance Binary Int where
     get  bh = do
         x <- get bh
         return $! (fromIntegral (x :: Int64))
+
+instance Binary Float where
+    put_ bh f = put_ bh (FixedLengthEncoding (castFloatToWord32 f))
+    get  bh = do
+      x <- get bh
+      return $! castWord32ToFloat (unFixedLength x)
+
+instance Binary Double where
+    put_ bh d = put_ bh (FixedLengthEncoding (castDoubleToWord64 d))
+    get  bh = do
+      x <- get bh
+      return $! castWord64ToDouble (unFixedLength x)
 
 instance Binary a => Binary [a] where
     put_ bh l = do

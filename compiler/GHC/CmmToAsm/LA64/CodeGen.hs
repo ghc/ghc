@@ -11,7 +11,6 @@ module GHC.CmmToAsm.LA64.CodeGen (
 where
 
 import Data.Maybe
-import Data.Word
 import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
@@ -57,6 +56,7 @@ import GHC.Utils.Monad
 import Control.Monad
 import GHC.Cmm.Dataflow.Label
 import GHC.Types.Unique.DSM
+import GHC.Types.Literal.Floating
 
 -- [General layout of an NCG]
 cmmTopCodeGen ::
@@ -467,29 +467,26 @@ getRegister' config plat expr =
           let imm = OpImm . ImmInteger $ narrowU w i
           return (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg w dst) imm)))
 
-        CmmFloat 0 w -> do
-          let op = litToImm' lit
+        CmmFloat f fty | isPositiveZeroLF f -> do
+          let w = litFloatingTypeWidth fty
+              op = litToImm' lit
           pure (Any (floatFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg w dst) op)))
 
-        CmmFloat _f W8  -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (pdoc plat expr)
-        CmmFloat _f W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (pdoc plat expr)
-
-        CmmFloat f W32 -> do
-          let word = castFloatToWord32 (fromRational f) :: Word32
+        CmmFloat f LitFloat -> do
+          let word = castFloatToWord32 (litFloatingToHostFloat f)
           tmp <- getNewRegNat (intFormat W32)
           return (Any (floatFormat W32) (\dst -> toOL [ annExpr expr
                                                       $ MOV (OpReg W32 tmp) (OpImm (ImmInteger (fromIntegral word)))
                                                       , MOV (OpReg W32 dst) (OpReg W32 tmp)
                                                       ]))
-        CmmFloat f W64 -> do
-          let word = castDoubleToWord64 (fromRational f) :: Word64
+        CmmFloat f LitDouble -> do
+          let word = castDoubleToWord64 (litFloatingToHostDouble f)
           tmp <- getNewRegNat (intFormat W64)
           return (Any (floatFormat W64) (\dst -> toOL [ annExpr expr
                                                       $ MOV (OpReg W64 tmp) (OpImm (ImmInteger (fromIntegral word)))
                                                       , MOV (OpReg W64 dst) (OpReg W64 tmp)
                                                       ]))
 
-        CmmFloat _f _w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (pdoc plat expr)
         CmmVec _lits -> pprPanic "getRegister' (CmmLit:CmmVec): " (pdoc plat expr)
 
         CmmLabel lbl -> do

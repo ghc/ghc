@@ -70,8 +70,8 @@ cgLit (LitRubbish _ rep) =
       num_rep_lit Word16Rep = mkLitWord16Unchecked 0
       num_rep_lit Word32Rep = mkLitWord32Unchecked 0
       num_rep_lit Word64Rep = mkLitWord64Unchecked 0
-      num_rep_lit FloatRep  = LitFloat 0
-      num_rep_lit DoubleRep = LitDouble 0
+      num_rep_lit FloatRep  = mkLitFloat  0.0
+      num_rep_lit DoubleRep = mkLitDouble 0.0
       num_rep_lit other     = pprPanic "num_rep_lit: Not a num lit" (ppr other)
 
 cgLit other_lit = do
@@ -93,8 +93,7 @@ mkSimpleLit platform = \case
    (LitNumber LitNumWord16 i)   -> CmmInt i W16
    (LitNumber LitNumWord32 i)   -> CmmInt i W32
    (LitNumber LitNumWord64 i)   -> CmmInt i W64
-   (LitFloat r)                 -> CmmFloat r W32
-   (LitDouble r)                -> CmmFloat r W64
+   (LitFloating fty r)          -> CmmFloat r fty
    (LitLabel fs fod)
      -> let -- TODO: Literal labels might not actually be in the current package...
             labelSrc = ForeignLabelInThisPackage
