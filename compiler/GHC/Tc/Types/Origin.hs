@@ -9,7 +9,7 @@ module GHC.Tc.Types.Origin (
 
   -- * CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
-  srcCodeOriginCtOrigin, errCtxtCtOrigin,
+  hsCtxtCtOrigin,
   invisibleOrigin_maybe, isVisibleOrigin, toInvisibleOrigin,
   pprCtOrigin, pprCtOriginBriefly, isGivenOrigin,
   foldMapCtOrigin,
@@ -629,20 +629,16 @@ exprCtOrigin (HsIf {})            = IfThenElseOrigin
 exprCtOrigin (HsProjection _ p)   = RecordFieldProjectionOrigin (FieldLabelStrings $ fmap noLocA p)
 exprCtOrigin (RecordUpd{})        = RecordUpdOrigin
 exprCtOrigin (HsGetField _ _ f)   = GetFieldOrigin (fmap field_label $ dfoLabel (unLoc f))
-exprCtOrigin (XExpr (ExpandedThingRn (HSE o _))) = errCtxtCtOrigin o
+exprCtOrigin (XExpr (ExpandedThingRn (HSE o _))) = hsCtxtCtOrigin o
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 
-srcCodeOriginCtOrigin :: HsCtxt -> CtOrigin
-srcCodeOriginCtOrigin = errCtxtCtOrigin
-
-errCtxtCtOrigin :: HsCtxt -> CtOrigin
-errCtxtCtOrigin (ExprCtxt e) = exprCtOrigin e
-errCtxtCtOrigin (FunAppCtxt (FunAppCtxtExpr _ e) _) = exprCtOrigin e
-errCtxtCtOrigin (StmtErrCtxt{}) = DoStmtOrigin
-errCtxtCtOrigin (StmtErrCtxtPat p) = DoPatOrigin p
-errCtxtCtOrigin (RecordUpdCtxt{}) = RecordUpdOrigin
-errCtxtCtOrigin _ = Shouldn'tHappenOrigin "errCtxtCtOrigin"
-
+hsCtxtCtOrigin :: HsCtxt -> CtOrigin
+hsCtxtCtOrigin (ExprCtxt e) = exprCtOrigin e
+hsCtxtCtOrigin (FunAppCtxt (FunAppCtxtExpr _ e) _) = exprCtOrigin e
+hsCtxtCtOrigin (StmtErrCtxt{}) = DoStmtOrigin
+hsCtxtCtOrigin (StmtErrCtxtPat p) = DoPatOrigin p
+hsCtxtCtOrigin (RecordUpdCtxt{}) = RecordUpdOrigin
+hsCtxtCtOrigin _ = Shouldn'tHappenOrigin "hsCtxtCtOrigin"
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin

@@ -61,7 +61,7 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles, addDependentDirectories,
 
   -- * Error management
-  getSrcCodeOrigin,
+  getHsCtxt,
   getSrcSpanM, getRealSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
   inGeneratedCode,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
@@ -1094,8 +1094,8 @@ setSrcSpan (GeneratedSrcSpan{}) thing_inside
 setSrcSpan _ thing_inside
   = thing_inside
 
-getSrcCodeOrigin :: TcRn HsCtxt
-getSrcCodeOrigin = getLclEnvSrcCodeOrigin <$> getLclEnv
+getHsCtxt :: TcRn HsCtxt
+getHsCtxt = getLclEnvHsCtxt <$> getLclEnv
 
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
