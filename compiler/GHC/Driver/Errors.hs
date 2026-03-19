@@ -16,6 +16,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.Maybe (fromMaybe)
 
 reportError :: Logger -> NamePprCtx -> DiagOpts -> SrcSpan -> SDoc -> IO ()
 reportError logger nameContext opts span doc = do

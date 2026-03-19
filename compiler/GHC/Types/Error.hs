@@ -109,7 +109,7 @@ import Data.Bifunctor
 import Data.Foldable
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
-import Data.List ( intercalate, sortBy )
+import Data.List ( intercalate, sort )
 import Data.Maybe ( mapMaybe, maybeToList )
 import Data.Typeable ( Typeable )
 import Numeric.Natural ( Natural )
@@ -804,7 +804,7 @@ getCaretDiagnostics msg_class spans =
   vcat <$> traverse (getSingleCaretDiagnostic msg_class) (dedupSortedRealSpans spans)
   where
     dedupSortedRealSpans :: NonEmpty SrcSpan -> [RealSrcSpan]
-    dedupSortedRealSpans = go Nothing . sortBy leftmost_smallest . mapMaybe srcSpanToRealSrcSpan . NE.toList
+    dedupSortedRealSpans = go Nothing . sort . mapMaybe srcSpanToRealSrcSpan . NE.toList
       where
         go _ [] = []
         go prev (span:rest)
