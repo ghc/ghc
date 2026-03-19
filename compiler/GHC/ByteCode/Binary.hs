@@ -99,15 +99,15 @@ instance Binary OnDiskModuleByteCode where
   get bh = do
     odgbc_hash <- get bh
     odgbc_module <- get bh
-    odgbc_compiled_byte_code <- get bh
-    odgbc_foreign <- get bh
+    odgbc_compiled_byte_code <- lazyGet bh
+    odgbc_foreign <- lazyGet bh
     pure OnDiskModuleByteCode {..}
 
   put_ bh OnDiskModuleByteCode {..} = do
     put_ bh odgbc_hash
     put_ bh odgbc_module
-    put_ bh odgbc_compiled_byte_code
-    put_ bh odgbc_foreign
+    lazyPut bh odgbc_compiled_byte_code
+    lazyPut bh odgbc_foreign
 
 instance Binary OnDiskBytecodeLib where
   get bh = do
