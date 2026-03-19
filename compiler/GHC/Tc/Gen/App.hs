@@ -1941,7 +1941,7 @@ quickLookArg1 pos app_lspan (fun, fun_lspan) larg@(L _ arg) sc_arg_ty@(Scaled _ 
     do { ((rn_fun_arg, fun_lspan_arg), rn_args) <- splitHsApps arg
 
        -- Step 1: get the type of the head of the argument
-       ; (fun_ue, mb_fun_ty) <- (tcCollectingUsage $ tcInferAppHead_maybe rn_fun_arg)
+       ; (fun_ue, mb_fun_ty) <- tcCollectingUsage $ tcInferAppHead_maybe rn_fun_arg
          -- tcCollectingUsage: the use of an Id at the head generates usage-info
          -- See the call to `tcEmitBindingUsage` in `check_local_id`.  So we must
          -- capture and save it in the `EValArgQL`.  See (QLA6) in
@@ -2018,9 +2018,9 @@ mk_origin fun_lspan rn_fun
   = return $ exprCtOrigin rn_fun
   | otherwise -- if the location is generated,
               -- the best we can do is to approximate by looking on top of the error message stack
-  = do { code_orig <- getSrcCodeOrigin
+  = do { code_orig <- getHsCtxt
        ; traceTc "mk_origin" (pprHsCtxt code_orig)
-       ; return $ srcCodeOriginCtOrigin code_orig
+       ; return $ hsCtxtCtOrigin code_orig
        }
 
 

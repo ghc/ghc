@@ -467,7 +467,7 @@ tcInferAppHead_maybe fun = case fun of
                                               -- visible type applications in the argument.
                                               -- c.f. T19167
                                               (\ (e, ds_flag, ty) -> (mkExpandedTc o (L loc e), ds_flag, ty)) <$>
-                                                  tcExprSigma False (errCtxtCtOrigin o) e
+                                                  tcExprSigma False (hsCtxtCtOrigin o) e
                                               )
       _                           -> return Nothing
 

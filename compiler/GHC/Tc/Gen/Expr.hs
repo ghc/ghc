@@ -678,6 +678,7 @@ tcExpr expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
 -- in the renamer. See Note [Overview of record dot syntax] in
 -- GHC.Hs.Expr. This is why we match on 'rupd_flds = Left rbnds' here
 -- and panic otherwise.
+-- WIP: To be fixed soon expandRecordUpd needs to return HsExpansion and not a separate ds_res_ty
 tcExpr expr@(RecordUpd { rupd_expr = record_expr
                        , rupd_flds =
                            RegularRecUpdFields
@@ -1863,14 +1864,3 @@ checkMissingFields con_like rbinds arg_tys
     field_strs = conLikeImplBangs con_like
 
     fl `elemField` flds = any (\ fl' -> flSelector fl == fl') flds
-
-
--- Expands the expression on the fly
--- See Note [Handling overloaded and rebindable constructs]
--- See Note [Typechecking by expansion: overview]
-tcExpandExpr :: HsExpr GhcRn -> TcM (HsExpr GhcRn)
-tcExpandExpr orig_expr@(HsDo _ flav (L _ stmts))
-  = do { expanded_expr <- expandDoStmts flav stmts
-       ; return (mkExpandedLExpr orig_expr expanded_expr) }
-
-tcExpandExpr e = return e
