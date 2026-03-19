@@ -161,6 +161,8 @@ static void freeEventLoggingBuffer(void);
 static void ensureRoomForEvent(EventsBuf *eb, EventTypeNum tag);
 static int ensureRoomForVariableEvent(EventsBuf *eb, StgWord size);
 
+static void flushEventLog_(Capability **cap USED_IF_THREADS);
+
 static inline void postWord8(EventsBuf *eb, StgWord8 i)
 {
     *(eb->pos++) = i;
@@ -491,7 +493,7 @@ endEventLogging(void)
 
     eventlog_enabled = false;
 
-    flushEventLog(NULL);
+    flushEventLog_(NULL);
 
     ACQUIRE_LOCK(&eventBufMutex);
 
@@ -1616,6 +1618,17 @@ void flushAllCapsEventsBufs(void)
 
 void flushEventLog(Capability **cap USED_IF_THREADS)
 {
+  ACQUIRE_LOCK(&state_change_mutex);
+  flushEventLog_(cap);
+  RELEASE_LOCK(&state_change_mutex);
+}
+
+// This is an unsafe version of flushEventLog that does not acquire/release the
+// state_change mutex. It is for internal use only and should only be used when
+// (1) you're sure that there's no chance of racing with start/endEventLogging,
+// and (2) there is an event_log_writer.
+static void flushEventLog_(Capability **cap USED_IF_THREADS)
+{
     if (!event_log_writer) {
         return;
     }
@@ -1644,7 +1657,7 @@ void flushEventLog(Capability **cap USED_IF_THREADS)
     flushEventLogWriter();
 }
 
-#else
+#else /*!TRACING*/
 
 enum EventLogStatus eventLogStatus(void)
 {
