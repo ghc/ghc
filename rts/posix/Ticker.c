@@ -108,10 +108,6 @@ ghc-stage2: timer_create: Not owner
 // Select the variant to use
 #if defined(USE_TIMERFD_FOR_ITIMER)
 #include "ticker/TimerFd.c"
-#elif defined(USE_PTHREAD_FOR_ITIMER)
-#include "ticker/Pthread.c"
-#elif defined(USE_TIMER_CREATE)
-#include "ticker/TimerCreate.c"
 #else
-#include "ticker/Setitimer.c"
+#include "ticker/Pthread.c"
 #endif
