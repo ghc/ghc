@@ -35,7 +35,7 @@ test('options_ghc_fobject-code',
      ghci_script,
      ['Load_Mod_top.script'])
 
-# Should override the -fbyte-code in normal compile
+# Used to override the -fbyte-code in normal compile
 test('options_ghc_fbyte-code',
      [ when(fast(), skip),
           only_ways(['llvm']),
