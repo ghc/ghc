@@ -1140,7 +1140,7 @@ convertAnnotationWrapper fhv = do
 -}
 
 runQuasi :: TH.Q a -> TcM a
-runQuasi (TH.Q act) = unliftIOEnv $ \runInIO -> liftIO $ act runInIO metaHandlersTcM
+runQuasi (TH.Q act) = unliftIOEnv $ \runInIO -> liftIO $ act (metaHandlersTcM runInIO)
 
 runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 runRemoteModFinalizers (ThModFinalizers finRefs) = do
@@ -1557,71 +1557,71 @@ location = do { m <- getModule
                                 , TH.loc_start = (srcSpanStartLine r, srcSpanStartCol r)
                                 , TH.loc_end = (srcSpanEndLine   r, srcSpanEndCol   r) }) }
 
-metaHandlersTcM :: TH.MetaHandlers TcM
-metaHandlersTcM = TH.MetaHandlers {
-    mFail = fail
-    , mNewName = \s -> do { u <- newUnique
+metaHandlersTcM :: (forall x. TcM x -> IO x) -> TH.MetaHandlers IO
+metaHandlersTcM runInIO = TH.MetaHandlers {
+    mFail = \s -> runInIO $ fail s
+    , mNewName = \s -> runInIO $ do { u <- newUnique
                       ; let i = toInteger (getKey u)
                       ; return (TH.mkNameU s i) }
 
     -- 'msg' is forced to ensure exceptions don't escape,
     -- see Note [Exceptions in TH]
-    , mReport = report
+    , mReport = fmap runInIO . report
 
-    , mLocation = location
+    , mLocation = runInIO location
 
-    , mLookupName       = lookupName
-    , mReify            = reify
-    , mReifyFixity      = \nm -> lookupThName nm >>= reifyFixity
-    , mReifyType        = reifyTypeOfThing
-    , mReifyInstances   = reifyInstances
-    , mReifyRoles       = reifyRoles
-    , mReifyAnnotations = reifyAnnotations
-    , mReifyModule      = reifyModule
-    , mReifyConStrictness = \nm -> do { nm' <- lookupThName nm
+    , mLookupName       = fmap runInIO . lookupName
+    , mReify            = runInIO . reify
+    , mReifyFixity      = \nm -> runInIO $ lookupThName nm >>= reifyFixity
+    , mReifyType        = runInIO . reifyTypeOfThing
+    , mReifyInstances   = fmap runInIO . reifyInstances
+    , mReifyRoles       = runInIO . reifyRoles
+    , mReifyAnnotations = runInIO . reifyAnnotations
+    , mReifyModule      = runInIO . reifyModule
+    , mReifyConStrictness = \nm -> runInIO $ do { nm' <- lookupThName nm
                                       ; dc  <- tcLookupDataCon nm'
                                       ; let bangs = dataConImplBangs dc
                                       ; return (map reifyDecidedStrictness bangs) }
 
-          -- For qRecover, discard error messages if
-          -- the recovery action is chosen.  Otherwise
-          -- we'll only fail higher up.
-          -- NB: extremely subtle!!! TODO: write up note
-          -- tryTcDiscardingErrs manipulates the reader env so we need to be careful we don't sneak in the outside env
-    , mRecover = \recover main -> tryTcDiscardingErrs (runQuasi recover) (runQuasi main)
+    --       -- For qRecover, discard error messages if
+    --       -- the recovery action is chosen.  Otherwise
+    --       -- we'll only fail higher up.
+    --       -- NB: extremely subtle!!! TODO: write up note
+    --       -- tryTcDiscardingErrs manipulates the reader env so we need to be careful we don't sneak in the outside env
+    , mRecover = \recover main -> runInIO $ tryTcDiscardingErrs (runQuasi recover) (runQuasi main)
 
-    , mGetPackageRoot = do
+    , mGetPackageRoot = runInIO $ do
         dflags <- getDynFlags
         return $ fromMaybe "." (workingDirectory dflags)
 
-    , mAddDependentFile = \fp -> do
+    , mAddDependentFile = \fp -> runInIO $ do
         ref <- fmap tcg_dependent_files getGblEnv
         dep_files <- readTcRef ref
         writeTcRef ref (fp:dep_files)
 
-    , mAddDependentDirectory = \dp -> do
+    , mAddDependentDirectory = \dp -> runInIO $ do
         ref <- fmap tcg_dependent_dirs getGblEnv
         dep_dirs <- readTcRef ref
         writeTcRef ref (dp:dep_dirs)
 
-    , mAddTempFile = \suffix -> do
+    , mAddTempFile = \suffix -> runInIO $ do
         dflags <- getDynFlags
         logger <- getLogger
         tmpfs  <- hsc_tmpfs <$> getTopEnv
         liftIO $ newTempName logger tmpfs (tmpDir dflags) TFL_GhcSession suffix
 
-    , mAddTopDecls = addTopDecls
+    , mAddTopDecls = runInIO . addTopDecls
 
-    , mAddForeignFilePath = \lang fp -> do
+    , mAddForeignFilePath = \lang fp -> runInIO $ do
         var <- fmap tcg_th_foreign_files getGblEnv
         updTcRef var ((lang, fp) :)
 
-    , mAddModFinalizer = \fin -> do
+    , mAddModFinalizer = \fin -> runInIO $ do
         r <- liftIO $ mkRemoteRef fin
         fref <- liftIO $ mkForeignRef r (freeRemoteRef r)
         addModFinalizerRef fref
 
-    , mAddCorePlugin = \plugin -> do
+    , mAddCorePlugin = \plugin -> runInIO $ do
         hsc_env <- getTopEnv
         let fc        = hsc_FC hsc_env
         let home_unit = hsc_home_unit hsc_env
@@ -1636,20 +1636,20 @@ metaHandlersTcM = TH.MetaHandlers {
         th_coreplugins_var <- tcg_th_coreplugins <$> getGblEnv
         updTcRef th_coreplugins_var (plugin:)
 
-    , mGetQ = getQ
+    , mGetQ = runInIO getQ
 
-    , mPutQ = \x -> do
+    , mPutQ = \x -> runInIO $ do
         th_state_var <- fmap tcg_th_state getGblEnv
         updTcRef th_state_var (\m -> Map.insert (typeOf x) (toDyn x) m)
 
-    , mIsExtEnabled = xoptM
+    , mIsExtEnabled = runInIO . xoptM
 
-    , mExtsEnabled =
+    , mExtsEnabled = runInIO $
         EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
 
-    , mPutDoc = putDoc
+    , mPutDoc = fmap runInIO . putDoc
 
-    , mGetDoc = getDoc
+    , mGetDoc = runInIO . getDoc
   }
 
 -- | Looks up documentation for a declaration in first the current module,

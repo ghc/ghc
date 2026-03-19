@@ -150,7 +150,7 @@ class (MonadIO m, MonadFail m) => Quasi m where
 --  type environment, so reification isn't going to
 --  work.
 instance Quasi IO where
-  qRunQ (Q m) = m id metaHandlersIO
+  qRunQ (Q m) = m metaHandlersIO
   qNewName = newNameIO
 
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
@@ -332,7 +332,7 @@ counter = unsafePerformIO (newIORef 0)
 -- inversion](https://en.wikipedia.org/wiki/Dependency_inversion_principle),
 -- providing an abstract interface for the user which is later concretely
 -- fufilled by an concrete 'Quasi' instance, internal to GHC.
-newtype Q a = Q { unQ :: forall m. (forall x. m x -> IO x) -> MetaHandlers m -> IO a }
+newtype Q a = Q { unQ :: MetaHandlers IO -> IO a }
 
 -- | \"Runs\" the 'Q' monad. Normal users of Template Haskell
 -- should not need this function, as the splice brackets @$( ... )@
@@ -349,19 +349,19 @@ runQ :: Quasi m => Q a -> m a
 runQ = qRunQ
 
 instance Monad Q where
-  Q m >>= k  = Q $ \r h -> (m r h >>= \x -> unQ (k x) r h)
+  Q m >>= k  = Q $ \h -> (m h >>= \x -> unQ (k x) h)
   (>>) = (*>)
 
 instance MonadFail Q where
-  fail s     = report True s >> Q (\r h -> r $ mFail h "Q monad failure")
+  fail s     = report True s >> Q (\h ->  mFail h "Q monad failure")
 
 instance Functor Q where
-  fmap f (Q x) = Q $ \r h -> fmap f (x r h)
+  fmap f (Q x) = Q $ \h -> fmap f (x h)
 
 instance Applicative Q where
-  pure x = Q $ \_ _ -> pure x
-  Q f <*> Q x = Q $ \r h -> (f r h <*> x r h)
-  Q m *> Q n = Q $ \r h -> (m r h *> n r h)
+  pure x = Q $ \_ -> pure x
+  Q f <*> Q x = Q $ \h -> (f h <*> x h)
+  Q m *> Q n = Q $ \h -> (m h *> n h)
 
 -- | @since 2.17.0.0
 instance Semigroup a => Semigroup (Q a) where
@@ -431,13 +431,13 @@ class Monad m => Quote m where
   newName :: String -> m Name
 
 runHandler :: (forall m. MetaHandlers m -> m a) -> Q a
-runHandler op = Q $ \r h -> r (op h)
+runHandler op = Q $ \h -> (op h)
 
 runHandler1 :: (forall m. MetaHandlers m -> a -> m b) -> a -> Q b
-runHandler1 op = \x -> Q $ \r h -> r (op h x)
+runHandler1 op = \x -> Q $ \h -> (op h x)
 
 runHandler2 :: (forall m. MetaHandlers m -> a -> b -> m c) -> a -> b -> Q c
-runHandler2 op = \x y -> Q $ \r h -> r (op h x y)
+runHandler2 op = \x y -> Q $ \h -> (op h x y)
 
 instance Quote Q where
   newName = runHandler1 mNewName
@@ -653,7 +653,7 @@ reportWarning = report False
 recover :: Q a -- ^ handler to invoke on failure
         -> Q a -- ^ computation to run
         -> Q a
-recover rec main = Q $ \r h -> r $ mRecover h rec main
+recover rec main = Q $ \h -> mRecover h rec main
 
 -- We don't export lookupName; the Bool isn't a great API
 -- Instead we export lookupTypeName, lookupValueName
@@ -920,7 +920,7 @@ location = runHandler mLocation
 -- necessarily flushed when the compiler finishes running, so you should
 -- flush them yourself.
 runIO :: IO a -> Q a
-runIO m = Q $ \_ _ -> m
+runIO m = Q $ \_ -> m
 
 -- | Get the package root for the current package which is being compiled.
 -- This can be set explicitly with the -package-root flag but is normally

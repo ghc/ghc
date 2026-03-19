@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, StandaloneDeriving, DeriveGeneric,
-    TupleSections, RecordWildCards, InstanceSigs, CPP #-}
+    TupleSections, RecordWildCards, InstanceSigs, CPP, RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- |
@@ -174,18 +174,19 @@ reifyAnnotations lookup =
     where typerep = typeOf (undefined :: a)
 
 runQinGHCiQ :: TH.Q a -> GHCiQ a
-runQinGHCiQ (TH.Q m) = GHCiQ $ \sRef -> m (runInIO sRef) metaHandlersGHCiQ
+runQinGHCiQ (TH.Q m) = GHCiQ $ \sRef -> m (metaHandlersGHCiQ (runInIO sRef))
   where
     runInIO :: IORef QState -> GHCiQ a -> IO a
     runInIO sRef (GHCiQ m) = m sRef
 
-metaHandlersGHCiQ = TH.MetaHandlers {
-    mFail = fail
-  , mNewName = \str -> ghcCmd (NewName str)
-  , mReport = \isError msg -> ghcCmd (Report isError msg)
+metaHandlersGHCiQ :: (forall x. GHCiQ x -> IO x) -> TH.MetaHandlers IO
+metaHandlersGHCiQ runInIO = TH.MetaHandlers {
+    mFail = runInIO . fail
+  , mNewName = \str -> runInIO $ ghcCmd (NewName str)
+  , mReport = \isError msg -> runInIO $ ghcCmd (Report isError msg)
 
   -- See Note [TH recover with -fexternal-interpreter] in GHC.Tc.Gen.Splice
-  , mRecover = \h a -> GHCiQ $ \sRef -> mask $ \unmask -> do
+  , mRecover = \h a -> runInIO $ GHCiQ $ \sRef -> mask $ \unmask -> do
       s <- readIORef sRef
       remoteTHCall (qsPipe s) StartRecover
       e <- try $ unmask $ runGHCiQ (runQinGHCiQ a <* ghcCmd FailIfErrs) sRef
@@ -195,37 +196,37 @@ metaHandlersGHCiQ = TH.MetaHandlers {
           -- in case of error, restore the state to the start of the `recover` block.
           newIORef s >>= runGHCiQ (runQinGHCiQ h)
         Right r -> return r
-  , mLookupName = \isType occ -> ghcCmd (LookupName isType occ)
-  , mReify = \name -> ghcCmd (Reify name)
-  , mReifyFixity = \name -> ghcCmd (ReifyFixity name)
-  , mReifyType = \name -> ghcCmd (ReifyType name)
-  , mReifyInstances = \name tys -> ghcCmd (ReifyInstances name tys)
-  , mReifyRoles = \name -> ghcCmd (ReifyRoles name)
+  , mLookupName = \isType occ -> runInIO $ ghcCmd (LookupName isType occ)
+  , mReify = \name ->runInIO $ ghcCmd (Reify name)
+  , mReifyFixity = \name ->runInIO $ ghcCmd (ReifyFixity name)
+  , mReifyType = \name -> runInIO $ ghcCmd (ReifyType name)
+  , mReifyInstances = \name tys -> runInIO $ghcCmd (ReifyInstances name tys)
+  , mReifyRoles = \name -> runInIO $ ghcCmd (ReifyRoles name)
 
-  , mReifyAnnotations = reifyAnnotations
-  , mReifyModule = \m -> ghcCmd (ReifyModule m)
-  , mReifyConStrictness = \name -> ghcCmd (ReifyConStrictness name)
-  , mLocation = fromMaybe noLoc . qsLocation <$> getState
-  , mGetPackageRoot = ghcCmd GetPackageRoot
-  , mAddDependentFile = \file -> ghcCmd (AddDependentFile file)
-  , mAddDependentDirectory = \dir -> ghcCmd (AddDependentDirectory dir)
-  , mAddTempFile = \suffix -> ghcCmd (AddTempFile suffix)
-  , mAddTopDecls = \decls -> ghcCmd (AddTopDecls decls)
-  , mAddForeignFilePath = \lang fp -> ghcCmd (AddForeignFilePath lang fp)
-  , mAddModFinalizer = \fin -> GHCiQ (\s -> mkRemoteRef fin) >>=
+  , mReifyAnnotations = runInIO . reifyAnnotations
+  , mReifyModule = \m -> runInIO $ ghcCmd (ReifyModule m)
+  , mReifyConStrictness = \name -> runInIO $ ghcCmd (ReifyConStrictness name)
+  , mLocation = runInIO $ fromMaybe noLoc . qsLocation <$> getState
+  , mGetPackageRoot = runInIO $ ghcCmd GetPackageRoot
+  , mAddDependentFile = \file -> runInIO $ ghcCmd (AddDependentFile file)
+  , mAddDependentDirectory = \dir -> runInIO $ ghcCmd (AddDependentDirectory dir)
+  , mAddTempFile = \suffix -> runInIO $ ghcCmd (AddTempFile suffix)
+  , mAddTopDecls = \decls -> runInIO $ ghcCmd (AddTopDecls decls)
+  , mAddForeignFilePath = \lang fp -> runInIO $ ghcCmd (AddForeignFilePath lang fp)
+  , mAddModFinalizer = \fin -> runInIO $ GHCiQ (\s -> mkRemoteRef fin) >>=
                          ghcCmd . AddModFinalizer
-  , mAddCorePlugin = \str -> ghcCmd (AddCorePlugin str)
-  , mGetQ = do
+  , mAddCorePlugin = \str -> runInIO $ ghcCmd (AddCorePlugin str)
+  , mGetQ = runInIO $ do
     s <- getState
     let lookup :: forall a. Typeable a => Map TypeRep Dynamic -> Maybe a
         lookup m = fromDynamic =<< M.lookup (typeOf (undefined::a)) m
     return $ lookup (qsMap s)
-  , mPutQ = \k -> GHCiQ $ \sRef ->
+  , mPutQ = \k -> runInIO $ GHCiQ $ \sRef ->
       modifyIORef' sRef (\s -> s { qsMap = M.insert (typeOf k) (toDyn k) (qsMap s) })
-  , mIsExtEnabled = \x -> ghcCmd (IsExtEnabled x)
-  , mExtsEnabled = ghcCmd ExtsEnabled
-  , mPutDoc = \l s -> ghcCmd (PutDoc l s)
-  , mGetDoc = \l -> ghcCmd (GetDoc l)
+  , mIsExtEnabled = \x -> runInIO $ ghcCmd (IsExtEnabled x)
+  , mExtsEnabled = runInIO $ ghcCmd ExtsEnabled
+  , mPutDoc = \l s -> runInIO $ ghcCmd (PutDoc l s)
+  , mGetDoc = \l -> runInIO $ ghcCmd (GetDoc l)
 }
 
 -- | The implementation of the 'StartTH' message: create
