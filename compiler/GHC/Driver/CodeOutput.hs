@@ -346,15 +346,15 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
 
 pprCStubInitFiniDecls :: Platform -> CStub -> SDoc
 pprCStubInitFiniDecls platform cstub =
-  vcat (zipWith (pprInitOrFiniDecl ".init_array") [0 :: Int ..] (getInitializers cstub))
-  $$ vcat (zipWith (pprInitOrFiniDecl ".fini_array") [0 :: Int ..] (getFinalizers cstub))
+  vcat (zipWith (pprInitOrFiniDecl "ini" ".init_array") [0 :: Int ..] (getInitializers cstub))
+  $$ vcat (zipWith (pprInitOrFiniDecl "fini" ".fini_array") [0 :: Int ..] (getFinalizers cstub))
   where
-    pprInitOrFiniDecl :: String -> Int -> CLabel -> SDoc
-    pprInitOrFiniDecl section_name n lbl =
+    pprInitOrFiniDecl :: String -> String -> Int -> CLabel -> SDoc
+    pprInitOrFiniDecl suf section_name n lbl =
       vcat
         [ hsep [text "extern void", pprCLabel platform lbl, text "(void);"]
         , hsep [ text "static void (*"
-               <> text "__ghc_init_fini_"
+               <> text "__ghc_" <> text suf <> text "_"
                <> int n
                <> text ")(void)"
                , text "__attribute__((used, section("
