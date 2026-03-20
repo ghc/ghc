@@ -83,7 +83,6 @@ import qualified Data.Kind as Hs
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (isNothing)
 import qualified Data.Semigroup as Semi
-import GHC.Generics
 
 {- *********************************************************************
 *                                                                      *
