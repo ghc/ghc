@@ -26,7 +26,7 @@ ex0 =
   in g f
 
 -- ((∀ a. a->a) -> Int) -> Bool  ⊑  α[tau]
--- Rejected by GHC up to and including 9.14.
+-- Rejected by GHC up to and including 9.12.
 ex1' :: ()
 ex1' =
   let
@@ -38,7 +38,7 @@ ex1' =
     -- Couldn't match expected type ‘α’ with actual type ‘((∀ a. a -> a) -> Int) -> Bool’
 
 -- ((∀ a. a->a) -> Int) -> Bool  ⊑  β[tau] Bool
--- Rejected by GHC up to and including 9.14.
+-- Rejected by GHC up to and including 9.12.
 ex2' :: ()
 ex2' =
   let
@@ -50,7 +50,7 @@ ex2' =
     -- Couldn't match expected type ‘β’ with actual type ‘(->) ((∀ a. a -> a) -> Int)’
 
 -- ex3 ::  β[tau] Bool  ⊑  (∀ a. a->a) -> Bool
--- Rejected by GHC up to and including 9.14.
+-- Rejected by GHC up to and including 9.12.
 ex3 :: ()
 ex3 =
   let
@@ -62,7 +62,7 @@ ex3 =
     -- Couldn't match expected type ‘β’ with actual type ‘(->) (∀ a. a -> a)’
 
 -- ex3' :: F Int Bool  ⊑  (∀ a. a->a) -> Bool, where F Int = (->) (Int -> Int)
--- Rejected by GHC up to and including 9.14.
+-- Rejected by GHC up to and including 9.12.
 ex3' :: ()
 ex3' =
   let
