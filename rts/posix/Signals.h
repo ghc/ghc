@@ -25,8 +25,6 @@ extern siginfo_t *next_pending_handler;
 void startSignalHandlers(Capability *cap);
 #endif
 
-void install_vtalrm_handler(int sig, TickProc handle_tick);
-
 /* Communicating with the IO manager thread (see GHC.Conc).
  *
  * TODO: these I/O manager things are not related to signals and ought to live
