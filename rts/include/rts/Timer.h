@@ -15,4 +15,4 @@
 
 void startTimer (void);
 void stopTimer  (void);
-int rtsTimerSignal (void);
+int rtsTimerSignal (void); // Deprecated: see issue #27073
