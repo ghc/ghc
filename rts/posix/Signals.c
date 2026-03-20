@@ -640,35 +640,6 @@ set_sigtstp_action (bool handle)
     }
 }
 
-/* Used by ItimerTimerCreate and ItimerSetitimer implementations */
-void
-install_vtalrm_handler(int sig, TickProc handle_tick)
-{
-    struct sigaction action;
-    memset(&action, 0, sizeof(struct sigaction));
-
-    action.sa_handler = handle_tick;
-
-    sigemptyset(&action.sa_mask);
-
-#if defined(SA_RESTART)
-    // specify SA_RESTART.  One consequence if we don't do this is
-    // that readline gets confused by the -threaded RTS.  It seems
-    // that if a SIGALRM handler is installed without SA_RESTART,
-    // readline installs its own SIGALRM signal handler (see
-    // readline's signals.c), and this somehow causes readline to go
-    // wrong when the input exceeds a single line (try it).
-    action.sa_flags = SA_RESTART;
-#else
-    action.sa_flags = 0;
-#endif
-
-    if (sigaction(sig, &action, NULL) == -1) {
-        sysErrorBelch("sigaction");
-        stg_exit(EXIT_FAILURE);
-    }
-}
-
 /* -----------------------------------------------------------------------------
  * Install default signal handlers.
  *
