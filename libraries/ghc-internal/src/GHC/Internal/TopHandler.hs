@@ -39,12 +39,12 @@ module GHC.Internal.TopHandler (
 import GHC.Internal.Control.Exception
 import GHC.Internal.Data.Maybe
 
-import GHC.Internal.Classes (Eq(..), Ord(..), (&&))
+import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Base (
-    String, const, failIO, otherwise, pure, return, ($), (++), (>>),
+    String, failIO, return, ($), (++), (>>),
   )
 import GHC.Internal.Conc.Sync hiding (throwTo)
 import GHC.Internal.Prim (Weak#, seq)
@@ -65,6 +65,17 @@ import GHC.Internal.ConsoleHandler as GHC.ConsoleHandler
 import GHC.Internal.Ptr
 import GHC.Internal.Conc.Signal
 import GHC.Internal.Data.Dynamic (toDyn)
+#endif
+
+#if !defined(HAVE_SIGNAL_H)
+import GHC.Internal.Base (pure)
+#endif
+
+#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
+import GHC.Internal.Base (
+    const, otherwise,
+  )
+import GHC.Internal.Classes (Ord(..), (&&))
 #endif
 
 -- Note [rts_setMainThread must be called unsafely]

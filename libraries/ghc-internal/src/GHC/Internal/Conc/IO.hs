@@ -58,7 +58,7 @@ module GHC.Internal.Conc.IO
 #endif
         ) where
 
-import GHC.Internal.Base (otherwise, pure, return, ($))
+import GHC.Internal.Base (otherwise, return, ($))
 import GHC.Internal.Conc.Sync as Sync
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.STM as STM
@@ -80,6 +80,10 @@ import qualified GHC.Internal.Event.Thread as Event
 #if defined(wasm32_HOST_ARCH)
 import qualified GHC.Internal.Wasm.Prim.Conc as Wasm
 import qualified GHC.Internal.Wasm.Prim.Flag as Wasm
+#endif
+
+#if defined(javascript_HOST_ARCH)
+import GHC.Internal.Base (pure)
 #endif
 
 ensureIOManagerIsRunning :: IO ()

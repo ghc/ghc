@@ -51,7 +51,7 @@ import GHC.Internal.Classes (
     Eq(..), Ord(..),
     eqInt, neInt, gtInt, geInt, ltInt, leInt,
     divInt8#, divInt16#, divInt32#,
-    divModInt8#, divModInt16#, divModInt32#, divModInt#,
+    divModInt8#, divModInt16#, divModInt32#,
     modInt8#, modInt16#, modInt32#,
     (&&), (||),
   )
@@ -62,6 +62,12 @@ import GHC.Internal.Read
 import GHC.Internal.Arr
 import GHC.Internal.Show
 import GHC.Internal.Types (Bool(..), Float, Double, Int(..), isTrue#)
+
+#if WORD_SIZE_IN_BITS == 64
+import GHC.Internal.Classes (
+    divModInt#,
+  )
+#endif
 
 ------------------------------------------------------------------------
 -- type Int8

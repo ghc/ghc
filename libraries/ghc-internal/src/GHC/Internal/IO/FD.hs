@@ -30,7 +30,7 @@ module GHC.Internal.IO.FD (
     ) where
 
 import GHC.Internal.Base (
-    String, fmap, id, otherwise, pure, return, when, ($), (.), (++), (>>=),
+    String, fmap, otherwise, pure, return, when, ($), (.), (++), (>>=),
   )
 import GHC.Internal.Bits
 import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
@@ -58,6 +58,10 @@ import GHC.Internal.Err (error)
 import GHC.Internal.Windows
 import GHC.Internal.IO.SubSystem ((<!>))
 import GHC.Internal.Foreign.Storable
+#else
+import GHC.Internal.Base (
+    id,
+  )
 #endif
 
 import GHC.Internal.Foreign.C.Types

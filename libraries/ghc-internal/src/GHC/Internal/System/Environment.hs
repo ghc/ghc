@@ -49,9 +49,13 @@ import GHC.Internal.Base (fmap)
 import GHC.Internal.Classes (Ord(..))
 import GHC.Internal.Control.Exception.Base (bracket)
 import GHC.Internal.Err (undefined)
+#else
+import GHC.Internal.Base (
+    map, (++),
+  )
 #endif
 import GHC.Internal.Base (
-    String, liftM, map, mapM, otherwise, return, ($), (.), (++), (>>=),
+    String, liftM, mapM, otherwise, return, ($), (.), (>>=),
   )
 import GHC.Internal.List (null, elem, takeWhile, break)
 import GHC.Internal.Maybe (Maybe(..))

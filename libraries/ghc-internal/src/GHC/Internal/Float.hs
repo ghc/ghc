@@ -185,12 +185,12 @@ import GHC.Internal.Prim (
     decodeFloat_Int#, divideFloat#, double2Float#, eqWord#, expDouble#,
     expFloat#, expm1Double#, expm1Float#, fabsDouble#, fabsFloat#,
     float2Double#, geFloat#, gtFloat#, gtWord#, int2Float#, int2Double#,
-    int2Word#, int64ToInt#, leFloat#, log1pDouble#, log1pFloat#, logDouble#,
+    int2Word#, leFloat#, log1pDouble#, log1pFloat#, logDouble#,
     logFloat#, ltFloat#, ltWord#, minusFloat#, minusWord#, negateDouble#,
     negateFloat#, negateInt#, plusFloat#, powerFloat#, sinDouble#, sinFloat#,
     sinhDouble#, sinhFloat#, sqrtDouble#, sqrtFloat#, tanDouble#, tanFloat#,
     tanhDouble#, tanhFloat#, timesFloat#, uncheckedIShiftRA#, uncheckedShiftL#,
-    word2Float#, word2Double#, word2Int#, word64ToWord#,
+    word2Float#, word2Double#, word2Int#,
     (+#), (+##), (-#), (-##), (*##), (**##), (/##), (<#), (<##), (<=#), (<=##),
     (>#), (>##), (>=#), (>=##),
   )
@@ -205,6 +205,13 @@ import GHC.Internal.Arr
 import GHC.Internal.Float.RealFracMethods
 import GHC.Internal.Float.ConversionUtils
 import GHC.Internal.Bignum.BigNat
+
+#if WORD_SIZE_IN_BITS == 64
+import GHC.Internal.Prim (
+    int64ToInt#,
+    word64ToWord#,
+  )
+#endif
 
 infixr 8  **
 

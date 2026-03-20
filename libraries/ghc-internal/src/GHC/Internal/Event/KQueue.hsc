@@ -33,7 +33,7 @@ import GHC.Internal.Data.Bits (Bits(..), FiniteBits(..))
 import GHC.Internal.Err (errorWithoutStackTrace, undefined)
 import GHC.Internal.Int
 import GHC.Internal.Data.Maybe (Maybe(..), catMaybes)
-import GHC.Internal.Types (Bool(..), Int, IO)
+import GHC.Internal.Types (Bool(..), IO)
 import GHC.Internal.Word (Word16, Word32)
 import GHC.Internal.Foreign.C.Error (throwErrnoIfMinus1, eINTR, eINVAL,
                         eNOTSUP, getErrno, throwErrno)

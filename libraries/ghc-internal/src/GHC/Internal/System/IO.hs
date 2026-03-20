@@ -249,6 +249,7 @@ import GHC.Internal.Base (String, failIO, otherwise, return, ($), (.), (>>=))
 import GHC.Internal.List
 #if !defined(mingw32_HOST_OS)
 import GHC.Internal.IORef
+import GHC.Internal.Types (Int)
 #endif
 import GHC.Internal.Num
 import GHC.Internal.IO hiding ( bracket, onException )
@@ -262,7 +263,7 @@ import GHC.Internal.IO.Encoding
 import GHC.Internal.Text.Read
 import GHC.Internal.IO.StdHandles
 import GHC.Internal.Show
-import GHC.Internal.Types (Bool(..), Char, Int)
+import GHC.Internal.Types (Bool(..), Char)
 -----------------------------------------------------------------------------
 -- Standard IO
 

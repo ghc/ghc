@@ -66,13 +66,17 @@ import GHC.Internal.Ptr
 import GHC.Internal.Types (Bool(..), Double, Int)
 import GHC.Internal.Word
 import GHC.Internal.Base (
-    String, otherwise, pure, return, (.), (++), (<*>), (=<<),
+    String, otherwise, return, (.), (++), (<*>), (=<<),
   )
 import GHC.Internal.Enum
 import GHC.Internal.Generics (Generic)
 import GHC.Internal.IO
 import GHC.Internal.Real
 import GHC.Internal.Show
+
+#if defined(javascript_HOST_ARCH)
+import GHC.Internal.Base (pure)
+#endif
 
 -- | 'RtsTime' is defined as a @StgWord64@ in @stg/Types.h@
 --

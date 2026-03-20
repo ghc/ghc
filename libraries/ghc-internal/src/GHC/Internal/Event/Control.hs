@@ -29,7 +29,7 @@ module GHC.Internal.Event.Control
 #include <ghcplatform.h>
 #include "EventConfig.h"
 
-import GHC.Internal.Base (fmap, otherwise, pure, return, when, ($), (.))
+import GHC.Internal.Base (fmap, otherwise, return, when, ($), (.))
 import GHC.Internal.Classes (Eq(..), (&&))
 import GHC.Internal.IORef
 import GHC.Internal.Conc.Signal (Signal)
@@ -54,6 +54,10 @@ import GHC.Internal.Foreign.C.Error (throwErrnoIfMinus1, eBADF)
 import GHC.Internal.Foreign.C.Types (CULLong(..))
 #else
 import GHC.Internal.Foreign.C.Error (eAGAIN, eWOULDBLOCK, eBADF)
+#endif
+
+#if defined(wasm32_HOST_ARCH)
+import GHC.Internal.Base (pure)
 #endif
 
 data ControlMessage = CMsgWakeup

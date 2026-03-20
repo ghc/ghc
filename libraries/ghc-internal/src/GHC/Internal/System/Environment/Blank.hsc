@@ -43,7 +43,7 @@ import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.List (elem, null, takeWhile)
 import GHC.Internal.Foreign.C.String
-import GHC.Internal.Base (String, otherwise, return, ($))
+import GHC.Internal.Base (String, otherwise, ($))
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.Base ((.))
 import GHC.Internal.Foreign.Ptr
@@ -51,6 +51,7 @@ import GHC.Internal.Windows
 import GHC.Internal.Control.Monad
 import GHC.Internal.Data.List (lookup)
 #else
+import GHC.Internal.Base (return)
 import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Real (fromIntegral)
