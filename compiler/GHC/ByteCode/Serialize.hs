@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecordWildCards #-}
 -- Orphans are here since the Binary instances use an ad-hoc means of serialising
@@ -20,7 +21,7 @@ module GHC.ByteCode.Serialize
 where
 
 import Control.Monad
-import Data.Binary qualified as Binary
+import Data.ByteString.Short (ShortByteString(..))
 import Data.Foldable
 import Data.IORef
 import Data.Proxy
@@ -320,18 +321,29 @@ instance Binary UnlinkedBCO where
     UnlinkedBCO
       <$> getViaBinName bh
       <*> get bh
-      <*> (Binary.decode <$> get bh)
-      <*> (Binary.decode <$> get bh)
+      <*> get bh
+      <*> get bh
       <*> get bh
       <*> get bh
 
   put_ bh UnlinkedBCO {..} = do
     putViaBinName bh unlinkedBCOName
     put_ bh unlinkedBCOArity
-    put_ bh $ Binary.encode unlinkedBCOInstrs
-    put_ bh $ Binary.encode unlinkedBCOBitmap
+    put_ bh unlinkedBCOInstrs
+    put_ bh unlinkedBCOBitmap
     put_ bh unlinkedBCOLits
     put_ bh unlinkedBCOPtrs
+
+-- Also see Note [BCOByteArray serialization]. This instance is unlike
+-- the `Binary` instances in `ghci`, which are for the `Binary` class
+-- in `binary` and are used across host/target platforms; here this
+-- instance is only used on the host for bytecode object serialization
+-- and doesn't cross host/target boundary. Therefore it's safe to
+-- serialize the underlying buffer directly.
+instance Binary (BCOByteArray a) where
+  put_ bh (BCOByteArray ba#) = put_ bh $ SBS ba#
+
+  get bh = (\(SBS ba#) -> BCOByteArray ba#) <$> get bh
 
 instance Binary BCOPtr where
   get bh = do
