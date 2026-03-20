@@ -1139,6 +1139,7 @@ convertAnnotationWrapper fhv = do
 ************************************************************************
 -}
 
+-- TODO: rename
 runQuasi :: TH.Q a -> TcM a
 runQuasi (TH.Q act) = unliftIOEnv $ \runInIO -> liftIO $ act (metaHandlersTcM runInIO)
 
@@ -1467,7 +1468,7 @@ when showing an error message.
 To call runQ in the Tc monad, we need to make TcM an instance of Quasi:
 -}
 
-report :: Bool -> [Char] -> TcM ()
+report :: Bool -> String -> TcM ()
 report True msg  = seqList msg $ addErr        $ TcRnTHError $ ReportCustomQuasiError True  msg
 report False msg = seqList msg $ addDiagnostic $ TcRnTHError $ ReportCustomQuasiError False msg
 
@@ -1559,7 +1560,8 @@ location = do { m <- getModule
 
 metaHandlersTcM :: (forall x. TcM x -> IO x) -> TH.MetaHandlers IO
 metaHandlersTcM runInIO = TH.MetaHandlers {
-    mFail = \s -> runInIO $ fail s
+    -- We are careful to use the TcM instance not the one for IO, since that would lead to a different error.
+    mFail = \s -> runInIO $ fail @TcM s
     , mNewName = \s -> runInIO $ do { u <- newUnique
                       ; let i = toInteger (getKey u)
                       ; return (TH.mkNameU s i) }
@@ -1578,16 +1580,17 @@ metaHandlersTcM runInIO = TH.MetaHandlers {
     , mReifyRoles       = runInIO . reifyRoles
     , mReifyAnnotations = runInIO . reifyAnnotations
     , mReifyModule      = runInIO . reifyModule
-    , mReifyConStrictness = \nm -> runInIO $ do { nm' <- lookupThName nm
+    , mReifyConStrictness = \nm -> runInIO $ do
+                                      { nm' <- lookupThName nm
                                       ; dc  <- tcLookupDataCon nm'
                                       ; let bangs = dataConImplBangs dc
                                       ; return (map reifyDecidedStrictness bangs) }
 
-    --       -- For qRecover, discard error messages if
-    --       -- the recovery action is chosen.  Otherwise
-    --       -- we'll only fail higher up.
-    --       -- NB: extremely subtle!!! TODO: write up note
-    --       -- tryTcDiscardingErrs manipulates the reader env so we need to be careful we don't sneak in the outside env
+          -- For qRecover, discard error messages if
+          -- the recovery action is chosen.  Otherwise
+          -- we'll only fail higher up.
+          -- NB: extremely subtle!!! TODO: write up note
+          -- tryTcDiscardingErrs manipulates the reader env so we need to be careful we don't sneak in the outside env
     , mRecover = \recover main -> runInIO $ tryTcDiscardingErrs (runQuasi recover) (runQuasi main)
 
     , mGetPackageRoot = runInIO $ do

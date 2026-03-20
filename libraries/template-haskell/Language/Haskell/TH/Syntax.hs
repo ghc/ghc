@@ -504,3 +504,181 @@ pattern SpecialiseP nm ty inl phases = SpecialiseEP Nothing [] (SigE (VarE nm) t
 
 unQ :: Q a -> (forall m. Quasi m => m a)
 unQ m =  runQ m
+
+-----------------------------------------------------
+--
+--              The Quasi class
+--
+-----------------------------------------------------
+
+class (MonadIO m, MonadFail m) => Quasi m where
+  qRunQ :: Q a -> m a
+  -- | Fresh names. See 'newName'.
+  qNewName :: String -> m Name
+
+  ------- Error reporting and recovery -------
+  -- | Report an error (True) or warning (False)
+  -- ...but carry on; use 'fail' to stop. See 'report'.
+  qReport  :: Bool -> String -> m ()
+
+  -- | See 'recover'.
+  qRecover :: m a -- ^ the error handler
+           -> m a -- ^ action which may fail
+           -> m a -- ^ Recover from the monadic 'fail'
+
+  ------- Inspect the type-checker's environment -------
+  -- | True <=> type namespace, False <=> value namespace. See 'lookupName'.
+  qLookupName :: Bool -> String -> m (Maybe Name)
+  -- | See 'reify'.
+  qReify          :: Name -> m Info
+  -- | See 'reifyFixity'.
+  qReifyFixity    :: Name -> m (Maybe Fixity)
+  -- | See 'reifyType'.
+  qReifyType      :: Name -> m Type
+  -- | Is (n tys) an instance? Returns list of matching instance Decs (with
+  -- empty sub-Decs) Works for classes and type functions. See 'reifyInstances'.
+  qReifyInstances :: Name -> [Type] -> m [Dec]
+  -- | See 'reifyRoles'.
+  qReifyRoles         :: Name -> m [Role]
+  -- | See 'reifyAnnotations'.
+  qReifyAnnotations   :: Data a => AnnLookup -> m [a]
+  -- | See 'reifyModule'.
+  qReifyModule        :: Module -> m ModuleInfo
+  -- | See 'reifyConStrictness'.
+  qReifyConStrictness :: Name -> m [DecidedStrictness]
+
+  -- | See 'location'.
+  qLocation :: m Loc
+
+  -- | Input/output (dangerous). See 'runIO'.
+  qRunIO :: IO a -> m a
+  qRunIO = liftIO
+  -- | See 'getPackageRoot'.
+  qGetPackageRoot :: m FilePath
+
+  -- | See 'addDependentFile'.
+  qAddDependentFile :: FilePath -> m ()
+
+  -- | See 'addDependentDirectory'.
+  qAddDependentDirectory :: FilePath -> m ()
+
+  -- | See 'addTempFile'.
+  qAddTempFile :: String -> m FilePath
+
+  -- | See 'addTopDecls'.
+  qAddTopDecls :: [Dec] -> m ()
+
+  -- | See 'addForeignFilePath'.
+  qAddForeignFilePath :: ForeignSrcLang -> String -> m ()
+
+  -- | See 'addModFinalizer'.
+  qAddModFinalizer :: Q () -> m ()
+
+  -- | See 'addCorePlugin'.
+  qAddCorePlugin :: String -> m ()
+
+  -- | See 'getQ'.
+  qGetQ :: Typeable a => m (Maybe a)
+
+  -- | See 'putQ'.
+  qPutQ :: Typeable a => a -> m ()
+
+  -- | See 'isExtEnabled'.
+  qIsExtEnabled :: Extension -> m Bool
+  -- | See 'extsEnabled'.
+  qExtsEnabled :: m [Extension]
+
+  -- | See 'putDoc'.
+  qPutDoc :: DocLoc -> String -> m ()
+  -- | See 'getDoc'.
+  qGetDoc :: DocLoc -> m (Maybe String)
+
+-- | \"Runs\" the 'Q' monad. Normal users of Template Haskell
+-- should not need this function, as the splice brackets @$( ... )@
+-- are the usual way of running a 'Q' computation.
+--
+-- This function is primarily used in GHC internals, and for debugging
+-- splices by running them in 'IO'.
+--
+-- Note that many functions in 'Q', such as 'reify' and other compiler
+-- queries, are not supported when running 'Q' in 'IO'; these operations
+-- simply fail at runtime. Indeed, the only operations guaranteed to succeed
+-- are 'newName', 'runIO', 'reportError' and 'reportWarning'.
+runQ :: Quasi m => Q a -> m a
+runQ = qRunQ
+
+-----------------------------------------------------
+--      The IO instance of Quasi
+-----------------------------------------------------
+
+--  | This instance is used only when running a Q
+--  computation in the IO monad, usually just to
+--  print the result.  There is no interesting
+--  type environment, so reification isn't going to
+--  work.
+instance Quasi IO where
+  qRunQ (Q m) = m metaHandlersIO
+  qNewName = newNameIO
+
+  qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
+  qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
+
+  qLookupName _ _       = badIO "lookupName"
+  qReify _              = badIO "reify"
+  qReifyFixity _        = badIO "reifyFixity"
+  qReifyType _          = badIO "reifyFixity"
+  qReifyInstances _ _   = badIO "reifyInstances"
+  qReifyRoles _         = badIO "reifyRoles"
+  qReifyAnnotations _   = badIO "reifyAnnotations"
+  qReifyModule _        = badIO "reifyModule"
+  qReifyConStrictness _ = badIO "reifyConStrictness"
+  qLocation             = badIO "currentLocation"
+  qRecover _ _          = badIO "recover" -- Maybe we could fix this?
+  qGetPackageRoot       = badIO "getProjectRoot"
+  qAddDependentFile _   = badIO "addDependentFile"
+  qAddTempFile _        = badIO "addTempFile"
+  qAddTopDecls _        = badIO "addTopDecls"
+  qAddForeignFilePath _ _ = badIO "addForeignFilePath"
+  qAddModFinalizer _    = badIO "addModFinalizer"
+  qAddCorePlugin _      = badIO "addCorePlugin"
+  qGetQ                 = badIO "getQ"
+  qPutQ _               = badIO "putQ"
+  qIsExtEnabled _       = badIO "isExtEnabled"
+  qExtsEnabled          = badIO "extsEnabled"
+  qPutDoc _ _           = badIO "putDoc"
+  qGetDoc _             = badIO "getDoc"
+  qAddDependentDirectory _ = badIO "AddDependentDirectory"
+
+badIO :: String -> IO a
+badIO op = do   { qReport True ("Can't do `" ++ op ++ "' in the IO monad")
+                ; fail "Template Haskell failure" }
+
+instance Quasi Q where
+  qRunQ               = id
+  qNewName            = newName
+  qReport             = report
+  qRecover            = recover
+  qReify              = reify
+  qReifyFixity        = reifyFixity
+  qReifyType          = reifyType
+  qReifyInstances     = reifyInstances
+  qReifyRoles         = reifyRoles
+  qReifyAnnotations   = reifyAnnotations
+  qReifyModule        = reifyModule
+  qReifyConStrictness = reifyConStrictness
+  qLookupName         = lookupName
+  qLocation           = location
+  qGetPackageRoot     = getPackageRoot
+  qAddDependentFile   = addDependentFile
+  qAddDependentDirectory = addDependentDirectory
+  qAddTempFile        = addTempFile
+  qAddTopDecls        = addTopDecls
+  qAddForeignFilePath = addForeignFilePath
+  qAddModFinalizer    = addModFinalizer
+  qAddCorePlugin      = addCorePlugin
+  qGetQ               = getQ
+  qPutQ               = putQ
+  qIsExtEnabled       = isExtEnabled
+  qExtsEnabled        = extsEnabled
+  qPutDoc             = putDoc
+  qGetDoc             = getDoc

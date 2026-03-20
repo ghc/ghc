@@ -52,175 +52,6 @@ import GHC.Internal.ForeignSrcLang
 import GHC.Internal.LanguageExtensions
 import GHC.Internal.TH.Syntax
 
------------------------------------------------------
---
---              The Quasi class
---
------------------------------------------------------
-
-class (MonadIO m, MonadFail m) => Quasi m where
-  qRunQ :: Q a -> m a
-  -- | Fresh names. See 'newName'.
-  qNewName :: String -> m Name
-
-  ------- Error reporting and recovery -------
-  -- | Report an error (True) or warning (False)
-  -- ...but carry on; use 'fail' to stop. See 'report'.
-  qReport  :: Bool -> String -> m ()
-
-  -- | See 'recover'.
-  qRecover :: m a -- ^ the error handler
-           -> m a -- ^ action which may fail
-           -> m a -- ^ Recover from the monadic 'fail'
-
-  ------- Inspect the type-checker's environment -------
-  -- | True <=> type namespace, False <=> value namespace. See 'lookupName'.
-  qLookupName :: Bool -> String -> m (Maybe Name)
-  -- | See 'reify'.
-  qReify          :: Name -> m Info
-  -- | See 'reifyFixity'.
-  qReifyFixity    :: Name -> m (Maybe Fixity)
-  -- | See 'reifyType'.
-  qReifyType      :: Name -> m Type
-  -- | Is (n tys) an instance? Returns list of matching instance Decs (with
-  -- empty sub-Decs) Works for classes and type functions. See 'reifyInstances'.
-  qReifyInstances :: Name -> [Type] -> m [Dec]
-  -- | See 'reifyRoles'.
-  qReifyRoles         :: Name -> m [Role]
-  -- | See 'reifyAnnotations'.
-  qReifyAnnotations   :: Data a => AnnLookup -> m [a]
-  -- | See 'reifyModule'.
-  qReifyModule        :: Module -> m ModuleInfo
-  -- | See 'reifyConStrictness'.
-  qReifyConStrictness :: Name -> m [DecidedStrictness]
-
-  -- | See 'location'.
-  qLocation :: m Loc
-
-  -- | Input/output (dangerous). See 'runIO'.
-  qRunIO :: IO a -> m a
-  qRunIO = liftIO
-  -- | See 'getPackageRoot'.
-  qGetPackageRoot :: m FilePath
-
-  -- | See 'addDependentFile'.
-  qAddDependentFile :: FilePath -> m ()
-
-  -- | See 'addDependentDirectory'.
-  qAddDependentDirectory :: FilePath -> m ()
-
-  -- | See 'addTempFile'.
-  qAddTempFile :: String -> m FilePath
-
-  -- | See 'addTopDecls'.
-  qAddTopDecls :: [Dec] -> m ()
-
-  -- | See 'addForeignFilePath'.
-  qAddForeignFilePath :: ForeignSrcLang -> String -> m ()
-
-  -- | See 'addModFinalizer'.
-  qAddModFinalizer :: Q () -> m ()
-
-  -- | See 'addCorePlugin'.
-  qAddCorePlugin :: String -> m ()
-
-  -- | See 'getQ'.
-  qGetQ :: Typeable a => m (Maybe a)
-
-  -- | See 'putQ'.
-  qPutQ :: Typeable a => a -> m ()
-
-  -- | See 'isExtEnabled'.
-  qIsExtEnabled :: Extension -> m Bool
-  -- | See 'extsEnabled'.
-  qExtsEnabled :: m [Extension]
-
-  -- | See 'putDoc'.
-  qPutDoc :: DocLoc -> String -> m ()
-  -- | See 'getDoc'.
-  qGetDoc :: DocLoc -> m (Maybe String)
-
------------------------------------------------------
---      The IO instance of Quasi
------------------------------------------------------
-
---  | This instance is used only when running a Q
---  computation in the IO monad, usually just to
---  print the result.  There is no interesting
---  type environment, so reification isn't going to
---  work.
-instance Quasi IO where
-  qRunQ (Q m) = m metaHandlersIO
-  qNewName = newNameIO
-
-  qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
-  qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
-
-  qLookupName _ _       = badIO "lookupName"
-  qReify _              = badIO "reify"
-  qReifyFixity _        = badIO "reifyFixity"
-  qReifyType _          = badIO "reifyFixity"
-  qReifyInstances _ _   = badIO "reifyInstances"
-  qReifyRoles _         = badIO "reifyRoles"
-  qReifyAnnotations _   = badIO "reifyAnnotations"
-  qReifyModule _        = badIO "reifyModule"
-  qReifyConStrictness _ = badIO "reifyConStrictness"
-  qLocation             = badIO "currentLocation"
-  qRecover _ _          = badIO "recover" -- Maybe we could fix this?
-  qGetPackageRoot       = badIO "getProjectRoot"
-  qAddDependentFile _   = badIO "addDependentFile"
-  qAddTempFile _        = badIO "addTempFile"
-  qAddTopDecls _        = badIO "addTopDecls"
-  qAddForeignFilePath _ _ = badIO "addForeignFilePath"
-  qAddModFinalizer _    = badIO "addModFinalizer"
-  qAddCorePlugin _      = badIO "addCorePlugin"
-  qGetQ                 = badIO "getQ"
-  qPutQ _               = badIO "putQ"
-  qIsExtEnabled _       = badIO "isExtEnabled"
-  qExtsEnabled          = badIO "extsEnabled"
-  qPutDoc _ _           = badIO "putDoc"
-  qGetDoc _             = badIO "getDoc"
-  qAddDependentDirectory _ = badIO "AddDependentDirectory"
-
-metaHandlersIO :: MetaHandlers IO
-metaHandlersIO  = MetaHandlers {
-    mFail = fail
-  , mNewName = newNameIO
-  , mReport = \b msg ->
-     if b then
-       hPutStrLn stderr ("Template Haskell error: " ++ msg)
-     else
-       hPutStrLn stderr ("Template Haskell error: " ++ msg) -- TODO: should this be different from above?
-  , mLookupName           = \ _ _ -> badIO "lookupName"
-  , mReify                = \_ -> badIO "reify"
-  , mReifyFixity          = \_ -> badIO "reifyFixity"
-  , mReifyType            = \_ -> badIO "reifyFixity"
-  , mReifyInstances       = \_ _ -> badIO "reifyInstances"
-  , mReifyRoles           = \_ -> badIO "reifyRoles"
-  , mReifyAnnotations     = \_ -> badIO "reifyAnnotations"
-  , mReifyModule          = \_ -> badIO "reifyModule"
-  , mReifyConStrictness   = \_ -> badIO "reifyConStrictness"
-  , mLocation             = badIO "currentLocation"
-  , mRecover              = \_ _ -> badIO "recover" -- Maybe we could fix this?
-  , mGetPackageRoot       = badIO "getProjectRoot"
-  , mAddDependentFile     = \_ -> badIO "addDependentFile"
-  , mAddTempFile          = \_ -> badIO "addTempFile"
-  , mAddTopDecls          = \_ -> badIO "addTopDecls"
-  , mAddForeignFilePath   = \_ _ -> badIO "addForeignFilePath"
-  , mAddModFinalizer      = \_ -> badIO "addModFinalizer"
-  , mAddCorePlugin        = \_ -> badIO "addCorePlugin"
-  , mGetQ                 = badIO "getQ"
-  , mPutQ                 = \_ -> badIO "putQ"
-  , mIsExtEnabled         = \_ -> badIO "isExtEnabled"
-  , mExtsEnabled          = badIO "extsEnabled"
-  , mPutDoc               = \_ _ -> badIO "putDoc"
-  , mGetDoc               = \_ -> badIO "getDoc"
-  , mAddDependentDirectory = \_ -> badIO "AddDependentDirectory"
-  }
-
-instance Quote IO where
-  newName = newNameIO
-
 data MetaHandlers m = MetaHandlers {
     mFail :: forall a. String -> m a
     -- | Fresh names. See 'newName'.
@@ -301,14 +132,54 @@ data MetaHandlers m = MetaHandlers {
     , mGetDoc :: DocLoc -> m (Maybe String)
   }
 
+badIO :: String -> IO a
+badIO op = do   { hPutStrLn stderr ("Can't do `" ++ op ++ "' in the IO monad")
+                ; fail "Template Haskell failure" }
+
+metaHandlersIO :: MetaHandlers IO
+metaHandlersIO  = MetaHandlers {
+    mFail = fail
+  , mNewName = newNameIO
+  , mReport = \b msg ->
+     if b then
+       hPutStrLn stderr ("Template Haskell error: " ++ msg)
+     else
+       hPutStrLn stderr ("Template Haskell error: " ++ msg) -- TODO: should this be different from above?
+  , mLookupName           = \ _ _ -> badIO "lookupName"
+  , mReify                = \_ -> badIO "reify"
+  , mReifyFixity          = \_ -> badIO "reifyFixity"
+  , mReifyType            = \_ -> badIO "reifyFixity"
+  , mReifyInstances       = \_ _ -> badIO "reifyInstances"
+  , mReifyRoles           = \_ -> badIO "reifyRoles"
+  , mReifyAnnotations     = \_ -> badIO "reifyAnnotations"
+  , mReifyModule          = \_ -> badIO "reifyModule"
+  , mReifyConStrictness   = \_ -> badIO "reifyConStrictness"
+  , mLocation             = badIO "currentLocation"
+  , mRecover              = \_ _ -> badIO "recover" -- Maybe we could fix this?
+  , mGetPackageRoot       = badIO "getProjectRoot"
+  , mAddDependentFile     = \_ -> badIO "addDependentFile"
+  , mAddTempFile          = \_ -> badIO "addTempFile"
+  , mAddTopDecls          = \_ -> badIO "addTopDecls"
+  , mAddForeignFilePath   = \_ _ -> badIO "addForeignFilePath"
+  , mAddModFinalizer      = \_ -> badIO "addModFinalizer"
+  , mAddCorePlugin        = \_ -> badIO "addCorePlugin"
+  , mGetQ                 = badIO "getQ"
+  , mPutQ                 = \_ -> badIO "putQ"
+  , mIsExtEnabled         = \_ -> badIO "isExtEnabled"
+  , mExtsEnabled          = badIO "extsEnabled"
+  , mPutDoc               = \_ _ -> badIO "putDoc"
+  , mGetDoc               = \_ -> badIO "getDoc"
+  , mAddDependentDirectory = \_ -> badIO "AddDependentDirectory"
+  }
+
+instance Quote IO where
+  newName = newNameIO
+
+
 
 newNameIO :: String -> IO Name
 newNameIO s = do { n <- atomicModifyIORef' counter (\x -> (x + 1, x))
                  ; pure (mkNameU s n) }
-
-badIO :: String -> IO a
-badIO op = do   { qReport True ("Can't do `" ++ op ++ "' in the IO monad")
-                ; fail "Template Haskell failure" }
 
 -- Global variable to generate unique symbols
 counter :: IORef Uniq
@@ -333,20 +204,6 @@ counter = unsafePerformIO (newIORef 0)
 -- providing an abstract interface for the user which is later concretely
 -- fufilled by an concrete 'Quasi' instance, internal to GHC.
 newtype Q a = Q { unQ :: MetaHandlers IO -> IO a }
-
--- | \"Runs\" the 'Q' monad. Normal users of Template Haskell
--- should not need this function, as the splice brackets @$( ... )@
--- are the usual way of running a 'Q' computation.
---
--- This function is primarily used in GHC internals, and for debugging
--- splices by running them in 'IO'.
---
--- Note that many functions in 'Q', such as 'reify' and other compiler
--- queries, are not supported when running 'Q' in 'IO'; these operations
--- simply fail at runtime. Indeed, the only operations guaranteed to succeed
--- are 'newName', 'runIO', 'reportError' and 'reportWarning'.
-runQ :: Quasi m => Q a -> m a
-runQ = qRunQ
 
 instance Monad Q where
   Q m >>= k  = Q $ \h -> (m h >>= \x -> unQ (k x) h)
@@ -430,14 +287,17 @@ class Monad m => Quote m where
   -}
   newName :: String -> m Name
 
+-- | Utility function for lifting a 0-ary method of 'MetaHandlers' into 'Q'
 runHandler :: (forall m. MetaHandlers m -> m a) -> Q a
-runHandler op = Q $ \h -> (op h)
+runHandler op = Q $ \h -> op h
 
+-- | Utility function for lifting a 1-ary method of 'MetaHandlers' into 'Q'
 runHandler1 :: (forall m. MetaHandlers m -> a -> m b) -> a -> Q b
-runHandler1 op = \x -> Q $ \h -> (op h x)
+runHandler1 op = \x -> Q $ \h -> op h x
 
+-- | Utility function for lifting a 2-ary method of 'MetaHandlers' into 'Q'
 runHandler2 :: (forall m. MetaHandlers m -> a -> b -> m c) -> a -> b -> Q c
-runHandler2 op = \x y -> Q $ \h -> (op h x y)
+runHandler2 op = \x y -> Q $ \h -> op h x y
 
 instance Quote Q where
   newName = runHandler1 mNewName
@@ -658,15 +518,15 @@ recover rec main = Q $ \h -> mRecover h rec main
 -- We don't export lookupName; the Bool isn't a great API
 -- Instead we export lookupTypeName, lookupValueName
 lookupName :: Bool -> String -> Q (Maybe Name)
-lookupName ns s = runHandler2 mLookupName ns s
+lookupName = runHandler2 mLookupName
 
 -- | Look up the given name in the (type namespace of the) current splice's scope. See "Language.Haskell.TH.Syntax#namelookup" for more details.
 lookupTypeName :: String -> Q (Maybe Name)
-lookupTypeName  s = runHandler2 mLookupName True s
+lookupTypeName = runHandler2 mLookupName True
 
 -- | Look up the given name in the (value namespace of the) current splice's scope. See "Language.Haskell.TH.Syntax#namelookup" for more details.
 lookupValueName :: String -> Q (Maybe Name)
-lookupValueName s = runHandler2 mLookupName False s
+lookupValueName = runHandler2 mLookupName False
 
 {-
 Note [Name lookup]
@@ -850,7 +710,7 @@ has some discussion around this.
 
 -}
 reifyInstances :: Name -> [Type] -> Q [InstanceDec]
-reifyInstances cls tys = runHandler2 mReifyInstances cls tys
+reifyInstances = runHandler2 mReifyInstances
 
 {- | @reifyRoles nm@ returns the list of roles associated with the parameters
 (both visible and invisible) of
@@ -869,20 +729,20 @@ and @reifyRoles Proxy@, we will get @['NominalR', 'PhantomR']@. The 'NominalR' i
 the role of the invisible @k@ parameter. Kind parameters are always nominal.
 -}
 reifyRoles :: Name -> Q [Role]
-reifyRoles nm = runHandler1 mReifyRoles nm
+reifyRoles = runHandler1 mReifyRoles
 
 -- | @reifyAnnotations target@ returns the list of annotations
 -- associated with @target@.  Only the annotations that are
 -- appropriately typed is returned.  So if you have @Int@ and @String@
 -- annotations for the same target, you have to call this function twice.
 reifyAnnotations :: Data a => AnnLookup -> Q [a]
-reifyAnnotations an = runHandler1 mReifyAnnotations an
+reifyAnnotations = runHandler1 mReifyAnnotations
 
 -- | @reifyModule mod@ looks up information about module @mod@.  To
 -- look up the current module, call this function with the return
 -- value of 'Language.Haskell.TH.Lib.thisModule'.
 reifyModule :: Module -> Q ModuleInfo
-reifyModule m = runHandler1 mReifyModule m
+reifyModule = runHandler1 mReifyModule
 
 -- | @reifyConStrictness nm@ looks up the strictness information for the fields
 -- of the constructor with the name @nm@. Note that the strictness information
@@ -897,7 +757,7 @@ reifyModule m = runHandler1 mReifyModule m
 -- circumstances, but it would return @['DecidedStrict', DecidedStrict]@ if the
 -- @-XStrictData@ language extension was enabled.
 reifyConStrictness :: Name -> Q [DecidedStrictness]
-reifyConStrictness n = runHandler1 mReifyConStrictness n
+reifyConStrictness = runHandler1 mReifyConStrictness
 
 -- | Is the list of instances returned by 'reifyInstances' nonempty?
 --
@@ -951,7 +811,7 @@ getPackageRoot = runHandler mGetPackageRoot
 --   * The state of the directory is read at the interface generation time,
 --     not at the time of the function call.
 addDependentDirectory :: FilePath -> Q ()
-addDependentDirectory dp = runHandler1 mAddDependentDirectory dp
+addDependentDirectory = runHandler1 mAddDependentDirectory
 
 -- | Record external files that runIO is using (dependent upon).
 -- The compiler can then recognize that it should re-compile the Haskell file
@@ -965,17 +825,17 @@ addDependentDirectory dp = runHandler1 mAddDependentDirectory dp
 --
 --   * The dependency is based on file content, not a modification time
 addDependentFile :: FilePath -> Q ()
-addDependentFile fp = runHandler1 mAddDependentFile fp
+addDependentFile = runHandler1 mAddDependentFile
 
 -- | Obtain a temporary file path with the given suffix. The compiler will
 -- delete this file after compilation.
 addTempFile :: String -> Q FilePath
-addTempFile suffix = runHandler1 mAddTempFile suffix
+addTempFile = runHandler1 mAddTempFile
 
 -- | Add additional top-level declarations. The added declarations will be type
 -- checked along with the current declaration group.
 addTopDecls :: [Dec] -> Q ()
-addTopDecls ds = runHandler1 mAddTopDecls ds
+addTopDecls = runHandler1 mAddTopDecls
 
 -- | Same as 'addForeignSource', but expects to receive a path pointing to the
 -- foreign file instead of a 'String' of its contents. Consider using this in
@@ -984,7 +844,7 @@ addTopDecls ds = runHandler1 mAddTopDecls ds
 -- This is a good alternative to 'addForeignSource' when you are trying to
 -- directly link in an object file.
 addForeignFilePath :: ForeignSrcLang -> FilePath -> Q ()
-addForeignFilePath lang fp = runHandler2 mAddForeignFilePath lang fp
+addForeignFilePath = runHandler2 mAddForeignFilePath
 
 -- | Add a finalizer that will run in the Q monad after the current module has
 -- been type checked. This only makes sense when run within a top-level splice.
@@ -993,7 +853,7 @@ addForeignFilePath lang fp = runHandler2 mAddForeignFilePath lang fp
 -- 'reify' is able to find the local definitions when executed inside the
 -- finalizer.
 addModFinalizer :: Q () -> Q ()
-addModFinalizer act = runHandler1 mAddModFinalizer act
+addModFinalizer = runHandler1 mAddModFinalizer
 
 -- | Adds a core plugin to the compilation pipeline.
 --
@@ -1003,7 +863,7 @@ addModFinalizer act = runHandler1 mAddModFinalizer act
 -- to tell the compiler that we needed to compile first a plugin module in the
 -- current package.
 addCorePlugin :: String -> Q ()
-addCorePlugin plugin = runHandler1 mAddCorePlugin plugin
+addCorePlugin = runHandler1 mAddCorePlugin
 
 -- | Get state from the 'Q' monad. The state maintained by 'Q' is isomorphic to
 -- a type-indexed finite map. That is,
@@ -1022,11 +882,11 @@ getQ = runHandler mGetQ
 -- | Replace the state in the 'Q' monad. Note that the state is local to the
 -- Haskell module in which the Template Haskell expression is executed.
 putQ :: Typeable a => a -> Q ()
-putQ x = runHandler1 mPutQ x
+putQ = runHandler1 mPutQ
 
 -- | Determine whether the given language extension is enabled in the 'Q' monad.
 isExtEnabled :: Extension -> Q Bool
-isExtEnabled ext = runHandler1 mIsExtEnabled ext
+isExtEnabled = runHandler1 mIsExtEnabled
 
 -- | List all enabled language extensions.
 extsEnabled :: Q [Extension]
@@ -1049,48 +909,17 @@ extsEnabled = runHandler mExtsEnabled
 -- Adding documentation to anything outside of the current module will cause an
 -- error.
 putDoc :: DocLoc -> String -> Q ()
-putDoc t s = runHandler2 mPutDoc t s
+putDoc = runHandler2 mPutDoc
 
 -- | Retrieves the Haddock documentation at the specified location, if one
 -- exists.
 -- It can be used to read documentation on things defined outside of the current
 -- module, provided that those modules were compiled with the @-haddock@ flag.
 getDoc :: DocLoc -> Q (Maybe String)
-getDoc n = runHandler1 mGetDoc n
+getDoc = runHandler1 mGetDoc
 
 instance MonadIO Q where
   liftIO = runIO
-
-instance Quasi Q where
-  qRunQ               = id
-  qNewName            = newName
-  qReport             = report
-  qRecover            = recover
-  qReify              = reify
-  qReifyFixity        = reifyFixity
-  qReifyType          = reifyType
-  qReifyInstances     = reifyInstances
-  qReifyRoles         = reifyRoles
-  qReifyAnnotations   = reifyAnnotations
-  qReifyModule        = reifyModule
-  qReifyConStrictness = reifyConStrictness
-  qLookupName         = lookupName
-  qLocation           = location
-  qGetPackageRoot     = getPackageRoot
-  qAddDependentFile   = addDependentFile
-  qAddDependentDirectory = addDependentDirectory
-  qAddTempFile        = addTempFile
-  qAddTopDecls        = addTopDecls
-  qAddForeignFilePath = addForeignFilePath
-  qAddModFinalizer    = addModFinalizer
-  qAddCorePlugin      = addCorePlugin
-  qGetQ               = getQ
-  qPutQ               = putQ
-  qIsExtEnabled       = isExtEnabled
-  qExtsEnabled        = extsEnabled
-  qPutDoc             = putDoc
-  qGetDoc             = getDoc
-
 
 ----------------------------------------------------
 -- The following operations are used solely in GHC.HsToCore.Quote when

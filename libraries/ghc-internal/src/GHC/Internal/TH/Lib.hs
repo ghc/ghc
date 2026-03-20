@@ -1074,7 +1074,7 @@ withDecDoc :: String -> Q Dec -> Q Dec
 withDecDoc doc dec = do
   dec' <- dec
   case doc_loc dec' of
-    Just loc -> qAddModFinalizer $ qPutDoc loc doc
+    Just loc -> addModFinalizer $ putDoc loc doc
     Nothing  -> pure ()
   pure dec'
   where
@@ -1123,7 +1123,7 @@ funD_doc :: Name -> [Q Clause]
          -> [Maybe String] -- ^ Documentation to attach to arguments
          -> Q Dec
 funD_doc nm cs mfun_doc arg_docs = do
-  qAddModFinalizer $ sequence_
+  addModFinalizer $ sequence_
     [putDoc (ArgDoc nm i) s | (i, Just s) <- zip [0..] arg_docs]
   let dec = funD nm cs
   case mfun_doc of
@@ -1140,7 +1140,7 @@ dataD_doc :: Q Cxt -> Name -> [Q (TyVarBndr BndrVis)] -> Maybe (Q Kind)
           -- ^ Documentation to attach to the data declaration
           -> Q Dec
 dataD_doc ctxt tc tvs ksig cons_with_docs derivs mdoc = do
-  qAddModFinalizer $ mapM_ docCons cons_with_docs
+  addModFinalizer $ mapM_ docCons cons_with_docs
   let dec = dataD ctxt tc tvs ksig (map (\(con, _, _) -> con) cons_with_docs) derivs
   maybe dec (flip withDecDoc dec) mdoc
 
@@ -1154,7 +1154,7 @@ newtypeD_doc :: Q Cxt -> Name -> [Q (TyVarBndr BndrVis)] -> Maybe (Q Kind)
              -- ^ Documentation to attach to the newtype declaration
              -> Q Dec
 newtypeD_doc ctxt tc tvs ksig con_with_docs@(con, _, _) derivs mdoc = do
-  qAddModFinalizer $ docCons con_with_docs
+  addModFinalizer $ docCons con_with_docs
   let dec = newtypeD ctxt tc tvs ksig con derivs
   maybe dec (flip withDecDoc dec) mdoc
 
@@ -1167,7 +1167,7 @@ typeDataD_doc :: Name -> [Q (TyVarBndr BndrVis)] -> Maybe (Q Kind)
           -- ^ Documentation to attach to the data declaration
           -> Q Dec
 typeDataD_doc tc tvs ksig cons_with_docs mdoc = do
-  qAddModFinalizer $ mapM_ docCons cons_with_docs
+  addModFinalizer $ mapM_ docCons cons_with_docs
   let dec = typeDataD tc tvs ksig (map (\(con, _, _) -> con) cons_with_docs)
   maybe dec (flip withDecDoc dec) mdoc
 
@@ -1181,7 +1181,7 @@ dataInstD_doc :: Q Cxt -> (Maybe [Q (TyVarBndr ())]) -> Q Type -> Maybe (Q Kind)
               -- ^ Documentation to attach to the instance declaration
               -> Q Dec
 dataInstD_doc ctxt mb_bndrs ty ksig cons_with_docs derivs mdoc = do
-  qAddModFinalizer $ mapM_ docCons cons_with_docs
+  addModFinalizer $ mapM_ docCons cons_with_docs
   let dec = dataInstD ctxt mb_bndrs ty ksig (map (\(con, _, _) -> con) cons_with_docs)
               derivs
   maybe dec (flip withDecDoc dec) mdoc
@@ -1197,7 +1197,7 @@ newtypeInstD_doc :: Q Cxt -> (Maybe [Q (TyVarBndr ())]) -> Q Type
                  -- ^ Documentation to attach to the instance declaration
                  -> Q Dec
 newtypeInstD_doc ctxt mb_bndrs ty ksig con_with_docs@(con, _, _) derivs mdoc = do
-  qAddModFinalizer $ docCons con_with_docs
+  addModFinalizer $ docCons con_with_docs
   let dec = newtypeInstD ctxt mb_bndrs ty ksig con derivs
   maybe dec (flip withDecDoc dec) mdoc
 
@@ -1207,7 +1207,7 @@ patSynD_doc :: Name -> Q PatSynArgs -> Q PatSynDir -> Q Pat
             -> [Maybe String] -- ^ Documentation to attach to the pattern arguments
             -> Q Dec
 patSynD_doc name args dir pat mdoc arg_docs = do
-  qAddModFinalizer $ sequence_
+  addModFinalizer $ sequence_
     [putDoc (ArgDoc name i) s | (i, Just s) <- zip [0..] arg_docs]
   let dec = patSynD name args dir pat
   maybe dec (flip withDecDoc dec) mdoc
