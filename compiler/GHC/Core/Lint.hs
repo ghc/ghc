@@ -1720,11 +1720,13 @@ lintCoreAlt case_bndr scrut_ty _ alt_ty (Alt (LitAlt lit) args rhs)
     lit_ty = literalType lit
 
 lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rhs)
-  | isNewTyCon (dataConTyCon con)
+  | isNewTyCon (dataConTyCon con)            -- (DALT1) in Note [DataAlt restrictions] in GHC.Core
   = zeroUE <$ addErrL (mkNewTyDataConAltMsg scrut_ty alt)
+  | isUnaryClassTyCon (dataConTyCon con)     -- (DALT3) in Note [DataAlt restrictions] in GHC.Core
+  = zeroUE <$ addErrL (mkUnaryClassDataConAltMsg scrut_ty alt)
   | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty
   = addLoc (CaseAlt alt) $  do
-    { checkTypeDataConOcc "pattern" con
+    { checkTypeDataConOcc "pattern" con      -- (DALT2) in Note [DataAlt restrictions] in GHC.Core
     ; lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
 
       -- Instantiate the universally quantified
@@ -3806,6 +3808,11 @@ mkNewTyDataConAltMsg scrut_ty alt
            text "Scrutinee type:" <+> ppr scrut_ty,
            text "Alternative:" <+> pprCoreAlt alt ]
 
+mkUnaryClassDataConAltMsg :: Type -> CoreAlt -> SDoc
+mkUnaryClassDataConAltMsg scrut_ty alt
+  = vcat [ text "Data alternative for unary class datacon"
+         , text "Scrutinee type:" <+> ppr scrut_ty
+         , text "Alternative:" <+> pprCoreAlt alt ]
 
 ------------------------------------------------------
 --      Other error messages

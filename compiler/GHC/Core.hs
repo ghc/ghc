@@ -286,7 +286,9 @@ data Alt b
 -- See Note [GHC Formalism] in GHC.Core.Lint
 data AltCon
   = DataAlt DataCon   --  ^ A plain data constructor: @case e of { Foo x -> ... }@.
-                      -- Invariant: the 'DataCon' is always from a @data@ type, and never from a @newtype@
+                      -- Invariant: the 'DataCon' is always from a @data@ type,
+                      -- and never from a @newtype@ or a unary class.
+                      -- See Note [DataAlt restrictions]
 
   | LitAlt  Literal   -- ^ A literal: @case e of { 1 -> ... }@
                       -- Invariant: always an *unlifted* literal
@@ -330,6 +332,63 @@ mkBinds Recursive binds = [Rec binds]
 mkBinds NonRecursive binds = map (uncurry NonRec) binds
 
 {-
+Note [DataAlt restrictions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The DataCon in a DataAlt is subject to three restrictions:
+
+(DALT1) It is never from a newtype.
+
+  Newtypes are always represented via coercions, never by pattern matching
+  on their data constructor. We can still have a case expression over a
+  newtype scrutinee if we are just doing an eval:
+
+      case x of { DEFAULT -> e }
+
+  but we must not match on the newtype constructor.
+
+(DALT2) It is never from a `type data` declaration.
+
+  The constructors of a `type data` declaration (see
+  Note [Type data declarations] in GHC.Rename.Module) exist only at the
+  type level and have no value-level representation. Nevertheless, it is
+  possible to strictly evaluate a value whose type is a `type data`
+  declaration. For example (from test type-data/should_compile/T2294b.hs):
+
+      type data T a where
+        A :: T Int
+
+      f :: T a -> ()
+      f !x = ()
+
+  We want to generate the following Core for f:
+
+      f = \(@a) (x :: T a) ->
+          case x of { __DEFAULT -> () }
+
+  Namely we do _not_ want to match on `A`, as it doesn't exist at the value
+  level! See wrinkle (W2b) in Note [Type data declarations] in
+  GHC.Rename.Module.
+
+(DALT3) It is never from a unary class (#27071).
+
+  Unary class constructors are erased at runtime: the dictionary IS the
+  single method (or superclass), with no wrapper. Matching on the dictionary
+  constructor is therefore illegal in Core; case expressions over unary
+  class dictionaries must use DEFAULT. For example, given
+
+      class C a where { op :: a -> a }
+
+  a case on a C dictionary looks like:
+
+      case d of bndr { DEFAULT -> ...bndr... }
+  not:
+      case d of { C:C op -> ...op... }    -- WRONG
+
+  See (UCM13) in Note [Unary class magic] in GHC.Core.TyCon.
+
+All three restrictions are checked by Core Lint, and they each give rise
+to a special case in `GHC.Core.Utils.refineDefaultAlt`.
+
 Note [Literal alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Literal alternatives (LitAlt lit) are always for *un-lifted* literals.

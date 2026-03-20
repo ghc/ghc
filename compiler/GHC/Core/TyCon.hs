@@ -1584,6 +1584,20 @@ There are a number of wrinkles
   a black hole when rehydrating interface the interface file. Easiest just to
   store the bit!  See `ifUnary` in GHC.Iface.Synatax.IfaceClassBody.
 
+(UCM13) In Core, a case expression must never pattern-match on a unary class
+  data constructor (#27071). Since the constructor is erased at runtime, the
+  only valid form is:
+
+      case d of bndr { DEFAULT -> ...bndr... }
+
+  See (DALT3) Note [DataAlt restrictions] in GHC.Core.
+
+  Generally, class dictionaries are only taken apart by the method
+  selectors, which are never inlined; see Note [ClassOp/DFun selection]
+  in GHC.Tc.TyCl.Instance. However the demand analyser can add `seq` forcing
+  on strict arguments (see Note [Which Ids should be strictified] in
+  GHC.Core.Utils), so we must be careful not to "fill in" the DEFAULT to mention
+  the data constructor; see GHC.Core.Utils.refineDefaultAlt.
 
 Note [Representing unary classes with newtypes: bad, bad, bad]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
