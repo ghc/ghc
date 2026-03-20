@@ -7,12 +7,14 @@
  * ---------------------------------------------------------------------------*/
 
 /*
- * The interval timer is used for profiling and for context switching in the
- * threaded build.
+ * The interval timer is used for profiling and for context switching.
  *
  * This file defines the platform-independent view of interval timing, relying
- * on platform-specific services to install and run the timers.
+ * on platform-specific services to install and run the timers. See
+ * posix/Ticker.c and win32/Ticker.c for the platform specific parts.
  *
+ * If you are looking for Itimer.c then you either file or one of the
+ * platform-specific Ticker.c files.
  */
 
 #include "rts/PosixSource.h"
