@@ -1948,6 +1948,41 @@ the LHS vs the new RHS. And vice-versa (if it's the RHS that is a FunTy).
 
 See T11305 and T26225 for examples of when this is important.
 
+Wrinkle [Avoiding a loop in tc_sub_type_deep]
+
+  In #26823, we had:
+
+    alpha  <=  a -> alpha
+
+  If we simply unified the two types, the occurs-check would trigger.
+  In deep subsumption however, we need to be careful, as we might do the
+  following:
+
+    A1. Create fresh metavariables beta, gamma
+    A2. Unify alpha ~ beta -> gamma
+    A3. Decompose  "beta -> gamma <= a -> (beta -> gamma)", obtaining
+              a <= beta  and  gamma <= beta -> gamma
+    A4. Recur with gamma <= beta -> gamma
+
+  If we do this, we enter an infinite loop and GHC hangs at compile time.
+  To avoid this, we must first recur, before unifying. So the above becomes:
+
+    B1 (like A1). Create fresh metavariables beta, gamma
+    B2 (like A3). Decompose  "beta -> gamma <= a -> alpha", obtaining
+          a <= beta  and  gamma <= alpha
+    B3. Solve these two sub-problems by unification
+          a ~ beta,   gamma ~ alpha
+    B4 (like A2). Then, and only then, unify alpha ~ beta->gamma
+
+    With this approach, GHC will be left with the following unifications:
+
+      - alpha ~ (beta -> gamma)
+      - a ~ beta
+      - gamma ~ alpha
+
+    GHC will fail to solve this unification problem due to an occurs check
+    failure, thus rejecting the program with a type error (as desired).
+
 Note [Deep subsumption and required foralls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A required forall, (forall a -> ty) behaves like a "rho-type", one with no
@@ -2117,8 +2152,9 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
            ; exp_arg  <- newOpenFlexiTyVarTy -- NB: no FRR check needed; we might not need to eta-expand
            ; exp_res  <- newOpenFlexiTyVarTy
            ; let exp_funTy = FunTy { ft_af = af1, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res }
-           ; unify_wrap <- just_unify exp_funTy ty_e
+             -- Recur before unifying; see Wrinkle [Avoiding a loop in tc_sub_type_deep]
            ; fun_wrap <- go_fun af1 act_mult act_arg act_res af1 exp_mult exp_arg exp_res
+           ; unify_wrap <- just_unify exp_funTy ty_e
            ; return $ unify_wrap <.> fun_wrap
              -- unify_wrap :: exp_funTy ~~> ty_e
              -- fun_wrap :: ty_a ~~> exp_funTy
@@ -2129,8 +2165,9 @@ tc_sub_type_deep fun_pos@(tc_fun, pos) ds_depth unify inst_orig ctxt ty_actual t
            ; act_arg  <- newOpenFlexiTyVarTy -- NB: no FRR check needed; we might not need to eta-expand
            ; act_res  <- newOpenFlexiTyVarTy
            ; let act_funTy = FunTy { ft_af = af2, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res }
-           ; unify_wrap <- just_unify ty_a act_funTy
+             -- Recur before unifying; see Wrinkle [Avoiding a loop in tc_sub_type_deep]
            ; fun_wrap <- go_fun af2 act_mult act_arg act_res af2 exp_mult exp_arg exp_res
+           ; unify_wrap <- just_unify ty_a act_funTy
            ; return $ fun_wrap <.> unify_wrap
              -- unify_wrap :: ty_a ~~> act_funTy
              -- fun_wrap :: act_funTy ~~> ty_e
