@@ -187,9 +187,3 @@ exitTicker (bool wait)
         pthread_detach(thread);
     }
 }
-
-int
-rtsTimerSignal(void)
-{
-    return SIGALRM;
-}

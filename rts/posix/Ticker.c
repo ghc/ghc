@@ -37,3 +37,14 @@
 #else
 #include "ticker/Pthread.c"
 #endif
+
+/* Legacy of the signal-based ticker implementations. The unix package's
+ * signal module lists reserved signals that users should avoid, which
+ * includes this one.
+ * TODO: Remove this export once the unix package no longer needs it.
+ *       See issue #27073
+ */
+int rtsTimerSignal(void)
+{
+    return SIGALRM;
+}
