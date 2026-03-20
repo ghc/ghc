@@ -718,7 +718,7 @@ slow_spw(void *Sp, StgStack *cur_stack, StgWord offset_words){
     }
     // 2b. Access the element if there is no underflow frame, it must be right
     // at the top of the stack.
-    else if(Sp_plusW(offset_words) < (StgPtr)(cur_stack->stack + cur_stack->stack_size)) {
+    else if(Sp_plusW(offset_words) < (void*)(cur_stack->stack + cur_stack->stack_size)) {
         // Still inside the stack chunk
         return Sp_plusW(offset_words);
     } else {
@@ -2469,7 +2469,7 @@ run_BCO:
                     threadStackUnderflow(cap, cap->r.rCurrentTSO);
                     LOAD_STACK_POINTERS;
                     by -= sp_to_uf;
-                } else if (Sp_plusW(by) < (StgPtr)(stk->stack + stk->stack_size)) {
+                } else if (Sp_plusW(by) < (void*)(stk->stack + stk->stack_size)) {
                     // we're within the first stack chunk, this chunk has
                     // no underflow frame
                     break;
