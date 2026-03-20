@@ -572,7 +572,8 @@ tcExpr (HsDo _ do_or_lc stmts) res_ty
   = do hse <- expandDoStmts do_or_lc stmts
        tcHsExpansion hse res_ty
   | otherwise
-  -- ListComp, MonadComp are handled by tcDoStmts
+  -- ListComp and MonadComp are handled by legacy tcDoStmts for now,
+  -- The ultimate goal is to handle them via expandDoStmts.
   -- GHCiStmts are handled completely separate
   = tcDoStmts do_or_lc stmts res_ty
 
@@ -787,15 +788,16 @@ directly, it's much easier to
    * Expand (or desugar) the code to something simpler
    * Typecheck that simpler expression
 
-Example: record updates.  The typechecker looks like this:
+Example: Typechecking the do expression. The typechecker looks (somewhat) like this:
 
-   tcExpr e@(HsDo{}) rho = do { ee <- expandExpr e
-                              ; tcExpr ee rho }
+   tcExpr e@(HsDo _ stmts) rho = do { hse <- expandDoStmts stmts
+                                    ; tcHsExpansion hse rho }
 
-The `expandExpr` replaces the HsDo { x <- e1; return x }
+The `expandDoStmts` replaces the HsDo { x <- e1; return x }
 with something like
-   e1 >>= \ x -> x
-and we then typecheck the latter.
+   HSE { hs_ctxt = e
+       , expanded_expr = e1 >>= \ x -> x }
+and we then typecheck the expression `e1 >>= \ x -> x`
 
 See also Note [Handling overloaded and rebindable constructs]
      and Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
@@ -807,8 +809,8 @@ The rest of this Note explains how that is done.
 * The expansion process typically takes a user written thing
        L lspan ue
   and returns
-       L lspan (XExpr (ExpandedThingRn { xrn_orig = ue
-                                       , xrn_expanded = ee } ))
+       L lspan (XExpr (ExpandedThingRn (HSE { hs_ctxt = ue
+                                            , expanded_expr = ee } ))
   where `ee` is the expansion of the user written thing `ue`
 
 * The type checker context has 3 key fields that describe the context:
@@ -825,30 +827,29 @@ The rest of this Note explains how that is done.
   The `tcl_in_gen_code` is a boolean that keeps track of whether
   the current expression being typechecked is compiler generated
   or user generated.
+  INVARIANT: `tcl_in_gen_code` is modified only in `setSrcSpan`.
 
-  The `tcl_in_gen_code` is a boolean that keeps track of whether
-  the current expression being typechecked is compiler generated
-  or user generated.
 
 * Now, when
       tcMonoLExpr :: LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
   gets a located expression, it does 2 things:
-    * Calls `addLExprCtxt` to perform error context management
-    * Calls `tcExpr` to typecheck the expression.
+    (a) Calls `addLExprCtxt` to perform error context management
+    (b) Calls `tcExpr` to typecheck the expression.
 
-* `addLExprCtxt span expr`
+(a) `addLExprCtxt span expr`
     (1) updates the location of `tcl_loc` with the `span` above,
     (2) adds an `ErrCtxt` on top of the `tcl_err_ctxt`.
 
 * However, if the `span` is generated (see `isGeneratedSrcSpan`), then
-  `addLExprCtxt` is a no-op. Crucially, when we generate code in `expandExpr`,
+  `addLExprCtxt` sets `tcl_in_gen_code` to `True` via a call to `setSrcSpan`
+  and the `tcl_err_ctxt` is left untouched. Crucially, when we generate code in `expandExpr`,
   all the generated AST notes are tagged with a `GeneratedSrcSpan`. This
   is how we avoid populating the TcLclCtxt with generated code.
 
-* The type checker error-stack element `GHC.Tc.Types.ErrCtxt.ErrCtxt`
-     type ErrCtxt = HsCtxt
+* The type checker error-stack element `GHC.Tc.Types.ErrCtxt.HsCtxt`
+  just stores an error message
 
-    just stores an error message
+           type ErrCtxt = HsCtxt
 
   When called on an `XExpr`, `addLExprCtxt`, adds the user written thing
   `ue`, and the error message provided by the caller on the `ErrCtxtStack` See
@@ -858,10 +859,9 @@ The rest of this Note explains how that is done.
 
 tcHsExpansion :: HsExpansion GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcHsExpansion (HSE o e) res_ty
-   = mkExpandedTc o <$> -- necessary for hpc ticks
-         -- Need to call tcExpr and not tcApp
-         -- as e can be let statement which tcApp cannot gracefully handle
-         tcMonoLExpr e res_ty
+   = do e' <- tcMonoLExpr e res_ty
+        return $ XExpr (ExpandedThingTc (HSE o e'))
+
 
 {-
 ************************************************************************
