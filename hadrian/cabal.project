@@ -4,6 +4,8 @@ packages: ./
 
 -- This essentially freezes the build plan for hadrian
 -- It would be wise to keep this up to date with the state set in .gitlab/ci.sh.
+-- Also remember to bump CACHE_REV in .gitlab-ci.yml, otherwise stale
+-- cabal cache on some runners may result in [Cabal-7159] errors.
 index-state: 2026-03-10T17:36:36Z
 
 -- N.B. Compile with -O0 since this is not a performance-critical executable
