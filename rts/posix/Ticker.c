@@ -25,11 +25,11 @@
 
 /* Select a ticker implementation to use:
  *
- * On Linux we can use timerfd_* and a thread that waits on it using poll.
- * Linux has had timerfd since version 2.6.25. NetBSD has also had timerfd
- * support since version 10.
+ * On modern Linux, FreeBSD and NetBSD we can use timerfd_create and a thread
+ * that waits on it using poll. Linux has had timerfd since version 2.6.25.
+ * NetBSD has had timerfd since version 10, and FreeBSD since version 15.
  *
- * For older version of linux/netbsd without timerfd, and for all other posix
+ * For older version of linux/bsd without timerfd, and for all other posix
  * platforms, we use the implementation using posix pthreads and nanosleep().
  */
 #if defined(HAVE_SYS_TIMERFD_H)
