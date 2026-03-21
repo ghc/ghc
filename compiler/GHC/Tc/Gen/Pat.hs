@@ -405,7 +405,7 @@ so that tcPat can extend the environment for the thing_inside, but also
 so that constraints arising in the thing_inside can be discharged by the
 pattern.
 
-This does not work so well for the ErrCtxt carried by the monad: we don't
+This does not work so well for the HsCtxt carried by the monad: we don't
 want the error-context for the pattern to scope over the RHS.
 Hence the getErrCtxt/setErrCtxt stuff in tcMultiple
 -}

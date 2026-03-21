@@ -34,7 +34,7 @@ module GHC.Tc.Types(
         FrontendResult(..),
 
         -- Renamer types
-        ErrCtxt,
+        HsCtxt,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
         ImportUserSpec(..),
         ImpUserList(..),

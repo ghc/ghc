@@ -7650,7 +7650,7 @@ pprTypeSyntaxName ContextArrowSyntax    = "context arrow (=>)"
 pprTypeSyntaxName FunctionArrowSyntax   = "function type arrow (->)"
 
 --------------------------------------------------------------------------------
--- ErrCtxt
+-- HsCtxt
 
 pprTyConInstFlavour :: TyConInstFlavour -> SDoc
 pprTyConInstFlavour

@@ -1,9 +1,10 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module GHC.Tc.Types.ErrCtxt
-  ( ErrCtxt, HsCtxt(..), isHsCtxtLandmark
+  ( HsCtxt(..), isHsCtxtLandmark
   , UserSigType(..), FunAppCtxtFunArg(..)
   , TyConInstFlavour(..)
+  , ErrCtxtStack
 
   -- * UserTypeCtxt
   , UserTypeCtxt(..), pprUserTypeCtxt, isSigMaybe
@@ -51,6 +52,7 @@ import qualified Data.List.NonEmpty as NE
 {- *********************************************************************
 *                                                                      *
           UserTypeCtxt
+b
 *                                                                      *
 ********************************************************************* -}
 
@@ -195,19 +197,14 @@ isSigMaybe _                = Nothing
 
 {- *********************************************************************
 *                                                                      *
-          ErrCtxt
+                 HsCtxt
+         Error message contexts
 *                                                                      *
 ********************************************************************* -}
---------------------------------------------------------------------------------
 
--- type HsCtxtM = TidyEnv -> ZonkM (TidyEnv, HsCtxt)
-
--- | Additional context to include in an error message, e.g.
--- "In the type signature ...", "In the ambiguity check for ...", etc.
-type ErrCtxt = HsCtxt
-
---------------------------------------------------------------------------------
--- Error message contexts
+-- An error-context stack (maintained in the typehcecker's monad)
+-- is just a stack of HsCtxts
+type ErrCtxtStack = [HsCtxt]
 
 data UserSigType
   = UserLHsSigType !(LHsSigType GhcRn)

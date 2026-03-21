@@ -439,7 +439,7 @@ pprCtLoc (CtLoc { ctl_origin = o, ctl_env = lcl})
 -- when reporting errors, see `setCtLocM`.
 --
 -- See also 'TcLclCtxt'.
-data CtLocEnv = CtLocEnv { ctl_ctxt :: ![ErrCtxt]
+data CtLocEnv = CtLocEnv { ctl_ctxt :: !ErrCtxtStack
                          , ctl_loc :: !RealSrcSpan
                          , ctl_bndrs :: !TcBinderStack
                          , ctl_tclvl :: !TcLevel
