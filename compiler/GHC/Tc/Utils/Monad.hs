@@ -61,7 +61,6 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles, addDependentDirectories,
 
   -- * Error management
-  getHsCtxt,
   getSrcSpanM, getRealSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
   inGeneratedCode,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
@@ -88,7 +87,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Context management for the type checker
   getErrCtxt, setErrCtxt, addErrCtxt,
-  addLExprCtxt,
+  addExprCtxt,
   popErrCtxt, getCtLocM, setCtLocM, mkCtLocEnv,
 
   -- * Diagnostic message generation (type checker)
@@ -98,7 +97,7 @@ module GHC.Tc.Utils.Monad(
   checkTc, checkTcM,
   checkJustTc, checkJustTcM,
   failIfTc, failIfTcM,
-  mkErrCtxt,
+  tidyErrCtxt,
   addTcRnDiagnostic, addDetailedDiagnostic,
   mkTcRnMessage, reportDiagnostic, reportDiagnostics,
   warnIf, diagnosticTc, diagnosticTcM,
@@ -1086,16 +1085,21 @@ inGeneratedCode = lclEnvInGeneratedCode <$> getLclEnv
 
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- See Note [Error contexts in generated code]
--- NB: This is the only place where tcl_in_gen_code is modified
+-- When entering a node decorated with a /user/ span:
+--   * Record that span in `tcl_loc`
+--   * Set `tcl_in_gen_code` to False, to record that we
+--     are in user code.
+-- When entering a node decorated with a /generated/ span:
+--   * Do not touch `tcl_loc`, so that `tcl_loc` always records
+--     the innermost user span.
+-- NB: This is the only place where `tcl_loc` and `tcl_in_gen_code`
+--     are modified
 setSrcSpan (RealSrcSpan loc _) thing_inside
   = updLclCtxt (\ctxt -> ctxt {tcl_loc = loc, tcl_in_gen_code = False}) thing_inside
 setSrcSpan (GeneratedSrcSpan{}) thing_inside
   = updLclCtxt (\ctxt -> ctxt {tcl_in_gen_code = True}) thing_inside
 setSrcSpan _ thing_inside
   = thing_inside
-
-getHsCtxt :: TcRn HsCtxt
-getHsCtxt = getLclEnvHsCtxt <$> getLclEnv
 
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
@@ -1177,7 +1181,7 @@ addErrAt :: SrcSpan -> TcRnMessage -> TcRn ()
 -- work doesn't matter
 addErrAt loc msg = do { ctxt <- getErrCtxt
                       ; tidy_env <- liftZonkM $ tcInitTidyEnv
-                      ; err_ctxt <- mkErrCtxt tidy_env ctxt
+                      ; err_ctxt <- tidyErrCtxt tidy_env ctxt
                       ; let detailed_msg = mkDetailedMessage (ErrInfo err_ctxt Nothing noHints) msg
                       ; add_long_err_at loc detailed_msg }
 
@@ -1314,57 +1318,49 @@ problem.
 
 Note [Error contexts in generated code]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* setSrcSpan is the only place that modifies `tcl_in_gen_code`
+* setSrcSpan is the only place that modifies `tcl_loc` and `tcl_in_gen_code`
 
-* addLExpr updates updates the ErrCtxt stored in LclEnv with the following logic
-  - If the `SrcSpan` is a `RealSrcSpan`, `setSrcSpan` updates the `tcl_loc` to the given value
-    and sets `tcl_in_gen_code` to `False`. Meaning we are not type checking a compiler generated
-    expression. And thus it can add the expression on to the ErrCtxt Stack
-  - If the `SrcSpan` is a GeneratedSrcSpan then `tcl_in_gen_code` is set to `True`, meaning
-    the expression in hand is compiler generated, and hence it is not added on to the stack.
+* addLExpr updates updates the HsCtxt stored in LclEnv with the following logic
+  - If `tcl_in_gen_code` is true, do nothing
+  - Otherwise push a suitable HsCtxt onto the ErrCtxtStack
 
 This ensures that the error messages do not leak compiler generated expressions which can
 be confusing to the users as they never appear in the original source code
 
-
 - See Note [Rebindable syntax and XXExprGhcRn] in `GHC.Hs.Expr` for
-more discussion of this fancy footwork
+  more discussion of this fancy footwork
 - See Note [Generated code and pattern-match checking] in `GHC.Types.Basic` for the
-relation with pattern-match checks
-- See Note [ErrCtxtStack Manipulation] in `GHC.Tc.Types.LclEnv` for info about `ErrCtxtStack`
+  relation with pattern-match checks
 -}
 
 -- See Note [Error contexts in generated code]
-addLExprCtxt :: SrcSpan -> HsExpr GhcRn -> TcRn a -> TcRn a
-addLExprCtxt lspan e thing_inside
-  = setSrcSpan lspan $ add_expr_ctxt e thing_inside
-    where
-      add_expr_ctxt :: HsExpr GhcRn -> TcRn a -> TcRn a
-      add_expr_ctxt e thing_inside
-         = do { igc <- inGeneratedCode
-              ; if igc -- generated
-                then thing_inside
-                else case e of
-                       -- The HsHole special case addresses situations like
-                       --    f x = _
-                       -- when we don't want to say "In the expression: _",
-                       -- because it is mentioned in the error message itself
-                       HsHole{} -> thing_inside
+addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
+addExprCtxt e thing_inside
+  = do { igc <- inGeneratedCode
+       ; if igc -- In generated code; so addExprCtxt is a no-op
+         then thing_inside
+         else case e of
+                -- The HsHole special case addresses situations like
+                --    f x = _
+                -- when we don't want to say "In the expression: _",
+                -- because it is mentioned in the error message itself
+                HsHole{} -> thing_inside
 
-                     -- There is a special case for expressions with signatures to avoid having too verbose
-                     -- error context. c.f. RecordDotSyntaxFail9
-                     -- Add the original HsCtxt if we are typechecking an expanded expression
-                       ExprWithTySig _ (L _ e') _
-                         | XExpr (ExpandedThingRn (HSE o _)) <- e' -> addErrCtxt o thing_inside
-                       XExpr (ExpandedThingRn (HSE o _)) -> addErrCtxt o thing_inside
+              -- There is a special case for expressions with signatures to avoid having
+              -- too verbose error context. c.f. RecordDotSyntaxFail9
+              -- Add the original HsCtxt if we are typechecking an expanded expression
+                ExprWithTySig _ (L _ e') _
+                  | XExpr (ExpandedThingRn (HSE o _)) <- e' -> addErrCtxt o thing_inside
 
-                       _ -> addErrCtxt (ExprCtxt e) thing_inside
-              }
+                XExpr (ExpandedThingRn (HSE o _)) -> addErrCtxt o thing_inside
 
-getErrCtxt :: TcM [ErrCtxt]
+                _ -> addErrCtxt (ExprCtxt e) thing_inside
+       }
+
+getErrCtxt :: TcM ErrCtxtStack
 getErrCtxt = do { env <- getLclEnv; return (getLclEnvErrCtxt env) }
 
-setErrCtxt :: [ErrCtxt] -> TcM a -> TcM a
+setErrCtxt :: ErrCtxtStack -> TcM a -> TcM a
 {-# INLINE setErrCtxt #-}   -- Note [Inlining addErrCtxt]
 setErrCtxt ctxt = updLclEnv (setLclEnvErrCtxt ctxt)
 
@@ -1374,7 +1370,7 @@ addErrCtxt :: HsCtxt -> TcM a -> TcM a
 addErrCtxt ctxt = pushCtxt ctxt
 
 -- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
-pushCtxt :: ErrCtxt -> TcM a -> TcM a
+pushCtxt :: HsCtxt -> TcM a -> TcM a
 {-# INLINE pushCtxt #-} -- Note [Inlining addErrCtxt]
 pushCtxt ctxt = updLclEnv (addLclEnvErrCtxt ctxt)
 
@@ -1868,7 +1864,7 @@ addDiagnosticTc msg
 addDiagnosticTcM :: (TidyEnv, TcRnMessage) -> TcM ()
 addDiagnosticTcM (env0, msg)
  = do { ctxt <- getErrCtxt
-      ; extra <- mkErrCtxt env0 ctxt
+      ; extra <- tidyErrCtxt env0 ctxt
       ; let detailed_msg = mkDetailedMessage (ErrInfo extra Nothing noHints) msg
       ; add_diagnostic detailed_msg }
 
@@ -1881,7 +1877,7 @@ addDetailedDiagnostic mkMsg = do
   !diag_opts  <- initDiagOpts <$> getDynFlags
   env0 <- liftZonkM tcInitTidyEnv
   ctxt <- getErrCtxt
-  err_info <- mkErrCtxt env0 ctxt
+  err_info <- tidyErrCtxt env0 ctxt
   reportDiagnostic $
     mkMsgEnvelope diag_opts loc name_ppr_ctx $
       mkMsg err_info
@@ -1918,16 +1914,19 @@ add_diagnostic msg
 -}
 
 add_err_tcm :: TidyEnv -> TcRnMessage -> SrcSpan
-            -> [ErrCtxt]
+            -> ErrCtxtStack
             -> TcM ()
 add_err_tcm tidy_env msg loc ctxt
- = do { err_ctxt <- mkErrCtxt tidy_env ctxt
+ = do { err_ctxt <- tidyErrCtxt tidy_env ctxt
       ; add_long_err_at loc $
           mkDetailedMessage (ErrInfo err_ctxt Nothing noHints) msg }
 
-mkErrCtxt :: TidyEnv -> [ErrCtxt] -> TcM [HsCtxt]
--- Tidy the error info, trimming excessive contexts
-mkErrCtxt env ctxts
+tidyErrCtxt :: TidyEnv -> ErrCtxtStack -> TcM ErrCtxtStack
+-- Do the following
+--   * Zonk each HsCtxt in the ErrCtxtStack
+--   * Tidy each using TidyEnv
+--   * Trim excessive contexts
+tidyErrCtxt env ctxts
 --  = do
 --       dbg <- hasPprDebug <$> getDynFlags
 --       if dbg                -- In -dppr-debug style the output
@@ -1935,7 +1934,7 @@ mkErrCtxt env ctxts
 --          else go dbg 0 env ctxts
  = go False 0 env ctxts -- regular error ctx
  where
-   go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM [HsCtxt]
+   go :: Bool -> Int -> TidyEnv -> ErrCtxtStack -> TcM ErrCtxtStack
    go _ _ _ [] = return []
    go dbg n env (ctxt : ctxts)
      | isHsCtxtLandmark ctxt

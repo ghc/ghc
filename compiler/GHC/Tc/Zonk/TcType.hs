@@ -798,6 +798,8 @@ tidyEvVar env var = updateIdTypeAndMult (tidyType env) var
 
 
 zonkTidyHsCtxt :: TidyEnv -> HsCtxt -> ZonkM (TidyEnv, HsCtxt)
+-- We zonk and tidy a HsCtxt just before putting it into an error message
+-- so that it contains as much info as possible, as tidily as possible
 zonkTidyHsCtxt env e@(ExprCtxt{}) = return (env, e)
 zonkTidyHsCtxt env (ThetaCtxt ctxt theta_ty) = do
   (env', theta_ty') <- zonkTidyTcTypes env theta_ty

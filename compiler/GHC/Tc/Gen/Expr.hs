@@ -122,7 +122,8 @@ tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
                             -> TcM (LHsExpr GhcTc)
 
 tcPolyLExpr (L loc expr) res_ty
-  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
+  = setSrcSpanA loc   $
+    addExprCtxt expr  $  -- Note [Error contexts in generated code]
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
@@ -250,9 +251,11 @@ tcInferExpr, tcInferExprNC :: InferInstFlag -> LHsExpr GhcRn -> TcM (LHsExpr Ghc
 tcInferExpr   = tc_infer_expr    IFRR_Any
 tcInferExprNC = tc_infer_expr_NC IFRR_Any
 
-tc_infer_expr, tc_infer_expr_NC :: InferFRRFlag -> InferInstFlag -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcType)
+tc_infer_expr, tc_infer_expr_NC :: InferFRRFlag -> InferInstFlag
+                                -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcType)
 tc_infer_expr ifrr iif (L loc expr)
-  = addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
+  = setSrcSpanA loc  $
+    addExprCtxt expr $  -- Note [Error contexts in generated code]
     do { (expr', rho) <- runInfer iif ifrr (tcExpr expr)
        ; return (L loc expr', rho) }
 
@@ -278,9 +281,10 @@ tcMonoLExpr, tcMonoLExprNC
     -> TcM (LHsExpr GhcTc)
 
 tcMonoLExpr (L loc expr) res_ty
-  = do addLExprCtxt (locA loc) expr $  -- Note [Error contexts in generated code]
-         do  { expr' <- tcExpr expr res_ty
-             ; return (L loc expr') }
+  = setSrcSpanA loc   $
+    addExprCtxt expr $  -- Note [Error contexts in generated code]
+    do  { expr' <- tcExpr expr res_ty
+        ; return (L loc expr') }
 
 tcMonoLExprNC (L loc expr) res_ty
   = setSrcSpanA loc $
@@ -814,9 +818,9 @@ The rest of this Note explains how that is done.
   where `ee` is the expansion of the user written thing `ue`
 
 * The type checker context has 3 key fields that describe the context:
-     TcLclCtxt { tcl_loc      :: RealSrcSpan
+     TcLclCtxt { tcl_loc         :: RealSrcSpan
                , tcl_in_gen_code :: Bool
-               , tcl_err_ctxt :: [ErrCtxt]
+               , tcl_err_ctxt    :: ErrCtxtStack
                , ... }
   Note `tcl_loc` always points to a real place in the source code,
   hence `RealSrcSpan`.
@@ -832,24 +836,20 @@ The rest of this Note explains how that is done.
 
 * Now, when
       tcMonoLExpr :: LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
-  gets a located expression, it does 2 things:
-    (a) Calls `addLExprCtxt` to perform error context management
-    (b) Calls `tcExpr` to typecheck the expression.
+  gets a located expression, it does 3 things:
+    (a) Calls `setSrcSpanA` to set the ambient source-code location
+    (b) Calls `addExprCtxt` to add a suitable `HsCtxt` on top of the `tcl_err_ctxt`.
+    (c) Calls `tcExpr` to typecheck the expression.
 
-(a) `addLExprCtxt span expr`
-    (1) updates the location of `tcl_loc` with the `span` above,
-    (2) adds an `ErrCtxt` on top of the `tcl_err_ctxt`.
-
-* However, if the `span` is generated (see `isGeneratedSrcSpan`), then
-  `addLExprCtxt` sets `tcl_in_gen_code` to `True` via a call to `setSrcSpan`
-  and the `tcl_err_ctxt` is left untouched. Crucially, when we generate code in `expandExpr`,
-  all the generated AST notes are tagged with a `GeneratedSrcSpan`. This
-  is how we avoid populating the TcLclCtxt with generated code.
+* In these calls, if the `span` is generated  (see `isGeneratedSrcSpan`), then
+     - `setSrcSpanA` sets `tcl_in_gen_code` to `True`
+     - `addErrCtxt` is a no-op if `tcl_in_gen_code` is True
+  This is how we avoid populating the TcLclCtxt with generated code.
 
 * The type checker error-stack element `GHC.Tc.Types.ErrCtxt.HsCtxt`
   just stores an error message
 
-           type ErrCtxt = HsCtxt
+           type ErrCtxtStack = [HsCtxt]
 
   When called on an `XExpr`, `addLExprCtxt`, adds the user written thing
   `ue`, and the error message provided by the caller on the `ErrCtxtStack` See

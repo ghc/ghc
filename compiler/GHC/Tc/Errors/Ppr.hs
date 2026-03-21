@@ -7651,7 +7651,7 @@ pprTypeSyntaxName FunctionArrowSyntax   = "function type arrow (->)"
 pprTypeSyntaxName StarKindSyntax        = "kind" <+> quotes starLit
 
 --------------------------------------------------------------------------------
--- ErrCtxt
+-- HsCtxt
 
 pprTyConInstFlavour :: TyConInstFlavour -> SDoc
 pprTyConInstFlavour

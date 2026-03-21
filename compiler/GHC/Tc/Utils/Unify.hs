@@ -2735,11 +2735,11 @@ uType_defer (UE { u_loc = loc, u_defer = ref
          -- snocBag: see Note [Work-list ordering] in GHC.Tc.Solver.Equality
 
        -- Error trace only
-       -- NB. do *not* call mkErrCtxt unless tracing is on,
+       -- NB. do *not* call tidyErrCtxt unless tracing is on,
        --     because it is hugely expensive (#5631)
        ; whenDOptM Opt_D_dump_tc_trace $
          do { ctxt     <- getErrCtxt
-            ; err_ctxt <- mkErrCtxt emptyTidyEnv ctxt
+            ; err_ctxt <- tidyErrCtxt emptyTidyEnv ctxt
             ; traceTc "utype_defer" $
                 vcat ( ppr role
                      : debugPprType ty1

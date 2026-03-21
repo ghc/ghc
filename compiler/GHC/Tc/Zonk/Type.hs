@@ -152,7 +152,7 @@ I.1. GHC.Tc.Zonk.Monad - the ZonkM monad
   as used in GHC.Tc.Zonk.TcType.
 
   Crucially, it never errors. It is the monad we use when reporting errors
-  (see ErrCtxt), and it would be quite bad if we could error in the middle
+  (see HsCtxt), and it would be quite bad if we could error in the middle
   of reporting an error!
 
 I.2. GHC.Tc.Zonk.TcType - zonking types in the typechecker
