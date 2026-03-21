@@ -13,7 +13,8 @@ module GHC.Core.Subst (
 
         -- ** Substituting into expressions and related types
         deShadowBinds, substRuleInfo, substRulesForImportedIds,
-        substTyUnchecked, substCo, substExpr, substExprSC, substBind, substBindSC,
+        substTy, substTyUnchecked, substCo,
+        substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
         lookupIdSubst, lookupIdSubst_maybe, substIdType, substIdOcc,
         substTickish, substDVarSet, substIdInfo,
@@ -42,8 +43,7 @@ import GHC.Core.FVs
 import GHC.Core.Seq
 import GHC.Core.Utils
 
-        -- We are defining local versions
-import GHC.Core.Type hiding ( substTy )
+import GHC.Core.Type
 import GHC.Core.Coercion( mkCoVarCo, substCoVarBndr )
 import GHC.Core.TyCo.FVs
 

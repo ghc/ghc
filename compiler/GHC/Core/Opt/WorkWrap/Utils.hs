@@ -241,10 +241,10 @@ mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
                 = (work_args, work_args, work_marks)
 
               call_work work_fn  = mkVarApps (Var work_fn) work_call_args
-              call_rhs fn_rhs = mkAppsBeta fn_rhs fn_args
-                                  -- See Note [Join points and beta-redexes]
+              call_rhs fn_rhs = mkApps fn_rhs fn_args
+                   -- See Note [Join points and beta-redexes] in GHC.Core.Lint
               wrapper_body = mkLams cloned_arg_vars . wrap_fn_cpr . wrap_fn_str . call_work
-                                  -- See Note [Call-by-value for worker args]
+                   -- See Note [Call-by-value for worker args]
               work_seq_str_flds = mkStrictFieldSeqs (zip work_lam_args work_call_str)
               worker_body = mkLams work_lam_args . work_seq_str_flds . work_fn_cpr . call_rhs
               worker_args_dmds= [ idDemandInfo v | v <- work_call_args, isId v]
@@ -279,14 +279,6 @@ mkWwBodies opts fun_id ww_arity arg_vars res_ty demands res_cpr
     n_dmds = length demands
     arity_ok | isJoinId fun_id = ww_arity <= n_dmds
              | otherwise       = ww_arity == n_dmds
-
--- | Version of 'GHC.Core.mkApps' that does beta reduction on-the-fly.
--- PRECONDITION: The arg expressions are not free in any of the lambdas binders.
-mkAppsBeta :: CoreExpr -> [CoreArg] -> CoreExpr
--- The precondition holds for our call site in mkWwBodies, because all the FVs
--- of as are either cloned_arg_vars (and thus fresh) or fresh worker args.
-mkAppsBeta (Lam b body) (a:as) = bindNonRec b a $! mkAppsBeta body as
-mkAppsBeta f            as     = mkApps f as
 
 -- See Note [Limit w/w arity]
 isWorkerSmallEnough :: Int -> Int -> [Var] -> Bool
@@ -524,36 +516,6 @@ Solution is simple: put the void argument /last/:
   $wf = ...
 
 c.f Note [SpecConstr void argument insertion] in GHC.Core.Opt.SpecConstr
-
-Note [Join points and beta-redexes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Originally, the worker would invoke the original function by calling it with
-arguments, thus producing a beta-redex for the simplifier to munch away:
-
-  \x y z -> e => (\x y z -> e) wx wy wz
-
-Now that we have special rules about join points, however, this is Not Good if
-the original function is itself a join point, as then it may contain invocations
-of other join points:
-
-  join j1 x = ...
-  join j2 y = if y == 0 then 0 else j1 y
-
-  =>
-
-  join j1 x = ...
-  join $wj2 y# = let wy = I# y# in (\y -> if y == 0 then 0 else jump j1 y) wy
-  join j2 y = case y of I# y# -> jump $wj2 y#
-
-There can't be an intervening lambda between a join point's declaration and its
-occurrences, so $wj2 here is wrong. But of course, this is easy enough to fix:
-
-  ...
-  let join $wj2 y# = let wy = I# y# in let y = wy in if y == 0 then 0 else j1 y
-  ...
-
-Hence we simply do the beta-reduction here. (This would be harder if we had to
-worry about hygiene, but luckily wy is freshly generated.)
 
 Note [Freshen WW arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
