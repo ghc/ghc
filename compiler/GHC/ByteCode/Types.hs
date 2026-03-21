@@ -32,6 +32,7 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Data.FlatBag
+import GHC.Data.SmallArray
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Binary
@@ -250,14 +251,14 @@ data UnlinkedBCO
         unlinkedBCOArity  :: {-# UNPACK #-} !Int,
         unlinkedBCOInstrs :: !(BCOByteArray Word16),      -- insns
         unlinkedBCOBitmap :: !(BCOByteArray Word),      -- bitmap
-        unlinkedBCOLits   :: !(FlatBag BCONPtr),       -- non-ptrs
-        unlinkedBCOPtrs   :: !(FlatBag BCOPtr)         -- ptrs
+        unlinkedBCOLits   :: !(SmallArray BCONPtr),     -- non-ptrs
+        unlinkedBCOPtrs   :: !(SmallArray BCOPtr)       -- ptrs
    }
 
 instance NFData UnlinkedBCO where
   rnf UnlinkedBCO{..} =
-    rnf unlinkedBCOLits `seq`
-    rnf unlinkedBCOPtrs
+    rnfSmallArray unlinkedBCOLits `seq`
+    rnfSmallArray unlinkedBCOPtrs
 
 data BCOPtr
   = BCOPtrName   !Name
@@ -293,11 +294,10 @@ instance NFData BCONPtr where
 instance Outputable UnlinkedBCO where
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
       = sep [text "BCO", ppr nm, text "with",
-             ppr (sizeFlatBag lits), text "lits",
-             ppr (sizeFlatBag ptrs), text "ptrs" ]
+             ppr (sizeofSmallArray lits), text "lits",
+             ppr (sizeofSmallArray ptrs), text "ptrs" ]
 
 instance Binary FFIInfo where
   get bh = FFIInfo <$> get bh <*> get bh
 
   put_ bh FFIInfo {..} = put_ bh ffiInfoArgs *> put_ bh ffiInfoRet
-

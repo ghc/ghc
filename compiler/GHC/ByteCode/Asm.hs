@@ -88,9 +88,9 @@ bcoFreeNames bco
   where
     bco_refs (UnlinkedBCO _ _ _ _ nonptrs ptrs)
         = unionManyUniqDSets (
-             mkUniqDSet [ n | BCOPtrName n <- elemsFlatBag ptrs ] :
-             mkUniqDSet [ n | BCONPtrItbl n <- elemsFlatBag nonptrs ] :
-             map bco_refs [ bco | BCOPtrBCO bco <- elemsFlatBag ptrs ]
+             mkUniqDSet [ n | BCOPtrName n <- smallArrayToList ptrs ] :
+             mkUniqDSet [ n | BCONPtrItbl n <- smallArrayToList nonptrs ] :
+             map bco_refs [ bco | BCOPtrBCO bco <- smallArrayToList ptrs ]
           )
 
 -- -----------------------------------------------------------------------------
@@ -235,8 +235,8 @@ assembleBCO platform
                            , unlinkedBCOArity = arity
                            , unlinkedBCOInstrs = insns_arr
                            , unlinkedBCOBitmap = bitmap_arr
-                           , unlinkedBCOLits = fromSmallArray final_lit_array
-                           , unlinkedBCOPtrs = fromSmallArray final_ptr_array
+                           , unlinkedBCOLits = final_lit_array
+                           , unlinkedBCOPtrs = final_ptr_array
                            }
 
   -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
