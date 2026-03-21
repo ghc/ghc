@@ -300,7 +300,19 @@ linkExecutable logger tmpfs opts unit_env o_files dep_units = do
                      then ["-Wl,--gc-sections"]
                      else [])
 
+                 -- On Windows, module .o files may be archives (see
+                 -- Note [Object merging] in GHC.Driver.Pipeline.Execute).
+                 -- Use --whole-archive to ensure all archive members are
+                 -- included, especially those containing .ctors/.dtors
+                 -- initializer/finalizer sections. See Note [Initializers and
+                 -- finalizers in Cmm] in GHC.Cmm.InitFini.
+                 ++ (if platformOS platform == OSMinGW32
+                     then ["-Wl,--whole-archive"]
+                     else [])
                  ++ o_files
+                 ++ (if platformOS platform == OSMinGW32
+                     then ["-Wl,--no-whole-archive"]
+                     else [])
                  ++ lib_path_opts)
                  ++ extra_ld_inputs
                  ++ map GHC.SysTools.Option (

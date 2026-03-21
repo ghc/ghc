@@ -119,6 +119,7 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                   { a <- linted_cmm_stream
                   ; let stubs = genForeignStubs a
                   ; emitInitializerDecls this_mod stubs
+                  ; emitFinalizerDecls this_mod stubs
                   ; return (stubs, a) }
 
         ; let dus1 = newTagDUniqSupply CodeGenTag dus0
@@ -133,19 +134,23 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
         }
 
 -- | See Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini for details.
-emitInitializerDecls :: Module -> ForeignStubs -> CgStream RawCmmGroup ()
-emitInitializerDecls this_mod (ForeignStubs _ cstub)
-  | initializers <- getInitializers cstub
-  , not $ null initializers =
-      let init_array = CmmData sect statics
-          lbl = mkInitializerArrayLabel this_mod
-          sect = Section InitArray lbl
+emitInitializerDecls, emitFinalizerDecls :: Module -> ForeignStubs -> CgStream RawCmmGroup ()
+emitInitializerDecls = emitInitFiniArrayDecls InitArray mkInitializerArrayLabel getInitializers
+emitFinalizerDecls   = emitInitFiniArrayDecls FiniArray mkFinalizerArrayLabel   getFinalizers
+
+emitInitFiniArrayDecls :: SectionType -> (Module -> CLabel) -> (CStub -> [CLabel])
+                       -> Module -> ForeignStubs -> CgStream RawCmmGroup ()
+emitInitFiniArrayDecls sect_type mk_lbl get_labels this_mod (ForeignStubs _ cstub)
+  | labels <- get_labels cstub
+  , not $ null labels =
+      let lbl     = mk_lbl this_mod
+          sect    = Section sect_type lbl
           statics = CmmStaticsRaw lbl
             [ CmmStaticLit $ CmmLabel fn_name
-            | fn_name <- initializers
+            | fn_name <- labels
             ]
-    in Stream.yield [init_array]
-emitInitializerDecls _ _ = return ()
+    in Stream.yield [CmmData sect statics]
+emitInitFiniArrayDecls _ _ _ _ _ = return ()
 
 doOutput :: String -> (Handle -> IO a) -> IO a
 doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action

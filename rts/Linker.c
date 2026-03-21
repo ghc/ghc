@@ -1117,6 +1117,27 @@ freePreloadObjectFile (ObjectCode *oc)
     oc->fileSize = 0;
 }
 
+/* Note [Object unloading and finalizers]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * An ObjectCode may contain .fini_array/.dtors sections with finalizers that
+ * should run when the object is unloaded. However, we must only run these
+ * finalizers if the corresponding initializers (.init_array/.ctors) have
+ * actually been executed.
+ *
+ * Archive members start in OBJECT_LOADED state and only progress to
+ * OBJECT_NEEDED -> OBJECT_RESOLVED -> OBJECT_READY when a symbol from
+ * them is actually required. An archive member that was never needed never
+ * has its relocations applied, so its .fini_array section data still
+ * contains zeros (unresolved relocation targets). Running those finalizers
+ * would dereference NULL function pointers.
+ *
+ * When unloadObj sets an object's status to OBJECT_UNLOADED, it does so
+ * regardless of the previous state, so we cannot rely on the status alone
+ * to decide whether finalizers should run. Instead, we track whether
+ * initializers were executed via the initializersRan flag, which is set in
+ * ocRunInit after successfully running the initializers.
+ */
+
 /*
  * freeObjectCode() releases all the pieces of an ObjectCode.  It is called by
  * the GC when a previously unloaded ObjectCode has been determined to be
@@ -1126,11 +1147,9 @@ void freeObjectCode (ObjectCode *oc)
 {
     IF_DEBUG(linker, ocDebugBelch(oc, "freeObjectCode: start\n"));
 
-    // Run finalizers
-    if (oc->type == STATIC_OBJECT &&
-            (oc->status == OBJECT_READY || oc->status == OBJECT_UNLOADED)) {
-        // Only run finalizers if the initializers have also been run, which
-        // happens when we resolve the object.
+    // Run finalizers only if initializers have been run.
+    // See Note [Object unloading and finalizers].
+    if (oc->type == STATIC_OBJECT && oc->initializersRan) {
 #if defined(OBJFORMAT_ELF)
         ocRunFini_ELF(oc);
 #elif defined(OBJFORMAT_PEi386)
@@ -1295,6 +1314,7 @@ mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
    oc->imageMapped       = mapped;
 
    oc->misalignment      = misalignment;
+   oc->initializersRan   = false;
    oc->cxa_finalize      = NULL;
    oc->extraInfos        = NULL;
 
@@ -1691,6 +1711,7 @@ int ocRunInit(ObjectCode *oc)
     foreignExportsFinishedLoadingObject();
 
     if (!r) { return r; }
+    oc->initializersRan = true;
     oc->status = OBJECT_READY;
 
     return 1;
