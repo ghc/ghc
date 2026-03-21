@@ -1,38 +1,60 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1995-2007
+ * (c) The GHC Team, 1995-2026
  *
- * Interval timer for profiling and pre-emptive scheduling.
+ * The posix implementation of the interval timer, used for pre-emptive
+ * scheduling of Haskell threads, and for sample based profiling.
+ *
+ * This file defines the "ticker": the platform-specific service to install and
+ * run the timer. See rts/Timer.c for the platform-dependent view of interval
+ * timing.
  *
  * ---------------------------------------------------------------------------*/
 
-/*
- * We use a realtime timer by default.  I found this much more
- * reliable than a CPU timer:
+/* This implementation uses a posix thread which repeatedly blocks on a timeout
+ * using either the ppoll() or select() API. This lets it also block on a file
+ * descriptor for early wakeup.
  *
- * Experiments with different frequencies: using
- * CLOCK_REALTIME/CLOCK_MONOTONIC on Linux 2.6.32,
- *     1000us has  <1% impact on runtime
- *      100us has  ~2% impact on runtime
- *       10us has ~40% impact on runtime
+ * The design uses a simple relative time delay with no catchup. That is, time
+ * spent by the ticker thread itself (e.g. flushing eventlog buffers) is not
+ * accounted for, and the next tick is delayed by that much (modulo wakeup
+ * jitter). This is probably the right thing to do: generally in realtime
+ * systems one does not want to try to catch up when behind, since that tends
+ * towards oversubscribing resources. Graceful degredation is usually
+ * preferable.
  *
- * using CLOCK_PROCESS_CPUTIME_ID on Linux 2.6.32,
- *     I cannot get it to tick faster than 10ms (10000us)
- *     which isn't great for profiling.
+ * Experimental results (on Linux 6.18 on x86-64) to measure the typical
+ * difference between the requested wakeup time and actual wakeup time for
+ * different delay intervals:
  *
- * In the threaded RTS, we can't tick in CPU time because the thread
- * which has the virtual timer might be idle, so the tick would never
- * fire.  Therefore we used to tick in realtime in the threaded RTS and
- * in CPU time otherwise, but now we always tick in realtime, for
- * several reasons:
+ *  interval   typical actual wakeup time after due time
+ *   10000us   340 -- 400us      (this is the default interval)
+ *    1000us    55 -- 100us
+ *     100us    55us
+ *      10us    55us
  *
- *   - resolution (see above)
- *   - consistency (-threaded is the same as normal)
- *   - more consistency: Windows only has a realtime timer
+ * While there's quite a bit of variance to these numbers, the results do not
+ * vary significantly between using select, ppoll or nanosleep.
  *
- * Note we want to use CLOCK_MONOTONIC rather than CLOCK_REALTIME,
- * because the latter may jump around (NTP adjustments, leap seconds
- * etc.).
+ * On Linux at least, for longer delays the kernel allows itself lower wakeup
+ * accuracy (which allows it to save power by coalescing multiple wakeups).
+ * Similarly, the reason for 55us on the low end is that the default thread
+ * timer slack on Linux is 50us, and context switch time accounts for the
+ * remainder.
+ *
+ * In conclusion, on Linux at least, the accuracy is fine, both for the
+ * default interval (10ms, 10000us) and for shorter intervals used during
+ * profiling.
+ *
+ * Historically we had ticker implementations using signals. This was always a
+ * rather shakey thing to do but we originally had few alternatives.
+ * - One problem with using signals is that there are severe limits on what
+ *   code can be called from signal handlers. In particular it's not possible
+ *   to take locks in a signal handler contex. This was enough for contex
+ *   switching, but it's no good for things like flushing the eventlog, or
+ *   waking up rts tasks.
+ * - We also want to avoid using alarm signals, as these can interrupt system
+ *   calls (#10840) or can be overwritten by user code.
  */
 
 #include "rts/PosixSource.h"
