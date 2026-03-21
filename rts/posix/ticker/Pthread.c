@@ -43,7 +43,25 @@
 #include "Proftimer.h"
 #include "Schedule.h"
 #include "posix/Clock.h"
+#include "posix/FdWakeup.h"
+
+#if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
+/* We prefer the ppoll() function if available since it allows sanely waiting
+ * on a single fd with precise timeouts (nanosecond precision). It is not in
+ * the posix standard however and some platforms (notably glibc and freebsd)
+ * need special CPP defines to make it available:
+ */
+#define _GNU_SOURCE 1
+#define __BSD_VISIBLE 1
+#include <signal.h>
 #include <poll.h>
+#else
+/* Otherwise we use the classic select(), which does have microsecond
+ * precision, but requires we build three whole 1024 bit (128 byte) fd sets
+ * just to wait on one fd.
+ */
+#include <sys/select.h>
+#endif
 
 #include <time.h>
 #if HAVE_SYS_TIME_H
@@ -63,14 +81,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-/*
- * TFD_CLOEXEC has been added in Linux 2.6.26.
- * If it is not available, we use fcntl(F_SETFD).
- */
-#if !defined(TFD_CLOEXEC)
-#define TFD_CLOEXEC 0
-#endif
-
 static Time itimer_interval = DEFAULT_TICK_INTERVAL;
 
 // Should we be firing ticks?
@@ -86,15 +96,69 @@ static Condition start_cond;
 static Mutex mutex;
 static OSThreadId thread;
 
+// fds for interrupting the ticker
+static int interruptfd_r = -1, interruptfd_w = -1;
+
 static void *itimer_thread_func(void *_handle_tick)
 {
     TickProc handle_tick = _handle_tick;
 
+#if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
+    struct pollfd pollfds[1];
+
+    pollfds[0].fd = interruptfd_r;
+    pollfds[0].events = POLLIN;
+
+    struct timespec ts = { .tv_sec  = TimeToSeconds(itimer_interval)
+                         , .tv_nsec = TimeToNS(itimer_interval) % 1000000000
+                         };
+#else
+    fd_set selectfds;
+    FD_ZERO(&selectfds);
+    FD_SET(interruptfd_r, &selectfds);
+
+    struct timeval tv = { .tv_sec  = TimeToSeconds(itimer_interval)
+                                     /* convert remainder time in nanoseconds
+                                        to microseconds, rounding up: */
+                        , .tv_usec = ((TimeToNS(itimer_interval) % 1000000000)
+                                     + 999) / 1000
+                        };
+#endif
+
     // Relaxed is sufficient: If we don't see that exited was set in one iteration we will
     // see it next time.
     while (!RELAXED_LOAD_ALWAYS(&exited)) {
-        if (rtsSleep(itimer_interval) != 0) {
-            sysErrorBelch("Ticker: sleep failed: %s", strerror(errno));
+
+#if defined(HAVE_DECL_PPOLL) && HAVE_DECL_PPOLL == 1
+        int nfds   = 1;
+        int nready = ppoll(pollfds, nfds, &ts, NULL);
+#else
+        struct timeval tv_tmp = tv; // copy since select may change this value.
+        int nfds   = interruptfd_r+1;
+        int nready = select(nfds, &selectfds, NULL, NULL, &tv_tmp);
+#endif
+        // In either case (ppoll or select), the result nready is the number
+        // of fds that are ready.
+        if (RTS_LIKELY(nready == 0)) {
+            // Timer expired, not interrupted, continue.
+        } else if (nready > 0) {
+            // We only monitor one fd (the interruptfd_r), so we know
+            // it is that fd that is ready without any further checks.
+            collectFdWakeup(interruptfd_r);
+            // No further action needed, continue on to handling the final tick
+            // and then stop.
+
+            // Note that we rely on sendFdWakeup and select/poll to provide the
+            // happens-before relation. So if 'exited' was set before calling
+            // sendFdWakeup, then we should be able to reliably read it after.
+            // And thus reading 'exited' in the while loop guard is ok.
+        } else {
+            // While the RTS attempts to mask signals, some foreign libraries
+            // that rely on signal delivery may unmask them. Consequently we
+            // may see EINTR. See #24610.
+            if (errno != EINTR) {
+                sysErrorBelch("Ticker: poll failed: %s", strerror(errno));
+            }
         }
 
         // first try a cheap test
@@ -127,6 +191,24 @@ initTicker (Time interval, TickProc handle_tick)
 
     initCondition(&start_cond);
     initMutex(&mutex);
+
+    /* Open the interrupt fd synchronously.
+     *
+     * We used to do it in itimer_thread_func (i.e. in the timer thread) but it
+     * meant that some user code could run before it and get confused by the
+     * allocation of the timerfd.
+     *
+     * See hClose002 which unsafely closes a file descriptor twice expecting an
+     * exception the second time: it sometimes failed when the second call to
+     * "close" closed our own timerfd which inadvertently reused the same file
+     * descriptor closed by the first call! (see #20618)
+     */
+
+    if (interruptfd_r != -1) {
+        // don't leak the old file descriptors after a fork (#25280)
+        closeFdWakeup(interruptfd_r, interruptfd_w);
+    }
+    newFdWakeup(&interruptfd_r, &interruptfd_w);
 
     /*
      * Create the thread with all blockable signals blocked, leaving signal
@@ -175,12 +257,14 @@ exitTicker (bool wait)
     SEQ_CST_STORE(&exited, true);
     // ensure that ticker wakes up if stopped
     startTicker();
+    sendFdWakeup(interruptfd_w);
 
     // wait for ticker to terminate if necessary
     if (wait) {
         if (pthread_join(thread, NULL)) {
             sysErrorBelch("Ticker: Failed to join: %s", strerror(errno));
         }
+        closeFdWakeup(interruptfd_r, interruptfd_w);
         closeMutex(&mutex);
         closeCondition(&start_cond);
     } else {
