@@ -957,8 +957,8 @@ addArgCtxt arg_no (app_head, app_head_lspan) (L arg_loc arg) thing_inside
                                     , ppr arg
                                     , ppr arg_no])
        ; setSrcSpanA arg_loc $
-          addErrCtxt (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
-            thing_inside
+         addErrCtxt (FunAppCtxt (FunAppCtxtExpr app_head arg) arg_no) $
+         thing_inside
        }
   | otherwise
   = do { traceTc "addArgCtxt" (vcat [text "generated Head"
@@ -966,8 +966,9 @@ addArgCtxt arg_no (app_head, app_head_lspan) (L arg_loc arg) thing_inside
                                     , ppr app_head_lspan
                                     , ppr arg_loc
                                     , ppr arg])
-       ; addLExprCtxt (locA arg_loc) arg $
-          thing_inside
+       ; setSrcSpanA arg_loc $
+         addExprCtxt arg $
+         thing_inside
        }
 
 
@@ -2012,17 +2013,21 @@ quickLookArg1 pos app_lspan (fun, fun_lspan) larg@(L _ arg) sc_arg_ty@(Scaled _ 
                            , eaql_res_rho  = app_res_rho }) }}}
 
 
-mk_origin :: SrcSpan       -- SrcSpan of the argument
+mk_origin :: SrcSpan       -- SrcSpan of the function
           -> HsExpr GhcRn  -- The head of the expression application chain
           -> TcM CtOrigin
 mk_origin fun_lspan rn_fun
   | not (isGeneratedSrcSpan fun_lspan)
   = return $ exprCtOrigin rn_fun
-  | otherwise -- if the location is generated,
-              -- the best we can do is to approximate by looking on top of the error message stack
-  = do { code_orig <- getHsCtxt
-       ; traceTc "mk_origin" (pprHsCtxt code_orig)
-       ; return $ hsCtxtCtOrigin code_orig
+
+  | otherwise -- If the location is generated, the best we can do is to
+              -- approximate by looking on top of the error message stack
+  = do { err_ctxt_stack <- getErrCtxt
+       ; let hs_ctxt = case err_ctxt_stack of
+                          (c:_) -> c
+                          [] -> pprPanic "mk_origin" (ppr rn_fun)
+       ; traceTc "mk_origin" (pprHsCtxt hs_ctxt)
+       ; return $ hsCtxtCtOrigin hs_ctxt
        }
 
 

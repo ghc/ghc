@@ -21,7 +21,6 @@ module GHC.Tc.Types.LclEnv (
   , setLclEnvTypeEnv
   , modifyLclEnvTcLevel
 
-  , getLclEnvHsCtxt
   , setLclEnvHsCtxt
   , setLclCtxtHsCtxt
   , lclEnvInGeneratedCode
@@ -90,34 +89,6 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_errs :: TcRef (Messages TcRnMessage)     -- Place to accumulate diagnostics
     }
 
-{-
-
-Note [ErrCtxtStack Manipulation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The ErrCtxtStack is a list of ErrCtxt
-
-This data structure keeps track of two things:
-1. Are we type checking a compiler generated/non-user written code.
-2. The trail of the error messages that have been added in route to the current expression
-
-* When the `ErrCtxtStack` is a `UserCodeCtxt`,
-  - the current expression being typechecked is user written
-* When the `ErrorCtxtStack` is a `ExpansionCodeCtxt`
-  - the current expression being typechecked is compiler generated/expanded;
-  - the original source code thing is stored in `src_code_origin` field.
-  - the `src_code_origin` is what will be used in the error message displayed to the user
-
-In the current design, if the top of the ErrCtxtStack is an ExpansionCodeCtxt
-i.e. we are currently typechecking a compiler generated expression, and we encounter
-an XExpr, then we _replace_ the top of the stack with the new XExpr. Otherwise, we
-push the new expression error message on top of the stack. cf. `LclEnv.setLclCtxtHsCtxt`
-
--}
-
-
--- See Note [ErrCtxtStack Manipulation]
-type ErrCtxtStack = [ErrCtxt]
-
 -- | Get the top of the error message stack
 get_err_ctxt_stack_head :: ErrCtxtStack -> HsCtxt
 get_err_ctxt_stack_head (e : _) = e
@@ -127,7 +98,7 @@ data TcLclCtxt
   = TcLclCtxt {
         tcl_loc         :: RealSrcSpan,     -- Source span
         tcl_in_gen_code :: Bool,            -- Are we type checking a generated expression?
-        tcl_err_ctxt    :: ErrCtxtStack,    -- See Note [ErrCtxtStack Manipulation]
+        tcl_err_ctxt    :: ErrCtxtStack,
         tcl_tclvl       :: TcLevel,
         tcl_bndrs       :: TcBinderStack,   -- Used for reporting relevant bindings,
                                             -- and for tidying type
@@ -191,26 +162,23 @@ setLclEnvLoc loc = modifyLclCtxt (\lenv -> lenv { tcl_loc = loc })
 getLclEnvLoc :: TcLclEnv -> RealSrcSpan
 getLclEnvLoc = tcl_loc . tcl_lcl_ctxt
 
-getLclEnvErrCtxt :: TcLclEnv -> [ErrCtxt]
+getLclEnvErrCtxt :: TcLclEnv -> ErrCtxtStack
 getLclEnvErrCtxt = tcl_err_ctxt . tcl_lcl_ctxt
 
 setLclEnvErrCtxt :: ErrCtxtStack -> TcLclEnv -> TcLclEnv
 setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_err_ctxt = ctxt })
 
 -- See Note [ErrCtxtStack Manipulation]
-addLclEnvErrCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
+addLclEnvErrCtxt :: HsCtxt -> TcLclEnv -> TcLclEnv
 addLclEnvErrCtxt ec = setLclEnvHsCtxt ec
 
-getLclEnvHsCtxt :: TcLclEnv -> HsCtxt
-getLclEnvHsCtxt = get_err_ctxt_stack_head . tcl_err_ctxt . tcl_lcl_ctxt
-
-setLclEnvHsCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
+setLclEnvHsCtxt :: HsCtxt -> TcLclEnv -> TcLclEnv
 setLclEnvHsCtxt ec = modifyLclCtxt (setLclCtxtHsCtxt ec)
 
 -- See Note [ErrCtxtStack Manipulation]
-setLclCtxtHsCtxt :: ErrCtxt -> TcLclCtxt -> TcLclCtxt
+setLclCtxtHsCtxt :: HsCtxt -> TcLclCtxt -> TcLclCtxt
 setLclCtxtHsCtxt ec lclCtxt
-  -- never stack 2 statement error contexts on top of each other
+  -- Never stack 2 statement error contexts on top of each other
   | StmtErrCtxt{} : ecs <- tcl_err_ctxt lclCtxt
   , StmtErrCtxt{} <- ec
   = lclCtxt { tcl_err_ctxt =  ec : ecs }

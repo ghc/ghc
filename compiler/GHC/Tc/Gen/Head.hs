@@ -473,7 +473,8 @@ tcInferAppHead_maybe fun = case fun of
 
 
 
-with_get_ds :: TcM (HsExpr GhcTc, TcSigmaType) -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
+with_get_ds :: TcM (HsExpr GhcTc, TcSigmaType)
+            -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
 with_get_ds mthing =
   do { (expr_tc, sig_ty) <- mthing
      ; ds_flag <- getDeepSubsumptionFlag_DataConHead expr_tc
