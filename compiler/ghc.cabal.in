@@ -361,6 +361,7 @@ Library
         GHC.Core.InstEnv
         GHC.Core.Lint
         GHC.Core.Lint.Interactive
+        GHC.Core.Lint.SubstTypeLets
         GHC.Core.LateCC
         GHC.Core.LateCC.Types
         GHC.Core.LateCC.TopLevelBinds

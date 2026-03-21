@@ -2676,6 +2676,8 @@ occAnalArgs :: OccEnv -> CoreExpr -> [CoreExpr]
             -> WithUsageDetails CoreExpr
 -- The `fun` argument is just an accumulating parameter,
 -- the base for building the application we return
+--
+-- We have applied markAllNonTail to the returned usage-details
 occAnalArgs env fun args one_shots
   = go emptyDetails fun args one_shots
   where
@@ -2686,7 +2688,9 @@ occAnalArgs env fun args one_shots
     encl | Var f <- fun, isDeadEndSig (idDmdSig f) = OccScrut
          | otherwise                               = OccVanilla
 
-    go uds fun [] _ = WUD uds fun
+    go uds fun [] _ = WUD (markAllNonTail uds) fun
+       -- markAllNonTail: calls in arguments are not tail calls!
+
     go uds fun (arg:args) one_shots
       = go (uds `andUDs` arg_uds) (fun `App` arg') args one_shots'
       where
@@ -2778,8 +2782,7 @@ occAnalApp env (Var fun_id, args, ticks)
 
     all_uds = fun_uds `andUDs` final_args_uds
 
-    !final_args_uds = markAllNonTail                              $
-                      markAllInsideLamIf (isRhsEnv env && is_exp) $
+    !final_args_uds = markAllInsideLamIf (isRhsEnv env && is_exp) $
                         -- isRhsEnv: see Note [OccEncl]
                       args_uds
        -- We mark the free vars of the argument of a constructor or PAP
@@ -2809,20 +2812,27 @@ occAnalApp env (Var fun_id, args, ticks)
         -- See Note [Sources of one-shot information], bullet point A']
 
 occAnalApp env (fun, args, ticks)
-  = let app_out = mkTicks ticks app'
-    in WUD (markAllNonTail (fun_uds `andUDs` args_uds)) app_out
-
+  = WUD (fun_uds `andUDs` args_uds) (mkTicks ticks app')
   where
     !(WUD args_uds app') = occAnalArgs env fun' args []
-    !(WUD fun_uds fun')  = occAnal (addAppCtxt env args) fun
-        -- The addAppCtxt is a bit cunning.  One iteration of the simplifier
-        -- often leaves behind beta redexes like
-        --      (\x y -> e) a1 a2
-        -- Here we would like to mark x,y as one-shot, and treat the whole
-        -- thing much like a let.  We do this by pushing some OneShotLam items
-        -- onto the context stack.
+    !(WUD fun_uds fun')  = go_fun env fun args
+
+    -- See (A2) in Note [occAnal for applications]
+    go_fun env (Lam bndr body) (_ : args)
+      = addInScopeOne env bndr $ \ env' ->
+        let !(WUD body_uds body') = go_fun env' body args
+            !bndr' = tagLamBinder body_uds bndr
+        in WUD body_uds (Lam bndr' body')
+    go_fun env fun args
+      | null args
+      = occAnal env fun
+      | otherwise
+      = let !env' = addAppCtxt env args
+            !(WUD fun_uds fun') = occAnal env' fun
+        in WUD (markAllNonTail fun_uds) fun'
 
 addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
+-- See (A3) in Note [occAnal for applications]
 addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
   | n_val_args > 0
   = env { occ_one_shots = replicate n_val_args OneShotLam ++ ctxt
@@ -2834,8 +2844,40 @@ addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
   where
     n_val_args = valArgCount args
 
+{- Note [occAnal for applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+One iteration of the simplifier sometimes leaves behind beta redexes like
+     (\x y -> e) a1 a2
+This happens particularly in worker/wrapper; see Note [Join points and beta-redexes]
+in GHC.Core.Lint.  In these cases there are three things we want to take care of
+in the occurrence analyser:
 
-{-
+(A1) We don't want to mark variables inside `e` as `InsideLam`; that would just
+  delay inlining them for another iteration of the Simplifier.
+
+(A2) If there is a join-point invocation inside `e`, we don't want to complain about
+  lost join points.  See Note [Join points and beta-redexes] in GHC.Core.Lint for
+  more detail.
+
+(A3) Suppose we have something like
+     (case e of (a,b) -> (\x.blah) |> co) arg
+  which can happen during 'gentle' simplification when we don't do case-of-case,
+  not push arguments into cases.  Then we'd still like to mark that lambda
+  as one-shot, so that things can get inlined inside it.  We can to this
+  by pushing OneShotLam items onto the context stack.
+
+  Live example: `read_tup4` in test CoOpt_Read.
+
+How we address these:
+
+* (A2): we focus narrowly on visible beta-redexes ((\x.e) arg), since that
+  is what is needed for Note [Join points and beta-redexes].  We do this
+  via the `go_fun` loop in `occAnalApp`.
+
+* (A1) and (A3): for visible beta-redexes, the `go_fun` loop does the job.
+  But for less-visible ones, like in (A3) we push `OneShotLam` items onto
+  the context stack, in `addAppCtxt`.
+
 Note [Sources of one-shot information]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The occurrence analyser obtains one-shot-lambda information from two sources:
