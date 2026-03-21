@@ -8,7 +8,8 @@
 
 #pragma once
 
-#if defined(HAVE_LINUX_MMAN_H)
+// Only enabled it on non-i386 Linux
+#if defined(HAVE_LINUX_MMAN_H) && !defined(i386_HOST_ARCH)
 #include <linux/mman.h>
 
 #define HUGEPAGE_SHIFT 21
