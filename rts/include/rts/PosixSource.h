@@ -29,6 +29,8 @@
    Oracle's Solaris 11 supports only up to XPG6, hence the ifdef.
   */
 
+#undef _POSIX_C_SOURCE
+#undef _XOPEN_SOURCE
 #if defined(solaris2_HOST_OS)
 #define _POSIX_C_SOURCE 200112L
 #define _XOPEN_SOURCE   600
