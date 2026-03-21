@@ -260,3 +260,22 @@ test('T26537', js_broken(26558), compile_and_run, ['-O2 -fregs-graph'])
 # AArch64-specific runtime tests
 test('aarch64-ushr-subword-run', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
 test('aarch64-subword-ops', [unless(arch('aarch64'), skip)], compile_and_run, ['-O'])
+
+# Check that GHC-generated finalizers run on Darwin. The Apple linker doesn't
+# support --wrap, so we can't intercept hs_spt_remove directly.  Instead we
+# compile a small checker dylib (T27072d_check.c) whose constructor registers
+# a __cxa_atexit handler *before* the executable's __mod_init_func entries run.
+# LIFO ordering ensures the checker fires after the GHC-generated finalizer,
+# so it can observe that SPT entries were removed.
+# Requires dynamic way so the RTS is a dylib (avoids archive conflicts).
+test('T27072d', [req_c, only_ways(['dyn']), when(not opsys('darwin'), skip),
+     pre_cmd('{compiler} -shared -no-hs-main'
+             ' -optl -undefined -optl dynamic_lookup'
+             ' -o T27072d_check.dylib T27072d_check.c')],
+     compile_and_run,
+     ['T27072d_c.c -no-hs-main'
+      ' -optl -Wl,-needed_library,T27072d_check.dylib -optl -rpath -optl .'])
+# check that finalizers are being run, using --wrap to intercept hs_spt_remove.
+# Skipped on Darwin (Apple linker doesn't support --wrap).
+test('T27072w', [req_c, js_skip, when(opsys('darwin'), skip)],
+     compile_and_run, ['T27072w_c.c -no-hs-main -optl-Wl,--wrap=hs_spt_remove'])

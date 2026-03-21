@@ -1,0 +1,10 @@
+section: codegen
+synopsis: Fix module finalizers on multiple platforms
+description: {
+  GHC-generated module finalizers (e.g. ``hs_spt_remove`` for the Static
+  Pointer Table) now run correctly on ELF platforms, darwin, wasm32 and
+  Windows. Also fixes running finalizers when unloading objects with the
+  RTS linker.
+}
+issues: #27072
+mrs: !15762

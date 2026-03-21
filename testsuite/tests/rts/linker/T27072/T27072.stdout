@@ -1,0 +1,3 @@
+counter before load: 0
+counter after load: 1
+counter after unload: 0
