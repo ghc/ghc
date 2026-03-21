@@ -26,7 +26,6 @@ import GHC.Wasm.Prim
 #else
 import GHCi.Utils
 #endif
-import Data.Word (Word8)
 
 import Control.DeepSeq
 import Control.Exception
