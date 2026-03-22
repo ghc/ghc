@@ -628,20 +628,6 @@ function install_bindist() {
     *)
       read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
 
-      if [[ "${CROSS_TARGET:-no_cross_target}" =~ "mingw" ]]; then
-          # We suppose that host target = build target.
-          # By the fact above it is clearly turning out which host value is
-          # for currently built compiler.
-          # The fix for #21970 will probably remove this if-branch.
-          local -r CROSS_HOST_GUESS=$($SHELL ./config.guess)
-          args+=( "--target=$CROSS_TARGET" "--host=$CROSS_HOST_GUESS" )
-
-      # FIXME: The bindist configure script shouldn't need to be reminded of
-      # the target platform. See #21970.
-      elif [ -n "${CROSS_TARGET:-}" ]; then
-          args+=( "--target=$CROSS_TARGET" "--host=$CROSS_TARGET" )
-      fi
-
       run ${CONFIGURE_WRAPPER:-} ./configure \
           --prefix="$instdir" \
           "${args[@]+"${args[@]}"}" || fail "bindist configure failed"
