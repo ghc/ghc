@@ -961,7 +961,7 @@ class Functor f where
     -- Note that for any type constructor with more than one parameter (e.g., 'Either'),
     -- only the last type parameter can be modified with `fmap` (e.g., `b` in @Either a b@).
     --
-    -- Some type constructors with two parameters or more have a @'Data.Bifunctor'@ instance that allows
+    -- Some type constructors with two parameters or more have a @'Data.Bifunctor.Bifunctor'@ instance that allows
     -- both the last and the penultimate parameters to be mapped over.
     --
     -- ==== __Examples__
