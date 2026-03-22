@@ -89,10 +89,6 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_errs :: TcRef (Messages TcRnMessage)     -- Place to accumulate diagnostics
     }
 
--- | Get the top of the error message stack
-get_err_ctxt_stack_head :: ErrCtxtStack -> HsCtxt
-get_err_ctxt_stack_head (e : _) = e
-get_err_ctxt_stack_head _ = error "get_err_ctxt_stack_head: oops! Empty error message stack"
 
 data TcLclCtxt
   = TcLclCtxt {
@@ -176,7 +172,7 @@ setLclEnvHsCtxt ec = modifyLclCtxt (setLclCtxtHsCtxt ec)
 
 setLclCtxtHsCtxt :: HsCtxt -> TcLclCtxt -> TcLclCtxt
 setLclCtxtHsCtxt ec lclCtxt
-  -- Never stack 2 statement error contexts on top of each other
+  -- Never stack 2 do statement error messages on top of each other
   | StmtErrCtxt{} : ecs <- tcl_err_ctxt lclCtxt
   , StmtErrCtxt{} <- ec
   = lclCtxt { tcl_err_ctxt =  ec : ecs }

@@ -917,7 +917,7 @@ foldMapCtOrigin f = go
         DerivOriginDC {} -> f orig
         DerivOriginCoerce {}  -> f orig
         DefaultOrigin {} -> f orig
-        DoOrigin {} -> f orig
+        DoStmtOrigin {} -> f orig
         DoPatOrigin {} -> f orig
         MCompOrigin {} -> f orig
         MCompPatOrigin {} -> f orig
