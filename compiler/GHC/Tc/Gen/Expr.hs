@@ -799,8 +799,8 @@ Example: Typechecking the do expression. The typechecker looks (somewhat) like t
 
 The `expandDoStmts` replaces the HsDo { x <- e1; return x }
 with something like
-   HSE { hs_ctxt = e
-       , expanded_expr = e1 >>= \ x -> x }
+   HSE { hse_ctxt = ExprCtxt e
+       , hse_exp  = e1 >>= \ x -> x }
 and we then typecheck the expression `e1 >>= \ x -> x`
 
 See also Note [Handling overloaded and rebindable constructs]
@@ -813,8 +813,8 @@ The rest of this Note explains how that is done.
 * The expansion process typically takes a user written thing
        L lspan ue
   and returns
-       L lspan (XExpr (ExpandedThingRn (HSE { hs_ctxt = ue
-                                            , expanded_expr = ee } ))
+       L lspan (XExpr (ExpandedThingRn (HSE { hse_ctxt = ue
+                                            , hse_exp  = ee } ))
   where `ee` is the expansion of the user written thing `ue`
 
 * The type checker context has 3 key fields that describe the context:
@@ -831,36 +831,32 @@ The rest of this Note explains how that is done.
   The `tcl_in_gen_code` is a boolean that keeps track of whether
   the current expression being typechecked is compiler generated
   or user generated.
-  INVARIANT: `tcl_in_gen_code` is modified only in `setSrcSpan`.
 
+  INVARIANT: `tcl_loc` and `tcl_in_gen_code` are modified only in `setSrcSpan`.
 
 * Now, when
       tcMonoLExpr :: LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
   gets a located expression, it does 3 things:
     (a) Calls `setSrcSpanA` to set the ambient source-code location
-    (b) Calls `addExprCtxt` to add a suitable `HsCtxt` on top of the `tcl_err_ctxt`.
+    (b) Calls `addExprCtxt` to push a suitable `HsCtxt` on top of the `tcl_err_ctxt`.
     (c) Calls `tcExpr` to typecheck the expression.
 
 * In these calls, if the `span` is generated  (see `isGeneratedSrcSpan`), then
-     - `setSrcSpanA` sets `tcl_in_gen_code` to `True`
-     - `addErrCtxt` is a no-op if `tcl_in_gen_code` is True
-  This is how we avoid populating the TcLclCtxt with generated code.
+     - `setSrcSpanA` sets `tcl_in_gen_code` to `True`, and leaves `tcl_loc` unchanged
+     - `addExprCtxt` is a no-op if `tcl_in_gen_code` is True
+  The result is that `tcl_loc` has the span from the innermost /user/ tree node;
+  and the ErrCtxtStack in `tcl_err_ctxt` only has contexts arisign from user code.
 
-* The type checker error-stack element `GHC.Tc.Types.ErrCtxt.HsCtxt`
-  just stores an error message
-
-           type ErrCtxtStack = [HsCtxt]
-
-  When called on an `XExpr`, `addLExprCtxt`, adds the user written thing
-  `ue`, and the error message provided by the caller on the `ErrCtxtStack` See
-  Note [ErrCtxtStack Manipulation] for more details.
-
+* Note that inside an expansion we have sub-expressions from the original program.
+  As soon as we enter one of those, identified by a /user/ span, `setSrcSpanA` will
+  sets the `tcl_loc` to reflect that span, and switch off `tcl_in_gen_code`.  Nice!
 -}
 
 tcHsExpansion :: HsExpansion GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
-tcHsExpansion (HSE o e) res_ty
-   = do e' <- tcMonoLExpr e res_ty
-        return $ XExpr (ExpandedThingTc (HSE o e'))
+tcHsExpansion (HSE { hse_ctxt = o, hse_exp = e }) res_ty
+   = do { e' <- tcMonoLExpr e res_ty
+        ; return $ XExpr $ ExpandedThingTc $
+          HSE { hse_ctxt = o, hse_exp = e' } }
 
 
 {-
