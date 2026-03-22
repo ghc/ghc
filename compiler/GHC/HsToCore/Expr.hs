@@ -719,13 +719,13 @@ ds_app (XExpr (ConLikeTc con)) _hs_args core_args
 ds_app (XExpr (HsRecSelTc (FieldOcc { foLabel = L _ sel_id }))) _hs_args core_args
   = ds_app_rec_sel sel_id sel_id core_args
 
-ds_app (XExpr (ExpandedThingTc _orig e)) hs_args core_args
-  = ds_app e hs_args core_args
+ds_app (XExpr (ExpandedThingTc (HSE _orig e))) hs_args core_args
+  = ds_app (unLoc e) hs_args core_args
   -- NB: this is important for the 'getField' case of 'ds_app_var', which needs
   -- to see all type arguments to 'getField' at once, while for record field
   -- projections such as (.fld) we may get:
   --
-  --   XExpr (ExpandedThingTc (.fld) (getField @Symbol @LiftedRep @LiftedRep "fld"))
+  --   XExpr (ExpandedThingTc (HSE (.fld) (getField @Symbol @LiftedRep @LiftedRep "fld")))
   --     `HsAppType` rec_ty `HsAppType` fld
 
 ds_app (HsVar _ lfun) hs_args core_args
