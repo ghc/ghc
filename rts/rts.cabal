@@ -588,6 +588,3 @@ library
                     posix/Signals.c
                     posix/Timeout.c
                     posix/TTY.c
-                    -- ticker/*.c
-                    -- We don't want to compile posix/ticker/*.c, these will be #included
-                    -- from Ticker.c
