@@ -451,7 +451,7 @@ It stores the original statement (with location) and the expanded expression
     of the error context stack which contains the error message for
     the previous statement: eg. "In the stmt of a do block: e1".
     This popping is implicitly done when we push the error context message for the next statment.
-    See Note [ErrCtxtStack Manipulation] and `LclEnv.setLclCtxtHsCtxt`
+    See `LclEnv.setLclCtxtHsCtxt`
 
     Sans the popping business for error context stack,
     if there were to be a type error in `e2`, we would get a spurious and confusing error message
