@@ -710,7 +710,7 @@ slow_spw(void *Sp, StgStack *cur_stack, StgWord offset_words){
 
       // How many words were on the stack
       stackWords = (StgWord *)frame - (StgWord *) Sp;
-      ASSERT(offset_words > stackWords);
+      ASSERT(offset_words >= stackWords);
 
       // Recursive, in the very unlikely case we have to traverse two
       // stack chunks.
