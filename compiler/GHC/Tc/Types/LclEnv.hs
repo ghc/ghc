@@ -168,14 +168,12 @@ getLclEnvErrCtxt = tcl_err_ctxt . tcl_lcl_ctxt
 setLclEnvErrCtxt :: ErrCtxtStack -> TcLclEnv -> TcLclEnv
 setLclEnvErrCtxt ctxt = modifyLclCtxt (\env -> env { tcl_err_ctxt = ctxt })
 
--- See Note [ErrCtxtStack Manipulation]
 addLclEnvErrCtxt :: HsCtxt -> TcLclEnv -> TcLclEnv
 addLclEnvErrCtxt ec = setLclEnvHsCtxt ec
 
 setLclEnvHsCtxt :: HsCtxt -> TcLclEnv -> TcLclEnv
 setLclEnvHsCtxt ec = modifyLclCtxt (setLclCtxtHsCtxt ec)
 
--- See Note [ErrCtxtStack Manipulation]
 setLclCtxtHsCtxt :: HsCtxt -> TcLclCtxt -> TcLclCtxt
 setLclCtxtHsCtxt ec lclCtxt
   -- Never stack 2 statement error contexts on top of each other
