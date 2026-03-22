@@ -46,7 +46,10 @@ import Data.List ((\\))
 --   See Note [Expanding HsDo with XXExprGhcRn] below for `HsDo` specific commentary
 --   and Note [Handling overloaded and rebindable constructs] for high level commentary
 expandDoStmts :: HsDoFlavour -> XRec GhcRn [ExprLStmt GhcRn] -> TcM (HsExpansion GhcRn)
-expandDoStmts doFlav lstmts@(L _ stmts) = HSE (ExprCtxt (HsDo noExtField doFlav lstmts)) <$> expand_do_stmts doFlav stmts
+expandDoStmts doFlav lstmts@(L _ stmts)
+  = do { exp <- expand_do_stmts doFlav stmts
+       ; return $ HSE { hse_ctxt = ExprCtxt (HsDo noExtField doFlav lstmts)
+                      , hse_exp  = exp } }
 
 -- | The main work horse for expanding do block statements into applications of binds and thens
 --   See Note [Expanding HsDo with XXExprGhcRn]

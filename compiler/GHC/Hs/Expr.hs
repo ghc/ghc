@@ -662,9 +662,13 @@ type instance XXExpr GhcTc = XXExprGhcTc
 
 -- See Note [Rebindable syntax and XXExprGhcRn]
 -- See Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
-data HsExpansion p = HSE { hs_ctxt :: HsCtxt -- The original source thing context to be used for error messages
-                         , expanded_expr :: LHsExpr p } -- The compiler generated, expanded expression
-                                                        -- This is located because of do statements (TODO ANI : Add Note)
+data HsExpansion p
+  = HSE { hse_ctxt :: HsCtxt      -- The original source thing context,
+                                  -- to be used for error messages
+        , hse_exp  :: LHsExpr p   -- The compiler generated expansion
+                                  -- This is located because of do statements
+                                  -- (TODO ANI : Add Note)
+        }
 
 data XXExprGhcRn
   = ExpandedThingRn (HsExpansion GhcRn)  -- ^ Renamed/Pre Typecheck expanded expression
