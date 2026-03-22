@@ -11,11 +11,11 @@ ghcInGhciFlavour :: Flavour
 ghcInGhciFlavour = disableProfiledLibs $ defaultFlavour
     { name        = "ghc-in-ghci"
     , extraArgs   = ghciArgs
-    , libraryWays =
+    , libraryWays = \stage ->
         Set.fromList
             <$> mconcat
                 [ pure [vanilla]
-                , platformSupportsSharedLibs ? pure [dynamic]
+                , targetSupportsSharedLibs stage ? pure [dynamic]
                 ]
     }
 

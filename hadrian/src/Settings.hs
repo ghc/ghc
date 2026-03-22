@@ -38,7 +38,10 @@ getArgs :: Args
 getArgs = mconcat [ defaultBuilderArgs, defaultPackageArgs, getExtraArgs ]
 
 getLibraryWays :: Ways
-getLibraryWays = expr flavour >>= libraryWays
+getLibraryWays = do
+    flav <- expr flavour
+    stage <- getStage
+    libraryWays flav stage
 
 getRtsWays :: Ways
 getRtsWays = expr flavour >>= rtsWays

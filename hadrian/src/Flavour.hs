@@ -325,7 +325,7 @@ disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = const (pure F
 -- | Don't build libraries in dynamic 'Way's.
 disableDynamicLibs :: Flavour -> Flavour
 disableDynamicLibs flavour =
-  flavour { libraryWays = prune $ libraryWays flavour,
+  flavour { libraryWays = prune . libraryWays flavour,
             rtsWays = prune $ rtsWays flavour,
             dynamicGhcPrograms = const (pure False)
           }
@@ -338,7 +338,7 @@ disableDynamicLibs flavour =
 enableProfiledLibs :: Flavour -> Flavour
 enableProfiledLibs flavour =
   flavour
-    { libraryWays = addProfilingWays $ libraryWays flavour,
+    { libraryWays = addProfilingWays . libraryWays flavour,
       rtsWays = addProfilingWays $ rtsWays flavour
     }
   where
@@ -351,7 +351,7 @@ enableProfiledLibs flavour =
 -- | Don't build libraries in profiled 'Way's.
 disableProfiledLibs :: Flavour -> Flavour
 disableProfiledLibs flavour =
-    flavour { libraryWays = prune $ libraryWays flavour
+    flavour { libraryWays = prune . libraryWays flavour
             , rtsWays     = prune $ rtsWays flavour
             }
   where
@@ -473,9 +473,9 @@ hostFullyStatic flavour =
                [ notM stage1 ? pure ws,
                  stage1
                    ? pure (ws `Set.difference` Set.fromList [dynamic, profilingDynamic, threadedDynamic, threadedDebugDynamic, threadedProfilingDynamic, threadedDebugProfilingDynamic, debugDynamic, debugProfilingDynamic])
-               ]
-         , libraryWays = do
-             ws <- libraryWays f
+                ]
+         , libraryWays = \stage -> do
+             ws <- libraryWays f stage
              mconcat
                [ notM stage1 ? pure ws,
                  stage1

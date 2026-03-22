@@ -29,7 +29,8 @@ data Flavour = Flavour {
     textWithSIMDUTF :: Stage -- ^ stage of the /built/ compiler
                     -> Action Bool,
     -- | Build libraries these ways.
-    libraryWays :: Ways,
+    libraryWays :: Stage -- ^ stage of the /built/ compiler
+                  -> Ways,
     -- | Build RTS these ways.
     rtsWays :: Ways,
     -- | Build dynamic GHC programs.
