@@ -6,6 +6,8 @@
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE UnboxedTuples #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+
 module GHC.Internal.JS.Prim ( JSVal(..), JSVal#
                    , JSException(..)
                    , WouldBlockException(..)
@@ -44,7 +46,7 @@ import           GHC.Internal.Unsafe.Coerce (unsafeCoerce)
 import           GHC.Internal.Prim
 import           GHC.Internal.Types
 import qualified GHC.Internal.Exception as Ex
-import qualified GHC.Internal.CString as GHC
+import qualified GHC.Internal.Types (unpackCString#, unpackCStringUtf8#) as GHC
 import           GHC.Internal.IO
 import           GHC.Internal.Base
 import           GHC.Internal.Show

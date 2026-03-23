@@ -12,35 +12,45 @@ module GHC.Tc.Instance.Typeable(mkTypeableBinds, tyConIsTypeable) where
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Types.Basic ( TypeOrConstraint(..) )
-import GHC.Types.InlinePragma ( neverInlinePragma )
-import GHC.Types.SourceText ( SourceText(..) )
-import GHC.Iface.Env( newGlobalBinder )
-import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
+import GHC.Hs
+
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence ( mkWpTyApps )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import GHC.Types.TyThing ( lookupId )
-import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim ( primTyCons )
-import GHC.Builtin.Types
+
+import GHC.Iface.Env( newGlobalBinder )
+
+import GHC.Builtin.Modules( gHC_TYPES, gHC_PRIM )
+import GHC.Builtin.KnownOccs
+import GHC.Builtin.KnownKeys (trTyConTyConKey)
+import GHC.Builtin.WiredIn.Prim ( primTyCons )
+import GHC.Builtin.WiredIn.Types
                   ( runtimeRepTyCon
                   , levityTyCon, vecCountTyCon, vecElemTyCon
                   , nilDataCon, consDataCon )
+
+import GHC.Types.Basic ( TypeOrConstraint(..) )
+import GHC.Types.InlinePragma ( neverInlinePragma )
+import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Types.Name
 import GHC.Types.Id
+import GHC.Types.Var ( VarBndr(..) )
+
+import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon
-import GHC.Unit.Module
-import GHC.Hs
-import GHC.Driver.DynFlags
-import GHC.Types.Var ( VarBndr(..) )
 import GHC.Core.Map.Type
+
+import GHC.Unit.Module
+
+import GHC.Driver.DynFlags
+
 import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Misc
 import GHC.Data.FastString ( FastString, mkFastString, fsLit )
 
 import Control.Monad.Trans.State.Strict
@@ -139,6 +149,14 @@ There are many wrinkles:
          logic back to the solver since the performance hit we take in doing
          this at type-definition time is non-trivial and Typeable isn't very
          widely used. This is discussed in #13261.
+
+  (GPT8) If the module has no data type declarations, we will don't need /any/
+         typeable declarations -- not even for
+             $trModule = Module "pkg" "modname"
+         That's saves work; and it's very good in `base` because it means we
+         often don't need to tiresomely bring
+             `GHC.Internal.Data.Typeable.Internal.Module`
+         into scope (for -frebindable-known-names) for tiny shim modules.
 -}
 
 {- Note [NOINLINE on generated Typeable bindings]
@@ -298,31 +316,47 @@ We use it in:
 -- 'tcRnSrcDecls'.
 --
 -- See Note [Grand plan for Typeable] in "GHC.Tc.Instance.Typeable".
-mkTypeableBinds :: TcM TcGblEnv
+mkTypeableBinds :: HasDebugCallStack => TcM TcGblEnv
 mkTypeableBinds
   = do { dflags <- getDynFlags
-       ; if gopt Opt_NoTypeableBinds dflags then getGblEnv else do
+       ; tcg_env <- getGblEnv
+       ; let this_mod         = tcg_mod tcg_env
+             tycons_that_need = filter tc_needs_typeable (tcg_tcs tcg_env)
+               -- These tycons will need some typeable bindings
+
+       ; traceTc "mkTypableBinds" (ppr this_mod $$ ppr tycons_that_need $$ callStackDoc)
+
+       -- Stop now if we don't need any typable bindings
+       -- See (GPT8) in Note [Grand plan for Typeable]
+       ; if no_typeable_binds_needed dflags this_mod tycons_that_need
+         then do { traceTc "No Typeable bindings needed" empty
+                 ; getGblEnv }
+         else do
+
        { -- Create a binding for $trModule.
          -- Do this before processing any data type declarations,
          -- which need tcg_tr_module to be initialised
-       ; tcg_env <- mkModIdBindings
+       ; (tcg_env, mod_id) <- mkModIdBindings this_mod "$trModule"
+
          -- Now we can generate the TyCon representations...
          -- First we handle the primitive TyCons if we are compiling GHC.Types
-       ; (tcg_env, prim_todos) <- setGblEnv tcg_env mkPrimTypeableTodos
+       ; (tcg_env, prim_todos) <- setGblEnv tcg_env $
+                                  mkPrimTypeableTodos this_mod mod_id
 
          -- Then we produce bindings for the user-defined types in this module.
        ; setGblEnv tcg_env $
-    do { mod <- getModule
-       ; let tycons = filter needs_typeable_binds (tcg_tcs tcg_env)
-             mod_id = case tcg_tr_module tcg_env of  -- Should be set by now
-                        Just mod_id -> mod_id
-                        Nothing     -> pprPanic "tcMkTypeableBinds" (ppr tycons)
-       ; traceTc "mkTypeableBinds" (ppr tycons)
-       ; this_mod_todos <- todoForTyCons mod mod_id tycons
+    do { traceTc "mkTypeableBinds" (ppr tycons_that_need)
+       ; this_mod_todos <- todoForTyCons this_mod mod_id tycons_that_need
        ; mkTypeRepTodoBinds (this_mod_todos : prim_todos)
        } } }
   where
-    needs_typeable_binds tc
+    no_typeable_binds_needed dflags mod tycons_that_need
+      | gopt Opt_NoTypeableBinds dflags = True
+      | mod == gHC_TYPES                = False
+      | otherwise                       = null tycons_that_need
+
+    tc_needs_typeable :: TyCon -> Bool
+    tc_needs_typeable tc
       | tc `elem` ghcTypesTypeableTyCons
       = False
       | otherwise =
@@ -337,29 +371,34 @@ mkTypeableBinds
 *                                                                      *
 ********************************************************************* -}
 
-mkModIdBindings :: TcM TcGblEnv
-mkModIdBindings
-  = do { mod <- getModule
-       ; loc <- getSrcSpanM
-       ; mod_nm        <- newGlobalBinder mod (mkVarOccFS (fsLit "$trModule")) loc
-       ; trModuleTyCon <- tcLookupTyCon trModuleTyConName
-       ; let mod_id = mkExportedVanillaId mod_nm (mkTyConApp trModuleTyCon [])
+mkModIdBindings :: Module -> String -> TcM (TcGblEnv, Id)
+-- The String is typically "$trModule"
+-- The returned Id is for $trModule :: Module
+-- A binding giving a runtime representation for the name of the module
+mkModIdBindings mod occ_str
+  = do { mod_rhs <- mkModIdRHS mod
+       ; loc    <- getSrcSpanM
+       ; mod_nm <- newGlobalBinder mod (mkVarOcc occ_str) Nothing loc
+       ; trModuleTyCon <- tcLookupKnownOccTyCon trModuleTyConOcc
+
+       ; let mod_id = mkExportedVanillaId mod_nm (mkTyConTy trModuleTyCon)
                       `setInlinePragma` neverInlinePragma
                    -- See Note [NOINLINE on generated Typeable bindings]
-       ; mod_bind      <- mkVarBind mod_id <$> mkModIdRHS mod
+             mod_bind = mkVarBind mod_id mod_rhs
 
        ; tcg_env <- tcExtendGlobalValEnv [mod_id] getGblEnv
-       ; return (tcg_env { tcg_tr_module = Just mod_id }
-                 `addTypecheckedBinds` [[mod_bind]]) }
+       ; let tcg_env' = tcg_env `addTypecheckedBinds` [[mod_bind]]
+       ; return (tcg_env', mod_id) }
 
 mkModIdRHS :: Module -> TcM (LHsExpr GhcTc)
 mkModIdRHS mod
-  = do { trModuleDataCon <- tcLookupDataCon trModuleDataConName
+  = do { trModuleDataCon <- tcLookupKnownOccDataCon trModuleDataConOcc
        ; trNameLit <- mkTrNameLit
        ; return $ nlHsDataCon trModuleDataCon
                   `nlHsApp` trNameLit (unitFS (moduleUnit mod))
                   `nlHsApp` trNameLit (moduleNameFS (moduleName mod))
        }
+
 
 {- *********************************************************************
 *                                                                      *
@@ -378,9 +417,6 @@ data TypeableTyCon
 
 data TypeRepTodo
   = TyConTodo TyConTodo
-  | ExportedKindRepsTodo [(Kind, Id)]
-      -- ^ Build exported 'KindRep' bindings for the given set of kinds.
-
 
 -- | A group of 'TyCon's in need of type-rep bindings.
 data TyConTodo
@@ -393,7 +429,7 @@ data TyConTodo
 
 todoForTyCons :: Module -> Id -> [TyCon] -> TcM TypeRepTodo
 todoForTyCons mod mod_id tycons = do
-    trTyConTy <- mkTyConTy <$> tcLookupTyCon trTyConTyConName
+    trTyConTy <- mkTyConTy <$> tcLookupKnownKeyTyCon trTyConTyConKey
     let mk_rep_id :: TyConRepName -> Id
         mk_rep_id rep_name = mkExportedVanillaId rep_name trTyConTy
                              `setInlinePragma` neverInlinePragma
@@ -424,12 +460,6 @@ todoForTyCons mod mod_id tycons = do
     mod_fpr = fingerprintString $ moduleNameString $ moduleName mod
     pkg_fpr = fingerprintString $ unitString $ moduleUnit mod
 
-todoForExportedKindReps :: [(Kind, Name)] -> TcM TypeRepTodo
-todoForExportedKindReps kinds = do
-    trKindRepTy <- mkTyConTy <$> tcLookupTyCon kindRepTyConName
-    let mkId (k, name) = (k, mkExportedVanillaId name trKindRepTy)
-    return $ ExportedKindRepsTodo $ map mkId kinds
-
 -- | Generate TyCon bindings for a set of type constructors
 mkTypeRepTodoBinds :: [TypeRepTodo] -> TcM TcGblEnv
 mkTypeRepTodoBinds [] = getGblEnv
@@ -445,21 +475,19 @@ mkTypeRepTodoBinds todos
              produced_bndrs = [ tycon_rep_id
                               | TyConTodo (TCTD { todo_tycons = tcs }) <- todos
                               , TypeableTyCon {..} <- tcs
-                              ] ++
-                              [ rep_id
-                              | ExportedKindRepsTodo kinds <- todos
-                              , (_, rep_id) <- kinds
                               ]
        ; gbl_env <- tcExtendGlobalValEnv produced_bndrs getGblEnv
 
        ; let mk_binds :: TypeRepTodo -> KindRepM [LHsBinds GhcTc]
              mk_binds (TyConTodo (todo@(TCTD { todo_tycons = tcs }))) =
                  mapM (mkTyConRepBinds stuff todo) tcs
-             mk_binds (ExportedKindRepsTodo kinds) =
-                 mkExportedKindReps stuff kinds >> return []
 
-       ; (gbl_env, binds) <- setGblEnv gbl_env
-                             $ runKindRepM (mapM mk_binds todos)
+       ; (gbl_env, binds) <- setGblEnv gbl_env $
+                             runKindRepM (mapM mk_binds todos)
+
+       -- All the binders in `binds` are already in the `gbl_env`
+       -- via the earlier call to tcExtendGlobalValEnv, so we
+       -- just add `binds` to the global bindings
        ; return $ gbl_env `addTypecheckedBinds` concat binds }
 
 -- | Generate bindings for the type representation of a wired-in 'TyCon's
@@ -467,44 +495,24 @@ mkTypeRepTodoBinds todos
 -- representation bindings for these primitive types into "GHC.Types"
 --
 -- See Note [Grand plan for Typeable] in this module.
-mkPrimTypeableTodos :: TcM (TcGblEnv, [TypeRepTodo])
-mkPrimTypeableTodos
-  = do { mod <- getModule
-       ; if mod == gHC_TYPES
-           then do { -- Build Module binding for GHC.Prim
-                     trModuleTyCon <- tcLookupTyCon trModuleTyConName
-                   ; let ghc_prim_module_id =
-                             mkExportedVanillaId trGhcPrimModuleName
-                                                 (mkTyConTy trModuleTyCon)
+mkPrimTypeableTodos :: Module -> Id -> TcM (TcGblEnv, [TypeRepTodo])
+mkPrimTypeableTodos mod this_mod_id
+  | mod == gHC_TYPES
+  = do { -- Build Module binding for GHC.Prim
+         (gbl_env',  ghc_prim_module_id) <- mkModIdBindings mod "tr$ModuleGHCPrim"
 
-                   ; ghc_prim_module_bind <- mkVarBind ghc_prim_module_id
-                                             <$> mkModIdRHS gHC_PRIM
+         -- Build TypeRepTodos for types in GHC.Prim
+       ; todo2 <- todoForTyCons gHC_PRIM ghc_prim_module_id
+                                ghcPrimTypeableTyCons
 
-                     -- Extend our environment with above
-                   ; gbl_env <- tcExtendGlobalValEnv [ghc_prim_module_id]
-                                                     getGblEnv
-                   ; let gbl_env' = gbl_env `addTypecheckedBinds`
-                                    [[ghc_prim_module_bind]]
+       ; todo3 <- todoForTyCons gHC_TYPES this_mod_id
+                                ghcTypesTypeableTyCons
 
-                     -- Build TypeRepTodos for built-in KindReps
-                   ; todo1 <- todoForExportedKindReps builtInKindReps
-
-                     -- Build TypeRepTodos for types in GHC.Prim
-                   ; todo2 <- todoForTyCons gHC_PRIM ghc_prim_module_id
-                                            ghcPrimTypeableTyCons
-
-                   ; tcg_env <- getGblEnv
-                   ; let mod_id = case tcg_tr_module tcg_env of  -- Should be set by now
-                                   Just mod_id -> mod_id
-                                   Nothing     -> pprPanic "tcMkTypeableBinds" empty
-
-                   ; todo3 <- todoForTyCons gHC_TYPES mod_id ghcTypesTypeableTyCons
-
-                   ; return ( gbl_env' , [todo1, todo2, todo3])
-                   }
-           else do gbl_env <- getGblEnv
-                   return (gbl_env, [])
+       ; return ( gbl_env' , [todo2, todo3])
        }
+
+  | otherwise -- No-op
+  = do { gbl_env <- getGblEnv; return (gbl_env, []) }
 
 -- | This is the list of primitive 'TyCon's for which we must generate bindings
 -- in "GHC.Types". This should include all types defined in "GHC.Prim".
@@ -536,7 +544,7 @@ data TypeableStuff
             , kindRepVarDataCon      :: DataCon
             , kindRepAppDataCon      :: DataCon
             , kindRepFunDataCon      :: DataCon
-            , kindRepTYPEDataCon     :: DataCon
+            , kindRepTypeDataCon     :: DataCon
             , kindRepTypeLitSDataCon :: DataCon
             , typeLitSymbolDataCon   :: DataCon
             , typeLitCharDataCon     :: DataCon
@@ -547,17 +555,17 @@ data TypeableStuff
 collect_stuff :: TcM TypeableStuff
 collect_stuff = do
     platform               <- targetPlatform <$> getDynFlags
-    trTyConDataCon         <- tcLookupDataCon trTyConDataConName
-    kindRepTyCon           <- tcLookupTyCon   kindRepTyConName
-    kindRepTyConAppDataCon <- tcLookupDataCon kindRepTyConAppDataConName
-    kindRepVarDataCon      <- tcLookupDataCon kindRepVarDataConName
-    kindRepAppDataCon      <- tcLookupDataCon kindRepAppDataConName
-    kindRepFunDataCon      <- tcLookupDataCon kindRepFunDataConName
-    kindRepTYPEDataCon     <- tcLookupDataCon kindRepTYPEDataConName
-    kindRepTypeLitSDataCon <- tcLookupDataCon kindRepTypeLitSDataConName
-    typeLitSymbolDataCon   <- tcLookupDataCon typeLitSymbolDataConName
-    typeLitNatDataCon      <- tcLookupDataCon typeLitNatDataConName
-    typeLitCharDataCon     <- tcLookupDataCon typeLitCharDataConName
+    trTyConDataCon         <- tcLookupKnownOccDataCon trTyConDataConOcc
+    kindRepTyCon           <- tcLookupKnownOccTyCon   kindRepTyConOcc
+    kindRepTyConAppDataCon <- tcLookupKnownOccDataCon kindRepTyConAppDataConOcc
+    kindRepVarDataCon      <- tcLookupKnownOccDataCon kindRepVarDataConOcc
+    kindRepAppDataCon      <- tcLookupKnownOccDataCon kindRepAppDataConOcc
+    kindRepFunDataCon      <- tcLookupKnownOccDataCon kindRepFunDataConOcc
+    kindRepTypeDataCon     <- tcLookupKnownOccDataCon kindRepTypeDataConOcc
+    kindRepTypeLitSDataCon <- tcLookupKnownOccDataCon kindRepTypeLitSDataConOcc
+    typeLitSymbolDataCon   <- tcLookupKnownOccDataCon typeLitSymbolDataConOcc
+    typeLitNatDataCon      <- tcLookupKnownOccDataCon typeLitNatDataConOcc
+    typeLitCharDataCon     <- tcLookupKnownOccDataCon typeLitCharDataConOcc
     trNameLit              <- mkTrNameLit
     return Stuff {..}
 
@@ -566,7 +574,7 @@ collect_stuff = do
 -- representations.
 mkTrNameLit :: TcM (FastString -> LHsExpr GhcTc)
 mkTrNameLit = do
-    trNameSDataCon <- tcLookupDataCon trNameSDataConName
+    trNameSDataCon <- tcLookupKnownOccDataCon trNameSDataConOcc
     let trNameLit :: FastString -> LHsExpr GhcTc
         trNameLit fs = nlHsPar $ nlHsDataCon trNameSDataCon
                        `nlHsApp` nlHsLit (mkHsStringPrimLit fs)
@@ -637,12 +645,12 @@ liftTc = KindRepM . lift
 -- | We generate `KindRep`s for a few common kinds, so that they
 -- can be reused across modules.
 -- These definitions are generated in `ghc-prim:GHC.Types`.
-builtInKindReps :: [(Kind, Name)]
+builtInKindReps :: [(Kind, KnownOcc)]
 builtInKindReps =
-    [ (star,                              starKindRepName)
-    , (constraintKind,                    constraintKindRepName)
-    , (mkVisFunTyMany star star,          starArrStarKindRepName)
-    , (mkVisFunTysMany [star, star] star, starArrStarArrStarKindRepName)
+    [ (star,                              mkVarOcc "krepStar")
+    , (constraintKind,                    mkVarOcc "krepConstraint")
+    , (mkVisFunTyMany star star,          mkVarOcc "krepStarArr")
+    , (mkVisFunTysMany [star, star] star, mkVarOcc "krepStarArrStarArr")
     ]
   where
     star = liftedTypeKind
@@ -650,27 +658,10 @@ builtInKindReps =
 initialKindRepEnv :: TcRn KindRepEnv
 initialKindRepEnv = foldlM add_kind_rep emptyTypeMap builtInKindReps
   where
-    add_kind_rep acc (k,n) = do
-        id <- tcLookupId n
+    add_kind_rep acc (k,occ) = do
+        id <- tcLookupKnownOccId occ
         return $! extendTypeMap acc k (id, Nothing)
         -- The TypeMap looks through type synonyms
-
--- | Performed while compiling "GHC.Types" to generate the built-in 'KindRep's.
-mkExportedKindReps :: TypeableStuff
-                   -> [(Kind, Id)]  -- ^ the kinds to generate bindings for
-                   -> KindRepM ()
-mkExportedKindReps stuff = mapM_ kindrep_binding
-  where
-    empty_scope = mkDeBruijnContext []
-
-    kindrep_binding :: (Kind, Id) -> KindRepM ()
-    kindrep_binding (kind, rep_bndr) = do
-        -- We build the binding manually here instead of using mkKindRepRhs
-        -- since the latter would find the built-in 'KindRep's in the
-        -- 'KindRepEnv' (by virtue of being in 'initialKindRepEnv').
-        rhs <- mkKindRepRhs stuff empty_scope kind
-        liftTc (traceTc "mkExport" (ppr kind $$ ppr rep_bndr $$ ppr rhs))
-        addKindRepBind empty_scope kind rep_bndr rhs
 
 addKindRepBind :: CmEnv -> Kind -> Id -> LHsExpr GhcTc -> KindRepM ()
 addKindRepBind in_scope k bndr rhs =
@@ -680,16 +671,25 @@ addKindRepBind in_scope k bndr rhs =
 -- | Run a 'KindRepM' and add the produced 'KindRep's to the typechecking
 -- environment.
 runKindRepM :: KindRepM a -> TcRn (TcGblEnv, a)
-runKindRepM (KindRepM action) = do
-    kindRepEnv <- initialKindRepEnv
-    (res, reps_env) <- runStateT action kindRepEnv
-    let rep_binds = foldTypeMap to_bind_pair [] reps_env
-        to_bind_pair (bndr, Just rhs) rest = (bndr, rhs) : rest
-        to_bind_pair (_, Nothing) rest = rest
-    tcg_env <- tcExtendGlobalValEnv (map fst rep_binds) getGblEnv
-    let binds = map (uncurry mkVarBind) rep_binds
-        tcg_env' = tcg_env `addTypecheckedBinds` [binds]
-    return (tcg_env', res)
+runKindRepM (KindRepM action)
+  = do { kindRepEnv <- initialKindRepEnv
+       ; (res, reps_env) <- runStateT action kindRepEnv
+
+       ; let rep_binds :: [(Id, LHsExpr GhcTc)]
+             rep_binds = foldTypeMap to_bind_pair [] reps_env
+
+             bndrs :: [Id]
+             bndrs = map fst rep_binds
+
+             binds ::  LHsBinds GhcTc
+             binds = map (uncurry mkVarBind) rep_binds
+
+       ; tcg_env <- tcExtendGlobalValEnv bndrs getGblEnv
+       ; let tcg_env' = tcg_env `addTypecheckedBinds` [binds]
+       ; return (tcg_env', res) }
+  where
+    to_bind_pair (bndr, Just rhs) rest = (bndr, rhs) : rest
+    to_bind_pair (_, Nothing) rest = rest
 
 -- | Produce or find a 'KindRep' for the given kind.
 getKindRep :: TypeableStuff -> CmEnv  -- ^ in-scope kind variables
@@ -731,22 +731,14 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
         -- We handle (TYPE LiftedRep) etc separately to make it
         -- clear to consumers (e.g. serializers) that there is
         -- a loop here (as TYPE :: RuntimeRep -> TYPE 'LiftedRep)
-      | Just (TypeLike, rep) <- sORTKind_maybe k
+      | Just (torc, rep) <- sORTKind_maybe k
+      , isLiftedRuntimeRep rep    -- rep is (Boxed LiftedRep)
               -- Typeable respects the Constraint/Type distinction
               -- so do not follow the special case here
+      , TypeLike <- torc  -- For now
       = -- Here k = TYPE <something>
-        case splitTyConApp_maybe rep of
-          Just (tc, [])         -- TYPE IntRep, TYPE FloatRep etc
-            | Just dc <- isPromotedDataCon_maybe tc
-              -> return $ nlHsDataCon kindRepTYPEDataCon `nlHsApp` nlHsDataCon dc
+        return (nlHsDataCon kindRepTypeDataCon)
 
-          Just (rep_tc, [levArg])  -- TYPE (BoxedRep lev)
-            | Just dcRep <- isPromotedDataCon_maybe rep_tc
-            , Just (lev_tc, []) <- splitTyConApp_maybe levArg
-            , Just dcLev <- isPromotedDataCon_maybe lev_tc
-              -> return $ nlHsDataCon kindRepTYPEDataCon `nlHsApp` (nlHsDataCon dcRep `nlHsApp` nlHsDataCon dcLev)
-
-          _   -> new_kind_rep k
       | otherwise = new_kind_rep k
 
     new_kind_rep ki  -- Expand synonyms
@@ -768,7 +760,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
 
     new_kind_rep k@(TyConApp tc tys)
       | Just rep_name <- tyConRepName_maybe tc
-      = do rep_id <- liftTc $ lookupId rep_name
+      = do rep_id <- liftTc $ tcLookupId rep_name
            tys' <- mapM (getKindRep stuff in_scope) tys
            return $ nlHsDataCon kindRepTyConAppDataCon
                     `nlHsApp` nlHsVar rep_id
@@ -861,8 +853,7 @@ The TypeRep encoding of `Proxy Type Int` looks like this:
     $trProxy = TrApp $trProxyType $trInt TrType
 
     $tkProxy :: GHC.Types.KindRep
-    $tkProxy = KindRepFun (KindRepVar 0)
-                          (KindRepTyConApp (KindRepTYPE LiftedRep) [])
+    $tkProxy = KindRepFun (KindRepVar 0) KindRepType
 
 Note how $trProxyType cannot use 'TrApp', because TypeRep cannot represent
 polymorphic types.  So instead

@@ -25,7 +25,7 @@ import GHC.Stg.Syntax
 import GHC.Platform
 import GHC.Platform.Profile
 
-import GHC.Builtin.Names (unpackCStringName, unpackCStringUtf8Name)
+import GHC.Builtin.KnownKeys (unpackCStringIdKey, unpackCStringUtf8IdKey)
 
 import GHC.StgToCmm.Config
 import GHC.StgToCmm.Expr
@@ -183,9 +183,9 @@ isUnpackCStringClosure body = case stripStgTicksTopE (not . tickishIsCode) body 
   _ -> Nothing
   where
     is_string_unpack_op f
-      | idName f == unpackCStringName     = Just mkRtsUnpackCStringLabel
-      | idName f == unpackCStringUtf8Name = Just mkRtsUnpackCStringUtf8Label
-      | otherwise                         = Nothing
+      | f `hasKnownKey` unpackCStringIdKey     = Just mkRtsUnpackCStringLabel
+      | f `hasKnownKey` unpackCStringUtf8IdKey = Just mkRtsUnpackCStringUtf8Label
+      | otherwise                              = Nothing
 
 ------------------------------------------------------------------------
 --              Non-top-level bindings

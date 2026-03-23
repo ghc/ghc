@@ -63,7 +63,8 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.Error
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownOccs
+import GHC.Builtin.KnownKeys
 
 import GHC.Driver.DynFlags
 import GHC.Utils.Misc
@@ -657,7 +658,8 @@ tcInferId lname@(L loc (WithUserRdr rdr id_name))
     do { dflags <- getDynFlags
        ; if gopt Opt_IgnoreAsserts dflags
          then tc_infer_id lname
-         else tc_infer_id (L loc $ WithUserRdr rdr assertErrorName) }
+         else do { assertErrorName <- idName <$> tcLookupKnownOccId assertErrorIdOcc
+                 ; tc_infer_id (L loc $ WithUserRdr rdr assertErrorName) } }
 
   | otherwise
   = tc_infer_id lname

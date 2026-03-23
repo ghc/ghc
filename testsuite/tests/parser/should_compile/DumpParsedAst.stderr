@@ -439,7 +439,8 @@
                       (EpaComments
                        []))
                      (Exact
-                      {Name: :}))))
+                      (ExactName
+                       {Name: :})))))
                   (L
                    (EpAnn
                     (EpaSpan { DumpParsedAst.hs:11:15-16 })

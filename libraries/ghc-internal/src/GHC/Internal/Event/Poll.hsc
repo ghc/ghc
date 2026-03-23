@@ -10,6 +10,8 @@ module GHC.Internal.Event.Poll
     , available
     ) where
 
+import qualified GHC.Internal.Stack.Types as Rebindable
+
 #include "EventConfig.h"
 
 #if !defined(HAVE_POLL_H)
@@ -26,24 +28,20 @@ available = False
 #else
 #include <poll.h>
 
-import GHC.Internal.Classes (Eq(..), Ord(..), (||))
+import GHC.Internal.Base
 import GHC.Internal.Control.Concurrent.MVar (MVar, newMVar, swapMVar)
 import GHC.Internal.Data.Bits (Bits, FiniteBits, (.|.), (.&.))
 import GHC.Internal.Err (errorWithoutStackTrace, undefined)
 import GHC.Internal.Foreign.C.Types (CInt(..), CShort(..))
 import GHC.Internal.Foreign.Ptr (Ptr)
 import GHC.Internal.Foreign.Storable (Storable(..))
-import GHC.Internal.Base (
-    Monoid(..), liftM, liftM2, otherwise, return, when, ($), (.), (=<<),
-  )
 import GHC.Internal.Conc.Sync (withMVar)
 import GHC.Internal.Enum (maxBound)
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Real (fromIntegral, div)
-import GHC.Internal.Show (Show)
+import GHC.Internal.Show
 import GHC.Internal.System.Posix.Types (Fd(..), CNfds(..))
-import GHC.Internal.Types (Bool(..), Int, IO)
 
 import qualified GHC.Internal.Event.Array as A
 import qualified GHC.Internal.Event.Internal as E

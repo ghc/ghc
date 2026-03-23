@@ -96,32 +96,35 @@ import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBin
                                   tcInstTypeBndrs )
 import GHC.Tc.Zonk.TcType
 
+import GHC.Core.TyCon
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.Class
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 
-import GHC.Builtin.Types.Prim
+import GHC.Builtin( allNameStrings )
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
+
 import GHC.Types.Error
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Core.TyCon
-import GHC.Core.ConLike
-import GHC.Core.DataCon
-import GHC.Core.Class
 import GHC.Types.Name
 import GHC.Types.Var.Env
-import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
-import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Utils.Misc
 import GHC.Types.Unique.Supply
+
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Builtin.Names hiding ( wildCardName )
+
 import GHC.Driver.DynFlags
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -1265,7 +1268,7 @@ tcHsType mode rn_ty@(HsIParamTy _ (L _ n) ty) exp_kind
   = do { massert (isTypeLevel (mode_tyki mode))
        ; ty' <- tc_check_lhs_type mode ty liftedTypeKind
        ; let n' = mkStrLitTy $ hsIPNameFS n
-       ; ipClass <- tcLookupClass ipClassName
+       ; ipClass <- tcLookupKnownKeyClass ipClassKey
        ; checkExpKind rn_ty (mkClassPred ipClass [n',ty'])
                            constraintKind exp_kind }
 
@@ -4929,7 +4932,8 @@ tc_lhs_kind_sig mode ctxt hs_kind
 
 promotionErr :: Name -> PromotionErr -> TcM a
 promotionErr name err
-  = failWithTc $ TcRnUnpromotableThing name err
+  = do { traceTc "promotionError" (ppr name)
+       ; failWithTc $ TcRnUnpromotableThing name err }
 
 {-
 ************************************************************************

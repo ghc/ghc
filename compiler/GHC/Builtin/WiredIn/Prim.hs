@@ -10,7 +10,7 @@ Wired-in knowledge about primitive types
 
 -- | This module defines TyCons that can't be expressed in Haskell.
 --   They are all, therefore, wired-in TyCons.  C.f module "GHC.Builtin.Types"
-module GHC.Builtin.Types.Prim(
+module GHC.Builtin.WiredIn.Prim(
         mkTemplateKindVar, mkTemplateKindVars,
         mkTemplateTyVars, mkTemplateTyVarsFrom,
         mkTemplateKiTyVars, mkTemplateKiTyVar,
@@ -110,7 +110,7 @@ module GHC.Builtin.Types.Prim(
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
   ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind, unliftedTypeKind
   , boxedRepDataConTyCon, vecRepDataConTyCon
   , liftedRepTy, unliftedRepTy, zeroBitRepTy
@@ -143,7 +143,9 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 
 import GHC.Builtin.Uniques
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( gHC_PRIM )
+
 import GHC.Utils.Misc ( changeLast )
 import GHC.Utils.Panic ( assertPpr )
 import GHC.Utils.Outputable
@@ -234,7 +236,7 @@ pcPrimTyCon_LevPolyLastArg name roles res_rep
 A few primitive TyCons are "unexposed", meaning:
 * We don't want users to be able to write them (see #15209);
   i.e. they aren't in scope, ever.  In particular they do not
-  appear in the exports of GHC.Prim: see GHC.Builtin.Utils.ghcPrimExports
+  appear in the exports of GHC.Prim: see GHC.Builtin.ghcPrimExports
 
 * We don't want users to see them in GHCi's @:browse@ output (see #12023).
 -}
@@ -877,7 +879,7 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
 * error :: forall (rr::RuntimeRep) (a::TYPE rr). String -> a
   Code generator never has to manipulate the return value.
 
-* unsafeCoerce#, defined in Desugar.mkUnsafeCoercePair:
+* unsafeCoerce#, defined in Desugar.mkUnsafeCoercePrimPair:
   Always inlined to be a no-op
      unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                              (a :: TYPE r1) (b :: TYPE r2).

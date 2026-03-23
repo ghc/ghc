@@ -36,8 +36,8 @@ import GHC.Types.Name.Occurrence as OccName
 import GHC.Types.SrcLoc
 import GHC.Core.Type as Hs
 import qualified GHC.Core.Coercion as Coercion ( Role(..) )
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim( fUNTyCon )
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim( fUNTyCon )
 import GHC.Hs.Decls.Overlap as Hs
 import GHC.Types.Basic as Hs
 import GHC.Types.ForeignCall
@@ -1900,7 +1900,7 @@ hsTypeToArrow :: LHsType GhcPs -> HsModifiedFunArr GhcPs
 hsTypeToArrow (L l w) = HsModifiedFunArr noExtField mods arr
  where
   (mods, arr) = case w of
-                     HsTyVar _ _ (L _ (isExact_maybe -> Just n))
+                     HsTyVar _ _ (L _ (rdrNameExactName_maybe -> Just n))
                         | n == oneDataConName -> ([], HsLinearArr noAnn)
                         | n == manyDataConName -> ([], HsStandardArr (EpArrow noAnn))
                      _ -> ([L l (HsModifier noAnn (L l w))], HsStandardArr (EpArrow noAnn))
@@ -2330,7 +2330,7 @@ thOrigOrExactRdrName occ th_ns pkg mod = knownOrigToExactRdrName (thOrigRdrName 
 knownOrigToExactRdrName :: RdrName -> RdrName
 knownOrigToExactRdrName (Orig mod occ)
   | Just name <- isKnownOrigName_maybe mod occ
-  = Exact name
+  = nameRdrName name
 knownOrigToExactRdrName rdr = rdr
 
 -- Return an exact RdrName if we're dealing with built-in syntax.

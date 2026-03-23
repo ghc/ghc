@@ -77,8 +77,9 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.Types
-import GHC.Builtin.Names
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
 import GHC.Driver.DynFlags
@@ -368,7 +369,7 @@ tcExpr e@(HsIPVar _ x) res_ty
           -- (The type of an implicit parameter must have kind 'Type'.)
        ; let ip_name = mkStrLitTy (hsIPNameFS x)
              origin  = IPOccOrigin x
-       ; ip_class <- tcLookupClass ipClassName
+       ; ip_class <- tcLookupKnownKeyClass ipClassKey
        ; let ip_pred = mkClassPred ip_class [ip_name, ip_ty]
        ; ip_dict <- emitWantedEvVar origin ip_pred
        ; let (ip_op, _) = decomposeIPPred ip_pred
@@ -617,7 +618,7 @@ tcExpr (HsStatic _ expr) res_ty
         ; let expr'' = mkLHsWrap (mkWpLet ev_binds) expr'
 
         -- Require the type of the argument to be Typeable.
-        ; typeableClass <- tcLookupClass typeableClassName
+        ; typeableClass <- tcLookupKnownKeyClass typeableClassKey
         ; typeable_ev <- emitWantedEvVar StaticOrigin $
                          mkTyConApp (classTyCon typeableClass)
                                     [liftedTypeKind, expr_ty]
@@ -626,8 +627,9 @@ tcExpr (HsStatic _ expr) res_ty
         --   fromStaticPtr :: forall p. (IsStatic p) =>
         --                    forall a. (Typeable a) =>
         --                    StaticPtr a -> p a
-        ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName [p_ty]
-        ; static_ptr_ty_con <- tcLookupTyCon staticPtrTyConName
+        ; fromStaticPtr <- newKnownOccMethod StaticOrigin
+                                    fromStaticPtrClassOpOcc [p_ty]
+        ; static_ptr_ty_con <- tcLookupKnownOccTyCon staticPtrTyConOcc
         ; let wrap = mkWpEvVarApps [typeable_ev] <.> mkWpTyApps [expr_ty]
               static_expr_ty = mkTyConApp static_ptr_ty_con [expr_ty]
         ; return $ mkHsWrapCo co $
@@ -792,8 +794,8 @@ tcArithSeq :: Maybe (SyntaxExpr GhcRn) -> ArithSeqInfo GhcRn -> ExpRhoType
 tcArithSeq witness seq@(From expr) res_ty
   = do { (wrap, elt_mult, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr' <-tcScalingUsage elt_mult $ tcCheckPolyExpr expr elt_ty
-       ; enum_from <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromName [elt_ty]
+       ; enum_from <- newKnownOccMethod (ArithSeqOrigin seq)
+                              enumFromClassOpOcc [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from wit' (From expr') }
 
@@ -801,8 +803,8 @@ tcArithSeq witness seq@(FromThen expr1 expr2) res_ty
   = do { (wrap, elt_mult, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr1' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr1 elt_ty
        ; expr2' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr2 elt_ty
-       ; enum_from_then <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromThenName [elt_ty]
+       ; enum_from_then <- newKnownOccMethod (ArithSeqOrigin seq)
+                              enumFromThenClassOpOcc [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from_then wit' (FromThen expr1' expr2') }
 
@@ -810,8 +812,8 @@ tcArithSeq witness seq@(FromTo expr1 expr2) res_ty
   = do { (wrap, elt_mult, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr1' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr1 elt_ty
        ; expr2' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr2 elt_ty
-       ; enum_from_to <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromToName [elt_ty]
+       ; enum_from_to <- newKnownOccMethod (ArithSeqOrigin seq)
+                              enumFromToClassOpOcc [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from_to wit' (FromTo expr1' expr2') }
 
@@ -820,8 +822,8 @@ tcArithSeq witness seq@(FromThenTo expr1 expr2 expr3) res_ty
         ; expr1' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr1 elt_ty
         ; expr2' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr2 elt_ty
         ; expr3' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr3 elt_ty
-        ; eft <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromThenToName [elt_ty]
+        ; eft <- newKnownOccMethod (ArithSeqOrigin seq)
+                              enumFromThenToClassOpOcc [elt_ty]
         ; return $ mkHsWrap wrap $
           ArithSeq eft wit' (FromThenTo expr1' expr2' expr3') }
 

@@ -13,7 +13,7 @@ import GHC.Prelude
 
 import GHC.Driver.Flags ( DumpFlag (..) )
 
-import GHC.Builtin.Names ( runRWKey )
+import GHC.Builtin.KnownKeys ( runRWKey )
 
 import GHC.Types.Var.Env
 import GHC.Types.Basic

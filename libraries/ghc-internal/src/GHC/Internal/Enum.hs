@@ -4,6 +4,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Bounded, Enum
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -37,12 +41,8 @@ module GHC.Internal.Enum
   )
 where
 
-import GHC.Internal.Base (
-    String, asTypeOf, build, map, maxInt, minInt, ord, otherwise,
-    ($), (.), (++),
-  )
+import GHC.Internal.Base hiding( many )
 import GHC.Internal.Char
-import GHC.Internal.Classes (Eq (..), Ord (..))
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Bignum.Integer
 import GHC.Internal.Num
@@ -53,10 +53,7 @@ import GHC.Internal.Prim (
     (+#), (-#), (==#), (/=#), (<#), (>#), (>=#),
   )
 import GHC.Internal.Tuple (Solo (..))
-import GHC.Internal.Types (
-    Bool(..), Char(..), Int(..), Levity(..), Ordering(..), VecCount(..),
-    VecElem(..), Word(..), isTrue#,
-  )
+
 default ()              -- Double isn't available yet
 
 -- | The 'Bounded' class is used to name the upper and lower limits of a

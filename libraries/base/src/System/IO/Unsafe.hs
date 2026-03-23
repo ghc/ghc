@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -28,6 +29,10 @@ import GHC.Internal.IO
 import GHC.Internal.IORef
 import GHC.Internal.Exception
 import GHC.Internal.Control.Exception
+#if __GLASGOW_HASKELL__ >= 1001
+import GHC.Internal.Num as Rebindable( Num ) -- For -frebindable-known-names
+import GHC.Internal.Stack.Types as Rebindable( pushCallStack, emptyCallStack )
+#endif
 
 -- | A slightly faster version of `GHC.Internal.System.IO.fixIO` that may not be
 -- safe to use with multiple threads.  The unsafety arises when used

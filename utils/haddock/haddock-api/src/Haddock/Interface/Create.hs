@@ -44,8 +44,8 @@ import Data.Maybe (catMaybes, isJust, mapMaybe, maybeToList)
 import Data.Traversable (for)
 import qualified Data.Text as T
 import GHC hiding (lookupName)
-import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.Modules( gHC_PRIM )
+import GHC.Builtin.WiredIn.Prim
 import GHC.Core.ConLike (ConLike (..))
 import GHC.Data.FastString (FastString, bytesFS)
 import qualified GHC.Driver.Config.Parser as Parser

@@ -74,12 +74,12 @@ module GHC.Exts
      -- **  Overloaded string literals
      IsString(..),
      -- **  CString
-     unpackCString#,
-     unpackAppendCString#,
-     unpackFoldrCString#,
-     unpackCStringUtf8#,
-     unpackNBytes#,
-     cstringLength#,
+     CS.unpackCString#,
+     CS.unpackAppendCString#,
+     CS.unpackFoldrCString#,
+     CS.unpackCStringUtf8#,
+     CS.unpackNBytes#,
+     CS.cstringLength#,
      -- *  Debugging
      -- **  Breakpoints
      breakpoint,
@@ -369,7 +369,20 @@ import GHC.Prim hiding
 
 import GHC.Prim.Ext
 
+import qualified GHC.Types as CS (
+  unpackCString#,
+  unpackAppendCString#,
+  unpackFoldrCString#,
+  unpackCStringUtf8#,
+  unpackNBytes#,
+  cstringLength# )
 import GHC.Types hiding (
+  unpackCString#,
+  unpackAppendCString#,
+  unpackFoldrCString#,
+  unpackCStringUtf8#,
+  unpackNBytes#,
+  cstringLength#,
   IO,   -- Exported from "GHC.IO"
   Type, -- Exported from "Data.Kind"
   -- GHC's internal representation of 'TyCon's, for 'Typeable'

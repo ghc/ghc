@@ -144,7 +144,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.FVs
    ( noFreeVarsOfType )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    ( runtimeRepTyCon, constraintKind, levityTyCon
    , multiplicityTyCon
    , vecCountTyCon, vecElemTyCon )
@@ -159,26 +159,32 @@ import GHC.Builtin.Uniques
   , dataConTyRepNameUnique )
 
 import GHC.Hs.Extension (GhcTc)
+import GHC.Settings.Constants
 
-import GHC.Utils.Binary
+import GHC.Core.Coercion.Axiom
+import GHC.Core.Class
+
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Core.Class
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Core.Coercion.Axiom
-import GHC.Builtin.Names
-import GHC.Data.Maybe
+import GHC.Types.Unique.Set
+import GHC.Types.FieldLabel
+
+import GHC.Builtin.Modules( gHC_PRIM, gHC_TYPES )
+import GHC.Builtin.KnownKeys
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString.Env
-import GHC.Types.FieldLabel
-import GHC.Settings.Constants
+import GHC.Utils.Binary
 import GHC.Utils.Misc
-import GHC.Types.Unique.Set
+
 import GHC.Unit.Module
+
+import GHC.Data.FastString.Env
+import GHC.Data.Maybe
 import Control.DeepSeq
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))

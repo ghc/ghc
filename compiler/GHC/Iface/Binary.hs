@@ -32,21 +32,26 @@ module GHC.Iface.Binary (
 
 import GHC.Prelude
 
-import GHC.Builtin.Utils   ( isKnownKeyName, lookupKnownKeyName )
-import GHC.Unit
-import GHC.Unit.Module.ModIface
-import GHC.Types.Name
-import GHC.Platform.Profile
+import GHC.Builtin   ( knownKeyOccMap, isWiredInKnownKeyName, lookupWiredInKnownKeyName )
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
-import GHC.Data.FastMutInt
-import GHC.Types.Unique
 import GHC.Utils.Outputable
-import GHC.Types.Name.Cache
+
+import GHC.Types.Name
+import GHC.Types.Unique
 import GHC.Types.SrcLoc
+import GHC.Types.Name.Cache
+
+import GHC.Unit
+import GHC.Unit.Module.ModIface
+
+import GHC.Platform.Profile
 import GHC.Platform
 import GHC.Settings.Constants
 import GHC.Iface.Type (IfaceType(..), getIfaceType, putIfaceType, ifaceTypeSharedByte)
+
+import GHC.Data.FastMutInt
+import GHC.Data.Maybe( orElse )
 
 import Control.Monad
 import Data.Array
@@ -659,7 +664,8 @@ The symbol table payload will look like:
     $names.size
     for table_ix, occ in $names
       $table_ix
-      $occ
+      $name.occ
+      $name.is_known_key
 -}
 putSymbolTable :: WriteBinHandle -> Int -> ModuleEnv [(Int, Name)] -> IO ()
 putSymbolTable bh name_count symtab = do
@@ -672,47 +678,66 @@ putSymbolTable bh name_count symtab = do
         let occ = assertPpr (isExternalName name) (ppr name) (nameOccName name)
         put_ bh table_ix
         put_ bh occ
+        put_ bh (isKnownKeyName name)
 
 -- | Decode the symbol table -- layout set by 'putSymbolTable'.
 getSymbolTable :: ReadBinHandle -> NameCache -> IO (SymbolTable Name)
+-- Create an array of Names for the symbols and add them to the NameCache
 getSymbolTable bh name_cache = do
     sz <- get bh :: IO Int
-    -- create an array of Names for the symbols and add them to the NameCache
     updateNameCache' name_cache $ \cache0 -> do
       mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int Name)
       mods_sz <- get bh :: IO Int
       cache <-
-        foldGet' (fromIntegral mods_sz) bh cache0 $ \_mod_ix (mod,mod_nms_sz) cache1 -> do
-          foldGet' (fromIntegral (mod_nms_sz::Int)) bh cache1 $ \_mod_nms_ix (table_ix, occ) cache2 -> do
-            case lookupOrigNameCache cache2 mod occ of
-              Just name -> do
-                writeArray mut_arr table_ix name
-                return cache2
-              Nothing   -> do
-                uniq <- takeUniqFromNameCache name_cache
-                let name   = mkExternalName uniq mod occ noSrcSpan
-                    cache3 = extendOrigNameCache cache2 mod occ name
-                writeArray mut_arr table_ix name
-                return cache3
+        foldGet' (fromIntegral mods_sz) bh cache0 $ \_mod_ix (mod,mod_nms_sz) cache1 ->
+          foldGet' (fromIntegral (mod_nms_sz::Int)) bh cache1 (deserialise_one mut_arr mod)
       arr <- unsafeFreeze mut_arr
       return (cache, arr)
+  where
+    deserialise_one :: (IOArray Int Name)
+                    -> Module
+                    -> Word -> (Int, OccName, Bool)
+                    -> OrigNameCache -> IO OrigNameCache
+    deserialise_one mut_arr mod _mod_nms_ix (table_ix, occ, is_known_key) cache2 = do
+      case lookupOrigNameCache cache2 mod occ of
+        Just name -> do
+          writeArray mut_arr table_ix name
+          return cache2
+        Nothing
+          | is_known_key -> do
+              let uniq = lookupOccEnv knownKeyOccMap occ `orElse`
+                           pprPanic "getSymbolTable" (ppr occ)
+              extend_cache_with (mkKnownKeyName uniq mod occ noSrcSpan)
+          | otherwise -> do
+              uniq <- takeUniqFromNameCache name_cache
+              extend_cache_with (mkExternalName uniq mod occ noSrcSpan)
+      where
+        extend_cache_with name = do
+          let cache3 = extendOrigNameCache cache2 mod occ name
+          writeArray mut_arr table_ix name
+          return cache3
 
 
--- Note [Symbol table representation of names]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- An occurrence of a name in an interface file is serialized as a single 32-bit
--- word. The format of this word is:
---  00xxxxxx xxxxxxxx xxxxxxxx xxxxxxxx
---   A normal name. x is an index into the symbol table
---  10xxxxxx xxyyyyyy yyyyyyyy yyyyyyyy
---   A known-key name. x is the Unique's Char, y is the int part. We assume that
---   all known-key uniques fit in this space. This is asserted by
---   GHC.Builtin.Utils.knownKeyNamesOkay.
---
--- During serialization we check for known-key things using isKnownKeyName.
--- During deserialization we use lookupKnownKeyName to get from the unique back
--- to its corresponding Name.
+{-
+Note [Symbol table representation of names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An occurrence of a name in an interface file is serialized as a single 32-bit
+word. The format of this word is:
+ 00xxxxxx xxxxxxxx xxxxxxxx xxxxxxxx
+  A normal name. x is an index into the symbol table
+ 10xxxxxx xxyyyyyy yyyyyyyy yyyyyyyy
+  A wired-in name. x is the Unique's Char, y is the int part. We assume that
+  all wired-in known-key uniques fit in this space. This is asserted by
+  GHC.Builtin.knownKeyNamesOkay.
+
+During serialization we check for tuples or wired-in things with 'isWiredInKnownKeyName'.
+During deserialization we use 'lookupWiredInKnownKeyName' to get from the
+unique back to its tuple or corresponding Name.
+
+Tuples are a special case of wired-in names that we can construct from the
+unique alone (see 'knownUniqueTupleName'). Tuples aren't included in the
+wired-in names map: see Note [Infinite families of known-key names].
+-}
 
 
 -- See Note [Symbol table representation of names]
@@ -721,7 +746,7 @@ putName BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }
         bh name
-  | isKnownKeyName name
+  | isWiredInKnownKeyName name
   , let (c, u) = unpkUniqueGrimily (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
   = -- assert (u < 2^(22 :: Int))
     put_ bh (0x80000000
@@ -764,7 +789,7 @@ getSymtabName symtab bh = do
           ix  = fromIntegral i .&. 0x003FFFFF
           u   = mkUniqueGrimilyWithTag tag ix
         in
-          return $! case lookupKnownKeyName u of
+          return $! case lookupWiredInKnownKeyName u of
                       Nothing -> pprPanic "getSymtabName:unknown known-key unique"
                                           (ppr i $$ ppr u $$ char tag $$ ppr ix)
                       Just n  -> n

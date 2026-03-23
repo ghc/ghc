@@ -199,16 +199,19 @@ Library
 
     Exposed-Modules:
         GHC
-        GHC.Builtin.Names
-        GHC.Builtin.Names.TH
+        GHC.Builtin
+        GHC.Builtin.KnownKeys
+        GHC.Builtin.KnownOccs
+        GHC.Builtin.Modules
         GHC.Builtin.PrimOps
         GHC.Builtin.PrimOps.Casts
         GHC.Builtin.PrimOps.Ids
-        GHC.Builtin.Types
-        GHC.Builtin.Types.Literals
-        GHC.Builtin.Types.Prim
+        GHC.Builtin.TH
+        GHC.Builtin.WiredIn.Types
+        GHC.Builtin.WiredIn.TypeLits
+        GHC.Builtin.WiredIn.Prim
+        GHC.Builtin.WiredIn.Ids
         GHC.Builtin.Uniques
-        GHC.Builtin.Utils
         GHC.ByteCode.Asm
         GHC.ByteCode.Binary
         GHC.ByteCode.Breakpoints
@@ -994,7 +997,6 @@ Library
         GHC.Unit.Types
         GHC.Utils.Asm
         GHC.Utils.Binary
-        GHC.Utils.Binary.Typeable
         GHC.Utils.BufHandle
         GHC.Utils.CliOption
         GHC.Utils.Constants

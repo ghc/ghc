@@ -149,16 +149,14 @@ module GHC.Internal.Control.Concurrent.MVar
         , addMVarFinalizer
     ) where
 
+import GHC.Internal.Base
 import GHC.Internal.MVar ( MVar(..), newEmptyMVar, newMVar, takeMVar, putMVar,
                   tryTakeMVar, tryPutMVar, isEmptyMVar, readMVar,
                   tryReadMVar
                 )
 import qualified GHC.Internal.MVar
 import GHC.Internal.Weak
-import GHC.Internal.Base ( return, ($), (>>=) )
 import GHC.Internal.Prim ( mkWeak# )
-import GHC.Internal.Types ( IO(..) )
-
 import GHC.Internal.Control.Exception.Base
 
 {-|

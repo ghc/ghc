@@ -52,7 +52,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Core.Type
-import GHC.Builtin.Types (mkTupleStr)
+import GHC.Builtin.WiredIn.Types (mkTupleStr)
 import GHC.Tc.Utils.TcType (TcType)
 import {-# SOURCE #-} GHC.Tc.Types.LclEnv (TcLclEnv)
 
@@ -1479,8 +1479,14 @@ type instance XXCmd       GhcTc = HsWrap HsCmd
     -- Then (XCmd (HsWrap wrap cmd)) :: arg2 --> res
 
 -- | Command Syntax Table (for Arrow syntax)
-type CmdSyntaxTable p = [(Name, HsExpr p)]
+newtype CmdSyntaxTable p = CST [(KnownOcc, HsExpr p)]
 -- See Note [CmdSyntaxTable]
+
+instance Typeable p => Data (CmdSyntaxTable p) where
+    -- Don't traverse a CmdSyntaxTable
+    toConstr _   = abstractConstr "CmdSyntaxTable"
+    gunfold _ _  = error "gunfold:CmdSyntaxTable"
+    dataTypeOf _ = mkNoRepType "CmdSyntaxTable"
 
 {-
 Note [CmdSyntaxTable]
@@ -1512,7 +1518,7 @@ is Less Cool because
     See the tedious GHC.Rename.Expr.methodNamesCmd.
 
   * The desugarer has to know the polymorphic type of the instantiated
-    method. This is checked by Inst.tcSyntaxName, but is less flexible
+    method. This is checked by Inst.tcCmdSyntaxTable, but is less flexible
     than the rest of rebindable syntax, where the type is less
     pre-ordained.  (And this flexibility is useful; for example we can
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)

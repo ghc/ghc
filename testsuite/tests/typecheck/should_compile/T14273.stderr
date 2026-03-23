@@ -8,9 +8,9 @@ T14273.hs:7:27: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
       Potentially matching instances:
         instance (Show a, Show b) => Show (Either a b)
           -- Defined in ‘GHC.Internal.Data.Either’
-        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
+        instance Show Integer -- Defined in ‘GHC.Internal.Show’
         ...plus 26 others
-        ...plus 49 instances involving out-of-scope types
+        ...plus 36 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘Just’, namely ‘(show _a)’
       In the expression: Just (show _a)
@@ -33,17 +33,17 @@ T14273.hs:7:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         otherwise :: Bool
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Base’))
+        () :: () (bound at <wired into compiler>)
         EQ :: Ordering
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Types’))
+        False :: Bool
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Types’))
         GT :: Ordering
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Types’))
         LT :: Ordering
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Types’))
-        () :: () (bound at <wired into compiler>)
-        False :: Bool
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Types’))
         True :: Bool
@@ -61,7 +61,7 @@ T14273.hs:13:10: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
       Potentially matching instances:
         instance (Show a, Show b) => Show (Either a b)
           -- Defined in ‘GHC.Internal.Data.Either’
-        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
+        instance Show Integer -- Defined in ‘GHC.Internal.Show’
         ...plus 26 others
         ...plus 29 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)

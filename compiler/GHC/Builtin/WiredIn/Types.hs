@@ -12,7 +12,7 @@ Wired-in knowledge about {\em non-primitive} types
 
 -- | This module is about types that can be defined in Haskell, but which
 --   must be wired into the compiler nonetheless.  C.f module "GHC.Builtin.Types.Prim"
-module GHC.Builtin.Types (
+module GHC.Builtin.WiredIn.Types (
         -- * Helper functions defined here
         mkWiredInTyConName, -- This is used in GHC.Builtin.Types.Literals to define the
                             -- built-in functions for evaluation.
@@ -25,24 +25,24 @@ module GHC.Builtin.Types (
         isInfiniteFamilyOrigName_maybe,
 
         -- * Bool
-        boolTy, boolTyCon, boolTyCon_RDR, boolTyConName,
-        trueDataCon, trueDataConName,  trueDataConId,  true_RDR,
-        falseDataCon, falseDataConName, falseDataConId, false_RDR,
+        boolTy, boolTyCon, boolTyConName,
+        trueDataCon, trueDataConName,  trueDataConId,
+        falseDataCon, falseDataConName, falseDataConId,
         promotedFalseDataCon, promotedTrueDataCon,
 
         -- * Ordering
         orderingTyCon,
-        ordLTDataCon, ordLTDataConId,
-        ordEQDataCon, ordEQDataConId,
-        ordGTDataCon, ordGTDataConId,
+        ordLTDataCon, ordLTDataConId, ordLTDataConName,
+        ordEQDataCon, ordEQDataConId, ordEQDataConName,
+        ordGTDataCon, ordGTDataConId, ordGTDataConName,
         promotedLTDataCon, promotedEQDataCon, promotedGTDataCon,
 
         -- * Boxing primitive types
         boxingDataCon, BoxingInfo(..),
 
         -- * Char
-        charTyCon, charDataCon, charTyCon_RDR,
-        charTy, stringTy, charTyConName, stringTyCon_RDR,
+        charTyCon, charDataCon,
+        charTy, stringTy, charTyConName, stringTyConName,
 
         -- * Double
         doubleTyCon, doubleDataCon, doubleTy, doubleTyConName,
@@ -51,19 +51,19 @@ module GHC.Builtin.Types (
         floatTyCon, floatDataCon, floatTy, floatTyConName,
 
         -- * Int
-        intTyCon, intDataCon, intTyCon_RDR, intDataCon_RDR, intTyConName,
+        intTyCon, intDataCon, intTyConName, intDataConName,
         intTy,
 
         -- * Word
         wordTyCon, wordDataCon, wordTyConName, wordTy,
 
         -- * Word8
-        word8TyCon, word8DataCon, word8Ty,
+        word8TyCon, word8DataCon, word8TyConName, word8Ty,
 
         -- * List
-        listTyCon, listTyCon_RDR, listTyConName, listTyConKey,
+        listTyCon, listTyConName, listTyConKey,
         nilDataCon, nilDataConName, nilDataConKey,
-        consDataCon_RDR, consDataCon, consDataConName,
+        consDataCon, consDataConName,
         promotedNilDataCon, promotedConsDataCon,
         mkListTy, mkPromotedListTy, extractPromotedList,
 
@@ -165,7 +165,10 @@ module GHC.Builtin.Types (
         naturalNSDataCon, naturalNSDataConName,
         naturalNBDataCon, naturalNBDataConName,
 
-         pretendNameIsInScope,
+        -- * GHC
+        pluginTyConName, frontendPluginTyConName,
+
+        pretendNameIsInScope,
     ) where
 
 import GHC.Prelude
@@ -173,8 +176,9 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Types.Id.Make ( mkDataConWorkId, mkDictSelId )
 
 -- friends:
-import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules
+import GHC.Builtin.WiredIn.Prim
 import GHC.Builtin.Uniques
 
 -- others:
@@ -228,6 +232,7 @@ import Numeric          ( showInt )
 
 import Data.Word (Word8)
 import Control.Applicative ((<|>))
+import GHC.Types.SrcLoc (noSrcSpan)
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
@@ -235,10 +240,8 @@ alpha_tyvar = [alphaTyVar]
 alpha_ty :: [Type]
 alpha_ty = [alphaTy]
 
-{-
-Note [Wired-in Types and Type Constructors]
+{- Note [Wired-in Types and Type Constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 This module include a lot of wired-in types and type constructors. Here,
 these are presented in a tabular format to make it easier to find the
 wired-in type identifier corresponding to a known Haskell type. Data
@@ -279,12 +282,12 @@ boolTyCon               TyCon   GHC.Types.Bool        Data type
 ************************************************************************
 
 If you change which things are wired in, make sure you change their
-names in GHC.Builtin.Names, so they use wTcQual, wDataQual, etc
+names in GHC.Builtin.KnownKeys, so they use wTcQual, wDataQual, etc
 
 -}
 
 
--- This list is used only to define GHC.Builtin.Utils.knownKeyNames. That in turn
+-- This list is used only to define GHC.Builtin.wiredInNames. That in turn
 -- is used to initialise the name environment carried around by the renamer.
 -- This means that if we look up the name of a TyCon (or its implicit binders)
 -- that occurs in this list that name will be assigned the wired-in key we
@@ -293,9 +296,9 @@ names in GHC.Builtin.Names, so they use wTcQual, wDataQual, etc
 -- Because of their infinite nature, this list excludes
 --   * Tuples of all sorts (boxed, unboxed, constraint) (mkTupleTyCon)
 --   * Unboxed sums (sumTyCon)
--- See Note [Infinite families of known-key names] in GHC.Builtin.Names
+-- See Note [Infinite families of known-key names] in GHC.Builtin.KnownKeys
 --
--- See also Note [Known-key names]
+-- See also Note [Overview of known entities]
 wiredInTyCons :: [TyCon]
 
 wiredInTyCons = map (dataConTyCon . snd) boxingDataCons
@@ -396,16 +399,23 @@ nothingDataConName = mkWiredInDataConName UserSyntax gHC_INTERNAL_MAYBE (fsLit "
 justDataConName    = mkWiredInDataConName UserSyntax gHC_INTERNAL_MAYBE (fsLit "Just")
                                           justDataConKey justDataCon
 
-wordTyConName, wordDataConName, word8DataConName :: Name
-wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
-wordDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "W#")     wordDataConKey   wordDataCon
-word8DataConName   = mkWiredInDataConName UserSyntax gHC_INTERNAL_WORD  (fsLit "W8#")    word8DataConKey  word8DataCon
+wordTyConName, wordDataConName, word8TyConName, word8DataConName :: Name
+wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES         (fsLit "Word")   wordTyConKey     wordTyCon
+wordDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES         (fsLit "W#")     wordDataConKey   wordDataCon
+word8TyConName     = mkWiredInTyConName   UserSyntax gHC_INTERNAL_WORD (fsLit "Word8")  word8TyConKey    word8TyCon
+word8DataConName   = mkWiredInDataConName UserSyntax gHC_INTERNAL_WORD (fsLit "W8#")    word8DataConKey  word8DataCon
 
 floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
 floatTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float")  floatTyConKey    floatTyCon
 floatDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "F#")     floatDataConKey  floatDataCon
 doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") doubleTyConKey   doubleTyCon
 doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#")     doubleDataConKey doubleDataCon
+
+orderingTyConName, ordLTDataConName, ordEQDataConName, ordGTDataConName :: Name
+orderingTyConName = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Ordering") orderingTyConKey orderingTyCon
+ordLTDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "LT")       ordLTDataConKey  ordLTDataCon
+ordEQDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "EQ")       ordEQDataConKey  ordEQDataCon
+ordGTDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "GT")       ordGTDataConKey  ordGTDataCon
 
 -- Any
 
@@ -607,18 +617,6 @@ makeRecoveryTyCon tc
 typeSymbolKindConName :: Name
 typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Symbol") typeSymbolKindConNameKey typeSymbolKindCon
 
-
-boolTyCon_RDR, false_RDR, true_RDR, intTyCon_RDR, charTyCon_RDR, stringTyCon_RDR,
-    intDataCon_RDR, listTyCon_RDR, consDataCon_RDR :: RdrName
-boolTyCon_RDR   = nameRdrName boolTyConName
-false_RDR       = nameRdrName falseDataConName
-true_RDR        = nameRdrName trueDataConName
-intTyCon_RDR    = nameRdrName intTyConName
-charTyCon_RDR   = nameRdrName charTyConName
-stringTyCon_RDR = nameRdrName stringTyConName
-intDataCon_RDR  = nameRdrName intDataConName
-listTyCon_RDR   = nameRdrName listTyConName
-consDataCon_RDR = nameRdrName consDataConName
 
 {-
 ************************************************************************
@@ -832,7 +830,7 @@ Note [How tuples work]
   deserialization we lookup the Name associated with the unique with the logic
   in GHC.Builtin.Uniques. See Note [Symbol table representation of names] for details.
 
-See also Note [Known-key names] in GHC.Builtin.Names.
+See also Note [Overview of known entities] in GHC.Builtin.
 
 Note [One-tuples]
 ~~~~~~~~~~~~~~~~~
@@ -990,7 +988,7 @@ isBuiltInOcc = isJust . isBuiltInOcc_maybe listTuplePuns
       -- whether isBuiltInOcc_maybe matches. See Note [isBuiltInOcc_maybe]
 
 -- Match on original names of infinite families (tuples and sums).
--- See Note [Infinite families of known-key names] in GHC.Builtin.Names
+-- See Note [Infinite families of known-key names] in GHC.Builtin.KnownKeys
 isInfiniteFamilyOrigName_maybe :: Module -> OccName -> Maybe Name
 isInfiniteFamilyOrigName_maybe mod occ =
 
@@ -2903,6 +2901,18 @@ naturalNSDataCon = pcDataCon naturalNSDataConName [] [wordPrimTy] naturalTyCon
 naturalNBDataCon :: DataCon
 naturalNBDataCon = pcDataCon naturalNBDataConName [] [byteArrayPrimTy] naturalTyCon
 
+---------------------------------------
+-- ghc
+---------------------------------------
+
+pLUGINS :: Module
+pLUGINS = mkThisGhcModule (fsLit "GHC.Driver.Plugins")
+
+pluginTyConName :: Name
+pluginTyConName = mkExternalName pluginTyConKey pLUGINS (mkOccName tcName "Plugin") noSrcSpan
+
+frontendPluginTyConName :: Name
+frontendPluginTyConName = mkExternalName frontendPluginTyConKey pLUGINS (mkOccName tcName "FrontendPlugin") noSrcSpan
 
 {-
 ************************************************************************

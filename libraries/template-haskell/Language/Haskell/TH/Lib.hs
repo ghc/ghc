@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE CPP #-}
 
 -- |
 -- Language.Haskell.TH.Lib contains lots of useful helper functions for
@@ -180,8 +181,10 @@ import GHC.Boot.TH.Lib hiding
 
   , conP
 
+#if __GLASGOW_HASKELL__ < 1001
   , Role
   , InjectivityAnn
+#endif
   )
 import qualified GHC.Boot.TH.Lib as Internal
 import Language.Haskell.TH.Syntax

@@ -36,7 +36,7 @@ import GHC.Core.TyCon.Set
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types ( anyTypeOfKind
   , vecRepDataConTyCon
   , liftedRepTy, unliftedRepTy
   , intRepDataConTy

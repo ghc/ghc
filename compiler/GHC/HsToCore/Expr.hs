@@ -60,7 +60,6 @@ import GHC.Types.Name hiding (varName)
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make
 import GHC.Types.Var( isInvisibleAnonPiTyBinder )
 import GHC.Types.Var.Set( isEmptyVarSet, elemVarSet )
 import GHC.Types.Basic
@@ -70,8 +69,9 @@ import GHC.Types.Tickish
 import GHC.Unit.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import GHC.Builtin.Types
-import GHC.Builtin.Names
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Ids
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -479,7 +479,7 @@ the overloaded function `fromStaticPtr`.
 dsExpr (HsStatic (static_ptr_ty, from_static_fun) expr@(L loc _))
   = do { dflags <- getDynFlags
 
-       ; make_static_id <- dsLookupGlobalId makeStaticName
+       ; make_static_id <- dsLookupKnownKeyId makeStaticKey
        ; expr_ds        <- dsLExpr expr
        ; from_static_ds <- dsExpr from_static_fun
 
@@ -770,7 +770,7 @@ ds_app_var (L loc fun_id) hs_args core_args
   -----------------------
   -- Warn about identities for (fromInteger :: Integer -> Integer) etc
   -- They all have a type like:  forall <tvs>. <cxt> => arg_ty -> res_ty
-  | idName fun_id `elem` numericConversionNames
+  | getUnique fun_id `elem` numericConversionKeys
   , let (conv_ty, _) = apply_invis_args fun_id core_args
   , Just (arg_ty, res_ty) <- splitVisibleFunTy_maybe conv_ty
   = do { dflags <- getDynFlags

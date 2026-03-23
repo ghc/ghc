@@ -82,8 +82,8 @@ import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
 
-import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Data.Bag
 import GHC.Data.List.SetOps
@@ -1010,7 +1010,7 @@ lintIdOcc id nargs
           -- Check for a nested occurrence of the StaticPtr constructor.
           -- See Note [Checking StaticPtrs].
         ; when (nargs /= 0) $
-          checkL (idName id /= makeStaticName) $
+          checkL (not (id `hasKnownKey` makeStaticKey)) $
           text "Found makeStatic nested in an expression"
 
         -- Occurrences of an Id should never be dead....

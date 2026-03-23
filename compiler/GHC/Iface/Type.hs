@@ -67,14 +67,14 @@ module GHC.Iface.Type (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
                                  ( coercibleTyCon, heqTyCon
                                  , constraintKindTyConName
                                  , tupleTyConName
                                  , tupleDataConName
                                  , manyDataConTyCon
                                  , liftedRepTyCon, liftedDataConTyCon
-                                 , sumTyCon )
+                                 , liftedTypeKindTyConName, sumTyCon,  )
 import GHC.Base ( Multiplicity(..) )
 import GHC.Core.Multiplicity ( pprArrowWithModifiers )
 import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
@@ -83,8 +83,7 @@ import GHC.Core.TyCo.Compare( eqForAllVis )
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
-import GHC.Builtin.Names
-import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyConName )
+import GHC.Builtin.KnownKeys
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Utils.Binary
@@ -113,28 +112,34 @@ import qualified Data.Set as Set
 ************************************************************************
 -}
 
+type IfExtName = Name -- Always an External, KnownKey, or WiredIn Name
+                      -- Never an Internal of System Name
+
 -- | A local name in iface syntax
 newtype IfLclName = IfLclName
   { getIfLclName :: LexicalFastString
   } deriving (Eq, Ord, Show)
-
-ifLclNameFS :: IfLclName -> FastString
-ifLclNameFS = getLexicalFastString . getIfLclName
-
-mkIfLclName :: FastString -> IfLclName
-mkIfLclName = IfLclName . LexicalFastString
-
-type IfExtName = Name   -- An External or WiredIn Name can appear in Iface syntax
-                        -- (However Internal or System Names never should)
 
 data IfaceBndr          -- Local (non-top-level) binders
   = IfaceIdBndr {-# UNPACK #-} !IfaceIdBndr
   | IfaceTvBndr {-# UNPACK #-} !IfaceTvBndr
   deriving (Eq, Ord)
 
-
 type IfaceIdBndr  = (IfaceType, IfLclName, IfaceType)  -- (multiplicity, name, type)
 type IfaceTvBndr  = (IfLclName, IfaceKind)
+
+type IfaceLamBndr = (IfaceBndr, IfaceOneShot)
+
+data IfaceOneShot    -- See Note [Preserve OneShotInfo] in "GHC.Core.Tidy"
+  = IfaceNoOneShot   -- and Note [oneShot magic] in "GHC.Types.Id.Make"
+  | IfaceOneShot
+
+
+ifLclNameFS :: IfLclName -> FastString
+ifLclNameFS = getLexicalFastString . getIfLclName
+
+mkIfLclName :: FastString -> IfLclName
+mkIfLclName = IfLclName . LexicalFastString
 
 ifaceTvBndrName :: IfaceTvBndr -> IfLclName
 ifaceTvBndrName (n,_) = n
@@ -149,12 +154,6 @@ ifaceBndrName (IfaceIdBndr bndr) = ifaceIdBndrName bndr
 ifaceBndrType :: IfaceBndr -> IfaceType
 ifaceBndrType (IfaceIdBndr (_, _, t)) = t
 ifaceBndrType (IfaceTvBndr (_, t)) = t
-
-type IfaceLamBndr = (IfaceBndr, IfaceOneShot)
-
-data IfaceOneShot    -- See Note [Preserve OneShotInfo] in "GHC.Core.Tidy"
-  = IfaceNoOneShot   -- and Note [oneShot magic] in "GHC.Types.Id.Make"
-  | IfaceOneShot
 
 instance Outputable IfaceOneShot where
   ppr IfaceNoOneShot = text "NoOneShotInfo"

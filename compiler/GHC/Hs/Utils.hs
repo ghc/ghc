@@ -41,7 +41,7 @@ module GHC.Hs.Utils(
   mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap,
   mkHsCmdIf, mkConLikeTc,
 
-  nlHsTyApp, nlHsTyApps, nlHsVar, nlHsDataCon,
+  nlHsAppType, nlHsTyApp, nlHsTyApps, nlHsVar, nlHsDataCon,
   nlHsLit, nlHsApp, nlHsApps, nlHsSyntaxApps,
   nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
@@ -125,7 +125,7 @@ import GHC.Core.ConLike
 import GHC.Core.Make   ( mkChunkified )
 import GHC.Core.Type   ( Type, isUnliftedType )
 
-import GHC.Builtin.Types ( unitTy )
+import GHC.Builtin.WiredIn.Types ( unitTy )
 
 import GHC.Types.Id
 import GHC.Types.Name
@@ -293,6 +293,15 @@ mkHsCaseAlt :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
             -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 mkHsCaseAlt (L l pat) expr
   = mkSimpleMatch CaseAlt (L (l2l l) [L l pat]) expr
+
+nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
+-- Make the source expression (fun_expr @ty), via HsAppType
+nlHsAppType e s = noLocA (HsAppType noAnn e hs_ty)
+  where
+    hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec $ nlHsCoreTy s
+
+nlHsCoreTy :: HsCoreTy -> LHsType GhcPs
+nlHsCoreTy = noLocA . XHsType . HsCoreTy
 
 nlHsTyApp :: Id -> [Type] -> LHsExpr GhcTc
 nlHsTyApp fun_id tys
@@ -565,12 +574,14 @@ nlNullaryConPat con = noLocA $ ConPat
   }
 
 nlWildConPat :: DataCon -> LPat GhcPs
+-- The pattern (K {})
 nlWildConPat con = noLocA $ ConPat
   { pat_con_ext = noExtField
   , pat_con = noLocA $ getRdrName con
-  , pat_args = PrefixCon noExtField $
-     replicate (dataConSourceArity con)
-               nlWildPat
+  , pat_args = RecCon (NoEpTok, NoEpTok) $ HsRecFields
+      { rec_ext = (NoEpTok, NoEpTok)
+      , rec_flds = []
+      , rec_dotdot = Nothing }
   }
 
 -- | Wildcard pattern - after parsing

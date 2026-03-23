@@ -6,7 +6,7 @@ TYPE CONSTRUCTORS
   class C3{1} :: * -> Constraint
   type synonym Syn1{1} :: * -> *
 Dependent modules: []
-Dependent packages: [(normal, base-4.22.0.0)]
+Dependent packages: [(normal, base-4.23.0.0)]
 
 ==================== Typechecker ====================
 Roles4.$tcC3 [InlPrag=[~]]
@@ -36,7 +36,7 @@ $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepFun
-      GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
+      GHC.Internal.Types.krepStar GHC.Internal.Types.krepConstraint
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepTyConApp
       GHC.Internal.Types.$tcList ((:) $krep [])

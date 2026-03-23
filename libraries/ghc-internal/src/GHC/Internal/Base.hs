@@ -82,6 +82,9 @@ Other Prelude modules are much easier with fewer complex dependencies.
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Monad and lots of other known-key things
+
 -- -Wno-orphans is needed for things like:
 -- Orphan rule: "x# -# x#" ALWAYS forall x# :: Int# -# x# x# = 0
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -103,7 +106,12 @@ Other Prelude modules are much easier with fewer complex dependencies.
 
 #include "MachDeps.h"
 
-module GHC.Internal.Base where
+module GHC.Internal.Base(
+      module GHC.Internal.Base,
+      module GHC.Internal.Classes,
+      module GHC.Internal.Types,
+      module GHC.Internal.Magic
+  ) where
 
 import GHC.Internal.Types hiding (
   Unit#,
@@ -306,7 +314,6 @@ import GHC.Internal.Classes hiding (
   CTuple63,
   CTuple64,
   )
-import GHC.Internal.CString
 import GHC.Internal.Magic
 import GHC.Internal.Prim hiding (dataToTagSmall#, dataToTagLarge#, whereFrom#)
   -- Hide dataToTag# ops because they are expected to break for
@@ -349,6 +356,7 @@ data constructor, which lives in GHC.Tuple.
 When bootstrapping GHC, it is important that we do not attempt to
 compile any such reference to GHC.Tuple before GHC.Tuple itself has
 been built, otherwise compilation will fail with an error like this one:
+
     Failed to load interface for ‘GHC.Tuple’.
     There are files missing in the ‘ghc-prim-0.10.0’ package,
     try running 'ghc-pkg check'.
@@ -360,10 +368,9 @@ imports of X must include Y.
 
 Such implicit dependencies can be introduced in at least the following ways:
 
-W1:
-  Common awkward dependencies:
+(W1) Common awkward dependencies:
    * TypeRep metadata introduces references to GHC.Internal.Types in EVERY module.
-   * A String literal introduces a reference to GHC.Internal.CString, for either
+   * A String literal introduces a reference to GHC.Internal.Types, for either
      unpackCString# or unpackCStringUtf8# depending on its contents.
    * Tuple-notation introduces references to GHC.Internal.Tuple.
    * Constraint tuples introduce references to GHC.Internal.Classes.
@@ -387,8 +394,7 @@ W1:
 
   Improving this situation is discussed at #24520.
 
-W2:
-  Non-exhaustive pattern matches, incomplete record selectors,
+(W2) Non-exhaustive pattern matches, incomplete record selectors,
   missing record fields, and missing class instance methods all
   introduce references to GHC.Internal.Control.Exception.Base.
 
@@ -397,8 +403,7 @@ W2:
   But since they generally have bad code smell and are avoided by
   developers anyway, this restriction has not been very burdensome.
 
-W3:
-  Various "overloaded" bits of syntax:
+(W3) Various "overloaded" bits of syntax:
    * Overloaded integer literals introduce references to GHC.Internal.Num.
      * Likewise overloaded fractional literals to GHC.Internal.Real
      * Likewise overloaded string literals to GHC.Internal.Data.String
@@ -418,8 +423,7 @@ W3:
   which compiles with -XTemplateHaskell *without* requiring the user to
   import GHC.Internal.TH.Lib.
 
-W4:
-  Stock derived instances introduce references to various things.
+(W4) Stock derived instances introduce references to various things.
   Derived Eq instances can reference GHC.Magic.dataToTag#, for example.
   But since any module containing a derived Eq instance must import Eq,
   as long as the module which defines Eq imports GHC.Magic this cannot
@@ -431,21 +435,21 @@ W4:
   The derived Lift instance references various identifiers in
   GHC.Internal.TH.Lib, so it is an import of GHC.Internal.TH.Lift.
 
+** TODO: Fix me when the reinstallable base stuff has settled **
 
-W5:
-  If no explicit "default" declaration is present, the assumed
+(W5) If no explicit "default" declaration is present, the assumed
   "default (Integer, Double)" creates a dependency on GHC.Internal.Bignum.Integer
   for the Integer type if defaulting is ever attempted during
   type-checking.  (This doesn't apply to hs-boot files, which can't
   be given "default" declarations anyway.)
 
-W6:
+(W6)
   In the wasm backend, JSFFI imports and exports pull in a bunch of stuff;
   see Note [Desugaring JSFFI static export] and Note [Desugaring JSFFI import]
   in GHC.HsToCore.Foreign.Wasm.
 
 A complete list could probably be made by going through the known-key
-names in GHC.Builtin.Names and GHC.Builtin.Names.TH.  To test whether
+names in GHC.Builtin.Names and GHC.Builtin.TH.  To test whether
 the transitive imports are sufficient for any single module, instruct
 the build system to build /only/ that module in stage 2.  For example,
 a command to check whether the transitive imports for GHC.Internal.Maybe
@@ -456,6 +460,23 @@ are sufficient is:
 Use the ".o-boot" suffix instead of ".o" to check an hs-boot file's
 transitive imports.
 
+Wrinkles:
+
+(TD1) When compiling `ghc-internal` and `base` we use -frebindable-known-names,
+  so we must bring into scope any known-key or known-occ names that are needed.
+  See Note [Overview of known entities] in GHC.Builtin
+
+  For modules high up in the hierarchy of `base`, a convenient way to
+  do this is to say
+        import qualified GHC.Essentials as Rebindable
+  (Why `qualified` and `as Rebindable`?  See (KN1) in
+   Note [Overview of known entities] in GHC.Builtin.)
+
+  For modules not so high up, you can say
+       import qualified GHC.Internal.Base as Rebindable
+  though you may also need GHC.Internal.Num when numerics are concerned.
+
+  For `ghc-internal` modules below GHC.Internal.Base we have to be more selective.
 
 Note [Semigroup stimes cycle]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1753,7 +1774,11 @@ instance Applicative [] where
 -- | @since base-2.01
 instance Monad []  where
     {-# INLINE (>>=) #-}
-    xs >>= f             = [y | x <- xs, y <- f x]
+    xs >>= f = [y | x <- xs, y <- f x]
+      -- Tricky! Here we use a list comprehension, so we are
+      -- relying it being desugared directly, and /not/ desugared
+      -- into calls of (>>=), else we'd get an infinite loop!
+
     {-# INLINE (>>) #-}
     (>>) = (*>)
 
@@ -1795,6 +1820,12 @@ foldr k z = go
           where
             go []     = z
             go (y:ys) = y `k` go ys
+
+
+foldrList :: (a -> b -> b) -> b -> [a] -> b
+-- An alias for `foldr`,  used only internally
+-- See Note [Tricky known-occ cases] in GHC.Builtin.KnownOccs
+foldrList = foldr
 
 -- | A list producer that can be fused with 'foldr'.
 -- This function is merely

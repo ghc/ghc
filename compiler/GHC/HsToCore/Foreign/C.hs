@@ -49,9 +49,10 @@ import GHC.Driver.Config
 import GHC.Cmm.Expr
 import GHC.Cmm.Utils
 
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Names
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 
 import GHC.Data.FastString
 
@@ -176,12 +177,12 @@ dsCFExportDynamic id co0 cconv = do
         -- Construct the label based on the passed id, don't use names
         -- depending on Unique. See #13807 and Note [Unique Determinism].
     cback <- newSysLocalDs scaled_arg_ty
-    newStablePtrId <- dsLookupGlobalId newStablePtrName
-    stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
+    newStablePtrId <- dsLookupKnownOccId newStablePtrIdOcc
+    stable_ptr_tycon <- dsLookupKnownKeyTyCon stablePtrTyConKey
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
-    bindIOId <- dsLookupGlobalId bindIOName
+    bindIOId <- dsLookupKnownOccId bindIOIdOcc
     stbl_value <- newSysLocalMDs stable_ptr_ty
     (h_code, c_code, typestring) <- dsCFExport id (mkRepReflCo export_ty) fe_nm cconv ExportIsDynamic
     let
@@ -240,7 +241,7 @@ dsFCall fn_id co fcall mDeclHeader = do
           | (_, res_ty1) <- tcSplitFunTys ty1
           , newty <- maybe res_ty1 snd (tcSplitIOType_maybe res_ty1)
           , Just (ptr, _) <- splitTyConApp_maybe newty
-          , tyConName ptr == constPtrConName
+          , tyConName ptr `hasKnownKey` constPtrTyConKey
           = text "const"
           | otherwise = empty
 
@@ -364,7 +365,7 @@ toCType t = case f False t of
            -- If the inner type is void-based, we collapse the pointer
            -- chain to just "void*". See Note [Collapsing void pointer chains].
            | Just (ptr, [t']) <- splitTyConApp_maybe t
-           , tyConName ptr `elem` [ptrTyConName, funPtrTyConName]
+           , tyConUnique ptr `elem` [ptrTyConKey, funPtrTyConKey]
               = case f True t' of
                 (mh, True, _) ->
                     (mh, True, text "void*")

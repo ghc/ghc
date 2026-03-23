@@ -8,8 +8,6 @@ T21115b.hs:9:1: warning:
     In the body of a let with binder fail :: (# #) -> Int#
 *** Offending Program ***
 Rec {
-$trModule = Module (TrNameS "main"#) (TrNameS "T21115b"#)
-
 foo
   = \ ds ->
       let {

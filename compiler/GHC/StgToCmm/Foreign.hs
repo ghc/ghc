@@ -54,7 +54,7 @@ import GHC.Types.Unique.DSM
 import GHC.Unit.Types
 
 import GHC.Core.TyCo.Rep
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 import GHC.Utils.Misc (zipEqual)
 
 import Control.Monad

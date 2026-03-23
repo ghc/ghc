@@ -59,8 +59,8 @@ import GHC.Core.Type (mkStrLitTy, mkCastTy)
 import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Core.TyCo.Tidy( tidyOpenTypeX )
 
-import GHC.Builtin.Types ( mkConstraintTupleTy )
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types ( mkConstraintTupleTy )
+import GHC.Builtin.WiredIn.Prim
 import GHC.Unit.Module
 
 import GHC.Types.SourceText
@@ -78,7 +78,7 @@ import GHC.Utils.Misc
 import GHC.Types.Basic
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Builtin.Names( ipClassName )
+import GHC.Builtin.KnownKeys( ipClassKey )
 import GHC.Types.Unique.Set
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -230,7 +230,7 @@ tcLocalBinds (HsValBinds x (XValBindsLR (HsVBG grps sigs))) thing_inside
 tcLocalBinds (HsValBinds _ (ValBinds {})) _ = panic "tcLocalBinds"
 
 tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
-  = do  { ipClass <- tcLookupClass ipClassName
+  = do  { ipClass <- tcLookupKnownKeyClass ipClassKey
         ; (given_ips, ip_binds') <-
             mapAndUnzipM (wrapLocSndMA (tc_ip_bind ipClass)) ip_binds
 

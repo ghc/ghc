@@ -15,19 +15,19 @@ subsumption_sort_hole_fits.hs:2:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdef
           with repeat @String
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.List’))
-        read :: forall a. Read a => String -> a
-          with read @[String]
-          (imported from ‘Prelude’ (and originally defined in ‘Text.Read’))
-        mempty :: forall a. Monoid a => a
-          with mempty @(String -> [String])
-          (imported from ‘Prelude’
-           (and originally defined in ‘GHC.Internal.Base’))
         fail :: forall (m :: * -> *) a.
                 (MonadFail m, GHC.Internal.Stack.Types.HasCallStack) =>
                 String -> m a
           with fail @[]
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Control.Monad.Fail’))
+        mempty :: forall a. Monoid a => a
+          with mempty @(String -> [String])
+          (imported from ‘Prelude’
+           (and originally defined in ‘GHC.Internal.Base’))
+        read :: forall a. Read a => String -> a
+          with read @[String]
+          (imported from ‘Prelude’ (and originally defined in ‘Text.Read’))
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @[]
           (imported from ‘Prelude’

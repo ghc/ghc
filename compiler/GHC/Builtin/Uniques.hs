@@ -8,8 +8,8 @@
 --
 
 module GHC.Builtin.Uniques
-    ( -- * Looking up known-key names
-      knownUniqueName
+    ( -- * Looking up known-key tuples
+      knownUniqueTupleName
 
       -- * Getting the 'Unique's of 'Name's
       -- ** Anonymous sums
@@ -58,7 +58,7 @@ module GHC.Builtin.Uniques
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
 import {-# SOURCE #-} GHC.Core.TyCon
 import {-# SOURCE #-} GHC.Core.DataCon
 import {-# SOURCE #-} GHC.Types.Id
@@ -73,9 +73,9 @@ import GHC.Utils.Panic
 import Data.Maybe
 import GHC.Utils.Word64 (word64ToInt)
 
--- | Get the 'Name' associated with a known-key 'Unique'.
-knownUniqueName :: Unique -> Maybe Name
-knownUniqueName u =
+-- | Get the 'Name' of a tuple associated with a known-key 'Unique' with a tuple tag.
+knownUniqueTupleName :: Unique -> Maybe Name
+knownUniqueTupleName u =
     case tag of
       SumTag -> Just $ getUnboxedSumName n
       BoxedTupleTyConTag -> Just $ getTupleTyConName Boxed n

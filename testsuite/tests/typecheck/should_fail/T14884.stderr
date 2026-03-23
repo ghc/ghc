@@ -40,7 +40,7 @@ T14884.hs:4:7: error: [GHC-39999]
       Potentially matching instances:
         instance (Show a, Show b) => Show (Either a b)
           -- Defined in ‘GHC.Internal.Data.Either’
-        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
+        instance Show Integer -- Defined in ‘GHC.Internal.Show’
         ...plus 26 others
         ...plus 29 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)

@@ -1641,3 +1641,54 @@ using the :ghc-flag:`--show-iface ⟨file⟩` :ref:`mode <modes>`. If there is a
 
 .. [1]
    This is a change in behaviour relative to 6.2 and earlier.
+
+
+.. _known-key-names
+
+Known-key names
+----------------------------------------
+
+(This section is relevant only if you are a GHC developer, or you are
+modifying the ``base`` package.)
+
+GHC relies on a few hundred entities (types, classes, and functions)
+defined in the libraries ``ghc-internal`` or ``base``.  These include the classes
+``Num``, ``Show``, etc, the types ``Rational``, ``Ratio`` etc, and much
+more.  These entities are so-called "known entities" with "known names".
+
+You can read ``Note [Overview of known entities]`` in GHC's source code
+to understand more.  The behaviour of known-key names is controlled by three
+flags:
+
+.. ghc-flag:: -frebindable-known-names
+    :shortdesc: Find known-key and known-occ names in the current top-level scope
+    :type: dynamic
+    :category:
+
+    This flag is off by default. It tells GHC to look for a known entity in
+    the current top-level scope. When the flag is off, GHC looks for known
+    entities in the exports of module ``GHC.Essentials``.
+
+    It is typically set when compiling modules in ``ghc-internal`` or ``base``,
+    since ``GHC.Essentials`` does not yet exist when compiling those packages.
+
+    GHC must assume ``GHC.Essentials`` is an implicit module dependency when
+    and only when ``-fno-rebindable-known-names``.
+
+.. ghc-flag:: -fdefines-known-key-names
+    :shortdesc: This module defines a known name
+    :type: dynamic
+    :category:
+
+    This flag is off by default.  It should be set when compiling a module
+    that *defines* a known entity.  That is how GHC knows that the entity
+    called "Rational" in this module is *the* known ``Rational`` and not
+    some other random type or class that happens to be called "Rational".
+
+.. ghc-flag:: -fexclude-known-key-define=(name)
+    :shortdesc: Do not treat a definition of (name) as a definition of a known entity
+    :type: dynamic
+    :category:
+
+    You can use this flag multiple times to excludes several names.
+

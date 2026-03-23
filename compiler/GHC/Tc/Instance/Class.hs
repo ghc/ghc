@@ -24,15 +24,15 @@ import GHC.Tc.Types.Origin ( InstanceWhat (..), SafeOverlapping, isHasFieldOrigi
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcLookupDataFamInst, FamInstEnvs )
 import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Names
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.PrimOps ( PrimOp(..) )
 import GHC.Builtin.PrimOps.Ids ( primOpId )
 
 import GHC.Types.FieldLabel
 import GHC.Types.SafeHaskell
-import GHC.Types.Name   ( Name )
+import GHC.Types.Name   ( Name, KnownKey )
 import GHC.Types.Name.Reader
 import GHC.Types.Var.Env ( VarEnv )
 import GHC.Types.Id
@@ -44,7 +44,7 @@ import GHC.Core.Predicate
 import GHC.Core.Coercion
 import GHC.Core.InstEnv
 import GHC.Core.Type
-import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS, mkCoreLams )
+import GHC.Core.Make ( getMkStringIds, mkCharExpr, mkNaturalExpr, mkStringExprFSWith, mkCoreLams )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -140,18 +140,18 @@ matchGlobalInst :: DynFlags
 -- (That is handled by a separate code path: see GHC.Tc.Solver.Dict.solveDict,
 --  which calls solveEqualityDict for equality classes.)
 matchGlobalInst dflags short_cut clas tys mb_loc
-  | cls_name == knownNatClassName      = matchKnownNat    dflags short_cut clas tys
-  | cls_name == knownSymbolClassName   = matchKnownSymbol dflags short_cut clas tys
-  | cls_name == knownCharClassName     = matchKnownChar   dflags short_cut clas tys
-  | isCTupleClass clas                 = matchCTuple                       clas tys
-  | cls_name == typeableClassName      = matchTypeable                     clas tys
-  | cls_name == withDictClassName      = matchWithDict                          tys
-  | cls_name == dataToTagClassName     = matchDataToTag                    clas tys
-  | cls_name == hasFieldClassName      = matchHasField    dflags short_cut clas tys mb_loc
-  | cls_name == unsatisfiableClassName = matchUnsatisfiable
-  | otherwise                          = matchInstEnv     dflags short_cut clas tys
+  | cls_key == knownNatClassKey      = matchKnownNat    dflags short_cut clas tys
+  | cls_key == knownSymbolClassKey   = matchKnownSymbol dflags short_cut clas tys
+  | cls_key == knownCharClassKey     = matchKnownChar   dflags short_cut clas tys
+  | isCTupleClass clas               = matchCTuple                       clas tys
+  | cls_key == typeableClassKey      = matchTypeable                     clas tys
+  | cls_key == withDictClassKey      = matchWithDict                          tys
+  | cls_key == dataToTagClassKey     = matchDataToTag                    clas tys
+  | cls_key == hasFieldClassKey      = matchHasField    dflags short_cut clas tys mb_loc
+  | cls_key == unsatisfiableClassKey = matchUnsatisfiable
+  | otherwise                        = matchInstEnv     dflags short_cut clas tys
   where
-    cls_name = className clas
+    cls_key = getUnique clas
 
 matchUnsatisfiable :: TcM ClsInstResult
 -- See (B) in Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors
@@ -378,7 +378,8 @@ matchKnownSymbol :: DynFlags
                  -> Class -> [Type] -> TcM ClsInstResult
 matchKnownSymbol _ _ clas [ty]  -- clas = KnownSymbol
   | Just s <- isStrLitTy ty = do
-        et <- mkStringExprFS s
+        mk_str <- getMkStringIds tcLookupKnownKeyId
+        let et = mkStringExprFSWith mk_str s
         makeLitDict clas ty et
 matchKnownSymbol df sc clas tys = matchInstEnv df sc clas tys
  -- See Note [Fabricating Evidence for Literals in Backpack] for why
@@ -443,7 +444,7 @@ matchWithDict [cls_ty, mty]
   , [inst_meth_ty] <- dataConInstArgTys dict_dc dict_args
   = do { sv <- mkSysLocalM (fsLit "withDict_s") ManyTy mty
        ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls_ty openAlphaTy)
-       ; wd_cls <- tcLookupClass withDictClassName
+       ; wd_cls <- tcLookupKnownKeyClass withDictClassKey
 
        -- Given ev_expr : mty ~N# inst_meth_ty, construct the method of
        -- the WithDict dictionary:
@@ -959,9 +960,9 @@ matchTypeable clas [k,t]  -- clas = Typeable
       -- see Note [No Typeable for polytypes or qualified types]
 
   -- Now cases that do work
-  | k `eqType` naturalTy      = doTyLit knownNatClassName         t
-  | k `eqType` typeSymbolKind = doTyLit knownSymbolClassName      t
-  | k `eqType` charTy         = doTyLit knownCharClassName        t
+  | k `eqType` naturalTy      = doTyLit knownNatClassKey          t
+  | k `eqType` typeSymbolKind = doTyLit knownSymbolClassKey       t
+  | k `eqType` charTy         = doTyLit knownCharClassKey         t
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
   , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks
 
@@ -1037,8 +1038,8 @@ mk_typeable_pred clas ty = mkClassPred clas [ typeKind ty, ty ]
   -- Typeable is implied by KnownNat/KnownSymbol. In the case of a type literal
   -- we generate a sub-goal for the appropriate class.
   -- See Note [Typeable for Nat and Symbol]
-doTyLit :: Name -> Type -> TcM ClsInstResult
-doTyLit kc t = do { kc_clas <- tcLookupClass kc
+doTyLit :: KnownKey -> Type -> TcM ClsInstResult
+doTyLit kc t = do { kc_clas <- tcLookupKnownKeyClass kc
                   ; let kc_pred    = mkClassPred kc_clas [ t ]
                         mk_ev [ev] = evTypeable t $ EvTypeableTyLit (EvExpr ev)
                         mk_ev _    = panic "doTyLit"

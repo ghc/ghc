@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}   -- See calls to mkTemplateTyVars
 
-module GHC.Builtin.Types.Literals
+module GHC.Builtin.WiredIn.TypeLits
   ( tryInteractInertFam, tryInteractTopFam, tryMatchFam
 
   , typeNatTyCons
@@ -39,14 +39,14 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Compare   ( tcEqType )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
 import GHC.Types.Unique.FM
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim  ( mkTemplateAnonTyConBinders, mkTemplateTyVars )
-import GHC.Builtin.Names
-                  ( gHC_INTERNAL_TYPELITS
-                  , gHC_INTERNAL_TYPELITS_INTERNAL
-                  , gHC_INTERNAL_TYPENATS
-                  , gHC_INTERNAL_TYPENATS_INTERNAL
-                  , typeNatAddTyFamNameKey
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim  ( mkTemplateAnonTyConBinders, mkTemplateTyVars )
+import GHC.Builtin.Modules     ( gHC_INTERNAL_TYPELITS
+                               , gHC_INTERNAL_TYPELITS_INTERNAL
+                               , gHC_INTERNAL_TYPENATS
+                               , gHC_INTERNAL_TYPENATS_INTERNAL )
+import GHC.Builtin.KnownKeys
+                  ( typeNatAddTyFamNameKey
                   , typeNatMulTyFamNameKey
                   , typeNatExpTyFamNameKey
                   , typeNatSubTyFamNameKey
@@ -92,10 +92,10 @@ There are a few steps to adding a built-in type family:
 
 * Adding a unique for the type family TyCon
 
-  These go in GHC.Builtin.Names. It will likely be of the form
+  These go in GHC.Builtin.KnownKeys. It will likely be of the form
   @myTyFamNameKey = mkPreludeTyConUnique xyz@, where @xyz@ is a number that
-  has not been chosen before in GHC.Builtin.Names. There are several examples already
-  in GHC.Builtin.Names—see, for instance, typeNatAddTyFamNameKey.
+  has not been chosen before in GHC.Builtin.KnownKeys. There are several examples already
+  in GHC.Builtin.KnownKeys—see, for instance, typeNatAddTyFamNameKey.
 
 * Adding the type family TyCon itself
 

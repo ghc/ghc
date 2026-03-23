@@ -739,7 +739,7 @@ mergeSignatures
                             , rdr_elt <- lookupGRE rdr_env (LookupOccName occ AllRelevantGREs) ]
 
     -- STEP 5: Typecheck the interfaces
-    let type_env_var = tcg_type_env_var tcg_env
+    let knot_type_env = tcg_knot_vars tcg_env
 
     -- typecheckIfacesForMerging does two things:
     --      1. It merges the all of the ifaces together, and typechecks the
@@ -748,7 +748,7 @@ mergeSignatures
     --      resolving to the merged type_env from (1).
     -- See typecheckIfacesForMerging for more details.
     (type_env, detailss) <- initIfaceTcRn $
-                            typecheckIfacesForMerging inner_mod ifaces type_env_var
+                            typecheckIfacesForMerging inner_mod ifaces knot_type_env
     let infos = zip ifaces detailss
 
     -- Test for cycles
@@ -764,7 +764,7 @@ mergeSignatures
     -- NB: Why do we set tcg_tcs/tcg_patsyns/tcg_type_env directly,
     -- rather than use tcExtendGlobalEnv (the normal method to add newly
     -- defined types to TcGblEnv?)  tcExtendGlobalEnv adds these
-    -- TyThings to 'tcg_type_env_var', which is consulted when
+    -- TyThings to 'tcg_knot_vars', which is consulted when
     -- we read in interfaces to tie the knot.  But *these TyThings themselves
     -- come from interface*, so that would result in deadlock.  Don't
     -- update it!

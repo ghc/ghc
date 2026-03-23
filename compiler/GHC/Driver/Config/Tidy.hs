@@ -16,8 +16,8 @@ import GHC.Driver.Env
 import GHC.Driver.Backend
 
 import GHC.Core.Make (getMkStringIds)
-import GHC.Builtin.Names
-import GHC.Tc.Utils.Env (lookupGlobal)
+import GHC.Builtin.KnownKeys
+import GHC.Tc.Utils.Env (lookupKnownKeyGlobal)
 import GHC.Types.TyThing
 import GHC.Platform.Ways
 
@@ -47,9 +47,9 @@ initStaticPtrOpts :: HscEnv -> IO StaticPtrOpts
 initStaticPtrOpts hsc_env = do
   let dflags = hsc_dflags hsc_env
 
-  mk_string <- getMkStringIds (fmap tyThingId . lookupGlobal hsc_env )
-  static_ptr_info_datacon <- tyThingDataCon <$> lookupGlobal hsc_env staticPtrInfoDataConName
-  static_ptr_datacon      <- tyThingDataCon <$> lookupGlobal hsc_env staticPtrDataConName
+  mk_string <- getMkStringIds (fmap tyThingId . lookupKnownKeyGlobal hsc_env)
+  static_ptr_info_datacon <- tyThingDataCon <$> lookupKnownKeyGlobal hsc_env staticPtrInfoDataConKey
+  static_ptr_datacon      <- tyThingDataCon <$> lookupKnownKeyGlobal hsc_env staticPtrDataConKey
 
   pure $ StaticPtrOpts
     { opt_platform = targetPlatform dflags

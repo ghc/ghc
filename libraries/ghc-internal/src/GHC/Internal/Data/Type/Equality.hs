@@ -46,14 +46,15 @@ module GHC.Internal.Data.Type.Equality (
   type (==)
   ) where
 
-import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Enum
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Show
 import GHC.Internal.Read
-import GHC.Internal.Types (Bool(..), Type, type (~), type (~~))
 import GHC.Internal.Data.Type.Bool
+
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
+import GHC.Internal.Base as Rebindable                -- For known-key names and deriving
 
 infix 4 :~:, :~~:
 

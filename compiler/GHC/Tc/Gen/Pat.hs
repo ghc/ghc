@@ -43,7 +43,7 @@ import GHC.Core.TyCo.Ppr ( pprTyVars )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Gen.HsType
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
@@ -52,7 +52,7 @@ import GHC.Core.Coercion
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Driver.DynFlags
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
@@ -943,7 +943,7 @@ AST is used for the subtraction operation.
       -- The Report says that n+k patterns must be in Integral
       -- but it's silly to insist on this in the RebindableSyntax case
       ; unlessM (xoptM LangExt.RebindableSyntax) $
-        do { icls <- tcLookupClass integralClassName
+        do { icls <- tcLookupKnownKeyClass integralClassKey
            ; instStupidTheta orig [mkClassPred icls [pat_ty]] }
 
       ; res <- tcExtendIdEnv1 name bndr_id thing_inside

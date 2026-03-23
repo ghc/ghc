@@ -63,7 +63,6 @@ import GHC.Hs.Decls.Overlap (OverlapMode)
 import GHC.Types.ForeignCall (CType)
 import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Name.Occurrence
-import GHC.Types.Name.Reader (RdrName (..))
 import GHC.Types.SrcLoc (srcSpanToRealSrcSpan)
 import GHC.Types.Var (Specificity)
 import GHC.Utils.Outputable hiding ((<>))
@@ -1031,12 +1030,6 @@ type instance XCTyFamInstDecl DocNameI = NoExtField
 -- * NFData instances for GHC types
 
 -----------------------------------------------------------------------------
-
-instance NFData RdrName where
-  rnf (Unqual on) = rnf on
-  rnf (Qual mn on) = mn `deepseq` on `deepseq` ()
-  rnf (Orig m on) = m `deepseq` on `deepseq` ()
-  rnf (Exact n) = rnf n
 
 instance NFData (EpAnn NameAnn) where
   rnf (EpAnn en ann cs) = en `deepseq` ann `deepseq` cs `deepseq` ()

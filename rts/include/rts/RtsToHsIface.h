@@ -58,8 +58,8 @@ typedef struct {
     StgClosure *divZZeroException_closure;  // GHC.Internal.Exception.Type.divZeroException_closure
     StgClosure *underflowException_closure;  // GHC.Internal.Exception.Type.underflowException_closure
     StgClosure *overflowException_closure;  // GHC.Internal.Exception.Type.overflowException_closure
-    const StgInfoTable *unpackCStringzh_info;  // GHC.Internal.CString.unpackCStringzh_info
-    const StgInfoTable *unpackCStringUtf8zh_info;  // GHC.Internal.CString.unpackCStringUtf8zh_info
+    const StgInfoTable *unpackCStringzh_info;  // GHC.Internal.Types.unpackCStringzh_info
+    const StgInfoTable *unpackCStringUtf8zh_info;  // GHC.Internal.Types.unpackCStringUtf8zh_info
 #if defined(wasm32_HOST_ARCH)
     StgClosure *raiseJSException_closure;  // GHC.Internal.Wasm.Prim.Imports.raiseJSException_closure
     const StgInfoTable *JSVal_con_info;  // GHC.Internal.Wasm.Prim.Types.JSVal_con_info

@@ -4,7 +4,7 @@ import GHC.Driver.Plugins
 import GHC.Tc.Plugin
 import GHC.Tc.Types
 import GHC.Tc.Types.Constraint
-import GHC.Builtin.Types (doubleTy)
+import GHC.Builtin.WiredIn.Types (doubleTy)
 
 plugin :: Plugin
 plugin = defaultPlugin

@@ -13,9 +13,11 @@ import Data.List
   )
 import Data.List qualified
 import Data.Maybe
-import GHC.Builtin.Names
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.Modules( mkGhcInternalModule )
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs( bindIOIdOcc, returnIOIdOcc, ioDataConOcc )
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 import GHC.Core
 import GHC.Core.Coercion
 import GHC.Core.DataCon
@@ -133,7 +135,7 @@ dsWasmJSDynamicExport ::
   CCallStaticTargetUnit ->
   DsM ([Binding], CHeader, CStub, [Id])
 dsWasmJSDynamicExport sync fn_id co unitId = do
-  sp_tycon <- dsLookupTyCon stablePtrTyConName
+  sp_tycon <- dsLookupKnownKeyTyCon stablePtrTyConKey
   let ty = coercionLKind co
       (tv_bndrs, fun_ty) = tcSplitForAllTyVarBinders ty
       ([Scaled ManyTy arg_ty], io_jsval_ty) = tcSplitFunTys fun_ty
@@ -336,13 +338,14 @@ dsWasmJSStaticImport fn_id co js_src' unitId sync = do
           importCStub Sync cfun_name (map scaledThing arg_tys) res_ty js_src
         )
     Async -> do
-      err_msg <- mkStringExpr $ js_src
-      io_tycon <- dsLookupTyCon ioTyConName
+      mk_str <- getMkStringIds dsLookupKnownKeyId
+      let err_msg = mkStringExprWith mk_str js_src
+      io_tycon <- dsLookupKnownKeyTyCon ioTyConKey
       jsval_ty <-
         mkTyConTy
           <$> lookupGhcInternalTyCon "GHC.Internal.Wasm.Prim.Types" "JSVal"
-      bindIO_id <- dsLookupGlobalId bindIOName
-      returnIO_id <- dsLookupGlobalId returnIOName
+      bindIO_id   <- dsLookupKnownOccId bindIOIdOcc
+      returnIO_id <- dsLookupKnownOccId returnIOIdOcc
       promise_id <- newSysLocalMDs jsval_ty
       blockPromise_id <-
         lookupGhcInternalVarId
@@ -446,7 +449,7 @@ importBindingRHS unitId cfun_name tvs arg_tys orig_res_ty res_trans = do
         lookupGhcInternalVarId
           "GHC.Internal.IO.Unsafe"
           "unsafeDupablePerformIO"
-      io_data_con <- dsLookupDataCon ioDataConName
+      io_data_con <- dsLookupKnownOccDataCon ioDataConOcc
       let ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, orig_res_ty]
           toIOCon = dataConWorkId io_data_con
           wrap the_call =

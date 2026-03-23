@@ -1449,7 +1449,7 @@ data HsStmtContext fn
   | PatGuard (HsMatchContext fn)      -- ^ Pattern guard for specified thing
   | ParStmtCtxt (HsStmtContext fn)    -- ^ A branch of a parallel stmt
   | TransStmtCtxt (HsStmtContext fn)  -- ^ A branch of a transform stmt
-  | ArrowExpr                         -- ^ do-notation in an arrow-command context
+  | ArrowExpr                         -- ^ Do-notation in an arrow-command context
 
 -- | Haskell arrow match context.
 data HsArrowMatchContext

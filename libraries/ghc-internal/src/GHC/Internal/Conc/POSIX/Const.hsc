@@ -21,6 +21,7 @@
 module GHC.Internal.Conc.POSIX.Const where
 
 import GHC.Internal.Word
+import qualified GHC.Internal.Num as Rebindable
 
 #include <Rts.h>
 

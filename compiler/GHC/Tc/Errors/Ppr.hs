@@ -39,11 +39,8 @@ import qualified GHC.Boot.TH.Syntax as TH
 --            import "ghc-internal"     qualified GHC.Internal.TH.Syntax as TH
 import qualified GHC.Boot.TH.Ppr as TH
 
-import GHC.Builtin.Names
-import GHC.Builtin.Types
-  ( boxedRepDataConTyCon, tYPETyCon
-  , pretendNameIsInScope
-  )
+import GHC.Builtin.WiredIn.Types( boxedRepDataConTyCon, tYPETyCon, pretendNameIsInScope )
+import GHC.Builtin.KnownKeys -- A bunch of keys
 
 import GHC.Types.Name.Reader
 import GHC.Unit.Module.ModIface
@@ -854,8 +851,8 @@ instance Diagnostic TcRnMessage where
 
     TcRnUselessTypeable
       -> mkSimpleDecorated $
-           text "Deriving" <+> quotes (ppr typeableClassName) <+>
-           text "has no effect: all types now auto-derive Typeable"
+           text "Deriving(Typeable) has no effect: all types now auto-derive Typeable"
+
     TcRnDerivingDefaults cls
       -> mkSimpleDecorated $ sep
                      [ text "Both DeriveAnyClass and"
@@ -4313,7 +4310,7 @@ pprTcSolverReportMsg ctxt
       = text "(maybe you haven't applied a function to enough arguments?)"
 
       -- Clarify the mysterious "No instance for (Typeable T)
-      | className clas == typeableClassName
+      | clas `hasKnownKey` typeableClassKey
       , [_,ty] <- tys     -- Look for (Typeable (k->*) (T k))
       , Just (tc,_) <- tcSplitTyConApp_maybe ty
       , not (isTypeFamilyTyCon tc)
@@ -5006,7 +5003,7 @@ potentials_msg_with_options
 
     name_in_scope name
       | pretendNameIsInScope name
-      = True -- E.g. (->); see Note [pretendNameIsInScope] in GHC.Builtin.Names
+      = True -- E.g. (->); see Note [pretendNameIsInScope] in GHC.Builtin.KnownKeys
       | Just mod <- nameModule_maybe name
       = qual_in_scope (qualName sty mod Nothing (nameOccName name))
       | otherwise
@@ -5221,7 +5218,7 @@ pprHasFieldMsg = \case
         text "NB: the field type of the record field" <+> quotes (ppr fld) <+> text "of" <+> quotes (ppr tc) <+> text "is not a mono-type."
   CustomHasField custom_hasField ->
     text "NB:" <+> quotes (ppr custom_hasField) <+> text "is not the built-in"
-      <+> quotes (ppr hasFieldClassName) <+> text "class."
+      <+> quotes (text "HasField") <+> text "class."
   SuggestSimilarFields (Just (tc, rep_tc)) fld suggs pat_syns _imp_suggs ->
     vcat
       [   text "NB:" <+> quotes (ppr tc)
@@ -5266,7 +5263,7 @@ pprHasFieldPatSynMsg fld pat_syns =
   if any same_name pat_syns
   then
     text "Pattern synonym record fields do not contribute"
-      <+> quotes (ppr hasFieldClassName) <+> text "instances."
+      <+> quotes (text "HasField") <+> text "instances."
   else empty
   where
     same_name (_,nm) =
@@ -6584,16 +6581,16 @@ suggestNonCanonicalDefinition reason =
   where
     action = case reason of
       NonCanonicalMonoid sub -> case sub of
-        NonCanonical_Sappend -> move sappendName mappendName
-        NonCanonical_Mappend -> remove mappendName sappendName
-      NonCanonicalMonad sub -> case sub of
-        NonCanonical_Pure -> move pureAName returnMName
-        NonCanonical_ThenA -> move thenAName thenMName
-        NonCanonical_Return -> remove returnMName pureAName
-        NonCanonical_ThenM -> remove thenMName thenAName
+        NonCanonical_Sappend -> move sappendClassOpOcc mappendClassOpOcc
+        NonCanonical_Mappend -> remove mappendClassOpOcc sappendClassOpOcc
+      NonCanonicalMonad sub  -> case sub of
+        NonCanonical_Pure    -> move   pureAClassOpOcc   returnMClassOpOcc
+        NonCanonical_ThenA   -> move   thenAClassOpOcc   thenMClassOpOcc
+        NonCanonical_Return  -> remove returnMClassOpOcc pureAClassOpOcc
+        NonCanonical_ThenM   -> remove thenMClassOpOcc   thenAClassOpOcc
 
-    move = SuggestMoveNonCanonicalDefinition
-    remove = SuggestRemoveNonCanonicalDefinition
+    move lhs_occ rhs_occ   = SuggestMoveNonCanonicalDefinition   lhs_occ rhs_occ
+    remove lhs_occ rhs_occ = SuggestRemoveNonCanonicalDefinition lhs_occ rhs_occ
 
     doc = case reason of
       NonCanonicalMonoid _ -> doc_monoid

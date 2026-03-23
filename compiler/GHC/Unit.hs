@@ -59,16 +59,19 @@ UnitIds are important because they are used to generate internal names
 Wired-in units
 --------------
 
-Certain libraries (ghc-prim, base, etc.) are known to the compiler and to the
-RTS as they provide some basic primitives.  Hence UnitIds of wired-in libraries
-are fixed. Instead of letting Cabal choose the UnitId for these libraries, their
-.cabal file uses the following stanza to force it to a specific value:
+Wired-in names have wired-in modules, which have a wired-in unit-id.
+Wired-in unit-ids, such as ghc-internal and the RTS, must be known to the
+compiler, as they provide some basic primitives.
 
-   ghc-options: -this-unit-id ghc-prim    -- taken from ghc-prim.cabal
+Hence wired-in unit-ids are fixed. Instead of letting Cabal choose
+the UnitId for these libraries, their .cabal file uses the following stanza to
+force it to a specific value:
 
-The RTS also uses entities of wired-in units by directly referring to symbols
-such as "base_GHCziIOziException_heapOverflow_closure" where the prefix is
-the UnitId of "base" unit.
+   ghc-options: -this-unit-id ghc-internal -- taken from ghc-internal.cabal
+
+The RTS also uses entities of wired-in units by referring to symbols such as
+"ghczminternal_GHCziInternalziTopHandler_runIO_closure" where the prefix is the
+UnitId of "ghc-internal" unit (see Note [RTS/ghc-internal interface]).
 
 Unit databases
 --------------

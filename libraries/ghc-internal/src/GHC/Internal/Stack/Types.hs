@@ -9,6 +9,7 @@
 -- we hide this module from haddock to enforce GHC.Internal.Stack as the main
 -- access point.
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Stack.Types
@@ -51,8 +52,9 @@ import cycle,
     which imports ‘GHC.Base‘ (libraries/base/GHC/Base.hs)
 -}
 
-import GHC.Internal.Classes (Eq)
-import GHC.Internal.Types (Char, Int)
+import GHC.Internal.Classes ( Eq( (==) ), (&&) )
+import GHC.Internal.Classes.IP as Rebindable
+import GHC.Internal.Types
 
 default ()
 

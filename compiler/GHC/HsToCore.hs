@@ -43,6 +43,7 @@ import GHC.Tc.Types.Origin ( Position(..), mkArgPos )
 import GHC.Tc.Utils.Monad
   ( TcMPluginHandling(..)
   , finalSafeMode, fixSafeInstances
+  , getGblEnv, setEnvs
   )
 import GHC.Tc.Module ( runTcInteractive )
 
@@ -62,11 +63,12 @@ import GHC.Core.Rules
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Ppr
 
-import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Ids ( mkRepPolyIdConcreteTyVars )
 
-import GHC.Data.Maybe    ( expectJust )
+import GHC.Data.Maybe    ( expectJust, MaybeErr (..) )
 import GHC.Data.OrdList
 import GHC.Data.SizedSeq ( sizeSS )
 
@@ -83,7 +85,6 @@ import GHC.Utils.Logger
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( mkRepPolyIdConcreteTyVars )
 import GHC.Types.InlinePragma ( alwaysInlinePragma, competesWith )
 import GHC.Types.ForeignStubs
 import GHC.Types.Avail
@@ -93,7 +94,6 @@ import GHC.Types.SourceFile
 import GHC.Types.TypeEnv
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.HpcInfo
 
@@ -104,6 +104,9 @@ import GHC.Unit.Module.Deps
 
 import Data.List (partition)
 import Data.IORef
+import GHC.Types.Unique.FM
+import GHC.Iface.Load (KnownEntitySource(..), lookupKnownKeyName, lookupKnownKeysModule)
+import GHC.HsToCore.Types (DsGblEnv(..))
 
 {-
 ************************************************************************
@@ -223,11 +226,13 @@ deSugar hsc_env
         ; endPassHscEnvIO hsc_env name_ppr_ctx CoreDesugar ds_binds ds_rules_for_imps
 
         ; let pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
-              home_unit = hsc_home_unit hsc_env
+              home_unit     = hsc_home_unit hsc_env
+        ; essentials_mod <- liftIO $ lookupKnownKeysModule hsc_env dflags
         ; let deps = mkDependencies home_unit
                                     (tcg_mod tcg_env)
                                     (tcg_imports tcg_env)
                                     (map mi_module pluginModules)
+                                    (moduleUnitId <$> essentials_mod)
 
         ; safe_mode <- finalSafeMode dflags tcg_env
 
@@ -604,6 +609,8 @@ even if we need pure access; note that wiring-in an Id requires all
 entities used in its definition *also* to be wired in, transitively
 and recursively.  This can be a huge pain.  The little trick
 documented here allows us to have the best of both worlds.
+(This has been improved with the new known-occ/keys work.
+ See Note [Overview of known entities] in GHC.Builtin.)
 
 Motivating example: unsafeCoerce#. See [Wiring in unsafeCoerce#] for the
 details.
@@ -637,8 +644,8 @@ Here are the moving parts:
 
 - magicDefnsEnv allows for quick access to magicDefns.
 
-- magicDefnModules, built also from magicDefns, contains the modules that
-  need careful attention.
+- moduleHasMagicDefn, determines if the module being compiled has any
+  magicDefns (if so, needs careful attention).
 
 Note [Wiring in unsafeCoerce#]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -688,14 +695,14 @@ patchMagicDefns :: OrdList (Id,CoreExpr)
 patchMagicDefns pairs
   -- optimization: check whether we're in a magic module before looking
   -- at all the ids
-  = do { this_mod <- getModule
-       ; if this_mod `elemModuleSet` magicDefnModules
+  = do { is_magic_mod <- moduleHasMagicDefn
+       ; if is_magic_mod
          then traverse patchMagicDefn pairs
          else return pairs }
 
 patchMagicDefn :: (Id, CoreExpr) -> DsM (Id, CoreExpr)
 patchMagicDefn orig_pair@(orig_id, orig_rhs)
-  | Just mk_magic_pair <- lookupNameEnv magicDefnsEnv (getName orig_id)
+  | Just mk_magic_pair <- lookupUFM magicDefnsEnv (getUnique orig_id)
   = do { magic_pair@(magic_id, _) <- mk_magic_pair orig_id orig_rhs
 
        -- Patching should not change the Name or the type of the Id
@@ -706,22 +713,41 @@ patchMagicDefn orig_pair@(orig_id, orig_rhs)
   | otherwise
   = return orig_pair
 
-magicDefns :: [(Name,    Id -> CoreExpr     -- old Id and RHS
+magicDefns :: [(KnownKey,    Id -> CoreExpr     -- old Id and RHS
                       -> DsM (Id, CoreExpr) -- new Id and RHS
                )]
-magicDefns = [ (unsafeCoercePrimName, mkUnsafeCoercePrimPair) ]
+magicDefns = [ (unsafeCoercePrimIdKey, mkUnsafeCoercePrimPair) ]
 
-magicDefnsEnv :: NameEnv (Id -> CoreExpr -> DsM (Id, CoreExpr))
-magicDefnsEnv = mkNameEnv magicDefns
+magicDefnsEnv :: UniqFM KnownKey (Id -> CoreExpr -> DsM (Id, CoreExpr))
+magicDefnsEnv = listToUFM magicDefns
 
-magicDefnModules :: ModuleSet
-magicDefnModules = mkModuleSet $ map (nameModule . getName . fst) magicDefns
+-- | Find if the current module defines any magic names
+moduleHasMagicDefn :: DsM Bool
+moduleHasMagicDefn = do
+  env      <- getGblEnv
+  this_mod <- getModule
+  -- If module -fdefines-known-key-names, look for the magic names in scope and
+  -- check if this module is the magic name's module. If module doesn't
+  -- -fdefines-known-key-names, it certainly doesn't define magic names.
+  kksource <- dsGetKnownKeySource
+  case kksource of
+    KES_FromModule -> return False
+    kes@KES_InScope{} -> do
+      let definesMagicName magicKey = do
+            mb_res <- lookupKnownKeyName magicKey kes
+            case mb_res of
+              Succeeded name -> return (nameModule name == this_mod)
+              Failed _ -> return False
+      dfns_magic <- setEnvs (ds_if_env env) $
+        mapM (definesMagicName . fst) magicDefns
+      pure $ any id dfns_magic
 
 mkUnsafeCoercePrimPair :: Id -> CoreExpr -> DsM (Id, CoreExpr)
 -- See Note [Wiring in unsafeCoerce#] for the defn we are creating here
 mkUnsafeCoercePrimPair _old_id old_expr
-  = do { unsafe_equality_proof_id <- dsLookupGlobalId unsafeEqualityProofName
-       ; unsafe_equality_tc       <- dsLookupTyCon unsafeEqualityTyConName
+  = do { unsafe_equality_proof_id <- dsLookupKnownKeyId unsafeEqualityProofIdKey
+       ; unsafe_equality_tc       <- dsLookupKnownKeyTyCon unsafeEqualityTyConKey
+       ; unsafeCoercePrimName     <- dsLookupKnownKeyName unsafeCoercePrimIdKey
 
        ; let [unsafe_refl_data_con] = tyConDataCons unsafe_equality_tc
 

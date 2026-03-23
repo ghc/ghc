@@ -43,16 +43,14 @@ import Control.Monad    ( unless, when, void )
 
 import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 
-import GHC.Tc.Utils.Env     ( tcMetaTy )
+import GHC.Tc.Utils.Env     ( tcMetaKnownOccTy )
 
 import GHC.Driver.DynFlags
 import GHC.Data.FastString
 import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Driver.Hooks
-import GHC.Builtin.Names.TH ( decsQTyConName, expQTyConName
-                            , patQTyConName, quoteDecName, quoteExpName
-                            , quotePatName, quoteTypeName, typeQTyConName)
+import GHC.Builtin.TH
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr   ( tcCheckPolyExpr )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice
@@ -339,13 +337,13 @@ runRnSplice flavour run_meta ppr_res splice
             Just h  -> h splice
 
        -- TODO: Should call tcUntypedSplice here
-       ; let the_expr = case splice' of
-                HsUntypedSpliceExpr _ e ->  e
-                HsQuasiQuote _ q str -> mkQuasiQuoteExpr flavour q str
-                XUntypedSplice {} -> pprPanic "runRnSplice: XUntypedSplice" (pprUntypedSplice False Nothing splice')
+       ; the_expr <- case splice' of
+            HsUntypedSpliceExpr _ e -> pure e
+            HsQuasiQuote _ q str -> fst <$> rnLExpr (mkQuasiQuoteExpr flavour q str)
+            XUntypedSplice {} -> pprPanic "runRnSplice: XUntypedSplice" (pprUntypedSplice False Nothing splice')
 
              -- Typecheck the expression
-       ; meta_exp_ty   <- tcMetaTy meta_ty_name
+       ; meta_exp_ty   <- tcMetaKnownOccTy meta_ty_name
        ; zonked_q_expr <- zonkTopLExpr =<<
                             tcTopSpliceExpr Untyped
                               (tcCheckPolyExpr the_expr meta_exp_ty)
@@ -364,10 +362,10 @@ runRnSplice flavour run_meta ppr_res splice
 
   where
     meta_ty_name = case flavour of
-                       UntypedExpSplice  -> expQTyConName
-                       UntypedPatSplice  -> patQTyConName
-                       UntypedTypeSplice -> typeQTyConName
-                       UntypedDeclSplice -> decsQTyConName
+                       UntypedExpSplice  -> expQTyConOcc
+                       UntypedPatSplice  -> patQTyConOcc
+                       UntypedTypeSplice -> typeQTyConOcc
+                       UntypedDeclSplice -> decsQTyConOcc
     what = case flavour of
                   UntypedExpSplice  -> "expression"
                   UntypedPatSplice  -> "pattern"
@@ -394,18 +392,18 @@ recordPendingSplice _ _ (TcPending _ _ _) = panic "impossible"
 ------------------
 mkQuasiQuoteExpr :: UntypedSpliceFlavour -> LIdP GhcRn
                  -> XRec GhcPs FastString
-                 -> LHsExpr GhcRn
+                 -> LHsExpr GhcPs
 -- Return the expression (quoter "...quote...")
 -- which is what we must run in a quasi-quote
 mkQuasiQuoteExpr flavour quoter (L q_span' quote)
   = L q_span $ HsApp noExtField (L q_span
              $ HsApp noExtField (L q_span
-                    (mkHsVar (L (l2l q_span) quote_selector)))
+                    (mkHsVar (L (l2l q_span) (Exact (ExactOcc quote_selector)))))
                                 quoterExpr)
                     quoteExpr
   where
     q_span = noAnnSrcSpan (locA q_span')
-    quoterExpr = L (l2l quoter) $! mkHsVar          $! quoter
+    quoterExpr = L (l2l quoter) $! mkHsVar    $! Exact . ExactName <$> quoter
     quoteExpr  = L q_span $! HsLit noExtField $! HsString NoSourceText quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName
