@@ -144,7 +144,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.FVs
    ( noFreeVarsOfType )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    ( runtimeRepTyCon, constraintKind, levityTyCon
    , multiplicityTyCon
    , vecCountTyCon, vecElemTyCon )
@@ -159,25 +159,31 @@ import GHC.Builtin.Uniques
   , dataConTyRepNameUnique )
 
 import GHC.Hs.Extension (GhcTc)
+import GHC.Settings.Constants
 
-import GHC.Utils.Binary
+import GHC.Core.Coercion.Axiom
+import GHC.Core.Class
+
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Core.Class
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Core.Coercion.Axiom
-import GHC.Builtin.Names
-import GHC.Data.Maybe
+import GHC.Types.Unique.Set
+import GHC.Types.FieldLabel
+
+import GHC.Builtin.Modules( gHC_PRIM, gHC_TYPES )
+import GHC.Builtin.KnownKeys
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.FieldLabel
-import GHC.Settings.Constants
+import GHC.Utils.Binary
 import GHC.Utils.Misc
-import GHC.Types.Unique.Set
+
 import GHC.Unit.Module
+
+import GHC.Data.Maybe
 import Control.DeepSeq
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
@@ -537,7 +543,7 @@ mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
     mk :: TyConBinder -> Kind -> Kind
     mk (Bndr tv (NamedTCB vis)) k = mkForAllTy (Bndr tv vis) k
     mk (Bndr tv AnonTCB)        k = mkNakedFunTy FTF_T_T (varType tv) k
-    -- mkNakedFunTy: see Note [Naked FunTy] in GHC.Builtin.Types
+    -- mkNakedFunTy: see Note [Naked FunTy] in GHC.Builtin.WiredIn.Types
 
 -- | (mkTyConTy tc) returns (TyConApp tc [])
 -- but arranges to share that TyConApp among all calls
@@ -1568,7 +1574,7 @@ There are a number of wrinkles
                   of boxed type
   The boxed-ness important. Consider
           class (a ~# b) => a ~ b where {}
-  which is `eqClass` in GHC.Builtin.Types.  This has only one field, but it is
+  which is `eqClass` in GHC.Builtin.WiredIn.Types.  This has only one field, but it is
   definitely not a unary class: it is definitely represented by an ordinary
   algebraic data type with a single field of type (a ~# b).
 

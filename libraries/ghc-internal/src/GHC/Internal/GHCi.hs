@@ -26,8 +26,7 @@ module GHC.Internal.GHCi (
         GHCiSandboxIO(..), NoIO()
     ) where
 
-import GHC.Internal.Base (Monad, Functor(fmap), Applicative(..), (>>=), id, (.), ap)
-import GHC.Internal.Types (IO())
+import GHC.Internal.Base
 
 -- | A monad that can execute GHCi statements by lifting them out of
 -- m into the IO monad. (e.g state monads)

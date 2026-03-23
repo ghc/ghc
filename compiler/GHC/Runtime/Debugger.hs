@@ -30,6 +30,8 @@ import GHC.Runtime.Heap.Inspect
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context
 
+import GHC.Builtin.WiredIn.Ids (ghcPrimIds)
+
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Iface.Env    ( newInteractiveBinder )
 import GHC.Core.Type
@@ -42,7 +44,6 @@ import GHC.Utils.Exception
 import GHC.Utils.Logger
 
 import GHC.Types.Id
-import GHC.Types.Id.Make (ghcPrimIds)
 import GHC.Types.Name
 import GHC.Types.Var hiding ( varName )
 import GHC.Types.Var.Set

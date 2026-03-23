@@ -190,6 +190,10 @@ module System.IO
 
 import GHC.Internal.System.IO (putStrLn, print)
 
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
+
 import GHC.Base (Bool (False, True), otherwise, failIO)
 import GHC.Err (errorWithoutStackTrace)
 import GHC.List ((++), reverse, break)

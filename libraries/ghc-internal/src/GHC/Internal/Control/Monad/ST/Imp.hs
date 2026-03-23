@@ -35,9 +35,10 @@ module GHC.Internal.Control.Monad.ST.Imp (
         unsafeSTToIO
     ) where
 
+import qualified GHC.Internal.Stack.Types as Rebindable
+import GHC.Internal.Base
 import GHC.Internal.ST           ( ST, runST, unsafeInterleaveST
                         , unsafeDupableInterleaveST )
-import GHC.Internal.Base         ( ($), return )
 import GHC.Internal.IO           ( stToIO, unsafeIOToST, unsafeSTToIO
                         , unsafeDupableInterleaveIO )
 import GHC.Internal.MVar         ( readMVar, putMVar, newEmptyMVar )

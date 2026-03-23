@@ -57,6 +57,9 @@ module GHC.RTS.Flags
   ) where
 
 import Prelude (Show,IO,Bool,Maybe,String,Int,Enum,FilePath,Double,Eq,(<$>))
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 import GHC.Generics (Generic)
 import qualified GHC.Internal.RTS.Flags as Internal

@@ -80,9 +80,9 @@ import GHC.Types.SourceError ( SourceError, initSourceErrorContext )
 import GHC.Types.Name
 import GHC.Types.Var ( varType )
 import GHC.Iface.Syntax ( showToHeader )
-import GHC.Builtin.Names
-import GHC.Builtin.Types( stringTyCon_RDR )
-import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName, greName, globalRdrEnvElts)
+import GHC.Builtin.KnownOccs( ghciStepIoMOcc, stringTyCon_RDR, compose_RDR )
+import GHC.Builtin.KnownKeys( ioTyConOcc )
+import GHC.Types.Name.Reader as RdrName
 import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Parser.Header ( toArgs )
@@ -2082,7 +2082,7 @@ defineMacro overwrite s
             let stringTy :: LHsType GhcPs
                 stringTy = nlHsTyVar NotPromoted stringTyCon_RDR
                 ioM :: LHsType GhcPs -- AZ
-                ioM = nlHsTyVar NotPromoted (getRdrName ioTyConName) `nlHsAppTy` stringTy
+                ioM = nlHsTyVar NotPromoted (Exact (ExactOcc ioTyConOcc)) `nlHsAppTy` stringTy
                 body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
                                            `mkHsApp` (nlHsPar expr)
                 tySig = mkHsWildCardBndrs $ noLocA $ mkHsImplicitSigType $
@@ -2151,9 +2151,9 @@ getGhciStepIO :: GHC.GhcMonad m => m (LHsExpr GhcPs)
 getGhciStepIO = do
   ghciTyConName <- GHC.getGHCiMonad
   let stringTy = nlHsTyVar NotPromoted stringTyCon_RDR
-      ghciM = nlHsTyVar NotPromoted (getRdrName ghciTyConName) `nlHsAppTy` stringTy
-      ioM = nlHsTyVar NotPromoted (getRdrName ioTyConName) `nlHsAppTy` stringTy
-      body = nlHsVar (getRdrName ghciStepIoMName)
+      ghciM = nlHsTyVar NotPromoted (Exact ghciTyConName) `nlHsAppTy` stringTy
+      ioM = nlHsTyVar NotPromoted (Exact (ExactOcc ioTyConOcc)) `nlHsAppTy` stringTy
+      body = nlHsVar (Exact (ExactOcc ghciStepIoMOcc))
       tySig = mkHsWildCardBndrs $ noLocA $ mkHsImplicitSigType $
               nlHsFunTy ghciM ioM
   return $ noLocA $ ExprWithTySig noAnn body tySig

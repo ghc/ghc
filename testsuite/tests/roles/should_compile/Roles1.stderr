@@ -20,7 +20,7 @@ DATA CONSTRUCTORS
   K2 :: forall a. a -> T2 a
   K1 :: forall a. a -> T1 a
 Dependent modules: []
-Dependent packages: [(normal, base-4.22.0.0)]
+Dependent packages: [(normal, base-4.23.0.0)]
 
 ==================== Typechecker ====================
 Roles1.$tcT7 [InlPrag=[~]]
@@ -43,7 +43,7 @@ Roles1.$tcT5 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       12033401645911719002#Word64 6369139038321702301#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "T5"#) 0#
-      GHC.Internal.Types.krep$*Arr*
+      GHC.Internal.Types.krepStarArr
 Roles1.$tc'K5 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       5548842497263642061#Word64 18349261927117571882#Word64
@@ -68,7 +68,7 @@ Roles1.$tcT2 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       12900773996789723956#Word64 9313087549503346504#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "T2"#) 0#
-      GHC.Internal.Types.krep$*Arr*
+      GHC.Internal.Types.krepStarArr
 Roles1.$tc'K2 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       11054915488163123841#Word64 10799789256744079155#Word64
@@ -77,7 +77,7 @@ Roles1.$tcT1 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       13228660854624297872#Word64 14494320157476678712#Word64
       Roles1.$trModule (GHC.Internal.Types.TrNameS "T1"#) 0#
-      GHC.Internal.Types.krep$*Arr*
+      GHC.Internal.Types.krepStarArr
 Roles1.$tc'K1 [InlPrag=[~]]
   = GHC.Internal.Types.TyCon
       1265606750138351672#Word64 7033043930969109074#Word64
@@ -89,9 +89,10 @@ $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 1
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepVar 2
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepApp $krep $krep
 $krep [InlPrag=[~]]
-  = GHC.Internal.Types.KindRepFun $krep GHC.Internal.Types.krep$*Arr*
+  = GHC.Internal.Types.KindRepFun
+      $krep GHC.Internal.Types.krepStarArr
 $krep [InlPrag=[~]]
-  = GHC.Internal.Types.KindRepFun $krep GHC.Internal.Types.krep$*
+  = GHC.Internal.Types.KindRepFun $krep GHC.Internal.Types.krepStar
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
@@ -99,7 +100,7 @@ $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepFun
-      GHC.Internal.Types.krep$*Arr* GHC.Internal.Types.krep$*Arr*
+      GHC.Internal.Types.krepStarArr GHC.Internal.Types.krepStarArr
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepTyConApp
       Roles1.$tcT7 ((:) $krep ((:) $krep ((:) $krep [])))

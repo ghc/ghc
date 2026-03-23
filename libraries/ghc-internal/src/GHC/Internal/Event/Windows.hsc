@@ -109,6 +109,7 @@ import GHC.Internal.Base (
     Semigroup(..), String, Monoid(..), const, fmap, otherwise, return, when,
     ($), (.), (++), (>>=), (=<<), (>>),
   )
+import qualified GHC.Internal.Base as Rebindable
 import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
 import GHC.Internal.Conc.Bound
 import GHC.Internal.Conc.Sync
@@ -118,10 +119,15 @@ import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Bits
 import GHC.Internal.Stable
+import qualified GHC.Internal.Stack.Types as Rebindable
+  ( SrcLoc(..), pushCallStack, emptyCallStack )
 import GHC.Internal.Enum (maxBound)
+import qualified GHC.Internal.Enum as Rebindable
 import GHC.Internal.Types (Bool(..), Int)
+import qualified GHC.Internal.Types as Rebindable
 import GHC.Internal.Windows
 import GHC.Internal.List (null)
+import qualified GHC.Internal.Show as Rebindable
 import GHC.Internal.Text.Show
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Marshal.Utils

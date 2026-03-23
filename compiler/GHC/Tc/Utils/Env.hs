@@ -1,6 +1,4 @@
 -- (c) The University of Glasgow 2006
-{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an
-                                       -- orphan
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 {-# LANGUAGE TypeFamilies #-}
@@ -16,7 +14,7 @@ module GHC.Tc.Utils.Env(
 
         -- Global environment
         tcExtendGlobalEnv, tcExtendTyConEnv,
-        tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
+        tcExtendGlobalEnvImplicit, syncTypeEnvKnotVars,
         tcExtendGlobalValEnv, tcTyThBinders,
         tcLookupLocatedGlobal, tcLookupGlobal, tcLookupGlobalOnly,
         tcLookupTyCon, tcLookupClass,
@@ -24,9 +22,16 @@ module GHC.Tc.Utils.Env(
         tcLookupRecSelParent,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
-        lookupGlobal, lookupGlobal_maybe,
+        tcLookupImported_maybe,
+        lookupGlobal, lookupGlobal_maybe, lookupKnownKeyGlobal,
         addTypecheckedBinds, addEvBinds, addTopEvBinds,
         failIllegalTyCon, failIllegalTyVar,
+
+        tcLookupKnownKeyGlobal, tcLookupKnownKeyTyCon,
+        tcLookupKnownKeyClass, tcLookupKnownKeyId,
+        tcLookupKnownOccTyCon, tcLookupKnownOccClass,
+        tcLookupKnownOccDataCon, tcLookupKnownOccId,
+        rnLookupKnownKeyName, rnLookupKnownKeyRdr, getKnownKeySource,
 
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnvList,
@@ -58,8 +63,8 @@ module GHC.Tc.Utils.Env(
 
         -- Template Haskell stuff
         LevelCheckReason(..),
-        tcMetaTy, thLevelIndex,
-        isBrackLevel,
+        tcMetaTy, tcMetaKnownOccTy,
+        thLevelIndex, isBrackLevel,
 
         -- New Ids
         newDFunName,
@@ -75,8 +80,9 @@ import GHC.Driver.Env
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.DynFlags
 
-import GHC.Builtin.Names
-import GHC.Builtin.Types
+import GHC.Builtin( isUnboundName )
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Types
 
 import GHC.Runtime.Context
 
@@ -156,8 +162,7 @@ lookupGlobal :: HscEnv -> Name -> IO TyThing
 -- A variant of lookupGlobal_maybe for the clients which are not
 -- interested in recovering from lookup failure and accept panic.
 lookupGlobal hsc_env name
-  = do  {
-          mb_thing <- lookupGlobal_maybe hsc_env name
+  = do  { mb_thing <- lookupGlobal_maybe hsc_env name
         ; case mb_thing of
             Succeeded thing -> return thing
             Failed err      ->
@@ -166,6 +171,7 @@ lookupGlobal hsc_env name
                           Right err -> pprDiagnostic err
               in pprPanic "lookupGlobal" msg
         }
+
 lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr (Either Name IfaceMessage) TyThing)
 -- This may look up an Id that one has previously looked up.
 -- If so, we are going to read its interface file, and add its bindings
@@ -205,6 +211,17 @@ importDecl_maybe hsc_env name
         ; return (Succeeded thing) }
   | otherwise
   = initIfaceLoad hsc_env (importDecl name)
+
+lookupKnownKeyGlobal :: HscEnv -> KnownKey -> IO TyThing
+lookupKnownKeyGlobal hsc_env key = do
+  eps <- hscEPS hsc_env
+  case eps_known_keys eps of
+    Nothing -> pprPanic "lookupKnownKeyGlobal" (text "eps_known_keys not initialized")
+    Just ((kk_map, _), _) -> case lookupKnownKeysMap kk_map key of
+      Succeeded name -> lookupGlobal hsc_env name
+      Failed err     -> pprPanic "lookupKnownKeyGlobal" (pprDiagnostic err)
+
+--------------------------------------------------------------------------------
 
 addTypecheckedBinds :: TcGblEnv -> [LHsBinds GhcTc] -> TcGblEnv
 addTypecheckedBinds tcg_env binds
@@ -265,6 +282,26 @@ tcLookupGlobal name
             Failed msg      -> failWithTc (TcRnInterfaceError msg)
         }}}
 
+tcLookupImported_maybe :: Name -> TcM (MaybeErr IfaceMessage TyThing)
+-- Returns (Failed err) if we can't find the interface file for the thing
+tcLookupImported_maybe name
+  = do  { hsc_env <- getTopEnv
+        ; mb_thing <- liftIO (lookupType hsc_env name)
+        ; case mb_thing of
+            Just thing -> return (Succeeded thing)
+            Nothing    -> tcImportDecl_maybe name }
+
+tcImportDecl_maybe :: Name -> TcM (MaybeErr IfaceMessage TyThing)
+-- Entry point for *source-code* uses of importDecl
+tcImportDecl_maybe name
+  | Just thing <- wiredInNameTyThing_maybe name
+  = do  { when (needWiredInHomeIface thing)
+               (initIfaceTcRn (loadWiredInHomeIface name))
+                -- See Note [Loading instances for wired-in things]
+        ; return (Succeeded thing) }
+  | otherwise
+  = initIfaceTcRn (importDecl name)
+
 -- Look up only in this module's global env't. Don't look in imports, etc.
 -- Panic if it's not there.
 tcLookupGlobalOnly :: Name -> TcM TyThing
@@ -275,11 +312,7 @@ tcLookupGlobalOnly name
                     Nothing    -> pprPanic "tcLookupGlobalOnly" (ppr name) }
 
 tcLookupDataCon :: Name -> TcM DataCon
-tcLookupDataCon name = do
-    thing <- tcLookupGlobal name
-    case thing of
-        AConLike (RealDataCon con) -> return con
-        _                          -> wrongThingErr WrongThingDataCon (AGlobal thing) name
+tcLookupDataCon = get_datacon . tcLookupGlobal
 
 tcLookupPatSyn :: Name -> TcM PatSyn
 tcLookupPatSyn name = do
@@ -308,18 +341,10 @@ tcLookupRecSelParent (RnRecUpdParent { rnRecUpdCons = cons })
       -- Any constructor will give the same result here.
 
 tcLookupClass :: Name -> TcM Class
-tcLookupClass name = do
-    thing <- tcLookupGlobal name
-    case thing of
-        ATyCon tc | Just cls <- tyConClass_maybe tc -> return cls
-        _                                           -> wrongThingErr WrongThingClass (AGlobal thing) name
+tcLookupClass = get_class . tcLookupGlobal
 
 tcLookupTyCon :: Name -> TcM TyCon
-tcLookupTyCon name = do
-    thing <- tcLookupGlobal name
-    case thing of
-        ATyCon tc -> return tc
-        _         -> wrongThingErr WrongThingTyCon (AGlobal thing) name
+tcLookupTyCon = get_tycon . tcLookupGlobal
 
 tcLookupAxiom :: Name -> TcM (CoAxiom Branched)
 tcLookupAxiom name = do
@@ -375,9 +400,6 @@ tcGetInstEnvs = do { eps <- getEps
                    ; return (InstEnvs { ie_global  = eps_inst_env eps
                                       , ie_local   = tcg_inst_env env
                                       , ie_visible = tcVisibleOrphanMods env }) }
-
-instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where
-    lookupThing = tcLookupGlobal
 
 -- Illegal term-level use of type things
 failIllegalTyCon :: WhatLooking -> WithUserRdr Name -> TcM a
@@ -474,21 +496,141 @@ to bring the data constructor A into scope. We thus emit the following message:
 
 ************************************************************************
 *                                                                      *
+                Looking up known-occ things
+*                                                                      *
+************************************************************************
+-}
+
+tcMetaKnownOccTy :: HasDebugCallStack => KnownOcc -> TcM Type
+tcMetaKnownOccTy occ
+  = do { tc <- tcLookupKnownOccTyCon occ
+       ; return (mkTyConTy tc) }
+
+tcMetaTy :: Name -> TcM Type
+-- Given the name of a Template Haskell data type,
+-- return the type
+-- E.g. given the name "Expr" return the type "Expr"
+tcMetaTy tc_name
+  = do { t <- tcLookupTyCon tc_name
+       ; return (mkTyConTy t) }
+
+getKnownKeySource :: TcRn KnownEntitySource
+-- Used by both renamer and typechecker and renamer
+getKnownKeySource
+  = do { rebindable_path <- goptM Opt_RebindableKnownNames
+       ; if rebindable_path
+         then do { gbl_env <- getGblEnv
+                 ; lcl_type_env <- getLclTypeEnv
+                 ; return (KES_InScope { ke_mod = tcg_mod gbl_env
+                                       , ke_rdr_env = tcg_rdr_env gbl_env
+                                       , ke_gbl_type_env = tcg_type_env gbl_env
+                                       , ke_lcl_type_env = lcl_type_env }) }
+         else return KES_FromModule }
+
+tcrn_wrapper :: HasDebugCallStack
+             => (KnownEntitySource -> IfG (MaybeErr IfaceMessage a)) -> TcRn a
+tcrn_wrapper do_the_lookup
+  = do { kk_source <- getKnownKeySource
+       ; mb_res <- initIfaceTcRn (do_the_lookup kk_source)
+       ; case mb_res of
+           Failed err    -> do { traceTc "Failing with" (callStackDoc)
+                               ; failWithTc (TcRnInterfaceError err) }
+           Succeeded res -> return res }
+
+------------------------------------------------------
+-- Known-key functions
+
+rnLookupKnownKeyRdr :: HasDebugCallStack => KnownKey -> RnM RdrName
+rnLookupKnownKeyRdr uniq
+  = do { nm <- rnLookupKnownKeyName uniq
+       ; return (nameRdrName nm) }
+
+rnLookupKnownKeyName :: HasDebugCallStack => KnownKey -> RnM Name
+rnLookupKnownKeyName = tcrn_wrapper . lookupKnownKeyName
+
+tcLookupKnownKeyGlobal :: HasDebugCallStack => KnownKey -> TcM TyThing
+tcLookupKnownKeyGlobal = tcrn_wrapper . lookupKnownKeyThing
+
+tcLookupKnownKeyClass :: HasDebugCallStack => KnownKey -> TcM Class
+tcLookupKnownKeyClass = get_class . tcLookupKnownKeyGlobal
+
+tcLookupKnownKeyTyCon :: HasDebugCallStack => KnownKey -> TcM TyCon
+tcLookupKnownKeyTyCon = get_tycon . tcLookupKnownKeyGlobal
+
+tcLookupKnownKeyId :: HasDebugCallStack => KnownKey -> TcM Id
+tcLookupKnownKeyId = get_id . tcLookupKnownKeyGlobal
+
+------------------------------------------------------
+-- Known-occ functions
+
+tcLookupKnownOccGlobal :: HasDebugCallStack => KnownOcc -> TcM TyThing
+tcLookupKnownOccGlobal = tcrn_wrapper . lookupKnownOccThing
+
+tcLookupKnownOccTyCon :: HasDebugCallStack => KnownOcc -> TcM TyCon
+tcLookupKnownOccTyCon = get_tycon . tcLookupKnownOccGlobal
+
+tcLookupKnownOccClass :: HasDebugCallStack => KnownOcc -> TcM Class
+tcLookupKnownOccClass = get_class . tcLookupKnownOccGlobal
+
+tcLookupKnownOccDataCon :: HasDebugCallStack => KnownOcc -> TcM DataCon
+tcLookupKnownOccDataCon = get_datacon . tcLookupKnownOccGlobal
+
+tcLookupKnownOccId :: HasDebugCallStack => KnownOcc -> TcM Id
+tcLookupKnownOccId = get_id . tcLookupKnownOccGlobal
+
+-------------------------------------------------------
+
+get_class :: TcRn TyThing -> TcRn Class
+get_class do_the_lookup
+  = do { thing <- do_the_lookup
+       ; case thing of
+           ATyCon tc | Just cls <- tyConClass_maybe tc
+                     -> return cls
+           _  -> wrongThingErr WrongThingClass (AGlobal thing) (getName thing) }
+
+get_tycon :: TcRn TyThing -> TcRn TyCon
+get_tycon do_the_lookup
+  = do { thing <- do_the_lookup
+       ; case thing of
+           ATyCon tc -> return tc
+           _  -> wrongThingErr WrongThingClass (AGlobal thing) (getName thing) }
+
+get_datacon :: TcRn TyThing -> TcRn DataCon
+get_datacon do_the_lookup
+  = do { thing <- do_the_lookup
+       ; case thing of
+           AConLike (RealDataCon con) -> return con
+           _  -> wrongThingErr WrongThingClass (AGlobal thing) (getName thing) }
+
+get_id :: TcRn TyThing -> TcRn Id
+get_id do_the_lookup
+  = do { thing <- do_the_lookup
+       ; case thing of
+           AnId id -> return id
+           _  -> wrongThingErr WrongThingClass (AGlobal thing) (getName thing) }
+
+{- *********************************************************************
+*                                                                      *
                 Extending the global environment
 *                                                                      *
 ************************************************************************
 -}
 
-setGlobalTypeEnv :: TcGblEnv -> TypeEnv -> TcM TcGblEnv
--- Use this to update the global type env
--- It updates both  * the normal tcg_type_env field
---                  * the tcg_type_env_var field seen by interface files
-setGlobalTypeEnv tcg_env new_type_env
-  = do  {     -- Sync the type-envt variable seen by interface files
-         ; case lookupKnotVars (tcg_type_env_var tcg_env) (tcg_mod tcg_env) of
-              Just tcg_env_var -> writeMutVar tcg_env_var new_type_env
-              Nothing -> return ()
-         ; return (tcg_env { tcg_type_env = new_type_env }) }
+syncTypeEnvKnotVars :: TcGblEnv -> TcM ()
+-- Use this to sync the tcg_knot_vars with the current type env
+-- so that interface-file and known-key/occ lookups will find the
+-- current bindings
+--
+-- Why the "!" before writing it into the variable?  Without, we will put
+-- a TypeEnv thunk into the knot-tied variable.  That thunk will eventually get
+-- forced if we are typechecking interfaces, but that is no good if we are
+-- trying to typecheck the very DFun we were going to put in.
+syncTypeEnvKnotVars tcg_env
+  = case lookupKnotVars (tcg_knot_vars tcg_env) (tcg_mod tcg_env) of
+      Just tcg_env_var -> do { let !type_env = tcg_type_env tcg_env
+                               -- Why the "!"?  See comment on the function
+                             ; writeMutVar tcg_env_var type_env }
+      Nothing -> return ()
 
 
 tcExtendGlobalEnvImplicit :: [TyThing] -> TcM r -> TcM r
@@ -496,8 +638,9 @@ tcExtendGlobalEnvImplicit :: [TyThing] -> TcM r -> TcM r
   -- Do not extend tcg_tcs, tcg_patsyns etc
 tcExtendGlobalEnvImplicit things thing_inside
    = do { tcg_env <- getGblEnv
-        ; let ge'  = extendTypeEnvList (tcg_type_env tcg_env) things
-        ; tcg_env' <- setGlobalTypeEnv tcg_env ge'
+        ; let !type_env' = extendTypeEnvList (tcg_type_env tcg_env) things
+              tcg_env'   = tcg_env { tcg_type_env = type_env' }
+        ; syncTypeEnvKnotVars tcg_env'
         ; setGblEnv tcg_env' thing_inside }
 
 tcExtendGlobalEnv :: [TyThing] -> TcM r -> TcM r
@@ -550,8 +693,8 @@ tcExtendRecEnv gbl_stuff thing_inside
  = do  { tcg_env <- getGblEnv
        ; let ge'      = extendNameEnvList (tcg_type_env tcg_env) gbl_stuff
              tcg_env' = tcg_env { tcg_type_env = ge' }
-         -- No need for setGlobalTypeEnv (which side-effects the
-         -- tcg_type_env_var); tcExtendRecEnv is used just
+         -- No need for syncTypeEnvKnotVars (which side-effects the
+         -- tcg_knot_vars); tcExtendRecEnv is used just
          -- when kind-check a group of type/class decls. It would
          -- in any case be wrong for an interface-file decl to end up
          -- with a TcTyCon in it!
@@ -929,13 +1072,6 @@ tcExtendRules lcl_rules thing_inside
 ************************************************************************
 -}
 
-tcMetaTy :: Name -> TcM Type
--- Given the name of a Template Haskell data type,
--- return the type
--- E.g. given the name "Expr" return the type "Expr"
-tcMetaTy tc_name = do
-    t <- tcLookupTyCon tc_name
-    return (mkTyConTy t)
 
 isBrackLevel :: ThLevel -> Bool
 isBrackLevel (Brack {}) = True
@@ -985,47 +1121,48 @@ tcGetDefaultTys
                                                      , cd_provenance = DP_Builtin
                                                      , cd_warn = Nothing }
 
-        -- see Note [Named default declarations] in GHC.Tc.Gen.Default
-        ; defaults <- getDeclaredDefaultTys -- User-supplied defaults
+        -- See Note [Named default declarations] in GHC.Tc.Gen.Default
+        ; user_defaults <- getDeclaredDefaultTys -- User-supplied defaults
         ; this_module <- tcg_mod <$> getGblEnv
         ; let this_unit = moduleUnit this_module
-        ; if this_unit == ghcInternalUnit
+        ; if this_unit == ghcInternalUnit -- if we wanted, this needn't be about ghc-internal
           -- see Remark [No built-in defaults in ghc-internal]
           -- in Note [Builtin class defaults] in GHC.Tc.Utils.Env
-          then return (defaults, extended_defaults)
+          then return (user_defaults, extended_defaults)
           else do
-              -- not one of the built-in units
+              -- Not one of the built-in units
               -- @default Num (Integer, Double)@, plus extensions
               { extDef <- if extended_defaults
-                          then do { list_ty <- tcMetaTy listTyConName
-                                  ; integer_ty <- tcMetaTy integerTyConName
-                                  ; foldableClass <- tcLookupClass foldableClassName
-                                  ; showClass <- tcLookupClass showClassName
-                                  ; eqClass <- tcLookupClass eqClassName
+                          then do { foldableClass <- tcLookupKnownKeyClass foldableClassKey
+                                  ; showClass     <- tcLookupKnownKeyClass showClassKey
+                                  ; eqClass       <- tcLookupKnownKeyClass eqClassKey
                                   ; pure $ defaultEnv
-                                    [ builtinDefaults foldableClass [list_ty]
-                                    , builtinDefaults showClass [unitTy, integer_ty, doubleTy]
-                                    , builtinDefaults eqClass [unitTy, integer_ty, doubleTy]
+                                    [ builtinDefaults foldableClass [mkTyConTy listTyCon]
+                                    , builtinDefaults showClass [unitTy, integerTy, doubleTy]
+                                    , builtinDefaults eqClass [unitTy, integerTy, doubleTy]
                                     ]
                                   }
                                   -- Note [Extended defaults]
                           else pure emptyDefaultEnv
               ; ovlStr <- if ovl_strings
-                          then do { isStringClass <- tcLookupClass isStringClassName
+                          then do { isStringClass <- tcLookupKnownKeyClass isStringClassKey
                                   ; pure $ unitDefaultEnv $ builtinDefaults isStringClass [stringTy]
                                   }
                           else pure emptyDefaultEnv
               ; checkWiredInTyCon doubleTyCon
-              ; numDef <- case lookupDefaultEnv defaults numClassName of
-                   Nothing -> do { integer_ty <- tcMetaTy integerTyConName
-                                 ; numClass <- tcLookupClass numClassName
-                                 ; pure $ unitDefaultEnv $ builtinDefaults numClass [integer_ty, doubleTy]
-                                 }
-                   -- The Num class is already user-defaulted, no need to construct the builtin default
-                   _ -> pure emptyDefaultEnv
+              ; numDef <- case lookupDefaultEnv_Directly user_defaults numClassKey of
+                   Nothing -> do { numClass   <- tcLookupKnownKeyClass numClassKey
+                                 ; pure $ unitDefaultEnv $
+                                   builtinDefaults numClass [integerTy, doubleTy] }
+
+                   _ -> -- The Num class is already user-defaulted, so
+                        -- no need to construct the builtin default
+                        pure emptyDefaultEnv
+
                 -- Supply the built-in defaults, but make the user-supplied defaults
-                -- override them.
-              ; let deflt_tys = mconcat [ extDef, numDef, ovlStr, defaults ]
+                -- override them.  We put the user-supplied ones last because in `mconcat`
+                -- on `DefaultEnv` the rightmost wins.
+              ; let deflt_tys = mconcat [ extDef, numDef, ovlStr, user_defaults ]
               ; return (deflt_tys, extended_defaults) } }
 
 {-
@@ -1132,7 +1269,7 @@ newDFunName clas tys loc
         ; let info_string = occNameString (getOccName clas) ++
                             concatMap (occNameString . getDFunTyKey) tys
         ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
-        ; newGlobalBinder mod dfun_occ loc }
+        ; newGlobalBinder mod dfun_occ Nothing loc }
 
 newFamInstTyConName :: LocatedN Name -> [Type] -> TcM Name
 newFamInstTyConName (L loc name) tys = mk_fam_inst_name id (locA loc) name [tys]
@@ -1147,7 +1284,7 @@ mk_fam_inst_name adaptOcc loc tc_name tyss
         ; let info_string = occNameString (getOccName tc_name) ++
                             intercalate "|" ty_strings
         ; occ   <- chooseUniqueOccTc (mkInstTyTcOcc info_string)
-        ; newGlobalBinder mod (adaptOcc occ) loc }
+        ; newGlobalBinder mod (adaptOcc occ) Nothing loc }
   where
     ty_strings = map (concatMap (occNameString . getDFunTyKey)) tyss
 
@@ -1240,6 +1377,7 @@ notFound (WithUserRdr rdr gre)
                ErrorWithoutFlag
            | otherwise  -> pure ()
 
+       ; traceTc "notFound" (ppr name)
        ; if isTermVarOrFieldNameSpace (nameNameSpace name)
            then
                -- This code path is only reachable with RequiredTypeArguments enabled
@@ -1265,8 +1403,8 @@ notFound (WithUserRdr rdr gre)
        where name = greName gre
 
 wrongThingErr :: WrongThingSort -> TcTyThing -> Name -> TcM a
-wrongThingErr expected thing name =
-  failWithTc (TcRnTyThingUsedWrong expected thing name)
+wrongThingErr expected thing name
+  = failWithTc (TcRnTyThingUsedWrong expected thing name)
 
 {- Note [Out of scope might be a staging error]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

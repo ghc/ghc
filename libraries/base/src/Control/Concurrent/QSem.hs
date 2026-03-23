@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE BangPatterns #-}
 
@@ -28,6 +29,9 @@ import GHC.Internal.Control.Concurrent.MVar ( MVar, newEmptyMVar, takeMVar, tryT
                           , putMVar, newMVar, tryPutMVar)
 import GHC.Internal.Control.Exception
 import GHC.Internal.Data.Maybe
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 -- | 'QSem' is a quantity semaphore in which the resource is acquired
 -- and released in units of one. It provides guaranteed FIFO ordering

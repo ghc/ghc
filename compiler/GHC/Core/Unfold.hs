@@ -53,7 +53,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Tickish
 
 import GHC.Builtin.PrimOps
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Data.Bag
 

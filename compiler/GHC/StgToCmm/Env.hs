@@ -37,14 +37,14 @@ import GHC.Cmm.Graph
 import GHC.Types.Name
 import GHC.Core.Type
 import GHC.Core.TyCo.Compare( eqType )
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Env
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import GHC.Builtin.Names (getUnique)
+import GHC.Builtin.KnownKeys (getUnique)
 
 
 -------------------------------------

@@ -1,0 +1,13 @@
+T27013e.hs:13:5: error: [GHC-49917]
+    Failed to load the known-names module ‘GHC.Essentials’ from the visible packages
+      while looking for known-occ name ‘fromInteger’
+    Did you mean to use ‘-package base’?
+    
+    Could not load module ‘GHC.Essentials’.
+    It is a member of the hidden package ‘base-4.23.0.0’.
+    Use -v to see a list of the files searched for.
+    
+    To lookup known-names in scope rather than in GHC.Essentials,
+      use ‘-frebindable-known-names’, and import
+      the necessary known-names definitions from ‘ghc-internal’.
+

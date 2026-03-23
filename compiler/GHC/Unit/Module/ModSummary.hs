@@ -86,6 +86,7 @@ data ModSummary
           -- ^ Source imports of the module
         ms_textual_imps :: [(ImportLevel, PkgQual, Located ModuleName)],
           -- ^ Non-source imports of the module from the module *text*
+          -- Includes 'import Prelude' if -XImplicitPrelude
         ms_parsed_mod   :: Maybe HsParsedModule,
           -- ^ The parsed, nonrenamed source, if we have it.  This is also
           -- used to support "inline module syntax" in Backpack files.

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 
 -- |
@@ -24,7 +25,10 @@ module Data.Bool
      bool
      ) where
 
-import Prelude (Bool(..), (&&), (||), not, otherwise)
+import Prelude ( Bool(..), (&&), (||), not, otherwise )
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 -- $setup
 -- >>> import Prelude

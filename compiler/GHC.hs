@@ -379,7 +379,7 @@ import GHC.Parser.Utils
 import GHC.Iface.Env ( trace_if )
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Hs
-import GHC.Builtin.Types.Prim ( alphaTyVars )
+import GHC.Builtin.WiredIn.Prim ( alphaTyVars )
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
@@ -391,7 +391,7 @@ import GHC.Tc.Utils.Monad
   )
 import GHC.Tc.Types
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Module
+import GHC.Tc.Module hiding (getGHCiMonad)
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family
 
@@ -1826,11 +1826,11 @@ setGHCiMonad :: GhcMonad m => String -> m ()
 setGHCiMonad name = withSession $ \hsc_env -> do
     ty <- liftIO $ hscIsGHCiMonad hsc_env name
     modifySession $ \s ->
-        let ic = (hsc_IC s) { ic_monad = ty }
+        let ic = (hsc_IC s) { ic_monad = ExactName ty }
         in s { hsc_IC = ic }
 
 -- | Get the monad GHCi lifts user statements into.
-getGHCiMonad :: GhcMonad m => m Name
+getGHCiMonad :: GhcMonad m => m ExactRdrName
 getGHCiMonad = fmap (ic_monad . hsc_IC) getSession
 
 getHistorySpan :: GhcMonad m => History -> m SrcSpan

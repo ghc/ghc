@@ -10,7 +10,7 @@ import GHC.Tc.Solver
 import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Data.Bag
-import GHC.Builtin.Types (intTy)
+import GHC.Builtin.WiredIn.Types (intTy)
 
 plugin :: Plugin
 plugin = defaultPlugin

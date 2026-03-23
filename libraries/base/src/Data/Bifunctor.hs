@@ -18,9 +18,12 @@ module Data.Bifunctor
   ( Bifunctor(..)
   ) where
 
+import Prelude
 import Control.Applicative  ( Const(..) )
 import GHC.Generics ( K1(..) )
-import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 -- $setup
 -- >>> import Prelude

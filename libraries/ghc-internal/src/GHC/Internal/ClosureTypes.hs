@@ -6,8 +6,9 @@ module GHC.Internal.ClosureTypes
     ( ClosureType(..)
     ) where
 
-import GHC.Internal.Classes (Eq, Ord)
+import GHC.Internal.Base
 import GHC.Internal.Enum
+import GHC.Internal.Num
 import GHC.Internal.Generics
 import GHC.Internal.Show
 

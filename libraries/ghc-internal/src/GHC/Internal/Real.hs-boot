@@ -1,5 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+   -- Defines Real etc
+
 module GHC.Internal.Real (Integral (..)) where
 
 -- For why this file exists
@@ -7,8 +10,10 @@ module GHC.Internal.Real (Integral (..)) where
 
 import GHC.Internal.Classes (Ord)
 import GHC.Internal.Bignum.Integer (Integer)
+import GHC.Internal.Types as Rebindable
 
-import {-# SOURCE #-} GHC.Internal.Num (Num)
+import {-# SOURCE #-} GHC.Internal.Num
+  -- fromInteger needed for the "1" literal
 import {-# SOURCE #-} GHC.Internal.Enum (Enum)
 
 data Ratio a

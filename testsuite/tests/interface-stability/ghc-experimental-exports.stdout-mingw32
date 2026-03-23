@@ -1,6 +1,6 @@
 
 module Data.Sum.Experimental where
-  -- Safety: Trustworthy
+  -- Safety: Safe
   type Sum# :: forall (reps :: [GHC.Internal.Types.RuntimeRep]). TupleArgKind# reps -> TYPE (GHC.Internal.Types.SumRep reps)
   type family Sum# ts where
       Sum# '() = (TypeError ...)
@@ -2094,7 +2094,7 @@ module Data.Sum.Experimental where
         = (TYPE a, TYPE b, TYPE c, TYPE d, TYPE e, TYPE f, TYPE g, TYPE h, TYPE i, TYPE j, TYPE k, TYPE l, TYPE m, TYPE n, TYPE o, TYPE p, TYPE q, TYPE r, TYPE s, TYPE t, TYPE u, TYPE v, TYPE w, TYPE x, TYPE y, TYPE z, TYPE aa, TYPE ab, TYPE ac, TYPE ad, TYPE ae, TYPE af, TYPE ag, TYPE ah, TYPE ai, TYPE aj, TYPE ak, TYPE al, TYPE am, TYPE an, TYPE ao, TYPE ap, TYPE aq, TYPE ar, TYPE as, TYPE at, TYPE au, TYPE av, TYPE aw, TYPE ax, TYPE ay, TYPE az, TYPE ba, TYPE bb, TYPE bc, TYPE bd, TYPE be, TYPE bf, TYPE bg, TYPE bh, TYPE bi, TYPE bj, TYPE bk, TYPE bl)
 
 module Data.Tuple.Experimental where
-  -- Safety: Trustworthy
+  -- Safety: Safe
   type CSolo :: Constraint -> Constraint
   class a => CSolo a
     {-# MINIMAL #-}
@@ -5995,9 +5995,10 @@ module GHC.PrimOps where
     fromString :: GHC.Internal.Base.String -> a
     {-# MINIMAL fromString #-}
   KindRepApp :: GHC.Internal.Types.KindRep -> GHC.Internal.Types.KindRep -> GHC.Internal.Types.KindRep
+  KindRepConstraint :: GHC.Internal.Types.KindRep
   KindRepFun :: GHC.Internal.Types.KindRep -> GHC.Internal.Types.KindRep -> GHC.Internal.Types.KindRep
-  KindRepTYPE :: RuntimeRep -> GHC.Internal.Types.KindRep
   KindRepTyConApp :: GHC.Internal.Types.TyCon -> [GHC.Internal.Types.KindRep] -> GHC.Internal.Types.KindRep
+  KindRepType :: GHC.Internal.Types.KindRep
   KindRepTypeLitD :: GHC.Internal.Types.TypeLitSort -> [Char] -> GHC.Internal.Types.KindRep
   KindRepTypeLitS :: GHC.Internal.Types.TypeLitSort -> Addr# -> GHC.Internal.Types.KindRep
   KindRepVar :: GHC.Internal.Types.KindBndr -> GHC.Internal.Types.KindRep
@@ -6703,6 +6704,10 @@ module GHC.PrimOps where
   isTrue# :: Int# -> Bool
   keepAlive# :: forall {l :: Levity} {r :: RuntimeRep} (a :: TYPE (BoxedRep l)) d (b :: TYPE r). a -> State# d -> (State# d -> b) -> b
   killThread# :: forall a. ThreadId# -> a -> State# RealWorld -> State# RealWorld
+  krepConstraint :: GHC.Internal.Types.KindRep
+  krepStar :: GHC.Internal.Types.KindRep
+  krepStarArr :: GHC.Internal.Types.KindRep
+  krepStarArrStarArr :: GHC.Internal.Types.KindRep
   labelThread# :: ThreadId# -> ByteArray# -> State# RealWorld -> State# RealWorld
   lazy :: forall a. a -> a
   leAddr# :: Addr# -> Addr# -> Int#
@@ -7508,6 +7513,7 @@ module GHC.PrimOps where
   uncheckedShiftRLWord8# :: Word8# -> Int# -> Word8#
   unmaskAsyncExceptions# :: forall {q :: RuntimeRep} (a :: TYPE q). (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
   unpackAppendCString# :: Addr# -> [Char] -> [Char]
+  unpackAppendCStringUtf8# :: Addr# -> [Char] -> [Char]
   unpackCString# :: Addr# -> [Char]
   unpackCStringUtf8# :: Addr# -> [Char]
   unpackClosure# :: forall a b. a -> (# Addr#, ByteArray#, Array# b #)
@@ -7518,6 +7524,7 @@ module GHC.PrimOps where
   unpackFloatX4# :: FloatX4# -> (# Float#, Float#, Float#, Float# #)
   unpackFloatX8# :: FloatX8# -> (# Float#, Float#, Float#, Float#, Float#, Float#, Float#, Float# #)
   unpackFoldrCString# :: forall a. Addr# -> (Char -> a -> a) -> a -> a
+  unpackFoldrCStringUtf8# :: forall a. Addr# -> (Char -> a -> a) -> a -> a
   unpackInt16X16# :: Int16X16# -> (# Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16# #)
   unpackInt16X32# :: Int16X32# -> (# Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16# #)
   unpackInt16X8# :: Int16X8# -> (# Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16# #)
@@ -7803,7 +7810,7 @@ module GHC.PrimOps where
     {-# MINIMAL #-}
 
 module GHC.Profiling.Eras where
-  -- Safety: Trustworthy
+  -- Safety: Safe
   getUserEra :: GHC.Internal.Types.IO GHC.Internal.Types.Word
   incrementUserEra :: GHC.Internal.Types.Word -> GHC.Internal.Types.IO GHC.Internal.Types.Word
   setUserEra :: GHC.Internal.Types.Word -> GHC.Internal.Types.IO ()
@@ -7914,7 +7921,7 @@ module GHC.Stack.Annotation.Experimental where
     ShowAnnotation :: forall a. GHC.Internal.Show.Show a => !(GHC.Internal.Maybe.Maybe GHC.Internal.Stack.Types.SrcLoc) -> a -> ShowAnnotation
   type SomeStackAnnotation :: *
   data SomeStackAnnotation where
-    SomeStackAnnotation :: forall a. (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> SomeStackAnnotation
+    SomeStackAnnotation :: forall a. (GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> SomeStackAnnotation
   type StackAnnotation :: * -> Constraint
   class StackAnnotation a where
     displayStackAnnotation :: a -> GHC.Internal.Base.String
@@ -7926,9 +7933,9 @@ module GHC.Stack.Annotation.Experimental where
     StringAnnotation :: !(GHC.Internal.Maybe.Maybe GHC.Internal.Stack.Types.SrcLoc) -> GHC.Internal.Base.String -> StringAnnotation
   annotateCallStack :: forall b. GHC.Internal.Stack.Types.HasCallStack => b -> b
   annotateCallStackIO :: forall a. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Types.IO a -> GHC.Internal.Types.IO a
-  annotateStack :: forall a b. (GHC.Internal.Stack.Types.HasCallStack, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> b -> b
-  annotateStackIO :: forall a b. (GHC.Internal.Stack.Types.HasCallStack, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
-  annotateStackShow :: forall a b. (GHC.Internal.Stack.Types.HasCallStack, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Show.Show a) => a -> b -> b
+  annotateStack :: forall a b. (GHC.Internal.Stack.Types.HasCallStack, GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> b -> b
+  annotateStackIO :: forall a b. (GHC.Internal.Stack.Types.HasCallStack, GHC.Internal.Data.Typeable.Internal.Typeable a, StackAnnotation a) => a -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
+  annotateStackShow :: forall a b. (GHC.Internal.Stack.Types.HasCallStack, GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Show.Show a) => a -> b -> b
   annotateStackShowIO :: forall a b. (GHC.Internal.Stack.Types.HasCallStack, GHC.Internal.Show.Show a) => a -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
   annotateStackString :: forall b. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Base.String -> b -> b
   annotateStackStringIO :: forall b. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Base.String -> GHC.Internal.Types.IO b -> GHC.Internal.Types.IO b
@@ -8017,7 +8024,7 @@ module GHC.TypeNats.Experimental where
   timesSNat :: forall (n :: GHC.Internal.TypeNats.Nat) (m :: GHC.Internal.TypeNats.Nat). GHC.Internal.TypeNats.SNat n -> GHC.Internal.TypeNats.SNat m -> GHC.Internal.TypeNats.SNat (n GHC.Internal.TypeNats.* m)
 
 module Prelude.Experimental where
-  -- Safety: Trustworthy
+  -- Safety: Safe
   type CSolo :: Constraint -> Constraint
   class a => CSolo a
     {-# MINIMAL #-}

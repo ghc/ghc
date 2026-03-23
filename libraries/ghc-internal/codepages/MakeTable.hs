@@ -217,6 +217,8 @@ theImports =
     [ "import GHC.Internal.Prim (Addr#)"
     , "import GHC.Internal.Types (Char, Int)"
     , "import GHC.Internal.Word"
+    , "import qualified GHC.Internal.Base as Rebindable"
+    , "import qualified GHC.Internal.Num  as Rebindable"
     ]
 
 theTypes :: [String]

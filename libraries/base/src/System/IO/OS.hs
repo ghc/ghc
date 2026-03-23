@@ -23,6 +23,10 @@ module System.IO.OS
 )
 where
 
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
+
 import Control.Monad (return)
 import Control.Concurrent.MVar (MVar)
 import Control.Exception (mask)
@@ -61,6 +65,9 @@ import GHC.IO.Exception
        )
 import Foreign.Ptr (Ptr)
 import Foreign.C.Types (CInt)
+#if __GLASGOW_HASKELL__ >= 1001
+import GHC.Internal.Num as Rebindable( Num ) -- For -frebindable-known-names (defaulting)
+#endif
 
 -- * Obtaining POSIX file descriptors and Windows handles
 

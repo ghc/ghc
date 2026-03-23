@@ -87,10 +87,14 @@ module Data.Fixed
     divMod'
 ) where
 
+import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 import GHC.Internal.Data.Data
 import GHC.Internal.TypeLits (KnownNat, natVal)
 import GHC.Internal.Read
-import GHC.Internal.Text.ParserCombinators.ReadPrec
+import GHC.Internal.Text.ParserCombinators.ReadPrec( ReadPrec )
 import GHC.Internal.Text.Read.Lex
 #if __GLASGOW_HASKELL__ < 1000
 import GHC.Internal.TH.Syntax (unsafeCodeCoerce)
@@ -99,7 +103,6 @@ import GHC.Internal.TH.Monad (unsafeCodeCoerce)
 #endif
 import qualified GHC.Internal.TH.Lift as TH
 import Data.Typeable
-import Prelude
 
 -- $setup
 -- >>> import Prelude

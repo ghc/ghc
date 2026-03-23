@@ -9,6 +9,10 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE BinaryLiterals #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines lots of functions that have BuiltinRules
+
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | Multi-precision natural

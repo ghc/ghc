@@ -88,7 +88,7 @@ module GHC.Tc.Utils.TcMType (
   -- * Other HsSyn functions
   mkHsDictLet, mkHsApp,
   mkHsAppTy, mkHsCaseAlt,
-  tcShortCutLit, shortCutLit, hsOverLitName,
+  tcShortCutLit, shortCutLit, hsOverLitKnownOcc,
   conLikeResTy
   ) where
 
@@ -110,7 +110,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
 import GHC.Tc.Zonk.TcType
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownOccs
 
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -129,7 +129,7 @@ import GHC.Types.Id as Id
 import GHC.Types.Name
 import GHC.Types.Var.Set
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Set
 import GHC.Types.Basic ( TypeOrKind(..)
@@ -2365,11 +2365,11 @@ mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc
 mkLit con lit = HsApp noExtField (nlHsDataCon con) (nlHsLit lit)
 
 ------------------------------
-hsOverLitName :: OverLitVal (GhcPass p)  -> Name
+hsOverLitKnownOcc :: OverLitVal (GhcPass p) -> KnownOcc
 -- Get the canonical 'fromX' name for a particular OverLitVal
-hsOverLitName (HsIntegral {})   = fromIntegerName
-hsOverLitName (HsFractional {}) = fromRationalName
-hsOverLitName (HsIsString {})   = fromStringName
+hsOverLitKnownOcc (HsIntegral {})   = fromIntegerClassOpOcc
+hsOverLitKnownOcc (HsFractional {}) = fromRationalClassOpOcc
+hsOverLitKnownOcc (HsIsString {})   = fromStringClassOpOcc
 
 
 {- *********************************************************************

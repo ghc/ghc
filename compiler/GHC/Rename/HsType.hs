@@ -51,7 +51,9 @@ import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, checkThLocalTyName, check
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.TyCon    ( isKindName )
 import GHC.Driver.Flags
+
 import GHC.Hs
+
 import GHC.Rename.Env
 import GHC.Rename.Doc
 import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV
@@ -60,23 +62,29 @@ import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTypeFixityRn )
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
+
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr ( pprHsDocContext )
 import GHC.Tc.Utils.Monad
-import GHC.Unit.Module ( getModule )
+
 import GHC.Types.Name.Reader
-import GHC.Builtin.Names
-import GHC.Builtin.Types
 import GHC.Types.Hint ( UntickedPromotedThing(..) )
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
 import GHC.Types.SourceText
-
-import GHC.Utils.Misc
 import GHC.Types.Fixity ( compareFixity, negateFixity )
 import GHC.Types.Basic  ( TypeOrKind(..) )
+
+import GHC.Builtin( mkUnboundName, isUnboundName )
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
+import GHC.Builtin.WiredIn.Types( oneDataConName )
+
+import GHC.Unit.Module ( getModule )
+
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
@@ -1710,9 +1718,10 @@ checkSectionPrec direction section op arg
 -- | Look up the fixity for an operator name.
 lookupFixityOp :: OpName -> RnM Fixity
 lookupFixityOp (NormalOp n)  = lookupFixityRn (getName n)
-lookupFixityOp NegateOp      = lookupFixityRn negateName
 lookupFixityOp (UnboundOp u) = lookupFixityRn (mkUnboundName (occName u))
 lookupFixityOp (RecFldOp f)  = lookupFieldFixityRn f
+lookupFixityOp NegateOp      = do { nm <- rnLookupKnownOccName negateClassOpOcc
+                                  ; lookupFixityRn nm }
 
 -- Precedence-related error messages
 

@@ -46,6 +46,7 @@ module GHC.Internal.Conc.POSIX
 
 import GHC.Internal.Data.Bits (shiftR)
 import GHC.Internal.Base (fmap, foldr, otherwise, return, when, ($))
+import qualified GHC.Internal.Base as Rebindable
 import GHC.Internal.Classes (Eq(..), Ord(..), not)
 import GHC.Internal.Clock
 import GHC.Internal.Conc.Sync

@@ -19,10 +19,8 @@
 -- is safe to break things.
 
 module GHC.Internal.TH.Lib where
-
-import GHC.Internal.TH.Syntax hiding (Role, InjectivityAnn)
+import GHC.Internal.TH.Syntax
 import GHC.Internal.TH.Monad
-import qualified GHC.Internal.TH.Syntax as TH
 
 #ifdef BOOTSTRAP_TH
 import Control.Applicative(liftA, Applicative(..))
@@ -32,22 +30,21 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import GHC.Exts (TYPE)
 import Prelude hiding (Applicative(..))
 #else
-import GHC.Internal.Base (
-    String, flip, liftA, liftA2, map, mapM, pure, ($), (.), (<*>), (>>=),
-  )
-import GHC.Internal.Data.Foldable
+import GHC.Internal.Base hiding( Type, Module, inline )
+import GHC.Internal.Data.Foldable hiding( foldr )
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Data.NonEmpty (NonEmpty(..))
 import GHC.Internal.Data.Traversable (traverse, sequenceA)
 import GHC.Internal.Err (error)
 import GHC.Internal.Integer
 import GHC.Internal.List (zip)
-import GHC.Internal.Prim (TYPE)
 import GHC.Internal.Real
-import GHC.Internal.Types (Char, Int)
 import GHC.Internal.Word
 import qualified GHC.Internal.Types as Kind (Type)
+import GHC.Internal.Num  as Rebindable( fromInteger )  -- For known-key names
+import GHC.Internal.Enum as Rebindable( enumFrom )    -- For known-key names
+import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
+import qualified GHC.Internal.Stack.Types as Rebindable
 #endif
 
 ----------------------------------------------------------
@@ -95,10 +92,6 @@ type PatSynDirQ          = Q PatSynDir
 type PatSynArgsQ         = Q PatSynArgs
 type FamilyResultSigQ    = Q FamilyResultSig
 type DerivStrategyQ      = Q DerivStrategy
-
--- must be defined here for DsMeta to find it
-type Role                = TH.Role
-type InjectivityAnn      = TH.InjectivityAnn
 
 type TyVarBndrUnit       = TyVarBndr ()
 type TyVarBndrSpec       = TyVarBndr Specificity
@@ -976,7 +969,7 @@ tyVarSig = fmap TyVarSig
 -- *   Injectivity annotation
 
 injectivityAnn :: Name -> [Name] -> InjectivityAnn
-injectivityAnn = TH.InjectivityAnn
+injectivityAnn = InjectivityAnn
 
 -------------------------------------------------------------------------------
 -- *   Role

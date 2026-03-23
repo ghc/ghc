@@ -58,7 +58,7 @@ T2431.$tc:~:
       T2431.$trModule
       $tc:~:2
       0#
-      GHC.Internal.Types.krep$*->*->*
+      GHC.Internal.Types.krepStarArrStarArr
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 $krep1 :: [GHC.Internal.Types.KindRep]

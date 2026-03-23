@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module GHC.Internal.Stack.Annotation where
 
-import GHC.Internal.Base (String, (++))
+import GHC.Internal.Base
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Stack (SrcLoc, prettySrcLoc)

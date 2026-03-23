@@ -60,6 +60,7 @@ import GHC.Internal.Numeric
 
 #if __GLASGOW_HASKELL__ >= 1001
 
+import qualified GHC.Essentials as Rebindable
 import GHC.Types (Char (C#))
 import GHC.Err (error, errorWithoutStackTrace)
 import GHC.Base (unsafeChr)

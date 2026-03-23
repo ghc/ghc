@@ -32,9 +32,9 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Core.Opt.WorkWrap.Utils
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.PrimOps
-import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
+import GHC.Builtin.WiredIn.Prim ( realWorldStatePrimTy )
 
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.MemoFun

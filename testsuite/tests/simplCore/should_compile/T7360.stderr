@@ -115,7 +115,7 @@ T7360.$tcFoo
       T7360.$trModule
       $tcFoo2
       0#
-      GHC.Internal.Types.krep$*
+      GHC.Internal.Types.KindRepType
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep1 :: GHC.Internal.Types.KindRep

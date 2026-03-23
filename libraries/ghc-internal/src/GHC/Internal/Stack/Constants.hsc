@@ -3,14 +3,13 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module GHC.Internal.Stack.Constants where
 
-import GHC.Internal.Base (($), (.))
-import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Base
 import GHC.Internal.Enum
 import GHC.Internal.Err (error)
 import GHC.Internal.Num
 import GHC.Internal.Show
 import GHC.Internal.Real
-import GHC.Internal.Types (Int)
+import GHC.Internal.Stack.Types as Rebindable
 
 #include "Rts.h"
 #undef BLOCK_SIZE

@@ -16,7 +16,7 @@ TYPE CONSTRUCTORS
     roles nominal
   type synonym Syn2{1} :: * -> *
 Dependent modules: []
-Dependent packages: [(normal, base-4.22.0.0)]
+Dependent packages: [(normal, base-4.23.0.0)]
 
 ==================== Typechecker ====================
 Roles3.$tcC4 [InlPrag=[~]]
@@ -46,7 +46,7 @@ Roles3.$tc'C:C1 [InlPrag=[~]]
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepTyConApp
       GHC.Internal.Types.$tc~
-      ((:) GHC.Internal.Types.krep$* ((:) $krep ((:) $krep [])))
+      ((:) GHC.Internal.Types.krepStar ((:) $krep ((:) $krep [])))
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepTyConApp
       Roles3.$tcC2 ((:) $krep ((:) $krep []))
@@ -59,10 +59,10 @@ $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
-  = GHC.Internal.Types.KindRepFun GHC.Internal.Types.krep$* $krep
+  = GHC.Internal.Types.KindRepFun GHC.Internal.Types.krepStar $krep
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepFun
-      GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
+      GHC.Internal.Types.krepStar GHC.Internal.Types.krepConstraint
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 Roles3.$trModule [InlPrag=[~]]
   = GHC.Internal.Types.Module

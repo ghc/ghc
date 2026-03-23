@@ -10,7 +10,7 @@ import GHC.Tc.Solver
 import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Data.Bag
-import GHC.Builtin.Types (doubleTy, intTy)
+import GHC.Builtin.WiredIn.Types (doubleTy, intTy)
 import Data.Maybe (mapMaybe)
 
 plugin :: Plugin

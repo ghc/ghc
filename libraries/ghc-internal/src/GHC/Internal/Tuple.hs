@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, PatternSynonyms, ExplicitNamespaces #-}
+{-# LANGUAGE NoImplicitPrelude, PatternSynonyms, ExplicitNamespaces, MagicHash #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Tuple
@@ -31,7 +31,7 @@ module GHC.Internal.Tuple (
 ) where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Internal.Types (Int)
+import GHC.Internal.Types
 
 default () -- Double and Integer aren't available yet
 
@@ -44,7 +44,7 @@ data Unit = ()
 
 -- The desugarer uses 1-tuples,
 -- but "Unit" is already used up for 0-tuples
--- See Note [One-tuples] in GHC.Builtin.Types
+-- See Note [One-tuples] in GHC.Builtin.WiredIn.Types
 
 -- | @Solo@ is the canonical lifted 1-tuple, just like 'Tuple2' is the canonical
 -- lifted 2-tuple (pair) and 'Tuple3' is the canonical lifted 3-tuple (triple).
@@ -601,4 +601,7 @@ data Tuple64 a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 
      r1,s1,t1,u1,v1,w1,x1,y1,z1,a2,b2,c2,d2,e2,f2,g2,h2,i2,j2,k2,l2)
 
 maxTupleSize :: Int
-maxTupleSize = 64
+maxTupleSize = I# 64#
+  -- Tricky: avoid using plain "64" because that's an overloaded literal,
+  -- and so desugars into (fromInteger (64::Integer)); but `fromInteger`
+  -- has not not yet been defined.

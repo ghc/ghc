@@ -28,14 +28,18 @@ module GHC.Internal.Event.Windows.ManagedThreadPool
   ) where
 
 import GHC.Internal.Base (return, ($))
+import qualified GHC.Internal.Base as Rebindable
 import GHC.Internal.Control.Concurrent.MVar
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Err (undefined)
 import GHC.Internal.Num ((-), (+))
+import qualified GHC.Internal.Num as Rebindable
 import qualified GHC.Internal.Event.Array as A
 import GHC.Internal.IO.Handle.Internals (debugIO)
 import GHC.Internal.Conc.Sync (ThreadId(..))
 import GHC.Internal.RTS.Flags.Test
+import qualified GHC.Internal.Stack.Types as Rebindable
+  ( SrcLoc(..), pushCallStack, emptyCallStack )
 import GHC.Internal.Types (Int, IO)
 
 ------------------------------------------------------------------------
