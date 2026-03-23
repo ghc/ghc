@@ -40,8 +40,7 @@ module GHC.Internal.IO.Handle.Types (
 
 #undef DEBUG
 
-import GHC.Internal.Base (String, return, (.))
-import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Base
 import GHC.Internal.Maybe (Maybe)
 import GHC.Internal.MVar
 import GHC.Internal.IO
@@ -51,7 +50,6 @@ import GHC.Internal.IO.Encoding.Types
 import GHC.Internal.IORef
 import GHC.Internal.Show
 import GHC.Internal.Read
-import GHC.Internal.Types (Bool(..), Int)
 import GHC.Internal.Word
 import GHC.Internal.IO.Device
 import GHC.Internal.Data.Typeable

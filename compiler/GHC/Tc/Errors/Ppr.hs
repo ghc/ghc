@@ -38,11 +38,8 @@ import qualified GHC.Boot.TH.Syntax as TH
 --            import "ghc-internal"     qualified GHC.Internal.TH.Syntax as TH
 import qualified GHC.Boot.TH.Ppr as TH
 
-import GHC.Builtin.Names
-import GHC.Builtin.Types
-  ( boxedRepDataConTyCon, tYPETyCon
-  , pretendNameIsInScope
-  )
+import GHC.Builtin.Types( boxedRepDataConTyCon, tYPETyCon, pretendNameIsInScope )
+import GHC.Builtin.Names -- A bunch of keys
 
 import GHC.Types.Name.Reader
 import GHC.Unit.Module.ModIface
@@ -853,8 +850,8 @@ instance Diagnostic TcRnMessage where
 
     TcRnUselessTypeable
       -> mkSimpleDecorated $
-           text "Deriving" <+> quotes (ppr typeableClassName) <+>
-           text "has no effect: all types now auto-derive Typeable"
+           text "Deriving(Typeable) has no effect: all types now auto-derive Typeable"
+
     TcRnDerivingDefaults cls
       -> mkSimpleDecorated $ sep
                      [ text "Both DeriveAnyClass and"
@@ -4303,7 +4300,7 @@ pprTcSolverReportMsg ctxt
       = text "(maybe you haven't applied a function to enough arguments?)"
 
       -- Clarify the mysterious "No instance for (Typeable T)
-      | className clas == typeableClassName
+      | clas `hasKnownKey` typeableClassKey
       , [_,ty] <- tys     -- Look for (Typeable (k->*) (T k))
       , Just (tc,_) <- tcSplitTyConApp_maybe ty
       , not (isTypeFamilyTyCon tc)
@@ -6581,16 +6578,16 @@ suggestNonCanonicalDefinition reason =
   where
     action = case reason of
       NonCanonicalMonoid sub -> case sub of
-        NonCanonical_Sappend -> move sappendName mappendName
-        NonCanonical_Mappend -> remove mappendName sappendName
-      NonCanonicalMonad sub -> case sub of
-        NonCanonical_Pure -> move pureAName returnMName
-        NonCanonical_ThenA -> move thenAName thenMName
-        NonCanonical_Return -> remove returnMName pureAName
-        NonCanonical_ThenM -> remove thenMName thenAName
+        NonCanonical_Sappend -> move sappendClassOpOcc mappendClassOpOcc
+        NonCanonical_Mappend -> remove mappendClassOpOcc sappendClassOpOcc
+      NonCanonicalMonad sub  -> case sub of
+        NonCanonical_Pure    -> move   pureAClassOpOcc   returnMClassOpOcc
+        NonCanonical_ThenA   -> move   thenAClassOpOcc   thenMClassOpOcc
+        NonCanonical_Return  -> remove returnMClassOpOcc pureAClassOpOcc
+        NonCanonical_ThenM   -> remove thenMClassOpOcc   thenAClassOpOcc
 
-    move = SuggestMoveNonCanonicalDefinition
-    remove = SuggestRemoveNonCanonicalDefinition
+    move lhs_occ rhs_occ   = SuggestMoveNonCanonicalDefinition   lhs_occ rhs_occ
+    remove lhs_occ rhs_occ = SuggestRemoveNonCanonicalDefinition lhs_occ rhs_occ
 
     doc = case reason of
       NonCanonicalMonoid _ -> doc_monoid

@@ -28,8 +28,7 @@ module GHC.Tc.Utils.Instantiate (
      newClsInst, newFamInst,
      tcGetInsts, tcGetInstEnvs, getOverlapFlag,
      tcExtendLocalInstEnv,
-     instCallConstraints, newMethodFromName,
-     tcSyntaxName,
+     instCallConstraints, newKnownOccMethod, newKnownKeyMethod,
 
      -- Simple functions over evidence variables
      tyCoVarsOfWC,
@@ -41,8 +40,8 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 
-import GHC.Builtin.Types  ( integerTyConName )
-import GHC.Builtin.Names
+import GHC.Builtin.Names( rationalTyConOcc )
+import GHC.Builtin.Types( integerTy )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type   ( hsLitType )
@@ -55,14 +54,13 @@ import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Core.Class( Class )
 import GHC.Core.Coercion.Axiom
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Instance.FunDeps
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
@@ -70,21 +68,19 @@ import GHC.Tc.Errors.Types
 import GHC.Rename.Utils( mkRnSyntaxExpr )
 
 import GHC.Types.Id.Make( mkDictFunId )
-import GHC.Types.Arity ( Arity, VisArity )
+import GHC.Types.Arity ( VisArity )
 import GHC.Types.Basic ( TypeOrKind(..) )
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Name
-import GHC.Types.Name.Reader (WithUserRdr(..))
 import GHC.Types.Var
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
-import GHC.Utils.Unique (sameUnique)
 
 import GHC.Unit.State
 import GHC.Unit.External
@@ -102,31 +98,35 @@ import Data.Function ( on )
 ************************************************************************
 -}
 
-newMethodFromName
+newKnownOccMethod
   :: CtOrigin              -- ^ why do we need this?
-  -> Name                  -- ^ name of the method
+  -> KnownOcc              -- ^ name of the method
   -> [TcRhoType]           -- ^ types with which to instantiate the class
   -> TcM (HsExpr GhcTc)
--- ^ Used when 'Name' is the wired-in name for a wired-in class method,
+-- ^ Used when 'KnownOcc' is the known occ for a known-occ class method,
 -- so the caller knows its type for sure, which should be of form
 --
 -- > forall a. C a => <blah>
 --
--- 'newMethodFromName' is supposed to instantiate just the outer
+-- 'newMethodFromKnownKey' is supposed to instantiate just the outer
 -- type variable and constraint
+newKnownOccMethod origin occ ty_args
+  = do { id <- tcLookupKnownOccId occ
+       ; finish_nkko origin id ty_args }
 
-newMethodFromName origin name ty_args
-  = do { id <- tcLookupId name
-              -- Use tcLookupId not tcLookupGlobalId; the method is almost
-              -- always a class op, but with -XRebindableSyntax GHC is
-              -- meant to find whatever thing is in scope, and that may
-              -- be an ordinary function.
+newKnownKeyMethod  -- Same as newKnownOccMethod, but with a KnownKey
+  :: CtOrigin -> KnownKey -> [TcRhoType]-> TcM (HsExpr GhcTc)
+newKnownKeyMethod origin key ty_args
+  = do { id <- tcLookupKnownKeyId key
+       ; finish_nkko origin id ty_args }
 
-       ; let ty = piResultTys (idType id) ty_args
+finish_nkko :: CtOrigin -> Id -> [TcRhoType] -> TcM (HsExpr GhcTc)
+finish_nkko origin id ty_args
+  = do { let ty = piResultTys (idType id) ty_args
              (theta, _caller_knows_this) = tcSplitPhiTy ty
-       ; wrap <- assert (not (isForAllTy ty) && isSingleton theta) $
+       ; wrap <- assertPpr (not (isForAllTy ty) && isSingleton theta)
+                   (ppr id <+> dcolon <+> ppr (idType id) $$ ppr ty_args) $
                  instCall origin ty_args theta
-
        ; return (mkHsWrap wrap (mkHsVar (noLocA id))) }
 
 {-
@@ -790,112 +790,13 @@ newNonTrivialOverloadedLit
 ------------
 mkOverLit :: OverLitVal -> TcM (HsLit GhcTc)
 mkOverLit (HsIntegral i)
-  = do  { integer_ty <- tcMetaTy integerTyConName
-        ; return (XLit $ HsInteger  (il_text i) (il_value i) integer_ty) }
+  = return (XLit $ HsInteger  (il_text i) (il_value i) integerTy)
 
 mkOverLit (HsFractional r)
-  = do  { rat_ty <- tcMetaTy rationalTyConName
+  = do  { rat_ty <- tcMetaKnownOccTy rationalTyConOcc
         ; return (XLit $ HsRat r rat_ty) }
 
 mkOverLit (HsIsString src s) = return (HsString src s)
-
-{-
-************************************************************************
-*                                                                      *
-                Re-mappable syntax
-
-     Used only for arrow syntax -- find a way to nuke this
-*                                                                      *
-************************************************************************
-
-Suppose we are doing the -XRebindableSyntax thing, and we encounter
-a do-expression.  We have to find (>>) in the current environment, which is
-done by the rename. Then we have to check that it has the same type as
-Control.Monad.(>>).  Or, more precisely, a compatible type. One 'customer' had
-this:
-
-  (>>) :: HB m n mn => m a -> n b -> mn b
-
-So the idea is to generate a local binding for (>>), thus:
-
-        let then72 :: forall a b. m a -> m b -> m b
-            then72 = ...something involving the user's (>>)...
-        in
-        ...the do-expression...
-
-Now the do-expression can proceed using then72, which has exactly
-the expected type.
-
-In fact tcSyntaxName just generates the RHS for then72, because we only
-want an actual binding in the do-expression case. For literals, we can
-just use the expression inline.
--}
-
-tcSyntaxName :: CtOrigin
-             -> TcType                  -- ^ Type to instantiate it at
-             -> (Name, HsExpr GhcRn)    -- ^ (Standard name, user name)
-             -> TcM (Name, HsExpr GhcTc)
-                                        -- ^ (Standard name, suitable expression)
--- USED ONLY FOR CmdTop (sigh) ***
--- See Note [CmdSyntaxTable] in "GHC.Hs.Expr"
-
-tcSyntaxName orig ty (std_nm, HsVar _ (L _ (WithUserRdr _ user_nm)))
-  | std_nm == user_nm
-  = do rhs <- newMethodFromName orig std_nm [ty]
-       return (std_nm, rhs)
-
-tcSyntaxName orig ty (std_nm, user_nm_expr) = do
-    std_id <- tcLookupId std_nm
-    let
-        ([tv], _, tau) = tcSplitSigmaTy (idType std_id)
-        sigma1         = substTyWith [tv] [ty] tau
-        -- Actually, the "tau-type" might be a sigma-type in the
-        -- case of locally-polymorphic methods.
-
-    span <- getSrcSpanM
-    addErrCtxt (SyntaxNameCtxt user_nm_expr orig sigma1 span) $ do
-
-        -- Check that the user-supplied thing has the
-        -- same type as the standard one.
-        -- Tiresome jiggling because tcCheckSigma takes a located expression
-     expr <- tcCheckPolyExpr (L (noAnnSrcSpan span) user_nm_expr) sigma1
-     hasFixedRuntimeRepRes std_nm user_nm_expr sigma1
-     return (std_nm, unLoc expr)
-
-{-
-************************************************************************
-*                                                                      *
-                FixedRuntimeRep
-*                                                                      *
-************************************************************************
--}
-
--- | Check that the result type of an expression has a fixed runtime representation.
---
--- Used only for arrow operations such as 'arr', 'first', etc.
-hasFixedRuntimeRepRes :: Name -> HsExpr GhcRn -> TcSigmaType -> TcM ()
-hasFixedRuntimeRepRes std_nm user_expr ty = mapM_ do_check mb_arity
-  where
-   do_check :: Arity -> TcM ()
-   do_check arity =
-     let res_ty = nTimes arity (snd . splitPiTy) ty
-     in hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowFun user_expr) res_ty
-   mb_arity :: Maybe Arity
-   mb_arity -- arity of the arrow operation, counting type-level arguments
-     | sameUnique std_nm arrAName     -- result used as an argument in, e.g., do_premap
-     = Just 3
-     | sameUnique std_nm composeAName -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
-     = Just 5
-     | sameUnique std_nm firstAName   -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
-     = Just 4
-     | sameUnique std_nm appAName     -- result used as an argument in, e.g., dsCmd/HsCmdArrApp/HsHigherOrderApp
-     = Just 2
-     | sameUnique std_nm choiceAName  -- result used as an argument in, e.g., HsCmdIf
-     = Just 5
-     | sameUnique std_nm loopAName    -- result used as an argument in, e.g., HsCmdIf
-     = Just 4
-     | otherwise
-     = Nothing
 
 {-
 ************************************************************************

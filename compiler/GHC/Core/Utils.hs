@@ -86,7 +86,7 @@ import GHC.Core.Reduction
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
 
-import GHC.Builtin.Names ( makeStaticName, unsafeEqualityProofIdKey, unsafeReflDataConKey )
+import GHC.Builtin.Names ( makeStaticKey, unsafeEqualityProofIdKey, unsafeReflDataConKey )
 import GHC.Builtin.PrimOps
 
 import GHC.Types.Var
@@ -2941,8 +2941,8 @@ collectMakeStaticArgs
   :: CoreExpr -> Maybe (CoreExpr, Type, CoreExpr, CoreExpr)
 collectMakeStaticArgs e
     | (fun@(Var b), [Type t, loc, arg], _) <- collectArgsTicks (const True) e
-    , idName b == makeStaticName = Just (fun, t, loc, arg)
-collectMakeStaticArgs _          = Nothing
+    , b `hasKnownKey` makeStaticKey = Just (fun, t, loc, arg)
+collectMakeStaticArgs _             = Nothing
 
 {-
 ************************************************************************

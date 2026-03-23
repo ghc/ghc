@@ -39,8 +39,9 @@ import GHC.Internal.Data.Maybe
 import GHC.Internal.Enum
 import GHC.Internal.Prim (coerce)
 import GHC.Internal.Show
-import GHC.Internal.Types (Coercible)
 import GHC.Internal.Read
+import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Base                -- For known-key names
 
 -- | Representational equality. If @Coercion a b@ is inhabited by some terminating
 -- value, then the type @a@ has the same underlying representation as the type @b@.

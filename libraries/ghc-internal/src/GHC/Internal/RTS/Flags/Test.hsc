@@ -21,6 +21,7 @@ import GHC.Internal.Base (pure)
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.Marshal.Utils
 #endif
+import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 #include "Rts.h"
 #include "rts/Flags.h"

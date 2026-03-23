@@ -2,6 +2,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+  -- Defines `fail`
+
 -- |
 -- Module      :  GHC.Internal.Control.Monad.Fail
 -- Copyright   :  (C) 2015 David Luposchainsky,

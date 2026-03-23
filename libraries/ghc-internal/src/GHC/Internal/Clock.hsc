@@ -11,7 +11,9 @@ import GHC.Internal.Base (return)
 import GHC.Internal.Real
 import GHC.Internal.Word
 import GHC.Internal.Types (Double, IO)
-import GHC.Internal.Float () -- for Num Double instance
+import GHC.Internal.Float ()           -- For Num Double instance
+import GHC.Internal.Base( (>>=) )      -- For known-key names
+import GHC.Internal.Num( fromInteger ) -- For known-key names
 #if defined(javascript_HOST_ARCH)
 import GHC.Internal.Num
 #endif

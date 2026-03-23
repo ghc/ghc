@@ -41,17 +41,20 @@ module GHC.Types.Name (
         -- * The main types
         Name,                                   -- Abstract
         BuiltInSyntax(..),
+        KnownKey, KnownOcc, KnownKeyNameMaps, hasKnownKey, pprKnownKey,
 
         -- ** Creating 'Name's
         mkSystemName, mkSystemNameAt,
         mkInternalName, mkClonedInternalName, mkDerivedInternalName,
         mkSystemVarName, mkSysTvName,
         mkFCallName,
-        mkExternalName, mkWiredInName,
+        mkExternalName, mkWiredInName, mkKnownKeyName,
+
+        mk_known_key_name,   -- Temporary. ToDo: get rid of me #27013
 
         -- ** Manipulating and deconstructing 'Name's
         nameUnique, setNameUnique,
-        nameOccName, nameNameSpace, nameModule, nameModule_maybe,
+        nameOccName, nameNameSpace, nameModule, nameModule_maybe, extNamePieces,
         setNameLoc,
         tidyNameOcc,
         localiseName,
@@ -66,6 +69,7 @@ module GHC.Types.Name (
         isTyVarName, isTyConName, isDataConName,
         isValName, isVarName, isDynLinkName, isFieldName,
         isWiredInName, isWiredIn, isBuiltInSyntax, isTupleTyConName,
+        isKnownKeyName, isKnownKey,
         isSumTyConName,
         isUnboxedTupleDataConLikeName,
         isHoleName,
@@ -97,6 +101,7 @@ import GHC.Unit.Home
 import GHC.Types.FieldLabel
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import GHC.Types.Unique.FM
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Utils.Binary
@@ -113,114 +118,9 @@ import qualified Data.Semigroup as S
 import GHC.Builtin.Uniques ( isTupleTyConUnique, isCTupleTyConUnique,
                              isSumTyConUnique, isTupleDataConLikeUnique )
 
-{-
-************************************************************************
-*                                                                      *
-\subsection[Name-datatype]{The @Name@ datatype, and name construction}
-*                                                                      *
-************************************************************************
--}
 
--- | A unique, unambiguous name for something, containing information about where
--- that thing originated.
-data Name = Name
-  { n_sort :: NameSort
-    -- ^ What sort of name it is
-
-  , n_occ  :: OccName
-    -- ^ Its occurrence name.
-    --
-    -- NOTE: kept lazy to allow known names to be known constructor applications
-    -- and to inline better. See Note [Fast comparison for built-in Names]
-
-  , n_uniq :: {-# UNPACK #-} !Unique
-    -- ^ Its unique.
-
-  , n_loc  :: !SrcSpan
-    -- ^ Definition site
-    --
-    -- NOTE: we make the n_loc field strict to eliminate some potential
-    -- (and real!) space leaks, due to the fact that we don't look at
-    -- the SrcLoc in a Name all that often.
-  }
-
--- See Note [About the NameSorts]
-data NameSort
-  = External Module
-        -- Either an import from another module
-        -- or a top-level name
-        -- See Note [About the NameSorts]
-
-  | WiredIn Module TyThing BuiltInSyntax
-        -- A variant of External, for wired-in things
-
-  | Internal            -- A user-defined local Id or TyVar
-                        -- defined in the module being compiled
-                        -- See Note [About the NameSorts]
-
-  | System              -- A system-defined Id or TyVar.  Typically the
-                        -- OccName is very uninformative (like 's')
-
-instance Outputable NameSort where
-  ppr (External _)    = text "external"
-  ppr (WiredIn _ _ _) = text "wired-in"
-  ppr  Internal       = text "internal"
-  ppr  System         = text "system"
-
-instance NFData Name where
-  rnf Name{..} = rnf n_sort `seq` rnf n_occ `seq` n_uniq `seq` rnf n_loc
-
--- Needs NFData Name, so the instance is here to avoid cyclic imports.
-instance NFData FieldLabel where
-  rnf (FieldLabel a b c) = rnf a `seq` rnf b `seq` rnf c
-
-instance NFData NameSort where
-  rnf (External m) = rnf m
-  rnf (WiredIn m t b) = rnf m `seq` t `seq` b `seq` ()
-    -- XXX this is a *lie*, we're not going to rnf the TyThing, but
-    -- since the TyThings for WiredIn Names are all static they can't
-    -- be hiding space leaks or errors.
-  rnf Internal = ()
-  rnf System = ()
-
--- | BuiltInSyntax is for things like @(:)@, @[]@ and tuples,
--- which have special syntactic forms.  They aren't in scope
--- as such.
-data BuiltInSyntax = BuiltInSyntax | UserSyntax
-
-{-
-Note [Fast comparison for built-in Names]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this wired-in Name in GHC.Builtin.Names:
-
-   int8TyConName = tcQual gHC_INTERNAL_INT  (fsLit "Int8")  int8TyConKey
-
-Ultimately this turns into something like:
-
-   int8TyConName = Name gHC_INTERNAL_INT (mkOccName ..."Int8") int8TyConKey
-
-So a comparison like `x == int8TyConName` will turn into `getUnique x ==
-int8TyConKey`, nice and efficient.  But if the `n_occ` field is strict, that
-definition will look like:
-
-   int8TyConName = case (mkOccName..."Int8") of occ ->
-                   Name gHC_INTERNAL_INT occ int8TyConKey
-
-and now the comparison will not optimise.  This matters even more when there are
-numerous comparisons (see #19386):
-
-if | tc == int8TyCon  -> ...
-   | tc == int16TyCon -> ...
-   ...etc...
-
-when we would like to get a single multi-branched case.
-
-TL;DR: we make the `n_occ` field lazy.
--}
-
-{-
-Note [About the NameSorts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [About the NameSorts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1.  Initially:
     * All types, classes, data constructors get External Names
     * Top-level Ids (including locally-defined ones) get External Names,
@@ -265,7 +165,115 @@ Note [About the NameSorts]
 
    The BuiltInSyntax flag => It's a syntactic form, not "in scope" (e.g. [])
    All built-in syntax things are WiredIn.
+
+Note [Fast comparison for built-in Names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this wired-in Name in GHC.Builtin.Names:
+
+   int8TyConName = tcQual gHC_INTERNAL_INT  (fsLit "Int8")  int8TyConKey
+
+Ultimately this turns into something like:
+
+   int8TyConName = Name gHC_INTERNAL_INT (mkOccName ..."Int8") int8TyConKey
+
+So a comparison like `x == int8TyConName` will turn into `getUnique x ==
+int8TyConKey`, nice and efficient.  But if the `n_occ` field is strict, that
+definition will look like:
+
+   int8TyConName = case (mkOccName..."Int8") of occ ->
+                   Name gHC_INTERNAL_INT occ int8TyConKey
+
+and now the comparison will not optimise.  This matters even more when there are
+numerous comparisons (see #19386):
+
+if | tc == int8TyCon  -> ...
+   | tc == int16TyCon -> ...
+   ...etc...
+
+when we would like to get a single multi-branched case.
+
+TL;DR: we make the `n_occ` field lazy.
 -}
+
+{- *******************************************************************
+*                                                                    *
+*              The `Name` datatype, and name construction            *
+*                                                                    *
+******************************************************************* -}
+
+-- | A unique, unambiguous name for something, containing information about where
+-- that thing originated.
+data Name = Name
+  { n_sort :: NameSort
+    -- ^ What sort of name it is
+
+  , n_occ  :: OccName
+    -- ^ Its occurrence name.
+    --
+    -- NOTE: kept lazy to allow known names to be known constructor applications
+    -- and to inline better. See Note [Fast comparison for built-in Names]
+
+  , n_uniq :: {-# UNPACK #-} !Unique
+    -- ^ Its unique.
+
+  , n_loc  :: !SrcSpan
+    -- ^ Definition site
+    --
+    -- NOTE: we make the n_loc field strict to eliminate some potential
+    -- (and real!) space leaks, due to the fact that we don't look at
+    -- the SrcLoc in a Name all that often.
+  }
+
+-- See Note [About the NameSorts]
+data NameSort
+  = External Module
+        -- Either an import from another module or a top-level name
+        -- The Module is the module where the entity is originally defined
+        -- See Note [About the NameSorts]
+
+  | KnownKey Module
+        -- Just like External, but signals that this is a KnownKey Name
+        -- See Note [Overview of known-key entities]
+
+  | WiredIn Module TyThing BuiltInSyntax
+        -- A variant of External, for wired-in things
+
+  | Internal            -- A user-defined local Id or TyVar
+                        -- defined in the module being compiled
+                        -- See Note [About the NameSorts]
+
+  | System              -- A system-defined Id or TyVar.  Typically the
+                        -- OccName is very uninformative (like 's')
+
+instance Outputable NameSort where
+  ppr (External _)    = text "external"
+  ppr (WiredIn _ _ _) = text "wired-in"
+  ppr  Internal       = text "internal"
+  ppr  System         = text "system"
+  ppr (KnownKey _)    = text "known-key"
+
+instance NFData Name where
+  rnf Name{..} = rnf n_sort `seq` rnf n_occ `seq` n_uniq `seq` rnf n_loc
+
+-- Needs NFData Name, so the instance is here to avoid cyclic imports.
+instance NFData FieldLabel where
+  rnf (FieldLabel a b c) = rnf a `seq` rnf b `seq` rnf c
+
+instance NFData NameSort where
+  rnf (External m) = rnf m
+  rnf (KnownKey m) = rnf m
+  rnf (WiredIn m t b) = rnf m `seq` t `seq` b `seq` ()
+    -- XXX this is a *lie*, we're not going to rnf the TyThing, but
+    -- since the TyThings for WiredIn Names are all static they can't
+    -- be hiding space leaks or errors.
+  rnf Internal = ()
+  rnf System = ()
+
+-- | BuiltInSyntax is for things like @(:)@, @[]@ and tuples,
+-- which have special syntactic forms.  They aren't in scope
+-- as such.
+data BuiltInSyntax = BuiltInSyntax | UserSyntax
+
 
 instance HasOccName Name where
   occName = nameOccName
@@ -283,24 +291,62 @@ nameNameSpace name = occNameSpace (n_occ name)
 nameSrcLoc    name = srcSpanStart (n_loc name)
 nameSrcSpan   name = n_loc  name
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{Predicates on names}
+                 Known-key names
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
+
+-- A known-key Name is identified by a statically-allocated Unique
+-- See Note [Overview of known-key entities] in GHC.Builtin
+type KnownKey = Unique
+type KnownOcc = OccName
+
+-- KnownKeyNameMap maps the KnownKey to the full Name for the thing
+type KnownKeyNameMaps = (UniqFM KnownKey Name, OccEnv Name)
+
+hasKnownKey :: Uniquable a => a -> KnownKey -> Bool
+-- See if a thing has a particular known key
+hasKnownKey = hasKey
+
+-- ToDo: get rid of this function when we complete the known-key name transition
+--       see #27013
+mk_known_key_name :: NameSpace -> Module -> FastString -> KnownKey -> Name
+{-# INLINE mk_known_key_name #-}
+mk_known_key_name space modu str unique
+  = mkKnownKeyName unique modu (mkOccNameFS space str) noSrcSpan
+
+pprKnownKey :: KnownKey -> SDoc
+-- Show it in both base64 and decimal, for debugging
+pprKnownKey uniq
+  = ppr uniq <+> braces (text (show tag) <+> ppr u)
+  where
+    (tag, u) = unpkUnique uniq
+
+
+{- *********************************************************************
+*                                                                      *
+                 Predicates on Names
+*                                                                      *
+********************************************************************* -}
 
 isInternalName    :: Name -> Bool
 isExternalName    :: Name -> Bool
 isSystemName      :: Name -> Bool
 isWiredInName     :: Name -> Bool
+isKnownKeyName    :: Name -> Bool
 
 isWiredInName (Name {n_sort = WiredIn _ _ _}) = True
 isWiredInName _                               = False
 
+isKnownKeyName (Name {n_sort = KnownKey _}) = True
+isKnownKeyName _                            = False
+
 isWiredIn :: NamedThing thing => thing -> Bool
 isWiredIn = isWiredInName . getName
+
+isKnownKey :: NamedThing thing => thing -> Bool
+isKnownKey = isKnownKeyName . getName
 
 wiredInNameTyThing_maybe :: Name -> Maybe TyThing
 wiredInNameTyThing_maybe (Name {n_sort = WiredIn _ thing _}) = Just thing
@@ -322,9 +368,10 @@ isUnboxedTupleDataConLikeName n
   | Just (Unboxed, _) <- isTupleDataConLikeUnique (getUnique n) = True
   | otherwise = False
 
-isExternalName (Name {n_sort = External _})    = True
-isExternalName (Name {n_sort = WiredIn _ _ _}) = True
-isExternalName _                               = False
+isExternalName (Name {n_sort = External {}}) = True
+isExternalName (Name {n_sort = KnownKey {}}) = True
+isExternalName (Name {n_sort = WiredIn {} }) = True
+isExternalName _                             = False
 
 isInternalName name = not (isExternalName name)
 
@@ -370,8 +417,16 @@ nameModule name =
 
 nameModule_maybe :: Name -> Maybe Module
 nameModule_maybe (Name { n_sort = External mod})    = Just mod
+nameModule_maybe (Name { n_sort = KnownKey mod})    = Just mod
 nameModule_maybe (Name { n_sort = WiredIn mod _ _}) = Just mod
 nameModule_maybe _                                  = Nothing
+
+extNamePieces :: Name -> (Module, OccName, Bool)
+-- Get the pieces of an external name, ready to serialise
+extNamePieces (Name { n_occ = occ, n_sort = External mod})    = (mod, occ, False)
+extNamePieces (Name { n_occ = occ, n_sort = WiredIn mod _ _}) = (mod, occ, False)
+extNamePieces (Name { n_occ = occ, n_sort = KnownKey mod})    = (mod, occ, True)
+extNamePieces name = pprPanic "extNamePieces" (ppr name)
 
 is_interactive_or_from :: Module -> Module -> Bool
 is_interactive_or_from from mod = from == mod || isInteractiveModule mod
@@ -444,6 +499,7 @@ nameIsHomePackage this_mod
   = \nm -> case n_sort nm of
               External nm_mod    -> moduleUnit nm_mod == this_pkg
               WiredIn nm_mod _ _ -> moduleUnit nm_mod == this_pkg
+              KnownKey nm_mod    -> moduleUnit nm_mod == this_pkg
               Internal -> True
               System   -> False
   where
@@ -536,6 +592,12 @@ mkExternalName uniq mod occ loc
   = Name { n_uniq = uniq, n_sort = External mod,
            n_occ = occ, n_loc = loc }
 
+mkKnownKeyName :: Unique -> Module -> OccName -> SrcSpan -> Name
+{-# INLINE mkKnownKeyName #-}
+mkKnownKeyName uniq mod occ loc
+  = Name { n_uniq = uniq, n_sort = KnownKey mod,
+           n_occ = occ, n_loc = loc }
+
 -- | Create a name which is actually defined by the compiler itself
 mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name
 {-# INLINE mkWiredInName #-}
@@ -608,13 +670,22 @@ stableNameCmp (Name { n_sort = s1, n_occ = occ1 })
     -- Later constructors are bigger
     sort_cmp (External m1) (External m2)       = m1 `stableModuleCmp` m2
     sort_cmp (External {}) _                   = LT
-    sort_cmp (WiredIn {}) (External {})        = GT
+
+    sort_cmp (KnownKey {})   (External {})     = GT
+    sort_cmp (KnownKey m1)   (KnownKey m2)     = m1 `stableModuleCmp` m2
+    sort_cmp (KnownKey {})   _                 = LT
+
+    sort_cmp (WiredIn {})     (External {})    = GT
+    sort_cmp (WiredIn {})     (KnownKey {})    = GT
     sort_cmp (WiredIn m1 _ _) (WiredIn m2 _ _) = m1 `stableModuleCmp` m2
     sort_cmp (WiredIn {})     _                = LT
+
     sort_cmp Internal         (External {})    = GT
+    sort_cmp Internal         (KnownKey {})    = GT
     sort_cmp Internal         (WiredIn {})     = GT
     sort_cmp Internal         Internal         = EQ
     sort_cmp Internal         System           = LT
+
     sort_cmp System           System           = EQ
     sort_cmp System           _                = GT
 
@@ -703,6 +774,7 @@ pprName_userQual user_qual name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ
                                   -- In code style, always qualify
                                   -- ToDo: maybe we could print all wired-in things unqualified
                                   --       in code style, to reduce symbol table bloat?
+               KnownKey mod    -> pprModule mod <> char '_' <> z_occ -- TODO: is this right
                System          -> pprUniqueAlways uniq
                Internal        -> pprUniqueAlways uniq
    z_occ = ztext $ zEncodeFS $ occNameMangledFS occ
@@ -712,10 +784,11 @@ pprName_userQual user_qual name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ
      sdocOption sdocListTuplePuns $ \listTuplePuns ->
        handlePuns listTuplePuns (namePun_maybe name) $
        case sort of
-         WiredIn mod _ builtin   -> pprExternal debug sty uniq mod user_qual occ True  builtin
-         External mod            -> pprExternal debug sty uniq mod user_qual occ False UserSyntax
-         System                  -> pprSystem   debug sty uniq occ
-         Internal                -> pprInternal debug sty uniq occ
+         WiredIn mod _ bi -> pprExternal debug sty uniq mod user_qual occ (text "(w)") bi
+         External mod     -> pprExternal debug sty uniq mod user_qual occ (text "(x)") UserSyntax
+         KnownKey mod     -> pprExternal debug sty uniq mod user_qual occ (text "(k)") UserSyntax
+         System           -> pprSystem   debug sty uniq occ
+         Internal         -> pprInternal debug sty uniq occ
 
    handlePuns :: Bool -> Maybe FastString -> SDoc -> SDoc
    handlePuns True (Just pun) _ = ftext pun
@@ -728,6 +801,7 @@ pprFullName :: Module -> Name -> SDoc
 pprFullName this_mod Name{n_sort = sort, n_occ = occ} =
   let mod = case sort of
         WiredIn  m _ _ -> m
+        KnownKey m     -> m
         External m     -> m
         System         -> this_mod
         Internal       -> this_mod
@@ -740,6 +814,7 @@ pprFullNameWithUnique :: Module -> Name -> SDoc
 pprFullNameWithUnique this_mod Name{n_sort = sort, n_uniq = u, n_occ = occ} =
   let mod = case sort of
         WiredIn  m _ _ -> m
+        KnownKey m     -> m
         External m     -> m
         System         -> this_mod
         Internal       -> this_mod
@@ -766,12 +841,12 @@ pprExternal :: Bool -> PprStyle -> Unique
             -> Module -- ^ module the 'Name' is defined in
             -> Maybe ModuleName -- ^ user module qualification
             -> OccName
-            -> Bool -- ^ wired-in?
+            -> SDoc   -- wired-in, known-key or empty
             -> BuiltInSyntax
             -> SDoc
-pprExternal debug sty uniq mod user_qual occ is_wired is_builtin
+pprExternal debug sty uniq mod user_qual occ pp_sort is_builtin
   | debug         = pp_mod <> ppr_occ_name occ
-                     <> braces (hsep [if is_wired then text "(w)" else empty,
+                     <> braces (hsep [pp_sort,
                                       pprNameSpaceBrief (occNameSpace occ),
                                       pprUnique uniq])
   | BuiltInSyntax <- is_builtin = ppr_occ_name occ  -- Never qualify builtin syntax
@@ -868,6 +943,7 @@ nameSortStableString System = "$_sys"
 nameSortStableString Internal = "$_in"
 nameSortStableString (External mod) = moduleStableString mod
 nameSortStableString (WiredIn mod _ _) = moduleStableString mod
+nameSortStableString (KnownKey mod)    = moduleStableString mod
 
 {-
 ************************************************************************

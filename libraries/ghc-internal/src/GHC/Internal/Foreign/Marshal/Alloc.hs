@@ -83,6 +83,7 @@ import GHC.Internal.Show
 import GHC.Internal.Ptr
 import GHC.Internal.Base                     ( String, return, ($), (++) )
 import GHC.Internal.Types                    ( Bool, Int(..), IO(..) )
+import GHC.Internal.Base( (>>=), (>>) )      -- For known-key names
 
 -- exported functions
 -- ------------------

@@ -16,18 +16,21 @@ module GHC.Iface.Errors.Types (
 
 import GHC.Prelude
 
-import GHC.Types.Name (Name)
+import GHC.Types.Name (Name, KnownKey, KnownOcc)
+import GHC.Types.Name.Reader (GlobalRdrElt)
 import GHC.Types.TyThing (TyThing)
+
 import GHC.Unit.Types (Module, InstalledModule, UnitId, Unit)
 import GHC.Unit.State (UnitState, ModuleSuggestion, ModuleOrigin, UnusableUnit, UnitInfo)
+
 import GHC.Exception.Type (SomeException)
+
 import GHC.Unit.Types ( IsBootInterface )
+import GHC.Unit.Module.Location
+
 import Language.Haskell.Syntax.Module.Name ( ModuleName )
 
-
-
 import GHC.Generics ( Generic )
-import GHC.Unit.Module.Location
 
 data IfaceMessageOpts = IfaceMessageOpts { ifaceShowTriedFiles :: !Bool -- ^ Whether to show files we tried to look for or not when printing loader errors
                                          , ifaceBuildingCabalPackage :: !BuildingCabalPackage
@@ -43,10 +46,28 @@ data IfaceMessage
   = Can'tFindInterface
       MissingInterfaceError
       InterfaceLookingFor
+
   | Can'tFindNameInInterface
       Name
       [TyThing] -- possibly relevant TyThings
+
   | CircularImport !Module
+
+  | MissingKnownKey1 KnownKey
+    -- We looked up a known-key, but it wasn't in the
+    -- known-key map that came from importing GHC.KnownKeyNames
+
+   | MissingKnownKey2 KnownKey
+     -- We looked up a known-key, but it wasn't in
+     -- the `knownKeyTable` of all known keys
+
+   | MissingKnownKey3 KnownOcc
+     -- We looked up a known-occ, but it wasn't in
+     -- the exports of GHC.KnownKeyNames
+
+   | KnownKeyScopeError KnownOcc [GlobalRdrElt]
+     -- We looked up a known-key in the GlobalRdrEnv,
+     -- but did not find a unique hit
   deriving Generic
 
 data MissingInterfaceError

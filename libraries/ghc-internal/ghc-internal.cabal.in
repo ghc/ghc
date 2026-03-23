@@ -287,6 +287,7 @@ Library
         GHC.Internal.RTS.Flags.Test
         GHC.Internal.ST
         GHC.Internal.StaticPtr
+        GHC.Internal.StaticPtr.Internal
         GHC.Internal.STRef
         GHC.Internal.Show
         GHC.Internal.STM
@@ -361,7 +362,6 @@ Library
         GHC.Internal.IO.Handle.Lock.LinuxOFD
         GHC.Internal.IO.Handle.Lock.NoOp
         GHC.Internal.IO.Handle.Lock.Windows
-        GHC.Internal.StaticPtr.Internal
         GHC.Internal.Event.Arr
         GHC.Internal.Event.Array
         GHC.Internal.Event.Internal
@@ -568,6 +568,10 @@ Library
     -- We need to set the unit id to ghc-internal (without a version number)
     -- as it's magic.
     ghc-options: -this-unit-id ghc-internal
+
+    -- Set -frebindable-known-key-names,
+    -- since GHC.KnownKeyNames isn't available yet
+    ghc-options: -frebindable-known-key-names
 
     -- Make sure we don't accidentally regress into anti-patterns
     ghc-options: -Wcompat -Wnoncanonical-monad-instances

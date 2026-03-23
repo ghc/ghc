@@ -515,7 +515,7 @@ mkDictSelId name clas
     --      op (dfT d1 d2) --->  opT d1 d2
     rule = BuiltinRule { ru_name = fsLit "Class op " `appendFS`
                                      occNameFS (getOccName name)
-                       , ru_fn    = name
+                       , ru_key   = nameUnique name
                        , ru_nargs = n_ty_args + 1
                        , ru_try   = dictSelRule val_index n_ty_args }
 

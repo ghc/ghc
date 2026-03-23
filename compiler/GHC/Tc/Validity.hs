@@ -1542,7 +1542,7 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
   -- Disallow hand-written Typeable instances, except that we
   -- allow a standalone deriving declaration: they are no-ops,
   -- and we warn about them in GHC.Tc.Deriv.deriveStandalone.
-  | clas_nm == typeableClassName
+  | clas_key == typeableClassKey
   , not (hs_src == HsigFile)
     -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings
@@ -1552,8 +1552,8 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
   -- are forbidden outside of signature files (#12837).
   -- Derived instances are forbidden completely (#21087).
      -- FIXME: DataToTag instances in signature files don't actually work yet
-  | clas_nm `elem` [ knownNatClassName, knownSymbolClassName
-                   , knownCharClassName, dataToTagClassName ]
+  | clas_key `elem` [ knownNatClassKey, knownSymbolClassKey
+                    , knownCharClassKey, dataToTagClassKey ]
   , (not (hs_src == HsigFile) && hand_written_bindings) || derived_instance
     -- Note [Instances of built-in classes in signature files]
   = fail_with_inst_err $ IllegalSpecialClassInstance clas False
@@ -1562,20 +1562,20 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
   -- instances for (~), (~~), or Coercible;
   -- but we DO want to allow them in quantified constraints:
   --   f :: (forall a b. Coercible a b => Coercible (m a) (m b)) => ...m...
-  | clas_nm `elem`
-    [ heqTyConName, eqTyConName, coercibleTyConName
-    , withDictClassName, unsatisfiableClassName ]
+  | clas_key `elem`
+    [ heqTyConKey, eqTyConKey, coercibleTyConKey
+    , withDictClassKey, unsatisfiableClassKey ]
   , not quantified_constraint
   = fail_with_inst_err $ IllegalSpecialClassInstance clas False
 
   -- Check for hand-written Generic instances (disallowed in Safe Haskell)
-  | clas_nm `elem` genericClassNames
+  | clas_key `elem` genericClassKeys
   , hand_written_bindings
   =  do { when (safeLanguageOn dflags) $
            fail_with_inst_err $ IllegalSpecialClassInstance clas True
         ; when (safeInferOn dflags) (recordUnsafeInfer emptyMessages) }
 
-  | clas_nm == hasFieldClassName
+  | clas_key == hasFieldClassKey
   , not quantified_constraint
   -- Don't do any validity checking for HasField contexts
   -- inside quantified constraints (#20989): the validity checks
@@ -1604,7 +1604,7 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
                     (TypeThing $ mkClassPred clas cls_args)
                  $ err
 
-    clas_nm = getName clas
+    clas_key = getUnique clas
     ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
 
     hand_written_bindings

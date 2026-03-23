@@ -29,6 +29,8 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.Types (Int, IO)
 import GHC.Internal.Word (Word8)
+import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 ------------------------------------------------------------------------
 -- Signal handling

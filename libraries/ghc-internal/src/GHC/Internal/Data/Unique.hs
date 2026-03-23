@@ -27,6 +27,7 @@ import GHC.Internal.IO.Unsafe (unsafePerformIO)
 import GHC.Internal.Num
 import GHC.Internal.Data.IORef
 import GHC.Internal.Types (Int, IO)
+import GHC.Internal.Base( (>>=) )     -- For known-key names
 
 -- $setup
 -- >>> import Prelude

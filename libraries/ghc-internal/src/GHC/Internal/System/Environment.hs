@@ -75,6 +75,7 @@ import GHC.Internal.System.Posix.Internals (withFilePath)
 #endif
 
 import GHC.Internal.System.Environment.ExecutablePath
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 #include "HsBaseConfig.h"
 

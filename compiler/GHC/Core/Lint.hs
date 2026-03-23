@@ -1064,7 +1064,7 @@ lintIdOcc in_id nargs
           -- Check for a nested occurrence of the StaticPtr constructor.
           -- See Note [Checking StaticPtrs].
         ; when (nargs /= 0) $
-          checkL (idName in_id /= makeStaticName) $
+          checkL (not (in_id `hasKnownKey` makeStaticKey)) $
           text "Found makeStatic nested in an expression"
 
         ; checkDeadIdOcc in_id

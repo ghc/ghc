@@ -889,6 +889,10 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "CircularImport"                                = 75429
   GhcDiagnosticCode "HiModuleNameMismatchWarn"                      = 53693
   GhcDiagnosticCode "ExceptionOccurred"                             = 47808
+  GhcDiagnosticCode "MissingKnownKey1"                              = 74926
+  GhcDiagnosticCode "MissingKnownKey2"                              = 71344
+  GhcDiagnosticCode "MissingKnownKey3"                              = 71345
+  GhcDiagnosticCode "KnownKeyScopeError"                            = 99040
 
   -- Out of scope errors
   GhcDiagnosticCode "NotInScope"                                    = 76037

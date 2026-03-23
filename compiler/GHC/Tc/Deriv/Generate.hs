@@ -29,6 +29,7 @@ module GHC.Tc.Deriv.Generate (
         gen_Lift_binds,
         gen_Newtype_binds,
         gen_Newtype_fam_insts,
+
         mkCoerceClassMethEqn,
         genAuxBinds,
         ordOpTbl, boxConTbl,
@@ -36,7 +37,7 @@ module GHC.Tc.Deriv.Generate (
 
         getPossibleDataCons,
         DerivInstTys(..), buildDataConInstArgEnv,
-        derivDataConInstArgTys, substDerivInstTys, zonkDerivInstTys
+        derivDataConInstArgTys, substDerivInstTys, zonkDerivInstTys,
     ) where
 
 import GHC.Prelude
@@ -50,6 +51,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Validity
+import GHC.Tc.Deriv.RdrNames
 
 import GHC.Core.DataCon
 import GHC.Core.FamInstEnv
@@ -72,8 +74,6 @@ import GHC.Types.Var.Set
 
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH
-import GHC.Builtin.PrimOps
-import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 
@@ -212,8 +212,8 @@ produced don't get through the typechecker.
 
 gen_Eq_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, Bag AuxBindSpec)
 gen_Eq_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
-                                  , dit_rep_tc_args = tycon_args }) = do
-    return (method_binds, emptyBag)
+                                  , dit_rep_tc_args = tycon_args })
+  = return ([eq_bind], emptyBag)
   where
     all_cons = getPossibleDataCons tycon tycon_args
     non_nullary_cons = filter (not . isNullarySrcDataCon) all_cons
@@ -235,7 +235,6 @@ gen_Eq_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                 else non_nullary_pats ++ [mkHsCaseAlt nlWildPat true_Expr]))
       ]
 
-    method_binds = [eq_bind]
     eq_bind = mkFunBindEC 2 loc eq_RDR (const true_Expr) binds
       where
         binds
@@ -484,12 +483,12 @@ gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
 
       | tag == first_tag + 1
-      = nlHsCase (nlHsVar b_RDR) [ mkHsCaseAlt (nlConWildPat first_con)
+      = nlHsCase (nlHsVar b_RDR) [ mkHsCaseAlt (nlWildConPat first_con)
                                              (gtResult op)
                                  , mkInnerEqAlt op data_con
                                  , mkHsCaseAlt nlWildPat (ltResult op) ]
       | tag == last_tag - 1
-      = nlHsCase (nlHsVar b_RDR) [ mkHsCaseAlt (nlConWildPat last_con)
+      = nlHsCase (nlHsVar b_RDR) [ mkHsCaseAlt (nlWildConPat last_con)
                                              (ltResult op)
                                  , mkInnerEqAlt op data_con
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
@@ -591,16 +590,6 @@ unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
   where
     ascribeBool = nlAscribe boolTyCon_RDR
 
-nlConWildPat :: DataCon -> LPat GhcPs
--- The pattern (K {})
-nlConWildPat con = noLocA $ ConPat
-  { pat_con_ext = noAnn
-  , pat_con = noLocA $ getRdrName con
-  , pat_args = RecCon $ HsRecFields
-      { rec_ext = noExtField
-      , rec_flds = []
-      , rec_dotdot = Nothing }
-  }
 
 {-
 ************************************************************************
@@ -1279,8 +1268,7 @@ gen_Show_binds get_fixity loc dit@(DerivInstTys{ dit_rep_tc = tycon
              show_arg b arg_ty
                  | isUnliftedType arg_ty
                  -- See Note [Deriving and unboxed types] in GHC.Tc.Deriv.Infer
-                 = nlHsApps compose_RDR
-                        [mk_shows_app boxed_arg, mk_showString_app postfixMod]
+                 = nlHsCompose (mk_shows_app boxed_arg) (mk_showString_app postfixMod)
                  | otherwise
                  = mk_showsPrec_app arg_prec arg
                where
@@ -1475,136 +1463,6 @@ kind1, kind2 :: Kind
 kind1 = typeToTypeKind
 kind2 = liftedTypeKind `mkVisFunTyMany` kind1
 
-gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstrTag_RDR,
-    mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR,
-    dataCast1_RDR, dataCast2_RDR, gcast1_RDR, gcast2_RDR,
-    constr_RDR, dataType_RDR,
-    eqChar_RDR  , ltChar_RDR  , geChar_RDR  , gtChar_RDR  , leChar_RDR  ,
-    eqInt_RDR   , ltInt_RDR   , geInt_RDR   , gtInt_RDR   , leInt_RDR   , neInt_RDR ,
-    eqInt8_RDR  , ltInt8_RDR  , geInt8_RDR  , gtInt8_RDR  , leInt8_RDR  ,
-    eqInt16_RDR , ltInt16_RDR , geInt16_RDR , gtInt16_RDR , leInt16_RDR ,
-    eqInt32_RDR , ltInt32_RDR , geInt32_RDR , gtInt32_RDR , leInt32_RDR ,
-    eqInt64_RDR , ltInt64_RDR , geInt64_RDR , gtInt64_RDR , leInt64_RDR ,
-    eqWord_RDR  , ltWord_RDR  , geWord_RDR  , gtWord_RDR  , leWord_RDR  ,
-    eqWord8_RDR , ltWord8_RDR , geWord8_RDR , gtWord8_RDR , leWord8_RDR ,
-    eqWord16_RDR, ltWord16_RDR, geWord16_RDR, gtWord16_RDR, leWord16_RDR,
-    eqWord32_RDR, ltWord32_RDR, geWord32_RDR, gtWord32_RDR, leWord32_RDR,
-    eqWord64_RDR, ltWord64_RDR, geWord64_RDR, gtWord64_RDR, leWord64_RDR,
-    eqAddr_RDR  , ltAddr_RDR  , geAddr_RDR  , gtAddr_RDR  , leAddr_RDR  ,
-    eqFloat_RDR , ltFloat_RDR , geFloat_RDR , gtFloat_RDR , leFloat_RDR ,
-    eqDouble_RDR, ltDouble_RDR, geDouble_RDR, gtDouble_RDR, leDouble_RDR,
-    int8DataCon_RDR, int16DataCon_RDR, int32DataCon_RDR, int64DataCon_RDR,
-    word8DataCon_RDR, word16DataCon_RDR, word32DataCon_RDR, word64DataCon_RDR
-    :: RdrName
-gfoldl_RDR     = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "gfoldl")
-gunfold_RDR    = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "gunfold")
-toConstr_RDR   = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "toConstr")
-dataTypeOf_RDR = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "dataTypeOf")
-dataCast1_RDR  = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "dataCast1")
-dataCast2_RDR  = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "dataCast2")
-gcast1_RDR     = varQual_RDR  gHC_INTERNAL_TYPEABLE (fsLit "gcast1")
-gcast2_RDR     = varQual_RDR  gHC_INTERNAL_TYPEABLE (fsLit "gcast2")
-mkConstrTag_RDR = varQual_RDR gHC_INTERNAL_DATA_DATA (fsLit "mkConstrTag")
-constr_RDR     = tcQual_RDR   gHC_INTERNAL_DATA_DATA (fsLit "Constr")
-mkDataType_RDR = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "mkDataType")
-dataType_RDR   = tcQual_RDR   gHC_INTERNAL_DATA_DATA (fsLit "DataType")
-conIndex_RDR   = varQual_RDR  gHC_INTERNAL_DATA_DATA (fsLit "constrIndex")
-prefix_RDR     = dataQual_RDR gHC_INTERNAL_DATA_DATA (fsLit "Prefix")
-infix_RDR      = dataQual_RDR gHC_INTERNAL_DATA_DATA (fsLit "Infix")
-
-eqChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqChar#")
-ltChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltChar#")
-leChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "leChar#")
-gtChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "gtChar#")
-geChar_RDR     = varQual_RDR  gHC_PRIM (fsLit "geChar#")
-
-eqInt_RDR      = varQual_RDR  gHC_PRIM (fsLit "==#")
-neInt_RDR      = varQual_RDR  gHC_PRIM (fsLit "/=#")
-ltInt_RDR      = varQual_RDR  gHC_PRIM (fsLit "<#" )
-leInt_RDR      = varQual_RDR  gHC_PRIM (fsLit "<=#")
-gtInt_RDR      = varQual_RDR  gHC_PRIM (fsLit ">#" )
-geInt_RDR      = varQual_RDR  gHC_PRIM (fsLit ">=#")
-
-eqInt8_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqInt8#")
-ltInt8_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltInt8#" )
-leInt8_RDR     = varQual_RDR  gHC_PRIM (fsLit "leInt8#")
-gtInt8_RDR     = varQual_RDR  gHC_PRIM (fsLit "gtInt8#" )
-geInt8_RDR     = varQual_RDR  gHC_PRIM (fsLit "geInt8#")
-
-eqInt16_RDR    = varQual_RDR  gHC_PRIM (fsLit "eqInt16#")
-ltInt16_RDR    = varQual_RDR  gHC_PRIM (fsLit "ltInt16#" )
-leInt16_RDR    = varQual_RDR  gHC_PRIM (fsLit "leInt16#")
-gtInt16_RDR    = varQual_RDR  gHC_PRIM (fsLit "gtInt16#" )
-geInt16_RDR    = varQual_RDR  gHC_PRIM (fsLit "geInt16#")
-
-eqInt32_RDR    = varQual_RDR  gHC_PRIM (fsLit "eqInt32#")
-ltInt32_RDR    = varQual_RDR  gHC_PRIM (fsLit "ltInt32#" )
-leInt32_RDR    = varQual_RDR  gHC_PRIM (fsLit "leInt32#")
-gtInt32_RDR    = varQual_RDR  gHC_PRIM (fsLit "gtInt32#" )
-geInt32_RDR    = varQual_RDR  gHC_PRIM (fsLit "geInt32#")
-
-eqInt64_RDR    = varQual_RDR  gHC_PRIM (fsLit "eqInt64#")
-ltInt64_RDR    = varQual_RDR  gHC_PRIM (fsLit "ltInt64#" )
-leInt64_RDR    = varQual_RDR  gHC_PRIM (fsLit "leInt64#")
-gtInt64_RDR    = varQual_RDR  gHC_PRIM (fsLit "gtInt64#" )
-geInt64_RDR    = varQual_RDR  gHC_PRIM (fsLit "geInt64#")
-
-eqWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqWord#")
-ltWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltWord#")
-leWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "leWord#")
-gtWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "gtWord#")
-geWord_RDR     = varQual_RDR  gHC_PRIM (fsLit "geWord#")
-
-eqWord8_RDR    = varQual_RDR  gHC_PRIM (fsLit "eqWord8#")
-ltWord8_RDR    = varQual_RDR  gHC_PRIM (fsLit "ltWord8#" )
-leWord8_RDR    = varQual_RDR  gHC_PRIM (fsLit "leWord8#")
-gtWord8_RDR    = varQual_RDR  gHC_PRIM (fsLit "gtWord8#" )
-geWord8_RDR    = varQual_RDR  gHC_PRIM (fsLit "geWord8#")
-
-eqWord16_RDR   = varQual_RDR  gHC_PRIM (fsLit "eqWord16#")
-ltWord16_RDR   = varQual_RDR  gHC_PRIM (fsLit "ltWord16#" )
-leWord16_RDR   = varQual_RDR  gHC_PRIM (fsLit "leWord16#")
-gtWord16_RDR   = varQual_RDR  gHC_PRIM (fsLit "gtWord16#" )
-geWord16_RDR   = varQual_RDR  gHC_PRIM (fsLit "geWord16#")
-
-eqWord32_RDR   = varQual_RDR  gHC_PRIM (fsLit "eqWord32#")
-ltWord32_RDR   = varQual_RDR  gHC_PRIM (fsLit "ltWord32#" )
-leWord32_RDR   = varQual_RDR  gHC_PRIM (fsLit "leWord32#")
-gtWord32_RDR   = varQual_RDR  gHC_PRIM (fsLit "gtWord32#" )
-geWord32_RDR   = varQual_RDR  gHC_PRIM (fsLit "geWord32#")
-
-eqWord64_RDR   = varQual_RDR  gHC_PRIM (fsLit "eqWord64#")
-ltWord64_RDR   = varQual_RDR  gHC_PRIM (fsLit "ltWord64#" )
-leWord64_RDR   = varQual_RDR  gHC_PRIM (fsLit "leWord64#")
-gtWord64_RDR   = varQual_RDR  gHC_PRIM (fsLit "gtWord64#" )
-geWord64_RDR   = varQual_RDR  gHC_PRIM (fsLit "geWord64#")
-
-eqAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "eqAddr#")
-ltAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "ltAddr#")
-leAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "leAddr#")
-gtAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "gtAddr#")
-geAddr_RDR     = varQual_RDR  gHC_PRIM (fsLit "geAddr#")
-
-eqFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "eqFloat#")
-ltFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "ltFloat#")
-leFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "leFloat#")
-gtFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "gtFloat#")
-geFloat_RDR    = varQual_RDR  gHC_PRIM (fsLit "geFloat#")
-
-eqDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit "==##")
-ltDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit "<##" )
-leDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit "<=##")
-gtDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit ">##" )
-geDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit ">=##")
-
-int8DataCon_RDR   = dataQual_RDR gHC_INTERNAL_INT (fsLit "I8#")
-int16DataCon_RDR  = dataQual_RDR gHC_INTERNAL_INT (fsLit "I16#")
-int32DataCon_RDR  = dataQual_RDR gHC_INTERNAL_INT (fsLit "I32#")
-int64DataCon_RDR  = dataQual_RDR gHC_INTERNAL_INT (fsLit "I64#")
-word8DataCon_RDR  = dataQual_RDR gHC_INTERNAL_WORD (fsLit "W8#")
-word16DataCon_RDR = dataQual_RDR gHC_INTERNAL_WORD (fsLit "W16#")
-word32DataCon_RDR = dataQual_RDR gHC_INTERNAL_WORD (fsLit "W32#")
-word64DataCon_RDR = dataQual_RDR gHC_INTERNAL_WORD (fsLit "W64#")
 {-
 ************************************************************************
 *                                                                      *
@@ -1656,17 +1514,17 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
             as_needed    = take con_arity as_RDRs
             lift_Expr    = mk_bracket finish
             con_brack :: LHsExpr GhcPs
-            con_brack    = nlHsApps (Exact conEName)
+            con_brack    = nlHsApps (knownOccRdrName conEOcc)
                             [noLocA $ HsUntypedBracket noExtField
-                              $ VarBr noSrcSpanA True (noLocA (Exact (dataConName data_con)))]
+                              $ VarBr noSrcSpanA True (noLocA (nameRdrName (dataConName data_con)))]
 
-            finish = foldl' (\b1 b2 -> nlHsApps (Exact appEName) [b1, b2]) con_brack (map lift_var as_needed)
+            finish = foldl' (\b1 b2 -> nlHsApps appE_RDR [b1, b2]) con_brack (map lift_var as_needed)
 
             lift_var :: RdrName -> LHsExpr (GhcPass 'Parsed)
             lift_var x   = nlHsPar (mk_lift_expr x)
 
             mk_lift_expr :: RdrName -> LHsExpr (GhcPass 'Parsed)
-            mk_lift_expr x = nlHsApps (Exact liftName) [nlHsVar x]
+            mk_lift_expr x = nlHsApps lift_RDR [nlHsVar x]
 
 {-
 ************************************************************************
@@ -2119,14 +1977,6 @@ gen_Newtype_fam_insts loc' cls inst_tvs inst_tys rhs_ty
         rep_tvs'    = scopedSort rep_tvs
         rep_cvs'    = scopedSort rep_cvs
 
-nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlHsAppType e s = noLocA (HsAppType noAnn e hs_ty)
-  where
-    hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec $ nlHsCoreTy s
-
-nlHsCoreTy :: HsCoreTy -> LHsType GhcPs
-nlHsCoreTy = noLocA . XHsType . HsCoreTy
-
 mkCoerceClassMethEqn :: Class   -- the class being derived
                      -> [TyVar] -- the tvs in the instance head (this includes
                                 -- the tvs from both the class types and the
@@ -2288,13 +2138,12 @@ mkParentType tc
        Nothing  -> mkTyConApp tc (mkTyVarTys (tyConTyVars tc))
        Just (fam_tc,tys) -> mkTyConApp fam_tc tys
 
-{-
-************************************************************************
+
+{- *********************************************************************
 *                                                                      *
-\subsection{Utility bits for generating bindings}
+           Utility bits for generating bindings
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 -- | Make a function binding. If no equations are given, produce a function
 -- with the given arity that produces a stock error.
@@ -2541,51 +2390,6 @@ genOpApp e1 op e2 = nlHsPar (nlHsOpApp e1 op e2)
 genPrimOpApp :: LHsExpr GhcPs -> RdrName -> LHsExpr GhcPs -> LHsExpr GhcPs
 genPrimOpApp e1 op e2 = nlHsPar (nlHsApp (nlHsVar tagToEnum_RDR) (nlHsOpApp e1 op e2))
 
-a_RDR, b_RDR, c_RDR, d_RDR, f_RDR, k_RDR, z_RDR, ah_RDR, bh_RDR, ch_RDR, dh_RDR
-    :: RdrName
-a_RDR           = mkVarUnqual (fsLit "a")
-b_RDR           = mkVarUnqual (fsLit "b")
-c_RDR           = mkVarUnqual (fsLit "c")
-d_RDR           = mkVarUnqual (fsLit "d")
-f_RDR           = mkVarUnqual (fsLit "f")
-k_RDR           = mkVarUnqual (fsLit "k")
-z_RDR           = mkVarUnqual (fsLit "z")
-ah_RDR          = mkVarUnqual (fsLit "a#")
-bh_RDR          = mkVarUnqual (fsLit "b#")
-ch_RDR          = mkVarUnqual (fsLit "c#")
-dh_RDR          = mkVarUnqual (fsLit "d#")
-
-as_RDRs, bs_RDRs, cs_RDRs :: [RdrName]
-as_RDRs         = [ mkVarUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) .. ] ]
-bs_RDRs         = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
-cs_RDRs         = [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
-
-a_Expr, b_Expr, c_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr, false_Expr,
-    true_Expr, pure_Expr, unsafeCodeCoerce_Expr :: LHsExpr GhcPs
-a_Expr                = nlHsVar a_RDR
-b_Expr                = nlHsVar b_RDR
-c_Expr                = nlHsVar c_RDR
-z_Expr                = nlHsVar z_RDR
-ltTag_Expr            = nlHsVar ltTag_RDR
-eqTag_Expr            = nlHsVar eqTag_RDR
-gtTag_Expr            = nlHsVar gtTag_RDR
-false_Expr            = nlHsVar false_RDR
-true_Expr             = nlHsVar true_RDR
-pure_Expr             = nlHsVar pure_RDR
-unsafeCodeCoerce_Expr = nlHsVar unsafeCodeCoerce_RDR
-
-a_Pat, b_Pat, c_Pat, d_Pat, k_Pat, z_Pat :: LPat GhcPs
-a_Pat           = nlVarPat a_RDR
-b_Pat           = nlVarPat b_RDR
-c_Pat           = nlVarPat c_RDR
-d_Pat           = nlVarPat d_RDR
-k_Pat           = nlVarPat k_RDR
-z_Pat           = nlVarPat z_RDR
-
-minusInt_RDR, tagToEnum_RDR :: RdrName
-minusInt_RDR  = getRdrName (primOpId IntSubOp   )
-tagToEnum_RDR = getRdrName (primOpId TagToEnumOp)
-
 new_tag2con_rdr_name, new_maxtag_rdr_name
   :: SrcSpan -> TyCon -> TcM RdrName
 -- Generates Exact RdrNames, for the binding positions
@@ -2612,7 +2416,7 @@ new_dc_deriv_rdr_name loc dc occ_fun
 newAuxBinderRdrName :: SrcSpan -> Name -> (OccName -> OccName) -> TcM RdrName
 newAuxBinderRdrName loc parent occ_fun = do
   uniq <- newUnique
-  pure $ Exact $ mkSystemNameAt uniq (occ_fun (nameOccName parent)) loc
+  pure $ nameRdrName $ mkSystemNameAt uniq (occ_fun (nameOccName parent)) loc
 
 -- | @getPossibleDataCons tycon tycon_args@ returns the constructors of @tycon@
 -- whose return types match when checked against @tycon_args@.
@@ -2675,79 +2479,6 @@ data DerivInstTys = DerivInstTys
     --   for newtype-derived instances. It is put here mainly for the sake of
     --   convenience.
   }
-
-instance Outputable DerivInstTys where
-  ppr (DerivInstTys { dit_cls_tys = cls_tys, dit_tc = tc, dit_tc_args = tc_args
-                    , dit_rep_tc = rep_tc, dit_rep_tc_args = rep_tc_args
-                    , dit_dc_inst_arg_env = dc_inst_arg_env })
-    = hang (text "DerivInstTys")
-         2 (vcat [ text "dit_cls_tys"         <+> ppr cls_tys
-                 , text "dit_tc"              <+> ppr tc
-                 , text "dit_tc_args"         <+> ppr tc_args
-                 , text "dit_rep_tc"          <+> ppr rep_tc
-                 , text "dit_rep_tc_args"     <+> ppr rep_tc_args
-                 , text "dit_dc_inst_arg_env" <+> ppr dc_inst_arg_env ])
-
--- | Look up a data constructor's instantiated field types in a 'DerivInstTys'.
--- See @Note [Instantiating field types in stock deriving]@.
-derivDataConInstArgTys :: DataCon -> DerivInstTys -> [Type]
-derivDataConInstArgTys dc dit =
-  case lookupUFM (dit_dc_inst_arg_env dit) dc of
-    Just inst_arg_tys -> inst_arg_tys
-    Nothing           -> pprPanic "derivDataConInstArgTys" (ppr dc)
-
--- | @'buildDataConInstArgEnv' tycon arg_tys@ constructs a cache that maps
--- each of @tycon@'s data constructors to their field types, with are to be
--- instantiated with @arg_tys@.
--- See @Note [Instantiating field types in stock deriving]@.
-buildDataConInstArgEnv :: TyCon -> [Type] -> DataConEnv [Type]
-buildDataConInstArgEnv rep_tc rep_tc_args =
-  listToUFM [ (dc, inst_arg_tys)
-            | dc <- tyConDataCons rep_tc
-            , let (_, _, inst_arg_tys) =
-                    dataConInstSig dc $ dataConInstUnivs dc rep_tc_args
-            ]
-
--- | Apply a substitution to all of the 'Type's contained in a 'DerivInstTys'.
--- See @Note [Instantiating field types in stock deriving]@ for why we need to
--- substitute into a 'DerivInstTys' in the first place.
-substDerivInstTys :: Subst -> DerivInstTys -> DerivInstTys
-substDerivInstTys subst
-  dit@(DerivInstTys { dit_cls_tys = cls_tys, dit_tc_args = tc_args
-                    , dit_rep_tc = rep_tc, dit_rep_tc_args = rep_tc_args })
-
-  | isEmptyTCvSubst subst
-  = dit
-  | otherwise
-  = dit{ dit_cls_tys         = cls_tys'
-       , dit_tc_args         = tc_args'
-       , dit_rep_tc_args     = rep_tc_args'
-       , dit_dc_inst_arg_env = buildDataConInstArgEnv rep_tc rep_tc_args'
-       }
-  where
-    cls_tys'     = substTys subst cls_tys
-    tc_args'     = substTys subst tc_args
-    rep_tc_args' = substTys subst rep_tc_args
-
--- | Zonk the 'TcTyVar's in a 'DerivInstTys' value to 'TyVar's.
--- See @Note [What is zonking?]@ in "GHC.Tc.Zonk.Type".
---
--- This is only used in the final zonking step when inferring
--- the context for a derived instance.
--- See @Note [Overlap and deriving]@ in "GHC.Tc.Deriv.Infer".
-zonkDerivInstTys :: DerivInstTys -> ZonkT TcM DerivInstTys
-zonkDerivInstTys dit@(DerivInstTys { dit_cls_tys = cls_tys
-                                   , dit_tc_args = tc_args
-                                   , dit_rep_tc = rep_tc
-                                   , dit_rep_tc_args = rep_tc_args }) = do
-  cls_tys'     <- zonkTcTypesToTypesX cls_tys
-  tc_args'     <- zonkTcTypesToTypesX tc_args
-  rep_tc_args' <- zonkTcTypesToTypesX rep_tc_args
-  pure dit{ dit_cls_tys         = cls_tys'
-          , dit_tc_args         = tc_args'
-          , dit_rep_tc_args     = rep_tc_args'
-          , dit_dc_inst_arg_env = buildDataConInstArgEnv rep_tc rep_tc_args'
-          }
 
 {-
 Note [Auxiliary binders]
@@ -3097,3 +2828,83 @@ the fields in a `DerivInstTys`, including the `dit_dc_inst_arg_env`.
 It is important to do this in inferConstraintsStock, as the
 deriving/should_compile/T20387 test case will not compile otherwise.
 -}
+
+{- *********************************************************************
+*                                                                      *
+                 DerivInstTys
+*                                                                      *
+********************************************************************* -}
+
+instance Outputable DerivInstTys where
+  ppr (DerivInstTys { dit_cls_tys = cls_tys, dit_tc = tc, dit_tc_args = tc_args
+                    , dit_rep_tc = rep_tc, dit_rep_tc_args = rep_tc_args
+                    , dit_dc_inst_arg_env = dc_inst_arg_env })
+    = hang (text "DerivInstTys")
+         2 (vcat [ text "dit_cls_tys"         <+> ppr cls_tys
+                 , text "dit_tc"              <+> ppr tc
+                 , text "dit_tc_args"         <+> ppr tc_args
+                 , text "dit_rep_tc"          <+> ppr rep_tc
+                 , text "dit_rep_tc_args"     <+> ppr rep_tc_args
+                 , text "dit_dc_inst_arg_env" <+> ppr dc_inst_arg_env ])
+
+-- | Look up a data constructor's instantiated field types in a 'DerivInstTys'.
+-- See @Note [Instantiating field types in stock deriving]@.
+derivDataConInstArgTys :: DataCon -> DerivInstTys -> [Type]
+derivDataConInstArgTys dc dit =
+  case lookupUFM (dit_dc_inst_arg_env dit) dc of
+    Just inst_arg_tys -> inst_arg_tys
+    Nothing           -> pprPanic "derivDataConInstArgTys" (ppr dc)
+
+-- | @'buildDataConInstArgEnv' tycon arg_tys@ constructs a cache that maps
+-- each of @tycon@'s data constructors to their field types, with are to be
+-- instantiated with @arg_tys@.
+-- See @Note [Instantiating field types in stock deriving]@.
+buildDataConInstArgEnv :: TyCon -> [Type] -> DataConEnv [Type]
+buildDataConInstArgEnv rep_tc rep_tc_args =
+  listToUFM [ (dc, inst_arg_tys)
+            | dc <- tyConDataCons rep_tc
+            , let (_, _, inst_arg_tys) =
+                    dataConInstSig dc $ dataConInstUnivs dc rep_tc_args
+            ]
+
+-- | Apply a substitution to all of the 'Type's contained in a 'DerivInstTys'.
+-- See @Note [Instantiating field types in stock deriving]@ for why we need to
+-- substitute into a 'DerivInstTys' in the first place.
+substDerivInstTys :: Subst -> DerivInstTys -> DerivInstTys
+substDerivInstTys subst
+  dit@(DerivInstTys { dit_cls_tys = cls_tys, dit_tc_args = tc_args
+                    , dit_rep_tc = rep_tc, dit_rep_tc_args = rep_tc_args })
+
+  | isEmptyTCvSubst subst
+  = dit
+  | otherwise
+  = dit{ dit_cls_tys         = cls_tys'
+       , dit_tc_args         = tc_args'
+       , dit_rep_tc_args     = rep_tc_args'
+       , dit_dc_inst_arg_env = buildDataConInstArgEnv rep_tc rep_tc_args'
+       }
+  where
+    cls_tys'     = substTys subst cls_tys
+    tc_args'     = substTys subst tc_args
+    rep_tc_args' = substTys subst rep_tc_args
+
+-- | Zonk the 'TcTyVar's in a 'DerivInstTys' value to 'TyVar's.
+-- See @Note [What is zonking?]@ in "GHC.Tc.Zonk.Type".
+--
+-- This is only used in the final zonking step when inferring
+-- the context for a derived instance.
+-- See @Note [Overlap and deriving]@ in "GHC.Tc.Deriv.Infer".
+zonkDerivInstTys :: DerivInstTys -> ZonkT TcM DerivInstTys
+zonkDerivInstTys dit@(DerivInstTys { dit_cls_tys = cls_tys
+                                   , dit_tc_args = tc_args
+                                   , dit_rep_tc = rep_tc
+                                   , dit_rep_tc_args = rep_tc_args }) = do
+  cls_tys'     <- zonkTcTypesToTypesX cls_tys
+  tc_args'     <- zonkTcTypesToTypesX tc_args
+  rep_tc_args' <- zonkTcTypesToTypesX rep_tc_args
+  pure dit{ dit_cls_tys         = cls_tys'
+          , dit_tc_args         = tc_args'
+          , dit_rep_tc_args     = rep_tc_args'
+          , dit_dc_inst_arg_env = buildDataConInstArgEnv rep_tc rep_tc_args'
+          }
+

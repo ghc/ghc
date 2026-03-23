@@ -1,6 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines mzip
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.Zip

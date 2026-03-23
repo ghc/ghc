@@ -88,7 +88,7 @@ module GHC.Core (
         RuleName, RuleFun, IdUnfoldingFun, InScopeEnv(..), RuleOpts,
 
         -- ** Operations on 'CoreRule's
-        ruleArity, ruleName, ruleIdName, ruleActivation,
+        ruleArity, ruleName, ruleKey, ruleActivation,
         setRuleIdName, ruleModule,
         isBuiltinRule, isLocalRule, isAutoRule,
     ) where
@@ -96,19 +96,21 @@ module GHC.Core (
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Types.Var.Env( InScopeSet )
-import GHC.Types.Var
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Rules.Config ( RuleOpts )
+import GHC.Core.DataCon
+import GHC.Unit.Module
+
 import GHC.Types.InlinePragma
 import GHC.Types.Name
 import GHC.Types.Name.Set
+import GHC.Types.Var.Env( InScopeSet )
+import GHC.Types.Var
 import GHC.Types.Literal
 import GHC.Types.Tickish
-import GHC.Core.DataCon
-import GHC.Unit.Module
 import GHC.Types.Basic
+import GHC.Types.Unique
 import GHC.Types.Unique.Set
 
 import GHC.Utils.Binary
@@ -1563,14 +1565,17 @@ data CoreRule
   -- A built-in rule is always visible (there is no such thing as
   -- an orphan built-in rule.)
   | BuiltinRule {
-        ru_name  :: RuleName,   -- ^ As above
-        ru_fn    :: Name,       -- ^ As above
+        ru_name  :: RuleName,            -- ^ As above
+        ru_key   :: KnownKey,     -- ^ Identifies the function
+                                         -- Not its Name because BuiltInRules are constants
+                                         -- and GHC doesn't know the defining module
+                                         -- See Note [Overview of known-key entities]
         ru_nargs :: Int,        -- ^ Number of arguments that 'ru_try' consumes,
                                 -- if it fires, including type arguments
         ru_try   :: RuleFun
                 -- ^ This function does the rewrite.  It given too many
                 -- arguments, it simply discards them; the returned 'CoreExpr'
-                -- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args
+                -- is just the rewrite of function applied to the first 'ru_nargs' args
     }
                 -- See Note [Extra args in the target] in GHC.Core.Rules
 
@@ -1593,7 +1598,7 @@ isAutoRule :: CoreRule -> Bool
 isAutoRule (BuiltinRule {}) = False
 isAutoRule (Rule { ru_auto = is_auto }) = is_auto
 
--- | The number of arguments the 'ru_fn' must be applied
+-- | The number of arguments the function must be applied
 -- to before the rule can match on it
 ruleArity :: CoreRule -> FullArgCount
 ruleArity (BuiltinRule {ru_nargs = n}) = n
@@ -1610,17 +1615,21 @@ ruleActivation :: CoreRule -> ActivationGhc
 ruleActivation (BuiltinRule { })       = AlwaysActive
 ruleActivation (Rule { ru_act = act }) = act
 
--- | The 'Name' of the 'GHC.Types.Id.Id' at the head of the rule left hand side
-ruleIdName :: CoreRule -> Name
-ruleIdName = ru_fn
-
 isLocalRule :: CoreRule -> Bool
 isLocalRule (BuiltinRule {})               = False
 isLocalRule (Rule { ru_local = is_local }) = is_local
 
+-- | The 'Unique' of the function at the head of the rule left hand side
+ruleKey :: CoreRule -> Unique
+ruleKey (Rule { ru_fn = name })        = nameUnique name
+ruleKey (BuiltinRule { ru_key = key }) = key
+
 -- | Set the 'Name' of the 'GHC.Types.Id.Id' at the head of the rule left hand side
 setRuleIdName :: Name -> CoreRule -> CoreRule
-setRuleIdName nm ru = ru { ru_fn = nm }
+setRuleIdName nm rule
+  = case rule of
+      Rule {}        -> rule { ru_fn = nm }
+      BuiltinRule {} -> rule { ru_key = nameUnique nm }
 
 {-
 ************************************************************************

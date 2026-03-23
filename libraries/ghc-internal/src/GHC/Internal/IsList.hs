@@ -2,6 +2,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines toList, fromList etc
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.IsList

@@ -266,8 +266,8 @@ import GHC.Data.Maybe
 import GHC.Data.Bool
 import GHC.Data.StringBuffer (stringToStringBuffer)
 import GHC.Types.Error
+import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader (RdrName(..))
-import GHC.Types.Name.Occurrence (isVarOcc, occNameString)
 import GHC.Utils.Monad
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
@@ -1367,6 +1367,8 @@ dynamic_flags_deps = [
       (noArg (\d -> d {rtsOptsSuggestions = False}))
   , make_ord_flag defGhcFlag "dhex-word-literals"
         (NoArg (setGeneralFlag Opt_HexWordLiterals))
+  , make_ord_flag defGhcFlag "fexclude-known-key-define"
+        (HasArg excludeKnownKeyName)
 
   , make_ord_flag defGhcFlag "ghcversion-file"      (hasArg addGhcVersionFile)
   , make_ord_flag defGhcFlag "main-is"              (SepArg setMainIs)
@@ -1386,6 +1388,7 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_Ticky_Dyn_Thunk))
   , make_ord_flag defGhcFlag "ticky-tag-checks"
         (NoArg (setGeneralFlag Opt_Ticky_Tag))
+
         ------- recompilation checker --------------------------------------
   , make_dep_flag defGhcFlag "recomp"
         (NoArg $ unSetGeneralFlag Opt_ForceRecomp)
@@ -1448,7 +1451,6 @@ dynamic_flags_deps = [
         ------ Debugging ----------------------------------------------------
   , make_ord_flag defGhcFlag "dstg-stats"
         (NoArg (setGeneralFlag Opt_StgStats))
-
   , make_ord_flag defGhcFlag "ddump-cmm"
         (setDumpFlag Opt_D_dump_cmm)
   , make_ord_flag defGhcFlag "ddump-cmm-from-stg"
@@ -2667,7 +2669,11 @@ fFlagsDeps = [
   flagSpec "break-points"                     Opt_InsertBreakpoints,
   flagSpec "info-table-map"                   Opt_InfoTableMap,
   flagSpec "info-table-map-with-stack"        Opt_InfoTableMapWithStack,
-  flagSpec "info-table-map-with-fallback"     Opt_InfoTableMapWithFallback
+  flagSpec "info-table-map-with-fallback"     Opt_InfoTableMapWithFallback,
+
+  -- Known-key names
+  flagSpec "defines-known-key-names"          Opt_DefinesKnownKeyNames,
+  flagSpec "rebindable-known-key-names"       Opt_RebindableKnownKeyNames
   ]
   ++ fHoleFlags
 
@@ -3096,6 +3102,16 @@ setDebugLevel mb_n =
     exposeSyms
       | n > 2     = setGeneralFlag' Opt_ExposeInternalSymbols
       | otherwise = id
+
+excludeKnownKeyName :: String -> DynP ()
+-- Can only exclude Ids and DataCons for now
+excludeKnownKeyName str@(c:_)
+  = upd $ \flags -> flags { knownKeyExclusions = occ : knownKeyExclusions flags }
+  where
+    occ | isUpper c || c==':' = mkDataOcc str
+        | otherwise           = mkVarOcc str
+
+excludeKnownKeyName [] = panic "excludeKnownKeyName"
 
 addPkgDbRef :: PkgDbRef -> DynP ()
 addPkgDbRef p = upd $ \s ->

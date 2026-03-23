@@ -65,19 +65,19 @@ module GHC.Internal.Exception
     , SrcLoc(..), prettySrcLoc
     ) where
 
-import GHC.Internal.Base (String, otherwise, return, ($))
-import GHC.Internal.Classes (Eq, Ord)
+import GHC.Internal.Base
 import GHC.Internal.Err (error)
-import GHC.Internal.Magic (noinline)
-import GHC.Internal.Prim (TYPE, raise#)
+import GHC.Internal.Prim (raise#)
 import GHC.Internal.Show
 import GHC.Internal.Stack.Types
-import GHC.Internal.Types (IO, RuntimeRep)
 import GHC.Internal.IO.Unsafe
 import {-# SOURCE #-} GHC.Internal.Stack (prettyCallStackLines, prettyCallStack, prettySrcLoc, withFrozenCallStack)
 import {-# SOURCE #-} GHC.Internal.Exception.Backtrace (collectExceptionAnnotation)
 import GHC.Internal.Exception.Context (SomeExceptionAnnotation(..))
 import GHC.Internal.Exception.Type
+import GHC.Internal.Base( (>>=) )        -- For known-key names
+import GHC.Internal.Classes( (==) )      -- For known-key names
+import GHC.Internal.Data.Typeable( Typeable ) -- For known-key names
 
 -- | Throw an exception.  Exceptions may be thrown from purely
 -- functional code, but may only be caught within the 'IO' monad.

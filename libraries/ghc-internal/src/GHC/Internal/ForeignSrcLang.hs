@@ -8,7 +8,7 @@ module GHC.Internal.ForeignSrcLang
 import Prelude -- See note [Why do we import Prelude here?]
 import GHC.Generics (Generic)
 #else
-import GHC.Internal.Classes (Eq)
+import GHC.Internal.Base
 import GHC.Internal.Show
 import GHC.Internal.Generics
 #endif

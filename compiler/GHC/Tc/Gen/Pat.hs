@@ -943,7 +943,7 @@ AST is used for the subtraction operation.
       -- The Report says that n+k patterns must be in Integral
       -- but it's silly to insist on this in the RebindableSyntax case
       ; unlessM (xoptM LangExt.RebindableSyntax) $
-        do { icls <- tcLookupClass integralClassName
+        do { icls <- tcLookupKnownKeyClass integralClassKey
            ; instStupidTheta orig [mkClassPred icls [pat_ty]] }
 
       ; res <- tcExtendIdEnv1 name bndr_id thing_inside

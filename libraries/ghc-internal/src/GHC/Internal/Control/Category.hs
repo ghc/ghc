@@ -2,6 +2,13 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines (>>>)
+{-# OPTIONS_GHC -fexclude-known-key-define=. #-}
+    -- Careful!  The (.) method in the Category class is not
+    --           the known-key name; that is in GHC.Internal.Base
+
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Category may never fire
     -- e.g. identity/left, identity/right, association;  see #10528

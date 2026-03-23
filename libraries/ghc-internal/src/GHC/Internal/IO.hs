@@ -49,8 +49,7 @@ module GHC.Internal.IO (
         mkUserError
     ) where
 
-import GHC.Internal.Base ( String, return, unIO, ($) )
-import GHC.Internal.Classes ( Eq )
+import GHC.Internal.Base
 import GHC.Internal.Magic ( lazy )
 import GHC.Internal.Maybe ( Maybe(..) )
 import GHC.Internal.Prim (

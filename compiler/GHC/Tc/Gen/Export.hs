@@ -183,8 +183,8 @@ accumExports f xs = do
          , fmap fst dflts
          , export_warn_spans
          , dont_warn_export )
-  where f' acc x
-          = fromMaybe (acc, Nothing) <$> attemptM (f acc x)
+  where
+    f' acc x = fromMaybe (acc, Nothing) <$> attemptM (f acc x)
 
 type ExportOccMap = OccEnv (Name, IE GhcPs)
         -- Tracks what a particular exported OccName

@@ -22,17 +22,13 @@ module GHC.Internal.Data.Proxy
       , KProxy(..)
   ) where
 
-import GHC.Internal.Base (
-    Alternative(..), Applicative(..), Functor(..), Monad(..), MonadPlus(..),
-    Monoid(..), Semigroup(..), const,
-  )
-import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Base
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Show
-import GHC.Internal.Types (Bool(..), Ordering(..), Type)
 import GHC.Internal.Read
 import GHC.Internal.Enum
 import GHC.Internal.Arr
+import GHC.Internal.Num( fromInteger)  -- For known-key names
 
 -- $setup
 -- >>> import GHC.Internal.Data.Void

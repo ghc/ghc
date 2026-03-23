@@ -32,22 +32,27 @@ module GHC.Iface.Binary (
 
 import GHC.Prelude
 
-import GHC.Builtin.Utils   ( isKnownKeyName, lookupKnownKeyName )
-import GHC.Unit
-import GHC.Unit.Module.ModIface
-import GHC.Types.Name
-import GHC.Platform.Profile
-import GHC.Types.Unique.FM
+import GHC.Builtin   ( knownKeyOccMap, oldIsKnownKeyName, oldLookupKnownKeyName )
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
-import GHC.Data.FastMutInt
-import GHC.Types.Unique
 import GHC.Utils.Outputable
-import GHC.Types.Name.Cache
+
+import GHC.Types.Name
+import GHC.Types.Unique.FM
+import GHC.Types.Unique
 import GHC.Types.SrcLoc
+import GHC.Types.Name.Cache
+
+import GHC.Unit
+import GHC.Unit.Module.ModIface
+
+import GHC.Platform.Profile
 import GHC.Platform
 import GHC.Settings.Constants
 import GHC.Iface.Type (IfaceType(..), getIfaceType, putIfaceType, ifaceTypeSharedByte)
+
+import GHC.Data.FastMutInt
+import GHC.Data.Maybe( orElse )
 
 import Control.Monad
 import Data.Array
@@ -648,40 +653,52 @@ initNameWriterTable = do
 
 
 putSymbolTable :: WriteBinHandle -> Int -> UniqFM Name (Int,Name) -> IO ()
-putSymbolTable bh name_count symtab = do
-    put_ bh name_count
-    let names = elems (array (0,name_count-1) (nonDetEltsUFM symtab))
-      -- It's OK to use nonDetEltsUFM here because the elements have
-      -- indices that array uses to create order
-    mapM_ (\n -> serialiseName bh n symtab) names
-
+putSymbolTable bh name_count symtab
+  = do { put_ bh name_count
+       ; let names = elems (array (0,name_count-1) (nonDetEltsUFM symtab))
+             -- It's OK to use nonDetEltsUFM here because the elements
+             -- have indices that array uses to create order
+       ; mapM_ serialise_one names }
+  where
+    serialise_one :: Name -> IO ()
+    serialise_one name
+      | (mod, occ, is_known_key) <- extNamePieces name
+      = put_ bh (moduleUnit mod, moduleName mod, occ, is_known_key)
 
 getSymbolTable :: ReadBinHandle -> NameCache -> IO (SymbolTable Name)
-getSymbolTable bh name_cache = do
-    sz <- get bh :: IO Int
-    -- create an array of Names for the symbols and add them to the NameCache
-    updateNameCache' name_cache $ \cache0 -> do
-        mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int Name)
-        cache <- foldGet' (fromIntegral sz) bh cache0 $ \i (uid, mod_name, occ) cache -> do
-          let mod = mkModule uid mod_name
-          case lookupOrigNameCache cache mod occ of
-            Just name -> do
-              writeArray mut_arr (fromIntegral i) name
-              return cache
-            Nothing   -> do
-              uniq <- takeUniqFromNameCache name_cache
-              let name      = mkExternalName uniq mod occ noSrcSpan
-                  new_cache = extendOrigNameCache cache mod occ name
-              writeArray mut_arr (fromIntegral i) name
-              return new_cache
-        arr <- unsafeFreeze mut_arr
-        return (cache, arr)
+-- Create an array of Names for the symbols and add them to the NameCache
+getSymbolTable bh name_cache
+ = updateNameCache' name_cache $ \cache0 ->
+   do { sz <- get bh :: IO Int
+      ; mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int Name)
+      ; cache <- foldGet' (fromIntegral sz) bh cache0 (deserialise_one mut_arr)
+      ; arr <- unsafeFreeze mut_arr
+      ; return (cache, arr) }
+  where
+    deserialise_one :: (IOArray Int Name)
+                    -> Word -> (Unit, ModuleName, OccName, Bool)
+                    -> OrigNameCache -> IO OrigNameCache
+    deserialise_one mut_arr i (uid, mod_name, occ, is_known_key) cache
+      = case lookupOrigNameCache cache mod occ of
+          Just name
+            -> do { writeArray mut_arr (fromIntegral i) name
+                  ; return cache }
+          Nothing
+            | is_known_key
+            , let uniq = lookupOccEnv knownKeyOccMap occ `orElse`
+                         pprPanic "getSymbolTable" (ppr occ)
+            -> extend_cache_with (mkKnownKeyName uniq mod occ noSrcSpan)
 
-serialiseName :: WriteBinHandle -> Name -> UniqFM key (Int,Name) -> IO ()
-serialiseName bh name _ = do
-    let mod = assertPpr (isExternalName name) (ppr name) (nameModule name)
-    put_ bh (moduleUnit mod, moduleName mod, nameOccName name)
+            | otherwise
+            -> do { uniq <- takeUniqFromNameCache name_cache
+                  ; extend_cache_with (mkExternalName uniq mod occ noSrcSpan) }
+      where
+        mod = mkModule uid mod_name
 
+        extend_cache_with name
+           = do { let new_cache = extendOrigNameCache cache mod occ name
+                ; writeArray mut_arr (fromIntegral i) name
+                ; return new_cache }
 
 -- Note [Symbol table representation of names]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -693,9 +710,9 @@ serialiseName bh name _ = do
 --  10xxxxxx xxyyyyyy yyyyyyyy yyyyyyyy
 --   A known-key name. x is the Unique's Char, y is the int part. We assume that
 --   all known-key uniques fit in this space. This is asserted by
---   GHC.Builtin.Utils.knownKeyNamesOkay.
+--   GHC.Builtin.knownKeyNamesOkay.
 --
--- During serialization we check for known-key things using isKnownKeyName.
+-- During serialization we check for known-key things using oldIsKnownKeyName.
 -- During deserialization we use lookupKnownKeyName to get from the unique back
 -- to its corresponding Name.
 
@@ -706,7 +723,7 @@ putName BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }
         bh name
-  | isKnownKeyName name
+  | oldIsKnownKeyName name
   , let (c, u) = unpkUniqueGrimly (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
   = -- assert (u < 2^(22 :: Int))
     put_ bh (0x80000000
@@ -739,7 +756,7 @@ getSymtabName symtab bh = do
           ix  = fromIntegral i .&. 0x003FFFFF
           u   = mkUniqueGrimilyWithTag tag ix
         in
-          return $! case lookupKnownKeyName u of
+          return $! case oldLookupKnownKeyName u of
                       Nothing -> pprPanic "getSymtabName:unknown known-key unique"
                                           (ppr i $$ ppr u $$ char tag $$ ppr ix)
                       Just n  -> n

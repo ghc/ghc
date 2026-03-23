@@ -20,10 +20,12 @@ module GHC.ResponseFile (
     expandResponse
   ) where
 
+import GHC.KnownKeyNames
+
 import Control.Monad      (return, (>>=), mapM)
 import Control.Exception  (IOException, catch)
 import Data.Function      (($), (.))
-import Data.Bool          (Bool (False, True), otherwise, not, (||))
+import Data.Bool          (Bool (False, True), otherwise, (||))
 import Data.Char          (Char, isSpace)
 import Data.List          ((++), map, filter, concat, reverse)
 import Data.String        (String, unlines)

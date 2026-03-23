@@ -67,6 +67,7 @@ import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
 
 import GHC.Word         ( Word64 )
 import Data.Char        ( chr, ord, isPrint )
+import Data.Data        ( Data )
 
 import Language.Haskell.Syntax.Module.Name
 
@@ -128,6 +129,7 @@ Prefer `env_ut :: Char` and
 --
 -- These are sometimes also referred to as \"keys\" in comments in GHC.
 newtype Unique = MkUnique Word64
+  deriving Data   -- Needed only because KnownKey is in RdrName
 
 data UniqueTag
   = AlphaTyVarTag

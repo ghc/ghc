@@ -70,6 +70,7 @@ import GHC.Internal.IO
 import GHC.Internal.IO.Exception
 import GHC.Internal.IO.Buffer
 import GHC.Internal.IO.Encoding.Types
+import GHC.Internal.Base( (>>), (>>=) )        -- For known-key names
 
 
 c_DEBUG_DUMP :: Bool

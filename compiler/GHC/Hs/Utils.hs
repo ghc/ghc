@@ -294,6 +294,15 @@ mkHsCaseAlt :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
 mkHsCaseAlt (L l pat) expr
   = mkSimpleMatch CaseAlt (L (l2l l) [L l pat]) expr
 
+nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
+-- Make the source expression (fun_expr @ty), via HsAppType
+nlHsAppType e s = noLocA (HsAppType noAnn e hs_ty)
+  where
+    hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec $ nlHsCoreTy s
+
+nlHsCoreTy :: HsCoreTy -> LHsType GhcPs
+nlHsCoreTy = noLocA . XHsType . HsCoreTy
+
 nlHsTyApp :: Id -> [Type] -> LHsExpr GhcTc
 nlHsTyApp fun_id tys
   = noLocA (mkHsWrap (mkWpTyApps tys) (mkHsVar (noLocA fun_id)))
@@ -565,12 +574,14 @@ nlNullaryConPat con = noLocA $ ConPat
   }
 
 nlWildConPat :: DataCon -> LPat GhcPs
+-- The pattern (K {})
 nlWildConPat con = noLocA $ ConPat
   { pat_con_ext = noAnn
   , pat_con = noLocA $ getRdrName con
-  , pat_args = PrefixCon $
-     replicate (dataConSourceArity con)
-               nlWildPat
+  , pat_args = RecCon $ HsRecFields
+      { rec_ext = noExtField
+      , rec_flds = []
+      , rec_dotdot = Nothing }
   }
 
 -- | Wildcard pattern - after parsing

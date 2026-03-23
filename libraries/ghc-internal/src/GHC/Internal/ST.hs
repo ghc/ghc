@@ -32,6 +32,8 @@ import GHC.Internal.Magic (runRW#)
 import GHC.Internal.Prim (State#, noDuplicate#)
 import GHC.Internal.Show
 
+import GHC.Internal.Num( fromInteger )  -- For known-key names
+
 default ()
 
 -- The 'ST' monad proper.  By default the monad is strict;

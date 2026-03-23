@@ -891,6 +891,10 @@ data GeneralFlag
 
    | Opt_G_NoStateHack
    | Opt_G_NoOptCoercion
+
+   -- Known-key names
+   | Opt_DefinesKnownKeyNames
+   | Opt_RebindableKnownKeyNames
    deriving (Eq, Show, Enum)
 
 -- | The set of flags which affect optimisation for the purposes of

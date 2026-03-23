@@ -225,7 +225,7 @@ thNameToGhcNameIO cache th_name
         ; return (listToMaybe names) }
   where
     lookup rdr_name
-      | Just n <- isExact_maybe rdr_name   -- This happens in derived code
+      | Just n <- rdrNameExactName_maybe rdr_name   -- This happens in derived code
       = return $ if isExternalName n then Just n else Nothing
       | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
       = Just <$> lookupNameCache cache rdr_mod rdr_occ

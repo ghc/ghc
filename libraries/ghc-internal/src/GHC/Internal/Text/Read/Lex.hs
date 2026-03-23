@@ -38,16 +38,12 @@ module GHC.Internal.Text.Read.Lex
 
 import GHC.Internal.Text.ParserCombinators.ReadP
 
-import GHC.Internal.Base (
-    Monad(..), MonadPlus(..), String, const, id, ord, otherwise, ($), (.),
-  )
+import GHC.Internal.Base
 import GHC.Internal.Char
-import GHC.Internal.Classes( Eq(..), Ord(..), not, (&&), (||) )
 import GHC.Internal.Err( errorWithoutStackTrace )
 import GHC.Internal.Num( Num(..), Integer )
 import GHC.Internal.Prim( seq )
 import GHC.Internal.Show( Show(..) )
-import GHC.Internal.Types( Bool(..), Char, Int )
 import GHC.Internal.Unicode
   ( GeneralCategory(..), generalCategory, isSpace, isAlpha, isAlphaNum )
 import GHC.Internal.Real( Rational, (%), fromIntegral, Integral,

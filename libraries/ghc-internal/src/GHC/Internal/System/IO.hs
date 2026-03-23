@@ -264,6 +264,10 @@ import GHC.Internal.Text.Read
 import GHC.Internal.IO.StdHandles
 import GHC.Internal.Show
 import GHC.Internal.Types (Bool(..), Char)
+import GHC.Internal.Control.Monad.Fail( fail )   -- For known-key names
+
+
+
 -----------------------------------------------------------------------------
 -- Standard IO
 
