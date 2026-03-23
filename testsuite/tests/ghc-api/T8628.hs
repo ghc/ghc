@@ -11,7 +11,7 @@ import GHC.Utils.Outputable
 import GHC.Data.Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
-import GHC.Builtin.Names
+import GHC.Builtin.Modules
 import Control.Monad.Catch as MC
 
 main :: IO()

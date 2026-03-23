@@ -3,6 +3,9 @@
 -- Note [Implementing unsafeCoerce]
 {-# OPTIONS_GHC -fno-strictness #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines unsafeEqualityProof etc
+
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MagicHash #-}
@@ -19,11 +22,10 @@ module GHC.Internal.Unsafe.Coerce
   , unsafeCoerce#
   ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Arr (amap) -- For amap/unsafeCoerce rule
-import GHC.Internal.Base (map)
 import GHC.Internal.Err (error)
-import GHC.Internal.Prim (TYPE)
-import GHC.Internal.Types (Levity(..), RuntimeRep(..), Type)
+import GHC.Internal.Stack.Types as Rebindable
 
 {- Note [Implementing unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

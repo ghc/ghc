@@ -38,6 +38,9 @@ module GHC.Internal.IO.Encoding.CodePage.Table where
 import GHC.Internal.Prim (Addr#)
 import GHC.Internal.Types (Char, Int)
 import GHC.Internal.Word
+import qualified GHC.Internal.Num as Rebindable
+import qualified GHC.Internal.Base as Rebindable
+
 data ConvArray a = ConvArray Addr#
 data CompactArray a b = CompactArray {
     encoderMax :: !a,

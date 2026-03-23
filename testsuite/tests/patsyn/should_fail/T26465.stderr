@@ -5,9 +5,10 @@ T26465.hs:10:5: error: [GHC-39999]
         g :: a0 -> Maybe a0 (bound at T26465.hs:10:1)
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Eq Ordering -- Defined in ‘GHC.Internal.Classes’
-        instance Eq Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
-        ...plus 24 others
+        instance [safe] Eq a => Eq (Maybe a)
+          -- Defined in ‘GHC.Internal.Maybe’
+        instance Eq a => Eq (Solo a) -- Defined in ‘GHC.Internal.Classes’
+        ...plus 23 others
         ...plus five instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: f

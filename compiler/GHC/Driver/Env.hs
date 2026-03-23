@@ -85,10 +85,12 @@ import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Builtin.Names
+
+import GHC.Builtin.Modules( gHC_PRIM )
 
 import Data.IORef
 import qualified Data.Set as Set
+import GHC.Types.Name.Reader (ExactRdrName(..))
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env hsc = do
@@ -177,16 +179,16 @@ configured via command-line flags (in `GHC.setTopSessionDynFlags`).
 
 -- Note [hsc_type_env_var hack]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- hsc_type_env_var is used to initialize tcg_type_env_var, and
+-- hsc_type_env_var is used to initialize tcg_knot_vars, and
 -- eventually it is the mutable variable that is queried from
 -- if_rec_types to get a TypeEnv.  So, clearly, it's something
 -- related to knot-tying (see Note [Tying the knot]).
 -- hsc_type_env_var is used in two places: initTcRn (where
--- it initializes tcg_type_env_var) and initIfaceCheck
+-- it initializes tcg_knot_vars) and initIfaceCheck
 -- (where it initializes if_rec_types).
 --
 -- But why do we need a way to feed a mutable variable in?  Why
--- can't we just initialize tcg_type_env_var when we start
+-- can't we just initialize tcg_knot_vars when we start
 -- typechecking?  The problem is we need to knot-tie the
 -- EPS, and we may start adding things to the EPS before type
 -- checking starts.
@@ -429,12 +431,12 @@ discardIC hsc_env
   dflags = ic_dflags old_ic
   old_ic = hsc_IC hsc_env
   empty_ic = emptyInteractiveContext dflags
+  home_unit = hsc_home_unit hsc_env
   keep_external_name ic_name
-    | nameIsFromExternalPackage home_unit old_name = old_name
+    | ExactName old_name <- ic_name old_ic
+    , nameIsFromExternalPackage home_unit old_name = ExactName old_name
+    | ExactOcc old_occ <- ic_name old_ic = ExactOcc old_occ
     | otherwise = ic_name empty_ic
-    where
-    home_unit = hsc_home_unit hsc_env
-    old_name = ic_name old_ic
 
 
 --------------------------------------------------------------------------------

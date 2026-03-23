@@ -33,7 +33,7 @@ module GHC.Internal.TypeLits.Internal
   , CmpSymbol, CmpChar
   ) where
 
-import GHC.Internal.Types (Symbol, Char, Ordering)
+import GHC.Internal.Base
 
 -- | Comparison of type-level symbols, as a function.
 --

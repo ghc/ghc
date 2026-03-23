@@ -21,6 +21,9 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE LinearTypes #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Typeable etc
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Data.Typeable.Internal
@@ -46,7 +49,7 @@ module GHC.Internal.Data.Typeable.Internal (
     withTypeable,
 
     -- * Module
-    Module,  -- Abstract
+    Module(..),
     moduleName, modulePackage, rnfModule,
 
     -- * TyCon
@@ -87,32 +90,22 @@ module GHC.Internal.Data.Typeable.Internal (
     trLiftedRep
   ) where
 
-import GHC.Internal.Base (
-    String, Void, foldr, id, map, ord, otherwise, ($), (.), (++),
-  )
-import GHC.Internal.Classes ( Eq(..), Ord(..), (||) )
-import GHC.Internal.CString ( unpackCStringUtf8# )
+import GHC.Internal.Base
 import qualified GHC.Internal.Arr as A
 import GHC.Internal.Data.Either (Either (..))
 import GHC.Internal.Data.Type.Equality
 import GHC.Internal.Err (error, errorWithoutStackTrace)
 import GHC.Internal.List ( splitAt, foldl', elem, replicate, length )
-import GHC.Internal.Magic ( inline )
 import GHC.Internal.Magic.Dict ( WithDict(..) )
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Unicode (isDigit)
 import GHC.Internal.Num ((-), (+), (*))
 import GHC.Internal.Word
-import GHC.Internal.Prim (Addr#, Int#, FUN, TYPE, proxy#, seq, (-#))
+import GHC.Internal.Prim (Addr#, Int#, FUN, proxy#, seq, (-#))
 import GHC.Internal.Show
 import GHC.Internal.TypeLits ( KnownChar, charVal', KnownSymbol, symbolVal'
                     , TypeError, ErrorMessage(..) )
 import GHC.Internal.TypeNats ( KnownNat, Nat, natVal' )
-import GHC.Internal.Types (
-    Bool(..), Char, Constraint, Int(..), KindBndr, KindRep(..), Levity(..),
-    Module(..), Multiplicity(..), Ordering(..), RuntimeRep(..), TyCon(..),
-    Symbol, TrName(..), Type, TypeLitSort(..), VecCount(..), VecElem(..),
-  )
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce )
 
 import GHC.Internal.Fingerprint.Type
@@ -122,6 +115,9 @@ import {-# SOURCE #-} GHC.Internal.Fingerprint
    -- of GHC.Internal.Data.Typeable as much as possible so we can optimise the derived
    -- instances.
 -- import {-# SOURCE #-} GHC.Internal.Debug.Trace (trace)
+
+import qualified GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
+import qualified GHC.Internal.Stack.Types as Rebindable
 
 #include "MachDeps.h"
 
@@ -175,13 +171,10 @@ rnfKindRep (KindRepTyConApp tc args) = rnfTyCon tc `seq` rnfList rnfKindRep args
 rnfKindRep (KindRepVar _)   = ()
 rnfKindRep (KindRepApp a b) = rnfKindRep a `seq` rnfKindRep b
 rnfKindRep (KindRepFun a b) = rnfKindRep a `seq` rnfKindRep b
-rnfKindRep (KindRepTYPE rr) = rnfRuntimeRep rr
+rnfKindRep KindRepType           = ()
+rnfKindRep KindRepConstraint     = ()
 rnfKindRep (KindRepTypeLitS _ _) = ()
 rnfKindRep (KindRepTypeLitD _ t) = rnfString t
-
-rnfRuntimeRep :: RuntimeRep -> ()
-rnfRuntimeRep (VecRep !_ !_) = ()
-rnfRuntimeRep !_             = ()
 
 rnfList :: (a -> ()) -> [a] -> ()
 rnfList _     []     = ()
@@ -216,7 +209,7 @@ data TypeRep a where
                  -- 'Just and the trKindVars will be [Bool].
                , trTyCon :: !TyCon
                , trKindVars :: [SomeTypeRep]
-               , trTyConKind :: !(TypeRep k) }  -- See Note [Kind caching]
+               , trTyConKind :: TypeRep k }  -- See Note [Kind caching]
             -> TypeRep (a :: k)
 
     -- | Invariant: Saturated arrow types (e.g. things of the form @a -> b@)
@@ -237,7 +230,7 @@ data TypeRep a where
     -- the sake of efficiency as functions are quite ubiquitous.
     -- A TrFun can represent `t1 -> t2` or `t1 -= t2`; but not  (a => b) or (a ==> b).
     -- See Note [No Typeable for polytypes or qualified types] in GHC.Tc.Instance.Class
-    -- and Note [Function type constructors and FunTy] in GHC.Builtin.Types.Prim
+    -- and Note [Function type constructors and FunTy] in GHC.Builtin.WiredIn.Prim
     -- We do not represent the function TyCon (i.e. (->) vs (-=>)) explicitly;
     -- instead, the TyCon is implicit in the kinds of the arguments.
     TrFun   :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
@@ -325,14 +318,31 @@ There are two things we need to be careful about when caching kinds.
 
 Wrinkle 1:
 
-We want to do it eagerly. Suppose we have
+The kind cache must be a /lazy/ field because, otherwise, we get a runtime loop:
 
-  tf :: TypeRep (f :: j -> k)
-  ta :: TypeRep (a :: j)
+  consider:
+  $tcTYPE = TyCon fp1 fp2 mod "TYPE"# krep01
+  krep01 = KindRepFun (KindRepTyConApp $tcRuntimeRep []) KindRepType
 
-Then the cached kind of App tf ta should be eagerly evaluated to k, rather
-than being stored as a thunk that will strip the (j ->) off of j -> k if
-and when it is forced.
+  typeRep @TYPE
+    = mkTrCon $tcTYPE
+    = TrTyCon { tc, cachedKrep = instantiateKindRep krep01 }
+
+  evaluating instantiateKindRep (KindRepFun ...) eagerly, will require
+  computing the fingerprint of tyConTYPE:
+
+    tyConTYPE = typeRepTyCon (typeRep @TYPE)
+              = typeRepTyCon (mkTrCon $tcTYPE [])
+
+  which in turn requires computing (mkTrCon $tcTYPE) again, which requires
+  computing the kind cache again, which is where we started. If we don't
+  compute the Kind cache, we can return the $tcTYPE straight away in a TrTyCon.
+
+  Really, if we could say tyConTYPE = $tcTYPE, we would avoid the entire thing.
+
+  This is very delicate, and it is essentially only necessary for TYPE.
+  Making the kind cache lazy suffices, but the overall design could be
+  potentially improved to avoid this subtlessness.
 
 Wrinkle 2:
 
@@ -345,9 +355,10 @@ But we *do not* want TypeReps to have cyclical structure! Most importantly,
 a cyclical structure cannot be stored in a compact region. Secondarily,
 using :force in GHCi on a cyclical structure will lead to non-termination.
 
-To avoid this trouble, we use a separate constructor for TypeRep Type.
+To avoid this trouble, we use a separate constructor for TypeRep Type,
+namely, TrType.
 mkTrApp is responsible for recognizing that TYPE is being applied to
-'LiftedRep and produce trType; other functions must recognize that TrType
+'LiftedRep and produce TrType; other functions must recognize that TrType
 represents an application.
 -}
 
@@ -619,11 +630,14 @@ someTypeRepTyCon :: SomeTypeRep -> TyCon
 someTypeRepTyCon (SomeTypeRep t) = typeRepTyCon t
 
 -- | Observe the type constructor of a type representation
+-- E.g typeRepTyCon (T a b)  = T
+--     typeRepTyCon (a -> b) = tyConFun
+--     typeRepTyCon Type     = tyConTYPE
 typeRepTyCon :: TypeRep a -> TyCon
-typeRepTyCon TrType = tyConTYPE
+typeRepTyCon TrType                   = tyConTYPE
 typeRepTyCon (TrTyCon {trTyCon = tc}) = tc
 typeRepTyCon (TrApp {trAppFun = a})   = typeRepTyCon a
-typeRepTyCon (TrFun {})               = typeRepTyCon $ typeRep @(->)
+typeRepTyCon (TrFun {})               = funTyCon
 
 -- | Type equality
 --
@@ -697,9 +711,13 @@ tyConKind (TyCon _ _ _ _ nKindVars# kindRep) kindVars =
     in instantiateKindRep kindVarsArr kindRep
 
 instantiateKindRep :: A.Array KindBndr SomeTypeRep -> KindRep -> SomeTypeRep
+-- This function is THE principal consumer of KindRep
 instantiateKindRep vars = go
   where
     go :: KindRep -> SomeTypeRep
+    go KindRepType       = SomeTypeRep TrType  -- Special magic for TrType
+    go KindRepConstraint = SomeTypeRep (typeRep @Constraint)
+
     go (KindRepTyConApp tc args)
       = let n_kind_args = tyConKindArgs tc
             (kind_args, ty_args) = splitAt n_kind_args args
@@ -717,110 +735,15 @@ instantiateKindRep vars = go
       = SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
     go (KindRepFun a b)
       = SomeTypeRep $ mkTrFun trMany (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
-    go (KindRepTYPE (BoxedRep Lifted)) = SomeTypeRep TrType
-    go (KindRepTYPE r) = unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r
+
     go (KindRepTypeLitS sort s)
       = mkTypeLitFromString sort (unpackCStringUtf8# s)
     go (KindRepTypeLitD sort s)
       = mkTypeLitFromString sort s
 
-    tYPE = kindedTypeRep @(RuntimeRep -> Type) @TYPE
 
 unsafeCoerceRep :: SomeTypeRep -> TypeRep a
 unsafeCoerceRep (SomeTypeRep r) = unsafeCoerce r
-
-unkindedTypeRep :: SomeKindedTypeRep k -> SomeTypeRep
-unkindedTypeRep (SomeKindedTypeRep x) = SomeTypeRep x
-
-data SomeKindedTypeRep k where
-    SomeKindedTypeRep :: forall k (a :: k). TypeRep a
-                      %1 -> SomeKindedTypeRep k
-
-kApp :: SomeKindedTypeRep (k -> k')
-     -> SomeKindedTypeRep k
-     -> SomeKindedTypeRep k'
-kApp (SomeKindedTypeRep f) (SomeKindedTypeRep a) =
-    SomeKindedTypeRep (mkTrApp f a)
-
-kindedTypeRep :: forall k (a :: k). Typeable a => SomeKindedTypeRep k
-kindedTypeRep = SomeKindedTypeRep (typeRep @a)
-
-buildList :: forall k. Typeable k
-          => [SomeKindedTypeRep k]
-          -> SomeKindedTypeRep [k]
-buildList = foldr cons nil
-  where
-    nil = kindedTypeRep @[k] @'[]
-    cons x rest = SomeKindedTypeRep (typeRep @'(:)) `kApp` x `kApp` rest
-
-runtimeRepTypeRep :: RuntimeRep -> SomeKindedTypeRep RuntimeRep
-runtimeRepTypeRep r =
-    case r of
-      BoxedRep Lifted -> SomeKindedTypeRep trLiftedRep
-      BoxedRep v  -> kindedTypeRep @_ @'BoxedRep
-                     `kApp` levityTypeRep v
-      VecRep c e  -> kindedTypeRep @_ @'VecRep
-                     `kApp` vecCountTypeRep c
-                     `kApp` vecElemTypeRep e
-      TupleRep rs -> kindedTypeRep @_ @'TupleRep
-                     `kApp` buildList (map runtimeRepTypeRep rs)
-      SumRep rs   -> kindedTypeRep @_ @'SumRep
-                     `kApp` buildList (map runtimeRepTypeRep rs)
-      IntRep      -> rep @'IntRep
-      Int8Rep     -> rep @'Int8Rep
-      Int16Rep    -> rep @'Int16Rep
-      Int32Rep    -> rep @'Int32Rep
-      Int64Rep    -> rep @'Int64Rep
-      WordRep     -> rep @'WordRep
-      Word8Rep    -> rep @'Word8Rep
-      Word16Rep   -> rep @'Word16Rep
-      Word32Rep   -> rep @'Word32Rep
-      Word64Rep   -> rep @'Word64Rep
-      AddrRep     -> rep @'AddrRep
-      FloatRep    -> rep @'FloatRep
-      DoubleRep   -> rep @'DoubleRep
-  where
-    rep :: forall (a :: RuntimeRep). Typeable a => SomeKindedTypeRep RuntimeRep
-    rep = kindedTypeRep @RuntimeRep @a
-
-levityTypeRep :: Levity -> SomeKindedTypeRep Levity
-levityTypeRep c =
-    case c of
-      Lifted   -> rep @'Lifted
-      Unlifted -> rep @'Unlifted
-  where
-    rep :: forall (a :: Levity). Typeable a => SomeKindedTypeRep Levity
-    rep = kindedTypeRep @Levity @a
-
-vecCountTypeRep :: VecCount -> SomeKindedTypeRep VecCount
-vecCountTypeRep c =
-    case c of
-      Vec2  -> rep @'Vec2
-      Vec4  -> rep @'Vec4
-      Vec8  -> rep @'Vec8
-      Vec16 -> rep @'Vec16
-      Vec32 -> rep @'Vec32
-      Vec64 -> rep @'Vec64
-  where
-    rep :: forall (a :: VecCount). Typeable a => SomeKindedTypeRep VecCount
-    rep = kindedTypeRep @VecCount @a
-
-vecElemTypeRep :: VecElem -> SomeKindedTypeRep VecElem
-vecElemTypeRep e =
-    case e of
-      Int8ElemRep     -> rep @'Int8ElemRep
-      Int16ElemRep    -> rep @'Int16ElemRep
-      Int32ElemRep    -> rep @'Int32ElemRep
-      Int64ElemRep    -> rep @'Int64ElemRep
-      Word8ElemRep    -> rep @'Word8ElemRep
-      Word16ElemRep   -> rep @'Word16ElemRep
-      Word32ElemRep   -> rep @'Word32ElemRep
-      Word64ElemRep   -> rep @'Word64ElemRep
-      FloatElemRep    -> rep @'FloatElemRep
-      DoubleElemRep   -> rep @'DoubleElemRep
-  where
-    rep :: forall (a :: VecElem). Typeable a => SomeKindedTypeRep VecElem
-    rep = kindedTypeRep @VecElem @a
 
 bareArrow :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                     (a :: TYPE r1) (b :: TYPE r2). ()
@@ -957,49 +880,14 @@ splitApps = go []
     go _ TrType
       = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Impossible 2"
 
--- This is incredibly shady! We don't really want to do this here; we
--- should really have the compiler reveal the TYPE TyCon directly
--- somehow. We need to construct this by hand because otherwise
--- we end up with horrible and somewhat mysterious loops trying to calculate
--- typeRep @TYPE. For the moment, we use the fact that we can get the proper
--- name of the ghc-internal package from the TyCon of LiftedRep (which we can
--- produce a TypeRep for without difficulty), and then just substitute in the
--- appropriate module and constructor names.
---
--- Prior to the introduction of BoxedRep, this was bad, but now it is
--- even worse! We have to construct several different TyCons by hand
--- so that we can build the fingerprint for TYPE ('BoxedRep 'LiftedRep).
--- If we call `typeRep @('BoxedRep 'LiftedRep)` while trying to compute
--- the fingerprint of `TYPE ('BoxedRep 'LiftedRep)`, we get a loop.
---
--- The ticket to find a better way to deal with this is
--- #14480.
-
-tyConRuntimeRep :: TyCon
-tyConRuntimeRep = mkTyCon ghcPrimPackage "GHC.Internal.Types" "RuntimeRep" 0
-  (KindRepTYPE (BoxedRep Lifted))
-
 tyConTYPE :: TyCon
-tyConTYPE = mkTyCon ghcPrimPackage "GHC.Internal.Prim" "TYPE" 0
-    (KindRepFun
-      (KindRepTyConApp tyConRuntimeRep [])
-      (KindRepTYPE (BoxedRep Lifted))
-    )
-
-tyConLevity :: TyCon
-tyConLevity = mkTyCon ghcPrimPackage "GHC.Internal.Types" "Levity" 0
-  (KindRepTYPE (BoxedRep Lifted))
+tyConTYPE = typeRepTyCon (typeRep @TYPE)
 
 tyCon'Lifted :: TyCon
-tyCon'Lifted = mkTyCon ghcPrimPackage "GHC.Internal.Types" "'Lifted" 0
-  (KindRepTyConApp tyConLevity [])
+tyCon'Lifted = typeRepTyCon (typeRep @'Lifted)
 
 tyCon'BoxedRep :: TyCon
-tyCon'BoxedRep = mkTyCon ghcPrimPackage "GHC.Internal.Types" "'BoxedRep" 0
-  (KindRepFun (KindRepTyConApp tyConLevity []) (KindRepTyConApp tyConRuntimeRep []))
-
-ghcPrimPackage :: String
-ghcPrimPackage = tyConPackage (typeRepTyCon (typeRep @Bool))
+tyCon'BoxedRep = typeRepTyCon (typeRep @'BoxedRep)
 
 funTyCon :: TyCon
 funTyCon = typeRepTyCon (typeRep @(->))
@@ -1018,7 +906,7 @@ isTupleTyCon tc
       _ -> Nothing
   | otherwise                   = Nothing
 
--- | See Note [Small Ints parsing] in GHC.Builtin.Types
+-- | See Note [Small Ints parsing] in GHC.Builtin.WiredIn.Types
 readTwoDigits :: String -> Maybe (Bool, Int)
 readTwoDigits s = case s of
   c1 : t1 | isDigit c1 -> case t1 of
@@ -1093,7 +981,7 @@ pattern KindRepTypeLit sort t <- (getKindRepTypeLit -> Just (sort, t))
     KindRepTypeLit sort t = KindRepTypeLitD sort t
 
 {-# COMPLETE KindRepTyConApp, KindRepVar, KindRepApp, KindRepFun,
-             KindRepTYPE, KindRepTypeLit #-}
+             KindRepType, KindRepConstraint, KindRepTypeLit #-}
 
 getKindRepTypeLit :: KindRep -> Maybe (TypeLitSort, String)
 getKindRepTypeLit (KindRepTypeLitS sort t) = Just (sort, unpackCStringUtf8# t)

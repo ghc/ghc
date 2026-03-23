@@ -9,6 +9,10 @@
 {-# LANGUAGE CApiFFI #-}
 -- We believe we could deorphan this module, by moving lots of things
 -- around, but we haven't got there yet:
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+   -- Defines RealFloat
+
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -59,7 +63,7 @@ module GHC.Internal.Float
     , word2Float
     , integerToFloat#
     , naturalToFloat#
-    , rationalToFloat
+    , rationalToFloat#, rationalToFloat
     , castWord32ToFloat
     , castFloatToWord32
     , castWord32ToFloat#
@@ -98,7 +102,7 @@ module GHC.Internal.Float
     , word2Double
     , integerToDouble#
     , naturalToDouble#
-    , rationalToDouble
+    , rationalToDouble#, rationalToDouble
     , castWord64ToDouble
     , castDoubleToWord64
     , castWord64ToDouble#
@@ -166,13 +170,10 @@ module GHC.Internal.Float
     , stgWord32ToFloat
     ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Data.Maybe
 
-import GHC.Internal.Base (String, id, otherwise, (.))
 import GHC.Internal.Bits
-import GHC.Internal.Classes (
-    Eq(..), Ord(..), eqFloat, eqDouble, not, (&&), (||),
-  )
 import GHC.Internal.List
 import GHC.Internal.Enum
 import GHC.Internal.Err (errorWithoutStackTrace)
@@ -195,9 +196,6 @@ import GHC.Internal.Prim (
     (>#), (>##), (>=#), (>=##),
   )
 import GHC.Internal.Show
-import GHC.Internal.Types (
-    Bool(..), Double(..), Float(..), Int(..), Ordering(..), isTrue#,
-  )
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Word
@@ -205,6 +203,7 @@ import GHC.Internal.Arr
 import GHC.Internal.Float.RealFracMethods
 import GHC.Internal.Float.ConversionUtils
 import GHC.Internal.Bignum.BigNat
+import GHC.Internal.Stack.Types as Rebindable
 
 #if WORD_SIZE_IN_BITS == 64
 import GHC.Internal.Prim (

@@ -1,8 +1,10 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE StandaloneDeriving #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Product
@@ -22,6 +24,10 @@ module Data.Functor.Product (
     Product(..),
   ) where
 
+import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 import Control.Applicative
 import GHC.Internal.Control.Monad (MonadPlus(..))
 import GHC.Internal.Control.Monad.Fix (MonadFix(..))
@@ -29,7 +35,6 @@ import Control.Monad.Zip (MonadZip(mzipWith))
 import GHC.Internal.Data.Data (Data)
 import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
-import Prelude
 
 -- $setup
 -- >>> import Prelude

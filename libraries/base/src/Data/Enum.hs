@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -25,6 +26,9 @@ module Data.Enum
     ) where
 
 import GHC.Internal.Enum
+#if __GLASGOW_HASKELL__ >= 1001
+import GHC.Internal.Num as Rebindable( Num ) -- For -frebindable-known-names (defaulting)
+#endif
 
 -- | Returns a list of all values of an enum type
 --

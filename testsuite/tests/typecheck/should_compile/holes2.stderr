@@ -5,9 +5,9 @@ holes2.hs:3:5: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
       Potentially matching instances:
         instance (Show a, Show b) => Show (Either a b)
           -- Defined in ‘GHC.Internal.Data.Either’
-        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
+        instance Show Integer -- Defined in ‘GHC.Internal.Show’
         ...plus 26 others
-        ...plus 49 instances involving out-of-scope types
+        ...plus 36 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: show _
       In an equation for ‘f’: f = show _
@@ -22,11 +22,11 @@ holes2.hs:3:10: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
       Valid hole fits include
         f :: String
         otherwise :: Bool
+        () :: ()
         EQ :: Ordering
+        False :: Bool
         GT :: Ordering
         LT :: Ordering
-        () :: ()
-        False :: Bool
         True :: Bool
         pi :: forall a. Floating a => a
 

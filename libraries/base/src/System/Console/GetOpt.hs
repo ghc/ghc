@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 
 -----------------------------------------------------------------------------
@@ -63,6 +64,9 @@ module System.Console.GetOpt (
 ) where
 
 import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 import GHC.Internal.Data.List ( isPrefixOf, find )
 
 -- |What to do with options following non-options

@@ -40,7 +40,6 @@ import GHC.Tc.Utils.Monad
   , initTcInteractive, initIfaceTcRn
   )
 import GHC.Iface.Load          ( loadPluginInterface, cannotFindModule )
-import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
 
 import GHC.Driver.Env
 import GHCi.RemoteTypes     ( HValue )
@@ -78,6 +77,7 @@ import GHC.Linker.Types
 import Data.List (unzip4)
 import GHC.Iface.Errors.Ppr
 import GHC.Driver.Monad
+import GHC.Builtin.WiredIn.Types (pluginTyConName, frontendPluginTyConName)
 
 {- Note [Timing of plugin initialization]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -174,7 +174,6 @@ loadPlugins hsc_env
         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
     loadPlugin = loadPlugin' (mkVarOccFS (fsLit "plugin")) pluginTyConName hsc_env
-
 
 loadFrontendPlugin :: HscEnv -> ModuleName -> IO (FrontendPlugin, [LinkableUsage], PkgsLoaded)
 loadFrontendPlugin hsc_env mod_name = do

@@ -1,6 +1,6 @@
 T21547.hs:9:14: error: [GHC-28914]
     • Level error:
-      instance for ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable
+      instance for ‘GHC.Internal.Data.Typeable.Internal.Typeable
                       T’ is used at level -1
       but it is bound at level 0
     • In the expression: foo [|| T () ||]

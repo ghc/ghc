@@ -5,6 +5,9 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BlockArguments #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines lots of functions that have BuiltinRules
+
 #include "MachDeps.h"
 #include "WordSize.h"
 
@@ -118,8 +121,6 @@ import GHC.Internal.Classes
 
 import GHC.Internal.Bignum.BigNat
 import GHC.Internal.Bignum.Primitives
-
-default ()
 
 -- | Natural number
 --

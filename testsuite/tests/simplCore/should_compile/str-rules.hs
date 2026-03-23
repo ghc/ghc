@@ -1,6 +1,5 @@
 {-# LANGUAGE MagicHash #-}
-import GHC.CString (unpackFoldrCString#, unpackCString#)
-import GHC.Base (eqString)
+import GHC.Base (unpackFoldrCString#, unpackCString#, eqString)
 main :: IO ()
 main = do
   let mix c n = fromEnum c + n

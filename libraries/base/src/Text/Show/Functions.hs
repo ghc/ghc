@@ -1,4 +1,6 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE MagicHash #-}
 -- This module deliberately declares orphan instances:
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -21,6 +23,9 @@
 module Text.Show.Functions () where
 
 import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Internal.Types as Rebindable (unpackCString#, unpackCStringUtf8#)
+#endif
 
 -- | @since 2.01
 instance Show (a -> b) where

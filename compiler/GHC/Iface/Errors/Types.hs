@@ -9,6 +9,7 @@ module GHC.Iface.Errors.Types (
   , FindingModuleOrInterface(..)
 
   , BuildingCabalPackage(..)
+  , LoadEssentialsReason(..)
 
   , IfaceMessageOpts(..)
 
@@ -16,18 +17,22 @@ module GHC.Iface.Errors.Types (
 
 import GHC.Prelude
 
-import GHC.Types.Name (Name)
+import GHC.Types.Name (Name, KnownKey, KnownOcc)
+import GHC.Types.Name.Reader (GlobalRdrElt)
 import GHC.Types.TyThing (TyThing)
+
 import GHC.Unit.Types (Module, InstalledModule, UnitId, Unit)
 import GHC.Unit.State (UnitState, ModuleSuggestion, ModuleOrigin, UnusableUnit, UnitInfo)
+
 import GHC.Exception.Type (SomeException)
+
 import GHC.Unit.Types ( IsBootInterface )
+import GHC.Unit.Module.Location
+
 import Language.Haskell.Syntax.Module.Name ( ModuleName )
 
-
-
+import GHC.Stack( CallStack )
 import GHC.Generics ( Generic )
-import GHC.Unit.Module.Location
 
 data IfaceMessageOpts = IfaceMessageOpts { ifaceShowTriedFiles :: !Bool -- ^ Whether to show files we tried to look for or not when printing loader errors
                                          , ifaceBuildingCabalPackage :: !BuildingCabalPackage
@@ -43,10 +48,38 @@ data IfaceMessage
   = Can'tFindInterface
       MissingInterfaceError
       InterfaceLookingFor
+
   | Can'tFindNameInInterface
       Name
       [TyThing] -- possibly relevant TyThings
+
   | CircularImport !Module
+
+  | MissingKnownKey1 KnownKey
+    -- We looked up a known-key, but it wasn't in the
+    -- known-key map that came from importing GHC.Essentials
+
+   | MissingKnownKey2 KnownKey
+     -- We looked up a known-key, but it wasn't in
+     -- the `knownKeyTable` of all known keys
+
+   | MissingKnownKey3 KnownOcc
+     -- We looked up a known-occ, but it wasn't in
+     -- the exports of GHC.Essentials
+
+   | KnownKeyScopeError KnownOcc [GlobalRdrElt] CallStack
+     -- We looked up a known-occ in the GlobalRdrEnv,
+     -- but did not find a unique hit
+     -- CallStack is so that we can get a backtrace
+
+   | CantFindEssentials MissingInterfaceError LoadEssentialsReason
+     -- We failed to find GHC.Essentials, the module exported from base which
+     -- exports all the compiler known-names. The 'MissingInterfaceError' is
+     -- the underlying reason the module could not be found. A 'KnownKey' is
+     -- attached if we were looking for one when we failed to load GHC.Essentials
+     --
+     -- Test cases:
+     --   tests/driver/T27013e
   deriving Generic
 
 data MissingInterfaceError
@@ -90,3 +123,11 @@ data BuildingCabalPackage
   = YesBuildingCabalPackage
   | NoBuildingCabalPackage
   deriving Eq
+
+data LoadEssentialsReason
+  = LookingForKnownKey KnownKey
+  | LookingForKnownOcc KnownOcc
+  | LookingForEssentialsModule
+  | UnknownLoadEssentialsReason
+  deriving Generic
+

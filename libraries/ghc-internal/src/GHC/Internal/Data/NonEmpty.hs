@@ -6,10 +6,7 @@ module GHC.Internal.Data.NonEmpty
   , map
   ) where
 
-import GHC.Internal.Base
-         ( Applicative (..), Functor (..), Monad (..), NonEmpty (..)
-         , Semigroup (..), (++), (.), ap, liftM2
-         )
+import GHC.Internal.Base hiding( map )
 
 -- The following were moved here from module Data.List.NonEmpty of the base
 -- package: map.

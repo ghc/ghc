@@ -67,14 +67,14 @@ module GHC.Iface.Type (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
                                  ( coercibleTyCon, heqTyCon
                                  , constraintKindTyConName
                                  , tupleTyConName
                                  , tupleDataConName
                                  , manyDataConTyCon
                                  , liftedRepTyCon, liftedDataConTyCon
-                                 , sumTyCon )
+                                 , liftedTypeKindTyConName, sumTyCon,  )
 import GHC.Base ( Multiplicity(..) )
 import GHC.Core.Multiplicity ( pprArrowWithModifiers )
 import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
@@ -83,8 +83,7 @@ import GHC.Core.TyCo.Compare( eqForAllVis )
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
-import GHC.Builtin.Names
-import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyConName )
+import GHC.Builtin.KnownKeys
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Utils.Binary
@@ -113,28 +112,34 @@ import qualified Data.Set as Set
 ************************************************************************
 -}
 
+type IfExtName = Name -- Always an External, KnownKey, or WiredIn Name
+                      -- Never an Internal of System Name
+
 -- | A local name in iface syntax
 newtype IfLclName = IfLclName
   { getIfLclName :: LexicalFastString
   } deriving (Eq, Ord, Show)
-
-ifLclNameFS :: IfLclName -> FastString
-ifLclNameFS = getLexicalFastString . getIfLclName
-
-mkIfLclName :: FastString -> IfLclName
-mkIfLclName = IfLclName . LexicalFastString
-
-type IfExtName = Name   -- An External or WiredIn Name can appear in Iface syntax
-                        -- (However Internal or System Names never should)
 
 data IfaceBndr          -- Local (non-top-level) binders
   = IfaceIdBndr {-# UNPACK #-} !IfaceIdBndr
   | IfaceTvBndr {-# UNPACK #-} !IfaceTvBndr
   deriving (Eq, Ord)
 
-
 type IfaceIdBndr  = (IfaceType, IfLclName, IfaceType)  -- (multiplicity, name, type)
 type IfaceTvBndr  = (IfLclName, IfaceKind)
+
+type IfaceLamBndr = (IfaceBndr, IfaceOneShot)
+
+data IfaceOneShot    -- See Note [Preserve OneShotInfo] in "GHC.Core.Tidy"
+  = IfaceNoOneShot   -- and Note [oneShot magic] in "GHC.Types.Id.Make"
+  | IfaceOneShot
+
+
+ifLclNameFS :: IfLclName -> FastString
+ifLclNameFS = getLexicalFastString . getIfLclName
+
+mkIfLclName :: FastString -> IfLclName
+mkIfLclName = IfLclName . LexicalFastString
 
 ifaceTvBndrName :: IfaceTvBndr -> IfLclName
 ifaceTvBndrName (n,_) = n
@@ -149,12 +154,6 @@ ifaceBndrName (IfaceIdBndr bndr) = ifaceIdBndrName bndr
 ifaceBndrType :: IfaceBndr -> IfaceType
 ifaceBndrType (IfaceIdBndr (_, _, t)) = t
 ifaceBndrType (IfaceTvBndr (_, t)) = t
-
-type IfaceLamBndr = (IfaceBndr, IfaceOneShot)
-
-data IfaceOneShot    -- See Note [Preserve OneShotInfo] in "GHC.Core.Tidy"
-  = IfaceNoOneShot   -- and Note [oneShot magic] in "GHC.Types.Id.Make"
-  | IfaceOneShot
 
 instance Outputable IfaceOneShot where
   ppr IfaceNoOneShot = text "NoOneShotInfo"
@@ -360,7 +359,7 @@ We do the same for covars, naturally.
 Note [Equality predicates in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC has several varieties of type equality (see Note [The equality types story]
-in GHC.Builtin.Types.Prim for details).  In an effort to avoid confusing users, we suppress
+in GHC.Builtin.WiredIn.Prim for details).  In an effort to avoid confusing users, we suppress
 the differences during pretty printing unless certain flags are enabled.
 Here is how each equality predicate* is printed in homogeneous and
 heterogeneous contexts, depending on which combination of the
@@ -411,7 +410,7 @@ possible since we can't see through type synonyms. Consequently, we need to
 record whether this particular application is homogeneous in IfaceTyConSort
 for the purposes of pretty-printing.
 
-See Note [The equality types story] in GHC.Builtin.Types.Prim.
+See Note [The equality types story] in GHC.Builtin.WiredIn.Prim.
 -}
 
 data IfaceTyConInfo   -- Used only to guide pretty-printing
@@ -485,7 +484,7 @@ data IfaceCoercion
   | IfaceAxiomCo      IfaceAxiomRule [IfaceCoercion]
        -- ^ There are only a fixed number of CoAxiomRules, so it suffices
        -- to use an IfaceLclName to distinguish them.
-       -- See Note [Adding built-in type families] in GHC.Builtin.Types.Literals
+       -- See Note [Adding built-in type families] in GHC.Builtin.WiredIn.TypeLits
   | IfaceUnivCo       UnivCoProvenance Role IfaceType IfaceType [IfaceCoercion]
   | IfaceSymCo        IfaceCoercion
   | IfaceTransCo      IfaceCoercion IfaceCoercion
@@ -1836,7 +1835,7 @@ ppr_iface_unused_ty_tycon ctxt_prec arg_k arg_nm args_usr
 --      heqTyCon         (~~)
 --
 -- See Note [Equality predicates in IfaceType]
--- and Note [The equality types story] in GHC.Builtin.Types.Prim
+-- and Note [The equality types story] in GHC.Builtin.WiredIn.Prim
 ppr_equality :: PprPrec -> IfaceTyCon -> [IfaceType] -> Maybe SDoc
 ppr_equality ctxt_prec tc args
   | hetero_eq_tc

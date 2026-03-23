@@ -18,7 +18,8 @@ module GHC.Internal.Wasm.Prim.Types (
   WouldBlockException (..)
 ) where
 
-import GHC.Internal.Base (String, pure, (.), ($))
+import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
+import GHC.Internal.Base
 import GHC.Internal.Classes (Ord(..))
 import GHC.Internal.Exception.Type
 import GHC.Internal.Foreign.C.String.Encoding

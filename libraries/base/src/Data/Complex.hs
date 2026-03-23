@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -36,7 +37,7 @@ module Data.Complex
         )  where
 
 import Prelude hiding (Applicative(..))
-import GHC.Internal.Base (Applicative (..))
+import GHC.Internal.Base
 import GHC.Generics (Generic, Generic1)
 import GHC.Internal.Float (Floating(..))
 import GHC.Internal.Data.Data (Data)
@@ -44,6 +45,9 @@ import Foreign (Storable, castPtr, peek, poke, pokeElemOff, peekElemOff, sizeOf,
                 alignment)
 import GHC.Internal.Control.Monad.Fix (MonadFix(..))
 import Control.Monad.Zip (MonadZip(..))
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 infix  6  :+
 

@@ -63,14 +63,20 @@ import GHC.Internal.Base (
     const, flip, fmap, liftM2, otherwise, return, when,
     ($), ($!), (.), (=<<), (>>),
   )
+import qualified GHC.Internal.Base as Rebindable
 import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
 import GHC.Internal.Data.Maybe (Maybe(..))
 import GHC.Internal.Enum
 import GHC.Internal.Err (error, undefined)
 import GHC.Internal.Num
 import GHC.Internal.Real
+import qualified GHC.Internal.Show as Rebindable
+import qualified GHC.Internal.Stack.Types as Rebindable
+  ( SrcLoc(..), pushCallStack, emptyCallStack )
 import GHC.Internal.List
 import GHC.Internal.Types (Bool(..), Int)
+import qualified GHC.Internal.Types as Rebindable
+import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
 import GHC.Internal.Word (Word8, Word16, Word64)
 
 import GHC.Internal.IO hiding (mask)

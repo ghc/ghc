@@ -177,6 +177,8 @@ addToUFM_C
   -> UniqFM key elt       -- ^ old
   -> key -> elt           -- ^ new
   -> UniqFM key elt       -- ^ result
+{-# SPECIALISE addToUFM_C :: (elt -> elt -> elt) -> UniqFM Unique elt
+                          -> Unique -> elt -> UniqFM Unique elt #-}
 -- Arguments of combining function of M.insertWith and addToUFM_C are flipped.
 addToUFM_C f (UFM m) k v =
   UFM (M.insertWith (flip f) (getKey $ getUnique k) v m)
@@ -198,6 +200,8 @@ addToUFM_Acc
   -> UniqFM key elts        -- old
   -> key -> elt             -- new
   -> UniqFM key elts        -- result
+{-# SPECIALISE addToUFM_Acc :: (elt -> elts -> elts) -> (elt->elts) -> UniqFM Unique elts
+                            -> Unique -> elt -> UniqFM Unique elts #-}
 addToUFM_Acc exi new (UFM m) k v =
   UFM (M.insertWith (\_new old -> exi v old) (getKey $ getUnique k) (new v) m)
 

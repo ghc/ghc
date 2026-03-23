@@ -9,6 +9,9 @@ module GHC.Internal.IO.Handle.Lock.Common
 import GHC.Internal.Exception
 import GHC.Internal.Show
 
+import GHC.Internal.Base          as Rebindable -- For known-occ things
+import GHC.Internal.Data.Typeable as Rebindable -- For known-occ things
+
 -- | Exception thrown by 'hLock' on non-Windows platforms that don't support
 -- 'flock'.
 data FileLockingNotSupported = FileLockingNotSupported

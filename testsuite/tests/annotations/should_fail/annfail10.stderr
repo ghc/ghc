@@ -1,4 +1,3 @@
-
 annfail10.hs:9:1: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from an annotation
       prevents the constraint ‘(GHC.Internal.Data.Data.Data
@@ -9,9 +8,10 @@ annfail10.hs:9:1: error: [GHC-39999]
                   GHC.Internal.Data.Data.Data b) =>
                  GHC.Internal.Data.Data.Data (Either a b)
           -- Defined in ‘GHC.Internal.Data.Data’
-        instance GHC.Internal.Data.Data.Data Ordering
+        instance GHC.Internal.Data.Data.Data Integer
           -- Defined in ‘GHC.Internal.Data.Data’
         ...plus 17 others
-        ...plus 49 instances involving out-of-scope types
+        ...plus 107 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the annotation: {-# ANN f Nothing #-}
+

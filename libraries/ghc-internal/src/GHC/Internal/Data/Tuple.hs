@@ -27,8 +27,6 @@ module GHC.Internal.Data.Tuple
 
 import GHC.Internal.Tuple (Solo (..), getSolo)
 
-default ()              -- Double isn't available yet
-
 -- ---------------------------------------------------------------------------
 -- Standard functions over tuples
 

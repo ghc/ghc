@@ -50,7 +50,7 @@ import GHC.Data.Maybe( orElse )
 
 import Control.Monad
 import qualified Data.Semigroup as S
-import GHC.Builtin.Types.Prim (fUNTyCon)
+import GHC.Builtin.WiredIn.Prim (fUNTyCon)
 
 {- Note [The Core unifier]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

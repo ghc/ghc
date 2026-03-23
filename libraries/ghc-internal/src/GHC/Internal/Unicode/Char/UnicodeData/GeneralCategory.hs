@@ -18,11 +18,10 @@ module GHC.Internal.Unicode.Char.UnicodeData.GeneralCategory
 (generalCategory)
 where
 
-import GHC.Internal.Base (ord)
-import GHC.Internal.Classes (Ord(..))
+import GHC.Internal.Base
 import GHC.Internal.Unicode.Bits (lookupIntN)
 import GHC.Internal.Num ((-))
-import GHC.Internal.Types (Char, Int)
+import GHC.Internal.Num as Rebindable( fromInteger ) -- For known-key names
 
 {-# NOINLINE lookup_bitmap #-}
 lookup_bitmap :: Int -> Int

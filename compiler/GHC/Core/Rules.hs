@@ -67,7 +67,7 @@ import GHC.Core.Opt.OccurAnal( occurAnalyseBndrsAndExpr )
 import GHC.Core.Rules.Config (roBuiltinRules)
 
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
-import GHC.Builtin.Types    ( anyTypeOfKind )
+import GHC.Builtin.WiredIn.Types    ( anyTypeOfKind )
 
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RuleInfo( RuleInfo ) )
@@ -78,8 +78,8 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name    ( Name, NamedThing(..), nameIsLocalOrFrom )
 import GHC.Types.Name.Set
-import GHC.Types.Name.Env
 import GHC.Types.Name.Occurrence( occNameFS )
+import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Tickish
 import GHC.Types.Basic
@@ -358,7 +358,7 @@ addIdSpecialisations id rules
 addRulesToId :: RuleBase -> Id -> Id
 -- Add rules in the RuleBase to the rules in the Id
 addRulesToId rule_base bndr
-  | Just rules <- lookupNameEnv rule_base (idName bndr)
+  | Just rules <- lookupRuleBase rule_base (idUnique bndr)
   = bndr `addIdSpecialisations` rules
   | otherwise
   = bndr
@@ -377,12 +377,12 @@ rulesOfBinds binds = concatMap (concatMap idCoreRules . bindersOf) binds
 -}
 
 -- | Gathers a collection of 'CoreRule's. Maps (the name of) an 'Id' to its rules
-type RuleBase = NameEnv [CoreRule]
+type RuleBase = UniqFM Unique [CoreRule]
         -- The rules are unordered;
         -- we sort out any overlaps on lookup
 
 emptyRuleBase :: RuleBase
-emptyRuleBase = emptyNameEnv
+emptyRuleBase = emptyUFM
 
 mkRuleBase :: [CoreRule] -> RuleBase
 mkRuleBase rules = extendRuleBaseList emptyRuleBase rules
@@ -393,7 +393,10 @@ extendRuleBaseList rule_base new_guys
 
 extendRuleBase :: RuleBase -> CoreRule -> RuleBase
 extendRuleBase rule_base rule
-  = extendNameEnv_Acc (:) Utils.singleton rule_base (ruleIdName rule) rule
+  = addToUFM_Acc (:) Utils.singleton rule_base (ruleKey rule) rule
+
+lookupRuleBase :: RuleBase -> Unique -> Maybe [CoreRule]
+lookupRuleBase = lookupUFM
 
 pprRuleBase :: RuleBase -> SDoc
 pprRuleBase rules = pprUFM rules $ \rss ->
@@ -441,9 +444,9 @@ addLocalRules rule_env rules
   = rule_env { re_local_rules = extendRuleBaseList (re_local_rules rule_env) rules }
 
 emptyRuleEnv :: RuleEnv
-emptyRuleEnv = RuleEnv { re_local_rules   = emptyNameEnv
-                       , re_home_rules    = emptyNameEnv
-                       , re_eps_rules     = emptyNameEnv
+emptyRuleEnv = RuleEnv { re_local_rules   = emptyRuleBase
+                       , re_home_rules    = emptyRuleBase
+                       , re_eps_rules     = emptyRuleBase
                        , re_visible_orphs = emptyModuleSet }
 
 getRules :: RuleEnv -> Id -> [CoreRule]
@@ -479,10 +482,10 @@ getRules (RuleEnv { re_local_rules   = local_rule_base
                                               drop_orphs eps_rules  ++
                                               idCoreRules fn
   where
-    fn_name = idName fn
+    fn_key = idUnique fn
     drop_orphs [] = []  -- Fast path; avoid invoking recursive filter
     drop_orphs xs = filter (ruleIsVisible orphs) xs
-    get rb = lookupNameEnv rb fn_name `orElse` []
+    get rb = lookupRuleBase rb fn_key `orElse` []
 
 ruleIsVisible :: ModuleSet -> CoreRule -> Bool
 ruleIsVisible _ BuiltinRule{} = True

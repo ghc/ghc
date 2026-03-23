@@ -6,7 +6,7 @@ module GHC.Internal.Wasm.Prim.Conc.Internal (
 
 import GHC.Internal.Base ((=<<))
 import GHC.Internal.IO (evaluate)
-import GHC.Internal.Types (Int, IO)
+import GHC.Internal.Types
 
 -- See W6 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 import GHC.Internal.Wasm.Prim.Imports ()

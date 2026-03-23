@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -49,12 +50,15 @@ module Data.Bifoldable
   , bifind
   ) where
 
+import Prelude
 import Control.Applicative
 import GHC.Internal.Data.Functor.Utils (Max(..), Min(..), (#.))
 import GHC.Internal.Data.Maybe (fromMaybe)
 import GHC.Internal.Data.Monoid
 import GHC.Generics (K1(..))
-import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 -- $setup
 -- >>> import Prelude

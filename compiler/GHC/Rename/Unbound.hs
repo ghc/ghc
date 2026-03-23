@@ -46,7 +46,7 @@ import GHC.Driver.Env.Types
 import {-# SOURCE #-} GHC.Tc.Errors.Hole ( getHoleFitDispConfig )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
-import GHC.Builtin.Names ( mkUnboundName, isUnboundName )
+import GHC.Builtin ( mkUnboundName, isUnboundName )
 import GHC.Utils.Misc
 import GHC.Utils.Panic (panic)
 
@@ -195,7 +195,7 @@ unknownNameSuggestionsMessage msg imp_errs hints
 
 notInScopeErr :: WhereLooking -> RdrName -> NotInScopeError
 notInScopeErr where_look rdr_name
-  | Just name <- isExact_maybe rdr_name
+  | Just name <- rdrNameExactName_maybe rdr_name
   = NoExactName name
   | WL_LocalTop <- where_look
   = NoTopLevelBinding

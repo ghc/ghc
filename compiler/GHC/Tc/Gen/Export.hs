@@ -6,7 +6,8 @@ module GHC.Tc.Gen.Export (rnExports, exports_from_avail, classifyGREs) where
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Builtin.Names
+import GHC.Builtin( isUnboundName )
+import GHC.Builtin.KnownOccs( main_RDR_Unqual )
 import GHC.Core.Class
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
@@ -183,8 +184,8 @@ accumExports f xs = do
          , fmap fst dflts
          , export_warn_spans
          , dont_warn_export )
-  where f' acc x
-          = fromMaybe (acc, Nothing) <$> attemptM (f acc x)
+  where
+    f' acc x = fromMaybe (acc, Nothing) <$> attemptM (f acc x)
 
 type ExportOccMap = OccEnv (Name, IE GhcPs)
         -- Tracks what a particular exported OccName

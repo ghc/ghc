@@ -1,5 +1,7 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -147,6 +149,10 @@ import qualified GHC.Internal.Data.Foldable       as Foldable
 import           GHC.Internal.Data.Function       (on)
 import           GHC.Internal.Data.Ord            (comparing)
 import           GHC.Internal.Stack.Types     (HasCallStack)
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Internal.Stack.Types as Rebindable (SrcLoc(..), pushCallStack, emptyCallStack)
+import qualified GHC.Internal.Types as Rebindable (unpackCString#, unpackCStringUtf8#)
+#endif
 import           GHC.Internal.Data.List.NonEmpty (NonEmpty (..), map, zip, zipWith)
 
 infixr 5 <|

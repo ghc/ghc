@@ -28,7 +28,7 @@ module GHC.Internal.Wasm.Prim.Imports (
   stg_messagePromiseBool
 ) where
 
-import GHC.Internal.Base (String, ($), unIO)
+import GHC.Internal.Base
 import GHC.Internal.Exception
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.Stable
@@ -38,6 +38,7 @@ import GHC.Internal.Prim (
 import GHC.Internal.Types (Any, IO(..))
 import GHC.Internal.Wasm.Prim.Types
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# )
+import qualified GHC.Internal.Stack.Types as Rebindable
 
 {-# OPAQUE raiseJSException #-}
 raiseJSException :: JSVal -> a

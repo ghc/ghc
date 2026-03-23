@@ -1,6 +1,6 @@
 
 module GHC.CString where
-  -- Safety: None
+  -- Safety: Safe-Inferred
   cstringLength# :: GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.Int#
   unpackAppendCString# :: GHC.Internal.Prim.Addr# -> [GHC.Internal.Types.Char] -> [GHC.Internal.Types.Char]
   unpackAppendCStringUtf8# :: GHC.Internal.Prim.Addr# -> [GHC.Internal.Types.Char] -> [GHC.Internal.Types.Char]
@@ -3921,7 +3921,7 @@ module GHC.Tuple where
   maxTupleSize :: GHC.Internal.Types.Int
 
 module GHC.Types where
-  -- Safety: None
+  -- Safety: Trustworthy
   type Any :: forall k. k
   type family Any @k where
   type Bool :: *
@@ -3956,7 +3956,7 @@ module GHC.Types where
   type KindBndr :: *
   type KindBndr = Int
   type KindRep :: *
-  data KindRep = KindRepTyConApp TyCon [KindRep] | KindRepVar {-# UNPACK #-} !KindBndr | KindRepApp KindRep KindRep | KindRepFun KindRep KindRep | KindRepTYPE !RuntimeRep | KindRepTypeLitS TypeLitSort GHC.Internal.Prim.Addr# | KindRepTypeLitD TypeLitSort [Char]
+  data KindRep = KindRepTyConApp TyCon [KindRep] | KindRepVar {-# UNPACK #-} !KindBndr | KindRepApp KindRep KindRep | KindRepFun KindRep KindRep | KindRepType | KindRepConstraint | KindRepTypeLitS TypeLitSort GHC.Internal.Prim.Addr# | KindRepTypeLitD TypeLitSort [Char]
   type Levity :: *
   data Levity = Lifted | Unlifted
   type LiftedRep :: RuntimeRep
@@ -6991,7 +6991,19 @@ module GHC.Types where
   type ZeroBitRep = TupleRep '[]
   type ZeroBitType :: *
   type ZeroBitType = TYPE ZeroBitRep
+  cstringLength# :: GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.Int#
   isTrue# :: GHC.Internal.Prim.Int# -> Bool
+  krepConstraint :: KindRep
+  krepStar :: KindRep
+  krepStarArr :: KindRep
+  krepStarArrStarArr :: KindRep
+  unpackAppendCString# :: GHC.Internal.Prim.Addr# -> [Char] -> [Char]
+  unpackAppendCStringUtf8# :: GHC.Internal.Prim.Addr# -> [Char] -> [Char]
+  unpackCString# :: GHC.Internal.Prim.Addr# -> [Char]
+  unpackCStringUtf8# :: GHC.Internal.Prim.Addr# -> [Char]
+  unpackFoldrCString# :: forall a. GHC.Internal.Prim.Addr# -> (Char -> a -> a) -> a -> a
+  unpackFoldrCStringUtf8# :: forall a. GHC.Internal.Prim.Addr# -> (Char -> a -> a) -> a -> a
+  unpackNBytes# :: GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.Int# -> [Char]
   type (~) :: forall k. k -> k -> Constraint
   class (a ~ b) => (~) a b
     {-# MINIMAL #-}

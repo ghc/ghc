@@ -9,10 +9,8 @@
 -----------------------------------------------------------------------------
 module GHC.Internal.Data.Functor.Utils where
 
-import GHC.Internal.Classes (Ord(..))
-import GHC.Internal.Data.Coerce (Coercible, coerce)
-import GHC.Internal.Base ( Applicative(..), Functor(..), Monad (..)
-                , Monoid(..), Semigroup(..), ($), liftM, otherwise )
+import GHC.Internal.Base
+import GHC.Internal.Data.Coerce (coerce)
 import qualified GHC.Internal.List as List
 import GHC.Internal.Maybe (Maybe(..))
 

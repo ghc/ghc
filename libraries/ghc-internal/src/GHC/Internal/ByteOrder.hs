@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -25,7 +26,8 @@ module GHC.Internal.ByteOrder
 -- Required for WORDS_BIGENDIAN
 #include <ghcautoconf.h>
 
-import GHC.Internal.Classes (Eq, Ord)
+import GHC.Internal.Base as Rebindable   -- For known-key names
+import GHC.Internal.Num  as Rebindable   -- For known-key names
 import GHC.Internal.Enum
 import GHC.Internal.Text.Show
 

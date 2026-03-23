@@ -5,8 +5,8 @@ module IfaceSharingIfaceType (types) where
 
 import GHC.Data.FastString
 import GHC.Builtin.Uniques
-import GHC.Builtin.Names
-import GHC.Builtin.Types
+import GHC.Builtin.Modules
+import GHC.Builtin.WiredIn.Types
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Iface.Type

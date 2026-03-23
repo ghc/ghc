@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Generic, Generic1 etc
+
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveFunctor              #-}
@@ -733,22 +736,18 @@ module GHC.Internal.Generics  (
 import GHC.Internal.Data.Either     ( Either (..) )
 import GHC.Internal.Data.Maybe      ( Maybe(..), fromMaybe )
 import GHC.Internal.Data.Ord        ( Down(..) )
-import GHC.Internal.Bignum.Integer ( Integer, integerToInt )
 import GHC.Internal.Prim        ( Addr#, Char#, Double#, Float#, Int#, Word# )
 import GHC.Internal.Ptr         ( Ptr(..) )
-import GHC.Internal.Types hiding (Any) -- clashes with the Semigroup
+import GHC.Internal.Base hiding( Any, foldr ) -- clashes with the Semigroup
+import GHC.Internal.Num  -- For deriving
+import GHC.Internal.Ix  -- For deriving
+import GHC.Internal.Enum  -- For deriving
 
 -- Needed for instances
-import GHC.Internal.Ix      ( Ix )
-import GHC.Internal.Base    ( Alternative(..), Applicative(..), Functor(..)
-                   , Monad(..), MonadPlus(..), NonEmpty(..), String
-                   , Semigroup(..), Void)
 import GHC.Internal.Err (errorWithoutStackTrace)
-import GHC.Internal.Classes ( Eq(..), Ord(..) )
-import GHC.Internal.Enum    ( Bounded, Enum )
 import GHC.Internal.Prim    ( coerce )
-import GHC.Internal.Read    ( Read(..) )
-import GHC.Internal.Show    ( Show(..), showString, showChar, showParen, appPrec )
+import GHC.Internal.Read    ( Read )
+import GHC.Internal.Show
 import GHC.Internal.Stack.Types ( SrcLoc(..) )
 import GHC.Internal.Tuple   (Solo (..))
 import GHC.Internal.Unicode ( GeneralCategory(..) )
@@ -767,6 +766,9 @@ import GHC.Internal.Data.Functor.Identity
 -- Needed for metadata
 import GHC.Internal.Data.Proxy   ( Proxy(..) )
 import GHC.Internal.TypeLits ( KnownSymbol, KnownNat, Nat, symbolVal, natVal )
+
+import qualified GHC.Internal.Num  as Rebindable
+import qualified GHC.Internal.Read as Rebindable
 
 --------------------------------------------------------------------------------
 -- Representation types

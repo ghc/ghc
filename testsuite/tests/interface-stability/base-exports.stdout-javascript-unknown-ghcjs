@@ -236,7 +236,7 @@ module Control.Exception where
   data ErrorCall = ErrorCall GHC.Internal.Base.String
   pattern ErrorCallWithLocation :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> ErrorCall
   type Exception :: * -> Constraint
-  class (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
+  class (GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Internal.Maybe.Maybe e
     displayException :: e -> GHC.Internal.Base.String
@@ -313,7 +313,7 @@ module Control.Exception where
 module Control.Exception.Annotation where
   -- Safety: None
   type ExceptionAnnotation :: * -> Constraint
-  class ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a => ExceptionAnnotation a where
+  class GHC.Internal.Data.Typeable.Internal.Typeable a => ExceptionAnnotation a where
     displayExceptionAnnotation :: a -> GHC.Internal.Base.String
     default displayExceptionAnnotation :: GHC.Internal.Show.Show a => a -> GHC.Internal.Base.String
     {-# MINIMAL #-}
@@ -355,7 +355,7 @@ module Control.Exception.Base where
   data ErrorCall = ErrorCall GHC.Internal.Base.String
   pattern ErrorCallWithLocation :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> ErrorCall
   type Exception :: * -> Constraint
-  class (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
+  class (GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Internal.Maybe.Maybe e
     displayException :: e -> GHC.Internal.Base.String
@@ -869,11 +869,11 @@ module Data.Data where
   type TyCon :: *
   data TyCon = ...
   type TypeRep :: *
-  type TypeRep = ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.SomeTypeRep
+  type TypeRep = GHC.Internal.Data.Typeable.Internal.SomeTypeRep
   type Typeable :: forall k. k -> Constraint
   class Typeable a where
     ...
-    {-# MINIMAL ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.typeRep# #-}
+    {-# MINIMAL GHC.Internal.Data.Typeable.Internal.typeRep# #-}
   cast :: forall a b. (Typeable a, Typeable b) => a -> GHC.Internal.Maybe.Maybe b
   constrFields :: Constr -> [GHC.Internal.Base.String]
   constrFixity :: Constr -> Fixity
@@ -916,7 +916,7 @@ module Data.Data where
   showConstr :: Constr -> GHC.Internal.Base.String
   showsTypeRep :: TypeRep -> GHC.Internal.Show.ShowS
   splitTyConApp :: TypeRep -> (TyCon, [TypeRep])
-  trLiftedRep :: ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.TypeRep GHC.Internal.Types.LiftedRep
+  trLiftedRep :: GHC.Internal.Data.Typeable.Internal.TypeRep GHC.Internal.Types.LiftedRep
   tyConFingerprint :: TyCon -> GHC.Internal.Fingerprint.Type.Fingerprint
   tyConModule :: TyCon -> GHC.Internal.Base.String
   tyConName :: TyCon -> GHC.Internal.Base.String
@@ -947,14 +947,14 @@ module Data.Dynamic where
   -- Safety: Safe
   type Dynamic :: *
   data Dynamic where
-    Dynamic :: forall a. ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.TypeRep a -> a -> Dynamic
+    Dynamic :: forall a. GHC.Internal.Data.Typeable.Internal.TypeRep a -> a -> Dynamic
   type Typeable :: forall k. k -> Constraint
   class Typeable a where
     ...
-    {-# MINIMAL ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.typeRep# #-}
+    {-# MINIMAL GHC.Internal.Data.Typeable.Internal.typeRep# #-}
   dynApp :: Dynamic -> Dynamic -> Dynamic
   dynApply :: Dynamic -> Dynamic -> GHC.Internal.Maybe.Maybe Dynamic
-  dynTypeRep :: Dynamic -> ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.SomeTypeRep
+  dynTypeRep :: Dynamic -> GHC.Internal.Data.Typeable.Internal.SomeTypeRep
   fromDyn :: forall a. Typeable a => Dynamic -> a -> a
   fromDynamic :: forall a. Typeable a => Dynamic -> GHC.Internal.Maybe.Maybe a
   toDyn :: forall a. Typeable a => a -> Dynamic
@@ -1869,11 +1869,11 @@ module Data.Typeable where
   type TyCon :: *
   data TyCon = ...
   type TypeRep :: *
-  type TypeRep = ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.SomeTypeRep
+  type TypeRep = GHC.Internal.Data.Typeable.Internal.SomeTypeRep
   type Typeable :: forall k. k -> Constraint
   class Typeable a where
     ...
-    {-# MINIMAL ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.typeRep# #-}
+    {-# MINIMAL GHC.Internal.Data.Typeable.Internal.typeRep# #-}
   cast :: forall a b. (Typeable a, Typeable b) => a -> GHC.Internal.Maybe.Maybe b
   decT :: forall {k} (a :: k) (b :: k). (Typeable a, Typeable b) => GHC.Internal.Data.Either.Either ((a :~: b) -> GHC.Internal.Base.Void) (a :~: b)
   eqT :: forall {k} (a :: k) (b :: k). (Typeable a, Typeable b) => GHC.Internal.Maybe.Maybe (a :~: b)
@@ -1888,7 +1888,7 @@ module Data.Typeable where
   rnfTypeRep :: TypeRep -> ()
   showsTypeRep :: TypeRep -> GHC.Internal.Show.ShowS
   splitTyConApp :: TypeRep -> (TyCon, [TypeRep])
-  trLiftedRep :: ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.TypeRep GHC.Internal.Types.LiftedRep
+  trLiftedRep :: GHC.Internal.Data.Typeable.Internal.TypeRep GHC.Internal.Types.LiftedRep
   tyConFingerprint :: TyCon -> GHC.Internal.Fingerprint.Type.Fingerprint
   tyConModule :: TyCon -> GHC.Internal.Base.String
   tyConName :: TyCon -> GHC.Internal.Base.String
@@ -3369,7 +3369,7 @@ module GHC.Base where
   type KindBndr :: *
   type KindBndr = Int
   type KindRep :: *
-  data KindRep = KindRepTyConApp TyCon [KindRep] | KindRepVar {-# UNPACK #-} !KindBndr | KindRepApp KindRep KindRep | KindRepFun KindRep KindRep | KindRepTYPE !RuntimeRep | KindRepTypeLitS TypeLitSort Addr# | KindRepTypeLitD TypeLitSort [Char]
+  data KindRep = KindRepTyConApp TyCon [KindRep] | KindRepVar {-# UNPACK #-} !KindBndr | KindRepApp KindRep KindRep | KindRepFun KindRep KindRep | KindRepType | KindRepConstraint | KindRepTypeLitS TypeLitSort Addr# | KindRepTypeLitD TypeLitSort [Char]
   type Levity :: *
   data Levity = Lifted | Unlifted
   type LiftedRep :: RuntimeRep
@@ -4065,6 +4065,10 @@ module GHC.Base where
   join :: forall (m :: * -> *) a. Monad m => m (m a) -> m a
   keepAlive# :: forall {l :: Levity} {r :: RuntimeRep} (a :: TYPE (BoxedRep l)) d (b :: TYPE r). a -> State# d -> (State# d -> b) -> b
   killThread# :: forall a. ThreadId# -> a -> State# RealWorld -> State# RealWorld
+  krepConstraint :: KindRep
+  krepStar :: KindRep
+  krepStarArr :: KindRep
+  krepStarArrStarArr :: KindRep
   labelThread# :: ThreadId# -> ByteArray# -> State# RealWorld -> State# RealWorld
   lazy :: forall a. a -> a
   leAddr# :: Addr# -> Addr# -> Int#
@@ -5240,7 +5244,7 @@ module GHC.ConsoleHandler where
   -- Safety: Safe
 
 module GHC.Constants where
-  -- Safety: None
+  -- Safety: Safe-Inferred
 
 module GHC.Encoding.UTF8 where
   -- Safety: None
@@ -5291,6 +5295,877 @@ module GHC.Err where
   errorWithoutStackTrace :: forall (r :: GHC.Internal.Types.RuntimeRep) (a :: TYPE r). [GHC.Internal.Types.Char] -> a
   undefined :: forall (r :: GHC.Internal.Types.RuntimeRep) (a :: TYPE r). GHC.Internal.Stack.Types.HasCallStack => a
 
+module GHC.Essentials where
+  -- Safety: Trustworthy
+  ($) :: forall (repa :: GHC.Internal.Types.RuntimeRep) (repb :: GHC.Internal.Types.RuntimeRep) (a :: TYPE repa) (b :: TYPE repb). (a -> b) -> a -> b
+  (&&) :: GHC.Internal.Types.Bool -> GHC.Internal.Types.Bool -> GHC.Internal.Types.Bool
+  (+++) :: forall a. GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a
+  (.) :: forall b c a. (b -> c) -> (a -> b) -> a -> c
+  type role (:*:) representational representational nominal
+  type (:*:) :: forall k. (k -> *) -> (k -> *) -> k -> *
+  data (:*:) f g p = (f p) :*: (g p)
+  type role (:+:) representational representational nominal
+  type (:+:) :: forall k. (k -> *) -> (k -> *) -> k -> *
+  data (:+:) f g p = L1 (f p) | R1 (g p)
+  type role (:.:) representational nominal nominal
+  type (:.:) :: forall k2 k1. (k2 -> *) -> (k1 -> k2) -> k1 -> *
+  newtype (:.:) f g p = Comp1 {unComp1 :: f (g p)}
+  (>>>) :: forall (arr :: * -> * -> *) a b c. GHC.Internal.Control.Arrow.Arrow arr => arr a b -> arr b c -> arr a c
+  type Alternative :: (* -> *) -> Constraint
+  class Applicative f => Alternative f where
+    ...
+    {-# MINIMAL GHC.Internal.Base.empty, (GHC.Internal.Base.<|>) #-}
+  type Applicative :: (* -> *) -> Constraint
+  class Functor f => Applicative f where
+    pure :: forall a. a -> f a
+    (<*>) :: forall a b. f (a -> b) -> f a -> f b
+    liftA2 :: forall a b c. (a -> b -> c) -> f a -> f b -> f c
+    (*>) :: forall a b. f a -> f b -> f b
+    ...
+    {-# MINIMAL pure, ((<*>) | liftA2) #-}
+  type Associativity :: *
+  data Associativity = LeftAssociative | RightAssociative | NotAssociative
+  type BangType :: *
+  type BangType = (GHC.Internal.TH.Syntax.Bang, Type)
+  type Body :: *
+  data Body = ...
+  type Bounded :: * -> Constraint
+  class Bounded a where
+    minBound :: a
+    maxBound :: a
+    {-# MINIMAL minBound, maxBound #-}
+  type C1 :: forall {k}. Meta -> (k -> *) -> k -> *
+  type C1 = M1 GHC.Internal.Generics.C
+  type CallStack :: *
+  data CallStack = ...
+  type Clause :: *
+  data Clause = ...
+  type role Code representational nominal
+  type Code :: (* -> *) -> forall (r :: GHC.Internal.Types.RuntimeRep). TYPE r -> *
+  newtype Code m a = ...
+  type Con :: *
+  data Con = ...
+  type role ConstPtr phantom
+  type ConstPtr :: * -> *
+  newtype ConstPtr a = ...
+  type Constr :: *
+  data Constr = ...
+  type Constructor :: forall {k}. k -> Constraint
+  class Constructor c where
+    conName :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t c f a -> [GHC.Internal.Types.Char]
+    conFixity :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t c f a -> GHC.Internal.Generics.Fixity
+    conIsRecord :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t c f a -> GHC.Internal.Types.Bool
+    {-# MINIMAL conName #-}
+  type D1 :: forall {k}. Meta -> (k -> *) -> k -> *
+  type D1 = M1 GHC.Internal.Generics.D
+  type Data :: * -> Constraint
+  class Typeable a => Data a where
+    gfoldl :: forall (c :: * -> *). (forall d b. Data d => c (d -> b) -> d -> c b) -> (forall g. g -> c g) -> a -> c a
+    gunfold :: forall (c :: * -> *). (forall b r. Data b => c (b -> r) -> c r) -> (forall r. r -> c r) -> Constr -> c a
+    toConstr :: a -> Constr
+    dataTypeOf :: a -> DataType
+    dataCast1 :: forall (t :: * -> *) (c :: * -> *). Typeable t => (forall d. Data d => c (t d)) -> GHC.Internal.Maybe.Maybe (c a)
+    dataCast2 :: forall (t :: * -> * -> *) (c :: * -> *). Typeable t => (forall d e. (Data d, Data e) => c (t d e)) -> GHC.Internal.Maybe.Maybe (c a)
+    ...
+    {-# MINIMAL gunfold, toConstr, dataTypeOf #-}
+  type DataToTag :: forall {lev :: GHC.Internal.Types.Levity}. TYPE (GHC.Internal.Types.BoxedRep lev) -> Constraint
+  class DataToTag a where
+    dataToTag# :: a -> GHC.Internal.Prim.Int#
+    {-# MINIMAL dataToTag# #-}
+  type DataType :: *
+  data DataType = ...
+  type Datatype :: forall {k}. k -> Constraint
+  class Datatype d where
+    datatypeName :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t d f a -> [GHC.Internal.Types.Char]
+    moduleName :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t d f a -> [GHC.Internal.Types.Char]
+    packageName :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t d f a -> [GHC.Internal.Types.Char]
+    isNewtype :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t d f a -> GHC.Internal.Types.Bool
+    {-# MINIMAL datatypeName, moduleName, packageName #-}
+  type Dec :: *
+  data Dec = ...
+  type DecidedStrictness :: *
+  data DecidedStrictness = DecidedLazy | DecidedStrict | DecidedUnpack
+  type Decs :: *
+  type Decs = [Dec]
+  type DecsQ :: *
+  type DecsQ = Q [Dec]
+  type DerivClause :: *
+  data DerivClause = ...
+  type DerivStrategy :: *
+  data DerivStrategy = ...
+  type Either :: * -> * -> *
+  data Either a b = Left a | Right b
+  type Enum :: * -> Constraint
+  class Enum a where
+    succ :: a -> a
+    pred :: a -> a
+    toEnum :: GHC.Internal.Types.Int -> a
+    fromEnum :: a -> GHC.Internal.Types.Int
+    enumFrom :: a -> [a]
+    enumFromThen :: a -> a -> [a]
+    enumFromTo :: a -> a -> [a]
+    enumFromThenTo :: a -> a -> a -> [a]
+    {-# MINIMAL toEnum, fromEnum #-}
+  type Eq :: * -> Constraint
+  class Eq a where
+    (==) :: a -> a -> GHC.Internal.Types.Bool
+    (/=) :: a -> a -> GHC.Internal.Types.Bool
+    {-# MINIMAL (==) | (/=) #-}
+  type ErrorMessage :: *
+  data ErrorMessage = Text GHC.Internal.Types.Symbol | forall t. ShowType t | ErrorMessage :<>: ErrorMessage | ErrorMessage :$$: ErrorMessage
+  type ExceptionContext :: *
+  data ExceptionContext = ...
+  type Exp :: *
+  data Exp = ...
+  type ExpQ :: *
+  type ExpQ = Q Exp
+  type FieldExp :: *
+  type FieldExp = (Name, Exp)
+  type FieldPat :: *
+  type FieldPat = (Name, Pat)
+  type Fixity :: *
+  data Fixity = Prefix | Infix
+  type FixityI :: *
+  data FixityI = PrefixI | InfixI Associativity GHC.Internal.TypeNats.Nat
+  type Floating :: * -> Constraint
+  class Fractional a => Floating a where
+    ...
+    {-# MINIMAL GHC.Internal.Float.pi, GHC.Internal.Float.exp, GHC.Internal.Float.log, GHC.Internal.Float.sin, GHC.Internal.Float.cos, GHC.Internal.Float.asin, GHC.Internal.Float.acos, GHC.Internal.Float.atan, GHC.Internal.Float.sinh, GHC.Internal.Float.cosh, GHC.Internal.Float.asinh, GHC.Internal.Float.acosh, GHC.Internal.Float.atanh #-}
+  type Foldable :: (* -> *) -> Constraint
+  class Foldable t where
+    ...
+    foldMap :: forall m a. Monoid m => (a -> m) -> t a -> m
+    ...
+    foldr :: forall a b. (a -> b -> b) -> b -> t a -> b
+    ...
+    GHC.Internal.Data.Foldable.toList :: forall a. t a -> [a]
+    null :: forall a. t a -> GHC.Internal.Types.Bool
+    ...
+    {-# MINIMAL foldMap | foldr #-}
+  type Fractional :: * -> Constraint
+  class Num a => Fractional a where
+    ...
+    fromRational :: Rational -> a
+    {-# MINIMAL fromRational, (GHC.Internal.Real.recip | (GHC.Internal.Real./)) #-}
+  type FunDep :: *
+  data FunDep = ...
+  type role FunPtr phantom
+  type FunPtr :: * -> *
+  data FunPtr a = ...
+  type Functor :: (* -> *) -> Constraint
+  class Functor f where
+    fmap :: forall a b. (a -> b) -> f a -> f b
+    (<$) :: forall a b. a -> f b -> f a
+    {-# MINIMAL fmap #-}
+  type GHCiSandboxIO :: (* -> *) -> Constraint
+  class Monad m => GHCiSandboxIO m where
+    ghciStepIO :: forall a. m a -> IO a
+    {-# MINIMAL ghciStepIO #-}
+  type Generic :: * -> Constraint
+  class Generic a where
+    type Rep :: * -> * -> *
+    type family Rep a
+    from :: forall x. a -> Rep a x
+    to :: forall x. Rep a x -> a
+    {-# MINIMAL from, to #-}
+  type Generic1 :: forall k. (k -> *) -> Constraint
+  class Generic1 @k f where
+    type Rep1 :: forall k. (k -> *) -> k -> *
+    type family Rep1 f
+    from1 :: forall (a :: k). f a -> Rep1 f a
+    to1 :: forall (a :: k). Rep1 f a -> f a
+    {-# MINIMAL from1, to1 #-}
+  type Guard :: *
+  data Guard = ...
+  type HasField :: forall {k} {r_rep :: GHC.Internal.Types.RuntimeRep} {a_rep :: GHC.Internal.Types.RuntimeRep}. k -> TYPE r_rep -> TYPE a_rep -> Constraint
+  class HasField x r a | x r -> a where
+    getField :: r -> a
+    {-# MINIMAL getField #-}
+  type IO :: * -> *
+  newtype IO a = IO (GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> (# GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld, a #))
+  type role IP nominal representational
+  type IP :: GHC.Internal.Types.Symbol -> * -> Constraint
+  class IP x a | x -> a where
+    ...
+    {-# MINIMAL GHC.Internal.Classes.IP.ip #-}
+  type InjectivityAnn :: *
+  data InjectivityAnn = ...
+  type Inline :: *
+  data Inline = NoInline | Inline | Inlinable
+  type Int16 :: *
+  data Int16 = I16# GHC.Internal.Prim.Int16#
+  type Int32 :: *
+  data Int32 = I32# GHC.Internal.Prim.Int32#
+  type Int64 :: *
+  data Int64 = I64# GHC.Internal.Prim.Int64#
+  type Int8 :: *
+  data Int8 = I8# GHC.Internal.Prim.Int8#
+  type Integral :: * -> Constraint
+  class (Real a, Enum a) => Integral a where
+    ...
+    toInteger :: a -> GHC.Internal.Bignum.Integer.Integer
+    {-# MINIMAL GHC.Internal.Real.quotRem, toInteger #-}
+  type IsStatic :: (* -> *) -> Constraint
+  class IsStatic p where
+    fromStaticPtr :: forall a. Typeable a => StaticPtr a -> p a
+    {-# MINIMAL fromStaticPtr #-}
+  type IsString :: * -> Constraint
+  class IsString a where
+    fromString :: GHC.Internal.Base.String -> a
+    {-# MINIMAL fromString #-}
+  type Ix :: * -> Constraint
+  class Ord a => Ix a where
+    range :: (a, a) -> [a]
+    index :: (a, a) -> a -> GHC.Internal.Types.Int
+    unsafeIndex :: (a, a) -> a -> GHC.Internal.Types.Int
+    inRange :: (a, a) -> a -> GHC.Internal.Types.Bool
+    ...
+    unsafeRangeSize :: (a, a) -> GHC.Internal.Types.Int
+    {-# MINIMAL range, (index | unsafeIndex), inRange #-}
+  type JSVal :: *
+  data JSVal = ...
+  type role K1 phantom representational phantom
+  type K1 :: forall k. * -> * -> k -> *
+  newtype K1 i c p = K1 {unK1 :: c}
+  type Kind :: *
+  type Kind = Type
+  type KindRep :: *
+  data KindRep = KindRepTyConApp TyCon [KindRep] | KindRepVar {-# UNPACK #-} !GHC.Internal.Types.KindBndr | KindRepApp KindRep KindRep | KindRepFun KindRep KindRep | KindRepType | ... | KindRepTypeLitS TypeLitSort GHC.Internal.Prim.Addr# | ...
+  type KnownChar :: GHC.Internal.Types.Char -> Constraint
+  class KnownChar n where
+    ...
+    {-# MINIMAL GHC.Internal.TypeLits.charSing #-}
+  type KnownNat :: GHC.Internal.TypeNats.Nat -> Constraint
+  class KnownNat n where
+    ...
+    {-# MINIMAL GHC.Internal.TypeNats.natSing #-}
+  type KnownSymbol :: GHC.Internal.Types.Symbol -> Constraint
+  class KnownSymbol n where
+    ...
+    {-# MINIMAL GHC.Internal.TypeLits.symbolSing #-}
+  type Lexeme :: *
+  data Lexeme = ... | Punc GHC.Internal.Base.String | Ident GHC.Internal.Base.String | Symbol GHC.Internal.Base.String | ...
+  type Lift :: forall (r :: GHC.Internal.Types.RuntimeRep). TYPE r -> Constraint
+  class Lift t where
+    lift :: forall (m :: * -> *). Quote m => t -> m Exp
+    default lift :: forall (m :: * -> *). (r ~ GHC.Internal.Types.LiftedRep, Quote m) => t -> m Exp
+    liftTyped :: forall (m :: * -> *). Quote m => t -> Code m t
+    {-# MINIMAL liftTyped #-}
+  type Lit :: *
+  data Lit = ...
+  type role M1 phantom phantom representational nominal
+  type M1 :: forall k. * -> Meta -> (k -> *) -> k -> *
+  newtype M1 i c f p = M1 {unM1 :: f p}
+  type Match :: *
+  data Match = ...
+  type Meta :: *
+  data Meta = MetaData GHC.Internal.Types.Symbol GHC.Internal.Types.Symbol GHC.Internal.Types.Symbol GHC.Internal.Types.Bool | MetaCons GHC.Internal.Types.Symbol FixityI GHC.Internal.Types.Bool | MetaSel (GHC.Internal.Maybe.Maybe GHC.Internal.Types.Symbol) SourceUnpackedness SourceStrictness DecidedStrictness
+  type ModName :: *
+  newtype ModName = ...
+  type Module :: *
+  data Module = Module TrName TrName
+  type Monad :: (* -> *) -> Constraint
+  class Applicative m => Monad m where
+    (>>=) :: forall a b. m a -> (a -> m b) -> m b
+    (>>) :: forall a b. m a -> m b -> m b
+    return :: forall a. a -> m a
+    {-# MINIMAL (>>=) #-}
+  type MonadFail :: (* -> *) -> Constraint
+  class Monad m => MonadFail m where
+    fail :: forall a. GHC.Internal.Stack.Types.HasCallStack => GHC.Internal.Base.String -> m a
+    {-# MINIMAL fail #-}
+  type MonadPlus :: (* -> *) -> Constraint
+  class (Alternative m, Monad m) => MonadPlus m where
+    ...
+    {-# MINIMAL #-}
+  type Monoid :: * -> Constraint
+  class Semigroup a => Monoid a where
+    mempty :: a
+    mappend :: a -> a -> a
+    ...
+    {-# MINIMAL mempty | GHC.Internal.Base.mconcat #-}
+  type Name :: *
+  data Name = ...
+  type NamespaceSpecifier :: *
+  data NamespaceSpecifier = NoNamespaceSpecifier | TypeNamespaceSpecifier | DataNamespaceSpecifier
+  type NonEmpty :: * -> *
+  data NonEmpty a = ...
+  type Num :: * -> Constraint
+  class Num a where
+    (+) :: a -> a -> a
+    (-) :: a -> a -> a
+    (*) :: a -> a -> a
+    negate :: a -> a
+    ...
+    fromInteger :: GHC.Internal.Bignum.Integer.Integer -> a
+    {-# MINIMAL (+), (*), GHC.Internal.Num.abs, GHC.Internal.Num.signum, fromInteger, (negate | (-)) #-}
+  type Ord :: * -> Constraint
+  class Eq a => Ord a where
+    compare :: a -> a -> GHC.Internal.Types.Ordering
+    (<) :: a -> a -> GHC.Internal.Types.Bool
+    (<=) :: a -> a -> GHC.Internal.Types.Bool
+    (>) :: a -> a -> GHC.Internal.Types.Bool
+    (>=) :: a -> a -> GHC.Internal.Types.Bool
+    max :: a -> a -> a
+    min :: a -> a -> a
+    {-# MINIMAL compare | (<=) #-}
+  type Overlap :: *
+  data Overlap = Overlappable | Overlapping | Overlaps | Incoherent
+  type Par1 :: * -> *
+  newtype Par1 p = Par1 {unPar1 :: p}
+  type Pat :: *
+  data Pat = ...
+  type PatQ :: *
+  type PatQ = Q Pat
+  type Phases :: *
+  data Phases = AllPhases | FromPhase GHC.Internal.Types.Int | BeforePhase GHC.Internal.Types.Int
+  type Pred :: *
+  type Pred = Type
+  type role Ptr phantom
+  type Ptr :: * -> *
+  data Ptr a = ...
+  type Q :: * -> *
+  newtype Q a = ...
+  type QuasiQuoter :: *
+  data QuasiQuoter = QuasiQuoter {quoteExp :: GHC.Internal.Base.String -> Q Exp, quotePat :: GHC.Internal.Base.String -> Q Pat, quoteType :: GHC.Internal.Base.String -> Q Type, quoteDec :: GHC.Internal.Base.String -> Q [Dec]}
+  type Quote :: (* -> *) -> Constraint
+  class Monad m => Quote m where
+    newName :: GHC.Internal.Base.String -> m Name
+    {-# MINIMAL newName #-}
+  type Ratio :: * -> *
+  data Ratio a = !a :% !a
+  type Rational :: *
+  type Rational = Ratio GHC.Internal.Bignum.Integer.Integer
+  type Read :: * -> Constraint
+  class Read a where
+    ...
+    readList :: GHC.Internal.Text.ParserCombinators.ReadP.ReadS [a]
+    readPrec :: GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a
+    readListPrec :: GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec [a]
+    {-# MINIMAL GHC.Internal.Read.readsPrec | readPrec #-}
+  type Real :: * -> Constraint
+  class (Num a, Ord a) => Real a where
+    toRational :: a -> Rational
+    {-# MINIMAL toRational #-}
+  type RealFloat :: * -> Constraint
+  class (RealFrac a, Floating a) => RealFloat a where
+    ...
+    {-# MINIMAL GHC.Internal.Float.floatRadix, GHC.Internal.Float.floatDigits, GHC.Internal.Float.floatRange, GHC.Internal.Float.decodeFloat, GHC.Internal.Float.encodeFloat, GHC.Internal.Float.isNaN, GHC.Internal.Float.isInfinite, GHC.Internal.Float.isDenormalized, GHC.Internal.Float.isNegativeZero, GHC.Internal.Float.isIEEE #-}
+  type RealFrac :: * -> Constraint
+  class (Real a, Fractional a) => RealFrac a where
+    ...
+    {-# MINIMAL GHC.Internal.Real.properFraction #-}
+  type Rec0 :: forall {k}. * -> k -> *
+  type Rec0 = K1 GHC.Internal.Generics.R
+  type role Rec1 representational nominal
+  type Rec1 :: forall k. (k -> *) -> k -> *
+  newtype Rec1 f p = Rec1 {unRec1 :: f p}
+  type Role :: *
+  data Role = ...
+  type RuleBndr :: *
+  data RuleBndr = ...
+  type RuleMatch :: *
+  data RuleMatch = ConLike | FunLike
+  type S1 :: forall {k}. Meta -> (k -> *) -> k -> *
+  type S1 = M1 GHC.Internal.Generics.S
+  type SPEC :: *
+  data SPEC = SPEC | SPEC2
+  type Selector :: forall {k}. k -> Constraint
+  class Selector s where
+    selName :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t s f a -> [GHC.Internal.Types.Char]
+    selSourceUnpackedness :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t s f a -> SourceUnpackedness
+    selSourceStrictness :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t s f a -> SourceStrictness
+    selDecidedStrictness :: forall k1 (t :: k -> (k1 -> *) -> k1 -> *) (f :: k1 -> *) (a :: k1). t s f a -> DecidedStrictness
+    {-# MINIMAL selName, selSourceUnpackedness, selSourceStrictness, selDecidedStrictness #-}
+  type Semigroup :: * -> Constraint
+  class Semigroup a where
+    (<>) :: a -> a -> a
+    ...
+    {-# MINIMAL (<>) | GHC.Internal.Base.sconcat #-}
+  type Show :: * -> Constraint
+  class Show a where
+    showsPrec :: GHC.Internal.Types.Int -> a -> GHC.Internal.Show.ShowS
+    ...
+    {-# MINIMAL showsPrec | GHC.Internal.Show.show #-}
+  type SomeTypeRep :: *
+  data SomeTypeRep where
+    SomeTypeRep :: forall k (a :: k). !(GHC.Internal.Data.Typeable.Internal.TypeRep a) -> SomeTypeRep
+  type SourceStrictness :: *
+  data SourceStrictness = NoSourceStrictness | SourceLazy | SourceStrict
+  type SourceUnpackedness :: *
+  data SourceUnpackedness = NoSourceUnpackedness | SourceNoUnpack | SourceUnpack
+  type SrcLoc :: *
+  data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Internal.Types.Char], srcLocModule :: [GHC.Internal.Types.Char], srcLocFile :: [GHC.Internal.Types.Char], srcLocStartLine :: {-# UNPACK #-} !GHC.Internal.Types.Int, srcLocStartCol :: {-# UNPACK #-} !GHC.Internal.Types.Int, srcLocEndLine :: {-# UNPACK #-} !GHC.Internal.Types.Int, srcLocEndCol :: {-# UNPACK #-} !GHC.Internal.Types.Int}
+  type StablePtr :: * -> *
+  data StablePtr a = ...
+  type StaticPtr :: * -> *
+  data StaticPtr a = StaticPtr GHC.Internal.Prim.Word64# GHC.Internal.Prim.Word64# StaticPtrInfo a
+  type StaticPtrInfo :: *
+  data StaticPtrInfo = StaticPtrInfo {...}
+  type Stmt :: *
+  data Stmt = ...
+  type TrName :: *
+  data TrName = TrNameS GHC.Internal.Prim.Addr# | ...
+  type Traversable :: (* -> *) -> Constraint
+  class (Functor t, Foldable t) => Traversable t where
+    traverse :: forall (f :: * -> *) a b. Applicative f => (a -> f b) -> t a -> f (t b)
+    ...
+    {-# MINIMAL traverse | GHC.Internal.Data.Traversable.sequenceA #-}
+  type TyCon :: *
+  data TyCon = TyCon GHC.Internal.Prim.Word64# GHC.Internal.Prim.Word64# Module TrName GHC.Internal.Prim.Int# KindRep
+  type TySynEqn :: *
+  data TySynEqn = ...
+  type TyVarBndrSpec :: *
+  type TyVarBndrSpec = GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity
+  type TyVarBndrUnit :: *
+  type TyVarBndrUnit = GHC.Internal.TH.Syntax.TyVarBndr ()
+  type TyVarBndrVis :: *
+  type TyVarBndrVis = GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis
+  type Type :: *
+  data Type = ...
+  type TypeError :: forall b. ErrorMessage -> b
+  type family TypeError a where
+  type TypeLitSort :: *
+  data TypeLitSort = TypeLitSymbol | TypeLitNat | TypeLitChar
+  type TypeQ :: *
+  type TypeQ = Q Type
+  type Typeable :: forall k. k -> Constraint
+  class Typeable a where
+    typeRep# :: GHC.Internal.Data.Typeable.Internal.TypeRep a
+    {-# MINIMAL typeRep# #-}
+  type role U1 phantom
+  type U1 :: forall k. k -> *
+  data U1 p = U1
+  UAddr :: forall k (p :: k). GHC.Internal.Prim.Addr# -> URec (Ptr ()) p
+  type UAddr :: forall {k}. k -> *
+  type UAddr = URec (Ptr ())
+  UChar :: forall k (p :: k). GHC.Internal.Prim.Char# -> URec GHC.Internal.Types.Char p
+  type UChar :: forall {k}. k -> *
+  type UChar = URec GHC.Internal.Types.Char
+  UDouble :: forall k (p :: k). GHC.Internal.Prim.Double# -> URec GHC.Internal.Types.Double p
+  type UDouble :: forall {k}. k -> *
+  type UDouble = URec GHC.Internal.Types.Double
+  UFloat :: forall k (p :: k). GHC.Internal.Prim.Float# -> URec GHC.Internal.Types.Float p
+  type UFloat :: forall {k}. k -> *
+  type UFloat = URec GHC.Internal.Types.Float
+  UInt :: forall k (p :: k). GHC.Internal.Prim.Int# -> URec GHC.Internal.Types.Int p
+  type UInt :: forall {k}. k -> *
+  type UInt = URec GHC.Internal.Types.Int
+  type URec :: forall k. * -> k -> *
+  data family URec a p
+  UWord :: forall k (p :: k). GHC.Internal.Prim.Word# -> URec GHC.Internal.Types.Word p
+  type UWord :: forall {k}. k -> *
+  type UWord = URec GHC.Internal.Types.Word
+  type role UnsafeEquality nominal nominal
+  type UnsafeEquality :: forall {k}. k -> k -> *
+  data UnsafeEquality a b where
+    UnsafeRefl :: forall {k} (a :: k). UnsafeEquality a a
+  type Unsatisfiable :: ErrorMessage -> Constraint
+  class Unsatisfiable msg where
+    ...
+    {-# MINIMAL GHC.Internal.TypeError.unsatisfiableLifted #-}
+  type role V1 phantom
+  type V1 :: forall k. k -> *
+  data V1 p
+  type VarBangType :: *
+  type VarBangType = (Name, GHC.Internal.TH.Syntax.Bang, Type)
+  type Void :: *
+  data Void
+  type WithDict :: Constraint -> * -> Constraint
+  class WithDict cls meth where
+    ...
+    {-# MINIMAL GHC.Internal.Magic.Dict.withDict #-}
+  type Word16 :: *
+  data Word16 = W16# GHC.Internal.Prim.Word16#
+  type Word32 :: *
+  data Word32 = W32# GHC.Internal.Prim.Word32#
+  type Word64 :: *
+  data Word64 = W64# GHC.Internal.Prim.Word64#
+  type Word8 :: *
+  data Word8 = W8# GHC.Internal.Prim.Word8#
+  all :: forall (t :: * -> *) a. Foldable t => (a -> GHC.Internal.Types.Bool) -> t a -> GHC.Internal.Types.Bool
+  anyclassStrategy :: forall (m :: * -> *). Quote m => m DerivStrategy
+  app :: forall (a :: * -> * -> *) b c. GHC.Internal.Control.Arrow.ArrowApply a => a (a b c, b) c
+  appE :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp
+  appKindT :: forall (m :: * -> *). Quote m => m Type -> m Kind -> m Type
+  appT :: forall (m :: * -> *). Quote m => m Type -> m Type -> m Type
+  appTypeE :: forall (m :: * -> *). Quote m => m Exp -> m Type -> m Exp
+  arr :: forall (a :: * -> * -> *) b c. GHC.Internal.Control.Arrow.Arrow a => (b -> c) -> a b c
+  arrowT :: forall (m :: * -> *). Quote m => m Type
+  asP :: forall (m :: * -> *). Quote m => Name -> m Pat -> m Pat
+  assert :: forall a. GHC.Internal.Types.Bool -> a -> a
+  assertError :: forall a. (?callStack::CallStack) => GHC.Internal.Types.Bool -> a -> a
+  augment :: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a] -> [a]
+  bang :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness -> m GHC.Internal.TH.Syntax.SourceStrictness -> m GHC.Internal.TH.Syntax.Bang
+  bangP :: forall (m :: * -> *). Quote m => m Pat -> m Pat
+  bangType :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.Bang -> m Type -> m BangType
+  bigNatCompare :: GHC.Internal.Bignum.BigNat.BigNat# -> GHC.Internal.Bignum.BigNat.BigNat# -> GHC.Internal.Types.Ordering
+  bigNatCompareWord# :: GHC.Internal.Bignum.BigNat.BigNat# -> GHC.Internal.Prim.Word# -> GHC.Internal.Types.Ordering
+  bigNatEq# :: GHC.Internal.Bignum.BigNat.BigNat# -> GHC.Internal.Bignum.BigNat.BigNat# -> GHC.Internal.Bignum.Primitives.Bool#
+  bindIO :: forall a b. IO a -> (a -> IO b) -> IO b
+  bindS :: forall (m :: * -> *). Quote m => m Pat -> m Exp -> m Stmt
+  bndrInvis :: GHC.Internal.TH.Syntax.BndrVis
+  bndrReq :: GHC.Internal.TH.Syntax.BndrVis
+  build :: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
+  cApi :: GHC.Internal.TH.Syntax.Callconv
+  cCall :: GHC.Internal.TH.Syntax.Callconv
+  caseE :: forall (m :: * -> *). Quote m => m Exp -> [m Match] -> m Exp
+  charL :: GHC.Internal.Types.Char -> Lit
+  charPrimL :: GHC.Internal.Types.Char -> Lit
+  charTyLit :: forall (m :: * -> *). Quote m => GHC.Internal.Types.Char -> m GHC.Internal.TH.Syntax.TyLit
+  choose :: forall a. [(GHC.Internal.Base.String, GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a)] -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a
+  classD :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.Cxt -> Name -> [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> [FunDep] -> [m Dec] -> m Dec
+  clause :: forall (m :: * -> *). Quote m => [m Pat] -> m Body -> [m Dec] -> m Clause
+  closedTypeFamilyD :: forall (m :: * -> *). Quote m => Name -> [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> m GHC.Internal.TH.Syntax.FamilyResultSig -> GHC.Internal.Maybe.Maybe InjectivityAnn -> [m TySynEqn] -> m Dec
+  compE :: forall (m :: * -> *). Quote m => [m Stmt] -> m Exp
+  conE :: forall (m :: * -> *). Quote m => Name -> m Exp
+  conP :: forall (m :: * -> *). Quote m => Name -> [m Type] -> [m Pat] -> m Pat
+  conT :: forall (m :: * -> *). Quote m => Name -> m Type
+  condE :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp -> m Exp
+  considerAccessible :: GHC.Internal.Types.Bool
+  constrIndex :: Constr -> GHC.Internal.Data.Data.ConIndex
+  constrainedE :: forall (m :: * -> *). Quote m => [m Exp] -> m Exp -> m Exp
+  constraintK :: forall (m :: * -> *). Quote m => m Kind
+  cstringLength# :: GHC.Internal.Prim.Addr# -> GHC.Internal.Prim.Int#
+  cxt :: forall (m :: * -> *). Quote m => [m Pred] -> m GHC.Internal.TH.Syntax.Cxt
+  dataD :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.Cxt -> Name -> [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> GHC.Internal.Maybe.Maybe (m Kind) -> [m Con] -> [m DerivClause] -> m Dec
+  dataFamilyD :: forall (m :: * -> *). Quote m => Name -> [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> GHC.Internal.Maybe.Maybe (m Kind) -> m Dec
+  dataInstD :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m Type -> GHC.Internal.Maybe.Maybe (m Kind) -> [m Con] -> [m DerivClause] -> m Dec
+  defaultD :: forall (m :: * -> *). Quote m => [m Type] -> m Dec
+  defaultSigD :: forall (m :: * -> *). Quote m => Name -> m Type -> m Dec
+  derivClause :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe (m DerivStrategy) -> [m Pred] -> m DerivClause
+  divInt# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+  doE :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe ModName -> [m Stmt] -> m Exp
+  doublePrimL :: Rational -> Lit
+  emptyCallStack :: CallStack
+  emptyExceptionContext :: ExceptionContext
+  enumIntToWord :: GHC.Internal.Types.Int -> GHC.Internal.Types.Word
+  eqString :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> GHC.Internal.Types.Bool
+  equalityT :: forall (m :: * -> *). Quote m => m Type
+  error :: forall (r :: GHC.Internal.Types.RuntimeRep) (a :: TYPE r). GHC.Internal.Stack.Types.HasCallStack => [GHC.Internal.Types.Char] -> a
+  expectP :: Lexeme -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec ()
+  explBidir :: forall (m :: * -> *). Quote m => [m Clause] -> m GHC.Internal.TH.Syntax.PatSynDir
+  fieldExp :: forall (m :: * -> *). Quote m => Name -> m Exp -> m (Name, Exp)
+  fieldPat :: forall (m :: * -> *). Quote m => Name -> m Pat -> m FieldPat
+  first :: forall (a :: * -> * -> *) b c d. GHC.Internal.Control.Arrow.Arrow a => a b c -> a (b, d) (c, d)
+  floatPrimL :: Rational -> Lit
+  foldrList :: forall a b. (a -> b -> b) -> b -> [a] -> b
+  forImpD :: forall (m :: * -> *). Quote m => GHC.Internal.TH.Syntax.Callconv -> GHC.Internal.TH.Syntax.Safety -> GHC.Internal.Base.String -> Name -> m Type -> m Dec
+  forallC :: forall (m :: * -> *). Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)] -> m GHC.Internal.TH.Syntax.Cxt -> m Con -> m Con
+  forallE :: forall (m :: * -> *). Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)] -> m Exp -> m Exp
+  forallT :: forall (m :: * -> *). Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)] -> m GHC.Internal.TH.Syntax.Cxt -> m Type -> m Type
+  forallVisE :: forall (m :: * -> *). Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m Exp -> m Exp
+  forallVisT :: forall (m :: * -> *). Quote m => [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m Type -> m Type
+  fromE :: forall (m :: * -> *). Quote m => m Exp -> m Exp
+  fromIntegral :: forall a b. (Integral a, Num b) => a -> b
+  fromLabel :: forall (x :: GHC.Internal.Types.Symbol) a. GHC.Internal.OverloadedLabels.IsLabel x a => a
+  fromList :: forall l. GHC.Internal.IsList.IsList l => [GHC.Internal.IsList.Item l] -> l
+  fromListN :: forall l. GHC.Internal.IsList.IsList l => GHC.Internal.Types.Int -> [GHC.Internal.IsList.Item l] -> l
+  fromThenE :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp
+  fromThenToE :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp -> m Exp
+  fromToE :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp
+  funD :: forall (m :: * -> *). Quote m => Name -> [m Clause] -> m Dec
+  funDep :: [Name] -> [Name] -> FunDep
+  gadtC :: forall (m :: * -> *). Quote m => [Name] -> [m GHC.Internal.TH.Syntax.StrictType] -> m Type -> m Con
+  gcast1 :: forall {k1} {k2} (c :: k1 -> *) (t :: k2 -> k1) (t' :: k2 -> k1) (a :: k2). (Typeable t, Typeable t') => c (t a) -> GHC.Internal.Maybe.Maybe (c (t' a))
+  gcast2 :: forall {k1} {k2} {k3} (c :: k1 -> *) (t :: k2 -> k3 -> k1) (t' :: k2 -> k3 -> k1) (a :: k2) (b :: k3). (Typeable t, Typeable t') => c (t a b) -> GHC.Internal.Maybe.Maybe (c (t' a b))
+  getFieldE :: forall (m :: * -> *). Quote m => m Exp -> GHC.Internal.Base.String -> m Exp
+  guard :: forall (f :: * -> *). Alternative f => GHC.Internal.Types.Bool -> f ()
+  guardedB :: forall (m :: * -> *). Quote m => [m (Guard, Exp)] -> m Body
+  implBidir :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.PatSynDir
+  implicitParamBindD :: forall (m :: * -> *). Quote m => GHC.Internal.Base.String -> m Exp -> m Dec
+  implicitParamT :: forall (m :: * -> *). Quote m => GHC.Internal.Base.String -> m Type -> m Type
+  implicitParamVarE :: forall (m :: * -> *). Quote m => GHC.Internal.Base.String -> m Exp
+  inferR :: Role
+  inferredSpec :: GHC.Internal.TH.Syntax.Specificity
+  infixApp :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp -> m Exp
+  infixC :: forall (m :: * -> *). Quote m => m (GHC.Internal.TH.Syntax.Bang, Type) -> Name -> m (GHC.Internal.TH.Syntax.Bang, Type) -> m Con
+  infixE :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe (m Exp) -> m Exp -> GHC.Internal.Maybe.Maybe (m Exp) -> m Exp
+  infixLWithSpecD :: forall (m :: * -> *). Quote m => GHC.Internal.Types.Int -> NamespaceSpecifier -> Name -> m Dec
+  infixNWithSpecD :: forall (m :: * -> *). Quote m => GHC.Internal.Types.Int -> NamespaceSpecifier -> Name -> m Dec
+  infixP :: forall (m :: * -> *). Quote m => m Pat -> Name -> m Pat -> m Pat
+  infixPatSyn :: forall (m :: * -> *). Quote m => Name -> Name -> m GHC.Internal.TH.Syntax.PatSynArgs
+  infixRWithSpecD :: forall (m :: * -> *). Quote m => GHC.Internal.Types.Int -> NamespaceSpecifier -> Name -> m Dec
+  infixT :: forall (m :: * -> *). Quote m => m Type -> Name -> m Type -> m Type
+  injectivityAnn :: Name -> [Name] -> InjectivityAnn
+  inline :: forall a. a -> a
+  instanceWithOverlapD :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe Overlap -> m GHC.Internal.TH.Syntax.Cxt -> m Type -> [m Dec] -> m Dec
+  intPrimL :: GHC.Internal.Bignum.Integer.Integer -> Lit
+  integerAbs :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerAdd :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerAnd :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerBit# :: GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Integer.Integer
+  integerComplement :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerDiv :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerDivMod# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> (# GHC.Internal.Bignum.Integer.Integer, GHC.Internal.Bignum.Integer.Integer #)
+  integerEncodeDouble# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Double#
+  integerEncodeFloat# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Float#
+  integerFromInt64# :: GHC.Internal.Prim.Int64# -> GHC.Internal.Bignum.Integer.Integer
+  integerFromNatural :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Integer.Integer
+  integerFromWord# :: GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Integer.Integer
+  integerFromWord64# :: GHC.Internal.Prim.Word64# -> GHC.Internal.Bignum.Integer.Integer
+  integerGcd :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerL :: GHC.Internal.Bignum.Integer.Integer -> Lit
+  integerLcm :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerMod :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerMul :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerNegate :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerOr :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerPopCount# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Int#
+  integerQuot :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerQuotRem# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> (# GHC.Internal.Bignum.Integer.Integer, GHC.Internal.Bignum.Integer.Integer #)
+  integerRem :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerShiftL# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Integer.Integer
+  integerShiftR# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Integer.Integer
+  integerSub :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  integerTestBit# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  integerToDouble# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Double#
+  integerToFloat# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Float#
+  integerToInt# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Int#
+  integerToInt64# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Int64#
+  integerToNatural :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Natural.Natural
+  integerToNaturalClamp :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Natural.Natural
+  integerToNaturalThrow :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Natural.Natural
+  integerToWord# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Word#
+  integerToWord64# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Word64#
+  integerXor :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer
+  interruptible :: GHC.Internal.TH.Syntax.Safety
+  invisP :: forall (m :: * -> *). Quote m => m Type -> m Pat
+  javaScript :: GHC.Internal.TH.Syntax.Callconv
+  join :: forall (m :: * -> *) a. Monad m => m (m a) -> m a
+  kiSigD :: forall (m :: * -> *). Quote m => Name -> m Kind -> m Dec
+  kindSig :: forall (m :: * -> *). Quote m => m Kind -> m GHC.Internal.TH.Syntax.FamilyResultSig
+  kindedBndrTV :: forall (m :: * -> *). Quote m => Name -> GHC.Internal.TH.Syntax.BndrVis -> m Kind -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)
+  kindedInvisTV :: forall (m :: * -> *). Quote m => Name -> GHC.Internal.TH.Syntax.Specificity -> m Kind -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)
+  kindedTV :: forall (m :: * -> *). Quote m => Name -> m Kind -> m (GHC.Internal.TH.Syntax.TyVarBndr ())
+  krepConstraint :: KindRep
+  krepStar :: KindRep
+  krepStarArr :: KindRep
+  krepStarArrStarArr :: KindRep
+  labelE :: forall (m :: * -> *). Quote m => GHC.Internal.Base.String -> m Exp
+  lamCaseE :: forall (m :: * -> *). Quote m => [m Match] -> m Exp
+  lamCasesE :: forall (m :: * -> *). Quote m => [m Clause] -> m Exp
+  lamE :: forall (m :: * -> *). Quote m => [m Pat] -> m Exp -> m Exp
+  letE :: forall (m :: * -> *). Quote m => [m Dec] -> m Exp -> m Exp
+  letS :: forall (m :: * -> *). Quote m => [m Dec] -> m Stmt
+  lexP :: GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec Lexeme
+  liftString :: forall (m :: * -> *). Quote m => GHC.Internal.Base.String -> m Exp
+  listE :: forall (m :: * -> *). Quote m => [m Exp] -> m Exp
+  listP :: forall (m :: * -> *). Quote m => [m Pat] -> m Pat
+  listT :: forall (m :: * -> *). Quote m => m Type
+  litE :: forall (m :: * -> *). Quote m => Lit -> m Exp
+  litP :: forall (m :: * -> *). Quote m => Lit -> m Pat
+  litT :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.TyLit -> m Type
+  loop :: forall (a :: * -> * -> *) b d c. GHC.Internal.Control.Monad.Fix.ArrowLoop a => a (b, d) (c, d) -> a b c
+  makeStatic :: forall a. (GHC.Internal.Types.Int, GHC.Internal.Types.Int) -> a -> StaticPtr a
+  map :: forall a b. (a -> b) -> [a] -> [b]
+  match :: forall (m :: * -> *). Quote m => m Pat -> m Body -> [m Dec] -> m Match
+  mdoE :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe ModName -> [m Stmt] -> m Exp
+  mfix :: forall (m :: * -> *) a. GHC.Internal.Control.Monad.Fix.MonadFix m => (a -> m a) -> m a
+  mkConstrTag :: DataType -> GHC.Internal.Base.String -> GHC.Internal.Types.Int -> [GHC.Internal.Base.String] -> Fixity -> Constr
+  mkDataType :: GHC.Internal.Base.String -> [Constr] -> DataType
+  mkModName :: GHC.Internal.Base.String -> ModName
+  mkName :: GHC.Internal.Base.String -> Name
+  mkNameG_d :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> GHC.Internal.Base.String -> Name
+  mkNameG_fld :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> GHC.Internal.Base.String -> GHC.Internal.Base.String -> Name
+  mkNameG_tc :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> GHC.Internal.Base.String -> Name
+  mkNameG_v :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> GHC.Internal.Base.String -> Name
+  mkNameL :: GHC.Internal.Base.String -> GHC.Internal.TH.Syntax.Uniq -> Name
+  mkNameQ :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> Name
+  mkNameS :: GHC.Internal.Base.String -> Name
+  mkRationalBase10 :: Rational -> GHC.Internal.Bignum.Integer.Integer -> Rational
+  mkRationalBase2 :: Rational -> GHC.Internal.Bignum.Integer.Integer -> Rational
+  mkTrAppChecked :: forall k1 k2 (a :: k1 -> k2) (b :: k1). GHC.Internal.Data.Typeable.Internal.TypeRep a -> GHC.Internal.Data.Typeable.Internal.TypeRep b -> GHC.Internal.Data.Typeable.Internal.TypeRep (a b)
+  mkTrCon :: forall k (a :: k). TyCon -> [SomeTypeRep] -> GHC.Internal.Data.Typeable.Internal.TypeRep a
+  mkTrFun :: forall (r1 :: GHC.Internal.Types.RuntimeRep) (r2 :: GHC.Internal.Types.RuntimeRep) (a :: TYPE r1) (b :: TYPE r2). GHC.Internal.Data.Typeable.Internal.TypeRep Many -> GHC.Internal.Data.Typeable.Internal.TypeRep a -> GHC.Internal.Data.Typeable.Internal.TypeRep b -> GHC.Internal.Data.Typeable.Internal.TypeRep (a -> b)
+  modInt# :: GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int# -> GHC.Internal.Prim.Int#
+  moduleAnnotation :: GHC.Internal.TH.Syntax.AnnTarget
+  mulArrowT :: forall (m :: * -> *). Quote m => m Type
+  multiIfE :: forall (m :: * -> *). Quote m => [m (Guard, Exp)] -> m Exp
+  mzip :: forall (m :: * -> *) a b. GHC.Internal.Control.Monad.Zip.MonadZip m => m a -> m b -> m (a, b)
+  naturalAdd :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  naturalAnd :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  naturalBit# :: GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Natural.Natural
+  naturalGcd :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  naturalLcm :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  naturalMul :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  naturalOr :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  naturalPopCount# :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Prim.Word#
+  naturalQuot :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  naturalQuotRem# :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> (# GHC.Internal.Bignum.Natural.Natural, GHC.Internal.Bignum.Natural.Natural #)
+  naturalRem :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  naturalShiftL# :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Natural.Natural
+  naturalShiftR# :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Natural.Natural
+  naturalSub :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> (# (# #) | GHC.Internal.Bignum.Natural.Natural #)
+  naturalSubThrow :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  naturalSubUnsafe :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  naturalTestBit# :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Prim.Word# -> GHC.Internal.Bignum.Primitives.Bool#
+  naturalToWord# :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Prim.Word#
+  naturalXor :: GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural -> GHC.Internal.Bignum.Natural.Natural
+  newStablePtr :: forall a. a -> IO (StablePtr a)
+  newtypeD :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.Cxt -> Name -> [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> GHC.Internal.Maybe.Maybe (m Kind) -> m Con -> [m DerivClause] -> m Dec
+  newtypeInstD :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.Cxt -> GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m Type -> GHC.Internal.Maybe.Maybe (m Kind) -> m Con -> [m DerivClause] -> m Dec
+  newtypeStrategy :: forall (m :: * -> *). Quote m => m DerivStrategy
+  noBindS :: forall (m :: * -> *). Quote m => m Exp -> m Stmt
+  noSig :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.FamilyResultSig
+  noSourceStrictness :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.SourceStrictness
+  noSourceUnpackedness :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness
+  nominalR :: Role
+  normalB :: forall (m :: * -> *). Quote m => m Exp -> m Body
+  normalC :: forall (m :: * -> *). Quote m => Name -> [m BangType] -> m Con
+  normalGE :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m (Guard, Exp)
+  not :: GHC.Internal.Types.Bool -> GHC.Internal.Types.Bool
+  numTyLit :: forall (m :: * -> *). Quote m => GHC.Internal.Bignum.Integer.Integer -> m GHC.Internal.TH.Syntax.TyLit
+  openTypeFamilyD :: forall (m :: * -> *). Quote m => Name -> [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> m GHC.Internal.TH.Syntax.FamilyResultSig -> GHC.Internal.Maybe.Maybe InjectivityAnn -> m Dec
+  orP :: forall (m :: * -> *). Quote m => NonEmpty (m Pat) -> m Pat
+  otherwise :: GHC.Internal.Types.Bool
+  parS :: forall (m :: * -> *). Quote m => [[m Stmt]] -> m Stmt
+  parens :: forall a. GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a
+  patGE :: forall (m :: * -> *). Quote m => [m Stmt] -> m Exp -> m (Guard, Exp)
+  patSynD :: forall (m :: * -> *). Quote m => Name -> m GHC.Internal.TH.Syntax.PatSynArgs -> m GHC.Internal.TH.Syntax.PatSynDir -> m Pat -> m Dec
+  patSynSigD :: forall (m :: * -> *). Quote m => Name -> m Type -> m Dec
+  pfail :: forall a. GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a
+  phantomR :: Role
+  plainBndrTV :: forall (m :: * -> *). Quote m => Name -> GHC.Internal.TH.Syntax.BndrVis -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)
+  plainInvisTV :: forall (m :: * -> *). Quote m => Name -> GHC.Internal.TH.Syntax.Specificity -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)
+  plainTV :: forall (m :: * -> *). Quote m => Name -> m (GHC.Internal.TH.Syntax.TyVarBndr ())
+  pragAnnD :: forall (m :: * -> *). Quote m => GHC.Internal.TH.Syntax.AnnTarget -> m Exp -> m Dec
+  pragCompleteD :: forall (m :: * -> *). Quote m => [Name] -> GHC.Internal.Maybe.Maybe Name -> m Dec
+  pragInlD :: forall (m :: * -> *). Quote m => Name -> Inline -> RuleMatch -> Phases -> m Dec
+  pragOpaqueD :: forall (m :: * -> *). Quote m => Name -> m Dec
+  pragRuleD :: forall (m :: * -> *). Quote m => GHC.Internal.Base.String -> GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> [m RuleBndr] -> m Exp -> m Exp -> Phases -> m Dec
+  pragSCCFunD :: forall (m :: * -> *). Quote m => Name -> m Dec
+  pragSCCFunNamedD :: forall (m :: * -> *). Quote m => Name -> GHC.Internal.Base.String -> m Dec
+  pragSpecED :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> [m RuleBndr] -> m Exp -> Phases -> m Dec
+  pragSpecInlED :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> [m RuleBndr] -> m Exp -> Inline -> Phases -> m Dec
+  pragSpecInstD :: forall (m :: * -> *). Quote m => m Type -> m Dec
+  prec :: forall a. GHC.Internal.Text.ParserCombinators.ReadPrec.Prec -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a
+  predError :: forall a. GHC.Internal.Base.String -> a
+  prefixPatSyn :: forall (m :: * -> *). Quote m => [Name] -> m GHC.Internal.TH.Syntax.PatSynArgs
+  prim :: GHC.Internal.TH.Syntax.Callconv
+  print :: forall a. Show a => a -> IO ()
+  projectionE :: forall (m :: * -> *). Quote m => NonEmpty GHC.Internal.Base.String -> m Exp
+  promotedConsT :: forall (m :: * -> *). Quote m => m Type
+  promotedNilT :: forall (m :: * -> *). Quote m => m Type
+  promotedT :: forall (m :: * -> *). Quote m => Name -> m Type
+  promotedTupleT :: forall (m :: * -> *). Quote m => GHC.Internal.Types.Int -> m Type
+  pushCallStack :: ([GHC.Internal.Types.Char], SrcLoc) -> CallStack -> CallStack
+  rationalL :: Rational -> Lit
+  rationalToDouble# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Double#
+  rationalToFloat# :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.Prim.Float#
+  readField :: forall a. GHC.Internal.Base.String -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a
+  readFieldHash :: forall a. GHC.Internal.Base.String -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a
+  readListDefault :: forall a. Read a => GHC.Internal.Text.ParserCombinators.ReadP.ReadS [a]
+  readListPrecDefault :: forall a. Read a => GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec [a]
+  readSymField :: forall a. GHC.Internal.Base.String -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a
+  realToFrac :: forall a b. (Real a, Fractional b) => a -> b
+  recC :: forall (m :: * -> *). Quote m => Name -> [m VarBangType] -> m Con
+  recConE :: forall (m :: * -> *). Quote m => Name -> [m (Name, Exp)] -> m Exp
+  recGadtC :: forall (m :: * -> *). Quote m => [Name] -> [m GHC.Internal.TH.Syntax.VarStrictType] -> m Type -> m Con
+  recP :: forall (m :: * -> *). Quote m => Name -> [m FieldPat] -> m Pat
+  recS :: forall (m :: * -> *). Quote m => [m Stmt] -> m Stmt
+  recUpdE :: forall (m :: * -> *). Quote m => m Exp -> [m (Name, Exp)] -> m Exp
+  recordPatSyn :: forall (m :: * -> *). Quote m => [Name] -> m GHC.Internal.TH.Syntax.PatSynArgs
+  representationalR :: Role
+  reset :: forall a. GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a
+  returnIO :: forall a. a -> IO a
+  roleAnnotD :: forall (m :: * -> *). Quote m => Name -> [Role] -> m Dec
+  ruleVar :: forall (m :: * -> *). Quote m => Name -> m RuleBndr
+  runMainIO :: forall a. IO a -> IO a
+  runRW# :: forall (r :: GHC.Internal.Types.RuntimeRep) (o :: TYPE r). (GHC.Internal.Prim.State# GHC.Internal.Prim.RealWorld -> o) -> o
+  safe :: GHC.Internal.TH.Syntax.Safety
+  sectionL :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp
+  sectionR :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp
+  seq# :: forall a s. a -> GHC.Internal.Prim.State# s -> (# GHC.Internal.Prim.State# s, a #)
+  sequenceQ :: forall (m :: * -> *) a. Monad m => [m a] -> m [a]
+  setField :: forall {k} (x :: k) r a. a -> r -> r
+  showCommaSpace :: GHC.Internal.Show.ShowS
+  showParen :: GHC.Internal.Types.Bool -> GHC.Internal.Show.ShowS -> GHC.Internal.Show.ShowS
+  showSpace :: GHC.Internal.Show.ShowS
+  showString :: GHC.Internal.Base.String -> GHC.Internal.Show.ShowS
+  shows :: forall a. Show a => a -> GHC.Internal.Show.ShowS
+  sigD :: forall (m :: * -> *). Quote m => Name -> m Type -> m Dec
+  sigE :: forall (m :: * -> *). Quote m => m Exp -> m Type -> m Exp
+  sigP :: forall (m :: * -> *). Quote m => m Pat -> m Type -> m Pat
+  sigT :: forall (m :: * -> *). Quote m => m Type -> m Kind -> m Type
+  sourceLazy :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.SourceStrictness
+  sourceNoUnpack :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness
+  sourceStrict :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.SourceStrictness
+  sourceUnpack :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness
+  specifiedSpec :: GHC.Internal.TH.Syntax.Specificity
+  standaloneDerivWithStrategyD :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe (m DerivStrategy) -> m GHC.Internal.TH.Syntax.Cxt -> m Type -> m Dec
+  starK :: forall (m :: * -> *). Quote m => m Kind
+  staticE :: forall (m :: * -> *). Quote m => m Exp -> m Exp
+  stdCall :: GHC.Internal.TH.Syntax.Callconv
+  step :: forall a. GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a -> GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec a
+  stockStrategy :: forall (m :: * -> *). Quote m => m DerivStrategy
+  strTyLit :: forall (m :: * -> *). Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.TyLit
+  stringL :: GHC.Internal.Base.String -> Lit
+  stringPrimL :: [Word8] -> Lit
+  succError :: forall a. GHC.Internal.Base.String -> a
+  thenIO :: forall a b. IO a -> IO b -> IO b
+  tildeP :: forall (m :: * -> *). Quote m => m Pat -> m Pat
+  toAnnotationWrapper :: forall a. Data a => a -> GHC.Internal.Desugar.AnnotationWrapper
+  toDyn :: forall a. Typeable a => a -> GHC.Internal.Data.Dynamic.Dynamic
+  toEnumError :: forall a b. Show a => GHC.Internal.Base.String -> GHC.Internal.Types.Int -> (a, a) -> b
+  toList :: forall l. GHC.Internal.IsList.IsList l => l -> [GHC.Internal.IsList.Item l]
+  trace :: forall a. GHC.Internal.Base.String -> a -> a
+  tupE :: forall (m :: * -> *). Quote m => [GHC.Internal.Maybe.Maybe (m Exp)] -> m Exp
+  tupP :: forall (m :: * -> *). Quote m => [m Pat] -> m Pat
+  tupleT :: forall (m :: * -> *). Quote m => GHC.Internal.Types.Int -> m Type
+  tySynD :: forall (m :: * -> *). Quote m => Name -> [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> m Type -> m Dec
+  tySynEqn :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe [m (GHC.Internal.TH.Syntax.TyVarBndr ())] -> m Type -> m Type -> m TySynEqn
+  tySynInstD :: forall (m :: * -> *). Quote m => m TySynEqn -> m Dec
+  tyVarSig :: forall (m :: * -> *). Quote m => m (GHC.Internal.TH.Syntax.TyVarBndr ()) -> m GHC.Internal.TH.Syntax.FamilyResultSig
+  typeAnnotation :: Name -> GHC.Internal.TH.Syntax.AnnTarget
+  typeCharTypeRep :: forall (a :: GHC.Internal.Types.Char). KnownChar a => GHC.Internal.Data.Typeable.Internal.TypeRep a
+  typeDataD :: forall (m :: * -> *). Quote m => Name -> [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> GHC.Internal.Maybe.Maybe (m Kind) -> [m Con] -> m Dec
+  typeE :: forall (m :: * -> *). Quote m => m Type -> m Exp
+  typeNatTypeRep :: forall (a :: GHC.Internal.TypeNats.Nat). KnownNat a => GHC.Internal.Data.Typeable.Internal.TypeRep a
+  typeP :: forall (m :: * -> *). Quote m => m Type -> m Pat
+  typeSymbolTypeRep :: forall (a :: GHC.Internal.Types.Symbol). KnownSymbol a => GHC.Internal.Data.Typeable.Internal.TypeRep a
+  typedRuleVar :: forall (m :: * -> *). Quote m => Name -> m Type -> m RuleBndr
+  uAddr# :: forall k (p :: k). URec (Ptr ()) p -> GHC.Internal.Prim.Addr#
+  uChar# :: forall k (p :: k). URec GHC.Internal.Types.Char p -> GHC.Internal.Prim.Char#
+  uDouble# :: forall k (p :: k). URec GHC.Internal.Types.Double p -> GHC.Internal.Prim.Double#
+  uFloat# :: forall k (p :: k). URec GHC.Internal.Types.Float p -> GHC.Internal.Prim.Float#
+  uInt# :: forall k (p :: k). URec GHC.Internal.Types.Int p -> GHC.Internal.Prim.Int#
+  uWord# :: forall k (p :: k). URec GHC.Internal.Types.Word p -> GHC.Internal.Prim.Word#
+  unType :: forall (r :: GHC.Internal.Types.RuntimeRep) (a :: TYPE r). GHC.Internal.TH.Monad.TExp a -> Exp
+  unTypeCode :: forall (r :: GHC.Internal.Types.RuntimeRep) (a :: TYPE r) (m :: * -> *). Quote m => Code m a -> m Exp
+  unboundVarE :: forall (m :: * -> *). Quote m => Name -> m Exp
+  unboxedSumE :: forall (m :: * -> *). Quote m => m Exp -> GHC.Internal.TH.Syntax.SumAlt -> GHC.Internal.TH.Syntax.SumArity -> m Exp
+  unboxedSumP :: forall (m :: * -> *). Quote m => m Pat -> GHC.Internal.TH.Syntax.SumAlt -> GHC.Internal.TH.Syntax.SumArity -> m Pat
+  unboxedSumT :: forall (m :: * -> *). Quote m => GHC.Internal.TH.Syntax.SumArity -> m Type
+  unboxedTupE :: forall (m :: * -> *). Quote m => [GHC.Internal.Maybe.Maybe (m Exp)] -> m Exp
+  unboxedTupP :: forall (m :: * -> *). Quote m => [m Pat] -> m Pat
+  unboxedTupleT :: forall (m :: * -> *). Quote m => GHC.Internal.Types.Int -> m Type
+  unidir :: forall (m :: * -> *). Quote m => m GHC.Internal.TH.Syntax.PatSynDir
+  unpackAppendCString# :: GHC.Internal.Prim.Addr# -> [GHC.Internal.Types.Char] -> [GHC.Internal.Types.Char]
+  unpackAppendCStringUtf8# :: GHC.Internal.Prim.Addr# -> [GHC.Internal.Types.Char] -> [GHC.Internal.Types.Char]
+  unpackCString# :: GHC.Internal.Prim.Addr# -> [GHC.Internal.Types.Char]
+  unpackCStringUtf8# :: GHC.Internal.Prim.Addr# -> [GHC.Internal.Types.Char]
+  unpackFoldrCString# :: forall a. GHC.Internal.Prim.Addr# -> (GHC.Internal.Types.Char -> a -> a) -> a -> a
+  unpackFoldrCStringUtf8# :: forall a. GHC.Internal.Prim.Addr# -> (GHC.Internal.Types.Char -> a -> a) -> a -> a
+  unsafe :: GHC.Internal.TH.Syntax.Safety
+  unsafeCodeCoerce :: forall (r :: GHC.Internal.Types.RuntimeRep) (a :: TYPE r) (m :: * -> *). Quote m => m Exp -> Code m a
+  unsafeCoerce# :: forall (q :: GHC.Internal.Types.RuntimeRep) (r :: GHC.Internal.Types.RuntimeRep) (a :: TYPE q) (b :: TYPE r). a -> b
+  unsafeEqualityProof :: forall {k} (a :: k) (b :: k). UnsafeEquality a b
+  unsafeUnpackJSStringUtf8## :: GHC.Internal.Prim.Addr# -> GHC.Internal.JS.Prim.JSVal#
+  unsatisfiable :: forall {rep :: GHC.Internal.Types.RuntimeRep} (msg :: ErrorMessage) (a :: TYPE rep). Unsatisfiable msg => a
+  valD :: forall (m :: * -> *). Quote m => m Pat -> m Body -> [m Dec] -> m Dec
+  valueAnnotation :: Name -> GHC.Internal.TH.Syntax.AnnTarget
+  varBangType :: forall (m :: * -> *). Quote m => Name -> m BangType -> m VarBangType
+  varE :: forall (m :: * -> *). Quote m => Name -> m Exp
+  varP :: forall (m :: * -> *). Quote m => Name -> m Pat
+  varT :: forall (m :: * -> *). Quote m => Name -> m Type
+  viaStrategy :: forall (m :: * -> *). Quote m => m Type -> m DerivStrategy
+  viewP :: forall (m :: * -> *). Quote m => m Exp -> m Pat -> m Pat
+  wildCardT :: forall (m :: * -> *). Quote m => m Type
+  wildP :: forall (m :: * -> *). Quote m => m Pat
+  wordPrimL :: GHC.Internal.Bignum.Integer.Integer -> Lit
+  (|||) :: forall (a :: * -> * -> *) b d c. GHC.Internal.Control.Arrow.ArrowChoice a => a b d -> a c d -> a (Either b c) d
+
 module GHC.Event where
   -- Safety: Safe
 
@@ -5315,7 +6190,7 @@ module GHC.Exception where
   data ErrorCall = ErrorCall GHC.Internal.Base.String
   pattern ErrorCallWithLocation :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> ErrorCall
   type Exception :: * -> Constraint
-  class (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
+  class (GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Internal.Maybe.Maybe e
     displayException :: e -> GHC.Internal.Base.String
@@ -5343,7 +6218,7 @@ module GHC.Exception.Type where
   type ArithException :: *
   data ArithException = Overflow | Underflow | LossOfPrecision | DivideByZero | Denormal | RatioZeroDenominator
   type Exception :: * -> Constraint
-  class (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
+  class (GHC.Internal.Data.Typeable.Internal.Typeable e, GHC.Internal.Show.Show e) => Exception e where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Internal.Maybe.Maybe e
     displayException :: e -> GHC.Internal.Base.String
@@ -5505,9 +6380,10 @@ module GHC.Exts where
     fromString :: GHC.Internal.Base.String -> a
     {-# MINIMAL fromString #-}
   KindRepApp :: GHC.Internal.Types.KindRep -> GHC.Internal.Types.KindRep -> GHC.Internal.Types.KindRep
+  KindRepConstraint :: GHC.Internal.Types.KindRep
   KindRepFun :: GHC.Internal.Types.KindRep -> GHC.Internal.Types.KindRep -> GHC.Internal.Types.KindRep
-  KindRepTYPE :: RuntimeRep -> GHC.Internal.Types.KindRep
   KindRepTyConApp :: GHC.Internal.Types.TyCon -> [GHC.Internal.Types.KindRep] -> GHC.Internal.Types.KindRep
+  KindRepType :: GHC.Internal.Types.KindRep
   KindRepTypeLitD :: GHC.Internal.Types.TypeLitSort -> [Char] -> GHC.Internal.Types.KindRep
   KindRepTypeLitS :: GHC.Internal.Types.TypeLitSort -> Addr# -> GHC.Internal.Types.KindRep
   KindRepVar :: GHC.Internal.Types.KindBndr -> GHC.Internal.Types.KindRep
@@ -6135,6 +7011,10 @@ module GHC.Exts where
   isTrue# :: Int# -> Bool
   keepAlive# :: forall {l :: Levity} {r :: RuntimeRep} (a :: TYPE (BoxedRep l)) d (b :: TYPE r). a -> State# d -> (State# d -> b) -> b
   killThread# :: forall a. ThreadId# -> a -> State# RealWorld -> State# RealWorld
+  krepConstraint :: GHC.Internal.Types.KindRep
+  krepStar :: GHC.Internal.Types.KindRep
+  krepStarArr :: GHC.Internal.Types.KindRep
+  krepStarArrStarArr :: GHC.Internal.Types.KindRep
   labelThread# :: ThreadId# -> ByteArray# -> State# RealWorld -> State# RealWorld
   lazy :: forall a. a -> a
   leAddr# :: Addr# -> Addr# -> Int#
@@ -6810,6 +7690,7 @@ module GHC.Exts where
   uncheckedShiftRLWord8# :: Word8# -> Int# -> Word8#
   unmaskAsyncExceptions# :: forall {q :: RuntimeRep} (a :: TYPE q). (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
   unpackAppendCString# :: Addr# -> [Char] -> [Char]
+  unpackAppendCStringUtf8# :: Addr# -> [Char] -> [Char]
   unpackCString# :: Addr# -> [Char]
   unpackCStringUtf8# :: Addr# -> [Char]
   unpackClosure# :: forall a b. a -> (# Addr#, ByteArray#, Array# b #)
@@ -6820,6 +7701,7 @@ module GHC.Exts where
   unpackFloatX4# :: FloatX4# -> (# Float#, Float#, Float#, Float# #)
   unpackFloatX8# :: FloatX8# -> (# Float#, Float#, Float#, Float#, Float#, Float#, Float#, Float# #)
   unpackFoldrCString# :: forall a. Addr# -> (Char -> a -> a) -> a -> a
+  unpackFoldrCStringUtf8# :: forall a. Addr# -> (Char -> a -> a) -> a -> a
   unpackInt16X16# :: Int16X16# -> (# Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16# #)
   unpackInt16X32# :: Int16X32# -> (# Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16# #)
   unpackInt16X8# :: Int16X8# -> (# Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16#, Int16# #)
@@ -7879,8 +8761,8 @@ module GHC.IO.Handle where
   hTryLock :: Handle -> LockMode -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
   hWaitForInput :: Handle -> GHC.Internal.Types.Int -> GHC.Internal.Types.IO GHC.Internal.Types.Bool
   isEOF :: GHC.Internal.Types.IO GHC.Internal.Types.Bool
-  mkDuplexHandle :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> NewlineMode -> GHC.Internal.Types.IO Handle
-  mkFileHandle :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.IO.IOMode.IOMode -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> NewlineMode -> GHC.Internal.Types.IO Handle
+  mkDuplexHandle :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> NewlineMode -> GHC.Internal.Types.IO Handle
+  mkFileHandle :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.IO.IOMode.IOMode -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> NewlineMode -> GHC.Internal.Types.IO Handle
   nativeNewline :: Newline
   nativeNewlineMode :: NewlineMode
   noNewlineTranslation :: NewlineMode
@@ -7930,11 +8812,11 @@ module GHC.IO.Handle.Internals where
   ioe_notReadable :: forall a. GHC.Internal.Types.IO a
   ioe_notWritable :: forall a. GHC.Internal.Types.IO a
   ioe_semiclosedHandle :: forall a. GHC.Internal.Types.IO a
-  mkDuplexHandle :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Internal.IO.Handle.Types.NewlineMode -> GHC.Internal.Types.IO GHC.Internal.IO.Handle.Types.Handle
-  mkDuplexHandleNoFinalizer :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Internal.IO.Handle.Types.NewlineMode -> GHC.Internal.Types.IO GHC.Internal.IO.Handle.Types.Handle
-  mkFileHandle :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.IO.IOMode.IOMode -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Internal.IO.Handle.Types.NewlineMode -> GHC.Internal.Types.IO GHC.Internal.IO.Handle.Types.Handle
-  mkFileHandleNoFinalizer :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.IO.IOMode.IOMode -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Internal.IO.Handle.Types.NewlineMode -> GHC.Internal.Types.IO GHC.Internal.IO.Handle.Types.Handle
-  mkHandle :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.IO.Handle.Types.HandleType -> GHC.Internal.Types.Bool -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Internal.IO.Handle.Types.NewlineMode -> GHC.Internal.Maybe.Maybe HandleFinalizer -> GHC.Internal.Maybe.Maybe (GHC.Internal.MVar.MVar GHC.Internal.IO.Handle.Types.Handle__) -> GHC.Internal.Types.IO GHC.Internal.IO.Handle.Types.Handle
+  mkDuplexHandle :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Internal.IO.Handle.Types.NewlineMode -> GHC.Internal.Types.IO GHC.Internal.IO.Handle.Types.Handle
+  mkDuplexHandleNoFinalizer :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Internal.IO.Handle.Types.NewlineMode -> GHC.Internal.Types.IO GHC.Internal.IO.Handle.Types.Handle
+  mkFileHandle :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.IO.IOMode.IOMode -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Internal.IO.Handle.Types.NewlineMode -> GHC.Internal.Types.IO GHC.Internal.IO.Handle.Types.Handle
+  mkFileHandleNoFinalizer :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.IO.IOMode.IOMode -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Internal.IO.Handle.Types.NewlineMode -> GHC.Internal.Types.IO GHC.Internal.IO.Handle.Types.Handle
+  mkHandle :: forall dev. (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, GHC.Internal.Data.Typeable.Internal.Typeable dev) => dev -> GHC.Internal.IO.FilePath -> GHC.Internal.IO.Handle.Types.HandleType -> GHC.Internal.Types.Bool -> GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Internal.IO.Handle.Types.NewlineMode -> GHC.Internal.Maybe.Maybe HandleFinalizer -> GHC.Internal.Maybe.Maybe (GHC.Internal.MVar.MVar GHC.Internal.IO.Handle.Types.Handle__) -> GHC.Internal.Types.IO GHC.Internal.IO.Handle.Types.Handle
   openTextEncoding :: forall a. GHC.Internal.Maybe.Maybe GHC.Internal.IO.Encoding.Types.TextEncoding -> GHC.Internal.IO.Handle.Types.HandleType -> (forall es ds. GHC.Internal.Maybe.Maybe (GHC.Internal.IO.Encoding.Types.TextEncoder es) -> GHC.Internal.Maybe.Maybe (GHC.Internal.IO.Encoding.Types.TextDecoder ds) -> GHC.Internal.Types.IO a) -> GHC.Internal.Types.IO a
   readTextDevice :: GHC.Internal.IO.Handle.Types.Handle__ -> GHC.Internal.IO.Buffer.CharBuffer -> GHC.Internal.Types.IO GHC.Internal.IO.Buffer.CharBuffer
   readTextDeviceNonBlocking :: GHC.Internal.IO.Handle.Types.Handle__ -> GHC.Internal.IO.Buffer.CharBuffer -> GHC.Internal.Types.IO GHC.Internal.IO.Buffer.CharBuffer
@@ -7998,7 +8880,7 @@ module GHC.IO.Handle.Types where
   type Handle__ :: *
   data Handle__
     = forall dev enc_state dec_state.
-      (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable dev) =>
+      (GHC.Internal.IO.Device.RawIO dev, GHC.Internal.IO.Device.IODevice dev, GHC.Internal.IO.BufferedIO.BufferedIO dev, GHC.Internal.Data.Typeable.Internal.Typeable dev) =>
       Handle__ {haDevice :: !dev,
                 haType :: HandleType,
                 haByteBuffer :: {-# UNPACK #-} !(GHC.Internal.IORef.IORef (GHC.Internal.IO.Buffer.Buffer GHC.Internal.Word.Word8)),
@@ -9134,7 +10016,7 @@ module GHC.StaticPtr where
   -- Safety: None
   type IsStatic :: (* -> *) -> Constraint
   class IsStatic p where
-    fromStaticPtr :: forall a. ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a => StaticPtr a -> p a
+    fromStaticPtr :: forall a. GHC.Internal.Data.Typeable.Internal.Typeable a => StaticPtr a -> p a
     {-# MINIMAL fromStaticPtr #-}
   type StaticKey :: *
   type StaticKey = GHC.Internal.Fingerprint.Type.Fingerprint
@@ -10527,8 +11409,8 @@ module Type.Reflection where
   data (:~~:) a b where
     HRefl :: forall {k1} (a :: k1). (:~~:) a a
   pattern App :: forall k2 (t :: k2). () => forall k1 (a :: k1 -> k2) (b :: k1). (t ~ a b) => TypeRep a -> TypeRep b -> TypeRep t
-  pattern Con :: forall k (a :: k). () => ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.NotApplication a => TyCon -> TypeRep a
-  pattern Con' :: forall k (a :: k). () => ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.NotApplication a => TyCon -> [SomeTypeRep] -> TypeRep a
+  pattern Con :: forall k (a :: k). () => GHC.Internal.Data.Typeable.Internal.NotApplication a => TyCon -> TypeRep a
+  pattern Con' :: forall k (a :: k). () => GHC.Internal.Data.Typeable.Internal.NotApplication a => TyCon -> [SomeTypeRep] -> TypeRep a
   pattern Fun :: forall k (fun :: k). () => forall (r1 :: GHC.Internal.Types.RuntimeRep) (r2 :: GHC.Internal.Types.RuntimeRep) (arg :: TYPE r1) (res :: TYPE r2). (k ~ *, fun ~~ (arg -> res)) => TypeRep arg -> TypeRep res -> TypeRep fun
   type Module :: *
   data Module = ...
@@ -10545,7 +11427,7 @@ module Type.Reflection where
   type Typeable :: forall k. k -> Constraint
   class Typeable a where
     ...
-    {-# MINIMAL ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.typeRep# #-}
+    {-# MINIMAL GHC.Internal.Data.Typeable.Internal.typeRep# #-}
   decTypeRep :: forall k1 k2 (a :: k1) (b :: k2). TypeRep a -> TypeRep b -> GHC.Internal.Data.Either.Either ((a :~~: b) -> GHC.Internal.Base.Void) (a :~~: b)
   eqTypeRep :: forall k1 k2 (a :: k1) (b :: k2). TypeRep a -> TypeRep b -> GHC.Internal.Maybe.Maybe (a :~~: b)
   moduleName :: Module -> GHC.Internal.Base.String
@@ -10569,7 +11451,7 @@ module Type.Reflection where
 module Type.Reflection.Unsafe where
   -- Safety: None
   type KindRep :: *
-  data KindRep = KindRepTyConApp TyCon [KindRep] | KindRepVar {-# UNPACK #-} !GHC.Internal.Types.KindBndr | KindRepApp KindRep KindRep | KindRepFun KindRep KindRep | KindRepTYPE !GHC.Internal.Types.RuntimeRep | KindRepTypeLitS TypeLitSort GHC.Internal.Prim.Addr# | KindRepTypeLitD TypeLitSort [GHC.Internal.Types.Char]
+  data KindRep = KindRepTyConApp TyCon [KindRep] | KindRepVar {-# UNPACK #-} !GHC.Internal.Types.KindBndr | KindRepApp KindRep KindRep | KindRepFun KindRep KindRep | KindRepType | KindRepConstraint | KindRepTypeLitS TypeLitSort GHC.Internal.Prim.Addr# | KindRepTypeLitD TypeLitSort [GHC.Internal.Types.Char]
   pattern KindRepTypeLit :: TypeLitSort -> GHC.Internal.Base.String -> KindRep
   type TyCon :: *
   data TyCon = ...
@@ -10580,9 +11462,9 @@ module Type.Reflection.Unsafe where
   data TypeRep a where
     ...
   mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1). TypeRep a -> TypeRep b -> TypeRep (a b)
-  mkTrCon :: forall k (a :: k). TyCon -> [ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.SomeTypeRep] -> TypeRep a
+  mkTrCon :: forall k (a :: k). TyCon -> [GHC.Internal.Data.Typeable.Internal.SomeTypeRep] -> TypeRep a
   mkTyCon :: GHC.Internal.Base.String -> GHC.Internal.Base.String -> GHC.Internal.Base.String -> GHC.Internal.Types.Int -> KindRep -> TyCon
-  someTypeRepFingerprint :: ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.SomeTypeRep -> GHC.Internal.Fingerprint.Type.Fingerprint
+  someTypeRepFingerprint :: GHC.Internal.Data.Typeable.Internal.SomeTypeRep -> GHC.Internal.Fingerprint.Type.Fingerprint
   tyConFingerprint :: TyCon -> GHC.Internal.Fingerprint.Type.Fingerprint
   tyConKindArgs :: TyCon -> GHC.Internal.Types.Int
   tyConKindRep :: TyCon -> KindRep
@@ -10865,6 +11747,7 @@ instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Alternati
 instance forall (f :: * -> *). GHC.Internal.Base.Alternative f => GHC.Internal.Base.Alternative (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall (f :: * -> *). GHC.Internal.Base.Alternative f => GHC.Internal.Base.Alternative (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance GHC.Internal.Base.Alternative GHC.Internal.STM.STM -- Defined in ‘GHC.Internal.STM’
+instance GHC.Internal.Base.Alternative GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Alternative f, GHC.Internal.Base.Alternative g) => GHC.Internal.Base.Alternative (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Alternative f, GHC.Internal.Base.Applicative g) => GHC.Internal.Base.Alternative (f GHC.Internal.Generics.:.: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *). (GHC.Internal.Generics.Generic1 f, GHC.Internal.Base.Alternative (GHC.Internal.Generics.Rep1 f)) => GHC.Internal.Base.Alternative (GHC.Internal.Generics.Generically1 f) -- Defined in ‘GHC.Internal.Generics’
@@ -10873,7 +11756,6 @@ instance forall (f :: * -> *). GHC.Internal.Base.Alternative f => GHC.Internal.B
 instance GHC.Internal.Base.Alternative GHC.Internal.Generics.U1 -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.Alternative GHC.Internal.Text.ParserCombinators.ReadP.P -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
 instance GHC.Internal.Base.Alternative GHC.Internal.Text.ParserCombinators.ReadP.ReadP -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
-instance GHC.Internal.Base.Alternative GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
 instance forall (a :: * -> * -> *) b. GHC.Internal.Control.Arrow.Arrow a => GHC.Internal.Base.Applicative (Control.Applicative.WrappedArrow a b) -- Defined in ‘Control.Applicative’
 instance forall (m :: * -> *). GHC.Internal.Base.Monad m => GHC.Internal.Base.Applicative (Control.Applicative.WrappedMonad m) -- Defined in ‘Control.Applicative’
 instance forall r. GHC.Internal.Base.Applicative ((->) r) -- Defined in ‘GHC.Internal.Base’
@@ -10910,7 +11792,7 @@ instance GHC.Internal.Base.Applicative Data.Semigroup.Last -- Defined in ‘Data
 instance GHC.Internal.Base.Applicative Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Applicative Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Applicative GHC.Internal.STM.STM -- Defined in ‘GHC.Internal.STM’
-instance GHC.Internal.Base.Applicative GHC.Internal.GHCi.NoIO -- Defined in ‘GHC.Internal.GHCi’
+instance GHC.Internal.Base.Applicative GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Applicative f, GHC.Internal.Base.Applicative g) => GHC.Internal.Base.Applicative (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Applicative f, GHC.Internal.Base.Applicative g) => GHC.Internal.Base.Applicative (f GHC.Internal.Generics.:.: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *). (GHC.Internal.Generics.Generic1 f, GHC.Internal.Base.Applicative (GHC.Internal.Generics.Rep1 f)) => GHC.Internal.Base.Applicative (GHC.Internal.Generics.Generically1 f) -- Defined in ‘GHC.Internal.Generics’
@@ -10919,9 +11801,10 @@ instance forall (f :: * -> *) i (c :: GHC.Internal.Generics.Meta). GHC.Internal.
 instance GHC.Internal.Base.Applicative GHC.Internal.Generics.Par1 -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *). GHC.Internal.Base.Applicative f => GHC.Internal.Base.Applicative (GHC.Internal.Generics.Rec1 f) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.Applicative GHC.Internal.Generics.U1 -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Base.Applicative GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
+instance GHC.Internal.Base.Applicative GHC.Internal.GHCi.NoIO -- Defined in ‘GHC.Internal.GHCi’
 instance GHC.Internal.Base.Applicative GHC.Internal.Text.ParserCombinators.ReadP.P -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
 instance GHC.Internal.Base.Applicative GHC.Internal.Text.ParserCombinators.ReadP.ReadP -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
-instance GHC.Internal.Base.Applicative GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
 instance forall (a :: * -> * -> *) b. GHC.Internal.Control.Arrow.Arrow a => GHC.Internal.Base.Functor (Control.Applicative.WrappedArrow a b) -- Defined in ‘Control.Applicative’
 instance forall (m :: * -> *). GHC.Internal.Base.Monad m => GHC.Internal.Base.Functor (Control.Applicative.WrappedMonad m) -- Defined in ‘Control.Applicative’
 instance forall r. GHC.Internal.Base.Functor ((->) r) -- Defined in ‘GHC.Internal.Base’
@@ -10965,7 +11848,7 @@ instance GHC.Internal.Base.Functor Data.Semigroup.Max -- Defined in ‘Data.Semi
 instance GHC.Internal.Base.Functor Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance forall i. GHC.Internal.Base.Functor (GHC.Internal.Arr.Array i) -- Defined in ‘GHC.Internal.Arr’
 instance GHC.Internal.Base.Functor GHC.Internal.STM.STM -- Defined in ‘GHC.Internal.STM’
-instance GHC.Internal.Base.Functor GHC.Internal.GHCi.NoIO -- Defined in ‘GHC.Internal.GHCi’
+instance GHC.Internal.Base.Functor GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Functor f, GHC.Internal.Base.Functor g) => GHC.Internal.Base.Functor (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Functor f, GHC.Internal.Base.Functor g) => GHC.Internal.Base.Functor (f GHC.Internal.Generics.:+: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Functor f, GHC.Internal.Base.Functor g) => GHC.Internal.Base.Functor (f GHC.Internal.Generics.:.: g) -- Defined in ‘GHC.Internal.Generics’
@@ -10982,12 +11865,14 @@ instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Type
 instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec GHC.Internal.Types.Char) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.Functor (GHC.Internal.Generics.URec (GHC.Internal.Ptr.Ptr ())) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.Functor GHC.Internal.Generics.V1 -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Base.Functor GHC.Internal.TH.Syntax.TyVarBndr -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Base.Functor GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
+instance GHC.Internal.Base.Functor GHC.Internal.GHCi.NoIO -- Defined in ‘GHC.Internal.GHCi’
 instance GHC.Internal.Base.Functor GHC.Internal.Text.ParserCombinators.ReadP.P -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
 instance GHC.Internal.Base.Functor GHC.Internal.Text.ParserCombinators.ReadP.ReadP -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
 instance [safe] GHC.Internal.Base.Functor System.Console.GetOpt.ArgDescr -- Defined in ‘System.Console.GetOpt’
 instance [safe] GHC.Internal.Base.Functor System.Console.GetOpt.ArgOrder -- Defined in ‘System.Console.GetOpt’
 instance [safe] GHC.Internal.Base.Functor System.Console.GetOpt.OptDescr -- Defined in ‘System.Console.GetOpt’
-instance GHC.Internal.Base.Functor GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
 instance forall (m :: * -> *). GHC.Internal.Base.Monad m => GHC.Internal.Base.Monad (Control.Applicative.WrappedMonad m) -- Defined in ‘Control.Applicative’
 instance forall r. GHC.Internal.Base.Monad ((->) r) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.Monad GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Base’
@@ -11020,15 +11905,16 @@ instance GHC.Internal.Base.Monad Data.Semigroup.Last -- Defined in ‘Data.Semig
 instance GHC.Internal.Base.Monad Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Monad Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Base.Monad GHC.Internal.STM.STM -- Defined in ‘GHC.Internal.STM’
-instance GHC.Internal.Base.Monad GHC.Internal.GHCi.NoIO -- Defined in ‘GHC.Internal.GHCi’
+instance GHC.Internal.Base.Monad GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.Monad f, GHC.Internal.Base.Monad g) => GHC.Internal.Base.Monad (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) i (c :: GHC.Internal.Generics.Meta). GHC.Internal.Base.Monad f => GHC.Internal.Base.Monad (GHC.Internal.Generics.M1 i c f) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.Monad GHC.Internal.Generics.Par1 -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *). GHC.Internal.Base.Monad f => GHC.Internal.Base.Monad (GHC.Internal.Generics.Rec1 f) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.Monad GHC.Internal.Generics.U1 -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Base.Monad GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
+instance GHC.Internal.Base.Monad GHC.Internal.GHCi.NoIO -- Defined in ‘GHC.Internal.GHCi’
 instance GHC.Internal.Base.Monad GHC.Internal.Text.ParserCombinators.ReadP.P -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
 instance GHC.Internal.Base.Monad GHC.Internal.Text.ParserCombinators.ReadP.ReadP -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
-instance GHC.Internal.Base.Monad GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
 instance GHC.Internal.Base.MonadPlus GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.MonadPlus [] -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Base.MonadPlus GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Base’
@@ -11039,13 +11925,13 @@ instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.MonadPlus
 instance forall (f :: * -> *). GHC.Internal.Base.MonadPlus f => GHC.Internal.Base.MonadPlus (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Data.Semigroup.Internal’
 instance forall (f :: * -> *). GHC.Internal.Base.MonadPlus f => GHC.Internal.Base.MonadPlus (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Monoid’
 instance GHC.Internal.Base.MonadPlus GHC.Internal.STM.STM -- Defined in ‘GHC.Internal.STM’
+instance GHC.Internal.Base.MonadPlus GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Base.MonadPlus f, GHC.Internal.Base.MonadPlus g) => GHC.Internal.Base.MonadPlus (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *) i (c :: GHC.Internal.Generics.Meta). GHC.Internal.Base.MonadPlus f => GHC.Internal.Base.MonadPlus (GHC.Internal.Generics.M1 i c f) -- Defined in ‘GHC.Internal.Generics’
 instance forall (f :: * -> *). GHC.Internal.Base.MonadPlus f => GHC.Internal.Base.MonadPlus (GHC.Internal.Generics.Rec1 f) -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.MonadPlus GHC.Internal.Generics.U1 -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Base.MonadPlus GHC.Internal.Text.ParserCombinators.ReadP.P -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
 instance GHC.Internal.Base.MonadPlus GHC.Internal.Text.ParserCombinators.ReadP.ReadP -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
-instance GHC.Internal.Base.MonadPlus GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
 instance forall b a. GHC.Internal.Base.Monoid b => GHC.Internal.Base.Monoid (a -> b) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.Types.IO a) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Monoid [a] -- Defined in ‘GHC.Internal.Base’
@@ -11097,6 +11983,7 @@ instance forall k (f :: k -> *) (p :: k) i (c :: GHC.Internal.Generics.Meta). GH
 instance forall p. GHC.Internal.Base.Monoid p => GHC.Internal.Base.Monoid (GHC.Internal.Generics.Par1 p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (p :: k). GHC.Internal.Base.Monoid (f p) => GHC.Internal.Base.Monoid (GHC.Internal.Generics.Rec1 f p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Base.Monoid (GHC.Internal.Generics.U1 p) -- Defined in ‘GHC.Internal.Generics’
+instance forall a. GHC.Internal.Base.Monoid a => GHC.Internal.Base.Monoid (GHC.Internal.TH.Monad.Q a) -- Defined in ‘GHC.Internal.TH.Monad’
 instance forall b a. GHC.Internal.Base.Semigroup b => GHC.Internal.Base.Semigroup (a -> b) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.Types.IO a) -- Defined in ‘GHC.Internal.Base’
 instance forall a. GHC.Internal.Base.Semigroup [a] -- Defined in ‘GHC.Internal.Base’
@@ -11157,6 +12044,7 @@ instance forall p. GHC.Internal.Base.Semigroup p => GHC.Internal.Base.Semigroup 
 instance forall k (f :: k -> *) (p :: k). GHC.Internal.Base.Semigroup (f p) => GHC.Internal.Base.Semigroup (GHC.Internal.Generics.Rec1 f p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Base.Semigroup (GHC.Internal.Generics.U1 p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Base.Semigroup (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
+instance forall a. GHC.Internal.Base.Semigroup a => GHC.Internal.Base.Semigroup (GHC.Internal.TH.Monad.Q a) -- Defined in ‘GHC.Internal.TH.Monad’
 instance forall k a (b :: k). GHC.Internal.Bits.Bits a => GHC.Internal.Bits.Bits (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Bits.Bits a => GHC.Internal.Bits.Bits (GHC.Internal.Data.Bits.And a) -- Defined in ‘GHC.Internal.Data.Bits’
 instance forall a. GHC.Internal.Bits.Bits a => GHC.Internal.Bits.Bits (GHC.Internal.Data.Bits.Iff a) -- Defined in ‘GHC.Internal.Data.Bits’
@@ -11298,8 +12186,8 @@ instance GHC.Internal.Classes.Eq GHC.Internal.Data.Data.ConstrRep -- Defined in 
 instance GHC.Internal.Classes.Eq GHC.Internal.Data.Data.DataRep -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Classes.Eq GHC.Internal.Data.Data.Fixity -- Defined in ‘GHC.Internal.Data.Data’
 instance forall k (s :: k). GHC.Internal.Classes.Eq (GHC.Internal.Data.Proxy.Proxy s) -- Defined in ‘GHC.Internal.Data.Proxy’
-instance GHC.Internal.Classes.Eq ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.SomeTypeRep -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
-instance forall k (a :: k). GHC.Internal.Classes.Eq (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.TypeRep a) -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
+instance GHC.Internal.Classes.Eq GHC.Internal.Data.Typeable.Internal.SomeTypeRep -- Defined in ‘GHC.Internal.Data.Typeable.Internal’
+instance forall k (a :: k). GHC.Internal.Classes.Eq (GHC.Internal.Data.Typeable.Internal.TypeRep a) -- Defined in ‘GHC.Internal.Data.Typeable.Internal’
 instance forall a b. (GHC.Internal.Classes.Eq a, GHC.Internal.Classes.Eq b) => GHC.Internal.Classes.Eq (GHC.Internal.Data.Either.Either a b) -- Defined in ‘GHC.Internal.Data.Either’
 instance [safe] forall k (a :: k). GHC.Internal.Classes.Eq (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Classes.Eq (f (g a)) => GHC.Internal.Classes.Eq (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
@@ -11376,10 +12264,6 @@ instance forall i e. (GHC.Internal.Ix.Ix i, GHC.Internal.Classes.Eq e) => GHC.In
 instance forall s i e. GHC.Internal.Classes.Eq (GHC.Internal.Arr.STArray s i e) -- Defined in ‘GHC.Internal.Arr’
 instance GHC.Internal.Classes.Eq GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
 instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.STM.TVar a) -- Defined in ‘GHC.Internal.STM’
-instance GHC.Internal.Classes.Eq GHC.Internal.Event.TimeOut.TimeoutKey -- Defined in ‘GHC.Internal.Event.TimeOut’
-instance GHC.Internal.Classes.Eq GHC.Internal.Stack.Types.SrcLoc -- Defined in ‘GHC.Internal.Stack.Types’
-instance GHC.Internal.Classes.Eq GHC.Internal.Exts.SpecConstrAnnotation -- Defined in ‘GHC.Internal.Exts’
-instance GHC.Internal.Classes.Eq GHC.Internal.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Internal.Fingerprint.Type’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Classes.Eq (f p), GHC.Internal.Classes.Eq (g p)) => GHC.Internal.Classes.Eq ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Classes.Eq (f p), GHC.Internal.Classes.Eq (g p)) => GHC.Internal.Classes.Eq ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Internal.Classes.Eq (f (g p)) => GHC.Internal.Classes.Eq ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Generics’
@@ -11401,6 +12285,77 @@ instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec 
 instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec GHC.Internal.Types.Char p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.URec (GHC.Internal.Ptr.Ptr ()) p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Classes.Eq (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.BndrVis -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Body -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Bytes -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Callconv -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Clause -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Con -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Dec -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.DerivClause -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.DerivStrategy -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.DocLoc -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Exp -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.FamilyResultSig -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Fixity -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.FixityDirection -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Foreign -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.FunDep -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Guard -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Info -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.InjectivityAnn -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Inline -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Match -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.ModName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Module -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.ModuleInfo -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Name -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.NameFlavour -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.NameSpace -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.NamespaceSpecifier -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.OccName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Overlap -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Pat -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.PatSynArgs -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.PatSynDir -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Phases -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.PkgName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Pragma -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Range -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Role -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.RuleBndr -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.RuleMatch -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Safety -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.SourceStrictness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.TyLit -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.TySynEqn -- Defined in ‘GHC.Internal.TH.Syntax’
+instance forall flag. GHC.Internal.Classes.Eq flag => GHC.Internal.Classes.Eq (GHC.Internal.TH.Syntax.TyVarBndr flag) -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Eq GHC.Internal.Stack.Types.SrcLoc -- Defined in ‘GHC.Internal.Stack.Types’
+instance GHC.Internal.Classes.Eq GHC.Internal.Text.Read.Lex.Lexeme -- Defined in ‘GHC.Internal.Text.Read.Lex’
+instance GHC.Internal.Classes.Eq GHC.Internal.Text.Read.Lex.Number -- Defined in ‘GHC.Internal.Text.Read.Lex’
+instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Classes.Eq (GHC.Internal.TypeLits.SChar c) -- Defined in ‘GHC.Internal.TypeLits’
+instance forall (s :: GHC.Internal.Types.Symbol). GHC.Internal.Classes.Eq (GHC.Internal.TypeLits.SSymbol s) -- Defined in ‘GHC.Internal.TypeLits’
+instance GHC.Internal.Classes.Eq GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
+instance GHC.Internal.Classes.Eq GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Classes.Eq (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
+instance GHC.Internal.Classes.Eq GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
+instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.BigNat.BigNat -- Defined in ‘GHC.Internal.Bignum.BigNat’
+instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
+instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Bignum.Natural’
+instance GHC.Internal.Classes.Eq GHC.Internal.Event.TimeOut.TimeoutKey -- Defined in ‘GHC.Internal.Event.TimeOut’
+instance GHC.Internal.Classes.Eq GHC.Internal.Exts.SpecConstrAnnotation -- Defined in ‘GHC.Internal.Exts’
+instance GHC.Internal.Classes.Eq GHC.Internal.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Internal.Fingerprint.Type’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.Buffer.BufferState -- Defined in ‘GHC.Internal.IO.Buffer’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.Device.IODeviceType -- Defined in ‘GHC.Internal.IO.Device’
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.Device.SeekMode -- Defined in ‘GHC.Internal.IO.Device’
@@ -11414,22 +12369,11 @@ instance GHC.Internal.Classes.Eq GHC.Internal.IO.IOMode.IOMode -- Defined in ‘
 instance GHC.Internal.Classes.Eq GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
 instance forall i e. GHC.Internal.Classes.Eq (GHC.Internal.IOArray.IOArray i e) -- Defined in ‘GHC.Internal.IOArray’
 instance GHC.Internal.Classes.Eq GHC.Internal.InfoProv.Types.InfoProv -- Defined in ‘GHC.Internal.InfoProv.Types’
-instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
 instance GHC.Internal.Classes.Eq GHC.Internal.JS.Foreign.Callback.OnBlocked -- Defined in ‘GHC.Internal.JS.Foreign.Callback’
-instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.BigNat.BigNat -- Defined in ‘GHC.Internal.Bignum.BigNat’
-instance GHC.Internal.Classes.Eq GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Bignum.Natural’
 instance GHC.Internal.Classes.Eq GHC.RTS.Flags.IoManagerFlag -- Defined in ‘GHC.RTS.Flags’
 instance forall a. GHC.Internal.Classes.Eq (GHC.Internal.StableName.StableName a) -- Defined in ‘GHC.Internal.StableName’
 instance GHC.Internal.Classes.Eq GHC.Internal.Stack.Decode.StackEntry -- Defined in ‘GHC.Internal.Stack.Decode’
-instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Classes.Eq (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
-instance GHC.Internal.Classes.Eq GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
-instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Classes.Eq (GHC.Internal.TypeLits.SChar c) -- Defined in ‘GHC.Internal.TypeLits’
-instance forall (s :: GHC.Internal.Types.Symbol). GHC.Internal.Classes.Eq (GHC.Internal.TypeLits.SSymbol s) -- Defined in ‘GHC.Internal.TypeLits’
-instance GHC.Internal.Classes.Eq GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
-instance GHC.Internal.Classes.Eq GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
 instance [safe] GHC.Internal.Classes.Eq System.Timeout.Timeout -- Defined in ‘System.Timeout’
-instance GHC.Internal.Classes.Eq GHC.Internal.Text.Read.Lex.Lexeme -- Defined in ‘GHC.Internal.Text.Read.Lex’
-instance GHC.Internal.Classes.Eq GHC.Internal.Text.Read.Lex.Number -- Defined in ‘GHC.Internal.Text.Read.Lex’
 instance forall a. GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.Base’
 instance GHC.Internal.Classes.Ord GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Base’
 instance forall k a (b :: k). GHC.Internal.Classes.Ord a => GHC.Internal.Classes.Ord (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
@@ -11472,8 +12416,8 @@ instance GHC.Internal.Classes.Ord GHC.Internal.Unicode.GeneralCategory -- Define
 instance forall k (a :: k) (b :: k). GHC.Internal.Classes.Ord (a GHC.Internal.Data.Type.Equality.:~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
 instance forall k1 k2 (a :: k1) (b :: k2). GHC.Internal.Classes.Ord (a GHC.Internal.Data.Type.Equality.:~~: b) -- Defined in ‘GHC.Internal.Data.Type.Equality’
 instance forall k (s :: k). GHC.Internal.Classes.Ord (GHC.Internal.Data.Proxy.Proxy s) -- Defined in ‘GHC.Internal.Data.Proxy’
-instance GHC.Internal.Classes.Ord ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.SomeTypeRep -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
-instance forall k (a :: k). GHC.Internal.Classes.Ord (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.TypeRep a) -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
+instance GHC.Internal.Classes.Ord GHC.Internal.Data.Typeable.Internal.SomeTypeRep -- Defined in ‘GHC.Internal.Data.Typeable.Internal’
+instance forall k (a :: k). GHC.Internal.Classes.Ord (GHC.Internal.Data.Typeable.Internal.TypeRep a) -- Defined in ‘GHC.Internal.Data.Typeable.Internal’
 instance forall a b. (GHC.Internal.Classes.Ord a, GHC.Internal.Classes.Ord b) => GHC.Internal.Classes.Ord (GHC.Internal.Data.Either.Either a b) -- Defined in ‘GHC.Internal.Data.Either’
 instance [safe] forall k (a :: k). GHC.Internal.Classes.Ord (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Internal.Classes.Ord (f (g a)) => GHC.Internal.Classes.Ord (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
@@ -11543,8 +12487,6 @@ instance GHC.Internal.Classes.Ord GHC.Internal.Foreign.C.Types.CWchar -- Defined
 instance forall a. GHC.Internal.Classes.Ord (GHC.Internal.Foreign.C.ConstPtr.ConstPtr a) -- Defined in ‘GHC.Internal.Foreign.C.ConstPtr’
 instance forall i e. (GHC.Internal.Ix.Ix i, GHC.Internal.Classes.Ord e) => GHC.Internal.Classes.Ord (GHC.Internal.Arr.Array i e) -- Defined in ‘GHC.Internal.Arr’
 instance GHC.Internal.Classes.Ord GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
-instance GHC.Internal.Classes.Ord GHC.Internal.Event.TimeOut.TimeoutKey -- Defined in ‘GHC.Internal.Event.TimeOut’
-instance GHC.Internal.Classes.Ord GHC.Internal.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Internal.Fingerprint.Type’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Classes.Ord (f p), GHC.Internal.Classes.Ord (g p)) => GHC.Internal.Classes.Ord ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Classes.Ord (f p), GHC.Internal.Classes.Ord (g p)) => GHC.Internal.Classes.Ord ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Internal.Classes.Ord (f (g p)) => GHC.Internal.Classes.Ord ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Generics’
@@ -11566,20 +12508,78 @@ instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec
 instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec GHC.Internal.Types.Char p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.URec (GHC.Internal.Ptr.Ptr ()) p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Classes.Ord (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.BndrVis -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Body -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Bytes -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Callconv -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Clause -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Con -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Dec -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.DerivClause -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.DerivStrategy -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.DocLoc -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Exp -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.FamilyResultSig -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Fixity -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.FixityDirection -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Foreign -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.FunDep -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Guard -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Info -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.InjectivityAnn -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Inline -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Match -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.ModName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Module -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.ModuleInfo -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Name -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.NameFlavour -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.NameSpace -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.NamespaceSpecifier -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.OccName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Overlap -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Pat -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.PatSynArgs -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.PatSynDir -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Phases -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.PkgName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Pragma -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Range -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Role -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.RuleBndr -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.RuleMatch -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Safety -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.SourceStrictness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.TyLit -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.TySynEqn -- Defined in ‘GHC.Internal.TH.Syntax’
+instance forall flag. GHC.Internal.Classes.Ord flag => GHC.Internal.Classes.Ord (GHC.Internal.TH.Syntax.TyVarBndr flag) -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
+instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Classes.Ord (GHC.Internal.TypeLits.SChar c) -- Defined in ‘GHC.Internal.TypeLits’
+instance forall (s :: GHC.Internal.Types.Symbol). GHC.Internal.Classes.Ord (GHC.Internal.TypeLits.SSymbol s) -- Defined in ‘GHC.Internal.TypeLits’
+instance GHC.Internal.Classes.Ord GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
+instance GHC.Internal.Classes.Ord GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Classes.Ord (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
+instance GHC.Internal.Classes.Ord GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
+instance GHC.Internal.Classes.Ord GHC.Internal.Bignum.BigNat.BigNat -- Defined in ‘GHC.Internal.Bignum.BigNat’
+instance GHC.Internal.Classes.Ord GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
+instance GHC.Internal.Classes.Ord GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Bignum.Natural’
+instance GHC.Internal.Classes.Ord GHC.Internal.Event.TimeOut.TimeoutKey -- Defined in ‘GHC.Internal.Event.TimeOut’
+instance GHC.Internal.Classes.Ord GHC.Internal.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Internal.Fingerprint.Type’
 instance GHC.Internal.Classes.Ord GHC.Internal.IO.Device.SeekMode -- Defined in ‘GHC.Internal.IO.Device’
 instance GHC.Internal.Classes.Ord GHC.Internal.IO.Handle.Types.BufferMode -- Defined in ‘GHC.Internal.IO.Handle.Types’
 instance GHC.Internal.Classes.Ord GHC.Internal.IO.Handle.Types.Newline -- Defined in ‘GHC.Internal.IO.Handle.Types’
 instance GHC.Internal.Classes.Ord GHC.Internal.IO.Handle.Types.NewlineMode -- Defined in ‘GHC.Internal.IO.Handle.Types’
 instance GHC.Internal.Classes.Ord GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
-instance GHC.Internal.Classes.Ord GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Bignum.Integer’
-instance GHC.Internal.Classes.Ord GHC.Internal.Bignum.BigNat.BigNat -- Defined in ‘GHC.Internal.Bignum.BigNat’
-instance GHC.Internal.Classes.Ord GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.Bignum.Natural’
-instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Classes.Ord (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
-instance GHC.Internal.Classes.Ord GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
-instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Classes.Ord (GHC.Internal.TypeLits.SChar c) -- Defined in ‘GHC.Internal.TypeLits’
-instance forall (s :: GHC.Internal.Types.Symbol). GHC.Internal.Classes.Ord (GHC.Internal.TypeLits.SSymbol s) -- Defined in ‘GHC.Internal.TypeLits’
-instance GHC.Internal.Classes.Ord GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
-instance GHC.Internal.Classes.Ord GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Control.Arrow.Arrow (->) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance forall (m :: * -> *). GHC.Internal.Base.Monad m => GHC.Internal.Control.Arrow.Arrow (GHC.Internal.Control.Arrow.Kleisli m) -- Defined in ‘GHC.Internal.Control.Arrow’
 instance GHC.Internal.Control.Arrow.ArrowApply (->) -- Defined in ‘GHC.Internal.Control.Arrow’
@@ -11598,9 +12598,10 @@ instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.Types.IO -- Defi
 instance GHC.Internal.Control.Monad.Fail.MonadFail [] -- Defined in ‘GHC.Internal.Control.Monad.Fail’
 instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.Maybe.Maybe -- Defined in ‘GHC.Internal.Control.Monad.Fail’
 instance forall (f :: * -> *). GHC.Internal.Control.Monad.Fail.MonadFail f => GHC.Internal.Control.Monad.Fail.MonadFail (GHC.Internal.Data.Monoid.Ap f) -- Defined in ‘GHC.Internal.Data.Monoid’
+instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
+instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
 instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.Text.ParserCombinators.ReadP.P -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
 instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.Text.ParserCombinators.ReadP.ReadP -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadP’
-instance GHC.Internal.Control.Monad.Fail.MonadFail GHC.Internal.Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘GHC.Internal.Text.ParserCombinators.ReadPrec’
 instance GHC.Internal.Control.Monad.Fix.ArrowLoop (->) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall (m :: * -> *). GHC.Internal.Control.Monad.Fix.MonadFix m => GHC.Internal.Control.Monad.Fix.ArrowLoop (GHC.Internal.Control.Arrow.Kleisli m) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Control.Monad.Fix.MonadFix f, GHC.Internal.Control.Monad.Fix.MonadFix g) => GHC.Internal.Control.Monad.Fix.MonadFix (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Control.Monad.Fix’
@@ -11634,6 +12635,7 @@ instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.Last -- Defined 
 instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Control.Monad.Fix.MonadFix Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance GHC.Internal.Control.Monad.IO.Class.MonadIO GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.Control.Monad.IO.Class’
+instance GHC.Internal.Control.Monad.IO.Class.MonadIO GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’
 instance forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Control.Monad.Zip.MonadZip f, GHC.Internal.Control.Monad.Zip.MonadZip g) => GHC.Internal.Control.Monad.Zip.MonadZip (f GHC.Internal.Generics.:*: g) -- Defined in ‘GHC.Internal.Control.Monad.Zip’
 instance forall (f :: * -> *). GHC.Internal.Control.Monad.Zip.MonadZip f => GHC.Internal.Control.Monad.Zip.MonadZip (GHC.Internal.Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Internal.Control.Monad.Zip’
 instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Ord.Down -- Defined in ‘GHC.Internal.Control.Monad.Zip’
@@ -11654,22 +12656,22 @@ instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Data.Semigroup.Int
 instance GHC.Internal.Control.Monad.Zip.MonadZip GHC.Internal.Generics.U1 -- Defined in ‘GHC.Internal.Control.Monad.Zip’
 instance GHC.Internal.Control.Monad.Zip.MonadZip Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance [safe] forall (f :: * -> *) (g :: * -> *). (GHC.Internal.Control.Monad.Zip.MonadZip f, GHC.Internal.Control.Monad.Zip.MonadZip g) => GHC.Internal.Control.Monad.Zip.MonadZip (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
-instance forall (a :: * -> * -> *) b c. (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable b, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable c, GHC.Internal.Data.Data.Data (a b c)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedArrow a b c) -- Defined in ‘Control.Applicative’
-instance forall (m :: * -> *) a. (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable m, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Data.Data.Data (m a)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedMonad m a) -- Defined in ‘Control.Applicative’
+instance forall (a :: * -> * -> *) b c. (GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Data.Typeable.Internal.Typeable b, GHC.Internal.Data.Typeable.Internal.Typeable c, GHC.Internal.Data.Data.Data (a b c)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedArrow a b c) -- Defined in ‘Control.Applicative’
+instance forall (m :: * -> *) a. (GHC.Internal.Data.Typeable.Internal.Typeable m, GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Data.Data.Data (m a)) => GHC.Internal.Data.Data.Data (Control.Applicative.WrappedMonad m a) -- Defined in ‘Control.Applicative’
 instance GHC.Internal.Data.Data.Data Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
-instance forall s. ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable s => GHC.Internal.Data.Data.Data (Data.Array.Byte.MutableByteArray s) -- Defined in ‘Data.Array.Byte’
+instance forall s. GHC.Internal.Data.Typeable.Internal.Typeable s => GHC.Internal.Data.Data.Data (Data.Array.Byte.MutableByteArray s) -- Defined in ‘Data.Array.Byte’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
-instance forall (f :: * -> *) (g :: * -> *) p. (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable g, GHC.Internal.Data.Data.Data p, GHC.Internal.Data.Data.Data (f p), GHC.Internal.Data.Data.Data (g p)) => GHC.Internal.Data.Data.Data ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Data.Data’
-instance forall (f :: * -> *) (g :: * -> *) p. (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable g, GHC.Internal.Data.Data.Data p, GHC.Internal.Data.Data.Data (f p), GHC.Internal.Data.Data.Data (g p)) => GHC.Internal.Data.Data.Data ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Data.Data’
-instance forall (f :: * -> *) (g :: * -> *) p. (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable g, GHC.Internal.Data.Data.Data p, GHC.Internal.Data.Data.Data (f (g p))) => GHC.Internal.Data.Data.Data ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Data.Data’
+instance forall (f :: * -> *) (g :: * -> *) p. (GHC.Internal.Data.Typeable.Internal.Typeable f, GHC.Internal.Data.Typeable.Internal.Typeable g, GHC.Internal.Data.Data.Data p, GHC.Internal.Data.Data.Data (f p), GHC.Internal.Data.Data.Data (g p)) => GHC.Internal.Data.Data.Data ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Data.Data’
+instance forall (f :: * -> *) (g :: * -> *) p. (GHC.Internal.Data.Typeable.Internal.Typeable f, GHC.Internal.Data.Typeable.Internal.Typeable g, GHC.Internal.Data.Data.Data p, GHC.Internal.Data.Data.Data (f p), GHC.Internal.Data.Data.Data (g p)) => GHC.Internal.Data.Data.Data ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Data.Data’
+instance forall (f :: * -> *) (g :: * -> *) p. (GHC.Internal.Data.Typeable.Internal.Typeable f, GHC.Internal.Data.Typeable.Internal.Typeable g, GHC.Internal.Data.Data.Data p, GHC.Internal.Data.Data.Data (f (g p))) => GHC.Internal.Data.Data.Data ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a b. (a ~ b, GHC.Internal.Data.Data.Data a) => GHC.Internal.Data.Data.Data (a GHC.Internal.Data.Type.Equality.:~: b) -- Defined in ‘GHC.Internal.Data.Data’
-instance forall i j (a :: i) (b :: j). (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable i, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable j, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable b, a ~~ b) => GHC.Internal.Data.Data.Data (a GHC.Internal.Data.Type.Equality.:~~: b) -- Defined in ‘GHC.Internal.Data.Data’
+instance forall i j (a :: i) (b :: j). (GHC.Internal.Data.Typeable.Internal.Typeable i, GHC.Internal.Data.Typeable.Internal.Typeable j, GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Data.Typeable.Internal.Typeable b, a ~~ b) => GHC.Internal.Data.Data.Data (a GHC.Internal.Data.Type.Equality.:~~: b) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Data.Semigroup.Internal.All -- Defined in ‘GHC.Internal.Data.Data’
-instance forall (f :: * -> *) a. (GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data a, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f) => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Semigroup.Internal.Alt f a) -- Defined in ‘GHC.Internal.Data.Data’
+instance forall (f :: * -> *) a. (GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data a, GHC.Internal.Data.Typeable.Internal.Typeable f) => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Semigroup.Internal.Alt f a) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Data.Semigroup.Internal.Any -- Defined in ‘GHC.Internal.Data.Data’
-instance forall (f :: * -> *) a. (GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data a, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f) => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Data’
+instance forall (f :: * -> *) a. (GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data a, GHC.Internal.Data.Typeable.Internal.Typeable f) => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Monoid.Ap f a) -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a b. (GHC.Internal.Data.Data.Data a, GHC.Internal.Data.Data.Data b, GHC.Internal.Ix.Ix a) => GHC.Internal.Data.Data.Data (GHC.Internal.Arr.Array a b) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Generics.Associativity -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.Data.Data’
@@ -11682,7 +12684,7 @@ instance GHC.Internal.Data.Data.Data GHC.Internal.Types.Char -- Defined in ‘GH
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Clause -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a b. (Coercible a b, GHC.Internal.Data.Data.Data a, GHC.Internal.Data.Data.Data b) => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Type.Coercion.Coercion a b) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Con -- Defined in ‘GHC.Internal.Data.Data’
-instance forall k a (b :: k). (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data a, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable b) => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Data’
+instance forall k a (b :: k). (GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data a, GHC.Internal.Data.Typeable.Internal.Typeable b) => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Foreign.C.ConstPtr.ConstPtr a) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Dec -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Internal.Data.Data’
@@ -11716,12 +12718,12 @@ instance GHC.Internal.Data.Data.Data GHC.Internal.Int.Int64 -- Defined in ‘GHC
 instance GHC.Internal.Data.Data.Data GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Foreign.Ptr.IntPtr -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.Data.Data’
-instance forall i p c. (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable i, GHC.Internal.Data.Data.Data p, GHC.Internal.Data.Data.Data c) => GHC.Internal.Data.Data.Data (GHC.Internal.Generics.K1 i c p) -- Defined in ‘GHC.Internal.Data.Data’
+instance forall i p c. (GHC.Internal.Data.Typeable.Internal.Typeable i, GHC.Internal.Data.Data.Data p, GHC.Internal.Data.Data.Data c) => GHC.Internal.Data.Data.Data (GHC.Internal.Generics.K1 i c p) -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Data.Monoid.Last a) -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data [a] -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Internal.Data.Data’
-instance forall p (f :: * -> *) (c :: GHC.Internal.Generics.Meta) i. (GHC.Internal.Data.Data.Data p, GHC.Internal.Data.Data.Data (f p), ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable c, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable i, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f) => GHC.Internal.Data.Data.Data (GHC.Internal.Generics.M1 i c f p) -- Defined in ‘GHC.Internal.Data.Data’
+instance forall p (f :: * -> *) (c :: GHC.Internal.Generics.Meta) i. (GHC.Internal.Data.Data.Data p, GHC.Internal.Data.Data.Data (f p), GHC.Internal.Data.Typeable.Internal.Typeable c, GHC.Internal.Data.Typeable.Internal.Typeable i, GHC.Internal.Data.Typeable.Internal.Typeable f) => GHC.Internal.Data.Data.Data (GHC.Internal.Generics.M1 i c f p) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Match -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.ModName -- Defined in ‘GHC.Internal.Data.Data’
@@ -11748,7 +12750,7 @@ instance forall t. GHC.Internal.Data.Data.Data t => GHC.Internal.Data.Data.Data 
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Ptr.Ptr a) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Range -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. (GHC.Internal.Data.Data.Data a, GHC.Internal.Real.Integral a) => GHC.Internal.Data.Data.Data (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.Data.Data’
-instance forall (f :: * -> *) p. (GHC.Internal.Data.Data.Data (f p), ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f, GHC.Internal.Data.Data.Data p) => GHC.Internal.Data.Data.Data (GHC.Internal.Generics.Rec1 f p) -- Defined in ‘GHC.Internal.Data.Data’
+instance forall (f :: * -> *) p. (GHC.Internal.Data.Data.Data (f p), GHC.Internal.Data.Typeable.Internal.Typeable f, GHC.Internal.Data.Data.Data p) => GHC.Internal.Data.Data.Data (GHC.Internal.Generics.Rec1 f p) -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.Role -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.RuleBndr -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.TH.Syntax.RuleMatch -- Defined in ‘GHC.Internal.Data.Data’
@@ -11785,10 +12787,10 @@ instance GHC.Internal.Data.Data.Data GHC.Internal.Word.Word64 -- Defined in ‘G
 instance GHC.Internal.Data.Data.Data GHC.Internal.Word.Word8 -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Data.Data.Data GHC.Internal.Foreign.Ptr.WordPtr -- Defined in ‘GHC.Internal.Data.Data’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (GHC.Internal.Functor.ZipList.ZipList a) -- Defined in ‘GHC.Internal.Data.Data’
-instance [safe] forall k (a :: k). (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a) => GHC.Internal.Data.Data.Data (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
-instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable g, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k1, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k2, GHC.Internal.Data.Data.Data (f (g a))) => GHC.Internal.Data.Data.Data (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
-instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable g, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data (g a)) => GHC.Internal.Data.Data.Data (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
-instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable f, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable g, ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data (g a)) => GHC.Internal.Data.Data.Data (Data.Functor.Sum.Sum f g a) -- Defined in ‘Data.Functor.Sum’
+instance [safe] forall k (a :: k). (GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Typeable.Internal.Typeable a) => GHC.Internal.Data.Data.Data (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). (GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Data.Typeable.Internal.Typeable f, GHC.Internal.Data.Typeable.Internal.Typeable g, GHC.Internal.Data.Typeable.Internal.Typeable k1, GHC.Internal.Data.Typeable.Internal.Typeable k2, GHC.Internal.Data.Data.Data (f (g a))) => GHC.Internal.Data.Data.Data (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
+instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Data.Typeable.Internal.Typeable f, GHC.Internal.Data.Typeable.Internal.Typeable g, GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data (g a)) => GHC.Internal.Data.Data.Data (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
+instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (GHC.Internal.Data.Typeable.Internal.Typeable a, GHC.Internal.Data.Typeable.Internal.Typeable f, GHC.Internal.Data.Typeable.Internal.Typeable g, GHC.Internal.Data.Typeable.Internal.Typeable k, GHC.Internal.Data.Data.Data (f a), GHC.Internal.Data.Data.Data (g a)) => GHC.Internal.Data.Data.Data (Data.Functor.Sum.Sum f g a) -- Defined in ‘Data.Functor.Sum’
 instance forall a b. (GHC.Internal.Data.Data.Data a, GHC.Internal.Data.Data.Data b) => GHC.Internal.Data.Data.Data (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Internal.Data.Data.Data a => GHC.Internal.Data.Data.Data (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
@@ -11838,6 +12840,7 @@ instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UFloat -- Def
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UInt -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.UWord -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.Generics.V1 -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Data.Foldable.Foldable GHC.Internal.TH.Syntax.TyVarBndr -- Defined in ‘GHC.Internal.TH.Syntax’
 instance forall a k (b :: k). GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. GHC.Internal.Data.String.IsString a => GHC.Internal.Data.String.IsString (GHC.Internal.Data.Functor.Identity.Identity a) -- Defined in ‘GHC.Internal.Data.String’
 instance forall a. (a ~ GHC.Internal.Types.Char) => GHC.Internal.Data.String.IsString [a] -- Defined in ‘GHC.Internal.Data.String’
@@ -11884,18 +12887,19 @@ instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UFloat 
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UInt -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.UWord -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.Generics.V1 -- Defined in ‘GHC.Internal.Generics’
-instance GHC.Internal.Data.Type.Coercion.TestCoercion GHC.Internal.TypeNats.SNat -- Defined in ‘GHC.Internal.TypeNats’
+instance GHC.Internal.Data.Traversable.Traversable GHC.Internal.TH.Syntax.TyVarBndr -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Data.Type.Coercion.TestCoercion GHC.Internal.TypeLits.SChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Data.Type.Coercion.TestCoercion GHC.Internal.TypeLits.SSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance GHC.Internal.Data.Type.Coercion.TestCoercion GHC.Internal.TypeNats.SNat -- Defined in ‘GHC.Internal.TypeNats’
 instance forall k (a :: k). GHC.Internal.Data.Type.Coercion.TestCoercion ((GHC.Internal.Data.Type.Equality.:~:) a) -- Defined in ‘GHC.Internal.Data.Type.Coercion’
 instance forall k1 k (a :: k1). GHC.Internal.Data.Type.Coercion.TestCoercion ((GHC.Internal.Data.Type.Equality.:~~:) a) -- Defined in ‘GHC.Internal.Data.Type.Coercion’
 instance forall k (a :: k). GHC.Internal.Data.Type.Coercion.TestCoercion (GHC.Internal.Data.Type.Coercion.Coercion a) -- Defined in ‘GHC.Internal.Data.Type.Coercion’
-instance GHC.Internal.Data.Type.Equality.TestEquality GHC.Internal.TypeNats.SNat -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Internal.Data.Type.Equality.TestEquality GHC.Internal.TypeLits.SChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Data.Type.Equality.TestEquality GHC.Internal.TypeLits.SSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance GHC.Internal.Data.Type.Equality.TestEquality GHC.Internal.TypeNats.SNat -- Defined in ‘GHC.Internal.TypeNats’
 instance forall k (a :: k). GHC.Internal.Data.Type.Equality.TestEquality ((GHC.Internal.Data.Type.Equality.:~:) a) -- Defined in ‘GHC.Internal.Data.Type.Equality’
 instance forall k1 k (a :: k1). GHC.Internal.Data.Type.Equality.TestEquality ((GHC.Internal.Data.Type.Equality.:~~:) a) -- Defined in ‘GHC.Internal.Data.Type.Equality’
-instance forall k1. GHC.Internal.Data.Type.Equality.TestEquality ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.TypeRep -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
+instance forall k1. GHC.Internal.Data.Type.Equality.TestEquality GHC.Internal.Data.Typeable.Internal.TypeRep -- Defined in ‘GHC.Internal.Data.Typeable.Internal’
 instance forall k k1 (f :: k -> *) (g :: k1 -> k). GHC.Internal.Data.Type.Equality.TestEquality f => GHC.Internal.Data.Type.Equality.TestEquality (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Functor.Compose’
 instance forall k a (b :: k). GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Enum.Bounded a => GHC.Internal.Enum.Bounded (GHC.Internal.Data.Bits.And a) -- Defined in ‘GHC.Internal.Data.Bits’
@@ -12095,9 +13099,9 @@ instance GHC.Internal.Exception.Type.Exception GHC.Internal.Control.Exception.Ba
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Control.Exception.Base.RecUpdError -- Defined in ‘GHC.Internal.Control.Exception.Base’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Control.Exception.Base.TypeError -- Defined in ‘GHC.Internal.Control.Exception.Base’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.Data.Dynamic.Dynamic -- Defined in ‘GHC.Internal.Data.Dynamic’
-instance [safe] GHC.Internal.Exception.Type.Exception ghc-internal-10.100.0:GHC.Internal.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.IO.Handle.Lock.Common’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.JS.Prim.JSException -- Defined in ‘GHC.Internal.JS.Prim’
 instance GHC.Internal.Exception.Type.Exception GHC.Internal.JS.Prim.WouldBlockException -- Defined in ‘GHC.Internal.JS.Prim’
+instance GHC.Internal.Exception.Type.Exception ghc-internal-10.100.0:GHC.Internal.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.IO.Handle.Lock.Common’
 instance [safe] GHC.Internal.Exception.Type.Exception System.Timeout.Timeout -- Defined in ‘System.Timeout’
 instance forall k a (b :: k). GHC.Internal.Float.Floating a => GHC.Internal.Float.Floating (GHC.Internal.Data.Functor.Const.Const a b) -- Defined in ‘GHC.Internal.Data.Functor.Const’
 instance forall a. GHC.Internal.Float.RealFloat a => GHC.Internal.Float.Floating (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
@@ -12251,6 +13255,62 @@ instance forall k (p :: k). GHC.Internal.Generics.Generic (GHC.Internal.Generics
 instance GHC.Internal.Generics.Generic GHC.Internal.Data.Version.Version -- Defined in ‘GHC.Internal.Generics’
 instance GHC.Internal.Generics.Generic GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.Generics’
 instance forall a. GHC.Internal.Generics.Generic (GHC.Internal.Functor.ZipList.ZipList a) -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.BndrVis -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Body -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Bytes -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Callconv -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Clause -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Con -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Dec -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.DerivClause -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.DerivStrategy -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.DocLoc -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Exp -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.FamilyResultSig -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Fixity -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.FixityDirection -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Foreign -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.FunDep -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Guard -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Info -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.InjectivityAnn -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Inline -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Match -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.ModName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Module -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.ModuleInfo -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Name -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.NameFlavour -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.NameSpace -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.NamespaceSpecifier -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.OccName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Overlap -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Pat -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.PatSynArgs -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.PatSynDir -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Phases -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.PkgName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Pragma -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Range -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Role -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.RuleBndr -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.RuleMatch -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Safety -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.SourceStrictness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.TyLit -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.TySynEqn -- Defined in ‘GHC.Internal.TH.Syntax’
+instance forall flag. GHC.Internal.Generics.Generic (GHC.Internal.TH.Syntax.TyVarBndr flag) -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Generics.Generic GHC.RTS.Flags.CCFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Internal.Generics.Generic GHC.RTS.Flags.ConcFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Internal.Generics.Generic GHC.RTS.Flags.DebugFlags -- Defined in ‘GHC.RTS.Flags’
@@ -12604,11 +13664,11 @@ instance GHC.Internal.Read.Read GHC.Internal.Generics.SourceStrictness -- Define
 instance GHC.Internal.Read.Read GHC.Internal.Generics.SourceUnpackedness -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Read.Read (GHC.Internal.Generics.U1 p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Read.Read (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
-instance [safe] GHC.Internal.Read.Read GHC.Stats.GCDetails -- Defined in ‘GHC.Stats’
-instance [safe] GHC.Internal.Read.Read GHC.Stats.RTSStats -- Defined in ‘GHC.Stats’
-instance GHC.Internal.Read.Read GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
 instance GHC.Internal.Read.Read GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
 instance GHC.Internal.Read.Read GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance GHC.Internal.Read.Read GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
+instance [safe] GHC.Internal.Read.Read GHC.Stats.GCDetails -- Defined in ‘GHC.Stats’
+instance [safe] GHC.Internal.Read.Read GHC.Stats.RTSStats -- Defined in ‘GHC.Stats’
 instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.BufferMode -- Defined in ‘System.IO’
 instance GHC.Internal.Read.Read GHC.Internal.IO.IOMode.IOMode -- Defined in ‘System.IO’
 instance GHC.Internal.Read.Read GHC.Internal.IO.Handle.Types.Newline -- Defined in ‘System.IO’
@@ -12809,8 +13869,8 @@ instance GHC.Internal.Show.Show GHC.Internal.Data.Data.DataRep -- Defined in ‘
 instance GHC.Internal.Show.Show GHC.Internal.Data.Data.DataType -- Defined in ‘GHC.Internal.Data.Data’
 instance GHC.Internal.Show.Show GHC.Internal.Data.Data.Fixity -- Defined in ‘GHC.Internal.Data.Data’
 instance forall k (s :: k). GHC.Internal.Show.Show (GHC.Internal.Data.Proxy.Proxy s) -- Defined in ‘GHC.Internal.Data.Proxy’
-instance GHC.Internal.Show.Show ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.SomeTypeRep -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
-instance forall k (a :: k). GHC.Internal.Show.Show (ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.TypeRep a) -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal’
+instance GHC.Internal.Show.Show GHC.Internal.Data.Typeable.Internal.SomeTypeRep -- Defined in ‘GHC.Internal.Data.Typeable.Internal’
+instance forall k (a :: k). GHC.Internal.Show.Show (GHC.Internal.Data.Typeable.Internal.TypeRep a) -- Defined in ‘GHC.Internal.Data.Typeable.Internal’
 instance GHC.Internal.Show.Show GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Show.Show GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.Float’
 instance GHC.Internal.Show.Show GHC.Internal.Data.Dynamic.Dynamic -- Defined in ‘GHC.Internal.Data.Dynamic’
@@ -12883,7 +13943,6 @@ instance GHC.Internal.Show.Show GHC.Internal.Foreign.C.Types.CWchar -- Defined i
 instance forall a. GHC.Internal.Show.Show (GHC.Internal.Foreign.C.ConstPtr.ConstPtr a) -- Defined in ‘GHC.Internal.Foreign.C.ConstPtr’
 instance forall a b. (GHC.Internal.Ix.Ix a, GHC.Internal.Show.Show a, GHC.Internal.Show.Show b) => GHC.Internal.Show.Show (GHC.Internal.Arr.Array a b) -- Defined in ‘GHC.Internal.Arr’
 instance GHC.Internal.Show.Show GHC.Internal.ByteOrder.ByteOrder -- Defined in ‘GHC.Internal.ByteOrder’
-instance GHC.Internal.Show.Show GHC.Internal.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Internal.Fingerprint.Type’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Show.Show (f p), GHC.Internal.Show.Show (g p)) => GHC.Internal.Show.Show ((GHC.Internal.Generics.:*:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Internal.Show.Show (f p), GHC.Internal.Show.Show (g p)) => GHC.Internal.Show.Show ((GHC.Internal.Generics.:+:) f g p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Internal.Show.Show (f (g p)) => GHC.Internal.Show.Show ((GHC.Internal.Generics.:.:) f g p) -- Defined in ‘GHC.Internal.Generics’
@@ -12904,6 +13963,74 @@ instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec G
 instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.URec GHC.Internal.Types.Char p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.UAddr p) -- Defined in ‘GHC.Internal.Generics’
 instance forall k (p :: k). GHC.Internal.Show.Show (GHC.Internal.Generics.V1 p) -- Defined in ‘GHC.Internal.Generics’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.BndrVis -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Body -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Bytes -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Callconv -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Clause -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Con -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Dec -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.DerivClause -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.DerivStrategy -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.DocLoc -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Exp -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.FamilyResultSig -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Fixity -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.FixityDirection -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Foreign -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.FunDep -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Guard -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Info -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.InjectivityAnn -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Inline -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Match -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.ModName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Module -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.ModuleInfo -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Name -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.NameFlavour -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.NameSpace -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.NamespaceSpecifier -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.OccName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Overlap -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Pat -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.PatSynArgs -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.PatSynDir -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Phases -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.PkgName -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Pragma -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Range -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Role -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.RuleBndr -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.RuleMatch -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Safety -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.SourceStrictness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.TyLit -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.TySynEqn -- Defined in ‘GHC.Internal.TH.Syntax’
+instance forall flag. GHC.Internal.Show.Show flag => GHC.Internal.Show.Show (GHC.Internal.TH.Syntax.TyVarBndr flag) -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
+instance GHC.Internal.Show.Show GHC.Internal.Text.Read.Lex.Lexeme -- Defined in ‘GHC.Internal.Text.Read.Lex’
+instance GHC.Internal.Show.Show GHC.Internal.Text.Read.Lex.Number -- Defined in ‘GHC.Internal.Text.Read.Lex’
+instance GHC.Internal.Show.Show GHC.Internal.StaticPtr.StaticPtrInfo -- Defined in ‘GHC.Internal.StaticPtr’
+instance GHC.Internal.Show.Show GHC.Internal.JS.Prim.JSException -- Defined in ‘GHC.Internal.JS.Prim’
+instance GHC.Internal.Show.Show GHC.Internal.JS.Prim.WouldBlockException -- Defined in ‘GHC.Internal.JS.Prim’
+instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Show.Show (GHC.Internal.TypeLits.SChar c) -- Defined in ‘GHC.Internal.TypeLits’
+instance forall (s :: GHC.Internal.Types.Symbol). GHC.Internal.Show.Show (GHC.Internal.TypeLits.SSymbol s) -- Defined in ‘GHC.Internal.TypeLits’
+instance GHC.Internal.Show.Show GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
+instance GHC.Internal.Show.Show GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
+instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Show.Show (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
+instance GHC.Internal.Show.Show GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
+instance GHC.Internal.Show.Show GHC.Internal.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Internal.Fingerprint.Type’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Device.SeekMode -- Defined in ‘GHC.Internal.IO.Device’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Encoding.Types.CodingProgress -- Defined in ‘GHC.Internal.IO.Encoding.Types’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Encoding.Types.TextEncoding -- Defined in ‘GHC.Internal.IO.Encoding.Types’
@@ -12914,13 +14041,11 @@ instance GHC.Internal.Show.Show GHC.Internal.IO.Handle.Types.Handle -- Defined i
 instance GHC.Internal.Show.Show GHC.Internal.IO.Handle.Types.HandleType -- Defined in ‘GHC.Internal.IO.Handle.Types’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Handle.Types.Newline -- Defined in ‘GHC.Internal.IO.Handle.Types’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Handle.Types.NewlineMode -- Defined in ‘GHC.Internal.IO.Handle.Types’
-instance [safe] GHC.Internal.Show.Show ghc-internal-10.100.0:GHC.Internal.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.IO.Handle.Lock.Common’
+instance GHC.Internal.Show.Show ghc-internal-10.100.0:GHC.Internal.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘ghc-internal-10.100.0:GHC.Internal.IO.Handle.Lock.Common’
 instance GHC.Internal.Show.Show GHC.Internal.IO.Handle.HandlePosn -- Defined in ‘GHC.Internal.IO.Handle’
 instance GHC.Internal.Show.Show GHC.Internal.IO.IOMode.IOMode -- Defined in ‘GHC.Internal.IO.IOMode’
 instance GHC.Internal.Show.Show GHC.Internal.IO.SubSystem.IoSubSystem -- Defined in ‘GHC.Internal.IO.SubSystem’
 instance GHC.Internal.Show.Show GHC.Internal.InfoProv.Types.InfoProv -- Defined in ‘GHC.Internal.InfoProv.Types’
-instance GHC.Internal.Show.Show GHC.Internal.JS.Prim.JSException -- Defined in ‘GHC.Internal.JS.Prim’
-instance GHC.Internal.Show.Show GHC.Internal.JS.Prim.WouldBlockException -- Defined in ‘GHC.Internal.JS.Prim’
 instance GHC.Internal.Show.Show GHC.RTS.Flags.CCFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.RTS.Flags.ConcFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.RTS.Flags.DebugFlags -- Defined in ‘GHC.RTS.Flags’
@@ -12939,19 +14064,120 @@ instance GHC.Internal.Show.Show GHC.RTS.Flags.TickyFlags -- Defined in ‘GHC.RT
 instance GHC.Internal.Show.Show GHC.RTS.Flags.TraceFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Internal.Show.Show GHC.Internal.Stack.Decode.Pointerness -- Defined in ‘GHC.Internal.Stack.Decode’
 instance GHC.Internal.Show.Show GHC.Internal.Stack.Decode.StackEntry -- Defined in ‘GHC.Internal.Stack.Decode’
-instance GHC.Internal.Show.Show GHC.Internal.StaticPtr.StaticPtrInfo -- Defined in ‘GHC.Internal.StaticPtr’
 instance [safe] GHC.Internal.Show.Show GHC.Stats.GCDetails -- Defined in ‘GHC.Stats’
 instance [safe] GHC.Internal.Show.Show GHC.Stats.RTSStats -- Defined in ‘GHC.Stats’
-instance forall (n :: GHC.Internal.TypeNats.Nat). GHC.Internal.Show.Show (GHC.Internal.TypeNats.SNat n) -- Defined in ‘GHC.Internal.TypeNats’
-instance GHC.Internal.Show.Show GHC.Internal.TypeNats.SomeNat -- Defined in ‘GHC.Internal.TypeNats’
-instance forall (c :: GHC.Internal.Types.Char). GHC.Internal.Show.Show (GHC.Internal.TypeLits.SChar c) -- Defined in ‘GHC.Internal.TypeLits’
-instance forall (s :: GHC.Internal.Types.Symbol). GHC.Internal.Show.Show (GHC.Internal.TypeLits.SSymbol s) -- Defined in ‘GHC.Internal.TypeLits’
-instance GHC.Internal.Show.Show GHC.Internal.TypeLits.SomeChar -- Defined in ‘GHC.Internal.TypeLits’
-instance GHC.Internal.Show.Show GHC.Internal.TypeLits.SomeSymbol -- Defined in ‘GHC.Internal.TypeLits’
 instance [safe] GHC.Internal.Show.Show System.Timeout.Timeout -- Defined in ‘System.Timeout’
-instance GHC.Internal.Show.Show GHC.Internal.Text.Read.Lex.Lexeme -- Defined in ‘GHC.Internal.Text.Read.Lex’
-instance GHC.Internal.Show.Show GHC.Internal.Text.Read.Lex.Number -- Defined in ‘GHC.Internal.Text.Read.Lex’
 instance [safe] forall a b. GHC.Internal.Show.Show (a -> b) -- Defined in ‘Text.Show.Functions’
 instance GHC.Internal.StaticPtr.IsStatic GHC.Internal.StaticPtr.StaticPtr -- Defined in ‘GHC.Internal.StaticPtr’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Addr# -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
 instance [safe] forall k (a :: k). GHC.Internal.TH.Lift.Lift (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.BndrVis -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Body -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Types.Bool -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Bytes -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Callconv -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Types.Char -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Clause -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Con -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Dec -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.DecidedStrictness -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.DerivClause -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.DerivStrategy -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.DocLoc -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Types.Double -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b) => GHC.Internal.TH.Lift.Lift (GHC.Internal.Data.Either.Either a b) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Exp -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.FamilyResultSig -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Fixity -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.FixityDirection -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Types.Float -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Foreign -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.FunDep -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Guard -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Info -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.InjectivityAnn -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Inline -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Types.Int -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int16 -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int32 -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int64 -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Int.Int8 -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Bignum.Integer.Integer -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a. GHC.Internal.TH.Lift.Lift a => GHC.Internal.TH.Lift.Lift [a] -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Lit -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Loc -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Match -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a. GHC.Internal.TH.Lift.Lift a => GHC.Internal.TH.Lift.Lift (GHC.Internal.Maybe.Maybe a) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.ModName -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Module -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Name -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NameFlavour -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NameIs -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NameSpace -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.NamespaceSpecifier -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Bignum.Natural.Natural -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a. GHC.Internal.TH.Lift.Lift a => GHC.Internal.TH.Lift.Lift (GHC.Internal.Base.NonEmpty a) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.OccName -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Overlap -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Pat -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.PatSynArgs -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.PatSynDir -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Phases -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.PkgName -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Pragma -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Range -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a. GHC.Internal.Real.Integral a => GHC.Internal.TH.Lift.Lift (GHC.Internal.Real.Ratio a) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Role -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.RuleBndr -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.RuleMatch -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Safety -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.SourceStrictness -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.SourceUnpackedness -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Specificity -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Stmt -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a. GHC.Internal.TH.Lift.Lift (GHC.Internal.TH.Monad.TExp a) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b) => GHC.Internal.TH.Lift.Lift (a, b) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c) => GHC.Internal.TH.Lift.Lift (a, b, c) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d) => GHC.Internal.TH.Lift.Lift (a, b, c, d) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d e. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e) => GHC.Internal.TH.Lift.Lift (a, b, c, d, e) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d e f. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e, GHC.Internal.TH.Lift.Lift f) => GHC.Internal.TH.Lift.Lift (a, b, c, d, e, f) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d e f g. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e, GHC.Internal.TH.Lift.Lift f, GHC.Internal.TH.Lift.Lift g) => GHC.Internal.TH.Lift.Lift (a, b, c, d, e, f, g) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.TyLit -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.TySynEqn -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a. GHC.Internal.TH.Lift.Lift a => GHC.Internal.TH.Lift.Lift (GHC.Internal.TH.Syntax.TyVarBndr a) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift () -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Base.Void -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Types.Word -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Word.Word16 -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Word.Word32 -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Word.Word64 -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Word.Word8 -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Double# -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Float# -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Int# -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b) => GHC.Internal.TH.Lift.Lift (# a | b #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c) => GHC.Internal.TH.Lift.Lift (# a | b | c #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d) => GHC.Internal.TH.Lift.Lift (# a | b | c | d #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d e. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e) => GHC.Internal.TH.Lift.Lift (# a | b | c | d | e #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d e f. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e, GHC.Internal.TH.Lift.Lift f) => GHC.Internal.TH.Lift.Lift (# a | b | c | d | e | f #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d e f g. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e, GHC.Internal.TH.Lift.Lift f, GHC.Internal.TH.Lift.Lift g) => GHC.Internal.TH.Lift.Lift (# a | b | c | d | e | f | g #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a. GHC.Internal.TH.Lift.Lift a => GHC.Internal.TH.Lift.Lift (# a #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b) => GHC.Internal.TH.Lift.Lift (# a, b #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c) => GHC.Internal.TH.Lift.Lift (# a, b, c #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d) => GHC.Internal.TH.Lift.Lift (# a, b, c, d #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d e. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e) => GHC.Internal.TH.Lift.Lift (# a, b, c, d, e #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d e f. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e, GHC.Internal.TH.Lift.Lift f) => GHC.Internal.TH.Lift.Lift (# a, b, c, d, e, f #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance forall a b c d e f g. (GHC.Internal.TH.Lift.Lift a, GHC.Internal.TH.Lift.Lift b, GHC.Internal.TH.Lift.Lift c, GHC.Internal.TH.Lift.Lift d, GHC.Internal.TH.Lift.Lift e, GHC.Internal.TH.Lift.Lift f, GHC.Internal.TH.Lift.Lift g) => GHC.Internal.TH.Lift.Lift (# a, b, c, d, e, f, g #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift (# #) -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Char# -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Word# -- Defined in ‘GHC.Internal.TH.Lift’
+instance GHC.Internal.TH.Monad.Quote GHC.Internal.Types.IO -- Defined in ‘GHC.Internal.TH.Monad’
+instance GHC.Internal.TH.Monad.Quote GHC.Internal.TH.Monad.Q -- Defined in ‘GHC.Internal.TH.Monad’

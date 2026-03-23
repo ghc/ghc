@@ -18,7 +18,7 @@ import GHC
   , getLogger
   )
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
   ( intTy
   , liftedDataConTy, liftedRepTy
   )
@@ -26,7 +26,7 @@ import GHC.Builtin.PrimOps
   ( PrimOp(CatchOp, RaiseOp) )
 import GHC.Builtin.PrimOps.Ids
   ( primOpId )
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
   ( runtimeRep1Ty, runtimeRep1TyVar
   , openAlphaTy, openAlphaTyVar
   )
@@ -44,7 +44,7 @@ import GHC.Driver.Config.Core.Lint
 import GHC.Driver.Session
   ( GeneralFlag(Opt_SuppressUniques), gopt_set )
 
-import GHC.Types.Id.Make
+import GHC.Builtin.WiredIn.Ids
   ( coerceId )
 import GHC.Types.Var ( Id )
 
