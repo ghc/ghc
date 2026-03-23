@@ -19,7 +19,7 @@ module GHC.Core.TyCon.Env (
         extendTyConEnv_C, extendTyConEnv_Acc, extendTyConEnv,
         extendTyConEnvList, extendTyConEnvList_C,
         filterTyConEnv, anyTyConEnv,
-        plusTyConEnv, plusTyConEnv_C, plusTyConEnv_CD, plusTyConEnv_CD2, alterTyConEnv,
+        plusTyConEnv, plusTyConEnv_C, plusTyConEnv_CD, plusTyConEnv_CD2, upsertTyConEnv, alterTyConEnv,
         lookupTyConEnv, lookupTyConEnv_NF, delFromTyConEnv, delListFromTyConEnv,
         elemTyConEnv, mapTyConEnv, disjointTyConEnv,
 
@@ -29,7 +29,7 @@ module GHC.Core.TyCon.Env (
         lookupDTyConEnv,
         delFromDTyConEnv, filterDTyConEnv,
         mapDTyConEnv, mapMaybeDTyConEnv,
-        adjustDTyConEnv, alterDTyConEnv, extendDTyConEnv, foldDTyConEnv
+        adjustDTyConEnv, upsertDTyConEnv, alterDTyConEnv, extendDTyConEnv, foldDTyConEnv
     ) where
 
 import GHC.Prelude
@@ -57,6 +57,7 @@ mkTyConEnv          :: [(TyCon,a)] -> TyConEnv a
 mkTyConEnvWith      :: (a -> TyCon) -> [a] -> TyConEnv a
 nonDetTyConEnvElts  :: TyConEnv a -> [a]
 alterTyConEnv       :: (Maybe a-> Maybe a) -> TyConEnv a -> TyCon -> TyConEnv a
+upsertTyConEnv      :: (Maybe a -> a) -> TyConEnv a -> TyCon -> TyConEnv a
 extendTyConEnv_C    :: (a->a->a) -> TyConEnv a -> TyCon -> a -> TyConEnv a
 extendTyConEnv_Acc  :: (a->b->b) -> (a->b) -> TyConEnv b -> TyCon -> a -> TyConEnv b
 extendTyConEnv      :: TyConEnv a -> TyCon -> a -> TyConEnv a
@@ -85,6 +86,7 @@ extendTyConEnv x y z   = addToUFM x y z
 extendTyConEnvList x l = addListToUFM x l
 lookupTyConEnv x y     = lookupUFM x y
 alterTyConEnv          = alterUFM
+upsertTyConEnv         = upsertUFM
 mkTyConEnv     l       = listToUFM l
 mkTyConEnvWith f       = mkTyConEnv . map (\a -> (f a, a))
 elemTyConEnv x y          = elemUFM x y
@@ -136,6 +138,9 @@ adjustDTyConEnv = adjustUDFM
 
 alterDTyConEnv :: (Maybe a -> Maybe a) -> DTyConEnv a -> TyCon -> DTyConEnv a
 alterDTyConEnv = alterUDFM
+
+upsertDTyConEnv :: (Maybe a -> a) -> DTyConEnv a -> TyCon -> DTyConEnv a
+upsertDTyConEnv = upsertUDFM
 
 extendDTyConEnv :: DTyConEnv a -> TyCon -> a -> DTyConEnv a
 extendDTyConEnv = addToUDFM

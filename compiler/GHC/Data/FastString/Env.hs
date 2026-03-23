@@ -16,7 +16,7 @@ module GHC.Data.FastString.Env (
         extendFsEnv_C, extendFsEnv_Acc, extendFsEnv,
         extendFsEnvList, extendFsEnvList_C,
         filterFsEnv,
-        plusFsEnv, plusFsEnv_C, alterFsEnv,
+        plusFsEnv, plusFsEnv_C, alterFsEnv, upsertFsEnv,
         lookupFsEnv, lookupFsEnv_NF, delFromFsEnv, delListFromFsEnv,
         elemFsEnv, mapFsEnv, strictMapFsEnv, mapMaybeFsEnv,
         nonDetFoldFsEnv,
@@ -46,6 +46,7 @@ type FastStringEnv a = UniqFM FastString a  -- Domain is FastString
 emptyFsEnv         :: FastStringEnv a
 mkFsEnv            :: [(FastString,a)] -> FastStringEnv a
 alterFsEnv         :: (Maybe a-> Maybe a) -> FastStringEnv a -> FastString -> FastStringEnv a
+upsertFsEnv        :: (Maybe a -> a) -> FastStringEnv a -> FastString -> FastStringEnv a
 extendFsEnv_C      :: (a->a->a) -> FastStringEnv a -> FastString -> a -> FastStringEnv a
 extendFsEnv_Acc    :: (a->b->b) -> (a->b) -> FastStringEnv b -> FastString -> a -> FastStringEnv b
 extendFsEnv        :: FastStringEnv a -> FastString -> a -> FastStringEnv a
@@ -69,6 +70,7 @@ extendFsEnv x y z         = addToUFM x y z
 extendFsEnvList x l       = addListToUFM x l
 lookupFsEnv x y           = lookupUFM x y
 alterFsEnv                = alterUFM
+upsertFsEnv               = upsertUFM
 mkFsEnv     l             = listToUFM l
 elemFsEnv x y             = elemUFM x y
 plusFsEnv x y             = plusUFM x y

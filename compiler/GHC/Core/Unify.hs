@@ -2208,10 +2208,10 @@ extendFamEnv tc tys ty = UM $ \state ->
   Unifiable (state { um_fam_env = extend (um_fam_env state) tc }, ())
   where
     extend :: FamSubstEnv -> TyCon -> FamSubstEnv
-    extend = alterTyConEnv alter_tm
+    extend = upsertTyConEnv alter_tm
 
-    alter_tm :: Maybe (ListMap TypeMap Type) -> Maybe (ListMap TypeMap Type)
-    alter_tm m_elt = Just (alterTM tys (\_ -> Just ty) (m_elt `orElse` emptyTM))
+    alter_tm :: Maybe (ListMap TypeMap Type) -> ListMap TypeMap Type
+    alter_tm m_elt = alterTM tys (\_ -> Just ty) (m_elt `orElse` emptyTM)
 
 umRnBndr2 :: UMEnv -> TyCoVar -> TyCoVar -> UMEnv
 umRnBndr2 env v1 v2

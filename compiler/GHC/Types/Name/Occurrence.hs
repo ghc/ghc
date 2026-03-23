@@ -732,7 +732,7 @@ extendOccEnv_Acc f g (MkOccEnv env) (OccName ns s) =
   MkOccEnv . extendFsEnv_Acc f' g' env s
     where
      f' :: a -> UniqFM NameSpace b -> UniqFM NameSpace b
-     f' a bs = alterUFM (Just . \ case { Nothing -> g a ; Just b -> f a b }) bs ns
+     f' a bs = upsertUFM (\ case { Nothing -> g a ; Just b -> f a b }) bs ns
      g' a = unitUFM ns (g a)
 
 -- | Delete one element from an 'OccEnv'.

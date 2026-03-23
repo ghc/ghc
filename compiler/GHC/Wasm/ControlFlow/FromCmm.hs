@@ -330,9 +330,9 @@ smartPlus platform e k =
   where width = cmmExprWidth platform e
 
 addToList :: ([a] -> [a]) -> Label -> LabelMap [a] -> LabelMap [a]
-addToList consx = mapAlter add
-    where add Nothing = Just (consx [])
-          add (Just xs) = Just (consx xs)
+addToList consx = mapUpsert add
+    where add Nothing = consx []
+          add (Just xs) = consx xs
 
 ------------------------------------------------------------------
 --- everything below here is for diagnostics in case of panic

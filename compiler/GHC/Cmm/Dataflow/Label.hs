@@ -38,6 +38,7 @@ module GHC.Cmm.Dataflow.Label
     , mapInsertWith
     , mapDelete
     , mapAlter
+    , mapUpsert
     , mapAdjust
     , mapUnion
     , mapUnions
@@ -206,6 +207,9 @@ mapDelete (Label k) (LM m) = LM (M.delete k m)
 
 mapAlter :: (Maybe v -> Maybe v) -> Label -> LabelMap v -> LabelMap v
 mapAlter f (Label k) (LM m) = LM (M.alter f k m)
+
+mapUpsert :: (Maybe v -> v) -> Label -> LabelMap v -> LabelMap v
+mapUpsert f (Label k) (LM m) = LM (M.upsert f k m)
 
 mapAdjust :: (v -> v) -> Label -> LabelMap v -> LabelMap v
 mapAdjust f (Label k) (LM m) = LM (M.adjust f k m)
