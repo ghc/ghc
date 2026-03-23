@@ -146,7 +146,7 @@ T25180.hs:66:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
 
 T25180.hs:73:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: b -> (# a | b #)
-      Where: ‘a’, ‘b’ are rigid type variables bound by
+      Where: ‘b’, ‘a’ are rigid type variables bound by
                the type signature for:
                  usum2_2 :: forall b a. b -> (# a | b #)
                at T25180.hs:72:1-27
@@ -176,7 +176,7 @@ T25180.hs:80:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
 
 T25180.hs:87:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: b -> (# a | b | c #)
-      Where: ‘a’, ‘b’, ‘c’ are rigid type variables bound by
+      Where: ‘b’, ‘a’, ‘c’ are rigid type variables bound by
                the type signature for:
                  usum3_2 :: forall b a c. b -> (# a | b | c #)
                at T25180.hs:86:1-31
@@ -191,7 +191,7 @@ T25180.hs:87:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
 
 T25180.hs:94:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: c -> (# a | b | c #)
-      Where: ‘a’, ‘b’, ‘c’ are rigid type variables bound by
+      Where: ‘c’, ‘a’, ‘b’ are rigid type variables bound by
                the type signature for:
                  usum3_3 :: forall c a b. c -> (# a | b | c #)
                at T25180.hs:93:1-31

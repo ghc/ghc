@@ -79,12 +79,12 @@ import GHC.Types.Var
 import GHC.Types.Id( idType )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.Var.FV
 import GHC.Types.Basic
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types( unitTy )
 
-import GHC.Utils.FV
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
@@ -1316,24 +1316,24 @@ isNestedEvId v = isId v && isInternalName (varName v)
 
 nestedEvIdsOfTerm :: EvTerm -> VarSet
 -- Returns only EvIds satisfying relevantEvId
-nestedEvIdsOfTerm tm = fvVarSet (filterFV isNestedEvId (evTermFVs tm))
+nestedEvIdsOfTerm = runFVSelectiveSet isNestedEvId . evTermFVs
 
-evTermFVs :: EvTerm -> FV
+evTermFVs :: EvTerm -> SelectiveDFV
 evTermFVs (EvExpr e)         = exprFVs e
 evTermFVs (EvTypeable _ ev)  = evFVsOfTypeable ev
 evTermFVs (EvFun { et_tvs = tvs, et_given = given
                  , et_binds = tc_ev_binds, et_body = v })
   = case tc_ev_binds of
-      TcEvBinds {}  -> emptyFV  -- See Note [Free vars of EvFun]
-      EvBinds binds -> addBndrsFV bndrs fvs
+      TcEvBinds {}  -> mempty  -- See Note [Free vars of EvFun]
+      EvBinds binds -> addBndrsSelectiveFV bndrs fvs
         where
-          fvs = foldr (unionFV . evTermFVs . eb_rhs) (unitFV v) binds
+          fvs = foldr (mappend . evTermFVs . eb_rhs) (unitFV v) binds
           bndrs = foldr ((:) . eb_lhs) (tvs ++ given) binds
 
-evTermFVss :: [EvTerm] -> FV
+evTermFVss :: [EvTerm] -> SelectiveDFV
 evTermFVss = mapUnionFV evTermFVs
 
-evFVsOfTypeable :: EvTypeable -> FV
+evFVsOfTypeable :: EvTypeable -> SelectiveDFV
 evFVsOfTypeable ev =
   case ev of
     EvTypeableTyCon _ e      -> mapUnionFV evTermFVs e

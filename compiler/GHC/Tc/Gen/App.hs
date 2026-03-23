@@ -47,6 +47,7 @@ import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.Names
 
 import GHC.Types.Var
+import GHC.Types.Var.FV
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
@@ -2156,24 +2157,24 @@ instance Monoid TcMBool where
 foldQLInstVars :: forall a. Monoid a => (TcTyVar -> a) -> TcType -> a
 {-# INLINE foldQLInstVars #-}
 foldQLInstVars check_tv ty
-  = do_ty ty
+  = runFV (do_ty ty) ()
   where
-    (do_ty, _, _, _) = foldTyCo folder ()
+    (do_ty, _, _, _) = foldTyCo folder
 
-    folder :: TyCoFolder () a
+    folder :: TyCoFolder (FV () a)
     folder = TyCoFolder { tcf_view = noView  -- See Note [Free vars and synonyms]
                                              -- in GHC.Core.TyCo.FVs
                         , tcf_tyvar = do_tv, tcf_covar = mempty
                         , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
 
-    do_bndr _ _ _ = ()
+    do_bndr _ = id
 
-    do_hole _ hole = do_ty (coVarKind (coHoleCoVar hole))
+    do_hole hole = do_ty (coVarKind (coHoleCoVar hole))
                      -- See (MIV2) in Note [Monomorphise instantiation variables]
 
-    do_tv :: () -> TcTyVar -> a
-    do_tv _ tv | isQLInstTyVar tv = check_tv tv
-               | otherwise        = mempty
+    do_tv :: TcTyVar -> FV () a
+    do_tv tv | isQLInstTyVar tv = MkFV $ \_ -> check_tv tv
+             | otherwise        = mempty
 
 {- *********************************************************************
 *                                                                      *

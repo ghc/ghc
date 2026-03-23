@@ -42,7 +42,6 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 
 import GHC.Utils.Outputable
-import GHC.Utils.FV
 import GHC.Utils.Error( Validity'(..), allValid )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -563,7 +562,7 @@ closeWrtFunDeps preds fixed_tvs
             -- closeOverKinds: see Note [Closing over kinds in coverage]
 
     tv_fds  :: [(TyCoVarSet,TyCoVarSet)]
-    tv_fds  = [ (tyCoVarsOfTypes ls, fvVarSet $ injectiveVarsOfTypes True rs)
+    tv_fds  = [ (tyCoVarsOfTypes ls, injectiveVarsOfTypes True rs)
                   -- See Note [Care with type functions]
               | pred <- preds
               , pred' <- pred : transSuperClasses pred

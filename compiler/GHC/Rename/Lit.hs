@@ -9,10 +9,10 @@ import GHC.Hs
 import GHC.Rename.Env (lookupNameWithQualifier)
 import GHC.Rename.Utils (genHsApps, genLHsLit)
 import GHC.Tc.Utils.Monad (RnM)
-import GHC.Types.Name.Set (FreeVars)
+import GHC.Types.Name.Set (FreeNames)
 import GHC.Types.SrcLoc (GenLocated(..))
 
-rnQualLit :: HsQualLit GhcPs -> RnM ((HsQualLit GhcRn, HsExpr GhcRn), FreeVars)
+rnQualLit :: HsQualLit GhcPs -> RnM ((HsQualLit GhcRn, HsExpr GhcRn), FreeNames)
 rnQualLit QualLit{..} = do
   let (funNameBase, hsLit) =
         case ql_val of

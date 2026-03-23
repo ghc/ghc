@@ -65,7 +65,6 @@ import GHC.Tc.Utils.Env (tcLookup)
 import GHC.Utils.Outputable
 import GHC.Driver.DynFlags
 import GHC.Data.Maybe
-import GHC.Utils.FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
 
 import Control.Arrow ( (&&&) )
 
@@ -746,17 +745,16 @@ findValidHoleFits env _ _ _ = return (env, noValidHoleFits)
 -- See Note [Relevant constraints]
 relevantCtEvidence :: Type -> [CtEvidence] -> [CtEvidence]
 relevantCtEvidence hole_ty simples
-  = if isEmptyVarSet (fvVarSet hole_fvs)
+  = if isEmptyVarSet hole_fvs
     then []
     else filter isRelevant simples
-  where hole_fvs = tyCoFVsOfType hole_ty
-        hole_fv_set = fvVarSet hole_fvs
+  where hole_fvs = tyCoVarsOfType hole_ty
         -- We filter out those constraints that have no variables (since
         -- they won't be solved by finding a type for the type variable
         -- representing the hole) and also other holes, since we're not
         -- trying to find hole fits for many holes at once.
         isRelevant ctev = not (isEmptyVarSet fvs) &&
-                          (fvs `intersectsVarSet` hole_fv_set)
+                          (fvs `intersectsVarSet` hole_fvs)
           where fvs = tyCoVarsOfCtEv ctev
 
 -- We zonk the hole fits so that the output aligns with the rest
@@ -794,7 +792,7 @@ sortHoleFitsByGraph :: [TcHoleFit] -> TcM [TcHoleFit]
 sortHoleFitsByGraph fits = go [] fits
   where tcSubsumesWCloning :: TcSigmaType -> TcSigmaType -> TcM Bool
         tcSubsumesWCloning fit_ty cand_ty =
-          withoutUnification (tyCoFVsOfTypes [fit_ty, cand_ty]) $
+          withoutUnification (tyCoVarsOfTypes [fit_ty, cand_ty]) $
             tcSubsumes fit_ty cand_ty
         go :: [(TcHoleFit, [TcHoleFit])] -> [TcHoleFit] -> TcM [TcHoleFit]
         go sofar [] = do { traceTc "subsumptionGraph was" $ ppr sofar
@@ -828,8 +826,9 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
      ; traceTc "checkingFitsFor }" empty
      ; return (discards, subs) }
   where
-    hole_fvs :: FV
-    hole_fvs = tyCoFVsOfType hole_ty
+    hole_fvs :: VarSet
+    hole_fvs = tyCoVarsOfType hole_ty
+
     -- Kickoff the checking of the elements.
     -- We iterate over the elements, checking each one in turn for whether
     -- it fits, and adding it to the results if it does.
@@ -971,10 +970,9 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
               then return (Just (z_wrp_tys, []))
               else do { let -- To be concrete matches, matches have to
                             -- be more than just an invented type variable.
-                            fvSet = fvVarSet fvs
                             notAbstract :: TcType -> Bool
                             notAbstract t = case getTyVar_maybe t of
-                                              Just tv -> tv `elemVarSet` fvSet
+                                              Just tv -> tv `elemVarSet` fvs
                                               _ -> True
                             allConcrete = all notAbstract z_wrp_tys
                       ; z_vars  <- liftZonkM $ zonkTcTyVars ref_vars
@@ -985,8 +983,9 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
                         then return $ Just (z_wrp_tys, z_vars)
                         else return Nothing }}
            ; Nothing -> return Nothing } }
-     where fvs = mkFVs ref_vars `unionFV` hole_fvs `unionFV` tyCoFVsOfType cand_ty
-           hole = typed_hole { th_hole = Nothing }
+     where
+       fvs = mkVarSet ref_vars `unionVarSet` hole_fvs `unionVarSet` tyCoVarsOfType cand_ty
+       hole = typed_hole { th_hole = Nothing }
 
 -- | Checks whether a MetaTyVar is flexible or not.
 isFlexiTyVar :: TcTyVar -> TcM Bool
@@ -995,16 +994,19 @@ isFlexiTyVar _ = return False
 
 -- | Takes a list of free variables and restores any Flexi type variables in
 -- free_vars after the action is run.
-withoutUnification :: FV -> TcM a -> TcM a
+withoutUnification :: TyCoVarSet -> TcM a -> TcM a
 withoutUnification free_vars action =
-  do { flexis <- filterM isFlexiTyVar fuvs
+  do { flexis <- filterM isFlexiTyVar (nonDetVarSetElems free_vars)
+                 -- nonDetEltsUFM: order of restoration does not matter
+
      ; result <- action
-          -- Reset any mutated free variables
+
+       -- Reset any mutated free variables
      ; mapM_ restore flexis
      ; return result }
-  where restore tv = do { traceTc "withoutUnification: restore flexi" (ppr tv)
-                        ; writeTcRef (metaTyVarRef tv) Flexi }
-        fuvs = fvVarList free_vars
+  where
+    restore tv = do { traceTc "withoutUnification: restore flexi" (ppr tv)
+                    ; writeTcRef (metaTyVarRef tv) Flexi }
 
 -- | Reports whether first type (ty_a) subsumes the second type (ty_b),
 -- discarding any errors. Subsumption here means that the ty_b can fit into the

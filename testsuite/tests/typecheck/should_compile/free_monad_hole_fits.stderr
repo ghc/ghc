@@ -1,13 +1,13 @@
 free_monad_hole_fits.hs:14:28: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole:
         _a :: (Free f a -> Free f b) -> f (Free f a) -> f (Free f b)
-      Where: ‘a’, ‘b’ are rigid type variables bound by
+      Where: ‘f’ is a rigid type variable bound by
+               the instance declaration
+               at free_monad_hole_fits.hs:10:10-38
+             ‘a’, ‘b’ are rigid type variables bound by
                the type signature for:
                  fmap :: forall a b. (a -> b) -> Free f a -> Free f b
                at free_monad_hole_fits.hs:11:5-8
-             ‘f’ is a rigid type variable bound by
-               the instance declaration
-               at free_monad_hole_fits.hs:10:10-38
       Or perhaps ‘_a’ is mis-spelled, or not in scope
     • In the first argument of ‘Free’, namely ‘(_a go fa)’
       In the expression: Free (_a go fa)
@@ -35,13 +35,13 @@ free_monad_hole_fits.hs:14:28: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault
 
 free_monad_hole_fits.hs:25:31: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Free f a -> Free f b
-      Where: ‘a’, ‘b’ are rigid type variables bound by
+      Where: ‘f’ is a rigid type variable bound by
+               the instance declaration
+               at free_monad_hole_fits.hs:22:10-40
+             ‘a’, ‘b’ are rigid type variables bound by
                the type signature for:
                  (>>=) :: forall a b. Free f a -> (a -> Free f b) -> Free f b
                at free_monad_hole_fits.hs:23:12-14
-             ‘f’ is a rigid type variable bound by
-               the instance declaration
-               at free_monad_hole_fits.hs:22:10-40
       Or perhaps ‘_a’ is mis-spelled, or not in scope
     • In the first argument of ‘fmap’, namely ‘_a’
       In the first argument of ‘Free’, namely ‘(fmap _a f)’

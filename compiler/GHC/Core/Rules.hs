@@ -90,7 +90,6 @@ import GHC.Data.Maybe
 import GHC.Data.Bag
 import GHC.Data.List.SetOps( hasNoDups )
 
-import GHC.Utils.FV( filterFV, fvVarSet )
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1509,9 +1508,8 @@ matchTemplateCast
     -> CoreExpr -> MCoercion
     -> Maybe RuleSubst
 matchTemplateCast renv subst e1 co1 e2 mco
-  | isEmptyVarSet $ fvVarSet $
-    filterFV (`elemVarSet` rv_tmpls renv) $    -- Check that the coercion does not
-    tyCoFVsOfCo substed_co                     -- mention any of the template variables
+  | -- Check that the coercion does not mention any of the template variables
+    not $ anyFreeVarsOfCo (`elemVarSet` rv_tmpls renv) substed_co
   = -- This is the good path
     -- See Note [Casts in the template] wrinkle (CT0)
     match renv subst e1 e2 (checkReflexiveMCo (mkTransMCoL mco (mkSymCo substed_co)))

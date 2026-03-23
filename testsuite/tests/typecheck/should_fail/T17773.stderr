@@ -1,7 +1,6 @@
-
 T17773.hs:16:22: error: [GHC-88464]
     • Found hole: _Refl :: Mzero x y :~: (x <|> y)
-      Where: ‘x’, ‘f’, ‘k’, ‘a’, ‘y’ are rigid type variables bound by
+      Where: ‘k’, ‘f’, ‘a’, ‘x’, ‘y’ are rigid type variables bound by
                the type signature for:
                  monadPlusMplus :: forall {k} (f :: k -> *) (a :: k) (x :: f a)
                                           (y :: f a).
@@ -12,3 +11,4 @@ T17773.hs:16:22: error: [GHC-88464]
     • Relevant bindings include
         monadPlusMplus :: Proxy x -> Proxy y -> Mzero x y :~: (x <|> y)
           (bound at T17773.hs:16:1)
+

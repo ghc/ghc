@@ -41,7 +41,7 @@ import GHC.Types.Id.Info
 import GHC.Types.InlinePragma (isInlinePragma)
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Name.Set hiding (FreeVars)
+import GHC.Types.Name.Set
 import GHC.Types.Name
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State

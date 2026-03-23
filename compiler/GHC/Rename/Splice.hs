@@ -118,7 +118,7 @@ occurred in a typed splice: #24190.)
 
 -}
 
-rnTypedBracket :: HsExpr GhcPs -> LHsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
+rnTypedBracket :: HsExpr GhcPs -> LHsExpr GhcPs -> RnM (HsExpr GhcRn, FreeNames)
 rnTypedBracket e br_body
   = addErrCtxt (TypedTHBracketCtxt br_body) $
     do { checkForTemplateHaskellQuotes e
@@ -146,7 +146,7 @@ rnTypedBracket e br_body
 
        }
 
-rnUntypedBracket :: HsExpr GhcPs -> HsQuote GhcPs -> RnM (HsExpr GhcRn, FreeVars)
+rnUntypedBracket :: HsExpr GhcPs -> HsQuote GhcPs -> RnM (HsExpr GhcRn, FreeNames)
 rnUntypedBracket e br_body
   = addErrCtxt (UntypedTHBracketCtxt br_body) $
     do { checkForTemplateHaskellQuotes e
@@ -180,19 +180,19 @@ rnUntypedBracket e br_body
 
        }
 
-rn_utbracket :: HsQuote GhcPs -> RnM (HsQuote GhcRn, FreeVars)
+rn_utbracket :: HsQuote GhcPs -> RnM (HsQuote GhcRn, FreeNames)
 rn_utbracket (VarBr _ is_value_name rdr_name)
   = do { name <- lookupOccRn (if is_value_name then WL_Term else WL_Type) (unLoc rdr_name)
        ; let res_name = L (l2l (locA rdr_name)) (WithUserRdr (unLoc rdr_name) name)
        ; if is_value_name then checkThLocalNameNoLift res_name else checkThLocalTyName name
        ; check_namespace is_value_name name
-       ; return (VarBr noExtField is_value_name (noLocA name), unitFV name) }
+       ; return (VarBr noExtField is_value_name (noLocA name), unitFN name) }
 
 rn_utbracket (ExpBr _ e) = do { (e', fvs) <- rnLExpr e
                                 ; return (ExpBr noExtField e', fvs) }
 
 rn_utbracket (PatBr _ p)
-  = rnPat ThPatQuote p $ \ p' -> return (PatBr noExtField p', emptyFVs)
+  = rnPat ThPatQuote p $ \ p' -> return (PatBr noExtField p', emptyFNs)
 
 rn_utbracket (TypBr _ t) = do { (t', fvs) <- rnLHsType TypBrCtx t
                                 ; return (TypBr noExtField t', fvs) }
@@ -271,12 +271,12 @@ returns a bogus term/type, so that it can report more than one error.
 We don't want the type checker to see these bogus unbound variables.
 -}
 
-rnUntypedSpliceGen :: (HsUntypedSplice GhcRn -> RnM (a, FreeVars))
+rnUntypedSpliceGen :: (HsUntypedSplice GhcRn -> RnM (a, FreeNames))
                                                     -- Outside brackets, run splice
                    -> (UntypedSpliceFlavour, HsUntypedSpliceResult z -> HsUntypedSplice GhcRn -> RnM a)
                                                    -- Inside brackets, make it pending
                    -> HsUntypedSplice GhcPs
-                   -> RnM (a, FreeVars)
+                   -> RnM (a, FreeNames)
 rnUntypedSpliceGen run_splice (flavour, run_pending) splice
   = addErrCtxt (UntypedSpliceCtxt splice) $ do
     { level <- getThLevel
@@ -304,7 +304,7 @@ rnUntypedSpliceGen run_splice (flavour, run_pending) splice
                    -- renaming it failed; otherwise we get a cascade of
                    -- errors from e.g. unbound variables
                  ; (result, fvs2) <- run_splice splice'
-                 ; return (result, fvs1 `plusFV` fvs2) } }
+                 ; return (result, fvs1 `plusFN` fvs2) } }
 
 
 -- Nested splices are fine without TemplateHaskell because they
@@ -423,7 +423,7 @@ unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "spn"))
 rnUntypedSplice :: HsUntypedSplice GhcPs
                 -> UntypedSpliceFlavour
                 -> RnM ( HsUntypedSplice GhcRn
-                       , FreeVars)
+                       , FreeNames)
 -- Not exported...used for all
 rnUntypedSplice (HsUntypedSpliceExpr _ expr) flavour
   = do  { (expr', fvs) <- rnLExpr expr
@@ -434,11 +434,11 @@ rnUntypedSplice (HsQuasiQuote _ quoter quote) flavour
         ; quoter' <- lookupLocatedOccRn WL_TermVariable quoter
         ; let res_name = WithUserRdr (unLoc quoter) <$> quoter'
         ; checkThLocalNameNoLift res_name
-        ; return (HsQuasiQuote (HsQuasiQuoteExt flavour) quoter' quote, unitFV (unLoc quoter')) }
+        ; return (HsQuasiQuote (HsQuasiQuoteExt flavour) quoter' quote, unitFN (unLoc quoter')) }
 
 ---------------------
 rnTypedSplice :: HsTypedSplice GhcPs -- Typed splice expression
-              -> RnM (HsExpr GhcRn, FreeVars)
+              -> RnM (HsExpr GhcRn, FreeNames)
 rnTypedSplice sp@(HsTypedSpliceExpr _ expr)
   = addErrCtxt (TypedSpliceCtxt Nothing sp) $ do
     { level <- getThLevel
@@ -471,14 +471,14 @@ rnTypedSplice sp@(HsTypedSpliceExpr _ expr)
                                             | gre <- globalRdrEnvElts gbl_rdr
                                             , isLocalGRE gre]
                       lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
-                      fvs2      = lcl_names `plusFV` gbl_names
+                      fvs2      = lcl_names `plusFN` gbl_names
 
-                ; return (HsTypedSplice HsTypedSpliceTop (HsTypedSpliceExpr noExtField result), fvs1 `plusFV` fvs2) } }
+                ; return (HsTypedSplice HsTypedSpliceTop (HsTypedSpliceExpr noExtField result), fvs1 `plusFN` fvs2) } }
   where
-    rn_splice :: RnM (LHsExpr GhcRn, FreeVars)
+    rn_splice :: RnM (LHsExpr GhcRn, FreeNames)
     rn_splice = rnLExpr expr
 
-rnUntypedSpliceExpr :: HsUntypedSplice GhcPs -> RnM (HsExpr GhcRn, FreeVars)
+rnUntypedSpliceExpr :: HsUntypedSplice GhcPs -> RnM (HsExpr GhcRn, FreeNames)
 rnUntypedSpliceExpr splice
   = rnUntypedSpliceGen run_expr_splice pend_expr_splice splice
   where
@@ -662,7 +662,7 @@ References:
 -}
 
 ----------------------
-rnSpliceType :: HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeVars)
+rnSpliceType :: HsUntypedSplice GhcPs -> RnM (HsType GhcRn, FreeNames)
 rnSpliceType splice
   = rnUntypedSpliceGen run_type_splice pend_type_splice splice
   where
@@ -670,7 +670,7 @@ rnSpliceType splice
        = ( UntypedTypeSplice
          , \x y -> pure $ HsSpliceTy x y)
 
-    run_type_splice :: HsUntypedSplice GhcRn -> RnM (HsType GhcRn, FreeVars)
+    run_type_splice :: HsUntypedSplice GhcRn -> RnM (HsType GhcRn, FreeNames)
     run_type_splice rn_splice
       = do { traceRn "rnSpliceType: untyped type splice" empty
            ; (hs_ty2, mod_finalizers) <-
@@ -742,7 +742,7 @@ whole signature, instead of as an arbitrary type.
 ----------------------
 -- | Rename a splice pattern. See Note [rnSplicePat]
 rnSplicePat :: HsUntypedSplice GhcPs -> RnM ( (HsUntypedSplice GhcRn, HsUntypedSpliceResult (LPat GhcPs))
-                                            , FreeVars)
+                                            , FreeNames)
 rnSplicePat splice
   = rnUntypedSpliceGen run_pat_splice pend_pat_splice splice
   where
@@ -756,13 +756,13 @@ rnSplicePat splice
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
            ; let p = HsUntypedSpliceTop (ThModFinalizers mod_finalizers) pat
-           ; return ((rn_splice, p), emptyFVs) }
+           ; return ((rn_splice, p), emptyFNs) }
               -- Wrap the result of the quasi-quoter in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
 
 -- | Rename a splice type pattern. Much the same as `rnSplicePat`, but works with LHsType instead of LPat
 rnSpliceTyPat :: HsUntypedSplice GhcPs -> RnM ( (HsUntypedSplice GhcRn, HsUntypedSpliceResult (LHsType GhcPs))
-                                            , FreeVars)
+                                            , FreeNames)
 rnSpliceTyPat splice
   = rnUntypedSpliceGen run_ty_pat_splice pend_ty_pat_splice splice
   where
@@ -776,12 +776,12 @@ rnSpliceTyPat splice
                 runRnSplice UntypedTypeSplice runMetaT ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
            ; let t = HsUntypedSpliceTop (ThModFinalizers mod_finalizers) ty
-           ; return ((rn_splice, t), emptyFVs) }
+           ; return ((rn_splice, t), emptyFNs) }
               -- Wrap the result of the quasi-quoter in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
 
 ----------------------
-rnSpliceDecl :: SpliceDecl GhcPs -> RnM (SpliceDecl GhcRn, FreeVars)
+rnSpliceDecl :: SpliceDecl GhcPs -> RnM (SpliceDecl GhcRn, FreeNames)
 rnSpliceDecl (SpliceDecl _ (L loc splice) flg)
   = rnUntypedSpliceGen run_decl_splice pend_decl_splice splice
   where
@@ -791,7 +791,7 @@ rnSpliceDecl (SpliceDecl _ (L loc splice) flg)
 
     run_decl_splice rn_splice  = pprPanic "rnSpliceDecl" (pprUntypedSplice True Nothing rn_splice)
 
-rnTopSpliceDecls :: HsUntypedSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeVars)
+rnTopSpliceDecls :: HsUntypedSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeNames)
 -- Declaration splice at the very top level of the module
 rnTopSpliceDecls splice
    =  do { checkTopSpliceAllowed splice

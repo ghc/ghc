@@ -222,6 +222,7 @@ GHC.Types.Unique.Set
 GHC.Types.Unique.Supply
 GHC.Types.Var
 GHC.Types.Var.Env
+GHC.Types.Var.FV
 GHC.Types.Var.Set
 GHC.Unit
 GHC.Unit.Home
@@ -252,7 +253,6 @@ GHC.Utils.Containers.Internal.StrictPair
 GHC.Utils.EndoOS
 GHC.Utils.Error
 GHC.Utils.Exception
-GHC.Utils.FV
 GHC.Utils.Fingerprint
 GHC.Utils.GlobalVars
 GHC.Utils.IO.Unsafe

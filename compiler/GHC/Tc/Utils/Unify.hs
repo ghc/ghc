@@ -86,7 +86,7 @@ import GHC.Tc.Solver.InertSet
 import GHC.Core.ConLike (ConLike(..))
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep hiding (Refl)
-import GHC.Core.TyCo.FVs( isInjectiveInType )
+import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr( debugPprType {- pprTyVar -} )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
@@ -103,6 +103,7 @@ import GHC.Types.Id( idType )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Var.FV
 import GHC.Types.Basic
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
@@ -3638,19 +3639,23 @@ mkOccFolders :: Name -> (TcType -> Bool, TcCoercion -> Bool)
 --   * if lhs_tv occurs (incl deeply, in the kind of variable)
 --   * if there is a coercion hole
 -- No expansion of type synonyms
-mkOccFolders lhs_tv = (getAny . check_ty, getAny . check_co)
+mkOccFolders lhs_tv = ( getAny . runFVTop . check_ty
+                      , getAny . runFVTop . check_co)
   where
-    !(check_ty, _, check_co, _) = foldTyCo occ_folder emptyVarSet
+    check_ty :: Type -> FV BoundVars Any
+    !(check_ty, _, check_co, _) = foldTyCo occ_folder
+
+    occ_folder :: TyCoFolder (FV BoundVars Any)
     occ_folder = TyCoFolder { tcf_view  = noView  -- Don't expand synonyms
                             , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                             , tcf_hole  = do_hole
-                            , tcf_tycobinder = do_bndr }
+                            , tcf_tycobinder = addBndrFV }
 
-    do_tcv is v = Any (not (v `elemVarSet` is) && tyVarName v == lhs_tv)
-                  `mappend` check_ty (varType v)
+    do_tcv v = (MkFV $ \ bvs ->
+                Any (not (v `elemVarSet` bvs) && tyVarName v == lhs_tv))
+               `mappend` check_ty (varType v)
 
-    do_bndr is tcv _faf = extendVarSet is tcv
-    do_hole _is _hole = DM.Any True  -- Reject coercion holes
+    do_hole _hole = MkFV $ \ _bvs -> DM.Any True  -- Reject coercion holes
 
 {- *********************************************************************
 *                                                                      *
