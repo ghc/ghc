@@ -686,6 +686,12 @@ test ('T13820',
       ],
       compile,
       ['-v0'])
+test ('T13960',
+      [ collect_compiler_stats('peak_megabytes_allocated', 20),
+        collect_compiler_stats('bytes allocated', 2),
+      ],
+      compile,
+      ['-O'])
 test ('T14766',
       [ collect_compiler_stats('bytes allocated',2),
         pre_cmd('python3 genT14766.py > T14766.hs'),
