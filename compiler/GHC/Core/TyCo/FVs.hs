@@ -4,13 +4,14 @@ module GHC.Core.TyCo.FVs
   (     shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
         tyCoVarsOfType,        tyCoVarsOfTypes,
         tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet,
+        tyCoVarsOfQuant,
 
         tyCoFVsBndr, tyCoFVsVarBndr, tyCoFVsVarBndrs,
         tyCoFVsOfType, tyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
         deepTcvFolder,
 
-        shallowTyCoVarsOfTyVarEnv, shallowTyCoVarsOfCoVarEnv,
+        tyCoVarsOfTyVarEnv, tyCoVarsOfCoVarEnv,
 
         shallowTyCoVarsOfCo, shallowTyCoVarsOfCos,
         tyCoVarsOfCo, tyCoVarsOfCos, tyCoVarsOfMCo,
@@ -333,6 +334,26 @@ tyCoVarsOfMCo (MCo co) = tyCoVarsOfCo co
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
 tyCoVarsOfCos cos = runTyCoVars (deep_cos cos)
 
+-- | Returns free variables of types, including kind variables as
+-- a non-deterministic set. For type synonyms it does /not/ expand the
+-- synonym.
+tyCoVarsOfTyVarEnv :: TyVarEnv Type -> TyCoVarSet
+-- See Note [Shallow and deep free variables]
+tyCoVarsOfTyVarEnv tys = tyCoVarsOfTypes (nonDetEltsUFM tys)
+  -- It's OK to use nonDetEltsUFM here because we immediately
+  -- forget the ordering by returning a set
+
+tyCoVarsOfCoVarEnv :: CoVarEnv Coercion -> TyCoVarSet
+tyCoVarsOfCoVarEnv cos = tyCoVarsOfCos (nonDetEltsUFM cos)
+  -- It's OK to use nonDetEltsUFM here because we immediately
+  -- forget the ordering by returning a set
+
+tyCoVarsOfQuant :: [TyCoVar] -> TyCoVarSet -> TyCoVarSet
+-- Give the deep free vars of (forall tcvs. <set>)
+tyCoVarsOfQuant [] fvs         = fvs
+tyCoVarsOfQuant (tcv:tcvs) fvs = (tyCoVarsOfQuant tcvs fvs `delVarSet` tcv)
+                                 `unionVarSet` tyCoVarsOfType (varType tcv)
+
 deep_ty  :: Type       -> EndoOS TyCoVarSet
 deep_tys :: [Type]     -> EndoOS TyCoVarSet
 deep_co  :: Coercion   -> EndoOS TyCoVarSet
@@ -384,20 +405,6 @@ shallowTyCoVarsOfCo co = runTyCoVars (shallow_co co)
 
 shallowTyCoVarsOfCos :: [Coercion] -> TyCoVarSet
 shallowTyCoVarsOfCos cos = runTyCoVars (shallow_cos cos)
-
--- | Returns free variables of types, including kind variables as
--- a non-deterministic set. For type synonyms it does /not/ expand the
--- synonym.
-shallowTyCoVarsOfTyVarEnv :: TyVarEnv Type -> TyCoVarSet
--- See Note [Free variables of types]
-shallowTyCoVarsOfTyVarEnv tys = shallowTyCoVarsOfTypes (nonDetEltsUFM tys)
-  -- It's OK to use nonDetEltsUFM here because we immediately
-  -- forget the ordering by returning a set
-
-shallowTyCoVarsOfCoVarEnv :: CoVarEnv Coercion -> TyCoVarSet
-shallowTyCoVarsOfCoVarEnv cos = shallowTyCoVarsOfCos (nonDetEltsUFM cos)
-  -- It's OK to use nonDetEltsUFM here because we immediately
-  -- forget the ordering by returning a set
 
 shallow_ty  :: Type       -> EndoOS TyCoVarSet
 shallow_tys :: [Type]     -> EndoOS TyCoVarSet

@@ -31,6 +31,7 @@ import GHC.Tc.Solver.Monad  as TcS
 import qualified GHC.Tc.Utils.Monad   as TcM
 import qualified GHC.Tc.Zonk.TcType   as TcM
 
+import GHC.Core.TyCo.FVs( tyCoVarsOfQuant )
 import GHC.Core.Predicate
 import GHC.Core.Reduction
 import GHC.Core.Coercion
@@ -1633,11 +1634,13 @@ solveWantedQCI :: TcSMode
 -- See Note [Solving a Wanted forall-constraint]
 solveWantedQCI mode ct@(CQuantCan (QCI { qci_ev =  ev, qci_tvs = tvs
                                        , qci_theta = theta, qci_body = body_pred }))
+  -- A worry: This quantified constraint is not fully zonked.  Does that matter?
   | CtWanted (WantedCt { ctev_pred = forall_pred, ctev_dest = dest
                        , ctev_rewriters = rewriters, ctev_loc = loc }) <- ev
   , let is_qc = IsQC forall_pred (ctLocOrigin loc)
         empty_subst = mkEmptySubst $ mkInScopeSet $
-                      tyCoVarsOfTypes (body_pred:theta) `delVarSetList` tvs
+                      tyCoVarsOfQuant tvs $
+                      tyCoVarsOfTypes (body_pred:theta)
   = TcS.setSrcSpan (getCtLocEnvLoc $ ctLocEnv loc) $
     -- This setSrcSpan is important: the TcM.newImplication uses that
     -- TcLclEnv for the implication, and that in turn sets the location

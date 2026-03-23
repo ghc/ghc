@@ -22,6 +22,7 @@ module GHC.Core.FVs (
         InterestingVarFun,
         exprSomeFreeVars, exprsSomeFreeVars,
         exprSomeFreeVarsList, exprsSomeFreeVarsList,
+        deepExprsFreeVarsDSet,
 
         -- * Free variables of Rules, Vars and Ids
         varTypeTyCoVars,
@@ -108,6 +109,13 @@ exprLocalFVs = filterFV isLocalVar . exprFVs
 -- returning a deterministic set.
 exprFreeVarsDSet :: CoreExpr -> DVarSet
 exprFreeVarsDSet = fvDVarSet . exprLocalFVs
+
+exprsFreeVarsDSet :: [CoreExpr] -> DVarSet
+exprsFreeVarsDSet = fvDVarSet . exprsLocalFVs
+
+deepExprsFreeVarsDSet :: [CoreExpr] -> DVarSet
+-- See (FVE1) in Note [Free variables of an expression]
+deepExprsFreeVarsDSet = closeOverKindsDSet . exprsFreeVarsDSet
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a deterministically ordered list.

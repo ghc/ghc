@@ -138,8 +138,8 @@ type CvSubstEnv = CoVarEnv Coercion
 When calling (substTy subst ty) it should be the case that
 the in-scope set in the substitution is a superset of both:
 
-  (SIa) The free vars of the range of the substitution
-  (SIb) The free vars of ty minus the domain of the substitution
+  (SIa) The deep free vars of the range of the substitution
+  (SIb) The deep free vars of ty minus the domain of the substitution
 
 * Reason for (SIa). Consider
       substTy [a :-> Maybe b] (forall b. b->a)
@@ -155,6 +155,8 @@ the in-scope set in the substitution is a superset of both:
   getting this:
       forall x. (Maybe b, x, x)
   Breaking (SIb) caused the bug from #11371.
+
+* Why /deep/ free vars?  See Note [No type-shadowing in Core] in GHC.Core.
 
 Note: if the free vars of the range of the substitution are freshly created,
 then the problems of (SIa) can't happen, and so it would be sound to
@@ -303,14 +305,14 @@ substInScopeSet (Subst in_scope _ _ _) = in_scope
 setInScope :: Subst -> InScopeSet -> Subst
 setInScope (Subst _ ids tvs cvs) in_scope = Subst in_scope ids tvs cvs
 
--- | Returns the free variables of the types in the range of a substitution as
--- a non-deterministic set.
+-- | Returns the deep free variables of the types in the range of a
+-- substitution as a non-deterministic set.
 getSubstRangeTyCoFVs :: Subst -> VarSet
 getSubstRangeTyCoFVs (Subst _ _ tenv cenv)
   = tenvFVs `unionVarSet` cenvFVs
   where
-    tenvFVs = shallowTyCoVarsOfTyVarEnv tenv
-    cenvFVs = shallowTyCoVarsOfCoVarEnv cenv
+    tenvFVs = tyCoVarsOfTyVarEnv tenv
+    cenvFVs = tyCoVarsOfCoVarEnv cenv
 
 isInScope :: Var -> Subst -> Bool
 isInScope v (Subst in_scope _ _ _) = v `elemInScopeSet` in_scope
@@ -437,7 +439,7 @@ unionSubst (Subst in_scope1 ids1 tenv1 cenv1) (Subst in_scope2 ids2 tenv2 cenv2)
 -- environment. No CoVars or Ids, please!
 zipTvSubst :: HasDebugCallStack => [TyVar] -> [Type] -> Subst
 zipTvSubst tvs tys
-  = mkTvSubst (mkInScopeSet (shallowTyCoVarsOfTypes tys)) tenv
+  = mkTvSubst (mkInScopeSet (tyCoVarsOfTypes tys)) tenv
   where
     tenv = zipTyEnv tvs tys
 
@@ -445,7 +447,7 @@ zipTvSubst tvs tys
 -- environment.  No TyVars, please!
 zipCvSubst :: HasDebugCallStack => [CoVar] -> [Coercion] -> Subst
 zipCvSubst cvs cos
-  = mkCvSubst (mkInScopeSet (shallowTyCoVarsOfCos cos)) cenv
+  = mkCvSubst (mkInScopeSet (tyCoVarsOfCos cos)) cenv
   where
     cenv = zipCoEnv cvs cos
 
@@ -453,7 +455,7 @@ zipCvSubst cvs cos
 zipTCvSubst :: HasDebugCallStack => [TyCoVar] -> [Type] -> Subst
 zipTCvSubst tcvs tys
   = zip_tcvsubst tcvs tys $
-    mkEmptySubst $ mkInScopeSet $ shallowTyCoVarsOfTypes tys
+    mkEmptySubst $ mkInScopeSet $ tyCoVarsOfTypes tys
   where zip_tcvsubst :: [TyCoVar] -> [Type] -> Subst -> Subst
         zip_tcvsubst (tv:tvs) (ty:tys) subst
           = zip_tcvsubst tvs tys (extendTCvSubst subst tv ty)
@@ -470,7 +472,7 @@ mkTvSubstPrs prs =
     assertPpr onlyTyVarsAndNoCoercionTy (text "prs" <+> ppr prs) $
     mkTvSubst in_scope tenv
   where tenv = mkVarEnv prs
-        in_scope = mkInScopeSet $ shallowTyCoVarsOfTypes $ map snd prs
+        in_scope = mkInScopeSet $ tyCoVarsOfTypes $ map snd prs
         onlyTyVarsAndNoCoercionTy =
           and [ isTyVar tv && not (isCoercionTy ty)
               | (tv, ty) <- prs ]
@@ -654,8 +656,8 @@ substTyAddInScope subst ty =
   substTy (extendSubstInScopeSet subst $ tyCoVarsOfType ty) ty
 
 -- | When calling `substTy` it should be the case that the in-scope set in
--- the substitution is a superset of the free vars of the range of the
--- substitution.
+-- the substitution is a superset of the (deep) free vars of the range of
+-- the substitution.
 -- See also Note [The substitution invariant].
 -- TODO: take into account ids and rename as isValidSubst
 isValidTCvSubst :: Subst -> Bool
@@ -663,8 +665,8 @@ isValidTCvSubst (Subst in_scope _ tenv cenv) =
   (tenvFVs `varSetInScope` in_scope) &&
   (cenvFVs `varSetInScope` in_scope)
   where
-  tenvFVs = shallowTyCoVarsOfTyVarEnv tenv
-  cenvFVs = shallowTyCoVarsOfCoVarEnv cenv
+  tenvFVs = tyCoVarsOfTyVarEnv tenv
+  cenvFVs = tyCoVarsOfCoVarEnv cenv
 
 -- | This checks if the substitution satisfies the invariant from
 -- Note [The substitution invariant].
@@ -673,9 +675,9 @@ checkValidSubst subst@(Subst in_scope _ tenv cenv) tys cos a
   = assertPpr (isValidTCvSubst subst)
               (text "in_scope" <+> ppr in_scope $$
                text "tenv" <+> ppr tenv $$
-               text "tenvFVs" <+> ppr (shallowTyCoVarsOfTyVarEnv tenv) $$
+               text "tenvFVs" <+> ppr (tyCoVarsOfTyVarEnv tenv) $$
                text "cenv" <+> ppr cenv $$
-               text "cenvFVs" <+> ppr (shallowTyCoVarsOfCoVarEnv cenv) $$
+               text "cenvFVs" <+> ppr (tyCoVarsOfCoVarEnv cenv) $$
                text "tys" <+> ppr tys $$
                text "cos" <+> ppr cos) $
     assertPpr tysCosFVsInScope
@@ -690,8 +692,8 @@ checkValidSubst subst@(Subst in_scope _ tenv cenv) tys cos a
   substDomain = nonDetKeysUFM tenv ++ nonDetKeysUFM cenv
     -- It's OK to use nonDetKeysUFM here, because we only use this list to
     -- remove some elements from a set
-  needInScope = (shallowTyCoVarsOfTypes tys `unionVarSet`
-                 shallowTyCoVarsOfCos cos)
+  needInScope = (tyCoVarsOfTypes tys `unionVarSet`
+                 tyCoVarsOfCos cos)
                 `delListFromUniqSet_Directly` substDomain
   tysCosFVsInScope = needInScope `varSetInScope` in_scope
 
@@ -895,7 +897,7 @@ subst_co subst co
     go_hole h@(CH { ch_co_var = cv }) = h { ch_co_var = updateVarType go_ty cv }
 
 -- | Perform a substitution within a 'DVarSet' of free variables,
--- returning the shallow free coercion variables.
+-- returning the free coercion variables.
 substDCoVarSet :: Subst -> DCoVarSet -> DCoVarSet
 substDCoVarSet subst cvs = coVarsOfCosDSet $ map (substCoVar subst) $
                            dVarSetElems cvs
@@ -955,7 +957,7 @@ substTyVarBndrUsing subst_fn subst@(Subst in_scope idenv tenv cenv) old_var
     new_env | no_change = delVarEnv tenv old_var
             | otherwise = extendVarEnv tenv old_var (TyVarTy new_var)
 
-    _no_capture = not (new_var `elemVarSet` shallowTyCoVarsOfTyVarEnv tenv)
+    _no_capture = not (new_var `elemVarSet` tyCoVarsOfTyVarEnv tenv)
     -- Assertion check that we are not capturing something in the substitution
 
     old_ki = tyVarKind old_var

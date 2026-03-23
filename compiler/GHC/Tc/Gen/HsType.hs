@@ -1296,13 +1296,13 @@ tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
 tcHsType _ rn_ty@(XHsType ty) exp_kind
   = do env <- getLclEnv
        -- Raw uniques since we go from NameEnv to TvSubstEnv.
-       let subst_prs :: [(Unique, TcTyVar)]
-           subst_prs = [ (getUnique nm, tv)
+       let subst_prs :: [(Unique, TcType)]
+           subst_prs = [ (getUnique nm, mkTyVarTy tv)
                        | ATyVar nm tv <- nonDetNameEnvElts (getLclEnvTypeEnv env) ]
-           subst = mkTvSubst
-                     (mkInScopeSetList $ map snd subst_prs)
-                     (listToUFM_Directly $ map (fmap mkTyVarTy) subst_prs)
-           ty' = substTy subst ty
+           in_scope = mkInScopeSet $
+                      tyCoVarsOfTypes (ty : map snd subst_prs)
+           subst = mkTvSubst in_scope (listToUFM_Directly subst_prs)
+           ty'   = substTy subst ty
        checkExpKind rn_ty ty' (typeKind ty') exp_kind
 
 tc_hs_lit_ty :: HsType GhcRn

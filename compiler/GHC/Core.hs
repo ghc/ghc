@@ -425,33 +425,88 @@ Note [Shadowing in Core]
 You might wonder if there is an invariant that a Core expression has no
 "shadowing".  For example, is this illegal?
      \x. \x. blah     -- x is shadowed
-Answer; no!  Core does /not/ have a no-shadowing invariant.
 
-Neither the simplifier nor any other pass GUARANTEES that shadowing is
-avoided. Thus, all passes SHOULD work fine even in the presence of
-arbitrary shadowing in their inputs.
+Answer:
+* No!  Core does /not/ have a no-shadowing invariant;
+  That is, we allow (\x. (x, \x. x))
+  See the rest of this note
 
-So the Unique in a Var is not really unique at all.  Still, it's very
-useful to give a constant-time equality/ordering for Vars, and to give
-a key that can be used to make sets of Vars (VarSet), or mappings from
-Vars to other things (VarEnv).   Moreover, if you do want to eliminate
-shadowing, you can give a new Unique to an Id without changing its
-printable name, which makes debugging easier.
+* But Core /does/ have a no-type-shadowing invariant;
+  See Note [No type-shadowing in Core]
 
 It would in many ways be easier to have a no-shadowing invariant.  And the
 Simplifier does its best to clone variables that are shadowed.  But it is
 extremely difficult to GUARANTEE it:
 
-* We use `GHC.Types.Id.mkTemplateLocal` to make up local binders, with uniques
-  that are locally-unique (enough for the purpose) but not globally unique.
-  It is convenient not to have to plumb a unique supply to these functions.
+  * We use `GHC.Types.Id.mkTemplateLocal` to make up local binders, with uniques
+    that are locally-unique (enough for the purpose) but not globally unique.
+    It is convenient not to have to plumb a unique supply to these functions.
 
-* It is very difficult for the Simplifier to gurantee a no-shadowing result.
-  See Note [Shadowing in the Simplifier] in GHC.Core.Opt.Simplify.Iteration.
+  * It is very difficult for the Simplifier to gurantee a no-shadowing result.
+    See Note [Shadowing in the Simplifier] in GHC.Core.Opt.Simplify.Iteration.
 
-* See Note [Shadowing in CSE] in GHC.Core.Opt.CSE
+  * See Note [Shadowing in CSE] in GHC.Core.Opt.CSE
 
-* See Note [Shadowing in SpecConstr] in GHC.Core.Opt.SpecContr
+  * See Note [Shadowing in SpecConstr] in GHC.Core.Opt.SpecContr
+
+TL;DR: neither the simplifier nor any other pass GUARANTEES that shadowing is
+avoided. Thus, all passes MUST work fine even in the presence of arbitrary
+shadowing in their inputs.
+
+So the Unique in a Var is not really unique at all.  Still, it's very useful to
+give a constant-time equality/ordering for Vars, and to give a key that can be
+used to make sets of Vars (VarSet), or mappings from Vars to other things
+(VarEnv).  Moreover, if you do want to eliminate shadowing, you can give a new
+Unique to an Id without changing its printable name, which makes debugging
+easier.
+
+Note [No type-shadowing in Core]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider applying `exprType` to this term:
+
+       /\ a. \(x :: a). /\a. x
+
+where we have genuine shadowing: both lambdas bind the same a.  Remember: every
+occurrence of `x` is just a copy of the binder (x::a).
+
+Now what does `exprType` return for that term?  It will return the incorrect type
+        forall a. a -> forall a. a
+whereas the correct type is:
+        forall a. a -> forall b. a
+where we rename the inner forall.
+
+A similar problem occurs for types.  consider
+   forall (a :: RuntimeRep). Int -> forall (x :: TYPE a).
+                                    forall (a :: RuntimeRep). x
+This is a well-kinded type, in an environment-based scheme.  But `typeKind`
+will panic, because the kind of the body of a forall must not mention
+the forall'd variable (and the inner forall's body appears to do so).
+
+It might be possible to make `exprType` and `typeKind`` more complicated, so that
+they do renaming on the fly.  But instead we impose
+
+INVARIANT (NoTypeShadowing):
+  In every Core term (Expr) and core type (Type),
+  the variable free in a binder's type must be in scope
+  at every /occurrence/ of that variable.  In type-system terms:
+
+        fv(t) are not bound in G2
+        -------------------------
+        G1, x:t, G2 |- x : t
+
+How do we guarantee (NoTypeShadowing)?  The main thing that might
+disturb it is /substitution/.  When substituting in a term or type we
+need to ensure that the in-scope set includes:
+
+* The /deep/ free vars of the range of the substitution
+  E.g.  When substituting  [y :-> x::a->a] into
+         /\a. ..y...
+  we should have an InScopeSet that includes `a` so that we clone the `/\a`.
+
+* The /deep/ free vars of the term/type in which we are substituting
+  E.g when substituting [x :-> blah] into `e`, we must ensure that if we
+  clone a binder in `e`, we don't accidentally choose a new binder that
+  shadows a deep free var of `e`.
 
 Note [Core letrec invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
