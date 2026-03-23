@@ -3678,7 +3678,7 @@ The interpreter can't load modules with foreign export declarations!
     Unfortunately not. We haven't implemented it yet. Please compile any
     offending modules by hand before loading them into GHCi.
 
-:ghc-flag:`-O` is ineffective in GHCi!
+:ghc-flag:`-O` is experimental in GHCi!
 
     .. index::
        single: optimization; and GHCi
@@ -3686,11 +3686,12 @@ The interpreter can't load modules with foreign export declarations!
     Before GHC 9.8, optimizations were considered too unstable to be used with
     the bytecode interpreter.
     This restriction has been lifted, but is still regarded as experimental and
-    guarded by :ghc-flag:`-funoptimized-core-for-interpreter`, which is enabled
-    by default.
-    In order to use optimizations, run: ::
+    guarded by :ghc-flag:`-funoptimized-core-for-interpreter`. Starting with
+    10.0 it is enabled by default.
 
-      ghci -fno-unoptimized-core-for-interpreter -O
+    If this causes issue you can disable it by using: ::
+
+      ghci -funoptimized-core-for-interpreter -O
 
 Concurrent threads don't carry on running when GHCi is waiting for input.
     This should work, as long as your GHCi was built with the

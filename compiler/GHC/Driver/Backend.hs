@@ -20,9 +20,6 @@ especially the driver.  Examples include the following:
  * Property `backendValidityOfCImport` says whether the back end can
    import foreign C functions.
 
- * Property `backendForcesOptimization0` says whether the back end can
-   be used with optimization levels higher than `-O0`.
-
  * Property `backendCDefs` tells the compiler driver, "if you're using
    this back end, then these are the command-line flags you should add
    to any invocation of the C compiler."
@@ -88,7 +85,6 @@ module GHC.Driver.Backend
    , backendGeneratesHc
    , backendSptIsDynamic
    , backendSupportsBreakpoints
-   , backendForcesOptimization0
    , backendNeedsFullWays
    , backendSupportsHpc
    , backendSupportsCImport
@@ -679,17 +675,6 @@ backendSupportsBreakpoints = \case
   Named JavaScript  -> False
   Named Bytecode -> True
   Named NoBackend   -> False
-
--- | If this flag is set, then the driver forces the
--- optimization level to 0, issuing a warning message if
--- the command line requested a higher optimization level.
-backendForcesOptimization0 :: Backend -> Bool
-backendForcesOptimization0 (Named NCG)         = False
-backendForcesOptimization0 (Named LLVM)        = False
-backendForcesOptimization0 (Named ViaC)        = False
-backendForcesOptimization0 (Named JavaScript)  = False
-backendForcesOptimization0 (Named Bytecode) = True
-backendForcesOptimization0 (Named NoBackend)   = False
 
 -- | I don't understand exactly how this works.  But if
 -- this flag is set *and* another condition is met, then

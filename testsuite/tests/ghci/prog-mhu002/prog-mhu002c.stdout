@@ -11,7 +11,6 @@ other dynamic, non-language, flag settings:
   -fignore-hpc-changes
   -fno-ghci-history
   -fimplicit-import-qualified
-  -fno-unoptimized-core-for-interpreter
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points
@@ -30,7 +29,6 @@ other dynamic, non-language, flag settings:
   -fignore-hpc-changes
   -fno-ghci-history
   -fimplicit-import-qualified
-  -fno-unoptimized-core-for-interpreter
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points
@@ -47,7 +45,6 @@ other dynamic, non-language, flag settings:
   -fignore-hpc-changes
   -fno-ghci-history
   -fimplicit-import-qualified
-  -fno-unoptimized-core-for-interpreter
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points
@@ -64,7 +61,6 @@ other dynamic, non-language, flag settings:
   -fignore-hpc-changes
   -fno-ghci-history
   -fimplicit-import-qualified
-  -fno-unoptimized-core-for-interpreter
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points
@@ -81,7 +77,6 @@ other dynamic, non-language, flag settings:
   -fignore-hpc-changes
   -fno-ghci-history
   -fimplicit-import-qualified
-  -fno-unoptimized-core-for-interpreter
   -fshow-warning-groups
   -fprefer-byte-code
   -fbreak-points

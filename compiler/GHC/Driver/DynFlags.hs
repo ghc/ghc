@@ -1229,7 +1229,6 @@ defaultFlags settings
       Opt_CompactUnwind,
       Opt_ShowErrorContext,
       Opt_SuppressStgReps,
-      Opt_UnoptimizedCoreForInterpreter,
       Opt_SpecialiseIncoherents,
       Opt_WriteSelfRecompInfo
     ]
