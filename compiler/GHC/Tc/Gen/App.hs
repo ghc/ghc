@@ -11,10 +11,9 @@
 
 module GHC.Tc.Gen.App
        ( tcApp
-       , tcExprSigma
        , tcExprPrag ) where
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr, tcInferExprSigma )
 
 import GHC.Hs
 
@@ -163,32 +162,6 @@ Note [Instantiation variables are short lived]
   about this, but it seems to do no harm for the constraint solver to see the
   occasional instantiation variable.
 -}
-
-
-{- *********************************************************************
-*                                                                      *
-              tcInferSigma
-*                                                                      *
-********************************************************************* -}
-
--- Very similar to tcApp, but returns a sigma (uninstantiated) type
--- CAUTION: Any changes to tcApp should be reflected here
--- cf. T19167. the head is an expanded expression applied to a type
--- Caution: Currently we assume that the expression is compiler generated/expanded
--- Because that is what T19167 test case expects.
-tcExprSigma :: Bool -> CtOrigin -> HsExpr GhcRn -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
-tcExprSigma inst fun_orig rn_expr
-  = do { (fun@(rn_fun,fun_lspan), rn_args) <- splitHsApps rn_expr
-       ; (tc_fun, ds_flag, fun_sigma) <- tcInferAppHead fun
-       ; igc <- inGeneratedCode
-       ; traceTc "tcExprSigma" (vcat [ text "rn_expr:" <+> ppr rn_expr
-                                     , text "tc_fun" <+> ppr tc_fun
-                                     , text "igc:" <+> ppr igc])
-       ; (inst_args, app_res_sigma) <- tcInstFun DoQL inst ds_flag (fun_orig, rn_fun, fun_lspan)
-                                           tc_fun fun_sigma rn_args
-       ; tc_args <- tcValArgs DoQL (rn_fun, fun_lspan) inst_args
-       ; let tc_expr = rebuildHsApps (tc_fun, fun_lspan) tc_args
-       ; return (tc_expr, ds_flag, app_res_sigma) }
 
 
 {- *********************************************************************
@@ -377,14 +350,13 @@ Unify result type /before/ typechecking the args
 
 The latter is much better. That is why we call `checkResultTy` before tcValArgs.
 -}
--- CAUTION: Any changes to tcApp should be reflected in tcExprSigma
 tcApp :: HsExpr GhcRn
       -> ExpRhoType   -- When checking, -XDeepSubsumption <=> deeply skolemised
       -> TcM (HsExpr GhcTc)
 -- See Note [tcApp: typechecking applications]
 tcApp rn_expr exp_res_ty
   = do { -- Step 1: Split the application chain
-         (fun@(rn_fun, fun_lspan), rn_args) <- splitHsApps rn_expr
+         ((rn_fun, fun_lspan), rn_args) <- splitHsApps rn_expr
        ; inGenCode <- inGeneratedCode
        ; traceTc "tcApp {" $
            vcat [ text "generated? " <+> ppr inGenCode
@@ -394,7 +366,7 @@ tcApp rn_expr exp_res_ty
                 , text "rn_args:" <+> ppr rn_args ]
 
        -- Step 2: Infer the type of `fun`, the head of the application
-       ; (tc_fun, ds_flag, fun_sigma) <- tcInferAppHead fun
+       ; (tc_fun, fun_sigma) <- tcInferExprSigma rn_fun
        ; let tc_head = (tc_fun, fun_lspan)
              -- inst_final: top-instantiate the result type of the application,
              -- EXCEPT if we are trying to infer a sigma-type
@@ -424,7 +396,7 @@ tcApp rn_expr exp_res_ty
               , text "fun_origin" <+> ppr fun_orig
               , text "do_ql:" <+> ppr do_ql]
        ; (inst_args, app_res_rho)
-              <- tcInstFun do_ql inst_final ds_flag (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigma rn_args
+              <- tcInstFun do_ql inst_final (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigma rn_args
          -- See (TCAPP1) and (TCAPP2) in
          -- Note [tcApp: typechecking applications]
 
@@ -433,7 +405,7 @@ tcApp rn_expr exp_res_ty
 
                          -- Step 4.1: subsumption check against expected result type
                          -- See Note [Unify with expected type before typechecking arguments]
-                       ; res_wrap <- checkResultTy ds_flag rn_expr tc_head inst_args
+                       ; res_wrap <- checkResultTy rn_expr tc_head inst_args
                                                    app_res_rho exp_res_ty
                          -- Step 4.2: typecheck the  arguments
                        ; tc_args <- tcValArgs NoQL (rn_fun, fun_lspan) inst_args
@@ -453,7 +425,7 @@ tcApp rn_expr exp_res_ty
                        ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
 
                          -- Step 5.4: subsumption check against the expected type
-                       ; res_wrap <- checkResultTy ds_flag rn_expr tc_head inst_args
+                       ; res_wrap <- checkResultTy rn_expr tc_head inst_args
                                                     app_res_rho exp_res_ty
                          -- Step 5.5: wrap up
                        ; finishApp tc_head tc_args app_res_rho res_wrap } }
@@ -479,25 +451,27 @@ finishApp tc_head@(tc_fun,_) tc_args app_res_rho res_wrap
 
 -- | Connect up the inferred type of an application with the expected type.
 -- This is usually just a unification, but with deep subsumption there is more to do.
-checkResultTy :: DeepSubsumptionFlag
-              -> HsExpr GhcRn
+checkResultTy :: HsExpr GhcRn
               -> (HsExpr GhcTc, SrcSpan)  -- Head
               -> [HsExprArg p]            -- Arguments, just error messages
               -> TcRhoType  -- Inferred type of the application; zonked to
                             --   expose foralls, but maybe not /deeply/ instantiated
               -> ExpRhoType -- Expected type; this is deeply skolemised
               -> TcM HsWrapper
-checkResultTy ds_flag rn_expr _ _ app_res_rho (Infer inf_res)
-  = fillInferResult ds_flag (exprCtOrigin rn_expr) app_res_rho inf_res
+checkResultTy rn_expr (tc_fun, _) _ app_res_rho (Infer inf_res)
+  = do { ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
+       ; fillInferResult ds_flag (exprCtOrigin rn_expr) app_res_rho inf_res
+       }
 
-checkResultTy ds_flag rn_expr (tc_fun, fun_loc) inst_args app_res_rho (Check res_ty)
+checkResultTy rn_expr (tc_fun, fun_loc) inst_args app_res_rho (Check res_ty)
 -- Unify with expected type from the context
 -- See Note [Unify with expected type before typechecking arguments]
 --
 -- Match up app_res_rho: the result type of rn_expr
 --     with res_ty:  the expected result type
  = perhaps_add_res_ty_ctxt $
-   do { traceTc "checkResultTy {" $
+   do { ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
+      ; traceTc "checkResultTy {" $
           vcat [ text "tc_fun:" <+> ppr tc_fun
                , text "app_res_rho:" <+> ppr app_res_rho
                , text "res_ty:"  <+> ppr res_ty
@@ -609,7 +583,6 @@ tcValArg _ pos (fun, fun_lspan) (EValArgQL {
                       , eaql_arg_ty   = sc_arg_ty
                       , eaql_larg     = larg@(L arg_loc rn_expr)
                       , eaql_tc_fun   = tc_head
-                      , eaql_ds_flag  = ds_flag
                       , eaql_rn_fun   = rn_fun
                       , eaql_fun_ue   = head_ue
                       , eaql_args     = inst_args
@@ -618,7 +591,7 @@ tcValArg _ pos (fun, fun_lspan) (EValArgQL {
   = addArgCtxt pos (fun, fun_lspan) larg $
     do { -- Expose QL results to tcSkolemise, as in EValArg case
          Scaled mult exp_arg_ty <- liftZonkM $ zonkScaledTcType sc_arg_ty
-
+       ; ds_flag <- getDeepSubsumptionFlag_DataConHead (fst tc_head)
        ; traceTc "tcEValArgQL {" (vcat [ text "app_res_rho:" <+> ppr app_res_rho
                                        , text "exp_arg_ty:" <+> ppr exp_arg_ty
                                        , text "args:" <+> ppr inst_args
@@ -645,7 +618,7 @@ tcValArg _ pos (fun, fun_lspan) (EValArgQL {
 
                   ; tc_args <- tcValArgs DoQL (rn_fun, snd tc_head) inst_args
                   ; app_res_rho <- liftZonkM $ zonkTcType app_res_rho
-                  ; res_wrap <- checkResultTy ds_flag rn_expr tc_head inst_args
+                  ; res_wrap <- checkResultTy rn_expr tc_head inst_args
                                               app_res_rho (mkCheckExpType exp_arg_rho)
                   ; finishApp tc_head tc_args app_res_rho res_wrap }
 
@@ -681,7 +654,6 @@ tcInstFun :: QLFlag
                     --           always return a rho-type (but not a deep-rho type)
                     -- Generally speaking we pass in True; in Fig 5 of the paper
                     --    |-inst returns a rho-type
-          -> DeepSubsumptionFlag
           -> (CtOrigin, HsExpr GhcRn, SrcSpan)
           -> HsExpr GhcTc
           -> TcSigmaType -> [HsExprArg 'TcpRn]
@@ -690,7 +662,7 @@ tcInstFun :: QLFlag
 -- This crucial function implements the |-inst judgement in Fig 4, plus the
 -- modification in Fig 5, of the QL paper:
 -- "A quick look at impredicativity" (ICFP'20).
-tcInstFun do_ql inst_final ds_flag (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigma rn_args
+tcInstFun do_ql inst_final (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigma rn_args
   = do { traceTc "tcInstFun" (vcat [ text "origin" <+> ppr fun_orig
                                    , text "tc_fun" <+> ppr tc_fun
                                    , text "fun_sigma" <+> ppr fun_sigma
@@ -886,7 +858,7 @@ tcInstFun do_ql inst_final ds_flag (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigm
                 matchActualFunTy herald
                   (Just $ HsExprTcThing tc_fun)
                   (n_val_args, fun_sigma) fun_ty
-
+           ; ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
            ; arg' <- quickLookArg ds_flag do_ql pos ctxt (rn_fun, fun_lspan) arg arg_ty
            ; let acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
            ; go (pos+1) acc' res_ty rest_args }
@@ -1944,7 +1916,7 @@ quickLookArg1 pos app_lspan (fun, fun_lspan) larg@(L _ arg) sc_arg_ty@(Scaled _ 
     do { ((rn_fun_arg, fun_lspan_arg), rn_args) <- splitHsApps arg
 
        -- Step 1: get the type of the head of the argument
-       ; (fun_ue, mb_fun_ty) <- tcCollectingUsage $ tcInferAppHead_maybe rn_fun_arg
+       ; (fun_ue, (tc_fun_arg_head, fun_sigma_arg_head)) <- tcCollectingUsage $ tcInferExprSigma rn_fun_arg
          -- tcCollectingUsage: the use of an Id at the head generates usage-info
          -- See the call to `tcEmitBindingUsage` in `check_local_id`.  So we must
          -- capture and save it in the `EValArgQL`.  See (QLA6) in
@@ -1953,21 +1925,17 @@ quickLookArg1 pos app_lspan (fun, fun_lspan) larg@(L _ arg) sc_arg_ty@(Scaled _ 
        ; traceTc "quickLookArg {" $
          vcat [ text "arg:" <+> ppr arg
               , text "orig_arg_rho:" <+> ppr orig_arg_rho
-              , text "head:" <+> ppr rn_fun_arg <+> dcolon <+> ppr mb_fun_ty
+              , text "head:" <+> ppr rn_fun_arg <+> dcolon <+> ppr fun_sigma_arg_head
               , text "args:" <+> ppr rn_args ]
 
-       ; case mb_fun_ty of {
-           Nothing -> skipQuickLook app_lspan larg sc_arg_ty ;    -- fun is too complicated
-           Just (tc_fun_arg_head, ds_flag_arg, fun_sigma_arg_head) ->
-
        -- step 2: use |-inst to instantiate the head applied to the arguments
-    do { let arg_tc_head = (tc_fun_arg_head, fun_lspan_arg)
+       ; let arg_tc_head = (tc_fun_arg_head, fun_lspan_arg)
        ; do_ql <- wantQuickLook rn_fun_arg
 
        ; arg_orig <- mk_origin fun_lspan_arg rn_fun_arg
        ; ((inst_args, app_res_rho), wanted)
              <- captureConstraints $
-                tcInstFun do_ql True ds_flag_arg (arg_orig, rn_fun_arg, fun_lspan_arg) tc_fun_arg_head fun_sigma_arg_head rn_args
+                tcInstFun do_ql True (arg_orig, rn_fun_arg, fun_lspan_arg) tc_fun_arg_head fun_sigma_arg_head rn_args
                 -- We must capture type-class and equality constraints here, but
                 -- not usage information.  See (QLA6) in Note [Quick Look at
                 -- value arguments]
@@ -2005,12 +1973,12 @@ quickLookArg1 pos app_lspan (fun, fun_lspan) larg@(L _ arg) sc_arg_ty@(Scaled _ 
                            , eaql_larg     = larg
                            , eaql_tc_fun   = arg_tc_head
                            , eaql_rn_fun   = rn_fun_arg
-                           , eaql_ds_flag  = ds_flag_arg
                            , eaql_fun_ue   = fun_ue
                            , eaql_args     = inst_args
                            , eaql_wanted   = wanted
                            , eaql_encl     = arg_influences_enclosing_call
-                           , eaql_res_rho  = app_res_rho }) }}}
+                           , eaql_res_rho  = app_res_rho })
+       }
 
 
 mk_origin :: SrcSpan       -- SrcSpan of the function

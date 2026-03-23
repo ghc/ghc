@@ -14,41 +14,33 @@ module GHC.Tc.Gen.Head
        , addArgWrap, isHsValArg
        , leadingValArgs, isVisibleArg, getDeepSubsumptionFlag_DataConHead
 
-       , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId, tcInferConLike, obviousSig
        , tyConOf, tyConOfET
        , nonBidirectionalErr
+       , tcInferRecSelId, tcInferOverLit, check_naughty
 
        , pprArgInst, addFunResCtxt ) where
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
-import {-# SOURCE #-} GHC.Tc.Gen.App( tcExprSigma )
 
 import GHC.Prelude
 import GHC.Hs
 import GHC.Hs.Syn.Type
 
-import GHC.Rename.Utils (mkExpandedTc, mkExpandedExprTc)
+import GHC.Rename.Utils ( mkExpandedExprTc)
 
-import GHC.Tc.Gen.HsType
-import GHC.Tc.Gen.Bind( chooseInferredQuantifiers )
-import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig )
 import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Tc.Errors.Types
-import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Types.ErrCtxt( ReportRedundantConstraints(..) )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint( WantedConstraints )
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Zonk.TcType
 
 
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
@@ -58,7 +50,7 @@ import GHC.Core.ConLike( ConLike(..) )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
-import GHC.Core.Type
+
 
 import GHC.Types.Id
 import GHC.Types.Name
@@ -73,7 +65,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
-import GHC.Data.Maybe
 
 {- *********************************************************************
 *                                                                      *
@@ -144,7 +135,7 @@ takes apart either an HsApp, or an infix OpApp, returning
   innermost un-expanded head as the "error head".
 
 * A list of HsExprArg, the arguments
-* We do not look through expanded expressions (except PopErrCtxt.)
+* We do not look through expanded expressions (XExpr)
 -}
 
 data TcPass = TcpRn     -- Arguments decomposed
@@ -167,7 +158,6 @@ data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
                                                      -- location and error msgs
                , eaql_rn_fun  :: HsExpr GhcRn  -- Head of the argument if it is an application
                , eaql_tc_fun  :: (HsExpr GhcTc, SrcSpan) -- Typechecked head and its location span
-               , eaql_ds_flag :: DeepSubsumptionFlag     -- Was deepsubsumption enabled for this argument?
                , eaql_fun_ue  :: UsageEnv -- Usage environment of the typechecked head (QLA5)
                , eaql_args    :: [HsExprArg 'TcpInst]    -- Args: instantiated, not typechecked
                , eaql_wanted  :: WantedConstraints
@@ -423,63 +413,63 @@ Wrinkle (UTS1):
 *                                                                      *
 ********************************************************************* -}
 
-tcInferAppHead :: (HsExpr GhcRn, SrcSpan)
-               -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
--- Infer type of the head of an application
---   i.e. the 'f' in (f e1 ... en)
--- See Note [Application chains and heads] in GHC.Tc.Gen.App
--- We get back a /SigmaType/ because we have special cases for
---   * A bare identifier (just look it up)
---     This case also covers a record selector HsRecSel
---   * An expression with a type signature (e :: ty)
---   * An XExpr where 'f' is actually an expanded out expression
--- See Note [Application chains and heads] in GHC.Tc.Gen.App
---
--- Note that [] and (,,) are both HsVar:
---   see Note [Empty lists] and [ExplicitTuple] in GHC.Hs.Expr
---
--- NB: 'e' cannot be HsApp, HsTyApp, HsPrag, HsPar, because those
---     cases are dealt with by splitHsApps.
---
--- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
-tcInferAppHead (fun,fun_lspan)
-  = setSrcSpan fun_lspan $
-    do { mb_tc_fun <- tcInferAppHead_maybe fun
-       ; case mb_tc_fun of
-            Just (fun', ds_flag, fun_sigma) -> return (fun', ds_flag, fun_sigma)
-            Nothing -> with_get_ds $ runInferRho (tcExpr fun)
+-- tcInferAppHead :: (HsExpr GhcRn, SrcSpan)
+--                -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
+-- -- Infer type of the head of an application
+-- --   i.e. the 'f' in (f e1 ... en)
+-- -- See Note [Application chains and heads] in GHC.Tc.Gen.App
+-- -- We get back a /SigmaType/ because we have special cases for
+-- --   * A bare identifier (just look it up)
+-- --     This case also covers a record selector HsRecSel
+-- --   * An expression with a type signature (e :: ty)
+-- --   * An XExpr where 'f' is actually an expanded out expression
+-- -- See Note [Application chains and heads] in GHC.Tc.Gen.App
+-- --
+-- -- Note that [] and (,,) are both HsVar:
+-- --   see Note [Empty lists] and [ExplicitTuple] in GHC.Hs.Expr
+-- --
+-- -- NB: 'e' cannot be HsApp, HsTyApp, HsPrag, HsPar, because those
+-- --     cases are dealt with by splitHsApps.
+-- --
+-- -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
+-- tcInferAppHead (fun,fun_lspan)
+--   = setSrcSpan fun_lspan $
+--     do { mb_tc_fun <- tcInferAppHead_maybe fun
+--        ; case mb_tc_fun of
+--             Just (fun', ds_flag, fun_sigma) -> return (fun', ds_flag, fun_sigma)
+--             Nothing -> with_get_ds $ runInferRho (tcExpr fun)
 
-       }
+--        }
 
-tcInferAppHead_maybe :: HsExpr GhcRn
-                     -> TcM (Maybe (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType))
--- See Note [Application chains and heads] in GHC.Tc.Gen.App
--- Returns Nothing for a complicated head
--- XExpr's although complicated needs to be looked through, useful for QL things when
--- the argument is an XExpr
-tcInferAppHead_maybe fun = case fun of
-      HsVar _ nm                  -> Just <$> with_get_ds (tcInferId nm)
-      ExprWithTySig _ e hs_ty     -> Just <$> with_get_ds (tcExprWithSig e hs_ty)
-      HsOverLit _ lit             -> Just <$> with_get_ds (tcInferOverLit lit)
-      XExpr (HsRecSelRn f)        -> Just <$> with_get_ds (tcInferRecSelId f)
-      XExpr (ExpandedThingRn (HSE o (L loc e))) -> setSrcSpan (locA loc) $ Just <$>  (
-                                              -- We do not want to instantiate the type of the head as there may be
-                                              -- visible type applications in the argument.
-                                              -- c.f. T19167
-                                              (\ (e, ds_flag, ty) -> (mkExpandedTc o (L loc e), ds_flag, ty)) <$>
-                                                  tcExprSigma False (hsCtxtCtOrigin o) e
-                                              )
-      _                           -> return Nothing
+-- tcInferAppHead_maybe :: HsExpr GhcRn
+--                      -> TcM (Maybe (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType))
+-- -- See Note [Application chains and heads] in GHC.Tc.Gen.App
+-- -- Returns Nothing for a complicated head
+-- -- XExpr's although complicated needs to be looked through, useful for QL things when
+-- -- the argument is an XExpr
+-- tcInferAppHead_maybe fun = case fun of
+--       HsVar _ nm                  -> Just <$> with_get_ds (tcInferId nm)
+--       ExprWithTySig _ e hs_ty     -> Just <$> with_get_ds (tcExprWithSig e hs_ty)
+--       HsOverLit _ lit             -> Just <$> with_get_ds (tcInferOverLit lit)
+--       XExpr (HsRecSelRn f)        -> Just <$> with_get_ds (tcInferRecSelId f)
+--       XExpr (ExpandedThingRn (HSE o (L loc e))) -> setSrcSpan (locA loc) $ Just <$>  (
+--                                               -- We do not want to instantiate the type of the head as there may be
+--                                               -- visible type applications in the argument.
+--                                               -- c.f. T19167
+--                                               (\ (e, ds_flag, ty) -> (mkExpandedTc o (L loc e), ds_flag, ty)) <$>
+--                                                   tcExprSigma False (hsCtxtCtOrigin o) e
+--                                               )
+--       _                           -> return Nothing
 
 
 
-with_get_ds :: TcM (HsExpr GhcTc, TcSigmaType)
-            -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
-with_get_ds mthing =
-  do { (expr_tc, sig_ty) <- mthing
-     ; ds_flag <- getDeepSubsumptionFlag_DataConHead expr_tc
-     ; return (expr_tc, ds_flag, sig_ty)
-     }
+-- with_get_ds :: TcM (HsExpr GhcTc, TcSigmaType)
+--             -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
+-- with_get_ds mthing =
+--   do { (expr_tc, sig_ty) <- mthing
+--      ; ds_flag <- getDeepSubsumptionFlag_DataConHead expr_tc
+--      ; return (expr_tc, ds_flag, sig_ty)
+--      }
 
 {- *********************************************************************
 *                                                                      *
@@ -542,70 +532,6 @@ tyConOf fam_inst_envs ty0
 -- Variant of tyConOf that works for ExpTypes
 tyConOfET :: FamInstEnvs -> ExpRhoType -> Maybe TyCon
 tyConOfET fam_inst_envs ty0 = tyConOf fam_inst_envs =<< checkingExpType_maybe ty0
-
-{- *********************************************************************
-*                                                                      *
-                Expressions with a type signature
-                        expr :: type
-*                                                                      *
-********************************************************************* -}
-
-tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType (NoGhcTc GhcRn)
-              -> TcM (HsExpr GhcTc, TcSigmaType)
-tcExprWithSig expr hs_ty
-  = do { sig_info <- checkNoErrs $  -- Avoid error cascade
-                     tcUserTypeSig loc hs_ty Nothing
-       ; (expr', poly_ty) <- tcExprSig expr sig_info
-       ; return (ExprWithTySig noExtField expr' hs_ty, poly_ty) }
-  where
-    loc = getLocA (dropWildCards hs_ty)
-
-tcExprSig :: LHsExpr GhcRn -> TcIdSig -> TcM (LHsExpr GhcTc, TcSigmaType)
-tcExprSig expr (TcCompleteSig sig)
-   = do { expr' <- tcPolyLExprSig expr sig
-        ; return (expr', idType (sig_bndr sig)) }
-
-tcExprSig expr sig@(TcPartialSig (PSig { psig_name = name, psig_loc = loc }))
-  = setSrcSpan loc $   -- Sets the location for the implication constraint
-    do { (tclvl, wanted, (expr', sig_inst))
-             <- pushLevelAndCaptureConstraints  $
-                do { sig_inst <- tcInstSig sig
-                   ; expr' <- tcExtendNameTyVarEnv (mapSnd binderVar $ sig_inst_skols sig_inst) $
-                              tcExtendNameTyVarEnv (sig_inst_wcs   sig_inst) $
-                              tcCheckPolyExprNC expr (sig_inst_tau sig_inst)
-                   ; return (expr', sig_inst) }
-       -- See Note [Partial expression signatures]
-       ; let tau = sig_inst_tau sig_inst
-             infer_mode | null (sig_inst_theta sig_inst)
-                        , isNothing (sig_inst_wcx sig_inst)
-                        = ApplyMR
-                        | otherwise
-                        = NoRestrictions
-       ; ((qtvs, givens, ev_binds, _), residual)
-           <- captureConstraints $
-              simplifyInfer NotTopLevel tclvl infer_mode
-                            [sig_inst] [(name, tau)] wanted
-       ; emitConstraints residual
-
-       ; tau <- liftZonkM $ zonkTcType tau
-       ; let inferred_theta = map evVarPred givens
-             tau_tvs        = tyCoVarsOfType tau
-       ; (binders, my_theta) <- chooseInferredQuantifiers residual inferred_theta
-                                   tau_tvs qtvs (Just sig_inst)
-       ; let inferred_sigma = mkInfSigmaTy qtvs inferred_theta tau
-             my_sigma       = mkInvisForAllTys binders (mkPhiTy  my_theta tau)
-       ; wrap <- if inferred_sigma `eqType` my_sigma -- NB: eqType ignores vis.
-                 then return idHsWrapper  -- Fast path; also avoids complaint when we infer
-                                          -- an ambiguous type and have AllowAmbiguousType
-                                          -- e..g infer  x :: forall a. F a -> Int
-                 else tcSubTypeSigma ExprSigOrigin (ExprSigCtxt NoRRC) inferred_sigma my_sigma
-
-       ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
-       ; let poly_wrap = wrap
-                         <.> mkWpTyLams qtvs
-                         <.> mkWpEvLams givens
-                         <.> mkWpLet  ev_binds
-       ; return (mkLHsWrap poly_wrap expr', my_sigma) }
 
 
 {- Note [Partial expression signatures]

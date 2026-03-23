@@ -13,7 +13,7 @@
 module GHC.Tc.Gen.Expr
        ( tcCheckPolyExpr, tcCheckPolyExprNC,
          tcCheckMonoExpr, tcCheckMonoExprNC,
-         tcInferExpr, tcInferSigma,
+         tcInferExpr, tcInferSigma, tcInferExprSigma,
          tcInferRho, tcInferRhoNC,
          tcMonoLExpr, tcMonoLExprNC,
          tcInferRhoFRR, tcInferRhoFRRNC,
@@ -37,7 +37,8 @@ import GHC.Rename.Env         ( addUsedGRE, getUpdFieldLbls )
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Do
-import GHC.Tc.Gen.Bind        ( tcLocalBinds )
+import GHC.Tc.Gen.Bind        ( tcLocalBinds, chooseInferredQuantifiers )
+import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches
@@ -53,7 +54,10 @@ import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.ErrCtxt (ReportRedundantConstraints (..))
 import GHC.Tc.Errors.Types hiding (HoleError)
+import GHC.Tc.Solver  ( InferMode(..), simplifyInfer )
+
 
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
@@ -237,6 +241,9 @@ tcPolyExprCheck expr res_ty
 tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
 tcInferSigma = tcInferExpr IIF_Sigma
 
+tcInferExprSigma :: HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferExprSigma e = runInfer IIF_Sigma IFRR_Any (tcExpr e)
+
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 -- Infer a *rho*-type. The return type is always instantiated.
 tcInferRho   = tcInferExpr   IIF_DeepRho
@@ -314,14 +321,23 @@ tcExpr :: HsExpr GhcRn
 --   - ones understood by GHC.Tc.Gen.Head.tcInferAppHead_maybe
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- Se Note [Typechecking by expansion: overview]
-tcExpr e@(HsVar {})              res_ty = tcApp e res_ty
+tcExpr e@(HsVar _ v_rn) res_ty
+  = do { (v_tc, sigma_ty) <- tcInferId v_rn
+       ; tcWrapResult e v_tc sigma_ty res_ty }
+
+tcExpr e@(ExprWithTySig _ e_rn e_ty) res_ty
+  = do { (e_tc, sigma_ty) <- tcExprWithSig e_rn e_ty
+       ; tcWrapResult e e_tc sigma_ty res_ty }
+
+tcExpr e@(XExpr(HsRecSelRn f)) res_ty
+  = do { (e_tc, sigma_ty) <- tcInferRecSelId f
+       ; tcWrapResult e e_tc sigma_ty res_ty }
+
+tcExpr (XExpr (ExpandedThingRn hse)) res_ty = tcHsExpansion hse res_ty
+
 tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
 tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
 tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
-tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
-
-tcExpr (XExpr (ExpandedThingRn hse)) res_ty = tcHsExpansion hse res_ty
-tcExpr e@(XExpr{})               res_ty = tcApp e res_ty
 
 -- Typecheck an occurrence of an unbound Id
 --
@@ -389,7 +405,9 @@ tcExpr e@(HsOverLit _ lit) res_ty
          -- See Note [Short cut for overloaded literals] in GHC.Tc.Utils.TcMType
        ; case mb_res of
            Just lit' -> return (HsOverLit noExtField lit')
-           Nothing   -> tcApp e res_ty }
+           Nothing   ->
+             do { (e_tc, sigma_ty) <- tcInferOverLit lit
+                ; tcWrapResult e e_tc sigma_ty res_ty } }
            -- Why go via tcApp? See Note [Typechecking overloaded literals]
 
 {- Note [Typechecking overloaded literals]
@@ -776,6 +794,71 @@ tcExpr (SectionL {})       ty = pprPanic "tcExpr:SectionL"    (ppr ty)
 tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
 
 
+{- *********************************************************************
+*                                                                      *
+                Expressions with a type signature
+                        expr :: type
+*                                                                      *
+********************************************************************* -}
+
+tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType (NoGhcTc GhcRn)
+              -> TcM (HsExpr GhcTc, TcSigmaType)
+tcExprWithSig expr hs_ty
+  = do { sig_info <- checkNoErrs $  -- Avoid error cascade
+                     tcUserTypeSig loc hs_ty Nothing
+       ; (expr', poly_ty) <- tcExprSig expr sig_info
+       ; return (ExprWithTySig noExtField expr' hs_ty, poly_ty) }
+  where
+    loc = getLocA (dropWildCards hs_ty)
+
+tcExprSig :: LHsExpr GhcRn -> TcIdSig -> TcM (LHsExpr GhcTc, TcSigmaType)
+tcExprSig expr (TcCompleteSig sig)
+   = do { expr' <- tcPolyLExprSig expr sig
+        ; return (expr', idType (sig_bndr sig)) }
+
+tcExprSig expr sig@(TcPartialSig (PSig { psig_name = name, psig_loc = loc }))
+  = setSrcSpan loc $   -- Sets the location for the implication constraint
+    do { (tclvl, wanted, (expr', sig_inst))
+             <- pushLevelAndCaptureConstraints  $
+                do { sig_inst <- tcInstSig sig
+                   ; expr' <- tcExtendNameTyVarEnv (mapSnd binderVar $ sig_inst_skols sig_inst) $
+                              tcExtendNameTyVarEnv (sig_inst_wcs   sig_inst) $
+                              tcCheckPolyExprNC expr (sig_inst_tau sig_inst)
+                   ; return (expr', sig_inst) }
+       -- See Note [Partial expression signatures]
+       ; let tau = sig_inst_tau sig_inst
+             infer_mode | null (sig_inst_theta sig_inst)
+                        , isNothing (sig_inst_wcx sig_inst)
+                        = ApplyMR
+                        | otherwise
+                        = NoRestrictions
+       ; ((qtvs, givens, ev_binds, _), residual)
+           <- captureConstraints $
+              simplifyInfer NotTopLevel tclvl infer_mode
+                            [sig_inst] [(name, tau)] wanted
+       ; emitConstraints residual
+
+       ; tau <- liftZonkM $ zonkTcType tau
+       ; let inferred_theta = map evVarPred givens
+             tau_tvs        = tyCoVarsOfType tau
+       ; (binders, my_theta) <- chooseInferredQuantifiers residual inferred_theta
+                                   tau_tvs qtvs (Just sig_inst)
+       ; let inferred_sigma = mkInfSigmaTy qtvs inferred_theta tau
+             my_sigma       = mkInvisForAllTys binders (mkPhiTy  my_theta tau)
+       ; wrap <- if inferred_sigma `eqType` my_sigma -- NB: eqType ignores vis.
+                 then return idHsWrapper  -- Fast path; also avoids complaint when we infer
+                                          -- an ambiguous type and have AllowAmbiguousType
+                                          -- e..g infer  x :: forall a. F a -> Int
+                 else tcSubTypeSigma ExprSigOrigin (ExprSigCtxt NoRRC) inferred_sigma my_sigma
+
+       ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
+       ; let poly_wrap = wrap
+                         <.> mkWpTyLams qtvs
+                         <.> mkWpEvLams givens
+                         <.> mkWpLet  ev_binds
+       ; return (mkLHsWrap poly_wrap expr', my_sigma) }
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1050,7 +1133,7 @@ tcSyntaxOpGen :: CtOrigin
               -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExprTc)
 tcSyntaxOpGen orig (SyntaxExprRn op) arg_tys res_ty thing_inside
-  = do { (expr, _, sigma) <- tcInferAppHead (op, noSrcSpan)
+  = do { (expr, sigma) <- tcInferExprSigma op
              -- Ugh!! But all this code is scheduled for demolition anyway
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)
