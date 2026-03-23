@@ -390,13 +390,16 @@ instance Semigroup BufSpan where
 -- or a human-readable description of a location.
 data SrcSpan =
     RealSrcSpan !RealSrcSpan !(Strict.Maybe BufSpan)  -- See Note [Why Maybe BufPos]
-  | GeneratedSrcSpan !GeneratedSrcSpanDetails
+  | GeneratedSrcSpan !GeneratedSrcSpanDetails -- See Wrinkle [Why GeneratedSrcSpanDetails in GeneratedSrcSpan]
+                                              -- in Note [Typechecking by expansion: overview]
   | UnhelpfulSpan !UnhelpfulSpanReason
 
   deriving (Eq, Show) -- Show is used by GHC.Parser.Lexer, because we
                       -- derive Show for Token
 
--- Needed for HIE. See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
+-- Needed for HIE.
+-- See Note [Source locations for implicit function calls] in GHC.Iface.Ext.Ast
+-- See Wrinkle [Why GeneratedSrcSpanDetails in GeneratedSrcSpan] in Note [Typechecking by expansion: overview]
 data GeneratedSrcSpanDetails =
     OrigSpan !RealSrcSpan -- this the span of the user written thing
   | UnhelpfulGenerated -- we do not have the original location.

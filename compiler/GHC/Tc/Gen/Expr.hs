@@ -849,6 +849,60 @@ The rest of this Note explains how that is done.
 * Note that inside an expansion we have sub-expressions from the original program.
   As soon as we enter one of those, identified by a /user/ span, `setSrcSpanA` will
   sets the `tcl_loc` to reflect that span, and switch off `tcl_in_gen_code`.  Nice!
+
+Wrinkle [Why GeneratedSrcSpanDetails in GeneratedSrcSpan]
+
+* HIE Ast is used to compute information necessary for IDE tooling
+  and haddock document generation.
+  https://gitlab.haskell.org/ghc/ghc/-/wikis/hie-files
+* Compiler expanded code may give rise to constraints that are solved and stored
+  as evidences in the typecheck AST, LHsExpr GhcTc. Naturally, those evidences are marked as
+  arising from a generated code. Some of these evidences, however, need to be
+  traced back to the original user written code. (c.f. T23540 haddockHypsrcTest)
+
+* Eg. consider the user written overloaded list example:
+
+        data BetterList x = Nil | Cons x (BetterList x)
+
+        list :: BetterList Modulo1
+        list = [0, 1, 2, 3, Zero]
+
+  Over loadedlists are expanded by the compiler to
+
+        list = XExpr (ExpandedThingRn
+                 { hs_ctxt =  [0, 1, 2, 3, Zero]
+                 , hs_ex = L <gen> fromListN 5 [0, 1, 2, 3, Zero] })
+
+  where `fromListN :: IsList l => Int -> [Item l] -> l`
+
+
+  HIE AST needs to associate the implicit typeclass evidence bound by
+  the call to `fromListN` to the user written expression `[0, 1, 2, 3, Zero]`
+
+      ==========================
+      At point (43,8), we found:
+      ==========================
+      ┌
+      │ $dIsList at T23540.hs:1:1, of type: IsList (BetterList Modulo1)
+      │     is an evidence variable bound by a let, depending on: [$fIsListBetterList]
+      │           with scope: ModuleScope
+      │
+      │     Defined at <no location info>
+      └
+      |
+      `- ┌
+         │ $fIsListBetterList at T23540.hs:36:10-30, of type: forall x. IsList (BetterList x)
+         │     is an evidence variable bound by an instance of class IsList
+         │           with scope: ModuleScope
+         │
+         │     Defined at T23540.hs:36:10
+         └
+
+  We hence embedd the original source code in generated source span details in `SrcSpan.GeneratedSrcSpan`
+  and the function `Iface.Ext.Ast.getUnlocatedEvBinds` can build the appropriate Hie ast Node pointing
+  to the user written expression.
+
+
 -}
 
 tcHsExpansion :: HsExpansion GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
