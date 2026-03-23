@@ -14,6 +14,7 @@ module Data.List.NubOrdSet (
 import Data.Bool (Bool(..))
 import GHC.Internal.Data.Function ((.))
 import GHC.Internal.Data.Ord (Ordering(..))
+import GHC.Internal.Num( Num ) -- For -frebindable-known-key-names (defaulting)
 
 -- | Implemented as a red-black tree, a la Okasaki.
 data NubOrdSet a

@@ -2,6 +2,7 @@
 {-# LANGUAGE BlockArguments #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -31,15 +32,23 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Utils.Instantiate
+
 import GHC.Core.Multiplicity
 import GHC.Core.Coercion
+import GHC.Core.Type( splitPiTy )
+
 import GHC.Types.Arity ( Arity )
-import GHC.Types.Id( mkLocalId )
-import GHC.Tc.Utils.Instantiate
-import GHC.Builtin.Types
+import GHC.Types.Id( mkLocalId, idType )
+import GHC.Types.Name.Reader (WithUserRdr(..))
+import GHC.Types.Name( KnownKey, hasKnownKey )
 import GHC.Types.Var.Set
-import GHC.Builtin.Types.Prim
 import GHC.Types.SrcLoc
+
+import GHC.Builtin.Names
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -97,8 +106,7 @@ tcProc pat cmd@(L loc (HsCmdTop names _)) exp_ty
         ; (co1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
         -- start with the names as they are used to desugar the proc itself
         -- See #17423
-        ; names' <- setSrcSpanA loc $
-            mapM (tcSyntaxName ProcOrigin arr_ty) names
+        ; names' <- tcCmdSyntaxTable loc ProcOrigin arr_ty names
         ; let cmd_env = CmdEnv { cmd_arr = arr_ty }
         ; (pat', cmd') <- newArrowScope
                           $ tcCheckPat (ArrowMatchCtxt ProcExpr) pat (unrestricted arg_ty)
@@ -133,13 +141,13 @@ tcCmdTop :: CmdEnv
          -> CmdType
          -> TcM (LHsCmdTop GhcTc)
 
-tcCmdTop env names (L loc (HsCmdTop _names cmd)) cmd_ty@(cmd_stk, res_ty)
+tcCmdTop env (CST names) (L loc (HsCmdTop _names cmd)) cmd_ty@(cmd_stk, res_ty)
   = setSrcSpanA loc $
     do  { cmd' <- tcCmd env cmd cmd_ty
         ; let cmd_top = CmdTopTc { ctt_stack  = cmd_stk
                                  , ctt_arr_ty = cmd_arr env
                                  , ctt_res_ty = res_ty
-                                 , ctt_table  = names }
+                                 , ctt_table  = CST names }
         ; return (L loc $ HsCmdTop cmd_top cmd') }
 
 ----------------------------------------
@@ -308,8 +316,7 @@ tc_cmd env cmd@(HsCmdArrForm fixity expr f cmd_args) (cmd_stk, res_ty)
        = do { arr_ty <- newFlexiTyVarTy arrowTyConKind
             ; stk_ty <- newFlexiTyVarTy liftedTypeKind
             ; res_ty <- newFlexiTyVarTy liftedTypeKind
-            ; names' <- setSrcSpanA loc $
-                mapM (tcSyntaxName ArrowCmdOrigin arr_ty) names
+            ; names' <- tcCmdSyntaxTable loc ArrowCmdOrigin arr_ty names
             ; let env' = env { cmd_arr = arr_ty }
             ; cmd' <- tcCmdTop env' names' cmd (stk_ty, res_ty)
             ; return (cmd',  mkCmdArrTy env' (mkPairTy alphaTy stk_ty) res_ty) }
@@ -381,6 +388,96 @@ matchExpectedCmdArgs n ty
   = do { (co1, [ty1, ty2]) <- matchExpectedTyConApp pairTyCon ty
        ; (co2, tys, res_ty) <- matchExpectedCmdArgs (n-1) ty2
        ; return (mkTyConAppCo Nominal pairTyCon [co1, co2], ty1:tys, res_ty) }
+
+{-
+************************************************************************
+*                                                                      *
+                Re-mappable syntax
+
+     Used only for arrow syntax -- find a way to nuke this
+*                                                                      *
+************************************************************************
+
+Suppose we are doing the -XRebindableSyntax thing, and we encounter
+a do-expression.  We have to find (>>) in the current environment, which is
+done by the rename. Then we have to check that it has the same type as
+Control.Monad.(>>).  Or, more precisely, a compatible type. One 'customer' had
+this:
+
+  (>>) :: HB m n mn => m a -> n b -> mn b
+
+So the idea is to generate a local binding for (>>), thus:
+
+        let then72 :: forall a b. m a -> m b -> m b
+            then72 = ...something involving the user's (>>)...
+        in
+        ...the do-expression...
+
+Now the do-expression can proceed using then72, which has exactly
+the expected type.
+
+In fact tcCmdSyntaxTable just generates the RHS for then72, because we only
+want an actual binding in the do-expression case. For literals, we can
+just use the expression inline.
+-}
+
+tcCmdSyntaxTable :: EpAnnCO -> CtOrigin -> TcType
+                 -> CmdSyntaxTable GhcRn -> TcM (CmdSyntaxTable GhcTc)
+-- See Note [CmdSyntaxTable] in "GHC.Hs.Expr"
+tcCmdSyntaxTable loc orig ty (CST tbl)
+  = setSrcSpanA loc $
+    do { tbl' <- mapM do_one tbl
+       ; return (CST tbl') }
+  where
+     do_one (std_uniq, HsVar _ (L _ (WithUserRdr _ user_nm)))
+       | user_nm `hasKnownKey` std_uniq
+       = -- Use the standard operation
+         do rhs <- newKnownKeyMethod orig std_uniq [ty]
+            return (std_uniq, rhs)
+
+     do_one (std_uniq, user_nm_expr)
+       = -- Use the user_nm_expr in place of the standard operation
+         do { std_id <- tcLookupKnownKeyId std_uniq
+            ; let ([tv], _, tau) = tcSplitSigmaTy (idType std_id)
+                  sigma1         = substTyWith [tv] [ty] tau
+                  -- Actually, the "tau-type" might be a sigma-type in the
+                  -- case of locally-polymorphic methods.
+
+            ; addErrCtxt (SyntaxNameCtxt user_nm_expr orig sigma1 (locA loc)) $
+         do {   -- Check that the user-supplied thing has the
+                -- same type as the standard one.
+                -- Tiresome jiggling because tcCheckSigma takes a located expression
+           ; expr <- tcCheckPolyExpr (L (noAnnSrcSpan (locA loc)) user_nm_expr) sigma1
+           ; hasFixedRuntimeRepRes std_uniq user_nm_expr sigma1
+           ; return (std_uniq, unLoc expr) } }
+
+-- | Check that the result type of an expression has a fixed runtime representation.
+--
+-- Used only for arrow operations such as 'arr', 'first', etc.
+hasFixedRuntimeRepRes :: KnownKey -> HsExpr GhcRn -> TcSigmaType -> TcM ()
+hasFixedRuntimeRepRes std_uniq user_expr ty = mapM_ do_check mb_arity
+  where
+   do_check :: Arity -> TcM ()
+   do_check arity =
+     let res_ty = nTimes arity (snd . splitPiTy) ty
+     in hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowFun user_expr) res_ty
+
+   mb_arity :: Maybe Arity
+   mb_arity -- arity of the arrow operation, counting type-level arguments
+     | std_uniq == arrAIdKey     -- result used as an argument in, e.g., do_premap
+     = Just 3
+     | std_uniq == composeAIdKey -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
+     = Just 5
+     | std_uniq == firstAIdKey   -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
+     = Just 4
+     | std_uniq == appAIdKey     -- result used as an argument in, e.g., dsCmd/HsCmdArrApp/HsHigherOrderApp
+     = Just 2
+     | std_uniq == choiceAIdKey  -- result used as an argument in, e.g., HsCmdIf
+     = Just 5
+     | std_uniq == loopAIdKey    -- result used as an argument in, e.g., HsCmdIf
+     = Just 4
+     | otherwise
+     = Nothing
 
 {-
 ************************************************************************

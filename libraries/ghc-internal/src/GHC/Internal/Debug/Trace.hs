@@ -59,6 +59,7 @@ import GHC.Internal.Stack
 import GHC.Internal.Data.List (null, partition)
 import GHC.Internal.RTS.Flags.Test
 import GHC.Internal.Types (Bool, IO(..))
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 -- | 'userEventTracingEnabled' is True if event logging for user events (@+RTS -l@) is enabled.
 userEventTracingEnabled :: IO Bool

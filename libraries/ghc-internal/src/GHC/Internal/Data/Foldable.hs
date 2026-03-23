@@ -6,6 +6,11 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+{-# OPTIONS_GHC -fexclude-known-key-define=toList  #-}
+{-# OPTIONS_GHC -fexclude-known-key-define=foldr  #-}
+    -- Defines Foldable
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Data.Foldable

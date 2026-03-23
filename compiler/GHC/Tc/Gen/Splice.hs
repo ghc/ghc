@@ -76,7 +76,6 @@ import GHC.ThToHs
 import GHC.HsToCore.Docs
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Monad
-import GHC.IfaceToCore
 import GHC.Iface.Load
 
 import GHCi.Message
@@ -708,7 +707,7 @@ tcTypedBracket rn_expr expr res_ty
        ; meta_ty <- tcCodeTy m_var expr_ty
        ; ps' <- readMutVar ps_var
        ; codeco <- tcLookupId unsafeCodeCoerceName
-       ; bracket_ty <- mkAppTy m_var <$> tcMetaTy expTyConName
+       ; bracket_ty <- mkAppTy m_var <$> tcMetaKnownOccTy expTyConOcc
        ; let brack_tc = HsBracketTc { hsb_quote = ExpBr noExtField expr, hsb_ty = bracket_ty
                                     , hsb_wrap  = Just wrapper, hsb_splices = ps' }
              -- The tc_expr is stored here so that the expression can be used in HIE files.
@@ -780,32 +779,32 @@ brackTy b =
         ev_var <- emitQuoteWanted m_var
         -- Construct the final expected type of the quote, for example
         -- m Exp or m Type
-        final_ty <- mkAppTy m_var <$> tcMetaTy n
+        final_ty <- mkAppTy m_var <$> tcMetaKnownOccTy n
         -- Return the evidence variable and metavariable to be used during
         -- desugaring.
         let wrapper = QuoteWrapper ev_var m_var
         return (Just wrapper, final_ty)
   in
   case b of
-    (VarBr {}) -> (Nothing,) <$> tcMetaTy nameTyConName
+    (VarBr {}) -> (Nothing,) <$> tcMetaKnownOccTy nameTyConOcc
                                            -- Result type is Var (not Quote-monadic)
-    (ExpBr {})  -> mkTy expTyConName  -- Result type is m Exp
-    (TypBr {})  -> mkTy typeTyConName -- Result type is m Type
-    (DecBrG {}) -> mkTy decsTyConName -- Result type is m [Dec]
-    (PatBr {})  -> mkTy patTyConName  -- Result type is m Pat
+    (ExpBr {})  -> mkTy expTyConOcc  -- Result type is m Exp
+    (TypBr {})  -> mkTy typeTyConOcc -- Result type is m Type
+    (DecBrG {}) -> mkTy decsTyConOcc -- Result type is m [Dec]
+    (PatBr {})  -> mkTy patTyConOcc  -- Result type is m Pat
     (DecBrL {}) -> panic "tcBrackTy: Unexpected DecBrL"
 
 
 untypedSpliceResultType :: UntypedSpliceFlavour -> TcType -> TcM TcType
 untypedSpliceResultType flavour meta_ty = do
-  sp_ty <- tcMetaTy sp_ty_name
+  sp_ty <- tcMetaKnownOccTy sp_ty_name
   return $ mkAppTy meta_ty sp_ty
   where
     sp_ty_name = case flavour of
-      UntypedExpSplice  -> expTyConName
-      UntypedPatSplice  -> patTyConName
-      UntypedTypeSplice -> typeTyConName
-      UntypedDeclSplice -> decsTyConName
+      UntypedExpSplice  -> expTyConOcc
+      UntypedPatSplice  -> patTyConOcc
+      UntypedTypeSplice -> typeTyConOcc
+      UntypedDeclSplice -> decsTyConOcc
 
 ---------------
 -- | Typechecking a pending splice from a untyped bracket
@@ -824,11 +823,11 @@ tcUntypedSplice (QuoteWrapper _ m_var) splice_name (HsUntypedSpliceExpr (HsUserS
        ; return (PendingTcSplice splice_name expr') }
 tcUntypedSplice (QuoteWrapper _ m_var) splice_name (HsQuasiQuote (HsQuasiQuoteExt flavour) quoter s) = do
    -- 1. Check that the quoter is of type 'QuasiQuoter'
-   qq_type <- mkTyConTy <$> tcLookupTyCon quasiQuoterTyConName
+   qq_type <- tcMetaKnownOccTy quasiQuoterTyConOcc
    quoter' <- setSrcSpan (getLocA quoter) $ tcCheckId (unLoc quoter) (Check qq_type)
 
    -- 2. Check that the quasi-quote has type Q Exp/Q Pat/Q Dec/Q Decs (as appropriate)
-   qTy <- mkTyConTy <$> tcLookupTyCon qTyConName
+   qTy <- mkTyConTy <$> tcLookupKnownOccTyCon qTyConOcc
    quote_ty <- untypedSpliceResultType flavour m_var
    splice_ty <- untypedSpliceResultType flavour qTy
    res_co <- unifyInvisibleType InvisibleKind splice_ty quote_ty
@@ -864,9 +863,9 @@ tcUntypedSplice q splice_name (XUntypedSplice ils)
        ; v_expr' <- tcCheckMonoExpr v_expr id_ty
        -- lift :: Quote m' => a -> m' Exp
        ; lift <- setSrcSpan (getLocA id_name) $
-                  newMethodFromName (ImplicitLiftOrigin ils)
-                                     GHC.Builtin.Names.TH.liftName
-                                     [getRuntimeRep id_ty, id_ty]
+                  newKnownOccMethod (ImplicitLiftOrigin ils)
+                                    GHC.Builtin.Names.TH.liftIdOcc
+                                    [getRuntimeRep id_ty, id_ty]
        ; let res = nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLocA lift)) v_expr'
 
        ; return (PendingTcSplice splice_name res) }
@@ -890,9 +889,9 @@ tcPendingSpliceTyped q splice_name (XTypedSplice ils) res_ty
        ; v_expr' <- tcCheckMonoExpr v_expr res_ty
        -- lift :: Quote m' => a -> m' Exp
        ; lift <- setSrcSpan (getLocA id_name) $
-                  newMethodFromName (ImplicitLiftOrigin ils)
-                                     GHC.Builtin.Names.TH.liftName
-                                     [rep, res_ty]
+                  newKnownOccMethod (ImplicitLiftOrigin ils)
+                                    GHC.Builtin.Names.TH.liftIdOcc
+                                    [rep, res_ty]
        ; let res = nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLocA lift)) v_expr'
        ; return (PendingTcSplice splice_name res) }
 
@@ -903,7 +902,7 @@ tcCodeTy :: TcType -> TcType -> TcM TcType
 tcCodeTy m_ty exp_ty
   = do { unless (isTauTy exp_ty) $ addErr $
           TcRnTHError $ TypedTHError $ TypedTHWithPolyType exp_ty
-       ; codeCon <- tcLookupTyCon codeTyConName
+       ; codeCon <- tcLookupKnownOccTyCon codeTyConOcc
        ; let rep = getRuntimeRep exp_ty
        ; return (mkTyConApp codeCon [m_ty, rep, exp_ty]) }
 
@@ -974,7 +973,7 @@ tcTopSplice expr res_ty
   = do { -- Typecheck the expression,
          -- making sure it has type Q (T res_ty)
          res_ty <- expTypeToType res_ty
-       ; q_type <- tcMetaTy qTyConName
+       ; q_type <- tcMetaKnownOccTy qTyConOcc
        -- Top level splices must still be of type Q (TExp a)
        ; meta_exp_ty <- tcCodeTy q_type res_ty
        ; q_expr <- tcTopSpliceExpr Typed $
@@ -1078,7 +1077,7 @@ stubNestedSplice = warnPprTrace True "stubNestedSplice" empty $
 runAnnotation target expr = do
     -- Find the classes we want instances for in order to call toAnnotationWrapper
     loc <- getSrcSpanM
-    data_class <- tcLookupClass dataClassName
+    data_class <- tcLookupKnownKeyClass dataClassKey
     to_annotation_wrapper_id <- tcLookupId toAnnotationWrapperName
 
     -- Check the instances we require live in another module (we want to execute it..)
@@ -1555,12 +1554,12 @@ instance TH.Quasi TcM where
         = addErr $ TcRnTHError $ AddTopDeclsError $ InvalidTopDecl d
 
       bindName :: RdrName -> TcM ()
-      bindName (Exact n)
+      bindName rdr_name
+        | Just n <- rdrNameExactName_maybe rdr_name
         = do { th_topnames_var <- fmap tcg_th_topnames getGblEnv
-             ; updTcRef th_topnames_var (\ns -> extendNameSet ns n)
-             }
-
-      bindName name = addErr $ TcRnTHError $ THNameError $ NonExactName name
+             ; updTcRef th_topnames_var (\ns -> extendNameSet ns n) }
+        | otherwise
+        = addErr $ TcRnTHError $ THNameError $ NonExactName rdr_name
 
   qAddForeignFilePath lang fp = do
     var <- fmap tcg_th_foreign_files getGblEnv

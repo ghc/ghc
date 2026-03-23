@@ -30,7 +30,10 @@ module GHC.Internal.Conc.Bound
     , runInUnboundThread
     , rtsSupportsBoundThreads
     ) where
---
+
+import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Data.Typeable( Typeable )  -- For known-key names
+
 -- JavaScript platform doesn't support bound threads
 #if !defined(javascript_HOST_ARCH)
 #define SUPPORT_BOUND_THREADS

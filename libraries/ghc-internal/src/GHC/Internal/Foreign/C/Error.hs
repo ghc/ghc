@@ -108,6 +108,7 @@ import GHC.Internal.IO.Handle.Types
 import GHC.Internal.Num
 import GHC.Internal.Base ( String, otherwise, return, ($) )
 import GHC.Internal.Types ( Bool(..) )
+import GHC.Internal.Base( (>>=), (>>) )        -- For known-key names
 
 -- "errno" type
 -- ------------

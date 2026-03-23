@@ -78,6 +78,8 @@ import GHC.Internal.Real
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Types (Bool(..), Char, Int)
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
+import GHC.Internal.Control.Monad.Fail( fail )   -- For known-key names
 
 
 -- ---------------------------------------------------------------------------

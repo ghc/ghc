@@ -29,15 +29,13 @@ module GHC.Internal.Stack.Decode (
   )
 where
 
-import GHC.Internal.Base (String, mapM, pure, ($), (.), (<*>))
-import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Base
 import GHC.Internal.Err (error)
 import GHC.Internal.Show
 import GHC.Internal.Prim (
     Addr#, Int#, StackSnapshot#, Word#, Word32#, int2Word#,
   )
 import GHC.Internal.Real
-import GHC.Internal.Types (Any, Bool(..), Int(..), IO)
 import GHC.Internal.Word
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
@@ -63,6 +61,7 @@ import GHC.Internal.Heap.Closures
   )
 import GHC.Internal.Heap.Constants (wORD_SIZE_IN_BITS)
 import GHC.Internal.Stack.Annotation
+
 -- See Note [No way-dependent imports]
 #if defined(PROFILING)
 import GHC.Internal.Stack.Constants ()
@@ -77,6 +76,7 @@ import GHC.Internal.Stack.ConstantsProf ()
 #endif
 import GHC.Internal.Stack.CloneStack
 import GHC.Internal.InfoProv.Types (InfoProv (..), ipLoc, lookupIPE)
+import GHC.Internal.Enum( enumFrom, enumFromTo ) -- For known-key names
 
 {- Note [Decoding the stack]
    ~~~~~~~~~~~~~~~~~~~~~~~~~

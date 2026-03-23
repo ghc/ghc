@@ -23,6 +23,7 @@ import GHC.Internal.Classes (Ord(..))
 import GHC.Internal.Unicode.Bits (lookupIntN)
 import GHC.Internal.Num ((-))
 import GHC.Internal.Types (Char, Int)
+import GHC.Internal.Num( fromInteger ) -- For known-key names
 
 {-# NOINLINE lookup_bitmap #-}
 lookup_bitmap :: Int -> Int

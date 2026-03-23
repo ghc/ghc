@@ -471,8 +471,8 @@ data GhcHint
       superclass that defines the canonical version of the method.
     -}
   | SuggestMoveNonCanonicalDefinition
-    Name -- ^ move the implementation from this method
-    Name -- ^ ... to this method
+    OccName -- ^ move the implementation from this method
+    OccName -- ^ ... to this method
     String -- ^ Documentation URL
 
     {-| Suggest to increase the solver maximum reduction depth -}
@@ -482,8 +482,8 @@ data GhcHint
       canonical version of that method.
     -}
   | SuggestRemoveNonCanonicalDefinition
-    Name -- ^ method with non-canonical implementation
-    Name -- ^ possible other method to use as the RHS instead
+    OccName -- ^ method with non-canonical implementation
+    OccName -- ^ possible other method to use as the RHS instead
     String -- ^ Documentation URL
   {-| Suggest eta-reducing a type synonym used in the implementation
       of abstract data. -}

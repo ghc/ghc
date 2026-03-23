@@ -2,6 +2,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+   -- Defines Ix
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Ix
@@ -20,18 +23,14 @@ module GHC.Internal.Ix (
         Ix(..), indexError
     ) where
 
-import GHC.Internal.Classes (Ord(..), (&&))
+import GHC.Internal.Base
 import GHC.Internal.Enum
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Num
-import GHC.Internal.Base (String, Void, absurd, otherwise, ($), (.))
 import GHC.Internal.Prim ((<=#))
 import GHC.Internal.Real( fromIntegral )
 import GHC.Internal.Show
 import GHC.Internal.Tuple (Solo (..))
-import GHC.Internal.Types (
-    Bool(..), Char(..), Int(..), Ordering(..), Word(..), isTrue#,
-  )
 
 -- | The 'Ix' class is used to map a contiguous subrange of values in
 -- a type onto integers.  It is used primarily for array indexing

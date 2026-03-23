@@ -62,7 +62,8 @@ module System.Console.GetOpt (
    -- $example2
 ) where
 
-import Prelude
+import Prelude hiding( foldr )
+import GHC.KnownKeyNames
 import GHC.Internal.Data.List ( isPrefixOf, find )
 
 -- |What to do with options following non-options

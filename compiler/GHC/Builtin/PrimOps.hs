@@ -163,7 +163,7 @@ primOpFixity :: PrimOp -> Maybe Fixity
 *                                                                      *
 ************************************************************************
 
-See Note [GHC.Prim Docs] in GHC.Builtin.Utils
+See Note [GHC.Prim Docs] in GHC.Builtin
 -}
 
 data PrimOpDoc

@@ -183,7 +183,7 @@ unknownNameSuggestionsMessage msg imp_errs hints
 
 notInScopeErr :: WhereLooking -> RdrName -> NotInScopeError
 notInScopeErr where_look rdr_name
-  | Just name <- isExact_maybe rdr_name
+  | Just name <- rdrNameExactName_maybe rdr_name
   = NoExactName name
   | WL_LocalTop <- where_look
   = NoTopLevelBinding

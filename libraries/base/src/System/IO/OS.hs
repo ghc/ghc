@@ -23,6 +23,8 @@ module System.IO.OS
 )
 where
 
+import GHC.KnownKeyNames
+
 import Control.Monad (return)
 import Control.Concurrent.MVar (MVar)
 import Control.Exception (mask)
@@ -61,6 +63,7 @@ import GHC.IO.Exception
        )
 import Foreign.Ptr (Ptr)
 import Foreign.C.Types (CInt)
+import GHC.Internal.Num( Num ) -- For -frebindable-known-key-names (defaulting)
 
 -- * Obtaining POSIX file descriptors and Windows handles
 

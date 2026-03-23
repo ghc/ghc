@@ -24,6 +24,8 @@ import GHC.Internal.Prim (
     Int64#, RealWorld, State#, ThreadId#, setOtherThreadAllocationCounter#,
   )
 import GHC.Internal.Types (IO(..))
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
+import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 
 {-# NOINLINE allocationLimitHandler #-}

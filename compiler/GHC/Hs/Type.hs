@@ -111,7 +111,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..) )
 import GHC.Types.Var ( VarBndr, visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
-import GHC.Builtin.Names ( negateName )
 import GHC.Builtin.Types( mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
@@ -1165,7 +1164,7 @@ data OpName = NormalOp (WithUserRdr Name) -- ^ A normal identifier
 
 instance Outputable OpName where
   ppr (NormalOp n)   = ppr n
-  ppr NegateOp       = ppr negateName
+  ppr NegateOp       = text "negate"
   ppr (UnboundOp uv) = ppr uv
   ppr (RecFldOp fld) = ppr fld
 

@@ -53,12 +53,10 @@ module GHC.Internal.ForeignPtr
         finalizeForeignPtr
   ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Data.Foldable    ( sequence_ )
-
-import GHC.Internal.Classes ( Eq(..), Ord(..) )
 import GHC.Internal.Show
-import GHC.Internal.Base ( Monad(..), otherwise, unIO, ($), (++) )
 import GHC.Internal.Err ( errorWithoutStackTrace, undefined )
 import GHC.Internal.IORef
 import GHC.Internal.Prim (
@@ -70,9 +68,8 @@ import GHC.Internal.Prim (
   )
 import GHC.Internal.STRef        ( STRef(..) )
 import GHC.Internal.Ptr          ( Ptr(..), FunPtr(..) )
-import GHC.Internal.Types        ( Bool(.. ), Int(..), IO(..) )
-
 import GHC.Internal.Unsafe.Coerce    ( unsafeCoerce )
+import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 -- |The type 'ForeignPtr' represents references to objects that are
 -- maintained in a foreign language, i.e., that are not part of the

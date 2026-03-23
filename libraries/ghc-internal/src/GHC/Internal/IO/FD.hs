@@ -72,6 +72,7 @@ import GHC.Internal.Foreign.Marshal.Alloc (allocaBytes)
 import qualified GHC.Internal.System.Posix.Internals
 import GHC.Internal.System.Posix.Internals hiding (FD, setEcho, getEcho)
 import GHC.Internal.System.Posix.Types
+import GHC.Internal.Base( (>>=), (>>) )          -- For known-key names
 
 c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False

@@ -17,12 +17,10 @@ module GHC.Internal.InfoProv.Types
     , lookupIPE
     ) where
 
-import GHC.Internal.Base (String, fmap, return, unIO, ($), (++), (=<<))
-import GHC.Internal.Classes (Eq)
+import GHC.Internal.Base
 import GHC.Internal.Enum
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Real (fromIntegral)
-import GHC.Internal.Types (IO(..))
 import GHC.Internal.Word (Word32)
 import GHC.Internal.Show (Show)
 import GHC.Internal.Ptr (Ptr(..), plusPtr)
@@ -33,6 +31,9 @@ import GHC.Internal.IO.Encoding (utf8)
 import GHC.Internal.Foreign.Storable (peekByteOff)
 import GHC.Internal.ClosureTypes
 import GHC.Internal.Prim (whereFrom##)
+import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
+import GHC.Internal.Classes( (==) )     -- For known-key names
 
 data InfoProv = InfoProv {
   ipName :: String,

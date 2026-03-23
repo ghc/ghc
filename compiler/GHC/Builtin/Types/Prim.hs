@@ -234,7 +234,7 @@ pcPrimTyCon_LevPolyLastArg name roles res_rep
 A few primitive TyCons are "unexposed", meaning:
 * We don't want users to be able to write them (see #15209);
   i.e. they aren't in scope, ever.  In particular they do not
-  appear in the exports of GHC.Prim: see GHC.Builtin.Utils.ghcPrimExports
+  appear in the exports of GHC.Prim: see GHC.Builtin.ghcPrimExports
 
 * We don't want users to see them in GHCi's @:browse@ output (see #12023).
 -}

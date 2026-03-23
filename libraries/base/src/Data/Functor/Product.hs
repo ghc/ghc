@@ -3,6 +3,10 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE StandaloneDeriving #-}
+
+{-# OPTIONS_GHC -fno-rebindable-known-key-names #-}
+    -- We import Prelude, hence GHC.KnownKeyNames is available
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Product
@@ -22,6 +26,7 @@ module Data.Functor.Product (
     Product(..),
   ) where
 
+import Prelude
 import Control.Applicative
 import GHC.Internal.Control.Monad (MonadPlus(..))
 import GHC.Internal.Control.Monad.Fix (MonadFix(..))
@@ -29,7 +34,6 @@ import Control.Monad.Zip (MonadZip(mzipWith))
 import GHC.Internal.Data.Data (Data)
 import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
-import Prelude
 
 -- $setup
 -- >>> import Prelude

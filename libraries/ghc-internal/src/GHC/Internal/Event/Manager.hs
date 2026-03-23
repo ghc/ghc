@@ -58,7 +58,7 @@ module GHC.Internal.Event.Manager
 ------------------------------------------------------------------------
 -- Imports
 
-import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
+import GHC.Internal.Base
 import GHC.Internal.Control.Concurrent.MVar (MVar, newMVar, putMVar,
                                 tryPutMVar, takeMVar, withMVar)
 import GHC.Internal.Control.Exception (onException)
@@ -70,10 +70,6 @@ import GHC.Internal.Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef
 import GHC.Internal.Data.Maybe (maybe)
 import GHC.Internal.Data.OldList (partition)
 import GHC.Internal.Arr (Array, (!), listArray)
-import GHC.Internal.Base (
-    Monad(..), Monoid(..), String, fmap, liftM, map, otherwise, sequence, when,
-    ($), (.), (=<<), (++),
-  )
 import GHC.Internal.Conc.Sync (yield)
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.List (filter, replicate)
@@ -88,7 +84,6 @@ import GHC.Internal.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
                            Lifetime(..), EventLifetime, Timeout(..))
 import GHC.Internal.Event.Unique (Unique, UniqueSource, newSource, newUnique)
 import GHC.Internal.System.Posix.Types (Fd)
-import GHC.Internal.Types (Bool(..), Int, IO)
 
 import qualified GHC.Internal.Event.IntTable as IT
 import qualified GHC.Internal.Event.Internal as I

@@ -50,7 +50,7 @@ import GHC.Tc.Types.ErrCtxt
 
 import GHC.Hs
 
-import GHC.Builtin.Names (getFieldName)
+import GHC.Builtin.Names( getFieldClassOpKey )
 
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -1011,13 +1011,12 @@ isPushCallStackOrigin_maybe orig               = Just orig_fs
 isHasFieldOrigin :: CtOrigin -> Bool
 isHasFieldOrigin = Semi.getAny . foldMapCtOrigin (Semi.Any . go)
   where
-    go = \case
-      OccurrenceOf n -> n == getFieldName
-      OccurrenceOfRecSel {} -> True
-      RecordFieldProjectionOrigin {} -> True
-      GetFieldOrigin {} -> True
-      RecordUpdOrigin {} -> True
-      _ -> False
+    go (OccurrenceOf n)                 = n `hasKnownKey` getFieldClassOpKey
+    go (OccurrenceOfRecSel {})          = True
+    go (RecordFieldProjectionOrigin {}) = True
+    go (GetFieldOrigin {})              = True
+    go (RecordUpdOrigin {})             = True
+    go _ = False
 
 {-
 ************************************************************************

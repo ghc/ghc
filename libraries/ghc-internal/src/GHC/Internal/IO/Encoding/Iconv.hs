@@ -60,6 +60,7 @@ import GHC.Internal.Word
 import GHC.Internal.Real
 import GHC.Internal.IO.Unsafe (unsafePerformIO)
 import GHC.Internal.System.Posix.Internals
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False

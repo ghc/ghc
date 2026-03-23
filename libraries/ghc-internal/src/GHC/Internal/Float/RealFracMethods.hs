@@ -73,6 +73,8 @@ import GHC.Internal.Prim (
   )
 import GHC.Internal.Types (Double(..), Float(..), Int(..), isTrue#)
 
+import GHC.Internal.Num( fromInteger, negate ) -- For known-key names
+
 #if WORD_SIZE_IN_BITS < 64
 
 import GHC.Internal.Prim (

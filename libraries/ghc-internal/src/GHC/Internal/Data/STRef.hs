@@ -28,6 +28,7 @@ import GHC.Internal.Base ((.), (=<<))
 import GHC.Internal.Prim (seq)
 import GHC.Internal.ST
 import GHC.Internal.STRef
+import GHC.Internal.Base( (>>=) ) -- Used for known-key names
 
 -- $setup
 -- >>> import Prelude

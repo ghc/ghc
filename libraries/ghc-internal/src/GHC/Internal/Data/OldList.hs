@@ -222,11 +222,12 @@ import GHC.Internal.Prim ( seq, (+#) )
 import GHC.Internal.Types ( Bool(..), Char, Int(..), Ordering(..), Word )
 import GHC.Internal.Unicode      ( isSpace )
 import GHC.Internal.Data.Tuple       ( fst, snd )
-
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.List
 import GHC.Internal.Base ( String, flip, id, otherwise, return, ($), (.) )
+
+import GHC.Internal.Base( (>>=) )   -- For known-key names
 
 infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/phases.html#cpp-and-string-gaps
 

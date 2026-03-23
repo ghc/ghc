@@ -477,14 +477,24 @@ The Anno type family maps to the specific EpAnn variant for a given
 item.
 
 So
+  data EpAnn ann
+      = EpAnn { entry    :: !EpaLocation
+              , anns     :: !ann
+              , comments :: !EpAnnComments }
 
   type instance XRec (GhcPass p) a = XRecGhc a
   type XRecGhc a = GenLocated (Anno a) a
 
-  type instance Anno RdrName = SrcSpanAnnN
-  type LocatedN = GenLocated SrcSpanAnnN
+  type instance Anno RdrName              = SrcSpanAnnN
+  type instance Anno (HsExpr (GhcPass p)) = SrcSpanAnnA
+    ...setc for other types
 
-meaning we can have type LocatedN RdrName
+  type SrcSpanAnnA = EpAnn AnnListItem
+
+So
+* A (LHsExpr (GhcPass p)) is decorated with a (Anno (HsExpr (GhcPass p)))
+* ...which is a SrcSpanAnnA
+* ...which is an EpAnn with an `anns` field of `AnnListItem` (for some strange reason)
 
 -}
 

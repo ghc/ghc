@@ -48,6 +48,7 @@ import GHC.Internal.Prim.PtrEq ( sameMVar# )
 import GHC.Internal.Stable       ( StablePtr(..) )
 import GHC.Internal.Types ( Bool(..), IO(..), isTrue# )
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# )
+import GHC.Internal.Base( (>>=), (>>) )        -- For known-key names
 
 data MVar a = MVar (MVar# RealWorld a)
 {- ^

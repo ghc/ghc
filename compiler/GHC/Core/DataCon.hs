@@ -1810,7 +1810,7 @@ dataConCannotMatch :: [Type] -> DataCon -> Bool
 dataConCannotMatch tys con
   -- See (U6) in Note [Implementing unsafeCoerce]
   -- in base:Unsafe.Coerce
-  | dataConName con == unsafeReflDataConName
+  | con `hasKnownKey` unsafeReflDataConKey
                       = False
   | null inst_theta   = False   -- Common
   | all isTyVarTy tys = False   -- Also common

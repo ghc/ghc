@@ -105,11 +105,7 @@ module Data.Semigroup (
   , ArgMax
   ) where
 
-import           GHC.Internal.Base (
-    Applicative(..), Functor(..), Monad(..), Monoid(..), Semigroup(..),
-    otherwise, (.),
-  )
-import           GHC.Internal.Classes
+import           GHC.Internal.Base hiding( Any )
 import           GHC.Internal.Enum
 import           GHC.Internal.Show
 import           GHC.Internal.Prim (coerce)
@@ -121,11 +117,11 @@ import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
 import           GHC.Internal.Data.Foldable
-import           GHC.Internal.Data.NonEmpty (NonEmpty(..))
 import           GHC.Internal.Data.Traversable
 import           GHC.Internal.Data.Semigroup.Internal
 import           GHC.Internal.Control.Monad.Fix
 import           GHC.Internal.Data.Data
+import           GHC.Internal.Data.Typeable( Typeable )
 import           GHC.Generics
 import qualified GHC.Internal.List as List
 

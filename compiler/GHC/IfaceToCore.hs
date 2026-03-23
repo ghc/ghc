@@ -2,20 +2,16 @@
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-
 Type checking of type signatures in interface files
 -}
 
-
 {-# LANGUAGE NondecreasingIndentation #-}
-
 {-# LANGUAGE RecursiveDo #-}
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# LANGUAGE RecordWildCards #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module GHC.IfaceToCore (
-        tcLookupImported_maybe,
         importDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface,
         typecheckWholeCoreBindings,
         tcIfaceDefaults,
@@ -36,7 +32,6 @@ import GHC.Prelude
 
 import GHC.ByteCode.Types
 
-import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Config.Core.Lint ( initLintConfig )
 
@@ -136,7 +131,8 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
 import Data.List(nub)
-import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)
+import GHC.Builtin.Names ( ioTyConName
+                         , rOOT_MAIN )
 import GHC.Iface.Errors.Types
 
 import Language.Haskell.Syntax.BooleanFormula (BooleanFormula)
@@ -2049,90 +2045,13 @@ tcIfaceGlobal name
   = do { ifCheckWiredInThing thing; return thing }
 
   | otherwise
-  = do  { env <- getGblEnv
-        ; cur_mod <- if_mod <$> getLclEnv
-        ; case lookupKnotVars (if_rec_types env) (fromMaybe cur_mod (nameModule_maybe name))  of     -- Note [Tying the knot]
-            Just get_type_env
-                -> do           -- It's defined in a module in the hs-boot loop
-                { type_env <- setLclEnv () get_type_env         -- yuk
-                ; case lookupNameEnv type_env name of
-                    Just thing -> return thing
-                    -- See Note [Knot-tying fallback on boot]
-                    Nothing   -> via_external
-                }
-
-            _ -> via_external }
-  where
-    via_external =  do
-        { hsc_env <- getTopEnv
-        ; mb_thing <- liftIO (lookupType hsc_env name)
-        ; case mb_thing of {
-            Just thing -> return thing ;
-            Nothing    -> do
-
-        { mb_thing <- importDecl name   -- It's imported; go get it
-        ; case mb_thing of
+  = do { mod <- case nameModule_maybe name of
+                  Just mod -> return mod
+                  Nothing  -> if_mod <$> getLclEnv
+       ; mb_thing <- loadGlobalName name mod
+       ; case mb_thing of
             Failed err      -> failIfM (ppr name <+> pprDiagnostic err)
-            Succeeded thing -> return thing
-        }}}
-
--- Note [Tying the knot]
--- ~~~~~~~~~~~~~~~~~~~~~
--- The if_rec_types field is used when we are compiling M.hs, which indirectly
--- imports Foo.hi, which mentions M.T Then we look up M.T in M's type
--- environment, which is splatted into if_rec_types after we've built M's type
--- envt.
---
--- This is a dark and complicated part of GHC type checking, with a lot
--- of moving parts.  Interested readers should also look at:
---
---      * Note [Knot-tying typecheckIface]
---      * Note [DFun knot-tying]
---      * Note [hsc_type_env_var hack]
---      * Note [Knot-tying fallback on boot]
---      * Note [Hydrating Modules]
---
--- There is also a wiki page on the subject, see:
---
---      https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/tying-the-knot
-
--- Note [Knot-tying fallback on boot]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Suppose that you are typechecking A.hs, which transitively imports,
--- via B.hs, A.hs-boot. When we poke on B.hs and discover that it
--- has a reference to a type T from A, what TyThing should we wire
--- it up with? Clearly, if we have already typechecked T and
--- added it into the type environment, we should go ahead and use that
--- type. But what if we haven't typechecked it yet?
---
--- For the longest time, GHC adopted the policy that this was
--- *an error condition*; that you MUST NEVER poke on B.hs's reference
--- to a T defined in A.hs until A.hs has gotten around to kind-checking
--- T and adding it to the env. However, actually ensuring this is the
--- case has proven to be a bug farm, because it's really difficult to
--- actually ensure this never happens. The problem was especially poignant
--- with type family consistency checks, which eagerly happen before any
--- typechecking takes place.
---
--- Today, we take a different strategy: if we ever try to access
--- an entity from A which doesn't exist, we just fall back on the
--- definition of A from the hs-boot file. This is complicated in
--- its own way: it means that you may end up with a mix of A.hs and
--- A.hs-boot TyThings during the course of typechecking.  We don't
--- think (and have not observed) any cases where this would cause
--- problems, but the hypothetical situation one might worry about
--- is something along these lines in Core:
---
---    case x of
---        A -> e1
---        B -> e2
---
--- If, when typechecking this, we find x :: T, and the T we are hooked
--- up with is the abstract one from the hs-boot file, rather than the
--- one defined in this module with constructors A and B.  But it's hard
--- to see how this could happen, especially because the reference to
--- the constructor (A and B) means that GHC will always typecheck
--- this expression *after* typechecking T.
+            Succeeded thing -> return thing }
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
 tcIfaceTyCon (IfaceTyCon name _info)

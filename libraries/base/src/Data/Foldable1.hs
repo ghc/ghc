@@ -35,10 +35,6 @@ import Data.Semigroup
        (Dual (..), First (..), Last (..), Max (..), Min (..), Product (..),
        Semigroup (..), Sum (..))
 import GHC.Tuple (Solo (..))
-import Prelude
-       (Maybe (..), Monad (..), Ord, Ordering (..), id, seq, ($!), ($), (.),
-       (=<<), flip, const, error)
-
 import qualified Data.List.NonEmpty as NE
 
 import Data.Complex (Complex (..))
@@ -58,6 +54,11 @@ import qualified Data.Functor.Sum     as Functor
 
 -- coerce
 import GHC.Internal.Data.Coerce (Coercible, coerce)
+
+import Prelude
+       (Maybe (..), Monad (..), Ord, Ordering (..), id, seq, ($!), ($), (.),
+       (=<<), flip, const, error)
+import Prelude( Num ) -- For -frebindable-known-key-names (defaulting)
 
 -- $setup
 -- >>> import Prelude hiding (foldr1, foldl1, head, last, minimum, maximum)

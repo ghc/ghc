@@ -29,6 +29,8 @@ import GHC.Internal.Maybe (Maybe(..))
 #endif
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable
+import GHC.Internal.Num( fromInteger )    -- For known-key names
+import GHC.Internal.Base( (>>=), (>>) )   -- For known-key names
 
 -- | Read an InfoTable from the heap into a haskell type.
 -- WARNING: This code assumes it is passed a pointer to a "standard" info

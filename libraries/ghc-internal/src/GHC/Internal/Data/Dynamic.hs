@@ -54,6 +54,7 @@ import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Show
 import GHC.Internal.Exception
 import GHC.Internal.Types (Type)
+import GHC.Internal.Num( fromInteger )     -- For known-key names
 
 -------------------------------------------------------------
 --

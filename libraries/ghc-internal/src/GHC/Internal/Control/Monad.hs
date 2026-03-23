@@ -1,6 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines guard
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Control.Monad
@@ -94,6 +97,7 @@ import GHC.Internal.Maybe ( Maybe )
 import GHC.Internal.Num  ( (-) )
 import GHC.Internal.Prim ( seq )
 import GHC.Internal.Types ( Bool(..), Int, IO )
+import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 -- $setup
 -- >>> import Prelude

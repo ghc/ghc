@@ -90,7 +90,7 @@ module GHC.Tc.Utils.TcMType (
   -- * Other HsSyn functions
   mkHsDictLet, mkHsApp,
   mkHsAppTy, mkHsCaseAlt,
-  tcShortCutLit, shortCutLit, hsOverLitName,
+  tcShortCutLit, shortCutLit, hsOverLitKey,
   conLikeResTy
   ) where
 
@@ -2338,11 +2338,11 @@ mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc
 mkLit con lit = HsApp noExtField (nlHsDataCon con) (nlHsLit lit)
 
 ------------------------------
-hsOverLitName :: OverLitVal -> Name
+hsOverLitKey :: OverLitVal -> KnownKey
 -- Get the canonical 'fromX' name for a particular OverLitVal
-hsOverLitName (HsIntegral {})   = fromIntegerName
-hsOverLitName (HsFractional {}) = fromRationalName
-hsOverLitName (HsIsString {})   = fromStringName
+hsOverLitKey (HsIntegral {})   = fromIntegerClassOpKey
+hsOverLitKey (HsFractional {}) = fromRationalClassOpKey
+hsOverLitKey (HsIsString {})   = fromStringClassOpKey
 
 
 {- *********************************************************************

@@ -1641,3 +1641,44 @@ using the :ghc-flag:`--show-iface ⟨file⟩` :ref:`mode <modes>`. If there is a
 
 .. [1]
    This is a change in behaviour relative to 6.2 and earlier.
+
+
+.. _known-key-names
+
+Known-key names
+----------------------------------------
+
+(This section is relevant only if you are a GHC developer, or you are
+modifying the ``base`` package.)
+
+GHC relies on a few hundred entities (types, classes, and functions)
+defined in the libraries ``ghc-internal`` or ``base``.  These include the classes
+``Num``, ``Show``, etc, the types ``Rational``, ``Ratio`` etc, and much
+more.  These entities have so-called "known-key" names.
+
+You can read ``Note [Overview of known-key names]`` in GHC's source code
+to understand more.  The behaviour of known-key names is controlled by two
+flags:
+
+.. ghc-flag:: -frebindable-known-key-names
+    :shortdesc: Find known-key names in the current top-level scope
+    :type: dynamic
+    :category:
+
+    This flag is off by default.  It is typically set when compiling modules
+    in ``ghc-internal`` or ``base``, and tells GHC to look for a known-key
+    entity in the current top-level scope.  When the flag is un-set, GHC looks
+    for the module ``base:GHC.KnownKeyNames``, but this module does not exist
+    when compiling ``ghc-internal`` or ``base``, which is why the flag is needed.
+
+.. ghc-flag:: -fdefines-known-key-names
+    :shortdesc: This module defines a known-key name
+    :type: dynamic
+    :category:
+
+    This flag is off by default.  It should be set when compiling a module
+    that *defines* a known-key entity.  That is how GHC knows that the entity
+    called "Rational" in this module is *the* known-key ``Rational`` and not
+    some other random type or class that happens to be called "Rational".
+
+

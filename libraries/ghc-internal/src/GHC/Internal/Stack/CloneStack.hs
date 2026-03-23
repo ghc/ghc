@@ -27,6 +27,7 @@ import GHC.Internal.Prim (
   )
 import GHC.Internal.Stable
 import GHC.Internal.Types (IO(..))
+import GHC.Internal.Base( (>>=), (>>) )        -- For known-key names
 
 -- | A frozen snapshot of the state of an execution stack.
 --

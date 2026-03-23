@@ -50,7 +50,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Types.Evidence
 
-import GHC.Builtin.Names ( unsatisfiableIdName )
+import GHC.Builtin.Names ( unsatisfiableIdKey )
 
 import GHC.Core        ( Expr(..), mkVarApps )
 import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
@@ -1876,7 +1876,7 @@ tcMethods _skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
       _ | (theta_id,unsat_msg) : _ <- unsat_thetas
         -> do { (meth_id, _) <- mkMethIds clas tyvars dfun_ev_vars
                                          inst_tys sel_id
-             ; unsat_id <- tcLookupId unsatisfiableIdName
+             ; unsat_id <- tcLookupKnownKeyId unsatisfiableIdKey
              -- Recall that unsatisfiable :: forall {rep} (msg :: ErrorMessage) (a :: TYPE rep). Unsatisfiable msg => a
              --
              -- So we need to instantiate the forall and pass the dictionary evidence.

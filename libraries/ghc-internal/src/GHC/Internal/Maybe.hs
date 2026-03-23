@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, StandaloneDeriving #-}
+{-# LANGUAGE NoImplicitPrelude, StandaloneDeriving, MagicHash #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -- | Maybe type
@@ -9,6 +9,7 @@ where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 import GHC.Internal.Classes
+import GHC.Internal.Magic( dataToTag# ) -- For derived Eq
 
 default ()
 

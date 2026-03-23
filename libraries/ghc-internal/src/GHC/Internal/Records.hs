@@ -6,6 +6,8 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+   -- Defines GetField
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Records

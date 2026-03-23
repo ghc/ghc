@@ -155,7 +155,7 @@ import GHC.Core.Type    ( Specificity(..) )
 import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, sumDataCon,
-                          unrestrictedFunTyCon , listTyCon_RDR, unitDataCon )
+                          unrestrictedFunTyCon, unitDataCon )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )
 import GHC.Data.OrdList
@@ -869,7 +869,9 @@ setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace ns occ)
 setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace ns occ)
 setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
-setRdrNameSpace (Exact n)    ns
+setRdrNameSpace (Exact (ExactOcc o)) ns
+  = Exact (ExactOcc (setOccNameSpace ns o))
+setRdrNameSpace (Exact (ExactName n))    ns
   | Just thing <- wiredInNameTyThing_maybe n
   = setWiredInNameSpace thing ns
     -- Preserve Exact Names for wired-in things,
@@ -880,7 +882,7 @@ setRdrNameSpace (Exact n)    ns
 
   | otherwise   -- This can happen when quoting and then
                 -- splicing a fixity declaration for a type
-  = Exact (mkSystemNameAt (nameUnique n) occ (nameSrcSpan n))
+  = nameRdrName (mkSystemNameAt (nameUnique n) occ (nameSrcSpan n))
   where
     occ = setOccNameSpace ns (nameOccName n)
 
@@ -889,13 +891,13 @@ setWiredInNameSpace (ATyCon tc) ns
   | isDataConNameSpace ns
   = ty_con_data_con tc
   | isTcClsNameSpace ns
-  = Exact (getName tc)      -- No-op
+  = nameRdrName (getName tc)      -- No-op
 
 setWiredInNameSpace (AConLike (RealDataCon dc)) ns
   | isTcClsNameSpace ns
   = data_con_ty_con dc
   | isDataConNameSpace ns
-  = Exact (getName dc)      -- No-op
+  = nameRdrName (getName dc)      -- No-op
 
 setWiredInNameSpace thing ns
   = pprPanic "setWiredinNameSpace" (pprNameSpace ns <+> ppr thing)
@@ -904,10 +906,10 @@ ty_con_data_con :: TyCon -> RdrName
 ty_con_data_con tc
   | isTupleTyCon tc
   , Just dc <- tyConSingleDataCon_maybe tc
-  = Exact (getName dc)
+  = nameRdrName (getName dc)
 
   | tc `hasKey` listTyConKey
-  = Exact nilDataConName
+  = nameRdrName nilDataConName
 
   | otherwise  -- See Note [setRdrNameSpace for wired-in names]
   = Unqual (setOccNameSpace srcDataName (getOccName tc))
@@ -916,10 +918,10 @@ data_con_ty_con :: DataCon -> RdrName
 data_con_ty_con dc
   | let tc = dataConTyCon dc
   , isTupleTyCon tc
-  = Exact (getName tc)
+  = nameRdrName (getName tc)
 
   | dc `hasKey` nilDataConKey
-  = Exact listTyConName
+  = nameRdrName listTyConName
 
   | otherwise  -- See Note [setRdrNameSpace for wired-in names]
   = Unqual (setOccNameSpace tcClsName (getOccName dc))
@@ -3871,7 +3873,7 @@ mkListSyntaxTy0 brkOpen brkClose span =
     enabled = HsTyVar noAnn NotPromoted rn
 
     -- attach the comments only to the RdrName since it's the innermost AST node
-    rn = L (EpAnn fullLoc rdrNameAnn emptyComments) listTyCon_RDR
+    rn = L (EpAnn fullLoc rdrNameAnn emptyComments) (nameRdrName listTyConName)
 
     disabled =
       HsExplicitListTy annsKeyword NotPromoted []

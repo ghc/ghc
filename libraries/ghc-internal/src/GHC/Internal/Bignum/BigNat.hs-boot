@@ -2,6 +2,9 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines lots of functions that have BuiltinRules
+
 module GHC.Internal.Bignum.BigNat where
 
 import GHC.Internal.Bignum.WordArray

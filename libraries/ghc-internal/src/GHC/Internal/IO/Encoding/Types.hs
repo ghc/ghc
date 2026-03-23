@@ -29,14 +29,11 @@ module GHC.Internal.IO.Encoding.Types (
     DecodingBuffer#, EncodingBuffer#
   ) where
 
-import GHC.Internal.Base (String, unIO, ($))
-import GHC.Internal.Classes (Eq)
+import GHC.Internal.Base
 import GHC.Internal.Prim (RealWorld, State#)
 import GHC.Internal.Word
 import GHC.Internal.Show
--- import GHC.Internal.IO
 import GHC.Internal.IO.Buffer
-import GHC.Internal.Types (Char, IO(..))
 
 -- -----------------------------------------------------------------------------
 -- Text encoders/decoders

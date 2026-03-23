@@ -45,6 +45,7 @@ import GHC.Internal.Control.Exception.Base
                         ( catch, throwIO, NonTermination (..)
                         , BlockedIndefinitelyOnMVar (..) )
 import GHC.Internal.Prim         ( RealWorld )
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 -- | Allow the result of an 'ST' computation to be used (lazily)
 -- inside the computation.

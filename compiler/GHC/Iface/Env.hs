@@ -41,7 +41,10 @@ import GHC.Types.Avail
 import GHC.Types.Name.Cache
 import GHC.Types.Unique.Supply
 import GHC.Types.SrcLoc
+import GHC.Types.Unique
 
+import GHC.Utils.Misc( HasDebugCallStack )
+import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Utils.Error
 import GHC.Utils.Logger
@@ -59,20 +62,21 @@ import Control.Monad
 See Also: Note [The Name Cache] in GHC.Types.Name.Cache
 -}
 
-newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
--- Used for source code and interface files, to make the
--- Name for a thing, given its Module and OccName
+newGlobalBinder :: HasDebugCallStack => Module -> OccName -> Maybe Unique
+                -> SrcSpan -> TcRnIf a b Name
+-- Used for source code, to make the Name for a thing, given its Module and OccName
 -- See Note [The Name Cache] in GHC.Types.Name.Cache
+-- (Interface files interact with the NameCache via GHC.Iface.Binary.getSymbolTable.)
 --
 -- The cache may already have a binding for this thing,
--- because we may have seen an occurrence before, but now is the
+-- because we may have seen an /occurrence/ before, but now is the
 -- moment when we know its Module and SrcLoc in their full glory
 
-newGlobalBinder mod occ loc
+newGlobalBinder mod occ mb_uniq loc
   = do { hsc_env <- getTopEnv
-       ; name <- liftIO $ allocateGlobalBinder (hsc_NC hsc_env) mod occ loc
+       ; name <- liftIO $ allocateGlobalBinder (hsc_NC hsc_env) mod occ mb_uniq loc
        ; traceIf (text "newGlobalBinder" <+>
-                  (vcat [ ppr mod <+> ppr occ <+> ppr loc, ppr name]))
+                  vcat [ ppr mod <+> ppr occ <+> ppr loc <+> ppr mb_uniq, ppr name, callStackDoc])
        ; return name }
 
 newInteractiveBinder :: HscEnv -> OccName -> SrcSpan -> IO Name
@@ -80,14 +84,15 @@ newInteractiveBinder :: HscEnv -> OccName -> SrcSpan -> IO Name
 -- from the interactive context
 newInteractiveBinder hsc_env occ loc = do
   let mod = icInteractiveModule (hsc_IC hsc_env)
-  allocateGlobalBinder (hsc_NC hsc_env) mod occ loc
+  allocateGlobalBinder (hsc_NC hsc_env) mod occ Nothing loc
 
 allocateGlobalBinder
-  :: NameCache
-  -> Module -> OccName -> SrcSpan
+  :: HasDebugCallStack
+  => NameCache
+  -> Module -> OccName -> Maybe Unique -> SrcSpan
   -> IO Name
 -- See Note [The Name Cache] in GHC.Types.Name.Cache
-allocateGlobalBinder nc mod occ loc
+allocateGlobalBinder nc mod occ mb_uniq loc
   = updateNameCache nc mod occ $ \cache0 -> do
       case lookupOrigNameCache cache0 mod occ of
         -- A hit in the cache!  We are at the binding site of the name.
@@ -109,20 +114,28 @@ allocateGlobalBinder nc mod occ loc
         Just name | isWiredInName name
                   -> pure (cache0, name)
                   | otherwise
-                  -> pure (new_cache, name')
+                  -> assertPpr (not wrong_unique)
+                               (hang (text "allocateGlobalBinder:bad known-key unique")
+                                   2 (ppr mb_uniq $$ ppr name)) $
+                     pure (new_cache, name')
                   where
                     uniq      = nameUnique name
-                    name'     = mkExternalName uniq mod occ loc
+                    name'     = setNameLoc name loc
                                 -- name' is like name, but with the right SrcSpan
                     new_cache = extendOrigNameCache cache0 mod occ name'
+                    wrong_unique = case mb_uniq of
+                                     Nothing      -> False
+                                     Just kn_uniq -> kn_uniq /= uniq
 
         -- Miss in the cache!
         -- Build a completely new Name, and put it in the cache
-        _ -> do
-              uniq <- takeUniqFromNameCache nc
-              let name      = mkExternalName uniq mod occ loc
-              let new_cache = extendOrigNameCache cache0 mod occ name
-              pure (new_cache, name)
+        _ -> do { name <- case mb_uniq of
+                             Just uniq -> return (mkKnownKeyName uniq mod occ loc)
+                             Nothing -> do { uniq <- takeUniqFromNameCache nc
+                                           ; return (mkExternalName uniq mod occ loc) }
+                ; let new_cache = extendOrigNameCache cache0 mod occ name
+                ; -- pprTrace "allocatedGlobalBinder" (ppr name) $
+                  pure (new_cache, name) }
 
 ifaceExportNames :: [IfaceExport] -> TcRnIf gbl lcl [AvailInfo]
 ifaceExportNames exports = return exports
@@ -144,7 +157,7 @@ lookupOrig mod occ = do
   traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
   liftIO $ lookupNameCache (hsc_NC hsc_env) mod occ
 
-lookupNameCache :: NameCache -> Module -> OccName -> IO Name
+lookupNameCache :: HasDebugCallStack => NameCache -> Module -> OccName -> IO Name
 -- Lookup up the (Module,OccName) in the NameCache
 -- If you find it, return it; if not, allocate a fresh original name and extend
 -- the NameCache.
@@ -158,6 +171,7 @@ lookupNameCache nc mod occ = updateNameCache nc mod occ $ \cache0 ->
       uniq <- takeUniqFromNameCache nc
       let name      = mkExternalName uniq mod occ noSrcSpan
       let new_cache = extendOrigNameCache cache0 mod occ name
+      -- pprTrace "lookupNameCache miss" (ppr name) $
       pure (new_cache, name)
 
 externaliseName :: Module -> Name -> TcRnIf m n Name
@@ -178,7 +192,7 @@ externaliseName mod name
 setNameModule :: Maybe Module -> Name -> TcRnIf m n Name
 setNameModule Nothing n = return n
 setNameModule (Just m) n =
-    newGlobalBinder m (nameOccName n) (nameSrcSpan n)
+    newGlobalBinder m (nameOccName n) Nothing (nameSrcSpan n)
 
 {-
 ************************************************************************

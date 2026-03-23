@@ -1746,7 +1746,7 @@ dsEvTypeable :: Type -> EvTypeable -> DsM CoreExpr
 -- This code is tightly coupled to the representation
 -- of TypeRep, in base library Data.Typeable.Internal
 dsEvTypeable ty ev
-  = do { tyCl <- dsLookupTyCon typeableClassName    -- Typeable
+  = do { tyCl <- dsLookupKnownKeyTyCon typeableClassKey    -- Typeable
        ; let kind = typeKind ty
              typeable_data_con = tyConSingleDataCon tyCl  -- "Data constructor"
                                                     -- for Typeable

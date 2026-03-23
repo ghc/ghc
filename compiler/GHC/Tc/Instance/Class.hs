@@ -140,18 +140,18 @@ matchGlobalInst :: DynFlags
 -- (That is handled by a separate code path: see GHC.Tc.Solver.Dict.solveDict,
 --  which calls solveEqualityDict for equality classes.)
 matchGlobalInst dflags short_cut clas tys mb_loc
-  | cls_name == knownNatClassName      = matchKnownNat    dflags short_cut clas tys
-  | cls_name == knownSymbolClassName   = matchKnownSymbol dflags short_cut clas tys
-  | cls_name == knownCharClassName     = matchKnownChar   dflags short_cut clas tys
-  | isCTupleClass clas                 = matchCTuple                       clas tys
-  | cls_name == typeableClassName      = matchTypeable                     clas tys
-  | cls_name == withDictClassName      = matchWithDict                          tys
-  | cls_name == dataToTagClassName     = matchDataToTag                    clas tys
-  | cls_name == hasFieldClassName      = matchHasField    dflags short_cut clas tys mb_loc
-  | cls_name == unsatisfiableClassName = matchUnsatisfiable
-  | otherwise                          = matchInstEnv     dflags short_cut clas tys
+  | cls_key == knownNatClassKey      = matchKnownNat    dflags short_cut clas tys
+  | cls_key == knownSymbolClassKey   = matchKnownSymbol dflags short_cut clas tys
+  | cls_key == knownCharClassKey     = matchKnownChar   dflags short_cut clas tys
+  | isCTupleClass clas               = matchCTuple                       clas tys
+  | cls_key == typeableClassKey      = matchTypeable                     clas tys
+  | cls_key == withDictClassKey      = matchWithDict                          tys
+  | cls_key == dataToTagClassKey     = matchDataToTag                    clas tys
+  | cls_key == hasFieldClassKey      = matchHasField    dflags short_cut clas tys mb_loc
+  | cls_key == unsatisfiableClassKey = matchUnsatisfiable
+  | otherwise                        = matchInstEnv     dflags short_cut clas tys
   where
-    cls_name = className clas
+    cls_key = getUnique clas
 
 matchUnsatisfiable :: TcM ClsInstResult
 -- See (B) in Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors

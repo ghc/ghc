@@ -68,6 +68,7 @@ import GHC.Internal.Ptr
 import GHC.Internal.Num
 import GHC.Internal.Show
 import GHC.Internal.List
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 -- ---------------------------------------------------------------------------
 -- Simple input operations

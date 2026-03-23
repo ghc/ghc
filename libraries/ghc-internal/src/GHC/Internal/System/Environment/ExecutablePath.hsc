@@ -21,6 +21,9 @@ module GHC.Internal.System.Environment.ExecutablePath
   , executablePath
   ) where
 
+import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
+
 ##if defined(javascript_HOST_ARCH)
 
 import GHC.Internal.Base (return)

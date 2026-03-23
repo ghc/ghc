@@ -55,7 +55,6 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc (lastMaybe)
 import GHC.Data.Maybe
 import GHC.Core.Type
-import GHC.Core.TyCon
 import GHC.Types.Literal
 import GHC.Types.Literal.Floating
 import GHC.Core
@@ -63,6 +62,7 @@ import GHC.Core.TyCo.Compare( eqType, nonDetCmpType )
 import GHC.Core.Map.Expr
 import GHC.Core.Utils (exprType)
 import GHC.Builtin.Names
+import GHC.Builtin( knownKeyOccName )
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.InertSet (InertSet, emptyInertSet)
@@ -712,21 +712,21 @@ coreExprAsPmLit e = case collectArgs e of
     -> Just (PmLit ty (PmLitInt l))
   (Var x, [_ty, n_arg, d_arg])
     | Just dc <- isDataConWorkId_maybe x
-    , dataConName dc == ratioDataConName
+    , dc `hasKnownKey` ratioDataConKey
     , Just (PmLit _ (PmLitInt n)) <- coreExprAsPmLit n_arg
     , Just (PmLit _ (PmLitInt d)) <- coreExprAsPmLit d_arg
     -> Just (PmLit (exprType e) (PmLitRat (n % d)))
 
   (Var x, args)
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
-    | is_rebound_name x fromIntegerName
+    | is_rebound_name x fromIntegerClassOpKey
     , Just arg <- lastMaybe args
     , Just (_ty,l) <- bignum_conapp_maybe arg
     -> Just (PmLit integerTy (PmLitInt l)) >>= overloadPmLit (exprType e)
   (Var x, args)
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
     -- fromRational <expr>
-    | is_rebound_name x fromRationalName
+    | is_rebound_name x fromRationalClassOpKey
     , [r] <- dropWhile (not . is_ratio) args
     -> coreExprAsPmLit r >>= overloadPmLit (exprType e)
 
@@ -739,7 +739,7 @@ coreExprAsPmLit e = case collectArgs e of
     , [r, exp] <- dropWhile (not . is_ratio) args
     , (Var x, [_ty, n_arg, d_arg]) <- collectArgs r
     , Just dc <- isDataConWorkId_maybe x
-    , dataConName dc == ratioDataConName
+    , dc `hasKnownKey` ratioDataConKey
     , Just (PmLit _ (PmLitInt n)) <- coreExprAsPmLit n_arg
     , Just (PmLit _ (PmLitInt d)) <- coreExprAsPmLit d_arg
     , Just (_exp_ty,exp') <- bignum_conapp_maybe exp
@@ -750,7 +750,7 @@ coreExprAsPmLit e = case collectArgs e of
       Just $ PmLit (exprType e) (PmLitOverRat neg frac)
 
   (Var x, args)
-    | is_rebound_name x fromStringName
+    | is_rebound_name x fromStringClassOpKey
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
     , s:_ <- filter (isStringTy . exprType) $ filter isValArg args
     -- NB: Calls coreExprAsPmLit and then overloadPmLit, so that we return PmLitOverStrings
@@ -762,7 +762,7 @@ coreExprAsPmLit e = case collectArgs e of
     , ty `eqType` charTy
     -> literalToPmLit stringTy (mkLitString "")
   (Var x, [Lit l])
-    | idName x `elem` [unpackCStringName, unpackCStringUtf8Name]
+    | idUnique x `elem` [unpackCStringIdKey, unpackCStringUtf8IdKey]
     -> literalToPmLit stringTy l
 
   _ -> Nothing
@@ -784,21 +784,21 @@ coreExprAsPmLit e = case collectArgs e of
     is_ratio (Type _) = False
     is_ratio r
       | Just (tc, _) <- splitTyConApp_maybe (exprType r)
-      = tyConName tc == ratioTyConName
+      = tc `hasKnownKey` ratioTyConKey
       | otherwise
       = False
     is_larg_exp_ratio x
-      | is_rebound_name x mkRationalBase10Name
+      | is_rebound_name x mkRationalBase10IdKey
       = Just Base10
-      | is_rebound_name x mkRationalBase2Name
+      | is_rebound_name x mkRationalBase2IdKey
       = Just Base2
       | otherwise
       = Nothing
 
 
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
-    is_rebound_name :: Id -> Name -> Bool
-    is_rebound_name x n = getOccFS (idName x) == getOccFS n
+    is_rebound_name :: Id -> KnownKey -> Bool
+    is_rebound_name x k = getOccFS (idName x) == occNameFS (knownKeyOccName k)
 
 {- Note [Detecting overloaded literals with -XRebindableSyntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

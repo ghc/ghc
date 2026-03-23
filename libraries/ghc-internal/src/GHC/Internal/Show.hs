@@ -1,6 +1,10 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, StandaloneDeriving,
              MagicHash, UnboxedTuples #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Show
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 #include "MachDeps.h"
@@ -49,11 +53,7 @@ module GHC.Internal.Show
   )
         where
 
-import GHC.Internal.Base (
-    String, NonEmpty(..), Void, minInt, ord, otherwise, quotRemInt, unsafeChr,
-    ($), (.), (++),
-  )
-import GHC.Internal.Classes (Eq(..), Ord(..), (&&))
+import GHC.Internal.Base
 import GHC.Internal.CString (unpackCString#, unpackCStringUtf8#)
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.List ((!!), foldr1, break)
@@ -65,11 +65,6 @@ import GHC.Internal.Prim (
     word2Int#, (+#), (==#), (<#), (<=#), (>#), (>=#),
   )
 import GHC.Internal.Tuple (Solo (..))
-import GHC.Internal.Types (
-    Bool, Char(..), Int(..), KindRep(..), Levity(..), Module(..), Ordering(..),
-    RuntimeRep(..), TrName(..), TyCon(..), TypeLitSort(..), VecCount(..),
-    VecElem(..), Word(..), isTrue#,
-  )
 
 
 -- | The @shows@ functions return a function that prepends the

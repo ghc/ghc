@@ -5,8 +5,7 @@
 
 module GHC.Internal.Functor.ZipList (ZipList(..)) where
 
-import GHC.Internal.Base (Alternative(..), Applicative(..), Functor(..), ($))
-import GHC.Internal.Classes (Eq, Ord)
+import GHC.Internal.Base
 import GHC.Internal.List (repeat, zipWith)
 import GHC.Internal.Read (Read)
 import GHC.Internal.Show (Show)
