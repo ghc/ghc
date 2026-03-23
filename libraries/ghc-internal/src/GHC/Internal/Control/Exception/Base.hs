@@ -111,22 +111,20 @@ module GHC.Internal.Control.Exception.Base (
         nonTermination, nestedAtomically, noMatchingContinuationPrompt,
   ) where
 
-import           GHC.Internal.Base (
-    String, assert, const, flip, fmap, return, ($), (.), (++), (>>=),
-  )
-import           GHC.Internal.CString (unpackCStringUtf8#)
-import           GHC.Internal.Err (errorWithoutStackTrace)
-import           GHC.Internal.Exception
-import           GHC.Internal.IO           hiding (bracket, finally, onException)
-import           GHC.Internal.IO.Exception
-import           GHC.Internal.Exception.Type
-import           GHC.Internal.Maybe (Maybe(..))
-import           GHC.Internal.Prim (Addr#)
-import           GHC.Internal.Show
--- import GHC.Internal.Exception hiding ( Exception )
-import           GHC.Internal.Conc.Sync
+import qualified GHC.Internal.Stack.Types as Rebindable
+import GHC.Internal.Base
+import GHC.Internal.Err (errorWithoutStackTrace)
+import GHC.Internal.Exception
+import GHC.Internal.IO           hiding (bracket, finally, onException)
+import GHC.Internal.IO.Exception
+import GHC.Internal.Exception.Type
+import GHC.Internal.Maybe (Maybe(..))
+import GHC.Internal.Prim (Addr#)
+import GHC.Internal.Show
+import GHC.Internal.Conc.Sync
+import GHC.Internal.Data.Either
+import GHC.Internal.Data.Typeable.Internal as Rebindable
 
-import           GHC.Internal.Data.Either
 
 -----------------------------------------------------------------------------
 -- Catching exceptions

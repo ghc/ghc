@@ -58,14 +58,13 @@ module GHC.Internal.Conc.IO
 #endif
         ) where
 
-import GHC.Internal.Base (otherwise, return, ($))
+import GHC.Internal.Base
 import GHC.Internal.Conc.Sync as Sync
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.STM as STM
 import GHC.Internal.Prim (delay#, waitRead#, waitWrite#)
 import GHC.Internal.Real ( fromIntegral )
 import GHC.Internal.System.Posix.Types
-import GHC.Internal.Types (Bool(..), Int(..), IO(..))
 
 #if defined(mingw32_HOST_OS)
 import qualified GHC.Internal.Conc.Windows as Windows
@@ -80,10 +79,6 @@ import qualified GHC.Internal.Event.Thread as Event
 #if defined(wasm32_HOST_ARCH)
 import qualified GHC.Internal.Wasm.Prim.Conc as Wasm
 import qualified GHC.Internal.Wasm.Prim.Flag as Wasm
-#endif
-
-#if defined(javascript_HOST_ARCH)
-import GHC.Internal.Base (pure)
 #endif
 
 ensureIOManagerIsRunning :: IO ()

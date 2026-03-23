@@ -17,6 +17,9 @@
 
 module GHC.Internal.Numeric (showIntAtBase, showHex) where
 
+import qualified GHC.Internal.Num as Rebindable (Num(fromInteger))
+import qualified GHC.Internal.Classes as Rebindable (Eq((==)))
+import qualified GHC.Internal.Types as Rebindable
 import GHC.Internal.Prim (seq)
 import GHC.Internal.Types (Char, Int)
 import GHC.Internal.Classes ((<), (<=))

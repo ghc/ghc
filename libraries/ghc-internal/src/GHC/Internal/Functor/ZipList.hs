@@ -5,12 +5,11 @@
 
 module GHC.Internal.Functor.ZipList (ZipList(..)) where
 
-import GHC.Internal.Base (Alternative(..), Applicative(..), Functor(..), ($))
-import GHC.Internal.Classes (Eq, Ord)
+import GHC.Internal.Base hiding( foldr )
 import GHC.Internal.List (repeat, zipWith)
-import GHC.Internal.Read (Read)
-import GHC.Internal.Show (Show)
-import GHC.Internal.Data.Foldable (Foldable)
+import GHC.Internal.Read
+import GHC.Internal.Show
+import GHC.Internal.Data.Foldable
 import GHC.Internal.Data.Traversable (Traversable(..))
 
 -- | Lists, but with an 'Applicative' functor based on zipping.

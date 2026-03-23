@@ -18,6 +18,7 @@ import Data.IORef
 import GHC.Types.CostCentre.State
 import GHC.Types.Error
 import GHC.Types.Name.Env
+import GHC.Types.TypeEnv( TypeEnv )
 import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -59,10 +60,13 @@ presumably include source-file location information:
 data DsGblEnv
   = DsGblEnv
   { ds_mod          :: Module             -- For SCC profiling
+  , ds_gbl_rdr_env  :: GlobalRdrEnv
+        -- The GlobalRdrEnv is needed for the following reasons:
+        --    - to know what newtype constructors are in scope
+        --    - to check whether all members of a COMPLETE pragma are in scope
+        --    - when looking up know-key names
+  , ds_type_env     :: TypeEnv            -- Like tcg_type_enb
   , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
-  , ds_gbl_rdr_env  :: GlobalRdrEnv       -- needed only for the following reasons:
-                                          --    - to know what newtype constructors are in scope
-                                          --    - to check whether all members of a COMPLETE pragma are in scope
   , ds_tcm_plugins :: TcMPluginsRun
       -- ^ 'TcM' plugins, stored here so that we can invoke the typechecker
       -- without having to repeatedly re-initialise them.

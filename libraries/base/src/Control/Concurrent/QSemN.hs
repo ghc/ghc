@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -31,6 +32,9 @@ import GHC.Internal.Control.Exception
 import GHC.Internal.Control.Monad (when)
 import GHC.Internal.Data.IORef (IORef, newIORef, atomicModifyIORef)
 import System.IO.Unsafe (unsafePerformIO)
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 -- | 'QSemN' is a quantity semaphore in which the resource is acquired
 -- and released in arbitrary amounts. It provides guaranteed FIFO ordering

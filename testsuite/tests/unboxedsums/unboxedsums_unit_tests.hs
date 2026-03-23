@@ -6,8 +6,8 @@ import GHC.Driver.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic hiding (assert)
 import GHC.Types.RepType
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Types
 import GHC.Types.Unique.Set
 import GHC.Types.Unique
 

@@ -83,7 +83,7 @@ import GHC.Types.Unique.FM      ( pprUniqFM )
 import GHC.Data.OrdList
 import GHC.Data.Graph.UnVar
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Platform ( Platform )
 
 import GHC.Utils.Monad

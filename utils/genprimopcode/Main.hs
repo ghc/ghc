@@ -315,6 +315,7 @@ gen_wrappers (Info _ entries)
         -- Very important OPTIONS_GHC!  See Note [OPTIONS_GHC in GHC.PrimopWrappers]
      ++ "module GHC.Internal.PrimopWrappers where\n"
      ++ "import qualified GHC.Internal.Prim\n"
+     ++ "import qualified GHC.Internal.Base as Rebindable -- For Typeable bindings\n"
      ++ "import GHC.Internal.Tuple ()\n"
      ++ "import GHC.Internal.Prim (" ++ types ++ ")\n"
      ++ unlines (concatMap mk_wrapper wrappers)
@@ -705,7 +706,7 @@ sl_name i = "(fsLit \"" ++ name i ++ "\") "
 
 
 -- | A 'PrimOpTyVarBndr' specifies the textual name of a built-in 'TyVarBinder'
--- (usually from "GHC.Builtin.Types.Prim"), in the 'primOpTyVarBinder' field.
+-- (usually from "GHC.Builtin.WiredIn.Prim"), in the 'primOpTyVarBinder' field.
 --
 -- The kind of the type variable stored in the 'primOpTyVarBinder' field
 -- might also depend on some other type variables, for example in
@@ -794,7 +795,7 @@ ppType (TyApp (TyCon "ForeignObj#") []) = "foreignObjPrimTy"
 ppType (TyApp (TyCon "BCO")         []) = "bcoPrimTy"
 ppType (TyApp (TyCon "Compact#")    []) = "compactPrimTy"
 ppType (TyApp (TyCon "StackSnapshot#") []) = "stackSnapshotPrimTy"
-ppType (TyApp (TyCon "()")          []) = "unitTy"      -- unitTy is GHC.Builtin.Types's name for ()
+ppType (TyApp (TyCon "()")          []) = "unitTy"      -- unitTy is GHC.Builtin.WiredIn.Types's name for ()
 
 ppType (TyVar "a")                      = "alphaTy"
 ppType (TyVar "b")                      = "betaTy"

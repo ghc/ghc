@@ -1,11 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Enum
+
 -- For why this file exists
 -- See Note [Semigroup stimes cycle] in GHC.Internal.Base
 
 module GHC.Internal.Enum (Enum) where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Internal.Types ()
+import GHC.Internal.Types as Rebindable
 
 class Enum a

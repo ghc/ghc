@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 
 -- | Selected backend
 module GHC.Internal.Bignum.Backend

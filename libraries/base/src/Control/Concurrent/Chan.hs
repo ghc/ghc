@@ -40,6 +40,9 @@ import Prelude
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import GHC.Internal.Control.Concurrent.MVar
 import GHC.Internal.Control.Exception (mask_)
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 #define _UPK_(x) {-# UNPACK #-} !(x)
 

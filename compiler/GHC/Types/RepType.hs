@@ -36,7 +36,7 @@ import GHC.Core.TyCon.Set
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types ( anyTypeOfKind
   , vecRepDataConTyCon
   , liftedRepTy, unliftedRepTy
   , intRepDataConTy
@@ -441,7 +441,7 @@ data Levity     = Lifted
 It's all in 1-1 correspondence with PrimRep except for TupleRep and SumRep,
 which describe unboxed products and sums respectively. RuntimeRep is defined
 in the library ghc-prim:GHC.Types. It is also "wired-in" to GHC: see
-GHC.Builtin.Types.runtimeRepTyCon. The unarisation pass, in GHC.Stg.Unarise, transforms the
+GHC.Builtin.WiredIn.Types.runtimeRepTyCon. The unarisation pass, in GHC.Stg.Unarise, transforms the
 program, so that every variable has a type that has a PrimRep. For
 example, unarisation transforms our utup function above, to take two Int
 arguments instead of one (# Int, Int #) argument.
@@ -527,13 +527,13 @@ should be passed the TyCon produced by promoting one of the constructors
 of RuntimeRep into type-level data. The RuntimeRep promoted datacons are
 associated with a RuntimeRepInfo (stored directly in the PromotedDataCon
 constructor of TyCon, field promDcRepInfo).
-This pairing happens in GHC.Builtin.Types. A RuntimeRepInfo
+This pairing happens in GHC.Builtin.WiredIn.Types. A RuntimeRepInfo
 usually(*) contains a function from [Type] to [PrimRep]: the [Type] are
 the arguments to the promoted datacon. These arguments are necessary
 for the TupleRep and SumRep constructors, so that this process can recur,
 producing a flattened list of PrimReps. Calling this extracted function
 happens in runtimeRepPrimRep; the functions themselves are defined in
-tupleRepDataCon and sumRepDataCon, both in GHC.Builtin.Types.
+tupleRepDataCon and sumRepDataCon, both in GHC.Builtin.WiredIn.Types.
 
 The (*) above is to support vector representations. RuntimeRep refers
 to VecCount and VecElem, whose promoted datacons have nuggets of information
@@ -556,9 +556,9 @@ runtimeRepPrimRep calls tyConRuntimeRepInfo on (PromotedDataCon "IntRep"), resp.
 (PromotedDataCon "TupleRep"), extracting a function that will produce the PrimReps.
 In example 1, this function is passed an empty list (the empty list of args to IntRep)
 and returns the PrimRep IntRep. (See the definition of runtimeRepSimpleDataCons in
-GHC.Builtin.Types and its helper function mk_runtime_rep_dc.) Example 2 passes the promoted
+GHC.Builtin.WiredIn.Types and its helper function mk_runtime_rep_dc.) Example 2 passes the promoted
 list as the one argument to the extracted function. The extracted function is defined
-as prim_rep_fun within tupleRepDataCon in GHC.Builtin.Types. It takes one argument, decomposes
+as prim_rep_fun within tupleRepDataCon in GHC.Builtin.WiredIn.Types. It takes one argument, decomposes
 the promoted list (with extractPromotedList), and then recurses back to runtimeRepPrimRep
 to process the LiftedRep and WordRep, concatenating the results.
 

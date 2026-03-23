@@ -18,6 +18,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE QuantifiedConstraints #-}
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -54,11 +55,9 @@ module GHC.Internal.TypeNats
 
   ) where
 
-import GHC.Internal.Base(Functor(..), (.), otherwise, Void, (++))
-import GHC.Internal.Classes(Eq(..), Ord(..))
+import GHC.Internal.Base
 import GHC.Internal.Err(errorWithoutStackTrace)
 import GHC.Internal.Magic.Dict(WithDict(..))
-import GHC.Internal.Types
 import GHC.Internal.Bignum.Natural(Natural)
 import GHC.Internal.Show(Show(..), appPrec, appPrec1, showParen, showString)
 import GHC.Internal.Read(Read(..))
@@ -70,7 +69,6 @@ import GHC.Internal.Data.Type.Coercion (Coercion(..), TestCoercion(..))
 import GHC.Internal.Data.Type.Equality((:~:)(Refl), TestEquality(..))
 import GHC.Internal.Data.Type.Ord(OrderingI(..), type (<=), type (<=?))
 import GHC.Internal.Unsafe.Coerce(unsafeCoerce)
-
 import GHC.Internal.TypeNats.Internal(CmpNat)
 
 -- | A type synonym for 'Natural'.

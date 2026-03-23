@@ -1,4 +1,4 @@
-module GHC.Builtin.Types where
+module GHC.Builtin.WiredIn.Types where
 
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type, Kind, RuntimeRepType)

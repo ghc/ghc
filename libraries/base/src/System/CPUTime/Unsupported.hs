@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
 module System.CPUTime.Unsupported
     ( getCPUTime
     , getCpuTimePrecision
@@ -5,6 +7,10 @@ module System.CPUTime.Unsupported
 
 import GHC.Internal.IO.Exception
 import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Internal.Stack.Types as Rebindable (SrcLoc(..), pushCallStack, emptyCallStack)
+import qualified GHC.Internal.Types as Rebindable (unpackCString#, unpackCStringUtf8#)
+#endif
 
 getCPUTime :: IO Integer
 getCPUTime =

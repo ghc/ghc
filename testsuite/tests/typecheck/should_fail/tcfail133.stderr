@@ -1,4 +1,3 @@
-
 tcfail133.hs:2:61: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
@@ -7,9 +6,9 @@ tcfail133.hs:70:7: error: [GHC-39999]
       prevents the constraint ‘(Show a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
-        instance Show Ordering -- Defined in ‘GHC.Internal.Show’
         instance (Number a, Digit b, Show a, Show b) => Show (a :@ b)
           -- Defined at tcfail133.hs:11:54
+        instance Show One -- Defined at tcfail133.hs:9:28
         ...plus 28 others
         ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
@@ -26,3 +25,4 @@ tcfail133.hs:70:14: error: [GHC-39999]
       In the expression: show $ add (One :@ Zero) (One :@ One)
       In an equation for ‘foo’:
           foo = show $ add (One :@ Zero) (One :@ One)
+

@@ -66,7 +66,7 @@ import GHC.Core.Predicate
 import qualified GHC.Core.TyCo.Rep as Rep
 import GHC.Core.TyCon
 import GHC.Core.Class( Class, classTyCon )
-import GHC.Builtin.Names( eqPrimTyConKey, heqTyConKey, eqTyConKey, coercibleTyConKey )
+import GHC.Builtin.KnownKeys( eqPrimTyConKey, heqTyConKey, eqTyConKey, coercibleTyConKey )
 import GHC.Utils.Misc       ( partitionWith )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -140,7 +140,7 @@ Note [Prioritise class equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We prioritise equalities in the solver (see selectWorkItem). But class
 constraints like (a ~ b) and (a ~~ b) are actually equalities too;
-see Note [The equality types story] in GHC.Builtin.Types.Prim.
+see Note [The equality types story] in GHC.Builtin.WiredIn.Prim.
 
 Failing to prioritise these is inefficient (more kick-outs etc).
 But, worse, it can prevent us spotting a "recursive knot" among

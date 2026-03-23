@@ -22,6 +22,8 @@ module GHC.Tc.Module (
         getModuleInterface,
         tcRnDeclsi,
         isGHCiMonad,
+        getGHCiMonad,
+        getInteractivePrintName,
         runTcInteractive,    -- Used by GHC API clients (#8878)
         withTcMPlugins,      -- Used by GHC API clients (#20499)
         tcRnLookupName,
@@ -97,9 +99,11 @@ import GHC.Iface.Decl    ( coAxiomToIfaceDecl )
 import GHC.Iface.Env     ( externaliseName )
 import GHC.Iface.Load
 
-import GHC.Builtin.Types ( mkListTy, anyTypeOfKind )
-import GHC.Builtin.Names
-import GHC.Builtin.Utils
+import GHC.Builtin.WiredIn.Types ( mkListTy, anyTypeOfKind )
+import GHC.Builtin.Modules( mAIN_NAME, gHC_PRIM, rOOT_MAIN )
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
+import GHC.Builtin
 
 import GHC.Hs hiding ( FunDep(..) )
 import GHC.Hs.Dump
@@ -345,13 +349,17 @@ tcRnModuleTcRnM hsc_env mod_sum
                ; whenM (goptM Opt_DoCoreLinting) $
                  lintGblEnv (hsc_logger hsc_env) (hsc_dflags hsc_env) tcg_env
 
+               -- Sync the knot-tied type environment before checking
+               -- the M.hi-boot interface, if any
+               ; syncTypeEnvKnotVars tcg_env
+
                ; setGblEnv tcg_env
                  $ do { -- Compare hi-boot iface (if any) with the real thing
                         -- Must be done after processing the exports
                         tcg_env <- checkHiBootIface tcg_env boot_info
                       ; -- The new type env is already available to stuff
-                        -- slurped from interface files, via
-                        -- GHC.Tc.Utils.Env.setGlobalTypeEnv. It's important that this
+                        -- slurped from interface files, via syncTypeEnvKnotVars,
+                        -- itself called by tcRnSrcDecls. It's important that this
                         -- includes the stuff in checkHiBootIface,
                         -- because the latter might add new bindings for
                         -- boot_dfuns, which may be mentioned in imported
@@ -480,28 +488,28 @@ tcRnImports hsc_env import_decls
         ; gbl_env <- getGblEnv
         ; let unitId = homeUnitId $ hsc_home_unit hsc_env
               mnwib = GWIB (moduleName this_mod)(hscSourceToIsBoot (tcg_src gbl_env))
-        ;       -- We want instance declarations from all home-package
-                -- modules below this one, including boot modules, except
-                -- ourselves.  The 'except ourselves' is so that we don't
-                -- get the instances from this module's hs-boot file.  This
-                -- filtering also ensures that we don't see instances from
-                -- modules batch (@--make@) compiled before this one, but
-                -- which are not below this one.
-              ; (home_insts, home_fam_insts) <- liftIO $
-                    hugInstancesBelow hsc_env unitId mnwib
+          -- We want instance declarations from all home-package
+          -- modules below this one, including boot modules, except
+          -- ourselves.  The 'except ourselves' is so that we don't
+          -- get the instances from this module's hs-boot file.  This
+          -- filtering also ensures that we don't see instances from
+          -- modules batch (@--make@) compiled before this one, but
+          -- which are not below this one.
+        ; (home_insts, home_fam_insts) <- liftIO $
+              hugInstancesBelow hsc_env unitId mnwib
 
-                -- We use 'unsafeInterleaveIO' to avoid redundant memory allocations
-                -- See Note [Lazily loading COMPLETE pragmas] from GHC.HsToCore.Monad
-                -- and see https://gitlab.haskell.org/ghc/ghc/-/merge_requests/14274#note_620545
-              ; completeSigsBelow <- liftIO $ unsafeInterleaveIO $
-                    hugCompleteSigsBelow hsc_env unitId mnwib
+          -- We use 'unsafeInterleaveIO' to avoid redundant memory allocations
+          -- See Note [Lazily loading COMPLETE pragmas] from GHC.HsToCore.Monad
+          -- and see https://gitlab.haskell.org/ghc/ghc/-/merge_requests/14274#note_620545
+        ; completeSigsBelow <- liftIO $ unsafeInterleaveIO $
+              hugCompleteSigsBelow hsc_env unitId mnwib
 
-                -- Record boot-file info in the EPS, so that it's
-                -- visible to loadHiBootInterface in tcRnSrcDecls,
-                -- and any other incrementally-performed imports
-              ; when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
-                  updateEps_ $ \eps  -> eps { eps_is_boot = imp_boot_mods imports }
-               }
+          -- Record boot-file info in the EPS, so that it's
+          -- visible to loadHiBootInterface in tcRnSrcDecls,
+          -- and any other incrementally-performed imports
+        ; when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
+            updateEps_ $ \eps  -> eps { eps_is_boot = imp_boot_mods imports }
+         }
 
                 -- Update the gbl env
         ; updGblEnv ( \ gbl ->
@@ -566,6 +574,7 @@ tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
 tcRnSrcDecls explicit_mod_hdr export_ies decls
  = do { -- Do all the declarations
       ; (tcg_env, tcl_env, lie) <- tc_rn_src_decls decls
+      ; traceTc "tcRnSrcDecls" (ppr (tcg_type_env tcg_env))
 
       ------ Simplify constraints ---------
       --
@@ -584,7 +593,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                       ; return (tcg_env `addEvBinds` ev_binds) }
 
         -- Emit Typeable bindings
-      ; tcg_env <- setGblEnv tcg_env $
+      ; tcg_env <- restoreEnvs (tcg_env, tcl_env) $
                    mkTypeableBinds
 
       ; traceTc "Tc9" empty
@@ -656,15 +665,15 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
               -- to the previous tcg_env
 
             ; tcg_env' = tcg_env
-                          { tcg_binds     = binds'     ++ binds_mf
+                          { tcg_type_env  = final_type_env
+                          , tcg_binds     = binds'     ++ binds_mf
                           , tcg_ev_binds  = ev_binds' `unionBags` ev_binds_mf
                           , tcg_imp_specs = imp_specs' ++ imp_specs_mf
                           , tcg_rules     = rules'     ++ rules_mf
                           , tcg_fords     = fords'     ++ fords_mf
                           , tcg_patsyns   = pat_syns'  ++ patsyns_mf } } ;
 
-      ; setGlobalTypeEnv tcg_env' final_type_env
-   }
+      ; return tcg_env' }
 
 zonkTcGblEnv :: TcGblEnv
              -> TcM (TypeEnv, Bag EvBind, LHsBinds GhcTc,
@@ -723,6 +732,7 @@ tc_rn_src_decls ds
       ; (tcg_env, rn_decls) <- rnTopSrcDecls first_group
                 -- rnTopSrcDecls fails if there are any errors
 
+      ; traceRn "tc_rn_src_decls 77" empty
         -- Get TH-generated top-level declarations and make sure they don't
         -- contain any splices since we don't handle that at the moment
         --
@@ -744,7 +754,7 @@ tc_rn_src_decls ds
                         }
                       -- Rename TH-generated top-level declarations
                     ; (tcg_env, th_rn_decls) <- setGblEnv tcg_env
-                        $ rnTopSrcDecls th_group
+                       $ rnTopSrcDecls th_group
 
                       -- Dump generated top-level declarations
                     ; let msg = "top-level declarations added with 'addTopDecls'"
@@ -760,6 +770,7 @@ tc_rn_src_decls ds
       -- NB: set the env **before** captureTopConstraints so that error messages
       -- get reported w.r.t. the right GlobalRdrEnv. It is for this reason that
       -- the captureTopConstraints must go here, not in tcRnSrcDecls.
+      ; traceRn "about to typechecke decls" (ppr rn_decls)
       ; ((tcg_env, tcl_env), lie1) <- setGblEnv tcg_env $
                                       captureTopConstraints $
                                       tcTopSrcDecls rn_decls
@@ -828,7 +839,7 @@ tcRnHsBootDecls boot_or_sig decls
              <- tcTyClsInstDecls tycl_decls deriv_decls def_decls val_binds
         ; setGblEnv tcg_env     $ do {
 
-        -- Emit Typeable bindings
+        -- Emit (signatures for) Typeable bindings
         ; tcg_env <- mkTypeableBinds
         ; setGblEnv tcg_env $ do {
 
@@ -847,10 +858,11 @@ tcRnHsBootDecls boot_or_sig decls
         ; let { type_env0 = tcg_type_env gbl_env
               ; type_env1 = extendTypeEnvWithIds type_env0 val_ids
               ; type_env2 = extendTypeEnvWithIds type_env1 dfun_ids
-              ; dfun_ids = map iDFunId inst_infos
+              ; dfun_ids  = map iDFunId inst_infos
+              ; gbl_env'  = gbl_env { tcg_type_env = type_env2 }
               }
 
-        ; setGlobalTypeEnv gbl_env type_env2
+        ; return gbl_env'
    }}}
    ; traceTc "boot" (ppr lie); return gbl_env }
 
@@ -888,20 +900,14 @@ checkHiBootIface tcg_env boot_info
         --
         -- to (a) the type envt, and (b) the top-level bindings
         ; let boot_impedance_bds = map fst imp_prs
-              type_env'          = extendTypeEnvWithIds local_type_env boot_impedance_bds
+              !type_env'         = extendTypeEnvWithIds local_type_env boot_impedance_bds
               impedance_binds    =  [ mkVarBind boot_id (nlHsVar id)
                                     | (boot_id, id) <- imp_prs ]
               tcg_env_w_binds
-                = tcg_env { tcg_binds = binds ++ impedance_binds }
+                = tcg_env { tcg_type_env = type_env'
+                          , tcg_binds = binds ++ impedance_binds }
 
-        ; type_env' `seq`
-             -- Why the seq?  Without, we will put a TypeEnv thunk in
-             -- tcg_type_env_var.  That thunk will eventually get
-             -- forced if we are typechecking interfaces, but that
-             -- is no good if we are trying to typecheck the very
-             -- DFun we were going to put in.
-             -- TODO: Maybe setGlobalTypeEnv should be strict.
-          setGlobalTypeEnv tcg_env_w_binds type_env' }
+        ; return tcg_env_w_binds }
 
 {- Note [DFun impedance matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -991,7 +997,7 @@ This most works well, but there is one problem: DFuns!  We do not want
 to look at the mb_insts of the ModDetails in SelfBootInfo, because a
 dfun in one of those ClsInsts is gotten (in GHC.IfaceToCore.tcIfaceInst) by a
 (lazily evaluated) lookup in the if_rec_types.  We could extend the
-type env, do a setGloblaTypeEnv etc; but that all seems very indirect.
+type env, do a syncTypeEnvKnotVars etc; but that all seems very indirect.
 It is much more directly simply to extract the DFunIds from the
 md_types of the SelfBootInfo.
 
@@ -1959,7 +1965,7 @@ generateMainBinding tcg_env main_name = do
             -- See Note [Root-main Id]
             -- Construct the binding
             --      :Main.main :: IO res_ty = runMainIO res_ty main
-    ; run_main_id <- tcLookupId runMainIOName
+    ; run_main_id <- tcLookupKnownOccId runMainIOOcc
     ; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN
                                (mkVarOccFS (fsLit "main"))
                                (getSrcSpan main_name)
@@ -1984,7 +1990,7 @@ generateMainBinding tcg_env main_name = do
 
 getIOType :: TcM (TcType, TcType)
 -- Return (IO alpha, alpha) for fresh alpha
-getIOType = do { ioTyCon <- tcLookupTyCon ioTyConName
+getIOType = do { ioTyCon <- tcLookupKnownKeyTyCon ioTyConKey
                ; res_ty <- newFlexiTyVarTy liftedTypeKind
                ; return (mkTyConApp ioTyCon [res_ty], res_ty) }
 
@@ -2323,6 +2329,8 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
         ; uniq <- newUnique
         ; let loc' = noAnnSrcSpan $ locA loc
         ; interPrintName <- getInteractivePrintName
+        ; bindIOName     <- rnLookupKnownOccName bindIOIdOcc
+        ; thenIOName     <- rnLookupKnownOccName thenIOIdOcc
         ; let fresh_it  = itName uniq (locA loc)
               matches   = [mkMatch (mkPrefixFunRhs (L loc' fresh_it) noAnn) (noLocA []) rn_expr
                                    emptyLocalBinds]
@@ -2479,14 +2487,26 @@ tcUserStmt rdr_stmt@(L loc _)
        ; traceRn "tcRnStmt" (vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs])
        ; rnDump rn_stmt ;
 
-       ; ghciStep <- getGhciStepIO
-       ; let gi_stmt
-               | (L loc (BindStmt x pat expr)) <- rn_stmt
-                     = L loc $ BindStmt x pat (nlHsApp ghciStep expr)
-               | otherwise = rn_stmt
-
        ; opt_pr_flag <- goptM Opt_PrintBindResult
-       ; let print_result_plan
+       ; ghciStep   <- getGhciStepIO
+       ; printName  <- rnLookupKnownOccName printIdOcc
+       ; thenIOName <- rnLookupKnownOccName thenIOIdOcc
+       ; let gi_stmt | (L loc (BindStmt x pat expr)) <- rn_stmt
+                     = L loc $ BindStmt x pat (nlHsApp ghciStep expr)
+                     | otherwise
+                     = rn_stmt
+
+             mk_print_result_plan stmt v
+               = do { stuff@([v_id], _) <- tcGhciStmts [stmt, mk_print v]
+                    ; v_ty <- liftZonkM $ zonkTcType (idType v_id)
+                    ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
+                    ; return stuff }
+
+             mk_print v = L loc $ BodyStmt noExtField (nlHsApp (nlHsVar printName)
+                                           (nlHsVar v))
+                                           (mkRnSyntaxExpr thenIOName) noSyntaxExpr
+
+             print_result_plan
                | opt_pr_flag                         -- The flag says "print result"
                , [v] <- collectLStmtBinders CollNoDictBinders gi_stmt  -- One binder
                = Just $ mk_print_result_plan gi_stmt v
@@ -2495,18 +2515,9 @@ tcUserStmt rdr_stmt@(L loc _)
         -- The plans are:
         --      [stmt; print v]         if one binder and not v::()
         --      [stmt]                  otherwise
-       ; plan <- runPlans $ maybe id (NE.<|) print_result_plan $ NE.singleton $ tcGhciStmts [gi_stmt]
+       ; plan <- runPlans $ maybe id (NE.<|) print_result_plan $
+                 NE.singleton $ tcGhciStmts [gi_stmt]
        ; return (plan, fix_env) }
-  where
-    mk_print_result_plan stmt v
-      = do { stuff@([v_id], _) <- tcGhciStmts [stmt, print_v]
-           ; v_ty <- liftZonkM $ zonkTcType (idType v_id)
-           ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
-           ; return stuff }
-      where
-        print_v  = L loc $ BodyStmt noExtField (nlHsApp (nlHsVar printName)
-                                    (nlHsVar v))
-                                    (mkRnSyntaxExpr thenIOName) noSyntaxExpr
 
 {-
 Note [GHCi Plans]
@@ -2536,8 +2547,8 @@ any_lifted = anyTypeOfKind liftedTypeKind
 -- statement in the form 'IO [Any]'.
 tcGhciStmts :: [GhciLStmt GhcRn] -> TcM PlanResult
 tcGhciStmts stmts
- = do { ioTyCon <- tcLookupTyCon ioTyConName
-      ; ret_id  <- tcLookupId returnIOName             -- return @ IO
+ = do { ioTyCon <- tcLookupKnownKeyTyCon ioTyConKey
+      ; ret_id  <- tcLookupKnownOccId returnIOIdOcc             -- return @ IO
       ; let ret_ty      = mkListTy any_lifted
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty]
             tc_io_stmts = tcStmtsAndThen (HsDoStmt GhciStmtCtxt) tcDoStmt stmts
@@ -2575,7 +2586,7 @@ tcGhciStmts stmts
       -- We use Any rather than a dummy type such as () because of
       -- the rules of unsafeCoerce#; see Unsafe/Coerce.hs for the details.
 
-      ; AnId unsafe_coerce_id <- tcLookupGlobal unsafeCoercePrimName
+      ; unsafe_coerce_id <- tcLookupKnownKeyId unsafeCoercePrimIdKey
            -- We use unsafeCoerce# here because of (U11) in
            -- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
 
@@ -2598,8 +2609,9 @@ getGhciStepIO :: TcM (LHsExpr GhcRn)
 getGhciStepIO = do
     ghciTy <- getGHCiMonad
     a_tv <- newName (mkTyVarOccFS (fsLit "a"))
+    ioTyCon <- tcLookupKnownKeyTyCon ioTyConKey
     let ghciM   = nlHsAppTy (nlHsTyVar NotPromoted ghciTy) (nlHsTyVar NotPromoted a_tv)
-        ioM     = nlHsAppTy (nlHsTyVar NotPromoted ioTyConName) (nlHsTyVar NotPromoted a_tv)
+        ioM     = nlHsAppTy (nlHsTyVar NotPromoted (tyConName ioTyCon)) (nlHsTyVar NotPromoted a_tv)
 
         step_ty :: LHsSigType GhcRn
         step_ty = noLocA $ HsSig
@@ -2610,7 +2622,22 @@ getGhciStepIO = do
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs step_ty
 
+    ghciStepIoMName <- idName <$> tcLookupKnownOccId ghciStepIoMOcc
     return (noLocA $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
+
+getGHCiMonad :: TcRn Name
+getGHCiMonad = do { hsc <- getTopEnv
+                  ; monad_id <- case ic_monad $ hsc_IC hsc of
+                      ExactOcc occ -> tyConName <$> tcLookupKnownOccTyCon occ
+                      ExactName nm -> pure nm
+                  ; return monad_id }
+
+getInteractivePrintName :: TcRn Name
+getInteractivePrintName = do { hsc <- getTopEnv
+                             ; print_id <- case ic_int_print $ hsc_IC hsc of
+                                 ExactOcc occ -> idName <$> tcLookupKnownOccId occ
+                                 ExactName nm -> pure nm
+                             ; return print_id }
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages TcRnMessage, Maybe Name)
 isGHCiMonad hsc_env ty
@@ -2620,7 +2647,7 @@ isGHCiMonad hsc_env ty
         case occIO of
             Just [n] -> do
                 let name = greName n
-                ghciClass <- tcLookupClass ghciIoClassName
+                ghciClass <- tcLookupKnownOccClass ghciIoClassOcc
                 userTyCon <- tcLookupTyCon name
                 let userTy = mkTyConApp userTyCon []
                 _ <- tcLookupInstance ghciClass [userTy]

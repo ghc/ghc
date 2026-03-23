@@ -57,7 +57,7 @@ import GHC.Types.Tickish
 import GHC.Types.Id.Info
 import GHC.Types.Unique.Supply
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Data.Maybe
 
 import GHC.Utils.Misc

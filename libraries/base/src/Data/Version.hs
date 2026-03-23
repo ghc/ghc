@@ -42,6 +42,7 @@ import GHC.Internal.Data.Version
 
 #if __GLASGOW_HASKELL__ >= 1001
 
+import qualified GHC.Essentials as Rebindable
 import Control.Applicative (pure, (*>))
 import Data.Functor (fmap)
 import Data.Char (isDigit, isAlphaNum)

@@ -7,6 +7,7 @@ module GHC.Types.DefaultEnv
    , defaultEnv
    , unitDefaultEnv
    , lookupDefaultEnv
+   , lookupDefaultEnv_Directly
    , filterDefaultEnv
    , defaultList
    , plusDefaultEnv
@@ -22,6 +23,7 @@ import GHC.Hs
 import GHC.Tc.Utils.TcType (Type)
 import GHC.Types.Name (Name, nameUnique, stableNameCmp)
 import GHC.Types.Name.Env
+import GHC.Types.Unique
 import GHC.Types.Unique.FM (lookupUFM_Directly)
 import GHC.Types.SrcLoc (SrcSpan)
 import GHC.Unit.Types (Module)
@@ -135,7 +137,10 @@ insertDefaultEnv :: ClassDefaults -> DefaultEnv -> DefaultEnv
 insertDefaultEnv d env = extendNameEnv env (className $ cd_class d) d
 
 lookupDefaultEnv :: DefaultEnv -> Name -> Maybe ClassDefaults
-lookupDefaultEnv env = lookupUFM_Directly env . nameUnique
+lookupDefaultEnv env = lookupDefaultEnv_Directly env . nameUnique
+
+lookupDefaultEnv_Directly :: DefaultEnv -> Unique -> Maybe ClassDefaults
+lookupDefaultEnv_Directly = lookupUFM_Directly
 
 filterDefaultEnv :: (ClassDefaults -> Bool) -> DefaultEnv -> DefaultEnv
 filterDefaultEnv = filterNameEnv

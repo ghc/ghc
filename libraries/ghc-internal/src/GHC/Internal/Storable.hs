@@ -51,6 +51,7 @@ module GHC.Internal.Storable
         , writeWord64OffPtr
         ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Stable ( StablePtr(..) )
 import GHC.Internal.Int
 import GHC.Internal.Prim (
@@ -65,10 +66,8 @@ import GHC.Internal.Prim (
     writeWord32OffAddr#, writeWord64OffAddr#, writeWord8OffAddr#,
     writeWordOffAddr#,
   )
-import GHC.Internal.Types (Char(..), Float(..), Double(..), IO(..))
 import GHC.Internal.Word
 import GHC.Internal.Ptr
-import GHC.Internal.Base ( ($) )
 
 readWideCharOffPtr  :: Ptr Char          -> Int -> IO Char
 readIntOffPtr       :: Ptr Int           -> Int -> IO Int

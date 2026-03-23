@@ -25,6 +25,8 @@ import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Typeable
 
 import GHC.Internal.Base (String, fmap, otherwise, return, ($))
+import qualified GHC.Internal.Base as Rebindable
+import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
 import GHC.Internal.MVar
 import GHC.Internal.IO
 import GHC.Internal.IO.BufferedIO hiding (flushWriteBuffer)
@@ -35,6 +37,8 @@ import GHC.Internal.IO.IOMode
 import GHC.Internal.IO.Handle.Types
 import GHC.Internal.IO.Handle.Internals
 import qualified GHC.Internal.IO.Windows.Handle as Win
+import qualified GHC.Internal.Stack.Types as Rebindable
+  ( SrcLoc(..), pushCallStack, emptyCallStack )
 import GHC.Internal.Types (Bool(..))
 
 -- ---------------------------------------------------------------------------

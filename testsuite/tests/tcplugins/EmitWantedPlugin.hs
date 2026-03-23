@@ -7,7 +7,7 @@ import Data.Maybe
   ( catMaybes )
 
 -- ghc
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
   ( unitTy )
 import GHC.Core
   ( Expr(Type) )

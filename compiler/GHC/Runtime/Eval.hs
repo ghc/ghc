@@ -83,8 +83,8 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 
-import GHC.Builtin.Names ( toDynName )
-import GHC.Builtin.Types ( pretendNameIsInScope )
+import GHC.Builtin.KnownOccs ( toDyn_RDR )
+import GHC.Builtin.WiredIn.Types ( pretendNameIsInScope )
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -936,7 +936,7 @@ getInfo allInfo name
           ok n | n == name              = True
                        -- The one we looked for in the first place!
                | pretendNameIsInScope n = True
-                   -- See Note [pretendNameIsInScope] in GHC.Builtin.Names
+                   -- See Note [pretendNameIsInScope] in GHC.Builtin.KnownKeys
                | isExternalName n       = isJust (lookupGRE_Name rdr_env n)
                | otherwise              = True
 
@@ -1290,7 +1290,7 @@ dynCompileExpr expr = do
   parsed_expr <- parseExpr expr
   -- > Data.Dynamic.toDyn expr
   let loc = getLoc parsed_expr
-      to_dyn_expr = mkHsApp (L loc . mkHsVar . L (l2l loc) $ getRdrName toDynName)
+      to_dyn_expr = mkHsApp (L loc $ mkHsVar $ L (l2l loc) toDyn_RDR)
                             parsed_expr
   hval <- compileParsedExpr to_dyn_expr
   return (unsafeCoerce hval :: Dynamic)

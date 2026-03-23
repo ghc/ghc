@@ -2,6 +2,9 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE MagicHash #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines lots of functions that have BuiltinRules
+
 module GHC.Internal.Bignum.Integer where
 
 import GHC.Internal.Types

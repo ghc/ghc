@@ -1,0 +1,20 @@
+TH_pragmaSpecOld.hs:(6,2)-(9,28): Splicing declarations
+    [d| foo :: Num a => a -> a
+        {-# SPECIALISE foo :: Int -> Int #-}
+        {-# SPECIALISE foo :: Double -> Double #-}
+        foo x = x + 1 |]
+  ======>
+    foo :: Num a => a -> a
+    {-# SPECIALISE foo :: Int -> Int #-}
+    {-# SPECIALISE foo :: Double -> Double #-}
+    foo x = (x + 1)
+TH_pragmaSpecOld.hs:(11,2)-(14,28): Splicing declarations
+    [d| bar :: Num a => a -> a
+        {-# SPECIALISE INLINE [1] bar :: Float -> Float #-}
+        {-# SPECIALISE INLINE [1] bar :: Double -> Double #-}
+        bar x = x * 10 |]
+  ======>
+    bar :: Num a => a -> a
+    {-# SPECIALISE INLINE [1] bar :: Float -> Float #-}
+    {-# SPECIALISE INLINE [1] bar :: Double -> Double #-}
+    bar x = (x * 10)

@@ -28,13 +28,11 @@ module GHC.Internal.Foreign.Marshal.Error (
   void
 ) where
 
+import qualified GHC.Internal.Stack.Types as Rebindable
+import GHC.Internal.Base
 import GHC.Internal.Foreign.Ptr
-
-import GHC.Internal.Base (String, const, return, ($), (.), (>>))
-import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.Num
 import GHC.Internal.IO.Exception
-import GHC.Internal.Types (Bool, IO)
 
 -- exported functions
 -- ------------------

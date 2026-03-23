@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}   -- See calls to mkTemplateTyVars
 
-module GHC.Builtin.Types.Literals
+module GHC.Builtin.WiredIn.TypeLits
   ( tryInteractInertFam, tryInteractTopFam, tryMatchFam
 
   , typeNatTyCons
@@ -39,14 +39,14 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Compare   ( tcEqType )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
 import GHC.Types.Unique.FM
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim  ( mkTemplateAnonTyConBinders, mkTemplateTyVars )
-import GHC.Builtin.Names
-                  ( gHC_INTERNAL_TYPELITS
-                  , gHC_INTERNAL_TYPELITS_INTERNAL
-                  , gHC_INTERNAL_TYPENATS
-                  , gHC_INTERNAL_TYPENATS_INTERNAL
-                  , typeNatAddTyFamNameKey
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim  ( mkTemplateAnonTyConBinders, mkTemplateTyVars )
+import GHC.Builtin.Modules     ( gHC_INTERNAL_TYPELITS
+                               , gHC_INTERNAL_TYPELITS_INTERNAL
+                               , gHC_INTERNAL_TYPENATS
+                               , gHC_INTERNAL_TYPENATS_INTERNAL )
+import GHC.Builtin.KnownKeys
+                  ( typeNatAddTyFamNameKey
                   , typeNatMulTyFamNameKey
                   , typeNatExpTyFamNameKey
                   , typeNatSubTyFamNameKey
@@ -92,20 +92,20 @@ There are a few steps to adding a built-in type family:
 
 * Adding a unique for the type family TyCon
 
-  These go in GHC.Builtin.Names. It will likely be of the form
+  These go in GHC.Builtin.KnownKeys. It will likely be of the form
   @myTyFamNameKey = mkPreludeTyConUnique xyz@, where @xyz@ is a number that
-  has not been chosen before in GHC.Builtin.Names. There are several examples already
-  in GHC.Builtin.Names—see, for instance, typeNatAddTyFamNameKey.
+  has not been chosen before in GHC.Builtin.KnownKeys. There are several examples already
+  in GHC.Builtin.KnownKeys—see, for instance, typeNatAddTyFamNameKey.
 
 * Adding the type family TyCon itself
 
-  This goes in GHC.Builtin.Types.Literals. There are plenty of examples of how to define
+  This goes in GHC.Builtin.WiredIn.TypeLits. There are plenty of examples of how to define
   these -- see, for instance, typeNatAddTyCon.
 
   Once your TyCon has been defined, be sure to:
 
-  - Export it from GHC.Builtin.Types.Literals. (Not doing so caused #14632.)
-  - Include it in the typeNatTyCons list, defined in GHC.Builtin.Types.Literals.
+  - Export it from GHC.Builtin.WiredIn.TypeLits. (Not doing so caused #14632.)
+  - Include it in the typeNatTyCons list, defined in GHC.Builtin.WiredIn.TypeLits.
 
 * Define the type family somewhere
 
@@ -113,7 +113,7 @@ There are a few steps to adding a built-in type family:
   Currently, all of the built-in type families are defined in GHC.TypeLits or
   GHC.TypeNats, so those are likely candidates.
 
-  Since the behavior of your built-in type family is specified in GHC.Builtin.Types.Literals,
+  Since the behavior of your built-in type family is specified in GHC.Builtin.WiredIn.TypeLits,
   you should give an open type family definition with no instances, like so:
 
     type family MyTypeFam (m :: Nat) (n :: Nat) :: Nat

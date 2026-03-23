@@ -178,10 +178,8 @@ import GHC.Internal.Data.Traversable ( Traversable(..) )
 import GHC.Internal.Data.Tuple
 
 #if __GLASGOW_HASKELL__ >= 1000
-import GHC.Internal.Classes
 import GHC.Internal.Err
 import GHC.Internal.Prim (seq)
-import GHC.Internal.Types
 #endif
 import GHC.Internal.Base hiding ( foldr, mapM, sequence )
 import Text.Read

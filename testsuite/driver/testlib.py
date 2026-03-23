@@ -3131,6 +3131,9 @@ def normalise_errmsg(s: str) -> str:
         # however, these are completely benign stubs.
         # See https://gitlab.haskell.org/ghc/ghc/-/issues/27116
         s = modify_lines(s, lambda l: re.sub(r'.*ranlib:.*has no symbols', '', l))
+        # ranlib similarly warns about an archive in which no member defines a global symbol,
+        # e.g. a library made up of modules that contain no declarations at all.
+        s = drop_lines_containing(s, 'the table of contents is empty')
         # we also want to remove linker warnings having to do with undefined dynamic_lookup in combination with
         # making a single weak symbol undefined as this is dependent on other linker flags
         # See also https://github.com/haskell/process/pull/377

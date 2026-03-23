@@ -373,7 +373,8 @@
                          []))
                        (WithUserRdr
                         (Exact
-                         {Name: :})
+                         (ExactName
+                          {Name: :}))
                         {Name: :}))))
                     (L
                      (EpAnn

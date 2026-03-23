@@ -11,6 +11,13 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+{-# OPTIONS_GHC -fexclude-known-key-define=IntRep  #-}
+{-# OPTIONS_GHC -fexclude-known-key-define=FloatRep  #-}
+    -- Defines Data
+    -- Careful!  Don't confuse this IntRep, FloatRep with the ones from RuntimeRep,
+    --           which are the /real/ known-key entity.
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Data.Data
@@ -110,27 +117,20 @@ module GHC.Internal.Data.Data (
 
 ------------------------------------------------------------------------------
 
-import GHC.Internal.Classes (Eq(..), not)
+import GHC.Internal.Base hiding( RuntimeRep(..), Any )
 import GHC.Internal.Data.Functor.Const
 import GHC.Internal.Data.Either
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Monoid
-import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Data.Ord
 import GHC.Internal.Data.List (findIndex)
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Data.Version( Version(..) )
-import GHC.Internal.Base (
-    Monad(..), MonadPlus(..), String, Void, const, id, ($), (.),
-  )
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.List
 import GHC.Internal.Num
 import GHC.Internal.Show
 import GHC.Internal.Tuple (Solo (..))
-import GHC.Internal.Types (
-    Bool(..), Char, Coercible, Float, Double, Type, type (~), type (~~),
-  )
 
 -- Imports for the instances
 import GHC.Internal.Data.Functor.Identity -- So we can give Data instance for Identity
@@ -150,6 +150,9 @@ import GHC.Internal.Generics hiding (Fixity(..))
 import qualified GHC.Internal.TH.Syntax as TH
 import GHC.Internal.Functor.ZipList (ZipList(..))
 import GHC.Internal.Exts (SpecConstrAnnotation(..))
+
+import GHC.Internal.Data.Typeable.Internal as Rebindable
+import qualified GHC.Internal.Stack.Types  as Rebindable
 
 ------------------------------------------------------------------------------
 --

@@ -7,6 +7,7 @@ import GHC.Types.Unique.FM
 import GHC.Plugins
 import qualified GHC.Utils.Error
 import GHC.Types.TyThing
+import GHC.Tc.Utils.Env (lookupGlobal)
 
 import Debug.Trace
 import Data.Bifunctor (second)
@@ -29,7 +30,8 @@ install options todos = do
     case mb of
       Nothing -> error "Failed to locate woz"
       Just m  -> do
-        rep <- lookupId m
+        hsc_env <- getHscEnv
+        rep <- liftIO $ tyThingId <$> lookupGlobal hsc_env m
         return $ CoreDoPluginPass "Replace wiz with woz" (fixGuts rep) : todos
 
 fixGuts :: Id -> ModGuts -> CoreM ModGuts

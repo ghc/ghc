@@ -82,8 +82,8 @@ import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
 
-import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Data.Bag
 import GHC.Data.List.SetOps
@@ -177,7 +177,7 @@ If we have done specialisation the we check that there are
 Note [Linting function types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 All saturated applications of funTyCon are represented with the FunTy constructor.
-See Note [Function type constructors and FunTy] in GHC.Builtin.Types.Prim
+See Note [Function type constructors and FunTy] in GHC.Builtin.WiredIn.Prim
 
 We check this invariant in lintType.
 
@@ -1010,7 +1010,7 @@ lintIdOcc id nargs
           -- Check for a nested occurrence of the StaticPtr constructor.
           -- See Note [Checking StaticPtrs].
         ; when (nargs /= 0) $
-          checkL (idName id /= makeStaticName) $
+          checkL (not (id `hasKnownKey` makeStaticKey)) $
           text "Found makeStatic nested in an expression"
 
         -- Occurrences of an Id should never be dead....

@@ -122,7 +122,8 @@ data TcLclCtxt
         tcl_arrow_ctxt :: ArrowCtxt,       -- Arrow-notation context
 
         tcl_env  :: TcTypeEnv    -- The local type environment:
-                                 -- Ids and TyVars defined in this module
+                    -- Ids and TyVars defined in this module
+                    -- They move to the TcGbl env during zonkTopDecls
     }
 
 getLclEnvThLevel :: TcLclEnv -> ThLevel

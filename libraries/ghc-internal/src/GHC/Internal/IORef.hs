@@ -25,8 +25,7 @@ module GHC.Internal.IORef (
         atomicModifyIORefP, atomicSwapIORef, atomicModifyIORef'
     ) where
 
-import GHC.Internal.Base (Applicative(..), Monad(..), ($))
-import GHC.Internal.Classes (Eq)
+import GHC.Internal.Base
 import GHC.Internal.Prim (
     RealWorld, atomicModifyMutVar2#, atomicModifyMutVar_#, atomicSwapMutVar#,
   )

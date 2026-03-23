@@ -15,7 +15,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.RepType
 import GHC.Core.Type
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Builtin.PrimOps
 import GHC.Plugins (HasDebugCallStack)

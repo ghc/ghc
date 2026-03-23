@@ -122,7 +122,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Stg.Syntax
 import GHC.Stg.Pipeline ( stg2stg, StgCgInfos )
 
-import GHC.Builtin.Names
+import GHC.Builtin.Modules( gHC_PRIM, mkInteractiveModule )
 
 import GHC.Unit
 import GHC.Unit.Env

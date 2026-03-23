@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 
 -- |
@@ -39,6 +40,9 @@ module Text.Read
      readMaybe
      ) where
 
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 import GHC.Err (errorWithoutStackTrace)
 import GHC.Read
        (

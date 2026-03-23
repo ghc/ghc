@@ -16,7 +16,7 @@ import Data.Maybe
 import GHC.TypeNats
 
 -- ghc
-import GHC.Builtin.Types.Literals
+import GHC.Builtin.WiredIn.TypeLits
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep
 import GHC.Plugins

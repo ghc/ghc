@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP, NoImplicitPrelude, NondecreasingIndentation,
              RecordWildCards, ScopedTypeVariables,
              UnboxedTuples #-}
+{-# LANGUAGE MagicHash #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module GHC.Internal.IO.Encoding.CodePage.API (
@@ -23,6 +24,7 @@ import GHC.Internal.Word
 import GHC.Internal.Base (
     String, const, fmap, otherwise, return, when, ($), (.), (>>),
   )
+import qualified GHC.Internal.Base as Rebindable ((>>=))
 import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
 import GHC.Internal.Err (errorWithoutStackTrace, undefined)
 import GHC.Internal.List
@@ -32,8 +34,11 @@ import GHC.Internal.IO.Encoding.Types
 import GHC.Internal.IO.Encoding.UTF16
 import GHC.Internal.Num
 import GHC.Internal.Show
+import qualified GHC.Internal.Stack.Types as Rebindable
+  ( SrcLoc(..), pushCallStack, emptyCallStack )
 import GHC.Internal.Real
 import GHC.Internal.Types (Bool(..), Char, Int, IO(..), Ordering(..))
+import qualified GHC.Internal.Types as Rebindable
 import GHC.Internal.Windows hiding (LPCSTR)
 import GHC.Internal.ForeignPtr (castForeignPtr)
 

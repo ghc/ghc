@@ -42,7 +42,7 @@ import           Prelude
 import GHC.Platform
 import Data.List (isPrefixOf)
 
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import Language.Haskell.Syntax.Basic
 import GHC.Types.Name
 import GHC.StgToJS.Ids

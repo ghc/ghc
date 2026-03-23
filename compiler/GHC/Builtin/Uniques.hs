@@ -8,8 +8,8 @@
 --
 
 module GHC.Builtin.Uniques
-    ( -- * Looking up known-key names
-      knownUniqueName
+    ( -- * Looking up known-key tuples
+      knownUniqueTupleName
 
       -- * Getting the 'Unique's of 'Name's
       -- ** Anonymous sums
@@ -58,7 +58,7 @@ module GHC.Builtin.Uniques
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
 import {-# SOURCE #-} GHC.Core.TyCon
 import {-# SOURCE #-} GHC.Core.DataCon
 import {-# SOURCE #-} GHC.Types.Id
@@ -73,9 +73,9 @@ import GHC.Utils.Panic
 import Data.Maybe
 import GHC.Utils.Word64 (word64ToInt)
 
--- | Get the 'Name' associated with a known-key 'Unique'.
-knownUniqueName :: Unique -> Maybe Name
-knownUniqueName u =
+-- | Get the 'Name' of a tuple associated with a known-key 'Unique' with a tuple tag.
+knownUniqueTupleName :: Unique -> Maybe Name
+knownUniqueTupleName u =
     case tag of
       SumTag -> Just $ getUnboxedSumName n
       BoxedTupleTyConTag -> Just $ getTupleTyConName Boxed n
@@ -384,7 +384,7 @@ Note [Related uniques for wired-in things]
   The "+1" is implemented in dataConWorkerUnique and the "+2" is in dataConTyRepNameUnique.
   If this ever changes, make sure to also change the treatment for boxing tycons.
 
-* Because boxing tycons (see Note [Boxing constructors] in GHC.Builtin.Types)
+* Because boxing tycons (see Note [Boxing constructors] in GHC.Builtin.WiredIn.Types)
   come with both a tycon and a datacon, each one takes up five slots, combining
   the two cases above. Getting from the tycon to the datacon (by adding 2)
   is implemented in boxingDataConUnique.

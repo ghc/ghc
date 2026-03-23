@@ -94,8 +94,6 @@ import GHC.Internal.Prim.Exception
 import GHC.Internal.Prim
 import GHC.Internal.Types
 
-default ()
-
 ----------------------------------
 -- Bool#
 ----------------------------------

@@ -13,6 +13,9 @@ import Data.Ratio
 import Foreign
 import Foreign.C
 import System.CPUTime.Utils
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 -- For struct rusage
 #if HAVE_SYS_RESOURCE_H

@@ -27,10 +27,8 @@ module GHC.Internal.IO.Device (
         SeekMode(..)
     ) where
 
-import GHC.Internal.Base ( return )
-import GHC.Internal.Classes ( Eq, Ord )
+import GHC.Internal.Base
 import GHC.Internal.Maybe ( Maybe )
-import GHC.Internal.Types ( Bool(..), Int )
 import GHC.Internal.Word
 import GHC.Internal.Arr
 import GHC.Internal.Enum
@@ -38,6 +36,7 @@ import GHC.Internal.Show
 import GHC.Internal.Ptr
 import GHC.Internal.Num
 import GHC.Internal.IO
+import qualified GHC.Internal.Stack.Types as Rebindable
 import {-# SOURCE #-} GHC.Internal.IO.Exception ( unsupportedOperation )
 
 -- | A low-level I/O provider where the data is bytes in memory.

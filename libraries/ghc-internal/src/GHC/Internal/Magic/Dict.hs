@@ -8,6 +8,9 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}  -- See Note [withDict has an ambiguous type]
 {-# LANGUAGE Unsafe #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines WithDict
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Magic.Dict
@@ -33,7 +36,7 @@ module GHC.Internal.Magic.Dict (
     WithDict( withDict )
   ) where
 
-import GHC.Internal.Types (RuntimeRep, TYPE)
+import GHC.Internal.Types
 
 -- | The constraint @'WithDict' cls meth@ can be solved when evidence for
 -- the constraint @cls@ can be provided in the form of a dictionary of

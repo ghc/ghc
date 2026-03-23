@@ -137,6 +137,7 @@ genUnicodeVersion outdir = do
     body :: String -> BB.Builder
     body version = unlinesBB
       [ "{-# LANGUAGE NoImplicitPrelude #-}"
+      , "{-# LANGUAGE Trustworthy #-} -- known-key names, e.g. fromInteger"
       , "{-# OPTIONS_HADDOCK hide #-}"
       , ""
       , mkModuleHeader moduleName

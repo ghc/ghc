@@ -20,8 +20,6 @@ import GHC.Internal.Bignum.Primitives
 #include "MachDeps.h"
 #include "WordSize.h"
 
-default ()
-
 -- | Unlifted array of Word
 type WordArray#        = ByteArray#
 type MutableWordArray# = MutableByteArray#

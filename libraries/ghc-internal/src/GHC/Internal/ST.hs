@@ -24,15 +24,10 @@ module GHC.Internal.ST (
         liftST, unsafeInterleaveST, unsafeDupableInterleaveST
     ) where
 
-import GHC.Internal.Base (
-    Applicative(..), Functor(..), Monad(..), Monoid(..), Semigroup(..),
-    ap, liftM2, ($),
-  )
-import GHC.Internal.Magic (runRW#)
+import GHC.Internal.Base as Rebindable
+import GHC.Internal.Num  as Rebindable( fromInteger)
 import GHC.Internal.Prim (State#, noDuplicate#)
 import GHC.Internal.Show
-
-default ()
 
 -- The 'ST' monad proper.  By default the monad is strict;
 -- too many people got bitten by space leaks when it was lazy.

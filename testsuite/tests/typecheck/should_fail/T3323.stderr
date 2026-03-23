@@ -4,15 +4,13 @@ T3323.hs:18:7: error: [GHC-39999]
       from the context: (GHC.Internal.IO.Device.RawIO dev,
                          GHC.Internal.IO.Device.IODevice dev,
                          GHC.Internal.IO.BufferedIO.BufferedIO dev,
-                         ghc-internal-9.1300.0:GHC.Internal.Data.Typeable.Internal.Typeable
-                           dev)
+                         GHC.Internal.Data.Typeable.Internal.Typeable dev)
         bound by a pattern with constructor:
                    Handle__ :: forall dev enc_state dec_state.
                                (GHC.Internal.IO.Device.RawIO dev,
                                 GHC.Internal.IO.Device.IODevice dev,
                                 GHC.Internal.IO.BufferedIO.BufferedIO dev,
-                                ghc-internal-9.1300.0:GHC.Internal.Data.Typeable.Internal.Typeable
-                                  dev) =>
+                                GHC.Internal.Data.Typeable.Internal.Typeable dev) =>
                                dev
                                -> HandleType
                                -> GHC.Internal.IORef.IORef

@@ -29,6 +29,7 @@ import GHC.Internal.ByteOrder
 
 #if __GLASGOW_HASKELL__ >= 1001
 
+import qualified GHC.Essentials as Rebindable
 import Text.Read
 
 {-NOTE:

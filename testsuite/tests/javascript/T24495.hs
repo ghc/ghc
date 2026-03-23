@@ -4,7 +4,7 @@
 
 module Main where
 
-import GHC.CString
+import GHC.Base ()
 import GHC.JS.Prim (JSVal, toJSString)
 
 foo :: Double -> IO ()

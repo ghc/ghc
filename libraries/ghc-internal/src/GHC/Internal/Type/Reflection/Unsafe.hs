@@ -23,6 +23,7 @@ module GHC.Internal.Type.Reflection.Unsafe (
     , TyCon, mkTrCon, tyConKindRep, tyConKindArgs, tyConFingerprint
   ) where
 
+import GHC.Internal.Types -- For known-occ names
 import GHC.Internal.Data.Typeable.Internal hiding (mkTrApp)
 import qualified GHC.Internal.Data.Typeable.Internal as TI
 

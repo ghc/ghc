@@ -10,6 +10,7 @@ module GHC.Base
 
 import GHC.Classes
 import GHC.Prim
+import qualified GHC.Internal.Base as Rebindable
 
 class Num a  where
     signum    :: a -> a

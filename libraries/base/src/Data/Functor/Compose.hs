@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
@@ -26,8 +27,11 @@ module Data.Functor.Compose (
     Compose(..),
   ) where
 
+import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 import Data.Functor.Classes
-
 import Control.Applicative
 import GHC.Internal.Data.Coerce (coerce)
 import GHC.Internal.Data.Data (Data)
@@ -36,7 +40,6 @@ import GHC.Internal.Data.Monoid (Sum(..), All(..), Any(..), Product(..))
 import GHC.Internal.Data.Type.Equality (TestEquality(..), (:~:)(..))
 import GHC.Generics (Generic, Generic1)
 import Text.Read (Read(..), ReadPrec, readListDefault, readListPrecDefault)
-import Prelude
 
 infixr 9 `Compose`
 

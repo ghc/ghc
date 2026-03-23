@@ -5,6 +5,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE UnliftedNewtypes #-}
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
 
 module GHC.Internal.Wasm.Prim.Types (
   JSVal# (..),
@@ -18,14 +19,13 @@ module GHC.Internal.Wasm.Prim.Types (
   WouldBlockException (..)
 ) where
 
-import GHC.Internal.Base (String, pure, (.), ($))
-import GHC.Internal.Classes (Ord(..))
+import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
+import GHC.Internal.Base
 import GHC.Internal.Exception.Type
 import GHC.Internal.Foreign.C.String.Encoding
 import GHC.Internal.ForeignPtr
 import GHC.Internal.Prim (Int#, RealWorld, State#, mkWeak#, mkWeakNoFinalizer#)
 import GHC.Internal.Ptr
-import GHC.Internal.Types (Any, Int, UnliftedType)
 import GHC.Internal.IO
 import GHC.Internal.IO.Encoding
 import GHC.Internal.Maybe (Maybe(..))

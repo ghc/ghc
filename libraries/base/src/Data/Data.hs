@@ -104,6 +104,7 @@ import Data.Typeable
 
 #if __GLASGOW_HASKELL__ >= 1001
 
+import qualified GHC.Essentials as Rebindable
 import GHC.Real (toRational)
 import GHC.Float (Double)
 import Data.Eq ((==))

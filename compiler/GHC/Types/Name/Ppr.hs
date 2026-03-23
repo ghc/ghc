@@ -22,8 +22,8 @@ import GHC.Types.Name.Reader
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Builtin.Types.Prim ( fUNTyConName )
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Prim ( fUNTyConName )
+import GHC.Builtin.WiredIn.Types
 import Data.Maybe (isJust)
 
 
@@ -176,7 +176,7 @@ isPunnedDataConName occ =
 
 {- Note [pretendNameIsInScopeForPpr]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-c.f. Note [pretendNameIsInScope] in GHC.Builtin.Names
+c.f. Note [pretendNameIsInScope] in GHC.Builtin.KnownKeys
 Normally, a name is printed unqualified if it's in scope and unambiguous:
   ghci> :t not
   not :: Bool -> Bool

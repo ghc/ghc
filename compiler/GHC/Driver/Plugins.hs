@@ -5,7 +5,6 @@
 {-# LANGUAGE UnboxedTuples #-}
 #endif
 
-
 -- | Definitions for writing /plugins/ for GHC. Plugins can hook into
 -- several areas of the compiler. See the 'Plugin' type. These plugins
 -- include type-checker plugins, source plugins, and core-to-core plugins.

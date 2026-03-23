@@ -63,8 +63,8 @@ import GHC.Core.Make
 
 import GHC.Hs
 
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

@@ -61,6 +61,7 @@ module GHC.Internal.IO.Handle.Internals (
   debugIO, traceIO
  ) where
 
+import qualified GHC.Internal.Stack.Types as Rebindable
 import GHC.Internal.IO
 import GHC.Internal.IO.IOMode
 import GHC.Internal.IO.Encoding as Encoding
@@ -74,15 +75,11 @@ import GHC.Internal.IO.SubSystem ((<!>), isWindowsNativeIO)
 import qualified GHC.Internal.IO.Device as IODevice
 import qualified GHC.Internal.IO.BufferedIO as Buffered
 
-import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
+import GHC.Internal.Base
 import GHC.Internal.Conc.Sync
 import GHC.Internal.Err (error, errorWithoutStackTrace)
 import GHC.Internal.Real
-import GHC.Internal.Types (Bool(..), Char, Int)
 import GHC.Internal.Word
-import GHC.Internal.Base (
-    String, fmap, mapM, otherwise, pure, return, when, ($), (++),
-  )
 import GHC.Internal.Exception
 import GHC.Internal.Exception.Type
 import GHC.Internal.Num          ( Num(..) )
@@ -93,7 +90,6 @@ import GHC.Internal.Ptr (castPtr)
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Data.Maybe
 import GHC.Internal.System.Posix.Internals hiding (FD)
-
 import GHC.Internal.Foreign.C.String
 
 c_DEBUG_DUMP :: Bool

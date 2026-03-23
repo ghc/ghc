@@ -235,17 +235,17 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 
 import GHC.Core.TyCon
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
    ( charTy, naturalTy
    , typeSymbolKind, liftedTypeKind, unliftedTypeKind
    , constraintKind, zeroBitTypeKind
    , manyDataConTy, oneDataConTy
    , liftedRepTy, unliftedRepTy, zeroBitRepTy )
 
-import GHC.Types.Name( Name )
-import GHC.Builtin.Names
+import GHC.Types.Name( Name, hasKnownKey )
+import GHC.Builtin.KnownKeys
 import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-} GHC.Core.Coercion
@@ -610,7 +610,7 @@ kindRep_maybe kind
   | otherwise                            = Nothing
 
 -- | Returns True if the argument is (lifted) Type or Constraint
--- See Note [TYPE and CONSTRAINT] in GHC.Builtin.Types.Prim
+-- See Note [TYPE and CONSTRAINT] in GHC.Builtin.WiredIn.Prim
 isLiftedTypeKind :: Kind -> Bool
 isLiftedTypeKind kind
   = case kindRep_maybe kind of
@@ -1226,21 +1226,21 @@ pprUserTypeErrorTy ty =
 
     -- Text "Something"
     Just (tc,[txt])
-      | tyConName tc == typeErrorTextDataConName
+      | tc `hasKnownKey` typeErrorTextDataConKey
       , Just str <- isStrLitTy txt -> ftext str
 
     -- ShowType t
     Just (tc,[_k,t])
-      | tyConName tc == typeErrorShowTypeDataConName -> ppr t
+      | tc `hasKnownKey` typeErrorShowTypeDataConKey -> ppr t
 
     -- t1 :<>: t2
     Just (tc,[t1,t2])
-      | tyConName tc == typeErrorAppendDataConName ->
+      | tc `hasKnownKey` typeErrorAppendDataConKey ->
         pprUserTypeErrorTy t1 <> pprUserTypeErrorTy t2
 
     -- t1 :$$: t2
     Just (tc,[t1,t2])
-      | tyConName tc == typeErrorVAppendDataConName ->
+      | tc `hasKnownKey` typeErrorVAppendDataConKey ->
         pprUserTypeErrorTy t1 $$ pprUserTypeErrorTy t2
 
     -- An unevaluated type function
@@ -2583,7 +2583,7 @@ Here are the key kinding rules for types
           t1 -> t2 : torc2 LiftedRep
           -- In fact the arrow varies with torc1/torc2
           -- See Note [Function type constructors and FunTy]
-          -- in GHC.Builtin.Types.Prim
+          -- in GHC.Builtin.WiredIn.Prim
 
           torc is TYPE or CONSTRAINT
           ty : body_torc rep
@@ -3266,7 +3266,7 @@ e.g., during comparison.
 
  3. We have a single, statically allocated top-level binding to
     represent `TyConApp GHC.Types.Type []` (namely
-    'GHC.Builtin.Types.Prim.liftedTypeKind'), ensuring that we don't
+    'GHC.Builtin.WiredIn.Prim.liftedTypeKind'), ensuring that we don't
     need to allocate such types (goal (a)).  See functions
     mkTYPEapp and mkBoxedRepApp
 
@@ -3346,7 +3346,7 @@ mkTYPEapp_maybe :: RuntimeRepType -> Maybe Type
 --     because those inner types should already have been rewritten
 --     to LiftedRep and UnliftedRep respectively, by mkTyConApp
 --
--- see Note [TYPE and CONSTRAINT] in GHC.Builtin.Types.Prim.
+-- see Note [TYPE and CONSTRAINT] in GHC.Builtin.WiredIn.Prim.
 -- See Note [Using synonyms to compress types] in GHC.Core.Type
 {-# NOINLINE mkTYPEapp_maybe #-}
 mkTYPEapp_maybe (TyConApp tc args)
@@ -3379,7 +3379,7 @@ mkBoxedRepApp_maybe :: LevityType -> Maybe Type
 -- On the fly, rewrite
 --      BoxedRep Lifted     -->   liftedRepTy    (a synonym)
 --      BoxedRep Unlifted   -->   unliftedRepTy  (ditto)
--- See Note [TYPE and CONSTRAINT] in GHC.Builtin.Types.Prim.
+-- See Note [TYPE and CONSTRAINT] in GHC.Builtin.WiredIn.Prim.
 -- See Note [Using synonyms to compress types] in GHC.Core.Type
 {-# NOINLINE mkBoxedRepApp_maybe #-}
 mkBoxedRepApp_maybe (TyConApp tc args)
@@ -3393,7 +3393,7 @@ mkTupleRepApp_maybe :: Type -> Maybe Type
 -- ^ Given a `[RuntimeRep]`, apply `TupleRep` to it
 -- On the fly, rewrite
 --      TupleRep [] -> zeroBitRepTy   (a synonym)
--- See Note [TYPE and CONSTRAINT] in GHC.Builtin.Types.Prim.
+-- See Note [TYPE and CONSTRAINT] in GHC.Builtin.WiredIn.Prim.
 -- See Note [Using synonyms to compress types] in GHC.Core.Type
 {-# NOINLINE mkTupleRepApp_maybe #-}
 mkTupleRepApp_maybe (TyConApp tc args)

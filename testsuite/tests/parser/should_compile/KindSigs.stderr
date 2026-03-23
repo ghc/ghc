@@ -1058,7 +1058,8 @@
                    (EpaComments
                     []))
                   (Exact
-                   {Name: ()}))))))
+                   (ExactName
+                    {Name: ()})))))))
              [])
             (EmptyLocalBinds
              (NoExtField)))))])))))

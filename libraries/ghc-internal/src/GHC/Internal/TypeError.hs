@@ -12,6 +12,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Unsatisfiable
+
+
 {-|
 This module exports:
 
@@ -31,7 +35,7 @@ module GHC.Internal.TypeError
   , Unsatisfiable, unsatisfiable
   ) where
 
-import GHC.Internal.Types (TYPE, Bool(True), Constraint, Symbol)
+import GHC.Internal.Base
 
 {- Note [Custom type errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

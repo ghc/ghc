@@ -116,8 +116,8 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DFM
 import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 
-import GHC.Builtin.Types
-import GHC.Builtin.Names      ( runRWKey )
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.KnownKeys      ( runRWKey )
 
 import GHC.Data.FastString
 
