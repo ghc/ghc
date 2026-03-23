@@ -11,6 +11,9 @@ module System.CPUTime.Posix.ClockGetTime
     ) where
 
 import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 #if _POSIX_TIMERS > 0 && defined(_POSIX_CPUTIME) && _POSIX_CPUTIME >= 0
 

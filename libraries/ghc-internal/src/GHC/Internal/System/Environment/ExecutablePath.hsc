@@ -21,10 +21,13 @@ module GHC.Internal.System.Environment.ExecutablePath
   , executablePath
   ) where
 
+import GHC.Internal.Base
+import qualified GHC.Internal.Stack.Types as Rebindable
+import qualified GHC.Internal.Num as Rebindable  -- For known-key names
+
 ##if defined(javascript_HOST_ARCH)
 
-import GHC.Internal.Base (return)
-import GHC.Internal.IO (FilePath, IO)
+import GHC.Internal.IO (FilePath)
 import GHC.Internal.Data.Maybe (Maybe(..))
 
 getExecutablePath :: IO FilePath
@@ -39,10 +42,8 @@ executablePath = Nothing
 -- to one OS implementation from breaking another.
 
 import GHC.Internal.Maybe (Maybe(..))
-import GHC.Internal.IO (FilePath, IO)
+import GHC.Internal.IO (FilePath)
 #if defined(darwin_HOST_OS)
-import GHC.Internal.Base (fmap, otherwise, pure, ($), (>>=))
-import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Control.Exception (catch, throw)
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Real
@@ -56,7 +57,6 @@ import GHC.Internal.Foreign.Storable
 import GHC.Internal.System.IO.Error (isDoesNotExistError)
 import GHC.Internal.System.Posix.Internals
 #elif defined(linux_HOST_OS) || defined(gnu_HOST_OS)
-import GHC.Internal.Base (otherwise, ($))
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.List (isSuffixOf)
 import GHC.Internal.Foreign.C.Types
@@ -66,7 +66,6 @@ import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.Real
 import GHC.Internal.System.Posix.Internals
 #elif defined(solaris2_HOST_OS)
-import GHC.Internal.Base (otherwise, ($))
 import GHC.Internal.Control.Exception (catch, throw)
 import GHC.Internal.Data.Functor
 import GHC.Internal.Foreign.C.Types
@@ -76,7 +75,6 @@ import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.System.IO.Error (isDoesNotExistError)
 import GHC.Internal.System.Posix.Internals
 #elif defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
-import GHC.Internal.Base (otherwise, pure, ($))
 import GHC.Internal.Control.Exception (catch, throw)
 import GHC.Internal.Data.Functor
 import GHC.Internal.Foreign.C.Types
@@ -91,15 +89,12 @@ import GHC.Internal.System.Posix.Internals
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #elif defined(mingw32_HOST_OS)
-import GHC.Internal.Base (otherwise, pure, return, ($), (.))
-import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.Control.Exception
 import GHC.Internal.Control.Monad.Fail
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.List (isPrefixOf, drop)
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Real
-import GHC.Internal.Types (Bool(..))
 import GHC.Internal.Word
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Foreign.Marshal.Array
@@ -109,8 +104,6 @@ import GHC.Internal.Windows
 #include <windows.h>
 #include <stdint.h>
 #else
-import GHC.Internal.Base (($), (>>=), (++))
-import GHC.Internal.Classes (Ord(..))
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.Error

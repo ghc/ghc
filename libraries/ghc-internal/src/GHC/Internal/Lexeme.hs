@@ -19,11 +19,9 @@ module GHC.Internal.Lexeme (
 import Prelude -- See note [Why do we import Prelude here?]
 import Data.Char
 #else
-import GHC.Internal.Base (otherwise)
-import GHC.Internal.Classes (Eq(..), (&&), (||))
+import GHC.Internal.Base
 import GHC.Internal.Unicode
 import GHC.Internal.List (elem)
-import GHC.Internal.Types (Bool(..), Char)
 #endif
 
 -- | Is this character acceptable in a symbol (after the first char)?

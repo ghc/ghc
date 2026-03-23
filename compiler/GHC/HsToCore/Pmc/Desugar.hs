@@ -21,8 +21,9 @@ import GHC.Tc.Utils.TcMType (shortCutLit)
 import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Types.Name
-import GHC.Builtin.Types
-import GHC.Builtin.Names (rationalTyConName, toListName)
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.KnownKeys ( toListClassOpKey )
+import GHC.Builtin.KnownOccs ( rationalTyConOcc )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -185,7 +186,7 @@ desugarPat x pat = case pat of
           , tc == listTyCon
           -- `pat` looks like `coerce toList -> [p1,...,pn]`.
           -- Now take care of -XRebindableSyntax:
-          , let is_to_list (HsVar _ (L _ to_list)) = idName to_list == toListName
+          , let is_to_list (HsVar _ (L _ to_list)) = to_list `hasKnownKey` toListClassOpKey
                 is_to_list (XExpr (WrapExpr _ e))  = is_to_list e
                 is_to_list _                       = False
           , is_to_list (unLoc lrhs)
@@ -254,7 +255,7 @@ desugarPat x pat = case pat of
         , (HsFractional f) <- val
         , negates <- if fl_neg f then 1 else 0
         -> do
-            rat_tc <- dsLookupTyCon rationalTyConName
+            rat_tc <- dsLookupKnownOccTyCon rationalTyConOcc
             let rat_ty = mkTyConTy rat_tc
             return $ Just $ PmLit rat_ty (PmLitOverRat negates f)
         | otherwise

@@ -8,19 +8,19 @@ module GHC.Internal.RTS.Flags.Test
   )
 where
 
+import GHC.Internal.Base   -- For known-occ things
 import GHC.Internal.Ptr
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Data.Functor ((<$>))
-import GHC.Internal.Types (Bool(..), Int, IO)
 import GHC.Internal.Word (Word32)
 import GHC.Internal.Real (fromIntegral)
 
 #if defined(javascript_HOST_ARCH)
-import GHC.Internal.Base (pure)
 #else
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.Marshal.Utils
 #endif
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 #include "Rts.h"
 #include "rts/Flags.h"

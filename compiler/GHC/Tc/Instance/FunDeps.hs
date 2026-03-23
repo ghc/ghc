@@ -517,7 +517,7 @@ Note [Equality superclasses]
 Suppose we have
   class (a ~ [b]) => C a b
 
-Remember from Note [The equality types story] in GHC.Builtin.Types.Prim, that
+Remember from Note [The equality types story] in GHC.Builtin.WiredIn.Prim, that
   * (a ~~ b) is a superclass of (a ~ b)
   * (a ~# b) is a superclass of (a ~~ b)
 

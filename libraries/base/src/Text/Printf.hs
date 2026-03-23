@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -94,12 +95,16 @@ module Text.Printf(
 
 import Prelude
 import Data.Char
+
 import GHC.Internal.Int
 import GHC.Internal.Data.List (stripPrefix)
 import GHC.Internal.Word
 import GHC.Internal.Numeric.Natural
 import Numeric
 import System.IO
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 -- $setup
 -- >>> import Prelude
@@ -484,7 +489,7 @@ intModifierMap = [
 
 parseIntFormat :: a -> String -> FormatParse
 parseIntFormat _ s =
-  case foldr matchPrefix Nothing intModifierMap of
+  case Prelude.foldr matchPrefix Nothing intModifierMap of
     Just m -> m
     Nothing ->
       case s of

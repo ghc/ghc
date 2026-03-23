@@ -64,7 +64,7 @@ module GHC.Types.Literal
 import GHC.Prelude
 
 import GHC.Types.Literal.Floating
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 import GHC.Core.Type( Type, RuntimeRepType, mkForAllTy, mkTyVarTy, typeOrConstraintKind )
 import GHC.Core.TyCo.Compare( nonDetCmpType )
 import GHC.Types.Var

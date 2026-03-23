@@ -16,7 +16,7 @@ module GHC.Internal.Unicode.Char.UnicodeData.SimpleUpperCaseMapping
 (toSimpleUpperCase)
 where
 
-import GHC.Internal.Types (Char)
+import GHC.Internal.Types
 
 {-# NOINLINE toSimpleUpperCase #-}
 toSimpleUpperCase :: Char -> Char

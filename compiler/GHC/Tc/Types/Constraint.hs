@@ -125,7 +125,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.CtLoc
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Types.Var.Set
 import GHC.Types.Name.Reader
@@ -1426,7 +1426,7 @@ userTypeError_maybe look_everywhere = go
       | Just ty' <- coreView ty
       = go ty'
     go (TyConApp tc tys)
-      | tyConName tc == errorMessageTypeErrorFamName
+      | tc `hasKnownKey` errorMessageTypeErrorFamKey
       , _kind : msg : _ <- tys
               -- There may be more than 2 arguments, if the type error is
               -- used as a type constructor (e.g. at kind `Type -> Type`).
@@ -1503,7 +1503,7 @@ containsUserTypeError look_in_famapps pred =
 isUnsatisfiableCt_maybe :: Type -> Maybe ErrorMsgType
 isUnsatisfiableCt_maybe t
   | Just (tc, [msg]) <- splitTyConApp_maybe t
-  , tc `hasKey` unsatisfiableClassNameKey
+  , tc `hasKnownKey` unsatisfiableClassKey
   = Just msg
   | otherwise
   = Nothing

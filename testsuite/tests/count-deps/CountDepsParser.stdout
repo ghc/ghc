@@ -1,11 +1,15 @@
 Found GHC.Parser module dependencies
-GHC.Builtin.Names
+GHC.Builtin
+GHC.Builtin.KnownKeys
+GHC.Builtin.KnownOccs
+GHC.Builtin.Modules
 GHC.Builtin.PrimOps
 GHC.Builtin.PrimOps.Ids
-GHC.Builtin.Types
-GHC.Builtin.Types.Literals
-GHC.Builtin.Types.Prim
 GHC.Builtin.Uniques
+GHC.Builtin.WiredIn.Ids
+GHC.Builtin.WiredIn.Prim
+GHC.Builtin.WiredIn.TypeLits
+GHC.Builtin.WiredIn.Types
 GHC.Cmm.BlockId
 GHC.Cmm.CLabel
 GHC.Cmm.Dataflow.Label
@@ -247,7 +251,6 @@ GHC.Unit.Ppr
 GHC.Unit.State
 GHC.Unit.Types
 GHC.Utils.Binary
-GHC.Utils.Binary.Typeable
 GHC.Utils.BufHandle
 GHC.Utils.CliOption
 GHC.Utils.Constants

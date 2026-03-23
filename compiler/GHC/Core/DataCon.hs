@@ -84,7 +84,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.SourceText
 import GHC.Core.Class
 import GHC.Types.Name
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Core.Predicate
 import GHC.Types.Var
 import GHC.Types.Var.Env
@@ -1810,7 +1810,7 @@ dataConCannotMatch :: [Type] -> DataCon -> Bool
 dataConCannotMatch tys con
   -- See (U6) in Note [Implementing unsafeCoerce]
   -- in base:Unsafe.Coerce
-  | dataConName con == unsafeReflDataConName
+  | con `hasKnownKey` unsafeReflDataConKey
                       = False
   | null inst_theta   = False   -- Common
   | all isTyVarTy tys = False   -- Also common

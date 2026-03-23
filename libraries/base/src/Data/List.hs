@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 
 -- |
@@ -193,6 +194,9 @@ import GHC.Internal.Int (Int)
 import GHC.Internal.Num ((-))
 import GHC.List (build)
 import qualified Data.List.NubOrdSet as NubOrdSet
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable( Num, fromInteger )
+#endif
 
 inits1, tails1 :: [a] -> [NonEmpty a]
 

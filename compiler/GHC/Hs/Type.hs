@@ -111,8 +111,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..) )
 import GHC.Types.Var ( VarBndr, visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
-import GHC.Builtin.Names ( negateName )
-import GHC.Builtin.Types( mkTupleStr )
+import GHC.Builtin.WiredIn.Types( mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
 import GHC.Core.Multiplicity( pprArrowWithModifiers )
@@ -1184,7 +1183,7 @@ data OpName = NormalOp (WithUserRdr Name) -- ^ A normal identifier
 
 instance Outputable OpName where
   ppr (NormalOp n)   = ppr n
-  ppr NegateOp       = ppr negateName
+  ppr NegateOp       = text "negate"
   ppr (UnboundOp uv) = ppr uv
   ppr (RecFldOp fld) = ppr fld
 
@@ -1525,7 +1524,7 @@ hsTypeNeedsParens p = go_hs_ty
     go_hs_ty (HsFunTy{})              = p >= funPrec
     -- Special-case unary boxed tuple applications so that they are
     -- parenthesized as `Identity (Solo x)`, not `Identity Solo x` (#18612)
-    -- See Note [One-tuples] in GHC.Builtin.Types
+    -- See Note [One-tuples] in GHC.Builtin.WiredIn.Types
     go_hs_ty (HsTupleTy _ con [_])
       = case con of
           HsBoxedOrConstraintTuple   -> p >= appPrec
@@ -1539,7 +1538,7 @@ hsTypeNeedsParens p = go_hs_ty
     go_hs_ty (HsExplicitListTy{})     = False
     -- Special-case unary boxed tuple applications so that they are
     -- parenthesized as `Proxy ('MkSolo x)`, not `Proxy 'MkSolo x` (#18612)
-    -- See Note [One-tuples] in GHC.Builtin.Types
+    -- See Note [One-tuples] in GHC.Builtin.WiredIn.Types
     go_hs_ty (HsExplicitTupleTy _ _ [_])
                                       = p >= appPrec
     go_hs_ty (HsExplicitTupleTy{})    = False

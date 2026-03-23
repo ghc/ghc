@@ -15,9 +15,14 @@ import qualified GHC.Internal.Event.Windows.FFI as FFI
 
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Base (Monad(..), fmap, liftM, ($!))
+import qualified GHC.Internal.Base as Rebindable
 import GHC.Internal.Err (undefined)
+import qualified GHC.Internal.Num as Rebindable
 import GHC.Internal.Real
+import qualified GHC.Internal.Stack.Types as Rebindable
+  ( SrcLoc(..), pushCallStack, emptyCallStack )
 import GHC.Internal.Types (Double, IO)
+import qualified GHC.Internal.Types as Rebindable
 
 -- | Monotonic clock
 newtype Clock = Clock (IO Seconds)

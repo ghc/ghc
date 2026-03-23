@@ -2,10 +2,10 @@
   [1 of 1] Compiling ShouldFail[sig]
 [2 of 2] Processing q
   Instantiating q
-  [1 of 1] Including p[ShouldFail=base-4.20.0.0:Prelude]
-    Instantiating p[ShouldFail=base-4.20.0.0:Prelude]
+  [1 of 1] Including p[ShouldFail=base-4.23.0.0:Prelude]
+    Instantiating p[ShouldFail=base-4.23.0.0:Prelude]
     [1 of 1] Compiling ShouldFail[sig]
-<no location info>: error: [GHC-15843]
+bkpfail17.bkp:5:9: error: [GHC-15843]
     • Type constructor ‘Either’ has conflicting definitions in the module
       and its hsig file.
       Main module: type Either :: * -> * -> *

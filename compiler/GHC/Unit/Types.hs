@@ -588,7 +588,7 @@ ghcInternalUnitId, rtsUnitId,
 ghcInternalUnit, rtsUnit,
   mainUnit, thisGhcUnit, interactiveUnit, interactiveGhciUnit, interactiveSessionUnit :: Unit
 
-ghcInternalUnitId = UnitId (fsLit "ghc-internal")
+ghcInternalUnitId = UnitId (fsLit "ghc-internal") -- See Note [About units], section "Wired-in units"
 rtsUnitId         = UnitId (fsLit "rts")
 thisGhcUnitId     = UnitId (fsLit cProjectUnitId) -- See Note [GHC's Unit Id]
 interactiveUnitId = UnitId (fsLit "interactive")

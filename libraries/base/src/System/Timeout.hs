@@ -17,6 +17,8 @@
 -- TODO: Inspect is still suitable.
 module System.Timeout ( Timeout, timeout ) where
 
+import Prelude
+
 #if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
 import GHC.Internal.Control.Monad
 import GHC.Internal.Event           (getSystemTimerManager,
@@ -29,7 +31,9 @@ import GHC.Internal.Control.Exception   (Exception(..), handleJust, bracket,
                             asyncExceptionToException,
                             asyncExceptionFromException)
 import GHC.Internal.Data.Unique         (Unique, newUnique)
-import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 -- $setup
 -- >>> import Prelude

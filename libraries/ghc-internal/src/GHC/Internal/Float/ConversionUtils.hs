@@ -21,13 +21,12 @@
 
 module GHC.Internal.Float.ConversionUtils ( elimZerosInteger, elimZerosInt# ) where
 
-import GHC.Internal.Base (otherwise)
+import GHC.Internal.Base
 import GHC.Internal.Bignum.Integer
 import GHC.Internal.Prim (
     Int#, int2Word#, indexInt8OffAddr#, int8ToInt#, narrow8Word#,
     uncheckedIShiftRA#, word2Int#, (-#), (<=#), (<#),
   )
-import GHC.Internal.Types (isTrue#)
 
 #if WORD_SIZE_IN_BITS < 64
 
@@ -52,8 +51,6 @@ elim64# :: Int# -> Int# -> (# Integer, Int# #)
 elim64# = elimZerosInt#
 
 #endif
-
-default ()
 
 {-# INLINE elimZerosInteger #-}
 elimZerosInteger :: Integer -> Int# -> (# Integer, Int# #)

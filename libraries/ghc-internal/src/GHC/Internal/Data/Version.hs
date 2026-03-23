@@ -36,11 +36,8 @@ module GHC.Internal.Data.Version (
         makeVersion
   ) where
 
-import GHC.Internal.Classes          ( Eq ((==)), (&&) )
-import GHC.Internal.Int              ( Int )
-import GHC.Internal.Data.List        ( map, sort, concat, concatMap, intersperse, (++) )
-import GHC.Internal.Data.Ord
-import GHC.Internal.Data.String      ( String )
+import GHC.Internal.Base hiding( many )
+import GHC.Internal.Data.List        ( sort, concat, concatMap, intersperse )
 import GHC.Internal.Show
 
 {- |

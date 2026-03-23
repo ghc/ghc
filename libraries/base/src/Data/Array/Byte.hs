@@ -21,6 +21,10 @@ module Data.Array.Byte (
   MutableByteArray(..),
 ) where
 
+import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 import GHC.Internal.Data.Bits ((.&.), unsafeShiftR)
 import GHC.Internal.Data.Data (mkNoRepType, Data(..))
 import GHC.Internal.Data.Typeable (Typeable)
@@ -38,7 +42,6 @@ import GHC.Internal.TH.Monad (unsafeCodeCoerce)
 #endif
 import GHC.Internal.TH.Lift
 import GHC.Internal.ForeignPtr
-import Prelude
 
 -- | Lifted wrapper for 'ByteArray#'.
 --

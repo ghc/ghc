@@ -1,4 +1,4 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, NoListTuplePuns #-}
 {-# LANGUAGE ExplicitForAll, StandaloneKindSignatures, PolyKinds, DataKinds, TypeFamilyDependencies #-}
 

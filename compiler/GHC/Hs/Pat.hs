@@ -65,7 +65,7 @@ import GHC.Types.Basic
 import GHC.Types.SourceText
 -- others:
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Types.Var
 import GHC.Types.Name.Reader
 import GHC.Core.ConLike
@@ -1087,7 +1087,7 @@ patNeedsParens p = go @p
     go (AsPat {})        = False
     -- Special-case unary boxed tuple applications so that they are
     -- parenthesized as `Identity (Solo x)`, not `Identity Solo x` (#18612)
-    -- See Note [One-tuples] in GHC.Builtin.Types
+    -- See Note [One-tuples] in GHC.Builtin.WiredIn.Types
     go (TuplePat _ [_] Boxed)
                          = p >= appPrec
     go (TuplePat{})      = False

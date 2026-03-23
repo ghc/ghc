@@ -12,7 +12,7 @@ module GHC.Tc.Errors(
 
 import GHC.Prelude
 
-import GHC.Builtin.Names (hasFieldClassName)
+import GHC.Builtin.KnownKeys (hasFieldClassKey)
 
 import GHC.Driver.Env (hsc_units)
 import GHC.Driver.DynFlags
@@ -2786,7 +2786,7 @@ hasField_maybe :: PredType -> Maybe (Type, Type, Type)
 hasField_maybe pred =
   case classifyPredType pred of
     ClassPred cls tys
-      | className cls == hasFieldClassName
+      | className cls `hasKnownKey` hasFieldClassKey
       , [ _k, _rec_rep, _fld_rep, x_ty, rec_ty, fld_ty ] <- tys
       -> Just (x_ty, rec_ty, fld_ty)
     _ -> Nothing

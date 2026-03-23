@@ -21,12 +21,10 @@ module GHC.Internal.STRef (
         newSTRef, readSTRef, writeSTRef
     ) where
 
-import GHC.Internal.Classes (Eq(..))
+import GHC.Internal.Base
 import GHC.Internal.ST
-import GHC.Internal.Base (($))
 import GHC.Internal.Prim (MutVar#, newMutVar#, readMutVar#, writeMutVar#)
 import GHC.Internal.Prim.PtrEq (sameMutVar#)
-import GHC.Internal.Types (isTrue#)
 
 -- $setup
 -- >>> import Prelude

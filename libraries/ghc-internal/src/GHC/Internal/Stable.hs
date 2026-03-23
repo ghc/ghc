@@ -4,6 +4,7 @@
            , UnboxedTuples
   #-}
 {-# OPTIONS_HADDOCK not-home #-}
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -28,13 +29,11 @@ module GHC.Internal.Stable (
         castPtrToStablePtr
     ) where
 
-import GHC.Internal.Classes ( Eq(..) )
+import GHC.Internal.Base
 import GHC.Internal.Prim (
     StablePtr#, deRefStablePtr#, eqStablePtr#, makeStablePtr#,
   )
 import GHC.Internal.Ptr
-import GHC.Internal.Base ( ($) )
-import GHC.Internal.Types ( Bool(..), IO(..) )
 
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerceAddr )
 

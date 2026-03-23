@@ -4,7 +4,7 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   class C{2} :: * -> * -> Constraint
 Dependent modules: []
-Dependent packages: [(normal, base-4.22.0.0)]
+Dependent packages: [(normal, base-4.23.0.0)]
 
 ==================== Typechecker ====================
 Bug.$tcC [InlPrag=[~]]
@@ -28,10 +28,10 @@ $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
-  = GHC.Internal.Types.KindRepFun GHC.Internal.Types.krep$* $krep
+  = GHC.Internal.Types.KindRepFun GHC.Internal.Types.krepStar $krep
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepFun
-      GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
+      GHC.Internal.Types.krepStar GHC.Internal.Types.krepConstraint
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepTyConApp
       GHC.Internal.Tuple.$tcUnit [] @GHC.Internal.Types.KindRep

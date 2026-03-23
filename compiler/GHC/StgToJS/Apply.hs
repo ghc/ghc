@@ -48,6 +48,7 @@ import GHC.StgToJS.Types
 import GHC.StgToJS.Utils
 import GHC.StgToJS.Linker.Utils (decodeModifiedUTF8)
 
+import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.CostCentre
@@ -56,7 +57,7 @@ import GHC.Types.Literal
 
 import GHC.Stg.Syntax
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Core.TyCon
 import GHC.Core.DataCon
@@ -110,7 +111,7 @@ genApp ctx i args
     -- We detect if the Id is unsafeUnpackJSStringUtf8## applied to a string literal,
     -- if so then we convert the unsafeUnpack to a call to h$decode.
     | [StgVarArg v] <- args
-    , idName i == unsafeUnpackJSStringUtf8ShShName
+    , i `hasKnownKey` unsafeUnpackJSStringUtf8ShShKey
     -- See: https://gitlab.haskell.org/ghc/ghc/-/merge_requests/10588
     -- Comment by Josh Meredith  <josh.meredith@iohk.io>
     -- `typex_expr` can throw an error for certain bindings so it's important
@@ -121,7 +122,7 @@ genApp ctx i args
     -- Test case T23479
     | [StgLitArg (LitString bs)] <- args
     , Just d <- decodeModifiedUTF8 bs
-    , idName i == unsafeUnpackJSStringUtf8ShShName
+    , i `hasKnownKey` unsafeUnpackJSStringUtf8ShShKey
     , [top] <- concatMap typex_expr (ctxTarget ctx)
     = return . (,ExprInline) $ top |= toJExpr d
 
@@ -163,7 +164,7 @@ genApp ctx i args
     -- + Utf8 version below
     | [StgLitArg (LitString bs)] <- args
     , Just d <- decodeModifiedUTF8 bs
-    , idName i == unpackCStringName
+    , i `hasKnownKey` unpackCStringIdKey
     , [top] <- concatMap typex_expr (ctxTarget ctx)
     = return
         ( top |= app "h$toHsStringA" [toJExpr d]
@@ -171,7 +172,7 @@ genApp ctx i args
         )
     | [StgLitArg (LitString bs)] <- args
     , Just d <- decodeModifiedUTF8 bs
-    , idName i == unpackCStringUtf8Name
+    , i `hasKnownKey` unpackCStringUtf8IdKey
     , [top] <- concatMap typex_expr (ctxTarget ctx)
     = return
         ( top |= app "h$toHsString" [toJExpr d]

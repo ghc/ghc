@@ -29,7 +29,7 @@ import GHC.Types.Unique.Map
 import GHC.Stg.Syntax
 
 import GHC.Builtin.PrimOps
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Core.Type hiding (typeSize)
 

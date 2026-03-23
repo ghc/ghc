@@ -9,8 +9,8 @@ Wired-in knowledge about primitive types
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | This module defines TyCons that can't be expressed in Haskell.
---   They are all, therefore, wired-in TyCons.  C.f module "GHC.Builtin.Types"
-module GHC.Builtin.Types.Prim(
+--   They are all, therefore, wired-in TyCons.  C.f module "GHC.Builtin.WiredIn.Types"
+module GHC.Builtin.WiredIn.Prim(
         mkTemplateKindVar, mkTemplateKindVars,
         mkTemplateTyVars, mkTemplateTyVarsFrom,
         mkTemplateKiTyVars, mkTemplateKiTyVar,
@@ -110,7 +110,7 @@ module GHC.Builtin.Types.Prim(
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
   ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind, unliftedTypeKind
   , boxedRepDataConTyCon, vecRepDataConTyCon
   , liftedRepTy, unliftedRepTy, zeroBitRepTy
@@ -143,7 +143,9 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 
 import GHC.Builtin.Uniques
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( gHC_PRIM )
+
 import GHC.Utils.Misc ( changeLast )
 import GHC.Utils.Panic ( assertPpr )
 import GHC.Utils.Outputable
@@ -180,7 +182,7 @@ mkGenPrimTc built_in_syntax occ key tycon
 -- arguments of kind 'Type` with the given 'Role's,
 -- and the given result kind representation.
 --
--- Only use this in "GHC.Builtin.Types.Prim".
+-- Only use this in "GHC.Builtin.WiredIn.Prim".
 pcPrimTyCon :: Name
             -> [Role] -> RuntimeRepType -> TyCon
 pcPrimTyCon name roles res_rep
@@ -193,7 +195,7 @@ pcPrimTyCon name roles res_rep
 -- | Create a primitive nullary 'TyCon' with the given 'Name'
 -- and result kind representation.
 --
--- Only use this in "GHC.Builtin.Types.Prim".
+-- Only use this in "GHC.Builtin.WiredIn.Prim".
 pcPrimTyCon0 :: Name -> RuntimeRepType -> TyCon
 pcPrimTyCon0 name res_rep
   = pcPrimTyCon name [] res_rep
@@ -202,7 +204,7 @@ pcPrimTyCon0 name res_rep
 -- argument is levity-polymorphic, where the levity argument is
 -- implicit and comes before other arguments
 --
--- Only use this in "GHC.Builtin.Types.Prim".
+-- Only use this in "GHC.Builtin.WiredIn.Prim".
 pcPrimTyCon_LevPolyLastArg :: Name
                            -> [Role] -- ^ roles of the arguments (must be non-empty),
                                      -- not including the implicit argument of kind 'Levity',
@@ -234,7 +236,7 @@ pcPrimTyCon_LevPolyLastArg name roles res_rep
 A few primitive TyCons are "unexposed", meaning:
 * We don't want users to be able to write them (see #15209);
   i.e. they aren't in scope, ever.  In particular they do not
-  appear in the exports of GHC.Prim: see GHC.Builtin.Utils.ghcPrimExports
+  appear in the exports of GHC.Prim: see GHC.Builtin.ghcPrimExports
 
 * We don't want users to see them in GHCi's @:browse@ output (see #12023).
 -}
@@ -713,7 +715,7 @@ See Note [RuntimeRep polymorphism] about the `rr` parameter.
 
 There are a bunch of type synonyms and data types defined in the
 library ghc-prim:GHC.Types.  All of them are also wired in to GHC, in
-GHC.Builtin.Types
+GHC.Builtin.WiredIn.Types
 
   type Constraint   = CONSTRAINT LiftedRep  :: Type
 
@@ -877,13 +879,13 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
 * error :: forall (rr::RuntimeRep) (a::TYPE rr). String -> a
   Code generator never has to manipulate the return value.
 
-* unsafeCoerce#, defined in Desugar.mkUnsafeCoercePair:
+* unsafeCoerce#, defined in Desugar.mkUnsafeCoercePrimPair:
   Always inlined to be a no-op
      unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                              (a :: TYPE r1) (b :: TYPE r2).
                              a -> b
 
-* Unboxed tuples, and unboxed sums, defined in GHC.Builtin.Types
+* Unboxed tuples, and unboxed sums, defined in GHC.Builtin.WiredIn.Types
   Always inlined, and hence specialised to the call site
      (#,#) :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                      (a :: TYPE r1) (b :: TYPE r2).
@@ -1045,7 +1047,7 @@ All wanted constraints of this type are built with coercion holes.
 Note [Deferred errors for coercion holes] in GHC.Tc.Errors to see how
 equality constraints are deferred.
 
-Within GHC, ~# is called eqPrimTyCon, and it is defined in GHC.Builtin.Types.Prim.
+Within GHC, ~# is called eqPrimTyCon, and it is defined in GHC.Builtin.WiredIn.Prim.
 
 
     --------------------------
@@ -1077,7 +1079,7 @@ equalities. There is some special-casing in GHC.Tc.Solver.Dict.matchClassInst to
 pretend that there is an instance of this class, as we can't write the instance
 in Haskell.
 
-Within GHC, ~~ is called heqTyCon, and it is defined in GHC.Builtin.Types.
+Within GHC, ~~ is called heqTyCon, and it is defined in GHC.Builtin.WiredIn.Types.
 
 
     --------------------------
@@ -1095,7 +1097,7 @@ It is an almost-ordinary class defined as if by
 
  * The data constructor of the class is "Eq#", not ":C~"
 
-Within GHC, ~ is called eqTyCon, and it is defined in GHC.Builtin.Types.
+Within GHC, ~ is called eqTyCon, and it is defined in GHC.Builtin.WiredIn.Types.
 
 Historical note: prior to July 18 (~) was defined as a
   more-ordinary class with (~~) as a superclass.  But that made it
@@ -1119,7 +1121,7 @@ The is the representational analogue of ~#. This is the type of representational
 equalities that the solver works on. All wanted constraints of this type are
 built with coercion holes.
 
-Within GHC, ~R# is called eqReprPrimTyCon, and it is defined in GHC.Builtin.Types.Prim.
+Within GHC, ~R# is called eqReprPrimTyCon, and it is defined in GHC.Builtin.WiredIn.Prim.
 
 
     --------------------------
@@ -1137,7 +1139,7 @@ split required that both types be fully wired-in. Instead of doing this,
 I just got rid of HCoercible, as I'm not sure who would use it, anyway.
 
 Within GHC, Coercible is called coercibleTyCon, and it is defined in
-GHC.Builtin.Types.
+GHC.Builtin.WiredIn.Types.
 
 
     --------------------------

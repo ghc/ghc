@@ -49,7 +49,7 @@ import GHC.Tc.Zonk.TcType ( tcInitTidyEnv )
 import GHC.Hs
 import GHC.Iface.Load   ( loadSrcInterface )
 import GHC.Iface.Syntax ( fromIfaceWarnings )
-import GHC.Builtin.Names
+import GHC.Builtin.Modules( pRELUDE_NAME, rEBINDABLE_MOD_NAME )
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import GHC.Core.TyCo.Tidy
 import GHC.Core.PatSyn
@@ -1960,7 +1960,7 @@ warnUnusedImportDecls gbl_env hsc_src
         -- We should only warn for unnecessary *user* imports, but deciding
         -- minimal imports should take generated imports into account
        ; let usageUserImports = findImportUsage (excludeGenerated imports) uses
-             usageAllImports = findImportUsage imports uses
+             usageAllImports  = findImportUsage imports uses
 
        ; traceRn "warnUnusedImportDecls" $
                        (vcat [ text "Uses:" <+> ppr uses
@@ -1988,7 +1988,10 @@ findImportUsage imports used_gres
 
     unused_decl :: LImportDecl GhcRn -> ImportDeclUsage
     unused_decl decl@(L _ (ImportDecl { ideclImportList = imps }))
-      = (decl, used_gres, unused_names, unused_wcs)
+      = -- pprTrace "unused_decl" (vcat [ ppr decl
+        --                             , text "used" <+> ppr used_gres
+        --                             , text "unused" <+> ppr unused_names ]) $
+        (decl, used_gres, unused_names, unused_wcs)
       where
         used_gres = lookupImportMap decl import_usage
 
@@ -2027,8 +2030,10 @@ findImportUsage imports used_gres
               (flds, flds_used) = lookupFsEnv acc_fs fs `orElse` (emptyNameSet, Any False)
               acc_fs' = extendFsEnv acc_fs fs (extendNameSet flds n, Any used S.<> flds_used)
             in UnusedNames acc_ns acc_wcs acc_fs'
+
           | used
           = acc
+
           | otherwise
           = UnusedNames (acc_ns `extendNameSet` n) acc_wcs acc_fs
           where
@@ -2202,13 +2207,21 @@ warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
 warnUnusedImport rdr_env (L loc decl, used, unused, unused_wcs)
 
   -- Do not warn for 'import M()'
-  | Just (Exactly, []) <- ideclImportList decl
+  -- See (UI1) in Note [Unused imports]
+  | Just (Exactly, _) <- ideclImportList decl
+  , null unused && null unused_wcs
   = return ()
 
   -- Note [Do not warn about Prelude hiding]
   | Just (EverythingBut, hides) <- ideclImportList decl
   , not (null hides)
   , pRELUDE_NAME == unLoc (ideclName decl)
+  = return ()
+
+  -- Do not warn about import X as Rebindable
+  -- See (UI2) in Note [Unused imports]
+  | Just (L _ mod) <- ideclAs decl
+  , mod == rEBINDABLE_MOD_NAME
   = return ()
 
   -- Nothing used; drop entire declaration
@@ -2250,31 +2263,6 @@ warnUnusedImport rdr_env (L loc decl, used, unused, unused_wcs)
     sort_unused =
       [ UnusedImportWildcard wc | wc <- unused_wcs ] ++
       [ possible_field nm | nm <- sortBy (comparing nameOccName) unused ]
-
-{-
-Note [Do not warn about Prelude hiding]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We do not warn about
-   import Prelude hiding( x, y )
-because even if nothing else from Prelude is used, it may be essential to hide
-x,y to avoid name-shadowing warnings.  Example (#9061)
-   import Prelude hiding( log )
-   f x = log where log = ()
-
-
-
-Note [Printing minimal imports]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-To print the minimal imports we walk over all import decls (both user-supplied
-and generated), trim their import lists, then filter out generated decls.
-
-NB that
-
-  * We do *not* change the 'qualified' or 'as' parts!
-
-  * We do not discard a decl altogether; we might need instances
-    from it.  Instead we just trim to an empty import list
--}
 
 getMinimalImports :: [ImportDeclUsage] -> RnM [LImportDecl GhcRn]
 getMinimalImports ie_decls
@@ -2398,7 +2386,43 @@ to_ie_post_rn (L l n)
   | otherwise                   = L l (IEName noExtField (L (l2l l) n))
   where occ = occName n
 
-{-
+{- Note [Do not warn about Prelude hiding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not warn about
+   import Prelude hiding( x, y )
+because even if nothing else from Prelude is used, it may be essential to hide
+x,y to avoid name-shadowing warnings.  Example (#9061)
+   import Prelude hiding( log )
+   f x = log where log = ()
+
+Note [Unused imports]
+~~~~~~~~~~~~~~~~~~~~~
+In `warnUnusedImport`, if we see an import with an explicit list imports, thus
+   import M( a, b )
+and neither `a` nor `b` is used, we report the entire import decl as unused.  We
+check this by looking at the names that it brings into scope scope; if there are
+no ununused names, don't report.
+
+(UI1) We don't want to complain about `import M()`, because that is often used to bring
+   M's /instances/ into scope.  That is neatly dealt with by the "no unused
+   names" (nor unused wildcard imports) criterion.
+
+(UI2) We don't report a decl as unused if it has an `as Rebindable` qualifier.
+  See (KN1) in Note [Overview of known entities] in GHC.Builtin
+
+
+Note [Printing minimal imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To print the minimal imports we walk over all import decls (both user-supplied
+and generated), trim their import lists, then filter out generated decls.
+
+NB that
+
+  * We do *not* change the 'qualified' or 'as' parts!
+
+  * We do not discard a decl altogether; we might need instances
+    from it.  Instead we just trim to an empty import list
+
 Note [Partial export]
 ~~~~~~~~~~~~~~~~~~~~~
 Suppose we have

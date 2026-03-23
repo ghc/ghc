@@ -1,6 +1,11 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples, BangPatterns #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+   -- Defines Real, Integral, Ratio etc, etc, etc
+
 {-# OPTIONS_GHC -Wno-orphans #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -87,18 +92,13 @@ module GHC.Internal.Real
 
 #include "MachDeps.h"
 
-import GHC.Internal.Base (
-    asTypeOf, divInt, divModInt, id, modInt, otherwise, quotInt, quotRemInt,
-    remInt, (.), ($),
-  )
-import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&))
+import GHC.Internal.Base
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Num
 import GHC.Internal.List
 import GHC.Internal.Enum
 import GHC.Internal.Prim (quotRemWord#, quotWord#, raise#, remWord#)
 import GHC.Internal.Show
-import GHC.Internal.Types (Bool(..), Int(..), Ordering(..), Word(..))
 import {-# SOURCE #-} GHC.Internal.Exception( divZeroException, overflowException
                                    , underflowException
                                    , ratioZeroDenomException )
@@ -108,9 +108,6 @@ import GHC.Internal.Bignum.BigNat (gcdInt,gcdWord)
 infixr 8  ^, ^^
 infixl 7  /, `quot`, `rem`, `div`, `mod`
 infixl 7  %
-
-default ()              -- Double isn't available yet,
-                        -- and we shouldn't be using defaults anyway
 
 {- Note [Allow time for type-specialisation rules to fire]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

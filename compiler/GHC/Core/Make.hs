@@ -15,7 +15,7 @@ module GHC.Core.Make (
         mkIntExpr, mkIntExprInt, mkUncheckedIntExpr,
         mkIntegerExpr, mkNaturalExpr,
         mkFloatExpr, mkDoubleExpr,
-        mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
+        mkCharExpr, mkStringExprWith, mkStringExprFSWith,
         MkStringIds (..), getMkStringIds,
 
         -- * Constructing small tuples
@@ -33,7 +33,6 @@ module GHC.Core.Make (
 
         -- * Constructing list expressions
         mkNilExpr, mkConsExpr, mkListExpr,
-        mkFoldrExpr, mkBuildExpr,
 
         -- * Constructing Maybe expressions
         mkNothingExpr, mkJustExpr,
@@ -53,8 +52,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Types.Id
-import GHC.Types.Var  ( setTyVarUnique, visArgConstraintLike )
-import GHC.Types.TyThing
+import GHC.Types.Var  ( visArgConstraintLike )
 import GHC.Types.Id.Info
 import GHC.Types.Cpr
 import GHC.Types.Basic( TypeOrConstraint(..) )
@@ -72,9 +70,10 @@ import GHC.Core.Coercion     ( isCoVar, mkRepReflCo, mkForAllVisCos )
 import GHC.Core.DataCon      ( DataCon, dataConWorkId, dataConWrapId )
 import GHC.Core.Multiplicity
 
-import GHC.Builtin.Types
-import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -192,6 +191,9 @@ mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName w ty
   -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
   -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
 
+wildCardName :: Name
+wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
+
 -- | Make a case expression whose case binder is unused
 -- The alts and res_ty should not have any occurrences of WildId
 mkWildCase :: CoreExpr -- ^ scrutinee
@@ -295,26 +297,17 @@ mkDoubleExpr r = mkCoreConApps doubleDataCon [mkDoubleLit r]
 mkCharExpr     :: Char             -> CoreExpr      -- Result = C# c :: Int
 mkCharExpr c = mkCoreConApps charDataCon [mkCharLit c]
 
--- | Create a 'CoreExpr' which will evaluate to the given @String@
-mkStringExpr   :: MonadThings m => String     -> m CoreExpr  -- Result :: String
-mkStringExpr str = mkStringExprFS (mkFastString str)
-
--- | Create a 'CoreExpr' which will evaluate to a string morally equivalent to the given @FastString@
-mkStringExprFS :: MonadThings m => FastString -> m CoreExpr  -- Result :: String
-mkStringExprFS = mkStringExprFSLookup lookupId
-
-mkStringExprFSLookup :: Monad m => (Name -> m Id) -> FastString -> m CoreExpr
-mkStringExprFSLookup lookupM str = do
-  mk <- getMkStringIds lookupM
-  pure (mkStringExprFSWith mk str)
-
-getMkStringIds :: Applicative m => (Name -> m Id) -> m MkStringIds
-getMkStringIds lookupM = MkStringIds <$> lookupM unpackCStringName <*> lookupM unpackCStringUtf8Name
-
 data MkStringIds = MkStringIds
   { unpackCStringId     :: !Id
   , unpackCStringUtf8Id :: !Id
   }
+
+getMkStringIds :: Applicative m => (KnownKey -> m Id) -> m MkStringIds
+getMkStringIds lookupM = MkStringIds <$> lookupM unpackCStringIdKey <*> lookupM unpackCStringUtf8IdKey
+
+-- | Create a 'CoreExpr' which will evaluate to the given @String@
+mkStringExprWith :: MkStringIds -> String -> CoreExpr  -- Result :: String
+mkStringExprWith mks = mkStringExprFSWith mks . mkFastString
 
 mkStringExprFSWith :: MkStringIds -> FastString -> CoreExpr
 mkStringExprFSWith ids str
@@ -352,7 +345,7 @@ We could do one of two things:
 * Flatten it out, so that
     mkCoreTup [e1] = e1
 
-* Build a one-tuple (see Note [One-tuples] in GHC.Builtin.Types)
+* Build a one-tuple (see Note [One-tuples] in GHC.Builtin.WiredIn.Types)
     mkCoreTupSolo [e1] = Solo e1
   We use a suffix "Solo" to indicate this.
 
@@ -447,7 +440,7 @@ ones (`mkCoreTup` and friends) in two ways.
 
    These can't live in a tuple. `mkBigCoreTup` encodes such tuples by
    boxing up the offending arguments: see Note [Boxing constructors]
-   in GHC.Builtin.Types.
+   in GHC.Builtin.WiredIn.Types.
 
 If you just use the 'mkBigCoreTup', 'mkBigCoreVarTupTy', 'mkBigTupleSelector'
 and 'mkBigTupleCase' functions to do all your work with tuples you should be
@@ -501,7 +494,7 @@ wrapBox :: CoreExpr -> CoreExpr
 -- But if (ty :: ki), and ki is not Type, wrapBox returns (K @ty e)
 --     which has kind Type
 -- where K is the boxing data constructor for ki
--- See Note [Boxing constructors] in GHC.Builtin.Types
+-- See Note [Boxing constructors] in GHC.Builtin.WiredIn.Types
 -- Panics if there /is/ no boxing data con
 wrapBox e
   = case boxingDataCon e_ty of
@@ -517,7 +510,7 @@ boxTy :: HasDebugCallStack => Type -> Type
 -- if `e :: ty`, then `wrapBox e :: boxTy ty`.
 -- Note that if `ty :: Type`, `boxTy ty` just returns `ty`.
 -- Panics if it is not possible to box `ty`, like `wrapBox` (#22336)
--- See Note [Boxing constructors] in GHC.Builtin.Types
+-- See Note [Boxing constructors] in GHC.Builtin.WiredIn.Types
 boxTy ty
   = case boxingDataCon ty of
       BI_NoBoxNeeded -> ty
@@ -762,44 +755,6 @@ mkConsExpr ty hd tl = mkCoreConApps consDataCon [Type ty, hd, tl]
 -- | Make a list containing the given expressions, where the list has the given type
 mkListExpr :: Type -> [CoreExpr] -> CoreExpr
 mkListExpr ty xs = foldr (mkConsExpr ty) (mkNilExpr ty) xs
-
--- | Make a fully applied 'foldr' expression
-mkFoldrExpr :: MonadThings m
-            => Type             -- ^ Element type of the list
-            -> Type             -- ^ Fold result type
-            -> CoreExpr         -- ^ "Cons" function expression for the fold
-            -> CoreExpr         -- ^ "Nil" expression for the fold
-            -> CoreExpr         -- ^ List expression being folded acress
-            -> m CoreExpr
-mkFoldrExpr elt_ty result_ty c n list = do
-    foldr_id <- lookupId foldrName
-    return (Var foldr_id `App` Type elt_ty
-           `App` Type result_ty
-           `App` c
-           `App` n
-           `App` list)
-
--- | Make a 'build' expression applied to a locally-bound worker function
-mkBuildExpr :: (MonadFail m, MonadThings m, MonadUnique m)
-            => Type                                     -- ^ Type of list elements to be built
-            -> ((Id, Type) -> (Id, Type) -> m CoreExpr) -- ^ Function that, given information about the 'Id's
-                                                        -- of the binders for the build worker function, returns
-                                                        -- the body of that worker
-            -> m CoreExpr
-mkBuildExpr elt_ty mk_build_inside = do
-    n_tyvar <- newTyVar alphaTyVar
-    let n_ty = mkTyVarTy n_tyvar
-        c_ty = mkVisFunTysMany [elt_ty, n_ty] n_ty
-    [c, n] <- sequence [mkSysLocalM (fsLit "c") ManyTy c_ty, mkSysLocalM (fsLit "n") ManyTy n_ty]
-
-    build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
-
-    build_id <- lookupId buildName
-    return $ Var build_id `App` Type elt_ty `App` mkLams [n_tyvar, c, n] build_inside
-  where
-    newTyVar tyvar_tmpl = do
-      uniq <- getUniqueM
-      return (setTyVarUnique tyvar_tmpl uniq)
 
 {-
 ************************************************************************

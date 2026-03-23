@@ -59,7 +59,7 @@ module GHC.Internal.Exts
         -- ** Pointer types
         Ptr(..), FunPtr(..),
 
-        -- ** Other primitive types
+        -- ** Other primitive types and strings
         module GHC.Internal.Types,
 
         -- ** Legacy interface for arrays of arrays
@@ -116,14 +116,6 @@ module GHC.Internal.Exts
         -- ** Overloaded string literals
         IsString(..),
 
-        -- ** CString
-        unpackCString#,
-        unpackAppendCString#,
-        unpackFoldrCString#,
-        unpackCStringUtf8#,
-        unpackNBytes#,
-        cstringLength#,
-
         -- * Debugging
         -- ** Breakpoints
         breakpoint, breakpointCond,
@@ -163,6 +155,8 @@ module GHC.Internal.Exts
         maxTupleSize,
        ) where
 
+import GHC.Internal.Base
+
 import GHC.Internal.Prim hiding ( coerce, dataToTagSmall#, dataToTagLarge#, whereFrom# )
   -- Hide dataToTagLarge# because it is expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
@@ -184,24 +178,6 @@ import GHC.Internal.Prim.PtrEq (
     samePromptTag#,
   )
 
-import GHC.Internal.Classes ( Eq(..) )
-import GHC.Internal.CString (
-    unpackCString#,
-    unpackAppendCString#,
-    unpackFoldrCString#,
-    unpackCStringUtf8#,
-    unpackNBytes#,
-    cstringLength#,
-  )
-import GHC.Internal.Magic (
-    DataToTag(..),
-    inline,
-    noinline,
-    lazy,
-    oneShot,
-    considerAccessible,
-    runRW#,
-  )
 import GHC.Internal.Magic.Dict (WithDict(..))
 import GHC.Internal.Types
   hiding ( IO   -- Exported from "GHC.IO"
@@ -342,12 +318,8 @@ import GHC.Internal.Types
   )
 import GHC.Internal.Prim.Ext
 import GHC.Internal.ArrayArray
-import GHC.Internal.Base (
-    augment, breakpoint, breakpointCond, build, iShiftL#, iShiftRA#, iShiftRL#,
-    shiftL#, shiftRL#, otherwise,
-  )
 import GHC.Internal.Err ( errorWithoutStackTrace )
-import GHC.Internal.IO ( IO, seq# )
+import GHC.Internal.IO ( seq# )
 import GHC.Internal.Ptr
 import GHC.Internal.Stack
 import GHC.Internal.IsList (IsList(..)) -- for re-export

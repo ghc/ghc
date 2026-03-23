@@ -18,10 +18,11 @@
 
 module GHC.Internal.IO.IOMode (IOMode(..)) where
 
-import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.Show
 import GHC.Internal.Arr
 import GHC.Internal.Enum
+import GHC.Internal.Base as Rebindable              -- For known-key names
+import GHC.Internal.Num  as Rebindabl               -- For known-key names
 
 -- | See 'GHC.Internal.System.IO.openFile'
 data IOMode      =  ReadMode | WriteMode | AppendMode | ReadWriteMode

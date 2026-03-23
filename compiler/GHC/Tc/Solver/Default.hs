@@ -39,15 +39,19 @@ import GHC.Types.DefaultEnv ( ClassDefaults (..), defaultList )
 import GHC.Types.Unique.Set
 import GHC.Types.Id
 
-import GHC.Builtin.Utils
-import GHC.Builtin.Names
-import GHC.Builtin.Types
+import GHC.Builtin
+import GHC.Builtin.KnownOccs ( emptyExceptionContextIdOcc )
+import GHC.Builtin.KnownKeys( unsatisfiableIdKey
+                            , isStringClassKey
+                            )
+import GHC.Builtin.Modules ( gHC_INTERNAL_TYPEERROR )
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Ids ( unboxedUnitExpr )
 
-import GHC.Types.TyThing ( MonadThings(lookupId) )
+import GHC.Types.Unique
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Id.Make  ( unboxedUnitExpr )
 
 import GHC.Driver.DynFlags
 import GHC.Unit.Module ( getModule )
@@ -68,6 +72,7 @@ import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import GHC.Data.Maybe     ( isJust, mapMaybe, catMaybes )
 import Data.Monoid     ( First(..) )
+import qualified GHC.Tc.Utils.Env as TcM
 
 
 {- Note [Top-level Defaulting Plan]
@@ -308,7 +313,7 @@ unsatisfiableEvExpr (unsat_ev, given_msg) wtd_ty
          -- This avoids problems with circularity; where we are trying to look
          -- up the "unsatisfiable" Id while we are in the middle of typechecking it.
        ; if mod == gHC_INTERNAL_TYPEERROR then return (Var unsat_ev) else
-    do { unsatisfiable_id <- tcLookupId unsatisfiableIdName
+    do { unsatisfiable_id <- tcLookupKnownKeyId unsatisfiableIdKey
 
          -- See Note [Evidence terms from Unsatisfiable Givens]
          -- for a description of what evidence term we are constructing here.
@@ -445,7 +450,7 @@ defaultExceptionContext ct
   | ClassPred cls tys <- classifyPredType (ctPred ct)
   , isJust (isExceptionContextPred cls tys)
   = do { warnTcS $ TcRnDefaultedExceptionContext (ctLoc ct)
-       ; empty_ec_id <- lookupId emptyExceptionContextName
+       ; empty_ec_id <- wrapTcS (TcM.tcLookupKnownOccId emptyExceptionContextIdOcc)
        ; let ev = ctEvidence ct
              ev_tm = EvExpr (evWrapIPE (ctEvPred ev) (Var empty_ec_id))
        ; setDictIfWanted ev EvCanonical ev_tm
@@ -858,7 +863,7 @@ define the following:
     a class defined in the Prelude or the standard library, as defined
     by the Haskell 98 report (section 4.3.4)
 
-    These are defined in GHC.Builtin.Names.standardClassKeys.
+    These are defined in GHC.Builtin.KnownKeys.standardClassKeys.
 
 The rules for defaulting a collection 'S' of unsolved constraints are as follows:
 
@@ -1001,7 +1006,7 @@ applyDefaultingRules :: WantedConstraints -> TcS Bool
 -- See Note [How type-class constraints are defaulted]
 
 applyDefaultingRules wanteds
-  | isEmptyWC wanteds
+  | isSolvedWC wanteds -- not isEmptyWC, see (SCS5) in Note [Shortcut solving]
   = return False
   | otherwise
   = do { (default_env, extended_rules) <- getDefaultInfo

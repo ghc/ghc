@@ -8,6 +8,7 @@ module GHC.Internal.Event.Windows.Thread (
 ) where
 
 import GHC.Internal.Base (return, ($), (>>))
+import qualified GHC.Internal.Base as Rebindable
 import GHC.Internal.Event.Windows
 import GHC.Internal.IO
 import GHC.Internal.MVar

@@ -2,11 +2,7 @@ module GHC.Builtin.Uniques where
 
 import GHC.Prelude
 import GHC.Types.Unique
-import {-# SOURCE #-} GHC.Types.Name
 import GHC.Types.Basic
-
--- Needed by GHC.Builtin.Types
-knownUniqueName :: Unique -> Maybe Name
 
 mkSumTyConUnique :: Arity -> Unique
 mkSumDataConUnique :: ConTagZ -> Arity -> Unique

@@ -11,7 +11,7 @@ module GHC.Internal.Heap.InfoTable.Types
 
 #include "Rts.h"
 
-import GHC.Internal.Classes (Eq, Ord)
+import GHC.Internal.Base
 import GHC.Internal.Generics
 import GHC.Internal.ClosureTypes
 import GHC.Internal.Foreign.Ptr
@@ -19,7 +19,6 @@ import GHC.Internal.Foreign.Storable
 import GHC.Internal.Enum
 import GHC.Internal.Maybe (Maybe)
 import GHC.Internal.Num
-import GHC.Internal.Types (IO)
 import GHC.Internal.Word
 import GHC.Internal.Show
 import GHC.Internal.Real

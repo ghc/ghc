@@ -36,8 +36,7 @@ module GHC.Internal.MVar (
         , newStablePtrPrimMVar
     ) where
 
-import GHC.Internal.Base ( return, ($) )
-import GHC.Internal.Classes ( Eq(..) )
+import GHC.Internal.Base
 import GHC.Internal.Maybe ( Maybe(..) )
 import GHC.Internal.Prim (
     MVar#, RealWorld, isEmptyMVar#, makeStablePtr#, mkWeak#, newMVar#,
@@ -46,7 +45,6 @@ import GHC.Internal.Prim (
   )
 import GHC.Internal.Prim.PtrEq ( sameMVar# )
 import GHC.Internal.Stable       ( StablePtr(..) )
-import GHC.Internal.Types ( Bool(..), IO(..), isTrue# )
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce# )
 
 data MVar a = MVar (MVar# RealWorld a)

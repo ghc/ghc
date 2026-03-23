@@ -22,6 +22,7 @@ import GHC.Tc.Solver.FunDeps( tryDictFunDeps )
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 import GHC.Tc.Solver.Types
+import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify( uType, mightEqualLater )
 
@@ -36,7 +37,6 @@ import GHC.Core.InstEnv( DFunInstType )
 import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.Unify ( ruleMatchTyKiX )
 
-import GHC.Types.TyThing( lookupDataCon, lookupId )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Var
@@ -45,7 +45,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.Names( srcLocDataConName, pushCallStackName, emptyCallStackName )
+import GHC.Builtin.KnownOccs( emptyCallStackIdOcc, pushCallStackIdOcc, srcLocDataConOcc )
 
 import GHC.Utils.Monad ( concatMapM )
 import GHC.Utils.Outputable
@@ -65,6 +65,7 @@ import Data.Maybe ( listToMaybe, mapMaybe, isJust )
 import Data.Void( Void )
 
 import Control.Monad
+import qualified GHC.Tc.Solver.Monad as TcM
 
 {- *********************************************************************
 *                                                                      *
@@ -187,25 +188,26 @@ solveCallStack ev ev_cs
 evCallStack :: TcPredType -> EvCallStack -> TcS EvExpr
 -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
 evCallStack _ EvCsEmpty
-  = Var <$> lookupId emptyCallStackName
+  = Var <$> wrapTcS (tcLookupKnownOccId emptyCallStackIdOcc)
 evCallStack pred (EvCsPushCall fs loc tm)
   = do { df <- getDynFlags
        ; m  <- getModule
-       ; srcLocDataCon <- lookupDataCon srcLocDataConName
+       ; srcLocDataCon <- wrapTcS (tcLookupKnownOccDataCon srcLocDataConOcc)
+       ; mk_str <- getMkStringIds TcM.tcLookupKnownKeyId
        ; let platform = targetPlatform df
-             mkSrcLoc l = mkCoreConWrapApps srcLocDataCon <$>
-                          sequence [ mkStringExprFS (unitFS $ moduleUnit m)
-                                   , mkStringExprFS (moduleNameFS $ moduleName m)
-                                   , mkStringExprFS (srcSpanFile l)
-                                   , return $ mkIntExprInt platform (srcSpanStartLine l)
-                                   , return $ mkIntExprInt platform (srcSpanStartCol l)
-                                   , return $ mkIntExprInt platform (srcSpanEndLine l)
-                                   , return $ mkIntExprInt platform (srcSpanEndCol l)
-                                   ]
+             mkSrcLoc l = mkCoreConWrapApps srcLocDataCon
+                            [ mkStringExprFSWith mk_str (unitFS $ moduleUnit m)
+                            , mkStringExprFSWith mk_str (moduleNameFS $ moduleName m)
+                            , mkStringExprFSWith mk_str (srcSpanFile l)
+                            , mkIntExprInt platform (srcSpanStartLine l)
+                            , mkIntExprInt platform (srcSpanStartCol l)
+                            , mkIntExprInt platform (srcSpanEndLine l)
+                            , mkIntExprInt platform (srcSpanEndCol l)
+                            ]
 
-       ; push_cs_id <- lookupId pushCallStackName
-       ; name_expr  <- mkStringExprFS fs
-       ; loc_expr   <- mkSrcLoc loc
+       ; push_cs_id <- wrapTcS (tcLookupKnownOccId pushCallStackIdOcc)
+       ; let name_expr = mkStringExprFSWith mk_str fs
+       ; let loc_expr  = mkSrcLoc loc
                -- At this point tm :: IP sym CallStack
                -- but we need the actual CallStack to pass to pushCS,
                -- so we use evUwrapIP to strip the dictionary wrapper
@@ -414,7 +416,7 @@ There are two more similar "equality classes" like this.  The full list is
   * (~)         eqTyCon
   * (~~)        heqTyCon
   * Coercible   coercibleTyCon
-(See Note [The equality types story] in GHC.Builtin.Types.Prim.)
+(See Note [The equality types story] in GHC.Builtin.WiredIn.Prim.)
 
 (EQC1) For a Given (boxed) equality like (t1 ~ t2), we /replace/ the constraint
   with its superclass (which, remember, is equally powerful) rather than /adding/
@@ -669,6 +671,10 @@ Some wrinkles:
    if the residual constraint has any implications, even solved ones; and we
    don't want to reject short-cut solving just because we have some leftover
    /solved/ implications.  #26805 was a case in point.
+
+(SCS5) Similarly to (SCS4), `applyDefaultingRules` should use `isSolvedWC` not
+  `isEmptyWC`. This avoids unnecessarily trying defaulting rules on solved
+  constraints.
 
 Note [Shortcut solving: incoherence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

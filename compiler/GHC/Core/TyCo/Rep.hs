@@ -15,7 +15,7 @@ Note [The Type-related module hierarchy]
   GHC.Core.TyCo.FVs        imports GHC.Core.TyCo.Rep
   GHC.Core.TyCo.Subst      imports GHC.Core.TyCo.{Rep, FVs, Ppr}
   GHC.Core.TyCo.Tidy       imports GHC.Core.TyCo.{Rep, FVs}
-  GHC.Builtin.Types.Prim   imports GHC.Core.TyCo.Rep ( including mkTyConTy )
+  GHC.Builtin.WiredIn.Prim imports GHC.Core.TyCo.Rep ( including mkTyConTy )
   GHC.Core.Coercion        imports GHC.Core.Type
 -}
 
@@ -72,7 +72,7 @@ module GHC.Core.TyCo.Rep (
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
-import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Builtin.WiredIn.Types
 import {-# SOURCE #-} GHC.Core.TyCo.FVs( tyCoVarsOfType ) -- Use in assertions
 import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstraint )
 
@@ -86,7 +86,7 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
 import GHC.Utils.Outputable
@@ -661,7 +661,7 @@ represented by evidence of type p.
 %*                                                                      *
 %************************************************************************
 
-These functions are here so that they can be used by GHC.Builtin.Types.Prim,
+These functions are here so that they can be used by GHC.Builtin.WiredIn.Prim,
 which in turn is imported by Type
 -}
 
@@ -685,7 +685,7 @@ mkTyCoVarTys = map mkTyCoVarTy
 infixr 3 `mkFunTy`, `mkInvisFunTy`, `mkVisFunTyMany`
 
 mkNakedFunTy :: FunTyFlag -> Kind -> Kind -> Kind
--- See Note [Naked FunTy] in GHC.Builtin.Types
+-- See Note [Naked FunTy] in GHC.Builtin.WiredIn.Types
 -- Always Many multiplicity; kinds have no linearity
 mkNakedFunTy af arg res
  =  FunTy { ft_af   = af, ft_mult = manyDataConTy
@@ -1762,7 +1762,7 @@ During typechecking, constraint solving for type classes works by
     which actually binds d7 to the (Num a) evidence
 
 For equality constraints we use a different strategy.  See Note [The
-equality types story] in GHC.Builtin.Types.Prim for background on equality constraints.
+equality types story] in GHC.Builtin.WiredIn.Prim for background on equality constraints.
   - For /boxed/ equality constraints, (t1 ~N t2) and (t1 ~R t2), it's just
     like type classes above. (Indeed, boxed equality constraints *are* classes.)
   - But for /unboxed/ equality constraints (t1 ~R# t2) and (t1 ~N# t2)

@@ -61,8 +61,9 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCo.Tidy
 
-import GHC.Builtin.Types.Prim ( eqPrimTyCon, eqReprPrimTyCon )
-import GHC.Builtin.Types ( heqTyCon )
+import GHC.Builtin.WiredIn.Prim ( eqPrimTyCon, eqReprPrimTyCon )
+import GHC.Builtin.WiredIn.Types ( heqTyCon )
+import GHC.Builtin.WiredIn.Ids ( noinlineIdName, noinlineConstraintIdName )
 
 import GHC.Iface.Syntax
 import GHC.Data.FastString
@@ -70,7 +71,6 @@ import GHC.Data.BooleanFormula qualified as BF(BooleanFormula(..))
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( noinlineIdName, noinlineConstraintIdName )
 import GHC.Types.InlinePragma
 import GHC.Types.Literal
 import GHC.Types.Name

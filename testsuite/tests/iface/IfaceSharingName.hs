@@ -6,7 +6,7 @@ module IfaceSharingName where
 import Lib
 import GHC.Data.FastString
 import GHC.Builtin.Uniques
-import GHC.Builtin.Names
+import GHC.Builtin.Modules
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 

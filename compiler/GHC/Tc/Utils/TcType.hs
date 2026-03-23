@@ -227,8 +227,8 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Basic
 
-import GHC.Builtin.Names
-import GHC.Builtin.Types ( coercibleClass, eqClass, heqClass, unitTyConKey
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Types ( coercibleClass, eqClass, heqClass, unitTyConKey
                          , listTyCon, constraintKind )
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps ( getNth, findDupsEq )
@@ -2453,7 +2453,7 @@ isTerminatingClass cls
     || cls `hasKey` typeableClassKey
             -- Typeable constraints are bigger than they appear due
             -- to kind polymorphism, but we can never get instance divergence this way
-    || cls `hasKey` unsatisfiableClassNameKey
+    || cls `hasKey` unsatisfiableClassKey
 
 allDistinctTyVars :: TyVarSet -> [KindOrType] -> Bool
 -- (allDistinctTyVars tvs tys) returns True if tys are

@@ -18,8 +18,8 @@ import GHC.Core.FVs (mkRuleInfo)
 
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Uniques
-import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim
+import GHC.Builtin.Modules( gHC_PRIM )
+import GHC.Builtin.WiredIn.Prim
 
 import GHC.Types.Cpr
 import GHC.Types.Demand

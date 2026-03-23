@@ -1,6 +1,7 @@
 -- This is an internal module with a naive set implementation,
 -- solely for the purposes of `Data.List.{,NonEmpty.}nubOrd{,By}`.
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 
@@ -14,6 +15,9 @@ module Data.List.NubOrdSet (
 import Data.Bool (Bool(..))
 import GHC.Internal.Data.Function ((.))
 import GHC.Internal.Data.Ord (Ordering(..))
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 -- | Implemented as a red-black tree, a la Okasaki.
 data NubOrdSet a

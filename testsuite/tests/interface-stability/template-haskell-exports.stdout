@@ -516,7 +516,7 @@ module Language.Haskell.TH where
   implicitParamBindD :: forall (m :: * -> *). Quote m => GHC.Internal.Base.String -> m Exp -> m Dec
   implicitParamT :: forall (m :: * -> *). Quote m => GHC.Internal.Base.String -> m Type -> m Type
   implicitParamVarE :: forall (m :: * -> *). Quote m => GHC.Internal.Base.String -> m Exp
-  inferR :: GHC.Internal.TH.Lib.Role
+  inferR :: Role
   inferredSpec :: Specificity
   infixApp :: forall (m :: * -> *). Quote m => m Exp -> m Exp -> m Exp -> m Exp
   infixC :: forall (m :: * -> *). Quote m => m (Bang, Type) -> Name -> m (Bang, Type) -> m Con
@@ -527,7 +527,7 @@ module Language.Haskell.TH where
   infixPatSyn :: forall (m :: * -> *). Quote m => Name -> Name -> m PatSynArgs
   infixRD :: forall (m :: * -> *). Quote m => GHC.Internal.Types.Int -> Name -> m Dec
   infixT :: forall (m :: * -> *). Quote m => m Type -> Name -> m Type -> m Type
-  injectivityAnn :: Name -> [Name] -> GHC.Internal.TH.Lib.InjectivityAnn
+  injectivityAnn :: Name -> [Name] -> InjectivityAnn
   instanceD :: forall (m :: * -> *). Quote m => m Cxt -> m Type -> [m Dec] -> m Dec
   instanceWithOverlapD :: forall (m :: * -> *). Quote m => GHC.Internal.Maybe.Maybe Overlap -> m Cxt -> m Type -> [m Dec] -> m Dec
   intPrimL :: GHC.Internal.Bignum.Integer.Integer -> Lit
@@ -584,7 +584,7 @@ module Language.Haskell.TH where
   noSig :: FamilyResultSig
   noSourceStrictness :: forall (m :: * -> *). Quote m => m SourceStrictness
   noSourceUnpackedness :: forall (m :: * -> *). Quote m => m SourceUnpackedness
-  nominalR :: GHC.Internal.TH.Lib.Role
+  nominalR :: Role
   normalB :: forall (m :: * -> *). Quote m => m Exp -> m Body
   normalC :: forall (m :: * -> *). Quote m => Name -> [m BangType] -> m Con
   normalG :: forall (m :: * -> *). Quote m => m Exp -> m Guard
@@ -601,7 +601,7 @@ module Language.Haskell.TH where
   patSynD :: forall (m :: * -> *). Quote m => Name -> m PatSynArgs -> m PatSynDir -> m Pat -> m Dec
   patSynD_doc :: Name -> Q PatSynArgs -> Q PatSynDir -> Q Pat -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String] -> Q Dec
   patSynSigD :: forall (m :: * -> *). Quote m => Name -> m Type -> m Dec
-  phantomR :: GHC.Internal.TH.Lib.Role
+  phantomR :: Role
   plainBndrTV :: forall (m :: * -> *). Quote m => Name -> BndrVis -> m (TyVarBndr BndrVis)
   plainInvisTV :: forall (m :: * -> *). Quote m => Name -> Specificity -> m (TyVarBndr Specificity)
   plainTV :: forall flag. DefaultBndrFlag flag => Name -> TyVarBndr flag
@@ -650,8 +650,8 @@ module Language.Haskell.TH where
   report :: GHC.Internal.Types.Bool -> GHC.Internal.Base.String -> Q ()
   reportError :: GHC.Internal.Base.String -> Q ()
   reportWarning :: GHC.Internal.Base.String -> Q ()
-  representationalR :: GHC.Internal.TH.Lib.Role
-  roleAnnotD :: forall (m :: * -> *). Quote m => Name -> [GHC.Internal.TH.Lib.Role] -> m Dec
+  representationalR :: Role
+  roleAnnotD :: forall (m :: * -> *). Quote m => Name -> [Role] -> m Dec
   ruleVar :: forall (m :: * -> *). Quote m => Name -> m RuleBndr
   runIO :: forall a. GHC.Internal.Types.IO a -> Q a
   runQ :: forall (m :: * -> *) a. Language.Haskell.TH.Syntax.Quasi m => Q a -> m a
@@ -1046,7 +1046,7 @@ module Language.Haskell.TH.Lib where
   implicitParamBindD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Dec
   implicitParamT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
   implicitParamVarE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Base.String -> m GHC.Internal.TH.Syntax.Exp
-  inferR :: GHC.Internal.TH.Lib.Role
+  inferR :: GHC.Internal.TH.Syntax.Role
   inferredSpec :: GHC.Internal.TH.Syntax.Specificity
   infixApp :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   infixC :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m (GHC.Internal.TH.Syntax.Bang, GHC.Internal.TH.Syntax.Type) -> GHC.Internal.TH.Syntax.Name -> m (GHC.Internal.TH.Syntax.Bang, GHC.Internal.TH.Syntax.Type) -> m GHC.Internal.TH.Syntax.Con
@@ -1057,7 +1057,7 @@ module Language.Haskell.TH.Lib where
   infixPatSyn :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.PatSynArgs
   infixRD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Types.Int -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Dec
   infixT :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Type -> GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Type
-  injectivityAnn :: GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.Name] -> GHC.Internal.TH.Lib.InjectivityAnn
+  injectivityAnn :: GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.Name] -> GHC.Internal.TH.Syntax.InjectivityAnn
   instanceD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
   instanceWithOverlapD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.Maybe.Maybe Overlap -> m GHC.Internal.TH.Syntax.Cxt -> m GHC.Internal.TH.Syntax.Type -> [m GHC.Internal.TH.Syntax.Dec] -> m GHC.Internal.TH.Syntax.Dec
   intPrimL :: GHC.Internal.Bignum.Integer.Integer -> GHC.Internal.TH.Syntax.Lit
@@ -1100,7 +1100,7 @@ module Language.Haskell.TH.Lib where
   noSig :: GHC.Internal.TH.Syntax.FamilyResultSig
   noSourceStrictness :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.SourceStrictness
   noSourceUnpackedness :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.SourceUnpackedness
-  nominalR :: GHC.Internal.TH.Lib.Role
+  nominalR :: GHC.Internal.TH.Syntax.Role
   normalB :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Body
   normalC :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [m GHC.Internal.TH.Syntax.BangType] -> m GHC.Internal.TH.Syntax.Con
   normalG :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Guard
@@ -1117,7 +1117,7 @@ module Language.Haskell.TH.Lib where
   patSynD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.PatSynArgs -> m GHC.Internal.TH.Syntax.PatSynDir -> m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Dec
   patSynD_doc :: GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.PatSynArgs -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.PatSynDir -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Pat -> GHC.Internal.Maybe.Maybe GHC.Internal.Base.String -> [GHC.Internal.Maybe.Maybe GHC.Internal.Base.String] -> GHC.Internal.TH.Monad.Q GHC.Internal.TH.Syntax.Dec
   patSynSigD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.Type -> m GHC.Internal.TH.Syntax.Dec
-  phantomR :: GHC.Internal.TH.Lib.Role
+  phantomR :: GHC.Internal.TH.Syntax.Role
   plainBndrTV :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.BndrVis -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)
   plainInvisTV :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.Specificity -> m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.Specificity)
   plainTV :: forall flag. DefaultBndrFlag flag => GHC.Internal.TH.Syntax.Name -> GHC.Internal.TH.Syntax.TyVarBndr flag
@@ -1148,8 +1148,8 @@ module Language.Haskell.TH.Lib where
   recS :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [m GHC.Internal.TH.Syntax.Stmt] -> m GHC.Internal.TH.Syntax.Stmt
   recUpdE :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> [m (GHC.Internal.TH.Syntax.Name, GHC.Internal.TH.Syntax.Exp)] -> m GHC.Internal.TH.Syntax.Exp
   recordPatSyn :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => [GHC.Internal.TH.Syntax.Name] -> m GHC.Internal.TH.Syntax.PatSynArgs
-  representationalR :: GHC.Internal.TH.Lib.Role
-  roleAnnotD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Lib.Role] -> m GHC.Internal.TH.Syntax.Dec
+  representationalR :: GHC.Internal.TH.Syntax.Role
+  roleAnnotD :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> [GHC.Internal.TH.Syntax.Role] -> m GHC.Internal.TH.Syntax.Dec
   ruleVar :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => GHC.Internal.TH.Syntax.Name -> m GHC.Internal.TH.Syntax.RuleBndr
   safe :: GHC.Internal.TH.Syntax.Safety
   sectionL :: forall (m :: * -> *). GHC.Internal.TH.Monad.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
@@ -1729,8 +1729,8 @@ module Language.Haskell.TH.Syntax where
     qAddForeignFilePath :: ForeignSrcLang -> GHC.Internal.Base.String -> m ()
     qAddModFinalizer :: Q () -> m ()
     qAddCorePlugin :: GHC.Internal.Base.String -> m ()
-    qGetQ :: forall a. ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a => m (GHC.Internal.Maybe.Maybe a)
-    qPutQ :: forall a. ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a => a -> m ()
+    qGetQ :: forall a. GHC.Internal.Data.Typeable.Internal.Typeable a => m (GHC.Internal.Maybe.Maybe a)
+    qPutQ :: forall a. GHC.Internal.Data.Typeable.Internal.Typeable a => a -> m ()
     qIsExtEnabled :: Extension -> m GHC.Internal.Types.Bool
     qExtsEnabled :: m [Extension]
     qPutDoc :: DocLoc -> GHC.Internal.Base.String -> m ()
@@ -1813,7 +1813,7 @@ module Language.Haskell.TH.Syntax where
   falseName :: Name
   getDoc :: DocLoc -> Q (GHC.Internal.Maybe.Maybe GHC.Internal.Base.String)
   getPackageRoot :: Q GHC.Internal.IO.FilePath
-  getQ :: forall a. ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a => Q (GHC.Internal.Maybe.Maybe a)
+  getQ :: forall a. GHC.Internal.Data.Typeable.Internal.Typeable a => Q (GHC.Internal.Maybe.Maybe a)
   get_cons_names :: Con -> [Name]
   hoistCode :: forall (m :: * -> *) (n :: * -> *) (r :: GHC.Internal.Types.RuntimeRep) (a :: TYPE r). GHC.Internal.Base.Monad m => (forall x. m x -> n x) -> Code m a -> Code n a
   isExtEnabled :: Extension -> Q GHC.Internal.Types.Bool
@@ -1860,7 +1860,7 @@ module Language.Haskell.TH.Syntax where
   oneName :: Name
   pkgString :: PkgName -> GHC.Internal.Base.String
   putDoc :: DocLoc -> GHC.Internal.Base.String -> Q ()
-  putQ :: forall a. ghc-internal-10.100.0:GHC.Internal.Data.Typeable.Internal.Typeable a => a -> Q ()
+  putQ :: forall a. GHC.Internal.Data.Typeable.Internal.Typeable a => a -> Q ()
   recover :: forall a. Q a -> Q a -> Q a
   reify :: Name -> Q Info
   reifyAnnotations :: forall a. GHC.Internal.Data.Data.Data a => AnnLookup -> Q [a]
@@ -1999,7 +1999,7 @@ instance forall flag. GHC.Internal.Classes.Eq flag => GHC.Internal.Classes.Eq (G
 instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Eq GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Eq GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.LanguageExtensions’
-instance [safe] GHC.Internal.Classes.Eq GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
+instance GHC.Internal.Classes.Eq GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
 instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Classes.Ord GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Syntax’
@@ -2120,7 +2120,7 @@ instance forall flag. GHC.Internal.Generics.Generic (GHC.Internal.TH.Syntax.TyVa
 instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.Type -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Generics.Generic GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Generics.Generic GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.LanguageExtensions’
-instance [safe] GHC.Internal.Generics.Generic GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
+instance GHC.Internal.Generics.Generic GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
 instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Syntax’
 instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.Bang -- Defined in ‘GHC.Internal.TH.Syntax’
@@ -2180,7 +2180,7 @@ instance GHC.Internal.Show.Show GHC.Internal.TH.Syntax.TypeFamilyHead -- Defined
 instance GHC.Internal.Show.Show GHC.Internal.LanguageExtensions.Extension -- Defined in ‘GHC.Internal.LanguageExtensions’
 instance GHC.Internal.Show.Show GHC.Boot.TH.Ppr.ForallVisFlag -- Defined in ‘GHC.Boot.TH.Ppr’
 instance [safe] GHC.Internal.Show.Show GHC.Boot.TH.PprLib.Doc -- Defined in ‘GHC.Boot.TH.PprLib’
-instance [safe] GHC.Internal.Show.Show GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
+instance GHC.Internal.Show.Show GHC.Internal.ForeignSrcLang.ForeignSrcLang -- Defined in ‘GHC.Internal.ForeignSrcLang’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.Prim.Addr# -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.AnnLookup -- Defined in ‘GHC.Internal.TH.Lift’
 instance GHC.Internal.TH.Lift.Lift GHC.Internal.TH.Syntax.AnnTarget -- Defined in ‘GHC.Internal.TH.Lift’
