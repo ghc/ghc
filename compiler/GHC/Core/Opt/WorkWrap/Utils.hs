@@ -42,7 +42,6 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
-import GHC.Types.Id.Make ( voidArgId, voidPrimId )
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.Unique.Supply
@@ -52,7 +51,8 @@ import GHC.Data.FastString
 import GHC.Data.OrdList
 import GHC.Data.List.SetOps
 
-import GHC.Builtin.Types ( tupleDataCon )
+import GHC.Builtin.WiredIn.Types ( tupleDataCon )
+import GHC.Builtin.WiredIn.Ids ( voidArgId, voidPrimId )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -796,7 +796,7 @@ Worker/wrapper will unbox
      contains types of kind `TYPE rr`, but not of kind `CONSTRAINT rr`.
      This is annoying; there is no real reason for this except that we don't
      have TYPE/CONSTAINT polymorphism.  See Note [TYPE and CONSTRAINT]
-     in GHC.Builtin.Types.Prim.
+     in GHC.Builtin.WiredIn.Prim.
 
 The respective tests are in 'canUnboxArg' and
 'canUnboxResult', respectively.

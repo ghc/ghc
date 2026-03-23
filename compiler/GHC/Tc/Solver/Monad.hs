@@ -59,7 +59,7 @@ module GHC.Tc.Solver.Monad (
     getTopEnv, getGblEnv, getLclEnv, setSrcSpan,
     getTcEvBindsVar, getTcLevel,
     getTcEvBindsMap, setTcEvBindsMap, getTcEvBindsState, combineTcEvBinds,
-    tcLookupClass, tcLookupId, tcLookupTyCon,
+    tcLookupKnownKeyId,
 
     -- Inerts
     updInertSet, updInertCans,
@@ -136,9 +136,7 @@ import qualified GHC.Tc.Utils.Monad    as TcM
 import qualified GHC.Tc.Utils.TcMType  as TcM
 import qualified GHC.Tc.Instance.Class as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified GHC.Tc.Utils.Env      as TcM
-       ( tcGetDefaultTys
-       , tcLookupClass, tcLookupId, tcLookupTyCon
-       )
+       ( tcGetDefaultTys, tcLookupKnownKeyId, tcLookupKnownKeyTyCon )
 import GHC.Tc.Zonk.Monad ( ZonkM )
 import qualified GHC.Tc.Zonk.TcType  as TcM
 
@@ -161,7 +159,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Constraint
 
-import GHC.Builtin.Names ( callStackTyConName, exceptionContextTyConName )
+import GHC.Builtin.KnownKeys ( callStackTyConKey, exceptionContextTyConKey )
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep as Rep
@@ -179,7 +177,6 @@ import GHC.Rename.Env
 import qualified GHC.Rename.Env as TcM
 
 import GHC.Types.Name
-import GHC.Types.TyThing
 import GHC.Types.Name.Reader
 import GHC.Types.DefaultEnv ( DefaultEnv )
 import GHC.Types.Var
@@ -571,8 +568,8 @@ updSolvedDicts :: InstanceWhat -> DictCt -> TcS ()
 updSolvedDicts what dict_ct@(DictCt { di_cls = cls, di_tys = tys, di_ev = ev })
   | isWanted ev
   , instanceReturnsDictCon what
-  = do { is_callstack    <- is_tyConTy isCallStackTy        callStackTyConName
-       ; is_exceptionCtx <- is_tyConTy isExceptionContextTy exceptionContextTyConName
+  = do { is_callstack    <- is_tyConTy isCallStackTy        callStackTyConKey
+       ; is_exceptionCtx <- is_tyConTy isExceptionContextTy exceptionContextTyConKey
        ; let contains_callstack_or_exceptionCtx =
                mightMentionIP
                  (const True)
@@ -595,9 +592,9 @@ updSolvedDicts what dict_ct@(DictCt { di_cls = cls, di_tys = tys, di_ev = ev })
     -- per Note [Using typesAreApart when calling mightMentionIP].
     --
     -- See Note [Using isCallStackTy in mightMentionIP].
-    is_tyConTy :: (Type -> Bool) -> Name -> TcS (Type -> Bool)
-    is_tyConTy is_eq tc_name
-      = do { (mb_tc, _) <- wrapTcS $ TcM.tryTc $ TcM.tcLookupTyCon tc_name
+    is_tyConTy :: (Type -> Bool) -> KnownKey -> TcS (Type -> Bool)
+    is_tyConTy is_eq tc_key
+      = do { (mb_tc, _) <- wrapTcS $ TcM.tryTc $ TcM.tcLookupKnownKeyTyCon tc_key
            ; case mb_tc of
               Just tc ->
                 return $ \ ty -> not (typesAreApart ty (mkTyConTy tc))
@@ -1044,9 +1041,6 @@ instance MonadUnique TcS where
 
 instance HasModule TcS where
    getModule = wrapTcS getModule
-
-instance MonadThings TcS where
-   lookupThing n = wrapTcS (lookupThing n)
 
 -- Basic functionality
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1523,14 +1517,8 @@ getLclEnv = wrapTcS $ TcM.getLclEnv
 setSrcSpan :: RealSrcSpan -> TcS a -> TcS a
 setSrcSpan ss = wrap2TcS (TcM.setSrcSpan (RealSrcSpan ss mempty))
 
-tcLookupClass :: Name -> TcS Class
-tcLookupClass c = wrapTcS $ TcM.tcLookupClass c
-
-tcLookupId :: Name -> TcS Id
-tcLookupId n = wrapTcS $ TcM.tcLookupId n
-
-tcLookupTyCon :: Name -> TcS TyCon
-tcLookupTyCon n = wrapTcS $ TcM.tcLookupTyCon n
+tcLookupKnownKeyId :: KnownKey -> TcS Id
+tcLookupKnownKeyId c = wrapTcS $ TcM.tcLookupKnownKeyId c
 
 -- Any use of this function is a bit suspect, because it violates the
 -- pure veneer of TcS. But it's just about warnings around unused imports

@@ -11,6 +11,7 @@ interfacePlugin: GHC.Internal.Prim.Ext
 interfacePlugin: GHC.Internal.TH.Monad
 interfacePlugin: GHC.Internal.TH.Syntax
 typeCheckPlugin (rn)
+interfacePlugin: GHC.Essentials
 interfacePlugin: GHC.Internal.Stack.Types
 interfacePlugin: GHC.Internal.Exception.Context
 typeCheckPlugin (tc)
@@ -19,7 +20,6 @@ typeCheckPlugin (rn)
 interfacePlugin: GHC.Internal.TH.Lib
 metaPlugin: (return [])
 metaPlugin: quoteExp stringify "x"
-interfacePlugin: GHC.Internal.CString
 typeCheckPlugin (rn)
 typeCheckPlugin (rn)
 typeCheckPlugin (tc)

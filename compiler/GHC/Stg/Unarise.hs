@@ -392,7 +392,7 @@ import GHC.Data.FastString (FastString, mkFastString, fsLit)
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.Make (aBSENT_SUM_FIELD_ERROR_ID)
-import GHC.Types.Id.Make (voidPrimId, voidArgId)
+import GHC.Builtin.WiredIn.Ids (voidPrimId, voidArgId)
 import GHC.Utils.Monad (mapAccumLM)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -401,7 +401,7 @@ import GHC.Stg.Syntax
 import GHC.Stg.Utils
 import GHC.Stg.Make
 import GHC.Core.Type
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Utils.Misc

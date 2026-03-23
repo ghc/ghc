@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,7 +27,7 @@
 -----------------------------------------------------------------------------
 module GHC.Internal.Type.Reflection
     ( -- * The Typeable class
-      I.Typeable
+      I.Typeable( typeRep# )
     , I.typeRep
     , I.withTypeable
 
@@ -63,9 +64,10 @@ module GHC.Internal.Type.Reflection
     , I.tyConModule
     , I.tyConName
     , I.rnfTyCon
+    , I.mkTrAppChecked, I.mkTrCon
 
       -- * Module names
-    , I.Module
+    , I.Module  -- Abstract
     , I.moduleName, I.modulePackage, I.rnfModule
     ) where
 

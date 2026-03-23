@@ -241,16 +241,18 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program mb_modBreaks
                       tcg_fix_env = fix_env,
                       tcg_warns = warns
                     }
-  = do
-          let pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
-          let home_unit = hsc_home_unit hsc_env
+  = do    let pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
+          let home_unit     = hsc_home_unit hsc_env
+          let dflags        = ms_hspp_opts mod_summary
+          essentials_mod <- liftIO $ lookupKnownKeysModule hsc_env dflags
           let deps = mkDependencies home_unit
                                     (tcg_mod tc_result)
                                     (tcg_imports tc_result)
                                     (map mi_module pluginModules)
+                                    (moduleUnitId <$> essentials_mod)
 
           usage <- mkRecompUsageInfo hsc_env tc_result
-          docs <- extractDocs (ms_hspp_opts mod_summary) tc_result
+          docs  <- extractDocs dflags tc_result
           self_recomp <- traverse (mkSelfRecomp hsc_env this_mod (ms_hs_hash mod_summary)) usage
 
           let partial_iface = mkIface_ hsc_env

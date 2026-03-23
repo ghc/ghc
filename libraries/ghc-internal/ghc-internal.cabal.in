@@ -160,6 +160,9 @@ Library
         GHC.Internal.Data.Type.Equality
         GHC.Internal.Data.Type.Ord
         GHC.Internal.Data.Typeable
+        GHC.Internal.Data.Typeable.Internal
+            -- GHC.Internal.Data.Typeable.Internal is exposed
+            -- so that base:GHC.KnownKeynames can see it
         GHC.Internal.Data.Unique
         GHC.Internal.Data.Version
         GHC.Internal.Data.Void
@@ -277,6 +280,7 @@ Library
         GHC.Internal.RTS.Flags.Test
         GHC.Internal.ST
         GHC.Internal.StaticPtr
+        GHC.Internal.StaticPtr.Internal
         GHC.Internal.STRef
         GHC.Internal.Show
         GHC.Internal.STM
@@ -344,13 +348,11 @@ Library
         GHC.Internal.PrimopWrappers
 
     other-modules:
-        GHC.Internal.Data.Typeable.Internal
         GHC.Internal.IO.Handle.Lock.Common
         GHC.Internal.IO.Handle.Lock.Flock
         GHC.Internal.IO.Handle.Lock.LinuxOFD
         GHC.Internal.IO.Handle.Lock.NoOp
         GHC.Internal.IO.Handle.Lock.Windows
-        GHC.Internal.StaticPtr.Internal
         GHC.Internal.Event.Arr
         GHC.Internal.Event.Array
         GHC.Internal.Event.Internal
@@ -544,6 +546,10 @@ Library
     -- We need to set the unit id to ghc-internal (without a version number)
     -- as it's magic.
     ghc-options: -this-unit-id ghc-internal
+
+    -- Set -frebindable-known-names,
+    -- since GHC.Essentials isn't available yet
+    ghc-options: -frebindable-known-names
 
     -- Make sure we don't accidentally regress into anti-patterns
     ghc-options: -Wcompat -Wnoncanonical-monad-instances

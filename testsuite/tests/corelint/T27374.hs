@@ -20,7 +20,7 @@ import System.Environment
 -- ghc
 import GHC
   ( runGhc, getSessionDynFlags, getLogger )
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
   ( maybeTyCon, tupleTyCon, mkBoxedTupleTy )
 import GHC.Core
   ( Expr(Coercion) )

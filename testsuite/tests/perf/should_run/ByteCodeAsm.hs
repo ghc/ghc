@@ -11,7 +11,12 @@ import System.Environment (getArgs)
 import GHC.ByteCode.Asm ( assembleBCO )
 import GHC.ByteCode.Instr
 import Control.Monad
-import GHC.Builtin.Names
+import GHC.Types.Name (mkSystemVarName)
+import GHC.Types.Unique (mkUniqueIntGrimily)
+import GHC.Data.FastString (fsLit)
+
+fakeName :: Name
+fakeName = mkSystemVarName (mkUniqueIntGrimily 0) (fsLit "bco")
 
 -- Testing the performance of the bytecode assembler
 
@@ -46,14 +51,14 @@ instrs = [ STKCHECK 1234
          ++ [ TESTEQ_I64 n (LocalLabel 49) | n <- [1243 .. 1253 + 50 ]]
          ++ [ ENTER ]
          ++ [ SLIDE x n | x <- [0..5], n <- [0..10] ]
-         ++ [ PUSH_G appAName | _ <- [0..100] ]
+         ++ [ PUSH_G fakeName | _ <- [0..100] ]
          ++ [ PUSH_BCO fake_proto2 ]
 
-fake_proto = ProtoBCO appAName instrs [] 0 0 (Left [])
+fake_proto = ProtoBCO fakeName instrs [] 0 0 (Left [])
 
 instrs2 = [ STKCHECK 77, UNPACK 4, SLIDE 0 4, ENTER ]
 
-fake_proto2 = ProtoBCO appAName instrs2 [] 0 0 (Left [])
+fake_proto2 = ProtoBCO fakeName instrs2 [] 0 0 (Left [])
 
 main :: IO ()
 main = do

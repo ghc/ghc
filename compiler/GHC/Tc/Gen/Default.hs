@@ -12,11 +12,13 @@ module GHC.Tc.Gen.Default ( tcDefaultDecls, extendDefaultEnvWithLocalDefaults ) 
 import GHC.Prelude
 import GHC.Hs
 
-import GHC.Builtin.Names
+import GHC.Builtin( interactiveClassKeys )
+import GHC.Builtin.KnownKeys
+
 import GHC.Core.Class
 import GHC.Core.Predicate ( Pred (..), classifyPredType )
 
-import GHC.Data.Maybe ( firstJusts, maybeToList )
+import GHC.Data.Maybe ( firstJusts )
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.HsType
@@ -150,21 +152,9 @@ tcDefaultDecls decls =
     case (is_internal_unit, decls) of
       -- No default declarations
       (_, []) -> return []
-      -- As per Remark [default () in ghc-internal] in Note [Builtin class defaults],
-      -- some modules in ghc-internal include an empty `default ()` declaration, in order
-      -- to disable built-in defaults. This is no longer necessary (see `GHC.Tc.Utils.Env.tcGetDefaultTys`),
-      -- but we must still make sure not to error if we fail to look up e.g. the 'Num'
-      -- typeclass when typechecking such a default declaration. To do this, we wrap
-      -- calls of 'tcLookupClass' in 'tryTc'.
-      (True, [L _ (DefaultDecl _ _ Nothing [])]) -> do
-        h2010_dflt_clss <- foldMapM (fmap maybeToList . fmap fst . tryTc . tcLookupClass) =<< getH2010DefaultNames
-        case NE.nonEmpty h2010_dflt_clss of
-          Nothing -> return []
-          Just h2010_dflt_clss' -> toClassDefaults h2010_dflt_clss' decls
       -- Otherwise we take apart the declaration into the class constructor and its default types.
-      _ -> do
-        h2010_dflt_clss <- getH2010DefaultClasses
-        toClassDefaults h2010_dflt_clss decls
+      _ -> do { h2010_dflt_clss <- getH2010DefaultClasses
+              ; toClassDefaults h2010_dflt_clss decls }
   where
     getH2010DefaultClasses :: TcM (NonEmpty Class)
     -- All the classes subject to defaulting with a Haskell 2010 default
@@ -176,29 +166,38 @@ tcDefaultDecls decls =
     --    No extensions:       Num
     --    OverloadedStrings:   add IsString
     --    ExtendedDefaults:    add Show, Eq, Ord, Foldable, Traversable
-    getH2010DefaultClasses = mapM tcLookupClass =<< getH2010DefaultNames
-    getH2010DefaultNames
+    getH2010DefaultClasses = do { keys <- getH2010DefaultKeys
+                                ; mapM tcLookupKnownKeyClass keys }
+
+    getH2010DefaultKeys :: TcM (NonEmpty Unique)
+    getH2010DefaultKeys
       = do { ovl_str   <- xoptM LangExt.OverloadedStrings
            ; ext_deflt <- xoptM LangExt.ExtendedDefaultRules
            ; let deflt_str = if ovl_str
-                              then [isStringClassName]
+                              then [isStringClassKey]
                               else []
            ; let deflt_interactive = if ext_deflt
-                                  then interactiveClassNames
+                                  then interactiveClassKeys
                                   else []
            ; let extra_clss_names = deflt_str ++ deflt_interactive
-           ; return $ numClassName :| extra_clss_names
+           ; return $ numClassKey :| extra_clss_names
            }
-    declarationParts :: NonEmpty Class -> LDefaultDecl GhcRn -> TcM (Maybe (Maybe Class, LDefaultDecl GhcRn, [Type]))
+
+    declarationParts :: NonEmpty Class -> LDefaultDecl GhcRn
+                     -> TcM (Maybe (Maybe Class, LDefaultDecl GhcRn, [Type]))
+    -- The outer Maybe is Nothing if the Class is unsuitable for defaulting
+    -- (e.g. not unary).  In that case tcDefaultDeclClass has added an error
     declarationParts h2010_dflt_clss decl@(L locn (DefaultDecl _ _ mb_cls_name dflt_hs_tys))
       = setSrcSpan (locA locn) $
           case mb_cls_name of
-            -- Haskell 98 default declaration
+            -- Haskell 98 default declaration, e.g.
+            --    default (Int, Float)
             Nothing ->
               do { tau_tys <- addErrCtxt (DefaultDeclErrCtxt { ddec_in_type_list = True })
                             $ mapMaybeM (check_instance_any h2010_dflt_clss) dflt_hs_tys
                  ; return $ Just (Nothing, decl, tau_tys) }
-            -- Named default declaration
+            -- Named default declaration, e.g.
+            --    default C(Int, Float)
             Just cls_name ->
               do { named_deflt <- xoptM LangExt.NamedDefaults
                  ; checkErr named_deflt (TcRnIllegalNamedDefault decl)
@@ -215,9 +214,11 @@ tcDefaultDecls decls =
         dfs <- mapMaybeM (declarationParts h2010_dflt_clss) dfs
         return $ concatMap (go False) dfs
       where
-        go h98 = \case
-          (Nothing, rn_decl, tys) -> concatMap (go True) [(Just cls, rn_decl, tys) | cls <- NE.toList h2010_dflt_clss]
-          (Just cls, (L locn _), tys) -> [(L locn $ ClassDefaults cls tys (DP_Local (locA locn) h98) Nothing)]
+        go :: Bool -> (Maybe Class, LDefaultDecl GhcRn, [Type]) -> [LocatedA ClassDefaults]
+        go _ (Nothing, rn_decl, tys)
+           = concatMap (go True) [ (Just cls, rn_decl, tys) | cls <- NE.toList h2010_dflt_clss]
+        go h98 (Just cls, L locn _, tys)
+           = [L locn $ ClassDefaults cls tys (DP_Local (locA locn) h98) Nothing]
 
 -- | Extend the default environment with the local default declarations
 -- and do the action in the extended environment.

@@ -16,9 +16,12 @@ import GHC.Utils.Outputable
 
 -- See Note [Why is KnotVars not a ModuleEnv]
 -- See Note [KnotVars invariants]
-data KnotVars a = KnotVars { kv_domain :: [Module] -- Domain of the function , Note [KnotVars: Why store the domain?]
-                           -- Invariant: kv_lookup is surjective relative to kv_domain
+data KnotVars a = KnotVars { kv_domain :: [Module]
+                                  -- Domain of kv_lookup
+                                  -- See Note [KnotVars: Why store the domain?]
+
                            , kv_lookup :: Module -> Maybe a -- Lookup function
+                                  -- Invariant: kv_lookup is surjective relative to kv_domain
                            }
                 | NoKnotVars
                            deriving Functor

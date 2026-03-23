@@ -1,5 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving, ScopedTypeVariables #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Read
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -28,7 +32,7 @@ module GHC.Internal.Read
   , readLitChar
   , lexDigits
 
-  -- defining readers
+  -- Defining readers
   , lexP, expectP
   , paren
   , parens
@@ -40,8 +44,10 @@ module GHC.Internal.Read
   , readFieldHash
   , readSymField
 
-  -- Temporary
+  -- Convenient known-occ names for importing scopes
   , readParen
+  , prec, step, reset, (+++), pfail
+  , L.Lexeme(..)
   )
  where
 
@@ -55,6 +61,7 @@ import GHC.Internal.Text.ParserCombinators.ReadP
   )
 
 import qualified GHC.Internal.Text.Read.Lex as L
+import qualified GHC.Internal.Text.Read.Lex as Rebindable
 -- Lex exports 'lex', which is also defined here,
 -- hence the qualified import.
 -- We can't import *anything* unqualified, because that
@@ -64,23 +71,21 @@ import GHC.Internal.Text.ParserCombinators.ReadPrec
 
 import GHC.Internal.Data.Maybe
 
-import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Base
 import GHC.Internal.Err (undefined)
 import GHC.Internal.Unicode
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Float
 import GHC.Internal.Show
-import GHC.Internal.Base (
-    Applicative(..), String, Monad(..), NonEmpty(..), Void, foldr, map,
-    ($), (.), (++),
-  )
 import GHC.Internal.Arr
-import GHC.Internal.Types (Bool(..), Char, Int, Ordering(..))
 import GHC.Internal.Word
 import GHC.Internal.List (filter)
 import GHC.Internal.Tuple (Solo (..))
+import GHC.Internal.Stack.Types as Rebindable
 
+import GHC.Internal.Control.Monad.Fail as Rebindable( fail )   -- For known-key names
+import GHC.Internal.Base as Rebindable( eqString )             -- For known-key names
 
 -- | @'readParen' 'True' p@ parses what @p@ parses, but surrounded with
 -- parentheses.

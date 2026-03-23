@@ -7,8 +7,9 @@ module GHC.Internal.Data.List.NonEmpty
   , map
   ) where
 
-import GHC.Internal.Data.NonEmpty (NonEmpty (..), map)
+import GHC.Internal.Data.NonEmpty
 import qualified GHC.Internal.Data.List as List
+
 
 -- | The 'zip' function takes two streams and returns a stream of
 -- corresponding pairs.

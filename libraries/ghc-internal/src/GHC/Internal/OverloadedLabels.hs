@@ -47,6 +47,7 @@ module GHC.Internal.OverloadedLabels
        ) where
 
 import GHC.Internal.Types (Symbol)
+import qualified GHC.Internal.Base as Rebindable
 
 class IsLabel (x :: Symbol) a where
   fromLabel :: a

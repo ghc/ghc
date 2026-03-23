@@ -92,7 +92,7 @@ $krep2
 $krep3 :: GHC.Internal.Types.KindRep
 [GblId, Unf=OtherCon []]
 $krep3
-  = GHC.Internal.Types.KindRepFun $krep2 GHC.Internal.Types.krep$*
+  = GHC.Internal.Types.KindRepFun $krep2 GHC.Internal.Types.krepStar
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $tcSigned1 :: GHC.Internal.Prim.Addr#

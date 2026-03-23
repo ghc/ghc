@@ -102,17 +102,17 @@ valid_hole_fits.hs:30:10: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         otherwise :: Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Base’))
+        () :: () (bound at <wired into compiler>)
         EQ :: Ordering
+          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
+           (and originally defined in ‘GHC.Internal.Types’))
+        False :: Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Types’))
         GT :: Ordering
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Types’))
         LT :: Ordering
-          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Internal.Types’))
-        () :: () (bound at <wired into compiler>)
-        False :: Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Internal.Types’))
         True :: Bool

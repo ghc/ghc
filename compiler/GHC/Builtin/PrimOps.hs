@@ -29,10 +29,10 @@ module GHC.Builtin.PrimOps (
 
 import GHC.Prelude
 
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Types
 import GHC.Builtin.Uniques (mkPrimOpIdUnique, mkPrimOpWrapperUnique )
-import GHC.Builtin.Names ( gHC_PRIMOPWRAPPERS )
+import GHC.Builtin.Modules ( gHC_PRIMOPWRAPPERS )
 
 import GHC.Core.TyCon    ( isPrimTyCon, isUnboxedTupleTyCon, PrimRep(..) )
 import GHC.Core.Type
@@ -163,7 +163,7 @@ primOpFixity :: PrimOp -> Maybe Fixity
 *                                                                      *
 ************************************************************************
 
-See Note [GHC.Prim Docs] in GHC.Builtin.Utils
+See Note [GHC.Prim Docs] in GHC.Builtin
 -}
 
 data PrimOpDoc

@@ -7,6 +7,7 @@
   -- LANGUAGE pragmas: see Note [IP: implicit parameter class]
 
 {-# OPTIONS_HADDOCK not-home #-}
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Classes.IP
@@ -24,12 +25,9 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Internal.Classes.IP( IP(..)) where
+module GHC.Internal.Classes.IP( IP(..) ) where
 
 import GHC.Internal.Types
-
-
-default ()              -- Double isn't available yet
 
 -- | The syntax @?x :: a@ is desugared into @IP "x" a@
 -- IP is declared very early, so that libraries can take

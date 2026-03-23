@@ -30,7 +30,7 @@ module Haddock.Convert
 import Control.DeepSeq (force)
 import Data.Either (lefts, partitionEithers, rights)
 import Data.Maybe (catMaybes, mapMaybe)
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
   ( boxedRepDataConKey
   , eqTyConKey
   , hasKey
@@ -38,7 +38,7 @@ import GHC.Builtin.Names
   , liftedDataConKey
   , tYPETyConKey
   )
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
   ( eqTyConName
   , liftedTypeKindTyConName
   , listTyConName
@@ -47,7 +47,7 @@ import GHC.Builtin.Types
   , unitTy
   )
 
-import GHC.Builtin.Types.Prim (alphaTyVars)
+import GHC.Builtin.WiredIn.Prim (alphaTyVars)
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike

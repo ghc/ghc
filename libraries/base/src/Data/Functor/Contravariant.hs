@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -47,6 +48,7 @@ module Data.Functor.Contravariant (
   , Op(..)
   ) where
 
+import Prelude hiding ((.), id)
 import Control.Applicative
 import GHC.Internal.Control.Category
 import GHC.Internal.Data.Function (on)
@@ -58,8 +60,10 @@ import Data.Functor.Compose
 import GHC.Internal.Data.Monoid (Alt(..), All(..))
 import GHC.Internal.Data.Proxy
 import GHC.Generics
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
-import Prelude hiding ((.), id)
 
 -- | The class of contravariant functors.
 --

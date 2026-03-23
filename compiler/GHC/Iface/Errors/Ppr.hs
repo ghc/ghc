@@ -13,6 +13,7 @@ module GHC.Iface.Errors.Ppr
   , missingInterfaceErrorReason
   , missingInterfaceErrorDiagnostic
   , readInterfaceErrorDiagnostic
+  , defaultIfaceMessageOpts
 
   , lookingForHerald
   , cantFindErrorX
@@ -23,6 +24,8 @@ module GHC.Iface.Errors.Ppr
 
 import GHC.Prelude
 
+import GHC.Builtin( knownKeyOccName_maybe )
+import GHC.Builtin.Modules( eSSENTIALS_NAME )
 import GHC.Types.Error
 import GHC.Types.Hint.Ppr () -- Outputable GhcHint
 import GHC.Types.Error.Codes
@@ -59,10 +62,13 @@ interfaceErrorHints :: IfaceMessage -> [GhcHint]
 interfaceErrorHints = \ case
   Can'tFindInterface err _looking_for ->
     missingInterfaceErrorHints err
-  Can'tFindNameInInterface {} ->
-    noHints
-  CircularImport {} ->
-    noHints
+  Can'tFindNameInInterface {} ->   noHints
+  CircularImport {} -> noHints
+  MissingKnownKey1 {} -> noHints
+  MissingKnownKey2 {} -> noHints
+  MissingKnownKey3 {} -> noHints
+  KnownKeyScopeError {} -> noHints
+  CantFindEssentials {} -> noHints
 
 missingInterfaceErrorHints :: MissingInterfaceError -> [GhcHint]
 missingInterfaceErrorHints = \case
@@ -84,8 +90,12 @@ interfaceErrorReason (Can'tFindInterface err _)
   = missingInterfaceErrorReason err
 interfaceErrorReason (Can'tFindNameInInterface {})
   = ErrorWithoutFlag
-interfaceErrorReason (CircularImport {})
-  = ErrorWithoutFlag
+interfaceErrorReason (CircularImport {})     = ErrorWithoutFlag
+interfaceErrorReason (MissingKnownKey1 {})   = ErrorWithoutFlag
+interfaceErrorReason (MissingKnownKey2 {})   = ErrorWithoutFlag
+interfaceErrorReason (MissingKnownKey3 {})   = ErrorWithoutFlag
+interfaceErrorReason (KnownKeyScopeError {}) = ErrorWithoutFlag
+interfaceErrorReason (CantFindEssentials {}) = ErrorWithoutFlag
 
 missingInterfaceErrorReason :: MissingInterfaceError -> DiagnosticReason
 missingInterfaceErrorReason = \ case
@@ -289,6 +299,56 @@ interfaceErrorDiagnostic opts = \ case
   CircularImport mod ->
     text "Circular imports: module" <+> quotes (ppr mod)
     <+> text "depends on itself"
+
+  MissingKnownKey1 key -> hang (text "Could not find known key" <+> quotes (pprKnownKey key))
+                             2 (vcat [ text "in the exports of GHC.KnownKeys"
+                                     , text "occname:" <+> pp_occ (knownKeyOccName_maybe key)
+                                     , text "REMEMBER: for tycons, divide by 2!!"])
+         where
+           pp_occ (Just occ) = ppr occ
+           pp_occ Nothing    = text "Yikes: that key isn't in the known-key table"
+
+  MissingKnownKey2 key -> hang (text "Could not find known key" <+> quotes (pprKnownKey key))
+                             2 (text "in the static known-key table")
+
+  MissingKnownKey3 occ -> hang (text "Could not find known occurrence" <+> quotes (ppr occ))
+                             2 (text "in the exports of GHC.KnownKeys")
+
+  KnownKeyScopeError occ gres call_stack
+    | null gres
+    -> hang (text "Could not find known-key entity" <+> quotes (ppr occ))
+          2 (vcat [ text "in the top-level environment (unqualified, or qualified as Rebindable)"
+                  , text "Consider importing it"
+                  , prettyCallStackDoc call_stack ])
+    | otherwise
+    -> hang (text "Known-key entity" <+> quotes (ppr occ))
+          2 (text "is ambiguous in the top-level global environment" $$ ppr gres)
+
+  CantFindEssentials err reason ->
+    vcat
+      [ vcat [ hang (text "Failed to load the known-names module" <+> quotes (ppr eSSENTIALS_NAME) <+> text "from the visible packages")
+                  2 (case reason of
+                       UnknownLoadEssentialsReason -> empty
+                       LookingForKnownOcc occ      -> text "while looking for known-occ name" <+> quotes (ppr occ)
+                       LookingForKnownKey key      -> text "while looking for known-key" <+> quotes (pprKnownKey key)
+                       LookingForEssentialsModule  -> text "while trying to discover its package")
+             , text "Did you mean to use" <+> quotes (text "-package base") <> text "?" ]
+      , blankLine
+      , missingInterfaceErrorDiagnostic opts err
+      , blankLine
+      , case reason of
+          LookingForEssentialsModule
+            -> vcat [ text "This error was triggered while trying to discover the package of" <+> quotes (ppr eSSENTIALS_NAME) <> comma
+                    , text "rather than when looking up any specific known-name."
+                    , text "If you want to enforce" <+> quotes (ppr eSSENTIALS_NAME) <+> text "is not added to the module graph implicitly,"
+                    , text "you should use" <+> quotes (text "-frebindable-known-names")
+                    ]
+          _ -> hang (text "To lookup known-names in scope rather than in GHC.Essentials" <> comma)
+                  2 (vcat [ text "use" <+> quotes (text "-frebindable-known-names") <> comma <+> text "and import"
+                          , text "the necessary known-names definitions from" <+> quotes (text "ghc-internal") <> dot
+                          -- Alternatively, you may want to unsafely provide your own GHC.Essentials exposing the known-names you need in scope."
+                          ])
+      ]
 
 lookingForHerald :: InterfaceLookingFor -> SDoc
 lookingForHerald looking_for =

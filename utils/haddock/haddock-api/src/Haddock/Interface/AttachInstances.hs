@@ -32,7 +32,7 @@ import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.Ord (comparing)
 import qualified Data.Sequence as Seq
 import GHC
-import GHC.Builtin.Types (unrestrictedFunTyConName)
+import GHC.Builtin.WiredIn.Types (unrestrictedFunTyConName)
 import GHC.Core (isOrphan)
 import GHC.Core.Class
 import GHC.Core.Coercion

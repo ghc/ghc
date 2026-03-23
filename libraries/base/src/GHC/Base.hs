@@ -42,10 +42,10 @@ module GHC.Base
     , gtWord, geWord, leWord, ltWord, compareWord, compareWord#
 
       -- * C Strings
-    , unpackCString#, unpackAppendCString#, unpackFoldrCString#
-    , cstringLength#
-    , unpackCStringUtf8#, unpackAppendCStringUtf8#, unpackFoldrCStringUtf8#
-    , unpackNBytes#
+    , CS.unpackCString#, CS.unpackAppendCString#, CS.unpackFoldrCString#
+    , CS.cstringLength#
+    , CS.unpackCStringUtf8#, CS.unpackAppendCStringUtf8#, CS.unpackFoldrCStringUtf8#
+    , CS.unpackNBytes#
 
       -- * Magic combinators
     , inline, noinline, lazy, oneShot, runRW#, seq#, DataToTag(..)
@@ -142,9 +142,12 @@ module GHC.Base
 import GHC.Internal.Base hiding ( NonEmpty(..) )
 import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 #if __GLASGOW_HASKELL__ >= 1000
+#if __GLASGOW_HASKELL__ < 1001
 import GHC.Internal.Classes
 import GHC.Internal.CString
+import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Magic.Dict ( WithDict(..) )
+#endif
 #endif
 import GHC.Prim hiding
   (
@@ -401,10 +404,20 @@ import GHC.Prim.PtrEq
 import GHC.Internal.Err
 import GHC.Internal.IO (seq#)
 #if __GLASGOW_HASKELL__ >= 1000
-import GHC.Internal.Magic
+import GHC.Internal.Magic.Dict
 #endif
 import GHC.Internal.Maybe
+import qualified GHC.Types as CS (
+  unpackCString#, unpackAppendCString#, unpackFoldrCString#,
+  cstringLength#,
+  unpackCStringUtf8#, unpackAppendCStringUtf8#, unpackFoldrCStringUtf8#,
+  unpackNBytes#
+  )
 import GHC.Types hiding (
+  unpackCString#, unpackAppendCString#, unpackFoldrCString#,
+  cstringLength#,
+  unpackCStringUtf8#, unpackAppendCStringUtf8#, unpackFoldrCStringUtf8#,
+  unpackNBytes#,
   Unit#,
   Solo#(..),
   Tuple0#,

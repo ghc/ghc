@@ -53,6 +53,8 @@ module Control.Applicative (
     thenA,
     ) where
 
+
+import GHC.Internal.Base
 import GHC.Internal.Control.Category hiding ((.), id)
 import GHC.Internal.Control.Arrow
 import GHC.Internal.Data.Maybe
@@ -62,19 +64,15 @@ import GHC.Internal.Data.Functor ((<$>))
 import GHC.Internal.Data.Functor.Const (Const(..))
 import GHC.Internal.Data.Typeable (Typeable)
 import GHC.Internal.Data.Data (Data)
-
-import GHC.Internal.Base (
-    Alternative(..), Applicative(..), Functor(..), Monad(..), MonadPlus(..),
-    ap, const, liftA, liftA3, liftM, liftM2, (.), (<**>),
-  )
-#if __GLASGOW_HASKELL__ < 1000
-import GHC.Internal.Base (id)
-#else
-import GHC.Internal.Base (thenA)
-#endif
+import GHC.Generics( Generic, Generic1 )
 import GHC.Internal.Functor.ZipList (ZipList(..))
-import GHC.Internal.Types
-import GHC.Generics
+
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Internal.Data.Data as Rebindable
+import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
+import qualified GHC.Num as Rebindable
+import qualified GHC.Generics as Rebindable hiding( Fixity(..) )
+#endif
 
 -- $setup
 -- >>> import Prelude

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 module GHC.Weak.Finalize
     ( -- * Handling exceptions
@@ -21,6 +22,10 @@ import GHC.Internal.IO.Handle.Types (Handle)
 import GHC.Internal.IO.Handle.Text (hPutStrLn)
 import GHC.Internal.Prim (Array#, State#, RealWorld)
 import GHC.Internal.Types (Int, IO)
+#if __GLASGOW_HASKELL__ >= 1001
+import GHC.Internal.Num   as Rebindable( Num )  -- A necessary known-key name
+import GHC.Internal.Types as Rebindable( unpackCString#, unpackCStringUtf8# )
+#endif
 
 
 {-# DEPRECATED runFinalizerBatch

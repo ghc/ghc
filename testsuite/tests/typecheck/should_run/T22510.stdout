@@ -10,7 +10,7 @@ VecElem: GHC.Internal.Types
 'Int8ElemRep: GHC.Internal.Types
 ((),()): GHC.Internal.Tuple
 (# (),() #): GHC.Internal.Types
-Int64#: GHC.Internal.Prim
-Word64#: GHC.Internal.Prim
-TYPE: GHC.Internal.Prim
-CONSTRAINT: GHC.Internal.Prim
+Int64#: GHC.Internal.Types
+Word64#: GHC.Internal.Types
+TYPE: GHC.Internal.Types
+CONSTRAINT: GHC.Internal.Types

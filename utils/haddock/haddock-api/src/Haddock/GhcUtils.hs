@@ -43,7 +43,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text.Encoding
 import GHC hiding (HsTypeGhcPsExt (..))
-import GHC.Builtin.Types (liftedRepTy)
+import GHC.Builtin.WiredIn.Types (liftedRepTy)
 import GHC.Core.TyCo.FVs (deepDetTypesFV)
 import GHC.Core.TyCo.Rep (Type (..))
 import GHC.Core.Type (isRuntimeRepVar)

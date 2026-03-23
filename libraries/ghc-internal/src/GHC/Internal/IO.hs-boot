@@ -1,9 +1,10 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
 module GHC.Internal.IO where
 
-import GHC.Internal.Stack.Types (HasCallStack)
+import GHC.Internal.Stack.Types
 import GHC.Internal.Types
 import {-# SOURCE #-} GHC.Internal.Exception.Type (Exception, SomeException)
 

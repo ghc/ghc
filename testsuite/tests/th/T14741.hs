@@ -8,7 +8,7 @@ import Foreign.Marshal.Array
 import GHC.Exts
 import System.Mem
 import Control.Monad.IO.Class
-import GHC.CString
+import GHC.Base ()
 
 ptr :: Ptr ()
 ptr = Ptr $(do

@@ -31,5 +31,6 @@ module GHC.Internal.Control.Monad.ST (
         stToIO,
     ) where
 
+import GHC.Internal.Base as Rebindable   -- For known-occ things
 import GHC.Internal.Control.Monad.ST.Imp
 

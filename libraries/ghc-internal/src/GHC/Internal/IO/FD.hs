@@ -29,17 +29,14 @@ module GHC.Internal.IO.FD (
         stdin, stdout, stderr
     ) where
 
-import GHC.Internal.Base (
-    String, fmap, otherwise, pure, return, when, ($), (.), (++), (>>=),
-  )
+import qualified GHC.Internal.Stack.Types as Rebindable
+import GHC.Internal.Base
 import GHC.Internal.Bits
-import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Show
 import GHC.Internal.Enum
-import GHC.Internal.Types (Bool(..))
 import GHC.Internal.Word
 import GHC.Internal.Int
 import GHC.Internal.Ptr
@@ -53,15 +50,11 @@ import GHC.Internal.IO.Device (SeekMode(..), IODeviceType(..))
 import GHC.Internal.Conc.IO
 import GHC.Internal.IO.Exception
 #if defined(mingw32_HOST_OS)
-import GHC.Internal.Base (liftM2, (>>))
 import GHC.Internal.Err (error)
 import GHC.Internal.Windows
 import GHC.Internal.IO.SubSystem ((<!>))
 import GHC.Internal.Foreign.Storable
 #else
-import GHC.Internal.Base (
-    id,
-  )
 #endif
 
 import GHC.Internal.Foreign.C.Types

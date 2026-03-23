@@ -68,11 +68,11 @@ holes.hs:11:15: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         showParen :: Bool -> ShowS -> ShowS
         showString :: String -> ShowS
         putStrLn :: String -> IO ()
+        () :: ()
         EQ :: Ordering
+        False :: Bool
         GT :: Ordering
         LT :: Ordering
-        () :: ()
-        False :: Bool
         True :: Bool
         (++) :: forall a. [a] -> [a] -> [a]
         asTypeOf :: forall a. a -> a -> a

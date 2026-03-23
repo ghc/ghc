@@ -26,18 +26,20 @@
 module GHC.Types.Name.Reader (
         -- * The main type
         RdrName(..),    -- Constructors exported only to GHC.Iface.Binary
+        ExactRdrName(..),
 
         -- ** Construction
         mkRdrUnqual, mkRdrQual,
         mkUnqual, mkVarUnqual, mkQual, mkOrig,
-        nameRdrName, getRdrName,
+        nameRdrName, knownOccRdrName, getRdrName,
 
         -- ** Destruction
         rdrNameOcc, rdrNameSpace,
         demoteRdrName, demoteRdrNameTcCls, demoteRdrNameTv,
         promoteRdrName,
         isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual,
-        isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
+        isOrig, isOrig_maybe, isExact,
+        rdrNameExactName_maybe, rdrNameKnownOcc_maybe, isSrcRdrName,
 
         -- ** Preserving user-written qualification
         WithUserRdr(..), noUserRdr, unLocWithUserRdr, userRdrName, unwrapUserRdr,
@@ -66,6 +68,7 @@ module GHC.Types.Name.Reader (
         lookupGRE_FieldLabel,
         getGRE_NameQualifier_maybes,
         transformGREs, pickGREs, pickGREsModExp, pickLevelZeroGRE,
+        pickQualGREs, pickUnqualGREs,
 
         -- * GlobalRdrElts
         availFromGRE,
@@ -194,7 +197,7 @@ data RdrName
         -- we want to say \"Use Prelude.map dammit\". One of these
         -- can be created with 'mkOrig'
 
-  | Exact Name
+  | Exact ExactRdrName
         -- ^ Exact name
         --
         -- We know exactly the 'Name'. This is used:
@@ -205,8 +208,54 @@ data RdrName
         --  (2) By Template Haskell, when TH has generated a unique name
         --
         -- Such a 'RdrName' can be created by using 'getRdrName' on a 'Name'
+        --
+        -- See also Note [Exact RdrNames]
   deriving Data
 
+-- | Exactly a 'Name' or a 'KnownOcc'.
+-- See Note [Exact RdrNames]
+data ExactRdrName
+  = ExactName -- Use this when you know the exact Name
+      Name
+
+  | ExactOcc  -- Use this for known-occ names
+      KnownOcc
+  deriving (Eq, Ord, Data)
+
+instance NFData RdrName where
+  rnf (Unqual occ)  = rnf occ
+  rnf (Qual mn occ) = mn `deepseq` occ `deepseq` ()
+  rnf (Orig m occ)  = m `deepseq` occ `deepseq` ()
+  rnf (Exact n)     = rnf n
+
+instance NFData ExactRdrName where
+  rnf (ExactName n)  = rnf n
+  rnf (ExactOcc occ) = rnf occ
+
+{-
+Note [Exact RdrNames]
+~~~~~~~~~~~~~~~~~~~~~
+A parsed syntax tree, of type (HsExpr GhcPs), is populated with RdrNames.
+Sometimes such a syntax tree wants to refer to a particular entity,
+rather than whatever happens to be in scope. Examples:
+
+* When we splice in the result of a Template Haskell splice.  E.g.
+     \x -> $(f 'x)
+  The spliced-in tree refers to precisely the `x` bound by the lambda.
+
+* A derived instance `deriving( Ord )` generates a syntax tree that refers to
+  many build-in entities (classes, types, and functions), such as `(>)` or `map`.
+
+We suppport these use-cases through the `Exact` data contructor of `RdrName`.
+It carries an `ExactRdrName`, which has two constructors:
+
+* ExactName Name: we use this in the TH application to embed a full `Name` inside
+  a `RdrName`.
+
+* ExactOcc KnownOcc: use this in the `deriving` application, to embed the OccName
+  of a known-occ entity in a `RdrName`.  See Note [Overview of known entities]
+  in GHC.Builtin.
+-}
 {-
 ************************************************************************
 *                                                                      *
@@ -222,7 +271,8 @@ rdrNameOcc :: RdrName -> OccName
 rdrNameOcc (Qual _ occ) = occ
 rdrNameOcc (Unqual occ) = occ
 rdrNameOcc (Orig _ occ) = occ
-rdrNameOcc (Exact name) = nameOccName name
+rdrNameOcc (Exact (ExactName name)) = nameOccName name
+rdrNameOcc (Exact (ExactOcc occ))   = occ
 
 rdrNameSpace :: RdrName -> NameSpace
 rdrNameSpace = occNameSpace . rdrNameOcc
@@ -284,16 +334,14 @@ mkQual sp (m, n) = Qual (mkModuleNameFS m) (mkOccNameFS sp n)
 getRdrName :: NamedThing thing => thing -> RdrName
 getRdrName name = nameRdrName (getName name)
 
+knownOccRdrName :: KnownOcc -> RdrName
+knownOccRdrName occ = Exact (ExactOcc occ)
+
 nameRdrName :: Name -> RdrName
-nameRdrName name = Exact name
+nameRdrName name = Exact (ExactName name)
 -- Keep the Name even for Internal names, so that the
 -- unique is still there for debug printing, particularly
 -- of Types (which are converted to IfaceTypes before printing)
-
-nukeExact :: Name -> RdrName
-nukeExact n
-  | isExternalName n = Orig (nameModule n) (nameOccName n)
-  | otherwise        = Unqual (nameOccName n)
 
 isRdrDataCon :: RdrName -> Bool
 isRdrTyVar   :: RdrName -> Bool
@@ -332,9 +380,13 @@ isExact :: RdrName -> Bool
 isExact (Exact _) = True
 isExact _         = False
 
-isExact_maybe :: RdrName -> Maybe Name
-isExact_maybe (Exact n) = Just n
-isExact_maybe _         = Nothing
+rdrNameExactName_maybe :: RdrName -> Maybe Name
+rdrNameExactName_maybe (Exact (ExactName n)) = Just n
+rdrNameExactName_maybe _                     = Nothing
+
+rdrNameKnownOcc_maybe :: RdrName -> Maybe KnownOcc
+rdrNameKnownOcc_maybe (Exact (ExactOcc occ)) = Just occ
+rdrNameKnownOcc_maybe _                      = Nothing
 
 {-
 ************************************************************************
@@ -345,10 +397,14 @@ isExact_maybe _         = Nothing
 -}
 
 instance Outputable RdrName where
-    ppr (Exact name)   = ppr name
+    ppr (Exact exact)  = ppr exact
     ppr (Unqual occ)   = ppr occ
     ppr (Qual mod occ) = ppr mod <> dot <> ppr occ
     ppr (Orig mod occ) = getPprStyle (\sty -> pprModulePrefix sty mod Nothing occ <> ppr occ)
+
+instance Outputable ExactRdrName where
+    ppr (ExactName name) = ppr name
+    ppr (ExactOcc occ)   = ppr occ
 
 instance OutputableBndr RdrName where
     pprBndr _ n
@@ -357,16 +413,13 @@ instance OutputableBndr RdrName where
 
     pprInfixOcc  rdr = pprInfixVar  (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
     pprPrefixOcc rdr
-      | Just name <- isExact_maybe rdr = pprPrefixName name
+      | Just name <- rdrNameExactName_maybe rdr = pprPrefixName name
              -- pprPrefixName has some special cases, so
              -- we delegate to them rather than reproduce them
       | otherwise = pprPrefixVar (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
 
 instance Eq RdrName where
     (Exact n1)    == (Exact n2)    = n1==n2
-        -- Convert exact to orig
-    (Exact n1)    == r2@(Orig _ _) = nukeExact n1 == r2
-    r1@(Orig _ _) == (Exact n2)    = r1 == nukeExact n2
 
     (Orig m1 o1)  == (Orig m2 o2)  = m1==m2 && o1==o2
     (Qual m1 o1)  == (Qual m2 o2)  = m1==m2 && o1==o2
@@ -379,16 +432,9 @@ instance Ord RdrName where
     a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
     a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
 
-        -- Exact < Unqual < Qual < Orig
-        -- [Note: Apr 2004] We used to use nukeExact to convert Exact to Orig
-        --      before comparing so that Prelude.map == the exact Prelude.map, but
-        --      that meant that we reported duplicates when renaming bindings
-        --      generated by Template Haskell; e.g
-        --      do { n1 <- newName "foo"; n2 <- newName "foo";
-        --           <decl involving n1,n2> }
-        --      I think we can do without this conversion
-    compare (Exact n1) (Exact n2) = n1 `compare` n2
-    compare (Exact _)  _          = LT
+    -- Exact < Unqual < Qual < Orig
+    compare (Exact n1) (Exact n2)     = n1 `compare` n2
+    compare (Exact _)  _              = LT
 
     compare (Unqual _)   (Exact _)    = GT
     compare (Unqual o1)  (Unqual  o2) = o1 `compare` o2
@@ -464,7 +510,7 @@ lookupLocalRdrEnv (LRE { lre_env = env, lre_in_scope = ns }) rdr
   = lookupOccEnv env occ
 
   -- See Note [Local bindings with Exact Names]
-  | Exact name <- rdr
+  | Just name <- rdrNameExactName_maybe rdr
   , name `elemNameSet` ns
   = Just name
 
@@ -485,8 +531,9 @@ lookupLocalRdrOcc (LRE { lre_env = env }) occ = lookupOccEnv env occ
 elemLocalRdrEnv :: RdrName -> LocalRdrEnv -> Bool
 elemLocalRdrEnv rdr_name (LRE { lre_env = env, lre_in_scope = ns })
   = case rdr_name of
-      Unqual occ -> occ  `elemOccEnv` env
-      Exact name -> name `elemNameSet` ns  -- See Note [Local bindings with Exact Names]
+      Unqual occ             -> occ  `elemOccEnv` env
+      Exact (ExactName name) -> name `elemNameSet` ns  -- See Note [Local bindings with Exact Names]
+      Exact (ExactOcc{})     -> False
       Qual {} -> False
       Orig {} -> False
 
@@ -655,13 +702,13 @@ instance NFData Parent where
   rnf NoParent = ()
   rnf (ParentIs n) = rnf n
 
-plusParent :: Parent -> Parent -> Parent
+plusParent :: HasDebugCallStack => Parent -> Parent -> Parent
 -- See Note [Combining parents]
 plusParent p1@(ParentIs _)    p2 = hasParent p1 p2
 plusParent p1 p2@(ParentIs _)    = hasParent p2 p1
 plusParent NoParent NoParent     = NoParent
 
-hasParent :: Parent -> Parent -> Parent
+hasParent :: HasDebugCallStack => Parent -> Parent -> Parent
 #if defined(DEBUG)
 hasParent p NoParent = p
 hasParent p p'
@@ -1579,9 +1626,12 @@ pickGREs :: RdrName -> [GlobalRdrEltX info] -> [GlobalRdrEltX info]
 -- Return each such GRE, with its ImportSpecs filtered, to reflect
 -- how it is in scope qualified or unqualified respectively.
 -- See Note [GRE filtering]
-pickGREs (Unqual {})  gres = mapMaybe pickUnqualGRE     gres
-pickGREs (Qual mod _) gres = mapMaybe (pickQualGRE mod) gres
+pickGREs (Unqual {})  gres = pickUnqualGREs   gres
+pickGREs (Qual mod _) gres = pickQualGREs mod gres
 pickGREs _            _    = []  -- I don't think this actually happens
+
+pickUnqualGREs :: [GlobalRdrEltX info] -> [GlobalRdrEltX info]
+pickUnqualGREs gres = mapMaybe pickUnqualGRE gres
 
 pickUnqualGRE :: GlobalRdrEltX info -> Maybe (GlobalRdrEltX info)
 pickUnqualGRE gre@(GRE { gre_lcl = lcl, gre_imp = iss })
@@ -1589,6 +1639,9 @@ pickUnqualGRE gre@(GRE { gre_lcl = lcl, gre_imp = iss })
   | otherwise          = Just (gre { gre_imp = iss' })
   where
     iss' = filterBag unQualSpecOK iss
+
+pickQualGREs :: ModuleName -> [GlobalRdrEltX info] -> [GlobalRdrEltX info]
+pickQualGREs mod gres = mapMaybe (pickQualGRE mod) gres
 
 pickQualGRE :: ModuleName -> GlobalRdrEltX info -> Maybe (GlobalRdrEltX info)
 pickQualGRE mod gre@(GRE { gre_lcl = lcl, gre_imp = iss })
@@ -1653,7 +1706,12 @@ insertGRE :: GlobalRdrElt -> [GlobalRdrElt] -> [GlobalRdrElt]
 insertGRE new_g [] = [new_g]
 insertGRE new_g (old_g : old_gs)
         | greName new_g == greName old_g
-        = new_g `plusGRE` old_g : old_gs
+        = -- pprTrace "insertGRE"
+          --  (vcat [ text "old_gre:" <+> ppr old_g
+          --        , text "old_p:"   <+> ppr (gre_par old_g)
+          --        , text "new_gre:" <+> ppr new_g
+          --        , text "new_p:"   <+> ppr (gre_par new_g) ]) $
+          new_g `plusGRE` old_g : old_gs
         | otherwise
         = old_g : insertGRE new_g old_gs
 

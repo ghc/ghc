@@ -9,10 +9,13 @@ module GHC.Fingerprint (
         getFileHash
    ) where
 
-import GHC.Internal.Fingerprint
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 #if __GLASGOW_HASKELL__ >= 1000
 
+import GHC.Internal.Fingerprint
 import Data.Function (($))
 import Control.Monad (return, when)
 import Data.Bool (not, (&&))
@@ -23,8 +26,7 @@ import Data.Word (Word8)
 import Data.Eq ((/=))
 import Text.Show (show)
 import System.IO
-       (
-           IO,
+       (   IO,
            FilePath,
            IOMode (ReadMode),
            withBinaryFile,

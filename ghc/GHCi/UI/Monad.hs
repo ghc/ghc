@@ -48,7 +48,7 @@ import GHC.Types.SafeHaskell
 import GHC.Driver.Make (ModIfaceCache(..))
 import GHC.Unit
 import GHC.Types.Name.Reader as RdrName (mkOrig)
-import GHC.Builtin.Names (gHC_INTERNAL_GHCI_HELPERS)
+import GHC.Builtin.Modules (gHC_INTERNAL_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context
 import GHCi.RemoteTypes

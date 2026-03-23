@@ -37,20 +37,19 @@ module GHC.Internal.Foreign.Storable
 #include "MachDeps.h"
 #include "HsBaseConfig.h"
 
-import GHC.Internal.Classes ( Eq(..) )
+import GHC.Internal.Base
 import GHC.Internal.Err ( undefined )
 import GHC.Internal.Storable
 import GHC.Internal.Stable       ( StablePtr )
-import GHC.Internal.Types ( Bool(..), Char, Float, Double, IO )
 import GHC.Internal.Num
 import GHC.Internal.Int
 import GHC.Internal.Word
 import GHC.Internal.Ptr
-import GHC.Internal.Base ( liftM, return, ($) )
 import GHC.Internal.Fingerprint.Type
 import GHC.Internal.Foreign.C.ConstPtr
 import GHC.Internal.Data.Bits
 import GHC.Internal.Real
+import GHC.Internal.Stack.Types as Rebindable
 
 {- |
 The member functions of this class facilitate writing values of

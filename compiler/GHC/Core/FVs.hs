@@ -69,8 +69,8 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
-import GHC.Builtin.Types( unrestrictedFunTyConName )
-import GHC.Builtin.Types.Prim( fUNTyCon )
+import GHC.Builtin.WiredIn.Types( unrestrictedFunTyConName )
+import GHC.Builtin.WiredIn.Prim( fUNTyCon )
 import GHC.Data.Maybe( orElse )
 
 import GHC.Utils.EndoOS

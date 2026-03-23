@@ -16,7 +16,7 @@ module GHC.Internal.Unicode.Char.UnicodeData.SimpleLowerCaseMapping
 (toSimpleLowerCase)
 where
 
-import GHC.Internal.Types (Char)
+import GHC.Internal.Base
 
 {-# NOINLINE toSimpleLowerCase #-}
 toSimpleLowerCase :: Char -> Char

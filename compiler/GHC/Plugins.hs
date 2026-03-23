@@ -36,7 +36,7 @@ module GHC.Plugins
    , module GHC.Core.Type
    , module GHC.Core.TyCon
    , module GHC.Core.Coercion
-   , module GHC.Builtin.Types
+   , module GHC.Builtin.WiredIn.Types
    , module GHC.Driver.Env
    , module GHC.Types.Basic
    , module GHC.Types.Var.Set
@@ -74,7 +74,6 @@ where
 import GHC.Driver.Plugins
 
 -- Variable naming
-import GHC.Types.TyThing
 import GHC.Types.PkgQual
 import GHC.Types.SourceError
 import GHC.Types.Name.Reader
@@ -114,7 +113,7 @@ import GHC.Core.Type hiding {- conflict with GHC.Core.Subst -}
 import GHC.Core.Coercion hiding {- conflict with GHC.Core.Subst -}
                 ( substCo )
 import GHC.Core.TyCon
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Types
 import GHC.Driver.Env
 import GHC.Types.Basic
 
@@ -145,7 +144,6 @@ import GHC.Iface.Env    ( lookupNameCache )
 import GHC.Prelude
 import GHC.Utils.Monad  ( MonadIO, mapMaybeM )
 import GHC.ThToHs       ( thRdrNameGuesses )
-import GHC.Tc.Utils.Env ( lookupGlobal )
 import GHC.Types.Name.Cache ( NameCache )
 
 import GHC.Tc.Errors.Hole.FitTypes
@@ -157,12 +155,6 @@ import GHC.Types.Error         ( Messages )
 import GHC.Hs                  ( HsParsedModule )
 
 import qualified GHC.Boot.TH.Syntax as TH
-
-{- This instance is defined outside GHC.Core.Opt.Monad so that
-   GHC.Core.Opt.Monad does not depend on GHC.Tc.Utils.Env -}
-instance MonadThings CoreM where
-    lookupThing name = do { hsc_env <- getHscEnv
-                          ; liftIO $ lookupGlobal hsc_env name }
 
 {-
 ************************************************************************
@@ -225,7 +217,7 @@ thNameToGhcNameIO cache th_name
         ; return (listToMaybe names) }
   where
     lookup rdr_name
-      | Just n <- isExact_maybe rdr_name   -- This happens in derived code
+      | Just n <- rdrNameExactName_maybe rdr_name   -- This happens in derived code
       = return $ if isExternalName n then Just n else Nothing
       | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
       = Just <$> lookupNameCache cache rdr_mod rdr_occ

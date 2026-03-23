@@ -18,9 +18,7 @@ where
 
 import GHC.Internal.Prim
 import GHC.Internal.Magic
-import GHC.Internal.Types( Type )
-
-default () -- Double and Integer aren't available yet
+import GHC.Internal.Types
 
 {-
 Note [Compiler error functions]

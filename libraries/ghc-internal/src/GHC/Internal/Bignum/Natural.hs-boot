@@ -1,6 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines lots of functions that have BuiltinRules
+
 module GHC.Internal.Bignum.Natural where
 
 import {-# SOURCE #-} GHC.Internal.Bignum.BigNat

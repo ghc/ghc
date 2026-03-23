@@ -46,7 +46,7 @@ import GHC.Core.Reduction
 import GHC.Core.RoughMap
 import GHC.Core.FVs( orphNamesOfAxiomLHS )
 
-import GHC.Builtin.Types.Literals( tryMatchFam )
+import GHC.Builtin.WiredIn.TypeLits( tryMatchFam )
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env

@@ -53,7 +53,6 @@ import GHC.HsToCore.Monad
 
 import GHC.Core.Utils
 import GHC.Core.Make
-import GHC.Types.Id.Make
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.TyCon
@@ -62,12 +61,12 @@ import GHC.Core.PatSyn
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep( Scaled(..) )
-import GHC.Builtin.Types
 import GHC.Core.ConLike
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
+import GHC.Types.Id.Make( DataConBoxer(..), unwrapNewTypeBody )
 import GHC.Unit.Module
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc
@@ -76,6 +75,9 @@ import GHC.Utils.Misc
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Ids
 
 import GHC.Rename.Env ( irrefutableConLikeTc )
 import GHC.Tc.Types.Evidence
@@ -550,7 +552,7 @@ There are three cases.
        let { t = case e of Just (Just v) -> Solo v
            ; v = case t of Solo v -> v }
        in t `seq` body
-    The 'Solo' is a one-tuple; see Note [One-tuples] in GHC.Builtin.Types
+    The 'Solo' is a one-tuple; see Note [One-tuples] in GHC.Builtin.WiredIn.Types
     Note that forcing 't' makes the pattern match happen,
     but does not force 'v'.  That's why we call `mkBigCoreVarTupSolo`
     in `mkSelectorBinds`
@@ -572,7 +574,7 @@ There are three cases.
      - Forcing 't' will force the pattern to match fully;
        e.g. will diverge if (snd e) is bottom
      - But 'a' itself is not forced; it is wrapped in a one-tuple
-       (see Note [One-tuples] in GHC.Builtin.Types)
+       (see Note [One-tuples] in GHC.Builtin.WiredIn.Types)
 
   *   !(Just x) = e
     ==>
@@ -900,7 +902,8 @@ dsHandleMonadicFailure ctx pat res_ty match m_fail_op =
           -- that's the non-ApplicativeDo code path
           mkErrorAppDs pAT_ERROR_ID res_ty (matchDoContextErrString ctx)
         Just fail_op -> do
-          fail_msg <- mkStringExpr (mk_fail_msg dflags ctx pat)
+          mk_str <- getMkStringIds dsLookupKnownKeyId
+          let fail_msg = mkStringExprWith mk_str (mk_fail_msg dflags ctx pat)
           dsSyntaxExpr fail_op [fail_msg]
       body fail_expr
 

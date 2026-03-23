@@ -72,9 +72,11 @@ module GHC.Internal.Event.Windows.FFI (
 
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Base (String, fmap, return, ($), (.), (++), (>>=))
+import qualified GHC.Internal.Base as Rebindable
 import GHC.Internal.Classes (Eq(..), Ord, (||))
 import GHC.Internal.Err (undefined)
 import GHC.Internal.Num ((*))
+import qualified GHC.Internal.Num as Rebindable
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Marshal.Utils
 import GHC.Internal.Foreign.Storable
@@ -84,6 +86,8 @@ import GHC.Internal.Word
 import GHC.Internal.Stable
 import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.Show
+import qualified GHC.Internal.Stack.Types as Rebindable
+  ( SrcLoc(..), pushCallStack, emptyCallStack )
 import GHC.Internal.Types (Bool(..), IO)
 import GHC.Internal.Windows
 import qualified GHC.Internal.Event.Array as A

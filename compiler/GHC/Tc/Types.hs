@@ -180,7 +180,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 import GHC.Utils.Logger
 
-import GHC.Builtin.Names ( isUnboundName )
+import GHC.Builtin ( isUnboundName )
 
 import GHCi.Message
 import GHCi.RemoteTypes
@@ -361,16 +361,16 @@ data IfGblEnv
         -- Some information about where this environment came from;
         -- useful for debugging.
         if_doc :: SDoc,
+
         -- The type environment for the module being compiled,
         -- in case the interface refers back to it via a reference that
         -- was originally a hi-boot file.
         -- We need the module name so we can test when it's appropriate
         -- to look in this env.
         -- See Note [Tying the knot] in GHC.IfaceToCore
-        if_rec_types :: (KnotVars (IfG TypeEnv))
+        if_rec_types :: KnotVars (IfG TypeEnv)
                 -- Allows a read effect, so it can be in a mutable
                 -- variable; c.f. handling the external package type env
-                -- Nothing => interactive stuff, no loops possible
     }
 
 data IfLclEnv
@@ -500,7 +500,7 @@ data TcGblEnv
           -- NB: for what "things in this module" means, see
           -- Note [The interactive package] in "GHC.Runtime.Context"
 
-        tcg_type_env_var :: KnotVars (IORef TypeEnv),
+        tcg_knot_vars :: KnotVars (IORef TypeEnv),
                 -- Used only to initialise the interface-file
                 -- typechecker in initIfaceTcRn, so that it can see stuff
                 -- bound in this module when dealing with hi-boot recursions
@@ -583,7 +583,7 @@ data TcGblEnv
 
         tcg_zany_n :: TcRef Integer,
           -- ^ A source of unique identities for UnusedType instances
-          -- See Note [The types Any and UnusedType] in GHC.Builtin.Types, wrinkle (Any6)
+          -- See Note [The types Any and UnusedType] in GHC.Builtin.WiredIn.Types, wrinkle (Any6)
 
         tcg_merged :: [(Module, Fingerprint)],
           -- ^ The requirements we merged with; we always have to recompile

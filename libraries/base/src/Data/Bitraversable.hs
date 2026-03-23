@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -28,6 +29,7 @@ module Data.Bitraversable
   , bifoldMapDefault
   ) where
 
+import Prelude
 import Control.Applicative
 import Data.Bifunctor
 import Data.Bifoldable
@@ -35,7 +37,9 @@ import GHC.Internal.Data.Coerce
 import GHC.Internal.Data.Functor.Identity (Identity(..))
 import GHC.Internal.Data.Functor.Utils (StateL(..), StateR(..))
 import GHC.Generics (K1(..))
-import Prelude
+#if __GLASGOW_HASKELL__ >= 1001
+import qualified GHC.Essentials as Rebindable
+#endif
 
 -- $setup
 -- >>> import Prelude

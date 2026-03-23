@@ -88,11 +88,12 @@ import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
 import GHC.Parser.String
 
-import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
-                           tupleTyCon, tupleDataCon, nilDataCon,
-                           unboxedUnitTyCon, unboxedUnitDataCon,
-                           listTyCon_RDR, consDataCon_RDR,
-                           unrestrictedFunTyCon )
+import GHC.Builtin.WiredIn.Types
+            ( unitTyCon, unitDataCon, sumTyCon,
+              tupleTyCon, tupleDataCon, nilDataCon,
+              unboxedUnitTyCon, unboxedUnitDataCon,
+              listTyConName, consDataConName,
+              unrestrictedFunTyCon )
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import Language.Haskell.Syntax.Text
@@ -3913,7 +3914,7 @@ gtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, including unit t
                                                 (NameAnnOnly (NameParens (epTok $1) (epTok $2)) []) }
         | '(#' '#)'                    {% amsr (sLL $1 $> $ getRdrName unboxedUnitTyCon)
                                                 (NameAnnOnly (NameParensHash (epTok $1) (epTok $2)) []) }
-        | '[' ']'               {% amsr (sLL $1 $> $ listTyCon_RDR)
+        | '[' ']'               {% amsr (sLL $1 $> $ nameRdrName listTyConName)
                                       (NameAnnOnly (NameSquare (epTok $1) (epTok $2)) []) }
 
 ntgtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, excluding unit tuples
@@ -3945,7 +3946,7 @@ oqtycon_no_varcon :: { LocatedN RdrName }  -- Type constructor which cannot be m
                                     ; name = sL1 $2 $! mkUnqual tcClsName (getCONSYM $2) }
                                 in amsr (sLL $1 $> (unLoc name)) (NameAnn (NameParens (epTok $1) (epTok $3)) (glR $2) []) }
         | '(' ':' ')'        {% let { name :: Located RdrName
-                                    ; name = sL1 $2 $! consDataCon_RDR }
+                                    ; name = sL1 $2 $! nameRdrName consDataConName }
                                 in amsr (sLL $1 $> (unLoc name)) (NameAnn (NameParens (epTok $1) (epTok $3)) (glR $2) []) }
 
 {- Note [Type constructors in export list]
@@ -3989,7 +3990,7 @@ qtyconsym :: { LocatedN RdrName }
 tyconsym :: { LocatedN RdrName }
         : CONSYM                { sL1n $1 $! mkUnqual tcClsName (getCONSYM $1) }
         | VARSYM                { sL1n $1 $! mkUnqual tcClsName (getVARSYM $1) }
-        | ':'                   { sL1n $1 $! consDataCon_RDR }
+        | ':'                   { sL1n $1 $! nameRdrName consDataConName }
         | '-'                   { sL1n $1 $! mkUnqual tcClsName (fsLit "-") }
         | '.'                   { sL1n $1 $! mkUnqual tcClsName (fsLit ".") }
 
@@ -4170,7 +4171,7 @@ consym :: { LocatedN RdrName }
         : CONSYM              { sL1n $1 $ mkUnqual dataName (getCONSYM $1) }
 
         -- ':' means only list cons
-        | ':'                { sL1n $1 $ consDataCon_RDR }
+        | ':'                { sL1n $1 $ nameRdrName consDataConName }
 
 
 -----------------------------------------------------------------------------

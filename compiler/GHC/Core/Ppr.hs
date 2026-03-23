@@ -30,9 +30,10 @@ import GHC.Prelude
 import GHC.Core
 import GHC.Core.Stats (CoreStats(..), exprStats)
 import GHC.Data.FastString (LexicalFastString(..), fastStringToShortByteString)
+
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Literal( Literal, pprLiteral )
-import GHC.Types.Name( getOccFS, getSrcSpan, pprInfixName, pprPrefixName )
+import GHC.Types.Name( getOccFS, getSrcSpan, pprInfixName, pprPrefixName, pprKnownKey )
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -794,8 +795,8 @@ pprRules :: [CoreRule] -> SDoc
 pprRules rules = vcat (map pprRule rules)
 
 pprRule :: CoreRule -> SDoc
-pprRule (BuiltinRule { ru_fn = fn, ru_name = name})
-  = text "Built in rule for" <+> ppr fn <> colon <+> doubleQuotes (ppr name)
+pprRule (BuiltinRule { ru_key = key, ru_name = name})
+  = text "Built in rule for" <+> pprKnownKey key <> colon <+> doubleQuotes (ppr name)
 
 pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
                 ru_bndrs = tpl_vars, ru_args = tpl_args,

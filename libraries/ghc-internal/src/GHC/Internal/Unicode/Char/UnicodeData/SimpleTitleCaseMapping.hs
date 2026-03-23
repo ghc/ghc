@@ -16,7 +16,7 @@ module GHC.Internal.Unicode.Char.UnicodeData.SimpleTitleCaseMapping
 (toSimpleTitleCase)
 where
 
-import GHC.Internal.Types (Char)
+import GHC.Internal.Base
 
 {-# NOINLINE toSimpleTitleCase #-}
 toSimpleTitleCase :: Char -> Char

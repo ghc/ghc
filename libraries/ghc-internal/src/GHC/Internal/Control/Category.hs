@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
+
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Category may never fire
     -- e.g. identity/left, identity/right, association;  see #10528
@@ -20,10 +21,11 @@
 
 module GHC.Internal.Control.Category where
 
-import qualified GHC.Internal.Base (id,(.))
+import qualified GHC.Internal.Base
 import GHC.Internal.Data.Type.Coercion
 import GHC.Internal.Data.Type.Equality
 import GHC.Internal.Data.Coerce (coerce)
+import qualified GHC.Internal.Base as Rebindable
 
 infixr 9 .
 infixr 1 >>>, <<<

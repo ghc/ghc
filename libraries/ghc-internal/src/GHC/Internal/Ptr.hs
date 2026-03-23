@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, RoleAnnotations #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_HADDOCK not-home #-}
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -27,14 +28,12 @@ module GHC.Internal.Ptr (
 
     ) where
 
-import GHC.Internal.Base ((++), (.))
-import GHC.Internal.Classes ( Eq, Ord )
+import GHC.Internal.Base
 import GHC.Internal.Prim (
       Addr#, addr2Int#, coerce, int2Word#, minusAddr#, nullAddr#, plusAddr#,
       remAddr#, (-#),
    )
 import GHC.Internal.Show
-import GHC.Internal.Types ( Int(..) )
 import GHC.Internal.Num
 import GHC.Internal.List ( length, replicate )
 import GHC.Internal.Numeric          ( showHex )

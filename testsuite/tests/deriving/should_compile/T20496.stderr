@@ -29,7 +29,7 @@ rnd
   instance Foldable T where
     foldr f z (MkT a1) = f a1 z
     foldMap f (MkT a1) = f a1
-    null (MkT _) = False
+    null (MkT {}) = False
   
   instance Traversable T where
     traverse f (MkT a1) = fmap (\ b1 -> MkT b1) (f a1)

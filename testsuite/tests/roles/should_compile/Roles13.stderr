@@ -74,7 +74,7 @@ Roles13.$tcAge
       Roles13.$trModule
       $tcAge2
       0#
-      GHC.Internal.Types.krep$*
+      GHC.Internal.Types.krepStar
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep2 :: GHC.Internal.Types.KindRep
@@ -130,7 +130,7 @@ Roles13.$tcWrap
       Roles13.$trModule
       $tcWrap2
       0#
-      GHC.Internal.Types.krep$*Arr*
+      GHC.Internal.Types.krepStarArr
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 $krep4 :: [GHC.Internal.Types.KindRep]

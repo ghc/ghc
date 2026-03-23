@@ -44,8 +44,8 @@ import GHC.Core.Predicate
 import GHC.Core.Unify (tcUnifyTy)
 
 import GHC.Data.Pair
-import GHC.Builtin.Names
-import GHC.Builtin.Types (mkConstraintTupleTy, typeToTypeKind)
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Types (mkConstraintTupleTy, typeToTypeKind)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -346,7 +346,7 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
            -> assert (tyConTyVars rep_tc `lengthExceeds` 0) $
               -- Generic1 has a single kind variable
               assert (cls_tys `lengthIs` 1) $
-              do { functorClass <- lift $ tcLookupClass functorClassName
+              do { functorClass <- lift $ tcLookupKnownKeyClass functorClassKey
                  ; pure $ con_arg_constraints
                         $ get_gen1_constraints functorClass }
 

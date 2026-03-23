@@ -31,7 +31,6 @@ import GHC.Core.Coercion
 import GHC.Core.Multiplicity
 
 import GHC.Types.Id
-import GHC.Types.Id.Make
 import GHC.Types.InlinePragma ( ActivationX(NeverActive) )
 import GHC.Types.Literal
 import GHC.Types.ForeignStubs
@@ -54,9 +53,12 @@ import GHC.JS.Ppr
 import GHC.Driver.DynFlags
 import GHC.Driver.Config
 
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Names
+import GHC.Builtin.WiredIn.Types
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
+import GHC.Builtin.WiredIn.Ids( realWorldPrimId )
+
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
@@ -276,12 +278,12 @@ dsJsFExportDynamic id co0 cconv = do
         -- Construct the label based on the passed id, don't use names
         -- depending on Unique. See #13807 and Note [Unique Determinism].
     cback <- newSysLocalDs scaled_arg_ty
-    newStablePtrId <- dsLookupGlobalId newStablePtrName
-    stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
+    newStablePtrId <- dsLookupKnownOccId newStablePtrIdOcc
+    stable_ptr_tycon <- dsLookupKnownKeyTyCon stablePtrTyConKey
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
-    bindIOId <- dsLookupGlobalId bindIOName
+    bindIOId <- dsLookupKnownOccId bindIOIdOcc
     stbl_value <- newSysLocalMDs stable_ptr_ty
     (h_code, c_code, typestring) <- dsJsFExport id (mkRepReflCo export_ty) fe_nm cconv ExportIsDynamic
     let

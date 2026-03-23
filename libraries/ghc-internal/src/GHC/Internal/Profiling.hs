@@ -13,7 +13,7 @@ module GHC.Internal.Profiling ( -- * Cost Centre Profiling
                      , requestTickyCounterSamples
                      )where
 
-import GHC.Internal.Types (IO)
+import GHC.Internal.Base
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 import GHC.Internal.Tuple ()

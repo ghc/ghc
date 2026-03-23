@@ -66,8 +66,8 @@ import GHC.Iface.Env
 import GHC.Utils.Misc
 import GHC.Types.Var.Set
 import GHC.Types.Basic ( Boxity(..) )
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types
+import GHC.Builtin.WiredIn.Prim
+import GHC.Builtin.WiredIn.Types
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable as Ppr

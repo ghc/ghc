@@ -179,8 +179,9 @@ instance Outputable IfaceImportLevel where
 -- a dependencies information for the module being compiled.
 --
 -- The fourth argument is a list of plugin modules.
-mkDependencies :: HomeUnit -> Module -> ImportAvails -> [Module] -> Dependencies
-mkDependencies home_unit mod imports plugin_mods =
+-- The fifth argument is the unit-id of GHC.Essentials, unless -frebindable-known-names.
+mkDependencies :: HomeUnit -> Module -> ImportAvails -> [Module] -> Maybe UnitId -> Dependencies
+mkDependencies home_unit mod imports plugin_mods messentials_pkg =
   let (home_plugins, external_plugins) = partition (isHomeUnit home_unit . moduleUnit) plugin_mods
       plugin_units = Set.fromList (map (toUnitId . moduleUnit) external_plugins)
       all_direct_mods = foldr (\(s, mn) m -> extendInstalledModuleEnv m mn (s, (GWIB (moduleName mn) NotBoot)))
@@ -207,7 +208,14 @@ mkDependencies home_unit mod imports plugin_mods =
             -- We must also remove self-references from imp_orphs. See
             -- Note [Module self-dependency]
 
-      direct_pkgs = Set.map (\(lvl, uid) -> (IfaceImportLevel lvl, uid)) (imp_dep_direct_pkgs imports)
+      direct_pkgs = add_essentials_pkg $
+        Set.map (\(lvl, uid) -> (IfaceImportLevel lvl, uid)) (imp_dep_direct_pkgs imports)
+
+      -- Add the GHC.Essentials package to direct deps unless -frebindable-known-names is on
+      -- (the modgraph has edges to GHC.Essentials similarly, see `getImportEdges` in GHC.Parser.Header)
+      add_essentials_pkg = case messentials_pkg of
+        Nothing             -> id
+        Just essentials_uid -> Set.insert (IfaceImportLevel NormalLevel, essentials_uid)
 
       -- Set the packages required to be Safe according to Safe Haskell.
       -- See Note [Tracking Trust Transitively] in GHC.Rename.Names

@@ -1,4 +1,6 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE MagicHash #-}
 
 -- |
 --
@@ -34,6 +36,11 @@ import Data.Maybe (Maybe (Nothing))
 import Data.String (String)
 import Data.Eq ((/=))
 import System.IO (IO, hPutStrLn, stderr)
+#if __GLASGOW_HASKELL__ >= 1001
+import GHC.Internal.Num as Rebindable( Num, fromInteger ) -- For known-key names
+import qualified GHC.Internal.Stack.Types as Rebindable (SrcLoc(..), pushCallStack, emptyCallStack)
+import qualified GHC.Internal.Types as Rebindable (unpackCString#, unpackCStringUtf8#)
+#endif
 
 -- ---------------------------------------------------------------------------
 -- exitWith

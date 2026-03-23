@@ -58,7 +58,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type( partitionInvisibleTypes, coreView, rewriterView )
 
-import GHC.Builtin.Types.Prim( funTyFlagTyCon )
+import GHC.Builtin.WiredIn.Prim( funTyFlagTyCon )
 
 import Data.Monoid as DM ( Any(..) )
 import GHC.Core.TyCo.Rep

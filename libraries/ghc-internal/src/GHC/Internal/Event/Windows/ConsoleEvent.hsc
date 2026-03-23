@@ -24,17 +24,21 @@ module GHC.Internal.Event.Windows.ConsoleEvent (
 ) where
 
 import GHC.Internal.Base (return, ($))
+import qualified GHC.Internal.Base as Rebindable
 import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.Conc.Sync
 import GHC.Internal.Data.Maybe (Maybe(..))
 import GHC.Internal.Enum (Enum)
+import qualified GHC.Internal.Enum as Rebindable
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.IO (IO, unsafePerformIO)
 import GHC.Internal.MVar
 import GHC.Internal.Num (Num(..))
 import GHC.Internal.Read (Read)
+import qualified GHC.Internal.Read as Rebindable
 import GHC.Internal.Word (Word32)
 import GHC.Internal.Show (Show)
+import qualified GHC.Internal.Show as Rebindable
 
 #include <windows.h>
 

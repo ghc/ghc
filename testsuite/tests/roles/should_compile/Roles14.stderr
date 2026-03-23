@@ -20,7 +20,7 @@ $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Internal.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepFun
-      GHC.Internal.Types.krep$* GHC.Internal.Types.krep$Constraint
+      GHC.Internal.Types.krepStar GHC.Internal.Types.krepConstraint
 $krep [InlPrag=[~]]
   = GHC.Internal.Types.KindRepTyConApp Roles12.$tcC2 ((:) $krep [])
 Roles12.$trModule [InlPrag=[~]]

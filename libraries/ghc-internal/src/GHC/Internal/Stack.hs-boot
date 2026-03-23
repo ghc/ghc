@@ -1,9 +1,9 @@
-{-# LANGUAGE NoImplicitPrelude, RankNTypes #-}
+{-# LANGUAGE NoImplicitPrelude, RankNTypes, MagicHash #-}
 
 module GHC.Internal.Stack where
 
-import GHC.Internal.Base (String)
-import GHC.Internal.Stack.Types (HasCallStack, CallStack, SrcLoc)
+import GHC.Internal.Base
+import GHC.Internal.Stack.Types
 
 prettyCallStackLines :: CallStack -> [String]
 prettyCallStack :: CallStack -> String

@@ -14,6 +14,10 @@ import Data.Ratio
 import GHC.Internal.Foreign.C.Types
 import System.CPUTime.Utils
 
+#if !HAVE_TIMES
+import GHC.Essentials
+#endif
+
 -- for struct tms
 #if HAVE_SYS_TIMES_H
 #include <sys/times.h>

@@ -111,7 +111,7 @@ import GHC.Data.Bool
 import GHC.Data.EnumSet (EnumSet)
 import GHC.Data.Maybe
 import GHC.Data.OsPath ( OsPath )
-import GHC.Builtin.Names ( mAIN_NAME )
+import GHC.Builtin.Modules ( mAIN_NAME )
 import GHC.Driver.Backend
 import GHC.Driver.Flags
 import GHC.Driver.IncludeSpecs
@@ -119,6 +119,7 @@ import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Plugins.External
 import GHC.Settings
 import GHC.Settings.Constants
+import GHC.Types.Name.Occurrence
 import GHC.Types.Basic ( IntWithInf, treatZeroAsInf )
 import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.ProfAuto
@@ -378,6 +379,8 @@ data DynFlags = DynFlags {
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
+  -- Known-key exclusions
+  knownKeyExclusions :: [OccName],
 
   -- hsc dynamic flags
   dumpFlags             :: EnumSet DumpFlag,
@@ -698,6 +701,7 @@ defaultDynFlags mySettings =
         -- end of ghc -M values
         ghcVersionFile = Nothing,
         haddockOptions = Nothing,
+        knownKeyExclusions = [],
         dumpFlags = EnumSet.empty,
         generalFlags = EnumSet.fromList (defaultFlags mySettings),
         warningFlags = EnumSet.fromList standardWarnings,

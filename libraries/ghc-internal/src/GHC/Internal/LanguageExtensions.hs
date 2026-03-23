@@ -15,10 +15,11 @@ module GHC.Internal.LanguageExtensions ( Extension(..) ) where
 import Prelude -- See note [Why do we import Prelude here?]
 import GHC.Generics (Generic)
 #else
-import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Base
 import GHC.Internal.Show
 import GHC.Internal.Generics
-import GHC.Internal.Enum
+import GHC.Internal.Enum  -- For deriving
+import GHC.Internal.Num   -- For deriving
 #endif
 
 -- | The language extensions known to GHC.

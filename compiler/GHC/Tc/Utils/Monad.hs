@@ -56,7 +56,7 @@ module GHC.Tc.Utils.Monad(
   debugTc,
 
   -- * Typechecker global environment
-  getIsGHCi, getGHCiMonad, getInteractivePrintName,
+  getIsGHCi,
   tcHscSource, tcIsHsBootOrSig, tcIsHsig, tcSelfBootInfo, getGlobalRdrEnv,
   getRdrEnvs, getImports,
   getFixityEnv, extendFixityEnv,
@@ -168,8 +168,8 @@ module GHC.Tc.Utils.Monad(
 import GHC.Prelude
 
 
-import GHC.Builtin.Names
-import GHC.Builtin.Types( unusedTypeTyCon )
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.WiredIn.Types( unusedTypeTyCon )
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Hole.Plugin ( HoleFitPlugin, HoleFitPluginR (..) )
@@ -405,7 +405,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_default            = emptyDefaultEnv
           , tcg_default_exports    = emptyDefaultEnv
           , tcg_type_env           = emptyNameEnv
-          , tcg_type_env_var       = hsc_type_env_vars hsc_env
+          , tcg_knot_vars          = hsc_type_env_vars hsc_env
           , tcg_inst_env           = emptyInstEnv
           , tcg_fam_inst_env       = emptyFamInstEnv
           , tcg_ann_env            = emptyAnnEnv
@@ -1190,12 +1190,6 @@ traceOptIf flag doc
 getIsGHCi :: TcRn Bool
 getIsGHCi = do { mod <- getModule
                ; return (isInteractiveModule mod) }
-
-getGHCiMonad :: TcRn Name
-getGHCiMonad = do { hsc <- getTopEnv; return (ic_monad $ hsc_IC hsc) }
-
-getInteractivePrintName :: TcRn Name
-getInteractivePrintName = do { hsc <- getTopEnv; return (ic_int_print $ hsc_IC hsc) }
 
 tcIsHsBootOrSig :: TcRn Bool
 tcIsHsBootOrSig = isHsBootOrSig <$> tcHscSource
@@ -2263,7 +2257,7 @@ newUnusedType :: Name -> Kind -> TcM Type
 -- Return a type (UnusedType @k sym_n), where sym
 -- is a name and n is a fresh Integer.
 -- Recall  UnusedType :: forall k. Symbol -> k
--- See Note [The types Any and UnusedType] in GHC.Builtin.Types, wrinkle (Any6)
+-- See Note [The types Any and UnusedType] in GHC.Builtin.WiredIn.Types, wrinkle (Any6)
 newUnusedType name kind
   = do { env <- getGblEnv
        ; let zany_n_var = tcg_zany_n env
@@ -2579,18 +2573,16 @@ initIfaceTcRn thing_inside
         ; hsc_env <- getTopEnv
           -- bangs to avoid leaking the envs (#19356)
         ; let !mhome_unit = hsc_home_unit_maybe hsc_env
-              !knot_vars = tcg_type_env_var tcg_env
-              -- When we are instantiating a signature, we DEFINITELY
-              -- do not want to knot tie.
+              !knot_vars = tcg_knot_vars tcg_env
+              -- When we are instantiating a signature,
+              -- we DEFINITELY do not want to knot tie.
               is_instantiate = fromMaybe False (isHomeUnitInstantiating <$> mhome_unit)
-        ; let { if_env = IfGblEnv {
-                            if_doc = text "initIfaceTcRn",
-                            if_rec_types =
-                                if is_instantiate
-                                    then emptyKnotVars
-                                    else readTcRef <$> knot_vars
-                            }
-                         }
+
+              if_env = IfGblEnv { if_doc = text "initIfaceTcRn"
+                                , if_rec_types = if is_instantiate
+                                                 then emptyKnotVars
+                                                 else readTcRef <$> knot_vars }
+
         ; setEnvs (if_env, ()) thing_inside }
 
 -- | 'initIfaceLoad' can be used when there's no chance that the action will
@@ -2639,7 +2631,7 @@ getIfModule :: IfL Module
 getIfModule = do { env <- getLclEnv; return (if_mod env) }
 
 --------------------
-failIfM :: SDoc -> IfL a
+failIfM :: HasDebugCallStack => SDoc -> IfL a
 -- The Iface monad doesn't have a place to accumulate errors, so we
 -- just fall over fast if one happens; it "shouldn't happen".
 -- We use IfL here so that we can get context info out of the local env
