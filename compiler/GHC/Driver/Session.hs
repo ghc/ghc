@@ -3817,15 +3817,6 @@ makeDynFlagsConsistent dflags
     = loop (gopt_set dflags Opt_PIC)
            "Enabling -fPIC as it is always on for this platform"
 
- | backendForcesOptimization0 (backend dflags)
- , gopt Opt_UnoptimizedCoreForInterpreter dflags
- , let (dflags', changed) = updOptLevelChanged 0 dflags
- , changed
-    = loop dflags' $
-      "Ignoring optimization flags since they are experimental for the " ++
-      backendDescription (backend dflags) ++
-      ". Pass -fno-unoptimized-core-for-interpreter to enable this feature."
-
  | LinkInMemory <- ghcLink dflags
  , not (gopt Opt_ExternalInterpreter dflags)
  , hostIsProfiled

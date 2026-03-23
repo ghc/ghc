@@ -1734,10 +1734,10 @@ decision-making code depends on the code’s form.
 -  If your decision-making is driven by an equality or inequality
    predicate, an equivalent predicate may already be defined in module
    ``GHC.Driver.Backend``. For example, if your client wants to be
-   sure that optimization levels above ``-O0`` are permitted, it might
-   have originally compared ``backend /= Interpreter``. But now there is
+   sure that breakpoints are supported, it might
+   have originally compared ``backend == Interpreter``. But now there is
    a predicate for that: it is
-   ``not (backendForcesOptimization0 backend)``.
+   ``backendSupportsBreakpoints backend``.
 
    If the predicate you want is not already defined, you will have to
    fall back on the more general strategy defined below.
