@@ -357,15 +357,14 @@ addImmediateSuccessor weights node follower cfg
 -- | Adds a new edge, overwrites existing edges if present
 addEdge :: BlockId -> BlockId -> EdgeInfo -> CFG -> CFG
 addEdge from to info cfg =
-    mapAlter addFromToEdge from $
-    mapAlter addDestNode to cfg
+    mapUpsert addFromToEdge from $
+    mapUpsert addDestNode to cfg
     where
         -- Simply insert the edge into the edge list.
-        addFromToEdge Nothing = Just $ mapSingleton to info
-        addFromToEdge (Just wm) = Just $ mapInsert to info wm
+        addFromToEdge Nothing = mapSingleton to info
+        addFromToEdge (Just wm) = mapInsert to info wm
         -- We must add the destination node explicitly
-        addDestNode Nothing = Just $ mapEmpty
-        addDestNode n@(Just _) = n
+        addDestNode = fromMaybe mapEmpty
 
 
 -- | Adds a edge with the given weight to the cfg
@@ -610,11 +609,11 @@ getCfg platform weights graph =
     edgelessCfg = mapFromList $ zip (map G.entryLabel blocks) (repeat mapEmpty)
     insertEdge :: CFG -> ((BlockId,BlockId),EdgeInfo) -> CFG
     insertEdge m ((from,to),weight) =
-      mapAlter f from m
+      mapUpsert f from m
         where
-          f :: Maybe (LabelMap EdgeInfo) -> Maybe (LabelMap EdgeInfo)
-          f Nothing = Just $ mapSingleton to weight
-          f (Just destMap) = Just $ mapInsert to weight destMap
+          f :: Maybe (LabelMap EdgeInfo) -> LabelMap EdgeInfo
+          f Nothing = mapSingleton to weight
+          f (Just destMap) = mapInsert to weight destMap
     getBlockEdges :: CmmBlock -> [((BlockId,BlockId),EdgeInfo)]
     getBlockEdges block =
       case branch of

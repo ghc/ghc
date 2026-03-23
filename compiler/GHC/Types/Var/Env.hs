@@ -15,7 +15,7 @@ module GHC.Types.Var.Env (
         strictPlusVarEnv, plusVarEnv, plusVarEnv_C,
         strictPlusVarEnv_C, strictPlusVarEnv_C_Directly,
         plusVarEnv_CD, plusMaybeVarEnv_C,
-        plusVarEnvList, alterVarEnv,
+        plusVarEnvList, alterVarEnv, upsertVarEnv,
         delVarEnvList, delVarEnv,
         minusVarEnv,
         lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
@@ -40,7 +40,7 @@ module GHC.Types.Var.Env (
         isEmptyDVarEnv, foldDVarEnv, nonDetStrictFoldDVarEnv,
         mapDVarEnv, filterDVarEnv,
         modifyDVarEnv,
-        alterDVarEnv,
+        alterDVarEnv, upsertDVarEnv,
         plusDVarEnv, plusDVarEnv_C,
         unitDVarEnv,
         delDVarEnv,
@@ -509,6 +509,7 @@ mkVarEnv_Directly :: [(Unique, a)] -> VarEnv a
 zipVarEnv         :: [Var] -> [a] -> VarEnv a
 unitVarEnv        :: Var -> a -> VarEnv a
 alterVarEnv       :: (Maybe a -> Maybe a) -> VarEnv a -> Var -> VarEnv a
+upsertVarEnv      :: (Maybe a -> a) -> VarEnv a -> Var -> VarEnv a
 extendVarEnv      :: VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_C    :: (a->a->a) -> VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_Acc  :: (a->b->b) -> (a->b) -> VarEnv b -> Var -> a -> VarEnv b
@@ -548,6 +549,7 @@ elemVarEnv       = elemUFM
 elemVarEnvByKey  = elemUFM_Directly
 disjointVarEnv   = disjointUFM
 alterVarEnv      = alterUFM
+upsertVarEnv     = upsertUFM
 extendVarEnv     = addToUFM
 extendVarEnv_C   = addToUFM_C
 extendVarEnv_Acc = addToUFM_Acc
@@ -670,6 +672,9 @@ mapMaybeDVarEnv f = mapMaybeUDFM f
 
 alterDVarEnv :: (Maybe a -> Maybe a) -> DVarEnv a -> Var -> DVarEnv a
 alterDVarEnv = alterUDFM
+
+upsertDVarEnv :: (Maybe a -> a) -> DVarEnv a -> Var -> DVarEnv a
+upsertDVarEnv = upsertUDFM
 
 plusDVarEnv :: DVarEnv a -> DVarEnv a -> DVarEnv a
 plusDVarEnv = plusUDFM

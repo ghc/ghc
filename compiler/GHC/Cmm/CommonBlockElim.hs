@@ -307,6 +307,6 @@ groupByInt :: (a -> Int) -> [a] -> [[a]]
 groupByInt f xs = nonDetEltsUFM $ List.foldl' go emptyUFM xs
    -- See Note [Unique Determinism and code generation]
   where
-    go m x = alterUFM addEntry m (f x)
+    go m x = strictUpsertUFM addEntry m (f x)
       where
-        addEntry xs = Just $! maybe [x] (x:) xs
+        addEntry = maybe [x] (x:)

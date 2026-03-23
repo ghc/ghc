@@ -4297,7 +4297,7 @@ unconditional-inlining for join points.
    postInlineUnconditionally is primarily to push allocation into cold
    branches; but a join point doesn't allocate, so that's a non-motivation.
 
-(DJ2) In mkDupableAlt and mkDupableStrictBind, generate an alterative for /all/
+(DJ2) In mkDupableAlt and mkDupableStrictBind, generate an alternative for /all/
    alternatives, /except/ for ones that will definitely inline unconditionally
    straight away.  (In that case it's silly to make a join point in the first
    place; it just takes an extra Simplifier iteration to undo.)  This choice is

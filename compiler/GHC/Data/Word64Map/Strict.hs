@@ -109,6 +109,7 @@ module GHC.Data.Word64Map.Strict (
     , adjustWithKey
     , update
     , updateWithKey
+    , upsert
     , updateLookupWithKey
     , alter
     , alterF

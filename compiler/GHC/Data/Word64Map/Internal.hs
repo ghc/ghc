@@ -98,6 +98,7 @@ module GHC.Data.Word64Map.Internal (
     , adjustWithKey
     , update
     , updateWithKey
+    , upsert
     , updateLookupWithKey
     , alter
     , alterLookup
@@ -940,6 +941,24 @@ updateWithKey f k t@(Tip ky y)
                       Nothing -> Nil
   | otherwise     = t
 updateWithKey _ _ Nil = Nil
+
+-- | \(O(\min(n,W))\). Update the value at a key or insert a value if the key is
+-- not in the map.
+--
+-- @
+-- let inc = maybe 1 (+1)
+-- upsert inc 100 (fromList [(100,1),(300,2)]) == fromList [(100,2),(300,2)]
+-- upsert inc 200 (fromList [(100,1),(300,2)]) == fromList [(100,1),(200,1),(300,2)]
+-- @
+upsert :: (Maybe a -> a) -> Key -> Word64Map a -> Word64Map a
+upsert f !k t@(Bin p m l r)
+  | nomatch k p m = link k (Tip k (f Nothing)) p t
+  | zero k m = Bin p m (upsert f k l) r
+  | otherwise = Bin p m l (upsert f k r)
+upsert f !k t@(Tip ky y)
+  | k == ky = Tip ky (f (Just y))
+  | otherwise = link k (Tip k (f Nothing)) ky t
+upsert f !k Nil = Tip k (f Nothing)
 
 -- | \(O(\min(n,W))\). Lookup and update.
 -- The function returns original value, if it is updated.

@@ -32,6 +32,7 @@ module GHC.Types.Unique.DFM (
         delListFromUDFM,
         adjustUDFM,
         adjustUDFM_Directly,
+        upsertUDFM,
         alterUDFM,
         alterUDFM_L,
         mapUDFM,
@@ -450,6 +451,23 @@ alterUDFM f (UDFM m i) k =
   alterf (Just (TaggedVal v _)) = inject $ f (Just v)
   inject Nothing = Nothing
   inject (Just v) = Just $ TaggedVal v i
+
+-- | The expression (@'upsertUDFM' f map k@) updates the value at @k@ or inserts
+-- a new value if @k@ is absent.
+--
+-- Like 'alterUDFM', updating an existing entry assigns it the current tag, so it
+-- becomes the newest element in deterministic iteration order.
+upsertUDFM
+  :: Uniquable key
+  => (Maybe elt -> elt)  -- ^ How to adjust the element
+  -> UniqDFM key elt     -- ^ Old 'UniqDFM'
+  -> key                 -- ^ @key@ of the element to adjust
+  -> UniqDFM key elt     -- ^ New element at @key@ and modified 'UniqDFM'
+upsertUDFM f (UDFM m i) k =
+  UDFM (MS.upsert upsertf (getKey $ getUnique k) m) (i + 1)
+  where
+    upsertf Nothing = TaggedVal (f Nothing) i
+    upsertf (Just (TaggedVal v _)) = TaggedVal (f (Just v)) i
 
 -- | The expression (@'alterUDFM_L' f map k@) alters value @x@ at @k@, or absence
 -- thereof and returns the new element at @k@ if there is any.

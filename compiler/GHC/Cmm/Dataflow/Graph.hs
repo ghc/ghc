@@ -56,10 +56,10 @@ bodyToBlockList body = mapElems body
 addBlock
     :: (NonLocal block, HasDebugCallStack)
     => block C C -> LabelMap (block C C) -> LabelMap (block C C)
-addBlock block body = mapAlter add lbl body
+addBlock block body = mapUpsert add lbl body
   where
     lbl = entryLabel block
-    add Nothing = Just block
+    add Nothing = block
     add _ = error $ "duplicate label " ++ show lbl ++ " in graph"
 
 

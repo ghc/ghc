@@ -19,7 +19,7 @@ module GHC.Types.Name.Env (
         filterNameEnv, anyNameEnv,
         mapMaybeNameEnv,
         extendNameEnvListWith,
-        plusNameEnv, plusNameEnv_C, plusNameEnv_CD, plusNameEnv_CD2, alterNameEnv,
+        plusNameEnv, plusNameEnv_C, plusNameEnv_CD, plusNameEnv_CD2, alterNameEnv, upsertNameEnv,
         plusNameEnvList, plusNameEnvListWith,
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
         elemNameEnv, mapNameEnv, disjointNameEnv,
@@ -32,7 +32,10 @@ module GHC.Types.Name.Env (
         lookupDNameEnv,
         delFromDNameEnv, filterDNameEnv,
         mapDNameEnv,
-        adjustDNameEnv, alterDNameEnv, extendDNameEnv,
+        adjustDNameEnv,
+        upsertDNameEnv,
+        alterDNameEnv,
+        extendDNameEnv,
         eltsDNameEnv, extendDNameEnv_C,
         plusDNameEnv_C,
         foldDNameEnv,
@@ -107,6 +110,7 @@ mkNameEnvWith      :: (a -> Name) -> [a] -> NameEnv a
 fromUniqMap        :: UniqMap Name a -> NameEnv a
 nonDetNameEnvElts  :: NameEnv a -> [a]
 alterNameEnv       :: (Maybe a-> Maybe a) -> NameEnv a -> Name -> NameEnv a
+upsertNameEnv      :: (Maybe a -> a) -> NameEnv a -> Name -> NameEnv a
 extendNameEnv_C    :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
 extendNameEnv_Acc  :: (a->b->b) -> (a->b) -> NameEnv b -> Name -> a -> NameEnv b
 extendNameEnv      :: NameEnv a -> Name -> a -> NameEnv a
@@ -141,6 +145,7 @@ extendNameEnvList x l = addListToUFM x l
 extendNameEnvListWith f x l = addListToUFM x (map (\a -> (f a, a)) l)
 lookupNameEnv x y     = lookupUFM x y
 alterNameEnv          = alterUFM
+upsertNameEnv         = upsertUFM
 mkNameEnv     l       = listToUFM l
 mkNameEnvWith f       = mkNameEnv . map (\a -> (f a, a))
 fromUniqMap           = mapUFM snd . getUniqMap
@@ -197,6 +202,9 @@ adjustDNameEnv = adjustUDFM
 
 alterDNameEnv :: (Maybe a -> Maybe a) -> DNameEnv a -> Name -> DNameEnv a
 alterDNameEnv = alterUDFM
+
+upsertDNameEnv :: (Maybe a -> a) -> DNameEnv a -> Name -> DNameEnv a
+upsertDNameEnv = upsertUDFM
 
 extendDNameEnv :: DNameEnv a -> Name -> a -> DNameEnv a
 extendDNameEnv = addToUDFM

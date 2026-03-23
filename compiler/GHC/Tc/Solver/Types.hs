@@ -89,15 +89,15 @@ delTcApp :: TcAppMap a -> TyCon -> [Type] -> TcAppMap a
 delTcApp m tc tys = adjustDTyConEnv (deleteTM tys) m tc
 
 insertTcApp :: TcAppMap a -> TyCon -> [Type] -> a -> TcAppMap a
-insertTcApp m tc tys ct = alterDTyConEnv alter_tm m tc
+insertTcApp m tc tys ct = upsertDTyConEnv alter_tm m tc
   where
-    alter_tm mb_tm = Just (insertTM tys ct (mb_tm `orElse` emptyTM))
+    alter_tm mb_tm = insertTM tys ct (mb_tm `orElse` emptyTM)
 
 alterTcApp :: forall a. TcAppMap a -> TyCon -> [Type] -> XT a -> TcAppMap a
-alterTcApp m tc tys upd = alterDTyConEnv alter_tm m tc
+alterTcApp m tc tys upd = upsertDTyConEnv alter_tm m tc
   where
-    alter_tm :: Maybe (ListMap LooseTypeMap a) -> Maybe (ListMap LooseTypeMap a)
-    alter_tm m_elt = Just (alterTM tys upd (m_elt `orElse` emptyTM))
+    alter_tm :: Maybe (ListMap LooseTypeMap a) -> ListMap LooseTypeMap a
+    alter_tm m_elt = alterTM tys upd (m_elt `orElse` emptyTM)
 
 filterTcAppMap :: forall a. (a -> Bool) -> TcAppMap a -> TcAppMap a
 filterTcAppMap f m = mapMaybeDTyConEnv one_tycon m
