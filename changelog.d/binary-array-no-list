@@ -1,0 +1,13 @@
+section: compiler
+synopsis: Reduce allocations when (de)serialising `Array` in the `ghc` library.
+issues: #27109
+mrs: !15805
+
+description: {
+  The `ghc` library's `Binary` instance for `Array` was changed to
+  avoid allocating an intermediate list and to omit a redundant length
+  field during (de)serialisation.
+
+  This should only affect the `ghc` library's (de)serialisation code paths,
+  primarily when parsing HIE files and bytecode objects.
+}

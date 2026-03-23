@@ -142,6 +142,8 @@ import Control.DeepSeq
 import Control.Monad            ( when, (<$!>), unless, forM_, void )
 import Foreign hiding (bit, setBit, clearBit, shiftL, shiftR, void)
 import Data.Array
+import Data.Array.Base (unsafeFreezeIOArray)
+import Data.Array.IArray (traverseArray_)
 import Data.Array.IO
 import Data.Array.Unsafe
 import qualified Data.Binary as Binary
@@ -970,11 +972,12 @@ instance Binary a => Binary (NonEmpty a) where
 instance (Ix a, Binary a, Binary b) => Binary (Array a b) where
     put_ bh arr = do
         put_ bh $ bounds arr
-        put_ bh $ elems arr
+        traverseArray_ (put_ bh) arr
+
     get bh = do
-        bounds <- get bh
-        xs <- get bh
-        return $ listArray bounds xs
+        (l, u) <- get bh
+        marr <- newGenArray (l, u) $ \_ -> get bh
+        unsafeFreezeIOArray marr
 
 instance Binary a => Binary (SmallArray a) where
     put_ bh sa = do
