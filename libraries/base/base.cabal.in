@@ -33,6 +33,10 @@ Library
         ghc-internal == @ProjectVersionForLib@.*,
         ghc-prim,
 
+    -- Set -frebindable-known-key-names,
+    -- since GHC.KnownKeyNames isn't available yet
+    ghc-options: -frebindable-known-key-names
+
     exposed-modules:
           Control.Applicative
         , Control.Concurrent
@@ -213,6 +217,7 @@ Library
         , GHC.Integer.Logarithms
         , GHC.IsList
         , GHC.Ix
+        , GHC.KnownKeyNames
         , GHC.List
         , GHC.Maybe
         , GHC.MVar

@@ -29,6 +29,7 @@ import GHC.Internal.IO.Handle.Lock.Common
 import GHC.Internal.IO.Handle.Types (Handle)
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Types (Bool(..), IO)
+import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 lockImpl :: Handle -> String -> LockMode -> Bool -> IO Bool
 lockImpl h ctx mode block = do

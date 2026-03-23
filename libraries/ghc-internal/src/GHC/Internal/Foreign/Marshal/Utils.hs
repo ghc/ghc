@@ -66,6 +66,7 @@ import GHC.Internal.Prim (
     word2Int#, word8ToWord#,
   )
 import GHC.Internal.Types ( Bool(..), Int(..), IO(..) )
+import GHC.Internal.Base( (>>=), (>>) )      -- For known-key names
 
 -- combined allocation and marshalling
 -- -----------------------------------

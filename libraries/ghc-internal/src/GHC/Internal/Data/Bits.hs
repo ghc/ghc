@@ -59,14 +59,14 @@ module GHC.Internal.Data.Bits (
   And(..), Ior(..), Xor(..), Iff(..)
  ) where
 
-import GHC.Internal.Base (Monoid(..), Semigroup(..), ($), (.))
+import GHC.Internal.Base
 import GHC.Internal.Bits
-import GHC.Internal.Classes (Eq)
 import GHC.Internal.Enum
 import qualified GHC.Internal.List as List
 import GHC.Internal.Read
 import GHC.Internal.Show
-import GHC.Internal.Types (Int)
+
+import GHC.Internal.Base( (>>), (>>=) )   -- For known-key names
 
 -- $setup
 -- >>> import Prelude

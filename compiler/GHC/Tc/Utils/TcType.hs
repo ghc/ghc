@@ -2453,7 +2453,7 @@ isTerminatingClass cls
     || cls `hasKey` typeableClassKey
             -- Typeable constraints are bigger than they appear due
             -- to kind polymorphism, but we can never get instance divergence this way
-    || cls `hasKey` unsatisfiableClassNameKey
+    || cls `hasKey` unsatisfiableClassKey
 
 allDistinctTyVars :: TyVarSet -> [KindOrType] -> Bool
 -- (allDistinctTyVars tvs tys) returns True if tys are

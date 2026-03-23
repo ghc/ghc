@@ -1,5 +1,8 @@
 {-# LANGUAGE Safe #-}
 
+{-# OPTIONS_GHC -fno-rebindable-known-key-names #-}
+    -- We import Prelude, hence GHC.KnownKeyNames is available
+
 -- |
 --
 -- Module      :  Data.Bool
@@ -24,7 +27,7 @@ module Data.Bool
      bool
      ) where
 
-import Prelude (Bool(..), (&&), (||), not, otherwise)
+import Prelude ( Bool(..), (&&), (||), not, otherwise )
 
 -- $setup
 -- >>> import Prelude

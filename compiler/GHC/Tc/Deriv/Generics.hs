@@ -23,6 +23,7 @@ import GHC.Prelude hiding (head, init, last, tail)
 import GHC.Hs
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Deriv.Generate
+import GHC.Tc.Deriv.RdrNames
 import GHC.Tc.Deriv.Functor
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Instantiate( newFamInst )
@@ -445,7 +446,7 @@ gen_Generic_fam_inst gk get_fixity loc
      ; mod <- getModule
      ; let tc_occ  = nameOccName (tyConName tycon)
            rep_occ = case gk of Gen0 -> mkGenR tc_occ; Gen1 -> mkGen1R tc_occ
-     ; rep_name <- newGlobalBinder mod rep_occ loc
+     ; rep_name <- newGlobalBinder mod rep_occ Nothing loc
 
      ; let tcv      = tyCoVarsOfTypeList inst_ty
            (tv, cv) = partition isTyVar tcv
@@ -889,9 +890,6 @@ mkM1_E e = nlHsVar m1DataCon_RDR `nlHsApp` e
 mkM1_P :: LPat GhcPs -> LPat GhcPs
 mkM1_P p = nlParPat $ m1DataCon_RDR `nlConPat` [p]
 
-nlHsCompose :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
-nlHsCompose x y = compose_RDR `nlHsApps` [x, y]
-
 -- | Variant of foldr for producing balanced lists
 foldBal :: (a -> a -> a) -> a -> [a] -> a
 {-# INLINE foldBal #-} -- inlined to produce specialised code for each op
@@ -1107,3 +1105,4 @@ If one uses threshold values higher what is found in
 pragmas tends to be at best useless and at worst lead to code size blowup
 without runtime performance improvements.
 -}
+

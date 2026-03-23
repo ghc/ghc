@@ -7,6 +7,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
+{-# OPTIONS_GHC -fno-rebindable-known-key-names #-}
+    -- We import Prelude, hence GHC.KnownKeyNames is available
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Compose
@@ -26,8 +29,8 @@ module Data.Functor.Compose (
     Compose(..),
   ) where
 
+import Prelude
 import Data.Functor.Classes
-
 import Control.Applicative
 import GHC.Internal.Data.Coerce (coerce)
 import GHC.Internal.Data.Data (Data)
@@ -36,7 +39,6 @@ import GHC.Internal.Data.Monoid (Sum(..), All(..), Any(..), Product(..))
 import GHC.Internal.Data.Type.Equality (TestEquality(..), (:~:)(..))
 import GHC.Generics (Generic, Generic1)
 import GHC.Internal.Text.Read (Read(..), ReadPrec, readListDefault, readListPrecDefault)
-import Prelude
 
 infixr 9 `Compose`
 

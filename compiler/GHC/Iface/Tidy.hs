@@ -1107,7 +1107,7 @@ tidyTopName mod name_cache maybe_ref occ_env id
         -- This is necessary because the byte-code generator the byte-code
         -- generator builds a system-wide Name->BCO symbol table.
 
-  | local  && external = do new_external_name <- allocateGlobalBinder name_cache mod occ' loc
+  | local  && external = do new_external_name <- allocateGlobalBinder name_cache mod occ' Nothing loc
                             return (occ_env', new_external_name)
         -- If we want to externalise a currently-local name, check
         -- whether we have already assigned a unique for it.

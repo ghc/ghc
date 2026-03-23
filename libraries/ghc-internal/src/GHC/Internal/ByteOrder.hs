@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -28,6 +29,8 @@ module GHC.Internal.ByteOrder
 import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.Enum
 import GHC.Internal.Text.Show
+import GHC.Internal.Num    -- For known-key names
+import GHC.Internal.Base   -- For known-key names
 
 -- | Byte ordering.
 data ByteOrder

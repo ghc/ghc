@@ -19,6 +19,7 @@ import GHC.Internal.Prim (
     Array#, ByteArray#, Int#, RealWorld, State#, indexArray#, (-#)
   )
 import GHC.Internal.Types ( Int(..), IO(..) )
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 data ByteArray = ByteArray ByteArray#
 

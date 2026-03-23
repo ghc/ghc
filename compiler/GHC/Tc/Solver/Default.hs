@@ -39,7 +39,7 @@ import GHC.Types.DefaultEnv ( ClassDefaults (..), defaultList )
 import GHC.Types.Unique.Set
 import GHC.Types.Id
 
-import GHC.Builtin.Utils
+import GHC.Builtin
 import GHC.Builtin.Names
 import GHC.Builtin.Types
 
@@ -308,7 +308,7 @@ unsatisfiableEvExpr (unsat_ev, given_msg) wtd_ty
          -- This avoids problems with circularity; where we are trying to look
          -- up the "unsatisfiable" Id while we are in the middle of typechecking it.
        ; if mod == gHC_INTERNAL_TYPEERROR then return (Var unsat_ev) else
-    do { unsatisfiable_id <- tcLookupId unsatisfiableIdName
+    do { unsatisfiable_id <- tcLookupKnownKeyId unsatisfiableIdKey
 
          -- See Note [Evidence terms from Unsatisfiable Givens]
          -- for a description of what evidence term we are constructing here.

@@ -26,6 +26,10 @@ Library
 
     build-depends: ghc-internal
 
+    ghc-options: -frebindable-known-key-names
+         -- Do not create dependencies on GHC.KnownKeyNames!
+         -- It doesn't exist yet.
+
     other-modules:
       -- dummy module to make Hadrian/GHC build a valid library...
       Dummy

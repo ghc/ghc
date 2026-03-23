@@ -82,6 +82,9 @@ Other Prelude modules are much easier with fewer complex dependencies.
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Monad and lots of other known-key things
+
 -- -Wno-orphans is needed for things like:
 -- Orphan rule: "x# -# x#" ALWAYS forall x# :: Int# -# x# x# = 0
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -103,7 +106,12 @@ Other Prelude modules are much easier with fewer complex dependencies.
 
 #include "MachDeps.h"
 
-module GHC.Internal.Base where
+module GHC.Internal.Base(
+      module GHC.Internal.Base,
+      module GHC.Internal.Classes,
+      module GHC.Internal.Types,
+      module GHC.Internal.Magic
+  ) where
 
 import GHC.Internal.Types hiding (
   Unit#,
@@ -430,6 +438,7 @@ W4:
   The derived Lift instance references various identifiers in
   GHC.Internal.TH.Lib, so it is an import of GHC.Internal.TH.Lift.
 
+** TODO: Fix me when the reinstallable base stuff has settled **
 
 W5:
   If no explicit "default" declaration is present, the assumed
@@ -1752,7 +1761,11 @@ instance Applicative [] where
 -- | @since base-2.01
 instance Monad []  where
     {-# INLINE (>>=) #-}
-    xs >>= f             = [y | x <- xs, y <- f x]
+    xs >>= f = [y | x <- xs, y <- f x]
+      -- Tricky! Here we use a list comprehension, so we are
+      -- relying it being desugared directly, and /not/ desugared
+      -- into calls of (>>=), else we'd get an infinite loop!
+
     {-# INLINE (>>) #-}
     (>>) = (*>)
 

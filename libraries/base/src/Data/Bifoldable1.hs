@@ -13,6 +13,7 @@ import Control.Applicative (Const (..))
 import Data.Bifoldable     (Bifoldable (..))
 import Data.Semigroup      (Arg (..), Semigroup (..))
 import Prelude             (Either (..), id)
+import Prelude( Num ) -- For -frebindable-known-key-names (defaulting)
 
 class Bifoldable t => Bifoldable1 t where
      bifold1 :: Semigroup m => t m m -> m

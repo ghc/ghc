@@ -79,6 +79,7 @@ import GHC.Internal.List
 import GHC.Internal.Base (const, otherwise, return, ($), (.))
 import GHC.Internal.Prim ((+#))
 import GHC.Internal.Types (Int(..), IO)
+import GHC.Internal.Base( (>>=), (>>) )        -- For known-key names
 
 {- Note [Specialising array operations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

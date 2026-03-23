@@ -1,6 +1,11 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples, BangPatterns #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+   -- Defines Real, Integral etc, etc, etc
+
 {-# OPTIONS_GHC -Wno-orphans #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------

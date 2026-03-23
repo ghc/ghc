@@ -35,6 +35,7 @@ import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.Num
 import GHC.Internal.IO.Exception
 import GHC.Internal.Types (Bool, IO)
+import GHC.Internal.Base( (>>=) )        -- For known-key names
 
 -- exported functions
 -- ------------------

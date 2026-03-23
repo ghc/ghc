@@ -74,15 +74,11 @@ import GHC.Internal.IO.SubSystem ((<!>), isWindowsNativeIO)
 import qualified GHC.Internal.IO.Device as IODevice
 import qualified GHC.Internal.IO.BufferedIO as Buffered
 
-import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
+import GHC.Internal.Base
 import GHC.Internal.Conc.Sync
 import GHC.Internal.Err (error, errorWithoutStackTrace)
 import GHC.Internal.Real
-import GHC.Internal.Types (Bool(..), Char, Int)
 import GHC.Internal.Word
-import GHC.Internal.Base (
-    String, fmap, mapM, otherwise, pure, return, when, ($), (++),
-  )
 import GHC.Internal.Exception
 import GHC.Internal.Exception.Type
 import GHC.Internal.Num          ( Num(..) )
@@ -95,6 +91,7 @@ import GHC.Internal.Data.Maybe
 import GHC.Internal.System.Posix.Internals hiding (FD)
 
 import GHC.Internal.Foreign.C.String
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False

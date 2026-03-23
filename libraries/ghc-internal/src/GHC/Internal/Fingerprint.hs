@@ -34,8 +34,8 @@ import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.Foreign.Storable
-
 import GHC.Internal.Fingerprint.Type
+import GHC.Internal.Base( (>>), (>>=) )        -- For known-key names
 
 -- for SIZEOF_STRUCT_MD5CONTEXT:
 #include "HsBaseConfig.h"

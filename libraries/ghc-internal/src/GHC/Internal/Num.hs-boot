@@ -1,11 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Num
+
 module GHC.Internal.Num (Num (..)) where
 
 -- For why this file exists
 -- See Note [Semigroup stimes cycle] in GHC.Internal.Base
 
-import GHC.Internal.Bignum.Integer (Integer)
+import GHC.Internal.Bignum.Integer (Integer, integerZero)
 
 infixl 7  *
 infixl 6  +, -
@@ -20,4 +23,4 @@ class Num a where
     fromInteger         :: Integer -> a
 
     x - y               = x + negate y
-    negate x            = 0 - x
+    negate x            = fromInteger integerZero - x

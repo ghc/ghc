@@ -67,6 +67,10 @@ import GHC.Internal.Show (showSignedInt)
 import GHC.Internal.IO.Unsafe (unsafePerformIO)
 import GHC.Internal.System.Posix.Types (Fd)
 import GHC.Internal.Types (Bool(..), Int, IO)
+import GHC.Internal.Base( (>>=), (>>) )          -- For known-key names
+import GHC.Internal.Control.Monad.Fail( fail )   -- For known-key names
+import GHC.Internal.Num( fromInteger, negate )   -- For known-key names
+import GHC.Internal.Enum( enumFromTo )           -- For known-key names
 
 -- | Suspends the current thread for a given number of microseconds
 -- (GHC only).

@@ -56,6 +56,7 @@ import GHC.Internal.Err ( undefined )
 import GHC.Internal.Num
 import GHC.Internal.ForeignPtr
 import GHC.Internal.Types ( Int, IO )
+import GHC.Internal.Base( (>>=), (>>) )        -- For known-key names
 
 newForeignPtr :: FinalizerPtr a -> Ptr a -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign pointer, and

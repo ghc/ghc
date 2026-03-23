@@ -158,8 +158,8 @@ import GHC.Internal.Weak
 import GHC.Internal.Base ( return, ($), (>>=) )
 import GHC.Internal.Prim ( mkWeak# )
 import GHC.Internal.Types ( IO(..) )
-
 import GHC.Internal.Control.Exception.Base
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 {-|
   Take a value from an 'MVar', put a new value into the 'MVar' and

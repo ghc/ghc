@@ -7,6 +7,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines IsString
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Data.String

@@ -22,29 +22,29 @@ where
 
 import GHC.Prelude
 
-import GHC.Data.Bag
-import GHC.Core.DataCon
-import GHC.Data.FastString
 import GHC.Hs
-import GHC.Utils.Panic
-import GHC.Builtin.Names
-import GHC.Types.Name.Reader
-import GHC.Types.SrcLoc
-import GHC.Utils.Monad.State.Strict
+
 import GHC.Tc.Deriv.Generate
+import GHC.Tc.Deriv.RdrNames
 import GHC.Tc.Utils.TcType
+
+import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Utils.Misc
+
+import GHC.Types.Name.Reader
+import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Types.Id.Make (coerceId)
-import GHC.Builtin.Types (true_RDR, false_RDR)
-import GHC.Data.List.Infinite (Infinite (..))
-import qualified GHC.Data.List.Infinite as Inf
 
-import Data.Foldable
+import GHC.Utils.Misc
+import GHC.Utils.Monad.State.Strict
+import GHC.Utils.Panic
+
+import GHC.Data.Bag
+import GHC.Data.List.Infinite (Infinite (..))
+
 import Data.Maybe (catMaybes, isJust)
 
 {-
@@ -175,7 +175,7 @@ gen_Functor_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     fmap_bind = mkRdrFunBindEC 2 id fmap_name fmap_eqns
     fmap_match_ctxt = mkPrefixFunRhs fmap_name noAnn
 
-    fmap_eqn con = flip evalState bs_RDRs $
+    fmap_eqn con = flip evalState bs_RDRsInf $
                      match_for_con fmap_match_ctxt [f_Pat] con parts
       where
         parts = foldDataConArgs ft_fmap con dit
@@ -214,7 +214,7 @@ gen_Functor_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     replace_bind = mkRdrFunBindEC 2 id replace_name replace_eqns
     replace_match_ctxt = mkPrefixFunRhs replace_name noAnn
 
-    replace_eqn con = flip evalState bs_RDRs $
+    replace_eqn con = flip evalState bs_RDRsInf $
         match_for_con replace_match_ctxt [z_Pat] con parts
       where
         parts = foldDataConArgs ft_replace con dit
@@ -634,7 +634,7 @@ mkSimpleConMatch :: Monad m => HsMatchContextPs
                  -> m (LMatch GhcPs (LHsExpr GhcPs))
 mkSimpleConMatch ctxt fold extra_pats con insides = do
     let con_name = getRdrName con
-    let vars_needed = takeList insides as_RDRList
+    let vars_needed = takeList insides as_RDRs
     let bare_pat = nlConVarPat con_name vars_needed
     let pat = if null vars_needed
           then bare_pat
@@ -670,7 +670,7 @@ mkSimpleConMatch2 :: Monad m
                   -> m (LMatch GhcPs (LHsExpr GhcPs))
 mkSimpleConMatch2 ctxt fold extra_pats con insides = do
     let con_name = getRdrName con
-        vars_needed = takeList insides (toList as_RDRs)
+        vars_needed = takeList insides as_RDRs
         pat = nlConVarPat con_name vars_needed
         -- Make sure to zip BEFORE invoking catMaybes. We want the variable
         -- indices in each expression to match up with the argument indices
@@ -681,13 +681,13 @@ mkSimpleConMatch2 ctxt fold extra_pats con insides = do
         -- with the same index has a type which mentions the last type
         -- variable.
         argTysTyVarInfo = map isJust insides
-        (asWithTyVar, asWithoutTyVar) = partitionByList argTysTyVarInfo (toList as_Vars)
+        (asWithTyVar, asWithoutTyVar) = partitionByList argTysTyVarInfo as_Vars
 
         con_expr
           | null asWithTyVar = nlHsApps con_name asWithoutTyVar
           | otherwise =
-              let bs   = filterByList  argTysTyVarInfo bs_RDRList
-                  vars = filterByLists argTysTyVarInfo bs_VarList as_VarList
+              let bs   = filterByList  argTysTyVarInfo bs_RDRs
+                  vars = filterByLists argTysTyVarInfo bs_Vars as_Vars
               in mkHsLam (noLocA (map nlVarPat bs)) (nlHsApps con_name vars)
 
     rhs <- fold con_expr exps
@@ -839,7 +839,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     foldr_bind = mkRdrFunBind (L (noAnnSrcSpan loc) foldable_foldr_RDR) eqns
     eqns = map foldr_eqn data_cons
     foldr_eqn con
-      = evalState (match_foldr z_Expr [f_Pat,z_Pat] con =<< parts) bs_RDRs
+      = evalState (match_foldr z_Expr [f_Pat,z_Pat] con =<< parts) bs_RDRsInf
       where
         parts = sequence $ foldDataConArgs ft_foldr con dit
     foldr_match_ctxt = mkPrefixFunRhs foldr_name noAnn
@@ -853,7 +853,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     foldMap_eqns = map foldMap_eqn data_cons
 
     foldMap_eqn con
-      = evalState (match_foldMap [f_Pat] con =<< parts) bs_RDRs
+      = evalState (match_foldMap [f_Pat] con =<< parts) bs_RDRsInf
       where
         parts = sequence $ foldDataConArgs ft_foldMap con dit
     foldMap_match_ctxt = mkPrefixFunRhs foldMap_name noAnn
@@ -873,7 +873,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     null_bind = mkRdrFunBind null_name null_eqns
     null_eqns = map null_eqn data_cons
     null_eqn con
-      = flip evalState bs_RDRs $ do
+      = flip evalState bs_RDRsInf $ do
           parts <- sequence $ foldDataConArgs ft_null con dit
           case convert parts of
             Nothing -> return $
@@ -1069,7 +1069,7 @@ gen_Traversable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                    traverse_name traverse_eqns
     traverse_eqns = map traverse_eqn data_cons
     traverse_eqn con
-      = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
+      = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRsInf
       where
         parts = sequence $ foldDataConArgs ft_trav con dit
     traverse_match_ctxt = mkPrefixFunRhs traverse_name noAnn
@@ -1113,47 +1113,6 @@ gen_Traversable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
         mkApCon con (x1:x2:xs) =
             foldl' appAp (nlHsApps liftA2_RDR [con,x1,x2]) xs
           where appAp x y = nlHsApps ap_RDR [x,y]
-
------------------------------------------------------------------------
-
-f_Expr, z_Expr, mempty_Expr, foldMap_Expr,
-    traverse_Expr, coerce_Expr, pure_Expr, true_Expr, false_Expr,
-    all_Expr, null_Expr :: LHsExpr GhcPs
-f_Expr        = nlHsVar f_RDR
-z_Expr        = nlHsVar z_RDR
-mempty_Expr   = nlHsVar mempty_RDR
-foldMap_Expr  = nlHsVar foldMap_RDR
-traverse_Expr = nlHsVar traverse_RDR
-coerce_Expr   = nlHsVar (getRdrName coerceId)
-pure_Expr     = nlHsVar pure_RDR
-true_Expr     = nlHsVar true_RDR
-false_Expr    = nlHsVar false_RDR
-all_Expr      = nlHsVar all_RDR
-null_Expr     = nlHsVar null_RDR
-
-f_RDR, z_RDR :: RdrName
-f_RDR = mkVarUnqual (fsLit "f")
-z_RDR = mkVarUnqual (fsLit "z")
-
-as_RDRs, bs_RDRs :: Infinite RdrName
-as_RDRs = [ mkVarUnqual (mkFastString ("a"++show i)) | i <- Inf.enumFrom (1::Int) ]
-bs_RDRs = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- Inf.enumFrom (1::Int) ]
-
-as_Vars, bs_Vars :: Infinite (LHsExpr GhcPs)
-as_Vars = fmap nlHsVar as_RDRs
-bs_Vars = fmap nlHsVar bs_RDRs
-
-as_RDRList, bs_RDRList :: [RdrName]
-as_RDRList = Inf.toList as_RDRs
-bs_RDRList = Inf.toList bs_RDRs
-
-as_VarList, bs_VarList :: [LHsExpr GhcPs]
-as_VarList = Inf.toList as_Vars
-bs_VarList = Inf.toList bs_Vars
-
-f_Pat, z_Pat :: LPat GhcPs
-f_Pat = nlVarPat f_RDR
-z_Pat = nlVarPat z_RDR
 
 {-
 Note [DeriveFoldable with ExistentialQuantification]

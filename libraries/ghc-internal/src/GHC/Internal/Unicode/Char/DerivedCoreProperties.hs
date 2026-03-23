@@ -21,6 +21,7 @@ import GHC.Internal.Base (ord)
 import GHC.Internal.Classes (Ord(..), (&&))
 import GHC.Internal.Unicode.Bits (lookupBit64)
 import GHC.Internal.Types (Bool, Char)
+import GHC.Internal.Num( fromInteger ) -- For known-key names
 
 {-# INLINE isUppercase #-}
 isUppercase :: Char -> Bool

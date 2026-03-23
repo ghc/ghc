@@ -29,8 +29,8 @@ import GHC.Internal.Num (Num(..))
 import GHC.Internal.Event.Internal.Types
 import GHC.Internal.Prim (atomicExchangeAddrAddr#)
 import GHC.Internal.Types (Bool, Int, IO(..))
-
 import GHC.Internal.Ptr (Ptr(..))
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 -- | Event notification backend.
 data Backend = forall a. Backend {

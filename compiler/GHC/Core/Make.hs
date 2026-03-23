@@ -36,7 +36,6 @@ module GHC.Core.Make (
 
         -- * Constructing list expressions
         mkNilExpr, mkConsExpr, mkListExpr,
-        mkFoldrExpr, mkBuildExpr,
 
         -- * Constructing Maybe expressions
         mkNothingExpr, mkJustExpr,
@@ -53,7 +52,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Types.Id
-import GHC.Types.Var  ( setTyVarUnique, visArgConstraintLike )
+import GHC.Types.Var  ( visArgConstraintLike )
 import GHC.Types.TyThing
 import GHC.Types.Id.Info
 import GHC.Types.Cpr
@@ -794,44 +793,6 @@ mkConsExpr ty hd tl = mkCoreConApps consDataCon [Type ty, hd, tl]
 -- | Make a list containing the given expressions, where the list has the given type
 mkListExpr :: Type -> [CoreExpr] -> CoreExpr
 mkListExpr ty xs = foldr (mkConsExpr ty) (mkNilExpr ty) xs
-
--- | Make a fully applied 'foldr' expression
-mkFoldrExpr :: MonadThings m
-            => Type             -- ^ Element type of the list
-            -> Type             -- ^ Fold result type
-            -> CoreExpr         -- ^ "Cons" function expression for the fold
-            -> CoreExpr         -- ^ "Nil" expression for the fold
-            -> CoreExpr         -- ^ List expression being folded acress
-            -> m CoreExpr
-mkFoldrExpr elt_ty result_ty c n list = do
-    foldr_id <- lookupId foldrName
-    return (Var foldr_id `App` Type elt_ty
-           `App` Type result_ty
-           `App` c
-           `App` n
-           `App` list)
-
--- | Make a 'build' expression applied to a locally-bound worker function
-mkBuildExpr :: (MonadFail m, MonadThings m, MonadUnique m)
-            => Type                                     -- ^ Type of list elements to be built
-            -> ((Id, Type) -> (Id, Type) -> m CoreExpr) -- ^ Function that, given information about the 'Id's
-                                                        -- of the binders for the build worker function, returns
-                                                        -- the body of that worker
-            -> m CoreExpr
-mkBuildExpr elt_ty mk_build_inside = do
-    n_tyvar <- newTyVar alphaTyVar
-    let n_ty = mkTyVarTy n_tyvar
-        c_ty = mkVisFunTysMany [elt_ty, n_ty] n_ty
-    [c, n] <- sequence [mkSysLocalM (fsLit "c") ManyTy c_ty, mkSysLocalM (fsLit "n") ManyTy n_ty]
-
-    build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
-
-    build_id <- lookupId buildName
-    return $ Var build_id `App` Type elt_ty `App` mkLams [n_tyvar, c, n] build_inside
-  where
-    newTyVar tyvar_tmpl = do
-      uniq <- getUniqueM
-      return (setTyVarUnique tyvar_tmpl uniq)
 
 {-
 ************************************************************************

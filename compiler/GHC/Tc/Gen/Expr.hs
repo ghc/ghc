@@ -617,7 +617,7 @@ tcExpr (HsStatic _ expr) res_ty
         ; let expr'' = mkLHsWrap (mkWpLet ev_binds) expr'
 
         -- Require the type of the argument to be Typeable.
-        ; typeableClass <- tcLookupClass typeableClassName
+        ; typeableClass <- tcLookupKnownKeyClass typeableClassKey
         ; typeable_ev <- emitWantedEvVar StaticOrigin $
                          mkTyConApp (classTyCon typeableClass)
                                     [liftedTypeKind, expr_ty]
@@ -626,7 +626,8 @@ tcExpr (HsStatic _ expr) res_ty
         --   fromStaticPtr :: forall p. (IsStatic p) =>
         --                    forall a. (Typeable a) =>
         --                    StaticPtr a -> p a
-        ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName [p_ty]
+        ; fromStaticPtr <- newKnownKeyMethod StaticOrigin
+                                    fromStaticPtrClassOpKey [p_ty]
         ; static_ptr_ty_con <- tcLookupTyCon staticPtrTyConName
         ; let wrap = mkWpEvVarApps [typeable_ev] <.> mkWpTyApps [expr_ty]
               static_expr_ty = mkTyConApp static_ptr_ty_con [expr_ty]
@@ -792,8 +793,8 @@ tcArithSeq :: Maybe (SyntaxExpr GhcRn) -> ArithSeqInfo GhcRn -> ExpRhoType
 tcArithSeq witness seq@(From expr) res_ty
   = do { (wrap, elt_mult, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr' <-tcScalingUsage elt_mult $ tcCheckPolyExpr expr elt_ty
-       ; enum_from <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromName [elt_ty]
+       ; enum_from <- newKnownKeyMethod (ArithSeqOrigin seq)
+                              enumFromClassOpKey [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from wit' (From expr') }
 
@@ -801,8 +802,8 @@ tcArithSeq witness seq@(FromThen expr1 expr2) res_ty
   = do { (wrap, elt_mult, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr1' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr1 elt_ty
        ; expr2' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr2 elt_ty
-       ; enum_from_then <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromThenName [elt_ty]
+       ; enum_from_then <- newKnownKeyMethod (ArithSeqOrigin seq)
+                              enumFromThenClassOpKey [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from_then wit' (FromThen expr1' expr2') }
 
@@ -810,8 +811,8 @@ tcArithSeq witness seq@(FromTo expr1 expr2) res_ty
   = do { (wrap, elt_mult, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr1' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr1 elt_ty
        ; expr2' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr2 elt_ty
-       ; enum_from_to <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromToName [elt_ty]
+       ; enum_from_to <- newKnownKeyMethod (ArithSeqOrigin seq)
+                              enumFromToClassOpKey [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from_to wit' (FromTo expr1' expr2') }
 
@@ -820,8 +821,8 @@ tcArithSeq witness seq@(FromThenTo expr1 expr2 expr3) res_ty
         ; expr1' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr1 elt_ty
         ; expr2' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr2 elt_ty
         ; expr3' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr3 elt_ty
-        ; eft <- newMethodFromName (ArithSeqOrigin seq)
-                              enumFromThenToName [elt_ty]
+        ; eft <- newKnownKeyMethod (ArithSeqOrigin seq)
+                              enumFromThenToClassOpKey [elt_ty]
         ; return $ mkHsWrap wrap $
           ArithSeq eft wit' (FromThenTo expr1' expr2' expr3') }
 

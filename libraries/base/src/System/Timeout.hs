@@ -30,6 +30,7 @@ import GHC.Internal.Control.Exception   (Exception(..), handleJust, bracket,
                             asyncExceptionFromException)
 import GHC.Internal.Data.Unique         (Unique, newUnique)
 import Prelude
+import Data.Typeable( Typeable )
 
 -- $setup
 -- >>> import Prelude

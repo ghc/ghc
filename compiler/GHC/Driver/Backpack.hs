@@ -879,7 +879,7 @@ hsModuleToModSummary home_keys pn hsc_src modname
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file_ospath location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file_ospath location)
 
-    -- Also copied from 'getImports'
+    -- Also copied from 'getImportEdges'
     let (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
         implicit_prelude = xopt LangExt.ImplicitPrelude dflags

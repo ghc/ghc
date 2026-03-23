@@ -19,6 +19,8 @@ import GHC.Internal.Prim (
   )
 import GHC.Internal.Types(Int(..), IO(..))
 
+import GHC.Internal.Num( fromInteger )  -- For known-key names
+
 #include "MachDeps.h"
 
 data UniqueSource = US (MutableByteArray# RealWorld)

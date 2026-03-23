@@ -44,16 +44,14 @@ import Control.Monad    ( unless, when )
 
 import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 
-import GHC.Tc.Utils.Env     ( tcMetaTy )
+import GHC.Tc.Utils.Env     ( tcMetaKnownOccTy )
 
 import GHC.Driver.DynFlags
 import GHC.Data.FastString
 import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Driver.Hooks
-import GHC.Builtin.Names.TH ( decsQTyConName, expQTyConName
-                            , patQTyConName, quoteDecName, quoteExpName
-                            , quotePatName, quoteTypeName, typeQTyConName)
+import GHC.Builtin.Names.TH
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr   ( tcCheckPolyExpr )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice
@@ -345,7 +343,7 @@ runRnSplice flavour run_meta ppr_res splice
                 XUntypedSplice {} -> pprPanic "runRnSplice: XUntypedSplice" (pprUntypedSplice False Nothing splice')
 
              -- Typecheck the expression
-       ; meta_exp_ty   <- tcMetaTy meta_ty_name
+       ; meta_exp_ty   <- tcMetaKnownOccTy meta_ty_name
        ; zonked_q_expr <- zonkTopLExpr =<<
                             tcTopSpliceExpr Untyped
                               (tcCheckPolyExpr the_expr meta_exp_ty)
@@ -364,10 +362,10 @@ runRnSplice flavour run_meta ppr_res splice
 
   where
     meta_ty_name = case flavour of
-                       UntypedExpSplice  -> expQTyConName
-                       UntypedPatSplice  -> patQTyConName
-                       UntypedTypeSplice -> typeQTyConName
-                       UntypedDeclSplice -> decsQTyConName
+                       UntypedExpSplice  -> expQTyConOcc
+                       UntypedPatSplice  -> patQTyConOcc
+                       UntypedTypeSplice -> typeQTyConOcc
+                       UntypedDeclSplice -> decsQTyConOcc
     what = case flavour of
                   UntypedExpSplice  -> "expression"
                   UntypedPatSplice  -> "pattern"

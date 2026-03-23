@@ -1204,7 +1204,7 @@ zonk_cmd_top :: HsCmdTop GhcTc -> ZonkTcM (HsCmdTop GhcTc)
 zonk_cmd_top (HsCmdTop (CmdTopTc { ctt_stack  = stack_tys
                                  , ctt_arr_ty = arr_ty
                                  , ctt_res_ty = res_ty
-                                 , ctt_table  = ids }) cmd)
+                                 , ctt_table  = CST ids }) cmd)
   = do new_cmd <- zonkLCmd cmd
        new_stack_tys <- zonkTcTypeToTypeX stack_tys
        new_arr_ty <- zonkTcTypeToTypeX arr_ty
@@ -1220,7 +1220,7 @@ zonk_cmd_top (HsCmdTop (CmdTopTc { ctt_stack  = stack_tys
              CmdTopTc { ctt_stack  = new_stack_tys
                       , ctt_arr_ty = new_arr_ty
                       , ctt_res_ty = new_res_ty
-                      , ctt_table  = new_ids }
+                      , ctt_table  = CST new_ids }
 
        return (HsCmdTop new_cmd_top new_cmd)
 

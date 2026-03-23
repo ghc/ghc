@@ -12,6 +12,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Unsatisfiable
+
+
 {-|
 This module exports:
 

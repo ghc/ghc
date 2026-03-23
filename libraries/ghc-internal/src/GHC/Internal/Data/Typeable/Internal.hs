@@ -21,6 +21,9 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE LinearTypes #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Typeable etc
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Data.Typeable.Internal
@@ -87,10 +90,7 @@ module GHC.Internal.Data.Typeable.Internal (
     trLiftedRep
   ) where
 
-import GHC.Internal.Base (
-    String, Void, foldr, id, map, ord, otherwise, ($), (.), (++),
-  )
-import GHC.Internal.Classes ( Eq(..), Ord(..), (||) )
+import GHC.Internal.Base
 import GHC.Internal.CString ( unpackCStringUtf8# )
 import qualified GHC.Internal.Arr as A
 import GHC.Internal.Data.Either (Either (..))
@@ -103,16 +103,11 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Unicode (isDigit)
 import GHC.Internal.Num ((-), (+), (*))
 import GHC.Internal.Word
-import GHC.Internal.Prim (Addr#, Int#, FUN, TYPE, proxy#, seq, (-#))
+import GHC.Internal.Prim (Addr#, Int#, FUN, proxy#, seq, (-#))
 import GHC.Internal.Show
 import GHC.Internal.TypeLits ( KnownChar, charVal', KnownSymbol, symbolVal'
                     , TypeError, ErrorMessage(..) )
 import GHC.Internal.TypeNats ( KnownNat, Nat, natVal' )
-import GHC.Internal.Types (
-    Bool(..), Char, Constraint, Int(..), KindBndr, KindRep(..), Levity(..),
-    Module(..), Multiplicity(..), Ordering(..), RuntimeRep(..), TyCon(..),
-    Symbol, TrName(..), Type, TypeLitSort(..), VecCount(..), VecElem(..),
-  )
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce )
 
 import GHC.Internal.Fingerprint.Type
@@ -122,6 +117,9 @@ import {-# SOURCE #-} GHC.Internal.Fingerprint
    -- of GHC.Internal.Data.Typeable as much as possible so we can optimise the derived
    -- instances.
 -- import {-# SOURCE #-} GHC.Internal.Debug.Trace (trace)
+
+import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Base( eqString )             -- For known-key names
 
 #include "MachDeps.h"
 

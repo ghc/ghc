@@ -8,6 +8,7 @@ module GHC.Internal.IO.Handle.Lock.Common
 
 import GHC.Internal.Exception
 import GHC.Internal.Show
+import GHC.Internal.Data.Typeable( Typeable ) -- For known-key names
 
 -- | Exception thrown by 'hLock' on non-Windows platforms that don't support
 -- 'flock'.

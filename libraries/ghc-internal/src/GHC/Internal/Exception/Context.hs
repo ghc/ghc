@@ -35,9 +35,7 @@ module GHC.Internal.Exception.Context
     ) where
 
 import GHC.Internal.Data.OldList (intersperse)
-import GHC.Internal.Base (
-    Monoid(..), Semigroup(..), String, map, return, ($), (++),
-  )
+import GHC.Internal.Base
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Show (Show(..))
 import GHC.Internal.Data.Typeable.Internal (Typeable, typeRep, eqTypeRep)

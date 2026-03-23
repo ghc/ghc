@@ -120,6 +120,7 @@ import GHC.Internal.Foreign.C.String.Encoding (CString, CStringLen)
 #if defined(mingw32_HOST_OS)
 import GHC.Internal.Classes ((&&))
 #endif
+import GHC.Internal.Base( (>>) )        -- For known-key names
 
 -----------------------------------------------------------------------------
 -- Strings

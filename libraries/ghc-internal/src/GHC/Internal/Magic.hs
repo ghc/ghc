@@ -5,6 +5,10 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines inline etc
+
 {-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
 
 -----------------------------------------------------------------------------

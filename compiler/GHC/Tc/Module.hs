@@ -100,7 +100,7 @@ import GHC.Iface.Load
 
 import GHC.Builtin.Types ( mkListTy, anyTypeOfKind )
 import GHC.Builtin.Names
-import GHC.Builtin.Utils
+import GHC.Builtin
 
 import GHC.Hs hiding ( FunDep(..) )
 import GHC.Hs.Dump
@@ -2303,6 +2303,8 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
         ; uniq <- newUnique
         ; let loc' = noAnnSrcSpan $ locA loc
         ; interPrintName <- getInteractivePrintName
+        ; bindIOName     <- rnLookupKnownKeyName bindIOIdKey
+        ; thenIOName     <- rnLookupKnownKeyName thenIOIdKey
         ; let fresh_it  = itName uniq (locA loc)
               matches   = [mkMatch (mkPrefixFunRhs (L loc' fresh_it) noAnn) (noLocA []) rn_expr
                                    emptyLocalBinds]
@@ -2459,14 +2461,26 @@ tcUserStmt rdr_stmt@(L loc _)
        ; traceRn "tcRnStmt" (vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs])
        ; rnDump rn_stmt ;
 
-       ; ghciStep <- getGhciStepIO
-       ; let gi_stmt
-               | (L loc (BindStmt x pat expr)) <- rn_stmt
-                     = L loc $ BindStmt x pat (nlHsApp ghciStep expr)
-               | otherwise = rn_stmt
-
        ; opt_pr_flag <- goptM Opt_PrintBindResult
-       ; let print_result_plan
+       ; ghciStep   <- getGhciStepIO
+       ; printName  <- rnLookupKnownKeyName printIdKey
+       ; thenIOName <- rnLookupKnownKeyName thenIOIdKey
+       ; let gi_stmt | (L loc (BindStmt x pat expr)) <- rn_stmt
+                     = L loc $ BindStmt x pat (nlHsApp ghciStep expr)
+                     | otherwise
+                     = rn_stmt
+
+             mk_print_result_plan stmt v
+               = do { stuff@([v_id], _) <- tcGhciStmts [stmt, mk_print v]
+                    ; v_ty <- liftZonkM $ zonkTcType (idType v_id)
+                    ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
+                    ; return stuff }
+
+             mk_print v = L loc $ BodyStmt noExtField (nlHsApp (nlHsVar printName)
+                                           (nlHsVar v))
+                                           (mkRnSyntaxExpr thenIOName) noSyntaxExpr
+
+             print_result_plan
                | opt_pr_flag                         -- The flag says "print result"
                , [v] <- collectLStmtBinders CollNoDictBinders gi_stmt  -- One binder
                = Just $ mk_print_result_plan gi_stmt v
@@ -2475,18 +2489,9 @@ tcUserStmt rdr_stmt@(L loc _)
         -- The plans are:
         --      [stmt; print v]         if one binder and not v::()
         --      [stmt]                  otherwise
-       ; plan <- runPlans $ maybe id (NE.<|) print_result_plan $ NE.singleton $ tcGhciStmts [gi_stmt]
+       ; plan <- runPlans $ maybe id (NE.<|) print_result_plan $
+                 NE.singleton $ tcGhciStmts [gi_stmt]
        ; return (plan, fix_env) }
-  where
-    mk_print_result_plan stmt v
-      = do { stuff@([v_id], _) <- tcGhciStmts [stmt, print_v]
-           ; v_ty <- liftZonkM $ zonkTcType (idType v_id)
-           ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
-           ; return stuff }
-      where
-        print_v  = L loc $ BodyStmt noExtField (nlHsApp (nlHsVar printName)
-                                    (nlHsVar v))
-                                    (mkRnSyntaxExpr thenIOName) noSyntaxExpr
 
 {-
 Note [GHCi Plans]
@@ -2516,8 +2521,8 @@ any_lifted = anyTypeOfKind liftedTypeKind
 -- statement in the form 'IO [Any]'.
 tcGhciStmts :: [GhciLStmt GhcRn] -> TcM PlanResult
 tcGhciStmts stmts
- = do { ioTyCon <- tcLookupTyCon ioTyConName
-      ; ret_id  <- tcLookupId returnIOName             -- return @ IO
+ = do { ioTyCon <- tcLookupKnownKeyTyCon ioTyConKey
+      ; ret_id  <- tcLookupKnownKeyId returnIOIdKey             -- return @ IO
       ; let ret_ty      = mkListTy any_lifted
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty]
             tc_io_stmts = tcStmtsAndThen (HsDoStmt GhciStmtCtxt) tcDoStmt stmts
@@ -2962,7 +2967,7 @@ tcRnGetInfo hsc_env name
        ; thing  <- tcRnLookupName' name
        ; fixity <- lookupFixityRn name
        ; (cls_insts, fam_insts) <- lookupInsts thing
-       ; let info = lookupKnownNameInfo name
+       ; let info = oldLookupKnownNameInfo name
        ; return (thing, fixity, cls_insts, fam_insts, info) }
 
 

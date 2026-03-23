@@ -5,6 +5,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+   -- Defines fromLabel
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.OverloadedLabels

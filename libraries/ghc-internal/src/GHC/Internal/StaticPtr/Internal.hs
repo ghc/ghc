@@ -14,6 +14,10 @@
 -- which otherwise would bias GHC to conclude that any code using
 -- the static form would fail.
 {-# OPTIONS_GHC -fomit-interface-pragmas #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines makeStatic
+
 module GHC.Internal.StaticPtr.Internal (makeStatic) where
 
 import GHC.Internal.Base (($), (++))

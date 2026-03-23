@@ -47,6 +47,7 @@ import GHC.Internal.Types (Bool(..), Int, IO)
 
 import qualified GHC.Internal.Event.Array as A
 import qualified GHC.Internal.Event.Internal as E
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 available :: Bool
 available = True

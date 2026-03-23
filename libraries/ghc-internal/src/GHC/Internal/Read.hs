@@ -64,24 +64,21 @@ import GHC.Internal.Text.ParserCombinators.ReadPrec
 
 import GHC.Internal.Data.Maybe
 
-import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Base
 import GHC.Internal.Err (undefined)
 import GHC.Internal.Unicode
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Float
 import GHC.Internal.Show
-import GHC.Internal.Base (
-    Applicative(..), String, Monad(..), NonEmpty(..), Void, foldr, map,
-    ($), (.), (++),
-  )
 import GHC.Internal.Arr
-import GHC.Internal.Types (Bool(..), Char, Int, Ordering(..))
 import GHC.Internal.Word
 import GHC.Internal.List (filter)
 import GHC.Internal.Tuple (Solo (..))
 import GHC.Internal.ByteOrder
 
+import GHC.Internal.Control.Monad.Fail( fail )   -- For known-key names
+import GHC.Internal.Base( eqString )             -- For known-key names
 
 -- | @'readParen' 'True' p@ parses what @p@ parses, but surrounded with
 -- parentheses.

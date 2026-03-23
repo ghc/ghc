@@ -341,7 +341,7 @@ mkModIdBindings :: TcM TcGblEnv
 mkModIdBindings
   = do { mod <- getModule
        ; loc <- getSrcSpanM
-       ; mod_nm        <- newGlobalBinder mod (mkVarOccFS (fsLit "$trModule")) loc
+       ; mod_nm        <- newGlobalBinder mod (mkVarOccFS (fsLit "$trModule")) Nothing loc
        ; trModuleTyCon <- tcLookupTyCon trModuleTyConName
        ; let mod_id = mkExportedVanillaId mod_nm (mkTyConApp trModuleTyCon [])
                       `setInlinePragma` neverInlinePragma

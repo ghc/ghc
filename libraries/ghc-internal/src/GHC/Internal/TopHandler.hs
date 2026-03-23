@@ -77,6 +77,9 @@ import GHC.Internal.Base (
   )
 import GHC.Internal.Classes (Ord(..), (&&))
 #endif
+import GHC.Internal.Base( (>>=), (>>) )         -- For known-key names
+import GHC.Internal.Num( fromInteger, negate )  -- For known-key names
+import GHC.Internal.Data.Typeable( Typeable )   -- For known-key names
 
 -- Note [rts_setMainThread must be called unsafely]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

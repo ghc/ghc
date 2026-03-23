@@ -59,7 +59,7 @@ module GHC.Tc.Solver.Monad (
     getTopEnv, getGblEnv, getLclEnv, setSrcSpan,
     getTcEvBindsVar, getTcLevel,
     getTcEvBindsMap, setTcEvBindsMap, getTcEvBindsState, combineTcEvBinds,
-    tcLookupClass, tcLookupId, tcLookupTyCon,
+    tcLookupKnownKeyId,
 
     -- Inerts
     updInertSet, updInertCans,
@@ -136,9 +136,7 @@ import qualified GHC.Tc.Utils.Monad    as TcM
 import qualified GHC.Tc.Utils.TcMType  as TcM
 import qualified GHC.Tc.Instance.Class as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified GHC.Tc.Utils.Env      as TcM
-       ( tcGetDefaultTys
-       , tcLookupClass, tcLookupId, tcLookupTyCon
-       )
+       ( tcGetDefaultTys, tcLookupKnownKeyId, tcLookupTyCon )
 import GHC.Tc.Zonk.Monad ( ZonkM )
 import qualified GHC.Tc.Zonk.TcType  as TcM
 
@@ -1523,14 +1521,8 @@ getLclEnv = wrapTcS $ TcM.getLclEnv
 setSrcSpan :: RealSrcSpan -> TcS a -> TcS a
 setSrcSpan ss = wrap2TcS (TcM.setSrcSpan (RealSrcSpan ss mempty))
 
-tcLookupClass :: Name -> TcS Class
-tcLookupClass c = wrapTcS $ TcM.tcLookupClass c
-
-tcLookupId :: Name -> TcS Id
-tcLookupId n = wrapTcS $ TcM.tcLookupId n
-
-tcLookupTyCon :: Name -> TcS TyCon
-tcLookupTyCon n = wrapTcS $ TcM.tcLookupTyCon n
+tcLookupKnownKeyId :: KnownKey -> TcS Id
+tcLookupKnownKeyId c = wrapTcS $ TcM.tcLookupKnownKeyId c
 
 -- Any use of this function is a bit suspect, because it violates the
 -- pure veneer of TcS. But it's just about warnings around unused imports

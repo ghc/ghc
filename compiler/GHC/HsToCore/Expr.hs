@@ -479,7 +479,7 @@ the overloaded function `fromStaticPtr`.
 dsExpr (HsStatic (static_ptr_ty, from_static_fun) expr@(L loc _))
   = do { dflags <- getDynFlags
 
-       ; make_static_id <- dsLookupGlobalId makeStaticName
+       ; make_static_id <- dsLookupKnownKeyId makeStaticKey
        ; expr_ds        <- dsLExpr expr
        ; from_static_ds <- dsExpr from_static_fun
 
@@ -770,7 +770,7 @@ ds_app_var (L loc fun_id) hs_args core_args
   -----------------------
   -- Warn about identities for (fromInteger :: Integer -> Integer) etc
   -- They all have a type like:  forall <tvs>. <cxt> => arg_ty -> res_ty
-  | idName fun_id `elem` numericConversionNames
+  | getUnique fun_id `elem` numericConversionKeys
   , let (conv_ty, _) = apply_invis_args fun_id core_args
   , Just (arg_ty, res_ty) <- splitVisibleFunTy_maybe conv_ty
   = do { dflags <- getDynFlags

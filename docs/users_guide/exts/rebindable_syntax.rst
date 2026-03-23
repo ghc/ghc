@@ -78,6 +78,16 @@ not the Prelude versions:
 -  An overloaded label "``#foo``" means "``fromLabel @"foo"``", rather than
    "``GHC.OverloadedLabels.fromLabel @"foo"``" (see :ref:`overloaded-labels`).
 
+.. extension:: ImplicitKnownKeyNames
+    :shortdesc: Use module ``KnownKeyNames`` to find known-key names
+
+    ToDo: needs proper documentation
+
+.. extension:: DefinesKnownKeyNames
+    :shortdesc: This modules defines one or more known-key names
+
+    ToDo: needs proper documentation
+
 :extension:`RebindableSyntax` implies :extension:`NoImplicitPrelude`.
 
 In all cases (apart from arrow notation), the static semantics should be

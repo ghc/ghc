@@ -85,6 +85,8 @@ import qualified GHC.Internal.Wasm.Prim.Flag as Wasm
 #if defined(javascript_HOST_ARCH)
 import GHC.Internal.Base (pure)
 #endif
+import GHC.Internal.Base( (>>=), (>>) )          -- For known-key names
+
 
 ensureIOManagerIsRunning :: IO ()
 #if defined(javascript_HOST_ARCH)

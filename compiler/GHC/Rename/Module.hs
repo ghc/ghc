@@ -33,7 +33,7 @@ import GHC.Rename.Utils ( mapFvRn, bindLocalNames
                         , warnUnusedTypePatterns
                         , noNestedForallsContextsErr
                         , addNoNestedForallsContextsErr, checkInferredVars )
-import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
+import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
 
 import GHC.Tc.Errors.Types
@@ -42,11 +42,7 @@ import GHC.Tc.Types.Origin ( TypedThing(..) )
 
 import GHC.Unit
 import GHC.Unit.Module.Warnings
-import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
-                        , monadClassName, returnMName, thenMName
-                        , semigroupClassName, sappendName
-                        , monoidClassName, mappendName
-                        )
+import GHC.Builtin.Names
 
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
@@ -507,28 +503,32 @@ checkCanonicalInstances cls poly_ty mbinds = do
     --  * Warn if '(*>)' is defined backwards (i.e. @(*>) = (>>)@).
     --
     checkCanonicalMonadInstances
-      | cls == applicativeClassName =
+      | cls `hasKnownKey` applicativeClassKey =
           forM_ mbinds $ \(L loc mbind) -> setSrcSpanA loc $
               case mbind of
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
-                      | name == pureAName, isAliasMG mg == Just returnMName
+                      | name `hasKnownKey` pureAClassOpKey
+                      , isAliasMG mg returnMClassOpKey
                       -> addWarnNonCanonicalMonad NonCanonical_Pure
 
-                      | name == thenAName, isAliasMG mg == Just thenMName
+                      | name `hasKnownKey` thenAClassOpKey
+                      , isAliasMG mg thenMClassOpKey
                       -> addWarnNonCanonicalMonad NonCanonical_ThenA
 
                   _ -> return ()
 
-      | cls == monadClassName =
+      | cls `hasKnownKey` monadClassKey =
           forM_ mbinds $ \(L loc mbind) -> setSrcSpanA loc $
               case mbind of
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
-                      | name == returnMName, isAliasMG mg /= Just pureAName
+                      | name `hasKey` returnMClassOpKey
+                      , not (isAliasMG mg pureAClassOpKey)
                       -> addWarnNonCanonicalMonad NonCanonical_Return
 
-                      | name == thenMName, isAliasMG mg /= Just thenAName
+                      | name `hasKey` thenMClassOpKey
+                      , not (isAliasMG mg thenAClassOpKey)
                       -> addWarnNonCanonicalMonad NonCanonical_ThenM
 
                   _ -> return ()
@@ -549,22 +549,24 @@ checkCanonicalInstances cls poly_ty mbinds = do
     --  * Warn if '(<>)' is defined backwards (i.e. @(<>) = mappend@).
     --
     checkCanonicalMonoidInstances
-      | cls == semigroupClassName =
+      | cls `hasKnownKey`semigroupClassKey =
           forM_ mbinds $ \(L loc mbind) -> setSrcSpanA loc $
               case mbind of
                   FunBind { fun_id      = L _ name
                           , fun_matches = mg }
-                      | name == sappendName, isAliasMG mg == Just mappendName
+                      | name `hasKnownKey` sappendClassOpKey
+                      , isAliasMG mg mappendClassOpKey
                       -> addWarnNonCanonicalMonoid NonCanonical_Sappend
 
                   _ -> return ()
 
-      | cls == monoidClassName =
+      | cls `hasKnownKey` monoidClassKey =
           forM_ mbinds $ \(L loc mbind) -> setSrcSpanA loc $
               case mbind of
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
-                      | name == mappendName, isAliasMG mg /= Just sappendName
+                      | name `hasKnownKey` mappendClassOpKey
+                      , not (isAliasMG mg sappendClassOpKey)
                       -> addWarnNonCanonicalMonoid NonCanonical_Mappend
 
                   _ -> return ()
@@ -573,14 +575,14 @@ checkCanonicalInstances cls poly_ty mbinds = do
 
     -- test whether MatchGroup represents a trivial \"lhsName = rhsName\"
     -- binding, and return @Just rhsName@ if this is the case
-    isAliasMG :: MatchGroup GhcRn (LHsExpr GhcRn) -> Maybe Name
-    isAliasMG MG {mg_alts = (L _ [L _ (Match { m_pats = L _ []
-                                             , m_grhss = grhss })])}
+    isAliasMG :: MatchGroup GhcRn (LHsExpr GhcRn) -> KnownKey -> Bool
+    isAliasMG (MG {mg_alts = (L _ [L _ (Match { m_pats = L _ []
+                                              , m_grhss = grhss })])}) key
         | GRHSs _ (L _ (GRHS _ [] body) :| []) lbinds <- grhss
         , EmptyLocalBinds _ <- lbinds
-        , HsVar _ lrhsName  <- unLoc body
-        = Just (getName lrhsName)
-    isAliasMG _ = Nothing
+        , HsVar _ (L _ rhsName)  <- unLoc body
+        = getName rhsName `hasKnownKey` key
+    isAliasMG _ _ = False
 
     addWarnNonCanonicalMonoid reason =
       addWarnNonCanonicalDefinition (NonCanonicalMonoid reason)

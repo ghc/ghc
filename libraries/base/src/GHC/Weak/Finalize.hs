@@ -21,6 +21,7 @@ import GHC.Internal.IO.Handle.Types (Handle)
 import GHC.Internal.IO.Handle.Text (hPutStrLn)
 import GHC.Internal.Prim (Array#, State#, RealWorld)
 import GHC.Internal.Types (Int, IO)
+import GHC.Internal.Num( Num )  -- A necessary known-key name
 
 
 {-# DEPRECATED runFinalizerBatch

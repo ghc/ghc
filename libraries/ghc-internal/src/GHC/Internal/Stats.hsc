@@ -32,12 +32,11 @@ module GHC.Internal.Stats
     , getRTSStatsEnabled
 ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Control.Monad
 import GHC.Internal.Int
 import GHC.Internal.Maybe ( Maybe(..) )
-import GHC.Internal.Types ( Bool, IO )
 import GHC.Internal.Word
-import GHC.Internal.Base ( ($), (.) )
 import GHC.Internal.Generics (Generic)
 import GHC.Internal.Read ( Read )
 import GHC.Internal.Show ( Show )
@@ -45,6 +44,7 @@ import GHC.Internal.IO.Exception
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Foreign.Ptr
+import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 #include "Rts.h"
 

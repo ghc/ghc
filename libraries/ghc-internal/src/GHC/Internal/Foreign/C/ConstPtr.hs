@@ -27,6 +27,7 @@ import GHC.Internal.Classes (Eq(..), Ord(..))
 import GHC.Internal.Ptr
 import GHC.Internal.Show
 import GHC.Internal.Types (Type)
+import GHC.Internal.Num( fromInteger )   -- For known-key names
 
 -- | A pointer with the C @const@ qualifier. For instance, an argument of type
 -- @ConstPtr CInt@ would be marshalled as @const int*@.

@@ -280,7 +280,7 @@ dsJsFExportDynamic id co0 cconv = do
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
-    bindIOId <- dsLookupGlobalId bindIOName
+    bindIOId <- dsLookupKnownKeyId bindIOIdKey
     stbl_value <- newSysLocalMDs stable_ptr_ty
     (h_code, c_code, typestring) <- dsJsFExport id (mkRepReflCo export_ty) fe_nm cconv ExportIsDynamic
     let

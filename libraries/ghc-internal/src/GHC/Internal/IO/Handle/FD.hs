@@ -47,6 +47,8 @@ import GHC.Internal.IO.Handle.Internals
 import qualified GHC.Internal.IO.FD as FD
 import qualified GHC.Internal.System.Posix.Internals as Posix
 import GHC.Internal.Types (Bool(..))
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
+import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 -- ---------------------------------------------------------------------------
 -- Standard Handles

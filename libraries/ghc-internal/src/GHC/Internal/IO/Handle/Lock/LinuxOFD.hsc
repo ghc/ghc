@@ -37,6 +37,8 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Ptr
 import GHC.Internal.System.Posix.Types (COff, CPid)
 import GHC.Internal.Types (Bool(..), IO)
+import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 -- Linux open file descriptor locking.
 --

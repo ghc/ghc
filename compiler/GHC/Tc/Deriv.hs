@@ -582,7 +582,7 @@ derivePred tc tys mb_lderiv_strat via_tvs deriv_pred =
       Nothing -> return Nothing
       Just (cls, cls_tvs, arg_tys, arg_kind) ->
         do let mb_deriv_strat = fmap unLoc mb_lderiv_strat
-           if className cls == typeableClassName
+           if cls `hasKnownKey` typeableClassKey
            then do warnUselessTypeable
                    return Nothing
            else let deriv_tvs = via_tvs ++ cls_tvs in
@@ -759,7 +759,7 @@ deriveStandalone (L loc (DerivDecl (warn, _) deriv_ty mb_lderiv_strat overlap_mo
               , text "inst_tys':" <+> ppr inst_tys' ]
                 -- C.f. GHC.Tc.TyCl.Instance.tcLocalInstDecl1
 
-       ; if className cls == typeableClassName
+       ; if cls `hasKnownKey` typeableClassKey
          then do warnUselessTypeable
                  return Nothing
          else do early_deriv_spec <-
@@ -2189,7 +2189,7 @@ doDerivInstErrorChecks2 clas clas_inst theta wildcard mechanism
          -- Check for Generic instances that are derived with an exotic
          -- deriving strategy like DAC
          -- See Note [Deriving strategies]
-       ; when (exotic_mechanism && className clas `elem` genericClassNames) $
+       ; when (exotic_mechanism && getUnique clas `elem` genericClassKeys) $
          do { failIfTc (safeLanguageOn dflags)
                        (TcRnCannotDeriveInstance clas mempty Nothing NoGeneralizedNewtypeDeriving $
                           DerivErrSafeHaskellGenericInst)

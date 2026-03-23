@@ -8,6 +8,9 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines lots of functions that have BuiltinRules
+
 -- |
 -- Module      :  GHC.Internal.Bignum.Integer
 -- Copyright   :  (c) Sylvain Henry 2019,
@@ -1381,12 +1384,12 @@ integerRecipMod# x m
 
 integerPowMod# :: Integer -> Integer -> Natural -> (# Natural | () #)
 integerPowMod# !b !e !m
-   | naturalIsZero m  = (# | () #)
-   | naturalIsOne  m  = (# naturalZero | #)
-   | integerIsZero e  = (# naturalOne  | #)
+   | naturalIsZero m         = (# | () #)
+   | naturalIsOne  m         = (# naturalZero | #)
+   | integerIsZero e         = (# naturalOne  | #)
    | integerIsZero b
-     && integerGt e 0 = (# naturalZero | #)
-   | integerIsOne  b  = (# naturalOne  | #)
+   , integerGt e integerZero = (# naturalZero | #)
+   | integerIsOne  b         = (# naturalOne  | #)
      -- when the exponent is negative, try to find the modular multiplicative
      -- inverse and use it instead
    | integerIsNegative e = case integerRecipMod# b m of

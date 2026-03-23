@@ -49,6 +49,7 @@ module GHC.Internal.Arr (
 import GHC.Internal.Classes (Eq(..), Ord(..), (&&))
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Num
+import GHC.Internal.Enum( enumFromTo )  -- For known-key names
 import GHC.Internal.ST
 import GHC.Internal.Base (
     Applicative(..), Functor(..), otherwise, ($), ($!), (.),
@@ -62,6 +63,8 @@ import GHC.Internal.Prim (
 import GHC.Internal.Prim.PtrEq (sameMutableArray#)
 import GHC.Internal.Show
 import GHC.Internal.Types (Bool, Int(..), Ordering(..), isTrue#)
+
+import GHC.Internal.Base( (>>=) )   -- For known-key names
 
 infixl 9  !, //
 

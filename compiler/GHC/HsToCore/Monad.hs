@@ -22,9 +22,14 @@ module GHC.HsToCore.Monad (
         newUnique,
         UniqSupply, newUniqueSupply,
         getGhcModeDs, dsGetFamInstEnvs, dsGetGlobalRdrEnv,
+        getCCIndexDsM,
+
+        -- Looking up in the environment
         dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon,
         dsLookupDataCon, dsLookupConLike,
-        getCCIndexDsM,
+        dsLookupKnownKeyTyCon, dsLookupKnownKeyId,
+        dsLookupKnownKeyName,
+        dsLookupKnownOccId, dsLookupKnownOccTyCon,
 
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
 
@@ -78,6 +83,7 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 
 import GHC.IfaceToCore
+import GHC.Iface.Load
 
 import GHC.Tc.Utils.Monad
 
@@ -114,7 +120,9 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( HasDebugCallStack )
+
 import qualified GHC.Data.Strict as Strict
+import GHC.Data.Maybe
 import GHC.Data.OrdList
 
 import Data.IORef
@@ -393,16 +401,22 @@ mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
 mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
          statics_var next_wrapper_num complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs"
-  -- Failing tests here are `ghci` and `T11985` if you get this wrong.
-  -- this is very very "at a distance" because the reason for this check is that the type_env in interactive
-  -- mode is the smushed together of all the interactive modules.
-  -- See Note [Why is KnotVars not a ModuleEnv]
-                             , if_rec_types = KnotVars [mod] (\that_mod -> if that_mod == mod || isInteractiveModule mod
-                                                          then Just (return type_env)
-                                                          else Nothing) }
+                           , if_rec_types = KnotVars [mod] knot_var_fun }
+                  -- Failing tests here are `ghci` and `T11985` if you get this wrong.
+                  -- This is very very "at a distance" because the reason for this check
+                  -- is that the type_env in interactive mode is the smushed together
+                  -- of all the interactive modules.
+                  -- See Note [Why is KnotVars not a ModuleEnv]
+
+        knot_var_fun :: Module -> Maybe (IfG TypeEnv)
+        knot_var_fun that_mod
+          | that_mod == mod || isInteractiveModule mod = Just (return type_env)
+          | otherwise                                  = Nothing
+
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
                              NotBoot
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
+
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env
                            , ds_gbl_rdr_env  = rdr_env
@@ -420,6 +434,12 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
                            , dsl_unspecables = Just emptyVarSet
                            }
     in (gbl_env, lcl_env)
+
+dsToIfL :: IfL a -> DsM a
+-- Run an Iface action in the Ds monad
+dsToIfL iface_action
+  = do { env <- getGblEnv
+       ; setEnvs (ds_if_env env) iface_action }
 
 
 {-
@@ -547,29 +567,90 @@ mkNamePprCtxDs = ds_name_ppr_ctx <$> getGblEnv
 instance MonadThings (IOEnv (Env DsGblEnv DsLclEnv)) where
     lookupThing = dsLookupGlobal
 
+
+{- *********************************************************************
+*                                                                      *
+                Looking things up in the monad
+*                                                                      *
+********************************************************************* -}
+
+dsGetKnownKeySource :: DsM KnownKeyNameSource
+dsGetKnownKeySource
+  = do { rebindable_path <- goptM Opt_RebindableKnownKeyNames
+       ; if rebindable_path
+         then do { rdr_env <- dsGetGlobalRdrEnv
+                 ; return (KKNS_InScope rdr_env) }
+         else return KKNS_FromModule }
+
+--------------------------------------
+-- Lookups for known-occ things
+
+dsLookupKnownOccThing :: KnownOcc -> DsM TyThing
+dsLookupKnownOccThing occ
+  = do { rebindable_src <- dsGetKnownKeySource
+       ; dsToIfL $
+         do { mb_res <- lookupKnownOccThing occ rebindable_src
+            ; case mb_res of
+                 Succeeded thing -> return thing
+                 Failed msg -> failIfM (pprDiagnostic msg) } }
+
+dsLookupKnownOccTyCon :: KnownOcc -> DsM TyCon
+dsLookupKnownOccTyCon uniq = tyThingTyCon <$> dsLookupKnownOccThing uniq
+
+dsLookupKnownOccId :: KnownOcc -> DsM Id
+dsLookupKnownOccId uniq = tyThingId <$> dsLookupKnownOccThing uniq
+
+--------------------------------------
+-- Lookups for known-key things
+
+dsLookupKnownKeyName :: KnownKey -> DsM Name
+dsLookupKnownKeyName uniq
+  = do { rebindable_src <- dsGetKnownKeySource
+       ; dsToIfL $
+         do { mb_res <- lookupKnownKeyName uniq rebindable_src
+            ; case mb_res of
+                 Succeeded name -> return name
+                 Failed msg -> failIfM (pprDiagnostic msg) } }
+
+dsLookupKnownKeyThing :: KnownKey -> DsM TyThing
+dsLookupKnownKeyThing uniq
+  = do { rebindable_src <- dsGetKnownKeySource
+       ; dsToIfL $
+         do { mb_res <- lookupKnownKeyThing uniq rebindable_src
+            ; case mb_res of
+                 Succeeded thing -> return thing
+                 Failed msg -> failIfM (pprDiagnostic msg) } }
+
+dsLookupKnownKeyTyCon :: KnownKey -> DsM TyCon
+dsLookupKnownKeyTyCon uniq = tyThingTyCon <$> dsLookupKnownKeyThing uniq
+
+dsLookupKnownKeyId :: KnownKey -> DsM Id
+dsLookupKnownKeyId uniq = tyThingId <$> dsLookupKnownKeyThing uniq
+
+--------------------------------------
+-- Lookups given a Name
+
 dsLookupGlobal :: Name -> DsM TyThing
--- Very like GHC.Tc.Utils.Env.tcLookupGlobal
-dsLookupGlobal name
-  = do  { env <- getGblEnv
-        ; setEnvs (ds_if_env env)
-                  (tcIfaceGlobal name) }
+dsLookupGlobal name = dsToIfL (tcIfaceGlobal name)
 
 dsLookupGlobalId :: Name -> DsM Id
-dsLookupGlobalId name
-  = tyThingId <$> dsLookupGlobal name
+dsLookupGlobalId name = tyThingId <$> dsLookupGlobal name
 
 dsLookupTyCon :: Name -> DsM TyCon
-dsLookupTyCon name
-  = tyThingTyCon <$> dsLookupGlobal name
+dsLookupTyCon name = tyThingTyCon <$> dsLookupGlobal name
 
 dsLookupDataCon :: Name -> DsM DataCon
-dsLookupDataCon name
-  = tyThingDataCon <$> dsLookupGlobal name
+dsLookupDataCon name = tyThingDataCon <$> dsLookupGlobal name
 
 dsLookupConLike :: Name -> DsM ConLike
-dsLookupConLike name
-  = tyThingConLike <$> dsLookupGlobal name
+dsLookupConLike name = tyThingConLike <$> dsLookupGlobal name
 
+
+{- *********************************************************************
+*                                                                      *
+                Other monadic operations
+*                                                                      *
+********************************************************************* -}
 
 dsGetFamInstEnvs :: DsM FamInstEnvs
 -- Gets both the external-package inst-env

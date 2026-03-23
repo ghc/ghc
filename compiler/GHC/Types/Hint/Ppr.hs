@@ -257,17 +257,17 @@ instance Outputable GhcHint where
         , text " you're sure that type checking should terminate)" ]
     SuggestMoveNonCanonicalDefinition lhs rhs refURL ->
       text "Move definition from" <+>
-      quotes (pprPrefixUnqual rhs) <+>
-      text "to" <+> quotes (pprPrefixUnqual lhs) $$
+      quotes (pprPrefixOcc rhs) <+>
+      text "to" <+> quotes (pprPrefixOcc lhs) $$
       text "See also:" <+> text refURL
     SuggestRemoveNonCanonicalDefinition lhs rhs refURL ->
       text "Either remove definition for" <+>
-      quotes (pprPrefixUnqual lhs) <+> text "(recommended)" <+>
+      quotes (pprPrefixOcc lhs) <+> text "(recommended)" <+>
       text "or define as" <+>
-      quotes (pprPrefixUnqual lhs <+> text "=" <+> pprPrefixUnqual rhs) $$
+      quotes (pprPrefixOcc lhs <+> text "=" <+> pprPrefixOcc rhs) $$
       text "See also:" <+> text refURL
     SuggestEtaReduceAbsDataTySyn tc
-      -> text "If possible, eta-reduce the type synonym" <+> ppr_tc <+> text "so that it is nullary."
+        -> text "If possible, eta-reduce the type synonym" <+> ppr_tc <+> text "so that it is nullary."
         where ppr_tc = quotes (ppr $ tyConName tc)
     SuggestBindTyVarOnLhs tv
       -> text "Bind" <+> quotes (ppr tv) <+> text "on the LHS of the type declaration"
@@ -450,10 +450,6 @@ pprImpliedExtensions extension = case implied of
   where implied = map (quotes . ppr)
                 . filter (\ext -> extensionDeprecation ext == ExtensionNotDeprecated)
                 $ [impl | (impl, On orig) <- impliedXFlags, orig == extension]
-
-pprPrefixUnqual :: Name -> SDoc
-pprPrefixUnqual name =
-  pprPrefixOcc (getOccName name)
 
 pprSimilarFields :: TyCon -> TyCon -> FieldLabelString -> [(TyCon, SimilarName)] -> SDoc
 pprSimilarFields _tc rep_tc _fld suggs

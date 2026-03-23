@@ -13,6 +13,7 @@ module GHC.Iface.Errors.Ppr
   , missingInterfaceErrorReason
   , missingInterfaceErrorDiagnostic
   , readInterfaceErrorDiagnostic
+  , defaultIfaceMessageOpts
 
   , lookingForHerald
   , cantFindErrorX
@@ -59,10 +60,12 @@ interfaceErrorHints :: IfaceMessage -> [GhcHint]
 interfaceErrorHints = \ case
   Can'tFindInterface err _looking_for ->
     missingInterfaceErrorHints err
-  Can'tFindNameInInterface {} ->
-    noHints
-  CircularImport {} ->
-    noHints
+  Can'tFindNameInInterface {} ->   noHints
+  CircularImport {} -> noHints
+  MissingKnownKey1 {} -> noHints
+  MissingKnownKey2 {} -> noHints
+  MissingKnownKey3 {} -> noHints
+  KnownKeyScopeError {} -> noHints
 
 missingInterfaceErrorHints :: MissingInterfaceError -> [GhcHint]
 missingInterfaceErrorHints = \case
@@ -84,8 +87,11 @@ interfaceErrorReason (Can'tFindInterface err _)
   = missingInterfaceErrorReason err
 interfaceErrorReason (Can'tFindNameInInterface {})
   = ErrorWithoutFlag
-interfaceErrorReason (CircularImport {})
-  = ErrorWithoutFlag
+interfaceErrorReason (CircularImport {})     = ErrorWithoutFlag
+interfaceErrorReason (MissingKnownKey1 {})   = ErrorWithoutFlag
+interfaceErrorReason (MissingKnownKey2 {})   = ErrorWithoutFlag
+interfaceErrorReason (MissingKnownKey3 {})   = ErrorWithoutFlag
+interfaceErrorReason (KnownKeyScopeError {}) = ErrorWithoutFlag
 
 missingInterfaceErrorReason :: MissingInterfaceError -> DiagnosticReason
 missingInterfaceErrorReason = \ case
@@ -289,6 +295,20 @@ interfaceErrorDiagnostic opts = \ case
   CircularImport mod ->
     text "Circular imports: module" <+> quotes (ppr mod)
     <+> text "depends on itself"
+  MissingKnownKey1 key -> hang (text "Could not find known key" <+> quotes (pprKnownKey key))
+                             2 (text "in the exports of GHC.KnownKeys")
+  MissingKnownKey2 key -> hang (text "Could not find known key" <+> quotes (pprKnownKey key))
+                             2 (text "in the static known-key table")
+  MissingKnownKey3 occ -> hang (text "Could not find known occurrence" <+> quotes (ppr occ))
+                             2 (text "in the exports of GHC.KnownKeys")
+  KnownKeyScopeError occ gres
+    | null gres
+    -> hang (text "Could not find known-key entity" <+> quotes (ppr occ))
+          2 (vcat [ text "in the top-level global environment"
+                  , text "Consider importing it" ])
+    | otherwise
+    -> hang (text "Known-key entity" <+> quotes (ppr occ))
+          2 (text "is ambiguous in the top-level global environment")
 
 lookingForHerald :: InterfaceLookingFor -> SDoc
 lookingForHerald looking_for =

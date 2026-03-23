@@ -47,6 +47,8 @@ import GHC.Internal.Ptr
 import GHC.Internal.IO.Encoding
 import GHC.Internal.List ( concatMap, reverse )
 import GHC.Internal.Types ( IO(..) )
+import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 #define PROFILING
 #include "Rts.h"

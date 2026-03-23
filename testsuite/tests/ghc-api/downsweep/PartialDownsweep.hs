@@ -61,7 +61,7 @@ main = do
           , "import B"
           ]
         , [ "module B !parse_error where"
-          --  ^ this used to cause getImports to throw an exception instead
+          --  ^ this used to cause getImportEdges to throw an exception instead
           --  of having downsweep return an error for just this module
           , "import C"
           ]
@@ -95,7 +95,7 @@ main = do
           ]
         , [ "module B where"
           , "!parse_error"
-          --  ^ this is silently ignored, getImports assumes the import
+          --  ^ this is silently ignored, getImportEdges assumes the import
           -- list is just empty. This smells like a parser bug to me but
           -- I'm still documenting this behaviour here.
           , "import C"

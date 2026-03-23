@@ -39,6 +39,7 @@ import GHC.Internal.Word
 import GHC.Internal.Show
 import GHC.Internal.Num
 import GHC.Internal.Real ( fromIntegral )
+import GHC.Internal.Base( (>>=), (>>) )        -- For known-key names
 
 --import GHC.Internal.System.Posix.Internals
 

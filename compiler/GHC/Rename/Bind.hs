@@ -278,7 +278,8 @@ rnLocalValBindsLHS :: MiniFixityEnv
                    -> HsValBinds GhcPs
                    -> RnM ([Name], HsValBindsLR GhcRn GhcPs)
 rnLocalValBindsLHS fix_env binds
-  = do { binds' <- rnValBindsLHS (localRecNameMaker fix_env) binds
+  = do { traceRn "rnLocalValBinds" (ppr binds)
+       ; binds' <- rnValBindsLHS (localRecNameMaker fix_env) binds
 
          -- Check for duplicates and shadowing
          -- Must do this *after* renaming the patterns

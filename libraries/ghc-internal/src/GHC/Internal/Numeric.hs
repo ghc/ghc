@@ -76,6 +76,8 @@ import GHC.Internal.Show
 import GHC.Internal.Text.ParserCombinators.ReadP( ReadP, readP_to_S, pfail )
 import qualified GHC.Internal.Text.Read.Lex as L
 import GHC.Internal.Types (Bool(..), Char(..), Int)
+import GHC.Internal.Base( (>>=) )                -- For known-key names
+import GHC.Internal.Control.Monad.Fail( fail )   -- For known-key names
 
 -- $setup
 -- >>> import Prelude

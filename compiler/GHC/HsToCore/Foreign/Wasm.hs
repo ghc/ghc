@@ -337,12 +337,12 @@ dsWasmJSStaticImport fn_id co js_src' unitId sync = do
         )
     Async -> do
       err_msg <- mkStringExpr $ js_src
-      io_tycon <- dsLookupTyCon ioTyConName
+      io_tycon <- dsLookupKnownKeyTyCon ioTyConKey
       jsval_ty <-
         mkTyConTy
           <$> lookupGhcInternalTyCon "GHC.Internal.Wasm.Prim.Types" "JSVal"
-      bindIO_id <- dsLookupGlobalId bindIOName
-      returnIO_id <- dsLookupGlobalId returnIOName
+      bindIO_id   <- dsLookupKnownKeyId bindIOIdKey
+      returnIO_id <- dsLookupKnownKeyId returnIOIdKey
       promise_id <- newSysLocalMDs jsval_ty
       blockPromise_id <-
         lookupGhcInternalVarId

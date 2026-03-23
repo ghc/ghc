@@ -93,7 +93,9 @@ module Text.Printf(
 ) where
 
 import Prelude
+import GHC.KnownKeyNames( build )
 import Data.Char
+
 import GHC.Internal.Int
 import GHC.Internal.Data.List (stripPrefix)
 import GHC.Internal.Word
@@ -484,7 +486,7 @@ intModifierMap = [
 
 parseIntFormat :: a -> String -> FormatParse
 parseIntFormat _ s =
-  case foldr matchPrefix Nothing intModifierMap of
+  case Prelude.foldr matchPrefix Nothing intModifierMap of
     Just m -> m
     Nothing ->
       case s of

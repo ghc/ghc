@@ -15,11 +15,15 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
+{-# OPTIONS_GHC -fno-rebindable-known-key-names #-}
+    -- We import Prelude, hence GHC.KnownKeyNames is available
+
 module Data.Array.Byte (
   ByteArray(..),
   MutableByteArray(..),
 ) where
 
+import Prelude
 import GHC.Internal.Data.Bits ((.&.), unsafeShiftR)
 import GHC.Internal.Data.Data (mkNoRepType, Data(..))
 import GHC.Internal.Data.Typeable (Typeable)
@@ -35,7 +39,6 @@ import GHC.Internal.TH.Syntax
 import GHC.Internal.TH.Monad
 import GHC.Internal.TH.Lift
 import GHC.Internal.ForeignPtr
-import Prelude
 
 -- | Lifted wrapper for 'ByteArray#'.
 --

@@ -51,7 +51,7 @@ import cycle,
     which imports ‘GHC.Base‘ (libraries/base/GHC/Base.hs)
 -}
 
-import GHC.Internal.Classes (Eq)
+import GHC.Internal.Classes ( Eq( (==) ), (&&) )
 import GHC.Internal.Types (Char, Int)
 
 default ()

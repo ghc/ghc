@@ -37,7 +37,7 @@ import GHC.Types.Literal
 import GHC.Types.Literal.Floating
 import GHC.Types.Name.Occurrence ( occNameFS )
 import GHC.Types.Tickish
-import GHC.Types.Name ( Name, nameOccName )
+import GHC.Types.Name ( Name, KnownKey, nameUnique, nameOccName )
 import GHC.Types.Basic
 
 import GHC.Core
@@ -870,7 +870,10 @@ primOpRules nm = \case
 
 -- useful shorthands
 mkPrimOpRule :: Name -> Int -> [RuleM CoreExpr] -> Maybe CoreRule
-mkPrimOpRule nm arity rules = Just $ mkBasicRule nm arity (msum rules)
+mkPrimOpRule nm arity rules
+  = Just $ mkBasicRule (occNameFS (nameOccName nm))
+                       (nameUnique nm)
+                       arity (msum rules)
 
 mkRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
             -> [RuleM CoreExpr] -> Maybe CoreRule
@@ -1679,13 +1682,13 @@ but that is only a historical accident.
 ************************************************************************
 -}
 
-mkBasicRule :: Name -> Int -> RuleM CoreExpr -> CoreRule
+mkBasicRule :: RuleName -> KnownKey -> Int -> RuleM CoreExpr -> CoreRule
 -- Gives the Rule the same name as the primop itself
-mkBasicRule op_name n_args rm
-  = BuiltinRule { ru_name  = occNameFS (nameOccName op_name),
-                  ru_fn    = op_name,
-                  ru_nargs = n_args,
-                  ru_try   = runRuleM rm }
+mkBasicRule rule_nm op_key n_args rm
+  = BuiltinRule { ru_name  = rule_nm
+                , ru_key   = op_key
+                , ru_nargs = n_args
+                , ru_try   = runRuleM rm }
 
 newtype RuleM r = RuleM
   { runRuleM :: RuleOpts -> InScopeEnv -> Id -> [CoreExpr] -> Maybe r }
@@ -2062,6 +2065,30 @@ dataToTagRule = a `mplus` b
 
 {- *********************************************************************
 *                                                                      *
+             div and mod
+*                                                                      *
+********************************************************************* -}
+
+divIntRule :: RuleM CoreExpr
+divIntRule = msum [ nonZeroLit 1 >> binaryLit (intOp2 div)
+                  , leftZero
+                  , do { [arg, Lit (LitNumber LitNumInt d)] <- getArgs
+                       ; Just n <- return $ exactLog2 d
+                       ; platform <- getPlatform
+                       ; return $ Var (primOpId IntSraOp)
+                                  `App` arg `App` mkIntVal platform n } ]
+
+modIntRule :: RuleM CoreExpr
+modIntRule = msum [ nonZeroLit 1 >> binaryLit (intOp2 mod)
+                  , leftZero
+                  , do { [arg, Lit (LitNumber LitNumInt d)] <- getArgs
+                       ; Just _ <- return $ exactLog2 d
+                       ; platform <- getPlatform
+                       ; return $ Var (primOpId IntAndOp)
+                                  `App` arg `App` mkIntVal platform (d-1) } ]
+
+{- *********************************************************************
+*                                                                      *
              unsafeEqualityProof
 *                                                                      *
 ********************************************************************* -}
@@ -2132,53 +2159,45 @@ is fine.
 builtinRules :: [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
-  = [BuiltinRule { ru_name = fsLit "CStringFoldrLit",
-                   ru_fn = unpackCStringFoldrName,
-                   ru_nargs = 4, ru_try = match_cstring_foldr_lit_C },
-     BuiltinRule { ru_name = fsLit "CStringFoldrLitUtf8",
-                   ru_fn = unpackCStringFoldrUtf8Name,
-                   ru_nargs = 4, ru_try = match_cstring_foldr_lit_utf8 },
-     BuiltinRule { ru_name = fsLit "CStringAppendLit",
-                   ru_fn = unpackCStringAppendName,
-                   ru_nargs = 2, ru_try = match_cstring_append_lit_C },
-     BuiltinRule { ru_name = fsLit "CStringAppendLitUtf8",
-                   ru_fn = unpackCStringAppendUtf8Name,
-                   ru_nargs = 2, ru_try = match_cstring_append_lit_utf8 },
-     BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
-                   ru_nargs = 2, ru_try = match_eq_string },
-     BuiltinRule { ru_name = fsLit "CStringLength", ru_fn = cstringLengthName,
-                   ru_nargs = 1, ru_try = match_cstring_length },
-     BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
-                   ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
+  = [ BuiltinRule { ru_name = fsLit "CStringFoldrLit"
+                  , ru_key = unpackCStringFoldrIdKey
+                  , ru_nargs = 4, ru_try = match_cstring_foldr_lit_C }
+    , BuiltinRule { ru_name = fsLit "CStringFoldrLitUtf8"
+                  , ru_key = unpackCStringFoldrUtf8IdKey
+                  ,ru_nargs = 4, ru_try = match_cstring_foldr_lit_utf8 }
+    , BuiltinRule { ru_name = fsLit "CStringAppendLit"
+                  , ru_key = unpackCStringAppendIdKey
+                  , ru_nargs = 2, ru_try = match_cstring_append_lit_C }
+    , BuiltinRule { ru_name = fsLit "CStringAppendLitUtf8"
+                  , ru_key = unpackCStringAppendUtf8IdKey
+                  , ru_nargs = 2, ru_try = match_cstring_append_lit_utf8 }
+    , BuiltinRule { ru_name = fsLit "CStringLength"
+                  , ru_key = cstringLengthIdKey
+                  , ru_nargs = 1, ru_try = match_cstring_length }
 
-     mkBasicRule unsafeEqualityProofName 3 unsafeEqualityProofRule,
+    , BuiltinRule { ru_name = fsLit "EqString"
+                  , ru_key = eqStringIdKey
+                  , ru_nargs = 2, ru_try = match_eq_string }
 
-     mkBasicRule divIntName 2 $ msum
-        [ nonZeroLit 1 >> binaryLit (intOp2 div)
-        , leftZero
-        , do
-          [arg, Lit (LitNumber LitNumInt d)] <- getArgs
-          Just n <- return $ exactLog2 d
-          platform <- getPlatform
-          return $ Var (primOpId IntSraOp) `App` arg `App` mkIntVal platform n
-        ],
+    , BuiltinRule { ru_name = fsLit "Inline"
+                  , ru_key = inlineIdKey
+                  , ru_nargs = 2, ru_try = \_ _ _ -> match_inline }
 
-     mkBasicRule modIntName 2 $ msum
-        [ nonZeroLit 1 >> binaryLit (intOp2 mod)
-        , leftZero
-        , do
-          [arg, Lit (LitNumber LitNumInt d)] <- getArgs
-          Just _ <- return $ exactLog2 d
-          platform <- getPlatform
-          return $ Var (primOpId IntAndOp)
-            `App` arg `App` mkIntVal platform (d - 1)
-        ]
-     ]
+    , BuiltinRule { ru_name = fsLit "unsafeEqualityProof"
+                  , ru_key = unsafeEqualityProofIdKey
+                  , ru_nargs = 3, ru_try = runRuleM unsafeEqualityProofRule }
+
+    , BuiltinRule { ru_name = fsLit "divInt#"
+                  , ru_key = divIntIdKey
+                  , ru_nargs = 2, ru_try = runRuleM divIntRule }
+    , BuiltinRule { ru_name = fsLit "modInt#"
+                  , ru_key = modIntIdKey
+                  , ru_nargs = 2, ru_try = runRuleM modIntRule }
+    ]
  ++ builtinBignumRules
 {-# NOINLINE builtinRules #-}
--- there is no benefit to inlining these yet, despite this, GHC produces
+-- There is no benefit to inlining these yet, despite this, GHC produces
 -- unfoldings for this regardless since the floated list entries look small.
-
 
 
 {- Note [Built-in bignum rules]
@@ -2219,54 +2238,54 @@ RuleOpts.
 builtinBignumRules :: [CoreRule]
 builtinBignumRules =
   [ -- conversions
-    lit_to_integer "Word# -> Integer"   integerFromWordName
-  , lit_to_integer "Int64# -> Integer"  integerFromInt64Name
-  , lit_to_integer "Word64# -> Integer" integerFromWord64Name
-  , lit_to_integer "Natural -> Integer" integerFromNaturalName
+    lit_to_integer "Word# -> Integer"   integerFromWordIdKey
+  , lit_to_integer "Int64# -> Integer"  integerFromInt64IdKey
+  , lit_to_integer "Word64# -> Integer" integerFromWord64IdKey
+  , lit_to_integer "Natural -> Integer" integerFromNaturalIdKey
 
-  , integer_to_lit "Integer -> Word# (wrap)"   integerToWordName   mkWordLitWrap
-  , integer_to_lit "Integer -> Int# (wrap)"    integerToIntName    mkIntLitWrap
-  , integer_to_lit "Integer -> Word64# (wrap)" integerToWord64Name (\_ -> mkWord64LitWord64 . fromInteger)
-  , integer_to_lit "Integer -> Int64# (wrap)"  integerToInt64Name  (\_ -> mkInt64LitInt64 . fromInteger)
-  , integer_to_lit "Integer -> Float#"         integerToFloatName  (\_ -> mkFloatLit  . fromInteger)
-  , integer_to_lit "Integer -> Double#"        integerToDoubleName (\_ -> mkDoubleLit . fromInteger)
+  , integer_to_lit "Integer -> Word# (wrap)"   integerToWordIdKey   mkWordLitWrap
+  , integer_to_lit "Integer -> Int# (wrap)"    integerToIntIdKey    mkIntLitWrap
+  , integer_to_lit "Integer -> Word64# (wrap)" integerToWord64IdKey (\_ -> mkWord64LitWord64 . fromInteger)
+  , integer_to_lit "Integer -> Int64# (wrap)"  integerToInt64IdKey  (\_ -> mkInt64LitInt64 . fromInteger)
+  , integer_to_lit "Integer -> Float#"         integerToFloatIdKey  (\_ -> mkFloatLit  . fromInteger)
+  , integer_to_lit "Integer -> Double#"        integerToDoubleIdKey (\_ -> mkDoubleLit . fromInteger)
 
-  , integer_to_natural "Integer -> Natural (clamp)" integerToNaturalClampName False True
-  , integer_to_natural "Integer -> Natural (wrap)"  integerToNaturalName      False False
-  , integer_to_natural "Integer -> Natural (throw)" integerToNaturalThrowName True False
+  , integer_to_natural "Integer -> Natural (clamp)" integerToNaturalClampIdKey False True
+  , integer_to_natural "Integer -> Natural (wrap)"  integerToNaturalIdKey      False False
+  , integer_to_natural "Integer -> Natural (throw)" integerToNaturalThrowIdKey True False
 
-  , natural_to_word "Natural -> Word# (wrap)"  naturalToWordName
+  , natural_to_word "Natural -> Word# (wrap)"  naturalToWordIdKey
 
     -- comparisons (return an unlifted Int#)
-  , bignum_bin_pred "bigNatEq#"  bignatEqName (==)
+  , bignum_bin_pred "bigNatEq#"  bignatEqIdKey (==)
 
     -- comparisons (return an Ordering)
-  , bignum_compare "bignatCompare"      bignatCompareName
-  , bignum_compare "bignatCompareWord#" bignatCompareWordName
+  , bignum_compare "bignatCompare"      bignatCompareIdKey
+  , bignum_compare "bignatCompareWord#" bignatCompareWordIdKey
 
     -- binary operations
-  , integer_binop "integerAdd" integerAddName (+)
-  , integer_binop "integerSub" integerSubName (-)
-  , integer_binop "integerMul" integerMulName (*)
-  , integer_binop "integerGcd" integerGcdName gcd
-  , integer_binop "integerLcm" integerLcmName lcm
-  , integer_binop "integerAnd" integerAndName (.&.)
-  , integer_binop "integerOr"  integerOrName  (.|.)
-  , integer_binop "integerXor" integerXorName xor
+  , integer_binop "integerAdd" integerAddIdKey (+)
+  , integer_binop "integerSub" integerSubIdKey (-)
+  , integer_binop "integerMul" integerMulIdKey (*)
+  , integer_binop "integerGcd" integerGcdIdKey gcd
+  , integer_binop "integerLcm" integerLcmIdKey lcm
+  , integer_binop "integerAnd" integerAndIdKey (.&.)
+  , integer_binop "integerOr"  integerOrIdKey  (.|.)
+  , integer_binop "integerXor" integerXorIdKey xor
 
-  , natural_binop "naturalAdd" naturalAddName (+)
-  , natural_binop "naturalMul" naturalMulName (*)
-  , natural_binop "naturalGcd" naturalGcdName gcd
-  , natural_binop "naturalLcm" naturalLcmName lcm
-  , natural_binop "naturalAnd" naturalAndName (.&.)
-  , natural_binop "naturalOr"  naturalOrName  (.|.)
-  , natural_binop "naturalXor" naturalXorName xor
+  , natural_binop "naturalAdd" naturalAddIdKey (+)
+  , natural_binop "naturalMul" naturalMulIdKey (*)
+  , natural_binop "naturalGcd" naturalGcdIdKey gcd
+  , natural_binop "naturalLcm" naturalLcmIdKey lcm
+  , natural_binop "naturalAnd" naturalAndIdKey (.&.)
+  , natural_binop "naturalOr"  naturalOrIdKey  (.|.)
+  , natural_binop "naturalXor" naturalXorIdKey xor
 
     -- Natural subtraction: it's a binop but it can fail because of underflow so
     -- we have several primitives to handle here.
-  , natural_sub "naturalSubUnsafe" naturalSubUnsafeName
-  , natural_sub "naturalSubThrow"  naturalSubThrowName
-  , mkRule "naturalSub" naturalSubName 2 $ do
+  , natural_sub "naturalSubUnsafe" naturalSubUnsafeIdKey
+  , natural_sub "naturalSubThrow"  naturalSubThrowIdKey
+  , mkRule "naturalSub" naturalSubIdKey 2 $ do
         [a0,a1] <- getArgs
         x <- isNaturalLiteral a0
         y <- isNaturalLiteral a1
@@ -2278,53 +2297,53 @@ builtinBignumRules =
             else ret 2 $ mkNaturalExpr platform (x - y)
 
     -- unary operations
-  , bignum_unop "integerNegate"     integerNegateName     mkIntegerExpr negate
-  , bignum_unop "integerAbs"        integerAbsName        mkIntegerExpr abs
-  , bignum_unop "integerComplement" integerComplementName mkIntegerExpr complement
+  , bignum_unop "integerNegate"     integerNegateIdKey     mkIntegerExpr negate
+  , bignum_unop "integerAbs"        integerAbsIdKey        mkIntegerExpr abs
+  , bignum_unop "integerComplement" integerComplementIdKey mkIntegerExpr complement
 
-  , bignum_popcount "integerPopCount" integerPopCountName mkLitIntWrap
-  , bignum_popcount "naturalPopCount" naturalPopCountName mkLitWordWrap
+  , bignum_popcount "integerPopCount" integerPopCountIdKey mkLitIntWrap
+  , bignum_popcount "naturalPopCount" naturalPopCountIdKey mkLitWordWrap
 
     -- Bits.bit
-  , bignum_bit "integerBit" integerBitName mkIntegerExpr
-  , bignum_bit "naturalBit" naturalBitName mkNaturalExpr
+  , bignum_bit "integerBit" integerBitIdKey mkIntegerExpr
+  , bignum_bit "naturalBit" naturalBitIdKey mkNaturalExpr
 
     -- Bits.testBit
-  , bignum_testbit "integerTestBit" integerTestBitName
-  , bignum_testbit "naturalTestBit" naturalTestBitName
+  , bignum_testbit "integerTestBit" integerTestBitIdKey
+  , bignum_testbit "naturalTestBit" naturalTestBitIdKey
 
     -- Bits.shift
-  , bignum_shift "integerShiftL" integerShiftLName shiftL mkIntegerExpr
-  , bignum_shift "integerShiftR" integerShiftRName shiftR mkIntegerExpr
-  , bignum_shift "naturalShiftL" naturalShiftLName shiftL mkNaturalExpr
-  , bignum_shift "naturalShiftR" naturalShiftRName shiftR mkNaturalExpr
+  , bignum_shift "integerShiftL" integerShiftLIdKey shiftL mkIntegerExpr
+  , bignum_shift "integerShiftR" integerShiftRIdKey shiftR mkIntegerExpr
+  , bignum_shift "naturalShiftL" naturalShiftLIdKey shiftL mkNaturalExpr
+  , bignum_shift "naturalShiftR" naturalShiftRIdKey shiftR mkNaturalExpr
 
     -- division
-  , divop_one  "integerQuot"    integerQuotName    quot    mkIntegerExpr
-  , divop_one  "integerRem"     integerRemName     rem     mkIntegerExpr
-  , divop_one  "integerDiv"     integerDivName     div     mkIntegerExpr
-  , divop_one  "integerMod"     integerModName     mod     mkIntegerExpr
-  , divop_both "integerDivMod"  integerDivModName  divMod  mkIntegerExpr
-  , divop_both "integerQuotRem" integerQuotRemName quotRem mkIntegerExpr
+  , divop_one  "integerQuot"    integerQuotIdKey    quot    mkIntegerExpr
+  , divop_one  "integerRem"     integerRemIdKey     rem     mkIntegerExpr
+  , divop_one  "integerDiv"     integerDivIdKey     div     mkIntegerExpr
+  , divop_one  "integerMod"     integerModIdKey     mod     mkIntegerExpr
+  , divop_both "integerDivMod"  integerDivModIdKey  divMod  mkIntegerExpr
+  , divop_both "integerQuotRem" integerQuotRemIdKey quotRem mkIntegerExpr
 
-  , divop_one  "naturalQuot"    naturalQuotName    quot    mkNaturalExpr
-  , divop_one  "naturalRem"     naturalRemName     rem     mkNaturalExpr
-  , divop_both "naturalQuotRem" naturalQuotRemName quotRem mkNaturalExpr
+  , divop_one  "naturalQuot"    naturalQuotIdKey    quot    mkNaturalExpr
+  , divop_one  "naturalRem"     naturalRemIdKey     rem     mkNaturalExpr
+  , divop_both "naturalQuotRem" naturalQuotRemIdKey quotRem mkNaturalExpr
 
     -- conversions from Rational for Float/Double literals
-  , rational_to "rationalToFloat#"  rationalToFloatName  LitFloat
-  , rational_to "rationalToDouble#" rationalToDoubleName LitDouble
+  , rational_to "rationalToFloat#"  rationalToFloatIdKey  LitFloat
+  , rational_to "rationalToDouble#" rationalToDoubleIdKey LitDouble
 
     -- conversions from Integer for Float/Double literals
-  , integer_encode_float "integerEncodeFloat"  integerEncodeFloatName
+  , integer_encode_float "integerEncodeFloat"  integerEncodeFloatIdKey
       encodeLitFloat  LitFloat
-  , integer_encode_float "integerEncodeDouble" integerEncodeDoubleName
+  , integer_encode_float "integerEncodeDouble" integerEncodeDoubleIdKey
       encodeLitDouble LitDouble
   ]
   where
-    mkRule str name nargs f = BuiltinRule
+    mkRule str key nargs f = BuiltinRule
       { ru_name = fsLit str
-      , ru_fn = name
+      , ru_key = key
       , ru_nargs = nargs
       , ru_try = runRuleM $ do
           env <- getRuleOpts
@@ -2470,7 +2489,8 @@ builtinBignumRules =
       platform <- getPlatform
       pure $ mkCoreUnboxedTuple [mk_lit platform r, mk_lit platform s]
 
-    integer_encode_float :: String -> Name -> (Integer -> Int -> LitFloating) -> LitFloatingType -> CoreRule
+    integer_encode_float :: String -> KnownKey
+                         -> (Integer -> Int -> LitFloating) -> LitFloatingType -> CoreRule
     integer_encode_float str name encode_fun destType = mkRule str name 2 $ do
       [a0,a1] <- getArgs
       x <- isIntegerLiteral a0
@@ -2479,7 +2499,7 @@ builtinBignumRules =
       yInt <- liftMaybe (toIntegralSized y :: Maybe Int)
       pure $ Lit $ LitFloating destType $ encode_fun x yInt
 
-    rational_to :: String -> Name -> LitFloatingType -> CoreRule
+    rational_to :: String -> KnownKey -> LitFloatingType -> CoreRule
     rational_to str name destType = mkRule str name 2 $ do
       -- This turns `rationalToFloat# n d` where `n` and `d` are literals into
       -- a literal Float# (and similarly for Double#).

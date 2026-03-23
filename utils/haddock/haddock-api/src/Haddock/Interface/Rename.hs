@@ -34,7 +34,8 @@ import qualified Data.Set as Set
 import Data.Traversable (mapM)
 
 import GHC hiding (NoLink, HsTypeGhcPsExt (..))
-import GHC.Builtin.Types (eqTyCon_RDR, tupleDataConName, tupleTyConName)
+import GHC.Builtin.Types ( tupleDataConName, tupleTyConName)
+import GHC.Builtin.Names ( eqTyConKey )
 import GHC.Core.TyCon (tyConResKind)
 import GHC.Driver.DynFlags (getDynFlags)
 import GHC.Hs.Decls.Overlap (OverlapMode(..))
@@ -42,7 +43,6 @@ import GHC.Types.Basic (TupleSort (..))
 import GHC.Types.ForeignCall (CType(..))
 import qualified GHC.Types.ForeignCall as Hs (Header(..))
 import GHC.Types.Name
-import GHC.Types.Name.Reader (RdrName (Exact))
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
 
 import Haddock.Backends.Hoogle (ppExportD)
@@ -114,7 +114,7 @@ renameInterface ignoreSet renamingEnv expInfo warnings hoogle iface = do
         && not (isBuiltInSyntax name)
         && not (isTyVarName name)
         && not (isDerivedOccName $ nameOccName name)
-        && Exact name /= eqTyCon_RDR
+        && not (name `hasKnownKey` eqTyConKey)
         -- Must not be in the set of ignored symbols for the module or the
         -- unqualified ignored symbols
         && not (getOccString name `Set.member` ignoreSet')

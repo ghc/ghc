@@ -715,8 +715,8 @@ magicDefnModules = mkModuleSet $ map (nameModule . getName . fst) magicDefns
 mkUnsafeCoercePrimPair :: Id -> CoreExpr -> DsM (Id, CoreExpr)
 -- See Note [Wiring in unsafeCoerce#] for the defn we are creating here
 mkUnsafeCoercePrimPair _old_id old_expr
-  = do { unsafe_equality_proof_id <- dsLookupGlobalId unsafeEqualityProofName
-       ; unsafe_equality_tc       <- dsLookupTyCon unsafeEqualityTyConName
+  = do { unsafe_equality_proof_id <- dsLookupKnownKeyId unsafeEqualityProofIdKey
+       ; unsafe_equality_tc       <- dsLookupKnownKeyTyCon unsafeEqualityTyConKey
 
        ; let [unsafe_refl_data_con] = tyConDataCons unsafe_equality_tc
 

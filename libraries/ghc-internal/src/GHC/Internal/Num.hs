@@ -1,5 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Num
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -43,6 +47,8 @@ import GHC.Internal.Prim (
     (+#), (-#), (*#),
   )
 import GHC.Internal.Types (Int(..), Word(..))
+
+import GHC.Internal.Classes ( (==) )  -- Needed for know-key names
 
 infixl 7  *
 infixl 6  +, -

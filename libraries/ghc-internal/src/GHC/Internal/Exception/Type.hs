@@ -49,16 +49,16 @@ module GHC.Internal.Exception.Type
        , underflowException
        ) where
 
-import GHC.Internal.Classes (Eq, Ord)
+import GHC.Internal.Base
 import GHC.Internal.Data.OldList (lines, unlines, null)
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Typeable (Typeable, TypeRep, cast)
 import qualified GHC.Internal.Data.Typeable as Typeable
    -- loop: GHC.Internal.Data.Typeable -> GHC.Internal.Err -> GHC.Internal.Exception
-import GHC.Internal.Base (String, Void, fmap, return, ($), (.), (++))
 import GHC.Internal.Show
-import GHC.Internal.Types (Bool(..))
 import GHC.Internal.Exception.Context
+import GHC.Internal.Base( (>>=) )     -- For known-key names
+import GHC.Internal.Classes( (==) )   -- For known-key names
 
 {- |
 A constraint used to propagate 'ExceptionContext's.

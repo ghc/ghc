@@ -1,4 +1,8 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, BangPatterns, UnliftedFFITypes #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines unpackFoldrCString# etc
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.CString

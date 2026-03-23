@@ -3,6 +3,10 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE StandaloneDeriving #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+   -- Defines Arrow and its methods
+
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Arrow may never fire
     -- e.g. compose/arr;  see #10528

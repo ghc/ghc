@@ -2,6 +2,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeOperators #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines loop, mfix
+
 -- For head in instance MonadFix []
 {-# OPTIONS_GHC -Wno-x-partial #-}
 
@@ -52,6 +55,8 @@ import GHC.Internal.TH.Monad
 import GHC.Internal.Control.Exception
 import GHC.Internal.Control.Arrow
 import GHC.Internal.Types ( IO )
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
+import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 -- | Monads having fixed points with a \'knot-tying\' semantics.
 -- Instances of 'MonadFix' should satisfy the following laws:

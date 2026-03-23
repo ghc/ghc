@@ -7,6 +7,9 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Traversable
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Data.Traversable

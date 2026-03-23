@@ -4929,7 +4929,8 @@ tc_lhs_kind_sig mode ctxt hs_kind
 
 promotionErr :: Name -> PromotionErr -> TcM a
 promotionErr name err
-  = failWithTc $ TcRnUnpromotableThing name err
+  = do { traceTc "promotionError" (ppr name)
+       ; failWithTc $ TcRnUnpromotableThing name err }
 
 {-
 ************************************************************************

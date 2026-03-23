@@ -27,10 +27,8 @@ module GHC.Internal.IO.Device (
         SeekMode(..)
     ) where
 
-import GHC.Internal.Base ( return )
-import GHC.Internal.Classes ( Eq, Ord )
+import GHC.Internal.Base
 import GHC.Internal.Maybe ( Maybe )
-import GHC.Internal.Types ( Bool(..), Int )
 import GHC.Internal.Word
 import GHC.Internal.Arr
 import GHC.Internal.Enum
@@ -40,6 +38,7 @@ import GHC.Internal.Ptr
 import GHC.Internal.Num
 import GHC.Internal.IO
 import {-# SOURCE #-} GHC.Internal.IO.Exception ( unsupportedOperation )
+import GHC.Internal.Classes( (==) )   -- For known-key names
 
 -- | A low-level I/O provider where the data is bytes in memory.
 --   The Word64 offsets currently have no effect on POSIX system or consoles

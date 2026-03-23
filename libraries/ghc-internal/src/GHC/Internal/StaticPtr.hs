@@ -1,6 +1,10 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE MagicHash                 #-}
 {-# LANGUAGE UnboxedTuples             #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines IsStatic, etc
+
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 -----------------------------------------------------------------------------
 -- |
@@ -47,19 +51,18 @@ module GHC.Internal.StaticPtr
   , IsStatic(..)
   ) where
 
-import GHC.Internal.Classes             (Eq(..))
+import GHC.Internal.Base
 import GHC.Internal.Data.Typeable       (Typeable)
 import GHC.Internal.Foreign.C.Types     (CInt(..))
 import GHC.Internal.Foreign.Marshal.Array (allocaArray, peekArray, withArray)
-import GHC.Internal.Base            (String, id, mapM, return, ($), (>>=))
 import GHC.Internal.Maybe           (Maybe(..))
 import GHC.Internal.Prim            (Word64#, addrToAny#)
 import GHC.Internal.Ptr             (Ptr(..), nullPtr)
 import GHC.Internal.Fingerprint     (Fingerprint(..))
 import GHC.Internal.Real
-import GHC.Internal.Types           (Int, IO)
 import GHC.Internal.Word            (Word64(..))
 import GHC.Internal.Text.Show
+import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 
 -- | A reference to a value of type @a@.

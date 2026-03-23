@@ -48,15 +48,12 @@ module GHC.Internal.Event.TimerManager
 ------------------------------------------------------------------------
 -- Imports
 
-import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Base
 import GHC.Internal.Control.Exception (finally)
 import GHC.Internal.Data.Foldable (sequence_)
 import GHC.Internal.Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import GHC.Internal.Err (errorWithoutStackTrace)
-import GHC.Internal.Base (
-    Monoid(..), const, liftM, map, otherwise, return, when, ($), (++), (=<<),
-  )
 import GHC.Internal.Clock (getMonotonicTimeNSec)
 import GHC.Internal.Conc.Signal (runHandlers)
 import GHC.Internal.Enum (maxBound)
@@ -70,10 +67,10 @@ import GHC.Internal.Event.Internal (Backend, Event, evtRead, Timeout(..))
 import GHC.Internal.Event.Unique (UniqueSource, newSource, newUnique)
 import GHC.Internal.Event.TimeOut
 import GHC.Internal.System.Posix.Types (Fd)
-import GHC.Internal.Types (Bool(..), Int, IO)
 
 import qualified GHC.Internal.Event.Internal as I
 import qualified GHC.Internal.Event.PSQ as Q
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 #if defined(HAVE_POLL)
 import qualified GHC.Internal.Event.Poll   as Poll

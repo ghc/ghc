@@ -29,30 +29,35 @@ import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLocalBinds,
                                           dsSyntaxExpr )
 
 import GHC.Tc.Utils.TcType
-import GHC.Core.Multiplicity
 import GHC.Tc.Types.Evidence
+
+import GHC.HsToCore.Binds (dsHsWrapper)
+
+import GHC.Core.Multiplicity
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Make
-import GHC.HsToCore.Binds (dsHsWrapper)
+import GHC.Core.ConLike
 
+import GHC.Builtin.Types
+import GHC.Builtin.Names
 
 import GHC.Types.Id
-import GHC.Core.ConLike
-import GHC.Builtin.Types
+import GHC.Types.Name( KnownKey )
 import GHC.Types.Basic
-import GHC.Builtin.Names
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
+import GHC.Types.Unique.DSet
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
 import GHC.Data.List.SetOps( assocMaybe )
+
 import Data.Foldable (toList)
 import Data.List (mapAccumL)
 import Data.List.NonEmpty (NonEmpty(..), nonEmpty)
-import GHC.Utils.Misc
-import GHC.Types.Unique.DSet
 
 data DsCmdEnv = DsCmdEnv {
         arr_id, compose_id, first_id, app_id, choice_id, loop_id :: CoreExpr
@@ -60,36 +65,31 @@ data DsCmdEnv = DsCmdEnv {
 
 mkCmdEnv :: CmdSyntaxTable GhcTc -> DsM ([CoreBind], DsCmdEnv)
 -- See Note [CmdSyntaxTable] in GHC.Hs.Expr
-mkCmdEnv tc_meths
+mkCmdEnv (CST tc_meths)
   = do { (meth_binds, prs) <- mapAndUnzipM mk_bind tc_meths
 
-       -- NB: Some of these lookups might fail, but that's OK if the
-       -- symbol is never used. That's why we use Maybe first and then
-       -- panic. An eager panic caused trouble in typecheck/should_compile/tc192
-       ; let the_arr_id     = assocMaybe prs arrAName
-             the_compose_id = assocMaybe prs composeAName
-             the_first_id   = assocMaybe prs firstAName
-             the_app_id     = assocMaybe prs appAName
-             the_choice_id  = assocMaybe prs choiceAName
-             the_loop_id    = assocMaybe prs loopAName
+       ; let lookup_meth :: KnownKey -> CoreExpr
+             lookup_meth key
+                = case assocMaybe prs key of
+                    Nothing -> pprPanic "mkCmdEnv" (text "Not found:" <+> ppr key)
+                    Just id -> Var id
+             -- NB: Some of these assocMaybes might fail, but that's OK if the
+             -- symbol is never used. That's why we use Maybe first and then
+             -- panic. An eager panic caused trouble in typecheck/should_compile/tc192
 
-       ; return (meth_binds, DsCmdEnv {
-               arr_id     = Var (unmaybe the_arr_id arrAName),
-               compose_id = Var (unmaybe the_compose_id composeAName),
-               first_id   = Var (unmaybe the_first_id firstAName),
-               app_id     = Var (unmaybe the_app_id appAName),
-               choice_id  = Var (unmaybe the_choice_id choiceAName),
-               loop_id    = Var (unmaybe the_loop_id loopAName)
-             }) }
+       ; return (meth_binds, DsCmdEnv { arr_id     = lookup_meth arrAIdKey
+                                      , compose_id = lookup_meth composeAIdKey
+                                      , first_id   = lookup_meth firstAIdKey
+                                      , app_id     = lookup_meth appAIdKey
+                                      , choice_id  = lookup_meth choiceAIdKey
+                                      , loop_id    = lookup_meth loopAIdKey })
+       }
   where
     mk_bind (std_name, expr)
       = do { rhs <- dsExpr expr
            ; id <- newSysLocalMDs (exprType rhs)
            -- no check needed; these are functions
            ; return (NonRec id rhs, (std_name, id)) }
-
-    unmaybe Nothing name = pprPanic "mkCmdEnv" (text "Not found:" <+> ppr name)
-    unmaybe (Just id) _  = id
 
 -- arr :: forall b c. (b -> c) -> a b c
 do_arr :: DsCmdEnv -> Type -> Type -> CoreExpr -> CoreExpr

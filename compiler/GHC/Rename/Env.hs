@@ -17,7 +17,7 @@ module GHC.Rename.Env (
         lookupOccRn, lookupOccRn_maybe, lookupSameOccRn_maybe,
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
-        lookupTypeOccRn,
+        lookupTypeOccRn, lookupOccRnNone,
         lookupGlobalOccRn_maybe,
 
         lookupExprOccRn,
@@ -41,12 +41,10 @@ module GHC.Rename.Env (
         lookupGreAvailRn,
 
         -- Rebindable Syntax
-        lookupSyntax, lookupSyntaxExpr, lookupSyntaxNames,
+        lookupSyntax, lookupSyntaxExpr,
         lookupSyntaxName,
         lookupIfThenElse,
-
-        -- QualifiedDo
-        lookupQualifiedDo, lookupQualifiedDoName, lookupNameWithQualifier,
+        lookupNameWithQualifier,
 
         -- Constructing usage information
         DeprecationWarnings(..),
@@ -60,6 +58,8 @@ import GHC.Prelude
 
 import GHC.Iface.Load
 import GHC.Iface.Env
+import GHC.Iface.Errors.Types( IfaceMessage(..) )
+
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
@@ -68,41 +68,50 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Utils.Monad
 import GHC.Parser.PostProcess ( setRdrNameSpace )
+
+import GHC.Rename.Unbound
+import GHC.Rename.Utils
+
 import GHC.Builtin.Types
+import GHC.Builtin.Names( rOOT_MAIN )
+import GHC.Builtin( knownKeyOccMap, knownKeyOccName )
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModIface
+
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+
+import GHC.Driver.Env
+import GHC.Driver.Session
+
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSet
+import GHC.Types.Unique.Set
+import GHC.Types.TyThing ( tyThingGREInfo )
+import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Avail
 import GHC.Types.Hint
-import GHC.Unit.Module
-import GHC.Unit.Module.ModIface
-import GHC.Core.ConLike
-import GHC.Core.DataCon
-import GHC.Core.TyCon
-import GHC.Builtin.Names( rOOT_MAIN )
-import GHC.Types.Basic  ( TupleSort(..), tupleSortBoxity )
-import GHC.Types.TyThing ( tyThingGREInfo )
-import GHC.Types.SrcLoc as SrcLoc
-import GHC.Utils.Outputable as Outputable
-import GHC.Types.Unique.FM
-import GHC.Types.Unique.DSet
-import GHC.Types.Unique.Set
-import GHC.Utils.Misc
-import GHC.Utils.Panic
-import GHC.Data.Maybe
-import GHC.Driver.Env
-import GHC.Driver.Session
-import GHC.Data.FastString
-import GHC.Data.List.SetOps ( minusList )
-import qualified GHC.LanguageExtensions as LangExt
-import GHC.Rename.Unbound
-import GHC.Rename.Utils
-import GHC.Data.Bag
 import GHC.Types.CompleteMatch
 import GHC.Types.PkgQual
 import GHC.Types.GREInfo
+import GHC.Types.Basic  ( TupleSort(..), tupleSortBoxity )
 
-import Control.Arrow    ( first )
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+
+import qualified GHC.LanguageExtensions as LangExt
+import GHC.Data.Maybe
+import GHC.Data.FastString
+import GHC.Data.List.SetOps ( minusList )
+import GHC.Data.Bag
+
 import Control.Monad
 import Data.Either      ( partitionEithers )
 import Data.Function    ( on )
@@ -179,7 +188,7 @@ Note [Handling of deprecations] in GHC.Rename.Utils
 
 newTopSrcBinder :: LocatedN RdrName -> RnM Name
 newTopSrcBinder (L loc rdr_name)
-  | Just name <- isExact_maybe rdr_name
+  | Just name <- rdrNameExactName_maybe rdr_name
   =     -- This is here to catch
         --   (a) Exact-name binders created by Template Haskell
         --   (b) The PrelBase defn of (say) [] and similar, for which
@@ -224,11 +233,11 @@ newTopSrcBinder (L loc rdr_name)
         -- the RdrName, not from the environment.  In principle, it'd be fine to
         -- have an arbitrary mixture of external core definitions in a single module,
         -- (apart from module-initialisation issues, perhaps).
-        ; newGlobalBinder rdr_mod rdr_occ (locA loc) }
+        ; newGlobalBinder rdr_mod rdr_occ Nothing (locA loc) }
 
   | otherwise
-  = do  { when (isQual rdr_name)
-                 (addErrAt (locA loc) (badQualBndrErr rdr_name))
+  = do  { when (isQual rdr_name) $
+          addErrAt (locA loc) (badQualBndrErr rdr_name)
                 -- Binders should not be qualified; if they are, and with a different
                 -- module name, we get a confusing "M.T is not in scope" error later
 
@@ -239,10 +248,34 @@ newTopSrcBinder (L loc rdr_name)
              do { uniq <- newUnique
                 ; return (mkInternalName uniq (rdrNameOcc rdr_name) (locA loc)) }
           else
-             do { this_mod <- getModule
-                ; traceRn "newTopSrcBinder" (ppr this_mod $$ ppr rdr_name $$ ppr (locA loc))
-                ; newGlobalBinder this_mod (rdrNameOcc rdr_name) (locA loc) }
+             -- Finally we get the "normal path"; an ordinary, top-level binding
+             newTopVanillaSrcBinder (rdrNameOcc rdr_name) (locA loc)
         }
+
+newTopVanillaSrcBinder :: OccName -> SrcSpan -> RnM Name
+newTopVanillaSrcBinder occ loc
+  = do { this_mod <- getModule
+
+       -- See if this bindings is for a known-key name, and if so get its Unique
+       -- See 'Defining known-key names' in GHC.Types.Name
+       ; dflags <- getDynFlags
+       ; let defines_known_keys = gopt Opt_DefinesKnownKeyNames dflags
+             exclusions = knownKeyExclusions dflags
+             mb_uniq :: Maybe Unique
+             mb_uniq | defines_known_keys
+                     , not (occ `elem` exclusions)
+                     = lookupOccEnv knownKeyOccMap occ
+                     | otherwise          = Nothing
+
+       ; name <- newGlobalBinder this_mod occ mb_uniq loc
+       ; traceRn "newTopSrcBinder" $
+         vcat [ text "module:" <+> ppr this_mod
+              , text "occ:" <+> ppr occ
+              , text "mb_uniq:" <+> ppr mb_uniq
+              , text "loc:" <+> ppr loc
+              , text "name:" <+> ppr name ]
+       ; return name
+       }
 
 {-
 *********************************************************
@@ -300,7 +333,7 @@ lookupLocatedTopBndrRnN :: WhatLooking -> LocatedN RdrName -> RnM (LocatedN Name
 lookupLocatedTopBndrRnN what_look =
   wrapLocMA (fmap getName . lookupTopBndrRn what_look)
 
--- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
+-- | Lookup an Exact RdrName. See Note [Looking up Exact RdrNames].
 -- This never adds an error, but it may return one, see
 -- Note [Errors in lookup functions]
 lookupExactOcc_either :: Name -> RnM (Either NotInScopeError GlobalRdrElt)
@@ -324,24 +357,24 @@ lookupExactOcc_either name
        ; checkTupSize tupArity
        ; return $ Right $ mkExactGRE name info }
 
-  | isExternalName name
-  = do { info <- lookupExternalExactName name
-       ; return $ Right $ mkExactGRE name info }
-
   | otherwise
-  = lookupLocalExactGRE name
+  = do { this_mod <- getModule
+       ; if nameIsLocalOrFrom this_mod name
+         then lookupLocalExactGRE name
+         else lookupImportedExactName name }
 
-lookupExternalExactName :: Name -> RnM GREInfo
-lookupExternalExactName name
-  = do { thing <-
-           case wiredInNameTyThing_maybe name of
-             Just thing -> return thing
-             _          -> tcLookupGlobal name
-       ; return $ tyThingGREInfo thing }
+lookupImportedExactName :: Name -> RnM (Either NotInScopeError GlobalRdrElt)
+lookupImportedExactName name
+  = do { thing <- case wiredInNameTyThing_maybe name of
+                     Just thing -> return thing
+                     _          -> tcLookupGlobal name
+       ; let info = tyThingGREInfo thing
+       ; return $ Right $ mkExactGRE name info }
 
 lookupLocalExactGRE :: Name -> RnM (Either NotInScopeError GlobalRdrElt)
 lookupLocalExactGRE name
   = do { env <- getGlobalRdrEnv
+       ; traceRn "localexact" (ppr name)
        ; let lk = LookupExactName { lookupExactName = name
                                   , lookInAllNameSpaces = True }
              -- We want to check for clashes where the same Unique
@@ -350,11 +383,13 @@ lookupLocalExactGRE name
              -- check ALL namespaces, not just the NameSpace of the Name.
              -- See test cases T9066, T11809.
        ; case lookupGRE env lk of
-           [gre] -> return (Right gre)
+           [gre] -> do { traceRn "localexact1" (ppr gre)
+       ;               ; return (Right gre) }
 
            []    -> -- See Note [Splicing Exact names]
                     do { lcl_env <- getLocalRdrEnv
                        ; let gre = mkLocalVanillaGRE NoParent name -- LocalRdrEnv only contains Vanilla things
+                       ; traceRn "localexact2" (ppr gre)
                        ; if name `inLocalRdrEnvScope` lcl_env
                          then return (Right gre)
                          else
@@ -466,20 +501,25 @@ data ExactOrOrigResult
 -- Does the actual looking up an Exact or Orig name, see 'ExactOrOrigResult'
 lookupExactOrOrig_base :: RdrName -> RnM ExactOrOrigResult
 lookupExactOrOrig_base rdr_name
-  | Just n <- isExact_maybe rdr_name   -- This happens in derived code
+  | Just n <- rdrNameExactName_maybe rdr_name   -- This happens in derived code
   = cvtEither <$> lookupExactOcc_either n
+
+  | Just occ <- rdrNameKnownOcc_maybe rdr_name
+  = do { name <- rnLookupKnownOccName occ
+       ; traceRn "lookupExact" (ppr name)
+       ; cvtEither <$> lookupExactOcc_either name }
+
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
   = do { nm <- lookupOrig rdr_mod rdr_occ
 
        ; this_mod <- getModule
-       ; mb_gre <-
-         if nameIsLocalOrFrom this_mod nm
-         then lookupLocalExactGRE nm
-         else do { info <- lookupExternalExactName nm
-                 ; return $ Right $ mkExactGRE nm info }
+       ; mb_gre <- if nameIsLocalOrFrom this_mod nm
+                   then lookupLocalExactGRE nm
+                   else lookupImportedExactName nm
        ; return $ case mb_gre of
           Left  err -> ExactOrOrigError err
           Right gre -> FoundExactOrOrig gre }
+
   | otherwise = return NotExactOrOrig
   where
     cvtEither (Left e)    = ExactOrOrigError e
@@ -892,8 +932,8 @@ Exact RdrNames are generated by:
 * Template Haskell (See Note [Binders in Template Haskell] in GHC.ThToHs)
 * Derived instances (See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate)
 
-For data types and classes have Exact system Names in the binding
-positions for constructors, TyCons etc.  For example
+Template Hasekll may generate data type and class decls with Exact system
+Names in the binding positions for constructors, TyCons etc.  For example
     [d| data T = MkT Int |]
 when we splice in and convert to HsSyn RdrName, we'll get
     data (Exact (system Name "T")) = (Exact (system Name "MkT")) ...
@@ -907,8 +947,8 @@ So we do the following
    the name that goes in the GlobalRdrEnv
 
  * When looking up an occurrence of an Exact name, done in
-   GHC.Rename.Env.lookupExactOcc, we find the Name with the right unique in the
-   GlobalRdrEnv, and use the one from the envt -- it will be an
+   GHC.Rename.Env.lookupExactOcc, we find the Name with the right unique
+   in the GlobalRdrEnv, and use the one from the envt -- it will be an
    External Name in the case of the data type/constructor above.
 
  * Exact names are also use for purely local binders generated
@@ -986,6 +1026,36 @@ we'll miss the fact that the qualified import is redundant.
 --              Occurrences
 --------------------------------------------------
 -}
+
+rnLookupKnownOccName :: HasDebugCallStack => KnownOcc -> RnM Name
+-- We have to duplicate GHC.Iface.Load.lookupKnownOccName
+-- so that we can include a call to addUsedGRE, which in turn
+-- is needed to avoid "redundant import" messages when compiling in
+-- `ghc-internal` and `base`
+rnLookupKnownOccName occ
+  = do { kk_source <- getKnownKeySource
+       ; mb_res <- lookup_known_occ kk_source occ
+       ; case mb_res of
+           Failed err     -> failWithTc (TcRnInterfaceError err)
+           Succeeded name -> return name }
+
+lookup_known_occ :: HasDebugCallStack
+                   => KnownKeyNameSource -> KnownOcc
+                   -> RnM (MaybeErr IfaceMessage Name)
+lookup_known_occ KKNS_FromModule occ
+  = do { (_, occ_map) <- initIfaceTcRn loadKnownKeyOccMaps
+       ; case lookupOccEnv occ_map occ of
+           Just name -> return (Succeeded name)
+           Nothing   -> return (Failed (MissingKnownKey3 occ)) }
+
+lookup_known_occ (KKNS_InScope gbl_rdr_env) occ
+  = case lookupGRE gbl_rdr_env (LookupOccName occ SameNameSpace) of
+       [gre] -> do { let name = greName gre
+                   ; addUsedGRE NoDeprecationWarnings gre
+                   ; traceIf $ hang (text "lookupKnownKeyOcc NoImplicitKnownKeyNames")
+                                  2 (ppr name <+> ppr occ)
+                   ; return (Succeeded name) }
+       gres  -> return (Failed (KnownKeyScopeError occ gres))
 
 lookupLocatedOccRn :: WhatLooking
                    -> GenLocated (EpAnn ann) RdrName
@@ -2150,7 +2220,7 @@ lookupBindGroupOcc :: HsSigCtxt
 --
 -- See Note [Looking up signature names].
 lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns ns_spec
-  | Just n <- isExact_maybe rdr_name
+  | Just n <- rdrNameExactName_maybe rdr_name
   = do { mb_gre <- lookupExactOcc_either n
        ; return $ case mb_gre of
           Left err  -> NE.singleton $ Left err
@@ -2351,7 +2421,8 @@ lookupIfThenElse
          else do { ite <- lookupOccRnNone (mkVarUnqual (fsLit "ifThenElse"))
                  ; return (Just ite) } }
 
-lookupSyntaxName :: Name                 -- ^ The standard name
+lookupSyntaxName :: HasDebugCallStack
+                 => KnownKey      -- ^ The standard name
                  -> RnM (Name, FreeNames) -- ^ Possibly a non-standard name
 -- Lookup a Name that may be subject to Rebindable Syntax (RS).
 --
@@ -2359,71 +2430,41 @@ lookupSyntaxName :: Name                 -- ^ The standard name
 --
 -- - When RS is on, look up the OccName of the supplied Name; return
 --   what we find, or the supplied Name if there is nothing in scope
-lookupSyntaxName std_name
+lookupSyntaxName std_uniq
   = do { rebind <- xoptM LangExt.RebindableSyntax
        ; if not rebind
-         then return (std_name, emptyFNs)
-         else do { nm <- lookupOccRnNone (mkRdrUnqual (nameOccName std_name))
+         then do { nm <- rnLookupKnownKeyName std_uniq
+                 ; return (nm, emptyFNs) }
+         else do { nm <- lookupOccRnNone $ mkRdrUnqual $
+                         knownKeyOccName std_uniq
                  ; return (nm, unitFN nm) } }
 
-lookupSyntaxExpr :: Name                          -- ^ The standard name
+lookupSyntaxExpr :: KnownKey               -- ^ The standard name
                  -> RnM (HsExpr GhcRn, FreeNames)  -- ^ Possibly a non-standard name
-lookupSyntaxExpr std_name
-  = do { (name, fvs) <- lookupSyntaxName std_name
+lookupSyntaxExpr std_uniq
+  = do { (name, fvs) <- lookupSyntaxName std_uniq
        ; return (genHsVar name, fvs) }
 
-lookupSyntax :: Name                             -- The standard name
+lookupSyntax :: KnownKey                  -- The standard name
              -> RnM (SyntaxExpr GhcRn, FreeNames) -- Possibly a non-standard
                                                  -- name
-lookupSyntax std_name
-  = do { (name, fvs) <- lookupSyntaxName std_name
-       ; return (mkRnSyntaxExpr name, fvs) }
+lookupSyntax std_uniq
+  = do { (expr, fvs) <- lookupSyntaxExpr std_uniq
+       ; return (SyntaxExprRn expr, fvs) }
 
-lookupSyntaxNames :: [Name]                         -- Standard names
-     -> RnM ([HsExpr GhcRn], FreeNames) -- See comments with HsExpr.ReboundNames
-   -- this works with CmdTop, which wants HsExprs, not SyntaxExprs
-lookupSyntaxNames std_names
-  = do { rebindable_on <- xoptM LangExt.RebindableSyntax
-       ; if not rebindable_on then
-             return (map (mkHsVar . noLocA) std_names, emptyFNs)
-        else
-          do { usr_names <-
-                 mapM (lookupOccRnNone . mkRdrUnqual . nameOccName) std_names
-             ; return (map (mkHsVar . noLocA) usr_names, mkFNs usr_names) } }
-
-
-{-
-Note [QualifiedDo]
-~~~~~~~~~~~~~~~~~~
-QualifiedDo is implemented using the same placeholders for operation names in
-the AST that were devised for RebindableSyntax. Whenever the renamer checks
-which names to use for do syntax, it first checks if the do block is qualified
-(e.g. M.do { stmts }), in which case it searches for qualified names. If the
-qualified names are not in scope, an error is produced. If the do block is not
-qualified, the renamer does the usual search of the names which considers
-whether RebindableSyntax is enabled or not. Dealing with QualifiedDo is driven
-by the Opt_QualifiedDo dynamic flag.
--}
-
--- Lookup operations for a qualified do. If the context is not a qualified
--- do, then use lookupSyntaxExpr. See Note [QualifiedDo].
-lookupQualifiedDo :: HsStmtContext fn -> Name -> RnM (SyntaxExpr GhcRn, FreeNames)
-lookupQualifiedDo ctxt std_name
-  = first mkRnSyntaxExpr <$> lookupQualifiedDoName ctxt std_name
-
-lookupNameWithQualifier :: Name -> ModuleName -> RnM (Name, FreeNames)
-lookupNameWithQualifier std_name modName
-  = do { qname <- lookupOccRnNone (mkRdrQual modName (nameOccName std_name))
+lookupNameWithQualifier :: ModuleName -> KnownKey -> RnM (Name, FreeNames)
+lookupNameWithQualifier modName std_uniq
+  = do { qname <- lookupOccRnNone $
+                  mkRdrQual modName (knownKeyOccName std_uniq)
        ; return (qname, unitFN qname) }
 
--- See Note [QualifiedDo].
-lookupQualifiedDoName :: HsStmtContext fn -> Name -> RnM (Name, FreeNames)
-lookupQualifiedDoName ctxt std_name
-  = case qualifiedDoModuleName_maybe ctxt of
-      Nothing      -> lookupSyntaxName std_name
-      Just modName -> lookupNameWithQualifier std_name modName
 
---------------------------------------------------------------------------------
+{- *********************************************************************
+*                                                                      *
+                        Irrefutability
+*                                                                      *
+********************************************************************* -}
+
 -- Helper functions for 'isIrrefutableHsPat'.
 --
 -- (Defined here to avoid import cycles.)
@@ -2485,4 +2526,3 @@ in_single_complete_match con_nm = go
       | otherwise
       = go comps
 
---------------------------------------------------------------------------------

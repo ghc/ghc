@@ -15,6 +15,7 @@ import GHC.Internal.Base ( String, liftM, mapM, ($), (>>=) )
 import GHC.Internal.Real ( fromIntegral )
 import GHC.Internal.IO.Encoding
 import GHC.Internal.Types ( IO )
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 -- | Computation 'getFullArgs' is the "raw" version of
 -- 'GHC.Internal.System.Environment.getArgs', similar to @argv@ in other languages. It

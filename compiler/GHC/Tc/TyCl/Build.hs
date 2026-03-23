@@ -430,7 +430,7 @@ newImplicitBinderLoc :: Name                       -- Base name
 -- Just the same, but lets you specify the SrcSpan
 newImplicitBinderLoc base_name mk_sys_occ loc
   | Just mod <- nameModule_maybe base_name
-  = newGlobalBinder mod occ loc
+  = newGlobalBinder mod occ Nothing loc
   | otherwise           -- When typechecking a [d| decl bracket |],
                         -- TH generates types, classes etc with Internal names,
                         -- so we follow suit for the implicit binders
@@ -444,6 +444,6 @@ newTyConRepName :: Name -> TcRnIf gbl lcl TyConRepName
 newTyConRepName tc_name
   | Just mod <- nameModule_maybe tc_name
   , (mod, occ) <- tyConRepModOcc mod (nameOccName tc_name)
-  = newGlobalBinder mod occ noSrcSpan
+  = newGlobalBinder mod occ Nothing noSrcSpan
   | otherwise
   = newImplicitBinder tc_name mkTyConRepOcc

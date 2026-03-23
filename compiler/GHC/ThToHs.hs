@@ -1899,7 +1899,7 @@ hsTypeToArrow :: LHsType GhcPs -> HsModifiedFunArr GhcPs
 hsTypeToArrow w = HsModifiedFunArr noExtField mods arr
  where
   (mods, arr) = case unLoc w of
-                     HsTyVar _ _ (L _ (isExact_maybe -> Just n))
+                     HsTyVar _ _ (L _ (rdrNameExactName_maybe -> Just n))
                         | n == oneDataConName -> ([], HsLinearArr noAnn)
                         | n == manyDataConName -> ([], HsStandardArr (EpArrow noAnn))
                      _ -> ([HsModifier noAnn w], HsStandardArr (EpArrow noAnn))
@@ -2329,7 +2329,7 @@ thOrigOrExactRdrName occ th_ns pkg mod = knownOrigToExactRdrName (thOrigRdrName 
 knownOrigToExactRdrName :: RdrName -> RdrName
 knownOrigToExactRdrName (Orig mod occ)
   | Just name <- isKnownOrigName_maybe mod occ
-  = Exact name
+  = nameRdrName name
 knownOrigToExactRdrName rdr = rdr
 
 -- Return an exact RdrName if we're dealing with built-in syntax.

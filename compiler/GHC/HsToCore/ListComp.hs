@@ -8,7 +8,9 @@
 Desugaring list comprehensions, monad comprehensions and array comprehensions
 -}
 
-module GHC.HsToCore.ListComp ( dsListComp, dsMonadComp ) where
+module GHC.HsToCore.ListComp ( dsListComp, dsMonadComp
+                             , mkBuildExpr
+     ) where
 
 import GHC.Prelude
 
@@ -16,23 +18,32 @@ import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLocalBinds, dsSynta
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
+
 import GHC.Core
+import GHC.Core.Type
 import GHC.Core.Make
+import GHC.Core.Utils
 
 import GHC.HsToCore.Monad          -- the monadery used in the desugarer
 import GHC.HsToCore.Utils
+import GHC.HsToCore.Match
+
+import GHC.Types.Id
+import GHC.Types.SrcLoc
+import GHC.Types.Var( setTyVarUnique )
+import GHC.Types.Unique.Supply( getUniqueM )
 
 import GHC.Driver.DynFlags
-import GHC.Core.Utils
-import GHC.Types.Id
-import GHC.Core.Type
-import GHC.Builtin.Types
-import GHC.HsToCore.Match
+import GHC.Tc.Utils.TcType
+
 import GHC.Builtin.Names
-import GHC.Types.SrcLoc
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim( alphaTyVar )
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Tc.Utils.TcType
+
+import GHC.Data.FastString
 import GHC.Data.List.SetOps( getNth )
 
 import Data.Foldable ( toList )
@@ -118,7 +129,7 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
 
     -- Create an unzip function for the appropriate arity and element types and find "map"
     unzip_stuff' <- mkUnzipBind form from_bndrs_tys
-    map_id <- dsLookupGlobalId mapName
+    map_id <- dsLookupKnownKeyId mapIdKey
 
     -- Generate the expressions to build the grouped list
     let -- First we apply the grouping function to the inner list
@@ -662,3 +673,40 @@ mkMcUnzipM _ fmap_op ys elt_tys
                         mkBigTupleSelector xs (getNth xs n) tup_xs (Var tup_xs)
 
        ; return (mkBigCoreTup (map mk_elt [0..length elt_tys - 1])) }
+
+-- | Make a fully applied 'foldr' expression
+mkFoldrExpr :: Type             -- ^ Element type of the list
+            -> Type             -- ^ Fold result type
+            -> CoreExpr         -- ^ "Cons" function expression for the fold
+            -> CoreExpr         -- ^ "Nil" expression for the fold
+            -> CoreExpr         -- ^ List expression being folded acress
+            -> DsM CoreExpr
+mkFoldrExpr elt_ty result_ty c n list = do
+    foldr_id <- dsLookupKnownKeyId foldrIdKey
+    return (Var foldr_id `App` Type elt_ty
+           `App` Type result_ty
+           `App` c
+           `App` n
+           `App` list)
+
+-- | Make a 'build' expression applied to a locally-bound worker function
+mkBuildExpr :: Type                                       -- ^ Type of list elements to be built
+            -> ((Id, Type) -> (Id, Type) -> DsM CoreExpr) -- ^ Function that, given information about the 'Id's
+                                                          -- of the binders for the build worker function, returns
+                                                          -- the body of that worker
+            -> DsM CoreExpr
+mkBuildExpr elt_ty mk_build_inside = do
+    n_tyvar <- newTyVar alphaTyVar
+    let n_ty = mkTyVarTy n_tyvar
+        c_ty = mkVisFunTysMany [elt_ty, n_ty] n_ty
+    [c, n] <- sequence [mkSysLocalM (fsLit "c") ManyTy c_ty, mkSysLocalM (fsLit "n") ManyTy n_ty]
+
+    build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
+
+    build_id <- dsLookupKnownKeyId buildIdKey
+    return $ Var build_id `App` Type elt_ty `App` mkLams [n_tyvar, c, n] build_inside
+  where
+    newTyVar tyvar_tmpl = do
+      uniq <- getUniqueM
+      return (setTyVarUnique tyvar_tmpl uniq)
+

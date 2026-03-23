@@ -58,6 +58,7 @@ import GHC.Internal.IO.Unsafe (unsafePerformIO, unsafeInterleaveIO)
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Text.Show
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 -- N.B. See rts/include/rts/Libdw.h for notes on stack representation.
 

@@ -17,8 +17,8 @@ rnQualLit QualLit{..} = do
   let (funNameBase, hsLit) =
         case ql_val of
           -- See Note [Implementation of QualifiedStrings]
-          HsQualString st s -> (fromStringName, HsString st s)
-  (funName, fvs) <- lookupNameWithQualifier funNameBase ql_mod
+          HsQualString st s -> (fromStringClassOpKey, HsString st s)
+  (funName, fvs) <- lookupNameWithQualifier ql_mod funNameBase
   let lit = QualLit{ql_ext = L noAnn funName, ..}
   let expr = genHsApps funName [genLHsLit hsLit]
   pure ((lit, expr), fvs)

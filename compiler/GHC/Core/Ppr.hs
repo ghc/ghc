@@ -27,25 +27,27 @@ module GHC.Core.Ppr (
 import GHC.Prelude
 
 import GHC.Core
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Ppr
+import GHC.Core.Coercion
 import GHC.Core.Stats (exprStats)
+
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Literal( pprLiteral )
-import GHC.Types.Name( pprInfixName, pprPrefixName )
+import GHC.Types.Name( pprInfixName, pprPrefixName, pprKnownKey )
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.InlinePragma
 import GHC.Types.Demand
 import GHC.Types.Cpr
-import GHC.Core.DataCon
-import GHC.Core.TyCon
-import GHC.Core.TyCo.Ppr
-import GHC.Core.Coercion
-import GHC.Types.Basic
-import GHC.Utils.Misc
-import GHC.Utils.Outputable
 import GHC.Types.SrcLoc ( pprUserRealSpan )
 import GHC.Types.Tickish
+import GHC.Types.Basic
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
 
 {-
 ************************************************************************
@@ -668,8 +670,8 @@ pprRules :: [CoreRule] -> SDoc
 pprRules rules = vcat (map pprRule rules)
 
 pprRule :: CoreRule -> SDoc
-pprRule (BuiltinRule { ru_fn = fn, ru_name = name})
-  = text "Built in rule for" <+> ppr fn <> colon <+> doubleQuotes (ftext name)
+pprRule (BuiltinRule { ru_key = key, ru_name = name})
+  = text "Built in rule for" <+> pprKnownKey key <> colon <+> doubleQuotes (ftext name)
 
 pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
                 ru_bndrs = tpl_vars, ru_args = tpl_args,

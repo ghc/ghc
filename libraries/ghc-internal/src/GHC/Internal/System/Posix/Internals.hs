@@ -83,6 +83,7 @@ import GHC.Internal.Types (Int(..))
 import GHC.Internal.Int
 import GHC.Internal.Data.OldList (elem)
 #endif
+import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 -- ---------------------------------------------------------------------------
 -- Debugging the base package
