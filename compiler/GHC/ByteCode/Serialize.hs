@@ -25,22 +25,26 @@ where
 import GHC.Prelude
 
 import GHC.ByteCode.Binary
-import GHC.ByteCode.Types
 import GHC.ByteCode.Recomp.Binary (computeFingerprint)
-import GHC.Driver.Env
+import GHC.ByteCode.Types
 import GHC.Driver.DynFlags
+import GHC.Driver.Env
 import GHC.Iface.Binary
 import GHC.Iface.Recomp.Binary (putNameLiterally)
 import GHC.Linker.Types
+import GHC.Settings.Constants (hiVersion)
 import GHC.Unit.Types
 import GHC.Utils.Binary
-import GHC.Utils.TmpFs
-import GHC.Utils.Logger
 import GHC.Utils.Fingerprint (Fingerprint)
+import GHC.Utils.Logger
+import GHC.Utils.Panic
+import GHC.Utils.TmpFs
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
+import Data.ByteString qualified as BS
+import Data.Char (ord)
 import Data.Traversable
+import Data.Word
 import System.Directory
 import System.FilePath
 
@@ -79,7 +83,19 @@ The ticket where bytecode objects were dicussed is #26298
 
 See Note [-fwrite-byte-code is not the default]
 See Note [Recompilation avoidance with bytecode objects]
+See Note [Persistent bytecode file headers]
 
+Note [Persistent bytecode file headers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Persistent bytecode files (`.gbc`) and bytecode libraries (`.bytecodelib`)
+are version-specific binary formats. Without a small file-level header, stale
+or corrupt files are only discovered once we start deserialising the payload,
+which can lead to confusing failures.
+
+To make these failures explicit, we write a file-kind-specific magic word and
+the current `hiVersion` ahead of the binary payload. Readers validate this
+header before setting up the normal `Name`/`FastString` deserialisation
+machinery. This follows the same approach as normal interface files.
 -}
 
 writeBytecodeLib :: BytecodeLib -> FilePath -> IO ()
@@ -88,12 +104,14 @@ writeBytecodeLib lib path = do
   createDirectoryIfMissing True (takeDirectory path)
   bh' <- openBinMem (1024 * 1024)
   bh <- addBinNameWriter bh'
+  writePersistentBytecodeHeader BytecodeLibraryFile bh
   putWithUserData QuietBinIFace NormalCompression bh odbco
   writeBinMem bh path
 
 readBytecodeLib :: HscEnv -> FilePath -> IO OnDiskBytecodeLib
 readBytecodeLib hsc_env path = do
   bh' <- readBinMem path
+  readPersistentBytecodeHeader BytecodeLibraryFile path bh'
   bh <- addBinNameReader (hsc_NC hsc_env) bh'
   res <- getWithUserData (hsc_NC hsc_env) bh
   pure res
@@ -185,6 +203,7 @@ readBinByteCode hsc_env f = do
 readOnDiskModuleByteCode :: HscEnv -> FilePath -> IO OnDiskModuleByteCode
 readOnDiskModuleByteCode hsc_env f = do
   bh' <- readBinMem f
+  readPersistentBytecodeHeader ModuleByteCodeFile f bh'
   bh <- addBinNameReader (hsc_NC hsc_env) bh'
   getWithUserData (hsc_NC hsc_env) bh
 
@@ -195,6 +214,7 @@ writeBinByteCode f cbc = do
   bh' <- openBinMem (1024 * 1024)
   bh <- addBinNameWriter bh'
   odbco <- encodeOnDiskModuleByteCode cbc
+  writePersistentBytecodeHeader ModuleByteCodeFile bh
   putWithUserData QuietBinIFace NormalCompression bh odbco
   writeBinMem bh f
 
@@ -202,6 +222,55 @@ mkModuleByteCode :: Module -> CompiledByteCode -> [FilePath] -> IO ModuleByteCod
 mkModuleByteCode modl cbc foreign_files = do
   !bcos_hash <- fingerprintModuleByteCodeContents modl cbc foreign_files
   return $! ModuleByteCode modl cbc foreign_files bcos_hash
+
+data PersistentBytecodeFile
+  = ModuleByteCodeFile
+  | BytecodeLibraryFile
+
+-- See Note [Persistent bytecode file headers]
+writePersistentBytecodeHeader :: PersistentBytecodeFile -> WriteBinHandle -> IO ()
+writePersistentBytecodeHeader file_kind bh = do
+  put_ bh (persistentBytecodeMagic file_kind)
+  put_ bh (show hiVersion)
+
+readPersistentBytecodeHeader :: PersistentBytecodeFile -> FilePath -> ReadBinHandle -> IO ()
+readPersistentBytecodeHeader file_kind path bh = do
+  let mismatch what expected actual =
+        throwGhcExceptionIO $ ProgramError $
+          persistentBytecodeFileDescription file_kind ++ " header mismatch in " ++ path ++
+          ": " ++ what ++ " (expected " ++ expected ++ ", got " ++ actual ++ ")"
+
+  magic <- get bh
+  let expected_magic = persistentBytecodeMagic file_kind
+  if unFixedLength magic == unFixedLength expected_magic
+    then pure ()
+    else mismatch "magic" (show $ unFixedLength expected_magic) (show $ unFixedLength magic)
+
+  version <- get bh
+  let expected_version = show hiVersion
+  if version == expected_version
+    then pure ()
+    else mismatch "version" expected_version version
+
+persistentBytecodeFileDescription :: PersistentBytecodeFile -> String
+persistentBytecodeFileDescription ModuleByteCodeFile = "bytecode file"
+persistentBytecodeFileDescription BytecodeLibraryFile = "bytecode library"
+
+persistentBytecodeMagic :: PersistentBytecodeFile -> FixedLengthEncoding Word32
+persistentBytecodeMagic file_kind =
+  case file_kind of
+    ModuleByteCodeFile -> asciiWord32 "gbc0"
+    BytecodeLibraryFile -> asciiWord32 "bcl0"
+
+-- | Encode a 4-letter word into a single Word32.
+asciiWord32 :: String -> FixedLengthEncoding Word32
+asciiWord32 [a, b, c, d] =
+  FixedLengthEncoding $
+    (fromIntegral (ord a) `shiftL` 24) .|.
+    (fromIntegral (ord b) `shiftL` 16) .|.
+    (fromIntegral (ord c) `shiftL` 8)  .|.
+    fromIntegral (ord d)
+asciiWord32 _ = error "asciiWord32: expected exactly four ASCII characters"
 
 -- | Generate a 'Fingerprint' for the 'ModuleByteCode' contents.
 --

@@ -159,3 +159,9 @@ bytecode_object25:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c BytecodeForeign.hs -fbyte-code -fwrite-byte-code -fwrite-interface $(ghciWayFlags)
 	"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v1 -fno-hide-source-paths  -fbyte-code -fwrite-byte-code -fwrite-interface BytecodeForeign.hs -e "testForeign"
 
+# Test that corrupt bytecode file headers are rejected clearly.
+bytecode_object26:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c BytecodeTest.hs -fbyte-code -fwrite-byte-code
+	@printf 'bad!' | dd of=BytecodeTest.gbc bs=1 count=4 conv=notrunc 2>/dev/null
+	! "$(TEST_HC)" $(TEST_HC_OPTS) -c -bytecodelib -o linked.bytecode BytecodeTest.gbc 2> bytecode_object26.stderr
+	@grep -F "bytecode file header mismatch" bytecode_object26.stderr >/dev/null
