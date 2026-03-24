@@ -4512,12 +4512,14 @@ hintExplicitForall tok = do
 -- Hint about qualified-do
 hintQualifiedDo :: Located Token -> P ()
 hintQualifiedDo tok = do
-    qualifiedDo   <- getBit QualifiedDoBit
-    case maybeQDoDoc of
-      Just qdoDoc | not qualifiedDo ->
-        addError $ mkPlainErrorMsgEnvelope (getLoc tok) $
-          (PsErrIllegalQualifiedDo qdoDoc)
-      _ -> return ()
+    qualifiedDo <- getBit QualifiedDoBit
+    unless qualifiedDo $
+      maybe
+        (return ())
+        (\qdoDoc ->
+          addError $ mkPlainErrorMsgEnvelope (getLoc tok) $
+            (PsErrIllegalQualifiedDo qdoDoc))
+        maybeQDoDoc
   where
     maybeQDoDoc = case unLoc tok of
       ITdo (Just m) -> Just $ ftext m <> text ".do"
