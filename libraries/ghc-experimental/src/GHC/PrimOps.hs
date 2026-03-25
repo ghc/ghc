@@ -26,8 +26,255 @@
 
 module GHC.PrimOps
        (
-        module GHC.Internal.Exts,
+        -- ** Pointer types
+        Ptr(..), FunPtr(..),
+
+        -- ** Other primitive types
+        module GHC.Internal.Types,
+
+        -- ** Legacy interface for arrays of arrays
+        module GHC.Internal.ArrayArray,
+
+        -- * Primitive operations
+
+        module GHC.Internal.Prim,
+        module GHC.Internal.Prim.Ext,
+
+        -- ** Running 'RealWorld' state thread
+        runRW#,
+
+        -- ** Bit shift operations
+        shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
+
+        -- ** Pointer comparison operations
+        -- See `Note [Pointer comparison operations]` in primops.txt.pp
+        reallyUnsafePtrEquality,
+        unsafePtrEquality#,
+        eqStableName#,
+        sameArray#,
+        sameMutableArray#,
+        sameSmallArray#,
+        sameSmallMutableArray#,
+        sameByteArray#,
+        sameMutableByteArray#,
+        sameMVar#,
+        sameMutVar#,
+        sameTVar#,
+        samePromptTag#,
+
+        -- ** Compat wrapper
+        atomicModifyMutVar#,
+
+        -- ** Resize functions
+        --
+        -- | Resizing arrays of boxed elements is currently handled in
+        -- library space (rather than being a primop) since there is not
+        -- an efficient way to grow arrays. However, resize operations
+        -- may become primops in a future release of GHC.
+        resizeSmallMutableArray#,
+
+        -- ** Fusion
+        build, augment,
+
+        -- * Overloaded lists
+        IsList(..),
+
+        -- * Transform comprehensions
+        Down(..), groupWith, sortWith, the,
+
+        -- * Strings
+        -- ** Overloaded string literals
+        IsString(..),
+
+        -- ** CString
+        unpackCString#,
+        unpackAppendCString#,
+        unpackFoldrCString#,
+        unpackCStringUtf8#,
+        unpackNBytes#,
+        cstringLength#,
+
+        -- * Debugging
+        -- ** Breakpoints
+        breakpoint, breakpointCond,
+
+        -- ** Event logging
+        traceEvent,
+
+        -- ** The call stack
+        currentCallStack,
+
+        -- * Ids with special behaviour
+        inline, noinline, lazy, oneShot, considerAccessible, seq#,
+
+        -- * SpecConstr annotations
+        SpecConstrAnnotation(..), SPEC (..),
+
+        -- * Coercions
+        -- ** Safe coercions
+        --
+        -- | These are available from the /Trustworthy/ module "Data.Coerce" as well.
+        --
+        -- @since base-4.7.0.0
+        GHC.Internal.Data.Coerce.coerce,
+
+        -- ** Very unsafe coercion
+        unsafeCoerce#,
+
+        -- ** Casting class dictionaries with single methods
+        --
+        --   @since base-4.17.0.0
+        WithDict(..),
+
+        -- * Converting ADTs to constructor tags
+        DataToTag(..),
+
+        -- * The maximum tuple size
+        maxTupleSize,
        ) where
 
-import GHC.Internal.Exts
+import GHC.Internal.Prim hiding ( coerce, dataToTagSmall#, dataToTagLarge#, whereFrom# )
+  -- Hide dataToTagLarge# because it is expected to break for
+  -- GHC-internal reasons in the near future, and shouldn't
+  -- be exposed from base (not even GHC.Exts)
+  -- whereFrom# is similarly internal.
+import GHC.Internal.Types
+  hiding ( IO   -- Exported from "GHC.IO"
+         , Type -- Exported from "Data.Kind"
 
+           -- GHC's internal representation of 'TyCon's, for 'Typeable'
+         , Module, TrName, TyCon, TypeLitSort, KindRep, KindBndr,
+         Unit#,
+         Solo#,
+         Tuple0#,
+         Tuple1#,
+         Tuple2#,
+         Tuple3#,
+         Tuple4#,
+         Tuple5#,
+         Tuple6#,
+         Tuple7#,
+         Tuple8#,
+         Tuple9#,
+         Tuple10#,
+         Tuple11#,
+         Tuple12#,
+         Tuple13#,
+         Tuple14#,
+         Tuple15#,
+         Tuple16#,
+         Tuple17#,
+         Tuple18#,
+         Tuple19#,
+         Tuple20#,
+         Tuple21#,
+         Tuple22#,
+         Tuple23#,
+         Tuple24#,
+         Tuple25#,
+         Tuple26#,
+         Tuple27#,
+         Tuple28#,
+         Tuple29#,
+         Tuple30#,
+         Tuple31#,
+         Tuple32#,
+         Tuple33#,
+         Tuple34#,
+         Tuple35#,
+         Tuple36#,
+         Tuple37#,
+         Tuple38#,
+         Tuple39#,
+         Tuple40#,
+         Tuple41#,
+         Tuple42#,
+         Tuple43#,
+         Tuple44#,
+         Tuple45#,
+         Tuple46#,
+         Tuple47#,
+         Tuple48#,
+         Tuple49#,
+         Tuple50#,
+         Tuple51#,
+         Tuple52#,
+         Tuple53#,
+         Tuple54#,
+         Tuple55#,
+         Tuple56#,
+         Tuple57#,
+         Tuple58#,
+         Tuple59#,
+         Tuple60#,
+         Tuple61#,
+         Tuple62#,
+         Tuple63#,
+         Tuple64#,
+         Sum2#,
+         Sum3#,
+         Sum4#,
+         Sum5#,
+         Sum6#,
+         Sum7#,
+         Sum8#,
+         Sum9#,
+         Sum10#,
+         Sum11#,
+         Sum12#,
+         Sum13#,
+         Sum14#,
+         Sum15#,
+         Sum16#,
+         Sum17#,
+         Sum18#,
+         Sum19#,
+         Sum20#,
+         Sum21#,
+         Sum22#,
+         Sum23#,
+         Sum24#,
+         Sum25#,
+         Sum26#,
+         Sum27#,
+         Sum28#,
+         Sum29#,
+         Sum30#,
+         Sum31#,
+         Sum32#,
+         Sum33#,
+         Sum34#,
+         Sum35#,
+         Sum36#,
+         Sum37#,
+         Sum38#,
+         Sum39#,
+         Sum40#,
+         Sum41#,
+         Sum42#,
+         Sum43#,
+         Sum44#,
+         Sum45#,
+         Sum46#,
+         Sum47#,
+         Sum48#,
+         Sum49#,
+         Sum50#,
+         Sum51#,
+         Sum52#,
+         Sum53#,
+         Sum54#,
+         Sum55#,
+         Sum56#,
+         Sum57#,
+         Sum58#,
+         Sum59#,
+         Sum60#,
+         Sum61#,
+         Sum62#,
+         Sum63#,
+  )
+import qualified GHC.Internal.Prim.Ext
+import GHC.Internal.ArrayArray
+import GHC.Internal.Exts
+import GHC.Internal.Data.Coerce
