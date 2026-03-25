@@ -1,0 +1,29 @@
+(<body of e_reccon>) :: MyRec
+(<body of e_negapp>) :: T Word
+(<body of e_proc>) :: Int -> Int
+(<body of e_arith_ol>) :: MyList Int
+(<body of e_var>) :: Either Int Bool
+(<body of e_lit>) :: Char
+(<body of e_overlit>) :: T Word
+(<body of e_lam>) :: Bool -> Bool
+(<body of e_app>) :: Bool
+(<body of e_apptype>) :: Bool -> Bool
+(<body of e_par>) :: Bool
+(<body of e_tuple1>) :: (Int, Bool)
+(<body of e_tuple2>) :: Int -> (Int, Bool)
+(<body of e_tuple3>) :: Solo Char
+(<body of e_utuple1>) :: (# Int, Int# #)
+(<body of e_utuple2>) :: Int -> Int# -> (# Int, Int# #)
+(<body of e_usum>) :: (# Int# | Word# #)
+(<body of e_case>) :: Bool
+(<body of e_if>) :: Char
+(<body of e_multiif>) :: Int
+(<body of e_let>) :: Int
+(<body of e_list>) :: [Int]
+(<body of e_arith>) :: MyList Int
+(<body of e_tysig>) :: Bool
+(<body of e_listcomp>) :: [Int]
+(<body of e_recsel>) :: MyRec -> Int
+(<body of e_ubracket>) :: Q Exp
+(<body of e_tbracket>) :: Code Q Char
+(<body of e_static>) :: StaticPtr Bool

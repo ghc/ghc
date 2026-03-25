@@ -136,7 +136,11 @@ tcCmdTop :: CmdEnv
 tcCmdTop env names (L loc (HsCmdTop _names cmd)) cmd_ty@(cmd_stk, res_ty)
   = setSrcSpanA loc $
     do  { cmd' <- tcCmd env cmd cmd_ty
-        ; return (L loc $ HsCmdTop (CmdTopTc cmd_stk res_ty names) cmd') }
+        ; let cmd_top = CmdTopTc { ctt_stack  = cmd_stk
+                                 , ctt_arr_ty = cmd_arr env
+                                 , ctt_res_ty = res_ty
+                                 , ctt_table  = names }
+        ; return (L loc $ HsCmdTop cmd_top cmd') }
 
 ----------------------------------------
 tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTc)

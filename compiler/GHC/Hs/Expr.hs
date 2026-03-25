@@ -1608,9 +1608,16 @@ is Less Cool because
 -}
 
 data CmdTopTc
-  = CmdTopTc Type    -- Nested tuple of inputs on the command's stack
-             Type    -- return type of the command
-             (CmdSyntaxTable GhcTc) -- See Note [CmdSyntaxTable]
+  = CmdTopTc
+    -- | Nested tuple of inputs on the command's stack
+  { ctt_stack  :: Type
+    -- | Arrow type
+  , ctt_arr_ty :: Type
+    -- | Return type of the command
+  , ctt_res_ty :: Type
+    -- | Command syntax table; see Note [CmdSyntaxTable]
+  , ctt_table  :: CmdSyntaxTable GhcTc
+  }
 
 type instance XCmdTop  GhcPs = NoExtField
 type instance XCmdTop  GhcRn = CmdSyntaxTable GhcRn -- See Note [CmdSyntaxTable]

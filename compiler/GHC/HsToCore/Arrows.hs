@@ -284,7 +284,7 @@ dsProcExpr
         :: LPat GhcTc
         -> LHsCmdTop GhcTc
         -> DsM CoreExpr
-dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
+dsProcExpr pat (L _ (HsCmdTop (CmdTopTc { ctt_res_ty = cmd_ty, ctt_table = ids }) cmd)) = do
     (meth_binds, meth_ids) <- mkCmdEnv ids
     let locals = mkVarSet (collectPatBinders CollWithDictBinders pat)
     (core_cmd, _free_vars, env_ids)
@@ -656,8 +656,15 @@ dsTrimCmdArg
         -> DsM (CoreExpr,       -- desugared expression
                 DIdSet)         -- subset of local vars that occur free
 dsTrimCmdArg local_vars env_ids
-                       (L _ (HsCmdTop
-                                 (CmdTopTc stack_ty cmd_ty ids) cmd )) = do
+  (L _
+    (HsCmdTop
+      (CmdTopTc
+        { ctt_stack  = stack_ty
+        , ctt_res_ty = cmd_ty
+        , ctt_table  = ids
+        })
+      cmd)
+  ) = do
     (meth_binds, meth_ids) <- mkCmdEnv ids
     (core_cmd, free_vars, env_ids')
        <- dsfixCmd meth_ids local_vars stack_ty cmd_ty cmd

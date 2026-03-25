@@ -25,6 +25,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Types.Id
 import GHC.Types.Var( VarBndr(..) )
 import GHC.Types.SrcLoc
+import GHC.Utils.Misc ( HasDebugCallStack )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
@@ -114,11 +115,16 @@ hsExprType (HsLam _ _ (MG { mg_ext = match_group })) = matchGroupTcType match_gr
 hsExprType (HsApp _ f _) = funResultTy $ lhsExprType f
 hsExprType (HsAppType x f _) = piResultTy (lhsExprType f) x
 hsExprType (OpApp v _ _ _) = dataConCantHappen v
-hsExprType (NegApp _ _ se) = syntaxExprType se
+hsExprType (NegApp _ _ se) = syntaxExpr_wrappedFunResTy se
 hsExprType (HsPar _ e) = lhsExprType e
 hsExprType (SectionL v _ _) = dataConCantHappen v
 hsExprType (SectionR v _ _) = dataConCantHappen v
-hsExprType (ExplicitTuple _ args box) = mkTupleTy box $ map hsTupArgType args
+hsExprType (ExplicitTuple _ args box) =
+  -- Deal with tuple sections: one function arrow per missing argument
+  mkScaledFunTys [s | Missing s <- args] $
+    -- Use 'mkTupleTy1' to avoid flattening 1-tuples, as per
+    -- Note [Don't flatten tuples from HsSyn] in GHC.Core.Make.
+    mkTupleTy1 box (map hsTupArgType args)
 hsExprType (ExplicitSum alt_tys _ _ _) = mkSumTy alt_tys
 hsExprType (HsCase _ _ (MG { mg_ext = match_group })) = mg_res_ty match_group
 hsExprType (HsIf _ _ t _) = lhsExprType t
@@ -126,25 +132,29 @@ hsExprType (HsMultiIf ty _) = ty
 hsExprType (HsLet _ _ body) = lhsExprType body
 hsExprType (HsDo ty _ _) = ty
 hsExprType (ExplicitList ty _) = mkListTy ty
-hsExprType (RecordCon con_expr _ _) = hsExprType con_expr
+hsExprType (RecordCon con_expr _ _) = snd (splitFunTys (hsExprType con_expr))
 hsExprType (RecordUpd v _ _) = dataConCantHappen v
 hsExprType (HsGetField { gf_ext = v }) = dataConCantHappen v
 hsExprType (HsProjection { proj_ext = v }) = dataConCantHappen v
 hsExprType (ExprWithTySig _ e _) = lhsExprType e
-hsExprType (ArithSeq _ mb_overloaded_op asi) = case mb_overloaded_op of
-  Just op -> piResultTy (syntaxExprType op) asi_ty
-  Nothing -> asi_ty
-  where
-    asi_ty = arithSeqInfoType asi
+hsExprType (ArithSeq _ mb_overloaded_op asi) =
+  case mb_overloaded_op of
+    Just se -> syntaxExpr_wrappedFunResTy se
+    Nothing -> arithSeqInfoType asi
 hsExprType (HsTypedBracket   (HsBracketTc { hsb_ty = ty }) _) = ty
 hsExprType (HsUntypedBracket (HsBracketTc { hsb_ty = ty }) _) = ty
-hsExprType e@(HsTypedSplice{}) = pprPanic "hsExprType: Unexpected HsTypedSplice"
-                                          (ppr e)
-                                      -- Typed splices should have been eliminated during zonking, but we
-                                      -- can't use `dataConCantHappen` since they are still present before
-                                      -- than in the typechecked AST.
+hsExprType e@(HsTypedSplice{}) =
+  -- Typed splices should have been eliminated during zonking, but we
+  -- can't use `dataConCantHappen` since they are still present before
+  -- then in the typechecked AST.
+  pprPanic "hsExprType: Unexpected HsTypedSplice"
+    (ppr e)
 hsExprType (HsUntypedSplice ext _) = dataConCantHappen ext
-hsExprType (HsProc _ _ lcmd_top) = lhsCmdTopType lcmd_top
+hsExprType (HsProc _ pat (L _ (HsCmdTop cmd_top_tc _))) =
+  let CmdTopTc { ctt_arr_ty = arr_ty, ctt_res_ty = res_ty } = cmd_top_tc
+  in
+    -- (proc (pat :: a) -> (cmd :: b)) :: arr a b
+    mkAppTys arr_ty [hsLPatType pat, res_ty]
 hsExprType (HsStatic (ty,_) _s) = ty
 hsExprType (HsPragE _ _ e) = lhsExprType e
 hsExprType (HsEmbTy x _) = dataConCantHappen x
@@ -178,6 +188,13 @@ hsTupArgType :: HsTupArg GhcTc -> Type
 hsTupArgType (Present _ e)           = lhsExprType e
 hsTupArgType (Missing (Scaled _ ty)) = ty
 
+-- | The result type of a @SyntaxExpr GhcTc@ for a unary function,
+-- including the result 'HsWrapper'.
+syntaxExpr_wrappedFunResTy :: HasDebugCallStack => SyntaxExpr GhcTc -> Type
+syntaxExpr_wrappedFunResTy (SyntaxExprTc { syn_expr = e, syn_res_wrap = wrap }) =
+  hsWrapperType wrap (funResultTy (hsExprType e))
+syntaxExpr_wrappedFunResTy NoSyntaxExprTc =
+  panic "syntaxExpr_wrappedFunResTy: unexpected NoSyntaxExprTc"
 
 -- | The PRType (ty, tas) is short for (piResultTys ty (reverse tas))
 type PRType = (Type, [Type])
@@ -191,7 +208,7 @@ liftPRType :: (Type -> Type) -> PRType -> PRType
 liftPRType f pty = (f (prTypeType pty), [])
 
 hsWrapperType :: HsWrapper -> Type -> Type
--- Return the type of (WrapExpr wrap e), given that e :: ty
+-- ^ Return the type of @WrapExpr wrap e@, given that @e :: ty@
 hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
   where
     go WpHole              = id
@@ -209,12 +226,5 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
     go (WpTyApp ta)       = \(ty,tas) -> (ty, ta:tas)
     go (WpLet _)          = id
 
-lhsCmdTopType :: LHsCmdTop GhcTc -> Type
-lhsCmdTopType (L _ (HsCmdTop (CmdTopTc _ ret_ty _) _)) = ret_ty
-
 matchGroupTcType :: MatchGroupTc -> Type
 matchGroupTcType (MatchGroupTc args res _) = mkScaledFunTys args res
-
-syntaxExprType :: SyntaxExpr GhcTc -> Type
-syntaxExprType (SyntaxExprTc e _ _) = hsExprType e
-syntaxExprType NoSyntaxExprTc       = panic "syntaxExprType: Unexpected NoSyntaxExprTc"

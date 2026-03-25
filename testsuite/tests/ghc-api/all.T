@@ -74,4 +74,8 @@ test('T25577', [ extra_run_opts(f'"{config.libdir}"')
 test('T26120', [], compile_and_run, ['-package ghc'])
 
 test('T26264', normal, compile_and_run, ['-package ghc'])
+test('T26910', [ extra_run_opts(f'"{config.libdir}"')
+               # doesn't work in wasm/js due to lack of pipe(2) support
+               , when(arch('wasm32') or arch('javascript'), skip)
+               ], compile_and_run, ['-package ghc -package template-haskell'])
 test('TypeMapStringLiteral', normal, compile_and_run, ['-package ghc'])

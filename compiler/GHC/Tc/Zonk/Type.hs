@@ -1211,10 +1211,14 @@ zonkCmdTop :: LHsCmdTop GhcTc -> ZonkTcM (LHsCmdTop GhcTc)
 zonkCmdTop cmd = wrapLocZonkMA (zonk_cmd_top) cmd
 
 zonk_cmd_top :: HsCmdTop GhcTc -> ZonkTcM (HsCmdTop GhcTc)
-zonk_cmd_top (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
+zonk_cmd_top (HsCmdTop (CmdTopTc { ctt_stack  = stack_tys
+                                 , ctt_arr_ty = arr_ty
+                                 , ctt_res_ty = res_ty
+                                 , ctt_table  = ids }) cmd)
   = do new_cmd <- zonkLCmd cmd
        new_stack_tys <- zonkTcTypeToTypeX stack_tys
-       new_ty <- zonkTcTypeToTypeX ty
+       new_arr_ty <- zonkTcTypeToTypeX arr_ty
+       new_res_ty <- zonkTcTypeToTypeX res_ty
        new_ids <- mapSndM zonkExpr ids
 
        massert (definitelyLiftedType new_stack_tys)
@@ -1222,7 +1226,13 @@ zonk_cmd_top (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
          -- but indeed it should always be lifted due to the typing
          -- rules for arrows
 
-       return (HsCmdTop (CmdTopTc new_stack_tys new_ty new_ids) new_cmd)
+       let new_cmd_top =
+             CmdTopTc { ctt_stack  = new_stack_tys
+                      , ctt_arr_ty = new_arr_ty
+                      , ctt_res_ty = new_res_ty
+                      , ctt_table  = new_ids }
+
+       return (HsCmdTop new_cmd_top new_cmd)
 
 -------------------------------------------------------------------------
 zonkCoFn :: HsWrapper -> ZonkBndrTcM HsWrapper
