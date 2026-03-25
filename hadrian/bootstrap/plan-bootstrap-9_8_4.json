@@ -6,7 +6,7 @@
     },
     {
       "package": "ghc-prim",
-      "version": "0.10.0"
+      "version": "0.11.0"
     },
     {
       "package": "ghc-bignum",
@@ -14,19 +14,19 @@
     },
     {
       "package": "base",
-      "version": "4.18.2.1"
+      "version": "4.19.2.0"
     },
     {
       "package": "array",
-      "version": "0.5.6.0"
+      "version": "0.5.8.0"
     },
     {
       "package": "deepseq",
-      "version": "1.4.8.1"
+      "version": "1.5.1.0"
     },
     {
       "package": "ghc-boot-th",
-      "version": "9.6.6"
+      "version": "9.8.4"
     },
     {
       "package": "pretty",
@@ -34,15 +34,15 @@
     },
     {
       "package": "template-haskell",
-      "version": "2.20.0.0"
+      "version": "2.21.0.0"
     },
     {
       "package": "containers",
-      "version": "0.6.7"
+      "version": "0.6.8"
     },
     {
       "package": "bytestring",
-      "version": "0.11.5.3"
+      "version": "0.12.1.0"
     },
     {
       "package": "transformers",
@@ -54,7 +54,7 @@
     },
     {
       "package": "stm",
-      "version": "2.5.1.0"
+      "version": "2.5.3.1"
     },
     {
       "package": "exceptions",
@@ -62,11 +62,15 @@
     },
     {
       "package": "filepath",
-      "version": "1.4.300.1"
+      "version": "1.4.301.0"
     },
     {
       "package": "time",
       "version": "1.12.2"
+    },
+    {
+      "package": "unix",
+      "version": "2.8.6.0"
     },
     {
       "package": "binary",
@@ -74,26 +78,14 @@
     },
     {
       "package": "text",
-      "version": "2.0.2"
+      "version": "2.1.1"
     },
     {
       "package": "parsec",
-      "version": "3.1.16.1"
+      "version": "3.1.17.0"
     }
   ],
   "dependencies": [
-    {
-      "cabal_sha256": "5b7f8afd7a879c3c8c3c636fd3c7543cdd5e0b514b7da90e76907ccd11434031",
-      "component": "lib:unix",
-      "flags": [
-        "-os-string"
-      ],
-      "package": "unix",
-      "revision": 1,
-      "source": "hackage",
-      "src_sha256": "8117599bb3e4aa1d4656710afbc85aef2a75483eddfac5338f8cc88fb505eea2",
-      "version": "2.8.6.0"
-    },
     {
       "cabal_sha256": "1d68a81fa684d006b1ec73836cebe3de9a54688836915fe3e56a20389846bb4e",
       "component": "lib:file-io",
