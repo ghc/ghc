@@ -1517,14 +1517,9 @@ all p (x:xs)    =  p x && all p xs
 --
 -- >>> 3 `elem` [4..]
 -- * Hangs forever *
-elem                    :: (Eq a) => a -> [a] -> Bool
-elem _ []       = False
-elem x (y:ys)   = x==y || elem x ys
-{-# NOINLINE [1] elem #-}
-{-# RULES
-"elem/build"    forall x (g :: forall b . (a -> b -> b) -> b -> b)
-   . elem x (build g) = g (\ y r -> (x == y) || r) False
- #-}
+elem :: Eq a => a -> [a] -> Bool
+elem x = foldr (\y r -> x == y || r) False
+{-# INLINE elem #-}
 
 -- | 'notElem' is the negation of 'elem'.
 --
@@ -1544,14 +1539,9 @@ elem x (y:ys)   = x==y || elem x ys
 --
 -- >>> 3 `notElem` [4..]
 -- * Hangs forever *
-notElem                 :: (Eq a) => a -> [a] -> Bool
-notElem _ []    =  True
-notElem x (y:ys)=  x /= y && notElem x ys
-{-# NOINLINE [1] notElem #-}
-{-# RULES
-"notElem/build" forall x (g :: forall b . (a -> b -> b) -> b -> b)
-   . notElem x (build g) = g (\ y r -> (x /= y) && r) True
- #-}
+notElem :: Eq a => a -> [a] -> Bool
+notElem x = foldr (\y r -> x /= y && r) True
+{-# INLINE notElem #-}
 
 -- | \(\mathcal{O}(n)\). 'lookup' @key assocs@ looks up a key in an association
 -- list.
