@@ -1352,6 +1352,12 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     This can be useful in live-monitoring situations where the
     eventlog is consumed in real-time by another process.
 
+    Flushing the eventlog requires synchronising all capabilities,
+    which can be lead to performance regressions in highly parallel
+    applications.
+
+    To disable this flag set ⟨seconds⟩ to 0.
+
 .. rts-flag:: -v [⟨flags⟩]
 
     Log events as text to standard output, instead of to the
