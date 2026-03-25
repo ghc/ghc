@@ -153,11 +153,37 @@ AC_SUBST([EnableStrictGhcToolchainCheck])
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
+
+dnl AC_PROG_CC sets CFLAGS to `-g -O2` if the env var is empty.
+dnl Same goes for AC_PROG_CXX and CXXFLAGS. Setting the vars prevents this.
+dnl (`-g` increases binary sizes with debugging symbols. `-O2` may optimize
+dnl symbols away, confusing the RTS linker.)
+: ${CFLAGS=""}
+: ${CXXFLAGS=""}
+
 AC_PROG_CC([cc gcc clang])
 AC_PROG_CXX([c++ g++ clang++])
 # Work around #24324
 MOVE_TO_FLAGS([CC],[CFLAGS])
 MOVE_TO_FLAGS([CXX],[CXXFLAGS])
+
+dnl Save the original user-provided environment variables immediately
+dnl before any m4 macros modify them. These will be passed to ghc-toolchain
+dnl so it can make independent decisions and reach the same conclusions as autoconf.
+USER_CONF_CC_OPTS_STAGE2="$CFLAGS"
+USER_CONF_CXX_OPTS_STAGE2="$CXXFLAGS"
+USER_CONF_GCC_LINKER_OPTS_STAGE2="$LDFLAGS"
+USER_CPP_ARGS="$CPPFLAGS"
+USER_HS_CPP_ARGS="$HaskellCPPArgs"
+USER_JS_CPP_ARGS="$JavaScriptCPPArgs"
+USER_CMM_CPP_ARGS="$CmmCPPArgs"
+
+dnl Initialize CONF_* variables with user-provided environment variables
+dnl so that subsequent configure checks modify them and both autoconf and
+dnl ghc-toolchain see the same values
+CONF_CC_OPTS_STAGE2="$CFLAGS"
+CONF_CXX_OPTS_STAGE2="$CXXFLAGS"
+CONF_GCC_LINKER_OPTS_STAGE2="$LDFLAGS"
 
 dnl ** figure out how to invoke the C preprocessor (i.e. `gcc -E`)
 AC_PROG_CPP
