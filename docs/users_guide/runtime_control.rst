@@ -1331,7 +1331,7 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     package.
 
     Each event is associated with a timestamp which is the number of
-    nanoseconds since the start of executation of the running program.
+    nanoseconds since the start of execution of the running program.
     This is the elapsed time, not the CPU time.
 
 .. rts-flag:: -ol⟨filename⟩
