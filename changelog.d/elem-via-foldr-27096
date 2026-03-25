@@ -1,0 +1,4 @@
+section: base
+synopsis: Reimplement ``Data.List.elem`` and ``notElem`` using ``foldr`` to enable better specialization.
+issues: #27096
+mrs: !15793

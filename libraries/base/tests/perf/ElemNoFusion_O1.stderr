@@ -1,5 +1,38 @@
-noFusionElemSort = \ x x1 -> elem $fEqInt x (actualSort gtInt x1)
+noFusionElemSort
+  = \ x x1 ->
+      joinrec {
+        go1 ds
+          = case ds of {
+              [] -> False;
+              : y ys ->
+                case x of { I# x2 ->
+                case y of { I# y1 ->
+                case ==# x2 y1 of {
+                  __DEFAULT -> jump go1 ys;
+                  1# -> True
+                }
+                }
+                }
+            }; } in
+      jump go1 (actualSort gtInt x1)
 
 noFusionElemNonEmptyToList
-  = \ x x1 -> case x1 of { :| a1 as -> elem $fEqInt x (: a1 as) }
+  = \ x x1 ->
+      case x1 of { :| a1 as ->
+      joinrec {
+        go1 ds
+          = case ds of {
+              [] -> False;
+              : y ys ->
+                case x of { I# x2 ->
+                case y of { I# y1 ->
+                case ==# x2 y1 of {
+                  __DEFAULT -> jump go1 ys;
+                  1# -> True
+                }
+                }
+                }
+            }; } in
+      jump go1 (: a1 as)
+      }
 
