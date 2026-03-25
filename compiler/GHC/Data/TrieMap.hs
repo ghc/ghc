@@ -327,28 +327,60 @@ instance TrieMap m => Foldable (ListMap m) where
 instance (TrieMap m, Outputable a) => Outputable (ListMap m a) where
   ppr m = text "List elts" <+> ppr (foldTM (:) m [])
 
+{- Note [Making ListMap operations specialisable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'TrieMap (ListMap m)' methods are thin wrappers around these helpers:
+
+  lookupTM    = lkList lookupTM
+  alterTM     = xtList alterTM
+  foldTM      = fdList
+  filterTM    = ftList
+  mapMaybeTM  = mpList
+
+When these methods are used from another module, the wrappers would otherwise
+remain higher-order and polymorphic in the inner trie map. That leaves the
+recursive loops in 'xtList', 'fdList', 'ftList', and 'mpList' calling the
+inner-map operations indirectly via the 'TrieMap m' dictionary (#27097).
+
+Marking the helpers 'INLINABLE' exposes unfoldings to importing modules, so
+the specialiser can monomorphise those loops; see Note [Specialising imported
+functions] in GHC.Core.Opt.Specialise.
+
+Adding the 'INLINABLE' pragmas reduced compiler allocations by 2.9% in
+InstanceMatching and by 2.0% in T24984.
+
+We mark 'lkList' too, even though it does not itself use the 'TrieMap m'
+dictionary and GHC already gives it a non-dictionary-passing worker, for
+consistency with the other ListMap operations.
+-}
+
 lkList :: TrieMap m => (forall b. k -> m b -> Maybe b)
         -> [k] -> ListMap m a -> Maybe a
 lkList _  []     = lm_nil
 lkList lk (x:xs) = lm_cons >.> lk x >=> lkList lk xs
+{-# INLINABLE lkList #-} -- See Note [Making ListMap operations specialisable]
 
 xtList :: TrieMap m => (forall b. k -> XT b -> m b -> m b)
         -> [k] -> XT a -> ListMap m a -> ListMap m a
 xtList _  []     f m = m { lm_nil  = f (lm_nil m) }
 xtList tr (x:xs) f m = m { lm_cons = lm_cons m |> tr x |>> xtList tr xs f }
+{-# INLINABLE xtList #-} -- See Note [Making ListMap operations specialisable]
 
 fdList :: forall m a b. TrieMap m
        => (a -> b -> b) -> ListMap m a -> b -> b
 fdList k m = foldMaybe k          (lm_nil m)
            . foldTM    (fdList k) (lm_cons m)
+{-# INLINABLE fdList #-} -- See Note [Making ListMap operations specialisable]
 
 ftList :: TrieMap m => (a -> Bool) -> ListMap m a -> ListMap m a
 ftList f (LM { lm_nil = mnil, lm_cons = mcons })
   = LM { lm_nil = filterMaybe f mnil, lm_cons = fmap (filterTM f) mcons }
+{-# INLINABLE ftList #-} -- See Note [Making ListMap operations specialisable]
 
 mpList :: TrieMap m => (a -> Maybe b) -> ListMap m a -> ListMap m b
 mpList f (LM { lm_nil = mnil, lm_cons = mcons })
   = LM { lm_nil = mnil >>= f, lm_cons = fmap (mapMaybeTM f) mcons }
+{-# INLINABLE mpList #-} -- See Note [Making ListMap operations specialisable]
 
 {-
 ************************************************************************
