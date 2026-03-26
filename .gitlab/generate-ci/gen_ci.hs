@@ -1173,17 +1173,17 @@ debian_x86 =
 
 debian_aarch64 :: [JobGroup Job]
 debian_aarch64 =
-  [
-     disableValidate (standardBuildsWithConfig AArch64 (Linux Debian11) (splitSectionsBroken vanilla))
-   , disableValidate (standardBuildsWithConfig AArch64 (Linux Debian12) (splitSectionsBroken vanilla))
-   , fastCI (standardBuildsWithConfig AArch64 (Linux Debian13) (splitSectionsBroken vanilla))
-     -- LLVM backend bootstrap
-   , onlyRule LLVMBackend (validateBuilds AArch64 (Linux Debian13) llvm)
+  [ disableValidate (standardBuildsWithConfig AArch64 (Linux Debian11) (splitSectionsBroken vanilla))
+  , disableValidate (standardBuildsWithConfig AArch64 (Linux Debian12) (splitSectionsBroken vanilla))
+  , fastCI (standardBuildsWithConfig AArch64 (Linux Debian13) (splitSectionsBroken vanilla))
+    -- LLVM backend bootstrap
+  , onlyRule LLVMBackend (validateBuilds AArch64 (Linux Debian13) llvm)
   ]
 
 debian_i386 :: [JobGroup Job]
 debian_i386 =
   [ disableValidate (standardBuildsWithConfig I386 (Linux Debian11) (splitSectionsBroken vanilla))
+  , disableValidate (standardBuildsWithConfig I386 (Linux Debian12) (splitSectionsBroken vanilla))
   , addValidateRule I386Backend (standardBuildsWithConfig I386 (Linux Debian13) (splitSectionsBroken vanilla))
   ]
 
