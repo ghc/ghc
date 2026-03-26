@@ -679,17 +679,21 @@ tcExpr expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
                                 , rcon_con = L loc con_like
                                 , rcon_flds = rbinds' }
 
+        ; co <- tcSubTypeMono expr actual_res_ty res_ty
+
         -- Check for missing fields.  We do this after type-checking to get
         -- better types in error messages (cf #18869).  For example:
         --     data T a = MkT { x :: a, y :: a }
         --     r = MkT { y = True }
         -- Then we'd like to warn about a missing field `x :: True`, rather than `x :: a0`.
         --
-        -- NB: to do this really properly we should delay reporting until typechecking is complete,
-        -- via a new `HoleSort`.  But that seems too much work.
+        -- NB: to do this really properly we should delay reporting until typechecking
+        -- is complete, via a new `HoleSort`.  But that seems too much work.
+        --
+        -- However, it's worth doing it after calling `tcSubTypeMono`,
+        -- which may do some useful unifications
         ; checkMissingFields con_like rbinds arg_tys
 
-        ; co <- tcSubTypeMono expr actual_res_ty res_ty
         ; return (mkHsWrapCo co expr') }
   where
     orig = OccurrenceOf con_name
