@@ -32,6 +32,7 @@ import GHC.Types.Id.Make ( coercionTokenId )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.CostCentre
+import GHC.Types.Demand    ( isAtMostOnceDmd )
 import GHC.Types.Tickish
 import GHC.Types.Var.Env
 import GHC.Types.Name   ( isExternalName )
@@ -354,7 +355,7 @@ coreToTopStgRhs opts this_mod ccs (bndr, rhs)
        ; let (stg_rhs, ccs') =
                mkTopStgRhs (allowTopLevelConApp (coreToStg_platform opts) (coreToStg_ExternalDynamicRefs opts))
                            (coreToStg_AutoSccsOnIndividualCafs opts)
-                           this_mod ccs bndr new_rhs
+                           this_mod ccs (mkStgUpdateFlag bndr new_rhs) bndr new_rhs
              stg_arity =
                stgRhsArity stg_rhs
 
@@ -704,7 +705,7 @@ coreToStgRhs :: (Id,CoreExpr)
 
 coreToStgRhs (bndr, rhs) = do
     new_rhs <- coreToMkStgRhs bndr rhs
-    return (mkStgRhs bndr new_rhs)
+    return (mkStgRhs (mkStgUpdateFlag bndr new_rhs) new_rhs)
 
 -- Convert the RHS of a binding from Core to STG. This is a wrapper around
 -- coreToStgExpr that can handle value lambdas.
@@ -721,6 +722,24 @@ coreToMkStgRhs bndr expr = do
           , rhs_is_join = isJoinId bndr
           }
     pure mk_rhs
+
+mkStgUpdateFlag :: Id -> MkStgRhs -> UpdateFlag
+mkStgUpdateFlag bndr (MkStgRhs bndrs _rhs typ is_join)
+  | is_join                             = JumpedTo
+  | not (null bndrs)                    = ReEntrant
+  | isAtMostOnceDmd (idDemandInfo bndr) = SingleEntry
+  | non_updatable_tycon                 = ReEntrant
+  | otherwise                           = Updatable
+  where
+    non_updatable_tycon
+      | isDataConId bndr = False
+      | otherwise =
+        case splitTyConApp_maybe typ of
+          Just (tycon, _) ->
+            if not (tyConUpdatable (tyConFlags tycon))
+              then pprTrace "nonUpdatableTyCon:" (ppr tycon) True
+              else False
+          Nothing         -> False
 
 -- ---------------------------------------------------------------------------
 -- A monad for the core-to-STG pass

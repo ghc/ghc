@@ -785,14 +785,17 @@ tcRnHsBootDecls boot_or_sig decls
    = do { (first_group, group_tail) <- findSplice decls
 
                 -- Rename the declarations
-        ; (tcg_env, HsGroup { hs_tyclds = tycl_decls
-                            , hs_derivds = deriv_decls
-                            , hs_fords  = for_decls
-                            , hs_defds  = def_decls
-                            , hs_ruleds = rule_decls
-                            , hs_annds  = _
-                            , hs_valds  = XValBindsLR (HsVBG val_binds val_sigs) })
+        ; (tcg_env0, HsGroup { hs_tyclds = tycl_decls
+                             , hs_derivds = deriv_decls
+                             , hs_fords  = for_decls
+                             , hs_defds  = def_decls
+                             , hs_ruleds = rule_decls
+                             , hs_annds  = _
+                             , hs_recomputing_tyds = recomputing_tycons
+                             , hs_valds  = XValBindsLR (HsVBG val_binds val_sigs) })
               <- rnTopSrcDecls first_group
+
+        ; let tcg_env = extendRecomputingTyCons recomputing_tycons tcg_env0
 
         ; (gbl_env, lie) <- setGblEnv tcg_env $ captureTopConstraints $ do {
               -- NB: setGblEnv **before** captureTopConstraints so that
@@ -1699,6 +1702,13 @@ rnTopSrcDecls group
         return (tcg_env', rn_decls)
    }
 
+extendRecomputingTyCons :: [LIdP GhcRn] -> TcGblEnv -> TcGblEnv
+extendRecomputingTyCons tycons tcg_env
+  = tcg_env
+      { tcg_recomputing_tycons =
+          tcg_recomputing_tycons tcg_env `unionNameSet`
+          mkNameSet (map unLoc tycons) }
+
 tcTopSrcDecls :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                          hs_derivds = deriv_decls,
@@ -1706,9 +1716,12 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                          hs_defds  = default_decls,
                          hs_annds  = annotation_decls,
                          hs_ruleds = rule_decls,
+                         hs_recomputing_tyds = recomputing_tycons,
                          hs_valds  = hs_val_binds@(XValBindsLR
                                               (HsVBG val_binds val_sigs)) })
- = do {         -- Type-check the type and class decls, and all imported decls
+ = do { tcg_env <- getGblEnv
+      ; setGblEnv (extendRecomputingTyCons recomputing_tycons tcg_env) $ do {
+                -- Type-check the type and class decls, and all imported decls
                 -- The latter come in via tycl_decls
         traceTc "Tc2 (src)" empty ;
 
@@ -1785,7 +1798,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
         addUsedGREs NoDeprecationWarnings (bagToList fo_gres) ;
 
         return (tcg_env', tcl_env)
-    }}}}}
+    }}}}}}
 
 tcTopSrcDecls _ = panic "tcTopSrcDecls: ValBindsIn"
 

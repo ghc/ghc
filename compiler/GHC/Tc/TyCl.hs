@@ -3595,6 +3595,13 @@ tcDataDefn err_ctxt roles_info tc_name
                    ; res_kind       <- zonkTcTypeToTypeX   res_kind
                    ; return (kind, bndrs, stupid_theta, res_kind) }
 
+       ; tcg_env <- getGblEnv
+       ; let tycon_flags
+               | tc_name `elemNameSet` tcg_recomputing_tycons tcg_env
+               = defaultTyConFlags { tyConUpdatable = False }
+               | otherwise
+               = defaultTyConFlags
+
        ; tycon <- fixM $ \ rec_tycon -> do
              { data_cons <- tcConDecls DDataType rec_tycon tc_bndrs res_kind cons
              ; tc_rhs    <- mk_tc_rhs hsc_src rec_tycon data_cons
@@ -3603,7 +3610,7 @@ tcDataDefn err_ctxt roles_info tc_name
                                   bndrs nb_eta
                                   res_kind
                                   (roles_info tc_name)
-                                  defaultTyConFlags
+                                  tycon_flags
                                   (fmap (typeCheckCType . unLoc) cType)
                                   stupid_theta tc_rhs
                                   (VanillaAlgTyCon tc_rep_nm)

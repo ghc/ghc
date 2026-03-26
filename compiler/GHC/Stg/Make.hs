@@ -19,8 +19,8 @@ import GHC.Stg.Utils (stripStgTicksTop)
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.CostCentre
-import GHC.Types.Demand    ( isAtMostOnceDmd )
 import GHC.Types.Tickish
+import GHC.Types.Demand (isAtMostOnceDmd)
 
 -- Represents the RHS of a binding for use with mk(Top)StgRhs and
 -- mk(Top)StgRhsCon_maybe.
@@ -36,8 +36,8 @@ data MkStgRhs = MkStgRhs
 -- appended to `CollectedCCs` argument.
 mkTopStgRhs :: (Module -> DataCon -> [StgArg] -> Bool)
             -> Bool -> Module -> CollectedCCs
-            -> Id -> MkStgRhs -> (StgRhs, CollectedCCs)
-mkTopStgRhs allow_toplevel_con_app opt_AutoSccsOnIndividualCafs this_mod ccs bndr mk_rhs@(MkStgRhs bndrs rhs typ _)
+            -> UpdateFlag -> Id -> MkStgRhs -> (StgRhs, CollectedCCs)
+mkTopStgRhs allow_toplevel_con_app opt_AutoSccsOnIndividualCafs this_mod ccs upd_flag_core bndr mk_rhs@(MkStgRhs bndrs rhs typ _)
   -- try to make a StgRhsCon first
   | Just rhs_con <- mkTopStgRhsCon_maybe (allow_toplevel_con_app this_mod) mk_rhs
   = ( rhs_con, ccs )
@@ -46,7 +46,7 @@ mkTopStgRhs allow_toplevel_con_app opt_AutoSccsOnIndividualCafs this_mod ccs bnd
   = -- The list of arguments is non-empty, so not CAF
     ( StgRhsClosure noExtFieldSilent
                     dontCareCCS
-                    ReEntrant
+                    upd_flag
                     bndrs rhs typ
     , ccs )
 
@@ -65,7 +65,7 @@ mkTopStgRhs allow_toplevel_con_app opt_AutoSccsOnIndividualCafs this_mod ccs bnd
 
   where
     upd_flag | isAtMostOnceDmd (idDemandInfo bndr) = SingleEntry
-             | otherwise                           = Updatable
+             | otherwise                           = upd_flag_core
 
     -- CAF cost centres generated for -fcaf-all
     caf_cc = mkAutoCC bndr modl
@@ -81,8 +81,8 @@ mkTopStgRhs allow_toplevel_con_app opt_AutoSccsOnIndividualCafs this_mod ccs bnd
 
 -- Generate a non-top-level RHS. Cost-centre is always currentCCS,
 -- see Note [Cost-centre initialization plan].
-mkStgRhs :: Id -> MkStgRhs -> StgRhs
-mkStgRhs bndr mk_rhs@(MkStgRhs bndrs rhs typ is_join)
+mkStgRhs :: UpdateFlag -> MkStgRhs -> StgRhs
+mkStgRhs upd_flag mk_rhs@(MkStgRhs bndrs rhs typ _is_join)
   -- try to make a StgRhsCon first
   | Just rhs_con <- mkStgRhsCon_maybe mk_rhs
   = rhs_con
@@ -91,11 +91,6 @@ mkStgRhs bndr mk_rhs@(MkStgRhs bndrs rhs typ is_join)
   = StgRhsClosure noExtFieldSilent
                   currentCCS
                   upd_flag bndrs rhs typ
-  where
-    upd_flag | is_join                             = JumpedTo
-             | not (null bndrs)                    = ReEntrant
-             | isAtMostOnceDmd (idDemandInfo bndr) = SingleEntry
-             | otherwise                           = Updatable
 
   {-
     SDM: disabled.  Eval/Apply can't handle functions with arity zero very

@@ -384,6 +384,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_rules               = []
           , tcg_fords               = []
           , tcg_patsyns             = []
+          , tcg_recomputing_tycons  = emptyNameSet
           , tcg_merged              = []
           , tcg_dfun_n              = dfun_n_var
           , tcg_zany_n              = zany_n_var

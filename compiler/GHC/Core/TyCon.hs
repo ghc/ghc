@@ -830,7 +830,7 @@ The tyConUpdatable flag is controlled by the {-# RECOMPUTING T #-} pragma.
 
 
 defaultTyConFlags :: TyConFlags
-defaultTyConFlags = TyConFlags { tyConUpdatable = False }
+defaultTyConFlags = TyConFlags { tyConUpdatable = True }
 
 instance Binary TyConFlags where
     put_ bh (TyConFlags updatable) = put_ bh updatable

@@ -644,6 +644,7 @@ data TcGblEnv
         tcg_rules     :: [LRuleDecl GhcTc],  -- ...Rules
         tcg_fords     :: [LForeignDecl GhcTc], -- ...Foreign import & exports
         tcg_patsyns   :: [PatSyn],            -- ...Pattern synonyms
+        tcg_recomputing_tycons :: NameSet,    -- ...TyCons marked by RECOMPUTING pragmas
 
         tcg_hdr_info   :: (Maybe (LHsDoc GhcRn), Maybe (XRec GhcRn ModuleName)),
         -- ^ Maybe Haddock header docs and Maybe located module name
