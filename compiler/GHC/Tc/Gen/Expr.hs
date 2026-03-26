@@ -304,41 +304,37 @@ tcExpr :: HsExpr GhcRn
                        --                     is deeply skolemised
        -> TcM (HsExpr GhcTc)
 
+-- Deal with expansions
+tcExpr (XExpr (ExpandedThingRn hse)) res_ty = tcHsExpansion hse res_ty
+
+tcExpr e@(HsVar _ v_rn) res_ty
+  = do { (v_tc, sigma_ty) <- tcInferId v_rn
+       ; wrap <- tcCheckAppResult e v_tc sigma_ty res_ty
+       ; return (mkHsWrap wrap v_tc) }
+
+tcExpr e@(ExprWithTySig _ e_rn e_ty) res_ty
+  = do { (e_tc, sigma_ty) <- tcExprWithSig e_rn e_ty
+       ; wrap <- tcCheckAppResult e e_tc sigma_ty res_ty
+       ; return (mkHsWrap wrap e_tc) }
+
+tcExpr e@(XExpr(HsRecSelRn f)) res_ty
+  = do { (e_tc, sigma_ty) <- tcInferRecSelId f
+       ; wrap <- tcCheckAppResult e e_tc sigma_ty res_ty
+       ; return (mkHsWrap wrap e_tc) }
+
 -- Use tcApp to typecheck applications, which are treated specially
 -- by Quick Look.  Specifically:
---   - HsVar           lone variables, to ensure that they can get an
---                     impredicative instantiation (via Quick Look
---                     driven by res_ty (in checking mode)).
 --   - HsApp           value applications
 --   - HsAppType       type applications
---   - ExprWithTySig   (e :: type)
---   - HsRecSel        overloaded record fields
---   - ExpandedThingRn renamer/pre-typechecker expansions
 --   - HsOpApp         operator applications
---   - HsOverLit       overloaded literals
 -- These constructors are the union of
 --   - ones taken apart by GHC.Tc.Gen.Head.splitHsApps
 --   - ones understood by GHC.Tc.Gen.Head.tcInferAppHead_maybe
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- Se Note [Typechecking by expansion: overview]
-tcExpr e@(HsVar _ v_rn) res_ty
-  = do { (v_tc, sigma_ty) <- tcInferId v_rn
-       ; traceTc "tcExpr:HsVar" (ppr v_tc <+> dcolon <+> ppr sigma_ty $$ ppr res_ty)
-       ; tcWrapResult e v_tc sigma_ty res_ty }
-
-tcExpr e@(ExprWithTySig _ e_rn e_ty) res_ty
-  = do { (e_tc, sigma_ty) <- tcExprWithSig e_rn e_ty
-       ; tcWrapResult e e_tc sigma_ty res_ty }
-
-tcExpr e@(XExpr(HsRecSelRn f)) res_ty
-  = do { (e_tc, sigma_ty) <- tcInferRecSelId f
-       ; tcWrapResult e e_tc sigma_ty res_ty }
-
-tcExpr (XExpr (ExpandedThingRn hse)) res_ty = tcHsExpansion hse res_ty
-
-tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
-tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
-tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
+tcExpr e@(HsApp {})     res_ty = tcApp e res_ty
+tcExpr e@(HsAppType {}) res_ty = tcApp e res_ty
+tcExpr e@(OpApp {})     res_ty = tcApp e res_ty
 
 -- Typecheck an occurrence of an unbound Id
 --
@@ -488,7 +484,8 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
 
        ; traceTc "ExplicitTuple" (ppr act_res_ty $$ ppr res_ty)
 
-       ; tcWrapResultMono expr expr' act_res_ty res_ty }
+       ; co <- tcSubTypeMono expr act_res_ty res_ty
+       ; return (mkHsWrapCo co expr') }
 
 tcExpr (ExplicitSum _ alt arity expr) res_ty
   = do { let sum_tc = sumTyCon arity
@@ -682,8 +679,6 @@ tcExpr expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
                                 , rcon_con = L loc con_like
                                 , rcon_flds = rbinds' }
 
-        ; ret <- tcWrapResultMono expr expr' actual_res_ty res_ty
-
         -- Check for missing fields.  We do this after type-checking to get
         -- better types in error messages (cf #18869).  For example:
         --     data T a = MkT { x :: a, y :: a }
@@ -694,7 +689,8 @@ tcExpr expr@(RecordCon { rcon_con = L loc qcon@(WithUserRdr _ con_name)
         -- via a new `HoleSort`.  But that seems too much work.
         ; checkMissingFields con_like rbinds arg_tys
 
-        ; return ret }
+        ; co <- tcSubTypeMono expr actual_res_ty res_ty
+        ; return (mkHsWrapCo co expr') }
   where
     orig = OccurrenceOf con_name
 
@@ -721,14 +717,13 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr
                -- NB: it's important to use ds_res_ty and not res_ty here.
                -- Test case: T18802b.
 
-             ; tcWrapResultMono expr expr' ds_res_ty res_ty
+             ; co <- tcSubTypeMono expr ds_res_ty res_ty
              -- We need to unify the result type of the expanded
              -- expression with the expected result type.
              --
              -- See Note [Unifying result types in tcRecordUpd].
              -- Test case: T10808.
-             }
-        }
+             ; return (mkHsWrapCo co expr') } }
 
 tcExpr e@(RecordUpd { rupd_flds = OverloadedRecUpdFields {}}) _
   = pprPanic "tcExpr: unexpected overloaded-dot RecordUpd" $ ppr e

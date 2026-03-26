@@ -21,8 +21,6 @@ module GHC.Tc.Gen.Head
 
        , pprArgInst, addFunResCtxt ) where
 
-import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
-
 import GHC.Prelude
 import GHC.Hs
 import GHC.Hs.Syn.Type
@@ -63,7 +61,6 @@ import GHC.Builtin.Names
 import GHC.Driver.DynFlags
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Panic
 
 
 {- *********************************************************************
@@ -765,10 +762,11 @@ nonBidirectionalErr = TcRnPatSynNotBidirectional
 
 {- Note [Typechecking data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As per Note [Polymorphisation of linear fields] in
-GHC.Core.Multiplicity, when we use a data constructor as a term, we want to
-consider its field to have polymorphic multiplicities. That is,
-Note [Data constructors are linear by default] says:
+As per Note [Polymorphisation of linear fields] in GHC.Core.Multiplicity,
+when we use a data constructor as a term, we want to consider its field to
+have polymorphic multiplicities.
+
+That is, Note [Data constructors are linear by default] says:
 
     Just :: a. a %1 -> Maybe a
 
@@ -934,7 +932,8 @@ See Note [-fno-code mode].
 *                                                                      *
 ********************************************************************* -}
 
-addFunResCtxt :: HsExpr GhcTc -> [HsExprArg p]
+addFunResCtxt :: HasDebugCallStack
+              => HsExpr GhcTc -> [HsExprArg p]
               -> TcType -> ExpRhoType
               -> TcM a -> TcM a
 -- When we have a mis-match in the return type of a function
@@ -942,33 +941,10 @@ addFunResCtxt :: HsExpr GhcTc -> [HsExprArg p]
 -- But not in generated code, where we don't want
 -- to mention internal (rebindable syntax) function names
 addFunResCtxt fun args fun_res_ty env_ty thing_inside
-  = do { env_tv  <- newFlexiTyVarTy liftedTypeKind
-       ; dumping <- doptM Opt_D_dump_tc_trace
-       ; msg <- mk_msg dumping env_tv
-       ; addErrCtxt msg thing_inside }
+  = addErrCtxt (FunResCtxt fun (count isValArg args) fun_res_ty env_ty) $
+    thing_inside
       -- NB: use a landmark error context, so that an empty context
       -- doesn't suppress some more useful context
-  where
-    mk_msg dumping env_tv
-      = do { mb_env_ty <- readExpType_maybe env_ty
-                     -- by the time the message is rendered, the ExpType
-                     -- will be filled in (except if we're debugging)
-           ; env'     <- case mb_env_ty of
-                           Just env_ty -> return env_ty
-                           Nothing     -> do { massert dumping; return env_tv }
-           ; let -- See Note [Splitting nested sigma types in mismatched
-                 --           function types]
-                 (_, _, fun_tau) = tcSplitNestedSigmaTys fun_res_ty
-                 (_, _, env_tau) = tcSplitNestedSigmaTys env'
-                     -- env_ty is an ExpRhoTy, but with simple subsumption it
-                     -- is not deeply skolemised, so still use tcSplitNestedSigmaTys
-                 (args_fun, res_fun) = tcSplitFunTys fun_tau
-                 (args_env, res_env) = tcSplitFunTys env_tau
-                 info =
-                  FunResCtxt fun (count isValArg args) res_fun res_env
-                    (length args_fun) (length args_env)
-           ; return info }
-
 
 {-
 Note [Splitting nested sigma types in mismatched function types]

@@ -28,7 +28,7 @@ module GHC.Tc.Utils.TcType (
   ExpType(..), ExpKind, InferResult(..), InferInstFlag(..), InferFRRFlag(..),
   ExpTypeFRR, ExpSigmaType, ExpSigmaTypeFRR,
   ExpRhoType, ExpRhoTypeFRR,
-  mkCheckExpType,
+  mkCheckExpType, getCheckExpType,
   checkingExpType_maybe, checkingExpType,
 
   ExpPatType(..), mkCheckExpFunPatTy, mkInvisExpPatType,
@@ -491,6 +491,12 @@ instance Outputable InferResult where
 -- | Make an 'ExpType' suitable for checking.
 mkCheckExpType :: TcType -> ExpType
 mkCheckExpType = Check
+
+getCheckExpType :: HasDebugCallStack => ExpType -> TcType
+-- Expect a (Check ty).
+-- See Note [ExpType in HsCtxt] in GHC.Tc.Types.ErrCtxt
+getCheckExpType (Check ty) = ty
+getCheckExpType (Infer ir) = pprPanic "getCheckExpType" (ppr ir)
 
 -- | Returns the expected type when in checking mode.
 checkingExpType_maybe :: ExpType -> Maybe TcType

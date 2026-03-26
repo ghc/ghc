@@ -818,19 +818,26 @@ zonkTidyHsCtxt env e@(FunAppCtxt{}) = return (env, e)
 zonkTidyHsCtxt env (FunTysCtxt ctxt ty i1 i2) = do
   (env', ty') <- zonkTidyTcType env ty
   return $ (env', FunTysCtxt ctxt ty' i1 i2)
-zonkTidyHsCtxt env (FunResCtxt e i1 ty1 ty2 i2 i3) = do
-  (env', ty1') <- zonkTidyTcType env ty1
-  (env', ty2') <- zonkTidyTcType env' ty2
-  return $ (env', FunResCtxt e i1 ty1' ty2' i2 i3)
+zonkTidyHsCtxt env (FunResCtxt e n ty1 env_ty) = do
+  (env', ty1')    <- zonkTidyTcType env ty1
+  (env', env_ty') <- zonkExpType env' env_ty
+  return $ (env', FunResCtxt e n ty1' env_ty')
 zonkTidyHsCtxt env (PatSigErrCtxt sig_ty res_ty) = do
   (env', sig_ty') <- zonkTidyTcType env sig_ty
-  (env', res_ty') <-
-    case res_ty of
-      Check ty -> zonkTidyTcType env' ty
-      Infer (IR {ir_ref = ref}) -> do -- inlining readExpTyp_maybe to avoid module dep loops
-        mb_ty <- liftIO $ readIORef ref
-        case mb_ty of
-          Nothing -> error "zonkTidyHsCtxt PatSigErrCtxt"
-          Just ty -> zonkTidyTcType env' ty
-  return (env', PatSigErrCtxt sig_ty' (Check res_ty'))
+  (env', res_ty') <- zonkExpType env' res_ty
+  return (env', PatSigErrCtxt sig_ty' res_ty')
 zonkTidyHsCtxt env p = return (env, p)
+
+zonkExpType :: TidyEnv -> ExpType -> ZonkM (TidyEnv, ExpType)
+-- Zonk Infer{} to Check.  The hole should have been filled in by now
+zonkExpType env (Check ty)
+  = do { (env', ty') <- zonkTidyTcType env ty
+       ; return (env', Check ty') }
+zonkExpType env (Infer ir@(IR { ir_ref = ref }))
+  = do { -- inlining readExpTyp_maybe to avoid module dep loops
+       ; mb_ty <- liftIO $ readIORef ref
+       ; case mb_ty of
+            Nothing -> pprPanic "zonkTidyHsCtxt PatSigErrCtxt" (ppr ir)
+            Just ty -> do { (env', ty') <- zonkTidyTcType env ty
+                          ; return (env', Check ty') } }
+

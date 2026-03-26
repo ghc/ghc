@@ -251,7 +251,10 @@ data HsCtxt
   -- | In the instance type signature of a class method.
   | MethSigCtxt !Name !TcType !TcType
   -- | In a pattern type signature.
+
   | PatSigErrCtxt !TcType !ExpType
+     -- ExpType: see Note [ExpType in HsCtxt]
+
   -- | In a pattern.
   | PatCtxt !(Pat GhcRn)
   -- | In a pattern synonym declaration.
@@ -268,7 +271,10 @@ data HsCtxt
   -- | In a function call.
   | FunTysCtxt !ExpectedFunTyCtxt !Type !Int !Int
   -- | In the result of a function call.
-  | FunResCtxt !(HsExpr GhcTc) !Int !Type !Type !Int !Int
+
+  | FunResCtxt !(HsExpr GhcTc) !Int !TcType !ExpType
+     -- ExpType: see Note [ExpType in HsCtxt]
+
   -- | In the declaration of a type constructor.
   | TyConDeclCtxt !Name !(TyConFlavour TyCon)
   -- | In a type or data family instance (or default instance).
@@ -377,3 +383,14 @@ isHsCtxtLandmark (DerivBindCtxt{}) = True
 isHsCtxtLandmark (FunResCtxt{}) = True
 isHsCtxtLandmark (VDQWarningCtxt{}) = True
 isHsCtxtLandmark _ = False
+
+{- Note [ExpType in HsCtxt]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A couple of HsCtxt constructors have ExpTypes in them.  When zonking the
+Infer{} case we read the hole, which should be filled in by now, and zonk
+that type.  Now we want to put it back: we use (Check ty') for this, so that
+clients of a zonked HsCtxt don't need to be monadic.
+
+Result: after zonking, these ExpTypes are always (Check ty).  It woudl be nice
+to guarantee this statically, but it's hard to do so.
+-}
