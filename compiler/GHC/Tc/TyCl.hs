@@ -3603,6 +3603,7 @@ tcDataDefn err_ctxt roles_info tc_name
                                   bndrs nb_eta
                                   res_kind
                                   (roles_info tc_name)
+                                  defaultTyConFlags
                                   (fmap (typeCheckCType . unLoc) cType)
                                   stupid_theta tc_rhs
                                   (VanillaAlgTyCon tc_rep_nm)

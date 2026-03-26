@@ -831,6 +831,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                                           ty_binders (length extra_tcbs)
                                           res_kind
                                           (map (const Nominal) ty_binders)
+                                          defaultTyConFlags
                                           (fmap (typeCheckCType . unLoc) cType) stupid_theta
                                           tc_rhs parent
                                           gadt_syntax

@@ -9,6 +9,7 @@ The @TyCon@ datatype
 module GHC.Core.TyCon(
         -- * Main TyCon data types
         TyCon,
+        TyConFlags(..), defaultTyConFlags,
         AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
         FamTyConFlav(..), Role(..), Injectivity(..),
@@ -33,12 +34,14 @@ module GHC.Core.TyCon(
         mkPrimTyCon,
         mkTupleTyCon,
         mkSumTyCon,
+        mkSumTyConWithFlags,
         mkDataTyConRhs,
         mkLevPolyDataTyConRhs,
         mkSynonymTyCon,
         mkFamilyTyCon,
         mkPromotedDataCon,
         mkTcTyCon,
+        mkTcTyConWithFlags,
         noTcTyConScopedTyVars,
 
         -- ** Predicates on TyCons
@@ -88,6 +91,7 @@ module GHC.Core.TyCon(
         tyConArity,
         tyConNullaryTy, mkTyConTy,
         tyConRoles,
+        tyConFlags,
         tyConFlavour,
         tyConTuple_maybe, tyConClass_maybe, tyConATs,
         tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
@@ -110,6 +114,7 @@ module GHC.Core.TyCon(
         ExpandSynResult(..),
         expandSynTyCon_maybe,
         newTyConCo, newTyConCo_maybe,
+        setTyConFlags,
         pprPromotionQuote, mkTyConKind,
 
         -- ** Predicated on TyConFlavours
@@ -799,7 +804,40 @@ data TyCon = TyCon {
                                -- This list has length = tyConArity
                                -- See also Note [TyCon Role signatures]
 
-        tyConDetails :: !TyConDetails }
+        tyConDetails :: !TyConDetails,
+
+        tyConFlags :: !TyConFlags }
+
+data TyConFlags = TyConFlags { tyConUpdatable :: !Bool }
+
+{- Note [Non updatable TyCons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TyConFlags/tyConUpdatable invariants:
+
+tyConFlags must be default flags unless we are looking at
+an algebraic data type which is the result of a user given
+data or newtype declaration
+
+This means:
+* For all built in types tyConFlags must be the default flags.
+* For all tuple tycons (boxed or unboxed) we must use default flags.
+* For type classes we always use default flags.
+* For type synonyms we can use default flags.
+
+The tyConUpdatable flag is controlled by the {-# RECOMPUTING T #-} pragma.
+
+-}
+
+
+defaultTyConFlags :: TyConFlags
+defaultTyConFlags = TyConFlags { tyConUpdatable = False }
+
+instance Binary TyConFlags where
+    put_ bh (TyConFlags updatable) = put_ bh updatable
+    get bh = TyConFlags <$> get bh
+
+instance NFData TyConFlags where
+  rnf (TyConFlags updatable) = rnf updatable
 
 data TyConDetails =
   -- | Algebraic data types, from
@@ -2019,15 +2057,16 @@ module mutual-recursion.  And they aren't called from many places.
 So we compromise, and move their Kind calculation to the call site.
 -}
 
-mkTyCon :: Name
-        -> Kind -- ^ kind of the TyCon
-        -> [TyConBinder]
-        -> Int -- ^ number of binders introduced by eta-expansion
-        -> Kind -- ^ result kind of the TyCon
-        -> [Role]
-        -> TyConDetails
-        -> TyCon
-mkTyCon name kind binders nb_eta_bndrs res_kind roles details
+mkTyConWithFlags :: Name
+                 -> Kind -- ^ kind of the TyCon
+                 -> [TyConBinder]
+                 -> Int -- ^ number of binders introduced by eta-expansion
+                 -> Kind -- ^ result kind of the TyCon
+                 -> [Role]
+                 -> TyConFlags
+                 -> TyConDetails
+                 -> TyCon
+mkTyConWithFlags name kind binders nb_eta_bndrs res_kind roles flags details
   = tc
   where
     -- Recursive binding because of tyConNullaryTy
@@ -2042,6 +2081,7 @@ mkTyCon name kind binders nb_eta_bndrs res_kind roles details
                , tyConKind             = kind
                     -- NB: not necessarily equal to 'mkTyConKind binders res_kind'
                     -- See Note [Preserve user-written TyCon kind]
+               , tyConFlags            = flags
 
                  -- Cached things
                , tyConArity            = length binders
@@ -2074,6 +2114,7 @@ mkAlgTyCon :: Name
            -> Int                 -- ^ Number of binders introduced by eta expansion
            -> Kind                -- ^ Result kind
            -> [Role]              -- ^ The roles for each TyVar
+           -> TyConFlags
            -> Maybe (CType GhcTc) -- ^ The C type this type corresponds to
                                   --   when using the CAPI FFI
            -> [PredType]          -- ^ Stupid theta: see 'algTcStupidTheta'
@@ -2082,8 +2123,8 @@ mkAlgTyCon :: Name
                                   -- (e.g. vanilla, type family)
            -> Bool                -- ^ Was the 'TyCon' declared with GADT syntax?
            -> TyCon
-mkAlgTyCon name kind binders nb_eta_bndrs res_kind roles cType stupid rhs parent gadt_syn
-  = mkTyCon name kind binders nb_eta_bndrs res_kind roles $
+mkAlgTyCon name kind binders nb_eta_bndrs res_kind roles flags cType stupid rhs parent gadt_syn
+  = mkTyConWithFlags name kind binders nb_eta_bndrs res_kind roles flags $
     AlgTyCon { tyConCType       = cType
              , algTcStupidTheta = stupid
              , algTcRhs         = rhs
@@ -2101,9 +2142,10 @@ mkClassTyCon :: Name
              -> Class
              -> Name -> TyCon
 mkClassTyCon name kind binders roles rhs clas tc_rep_name
-  = mkAlgTyCon name kind binders 0 constraintKind roles Nothing [] rhs
-               (ClassTyCon clas tc_rep_name)
-               False
+  = mkAlgTyCon name kind binders 0 constraintKind roles defaultTyConFlags
+               Nothing [] rhs
+                        (ClassTyCon clas tc_rep_name)
+                        False
 
 mkTupleTyCon :: Name
              -> [TyConBinder]
@@ -2113,8 +2155,8 @@ mkTupleTyCon :: Name
              -> AlgTyConFlav
              -> TyCon
 mkTupleTyCon name binders res_kind con sort parent
-  = mkTyCon name (mkTyConKind binders res_kind) binders 0 res_kind
-            (constRoles binders Representational) $
+  = mkTyConWithFlags name (mkTyConKind binders res_kind) binders 0 res_kind
+                     (constRoles binders Representational) defaultTyConFlags $
     AlgTyCon { tyConCType       = Nothing
              , algTcGadtSyntax  = False
              , algTcStupidTheta = []
@@ -2133,8 +2175,18 @@ mkSumTyCon :: Name
            -> AlgTyConFlav
            -> TyCon
 mkSumTyCon name binders res_kind cons parent
-  = mkTyCon name (mkTyConKind binders res_kind) binders 0 res_kind
-            (constRoles binders Representational) $
+  = mkSumTyConWithFlags name binders res_kind cons parent defaultTyConFlags
+
+mkSumTyConWithFlags :: Name
+                    -> [TyConBinder]
+                    -> Kind    -- ^ Kind of the resulting 'TyCon'
+                    -> [DataCon]
+                    -> AlgTyConFlav
+                    -> TyConFlags
+                    -> TyCon
+mkSumTyConWithFlags name binders res_kind cons parent flags
+  = mkTyConWithFlags name (mkTyConKind binders res_kind) binders 0 res_kind
+                     (constRoles binders Representational) flags $
     AlgTyCon { tyConCType       = Nothing
              , algTcGadtSyntax  = False
              , algTcStupidTheta = []
@@ -2158,7 +2210,22 @@ mkTcTyCon :: Name
           -> TyConFlavour TyCon  -- ^ What sort of 'TyCon' this represents
           -> TyCon
 mkTcTyCon name kind binders nb_eta_bndrs res_kind scoped_tvs poly flav
-  = mkTyCon name kind binders nb_eta_bndrs res_kind (constRoles binders Nominal) $
+  = mkTcTyConWithFlags name kind binders nb_eta_bndrs res_kind scoped_tvs poly
+                       flav defaultTyConFlags
+
+mkTcTyConWithFlags :: Name
+                   -> Kind -- ^ TyCon kind
+                   -> [TyConBinder]
+                   -> Int -- ^ number of binders introduced by eta expansion
+                   -> Kind                -- ^ /result/ kind only
+                   -> [(Name,TcTyVar)]    -- ^ Scoped type variables;
+                   -> Bool                -- ^ Is this TcTyCon generalised already?
+                   -> TyConFlavour TyCon  -- ^ What sort of 'TyCon' this represents
+                   -> TyConFlags
+                   -> TyCon
+mkTcTyConWithFlags name kind binders nb_eta_bndrs res_kind scoped_tvs poly flav flags
+  = mkTyConWithFlags name kind binders nb_eta_bndrs res_kind
+                     (constRoles binders Nominal) flags $
     TcTyCon { tctc_scoped_tvs = scoped_tvs
             , tctc_is_poly    = poly
             , tctc_flavour    = flav }
@@ -2179,7 +2246,8 @@ mkPrimTyCon :: Name
             -> [Role]
             -> TyCon
 mkPrimTyCon name binders res_kind roles
-  = mkTyCon name (mkTyConKind binders res_kind) binders 0 res_kind roles $
+  = mkTyConWithFlags name (mkTyConKind binders res_kind) binders 0 res_kind
+                     roles defaultTyConFlags $
     PrimTyCon { primRepName  = mkPrelTyConRepName name }
 
 -- | Create a type synonym 'TyCon'
@@ -2193,7 +2261,7 @@ mkSynonymTyCon :: Name
                -> TyCon
 mkSynonymTyCon name kind binders res_kind roles rhs is_tau
                is_fam_free is_forgetful is_concrete
-  = mkTyCon name kind binders 0 res_kind roles $
+  = mkTyConWithFlags name kind binders 0 res_kind roles defaultTyConFlags $
     SynonymTyCon { synTcRhs       = rhs
                  , synIsTau       = is_tau
                  , synIsFamFree   = is_fam_free
@@ -2209,7 +2277,8 @@ mkFamilyTyCon :: Name
               -> Maybe Name -> FamTyConFlav
               -> Maybe Class -> Injectivity -> TyCon
 mkFamilyTyCon name kind binders nb_eta res_kind resVar flav parent inj
-  = mkTyCon name kind binders nb_eta res_kind (constRoles binders Nominal) $
+  = mkTyConWithFlags name kind binders nb_eta res_kind
+                     (constRoles binders Nominal) defaultTyConFlags $
     FamilyTyCon { famTcResVar  = resVar
                 , famTcFlav    = flav
                 , famTcParent  = classTyCon <$> parent
@@ -2223,7 +2292,8 @@ mkPromotedDataCon :: DataCon -> Name -> TyConRepName
                   -> [TyConBinder] -> Kind -> [Role]
                   -> PromDataConInfo -> TyCon
 mkPromotedDataCon con name rep_name binders res_kind roles rep_info
-  = mkTyCon name (mkTyConKind binders res_kind) binders 0 res_kind roles $
+  = mkTyConWithFlags name (mkTyConKind binders res_kind) binders 0 res_kind
+                     roles defaultTyConFlags $
     PromotedDataCon { dataCon    = con
                     , tcRepName  = rep_name
                     , promDcInfo = rep_info }
@@ -2785,6 +2855,9 @@ isTcTyCon :: TyCon -> Bool
 isTcTyCon (TyCon { tyConDetails = details })
   | TcTyCon {} <- details = True
   | otherwise             = False
+
+setTyConFlags :: TyCon -> TyConFlags -> TyCon
+setTyConFlags tc flags = tc { tyConFlags = flags }
 
 setTcTyConKind :: TyCon -> Kind -> TyCon
 -- Update the Kind of a TcTyCon

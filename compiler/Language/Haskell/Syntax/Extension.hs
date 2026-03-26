@@ -272,6 +272,7 @@ type family XAnnD        x
 type family XRuleD       x
 type family XSpliceD     x
 type family XDocD        x
+type family XRecomputeTyD x
 type family XRoleAnnotD  x
 type family XXHsDecl     x
 

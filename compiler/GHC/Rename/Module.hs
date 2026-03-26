@@ -110,6 +110,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                             hs_fords   = foreign_decls,
                             hs_defds   = default_decls,
                             hs_ruleds  = rule_decls,
+                            hs_recomputing_tyds = recomputing_ty_decls,
                             hs_docs    = docs })
  = do {
    -- (A) Process the top-level fixity declarations, creating a mapping from
@@ -211,6 +212,8 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    (rn_default_decls, src_fvs5) <- rnList rnDefaultDecl   default_decls ;
    (rn_deriv_decls,   src_fvs6) <- rnList rnSrcDerivDecl  deriv_decls ;
    (rn_splice_decls,  src_fvs7) <- rnList rnSpliceDecl    splice_decls ;
+   rn_recomputing_ty_decls <- traverse (lookupLocatedOccRn WL_TyCon)
+                                       recomputing_ty_decls ;
    rn_docs <- traverse rnLDocDecl docs ;
 
    -- Update the TcGblEnv with renamed COMPLETE pragmas from the current
@@ -234,6 +237,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                              hs_annds  = rn_ann_decls,
                              hs_defds  = rn_default_decls,
                              hs_ruleds = rn_rule_decls,
+                             hs_recomputing_tyds = rn_recomputing_ty_decls,
                              hs_docs   = rn_docs } ;
 
         tcf_bndrs = hsTyClForeignBinders rn_tycl_decls rn_foreign_decls ;
@@ -2838,6 +2842,8 @@ add gp@(HsGroup {hs_annds  = ts}) l (AnnD _ d) ds
   = addl (gp { hs_annds = L l d : ts }) ds
 add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD _ d) ds
   = addl (gp { hs_ruleds = L l d : ts }) ds
+add gp@(HsGroup {hs_recomputing_tyds = ts}) _ (RecomputeTyD _ tycon) ds
+  = addl (gp { hs_recomputing_tyds = tycon : ts }) ds
 add gp l (DocD _ d) ds
   = addl (gp { hs_docs = (L l d) : (hs_docs gp) })  ds
 

@@ -79,7 +79,8 @@ import GHC.Unit.Module.Warnings
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike )
-import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
+import GHC.Core.TyCon
+  ( Role (..), Injectivity(..), TyConFlags, tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.EnforceEpt.TagSig
@@ -198,6 +199,7 @@ data IfaceDecl
                 ifResKind    :: IfaceType,      -- Result kind of type constructor
                 ifCType      :: Maybe (CType GhcTc), -- C type for CAPI FFI
                 ifRoles      :: [Role],         -- Roles
+                ifTyConFlags :: TyConFlags,
                 ifCtxt       :: IfaceContext,   -- The "stupid theta"
                 ifCons       :: IfaceConDecls,  -- Includes new/data/data family info
                 ifGadtSyntax :: Bool,           -- True <=> declared using
@@ -2268,7 +2270,7 @@ instance Binary IfaceDecl where
         lazyPut bh (ty, details, idinfo)
         -- See Note [Lazy deserialization of IfaceId]
 
-    put_ bh (IfaceData a1 a10 a2 a11 a3 a4 a5 a6 a7 a8 a9) = do
+    put_ bh (IfaceData a1 a11 a2 a12 a3 a4 a5 a6 a7 a8 a9 a10) = do
         putByte bh 2
         putIfaceTopBndr bh a1
         put_ bh a2
@@ -2281,6 +2283,7 @@ instance Binary IfaceDecl where
         put_ bh a9
         put_ bh a10
         put_ bh a11
+        put_ bh a12
 
     put_ bh (IfaceSynonym a1 a6 a2 a3 a4 a5) = do
         putByte bh 3
@@ -2305,7 +2308,7 @@ instance Binary IfaceDecl where
     -- NB: Written in a funny way to avoid an interface change
     put_ bh (IfaceClass {
                 ifName    = a2,
-                ifKind    = a10,
+                ifKind    = a9,
                 ifRoles   = a3,
                 ifBinders = a4,
                 ifFDs     = a5,
@@ -2314,7 +2317,7 @@ instance Binary IfaceDecl where
                     ifATs       = a6,
                     ifSigs      = a7,
                     ifMinDef    = a8,
-                    ifUnary     = a9
+                    ifUnary     = a10
                 }}) = do
         putByte bh 5
         put_ bh a1
@@ -2382,7 +2385,8 @@ instance Binary IfaceDecl where
                     a9  <- get bh
                     a10 <- get bh
                     a11 <- get bh
-                    return (IfaceData a1 a10 a2 a11 a3 a4 a5 a6 a7 a8 a9)
+                    a12 <- get bh
+                    return (IfaceData a1 a11 a2 a12 a3 a4 a5 a6 a7 a8 a9 a10)
             3 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
@@ -2411,7 +2415,7 @@ instance Binary IfaceDecl where
                     a10 <- get bh
                     return (IfaceClass {
                         ifName    = a2,
-                        ifKind    = a10,
+                        ifKind    = a9,
                         ifRoles   = a3,
                         ifBinders = a4,
                         ifFDs     = a5,
@@ -2420,7 +2424,7 @@ instance Binary IfaceDecl where
                             ifATs       = a6,
                             ifSigs      = a7,
                             ifMinDef    = a8,
-                            ifUnary     = a9
+                            ifUnary     = a10
                         }})
             6 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
@@ -3091,9 +3095,10 @@ instance NFData IfaceDecl where
     IfaceId f1 f2 f3 f4 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
 
-    IfaceData f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 ->
+    IfaceData f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq`
-      rnf f6 `seq` rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` rnf f11
+      rnf f6 `seq` rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq`
+      rnf f11 `seq` rnf f12
 
     IfaceSynonym f1 f2 f3 f4 f5 f6 ->
       rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6

@@ -854,6 +854,7 @@ data Token
   | ITinclude_prag String
   | ITlanguage_prag
   | ITminimal_prag      SourceText
+  | ITrecomputing_prag  SourceText
   | IToverlappable_prag SourceText  -- instance overlap mode
   | IToverlapping_prag  SourceText  -- instance overlap mode
   | IToverlaps_prag     SourceText  -- instance overlap mode
@@ -3520,6 +3521,7 @@ oneWordPrags = Map.fromList [
      ("nounpack", fstrtoken (\s -> ITnounpack_prag (SourceText s))),
      ("ann", fstrtoken (\s -> ITann_prag (SourceText s))),
      ("minimal", fstrtoken (\s -> ITminimal_prag (SourceText s))),
+     ("recomputing", fstrtoken (\s -> ITrecomputing_prag (SourceText s))),
      ("overlaps", fstrtoken (\s -> IToverlaps_prag (SourceText s))),
      ("overlappable", fstrtoken (\s -> IToverlappable_prag (SourceText s))),
      ("overlapping", fstrtoken (\s -> IToverlapping_prag (SourceText s))),

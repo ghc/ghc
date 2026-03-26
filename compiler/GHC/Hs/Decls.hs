@@ -159,6 +159,7 @@ type instance XAnnD       (GhcPass _) = NoExtField
 type instance XRuleD      (GhcPass _) = NoExtField
 type instance XSpliceD    (GhcPass _) = NoExtField
 type instance XDocD       (GhcPass _) = NoExtField
+type instance XRecomputeTyD (GhcPass _) = NoExtField
 type instance XRoleAnnotD (GhcPass _) = NoExtField
 type instance XXHsDecl    (GhcPass _) = DataConCantHappen
 
@@ -213,6 +214,7 @@ emptyGroup = HsGroup { hs_ext = noExtField,
                        hs_derivds = [],
                        hs_fixds = [], hs_defds = [], hs_annds = [],
                        hs_fords = [], hs_warnds = [], hs_ruleds = [],
+                       hs_recomputing_tyds = [],
                        hs_valds = error "emptyGroup hs_valds: Can't happen",
                        hs_splcds = [],
                        hs_docs = [] }
@@ -257,6 +259,7 @@ appendGroups
         hs_fords  = fords1,
         hs_warnds = warnds1,
         hs_ruleds = rulds1,
+        hs_recomputing_tyds = recomp_tys1,
         hs_docs   = docs1 }
     HsGroup {
         hs_valds  = val_groups2,
@@ -269,6 +272,7 @@ appendGroups
         hs_fords  = fords2,
         hs_warnds = warnds2,
         hs_ruleds = rulds2,
+        hs_recomputing_tyds = recomp_tys2,
         hs_docs   = docs2 }
   =
     HsGroup {
@@ -283,6 +287,7 @@ appendGroups
         hs_fords  = fords1 ++ fords2,
         hs_warnds = warnds1 ++ warnds2,
         hs_ruleds = rulds1 ++ rulds2,
+        hs_recomputing_tyds = recomp_tys1 ++ recomp_tys2,
         hs_docs   = docs1  ++ docs2 }
 
 instance (OutputableBndrId p) => Outputable (HsDecl (GhcPass p)) where
@@ -299,6 +304,7 @@ instance (OutputableBndrId p) => Outputable (HsDecl (GhcPass p)) where
     ppr (AnnD _ ad)               = ppr ad
     ppr (SpliceD _ dd)            = ppr dd
     ppr (DocD _ doc)              = ppr doc
+    ppr (RecomputeTyD _ tycon)    = text "{-# RECOMPUTING" <+> ppr tycon <+> text "#-}"
     ppr (RoleAnnotD _ ra)         = ppr ra
 
 instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
@@ -310,11 +316,13 @@ instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
                    hs_annds  = ann_decls,
                    hs_fords  = foreign_decls,
                    hs_defds  = default_decls,
-                   hs_ruleds = rule_decls })
+                   hs_ruleds = rule_decls,
+                   hs_recomputing_tyds = recomp_ty_decls })
         = vcat_mb empty
             [ppr_ds fix_decls, ppr_ds default_decls,
              ppr_ds deprec_decls, ppr_ds ann_decls,
              ppr_ds rule_decls,
+             ppr_recompute_tys recomp_ty_decls,
              if isEmptyValBinds val_decls
                 then Nothing
                 else Just (ppr val_decls),
@@ -328,6 +336,12 @@ instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
           ppr_ds :: Outputable a => [a] -> Maybe SDoc
           ppr_ds [] = Nothing
           ppr_ds ds = Just (vcat (map ppr ds))
+
+          ppr_recompute_tys :: OutputableBndrId p => [LIdP (GhcPass p)] -> Maybe SDoc
+          ppr_recompute_tys [] = Nothing
+          ppr_recompute_tys tys =
+            Just (vcat [ text "{-# RECOMPUTING" <+> ppr tycon <+> text "#-}"
+                       | tycon <- tys ])
 
           vcat_mb :: SDoc -> [Maybe SDoc] -> SDoc
           -- Concatenate vertically with white-space between non-blanks

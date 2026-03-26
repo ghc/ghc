@@ -623,6 +623,7 @@ pcTyCon :: Name -> Maybe (CType GhcTc) -> [TyVar] -> [DataCon] -> TyCon
 pcTyCon name cType tyvars cons
   = mkAlgTyCon name (mkTyConKind bndrs res_kind) bndrs 0 res_kind
                 (map (const Representational) tyvars)
+                defaultTyConFlags
                 cType
                 []              -- No stupid theta
                 (mkDataTyConRhs cons)

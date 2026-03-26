@@ -300,7 +300,6 @@ buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> ClassMinimalDef        -- Minimal complete definition
            -> Bool                   -- True <=> is a unary class
            -> TcRnIf m n Class
-
 buildClass tycon_name kind binders roles fds sc_theta at_items sig_stuff mindef unary_class
   = fixM  $ \ rec_clas ->       -- Only name generation inside loop
     do  { traceIf (text "buildClass")
@@ -359,7 +358,7 @@ buildClass tycon_name kind binders roles fds sc_theta at_items sig_stuff mindef 
                   = mkDataTyConRhs [dict_con]
 
               tycon = mkClassTyCon tycon_name kind binders roles
-                                   rhs rec_clas tc_rep_name
+                                    rhs rec_clas tc_rep_name
                 -- A class can be recursive, and in the case of newtypes
                 -- this matters.  For example
                 --      class C a where { op :: C b => a -> b -> Int }
@@ -400,7 +399,6 @@ buildAbstractClass :: Name
                    -> [Role]
                    -> [FunDep TyVar]
                    -> TcRnIf m n Class
-
 buildAbstractClass tycon_name kind binders roles fds
   = fixM  $ \ rec_clas ->       -- Only name generation inside loop
     do  { traceIf (text "buildClass")
@@ -408,8 +406,8 @@ buildAbstractClass tycon_name kind binders roles fds
         ; tc_rep_name  <- newTyConRepName tycon_name
         ; let univ_tvs = binderVars binders
               tycon = mkClassTyCon tycon_name kind binders roles
-                                   AbstractTyCon
-                                   rec_clas tc_rep_name
+                                    AbstractTyCon
+                                    rec_clas tc_rep_name
               result = mkAbstractClass tycon_name univ_tvs fds tycon
         ; traceIf (text "buildClass" <+> ppr tycon)
         ; return result }

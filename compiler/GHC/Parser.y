@@ -657,6 +657,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '{-# NOUNPACK'           { L _ (ITnounpack_prag _) }
  '{-# ANN'                { L _ (ITann_prag _) }
  '{-# MINIMAL'            { L _ (ITminimal_prag _) }
+ '{-# RECOMPUTING'        { L _ (ITrecomputing_prag _) }
  '{-# CTYPE'              { L _ (ITctype _) }
  '{-# OVERLAPPING'        { L _ (IToverlapping_prag _) }
  '{-# OVERLAPPABLE'       { L _ (IToverlappable_prag _) }
@@ -1303,6 +1304,7 @@ topdecl :: { LHsDecl GhcPs }
         | '{-# DEPRECATED' deprecations '#-}'   {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ((glR $1,epTok $3), (getDEPRECATED_PRAGs $1)) (fromOL $2))) }
         | '{-# WARNING' warnings '#-}'          {% amsA' (sLL $1 $> $ WarningD noExtField (Warnings ((glR $1,epTok $3), (getWARNING_PRAGs $1)) (fromOL $2))) }
         | '{-# RULES' rules '#-}'               {% amsA' (sLL $1 $> $ RuleD noExtField (HsRules ((glR $1,epTok $3), (getRULES_PRAGs $1)) (reverse $2))) }
+        | '{-# RECOMPUTING' otycon '#-}'        {% amsA' (sLL $1 $> $ RecomputeTyD noExtField $2) }
         | annotation { $1 }
         | decl_no_th                            { $1 }
 

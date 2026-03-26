@@ -149,6 +149,7 @@ data HsDecl p
                                                  -- (Includes quasi-quotes)
   | DocD       (XDocD p)       (DocDecl p)       -- ^ Documentation comment
                                                  -- declaration
+  | RecomputeTyD (XRecomputeTyD p) (LIdP p)      -- ^ Recomputing type pragma
   | RoleAnnotD (XRoleAnnotD p) (RoleAnnotDecl p) -- ^Role annotation declaration
   | XHsDecl    !(XXHsDecl p)
 
@@ -225,6 +226,7 @@ data HsGroup p
         hs_warnds :: [LWarnDecls p],
         hs_annds  :: [LAnnDecl p],
         hs_ruleds :: [LRuleDecls p],
+        hs_recomputing_tyds :: [LIdP p],
 
         hs_docs   :: [LDocDecl p]
     }
