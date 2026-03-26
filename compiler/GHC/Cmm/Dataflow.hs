@@ -101,6 +101,8 @@ analyzeCmmBwd, analyzeCmmFwd
     -> FactBase f
 analyzeCmmBwd = analyzeCmm Bwd
 analyzeCmmFwd = analyzeCmm Fwd
+{-# SPECIALIZE analyzeCmmBwd :: DataflowLattice f -> TransferFun' CmmNode f -> GenCmmGraph CmmNode -> FactBase f -> FactBase f #-}
+{-# SPECIALIZE analyzeCmmFwd :: DataflowLattice f -> TransferFun' CmmNode f -> GenCmmGraph CmmNode -> FactBase f -> FactBase f #-}
 
 analyzeCmm
     :: (NonLocal node)
@@ -167,6 +169,7 @@ rewriteCmmBwd
     -> FactBase f
     -> UniqDSM (GenCmmGraph node, FactBase f)
 rewriteCmmBwd = rewriteCmm Bwd
+{-# SPECIALIZE rewriteCmmBwd :: DataflowLattice f -> RewriteFun' CmmNode f -> GenCmmGraph CmmNode -> FactBase f -> UniqDSM (GenCmmGraph CmmNode, FactBase f) #-}
 
 rewriteCmm
     :: (NonLocal node)

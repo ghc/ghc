@@ -119,6 +119,7 @@ labelsDefined (GMany _ body x) = mapFoldlWithKey addEntry (exitLabel x) body
         exitLabel :: MaybeO x (block n C O) -> LabelSet
         exitLabel NothingO  = setEmpty
         exitLabel (JustO b) = setSingleton (entryLabel b)
+{-# INLINABLE labelsDefined #-}
 
 
 ----------------------------------------------------------------
@@ -182,5 +183,6 @@ revPostorderFrom graph start = go start_worklist setEmpty []
       | Just b <- mapLookup label graph = ConsTodo b wl
       | otherwise =
            error $ "Label that doesn't have a block?! " ++ show label
+{-# INLINABLE revPostorderFrom #-}
 
 data DfsStack a = ConsTodo a (DfsStack a) | ConsMark a (DfsStack a) | Nil

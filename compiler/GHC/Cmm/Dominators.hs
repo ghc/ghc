@@ -166,6 +166,7 @@ graphWithDominators g = GraphWithDominators (reachable rpblocks g) dmap rpmap
             doms = tabulate bounds domSet
 
             dmap = mapFromList $ zipWith (\lbl i -> (lbl, domSet i)) rplabels' [0..]
+{-# SPECIALIZE graphWithDominators :: HasDebugCallStack => GenCmmGraph CmmNode -> GraphWithDominators CmmNode #-}
 
 reachable :: NonLocal node => [Block node C C] -> GenCmmGraph node -> GenCmmGraph node
 reachable blocks g = g { g_graph = GMany NothingO blockmap NothingO }
