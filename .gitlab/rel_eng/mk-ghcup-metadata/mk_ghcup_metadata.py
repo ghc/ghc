@@ -244,7 +244,8 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
           }
 
     a32 = { "Linux_Debian": { "( >= 11 && < 12 )": deb11_i386
-                            , ">= 12": deb12_i386
+                            , "( >= 12 && < 13 )": deb12_i386
+                            , ">= 13": deb13_i386
                             , "unknown_versioning": deb11_i386 }
           , "Linux_Ubuntu": { "unknown_versioning": deb11_i386 }
           , "Linux_Mint" : { "unknown_versioning": deb11_i386 }
