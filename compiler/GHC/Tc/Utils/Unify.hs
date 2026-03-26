@@ -1197,13 +1197,15 @@ There are two things to worry about:
 1. What if it is under a GADT or existential pattern match?
    - GADTs: a unification variable (and Infer's hole is similar) is untouchable
    - Existentials: be careful about skolem-escape
+   See Note [fillInferResult: GADTs and existentials]
 
 2. What if it is filled in more than once?  E.g. multiple branches of a case
      case e of
         T1 -> e1
         T2 -> e2
+   See Note [fillInferResult: multiple branches]
 
-Our typing rules are:
+In general our typing rules are:
 
 * The RHS of a existential or GADT alternative must always be a
   monotype, regardless of the number of alternatives.
@@ -1218,17 +1220,13 @@ Our typing rules are:
        We use choice (2) in that Section.
        (GHC 8.10 and earlier used choice (1).)
 
-  But note that
-      case e of
-        True  -> hr
-        False -> \x -> hr x
-  will fail, because we still /infer/ both branches, so the \x will get
-  a (monotype) unification variable, which will fail to unify with
-  (forall a. a->a)
+Note [fillInferResult: GADTs and existentials]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We can detect the GADT/existential situation, case (1) of Note [fillInferResult],
+by seeing that the current TcLevel is greater than that stored in ir_lvl of the
+Infer ExpType.  We bump the level whenever we go past a GADT/existential match.
 
-For (1) we can detect the GADT/existential situation by seeing that
-the current TcLevel is greater than that stored in ir_lvl of the Infer
-ExpType.  We bump the level whenever we go past a GADT/existential match.
+We insist that the RHS has a monotype, regardless of the number of alternatives.
 
 Then, before filling the hole use promoteTcType to promote the type
 to the outer ir_lvl.  promoteTcType does this
@@ -1238,11 +1236,6 @@ to the outer ir_lvl.  promoteTcType does this
 That forces the type to be a monotype (since unification variables can
 only unify with monotypes); and catches skolem-escapes because the
 alpha is untouchable until the equality floats out.
-
-For (2), we simply look to see if the hole is filled already.
-  - if not, we promote (as above) and fill the hole
-  - if it is filled, we simply unify with the type that is
-    already there
 
 (FIR1) There is one wrinkle.  Suppose we have
              case e of
@@ -1258,7 +1251,36 @@ For (2), we simply look to see if the hole is filled already.
     So if we check G2 second, we still want to emit a constraint that restricts
     the RHS to be a monotype. This is done by ensureMonoType, and it works
     by simply generating a constraint (alpha ~ ty), where alpha is a fresh
-unification variable.  We discard the evidence.
+    unification variable.  We discard the evidence.
+
+Note [fillInferResult: multiple branches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If there are multiple case branches, case (2) of Note [fillInferResult]
+we simply look to see if the hole is filled already.
+  - if not, we promote (as above) and fill the hole
+  - if it is filled, we simply unify with the type that is already there
+
+But consider
+    case x of
+      True  -> True
+      False -> error "urk"
+and suppose we call `tcInferSigma` on this expression, so that the `ir_inst`
+field of the expected result type is `IIF_Sigma`.   The danger is that we'll
+fill the hole with `Bool` (from the `True`) and then reject when we try to
+unify that with `forall a. a->a`, from the call to `error`.
+
+To avoid this, we never infer a sigma-type from a multi-branch `case`.  Instead
+we just zap the `IIF_Sigma` to `IIF_DeepRho` when walking inside the branches
+of multi-arm case-expression, or an if-expression. See calls to
+`adjustExpTypeForCaseBranches`.
+
+Note that
+      case e of
+        True  -> hr
+        False -> \x -> hr x
+      where hr :: (forall a. a->a) -> Int
+will fail, because we still /infer/ both branches, so the \x will get a
+(monotype) unification variable, which will fail to unify with (forall a. a->a)
 
 Note [Instantiation of InferResult]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1316,7 +1338,7 @@ HOWEVER, not always! Here are places where we want `IIF_Sigma` meaning
   but /not/ deeply instantiate (#26331). See Note [View patterns and polymorphism]
   in GHC.Tc.Gen.Pat.  This the only place we use IIF_ShallowRho.
 
-Why do we want to deeply instantiate, ever?  Why isn't top-instantiation enough?
+Why do we want to /deeply/ instantiate, ever?  Why isn't top-instantiation enough?
 Answer: to accept the following program (T26225b) with -XDeepSubsumption, we
 need to deeply instantiate when inferring in checkResultTy:
 

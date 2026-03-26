@@ -323,6 +323,7 @@ tcExpr :: HsExpr GhcRn
 -- Se Note [Typechecking by expansion: overview]
 tcExpr e@(HsVar _ v_rn) res_ty
   = do { (v_tc, sigma_ty) <- tcInferId v_rn
+       ; traceTc "tcExpr:HsVar" (ppr v_tc <+> dcolon <+> ppr sigma_ty $$ ppr res_ty)
        ; tcWrapResult e v_tc sigma_ty res_ty }
 
 tcExpr e@(ExprWithTySig _ e_rn e_ty) res_ty
@@ -545,8 +546,9 @@ tcExpr (HsCase ctxt scrut matches) res_ty
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy
-       ; (u1,b1') <- tcCollectingUsage $ tcMonoLExpr b1 res_ty
-       ; (u2,b2') <- tcCollectingUsage $ tcMonoLExpr b2 res_ty
+       ; let res_ty' = adjustExpTypeForCaseBranches res_ty [b1,b2]
+       ; (u1,b1') <- tcCollectingUsage $ tcMonoLExpr b1 res_ty'
+       ; (u2,b2') <- tcCollectingUsage $ tcMonoLExpr b2 res_ty'
        ; tcEmitBindingUsage (supUE u1 u2)
        ; return (HsIf x pred' b1' b2') }
 

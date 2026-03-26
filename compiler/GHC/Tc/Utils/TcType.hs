@@ -441,11 +441,12 @@ data InferInstFlag  -- Specifies whether the inference should return an uninstan
 
   | IIF_ShallowRho  -- Trying to infer a shallow RhoType (no foralls or => at the top)
                     -- Top-instantiate (only, regardless of DeepSubsumption) before filling the hole
-                    -- Typically used when inferring the type of an expression
+                    -- Used only for view patterns; see Note [View patterns and polymorphism]
 
   | IIF_DeepRho     -- Trying to infer a possibly-deep RhoType (depending on DeepSubsumption)
                     -- If DeepSubsumption is off, same as IIF_ShallowRho
                     -- If DeepSubsumption is on, instantiate deeply before filling the hole
+                    -- Typically used when inferring the type of an expression
 
 type ExpSigmaType = ExpType
 type ExpRhoType   = ExpType

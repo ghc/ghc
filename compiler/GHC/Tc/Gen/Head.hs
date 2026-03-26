@@ -232,6 +232,7 @@ splitHsApps e = go e noSrcSpan []
     go (HsAppType _ (L l fun) ty) lspan args = go fun (locA l) (mkETypeArg lspan ty    : args)
     go (HsApp _ (L l fun) arg)    lspan args = go fun (locA l) (mkEValArg  lspan arg   : args)
 
+{-
     -- See Note [Looking through Template Haskell splices in splitHsApps]
     go e@(HsUntypedSplice splice_res splice) _ args
       = do { fun <- getUntypedSpliceBody splice_res
@@ -242,6 +243,7 @@ splitHsApps e = go e noSrcSpan []
             HsUntypedSpliceExpr _ (L l _) -> locA l -- l :: SrcAnn AnnListItem
             HsQuasiQuote _ _ (L l _)      -> locA l -- l :: SrcAnn NoEpAnns
             (XUntypedSplice (HsImplicitLiftSplice _ _ _ (L l _))) -> locA l
+-}
 
     -- See Note [Desugar OpApp in the typechecker]
     go e@(OpApp _ arg1 (L l op) arg2) _ args
@@ -342,6 +344,8 @@ where
 
 Note [Looking through ExpandedThingRn]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**** TODO ****  this note is out of date.  Fix me.
+
 When creating an application chain in splitHsApps, we must deal with
      ExpandedThingRn f1 (f `HsApp` e1) `HsApp` e2 `HsApp` e3
 

@@ -219,10 +219,10 @@ tcMatches :: (AnnoBody body, Outputable (body GhcTc))
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
           -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
 
-tcMatches ctxt tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
+tcMatches ctxt tc_body pat_tys exp_ty (MG { mg_alts = L l matches
                                           , mg_ext = origin })
   | null matches  -- Deal with case e of {}
-    -- Since there are no branches, no one else will fill in rhs_ty
+    -- Since there are no branches, no one else will fill in exp_ty
     -- when in inference mode, so we must do it ourselves,
     -- here, using expTypeToType
   = do { tcEmitBindingUsage bottomUE
@@ -233,17 +233,19 @@ tcMatches ctxt tc_body pat_tys rhs_ty (MG { mg_alts = L l matches
            [ExpForAllPatTy tvb] -> failWithTc $ TcRnEmptyCase ctxt (EmptyCaseForall tvb)
            []                   -> panic "tcMatches: no arguments in EmptyCase"
            _t1:(_t2:_ts)        -> panic "tcMatches: multiple arguments in EmptyCase"
-       ; rhs_ty <- expTypeToType rhs_ty
+       ; rhs_ty <- expTypeToType exp_ty
        ; return (MG { mg_alts = L l []
                     , mg_ext = MatchGroupTc [pat_ty] rhs_ty origin
                     }) }
 
   | otherwise
-  = do { umatches <- mapM (tcCollectingUsage . tcMatch tc_body pat_tys rhs_ty) matches
-       ; let (usages, matches') = unzip umatches
+  = do { let exp_ty' = adjustExpTypeForCaseBranches exp_ty matches
+             tc_match match = tcCollectingUsage $
+                              tcMatch tc_body pat_tys exp_ty' match
+       ; (usages, matches') <- mapAndUnzipM tc_match matches
        ; tcEmitBindingUsage $ supUEs usages
        ; pat_tys  <- mapM readScaledExpType (filter_out_forall_pat_tys pat_tys)
-       ; rhs_ty   <- readExpType rhs_ty
+       ; rhs_ty   <- readExpType exp_ty'
        ; traceTc "tcMatches" (ppr matches' $$ ppr pat_tys $$ ppr rhs_ty)
        ; return (MG { mg_alts   = L l matches'
                     , mg_ext    = MatchGroupTc pat_tys rhs_ty origin
