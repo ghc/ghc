@@ -1,0 +1,5 @@
+noFusionElemSort = \ x x1 -> elem $fEqInt x (actualSort gtInt x1)
+
+noFusionElemNonEmptyToList
+  = \ x x1 -> case x1 of { :| a1 as -> elem $fEqInt x (: a1 as) }
+

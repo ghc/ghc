@@ -1,0 +1,118 @@
+isElemList
+  = \ x ->
+      case x of { C# x1 ->
+      case x1 of {
+        __DEFAULT -> False;
+        'a'# -> True;
+        'b'# -> True;
+        'c'# -> True
+      }
+      }
+
+isNotElemList
+  = \ x ->
+      case x of { C# x1 ->
+      case x1 of {
+        __DEFAULT -> True;
+        'x'# -> False;
+        'y'# -> False;
+        'z'# -> False
+      }
+      }
+
+isOneOfThese
+  = \ x ->
+      case x of { I# x1 ->
+      case x1 of {
+        __DEFAULT -> False;
+        1# -> True;
+        2# -> True;
+        3# -> True;
+        4# -> True;
+        5# -> True
+      }
+      }
+
+isNotOneOfThese
+  = \ x ->
+      case x of { I# x1 ->
+      case x1 of {
+        __DEFAULT -> True;
+        1# -> False;
+        2# -> False;
+        3# -> False;
+        4# -> False;
+        5# -> False
+      }
+      }
+
+isElemString
+  = \ x ->
+      joinrec {
+        go addr z
+          = case indexCharOffAddr# addr 0# of ch {
+              __DEFAULT ->
+                case x of { C# x1 ->
+                case eqChar# x1 ch of {
+                  __DEFAULT -> jump go (plusAddr# addr 1#) z;
+                  1# -> True
+                }
+                };
+              '\NUL'# -> z
+            }; } in
+      jump go isElemString1 False
+
+isNotElemString
+  = \ x ->
+      joinrec {
+        go addr z
+          = case indexCharOffAddr# addr 0# of ch {
+              __DEFAULT ->
+                case x of { C# x1 ->
+                case eqChar# x1 ch of {
+                  __DEFAULT -> jump go (plusAddr# addr 1#) z;
+                  1# -> False
+                }
+                };
+              '\NUL'# ->
+                case z of {
+                  False -> True;
+                  True -> False
+                }
+            }; } in
+      jump go isNotElemString1 False
+
+isElemStringUtf
+  = \ x ->
+      unpackFoldrCStringUtf8#
+        isElemStringUtf1
+        (\ y r ->
+           case x of { C# x1 ->
+           case y of { C# y1 ->
+           case eqChar# x1 y1 of {
+             __DEFAULT -> r;
+             1# -> True
+           }
+           }
+           })
+        False
+
+isNotElemStringUtf
+  = \ x ->
+      case unpackFoldrCStringUtf8#
+             isNotElemStringUtf1
+             (\ y r ->
+                case x of { C# x1 ->
+                case y of { C# y1 ->
+                case eqChar# x1 y1 of {
+                  __DEFAULT -> r;
+                  1# -> True
+                }
+                }
+                })
+             False
+      of {
+        False -> True;
+        True -> False
+      }
+

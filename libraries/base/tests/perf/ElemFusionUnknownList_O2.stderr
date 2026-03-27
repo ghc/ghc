@@ -1,0 +1,206 @@
+fusionNotElemFilter
+  = \ x eta ->
+      joinrec {
+        go1 ds
+          = case ds of {
+              [] -> True;
+              : y ys ->
+                case y of { I# ipv ->
+                case remInt# ipv 2# of {
+                  __DEFAULT ->
+                    case x of { I# x1 ->
+                    case ==# x1 ipv of {
+                      __DEFAULT ->
+                        joinrec {
+                          go2 ds1
+                            = case ds1 of {
+                                [] -> True;
+                                : y1 ys1 ->
+                                  case y1 of { I# ipv1 ->
+                                  case remInt# ipv1 2# of {
+                                    __DEFAULT ->
+                                      case ==# x1 ipv1 of {
+                                        __DEFAULT -> jump go2 ys1;
+                                        1# -> False
+                                      };
+                                    0# -> jump go2 ys1
+                                  }
+                                  }
+                              }; } in
+                        jump go2 ys;
+                      1# -> False
+                    }
+                    };
+                  0# -> jump go1 ys
+                }
+                }
+            }; } in
+      jump go1 eta
+
+fusionElemFilter
+  = \ x eta ->
+      joinrec {
+        go1 ds
+          = case ds of {
+              [] -> False;
+              : y ys ->
+                case y of { I# ipv ->
+                case remInt# ipv 2# of {
+                  __DEFAULT ->
+                    case x of { I# x1 ->
+                    case ==# x1 ipv of {
+                      __DEFAULT ->
+                        joinrec {
+                          go2 ds1
+                            = case ds1 of {
+                                [] -> False;
+                                : y1 ys1 ->
+                                  case y1 of { I# ipv1 ->
+                                  case remInt# ipv1 2# of {
+                                    __DEFAULT ->
+                                      case ==# x1 ipv1 of {
+                                        __DEFAULT -> jump go2 ys1;
+                                        1# -> True
+                                      };
+                                    0# -> jump go2 ys1
+                                  }
+                                  }
+                              }; } in
+                        jump go2 ys;
+                      1# -> True
+                    }
+                    };
+                  0# -> jump go1 ys
+                }
+                }
+            }; } in
+      jump go1 eta
+
+fusionNotElemConcatMap
+  = \ x x1 ->
+      case x1 of {
+        [] -> True;
+        : y ys ->
+          case y of { I# x2 ->
+          case x of { I# x3 ->
+          case ==# x3 (+# x2 1#) of {
+            __DEFAULT ->
+              case ==# x3 (+# x2 2#) of {
+                __DEFAULT ->
+                  joinrec {
+                    go1 ds
+                      = case ds of {
+                          [] -> True;
+                          : y1 ys1 ->
+                            case y1 of { I# x4 ->
+                            case ==# x3 (+# x4 1#) of {
+                              __DEFAULT ->
+                                case ==# x3 (+# x4 2#) of {
+                                  __DEFAULT -> jump go1 ys1;
+                                  1# -> False
+                                };
+                              1# -> False
+                            }
+                            }
+                        }; } in
+                  jump go1 ys;
+                1# -> False
+              };
+            1# -> False
+          }
+          }
+          }
+      }
+
+fusionElemConcatMap
+  = \ x x1 ->
+      case x1 of {
+        [] -> False;
+        : y ys ->
+          case y of { I# x2 ->
+          case x of { I# x3 ->
+          case ==# x3 (+# x2 1#) of {
+            __DEFAULT ->
+              case ==# x3 (+# x2 2#) of {
+                __DEFAULT ->
+                  joinrec {
+                    go1 ds
+                      = case ds of {
+                          [] -> False;
+                          : y1 ys1 ->
+                            case y1 of { I# x4 ->
+                            case ==# x3 (+# x4 1#) of {
+                              __DEFAULT ->
+                                case ==# x3 (+# x4 2#) of {
+                                  __DEFAULT -> jump go1 ys1;
+                                  1# -> True
+                                };
+                              1# -> True
+                            }
+                            }
+                        }; } in
+                  jump go1 ys;
+                1# -> True
+              };
+            1# -> True
+          }
+          }
+          }
+      }
+
+fusionNotElemMap
+  = \ x eta ->
+      case eta of {
+        [] -> True;
+        : y ys ->
+          case x of { I# x1 ->
+          case y of { I# x2 ->
+          case ==# x1 (+# x2 1#) of {
+            __DEFAULT ->
+              joinrec {
+                go1 ds
+                  = case ds of {
+                      [] -> True;
+                      : y1 ys1 ->
+                        case y1 of { I# x3 ->
+                        case ==# x1 (+# x3 1#) of {
+                          __DEFAULT -> jump go1 ys1;
+                          1# -> False
+                        }
+                        }
+                    }; } in
+              jump go1 ys;
+            1# -> False
+          }
+          }
+          }
+      }
+
+fusionElemMap
+  = \ x eta ->
+      case eta of {
+        [] -> False;
+        : y ys ->
+          case x of { I# x1 ->
+          case y of { I# x2 ->
+          case ==# x1 (+# x2 1#) of {
+            __DEFAULT ->
+              joinrec {
+                go1 ds
+                  = case ds of {
+                      [] -> False;
+                      : y1 ys1 ->
+                        case y1 of { I# x3 ->
+                        case ==# x1 (+# x3 1#) of {
+                          __DEFAULT -> jump go1 ys1;
+                          1# -> True
+                        }
+                        }
+                    }; } in
+              jump go1 ys;
+            1# -> True
+          }
+          }
+          }
+      }
+

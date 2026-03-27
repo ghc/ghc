@@ -6,7 +6,7 @@ module T17752 where
 
 -- Should compile to a pattern match if the rules fire
 isElemList    x = x `elem` ['a','b','c']
-isNotElemList x = x `elem` ['x','y','z']
+isNotElemList x = x `notElem` ['x','y','z']
 
 isOneOfThese x = x `elem` [1,2,3,4,5::Int]
 isNotOneOfThese x = x `notElem` [1,2,3,4,5::Int]
