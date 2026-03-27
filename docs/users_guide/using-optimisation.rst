@@ -619,12 +619,13 @@ as such you shouldn't need to set any of them explicitly. A flag
 
 .. ghc-flag:: -fexpose-overloaded-unfoldings
     :shortdesc: Expose function unfoldings whose type contains constraints,
-        even for very large or recursive functions.
+        even for very large or recursive functions. Implied by
+        :ghc-flag:`-O2`.
     :type: dynamic
     :reverse: -fno-expose-overloaded-unfoldings
     :category:
 
-    :default: off
+    :default: off but enabled by :ghc-flag:`-O2`.
     :since: 9.12.1
 
     This experimental flag is a slightly less heavy weight alternative
