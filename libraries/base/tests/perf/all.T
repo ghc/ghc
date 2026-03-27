@@ -2,10 +2,25 @@
 setTestOpts(js_skip)
 
 #--------------------------------------
-# Check specialization of elem via rules
+# Check optimization of `elem`
 #--------------------------------------
 
-test('T17752', [only_ways(['normal'])] , makefile_test, ['T17752'])
+elemCoreFilter = "sed -En '/^(is|fusion|noFusion)[A-Za-z]*($| )/,/^$/p'"
+
+def elemCoreTest(test_name, module_name, opt):
+    test(test_name,
+         [only_ways(['normal']), extra_files([module_name + '.hs'])],
+         multimod_compile_filter,
+         [module_name,
+          f'{opt} -ddump-simpl -dsuppress-all -dsuppress-uniques -dno-typeable-binds',
+          elemCoreFilter])
+
+elemCoreTest('T17752_O1', 'T17752', '-O1')
+elemCoreTest('T17752_O2', 'T17752', '-O2')
+elemCoreTest('ElemFusionUnknownList_O1', 'ElemFusionUnknownList', '-O1')
+elemCoreTest('ElemFusionUnknownList_O2', 'ElemFusionUnknownList', '-O2')
+elemCoreTest('ElemNoFusion_O1', 'ElemNoFusion', '-O1')
+elemCoreTest('ElemNoFusion_O2', 'ElemNoFusion', '-O2')
 
 #--------------------------------------
 
