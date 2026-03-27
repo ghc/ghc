@@ -110,8 +110,9 @@ assembleBCOs
   -> [(Name, ByteString)]
   -> Maybe InternalModBreaks
   -> [SptEntry]
+  -> Maybe ByteCodeHpcInfo
   -> IO CompiledByteCode
-assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
+assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries use_hpc = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   let itbls = mkITbls profile tycons
@@ -122,6 +123,7 @@ assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
     , bc_strs = top_strs
     , bc_breaks = modbreaks
     , bc_spt_entries = spt_entries
+    , bc_hpc_info = use_hpc
     }
 
 -- Note [Allocating string literals]

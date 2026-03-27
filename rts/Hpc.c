@@ -323,8 +323,6 @@ hs_hpc_module(char *modName,
       }
       tmpModule->from_file = false;
   }
-
-  startupHpc();
 }
 
 static void

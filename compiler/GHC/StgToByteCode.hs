@@ -74,7 +74,6 @@ import Data.List ( genericReplicate, intersperse
 import Foreign hiding (shiftL, shiftR)
 import Control.Monad
 import Data.Char
-import Data.Word
 
 import GHC.Unit.Module
 
@@ -108,8 +107,9 @@ byteCodeGen :: HscEnv
             -> [TyCon]
             -> Maybe ModBreaks
             -> [SptEntry]
+            -> Maybe ByteCodeHpcInfo
             -> IO CompiledByteCode
-byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
+byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries hpc_info
    = withTiming logger
                 (text "GHC.StgToByteCode"<+>brackets (ppr this_mod))
                 (const ()) $ do
@@ -135,7 +135,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
         let mod_breaks = case mb_modBreaks of
              Nothing -> Nothing
              Just mb -> Just $ mkInternalModBreaks this_mod breakInfo mb
-        cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries
+        cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries hpc_info
 
         -- Squash space leaks in the CompiledByteCode.  This is really
         -- important, because when loading a set of modules into GHCi

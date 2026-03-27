@@ -137,6 +137,9 @@ import qualified Data.IntMap.Strict as IM
 import qualified Data.Map.Strict as M
 import Foreign.Ptr (nullPtr)
 import GHC.ByteCode.Serialize
+-- TODO: this import is wrong
+import GHC.HsToCore.Coverage (hpcModuleName)
+import qualified Data.ByteString.Char8 as BS8
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -988,10 +991,11 @@ dynLinkBCOs interp pls keep_spec bcos =
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
 
-            cbcs :: [CompiledByteCode]
-            cbcs = concatMap linkableBCOs new_bcos
+            -- cbcs :: [CompiledByteCode]
+            mbcs = concatMap linkableModuleByteCodes new_bcos
+            m = map (\ mbc -> (gbc_module mbc, gbc_compiled_byte_code mbc)) mbcs
         in do
-          bco_state <- dynLinkCompiledByteCode interp (pkgs_loaded pls) (bco_loader_state pls) traverseHomePackageBytecodeState keep_spec cbcs
+          bco_state <- dynLinkCompiledByteCode interp (pkgs_loaded pls) (bco_loader_state pls) traverseHomePackageBytecodeState keep_spec m
           return $! pls1 { bco_loader_state = bco_state }
 
 dynLinkCompiledByteCode :: Interp
@@ -999,9 +1003,10 @@ dynLinkCompiledByteCode :: Interp
                         -> BytecodeLoaderState
                         -> BytecodeLoaderStateTraverser IO  -- ^ The traverser tells us to update home package bytecode state or external package bytecode state
                         -> KeepModuleLinkableDefinitions
-                        -> [CompiledByteCode]
+                        -> [(Module, CompiledByteCode)]
                         -> IO BytecodeLoaderState
-dynLinkCompiledByteCode interp pkgs_loaded whole_bytecode_state traverse_bytecode_state keep_spec cbcs = do
+dynLinkCompiledByteCode interp pkgs_loaded whole_bytecode_state traverse_bytecode_state keep_spec mbcs = do
+        let cbcs = map snd mbcs
         st1 <- traverse_bytecode_state whole_bytecode_state $ \bytecode_state -> do
           let
               le1 = bco_linker_env bytecode_state
@@ -1030,6 +1035,8 @@ dynLinkCompiledByteCode interp pkgs_loaded whole_bytecode_state traverse_bytecod
           let ce2 = extendClosureEnv (closure_env (bco_linker_env bytecode_state)) new_binds
           -- Add SPT entries
           mapM_ (linkSptEntry interp ce2) (concatMap bc_spt_entries cbcs)
+          -- Load HPC modules
+          mapM_ (\(modn, cbc) -> linkHpcEntry interp modn (bc_hpc_info cbc)) mbcs
           return $! bytecode_state { bco_linker_env = (bco_linker_env bytecode_state) { closure_env = ce2 } }
 
 -- | Register SPT entries for this module in the interpreter
@@ -1042,8 +1049,18 @@ linkSptEntry interp ce (SptEntry name fpr) = do
     Nothing -> pprPanic "linkSptEntry" (ppr name)
     Just (_, hval) -> addSptEntry interp fpr hval
 
-
-
+linkHpcEntry :: Interp -> Module -> Maybe ByteCodeHpcInfo -> IO ()
+linkHpcEntry _interp _modl Nothing = pure ()
+linkHpcEntry interp modl (Just info) = do
+  addHpcModule interp
+    (toBS $ hpcModuleName modl)
+    (bchi_tick_count info)
+    (bchi_hash info)
+    (bchi_tickboxes info)
+  where
+    toBS :: SDoc -> ByteString
+    -- TODO: @fendor showSDocUnsafe is wrong, add info to 'ByteCodeHpcInfo'
+    toBS = BS8.pack . (++ "\0") . showSDocUnsafe . pprCode
 
 -- Link a bunch of BCOs and return references to their values
 linkSomeBCOs :: Interp

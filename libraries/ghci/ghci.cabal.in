@@ -59,6 +59,7 @@ library
     if flag(internal-interpreter)
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         exposed-modules:
+            GHCi.Coverage
             GHCi.Run
             GHCi.Debugger
             GHCi.CreateBCO

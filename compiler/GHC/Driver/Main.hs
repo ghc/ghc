@@ -151,6 +151,7 @@ import GHC.Hs.Dump
 import GHC.Hs.Stats         ( ppSourceStats )
 
 import GHC.HsToCore
+import GHC.HsToCore.Coverage ( hpcTickBoxes )
 
 import GHC.StgToByteCode    ( byteCodeGen )
 import GHC.StgToJS          ( stgToJS )
@@ -237,6 +238,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Error
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
+import GHC.Types.HpcInfo (HpcInfo (..))
 import GHC.Types.IPE
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
@@ -299,6 +301,8 @@ import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
 
 import GHC.ByteCode.Serialize
+import GHC.Driver.Ppr (showSDoc)
+import qualified Data.ByteString.Char8 as BS8
 
 {- **********************************************************************
 %*                                                                      *
@@ -1186,7 +1190,7 @@ compileWholeCoreBindings hsc_env type_env wcb = do
     gen_bytecode core_binds stubs foreign_files = do
       let cgi_guts = CgInteractiveGuts wcb_module core_binds
                       (typeEnvTyCons type_env) stubs foreign_files
-                      Nothing []
+                      Nothing [] NoHpcInfo
       trace_if logger (text "Generating ByteCode for" <+> ppr wcb_module)
       mkModuleByteCode hsc_env wcb_module wcb_mod_location cgi_guts
 
@@ -2136,11 +2140,12 @@ data CgInteractiveGuts = CgInteractiveGuts { cgi_module :: Module
                                            , cgi_foreign_files :: [(ForeignSrcLang, FilePath)]
                                            , cgi_modBreaks ::  Maybe ModBreaks
                                            , cgi_spt_entries :: [SptEntry]
+                                           , cgi_hpc_info :: HpcInfo
                                            }
 
 mkCgInteractiveGuts :: CgGuts -> CgInteractiveGuts
-mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_foreign_files, cg_modBreaks, cg_spt_entries}
-  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_foreign_files cg_modBreaks cg_spt_entries
+mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_foreign_files, cg_modBreaks, cg_spt_entries, cg_hpc_info}
+  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_foreign_files cg_modBreaks cg_spt_entries cg_hpc_info
 
 hscInteractive :: HscEnv
                -> CgInteractiveGuts
@@ -2163,13 +2168,15 @@ hscGenerateByteCode :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO Compiled
 hscGenerateByteCode hsc_env cgguts location = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
+    let platform = targetPlatform dflags
     let CgInteractiveGuts{ -- This is the last use of the ModGuts in a compilation.
                 -- From now on, we just use the bits we need.
                cgi_module   = this_mod,
                cgi_binds    = core_binds,
                cgi_tycons   = tycons,
                cgi_modBreaks = mod_breaks,
-               cgi_spt_entries = spt_entries } = cgguts
+               cgi_spt_entries = spt_entries,
+               cgi_hpc_info = hpc_info } = cgguts
 
     -------------------
     -- ADD IMPLICIT BINDINGS
@@ -2194,8 +2201,20 @@ hscGenerateByteCode hsc_env cgguts location = do
 
     let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
+    -------------------
+    -- Setup HPC info
+    let
+      bytecodeHpcInfo = case hpc_info of
+        NoHpcInfo -> Nothing
+        HpcInfo{hpcInfoTickCount, hpcInfoHash} ->
+          Just ByteCodeHpcInfo
+            { bchi_tick_count = hpcInfoTickCount
+            , bchi_hash = hpcInfoHash
+            , bchi_tickboxes = BS8.pack . (++ "\0") . showSDoc dflags $ hpcTickBoxes platform this_mod
+            }
+
     -----------------  Generate byte code ------------------
-    byteCodeGen hsc_env this_mod stg_binds tycons mod_breaks spt_entries
+    byteCodeGen hsc_env this_mod stg_binds tycons mod_breaks spt_entries bytecodeHpcInfo
 
 -- | Generate a byte code object linkable and write it to a file if `-fwrite-byte-code` is enabled.
 generateAndWriteByteCode :: HscEnv -> CgInteractiveGuts -> ModLocation -> IO ModuleByteCode
@@ -2844,6 +2863,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
                 []
                 Nothing -- modbreaks
                 [] -- spt entries
+                Nothing -- no hpc info
 
       {- load it -}
       bco_time <- getCurrentTime

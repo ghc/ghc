@@ -204,36 +204,37 @@ data BytecodeLoaderState = BytecodeLoaderState
        -- ^ Information about bytecode objects from the home package we have loaded into the interpreter.
        , externalPackage_loaded :: BytecodeState
        -- ^ Information about bytecode objects from external packages we have loaded into the interpreter.
+       , hpcInitialised :: !Bool
        }
 
 
 -- | Find a name loaded from bytecode
 lookupNameBytecodeState :: BytecodeLoaderState -> Name -> Maybe (Name, ForeignHValue)
-lookupNameBytecodeState (BytecodeLoaderState home_package external_package) name = do
+lookupNameBytecodeState (BytecodeLoaderState home_package external_package _) name = do
       lookupNameEnv (closure_env (bco_linker_env home_package)) name
   <|> lookupNameEnv (closure_env (bco_linker_env external_package)) name
 
 -- | Look up a break array in the bytecode loader state.
 lookupBreakArrayBytecodeState :: BytecodeLoaderState -> Module -> Maybe (ForeignRef BreakArray)
-lookupBreakArrayBytecodeState (BytecodeLoaderState home_package external_package) break_mod = do
+lookupBreakArrayBytecodeState (BytecodeLoaderState home_package external_package _) break_mod = do
   lookupModuleEnv (breakarray_env (bco_linked_breaks home_package)) break_mod
   <|> lookupModuleEnv (breakarray_env (bco_linked_breaks external_package)) break_mod
 
 -- | Look up an info table in the bytecode loader state.
 lookupInfoTableBytecodeState :: BytecodeLoaderState -> Name -> Maybe (Name, ItblPtr)
-lookupInfoTableBytecodeState (BytecodeLoaderState home_package external_package) info_mod = do
+lookupInfoTableBytecodeState (BytecodeLoaderState home_package external_package _) info_mod = do
   lookupNameEnv (itbl_env (bco_linker_env home_package)) info_mod
   <|> lookupNameEnv (itbl_env (bco_linker_env external_package)) info_mod
 
 -- | Look up an address in the bytecode loader state.
 lookupAddressBytecodeState :: BytecodeLoaderState -> Name -> Maybe (Name, AddrPtr)
-lookupAddressBytecodeState (BytecodeLoaderState home_package external_package) addr_mod = do
+lookupAddressBytecodeState (BytecodeLoaderState home_package external_package _) addr_mod = do
   lookupNameEnv (addr_env (bco_linker_env home_package)) addr_mod
   <|> lookupNameEnv (addr_env (bco_linker_env external_package)) addr_mod
 
 -- | Look up a cost centre stack in the bytecode loader state.
 lookupCCSBytecodeState :: BytecodeLoaderState -> Module -> Maybe (Array BreakTickIndex (RemotePtr CostCentre))
-lookupCCSBytecodeState (BytecodeLoaderState home_package external_package) ccs_mod = do
+lookupCCSBytecodeState (BytecodeLoaderState home_package external_package _) ccs_mod = do
   lookupModuleEnv (ccs_env (bco_linked_breaks home_package)) ccs_mod
   <|> lookupModuleEnv (ccs_env (bco_linked_breaks external_package)) ccs_mod
 
@@ -241,6 +242,7 @@ emptyBytecodeLoaderState :: BytecodeLoaderState
 emptyBytecodeLoaderState = BytecodeLoaderState
     { homePackage_loaded = emptyBytecodeState
     , externalPackage_loaded = emptyBytecodeState
+    , hpcInitialised = False
     }
 
 emptyBytecodeState :: BytecodeState

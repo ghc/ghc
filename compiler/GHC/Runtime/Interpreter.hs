@@ -17,6 +17,7 @@ module GHC.Runtime.Interpreter
   , mallocData
   , createBCOs
   , addSptEntry
+  , addHpcModule
   , mkCostCentres
   , costCentreStackInfo
   , newBreakArray
@@ -365,6 +366,10 @@ addSptEntry :: Interp -> Fingerprint -> ForeignHValue -> IO ()
 addSptEntry interp fpr ref =
   withForeignRef ref $ \val ->
     interpCmd interp (AddSptEntry fpr val)
+
+addHpcModule :: Interp -> ByteString -> Int -> Int -> ByteString -> IO ()
+addHpcModule interp modLabel tickNo hash tickboxes  =
+  interpCmd interp (AddHpcModule modLabel tickNo hash tickboxes)
 
 costCentreStackInfo :: Interp -> RemotePtr CostCentreStack -> IO [String]
 costCentreStackInfo interp ccs =

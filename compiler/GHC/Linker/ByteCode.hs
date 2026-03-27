@@ -37,7 +37,7 @@ linkBytecodeLib hsc_env gbcs = do
 
   let bytecodeLib' = BytecodeLib {
     bytecodeLibUnitId = homeUnitId_ dflags,
-    bytecodeLibFiles = all_cbcs,
+    bytecodeLibFiles = map undefined all_cbcs,
     bytecodeLibForeign = interpreter_foreign_lib
   }
   let output_fn = fromMaybe "a.out" (outputFile dflags)

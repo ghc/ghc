@@ -2111,6 +2111,9 @@ run_BCO:
             W_ arg1_ticks_array, arg2_tick_index;
             arg1_ticks_array = BCO_GET_LARGE_ARG;
             arg2_tick_index  = BCO_READ_NEXT_32;
+            IF_DEBUG(hpc,
+                     debugBelch("\tHPC Tick %lu %lu %lu\n", BCO_LIT(arg1_ticks_array), arg1_ticks_array, arg2_tick_index);
+                );
 
             ((StgWord64*)BCO_LIT(arg1_ticks_array))[arg2_tick_index]++;
             NEXT_INSTRUCTION;

@@ -19,6 +19,7 @@ import GHCi.CreateBCO
 import GHCi.InfoTable
 #endif
 
+import GHCi.Coverage
 import qualified GHC.InfoProv as InfoProv
 import GHCi.Debugger
 import GHCi.FFI
@@ -88,6 +89,7 @@ run m = case m of
     fmap toRemotePtr <$> lookupSymbolInDLL (fromRemotePtr dll) str
   FreeHValueRefs rs -> mapM_ freeRemoteRef rs
   AddSptEntry fpr r -> localRef r >>= sptAddEntry fpr
+  AddHpcModule modl ticks hash tickboxes -> hpcAddModule modl ticks hash tickboxes
   EvalStmt opts r -> evalStmt opts r
   ResumeStmt opts r -> resumeStmt opts r
   AbandonStmt r -> abandonStmt r

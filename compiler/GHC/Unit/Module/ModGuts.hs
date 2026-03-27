@@ -141,8 +141,9 @@ data CgGuts
         cg_dep_pkgs  :: !(Set UnitId),      -- ^ Dependent packages, used to
                                             -- generate #includes for C code gen
         cg_modBreaks :: !(Maybe ModBreaks), -- ^ Module breakpoints
-        cg_spt_entries :: [SptEntry]
+        cg_spt_entries :: [SptEntry],
                 -- ^ Static pointer table entries for static forms defined in
                 -- the module.
                 -- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable"
+        cg_hpc_info :: HpcInfo
     }

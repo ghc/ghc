@@ -22,6 +22,9 @@ module GHC.ByteCode.Types
   -- * Mod Breaks
   , ModBreaks (..), BreakpointId(..), BreakTickIndex
 
+  -- * Hpc Info
+  , ByteCodeHpcInfo(..)
+
   -- * Internal Mod Breaks
   , InternalModBreaks(..), CgBreakInfo(..), seqInternalModBreaks
   -- ** Internal breakpoint identifier
@@ -76,6 +79,13 @@ data CompiledByteCode = CompiledByteCode
     -- ^ Static pointer table entries which should be loaded along with the
     -- BCOs. See Note [Grand plan for static forms] in
     -- "GHC.Iface.Tidy.StaticPtrTable".
+  , bc_hpc_info :: Maybe ByteCodeHpcInfo -- ^ TODO: @fendor
+  }
+
+data ByteCodeHpcInfo = ByteCodeHpcInfo
+  { bchi_tick_count :: {-# UNPACK #-} !Int
+  , bchi_hash :: {-# UNPACK #-} !Int
+  , bchi_tickboxes :: !ByteString
   }
 
 -- | A libffi ffi_cif function prototype.
