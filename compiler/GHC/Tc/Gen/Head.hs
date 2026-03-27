@@ -167,7 +167,6 @@ data HsExprArg (p :: TcPass) where -- See Note [HsExprArg]
                                                      -- location and error msgs
                , eaql_rn_fun  :: HsExpr GhcRn  -- Head of the argument if it is an application
                , eaql_tc_fun  :: (HsExpr GhcTc, SrcSpan) -- Typechecked head and its location span
-               , eaql_ds_flag :: DeepSubsumptionFlag     -- Was deepsubsumption enabled for this argument?
                , eaql_fun_ue  :: UsageEnv -- Usage environment of the typechecked head (QLA5)
                , eaql_args    :: [HsExprArg 'TcpInst]    -- Args: instantiated, not typechecked
                , eaql_wanted  :: WantedConstraints
@@ -424,7 +423,7 @@ Wrinkle (UTS1):
 ********************************************************************* -}
 
 tcInferAppHead :: (HsExpr GhcRn, SrcSpan)
-               -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
+               -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Infer type of the head of an application
 --   i.e. the 'f' in (f e1 ... en)
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
@@ -446,40 +445,35 @@ tcInferAppHead (fun,fun_lspan)
   = setSrcSpan fun_lspan $
     do { mb_tc_fun <- tcInferAppHead_maybe fun
        ; case mb_tc_fun of
-            Just (fun', ds_flag, fun_sigma) -> return (fun', ds_flag, fun_sigma)
-            Nothing -> with_get_ds $ runInferRho (tcExpr fun)
+            Just (fun', fun_sigma) -> return (fun', fun_sigma)
+            Nothing -> runInferRho (tcExpr fun)
 
        }
 
 tcInferAppHead_maybe :: HsExpr GhcRn
-                     -> TcM (Maybe (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType))
+                     -> TcM (Maybe (HsExpr GhcTc, TcSigmaType))
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- Returns Nothing for a complicated head
 -- XExpr's although complicated needs to be looked through, useful for QL things when
 -- the argument is an XExpr
 tcInferAppHead_maybe fun = case fun of
-      HsVar _ nm                  -> Just <$> with_get_ds (tcInferId nm)
-      ExprWithTySig _ e hs_ty     -> Just <$> with_get_ds (tcExprWithSig e hs_ty)
-      HsOverLit _ lit             -> Just <$> with_get_ds (tcInferOverLit lit)
-      XExpr (HsRecSelRn f)        -> Just <$> with_get_ds (tcInferRecSelId f)
-      XExpr (ExpandedThingRn (HSE o (L loc e))) -> setSrcSpan (locA loc) $ Just <$>  (
-                                              -- We do not want to instantiate the type of the head as there may be
-                                              -- visible type applications in the argument.
-                                              -- c.f. T19167
-                                              (\ (e, ds_flag, ty) -> (mkExpandedTc o (L loc e), ds_flag, ty)) <$>
-                                                  tcExprSigma False (hsCtxtCtOrigin o) e
-                                              )
-      _                           -> return Nothing
-
-
-
-with_get_ds :: TcM (HsExpr GhcTc, TcSigmaType)
-            -> TcM (HsExpr GhcTc, DeepSubsumptionFlag, TcSigmaType)
-with_get_ds mthing =
-  do { (expr_tc, sig_ty) <- mthing
-     ; ds_flag <- getDeepSubsumptionFlag_DataConHead expr_tc
-     ; return (expr_tc, ds_flag, sig_ty)
-     }
+      HsVar _ nm
+        -> Just <$> tcInferId nm
+      ExprWithTySig _ e hs_ty
+        -> Just <$>tcExprWithSig e hs_ty
+      HsOverLit _ lit
+        -> Just <$> tcInferOverLit lit
+      XExpr (HsRecSelRn f)
+        -> Just <$> tcInferRecSelId f
+      XExpr (ExpandedThingRn (HSE o (L loc e)))
+        -> setSrcSpan (locA loc) $ Just <$>
+           do { (e', ty) <- tcExprSigma False (hsCtxtCtOrigin o) e
+              ; return (mkExpandedTc o (L loc e'), ty) }
+                      -- We do not want to instantiate the type of the head as there may be
+                      -- visible type applications in the argument.
+                      -- c.f. T19167
+      _
+        -> return Nothing
 
 {- *********************************************************************
 *                                                                      *
