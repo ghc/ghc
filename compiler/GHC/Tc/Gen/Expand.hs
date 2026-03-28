@@ -1,0 +1,107 @@
+{-# LANGUAGE TypeFamilies        #-}
+
+{-
+(c) The University of Glasgow 2006
+(c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+-}
+
+module GHC.Tc.Gen.Expand( tcExpand ) where
+
+import GHC.Prelude
+
+import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
+
+import GHC.Hs
+
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Types.ErrCtxt
+
+import GHC.Rename.Utils
+
+{- Note [Typechecking by expansion: overview]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For many constructs, rather than typechecking the user-written code
+directly, it's much easier to
+   * Expand (or desugar) the code to something simpler
+   * Typecheck that simpler expression
+
+Example: Typechecking the do expression. The typechecker looks (somewhat) like this:
+
+   tcExpr e@(HsDo _ stmts) rho = do { hse <- expandDoStmts stmts
+                                    ; tcHsExpansion hse rho }
+
+The `expandDoStmts` replaces the HsDo { x <- e1; return x }
+with something like
+   HSE { hse_ctxt = ExprCtxt e
+       , hse_exp  = e1 >>= \ x -> x }
+and we then typecheck the expression `e1 >>= \ x -> x`
+
+See also Note [Handling overloaded and rebindable constructs]
+     and Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
+
+The Big Question is how to ensure that error messages mention
+only user-written source code, and never talk about the expanded code.
+The rest of this Note explains how that is done.
+
+* The expansion process typically takes a user written thing
+       L lspan ue
+  and returns
+       L lspan (XExpr (ExpandedThingRn (HSE { hse_ctxt = ue
+                                            , hse_exp  = ee } ))
+  where `ee` is the expansion of the user written thing `ue`
+
+* The type checker context has 3 key fields that describe the context:
+     TcLclCtxt { tcl_loc         :: RealSrcSpan
+               , tcl_in_gen_code :: Bool
+               , tcl_err_ctxt    :: ErrCtxtStack
+               , ... }
+  Note `tcl_loc` always points to a real place in the source code,
+  hence `RealSrcSpan`.
+
+  The `tcl_err_ctxt` is a stack of contexts, each saying something
+  like "In the expression: x+y" or "In second argument of `$` namely 'r { x=2 }'"
+
+  The `tcl_in_gen_code` is a boolean that keeps track of whether
+  the current expression being typechecked is compiler generated
+  or user generated.
+
+  INVARIANT: `tcl_loc` and `tcl_in_gen_code` are modified only in `setSrcSpan`.
+
+* Now, when
+      tcMonoLExpr :: LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
+  gets a located expression, it does 3 things:
+    (a) Calls `setSrcSpanA` to set the ambient source-code location
+    (b) Calls `addExprCtxt` to push a suitable `HsCtxt` on top of the `tcl_err_ctxt`.
+    (c) Calls `tcExpr` to typecheck the expression.
+
+* In these calls, if the `span` is generated  (see `isGeneratedSrcSpan`), then
+     - `setSrcSpanA` sets `tcl_in_gen_code` to `True`, and leaves `tcl_loc` unchanged
+     - `addExprCtxt` is a no-op if `tcl_in_gen_code` is True
+  The result is that `tcl_loc` has the span from the innermost /user/ tree node;
+  and the ErrCtxtStack in `tcl_err_ctxt` only has contexts arisign from user code.
+
+* Note that inside an expansion we have sub-expressions from the original program.
+  As soon as we enter one of those, identified by a /user/ span, `setSrcSpanA` will
+  sets the `tcl_loc` to reflect that span, and switch off `tcl_in_gen_code`.  Nice!
+-}
+
+---------------
+tcExpand :: HsExpr GhcRn -> TcM (Maybe (HsExpansion GhcRn))
+tcExpand e@(OpApp _ arg1 op arg2)
+  = return $ Just $
+    HSE { hse_ctxt = ExprCtxt e
+        , hse_exp  = foldl ap op [arg1,arg2] }
+  where
+    ap f a = wrapGenSpan (HsApp noExtField f a)
+
+tcExpand (XExpr (ExpandedThingRn hse))
+  = return (Just hse)
+
+tcExpand e@(HsUntypedSplice splice_res _)
+-- See Note [Looking through Template Haskell splices in splitHsApps]
+  = do { fun <- getUntypedSpliceBody splice_res
+       ; return $ Just $
+         HSE { hse_ctxt = ExprCtxt e
+             , hse_exp  = wrapGenSpan fun } }
+
+tcExpand _ = return Nothing

@@ -13,7 +13,7 @@
 module GHC.Tc.Gen.Expr
        ( tcCheckPolyExpr, tcCheckPolyExprNC,
          tcCheckMonoExpr, tcCheckMonoExprNC,
-         tcInferExpr, tcInferSigma,
+         tcInferExpr, tcInferSigma, tcInferExprSigma,
          tcInferRho, tcInferRhoNC,
          tcMonoLExpr, tcMonoLExprNC,
          tcInferRhoFRR, tcInferRhoFRRNC,
@@ -30,10 +30,10 @@ import {-# SOURCE #-} GHC.Tc.Gen.Splice
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
-
 import GHC.Rename.Utils
 import GHC.Rename.Env         ( addUsedGRE, getUpdFieldLbls )
 
+import GHC.Tc.Gen.Expand( tcExpand )
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Do
@@ -237,6 +237,9 @@ tcPolyExprCheck expr res_ty
 tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
 tcInferSigma = tcInferExpr IIF_Sigma
 
+tcInferExprSigma :: HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferExprSigma e = runInfer IIF_Sigma IFRR_Any (tcExpr e)
+
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 -- Infer a *rho*-type. The return type is always instantiated.
 tcInferRho   = tcInferExpr   IIF_DeepRho
@@ -292,6 +295,12 @@ tcMonoLExprNC (L loc expr) res_ty
         ; return (L loc expr') }
 
 ---------------
+tcCollectApp :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcCollectApp the_app res_ty
+  = do { (fun, args) <- splitHsApps the_app
+       ; tcApp the_app fun args res_ty }
+
+---------------
 tcExpr :: HsExpr GhcRn
        -> ExpRhoType   -- DeepSubsumption <=> when checking, this type
                        --                     is deeply skolemised
@@ -312,19 +321,11 @@ tcExpr :: HsExpr GhcRn
 --   - ones taken apart by GHC.Tc.Gen.Head.splitHsApps
 --   - ones understood by GHC.Tc.Gen.Head.tcInferAppHead_maybe
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
-tcExpr e@(HsVar {})              res_ty = tcApp e res_ty
-tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
-tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
-tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
-tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
-tcExpr e@(XExpr (HsRecSelRn{}))  res_ty = tcApp e res_ty
-
--- Renamer expanded expressions (eg. Right/Left sections)
--- or tcExpr expanded expressions (eg. Do statements and Record updates)
--- are type checked using tcHsExpansion.
--- See Note [Typechecking by expansion: overview]
-tcExpr (XExpr (ExpandedThingRn hse)) res_ty = tcHsExpansion hse res_ty
-
+tcExpr e@(HsVar {})              res_ty = tcApp e e [] res_ty
+tcExpr e@(ExprWithTySig {})      res_ty = tcApp e e [] res_ty
+tcExpr e@(XExpr (HsRecSelRn{}))  res_ty = tcApp e e [] res_ty
+tcExpr e@(HsAppType {})          res_ty = tcCollectApp e res_ty
+tcExpr e@(HsApp {})              res_ty = tcCollectApp e res_ty
 
 -- Typecheck an occurrence of an unbound Id
 --
@@ -392,7 +393,7 @@ tcExpr e@(HsOverLit _ lit) res_ty
          -- See Note [Short cut for overloaded literals] in GHC.Tc.Utils.TcMType
        ; case mb_res of
            Just lit' -> return (HsOverLit noExtField lit')
-           Nothing   -> tcApp e res_ty }
+           Nothing   -> tcApp e e [] res_ty }
            -- Why go via tcApp? See Note [Typechecking overloaded literals]
 
 {- Note [Typechecking overloaded literals]
@@ -530,8 +531,9 @@ tcExpr (HsCase ctxt scrut matches) res_ty
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy
-       ; (u1,b1') <- tcCollectingUsage $ tcMonoLExpr b1 res_ty
-       ; (u2,b2') <- tcCollectingUsage $ tcMonoLExpr b2 res_ty
+       ; let res_ty' = adjustExpTypeForCaseBranches res_ty [b1,b2]
+       ; (u1,b1') <- tcCollectingUsage $ tcMonoLExpr b1 res_ty'
+       ; (u2,b2') <- tcCollectingUsage $ tcMonoLExpr b2 res_ty'
        ; tcEmitBindingUsage (supUE u1 u2)
        ; return (HsIf x pred' b1' b2') }
 
@@ -733,19 +735,6 @@ tcExpr (ArithSeq _ witness seq) res_ty
 {-
 ************************************************************************
 *                                                                      *
-                Record dot syntax
-*                                                                      *
-************************************************************************
--}
-
--- These terms have been replaced by their expanded expressions in the renamer. See
--- Note [Overview of record dot syntax].
-tcExpr (HsGetField _ _ _) _ = panic "GHC.Tc.Gen.Expr: tcExpr: HsGetField: Not implemented"
-tcExpr (HsProjection _ _) _ = panic "GHC.Tc.Gen.Expr: tcExpr: HsProjection: Not implemented"
-
-{-
-************************************************************************
-*                                                                      *
                 Template Haskell
 *                                                                      *
 ************************************************************************
@@ -755,17 +744,7 @@ tcExpr (HsProjection _ _) _ = panic "GHC.Tc.Gen.Expr: tcExpr: HsProjection: Not 
 -- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
 tcExpr (HsTypedSplice ext splice)   res_ty = tcTypedSplice ext splice res_ty
 tcExpr e@(HsTypedBracket _ext body) res_ty = tcTypedBracket e body res_ty
-
 tcExpr e@(HsUntypedBracket ps body) res_ty = tcUntypedBracket e body ps res_ty
-tcExpr (HsUntypedSplice splice _)   res_ty
-  -- Since `tcApp` deals with `HsUntypedSplice` (in `splitHsApps`), you might
-  -- wonder why we don't delegate to `tcApp` as we do for `HsVar`, etc.
-  -- (See the initial block of equations for `tcExpr`.) But we can't do this
-  -- for `HsUntypedSplice`; to see why, read Wrinkle (UTS1) in
-  -- Note [Looking through Template Haskell splices in splitHsApps] in
-  -- GHC.Tc.Gen.Head.
-  = do { expr <- getUntypedSpliceBody splice
-       ; tcExpr expr res_ty }
 
 {-
 ************************************************************************
@@ -775,10 +754,12 @@ tcExpr (HsUntypedSplice splice _)   res_ty
 ************************************************************************
 -}
 
-tcExpr (HsOverLabel {})    ty = pprPanic "tcExpr:HsOverLabel"  (ppr ty)
-tcExpr (SectionL {})       ty = pprPanic "tcExpr:SectionL"    (ppr ty)
-tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
-
+-- See Note [Typechecking by expansion: overview]
+tcExpr e res_ty
+  = do { mb_hse <- tcExpand e
+       ; case mb_hse of
+           Just hse -> tcHsExpansion hse res_ty
+           Nothing  -> pprPanic "tcExpr: unhandled case:" (ppr e) }
 
 {-
 ************************************************************************
@@ -786,73 +767,6 @@ tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
                 Expansion Expressions (XXExprGhcRn)
 *                                                                      *
 ************************************************************************
--}
-
-{- Note [Typechecking by expansion: overview]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For many constructs, rather than typechecking the user-written code
-directly, it's much easier to
-   * Expand (or desugar) the code to something simpler
-   * Typecheck that simpler expression
-
-Example: Typechecking the do expression. The typechecker looks (somewhat) like this:
-
-   tcExpr e@(HsDo _ stmts) rho = do { hse <- expandDoStmts stmts
-                                    ; tcHsExpansion hse rho }
-
-The `expandDoStmts` replaces the HsDo { x <- e1; return x }
-with something like
-   HSE { hse_ctxt = ExprCtxt e
-       , hse_exp  = e1 >>= \ x -> x }
-and we then typecheck the expression `e1 >>= \ x -> x`
-
-See also Note [Handling overloaded and rebindable constructs]
-     and Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
-
-The Big Question is how to ensure that error messages mention
-only user-written source code, and never talk about the expanded code.
-The rest of this Note explains how that is done.
-
-* The expansion process typically takes a user written thing
-       L lspan ue
-  and returns
-       L lspan (XExpr (ExpandedThingRn (HSE { hse_ctxt = ue
-                                            , hse_exp  = ee } ))
-  where `ee` is the expansion of the user written thing `ue`
-
-* The type checker context has 3 key fields that describe the context:
-     TcLclCtxt { tcl_loc         :: RealSrcSpan
-               , tcl_in_gen_code :: Bool
-               , tcl_err_ctxt    :: ErrCtxtStack
-               , ... }
-  Note `tcl_loc` always points to a real place in the source code,
-  hence `RealSrcSpan`.
-
-  The `tcl_err_ctxt` is a stack of contexts, each saying something
-  like "In the expression: x+y" or "In second argument of `$` namely 'r { x=2 }'"
-
-  The `tcl_in_gen_code` is a boolean that keeps track of whether
-  the current expression being typechecked is compiler generated
-  or user generated.
-
-  INVARIANT: `tcl_loc` and `tcl_in_gen_code` are modified only in `setSrcSpan`.
-
-* Now, when
-      tcMonoLExpr :: LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
-  gets a located expression, it does 3 things:
-    (a) Calls `setSrcSpanA` to set the ambient source-code location
-    (b) Calls `addExprCtxt` to push a suitable `HsCtxt` on top of the `tcl_err_ctxt`.
-    (c) Calls `tcExpr` to typecheck the expression.
-
-* In these calls, if the `span` is generated  (see `isGeneratedSrcSpan`), then
-     - `setSrcSpanA` sets `tcl_in_gen_code` to `True`, and leaves `tcl_loc` unchanged
-     - `addExprCtxt` is a no-op if `tcl_in_gen_code` is True
-  The result is that `tcl_loc` has the span from the innermost /user/ tree node;
-  and the ErrCtxtStack in `tcl_err_ctxt` only has contexts arisign from user code.
-
-* Note that inside an expansion we have sub-expressions from the original program.
-  As soon as we enter one of those, identified by a /user/ span, `setSrcSpanA` will
-  sets the `tcl_loc` to reflect that span, and switch off `tcl_in_gen_code`.  Nice!
 -}
 
 tcHsExpansion :: HsExpansion GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)

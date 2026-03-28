@@ -63,7 +63,7 @@ module GHC.Tc.Utils.TcMType (
   mkCheckExpType, newInferExpType, newInferExpTypeFRR,
   runInfer, runInferRho, runInferSigma, runInferKind, runInferRhoFRR, runInferSigmaFRR,
   readExpType, readExpType_maybe, readScaledExpType,
-  expTypeToType, scaledExpTypeToType,
+  expTypeToType, scaledExpTypeToType, adjustExpTypeForCaseBranches,
   checkingExpType_maybe, checkingExpType,
   inferResultToType, ensureMonoType, promoteTcType,
 
@@ -498,6 +498,17 @@ inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
                             ; tau <- newMetaTyVarTyAtLevel tc_lvl (mkTYPEapp rr)
                             ; let conc_orig = ConcreteFRR $ FixedRuntimeRepOrigin tau frr
                             ; return tau }
+
+adjustExpTypeForCaseBranches :: ExpRhoType -> [branch] -> ExpRhoType
+-- See Note [fillInferResult: multiple branches]
+adjustExpTypeForCaseBranches exp_ty branches
+  = case exp_ty of
+      Infer ir | IR { ir_inst = IIF_Sigma } <- ir
+               , branches `lengthAtLeast` 2
+               -> Infer (ir { ir_inst = IIF_DeepRho })
+               | otherwise
+               -> exp_ty
+      Check {} -> exp_ty
 
 {- Note [inferResultToType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
