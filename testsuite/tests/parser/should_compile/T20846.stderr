@@ -162,7 +162,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { T20846.hs:4:10-18 })

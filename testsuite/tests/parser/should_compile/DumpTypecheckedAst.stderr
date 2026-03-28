@@ -104,6 +104,7 @@
               []))
             (HsVar
              (NoExtField)
+             (NotPromoted)
              (L
               (EpAnn
                (EpaSpan { <no location info> })
@@ -171,6 +172,7 @@
         []))
       (HsVar
        (NoExtField)
+       (NotPromoted)
        (L
         (EpAnn
          (EpaSpan { <no location info> })
@@ -282,6 +284,7 @@
               []))
             (HsVar
              (NoExtField)
+             (NotPromoted)
              (L
               (EpAnn
                (EpaSpan { <no location info> })
@@ -349,6 +352,7 @@
         []))
       (HsVar
        (NoExtField)
+       (NotPromoted)
        (L
         (EpAnn
          (EpaSpan { <no location info> })
@@ -460,6 +464,7 @@
               []))
             (HsVar
              (NoExtField)
+             (NotPromoted)
              (L
               (EpAnn
                (EpaSpan { <no location info> })
@@ -527,6 +532,7 @@
         []))
       (HsVar
        (NoExtField)
+       (NotPromoted)
        (L
         (EpAnn
          (EpaSpan { <no location info> })
@@ -638,6 +644,7 @@
               []))
             (HsVar
              (NoExtField)
+             (NotPromoted)
              (L
               (EpAnn
                (EpaSpan { <no location info> })
@@ -705,6 +712,7 @@
         []))
       (HsVar
        (NoExtField)
+       (NotPromoted)
        (L
         (EpAnn
          (EpaSpan { <no location info> })
@@ -816,6 +824,7 @@
               []))
             (HsVar
              (NoExtField)
+             (NotPromoted)
              (L
               (EpAnn
                (EpaSpan { <no location info> })
@@ -883,6 +892,7 @@
         []))
       (HsVar
        (NoExtField)
+       (NotPromoted)
        (L
         (EpAnn
          (EpaSpan { <no location info> })
@@ -1070,6 +1080,7 @@
           []))
         (HsVar
          (NoExtField)
+         (NotPromoted)
          (L
           (EpAnn
            (EpaSpan { <no location info> })
@@ -1087,6 +1098,7 @@
         []))
       (HsVar
        (NoExtField)
+       (NotPromoted)
        (L
         (EpAnn
          (EpaSpan { <no location info> })
@@ -1142,6 +1154,7 @@
           []))
         (HsVar
          (NoExtField)
+         (NotPromoted)
          (L
           (EpAnn
            (EpaSpan { <no location info> })
@@ -1159,6 +1172,7 @@
         []))
       (HsVar
        (NoExtField)
+       (NotPromoted)
        (L
         (EpAnn
          (EpaSpan { <no location info> })
@@ -1214,6 +1228,7 @@
           []))
         (HsVar
          (NoExtField)
+         (NotPromoted)
          (L
           (EpAnn
            (EpaSpan { <no location info> })
@@ -1231,6 +1246,7 @@
         []))
       (HsVar
        (NoExtField)
+       (NotPromoted)
        (L
         (EpAnn
          (EpaSpan { <no location info> })
@@ -1286,6 +1302,7 @@
           []))
         (HsVar
          (NoExtField)
+         (NotPromoted)
          (L
           (EpAnn
            (EpaSpan { <no location info> })
@@ -1303,6 +1320,7 @@
         []))
       (HsVar
        (NoExtField)
+       (NotPromoted)
        (L
         (EpAnn
          (EpaSpan { <no location info> })
@@ -1358,6 +1376,7 @@
           []))
         (HsVar
          (NoExtField)
+         (NotPromoted)
          (L
           (EpAnn
            (EpaSpan { <no location info> })
@@ -1375,6 +1394,7 @@
         []))
       (HsVar
        (NoExtField)
+       (NotPromoted)
        (L
         (EpAnn
          (EpaSpan { <no location info> })
@@ -1430,6 +1450,7 @@
           []))
         (HsVar
          (NoExtField)
+         (NotPromoted)
          (L
           (EpAnn
            (EpaSpan { <no location info> })
@@ -1490,6 +1511,7 @@
               []))
             (HsVar
              (NoExtField)
+             (NotPromoted)
              (L
               (EpAnn
                (EpaSpan { <no location info> })
@@ -1550,6 +1572,7 @@
                   []))
                 (HsVar
                  (NoExtField)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { <no location info> })
@@ -1610,6 +1633,7 @@
                       []))
                     (HsVar
                      (NoExtField)
+                     (NotPromoted)
                      (L
                       (EpAnn
                        (EpaSpan { <no location info> })
@@ -1681,6 +1705,7 @@
           []))
         (HsVar
          (NoExtField)
+         (NotPromoted)
          (L
           (EpAnn
            (EpaSpan { <no location info> })
@@ -1945,6 +1970,7 @@
                      []))
                    (HsVar
                     (NoExtField)
+                    (NotPromoted)
                     (L
                      (EpAnn
                       (EpaSpan { DumpTypecheckedAst.hs:20:8-15 })

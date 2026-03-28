@@ -1851,8 +1851,8 @@ ppr_mono_ty (XHsType (HsRecTy{})) _ _ _ = toHtml ("{..}" :: LText)
 ppr_mono_ty (XHsType HsCoreTy{}) _ _ _ = error "ppr_mono_ty HsCoreTy"
 ppr_mono_ty (HsExplicitListTy _ IsPromoted tys) u q _ = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
 ppr_mono_ty (HsExplicitListTy _ NotPromoted tys) u q _ = brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
-ppr_mono_ty (HsExplicitTupleTy _ IsPromoted tys) u q _ = promoQuote $ parenList $ map (ppLType u q HideEmptyContexts) tys
-ppr_mono_ty (HsExplicitTupleTy _ NotPromoted tys) u q _ = parenList $ map (ppLType u q HideEmptyContexts) tys
+ppr_mono_ty (HsExplicitTupleTy _ IsPromoted tys _) u q _ = promoQuote $ parenList $ map (ppLType u q HideEmptyContexts) tys  -- FIXME (int-index): ppr unboxed
+ppr_mono_ty (HsExplicitTupleTy _ NotPromoted tys _) u q _ = parenList $ map (ppLType u q HideEmptyContexts) tys              -- FIXME (int-index): ppr unboxed
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode qual _ =
   hsep
     [ ppr_mono_lty fun_ty unicode qual HideEmptyContexts

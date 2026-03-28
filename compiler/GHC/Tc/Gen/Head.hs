@@ -304,7 +304,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
 
     -- See Note [Looking through Template Haskell splices in splitHsApps]
     go e@(HsUntypedSplice splice_res splice) ctxt args
-      = do { fun <- getUntypedSpliceBody splice_res
+      = do { L _ fun <- getUntypedSpliceBody splice_res
            ; go fun ctxt' (EWrap (EExpand (OrigExpr e)) : args) }
       where
         ctxt' :: AppCtxt
@@ -550,7 +550,7 @@ tcInferAppHead_maybe :: HsExpr GhcRn
 -- Returns Nothing for a complicated head
 tcInferAppHead_maybe fun
   = case fun of
-      HsVar _ nm                -> Just <$> tcInferId nm
+      HsVar _ _ nm              -> Just <$> tcInferId nm
       XExpr (HsRecSelRn f)      -> Just <$> tcInferRecSelId f
       ExprWithTySig _ e hs_ty   -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit           -> Just <$> tcInferOverLit lit

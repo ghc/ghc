@@ -984,12 +984,12 @@ extractPatternSyn nm t tvs cons =
 
     data_ty con
       | ConDeclGADT{} <- con = con_res_ty con
-      | otherwise = foldl' (\x y -> noLocA (mkAppTyArg x y)) (noLocA (HsTyVar noAnn NotPromoted (noLocA $ noUserRdr t))) tvs
+      | otherwise = foldl' (\x y -> noLocA (mkAppTyArg x y)) (noLocA (HsTyVar noExtField NotPromoted (noLocA $ noUserRdr t))) tvs
       where
         mkAppTyArg :: LHsType GhcRn -> LHsTypeArg GhcRn -> HsType GhcRn
         mkAppTyArg f (HsValArg _ ty) = HsAppTy noExtField f ty
         mkAppTyArg f (HsTypeArg _ ki) = HsAppKindTy noExtField f ki
-        mkAppTyArg f (HsArgPar _) = HsParTy noAnn f
+        mkAppTyArg f (HsArgPar _) = HsParTy noExtField f
 
 extractRecSel
   :: Name
@@ -1012,12 +1012,12 @@ extractRecSel nm t tvs (L _ con : rest) =
     data_ty
       -- ResTyGADT _ ty <- con_res con = ty
       | ConDeclGADT{} <- con = con_res_ty con
-      | otherwise = foldl' (\x y -> noLocA (mkAppTyArg x y)) (noLocA (HsTyVar noAnn NotPromoted (noLocA $ noUserRdr t))) tvs
+      | otherwise = foldl' (\x y -> noLocA (mkAppTyArg x y)) (noLocA (HsTyVar noExtField NotPromoted (noLocA $ noUserRdr t))) tvs
       where
         mkAppTyArg :: LHsType GhcRn -> LHsTypeArg GhcRn -> HsType GhcRn
         mkAppTyArg f (HsValArg _ ty) = HsAppTy noExtField f ty
         mkAppTyArg f (HsTypeArg _ ki) = HsAppKindTy noExtField f ki
-        mkAppTyArg f (HsArgPar _) = HsParTy noAnn f
+        mkAppTyArg f (HsArgPar _) = HsParTy noExtField f
 
 -- | Keep export items with docs.
 pruneExportItems :: [ExportItem GhcRn] -> [ExportItem GhcRn]

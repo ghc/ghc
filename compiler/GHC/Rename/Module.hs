@@ -570,7 +570,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
                                              , m_grhss = grhss })])}
         | GRHSs _ (L _ (GRHS _ [] body) :| []) lbinds <- grhss
         , EmptyLocalBinds _ <- lbinds
-        , HsVar _ lrhsName  <- unLoc body
+        , HsVar _ _ lrhsName  <- unLoc body
         = Just (getName lrhsName)
     isAliasMG _ = Nothing
 
@@ -1273,7 +1273,7 @@ validRuleLhs foralls lhs
                                                       `mplus` checkl_e e2
     check (HsApp _ e1 e2)                 = checkl e1 `mplus` checkl_e e2
     check (HsAppType _ e _)               = checkl e
-    check (HsVar _ lv)
+    check (HsVar _ _ lv)
       | getName lv `notElem` foralls      = Nothing
     -- See Note [Parens on the LHS of a RULE]
     check (HsPar _ e)                     = checkl e

@@ -329,6 +329,7 @@ in `TcRnIllegalTypeExpr`.
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
+               PromotionFlag
               (LIdOccP p) -- ^ Variable
                           -- See Note [Located RdrNames]
 
@@ -394,6 +395,7 @@ data HsExpr p
   -- Note [ExplicitTuple]
   | ExplicitTuple
         (XExplicitTuple p)
+        PromotionFlag      -- whether explicitly promoted, for pretty printer
         [HsTupArg p]
         Boxity
 
@@ -431,6 +433,7 @@ data HsExpr p
   -- See Note [Empty lists]
   | ExplicitList
                 (XExplicitList p)  -- Gives type of components of list
+                PromotionFlag      -- whether explicitly promoted, for pretty printer
                 [LHsExpr p]
 
   -- | Record construction

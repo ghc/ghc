@@ -1182,7 +1182,7 @@ instance HiePass p => ToHie (LocatedA (HsQualLit (GhcPass p))) where
 
 instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
-      HsVar _ (L _ var) ->
+      HsVar _ _ (L _ var) ->
         [ toHie $ C Use (L mspan var)
              -- Patch up var location since typechecker removes it
         ]
@@ -1223,7 +1223,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         [ toHie a
         , toHie b
         ]
-      ExplicitTuple _ args _ ->
+      ExplicitTuple _ _ args _ ->
         [ toHie args
         ]
       ExplicitSum _ _ _ expr ->
@@ -1249,7 +1249,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         [ locOnly (locA ispan)
         , toHie $ listScopes NoScope stmts
         ]
-      ExplicitList _ exprs ->
+      ExplicitList _ _ exprs ->
         [ toHie exprs
         ]
       RecordCon { rcon_con = con, rcon_flds = binds} ->
@@ -1948,7 +1948,7 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsExplicitListTy _ _ tys ->
         [ toHie tys
         ]
-      HsExplicitTupleTy _ _ tys ->
+      HsExplicitTupleTy _ _ tys _ ->
         [ toHie tys
         ]
       HsTyLit _ _ -> []

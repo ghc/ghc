@@ -836,7 +836,7 @@ type instance Anno (CType DocNameI) = EpAnn AnnPragma
 type instance Anno (Header DocNameI) = EpAnn AnnPragma
 
 type XRecCond a =
-  ( XParTy a ~ (EpToken "(", EpToken ")")
+  ( XParTy a ~ NoExtField
   , NoGhcTc a ~ a
   , MapXRec a
   , UnXRec a
@@ -868,7 +868,7 @@ type instance XListTy DocNameI = EpAnn AnnParen
 type instance XTupleTy DocNameI = EpAnn AnnParen
 type instance XSumTy DocNameI = EpAnn AnnParen
 type instance XOpTy DocNameI = EpAnn NoEpAnns
-type instance XParTy DocNameI = (EpToken "(", EpToken ")")
+type instance XParTy DocNameI = NoExtField
 type instance XIParamTy DocNameI = EpAnn NoEpAnns
 type instance XKindSig DocNameI = EpAnn NoEpAnns
 type instance XSpliceTy DocNameI = DataConCantHappen

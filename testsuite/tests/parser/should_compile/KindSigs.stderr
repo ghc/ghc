@@ -1094,7 +1094,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { KindSigs.hs:23:11-12 })
@@ -1417,13 +1418,14 @@
         (EpaComments
          []))
        (HsExplicitTupleTy
-        ((,,)
+        ((,)
          (EpTok
           (EpaSpan { KindSigs.hs:28:16 }))
-         (EpTok
-          (EpaSpan { KindSigs.hs:28:17 }))
-         (EpTok
-          (EpaSpan { KindSigs.hs:28:44 })))
+         (AnnParens
+          (EpTok
+           (EpaSpan { KindSigs.hs:28:17 }))
+          (EpTok
+           (EpaSpan { KindSigs.hs:28:44 }))))
         (IsPromoted)
         [(L
           (EpAnn
@@ -1543,7 +1545,8 @@
              (EpaComments
               []))
             (Unqual
-             {OccName: b}))))])))))
+             {OccName: b}))))]
+        (Boxed))))))
   ,(L
     (EpAnn
      (EpaSpan { KindSigs.hs:31:1-31 })
@@ -1813,7 +1816,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { KindSigs.hs:35:8-11 })

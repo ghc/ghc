@@ -307,7 +307,7 @@ rnUnboundVar l v = do
     void $ reportUnboundName WL_Term v
   return (HsHole (HoleVar (L l v)), emptyFVs)
 
-rnExpr (HsVar _ (L l v))
+rnExpr (HsVar _ _ (L l v))
   = do { dflags <- getDynFlags
        ; mb_gre <- lookupExprOccRn v
        ; case mb_gre of {
@@ -329,7 +329,7 @@ rnExpr (HsVar _ (L l v))
               -- OverloadedLists works correctly
               -- Note [Empty lists] in GHC.Hs.Expr
             , xopt LangExt.OverloadedLists dflags
-            -> rnExpr (ExplicitList noAnn [])
+            -> rnExpr (ExplicitList noAnn NotPromoted [])
 
             | otherwise
             -> do { res_expr <- checkThLocalNameWithLift (L (l2l l) (WithUserRdr v nm))
@@ -491,25 +491,25 @@ rnExpr (HsDo _ do_or_lc (L l stmts))
       ; (pp_stmts, fvs2) <- postProcessStmtsForApplicativeDo do_or_lc stmts1
       ; return ( HsDo noExtField do_or_lc (L l pp_stmts), fvs1 `plusFV` fvs2 ) }
 -- ExplicitList: see Note [Handling overloaded and rebindable constructs]
-rnExpr (ExplicitList _ exps)
+rnExpr (ExplicitList _ prom exps)
   = do  { (exps', fvs) <- rnExprs exps
         ; opt_OverloadedLists <- xoptM LangExt.OverloadedLists
         ; if not opt_OverloadedLists
-          then return  (ExplicitList noExtField exps', fvs)
+          then return  (ExplicitList noExtField prom exps', fvs)
           else
     do { (from_list_n_name, fvs') <- lookupSyntaxName fromListNName
        ; loc <- getSrcSpanM -- See Note [Source locations for implicit function calls]
-       ; let rn_list  = ExplicitList noExtField exps'
+       ; let rn_list  = ExplicitList noExtField prom exps'
              lit_n    = mkIntegralLit (length exps)
              hs_lit   = genHsIntegralLit lit_n
              exp_list = genHsApps' (L (noAnnSrcSpan loc) from_list_n_name) [hs_lit, wrapGenSpan rn_list]
        ; return ( mkExpandedExpr rn_list exp_list
                 , fvs `plusFV` fvs') } }
 
-rnExpr (ExplicitTuple _ tup_args boxity)
+rnExpr (ExplicitTuple _ prom tup_args boxity)
   = do { checkTupleSection tup_args
        ; (tup_args', fvs) <- mapAndUnzipM rnTupArg tup_args
-       ; return (ExplicitTuple noExtField tup_args' boxity, plusFVs fvs) }
+       ; return (ExplicitTuple noExtField prom tup_args' boxity, plusFVs fvs) }
   where
     rnTupArg (Present x e) = do { (e',fvs) <- rnLExpr e
                                 ; return (Present x e', fvs) }
@@ -602,9 +602,9 @@ rnExpr (HsEmbTy _ ty)
        ; checkTypeSyntaxExtension TypeKeywordSyntax
        ; return (HsEmbTy noExtField ty', fvs) }
 
-rnExpr (HsStar x)
+rnExpr (HsStar _)
   = do { checkTypeSyntaxExtension StarKindSyntax
-       ; return (HsStar x, emptyFVs) }
+       ; return (HsStar noExtField, emptyFVs) }
 
 rnExpr (HsQual _ (L ann ctxt) ty)
   = do { (ctxt', fvs_ctxt) <- mapAndUnzipM rnLExpr ctxt
@@ -2568,7 +2568,7 @@ isReturnApp monad_names (L loc e) mb_pure = case e of
  where
   is_var f (L _ (HsPar _ e)) = is_var f e
   is_var f (L _ (HsAppType _ e _)) = is_var f e
-  is_var f (L _ (HsVar _ (L _ (WithUserRdr _q r)))) = f r
+  is_var f (L _ (HsVar _ _ (L _ (WithUserRdr _q r)))) = f r
        -- TODO: I don't know how to get this right for rebindable syntax
   is_var _ _ = False
 

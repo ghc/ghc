@@ -331,7 +331,7 @@ addClassContext _ _ sig = sig -- E.g. a MinimalSig is fine
 lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsTypeArg GhcRn]
 lHsQTyVarsToTypes tvs =
   [ HsValArg noExtField $ noLocA (case hsBndrVar (unLoc tvb) of
-      HsBndrVar _ nm   -> HsTyVar noAnn NotPromoted (fmap noUserRdr nm)
+      HsBndrVar _ nm   -> HsTyVar noExtField NotPromoted (fmap noUserRdr nm)
       HsBndrWildCard h -> HsWildCardTy h)
   | tvb <- hsq_explicit tvs
   ]
@@ -447,7 +447,7 @@ reparenTypePrec = go
     go _ (HsListTy x ty) = HsListTy x (reparenLType ty)
     go p (HsDocTy x ty d) = HsDocTy x (goL p ty) d
     go _ (HsExplicitListTy x p tys) = HsExplicitListTy x p (map reparenLType tys)
-    go _ (HsExplicitTupleTy x p tys) = HsExplicitTupleTy x p (map reparenLType tys)
+    go _ (HsExplicitTupleTy x p tys boxity) = HsExplicitTupleTy x p (map reparenLType tys) boxity
     go p (HsKindSig x ty kind) =
       paren p PREC_SIG $ HsKindSig x (goL PREC_SIG ty) (goL PREC_SIG kind)
     go p (HsIParamTy x n ty) =
@@ -486,7 +486,7 @@ reparenTypePrec = go
       -> HsType a
       -> HsType a -- Wrap in parens if (ctxt >= op)
     paren ctxt_prec op_prec
-      | ctxt_prec >= op_prec = HsParTy noAnn . wrapXRec @a
+      | ctxt_prec >= op_prec = HsParTy noExtField . wrapXRec @a
       | otherwise = id
 
 -- | Add parenthesis around the types in a 'HsType' (see 'reparenTypePrec')

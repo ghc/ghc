@@ -431,7 +431,8 @@
                              (EpaComments
                               []))
                             (HsVar
-                             (NoExtField)
+                             (NoEpTok)
+                             (NotPromoted)
                              (L
                               (EpAnn
                                (EpaSpan { DumpSemis.hs:11:13 })
@@ -462,7 +463,8 @@
                        (EpaComments
                         []))
                       (HsVar
-                       (NoExtField)
+                       (NoEpTok)
+                       (NotPromoted)
                        (L
                         (EpAnn
                          (EpaSpan { DumpSemis.hs:12:3 })
@@ -707,7 +709,8 @@
                        (EpaComments
                         []))
                       (HsVar
-                       (NoExtField)
+                       (NoEpTok)
+                       (NotPromoted)
                        (L
                         (EpAnn
                          (EpaSpan { DumpSemis.hs:17:5 })
@@ -736,7 +739,8 @@
                        (EpaComments
                         []))
                       (HsVar
-                       (NoExtField)
+                       (NoEpTok)
+                       (NotPromoted)
                        (L
                         (EpAnn
                          (EpaSpan { DumpSemis.hs:18:5 })
@@ -969,7 +973,8 @@
                        (EpaComments
                         []))
                       (HsVar
-                       (NoExtField)
+                       (NoEpTok)
+                       (NotPromoted)
                        (L
                         (EpAnn
                          (EpaSpan { DumpSemis.hs:22:15 })
@@ -1003,7 +1008,8 @@
                        (EpaComments
                         []))
                       (HsVar
-                       (NoExtField)
+                       (NoEpTok)
+                       (NotPromoted)
                        (L
                         (EpAnn
                          (EpaSpan { DumpSemis.hs:22:19 })
@@ -1037,7 +1043,8 @@
                        (EpaComments
                         []))
                       (HsVar
-                       (NoExtField)
+                       (NoEpTok)
+                       (NotPromoted)
                        (L
                         (EpAnn
                          (EpaSpan { DumpSemis.hs:22:25 })
@@ -1142,7 +1149,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { DumpSemis.hs:24:5-13 })
@@ -1245,7 +1253,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { DumpSemis.hs:25:5-13 })
@@ -1350,7 +1359,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { DumpSemis.hs:26:5-13 })
@@ -1874,7 +1884,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { DumpSemis.hs:32:7 })
@@ -2235,7 +2246,8 @@
                    (EpaComments
                     []))
                   (HsVar
-                   (NoExtField)
+                   (NoEpTok)
+                   (NotPromoted)
                    (L
                     (EpAnn
                      (EpaSpan { DumpSemis.hs:34:35 })
@@ -2370,7 +2382,8 @@
                    (EpaComments
                     []))
                   (HsVar
-                   (NoExtField)
+                   (NoEpTok)
+                   (NotPromoted)
                    (L
                     (EpAnn
                      (EpaSpan { DumpSemis.hs:37:8 })

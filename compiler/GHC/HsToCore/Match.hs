@@ -1169,7 +1169,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
       | isHsThingRnExpr o
       , isHsThingRnExpr o'
       = exp x x'
-    exp (HsVar _ i) (HsVar _ i') = i == i'
+    exp (HsVar _ prom i) (HsVar _ prom' i') = i == i' && prom == prom'
     exp (HsIPVar _ i) (HsIPVar _ i') =
       -- the instance for IPName derives using the id, so follow the HsVar case
       i == i'
@@ -1192,7 +1192,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
         lexp e1 e1' && lexp e2 e2'
     exp (SectionR _ e1 e2) (SectionR _ e1' e2') =
         lexp e1 e1' && lexp e2 e2'
-    exp (ExplicitTuple _ es1 _) (ExplicitTuple _ es2 _) =
+    exp (ExplicitTuple _ _ es1 _) (ExplicitTuple _ _ es2 _) =
         eq_list tup_arg es1 es2
     exp (ExplicitSum _ _ _ e) (ExplicitSum _ _ _ e') = lexp e e'
     exp (HsIf _ e e1 e2) (HsIf _ e' e1' e2') =

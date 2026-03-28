@@ -1,8 +1,10 @@
-hard_hole_fits.hs:14:22: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:14:27: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In an equation for ‘testMe’: testMe (HsVar a b) = _
+    • In an equation for ‘testMe’: testMe (HsVar a prom b) = _
     • Relevant bindings include
         b :: Language.Haskell.Syntax.Extension.LIdOccP GhcPs
+          (bound at hard_hole_fits.hs:14:22)
+        prom :: Language.Haskell.Syntax.Type.PromotionFlag
           (bound at hard_hole_fits.hs:14:17)
         a :: Language.Haskell.Syntax.Extension.XVar GhcPs
           (bound at hard_hole_fits.hs:14:15)
@@ -265,14 +267,16 @@ hard_hole_fits.hs:27:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Enum’))
 
-hard_hole_fits.hs:28:38: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:28:43: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’:
-          testMe (ExplicitTuple xet gls box) = _
+          testMe (ExplicitTuple xet prom gls box) = _
     • Relevant bindings include
         box :: Language.Haskell.Syntax.Basic.Boxity
-          (bound at hard_hole_fits.hs:28:31)
-        gls :: [HsTupArg GhcPs] (bound at hard_hole_fits.hs:28:27)
+          (bound at hard_hole_fits.hs:28:36)
+        gls :: [HsTupArg GhcPs] (bound at hard_hole_fits.hs:28:32)
+        prom :: Language.Haskell.Syntax.Type.PromotionFlag
+          (bound at hard_hole_fits.hs:28:27)
         xet :: Language.Haskell.Syntax.Extension.XExplicitTuple GhcPs
           (bound at hard_hole_fits.hs:28:23)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
@@ -412,11 +416,14 @@ hard_hole_fits.hs:34:27: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’
            (and originally defined in ‘GHC.Internal.Enum’))
 
-hard_hole_fits.hs:35:34: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:35:39: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In an equation for ‘testMe’: testMe (ExplicitList xel m_se) = _
+    • In an equation for ‘testMe’:
+          testMe (ExplicitList xel prom m_se) = _
     • Relevant bindings include
-        m_se :: [LHsExpr GhcPs] (bound at hard_hole_fits.hs:35:26)
+        m_se :: [LHsExpr GhcPs] (bound at hard_hole_fits.hs:35:31)
+        prom :: Language.Haskell.Syntax.Type.PromotionFlag
+          (bound at hard_hole_fits.hs:35:26)
         xel :: Language.Haskell.Syntax.Extension.XExplicitList GhcPs
           (bound at hard_hole_fits.hs:35:22)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)

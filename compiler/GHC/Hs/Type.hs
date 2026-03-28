@@ -86,7 +86,8 @@ module GHC.Hs.Type (
         pprHsType, pprHsForAll, pprHsForAllTelescope,
         pprHsOuterFamEqnTyVarBndrs, pprHsOuterSigTyVarBndrs,
         pprLHsContext,
-        hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
+        hsTypeNeedsParens, gHsParTy,
+        parenthesizeHsType, parenthesizeHsContext,
     ) where
 
 import GHC.Prelude
@@ -105,11 +106,12 @@ import GHC.Parser.Annotation
 
 import GHC.Base ( Multiplicity(..) )
 
-import GHC.Types.Fixity ( LexicalFixity(..) )
+import GHC.Types.Fixity ( LexicalFixity(..), Fixity, defaultFixity )
 import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( RdrName, WithUserRdr(..), noUserRdr )
 import GHC.Types.Var ( VarBndr, visArgTypeLike )
+import GHC.Tc.Types.Evidence ( HoleExprRef )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.Names ( negateName )
 import GHC.Builtin.Types( oneDataConName, mkTupleStr )
@@ -122,6 +124,7 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Misc (count)
+import GHC.Utils.Panic (panic)
 
 import Data.Maybe
 import Data.Data (Data)
@@ -425,27 +428,53 @@ and the same principle could be applied to foralls:
 except the `forall _.` example is rejected by checkForAllTelescopeWildcardBndrs.
 -}
 
-type instance XForAllTy        (GhcPass _) = NoExtField
-type instance XQualTy          (GhcPass _) = NoExtField
-type instance XTyVar           (GhcPass _) = EpToken "'"
+type instance XForAllTy        GhcPs = NoExtField
+type instance XForAllTy        GhcRn = NoExtField
+type instance XForAllTy        GhcTc = DataConCantHappen
+
+type instance XQualTy          GhcPs = NoExtField
+type instance XQualTy          GhcRn = NoExtField
+type instance XQualTy          GhcTc = DataConCantHappen
+
+type instance XTyVar           GhcPs = EpToken "'"
+type instance XTyVar           GhcRn = NoExtField
+type instance XTyVar           GhcTc = NoExtField
+
 type instance XAppTy           (GhcPass _) = NoExtField
-type instance XFunTy           (GhcPass _) = NoExtField
+
+type instance XFunTy           GhcPs = NoExtField
+type instance XFunTy           GhcRn = NoExtField
+type instance XFunTy           GhcTc = DataConCantHappen
+
 type instance XListTy          (GhcPass _) = AnnParen
 type instance XTupleTy         (GhcPass _) = AnnParen
 type instance XSumTy           (GhcPass _) = AnnParen
-type instance XOpTy            (GhcPass _) = NoExtField
-type instance XParTy           (GhcPass _) = (EpToken "(", EpToken ")")
+
+type instance XOpTy            GhcPs = NoExtField
+type instance XOpTy            GhcRn = Fixity
+type instance XOpTy            GhcTc = DataConCantHappen
+
+type instance XParTy           GhcPs = (EpToken "(", EpToken ")")
+type instance XParTy           GhcRn = NoExtField
+type instance XParTy           GhcTc = NoExtField
+
 type instance XIParamTy        (GhcPass _) = TokDcolon
-type instance XStarTy          (GhcPass _) = TokStar
-type instance XKindSig         (GhcPass _) = TokDcolon
+
+type instance XStarTy          GhcPs = TokStar
+type instance XStarTy          GhcRn = NoExtField
+type instance XStarTy          GhcTc = DataConCantHappen
+
+type instance XKindSig         GhcPs = TokDcolon
+type instance XKindSig         GhcRn = NoExtField
+type instance XKindSig         GhcTc = NoExtField
 
 type instance XAppKindTy       GhcPs = EpToken "@"
 type instance XAppKindTy       GhcRn = NoExtField
-type instance XAppKindTy       GhcTc = NoExtField
+type instance XAppKindTy       GhcTc = Type
 
 type instance XSpliceTy        GhcPs = NoExtField
 type instance XSpliceTy        GhcRn = HsUntypedSpliceResult (LHsType GhcRn)
-type instance XSpliceTy        GhcTc = Kind
+type instance XSpliceTy        GhcTc = DataConCantHappen
 
 type instance XDocTy           (GhcPass _) = NoExtField
 type instance XConDeclField    (GhcPass _) = ((EpaLocation, EpToken "#-}", EpaLocation), SourceText)
@@ -455,15 +484,15 @@ type instance XExplicitListTy  GhcPs = (EpToken "'", EpToken "[", EpToken "]")
 type instance XExplicitListTy  GhcRn = NoExtField
 type instance XExplicitListTy  GhcTc = Kind
 
-type instance XExplicitTupleTy GhcPs = (EpToken "'", EpToken "(", EpToken ")")
+type instance XExplicitTupleTy GhcPs = (EpToken "'", AnnParen)
 type instance XExplicitTupleTy GhcRn = NoExtField
-type instance XExplicitTupleTy GhcTc = [Kind]
+type instance XExplicitTupleTy GhcTc = NoExtField
 
 type instance XTyLit           (GhcPass _) = NoExtField
 
 type instance XWildCardTy      GhcPs = HoleKind
 type instance XWildCardTy      GhcRn = HoleKind
-type instance XWildCardTy      GhcTc = NoExtField
+type instance XWildCardTy      GhcTc = (HoleKind, HoleExprRef)
 
 type instance XXType           GhcPs = HsTypeGhcPsExt
 type instance XXType           GhcRn = HsCoreTy
@@ -531,7 +560,7 @@ type instance XExplicitMult _ GhcTc = Mult
 type instance XXMultAnnOf   _ (GhcPass _) = DataConCantHappen
 
 multAnnToHsType :: HsMultAnn GhcRn -> Maybe (LHsType GhcRn)
-multAnnToHsType = expandHsMultAnnOf (HsTyVar noAnn NotPromoted . fmap noUserRdr)
+multAnnToHsType = expandHsMultAnnOf (HsTyVar noExtField NotPromoted . fmap noUserRdr)
 
 -- | Convert an multiplicity annotation into its corresponding multiplicity.
 -- If no annotation was written, `Nothing` is returned.
@@ -660,7 +689,7 @@ hsLTyVarLocNames qtvs = mapMaybe hsLTyVarLocName (hsQTvExplicit qtvs)
 --  type S = (F :: res_kind)
 --                 ^^^^^^^^
 --
-hsTyKindSig :: LHsType (GhcPass p) -> Maybe (LHsKind (GhcPass p))
+hsTyKindSig :: LHsType (GhcPass p) -> Maybe (LHsKind (NoGhcTc (GhcPass p)))
 hsTyKindSig lty =
   case unLoc lty of
     HsParTy _ lty'    -> hsTyKindSig lty'
@@ -680,12 +709,20 @@ ignoreParens ty                   = ty
 ************************************************************************
 -}
 
-mkHsOpTy :: (Anno (IdOccGhcP p) ~ EpAnn a)
+mkHsOpTy :: forall p. (IsPass p)
          => PromotionFlag
          -> LHsType (GhcPass p) -> LIdOccP (GhcPass p)
          -> LHsType (GhcPass p) -> HsType (GhcPass p)
-mkHsOpTy prom ty1 op ty2 = HsOpTy noExtField ty1 tyop ty2
-  where tyop = L (l2l op) $ HsTyVar noAnn prom op
+mkHsOpTy prom ty1 op ty2 = HsOpTy x ty1 tyop ty2
+  where
+    x = case ghcPass @p of
+      GhcPs -> noExtField
+      GhcRn -> defaultFixity
+      GhcTc -> panic "mkHsOpTy @GhcTc"
+    tyop = case ghcPass @p of
+      GhcPs -> L (l2l op) $ HsTyVar noAnn prom op
+      GhcRn -> L (l2l op) $ HsTyVar noExtField prom op
+      GhcTc -> panic "mkHsOpTy @GhcTc"
 
 mkHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 mkHsAppTy t1 t2 = addCLocA t1 t2 (HsAppTy noExtField t1 t2)
@@ -695,7 +732,7 @@ mkHsAppTys :: LHsType (GhcPass p) -> [LHsType (GhcPass p)]
 mkHsAppTys = foldl' mkHsAppTy
 
 mkHsAppKindTy :: XAppKindTy (GhcPass p)
-              -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+              -> LHsType (GhcPass p) -> LHsType (NoGhcTc (GhcPass p))
               -> LHsType (GhcPass p)
 mkHsAppKindTy at ty k = addCLocA ty k (HsAppKindTy at ty k)
 
@@ -1439,7 +1476,7 @@ ppr_mono_ty (HsSpliceTy ext s)    =
 ppr_mono_ty (HsExplicitListTy _ prom tys)
   | isPromoted prom = quote $ brackets (spaceIfSingleQuote $ interpp'SP tys)
   | otherwise       = brackets (interpp'SP tys)
-ppr_mono_ty (HsExplicitTupleTy _ prom tys)
+ppr_mono_ty (HsExplicitTupleTy _ prom tys _) -- FIXME (int-index): Boxity
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `'MkSolo x`, not `'(x)`
   | [ty] <- tys
@@ -1525,7 +1562,7 @@ hsTypeNeedsParens p = go_hs_ty
     -- Special-case unary boxed tuple applications so that they are
     -- parenthesized as `Proxy ('MkSolo x)`, not `Proxy 'MkSolo x` (#18612)
     -- See Note [One-tuples] in GHC.Builtin.Types
-    go_hs_ty (HsExplicitTupleTy _ _ [_])
+    go_hs_ty (HsExplicitTupleTy _ _ [_] _)
                                       = p >= appPrec
     go_hs_ty (HsExplicitTupleTy{})    = False
     go_hs_ty (HsTyLit{})              = False
@@ -1554,12 +1591,21 @@ hsTypeNeedsParens p = go_hs_ty
     go_core_ty (CastTy t _)   = go_core_ty t
     go_core_ty (CoercionTy{}) = False
 
+-- | Parenthesize a type without token information
+gHsParTy :: forall p. IsPass p => LHsType (GhcPass p) -> HsType (GhcPass p)
+gHsParTy e = HsParTy x e
+  where
+    x = case ghcPass @p of
+      GhcPs -> noAnn
+      GhcRn -> noExtField
+      GhcTc -> noExtField
+
 -- | @'parenthesizeHsType' p ty@ checks if @'hsTypeNeedsParens' p ty@ is
 -- true, and if so, surrounds @ty@ with an 'HsParTy'. Otherwise, it simply
 -- returns @ty@.
 parenthesizeHsType :: IsPass p => PprPrec -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 parenthesizeHsType p lty@(L loc ty)
-  | hsTypeNeedsParens p ty = L loc (HsParTy noAnn lty)
+  | hsTypeNeedsParens p ty = L loc (gHsParTy lty)
   | otherwise              = lty
 
 -- | @'parenthesizeHsContext' p ctxt@ checks if @ctxt@ is a single constraint

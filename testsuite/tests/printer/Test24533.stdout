@@ -656,7 +656,8 @@
                      (EpaComments
                       []))
                     (HsVar
-                     (NoExtField)
+                     (NoEpTok)
+                     (NotPromoted)
                      (L
                       (EpAnn
                        (EpaSpan { Test24533.hs:16:16-19 })
@@ -1260,7 +1261,8 @@
                      (EpaComments
                       []))
                     (HsVar
-                     (NoExtField)
+                     (NoEpTok)
+                     (NotPromoted)
                      (L
                       (EpAnn
                        (EpaSpan { Test24533.ppr.hs:6:16-19 })

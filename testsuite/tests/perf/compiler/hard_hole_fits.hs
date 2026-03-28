@@ -11,7 +11,7 @@ import Language.Haskell.Syntax.Expr
 import GHC (GhcPs)
 
 testMe :: HsExpr GhcPs -> Int
-testMe (HsVar a b) = _
+testMe (HsVar a prom b) = _
 testMe (HsHole a) = _
 testMe (HsOverLabel xol m_ip) = _
 testMe (HsIPVar xv hin) = _
@@ -25,14 +25,14 @@ testMe (NegApp xna gl se) = _
 testMe (HsPar xp ab) = _
 testMe (SectionL xsl gl gl') = _
 testMe (SectionR xsr gl gl') = _
-testMe (ExplicitTuple xet gls box) = _
+testMe (ExplicitTuple xet prom gls box) = _
 testMe (ExplicitSum xes n i gl) = _
 testMe (HsCase xc gl mg) = _
 testMe (HsIf xi m_se gl gl' ) = _
 testMe (HsMultiIf xmi gls) = _
 testMe (HsLet xl gl gl') = _
 testMe (HsDo xd hsc gl) = _
-testMe (ExplicitList xel m_se) = _
+testMe (ExplicitList xel prom m_se) = _
 testMe (RecordCon xrc gl hrf) = _
 testMe (RecordUpd xru gl gls) = _
 testMe (ExprWithTySig xewts gl hwcb) = _

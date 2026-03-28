@@ -931,10 +931,10 @@ zonkExpr   :: HsExpr GhcTc    -> ZonkTcM (HsExpr GhcTc)
 zonkLExprs exprs = mapM zonkLExpr exprs
 zonkLExpr  expr  = wrapLocZonkMA zonkExpr expr
 
-zonkExpr (HsVar x (L l id))
+zonkExpr (HsVar x prom (L l id))
   = assertPpr (isNothing (isDataConId_maybe id)) (ppr id) $
   do { id' <- zonkIdOcc id
-     ; return (HsVar x (L l id')) }
+     ; return (HsVar x prom (L l id')) }
 
 zonkExpr (HsHole (h, her))
   = do her' <- zonk_her her
@@ -1001,9 +1001,9 @@ zonkExpr (HsPar x e)
 
 zonkExpr (SectionL x _ _) = dataConCantHappen x
 zonkExpr (SectionR x _ _) = dataConCantHappen x
-zonkExpr (ExplicitTuple x tup_args boxed)
+zonkExpr (ExplicitTuple x prom tup_args boxed)
   = do { new_tup_args <- mapM zonk_tup_arg tup_args
-       ; return (ExplicitTuple x new_tup_args boxed) }
+       ; return (ExplicitTuple x prom new_tup_args boxed) }
   where
     zonk_tup_arg (Present x e) = do { e' <- zonkLExpr e
                                     ; return (Present x e') }
@@ -1046,10 +1046,10 @@ zonkExpr (HsDo ty do_or_lc (L l stmts))
        new_ty <- zonkTcTypeToTypeX ty
        return (HsDo new_ty do_or_lc (L l new_stmts))
 
-zonkExpr (ExplicitList ty exprs)
+zonkExpr (ExplicitList ty prom exprs)
   = do new_ty <- zonkTcTypeToTypeX ty
        new_exprs <- zonkLExprs exprs
-       return (ExplicitList new_ty new_exprs)
+       return (ExplicitList new_ty prom new_exprs)
 
 zonkExpr expr@(RecordCon { rcon_ext = con_expr, rcon_flds = rbinds })
   = do  { new_con_expr <- zonkExpr con_expr

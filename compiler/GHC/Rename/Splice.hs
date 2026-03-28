@@ -482,7 +482,7 @@ rnUntypedSpliceExpr :: HsUntypedSplice GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnUntypedSpliceExpr splice
   = rnUntypedSpliceGen run_expr_splice pend_expr_splice splice
   where
-    pend_expr_splice :: (UntypedSpliceFlavour, HsUntypedSpliceResult (HsExpr GhcRn) -> HsUntypedSplice GhcRn -> RnM (HsExpr GhcRn))
+    pend_expr_splice :: (UntypedSpliceFlavour, HsUntypedSpliceResult (LHsExpr GhcRn) -> HsUntypedSplice GhcRn -> RnM (HsExpr GhcRn))
     pend_expr_splice
       = (UntypedExpSplice, \x y -> pure $ HsUntypedSplice x y)
 
@@ -501,10 +501,10 @@ rnUntypedSpliceExpr splice
            --                                       before expansion
            -- expr_ps   :: LHsExpr GhcPs is the result of running the splice
            -- expr_rn   :: HsExpr GhcRn is the result of renaming ps_expr
-           ; let res :: HsUntypedSpliceResult (HsExpr GhcRn)
+           ; let res :: HsUntypedSpliceResult (LHsExpr GhcRn)
                  res  = HsUntypedSpliceTop
                           { utsplice_result_finalizers = ThModFinalizers mod_finalizers
-                          , utsplice_result            = expr_rn }
+                          , utsplice_result            = L l expr_rn }
            ; return (gHsPar (L l (HsUntypedSplice res rn_splice)), fvs)
            }
 
@@ -696,7 +696,7 @@ rnSpliceType splice
     -- that depends on the context.
     mb_paren :: LHsType GhcRn -> LHsType GhcRn
     mb_paren lhs_ty@(L loc hs_ty)
-      | hsTypeNeedsParens maxPrec hs_ty = L loc (HsParTy noAnn lhs_ty)
+      | hsTypeNeedsParens maxPrec hs_ty = L loc (HsParTy noExtField lhs_ty)
       | otherwise                       = lhs_ty
 
 {- Note [Partial Type Splices]
@@ -954,16 +954,16 @@ checkThLocalName allow_lifting name_var
   -- even though the 'mkNameG_v' here is essentially a quotation, we do not do
   -- level checks as we assume that the user was trying to bypass the level checks
   | isExact (userRdrName (unLoc name_var)) || isOrig (userRdrName (unLoc name_var))
-  = return (HsVar noExtField name_var)
+  = return (HsVar noExtField NotPromoted name_var)
   | isUnboundName name                  -- Do not report two errors for
-  = return (HsVar noExtField name_var)  --   $(not_in_scope args)
+  = return (HsVar noExtField NotPromoted name_var)  --   $(not_in_scope args)
   | isWiredInName name
-  = return (HsVar noExtField name_var)
+  = return (HsVar noExtField NotPromoted name_var)
   | otherwise
   = do  {
           mb_local_use <- getCurrentAndBindLevel name
         ; case mb_local_use of {
-             Nothing -> return (HsVar noExtField name_var) ;  -- Not a locally-bound thing
+             Nothing -> return (HsVar noExtField NotPromoted name_var) ;  -- Not a locally-bound thing
              Just (top_lvl, bind_lvl, use_lvl) ->
     do  { cur_mod <- extractModule <$> getGblEnv
         ; let is_local
@@ -997,16 +997,16 @@ checkCrossLevelLifting :: DynFlags
                        -> TcM (HsExpr GhcRn)
 checkCrossLevelLifting dflags reason top_lvl_flg is_local allow_lifting bind_lvl use_lvl name_var
   -- 1. If name is in-scope, at the correct level.
-  | use_lvl_idx `Set.member` bind_lvl = return (HsVar noExtField name_var)
+  | use_lvl_idx `Set.member` bind_lvl = return (HsVar noExtField NotPromoted name_var)
   -- 2. Name is imported with -XImplicitStagePersistence
   | not is_local
-  , xopt LangExt.ImplicitStagePersistence dflags = return (HsVar noExtField name_var)
+  , xopt LangExt.ImplicitStagePersistence dflags = return (HsVar noExtField NotPromoted name_var)
   -- 3. Name is top-level, with -XImplicitStagePersistence, and needs
   -- to be persisted into the future.
   | isTopLevel top_lvl_flg
   , is_local
   , any (use_lvl_idx >=) (Set.toList bind_lvl)
-  , xopt LangExt.ImplicitStagePersistence dflags = when (isExternalName name) (keepAlive name) >> return (HsVar noExtField name_var)
+  , xopt LangExt.ImplicitStagePersistence dflags = when (isExternalName name) (keepAlive name) >> return (HsVar noExtField NotPromoted name_var)
   -- 4. Name is in a bracket, and lifting is allowed
   --    We need to increment at most once because nested brackets are not allowed
   | Brack _ pending <- use_lvl
@@ -1025,7 +1025,7 @@ checkCrossLevelLifting dflags reason top_lvl_flg is_local allow_lifting bind_lvl
        -- Update the pending splices if we are renaming a typed bracket
        recordPendingSplice splice_name pend_splice pending
   -- Otherwise, we have a level error, report.
-  | otherwise = addErrTc (TcRnBadlyLevelled reason bind_lvl use_lvl_idx Nothing ErrorWithoutFlag ) >> return (HsVar noExtField name_var)
+  | otherwise = addErrTc (TcRnBadlyLevelled reason bind_lvl use_lvl_idx Nothing ErrorWithoutFlag ) >> return (HsVar noExtField NotPromoted name_var)
   where
     name = getName name_var
     use_lvl_idx = thLevelIndex use_lvl

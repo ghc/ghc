@@ -1339,8 +1339,8 @@ ppr_mono_ty (XHsType HsRecTy{}) _ = text "{..}"
 ppr_mono_ty (XHsType HsCoreTy{}) _ = error "ppr_mono_ty HsCoreTy"
 ppr_mono_ty (HsExplicitListTy _ IsPromoted tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys
 ppr_mono_ty (HsExplicitListTy _ NotPromoted tys) u = brackets $ hsep $ punctuate comma $ map (ppLType u) tys
-ppr_mono_ty (HsExplicitTupleTy _ IsPromoted tys) u = Pretty.quote $ parenList $ map (ppLType u) tys
-ppr_mono_ty (HsExplicitTupleTy _ NotPromoted tys) u = parenList $ map (ppLType u) tys
+ppr_mono_ty (HsExplicitTupleTy _ IsPromoted tys _) u = Pretty.quote $ parenList $ map (ppLType u) tys  -- FIXME (int-index): ppr unboxed
+ppr_mono_ty (HsExplicitTupleTy _ NotPromoted tys _) u = parenList $ map (ppLType u) tys                -- FIXME (int-index): ppr unboxed
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode =
   hsep [ppr_mono_lty fun_ty unicode, ppr_mono_lty arg_ty unicode]
 ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode =

@@ -51,7 +51,7 @@ module Language.Haskell.Syntax.Type (
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 
-import Language.Haskell.Syntax.Basic ( SrcStrictness, SrcUnpackedness )
+import Language.Haskell.Syntax.Basic ( SrcStrictness, SrcUnpackedness, Boxity )
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Specificity
 import Language.Haskell.Syntax.Lit
@@ -820,7 +820,7 @@ data HsType pass
 
   | HsAppKindTy         (XAppKindTy pass) -- type level type app
                         (LHsType pass)
-                        (LHsKind pass)
+                        (LHsKind (NoGhcTc pass))
 
   | HsFunTy             (XFunTy pass)
                         (HsMultAnn pass) -- multiplicty annotations, includes the arrow
@@ -859,7 +859,7 @@ data HsType pass
 
   | HsKindSig           (XKindSig pass)
                         (LHsType pass)  -- (ty :: kind)
-                        (LHsKind pass)  -- A type with a kind signature
+                        (LHsKind (NoGhcTc pass))  -- A type with a kind signature
       -- ^
       -- > (ty :: kind)
 
@@ -878,6 +878,7 @@ data HsType pass
         (XExplicitTupleTy pass)
         PromotionFlag      -- whether explicitly promoted, for pretty printer
         [LHsType pass]
+        Boxity
 
   | HsTyLit (XTyLit pass) (HsLit pass)      -- A promoted literal
 
@@ -1201,7 +1202,7 @@ type family XArgPar  p
 type family XXArg    p
 
 -- type level equivalent
-type LHsTypeArg p = HsArg p (LHsType p) (LHsKind p)
+type LHsTypeArg p = HsArg p (LHsType p) (LHsKind (NoGhcTc p))
 
 {-
 Note [HsArgPar]

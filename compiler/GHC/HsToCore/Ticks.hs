@@ -517,7 +517,7 @@ addBinTickLHsExpr boxLabel e@(L pos e0)
 
 addTickHsExpr :: HsExpr GhcTc -> TM (HsExpr GhcTc)
 -- See Note [Record-selector ticks]
-addTickHsExpr e@(HsVar _ (L _ id)) =
+addTickHsExpr e@(HsVar _ _ (L _ id)) =
     freeVar id >> recSelTick id >>= pure . maybe e wrap
   where wrap = foldr (\tick -> XExpr . HsTick tick . noLocA) e
 addTickHsExpr e@(HsIPVar {})            = return e
@@ -559,8 +559,8 @@ addTickHsExpr (SectionR x e1 e2) =
         liftM2 (SectionR x)
                 (addTickLHsExprNever e1)
                 (addTickLHsExpr e2)
-addTickHsExpr (ExplicitTuple x es boxity) =
-        liftM2 (ExplicitTuple x)
+addTickHsExpr (ExplicitTuple x prom es boxity) =
+        liftM2 (ExplicitTuple x prom)
                 (mapM addTickTupArg es)
                 (return boxity)
 addTickHsExpr (ExplicitSum ty tag arity e) = do
@@ -586,8 +586,8 @@ addTickHsExpr (HsLet x binds e) =
           binds' <- addTickHsLocalBinds binds -- to think about: !patterns.
           e' <- addTickLHsExprLetBody e
           return (HsLet x binds' e')
-addTickHsExpr (ExplicitList ty es)
-  = liftM2 ExplicitList (return ty) (mapM (addTickLHsExpr) es)
+addTickHsExpr (ExplicitList ty prom es)
+  = liftM (ExplicitList ty prom) (mapM (addTickLHsExpr) es)
 
 addTickHsExpr (HsStatic fvs e) = HsStatic fvs <$> addTickLHsExpr e
 

@@ -172,7 +172,7 @@ tcPolyExprCheck expr res_ty
       -- Look through any untyped splices (#24559)
       -- c.f. Note [Looking through Template Haskell splices in splitHsApps]
       tc_body (HsUntypedSplice splice_res _)
-        = do { body <- getUntypedSpliceBody splice_res
+        = do { L _ body <- getUntypedSpliceBody splice_res
              ; tc_body body }
 
       -- The special case for lambda: go to tcLambdaMatches, passing pat_tys
@@ -426,14 +426,14 @@ tcExpr e@HsQualLit{} _ = pprPanic "tcExpr: HsQualLit" (ppr e)
 -- The expansion includes an ExplicitList, but it is always the built-in
 -- list type, so that's all we need concern ourselves with here.  See
 -- GHC.Rename.Expr. Note [Handling overloaded and rebindable constructs]
-tcExpr (ExplicitList _ exprs) res_ty
+tcExpr (ExplicitList _ prom exprs) res_ty
   = do  { res_ty <- expTypeToType res_ty
         ; (coi, elt_ty) <- matchExpectedListTy res_ty
         ; let tc_elt expr = tcCheckPolyExpr expr elt_ty
         ; exprs' <- mapM tc_elt exprs
-        ; return $ mkHsWrapCo coi $ ExplicitList elt_ty exprs' }
+        ; return $ mkHsWrapCo coi $ ExplicitList elt_ty prom exprs' }
 
-tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
+tcExpr expr@(ExplicitTuple x prom tup_args boxity) res_ty
   | all tupArgPresent tup_args
   = do { let arity  = length tup_args
              tup_tc = tupleTyCon boxity arity
@@ -447,13 +447,13 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; let arg_tys' = case boxity of Unboxed -> drop arity arg_tys
                                        Boxed   -> arg_tys
        ; tup_args1 <- tcCheckExplicitTuple tup_args arg_tys'
-       ; return $ mkHsWrapCo coi (ExplicitTuple x tup_args1 boxity) }
+       ; return $ mkHsWrapCo coi (ExplicitTuple x prom tup_args1 boxity) }
 
   | otherwise
   = -- The tup_args are a mixture of Present and Missing (for tuple sections).
     do { (tup_args1, arg_tys) <- tcInferTupArgs boxity tup_args
 
-       ; let expr'       = ExplicitTuple x tup_args1 boxity
+       ; let expr'       = ExplicitTuple x prom tup_args1 boxity
              missing_tys = [Scaled mult ty | (Missing (Scaled mult _), ty) <- zip tup_args1 arg_tys]
 
              -- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
@@ -736,7 +736,7 @@ tcExpr (HsUntypedSplice splice _)   res_ty
   -- for `HsUntypedSplice`; to see why, read Wrinkle (UTS1) in
   -- Note [Looking through Template Haskell splices in splitHsApps] in
   -- GHC.Tc.Gen.Head.
-  = do { expr <- getUntypedSpliceBody splice
+  = do { L _ expr <- getUntypedSpliceBody splice
        ; tcExpr expr res_ty }
 
 {-

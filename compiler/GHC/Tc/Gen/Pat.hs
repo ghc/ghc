@@ -514,25 +514,25 @@ pat_to_type (EmbTyPat _ (HsTP x t)) =
 pat_to_type (VarPat _ lname)  =
   do { tell (tpBuilderExplicitTV (unLoc lname))
      ; return b }
-  where b = noLocA (HsTyVar noAnn NotPromoted $ fmap noUserRdr lname)
+  where b = noLocA (HsTyVar noExtField NotPromoted $ fmap noUserRdr lname)
 pat_to_type (WildPat _) = return b
   where b = noLocA (HsWildCardTy (HoleVar (noLocA unnamedHoleRdrName)))
 pat_to_type (SigPat _ pat sig_ty)
   = do { t <- pat_to_type (unLoc pat)
        ; let { !(HsPS x_hsps k) = sig_ty
-             ; b = noLocA (HsKindSig noAnn t k) }
+             ; b = noLocA (HsKindSig noExtField t k) }
        ; tell (tpBuilderPatSig x_hsps)
        ; return b }
 pat_to_type (ParPat _ pat)
   = do { t <- pat_to_type (unLoc pat)
-       ; return (noLocA (HsParTy noAnn t)) }
+       ; return (noLocA (HsParTy noExtField t)) }
 pat_to_type (SplicePat (HsUntypedSpliceTop mod_finalizers pat) splice) = do
       { t <- pat_to_type pat
       ; return (noLocA (HsSpliceTy (HsUntypedSpliceTop mod_finalizers t) splice)) }
 
-pat_to_type (TuplePat _ pats Boxed)
+pat_to_type (TuplePat _ pats boxity)
   = do { tys <- traverse (pat_to_type . unLoc) pats
-       ; let t = noLocA (HsExplicitTupleTy noExtField NotPromoted tys)
+       ; let t = noLocA (HsExplicitTupleTy noExtField NotPromoted tys boxity)
        ; pure t }
 pat_to_type (ListPat _ pats)
   = do { tys <- traverse (pat_to_type . unLoc) pats
@@ -552,7 +552,7 @@ pat_to_type (ConPat _ lname (InfixCon left right))
        ; let { t = noLocA (mkHsOpTy NotPromoted lty lname rty)}
        ; pure t }
 pat_to_type (ConPat _ lname (PrefixCon args))
-  = do { let { appHead = noLocA (HsTyVar noAnn NotPromoted lname) }
+  = do { let { appHead = noLocA (HsTyVar noExtField NotPromoted lname) }
        ; foldM apply_arg appHead args }
       where
         apply_arg :: LHsType GhcRn -> LPat GhcRn -> WriterT HsTyPatRnBuilder TcM (LHsType GhcRn)

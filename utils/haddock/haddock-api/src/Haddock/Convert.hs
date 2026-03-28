@@ -60,6 +60,7 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Hs
 import GHC.Types.Basic (DefMethSpec (..), TupleSort (..))
+import GHC.Types.Fixity
 import GHC.Types.Id (idType, setIdType)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (mkVarUnqual)
@@ -118,10 +119,10 @@ tyThingToLHsDecl prr t = case t of
             cvt (HsTvb { tvb_var = bvar, tvb_kind = bkind }) =
               case bkind of
                 HsBndrNoKind _    -> cvt' bvar
-                HsBndrKind _ kind -> HsKindSig noAnn (noLocA (cvt' bvar)) kind
+                HsBndrKind _ kind -> HsKindSig noExtField (noLocA (cvt' bvar)) kind
 
             cvt' :: HsBndrVar GhcRn -> HsType GhcRn
-            cvt' (HsBndrVar _ nm)   = HsTyVar noAnn NotPromoted (fmap noUserRdr nm)
+            cvt' (HsBndrVar _ nm)   = HsTyVar noExtField NotPromoted (fmap noUserRdr nm)
             cvt' (HsBndrWildCard h) = HsWildCardTy h
 
             -- \| Convert a LHsTyVarBndr to an equivalent LHsType.
@@ -727,7 +728,7 @@ annotHsType True ty hs_ty
   | not $ isEmptyVarSet $ filterVarSet isTyVar $ tyCoVarsOfType ty =
       let ki = typeKind ty
           hs_ki = synifyType WithinType emptyVarSet ki
-       in noLocA (HsKindSig noAnn hs_ty hs_ki)
+       in noLocA (HsKindSig noExtField hs_ty hs_ki)
 annotHsType _ _ hs_ty = hs_ty
 
 -- | For every argument type that a type constructor accepts,
@@ -797,7 +798,7 @@ synifyType
   -> Type
   -- ^ the type to convert
   -> LHsType GhcRn
-synifyType _ _ (TyVarTy tv) = noLocA $ HsTyVar noAnn NotPromoted $ noLocA (noUserRdr $ getName tv)
+synifyType _ _ (TyVarTy tv) = noLocA $ HsTyVar noExtField NotPromoted $ noLocA (noUserRdr $ getName tv)
 synifyType _ boundTvs (TyConApp tc tys) =
   maybe_sig res_ty
   where
@@ -808,7 +809,7 @@ synifyType _ boundTvs (TyConApp tc tys) =
       , [TyConApp rep [TyConApp lev []]] <- tys
       , rep `hasKey` boxedRepDataConKey
       , lev `hasKey` liftedDataConKey =
-          noLocA (HsTyVar noAnn NotPromoted (noLocA $ noUserRdr liftedTypeKindTyConName))
+          noLocA (HsTyVar noExtField NotPromoted (noLocA $ noUserRdr liftedTypeKindTyConName))
       -- Use non-prefix tuple syntax where possible, because it looks nicer.
       | Just sort <- tyConTuple_maybe tc
       , tyConArity tc == tys_len =
@@ -826,7 +827,7 @@ synifyType _ boundTvs (TyConApp tc tys) =
       | Just dc <- isPromotedDataCon_maybe tc
       , isTupleDataCon dc
       , dataConSourceArity dc == length vis_tys =
-          noLocA $ HsExplicitTupleTy noExtField IsPromoted (map (synifyType WithinType boundTvs) vis_tys)
+          noLocA $ HsExplicitTupleTy noExtField IsPromoted (map (synifyType WithinType boundTvs) vis_tys) Boxed
       -- ditto for lists
       | getName tc == listTyConName
       , [ty] <- vis_tys =
@@ -842,8 +843,8 @@ synifyType _ boundTvs (TyConApp tc tys) =
                   | L _ (HsExplicitListTy _ IsPromoted tTy') <- stripKindSig tTy ->
                       noLocA $ HsExplicitListTy noExtField IsPromoted (hTy : tTy')
                   | otherwise ->
-                      let tyop = noLocA $ HsTyVar noAnn IsPromoted (noLocA $ noUserRdr $ getName tc)
-                      in noLocA $ HsOpTy noExtField hTy tyop tTy
+                      let tyop = noLocA $ HsTyVar noExtField IsPromoted (noLocA $ noUserRdr $ getName tc)
+                      in noLocA $ HsOpTy defaultFixity hTy tyop tTy
       -- ditto for implicit parameter tycons
       | tc `hasKey` ipClassKey
       , [name, ty] <- tys
@@ -854,25 +855,25 @@ synifyType _ boundTvs (TyConApp tc tys) =
       , [ty1, ty2] <- tys =
           noLocA $
             HsOpTy
-              noExtField
+              defaultFixity
               (synifyType WithinType boundTvs ty1)
-              (noLocA $ HsTyVar noAnn NotPromoted (noLocA $ noUserRdr eqTyConName))
+              (noLocA $ HsTyVar noExtField NotPromoted (noLocA $ noUserRdr eqTyConName))
               (synifyType WithinType boundTvs ty2)
       -- and infix type operators
       | isSymOcc (nameOccName (getName tc))
       , ty1 : ty2 : tys_rest <- vis_tys =
           mk_app_tys
             ( HsOpTy
-                noExtField
+                defaultFixity
                 (synifyType WithinType boundTvs ty1)
-                (noLocA $ HsTyVar noAnn prom (noLocA $ noUserRdr $ getName tc))
+                (noLocA $ HsTyVar noExtField prom (noLocA $ noUserRdr $ getName tc))
                 (synifyType WithinType boundTvs ty2)
             )
             tys_rest
       -- Most TyCons:
       | otherwise =
           mk_app_tys
-            (HsTyVar noAnn prom $ noLocA (noUserRdr $ getName tc))
+            (HsTyVar noExtField prom $ noLocA (noUserRdr $ getName tc))
             vis_tys
       where
         !prom = if isPromotedDataCon tc then IsPromoted else NotPromoted
@@ -892,7 +893,7 @@ synifyType _ boundTvs (TyConApp tc tys) =
       | tyConAppNeedsKindSig False tc tys_len =
           let full_kind = typeKind (mkTyConApp tc tys)
               full_kind' = synifyType WithinType boundTvs full_kind
-           in noLocA $ HsKindSig noAnn ty' full_kind'
+           in noLocA $ HsKindSig noExtField ty' full_kind'
       | otherwise = ty'
 synifyType _ boundTvs ty@(AppTy{}) =
   let

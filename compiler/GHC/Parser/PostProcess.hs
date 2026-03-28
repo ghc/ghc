@@ -1077,7 +1077,7 @@ mkSpecSig inl_prag activation_anns m_rule_binds expr m_sigtypes_ascr
         -- So we must have the old form  {# SPECIALISE f :: ty1, ty2, ty3 #-}
         -- Use the old SpecSig route
         | Nothing <- m_rule_binds
-        , L _ (HsVar _ var) <- expr
+        , L _ (HsVar _ _ var) <- expr
         -> do addPsMessage sigs_loc PsWarnSpecMultipleTypeAscription
               pure $
                 SpecSig (activation_anns {ass_dcolon = Just colon_ann })
@@ -1223,7 +1223,7 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
   -- With NoListTuplePuns, contexts are parsed as data constructors, which causes failure
   -- downstream.
   -- This converts them just like when they are parsed as types in the punned case.
-  check (oparens,cparens,cs) (L _l (HsExplicitTupleTy (q,o,c) _ ts))
+  check (oparens,cparens,cs) (L _l (HsExplicitTupleTy (q,AnnParens o c) _ ts _)) -- FIXME (int-index): Only accept NotPromoted Boxed?
     = punsAllowed >>= \case
       True -> unprocessed
       False -> do
@@ -1264,14 +1264,15 @@ checkContextExpr orig_expr@(L (EpAnn l _ cs) _) =
   where
     check :: ([EpToken "("],[EpToken ")"],EpAnnComments)
         -> LHsExpr GhcPs -> PV (LocatedC [LHsExpr GhcPs])
-    check (oparens,cparens,cs) (L _ (ExplicitTuple (ap_open, ap_close) tup_args boxity))
+    check (oparens,cparens,cs) (L _ (ExplicitTuple (_, anns) _ tup_args boxity))
              -- Neither unboxed tuples (#e1,e2#) nor tuple sections (e1,,e2,) can be a context
       | isBoxed boxity
       , Just es <- tupArgsPresent_maybe tup_args
-      = mkCTuple (oparens ++ [EpTok ap_open], EpTok ap_close : cparens, cs) es
+      , AnnParens ap_open ap_close <- anns
+      = mkCTuple (oparens ++ [ap_open], ap_close : cparens, cs) es
     check (opi, cpi, csi) (L _ (HsPar (open_tok, close_tok) expr))
       = check (opi ++ [open_tok], close_tok : cpi, csi) expr
-    check (oparens,cparens,cs) (L _ (HsVar _ (L (EpAnn _ (NameAnnOnly (NameParens open closed) []) _) name)))
+    check (oparens,cparens,cs) (L _ (HsVar _ _ (L (EpAnn _ (NameAnnOnly (NameParens open closed) []) _) name)))
       | name == nameRdrName (dataConName unitDataCon)
       = mkCTuple (oparens ++ [open], closed : cparens, cs) []
     check _ _ = unprocessed
@@ -1556,8 +1557,8 @@ checkPatBind _loc lhs (L _ grhss) mult = do
 checkValSigLhs :: LHsExpr GhcPs -> P (LocatedN RdrName)
 checkValSigLhs lhs@(L l lhs_expr) =
   case lhs_expr of
-    HsVar _ lrdr@(L _ v) -> check_var v lrdr
-    _                    -> make_err PsErrInvalidTypeSig_Other
+    HsVar _ _ lrdr@(L _ v) -> check_var v lrdr
+    _                      -> make_err PsErrInvalidTypeSig_Other
   where
     check_var v lrdr
       | not (isUnqual v) = make_err PsErrInvalidTypeSig_Qualified
@@ -1705,8 +1706,8 @@ class DisambInfixOp b where
   mkHsInfixHolePV :: LocatedN RdrName -> PV (LocatedN b)
 
 instance DisambInfixOp (HsExpr GhcPs) where
-  mkHsVarOpPV v = return $ L (getLoc v) (HsVar noExtField v)
-  mkHsConOpPV v = return $ L (getLoc v) (HsVar noExtField v)
+  mkHsVarOpPV v = return $ L (getLoc v) (HsVar noAnn NotPromoted v)
+  mkHsConOpPV v = return $ L (getLoc v) (HsVar noAnn NotPromoted v)
   mkHsInfixHolePV v = return $ L (getLoc v) (HsHole (HoleVar v))
 
 instance DisambInfixOp RdrName where
@@ -1803,7 +1804,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsTySigPV
     :: SrcSpanAnnA -> LocatedA b -> LHsType GhcPs -> TokDcolon -> PV (LocatedA b)
   -- | Disambiguate "[a,b,c]" (list syntax)
-  mkHsExplicitListPV :: SrcSpan -> [LocatedA b] -> AnnList () -> PV (LocatedA b)
+  mkHsExplicitListPV :: SrcSpan -> [LocatedA b] -> (EpToken "'", EpToken "[", EpToken "]") -> PV (LocatedA b)
   -- | Disambiguate "$(...)" and "[quasi|...|]" (TH splices)
   mkHsSplicePV :: Located (HsUntypedSplice GhcPs) -> PV (LocatedA b)
   -- | Disambiguate "f { a = b, ... }" syntax (record construction and record updates)
@@ -1841,7 +1842,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsBangPatPV :: SrcSpan -> LocatedA b -> EpToken "!" -> PV (LocatedA b)
   -- | Disambiguate tuple sections and unboxed sums
   mkSumOrTuplePV
-    :: SrcSpanAnnA -> Boxity -> SumOrTuple b -> (EpaLocation, EpaLocation) -> PV (LocatedA b)
+    :: SrcSpanAnnA -> Boxity -> SumOrTuple b -> AnnParen -> PV (LocatedA b)
   -- | Disambiguate "type t" (embedded type)
   mkHsEmbTyPV :: SrcSpan -> EpToken "type" -> LHsType GhcPs -> PV (LocatedA b)
   -- | Validate infixexp LHS to reject unwanted {-# SCC ... #-} pragmas
@@ -2038,7 +2039,7 @@ instance DisambECP (HsExpr GhcPs) where
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsPar (lpar, rpar) e)
   mkHsVarPV v@(L l@(EpAnn anc _ _) _) = do
     !cs <- getCommentsFor (getHasLoc l)
-    return $ L (EpAnn anc noAnn cs) (HsVar noExtField v)
+    return $ L (EpAnn anc noAnn cs) (HsVar noAnn NotPromoted v)
   mkHsLitPV (L l a) = do
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (HsLit noExtField a)
@@ -2054,7 +2055,7 @@ instance DisambECP (HsExpr GhcPs) where
     return $ L (EpAnn anc an (csIn Semi.<> cs)) (ExprWithTySig anns a (hsTypeToHsSigWcType sig))
   mkHsExplicitListPV l xs anns = do
     !cs <- getCommentsFor l
-    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (ExplicitList anns xs)
+    return $ L (EpAnn (spanAsAnchor l) noAnn cs) (ExplicitList anns NotPromoted xs)
   mkHsSplicePV (L l a) = do
     !cs <- getCommentsFor l
     return $ fmap (HsUntypedSplice NoExtField) (L (EpAnn (spanAsAnchor l) noAnn cs) a)
@@ -2138,10 +2139,10 @@ instance DisambECP (PatBuilder GhcPs) where
     let sig = mkHsPatSigType noAnn t
     sig_pat <- addSigPatP l p' sig anns
     return $ fmap PatBuilderPat sig_pat
-  mkHsExplicitListPV l xs anns = do
+  mkHsExplicitListPV l xs (_,o,c) = do
     ps <- traverse checkLPat xs
     !cs <- getCommentsFor l
-    return (L (EpAnn (spanAsAnchor l) noAnn cs) (PatBuilderPat (ListPat anns ps)))
+    return (L (EpAnn (spanAsAnchor l) noAnn cs) (PatBuilderPat (ListPat (o,c) ps)))
   mkHsSplicePV (L l sp) = do
     !cs <- getCommentsFor l
     return $ L (EpAnn (spanAsAnchor l) noAnn cs) (PatBuilderPat (SplicePat noExtField sp))
@@ -2977,7 +2978,7 @@ mkRecConstrOrUpdate
         -> ([Fbind (HsExpr GhcPs)], Maybe SrcSpan)
         -> (Maybe (EpToken "{"), Maybe (EpToken "}"))
         -> PV (HsExpr GhcPs)
-mkRecConstrOrUpdate _ (L _ (HsVar _ (L l c))) _lrec (fbinds,dd) anns
+mkRecConstrOrUpdate _ (L _ (HsVar _ _ (L l c))) _lrec (fbinds,dd) anns
   | isRdrDataCon c
   = do
       let (fs, ps) = partitionEithers fbinds
@@ -3049,7 +3050,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
           -- by HsVar "f" here, before the update is written to a
           -- setField expressions.
           punnedVar :: FastString -> LHsExpr GhcPs
-          punnedVar f  = if not pun then arg else noLocA . HsVar noExtField . noLocA . mkRdrUnqual . mkVarOccFS $ f
+          punnedVar f  = if not pun then arg else noLocA . HsVar noAnn NotPromoted . noLocA . mkRdrUnqual . mkVarOccFS $ f
 
 mkRdrRecordCon
   :: LocatedN RdrName -> HsRecordBinds GhcPs -> (Maybe (EpToken "{"), Maybe (EpToken "}")) -> HsExpr GhcPs
@@ -3663,13 +3664,13 @@ hintBangPat span e = do
       addError $ mkPlainErrorMsgEnvelope span $ PsErrIllegalBangPattern e
 
 mkSumOrTupleExpr :: SrcSpanAnnA -> Boxity -> SumOrTuple (HsExpr GhcPs)
-                 -> (EpaLocation, EpaLocation)
+                 -> AnnParen
                  -> PV (LHsExpr GhcPs)
 
 -- Tuple
 mkSumOrTupleExpr l@(EpAnn anc an csIn) boxity (Tuple es) anns = do
     !cs <- getCommentsFor (locA l)
-    return $ L (EpAnn anc an (csIn Semi.<> cs)) (ExplicitTuple anns (map toTupArg es) boxity)
+    return $ L (EpAnn anc an (csIn Semi.<> cs)) (ExplicitTuple (noAnn, anns) NotPromoted (map toTupArg es) boxity)
   where
     toTupArg :: Either (EpAnn Bool) (LHsExpr GhcPs) -> HsTupArg GhcPs
     toTupArg (Left ann) = missingTupArg ann
@@ -3678,7 +3679,7 @@ mkSumOrTupleExpr l@(EpAnn anc an csIn) boxity (Tuple es) anns = do
 -- Sum
 -- mkSumOrTupleExpr l Unboxed (Sum alt arity e) =
 --     return $ L l (ExplicitSum noExtField alt arity e)
-mkSumOrTupleExpr l@(EpAnn anc anIn csIn) Unboxed (Sum alt arity e barsp barsa) (o, c) = do
+mkSumOrTupleExpr l@(EpAnn anc anIn csIn) Unboxed (Sum alt arity e barsp barsa) ~(AnnParensHash ~(EpTok o) ~(EpTok c)) = do
     let an = AnnExplicitSum o barsp barsa c
     !cs <- getCommentsFor (locA l)
     return $ L (EpAnn anc anIn (csIn Semi.<> cs)) (ExplicitSum an alt arity e)
@@ -3686,7 +3687,7 @@ mkSumOrTupleExpr l Boxed a@Sum{} _ =
     addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrUnsupportedBoxedSumExpr a
 
 mkSumOrTuplePat
-  :: SrcSpanAnnA -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> (EpaLocation, EpaLocation)
+  :: SrcSpanAnnA -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> AnnParen
   -> PV (LocatedA (PatBuilder GhcPs))
 
 -- Tuple
@@ -3839,10 +3840,10 @@ mkTupleSyntaxTy parOpen args parClose =
     enabled =
       HsTupleTy annParen HsBoxedOrConstraintTuple args
     disabled =
-      HsExplicitTupleTy annsKeyword NotPromoted args
+      HsExplicitTupleTy annsKeyword NotPromoted args Boxed
 
     annParen = AnnParens parOpen parClose
-    annsKeyword = (NoEpTok, parOpen, parClose)
+    annsKeyword = (NoEpTok, annParen)
 
 -- | Decide whether to parse tuple con syntax @(,)@ in a type as a
 -- type or data constructor, based on the extension @ListTuplePuns@.

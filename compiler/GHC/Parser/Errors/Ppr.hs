@@ -869,7 +869,7 @@ instance Diagnostic PsMessage where
         -- Sadly 'foreign import' still barfs 'parse error' because
         --  'import' is a keyword
         -- looks_like :: RdrName -> LHsExpr GhcPsErr -> Bool -- AZ
-        looks_like s (L _ (HsVar _ (L _ v))) = v == s
+        looks_like s (L _ (HsVar _ _ (L _ v))) = v == s
         looks_like s (L _ (HsApp _ lhs _))   = looks_like s lhs
         looks_like _ _                       = False
 

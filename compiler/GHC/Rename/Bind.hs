@@ -1166,7 +1166,7 @@ checkSpecESigShape spec_e = go_l spec_e
     go (ExprWithTySig _ fn _) = go_l fn
     go (HsApp _ fn _)         = go_l fn
     go (HsAppType _ fn _)     = go_l fn
-    go (HsVar _ (L _ fn))     = return fn
+    go (HsVar _ _ (L _ fn))   = return fn
     go (HsPar _ e)            = go_l e
     go _ = failWithTc (TcRnSpecSigShape spec_e)
 

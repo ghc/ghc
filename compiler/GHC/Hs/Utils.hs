@@ -125,7 +125,7 @@ import GHC.Core.ConLike
 import GHC.Core.Make   ( mkChunkified )
 import GHC.Core.Type   ( Type, isUnliftedType )
 
-import GHC.Builtin.Types ( unitTy, manyDataConTy )
+import GHC.Builtin.Types ( unitTy )
 
 import GHC.Types.Id
 import GHC.Types.Name
@@ -606,24 +606,36 @@ nlHsIf cond true false = noLocA (HsIf noAnn cond true false)
 
 nlHsCase expr matches
   = noLocA (HsCase noAnn expr (mkMatchGroup (Generated OtherExpansion SkipPmc) (noLocA matches)))
-nlList exprs          = noLocA (ExplicitList noAnn exprs)
+nlList exprs          = noLocA (ExplicitList noAnn NotPromoted exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: forall p a. IsSrcSpanAnn p a
           => PromotionFlag -> IdP (GhcPass p)           -> LHsType (GhcPass p)
 nlHsFunTy :: forall p. IsPass p
           => LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
-nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
+nlHsParTy :: forall p. IsPass p
+          => LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLocA (HsAppTy noExtField f t)
-nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocA $ noUserRdrP @p x))
-nlHsFunTy a b = noLocA (HsFunTy noExtField (HsUnannotated x) a b)
+
+nlHsTyVar p n = noLocA (HsTyVar x p (noLocA $ noUserRdrP @p n))
   where
     x = case ghcPass @p of
+      GhcPs -> noAnn
+      GhcRn -> noExtField
+      GhcTc -> noExtField
+
+nlHsFunTy a b = noLocA (HsFunTy xf (HsUnannotated xm) a b)
+  where
+    xf = case ghcPass @p of
+      GhcPs -> noExtField
+      GhcRn -> noExtField
+      GhcTc -> panic "nlHsFunTy @GhcTc"
+    xm = case ghcPass @p of
       GhcPs -> EpArrow noAnn
       GhcRn -> noExtField
-      GhcTc -> manyDataConTy
-nlHsParTy t   = noLocA (HsParTy noAnn t)
+      GhcTc -> panic "nlHsFunTy @GhcTc"
+nlHsParTy t   = noLocA (gHsParTy t)
 
 nlHsTyConApp :: forall p a. IsSrcSpanAnn p a
              => PromotionFlag
@@ -660,13 +672,13 @@ forgetUserRdr =
     GhcTc -> id
 
 nlHsAppKindTy :: forall p. IsPass p =>
-  LHsType (GhcPass p) -> LHsKind (GhcPass p) -> LHsType (GhcPass p)
+  LHsType (GhcPass p) -> LHsKind (NoGhcTc (GhcPass p)) -> LHsType (GhcPass p)
 nlHsAppKindTy f k = noLocA (HsAppKindTy x f k)
   where
     x = case ghcPass @p of
       GhcPs -> noAnn
       GhcRn -> noExtField
-      GhcTc -> noExtField
+      GhcTc -> panic "nlHsAppKindTy @GhcTc"
 
 {-
 Tuples.  All these functions are *pre-typechecker* because they lack
@@ -678,7 +690,7 @@ mkLHsTupleExpr :: [LHsExpr (GhcPass p)] -> XExplicitTuple (GhcPass p)
 -- Makes a pre-typechecker boxed tuple, deals with 1 case
 mkLHsTupleExpr [e] _ = e
 mkLHsTupleExpr es ext
-  = noLocA $ ExplicitTuple ext (map (Present noExtField) es) Boxed
+  = noLocA $ ExplicitTuple ext NotPromoted (map (Present noExtField) es) Boxed
 
 mkLHsVarTuple :: IsSrcSpanAnn p a
                => [IdP (GhcPass p)]  -> XExplicitTuple (GhcPass p)

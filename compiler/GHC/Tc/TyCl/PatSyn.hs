@@ -1051,7 +1051,7 @@ tcPatToExpr args pat = go pat
                     -> Either PatSynInvalidRhsReason (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
-           ; let con = L (l2l loc) (HsVar noExtField lcon)
+           ; let con = L (l2l loc) (HsVar noExtField NotPromoted lcon)
            ; return (unLoc $ mkHsApps con exprs)
            }
 
@@ -1086,9 +1086,9 @@ tcPatToExpr args pat = go pat
     go1 (ParPat _ pat) = fmap (HsPar noExtField) (go pat)
     go1 (ListPat _ pats)
       = do { exprs <- mapM go pats
-           ; return $ ExplicitList noExtField exprs }
+           ; return $ ExplicitList noExtField NotPromoted exprs }
     go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
-                                         ; return $ ExplicitTuple noExtField
+                                         ; return $ ExplicitTuple noExtField NotPromoted
                                            (map (Present noExtField) exprs) box }
     go1 (SumPat _ pat alt arity)    = do { expr <- go1 (unLoc pat)
                                          ; return $ ExplicitSum noExtField alt arity

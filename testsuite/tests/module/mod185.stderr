@@ -157,7 +157,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { mod185.hs:5:8-24 })

@@ -436,7 +436,8 @@
                    (EpaComments
                     []))
                   (HsVar
-                   (NoExtField)
+                   (NoEpTok)
+                   (NotPromoted)
                    (L
                     (EpAnn
                      (EpaSpan { DumpParsedAstComments.hs:19:8-15 })

@@ -206,7 +206,7 @@ lookupFieldFixityRn (FieldOcc _ n) = lookupFixityRn (unLoc n)
 lookupExprFixityRn :: LHsExpr GhcRn -> RnM Fixity
 lookupExprFixityRn e =
   case e of
-    L _ (HsVar _ op) -> lookupFixityRn (unLocWithUserRdr op)
+    L _ (HsVar _ _ op) -> lookupFixityRn (unLocWithUserRdr op)
     L _ (XExpr (HsRecSelRn f)) -> lookupFieldFixityRn f
     _ -> return (Fixity minPrecedence InfixL)
     -- c.f. lookupFixity for unbound

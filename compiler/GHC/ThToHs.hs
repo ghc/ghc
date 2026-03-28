@@ -1141,7 +1141,7 @@ cvtl e = wrapLA (cvt e)
                                           ; return (HsLit noExtField l') }
              -- Note [Converting strings]
       | otherwise       = do { xs' <- mapM cvtl xs
-                             ; return $ ExplicitList noAnn xs'
+                             ; return $ ExplicitList noAnn NotPromoted xs'
                              }
 
     -- Infix expressions
@@ -1285,6 +1285,7 @@ cvt_tup es boxity = do { let cvtl_maybe Nothing  = return (missingTupArg noAnn)
                        ; es' <- mapM cvtl_maybe es
                        ; return $ ExplicitTuple
                                     noAnn
+                                    NotPromoted
                                     es'
                                     boxity }
 
@@ -1840,7 +1841,7 @@ cvtTypeKind typeOrKind ty
            PromotedTupleT n
               | Just normals <- m_normals
               , normals `lengthIs` n   -- Saturated
-              -> returnLA (HsExplicitTupleTy noAnn IsPromoted normals)
+              -> returnLA (HsExplicitTupleTy noAnn IsPromoted normals Boxed)
               | otherwise
               -> do { tuple_tc <- returnLA $ getRdrName $ tupleDataCon Boxed n
                     ; mk_apps (HsTyVar noAnn IsPromoted tuple_tc) tys' }

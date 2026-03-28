@@ -548,7 +548,7 @@ rnHsTyKi env tv@(HsTyVar _ ip (L loc rdr_name))
 
              | otherwise -> pure ()
        ; checkPromotedDataConName env tv Prefix ip name
-       ; return (HsTyVar noAnn ip loc_name_with_rdr, unitFV name) }
+       ; return (HsTyVar noExtField ip loc_name_with_rdr, unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy _ ty1 tyop ty2)
   = setSrcSpan (getLocA tyop) $
@@ -561,7 +561,7 @@ rnHsTyKi env ty@(HsOpTy _ ty1 tyop ty2)
 
 rnHsTyKi env (HsParTy _ ty)
   = do { (ty', fvs) <- rnLHsTyKi env ty
-       ; return (HsParTy noAnn ty', fvs) }
+       ; return (HsParTy noExtField ty', fvs) }
 
 rnHsTyKi env (HsFunTy u mult ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
@@ -576,13 +576,13 @@ rnHsTyKi env listTy@(HsListTy x ty)
        ; (ty', fvs) <- rnLHsTyKi env ty
        ; return (HsListTy x ty', fvs) }
 
-rnHsTyKi env (HsKindSig x ty k)
+rnHsTyKi env (HsKindSig _ ty k)
   = do { kind_sigs_ok <- xoptM LangExt.KindSignatures
        ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) k)
        ; (k', sig_fvs)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
        ; (ty', lhs_fvs) <- bindSigTyVarsFV (hsScopedKvs k') $
                            rnLHsTyKi env ty
-       ; return (HsKindSig x ty' k', lhs_fvs `plusFV` sig_fvs) }
+       ; return (HsKindSig noExtField ty' k', lhs_fvs `plusFV` sig_fvs) }
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
@@ -619,8 +619,8 @@ rnHsTyKi env t@(HsIParamTy x n ty)
        ; (ty', fvs) <- rnLHsTyKi env ty
        ; return (HsIParamTy x n ty', fvs) }
 
-rnHsTyKi _ (HsStarTy x)
-  = return (HsStarTy x, emptyFVs)
+rnHsTyKi _ (HsStarTy _)
+  = return (HsStarTy noExtField, emptyFVs)
 
 rnHsTyKi _ (HsSpliceTy _ sp)
   = rnSpliceType sp
@@ -670,10 +670,10 @@ rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
            addDiagnostic (TcRnUntickedPromotedThing $ UntickedExplicitList)
        ; return (HsExplicitListTy noExtField ip tys', fvs) }
 
-rnHsTyKi env ty@(HsExplicitTupleTy _ ip tys)
+rnHsTyKi env ty@(HsExplicitTupleTy _ ip tys boxity)
   = do { checkDataKinds env ty
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
-       ; return (HsExplicitTupleTy noExtField ip tys', fvs) }
+       ; return (HsExplicitTupleTy noExtField ip tys' boxity, fvs) }
 
 rnHsTyKi env (HsWildCardTy h)
   = do { checkAnonWildCard env
@@ -769,14 +769,14 @@ rnLTyVar (L loc rdr_name)
 rnHsTyOp :: RnTyKiEnv -> HsType GhcPs -> LHsType GhcPs
          -> RnM (LHsType GhcRn, FreeVars)
 rnHsTyOp env overall_ty tyop
-  | L l (HsTyVar ann prom (L loc op)) <- tyop
+  | L l (HsTyVar _ prom (L loc op)) <- tyop
   = do { op' <- rnTyVar env op
        ; unlessXOptM LangExt.TypeOperators $
            if (op' `hasKey` eqTyConKey) -- See [eqTyCon (~) compatibility fallback] in GHC.Rename.Env
            then addDiagnostic TcRnTypeEqualityRequiresOperators
            else addErr $ TcRnIllegalTypeOperator (ppr overall_ty) op
        ; checkPromotedDataConName env overall_ty Infix prom op'
-       ; let tyop' = L l (HsTyVar ann prom (L loc (WithUserRdr op op')))
+       ; let tyop' = L l (HsTyVar noExtField prom (L loc (WithUserRdr op op')))
        ; return (tyop', unitFV op') }
   | otherwise
   = rnLHsTyKi env tyop
@@ -1409,8 +1409,8 @@ mkHsOpTyRn tyop1 fix1 ty1 (L loc2 (HsOpTy _ ty2a tyop2 ty2b))
   = do  { fix2 <- lookupTypeFixityRn tyop2
         ; mk_hs_op_ty tyop1 fix1 ty1 tyop2 fix2 ty2a ty2b loc2 }
 
-mkHsOpTyRn tyop _ ty1 ty2              -- Default case, no rearrangement
-  = return (HsOpTy noExtField ty1 tyop ty2)
+mkHsOpTyRn tyop fix ty1 ty2              -- Default case, no rearrangement
+  = return (HsOpTy fix ty1 tyop ty2)
 
 ---------------
 mk_hs_op_ty :: LHsType GhcRn -> Fixity -> LHsType GhcRn
@@ -1426,8 +1426,8 @@ mk_hs_op_ty tyop1 fix1 ty1 tyop2 fix2 ty2a ty2b loc2
                            new_ty <- mkHsOpTyRn tyop1 fix1 ty1 ty2a
                          ; return (noLocA new_ty `op2ty` ty2b) }
   where
-    lhs `op1ty` rhs = HsOpTy noExtField lhs tyop1 rhs
-    lhs `op2ty` rhs = HsOpTy noExtField lhs tyop2 rhs
+    lhs `op1ty` rhs = HsOpTy fix1 lhs tyop1 rhs
+    lhs `op2ty` rhs = HsOpTy fix2 lhs tyop2 rhs
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
 
@@ -1489,7 +1489,7 @@ data NegationHandling = ReassociateNegation | KeepNegationIntact
 get_op :: LHsExpr GhcRn -> OpName
 -- An unbound name could be either HsVar or (HsHole (HoleVar _, _))
 -- See GHC.Rename.Expr.rnUnboundVar
-get_op (L _ (HsVar _ n))                 = NormalOp (unLoc n)
+get_op (L _ (HsVar _ _ n))               = NormalOp (unLoc n)
 get_op (L _ (HsHole (HoleVar (L _ uv)))) = UnboundOp uv
 get_op (L _ (XExpr (HsRecSelRn fld)))    = RecFldOp fld
 get_op other                             = pprPanic "get_op" (ppr other)
@@ -2132,7 +2132,7 @@ extract_lty (L _ ty) acc
       HsSpliceTy {}               -> acc  -- Type splices mention no tvs
       HsDocTy _ ty _              -> extract_lty ty acc
       HsExplicitListTy _ _ tys    -> extract_ltys tys acc
-      HsExplicitTupleTy _ _ tys   -> extract_ltys tys acc
+      HsExplicitTupleTy _ _ tys _ -> extract_ltys tys acc
       HsTyLit _ _                 -> acc
       HsStarTy _                  -> acc
       HsKindSig _ ty ki           -> extract_kind_sig ty ki acc

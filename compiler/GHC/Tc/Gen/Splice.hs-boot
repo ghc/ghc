@@ -32,7 +32,7 @@ tcUntypedBracket :: HsExpr GhcRn
 runTopSplice :: DelayedSplice -> TcM (HsExpr GhcTc)
 
 runAnnotation        :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
-getUntypedSpliceBody :: HsUntypedSpliceResult (HsExpr GhcRn) -> TcM (HsExpr GhcRn)
+getUntypedSpliceBody :: HsUntypedSpliceResult (LHsExpr GhcRn) -> TcM (LHsExpr GhcRn)
 
 tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr GhcTc) -> TcM (LHsExpr GhcTc)
 

@@ -841,7 +841,7 @@ tcSyntaxName :: CtOrigin
 -- USED ONLY FOR CmdTop (sigh) ***
 -- See Note [CmdSyntaxTable] in "GHC.Hs.Expr"
 
-tcSyntaxName orig ty (std_nm, HsVar _ (L _ (WithUserRdr _ user_nm)))
+tcSyntaxName orig ty (std_nm, HsVar _ _ (L _ (WithUserRdr _ user_nm)))
   | std_nm == user_nm
   = do rhs <- newMethodFromName orig std_nm [ty]
        return (std_nm, rhs)

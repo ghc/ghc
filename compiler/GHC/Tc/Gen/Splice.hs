@@ -667,7 +667,7 @@ tcUntypedBracket  :: HsExpr GhcRn -> HsQuote GhcRn -> [PendingRnSplice] -> ExpRh
                   -> TcM (HsExpr GhcTc)
 tcTypedSplice     :: HsTypedSpliceResult -> HsTypedSplice GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
-getUntypedSpliceBody :: HsUntypedSpliceResult (HsExpr GhcRn) -> TcM (HsExpr GhcRn)
+getUntypedSpliceBody :: HsUntypedSpliceResult (LHsExpr GhcRn) -> TcM (LHsExpr GhcRn)
 runAnnotation        :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
 
 {-
@@ -860,7 +860,7 @@ tcUntypedSplice (QuoteWrapper _ m_var) splice_name (HsQuasiQuote (HsQuasiQuoteEx
 tcUntypedSplice q splice_name (XUntypedSplice ils)
   = do { let id_name = implicit_lift_lid ils
        ; id_ty <- newOpenFlexiTyVarTy
-       ; let v_expr = noLocA (HsVar noExtField id_name)
+       ; let v_expr = noLocA (HsVar noExtField NotPromoted id_name)
        ; v_expr' <- tcCheckMonoExpr v_expr id_ty
        -- lift :: Quote m' => a -> m' Exp
        ; lift <- setSrcSpan (getLocA id_name) $
@@ -886,7 +886,7 @@ tcPendingSpliceTyped q splice_name (XTypedSplice ils) res_ty
   = do { let id_name = implicit_lift_lid ils
        ; res_ty <- expTypeToType res_ty
        ; let rep = getRuntimeRep res_ty
-       ; let v_expr = noLocA (HsVar noExtField id_name)
+       ; let v_expr = noLocA (HsVar noExtField NotPromoted id_name)
        ; v_expr' <- tcCheckMonoExpr v_expr res_ty
        -- lift :: Quote m' => a -> m' Exp
        ; lift <- setSrcSpan (getLocA id_name) $

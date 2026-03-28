@@ -589,7 +589,7 @@ tcValArg _ (EValArgQL { eaql_wanted  = wanted
 
 --------------------
 wantQuickLook :: HsExpr GhcRn -> TcM QLFlag
-wantQuickLook (HsVar _ (L _ (WithUserRdr _ f)))
+wantQuickLook (HsVar _ _ (L _ (WithUserRdr _ f)))
   | getUnique f `elem` quickLookKeys = return DoQL
 wantQuickLook _                      = do { impred <- xoptM LangExt.ImpredicativeTypes
                                           ; if impred then return DoQL else return NoQL }
@@ -638,7 +638,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
     -- types. See Note [Representation-polymorphic Ids with no binding]
     -- in GHC.Tc.Utils.Concrete
     fun_conc_tvs
-      | HsVar _ (L _ fun_id) <- tc_fun
+      | HsVar _ _ (L _ fun_id) <- tc_fun
       = idConcreteTvs fun_id
       -- Recall that DataCons are represented using ConLikeTc at GhcTc stage,
       -- see Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
@@ -1122,12 +1122,12 @@ expr_to_type earg =
       do { ctxt' <- mapM go ctxt
          ; ty <- go expr
          ; return (L l (HsQualTy noExtField (L ann ctxt') ty)) }
-    go (L l (HsVar _ lname)) =
+    go (L l (HsVar _ prom lname)) =
       -- GHC Proposal #281, section 7.5 "T2T-Mapping":
       --   variables and constructors (regardless of their namespace)
       --   are mapped directly, without modification.
       do { detect_puns lname
-         ; return (L l (HsTyVar noAnn NotPromoted lname)) }
+         ; return (L l (HsTyVar noExtField prom lname)) }
     go (L l (HsApp _ lhs rhs)) =
       do { lhs' <- go lhs
          ; rhs' <- go rhs
@@ -1136,29 +1136,28 @@ expr_to_type earg =
       do { lhs' <- go lhs
          ; rhs' <- unwrap_wc rhs
          ; return (L l (HsAppKindTy noExtField lhs' rhs')) }
-    go (L l (OpApp _ lhs op rhs)) =
+    go (L l (OpApp fix lhs op rhs)) =
       do { lhs' <- go lhs
          ; op'  <- go op
          ; rhs' <- go rhs
-         ; return (L l (HsOpTy noExtField lhs' op' rhs')) }
+         ; return (L l (HsOpTy fix lhs' op' rhs')) }
     go (L l (HsOverLit _ ol))
       = do { let lit = tyLitFromOverloadedLit (ol_val ol)
            ; return (L l (HsTyLit noExtField lit)) }
     go (L l (HsLit _ lit))
       = return (L l (HsTyLit noExtField lit))
-    go (L l (ExplicitTuple _ tup_args boxity))
-      -- Neither unboxed tuples (#e1,e2#) nor tuple sections (e1,,e2,) can be promoted
-      | isBoxed boxity
-      , Just es <- tupArgsPresent_maybe tup_args
+    go (L l (ExplicitTuple _ prom tup_args boxity))
+      -- Tuple sections (e1,,e2,) can't be promoted
+      | Just es <- tupArgsPresent_maybe tup_args
       = do { ts <- traverse go es
-           ; return (L l (HsExplicitTupleTy noExtField NotPromoted ts)) }
-    go (L l (ExplicitList _ es)) =
+           ; return (L l (HsExplicitTupleTy noExtField prom ts boxity)) }
+    go (L l (ExplicitList _ prom es)) =
       do { ts <- traverse go es
-         ; return (L l (HsExplicitListTy noExtField NotPromoted ts)) }
+         ; return (L l (HsExplicitListTy noExtField prom ts)) }
     go (L l (ExprWithTySig _ e sig_ty)) =
       do { t <- go e
          ; sig_ki <- (unwrap_sig <=< unwrap_wc) sig_ty
-         ; return (L l (HsKindSig noAnn t sig_ki)) }
+         ; return (L l (HsKindSig noExtField t sig_ki)) }
       where
         unwrap_sig :: LHsSigType GhcRn -> TcM (LHsType GhcRn)
         unwrap_sig (L _ (HsSig _ HsOuterImplicit{hso_ximplicit=bndrs} body))
@@ -1168,10 +1167,10 @@ expr_to_type earg =
           return $ L l (HsForAllTy noExtField (HsForAllInvis noAnn bndrs) body)
     go (L l (HsPar _ e)) =
       do { t <- go e
-         ; return (L l (HsParTy noAnn t)) }
+         ; return (L l (HsParTy noExtField t)) }
     go (L l (HsUntypedSplice splice_result splice))
       | HsUntypedSpliceTop finalizers e <- splice_result
-      = do { t <- go (L l e)
+      = do { t <- go e
            ; let splice_result' = HsUntypedSpliceTop finalizers t
            ; return (L l (HsSpliceTy splice_result' splice)) }
     go (L l (HsStar x))
@@ -2344,7 +2343,7 @@ It's all grotesquely complicated.
 -}
 
 isTagToEnum :: HsExpr GhcTc -> Bool
-isTagToEnum (HsVar _ (L _ fun_id)) = fun_id `hasKey` tagToEnumKey
+isTagToEnum (HsVar _ _ (L _ fun_id)) = fun_id `hasKey` tagToEnumKey
 isTagToEnum _ = False
 
 tcTagToEnum :: (HsExpr GhcTc, AppCtxt) -> [HsExprArg 'TcpTc]

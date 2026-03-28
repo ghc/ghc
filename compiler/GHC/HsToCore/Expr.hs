@@ -390,7 +390,7 @@ That 'g' in the 'in' part is an evidence variable, and when
 converting to core it must become a CO.
 -}
 
-dsExpr (ExplicitTuple _ tup_args boxity)
+dsExpr (ExplicitTuple _ _ tup_args boxity)
   = do { let go (lam_vars, args) (Missing st)
                     -- For every missing expression, we need
                     -- another lambda in the desugaring.
@@ -458,7 +458,7 @@ dsExpr (HsMultiIf res_ty alts)
     mkErrorExpr = mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID res_ty
                                (text "multi-way if")
 
-dsExpr (ExplicitList elt_ty xs) = dsExplicitList elt_ty xs
+dsExpr (ExplicitList elt_ty _ xs) = dsExplicitList elt_ty xs
 
 dsExpr (ArithSeq expr witness seq)
   = case witness of
@@ -731,7 +731,7 @@ ds_app (XExpr (ExpandedThingTc _orig e)) hs_args core_args
   --   XExpr (ExpandedThingTc (.fld) (getField @Symbol @LiftedRep @LiftedRep "fld"))
   --     `HsAppType` rec_ty `HsAppType` fld
 
-ds_app (HsVar _ lfun) hs_args core_args
+ds_app (HsVar _ _ lfun) hs_args core_args
   = ds_app_var lfun hs_args core_args
 
 ds_app e _hs_args core_args

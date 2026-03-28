@@ -351,8 +351,8 @@ processAllTypeCheckedModule tcm
     getTypeLHsExpr e = Just (mid, getLocA e, lhsExprType e)
       where
         mid :: Maybe Id
-        mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i
-            | otherwise                              = Nothing
+        mid | HsVar _ _ (L _ i) <- unwrapVar (unLoc e) = Just i
+            | otherwise                                = Nothing
 
         unwrapVar (XExpr (WrapExpr _ var)) = var
         unwrapVar e'                       = e'

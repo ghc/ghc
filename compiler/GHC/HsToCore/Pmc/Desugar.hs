@@ -184,7 +184,7 @@ desugarPat x pat = case pat of
           , tc == listTyCon
           -- `pat` looks like `coerce toList -> [p1,...,pn]`.
           -- Now take care of -XRebindableSyntax:
-          , let is_to_list (HsVar _ (L _ to_list)) = idName to_list == toListName
+          , let is_to_list (HsVar _ _ (L _ to_list)) = idName to_list == toListName
                 is_to_list (XExpr (WrapExpr _ e))  = is_to_list e
                 is_to_list _                       = False
           , is_to_list (unLoc lrhs)

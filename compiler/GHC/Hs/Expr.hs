@@ -45,6 +45,7 @@ import GHC.Types.Tickish (CoreTickish)
 import GHC.Types.Unique.Set (UniqSet)
 import GHC.Types.ThLevelIndex
 import GHC.Core.ConLike ( conLikeName, ConLike )
+import GHC.Core.Ppr (pprOccWithTick)
 import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -224,7 +225,9 @@ type instance XOverLabel     GhcTc = DataConCantHappen
 
 -- ---------------------------------------------------------------------
 
-type instance XVar           (GhcPass _) = NoExtField
+type instance XVar           GhcPs = EpToken "'"
+type instance XVar           GhcRn = NoExtField
+type instance XVar           GhcTc = NoExtField
 
 type instance XIPVar         GhcPs = NoExtField
 type instance XIPVar         GhcRn = NoExtField
@@ -263,7 +266,7 @@ type instance XPar           GhcPs = (EpToken "(", EpToken ")")
 type instance XPar           GhcRn = NoExtField
 type instance XPar           GhcTc = NoExtField
 
-type instance XExplicitTuple GhcPs = (EpaLocation, EpaLocation)
+type instance XExplicitTuple GhcPs = (EpToken "'", AnnParen)
 type instance XExplicitTuple GhcRn = NoExtField
 type instance XExplicitTuple GhcTc = NoExtField
 
@@ -291,7 +294,7 @@ type instance XDo            GhcPs = AnnList EpaLocation
 type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
 
-type instance XExplicitList  GhcPs = AnnList ()
+type instance XExplicitList  GhcPs = (EpToken "'", EpToken "[", EpToken "]")
 type instance XExplicitList  GhcRn = NoExtField
 type instance XExplicitList  GhcTc = Type
 -- GhcPs: ExplicitList includes all source-level
@@ -374,7 +377,7 @@ type instance XEmbTy         GhcTc = DataConCantHappen
   -- Valid usages are immediately desugared into Type.
 
 type instance XStar          GhcPs = TokStar
-type instance XStar          GhcRn = TokStar
+type instance XStar          GhcRn = NoExtField
 type instance XStar          GhcTc = DataConCantHappen
 
 {-
@@ -541,18 +544,18 @@ multAnnToHsExpr :: HsMultAnnOf (LocatedA (HsExpr GhcRn)) GhcRn -> Maybe (Located
 multAnnToHsExpr = expandHsMultAnnOf mkHsVar
 
 mkHsVar :: forall p. IsPass p => LIdP (GhcPass p) -> HsExpr (GhcPass p)
-mkHsVar n = HsVar noExtField $
+mkHsVar n =
   case ghcPass @p of
-    GhcPs -> n
-    GhcRn -> fmap (WithUserRdr $ nameRdrName $ unLoc n) n
-    GhcTc -> n
+    GhcPs -> HsVar noAnn NotPromoted n
+    GhcRn -> HsVar noExtField NotPromoted (fmap (WithUserRdr $ nameRdrName $ unLoc n) n)
+    GhcTc -> HsVar noExtField NotPromoted n
 
 mkHsVarWithUserRdr :: forall p. IsPass p => RdrName -> LIdP (GhcPass p) -> HsExpr (GhcPass p)
-mkHsVarWithUserRdr rdr n = HsVar noExtField $
+mkHsVarWithUserRdr rdr n =
   case ghcPass @p of
-    GhcPs -> n
-    GhcRn -> fmap (WithUserRdr rdr) n
-    GhcTc -> n
+    GhcPs -> HsVar noAnn NotPromoted n
+    GhcRn -> HsVar noExtField NotPromoted (fmap (WithUserRdr rdr) n)
+    GhcTc -> HsVar noExtField NotPromoted n
 
 data AnnExplicitSum
   = AnnExplicitSum {
@@ -895,7 +898,7 @@ ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
 ppr_expr e@(HsApp {})        = pprApp e
 ppr_expr e@(HsAppType {})    = pprApp e
 
-ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
+ppr_expr (HsVar _ prom (L _ name)) = pprOccWithTick Prefix prom name
 ppr_expr (HsIPVar _ v)       = ppr v
 ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
@@ -962,7 +965,7 @@ ppr_expr (SectionR _ op expr)
 
     pp_infixly v = sep [v, pp_expr]
 
-ppr_expr (ExplicitTuple _ exprs boxity)
+ppr_expr (ExplicitTuple _ _ exprs boxity)  -- FIXME (int-index): pretty-print the tick
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `MkSolo x`, not `(x)`
   | [Present _ expr] <- exprs
@@ -1021,8 +1024,10 @@ ppr_expr (HsLet _ binds expr)
 
 ppr_expr (HsDo _ do_or_list_comp (L _ stmts)) = pprDo do_or_list_comp stmts
 
-ppr_expr (ExplicitList _ exprs)
-  = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
+ppr_expr (ExplicitList _ prom exprs)
+  | isPromoted prom = quote $ brackets (spaceIfSingleQuote $ interpp'SP exprs)
+  | otherwise       = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
+                   -- brackets (interpp'SP tys)
 
 ppr_expr (RecordCon { rcon_con = con, rcon_flds = rbinds })
   = hang pp_con 2 (ppr rbinds)
@@ -1159,7 +1164,7 @@ instance Outputable XXExprGhcTc where
   ppr (HsRecSelTc f)      = pprPrefixOcc f
 
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
-ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
+ppr_infix_expr (HsVar _ prom (L _ op)) = Just (pprOccWithTick Infix prom op)
 ppr_infix_expr (HsHole x) = Just $ pprInfixOcc $ case (ghcPass @p, x) of
   (GhcPs, HoleVar (L _ v)) -> v
   (GhcRn, HoleVar (L _ v)) -> v
@@ -1228,7 +1233,7 @@ hsExprNeedsParens prec = go
     -- Special-case unary boxed tuple applications so that they are
     -- parenthesized as `Identity (Solo x)`, not `Identity Solo x` (#18612)
     -- See Note [One-tuples] in GHC.Builtin.Types
-    go (ExplicitTuple _ [Present{}] Boxed)
+    go (ExplicitTuple _ _ [Present{}] Boxed)
                                       = prec >= appPrec
     go (ExplicitTuple{})              = False
     go (ExplicitSum{})                = False
@@ -1699,7 +1704,7 @@ ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp False)
   = hsep [ppr_lexpr arg, arrowtt, ppr_lexpr arrow]
 
 ppr_cmd (HsCmdArrForm rn_fix (L _ op) ps_fix args)
-  | HsVar _ (L _ v) <- op
+  | HsVar _ _ (L _ v) <- op
   = ppr_cmd_infix v
   | GhcTc <- ghcPass @p
   , XExpr (ConLikeTc c) <- op
@@ -2272,7 +2277,7 @@ type instance XTypedSplice   GhcRn = HsTypedSpliceResult
 type instance XTypedSplice   GhcTc = DelayedSplice
 
 type instance XUntypedSplice GhcPs = NoExtField
-type instance XUntypedSplice GhcRn = HsUntypedSpliceResult (HsExpr GhcRn)
+type instance XUntypedSplice GhcRn = HsUntypedSpliceResult (LHsExpr GhcRn)
 type instance XUntypedSplice GhcTc = DataConCantHappen
 
 -- HsUntypedSplice

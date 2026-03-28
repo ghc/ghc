@@ -139,7 +139,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { Test20297.hs:5:7 })
@@ -263,7 +264,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { Test20297.hs:9:7 })
@@ -421,7 +423,8 @@
                                   (EpaComments
                                    []))
                                  (HsVar
-                                  (NoExtField)
+                                  (NoEpTok)
+                                  (NotPromoted)
                                   (L
                                    (EpAnn
                                     (EpaSpan { Test20297.hs:11:22-26 })
@@ -574,7 +577,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { Test20297.ppr.hs:4:5 })
@@ -692,7 +696,8 @@
                  (EpaComments
                   []))
                 (HsVar
-                 (NoExtField)
+                 (NoEpTok)
+                 (NotPromoted)
                  (L
                   (EpAnn
                    (EpaSpan { Test20297.ppr.hs:7:5 })
@@ -844,7 +849,8 @@
                                   (EpaComments
                                    []))
                                  (HsVar
-                                  (NoExtField)
+                                  (NoEpTok)
+                                  (NotPromoted)
                                   (L
                                    (EpAnn
                                     (EpaSpan { Test20297.ppr.hs:9:20-24 })

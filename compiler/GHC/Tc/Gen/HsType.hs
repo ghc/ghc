@@ -826,7 +826,7 @@ tcFamTyPats fam_tc hs_pats
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    lhs_fun   = noLocA (HsTyVar noAnn NotPromoted (noLocA $ noUserRdr fam_name))
+    lhs_fun   = noLocA (HsTyVar noExtField NotPromoted (noLocA $ noUserRdr fam_name))
 
 {- Note [tcFamTyPats: zonking the result kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1237,7 +1237,7 @@ tcHsType mode rn_ty@(HsExplicitListTy _ _ tys) exp_kind
     mk_cons k a b = mkTyConApp (promoteDataCon consDataCon) [k, a, b]
     mk_nil  k     = mkTyConApp (promoteDataCon nilDataCon) [k]
 
-tcHsType mode rn_ty@(HsExplicitTupleTy _ _ tys) exp_kind
+tcHsType mode rn_ty@(HsExplicitTupleTy _ _ tys _) exp_kind  -- FIXME (int-index): Reject unboxed
   -- using newMetaKindVar means that we force instantiations of any polykinded
   -- types. At first, I just used tc_infer_lhs_type, but that led to #11255.
   = do { ks   <- replicateM arity newMetaKindVar

@@ -1485,7 +1485,7 @@ repTy t@(HsSpliceTy (HsUntypedSpliceTop _ _) _) = pprPanic "repTy: top level spl
 repTy (HsExplicitListTy _ _ tys) = do
                                     tys1 <- repLTys tys
                                     repTPromotedList tys1
-repTy (HsExplicitTupleTy _ _ tys) = do
+repTy (HsExplicitTupleTy _ _ tys Boxed) = do
                                     tys1 <- repLTys tys
                                     tcon <- repPromotedTupleTyCon (length tys)
                                     repTapps tcon tys1
@@ -1555,7 +1555,7 @@ repLE :: LHsExpr GhcRn -> MetaM (Core (M TH.Exp))
 repLE (L loc e) = mapReaderT (putSrcSpanDs (locA loc)) (repE e)
 
 repE :: HsExpr GhcRn -> MetaM (Core (M TH.Exp))
-repE (HsVar _ (L _ (WithUserRdr _ x))) =
+repE (HsVar _ _ (L _ (WithUserRdr _ x))) =
   do { mb_val <- lift $ dsLookupMetaEnv x
      ; case mb_val of
         Nothing            -> do { str <- lift $ globalVar x
@@ -1643,8 +1643,8 @@ repE e@(HsDo _ ctxt (L _ sts))
   | otherwise
   = notHandled (ThMonadComprehensionSyntax e)
 
-repE (ExplicitList _ es) = do { xs <- repLEs es; repListExp xs }
-repE (ExplicitTuple _ es boxity) =
+repE (ExplicitList _ _ es) = do { xs <- repLEs es; repListExp xs }
+repE (ExplicitTuple _ _ es boxity) =
   let tupArgToCoreExp :: HsTupArg GhcRn -> MetaM (Core (Maybe (M TH.Exp)))
       tupArgToCoreExp a
         | (Present _ e) <- a = do { e' <- repLE e

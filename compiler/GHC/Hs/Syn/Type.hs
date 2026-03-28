@@ -105,7 +105,7 @@ lhsExprType (L _ e) = hsExprType e
 
 -- | Compute the 'Type' of an @'HsExpr' 'GhcTc'@ in a pure fashion.
 hsExprType :: HsExpr GhcTc -> Type
-hsExprType (HsVar _ (L _ id)) = idType id
+hsExprType (HsVar _ _ (L _ id)) = idType id
 hsExprType (HsOverLabel v _) = dataConCantHappen v
 hsExprType (HsIPVar v _) = dataConCantHappen v
 hsExprType (HsOverLit _ lit) = overLitType lit
@@ -119,7 +119,7 @@ hsExprType (NegApp _ _ se) = syntaxExpr_wrappedFunResTy se
 hsExprType (HsPar _ e) = lhsExprType e
 hsExprType (SectionL v _ _) = dataConCantHappen v
 hsExprType (SectionR v _ _) = dataConCantHappen v
-hsExprType (ExplicitTuple _ args box) =
+hsExprType (ExplicitTuple _ _ args box) =
   -- Deal with tuple sections: one function arrow per missing argument
   mkScaledFunTys [s | Missing s <- args] $
     -- Use 'mkTupleTy1' to avoid flattening 1-tuples, as per
@@ -131,7 +131,7 @@ hsExprType (HsIf _ _ t _) = lhsExprType t
 hsExprType (HsMultiIf ty _) = ty
 hsExprType (HsLet _ _ body) = lhsExprType body
 hsExprType (HsDo ty _ _) = ty
-hsExprType (ExplicitList ty _) = mkListTy ty
+hsExprType (ExplicitList ty _ _) = mkListTy ty
 hsExprType (RecordCon con_expr _ _) = snd (splitFunTys (hsExprType con_expr))
 hsExprType (RecordUpd v _ _) = dataConCantHappen v
 hsExprType (HsGetField { gf_ext = v }) = dataConCantHappen v

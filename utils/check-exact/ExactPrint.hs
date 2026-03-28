@@ -1187,7 +1187,7 @@ lga_sep k parent = fmap (\new -> parent { ga_sep = new })
 --       , sumPatVbarsAfter  :: [EpToken "|"]
 --       } deriving Data
 
-lsumPatParens :: Lens EpAnnSumPat (EpaLocation, EpaLocation)
+lsumPatParens :: Lens EpAnnSumPat AnnParen
 lsumPatParens k parent = fmap (\new -> parent { sumPatParens = new })
                               (k (sumPatParens parent))
 
@@ -2847,14 +2847,17 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _s = a
 
-  exact (HsVar x n) = do
+  exact (HsVar an prom n) = do
+    an0 <- if (prom == IsPromoted)
+             then markEpToken an
+             else return an
     -- The parser inserts a placeholder value for a record pun rhs. This must be
     -- filtered.
     let pun_RDR = "pun-right-hand-side"
     n' <- if (showPprUnsafe n /= pun_RDR)
       then markAnnotated n
       else return n
-    return (HsVar x n')
+    return (HsVar an0 prom n')
   exact (HsHole h) = do
     h' <- exactHole h
     return (HsHole h')
@@ -2931,16 +2934,15 @@ instance ExactPrint (HsExpr GhcPs) where
     expr' <- markAnnotated expr
     return (SectionR an op' expr')
 
-  exact (ExplicitTuple (o,c) args b) = do
-    o0 <- if b == Boxed then printStringAtAA o "("
-                        else printStringAtAA o "(#"
-
+  exact (ExplicitTuple (tick, paren) prom args b) = do
+    tick' <- if isPromoted prom
+               then markEpToken tick
+               else return tick
+    paren0 <- markOpeningParen paren
     args' <- mapM markAnnotated args
-
-    c0 <- if b == Boxed then printStringAtAA c ")"
-                        else printStringAtAA c "#)"
+    paren1 <- markClosingParen paren0
     debugM $ "ExplicitTuple done"
-    return (ExplicitTuple (o0,c0) args' b)
+    return (ExplicitTuple (tick', paren1) prom args' b)
 
   exact (ExplicitSum an alt arity expr) = do
     an0 <- markLensFun an laesOpen (\loc -> printStringAtAA loc "(#")
@@ -2988,13 +2990,16 @@ instance ExactPrint (HsExpr GhcPs) where
     (an',stmts') <- markAnnListA' an $ \a -> exactDo a do_or_list_comp stmts
     return (HsDo an' do_or_list_comp stmts')
 
-  exact (ExplicitList an es) = do
+  exact (ExplicitList (sq,o,c) prom es) = do
     debugM $ "ExplicitList start"
-    an0 <- markLensBracketsO' an lal_brackets
+    sq' <- if (isPromoted prom)
+             then markEpToken sq
+             else return sq
+    o' <- markEpToken o
     es' <- markAnnotated es
-    an1 <- markLensBracketsC' an0 lal_brackets
+    c' <- markEpToken c
     debugM $ "ExplicitList end"
-    return (ExplicitList an1 es')
+    return (ExplicitList (sq',o',c') prom es')
   exact (RecordCon (open, close) con_id binds) = do
     con_id' <- markAnnotated con_id
     open' <- mapM markEpToken open
@@ -4012,14 +4017,14 @@ instance ExactPrint (HsType GhcPs) where
     tys' <- markAnnotated tys
     c' <- markEpToken c
     return (HsExplicitListTy (sq',o',c') prom tys')
-  exact (HsExplicitTupleTy (sq, o, c) prom tys) = do
+  exact (HsExplicitTupleTy (sq, paren) prom tys b) = do
     sq' <- if (isPromoted prom)
               then markEpToken sq
               else return sq
-    o' <- markEpToken o
+    paren0 <- markOpeningParen paren
     tys' <- markAnnotated tys
-    c' <- markEpToken c
-    return (HsExplicitTupleTy (sq', o', c') prom tys')
+    paren1 <- markClosingParen paren0
+    return (HsExplicitTupleTy (sq', paren1) prom tys' b)
   exact (HsTyLit an lit) = do
     lit' <- withPpr lit
     return (HsTyLit an lit')
@@ -4688,26 +4693,24 @@ instance ExactPrint (Pat GhcPs) where
     pat' <- markAnnotated pat
     return (BangPat an0 pat')
 
-  exact (ListPat an pats) = do
-    (an', pats') <- markAnnList' an (markAnnotated pats)
-    return (ListPat an' pats')
-
-  exact (TuplePat (o,c) pats boxity) = do
-    o0 <- case boxity of
-             Boxed   -> printStringAtAA o "("
-             Unboxed -> printStringAtAA o "(#"
+  exact (ListPat (o,c) pats) = do
+    o' <- markEpToken o
     pats' <- markAnnotated pats
-    c0 <- case boxity of
-             Boxed   -> printStringAtAA c ")"
-             Unboxed -> printStringAtAA c "#)"
-    return (TuplePat (o0,c0) pats' boxity)
+    c' <- markEpToken c
+    return (ListPat (o',c') pats')
+
+  exact (TuplePat an pats boxity) = do
+    an0 <- markOpeningParen an
+    pats' <- markAnnotated pats
+    an1 <- markClosingParen an0
+    return (TuplePat an1 pats' boxity)
 
   exact (SumPat an pat alt arity) = do
-    an0 <- markLensFun an (lsumPatParens . lfst) (\loc -> printStringAtAA loc "(#")
+    an0 <- markLensFun an lsumPatParens markOpeningParen
     an1 <- markLensFun an0 lsumPatVbarsBefore (\locs -> mapM markEpToken locs)
     pat' <- markAnnotated pat
     an2 <- markLensFun an1 lsumPatVbarsAfter (\locs -> mapM markEpToken locs)
-    an3 <- markLensFun an2 (lsumPatParens . lsnd)  (\loc -> printStringAtAA loc "#)")
+    an3 <- markLensFun an2 lsumPatParens markClosingParen
     return (SumPat an3 pat' alt arity)
 
   exact (OrPat an pats) = do

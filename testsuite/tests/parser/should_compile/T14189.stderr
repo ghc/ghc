@@ -97,7 +97,7 @@
                   (EpaComments
                    []))
                  (HsTyVar
-                  (NoEpTok)
+                  (NoExtField)
                   (NotPromoted)
                   (L
                    (EpAnn
@@ -218,7 +218,7 @@
                      (EpaComments
                       []))
                     (HsTyVar
-                     (NoEpTok)
+                     (NoExtField)
                      (NotPromoted)
                      (L
                       (EpAnn
