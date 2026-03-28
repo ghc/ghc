@@ -12,7 +12,7 @@ module GHC.Internal.Char
 
 import GHC.Internal.Classes (eqChar, neChar)
 import GHC.Internal.Base (otherwise, (++))
-import GHC.Internal.Err (errorWithoutStackTrace)
+import GHC.Internal.Err (error)
 import GHC.Internal.Show
 import GHC.Internal.Prim (chr#, int2Word#, leWord#, Int#, Char#)
 import GHC.Internal.Types (Char(..), Int(..), isTrue#)
@@ -29,4 +29,7 @@ safe_chr# i#
 
 {-# NOINLINE chr_error #-}
 chr_error :: Int# -> Char#
-chr_error i# = errorWithoutStackTrace ("Prelude.chr: bad argument: " ++ showSignedInt (I# 9#) (I# i#) "")
+chr_error i# = error ("Data.Char.chr: argument outside Unicode range: 0..1114111: " ++ showSignedInt (I# 9#) (I# i#) "")
+-- It's not really "Data.Char", but we assume that
+-- the majority of users will import it from "base:Data.Char"
+-- and not from "ghc-internal:GHC.Internal.Char".
