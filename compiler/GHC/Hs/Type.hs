@@ -693,7 +693,7 @@ hsTyKindSig :: LHsType (GhcPass p) -> Maybe (LHsKind (NoGhcTc (GhcPass p)))
 hsTyKindSig lty =
   case unLoc lty of
     HsParTy _ lty'    -> hsTyKindSig lty'
-    HsKindSig _ _ k   -> Just k
+    HsKindSig _ _ wck -> Just (sig_body (unLoc (hswc_body wck)))
     _                 -> Nothing
 
 ---------------------
@@ -732,9 +732,9 @@ mkHsAppTys :: LHsType (GhcPass p) -> [LHsType (GhcPass p)]
 mkHsAppTys = foldl' mkHsAppTy
 
 mkHsAppKindTy :: XAppKindTy (GhcPass p)
-              -> LHsType (GhcPass p) -> LHsType (NoGhcTc (GhcPass p))
+              -> LHsType (GhcPass p) -> LHsWcType (NoGhcTc (GhcPass p))
               -> LHsType (GhcPass p)
-mkHsAppKindTy at ty k = addCLocA ty k (HsAppKindTy at ty k)
+mkHsAppKindTy at ty wck = addCLocA ty (hswc_body wck) (HsAppKindTy at ty wck)
 
 {-
 ************************************************************************
@@ -1463,8 +1463,8 @@ ppr_mono_ty (HsTupleTy _ con tys)
                     _              -> BoxedTuple
 ppr_mono_ty (HsSumTy _ tys)
   = tupleParens UnboxedTuple (pprWithBars ppr tys)
-ppr_mono_ty (HsKindSig _ ty kind)
-  = ppr_mono_lty ty <+> dcolon <+> ppr kind
+ppr_mono_ty (HsKindSig _ ty wck)
+  = ppr_mono_lty ty <+> dcolon <+> ppr (sig_body (unLoc (hswc_body wck)))
 ppr_mono_ty (HsListTy _ ty)       = brackets (ppr_mono_lty ty)
 ppr_mono_ty (HsIParamTy _ n ty)   = (ppr n <+> dcolon <+> ppr_mono_lty ty)
 ppr_mono_ty (HsSpliceTy ext s)    =
@@ -1490,8 +1490,8 @@ ppr_mono_ty (HsStarTy _)        = starLit
 
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty)
   = hsep [ppr_mono_lty fun_ty, ppr_mono_lty arg_ty]
-ppr_mono_ty (HsAppKindTy _ ty k)
-  = ppr_mono_lty ty <+> char '@' <> ppr_mono_lty k
+ppr_mono_ty (HsAppKindTy _ ty wck)
+  = ppr_mono_lty ty <+> char '@' <> ppr_mono_lty (hswc_body wck)
 ppr_mono_ty (HsOpTy _ ty1 tyop ty2)
   | Just pp_op <- ppr_infix_ty tyop
   = sep [pp_ty1, sep [pp_op, pp_ty2]]

@@ -1784,7 +1784,7 @@ cvtTypeKind typeOrKind ty
            SigT ty ki
              -> do { ty' <- cvtType ty
                    ; ki' <- cvtKind ki
-                   ; mk_apps (HsKindSig noAnn ty' ki') tys'
+                   ; mk_apps (HsKindSig noAnn ty' (mkHsWildCardBndrs (noLocA (mkHsImplicitSigType ki')))) tys'
                    }
 
            LitT lit
@@ -1925,7 +1925,7 @@ mk_apps head_ty type_args = do
                              mk_apps (HsAppTy noExtField phead_ty p_ty) args
           HsTypeArg at ki ->
                           do p_ki <- add_parens ki
-                             mk_apps (HsAppKindTy at phead_ty p_ki) args
+                             mk_apps (HsAppKindTy at phead_ty (mkHsWildCardBndrs p_ki)) args
           HsArgPar _   -> mk_apps (HsParTy noAnn phead_ty) args
 
   go type_args

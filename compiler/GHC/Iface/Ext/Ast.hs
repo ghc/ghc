@@ -1904,9 +1904,9 @@ instance ToHie (LocatedA (HsType GhcRn)) where
         [ toHie a
         , toHie b
         ]
-      HsAppKindTy _ ty ki ->
+      HsAppKindTy _ ty wck ->
         [ toHie ty
-        , toHie ki
+        , toHie (hswc_body wck)
         ]
       HsFunTy _ w a b ->
         [ toHie (multAnnToHsType w)
@@ -1934,9 +1934,9 @@ instance ToHie (LocatedA (HsType GhcRn)) where
         [ toHie ip
         , toHie ty
         ]
-      HsKindSig _ a b ->
+      HsKindSig _ a wck ->
         [ toHie a
-        , toHie b
+        , toHie (sig_body (unLoc (hswc_body wck)))
         ]
       HsSpliceTy _ a ->
         [ toHie $ L span a

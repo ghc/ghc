@@ -820,7 +820,7 @@ data HsType pass
 
   | HsAppKindTy         (XAppKindTy pass) -- type level type app
                         (LHsType pass)
-                        (LHsKind (NoGhcTc pass))
+                        (LHsWcType (NoGhcTc pass))
 
   | HsFunTy             (XFunTy pass)
                         (HsMultAnn pass) -- multiplicty annotations, includes the arrow
@@ -858,8 +858,8 @@ data HsType pass
   | HsStarTy            (XStarTy pass)  -- Note [HsStarTy]
 
   | HsKindSig           (XKindSig pass)
-                        (LHsType pass)  -- (ty :: kind)
-                        (LHsKind (NoGhcTc pass))  -- A type with a kind signature
+                        (LHsType pass)       -- (ty :: kind)
+                        (LHsSigWcType (NoGhcTc pass))  -- A type with a kind signature
       -- ^
       -- > (ty :: kind)
 

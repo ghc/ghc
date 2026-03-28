@@ -1358,12 +1358,12 @@ rn_ty_pat (HsAppTy _ fun_ty arg_ty) = do
   arg_ty' <- rn_lty_pat arg_ty
   pure (HsAppTy noExtField fun_ty' arg_ty')
 
-rn_ty_pat (HsAppKindTy _ ty ki) = do
+rn_ty_pat (HsAppKindTy _ ty wck) = do
   kind_app <- liftRn $ xoptM LangExt.TypeApplications
-  unless kind_app (liftRn $ addErr (typeAppErr KindLevel ki))
+  unless kind_app (liftRn $ addErr (typeAppErr KindLevel (hswc_body wck)))
   ty' <- rn_lty_pat ty
-  ki' <- rn_lty_pat ki
-  pure (HsAppKindTy noExtField ty' ki')
+  ki' <- rn_lty_pat (hswc_body wck)
+  pure (HsAppKindTy noExtField ty' (mkEmptyWildCardBndrs ki'))
 
 rn_ty_pat (HsFunTy an mult lhs rhs) = do
   lhs' <- rn_lty_pat lhs
@@ -1428,15 +1428,17 @@ rn_ty_pat tyLit@(HsTyLit src lit) = do
 rn_ty_pat (HsWildCardTy h) =
   pure (HsWildCardTy h)
 
-rn_ty_pat (HsKindSig _ ty ki) = do
+rn_ty_pat (HsKindSig _ ty wck) = do
   ctxt <- askDocContext
   kind_sigs_ok <- liftRn $ xoptM LangExt.KindSignatures
+  let ki = sig_body (unLoc (hswc_body wck))
   unless kind_sigs_ok (liftRn $ badKindSigErr ctxt ki)
   ~(HsPS hsps ki') <- liftRnWithCont $
                       rnHsPatSigKind AlwaysBind ctxt (HsPS noAnn ki)
   ty' <- rn_lty_pat ty
   tellTPB (tpBuilderPatSig hsps)
-  pure (HsKindSig noExtField ty' ki')
+  let wck' = HsWC { hswc_ext = [], hswc_body = noLocA (HsSig noExtField (HsOuterImplicit []) ki') }
+  pure (HsKindSig noExtField ty' wck')
 
 rn_ty_pat (HsSpliceTy _ splice) = do
   res <- liftRnFV $ rnSpliceTyPat splice

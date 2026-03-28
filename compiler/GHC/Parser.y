@@ -2202,7 +2202,8 @@ opt_tyconsig :: { (Maybe (EpUniToken "::" "\8759"), Maybe (LocatedN RdrName)) }
 sigktype :: { LHsSigType GhcPs }
         : sigtype              { $1 }
         | ctype '::' kind      {% amsA' (sLL $1 $> $ mkHsImplicitSigType $
-                                         sLLa $1 $> $ HsKindSig (epUniTok $2) $1 $3) }
+                                         sLLa $1 $> $ HsKindSig (epUniTok $2) $1
+                                           (mkHsWildCardBndrs (noLocA (mkHsImplicitSigType $3)))) }
 
 -- Like ctype, but for types that obey the forall-or-nothing rule.
 -- See Note [forall-or-nothing rule] in GHC.Hs.Type. To avoid duplicating the
@@ -2242,7 +2243,8 @@ forall_telescope :: { Located (HsForAllTelescope GhcPs) }
 -- A ktype is a ctype, possibly with a kind annotation
 ktype :: { LHsType GhcPs }
         : ctype                { $1 }
-        | ctype '::' kind      {% amsA' (sLL $1 $> $ HsKindSig (epUniTok $2) $1 $3) }
+        | ctype '::' kind      {% amsA' (sLL $1 $> $ HsKindSig (epUniTok $2) $1
+                                           (mkHsWildCardBndrs (noLocA (mkHsImplicitSigType $3)))) }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType GhcPs }

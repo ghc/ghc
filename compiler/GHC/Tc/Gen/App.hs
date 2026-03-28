@@ -1135,7 +1135,7 @@ expr_to_type earg =
     go (L l (HsAppType _ lhs rhs)) =
       do { lhs' <- go lhs
          ; rhs' <- unwrap_wc rhs
-         ; return (L l (HsAppKindTy noExtField lhs' rhs')) }
+         ; return (L l (HsAppKindTy noExtField lhs' (mkEmptyWildCardBndrs rhs'))) }
     go (L l (OpApp fix lhs op rhs)) =
       do { lhs' <- go lhs
          ; op'  <- go op
@@ -1157,7 +1157,8 @@ expr_to_type earg =
     go (L l (ExprWithTySig _ e sig_ty)) =
       do { t <- go e
          ; sig_ki <- (unwrap_sig <=< unwrap_wc) sig_ty
-         ; return (L l (HsKindSig noExtField t sig_ki)) }
+         ; let wck = HsWC { hswc_ext = [], hswc_body = noLocA (HsSig noExtField (HsOuterImplicit []) sig_ki) }
+         ; return (L l (HsKindSig noExtField t wck)) }
       where
         unwrap_sig :: LHsSigType GhcRn -> TcM (LHsType GhcRn)
         unwrap_sig (L _ (HsSig _ HsOuterImplicit{hso_ximplicit=bndrs} body))

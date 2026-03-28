@@ -1444,9 +1444,9 @@ repTy (HsAppTy _ f a)       = do
                                 f1 <- repLTy f
                                 a1 <- repLTy a
                                 repTapp f1 a1
-repTy (HsAppKindTy _ ty ki) = do
+repTy (HsAppKindTy _ ty wck) = do
                                 ty1 <- repLTy ty
-                                ki1 <- repLTy ki
+                                ki1 <- repLTy (hswc_body wck)
                                 repTappKind ty1 ki1
 repTy (HsFunTy _ w f a) = do
                             f1   <- repLTy f
@@ -1476,9 +1476,9 @@ repTy (HsSumTy _ tys)       = do tys1 <- repLTys tys
 repTy (HsOpTy _ ty1 op ty2) = repLTy ((op `nlHsAppTy` ty1) `nlHsAppTy` ty2)
 repTy (HsParTy _ t)         = repLTy t
 repTy (HsStarTy _)          = repTStar
-repTy (HsKindSig _ t k)     = do
+repTy (HsKindSig _ t wck)   = do
                                 t1 <- repLTy t
-                                k1 <- repLTy k
+                                k1 <- repLTy (sig_body (unLoc (hswc_body wck)))
                                 repTSig t1 k1
 repTy (HsSpliceTy (HsUntypedSpliceNested n) _) = rep_splice n
 repTy t@(HsSpliceTy (HsUntypedSpliceTop _ _) _) = pprPanic "repTy: top level splice" (ppr t)

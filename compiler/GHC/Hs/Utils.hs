@@ -673,11 +673,11 @@ forgetUserRdr =
 
 nlHsAppKindTy :: forall p. IsPass p =>
   LHsType (GhcPass p) -> LHsKind (NoGhcTc (GhcPass p)) -> LHsType (GhcPass p)
-nlHsAppKindTy f k = noLocA (HsAppKindTy x f k)
+nlHsAppKindTy f k = noLocA (HsAppKindTy x f wck)
   where
-    x = case ghcPass @p of
-      GhcPs -> noAnn
-      GhcRn -> noExtField
+    (x, wck) = case ghcPass @p of
+      GhcPs -> (noAnn,      HsWC { hswc_ext = noExtField, hswc_body = k })
+      GhcRn -> (noExtField, HsWC { hswc_ext = [],         hswc_body = k })
       GhcTc -> panic "nlHsAppKindTy @GhcTc"
 
 {-

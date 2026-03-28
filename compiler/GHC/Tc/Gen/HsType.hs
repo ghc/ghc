@@ -1280,8 +1280,9 @@ tcHsType mode rn_ty@(HsAppTy{})     exp_kind = tc_app_ty mode rn_ty exp_kind
 tcHsType mode rn_ty@(HsAppKindTy{}) exp_kind = tc_app_ty mode rn_ty exp_kind
 tcHsType mode rn_ty@(HsOpTy{})      exp_kind = tc_app_ty mode rn_ty exp_kind
 
-tcHsType mode rn_ty@(HsKindSig _ ty sig) exp_kind
-  = do { let mode' = mode { mode_tyki = KindLevel }
+tcHsType mode rn_ty@(HsKindSig _ ty wck) exp_kind
+  = do { let sig = sig_body (unLoc (hswc_body wck))
+             mode' = mode { mode_tyki = KindLevel }
        ; sig' <- tc_lhs_kind_sig mode' KindSigCtxt sig
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
@@ -1554,7 +1555,8 @@ splitHsAppTys hs_ty = go (noLocA hs_ty) []
        -> (LHsType GhcRn,
            [HsArg GhcRn (LHsType GhcRn) (LHsKind GhcRn)]) -- AZ temp
     go (L _  (HsAppTy _ f a))      as = go f (HsValArg noExtField a : as)
-    go (L _  (HsAppKindTy _ ty k)) as = go ty (HsTypeArg noExtField k : as)
+    go (L _  (HsAppKindTy _ ty wck)) as = assertPpr (null (hswc_ext wck)) (text "splitHsAppTys: unexpected wildcards in HsAppKindTy") $
+                                          go ty (HsTypeArg noExtField (hswc_body wck) : as)
     go (L sp (HsParTy _ f))        as = go f (HsArgPar (locA sp) : as)
     go (L _  (HsOpTy _ l tyop r))  as =
       (tyop, HsValArg noExtField l : HsValArg noExtField r : as)
@@ -1932,7 +1934,7 @@ appTypeToArg f []                       = f
 appTypeToArg f (HsValArg _ arg   : args) = appTypeToArg (mkHsAppTy f arg) args
 appTypeToArg f (HsArgPar _       : args) = appTypeToArg f                 args
 appTypeToArg f (HsTypeArg _ arg  : args)
-  = appTypeToArg (mkHsAppKindTy noExtField f arg) args
+  = appTypeToArg (mkHsAppKindTy noExtField f (mkEmptyWildCardBndrs arg)) args
 
 
 {- *********************************************************************
@@ -4618,9 +4620,9 @@ tyPatToBndr :: HsTyPat GhcRn -> Maybe (HsTyVarBndr () GhcRn)
 tyPatToBndr HsTP{hstp_body = (L _ hs_ty)} = go hs_ty where
   go :: HsType GhcRn -> Maybe (HsTyVarBndr () GhcRn)
   go (HsParTy _ (L _ ty)) = go ty
-  go (HsKindSig _ (L _ ty) ki) = do
+  go (HsKindSig _ (L _ ty) wck) = do
     bvar <- go_bvar ty
-    let bkind = HsBndrKind noExtField ki
+    let bkind = HsBndrKind noExtField (sig_body (unLoc (hswc_body wck)))
     Just (HsTvb noAnn () bvar bkind)
   go ty = do
     bvar <- go_bvar ty

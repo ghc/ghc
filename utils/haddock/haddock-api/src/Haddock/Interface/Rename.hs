@@ -379,10 +379,10 @@ renameType t = case t of
     a' <- renameLType a
     b' <- renameLType b
     return (HsAppTy noAnn a' b')
-  HsAppKindTy _ a b -> do
+  HsAppKindTy _ a wck -> do
     a' <- renameLType a
-    b' <- renameLKind b
-    return (HsAppKindTy noAnn a' b')
+    b' <- renameLKind (hswc_body wck)
+    return (HsAppKindTy noAnn a' (HsWC { hswc_ext = noExtField, hswc_body = b' }))
   HsFunTy _ w a b -> do
     a' <- renameLType a
     b' <- renameLType b
@@ -405,10 +405,10 @@ renameType t = case t of
     b' <- renameLType b
     return (HsOpTy noAnn a' op' b')
   HsParTy _ ty -> return . (HsParTy noExtField) =<< renameLType ty
-  HsKindSig _ ty k -> do
+  HsKindSig _ ty ki -> do
     ty' <- renameLType ty
-    k' <- renameLKind k
-    return (HsKindSig noAnn ty' k')
+    ki' <- renameLSigWcType ki
+    return (HsKindSig noAnn ty' ki')
   HsDocTy _ ty doc -> do
     ty' <- renameLType ty
     doc' <- renameLDocHsSyn doc

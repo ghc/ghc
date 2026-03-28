@@ -3952,11 +3952,11 @@ instance ExactPrint (HsType GhcPs) where
     t1' <- markAnnotated t1
     t2' <- markAnnotated t2
     return (HsAppTy an t1' t2')
-  exact (HsAppKindTy at ty ki) = do
+  exact (HsAppKindTy at ty wck) = do
     ty' <- markAnnotated ty
     at' <- markEpToken at
-    ki' <- markAnnotated ki
-    return (HsAppKindTy at' ty' ki')
+    ki' <- markAnnotated (hswc_body wck)
+    return (HsAppKindTy at' ty' (wck { hswc_body = ki' }))
   exact (HsFunTy an mult ty1 ty2) = do
     (mult', ty1') <- markMultAnnOf mult (markAnnotated ty1)
     ty2' <- markAnnotated ty2
@@ -3994,11 +3994,13 @@ instance ExactPrint (HsType GhcPs) where
   exact (HsStarTy tokstar) = do
     tokstar' <- markEpUniToken tokstar
     return (HsStarTy tokstar')
-  exact (HsKindSig an ty k) = do
+  exact (HsKindSig an ty wck) = do
     ty' <- markAnnotated ty
     an0 <- markEpUniToken an
-    k' <- markAnnotated k
-    return (HsKindSig an0 ty' k')
+    let lsig = hswc_body wck
+    ki' <- markAnnotated (sig_body (unLoc lsig))
+    let wck' = wck { hswc_body = L (getLoc lsig) ((unLoc lsig) { sig_body = ki' }) }
+    return (HsKindSig an0 ty' wck')
   exact (HsSpliceTy a splice) = do
     splice' <- markAnnotated splice
     return (HsSpliceTy a splice')

@@ -988,7 +988,7 @@ extractPatternSyn nm t tvs cons =
       where
         mkAppTyArg :: LHsType GhcRn -> LHsTypeArg GhcRn -> HsType GhcRn
         mkAppTyArg f (HsValArg _ ty) = HsAppTy noExtField f ty
-        mkAppTyArg f (HsTypeArg _ ki) = HsAppKindTy noExtField f ki
+        mkAppTyArg f (HsTypeArg _ ki) = HsAppKindTy noExtField f (HsWC { hswc_ext = [], hswc_body = ki })
         mkAppTyArg f (HsArgPar _) = HsParTy noExtField f
 
 extractRecSel
@@ -1016,7 +1016,7 @@ extractRecSel nm t tvs (L _ con : rest) =
       where
         mkAppTyArg :: LHsType GhcRn -> LHsTypeArg GhcRn -> HsType GhcRn
         mkAppTyArg f (HsValArg _ ty) = HsAppTy noExtField f ty
-        mkAppTyArg f (HsTypeArg _ ki) = HsAppKindTy noExtField f ki
+        mkAppTyArg f (HsTypeArg _ ki) = HsAppKindTy noExtField f (HsWC { hswc_ext = [], hswc_body = ki })
         mkAppTyArg f (HsArgPar _) = HsParTy noExtField f
 
 -- | Keep export items with docs.

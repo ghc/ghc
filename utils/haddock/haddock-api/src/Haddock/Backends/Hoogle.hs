@@ -98,13 +98,13 @@ dropHsDocTy = drop_sig_ty
     drop_ty (HsForAllTy x a e) = HsForAllTy x a (drop_lty e)
     drop_ty (HsQualTy x a e) = HsQualTy x a (drop_lty e)
     drop_ty (HsAppTy x a b) = HsAppTy x (drop_lty a) (drop_lty b)
-    drop_ty (HsAppKindTy x a b) = HsAppKindTy x (drop_lty a) (drop_lty b)
+    drop_ty (HsAppKindTy x a wck) = HsAppKindTy x (drop_lty a) (wck { hswc_body = drop_lty (hswc_body wck) })
     drop_ty (HsFunTy x w a b) = HsFunTy x w (drop_lty a) (drop_lty b)
     drop_ty (HsListTy x a) = HsListTy x (drop_lty a)
     drop_ty (HsTupleTy x a b) = HsTupleTy x a (map drop_lty b)
     drop_ty (HsOpTy x a b c) = HsOpTy x (drop_lty a) (drop_lty b) (drop_lty c)
     drop_ty (HsParTy x a) = HsParTy x (drop_lty a)
-    drop_ty (HsKindSig x a b) = HsKindSig x (drop_lty a) b
+    drop_ty (HsKindSig x a wck) = HsKindSig x (drop_lty a) wck
     drop_ty (HsDocTy _ a _) = drop_ty $ unL a
     drop_ty x = x
 
@@ -323,7 +323,7 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
           HsBndrWildCard h -> HsWildCardTy h
         tvk = case bkind of
           HsBndrNoKind _   -> tv
-          HsBndrKind _ lty -> HsKindSig noExtField (reL tv) lty
+          HsBndrKind _ lty -> HsKindSig noExtField (reL tv) (HsWC { hswc_ext = [], hswc_body = noLocA (HsSig noExtField (HsOuterImplicit []) lty) })
 
     resType =
       apps $

@@ -448,8 +448,11 @@ reparenTypePrec = go
     go p (HsDocTy x ty d) = HsDocTy x (goL p ty) d
     go _ (HsExplicitListTy x p tys) = HsExplicitListTy x p (map reparenLType tys)
     go _ (HsExplicitTupleTy x p tys boxity) = HsExplicitTupleTy x p (map reparenLType tys) boxity
-    go p (HsKindSig x ty kind) =
-      paren p PREC_SIG $ HsKindSig x (goL PREC_SIG ty) (goL PREC_SIG kind)
+    go p (HsKindSig x ty wck) =
+      let sig = unXRec @a (hswc_body wck)
+          ki' = goL PREC_SIG (sig_body sig)
+          wck' = HsWC { hswc_ext = hswc_ext wck, hswc_body = mapXRec @a (\_ -> (HsSig (sig_ext sig) (sig_bndrs sig) ki')) (hswc_body wck) }
+      in paren p PREC_SIG $ HsKindSig x (goL PREC_SIG ty) wck'
     go p (HsIParamTy x n ty) =
       paren p PREC_SIG $ HsIParamTy x n (reparenLType ty)
     go p (HsForAllTy x tele ty) =
@@ -463,8 +466,8 @@ reparenTypePrec = go
       paren p PREC_FUN $ HsFunTy x w (goL PREC_FUN ty1) (goL PREC_TOP ty2)
     go p (HsAppTy x fun_ty arg_ty) =
       paren p PREC_CON $ HsAppTy x (goL PREC_FUN fun_ty) (goL PREC_CON arg_ty)
-    go p (HsAppKindTy x fun_ty arg_ki) =
-      paren p PREC_CON $ HsAppKindTy x (goL PREC_FUN fun_ty) (goL PREC_CON arg_ki)
+    go p (HsAppKindTy x fun_ty wck) =
+      paren p PREC_CON $ HsAppKindTy x (goL PREC_FUN fun_ty) (wck { hswc_body = goL PREC_CON (hswc_body wck) })
     go p (HsOpTy x ty1 op ty2) =
       paren p PREC_FUN $ HsOpTy x (goL PREC_OP ty1) op (goL PREC_OP ty2)
     go p (HsParTy _ t) = unXRec @a $ goL p t -- pretend the paren doesn't exist - it will be added back if needed

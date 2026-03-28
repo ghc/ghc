@@ -1836,8 +1836,8 @@ ppr_mono_ty (HsTupleTy _ con tys) u q _ =
   tupleParens con (map (ppLType u q HideEmptyContexts) tys)
 ppr_mono_ty (HsSumTy _ tys) u q _ =
   sumParens (map (ppLType u q HideEmptyContexts) tys)
-ppr_mono_ty (HsKindSig _ ty kind) u q e =
-  ppr_mono_lty ty u q e <+> dcolon u <+> ppLKind u q kind
+ppr_mono_ty (HsKindSig _ ty wck) u q e =
+  ppr_mono_lty ty u q e <+> dcolon u <+> ppLKind u q (sig_body (unLoc (hswc_body wck)))
 ppr_mono_ty (HsListTy _ ty) u q _ = brackets (ppr_mono_lty ty u q HideEmptyContexts)
 ppr_mono_ty (HsIParamTy _ (L _ n) ty) u q _ =
   ppIPName n <+> dcolon u <+> ppr_mono_lty ty u q HideEmptyContexts
@@ -1858,10 +1858,10 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode qual _ =
     [ ppr_mono_lty fun_ty unicode qual HideEmptyContexts
     , ppr_mono_lty arg_ty unicode qual HideEmptyContexts
     ]
-ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode qual _ =
+ppr_mono_ty (HsAppKindTy _ fun_ty wck) unicode qual _ =
   hsep
     [ ppr_mono_lty fun_ty unicode qual HideEmptyContexts
-    , atSign <> ppr_mono_lty arg_ki unicode qual HideEmptyContexts
+    , atSign <> ppr_mono_lty (hswc_body wck) unicode qual HideEmptyContexts
     ]
 ppr_mono_ty (HsOpTy _ ty1 tyop ty2) unicode qual _
   | Just pp_op <- ppr_infix_ty tyop qual

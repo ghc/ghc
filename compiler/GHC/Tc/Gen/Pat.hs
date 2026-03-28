@@ -520,7 +520,8 @@ pat_to_type (WildPat _) = return b
 pat_to_type (SigPat _ pat sig_ty)
   = do { t <- pat_to_type (unLoc pat)
        ; let { !(HsPS x_hsps k) = sig_ty
-             ; b = noLocA (HsKindSig noExtField t k) }
+             ; wck = HsWC { hswc_ext = [], hswc_body = noLocA (HsSig noExtField (HsOuterImplicit []) k) }
+             ; b = noLocA (HsKindSig noExtField t wck) }
        ; tell (tpBuilderPatSig x_hsps)
        ; return b }
 pat_to_type (ParPat _ pat)
@@ -558,7 +559,7 @@ pat_to_type (ConPat _ lname (PrefixCon args))
         apply_arg :: LHsType GhcRn -> LPat GhcRn -> WriterT HsTyPatRnBuilder TcM (LHsType GhcRn)
         apply_arg !t (L _ (InvisPat _ (HsTP argx arg)))
           = do { tell (builderFromHsTyPatRn argx)
-               ; pure (mkHsAppKindTy noExtField t arg)}
+               ; pure (mkHsAppKindTy noExtField t (mkEmptyWildCardBndrs arg))}
         apply_arg !t (L _ p)
           = do { ty_p <- pat_to_type p
                ; pure (mkHsAppTy t ty_p)}

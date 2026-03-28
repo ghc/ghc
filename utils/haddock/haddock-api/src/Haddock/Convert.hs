@@ -119,7 +119,7 @@ tyThingToLHsDecl prr t = case t of
             cvt (HsTvb { tvb_var = bvar, tvb_kind = bkind }) =
               case bkind of
                 HsBndrNoKind _    -> cvt' bvar
-                HsBndrKind _ kind -> HsKindSig noExtField (noLocA (cvt' bvar)) kind
+                HsBndrKind _ kind -> HsKindSig noExtField (noLocA (cvt' bvar)) (HsWC { hswc_ext = [], hswc_body = noLocA (HsSig noExtField (HsOuterImplicit []) kind) })
 
             cvt' :: HsBndrVar GhcRn -> HsType GhcRn
             cvt' (HsBndrVar _ nm)   = HsTyVar noExtField NotPromoted (fmap noUserRdr nm)
@@ -728,7 +728,7 @@ annotHsType True ty hs_ty
   | not $ isEmptyVarSet $ filterVarSet isTyVar $ tyCoVarsOfType ty =
       let ki = typeKind ty
           hs_ki = synifyType WithinType emptyVarSet ki
-       in noLocA (HsKindSig noExtField hs_ty hs_ki)
+       in noLocA (HsKindSig noExtField hs_ty (HsWC { hswc_ext = [], hswc_body = noLocA (HsSig noExtField (HsOuterImplicit []) hs_ki) }))
 annotHsType _ _ hs_ty = hs_ty
 
 -- | For every argument type that a type constructor accepts,
@@ -893,7 +893,7 @@ synifyType _ boundTvs (TyConApp tc tys) =
       | tyConAppNeedsKindSig False tc tys_len =
           let full_kind = typeKind (mkTyConApp tc tys)
               full_kind' = synifyType WithinType boundTvs full_kind
-           in noLocA $ HsKindSig noExtField ty' full_kind'
+           in noLocA $ HsKindSig noExtField ty' (HsWC { hswc_ext = [], hswc_body = noLocA (HsSig noExtField (HsOuterImplicit []) full_kind') })
       | otherwise = ty'
 synifyType _ boundTvs ty@(AppTy{}) =
   let

@@ -287,7 +287,7 @@ no_anon_wc_ty lty = go lty
     go (L _ ty) = case ty of
       HsWildCardTy _                 -> False
       HsAppTy _ ty1 ty2              -> go ty1 && go ty2
-      HsAppKindTy _ ty ki            -> go ty && go ki
+      HsAppKindTy _ ty wck           -> go ty && go (hswc_body wck)
       HsFunTy _ w ty1 ty2            -> go ty1 && go ty2 && all go (multAnnToHsType w)
       HsListTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
@@ -295,7 +295,7 @@ no_anon_wc_ty lty = go lty
       HsOpTy _ ty1 tyop ty2          -> go tyop && go ty1 && go ty2
       HsParTy _ ty                   -> go ty
       HsIParamTy _ _ ty              -> go ty
-      HsKindSig _ ty kind            -> go ty && go kind
+      HsKindSig _ ty wck             -> go ty && go (sig_body (unLoc (hswc_body wck)))
       HsDocTy _ ty _                 -> go ty
       HsExplicitListTy _ _ tys       -> gos tys
       HsExplicitTupleTy _ _ tys _    -> gos tys

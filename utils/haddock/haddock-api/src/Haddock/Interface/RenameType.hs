@@ -99,7 +99,8 @@ renameType (HsQualTy x lctxt lt) =
 renameType (HsTyVar x ip name) = HsTyVar x ip <$> renameLNameOcc name
 renameType t@(HsStarTy _) = pure t
 renameType (HsAppTy x lf la) = HsAppTy x <$> renameLType lf <*> renameLType la
-renameType (HsAppKindTy x lt lk) = HsAppKindTy x <$> renameLType lt <*> renameLKind lk
+renameType (HsAppKindTy x lt wck) = (\lt' lk' -> HsAppKindTy x lt' (wck { hswc_body = lk' }))
+                                     <$> renameLType lt <*> renameLKind (hswc_body wck)
 renameType (HsFunTy x w la lr) = HsFunTy x <$> renameHsMultAnn w <*> renameLType la <*> renameLType lr
 renameType (HsListTy x lt) = HsListTy x <$> renameLType lt
 renameType (HsTupleTy x srt lt) = HsTupleTy x srt <$> mapM renameLType lt
@@ -108,7 +109,7 @@ renameType (HsOpTy x la lop lb) =
   HsOpTy x <$> renameLType la <*> renameLType lop <*> renameLType lb
 renameType (HsParTy x lt) = HsParTy x <$> renameLType lt
 renameType (HsIParamTy x ip lt) = HsIParamTy x ip <$> renameLType lt
-renameType (HsKindSig x lt lk) = HsKindSig x <$> renameLType lt <*> pure lk
+renameType (HsKindSig x lt wck) = HsKindSig x <$> renameLType lt <*> pure wck
 renameType t@(HsSpliceTy _ _) = pure t
 renameType (HsDocTy x lt doc) = HsDocTy x <$> renameLType lt <*> pure doc
 renameType t@(XHsType _) = pure t

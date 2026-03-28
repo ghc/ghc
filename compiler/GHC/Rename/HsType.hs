@@ -576,13 +576,15 @@ rnHsTyKi env listTy@(HsListTy x ty)
        ; (ty', fvs) <- rnLHsTyKi env ty
        ; return (HsListTy x ty', fvs) }
 
-rnHsTyKi env (HsKindSig _ ty k)
+rnHsTyKi env (HsKindSig _ ty wck)
   = do { kind_sigs_ok <- xoptM LangExt.KindSignatures
-       ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) k)
-       ; (k', sig_fvs)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
+       ; let ki = sig_body (unLoc (hswc_body wck))
+       ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) ki)
+       ; (k', sig_fvs)  <- rnLHsTyKi (env { rtke_level = KindLevel }) ki
+       ; let wck' = HsWC { hswc_ext = [], hswc_body = noLocA (HsSig noExtField (HsOuterImplicit []) k') }
        ; (ty', lhs_fvs) <- bindSigTyVarsFV (hsScopedKvs k') $
                            rnLHsTyKi env ty
-       ; return (HsKindSig noExtField ty' k', lhs_fvs `plusFV` sig_fvs) }
+       ; return (HsKindSig noExtField ty' wck', lhs_fvs `plusFV` sig_fvs) }
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
@@ -607,12 +609,12 @@ rnHsTyKi env (HsAppTy _ ty1 ty2)
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
        ; return (HsAppTy noExtField ty1' ty2', fvs1 `plusFV` fvs2) }
 
-rnHsTyKi env (HsAppKindTy _ ty k)
+rnHsTyKi env (HsAppKindTy _ ty wck)
   = do { kind_app <- xoptM LangExt.TypeApplications
-       ; unless kind_app (addErr (typeAppErr KindLevel k))
+       ; unless kind_app (addErr (typeAppErr KindLevel (hswc_body wck)))
        ; (ty', fvs1) <- rnLHsTyKi env ty
-       ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
-       ; return (HsAppKindTy noExtField ty' k', fvs1 `plusFV` fvs2) }
+       ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) (hswc_body wck)
+       ; return (HsAppKindTy noExtField ty' (mkEmptyWildCardBndrs k'), fvs1 `plusFV` fvs2) }
 
 rnHsTyKi env t@(HsIParamTy x n ty)
   = do { notInKinds env t
@@ -2047,7 +2049,7 @@ extractHsTyRdrTyVarsKindVars :: LHsType GhcPs -> FreeKiTyVars
 extractHsTyRdrTyVarsKindVars (L _ ty) =
   case ty of
     HsParTy _ ty -> extractHsTyRdrTyVarsKindVars ty
-    HsKindSig _ _ ki -> extractHsTyRdrTyVars ki
+    HsKindSig _ _ wck -> extractHsTyRdrTyVars (sig_body (unLoc (hswc_body wck)))
     _ -> []
 
 -- | Extracts free type and kind variables from types in a list.
@@ -2116,8 +2118,8 @@ extract_lty (L _ ty) acc
       HsTyVar _ _  ltv            -> extract_tv ltv acc
       HsAppTy _ ty1 ty2           -> extract_lty ty1 $
                                      extract_lty ty2 acc
-      HsAppKindTy _ ty k          -> extract_lty ty $
-                                     extract_lty k acc
+      HsAppKindTy _ ty wck        -> extract_lty ty $
+                                     extract_lty (hswc_body wck) acc
       HsListTy _ ty               -> extract_lty ty acc
       HsTupleTy _ _ tys           -> extract_ltys tys acc
       HsSumTy _ tys               -> extract_ltys tys acc
@@ -2135,7 +2137,7 @@ extract_lty (L _ ty) acc
       HsExplicitTupleTy _ _ tys _ -> extract_ltys tys acc
       HsTyLit _ _                 -> acc
       HsStarTy _                  -> acc
-      HsKindSig _ ty ki           -> extract_kind_sig ty ki acc
+      HsKindSig _ ty wck          -> extract_kind_sig ty (sig_body (unLoc (hswc_body wck))) acc
       HsForAllTy { hst_tele = tele, hst_body = ty }
                                   -> extract_hs_for_all_telescope tele acc $
                                      extract_lty ty []

@@ -1330,7 +1330,7 @@ ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
 ppr_mono_ty (HsTyVar _ IsPromoted (L _ name)) _ = char '\'' <> ppDocName name
 ppr_mono_ty (HsTupleTy _ con tys) u = tupleParens con (map (ppLType u) tys)
 ppr_mono_ty (HsSumTy _ tys) u = sumParens (map (ppLType u) tys)
-ppr_mono_ty (HsKindSig _ ty kind) u = parens (ppr_mono_lty ty u <+> dcolon u <+> ppLKind u kind)
+ppr_mono_ty (HsKindSig _ ty wck) u = parens (ppr_mono_lty ty u <+> dcolon u <+> ppLKind u (sig_body (unLoc (hswc_body wck))))
 ppr_mono_ty (HsListTy _ ty) u = brackets (ppr_mono_lty ty u)
 ppr_mono_ty (HsIParamTy _ (L _ n) ty) u = ppIPName n <+> dcolon u <+> ppr_mono_lty ty u
 ppr_mono_ty (HsSpliceTy v _) _ = dataConCantHappen v
@@ -1343,8 +1343,8 @@ ppr_mono_ty (HsExplicitTupleTy _ IsPromoted tys _) u = Pretty.quote $ parenList 
 ppr_mono_ty (HsExplicitTupleTy _ NotPromoted tys _) u = parenList $ map (ppLType u) tys                -- FIXME (int-index): ppr unboxed
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode =
   hsep [ppr_mono_lty fun_ty unicode, ppr_mono_lty arg_ty unicode]
-ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode =
-  hsep [ppr_mono_lty fun_ty unicode, atSign <> ppr_mono_lty arg_ki unicode]
+ppr_mono_ty (HsAppKindTy _ fun_ty wck) unicode =
+  hsep [ppr_mono_lty fun_ty unicode, atSign <> ppr_mono_lty (hswc_body wck) unicode]
 ppr_mono_ty (HsOpTy _ ty1 tyop ty2) unicode
   | Just pp_op <- ppr_infix_ty tyop
   = pp_ty1 <+> pp_op <+> pp_ty2

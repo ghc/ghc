@@ -963,10 +963,10 @@ checkTyVars pp_what equals_or_where tc tparms
 
         -- Check that the name space is correct!
     chk :: [EpaLocation] -> [EpaLocation] -> HsBndrVis GhcPs -> LHsType GhcPs -> P (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
-    chk ops cps bvis (L l (HsKindSig tok_dc (L annt t) k))
+    chk ops cps bvis (L l (HsKindSig tok_dc (L annt t) wck))
         | Just (ann, bvar) <- match_bndr_var t
             = let
-                bkind = HsBndrKind noExtField k
+                bkind = HsBndrKind noExtField (sig_body (unLoc (hswc_body wck)))
                 an = (reverse ops) ++ cps
               in
                 return (L (widenLocatedAnL (l Semi.<> annt) (for_widening bvis:an))
@@ -1146,7 +1146,7 @@ checkTyClHdr is_cls ty
             rhs = HsValArg noExtField t2
     go cs l (HsParTy (o,c) ty)    acc ops cps fix = goL (cs Semi.<> comments l) ty acc (o:ops) (c:cps) fix
     go cs l (HsAppTy _ t1 t2) acc ops cps fix = goL (cs Semi.<> comments l) t1 (HsValArg noExtField t2:acc) ops cps fix
-    go cs l (HsAppKindTy at ty ki) acc ops cps fix = goL (cs Semi.<> comments l) ty (HsTypeArg at ki:acc) ops cps fix
+    go cs l (HsAppKindTy at ty wck) acc ops cps fix = goL (cs Semi.<> comments l) ty (HsTypeArg at (hswc_body wck):acc) ops cps fix
     go cs l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ops cps fix
       = return (L (l2l l) (nameRdrName tup_name)
                , map (HsValArg noExtField) ts, fix, (reverse ops), cps, cs Semi.<> comments l)
@@ -2417,7 +2417,7 @@ class DisambTD b where
 instance DisambTD (HsType GhcPs) where
   mkHsAppTyHeadPV = return
   mkHsAppTyPV t1 t2 = return (mkHsAppTy t1 t2)
-  mkHsAppKindTyPV t at ki = return (mkHsAppKindTy at t ki)
+  mkHsAppKindTyPV t at ki = return (mkHsAppKindTy at t (mkHsWildCardBndrs ki))
   mkHsOpTyPV t1 tyop t2 = do
     let (L l ty) = mkLHsOpTy t1 tyop t2
     !cs <- getCommentsFor (locA l)
