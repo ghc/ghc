@@ -45,6 +45,13 @@ test('T13077a', normal, compile, [''])
 # T13143: WW for NOINLINE function f
 test('T13143', [ grep_errmsg(r'^T13143\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques'])
 
+# Uniques in the free variable part of a demand signature should be
+# suppressed by -dsuppress-uniques.
+test('T27106', normal, multimod_compile_filter,
+     ['T27106',
+      '-v0 -O -ddump-simpl -dsuppress-uniques',
+      r"sed -n '/^weird /,/.* Str=/p'"])
+
 # T15627
 #   Absent bindings of unlifted types should be WW'ed away.
 #   The idea is to check that both $wmutVar and $warray
