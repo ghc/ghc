@@ -6,8 +6,8 @@ Result size of Tidy Core
 Rec {
 -- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
-  :: forall {a}. (# #) -> a
-[GblId, Arity=1, Str=<B>b{sBo->S}, Cpr=b, Unf=OtherCon []]
+  :: forall a. (# #) -> a
+[GblId, Arity=1, Str=<B>b{S}, Cpr=b, Unf=OtherCon []]
 T13143.$wf = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Types.(##)
 end Rec }
 
@@ -15,7 +15,7 @@ end Rec }
 f [InlPrag=NOINLINE[final]] :: forall a. Int -> a
 [GblId,
  Arity=1,
- Str=<B>b{sBo->S},
+ Str=<B>b{S},
  Cpr=b,
  Unf=Unf{Src=StableSystem, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
@@ -66,7 +66,7 @@ T13143.$trModule
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 lvl :: Int
-[GblId, Str=b{sBo->S}, Cpr=b]
+[GblId, Str=b{S}, Cpr=b]
 lvl = T13143.$wf @Int GHC.Types.(##)
 
 Rec {
