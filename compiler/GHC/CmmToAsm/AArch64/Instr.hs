@@ -29,7 +29,7 @@ import GHC.Types.Unique.DSM
 
 import GHC.Utils.Panic
 
-import Data.Maybe (fromMaybe, catMaybes)
+import Data.Maybe (catMaybes)
 
 import GHC.Stack
 
@@ -655,7 +655,7 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
             -> patchJumpInstr insn retarget : r
         _other -> insn : r
 
-        where retarget b = fromMaybe b (mapLookup b new_blockmap)
+        where retarget b = mapFindWithDefault b b new_blockmap
 
       new_code = concatMap insert_stack_insn code
     -- in

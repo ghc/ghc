@@ -252,7 +252,7 @@ simpleRewrite rw (JFunction args stat)= JFunction (map varReplace args) (go stat
     zeroUsed _                  = False
 
     varReplace :: Ident -> Ident
-    varReplace v = fromMaybe v (UM.lookupUniqMap (renameVar rw) v)
+    varReplace v = UM.lookupWithDefaultUniqMap (renameVar rw) v v
 
     {-
       We can sometimes float down an expression to avoid an assignment:

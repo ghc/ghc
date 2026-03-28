@@ -149,8 +149,7 @@ regSpill_top platform regSlotMap cmm
         patchLiveSlot slotMap blockId regsLive
          = let
                 -- Slots that are already recorded as being live.
-                curSlotsLive    = fromMaybe IntSet.empty
-                                $ mapLookup blockId slotMap
+                curSlotsLive    = mapFindWithDefault IntSet.empty blockId slotMap
 
                 moreSlotsLive   = IntSet.fromList
                                 $ mapMaybe (lookupUFM regSlotMap . regWithFormat_reg)

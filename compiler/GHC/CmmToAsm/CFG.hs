@@ -1217,22 +1217,21 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
         getProb' arr b1 b2 = readSTRef arr >>=
             (\graph ->
                 return .
-                        fromMaybe (error "getFreq 1") .
-                        IM.lookup b2 .
-                        fromMaybe (error "getFreq 2") $
-                        (IM.lookup b1 graph)
+                        IM.findWithDefault (error "getFreq 1") b2 .
+                        IM.findWithDefault (error "getFreq 2") b1 $
+                        graph
             )
         setProb' arr b1 b2 prob = do
           g <- readSTRef arr
-          let !m = fromMaybe (error "Foo") $ IM.lookup b1 g
+          let !m = IM.findWithDefault (error "Foo") b1 g
               !m' = IM.insert b2 prob m
           writeSTRef arr $! (IM.insert b1 m' g)
 
         getEdgeFreq b1 b2 = getProb' edgeProbs b1 b2
         setEdgeFreq b1 b2 = setProb' edgeProbs b1 b2
-        getProb b1 b2 = fromMaybe (error "getProb") $ do
-            m' <- IM.lookup b1 graph
-            IM.lookup b2 m'
+        getProb b1 b2 =
+          IM.findWithDefault (error "getProb") b2 $
+            IM.findWithDefault (error "getProb") b1 graph
 
         getBackProb b1 b2 = getProb' edgeBackProbs b1 b2
         setBackProb b1 b2 = setProb' edgeBackProbs b1 b2
@@ -1311,9 +1310,9 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
   where
     -- How can these lookups fail? Consider the CFG [A -> B]
     predecessors :: Int -> IS.IntSet
-    predecessors b = fromMaybe IS.empty $ IM.lookup b revGraph
+    predecessors b = IM.findWithDefault IS.empty b revGraph
     successors :: Int -> [Int]
-    successors b = fromMaybe (lookupError "succ" b graph)$ IM.keys <$> IM.lookup b graph
+    successors b = IM.keys $ IM.findWithDefault (lookupError "succ" b graph) b graph
     lookupError s b g = pprPanic ("Lookup error " ++ s) $
                             ( text "node" <+> ppr b $$
                                 text "graph" <+>

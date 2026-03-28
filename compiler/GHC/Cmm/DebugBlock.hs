@@ -164,7 +164,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
       -- as children.
       blocksForScope :: Maybe (RealSrcSpan, LexicalFastString) -> (CmmTickScope, NonEmpty BlockContext) -> DebugBlock
       blocksForScope cstick (scope, bctx:|bctxs) = mkBlock True bctx
-        where nested = fromMaybe [] $ Map.lookup scope scopeMap
+        where nested = Map.findWithDefault [] scope scopeMap
               childs = map (mkBlock False) bctxs ++
                        map (blocksForScope stick) nested
 
@@ -269,7 +269,7 @@ cmmDebugLink labels unwindPts blocks = mapMaybe link blocks
           pos      -> Just $ block
                          { dblPosition = pos
                          , dblBlocks   = mapMaybe link (dblBlocks block)
-                         , dblUnwind   = fromMaybe mempty $ mapLookup (dblLabel block) unwindPts
+                         , dblUnwind   = mapFindWithDefault mempty (dblLabel block) unwindPts
                          }
 
 -- | Converts debug blocks into a label map for easier lookups

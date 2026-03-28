@@ -984,7 +984,7 @@ getDocs name =
                          , docs_args = args
                          } ->
                  pure (Right ( lookupUniqMap decls name
-                             , fromMaybe mempty $ lookupUniqMap args name))
+                             , lookupWithDefaultUniqMap args mempty name))
   where
     compiled =
       -- TODO: Find a more direct indicator.

@@ -491,7 +491,7 @@ slurpReloadCoalesce live
         --      if we have slot maps for multiple in-edges then we need to merge them.
         getSlotMap blockId
          = do   map             <- get
-                let slotMaps    = fromMaybe [] (lookupUFM map blockId)
+                let slotMaps    = lookupWithDefaultUFM map [] blockId
                 return          $ foldr mergeSlotMaps emptyUFM slotMaps
 
         mergeSlotMaps :: SlotMap Reg -> SlotMap Reg -> SlotMap Reg

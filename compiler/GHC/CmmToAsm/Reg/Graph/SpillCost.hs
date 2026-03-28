@@ -35,7 +35,7 @@ import GHC.CmmToAsm.Format
 import GHC.Utils.Misc
 
 import Data.List        (nub)
-import Data.Maybe
+import Data.Maybe       (mapMaybe)
 import Control.Monad (join)
 
 
@@ -253,8 +253,7 @@ spillCost_length info _ reg
         | lifetime <= 1         = 1/0
         | otherwise             = 1 / fromIntegral lifetime
         where (_, _, _, lifetime)
-                = fromMaybe (reg, 0, 0, 0)
-                $ lookupUFM info reg
+                = lookupWithDefaultUFM info (reg, 0, 0, 0) reg
 
 
 -- | Extract a map of register lifetimes from a `SpillCostInfo`.
@@ -308,4 +307,3 @@ pprSpillCostRecord regClass pprReg graph (reg, uses, defs, life)
         , ppr $ nodeDegree regClass graph reg
         , text $ show $ (fromIntegral (uses + defs)
                        / fromIntegral (nodeDegree regClass graph reg) :: Float) ]
-

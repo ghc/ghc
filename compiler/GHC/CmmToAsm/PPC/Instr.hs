@@ -58,7 +58,7 @@ import GHC.Types.Unique.DSM
 import Data.Foldable (toList)
 import qualified Data.List.NonEmpty as NE
 import GHC.Data.FastString (FastString)
-import GHC.Data.Maybe (expectJust, fromMaybe)
+import GHC.Data.Maybe (expectJust)
 
 
 --------------------------------------------------------------------------------
@@ -153,7 +153,7 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
 
         retarget :: BlockId -> BlockId
         retarget b
-            = fromMaybe b (mapLookup b new_blockmap)
+            = mapFindWithDefault b b new_blockmap
 
         new_code
             = concatMap insert_stack_insns code

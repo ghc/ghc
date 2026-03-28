@@ -59,7 +59,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
 import GHC.Types.Unique( hasKey )
 
-import GHC.Data.Maybe     ( fromMaybe, orElse, catMaybes, isJust, isNothing )
+import GHC.Data.Maybe     ( orElse, catMaybes, isJust, isNothing )
 import GHC.Data.FastString
 
 import GHC.Utils.Misc
@@ -1301,7 +1301,7 @@ combineUsages = foldr1WithDefault nullUsage combineUsage
 lookupOccs :: Traversable f => ScUsage -> f OutVar -> (ScUsage, f ArgOcc)
 lookupOccs (SCU { scu_calls = sc_calls, scu_occs = sc_occs }) bndrs
   = (SCU {scu_calls = sc_calls, scu_occs = delVarEnvList sc_occs bndrs},
-    fromMaybe NoOcc . lookupVarEnv sc_occs <$> bndrs)
+    lookupWithDefaultVarEnv sc_occs NoOcc <$> bndrs)
 
 data ArgOcc = NoOcc     -- Doesn't occur at all; or a type argument
             | UnkOcc    -- Used in some unknown way

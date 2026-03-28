@@ -2122,7 +2122,7 @@ instance Outputable UnitErr where
 -- to form @mod_name@, or @[]@ if this is not a requirement.
 requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
 requirementMerges pkgstate mod_name =
-  fromMaybe [] (lookupUniqMap (requirementContext pkgstate) mod_name)
+  lookupWithDefaultUniqMap (requirementContext pkgstate) [] mod_name
 
 -- -----------------------------------------------------------------------------
 

@@ -199,9 +199,11 @@ runInstrs platform long_jumps is_state instrs = do
   ptr_array <- newSmallArrayIO (fromIntegral $ ptrCount is_state) undefined
   lit_array <- newSmallArrayIO (fromIntegral $ litCount is_state) undefined
   let env :: LocalLabel -> Word
-      env lbl = fromMaybe
-        (pprPanic "assembleBCO.findLabel" (ppr lbl))
-        (lookupUFM (lblEnv is_state) lbl)
+      env lbl =
+        lookupWithDefaultUFM
+          (lblEnv is_state)
+          (pprPanic "assembleBCO.findLabel" (ppr lbl))
+          lbl
   let initial_state  = AsmState 0 0 0
   let initial_reader = RunAsmReader{..}
   runAsm long_jumps env initial_reader initial_state (mapM_ (\i -> assembleRunAsm platform i) instrs)

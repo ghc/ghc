@@ -175,7 +175,7 @@ mkDocStructureFromExportList mdl import_avails export_list =
     moduleExport alias avails =
         DsiModExport (nubSortNE orig_names) (sortAvails (nubAvails avails))
       where
-        orig_names = fromMaybe aliasErr (lookupUniqMap aliasMap alias)
+        orig_names = lookupWithDefaultUniqMap aliasMap aliasErr alias
         aliasErr = error $ "mkDocStructureFromExportList: "
                            ++ (moduleNameString . moduleName) mdl
                            ++ ": Can't find alias " ++ moduleNameString alias

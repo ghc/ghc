@@ -1497,7 +1497,7 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
          JMP _ _     -> dealloc ++ (insn : r)
          JXX_GBL _ _ -> panic "insert_dealloc: cannot handle JXX_GBL"
          _other      -> patchJumpInstr insn retarget : r
-           where retarget b = fromMaybe b (mapLookup b new_blockmap)
+           where retarget b = mapFindWithDefault b b new_blockmap
 
       new_code = concatMap insert_stack_insns code
     -- in

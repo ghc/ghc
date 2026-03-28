@@ -104,7 +104,6 @@ import GHC.Types.Basic (isWeakLoopBreaker)
 import GHC.Types.Var.Env
 import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
-import Data.Maybe (fromMaybe)
 import GHC.Core.Map.Expr
 import GHC.Data.TrieMap
 import GHC.Types.Name.Env
@@ -278,7 +277,7 @@ substArg env (StgVarArg from) = StgVarArg (substVar env from)
 substArg _   (StgLitArg lit)  = StgLitArg lit
 
 substVar :: CseEnv -> InId -> OutId
-substVar env id = fromMaybe id $ lookupVarEnv (ce_subst env) id
+substVar env id = lookupWithDefaultVarEnv (ce_subst env) id id
 
 -- Functions to enter binders
 

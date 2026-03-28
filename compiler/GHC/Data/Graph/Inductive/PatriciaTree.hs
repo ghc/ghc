@@ -31,7 +31,6 @@ import GHC.Data.Graph.Inductive.Graph
 import           Data.IntMap         (IntMap)
 import qualified Data.IntMap         as IM
 import           Data.List           (sort)
-import           Data.Maybe          (fromMaybe)
 import           Data.Tuple          (swap)
 
 import qualified Data.IntMap.Strict as IMS
@@ -93,11 +92,9 @@ instance Graph Gr where
 
     noNodes   (Gr g) = IM.size g
 
-    nodeRange (Gr g) = fromMaybe (error "nodeRange of empty graph")
-                       $ liftA2 (,) (ix (IM.minViewWithKey g))
-                                    (ix (IM.maxViewWithKey g))
-      where
-        ix = fmap (fst . fst)
+    nodeRange (Gr g)
+      | IM.null g  = error "nodeRange of empty graph"
+      | otherwise  = (fst (IM.findMin g), fst (IM.findMax g))
 
     labEdges (Gr g) = do (node, (_, _, s)) <- IM.toList g
                          (next, labels)    <- IM.toList s

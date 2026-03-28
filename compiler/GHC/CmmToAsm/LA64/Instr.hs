@@ -632,7 +632,7 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
         patchJumpInstr insn retarget : r
       _other -> insn : r
 
-      where retarget b = fromMaybe b (mapLookup b new_blockmap)
+      where retarget b = mapFindWithDefault b b new_blockmap
 
     new_code = concatMap insert_stack_insn code
   return (CmmProc info lbl live (ListGraph new_code), retargetList)

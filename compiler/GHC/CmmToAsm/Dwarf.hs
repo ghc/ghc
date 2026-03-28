@@ -135,7 +135,7 @@ debugSplitProcs b = concat $ H.mapElems $ mergeMaps $ map (split Nothing) b
                 blk' = blk { dblBlocks = own_blks
                            , dblParent = parent
                            }
-                own_blks = fromMaybe [] $ H.mapLookup prc nested
+                own_blks = H.mapFindWithDefault [] prc nested
                 nested = mergeMaps $ map (split parent') $ dblBlocks blk
                 -- Figure out who should be the parent of nested blocks.
                 -- If @blk@ is optimized out then it isn't a good choice
