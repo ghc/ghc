@@ -320,7 +320,7 @@ ppCtor sDocContext dat subdocs con@ConDeclH98{con_args = con_args'} =
         tv, tvk :: HsType GhcRn
         tv = case bvar of
           HsBndrVar _ n -> HsTyVar noAnn NotPromoted (fmap noUserRdr n)
-          HsBndrWildCard _ -> HsWildCardTy noExtField
+          HsBndrWildCard h -> HsWildCardTy h
         tvk = case bkind of
           HsBndrNoKind _   -> tv
           HsBndrKind _ lty -> HsKindSig noAnn (reL tv) lty

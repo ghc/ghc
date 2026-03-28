@@ -48,3 +48,5 @@ data HsUntypedSpliceResult thing
       , utsplice_result            :: thing
       }
   | HsUntypedSpliceNested SplicePointName
+
+data HoleKind

@@ -228,10 +228,10 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
     rn_ty env (HsQualTy { hst_ctxt = L cx hs_ctxt
                         , hst_body = hs_ty })
       | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
-      , L lx (HsWildCardTy _)  <- ignoreParens hs_ctxt_last
+      , L lx (HsWildCardTy h)  <- ignoreParens hs_ctxt_last
       = do { (hs_ctxt1', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt1
            ; setSrcSpanA lx $ checkExtraConstraintWildCard env hs_ctxt1
-           ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy noExtField)]
+           ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy h)]
            ; (hs_ty', fvs2) <- rnLHsTyKi env hs_ty
            ; return (HsQualTy { hst_xqual = noExtField
                               , hst_ctxt = L cx hs_ctxt'
@@ -661,7 +661,7 @@ rnHsTyKi env ty@(XHsType (HsRecTy {})) = do
   addErr $
     TcRnWithHsDocContext (rtke_ctxt env) $
       TcRnIllegalRecordSyntax ty
-  return (HsWildCardTy noExtField, emptyFVs) -- trick to avoid `failWithTc`
+  return (HsWildCardTy GHC.Hs.HoleError, emptyFVs) -- trick to avoid `failWithTc`
 
 rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
   = do { checkDataKinds env ty
@@ -675,9 +675,9 @@ rnHsTyKi env ty@(HsExplicitTupleTy _ ip tys)
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
        ; return (HsExplicitTupleTy noExtField ip tys', fvs) }
 
-rnHsTyKi env (HsWildCardTy _)
+rnHsTyKi env (HsWildCardTy h)
   = do { checkAnonWildCard env
-       ; return (HsWildCardTy noExtField, emptyFVs) }
+       ; return (HsWildCardTy h, emptyFVs) }
 
 {-
 Note [Strict level checks with ExplicitLevelImports]
@@ -966,10 +966,10 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
     get_bndr_loc (L l tvb) =
       combineSrcSpans
         (case hsBndrVar tvb of
-          HsBndrWildCard tok ->
-            case tok of
-              NoEpTok   -> locA l
-              EpTok loc -> locA loc
+          HsBndrWildCard hole ->
+            case hole of
+              GHC.Hs.HoleError  -> locA l
+              HoleVar (L loc _) -> locA loc
           HsBndrVar _ ln   -> getLocA ln)
         (case hsBndrKind tvb of
           HsBndrNoKind _ -> noSrcSpan
@@ -1237,8 +1237,8 @@ bindHsBndrVar mb_assoc (HsBndrVar _ lrdr@(L lv _)) thing_inside
   = do { tv_nm  <- newTyVarNameRn mb_assoc lrdr
        ; bindLocalNamesFV [tv_nm] $
          thing_inside (HsBndrVar noExtField (L lv tv_nm)) }
-bindHsBndrVar _ (HsBndrWildCard _) thing_inside
-  = thing_inside (HsBndrWildCard noExtField)
+bindHsBndrVar _ (HsBndrWildCard h) thing_inside
+  = thing_inside (HsBndrWildCard h)
 
 rnHsBndrKind :: HsDocContext -> HsBndrKind GhcPs -> RnM (HsBndrKind GhcRn, FreeVars)
 rnHsBndrKind _ (HsBndrNoKind _) = return (HsBndrNoKind noExtField, emptyFVs)
