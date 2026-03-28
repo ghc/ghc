@@ -2830,7 +2830,10 @@ instance Outputable DmdEnv where
     = ppr div <> if null fv_elts then empty
                  else braces (fsep (map pp_elt fv_elts))
     where
-      pp_elt (uniq, dmd) = ppr uniq <> text "->" <> ppr dmd
+      pp_elt (uniq, dmd) =
+        sdocOption sdocSuppressUniques $ \case
+          True  -> ppr dmd
+          False -> ppr uniq <> text "->" <> ppr dmd
       fv_elts = nonDetUFMToList fvs
         -- It's OK to use nonDetUFMToList here because we only do it for
         -- pretty printing
