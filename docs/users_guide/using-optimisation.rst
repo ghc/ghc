@@ -1614,7 +1614,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     a polymorphic sub-demand of the same letter: E.g. ``L`` is equivalent to
     ``LL`` by expansion of the single letter demand, which is equivalent to
     ``LP(LP(..))``, so ``L``\s all the way down. It is always clear from
-    context whether we talk about about a cardinality, sub-demand or demand.
+    context whether we talk about a cardinality, sub-demand or demand.
 
     **Demand signatures**
 
@@ -1623,15 +1623,15 @@ as such you shouldn't need to set any of them explicitly. A flag
 
     .. code-block:: none
 
-        {x->dx,y->dy,z->dz...}<d1><d2><d3>...<dn>div
-                ^              ^   ^   ^      ^   ^
-                |              |   |   |      |   |
-                |              \---+---+------/   |
-                |                  |              |
-           demand on free        demand on      divergence
-             variables           arguments      information
-         (omitted if empty)                     (omitted if
-                                              no information)
+        <d1><d2><d3>...<dn>div{x->dx,y->dy,z->dz...}
+         ^   ^   ^      ^   ^              ^
+         |   |   |      |   |              |
+         \---+---+------/   |              |
+             |              |              |
+          demand on     divergence        demand on
+          arguments     information      free variables
+                        (omitted if     (omitted if empty)
+                        no information)
 
     We summarise ``fst``'s demand properties in its *demand signature*
     ``<1P(1L,A)>``, which just says "If ``fst`` is applied to one argument,
@@ -1653,11 +1653,14 @@ as such you shouldn't need to set any of them explicitly. A flag
         maybe n _ Nothing  = n
         maybe _ s (Just a) = s a
 
-    We give it demand signature ``<L><MC(M,L)><1L>``.  The ``C(M,L)`` is a *call
-    sub-demand* that says "Called at most once, where the result is used
-    according to ``L``". The expression ``f `seq` f 1`` puts ``f`` under
-    demand ``SC(1,L)`` and serves as an example where the upper bound on
-    evaluation cardinality doesn't coincide with that of the call cardinality.
+    We give it demand signature ``<ML><MC(1,L)><1L>``. For the second
+    argument, the outer cardinality ``M`` says that it is used at most once
+    overall. If it is used, the *call sub-demand* ``C(1,L)`` says that it is
+    called exactly once and its result is used according to ``L``.
+
+    By contrast, the expression ``f `seq` f 1`` puts ``f`` under demand
+    ``SC(1,L)`` and serves as an example where the upper bound on evaluation
+    cardinality doesn't coincide with that of the call cardinality.
 
     Cardinality is always relative to the enclosing call cardinality, so
     ``g 1 2 + g 3 4`` puts ``g`` under demand ``SC(S,C(1,L))``, which says
