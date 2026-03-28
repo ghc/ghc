@@ -1798,7 +1798,8 @@ cvtTypeKind typeOrKind ty
              -> mk_apps (HsTyLit noExtField (cvtTyLit lit)) tys'
 
            WildCardT
-             -> mk_apps (mkAnonWildCardTy noAnn) tys'
+             -> do { n' <- wrapLN (return unnamedHoleRdrName)
+                   ; mk_apps (HsWildCardTy (HoleVar n')) tys' }
 
            InfixT t1 s t2
              -> do { s'  <- tconName s

@@ -20,9 +20,7 @@ X(ExplicitList) mismatch
 X(ExplicitTuple) mismatch
   >>> ((EpaLocation' [GenLocated (EpaLocation' NoComments) EpaComment]),(EpaLocation' [GenLocated (EpaLocation' NoComments) EpaComment]))
   <<< ((EpToken "'"),(EpToken "("),(EpToken ")"))
-X(Hole) mismatch
-  >>> HoleKind
-  <<< EpToken "_"
+X(Hole) match = HoleKind
 
 Extension fields @GhcRn
 -----------------------
@@ -50,9 +48,7 @@ X(UntypedSplice) mismatch
   <<< HsUntypedSpliceResult (GenLocated (EpAnn AnnListItem) (HsType (GhcPass 'Renamed)))
 X(ExplicitList) match = NoExtField
 X(ExplicitTuple) match = NoExtField
-X(Hole) mismatch
-  >>> HoleKind
-  <<< NoExtField
+X(Hole) match = HoleKind
 
 Extension fields @GhcTc
 -----------------------
