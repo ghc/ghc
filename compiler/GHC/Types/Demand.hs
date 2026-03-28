@@ -510,7 +510,7 @@ type CardNonOnce = Card
 -- | Absent, {0}. Pretty-printed as A.
 pattern C_00 :: Card
 pattern C_00 = Card 0b001
--- | Bottom, {}. Pretty-printed as A.
+-- | Bottom, {}. Pretty-printed as B.
 pattern C_10 :: Card
 pattern C_10 = Card 0b000
 -- | Strict and used once, {1}. Pretty-printed as 1.
@@ -2046,7 +2046,7 @@ gets reached.  For example, we don't want to be strict in the strict free
 variables of 'rhs'.
 
 So we have the simple definition
-  deferAfterPreciseException = lubDmdType (DmdType emptyDmdEnv [] exnDiv)
+  deferAfterPreciseException = lubDmdType (DmdType (DE emptyVarEnv exnDiv) [])
 
 Historically, when we had `lubBoxity = _unboxedWins` (see Note [unboxedWins]),
 we had a more complicated definition for deferAfterPreciseException to make sure
@@ -2054,7 +2054,7 @@ it preserved boxity in its argument. That was needed for code like
    case <I/O operation> of
       (# s', r) -> f x
 
-which uses `x` *boxed*. If we `lub`bed it with `(DmdType emptyDmdEnv [] exnDiv)`
+which uses `x` *boxed*. If we `lub`bed it with `(DmdType (DE emptyVarEnv exnDiv) [])`
 we'd get an *unboxed* demand on `x` (because we let Unboxed win),
 which led to #20746.  Nowadays with `lubBoxity = boxedWins` we don't need
 the complicated definition.
@@ -2191,8 +2191,8 @@ transformer, namely
         a single DmdType
 (Nevertheless we dignify DmdSig as a distinct type.)
 
-The DmdSig for an Id is a semantic thing.  Suppose a function `f` has a DmdSig of
-  DmdSig (DmdType (fv_dmds,res) [d1..dn])
+The DmdSig for an Id is a semantic thing. Suppose a function `f` has a DmdSig of
+  DmdSig (DmdType (DE fv_dmds div) [d1..dn])
 Here `n` is called the "demand-sig arity" of the DmdSig.  The signature means:
   * If you apply `f` to n arguments (the demand-sig-arity)
   * then you can unleash demands d1..dn on the arguments
@@ -2206,10 +2206,10 @@ demand, used for signature inference. Therefore we place a top demand on all
 arguments.
 
 For example, the demand transformer described by the demand signature
-        DmdSig (DmdType {x -> <1L>} <A><1P(L,L)>)
+        <A><1P(L,L)>{x->1L}
 says that when the function is applied to two arguments, it
-unleashes demand 1L on the free var x, A on the first arg,
-and 1P(L,L) on the second.
+unleashes demand A on the first arg, 1P(L,L) on the second,
+and 1L on the free var x.
 
 If this same function is applied to one arg, all we can say is that it
 uses x with 1L, and its arg with demand 1P(L,L).
@@ -2229,10 +2229,10 @@ was evaluated. Here's an example:
 
 The abstract transformer (let's call it F_e) of the if expression (let's
 call it e) would transform an incoming (undersaturated!) head sub-demand A
-into a demand type like {x-><1L>,y-><L>}<L>. In pictures:
+into a demand type like <L>{x->1L,y->L}. In pictures:
 
      SubDemand ---F_e---> DmdType
-     <A>                  {x-><1L>,y-><L>}<L>
+     <A>                  <L>{x->1L,y->L}
 
 Let's assume that the demand transformers we compute for an expression are
 correct wrt. to some concrete semantics for Core. How do demand signatures fit
@@ -2240,7 +2240,7 @@ in? They are strange beasts, given that they come with strict rules when to
 it's sound to unleash them.
 
 Fortunately, we can formalise the rules with Galois connections. Consider
-f's strictness signature, {}<1L><L>. It's a single-point approximation of
+f's strictness signature, <1L><L>. It's a single-point approximation of
 the actual abstract transformer of f's RHS for arity 2. So, what happens is that
 we abstract *once more* from the abstract domain we already are in, replacing
 the incoming Demand by a simple lattice with two elements denoting incoming
@@ -2260,8 +2260,8 @@ With
 and F_f being the abstract transformer of f's RHS and f_f being the abstracted
 abstract transformer computable from our demand signature simply by
 
-  f_f(>=2) = {}<1L><L>
-  f_f(<2)  = multDmdType C_0N {}<1L><L>
+  f_f(>=2) = <1L><L>
+  f_f(<2)  = multDmdType C_0N <1L><L>
 
 where multDmdType makes a proper top element out of the given demand type.
 
@@ -2283,9 +2283,9 @@ yields a more precise demand type:
 
     incoming sub-demand   |  demand type
     --------------------------------
-    P(A)                  |  <L><L>{}
-    C(1,C(1,P(L)))        |  <1P(L)><L>{}
-    C(1,C(1,1P(1P(L),A))) |  <1P(A)><A>{}
+    P(A)                  |  <L><L>
+    C(1,C(1,P(L)))        |  <1P(L)><L>
+    C(1,C(1,1P(1P(L),A))) |  <1P(A)><A>
 
 Note that in the first example, the depth of the demand type was *higher* than
 the arity of the incoming call demand due to the anonymous lambda.
@@ -2743,15 +2743,15 @@ This is the syntax for demand signatures:
        |  x            exnDiv
        |  b            botDiv
 
-  sig ::= {x->dx,y->dy,z->dz...}<d1><d2><d3>...<dn>div
-                  ^              ^   ^   ^      ^   ^
-                  |              |   |   |      |   |
-                  |              \---+---+------/   |
-                  |                  |              |
-             demand on free        demand on      divergence
-               variables           arguments      information
-           (omitted if empty)                     (omitted if
-                                                no information)
+  sig ::= <d1><d2><d3>...<dn>div{x->dx,y->dy,z->dz...}
+           ^   ^   ^      ^   ^              ^
+           |   |   |      |   |              |
+           \---+---+------/   |              |
+               |              |              |
+            demand on    divergence        demand on
+            arguments    information      free variables
+                         (omitted if     (omitted if empty)
+                         no information)
 
 Note [Demand examples]
 ~~~~~~~~~~~~~~~~~~~~~~

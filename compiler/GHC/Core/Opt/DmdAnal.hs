@@ -1448,7 +1448,7 @@ because it has seen two lambdas, \x and \y. Since the length of the argument
 demands in a DmdSig gives the "threshold" for applying the signature
 (see Note [DmdSig: demand signatures, and demand-sig arity] in GHC.Types.Demand)
 we must trim that DmdType to just
-    DmdSig (DmdTypte fvs [x-dmd])
+    DmdSig (DmdType fvs [x-dmd])
 when making that DmdType into the DmdSig for f.  This trimming is the job of
 `mkDmdSigForArity`.
 
