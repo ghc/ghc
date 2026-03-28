@@ -1530,13 +1530,17 @@ data ExpectedFunTyCtxt
   -- | A rebindable syntax operator is expected to have a function type.
   --
   -- Test cases for representation-polymorphism checks:
-  --   RepPolyDoBind, RepPolyDoBody{1,2}, RepPolyMc{Bind,Body,Guard}, RepPolyNPlusK
+  --   RepPolyMc{Bind,Body,Guard}, RepPolyNPlusK
   = forall (p :: Pass)
      . (OutputableBndrId p)
     => ExpectedFunTySyntaxOp !CtOrigin !(HsExpr (GhcPass p))
       -- ^ rebindable syntax operator
 
-  -- |
+  -- | A rebindable syntax operator is expected to have a function type.
+  --
+  -- Test cases for representation-polymorphism checks:
+  --   RepPolyDoBind, RepPolyDoBody{1,2},
+  -- This constructor will merge with ExpectedFunTySyntaxOp when tcSyntaxOp is retired.
   | ExpectedTySyntax !CtOrigin !(HsExpr GhcRn)
 
   -- | A view pattern must have a function type.

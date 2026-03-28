@@ -306,22 +306,25 @@ tcExpr :: HsExpr GhcRn
 --   - HsAppType       type applications
 --   - ExprWithTySig   (e :: type)
 --   - HsRecSel        overloaded record fields
---   - ExpandedThingRn renamer/pre-typechecker expansions
 --   - HsOpApp         operator applications
 --   - HsOverLit       overloaded literals
 -- These constructors are the union of
 --   - ones taken apart by GHC.Tc.Gen.Head.splitHsApps
 --   - ones understood by GHC.Tc.Gen.Head.tcInferAppHead_maybe
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
--- Se Note [Typechecking by expansion: overview]
 tcExpr e@(HsVar {})              res_ty = tcApp e res_ty
 tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
 tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
 tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
 tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
+tcExpr e@(XExpr (HsRecSelRn{}))  res_ty = tcApp e res_ty
 
+-- Renamer expanded expressions (eg. Right/Left sections)
+-- or tcExpr expanded expressions (eg. Do statements and Record updates)
+-- are type checked using tcHsExpansion.
+-- See Note [Typechecking by expansion: overview]
 tcExpr (XExpr (ExpandedThingRn hse)) res_ty = tcHsExpansion hse res_ty
-tcExpr e@(XExpr{})               res_ty = tcApp e res_ty
+
 
 -- Typecheck an occurrence of an unbound Id
 --

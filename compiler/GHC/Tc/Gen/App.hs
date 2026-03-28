@@ -539,7 +539,10 @@ checkResultTy rn_expr (tc_fun, fun_loc) inst_args app_res_rho (Check res_ty)
         thing_inside
 
 ----------------
-tcValArgs :: QLFlag -> (HsExpr GhcRn, SrcSpan) -> [HsExprArg 'TcpInst] -> TcM [HsExprArg 'TcpTc]
+tcValArgs :: QLFlag
+          -> (HsExpr GhcRn, SrcSpan) -- Head of the application chain (used only for error message generation)
+          -> [HsExprArg 'TcpInst]
+          -> TcM [HsExprArg 'TcpTc]
 -- Importantly, tcValArgs works left-to-right, so that by the time we
 -- encounter an argument, we have monomorphised all the instantiation
 -- variables that its type contains.  All that is left to do is an ordinary
@@ -553,7 +556,7 @@ tcValArgs do_ql (fun, fun_lspan) args = go do_ql 0 args
          ; return (arg' : args') }
       where
     -- increment position if the argument is user written type or value argument
-        pos' | EValArg{} <- arg
+        !pos' | EValArg{} <- arg
              = pos + 1
              | EValArgQL{} <- arg
              = pos + 1
@@ -564,7 +567,10 @@ tcValArgs do_ql (fun, fun_lspan) args = go do_ql 0 args
              = pos
 
 
-tcValArg :: QLFlag -> Int -> (HsExpr GhcRn, SrcSpan) -> HsExprArg 'TcpInst    -- Actual argument
+tcValArg :: QLFlag
+         -> Int                     -- argument position (used only for error message generation)
+         -> (HsExpr GhcRn, SrcSpan) -- Head of the application chain (used only for error message generation)
+         -> HsExprArg 'TcpInst    -- Actual argument
          -> TcM (HsExprArg 'TcpTc)          -- Resulting argument
 tcValArg _     _ _ (EPrag l p)         = return (EPrag l (tcExprPrag p))
 tcValArg _     _ _ (ETypeArg l hty ty) = return (ETypeArg l hty ty)
