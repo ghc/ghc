@@ -1430,8 +1430,8 @@ rn_ty_pat tyLit@(HsTyLit src lit) = do
   check_data_kinds tyLit
   pure (HsTyLit src (convertLit lit))
 
-rn_ty_pat (HsWildCardTy _) =
-  pure (HsWildCardTy noExtField)
+rn_ty_pat (HsWildCardTy h) =
+  pure (HsWildCardTy h)
 
 rn_ty_pat (HsKindSig an ty ki) = do
   ctxt <- askDocContext

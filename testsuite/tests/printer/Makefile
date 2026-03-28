@@ -832,6 +832,11 @@ PprLetIn:
 	$(CHECK_PPR)   $(LIBDIR) PprLetIn.hs
 	$(CHECK_EXACT) $(LIBDIR) PprLetIn.hs
 
+.PHONY: PprInfixHole
+PprInfixHole:
+	$(CHECK_PPR)   $(LIBDIR) PprInfixHole.hs
+	$(CHECK_EXACT) $(LIBDIR) PprInfixHole.hs
+
 .PHONY: CaseAltComments
 CaseAltComments:
 	$(CHECK_PPR)   $(LIBDIR) CaseAltComments.hs

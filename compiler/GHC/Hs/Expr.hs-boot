@@ -54,3 +54,5 @@ data HsUntypedSpliceResult thing
 
 type HsMatchContextRn = HsMatchContext (LIdP GhcRn)
 type HsStmtContextRn = HsStmtContext (LIdP GhcRn)
+
+data HoleKind

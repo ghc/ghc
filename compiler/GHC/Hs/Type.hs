@@ -55,7 +55,7 @@ module GHC.Hs.Type (
 
         OpName(..),
 
-        mkAnonWildCardTy, pprAnonWildCard,
+        pprAnonWildCard,
 
         hsOuterTyVarNames, hsOuterExplicitBndrs, mapHsOuterImplicit,
         mkHsOuterImplicit, mkHsOuterExplicit,
@@ -93,7 +93,7 @@ import GHC.Prelude
 
 import Language.Haskell.Syntax.Type
 
-import {-# SOURCE #-} GHC.Hs.Expr ( pprUntypedSplice, HsUntypedSpliceResult(..) )
+import {-# SOURCE #-} GHC.Hs.Expr ( pprUntypedSplice, HsUntypedSpliceResult(..), HoleKind )
 
 import Language.Haskell.Syntax.Extension
 import GHC.Core.DataCon ( SrcStrictness(..), SrcUnpackedness(..)
@@ -342,8 +342,8 @@ type instance XXBndrKind  (GhcPass p) = DataConCantHappen
 
 type instance XBndrVar (GhcPass p) = NoExtField
 
-type instance XBndrWildCard GhcPs = EpToken "_"
-type instance XBndrWildCard GhcRn = NoExtField
+type instance XBndrWildCard GhcPs = HoleKind
+type instance XBndrWildCard GhcRn = HoleKind
 type instance XBndrWildCard GhcTc = NoExtField
 
 type instance XXBndrVar (GhcPass p) = DataConCantHappen
@@ -476,8 +476,8 @@ type instance XExplicitTupleTy GhcTc = [Kind]
 
 type instance XTyLit           (GhcPass _) = NoExtField
 
-type instance XWildCardTy      GhcPs = EpToken "_"
-type instance XWildCardTy      GhcRn = NoExtField
+type instance XWildCardTy      GhcPs = HoleKind
+type instance XWildCardTy      GhcRn = HoleKind
 type instance XWildCardTy      GhcTc = NoExtField
 
 type instance XXType           GhcPs = HsTypeGhcPsExt
@@ -660,9 +660,6 @@ ignoreParens ty                   = ty
 *                                                                      *
 ************************************************************************
 -}
-
-mkAnonWildCardTy :: EpToken "_" -> HsType GhcPs
-mkAnonWildCardTy tok = HsWildCardTy tok
 
 mkHsOpTy :: (Anno (IdOccGhcP p) ~ EpAnn a)
          => PromotionFlag

@@ -515,7 +515,7 @@ pat_to_type (VarPat _ lname)  =
      ; return b }
   where b = noLocA (HsTyVar noAnn NotPromoted $ fmap noUserRdr lname)
 pat_to_type (WildPat _) = return b
-  where b = noLocA (HsWildCardTy noExtField)
+  where b = noLocA (HsWildCardTy (HoleVar (noLocA unnamedHoleRdrName)))
 pat_to_type (SigPat _ pat sig_ty)
   = do { t <- pat_to_type (unLoc pat)
        ; let { !(HsPS x_hsps k) = sig_ty

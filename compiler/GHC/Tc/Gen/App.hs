@@ -1234,8 +1234,8 @@ expr_to_type earg =
            ; return (L l (HsSpliceTy splice_result' splice)) }
     go (L l (HsStar x))
       = return (L l (HsStarTy x))
-    go (L l (HsHole (HoleVar (L _ rdr))))
-      | isUnderscore occ = return (L l (HsWildCardTy noExtField))
+    go (L l (HsHole h@(HoleVar (L _ rdr))))
+      | isUnderscore occ = return (L l (HsWildCardTy h))
       | startsWithUnderscore occ =
           -- See Note [Wildcards in the T2T translation]
           do { wildcards_enabled <- xoptM LangExt.NamedWildCards

@@ -2072,7 +2072,7 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsQualLitPV (L (EpAnn l an csIn) a) = do
     !cs <- getCommentsFor (locA l)
     return $ L (EpAnn l an (cs Semi.<> csIn)) (HsQualLit noExtField a)
-  mkHsWildCardPV l = return $ L (noAnnSrcSpan l) (HsHole (HoleVar (L (noAnnSrcSpan l) (mkUnqual varName (fsLit "_")))))
+  mkHsWildCardPV l = return $ L (noAnnSrcSpan l) (HsHole (HoleVar (L (noAnnSrcSpan l) unnamedHoleRdrName)))
   mkHsTySigPV l@(EpAnn anc an csIn) a sig anns = do
     !cs <- getCommentsFor (locA l)
     return $ L (EpAnn anc an (csIn Semi.<> cs)) (ExprWithTySig anns a (hsTypeToHsSigWcType sig))

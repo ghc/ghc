@@ -4772,8 +4772,8 @@ tyPatToBndr HsTP{hstp_body = (L _ hs_ty)} = go hs_ty where
   go_bvar (HsTyVar _ _ tv)
     | isTyVarName (getName tv)
     = Just (HsBndrVar noExtField (fmap getName tv))
-  go_bvar (HsWildCardTy _)
-    = Just (HsBndrWildCard noExtField)
+  go_bvar (HsWildCardTy h)
+    = Just (HsBndrWildCard h)
   go_bvar _ = Nothing
 
 {- Note [Type patterns: binders and unifiers]

@@ -199,6 +199,7 @@ test('ListTuplePuns', extra_files(['ListTuplePuns.hs']), ghci_script, ['ListTupl
 test('AnnotationNoListTuplePuns', [ignore_stderr, req_ppr_deps], makefile_test, ['AnnotationNoListTuplePuns'])
 test('Test24533', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24533'])
 test('PprLetIn', [ignore_stderr, req_ppr_deps], makefile_test, ['PprLetIn'])
+test('PprInfixHole', [ignore_stderr, req_ppr_deps], makefile_test, ['PprInfixHole'])
 test('CaseAltComments', [ignore_stderr, req_ppr_deps], makefile_test, ['CaseAltComments'])
 test('MatchPatComments', [ignore_stderr, req_ppr_deps], makefile_test, ['MatchPatComments'])
 test('Test24748', [ignore_stderr, req_ppr_deps], makefile_test, ['Test24748'])

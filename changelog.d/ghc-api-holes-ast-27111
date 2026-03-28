@@ -1,0 +1,10 @@
+section: ghc-lib
+synopsis: Refactor ``HsWildCardTy`` to use ``HoleKind``
+issues: #27111
+mrs: !15817
+
+description: {
+Refactor the AST to store ``HoleKind`` not only in ``XHole``, but also in
+``XWildCardTy`` and ``XBndrWildCard``. This provides more information for exact
+printing of infix holes.
+}

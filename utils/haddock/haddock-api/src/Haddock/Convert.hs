@@ -122,7 +122,7 @@ tyThingToLHsDecl prr t = case t of
 
             cvt' :: HsBndrVar GhcRn -> HsType GhcRn
             cvt' (HsBndrVar _ nm)   = HsTyVar noAnn NotPromoted (fmap noUserRdr nm)
-            cvt' (HsBndrWildCard _) = HsWildCardTy noExtField
+            cvt' (HsBndrWildCard h) = HsWildCardTy h
 
             -- \| Convert a LHsTyVarBndr to an equivalent LHsType.
             hsLTyVarBndrToType :: LHsTyVarBndr flag GhcRn -> LHsType GhcRn

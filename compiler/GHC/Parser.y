@@ -2366,13 +2366,13 @@ tyop :: { LHsType GhcPs }
         | tyvarop                       { sL1a $1 (HsTyVar noAnn NotPromoted $1) }
         | SIMPLEQUOTE qconop            { sLLa $1 $> (HsTyVar (epTok $1) IsPromoted $2) }
         | SIMPLEQUOTE varop             { sLLa $1 $> (HsTyVar (epTok $1) IsPromoted $2) }
-        | '`' '_' '`'                   { sLLa $1 $> (mkAnonWildCardTy (epTok $2)) }   -- TODO: reuse hole_op (blocked on #27111)
+        | hole_op                       { sLLa $1 $> (HsWildCardTy (HoleVar $1)) }
 
 atype :: { LHsType GhcPs }
         : ntgtycon                       {% amsA' (sL1 $1 (HsTyVar noAnn NotPromoted $1)) }      -- Not including unit tuples
         -- See Note [%shift: atype -> tyvar]
         | tyvar %shift                   {% amsA' (sL1 $1 (HsTyVar noAnn NotPromoted $1)) }      -- (See Note [Unit tuples])
-        | '_'   %shift                   { sL1a $1 $ mkAnonWildCardTy (epTok $1) }
+        | '_'   %shift                   { sL1a $1 $ HsWildCardTy (HoleVar (sL1a $1 unnamedHoleRdrName)) }
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1a $1 (HsStarTy (epUniTok $1)) } }
 
@@ -2486,7 +2486,7 @@ tv_bndr_no_braces :: { LHsTyVarBndr Specificity GhcPs }
 
 tyvar_wc :: { Located (HsBndrVar GhcPs) }
         : tyvar                         { sL1 $1 (HsBndrVar noExtField $1) }
-        | '_'                           { sL1 $1 (HsBndrWildCard (epTok $1)) }
+        | '_'                           { sL1 $1 (HsBndrWildCard (HoleVar (sL1a $1 unnamedHoleRdrName))) }
 
 fds :: { Located (EpToken "|",[LHsFunDep GhcPs]) }
         : {- empty -}                   { noLoc (NoEpTok,[]) }
@@ -4021,7 +4021,7 @@ qopm    :: { forall b. DisambInfixOp b => PV (LocatedN b) }   -- used in section
         | hole_op               { mkHsInfixHolePV $1 }
 
 hole_op :: { LocatedN RdrName }   -- used in sections
-hole_op : '`' '_' '`'           {% amsr (sLL $1 $> (mkUnqual varName (fsLit "_")))
+hole_op : '`' '_' '`'           {% amsr (sLL $1 $> unnamedHoleRdrName)
                                            (NameAnn (NameBackquotes (epTok $1) (epTok $3)) (glR $2) []) }
 
 qvarop :: { LocatedN RdrName }

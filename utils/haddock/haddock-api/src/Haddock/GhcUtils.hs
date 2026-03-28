@@ -326,10 +326,10 @@ addClassContext _ _ sig = sig -- E.g. a MinimalSig is fine
 
 lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsTypeArg GhcRn]
 lHsQTyVarsToTypes tvs =
-  [ HsValArg noExtField $ noLocA (case hsLTyVarName tv of
-      Nothing -> HsWildCardTy noExtField
-      Just nm -> HsTyVar noAnn NotPromoted (noLocA $ noUserRdr nm))
-  | tv <- hsq_explicit tvs
+  [ HsValArg noExtField $ noLocA (case hsBndrVar (unLoc tvb) of
+      HsBndrVar _ nm   -> HsTyVar noAnn NotPromoted (fmap noUserRdr nm)
+      HsBndrWildCard h -> HsWildCardTy h)
+  | tvb <- hsq_explicit tvs
   ]
 
 hsQTvExplicitBinders :: LHsQTyVars DocNameI -> [LHsTyVarBndr (HsBndrVis DocNameI) DocNameI]

@@ -2844,6 +2844,14 @@ instance ExactPrint (GRHS GhcPs (LocatedA (HsCmd GhcPs))) where
 
 -- ---------------------------------------------------------------------
 
+exactHole :: (Monad m, Monoid w) => HoleKind -> EP w m HoleKind
+exactHole (HoleVar n) = do
+  n' <- markAnnotated n
+  return (HoleVar n')
+exactHole HoleError =
+  -- TODO: Adapt 'HoleError' to include the 'SourceText':
+  error "Cannot exact print HoleError"
+
 instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _s = a
@@ -2856,14 +2864,9 @@ instance ExactPrint (HsExpr GhcPs) where
       then markAnnotated n
       else return n
     return (HsVar x n')
-  exact (HsHole (HoleVar n)) = do
-    let pun_RDR = "pun-right-hand-side"
-    n' <- if (showPprUnsafe n /= pun_RDR)
-      then markAnnotated n
-      else return n
-    return (HsHole (HoleVar n'))
-  -- TODO: Adapt 'HoleError' to include the 'SourceText':
-  exact (HsHole HoleError) = error "Cannot exact print HoleError"
+  exact (HsHole h) = do
+    h' <- exactHole h
+    return (HsHole h')
   exact x@(HsOverLabel src l) = do
     printStringAdvanceA "#" >> return ()
     case src of
@@ -3927,9 +3930,9 @@ instance ExactPrint (HsBndrVar GhcPs) where
   exact (HsBndrVar x n) = do
     n' <- markAnnotated n
     return (HsBndrVar x n')
-  exact (HsBndrWildCard t) = do
-    t' <- markEpToken t
-    return (HsBndrWildCard t')
+  exact (HsBndrWildCard h) = do
+    h' <- exactHole h
+    return (HsBndrWildCard h')
 
 -- ---------------------------------------------------------------------
 
@@ -4034,7 +4037,9 @@ instance ExactPrint (HsType GhcPs) where
   exact (HsTyLit an lit) = do
     lit' <- withPpr lit
     return (HsTyLit an lit')
-  exact t@(HsWildCardTy _) = printStringAdvance "_" >> return t
+  exact (HsWildCardTy h) = do
+    h' <- exactHole h
+    return (HsWildCardTy h')
   exact x = error $ "missing match for HsType:" ++ showAst x
 
 -- ---------------------------------------------------------------------
