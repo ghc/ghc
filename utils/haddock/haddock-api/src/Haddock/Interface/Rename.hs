@@ -418,15 +418,17 @@ renameType t = case t of
   HsExplicitListTy _ a b -> HsExplicitListTy noAnn a <$> mapM renameLType b
   -- Special-case unary boxed tuples so that they are pretty-printed as
   -- `'MkSolo x`, not `'(x)`
-  HsExplicitTupleTy _ ip [ty] boxity -> do
+  HsExplicitTupleTy _ ip [Present _ ty] boxity -> do
     name <- renameName (tupleDataConName boxity 1)
     let lhs = noLocA $ HsTyVar noAnn ip (noLocA name)
     rhs <- renameLType ty
     return (HsAppTy noAnn lhs rhs)
-  HsExplicitTupleTy _ ip b boxity -> (\b' -> HsExplicitTupleTy noAnn ip b' boxity) <$> mapM renameLType b
+  HsExplicitTupleTy _ ip b boxity -> (\b' -> HsExplicitTupleTy noAnn ip b' boxity) <$> mapM renameTupArg b
   HsSpliceTy (HsUntypedSpliceTop _ st) _ -> renameType (unLoc st)
   HsSpliceTy (HsUntypedSpliceNested _) _ -> error "renameType: not an top level type splice"
   HsWildCardTy _ -> pure (HsWildCardTy noAnn)
+
+renameTupArg (Present _ t) = Present noExtField <$> renameLType t
 
 renameTyLit :: HsLit GhcRn -> HsLit DocNameI
 renameTyLit t = case t of

@@ -14,6 +14,8 @@ module Language.Haskell.Syntax.Type (
         HsMultAnn, HsMultAnnOf(..),
         XUnannotated, XLinearAnn, XExplicitMult, XXMultAnnOf,
 
+        LHsTupArgOf, HsTupArgOf(..),
+
         HsType(..), LHsType, HsKind, LHsKind,
         HsBndrVis(..), XBndrRequired, XBndrInvisible, XXBndrVis,
         HsBndrVar(..), XBndrVar, XBndrWildCard, XXBndrVar,
@@ -877,7 +879,7 @@ data HsType pass
   | HsExplicitTupleTy      -- A promoted explicit tuple
         (XExplicitTupleTy pass)
         PromotionFlag      -- whether explicitly promoted, for pretty printer
-        [LHsType pass]
+        [HsTupArgOf pass (LHsType pass)]
         Boxity
 
   | HsTyLit (XTyLit pass) (HsLit pass)      -- A promoted literal
@@ -888,6 +890,21 @@ data HsType pass
   -- Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
   | XHsType
       !(XXType pass)
+
+-- | Located Haskell Tuple Argument
+--
+-- 'HsTupArg' is used for tuple sections
+-- @(,a,)@ is represented by
+-- @ExplicitTuple [Missing ty1, Present a, Missing ty3]@
+-- Which in turn stands for @(\x:ty1 \y:ty2. (x,a,y))@
+type LHsTupArgOf id a = XRec id (HsTupArgOf id a)
+
+-- | Haskell Tuple Argument
+data HsTupArgOf id a
+  = Present (XPresent id) a  -- ^ The argument
+  | Missing (XMissing id)    -- ^ The argument is missing, but this is its type
+  | XTupArg !(XXTupArg id)   -- ^ Extension point; see Note [Trees That Grow]
+                             -- in Language.Haskell.Syntax.Extension
 
 type HsMultAnn pass = HsMultAnnOf (LHsType (NoGhcTc pass)) pass
 

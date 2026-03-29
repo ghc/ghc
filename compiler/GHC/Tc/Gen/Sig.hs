@@ -298,7 +298,7 @@ no_anon_wc_ty lty = go lty
       HsKindSig _ ty wck             -> go ty && go (sig_body (unLoc (hswc_body wck)))
       HsDocTy _ ty _                 -> go ty
       HsExplicitListTy _ _ tys       -> gos tys
-      HsExplicitTupleTy _ _ tys _    -> gos tys
+      HsExplicitTupleTy _ _ (TupArgs tys) _ -> gos tys
       HsForAllTy { hst_tele = tele
                  , hst_body = ty } -> no_anon_wc_tele tele
                                         && go ty

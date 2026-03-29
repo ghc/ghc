@@ -827,7 +827,7 @@ synifyType _ boundTvs (TyConApp tc tys) =
       | Just dc <- isPromotedDataCon_maybe tc
       , isTupleDataCon dc
       , dataConSourceArity dc == length vis_tys =
-          noLocA $ HsExplicitTupleTy noExtField IsPromoted (map (synifyType WithinType boundTvs) vis_tys) Boxed
+          noLocA $ HsExplicitTupleTy noExtField IsPromoted (map (Present noExtField . synifyType WithinType boundTvs) vis_tys) Boxed
       -- ditto for lists
       | getName tc == listTyConName
       , [ty] <- vis_tys =

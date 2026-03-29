@@ -1150,7 +1150,7 @@ expr_to_type earg =
       -- Tuple sections (e1,,e2,) can't be promoted
       | Just es <- tupArgsPresent_maybe tup_args
       = do { ts <- traverse go es
-           ; return (L l (HsExplicitTupleTy noExtField prom ts boxity)) }
+           ; return (L l (HsExplicitTupleTy noExtField prom (map (Present noExtField) ts) boxity)) }
     go (L l (ExplicitList _ prom es)) =
       do { ts <- traverse go es
          ; return (L l (HsExplicitListTy noExtField prom ts)) }

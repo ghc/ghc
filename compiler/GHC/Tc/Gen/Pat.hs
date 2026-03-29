@@ -533,7 +533,7 @@ pat_to_type (SplicePat (HsUntypedSpliceTop mod_finalizers pat) splice) = do
 
 pat_to_type (TuplePat _ pats boxity)
   = do { tys <- traverse (pat_to_type . unLoc) pats
-       ; let t = noLocA (HsExplicitTupleTy noExtField NotPromoted tys boxity)
+       ; let t = noLocA (HsExplicitTupleTy noExtField NotPromoted (map (Present noExtField) tys) boxity)
        ; pure t }
 pat_to_type (ListPat _ pats)
   = do { tys <- traverse (pat_to_type . unLoc) pats

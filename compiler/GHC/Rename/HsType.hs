@@ -672,10 +672,10 @@ rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
            addDiagnostic (TcRnUntickedPromotedThing $ UntickedExplicitList)
        ; return (HsExplicitListTy noExtField ip tys', fvs) }
 
-rnHsTyKi env ty@(HsExplicitTupleTy _ ip tys boxity)
+rnHsTyKi env ty@(HsExplicitTupleTy _ ip (TupArgs tys) boxity)
   = do { checkDataKinds env ty
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi env) tys
-       ; return (HsExplicitTupleTy noExtField ip tys' boxity, fvs) }
+       ; return (HsExplicitTupleTy noExtField ip (map (Present noExtField) tys') boxity, fvs) }
 
 rnHsTyKi env (HsWildCardTy h)
   = do { checkAnonWildCard env
@@ -2134,7 +2134,7 @@ extract_lty (L _ ty) acc
       HsSpliceTy {}               -> acc  -- Type splices mention no tvs
       HsDocTy _ ty _              -> extract_lty ty acc
       HsExplicitListTy _ _ tys    -> extract_ltys tys acc
-      HsExplicitTupleTy _ _ tys _ -> extract_ltys tys acc
+      HsExplicitTupleTy _ _ (TupArgs tys) _ -> extract_ltys tys acc
       HsTyLit _ _                 -> acc
       HsStarTy _                  -> acc
       HsKindSig _ ty wck          -> extract_kind_sig ty (sig_body (unLoc (hswc_body wck))) acc

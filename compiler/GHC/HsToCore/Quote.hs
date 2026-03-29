@@ -1485,7 +1485,7 @@ repTy t@(HsSpliceTy (HsUntypedSpliceTop _ _) _) = pprPanic "repTy: top level spl
 repTy (HsExplicitListTy _ _ tys) = do
                                     tys1 <- repLTys tys
                                     repTPromotedList tys1
-repTy (HsExplicitTupleTy _ _ tys Boxed) = do
+repTy (HsExplicitTupleTy _ _ (TupArgs tys) Boxed) = do
                                     tys1 <- repLTys tys
                                     tcon <- repPromotedTupleTyCon (length tys)
                                     repTapps tcon tys1

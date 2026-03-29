@@ -69,7 +69,5 @@ T(FunArr) match = HsMultAnnOf (GenLocated (EpAnn AnnListItem) (HsExpr P)) P -> G
 T(ExprWithTySig) match = GenLocated (EpAnn AnnListItem) (HsExpr P) -> HsWildCardBndrs P (GenLocated (EpAnn AnnListItem) (HsSigType P)) -> HsExpr P
 T(UntypedSplice) match = HsUntypedSplice P -> HsExpr P
 T(ExplicitList) match = PromotionFlag -> [GenLocated (EpAnn AnnListItem) (HsExpr P)] -> HsExpr P
-T(ExplicitTuple) mismatch
-  >>> PromotionFlag -> [HsTupArg P] -> Boxity -> HsExpr P
-  <<< PromotionFlag -> [GenLocated (EpAnn AnnListItem) (HsExpr P)] -> Boxity -> HsExpr P
+T(ExplicitTuple) match = PromotionFlag -> [HsTupArgOf P (GenLocated (EpAnn AnnListItem) (HsExpr P))] -> Boxity -> HsExpr P
 T(Hole) match = HsExpr P

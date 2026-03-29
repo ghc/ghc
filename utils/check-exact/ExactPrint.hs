@@ -3347,7 +3347,7 @@ instance ExactPrint (DotFieldOcc GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (HsTupArg GhcPs) where
+instance ExactPrint a => ExactPrint (HsTupArgOf GhcPs a) where
   getAnnotationEntry (Present _ _) = NoEntryVal
   getAnnotationEntry (Missing (EpAnn _ False _)) = NoEntryVal
   getAnnotationEntry (Missing an)   = fromAnn an

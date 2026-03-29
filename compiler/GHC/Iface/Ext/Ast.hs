@@ -1361,7 +1361,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
           _ -> []
 
 -- NOTE: no longer have the location
-instance HiePass p => ToHie (HsTupArg (GhcPass p)) where
+instance (HiePass p, ToHie a) => ToHie (HsTupArgOf (GhcPass p) a) where
   toHie arg = concatM $ case arg of
     Present _ expr ->
       [ toHie expr

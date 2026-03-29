@@ -447,7 +447,7 @@ reparenTypePrec = go
     go _ (HsListTy x ty) = HsListTy x (reparenLType ty)
     go p (HsDocTy x ty d) = HsDocTy x (goL p ty) d
     go _ (HsExplicitListTy x p tys) = HsExplicitListTy x p (map reparenLType tys)
-    go _ (HsExplicitTupleTy x p tys boxity) = HsExplicitTupleTy x p (map reparenLType tys) boxity
+    go _ (HsExplicitTupleTy x p tys boxity) = HsExplicitTupleTy x p (map reparenTupArg tys) boxity
     go p (HsKindSig x ty wck) =
       let sig = unXRec @a (hswc_body wck)
           ki' = goL PREC_SIG (sig_body sig)
@@ -491,6 +491,11 @@ reparenTypePrec = go
     paren ctxt_prec op_prec
       | ctxt_prec >= op_prec = HsParTy noExtField . wrapXRec @a
       | otherwise = id
+
+reparenTupArg :: forall a. XRecCond a => HsTupArgOf a (LHsType a) -> HsTupArgOf a (LHsType a)
+reparenTupArg (Present x a) = Present x (reparenLType a)
+reparenTupArg t@Missing{} = t
+reparenTupArg t@XTupArg{} = t
 
 -- | Add parenthesis around the types in a 'HsType' (see 'reparenTypePrec')
 reparenType :: XRecCond a => HsType a -> HsType a

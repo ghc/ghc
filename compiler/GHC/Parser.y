@@ -2379,7 +2379,7 @@ atype :: { LHsType GhcPs }
         | SIMPLEQUOTE  '(' ktype ',' comma_types1 ')'
                              {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
                                    ; h <- addTrailingCommaA $3 (epTok $4)
-                                   ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1, AnnParens (epTok $2) (epTok $6)) IsPromoted (h : $5) Boxed) }}
+                                   ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1, AnnParens (epTok $2) (epTok $6)) IsPromoted (map (Present noExtField) (h : $5)) Boxed) }}
         | '[' ']'               {% withCombinedComments $1 $> (mkListSyntaxTy0 (epTok $1) (epTok $2)) }
         | SIMPLEQUOTE  '[' comma_types0 ']'     {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
                                                       ; amsA' (sLL $1 $> $ HsExplicitListTy (epTok $1, epTok $2, epTok $4) IsPromoted $3) }}

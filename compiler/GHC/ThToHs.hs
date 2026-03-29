@@ -1841,7 +1841,7 @@ cvtTypeKind typeOrKind ty
            PromotedTupleT n
               | Just normals <- m_normals
               , normals `lengthIs` n   -- Saturated
-              -> returnLA (HsExplicitTupleTy noAnn IsPromoted normals Boxed)
+              -> returnLA (HsExplicitTupleTy noAnn IsPromoted (map (Present noExtField) normals) Boxed)
               | otherwise
               -> do { tuple_tc <- returnLA $ getRdrName $ tupleDataCon Boxed n
                     ; mk_apps (HsTyVar noAnn IsPromoted tuple_tc) tys' }

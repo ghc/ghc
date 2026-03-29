@@ -14,6 +14,8 @@
 module GHC.Hs.Expr
   ( module Language.Haskell.Syntax.Expr
   , module GHC.Hs.Expr
+  , tupArgPresent
+  , tupArgsPresent_maybe
   ) where
 
 import Language.Haskell.Syntax.Expr
@@ -625,25 +627,6 @@ type instance XXPragE        (GhcPass _) = DataConCantHappen
 
 type instance XCDotFieldOcc (GhcPass _) = AnnFieldLabel
 type instance XXDotFieldOcc (GhcPass _) = DataConCantHappen
-
-type instance XPresent         (GhcPass _) = NoExtField
-
-type instance XMissing         GhcPs = EpAnn Bool -- True for empty last comma
-type instance XMissing         GhcRn = NoExtField
-type instance XMissing         GhcTc = Scaled Type
-
-type instance XXTupArg         (GhcPass _) = DataConCantHappen
-
-tupArgPresent :: HsTupArg (GhcPass p) -> Bool
-tupArgPresent (Present {}) = True
-tupArgPresent (Missing {}) = False
-
-tupArgPresent_maybe :: HsTupArg (GhcPass p) -> Maybe (LHsExpr (GhcPass p))
-tupArgPresent_maybe (Present _ e) = Just e
-tupArgPresent_maybe (Missing {})  = Nothing
-
-tupArgsPresent_maybe :: [HsTupArg (GhcPass p)] -> Maybe [LHsExpr (GhcPass p)]
-tupArgsPresent_maybe = traverse tupArgPresent_maybe
 
 
 {- *********************************************************************

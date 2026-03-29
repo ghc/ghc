@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms, ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                        -- in module Language.Haskell.Syntax.Extension
@@ -88,6 +89,9 @@ module GHC.Hs.Type (
         pprLHsContext,
         hsTypeNeedsParens, gHsParTy,
         parenthesizeHsType, parenthesizeHsContext,
+
+        HsTupArgOf, pattern TupArgs,
+        tupArgPresent, tupArgsPresent_maybe,
     ) where
 
 import GHC.Prelude
@@ -497,6 +501,27 @@ type instance XWildCardTy      GhcTc = (HoleKind, HoleExprRef)
 type instance XXType           GhcPs = HsTypeGhcPsExt
 type instance XXType           GhcRn = HsCoreTy
 type instance XXType           GhcTc = DataConCantHappen
+
+type instance XPresent         (GhcPass _) = NoExtField
+
+type instance XMissing         GhcPs = EpAnn Bool -- True for empty last comma
+type instance XMissing         GhcRn = NoExtField
+type instance XMissing         GhcTc = Scaled Type
+
+type instance XXTupArg         (GhcPass _) = DataConCantHappen
+
+tupArgPresent :: HsTupArgOf (GhcPass p) a -> Bool
+tupArgPresent (Present {}) = True
+tupArgPresent (Missing {}) = False
+
+tupArgPresent_maybe :: HsTupArgOf (GhcPass p) a -> Maybe a
+tupArgPresent_maybe (Present _ e) = Just e
+tupArgPresent_maybe (Missing {})  = Nothing
+
+tupArgsPresent_maybe :: [HsTupArgOf (GhcPass p) a] -> Maybe [a]
+tupArgsPresent_maybe = traverse tupArgPresent_maybe
+
+pattern TupArgs ts <- (tupArgsPresent_maybe -> Just ts)
 
 type HsCoreTy = Type
 
@@ -1476,7 +1501,7 @@ ppr_mono_ty (HsSpliceTy ext s)    =
 ppr_mono_ty (HsExplicitListTy _ prom tys)
   | isPromoted prom = quote $ brackets (spaceIfSingleQuote $ interpp'SP tys)
   | otherwise       = brackets (interpp'SP tys)
-ppr_mono_ty (HsExplicitTupleTy _ prom tys _) -- FIXME (int-index): Boxity
+ppr_mono_ty (HsExplicitTupleTy _ prom (TupArgs tys) _) -- FIXME (int-index): Boxity
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `'MkSolo x`, not `'(x)`
   | [ty] <- tys

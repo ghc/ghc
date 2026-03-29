@@ -10,7 +10,10 @@
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 
 -- | Abstract Haskell syntax for expressions.
-module Language.Haskell.Syntax.Expr where
+module Language.Haskell.Syntax.Expr
+  ( module Language.Haskell.Syntax.Expr
+  , HsTupArgOf(..)
+  ) where
 
 import Language.Haskell.Syntax.Basic
 import Language.Haskell.Syntax.Decls
@@ -567,20 +570,8 @@ data HsPragE p
 
   | XHsPragE !(XXPragE p)
 
--- | Located Haskell Tuple Argument
---
--- 'HsTupArg' is used for tuple sections
--- @(,a,)@ is represented by
--- @ExplicitTuple [Missing ty1, Present a, Missing ty3]@
--- Which in turn stands for @(\x:ty1 \y:ty2. (x,a,y))@
-type LHsTupArg id = XRec id (HsTupArg id)
-
--- | Haskell Tuple Argument
-data HsTupArg id
-  = Present (XPresent id) (LHsExpr id)     -- ^ The argument
-  | Missing (XMissing id)    -- ^ The argument is missing, but this is its type
-  | XTupArg !(XXTupArg id)   -- ^ Extension point; see Note [Trees That Grow]
-                             -- in Language.Haskell.Syntax.Extension
+type LHsTupArg id = LHsTupArgOf id (LHsExpr id)
+type HsTupArg id = HsTupArgOf id (LHsExpr id)
 
 -- | Which kind of lambda case are we dealing with?
 data HsLamVariant
