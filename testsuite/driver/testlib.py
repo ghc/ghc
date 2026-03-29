@@ -25,7 +25,7 @@ from testglobals import config, ghc_env, default_testopts, brokens, t, \
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, testing_metrics, residency_testing_metrics, \
                      stable_perf_counters, \
-                     PassFail, badResult, memoize
+                     PassFail, badResult, str_warn
 from term_color import Color, colored
 import testutil
 from cpu_features import have_cpu_feature
@@ -3420,9 +3420,20 @@ if config.msys:
                 exception = e
             retries -= 1
 
+        # Don't fail as framework error if cleanup fails here, just
+        # print the warning and proceed. I've seen new failure mode
+        # here on Windows Server 2025 and recent msys2 installation:
+        # fifo.lnk is created as read-only and the on_error trick
+        # above somehow doesn't work.
+        #
+        # For a local testsuite run, it's in %TEMP% that will be
+        # periodically cleaned up anyway; for CI, there's post-job
+        # cleanup and runner level cleanup. It's better to report
+        # actual job pass/failure than to waste CPU cycles to spurious
+        # Windows misery.
         if retries == 0 and testdir.exists():
-            raise Exception("Unable to remove folder '%s': %s\nUnable to start current test."
-                            % (testdir, exception))
+            print(str_warn("Unable to remove folder '%s': %s\nUnable to start current test."
+                            % (testdir, exception)))
 else:
     def cleanup() -> None:
         testdir = getTestOpts().testdir_raw
