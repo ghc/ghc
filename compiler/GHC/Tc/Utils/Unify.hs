@@ -2075,12 +2075,10 @@ getDeepSubsumptionFlag_DataConHead app_head =
          if | user_ds
             -> Deep DeepSub
             | XExpr (ConLikeTc (RealDataCon {})) <- app_head
-            = Deep TopSub
-            | HsVar _ f <- app_head
-            , isDataConId (unLoc f)
-            = Deep TopSub
+            -> Deep TopSub
             | otherwise
-            = Shallow
+            -> Shallow
+     }
 
 -- | 'tc_sub_type_deep' is where the actual work happens for deep subsumption.
 --
