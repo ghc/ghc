@@ -1,0 +1,1 @@
+["RootBox (Bin LeafA LeafB)","Bin (Bin LeafA LeafB) (Bin LeafB LeafA)","Bin LeafA LeafB","Bin LeafB LeafA","RootBox (Bin (Bin LeafA LeafB) (Bin LeafB LeafA))","LeafA","LeafB","PairBox (LeafA) (Bin LeafA LeafB)"]
