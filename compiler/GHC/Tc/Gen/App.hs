@@ -567,11 +567,11 @@ tcValArgs do_ql (fun, fun_lspan) args = go do_ql 0 args
              = pos
 
 
-tcValArg :: QLFlag
-         -> Int                     -- argument position (used only for error message generation)
-         -> (HsExpr GhcRn, SrcSpan) -- Head of the application chain (used only for error message generation)
-         -> HsExprArg 'TcpInst    -- Actual argument
-         -> TcM (HsExprArg 'TcpTc)          -- Resulting argument
+tcValArg :: QLFlag                  -- ^ Are we typechecking with Quick Look turned on?
+         -> Int                     -- ^ Argument position (used only for error message generation)
+         -> (HsExpr GhcRn, SrcSpan) -- ^ Head of the application chain (used only for error message generation)
+         -> HsExprArg 'TcpInst      -- ^ Actual argument
+         -> TcM (HsExprArg 'TcpTc)  -- ^ Resulting argument
 tcValArg _     _ _ (EPrag l p)         = return (EPrag l (tcExprPrag p))
 tcValArg _     _ _ (ETypeArg l hty ty) = return (ETypeArg l hty ty)
 tcValArg do_ql _ _ (EWrap (EHsWrap w)) = do { whenQL do_ql $ qlMonoHsWrapper w

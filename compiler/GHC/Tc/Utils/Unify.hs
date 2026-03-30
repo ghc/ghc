@@ -2079,26 +2079,12 @@ getDeepSubsumptionFlag_DataConHead app_head =
      }
   where
     go :: HsExpr GhcTc -> DeepSubsumptionFlag
-    go app_head
-     | XExpr (ConLikeTc (RealDataCon {})) <- app_head
-     = Deep TopSub
-     | XExpr (ExpandedThingTc (HSE _ (L _ f))) <- app_head
-     = go f
-     | XExpr (WrapExpr _ f) <- app_head
-     = go f
-     | HsVar _ f <- app_head
-     , isDataConId (unLoc f)
-     = Deep TopSub
-     | HsApp _ f _ <- app_head
-     = go (unLoc f)
-     | HsAppType _ f _ <- app_head
-     = go (unLoc f)
-     | OpApp _ _ f _ <- app_head
-     = go (unLoc f)
-     | HsPar _ f <- app_head
-     = go (unLoc f)
-     | otherwise
-     = Shallow
+    go (XExpr (ConLikeTc (RealDataCon {}))) = Deep TopSub
+    go (XExpr (ExpandedThingTc (HSE _ (L _ f)))) = go f
+    go (XExpr (WrapExpr _ f)) = go f
+    go (HsApp _ f _) = go (unLoc f)
+    go (HsAppType _ f _) = go (unLoc f)
+    go _ = Shallow
 
 
 -- | 'tc_sub_type_deep' is where the actual work happens for deep subsumption.
