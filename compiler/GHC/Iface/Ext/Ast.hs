@@ -252,11 +252,6 @@ getUnlocatedEvBinds file = do
             let node = Node (mkSourcedNodeInfo org ni) spn []
                 ni = NodeInfo mempty [] $ M.fromList [mkNodeInfo e]
               in (xs,node:ys)
-        GeneratedSrcSpan (OrigSpan spn)
-          | srcSpanFile spn == file ->
-            let node = Node (mkSourcedNodeInfo org ni) spn []
-                ni = NodeInfo mempty [] $ M.fromList [mkNodeInfo e]
-              in (xs,node:ys)
         _ -> (mkNodeInfo e : xs,ys)
 
       (nis,asts) = foldr go ([],[]) elts
@@ -639,7 +634,6 @@ toHieCtxLocVar context span name'
 instance ToHie (Context (Located Var)) where
   toHie c = case c of
       C context (L (RealSrcSpan span _) name') -> toHieCtxLocVar context span name'
-      C context (L (GeneratedSrcSpan (OrigSpan span)) name') -> toHieCtxLocVar context span name'
       C (EvidenceVarBind i _ sp)  (L _ name) -> do
         addUnlocatedEvBind name (EvidenceVarBind i ModuleScope sp)
         pure []
