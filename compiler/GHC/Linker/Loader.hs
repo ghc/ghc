@@ -1036,7 +1036,7 @@ dynLinkCompiledByteCode interp pkgs_loaded whole_bytecode_state traverse_bytecod
           -- Add SPT entries
           mapM_ (linkSptEntry interp ce2) (concatMap bc_spt_entries cbcs)
           -- Load HPC modules
-          mapM_ (\(modn, cbc) -> linkHpcEntry interp modn (bc_hpc_info cbc)) mbcs
+          mapM_ (\(_, cbc) -> linkHpcEntry interp (bc_hpc_info cbc)) mbcs
           return $! bytecode_state { bco_linker_env = (bco_linker_env bytecode_state) { closure_env = ce2 } }
 
 -- | Register SPT entries for this module in the interpreter
@@ -1049,18 +1049,11 @@ linkSptEntry interp ce (SptEntry name fpr) = do
     Nothing -> pprPanic "linkSptEntry" (ppr name)
     Just (_, hval) -> addSptEntry interp fpr hval
 
-linkHpcEntry :: Interp -> Module -> Maybe ByteCodeHpcInfo -> IO ()
-linkHpcEntry _interp _modl Nothing = pure ()
-linkHpcEntry interp modl (Just info) = do
+linkHpcEntry :: Interp -> Maybe ByteCodeHpcInfo -> IO ()
+linkHpcEntry _interp Nothing = pure ()
+linkHpcEntry interp (Just info) = do
   addHpcModule interp
-    (toBS $ hpcModuleName modl)
-    (bchi_tick_count info)
-    (bchi_hash info)
-    (bchi_tickboxes info)
-  where
-    toBS :: SDoc -> ByteString
-    -- TODO: @fendor showSDocUnsafe is wrong, add info to 'ByteCodeHpcInfo'
-    toBS = BS8.pack . (++ "\0") . showSDocUnsafe . pprCode
+    (bchi_initializer info)
 
 -- Link a bunch of BCOs and return references to their values
 linkSomeBCOs :: Interp

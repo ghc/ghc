@@ -17,17 +17,19 @@ import GHCi.ObjLink (lookupSymbol)
 import Debug.Trace
 
 -- | Used by GHCi to add an SPT entry for a set of interactive bindings.
-hpcAddModule :: ByteString -> Int -> Int -> ByteString -> IO ()
-hpcAddModule modl ticks hash tickboxes = do
-  B.unsafeUseAsCString modl $ \modlLiteral -> do
-    lookupSymbol (BS8.unpack tickboxes) >>= \ case
-      Nothing -> pure ()
-      Just tickBoxRef -> do
-        hpc_register_module modlLiteral (fromIntegral ticks) (fromIntegral hash) (castPtr tickBoxRef)
-        hpc_startup
+hpcAddModule :: ByteString -> IO ()
+hpcAddModule init_label = do
+  lookupSymbol (BS8.unpack init_label) >>= \ case
+    Nothing -> pure ()
+    Just tickBoxRef -> do
+      invokeFunc $ castPtrToFunPtr tickBoxRef
+      hpc_startup
 
-foreign import ccall "hs_hpc_module"
-    hpc_register_module :: CString -> Word32 -> Word32 -> Ptr Word64 -> IO ()
+foreign import ccall "dynamic"
+    invokeFunc :: FunPtr (IO ()) -> IO ()
+
+-- foreign import ccall "hs_hpc_module"
+--     hpc_register_module :: CString -> Word32 -> Word32 -> Ptr Word64 -> IO ()
 
 foreign import ccall "startupHpc"
     hpc_startup :: IO ()

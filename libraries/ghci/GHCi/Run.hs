@@ -89,7 +89,7 @@ run m = case m of
     fmap toRemotePtr <$> lookupSymbolInDLL (fromRemotePtr dll) str
   FreeHValueRefs rs -> mapM_ freeRemoteRef rs
   AddSptEntry fpr r -> localRef r >>= sptAddEntry fpr
-  AddHpcModule modl ticks hash tickboxes -> hpcAddModule modl ticks hash tickboxes
+  AddHpcModule init_func -> hpcAddModule init_func
   EvalStmt opts r -> evalStmt opts r
   ResumeStmt opts r -> resumeStmt opts r
   AbandonStmt r -> abandonStmt r

@@ -131,10 +131,12 @@ hpcInitCode platform this_mod (HpcInfo tickCount hashNo)
     tickboxes = hpcTickBoxes platform this_mod
 
 hpcStubLabel :: Module -> CLabel
-hpcStubLabel this_mod = mkInitializerStubLabel this_mod (fsLit "hpc")
+hpcStubLabel this_mod =
+  mkInitializerStubLabel this_mod (fsLit "hpc")
 
 hpcModuleName :: Module -> SDoc
-hpcModuleName this_mod =  full_name_str
+hpcModuleName this_mod =
+  full_name_str
   where
   full_name_str
     | moduleUnit this_mod == mainUnit
@@ -148,4 +150,5 @@ hpcModuleName this_mod =  full_name_str
                         bytesFS (unitFS  (moduleUnit this_mod)))
 
 hpcTickBoxes :: Platform -> Module -> SDoc
-hpcTickBoxes platform this_mod = pprCLabel platform (mkHpcTicksLabel this_mod)
+hpcTickBoxes platform this_mod =
+  pprCLabel platform (mkHpcTicksLabel this_mod)

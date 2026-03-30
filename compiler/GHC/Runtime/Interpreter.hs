@@ -367,9 +367,9 @@ addSptEntry interp fpr ref =
   withForeignRef ref $ \val ->
     interpCmd interp (AddSptEntry fpr val)
 
-addHpcModule :: Interp -> ByteString -> Int -> Int -> ByteString -> IO ()
-addHpcModule interp modLabel tickNo hash tickboxes  =
-  interpCmd interp (AddHpcModule modLabel tickNo hash tickboxes)
+addHpcModule :: Interp -> ByteString -> IO ()
+addHpcModule interp init_call =
+  interpCmd interp (AddHpcModule init_call)
 
 costCentreStackInfo :: Interp -> RemotePtr CostCentreStack -> IO [String]
 costCentreStackInfo interp ccs =

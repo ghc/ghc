@@ -83,9 +83,7 @@ data CompiledByteCode = CompiledByteCode
   }
 
 data ByteCodeHpcInfo = ByteCodeHpcInfo
-  { bchi_tick_count :: {-# UNPACK #-} !Int
-  , bchi_hash :: {-# UNPACK #-} !Int
-  , bchi_tickboxes :: !ByteString
+  { bchi_initializer :: !ByteString
   }
 
 -- | A libffi ffi_cif function prototype.

@@ -319,19 +319,13 @@ instance Binary CompiledByteCode where
     put_ bh bc_hpc_info
 
 instance Binary ByteCodeHpcInfo where
-  put_ bh ByteCodeHpcInfo{bchi_tick_count,bchi_hash,bchi_tickboxes} = do
-    put_ bh bchi_tick_count
-    put_ bh bchi_hash
-    put_ bh bchi_tickboxes
+  put_ bh ByteCodeHpcInfo{bchi_initializer} = do
+    put_ bh bchi_initializer
 
   get bh = do
-    bchi_tick_count <- get bh
-    bchi_hash <- get bh
-    bchi_tickboxes <- get bh
+    bchi_initializer <- get bh
     pure ByteCodeHpcInfo
-      { bchi_tick_count
-      , bchi_hash
-      , bchi_tickboxes
+      { bchi_initializer
       }
 
 instance Binary UnlinkedBCO where

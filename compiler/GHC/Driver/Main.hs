@@ -2206,11 +2206,9 @@ hscGenerateByteCode hsc_env cgguts location = do
     let
       bytecodeHpcInfo = case hpc_info of
         NoHpcInfo -> Nothing
-        HpcInfo{hpcInfoTickCount, hpcInfoHash} ->
+        HpcInfo{} ->
           Just ByteCodeHpcInfo
-            { bchi_tick_count = hpcInfoTickCount
-            , bchi_hash = hpcInfoHash
-            , bchi_tickboxes = BS8.pack . (++ "\0") . showSDoc dflags $ hpcTickBoxes platform this_mod
+            { bchi_initializer = hpcInfoTickCount
             }
 
     -----------------  Generate byte code ------------------
