@@ -426,7 +426,7 @@ Some examples:
 
 tcSkolemiseGeneral
   :: HasDebugCallStack
-  => DeepSubsumptionFlag
+  => DeepSubsumptionFlag   -- Ignores the DeepSubsumptionDepth
   -> UserTypeCtxt
   -> TcType -> TcType   -- top_ty and expected_ty
         -- Here, top_ty      is the type we started to skolemise; used only in SigSkol
@@ -1169,7 +1169,7 @@ fillInferResultNoInst act_res_ty (IR { ir_uniq = u
 
                      ; return final_co } }
 
-fillInferResult :: DeepSubsumptionFlag -> CtOrigin -> TcType -> InferResult -> TcM HsWrapper
+fillInferResult :: DeepSubsumptionFlag -> CtOrigin -> TcSigmaType -> InferResult -> TcM HsWrapper
 -- See Note [Instantiation of InferResult]
 fillInferResult ds_flag ct_orig res_ty ires@(IR { ir_inst = iif })
   = case iif of
@@ -1203,7 +1203,7 @@ There are two things to worry about:
         T1 -> e1
         T2 -> e2
 
-Our typing rules are:
+In general our typing rules are:
 
 * The RHS of a existential or GADT alternative must always be a
   monotype, regardless of the number of alternatives.
@@ -1218,17 +1218,13 @@ Our typing rules are:
        We use choice (2) in that Section.
        (GHC 8.10 and earlier used choice (1).)
 
-  But note that
-      case e of
-        True  -> hr
-        False -> \x -> hr x
-  will fail, because we still /infer/ both branches, so the \x will get
-  a (monotype) unification variable, which will fail to unify with
-  (forall a. a->a)
+Note [fillInferResult: GADTs and existentials]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We can detect the GADT/existential situation, case (1) of Note [fillInferResult],
+by seeing that the current TcLevel is greater than that stored in ir_lvl of the
+Infer ExpType.  We bump the level whenever we go past a GADT/existential match.
 
-For (1) we can detect the GADT/existential situation by seeing that
-the current TcLevel is greater than that stored in ir_lvl of the Infer
-ExpType.  We bump the level whenever we go past a GADT/existential match.
+We insist that the RHS has a monotype, regardless of the number of alternatives.
 
 Then, before filling the hole use promoteTcType to promote the type
 to the outer ir_lvl.  promoteTcType does this
@@ -1238,11 +1234,6 @@ to the outer ir_lvl.  promoteTcType does this
 That forces the type to be a monotype (since unification variables can
 only unify with monotypes); and catches skolem-escapes because the
 alpha is untouchable until the equality floats out.
-
-For (2), we simply look to see if the hole is filled already.
-  - if not, we promote (as above) and fill the hole
-  - if it is filled, we simply unify with the type that is
-    already there
 
 (FIR1) There is one wrinkle.  Suppose we have
              case e of
@@ -1258,7 +1249,36 @@ For (2), we simply look to see if the hole is filled already.
     So if we check G2 second, we still want to emit a constraint that restricts
     the RHS to be a monotype. This is done by ensureMonoType, and it works
     by simply generating a constraint (alpha ~ ty), where alpha is a fresh
-unification variable.  We discard the evidence.
+    unification variable.  We discard the evidence.
+
+Note [fillInferResult: multiple branches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If there are multiple case branches, case (2) of Note [fillInferResult]
+we simply look to see if the hole is filled already.
+  - if not, we promote (as above) and fill the hole
+  - if it is filled, we simply unify with the type that is already there
+
+But consider
+    case x of
+      True  -> True
+      False -> error "urk"
+and suppose we call `tcInferSigma` on this expression, so that the `ir_inst`
+field of the expected result type is `IIF_Sigma`.   The danger is that we'll
+fill the hole with `Bool` (from the `True`) and then reject when we try to
+unify that with `forall a. a->a`, from the call to `error`.
+
+To avoid this, we never infer a sigma-type from a multi-branch `case`.  Instead
+we just zap the `IIF_Sigma` to `IIF_DeepRho` when walking inside the branches
+of multi-arm case-expression, or an if-expression. See calls to
+`adjustExpTypeForCaseBranches`.
+
+Note that
+      case e of
+        True  -> hr
+        False -> \x -> hr x
+      where hr :: (forall a. a->a) -> Int
+will fail, because we still /infer/ both branches, so the \x will get a
+(monotype) unification variable, which will fail to unify with (forall a. a->a)
 
 Note [Instantiation of InferResult]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2068,17 +2088,20 @@ getDeepSubsumptionFlag =
 -- | Variant of 'getDeepSubsumptionFlag' which enables a top-level subsumption
 -- in order to implement the plan of Note [Typechecking data constructors].
 getDeepSubsumptionFlag_DataConHead :: HsExpr GhcTc -> TcM DeepSubsumptionFlag
-getDeepSubsumptionFlag_DataConHead app_head =
-  do { user_ds <- xoptM LangExt.DeepSubsumption
-     ; traceTc "getDeepSubsumptionFlag_DataConHead" (ppr app_head)
-     ; return $
-         if | user_ds
-            -> Deep DeepSub
-            | XExpr (ConLikeTc (RealDataCon {})) <- app_head
-            -> Deep TopSub
-            | otherwise
-            -> Shallow
-     }
+getDeepSubsumptionFlag_DataConHead app_head
+  = do { user_ds <- xoptM LangExt.DeepSubsumption
+       ; return $ if | user_ds          -> Deep DeepSub
+                     | dc_head app_head -> Deep TopSub
+                     | otherwise        -> Shallow  }
+  where
+    dc_head (XExpr (ConLikeTc (RealDataCon {}))) = True
+    dc_head (XExpr (WrapExpr _ f))  = dc_head f
+    dc_head (HsApp _ (L _ f) _)     = dc_head f
+    dc_head (HsAppType _ (L _ f) _) = dc_head f
+    dc_head (OpApp _ _ (L _ f) _)   = dc_head f
+    dc_head (HsPar _ (L _ f))       = dc_head f
+    dc_head _ = False
+
 
 -- | 'tc_sub_type_deep' is where the actual work happens for deep subsumption.
 --

@@ -35,6 +35,8 @@ tcInferRho, tcInferRhoNC ::
 tcInferRhoFRR, tcInferRhoFRRNC ::
   FixedRuntimeRepContext -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 
+tcInferExprSigma :: HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
+
 tcInferExpr :: InferInstFlag -> LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcType)
 
 tcSyntaxOp :: CtOrigin

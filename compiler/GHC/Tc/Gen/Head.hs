@@ -21,15 +21,14 @@ module GHC.Tc.Gen.Head
 
        , pprArgInst, addFunResCtxt ) where
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckPolyExprNC, tcPolyLExprSig )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckPolyExprNC, tcPolyLExprSig, tcInferExprSigma )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
-import {-# SOURCE #-} GHC.Tc.Gen.App( tcExprSigma )
 
 import GHC.Prelude
 import GHC.Hs
 import GHC.Hs.Syn.Type
 
-import GHC.Rename.Utils (mkExpandedTc, mkExpandedExprTc)
+import GHC.Rename.Utils (mkExpandedExprTc)
 
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Bind( chooseInferredQuantifiers )
@@ -446,7 +445,7 @@ tcInferAppHead (fun,fun_lspan)
     do { mb_tc_fun <- tcInferAppHead_maybe fun
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
-            Nothing -> runInferRho (tcExpr fun)
+            Nothing -> tcInferExprSigma fun
 
        }
 
@@ -465,13 +464,14 @@ tcInferAppHead_maybe fun = case fun of
         -> Just <$> tcInferOverLit lit
       XExpr (HsRecSelRn f)
         -> Just <$> tcInferRecSelId f
-      XExpr (ExpandedThingRn (HSE o (L loc e)))
-        -> setSrcSpan (locA loc) $ Just <$>
-           do { (e', ty) <- tcExprSigma False (hsCtxtCtOrigin o) e
-              ; return (mkExpandedTc o (L loc e'), ty) }
-                      -- We do not want to instantiate the type of the head as there may be
-                      -- visible type applications in the argument.
-                      -- c.f. T19167
+
+--      XExpr (ExpandedThingRn (HSE o (L loc e)))
+--        -> setSrcSpan (locA loc) $ Just <$>
+--           do { (e', ty) <- tcExprSigma False (hsCtxtCtOrigin o) e
+--              ; return (mkExpandedTc o (L loc e'), ty) }
+--                      -- We do not want to instantiate the type of the head as there may be
+--                      -- visible type applications in the argument.
+--                      -- c.f. T19167
       _
         -> return Nothing
 

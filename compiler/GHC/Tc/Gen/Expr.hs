@@ -13,7 +13,7 @@
 module GHC.Tc.Gen.Expr
        ( tcCheckPolyExpr, tcCheckPolyExprNC,
          tcCheckMonoExpr, tcCheckMonoExprNC,
-         tcInferExpr, tcInferSigma,
+         tcInferExpr, tcInferSigma, tcInferExprSigma,
          tcInferRho, tcInferRhoNC,
          tcMonoLExpr, tcMonoLExprNC,
          tcInferRhoFRR, tcInferRhoFRRNC,
@@ -236,6 +236,9 @@ tcPolyExprCheck expr res_ty
 
 tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
 tcInferSigma = tcInferExpr IIF_Sigma
+
+tcInferExprSigma :: HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferExprSigma e = runInfer IIF_Sigma IFRR_Any (tcExpr e)
 
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 -- Infer a *rho*-type. The return type is always instantiated.
@@ -530,8 +533,9 @@ tcExpr (HsCase ctxt scrut matches) res_ty
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred'    <- tcCheckMonoExpr pred boolTy
-       ; (u1,b1') <- tcCollectingUsage $ tcMonoLExpr b1 res_ty
-       ; (u2,b2') <- tcCollectingUsage $ tcMonoLExpr b2 res_ty
+       ; let res_ty' = adjustExpTypeForCaseBranches res_ty [b1,b2]
+       ; (u1,b1') <- tcCollectingUsage $ tcMonoLExpr b1 res_ty'
+       ; (u2,b2') <- tcCollectingUsage $ tcMonoLExpr b2 res_ty'
        ; tcEmitBindingUsage (supUE u1 u2)
        ; return (HsIf x pred' b1' b2') }
 

@@ -488,8 +488,8 @@ checkResultTy :: HsExpr GhcRn
                             --   expose foralls, but maybe not /deeply/ instantiated
               -> ExpRhoType -- Expected type; this is deeply skolemised
               -> TcM HsWrapper
-checkResultTy rn_expr (tc_fun, _) _ app_res_rho (Infer inf_res)
-  = do { ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
+checkResultTy rn_expr _ _ app_res_rho (Infer inf_res)
+  = do { ds_flag <- getDeepSubsumptionFlag
        ; fillInferResult ds_flag (exprCtOrigin rn_expr) app_res_rho inf_res }
 
 
@@ -636,7 +636,8 @@ tcValArg _ pos (fun, fun_lspan) (EValArgQL {
                                        , text "app_lspan" <+> ppr lspan
                                        , text "head_lspan" <+> ppr fun_lspan
                                        , text "tc_head" <+> ppr tc_head])
-       ; ds_flag <- getDeepSubsumptionFlag_DataConHead (fst tc_head)
+       ; ds_flag <- getDeepSubsumptionFlag
+         -- NB: whether to do deep /skolemisation/ is independent of data constructors
        ; (wrap, arg')
             <- tcScalingUsage mult  $
                tcSkolemise ds_flag GenSigCtxt exp_arg_ty $ \ exp_arg_rho ->
@@ -894,8 +895,7 @@ tcInstFun do_ql inst_final (fun_orig, rn_fun, fun_lspan) tc_fun fun_sigma rn_arg
                 matchActualFunTy herald
                   (Just $ HsExprTcThing tc_fun)
                   (n_val_args, fun_sigma) fun_ty
-           ; ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
-           ; arg' <- quickLookArg ds_flag do_ql pos ctxt (rn_fun, fun_lspan) arg arg_ty
+           ; arg' <- quickLookArg do_ql pos ctxt (rn_fun, fun_lspan) arg arg_ty
            ; let acc' = arg' : addArgWrap (mkWpCastN fun_co) acc
            ; go (pos+1) acc' res_ty rest_args }
 
@@ -1883,17 +1883,18 @@ This turned out to be more subtle than I expected.  Wrinkles:
 
 -}
 
-quickLookArg :: DeepSubsumptionFlag -> QLFlag -> Int
+quickLookArg :: QLFlag -> Int
              -> SrcSpan -- ^ location span of the whole application
              -> (HsExpr GhcRn, SrcSpan) -- ^ Head of the application chain and its source span
              -> LHsExpr GhcRn          -- ^ Argument
              -> Scaled TcSigmaTypeFRR  -- ^ Type expected by the function
              -> TcM (HsExprArg 'TcpInst)
 -- See Note [Quick Look at value arguments]
-quickLookArg _ NoQL _ app_lspan _ larg orig_arg_ty
+quickLookArg NoQL _ app_lspan _ larg orig_arg_ty
   = skipQuickLook app_lspan larg orig_arg_ty
-quickLookArg ds_flag DoQL pos app_lspan fun_and_lspan larg orig_arg_ty
-  = do { is_rho <- tcIsDeepRho ds_flag (scaledThing orig_arg_ty)
+quickLookArg DoQL pos app_lspan fun_and_lspan larg orig_arg_ty
+  = do { ds_flag <- getDeepSubsumptionFlag
+       ; is_rho <- tcIsDeepRho ds_flag (scaledThing orig_arg_ty)
        ; traceTc "qla" (ppr orig_arg_ty $$ ppr is_rho)
        ; if not is_rho
          then skipQuickLook app_lspan larg orig_arg_ty
