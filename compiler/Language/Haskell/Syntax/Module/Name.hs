@@ -17,7 +17,8 @@ instance Data ModuleName where
   -- don't traverse?
   toConstr x   = constr
     where
-      constr = mkConstr (dataTypeOf x) "{abstract:ModuleName}" [] Prefix
+      -- Fake a Algebraic constr. See #27129
+      constr = mkConstrTag (dataTypeOf x) "{abstract:ModuleName}" 1 [] Prefix
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "ModuleName"
 
