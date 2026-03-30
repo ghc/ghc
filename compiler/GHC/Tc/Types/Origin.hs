@@ -1536,13 +1536,6 @@ data ExpectedFunTyCtxt
     => ExpectedFunTySyntaxOp !CtOrigin !(HsExpr (GhcPass p))
       -- ^ rebindable syntax operator
 
-  -- | A rebindable syntax operator is expected to have a function type.
-  --
-  -- Test cases for representation-polymorphism checks:
-  --   RepPolyDoBind, RepPolyDoBody{1,2},
-  -- This constructor will merge with ExpectedFunTySyntaxOp when tcSyntaxOp is retired.
-  | ExpectedTySyntax !CtOrigin !(HsExpr GhcRn)
-
   -- | A view pattern must have a function type.
   --
   -- Test cases for representation-polymorphism checks:
@@ -1598,9 +1591,6 @@ pprExpectedFunTyCtxt funTy_origin i =
                  , text "the rebindable syntax operator"
                  , quotes (ppr op) ]
            , nest 2 (ppr orig) ]
-    ExpectedTySyntax orig arg ->
-      vcat [ text "The expression" <+> quotes (ppr arg)
-           , nest 2 (ppr orig) ]
     ExpectedFunTyViewPat expr ->
       vcat [ the_arg_of <+> text "the view pattern"
            , nest 2 (ppr expr) ]
@@ -1629,8 +1619,6 @@ pprExpectedFunTyCtxt funTy_origin i =
 pprExpectedFunTyHerald :: ExpectedFunTyCtxt -> SDoc
 pprExpectedFunTyHerald (ExpectedFunTySyntaxOp {})
   = text "This rebindable syntax expects a function with"
-pprExpectedFunTyHerald (ExpectedTySyntax orig _)
-  = pprCtOriginBriefly orig
 pprExpectedFunTyHerald (ExpectedFunTyViewPat {})
   = text "A view pattern expression expects"
 pprExpectedFunTyHerald (ExpectedFunTyArg fun _)
