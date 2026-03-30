@@ -445,8 +445,7 @@ tcInferAppHead (fun,fun_lspan)
     do { mb_tc_fun <- tcInferAppHead_maybe fun
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
-            Nothing -> tcInferExprSigma fun
-
+            Nothing                -> tcInferExprSigma fun
        }
 
 tcInferAppHead_maybe :: HsExpr GhcRn
@@ -456,24 +455,11 @@ tcInferAppHead_maybe :: HsExpr GhcRn
 -- XExpr's although complicated needs to be looked through, useful for QL things when
 -- the argument is an XExpr
 tcInferAppHead_maybe fun = case fun of
-      HsVar _ nm
-        -> Just <$> tcInferId nm
-      ExprWithTySig _ e hs_ty
-        -> Just <$>tcExprWithSig e hs_ty
-      HsOverLit _ lit
-        -> Just <$> tcInferOverLit lit
-      XExpr (HsRecSelRn f)
-        -> Just <$> tcInferRecSelId f
-
---      XExpr (ExpandedThingRn (HSE o (L loc e)))
---        -> setSrcSpan (locA loc) $ Just <$>
---           do { (e', ty) <- tcExprSigma False (hsCtxtCtOrigin o) e
---              ; return (mkExpandedTc o (L loc e'), ty) }
---                      -- We do not want to instantiate the type of the head as there may be
---                      -- visible type applications in the argument.
---                      -- c.f. T19167
-      _
-        -> return Nothing
+      HsVar _ nm              -> Just <$> tcInferId nm
+      ExprWithTySig _ e hs_ty -> Just <$>tcExprWithSig e hs_ty
+      HsOverLit _ lit         -> Just <$> tcInferOverLit lit
+      XExpr (HsRecSelRn f)    -> Just <$> tcInferRecSelId f
+      _                       -> return Nothing
 
 {- *********************************************************************
 *                                                                      *

@@ -11,7 +11,6 @@
 
 module GHC.Tc.Gen.App
        ( tcApp
-       , tcExprSigma
        , tcExprPrag ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
@@ -163,34 +162,6 @@ Note [Instantiation variables are short lived]
   about this, but it seems to do no harm for the constraint solver to see the
   occasional instantiation variable.
 -}
-
-
-{- *********************************************************************
-*                                                                      *
-              tcInferSigma
-*                                                                      *
-********************************************************************* -}
-
--- Very similar to tcApp, but returns a sigma (uninstantiated) type
--- CAUTION: Any changes to tcApp should be reflected here
--- cf. T19167. the head is an expanded expression applied to a type
--- Caution: Currently we assume that the expression is compiler generated/expanded
--- Because that is what T19167 test case expects.
--- This function should go away after MR!15778 lands
-tcExprSigma :: Bool -> CtOrigin -> HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
-tcExprSigma inst fun_orig rn_expr
-  = do { (fun@(rn_fun,fun_lspan), rn_args) <- splitHsApps rn_expr
-       ; do_ql <- wantQuickLook rn_fun
-       ; (tc_fun, fun_sigma) <- tcInferAppHead fun
-       ; inGenCode <- inGeneratedCode
-       ; traceTc "tcExprSigma" (vcat [ text "rn_expr:" <+> ppr rn_expr
-                                     , text "tc_fun" <+> ppr tc_fun
-                                     , text "inGeneratedCode:" <+> ppr inGenCode])
-       ; (inst_args, app_res_sigma) <- tcInstFun do_ql inst (fun_orig, rn_fun, fun_lspan)
-                                           tc_fun fun_sigma rn_args
-       ; tc_args <- tcValArgs do_ql (rn_fun, fun_lspan) inst_args
-       ; let tc_expr = rebuildHsApps (tc_fun, fun_lspan) tc_args
-       ; return (tc_expr, app_res_sigma) }
 
 
 {- *********************************************************************

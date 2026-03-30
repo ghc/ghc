@@ -1261,16 +1261,27 @@ we simply look to see if the hole is filled already.
 But consider
     case x of
       True  -> True
-      False -> error "urk"
+      False -> undefined
 and suppose we call `tcInferSigma` on this expression, so that the `ir_inst`
 field of the expected result type is `IIF_Sigma`.   The danger is that we'll
 fill the hole with `Bool` (from the `True`) and then reject when we try to
-unify that with `forall a. a->a`, from the call to `error`.
+unify that with `forall a. a->a`, from the call to `undefined`.
+
+Another example:
+   case x of
+     True  -> (e1 :: forall a b. a->b)
+     False -> (e3 :: forall b a. a->b)
 
 To avoid this, we never infer a sigma-type from a multi-branch `case`.  Instead
 we just zap the `IIF_Sigma` to `IIF_DeepRho` when walking inside the branches
 of multi-arm case-expression, or an if-expression. See calls to
 `adjustExpTypeForCaseBranches`.
+
+This does mean that this would work:
+   (let x = 77+55 in h x x) @Int
+where
+   h :: Int -> Int -> forall a. a->a
+The `@Int` would instantiate the `forall a`.
 
 Note that
       case e of
