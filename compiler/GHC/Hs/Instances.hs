@@ -17,6 +17,21 @@ module GHC.Hs.Instances where
 
 -- UndecidableInstances ?
 
+{- Note [Data.Data instances for GHC AST Types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We give all of the frontend types and their instantiations (HsSyn) and
+some other types Data.Data instances. There are two main motivations to
+do so:
+
+* For users of the GHC API it allows to write Generic code over the GHC AST.
+* GHC itself has a few uses of these as well:
+    * In the showAstData, showAstDataFull helpers to print a representation of
+      the actual AST using it's constructors rather than just user facing pretty printing.
+    * It's used to some degree for HIE file generation in the ToHIE instances.
+    * TH serialization uses it for serialization of Annotations (GHC.Serialized)
+    * Some of the dump flags use showAstData to produce the actual dump output.
+-}
+
 import Data.Data hiding ( Fixity )
 
 import GHC.Prelude
