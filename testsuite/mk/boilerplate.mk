@@ -247,6 +247,10 @@ ifeq "$(LINT_WHITESPACE)" ""
 LINT_WHITESPACE := $(abspath $(TOP)/../inplace/bin/lint-whitespace)
 endif
 
+ifeq "$(CHANGELOG_D)" ""
+CHANGELOG_D := $(abspath $(TOP)/../inplace/bin/changelog-d)
+endif
+
 # -----------------------------------------------------------------------------
 # configuration of TEST_HC
 

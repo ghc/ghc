@@ -31,7 +31,6 @@ When forking a new release branch for a new major release series (e.g. `ghc-9.14
 * [ ] Verify that the platform support documentation is up-to-date with reality:
   * https://gitlab.haskell.org/ghc/ghc/-/wikis/platforms/windows
   * https://gitlab.haskell.org/ghc/ghc/-/wikis/platforms/
-* [ ] Remove the release notes for the previous release (e.g. `docs/users_guide/8.6.*-notes.rst`)
 * [ ] In `configure.ac` update `MinBootGhcVersion` to be the major version of the last supported bootstrap compiler. We currently guarantee bootstrapping with the last two major releases; therefore, when preparing, e.g., GHC `9.14` you should set `MinBootGhcVersion` to `9.10`.
 * [ ] Create the new branch: `git branch ghc-9.14`
 * [ ] In the new branch bump the version number in `configure.ac` to, e.g., `9.14`
@@ -43,7 +42,7 @@ When forking a new release branch for a new major release series (e.g. `ghc-9.14
 * [ ] Tag this `master` commit as, e.g., `ghc-9.14-start`
 * [ ] Push all of the above tags and branches
 * [ ] Create a new worksheet in the GHC submodule tracking spreadsheet (ask in `#ghc` for a link), populate the "current" and "desired" version columns, and send an email to submodule maintainers and `ghc-releases@haskell.org` asking them to notify us of their needs
-* [ ] After forking, remove release notes from `master` and start a new set of release notes for the next release
+* [ ] After forking, clear `changelog.d/` entries from `master`: run `hadrian/build changelog-clear` and commit the result
 * [ ] After forking, notify `ghc-releases@haskell.org` that fork has been made
 * [ ] Create a weekly scheduled pipeline building the new branch to ensure that it does not bit-rot and bindists are persistently available
 
@@ -95,10 +94,11 @@ When forking a new release branch for a new major release series (e.g. `ghc-9.14
    * [ ] `libraries/ghc-bignum/gmp/gmp-tarballs` (upstream: ghc/gmp-tarballs>)
 * [ ] `LlvmMinVersion` and `LlvmMaxVersion` in `configure.ac` is targetting intended LLVM version
 * [ ] `llvm-targets` file [updated](https://gitlab.haskell.org/ghc/ghc/wikis/making-releases#updating-the-tree)
-* [ ] Release notes (`docs/users_guide/x.y.z-notes.rst`) written
-   * Release notes linked in `docs/users_guide/release-notes.rst`
-   * LLVM version requirement mentioned
-* [ ] Remove "Included libraries" sections from old release notes
+* [ ] Generate release notes: `hadrian/build changelog --changelog-version=x.y.z`
+   * Review and edit the generated file as needed
+   * Verify the frozen "Included libraries" table is accurate
+   * Ensure LLVM version requirement is mentioned
+   * Link release notes in `docs/users_guide/release-notes.rst`
 * [ ] `autoconf` scripts [updated](https://gitlab.haskell.org/ghc/ghc/wikis/making-releases#updating-the-tree)
 * [ ] Check that Unicode database in `base` (`libraries/base/cbits/README.Unicode`) reflects current standard release (http://www.unicode.org/versions/latest/).
 * [ ] Verify that the ~"backport needed" label has no more issues/merge requests needing backport

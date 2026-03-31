@@ -245,6 +245,40 @@ ghc-linters:
     - if: $CI_MERGE_REQUEST_ID
     - *drafts-can-fail-lint
 
+# Check that MRs include a changelog entry in changelog.d/.
+# Skipped if the MR has the ~"no-changelog" label.
+lint-changelog:
+  stage: tool-lint
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb13:$DOCKER_REV"
+  extends: .lint-params
+  variables:
+    BUILD_FLAVOUR: default
+    CHANGELOG_EXPECT_MR: "$CI_MERGE_REQUEST_IID"
+  script:
+    # Check that the MR adds at least one changelog entry
+    - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
+    - added=$(git diff --name-only --diff-filter=A "$base..$CI_COMMIT_SHA" -- 'changelog.d/' | grep -v '^changelog.d/config$' || true)
+    - |
+      if [ -z "$added" ]; then
+        echo "ERROR: No changelog entry found in changelog.d/"
+        echo "Please add a changelog entry file describing your user-facing changes."
+        echo "If this MR does not need a changelog entry, apply the 'no-changelog' label."
+        exit 1
+      fi
+    - echo "Found changelog entries:" $added
+    # Build changelog-d and validate all entries (checks required fields, section names, MR number)
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh run_hadrian test --test-root-dirs="testsuite/tests/linters" --only=changelog-d
+  dependencies: []
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
+      when: never
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*no-changelog.*/'
+      when: never
+    - if: $CI_MERGE_REQUEST_ID
+    - *drafts-can-fail-lint
+
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"

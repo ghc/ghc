@@ -16,6 +16,7 @@ import qualified CommandLine
 import qualified Environment
 import qualified Rules
 import qualified Rules.Codes
+import qualified Rules.Changelog
 import qualified Rules.Clean
 import qualified Rules.Docspec
 import qualified Rules.Documentation
@@ -115,6 +116,7 @@ main = do
 #if HADRIAN_ENABLE_SELFTEST
             Rules.Selftest.selftestRules
 #endif
+            Rules.Changelog.changelogRules
             Rules.SourceDist.sourceDistRules
             Rules.Test.testRules
             Rules.topLevelTargets

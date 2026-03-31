@@ -24,7 +24,8 @@ Please take a few moments to address the following points:
    places.
  * [ ] add a [testcase to the testsuite][adding test].
  * [ ] updates the users guide if applicable
- * [ ] mentions new features in the release notes for the next release
+ * [ ] add a changelog entry in `changelog.d/` for user-facing changes (see [changelog guide][changelog]).
+   If this MR does not need a changelog entry, apply the ~"no-changelog" label.
 
 If you have any questions don't hesitate to open your merge request and inquire
 in a comment. If your patch isn't quite done yet please do add prefix your MR
@@ -40,3 +41,4 @@ no one has offered a review in a few days then please leave a comment mentioning
 
 [notes]: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/coding-style#comments-in-the-source-code
 [adding test]: https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests/adding
+[changelog]: https://gitlab.haskell.org/ghc/ghc/-/wikis/contributing/changelog

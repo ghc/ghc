@@ -64,6 +64,12 @@ whitespaceLinterSourcePath = "linters/lint-whitespace/Main.hs"
 whitespaceLinterExtra :: [String]
 whitespaceLinterExtra = ["-ilinters/lint-whitespace", "-ilinters/linters-common"]
 
+changelogDProgPath, changelogDSourcePath :: FilePath
+changelogDProgPath = "test/bin/changelog-d" <.> exe
+changelogDSourcePath = "utils/changelog-d/ChangelogD.hs"
+changelogDExtra :: [String]
+changelogDExtra = ["-iutils/changelog-d"]
+
 data CheckProgram =
         CheckProgram { cp_target :: String -- ^ Name for the hadrian target
                      , cp_exe_path :: FilePath -- ^ Path to resulting executable
@@ -83,6 +89,7 @@ checkPrograms =
     , CheckProgram "lint:notes" noteLinterProgPath  noteLinterSourcePath  noteLinterExtra  lintNotes  (const stage0Boot)  id
     , CheckProgram "lint:codes" codeLinterProgPath  codeLinterSourcePath  codeLinterExtra  lintCodes  id id
     , CheckProgram "lint:whitespace"  whitespaceLinterProgPath  whitespaceLinterSourcePath  whitespaceLinterExtra  lintWhitespace  (const stage0Boot)  (filter (/= lintersCommon))
+    , CheckProgram "lint:changelog"  changelogDProgPath  changelogDSourcePath  changelogDExtra  changelogD  (const stage0Boot)  id
     ]
 
 inTreeOutTree :: (Stage -> Action b) -> Action b -> Action b
@@ -239,6 +246,7 @@ testEnv = do
       , "LINT_NOTES" .= (top -/- root -/- noteLinterProgPath)
       , "LINT_CODES" .= (top -/- root -/- codeLinterProgPath)
       , "LINT_WHITESPACE" .= (top -/- root -/- whitespaceLinterProgPath)
+      , "CHANGELOG_D" .= (top -/- root -/- changelogDProgPath)
       -- This lets us bypass the need to generate a config
       -- through Make, which happens in testsuite/mk/boilerplate.mk
       -- which is in turn included by all test 'Makefile's.

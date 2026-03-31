@@ -3,7 +3,7 @@ module CommandLine (
     lookupBignum,
     cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdCompleteSetting,
     cmdDocsArgs, cmdUnitIdHash, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
-    cmdPrefix, DocArgs(..), defaultDocArgs
+    cmdPrefix, cmdChangelogVersion, DocArgs(..), defaultDocArgs
     ) where
 
 import Data.Either
@@ -37,8 +37,9 @@ data CommandLineArgs = CommandLineArgs
     , testArgs       :: TestArgs
     , docsArgs       :: DocArgs
     , docTargets     :: DocTargets
-    , prefix         :: Maybe FilePath
-    , completeStg    :: Maybe String }
+    , prefix           :: Maybe FilePath
+    , changelogVersion :: Maybe String
+    , completeStg      :: Maybe String }
     deriving (Eq, Show)
 
 -- | Default values for 'CommandLineArgs'.
@@ -57,8 +58,9 @@ defaultCommandLineArgs = CommandLineArgs
     , testArgs       = defaultTestArgs
     , docsArgs       = defaultDocArgs
     , docTargets     = Set.fromList [minBound..maxBound]
-    , prefix         = Nothing
-    , completeStg    = Nothing }
+    , prefix           = Nothing
+    , changelogVersion = Nothing
+    , completeStg      = Nothing }
 
 -- | These arguments are used by the `test` target.
 data TestArgs = TestArgs
@@ -241,6 +243,9 @@ readBrokenTests tests =
 readPrefix :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readPrefix ms = Right $ \flags -> flags { prefix = ms }
 
+readChangelogVersion :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readChangelogVersion ms = Right $ \flags -> flags { changelogVersion = ms }
+
 readCompleteStg :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readCompleteStg ms = Right $ \flags -> flags { completeStg = ms }
 
@@ -321,6 +326,8 @@ optDescrs =
     , Option [] ["test-have-intree-files"] (NoArg readTestHasInTreeFiles) "Run the in-tree tests even with an out of tree compiler"
     , Option [] ["prefix"] (OptArg readPrefix "PATH")
         "Destination path for the bindist 'install' rule"
+    , Option [] ["changelog-version"] (OptArg readChangelogVersion "VERSION")
+        "Version number for the 'changelog' rule (e.g. 10.2.1)"
     , Option [] ["complete-setting"] (OptArg readCompleteStg "SETTING")
         "Setting key to autocomplete, for the 'autocomplete' target."
     , Option [] ["haddock-for-hackage"] (NoArg readHaddockBaseUrl)
@@ -374,6 +381,9 @@ cmdFlavour = flavour <$> cmdLineArgs
 
 cmdPrefix :: Action (Maybe String)
 cmdPrefix = prefix <$> cmdLineArgs
+
+cmdChangelogVersion :: Action (Maybe String)
+cmdChangelogVersion = changelogVersion <$> cmdLineArgs
 
 cmdCompleteSetting :: Action (Maybe String)
 cmdCompleteSetting = completeStg <$> cmdLineArgs
