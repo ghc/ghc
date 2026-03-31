@@ -1305,7 +1305,7 @@ Usually this field is `IIF_DeepRho` meaning "return a (possibly deep) rho-type".
 Why is this the common case?  See #17173 for discussion.  Here are some examples
 of why:
 
-1. Consider
+(IIR1) Consider
     f x = (*)
    We want to instantiate the type of (*) before returning, else we
    will infer the type
@@ -1317,21 +1317,46 @@ of why:
    instantiating. This could perhaps be worked around, but it may be
    hard to know even when instantiation should happen.
 
-2. Another reason.  Consider
+(IIR2) Another reason.  Consider
        f :: (?x :: Int) => a -> a
        g y = let ?x = 3::Int in f
    Here want to instantiate f's type so that the ?x::Int constraint
   gets discharged by the enclosing implicit-parameter binding.
 
-3. Suppose one defines plus = (+). If we instantiate lazily, we will
+(IIR3) Suppose one defines plus = (+). If we instantiate lazily, we will
    infer plus :: forall a. Num a => a -> a -> a. However, the monomorphism
    restriction compels us to infer
       plus :: Integer -> Integer -> Integer
    (or similar monotype). Indeed, the only way to know whether to apply
    the monomorphism restriction at all is to instantiate
 
-HOWEVER, not always! Here are places where we want `IIF_Sigma` meaning
-"return a sigma-type":
+(IIR4) When -XDeepSubsumption is on, we /deeply/ instantiate. Why isn't
+   top-instantiation enough? Answer: to accept the following program (T26225b) with
+   -XDeepSubsumption, we need to deeply instantiate when inferring in checkResultTy:
+
+        f :: Int -> (forall a. a->a)
+        g :: Int -> Bool -> Bool
+
+        test b = case b of
+                   True  -> f
+                   False -> g
+
+   If we don't deeply instantiate in the branches of the case expression, we will
+   try to unify the type of `f` with that of `g`, which fails. If we instead
+   deeply instantiate `f`, we will fill the `InferResult` with `Int -> alpha -> alpha`
+   which then successfully unifies with the type of `g` when we come to fill the
+   `InferResult` hole a second time for the second case branch.
+
+(IIR5) When inferring, even /without/ -XDeepSubsumption, we must deeply instantiate
+  the types of data constructors. E.g
+        data T = MkT Int int
+        f = MkT 3
+  We must infer MkT 3 :: Int ->{mu}  T    (fresh mu)
+        and not MkT 3 :: Int ->{one} T
+  See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
+  Hence the use of `getDeepSubsumptionFlag_DataConHead` in `checkResultTy`.
+
+HOWEVER, `ir_inst` is not always `IIF_DeepRho`! Here are places when it isn't:
 
 * IIF_Sigma: In GHC.Tc.Module.tcRnExpr, which implements GHCi's :type
   command, we want to return a completely uninstantiated type.
@@ -1347,23 +1372,6 @@ HOWEVER, not always! Here are places where we want `IIF_Sigma` meaning
   but /not/ deeply instantiate (#26331). See Note [View patterns and polymorphism]
   in GHC.Tc.Gen.Pat.  This the only place we use IIF_ShallowRho.
 
-Why do we want to deeply instantiate, ever?  Why isn't top-instantiation enough?
-Answer: to accept the following program (T26225b) with -XDeepSubsumption, we
-need to deeply instantiate when inferring in checkResultTy:
-
-  f :: Int -> (forall a. a->a)
-  g :: Int -> Bool -> Bool
-
-  test b =
-    case b of
-      True  -> f
-      False -> g
-
-If we don't deeply instantiate in the branches of the case expression, we will
-try to unify the type of 'f' with that of 'g', which fails. If we instead
-deeply instantiate 'f', we will fill the 'InferResult' with 'Int -> alpha -> alpha'
-which then successfully unifies with the type of 'g' when we come to fill the
-'InferResult' hole a second time for the second case branch.
 -}
 
 {-

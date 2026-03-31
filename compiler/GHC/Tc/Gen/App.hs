@@ -461,11 +461,8 @@ checkResultTy :: HsExpr GhcRn
               -> TcM HsWrapper
 checkResultTy rn_expr (tc_fun,_) _ app_res_rho (Infer inf_res)
   = do { ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
-                    -- We must deeply-instantiate data constructors
-                    -- E.g.  data T = MkT Int int
-                    --       f = K 3
-                    -- We must infer f :: Int ->{many} T
-                    --       and not f :: Int ->{one}  T
+         -- Why the "DataConHead" bit?  See (IIR5) in
+         -- Note [Instantiation of InferResult] in GHC.Tc.Utils.Unify.
        ; fillInferResult ds_flag (exprCtOrigin rn_expr) app_res_rho inf_res }
 
 checkResultTy rn_expr (tc_fun, fun_loc) inst_args app_res_rho (Check res_ty)
