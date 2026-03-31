@@ -620,6 +620,12 @@ typedef struct MessageCloneStack_ {
     StgTSO    *tso;
 } MessageCloneStack;
 
+typedef struct MessageUpdTSOFlag_ {
+    StgHeader header;
+    Message   *link;
+    StgTSO    *tso;
+    StgWord   flag;
+} MessageUpdTSOFlag;
 
 /* ----------------------------------------------------------------------------
    Compact Regions
