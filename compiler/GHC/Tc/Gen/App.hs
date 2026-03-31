@@ -350,7 +350,7 @@ Unify result type /before/ typechecking the args
 
 The latter is much better. That is why we call `checkResultTy` before tcValArgs.
 -}
--- CAUTION: Any changes to tcApp should be reflected in tcExprSigma
+
 tcApp :: HsExpr GhcRn
       -> ExpRhoType   -- When checking, -XDeepSubsumption <=> deeply skolemised
       -> TcM (HsExpr GhcTc)
@@ -459,10 +459,14 @@ checkResultTy :: HsExpr GhcRn
                             --   expose foralls, but maybe not /deeply/ instantiated
               -> ExpRhoType -- Expected type; this is deeply skolemised
               -> TcM HsWrapper
-checkResultTy rn_expr _ _ app_res_rho (Infer inf_res)
-  = do { ds_flag <- getDeepSubsumptionFlag
+checkResultTy rn_expr (tc_fun,_) _ app_res_rho (Infer inf_res)
+  = do { ds_flag <- getDeepSubsumptionFlag_DataConHead tc_fun
+                    -- We must deeply-instantiate data constructors
+                    -- E.g.  data T = MkT Int int
+                    --       f = K 3
+                    -- We must infer f :: Int ->{many} T
+                    --       and not f :: Int ->{one}  T
        ; fillInferResult ds_flag (exprCtOrigin rn_expr) app_res_rho inf_res }
-
 
 checkResultTy rn_expr (tc_fun, fun_loc) inst_args app_res_rho (Check res_ty)
 -- Unify with expected type from the context
