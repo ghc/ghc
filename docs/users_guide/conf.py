@@ -17,8 +17,7 @@ import ghc_config
 extensions = ['sphinx.ext.extlinks',
               'sphinx.ext.mathjax',
               # GHC-specific extensions
-              'flags',
-              'ghc_packages']
+              'flags']
 
 templates_path = ['.templates']
 source_suffix = '.rst'

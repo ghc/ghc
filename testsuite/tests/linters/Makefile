@@ -29,6 +29,13 @@ changelogs:
 notes:
 	(cd $(TOP)/.. && $(LINT_NOTES) broken-refs)
 
+changelog-d:
+ifdef CHANGELOG_EXPECT_MR
+	(cd $(TOP)/.. && $(CHANGELOG_D) changelog.d/ --validate --expect-mr $(CHANGELOG_EXPECT_MR))
+else
+	(cd $(TOP)/.. && $(CHANGELOG_D) changelog.d/ --validate)
+endif
+
 whitespace:
 	(cd $(TOP)/.. &&\
 	  $(LINT_WHITESPACE) tracked\

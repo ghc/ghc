@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Packages (
     -- * GHC packages
-    array, base, binary, bytestring, cabal, cabalSyntax, checkPpr,
+    array, base, binary, bytestring, cabal, cabalSyntax, changelogD, checkPpr,
     checkExact, countDeps,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
     exceptions, filepath, fileio, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform,
@@ -33,7 +33,7 @@ import Oracles.Setting
 -- packages and modify build default build conditions in "UserSettings".
 ghcPackages :: [Package]
 ghcPackages =
-    [ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps
+    [ array, base, binary, bytestring, cabalSyntax, cabal, changelogD, checkPpr, checkExact, countDeps
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform
     , ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim
@@ -50,7 +50,7 @@ isGhcPackage :: Package -> Bool
 isGhcPackage = (`elem` ghcPackages)
 
 -- | Package definitions, see 'Package'.
-array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps,
+array, base, binary, bytestring, cabalSyntax, cabal, changelogD, checkPpr, checkExact, countDeps,
   compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
   exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform,
   ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghci, ghcInternal, ghciWrapper, ghcPkg, ghcPrim,
@@ -67,6 +67,7 @@ binary              = lib  "binary"
 bytestring          = lib  "bytestring"
 cabalSyntax         = lib  "Cabal-syntax"    `setPath` "libraries/Cabal/Cabal-syntax"
 cabal               = lib  "Cabal"           `setPath` "libraries/Cabal/Cabal"
+changelogD          = util "changelog-d"
 checkPpr            = util "check-ppr"
 checkExact          = util "check-exact"
 countDeps           = util "count-deps"

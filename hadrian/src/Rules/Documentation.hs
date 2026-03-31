@@ -69,25 +69,10 @@ pathPath _ = ""
 
 needDocDeps :: Action ()
 needDocDeps = do
-    -- These cabal files are needed by the docs/users_guide/ghc_packages.py
-    -- logic to determine the versions of packages shipped with GHC.
-    let templatedCabalFiles = map pkgCabalFile
-            [ ghcBoot
-            , ghcBootTh
-            , ghcExperimental
-            , ghcInternal
-            , ghci
-            , compiler
-            , ghcHeap
-            , templateHaskell
-            ]
-
-    need templatedCabalFiles
     need [ "docs" -/- "users_guide" -/- file
          | file <- [ "conf.py"
                    , "flags.py"
                    , "ghc_config.py"
-                   , "ghc_packages.py"
                    , "utils.py"
                    ]
          ]

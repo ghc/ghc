@@ -33,3 +33,6 @@ test('notes', [ req_ls_files
 test('whitespace', [ req_ls_files
                    , req_hadrian_deps(["lint:whitespace"]) ]
                  , makefile_test, ['whitespace'])
+
+test('changelog-d', [ req_hadrian_deps(["lint:changelog"]) ]
+                   , makefile_test, ['changelog-d'])

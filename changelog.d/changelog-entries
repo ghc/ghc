@@ -1,0 +1,8 @@
+section: packaging
+synopsis: GHC now uses a ``changelog.d/`` fragment-based workflow for release
+  notes. Contributors should add a file in ``changelog.d/`` for user-facing
+  changes. See the `changelog guide
+  <https://gitlab.haskell.org/ghc/ghc/-/wikis/contributing/changelog>`_ for
+  details.
+issues: #26002
+mrs: !15830

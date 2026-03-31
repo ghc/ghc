@@ -67,6 +67,7 @@ defaultBignumBackend = "gmp"
 stageBootPackages :: Action [Package]
 stageBootPackages = return
   [ lintersCommon, lintCommitMsg, lintSubmoduleRefs, lintWhitespace, lintNotes
+  , changelogD
   , hsc2hs
   , compareSizes
   , deriveConstants

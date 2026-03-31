@@ -1,0 +1,11 @@
+.. _release-10-2-1:
+
+Version 10.2.1
+==============
+
+.. note::
+
+   This is a stub. It will be replaced by release notes generated from
+   ``changelog.d/`` entries before the 10.2 fork.
+
+   To regenerate, run ``hadrian/build changelog --changelog-version=10.2.1``.

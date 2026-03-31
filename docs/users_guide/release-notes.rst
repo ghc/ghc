@@ -4,4 +4,4 @@ Release notes
 .. toctree::
    :maxdepth: 1
 
-   10.0.1-notes
+   10.2.1-notes

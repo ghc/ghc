@@ -6,11 +6,13 @@ if parse_version(sphinx.__version__) >= parse_version("4.0.0"):
     extlinks = {
         'ghc-ticket': ('https://gitlab.haskell.org/ghc/ghc/issues/%s', '#%s'),
         'ghc-wiki': ('https://gitlab.haskell.org/ghc/ghc/wikis/%s', '%s'),
+        'ghc-mr': ('https://gitlab.haskell.org/ghc/ghc/-/merge_requests/%s', '!%s'),
     }
 else:
     extlinks = {
         'ghc-ticket': ('https://gitlab.haskell.org/ghc/ghc/issues/%s', '#'),
         'ghc-wiki': ('https://gitlab.haskell.org/ghc/ghc/wikis/%s', ''),
+        'ghc-mr': ('https://gitlab.haskell.org/ghc/ghc/-/merge_requests/%s', '!'),
     }
 
 libs_base_uri = '../libraries'
