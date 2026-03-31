@@ -102,7 +102,7 @@ writeBytecodeLib :: BytecodeLib -> FilePath -> IO ()
 writeBytecodeLib lib path = do
   odbco <- encodeBytecodeLib lib
   createDirectoryIfMissing True (takeDirectory path)
-  bh' <- openBinMem (1024 * 1024)
+  bh' <- openBinMem initBinMemSize
   bh <- addBinNameWriter bh'
   writePersistentBytecodeHeader BytecodeLibraryFile bh
   putWithUserData QuietBinIFace NormalCompression bh odbco
@@ -211,7 +211,7 @@ readOnDiskModuleByteCode hsc_env f = do
 writeBinByteCode :: FilePath -> ModuleByteCode -> IO ()
 writeBinByteCode f cbc = do
   createDirectoryIfMissing True (takeDirectory f)
-  bh' <- openBinMem (1024 * 1024)
+  bh' <- openBinMem initBinMemSize
   bh <- addBinNameWriter bh'
   odbco <- encodeOnDiskModuleByteCode cbc
   writePersistentBytecodeHeader ModuleByteCodeFile bh
@@ -222,6 +222,21 @@ mkModuleByteCode :: Module -> CompiledByteCode -> [FilePath] -> IO ModuleByteCod
 mkModuleByteCode modl cbc foreign_files = do
   !bcos_hash <- fingerprintModuleByteCodeContents modl cbc foreign_files
   return $! ModuleByteCode modl cbc foreign_files bcos_hash
+
+-- | Generate a 'Fingerprint' for the 'ModuleByteCode' contents.
+--
+-- Note, this will serialise the contents of the 'ModuleByteCode' separately
+-- to 'writeBytecodeLib'.
+-- This means, if the 'ModuleByteCode' is written to disk, it will be
+-- serialised twice.
+fingerprintModuleByteCodeContents :: Module -> CompiledByteCode -> [FilePath] -> IO Fingerprint
+fingerprintModuleByteCodeContents modl cbc foreign_files = do
+  foreign_contents <- readObjectFiles foreign_files
+  pure $ computeFingerprint putNameLiterally (modl, cbc, foreign_contents)
+
+-- ----------------------------------------------------------------------------
+-- ByteCode module and library magic header.
+-- ----------------------------------------------------------------------------
 
 data PersistentBytecodeFile
   = ModuleByteCodeFile
@@ -272,13 +287,10 @@ asciiWord32 [a, b, c, d] =
     fromIntegral (ord d)
 asciiWord32 _ = error "asciiWord32: expected exactly four ASCII characters"
 
--- | Generate a 'Fingerprint' for the 'ModuleByteCode' contents.
---
--- Note, this will serialise the contents of the 'ModuleByteCode' separately
--- to 'writeBytecodeLib'.
--- This means, if the 'ModuleByteCode' is written to disk, it will be
--- serialised twice.
-fingerprintModuleByteCodeContents :: Module -> CompiledByteCode -> [FilePath] -> IO Fingerprint
-fingerprintModuleByteCodeContents modl cbc foreign_files = do
-  foreign_contents <- readObjectFiles foreign_files
-  pure $ computeFingerprint putNameLiterally (modl, cbc, foreign_contents)
+-- ----------------------------------------------------------------------------
+-- Constants and utils
+-- ----------------------------------------------------------------------------
+
+-- | Initial ram buffer to allocate for writing .gbc and .bytecodelib files.
+initBinMemSize :: Int
+initBinMemSize = 1024 * 1024 -- 1 MB
