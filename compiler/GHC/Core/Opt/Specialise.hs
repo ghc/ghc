@@ -3247,9 +3247,14 @@ case we can clearly specialise. But there are wrinkles:
 
 (ID6) The Main Plan says that it's worth specialising if the argument is an application
    of a dictionary contructor.  But what if the dictionary has no methods?  Then we
-   gain nothing by specialising, unless the /superclasses/ are interesting.   A case
-   in point is constraint tuples (% d1, .., dn %); a constraint N-tuple is a class
-   with N superclasses and no methods.
+   gain nothing by specialising, unless the /superclasses/ are interesting.
+
+   So if there are no methods, we recursively call `interestingDict` on the
+   superclasses.  Why recurse? If we have
+         \d1 d2.  f (CTuple d1 d2)
+   If `d1 and `d2` are uninteresting dictionaries, then so is (CTuple d1 d2).
+   (Remember: a constraint tuple is just a class with N superclasses and no methods.)
+   See discussion on #26831.
 
 (ID7) A unary (single-method) class is currently represented by (meth |> co).  We
    will unwrap the cast (see (ID5)) and then want to reply "yes" if the method
