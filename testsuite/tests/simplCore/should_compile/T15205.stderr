@@ -10,7 +10,7 @@ f :: forall a b. C a b => a -> b
  Str=<1P(A,1C(1,C(1,L)))><L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=IF_ARGS [30 0] 40 0}]
+         Guidance=IF_ARGS [90 0] 40 0}]
 f = \ (@a) (@b) ($dC :: C a b) (x :: a) -> op @a @b $dC x x
 
 

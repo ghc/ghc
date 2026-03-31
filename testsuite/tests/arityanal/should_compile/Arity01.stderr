@@ -12,7 +12,7 @@ Rec {
 F1.f1_h1 [Occ=LoopBreaker] :: Integer -> Integer -> Integer -> Integer
 [GblId, Arity=3, Str=<1L><1L><SL>, Unf=OtherCon []]
 F1.f1_h1
-  = \ (n :: Integer) (x :: Integer) (eta [OS=OneShot] :: Integer) ->
+  = \ (n :: Integer) (x [OS=OneShot] :: Integer) (eta [OS=OneShot] :: Integer) ->
       case x of x1 { __DEFAULT ->
       case n of y1 { __DEFAULT ->
       case GHC.Num.Integer.integerLt# x1 y1 of {
@@ -45,7 +45,7 @@ F1.s1 = GHC.Num.Integer.IS 3#
 
 -- RHS size: {terms: 8, types: 7, coercions: 0, joins: 0/0}
 s :: forall {t1} {t2}. Num t1 => (t1 -> t2) -> t2
-[GblId, Arity=2, Str=<MP(A,A,A,A,A,A,1C(1,L))><1C(1,L)>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 60] 50 0}]
+[GblId, Arity=2, Str=<MP(A,A,A,A,A,A,1C(1,L))><1C(1,L)>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [90 60] 50 0}]
 s = \ (@t) (@t1) ($dNum :: Num t) (f :: t -> t1) -> f (fromInteger @t $dNum F1.s1)
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
