@@ -62,7 +62,6 @@ import GHC.Utils.Panic
 
 import Control.Monad    ( mapAndUnzipM, when )
 import Data.Word
-import Data.Maybe       ( fromJust )
 
 import GHC.Types.Basic
 import GHC.Data.FastString
@@ -1216,7 +1215,6 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
  = do let fmt      = intFormat (max width W32)
           reg_dst  = getLocalRegReg dst
 
-
       let addr_fmt = intFormat (wordWidth platform)
       (unaligned_addr, ucode) <- getSomeReg addr
       aligned_addr <- getNewRegNat addr_fmt
@@ -1307,15 +1305,6 @@ genCCall platform (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
         `appOL` post_code
 
         where
-           align_address
-             = do
-             let addr_fmt = intFormat (wordWidth platform)
-             (unaligned_addr, ucode) <- getSomeReg addr
-             aligned_addr <- getNewRegNat addr_fmt
-             return (Amode (AddrRegReg r0 aligned_addr)
-                     (ucode `snocOL` (CLRRI addr_fmt aligned_addr
-                                      unaligned_addr 2)), Just unaligned_addr)
-
            shift_amount platform shift
              = let shift_amt = case width of
                                  W8  -> 24
