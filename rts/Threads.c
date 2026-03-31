@@ -377,6 +377,38 @@ migrateThread (Capability *from, StgTSO *tso, Capability *to)
 }
 
 /* ----------------------------------------------------------------------------
+   {set,unset}ThreadFlag
+
+   sets or unsets a flag in a given TSO
+   ------------------------------------------------------------------------- */
+
+#if defined(THREADED_RTS)
+static void
+updThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag, const StgInfoTable* info);
+
+void setThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag)
+{
+    updThreadFlag(from, tso, flag, &stg_MSG_SET_TSO_FLAG_info);
+}
+
+void unsetThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag)
+{
+    updThreadFlag(from, tso, flag, &stg_MSG_UNSET_TSO_FLAG_info);
+}
+
+static void
+updThreadFlag(Capability *from, StgTSO *tso, StgWord32 flag, const StgInfoTable* info)
+{
+    MessageUpdTSOFlag *msg;
+    msg = (MessageUpdTSOFlag *)allocate(from,sizeofW(MessageUpdTSOFlag));
+    msg->tso  = tso;
+    msg->flag = flag;
+    SET_HDR_RELEASE(msg, info, CCS_SYSTEM);
+    sendMessage(from, tso->cap, (Message*)msg);
+}
+#endif
+
+/* ----------------------------------------------------------------------------
    awakenBlockedQueue
 
    wakes up all the threads on the specified queue.
