@@ -99,13 +99,13 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Builtin.Types
 import GHC.Types.Name
-import GHC.Types.Id( idType, isDataConId )
+import GHC.Types.Id( idType )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
-import GHC.Types.SrcLoc (unLoc, GenLocated (..))
+import GHC.Types.SrcLoc ( GenLocated (..) )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
