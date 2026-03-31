@@ -1,0 +1,8 @@
+section: rts
+synopsis: Add rts Message to set/unset TSO flags
+issues: #27131
+mrs: !15831
+description: This enables e.g. toggling breakpoints from different threads,
+    which is necessary to safely implement features like pausing, per-thread
+    step-in, and more in the haskell debugger.
+
