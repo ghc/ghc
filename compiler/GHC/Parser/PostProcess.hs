@@ -1228,17 +1228,11 @@ checkContext orig_t@(L (EpAnn l _ cs) _orig_t) =
   -- With NoListTuplePuns, contexts are parsed as data constructors, which causes failure
   -- downstream.
   -- This converts them just like when they are parsed as types in the punned case.
-  check (oparens,cparens,cs) (L _l (HsExplicitTupleTy (q,o,c) _ ts))
-    = punsAllowed >>= \case
-      True -> unprocessed
-      False -> do
-        let
-          (op, cp) = case q of
-            EpTok ql -> ([EpTok ql], [c])
-            _        -> ([o], [c])
-        mkCTuple (oparens ++ op, cp ++ cparens, cs) ts
+  check (oparens,cparens,cs) (L _l (HsExplicitTupleTy (_, AnnParens o c) NotPromoted ts))
+    = mkCTuple (oparens ++ [o], c : cparens, cs) ts
+
   check (opi,cpi,csi) (L _lp1 (HsParTy (o,c) ty))
-                                             -- to be sure HsParTy doesn't get into the way
+                                             -- to be sure HsParTy doesn't get in the way
     = check (o:opi, c:cpi, csi) ty
 
   -- No need for anns, returning original
@@ -1269,11 +1263,10 @@ checkContextExpr orig_expr@(L (EpAnn l _ cs) _) =
   where
     check :: ([EpToken "("],[EpToken ")"],EpAnnComments)
         -> LHsExpr GhcPs -> PV (LocatedC [LHsExpr GhcPs])
-    check (oparens,cparens,cs) (L _ (ExplicitTuple (ap_open, ap_close) tup_args boxity))
+    check (oparens,cparens,cs) (L _ (ExplicitTuple (AnnParens open_tok close_tok) tup_args Boxed))
              -- Neither unboxed tuples (#e1,e2#) nor tuple sections (e1,,e2,) can be a context
-      | isBoxed boxity
-      , Just es <- tupArgsPresent_maybe tup_args
-      = mkCTuple (oparens ++ [EpTok ap_open], EpTok ap_close : cparens, cs) es
+      | Just es <- tupArgsPresent_maybe tup_args
+      = mkCTuple (oparens ++ [open_tok], close_tok : cparens, cs) es
     check (opi, cpi, csi) (L _ (HsPar (open_tok, close_tok) expr))
       = check (opi ++ [open_tok], close_tok : cpi, csi) expr
     check (oparens,cparens,cs) (L _ (HsVar _ (L (EpAnn _ (NameAnnOnly (NameParens open closed) []) _) name)))
@@ -1861,7 +1854,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsBangPatPV :: SrcSpan -> LocatedA b -> EpToken "!" -> PV (LocatedA b)
   -- | Disambiguate tuple sections and unboxed sums
   mkSumOrTuplePV
-    :: SrcSpanAnnA -> Boxity -> SumOrTuple b -> (EpaLocation, EpaLocation) -> PV (LocatedA b)
+    :: SrcSpanAnnA -> Boxity -> SumOrTuple b -> AnnParen -> PV (LocatedA b)
   -- | Disambiguate "type t" (embedded type)
   mkHsEmbTyPV :: SrcSpan -> EpToken "type" -> LHsType GhcPs -> PV (LocatedA b)
   -- | Disambiguate modifiers (%a)
@@ -3694,7 +3687,7 @@ hintBangPat span e = do
       addError $ mkPlainErrorMsgEnvelope span $ PsErrIllegalBangPattern e
 
 mkSumOrTupleExpr :: SrcSpanAnnA -> Boxity -> SumOrTuple (HsExpr GhcPs)
-                 -> (EpaLocation, EpaLocation)
+                 -> AnnParen
                  -> PV (LHsExpr GhcPs)
 
 -- Tuple
@@ -3709,15 +3702,15 @@ mkSumOrTupleExpr l@(EpAnn anc an csIn) boxity (Tuple es) anns = do
 -- Sum
 -- mkSumOrTupleExpr l Unboxed (Sum alt arity e) =
 --     return $ L l (ExplicitSum noExtField alt arity e)
-mkSumOrTupleExpr l@(EpAnn anc anIn csIn) Unboxed (Sum alt arity e barsp barsa) (o, c) = do
-    let an = AnnExplicitSum o barsp barsa c
+mkSumOrTupleExpr l@(EpAnn anc anIn csIn) Unboxed (Sum alt arity e barsp barsa) anns = do
+    let an = AnnExplicitSum anns barsp barsa
     !cs <- getCommentsFor (locA l)
     return $ L (EpAnn anc anIn (csIn Semi.<> cs)) (ExplicitSum an alt arity e)
 mkSumOrTupleExpr l Boxed a@Sum{} _ =
     addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrUnsupportedBoxedSumExpr a
 
 mkSumOrTuplePat
-  :: SrcSpanAnnA -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> (EpaLocation, EpaLocation)
+  :: SrcSpanAnnA -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> AnnParen
   -> PV (LocatedA (PatBuilder GhcPs))
 
 -- Tuple
@@ -3843,7 +3836,7 @@ mkTupleSyntaxTy parOpen args parClose =
       HsExplicitTupleTy annsKeyword NotPromoted args
 
     annParen = AnnParens parOpen parClose
-    annsKeyword = (NoEpTok, parOpen, parClose)
+    annsKeyword = (NoEpTok, annParen)
 
 -- | Decide whether to parse tuple con syntax @(,)@ in a type as a
 -- type or data constructor, based on the extension @ListTuplePuns@.
@@ -3895,7 +3888,7 @@ mkListSyntaxTy1 brkOpen t brkClose =
       HsExplicitListTy annsKeyword NotPromoted [t]
 
     annsKeyword = (NoEpTok, brkOpen, brkClose)
-    annParen = AnnParensSquare brkOpen brkClose
+    annParen = (brkOpen, brkClose)
 
 parseError :: HsExpr GhcPs
 parseError = HsHole HoleError

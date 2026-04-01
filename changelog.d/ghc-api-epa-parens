@@ -1,0 +1,12 @@
+section: ghc-lib
+synopsis: Use ``AnnParen`` for tuples and sums
+issues: #26969
+mrs: !15836
+
+description: {
+Do not use ``AnnParen`` in ``XListTy``, replacing it with ``EpToken "["`` and ``"]"``,
+and specialise it to tuples/sums by dropping the ``AnnParensSquare`` constructor,
+keeping only ``AnnParens`` and ``AnnParensHash``. Use ``AnnParen`` in ``XExplicitTuple``,
+``XExplicitTupleTy``, ``XTuplePat``, ``XExplicitSum`` (via ``AnnExplicitSum``), and
+``XSumPat`` (via ``EpAnnSumPat``).
+}

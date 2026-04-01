@@ -274,7 +274,7 @@
             (EpaComments
              []))
            (HsListTy
-            (AnnParensSquare
+            ((,)
              (EpTok
               (EpaSpan { DumpParsedAst.hs:9:16 }))
              (EpTok
@@ -656,7 +656,7 @@
               (EpaComments
                []))
              (HsListTy
-              (AnnParensSquare
+              ((,)
                (EpTok
                 (EpaSpan { DumpParsedAst.hs:10:27 }))
                (EpTok

@@ -18,8 +18,8 @@ X(ExplicitList) mismatch
   >>> AnnList ()
   <<< ((EpToken "'"),(EpToken "["),(EpToken "]"))
 X(ExplicitTuple) mismatch
-  >>> ((EpaLocation' [GenLocated (EpaLocation' NoComments) EpaComment]),(EpaLocation' [GenLocated (EpaLocation' NoComments) EpaComment]))
-  <<< ((EpToken "'"),(EpToken "("),(EpToken ")"))
+  >>> AnnParen
+  <<< ((EpToken "'"),AnnParen)
 X(Hole) match = HoleKind
 
 Extension fields @GhcRn

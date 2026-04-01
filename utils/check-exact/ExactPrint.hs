@@ -858,9 +858,6 @@ markParenO (AnnParens o c) = do
 markParenO (AnnParensHash o c) = do
   o' <- markEpToken o
   return (AnnParensHash o' c)
-markParenO (AnnParensSquare o c) = do
-  o' <- markEpToken o
-  return (AnnParensSquare o' c)
 
 markParenC :: (Monad m, Monoid w) => AnnParen -> EP w m AnnParen
 markParenC (AnnParens o c) = do
@@ -869,9 +866,6 @@ markParenC (AnnParens o c) = do
 markParenC (AnnParensHash o c) = do
   c' <- markEpToken c
   return (AnnParensHash o c')
-markParenC (AnnParensSquare o c) = do
-  c' <- markEpToken c
-  return (AnnParensSquare o c')
 
 -- ---------------------------------------------------------------------
 -- Bare bones Optics
@@ -1015,15 +1009,14 @@ lsnd k parent = fmap (\new -> (fst parent, new))
 -- -------------------------------------
 -- data AnnExplicitSum
 --   = AnnExplicitSum {
---       aesOpen       :: EpaLocation,
+--       aesParens     :: AnnParen,
 --       aesBarsBefore :: [EpToken "|"],
---       aesBarsAfter  :: [EpToken "|"],
---       aesClose      :: EpaLocation
+--       aesBarsAfter  :: [EpToken "|"]
 --       } deriving Data
 
-laesOpen :: Lens AnnExplicitSum EpaLocation
-laesOpen k parent = fmap (\new -> parent { aesOpen = new })
-                         (k (aesOpen parent))
+laesParens :: Lens AnnExplicitSum AnnParen
+laesParens k parent = fmap (\new -> parent { aesParens = new })
+                           (k (aesParens parent))
 
 laesBarsBefore :: Lens AnnExplicitSum [EpToken "|"]
 laesBarsBefore k parent = fmap (\new -> parent { aesBarsBefore = new })
@@ -1032,10 +1025,6 @@ laesBarsBefore k parent = fmap (\new -> parent { aesBarsBefore = new })
 laesBarsAfter :: Lens AnnExplicitSum [EpToken "|"]
 laesBarsAfter k parent = fmap (\new -> parent { aesBarsAfter = new })
                                (k (aesBarsAfter parent))
-
-laesClose :: Lens AnnExplicitSum EpaLocation
-laesClose k parent = fmap (\new -> parent { aesClose = new })
-                               (k (aesClose parent))
 
 -- -------------------------------------
 -- data AnnFieldLabel
@@ -1183,12 +1172,12 @@ lga_sep k parent = fmap (\new -> parent { ga_sep = new })
 
 -- ---------------------------------------------------------------------
 -- data EpAnnSumPat = EpAnnSumPat
---       { sumPatParens      :: (EpaLocation, EpaLocation)
+--       { sumPatParens      :: AnnParen
 --       , sumPatVbarsBefore :: [EpToken "|"]
 --       , sumPatVbarsAfter  :: [EpToken "|"]
 --       } deriving Data
 
-lsumPatParens :: Lens EpAnnSumPat (EpaLocation, EpaLocation)
+lsumPatParens :: Lens EpAnnSumPat AnnParen
 lsumPatParens k parent = fmap (\new -> parent { sumPatParens = new })
                               (k (sumPatParens parent))
 
@@ -2940,23 +2929,21 @@ instance ExactPrint (HsExpr GhcPs) where
     expr' <- markAnnotated expr
     return (SectionR an op' expr')
 
-  exact (ExplicitTuple (o,c) args b) = do
-    o0 <- if b == Boxed then printStringAtAA o "("
-                        else printStringAtAA o "(#"
+  exact (ExplicitTuple an args b) = do
+    an0 <- markOpeningParen an
 
     args' <- mapM markAnnotated args
 
-    c0 <- if b == Boxed then printStringAtAA c ")"
-                        else printStringAtAA c "#)"
+    an1 <- markClosingParen an0
     debugM $ "ExplicitTuple done"
-    return (ExplicitTuple (o0,c0) args' b)
+    return (ExplicitTuple an1 args' b)
 
   exact (ExplicitSum an alt arity expr) = do
-    an0 <- markLensFun an laesOpen (\loc -> printStringAtAA loc "(#")
+    an0 <- markLensFun an laesParens markOpeningParen
     an1 <- markLensFun an0 laesBarsBefore (\locs -> mapM markEpToken locs)
     expr' <- markAnnotated expr
     an2 <- markLensFun an1 laesBarsAfter (\locs -> mapM markEpToken locs)
-    an3 <- markLensFun an2 laesClose (\loc -> printStringAtAA loc "#)")
+    an3 <- markLensFun an2 laesParens markClosingParen
     return (ExplicitSum an3 alt arity expr')
 
   exact (HsCase an e alts) = do
@@ -3970,11 +3957,11 @@ instance ExactPrint (HsType GhcPs) where
     (mult', ty1') <- markModifiedFunArrOf mult (markAnnotated ty1)
     ty2' <- markAnnotated ty2
     return (HsFunTy an mult' ty1' ty2')
-  exact (HsListTy an tys) = do
-    an0 <- markOpeningParen an
-    tys' <- markAnnotated tys
-    an1 <- markClosingParen an0
-    return (HsListTy an1 tys')
+  exact (HsListTy (o,c) t) = do
+    o' <- markEpToken o
+    t' <- markAnnotated t
+    c' <- markEpToken c
+    return (HsListTy (o',c') t')
   exact (HsTupleTy an con tys) = do
     an0 <- markOpeningParen an
     tys' <- markAnnotated tys
@@ -4026,14 +4013,14 @@ instance ExactPrint (HsType GhcPs) where
     tys' <- markAnnotated tys
     c' <- markEpToken c
     return (HsExplicitListTy (sq',o',c') prom tys')
-  exact (HsExplicitTupleTy (sq, o, c) prom tys) = do
+  exact (HsExplicitTupleTy (sq, an) prom tys) = do
     sq' <- if (isPromoted prom)
               then markEpToken sq
               else return sq
-    o' <- markEpToken o
+    an0 <- markOpeningParen an
     tys' <- markAnnotated tys
-    c' <- markEpToken c
-    return (HsExplicitTupleTy (sq', o', c') prom tys')
+    an1 <- markClosingParen an0
+    return (HsExplicitTupleTy (sq', an1) prom tys')
   exact (HsTyLit an lit) = do
     lit' <- withPpr lit
     return (HsTyLit an lit')
@@ -4713,22 +4700,18 @@ instance ExactPrint (Pat GhcPs) where
     (an', pats') <- markAnnList' an (markAnnotated pats)
     return (ListPat an' pats')
 
-  exact (TuplePat (o,c) pats boxity) = do
-    o0 <- case boxity of
-             Boxed   -> printStringAtAA o "("
-             Unboxed -> printStringAtAA o "(#"
+  exact (TuplePat an pats boxity) = do
+    an0 <- markOpeningParen an
     pats' <- markAnnotated pats
-    c0 <- case boxity of
-             Boxed   -> printStringAtAA c ")"
-             Unboxed -> printStringAtAA c "#)"
-    return (TuplePat (o0,c0) pats' boxity)
+    an1 <- markClosingParen an0
+    return (TuplePat an1 pats' boxity)
 
   exact (SumPat an pat alt arity) = do
-    an0 <- markLensFun an (lsumPatParens . lfst) (\loc -> printStringAtAA loc "(#")
+    an0 <- markLensFun an lsumPatParens markOpeningParen
     an1 <- markLensFun an0 lsumPatVbarsBefore (\locs -> mapM markEpToken locs)
     pat' <- markAnnotated pat
     an2 <- markLensFun an1 lsumPatVbarsAfter (\locs -> mapM markEpToken locs)
-    an3 <- markLensFun an2 (lsumPatParens . lsnd)  (\loc -> printStringAtAA loc "#)")
+    an3 <- markLensFun an2 lsumPatParens markClosingParen
     return (SumPat an3 pat' alt arity)
 
   exact (OrPat an pats) = do

@@ -728,7 +728,7 @@
         (EpaComments
          []))
        (HsListTy
-        (AnnParensSquare
+        ((,)
          (EpTok
           (EpaSpan { KindSigs.hs:19:12 }))
          (EpTok
@@ -1424,13 +1424,14 @@
         (EpaComments
          []))
        (HsExplicitTupleTy
-        ((,,)
+        ((,)
          (EpTok
           (EpaSpan { KindSigs.hs:28:16 }))
-         (EpTok
-          (EpaSpan { KindSigs.hs:28:17 }))
-         (EpTok
-          (EpaSpan { KindSigs.hs:28:44 })))
+         (AnnParens
+          (EpTok
+           (EpaSpan { KindSigs.hs:28:17 }))
+          (EpTok
+           (EpaSpan { KindSigs.hs:28:44 }))))
         (IsPromoted)
         [(L
           (EpAnn
@@ -1508,7 +1509,7 @@
              (EpaComments
               []))
             (HsListTy
-             (AnnParensSquare
+             ((,)
               (EpTok
                (EpaSpan { KindSigs.hs:28:34 }))
               (EpTok

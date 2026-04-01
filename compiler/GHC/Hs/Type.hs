@@ -445,7 +445,7 @@ type instance XQualTy          (GhcPass _) = NoExtField
 type instance XTyVar           (GhcPass _) = EpToken "'"
 type instance XAppTy           (GhcPass _) = NoExtField
 type instance XFunTy           (GhcPass _) = NoExtField
-type instance XListTy          (GhcPass _) = AnnParen
+type instance XListTy          (GhcPass _) = (EpToken "[", EpToken "]")
 type instance XTupleTy         (GhcPass _) = AnnParen
 type instance XSumTy           (GhcPass _) = AnnParen
 type instance XOpTy            (GhcPass _) = NoExtField
@@ -470,7 +470,7 @@ type instance XExplicitListTy  GhcPs = (EpToken "'", EpToken "[", EpToken "]")
 type instance XExplicitListTy  GhcRn = NoExtField
 type instance XExplicitListTy  GhcTc = Kind
 
-type instance XExplicitTupleTy GhcPs = (EpToken "'", EpToken "(", EpToken ")")
+type instance XExplicitTupleTy GhcPs = (EpToken "'", AnnParen)
 type instance XExplicitTupleTy GhcRn = NoExtField
 type instance XExplicitTupleTy GhcTc = [Kind]
 
