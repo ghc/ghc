@@ -33,8 +33,8 @@ alexGetByte (AI loc s)
   | otherwise = byte `seq` loc' `seq` s' `seq`
                 --trace (show (ord c)) $
                 Just (byte, (AI loc' s'))
-  where (c,s') = nextChar s
-        loc'   = advancePsLoc loc c
+  where next@(c,s') = nextChar s
+        loc'   = advancePsLoc loc next
         byte   = adjustChar c
 
 -- Getting the previous 'Char' isn't enough here - we need to convert it into

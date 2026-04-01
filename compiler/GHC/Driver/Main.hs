@@ -499,13 +499,13 @@ hscParse' mod_summary
 
     let diag_opts = initDiagOpts dflags
     when (wopt Opt_WarnUnicodeBidirectionalFormatCharacters dflags) $ do
-      case checkBidirectionFormatChars (PsLoc loc (BufPos 0)) buf of
+      case checkBidirectionFormatChars (PsLoc loc (curBufPos buf)) buf of
         Nothing -> pure ()
-        Just chars@((eloc,chr,_) :| _) ->
-          let span = mkSrcSpanPs $ mkPsSpan eloc (advancePsLoc eloc chr)
+        Just chars@((buf',(eloc,chr,_)) :| _) ->
+          let span = mkSrcSpanPs $ mkPsSpan eloc (advancePsLoc eloc (chr, buf'))
           in logDiagnostics $ singleMessage $
                mkPlainMsgEnvelope diag_opts span $
-               GhcPsMessage $ PsWarnBidirectionalFormatChars chars
+               GhcPsMessage $ PsWarnBidirectionalFormatChars (snd <$> chars)
 
     let parseMod | HsigFile == ms_hsc_src mod_summary
                  = parseSignature
@@ -569,28 +569,28 @@ hscParse' mod_summary
             unless (isEmptyMessages errs) $ throwErrors sec (GhcPsMessage <$> errs)
             return transformed
 
-checkBidirectionFormatChars :: PsLoc -> StringBuffer -> Maybe (NonEmpty (PsLoc, Char, String))
+checkBidirectionFormatChars :: PsLoc -> StringBuffer -> Maybe (NonEmpty (StringBuffer, (PsLoc, Char, String)))
 checkBidirectionFormatChars start_loc sb
   | containsBidirectionalFormatChar sb = Just $ go start_loc sb
   | otherwise = Nothing
   where
-    go :: PsLoc -> StringBuffer -> NonEmpty (PsLoc, Char, String)
+    go :: PsLoc -> StringBuffer -> NonEmpty (StringBuffer, (PsLoc, Char, String))
     go loc sb
       | atEnd sb = panic "checkBidirectionFormatChars: no char found"
       | otherwise = case nextChar sb of
-          (chr, sb)
+          next@(chr, sb)
             | Just desc <- lookup chr bidirectionalFormatChars ->
-                (loc, chr, desc) :| go1 (advancePsLoc loc chr) sb
-            | otherwise -> go (advancePsLoc loc chr) sb
+                (sb, (loc, chr, desc)) :| go1 (advancePsLoc loc next) sb
+            | otherwise -> go (advancePsLoc loc next) sb
 
-    go1 :: PsLoc -> StringBuffer -> [(PsLoc, Char, String)]
+    go1 :: PsLoc -> StringBuffer -> [(StringBuffer, (PsLoc, Char, String))]
     go1 loc sb
       | atEnd sb = []
       | otherwise = case nextChar sb of
-          (chr, sb)
+          next@(chr, sb)
             | Just desc <- lookup chr bidirectionalFormatChars ->
-                (loc, chr, desc) : go1 (advancePsLoc loc chr) sb
-            | otherwise -> go1 (advancePsLoc loc chr) sb
+                (sb, (loc, chr, desc)) : go1 (advancePsLoc loc next) sb
+            | otherwise -> go1 (advancePsLoc loc next) sb
 
 
 -- -----------------------------------------------------------------------------

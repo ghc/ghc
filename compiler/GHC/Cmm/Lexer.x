@@ -385,10 +385,9 @@ alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
 alexGetByte (loc,s)
   | atEnd s   = Nothing
   | otherwise = b `seq` loc' `seq` s' `seq` Just (b, (loc', s'))
-  where c    = currentChar s
-        b    = fromIntegral $ ord $ c
-        loc' = advancePsLoc loc c
-        s'   = stepOn s
+  where next@(c,s') = nextChar s
+        b    = fromIntegral (ord c)
+        loc' = advancePsLoc loc next
 
 getInput :: PD AlexInput
 getInput = PD $ \_ _ s@PState{ loc=l, buffer=b } -> POk s (l,b)

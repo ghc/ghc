@@ -2283,7 +2283,7 @@ tok_qstrings lex_str span0 buf0 len0 endBuf0 = do
             case nextChar buf of
               _ | atEnd buf -> panic "tok_qstrings unexpectedly hit EOF"
               ('"', _) -> (buf, loc)
-              (c, buf') -> go buf' (advancePsLoc loc c)
+              next@(_, buf') -> go buf' (advancePsLoc loc next)
        in go buf0 (psSpanStart span0)
 
     -- The length of the module name + string literal, separately
@@ -2322,9 +2322,8 @@ lex_qquasiquote_tok :: Action
 lex_qquasiquote_tok span buf len _buf2 = do
   let (qual, quoter) = splitQualName (stepOn buf) (len - 2) False
   quoteStart <- getParsedLoc
-  let quoter_span_start = advancePsLoc (psSpanStart span) '['
-      quoter_span_end   = foldl' advancePsLoc quoter_span_start
-                            (take (len - 2) (repeat 'a'))
+  let quoter_span_start = undefined -- advancePsLoc (psSpanStart span) '['
+      quoter_span_end   = undefined -- foldl' advancePsLoc quoter_span_start (take (len - 2) (repeat 'a'))
       quoter_span       = mkPsSpan quoter_span_start quoter_span_end
   quote <- lex_quasiquote (psRealLoc quoteStart) ""
   end <- getParsedLoc
@@ -2341,8 +2340,8 @@ lex_quasiquote_tok span buf len _buf2 = do
                 -- 'tail' drops the initial '[',
                 -- while the -1 drops the trailing '|'
   quoteStart <- getParsedLoc
-  let quoter_span_start = advancePsLoc (psSpanStart span) '['
-      quoter_span_end   = foldl' advancePsLoc quoter_span_start quoter
+  let quoter_span_start = undefined -- advancePsLoc (psSpanStart span) '['
+      quoter_span_end   = undefined -- foldl' advancePsLoc quoter_span_start quoter
       quoter_span       = mkPsSpan quoter_span_start quoter_span_end
   quote <- lex_quasiquote (psRealLoc quoteStart) ""
   end <- getParsedLoc
@@ -2647,8 +2646,8 @@ alexGetChar' (AI loc s)
   | otherwise = c `seq` loc' `seq` s' `seq`
                 --trace (show (ord c)) $
                 Just (c, (AI loc' s'))
-  where (c,s') = nextChar s
-        loc'   = advancePsLoc loc c
+  where next@(c,s') = nextChar s
+        loc' = advancePsLoc loc next
 
 -- | Advance the given input N bytes.
 advanceInputBytes :: Int -> AlexInput -> AlexInput
@@ -2956,7 +2955,7 @@ initParserState options buf loc =
       srcfiles      = [],
       alr_pending_implicit_tokens = [],
       alr_next_token = Nothing,
-      alr_last_loc = PsSpan (alrInitialLoc (fsLit "<no file>")) (BufSpan (BufPos 0) (BufPos 0)),
+      alr_last_loc = PsSpan (alrInitialLoc (fsLit "<no file>")) (BufSpan (curBufPos buf) (curBufPos buf)),
       alr_context = [],
       alr_expecting_ocurly = Nothing,
       alr_justClosedExplicitLetBlock = False,
@@ -2965,7 +2964,7 @@ initParserState options buf loc =
       comment_q = [],
       hdk_comments = nilOL
     }
-  where init_loc = PsLoc loc (BufPos 0)
+  where init_loc = PsLoc loc (curBufPos buf)
 
 -- | An mtl-style class for monads that support parsing-related operations.
 -- For example, sometimes we make a second pass over the parsing results to validate,

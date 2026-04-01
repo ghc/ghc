@@ -19,7 +19,6 @@ module GHC.Types.SrcLoc (
         interactiveSrcLoc,      -- Code from an interactive session
 
         advanceSrcLoc,
-        advanceBufPos,
 
         -- ** Unsafely deconstructing SrcLoc
         -- These are dubious exports, because they crash on some inputs
@@ -70,6 +69,7 @@ module GHC.Types.SrcLoc (
         getBufSpan,
         removeBufSpan,
         combineBufSpans,
+        curBufPos,
 
         -- * Located
         Located,
@@ -118,6 +118,7 @@ import GHC.Utils.Json
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
+import GHC.Data.StringBuffer (StringBuffer, cur)
 import qualified GHC.Data.Strict as Strict
 
 import Control.DeepSeq
@@ -221,6 +222,8 @@ data RealSrcLoc
 newtype BufPos = BufPos { bufPos :: Int }
   deriving (Eq, Ord, Show, Data, NFData)
 
+curBufPos :: StringBuffer -> BufPos
+curBufPos sb = BufPos (cur sb)
 
 -- | Source Location
 data SrcLoc
@@ -282,9 +285,6 @@ advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
 
 advance_tabstop :: Int -> Int
 advance_tabstop c = ((((c - 1) `shiftR` 3) + 1) `shiftL` 3) + 1
-
-advanceBufPos :: BufPos -> BufPos
-advanceBufPos (BufPos i) = BufPos (i+1)
 
 {-
 ************************************************************************
@@ -893,9 +893,9 @@ type PsLocated = GenLocated PsSpan
 psLocatedToLocated :: PsLocated a -> Located a
 psLocatedToLocated (L sp a) = L (mkSrcSpanPs sp) a
 
-advancePsLoc :: PsLoc -> Char -> PsLoc
-advancePsLoc (PsLoc real_loc buf_loc) c =
-  PsLoc (advanceSrcLoc real_loc c) (advanceBufPos buf_loc)
+advancePsLoc :: PsLoc -> (Char, StringBuffer) -> PsLoc
+advancePsLoc (PsLoc real_loc _) (c, sb) =
+  PsLoc (advanceSrcLoc real_loc c) (curBufPos sb)
 
 mkPsSpan :: PsLoc -> PsLoc -> PsSpan
 mkPsSpan (PsLoc r1 b1) (PsLoc r2 b2) = PsSpan (mkRealSrcSpan r1 r2) (BufSpan b1 b2)
