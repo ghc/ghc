@@ -458,7 +458,7 @@
              (EpaComments
               []))
             (HsListTy
-             (AnnParensSquare
+             ((,)
               (EpTok
                (EpaSpan { T20452.hs:8:57 }))
               (EpTok
@@ -705,7 +705,7 @@
              (EpaComments
               []))
             (HsListTy
-             (AnnParensSquare
+             ((,)
               (EpTok
                (EpaSpan { T20452.hs:9:57 }))
               (EpTok

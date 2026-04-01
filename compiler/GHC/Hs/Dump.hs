@@ -221,7 +221,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
              NoBlankEpAnnotations -> parens (case ap of
                                       (AnnParens       o c) -> text "AnnParens"       $$ vcat [showAstData' o, showAstData' c]
                                       (AnnParensHash   o c) -> text "AnnParensHash"   $$ vcat [showAstData' o, showAstData' c]
-                                      (AnnParensSquare o c) -> text "AnnParensSquare" $$ vcat [showAstData' o, showAstData' c]
                                       )
 
             annClassDecl :: AnnClassDecl -> SDoc

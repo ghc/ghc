@@ -264,7 +264,7 @@ type instance XPar           GhcPs = (EpToken "(", EpToken ")")
 type instance XPar           GhcRn = NoExtField
 type instance XPar           GhcTc = NoExtField
 
-type instance XExplicitTuple GhcPs = (EpaLocation, EpaLocation)
+type instance XExplicitTuple GhcPs = AnnParen
 type instance XExplicitTuple GhcRn = NoExtField
 type instance XExplicitTuple GhcTc = NoExtField
 
@@ -554,14 +554,13 @@ mkHsVarWithUserRdr rdr n = HsVar noExtField $
 
 data AnnExplicitSum
   = AnnExplicitSum {
-      aesOpen       :: EpaLocation,
+      aesParens     :: AnnParen,
       aesBarsBefore :: [EpToken "|"],
-      aesBarsAfter  :: [EpToken "|"],
-      aesClose      :: EpaLocation
+      aesBarsAfter  :: [EpToken "|"]
       } deriving Data
 
 instance NoAnn AnnExplicitSum where
-  noAnn = AnnExplicitSum noAnn noAnn noAnn noAnn
+  noAnn = AnnExplicitSum noAnn noAnn noAnn
 
 data AnnFieldLabel
   = AnnFieldLabel {

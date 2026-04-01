@@ -552,12 +552,11 @@ data AnnListBrackets
 -- Annotations for parenthesised elements, such as tuples, lists
 -- ---------------------------------------------------------------------
 
--- | exact print annotation for an item having surrounding "brackets", such as
--- tuples or lists
+-- | exact print annotation for an item having parentheses, with or without
+-- the hash symbol, e.g. tuples, unboxed tuples, unboxed sums
 data AnnParen
   = AnnParens       (EpToken "(")  (EpToken ")")  -- ^ '(', ')'
   | AnnParensHash   (EpToken "(#") (EpToken "#)") -- ^ '(#', '#)'
-  | AnnParensSquare (EpToken "[")  (EpToken "]")  -- ^ '[', ']'
   deriving Data
 
 -- ---------------------------------------------------------------------
@@ -1219,7 +1218,6 @@ instance (Outputable e)
 instance Outputable AnnParen where
   ppr (AnnParens       o c) = text "AnnParens" <+> ppr o <+> ppr c
   ppr (AnnParensHash   o c) = text "AnnParensHash" <+> ppr o <+> ppr c
-  ppr (AnnParensSquare o c) = text "AnnParensSquare" <+> ppr o <+> ppr c
 
 instance Outputable AnnListItem where
   ppr (AnnListItem ts) = text "AnnListItem" <+> ppr ts

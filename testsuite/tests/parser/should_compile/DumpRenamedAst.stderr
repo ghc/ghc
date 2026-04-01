@@ -602,7 +602,7 @@
                 (EpaComments
                  []))
                (HsListTy
-                (AnnParensSquare
+                ((,)
                  (EpTok
                   (EpaSpan { DumpRenamedAst.hs:12:27 }))
                  (EpTok
@@ -710,7 +710,7 @@
               (EpaComments
                []))
              (HsListTy
-              (AnnParensSquare
+              ((,)
                (EpTok
                 (EpaSpan { DumpRenamedAst.hs:11:16 }))
                (EpTok
@@ -1930,7 +1930,7 @@
                (EpaComments
                 []))
               (HsListTy
-               (AnnParensSquare
+               ((,)
                 (EpTok
                  (EpaSpan { DumpRenamedAst.hs:31:12 }))
                 (EpTok
@@ -1995,7 +1995,7 @@
                  (EpaComments
                   []))
                 (HsListTy
-                 (AnnParensSquare
+                 ((,)
                   (EpTok
                    (EpaSpan { DumpRenamedAst.hs:32:10 }))
                   (EpTok

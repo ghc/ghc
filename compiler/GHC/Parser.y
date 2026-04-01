@@ -2398,14 +2398,14 @@ atype :: { LHsType GhcPs }
         | '(' ktype ')'               {% amsA' (sLL $1 $> $ HsParTy (epTok $1, epTok $3) $2) }
                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE '(' ')'         {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
-                                            ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1,epTok $2,epTok $3) IsPromoted []) }}
+                                            ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1, AnnParens (epTok $2) (epTok $3)) IsPromoted []) }}
         | SIMPLEQUOTE gen_qcon {% amsA' (sLL $1 $> $ HsTyVar (epTok $1) IsPromoted $2) }
         | SIMPLEQUOTE sysdcon_nolist {% do { requireLTPuns PEP_QuoteDisambiguation $1 (reLoc $>)
                                            ; amsA' (sLL $1 $> $ HsTyVar (epTok $1) IsPromoted (L (getLoc $2) $ nameRdrName (dataConName (unLoc $2)))) }}
         | SIMPLEQUOTE  '(' ktype ',' comma_types1 ')'
                              {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
                                    ; h <- addTrailingCommaA $3 (epTok $4)
-                                   ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1,epTok $2,epTok $6) IsPromoted (h : $5)) }}
+                                   ; amsA' (sLL $1 $> $ HsExplicitTupleTy (epTok $1, AnnParens (epTok $2) (epTok $6)) IsPromoted (h : $5)) }}
         | '[' ']'               {% withCombinedComments $1 $> (mkListSyntaxTy0 (epTok $1) (epTok $2)) }
         | SIMPLEQUOTE  '[' comma_types0 ']'     {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
                                                       ; amsA' (sLL $1 $> $ HsExplicitListTy (epTok $1, epTok $2, epTok $4) IsPromoted $3) }}
@@ -3221,7 +3221,7 @@ aexp2   :: { ECP }
         | '(' tup_exprs ')'             { ECP $
                                            $2 >>= \ $2 ->
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Boxed $2
-                                                (glR $1,glR $3)}
+                                                (AnnParens (epTok $1) (epTok $3))}
 
         | '(' orpats(exp2) ')'          {% do
                                               { pat <- hintOrPats (sL1a $2 (OrPat NoExtField (unLoc $2)))
@@ -3237,11 +3237,11 @@ aexp2   :: { ECP }
         | '(#' texp '#)'                { ECP $
                                            unECP $2 >>= \ $2 ->
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Unboxed (Tuple [Right $2])
-                                                 (glR $1,glR $3) }
+                                                 (AnnParensHash (epTok $1) (epTok $3)) }
         | '(#' tup_exprs '#)'           { ECP $
                                            $2 >>= \ $2 ->
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Unboxed $2
-                                                (glR $1,glR $3) }
+                                                (AnnParensHash (epTok $1) (epTok $3)) }
 
         | '[' list ']'      { ECP $ $2 (comb2 $1 $>) (glR $1,glR $3) }
         | '_'               { ECP $ mkHsWildCardPV (getLoc $1) }
