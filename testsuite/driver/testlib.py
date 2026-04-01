@@ -3005,6 +3005,12 @@ def normalise_errmsg(s: str) -> str:
     # Emscripten displays cache info and old emcc doesn't support EMCC_LOGGING=0
     s = re.sub('cache:INFO: .*\n', '', s)
 
+    # on newer versions of MacOS X, the shipped ranlib warns about object files with no symbols,
+    # however, these are completely benign stubs.
+    # See https://gitlab.haskell.org/ghc/ghc/-/issues/27116
+    if opsys('darwin'):
+        s = modify_lines(s, lambda l: re.sub(r'.*ranlib:.*has no symbols', '', l))
+
     return s
 
 # normalise a .prof file, so that we can reasonably compare it against
