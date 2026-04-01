@@ -499,6 +499,11 @@ extern char **environ;
       SymI_HasDataProto(stg_gc_pp)                                          \
       SymI_HasDataProto(stg_gc_ppp)                                         \
       SymI_HasDataProto(stg_gc_pppp)                                        \
+      SymI_HasDataProto(stg_gc_ppppp)                                       \
+      SymI_HasDataProto(stg_gc_ip)                                          \
+      SymI_HasDataProto(stg_gc_pi)                                          \
+      SymI_HasDataProto(stg_gc_ii)                                          \
+      SymI_HasDataProto(stg_gc_bpp)                                         \
       SymI_HasDataProto(__stg_gc_fun)                                       \
       SymI_HasDataProto(stg_gc_fun_info)                                    \
       SymI_HasDataProto(stg_yield_noregs)                                   \

@@ -361,6 +361,11 @@ RTS_FUN_DECL(stg_gc_l1);
 RTS_FUN_DECL(stg_gc_pp);
 RTS_FUN_DECL(stg_gc_ppp);
 RTS_FUN_DECL(stg_gc_pppp);
+RTS_FUN_DECL(stg_gc_ppppp);
+RTS_FUN_DECL(stg_gc_ip);
+RTS_FUN_DECL(stg_gc_pi);
+RTS_FUN_DECL(stg_gc_ii);
+RTS_FUN_DECL(stg_gc_bpp);
 
 RTS_RET(stg_gc_fun);
 RTS_FUN_DECL(__stg_gc_fun);

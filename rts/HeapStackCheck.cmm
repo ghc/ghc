@@ -373,8 +373,6 @@ stg_gc_l1 return (L_ l)
     jump stg_gc_noregs (stg_ret_l_info, l) ();
 }
 
-/*-- Unboxed tuples with multiple pointers -------------------------------- */
-
 stg_gc_pp return (P_ arg1, P_ arg2)
 {
     call stg_gc_noregs();
@@ -391,6 +389,36 @@ stg_gc_pppp return (P_ arg1, P_ arg2, P_ arg3, P_ arg4)
 {
     call stg_gc_noregs();
     return (arg1,arg2,arg3,arg4);
+}
+
+stg_gc_ppppp return (P_ arg1, P_ arg2, P_ arg3, P_ arg4, P_ arg5)
+{
+    call stg_gc_noregs();
+    return (arg1,arg2,arg3,arg4,arg5);
+}
+
+stg_gc_ip return (W_ arg1, P_ arg2)
+{
+    call stg_gc_noregs();
+    return (arg1,arg2);
+}
+
+stg_gc_pi return (P_ arg1, W_ arg2)
+{
+    call stg_gc_noregs();
+    return (arg1,arg2);
+}
+
+stg_gc_ii return (W_ arg1, W_ arg2)
+{
+    call stg_gc_noregs();
+    return (arg1,arg2);
+}
+
+stg_gc_bpp return (I8 arg1, P_ arg2, P_ arg3)
+{
+    call stg_gc_noregs();
+    return (arg1,arg2,arg3);
 }
 
 /* -----------------------------------------------------------------------------

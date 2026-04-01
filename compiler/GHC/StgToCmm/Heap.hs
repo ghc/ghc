@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 -----------------------------------------------------------------------------
 --
 -- Stg to C--: heap management functions
@@ -44,7 +45,7 @@ import GHC.Types.Id ( Id )
 import GHC.Unit
 import GHC.Platform
 import GHC.Platform.Profile
-import GHC.Data.FastString( mkFastString, fsLit )
+import GHC.Data.FastString( FastString )
 import GHC.Utils.Panic( sorry )
 
 import Control.Monad (when)
@@ -125,7 +126,7 @@ allocHeapClosure rep info_ptr use_cc payload = do
             -- ie 1 *before* the info-ptr word of new object.
 
   base <- getHpRelOffset info_offset
-  emitComment $ mkFastString "allocHeapClosure"
+  emitComment "allocHeapClosure"
   emitSetDynHdr base info_ptr use_cc
 
   -- Fill in the fields
@@ -460,35 +461,41 @@ genericGC checkYield code
        call <- mkCall generic_gc (GC, GC) [] [] updfr_sz []
        heapCheck False checkYield (call <*> mkBranch lretry) code
 
+-- | Predefined ("canned") GC functions
+--
+-- Functions have been added to cover 99% of the GC calls made in GHC and Cabal.
+-- See #27142.
 cannedGCEntryPoint :: Platform -> [LocalReg] -> Maybe CmmExpr
-cannedGCEntryPoint platform regs
-  = case map localRegType regs of
-      []  -> Just (mkGcLabel "stg_gc_noregs")
-      [ty]
-          | isGcPtrType ty -> Just (mkGcLabel "stg_gc_unpt_r1")
-          | isFloatType ty -> case width of
-                                  W32       -> Just (mkGcLabel "stg_gc_f1")
-                                  W64       -> Just (mkGcLabel "stg_gc_d1")
-                                  _         -> Nothing
-
-          | width == wordWidth platform -> Just (mkGcLabel "stg_gc_unbx_r1")
-          | width == W64                -> Just (mkGcLabel "stg_gc_l1")
-          | otherwise                   -> Nothing
-          where
-              width = typeWidth ty
-      [ty1,ty2]
-          |  isGcPtrType ty1
-          && isGcPtrType ty2 -> Just (mkGcLabel "stg_gc_pp")
-      [ty1,ty2,ty3]
-          |  isGcPtrType ty1
-          && isGcPtrType ty2
-          && isGcPtrType ty3 -> Just (mkGcLabel "stg_gc_ppp")
-      [ty1,ty2,ty3,ty4]
-          |  isGcPtrType ty1
-          && isGcPtrType ty2
-          && isGcPtrType ty3
-          && isGcPtrType ty4 -> Just (mkGcLabel "stg_gc_pppp")
-      _otherwise -> Nothing
+cannedGCEntryPoint platform regs =
+  case map localRegType regs of
+    []   -> ret "stg_gc_noregs"
+    [ty]
+        | is_gc  ty -> ret "stg_gc_unpt_r1"
+        | is_f32 ty -> ret "stg_gc_f1"
+        | is_f64 ty -> ret "stg_gc_d1"
+        | is_wn ty  -> ret "stg_gc_unbx_r1"
+        | is_w64 ty -> ret "stg_gc_l1"
+    [ty1,ty2]
+        | is_gc ty1 && is_gc ty2 -> ret "stg_gc_pp"
+        | is_gc ty1 && is_wn ty2 -> ret "stg_gc_pi"
+        | is_wn ty1 && is_gc ty2 -> ret "stg_gc_ip"
+        | is_wn ty1 && is_wn ty2 -> ret "stg_gc_ii"
+    [ty1,ty2,ty3]
+        | is_gc ty1 && is_gc ty2 && is_gc ty3 -> ret "stg_gc_ppp"
+        | is_w8 ty1 && is_gc ty2 && is_gc ty3 -> ret "stg_gc_bpp"
+    [ty1,ty2,ty3,ty4]
+        | is_gc ty1 && is_gc ty2 && is_gc ty3 && is_gc ty4 -> ret "stg_gc_pppp"
+    [ty1,ty2,ty3,ty4,ty5]
+        | is_gc ty1 && is_gc ty2 && is_gc ty3 && is_gc ty4 && is_gc ty5 -> ret "stg_gc_ppppp"
+    _ -> Nothing
+  where
+    ret fs = Just (mkGcLabel fs)
+    is_gc  ty = isGcPtrType ty
+    is_wn  ty = isBitsType ty && typeWidth ty == wordWidth platform
+    is_w8  ty = isBitsType ty && typeWidth ty == W8
+    is_w64 ty = isBitsType ty && typeWidth ty == W64
+    is_f32 ty = isFloatType ty && typeWidth ty == W32
+    is_f64 ty = isFloatType ty && typeWidth ty == W64
 
 -- Note [stg_gc arguments]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -514,8 +521,8 @@ generic_gc :: CmmExpr
 generic_gc = mkGcLabel "stg_gc_noregs"
 
 -- | Create a CLabel for calling a garbage collector entry point
-mkGcLabel :: String -> CmmExpr
-mkGcLabel s = CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit s)))
+mkGcLabel :: FastString -> CmmExpr
+mkGcLabel s = CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId s))
 
 -------------------------------
 heapCheck :: Bool -> Bool -> CmmAGraph -> FCode a -> FCode a
