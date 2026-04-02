@@ -3648,6 +3648,7 @@ makeDynFlagsConsistent dflags
                  ". Ignoring -fhpc."
       in loop dflags' warn
 
+
  | backendSwappableWithViaC (backend dflags) &&
    platformUnregisterised (targetPlatform dflags)
     = loop (dflags { backend = viaCBackend })

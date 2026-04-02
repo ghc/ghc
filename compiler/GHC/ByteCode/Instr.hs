@@ -17,6 +17,7 @@ import GHC.ByteCode.Types
 import GHC.Cmm.Type (Width)
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Utils.Outputable
+import GHC.Data.FastString     ( FastString )
 import GHC.Types.Name
 import GHC.Types.Literal
 import GHC.Types.Unique
@@ -260,6 +261,10 @@ data BCInstr
    -- Breakpoints
    | BRK_FUN          !InternalBreakpointId
 
+   -- | HPC tick instruction
+   | HPC_TICK         !FastString -- ^ Name of the tickbox array
+                      !Word32     -- ^ Index into the tickbox array
+
 #if MIN_VERSION_rts(1,0,3)
    -- | A "meta"-instruction for recording the name of a BCO for debugging purposes.
    -- These are ignored by the interpreter but helpfully printed by the disassmbler.
@@ -454,6 +459,7 @@ instance Outputable BCInstr where
                              = text "BRK_FUN" <+> text "<breakarray>"
                                <+> ppr info_mod <+> ppr infox
                                <+> text "<cc>"
+   ppr (HPC_TICK lbl ix)     = text "HPC_TICK" <+> ppr lbl <+> ppr ix
 #if MIN_VERSION_rts(1,0,3)
    ppr (BCO_NAME nm)         = text "BCO_NAME" <+> text (show nm)
 #endif
@@ -580,6 +586,7 @@ bciStackUse OP_INDEX_ADDR{}         = 0
 
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0
+bciStackUse HPC_TICK{}            = 0
 
 -- These insns actually reduce stack use, but we need the high-tide level,
 -- so can't use this info.  Not that it matters much.
