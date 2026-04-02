@@ -3061,7 +3061,7 @@ data LintEnv
                   -- Non-CoVar Ids don't appear in here, not even in the InScopeSet
                   -- Used for cloning to avoid shadowing of TyCoVars, so that eqType works ok
                   --    See Note [Dealing with shadowing]
-                  -- /Not/ used for substitution of type-lets; that is done via the unfoldign
+                  -- /Not/ used for substitution of type-lets; that is done via the unfolding
                   --    inside the type variable.
 
        , le_in_vars :: VarEnv (InVar, OutVar)
@@ -3764,6 +3764,10 @@ checkBndrOccCompatibility in_bndr v_occ
   = do { checkL (occ_is == bndr_is) $
          bndr_occ_mismatch (ppr bndr_is) (ppr occ_is)
 
+-- *** ToDo: thing about WhatItIs.
+-- intent: occurrence should be the same kind of thing as the binder
+-- *** ToDo: check that we don't have a term var in a type.
+
        -- Check for the case where an /occurrence/ is
        -- a GlobalId, but there is an enclosing binding for a LocalId.
        -- NB: the in-scope variables are mostly LocalIds, checked by lintIdBndr,
@@ -3782,6 +3786,9 @@ checkBndrOccCompatibility in_bndr v_occ
        ; ensureEqTys occ_ty in_bndr_ty $
          hang (text "Mismatch in type between binder and occurrence")
             2 extra_info
+
+-- *** ToDo: check (TCL4) no-shadowing, but we can only do that when
+-- 
 
        ; checkLM (sameUnfolding in_bndr v_occ) $
          hang (text "Mismatch in type-let unfolding between binder and occurrence")

@@ -529,8 +529,10 @@ We allow non-recursive type lets:
    let a = TYPE (Maybe Int) in <body>
 and similarly for coercions.  We support this as follows:
 
-(TCL1) A let-bound TyVar `a` usually (see (TLC1) has an /unfolding/, equal to the
-  RHS of the let-binding.
+(TCL1) A let-bound TyVar `a` usually has an /unfolding/, equal to the
+  RHS of the let-binding.  But see (TCLW1) for the exception.
+
+  However: an occurrence has an unfolding iff the binder does
 
 (TCL2) If you use `-fprint-tyvar-unfoldings` you can see the unfolding at every
   occurrence of `a`, printed like this: a{=Maybe Int}
@@ -539,9 +541,12 @@ and similarly for coercions.  We support this as follows:
   of a TyVar, just as they look through type synonyms.  See the use of
   `tyVarUnfolding_maybe` in `GHC.Core.Type.coreView`.
 
-(TCL4) General invariant: if `a` is let-bound, a=<type>, then every /occurrence/
-  of `a` (as well as the binder) has an unfolding `rhs`.  Reason: all occurrences
-  must behave like <type>, without referring to any environment.
+(TCL4) General invariant: if `a` is let-bound with a TyVarUnfolding a{=<rhs>}, then
+  1. Every /occurrence/ of `a` has the same unfolding <rhs>
+  2. The free variables of `rhs` are all in scope at the occurrence site; they must
+     not be shadowed.  c.f. Note [No type-shadowing in Core]
+
+  Reason: all occurrences must behave like <rhs>, without referring to any environment.
 
   Consider a beta-redex  ((/\a. blah) ty) in the Simplifier.  We may turn that into
          let @a{=ty} = ty in blah
@@ -549,7 +554,10 @@ and similarly for coercions.  We support this as follows:
   tyvar-replete-with-unfolding, rather than merely extending the in-scope set
   as we do for Ids.
 
-  Excpetion: see (TCLW1).
+  Exception: see (TCLW1).
+
+  *** TODO ** (TLC4) is just invariant (NoTypeShadowing)
+  *** TODO ** Explain we don't apply the same invariant to /terms/
 
 (TCL5) A lambda-bound or case-bound type variable never has an unfolding.
 
@@ -559,17 +567,24 @@ and similarly for coercions.  We support this as follows:
 
 Wrinkles:
 
-(TCLW1) In a type let (Let @a = TYPE ty in body), we do /not/ insist that
-  the binder `a` has a TyVarUnfolding.  But if it does not, then the occurrences
-  of `a` in `body` should not have an unfolding, and `body` must be well-typed
-  without paying attention to the binding. More precisely,
-       let @a = TYPE ty in body
-  where `a` has no TyVarUnfolding, is well-typed iff
-       (/\a. body) ty
-  is well-typed.  This is used during worker/wrapper, which creates type-lets.
-  See GHC.Core.Opt.WorkWrap.Utils.mkAppsBeta.
+(TCLW1)    *** TODO *** I think this is now out of date, once we have !15829 ****
+  In a type let (Let @a = TYPE ty in body), we do /not/ insist that
+  the binder `a` has a TyVarUnfolding.  Why don't we insist?  Because then we
+  could not just wrap a well-typed expression in a let-binding for one of its
+  free type variables.
 
-  So: (TCL4) + (TCLW1): an occurrence has an unfolding iff the binder does
+  If the type binding does /not/ have a TyVarUnfolding, then `body` must be
+  well-typed without paying attention to the binding. More precisely,
+       let @a = TYPE ty in body
+   where `a` has no TyVarUnfolding, is well-typed iff
+        (/\a. body) ty
+   is well-typed.  This is used during worker/wrapper, which creates type-lets.
+   See GHC.Core.Opt.WorkWrap.Utils.mkAppsBeta.
+
+  e.g.  let @a = Char in id @a 'x'
+  where 'a' does not have a TyVarUnfolding, is is not well-typed, because to
+  check (id @a 'x') we need to know that a=Char.  The sub-expression (id @a 'x')
+  is simply ill-typed!
 
 (TCLW2) In the output of the desugarer /only/, it is very convenient to allow
       let a = <type> in ...a....
