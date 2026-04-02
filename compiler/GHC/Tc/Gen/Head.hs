@@ -223,14 +223,15 @@ addArgWrap wrap args
 
 
 --------------------
-getFunSrcSpan :: [HsExprArg 'TcpRn] -> TcM SrcSpan
-getFunSrcSpan [] = getSrcSpanM
-getFunSrcSpan (ETypeArg { ea_loc_span = l }    : _)    = return (locA l)
-getFunSrcSpan (EValArg  { ea_loc_span = l }    : _)    = return (locA l)
-getFunSrcSpan (EPrag l _                       : _)    = return (locA l)
-getFunSrcSpan (EWrap (EPar l)                  : _)    = return (locA l)
-getFunSrcSpan (EWrap (EExpand l _)             : _)    = return (locA l)
-getFunSrcSpan (EWrap (EHsWrap {})              : args) = getFunSrcSpan args
+getFunSrcSpan :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> TcM SrcSpan
+getFunSrcSpan (ExprWithTySig _ (L l _) _) _              = return (locA l)
+getFunSrcSpan _                                    []    = getSrcSpanM
+getFunSrcSpan _ (ETypeArg { ea_loc_span = l }    : _)    = return (locA l)
+getFunSrcSpan _ (EValArg  { ea_loc_span = l }    : _)    = return (locA l)
+getFunSrcSpan _ (EPrag l _                       : _)    = return (locA l)
+getFunSrcSpan _ (EWrap (EPar l)                  : _)    = return (locA l)
+getFunSrcSpan _ (EWrap (EExpand l _)             : _)    = return (locA l)
+getFunSrcSpan f (EWrap (EHsWrap {})              : args) = getFunSrcSpan f args
 
 --------------------
 isHsValArg :: HsExprArg id -> Bool
@@ -294,10 +295,10 @@ instance Outputable EWrap where
 splitHsApps :: HsExpr GhcRn -> TcM (HsExpr GhcRn, [HsExprArg 'TcpRn])
 splitHsApps e = go e []
   where
-    go (HsPar _ (L l fun))        args = go fun (EWrap (EPar l)   : args)
-    go (HsPragE _ p (L l fun))    args = go fun (EPrag      l p   : args)
-    go (HsAppType _ (L l fun) ty) args = go fun (mkETypeArg l ty  : args)
-    go (HsApp _ (L l fun) arg)    args = go fun (mkEValArg  l arg : args)
+    go (HsPar _ (L l fun))         args = go fun (EWrap (EPar l)   : args)
+    go (HsPragE _ p (L l fun))     args = go fun (EPrag      l p   : args)
+    go (HsAppType _ (L l fun) ty)  args = go fun (mkETypeArg l ty  : args)
+    go (HsApp _ (L l fun) arg)     args = go fun (mkEValArg  l arg : args)
     go fun args = do { mb_hse <- tcExpand fun
                      ; case mb_hse of
                           Just (HSE { hse_ctxt = orig, hse_exp = L l fun' })
