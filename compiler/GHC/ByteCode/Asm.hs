@@ -25,6 +25,8 @@ module GHC.ByteCode.Asm (
 import GHC.Prelude hiding ( any, words )
 
 import Data.Maybe
+import qualified GHC.Data.Strict as Strict
+
 import GHC.ByteCode.Instr
 import GHC.ByteCode.InfoTable
 import GHC.ByteCode.Types
@@ -128,8 +130,9 @@ assembleBCOs
   -> [(Name, ByteString)]
   -> Maybe InternalModBreaks
   -> [SptEntry]
+  -> Strict.Maybe ByteCodeHpcInfo
   -> IO CompiledByteCode
-assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
+assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries use_hpc = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   let itbls = mkITbls profile tycons
@@ -140,6 +143,7 @@ assembleBCOs profile proto_bcos tycons top_strs modbreaks spt_entries = do
     , bc_strs = top_strs
     , bc_breaks = modbreaks
     , bc_spt_entries = spt_entries
+    , bc_hpc_info = use_hpc
     }
 
 -- Note [Allocating string literals]
@@ -970,6 +974,12 @@ assembleI platform i = case i of
     np               <- lit1 $ BCONPtrCostCentre ibi
     emit_ bci_BRK_FUN [ Op p1, Op info_addr, Op info_unitid_addr
                       , SmallOp ix_hi, SmallOp ix_lo, Op np ]
+
+  HPC_TICK lbl ix -> do
+    p <- lit1 (BCONPtrLbl lbl)
+    let ix_hi = fromIntegral (ix `shiftR` 16)
+        ix_lo = fromIntegral (ix .&. 0xffff)
+    emit_ bci_HPC_TICK [Op p, SmallOp ix_hi, SmallOp ix_lo]
 
 #if MIN_VERSION_rts(1,0,3)
   BCO_NAME name            -> do np <- lit1 (BCONPtrStr name)

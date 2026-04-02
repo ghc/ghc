@@ -1703,7 +1703,7 @@ run_BCO:
             &&lbl_bci_TESTEQ_W8 - &&lbl_bci_DEFAULT,
             &&lbl_bci_PRIMCALL - &&lbl_bci_DEFAULT,
             &&lbl_bci_BCO_NAME - &&lbl_bci_DEFAULT,
-            &&lbl_bci_DEFAULT - &&lbl_bci_DEFAULT,
+            &&lbl_bci_HPC_TICK - &&lbl_bci_DEFAULT,
             &&lbl_bci_OP_ADD_64 - &&lbl_bci_DEFAULT,
             &&lbl_bci_OP_SUB_64 - &&lbl_bci_DEFAULT,
             &&lbl_bci_OP_AND_64 - &&lbl_bci_DEFAULT,
@@ -2067,6 +2067,15 @@ run_BCO:
             cap->r.rCurrentTSO->flags &= ~TSO_STOPPED_ON_BREAKPOINT;
 
             // continue normal execution of the byte code instructions
+            NEXT_INSTRUCTION;
+        }
+
+        INSTRUCTION(bci_HPC_TICK): {
+            W_ arg1_ticks_array, arg2_tick_index;
+            arg1_ticks_array = BCO_GET_LARGE_ARG;
+            arg2_tick_index  = BCO_READ_NEXT_32;
+
+            ((StgWord64*)BCO_LIT(arg1_ticks_array))[arg2_tick_index]++;
             NEXT_INSTRUCTION;
         }
 

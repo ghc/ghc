@@ -402,6 +402,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
                           , mg_foreign_files    = foreign_files
                           , mg_modBreaks        = modBreaks
                           , mg_boot_exports     = boot_exports
+                          , mg_hpc_info         = hpc_info
                           }) = do
 
   (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod tcs binds imp_rules
@@ -471,6 +472,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
                  , cg_dep_pkgs      = S.map snd (dep_direct_pkgs deps)
                  , cg_modBreaks     = modBreaks
                  , cg_spt_entries   = spt_entries
+                 , cg_hpc_info      = hpc_info
                  }
          , ModDetails { md_types            = tidy_type_env
                       , md_rules            = tidy_rules

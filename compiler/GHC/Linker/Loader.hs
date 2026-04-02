@@ -65,9 +65,10 @@ import GHCi.RemoteTypes
 import GHC.Iface.Load
 import GHCi.Message
 
+import GHC.ByteCode.Asm
 import GHC.ByteCode.Breakpoints
 import GHC.ByteCode.Linker
-import GHC.ByteCode.Asm
+import GHC.ByteCode.Serialize
 import GHC.ByteCode.Types
 
 import GHC.Linker.Unit (getUnitDepends)
@@ -97,8 +98,9 @@ import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModIface
 import GHC.Unit.State as Packages
 
-import qualified GHC.Data.ShortText as ST
 import GHC.Data.FastString
+import qualified GHC.Data.ShortText as ST
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Linker.Deps
 import GHC.Linker.MacOS
@@ -136,7 +138,6 @@ import qualified GHC.Runtime.Interpreter as GHCi
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Map.Strict as M
 import Foreign.Ptr (nullPtr)
-import GHC.ByteCode.Serialize
 
 -- Note [Linkers and loaders]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1025,6 +1026,8 @@ dynLinkCompiledByteCode interp pkgs_loaded whole_bytecode_state traverse_bytecod
           let ce2 = extendClosureEnv (closure_env (bco_linker_env bytecode_state)) new_binds
           -- Add SPT entries
           mapM_ (linkSptEntry interp ce2) (concatMap bc_spt_entries cbcs)
+          -- Load HPC modules
+          mapM_ (linkHpcEntry interp . bc_hpc_info) cbcs
           return $! bytecode_state { bco_linker_env = (bco_linker_env bytecode_state) { closure_env = ce2 } }
 
 -- | Register SPT entries for this module in the interpreter
@@ -1037,8 +1040,14 @@ linkSptEntry interp ce (SptEntry name fpr) = do
     Nothing -> pprPanic "linkSptEntry" (ppr name)
     Just (_, hval) -> addSptEntry interp fpr hval
 
-
-
+linkHpcEntry :: Interp -> Strict.Maybe ByteCodeHpcInfo -> IO ()
+linkHpcEntry _interp Strict.Nothing = pure ()
+linkHpcEntry interp (Strict.Just info) = do
+  addHpcModule interp
+    (bchi_module_name info)
+    (bchi_tick_count info)
+    (bchi_hash info)
+    (bchi_tickbox_name info)
 
 -- Link a bunch of BCOs and return references to their values
 linkSomeBCOs :: Interp

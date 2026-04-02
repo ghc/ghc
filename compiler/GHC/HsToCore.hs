@@ -163,20 +163,20 @@ deSugar hsc_env
                                        export_set (typeEnvTyCons type_env) binds
                               else return (binds, Nothing)
         ; let modBreaks
-                | Just (_, specs) <- m_tickInfo
+                | Just (_, _, breakpointSpecs) <- m_tickInfo
                 , breakpointsAllowed dflags
-                = Just $ mkModBreaks (interpreterProfiled $ hscInterp hsc_env) mod specs
+                = Just $ mkModBreaks (interpreterProfiled $ hscInterp hsc_env) mod breakpointSpecs
                 | otherwise
                 = Nothing
 
         ; ds_hpc_info <- case m_tickInfo of
-            Just (orig_file2, ticks)
+            Just (orig_file2, hpcTicks, _)
               | gopt Opt_Hpc $ hsc_dflags hsc_env
               -> do
               hashNo <- if gopt Opt_Hpc $ hsc_dflags hsc_env
-                then writeMixEntries (hpcDir dflags) mod ticks orig_file2
+                then writeMixEntries (hpcDir dflags) mod hpcTicks orig_file2
                 else return 0 -- dummy hash when none are written
-              pure $ HpcInfo (fromIntegral $ sizeSS ticks) hashNo
+              pure $ HpcInfo (fromIntegral $ sizeSS hpcTicks) hashNo
             _ -> pure $ emptyHpcInfo
 
         ; (msgs, mb_res) <- initDs hsc_env tcg_env $

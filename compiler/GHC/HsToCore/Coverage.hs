@@ -6,6 +6,11 @@
 module GHC.HsToCore.Coverage
   ( writeMixEntries
   , hpcInitCode
+  , hpcStubLabel
+  , hpcModuleName
+  , hpcTickBoxes
+  , mkHpcTickBoxesLabell
+  , mkHpcModuleLabel
   ) where
 
 import GHC.Prelude as Prelude
@@ -116,24 +121,41 @@ hpcInitCode _ _ (NoHpcInfo {}) = mempty
 hpcInitCode platform this_mod (HpcInfo tickCount hashNo)
  = initializerCStub platform fn_name decls body
   where
-    fn_name = mkInitializerStubLabel this_mod (fsLit "hpc")
+    fn_name = hpcStubLabel this_mod
     decls = text "StgWord64 " <> tickboxes <> brackets (int tickCount) <> semi
     body = text "hs_hpc_module" <>
               parens (hcat (punctuate comma [
-                  doubleQuotes full_name_str,
+                  doubleQuotes (hpcModuleName this_mod),
                   int tickCount, -- really StgWord32
                   int hashNo,    -- really StgWord32
                   tickboxes
                 ])) <> semi
+    tickboxes = hpcTickBoxes platform this_mod
 
-    tickboxes = pprCLabel platform (mkHpcTicksLabel $ this_mod)
+hpcStubLabel :: Module -> CLabel
+hpcStubLabel this_mod = mkInitializerStubLabel this_mod (fsLit "hpc")
 
-    module_name  = hcat (map (text.charToC) $ BS.unpack $
-                         bytesFS (moduleNameFS (moduleName this_mod)))
-    package_name = hcat (map (text.charToC) $ BS.unpack $
-                         bytesFS (unitFS  (moduleUnit this_mod)))
-    full_name_str
-       | moduleUnit this_mod == mainUnit
-       = module_name
-       | otherwise
-       = package_name <> char '/' <> module_name
+hpcModuleName :: Module -> SDoc
+hpcModuleName this_mod =  full_name_str
+  where
+  full_name_str
+    | moduleUnit this_mod == mainUnit
+    = module_name
+    | otherwise
+    = package_name <> char '/' <> module_name
+  module_name  = hcat (map (text.charToC) $ BS.unpack $
+                    bytesFS (moduleNameFS (moduleName this_mod)))
+
+  package_name = hcat (map (text.charToC) $ BS.unpack $
+                        bytesFS (unitFS  (moduleUnit this_mod)))
+
+hpcTickBoxes :: Platform -> Module -> SDoc
+hpcTickBoxes platform this_mod = pprCLabel platform (mkHpcTicksLabel this_mod)
+
+mkHpcTickBoxesLabell :: Platform -> Module -> String
+mkHpcTickBoxesLabell platform mod =
+  showSDocOneLine defaultSDocContext (pprCode $ hpcTickBoxes platform mod)
+
+mkHpcModuleLabel :: Module -> String
+mkHpcModuleLabel mod =
+  showSDocOneLine defaultSDocContext (pprCode $ hpcModuleName mod)

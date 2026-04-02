@@ -23,7 +23,10 @@ test('T2991', [cmd_wrapper(T2991)],
               # Run with 'ghc --main'. Do not list other modules explicitly.
               multimod_compile_and_run, ['T2991', ''])
 
-test('T17073', when(opsys('mingw32'), expect_broken(17607)),
-     makefile_test, ['T17073 HPC={hpc}'])
+test('T17073a', [when(opsys('mingw32'), expect_broken(17607)), extra_files(['T17073.hs'])],
+     makefile_test, ['T17073a HPC={hpc}'])
+test('T17073b', [extra_files(['T17073.hs'])],
+     makefile_test, ['T17073b HPC={hpc}'])
 
-test('T20568', normal, makefile_test, [])
+test('T20568a', [extra_files(['T20568.hs'])], makefile_test, [])
+test('T20568b', [extra_files(['T20568.hs'])], makefile_test, [])

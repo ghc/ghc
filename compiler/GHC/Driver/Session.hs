@@ -3792,12 +3792,6 @@ makeDynFlagsConsistent dflags
            pgmError (backendDescription (backend dflags) ++
                      " supports only unregisterised ABI but target platform doesn't use it.")
 
- | gopt Opt_Hpc dflags && not (backendSupportsHpc (backend dflags))
-    = let dflags' = gopt_unset dflags Opt_Hpc
-          warn = "Hpc can't be used with " ++ backendDescription (backend dflags) ++
-                 ". Ignoring -fhpc."
-      in loop dflags' warn
-
  | backendSwappableWithViaC (backend dflags) &&
    platformUnregisterised (targetPlatform dflags)
     = loop (dflags { backend = viaCBackend })
