@@ -18,4 +18,3 @@ data HpcInfo
 
 emptyHpcInfo :: HpcInfo
 emptyHpcInfo = NoHpcInfo
-

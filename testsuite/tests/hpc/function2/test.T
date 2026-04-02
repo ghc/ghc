@@ -14,3 +14,14 @@ test('tough2',
        omit_ways(ghci_ways + prof_ways), # profile goes in the wrong place
        when(arch('wasm32'), fragile(23243)) ],
      multimod_compile_and_run, ['subdir/tough2.lhs', '-fhpc'])
+
+# Same as tough2, but for ghci
+test('tough3',
+     [extra_files(['../hpcrun.pl', 'subdir/']),
+       literate,
+       cmd_prefix(hpc_prefix),
+       ignore_extension,
+       extra_hc_opts('-fhpc subdir/tough2.lhs'),
+       omit_ways(ghci_ways + prof_ways), # profile goes in the wrong place
+       when(arch('wasm32'), fragile(23243)) ],
+     ghci_script, ['tough3.script'])

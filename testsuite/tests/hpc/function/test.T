@@ -1,4 +1,4 @@
-setTestOpts([omit_ghci, when(fast(), skip), js_skip])
+setTestOpts([when(fast(), skip), js_skip])
 
 hpc_prefix = "perl hpcrun.pl --clear --exeext={exeext} --hpc={hpc}"
 
@@ -8,3 +8,9 @@ test('tough',
       ignore_extension,
       when(arch('wasm32'), fragile(23243))],
      compile_and_run, ['-fhpc'])
+
+test('tough1',
+     [extra_files(['tough.hs']),
+      ignore_extension,
+      when(arch('wasm32'), fragile(23243))],
+     makefile_test, [])
