@@ -68,6 +68,7 @@ import GHC.Data.Maybe
 import GHC.Types.Tickish
 import GHC.Types.SptEntry
 import GHC.ByteCode.Breakpoints
+import qualified GHC.HsToCore.Coverage as Coverage
 
 import Data.List ( genericReplicate, intersperse
                  , partition, scanl', sortBy, zip4, zip6 )
@@ -97,6 +98,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (ReaderT(..))
 import Control.Monad.Trans.State  (StateT(..))
 import Data.Bifunctor (Bifunctor(..))
+import qualified GHC.Data.Strict as Strict
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -107,8 +109,9 @@ byteCodeGen :: HscEnv
             -> [TyCon]
             -> Maybe ModBreaks
             -> [SptEntry]
+            -> Strict.Maybe ByteCodeHpcInfo
             -> IO CompiledByteCode
-byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
+byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries hpc_info
    = withTiming logger
                 (text "GHC.StgToByteCode"<+>brackets (ppr this_mod))
                 (const ()) $ do
@@ -134,7 +137,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks spt_entries
         let mod_breaks = case mb_modBreaks of
              Nothing -> Nothing
              Just mb -> Just $ mkInternalModBreaks this_mod breakInfo mb
-        cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries
+        cbc <- assembleBCOs profile proto_bcos tycs strings mod_breaks spt_entries hpc_info
 
         -- Squash space leaks in the CompiledByteCode.  This is really
         -- important, because when loading a set of modules into GHCi
@@ -628,6 +631,11 @@ schemeE d s p (StgLet _ext binds body) = do
 schemeE _d _s _p (StgTick (Breakpoint _ bp_id _) _rhs)
    = pprPanic "schemeE: Breakpoint without let binding:"
         (ppr bp_id <+> text "forgot to run bcPrep?")
+
+schemeE d s p (StgTick (HpcTick mod ix) rhs) = do
+   platform <- profilePlatform <$> getProfile
+   rhs_code <- schemeE d s p rhs
+   pure (unitOL (HPC_TICK (mkHpcTickBoxesLabell platform mod) (fromIntegral ix)) `appOL` rhs_code)
 
 -- ignore other kinds of tick
 schemeE d s p (StgTick _ rhs) = schemeE d s p rhs
@@ -2802,6 +2810,10 @@ getLastBreakTick = BcM $ \env st ->
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
+
+mkHpcTickBoxesLabell :: Platform -> Module -> FastString
+mkHpcTickBoxesLabell platform mod =
+  fsLit (Coverage.mkHpcTickBoxesLabell platform mod)
 
 -- Dehydrating CgBreakInfo
 

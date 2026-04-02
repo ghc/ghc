@@ -101,7 +101,7 @@ addTicksToBinds
                                 -- hasn't set it), so we have to work from this set.
         -> [TyCon]              -- ^ Type constructors in this module
         -> LHsBinds GhcTc
-        -> IO (LHsBinds GhcTc, Maybe (FilePath, SizedSeq Tick))
+        -> IO (LHsBinds GhcTc, Maybe (FilePath, SizedSeq Tick, SizedSeq Tick))
 
 addTicksToBinds logger cfg
                 mod mod_loc exports tyCons binds
@@ -135,12 +135,13 @@ addTicksToBinds logger cfg
 
           (binds1,st) = foldr tickPass (binds, initTTState) passes
 
-          extendedMixEntries = ticks st
+          hpcEntries = hpcTicks st
+          breakpointEntries = breakpointTicks st
 
      putDumpFileMaybe logger Opt_D_dump_ticked "HPC" FormatHaskell
        (pprLHsBinds binds1)
 
-     return (binds1, Just (orig_file2, extendedMixEntries))
+     return (binds1, Just (orig_file2, hpcEntries, breakpointEntries))
 
   | otherwise = return (binds, Nothing)
 
@@ -1053,23 +1054,31 @@ addTickArithSeqInfo (FromThenTo e1 e2 e3) =
                 (addTickLHsExpr e2)
                 (addTickLHsExpr e3)
 
-data TickTransState = TT { ticks       :: !(SizedSeq Tick)
-                         , ccIndices   :: !CostCentreState
-                         , recSelTicks :: !(IdEnv CoreTickish)
+data TickTransState = TT { hpcTicks        :: !(SizedSeq Tick)
+                         , breakpointTicks :: !(SizedSeq Tick)
+                         , ccIndices       :: !CostCentreState
+                         , recSelTicks     :: !(IdEnv CoreTickish)
                          }
 
 initTTState :: TickTransState
-initTTState = TT { ticks        = emptySS
-                 , ccIndices    = newCostCentreState
-                 , recSelTicks  = emptyVarEnv
+initTTState = TT { hpcTicks        = emptySS
+                 , breakpointTicks = emptySS
+                 , ccIndices       = newCostCentreState
+                 , recSelTicks     = emptyVarEnv
                  }
 
-addMixEntry :: Tick -> TM Int
-addMixEntry ent = do
-  c <- fromIntegral . sizeSS . ticks <$> getState
+addHpcEntry :: Tick -> TM Int
+addHpcEntry ent = do
+  c <- fromIntegral . sizeSS . hpcTicks <$> getState
   setState $ \st ->
-    st { ticks = addToSS (ticks st) ent
-       }
+    st { hpcTicks = addToSS (hpcTicks st) ent }
+  return c
+
+addBreakpointEntry :: Tick -> TM Int
+addBreakpointEntry ent = do
+  c <- fromIntegral . sizeSS . breakpointTicks <$> getState
+  setState $ \st ->
+    st { breakpointTicks = addToSS (breakpointTicks st) ent }
   return c
 
 addRecSelTick :: Id -> CoreTickish -> TM ()
@@ -1297,7 +1306,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
 
   env <- getEnv
   case tickishType env of
-    HpcTicks -> HpcTick (this_mod env) <$> addMixEntry me
+    HpcTicks -> HpcTick (this_mod env) <$> addHpcEntry me
 
     ProfNotes -> do
       flavour <- mkHpcCCFlavour <$> getCCIndexM cc_name
@@ -1306,7 +1315,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
       return $ ProfNote cc count True{-scopes-}
 
     Breakpoints -> do
-      i <- addMixEntry me
+      i <- addBreakpointEntry me
       pure (Breakpoint noExtField (BreakpointId (this_mod env) i) ids)
 
     SourceNotes | RealSrcSpan pos' _ <- pos ->
@@ -1331,19 +1340,19 @@ mkBinTickBoxHpc :: (Bool -> BoxLabel) -> SrcSpan -> LHsExpr GhcTc
 mkBinTickBoxHpc boxLabel pos e = do
   env <- getEnv
   binTick <- HsBinTick
-    <$> addMixEntry (Tick { tick_loc = pos
+    <$> addHpcEntry (Tick { tick_loc = pos
                           , tick_path = declPath env
                           , tick_ids = []
                           , tick_label = boxLabel True
                           })
-    <*> addMixEntry (Tick { tick_loc = pos
+    <*> addHpcEntry (Tick { tick_loc = pos
                           , tick_path = declPath env
                           , tick_ids = []
                           , tick_label = boxLabel False
                           })
     <*> pure e
   tick <- HpcTick (this_mod env)
-    <$> addMixEntry (Tick { tick_loc = pos
+    <$> addHpcEntry (Tick { tick_loc = pos
                           , tick_path = declPath env
                           , tick_ids = []
                           , tick_label = ExpBox False

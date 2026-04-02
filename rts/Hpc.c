@@ -270,6 +270,9 @@ hs_hpc_module(char *modName,
   HpcModuleInfo *tmpModule;
   uint32_t i;
 
+  debugTrace(DEBUG_hpc, "hs_hpc_module(%s, count=%u, hash=%u)\n",
+             modName, modCount, modHashNo);
+
   if (moduleHash == NULL) {
       moduleHash = allocStrHashTable();
   }

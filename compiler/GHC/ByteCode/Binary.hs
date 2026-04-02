@@ -135,13 +135,15 @@ instance Binary CompiledByteCode where
       replicateM bc_strs_len $ (,) <$> getViaBinName bh <*> get bh
     bc_breaks <- get bh
     bc_spt_entries <- get bh
+    bc_hpc_info <- get bh
     return $
       CompiledByteCode
         { bc_bcos,
           bc_itbls,
           bc_strs,
           bc_breaks,
-          bc_spt_entries
+          bc_spt_entries,
+          bc_hpc_info
         }
 
   put_ bh CompiledByteCode {..} = do
@@ -154,6 +156,26 @@ instance Binary CompiledByteCode where
     for_ bc_strs $ \(nm, str) -> putViaBinName bh nm *> put_ bh str
     put_ bh bc_breaks
     put_ bh bc_spt_entries
+    put_ bh bc_hpc_info
+
+instance Binary ByteCodeHpcInfo where
+  put_ bh ByteCodeHpcInfo{bchi_tick_count,bchi_hash,bchi_tickbox_name,bchi_module_name} = do
+    put_ bh bchi_module_name
+    put_ bh bchi_tickbox_name
+    put_ bh bchi_tick_count
+    put_ bh bchi_hash
+
+  get bh = do
+    bchi_module_name <- get bh
+    bchi_tickbox_name <- get bh
+    bchi_tick_count <- get bh
+    bchi_hash <- get bh
+    pure ByteCodeHpcInfo
+      { bchi_tick_count
+      , bchi_hash
+      , bchi_tickbox_name
+      , bchi_module_name
+      }
 
 instance Binary UnlinkedBCO where
   get bh = do
