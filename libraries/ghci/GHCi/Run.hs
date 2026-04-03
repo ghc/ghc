@@ -34,7 +34,7 @@ import Control.DeepSeq
 import Control.Exception
 import Control.Monad
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Short as BS
+import qualified Data.ByteString.Short.Internal as BS
 import qualified Data.ByteString.Unsafe as B
 import GHC.Exts
 import qualified GHC.Exts.Heap as Heap
@@ -359,7 +359,7 @@ withBreakAction opts breakMVar statusMVar mtid act
        if is_exception
        then pure Nothing
        else do
-         info_mod <- peekCString (Ptr info_mod#)
+         info_mod <- BS.packCString (Ptr info_mod#)
          info_mod_uid <- BS.packCString (Ptr info_mod_uid#)
          pure (Just (EvalBreakpoint info_mod info_mod_uid (I# infox#)))
      putMVar statusMVar $ EvalBreak apStack_r breakpoint resume_r ccs
@@ -434,16 +434,23 @@ mkString0 bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
   pokeElemOff (ptr :: Ptr CChar) len 0
   return (castRemotePtr (toRemotePtr ptr))
 
-mkCostCentres :: String -> [(String,String)] -> IO [RemotePtr CostCentre]
+mkCostCentres :: RemotePtr () -> [(BS.ShortByteString, BS.ShortByteString)] -> IO [RemotePtr CostCentre]
 #if defined(PROFILING)
 mkCostCentres mod ccs = do
-  c_module <- newCString mod
+  let c_module = fromRemotePtr $ castRemotePtr mod
   mapM (mk_one c_module) ccs
  where
   mk_one c_module (decl_path,srcspan) = do
-    c_name <- newCString decl_path
-    c_srcspan <- newCString srcspan
+    c_name <- newCStringFromSBS decl_path
+    c_srcspan <- newCStringFromSBS srcspan
     toRemotePtr <$> c_mkCostCentre c_name c_module c_srcspan
+
+  newCStringFromSBS sbs = do
+    let len = BS.length sbs
+    buf <- mallocBytes $ len + 1
+    BS.copyToPtr sbs 0 buf (fromIntegral len)
+    pokeByteOff buf len (0 :: Word8)
+    pure buf
 
 foreign import ccall unsafe "mkCostCentre"
   c_mkCostCentre :: Ptr CChar -> Ptr CChar -> Ptr CChar -> IO (Ptr CostCentre)

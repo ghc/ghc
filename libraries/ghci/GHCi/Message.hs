@@ -162,8 +162,8 @@ data Message a where
 
   -- | Create a set of CostCentres with the same module name
   MkCostCentres
-   :: String     -- module, RemotePtr so it can be shared
-   -> [(String,String)] -- (name, SrcSpan)
+   :: !(RemotePtr ())                             -- ModuleName
+   -> ![(BS.ShortByteString, BS.ShortByteString)] -- (name, SrcSpan)
    -> Message [RemotePtr CostCentre]
 
   -- | Show a 'CostCentreStack' as a @[String]@
@@ -430,7 +430,7 @@ data EvalStatus_ a b
 instance Binary a => Binary (EvalStatus_ a b)
 
 data EvalBreakpoint = EvalBreakpoint
-  { eb_info_mod      :: String -- ^ Breakpoint info module
+  { eb_info_mod      :: !BS.ShortByteString -- ^ Breakpoint info module
   , eb_info_mod_unit :: BS.ShortByteString -- ^ Breakpoint tick module unit id
   , eb_info_index    :: Int    -- ^ Breakpoint info index
   }
