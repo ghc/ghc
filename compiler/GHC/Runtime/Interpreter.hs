@@ -465,27 +465,27 @@ lookupSymbol :: Interp -> InterpSymbol s -> IO (Maybe (Ptr ()))
 lookupSymbol interp str = withSymbolCache interp str $
   case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
+    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (fastStringToShortByteString (interpSymbolToCLabel str)))
 #endif
     ExternalInterp ext -> case ext of
       ExtIServ i -> withIServ i $ \inst -> fmap fromRemotePtr <$> do
         uninterruptibleMask_ $
-          sendMessage inst (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
+          sendMessage inst (LookupSymbol (fastStringToShortByteString (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
       ExtWasm i -> withWasmInterp i $ \inst -> fmap fromRemotePtr <$> do
         uninterruptibleMask_ $
-          sendMessage inst (LookupSymbol (unpackFS (interpSymbolToCLabel str)))
+          sendMessage inst (LookupSymbol (fastStringToShortByteString (interpSymbolToCLabel str)))
 
 lookupSymbolInDLL :: Interp -> RemotePtr LoadedDLL -> InterpSymbol s -> IO (Maybe (Ptr ()))
 lookupSymbolInDLL interp dll str = withSymbolCache interp str $
   case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (unpackFS (interpSymbolToCLabel str)))
+    InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbolInDLL dll (fastStringToShortByteString (interpSymbolToCLabel str)))
 #endif
     ExternalInterp ext -> case ext of
       ExtIServ i -> withIServ i $ \inst -> fmap fromRemotePtr <$> do
         uninterruptibleMask_ $
-          sendMessage inst (LookupSymbolInDLL dll (unpackFS (interpSymbolToCLabel str)))
+          sendMessage inst (LookupSymbolInDLL dll (fastStringToShortByteString (interpSymbolToCLabel str)))
       ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
       -- wasm dyld doesn't track which symbol comes from which .so
       ExtWasm {} -> lookupSymbol interp str
@@ -519,7 +519,7 @@ interpSymbolToCLabel s = eliminateInterpSymbol s interpretedInterpSymbol $ \is -
 
 lookupClosure :: Interp -> InterpSymbol s -> IO (Maybe HValueRef)
 lookupClosure interp str =
-  interpCmd interp (LookupClosure (unpackFS (interpSymbolToCLabel str)))
+  interpCmd interp (LookupClosure (fastStringToShortByteString (interpSymbolToCLabel str)))
 
 -- | 'withSymbolCache' tries to find a symbol in the 'interpLookupSymbolCache'
 -- which maps symbols to the address where they are loaded.

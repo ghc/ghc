@@ -1,2 +1,3 @@
+:set -XOverloadedStrings
 import GHCi.ObjLink
 lookupClosure "blah"

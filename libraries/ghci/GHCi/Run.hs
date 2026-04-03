@@ -135,12 +135,12 @@ foreign import javascript "((ptr,off) => globalThis.h$loadJS(h$decodeUtf8z(ptr,o
 
 foreign import javascript "((ptr,off) => globalThis.h$lookupClosure(h$decodeUtf8z(ptr,off)))" lookupJSClosure# :: CString -> State# RealWorld -> (# State# RealWorld, Int# #)
 
-lookupJSClosure' :: String -> IO Int
-lookupJSClosure' str = withCString str $ \cstr -> IO (\s ->
+lookupJSClosure' :: BS.ShortByteString -> IO Int
+lookupJSClosure' str = BS.useAsCString str $ \cstr -> IO (\s ->
   case lookupJSClosure# cstr s of
     (# s', r #) -> (# s', I# r #))
 
-lookupJSClosure :: String -> IO (Maybe HValueRef)
+lookupJSClosure :: BS.ShortByteString -> IO (Maybe HValueRef)
 lookupJSClosure str = lookupJSClosure' str >>= \case
   0 -> pure Nothing
   r -> pure (Just (RemoteRef (RemotePtr (fromIntegral r))))

@@ -31,6 +31,8 @@ import GHCi.RemoteTypes
 import GHCi.Message (LoadedDLL)
 import Control.Exception (throwIO, ErrorCall(..))
 import Control.Monad    ( when )
+import qualified Data.ByteString.Short as BS
+import Data.Char (ord)
 import Data.Foldable
 import Foreign.C
 import Foreign.Marshal.Alloc ( alloca, free )
@@ -104,15 +106,15 @@ unloadObj f = throwIO $ ErrorCall $ "unloadObj: unsupported on wasm for " <> f
 purgeObj :: String -> IO ()
 purgeObj f = throwIO $ ErrorCall $ "purgeObj: unsupported on wasm for " <> f
 
-lookupSymbol :: String -> IO (Maybe (Ptr a))
-lookupSymbol sym = do
-  r <- js_lookupSymbol $ toJSString sym
+lookupSymbol :: BS.ShortByteString -> IO (Maybe (Ptr a))
+lookupSymbol sym@(BS.SBS ba#) = do
+  r <- js_lookupSymbolPtr ba# (BS.length sym)
   evaluate $ if r == nullPtr then Nothing else Just r
 
-foreign import javascript unsafe "__ghc_wasm_jsffi_dyld.lookupSymbol($1)"
-  js_lookupSymbol :: JSString -> IO (Ptr a)
+foreign import javascript unsafe "__ghc_wasm_jsffi_dyld.lookupSymbolPtr($1,$2)"
+  js_lookupSymbolPtr :: ByteArray# -> Int -> IO (Ptr a)
 
-lookupSymbolInDLL :: Ptr LoadedDLL -> String -> IO (Maybe (Ptr a))
+lookupSymbolInDLL :: Ptr LoadedDLL -> BS.ShortByteString -> IO (Maybe (Ptr a))
 lookupSymbolInDLL _ _ = pure Nothing
 
 resolveObjs :: IO Bool
@@ -149,27 +151,27 @@ initObjLinker :: ShouldRetainCAFs -> IO ()
 initObjLinker RetainCAFs = c_initLinker_ 1
 initObjLinker _ = c_initLinker_ 0
 
-lookupSymbol :: String -> IO (Maybe (Ptr a))
+lookupSymbol :: BS.ShortByteString -> IO (Maybe (Ptr a))
 lookupSymbol str_in = do
    let str = prefixUnderscore str_in
-   withCAString str $ \c_str -> do
+   BS.useAsCString str $ \c_str -> do
      addr <- c_lookupSymbol c_str
      if addr == nullPtr
         then return Nothing
         else return (Just addr)
 
-lookupSymbolInDLL :: Ptr LoadedDLL -> String -> IO (Maybe (Ptr a))
+lookupSymbolInDLL :: Ptr LoadedDLL -> BS.ShortByteString -> IO (Maybe (Ptr a))
 lookupSymbolInDLL dll str_in = do
    let str = prefixUnderscore str_in
-   withCAString str $ \c_str -> do
+   BS.useAsCString str $ \c_str -> do
      addr <- c_lookupSymbolInNativeObj dll c_str
      if addr == nullPtr
        then return Nothing
        else return (Just addr)
 
-prefixUnderscore :: String -> String
+prefixUnderscore :: BS.ShortByteString -> BS.ShortByteString
 prefixUnderscore
- | cLeadingUnderscore = ('_':)
+ | cLeadingUnderscore = BS.cons (fromIntegral (ord '_'))
  | otherwise          = id
 
 -- | loadDLL loads a dynamic library using the OS's native linker
@@ -298,7 +300,7 @@ isWindowsHost = False
 
 #endif
 
-lookupClosure :: String -> IO (Maybe HValueRef)
+lookupClosure :: BS.ShortByteString -> IO (Maybe HValueRef)
 lookupClosure str = do
   m <- lookupSymbol str
   case m of
