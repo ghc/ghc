@@ -134,7 +134,9 @@ EXTERN_INLINE void busy_wait_nop(void);
  *
  * See also:
  *
- *   - The C11 standard, ISO/IEC 14882 2011.
+ *   - The C11 standard, ISO/IEC 9899:2011.
+ *
+ *   - The C++11 standard, ISO/IEC 14882 2011.
  *
  *   - Boehm, Adve. "Foundations of the C++ Concurrency Memory Model."
  *     PLDI '08.
