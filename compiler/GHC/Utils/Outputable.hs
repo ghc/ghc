@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 
@@ -61,7 +62,10 @@ module GHC.Utils.Outputable (
         pprDebugAndThen,
 
         pprInfixVar, pprPrefixVar,
-        pprHsChar, pprHsString, pprHsBytes,
+        pprHsChar,
+        pprHsString, pprHsString',
+        pprHsStringMulti, pprHsStringMulti',
+        pprHsBytes,
 
         primFloatSuffix, primCharSuffix, primDoubleSuffix,
         primInt8Suffix, primWord8Suffix,
@@ -165,7 +169,11 @@ import Data.Void
 import Control.DeepSeq (NFData(rnf))
 
 import GHC.Fingerprint
-import GHC.Show         ( showMultiLineString )
+#if MIN_VERSION_base(4,23,0)
+import GHC.Show (showMultiLineString')
+#else
+import GHC.Show (showLitString)
+#endif
 import GHC.Utils.Exception
 import GHC.Exts (oneShot)
 
@@ -1355,14 +1363,48 @@ pprHsChar :: Char -> SDoc
 pprHsChar c | c > '\x10ffff' = char '\\' <> text (show (fromIntegral (ord c) :: Word32))
             | otherwise      = text (show c)
 
--- | Special combinator for showing string literals.
+-- | Special combinator for showing single-line string literals.
 pprHsString :: String -> SDoc
-pprHsString fs = vcat (map text (showMultiLineString fs))
+pprHsString fs = char '"' <> pprHsString' fs <> char '"'
+
+-- | Like 'pprHsString' except without the outer quotes.
+pprHsString' :: String -> SDoc
+pprHsString' = vcat . map text . showMultiLineString' Nothing
+
+-- | Special combinator for showing multi-line string literals.
+pprHsStringMulti :: FastString -> SDoc
+pprHsStringMulti fs = text "\"\"\"" <> pprHsString' (unpackFS fs) <> text "\"\"\""
+
+-- | Like 'pprHsStringMulti' except without the outer quotes.
+pprHsStringMulti' :: String -> SDoc
+pprHsStringMulti' = vcat . map text . showLitStringMultiline
+  where
+    showLitChars :: String -> ShowS
+    showLitChars [] s = s
+    showLitChars (c : cs) s = showLitChar c (showLitChars cs s)
+
+    showLitStringMultiline :: String -> [String]
+    showLitStringMultiline = map (flip showLitChars "") . lines
+
+#if !MIN_VERSION_base(4,23,0)
+-- Copied from GHC.Internal.Show
+showMultiLineString' :: Maybe Char -> String -> [String]
+showMultiLineString' delim = map ($ "") . go showDelim
+  where
+    showDelim = case delim of Just d -> showChar d; Nothing -> id
+    showNL = showString "\\n"
+    showBS = showChar '\\'
+    go pre s =
+      case break (== '\n') s of
+        (l, '\n':s'@(_:_)) -> (pre . showLitString l . showNL . showBS) : go showBS s'
+        (l, '\n':[])       -> (pre . showLitString l . showNL . showDelim) : []
+        (l, _)             -> (pre . showLitString l . showDelim) : []
+#endif
 
 -- | Special combinator for showing bytestring literals.
 pprHsBytes :: ByteString -> SDoc
 pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
-                in vcat (map text (showMultiLineString escaped)) <> char '#'
+                in char '"' <> pprHsString' escaped <> text "\"#"
     where escape :: Word8 -> String
           escape w = let c = chr (fromIntegral w)
                      in if isAscii c

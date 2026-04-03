@@ -42,7 +42,8 @@ module GHC.Internal.Show
         -- Instances for Show: (), [], Bool, Ordering, Int, Char
 
         -- Show support code
-        shows, showChar, showString, showMultiLineString,
+        shows, showChar, showString,
+        showMultiLineString, showMultiLineString',
         showParen, showList__, showCommaSpace, showSpace,
         showLitChar, showLitString, protectEsc,
         intToDigit, showSignedInt,
@@ -421,13 +422,20 @@ showMultiLineString :: String -> [String]
 --   * wrap the entire thing in double quotes
 -- Example:  @showMultiLineString "hello\ngoodbye\nblah"@
 -- returns   @["\"hello\\n\\", "\\goodbye\n\\", "\\blah\""]@
-showMultiLineString str
-  = go '\"' str
+showMultiLineString = showMultiLineString' (Just '\"')
+
+-- | Like 'showMultiLineString' except using the given delimiter
+showMultiLineString' :: Maybe Char -> String -> [String]
+showMultiLineString' delim = map ($ "") . go showDelim
   where
-    go ch s = case break (== '\n') s of
-                (l, _:s'@(_:_)) -> (ch : showLitString l "\\n\\") : go '\\' s'
-                (l, "\n")       -> [ch : showLitString l "\\n\""]
-                (l, _)          -> [ch : showLitString l "\""]
+    showDelim = case delim of Just d -> showChar d; Nothing -> id
+    showNL = showString "\\n"
+    showBS = showChar '\\'
+    go pre s =
+      case break (== '\n') s of
+        (l, '\n':s'@(_:_)) -> (pre . showLitString l . showNL . showBS) : go showBS s'
+        (l, '\n':[])       -> (pre . showLitString l . showNL . showDelim) : []
+        (l, _)             -> (pre . showLitString l . showDelim) : []
 
 isDec :: Char -> Bool
 isDec c = c >= '0' && c <= '9'

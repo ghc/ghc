@@ -9240,6 +9240,7 @@ module GHC.Show where
   showLitChar :: GHC.Internal.Types.Char -> ShowS
   showLitString :: GHC.Internal.Base.String -> ShowS
   showMultiLineString :: GHC.Internal.Base.String -> [GHC.Internal.Base.String]
+  showMultiLineString' :: GHC.Internal.Maybe.Maybe GHC.Internal.Types.Char -> GHC.Internal.Base.String -> [GHC.Internal.Base.String]
   showParen :: GHC.Internal.Types.Bool -> ShowS -> ShowS
   showSignedInt :: GHC.Internal.Types.Int -> GHC.Internal.Types.Int -> ShowS
   showSpace :: ShowS

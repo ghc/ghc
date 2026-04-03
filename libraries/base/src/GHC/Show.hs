@@ -18,7 +18,7 @@ module GHC.Show
         Show(..), ShowS,
 
         -- * Show support code
-        shows, showChar, showString, showMultiLineString,
+        shows, showChar, showString, showMultiLineString, showMultiLineString',
         showParen, showList__, showCommaSpace, showSpace,
         showLitChar, showLitString, protectEsc,
         intToDigit, showSignedInt,
