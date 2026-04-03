@@ -1,6 +1,7 @@
 -- | Tracing utilities
 module GHC.Utils.Trace
   ( pprTrace
+  , pprTrace_
   , pprTraceM
   , pprTraceDebug
   , pprTraceIt
@@ -42,6 +43,22 @@ pprTrace :: String -> SDoc -> a -> a
 pprTrace str doc x
   | unsafeHasNoDebugOutput = x
   | otherwise              = pprDebugAndThen traceSDocContext trace (text str) doc x
+
+-- | A version of 'pprTrace' that is useful for quick debugging:
+--
+-- @
+-- fooBar x y
+--   | cond      = body1
+--   | otherwise = body2
+--   where
+--     !_ = pprTrace_ "fooBar" $
+--          vcat [ text "x:" <+> ppr x
+--               , text "y:" <+> ppr y
+--               , text "cond:" <+> ppr cond
+--               ]
+-- @
+pprTrace_ :: String -> SDoc -> ()
+pprTrace_ str doc = pprTrace str doc ()
 
 pprTraceM :: Applicative f => String -> SDoc -> f ()
 pprTraceM str doc = pprTrace str doc (pure ())
