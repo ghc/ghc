@@ -86,9 +86,9 @@ data Message a where
 
   -- These all invoke the corresponding functions in the RTS Linker API.
   InitLinker :: Message ()
-  LookupSymbol :: String -> Message (Maybe (RemotePtr ()))
-  LookupSymbolInDLL :: RemotePtr LoadedDLL -> String -> Message (Maybe (RemotePtr ()))
-  LookupClosure :: String -> Message (Maybe HValueRef)
+  LookupSymbol :: !BS.ShortByteString -> Message (Maybe (RemotePtr ()))
+  LookupSymbolInDLL :: !(RemotePtr LoadedDLL) -> !BS.ShortByteString -> Message (Maybe (RemotePtr ()))
+  LookupClosure :: !BS.ShortByteString -> Message (Maybe HValueRef)
   LoadDLLs :: [String] -> Message (Either String [RemotePtr LoadedDLL])
   LoadArchive :: String -> Message () -- error?
   LoadObj :: String -> Message () -- error?

@@ -405,7 +405,7 @@ loadExternalPlugins ps = do
         symbol
           | null unit = ztmp
           | otherwise = zEncodeString unit ++ "_" ++ ztmp
-    plugin <- lookupSymbol symbol >>= \case
+    plugin <- lookupSymbol (utf8EncodeShortByteString symbol) >>= \case
       Nothing -> pprPanic "loadExternalPlugins"
                   (vcat [ text "Symbol not found"
                         , text "  Library path: " <> text path
