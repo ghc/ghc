@@ -1,9 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Main (main) where
 
 import Control.Exception
 import Control.Monad
+import Data.ByteString.Short (ShortByteString)
 
 import Foreign
 
@@ -15,7 +17,7 @@ import GHCi.ObjLink
 
 rotateSO
   :: (FunPtr (IO (StablePtr a)) -> (IO (StablePtr a)))
-  -> String
+  -> ShortByteString
   -> (Maybe FilePath, FilePath)
   -> IO a
 rotateSO dynamicCall symName (old, newDLL) = do
