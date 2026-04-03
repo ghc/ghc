@@ -26,7 +26,6 @@ void arm_atomic_spin_unlock(void);
 // Ticker implementation.
 #define RELAXED_LOAD_ALWAYS(ptr) atomic_load_explicit(ptr, memory_order_relaxed)
 #define RELAXED_STORE_ALWAYS(ptr,val) atomic_store_explicit(ptr, val, memory_order_relaxed)
-#define RELAXED_ADD_ALWAYS(ptr,val) (atomic_fetch_add(ptr, val, memory_order_relaxed) + val)
 
 // Acquire/release atomic operations
 #define ACQUIRE_LOAD_ALWAYS(ptr) atomic_load_explicit(ptr, memory_order_acquire)
