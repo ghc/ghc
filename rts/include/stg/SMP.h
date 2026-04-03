@@ -13,6 +13,8 @@
 
 #pragma once
 
+#include <stdatomic.h>
+
 #if defined(arm_HOST_ARCH) && defined(arm_HOST_ARCH_PRE_ARMv6)
 void arm_atomic_spin_lock(void);
 void arm_atomic_spin_unlock(void);
@@ -22,20 +24,20 @@ void arm_atomic_spin_unlock(void);
 // These are atomic even in the non-threaded RTS. These are necessary in the
 // Proftimer implementation, which may be called from the pthreads-based
 // Ticker implementation.
-#define RELAXED_LOAD_ALWAYS(ptr) __atomic_load_n(ptr, __ATOMIC_RELAXED)
-#define RELAXED_STORE_ALWAYS(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELAXED)
-#define RELAXED_ADD_ALWAYS(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_RELAXED)
+#define RELAXED_LOAD_ALWAYS(ptr) atomic_load_explicit(ptr, memory_order_relaxed)
+#define RELAXED_STORE_ALWAYS(ptr,val) atomic_store_explicit(ptr, val, memory_order_relaxed)
+#define RELAXED_ADD_ALWAYS(ptr,val) (atomic_fetch_add(ptr, val, memory_order_relaxed) + val)
 
 // Acquire/release atomic operations
-#define ACQUIRE_LOAD_ALWAYS(ptr) __atomic_load_n(ptr, __ATOMIC_ACQUIRE)
-#define RELEASE_STORE_ALWAYS(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELEASE)
+#define ACQUIRE_LOAD_ALWAYS(ptr) atomic_load_explicit(ptr, memory_order_acquire)
+#define RELEASE_STORE_ALWAYS(ptr,val) atomic_store_explicit(ptr, val, memory_order_release)
 
 // Sequentially consistent atomic operations
-#define SEQ_CST_LOAD_ALWAYS(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
-#define SEQ_CST_STORE_ALWAYS(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
-#define SEQ_CST_ADD_ALWAYS(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_SEQ_CST)
-#define SEQ_CST_SUB_ALWAYS(ptr,val) __atomic_sub_fetch(ptr, val, __ATOMIC_SEQ_CST)
-#define SEQ_CST_XCHG_ALWAYS(ptr,val) __atomic_exchange_n(ptr, val, __ATOMIC_SEQ_CST);
+#define SEQ_CST_LOAD_ALWAYS(ptr) atomic_load(ptr)
+#define SEQ_CST_STORE_ALWAYS(ptr,val) atomic_store(ptr, val)
+#define SEQ_CST_ADD_ALWAYS(ptr,val) (atomic_fetch_add(ptr, val) + val)
+#define SEQ_CST_SUB_ALWAYS(ptr,val) (atomic_fetch_sub(ptr, val) - val)
+#define SEQ_CST_XCHG_ALWAYS(ptr,val) atomic_exchange(ptr, val);
 
 #if defined(THREADED_RTS)
 
@@ -441,7 +443,7 @@ EXTERN_INLINE void busy_wait_nop(void);
 EXTERN_INLINE StgWord
 xchg(StgPtr p, StgWord w)
 {
-    return __atomic_exchange_n(p, w, __ATOMIC_SEQ_CST);
+    return atomic_exchange(p, w);
 }
 
 /*
@@ -451,20 +453,20 @@ xchg(StgPtr p, StgWord w)
 EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
-    __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    atomic_compare_exchange_strong(p, &o, n);
     return o;
 }
 
 EXTERN_INLINE StgWord8
 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
 {
-    __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    atomic_compare_exchange_strong(p, &o, n);
     return o;
 }
 
 EXTERN_INLINE StgWord
 cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n) {
-    __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED);
+    atomic_compare_exchange_strong_explicit(p, &o, n, memory_order_seq_cst, memory_order_relaxed);
     return o;
 }
 
@@ -474,13 +476,13 @@ cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n) {
 EXTERN_INLINE StgWord
 atomic_inc(StgVolatilePtr p, StgWord incr)
 {
-    return __atomic_add_fetch(p, incr, __ATOMIC_SEQ_CST);
+    return atomic_fetch_add(p, incr) + incr;
 }
 
 EXTERN_INLINE StgWord
 atomic_dec(StgVolatilePtr p, StgWord decr)
 {
-    return __atomic_sub_fetch(p, decr, __ATOMIC_SEQ_CST);
+    return atomic_fetch_sub(p, decr) - decr;
 }
 
 /*
@@ -513,18 +515,18 @@ busy_wait_nop(void)
 #define VOLATILE_LOAD(p) (*((StgVolatilePtr)(p)))
 
 // Relaxed atomic operations.
-#define RELAXED_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_RELAXED)
-#define RELAXED_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELAXED)
-#define RELAXED_ADD(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_RELAXED)
+#define RELAXED_LOAD(ptr) atomic_load_explicit(ptr, memory_order_relaxed)
+#define RELAXED_STORE(ptr,val) atomic_store_explicit(ptr, val, memory_order_relaxed)
+#define RELAXED_ADD(ptr,val) (atomic_fetch_add_explicit(ptr, val, memory_order_relaxed) + val)
 
 // Acquire/release atomic operations
-#define ACQUIRE_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_ACQUIRE)
-#define RELEASE_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELEASE)
+#define ACQUIRE_LOAD(ptr) atomic_load_explicit(ptr, memory_order_acquire)
+#define RELEASE_STORE(ptr,val) atomic_store_explicit(ptr, val, memory_order_release)
 
 // Sequentially consistent atomic operations
-#define SEQ_CST_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
-#define SEQ_CST_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
-#define SEQ_CST_ADD(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_SEQ_CST)
+#define SEQ_CST_LOAD(ptr) atomic_load(ptr)
+#define SEQ_CST_STORE(ptr,val) atomic_store(ptr, val)
+#define SEQ_CST_ADD(ptr,val) (atomic_fetch_add(ptr, val) + val)
 
 // Non-atomic addition for "approximate" counters that can be lossy
 #define NONATOMIC_ADD(ptr,val) RELAXED_STORE(ptr, RELAXED_LOAD(ptr) + val)
@@ -543,22 +545,22 @@ busy_wait_nop(void)
 // otherwise unable to reason about fences). See Note [ThreadSanitizer] in
 // TSANUtils.h.
 
-#define ACQUIRE_FENCE() __atomic_thread_fence(__ATOMIC_ACQUIRE)
-#define RELEASE_FENCE() __atomic_thread_fence(__ATOMIC_RELEASE)
-#define SEQ_CST_FENCE() __atomic_thread_fence(__ATOMIC_SEQ_CST)
+#define ACQUIRE_FENCE() atomic_thread_fence(memory_order_acquire)
+#define RELEASE_FENCE() atomic_thread_fence(memory_order_release)
+#define SEQ_CST_FENCE() atomic_thread_fence(memory_order_seq_cst)
 
 #if defined(TSAN_ENABLED)
 #if !defined(__clang__)
 #undef ACQUIRE_FENCE
 #undef RELEASE_FENCE
 #undef SEQ_CST_FENCE
-#define ACQUIRE_FENCE() NO_WARN(-Wtsan, __atomic_thread_fence(__ATOMIC_ACQUIRE);)
-#define RELEASE_FENCE() NO_WARN(-Wtsan, __atomic_thread_fence(__ATOMIC_RELEASE);)
-#define SEQ_CST_FENCE() NO_WARN(-Wtsan, __atomic_thread_fence(__ATOMIC_SEQ_CST);)
+#define ACQUIRE_FENCE() NO_WARN(-Wtsan, atomic_thread_fence(memory_order_acquire);)
+#define RELEASE_FENCE() NO_WARN(-Wtsan, atomic_thread_fence(memory_order_release);)
+#define SEQ_CST_FENCE() NO_WARN(-Wtsan, atomic_thread_fence(memory_order_seq_cst);)
 #endif
 #define ACQUIRE_FENCE_ON(x) (void)ACQUIRE_LOAD(x)
 #else
-#define ACQUIRE_FENCE_ON(x) __atomic_thread_fence(__ATOMIC_ACQUIRE)
+#define ACQUIRE_FENCE_ON(x) atomic_thread_fence(memory_order_acquire)
 #endif
 
 /* ---------------------------------------------------------------------- */

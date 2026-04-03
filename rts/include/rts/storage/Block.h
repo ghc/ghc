@@ -305,7 +305,7 @@ block_set_flag(bdescr *bd, uint16_t flag)
 {
     // TODO: This ordering is stronger than necessary for many users (e.g.
     // setting flags).
-    __atomic_or_fetch(&bd->flags, flag, __ATOMIC_SEQ_CST);
+    atomic_fetch_or(&bd->flags, flag);
 }
 
 INLINE_HEADER void
@@ -313,7 +313,7 @@ block_clear_flag(bdescr *bd, uint16_t flag)
 {
     // TODO: This ordering is stronger than necessary for many users (e.g.
     // setting flags).
-    __atomic_and_fetch(&bd->flags, ~flag, __ATOMIC_SEQ_CST);
+    atomic_fetch_and(&bd->flags, ~flag);
 }
 
 INLINE_HEADER uint16_t

@@ -443,9 +443,9 @@ evacuate_large(StgPtr p)
   ws = &gct->gens[new_gen_no];
   new_gen = &generations[new_gen_no];
 
-  __atomic_fetch_or(&bd->flags, BF_EVACUATED, __ATOMIC_ACQ_REL);
+  atomic_fetch_or_explicit(&bd->flags, BF_EVACUATED, memory_order_acq_rel);
   if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
-      __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_ACQ_REL);
+      atomic_fetch_or_explicit(&bd->flags, BF_NONMOVING, memory_order_acq_rel);
 
       // See Note [Non-moving GC: Marking evacuated objects].
       if (major_gc && !deadlock_detect_gc) {
@@ -604,7 +604,7 @@ evacuate_compact (StgPtr p)
     // in the GC, and that should never see blocks other than the first)
     bd->flags |= BF_EVACUATED;
     if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
-      __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_RELAXED);
+      atomic_fetch_or_explicit(&bd->flags, BF_NONMOVING, memory_order_relaxed);
 
       // See Note [Non-moving GC: Marking evacuated objects].
       if (major_gc && !deadlock_detect_gc) {
