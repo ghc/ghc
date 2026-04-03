@@ -37,6 +37,7 @@ import GHC.Prelude
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Occurrence
 import Control.DeepSeq
+import qualified Data.ByteString.Short as SBS
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IM
 
@@ -235,8 +236,8 @@ getBreakVars = getBreakXXX modBreaks_vars
 getBreakDecls :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO [String]
 getBreakDecls = getBreakXXX modBreaks_decls
 
--- | Get the decls for this breakpoint
-getBreakCCS :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO ((String, String))
+-- | Get the cost centre info for this breakpoint
+getBreakCCS :: (Module -> IO ModBreaks) -> InternalBreakpointId -> InternalModBreaks -> IO (SBS.ShortByteString, SBS.ShortByteString)
 getBreakCCS = getBreakXXX modBreaks_ccs
 
 -- | Internal utility to access a ModBreaks field at a particular breakpoint index

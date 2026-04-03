@@ -107,6 +107,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (mask)
 import Data.Binary
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Short as SBS
 import Foreign hiding (void)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
@@ -352,9 +353,15 @@ evalStringToIOString interp fhv str =
 mallocData :: Interp -> ByteString -> IO (RemotePtr ())
 mallocData interp bs = interpCmd interp (MallocData bs)
 
-mkCostCentres :: Interp -> String -> [(String,String)] -> IO [RemotePtr CostCentre]
-mkCostCentres interp mod ccs =
-  interpCmd interp (MkCostCentres mod ccs)
+mkCostCentres :: Interp -> FastString -> [(SBS.ShortByteString, SBS.ShortByteString)] -> IO [RemotePtr CostCentre]
+mkCostCentres interp mod ccs = do
+  rp <- modifyMVar (interpStringCache interp) $ \fs_env ->
+    case lookupFsEnv fs_env mod of
+      Just rp -> pure (fs_env, rp)
+      Nothing -> do
+        rp <- fmap head $ interpCmd interp $ MallocStrings [bytesFS mod]
+        pure (extendFsEnv fs_env mod rp, rp)
+  interpCmd interp $ MkCostCentres rp ccs
 
 -- | Create a set of BCOs that may be mutually recursive.
 createBCOs :: Interp -> [ResolvedBCO] -> IO [HValueRef]
@@ -413,7 +420,7 @@ evalBreakpointToId :: EvalBreakpoint -> InternalBreakpointId
 evalBreakpointToId eval_break =
   let
     mkUnitId u = fsToUnit $ mkFastStringShortByteString u
-    toModule u n = mkModule (mkUnitId u) (mkModuleName n)
+    toModule u n = mkModule (mkUnitId u) (mkModuleNameFS (mkFastStringShortByteString n))
   in
     InternalBreakpointId
       { ibi_info_mod   = toModule (eb_info_mod_unit eval_break) (eb_info_mod eval_break)

@@ -1846,7 +1846,7 @@ allocateCCS interp ce mbss
             ccs <- {- one ccs ptr per tick index -}
               mkCostCentres
                 interp
-                (moduleNameString $ moduleName modBreaks_module)
+                (moduleNameFS $ moduleName modBreaks_module)
                 (elems modBreaks_ccs)
             return $ M.fromList $
               zipWith (\el ix -> (BreakpointId modBreaks_module ix, el)) ccs [0..]
