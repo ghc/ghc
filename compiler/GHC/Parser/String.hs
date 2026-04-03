@@ -44,12 +44,7 @@ data StringLexError = StringLexError LexErr BufPos
   deriving (Show, Eq)
 
 lexString :: Int -> StringBuffer -> Either StringLexError String
-lexString = lexStringWith processChars processChars
-  where
-    processChars :: HasChar c => [c] -> Either (c, LexErr) [c]
-    processChars =
-          collapseGaps
-      >>> resolveEscapes
+lexString = lexStringWith processCharsSingle processCharsSingle
 
 -- -----------------------------------------------------------------------------
 -- Lexing interface
@@ -127,6 +122,11 @@ bufferLocatedChars initialBuf len = go initialBuf
 
 -- -----------------------------------------------------------------------------
 -- Lexing phases
+
+processCharsSingle :: HasChar c => [c] -> Either (c, LexErr) [c]
+processCharsSingle =
+      collapseGaps
+  >>> resolveEscapes
 
 -- | Collapse all string gaps in the given input.
 --
@@ -353,88 +353,60 @@ to standard string literals for overlap checking, ensuring that
 -- and rejoining lines, and instead manually find newline characters,
 -- for performance.
 lexMultilineString :: Int -> StringBuffer -> Either StringLexError String
-lexMultilineString = lexStringWith processChars processChars
+lexMultilineString = lexStringWith processCharsMulti processCharsMulti
+
+processCharsMulti :: HasChar c => [c] -> Either (c, LexErr) [c]
+processCharsMulti =
+      collapseGaps             -- Step 1
+  >>> normalizeEOL
+  >>> expandLeadingTabs        -- Step 3
+  >>> rmCommonWhitespacePrefix -- Step 4
+  >>> collapseOnlyWsLines      -- Step 5
+  >>> rmFirstNewline           -- Step 7a
+  >>> rmLastNewline            -- Step 7b
+  >>> resolveEscapes           -- Step 8
+
+-- Normalize line endings to LF. The spec dictates that lines should be
+-- split on newline characters and rejoined with ``\n``. But because we
+-- aren't actually splitting/rejoining, we'll manually normalize here
+normalizeEOL :: HasChar c => [c] -> [c]
+normalizeEOL = go
   where
-    processChars :: HasChar c => [c] -> Either (c, LexErr) [c]
-    processChars =
-          collapseGaps             -- Step 1
-      >>> normalizeEOL
-      >>> expandLeadingTabs        -- Step 3
-      >>> rmCommonWhitespacePrefix -- Step 4
-      >>> collapseOnlyWsLines      -- Step 5
-      >>> rmFirstNewline           -- Step 7a
-      >>> rmLastNewline            -- Step 7b
-      >>> resolveEscapes           -- Step 8
+    go = \case
+      Char '\r' : c@(Char '\n') : cs -> c : go cs
+      c@(Char '\r') : cs -> setChar '\n' c : go cs
+      c@(Char '\f') : cs -> setChar '\n' c : go cs
+      c : cs -> c : go cs
+      [] -> []
 
-    -- Normalize line endings to LF. The spec dictates that lines should be
-    -- split on newline characters and rejoined with ``\n``. But because we
-    -- aren't actually splitting/rejoining, we'll manually normalize here
-    normalizeEOL :: HasChar c => [c] -> [c]
-    normalizeEOL =
-      let go = \case
-            Char '\r' : c@(Char '\n') : cs -> c : go cs
-            c@(Char '\r') : cs -> setChar '\n' c : go cs
-            c@(Char '\f') : cs -> setChar '\n' c : go cs
-            c : cs -> c : go cs
-            [] -> []
-       in go
+-- | Expands all tabs blindly, since the lexer will verify that tabs can only appear
+-- as leading indentation
+expandLeadingTabs :: HasChar c => [c] -> [c]
+expandLeadingTabs = go 0
+  where
+    go !col = \case
+      c@(Char '\t') : cs ->
+        let fill = 8 - (col `mod` 8)
+         in replicate fill (setChar ' ' c) ++ go (col + fill) cs
+      c : cs -> c : go (if getChar c == '\n' then 0 else col + 1) cs
+      [] -> []
 
-    -- expands all tabs, since the lexer will verify that tabs can only appear
-    -- as leading indentation
-    expandLeadingTabs :: HasChar c => [c] -> [c]
-    expandLeadingTabs =
-      let go !col = \case
-            c@(Char '\t') : cs ->
-              let fill = 8 - (col `mod` 8)
-               in replicate fill (setChar ' ' c) ++ go (col + fill) cs
-            c : cs -> c : go (if getChar c == '\n' then 0 else col + 1) cs
-            [] -> []
-       in go 0
+rmCommonWhitespacePrefix :: HasChar c => [c] -> [c]
+rmCommonWhitespacePrefix cs0 = go cs0
+  where
+    commonWSPrefix = getCommonWsPrefix (map getChar cs0)
 
-    rmCommonWhitespacePrefix :: HasChar c => [c] -> [c]
-    rmCommonWhitespacePrefix cs0 =
-      let commonWSPrefix = getCommonWsPrefix (map getChar cs0)
-          go = \case
-            c@(Char '\n') : cs -> c : go (dropLine commonWSPrefix cs)
-            c : cs -> c : go cs
-            [] -> []
-          -- drop x characters from the string, or up to a newline, whichever
-          -- comes first
-          dropLine !x = \case
-            cs | x <= 0 -> cs
-            cs@(Char '\n' : _) -> cs
-            _ : cs -> dropLine (x - 1) cs
-            [] -> []
-       in go cs0
+    go = \case
+      c@(Char '\n') : cs -> c : go (dropLine commonWSPrefix cs)
+      c : cs -> c : go cs
+      [] -> []
 
-    collapseOnlyWsLines :: HasChar c => [c] -> [c]
-    collapseOnlyWsLines =
-      let go = \case
-            c@(Char '\n') : cs | Just cs' <- checkAllWs cs -> c : go cs'
-            c : cs -> c : go cs
-            [] -> []
-          checkAllWs = \case
-            -- got all the way to a newline or the end of the string, return
-            cs@(Char '\n' : _) -> Just cs
-            cs@[] -> Just cs
-            -- found whitespace, continue
-            Char c : cs | is_space c -> checkAllWs cs
-            -- anything else, stop
-            _ -> Nothing
-       in go
-
-    rmFirstNewline :: HasChar c => [c] -> [c]
-    rmFirstNewline = \case
-      Char '\n' : cs -> cs
-      cs -> cs
-
-    rmLastNewline :: HasChar c => [c] -> [c]
-    rmLastNewline =
-      let go = \case
-            [] -> []
-            [Char '\n'] -> []
-            c : cs -> c : go cs
-       in go
+    -- drop x characters from the string, or up to a newline, whichever comes first
+    dropLine !x = \case
+      cs | x <= 0 -> cs
+      cs@(Char '\n' : _) -> cs
+      _ : cs -> dropLine (x - 1) cs
+      [] -> []
 
 -- | See step 4 in Note [Multiline string literals]
 --
@@ -449,6 +421,36 @@ getCommonWsPrefix s =
         filter (not . all is_space) -- ignore whitespace-only lines
       . drop 1                      -- ignore first line in calculation
       $ lines s
+
+collapseOnlyWsLines :: HasChar c => [c] -> [c]
+collapseOnlyWsLines = go
+  where
+    go = \case
+      c@(Char '\n') : cs | Just cs' <- checkAllWs cs -> c : go cs'
+      c : cs -> c : go cs
+      [] -> []
+
+    checkAllWs = \case
+      -- got all the way to a newline or the end of the string, return
+      cs@(Char '\n' : _) -> Just cs
+      cs@[] -> Just cs
+      -- found whitespace, continue
+      Char c : cs | is_space c -> checkAllWs cs
+      -- anything else, stop
+      _ -> Nothing
+
+rmFirstNewline :: HasChar c => [c] -> [c]
+rmFirstNewline = \case
+  Char '\n' : cs -> cs
+  cs -> cs
+
+rmLastNewline :: HasChar c => [c] -> [c]
+rmLastNewline = go
+  where
+    go = \case
+      [] -> []
+      [Char '\n'] -> []
+      c : cs -> c : go cs
 
 {-
 Note [Multiline string literals]
