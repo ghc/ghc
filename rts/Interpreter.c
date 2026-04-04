@@ -695,7 +695,7 @@ interpretBCO (Capability* cap)
 
     // N.B. HpLim is the context-switch flag; when it
     // goes to zero we must return to the scheduler.
-    RELAXED_STORE_ALWAYS(&cap->r.rHpLim, (P_)1);
+    atomic_store_explicit(&cap->r.rHpLim, (P_)1, memory_order_relaxed);
 
     IF_DEBUG(interpreter,
              debugBelch(

@@ -46,7 +46,7 @@ void
 stopProfTimer( void )
 {
 #if defined(PROFILING)
-    RELAXED_STORE_ALWAYS(&do_prof_ticks, false);
+    atomic_store_explicit(&do_prof_ticks, false, memory_order_relaxed);
 #endif
 }
 
@@ -54,7 +54,7 @@ void
 startProfTimer( void )
 {
 #if defined(PROFILING)
-    RELAXED_STORE_ALWAYS(&do_prof_ticks, true);
+    atomic_store_explicit(&do_prof_ticks, true, memory_order_relaxed);
 #endif
 }
 
@@ -62,7 +62,7 @@ void
 stopHeapProfTimer( void )
 {
   if (RtsFlags.ProfFlags.doHeapProfile){
-    RELAXED_STORE_ALWAYS(&heap_prof_timer_active, false);
+      atomic_store_explicit(&heap_prof_timer_active, false, memory_order_relaxed);
     pauseHeapProfTimer();
   }
 }
@@ -71,14 +71,14 @@ void
 startHeapProfTimer( void )
 {
   if (RtsFlags.ProfFlags.doHeapProfile){
-    RELAXED_STORE_ALWAYS(&heap_prof_timer_active, true);
+      atomic_store_explicit(&heap_prof_timer_active, true, memory_order_relaxed);
     resumeHeapProfTimer();
   }
 }
 
 void
 pauseHeapProfTimer ( void ) {
-    RELAXED_STORE_ALWAYS(&do_heap_prof_ticks, false);
+    atomic_store_explicit(&do_heap_prof_ticks, false, memory_order_relaxed);
 }
 
 
@@ -86,7 +86,7 @@ void
 resumeHeapProfTimer ( void ) {
     if (RtsFlags.ProfFlags.doHeapProfile &&
         RtsFlags.ProfFlags.heapProfileIntervalTicks > 0) {
-        RELAXED_STORE_ALWAYS(&do_heap_prof_ticks, true);
+        atomic_store_explicit(&do_heap_prof_ticks, true, memory_order_relaxed);
     }
 }
 
@@ -94,14 +94,14 @@ void
 requestHeapCensus( void ){
   // If no profiling mode is passed then just ignore the call.
   if (RtsFlags.ProfFlags.doHeapProfile){
-    RELAXED_STORE_ALWAYS(&performHeapProfile, true);
+      atomic_store_explicit(&performHeapProfile, true, memory_order_relaxed);
   }
 }
 
 void
 initProfTimer( void )
 {
-    RELAXED_STORE_ALWAYS(&performHeapProfile, false);
+    atomic_store_explicit(&performHeapProfile, false, memory_order_relaxed);
 
     ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
 
@@ -120,7 +120,7 @@ handleProfTick(void)
 {
 #if defined(PROFILING)
     total_ticks++;
-    if (RELAXED_LOAD_ALWAYS(&do_prof_ticks)) {
+    if (atomic_load_explicit(&do_prof_ticks, memory_order_relaxed)) {
         uint32_t n;
         for (n=0; n < getNumCapabilities(); n++) {
             Capability *cap = getCapability(n);
@@ -136,16 +136,17 @@ handleProfTick(void)
         ticks_to_ticky_sample--;
         if (ticks_to_ticky_sample <= 0) {
             ticks_to_ticky_sample = RtsFlags.ProfFlags.heapProfileIntervalTicks;
-            RELAXED_STORE_ALWAYS(&performTickySample, true);
+            atomic_store_explicit(&performTickySample, true, memory_order_relaxed);
         }
     }
 #endif
 
-    if (RELAXED_LOAD_ALWAYS(&do_heap_prof_ticks) && RELAXED_LOAD_ALWAYS(&heap_prof_timer_active))  {
+    if (atomic_load_explicit(&do_heap_prof_ticks, memory_order_relaxed) &&
+        atomic_load_explicit(&heap_prof_timer_active, memory_order_relaxed))  {
         ticks_to_heap_profile--;
         if (ticks_to_heap_profile <= 0) {
             ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
-            RELAXED_STORE_ALWAYS(&performHeapProfile, true);
+            atomic_store_explicit(&performHeapProfile, true, memory_order_relaxed);
         }
     }
 }

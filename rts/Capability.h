@@ -489,14 +489,14 @@ stopCapability (Capability *cap)
     // It may not work - the thread might be updating HpLim itself
     // at the same time - so we also have the context_switch/interrupted
     // flags as a sticky way to tell the thread to stop.
-    RELAXED_STORE_ALWAYS(&cap->r.rHpLim, NULL);
+    atomic_store_explicit(&cap->r.rHpLim, NULL, memory_order_relaxed);
 }
 
 INLINE_HEADER void
 interruptCapability (Capability *cap)
 {
     stopCapability(cap);
-    RELAXED_STORE_ALWAYS(&cap->interrupt, true);
+    atomic_store_explicit(&cap->interrupt, true, memory_order_relaxed);
 }
 
 INLINE_HEADER void
@@ -505,7 +505,7 @@ contextSwitchCapability (Capability *cap, bool immediately)
     if(immediately) {
         stopCapability(cap);
     }
-    RELAXED_STORE_ALWAYS(&cap->context_switch, true);
+    atomic_store_explicit(&cap->context_switch, true, memory_order_relaxed);
 }
 
 #if defined(THREADED_RTS)

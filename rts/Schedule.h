@@ -74,12 +74,12 @@ extern StgWord sched_state;
 
 INLINE_HEADER void setSchedState(enum SchedState ss)
 {
-    SEQ_CST_STORE_ALWAYS(&sched_state, (StgWord) ss);
+    atomic_store(&sched_state, (StgWord) ss);
 }
 
 INLINE_HEADER enum SchedState getSchedState(void)
 {
-    return (enum SchedState) SEQ_CST_LOAD_ALWAYS(&sched_state);
+    return (enum SchedState) atomic_load(&sched_state);
 }
 
 /*
@@ -124,14 +124,14 @@ extern StgWord recent_activity;
 INLINE_HEADER enum RecentActivity
 setRecentActivity(enum RecentActivity new_value)
 {
-    StgWord old = SEQ_CST_XCHG_ALWAYS((StgPtr) &recent_activity, (StgWord) new_value);
+    StgWord old = atomic_exchange((StgPtr) &recent_activity, (StgWord) new_value);
     return (enum RecentActivity) old;
 }
 
 INLINE_HEADER enum RecentActivity
 getRecentActivity(void)
 {
-    return (enum RecentActivity) RELAXED_LOAD_ALWAYS(&recent_activity);
+    return (enum RecentActivity) atomic_load_explicit(&recent_activity, memory_order_relaxed);
 }
 
 extern bool heap_overflow;

@@ -114,7 +114,7 @@ handle_tick(int unused STG_UNUSED)
 {
   handleProfTick();
   if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0
-      && SEQ_CST_LOAD_ALWAYS(&timer_disabled) == 0)
+      && atomic_load(&timer_disabled) == 0)
   {
       ticks_to_ctxt_switch--;
       if (ticks_to_ctxt_switch <= 0) {
@@ -189,7 +189,7 @@ initTimer(void)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
         initTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
     }
-    SEQ_CST_STORE_ALWAYS(&timer_disabled, 1);
+    atomic_store(&timer_disabled, 1);
 #endif
 }
 
@@ -197,7 +197,7 @@ void
 startTimer(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (SEQ_CST_SUB_ALWAYS(&timer_disabled, 1) == 0) {
+    if (atomic_fetch_sub(&timer_disabled, 1) == 1) {
         if (RtsFlags.MiscFlags.tickInterval != 0) {
             startTicker();
         }
@@ -209,7 +209,7 @@ void
 stopTimer(void)
 {
 #if defined(HAVE_PREEMPTION)
-    if (SEQ_CST_ADD_ALWAYS(&timer_disabled, 1) == 1) {
+    if (atomic_fetch_add(&timer_disabled, 1) == 0) {
         if (RtsFlags.MiscFlags.tickInterval != 0) {
             stopTicker();
         }

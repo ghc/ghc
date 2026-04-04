@@ -20,24 +20,6 @@ void arm_atomic_spin_lock(void);
 void arm_atomic_spin_unlock(void);
 #endif
 
-// Unconditionally atomic operations
-// These are atomic even in the non-threaded RTS. These are necessary in the
-// Proftimer implementation, which may be called from the pthreads-based
-// Ticker implementation.
-#define RELAXED_LOAD_ALWAYS(ptr) atomic_load_explicit(ptr, memory_order_relaxed)
-#define RELAXED_STORE_ALWAYS(ptr,val) atomic_store_explicit(ptr, val, memory_order_relaxed)
-
-// Acquire/release atomic operations
-#define ACQUIRE_LOAD_ALWAYS(ptr) atomic_load_explicit(ptr, memory_order_acquire)
-#define RELEASE_STORE_ALWAYS(ptr,val) atomic_store_explicit(ptr, val, memory_order_release)
-
-// Sequentially consistent atomic operations
-#define SEQ_CST_LOAD_ALWAYS(ptr) atomic_load(ptr)
-#define SEQ_CST_STORE_ALWAYS(ptr,val) atomic_store(ptr, val)
-#define SEQ_CST_ADD_ALWAYS(ptr,val) (atomic_fetch_add(ptr, val) + val)
-#define SEQ_CST_SUB_ALWAYS(ptr,val) (atomic_fetch_sub(ptr, val) - val)
-#define SEQ_CST_XCHG_ALWAYS(ptr,val) atomic_exchange(ptr, val);
-
 #if defined(THREADED_RTS)
 
 /* ----------------------------------------------------------------------------

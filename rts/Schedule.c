@@ -410,7 +410,7 @@ schedule (Capability *initialCapability, Task *task)
     if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0 &&
         (!emptyRunQueue(cap) ||
           anyPendingTimeoutsOrIO(cap))) {
-        RELAXED_STORE(&cap->context_switch, 1);
+        atomic_store_explicit(&cap->context_switch, 1, memory_order_relaxed);
     }
 
 run_thread:
@@ -1153,13 +1153,13 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
 static bool
 scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 {
-    if (RELAXED_LOAD_ALWAYS(&cap->r.rHpLim) == NULL ||
-            RELAXED_LOAD_ALWAYS(&cap->context_switch)) {
+    if (atomic_load_explicit(&cap->r.rHpLim, memory_order_relaxed) == NULL ||
+        atomic_load_explicit(&cap->context_switch, memory_order_relaxed)) {
         // Sometimes we miss a context switch, e.g. when calling
         // primitives in a tight loop, MAYBE_GC() doesn't check the
         // context switch flag, and we end up waiting for a GC.
         // See #1984, and concurrent/should_run/1984
-        RELAXED_STORE_ALWAYS(&cap->context_switch, 0);
+        atomic_store_explicit(&cap->context_switch, 0, memory_order_relaxed);
         appendToRunQueue(cap,t);
     } else {
         pushOnRunQueue(cap,t);
@@ -1264,8 +1264,8 @@ scheduleHandleYield( Capability *cap, StgTSO *t, uint32_t prev_what_next )
     // the CPU because the tick always arrives during GC).  This way
     // penalises threads that do a lot of allocation, but that seems
     // better than the alternative.
-    if (RELAXED_LOAD_ALWAYS(&cap->context_switch) != 0) {
-        RELAXED_STORE_ALWAYS(&cap->context_switch, 0);
+    if (atomic_load_explicit(&cap->context_switch, memory_order_relaxed) != 0) {
+        atomic_store_explicit(&cap->context_switch, 0, memory_order_relaxed);
         appendToRunQueue(cap,t);
     } else {
         pushOnRunQueue(cap,t);

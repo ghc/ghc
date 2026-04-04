@@ -109,7 +109,7 @@ static void *itimer_thread_func(void *_handle_tick)
 
     // Relaxed is sufficient: If we don't see that exited was set in one iteration we will
     // see it next time.
-    while (!RELAXED_LOAD_ALWAYS(&exited)) {
+    while (!atomic_load_explicit(&exited, memory_order_relaxed)) {
         if (poll(pollfds, 2, -1) == -1) {
             // While the RTS attempts to mask signals, some foreign libraries
             // may rely on signal delivery may unmask them. Consequently we may
@@ -143,7 +143,7 @@ static void *itimer_thread_func(void *_handle_tick)
         }
 
         // first try a cheap test
-        if (RELAXED_LOAD_ALWAYS(&stopped)) {
+        if (atomic_load_explicit(&stopped, memory_order_relaxed)) {
             OS_ACQUIRE_LOCK(&mutex);
             // should we really stop?
             if (stopped) {
