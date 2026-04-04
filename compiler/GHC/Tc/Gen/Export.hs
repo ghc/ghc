@@ -163,7 +163,7 @@ data ExportAccumWildcards
 emptyExportAccumWildcards :: ExportAccumWildcards
 emptyExportAccumWildcards = ExportAccumWildcards Nothing Nothing
 
-get_export_accum_wcs :: NamespaceSpecifier -> ExportAccumWildcards -> Maybe [Name]
+get_export_accum_wcs :: NamespaceSpecifier GhcPs -> ExportAccumWildcards -> Maybe [Name]
 get_export_accum_wcs ns_spec ExportAccumWildcards{eaw_type, eaw_data} =
   case ns_spec of
     NoNamespaceSpecifier{}   -> panic "get_export_accum_wcs: NoNamespaceSpecifier"  -- see PsErrPlainWildcardExport
@@ -446,8 +446,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                         expacc_wildcards  = earlier_wcs,
                         expacc_warn_spans = export_warn_spans,
                         expacc_dont_warn  = dont_warn_export
-                      } (L loc ie@(IEWholeNamespace x@(IEWholeNamespaceExt { iewn_warning = warn_txt_ps
-                                                                           , iewn_ns_spec = ns_spec })))
+                      } (L loc ie@(IEWholeNamespace x@(IEWholeNamespaceExt { iewn_warning = warn_txt_ps })
+                                                       ns_spec))
       | Just exported_names <- get_export_accum_wcs ns_spec earlier_wcs  -- Duplicate export of a namespace
       = do { addDiagnostic (TcRnDupeWildcardExport (moduleName this_mod) ns_spec)
            ; (export_warn_spans', dont_warn_export', _) <-
@@ -473,7 +473,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                  ; all_gres       = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
                  ; exported_names = map greName new_gres
                  ; wcs            = case ns_spec of
-                    NoNamespaceSpecifier     -> panic "exports_from_item: NoNamespaceSpecifier"  -- see PsErrPlainWildcardExport
+                    NoNamespaceSpecifier{}   -> panic "exports_from_item: NoNamespaceSpecifier"  -- see PsErrPlainWildcardExport
                     TypeNamespaceSpecifier{} -> earlier_wcs { eaw_type = Just exported_names }
                     DataNamespaceSpecifier{} -> earlier_wcs { eaw_data = Just exported_names }
                  }
@@ -508,7 +508,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                    , expacc_warn_spans = export_warn_spans'
                                    , expacc_dont_warn  = dont_warn_export' }
                      , Just (L loc (IEWholeNamespace x{ iewn_warning = warn_txt_rn
-                                                      , iewn_names = exported_names })
+                                                      , iewn_names = exported_names }
+                                                     (rnNamespaceSpecifier ns_spec))
                             , new_exports) ) }
 
     exports_from_item acc lie = do
@@ -608,10 +609,10 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             expacc_exp_occs   = occs,
             expacc_warn_spans = export_warn_spans,
             expacc_dont_warn  = dont_warn_export
-          } (L loc ie@(IEThingAll x l doc))
+          } (L loc ie@(IEThingAll x ns_spec l doc))
         = do mb_gre <- lookupGreAvailRn (ieLWrappedNameWhatLooking l) $ lieWrappedName l
              for mb_gre $ \ par -> do
-               all_kids <- lookup_ie_kids_all ie (ieta_ns_spec x) l par
+               all_kids <- lookup_ie_kids_all ie ns_spec l par
                let name = greName par
                    all_gres = par : all_kids
                    all_names = map greName all_gres
@@ -630,7 +631,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                return ( expacc{ expacc_exp_occs   = occs'
                               , expacc_warn_spans = export_warn_spans'
                               , expacc_dont_warn  = dont_warn_export' }
-                      , L loc (IEThingAll x' (replaceLWrappedName l name) doc')
+                      , L loc (IEThingAll x' (rnNamespaceSpecifier ns_spec) (replaceLWrappedName l name) doc')
                       , Just $ AvailTC name all_names )
 
     lookup_ie expacc@ExportAccum{
@@ -648,7 +649,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                wc_kids <-
                  case wc of
                    NoIEWildcard -> return []
-                   IEWildcard _ -> lookup_ie_kids_all ie NoNamespaceSpecifier l par
+                   IEWildcard _ -> lookup_ie_kids_all ie (NoNamespaceSpecifier noExtField) l par
 
                let name = greName par
                    all_kids = with_kids ++ wc_kids
@@ -682,7 +683,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
          ; return (unzip kids) }
 
     lookup_ie_kids_all :: IE GhcPs
-                  -> NamespaceSpecifier
+                  -> NamespaceSpecifier GhcPs
                   -> LIEWrappedName GhcPs
                   -> GlobalRdrElt
                   -> RnM [GlobalRdrElt]
@@ -691,7 +692,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                gres = findChildren kids_env name
          -- We only choose level 0 exports when filling in part of an export list implicitly.
          ; let kids_0 = mapMaybe pickLevelZeroGRE gres
-               selected_kids = filterByNamespaceGREs ns_spec kids_0
+               selected_kids = filterByNamespaceSpecifierGREs ns_spec kids_0
          ; when (null selected_kids) $
              addTcRnDiagnostic (TcRnDodgyExports (DodgyExportsEmptyParent ie ns_spec gre))
          ; addUsedKids (ieWrappedName rdr) selected_kids
@@ -1105,7 +1106,7 @@ dupExport_ok child ie1 ie2
   where
     explicit_in (IEModuleContents {}) = False                   -- module M
     explicit_in (IEWholeNamespace {}) = False                   -- `type ..` or `data ..`
-    explicit_in (IEThingAll _ r _)
+    explicit_in (IEThingAll _ _ r _)
       = occName child == rdrNameOcc (ieWrappedName $ unLoc r)  -- T(..)
     explicit_in _              = True
 

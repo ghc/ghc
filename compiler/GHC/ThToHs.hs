@@ -274,10 +274,10 @@ cvtDec (TH.InfixD fx th_ns_spec nm)
   -- it's a variable or constructor and proceed.
   = do { nm' <- vcNameN nm
        ; returnJustLA (Hs.SigD noExtField (FixSig noAnn
-                                      (FixitySig ns_spec [nm'] (cvtFixity fx)))) }
+                                      (FixitySig noExtField ns_spec [nm'] (cvtFixity fx)))) }
   where
     ns_spec = case th_ns_spec of
-      TH.NoNamespaceSpecifier -> Hs.NoNamespaceSpecifier
+      TH.NoNamespaceSpecifier -> Hs.NoNamespaceSpecifier noExtField
       TH.TypeNamespaceSpecifier -> Hs.TypeNamespaceSpecifier noAnn
       TH.DataNamespaceSpecifier -> Hs.DataNamespaceSpecifier noAnn
 

@@ -912,6 +912,11 @@ type instance XXBndrKind DocNameI = DataConCantHappen
 type instance XCFieldOcc DocNameI = RdrName
 type instance XXFieldOcc DocNameI = DataConCantHappen
 
+type instance XNoNamespaceSpecifier DocNameI = NoExtField
+type instance XTypeNamespaceSpecifier DocNameI = NoExtField
+type instance XDataNamespaceSpecifier DocNameI = NoExtField
+type instance XXNamespaceSpecifier DocNameI = DataConCantHappen
+
 type instance XFixitySig DocNameI = NoExtField
 type instance XFixSig DocNameI = NoExtField
 type instance XPatSynSig DocNameI = NoExtField

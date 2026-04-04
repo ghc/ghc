@@ -1939,25 +1939,25 @@ instance ExactPrint (WarnDecl GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact (Warning (ns_spec, (o,c)) lns  (WarningTxt src mb_cat ls )) = do
+  exact (Warning (o,c) ns_spec lns (WarningTxt src mb_cat ls )) = do
     mb_cat' <- markAnnotated mb_cat
     ns_spec' <- exactNsSpec ns_spec
     lns' <- markAnnotated lns
     o' <- markEpToken o
     ls' <- markAnnotated ls
     c' <- markEpToken c
-    return (Warning (ns_spec', (o',c')) lns'  (WarningTxt src mb_cat' ls'))
+    return (Warning (o',c') ns_spec' lns' (WarningTxt src mb_cat' ls'))
 
-  exact (Warning (ns_spec, (o,c)) lns (DeprecatedTxt src ls)) = do
+  exact (Warning (o,c) ns_spec lns (DeprecatedTxt src ls)) = do
     ns_spec' <- exactNsSpec ns_spec
     lns' <- markAnnotated lns
     o' <- markEpToken o
     ls' <- markAnnotated ls
     c' <- markEpToken c
-    return (Warning (ns_spec', (o',c')) lns' (DeprecatedTxt src ls'))
+    return (Warning (o',c') ns_spec' lns' (DeprecatedTxt src ls'))
 
-exactNsSpec :: (Monad m, Monoid w) => NamespaceSpecifier -> EP w m NamespaceSpecifier
-exactNsSpec NoNamespaceSpecifier = pure NoNamespaceSpecifier
+exactNsSpec :: (Monad m, Monoid w) => NamespaceSpecifier GhcPs -> EP w m (NamespaceSpecifier GhcPs)
+exactNsSpec (NoNamespaceSpecifier x) = pure (NoNamespaceSpecifier x)
 exactNsSpec (TypeNamespaceSpecifier type_) = do
   type_' <- markEpToken type_
   pure (TypeNamespaceSpecifier type_')
@@ -2637,7 +2637,7 @@ instance ExactPrint (Sig GhcPs) where
         (dc', vars',ty') <- exactVarSig dc vars ty
         return (ClassOpSig (AnnSig dc' mp md) is_deflt vars' ty')
 
-  exact (FixSig ((af, ma),src) (FixitySig ns names (Fixity v fdir))) = do
+  exact (FixSig ((af, ma),src) (FixitySig _ ns names (Fixity v fdir))) = do
     let fixstr = case fdir of
          InfixL -> "infixl"
          InfixR -> "infixr"
@@ -2646,7 +2646,7 @@ instance ExactPrint (Sig GhcPs) where
     ma' <- mapM (\l -> printStringAtAA l (sourceTextToString src (show v))) ma
     ns' <- markAnnotated ns
     names' <- markAnnotated names
-    return (FixSig ((af',ma'),src) (FixitySig ns' names' (Fixity v fdir)))
+    return (FixSig ((af',ma'),src) (FixitySig noExtField ns' names' (Fixity v fdir)))
 
   exact (InlineSig (o,c,act) ln inl) = do
     o' <- markAnnOpen'' o (inlinePragmaSource inl) "{-# INLINE"
@@ -2707,11 +2707,11 @@ instance ExactPrint (Sig GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint NamespaceSpecifier where
+instance ExactPrint (NamespaceSpecifier GhcPs) where
   getAnnotationEntry _ = NoEntryVal
   setAnnotationAnchor a _ _ _ = a
 
-  exact NoNamespaceSpecifier = return NoNamespaceSpecifier
+  exact (NoNamespaceSpecifier x) = return (NoNamespaceSpecifier x)
   exact (TypeNamespaceSpecifier typeTok) = do
       typeTok' <- markEpToken typeTok
       return (TypeNamespaceSpecifier typeTok')
@@ -4587,16 +4587,16 @@ instance ExactPrint (IE GhcPs) where
     thing' <- markAnnotated thing
     doc' <- markAnnotated doc
     return (IEThingAbs depr' thing' doc')
-  exact (IEThingAll x thing doc) = do
+  exact (IEThingAll x ns_spec thing doc) = do
     depr' <- markAnnotated (ieta_warning x)
-    ns_spec' <- markAnnotated (ieta_ns_spec x)
+    ns_spec' <- markAnnotated ns_spec
     thing' <- markAnnotated thing
     op' <- markEpToken (ieta_tok_lpar x)
     dd' <- markEpToken (ieta_tok_wc x)
     cp' <- markEpToken (ieta_tok_rpar x)
     doc' <- markAnnotated doc
-    let x' = IEThingAllExt depr' ns_spec' op' dd' cp'
-    return (IEThingAll x' thing' doc')
+    let x' = IEThingAllExt depr' op' dd' cp'
+    return (IEThingAll x' ns_spec' thing' doc')
 
   exact (IEThingWith (depr, (op,dd,c,cp)) thing wc withs doc) = do
     depr' <- markAnnotated depr
@@ -4624,11 +4624,11 @@ instance ExactPrint (IE GhcPs) where
     m' <- markAnnotated m
     return (IEModuleContents (depr', an0) m')
 
-  exact (IEWholeNamespace (IEWholeNamespaceExt depr ns_spec tk_wc names)) = do
+  exact (IEWholeNamespace (IEWholeNamespaceExt depr tk_wc names) ns_spec) = do
     depr' <- markAnnotated depr
     ns_spec' <- markAnnotated ns_spec
     tk_wc' <- markEpToken tk_wc
-    return (IEWholeNamespace (IEWholeNamespaceExt depr' ns_spec' tk_wc' names))
+    return (IEWholeNamespace (IEWholeNamespaceExt depr' tk_wc' names) ns_spec')
 
   -- These three exist to not error out, but are no-ops The contents
   -- appear as "normal" comments too, which we process instead.

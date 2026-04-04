@@ -1,0 +1,12 @@
+section: ghc-lib
+synopsis: Move ``NamespaceSpecifier`` from extension fields into the AST proper
+issues: #26678
+mrs: !15858
+
+description: {
+Move the declaration of ``NamespaceSpecifier`` from ``GHC.Hs.Basic`` to
+``Language.Haskell.Syntax.ImpExp`` and parameterise it by the compiler pass,
+creating the necessary extension points. Update ``FixitySig``, ``IEThingAll``,
+and ``IEWholeNamespace`` to store ``NamespaceSpecifier`` directly rather than
+in their extension fields.
+}

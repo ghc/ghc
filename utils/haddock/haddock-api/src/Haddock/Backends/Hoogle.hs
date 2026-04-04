@@ -374,7 +374,7 @@ ppCtor
           mkForallTys = flip (foldr mkForallTy)
 
 ppFixity :: SDocContext -> (Name, Fixity) -> [String]
-ppFixity sDocContext (name, fixity) = [out sDocContext ((FixitySig NoNamespaceSpecifier [noLocA name] fixity) :: FixitySig GhcRn)]
+ppFixity sDocContext (name, fixity) = [out sDocContext ((FixitySig noExtField (NoNamespaceSpecifier noExtField) [noLocA name] fixity) :: FixitySig GhcRn)]
 
 ---------------------------------------------------------------------
 -- DOCUMENTATION

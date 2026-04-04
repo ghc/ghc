@@ -26,6 +26,7 @@ import Language.Haskell.Syntax.Binds.InlinePragma (InlinePragma)
 import Language.Haskell.Syntax.BooleanFormula (LBooleanFormula)
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
+import Language.Haskell.Syntax.ImpExp (NamespaceSpecifier)
 
 import GHC.Types.SourceText (StringLiteral)
 
@@ -397,7 +398,7 @@ data Sig pass
 type LFixitySig pass = XRec pass (FixitySig pass)
 
 -- | Fixity Signature
-data FixitySig pass = FixitySig (XFixitySig pass) [LIdP pass] Fixity
+data FixitySig pass = FixitySig (XFixitySig pass) (NamespaceSpecifier pass) [LIdP pass] Fixity
                     | XFixitySig !(XXFixitySig pass)
 
 isFixityLSig :: forall p. UnXRec p => LSig p -> Bool

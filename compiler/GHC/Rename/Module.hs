@@ -294,13 +294,14 @@ rnSrcWarnDecls bndr_set decls'
 
    sig_ctxt = TopSigCtxt bndr_set
 
-   rn_deprec w@(Warning (ns_spec, _) rdr_names txt)
+   rn_deprec w@(Warning _ ns_spec rdr_names txt)
        -- ensures that the names are defined locally
      = do { names <- concatMapM (lookupLocalTcNames sig_ctxt SigLikeDeprecation ns_spec . unLoc)
                                 rdr_names
           ; unlessXOptM LangExt.ExplicitNamespaces $
-            when (ns_spec /= NoNamespaceSpecifier) $
-            addErr (TcRnNamespacedWarningPragmaWithoutFlag w)
+            case ns_spec of
+              NoNamespaceSpecifier{} -> return ()
+              _ -> addErr (TcRnNamespacedWarningPragmaWithoutFlag w)
           ; txt' <- rnWarningTxt txt
           ; return [(nameOccName nm, txt') | (_, nm) <- names] }
   -- Use the OccName from the Name we looked up, rather than from the RdrName,
@@ -308,9 +309,9 @@ rnSrcWarnDecls bndr_set decls'
   -- (e.g. deprecating both a variable and a record field).
 
    warn_rdr_dups = find_dup_warning_names
-                   $ concatMap (\(L _ (Warning (ns_spec, _) ns _)) -> (ns_spec,) <$> ns) decls
+                   $ concatMap (\(L _ (Warning _ ns_spec ns _)) -> (ns_spec,) <$> ns) decls
 
-   find_dup_warning_names :: [(NamespaceSpecifier, LocatedN RdrName)] -> [NonEmpty (NamespaceSpecifier, LocatedN RdrName)]
+   find_dup_warning_names :: [(NamespaceSpecifier GhcPs, LocatedN RdrName)] -> [NonEmpty (NamespaceSpecifier GhcPs, LocatedN RdrName)]
    find_dup_warning_names = findDupsEq (\ (spec1, x) -> \ (spec2, y) ->
                               overlappingNamespaceSpecifiers spec1 spec2 &&
                               rdrNameOcc (unLoc x) == rdrNameOcc (unLoc y))

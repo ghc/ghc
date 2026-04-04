@@ -321,7 +321,7 @@ instance HasHaddock (LocatedA (IE GhcPs)) where
       let ie' = case ie of
             IEVar ext nm _                 -> IEVar ext nm mb_ldoc
             IEThingAbs ext nm _            -> IEThingAbs ext nm mb_ldoc
-            IEThingAll ext nm _            -> IEThingAll ext nm mb_ldoc
+            IEThingAll ext ns nm _         -> IEThingAll ext ns nm mb_ldoc
             IEThingWith ext nm wild subs _ -> IEThingWith ext nm wild subs mb_ldoc
             x                              -> x
       pure $ L l_export ie'

@@ -132,8 +132,6 @@ import GHC.Builtin.Uniques ( isFldNSUnique )
 import GHC.Types.ThLevelIndex
 import qualified Data.Set as Set
 
-import GHC.Hs.Basic
-
 import GHC.Unit.Module
 
 import GHC.Utils.Misc as Utils
@@ -1108,9 +1106,8 @@ filterFieldGREs :: FieldsOrSelectors -> [GlobalRdrElt] -> [GlobalRdrElt]
 filterFieldGREs WantBoth = id
 filterFieldGREs fos = filter (allowGRE fos)
 
-filterByNamespaceGREs :: NamespaceSpecifier -> [GlobalRdrElt] -> [GlobalRdrElt]
-filterByNamespaceGREs NoNamespaceSpecifier = id
-filterByNamespaceGREs ns_spec = filter (coveredByNamespaceSpecifier ns_spec . greNameSpace)
+filterByNamespaceGREs :: (NameSpace -> Bool) -> [GlobalRdrElt] -> [GlobalRdrElt]
+filterByNamespaceGREs p = filter (p . greNameSpace)
 
 allowGRE :: FieldsOrSelectors -> GlobalRdrElt -> Bool
 allowGRE WantBoth   _

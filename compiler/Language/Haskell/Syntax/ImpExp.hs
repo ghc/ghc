@@ -97,7 +97,7 @@ data IE pass
         -- @
 
         -- See Note [Located RdrNames] in GHC.Hs.Expr
-  | IEThingAll  (XIEThingAll pass) (LIEWrappedName pass) (Maybe (ExportDoc pass))
+  | IEThingAll  (XIEThingAll pass) (NamespaceSpecifier pass) (LIEWrappedName pass) (Maybe (ExportDoc pass))
         -- ^ Imported or exported thing with wildcard subordinate list (e.g. @(..)@)
         --
         -- The thing is a Class\/Type and the All refers to methods\/constructors
@@ -128,7 +128,7 @@ data IE pass
         -- @
         -- module Mod ( module Mod2 )
         -- @
-  | IEWholeNamespace (XIEWholeNamespace pass)
+  | IEWholeNamespace (XIEWholeNamespace pass) (NamespaceSpecifier pass)
         -- ^ Import or export of an entire namespace of the current module.
         --
         -- @
@@ -187,3 +187,33 @@ data IEWrappedName p
 
 -- | Located name with possible adornment
 type LIEWrappedName p = XRec p (IEWrappedName p)
+
+-- | Optional namespace specifier for:
+--
+-- * import/export items
+-- * fixity signatures
+-- * @WARNING@ and @DEPRECATED@ pragmas
+--
+-- Examples:
+--
+-- @
+-- module M (data ..) where
+--        -- ↑ DataNamespaceSpecifier
+--
+-- import Data.Proxy as T (type ..)
+--                      -- ↑ TypeNamespaceSpecifier
+--
+-- {-# WARNING in "x-partial" data Head "don't use this pattern synonym" #-}
+--                          -- ↑ DataNamespaceSpecifier
+--
+-- {-# DEPRECATED type D "This type was deprecated" #-}
+--              -- ↑ TypeNamespaceSpecifier
+--
+-- infixr 6 data $
+--        -- ↑ DataNamespaceSpecifier
+-- @
+data NamespaceSpecifier p
+  = NoNamespaceSpecifier (XNoNamespaceSpecifier p)
+  | TypeNamespaceSpecifier (XTypeNamespaceSpecifier p)
+  | DataNamespaceSpecifier (XDataNamespaceSpecifier p)
+  | XNamespaceSpecifier !(XXNamespaceSpecifier p)

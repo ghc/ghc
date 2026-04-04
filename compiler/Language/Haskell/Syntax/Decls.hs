@@ -100,6 +100,7 @@ import Language.Haskell.Syntax.Decls.Overlap (OverlapMode)
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Specificity (Specificity)
 import Language.Haskell.Syntax.Type
+import Language.Haskell.Syntax.ImpExp (NamespaceSpecifier)
 
 import GHC.Data.FastString (FastString)
 import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
@@ -1447,7 +1448,7 @@ data WarnDecls pass = Warnings { wd_ext      :: XWarnings pass
 type LWarnDecl pass = XRec pass (WarnDecl pass)
 
 -- | Warning pragma Declaration
-data WarnDecl pass = Warning (XWarning pass) [LIdP pass] (WarningTxt pass)
+data WarnDecl pass = Warning (XWarning pass) (NamespaceSpecifier pass) [LIdP pass] (WarningTxt pass)
                    | XWarnDecl !(XXWarnDecl pass)
 
 

@@ -2020,8 +2020,8 @@ instance Diagnostic TcRnMessage where
             | otherwise
             = text "they are not unfilled metavariables"
 
-    TcRnNamespacedWarningPragmaWithoutFlag warning@(Warning (kw, _) _ txt) -> mkSimpleDecorated $
-      vcat [ text "Illegal use of the" <+> quotes (ppr kw) <+> text "keyword:"
+    TcRnNamespacedWarningPragmaWithoutFlag warning@(Warning _ ns_spec _ txt) -> mkSimpleDecorated $
+      vcat [ text "Illegal use of the" <+> quotes (ppr ns_spec) <+> text "keyword:"
            , nest 2 (ppr warning)
            , text "in a" <+> pragma_type <+> text "pragma"
            ]
@@ -2039,7 +2039,7 @@ instance Diagnostic TcRnMessage where
                InvisPatMisplaced -> text "An invisible type pattern must occur in an argument position."
            ]
 
-    TcRnNamespacedFixitySigWithoutFlag sig@(FixitySig kw _ _) -> mkSimpleDecorated $
+    TcRnNamespacedFixitySigWithoutFlag sig@(FixitySig _ kw _ _) -> mkSimpleDecorated $
       vcat [ text "Illegal use of the" <+> quotes (ppr kw) <+> text "keyword:"
            , nest 2 (ppr sig)
            , text "in a fixity signature"
@@ -3703,7 +3703,7 @@ messageWithHsDocContext opts ctxt main_msg = do
 
 --------------------------------------------------------------------------------
 
-dodgy_msg :: Outputable ie => SDoc -> GlobalRdrElt -> ie -> NamespaceSpecifier -> SDoc
+dodgy_msg :: Outputable ie => SDoc -> GlobalRdrElt -> ie -> NamespaceSpecifier (GhcPass p) -> SDoc
 dodgy_msg kind tc ie ns_spec
   = vcat [ text "The" <+> kind <+> text "item" <+> quotes (ppr ie) <+> text "suggests that"
          , quotes (ppr $ greName tc) <+> text "has" <+> fst rest, snd rest ]
@@ -3713,7 +3713,7 @@ dodgy_msg kind tc ie ns_spec
       case greInfo tc of
         IAmTyCon ClassFlavour
           -> let items = case ns_spec of
-                   NoNamespaceSpecifier     -> text "class methods or associated types"
+                   NoNamespaceSpecifier{}   -> text "class methods or associated types"
                    DataNamespaceSpecifier{} -> text "class methods"
                    TypeNamespaceSpecifier{} -> text "associated types"
              in ( text "(in-scope)" <+> items <> comma
@@ -3724,15 +3724,15 @@ dodgy_msg kind tc ie ns_spec
                  type_msg = ( text "associated types" <> comma
                             , text "but it is not a class" )
              in case ns_spec of
-                  NoNamespaceSpecifier     -> data_msg
+                  NoNamespaceSpecifier{}   -> data_msg
                   DataNamespaceSpecifier{} -> data_msg
                   TypeNamespaceSpecifier{} -> type_msg
         _ -> ( text "children" <> comma
              , text "but it is not a type constructor or a class" )
 
-pprNamespaceItems :: NamespaceSpecifier -> [SDoc]
+pprNamespaceItems :: NamespaceSpecifier (GhcPass p) -> [SDoc]
 pprNamespaceItems ns_spec = case ns_spec of
-  NoNamespaceSpecifier -> [text "names"]
+  NoNamespaceSpecifier{} -> [text "names"]
   TypeNamespaceSpecifier{} ->
     [text "types,", text "classes,",
      text "or other names", text "in the type namespace"]

@@ -26,14 +26,15 @@ import GHC.Prelude
 import GHC.Types.SourceText   ( SourceText(..) )
 import GHC.Types.SrcLoc
 import GHC.Types.Name
+import GHC.Types.Name.Reader
 import GHC.Types.PkgQual
 
 import GHC.Parser.Annotation
-import GHC.Hs.Basic
 import GHC.Hs.Extension
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Misc ((<||>))
 
 import GHC.Unit.Module.Warnings
 
@@ -101,6 +102,14 @@ deriving instance Data (IEWrappedName GhcTc)
 deriving instance Eq (IEWrappedName GhcPs)
 deriving instance Eq (IEWrappedName GhcRn)
 deriving instance Eq (IEWrappedName GhcTc)
+
+deriving instance Data (NamespaceSpecifier GhcPs)
+deriving instance Data (NamespaceSpecifier GhcRn)
+deriving instance Data (NamespaceSpecifier GhcTc)
+
+deriving instance Eq (NamespaceSpecifier GhcPs)
+deriving instance Eq (NamespaceSpecifier GhcRn)
+deriving instance Eq (NamespaceSpecifier GhcTc)
 
 -- ---------------------------------------------------------------------
 
@@ -221,6 +230,11 @@ type instance XIEType    (GhcPass _) = EpToken "type"
 type instance XIEData    (GhcPass _) = EpToken "data"
 type instance XXIEWrappedName (GhcPass _) = DataConCantHappen
 
+type instance XNoNamespaceSpecifier   (GhcPass _) = NoExtField
+type instance XTypeNamespaceSpecifier (GhcPass _) = EpToken "type"
+type instance XDataNamespaceSpecifier (GhcPass _) = EpToken "data"
+type instance XXNamespaceSpecifier    (GhcPass _) = DataConCantHappen
+
 type instance Anno (IEWrappedName (GhcPass _)) = SrcSpanAnnA
 
 type instance Anno (IE (GhcPass p)) = SrcSpanAnnA
@@ -244,8 +258,6 @@ data IEThingAllExt pass =
     ieta_warning  :: Maybe (LWarningTxt pass),
       -- ^ Export deprecation annotation. Always 'Nothing' for import lists,
       -- since export deprecation can only be used in exports.
-    ieta_ns_spec  :: NamespaceSpecifier,
-      -- ^ See #26678 "NamespaceSpecifier in extension fields"
     ieta_tok_lpar :: EpToken "(",
     ieta_tok_wc   :: EpToken "..",
     ieta_tok_rpar :: EpToken ")"
@@ -272,8 +284,6 @@ type instance XIEModuleContents  GhcTc = NoExtField
 data IEWholeNamespaceExt pass =
   IEWholeNamespaceExt {
     iewn_warning :: Maybe (LWarningTxt pass),
-    iewn_ns_spec :: NamespaceSpecifier,
-      -- ^ See #26678 "NamespaceSpecifier in extension fields"
     iewn_tok_wc  :: EpToken "..",
     iewn_names   :: [IdP pass]
       -- ^ The list @[Name]@ stores the names that the @..@ expands to;
@@ -293,7 +303,7 @@ ieLIEWrappedName :: IE (GhcPass p) -> LIEWrappedName (GhcPass p)
 ieLIEWrappedName (IEVar _ n _)           = n
 ieLIEWrappedName (IEThingAbs  _ n _)     = n
 ieLIEWrappedName (IEThingWith _ n _ _ _) = n
-ieLIEWrappedName (IEThingAll  _ n _)     = n
+ieLIEWrappedName (IEThingAll  _ _ n _)   = n
 ieLIEWrappedName _ = panic "ieLIEWrappedName failed pattern match!"
 
 ieName :: IE (GhcPass p) -> IdP (GhcPass p)
@@ -302,9 +312,9 @@ ieName = lieWrappedName . ieLIEWrappedName
 ieNames :: IE (GhcPass p) -> [IdP (GhcPass p)]
 ieNames (IEVar       _ (L _ n) _)      = [ieWrappedName n]
 ieNames (IEThingAbs  _ (L _ n) _)      = [ieWrappedName n]
-ieNames (IEThingAll  _ (L _ n) _)      = [ieWrappedName n]
+ieNames (IEThingAll  _ _ (L _ n) _)    = [ieWrappedName n]
 ieNames (IEThingWith _ (L _ n) _ ns _) = ieWrappedName n : map (ieWrappedName . unLoc) ns
-ieNames (IEWholeNamespace x)           = iewn_names x
+ieNames (IEWholeNamespace x _)         = iewn_names x
 ieNames (IEModuleContents {})     = []
 ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
@@ -316,12 +326,12 @@ ieDeprecation = fmap unLoc . ie_deprecation (ghcPass @p)
     ie_deprecation :: GhcPass p -> IE (GhcPass p) -> Maybe (LWarningTxt (GhcPass p))
     ie_deprecation GhcPs (IEVar xie _ _) = xie
     ie_deprecation GhcPs (IEThingAbs xie _ _) = xie
-    ie_deprecation GhcPs (IEThingAll xie _ _) = ieta_warning xie
+    ie_deprecation GhcPs (IEThingAll xie _ _ _) = ieta_warning xie
     ie_deprecation GhcPs (IEThingWith (xie, _) _ _ _ _) = xie
     ie_deprecation GhcPs (IEModuleContents (xie, _) _) = xie
     ie_deprecation GhcRn (IEVar xie _ _) = xie
     ie_deprecation GhcRn (IEThingAbs xie _ _) = xie
-    ie_deprecation GhcRn (IEThingAll xie _ _) = ieta_warning xie
+    ie_deprecation GhcRn (IEThingAll xie _ _ _) = ieta_warning xie
     ie_deprecation GhcRn (IEThingWith (xie, _) _ _ _ _) = xie
     ie_deprecation GhcRn (IEModuleContents xie _) = xie
     ie_deprecation _ _ = Nothing
@@ -367,9 +377,9 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
                       , Just $ ppr (unLoc thing)
                       , exportDocstring <$> doc
                       ]
-    ppr ie@(IEThingAll x thing doc) =
+    ppr ie@(IEThingAll _ ns_spec thing doc) =
       sep $ catMaybes [ ppr <$> ieDeprecation ie
-                      , Just $ ppr (unLoc thing) <> parens (ppr (ieta_ns_spec x) <+> text "..")
+                      , Just $ ppr (unLoc thing) <> parens (ppr ns_spec <+> text "..")
                       , exportDocstring <$> doc
                       ]
     ppr ie@(IEThingWith _ thing wc withs doc) =
@@ -387,7 +397,7 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
                 in bs ++ [text ".."] ++ as
     ppr ie@(IEModuleContents _ mod')
         = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "module" <+> ppr mod']
-    ppr (IEWholeNamespace x)      = ppr (iewn_ns_spec x) <+> text ".."
+    ppr (IEWholeNamespace _ ns_spec) = ppr ns_spec <+> text ".."
     ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")
     ppr (IEDoc _ doc)             = ppr doc
     ppr (IEDocNamed _ string)     = text ("<IEDocNamed: " ++ string ++ ">")
@@ -413,3 +423,30 @@ pprImpExp name = type_pref <+> pprPrefixOcc name
     occ = occName name
     type_pref | isTcOcc occ && isSymOcc occ = text "type"
               | otherwise                   = empty
+
+-- | Check if namespace specifiers overlap, i.e. if they are equal or
+-- if at least one of them doesn't specify a namespace
+overlappingNamespaceSpecifiers :: NamespaceSpecifier (GhcPass p) -> NamespaceSpecifier (GhcPass p') -> Bool
+overlappingNamespaceSpecifiers NoNamespaceSpecifier{} _ = True
+overlappingNamespaceSpecifiers _ NoNamespaceSpecifier{} = True
+overlappingNamespaceSpecifiers TypeNamespaceSpecifier{} TypeNamespaceSpecifier{} = True
+overlappingNamespaceSpecifiers DataNamespaceSpecifier{} DataNamespaceSpecifier{} = True
+overlappingNamespaceSpecifiers _ _ = False
+
+-- | Check if namespace is covered by a namespace specifier:
+--     * NoNamespaceSpecifier covers both namespaces
+--     * TypeNamespaceSpecifier covers the type namespace only
+--     * DataNamespaceSpecifier covers the data namespace only
+coveredByNamespaceSpecifier :: NamespaceSpecifier (GhcPass p) -> NameSpace -> Bool
+coveredByNamespaceSpecifier NoNamespaceSpecifier{} = const True
+coveredByNamespaceSpecifier TypeNamespaceSpecifier{} = isTcClsNameSpace <||> isTvNameSpace
+coveredByNamespaceSpecifier DataNamespaceSpecifier{} = isValNameSpace
+
+filterByNamespaceSpecifierGREs :: NamespaceSpecifier (GhcPass p) -> [GlobalRdrElt] -> [GlobalRdrElt]
+filterByNamespaceSpecifierGREs NoNamespaceSpecifier{} = id
+filterByNamespaceSpecifierGREs ns_spec = filterByNamespaceGREs (coveredByNamespaceSpecifier ns_spec)
+
+instance Outputable (NamespaceSpecifier (GhcPass p)) where
+  ppr NoNamespaceSpecifier{} = empty
+  ppr TypeNamespaceSpecifier{} = text "type"
+  ppr DataNamespaceSpecifier{} = text "data"

@@ -2125,8 +2125,9 @@ lookupSigCtxtOccRn :: HsSigCtxt
                    -> RnM (GenLocated (EpAnn ann) Name)
 lookupSigCtxtOccRn ctxt what
   = wrapLocMA $ \ rdr_name ->
-    do { let also_try_tycons = False
-       ; mb_names <- lookupBindGroupOcc ctxt what rdr_name also_try_tycons NoNamespaceSpecifier
+    do { let { also_try_tycons = False
+             ; ns_spec = NoNamespaceSpecifier noExtField }
+       ; mb_names <- lookupBindGroupOcc ctxt what rdr_name also_try_tycons ns_spec
        ; case mb_names of
            Right name NE.:| rest ->
              do { massertPpr (null rest) $
@@ -2143,7 +2144,7 @@ lookupBindGroupOcc :: HsSigCtxt
                    -> Bool -- ^ if the 'RdrName' we are looking up is in
                            -- a value 'NameSpace', should we also look up
                            -- in the type constructor 'NameSpace'?
-                   -> NamespaceSpecifier
+                   -> NamespaceSpecifier GhcPs
                    -> RnM (NE.NonEmpty (Either NotInScopeError Name))
 -- ^ Looks up the 'RdrName', expecting it to resolve to one of the
 -- bound names currently in scope. If not, return an appropriate error message.
@@ -2246,7 +2247,7 @@ lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns ns_spec
 
 
 ---------------
-lookupLocalTcNames :: HsSigCtxt -> SigLike -> NamespaceSpecifier -> RdrName -> RnM [(RdrName, Name)]
+lookupLocalTcNames :: HsSigCtxt -> SigLike -> NamespaceSpecifier GhcPs -> RdrName -> RnM [(RdrName, Name)]
 -- GHC extension: look up both the tycon and data con or variable.
 -- Used for top-level fixity signatures and deprecations.
 -- Complain if neither is in scope.

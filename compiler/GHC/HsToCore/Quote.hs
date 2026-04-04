@@ -326,7 +326,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
     no_splice (L loc _)
       = notHandledL (locA loc) ThSplicesWithinDeclBrackets
     no_warn :: LWarnDecl GhcRn -> MetaM a
-    no_warn (L loc (Warning _ thing _))
+    no_warn (L loc (Warning _ _ thing _))
       = notHandledL (locA loc) (ThWarningAndDeprecationPragmas thing)
     no_doc (L loc _)
       = notHandledL (locA loc) ThHaddockDocumentation
@@ -772,7 +772,7 @@ repLFixD :: LFixitySig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 repLFixD (L loc fix_sig) = rep_fix_d (locA loc) fix_sig
 
 rep_fix_d :: SrcSpan -> FixitySig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
-rep_fix_d loc (FixitySig ns_spec names (Fixity prec dir))
+rep_fix_d loc (FixitySig _ ns_spec names (Fixity prec dir))
   = do { MkC prec' <- coreIntLit prec
        ; let rep_fn = case dir of
                         InfixL -> infixLWithSpecDName
@@ -2765,7 +2765,7 @@ repOverlap mb =
   just    = coreJust overlapTyConName
 
 
-repNamespaceSpecifier :: NamespaceSpecifier -> MetaM (Core (TH.NamespaceSpecifier))
+repNamespaceSpecifier :: NamespaceSpecifier GhcRn -> MetaM (Core (TH.NamespaceSpecifier))
 repNamespaceSpecifier ns_spec = case ns_spec of
   NoNamespaceSpecifier{} -> dataCon noNamespaceSpecifierDataConName
   TypeNamespaceSpecifier{} -> dataCon typeNamespaceSpecifierDataConName

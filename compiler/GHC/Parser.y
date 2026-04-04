@@ -2106,13 +2106,13 @@ warnings :: { OrdList (LWarnDecl GhcPs) }
 warning :: { OrdList (LWarnDecl GhcPs) }
         : warning_category namespace_spec namelist strings
                 {% fmap unitOL $ amsA' (L (comb4 $1 $2 $3 $4)
-                     (Warning (unLoc $2, fst $ unLoc $4) (unLoc $3)
+                     (Warning (fst $ unLoc $4) (unLoc $2) (unLoc $3)
                               (WarningTxt NoSourceText $1 (map stringLiteralToHsDocWst $ snd $ unLoc $4)))) }
 
-namespace_spec :: { Located NamespaceSpecifier }
+namespace_spec :: { Located (NamespaceSpecifier GhcPs) }
   : 'type'      { sL1 $1 $ TypeNamespaceSpecifier (epTok $1) }
   | 'data'      { sL1 $1 $ DataNamespaceSpecifier (epTok $1) }
-  | {- empty -} { sL0    $ NoNamespaceSpecifier }
+  | {- empty -} { sL0    $ NoNamespaceSpecifier noExtField }
 
 deprecations :: { OrdList (LWarnDecl GhcPs) }
         : deprecations ';' deprecation
@@ -2134,7 +2134,7 @@ deprecations :: { OrdList (LWarnDecl GhcPs) }
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 deprecation :: { OrdList (LWarnDecl GhcPs) }
         : namespace_spec namelist strings
-             {% fmap unitOL $ amsA' (sL (comb3 $1 $2 $>) $ (Warning (unLoc $1, fst $ unLoc $3) (unLoc $2)
+             {% fmap unitOL $ amsA' (sL (comb3 $1 $2 $>) $ (Warning (fst $ unLoc $3) (unLoc $1) (unLoc $2)
                                           (DeprecatedTxt NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
 
 strings :: { Located ((EpToken "[", EpToken "]"),[Located StringLiteral]) }
@@ -2794,7 +2794,7 @@ sigdecl :: { LHsDecl GhcPs }
                                                 Nothing -> (NoSourceText, maxPrecedence)
                                                 Just l2 -> (fst $ unLoc l2, snd $ unLoc l2)
                    ; amsA' (sLL $1 $> $ SigD noExtField
-                            (FixSig ((glR $1, mbPrecAnn), fixText) (FixitySig (unLoc $3) (fromOL $ unLoc $4)
+                            (FixSig ((glR $1, mbPrecAnn), fixText) (FixitySig noExtField (unLoc $3) (fromOL $ unLoc $4)
                                     (Fixity fixPrec (unLoc $1)))))
                    }}
 

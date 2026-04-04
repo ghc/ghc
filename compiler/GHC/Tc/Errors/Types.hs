@@ -1563,7 +1563,7 @@ data TcRnMessage where
 
      Text cases: None
   -}
-  TcRnDupeWildcardExport :: ModuleName -> NamespaceSpecifier -> TcRnMessage
+  TcRnDupeWildcardExport :: ModuleName -> NamespaceSpecifier GhcPs -> TcRnMessage
 
   {-| TcRnExportedModNotImported is an error that occurs when an export list
       contains a module that is not imported.
@@ -6477,7 +6477,7 @@ data DodgyImportsReason =
     Test cases:
       DodgyImports
   -}
-  DodgyImportsEmptyParent !(IE GhcPs) !NamespaceSpecifier !GlobalRdrElt
+  DodgyImportsEmptyParent !(IE GhcPs) !(NamespaceSpecifier GhcPs) !GlobalRdrElt
   |
   {-| A 'hiding' clause contains something that would be reported as an error in a
     regular import, but is relaxed to a warning.
@@ -6494,7 +6494,7 @@ data DodgyImportsReason =
         T25901_imp_dodgy_1
         T25901_imp_dodgy_2
   -}
-  DodgyImportsWildcard !ModuleName !NamespaceSpecifier
+  DodgyImportsWildcard !ModuleName !(NamespaceSpecifier GhcPs)
   deriving (Generic)
 
 -- | Different types of warnings for dodgy exports.
@@ -6515,7 +6515,7 @@ data DodgyExportsReason =
 
       Test cases: warnings/should_compile/DodgyExports01
   -}
-  DodgyExportsEmptyParent !(IE GhcPs) !NamespaceSpecifier !GlobalRdrElt
+  DodgyExportsEmptyParent !(IE GhcPs) !(NamespaceSpecifier GhcPs) !GlobalRdrElt
   |
   {-| An export list contains a module that has no exports.
 
@@ -6536,7 +6536,7 @@ data DodgyExportsReason =
 
       Test cases: None
   -}
-  DodgyExportsWildcard !ModuleName !NamespaceSpecifier
+  DodgyExportsWildcard !ModuleName !(NamespaceSpecifier GhcPs)
   deriving (Generic)
 
 -- | What extensions were enabled at import site.
@@ -6590,7 +6590,7 @@ data ImportLookupReason where
 data UnusedImportName where
   UnusedImportNameRecField :: !Parent -> !OccName -> UnusedImportName
   UnusedImportNameRegular :: !Name -> UnusedImportName
-  UnusedImportWildcard :: !NamespaceSpecifier -> UnusedImportName
+  UnusedImportWildcard :: !(NamespaceSpecifier GhcRn) -> UnusedImportName
 
 -- | Different types of errors for unused imports.
 data UnusedImportReason where

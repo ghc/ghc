@@ -123,10 +123,10 @@ mkExportsDocs = foldMap f
     ieExportDoc :: IE GhcRn -> Maybe (ExportDoc GhcRn)
     ieExportDoc (IEVar _ _ doc) = doc
     ieExportDoc (IEThingAbs _ _ doc) = doc
-    ieExportDoc (IEThingAll _ _ doc) = doc
+    ieExportDoc (IEThingAll _ _ _ doc) = doc
     ieExportDoc (IEThingWith _ _ _ _ doc) = doc
     ieExportDoc (IEModuleContents _ _) = Nothing
-    ieExportDoc (IEWholeNamespace _) = Nothing
+    ieExportDoc (IEWholeNamespace _ _) = Nothing
     ieExportDoc (IEGroup _ _ _) = Nothing
     ieExportDoc (IEDoc _ _) = Nothing
     ieExportDoc (IEDocNamed _ _) = Nothing
@@ -336,7 +336,7 @@ sigNameNoLoc env (ClassOpSig _ True  ns _)     = mapMaybe (lookupOccEnv env . mk
 sigNameNoLoc _   (PatSynSig  _   ns _)         = map (unXRec @a) ns
 sigNameNoLoc _   (SpecSig    _   n _ _)        = [unXRec @a n]
 sigNameNoLoc _   (InlineSig  _   n _)          = [unXRec @a n]
-sigNameNoLoc _   (FixSig _ (FixitySig _ ns _)) = map (unXRec @a) ns
+sigNameNoLoc _   (FixSig _ (FixitySig _ _ ns _)) = map (unXRec @a) ns
 sigNameNoLoc _   _                             = []
 
 -- Extract the source location where an instance is defined. This is used
