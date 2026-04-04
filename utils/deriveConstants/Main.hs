@@ -137,7 +137,10 @@ parseArgs = do args <- getArgs
           f opts ("-o" : fn : args')
               = f (opts {o_outputFilename = Just fn}) args'
           f opts ("--gcc-program" : prog : args')
-              = f (opts {o_gccProg = Just prog}) args'
+              = case words prog of
+                  (p:flags) -> f (opts {o_gccProg = Just p,
+                                        o_gccFlags = flags ++ o_gccFlags opts}) args'
+                  []        -> f (opts {o_gccProg = Just prog}) args'
           f opts ("--gcc-flag" : flag : args')
               = f (opts {o_gccFlags = flag : o_gccFlags opts}) args'
           f opts ("--nm-program" : prog : args')
