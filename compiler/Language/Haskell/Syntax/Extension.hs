@@ -800,6 +800,12 @@ type family XIEData p
 type family XXIEWrappedName p
 
 
+-- -------------------------------------
+-- NamespaceSpecifier type families
+type family XNoNamespaceSpecifier p
+type family XTypeNamespaceSpecifier p
+type family XDataNamespaceSpecifier p
+type family XXNamespaceSpecifier p
 
 -- =====================================================================
 -- Misc

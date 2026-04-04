@@ -1403,8 +1403,7 @@ type instance XWarnings      GhcTc = SourceText
 
 type instance XXWarnDecls    (GhcPass _) = DataConCantHappen
 
-type instance XWarning      (GhcPass _) = (NamespaceSpecifier, (EpToken "[", EpToken "]"))
-      -- See #26678 "NamespaceSpecifier in extension fields"
+type instance XWarning      (GhcPass _) = (EpToken "[", EpToken "]")
 
 type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 
@@ -1420,7 +1419,7 @@ instance OutputableBndrId p
 
 instance OutputableBndrId p
        => Outputable (WarnDecl (GhcPass p)) where
-    ppr (Warning (ns_spec, _) thing txt)
+    ppr (Warning _ ns_spec thing txt)
       = ppr_category
               <+> ppr ns_spec
               <+> hsep (punctuate comma (map ppr thing))

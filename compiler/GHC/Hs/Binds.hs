@@ -32,7 +32,7 @@ import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
 
 import GHC.Hs.Extension
 import GHC.Hs.Type
-import GHC.Hs.Basic
+import GHC.Hs.ImpExp ()
 
 import GHC.Tc.Types.Evidence
 
@@ -722,9 +722,7 @@ type instance XXSig             GhcPs = DataConCantHappen
 type instance XXSig             GhcRn = IdSig
 type instance XXSig             GhcTc = IdSig
 
-type instance XFixitySig  GhcPs = NamespaceSpecifier
-type instance XFixitySig  GhcRn = NamespaceSpecifier
-type instance XFixitySig  GhcTc = NoExtField
+type instance XFixitySig  (GhcPass p) = NoExtField
 type instance XXFixitySig (GhcPass p) = DataConCantHappen
 
 data AnnSpecSig
@@ -924,13 +922,8 @@ extractSpecPragName srcTxt =  case (words $ show srcTxt) of
 
 instance OutputableBndrId p
        => Outputable (FixitySig (GhcPass p)) where
-  ppr (FixitySig ns_spec names fixity) = sep [ppr fixity, ppr_ns_spec, pprops]
+  ppr (FixitySig _ ns_spec names fixity) = sep [ppr fixity, ppr ns_spec, pprops]
     where
-      ppr_ns_spec =
-        case ghcPass @p of
-          GhcPs -> ppr ns_spec
-          GhcRn -> ppr ns_spec
-          GhcTc -> empty
       pprops = hsep $ punctuate comma (map (pprInfixOcc . unLoc) names)
 
 pragBrackets :: SDoc -> SDoc

@@ -3320,8 +3320,8 @@ mkModuleImpExp ctx warning (top, tcp) (L l specname) subs = do
     ImpExpAll m_kw tok -> do
       newName <- nameT
       let ns_spec = namespaceSpecifierFromKw m_kw
-          x = IEThingAllExt warning ns_spec top tok tcp
-      return $ IEThingAll x (L l newName) noExportDoc
+          x = IEThingAllExt warning top tok tcp
+      return $ IEThingAll x ns_spec (L l newName) noExportDoc
     ImpExpList xs -> do
       -- `xs` contains no wildcards (checked by mkImpExpSubSpec)
       newName <- nameT
@@ -3375,8 +3375,8 @@ mkModuleImpExp ctx warning (top, tcp) (L l specname) subs = do
         Just (ExplicitDataNamespace tok) -> IEData tok name
     ieNameFromSpec ImpExpQcWildcard{} = panic "ieNameFromSpec got wildcard"
 
-    namespaceSpecifierFromKw :: Maybe ExplicitNamespaceKeyword -> NamespaceSpecifier
-    namespaceSpecifierFromKw Nothing = NoNamespaceSpecifier
+    namespaceSpecifierFromKw :: Maybe ExplicitNamespaceKeyword -> NamespaceSpecifier GhcPs
+    namespaceSpecifierFromKw Nothing = NoNamespaceSpecifier noExtField
     namespaceSpecifierFromKw (Just (ExplicitTypeNamespace tok)) = TypeNamespaceSpecifier tok
     namespaceSpecifierFromKw (Just (ExplicitDataNamespace tok)) = DataNamespaceSpecifier tok
 
@@ -3423,15 +3423,13 @@ mkDataWcImpExp loc tk_ns tk_wc = do
   return (L (noAnnSrcSpan loc) ie_spec)
 
 mkIEWholeNamespacePs :: Maybe (LWarningTxt GhcPs)
-                     -> NamespaceSpecifier
+                     -> NamespaceSpecifier GhcPs
                      -> EpToken ".."
                      -> IE GhcPs
-mkIEWholeNamespacePs warning ns_spec tk_wc =
-  IEWholeNamespace IEWholeNamespaceExt {
-    iewn_warning  = warning,
-    iewn_ns_spec  = ns_spec,
-    iewn_tok_wc   = tk_wc,
-    iewn_names    = [] }
+mkIEWholeNamespacePs warning ns_spec tk_wc = IEWholeNamespace x ns_spec
+  where x = IEWholeNamespaceExt { iewn_warning = warning,
+                                  iewn_tok_wc  = tk_wc,
+                                  iewn_names   = [] }
 
 mkWholeTypeWcImpExp :: SrcSpan
                     -> Maybe (LWarningTxt GhcPs)
@@ -3457,7 +3455,7 @@ mkPlainWcImpExp :: Maybe (LWarningTxt GhcPs)
                 -> EpToken ".."
                 -> P (LIE GhcPs)
 mkPlainWcImpExp warning tk_wc = do
-  let ie_spec = mkIEWholeNamespacePs warning NoNamespaceSpecifier tk_wc
+  let ie_spec = mkIEWholeNamespacePs warning (NoNamespaceSpecifier noExtField) tk_wc
   return (L (l2l tk_wc) ie_spec)
 
 -- In the correct order

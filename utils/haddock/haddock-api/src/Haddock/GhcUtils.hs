@@ -79,11 +79,11 @@ filterLSigNames p (L loc sig) = L loc <$> (filterSigNames p sig)
 filterSigNames :: (IdP (GhcPass p) -> Bool) -> Sig (GhcPass p) -> Maybe (Sig (GhcPass p))
 filterSigNames p orig@(SpecSig _ n _ _) = ifTrueJust (p $ unLoc n) orig
 filterSigNames p orig@(InlineSig _ n _) = ifTrueJust (p $ unLoc n) orig
-filterSigNames p (FixSig _ (FixitySig ns_spec ns ty)) =
+filterSigNames p (FixSig _ (FixitySig _ ns_spec ns ty)) =
   case filter (p . unLoc) ns of
 
     [] -> Nothing
-    filtered -> Just (FixSig noAnn (FixitySig ns_spec filtered ty))
+    filtered -> Just (FixSig noAnn (FixitySig noExtField ns_spec filtered ty))
 filterSigNames _ orig@(MinimalSig _ _) = Just orig
 filterSigNames p (TypeSig _ mods ns ty) =
   case filter (p . unLoc) ns of
@@ -112,7 +112,7 @@ sigNameNoLoc' _ (ClassOpSig _ _ ns _) = map (unXRec @pass) ns
 sigNameNoLoc' _ (PatSynSig _ ns _) = map (unXRec @pass) ns
 sigNameNoLoc' _ (SpecSig _ n _ _) = [unXRec @pass n]
 sigNameNoLoc' _ (InlineSig _ n _) = [unXRec @pass n]
-sigNameNoLoc' _ (FixSig _ (FixitySig _ ns _)) = map (unXRec @pass) ns
+sigNameNoLoc' _ (FixSig _ (FixitySig _ _ ns _)) = map (unXRec @pass) ns
 sigNameNoLoc' _ _ = []
 
 -- | Was this signature given by the user?

@@ -47,6 +47,7 @@ import GHC.Rename.Utils
 import GHC.Driver.DynFlags
 
 import GHC.Data.BooleanFormula ( bfTraverse )
+import GHC.Data.FastString     ( FastString )
 import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Data.Maybe          ( orElse, mapMaybe )
 import GHC.Data.OrdList
@@ -705,7 +706,7 @@ makeMiniFixityEnv :: [LFixitySig GhcPs] -> RnM MiniFixityEnv
 makeMiniFixityEnv decls = foldlM add_one_sig emptyMiniFixityEnv decls
  where
    add_one_sig :: MiniFixityEnv -> LFixitySig GhcPs -> RnM MiniFixityEnv
-   add_one_sig env (L loc (FixitySig ns_spec names fixity)) =
+   add_one_sig env (L loc (FixitySig _ ns_spec names fixity)) =
      foldlM add_one env [ (locA loc,locA name_loc,name,fixity, ns_spec)
                         | L name_loc name <- names ]
 
@@ -724,9 +725,11 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyMiniFixityEnv decls
              addErrAt name_loc (TcRnMultipleFixityDecls loc' name)
            ; return env}
      }
+
+   search_for_dups :: NamespaceSpecifier GhcPs -> MiniFixityEnv -> FastString -> Maybe (Located Fixity)
    search_for_dups ns_spec MFE{mfe_data_level_names, mfe_type_level_names} fs
     = case ns_spec of
-      NoNamespaceSpecifier -> case lookupFsEnv mfe_data_level_names fs of
+      NoNamespaceSpecifier{} -> case lookupFsEnv mfe_data_level_names fs of
         -- We only need to find a single duplicate to emit an error about
         -- multiple fixity decls. Therefore, if we find a duplicate in the
         -- term-level namespace, then there is no need to look in the type-level namespace.
@@ -735,9 +738,10 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyMiniFixityEnv decls
       TypeNamespaceSpecifier{} -> lookupFsEnv mfe_type_level_names fs
       DataNamespaceSpecifier{} -> lookupFsEnv mfe_data_level_names fs
 
+   extend_mini_fixity_env :: NamespaceSpecifier GhcPs -> MiniFixityEnv -> FastString -> Located Fixity -> MiniFixityEnv
    extend_mini_fixity_env ns_spec env@MFE{mfe_data_level_names, mfe_type_level_names} fs fix_item
     = case ns_spec of
-      NoNamespaceSpecifier     -> MFE { mfe_data_level_names = (extendFsEnv mfe_data_level_names fs fix_item)
+      NoNamespaceSpecifier{}   -> MFE { mfe_data_level_names = (extendFsEnv mfe_data_level_names fs fix_item)
                                       , mfe_type_level_names = (extendFsEnv mfe_type_level_names fs fix_item)}
 
       TypeNamespaceSpecifier{} -> env { mfe_type_level_names = (extendFsEnv mfe_type_level_names fs fix_item)}
@@ -1254,7 +1258,7 @@ findDupSigs sigs
   = findDupsEq matching_sig (concatMap (expand_sig . unLoc) sigs)
   where
     expand_sig :: Sig GhcPs -> [(LocatedN RdrName, Sig GhcPs)] -- AZ
-    expand_sig sig@(FixSig _ (FixitySig _ ns _)) = zip ns (repeat sig)
+    expand_sig sig@(FixSig _ (FixitySig _ _ ns _)) = zip ns (repeat sig)
     expand_sig sig@(InlineSig _ n _)             = [(n,sig)]
     expand_sig sig@(TypeSig _ _ ns _)            = [(n,sig) | n <- ns]
     expand_sig sig@(ClassOpSig _ _ ns _)         = [(n,sig) | n <- ns]
@@ -1507,14 +1511,15 @@ rnSrcFixityDecl sig_ctxt = rn_decl
         -- for con-like things; hence returning a list
         -- If neither are in scope, report an error; otherwise
         -- return a fixity sig for each (slightly odd)
-    rn_decl sig@(FixitySig ns_spec fnames fixity)
+    rn_decl sig@(FixitySig _ ns_spec fnames fixity)
       = do unlessXOptM LangExt.ExplicitNamespaces $
-             when (ns_spec /= NoNamespaceSpecifier) $
-             addErr (TcRnNamespacedFixitySigWithoutFlag sig)
+             case ns_spec of
+               NoNamespaceSpecifier{} -> return ()
+               _ -> addErr (TcRnNamespacedFixitySigWithoutFlag sig)
            names <- concatMapM (lookup_one ns_spec) fnames
-           return (FixitySig ns_spec names fixity)
+           return (FixitySig noExtField (rnNamespaceSpecifier ns_spec) names fixity)
 
-    lookup_one :: NamespaceSpecifier -> LocatedN RdrName -> RnM [LocatedN Name]
+    lookup_one :: NamespaceSpecifier GhcPs -> LocatedN RdrName -> RnM [LocatedN Name]
     lookup_one ns_spec (L name_loc rdr_name)
       = setSrcSpanA name_loc $
                     -- This lookup will fail if the name is not defined in the

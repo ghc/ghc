@@ -53,7 +53,9 @@
         (Nothing))
        (NoSourceText))
       (FixitySig
-       (NoNamespaceSpecifier)
+       (NoExtField)
+       (NoNamespaceSpecifier
+        (NoExtField))
        [(L
          (EpAnn
           (EpaSpan { T20846.hs:3:8-11 })

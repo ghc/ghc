@@ -2177,7 +2177,7 @@ instance ToHie (LocatedA (DerivDecl GhcRn)) where
 
 instance ToHie (LocatedA (FixitySig GhcRn)) where
   toHie (L span sig) = concatM $ makeNodeA sig span : case sig of
-      FixitySig _ vars _ ->
+      FixitySig _ _ vars _ ->
         [ toHie $ map (C Use) vars
         ]
 
@@ -2223,7 +2223,7 @@ instance ToHie (LocatedA (WarnDecls GhcRn)) where
 
 instance ToHie (LocatedA (WarnDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
-      Warning _ vars _ ->
+      Warning _ _ vars _ ->
         [ toHie $ map (C Use) vars
         ]
 
@@ -2304,7 +2304,7 @@ instance ToHie (IEContext (LocatedA (IE GhcRn))) where
       IEThingAbs _ n _ ->
         [ toHie $ IEC c n
         ]
-      IEThingAll _ n _ ->
+      IEThingAll _ _ n _ ->
         [ toHie $ IEC c n
         ]
       IEThingWith _ n _ ns _ ->
@@ -2314,7 +2314,7 @@ instance ToHie (IEContext (LocatedA (IE GhcRn))) where
       IEModuleContents _ n ->
         [ toHie $ IEC c n
         ]
-      IEWholeNamespace _ -> []
+      IEWholeNamespace _ _ -> []
       IEGroup _ _ d -> [toHie d]
       IEDoc _ d -> [toHie d]
       IEDocNamed _ _ -> []

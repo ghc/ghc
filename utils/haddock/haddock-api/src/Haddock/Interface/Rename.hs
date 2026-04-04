@@ -240,6 +240,11 @@ renameName name = do
 renameNameL :: GenLocated l Name -> RnM (GenLocated l DocName)
 renameNameL = mapM renameName
 
+renameNamespaceSpecifier :: NamespaceSpecifier GhcRn -> NamespaceSpecifier DocNameI
+renameNamespaceSpecifier (NoNamespaceSpecifier _)   = NoNamespaceSpecifier noExtField
+renameNamespaceSpecifier (TypeNamespaceSpecifier _) = TypeNamespaceSpecifier noExtField
+renameNamespaceSpecifier (DataNamespaceSpecifier _) = DataNamespaceSpecifier noExtField
+
 -- | Rename a list of export items in the current renaming environment.
 renameExportItems :: [ExportItem GhcRn] -> RnM [ExportItem DocNameI]
 renameExportItems = mapM renameExportItem
@@ -829,9 +834,9 @@ renameSig sig = case sig of
     lnames' <- mapM renameNameL lnames
     sig_ty' <- renameLSigType sig_ty
     return $ PatSynSig noExtField lnames' sig_ty'
-  FixSig _ (FixitySig _ lnames fixity) -> do
+  FixSig _ (FixitySig _ ns_spec lnames fixity) -> do
     lnames' <- mapM renameNameL lnames
-    return $ FixSig noExtField (FixitySig noExtField lnames' fixity)
+    return $ FixSig noExtField (FixitySig noExtField (renameNamespaceSpecifier ns_spec) lnames' fixity)
   MinimalSig _ (L l s) -> do
     s' <- bfTraverse (traverse lookupRn) s
     return $ MinimalSig noExtField (L l s')

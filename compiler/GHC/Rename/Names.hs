@@ -24,7 +24,8 @@ module GHC.Rename.Names (
         printMinimalImports,
         renamePkgQual, renameRawPkgQual,
         classifyGREs,
-        ImportDeclUsage
+        ImportDeclUsage,
+        rnNamespaceSpecifier
     ) where
 
 import GHC.Prelude hiding ( head, init, last, tail )
@@ -1176,6 +1177,11 @@ importsFromIface hsc_env iface decl_spec hidden = mkGlobalRdrEnv $ case hidden o
     all_gres = gresFromAvails hsc_env (Just imp_spec) (mi_exports iface)
     imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
 
+rnNamespaceSpecifier :: NamespaceSpecifier GhcPs -> NamespaceSpecifier GhcRn
+rnNamespaceSpecifier (NoNamespaceSpecifier _)   = NoNamespaceSpecifier noExtField
+rnNamespaceSpecifier (TypeNamespaceSpecifier x) = TypeNamespaceSpecifier x
+rnNamespaceSpecifier (DataNamespaceSpecifier x) = DataNamespaceSpecifier x
+
 filterImports
     :: HasDebugCallStack
     => HscEnv
@@ -1314,18 +1320,17 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                      , let name = greName gre ]
                    , export_depr_warns )
 
-        IEThingAll x (L l tc) _ -> do
+        IEThingAll x ns_spec (L l tc) _ -> do
             ImpOccItem { imp_item      = gre
                        , imp_bundled   = bundled_gres
                        , imp_is_parent = is_par
                        }
               <- lookup_parent ie $ ieWrappedName tc
             let name = greName gre
-                ns_spec = ieta_ns_spec x
 
                 child_gres :: [GlobalRdrElt]
                 child_gres
-                  | is_par    = filterByNamespaceGREs ns_spec bundled_gres
+                  | is_par    = filterByNamespaceSpecifierGREs ns_spec bundled_gres
                   | otherwise = []
 
                 imp_list_warn
@@ -1342,6 +1347,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                   = []
 
                 renamed_ie = IEThingAll (x { ieta_warning = Nothing })
+                                        (rnNamespaceSpecifier ns_spec)
                                         (L l (replaceWrappedName tc name))
                                         noDocstring
                 export_depr_warn
@@ -1402,13 +1408,13 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                      ,gres)]
                   , bad_import_warns ++ export_depr_warns)
 
-        IEWholeNamespace x -> do
-          let ns_spec    = iewn_ns_spec x
-              mod_name   = moduleName import_mod
+        IEWholeNamespace x ns_spec -> do
+          let mod_name   = moduleName import_mod
               names      = map greName gres
               renamed_ie = IEWholeNamespace x { iewn_warning  = Nothing
                                               , iewn_names    = names }
-              gres = filter (coveredByNamespaceSpecifier ns_spec . greNameSpace) $
+                                            (rnNamespaceSpecifier ns_spec)
+              gres = filterByNamespaceSpecifierGREs ns_spec $
                      gresFromAvails hsc_env (Just imp_spec) (mi_exports iface)
               imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
               dodgy_warn
@@ -1621,9 +1627,9 @@ gresFromIE decl_spec (L loc ie, gres)
   = map set_gre_imp gres
   where
     is_explicit = case ie of
-                    IEThingAll _ name _ -> \n -> n == lieWrappedName name
-                    IEWholeNamespace _  -> \_ -> False
-                    _                   -> \_ -> True
+                    IEThingAll _ _ name _ -> \n -> n == lieWrappedName name
+                    IEWholeNamespace _ _  -> \_ -> False
+                    _                     -> \_ -> True
     prov_fn name
       = ImpSpec { is_decl = decl_spec, is_item = item_spec }
       where
@@ -1944,7 +1950,7 @@ type ImportDeclUsage
    = ( LImportDecl GhcRn   -- The import declaration
      , [GlobalRdrElt]      -- What *is* used (normalised)
      , [Name]              -- What is imported but *not* used
-     , [NamespaceSpecifier] )  -- Unused wildcards
+     , [NamespaceSpecifier GhcRn] )  -- Unused wildcards
 
 warnUnusedImportDecls :: TcGblEnv -> HscSource -> RnM ()
 warnUnusedImportDecls gbl_env hsc_src
@@ -2002,14 +2008,14 @@ findImportUsage imports used_gres
         add_unused :: IE GhcRn -> UnusedNames -> UnusedNames
         add_unused (IEVar _ n _)      acc = add_unused_name (lieWrappedName n) True acc
         add_unused (IEThingAbs _ n _) acc = add_unused_name (lieWrappedName n) False acc
-        add_unused (IEThingAll _ n _) acc = add_unused_all  (lieWrappedName n) acc
+        add_unused (IEThingAll _ _ n _) acc = add_unused_all (lieWrappedName n) acc
         add_unused (IEThingWith _ p wc ns _) acc = add_wc_all (add_unused_with pn xs acc)
           where pn = lieWrappedName p
                 xs = map lieWrappedName ns
                 add_wc_all = case wc of
                             NoIEWildcard -> id
                             IEWildcard _ -> add_unused_all pn
-        add_unused (IEWholeNamespace x) acc = add_unused_wildcard (iewn_ns_spec x) (iewn_names x) acc
+        add_unused (IEWholeNamespace x ns_spec) acc = add_unused_wildcard ns_spec (iewn_names x) acc
         add_unused _ acc = acc
 
         add_unused_name :: Name -> Bool -> UnusedNames -> UnusedNames
@@ -2045,7 +2051,7 @@ findImportUsage imports used_gres
         -- imported Num(signum).  We don't want to complain that
         -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
 
-        add_unused_wildcard :: NamespaceSpecifier -> [Name] -> UnusedNames -> UnusedNames
+        add_unused_wildcard :: NamespaceSpecifier GhcRn -> [Name] -> UnusedNames -> UnusedNames
         add_unused_wildcard ns_spec names acc@(UnusedNames acc_ns acc_wcs acc_fs)
           | any_used  = acc
           | otherwise = UnusedNames acc_ns (ns_spec : acc_wcs) acc_fs
@@ -2064,7 +2070,7 @@ data UnusedNames =
        -- ^ Unused 'Name's in an import list, not including record fields
        -- that are plain 'IEVar' imports (tracked by 'rec_fld_uses')
        -- or wildcard imports (tracked by 'unused_wildcards').
-    , unused_wildcards :: [NamespaceSpecifier]
+    , unused_wildcards :: [NamespaceSpecifier GhcRn]
        -- ^ Unused wildcards @type ..@ or @data ..@ in an import list.
     , rec_fld_uses :: FastStringEnv (NameSet, Any)
       -- ^ Record fields imported without a parent (i.e. an 'IEVar' import).
@@ -2092,7 +2098,7 @@ collectUnusedNames (UnusedNames { unused_names = nms, rec_fld_uses = flds })
       | at_least_one_name_is_used = acc
       | otherwise                 = unionNameSet nms acc
 
-collectUnusedWildcards :: UnusedNames -> [NamespaceSpecifier]
+collectUnusedWildcards :: UnusedNames -> [NamespaceSpecifier GhcRn]
 collectUnusedWildcards = unused_wildcards
 
 {- Note [Reporting unused imported duplicate record fields]
@@ -2309,7 +2315,8 @@ getMinimalImports ie_decls
            ] of
         [xs]
           | all_used xs
-          -> return [IEThingAll (IEThingAllExt Nothing NoNamespaceSpecifier noAnn noAnn noAnn)
+          -> return [IEThingAll (IEThingAllExt Nothing noAnn noAnn noAnn)
+                                (NoNamespaceSpecifier noExtField)
                                 (to_ie_post_rn $ noLocA n)
                                 Nothing]
           | otherwise
