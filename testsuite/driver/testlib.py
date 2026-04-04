@@ -3061,6 +3061,8 @@ def normalise_errmsg(s: str) -> str:
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
     # ignore superfluous dylibs passed to the linker.
     s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
+    # ignore macOS ld warning about reexported libraries (e.g. Homebrew llvm libunwind)
+    s = re.sub('ld: warning: reexported library with install name .* couldn.t be matched with any parent library and will be linked directly\n','',s)
     # ignore LLVM Version mismatch garbage; this will just break tests.
     s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
     s = re.sub('Currently only [\\.0-9]+ is supported. System LLVM version: [\\.0-9]+.*\n','',s)
@@ -3175,6 +3177,8 @@ def normalise_output( s: str ) -> str:
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
     # ignore superfluous dylibs passed to the linker.
     s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
+    # ignore macOS ld warning about reexported libraries (e.g. Homebrew llvm libunwind)
+    s = re.sub('ld: warning: reexported library with install name .* couldn.t be matched with any parent library and will be linked directly\n','',s)
     # ignore LLVM Version mismatch garbage; this will just break tests.
     s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
     s = re.sub('Currently only [\\.0-9]+ is supported. System LLVM version: [\\.0-9]+.*\n','',s)
