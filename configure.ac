@@ -637,7 +637,7 @@ AC_SYS_INTERPRETER()
 
 dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
-dnl     If gcc, make sure it's at least 4.7
+dnl     If gcc, make sure it's at least 4.9
 dnl
 FP_GCC_VERSION
 
