@@ -391,3 +391,4 @@ test('GhciPackageRename',
      [extra_hc_opts("-hide-all-packages -package 'containers (Data.Map as Prelude)'")],
      ghci_script,
      ['GhciPackageRename.script'])
+test('T26233', normal, ghci_script, ['T26233.script'])

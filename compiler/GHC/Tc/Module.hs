@@ -2367,8 +2367,9 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                         -- The two-step process avoids getting two errors: one from
                         -- the expression itself, and one from the 'print it' part
                         -- This two-step story is very clunky, alas
-                  , do { _ <- checkNoErrs (tcGhciStmts [let_stmt])
+                  , do { _ <- checkNoErrs (discardWarnings (tcGhciStmts [let_stmt]))
                                 --- checkNoErrs defeats the error recovery of let-bindings
+                                --- discardWarnings: warnings come from the second typecheck
                        ; tcGhciStmts [let_stmt, print_it] } ]
 
               -- Plans where we don't bind "it"
