@@ -1,0 +1,10 @@
+T25996.hs:11:7: warning: [GHC-81995] [-Wunused-do-bind (in -Wall)]
+    A do-notation statement discarded a result of type ‘Integer’
+    Suggested fix:
+      Suppress this warning by saying ‘_ <- pure (10 :: Integer)’
+
+T25996.hs:16:3: warning: [GHC-81995] [-Wunused-do-bind (in -Wall)]
+    A do-notation statement discarded a result of type ‘Integer’
+    Suggested fix:
+      Suppress this warning by saying ‘_ <- pure (10 :: Integer)’
+

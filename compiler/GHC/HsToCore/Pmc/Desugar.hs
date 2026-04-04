@@ -375,16 +375,18 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
 
 desugarPatBind :: SrcSpan -> Id -> Pat GhcTc -> DsM (PmPatBind Pre)
 -- See 'GrdPatBind' for how this simply repurposes GrdGRHS.
-desugarPatBind loc var pat =
+-- See Note [Suppress warnings in PMC desugaring]
+desugarPatBind loc var pat = discardWarningsDs $
   PmPatBind . flip PmGRHS (SrcInfo (L loc (ppr pat))) <$> desugarPat var pat
 
 desugarEmptyCase :: Id -> DsM PmEmptyCase
 desugarEmptyCase var = pure PmEmptyCase { pe_var = var }
 
 -- | Desugar the non-empty 'Match'es of a 'MatchGroup'.
+-- See Note [Suppress warnings in PMC desugaring]
 desugarMatches :: [Id] -> NonEmpty (LMatch GhcTc (LHsExpr GhcTc))
                -> DsM (PmMatchGroup Pre)
-desugarMatches vars matches =
+desugarMatches vars matches = discardWarningsDs $
   PmMatchGroup <$> traverse (desugarMatch vars) matches
 
 -- Desugar a single match
@@ -398,8 +400,9 @@ desugarMatch vars (L match_loc (Match { m_pats = L _ pats, m_grhss = grhss })) =
   -- tracePm "desugarMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
   return PmMatch { pm_pats = pats', pm_grhss = grhss' }
 
+-- See Note [Suppress warnings in PMC desugaring]
 desugarGRHSs :: SrcSpan -> SDoc -> GRHSs GhcTc (LHsExpr GhcTc) -> DsM (PmGRHSs Pre)
-desugarGRHSs match_loc pp_pats grhss = do
+desugarGRHSs match_loc pp_pats grhss = discardWarningsDs $ do
   lcls <- desugarLocalBinds (grhssLocalBinds grhss)
   grhss' <- traverse (desugarLGRHS match_loc pp_pats) (grhssGRHSs grhss)
   return PmGRHSs { pgs_lcls = lcls, pgs_grhss = grhss' }
@@ -592,6 +595,17 @@ the whole point.
 The place to store the 'PmLet' guards for @where@ clauses (which are per
 'GRHSs') is as a field of 'PmGRHSs'. For plain @let@ guards as in the guards of
 @x@, we can simply add them to the 'pg_grds' field of 'PmGRHS'.
+
+Note [Suppress warnings in PMC desugaring]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This module uses 'dsLExpr', 'dsExpr', and 'dsSyntaxExpr' to desugar
+expressions into Core for pattern match checking. The main desugaring
+pass in GHC.HsToCore processes these same expressions too, so without
+suppression any warnings would be emitted twice (#25996).
+
+To avoid this, the exported functions ('desugarPatBind', 'desugarMatches',
+'desugarGRHSs') are wrapped in 'discardWarningsDs', covering all internal
+desugarer calls without having to wrap each one individually.
 
 Note [Desugaring -XStrict matches in Pmc]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

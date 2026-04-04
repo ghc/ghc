@@ -1,0 +1,6 @@
+section: compiler
+synopsis: Fix duplicate desugaring warnings emitted by the pattern match checker.
+  The pattern match checker now suppresses warnings that are already reported
+  by the main desugaring pass.
+issues: #25996
+mrs: !15859
