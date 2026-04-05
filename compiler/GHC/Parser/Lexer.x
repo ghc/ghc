@@ -111,6 +111,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.StringBuffer
+import GHC.Data.StringMeta
 import GHC.Data.FastString
 import GHC.Types.Error
 import GHC.Types.Unique.FM

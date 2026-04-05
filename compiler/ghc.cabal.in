@@ -467,6 +467,7 @@ Library
         GHC.Data.Stream
         GHC.Data.Strict
         GHC.Data.StringBuffer
+        GHC.Data.StringMeta
         GHC.Data.TrieMap
         GHC.Data.Unboxed
         GHC.Data.UnionFind

@@ -55,6 +55,7 @@ import GHC.Data.OrdList
 import GHC.Data.BooleanFormula ( BooleanFormula(..), LBooleanFormula, mkTrue )
 import GHC.Data.FastString
 import GHC.Data.Maybe          ( orElse )
+import GHC.Data.StringMeta
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error
@@ -86,7 +87,6 @@ import GHC.Parser.HaddockLex
 import GHC.Parser.Annotation
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
-import GHC.Parser.String
 
 import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            tupleTyCon, tupleDataCon, nilDataCon,
