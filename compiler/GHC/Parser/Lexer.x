@@ -141,6 +141,7 @@ import qualified GHC.Parser.Lexer.String as Lexer.String
 import GHC.Parser.String
 
 import Language.Haskell.Syntax.Module.Name (ModuleName(..))
+import Language.Haskell.Syntax.StringMeta
 import Language.Haskell.Syntax.Text
 }
 

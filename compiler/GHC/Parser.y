@@ -87,7 +87,6 @@ import GHC.Parser.HaddockLex
 import GHC.Parser.Annotation
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
-import GHC.Parser.String
 
 import GHC.Builtin.WiredIn.Types
             ( unitTyCon, unitDataCon, sumTyCon,
@@ -97,6 +96,7 @@ import GHC.Builtin.WiredIn.Types
               unrestrictedFunTyCon )
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import Language.Haskell.Syntax.StringMeta
 import Language.Haskell.Syntax.Text
 
 import qualified Data.Semigroup as Semi
