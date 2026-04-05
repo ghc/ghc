@@ -6,10 +6,6 @@ module GHC.Parser.String (
   lexString,
   lexMultilineString,
 
-  -- * StringMeta
-  StringMeta (..),
-  defaultStrMeta,
-
   -- * Unicode smart quote helpers
   isDoubleSmartQuote,
   isSingleSmartQuote,
@@ -20,7 +16,6 @@ import GHC.Prelude hiding (getChar)
 import Control.Arrow ((>>>))
 import Control.Monad (when)
 import Data.Char (chr, ord)
-import Data.Data (Data)
 import qualified Data.Foldable1 as Foldable1
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (listToMaybe, mapMaybe)
@@ -37,7 +32,6 @@ import GHC.Parser.CharClass (
  )
 import GHC.Parser.Errors.Types (LexErr (..))
 import GHC.Utils.Panic (panic)
-import Language.Haskell.Syntax.Module.Name (ModuleName)
 
 type BufPos = Int
 data StringLexError = StringLexError LexErr BufPos
@@ -288,20 +282,7 @@ isSingleSmartQuote = \case
   _ -> False
 
 -- -----------------------------------------------------------------------------
--- StringMeta
-
-data StringMeta = StringMeta
-  { strMetaMultiline  :: Bool
-  , strMetaQualified  :: Maybe ModuleName
-  }
-  deriving (Show, Data)
-
-defaultStrMeta :: StringMeta
-defaultStrMeta =
-  StringMeta
-    { strMetaMultiline = False
-    , strMetaQualified = Nothing
-    }
+-- QualifiedStrings
 
 {- Note [Implementation of QualifiedStrings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
