@@ -373,7 +373,8 @@ data HsCtxt
 
 
 isHsCtxtLandmark :: HsCtxt -> Bool
-isHsCtxtLandmark (DerivBindCtxt{}) = True
-isHsCtxtLandmark (FunResCtxt{}) = True
+isHsCtxtLandmark (DerivBindCtxt{})  = True
+isHsCtxtLandmark (FunResCtxt{})     = True
 isHsCtxtLandmark (VDQWarningCtxt{}) = True
+isHsCtxtLandmark (StmtErrCtxtPat{}) = True
 isHsCtxtLandmark _ = False
