@@ -7710,12 +7710,8 @@ pprHsCtxt = \case
   PatSigErrCtxt sig_ty res_ty ->
     vcat [ hang (text "When checking that the pattern signature:")
               4 (ppr sig_ty)
-         , nest 2 (hang (text "fits the type of its context:") 2 pp_res_ty) ]
-    where
-      -- Zonking will have turned Infer into Check
-      pp_res_ty = case res_ty of
-                    Check ty -> ppr ty
-                    Infer ir -> text "OOPS" <+> ppr ir
+         , nest 2 (hang (text "fits the type of its context:")
+                      2 (ppr (getCheckExpType res_ty))) ]
 
   PatCtxt pat ->
     hang (text "In the pattern:") 2 (ppr pat)
@@ -7777,7 +7773,7 @@ pprHsCtxt = \case
       full_herald = pprExpectedFunTyHerald herald
                 <+> speakNOf n_vis_args_in_call (text "visible argument")
                  -- What are "visible" arguments? See Note [Visibility and arity] in GHC.Types.Basic
-  FunResCtxt fun n_val_args res_fun res_env n_fun n_env
+  FunResCtxt fun n_val_args fun_res_ty env_ty
     | -- Check for too few args
       --  fun_tau = a -> b, res_tau = Int
       n_fun > n_env
@@ -7801,6 +7797,18 @@ pprHsCtxt = \case
     -> empty
       -- text "Debug" <+> vcat [ppr fun, ppr n_val_args, ppr res_fun, ppr res_env, ppr n_fun, ppr n_env]
     where
+      -- See Note [Splitting nested sigma types in mismatched
+      --           function types]
+      -- env_ty is an ExpRhoTy, but with simple subsumption it
+      -- is not /deeply/ skolemised, so still use tcSplitNestedSigmaTys
+
+      (_,_,fun_tau)   = tcSplitNestedSigmaTys fun_res_ty
+      (_, _, env_tau) = tcSplitNestedSigmaTys (getCheckExpType env_ty)
+      (args_fun, res_fun) = tcSplitFunTys fun_tau
+      (args_env, res_env) = tcSplitFunTys env_tau
+      n_fun = length args_fun
+      n_env = length args_env
+
       not_fun ty   -- ty is definitely not an arrow type,
                    -- and cannot conceivably become one
         = case tcSplitTyConApp_maybe ty of

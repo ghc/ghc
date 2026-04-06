@@ -28,7 +28,7 @@ module GHC.Tc.Utils.TcType (
   ExpType(..), ExpKind, InferResult(..), InferInstFlag(..), InferFRRFlag(..),
   ExpTypeFRR, ExpSigmaType, ExpSigmaTypeFRR,
   ExpRhoType, ExpRhoTypeFRR,
-  mkCheckExpType,
+  mkCheckExpType, getCheckExpType,
   checkingExpType_maybe, checkingExpType,
 
   ExpPatType(..), mkCheckExpFunPatTy, mkInvisExpPatType,
@@ -440,11 +440,12 @@ data InferInstFlag  -- Specifies whether the inference should return an uninstan
 
   | IIF_ShallowRho  -- Trying to infer a shallow RhoType (no foralls or => at the top)
                     -- Top-instantiate (only, regardless of DeepSubsumption) before filling the hole
-                    -- Typically used when inferring the type of an expression
+                    -- Used only for view patterns; see Note [View patterns and polymorphism]
 
   | IIF_DeepRho     -- Trying to infer a possibly-deep RhoType (depending on DeepSubsumption)
                     -- If DeepSubsumption is off, same as IIF_ShallowRho
                     -- If DeepSubsumption is on, instantiate deeply before filling the hole
+                    -- Typically used when inferring the type of an expression
 
 type ExpSigmaType = ExpType
 type ExpRhoType   = ExpType
@@ -489,6 +490,12 @@ instance Outputable InferResult where
 -- | Make an 'ExpType' suitable for checking.
 mkCheckExpType :: TcType -> ExpType
 mkCheckExpType = Check
+
+getCheckExpType :: HasDebugCallStack => ExpType -> TcType
+-- Expect a (Check ty).
+-- See Note [ExpType in HsCtxt] in GHC.Tc.Types.ErrCtxt
+getCheckExpType (Check ty) = ty
+getCheckExpType (Infer ir) = pprPanic "getCheckExpType" (ppr ir)
 
 -- | Returns the expected type when in checking mode.
 checkingExpType_maybe :: ExpType -> Maybe TcType
