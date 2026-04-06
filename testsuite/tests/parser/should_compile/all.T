@@ -198,8 +198,8 @@ test('T20718b',  normal, compile, ['-dsuppress-uniques -ddump-parsed-ast -dkeep-
 test('T21589', normal, compile, [''])
 test('T19372consym', normal, compile, [''])
 test('ListTuplePunsSuccess1', extra_files(['ListTuplePunsSuccess1.hs']), ghci_script, ['ListTuplePunsSuccess1.script'])
-test('ListTuplePunsFamiliesCompat', expect_broken(23135), compile, [''])
-test('ListTuplePunsFamilies', [expect_broken(23135), extra_files(['ListTuplePunsFamilies.hs'])], ghci_script, ['ListTuplePunsFamilies.script'])
+test('ListTuplePunsFamiliesCompat', normal, compile, [''])
+test('ListTuplePunsFamilies', [extra_files(['ListTuplePunsFamilies.hs'])], ghci_script, ['ListTuplePunsFamilies.script'])
 
 
 test('T22155', normal, compile, ['-dsuppress-uniques -ddump-simpl -dsuppress-all -dno-typeable-binds'])

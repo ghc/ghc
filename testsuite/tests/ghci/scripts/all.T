@@ -382,7 +382,7 @@ test('T16468', normal, ghci_script, ['T16468.script'])
 test('T23686', normal, ghci_script, ['T23686.script'])
 test('T13869', extra_files(['T13869a.hs', 'T13869b.hs']), ghci_script, ['T13869.script'])
 test('ListTuplePunsPpr', normal, ghci_script, ['ListTuplePunsPpr.script'])
-test('ListTuplePunsPprNoAbbrevTuple', [expect_broken(23135), limit_stdout_lines(13)], ghci_script, ['ListTuplePunsPprNoAbbrevTuple.script'])
+test('ListTuplePunsPprNoAbbrevTuple', [limit_stdout_lines(14)], ghci_script, ['ListTuplePunsPprNoAbbrevTuple.script'])
 test('T24459', normal, ghci_script, ['T24459.script'])
 test('T24632', normal, ghci_script, ['T24632.script'])
 
