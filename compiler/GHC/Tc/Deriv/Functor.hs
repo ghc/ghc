@@ -25,8 +25,9 @@ import GHC.Prelude
 import GHC.Hs
 
 import GHC.Tc.Deriv.Generate
-import GHC.Tc.Deriv.RdrNames
 import GHC.Tc.Utils.TcType
+
+import GHC.Builtin.RdrNames
 
 import GHC.Core.DataCon
 import GHC.Core.TyCon
