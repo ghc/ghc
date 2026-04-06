@@ -235,6 +235,7 @@ import GHC.Internal.Types hiding (
   Sum61#,
   Sum62#,
   Sum63#,
+  Sum64#,
   )
 import GHC.Internal.Classes hiding (
   CUnit,

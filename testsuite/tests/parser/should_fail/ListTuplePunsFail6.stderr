@@ -1,0 +1,7 @@
+ListTuplePunsFail6.hs:9:8: error: [GHC-64725]
+    • Tuple# does not work for 1-tuples; use Solo#.
+    • In the expression: (# 1 #) :: Tuple# Int
+      In the expression: case (# 1 #) :: Tuple# Int of _ -> 0
+      In an equation for ‘unboxedSoloFam’:
+          unboxedSoloFam = case (# 1 #) :: Tuple# Int of _ -> 0
+

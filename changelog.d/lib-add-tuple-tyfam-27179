@@ -1,0 +1,4 @@
+section: ghc-experimental
+synopsis: Define and export type families ``Tuple``, ``Constraints``, ``Tuple#``, ``Sum#`` (GHC Proposal `#475 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0475-tuple-syntax.rst>`_ "Non-punning list and tuple syntax")
+issues: #27179
+mrs: !15898
