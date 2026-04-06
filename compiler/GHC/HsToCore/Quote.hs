@@ -2442,12 +2442,12 @@ rep2X lift_dsm get_wrap n xs = do
   ; return (MkC $ (foldl' App (wrap (Var rep_id)) xs)) }
 
 
-krep2M      ::           KnownOcc -> [CoreExpr] -> MetaM (Core (M a))
+-- krep2M      ::           KnownOcc -> [CoreExpr] -> MetaM (Core (M a))
 krep2       ::           KnownOcc -> [CoreExpr] -> MetaM (Core (M a))
 krep2_nw    :: NotM a => KnownOcc -> [CoreExpr] -> MetaM (Core a)
 krep2_nwDsM :: NotM a => KnownOcc -> [CoreExpr] -> DsM (Core a)
 krep2  = krep2X lift (asks quoteWrapper)
-krep2M = krep2X lift (asks monadWrapper)
+-- krep2M = krep2X lift (asks monadWrapper)
 krep2_nw n xs = lift (krep2_nwDsM n xs)
 krep2_nwDsM   = krep2X id (return id)
 

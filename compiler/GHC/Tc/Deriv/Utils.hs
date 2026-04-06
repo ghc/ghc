@@ -66,7 +66,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
 
 import GHC.Builtin.Names
-import GHC.Builtin.RdrNames( compose_RDR )
 import GHC.Builtin.Names.TH (liftClassKey)
 
 import GHC.Utils.Misc

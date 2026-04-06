@@ -1,8 +1,5 @@
 {-# LANGUAGE MagicHash, Trustworthy, RankNTypes #-}
 
-{-# OPTIONS_GHC -fdefines-known-key-names #-}
-    -- See Note [Known-key names and IsList]
-
 -- |
 --
 -- Module      :  GHC.KnownKeyNames
