@@ -500,7 +500,7 @@ busy_wait_nop(void)
 // Relaxed atomic operations.
 #define RELAXED_LOAD(ptr) atomic_load_explicit(ptr, memory_order_relaxed)
 #define RELAXED_STORE(ptr,val) atomic_store_explicit(ptr, val, memory_order_relaxed)
-#define RELAXED_ADD(ptr,val) (atomic_fetch_add_explicit(ptr, val, memory_order_relaxed) + val)
+#define RELAXED_ADD(ptr,val) atomic_fetch_add_explicit(ptr, val, memory_order_relaxed)
 
 // Acquire/release atomic operations
 #define ACQUIRE_LOAD(ptr) atomic_load_explicit(ptr, memory_order_acquire)
@@ -509,7 +509,7 @@ busy_wait_nop(void)
 // Sequentially consistent atomic operations
 #define SEQ_CST_LOAD(ptr) atomic_load(ptr)
 #define SEQ_CST_STORE(ptr,val) atomic_store(ptr, val)
-#define SEQ_CST_ADD(ptr,val) (atomic_fetch_add(ptr, val) + val)
+#define SEQ_CST_ADD(ptr,val) atomic_fetch_add(ptr, val)
 
 // Non-atomic addition for "approximate" counters that can be lossy
 #define NONATOMIC_ADD(ptr,val) RELAXED_STORE(ptr, RELAXED_LOAD(ptr) + val)
