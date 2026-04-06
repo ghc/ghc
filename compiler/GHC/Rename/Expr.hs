@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE RecordWildCards     #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -39,7 +40,6 @@ import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice
                           , rnUntypedSpliceExpr, checkThLocalNameWithLift, checkThLocalNameNoLift )
 import GHC.Rename.HsType
-import GHC.Rename.Lit
 import GHC.Rename.Pat
 
 import GHC.Driver.DynFlags
@@ -74,7 +74,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import qualified Data.Foldable as Partial (maximum)
 import Data.List (unzip4)
-import Data.List.NonEmpty ( NonEmpty(..), head, init, last, nonEmpty, scanl, tail )
+import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty, scanl, tail )
 import Data.Ord
 import Data.Array
 import GHC.Driver.Env (HscEnv)
@@ -85,20 +85,34 @@ import Data.Foldable (toList)
 
 Nomenclature
 -------------
-* Expansion (`HsExpr GhcRn -> HsExpr GhcRn`): expand between renaming and
-  typechecking, using the `XXExprGhcRn` constructor of `HsExpr`.
-* Desugaring (`HsExpr GhcTc -> Core.Expr`): convert the typechecked `HsSyn` to Core.  This is done in GHC.HsToCore
+* Expansion (`HsExpr GhcRn -> HsExpansion GhcRn`): expand after renaming and
+  right before typechecking, using the `XXExprGhcRn` constructor of `HsExpr`.
+* Desugaring (`HsExpr GhcTc -> Core.Expr`): convert the typechecked `HsSyn` to Core.
+  This is done in GHC.HsToCore
 
 
 For overloaded constructs (overloaded literals, lists, strings), and
 rebindable constructs (e.g. if-then-else), our general plan is this,
 using overloaded labels #foo as an example:
 
-* In the RENAMER: transform
+* In the RENAMER (GHC.Tc.Rename.rnExpr):
+  Identify if we need to transform the rebindable construct
+  and store the appropriate `fromLabel` function in the RebindableSyntaxTable
+  field associated with HsOverLabel.
+
       HsOverLabel "foo"
-      ==> XExpr (ExpandedThingRn (HsOverLabel #foo)
-                                 (fromLabel `HsAppType` "foo"))
+      ==> HsOverLabel (Rebindable [("fromLabel", fromLabelClassOpName)]) "foo"
+
+* In the EXPANSION (GHC.Tc.Gen.Expand.tcExpand):
+  Expand the HsOverLabel to an Expanded expression
+  using the fromLabel function stored in the rebindable syntax table
+
+      HsOverLabel (Rebindable [("fromLabel", fromLabelClassOpName)]) "foo"
+      ==> XExpr (ExpandedThingRn HSE { hse_ctxt = (HsOverLabel #foo)
+                                     , hse_exp  = L genLoc (fromLabel `HsAppType` "foo") })
+
   We write this more compactly in concrete-syntax form like this
+
       #foo  ==>  fromLabel @"foo"
 
   Recall that in (ExpandedThingRn orig expanded), 'orig' is the original term
@@ -108,16 +122,18 @@ using overloaded labels #foo as an example:
 * In the TYPECHECKER: typecheck the expansion, in this case
       fromLabel @"foo"
   The typechecker (and desugarer) will never see HsOverLabel
+  See Note [Typechecking by expansion: overview]
 
-In effect, the renamer does a bit of desugaring. Recall GHC.Hs.Expr
-Note [Rebindable syntax and XXExprGhcRn], which describes the use of XXExprGhcRn.
+In effect, the renamer stores the rebindable syntax functions (ifThenElse, fromLabel, etc).
+in the rebindable syntax table, the expander build the actual AST before typechecking.
+Recall GHC.Hs.Expr Note [Rebindable syntax and XXExprGhcRn], which describes the use of XXExprGhcRn.
 
 RebindableSyntax:
   If RebindableSyntax is off we use the built-in 'fromLabel', defined in
      GHC.Builtin.KnownKeys.fromLabelClassOpName
   If RebindableSyntax if ON, we look up "fromLabel" in the environment
      to get whichever one is in scope.
-This is accomplished by lookupSyntaxName, and it applies to all the
+This is accomplished by `lookupSyntaxName`, and it applies to all the
 constructs below.
 
 See also Note [Handling overloaded and rebindable patterns] in GHC.Rename.Pat
@@ -150,9 +166,6 @@ but several have a little bit of special treatment:
   where `leftSection` and `rightSection` are representation-polymorphic
   wired-in Ids. See Note [Left and right sections]
 
-* To understand why expansions for `OpApp` is done in `GHC.Tc.Gen.Head.splitHsApps`
-  see Note [Doing XXExprGhcRn in the Renamer vs Typechecker] below.
-
 * RecordUpd: we desugar record updates into case expressions,
   in GHC.Tc.Gen.Expr.tcExpr.
 
@@ -173,8 +186,23 @@ but several have a little bit of special treatment:
 
   See Note [Record Updates] in GHC.Tc.Gen.Expr for more details.
 
-  To understand Why is this done in the typechecker, and not in the renamer
-  see Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
+  This expansion is done in the typechecker on the fly (`GHC.Tc.Gen.tcExpr`), (until #27160 is fixed)
+  and not in the renamer for two reasons:
+
+    - (Until we implement GHC proposal #366)
+      We need to know the type of the record to disambiguate its fields.
+
+    - We use the type signature of the data constructor to provide `IdSigs`
+      to the let-bound variables (x', y' in the example of
+      See Note [Handling overloaded and rebindable constructs]).
+      This is needed to accept programs such as
+
+          data R b = MkR { f :: (forall a. a -> a) -> (Int,b), c :: Int }
+          foo r = r { f = \ k -> (k 3, k 'x') }
+
+      in which an updated field has a higher-rank type.
+      See Wrinkle [Using IdSig] in Note [Record Updates] in GHC.Tc.Gen.Expr.
+
 
 * HsDo: We expand `HsDo` statements in `Ghc.Tc.Gen.Do`.
 
@@ -189,8 +217,22 @@ but several have a little bit of special treatment:
                                       (return (f x))))
 
      See Note [Expanding HsDo with XXExprGhcRn] in `Ghc.Tc.Gen.Do` for more details.
-     To understand why is this done in the typechecker and not in the renamer.
-     See Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
+
+    - The expansion for do block statements is done on the fly right before typechecking
+      in `GHC.Tc.Gen.Expand.tcExpand` using `GHC.Tc.Gen.Do.expandDoStmts`.
+      There are 2 main reasons:
+
+      1. During the renaming phase, we may not have all the constructor details `HsConDetails` populated in the
+         data structure. This would result in an inaccurate irrefutability analysis causing
+         the continuation lambda body to be wrapped with `fail` alternatives when not needed.
+         See Part 1. of Note [Expanding HsDo with XXExprGhcRn] (test pattern-fails.hs)
+
+      2. If the expansion is done on the fly during renaming, expressions that
+         have explicit type applications using (-XTypeApplciations) will not work (cf. Let statements expansion)
+         as the name freshening happens from the root of the AST to the leaves,
+         but the expansion happens in the opposite direction (from leaves to the root),
+         causing the renamer to miss the scoped type variables.
+
 
 Note [Overloaded labels]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -210,66 +252,6 @@ type-applying to "foo", so we get
 
 And those inferred kind quantifiers will indeed be instantiated when we
 typecheck the renamed-syntax call (fromLabel @"foo").
-
-Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We expand some `HsExpr GhcRn` code at various places, usually, on the fly,
-depending on when it is more convenient. It may be beneficial to have a
-separate `HsExpr GhcRn -> HsExpr GhcRn` pass that does this expansion uniformly
-in the future when we have enough cases to cater for. For the time being,
-this note documents which language feature is expanded at which phase,
-and the reasons for doing so.
-
-  ** `HsIf` Expansions
-  --------------------
-  `HsIf` expansions are expanded in the Renamer becuase it is more convinent
-  to do so there and then not worry about it in the later stage.
-  `-XRebindableSyntax` is used to decide whether we use the `HsIf` or user defined if
-
-
-  ** `OpApp` Expansions
-  ---------------------
-  The typechecker turns `OpApp` into a use of `XXExprGhcRn`
-  on the fly, in `GHC.Tc.Gen.Head.splitHsApps`.
-  The language extension `RebindableSyntax` does not affect this behaviour.
-
-  It's a bit painful to transform `OpApp e1 op e2` to a `XXExprGhcRn`
-  form, because the renamer does precedence rearrangement after name
-  resolution. So the renamer leaves an `OpApp` as an `OpApp`.
-
-  ** Record Update Syntax `RecordUpd` Expansions
-  ----------------------------------------------
-  This is done in the typechecker on the fly (`GHC.Tc.Expr.tcExpr`), and not the renamer, for two reasons:
-
-    - (Until we implement GHC proposal #366)
-      We need to know the type of the record to disambiguate its fields.
-
-    - We use the type signature of the data constructor to provide `IdSigs`
-      to the let-bound variables (x', y' in the example of
-      Note [Handling overloaded and rebindable constructs] above).
-      This is needed to accept programs such as
-
-          data R b = MkR { f :: (forall a. a -> a) -> (Int,b), c :: Int }
-          foo r = r { f = \ k -> (k 3, k 'x') }
-
-      in which an updated field has a higher-rank type.
-      See Wrinkle [Using IdSig] in Note [Record Updates] in GHC.Tc.Gen.Expr.
-
-  ** `HsDo` Statement Expansions
-  -----------------------------------
-  The expansion for do block statements is done on the fly right before typechecking in `GHC.Tc.Gen.Expr`
-  using `GHC.Tc.Gen.Do.expandDoStmts`. There are 2 main reasons:
-
-  -  During the renaming phase, we may not have all the constructor details `HsConDetails` populated in the
-     data structure. This would result in an inaccurate irrefutability analysis causing
-     the continuation lambda body to be wrapped with `fail` alternatives when not needed.
-     See Part 1. of Note [Expanding HsDo with XXExprGhcRn] (test pattern-fails.hs)
-
-  -  If the expansion is done on the fly during renaming, expressions that
-     have explicit type applications using (-XTypeApplciations) will not work (cf. Let statements expansion)
-     as the name freshening happens from the root of the AST to the leaves,
-     but the expansion happens in the opposite direction (from leaves to the root),
-     causing the renamer to miss the scoped type variables.
 -}
 
 {-
@@ -345,13 +327,10 @@ rnExpr (HsHole h)
 
 -- HsOverLabel: see Note [Handling overloaded and rebindable constructs]
 rnExpr (HsOverLabel src v)
-  = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpOcc
-       ; return ( mkExpandedExpr (HsOverLabel src v) $
-                  HsAppType noExtField (genLHsVar from_label) hs_ty_arg
-                , fvs ) }
-  where
-    hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
-                HsTyLit noExtField (HsString NoSourceText v)
+  = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpName
+       ; let rs_table = Rebindable [(nameOccName fromLabelClassOpName, from_label)]
+       ; return (HsOverLabel (src, rs_table) v, fvs)
+       }
 
 rnExpr (HsLit x lit) | HsString src s <- lit
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings
@@ -373,10 +352,12 @@ rnExpr (HsOverLit x lit)
                  return (HsApp noExtField (noLocA neg) (noLocA (HsOverLit x lit'))
                         , fvs ) }
 
-rnExpr (HsQualLit x lit) = do
-  ((lit', desugaredExpr), fvs) <- rnQualLit lit
-  let origExpr = HsQualLit x lit'
-  return (mkExpandedExpr origExpr desugaredExpr, fvs)
+rnExpr (HsQualLit x QualLit{..})
+ = do { (funName, fvs) <- lookupNameWithQualifier fromStringName ql_mod
+      ; let ql_val' = case ql_val of
+                        HsQualString st s -> HsQualString st s
+      ; return (HsQualLit x (QualLit (L noAnn funName) ql_mod ql_val'), fvs)
+      }
 
 rnExpr (HsApp x fun arg)
   = do { (fun',fvFun) <- rnLExpr fun
@@ -420,19 +401,15 @@ rnExpr (HsGetField _ e f)
  = do { (getField, fv_getField) <- lookupSyntaxName getFieldClassOpOcc
       ; (e, fv_e) <- rnLExpr e
       ; let f' = rnDotFieldOcc <$> f
-      ; return ( mkExpandedExpr
-                   (HsGetField noExtField e f')
-                   (mkGetField getField e (fmap (unLoc . dfoLabel) f'))
-               , fv_e `plusFN` fv_getField ) }
+            rs_table = Rebindable  [(nameOccName getFieldName, getField)]
+      ; return (HsGetField rs_table e f', fv_e `plusFN` fv_getField) }
 
 rnExpr (HsProjection _ fs)
-  = do { (getField, fv_getField) <- lookupSyntaxName getFieldClassOpOcc
-       ; circ <- rnLookupKnownOccName composeIdOcc
+  = do { (getFieldName, fv_getField) <- lookupSyntaxName getFieldName
+       ; circName <- rnLookupKnownOccName composeIdOcc
        ; let fs' = NE.map rnDotFieldOcc fs
-       ; return ( mkExpandedExpr
-                    (HsProjection noExtField fs')
-                    (mkProjection getField circ $ NE.map (unLoc . dfoLabel) fs')
-                , unitFN circ `plusFN` fv_getField) }
+             rs_table = Rebindable  [(nameOccName getFieldName , getFieldName), (rdrNameOcc compose_RDR, circName)]
+       ; return (HsProjection rs_table fs', unitFN circName `plusFN` fv_getField) }
 
 ------------------------------------------
 -- Template Haskell extensions
@@ -496,15 +473,12 @@ rnExpr (ExplicitList _ exps)
   = do  { (exps', fvs) <- rnExprs exps
         ; opt_OverloadedLists <- xoptM LangExt.OverloadedLists
         ; if not opt_OverloadedLists
-          then return  (ExplicitList noExtField exps', fvs)
+          then return  (ExplicitList NoRebindable exps', fvs)
           else
     do { (from_list_n_name, fvs') <- lookupSyntaxName fromListNClassOpOcc
-       ; loc <- getSrcSpanM -- See Note [Source locations for implicit function calls]
-       ; let rn_list  = ExplicitList noExtField exps'
-             lit_n    = mkIntegralLit (length exps)
-             hs_lit   = genHsIntegralLit lit_n
-             exp_list = genHsApps' (wrapGenSpan' loc from_list_n_name) [hs_lit, wrapGenSpan rn_list]
-       ; return ( mkExpandedExpr rn_list exp_list
+       ; let rs_table = Rebindable  [(nameOccName fromListNClassOpOcc, from_list_n_name)]
+             rn_list  = ExplicitList rs_table exps'
+       ; return ( rn_list
                 , fvs `plusFN` fvs') } }
 
 rnExpr (ExplicitTuple _ tup_args boxity)
@@ -548,7 +522,7 @@ rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
                     RegularRecUpdFields
                     { xRecUpdFields = parents
                     , recUpdFields  = flds }
-            ; return ( RecordUpd noExtField (L l e) upd_flds
+            ; return ( RecordUpd NoRebindable (L l e) upd_flds
                      , fv_e `plusFN` fv_flds ) }
 
       -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
@@ -563,13 +537,13 @@ rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
            ; (setField, fv_setField) <- lookupSyntaxName setFieldClassOpOcc
            ; (e, fv_e) <- rnExpr expr
            ; (us, fv_us) <- rnHsUpdProjs flds
-            ; let upd_flds = OverloadedRecUpdFields
+           ; let upd_flds = OverloadedRecUpdFields
                             { xOLRecUpdFields = noExtField
                             , olRecUpdFields  = us }
-            ; return ( mkExpandedExpr
-                         (RecordUpd noExtField (L l e) upd_flds)
-                         (mkRecordDotUpd getField setField (L l e) us)
-                        , plusFNs [fv_getField, fv_setField, fv_e, fv_us] ) }
+                 rs_table = Rebindable [(nameOccName getField, getField) , (nameOccName setField, setField)]
+           ; return (RecordUpd rs_table (L l e) upd_flds
+                    , plusFNs [fv_getField, fv_setField, fv_e, fv_us] )
+           }
 
 
 rnExpr (ExprWithTySig _ expr pty)
@@ -708,155 +682,20 @@ rnSection :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeNames)
 -- Also see Note [Handling overloaded and rebindable constructs]
 
 rnSection section@(SectionR x op expr)
-  -- See Note [Left and right sections]
   = do  { (op', fvs_op)     <- rnLExpr op
         ; (expr', fvs_expr) <- rnLExpr expr
         ; checkSectionPrec InfixR section op' expr'
-        ; let rn_section = SectionR x op' expr'
-              ds_section = genHsApps rightSectionName [op',expr']
-        ; return ( mkExpandedExpr rn_section ds_section
-                 , fvs_op `plusFN` fvs_expr) }
+        ; return $ (SectionR x op' expr' , fvs_op `plusFN`  fvs_expr) }
 
 rnSection section@(SectionL x expr op)
-  -- See Note [Left and right sections]
   = do  { (expr', fvs_expr) <- rnLExpr expr
         ; (op', fvs_op)     <- rnLExpr op
         ; checkSectionPrec InfixL section op' expr'
-        ; postfix_ops <- xoptM LangExt.PostfixOperators
-                        -- Note [Left and right sections]
-        ; let rn_section = SectionL x expr' op'
-              ds_section
-                | postfix_ops = HsApp noExtField op' expr'
-                | otherwise   = genHsApps leftSectionName
-                                   [wrapGenSpan $ HsApp noExtField op' expr']
-        ; return ( mkExpandedExpr rn_section ds_section
-                 , fvs_op `plusFN` fvs_expr) }
+        ; return $ (SectionL x expr' op', fvs_op `plusFN` fvs_expr) }
 
 rnSection other = pprPanic "rnSection" (ppr other)
 
-{- Note [Left and right sections]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Dealing with left sections (x *) and right sections (* x) is
-surprisingly fiddly.  We expand like this
-     (`op` e) ==> rightSection op e
-     (e `op`) ==> leftSection  (op e)
-
-Using an auxiliary function in this way avoids the awkwardness of
-generating a lambda, esp if `e` is a redex, so we *don't* want
-to generate `(\x -> op x e)`. See Historical
-Note [Desugaring operator sections]
-
-Here are their definitions:
-   leftSection :: forall r1 r2 n (a::TYPE r1) (b::TYPE r2).
-                  (a %n-> b) -> a %n-> b
-   leftSection f x = f x
-
-   rightSection :: forall r1 r2 r3 n1 n2 (a::TYPE r1) (b::TYPE r2) (c::TYPE r3).
-                   (a %n1 -> b %n2-> c) -> b %n2-> a %n1-> c
-   rightSection f y x = f x y
-
-Note the wrinkles:
-
-* We do /not/ use lookupSyntaxName, which would make left and right
-  section fall under RebindableSyntax.  Reason: it would be a user-
-  facing change, and there are some tricky design choices (#19354).
-  Plus, infix operator applications would be trickier to make
-  rebindable, so it'd be inconsistent to do so for sections.
-
-  TL;DR: we still use the renamer-expansion mechanism for operator
-  sections, but only to eliminate special-purpose code paths in the
-  renamer and desugarer.
-
-* leftSection and rightSection must be representation-polymorphic, to allow
-  (+# 4#) and (4# +#) to work. See
-  Note [Wired-in Ids for rebindable syntax] in GHC.Types.Id.Make.
-
-* leftSection and rightSection must be multiplicity-polymorphic.
-  (Test linear/should_compile/OldList showed this up.)
-
-* Because they are representation-polymorphic, we have to define them
-  as wired-in Ids, with compulsory inlining.  See
-  GHC.Types.Id.Make.leftSectionId, rightSectionId.
-
-* leftSection is just ($) really; but unlike ($) it is
-  representation-polymorphic in the result type, so we can write
-  `(x +#)`, say.
-
-* The type of leftSection must have an arrow in its first argument,
-  because (x `ord`) should be rejected, because ord does not take two
-  arguments
-
-* It's important that we define leftSection in an eta-expanded way,
-  (i.e. not leftSection f = f), so that
-      (True `undefined`) `seq` ()
-      = (leftSection (undefined True) `seq` ())
-  evaluates to () and not undefined
-
-* If PostfixOperators is ON, then we expand a left section like this:
-      (e `op`)  ==>   op e
-  with no auxiliary function at all.  Simple!
-
-* leftSection and rightSection switch on ImpredicativeTypes locally,
-  during Quick Look; see GHC.Tc.Gen.App.wantQuickLook. Consider
-  test DeepSubsumption08:
-     type Setter st t a b = forall f. Identical f => blah
-     (.~) :: Setter s t a b -> b -> s -> t
-     clear :: Setter a a' b (Maybe b') -> a -> a'
-     clear = (.~ Nothing)
-   The expansion look like (rightSection (.~) Nothing).  So we must
-   instantiate `rightSection` first type argument to a polytype!
-   Hence the special magic in App.wantQuickLook.
-
-Historical Note [Desugaring operator sections]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This Note explains some historical trickiness in desugaring left and
-right sections.  That trickiness has completely disappeared now that
-we desugar to calls to 'leftSection` and `rightSection`, but I'm
-leaving it here to remind us how nice the new story is.
-
-Desugaring left sections with -XPostfixOperators is straightforward: convert
-(expr `op`) to (op expr).
-
-Without -XPostfixOperators it's a bit more tricky. At first it looks as if we
-can convert
-
-    (expr `op`)
-
-naively to
-
-    \x -> op expr x
-
-But no!  expr might be a redex, and we can lose laziness badly this
-way.  Consider
-
-    map (expr `op`) xs
-
-for example. If expr were a redex then eta-expanding naively would
-result in multiple evaluations where the user might only have expected one.
-
-So we convert instead to
-
-    let y = expr in \x -> op y x
-
-Also, note that we must do this for both right and (perhaps surprisingly) left
-sections. Why are left sections necessary? Consider the program (found in #18151),
-
-    seq (True `undefined`) ()
-
-according to the Haskell Report this should reduce to () (as it specifies
-desugaring via eta expansion). However, if we fail to eta expand we will rather
-bottom. Consequently, we must eta expand even in the case of a left section.
-
-If `expr` is actually just a variable, say, then the simplifier
-will inline `y`, eliminating the redundant `let`.
-
-Note that this works even in the case that `expr` is unlifted. In this case
-bindNonRec will automatically do the right thing, giving us:
-
-    case expr of y -> (\x -> op y x)
-
-See #18151.
-
+{-
 Note [Reporting unbound names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Faced with an out-of-scope `RdrName` there are two courses of action
@@ -2862,77 +2701,16 @@ rnHsIf p b1 b2
        ; (b1', fvB1) <- rnLExpr b1
        ; (b2', fvB2) <- rnLExpr b2
        ; let fvs_if = plusFNs [fvP, fvB1, fvB2]
-             rn_if  = HsIf noExtField  p' b1' b2'
-
        -- Deal with rebindable syntax
        ; mb_ite <- lookupIfThenElse
        ; case mb_ite of
             Nothing  -- Non rebindable-syntax case
-              -> return (rn_if, fvs_if)
+              -> return (HsIf NoRebindable  p' b1' b2', fvs_if)
 
             Just ite_name   -- Rebindable-syntax case
-              -> do { let ds_if = genHsApps ite_name [p', b1', b2']
-                          fvs   = plusFNs [fvs_if, unitFN ite_name]
-                    ; return (mkExpandedExpr rn_if ds_if, fvs) } }
+              -> do { let fvs   = plusFNs [fvs_if, unitFN ite_name]
+                    ; return (HsIf (Rebindable [(rdrNameOcc $ mkVarUnqual (fsLit "ifThenElse"), ite_name)]) p' b1' b2', fvs) } }
 
------------------------------------------
--- Bits and pieces for RecordDotSyntax.
---
--- See Note [Overview of record dot syntax] in GHC.Hs.Expr.
-
--- mkGetField arg field calculates a get_field @field arg expression.
--- e.g. z.x = mkGetField z x = get_field @x z
-mkGetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
-mkGetField get_field arg field = unLoc (head $ mkGet get_field (arg :| []) field)
-
--- mkSetField a field b calculates a set_field @field expression.
--- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' to a on b").
--- NB: the order of aruments is specified by GHC Proposal 583: HasField redesign.
-mkSetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> LHsExpr GhcRn -> HsExpr GhcRn
-mkSetField set_field a (L _ (FieldLabelString field)) b =
-  genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit field) b) a
-
-mkGet :: Name -> NonEmpty (LHsExpr GhcRn) -> LocatedAn NoEpAnns FieldLabelString -> NonEmpty (LHsExpr GhcRn)
-mkGet get_field l@(r :| _) (L _ (FieldLabelString field)) =
-  wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) NE.<| l
-
-mkSet :: Name -> LHsExpr GhcRn -> (LocatedAn NoEpAnns FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
-mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
-
--- mkProjection fields calculates a projection.
--- e.g. .x = mkProjection [x] = getField @"x"
---      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
-mkProjection :: Name -> Name -> NonEmpty FieldLabelString -> HsExpr GhcRn
-mkProjection getFieldName circName (field :| fields) = foldl' f (proj field) fields
-  where
-    f :: HsExpr GhcRn -> FieldLabelString -> HsExpr GhcRn
-    f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
-
-    proj :: FieldLabelString -> HsExpr GhcRn
-    proj (FieldLabelString f) = genHsVar getFieldName `genAppType` genHsTyLit f
-
--- mkProjUpdateSetField calculates functions representing dot notation record updates.
--- e.g. Suppose an update like foo.bar = 1.
---      We calculate the function \a -> setField @"foo" a (setField @"bar" (getField @"foo" a) 1).
-mkProjUpdateSetField :: Name -> Name -> LHsRecProj GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
-mkProjUpdateSetField get_field set_field (L _ (HsFieldBind { hfbLHS = (L _ (FieldLabelStrings flds')), hfbRHS = arg } ))
-  = let {
-      ; flds = NE.map (fmap (unLoc . dfoLabel)) flds'
-      ; final = last flds  -- quux
-      ; fields = init flds   -- [foo, bar, baz]
-      ; getters = \a -> foldl' (mkGet get_field) (a :| []) fields  -- Ordered from deep to shallow.
-          -- [getField@"baz"(getField@"bar"(getField@"foo" a), getField@"bar"(getField@"foo" a), getField@"foo" a, a]
-      ; zips = \a -> (final, head (getters a)) : zip (reverse fields) (tail (getters a)) -- Ordered from deep to shallow.
-          -- [("quux", getField@"baz"(getField@"bar"(getField@"foo" a)), ("baz", getField@"bar"(getField@"foo" a)), ("bar", getField@"foo" a), ("foo", a)]
-      }
-    in (\a -> foldl' (mkSet set_field) arg (zips a))
-          -- setField@"foo" (a) (setField@"bar" (getField @"foo" (a))(setField@"baz" (getField @"bar" (getField @"foo" (a)))(setField@"quux" (getField @"baz" (getField @"bar" (getField @"foo" (a))))(quux))))
-
-mkRecordDotUpd :: Name -> Name -> LHsExpr GhcRn -> [LHsRecUpdProj GhcRn] -> HsExpr GhcRn
-mkRecordDotUpd get_field set_field exp updates = foldl' fieldUpdate (unLoc exp) updates
-  where
-    fieldUpdate :: HsExpr GhcRn -> LHsRecUpdProj GhcRn -> HsExpr GhcRn
-    fieldUpdate acc lpu =  unLoc $ (mkProjUpdateSetField get_field set_field lpu) (wrapGenSpan acc)
 
 rnHsUpdProjs :: [LHsRecUpdProj GhcPs] -> RnM ([LHsRecUpdProj GhcRn], FreeNames)
 rnHsUpdProjs us = do

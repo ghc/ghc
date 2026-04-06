@@ -139,9 +139,8 @@ rnTypedBracket e br_body
        ; recordThUse
 
        ; traceRn "Renaming typed TH bracket" empty
-       ; (body', fvs_e) <- setThLevel (Brack cur_level RnPendingTyped) $ rnLExpr br_body
-       ; return (HsTypedBracket noExtField body', fvs_e)
-
+       ; (body, fvs_e) <- setThLevel (Brack cur_level RnPendingTyped) $ rnLExpr br_body
+       ; return (HsTypedBracket noExtField body, fvs_e)
        }
 
 rnUntypedBracket :: HsExpr GhcPs -> HsQuote GhcPs -> RnM (HsExpr GhcRn, FreeNames)
@@ -174,6 +173,7 @@ rnUntypedBracket e br_body
          setThLevel (UntypedBrack cur_level ps_var) $
                   rn_utbracket br_body
        ; pendings <- readMutVar ps_var
+
        ; return (HsUntypedBracket pendings body', fvs_e)
 
        }
@@ -610,6 +610,13 @@ when processing untyped TH quotes from that module, to avoid the aforementioned
 problems, but keeps it on while processing typed TH quotes.
 
 This note and approach originated in #18102.
+
+The MR!15868 (#27156) moved all the expansion/rebindable syntax (RS) mechanism into its own pass,
+done after renaming and right before typechecking.
+Before this patch, only some constructs (if then else, overloaded labels) were
+expanded in the renamer, but some (Do statements and record updates) were done after
+the renamer. This meant that the treatment of rebindable syntax and typed template haskell was
+not uniform across constructs. The MR!15868 makes the treatement of RS uniform for all constructs.
 
 -}
 
