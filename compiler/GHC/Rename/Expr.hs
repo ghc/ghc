@@ -930,7 +930,7 @@ rnCmdTop = wrapLocFstMA rnCmdTop'
                          uniqDSetToList (methodNamesCmd (unLoc cmd'))
         ; (cmd_names, cmd_fvs) <- mapAndUnzipM lookupSyntaxName cmd_keys
         ; return (HsCmdTop (CST (cmd_keys `zip` map genHsVar cmd_names)) cmd',
-                  fvCmd `plusFV` plusFNs cmd_fvs) }
+                  fvCmd `plusFN` plusFNs cmd_fvs) }
 
 rnLCmd :: LHsCmd GhcPs -> RnM (LHsCmd GhcRn, FreeNames)
 rnLCmd = wrapLocFstMA rnCmd

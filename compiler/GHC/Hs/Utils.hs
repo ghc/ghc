@@ -41,7 +41,7 @@ module GHC.Hs.Utils(
   mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap,
   mkHsCmdIf, mkConLikeTc,
 
-  nlHsTyApp, nlHsTyApps, nlHsVar, nlHsDataCon,
+  nlHsAppType, nlHsTyApp, nlHsTyApps, nlHsVar, nlHsDataCon,
   nlHsLit, nlHsApp, nlHsApps, nlHsSyntaxApps,
   nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,

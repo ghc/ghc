@@ -32,7 +32,7 @@ module GHC.Tc.Deriv.Generate (
 
         mkCoerceClassMethEqn,
         genAuxBinds,
-        ordOpTbl, boxConTbl,
+        ordOpTbl, boxConTbl, nlHsCompose,
         mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr,
 
         getPossibleDataCons,
@@ -51,7 +51,6 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Validity
-import GHC.Tc.Deriv.RdrNames
 
 import GHC.Core.DataCon
 import GHC.Core.FamInstEnv
@@ -73,6 +72,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 
 import GHC.Builtin.Names
+import GHC.Builtin.RdrNames
 import GHC.Builtin.Names.TH
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
@@ -2141,9 +2141,12 @@ mkParentType tc
 
 {- *********************************************************************
 *                                                                      *
-           Utility bits for generating bindings
+           Utility bits for syntax trees
 *                                                                      *
 ********************************************************************* -}
+
+nlHsCompose :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
+nlHsCompose x y = compose_RDR `nlHsApps` [x, y]
 
 -- | Make a function binding. If no equations are given, produce a function
 -- with the given arity that produces a stock error.
