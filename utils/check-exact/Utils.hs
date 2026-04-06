@@ -557,7 +557,7 @@ isSymbolRdrName n = isSymOcc $ rdrNameOcc n
 
 rdrName2String :: RdrName -> String
 rdrName2String r =
-  case isExact_maybe r of
+  case rdrNameExactName_maybe r of
     Just n  -> name2String n
     Nothing ->
       case r of
