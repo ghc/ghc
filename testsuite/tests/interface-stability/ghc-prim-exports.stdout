@@ -5373,6 +5373,74 @@ module GHC.Types where
                  -> TYPE k62
                  -> TYPE (SumRep [k0, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, k11, k12, k13, k14, k15, k16, k17, k18, k19, k20, k21, k22, k23, k24, k25, k26, k27, k28, k29, k30, k31, k32, k33, k34, k35, k36, k37, k38, k39, k40, k41, k42, k43, k44, k45, k46, k47, k48, k49, k50, k51, k52, k53, k54, k55, k56, k57, k58, k59, k60, k61, k62])
   data Sum63# a b c d e f g h i j k l m n o p q r s t u v w x y z t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 = ...
+  type Sum64# :: forall (k0 :: RuntimeRep) (k1 :: RuntimeRep) (k2 :: RuntimeRep) (k3 :: RuntimeRep) (k4 :: RuntimeRep) (k5 :: RuntimeRep) (k6 :: RuntimeRep) (k7 :: RuntimeRep) (k8 :: RuntimeRep) (k9 :: RuntimeRep) (k10 :: RuntimeRep) (k11 :: RuntimeRep) (k12 :: RuntimeRep) (k13 :: RuntimeRep) (k14 :: RuntimeRep) (k15 :: RuntimeRep) (k16 :: RuntimeRep) (k17 :: RuntimeRep) (k18 :: RuntimeRep) (k19 :: RuntimeRep) (k20 :: RuntimeRep) (k21 :: RuntimeRep) (k22 :: RuntimeRep) (k23 :: RuntimeRep) (k24 :: RuntimeRep) (k25 :: RuntimeRep) (k26 :: RuntimeRep) (k27 :: RuntimeRep) (k28 :: RuntimeRep) (k29 :: RuntimeRep) (k30 :: RuntimeRep) (k31 :: RuntimeRep)
+                        (k32 :: RuntimeRep) (k33 :: RuntimeRep) (k34 :: RuntimeRep) (k35 :: RuntimeRep) (k36 :: RuntimeRep) (k37 :: RuntimeRep) (k38 :: RuntimeRep) (k39 :: RuntimeRep) (k40 :: RuntimeRep) (k41 :: RuntimeRep) (k42 :: RuntimeRep) (k43 :: RuntimeRep) (k44 :: RuntimeRep) (k45 :: RuntimeRep) (k46 :: RuntimeRep) (k47 :: RuntimeRep) (k48 :: RuntimeRep) (k49 :: RuntimeRep) (k50 :: RuntimeRep) (k51 :: RuntimeRep) (k52 :: RuntimeRep) (k53 :: RuntimeRep) (k54 :: RuntimeRep) (k55 :: RuntimeRep) (k56 :: RuntimeRep) (k57 :: RuntimeRep) (k58 :: RuntimeRep) (k59 :: RuntimeRep) (k60 :: RuntimeRep) (k61 :: RuntimeRep) (k62 :: RuntimeRep) (k63 :: RuntimeRep).
+                 TYPE k0
+                 -> TYPE k1
+                 -> TYPE k2
+                 -> TYPE k3
+                 -> TYPE k4
+                 -> TYPE k5
+                 -> TYPE k6
+                 -> TYPE k7
+                 -> TYPE k8
+                 -> TYPE k9
+                 -> TYPE k10
+                 -> TYPE k11
+                 -> TYPE k12
+                 -> TYPE k13
+                 -> TYPE k14
+                 -> TYPE k15
+                 -> TYPE k16
+                 -> TYPE k17
+                 -> TYPE k18
+                 -> TYPE k19
+                 -> TYPE k20
+                 -> TYPE k21
+                 -> TYPE k22
+                 -> TYPE k23
+                 -> TYPE k24
+                 -> TYPE k25
+                 -> TYPE k26
+                 -> TYPE k27
+                 -> TYPE k28
+                 -> TYPE k29
+                 -> TYPE k30
+                 -> TYPE k31
+                 -> TYPE k32
+                 -> TYPE k33
+                 -> TYPE k34
+                 -> TYPE k35
+                 -> TYPE k36
+                 -> TYPE k37
+                 -> TYPE k38
+                 -> TYPE k39
+                 -> TYPE k40
+                 -> TYPE k41
+                 -> TYPE k42
+                 -> TYPE k43
+                 -> TYPE k44
+                 -> TYPE k45
+                 -> TYPE k46
+                 -> TYPE k47
+                 -> TYPE k48
+                 -> TYPE k49
+                 -> TYPE k50
+                 -> TYPE k51
+                 -> TYPE k52
+                 -> TYPE k53
+                 -> TYPE k54
+                 -> TYPE k55
+                 -> TYPE k56
+                 -> TYPE k57
+                 -> TYPE k58
+                 -> TYPE k59
+                 -> TYPE k60
+                 -> TYPE k61
+                 -> TYPE k62
+                 -> TYPE k63
+                 -> TYPE (SumRep [k0, k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, k11, k12, k13, k14, k15, k16, k17, k18, k19, k20, k21, k22, k23, k24, k25, k26, k27, k28, k29, k30, k31, k32, k33, k34, k35, k36, k37, k38, k39, k40, k41, k42, k43, k44, k45, k46, k47, k48, k49, k50, k51, k52, k53, k54, k55, k56, k57, k58, k59, k60, k61, k62, k63])
+  data Sum64# a b c d e f g h i j k l m n o p q r s t u v w x y z t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 = ...
   type Sum7# :: forall (k0 :: RuntimeRep) (k1 :: RuntimeRep) (k2 :: RuntimeRep) (k3 :: RuntimeRep) (k4 :: RuntimeRep) (k5 :: RuntimeRep) (k6 :: RuntimeRep). TYPE k0 -> TYPE k1 -> TYPE k2 -> TYPE k3 -> TYPE k4 -> TYPE k5 -> TYPE k6 -> TYPE (SumRep [k0, k1, k2, k3, k4, k5, k6])
   data Sum7# a b c d e f g = ...
   type Sum8# :: forall (k0 :: RuntimeRep) (k1 :: RuntimeRep) (k2 :: RuntimeRep) (k3 :: RuntimeRep) (k4 :: RuntimeRep) (k5 :: RuntimeRep) (k6 :: RuntimeRep) (k7 :: RuntimeRep). TYPE k0 -> TYPE k1 -> TYPE k2 -> TYPE k3 -> TYPE k4 -> TYPE k5 -> TYPE k6 -> TYPE k7 -> TYPE (SumRep [k0, k1, k2, k3, k4, k5, k6, k7])

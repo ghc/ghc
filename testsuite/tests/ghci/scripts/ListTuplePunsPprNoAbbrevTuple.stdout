@@ -1,7 +1,8 @@
-type Tuple :: forall (n :: GHC.TypeNats.Nat).
-              Data.Tuple.Experimental.TupleArgKind (*) n -> *
-type family Tuple ts = r | r -> n ts where
+type Tuple :: forall (n :: GHC.Internal.TypeNats.Nat).
+              Data.Tuple.Experimental.TupleArgKind n -> *
+type family Tuple ts where
     Tuple () = Unit
+    Tuple a = a
     Tuple (a, b) = Tuple2 a b
     Tuple (a, b, c) = Tuple3 a b c
     Tuple (a, b, c, d) = Tuple4 a b c d

@@ -338,6 +338,7 @@ import GHC.Internal.Types
          Sum61#,
          Sum62#,
          Sum63#,
+         Sum64#,
   )
 import GHC.Internal.Prim.Ext
 import GHC.Internal.ArrayArray
