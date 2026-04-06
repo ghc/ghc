@@ -16,7 +16,11 @@ import GHC.Hs
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.ErrCtxt
 
+import GHC.Types.Id.Make
+
 import GHC.Rename.Utils
+
+import qualified GHC.LanguageExtensions as LangExt
 
 {- Note [Typechecking by expansion: overview]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -109,6 +113,23 @@ tcExpand e@(OpApp _ arg1 op arg2)
         , hse_exp  = foldl ap op [arg1,arg2] }
   where
     ap f a = wrapGenSpan (HsApp noExtField f a)
+
+tcExpand e@(SectionR _ op expr)
+  = return $ Just $
+    HSE { hse_ctxt = ExprCtxt e
+        , hse_exp  = wrapGenSpan $ genHsApps rightSectionName [op, expr] }
+
+tcExpand e@(SectionL _ expr op)
+  = do { postfix_ops <- xoptM LangExt.PostfixOperators
+                        -- Note [Left and right sections]
+        ; let ds_section
+                | postfix_ops = HsApp noExtField op expr
+                | otherwise   = genHsApps leftSectionName
+                                   [wrapGenSpan $ HsApp noExtField op expr]
+        ; return $ Just $
+          HSE { hse_ctxt = ExprCtxt e
+              , hse_exp = wrapGenSpan ds_section } }
+
 
 tcExpand (XExpr (ExpandedThingRn hse))
   = return (Just hse)

@@ -50,7 +50,6 @@ import GHC.Unit.Module ( isInteractiveModule )
 
 import GHC.Types.Basic (TypeOrKind (TypeLevel))
 import GHC.Types.FieldLabel
-import GHC.Types.Id.Make
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -722,25 +721,14 @@ rnSection section@(SectionR x op expr)
   = do  { (op', fvs_op)     <- rnLExpr op
         ; (expr', fvs_expr) <- rnLExpr expr
         ; checkSectionPrec InfixR section op' expr'
-        ; let rn_section = SectionR x op' expr'
-              ds_section = genHsApps rightSectionName [op',expr']
-        ; return ( mkExpandedExpr rn_section ds_section
-                 , fvs_op `plusFN` fvs_expr) }
+        ; return $ (SectionR x op' expr' , fvs_op `plusFN`  fvs_expr) }
 
 rnSection section@(SectionL x expr op)
   -- See Note [Left and right sections]
   = do  { (expr', fvs_expr) <- rnLExpr expr
         ; (op', fvs_op)     <- rnLExpr op
         ; checkSectionPrec InfixL section op' expr'
-        ; postfix_ops <- xoptM LangExt.PostfixOperators
-                        -- Note [Left and right sections]
-        ; let rn_section = SectionL x expr' op'
-              ds_section
-                | postfix_ops = HsApp noExtField op' expr'
-                | otherwise   = genHsApps leftSectionName
-                                   [wrapGenSpan $ HsApp noExtField op' expr']
-        ; return ( mkExpandedExpr rn_section ds_section
-                 , fvs_op `plusFN` fvs_expr) }
+        ; return $ (SectionL x expr' op', fvs_op `plusFN` fvs_expr) }
 
 rnSection other = pprPanic "rnSection" (ppr other)
 
