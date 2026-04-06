@@ -557,15 +557,13 @@ isSymbolRdrName n = isSymOcc $ rdrNameOcc n
 
 rdrName2String :: RdrName -> String
 rdrName2String r =
-  case rdrNameExactName_maybe r of
-    Just n  -> name2String n
-    Nothing ->
       case r of
         Unqual occ       -> occNameString occ
         Qual modname occ -> moduleNameString modname ++ "."
                                 ++ occNameString occ
-        Orig _ occ       -> occNameString occ
-        Exact n          -> getOccString n
+        Orig _ occ           -> occNameString occ
+        Exact (ExactOcc occ) -> occNameString occ
+        Exact (ExactName n)  -> name2String n
 
 name2String :: Name -> String
 name2String = showPprUnsafe
