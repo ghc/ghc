@@ -22,7 +22,7 @@ module GHC.Core.Opt.Simplify.Utils (
 
         -- The continuation type
         SimplCont(..), DupFlag(..), FromWhat(..), StaticEnv,
-        isSimplified, contIsStop, contHasArgs,
+        isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs, contIsRhs,
         countArgs, contOutArgs, dropContArgs,
@@ -33,7 +33,7 @@ module GHC.Core.Opt.Simplify.Utils (
         ArgInfo(..), ArgSpec(..), mkArgInfo,
         addValArgTo, addTyArgTo,
         argInfoExpr, argSpecArg,
-        pushSimplifiedArgs, pushArgSpecs,
+        pushArgs, pushArgSpecs,
         isStrictArgInfo, lazyArgContext,
 
         abstractFloats,
@@ -389,13 +389,12 @@ pushArgs _env _dup _fun_ty [] cont
   = cont
 pushArgs env dup fun_ty (arg:args) cont
   | Type ty <- arg
-  = ApplyToType { sc_hole_ty = fun_ty
-                , sc_arg_ty = ty, sc_env = env
-                , sc_cont = pushArgs env dup (piResultTy fun_ty ty) args }
+  = ApplyToTy { sc_hole_ty = fun_ty, sc_arg_ty = ty
+              , sc_cont = pushArgs env dup (piResultTy fun_ty ty) args cont }
   | otherwise
   = ApplyToVal { sc_dup = dup, sc_hole_ty = fun_ty
                , sc_arg = arg, sc_env = env
-               , sc_cont = pushArgs env dup (funResultTy fun_ty) args }
+               , sc_cont = pushArgs env dup (funResultTy fun_ty) args  cont}
 
 pushArgSpecs :: SimplEnvIS  -- Barely needed, since sc_dup = Simplified
              -> [ArgSpec]   -- In normal, forward order
@@ -450,11 +449,6 @@ contIsRhs :: SimplCont -> Maybe RecFlag
 contIsRhs (Stop _ (RhsCtxt is_rec) _) = Just is_rec
 contIsRhs (CastIt { sc_cont = k })    = contIsRhs k   -- For f = e |> co, treat e as Rhs context
 contIsRhs _                           = Nothing
-
--------------------
-contHasArgs (ApplyToTy {})  = True
-contHasArgs (ApplyToVal {}) = True
-contHasArgs _               = False
 
 -------------------
 contIsStop :: SimplCont -> Bool

@@ -2294,11 +2294,12 @@ simplOutExpr :: SimplEnvIS -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutEx
 simplOutExpr env expr cont
   = case fun of
       Var v                    -> simplOutId env v cont'
-      Lam {} | not (null args) -> simplLam env fun cont'  -- We have a beta-redex
+      Lam {} | not (null args) -> simplLam env occ_fun cont'  -- We have a beta-redex
       _                        -> rebuild_go env expr cont
   where
-    (fun, args) <- collectArgs expr
+    (fun, args) = collectArgs expr
     cont' = pushArgs env Simplified (expType fun) args cont
+    occ_fun = occurAnalyseExpr fun  -- ToDo:explain; c.f. Note [Occurrence-analyse after rule firing]
 
 ---------------------------------------------------------
 simplOutId :: SimplEnvIS -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
@@ -2645,18 +2646,18 @@ See Note [No free join points in arityType] in GHC.Core.Opt.Arity
 
 tryRules :: SimplEnv -> [CoreRule]
          -> OutId -> [OutExpr]
-         -> SimplM (Maybe (FullArgCount, CoreExpr))
+         -> SimplM (Maybe (FullArgCount, CoreExpr, [CoreExpr]))
 
 tryRules env rules fn args
-  | Just (rule, rule_rhs) <- lookupRule ropts in_scope_env
-                                        act_fun fn args rules
+  | Just (rule, rule_rhs, rule_args) <- lookupRule ropts in_scope_env
+                                            act_fun fn args rules
   -- Fire a rule for the function
   = do { logger <- getLogger
        ; checkedTick (RuleFired (ruleName rule))
-       ; let occ_anald_rhs = occurAnalyseExpr rule_rhs
-                 -- See Note [Occurrence-analyse after rule firing]
+--       ; let occ_anald_rhs = occurAnalyseExpr rule_rhs
+--                 -- See Note [Occurrence-analyse after rule firing]
        ; dump logger rule rule_rhs
-       ; return (Just (ruleArity rule, occ_anald_rhs)) }
+       ; return (Just (ruleArity rule, rhs_rhs, rule_args)) }
 
   | otherwise  -- No rule fires
   = do { logger <- getLogger

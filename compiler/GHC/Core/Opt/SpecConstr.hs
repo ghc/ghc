@@ -2906,8 +2906,8 @@ betterPat is (CP { cp_qvars = vs1, cp_args = as1 })
              (CP { cp_qvars = vs2, cp_args = as2 })
   | equalLength as1 as2
   = case matchExprs ise vs1 as1 as2 of
-      Just (_, ms) -> all exprIsTrivial ms
-      Nothing      -> False
+      Just (ms,_,_) -> all exprIsTrivial ms
+      Nothing       -> False
 
   | otherwise -- We must handle patterns of unequal length separately (#24282)
   = False  -- For the pattern with more args, the last arg is "interesting"
