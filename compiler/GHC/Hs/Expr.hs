@@ -220,7 +220,9 @@ type instance XRecSel              GhcTc = NoExtField
 -- OverLabel not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
 type instance XOverLabel     GhcPs = SourceText
-type instance XOverLabel     GhcRn = SourceText
+type instance XOverLabel     GhcRn = ( SourceText              -- Needed for pretty printing
+                                     , RebindableSyntaxTable)  -- contains the fromLabel Name
+
 type instance XOverLabel     GhcTc = DataConCantHappen
 
 -- ---------------------------------------------------------------------
@@ -277,7 +279,7 @@ type instance XCase          GhcRn = HsMatchContextRn
 type instance XCase          GhcTc = HsMatchContextRn
 
 type instance XIf            GhcPs = AnnsIf
-type instance XIf            GhcRn = NoExtField
+type instance XIf            GhcRn = RebindableSyntaxTable -- NoRebindable <=> RebindableSyntax is off
 type instance XIf            GhcTc = NoExtField
 
 type instance XMultiIf       GhcPs = (EpToken "if", EpToken "{", EpToken "}")
@@ -293,7 +295,7 @@ type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
 
 type instance XExplicitList  GhcPs = AnnList ()
-type instance XExplicitList  GhcRn = NoExtField
+type instance XExplicitList  GhcRn = RebindableSyntaxTable -- NoRebindable <=> RebindableSyntax is off
 type instance XExplicitList  GhcTc = Type
 -- GhcPs: ExplicitList includes all source-level
 --   list literals, including overloaded ones
@@ -308,7 +310,7 @@ type instance XRecordCon     GhcRn = NoExtField
 type instance XRecordCon     GhcTc = PostTcExpr   -- Instantiated constructor function
 
 type instance XRecordUpd     GhcPs = (Maybe (EpToken "{"), Maybe (EpToken "}"))
-type instance XRecordUpd     GhcRn = NoExtField
+type instance XRecordUpd     GhcRn = RebindableSyntaxTable -- NoRebindable <=> RebindableSyntaxTable is off
 type instance XRecordUpd     GhcTc = DataConCantHappen
   -- We desugar record updates in the typechecker.
   -- See [Handling overloaded and rebindable constructs],
@@ -340,16 +342,16 @@ type instance XLHsRecUpdLabels GhcTc = DataConCantHappen
 type instance XLHsOLRecUpdLabels p = NoExtField
 
 type instance XGetField     GhcPs = NoExtField
-type instance XGetField     GhcRn = NoExtField
+type instance XGetField     GhcRn = RebindableSyntaxTable
 type instance XGetField     GhcTc = DataConCantHappen
--- HsGetField is eliminated by the renamer. See [Handling overloaded
--- and rebindable constructs].
+-- HsGetField is eliminated by the expansion in GHC.Tc.Expand
+-- See [Handling overloaded and rebindable constructs].
 
 type instance XProjection     GhcPs = AnnProjection
-type instance XProjection     GhcRn = NoExtField
+type instance XProjection     GhcRn = RebindableSyntaxTable
 type instance XProjection     GhcTc = DataConCantHappen
--- HsProjection is eliminated by the renamer. See [Handling overloaded
--- and rebindable constructs].
+-- HsProjection is eliminated by the expansion in GHC.Tc.Expand
+-- See [Handling overloaded and rebindable constructs].
 
 type instance XExprWithTySig GhcPs = TokDcolon
 type instance XExprWithTySig GhcRn = NoExtField
@@ -819,7 +821,7 @@ ppr_expr (HsHole x) = case (ghcPass @p, x) of
   (GhcTc, (HoleError, _)) -> pprPrefixOcc unnamedHoleRdrName
 ppr_expr (HsOverLabel s l) = case ghcPass @p of
                GhcPs -> helper s
-               GhcRn -> helper s
+               GhcRn -> helper (fst s)
                GhcTc -> dataConCantHappen s
     where helper s =
             char '#' <> case s of
@@ -1481,6 +1483,15 @@ type instance XXCmd       GhcTc = HsWrap HsCmd
 -- | Command Syntax Table (for Arrow syntax)
 type CmdSyntaxTable p = [(Name, HsExpr p)]
 -- See Note [CmdSyntaxTable]
+
+data RebindableSyntaxTable = NoRebindable | Rebindable [(OccName, Name)]
+-- Stores the names of the operators for rebindable syntax
+-- eg. getField, setField etc.
+-- GHC.Tc.Expand will use these names to build the expansions
+
+isNoRebindable :: RebindableSyntaxTable -> Bool
+isNoRebindable NoRebindable = True
+isNoRebindable Rebindable{} = False
 
 {-
 Note [CmdSyntaxTable]

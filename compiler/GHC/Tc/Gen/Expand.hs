@@ -7,16 +7,33 @@
 
 module GHC.Tc.Gen.Expand( tcExpand ) where
 
-import GHC.Prelude
-
-import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
+import GHC.Prelude hiding (last, init, tail)
+import GHC.Data.FastString
 
 import GHC.Hs
 
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.ErrCtxt
+import GHC.Tc.Gen.Do
+import {-# SOURCE #-} GHC.Tc.Gen.Splice( getUntypedSpliceBody )
+
+import GHC.Types.Name
+import GHC.Types.Name.Reader
+import GHC.Types.Id.Make
+import GHC.Types.SrcLoc
+import GHC.Types.SourceText ( mkIntegralLit , SourceText(..) )
+
+import GHC.Builtin.Names
 
 import GHC.Rename.Utils
+
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+
+import qualified Data.List.NonEmpty as NE ( map, head, (<|) )
+import Data.List.NonEmpty ( NonEmpty(..), init, last, tail )
+
+import qualified GHC.LanguageExtensions as LangExt
 
 {- Note [Typechecking by expansion: overview]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -101,8 +118,39 @@ Wrinkle (TBE1)
 
 -}
 
----------------
+-- See Note [Typechecking by expansion: overview]
 tcExpand :: HsExpr GhcRn -> TcM (Maybe (HsExpansion GhcRn))
+
+------------------------------------------
+-- Overloaded labels
+tcExpand e@(HsOverLabel (_, Rebindable rs_table) v)
+  | Just fromLabelName <- lookup (nameOccName fromLabelClassOpName) rs_table
+  , let hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
+                      HsTyLit noExtField (HsString NoSourceText v)
+  = return $ Just $
+    HSE { hse_ctxt = ExprCtxt e
+        , hse_exp = wrapGenSpan $ HsAppType noExtField (genLHsVar fromLabelName) hs_ty_arg
+        }
+
+  | otherwise
+  = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find fromLabel in rs_table"
+                              , ppr e] )
+
+------------------------------------------
+-- Qualified Literals
+tcExpand e@(HsQualLit _ QualLit{ql_val = ql_val, ql_ext = (L _ fromStringName)})
+  = do { let hsLit = case ql_val of
+                        -- See Note [Implementation of QualifiedStrings]
+                        HsQualString st s -> HsString st s
+       ; return $ Just $
+         HSE { hse_ctxt = ExprCtxt e
+             , hse_exp = wrapGenSpan $ genHsApps fromStringName [genLHsLit hsLit]
+             }
+       }
+
+
+------------------------------------------
+-- Operator Applications
 tcExpand e@(OpApp _ arg1 op arg2)
   = return $ Just $
     HSE { hse_ctxt = ExprCtxt e
@@ -110,14 +158,327 @@ tcExpand e@(OpApp _ arg1 op arg2)
   where
     ap f a = wrapGenSpan (HsApp noExtField f a)
 
-tcExpand (XExpr (ExpandedThingRn hse))
-  = return (Just hse)
+------------------------------------------
+-- If
+
+-- NoRebindable <=> rebindable is turned off
+--             so we typecheck the HsIf in tcExprNoExpand
+tcExpand (HsIf NoRebindable _ _ _ )
+  = return Nothing
+tcExpand e@(HsIf (Rebindable rs_table) p b1 b2)
+  | Just ifThenElseName <- lookup (rdrNameOcc $ mkVarUnqual (fsLit "ifThenElse")) rs_table
+  = return $ Just $
+    HSE { hse_ctxt = ExprCtxt e
+        , hse_exp = wrapGenSpan $ genHsApps ifThenElseName [p, b1, b2]
+        }
+  | otherwise
+  = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find ifThenElse in rs_table"
+                              , ppr e ])
+
+------------------------------------------
+-- Record dot syntax
+
+tcExpand e@(HsGetField (Rebindable rs_table) expr f)
+ | Just getField <- lookup (nameOccName getFieldName) rs_table
+ = return $ Just $
+   HSE { hse_ctxt = ExprCtxt e
+       , hse_exp = wrapGenSpan $ (mkGetField getField expr (fmap (unLoc . dfoLabel) f)) }
+ | otherwise
+ = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField in rs_table"
+                             , ppr e ])
+
+tcExpand e@(HsProjection (Rebindable rs_table) fs)
+ | Just getField <- lookup (nameOccName getFieldName) rs_table
+ , Just circ <- lookup (rdrNameOcc compose_RDR) rs_table
+ = return $ Just $
+   HSE { hse_ctxt = ExprCtxt e
+       , hse_exp = wrapGenSpan $ (mkProjection getField circ $ NE.map (unLoc . dfoLabel) fs) }
+ | otherwise
+ = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField or circ in rs_table"
+                             , ppr e])
+
+
+tcExpand (RecordUpd NoRebindable _ _ ) = return Nothing -- until #27160 is fixed
+
+tcExpand e@(RecordUpd (Rebindable rs_table) (L l expr) (OverloadedRecUpdFields { olRecUpdFields = us}))
+ | Just getField <- lookup (nameOccName getFieldName) rs_table
+ , Just setField <- lookup (nameOccName setFieldName) rs_table
+ = return $ Just $
+   HSE { hse_ctxt = ExprCtxt e
+       , hse_exp = wrapGenSpan $ mkRecordDotUpd getField setField (L l expr) us }
+ | otherwise
+ = pprPanic "tcExpand" (vcat [ text "Should Never Happen: could not find getField or setfield in rs_table"
+                             , ppr e ])
+
+------------------------------------------
+-- Left and Right Sections
+
+tcExpand e@(SectionR _ op expr)
+  -- See Note [Left and right sections]
+  = return $ Just $
+    HSE { hse_ctxt = ExprCtxt e
+        , hse_exp  = wrapGenSpan $ genHsApps rightSectionName [op, expr] }
+
+tcExpand e@(SectionL _ expr op)
+  -- Note [Left and right sections]
+  = do { postfix_ops <- xoptM LangExt.PostfixOperators
+        ; let ds_section
+                | postfix_ops = HsApp noExtField op expr
+                | otherwise   = genHsApps leftSectionName
+                                   [wrapGenSpan $ HsApp noExtField op expr]
+        ; return $ Just $
+          HSE { hse_ctxt = ExprCtxt e
+              , hse_exp = wrapGenSpan ds_section } }
+
+------------------------------------------
+-- Explicit Lists
+
+tcExpand (ExplicitList NoRebindable _ )
+  = return Nothing -- rebindable syntax is off
+tcExpand e@(ExplicitList (Rebindable rs_table) exps)
+  | Just from_list_n_name <- lookup (nameOccName fromListNName) rs_table
+  = do { loc <- getSrcSpanM -- See Note [Source locations for implicit function calls]
+       ; let lit_n    = mkIntegralLit (length exps)
+             hs_lit   = genHsIntegralLit lit_n
+             exp_list = genHsApps' (wrapGenSpan' loc from_list_n_name)
+                           [hs_lit, wrapGenSpan (ExplicitList NoRebindable exps)]
+                                                               -- important to make it NoRebindable
+                                                               -- Or we will go into an infinite loop
+       ; return $ Just $
+         HSE { hse_ctxt = ExprCtxt e
+             , hse_exp = wrapGenSpan $ exp_list }
+       }
+   | otherwise
+   = pprPanic "tcExpand" (vcat [text "Should Never Happen: could not find fromListN in rs_table"
+                               , ppr e] )
+
+
+------------------------------------------
+-- Do statements
+
+tcExpand (HsDo _ do_or_lc stmts)
+  | DoExpr{} <- do_or_lc
+  -- ApplicativeDo are typechecked using tcDoStmts
+  = do isApplicativeDo <- xoptM LangExt.ApplicativeDo
+       if isApplicativeDo
+         then return Nothing -- to be fixed by #24406
+         -- Expand expression on the fly otherwise
+         -- See Note [Typechecking by expansion: overview]
+         else do { hse <- expandDoStmts do_or_lc stmts
+                 ; return (Just hse) }
+  | MDoExpr{} <- do_or_lc
+  = do hse <- expandDoStmts do_or_lc stmts
+       return (Just hse)
+  | otherwise
+  -- ListComp and MonadComp are handled by legacy tcDoStmts for now,
+  -- The ultimate goal is to handle them via expandDoStmts.
+  -- GHCiStmts are handled completely separate
+  = return Nothing
+
+------------------------------------------
+-- Template Haskell Splices
 
 tcExpand e@(HsUntypedSplice splice_res _)
 -- See Note [Looking through Template Haskell splices in splitHsApps]
   = do { fun <- getUntypedSpliceBody splice_res
        ; return $ Just $
-         HSE { hse_ctxt = ExprCtxt e
-             , hse_exp  = wrapGenSpan fun } }
+             HSE { hse_ctxt = ExprCtxt e
+                 , hse_exp  = wrapGenSpan fun }
+       }
 
-tcExpand _ = return Nothing
+------------------------
+-- XExpr
+-- Expansions are idempotent, XExprs do not expand again
+tcExpand (XExpr (ExpandedThingRn hse))
+  = return $ Just hse
+
+tcExpand _ = return $ Nothing
+
+
+
+{- Note [Left and right sections]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Dealing with left sections (x *) and right sections (* x) is
+surprisingly fiddly.  We expand like this
+     (`op` e) ==> rightSection op e
+     (e `op`) ==> leftSection  (op e)
+
+Using an auxiliary function in this way avoids the awkwardness of
+generating a lambda, esp if `e` is a redex, so we *don't* want
+to generate `(\x -> op x e)`. See Historical
+Note [Desugaring operator sections]
+
+Here are their definitions:
+   leftSection :: forall r1 r2 n (a::TYPE r1) (b::TYPE r2).
+                  (a %n-> b) -> a %n-> b
+   leftSection f x = f x
+
+   rightSection :: forall r1 r2 r3 n1 n2 (a::TYPE r1) (b::TYPE r2) (c::TYPE r3).
+                   (a %n1 -> b %n2-> c) -> b %n2-> a %n1-> c
+   rightSection f y x = f x y
+
+Note the wrinkles:
+
+* We do /not/ use lookupSyntaxName, which would make left and right
+  section fall under RebindableSyntax.  Reason: it would be a user-
+  facing change, and there are some tricky design choices (#19354).
+  Plus, infix operator applications would be trickier to make
+  rebindable, so it'd be inconsistent to do so for sections.
+
+  TL;DR: we still use the renamer-expansion mechanism for operator
+  sections, but only to eliminate special-purpose code paths in the
+  renamer and desugarer.
+
+* leftSection and rightSection must be representation-polymorphic, to allow
+  (+# 4#) and (4# +#) to work. See
+  Note [Wired-in Ids for rebindable syntax] in GHC.Types.Id.Make.
+
+* leftSection and rightSection must be multiplicity-polymorphic.
+  (Test linear/should_compile/OldList showed this up.)
+
+* Because they are representation-polymorphic, we have to define them
+  as wired-in Ids, with compulsory inlining.  See
+  GHC.Types.Id.Make.leftSectionId, rightSectionId.
+
+* leftSection is just ($) really; but unlike ($) it is
+  representation-polymorphic in the result type, so we can write
+  `(x +#)`, say.
+
+* The type of leftSection must have an arrow in its first argument,
+  because (x `ord`) should be rejected, because ord does not take two
+  arguments
+
+* It's important that we define leftSection in an eta-expanded way,
+  (i.e. not leftSection f = f), so that
+      (True `undefined`) `seq` ()
+      = (leftSection (undefined True) `seq` ())
+  evaluates to () and not undefined
+
+* If PostfixOperators is ON, then we expand a left section like this:
+      (e `op`)  ==>   op e
+  with no auxiliary function at all.  Simple!
+
+* leftSection and rightSection switch on ImpredicativeTypes locally,
+  during Quick Look; see GHC.Tc.Gen.App.wantQuickLook. Consider
+  test DeepSubsumption08:
+     type Setter st t a b = forall f. Identical f => blah
+     (.~) :: Setter s t a b -> b -> s -> t
+     clear :: Setter a a' b (Maybe b') -> a -> a'
+     clear = (.~ Nothing)
+   The expansion look like (rightSection (.~) Nothing).  So we must
+   instantiate `rightSection` first type argument to a polytype!
+   Hence the special magic in App.wantQuickLook.
+
+Historical Note [Desugaring operator sections]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note explains some historical trickiness in desugaring left and
+right sections.  That trickiness has completely disappeared now that
+we desugar to calls to 'leftSection` and `rightSection`, but I'm
+leaving it here to remind us how nice the new story is.
+
+Desugaring left sections with -XPostfixOperators is straightforward: convert
+(expr `op`) to (op expr).
+
+Without -XPostfixOperators it's a bit more tricky. At first it looks as if we
+can convert
+
+    (expr `op`)
+
+naively to
+
+    \x -> op expr x
+
+But no!  expr might be a redex, and we can lose laziness badly this
+way.  Consider
+
+    map (expr `op`) xs
+
+for example. If expr were a redex then eta-expanding naively would
+result in multiple evaluations where the user might only have expected one.
+
+So we convert instead to
+
+    let y = expr in \x -> op y x
+
+Also, note that we must do this for both right and (perhaps surprisingly) left
+sections. Why are left sections necessary? Consider the program (found in #18151),
+
+    seq (True `undefined`) ()
+
+according to the Haskell Report this should reduce to () (as it specifies
+desugaring via eta expansion). However, if we fail to eta expand we will rather
+bottom. Consequently, we must eta expand even in the case of a left section.
+
+If `expr` is actually just a variable, say, then the simplifier
+will inline `y`, eliminating the redundant `let`.
+
+Note that this works even in the case that `expr` is unlifted. In this case
+bindNonRec will automatically do the right thing, giving us:
+
+    case expr of y -> (\x -> op y x)
+
+See #18151.
+-}
+
+
+
+
+
+-----------------------------------------
+-- Bits and pieces for RecordDotSyntax.
+--
+-- See Note [Overview of record dot syntax] in GHC.Hs.Expr.
+
+-- mkGetField arg field calculates a get_field @field arg expression.
+-- e.g. z.x = mkGetField z x = get_field @x z
+mkGetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
+mkGetField get_field arg field = unLoc (NE.head $ mkGet get_field (arg :| []) field)
+
+-- mkSetField a field b calculates a set_field @field expression.
+-- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' to a on b").
+-- NB: the order of aruments is specified by GHC Proposal 583: HasField redesign.
+mkSetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> LHsExpr GhcRn -> HsExpr GhcRn
+mkSetField set_field a (L _ (FieldLabelString field)) b =
+  genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit field) b) a
+
+mkGet :: Name -> NonEmpty (LHsExpr GhcRn) -> LocatedAn NoEpAnns FieldLabelString -> NonEmpty (LHsExpr GhcRn)
+mkGet get_field l@(r :| _) (L _ (FieldLabelString field)) =
+  wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) NE.<| l
+
+mkSet :: Name -> LHsExpr GhcRn -> (LocatedAn NoEpAnns FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
+mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
+
+-- mkProjection fields calculates a projection.
+-- e.g. .x = mkProjection [x] = getField @"x"
+--      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
+mkProjection :: Name -> Name -> NonEmpty FieldLabelString -> HsExpr GhcRn
+mkProjection getFieldName circName (field :| fields) = foldl' f (proj field) fields
+  where
+    f :: HsExpr GhcRn -> FieldLabelString -> HsExpr GhcRn
+    f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
+
+    proj :: FieldLabelString -> HsExpr GhcRn
+    proj (FieldLabelString f) = genHsVar getFieldName `genAppType` genHsTyLit f
+
+-- mkProjUpdateSetField calculates functions representing dot notation record updates.
+-- e.g. Suppose an update like foo.bar = 1.
+--      We calculate the function \a -> setField @"foo" a (setField @"bar" (getField @"foo" a) 1).
+mkProjUpdateSetField :: Name -> Name -> LHsRecProj GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
+mkProjUpdateSetField get_field set_field (L _ (HsFieldBind { hfbLHS = (L _ (FieldLabelStrings flds')), hfbRHS = arg } ))
+  = let {
+      ; flds = NE.map (fmap (unLoc . dfoLabel)) flds'
+      ; final = last flds  -- quux
+      ; fields = init flds   -- [foo, bar, baz]
+      ; getters = \a -> foldl' (mkGet get_field) (a :| []) fields  -- Ordered from deep to shallow.
+          -- [getField@"baz"(getField@"bar"(getField@"foo" a), getField@"bar"(getField@"foo" a), getField@"foo" a, a]
+      ; zips = \a -> (final, NE.head (getters a)) : zip (reverse fields) (tail (getters a)) -- Ordered from deep to shallow.
+          -- [("quux", getField@"baz"(getField@"bar"(getField@"foo" a)), ("baz", getField@"bar"(getField@"foo" a)), ("bar", getField@"foo" a), ("foo", a)]
+      }
+    in (\a -> foldl' (mkSet set_field) arg (zips a))
+          -- setField@"foo" (a) (setField@"bar" (getField @"foo" (a))(setField@"baz" (getField @"bar" (getField @"foo" (a)))(setField@"quux" (getField @"baz" (getField @"bar" (getField @"foo" (a))))(quux))))
+
+mkRecordDotUpd :: Name -> Name -> LHsExpr GhcRn -> [LHsRecUpdProj GhcRn] -> HsExpr GhcRn
+mkRecordDotUpd get_field set_field exp updates = foldl' fieldUpdate (unLoc exp) updates
+  where
+    fieldUpdate :: HsExpr GhcRn -> LHsRecUpdProj GhcRn -> HsExpr GhcRn
+    fieldUpdate acc lpu =  unLoc $ (mkProjUpdateSetField get_field set_field lpu) (wrapGenSpan acc)

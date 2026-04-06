@@ -141,9 +141,8 @@ rnTypedBracket e br_body
        ; recordThUse
 
        ; traceRn "Renaming typed TH bracket" empty
-       ; (body', fvs_e) <- setThLevel (Brack cur_level RnPendingTyped) $ rnLExpr br_body
-       ; return (HsTypedBracket noExtField body', fvs_e)
-
+       ; (body, fvs_e) <- setThLevel (Brack cur_level RnPendingTyped) $ rnLExpr br_body
+       ; return (HsTypedBracket noExtField body, fvs_e)
        }
 
 rnUntypedBracket :: HsExpr GhcPs -> HsQuote GhcPs -> RnM (HsExpr GhcRn, FreeNames)
@@ -176,6 +175,7 @@ rnUntypedBracket e br_body
          setThLevel (UntypedBrack cur_level ps_var) $
                   rn_utbracket br_body
        ; pendings <- readMutVar ps_var
+
        ; return (HsUntypedBracket pendings body', fvs_e)
 
        }
