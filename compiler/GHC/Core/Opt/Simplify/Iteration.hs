@@ -2269,7 +2269,7 @@ simplInId :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplInId env var cont
   | Just dc <- isDataConWorkId_maybe var
   , isLazyDataConRep dc                    -- See Note [Fast path for lazy data constructors]
-  = rebuild zapped_env (Var var) cont
+  = rebuild_go zapped_env (Var var) cont
   | otherwise
   = case substId env var of
       ContEx tvs cvs ids e -> simplExprF env' e cont
@@ -2282,11 +2282,23 @@ simplInId env var cont
         where
           cont' = trimJoinCont out_id (idJoinPointHood out_id) cont
 
-      DoneEx e mb_join -> simplExprF zapped_env e cont'
+      DoneEx e mb_join -> simplOutExpr zapped_env e cont'
         where
           cont' = trimJoinCont var mb_join cont
   where
     zapped_env =  zapSubstEnv env  -- See Note [zapSubstEnv]
+
+
+---------------------------------------------------------
+simplOutExpr :: SimplEnvIS -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
+simplOutExpr env expr cont
+  = case fun of
+      Var v                    -> simplOutId env v cont'
+      Lam {} | not (null args) -> simplLam env fun cont'  -- We have a beta-redex
+      _                        -> rebuild_go env expr cont
+  where
+    (fun, args) <- collectArgs expr
+    cont' = pushArgs env Simplified (expType fun) args cont
 
 ---------------------------------------------------------
 simplOutId :: SimplEnvIS -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
@@ -2338,7 +2350,7 @@ simplOutId env fun cont
 
        ; let rr'   = getRuntimeRep new_runrw_res_ty
              call' = mkApps (Var fun) [mkTyArg rr', mkTyArg new_runrw_res_ty, arg']
-       ; rebuild env call' outer_cont }
+       ; rebuild_go env call' outer_cont }
 
 -- Normal case for (f e1 .. en)
 simplOutId env fun cont
@@ -2351,8 +2363,9 @@ simplOutId env fun cont
                      then tryRules env rules_for_me fun out_args
                      else return Nothing
        ; case mb_match of {
-             Just (rule_arity, rhs) -> simplExprF env rhs $
-                                       dropContArgs rule_arity cont ;
+             Just (rule_arity, rhs, rhs_args ) -> simplExprF env rhs $
+                                                  pushArgs env NoDup rhs_args $
+                                                  dropContArgs rule_arity cont ;
              Nothing ->
 
     -- Try inlining
@@ -2444,8 +2457,10 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules })
   = do { let args = reverse rev_args
        ; mb_match <- tryRules env rules fun (map argSpecArg args)
        ; case mb_match of
-           Just (rule_arity, rhs) -> simplExprF env rhs $
-                                     pushSimplifiedArgs env (drop rule_arity args) cont
+           Just (rule_arity, rhs, rhs_args)
+             -> simplExprF env rhs $
+                pushArgs env Simplified rhs_args $
+                pushArgSpecs env (drop rule_arity args) cont
            Nothing -> rebuild env (argInfoExpr fun rev_args) cont }
 
 -----------------------------------
@@ -2707,10 +2722,11 @@ trySeqRules in_env scrut rhs cont
        ; let seq_rules = getRules rule_base seqId
        ; mb_match <- tryRules in_env seq_rules seqId out_args
        ; case mb_match of
-            Nothing                -> return Nothing
-            Just (rule_arity, rhs) -> return (Just (rhs, cont'))
+            Nothing                          -> return Nothing
+            Just (rule_arity, rhs, rhs_args) -> return (Just (rhs, cont'))
                 where
-                  cont' = pushSimplifiedArgs in_env (drop rule_arity out_arg_specs) rule_cont
+                  cont' = pushArgs in_env Simplified rhs_args $
+                          pushArgSpecs in_env (drop rule_arity out_arg_specs) rule_cont
        }
   where
     no_cast_scrut = drop_casts scrut
@@ -3218,7 +3234,7 @@ reallyRebuildCase env scrut case_bndr alts cont
                             --    Note [Case-of-case and full laziness]
   = do { case_expr <- simplAlts env scrut case_bndr alts
                                 (mkBoringStop (contHoleType cont))
-       ; rebuild (zapSubstEnv env) case_expr cont }
+       ; rebuild env case_expr cont }
 
   | otherwise
   = do { (floats, env', cont') <- mkDupableCaseCont env alts cont

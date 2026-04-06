@@ -22,7 +22,7 @@ module GHC.Core.Opt.Simplify.Utils (
 
         -- The continuation type
         SimplCont(..), DupFlag(..), FromWhat(..), StaticEnv,
-        isSimplified, contIsStop,
+        isSimplified, contIsStop, contHasArgs,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs, contIsRhs,
         countArgs, contOutArgs, dropContArgs,
@@ -33,7 +33,7 @@ module GHC.Core.Opt.Simplify.Utils (
         ArgInfo(..), ArgSpec(..), mkArgInfo,
         addValArgTo, addTyArgTo,
         argInfoExpr, argSpecArg,
-        pushSimplifiedArgs,
+        pushSimplifiedArgs, pushArgSpecs,
         isStrictArgInfo, lazyArgContext,
 
         abstractFloats,
@@ -384,16 +384,29 @@ isStrictArgInfo (ArgInfo { ai_dmds = dmds })
   | dmd:_ <- dmds = isStrUsedDmd dmd
   | otherwise     = False
 
-pushSimplifiedArgs :: SimplEnv
-                   -> [ArgSpec]   -- In normal, forward order
-                   -> SimplCont -> SimplCont
-pushSimplifiedArgs env args cont = foldr (pushSimplifiedArg env) cont args
+pushArgs :: SimplEnvIS -> DupFlag -> Type -> [OutExpr] -> SimplCont -> SimplCont
+pushArgs _env _dup _fun_ty [] cont
+  = cont
+pushArgs env dup fun_ty (arg:args) cont
+  | Type ty <- arg
+  = ApplyToType { sc_hole_ty = fun_ty
+                , sc_arg_ty = ty, sc_env = env
+                , sc_cont = pushArgs env dup (piResultTy fun_ty ty) args }
+  | otherwise
+  = ApplyToVal { sc_dup = dup, sc_hole_ty = fun_ty
+               , sc_arg = arg, sc_env = env
+               , sc_cont = pushArgs env dup (funResultTy fun_ty) args }
+
+pushArgSpecs :: SimplEnvIS  -- Barely needed, since sc_dup = Simplified
+             -> [ArgSpec]   -- In normal, forward order
+             -> SimplCont -> SimplCont
+pushArgSpecs env args cont = foldr (pushArgSpec env) cont args
 -- pushSimplifiedRevArgs env args cont = foldl' (\k a -> pushSimplifiedArg env a k) cont args
 
-pushSimplifiedArg :: SimplEnv -> ArgSpec -> SimplCont -> SimplCont
-pushSimplifiedArg _env (TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }) cont
+pushArgSpec :: SimplEnvIS -> ArgSpec -> SimplCont -> SimplCont
+pushArgSpec _env (TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }) cont
   = ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont }
-pushSimplifiedArg env (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
+pushArgSpec env (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
   = ApplyToVal { sc_arg = arg, sc_env = env, sc_dup = Simplified
                  -- The SubstEnv will be ignored since sc_dup=Simplified
                , sc_hole_ty = hole_ty, sc_cont = cont }
@@ -437,6 +450,11 @@ contIsRhs :: SimplCont -> Maybe RecFlag
 contIsRhs (Stop _ (RhsCtxt is_rec) _) = Just is_rec
 contIsRhs (CastIt { sc_cont = k })    = contIsRhs k   -- For f = e |> co, treat e as Rhs context
 contIsRhs _                           = Nothing
+
+-------------------
+contHasArgs (ApplyToTy {})  = True
+contHasArgs (ApplyToVal {}) = True
+contHasArgs _               = False
 
 -------------------
 contIsStop :: SimplCont -> Bool
