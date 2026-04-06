@@ -1316,6 +1316,13 @@ cross_jobs = [
           -- unexpected triple.
         . setVariable "CFLAGS" cflags
         . setVariable "CONF_CC_OPTS_STAGE2" cflags
+          -- For bindists `$USER_CONF_CC_OPTS_STAGE2` is not automatically set
+          -- to `$CONF_CC_OPTS_STAGE2`. But, we still have to deal with the hack
+          -- mentioned in the previous comment.
+          --
+          -- TODO: It would be nice to get rid of this hack. This would probably
+          -- involve setting the toolchain up in a different way.
+        . setVariable "USER_CONF_CC_OPTS_STAGE2" cflags
         ) where
             llvm_prefix = "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-"
             cflags = "-fuse-ld=" ++ llvm_prefix ++ "ld --rtlib=compiler-rt"

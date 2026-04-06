@@ -331,6 +331,7 @@
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
       "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate",
+      "USER_CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
       "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres"
     }
   },
@@ -412,6 +413,7 @@
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
       "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
+      "USER_CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
       "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres"
     }
   },
@@ -1123,6 +1125,7 @@
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
       "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate",
+      "USER_CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
       "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres",
       "XZ_OPT": "-9"
     }
@@ -1205,6 +1208,7 @@
       "STRINGS": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strings",
       "STRIP": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-strip",
       "TEST_ENV": "aarch64-linux-deb12-wine-int_native-cross_aarch64-unknown-mingw32-validate+llvm",
+      "USER_CONF_CC_OPTS_STAGE2": "-fuse-ld=/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-ld --rtlib=compiler-rt",
       "WindresCmd": "/opt/llvm-mingw-linux/bin/aarch64-w64-mingw32-windres",
       "XZ_OPT": "-9"
     }
