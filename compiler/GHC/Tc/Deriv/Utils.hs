@@ -82,16 +82,6 @@ import GHC.Data.List.SetOps (assocMaybe)
 
 {- *********************************************************************
 *                                                                      *
-        Small utitilties to construct syntax trees
-*                                                                      *
-********************************************************************* -}
-
-nlHsCompose :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
-nlHsCompose x y = compose_RDR `nlHsApps` [x, y]
-
-
-{- *********************************************************************
-*                                                                      *
         The DerivM monad and its DerivEnv environment
 *                                                                      *
 ********************************************************************* -}

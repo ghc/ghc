@@ -23,7 +23,6 @@ import GHC.Prelude hiding (head, init, last, tail)
 import GHC.Hs
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Deriv.Generate
-import GHC.Tc.Deriv.RdrNames
 import GHC.Tc.Deriv.Functor
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Instantiate( newFamInst )
@@ -48,6 +47,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set (elemVarSet)
 
+import GHC.Builtin.RdrNames
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Builtin.Names
