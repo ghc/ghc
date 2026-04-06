@@ -2,11 +2,11 @@ RecordDotSyntaxFail8.hs:47:17: error: [GHC-39999]
     • No instance for ‘HasField "quux1" Quux Quux’
         arising from selecting the field ‘quux1’
       NB: ‘HasField’ is not the built-in ‘GHC.Internal.Records.HasField’ class.
-    • In the second argument of ‘($)’, namely ‘....bar.baz.quux1’
-      In a stmt of a 'do' block: print @Quux $ ....baz.quux1
+    • In the second argument of ‘($)’, namely ‘a.foo.bar.baz.quux1’
+      In a stmt of a 'do' block: print @Quux $ a.foo.bar.baz.quux1
       In the expression:
         do let a = Foo {foo = ...}
-           print @Quux $ ....quux1
+           print @Quux $ ....bar.baz.quux1
            let b = myQuux
            print @Quux $ b.quux2
            let c = Foo {foo = ...}
@@ -20,7 +20,7 @@ RecordDotSyntaxFail8.hs:50:17: error: [GHC-39999]
       In a stmt of a 'do' block: print @Quux $ b.quux2
       In the expression:
         do let a = Foo {foo = ...}
-           print @Quux $ ....quux1
+           print @Quux $ ....bar.baz.quux1
            let b = myQuux
            print @Quux $ b.quux2
            let c = Foo {foo = ...}
@@ -30,11 +30,11 @@ RecordDotSyntaxFail8.hs:53:17: error: [GHC-39999]
     • No instance for ‘HasField "quux3" Quux r0’
         arising from selecting the field ‘quux3’
       NB: ‘HasField’ is not the built-in ‘GHC.Internal.Records.HasField’ class.
-    • In the second argument of ‘($)’, namely ‘....baz.quux3.wob’
-      In a stmt of a 'do' block: print @Bool $ ....quux3.wob
+    • In the second argument of ‘($)’, namely ‘a.foo.bar.baz.quux3.wob’
+      In a stmt of a 'do' block: print @Bool $ a.foo.bar.baz.quux3.wob
       In the expression:
         do let a = Foo {foo = ...}
-           print @Quux $ ....quux1
+           print @Quux $ ....bar.baz.quux1
            let b = myQuux
            print @Quux $ b.quux2
            let c = Foo {foo = ...}

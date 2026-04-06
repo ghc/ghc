@@ -1087,7 +1087,7 @@ tcPatToExpr args pat = go pat
     go1 (ParPat _ pat) = fmap (HsPar noExtField) (go pat)
     go1 (ListPat _ pats)
       = do { exprs <- mapM go pats
-           ; return $ ExplicitList noExtField exprs }
+           ; return $ ExplicitList NoRebindable exprs }
     go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
                                          ; return $ ExplicitTuple noExtField
                                            (map (Present noExtField) exprs) box }

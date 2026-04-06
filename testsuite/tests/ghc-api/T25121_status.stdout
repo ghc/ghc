@@ -45,8 +45,10 @@ X(ExprWithTySig) mismatch
   <<< EpUniToken "::" "\8759"
 X(UntypedSplice) mismatch
   >>> HsUntypedSpliceResult (HsExpr (GhcPass 'Renamed))
-  <<< HsUntypedSpliceResult (GenLocated (EpAnn [TrailingAnn]) (HsType (GhcPass 'Renamed)))
-X(ExplicitList) match = NoExtField
+  <<< HsUntypedSpliceResult (GenLocated (EpAnn AnnListItem) (HsType (GhcPass 'Renamed)))
+X(ExplicitList) mismatch
+  >>> RebindableSyntaxTable
+  <<< NoExtField
 X(ExplicitTuple) match = NoExtField
 X(Hole) match = HoleKind
 
