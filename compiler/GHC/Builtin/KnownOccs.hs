@@ -151,7 +151,7 @@ foldrListIdOcc       = mkVarOcc "foldrList"
 
 guardMIdOcc, mfixIdOcc, joinMIdOcc, mzipIdOcc, apAClassOpOcc, failMClassOpOcc, fmapClassOpOcc,
   fromIntegerClassOpOcc,
-  fromRationalClassOpOcc, mkRationalBase2IdOcc, mkRationalBase10IdOcc :: KnownOcc
+  fromRationalClassOpOcc, mkRationalBase2IdOcc, mkRationalBase10IdOcc, ifThenElseIdOcc:: KnownOcc
 guardMIdOcc            = mkVarOcc "guard"
 mfixIdOcc              = mkVarOcc "mfix"
 joinMIdOcc             = mkVarOcc "join"
@@ -163,6 +163,7 @@ fromIntegerClassOpOcc  = mkVarOcc "fromInteger"
 fromRationalClassOpOcc = mkVarOcc "fromRational"
 mkRationalBase2IdOcc   = mkVarOcc "mkRationalBase2"
 mkRationalBase10IdOcc  = mkVarOcc "mkRationalBase10"
+ifThenElseIdOcc        = mkVarOcc "ifThenElse"
 
 -- Some known-occ data types and their constructors
 eitherTyConOcc, leftDataConOcc, rightDataConOcc, voidTyConOcc, rationalTyConOcc,
