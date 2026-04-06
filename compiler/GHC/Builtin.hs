@@ -14,9 +14,10 @@
 --
 --  * given a 'Unique', looking up its corresponding known-key 'Name'
 --
--- See Note [Known-key names] and Note [Oerview of wired-in things] for information
--- about the two types of prelude things in GHC.
---
+-- See Note [Overview of known-key entities]
+-- and Note [Overview of wired-in things] for information
+-- about the types of "known" things in GHC.
+
 module GHC.Builtin (
         -- * Main exports
         wiredInNames, wiredInIds, ghcPrimIds,
@@ -386,6 +387,12 @@ Note [Overview of wired-in things]
 
 * GHC.Iface.Make prunes out wired-in things before putting them in an interface file.
   So interface files never contain wired-in things.
+
+See also
+  - Note [Drop wired-in things] in GHC.Iface.Tidy
+  - Note [Loading instances for wired-in things] in GHC.Iface.Load
+  - Note [Related uniques for wired-in things] in GHC.Builtin.Uniques
+  - Note [Declarations for wired-in things] in GHC.Tc.TyCl
 -}
 
 -- | This list is used to ensure that when you say "Prelude.map" in your source
