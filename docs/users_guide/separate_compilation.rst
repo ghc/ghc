@@ -1656,7 +1656,7 @@ defined in the libraries ``ghc-internal`` or ``base``.  These include the classe
 ``Num``, ``Show``, etc, the types ``Rational``, ``Ratio`` etc, and much
 more.  These entities have so-called "known-key" names.
 
-You can read ``Note [Overview of known-key names]`` in GHC's source code
+You can read ``Note [Overview of known-key entities]`` in GHC's source code
 to understand more.  The behaviour of known-key names is controlled by two
 flags:
 
@@ -1681,4 +1681,10 @@ flags:
     called "Rational" in this module is *the* known-key ``Rational`` and not
     some other random type or class that happens to be called "Rational".
 
+.. ghc-flag:: -fexclude-known-key-define=(name)
+    :shortdesc: Do not treat a definition of (name) as a definition of a known-key entity
+    :type: dynamic
+    :category:
+
+    You can use this flag multiple times to excludes several names.
 
