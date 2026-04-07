@@ -668,10 +668,12 @@ stableNameCmp (Name { n_sort = s1, n_occ = occ1 })
     -- The ordinary compare on OccNames is lexicographic
   where
     -- Later constructors are bigger
+    -- Compare External and KnownKey solely module
     sort_cmp (External m1) (External m2)       = m1 `stableModuleCmp` m2
+    sort_cmp (External m1) (KnownKey m2)       = m1 `stableModuleCmp` m2
     sort_cmp (External {}) _                   = LT
 
-    sort_cmp (KnownKey {})   (External {})     = GT
+    sort_cmp (KnownKey m1)   (External m2)     = m1 `stableModuleCmp` m2
     sort_cmp (KnownKey m1)   (KnownKey m2)     = m1 `stableModuleCmp` m2
     sort_cmp (KnownKey {})   _                 = LT
 
