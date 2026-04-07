@@ -476,7 +476,10 @@ static  :: { CmmParse [CmmStatic] }
                 { do { lits <- sequence $4
                 ; profile <- getProfile
                      ; return $ map CmmStaticLit $
-                        mkStaticClosure profile (mkForeignLabel $3 ForeignLabelInExternalPackage IsData)
+                        mkStaticClosure profile
+                                        (mkForeignLabel $3
+                                           ForeignLabelInExternalPackage
+                                           ForeignLabelIsData)
                          -- mkForeignLabel because these are only used
                          -- for CHARLIKE and INTLIKE closures in the RTS.
                         dontCareCCS (map getLit lits) [] [] [] [] } }
@@ -646,11 +649,13 @@ importName
         -- A label imported without an explicit packageId.
         --      These are taken to come from some foreign, unnamed package.
         : NAME
-        { ($1, mkForeignLabel $1 ForeignLabelInExternalPackage IsFunction) }
+        { ($1, mkForeignLabel $1 ForeignLabelInExternalPackage
+                                 ForeignLabelIsFunction) }
 
-        -- as previous 'NAME', but 'IsData'
+        -- as previous 'NAME', but 'ForeignLabelIsData'
         | 'CLOSURE' NAME
-        { ($2, mkForeignLabel $2 ForeignLabelInExternalPackage IsData) }
+        { ($2, mkForeignLabel $2 ForeignLabelInExternalPackage
+                                 ForeignLabelIsData) }
 
         -- A label imported with an explicit UnitId.
         | STRING NAME
@@ -754,7 +759,9 @@ expr_or_unknown
                 { do e <- $1; return (Just e) }
 
 foreignLabel     :: { CmmParse CmmExpr }
-        : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 ForeignLabelInThisPackage IsFunction))) }
+        : NAME                          { return . CmmLit . CmmLabel $
+                                            mkForeignLabel $1 ForeignLabelInThisPackage
+                                                              ForeignLabelIsFunction }
 
 opt_never_returns :: { CmmReturnInfo }
         :                               { CmmMayReturn }

@@ -143,7 +143,7 @@ module GHC.Cmm.CLabel (
 import GHC.Prelude
 
 import GHC.Types.Id.Info
-import GHC.Types.ForeignCall (FunctionOrData(..))
+import GHC.Types.ForeignCall (ForeignLabelIsFunctionOrData(..))
 import {-# SOURCE #-} GHC.Cmm.BlockId (BlockId, mkBlockId)
 import GHC.Unit.Types
 import GHC.Types.Name
@@ -240,7 +240,7 @@ data CLabel
 
         ForeignLabelSource      -- ^ what package the foreign label is in.
 
-        FunctionOrData
+        ForeignLabelIsFunctionOrData
 
   -- | Local temporary label used for native (or LLVM) code generation; must not
   -- appear outside of these contexts. Use primarily for debug information
@@ -657,7 +657,7 @@ mkDirty_MUT_VAR_Label,
     mkSMAP_DIRTY_infoLabel, mkBadAlignmentLabel,
     mkOutOfBoundsAccessLabel, mkMemcpyRangeOverlapLabel,
     mkMUT_VAR_CLEAN_infoLabel :: CLabel
-mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") ForeignLabelInExternalPackage IsFunction
+mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") ForeignLabelInExternalPackage ForeignLabelIsFunction
 mkNonmovingWriteBarrierEnabledLabel
                                 = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "nonmoving_write_barrier_enabled") CmmData
 mkOrigThunkInfoLabel            = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_orig_thunk_info_frame") CmmInfo
@@ -675,8 +675,8 @@ mkSMAP_FROZEN_CLEAN_infoLabel   = CmmLabel rtsUnitId (NeedExternDecl False) (fsL
 mkSMAP_FROZEN_DIRTY_infoLabel   = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
 mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
 mkBadAlignmentLabel             = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_badAlignment")      CmmEntry
-mkOutOfBoundsAccessLabel        = mkForeignLabel (fsLit "rtsOutOfBoundsAccess") ForeignLabelInExternalPackage IsFunction
-mkMemcpyRangeOverlapLabel       = mkForeignLabel (fsLit "rtsMemcpyRangeOverlap") ForeignLabelInExternalPackage IsFunction
+mkOutOfBoundsAccessLabel        = mkForeignLabel (fsLit "rtsOutOfBoundsAccess") ForeignLabelInExternalPackage ForeignLabelIsFunction
+mkMemcpyRangeOverlapLabel       = mkForeignLabel (fsLit "rtsMemcpyRangeOverlap") ForeignLabelInExternalPackage ForeignLabelIsFunction
 mkMUT_VAR_CLEAN_infoLabel       = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_MUT_VAR_CLEAN")     CmmInfo
 
 mkSRTInfoLabel :: Int -> CLabel
@@ -761,7 +761,7 @@ mkPrimCallLabel (PrimCall str pkg)
 mkForeignLabel
         :: FastString           -- name
         -> ForeignLabelSource   -- what package it's in
-        -> FunctionOrData
+        -> ForeignLabelIsFunctionOrData
         -> CLabel
 
 mkForeignLabel = ForeignLabel
@@ -1226,8 +1226,8 @@ labelType (RtsLabel (RtsPrimOp _))              = CodeLabel
 labelType (RtsLabel (RtsSlowFastTickyCtr _))    = DataLabel
 labelType (LocalBlockLabel _)                   = CodeLabel
 labelType (SRTLabel _)                          = DataLabel
-labelType (ForeignLabel _ _ IsFunction)         = CodeLabel
-labelType (ForeignLabel _ _ IsData)             = DataLabel
+labelType (ForeignLabel _ _ ForeignLabelIsFunction) = CodeLabel
+labelType (ForeignLabel _ _ ForeignLabelIsData)     = DataLabel
 labelType (AsmTempLabel _)                      = panic "labelType(AsmTempLabel)"
 labelType (AsmTempDerivedLabel _ _)             = panic "labelType(AsmTempDerivedLabel)"
 labelType (StringLitLabel _)                    = DataLabel

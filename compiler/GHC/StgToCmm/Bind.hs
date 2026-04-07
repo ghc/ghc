@@ -863,7 +863,8 @@ link_caf node = do
         -- Call the RTS function newCAF, returning the newly-allocated
         -- blackhole indirection closure
   ; let newCAF_lbl = mkForeignLabel (fsLit "newCAF")
-                                    ForeignLabelInExternalPackage IsFunction
+                                    ForeignLabelInExternalPackage
+                                    ForeignLabelIsFunction
   ; let profile  = stgToCmmProfile cfg
   ; let platform = profilePlatform profile
   ; bh <- newTemp (bWord platform)
