@@ -2496,16 +2496,6 @@ instance Binary LeftOrRight where
                    0 -> return CLeft
                    _ -> return CRight }
 
-instance Binary FunctionOrData where
-    put_ bh IsFunction = putByte bh 0
-    put_ bh IsData     = putByte bh 1
-    get bh = do
-        h <- getByte bh
-        case h of
-          0 -> return IsFunction
-          1 -> return IsData
-          _ -> panic "Binary FunctionOrData"
-
 instance Binary CbvMark where
     put_ bh NotMarkedCbv = putByte bh 0
     put_ bh MarkedCbv    = putByte bh 1

@@ -39,7 +39,6 @@ import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.RepType
 import GHC.Types.ForeignCall
-import GHC.Types.Basic
 
 import GHC.Unit.Module
 
