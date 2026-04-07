@@ -10,6 +10,7 @@
 module GHC.Core.Rules (
         -- ** Looking up rules
         RuleMatch(..), lookupRule, matchExprs, ruleLhsIsMoreSpecific,
+        BindWrapper, isEmptyBindWrapper, applyBindWrapper,
 
         -- ** RuleBase, RuleEnv
         RuleBase, RuleEnv(..), mkRuleEnv, emptyRuleEnv,
@@ -88,6 +89,7 @@ import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.Bag
+import GHC.Data.OrdList
 import GHC.Data.List.SetOps( hasNoDups )
 
 import GHC.Utils.Misc as Utils
@@ -590,7 +592,7 @@ lookupRule opts rule_env@(ISE in_scope _) is_active fn args rules
     go ms [] = ms
     go ms (r:rs)
       | Just rm <- matchRule opts rule_env is_active fn args' rough_args r
-      = go (rm { rm_binds = mkTicks ticks . rm_binds rm } : ms) rs
+      = go (rm { rm_binds = mkTicks ticks `consOL` rm_binds rm } : ms) rs
       | otherwise
       = -- pprTrace "match failed" (ppr r $$ ppr args $$
         --   ppr [ (arg_id, maybeUnfoldingTemplate unf)
@@ -745,7 +747,7 @@ matchRule opts rule_env _is_active fn args _rough_args
        ; return (RM { rm_rule = rule
                     , rm_rhs = rhs
                     , rm_args = []
-                    , rm_binds = id
+                    , rm_binds = emptyBindWrapper
                     , rm_bndrs = [] }) }
 
 matchRule _opts rule_env is_active _fn target_es rough_args
@@ -967,13 +969,23 @@ data RuleSubst = RS { -- Substitution; applied only to the template, not the tar
                     , rs_bndrs    :: [Var]        -- Variables bound by floated lets
                     }
 
-type BindWrapper = CoreExpr -> CoreExpr
+type BindWrapper = OrdList (CoreExpr -> CoreExpr)
   -- See Notes [Matching lets] and [Matching cases]
   -- we represent the floated bindings as a core-to-core function
+  -- WE use an OrdList so that we can tell the common case of an empty wrapper
+
+emptyBindWrapper :: BindWrapper
+emptyBindWrapper = nilOL
+
+isEmptyBindWrapper :: BindWrapper -> Bool
+isEmptyBindWrapper = isNilOL
+
+applyBindWrapper :: BindWrapper -> CoreExpr -> CoreExpr
+applyBindWrapper bw e = foldrOL ($) e bw
 
 emptyRuleSubst :: RuleSubst
 emptyRuleSubst = RS { rs_tv_subst = emptyVarEnv, rs_id_subst = emptyVarEnv
-                    , rs_binds = \e -> e, rs_bndrs = [] }
+                    , rs_binds = nilOL, rs_bndrs = [] }
 
 
 {- Note [Casts in the target]
@@ -1109,7 +1121,7 @@ match renv subst e1 (Tick t e2) mco
   | otherwise
   = Nothing
   where
-    subst' = subst { rs_binds = rs_binds subst . mkTick t }
+    subst' = subst { rs_binds = rs_binds subst `snocOL` mkTick t }
 
 match renv subst e@(Tick t e1) e2 mco
   | tickishFloatable t  -- Ignore floatable ticks in rule template.
@@ -1343,7 +1355,7 @@ match renv subst e1 (Let bind e2) mco
                 -- We are floating the let-binding out, as if it had enclosed
                 -- the entire target from Day 1.  So we must add its binders to
                 -- the in-scope set (#20200)
-          (subst { rs_binds = rs_binds subst . Let bind'
+          (subst { rs_binds = rs_binds subst `snocOL` Let bind'
                  , rs_bndrs = new_bndrs ++ rs_bndrs subst })
           e1 e2 mco
   | otherwise
@@ -1369,7 +1381,7 @@ match renv subst (Lam x1 e1) e2 mco
   , Just (x2, e2', ts) <- exprIsLambda_maybe in_scope_env casted_e2
     -- See Note [Lambdas in the template]
   = let renv'  = rnMatchBndr2 renv x1 x2
-        subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
+        subst' = subst { rs_binds = rs_binds subst `snocOL` flip (foldr mkTick) ts }
     in  match renv' subst' e1 e2' MRefl
 
 match renv subst e1 e2@(Lam {}) mco
@@ -1434,11 +1446,11 @@ match _ _ _e1 _e2 _mco = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (
 eta_reduce :: RuleMatchEnv -> CoreExpr -> Maybe (RuleMatchEnv, CoreExpr)
 -- See Note [Eta reduction in the target]
 eta_reduce renv e@(Lam {})
-  = go renv id [] e
+  = go renv emptyBindWrapper [] e
   where
     go :: RuleMatchEnv -> BindWrapper -> [Var] -> CoreExpr
        -> Maybe (RuleMatchEnv, CoreExpr)
-    go renv bw vs (Let b e) = go renv (bw . Let b) vs e
+    go renv bw vs (Let b e) = go renv (bw `snocOL` Let b) vs e
 
     go renv bw vs (Lam v e) = go renv' bw (v':vs) e
       where
@@ -1453,7 +1465,7 @@ eta_reduce renv e@(Lam {})
       , v == rnOccR (rv_lcl renv) tv
       = go renv bw vs f
 
-    go renv bw []    e = Just (renv, bw e)
+    go renv bw []    e = Just (renv, applyBindWrapper bw e)
     go _    _  (_:_) _ = Nothing
 
 eta_reduce _ _ = Nothing

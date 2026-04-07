@@ -40,7 +40,8 @@ import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo {- exprsFreeIds -} )
-import GHC.Core.Rules   ( lookupRule, getRules )
+import GHC.Core.Rules   ( RuleMatch(..), applyBindWrapper, isEmptyBindWrapper
+                        , lookupRule, getRules )
 import GHC.Core.Multiplicity
 
 import GHC.Hs.Extension
@@ -2298,7 +2299,7 @@ simplOutExpr env expr cont
       _                        -> rebuild_go env expr cont
   where
     (fun, args) = collectArgs expr
-    cont' = pushArgs env Simplified (expType fun) args cont
+    cont' = pushArgs env Simplified (exprType fun) args cont
     occ_fun = occurAnalyseExpr fun  -- ToDo:explain; c.f. Note [Occurrence-analyse after rule firing]
 
 ---------------------------------------------------------
@@ -2364,10 +2365,14 @@ simplOutId env fun cont
                      then tryRules env rules_for_me fun out_args
                      else return Nothing
        ; case mb_match of {
-             Just (rule_arity, rhs, rhs_args ) -> simplExprF env rhs $
-                                                  pushArgs env NoDup rhs_args $
-                                                  dropContArgs rule_arity cont ;
-             Nothing ->
+             Just (RM { rm_rule = rule, rm_rhs = rhs
+                      , rm_args = rhs_args, rm_binds = wrap })
+                  -> simplExprF env rhs' $
+                     dropContArgs (ruleArity rule) cont
+                  where
+                    rhs' = applyBindWrapper wrap $
+                           mkApps rhs rhs_args
+           ; Nothing ->
 
     -- Try inlining
     do { logger <- getLogger
@@ -2451,18 +2456,15 @@ rebuildCall env fun_info
         ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
 
 ---------- No further useful info, revert to generic rebuild ------------
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_arg_specs, ai_rules = rules }) cont
   | null rules
-  = rebuild env (argInfoExpr fun rev_args) cont
+  = rebuild env (argInfoExpr fun rev_arg_specs) cont
   | otherwise  -- Try rules again: Plan (AFTER) in Note [When to apply rewrite rules]
-  = do { let args = reverse rev_args
-       ; mb_match <- tryRules env rules fun (map argSpecArg args)
+  = do { let arg_specs = reverse rev_arg_specs
+       ; mb_match <- tryRules env rules fun (map argSpecArg arg_specs)
        ; case mb_match of
-           Just (rule_arity, rhs, rhs_args)
-             -> simplExprF env rhs $
-                pushArgs env Simplified rhs_args $
-                pushArgSpecs env (drop rule_arity args) cont
-           Nothing -> rebuild env (argInfoExpr fun rev_args) cont }
+           Just rule_match -> fireRuleAFTER env rule_match arg_specs cont
+           Nothing         -> rebuild env (argInfoExpr fun rev_arg_specs) cont }
 
 -----------------------------------
 tryInlining :: SimplEnv -> Logger -> OutId -> SimplCont -> SimplM (Maybe OutExpr)
@@ -2644,20 +2646,36 @@ See Note [No free join points in arityType] in GHC.Core.Opt.Arity
 ************************************************************************
 -}
 
+fireRuleAFTER :: SimplEnv -> RuleMatch
+              -> [ArgSpec] -> SimplCont
+              -> SimplM (SimplFloats, CoreExpr)
+fireRuleAFTER env rule_match arg_specs cont
+  | RM { rm_rule = rule, rm_rhs = rhs, rm_args = rhs_args
+       , rm_binds = wrap, rm_bndrs = bndrs } <- rule_match
+  = do { let env' = env `addNewInScopeIds` bndrs
+       ; (floats, e') <- simplExprF env' rhs $
+                         pushArgs env' Simplified (exprType rhs) rhs_args $
+                         pushArgSpecs env' (drop (ruleArity rule) arg_specs) cont
+       ; return $
+         if isEmptyBindWrapper wrap
+         then (floats, e')
+         else (emptyFloats env', applyBindWrapper wrap $
+                                 wrapFloats floats e') }
+
+
 tryRules :: SimplEnv -> [CoreRule]
          -> OutId -> [OutExpr]
-         -> SimplM (Maybe (FullArgCount, CoreExpr, [CoreExpr]))
+         -> SimplM (Maybe RuleMatch)
 
 tryRules env rules fn args
-  | Just (rule, rule_rhs, rule_args) <- lookupRule ropts in_scope_env
-                                            act_fun fn args rules
-  -- Fire a rule for the function
-  = do { logger <- getLogger
-       ; checkedTick (RuleFired (ruleName rule))
---       ; let occ_anald_rhs = occurAnalyseExpr rule_rhs
---                 -- See Note [Occurrence-analyse after rule firing]
-       ; dump logger rule rule_rhs
-       ; return (Just (ruleArity rule, rhs_rhs, rule_args)) }
+  | Just rule_match <- lookupRule ropts in_scope_env
+                                  act_fun fn args rules
+    -- Fire a rule for the function
+  = do { let the_rule = rm_rule rule_match
+       ; logger <- getLogger
+       ; checkedTick (RuleFired (ruleName the_rule))
+       ; dump logger the_rule (rm_rhs rule_match)
+       ; return (Just rule_match) }
 
   | otherwise  -- No rule fires
   = do { logger <- getLogger
@@ -2723,12 +2741,8 @@ trySeqRules in_env scrut rhs cont
        ; let seq_rules = getRules rule_base seqId
        ; mb_match <- tryRules in_env seq_rules seqId out_args
        ; case mb_match of
-            Nothing                          -> return Nothing
-            Just (rule_arity, rhs, rhs_args) -> return (Just (rhs, cont'))
-                where
-                  cont' = pushArgs in_env Simplified rhs_args $
-                          pushArgSpecs in_env (drop rule_arity out_arg_specs) rule_cont
-       }
+            Nothing         -> return Nothing
+            Just rule_match -> Just <$> fireRuleAFTER in_env rule_match out_arg_specs cont }
   where
     no_cast_scrut = drop_casts scrut
 
