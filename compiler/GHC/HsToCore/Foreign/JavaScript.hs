@@ -236,8 +236,8 @@ dsJsImport id co (CLabel cid) _ _ _ = do
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
              Just tycon
               | tyConUnique tycon == funPtrTyConKey ->
-                 IsFunction
-             _ -> IsData
+                 ForeignLabelIsFunction
+             _ -> ForeignLabelIsData
    (_resTy, foRhs) <- jsResultWrapper ty
 --   ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
    let rhs = foRhs (Lit (LitLabel cid fod))
@@ -291,7 +291,7 @@ dsJsFExportDynamic id co0 cconv = do
           (ccall).
          -}
         adj_args      = [ Var stbl_value
-                        , Lit (LitLabel fe_nm IsFunction)
+                        , Lit (LitLabel fe_nm ForeignLabelIsFunction)
                         , Lit (mkLitString typestring)
                         ]
           -- name of external entry point providing these services.

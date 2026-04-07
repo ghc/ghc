@@ -2723,7 +2723,8 @@ genCCall target dest_regs arg_regs = do
     mkCCall name = do
       config <- getConfig
       target <- cmmMakeDynamicReference config CallReference $
-          mkForeignLabel name ForeignLabelInThisPackage IsFunction
+                  mkForeignLabel name ForeignLabelInThisPackage
+                                      ForeignLabelIsFunction
       let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
       genCCall (ForeignTarget target cconv) dest_regs arg_regs
 

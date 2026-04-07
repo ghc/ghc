@@ -1896,9 +1896,9 @@ genPrimCCall name dsts args = do
 genLibCCall :: FastString -> [CmmFormal] -> [CmmActual] -> NatM InstrBlock
 genLibCCall name dsts args = do
   config <- getConfig
-  target <-
-    cmmMakeDynamicReference config CallReference
-      $ mkForeignLabel name ForeignLabelInThisPackage IsFunction
+  target <- cmmMakeDynamicReference config CallReference $
+              mkForeignLabel name ForeignLabelInThisPackage
+                                  ForeignLabelIsFunction
   let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
   genCCall target cconv dsts args
 

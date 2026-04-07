@@ -89,8 +89,8 @@ module GHC.Types.ForeignCall (
   -- *** Conversion
   renameHeader,
   typeCheckHeader,
-  -- ** FunctionOrData
-  FunctionOrData(..),
+  -- ** ForeignLabelIsFunctionOrData
+  ForeignLabelIsFunctionOrData(..),
   ) where
 
 import GHC.Prelude
@@ -233,31 +233,31 @@ renameHeader (Header a b) = Header a b
 {-
 ************************************************************************
 *                                                                      *
-\subsection{FunctionOrData}
+\subsection{ForeignLabelIsFunctionOrData}
 *                                                                      *
 ************************************************************************
 -}
 
-data FunctionOrData = IsFunction | IsData
+data ForeignLabelIsFunctionOrData = ForeignLabelIsFunction | ForeignLabelIsData
     deriving (Eq, Ord, Data)
 
-instance Outputable FunctionOrData where
-    ppr IsFunction = text "(function)"
-    ppr IsData     = text "(data)"
+instance Outputable ForeignLabelIsFunctionOrData where
+    ppr ForeignLabelIsFunction = text "(function)"
+    ppr ForeignLabelIsData     = text "(data)"
 
-instance Binary FunctionOrData where
-    put_ bh IsFunction = putByte bh 0
-    put_ bh IsData     = putByte bh 1
+instance Binary ForeignLabelIsFunctionOrData where
+    put_ bh ForeignLabelIsFunction = putByte bh 0
+    put_ bh ForeignLabelIsData     = putByte bh 1
     get bh = do
         h <- getByte bh
         case h of
-          0 -> return IsFunction
-          1 -> return IsData
-          _ -> panic "Binary FunctionOrData"
+          0 -> return ForeignLabelIsFunction
+          1 -> return ForeignLabelIsData
+          _ -> panic "Binary ForeignLabelIsFunctionOrData"
 
-instance NFData FunctionOrData where
-  rnf IsFunction = ()
-  rnf IsData = ()
+instance NFData ForeignLabelIsFunctionOrData where
+  rnf ForeignLabelIsFunction = ()
+  rnf ForeignLabelIsData = ()
 
 {-
 ************************************************************************
