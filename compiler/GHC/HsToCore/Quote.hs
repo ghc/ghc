@@ -53,7 +53,7 @@ import GHC.Core.Make
 import GHC.Core.Utils
 
 import GHC.Builtin.Names
-import GHC.Builtin.Names.TH
+import GHC.Builtin.TH
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 

@@ -1261,7 +1261,7 @@ hasFieldClassKey = mkPreludeClassUnique 50
 
 
 ---------------- Template Haskell -------------------
---      GHC.Builtin.Names.TH: USES ClassUniques 200-299
+--      GHC.Builtin.TH: USES ClassUniques 200-299
 -----------------------------------------------------
 
 {-
@@ -1507,7 +1507,7 @@ multMulTyConKey :: KnownKey
 multMulTyConKey = mkPreludeTyConUnique 199
 
 ---------------- Template Haskell -------------------
---      GHC.Builtin.Names.TH: USES TyConUniques 200-299
+--      GHC.Builtin.TH: USES TyConUniques 200-299
 -----------------------------------------------------
 
 ----------------------- SIMD ------------------------
@@ -1734,7 +1734,7 @@ naturalNBDataConKey       = mkPreludeDataConUnique 124
 
 
 ---------------- Template Haskell -------------------
---      GHC.Builtin.Names.TH: USES DataUniques 200-250
+--      GHC.Builtin.TH: USES DataUniques 200-250
 -----------------------------------------------------
 
 
@@ -1943,7 +1943,7 @@ proxyHashKey :: KnownKey
 proxyHashKey = mkPreludeMiscIdUnique 502
 
 ---------------- Template Haskell -------------------
---      GHC.Builtin.Names.TH: USES IdUniques 200-499
+--      GHC.Builtin.TH: USES IdUniques 200-499
 -----------------------------------------------------
 
 -- Used to make `Typeable` dictionaries

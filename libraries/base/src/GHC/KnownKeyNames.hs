@@ -81,7 +81,7 @@ module GHC.KnownKeyNames
     , arr, (>>>), first, app, (|||), loop
 
     -- IO
-    , thenIO, bindIO, returnIO, print
+    , IO, thenIO, bindIO, returnIO, print
 
     -- Unsatisfiable
     , Unsatisfiable, unsatisfiable
@@ -112,8 +112,11 @@ module GHC.KnownKeyNames
     , integerComplement, integerBit#, integerTestBit#, integerShiftL#, integerShiftR#
 
     -- Template Haskell
-    , Q, Name, FieldExp, Decs, TH.Type, FunDep
+    , Q, DecsQ, ExpQ, TypeQ, PatQ
+    , Name, Decs, TH.Type, FunDep
     , Pred, Code, InjectivityAnn, Overlap, ModName, QuasiQuoter
+    , Stmt, Con, BangType, VarBangType, RuleBndr, TySynEqn, Role, DerivClause
+    , Kind, TyVarBndrUnit, TyVarBndrSpec, TyVarBndrVis, DerivStrategy
     , sequenceQ, newName, mkName, mkNameG_v, mkNameG_d, mkNameG_tc, mkNameG_fld, mkNameL
     , mkNameQ, mkNameS, mkModName, unType, unTypeCode, unsafeCodeCoerce
     , lift, liftString, liftTyped
