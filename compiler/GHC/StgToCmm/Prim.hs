@@ -30,6 +30,7 @@ import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Prof ( costCentreFrom )
 
 import GHC.Types.Basic
+import GHC.Types.ForeignCall
 import GHC.Types.Literal.Floating
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph

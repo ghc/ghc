@@ -28,7 +28,6 @@ module GHC.Types.Basic (
         Alignment, mkAlignment, alignmentOf, alignmentBytes,
 
         PromotionFlag(..), isPromoted,
-        FunctionOrData(..),
 
         RecFlag(..), isRec, isNonRec, boolToRecFlag,
         Origin(..), isGenerated, DoPmc(..), requiresPMC,
@@ -368,35 +367,6 @@ unSwap :: SwapFlag -> (a->a->b) -> a -> a -> b
 unSwap NotSwapped f a b = f a b
 unSwap IsSwapped  f a b = f b a
 
-
-{-
-************************************************************************
-*                                                                      *
-\subsection[FunctionOrData]{FunctionOrData}
-*                                                                      *
-************************************************************************
--}
-
-data FunctionOrData = IsFunction | IsData
-    deriving (Eq, Ord, Data)
-
-instance Outputable FunctionOrData where
-    ppr IsFunction = text "(function)"
-    ppr IsData     = text "(data)"
-
-instance Binary FunctionOrData where
-    put_ bh IsFunction = putByte bh 0
-    put_ bh IsData     = putByte bh 1
-    get bh = do
-        h <- getByte bh
-        case h of
-          0 -> return IsFunction
-          1 -> return IsData
-          _ -> panic "Binary FunctionOrData"
-
-instance NFData FunctionOrData where
-  rnf IsFunction = ()
-  rnf IsData = ()
 
 {-
 ************************************************************************

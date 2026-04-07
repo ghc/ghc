@@ -66,6 +66,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Utils (cmmLoadBWord)
 
 import GHC.Types.Basic
+import GHC.Types.ForeignCall (FunctionOrData(..))
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
