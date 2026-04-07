@@ -144,7 +144,7 @@ data Literal
                                 -- ^ @Float#@ or @Double#@.
                                 -- Create with 'mkLitFloat' or 'mkLitDouble'.
 
-  | LitLabel   FastString FunctionOrData
+  | LitLabel FastString ForeignLabelIsFunctionOrData
                                 -- ^ A label literal. Parameters:
                                 --
                                 -- 1) The name of the symbol mentioned in the

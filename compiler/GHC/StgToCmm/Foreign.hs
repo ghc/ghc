@@ -86,7 +86,10 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
                               TargetIsInThat unit -> ForeignLabelInPackage $ toUnitId unit
                         in  ( unzip cmm_args
                             , CmmLit
-                              (CmmLabel (mkForeignLabel (mkFastStringShortText lbl) labelSource IsFunction)))
+                              (CmmLabel (mkForeignLabel
+                                            (mkFastStringShortText lbl)
+                                            labelSource
+                                            ForeignLabelIsFunction)))
 
                     DynamicTarget{} -> case cmm_args of
                        (fn,_):rest -> (unzip rest, fn)

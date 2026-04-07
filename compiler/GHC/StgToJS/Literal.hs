@@ -61,12 +61,13 @@ genLit = \case
     LitNumBigNat  -> panic "genLit: unexpected BigNat that should have been removed in CorePrep"
   LitFloating LitFloat r     -> return [ toJExpr (float2Double $ litFloatingToHostFloat r) ]
   LitFloating LitDouble r    -> return [ toJExpr (litFloatingToHostDouble r) ]
-  LitLabel name fod
-    | fod == IsFunction      -> return [ ApplExpr hdMkFunctionPtr
+  LitLabel name ForeignLabelIsFunction
+                             -> return [ ApplExpr hdMkFunctionPtr
                                                   [global (mkRawSymbol True name)]
                                        , ValExpr (JInt 0)
                                        ]
-    | otherwise              -> return [ toJExpr (global (mkRawSymbol True name))
+  LitLabel name ForeignLabelIsData
+                             -> return [ toJExpr (global (mkRawSymbol True name))
                                        , ValExpr (JInt 0)
                                        ]
   LitRubbish _ rr_ty ->
@@ -114,7 +115,7 @@ genStaticLit = \case
     LitNumBigNat  -> panic "genStaticLit: unexpected BigNat that should have been removed in CorePrep"
   LitFloating LitFloat r   -> return [ DoubleLit . SaneDouble $ float2Double $ litFloatingToHostFloat r ]
   LitFloating LitDouble r  -> return [ DoubleLit . SaneDouble $ litFloatingToHostDouble r ]
-  LitLabel name fod        -> return [ LabelLit (fod == IsFunction) (mkRawSymbol True name)
+  LitLabel name fod        -> return [ LabelLit (fod == ForeignLabelIsFunction) (mkRawSymbol True name)
                                      , IntLit 0 ]
   LitRubbish _ rep ->
     let prim_reps = runtimeRepPrimRep (text "GHC.StgToJS.Literal.genStaticLit") rep
