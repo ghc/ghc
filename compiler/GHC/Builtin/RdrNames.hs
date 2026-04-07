@@ -18,7 +18,7 @@ import GHC.Builtin
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types  -- A bunch of wired-in TyCons and DataCons
 import GHC.Builtin.PrimOps.Ids (primOpId)
-import GHC.Builtin.Names.TH( unsafeCodeCoerceName, liftTypedName )
+import GHC.Builtin.TH( unsafeCodeCoerceName, liftTypedName )
 import GHC.Builtin.Names
 
 import GHC.Types.Name.Reader( RdrName, mkVarUnqual, getRdrName

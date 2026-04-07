@@ -453,7 +453,7 @@ W6:
   in GHC.HsToCore.Foreign.Wasm.
 
 A complete list could probably be made by going through the known-key
-names in GHC.Builtin.Names and GHC.Builtin.Names.TH.  To test whether
+names in GHC.Builtin.Names and GHC.Builtin.TH.  To test whether
 the transitive imports are sufficient for any single module, instruct
 the build system to build /only/ that module in stage 2.  For example,
 a command to check whether the transitive imports for GHC.Internal.Maybe

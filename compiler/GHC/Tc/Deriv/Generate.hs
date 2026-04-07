@@ -73,7 +73,7 @@ import GHC.Types.Var.Set
 
 import GHC.Builtin.Names
 import GHC.Builtin.RdrNames
-import GHC.Builtin.Names.TH
+import GHC.Builtin.TH
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 

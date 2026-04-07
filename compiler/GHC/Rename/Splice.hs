@@ -51,7 +51,7 @@ import GHC.Data.FastString
 import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Driver.Hooks
-import GHC.Builtin.Names.TH
+import GHC.Builtin.TH
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr   ( tcCheckPolyExpr )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice

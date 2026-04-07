@@ -68,7 +68,7 @@ import GHC.Core.TyCo.Rep as TyCoRep
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv as InstEnv
 
-import GHC.Builtin.Names.TH
+import GHC.Builtin.TH
 import GHC.Builtin.Names
 import GHC.Builtin.Types
 
@@ -864,7 +864,7 @@ tcUntypedSplice q splice_name (XUntypedSplice ils)
        -- lift :: Quote m' => a -> m' Exp
        ; lift <- setSrcSpan (getLocA id_name) $
                   newKnownOccMethod (ImplicitLiftOrigin ils)
-                                    GHC.Builtin.Names.TH.liftIdOcc
+                                    GHC.Builtin.TH.liftIdOcc
                                     [getRuntimeRep id_ty, id_ty]
        ; let res = nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLocA lift)) v_expr'
 
@@ -890,7 +890,7 @@ tcPendingSpliceTyped q splice_name (XTypedSplice ils) res_ty
        -- lift :: Quote m' => a -> m' Exp
        ; lift <- setSrcSpan (getLocA id_name) $
                   newKnownOccMethod (ImplicitLiftOrigin ils)
-                                    GHC.Builtin.Names.TH.liftIdOcc
+                                    GHC.Builtin.TH.liftIdOcc
                                     [rep, res_ty]
        ; let res = nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLocA lift)) v_expr'
        ; return (PendingTcSplice splice_name res) }
@@ -3108,7 +3108,7 @@ tcGetInterp = do
 -- Note [Hard-wiring in-tree template-haskell for desugaring quotes]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- To desugar Template Haskell quotes, GHC needs to wire in a bunch of Names in the
--- `ghc-internal` library as Note [Known-key names], in GHC.Builtin.Names.TH.
+-- `ghc-internal` library as Note [Known-key names], in GHC.Builtin.TH.
 -- Consider
 -- > foo :: Q Exp
 -- > foo = [| unwords ["hello", "world"] |]

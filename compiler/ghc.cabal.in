@@ -201,11 +201,11 @@ Library
         GHC
         GHC.Builtin
         GHC.Builtin.Names
-        GHC.Builtin.Names.TH
         GHC.Builtin.PrimOps
         GHC.Builtin.PrimOps.Casts
         GHC.Builtin.PrimOps.Ids
         GHC.Builtin.RdrNames
+        GHC.Builtin.TH
         GHC.Builtin.Types
         GHC.Builtin.Types.Literals
         GHC.Builtin.Types.Prim
