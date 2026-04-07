@@ -112,18 +112,29 @@ module GHC.KnownKeyNames
     , integerComplement, integerBit#, integerTestBit#, integerShiftL#, integerShiftR#
 
     -- Template Haskell
-    , Q, Name, FieldExp, Dec, Decs, TH.Type, FunDep
+    , Q, Name, FieldExp, Decs, TH.Type, FunDep
     , Pred, Code, InjectivityAnn, Overlap, ModName, QuasiQuoter
     , sequenceQ, newName, mkName, mkNameG_v, mkNameG_d, mkNameG_tc, mkNameG_fld, mkNameL
     , mkNameQ, mkNameS, mkModName, unType, unTypeCode, unsafeCodeCoerce
     , lift, liftString, liftTyped
+    , Dec, funD, valD, dataD, newtypeD, typeDataD, tySynD, classD, instanceWithOverlapD
+         , standaloneDerivWithStrategyD, sigD, kiSigD, defaultD, defaultSigD, forImpD
+         , pragInlD, pragOpaqueD
+-- ToDo: why are these two out of scope??
+--         , pragSpecD, pragSpecInlD
+-- End of ToDo
+         , pragSpecED, pragSpecInlED
+         , pragSpecInstD, pragRuleD, pragCompleteD, pragAnnD, pragSCCFunD
+         , pragSCCFunNamedD, dataInstD, newtypeInstD, tySynInstD, openTypeFamilyD
+         , closedTypeFamilyD, dataFamilyD, infixLWithSpecD, infixRWithSpecD, roleAnnotD
+         , patSynD, patSynSigD, implicitParamBindD
     , Lit, charL, stringL, integerL, intPrimL, wordPrimL, floatPrimL
          , doublePrimL, rationalL, stringPrimL, charPrimL
     , Pat, litP, varP, tupP, unboxedTupP, unboxedSumP, conP, infixP, tildeP
          , bangP, asP, wildP, recP, listP, sigP, viewP, orP, typeP, invisP
     , Exp, varE, conE, litE, appE, appTypeE, infixE, infixApp, sectionL, sectionR
-         , lamE, lamCaseE, lamCasesE, tupE, unboxedTupE, unboxedSumE, condE
-         , multiIfE, letE, caseE, doE, mdoE, compE, fromE, fromThenE, fromToE, fromThenToE
+         , lamE, lamCaseE, lamCasesE, tupE, unboxedTupE, unboxedSumE, condE, multiIfE
+         , letE, caseE, doE, mdoE, compE, fromE, fromThenE, fromToE, fromThenToE
          , listE, sigE, recConE, recUpdE, staticE, unboundVarE, labelE, implicitParamVarE
          , getFieldE, projectionE, typeE, forallE, forallVisE, constrainedE
     , FieldExp, fieldExp
