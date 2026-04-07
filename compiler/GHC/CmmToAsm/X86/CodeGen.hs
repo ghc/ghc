@@ -78,7 +78,7 @@ import GHC.Generics (Generic, Generically(..))
 
 -- The rest:
 import GHC.Data.Maybe ( expectJust )
-import GHC.Types.ForeignCall ( CCallConv(..) )
+import GHC.Types.ForeignCall ( CCallConv(..), FunctionOrData(..) )
 import GHC.Types.Literal.Floating
 import GHC.Data.OrdList
 import GHC.Utils.Outputable

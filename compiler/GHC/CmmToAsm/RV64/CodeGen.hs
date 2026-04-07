@@ -44,7 +44,6 @@ import GHC.Platform
 import GHC.Platform.Reg
 import GHC.Platform.Regs
 import GHC.Prelude hiding (EQ)
-import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc (srcSpanFile, srcSpanStartCol, srcSpanStartLine)
 import GHC.Types.Tickish (GenTickish (..))

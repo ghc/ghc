@@ -21,7 +21,7 @@ import GHC.StgToJS.Linker.Utils (decodeModifiedUTF8)
 
 import GHC.Types.Literal
 import GHC.Types.Literal.Floating
-import GHC.Types.Basic
+import GHC.Types.ForeignCall
 import GHC.Types.RepType
 import GHC.Utils.Misc
 import GHC.Utils.Panic
