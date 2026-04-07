@@ -21,7 +21,8 @@
 module GHC.Builtin (
         -- * Main exports
         wiredInNames, wiredInIds, ghcPrimIds,
-        knownKeyTable, knownKeyOccMap, knownKeyUniqMap, knownKeyOccName,
+        knownKeyTable, knownKeyOccMap, knownKeyUniqMap,
+        knownKeyOccName, knownKeyOccName_maybe,
         knownKeyRdrName, knownOccRdrName, knownVarOccRdrName,
 
         -- * Known-key names
@@ -51,7 +52,7 @@ import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Literals ( typeNatTyCons )
 import GHC.Builtin.Types.Prim
-import GHC.Builtin.Names.TH ( templateHaskellNames, thKnownKeyTable )
+import GHC.Builtin.TH ( templateHaskellNames, thKnownKeyTable )
 import GHC.Builtin.Names( basicKnownKeyTable, basicKnownKeyNames )
 import GHC.Builtin.Names( charDataConKey, intDataConKey, numericClassKeys, standardClassKeys )
 
@@ -84,6 +85,7 @@ import GHC.Unit.Module.ModIface (IfaceExport)
 import GHC.Unit.Module.Warnings
 
 import GHC.Data.List.SetOps
+import GHC.Data.Maybe( orElse )
 
 import Control.Applicative ((<|>))
 import Data.Maybe
@@ -351,10 +353,14 @@ knownKeyTable = basicKnownKeyTable ++
 knownKeyOccName :: HasDebugCallStack => KnownKey -> OccName
 -- Find the OccName from the KnownKey,
 -- by looking in the knownKeyUniqMap
-knownKeyOccName std_uniq
-  = case lookupUFM knownKeyUniqMap std_uniq of
-        Just occ -> occ
-        Nothing  -> pprPanic "knownKeyOccName" (pprKnownKey std_uniq)
+knownKeyOccName key
+  = knownKeyOccName_maybe key `orElse`
+    pprPanic "knownKeyOccName" (pprKnownKey key)
+
+knownKeyOccName_maybe :: HasDebugCallStack
+                      => KnownKey -> Maybe OccName
+knownKeyOccName_maybe key
+  = lookupUFM knownKeyUniqMap key
 
 knownKeyRdrName :: KnownKey -> RdrName
 knownKeyRdrName key = knownOccRdrName (knownKeyOccName key)

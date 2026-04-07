@@ -4,7 +4,7 @@
 -- %*                                                                   *
 -- %************************************************************************
 
-module GHC.Builtin.Names.TH where
+module GHC.Builtin.TH where
 
 import GHC.Prelude ()
 

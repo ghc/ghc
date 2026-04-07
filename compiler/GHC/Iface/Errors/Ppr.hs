@@ -24,6 +24,7 @@ module GHC.Iface.Errors.Ppr
 
 import GHC.Prelude
 
+import GHC.Builtin( knownKeyOccName_maybe )
 import GHC.Types.Error
 import GHC.Types.Hint.Ppr () -- Outputable GhcHint
 import GHC.Types.Error.Codes
@@ -295,12 +296,20 @@ interfaceErrorDiagnostic opts = \ case
   CircularImport mod ->
     text "Circular imports: module" <+> quotes (ppr mod)
     <+> text "depends on itself"
+
   MissingKnownKey1 key -> hang (text "Could not find known key" <+> quotes (pprKnownKey key))
-                             2 (text "in the exports of GHC.KnownKeys")
+                             2 (vcat [ text "in the exports of GHC.KnownKeys"
+                                     , text "occname:" <+> pp_occ (knownKeyOccName_maybe key) ])
+         where
+           pp_occ (Just occ) = ppr occ
+           pp_occ Nothing    = text "Yikes: that key isn't in the known-key table"
+
   MissingKnownKey2 key -> hang (text "Could not find known key" <+> quotes (pprKnownKey key))
                              2 (text "in the static known-key table")
+
   MissingKnownKey3 occ -> hang (text "Could not find known occurrence" <+> quotes (ppr occ))
                              2 (text "in the exports of GHC.KnownKeys")
+
   KnownKeyScopeError occ gres
     | null gres
     -> hang (text "Could not find known-key entity" <+> quotes (ppr occ))
