@@ -70,7 +70,7 @@ import GHC.Core.TyCo.Compare( nonDetCmpType )
 import GHC.Types.Var
 import GHC.Utils.Outputable
 import GHC.Data.FastString
-import GHC.Types.Basic
+import GHC.Types.ForeignCall
 import GHC.Utils.Binary
 import GHC.Settings.Constants
 import GHC.Platform

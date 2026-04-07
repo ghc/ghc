@@ -56,6 +56,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Basic
+import GHC.Types.ForeignCall
 import GHC.Types.Tickish ( tickishIsCode )
 
 import GHC.Utils.Misc

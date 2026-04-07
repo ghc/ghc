@@ -74,7 +74,7 @@ import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 
 -- The rest:
 import GHC.Data.Maybe ( expectJust )
-import GHC.Types.ForeignCall ( CCallConv(..) )
+import GHC.Types.ForeignCall ( CCallConv(..), FunctionOrData(..) )
 import GHC.Types.Literal.Floating
 import GHC.Data.OrdList
 import GHC.Utils.Outputable

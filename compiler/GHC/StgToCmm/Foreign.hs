@@ -49,7 +49,6 @@ import GHC.Runtime.Heap.Layout
 import GHC.Types.ForeignCall
 import GHC.Data.Maybe
 import GHC.Utils.Panic
-import GHC.Types.Basic
 import GHC.Types.Unique.DSM
 import GHC.Unit.Types
 

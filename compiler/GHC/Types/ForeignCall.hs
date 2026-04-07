@@ -89,6 +89,8 @@ module GHC.Types.ForeignCall (
   -- *** Conversion
   renameHeader,
   typeCheckHeader,
+  -- ** FunctionOrData
+  FunctionOrData(..),
   ) where
 
 import GHC.Prelude
@@ -227,6 +229,35 @@ typeCheckHeader (Header a b) = Header a b
 
 renameHeader :: Header GhcPs -> Header GhcRn
 renameHeader (Header a b) = Header a b
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{FunctionOrData}
+*                                                                      *
+************************************************************************
+-}
+
+data FunctionOrData = IsFunction | IsData
+    deriving (Eq, Ord, Data)
+
+instance Outputable FunctionOrData where
+    ppr IsFunction = text "(function)"
+    ppr IsData     = text "(data)"
+
+instance Binary FunctionOrData where
+    put_ bh IsFunction = putByte bh 0
+    put_ bh IsData     = putByte bh 1
+    get bh = do
+        h <- getByte bh
+        case h of
+          0 -> return IsFunction
+          1 -> return IsData
+          _ -> panic "Binary FunctionOrData"
+
+instance NFData FunctionOrData where
+  rnf IsFunction = ()
+  rnf IsData = ()
 
 {-
 ************************************************************************
