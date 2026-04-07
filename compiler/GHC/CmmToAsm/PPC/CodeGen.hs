@@ -63,7 +63,7 @@ import GHC.Utils.Panic
 import Control.Monad    ( mapAndUnzipM, when )
 import Data.Word
 
-import GHC.Types.Basic
+import GHC.Types.ForeignCall ( FunctionOrData(..) )
 import GHC.Data.FastString
 
 -- -----------------------------------------------------------------------------

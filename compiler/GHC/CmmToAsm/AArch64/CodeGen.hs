@@ -54,7 +54,6 @@ import GHC.Utils.Outputable
 import Control.Monad    ( mapAndUnzipM )
 import GHC.Float
 
-import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Literal.Floating
 import GHC.Data.FastString

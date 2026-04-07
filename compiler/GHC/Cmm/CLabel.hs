@@ -143,7 +143,7 @@ module GHC.Cmm.CLabel (
 import GHC.Prelude
 
 import GHC.Types.Id.Info
-import GHC.Types.Basic
+import GHC.Types.ForeignCall (FunctionOrData(..))
 import {-# SOURCE #-} GHC.Cmm.BlockId (BlockId, mkBlockId)
 import GHC.Unit.Types
 import GHC.Types.Name
