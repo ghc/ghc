@@ -1,0 +1,5 @@
+section: packaging
+synopsis: Hadrian now warns when the Hackage package index is missing instead of
+  failing with an unhelpful error message.
+issues: #16484
+mrs: !15878
