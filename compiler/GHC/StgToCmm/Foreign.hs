@@ -81,7 +81,6 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
                         panic "cgForeignCall: unexpected FFI value import"
                     StaticTarget ext lbl ForeignFunction ->
                         let labelSource = case staticTargetUnit ext of
-                              TargetIsInThisUnit  -> ForeignLabelInThisPackage
                               TargetIsInThat unit -> ForeignLabelInPackage $ toUnitId unit
                         in  ( unzip cmm_args
                             , CmmLit
