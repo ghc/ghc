@@ -445,7 +445,7 @@ opsysVariables _ FreeBSD14 = mconcat
     -- Prefer to use the system's clang-based toolchain and not gcc
   , "CC" =: "cc"
   , "CXX" =: "c++"
-  , "FETCH_GHC_VERSION" =: "9.10.1"
+  , "FETCH_GHC_VERSION" =: "9.10.3"
   , "CABAL_INSTALL_VERSION" =: "3.14.2.0"
   ]
 opsysVariables arch (Linux distro) = distroVariables arch distro
