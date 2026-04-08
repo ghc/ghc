@@ -298,7 +298,7 @@ dsJsFExportDynamic id co0 cconv = do
           -- (probably in the RTS.)
         adjustor   = CCallSpec
                        (StaticTarget
-                         (StaticTargetGhc NoSourceText TargetIsInThisUnit)
+                         (StaticTargetGhc NoSourceText (TargetIsInThat rtsUnit))
                          (fsLit "createAdjustor")
                          ForeignFunction)
                        CCallConv
