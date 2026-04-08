@@ -652,7 +652,10 @@ initNameWriterTable = do
     )
 
 
-putSymbolTable :: WriteBinHandle -> Int -> UniqFM Name (Int,Name) -> IO ()
+putSymbolTable :: WriteBinHandle
+               -> Int                    -- Size of the table
+               -> UniqFM Name (Int,Name) -- For each Name, its index in the table
+               -> IO ()
 putSymbolTable bh name_count symtab
   = do { put_ bh name_count
        ; let names = elems (array (0,name_count-1) (nonDetEltsUFM symtab))
@@ -702,7 +705,6 @@ getSymbolTable bh name_cache
 
 -- Note [Symbol table representation of names]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- An occurrence of a name in an interface file is serialized as a single 32-bit
 -- word. The format of this word is:
 --  00xxxxxx xxxxxxxx xxxxxxxx xxxxxxxx
