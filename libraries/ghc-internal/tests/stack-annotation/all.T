@@ -2,6 +2,7 @@
 # and test with profiling way if available (#26507)
 ann_frame_opts = [ when(js_arch(), skip)
                  , when(have_profiling(), extra_ways(['prof']))
+                 , when(ghc_with_ipe(), ignore_stdout)
 		 , extra_files(['TestUtils.hs'])]
 
 test('ann_frame001', ann_frame_opts, compile_and_run, [''])
