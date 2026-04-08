@@ -4,7 +4,9 @@
              TypeApplications, StandaloneKindSignatures, GADTs,
              FlexibleInstances, UndecidableInstances, UnboxedSums #-}
 -- NegativeLiterals: see Note [Fixity of (->)]
+
 {-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Internal.Types

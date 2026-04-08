@@ -31,7 +31,7 @@ module GHC.Tc.Utils.Env(
 
         tcLookupKnownKeyGlobal, tcLookupKnownKeyTyCon,
         tcLookupKnownKeyClass, tcLookupKnownKeyId,
-        tcLookupKnownOccTyCon, tcLookupKnownOccId,
+        tcLookupKnownOccTyCon, tcLookupKnownOccDataCon, tcLookupKnownOccId,
         rnLookupKnownKeyName, rnLookupKnownKeyRdr, getKnownKeySource,
 
         -- Local environment
@@ -304,11 +304,7 @@ tcLookupGlobalOnly name
                     Nothing    -> pprPanic "tcLookupGlobalOnly" (ppr name) }
 
 tcLookupDataCon :: Name -> TcM DataCon
-tcLookupDataCon name = do
-    thing <- tcLookupGlobal name
-    case thing of
-        AConLike (RealDataCon con) -> return con
-        _                          -> wrongThingErr WrongThingDataCon (AGlobal thing) name
+tcLookupDataCon = get_datacon . tcLookupGlobal
 
 tcLookupPatSyn :: Name -> TcM PatSyn
 tcLookupPatSyn name = do
@@ -337,18 +333,10 @@ tcLookupRecSelParent (RnRecUpdParent { rnRecUpdCons = cons })
       -- Any constructor will give the same result here.
 
 tcLookupClass :: Name -> TcM Class
-tcLookupClass name = do
-    thing <- tcLookupGlobal name
-    case thing of
-        ATyCon tc | Just cls <- tyConClass_maybe tc -> return cls
-        _                                           -> wrongThingErr WrongThingClass (AGlobal thing) name
+tcLookupClass = get_class . tcLookupGlobal
 
 tcLookupTyCon :: Name -> TcM TyCon
-tcLookupTyCon name = do
-    thing <- tcLookupGlobal name
-    case thing of
-        ATyCon tc -> return tc
-        _         -> wrongThingErr WrongThingTyCon (AGlobal thing) name
+tcLookupTyCon = get_tycon . tcLookupGlobal
 
 tcLookupAxiom :: Name -> TcM (CoAxiom Branched)
 tcLookupAxiom name = do
@@ -573,6 +561,9 @@ tcLookupKnownOccGlobal = tcrn_wrapper . lookupKnownOccThing
 tcLookupKnownOccTyCon :: HasDebugCallStack => KnownOcc -> TcM TyCon
 tcLookupKnownOccTyCon = get_tycon . tcLookupKnownOccGlobal
 
+tcLookupKnownOccDataCon :: HasDebugCallStack => KnownOcc -> TcM DataCon
+tcLookupKnownOccDataCon = get_datacon . tcLookupKnownOccGlobal
+
 tcLookupKnownOccId :: HasDebugCallStack => KnownOcc -> TcM Id
 tcLookupKnownOccId = get_id . tcLookupKnownOccGlobal
 
@@ -590,6 +581,13 @@ get_tycon do_the_lookup
   = do { thing <- do_the_lookup
        ; case thing of
            ATyCon tc -> return tc
+           _  -> wrongThingErr WrongThingClass (AGlobal thing) (getName thing) }
+
+get_datacon :: TcRn TyThing -> TcRn DataCon
+get_datacon do_the_lookup
+  = do { thing <- do_the_lookup
+       ; case thing of
+           AConLike (RealDataCon con) -> return con
            _  -> wrongThingErr WrongThingClass (AGlobal thing) (getName thing) }
 
 get_id :: TcRn TyThing -> TcRn Id

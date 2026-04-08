@@ -2,7 +2,7 @@
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples, BangPatterns #-}
 
 {-# OPTIONS_GHC -fdefines-known-key-names #-}
-   -- Defines Real, Integral etc, etc, etc
+   -- Defines Real, Integral, Ratio etc, etc, etc
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 

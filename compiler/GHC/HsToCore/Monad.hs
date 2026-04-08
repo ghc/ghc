@@ -27,9 +27,9 @@ module GHC.HsToCore.Monad (
         -- Looking up in the environment
         dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon,
         dsLookupDataCon, dsLookupConLike,
-        dsLookupKnownKeyTyCon, dsLookupKnownKeyId,
+        dsLookupKnownKeyTyCon, dsLookupKnownKeyDataCon, dsLookupKnownKeyId,
         dsLookupKnownKeyName,
-        dsLookupKnownOccId, dsLookupKnownOccTyCon,
+        dsLookupKnownOccId, dsLookupKnownOccTyCon, dsLookupKnownOccDataCon,
 
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
 
@@ -597,6 +597,9 @@ dsLookupKnownOccThing occ
 dsLookupKnownOccTyCon :: KnownOcc -> DsM TyCon
 dsLookupKnownOccTyCon uniq = tyThingTyCon <$> dsLookupKnownOccThing uniq
 
+dsLookupKnownOccDataCon :: KnownOcc -> DsM DataCon
+dsLookupKnownOccDataCon uniq = tyThingDataCon <$> dsLookupKnownOccThing uniq
+
 dsLookupKnownOccId :: KnownOcc -> DsM Id
 dsLookupKnownOccId uniq = tyThingId <$> dsLookupKnownOccThing uniq
 
@@ -623,6 +626,9 @@ dsLookupKnownKeyThing uniq
 
 dsLookupKnownKeyTyCon :: KnownKey -> DsM TyCon
 dsLookupKnownKeyTyCon uniq = tyThingTyCon <$> dsLookupKnownKeyThing uniq
+
+dsLookupKnownKeyDataCon :: KnownKey -> DsM DataCon
+dsLookupKnownKeyDataCon uniq = tyThingDataCon <$> dsLookupKnownKeyThing uniq
 
 dsLookupKnownKeyId :: KnownKey -> DsM Id
 dsLookupKnownKeyId uniq = tyThingId <$> dsLookupKnownKeyThing uniq

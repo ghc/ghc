@@ -40,7 +40,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 
-import GHC.Builtin.KnownKeys( rationalTyConOcc )
+import GHC.Builtin.KnownOccs( rationalTyConOcc )
 import GHC.Builtin.Types( integerTy )
 
 import GHC.Hs

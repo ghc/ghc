@@ -238,7 +238,7 @@ dsFractionalLitToRational fl@FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = b
 dsRational :: Rational -> DsM CoreExpr
 dsRational (n :% d) = do
   platform <- targetPlatform <$> getDynFlags
-  dcn <- dsLookupDataCon ratioDataConName
+  dcn <- dsLookupKnownKeyDataCon ratioDataConKey
   let cn = mkIntegerExpr platform n
   let dn = mkIntegerExpr platform d
   return $ mkCoreConApps dcn [Type integerTy, cn, dn]
