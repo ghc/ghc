@@ -50,14 +50,12 @@ module GHC.Internal.IO (
     ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Magic ( lazy )
 import GHC.Internal.Maybe ( Maybe(..) )
 import GHC.Internal.Prim (
     RealWorld, State#, catch#, getMaskingState#, maskAsyncExceptions#,
     maskUninterruptible#, raiseIO#, unmaskAsyncExceptions#,
   )
 import GHC.Internal.ST
-import GHC.Internal.Types ( Char, IO(..) )
 import GHC.Internal.Exception
 import GHC.Internal.Exception.Type (NoBacktrace(..), whileHandling, WhileHandling(..), HasExceptionContext, ExceptionWithContext(..))
 import GHC.Internal.Show

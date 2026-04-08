@@ -59,7 +59,7 @@ module GHC.KnownKeyNames
     , dataToTag#
 
     -- Numbers
-    , Num, Integral, Real, Fractional
+    , Num, Integral, Real, Fractional, RealFloat
     , (+), (-), (*), negate, fromInteger
     , fromRational
     , mkRationalBase2, mkRationalBase10
@@ -71,7 +71,7 @@ module GHC.KnownKeyNames
 
     -- Records
     , HasField
-    , fromLabel, getField
+    , fromLabel, getField, setField
 
     -- Overloaded lists
     , IL.fromList, IL.fromListN, IL.toList
@@ -157,13 +157,14 @@ import GHC.Internal.Data.Data
 import GHC.Internal.Data.String( fromString )
 import GHC.Internal.Data.Foldable( Foldable )
 import GHC.Internal.Data.Traversable( Traversable )
+import GHC.Internal.Float( RealFloat )
 import GHC.Internal.Real( mkRationalBase2, mkRationalBase10 )
 import GHC.Internal.Control.Monad( fail, guard )
 import GHC.Internal.Control.Monad.Fix( mfix, loop )
 import GHC.Internal.Control.Monad.Zip( mzip )
 import GHC.Internal.Control.Arrow( arr, (>>>), first, app, (|||) )
 import GHC.Internal.OverloadedLabels( fromLabel )
-import GHC.Internal.Records( HasField, getField )
+import GHC.Internal.Records
 import GHC.Internal.CString as CS
 import GHC.Internal.TypeError( Unsatisfiable, unsatisfiable )
 import GHC.Internal.System.IO( print )

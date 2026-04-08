@@ -9,6 +9,10 @@
 {-# LANGUAGE CApiFFI #-}
 -- We believe we could deorphan this module, by moving lots of things
 -- around, but we haven't got there yet:
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+   -- Defines RealFloat
+
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}

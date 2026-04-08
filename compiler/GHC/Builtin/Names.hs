@@ -187,8 +187,6 @@ basicKnownKeyTable
     , (mkTcOcc "Foldable",     foldableClassKey)
     , (mkTcOcc "Traversable",  traversableClassKey)
     , (mkTcOcc "Bounded",      boundedClassKey)
-    , (mkTcOcc "Integral",     integralClassKey)
-    , (mkTcOcc "Real",         realClassKey)
     , (mkTcOcc "Data",         dataClassKey)
     , (mkTcOcc "Ix",           ixClassKey)
     , (mkTcOcc "Alternative",  alternativeClassKey)
@@ -216,6 +214,11 @@ basicKnownKeyTable
 
     -- Numeric operations
     , (mkTcOcc "Num",               numClassKey)
+    , (mkTcOcc "Integral",          integralClassKey)
+    , (mkTcOcc "Real",              realClassKey)
+    , (mkTcOcc "Fractional",        fractionalClassKey)
+    , (mkTcOcc "RealFloat",         realFloatClassKey)
+--    , (mkTcOcc "RealFrac",          realFracClassKey)
     , (mkVarOcc "-",                minusClassOpKey)
     , (mkVarOcc "negate",           negateClassOpKey)
     , (mkVarOcc "fromInteger",      fromIntegerClassOpKey)
@@ -270,8 +273,7 @@ basicKnownKeyTable
     , (mkTcOcc "HasField",   hasFieldClassKey)
     , (mkVarOcc "fromLabel", fromLabelClassOpKey)
     , (mkVarOcc "getField",  getFieldClassOpKey)
-    -- setField is not yet defined in ghc-internal
-    -- , (mkVarOcc "setField",  setFieldClassOpKey)
+    , (mkVarOcc "setField",  setFieldClassOpKey)
 
     -- FromList
     , (mkVarOcc "fromList",   fromListClassOpKey)
@@ -2149,61 +2151,3 @@ bignatCompareWordIdKey     = mkPreludeMiscIdUnique 693
 mkRationalBase2IdKey, mkRationalBase10IdKey :: KnownKey
 mkRationalBase2IdKey  = mkPreludeMiscIdUnique 700
 mkRationalBase10IdKey = mkPreludeMiscIdUnique 701 :: KnownKey
-
-{-
-************************************************************************
-*                                                                      *
-\subsection[Class-std-groups]{Standard groups of Prelude classes}
-*                                                                      *
-************************************************************************
-
-NOTE: @Eq@ and @Text@ do need to appear in @standardClasses@
-even though every numeric class has these two as a superclass,
-because the list of ambiguous dictionaries hasn't been simplified.
--}
-
-numericClassKeys :: [KnownKey]
-numericClassKeys =
-        [ numClassKey
-        , realClassKey
-        , integralClassKey
-        ]
-        ++ fractionalClassKeys
-
-fractionalClassKeys :: [KnownKey]
-fractionalClassKeys =
-        [ fractionalClassKey
-        , floatingClassKey
-        , realFracClassKey
-        , realFloatClassKey
-        ]
-
--- The "standard classes" are used in defaulting (Haskell 98 report 4.3.4),
--- and are: "classes defined in the Prelude or a standard library"
-standardClassKeys :: [KnownKey]
-standardClassKeys = derivableClassKeys ++ numericClassKeys
-                  ++ [randomClassKey, randomGenClassKey,
-                      functorClassKey,
-                      monadClassKey, monadPlusClassKey, monadFailClassKey,
-                      semigroupClassKey, monoidClassKey,
-                      isStringClassKey,
-                      applicativeClassKey, foldableClassKey,
-                      traversableClassKey, alternativeClassKey
-                     ]
-
-{-
-@derivableClassKeys@ is also used in checking \tr{deriving} constructs
-(@GHC.Tc.Deriv@).
--}
-
-derivableClassKeys :: [KnownKey]
-derivableClassKeys
-  = [ eqClassKey, ordClassKey, enumClassKey, ixClassKey,
-      boundedClassKey, showClassKey, readClassKey ]
-
-interactiveClassKeys :: [KnownKey]
--- These are the "interactive classes" that are consulted when doing
--- defaulting. Does not include Num or IsString, which have special
--- handling.
-interactiveClassKeys = [ showClassKey, eqClassKey, ordClassKey
-                       , foldableClassKey, traversableClassKey ]

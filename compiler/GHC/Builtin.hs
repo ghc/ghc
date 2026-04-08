@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -40,7 +42,9 @@ module GHC.Builtin (
         maybeCharLikeCon, maybeIntLikeCon,
 
         -- * Class categories
-        isNumericClass, isStandardClass
+        isNumericClass, isStandardClass,
+        numericClassKeys, fractionalClassKeys, standardClassKeys,
+        derivableClassKeys, interactiveClassKeys
 
     ) where
 
@@ -53,8 +57,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Literals ( typeNatTyCons )
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.TH ( templateHaskellNames, thKnownKeyTable )
-import GHC.Builtin.Names( basicKnownKeyTable, basicKnownKeyNames )
-import GHC.Builtin.Names( charDataConKey, intDataConKey, numericClassKeys, standardClassKeys )
+import GHC.Builtin.Names
 
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon
@@ -378,6 +381,92 @@ knownVarOccRdrName :: String -> RdrName
 knownVarOccRdrName s = knownOccRdrName (mkVarOcc s)
 
 
+
+{-
+************************************************************************
+*                                                                      *
+              Groups of keys
+*                                                                      *
+************************************************************************
+
+NOTE: @Eq@ and @Text@ do need to appear in @standardClasses@
+even though every numeric class has these two as a superclass,
+because the list of ambiguous dictionaries hasn't been simplified.
+-}
+
+numericClassKeys :: [KnownKey]
+numericClassKeys
+  = checkKnownKeys
+      [ numClassKey
+      , realClassKey
+      , integralClassKey
+      ]
+    ++ fractionalClassKeys
+
+fractionalClassKeys :: [KnownKey]
+fractionalClassKeys
+  = checkKnownKeys
+        [ fractionalClassKey
+        , floatingClassKey
+        , realFracClassKey
+        , realFloatClassKey
+        ]
+
+-- The "standard classes" are used in defaulting (Haskell 98 report 4.3.4),
+-- and are: "classes defined in the Prelude or a standard library"
+standardClassKeys :: [KnownKey]
+standardClassKeys
+  = derivableClassKeys
+    ++ numericClassKeys
+    ++ checkKnownKeys
+          [ randomClassKey, randomGenClassKey
+          , functorClassKey
+          , monadClassKey, monadPlusClassKey, monadFailClassKey
+          , semigroupClassKey, monoidClassKey
+          , isStringClassKey
+          , applicativeClassKey, foldableClassKey
+          , traversableClassKey, alternativeClassKey
+          ]
+
+{-
+@derivableClassKeys@ is also used in checking \tr{deriving} constructs
+(@GHC.Tc.Deriv@).
+-}
+
+derivableClassKeys :: [KnownKey]
+derivableClassKeys
+  = checkKnownKeys [ eqClassKey, ordClassKey, enumClassKey, ixClassKey
+                   , boundedClassKey, showClassKey, readClassKey ]
+
+interactiveClassKeys :: [KnownKey]
+-- These are the "interactive classes" that are consulted when doing
+-- defaulting. Does not include Num or IsString, which have special
+-- handling.
+interactiveClassKeys
+  = checkKnownKeys [ showClassKey, eqClassKey, ordClassKey
+                   , foldableClassKey, traversableClassKey ]
+
+checkKnownKeys :: [KnownKey] -> [KnownKey]
+-- An assertion check, that checks that these alleged known-keys do
+-- actually appear in the knownKeyTable.
+#ifdef DEBUG
+checkKnownKeys keys
+  | null bad_keys = keys
+  | otherwise     = pprPanic "checkKnownKeys" (vcat (map pprKnownKey bad_keys))
+  where
+    bad_keys = filter (not . (`elemUFM` knownKeyUniqMap)) keys
+#else
+checkKnownKeys keys = keys
+#endif
+
+isNumericClass, isStandardClass :: Class -> Bool
+isNumericClass     clas = classKey clas `is_elem` numericClassKeys
+isStandardClass    clas = classKey clas `is_elem` standardClassKeys
+
+is_elem :: Eq a => a -> [a] -> Bool
+is_elem = isIn "is_X_Class"
+
+
 {- *********************************************************************
 *                                                                      *
                      Wired-in things
@@ -652,18 +741,3 @@ maybeCharLikeCon, maybeIntLikeCon :: DataCon -> Bool
 maybeCharLikeCon con = con `hasKey` charDataConKey
 maybeIntLikeCon  con = con `hasKey` intDataConKey
 
-{-
-************************************************************************
-*                                                                      *
-            Class predicates
-*                                                                      *
-************************************************************************
--}
-
-isNumericClass, isStandardClass :: Class -> Bool
-
-isNumericClass     clas = classKey clas `is_elem` numericClassKeys
-isStandardClass    clas = classKey clas `is_elem` standardClassKeys
-
-is_elem :: Eq a => a -> [a] -> Bool
-is_elem = isIn "is_X_Class"

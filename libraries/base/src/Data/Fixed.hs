@@ -4,6 +4,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
+{-# OPTIONS_GHC -fno-rebindable-known-key-names #-}
+    -- We are importing Prelude, hence GHC.KnownKeyNames is available
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Fixed
@@ -87,7 +90,6 @@ module Data.Fixed
 ) where
 
 import Prelude
-import GHC.KnownKeyNames
 import GHC.Internal.Data.Data
 import GHC.Internal.TypeLits (KnownNat, natVal)
 import GHC.Internal.Read
@@ -95,7 +97,6 @@ import GHC.Internal.Text.ParserCombinators.ReadPrec( ReadPrec, pfail )
 import GHC.Internal.Text.Read.Lex
 import qualified GHC.Internal.TH.Monad as TH
 import qualified GHC.Internal.TH.Lift as TH
-import GHC.Internal.TH.Lift( lift )  -- Unqualified for known-occ names
 import Data.Typeable
 
 -- $setup

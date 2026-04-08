@@ -12,7 +12,9 @@ module GHC.Tc.Gen.Default ( tcDefaultDecls, extendDefaultEnvWithLocalDefaults ) 
 import GHC.Prelude
 import GHC.Hs
 
+import GHC.Builtin( interactiveClassKeys )
 import GHC.Builtin.Names
+
 import GHC.Core.Class
 import GHC.Core.Predicate ( Pred (..), classifyPredType )
 

@@ -6,6 +6,7 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
 
+{-# OPTIONS_GHC -Wno-unused-foralls #-}
 {-# OPTIONS_GHC -fdefines-known-key-names #-}
    -- Defines GetField
 -----------------------------------------------------------------------------
@@ -26,10 +27,11 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Records
-       ( HasField(..)
+       ( HasField(..), setField
        ) where
 
-import GHC.Internal.Types (TYPE, Constraint)
+import GHC.Internal.Types (TYPE, Type, Constraint)
+import GHC.Internal.Err( error )
 
 -- | Constraint representing the fact that the field @x@ belongs to
 -- the record type @r@ and has field type @a@.  This will be solved
@@ -45,3 +47,13 @@ type HasField :: forall {k} {r_rep} {a_rep} . k -> TYPE r_rep -> TYPE a_rep -> C
 class HasField x r a | x r -> a where
   -- | Selector function to extract the field from the record.
   getField :: r -> a
+
+
+setField :: forall {k} (x::k) (r :: Type) (a :: Type). a -> r -> r
+-- This setField is never used
+--   -XRebindableSyntax is required if -XOverloadedRecordUpdate is enabled
+-- But we still want to export setField from GHC.KnownKeyNames, so that
+--   * We can have a known-key for setField (see uses of setFieldClassOpKey)
+--   * The assertion check that GHC.KnownKeyNames exports every known-key
+--     should not fail
+setField = error "Yikes! setField is not implemented yet"
