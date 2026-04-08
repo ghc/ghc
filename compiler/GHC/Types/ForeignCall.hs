@@ -204,7 +204,6 @@ instance Outputable CCallSpec where
                 ForeignValue    -> text "__ffi_static_ccall_value"
                 ForeignFunction -> text "__ffi_static_ccall"
               pprUnit ext = case staticTargetUnit ext of
-                TargetIsInThisUnit  -> empty
                 TargetIsInThat unit -> ppr unit
               (srcTxt, pPkgId) = (staticTargetLabel ext, pprUnit ext)
           in pCallType
@@ -314,8 +313,7 @@ instance Binary CCallConv where
 -- either it is in this currently compiling compilation 'Unit',
 -- or it is in /that other/, compilation 'Unit'.
 data CCallStaticTargetUnit
-  = TargetIsInThisUnit  -- ^ In this current 'Unit'.
-  | TargetIsInThat Unit -- ^ In that other   'Unit'.
+  = TargetIsInThat Unit -- ^ In that other 'Unit'.
   deriving (Data, Eq)
 
 data StaticTargetGhc = StaticTargetGhc
@@ -355,16 +353,13 @@ deriving instance Eq (Header (GhcPass p))
 
 instance NFData CCallStaticTargetUnit where
     rnf = \case
-      TargetIsInThisUnit  -> ()
       TargetIsInThat unit -> rnf unit
 
 instance Binary CCallStaticTargetUnit where
     put_ bh = \case
-      TargetIsInThisUnit  -> putByte bh 0
       TargetIsInThat unit -> putByte bh 1 *> put_ bh unit
 
     get bh = getByte bh >>= \case
-      0 -> pure TargetIsInThisUnit
       _ -> TargetIsInThat <$> get bh
 
 instance NFData CTypeGhc where
