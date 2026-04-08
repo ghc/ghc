@@ -1118,12 +1118,11 @@ tcGetDefaultTys
               -- Not one of the built-in units
               -- @default Num (Integer, Double)@, plus extensions
               { extDef <- if extended_defaults
-                          then do { list_tc       <- tcLookupKnownKeyTyCon listTyConKey
-                                  ; foldableClass <- tcLookupKnownKeyClass foldableClassKey
+                          then do { foldableClass <- tcLookupKnownKeyClass foldableClassKey
                                   ; showClass     <- tcLookupKnownKeyClass showClassKey
                                   ; eqClass       <- tcLookupKnownKeyClass eqClassKey
                                   ; pure $ defaultEnv
-                                    [ builtinDefaults foldableClass [mkTyConTy list_tc]
+                                    [ builtinDefaults foldableClass [mkTyConTy listTyCon]
                                     , builtinDefaults showClass [unitTy, integerTy, doubleTy]
                                     , builtinDefaults eqClass [unitTy, integerTy, doubleTy]
                                     ]

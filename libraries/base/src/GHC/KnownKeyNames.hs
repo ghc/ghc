@@ -59,9 +59,8 @@ module GHC.KnownKeyNames
     , dataToTag#
 
     -- Numbers
-    , Num
+    , Num, Integral, Real, Fractional
     , (+), (-), (*), negate, fromInteger
-    , Integral, Real
     , fromRational
     , mkRationalBase2, mkRationalBase10
     , divInt#, modInt#
@@ -70,7 +69,7 @@ module GHC.KnownKeyNames
     , IsString
     , fromString
 
-    -- Records and lists
+    -- Records
     , HasField
     , fromLabel, getField
 
@@ -129,8 +128,8 @@ module GHC.KnownKeyNames
          , pragSpecED, pragSpecInlED
          , pragSpecInstD, pragRuleD, pragCompleteD, pragAnnD, pragSCCFunD
          , pragSCCFunNamedD, dataInstD, newtypeInstD, tySynInstD, openTypeFamilyD
-         , closedTypeFamilyD, dataFamilyD, infixLWithSpecD, infixRWithSpecD, roleAnnotD
-         , patSynD, patSynSigD, implicitParamBindD
+         , closedTypeFamilyD, dataFamilyD, infixLWithSpecD, infixRWithSpecD, infixNWithSpecD
+         , roleAnnotD, patSynD, patSynSigD, implicitParamBindD
     , Lit, charL, stringL, integerL, intPrimL, wordPrimL, floatPrimL
          , doublePrimL, rationalL, stringPrimL, charPrimL
     , Pat, litP, varP, tupP, unboxedTupP, unboxedSumP, conP, infixP, tildeP

@@ -168,28 +168,39 @@ lookupKnownKeyThing key mb_gbl_rdr_env
 lookupKnownKeyName :: HasDebugCallStack
                    => KnownKey -> KnownKeyNameSource
                    -> IfM lcl (MaybeErr IfaceMessage Name)
-lookupKnownKeyName uniq KKNS_FromModule
+lookupKnownKeyName key KKNS_FromModule
   = do { (kk_map, _) <- loadKnownKeyOccMaps
-       ; case lookupUFM kk_map uniq of
+       ; case lookupUFM kk_map key of
            Just name -> return (Succeeded name)
-           Nothing   -> return (Failed (MissingKnownKey1 uniq)) }
+           Nothing
+             | wired_in_nm : _ <- filter (`hasKey` key) wiredInNames
+             -> -- We should never call lookupKnownKeyName on the key of a wired-in
+                -- entity; see (KKN3) in Note [Overview of known-key entities]
+                -- We hackily panic here rather than use a civilised error
+                -- message so that we get a helpful stack backtrace
+                pprPanic "lookupKownKeyName" $
+                hang (text "You tried to look up wired-in"
+                      <+> quotes (ppr wired_in_nm) <+> text "in the known-key table")
+                   2 (text "Better to use the wired-in name directly")
+             | otherwise
+             -> return (Failed (MissingKnownKey1 key)) }
 
-lookupKnownKeyName uniq (KKNS_InScope gbl_rdr_env)
+lookupKnownKeyName key (KKNS_InScope gbl_rdr_env)
   -- Just gbl_rdr_env: we have -frebindable-known-key-names on, and
   --                   here is the top-level GlobalRdrEnv
   -- Look up the /un-qualified/ known-key OccName in the GlobalRdrEnv
   -- If we get a unique hit, use it; if not, panic.
-  | Just (occ :: OccName) <- lookupUFM knownKeyUniqMap uniq
+  | Just (occ :: OccName) <- lookupUFM knownKeyUniqMap key
   = case lookupGRE gbl_rdr_env (LookupRdrName (mkRdrUnqual occ) SameNameSpace) of
        [gre] -> do { let name = greName gre
                    ; traceIf $ hang (text "lookupKnownKeyName1 NoImplicitKnownKeyNames")
-                                  2 (ppr name <+> ppr uniq)
+                                  2 (ppr name <+> ppr key)
                    ; return (Succeeded name) }
        gres  -> return (Failed (KnownKeyScopeError occ gres))
 
   | otherwise
-  = pprTrace "lookup failed" (pprKnownKey uniq $$ callStackDoc) $
-    return (Failed (MissingKnownKey2 uniq))
+  = pprTrace "lookup failed" (pprKnownKey key $$ callStackDoc) $
+    return (Failed (MissingKnownKey2 key))
 
 lookupKnownOccThing :: HasDebugCallStack
                     => KnownOcc -> KnownKeyNameSource

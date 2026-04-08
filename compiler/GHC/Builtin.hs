@@ -291,6 +291,15 @@ Wrinkles
    So we compile GHC.Internal.Data.Foldable with
        -fexclude-known-key-define=toList
 
+(KKN3) You don't need need to export the wired-in entities from GHC.KnownKeyNames
+  because we (should) never look up a wired-in name via its key.  That is,
+  `GHC.Iface.Load.lookupKnownKeyName` should never be called on the key of
+  a wired-in name.
+
+  Alternative: export all wired-in entities from GHC.KnownKeyNames.  But that
+  would simply bloat the interface for no good reason.
+
+
 Note [Recipe for adding a known-occ name]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To make `wombat` into a known-occ name, you must ensure that:
@@ -452,6 +461,8 @@ wiredInNames
                         Nothing -> []
 
 -- | Check the known-key names list of consistency.
+-- (a) Unique is in-range (ToDo: get rid of this)
+-- (b) Distinct uniques
 knownKeyNamesOkay :: [Name] -> Maybe SDoc
 knownKeyNamesOkay all_names
   | ns@(_:_) <- filter (not . isValidKnownKeyUnique . getUnique) all_names
