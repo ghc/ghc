@@ -1802,7 +1802,7 @@ alreadyCovered :: SpecEnv
 alreadyCovered env bndrs fn args is_active rules
   = case specLookupRule env fn args is_active rules of
       Nothing             -> False
-      Just (rule, _,_)
+      Just (rule, _)
         | isAutoRule rule -> -- Discard identical rules
                              -- We know that (fn args) is an instance of RULE
                              -- Check if RULE is an instance of (fn args)
@@ -1822,7 +1822,10 @@ specLookupRule env fn args is_active rules
   = Nothing    -- Saves building a few thunks in the common case
   | otherwise
   = case lookupRule ropts in_scope_env is_active fn args rules of
-      Just (rule, rule_rhs, rule_args) -> Just (rule, mkApps rule_rhs rule_args)
+      Just (RM { rm_rule = rule, rm_rhs = rule_rhs
+               , rm_binds = wrap, rm_args = rule_args })
+        -> Just (rule, applyBindWrapper wrap (mkApps rule_rhs rule_args))
+      Nothing -> Nothing
   where
     dflags       = se_dflags env
     in_scope     = substInScopeSet (se_subst env)

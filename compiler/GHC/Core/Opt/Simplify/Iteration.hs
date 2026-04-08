@@ -2657,7 +2657,7 @@ fireRuleAFTER env rule_match arg_specs cont
                          pushArgs env' Simplified (exprType rhs) rhs_args $
                          pushArgSpecs env' (drop (ruleArity rule) arg_specs) cont
        ; return $
-         if isEmptyBindWrapper wrap
+         if isEmptyBindWrapper wrap  -- Not very pretty
          then (floats, e')
          else (emptyFloats env', applyBindWrapper wrap $
                                  wrapFloats floats e') }
@@ -2733,7 +2733,7 @@ tryRules env rules fn args
 trySeqRules :: SimplEnv
             -> OutExpr -> InExpr   -- Scrutinee and RHS
             -> SimplCont
-            -> SimplM (Maybe (CoreExpr, SimplCont))
+            -> SimplM (Maybe (RuleMatch, [ArgSpec], SimplCont))
 -- See Note [User-defined RULES for seq]
 -- `in_env` applies to `rhs :: InExpr` but not to `scrut :: OutExpr`
 trySeqRules in_env scrut rhs cont
@@ -2742,7 +2742,7 @@ trySeqRules in_env scrut rhs cont
        ; mb_match <- tryRules in_env seq_rules seqId out_args
        ; case mb_match of
             Nothing         -> return Nothing
-            Just rule_match -> Just <$> fireRuleAFTER in_env rule_match out_arg_specs cont }
+            Just rule_match -> return (Just (rule_match, arg_specs, rule_cont)) }
   where
     no_cast_scrut = drop_casts scrut
 
@@ -2756,20 +2756,22 @@ trySeqRules in_env scrut rhs cont
     rhs_ty    = substTy in_env (exprType rhs)
     rhs_rep   = getRuntimeRep rhs_ty
 
-    out_args = [Type rhs_rep, Type scrut_ty, Type rhs_ty, no_cast_scrut]
-               -- Cheaper than (map argSpecArg out_arg_specs)
-    out_arg_specs  = [ TyArg { as_arg_ty  = rhs_rep
-                        , as_hole_ty = seq_id_ty }
-                     , TyArg { as_arg_ty  = scrut_ty
-                             , as_hole_ty = res1_ty }
-                     , TyArg { as_arg_ty  = rhs_ty
-                             , as_hole_ty = res2_ty }
-                     , ValArg { as_arg = no_cast_scrut
-                              , as_dmd = seqDmd
-                              , as_hole_ty = res3_ty } ]
+    arg_specs :: [ArgSpec]
+    arg_specs  = [ TyArg { as_arg_ty  = rhs_rep
+                         , as_hole_ty = seq_id_ty }
+                 , TyArg { as_arg_ty  = scrut_ty
+                         , as_hole_ty = res1_ty }
+                 , TyArg { as_arg_ty  = rhs_ty
+                         , as_hole_ty = res2_ty }
+                 , ValArg { as_arg = no_cast_scrut
+                          , as_dmd = seqDmd
+                          , as_hole_ty = res3_ty } ]
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
                            , sc_env = in_env, sc_cont = cont
                            , sc_hole_ty = res4_ty }
+
+    out_args = [Type rhs_rep, Type scrut_ty, Type rhs_ty, no_cast_scrut]
+               -- Cheaper than (map argSpecArg out_arg_specs)
 
     -- Lazily evaluated, so we don't do most of this
     drop_casts (Cast e _) = drop_casts e
@@ -3196,8 +3198,8 @@ rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
   | is_plain_seq
   = do { mb_rule <- trySeqRules env scrut rhs cont
        ; case mb_rule of
-           Just (rule_rhs, cont') -> simplExprF (zapSubstEnv env) rule_rhs cont'
-           Nothing                -> reallyRebuildCase env scrut case_bndr alts cont }
+           Just (rm, ass, rcont) -> fireRuleAFTER env rm ass rcont
+           Nothing               -> reallyRebuildCase env scrut case_bndr alts cont }
 
   where
     all_dead_bndrs = all isDeadBinder bndrs       -- bndrs are [InId]
