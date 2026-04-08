@@ -296,9 +296,15 @@ dsJsFExportDynamic id co0 cconv = do
                         ]
           -- name of external entry point providing these services.
           -- (probably in the RTS.)
-        adjustor   = fsLit "createAdjustor"
+        adjustor   = CCallSpec
+                       (StaticTarget
+                         (StaticTargetGhc NoSourceText TargetIsInThisUnit)
+                         (fsLit "createAdjustor")
+                         ForeignFunction)
+                       CCallConv
+                       PlayRisky
 
-    ccall_adj <- dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])
+    ccall_adj <- dsCCall adjustor adj_args (mkTyConApp io_tc [res_ty])
         -- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
 
     let io_app = mkLams tvs                  $
