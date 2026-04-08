@@ -1,0 +1,6 @@
+:set -fno-break-points
+:load T25890.hs
+:break main
+:set -fbreak-points
+:load T25890.hs
+:break main

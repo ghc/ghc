@@ -1,0 +1,2 @@
+Cannot set breakpoint on ‘main’: No breakpoint found for ‘main’ in module ‘T25890’
+Breakpoint 0 activated at T25890.hs:(4,8)-(6,9)

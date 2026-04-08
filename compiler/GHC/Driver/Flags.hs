@@ -983,6 +983,7 @@ codeGenFlags = EnumSet.fromList
    , Opt_NoBignumRules
    , Opt_ObjectDeterminism
    , Opt_Haddock
+   , Opt_InsertBreakpoints
 
      -- Flags that affect catching of runtime errors
    , Opt_CatchNonexhaustiveCases
