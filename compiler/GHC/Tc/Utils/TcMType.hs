@@ -112,7 +112,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
 import GHC.Tc.Zonk.TcType
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Core.ConLike
 import GHC.Core.DataCon

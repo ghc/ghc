@@ -41,7 +41,7 @@ import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
 import GHC.Types.Unique.FM
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim  ( mkTemplateAnonTyConBinders, mkTemplateTyVars )
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
                   ( gHC_INTERNAL_TYPELITS
                   , gHC_INTERNAL_TYPELITS_INTERNAL
                   , gHC_INTERNAL_TYPENATS
@@ -92,10 +92,10 @@ There are a few steps to adding a built-in type family:
 
 * Adding a unique for the type family TyCon
 
-  These go in GHC.Builtin.Names. It will likely be of the form
+  These go in GHC.Builtin.KnownKeys. It will likely be of the form
   @myTyFamNameKey = mkPreludeTyConUnique xyz@, where @xyz@ is a number that
-  has not been chosen before in GHC.Builtin.Names. There are several examples already
-  in GHC.Builtin.Names—see, for instance, typeNatAddTyFamNameKey.
+  has not been chosen before in GHC.Builtin.KnownKeys. There are several examples already
+  in GHC.Builtin.KnownKeys—see, for instance, typeNatAddTyFamNameKey.
 
 * Adding the type family TyCon itself
 

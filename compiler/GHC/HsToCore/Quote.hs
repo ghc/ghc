@@ -16,8 +16,8 @@
 -- CoreExpr's of the "smart constructors" of the Meta.Exp datatype.
 --
 -- It also defines a bunch of knownKeyNames, in the same way as is done
--- in prelude/GHC.Builtin.Names.  It's much more convenient to do it here, because
--- otherwise we have to recompile GHC.Builtin.Names whenever we add a Name, which is
+-- in prelude/GHC.Builtin.KnownKeys.  It's much more convenient to do it here, because
+-- otherwise we have to recompile GHC.Builtin.KnownKeys whenever we add a Name, which is
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
@@ -52,7 +52,7 @@ import GHC.Core.Type( pattern ManyTy, mkFunTy )
 import GHC.Core.Make
 import GHC.Core.Utils
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.TH
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim

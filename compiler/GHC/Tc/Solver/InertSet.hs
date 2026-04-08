@@ -66,7 +66,7 @@ import GHC.Core.Predicate
 import qualified GHC.Core.TyCo.Rep as Rep
 import GHC.Core.TyCon
 import GHC.Core.Class( Class, classTyCon )
-import GHC.Builtin.Names( eqPrimTyConKey, heqTyConKey, eqTyConKey, coercibleTyConKey )
+import GHC.Builtin.KnownKeys( eqPrimTyConKey, heqTyConKey, eqTyConKey, coercibleTyConKey )
 import GHC.Utils.Misc       ( partitionWith )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

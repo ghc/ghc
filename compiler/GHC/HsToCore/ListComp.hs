@@ -36,7 +36,7 @@ import GHC.Types.Unique.Supply( getUniqueM )
 import GHC.Driver.DynFlags
 import GHC.Tc.Utils.TcType
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( alphaTyVar )
 

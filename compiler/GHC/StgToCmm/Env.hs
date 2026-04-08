@@ -44,7 +44,7 @@ import GHC.Types.Var.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import GHC.Builtin.Names (getUnique)
+import GHC.Builtin.KnownKeys (getUnique)
 
 
 -------------------------------------

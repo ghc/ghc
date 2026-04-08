@@ -83,7 +83,7 @@ import GHC.Core.TyCo.Compare( eqForAllVis )
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyConName )
 import GHC.Types.Name
 import GHC.Types.Basic

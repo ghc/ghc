@@ -21,7 +21,7 @@ import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Types.Name
 import GHC.Builtin.Types
-import GHC.Builtin.Names (rationalTyConKey, toListClassOpKey)
+import GHC.Builtin.KnownKeys (rationalTyConKey, toListClassOpKey)
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

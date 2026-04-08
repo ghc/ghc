@@ -86,7 +86,7 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
 import GHC.Utils.Outputable

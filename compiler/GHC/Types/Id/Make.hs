@@ -45,7 +45,7 @@ import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Core
 import GHC.Core.Opt.Arity( typeOneShot )

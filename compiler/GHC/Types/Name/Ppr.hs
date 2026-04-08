@@ -176,7 +176,7 @@ isPunnedDataConName occ =
 
 {- Note [pretendNameIsInScopeForPpr]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-c.f. Note [pretendNameIsInScope] in GHC.Builtin.Names
+c.f. Note [pretendNameIsInScope] in GHC.Builtin.KnownKeys
 Normally, a name is printed unqualified if it's in scope and unambiguous:
   ghci> :t not
   not :: Bool -> Bool

@@ -73,7 +73,7 @@ import GHC.Rename.Unbound
 import GHC.Rename.Utils
 
 import GHC.Builtin.Types
-import GHC.Builtin.Names( rOOT_MAIN )
+import GHC.Builtin.KnownKeys( rOOT_MAIN )
 import GHC.Builtin( knownKeyOccMap, knownKeyOccName )
 
 import GHC.Unit.Module
@@ -2404,7 +2404,7 @@ We store the relevant Name in the HsSyn tree, in
   * NegApp
   * NPlusKPat
   * HsDo
-respectively.  Initially, we just store the "standard" name (GHC.Builtin.Names.fromIntegralName,
+respectively.  Initially, we just store the "standard" name (GHC.Builtin.KnownKeys.fromIntegralName,
 fromRationalName etc), but the renamer changes this to the appropriate user
 name if Opt_NoImplicitPrelude is on.  That is what lookupSyntax does.
 

@@ -168,7 +168,7 @@ import GHC.Builtin.Uniques ( isTupleTyConUnique, isCTupleTyConUnique,
 
 Note [Fast comparison for built-in Names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this wired-in Name in GHC.Builtin.Names:
+Consider this wired-in Name in GHC.Builtin.KnownKeys:
 
    int8TyConName = tcQual gHC_INTERNAL_INT  (fsLit "Int8")  int8TyConKey
 

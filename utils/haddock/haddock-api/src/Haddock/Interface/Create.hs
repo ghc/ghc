@@ -43,7 +43,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, isJust, mapMaybe, maybeToList)
 import Data.Traversable (for)
 import GHC hiding (lookupName)
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types.Prim
 import GHC.Core.ConLike (ConLike (..))
 import GHC.Data.FastString (FastString, bytesFS, unpackFS)

@@ -45,7 +45,7 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Driver.DynFlags
 

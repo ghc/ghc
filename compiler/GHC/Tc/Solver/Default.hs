@@ -40,7 +40,7 @@ import GHC.Types.Unique.Set
 import GHC.Types.Id
 
 import GHC.Builtin
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types
 
 import GHC.Types.TyThing ( MonadThings(lookupId) )
@@ -858,7 +858,7 @@ define the following:
     a class defined in the Prelude or the standard library, as defined
     by the Haskell 98 report (section 4.3.4)
 
-    These are defined in GHC.Builtin.Names.standardClassKeys.
+    These are defined in GHC.Builtin.KnownKeys.standardClassKeys.
 
 The rules for defaulting a collection 'S' of unsolved constraints are as follows:
 

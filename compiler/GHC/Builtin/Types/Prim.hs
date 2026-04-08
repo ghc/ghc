@@ -143,7 +143,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 
 import GHC.Builtin.Uniques
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Utils.Misc ( changeLast )
 import GHC.Utils.Panic ( assertPpr )
 import GHC.Utils.Outputable

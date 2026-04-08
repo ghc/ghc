@@ -30,7 +30,7 @@ module Haddock.Convert
 import Control.DeepSeq (force)
 import Data.Either (lefts, partitionEithers, rights)
 import Data.Maybe (catMaybes, mapMaybe)
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
   ( boxedRepDataConKey
   , eqTyConKey
   , hasKey

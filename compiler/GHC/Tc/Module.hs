@@ -99,7 +99,7 @@ import GHC.Iface.Env     ( externaliseName )
 import GHC.Iface.Load
 
 import GHC.Builtin.Types ( mkListTy, anyTypeOfKind )
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin
 
 import GHC.Hs hiding ( FunDep(..) )

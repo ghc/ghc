@@ -13,7 +13,7 @@
 module GHC.KnownKeyNames
     ( Rational
     , Eq(..), Ord(..)  -- With their methods
-    , Show
+    , Show, Read
     , Foldable, Traversable
     , Functor, fmap
     , Monad, (>>), (>>=), return, fail, guard, mfix, join
@@ -146,6 +146,7 @@ module GHC.KnownKeyNames
     ) where
 
 import GHC.Internal.Show
+import GHC.Internal.Read
 import GHC.Internal.Num
 import GHC.Internal.Real
 import Data.String( IsString )

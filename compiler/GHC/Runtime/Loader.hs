@@ -37,7 +37,7 @@ import GHC.Rename.Names ( gresFromAvails )
 
 import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )
 import GHC.Iface.Load          ( loadPluginInterface, cannotFindModule )
-import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
+import GHC.Builtin.KnownKeys ( pluginTyConName, frontendPluginTyConName )
 
 import GHC.Driver.Env
 import GHCi.RemoteTypes     ( HValue )

@@ -82,7 +82,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.FV
 import GHC.Types.Basic
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types( unitTy )
 
 import GHC.Utils.Misc

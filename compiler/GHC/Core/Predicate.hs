@@ -53,7 +53,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Core.Multiplicity ( scaledThing )
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types.Prim( eqPrimTyCon, eqReprPrimTyCon )
 
 import GHC.Utils.Outputable

@@ -47,7 +47,7 @@ import Debug.Trace (traceMarkerIO)
 import System.Exit (exitFailure ) -- TODO use Haddock's die
 import Text.Printf
 import GHC hiding (verbosity, SuccessFlag(..))
-import GHC.Builtin.Names (mkMainModule_)
+import GHC.Builtin.KnownKeys (mkMainModule_)
 import qualified GHC.Data.EnumSet as EnumSet
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.Graph.Directed

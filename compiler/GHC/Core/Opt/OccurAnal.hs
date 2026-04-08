@@ -64,7 +64,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
-import GHC.Builtin.Names( runRWKey )
+import GHC.Builtin.KnownKeys( runRWKey )
 import GHC.Unit.Module( Module )
 
 import Data.List (mapAccumL)

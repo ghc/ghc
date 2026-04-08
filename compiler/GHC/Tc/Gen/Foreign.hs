@@ -59,7 +59,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types.Prim( isArrowTyCon )
 
 import GHC.Driver.Session

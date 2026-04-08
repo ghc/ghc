@@ -60,7 +60,7 @@ import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
 import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Cmm.MachOp ( FMASign(..) )
 import GHC.Cmm.Type ( Width(..) )

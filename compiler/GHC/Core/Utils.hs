@@ -86,7 +86,7 @@ import GHC.Core.Reduction
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
 
-import GHC.Builtin.Names ( makeStaticKey, unsafeEqualityProofIdKey, unsafeReflDataConKey )
+import GHC.Builtin.KnownKeys ( makeStaticKey, unsafeEqualityProofIdKey, unsafeReflDataConKey )
 import GHC.Builtin.PrimOps
 
 import GHC.Types.Var

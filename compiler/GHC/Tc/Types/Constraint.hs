@@ -125,7 +125,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.ErrCtxt
 import GHC.Tc.Types.CtLoc
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Types.Var.Set
 import GHC.Types.Name.Reader

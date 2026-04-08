@@ -50,7 +50,7 @@ import GHC.Core.Predicate( Pred(..), classifyPredType, eqRelRole )
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Reader
-import GHC.Builtin.Names ( gHC_INTERNAL_ERR, gHC_INTERNAL_UNSAFE_COERCE )
+import GHC.Builtin.KnownKeys ( gHC_INTERNAL_ERR, gHC_INTERNAL_UNSAFE_COERCE )
 import GHC.Builtin.Types ( tupleDataConName, unboxedSumDataConName )
 import GHC.Types.Id
 import GHC.Types.Name.Set (extendNameSet, NameSet, emptyNameSet)
@@ -683,7 +683,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
     builtIns exts = filter isBuiltInSyntax (wiredInNames ++ infFamNames)
       where
         -- Tuples and sums of are not included in knownKeyName as there are infinitely many of them.
-        -- See Note [Infinite families of known-key names] in GHC.Builtin.Names.
+        -- See Note [Infinite families of known-key names] in GHC.Builtin.KnownKeys.
         infFamNames =
              [tupleDataConName Boxed   n | n <- [0..max_tup]]
           ++ [tupleDataConName Unboxed n | unboxedTuples, n <- [0..max_tup]]

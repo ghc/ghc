@@ -169,7 +169,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Core.Coercion.Axiom
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

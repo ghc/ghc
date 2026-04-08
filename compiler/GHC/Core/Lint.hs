@@ -82,7 +82,7 @@ import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types.Prim
 
 import GHC.Data.Bag
