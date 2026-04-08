@@ -59,7 +59,7 @@ import GHC.Core.Rules
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Ppr
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 

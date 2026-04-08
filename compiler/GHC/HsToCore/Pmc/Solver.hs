@@ -75,7 +75,7 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst (elemSubst)

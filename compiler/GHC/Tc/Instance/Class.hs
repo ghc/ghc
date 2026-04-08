@@ -26,7 +26,7 @@ import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.PrimOps ( PrimOp(..) )
 import GHC.Builtin.PrimOps.Ids ( primOpId )
 

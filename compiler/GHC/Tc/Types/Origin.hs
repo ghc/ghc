@@ -50,7 +50,7 @@ import GHC.Tc.Types.ErrCtxt
 
 import GHC.Hs
 
-import GHC.Builtin.Names( getFieldClassOpKey )
+import GHC.Builtin.KnownKeys( getFieldClassOpKey )
 
 import GHC.Core.DataCon
 import GHC.Core.ConLike

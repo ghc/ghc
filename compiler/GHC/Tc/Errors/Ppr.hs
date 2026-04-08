@@ -39,7 +39,7 @@ import qualified GHC.Boot.TH.Syntax as TH
 import qualified GHC.Boot.TH.Ppr as TH
 
 import GHC.Builtin.Types( boxedRepDataConTyCon, tYPETyCon, pretendNameIsInScope )
-import GHC.Builtin.Names -- A bunch of keys
+import GHC.Builtin.KnownKeys -- A bunch of keys
 
 import GHC.Types.Name.Reader
 import GHC.Unit.Module.ModIface
@@ -4993,7 +4993,7 @@ potentials_msg_with_options
 
     name_in_scope name
       | pretendNameIsInScope name
-      = True -- E.g. (->); see Note [pretendNameIsInScope] in GHC.Builtin.Names
+      = True -- E.g. (->); see Note [pretendNameIsInScope] in GHC.Builtin.KnownKeys
       | Just mod <- nameModule_maybe name
       = qual_in_scope (qualName sty mod Nothing (nameOccName name))
       | otherwise

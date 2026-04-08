@@ -159,7 +159,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Constraint
 
-import GHC.Builtin.Names ( callStackTyConName, exceptionContextTyConName )
+import GHC.Builtin.KnownKeys ( callStackTyConName, exceptionContextTyConName )
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep as Rep

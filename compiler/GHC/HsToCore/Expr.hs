@@ -71,7 +71,7 @@ import GHC.Unit.Module
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Builtin.Types
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable

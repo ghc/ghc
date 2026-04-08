@@ -87,7 +87,7 @@ import GHC.Iface.Load
 
 import GHC.Tc.Utils.Monad
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Data.FastString
 

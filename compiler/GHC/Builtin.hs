@@ -57,7 +57,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Literals ( typeNatTyCons )
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.TH ( templateHaskellNames, thKnownKeyTable )
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon
@@ -149,7 +149,7 @@ When do we use each of these?
        cls `hasKnownKey` typeableClassKey
   or equivalently
        getUnique cls == typeableClassKey
-  where GHC.Builtin.Names.typeableClassKey is the statically chosen unique
+  where GHC.Builtin.KnownKeys.typeableClassKey is the statically chosen unique
   for `Typeable`.  See `GHC.Tc.Instance.Class.matchGlobalInst`
 
 * We use a known-occ entity when we just want to refer to the thing in, say,
@@ -192,7 +192,7 @@ Here is why GHC might want to refer to a known-occ entity:
 
 To implement all this, here are the moving parts:
 
-* Each known-key name has a /statically-chosen/ unique, fixed in GHC.Builtin.Names.
+* Each known-key name has a /statically-chosen/ unique, fixed in GHC.Builtin.KnownKeys.
   e.g. eqClassKey :: KnownKey
        eqClassKey = mkPreludeClassUnique 3
 
@@ -329,12 +329,12 @@ To make `wombat` into a known-key name, you must ensure that:
 
 * The module `GHC.KnownKeyNames` must export `wombat`.
 
-* In GHC.Builtin.Names you must define a static unique
+* In GHC.Builtin.KnownKeys you must define a static unique
      wombatKey :: KnownKey
      wombatKey = mkPreludeMiscIdUnique 892
   with an unused unique, here 892.
 
-* The big list `GHC.Builtin.Names.knownKeyTable` must contain an
+* The big list `GHC.Builtin.KnownKeys.knownKeyTable` must contain an
   entry for `wombat`
       (mkVarOcc "wombat", wombatKey)
 
@@ -501,7 +501,7 @@ See also
 
 -- | This list is used to ensure that when you say "Prelude.map" in your source
 -- code, or in an interface file, you get a Name with the correct known key (See
--- Note [Known-key names] in "GHC.Builtin.Names")
+-- Note [Known-key names] in "GHC.Builtin.KnownKeys")
 wiredInNames :: [Name]
 wiredInNames
   | debugIsOn

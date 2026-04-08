@@ -78,7 +78,7 @@ import GHC.Utils.Misc
 import GHC.Types.Basic
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Builtin.Names( ipClassName )
+import GHC.Builtin.KnownKeys( ipClassName )
 import GHC.Types.Unique.Set
 import qualified GHC.LanguageExtensions as LangExt
 

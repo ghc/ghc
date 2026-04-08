@@ -68,7 +68,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Monad
 
-import GHC.Builtin.Names ( specTyConKey )
+import GHC.Builtin.KnownKeys ( specTyConKey )
 
 import GHC.Exts( SpecConstrAnnotation(..) )
 import GHC.Serialized   ( deserializeWithData )

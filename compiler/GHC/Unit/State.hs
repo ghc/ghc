@@ -1205,7 +1205,7 @@ findWiredInUnits logger prec_map pkgs vis_map = do
 -- compiler, as described in Note [Wired-in units] in GHC.Unit.Types.
 --
 -- For instance, base-4.9.0.0 will be rewritten to just base, to match
--- what appears in GHC.Builtin.Names.
+-- what appears in GHC.Builtin.KnownKeys.
 
 upd_wired_in_mod :: WiringMap -> Module -> Module
 upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap uid) m

@@ -165,7 +165,7 @@ module GHC.Tc.Utils.Monad(
 import GHC.Prelude
 
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types( zonkAnyTyCon )
 
 import GHC.Tc.Errors.Types

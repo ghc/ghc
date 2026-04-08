@@ -18,7 +18,7 @@ module GHC.Tc.Utils.Concrete
 
 import GHC.Prelude
 
-import GHC.Builtin.Names       ( unsafeCoercePrimName )
+import GHC.Builtin.KnownKeys       ( unsafeCoercePrimName )
 import GHC.Builtin.Types
 
 import GHC.Core.Coercion

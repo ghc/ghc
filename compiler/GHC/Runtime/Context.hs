@@ -41,7 +41,7 @@ import GHC.Types.Name.Ppr
 import GHC.Types.TyThing
 import GHC.Types.Var
 
-import GHC.Builtin.Names ( ioTyConName, printName, mkInteractiveModule )
+import GHC.Builtin.KnownKeys ( ioTyConName, printName, mkInteractiveModule )
 
 import GHC.Utils.Outputable
 
@@ -55,7 +55,7 @@ as if they were defined in modules
    ...etc...
 with each bunch of declarations using a new module, all sharing a
 common package 'interactive' (see Module.interactiveUnitId, and
-GHC.Builtin.Names.mkInteractiveModule).
+GHC.Builtin.KnownKeys.mkInteractiveModule).
 
 This scheme deals well with shadowing.  For example:
 

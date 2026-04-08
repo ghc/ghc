@@ -201,7 +201,7 @@ import GHC.Tc.Zonk.Env ( ZonkFlexi (DefaultFlexi) )
 import GHC.Stg.Syntax
 import GHC.Stg.Pipeline ( stg2stg, StgCgInfos )
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos, LambdaFormInfo(..))

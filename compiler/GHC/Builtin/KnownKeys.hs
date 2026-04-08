@@ -1,7 +1,7 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[GHC.Builtin.Names]{Definitions of prelude modules and names}
+\section[GHC.Builtin.KnownKeys]{Definitions of prelude modules and names}
 
 
 Nota Bene: all Names defined in here should come from the base package,
@@ -102,15 +102,10 @@ things,
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Builtin.Names
-   ( Unique, Uniquable(..), hasKey,  -- Re-exported for convenience
+module GHC.Builtin.KnownKeys
+   ( Unique, Uniquable(..), hasKey  -- Re-exported for convenience
 
-   -----------------------------------------------------------
-   module GHC.Builtin.Names, -- A huge bunch of (a) Names,  e.g. intTyConName
-                             --                 (b) Uniques e.g. intTyConKey
-                             --                 (c) Groups of classes and types
-                             --                 (d) miscellaneous things
-                             -- So many that we export them all
+   , module GHC.Builtin.KnownKeys
    )
 where
 

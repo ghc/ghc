@@ -200,11 +200,11 @@ Library
     Exposed-Modules:
         GHC
         GHC.Builtin
-        GHC.Builtin.Names
+        GHC.Builtin.KnownKeys
+        GHC.Builtin.KnownOccs
         GHC.Builtin.PrimOps
         GHC.Builtin.PrimOps.Casts
         GHC.Builtin.PrimOps.Ids
-        GHC.Builtin.RdrNames
         GHC.Builtin.TH
         GHC.Builtin.Types
         GHC.Builtin.Types.Literals

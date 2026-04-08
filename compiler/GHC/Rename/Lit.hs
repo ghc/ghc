@@ -4,7 +4,7 @@ module GHC.Rename.Lit where
 
 import GHC.Prelude
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Hs
 import GHC.Rename.Env (lookupNameWithQualifier)
 import GHC.Rename.Utils (genHsApps, genLHsLit)

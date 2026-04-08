@@ -45,7 +45,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.Names( srcLocDataConName, pushCallStackName, emptyCallStackName )
+import GHC.Builtin.KnownKeys( srcLocDataConName, pushCallStackName, emptyCallStackName )
 
 import GHC.Utils.Monad ( concatMapM )
 import GHC.Utils.Outputable

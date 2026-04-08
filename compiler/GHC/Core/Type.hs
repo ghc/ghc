@@ -245,7 +245,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
    , liftedRepTy, unliftedRepTy, zeroBitRepTy )
 
 import GHC.Types.Name( Name )
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-} GHC.Core.Coercion

@@ -27,7 +27,7 @@ import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique (uniqueTag)
 import GHC.Builtin.Types
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin
 
 import GHC.Utils.Outputable
@@ -128,7 +128,7 @@ takeUniqFromNameCache (NameCache c _) = uniqFromTagGrimly c
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ = lookup_infinite <|> lookup_normal
   where
-    -- See Note [Known-key names], 3(c) in GHC.Builtin.Names
+    -- See Note [Known-key names], 3(c) in GHC.Builtin.KnownKeys
     -- and Note [Infinite families of known-key names]
     lookup_infinite = isInfiniteFamilyOrigName_maybe mod occ
     lookup_normal = do

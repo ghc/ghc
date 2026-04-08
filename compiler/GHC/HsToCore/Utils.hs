@@ -67,7 +67,7 @@ import GHC.Core.ConLike
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
 import GHC.Unit.Module
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.SrcLoc

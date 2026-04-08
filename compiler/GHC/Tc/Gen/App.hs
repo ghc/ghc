@@ -44,7 +44,7 @@ import GHC.Core.Coercion
 
 import GHC.Builtin.Types ( multiplicityTy, runtimeRepTy )
 import GHC.Builtin.PrimOps( tagToEnumKey )
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Types.Var
 import GHC.Types.Var.FV

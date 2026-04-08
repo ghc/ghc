@@ -78,7 +78,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 
 import GHC.Builtin.Types
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
 import GHC.Driver.DynFlags

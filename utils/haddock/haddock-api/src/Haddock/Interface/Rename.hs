@@ -35,7 +35,7 @@ import Data.Traversable (mapM)
 
 import GHC hiding (NoLink, HsTypeGhcPsExt (..))
 import GHC.Builtin.Types ( tupleDataConName, tupleTyConName)
-import GHC.Builtin.Names ( eqTyConKey )
+import GHC.Builtin.KnownKeys ( eqTyConKey )
 import GHC.Core.TyCon (tyConResKind)
 import GHC.Driver.DynFlags (getDynFlags)
 import GHC.Hs.Decls.Overlap (OverlapMode(..))

@@ -44,7 +44,7 @@ import GHC.Rename.Lit
 import GHC.Rename.Pat
 
 import GHC.Driver.DynFlags
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types ( nilDataConName, oneDataConName )
 import GHC.Unit.Module ( isInteractiveModule )
 
@@ -114,7 +114,7 @@ Note [Rebindable syntax and XXExprGhcRn], which describes the use of XXExprGhcRn
 
 RebindableSyntax:
   If RebindableSyntax is off we use the built-in 'fromLabel', defined in
-     GHC.Builtin.Names.fromLabelClassOpName
+     GHC.Builtin.KnownKeys.fromLabelClassOpName
   If RebindableSyntax if ON, we look up "fromLabel" in the environment
      to get whichever one is in scope.
 This is accomplished by lookupSyntaxName, and it applies to all the

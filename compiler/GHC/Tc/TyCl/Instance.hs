@@ -50,7 +50,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Types.Evidence
 
-import GHC.Builtin.Names ( unsatisfiableIdKey )
+import GHC.Builtin.KnownKeys ( unsatisfiableIdKey )
 
 import GHC.Core        ( Expr(..), mkVarApps )
 import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )

@@ -48,7 +48,7 @@ import GHC.Types.Name
 import GHC.Types.Literal
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 

@@ -36,7 +36,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Zonk.TcType
 
 import GHC.Builtin.Types
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 
 import GHC.Core.Type

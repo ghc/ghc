@@ -51,7 +51,7 @@ import GHC.Cmm.Utils
 
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Data.FastString
 

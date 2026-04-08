@@ -7,7 +7,7 @@
 
 -- | RdrNames used in 'deriving'
 
-module GHC.Builtin.RdrNames where
+module GHC.Builtin.KnownOccs where
 
 import GHC.Prelude
 
@@ -19,7 +19,7 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.Types  -- A bunch of wired-in TyCons and DataCons
 import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Builtin.TH( unsafeCodeCoerceName, liftTypedName )
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Types.Name.Reader( RdrName, mkVarUnqual, getRdrName
                             , nameRdrName )

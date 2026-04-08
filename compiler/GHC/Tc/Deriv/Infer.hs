@@ -44,7 +44,7 @@ import GHC.Core.Predicate
 import GHC.Core.Unify (tcUnifyTy)
 
 import GHC.Data.Pair
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types (mkConstraintTupleTy, typeToTypeKind)
 
 import GHC.Utils.Outputable

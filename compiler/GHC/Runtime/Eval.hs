@@ -83,7 +83,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 
-import GHC.Builtin.Names ( toDynName )
+import GHC.Builtin.KnownKeys ( toDynName )
 import GHC.Builtin.Types ( pretendNameIsInScope )
 
 import GHC.Data.Maybe
@@ -936,7 +936,7 @@ getInfo allInfo name
           ok n | n == name              = True
                        -- The one we looked for in the first place!
                | pretendNameIsInScope n = True
-                   -- See Note [pretendNameIsInScope] in GHC.Builtin.Names
+                   -- See Note [pretendNameIsInScope] in GHC.Builtin.KnownKeys
                | isExternalName n       = isJust (lookupGRE_Name rdr_env n)
                | otherwise              = True
 

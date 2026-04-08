@@ -85,7 +85,7 @@ import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import Data.IORef
 import qualified Data.Set as Set

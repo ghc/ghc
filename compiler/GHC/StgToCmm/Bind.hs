@@ -25,7 +25,7 @@ import GHC.Stg.Syntax
 import GHC.Platform
 import GHC.Platform.Profile
 
-import GHC.Builtin.Names (unpackCStringName, unpackCStringUtf8Name)
+import GHC.Builtin.KnownKeys (unpackCStringName, unpackCStringUtf8Name)
 
 import GHC.StgToCmm.Config
 import GHC.StgToCmm.Expr
