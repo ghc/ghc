@@ -58,7 +58,8 @@ import GHC.Core.Rules
 import GHC.Core.Ppr( pprCoreBinders )
 import GHC.Core.TyCo.Compare( eqType )
 
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownKeys( typeableClassKey )
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
 
 import GHC.Tc.Types.Evidence
@@ -1761,10 +1762,10 @@ type TypeRepExpr = CoreExpr
 -- | Returns a @CoreExpr :: TypeRep ty@
 ds_ev_typeable :: Type -> EvTypeable -> DsM CoreExpr
 ds_ev_typeable ty (EvTypeableTyCon tc kind_ev)
-  = do { mkTrCon <- dsLookupGlobalId mkTrConName
+  = do { mkTrCon <- dsLookupKnownOccId mkTrConOcc
                     -- mkTrCon :: forall k (a :: k). TyCon -> TypeRep k -> TypeRep a
-       ; someTypeRepTyCon <- dsLookupTyCon someTypeRepTyConName
-       ; someTypeRepDataCon <- dsLookupDataCon someTypeRepDataConName
+       ; someTypeRepTyCon <- dsLookupKnownOccTyCon someTypeRepTyConOcc
+       ; someTypeRepDataCon <- dsLookupKnownOccDataCon someTypeRepDataConOcc
                     -- SomeTypeRep :: forall k (a :: k). TypeRep a -> SomeTypeRep
 
        ; tc_rep <- tyConRep tc                      -- :: TyCon
@@ -1793,7 +1794,7 @@ ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
   | Just (t1,t2) <- splitAppTy_maybe ty
   = do { e1  <- getRep ev1 t1
        ; e2  <- getRep ev2 t2
-       ; mkTrAppChecked <- dsLookupGlobalId mkTrAppCheckedName
+       ; mkTrAppChecked <- dsLookupKnownOccId mkTrAppCheckedOcc
                     -- mkTrAppChecked :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
                     --                   TypeRep a -> TypeRep b -> TypeRep (a b)
        ; let (_, k1, k2) = splitFunTy (typeKind t1)  -- drop the multiplicity,
@@ -1809,7 +1810,7 @@ ds_ev_typeable ty (EvTypeableTrFun evm ev1 ev2)
   = do { e1 <- getRep ev1 t1
        ; e2 <- getRep ev2 t2
        ; em <- getRep evm m
-       ; mkTrFun <- dsLookupGlobalId mkTrFunName
+       ; mkTrFun <- dsLookupKnownOccId mkTrFunOcc
                     -- mkTrFun :: forall (m :: Multiplicity) r1 r2 (a :: TYPE r1) (b :: TYPE r2).
                     --            TypeRep m -> TypeRep a -> TypeRep b -> TypeRep (a % m -> b)
        ; let r1 = getRuntimeRep t1
@@ -1820,7 +1821,7 @@ ds_ev_typeable ty (EvTypeableTrFun evm ev1 ev2)
 
 ds_ev_typeable ty (EvTypeableTyLit ev)
   = -- See Note [Typeable for Nat and Symbol] in GHC.Tc.Instance.Class
-    do { fun  <- dsLookupGlobalId tr_fun
+    do { fun  <- dsLookupKnownOccId tr_fun
        ; dict <- dsEvTerm ev       -- Of type KnownNat/KnownSymbol
        ; return (mkApps (mkTyApps (Var fun) [ty]) [ dict ]) }
   where
@@ -1829,9 +1830,9 @@ ds_ev_typeable ty (EvTypeableTyLit ev)
     -- tr_fun is the Name of
     --       typeNatTypeRep    :: KnownNat    a => TypeRep a
     -- of    typeSymbolTypeRep :: KnownSymbol a => TypeRep a
-    tr_fun | ty_kind `eqType` naturalTy      = typeNatTypeRepName
-           | ty_kind `eqType` typeSymbolKind = typeSymbolTypeRepName
-           | ty_kind `eqType` charTy         = typeCharTypeRepName
+    tr_fun | ty_kind `eqType` naturalTy      = typeNatTypeRepOcc
+           | ty_kind `eqType` typeSymbolKind = typeSymbolTypeRepOcc
+           | ty_kind `eqType` charTy         = typeCharTypeRepOcc
            | otherwise = panic "dsEvTypeable: unknown type lit kind"
 
 ds_ev_typeable ty ev
@@ -1845,7 +1846,7 @@ getRep :: EvTerm          -- ^ EvTerm for @Typeable ty@
 --   typeRep# :: forall k (a::k). Typeable k a -> TypeRep a
 getRep ev ty
   = do { typeable_expr <- dsEvTerm ev
-       ; typeRepId     <- dsLookupGlobalId typeRepIdName
+       ; typeRepId     <- dsLookupKnownOccId typeRepIdOcc
        ; let ty_args = [typeKind ty, ty]
        ; return (mkApps (mkTyApps (Var typeRepId) ty_args) [ typeable_expr ]) }
 

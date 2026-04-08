@@ -1,5 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving, ScopedTypeVariables #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines Read
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------

@@ -443,7 +443,7 @@ matchWithDict [cls_ty, mty]
   , [inst_meth_ty] <- dataConInstArgTys dict_dc dict_args
   = do { sv <- mkSysLocalM (fsLit "withDict_s") ManyTy mty
        ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls_ty openAlphaTy)
-       ; wd_cls <- tcLookupClass withDictClassName
+       ; wd_cls <- tcLookupKnownKeyClass withDictClassKey
 
        -- Given ev_expr : mty ~N# inst_meth_ty, construct the method of
        -- the WithDict dictionary:

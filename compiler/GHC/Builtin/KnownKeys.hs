@@ -177,7 +177,7 @@ wired in ones are defined in GHC.Builtin.Types etc.
 
 basicKnownKeyTable :: [(OccName, KnownKey)]
 basicKnownKeyTable
-  = [ (rationalTyConOcc,     rationalTyConKey)
+  = [ (mkTcOcc "Read",         readClassKey)
     , (mkTcOcc "Show",         showClassKey)
     , (mkTcOcc "Foldable",     foldableClassKey)
     , (mkTcOcc "Traversable",  traversableClassKey)
@@ -213,15 +213,22 @@ basicKnownKeyTable
     , (mkTcOcc "Real",              realClassKey)
     , (mkTcOcc "Fractional",        fractionalClassKey)
     , (mkTcOcc "RealFloat",         realFloatClassKey)
---    , (mkTcOcc "RealFrac",          realFracClassKey)
+    , (mkTcOcc "RealFrac",          realFracClassKey)
     , (mkVarOcc "-",                minusClassOpKey)
     , (mkVarOcc "negate",           negateClassOpKey)
     , (mkVarOcc "fromInteger",      fromIntegerClassOpKey)
-    , (mkVarOcc "fromRational",     fromRationalClassOpKey)
-    , (mkVarOcc "mkRationalBase2",  mkRationalBase2IdKey)
-    , (mkVarOcc "mkRationalBase10", mkRationalBase10IdKey)
     , (mkVarOcc "divInt#",          divIntIdKey)
     , (mkVarOcc "modInt#",          modIntIdKey)
+
+    , (mkTcOcc "Ratio",             ratioTyConKey)
+    , (mkDataOcc ":%",              ratioDataConKey)
+    , (mkVarOcc "fromIntegral",     fromIntegralIdKey)
+    , (mkVarOcc "fromRational",     fromRationalClassOpKey)
+    , (mkVarOcc "toInteger",        toIntegerClassOpKey)
+    , (mkVarOcc "toRational",       toRationalClassOpKey)
+    , (mkVarOcc "realToFrac",       realToFracIdKey)
+    , (mkVarOcc "mkRationalBase2",  mkRationalBase2IdKey)
+    , (mkVarOcc "mkRationalBase10", mkRationalBase10IdKey)
 
     -- Class Functor
     , (mkTcOcc "Functor",     functorClassKey)
@@ -297,9 +304,13 @@ basicKnownKeyTable
     , (mkVarOcc "fromStaticPtr", fromStaticPtrClassOpKey)
     , (mkVarOcc "makeStatic",    makeStaticKey)
 
+    -- WithDict
+    , (mkTcOcc "WithDict", withDictClassKey)
+
     -- Unsatisfiable class
     , (mkTcOcc  "Unsatisfiable", unsatisfiableClassKey)
     , (mkVarOcc "unsatisfiable", unsatisfiableIdKey)
+
 
     -- Known-key names that have BuiltinRules in ConstantFold
     , (mkVarOcc "unpackFoldrCString#",      unpackCStringFoldrIdKey)
@@ -307,9 +318,9 @@ basicKnownKeyTable
     , (mkVarOcc "unpackAppendCString#",     unpackCStringAppendIdKey)
     , (mkVarOcc "unpackAppendCStringUtf8#", unpackCStringAppendUtf8IdKey)
     , (mkVarOcc "cstringLength#",           cstringLengthIdKey)
-
     , (mkVarOcc "eqString",                 eqStringIdKey)
     , (mkVarOcc "inline",                   inlineIdKey)
+    , (mkVarOcc "seq#",                     seqHashKey)
 
     -- Unsafe equality proofs
     , (mkVarOcc "unsafeEqualityProof",      unsafeEqualityProofIdKey)
@@ -387,59 +398,18 @@ basicKnownKeyNames
         runMainIOName,
         runRWName,
 
-        -- Type representation types
-        trModuleTyConName, trModuleDataConName,
-        trNameSDataConName,
-        trTyConTyConName, trTyConDataConName,
-
-        -- Typeable
-        someTypeRepTyConName,          -- known-occ
-        someTypeRepDataConName,   -- ditto
-        kindRepTyConName,
-        kindRepTyConAppDataConName,
-        kindRepVarDataConName,
-        kindRepAppDataConName,
-        kindRepFunDataConName,
-        kindRepTYPEDataConName,
-        kindRepTypeLitSDataConName,
-        typeLitSymbolDataConName,
-        typeLitNatDataConName,
-        typeLitCharDataConName,
-        typeRepIdName,
-        mkTrConName,
-        mkTrAppCheckedName,
-        mkTrFunName,
-        typeSymbolTypeRepName, typeNatTypeRepName, typeCharTypeRepName,
-        trGhcPrimModuleName,
-
         -- KindReps for common cases
+        trGhcPrimModuleName,
         starKindRepName,
         starArrStarKindRepName,
         starArrStarArrStarKindRepName,
         constraintKindRepName,
-
-        -- WithDict
-        withDictClassName,
-
-        -- seq#
-        seqHashName,
-
-        -- Dynamic
-        toDynName,
-
-        -- Conversion functions
-        ratioTyConName, ratioDataConName,
-        toIntegerName, toRationalName,
-        fromIntegralName, realToFracName,
 
         -- String stuff
         fromStringName,
 
         -- Monad stuff
         bindMName,
-
-        -- Read stuff
-        readClassName,
 
         -- Stable pointers
         newStablePtrName,
@@ -871,17 +841,6 @@ bniVarQual str key = varQual gHC_INTERNAL_NUM_INTEGER (fsLit str) key
 ---------------------------------
 
 -- GHC.Internal.Real types and classes
-ratioTyConName, ratioDataConName,
-    fromRationalName, toIntegerName, toRationalName, fromIntegralName,
-    realToFracName :: Name
-ratioTyConName      = tcQual  gHC_INTERNAL_REAL (fsLit "Ratio")        ratioTyConKey
-ratioDataConName    = dcQual  gHC_INTERNAL_REAL (fsLit ":%")           ratioDataConKey
-fromRationalName    = varQual gHC_INTERNAL_REAL (fsLit "fromRational") fromRationalClassOpKey
-toIntegerName       = varQual gHC_INTERNAL_REAL (fsLit "toInteger")    toIntegerClassOpKey
-toRationalName      = varQual gHC_INTERNAL_REAL (fsLit "toRational")   toRationalClassOpKey
-fromIntegralName    = varQual  gHC_INTERNAL_REAL (fsLit "fromIntegral")fromIntegralIdKey
-realToFracName      = varQual  gHC_INTERNAL_REAL (fsLit "realToFrac")  realToFracIdKey
-
 -- other GHC.Internal.Float functions
 integerToFloatName, integerToDoubleName,
   rationalToFloatName, rationalToDoubleName :: Name
@@ -890,71 +849,12 @@ integerToDoubleName  = varQual gHC_INTERNAL_FLOAT (fsLit "integerToDouble#") int
 rationalToFloatName  = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToFloat#") rationalToFloatIdKey
 rationalToDoubleName = varQual gHC_INTERNAL_FLOAT (fsLit "rationalToDouble#") rationalToDoubleIdKey
 
--- Typeable representation types
-trModuleTyConName
-  , trModuleDataConName
-  , trNameSDataConName
-  , trTyConTyConName
-  , trTyConDataConName
-  :: Name
-trModuleTyConName     = tcQual gHC_TYPES          (fsLit "Module")         trModuleTyConKey
-trModuleDataConName   = dcQual gHC_TYPES          (fsLit "Module")         trModuleDataConKey
-trNameSDataConName    = dcQual gHC_TYPES          (fsLit "TrNameS")        trNameSDataConKey
-trTyConTyConName      = tcQual gHC_TYPES          (fsLit "TyCon")          trTyConTyConKey
-trTyConDataConName    = dcQual gHC_TYPES          (fsLit "TyCon")          trTyConDataConKey
-
-kindRepTyConName
-  , kindRepTyConAppDataConName
-  , kindRepVarDataConName
-  , kindRepAppDataConName
-  , kindRepFunDataConName
-  , kindRepTYPEDataConName
-  , kindRepTypeLitSDataConName
-  :: Name
-kindRepTyConName      = tcQual gHC_TYPES          (fsLit "KindRep")        kindRepTyConKey
-kindRepTyConAppDataConName = dcQual gHC_TYPES     (fsLit "KindRepTyConApp") kindRepTyConAppDataConKey
-kindRepVarDataConName = dcQual gHC_TYPES          (fsLit "KindRepVar")     kindRepVarDataConKey
-kindRepAppDataConName = dcQual gHC_TYPES          (fsLit "KindRepApp")     kindRepAppDataConKey
-kindRepFunDataConName = dcQual gHC_TYPES          (fsLit "KindRepFun")     kindRepFunDataConKey
-kindRepTYPEDataConName = dcQual gHC_TYPES         (fsLit "KindRepTYPE")    kindRepTYPEDataConKey
-kindRepTypeLitSDataConName = dcQual gHC_TYPES     (fsLit "KindRepTypeLitS") kindRepTypeLitSDataConKey
-
-typeLitSymbolDataConName
-  , typeLitNatDataConName
-  , typeLitCharDataConName
-  :: Name
-typeLitSymbolDataConName = dcQual gHC_TYPES       (fsLit "TypeLitSymbol")  typeLitSymbolDataConKey
-typeLitNatDataConName    = dcQual gHC_TYPES       (fsLit "TypeLitNat")     typeLitNatDataConKey
-typeLitCharDataConName   = dcQual gHC_TYPES       (fsLit "TypeLitChar")    typeLitCharDataConKey
-
 -- Class Typeable, and functions for constructing `Typeable` dictionaries
-someTypeRepTyConName
-  , someTypeRepDataConName
-  , mkTrConName
-  , mkTrAppCheckedName
-  , mkTrFunName
-  , typeRepIdName
-  , typeNatTypeRepName
-  , typeSymbolTypeRepName
-  , typeCharTypeRepName
-  , trGhcPrimModuleName
-  :: Name
-someTypeRepTyConName   = tcQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "SomeTypeRep")    someTypeRepTyConKey
-someTypeRepDataConName = dcQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "SomeTypeRep")    someTypeRepDataConKey
-typeRepIdName         = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "typeRep#")       typeRepIdKey
-mkTrConName           = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrCon")        mkTrConKey
-mkTrAppCheckedName    = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrAppChecked") mkTrAppCheckedKey
-mkTrFunName           = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "mkTrFun")        mkTrFunKey
-typeNatTypeRepName    = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "typeNatTypeRep") typeNatTypeRepKey
-typeSymbolTypeRepName = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "typeSymbolTypeRep") typeSymbolTypeRepKey
-typeCharTypeRepName   = varQual gHC_INTERNAL_TYPEABLE_INTERNAL (fsLit "typeCharTypeRep") typeCharTypeRepKey
--- this is the Typeable 'Module' for GHC.Prim (which has no code, so we place in GHC.Types)
+trGhcPrimModuleName, starKindRepName, starArrStarKindRepName,
+  starArrStarArrStarKindRepName, constraintKindRepName :: Name
+-- This is the Typeable 'Module' for GHC.Prim (which has no code, so we place in GHC.Types)
 -- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
 trGhcPrimModuleName   = varQual gHC_TYPES         (fsLit "tr$ModuleGHCPrim")  trGhcPrimModuleKey
-
--- Typeable KindReps for some common cases
-starKindRepName, starArrStarKindRepName,
-  starArrStarArrStarKindRepName, constraintKindRepName :: Name
 starKindRepName        = varQual gHC_TYPES         (fsLit "krep$*")          starKindRepKey
 starArrStarKindRepName = varQual gHC_TYPES         (fsLit "krep$*Arr*")      starArrStarKindRepKey
 starArrStarArrStarKindRepName = varQual gHC_TYPES  (fsLit "krep$*->*->*")    starArrStarArrStarKindRepKey
@@ -966,10 +866,6 @@ withDictClassName = clsQual gHC_MAGIC_DICT (fsLit "WithDict") withDictClassKey
 
 nonEmptyTyConName :: Name
 nonEmptyTyConName = tcQual gHC_INTERNAL_BASE (fsLit "NonEmpty") nonEmptyTyConKey
-
--- seq#
-seqHashName :: Name
-seqHashName = varQual gHC_INTERNAL_IO (fsLit "seq#") seqHashKey
 
 -- Custom type errors
 errorMessageTypeErrorFamName
@@ -998,10 +894,6 @@ typeErrorShowTypeDataConName =
 unsafeCoercePrimName:: Name
 unsafeCoercePrimName    = varQual gHC_INTERNAL_UNSAFE_COERCE (fsLit "unsafeCoerce#") unsafeCoercePrimIdKey
 
--- Dynamic
-toDynName :: Name
-toDynName = varQual gHC_INTERNAL_DYNAMIC (fsLit "toDyn") toDynIdKey
-
 -- Error module
 assertErrorName    :: Name
 assertErrorName   = varQual gHC_INTERNAL_IO_Exception (fsLit "assertError") assertErrorIdKey
@@ -1009,10 +901,6 @@ assertErrorName   = varQual gHC_INTERNAL_IO_Exception (fsLit "assertError") asse
 -- GHC.Internal.Debug.Trace
 traceName          :: Name
 traceName         = varQual gHC_INTERNAL_DEBUG_TRACE (fsLit "trace") traceKey
-
--- Class Read
-readClassName :: Name
-readClassName   = clsQual gHC_INTERNAL_READ (fsLit "Read")      readClassKey
 
 genericClassKeys :: [KnownKey]
 genericClassKeys = [genClassKey, gen1ClassKey]
@@ -1156,9 +1044,6 @@ dcQual   modu str unique = mk_known_key_name dataName modu str unique
                  Statically-known occurrence names
 *                                                                      *
 ********************************************************************* -}
-
-rationalTyConOcc :: KnownOcc
-rationalTyConOcc = mkTcOcc "Rational"
 
 sappendClassOpOcc, pureAClassOpOcc, thenAClassOpOcc,
   returnMClassOpOcc, thenMClassOpOcc, mappendClassOpOcc :: KnownOcc

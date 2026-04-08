@@ -21,7 +21,8 @@ import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Types.Name
 import GHC.Builtin.Types
-import GHC.Builtin.KnownKeys (rationalTyConKey, toListClassOpKey)
+import GHC.Builtin.KnownKeys ( toListClassOpKey )
+import GHC.Builtin.KnownOccs ( rationalTyConOcc )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -254,7 +255,7 @@ desugarPat x pat = case pat of
         , (HsFractional f) <- val
         , negates <- if fl_neg f then 1 else 0
         -> do
-            rat_tc <- dsLookupKnownKeyTyCon rationalTyConKey
+            rat_tc <- dsLookupKnownOccTyCon rationalTyConOcc
             let rat_ty = mkTyConTy rat_tc
             return $ Just $ PmLit rat_ty (PmLitOverRat negates f)
         | otherwise

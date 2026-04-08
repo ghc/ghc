@@ -12,32 +12,41 @@ module GHC.Tc.Instance.Typeable(mkTypeableBinds, tyConIsTypeable) where
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Types.Basic ( TypeOrConstraint(..) )
-import GHC.Types.InlinePragma ( neverInlinePragma )
-import GHC.Types.SourceText ( SourceText(..) )
-import GHC.Iface.Env( newGlobalBinder )
-import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
+import GHC.Hs
+
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence ( mkWpTyApps )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
-import GHC.Types.TyThing ( lookupId )
+
+import GHC.Iface.Env( newGlobalBinder )
+
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.Types.Prim ( primTyCons )
 import GHC.Builtin.Types
                   ( runtimeRepTyCon
                   , levityTyCon, vecCountTyCon, vecElemTyCon
                   , nilDataCon, consDataCon )
+
+import GHC.Types.TyThing ( lookupId )
+import GHC.Types.Basic ( TypeOrConstraint(..) )
+import GHC.Types.InlinePragma ( neverInlinePragma )
+import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Types.Name
 import GHC.Types.Id
+import GHC.Types.Var ( VarBndr(..) )
+
+import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon
-import GHC.Unit.Module
-import GHC.Hs
-import GHC.Driver.DynFlags
-import GHC.Types.Var ( VarBndr(..) )
 import GHC.Core.Map.Type
+
+import GHC.Unit.Module
+
+import GHC.Driver.DynFlags
+
 import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -342,7 +351,7 @@ mkModIdBindings
   = do { mod <- getModule
        ; loc <- getSrcSpanM
        ; mod_nm        <- newGlobalBinder mod (mkVarOccFS (fsLit "$trModule")) Nothing loc
-       ; trModuleTyCon <- tcLookupTyCon trModuleTyConName
+       ; trModuleTyCon <- tcLookupKnownOccTyCon trModuleTyConOcc
        ; let mod_id = mkExportedVanillaId mod_nm (mkTyConApp trModuleTyCon [])
                       `setInlinePragma` neverInlinePragma
                    -- See Note [NOINLINE on generated Typeable bindings]
@@ -354,7 +363,7 @@ mkModIdBindings
 
 mkModIdRHS :: Module -> TcM (LHsExpr GhcTc)
 mkModIdRHS mod
-  = do { trModuleDataCon <- tcLookupDataCon trModuleDataConName
+  = do { trModuleDataCon <- tcLookupKnownOccDataCon trModuleDataConOcc
        ; trNameLit <- mkTrNameLit
        ; return $ nlHsDataCon trModuleDataCon
                   `nlHsApp` trNameLit (unitFS (moduleUnit mod))
@@ -393,7 +402,7 @@ data TyConTodo
 
 todoForTyCons :: Module -> Id -> [TyCon] -> TcM TypeRepTodo
 todoForTyCons mod mod_id tycons = do
-    trTyConTy <- mkTyConTy <$> tcLookupTyCon trTyConTyConName
+    trTyConTy <- mkTyConTy <$> tcLookupKnownOccTyCon trTyConTyConOcc
     let mk_rep_id :: TyConRepName -> Id
         mk_rep_id rep_name = mkExportedVanillaId rep_name trTyConTy
                              `setInlinePragma` neverInlinePragma
@@ -426,7 +435,7 @@ todoForTyCons mod mod_id tycons = do
 
 todoForExportedKindReps :: [(Kind, Name)] -> TcM TypeRepTodo
 todoForExportedKindReps kinds = do
-    trKindRepTy <- mkTyConTy <$> tcLookupTyCon kindRepTyConName
+    trKindRepTy <- mkTyConTy <$> tcLookupKnownOccTyCon kindRepTyConOcc
     let mkId (k, name) = (k, mkExportedVanillaId name trKindRepTy)
     return $ ExportedKindRepsTodo $ map mkId kinds
 
@@ -472,7 +481,7 @@ mkPrimTypeableTodos
   = do { mod <- getModule
        ; if mod == gHC_TYPES
            then do { -- Build Module binding for GHC.Prim
-                     trModuleTyCon <- tcLookupTyCon trModuleTyConName
+                     trModuleTyCon <- tcLookupKnownOccTyCon trModuleTyConOcc
                    ; let ghc_prim_module_id =
                              mkExportedVanillaId trGhcPrimModuleName
                                                  (mkTyConTy trModuleTyCon)
@@ -547,17 +556,17 @@ data TypeableStuff
 collect_stuff :: TcM TypeableStuff
 collect_stuff = do
     platform               <- targetPlatform <$> getDynFlags
-    trTyConDataCon         <- tcLookupDataCon trTyConDataConName
-    kindRepTyCon           <- tcLookupTyCon   kindRepTyConName
-    kindRepTyConAppDataCon <- tcLookupDataCon kindRepTyConAppDataConName
-    kindRepVarDataCon      <- tcLookupDataCon kindRepVarDataConName
-    kindRepAppDataCon      <- tcLookupDataCon kindRepAppDataConName
-    kindRepFunDataCon      <- tcLookupDataCon kindRepFunDataConName
-    kindRepTYPEDataCon     <- tcLookupDataCon kindRepTYPEDataConName
-    kindRepTypeLitSDataCon <- tcLookupDataCon kindRepTypeLitSDataConName
-    typeLitSymbolDataCon   <- tcLookupDataCon typeLitSymbolDataConName
-    typeLitNatDataCon      <- tcLookupDataCon typeLitNatDataConName
-    typeLitCharDataCon     <- tcLookupDataCon typeLitCharDataConName
+    trTyConDataCon         <- tcLookupKnownOccDataCon trTyConDataConOcc
+    kindRepTyCon           <- tcLookupKnownOccTyCon   kindRepTyConOcc
+    kindRepTyConAppDataCon <- tcLookupKnownOccDataCon kindRepTyConAppDataConOcc
+    kindRepVarDataCon      <- tcLookupKnownOccDataCon kindRepVarDataConOcc
+    kindRepAppDataCon      <- tcLookupKnownOccDataCon kindRepAppDataConOcc
+    kindRepFunDataCon      <- tcLookupKnownOccDataCon kindRepFunDataConOcc
+    kindRepTYPEDataCon     <- tcLookupKnownOccDataCon kindRepTYPEDataConOcc
+    kindRepTypeLitSDataCon <- tcLookupKnownOccDataCon kindRepTypeLitSDataConOcc
+    typeLitSymbolDataCon   <- tcLookupKnownOccDataCon typeLitSymbolDataConOcc
+    typeLitNatDataCon      <- tcLookupKnownOccDataCon typeLitNatDataConOcc
+    typeLitCharDataCon     <- tcLookupKnownOccDataCon typeLitCharDataConOcc
     trNameLit              <- mkTrNameLit
     return Stuff {..}
 
@@ -566,7 +575,7 @@ collect_stuff = do
 -- representations.
 mkTrNameLit :: TcM (FastString -> LHsExpr GhcTc)
 mkTrNameLit = do
-    trNameSDataCon <- tcLookupDataCon trNameSDataConName
+    trNameSDataCon <- tcLookupKnownOccDataCon trNameSDataConOcc
     let trNameLit :: FastString -> LHsExpr GhcTc
         trNameLit fs = nlHsPar $ nlHsDataCon trNameSDataCon
                        `nlHsApp` nlHsLit (mkHsStringPrimLit fs)

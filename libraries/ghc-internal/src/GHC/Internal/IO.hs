@@ -6,6 +6,10 @@
            , ScopedTypeVariables
            , UnboxedTuples
   #-}
+
+{-# OPTIONS_GHC -fdefines-known-key-names #-}
+    -- Defines seq#
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
