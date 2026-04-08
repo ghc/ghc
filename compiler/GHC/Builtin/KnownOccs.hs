@@ -21,6 +21,8 @@ import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Builtin.TH( unsafeCodeCoerceName, liftTypedName )
 import GHC.Builtin.KnownKeys
 
+import GHC.Types.Name( KnownOcc )
+import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader( RdrName, mkVarUnqual, getRdrName
                             , nameRdrName )
 import GHC.Types.Id.Make( coerceName )  -- `coerce` is wired-in
@@ -46,6 +48,85 @@ mechanisms:
   known-key things, merely to avoid duplicating knowledge of the KnownOcc
 
 -}
+
+
+{- *********************************************************************
+*                                                                      *
+        Known-occ OccNames
+*                                                                      *
+********************************************************************* -}
+
+rationalTyConOcc :: KnownOcc
+rationalTyConOcc = mkTcOcc "Rational"
+
+-- Class Typeable, and functions for constructing `Typeable` dictionaries
+someTypeRepTyConOcc
+  , someTypeRepDataConOcc
+  , mkTrConOcc
+  , mkTrAppCheckedOcc
+  , mkTrFunOcc
+  , typeRepIdOcc
+  , typeNatTypeRepOcc
+  , typeSymbolTypeRepOcc
+  , typeCharTypeRepOcc
+  :: KnownOcc
+someTypeRepTyConOcc   = mkTcOcc   "SomeTypeRep"
+someTypeRepDataConOcc = mkDataOcc "SomeTypeRep"
+typeRepIdOcc          = mkVarOcc  "typeRep#"
+mkTrConOcc            = mkVarOcc  "mkTrCon"
+mkTrAppCheckedOcc     = mkVarOcc  "mkTrAppChecked"
+mkTrFunOcc            = mkVarOcc  "mkTrFun"
+typeNatTypeRepOcc     = mkVarOcc  "typeNatTypeRep"
+typeSymbolTypeRepOcc  = mkVarOcc  "typeSymbolTypeRep"
+typeCharTypeRepOcc    = mkVarOcc  "typeCharTypeRep"
+
+typeLitSymbolDataConOcc
+  , typeLitNatDataConOcc
+  , typeLitCharDataConOcc
+  :: KnownOcc
+typeLitSymbolDataConOcc = mkDataOcc "TypeLitSymbol"
+typeLitNatDataConOcc    = mkDataOcc "TypeLitNat"
+typeLitCharDataConOcc   = mkDataOcc "TypeLitChar"
+
+
+trModuleTyConOcc
+  , trModuleDataConOcc
+  , trNameSDataConOcc
+  , trTyConTyConOcc
+  , trTyConDataConOcc
+  :: KnownOcc
+trModuleTyConOcc     = mkTcOcc "Module"
+trModuleDataConOcc   = mkDataOcc "Module"
+trNameSDataConOcc    = mkDataOcc "TrNameS"
+trTyConTyConOcc      = mkTcOcc   "TyCon"
+trTyConDataConOcc    = mkDataOcc "TyCon"
+
+-- Typeable representation types
+kindRepTyConOcc
+  , kindRepTyConAppDataConOcc
+  , kindRepVarDataConOcc
+  , kindRepAppDataConOcc
+  , kindRepFunDataConOcc
+  , kindRepTYPEDataConOcc
+  , kindRepTypeLitSDataConOcc
+  :: KnownOcc
+kindRepTyConOcc           = mkTcOcc "KindRep"
+kindRepTyConAppDataConOcc = mkDataOcc "KindRepTyConApp"
+kindRepVarDataConOcc      = mkDataOcc "KindRepVar"
+kindRepAppDataConOcc      = mkDataOcc "KindRepApp"
+kindRepFunDataConOcc      = mkDataOcc "KindRepFun"
+kindRepTYPEDataConOcc     = mkDataOcc "KindRepTYPE"
+kindRepTypeLitSDataConOcc = mkDataOcc "KindRepTypeLitS"
+
+
+{- *********************************************************************
+*                                                                      *
+        Misc global RdrNames
+*                                                                      *
+********************************************************************* -}
+
+toDyn_RDR :: RdrName
+toDyn_RDR = knownVarOccRdrName "toDyn"
 
 
 {- *********************************************************************

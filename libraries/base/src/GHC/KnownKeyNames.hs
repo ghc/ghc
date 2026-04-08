@@ -11,8 +11,7 @@
 --
 
 module GHC.KnownKeyNames
-    ( Rational
-    , Eq(..), Ord(..)  -- With their methods
+    ( Eq(..), Ord(..)  -- With their methods
     , Show, Read
     , Foldable, Traversable
     , Functor, fmap
@@ -21,6 +20,7 @@ module GHC.KnownKeyNames
 
     -- Misc
     , (.), (&&), not, map, foldr, build
+    , seq#
 
     -- Applicative
     , Applicative, pure, mzip, (<*>), (*>)
@@ -61,9 +61,13 @@ module GHC.KnownKeyNames
     -- Numbers
     , Num, Integral, Real, Fractional, RealFloat
     , (+), (-), (*), negate, fromInteger
-    , fromRational
-    , mkRationalBase2, mkRationalBase10
     , divInt#, modInt#
+
+    , Ratio( (:%) ), Rational
+    , mkRationalBase2, mkRationalBase10
+    , toInteger, toRational
+    , fromIntegral, fromRational
+    , realToFrac
 
     -- Strings
     , IsString
@@ -82,6 +86,9 @@ module GHC.KnownKeyNames
     -- IO
     , IO, thenIO, bindIO, returnIO, print
 
+    -- WithDict
+    , WithDict
+
     -- Unsatisfiable
     , Unsatisfiable, unsatisfiable
 
@@ -94,6 +101,15 @@ module GHC.KnownKeyNames
     , eqString, inline
 
     , UnsafeEquality( UnsafeRefl ), unsafeEqualityProof
+
+    -- Typeable and type representations
+    , SomeTypeRep( SomeTypeRep ), Module( Module )
+    , TyCon( TyCon ), TrName( TrNameS )
+    , KindRep( KindRepTyConApp, KindRepVar, KindRepApp, KindREpFun, KindRepTYPE, KindREpTypeLitS )
+    , typeLitSort( TypeLitSymbol, TypeLitNat, TypeLitChar )
+    , typeRep#
+    , mkTrCon, mkTrAppChecked, mkTrFun
+    , typeNatTypeRep, typeSymbolTypeRep, typeCharTypeRep
 
     -- Bignums
     , bigNatEq#, bigNatCompare, bigNatCompareWord#
@@ -153,13 +169,15 @@ import Data.String( IsString )
 import GHC.Internal.Base
 import GHC.Internal.Ix
 import GHC.Internal.Magic( inline )
+import GHC.Internal.Magic.Dict( WithDict )
 import GHC.Internal.Enum
+import GHC.Internal.Dynamic( toDyn )
 import GHC.Internal.Data.Data
 import GHC.Internal.Data.String( fromString )
 import GHC.Internal.Data.Foldable( Foldable )
 import GHC.Internal.Data.Traversable( Traversable )
 import GHC.Internal.Float( RealFloat )
-import GHC.Internal.Real( mkRationalBase2, mkRationalBase10 )
+import GHC.Internal.Real
 import GHC.Internal.Control.Monad( fail, guard )
 import GHC.Internal.Control.Monad.Fix( mfix, loop )
 import GHC.Internal.Control.Monad.Zip( mzip )
@@ -177,6 +195,7 @@ import GHC.Internal.StaticPtr( IsStatic(..) )
 import GHC.Internal.StaticPtr.Internal( makeStatic )
 
 import GHC.Internal.Data.Typeable( Typeable, gcast1, gcast2 )
+import GHC.Internal.Data.Typeable.Internal
 import GHC.Internal.Generics
 
 import GHC.Internal.Bignum.BigNat
