@@ -34,7 +34,6 @@ import GHC.Core.Predicate( tyCoVarsOfTypeWellScoped )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 
-import GHC.Types.SourceText
 import GHC.Types.Id.Make
 import GHC.Types.ForeignCall
 import GHC.Types.Basic

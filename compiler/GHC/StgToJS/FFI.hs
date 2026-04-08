@@ -181,15 +181,14 @@ genForeignCall :: HasDebugCallStack
                -> [StgArg]
                -> G (JStgStat, ExprResult)
 genForeignCall _ctx
-               (CCall (CCallSpec (StaticTarget ext tgt ForeignFunction)
+               (CCall (CCallSpec (StaticTarget _ext tgt ForeignFunction)
                                    JavaScriptCallConv
                                    PlayRisky))
                _t
                [obj]
                args
   | tgt == hdBuildObjectStr
-  , Just pairs <- getObjectKeyValuePairs args
-  , TargetIsInThisUnit <- staticTargetUnit ext = do
+  , Just pairs <- getObjectKeyValuePairs args = do
       pairs' <- mapM (\(k,v) -> genArg v >>= \vs -> return (k, head vs)) pairs
       return ( (|=) obj (ValExpr (JHash $ listToUniqMap pairs'))
              , ExprInline
