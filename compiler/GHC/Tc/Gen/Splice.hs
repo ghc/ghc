@@ -69,7 +69,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv as InstEnv
 
 import GHC.Builtin.TH
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types
 
 import GHC.ThToHs

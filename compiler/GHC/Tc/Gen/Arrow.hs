@@ -45,7 +45,7 @@ import GHC.Types.Name( KnownKey, hasKnownKey )
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 

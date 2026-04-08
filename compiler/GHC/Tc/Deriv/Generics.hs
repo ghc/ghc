@@ -47,10 +47,10 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set (elemVarSet)
 
-import GHC.Builtin.RdrNames
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Utils.Error( Validity'(..), andValid )
 import GHC.Utils.Outputable

@@ -56,7 +56,7 @@ import GHC.Types.Literal
 
 import GHC.Stg.Syntax
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Core.TyCon
 import GHC.Core.DataCon

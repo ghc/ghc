@@ -48,11 +48,11 @@ module GHC.Iface.Syntax (
 
 import GHC.Prelude
 
-import GHC.Builtin.Names(mkUnboundName)
+import GHC.Builtin.KnownKeys(mkUnboundName)
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula (pprBooleanFormula, isTrue)
 
-import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
+import GHC.Builtin.KnownKeys ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
                            constraintKindTyConKey )
 import GHC.Types.Unique ( hasKey )
 import GHC.Iface.Type

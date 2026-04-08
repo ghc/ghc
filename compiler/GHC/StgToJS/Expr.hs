@@ -65,7 +65,7 @@ import GHC.Stg.Syntax
 import GHC.Stg.Utils
 
 import GHC.Builtin.PrimOps
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Core hiding (Var)
 import GHC.Core.TyCon

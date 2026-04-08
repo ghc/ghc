@@ -22,7 +22,7 @@ import GHC.Tc.Types.Evidence ( mkWpTyApps )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Types.TyThing ( lookupId )
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types.Prim ( primTyCons )
 import GHC.Builtin.Types
                   ( runtimeRepTyCon

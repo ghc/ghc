@@ -57,7 +57,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Utils.Error
 import GHC.Utils.Misc

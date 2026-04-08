@@ -65,7 +65,7 @@ import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.TH (liftClassKey)
 
 import GHC.Utils.Misc

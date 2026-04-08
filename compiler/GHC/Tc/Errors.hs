@@ -12,7 +12,7 @@ module GHC.Tc.Errors(
 
 import GHC.Prelude
 
-import GHC.Builtin.Names (hasFieldClassName)
+import GHC.Builtin.KnownKeys (hasFieldClassName)
 
 import GHC.Driver.Env (hsc_units)
 import GHC.Driver.DynFlags

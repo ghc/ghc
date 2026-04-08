@@ -19,7 +19,7 @@ module GHC.HsToCore.Pmc.Check (
 
 import GHC.Prelude
 
-import GHC.Builtin.Names ( hasKey, considerAccessibleIdKey, trueDataConKey )
+import GHC.Builtin.KnownKeys ( hasKey, considerAccessibleIdKey, trueDataConKey )
 import GHC.HsToCore.Monad ( DsM )
 import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils
@@ -359,7 +359,7 @@ guard with it as the scrutinee expression will keep its parent clause alive:
 
 The key bits of the implementation are:
 
-  1. Its definition is recognised as known-key (see "GHC.Builtin.Names").
+  1. Its definition is recognised as known-key (see "GHC.Builtin.KnownKeys").
   2. After "GHC.HsToCore.Pmc.Desugar", the guard will end up as a 'PmCon', where
      the match var is the known-key 'considerAccessible' and the constructor
      against which it matches is 'True'.

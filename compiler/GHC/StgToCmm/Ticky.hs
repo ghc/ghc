@@ -143,7 +143,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Monad (whenM)
 
 -- Turgid imports for showTypeCategory
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Tc.Utils.TcType
 import GHC.Core.DataCon
 import GHC.Core.TyCon

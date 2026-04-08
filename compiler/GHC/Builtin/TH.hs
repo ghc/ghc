@@ -641,7 +641,7 @@ dataNamespaceSpecifierDataConName =
 ********************************************************************* -}
 
 -- ClassUniques available: 200-299
--- Check in GHC.Builtin.Names if you want to change this
+-- Check in GHC.Builtin.KnownKeys if you want to change this
 
 liftClassKey :: Unique
 liftClassKey = mkPreludeClassUnique 200
@@ -656,7 +656,7 @@ quoteClassKey = mkPreludeClassUnique 201
 ********************************************************************* -}
 
 -- TyConUniques available: 200-299
--- Check in GHC.Builtin.Names if you want to change this
+-- Check in GHC.Builtin.KnownKeys if you want to change this
 
 expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     patTyConKey,
@@ -713,7 +713,7 @@ quasiQuoterTyConKey     = mkPreludeTyConUnique 241
 ********************************************************************* -}
 
 -- DataConUniques available: 100-150
--- If you want to change this, make sure you check in GHC.Builtin.Names
+-- If you want to change this, make sure you check in GHC.Builtin.KnownKeys
 
 -- data Inline = ...
 noInlineDataConKey, inlineDataConKey, inlinableDataConKey :: Unique
@@ -756,7 +756,7 @@ dataNamespaceSpecifierDataConKey = mkPreludeDataConUnique 215
 ********************************************************************* -}
 
 -- IdUniques available: 200-499
--- If you want to change this, make sure you check in GHC.Builtin.Names
+-- If you want to change this, make sure you check in GHC.Builtin.KnownKeys
 
 sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_fldIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,

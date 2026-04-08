@@ -13,7 +13,7 @@ import GHC.Prelude
 import GHC.Hs
 
 import GHC.Builtin( interactiveClassKeys )
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Core.Class
 import GHC.Core.Predicate ( Pred (..), classifyPredType )

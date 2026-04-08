@@ -148,7 +148,7 @@ import GHC.Types.Unique
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Types.SrcLoc
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types.Prim
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe

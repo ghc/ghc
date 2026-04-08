@@ -16,7 +16,7 @@ import GHC.Driver.Env
 import GHC.Driver.Backend
 
 import GHC.Core.Make (getMkStringIds)
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Tc.Utils.Env (lookupGlobal)
 import GHC.Types.TyThing
 import GHC.Platform.Ways

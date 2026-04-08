@@ -168,7 +168,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 import GHC.Utils.Logger
 
-import GHC.Builtin.Names ( isUnboundName )
+import GHC.Builtin.KnownKeys ( isUnboundName )
 
 import GHCi.Message
 import GHCi.RemoteTypes

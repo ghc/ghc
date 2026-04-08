@@ -79,7 +79,7 @@ import GHC.Types.Name
 import GHC.Types.Var ( varType )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Builtin.Names
-import GHC.Builtin.RdrNames( stringTyCon_RDR, compose_RDR )
+import GHC.Builtin.KnownOccs( stringTyCon_RDR, compose_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName, greName, globalRdrEnvElts)
 import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer

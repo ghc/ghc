@@ -83,7 +83,7 @@ import GHC.Utils.Misc( HasDebugCallStack )
 
 import GHC.Settings.Constants
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin
 
 import GHC.Core.Rules

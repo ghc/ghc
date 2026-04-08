@@ -41,7 +41,7 @@ import GHC.Core.Make
 import GHC.Core.ConLike
 
 import GHC.Builtin.Types
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 
 import GHC.Types.Id
 import GHC.Types.Name( KnownKey )

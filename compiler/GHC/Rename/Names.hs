@@ -48,7 +48,7 @@ import GHC.Tc.Zonk.TcType ( tcInitTidyEnv )
 import GHC.Hs
 import GHC.Iface.Load   ( loadSrcInterface )
 import GHC.Iface.Syntax ( fromIfaceWarnings )
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import GHC.Core.TyCo.Tidy
 import GHC.Core.PatSyn

@@ -173,7 +173,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Types.Id.Make ( mkDataConWorkId, mkDictSelId )
 
 -- friends:
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Uniques
 
@@ -277,7 +277,7 @@ boolTyCon               TyCon   GHC.Types.Bool        Data type
 ************************************************************************
 
 If you change which things are wired in, make sure you change their
-names in GHC.Builtin.Names, so they use wTcQual, wDataQual, etc
+names in GHC.Builtin.KnownKeys, so they use wTcQual, wDataQual, etc
 
 -}
 
@@ -291,7 +291,7 @@ names in GHC.Builtin.Names, so they use wTcQual, wDataQual, etc
 -- Because of their infinite nature, this list excludes
 --   * Tuples of all sorts (boxed, unboxed, constraint) (mkTupleTyCon)
 --   * Unboxed sums (sumTyCon)
--- See Note [Infinite families of known-key names] in GHC.Builtin.Names
+-- See Note [Infinite families of known-key names] in GHC.Builtin.KnownKeys
 --
 -- See also Note [Known-key names]
 wiredInTyCons :: [TyCon]
@@ -813,7 +813,7 @@ Note [How tuples work]
   deserialization we lookup the Name associated with the unique with the logic
   in GHC.Builtin.Uniques. See Note [Symbol table representation of names] for details.
 
-See also Note [Known-key names] in GHC.Builtin.Names.
+See also Note [Known-key names] in GHC.Builtin.KnownKeys.
 
 Note [One-tuples]
 ~~~~~~~~~~~~~~~~~
@@ -971,7 +971,7 @@ isBuiltInOcc = isJust . isBuiltInOcc_maybe listTuplePuns
       -- whether isBuiltInOcc_maybe matches. See Note [isBuiltInOcc_maybe]
 
 -- Match on original names of infinite families (tuples and sums).
--- See Note [Infinite families of known-key names] in GHC.Builtin.Names
+-- See Note [Infinite families of known-key names] in GHC.Builtin.KnownKeys
 isInfiniteFamilyOrigName_maybe :: Module -> OccName -> Maybe Name
 isInfiniteFamilyOrigName_maybe mod occ =
 

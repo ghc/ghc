@@ -61,7 +61,7 @@ import GHC.Core
 import GHC.Core.TyCo.Compare( eqType, nonDetCmpType )
 import GHC.Core.Map.Expr
 import GHC.Core.Utils (exprType)
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin( knownKeyOccName )
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim

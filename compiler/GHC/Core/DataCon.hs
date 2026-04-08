@@ -84,7 +84,7 @@ import GHC.Types.FieldLabel
 import GHC.Types.SourceText
 import GHC.Core.Class
 import GHC.Types.Name
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Core.Predicate
 import GHC.Types.Var
 import GHC.Types.Var.Env

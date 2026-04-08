@@ -131,7 +131,7 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
 import Data.List(nub)
-import GHC.Builtin.Names ( ioTyConName
+import GHC.Builtin.KnownKeys ( ioTyConName
                          , rOOT_MAIN )
 import GHC.Iface.Errors.Types
 

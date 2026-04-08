@@ -23,7 +23,7 @@ import GHC.Driver.Flags
 
 import GHC.Unit
 
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.Types

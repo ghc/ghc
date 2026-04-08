@@ -52,7 +52,7 @@ import GHC.Core.Coercion
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
 import GHC.Driver.DynFlags
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
