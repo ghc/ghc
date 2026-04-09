@@ -5,6 +5,7 @@
 
 
 {-# LANGUAGE RecordWildCards  #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -- | Module finder
 module GHC.Unit.Finder (
@@ -210,7 +211,7 @@ findImportedModule
   -> IO FindResult
 findImportedModule hsc_env scope mod pkg_qual =
   let fc           = hsc_FC hsc_env
-      mb_home_unit = hsc_home_unit_maybe hsc_env
+      home_unit    = hsc_home_unit hsc_env
       dflags       = hsc_dflags hsc_env
       fopts        = initFinderOpts dflags
       providers    = mgHomeModuleNameProvidersMap (hsc_mod_graph hsc_env)
@@ -220,7 +221,7 @@ findImportedModule hsc_env scope mod pkg_qual =
       fopts
       (hsc_unit_env hsc_env)
       providers
-      mb_home_unit
+      home_unit
       scope
       mod
       pkg_qual
@@ -230,33 +231,30 @@ findImportedModuleNoHsc
   -> FinderOpts
   -> UnitEnv
   -> HomeModuleNameProvidersMap
-  -> Maybe HomeUnit
+  -> HomeUnit
   -> ModuleLookupScope
   -> ModuleName
   -> PkgQual
   -> IO FindResult
-findImportedModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit scope mod_name mb_pkg =
+findImportedModuleNoHsc fc fopts ue home_module_name_providers_map home_unit scope mod_name mb_pkg =
   case mb_pkg of
     NoPkgQual  -> unqual_import
-    ThisPkg uid | (homeUnitId <$> mb_home_unit) == Just uid -> home_import
+    ThisPkg uid | homeUnitId home_unit == uid -> home_import
                 | Just os <- lookup uid other_fopts -> home_pkg_import (uid, os)
-                | otherwise -> pprPanic "findImportModule" (ppr mod_name $$ ppr mb_pkg $$ ppr (homeUnitId <$> mb_home_unit) $$ ppr uid $$ ppr (map fst all_opts))
+                | otherwise -> pprPanic "findImportModule" (ppr mod_name $$ ppr mb_pkg $$ ppr home_unit_id $$ ppr uid $$ ppr (map fst all_opts))
     OtherPkg _ -> pkg_import
   where
 
-    mb_home_unit_id :: Maybe UnitId
-    mb_home_unit_id = homeUnitId <$> mb_home_unit
+    home_unit_id :: UnitId
+    home_unit_id = homeUnitId home_unit
 
     all_opts :: [(UnitId, FinderOpts)]
-    all_opts = case mb_home_unit_id of
-        Nothing           -> other_fopts
-        Just home_unit_id -> (home_unit_id, fopts) : other_fopts
+    all_opts =
+      (home_unit_id, fopts) : other_fopts
 
     home_import :: IO FindResult
-    home_import = case mb_home_unit of
-        Just home_unit -> findHomeModule fc fopts home_unit mod_name
-        Nothing        -> pure $
-                          NoPackage (panic "findImportedModule: no home-unit")
+    home_import =
+      findHomeModule fc fopts home_unit mod_name
 
     home_pkg_import :: (UnitId, FinderOpts) -> IO FindResult
     home_pkg_import = findHomeUnitDepModule fc ue home_module_name_providers_map scope mod_name
@@ -266,13 +264,11 @@ findImportedModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit 
 
     unqual_import :: IO FindResult
     unqual_import = findHomeOrRegularPackageModule fc fopts ue
-                        home_module_name_providers_map mb_home_unit scope mod_name
+                        home_module_name_providers_map home_unit scope mod_name
 
     unit_state :: UnitState
-    unit_state = case mb_home_unit_id of
-        Nothing           -> ue_homeUnitState ue
-        Just home_unit_id -> HUG.homeUnitEnv_units $
-                             ue_findHomeUnitEnv home_unit_id ue
+    unit_state = HUG.homeUnitEnv_units $
+      ue_findHomeUnitEnv home_unit_id ue
 
     other_fopts :: [(UnitId, FinderOpts)]
     other_fopts = homeUnitDepsFinderOpts ue home_module_name_providers_map
@@ -287,28 +283,26 @@ findPluginModuleNoHsc
   -> FinderOpts
   -> UnitEnv
   -> HomeModuleNameProvidersMap
-  -> Maybe HomeUnit
+  -> HomeUnit
   -> ModuleName
   -> IO FindResult
-findPluginModuleNoHsc fc fopts ue home_module_name_providers_map mb_home_unit@(Just home_unit) mod_name =
+findPluginModuleNoHsc fc fopts ue home_module_name_providers_map home_unit mod_name =
     findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map
-                            mb_home_unit LookupUser mod_name
+                            home_unit LookupUser mod_name
     `orIfNotFound`
     findExposedPluginPackageModule fc fopts unit_state mod_name
   where
     unit_state = HUG.homeUnitEnv_units $
                  ue_findHomeUnitEnv (homeUnitId home_unit) ue
-findPluginModuleNoHsc fc fopts ue _ Nothing mod_name =
-  findExposedPluginPackageModule fc fopts (ue_homeUnitState ue) mod_name
 
 findPluginModule :: HscEnv -> ModuleName -> IO FindResult
 findPluginModule hsc_env mod_name = do
   let fc           = hsc_FC hsc_env
-      mb_home_unit = hsc_home_unit_maybe hsc_env
+      home_unit    = hsc_home_unit hsc_env
       home_module_name_providers_map =
         mgHomeModuleNameProvidersMap (hsc_mod_graph hsc_env)
   findPluginModuleNoHsc fc (initFinderOpts (hsc_dflags hsc_env))
-    (hsc_unit_env hsc_env) home_module_name_providers_map mb_home_unit mod_name
+    (hsc_unit_env hsc_env) home_module_name_providers_map home_unit mod_name
 
 -- -----------------------------------------------------------------------------
 -- Home Module Finder Helpers
@@ -380,7 +374,7 @@ findHomeUnitDepModule fc ue home_module_name_providers_map scope mod_name (uid, 
     | Just real_mod_name
           <- lookupUniqMap (finder_reexportedModules opts) mod_name
         = findHomeOrRegularPackageModule fc opts ue home_module_name_providers_map
-              (Just $ DefiniteHomeUnit uid Nothing)
+              (DefiniteHomeUnit uid Nothing)
               scope real_mod_name
     | elementOfUniqSet mod_name (finder_hiddenModules opts)
     , LookupUser <- scope -- A system lookup is allowed to find hidden modules.
@@ -397,27 +391,22 @@ findHomeModuleAmongDeps
   -> FinderOpts
   -> UnitEnv
   -> HomeModuleNameProvidersMap
-  -> Maybe HomeUnit
+  -> HomeUnit
   -> ModuleLookupScope
   -> ModuleName
   -> IO FindResult
-findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map mb_home_unit scope mod_name =
+findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map home_unit scope mod_name =
     foldr1 orIfNotFound (home_import :| map home_pkg_import other_fopts)
     -- Do not try to be smart and change this to `foldr orIfNotFound home_import
     -- (map home_pkg_import other_fopts)`, as that would not be the same.
     -- `home_import` is first because we need to first look within the current
     -- unit before looking at the other units in order.
   where
-    home_import = case mb_home_unit of
-        Just home_unit -> findHomeModule fc fopts home_unit mod_name
-        Nothing        -> pure $
-                          NoPackage (panic "findHomeModuleAmongDeps: no home-unit")
+    home_import = findHomeModule fc fopts home_unit mod_name
+
     home_pkg_import = findHomeUnitDepModule fc ue home_module_name_providers_map scope mod_name
 
-    unit_state = case homeUnitId <$> mb_home_unit of
-        Nothing           -> ue_homeUnitState ue
-        Just home_unit_id -> HUG.homeUnitEnv_units $
-                             ue_findHomeUnitEnv home_unit_id ue
+    unit_state = HUG.homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
     other_fopts = homeUnitDepsFinderOpts ue home_module_name_providers_map
                                          unit_state mod_name
 
@@ -428,33 +417,31 @@ findHomeOrRegularPackageModule
   -> FinderOpts
   -> UnitEnv
   -> HomeModuleNameProvidersMap
-  -> Maybe HomeUnit
+  -> HomeUnit
   -> ModuleLookupScope
   -> ModuleName
   -> IO FindResult
-findHomeOrRegularPackageModule fc fopts ue home_module_name_providers_map mb_home_unit scope mod_name =
+findHomeOrRegularPackageModule fc fopts ue home_module_name_providers_map home_unit scope mod_name =
     findHomeModuleAmongDeps fc fopts ue home_module_name_providers_map
-                            mb_home_unit scope mod_name
+                            home_unit scope mod_name
     `orIfNotFound`
     findExposedPackageModule fc fopts unit_state scope mod_name NoPkgQual
   where
-    unit_state = case homeUnitId <$> mb_home_unit of
-        Nothing           -> ue_homeUnitState ue
-        Just home_unit_id -> HUG.homeUnitEnv_units $
-                             ue_findHomeUnitEnv home_unit_id ue
+    unit_state = HUG.homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
 
 
 -- | A version of findExactModule which takes the exact parts of the HscEnv it needs
 -- directly.
-findExactModuleNoHsc :: FinderCache -> FinderOpts -> UnitEnvGraph FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
-findExactModuleNoHsc fc fopts other_fopts unit_state mb_home_unit mod is_boot = do
-  res <- case mb_home_unit of
-    Just home_unit
+findExactModuleNoHsc :: FinderCache -> FinderOpts -> UnitEnvGraph FinderOpts -> UnitState -> HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModuleNoHsc fc fopts other_fopts unit_state home_unit mod is_boot = do
+  res <-
+    if
      | isHomeInstalledModule home_unit mod
         -> findInstalledHomeModule fc fopts (homeUnitId home_unit) (moduleName mod)
      | Just home_fopts <- HUG.unitEnv_lookup_maybe (moduleUnit mod) other_fopts
         -> findInstalledHomeModule fc home_fopts (moduleUnit mod) (moduleName mod)
-    _ -> findPackageModule fc unit_state fopts mod
+     | otherwise
+        -> findPackageModule fc unit_state fopts mod
   case (res, is_boot) of
     (InstalledFound loc, IsBoot) -> return (InstalledFound (addBootSuffixLocn loc))
     _ -> return res
@@ -470,7 +457,7 @@ findExactModule hsc_env mod is_boot = do
   let dflags = hsc_dflags hsc_env
   let fc = hsc_FC hsc_env
   let unit_state = hsc_units hsc_env
-  let home_unit = hsc_home_unit_maybe hsc_env
+  let home_unit = hsc_home_unit hsc_env
   let other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
   findExactModuleNoHsc fc (initFinderOpts dflags) other_fopts unit_state home_unit mod is_boot
 

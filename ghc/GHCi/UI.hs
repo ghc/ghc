@@ -861,7 +861,7 @@ installInteractiveHomeUnits dflags = do
       (unit_state,home_unit,_mconstants) <-
         liftIO $ initUnits logger dflags unit_index all_home_units
       hpt <- liftIO emptyHomePackageTable
-      pure (HUG.mkHomeUnitEnv unit_state dflags hpt (Just home_unit))
+      pure (HUG.mkHomeUnitEnv unit_state dflags hpt home_unit)
 
     concatPackageDbStacksUsingLongestCommonPrefix :: [[PackageDBFlag]] -> [PackageDBFlag]
     concatPackageDbStacksUsingLongestCommonPrefix stacks =

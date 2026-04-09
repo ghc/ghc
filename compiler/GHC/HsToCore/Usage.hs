@@ -82,7 +82,7 @@ mkUsageInfo uc plugins fc unit_env
   = do
     file_hashes <- liftIO $ mapM getFileHash dependent_files
     dirs_hashes <- liftIO $ mapM getDirHash dependent_dirs
-    let hu = ue_unsafeHomeUnit unit_env
+    let hu = ue_homeUnit unit_env
     -- Dependencies on object files due to TH and plugins
     object_usages <- liftIO $ mkObjectUsage plugins fc needed_links needed_pkgs
     let all_home_ids = HUG.allUnits (ue_home_unit_graph unit_env)

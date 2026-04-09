@@ -774,14 +774,14 @@ loadInterface doc_str mod from
 
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
-        ; let mhome_unit = ue_homeUnit (hsc_unit_env hsc_env)
+        ; let home_unit = ue_homeUnit (hsc_unit_env hsc_env)
         ; liftIO (lookupIfaceByModule hug (eps_PIT eps) mod) >>= \case {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
             _ -> do {
 
         -- READ THE MODULE IN
-        ; read_result <- case wantHiBootFile mhome_unit eps mod from of
+        ; read_result <- case wantHiBootFile home_unit eps mod from of
                            Failed err             -> return (Failed err)
                            Succeeded hi_boot_file -> do
                              hsc_env <- getTopEnv
@@ -877,7 +877,7 @@ loadInterface doc_str mod from
 
         ; warnPprTrace bad_boot "loadInterface" (ppr mod) $
           updateEps_  $ \ eps ->
-           if elemModuleEnv mod (eps_PIT eps) || is_external_sig mhome_unit iface
+           if elemModuleEnv mod (eps_PIT eps) || is_external_sig home_unit iface
                 then eps
            else if bad_boot
                 -- See Note [Loading your own hi-boot file]
@@ -1042,12 +1042,12 @@ dontLeakTheHUG thing_inside = do
 -- | Returns @True@ if a 'ModIface' comes from an external package.
 -- In this case, we should NOT load it into the EPS; the entities
 -- should instead come from the local merged signature interface.
-is_external_sig :: Maybe HomeUnit -> ModIface -> Bool
-is_external_sig mhome_unit iface =
+is_external_sig :: HomeUnit -> ModIface -> Bool
+is_external_sig home_unit iface =
     -- It's a signature iface...
     mi_semantic_module iface /= mi_module iface &&
     -- and it's not from the local package
-    notHomeModuleMaybe mhome_unit (mi_module iface)
+    notHomeModule home_unit (mi_module iface)
 
 -- | This is an improved version of 'findAndReadIface' which can also
 -- handle the case when a user requests @p[A=<B>]:M@ but we only
@@ -1071,13 +1071,12 @@ computeInterface
   -> IO (MaybeErr MissingInterfaceError (ModIface, ModLocation))
 computeInterface hsc_env doc_str hi_boot_file mod0 = do
   massert (not (isHoleModule mod0))
-  let mhome_unit  = hsc_home_unit_maybe hsc_env
+  let home_unit  = hsc_home_unit hsc_env
   let find_iface m = findAndReadIface hsc_env doc_str
                                       m mod0 hi_boot_file
   case getModuleInstantiation mod0 of
       (imod, Just indef)
-        | Just home_unit <- mhome_unit
-        , isHomeUnitIndefinite home_unit ->
+        | isHomeUnitIndefinite home_unit ->
           find_iface imod >>= \case
             Succeeded (iface0, path) ->
               rnModIface hsc_env (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case
@@ -1134,13 +1133,13 @@ moduleFreeHolesPrecise doc_str mod
                 return (Succeeded (renameFreeHoles ifhs insts))
             Failed err -> return (Failed err)
 
-wantHiBootFile :: Maybe HomeUnit -> ExternalPackageState -> Module -> WhereFrom
+wantHiBootFile :: HomeUnit -> ExternalPackageState -> Module -> WhereFrom
                -> MaybeErr MissingInterfaceError IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
-wantHiBootFile mhome_unit eps mod from
+wantHiBootFile home_unit eps mod from
   = case from of
        ImportByUser usr_boot
-          | usr_boot == IsBoot && notHomeModuleMaybe mhome_unit mod
+          | usr_boot == IsBoot && notHomeModule home_unit mod
           -> Failed (BadSourceImport mod)
           | otherwise -> Succeeded usr_boot
 
@@ -1148,7 +1147,7 @@ wantHiBootFile mhome_unit eps mod from
           -> Succeeded NotBoot
 
        ImportBySystem
-          | notHomeModuleMaybe mhome_unit mod
+          | notHomeModule home_unit mod
           -> Succeeded NotBoot
              -- If the module to be imported is not from this package
              -- don't look it up in eps_is_boot, because that is keyed
@@ -1222,7 +1221,7 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
   let profile = targetProfile dflags
       unit_state = hsc_units hsc_env
       name_cache = hsc_NC hsc_env
-      mhome_unit  = hsc_home_unit_maybe hsc_env
+      home_unit  = hsc_home_unit hsc_env
       dflags     = hsc_dflags hsc_env
       logger     = hsc_logger hsc_env
       hooks      = hsc_hooks hsc_env
@@ -1261,7 +1260,7 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
           trace_if logger (text "...not found")
           return $ Failed $ cannotFindInterface
                               unit_state
-                              mhome_unit
+                              home_unit
                               profile
                               (moduleName mod)
                               err

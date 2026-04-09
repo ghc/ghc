@@ -50,6 +50,7 @@ module GHC.Unit.Home.Graph
   -- * Utilities
   , hugSCCs
   , hugFromList
+  , hugFromHomeUnitEnvs
 
   -- ** Printing
   , pprHomeUnitGraph
@@ -150,11 +151,11 @@ data HomeUnitEnv = HomeUnitEnv
     --
     -- (This changes a previous invariant: changed Jan 05.)
 
-  , homeUnitEnv_home_unit :: !(Maybe HomeUnit)
+  , homeUnitEnv_home_unit :: !HomeUnit
     -- ^ Home-unit
   }
 
-mkHomeUnitEnv :: UnitState -> DynFlags -> HomePackageTable -> Maybe HomeUnit -> HomeUnitEnv
+mkHomeUnitEnv :: UnitState -> DynFlags -> HomePackageTable -> HomeUnit -> HomeUnitEnv
 mkHomeUnitEnv us dflags hpt home_unit = HomeUnitEnv
   { homeUnitEnv_units = us
   , homeUnitEnv_dflags = dflags
@@ -363,6 +364,9 @@ hugSCCs hug = sccs where
 hugFromList :: [(UnitId, HomeUnitEnv)] -> HomeUnitGraph
 hugFromList = UnitEnvGraph . Map.fromList
 
+hugFromHomeUnitEnvs :: [HomeUnitEnv] -> HomeUnitGraph
+hugFromHomeUnitEnvs = hugFromList . fmap (\hue -> (homeUnitId $ homeUnitEnv_home_unit hue, hue))
+
 pprHomeUnitGraph :: HomeUnitGraph -> IO SDoc
 pprHomeUnitGraph unitEnv = do
   docs <- mapM (\(k, v) -> pprHomeUnitEnv k v) $ Map.assocs $ unitEnv_graph unitEnv
@@ -372,6 +376,6 @@ pprHomeUnitEnv :: UnitId -> HomeUnitEnv -> IO SDoc
 pprHomeUnitEnv uid env = do
   hptDoc <- pprHPT $ homeUnitEnv_hpt env
   return $
-    ppr uid <+> text "(flags:" <+> ppr (homeUnitId_ $ homeUnitEnv_dflags env) <> text "," <+> ppr (fmap homeUnitId $ homeUnitEnv_home_unit env) <> text ")" <+> text "->"
+    ppr uid <+> text "(flags:" <+> ppr (homeUnitId_ $ homeUnitEnv_dflags env) <> text "," <+> ppr (homeUnitId $ homeUnitEnv_home_unit env) <> text ")" <+> text "->"
     $$ nest 4 hptDoc
 

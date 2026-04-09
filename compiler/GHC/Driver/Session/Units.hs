@@ -17,9 +17,9 @@ import GHC.Driver.Config.Diagnostic
 
 import GHC.Unit.Env
 import GHC.Unit (UnitId)
+import GHC.Unit.Home (homeUnitId)
 import GHC.Unit.Home.PackageTable
 import qualified GHC.Unit.Home.Graph as HUG
-import GHC.Unit.State  ( emptyUnitState )
 import qualified GHC.Unit.State as State
 
 import GHC.Types.SrcLoc
@@ -125,22 +125,23 @@ initMulti unitArgsFiles lintDynFlagsAndSrcs = do
 
   checkDuplicateUnits initial_dflags (NE.toList (NE.zip unitArgsFiles unitDflags))
 
-  (initial_home_graph, mainUnitId) <- liftIO $ createUnitEnvFromFlags unitDflags
-  let home_units = HUG.allUnits initial_home_graph
+  let home_units = Set.fromList $ map homeUnitId_ $ NE.toList unitDflags
 
-  home_unit_graph <- forM initial_home_graph $ \homeUnitEnv -> do
-    let hue_flags = homeUnitEnv_dflags homeUnitEnv
-        dflags = homeUnitEnv_dflags homeUnitEnv
-    (unit_state,home_unit,mconstants) <- liftIO $ State.initUnits logger hue_flags (hscUIC hsc_env) home_units
+  home_unit_envs <- forM unitDflags $ \dflags -> do
+    emptyHpt <- liftIO $ emptyHomePackageTable
+    (unit_state,home_unit,mconstants) <- liftIO $ State.initUnits logger dflags (hscUIC hsc_env) home_units
 
     updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
-    emptyHpt <- liftIO $ emptyHomePackageTable
     pure $ HomeUnitEnv
       { homeUnitEnv_units = unit_state
       , homeUnitEnv_dflags = updated_dflags
       , homeUnitEnv_hpt = emptyHpt
-      , homeUnitEnv_home_unit = Just home_unit
+      , homeUnitEnv_home_unit = home_unit
       }
+
+
+  let mainUnitId = homeUnitId $ homeUnitEnv_home_unit $ NE.head home_unit_envs
+  let home_unit_graph = HUG.hugFromHomeUnitEnvs $ NE.toList home_unit_envs
 
   checkUnitCycles initial_dflags home_unit_graph
 
@@ -230,16 +231,3 @@ offsetDynFlags dflags =
     augment_maybe (Just f) = Just (augment f)
     augment f | isRelative f, Just offset <- workingDirectory dflags = offset </> f
               | otherwise = f
-
-
-createUnitEnvFromFlags :: NE.NonEmpty DynFlags -> IO (HomeUnitGraph, UnitId)
-createUnitEnvFromFlags unitDflags = do
-  unitEnvList <- forM unitDflags $ \dflags -> do
-    emptyHpt <- emptyHomePackageTable
-    let newInternalUnitEnv =
-          HUG.mkHomeUnitEnv emptyUnitState dflags emptyHpt Nothing
-    return (homeUnitId_ dflags, newInternalUnitEnv)
-  let activeUnit = fst $ NE.head unitEnvList
-  return (HUG.hugFromList (NE.toList unitEnvList), activeUnit)
-
-
