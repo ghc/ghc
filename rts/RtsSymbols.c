@@ -605,6 +605,7 @@ extern char **environ;
       SymI_HasProto(hs_free_fun_ptr)                                    \
       SymI_HasProto(hs_hpc_rootModule)                                  \
       SymI_HasProto(hs_hpc_module)                                      \
+      SymI_HasProto(startupHpc)                                         \
       SymI_HasProto(hs_thread_done)                                     \
       SymI_HasProto(hs_try_putmvar)                                     \
       SymI_HasProto(hs_try_putmvar_with_value)                          \
