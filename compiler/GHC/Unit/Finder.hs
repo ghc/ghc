@@ -256,7 +256,7 @@ findImportedModuleNoHsc fc fopts ue home_module_map mhome_unit mod_name mb_pkg =
       in Set.toList providers
     unknown_units =
       let candidates = Set.difference hpt_deps complete_units
-          excluded = maybe dep_providers (\u -> Set.insert u dep_providers) current_unit_id
+          excluded = maybe Set.empty Set.singleton {- maybe dep_providers (\u -> Set.insert u dep_providers) -} current_unit_id
       in Set.toList (Set.difference candidates excluded)
     other_home_uids = known_other_uids ++ unknown_units
     other_fopts_list =
