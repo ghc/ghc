@@ -16,7 +16,7 @@ module GHC.Internal.Unicode.Version
 (unicodeVersion)
 where
 
-import GHC.Internal.Base( build )       -- For known-key names
+import GHC.Internal.Base                -- For known-key names
 import GHC.Internal.Num( fromInteger )  -- For known-key names
 import GHC.Internal.Data.Version
 

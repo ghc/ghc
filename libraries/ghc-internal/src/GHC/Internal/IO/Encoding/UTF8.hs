@@ -34,10 +34,7 @@ module GHC.Internal.IO.Encoding.UTF8 (
   utf8_bom, mkUTF8_bom
   ) where
 
-import GHC.Internal.Base (
-    Monad(..), assert, const, ord, otherwise, unIO, unsafeChr, ($),
-  )
-import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
+import GHC.Internal.Base
 import GHC.Internal.Real
 import GHC.Internal.Num
 import GHC.Internal.IORef
@@ -48,7 +45,6 @@ import GHC.Internal.IO.Encoding.Types
 import GHC.Internal.Prim (
     chr#, uncheckedIShiftL#, word2Int#, word8ToWord#, (+#), (-#),
   )
-import GHC.Internal.Types (Bool(..), Char(..), Int, IO)
 import GHC.Internal.Word
 import GHC.Internal.Data.Bits
 

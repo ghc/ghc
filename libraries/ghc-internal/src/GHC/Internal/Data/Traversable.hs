@@ -40,6 +40,7 @@ module GHC.Internal.Data.Traversable (
     foldMapDefault,
     ) where
 
+import GHC.Internal.Base hiding( mapM )
 import GHC.Internal.Data.Coerce
 import GHC.Internal.Data.Either ( Either(..) )
 import GHC.Internal.Data.Foldable
@@ -53,8 +54,6 @@ import GHC.Internal.Data.Ord ( Down(..) )
 import GHC.Internal.Data.Proxy ( Proxy(..) )
 
 import GHC.Internal.Arr
-import GHC.Internal.Base ( Applicative(..), Monad(..), Monoid, NonEmpty(..),
-                  ($), (.), id, flip )
 import qualified GHC.Internal.List as List ( foldr )
 import GHC.Internal.Maybe ( Maybe(..) )
 import GHC.Internal.Tuple (Solo (..))

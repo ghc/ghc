@@ -30,8 +30,8 @@ module GHC.Internal.System.Mem
         , disableAllocationLimit
        ) where
 
+import GHC.Internal.Types
 import GHC.Internal.Conc.Sync
-import GHC.Internal.Types (IO)
 
 -- | Triggers an immediate major garbage collection.
 performGC :: IO ()

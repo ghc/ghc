@@ -19,15 +19,14 @@ module GHC.Internal.Fingerprint (
         fingerprintBufferedStream
    ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Err (undefined)
 import GHC.Internal.IO
-import GHC.Internal.Base (String, ord, when, ($))
 import GHC.Internal.Bits
 import GHC.Internal.Num
 import GHC.Internal.Data.Maybe
 import GHC.Internal.List
 import GHC.Internal.Real
-import GHC.Internal.Types (Int)
 import GHC.Internal.Word
 import GHC.Internal.Ptr
 import GHC.Internal.Foreign.C.Types
@@ -35,7 +34,6 @@ import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Fingerprint.Type
-import GHC.Internal.Base( (>>), (>>=) )        -- For known-key names
 
 -- for SIZEOF_STRUCT_MD5CONTEXT:
 #include "HsBaseConfig.h"

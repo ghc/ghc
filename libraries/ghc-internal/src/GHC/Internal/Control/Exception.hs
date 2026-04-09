@@ -118,10 +118,10 @@ module GHC.Internal.Control.Exception (
 
   ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Control.Exception.Base
 import GHC.Internal.Exception.Type (ExceptionWithContext(..), whileHandling)
 
-import GHC.Internal.Base (Functor(..), foldr, return, ($), (.))
 import GHC.Internal.IO (IO, interruptible)
 import GHC.Internal.Maybe (Maybe(..))
 

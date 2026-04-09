@@ -14,19 +14,15 @@ import GHC.Prelude
 import GHC.Hs
 
 
-import GHC.Builtin
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types  -- A bunch of wired-in TyCons and DataCons
 import GHC.Builtin.PrimOps.Ids (primOpId)
-import GHC.Builtin.TH( unsafeCodeCoerceName, liftTypedName )
 import GHC.Builtin.KnownKeys
 
 import GHC.Types.Name( KnownOcc )
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader( RdrName, mkVarUnqual, getRdrName
-                            , nameRdrName )
-import GHC.Types.Id.Make( coerceName )  -- `coerce` is wired-in
-
+                            , nameRdrName, knownOccRdrName )
 
 import GHC.Data.List.Infinite (Infinite (..))
 import qualified GHC.Data.List.Infinite as Inf
@@ -52,9 +48,34 @@ mechanisms:
 
 {- *********************************************************************
 *                                                                      *
+        Infrastructure
+*                                                                      *
+********************************************************************* -}
+
+knownVarOccRdrName :: String -> RdrName
+knownVarOccRdrName s = knownOccRdrName (mkVarOcc s)
+
+
+{- *********************************************************************
+*                                                                      *
         Known-occ OccNames
 *                                                                      *
 ********************************************************************* -}
+
+knownOccs :: [KnownOcc]
+-- Used only for sanity-checks, and for suppressing unused imports
+-- when -frebindable-known-key-names is on
+knownOccs
+  = [ rationalTyConOcc
+    , someTypeRepTyConOcc, someTypeRepDataConOcc, mkTrConOcc, mkTrAppCheckedOcc
+    , mkTrFunOcc, typeRepIdOcc, typeNatTypeRepOcc, typeSymbolTypeRepOcc
+    , typeCharTypeRepOcc, typeLitSymbolDataConOcc, typeLitNatDataConOcc
+    , typeLitCharDataConOcc
+    , trModuleTyConOcc, trModuleDataConOcc, trNameSDataConOcc, trTyConTyConOcc
+    , trTyConDataConOcc, kindRepTyConOcc, kindRepTyConAppDataConOcc, kindRepVarDataConOcc
+    , kindRepAppDataConOcc, kindRepFunDataConOcc, kindRepTYPEDataConOcc
+    , kindRepTypeLitSDataConOcc
+    ]
 
 rationalTyConOcc :: KnownOcc
 rationalTyConOcc = mkTcOcc "Rational"
@@ -121,28 +142,32 @@ kindRepTypeLitSDataConOcc = mkDataOcc "KindRepTypeLitS"
 
 {- *********************************************************************
 *                                                                      *
-        Misc global RdrNames
+        Known-occ RdrNames
 *                                                                      *
 ********************************************************************* -}
+
+knownOccRdrNames :: [RdrName]
+knownOccRdrNames
+  = [ toDyn_RDR, compose_RDR
+    , appE_RDR, lift_RDR, liftTyped_RDR
+    , enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, enumFromThenTo_RDR
+    , fromEnum_RDR, toEnum_RDR, toEnumError_RDR, succError_RDR
+    , predError_RDR, enumIntToWord_RDR, succ_RDR, pred_RDR
+    , minBound_RDR, maxBound_RDR
+    , times_RDR, plus_RDR, and_RDR, not_RDR, range_RDR, inRange_RDR, index_RDR
+    , unsafeIndex_RDR, unsafeRangeSize_RDR
+    ]
 
 toDyn_RDR :: RdrName
 toDyn_RDR = knownVarOccRdrName "toDyn"
 
-
-{- *********************************************************************
-*                                                                      *
-        Global RdrNames used by derived instances
-*                                                                      *
-********************************************************************* -}
-
-appE_RDR, lift_RDR, liftTyped_RDR, unsafeCodeCoerce_RDR :: RdrName
-appE_RDR             = knownVarOccRdrName "appE"
-lift_RDR             = knownVarOccRdrName "lift"
-unsafeCodeCoerce_RDR = nameRdrName unsafeCodeCoerceName
-liftTyped_RDR        = nameRdrName liftTypedName
-
 compose_RDR :: RdrName
 compose_RDR = knownKeyRdrName composeIdKey
+
+appE_RDR, lift_RDR, liftTyped_RDR :: RdrName
+appE_RDR             = knownVarOccRdrName "appE"
+lift_RDR             = knownVarOccRdrName "lift"
+liftTyped_RDR        = knownVarOccRdrName "liftTyped"
 
 enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, enumFromThenTo_RDR :: RdrName
 enumFrom_RDR       = knownKeyRdrName enumFromClassOpKey
@@ -357,20 +382,18 @@ all_RDR                 = varQual_RDR gHC_INTERNAL_DATA_FOLDABLE       (fsLit "a
 traverse_RDR            = varQual_RDR gHC_INTERNAL_DATA_TRAVERSABLE    (fsLit "traverse")
 
 ltTag_Expr, eqTag_Expr, gtTag_Expr, false_Expr,
-  true_Expr, pure_Expr, unsafeCodeCoerce_Expr,
+  true_Expr, pure_Expr,
   mempty_Expr, foldMap_Expr,
-  traverse_Expr, coerce_Expr, all_Expr, null_Expr :: LHsExpr GhcPs
+  traverse_Expr, all_Expr, null_Expr :: LHsExpr GhcPs
 ltTag_Expr            = nlHsVar ltTag_RDR
 eqTag_Expr            = nlHsVar eqTag_RDR
 gtTag_Expr            = nlHsVar gtTag_RDR
 false_Expr            = nlHsVar false_RDR
 true_Expr             = nlHsVar true_RDR
 pure_Expr             = nlHsVar pure_RDR
-unsafeCodeCoerce_Expr = nlHsVar unsafeCodeCoerce_RDR
 mempty_Expr           = nlHsVar mempty_RDR
 foldMap_Expr          = nlHsVar foldMap_RDR
 traverse_Expr         = nlHsVar traverse_RDR
-coerce_Expr           = nlHsVar (nameRdrName coerceName)
 all_Expr              = nlHsVar all_RDR
 null_Expr             = nlHsVar null_RDR
 

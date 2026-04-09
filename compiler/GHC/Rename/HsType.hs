@@ -97,6 +97,7 @@ import GHC.Utils.Misc
 import GHC.Types.Fixity ( compareFixity, negateFixity )
 import GHC.Types.Basic  ( TypeOrKind(..) )
 
+import GHC.Builtin( mkUnboundName, isUnboundName )
 import GHC.Builtin.KnownKeys
 
 import GHC.Unit.Module ( getModule )

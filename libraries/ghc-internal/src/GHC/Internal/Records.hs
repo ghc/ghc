@@ -30,7 +30,7 @@ module GHC.Internal.Records
        ( HasField(..), setField
        ) where
 
-import GHC.Internal.Types (TYPE, Type, Constraint)
+import GHC.Internal.Base
 import GHC.Internal.Err( error )
 
 -- | Constraint representing the fact that the field @x@ belongs to

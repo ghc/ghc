@@ -64,7 +64,8 @@ import GHC.Internal.IO.Handle.Types
 import GHC.Internal.Stack.Types (HasCallStack)
 import {-# SOURCE #-} GHC.Internal.Stack ( withFrozenCallStack )
 import GHC.Internal.Foreign.C.Types
-import GHC.Internal.Data.Typeable ( Typeable, cast )
+import GHC.Internal.Data.Typeable( cast )
+import GHC.Internal.Type.Reflection   -- For known-occ things
 
 -- ------------------------------------------------------------------------
 -- Exception datatypes and operations

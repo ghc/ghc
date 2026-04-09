@@ -1,6 +1,11 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ExplicitNamespaces #-}
+
+{-# OPTIONS -Wno-unused-imports #-}
+    -- See wrinkle (TD1)
+
 
 -- | Primitive exceptions.
 --
@@ -15,7 +20,7 @@ where
 import GHC.Internal.Prim
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Internal.Types ()
+import GHC.Internal.Types
 
 default () -- Double and Integer aren't available yet
 

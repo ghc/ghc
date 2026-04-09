@@ -26,6 +26,7 @@ module GHC.Internal.Text.Show (
    showListWith,
  ) where
 
+import GHC.Internal.Types
 import GHC.Internal.Show
 
 -- | Show a list (using square brackets and commas), given a function

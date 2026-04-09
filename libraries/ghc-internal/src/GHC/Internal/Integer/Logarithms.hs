@@ -9,6 +9,7 @@ module GHC.Internal.Integer.Logarithms
    )
 where
 
+import GHC.Internal.Base
 import qualified GHC.Internal.Bignum.Primitives as N
 import qualified GHC.Internal.Bignum.Integer    as N
 import GHC.Internal.Bignum.Integer (Integer)

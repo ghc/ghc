@@ -49,7 +49,7 @@ module GHC.Internal.OverloadedLabels
        ( IsLabel(..)
        ) where
 
-import GHC.Internal.Types (Symbol)
+import GHC.Internal.Base
 
 class IsLabel (x :: Symbol) a where
   fromLabel :: a

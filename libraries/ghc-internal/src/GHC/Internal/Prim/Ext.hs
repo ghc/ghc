@@ -5,6 +5,9 @@
 {-# LANGUAGE GHCForeignImportPrim #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 
+{-# OPTIONS_GHC -dno-typeable-binds #-}
+  -- See (KKN4) in Note [Overview of known-key entities]
+
 {-# OPTIONS_GHC -Wno-orphans -Wno-inline-rule-shadowing #-}
 
 -- We need platform defines (tests for mingw32 below).
@@ -44,7 +47,7 @@ module GHC.Internal.Prim.Ext
 import GHC.Internal.Prim
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Internal.Types ()
+import GHC.Internal.Types()
 
 default () -- Double and Integer aren't available yet
 

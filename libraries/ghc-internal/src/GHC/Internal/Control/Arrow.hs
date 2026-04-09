@@ -51,13 +51,10 @@ module GHC.Internal.Control.Arrow (
     ArrowApply(..), ArrowMonad(..), leftApp,
     ) where
 
+import GHC.Internal.Base hiding( id, (.) )
 import GHC.Internal.Data.Tuple ( uncurry )
 import GHC.Internal.Data.Either
 import GHC.Internal.Control.Category
-import GHC.Internal.Base (
-    Alternative(..), Applicative(..), Functor(..), Monad(..), MonadPlus(..),
-    const, ($),
-  )
 import GHC.Internal.Generics (Generic, Generic1)
 
 infixr 5 <+>

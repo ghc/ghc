@@ -13,7 +13,7 @@ module GHC.Internal.AllocationLimitHandler
   , disableAllocationLimitFor
   )
   where
-import GHC.Internal.Base (pure, ($))
+import GHC.Internal.Base
 import GHC.Internal.Conc.Sync (ThreadId(..))
 import GHC.Internal.Data.IORef (IORef, readIORef, writeIORef, newIORef)
 import GHC.Internal.Foreign.C.Types
@@ -23,8 +23,6 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Prim (
     Int64#, RealWorld, State#, ThreadId#, setOtherThreadAllocationCounter#,
   )
-import GHC.Internal.Types (IO(..))
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 

@@ -39,8 +39,7 @@ module GHC.Internal.IO.Encoding.UTF32 (
   utf32le_encode,
   ) where
 
-import GHC.Internal.Base (Monad(..), const, ord, otherwise, unIO, ($))
-import GHC.Internal.Classes (Eq(..), Ord(..), not, (&&), (||))
+import GHC.Internal.Base
 import GHC.Internal.Real
 import GHC.Internal.Num
 -- import GHC.Internal.IO
@@ -51,7 +50,6 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Prim (
     chr#, uncheckedIShiftL#, word2Int#, word8ToWord#, (+#),
   )
-import GHC.Internal.Types (Bool(..), Char(..), Int, IO)
 import GHC.Internal.Word
 import GHC.Internal.Data.Bits
 import GHC.Internal.IORef

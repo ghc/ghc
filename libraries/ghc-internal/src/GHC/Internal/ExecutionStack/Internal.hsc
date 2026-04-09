@@ -37,12 +37,11 @@ module GHC.Internal.ExecutionStack.Internal (
   , invalidateDebugCache
   ) where
 
-import GHC.Internal.Classes (Eq(..))
+import GHC.Internal.Base
 import GHC.Internal.Data.Functor
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.List (reverse, null)
 import GHC.Internal.Err (undefined)
-import GHC.Internal.Types (Int, IO)
 import GHC.Internal.Word
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.String (peekCString, CString)
@@ -50,15 +49,10 @@ import GHC.Internal.Foreign.Ptr (Ptr, nullPtr, castPtr, plusPtr, FunPtr)
 import GHC.Internal.Foreign.ForeignPtr
 import GHC.Internal.Foreign.Marshal.Alloc (allocaBytes)
 import GHC.Internal.Foreign.Storable (Storable(..))
-import GHC.Internal.Base (
-    String, const, foldr, id, join, map, otherwise, pure, return,
-    ($), (.), (++), (<*>), (=<<),
-  )
 import GHC.Internal.IO.Unsafe (unsafePerformIO, unsafeInterleaveIO)
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Text.Show
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 -- N.B. See rts/include/rts/Libdw.h for notes on stack representation.
 

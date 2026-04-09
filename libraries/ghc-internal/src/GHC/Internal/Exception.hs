@@ -77,7 +77,7 @@ import GHC.Internal.Exception.Context (SomeExceptionAnnotation(..))
 import GHC.Internal.Exception.Type
 import GHC.Internal.Base( (>>=) )        -- For known-key names
 import GHC.Internal.Classes( (==) )      -- For known-key names
-import GHC.Internal.Data.Typeable( Typeable ) -- For known-key names
+import GHC.Internal.Data.Typeable        -- For known-key names
 
 -- | Throw an exception.  Exceptions may be thrown from purely
 -- functional code, but may only be caught within the 'IO' monad.

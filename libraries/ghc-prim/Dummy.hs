@@ -1,4 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+
+{-# OPTIONS_GHC -dno-typeable-binds #-}
+  -- See (KKN4) in Note [Overview of known-key entities]
+
 module Dummy where
 
 import GHC.Internal.Types ()

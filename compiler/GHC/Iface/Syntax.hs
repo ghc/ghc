@@ -48,21 +48,21 @@ module GHC.Iface.Syntax (
 
 import GHC.Prelude
 
-import GHC.Builtin.KnownKeys(mkUnboundName)
-import GHC.Data.FastString
-import GHC.Data.BooleanFormula (pprBooleanFormula, isTrue)
-
-import GHC.Builtin.KnownKeys ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
-                           constraintKindTyConKey )
-import GHC.Types.Unique ( hasKey )
 import GHC.Iface.Type
 import GHC.Iface.Recomp.Binary
+
+import GHC.Builtin( mkUnboundName )
+import GHC.Builtin.KnownKeys ( unrestrictedFunTyConKey, liftedTypeKindTyConKey
+                             , constraintKindTyConKey )
+
 import GHC.Core( IsOrphan, isOrphan, UnfoldingCache(..) )
-import GHC.Types.Demand
-import GHC.Types.Cpr
 import GHC.Core.Class
 import GHC.Types.FieldLabel
 import GHC.Core.Coercion.Axiom ( BranchIndex )
+
+import GHC.Types.Unique ( hasKey )
+import GHC.Types.Demand
+import GHC.Types.Cpr
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -74,11 +74,13 @@ import GHC.Types.Annotations( AnnPayload, AnnTarget )
 import GHC.Types.Basic
 import GHC.Types.InlinePragma
 import GHC.Types.Tickish
-import GHC.Unit.Module
-import GHC.Unit.Module.Warnings
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike )
+
+import GHC.Unit.Module
+import GHC.Unit.Module.Warnings
+
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
@@ -96,6 +98,9 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        zipWithEqual )
+
+import GHC.Data.FastString
+import GHC.Data.BooleanFormula (pprBooleanFormula, isTrue)
 
 import Language.Haskell.Syntax.BooleanFormula(BooleanFormula(..))
 

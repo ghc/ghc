@@ -42,6 +42,7 @@ import GHC.Tc.Types.Origin ( TypedThing(..) )
 
 import GHC.Unit
 import GHC.Unit.Module.Warnings
+import GHC.Builtin( mkUnboundName )
 import GHC.Builtin.KnownKeys
 
 import GHC.Types.FieldLabel

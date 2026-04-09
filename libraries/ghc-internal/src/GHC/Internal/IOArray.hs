@@ -24,13 +24,10 @@ module GHC.Internal.IOArray (
         boundsIOArray
     ) where
 
-import GHC.Internal.Base (return, ($))
-import GHC.Internal.Classes (Eq(..))
+import GHC.Internal.Base
 import GHC.Internal.IO
 import GHC.Internal.Arr
 import GHC.Internal.Prim (RealWorld)
-import GHC.Internal.Types (Int)
-import GHC.Internal.Base( (>>=) )     -- For known-key names
 
 -- ---------------------------------------------------------------------------
 -- | An 'IOArray' is a mutable, boxed, non-strict array in the 'IO' monad.

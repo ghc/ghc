@@ -9,7 +9,7 @@ module GHC.Internal.Weak.Finalize
     , runFinalizerBatch
     ) where
 
-import GHC.Internal.Base ( const, return, ($) )
+import GHC.Internal.Base
 import GHC.Internal.Conc.Sync ( labelThreadByteArray#, myThreadId )
 import GHC.Internal.Encoding.UTF8 ( utf8EncodeByteArray# )
 import GHC.Internal.Exception ( SomeException(..) )
@@ -18,8 +18,6 @@ import GHC.Internal.IORef ( IORef, newIORef, readIORef, writeIORef )
 import GHC.Internal.Prim (
     Array#, ByteArray#, Int#, RealWorld, State#, indexArray#, (-#)
   )
-import GHC.Internal.Types ( Int(..), IO(..) )
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 data ByteArray = ByteArray ByteArray#
 

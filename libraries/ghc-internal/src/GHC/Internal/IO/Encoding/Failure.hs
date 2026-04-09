@@ -25,21 +25,17 @@ module GHC.Internal.IO.Encoding.Failure (
     recoverDecode#, recoverEncode#,
   ) where
 
+import GHC.Internal.Base
 import GHC.Internal.IO
 import GHC.Internal.IO.Buffer
 import GHC.Internal.IO.Exception
-
-import GHC.Internal.Base ( String, ord, otherwise, return, (++) )
-import GHC.Internal.Classes ( Eq(..), Ord(..), (&&), (||) )
 import GHC.Internal.Char
 import GHC.Internal.Maybe ( Maybe(..) )
 import GHC.Internal.Prim ( RealWorld, State# )
-import GHC.Internal.Types ( Bool, Char )
 import GHC.Internal.Word
 import GHC.Internal.Show
 import GHC.Internal.Num
 import GHC.Internal.Real ( fromIntegral )
-import GHC.Internal.Base( (>>=), (>>) )        -- For known-key names
 
 --import GHC.Internal.System.Posix.Internals
 

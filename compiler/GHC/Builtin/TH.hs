@@ -17,28 +17,56 @@ import GHC.Data.FastString
 
 import Language.Haskell.Syntax.Module.Name
 
--- To add a name, do three things
---
---  1) Allocate a key
---  2) Make a "Name"
---  3) Add the name to templateHaskellNames
-
-thKnownKeyTable :: [(OccName,Unique)]
-thKnownKeyTable = []
+thKnownOccs :: [KnownOcc]
+thKnownOccs
+  = [ qTyConOcc, nameTyConOcc, fieldExpTyConOcc, patTyConOcc
+    , fieldPatTyConOcc, expTyConOcc, decTyConOcc, typeTyConOcc
+    , matchTyConOcc, clauseTyConOcc, funDepTyConOcc, predTyConOcc
+    , codeTyConOcc, injAnnTyConOcc, overlapTyConOcc, decsTyConOcc
+    , modNameTyConOcc, quasiQuoterTyConOcc
+    , liftIdOcc, unsafeCodeCoerceOcc
+    , charLOcc, stringLOcc, integerLOcc, intPrimLOcc, wordPrimLOcc
+    , floatPrimLOcc, doublePrimLOcc, rationalLOcc, stringPrimLOcc
+    , charPrimLOcc
+    , litPOcc, varPOcc, tupPOcc, unboxedTupPOcc, unboxedSumPOcc, conPOcc
+    , infixPOcc, tildePOcc, bangPOcc, asPOcc, wildPOcc, recPOcc, listPOcc
+    , sigPOcc, viewPOcc, typePOcc, invisPOcc, orPOcc
+    , matchOcc, clauseOcc
+    , varEOcc, conEOcc, litEOcc, appEOcc, appTypeEOcc, infixEOcc, infixAppOcc
+    , sectionLOcc, sectionROcc, lamEOcc, lamCaseEOcc, lamCasesEOcc, tupEOcc
+    , unboxedTupEOcc, unboxedSumEOcc, condEOcc, multiIfEOcc, letEOcc
+    , caseEOcc, doEOcc, mdoEOcc, compEOcc, staticEOcc, unboundVarEOcc
+    , labelEOcc, implicitParamVarEOcc, getFieldEOcc, projectionEOcc, typeEOcc
+    , forallEOcc, forallVisEOcc, constrainedEOcc
+    , fieldExpOcc
+    , funDOcc, valDOcc, dataDOcc, newtypeDOcc, typeDataDOcc, tySynDOcc, classDOcc
+    , instanceWithOverlapDOcc, sigDOcc, kiSigDOcc, forImpDOcc, pragInlDOcc
+    , pragSpecDOcc, pragSpecInlDOcc, pragSpecEDOcc, pragSpecInlEDOcc
+    , pragSpecInstDOcc, pragRuleDOcc
+    , pragAnnDOcc, pragSCCFunDOcc, pragSCCFunNamedDOcc
+    , standaloneDerivWithStrategyDOcc, defaultSigDOcc, defaultDOcc
+    , dataInstDOcc, newtypeInstDOcc, tySynInstDOcc, dataFamilyDOcc
+    , openTypeFamilyDOcc, closedTypeFamilyDOcc, infixLWithSpecDOcc
+    , infixRWithSpecDOcc, infixNWithSpecDOcc, roleAnnotDOcc, patSynDOcc
+    , patSynSigDOcc, pragCompleteDOcc, implicitParamBindDOcc, pragOpaqueDOcc
+    , patQTyConOcc, expQTyConOcc, stmtTyConOcc, conTyConOcc, bangTypeTyConOcc
+    , varBangTypeTyConOcc, typeQTyConOcc, decsQTyConOcc, ruleBndrTyConOcc
+    , tySynEqnTyConOcc, roleTyConOcc, derivClauseTyConOcc, kindTyConOcc
+    , tyVarBndrUnitTyConOcc, tyVarBndrSpecTyConOcc, tyVarBndrVisTyConOcc
+    , derivStrategyTyConOcc
+    ]
 
 templateHaskellNames :: [Name]
 -- The names that are implicitly mentioned by ``bracket''
 -- Should stay in sync with the import list of GHC.HsToCore.Quote
 
 templateHaskellNames = [
-    sequenceQName, newNameName, liftTypedName,
+    sequenceQName, newNameName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameG_fldName,
     mkNameLName,
     mkNameSName, mkNameQName,
     mkModNameName,
-    liftStringName,
     unTypeName, unTypeCodeName,
-    unsafeCodeCoerceName,
     -- FieldPat
     fieldPatName,
     -- Body
@@ -189,8 +217,8 @@ quasiQuoterTyConOcc   = mkTcOcc "QuasiQuoter"
 
 sequenceQName, newNameName,
     mkNameName, mkNameG_vName, mkNameG_fldName, mkNameG_dName, mkNameG_tcName,
-    mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeCodeName,
-    unsafeCodeCoerceName, liftTypedName, mkModNameName, mkNameQName :: Name
+    mkNameLName, mkNameSName, unTypeName, unTypeCodeName,
+    mkModNameName, mkNameQName :: Name
 sequenceQName  = thMonadFun (fsLit "sequenceQ") sequenceQIdKey
 newNameName    = thMonadFun (fsLit "newName")   newNameIdKey
 mkNameName     = thFun (fsLit "mkName")     mkNameIdKey
@@ -203,13 +231,11 @@ mkNameQName    = thFun (fsLit "mkNameQ")    mkNameQIdKey
 mkNameSName    = thFun (fsLit "mkNameS")    mkNameSIdKey
 mkModNameName  = thFun (fsLit "mkModName")  mkModNameIdKey
 unTypeName     = thMonadFld (fsLit "TExp") (fsLit "unType") unTypeIdKey
-unTypeCodeName    = thMonadFun (fsLit "unTypeCode") unTypeCodeIdKey
-unsafeCodeCoerceName = thMonadFun (fsLit "unsafeCodeCoerce") unsafeCodeCoerceIdKey
-liftStringName = liftFun (fsLit "liftString")  liftStringIdKey
-liftTypedName  = liftFun (fsLit "liftTyped") liftTypedIdKey
+unTypeCodeName = thMonadFun (fsLit "unTypeCode") unTypeCodeIdKey
 
-liftIdOcc :: KnownOcc
-liftIdOcc = mkVarOcc "lift"
+liftIdOcc, unsafeCodeCoerceOcc :: KnownOcc
+liftIdOcc           = mkVarOcc "lift"
+unsafeCodeCoerceOcc = mkVarOcc "unsafeCodeCoerce"
 
 -------------------- TH.Lib -----------------------
 -- data Lit = ...

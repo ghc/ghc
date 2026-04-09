@@ -43,7 +43,7 @@ import GHC.Driver.Env.Types
 import {-# SOURCE #-} GHC.Tc.Errors.Hole ( getHoleFitDispConfig )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
-import GHC.Builtin.KnownKeys ( mkUnboundName, isUnboundName )
+import GHC.Builtin ( mkUnboundName, isUnboundName )
 import GHC.Utils.Misc
 import GHC.Utils.Panic (panic)
 

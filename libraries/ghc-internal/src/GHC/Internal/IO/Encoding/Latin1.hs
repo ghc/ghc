@@ -36,17 +36,12 @@ module GHC.Internal.IO.Encoding.Latin1 (
   ascii_encode,
   ) where
 
-import GHC.Internal.Base (
-    Monad(..), const, ord, otherwise, unIO, unsafeChr, ($),
-  )
-import GHC.Internal.Classes (Eq(..), Ord(..))
+import GHC.Internal.Base
 import GHC.Internal.Real
 import GHC.Internal.Num
--- import GHC.Internal.IO
 import GHC.Internal.IO.Buffer
 import GHC.Internal.IO.Encoding.Failure
 import GHC.Internal.IO.Encoding.Types
-import GHC.Internal.Types (Int, IO)
 
 -- -----------------------------------------------------------------------------
 -- Latin1

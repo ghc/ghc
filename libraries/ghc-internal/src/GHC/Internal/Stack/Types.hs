@@ -52,7 +52,7 @@ import cycle,
 -}
 
 import GHC.Internal.Classes ( Eq( (==) ), (&&) )
-import GHC.Internal.Types (Char, Int)
+import GHC.Internal.Types
 
 default ()
 

@@ -81,22 +81,16 @@ module GHC.Internal.Control.Monad
     , (<$!>)
     ) where
 
-import GHC.Internal.Classes ( Ord(..) )
+import GHC.Internal.Base hiding( mapM, sequence )
 import GHC.Internal.Control.Monad.Fail ( MonadFail(fail) )
 import GHC.Internal.Data.Foldable ( Foldable, sequence_, sequenceA_, msum, mapM_, foldlM, forM_ )
 import GHC.Internal.Data.Functor ( void, (<$>) )
 import GHC.Internal.Data.Traversable ( forM, mapM, traverse, sequence, sequenceA )
 
-import GHC.Internal.Base (
-    Alternative(..), Applicative(..), Functor(..), Monad(..), MonadPlus(..),
-    ap, flip, foldr, id, join, liftM, liftM2, liftM3, liftM4, liftM5, otherwise,
-    thenM, when, (=<<),
-  )
 import GHC.Internal.List ( zipWith, unzip )
 import GHC.Internal.Maybe ( Maybe )
 import GHC.Internal.Num  ( (-) )
 import GHC.Internal.Prim ( seq )
-import GHC.Internal.Types ( Bool(..), Int, IO )
 import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 -- $setup

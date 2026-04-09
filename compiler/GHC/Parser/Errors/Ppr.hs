@@ -26,7 +26,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe (catMaybes)
 import GHC.Hs.Expr (prependQualified, HsExpr(..), HsLamVariant(..), lamCaseKeyword)
 import GHC.Hs.Type (pprLHsContext, pprHsArrow, pprHsForAll, pprHsModifiedFunArr, pprHsModifiers)
-import GHC.Builtin.KnownKeys (allNameStringList)
+import GHC.Builtin (allNameStringList)
 import qualified GHC.LanguageExtensions as LangExt
 import Data.List.NonEmpty (NonEmpty((:|)))
 import GHC.Hs.Pat (Pat(..), LPat)

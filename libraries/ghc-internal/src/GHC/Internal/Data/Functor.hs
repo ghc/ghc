@@ -48,7 +48,7 @@ module GHC.Internal.Data.Functor
       void,
     ) where
 
-import GHC.Internal.Base ( Functor(..), flip )
+import GHC.Internal.Base
 import GHC.Internal.Data.Tuple ( fst, snd )
 
 -- $setup

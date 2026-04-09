@@ -6,6 +6,7 @@ module GHC.Tc.Gen.Export (rnExports, exports_from_avail, classifyGREs) where
 import GHC.Prelude
 
 import GHC.Hs
+import GHC.Builtin( isUnboundName )
 import GHC.Builtin.KnownKeys
 import GHC.Core.Class
 import GHC.Tc.Errors.Types

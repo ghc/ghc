@@ -21,12 +21,11 @@ module GHC.Internal.System.Environment.ExecutablePath
   , executablePath
   ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Num( fromInteger )  -- For known-key names
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 ##if defined(javascript_HOST_ARCH)
 
-import GHC.Internal.Base (return)
 import GHC.Internal.IO (FilePath, IO)
 import GHC.Internal.Data.Maybe (Maybe(..))
 
@@ -45,7 +44,6 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.IO (FilePath, IO)
 #if defined(darwin_HOST_OS)
 import GHC.Internal.Base (fmap, otherwise, pure, ($), (>>=))
-import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Control.Exception (catch, throw)
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Real
@@ -102,7 +100,6 @@ import GHC.Internal.Data.Functor
 import GHC.Internal.Data.List (isPrefixOf, drop)
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Real
-import GHC.Internal.Types (Bool(..))
 import GHC.Internal.Word
 import GHC.Internal.Foreign.C.String
 import GHC.Internal.Foreign.Marshal.Array

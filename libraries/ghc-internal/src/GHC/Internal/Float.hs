@@ -170,13 +170,10 @@ module GHC.Internal.Float
     , stgWord32ToFloat
     ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Data.Maybe
 
-import GHC.Internal.Base (String, id, otherwise, (.))
 import GHC.Internal.Bits
-import GHC.Internal.Classes (
-    Eq(..), Ord(..), eqFloat, eqDouble, not, (&&), (||),
-  )
 import GHC.Internal.List
 import GHC.Internal.Enum
 import GHC.Internal.Err (errorWithoutStackTrace)
@@ -199,9 +196,6 @@ import GHC.Internal.Prim (
     (>#), (>##), (>=#), (>=##),
   )
 import GHC.Internal.Show
-import GHC.Internal.Types (
-    Bool(..), Double(..), Float(..), Int(..), Ordering(..), isTrue#,
-  )
 import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Word

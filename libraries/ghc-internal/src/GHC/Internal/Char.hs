@@ -10,12 +10,10 @@ module GHC.Internal.Char
     , eqChar, neChar
     ) where
 
-import GHC.Internal.Classes (eqChar, neChar)
-import GHC.Internal.Base (otherwise, (++))
+import GHC.Internal.Base
 import GHC.Internal.Err (error)
 import GHC.Internal.Show
 import GHC.Internal.Prim (chr#, int2Word#, leWord#, Int#, Char#)
-import GHC.Internal.Types (Char(..), Int(..), isTrue#)
 
 -- | The 'Prelude.toEnum' method restricted to the type 'Data.Char.Char'.
 chr :: Int -> Char

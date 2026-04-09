@@ -8,6 +8,7 @@ module GHC.Internal.Heap.Constants
 
 #include "MachDeps.h"
 
+import GHC.Internal.Base  -- For known-occ names
 import GHC.Internal.Data.Bits
 import GHC.Internal.Int
 import GHC.Internal.Num

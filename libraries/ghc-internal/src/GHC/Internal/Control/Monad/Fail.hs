@@ -17,12 +17,11 @@
 --
 module GHC.Internal.Control.Monad.Fail ( MonadFail(fail) ) where
 
-import GHC.Internal.Base (Monad, String, (.))
+import GHC.Internal.Base
 import {-# SOURCE #-} GHC.Internal.IO (throwIO)
 import {-# SOURCE #-} GHC.Internal.IO.Exception (userError)
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Stack.Types (HasCallStack)
-import GHC.Internal.Types (IO())
 
 -- | When a value is bound in @do@-notation, the pattern on the left
 -- hand side of @<-@ might not match. In this case, this class

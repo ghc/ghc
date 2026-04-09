@@ -35,15 +35,12 @@ module GHC.Internal.Data.Type.Ord (
   , OrdCond
   ) where
 
-import GHC.Internal.Classes (Eq)
+import GHC.Internal.Base
 import GHC.Internal.Show (Show(..))
 import GHC.Internal.TypeError
 import GHC.Internal.TypeLits.Internal
 import GHC.Internal.TypeNats.Internal
-import GHC.Internal.Types (Bool(..), Char, Ordering(..), type (~))
 
-import GHC.Internal.Classes ( (==) )    -- For known-key names in deriving(Eq)
-import GHC.Internal.Magic( dataToTag# ) -- For deriving
 
 -- | 'Compare' branches on the kind of its arguments to either compare by
 -- 'Symbol' or 'Nat'.

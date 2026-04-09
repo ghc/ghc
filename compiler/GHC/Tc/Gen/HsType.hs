@@ -96,32 +96,36 @@ import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBin
                                   tcInstTypeBndrs )
 import GHC.Tc.Zonk.TcType
 
+import GHC.Core.TyCon
+import GHC.Core.ConLike
+import GHC.Core.DataCon
+import GHC.Core.Class
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 
+import GHC.Builtin( allNameStrings )
+import GHC.Builtin.KnownKeys hiding ( wildCardName )
+import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
+
 import GHC.Types.Error
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Core.TyCon
-import GHC.Core.ConLike
-import GHC.Core.DataCon
-import GHC.Core.Class
 import GHC.Types.Name
 import GHC.Types.Var.Env
-import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Utils.Misc
 import GHC.Types.Unique.Supply
+
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Builtin.KnownKeys hiding ( wildCardName )
+
 import GHC.Driver.DynFlags
 import qualified GHC.LanguageExtensions as LangExt
 

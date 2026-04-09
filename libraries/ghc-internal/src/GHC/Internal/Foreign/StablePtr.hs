@@ -27,5 +27,6 @@ module GHC.Internal.Foreign.StablePtr
         , castPtrToStablePtr
         ) where
 
+import GHC.Internal.Types   -- For known-occ names
 import GHC.Internal.Stable
 

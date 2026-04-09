@@ -313,8 +313,11 @@ gen_wrappers (Info _ entries)
         -- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "{-# OPTIONS_GHC -Wno-deprecations -O0 -fno-do-eta-reduction #-}\n"
         -- Very important OPTIONS_GHC!  See Note [OPTIONS_GHC in GHC.PrimopWrappers]
+     ++ "{-# OPTIONS_GHC -Wno-unused-imports #-}\n"
+        -- Don't warn about unused import of GHC.Internal.Base; needed for Typeable bindings
      ++ "module GHC.Internal.PrimopWrappers where\n"
      ++ "import qualified GHC.Internal.Prim\n"
+     ++ "import GHC.Internal.Base  -- For Typeable bindings\n"
      ++ "import GHC.Internal.Tuple ()\n"
      ++ "import GHC.Internal.Prim (" ++ types ++ ")\n"
      ++ unlines (concatMap mk_wrapper wrappers)

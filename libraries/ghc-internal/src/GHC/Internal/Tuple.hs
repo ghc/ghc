@@ -31,7 +31,7 @@ module GHC.Internal.Tuple (
 ) where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Internal.Types (Int(..))
+import GHC.Internal.Types
 
 default () -- Double and Integer aren't available yet
 

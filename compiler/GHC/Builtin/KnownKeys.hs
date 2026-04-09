@@ -115,58 +115,50 @@ import GHC.Unit.Types
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
 import GHC.Types.Unique
+import GHC.Types.Unique.FM
 import GHC.Types.Name
-import GHC.Types.SrcLoc
+
+import GHC.Utils.Misc( HasDebugCallStack )
+import GHC.Utils.Panic
 
 import GHC.Builtin.Uniques
 
 import GHC.Data.FastString
-import GHC.Data.List.Infinite (Infinite (..))
-import qualified GHC.Data.List.Infinite as Inf
+import GHC.Data.Maybe
 
 import Language.Haskell.Syntax.Module.Name
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-     allNameStrings
+                  Infrastructure
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
-allNameStrings :: Infinite String
--- Infinite list of a,b,c...z, aa, ab, ac, ... etc
-allNameStrings = Inf.allListsOf ['a'..'z']
+-- | `knownKeyOccMap` maps the OccName of a known-key to its Unique
+knownKeyOccMap :: OccEnv KnownKey
+knownKeyOccMap = mkOccEnv knownKeyTable
 
-allNameStringList :: [String]
--- Infinite list of a,b,c...z, aa, ab, ac, ... etc
-allNameStringList = Inf.toList allNameStrings
+knownKeyUniqMap :: UniqFM KnownKey OccName
+knownKeyUniqMap = listToUFM [ (uniq, occ) | (occ, uniq) <- knownKeyTable ]
 
-{-
-************************************************************************
-o*                                                                      *
-\subsection{Local Names}
+knownKeyOccName :: HasDebugCallStack => KnownKey -> OccName
+-- Find the OccName from the KnownKey,
+-- by looking in the knownKeyUniqMap
+knownKeyOccName key
+  = knownKeyOccName_maybe key `orElse`
+    pprPanic "knownKeyOccName" (pprKnownKey key)
+
+knownKeyOccName_maybe :: HasDebugCallStack
+                      => KnownKey -> Maybe OccName
+knownKeyOccName_maybe key
+  = lookupUFM knownKeyUniqMap key
+
+knownKeyRdrName :: KnownKey -> RdrName
+knownKeyRdrName key = knownOccRdrName (knownKeyOccName key)
+
+{- *********************************************************************
 *                                                                      *
-************************************************************************
-
-This *local* name is used by the interactive stuff
--}
-
-itName :: Unique -> SrcSpan -> Name
-itName uniq loc = mkInternalName uniq (mkOccNameFS varName (fsLit "it")) loc
-
--- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
--- during compiler debugging.
-mkUnboundName :: OccName -> Name
-mkUnboundName occ = mkInternalName unboundKey occ noSrcSpan
-
-isUnboundName :: Name -> Bool
-isUnboundName name = name `hasKey` unboundKey
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Known key Names}
+              The master list of known-key names
 *                                                                      *
 ************************************************************************
 
@@ -175,8 +167,8 @@ names with uniques.  These ones are the *non* wired-in ones.  The
 wired in ones are defined in GHC.Builtin.Types etc.
 -}
 
-basicKnownKeyTable :: [(OccName, KnownKey)]
-basicKnownKeyTable
+knownKeyTable :: [(OccName, KnownKey)]
+knownKeyTable
   = [ (mkTcOcc "Read",         readClassKey)
     , (mkTcOcc "Show",         showClassKey)
     , (mkTcOcc "Foldable",     foldableClassKey)

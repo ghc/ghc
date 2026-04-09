@@ -48,6 +48,7 @@ import GHC.Tc.Zonk.TcType ( tcInitTidyEnv )
 import GHC.Hs
 import GHC.Iface.Load   ( loadSrcInterface )
 import GHC.Iface.Syntax ( fromIfaceWarnings )
+import GHC.Builtin( allKnownOccs )
 import GHC.Builtin.KnownKeys
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import GHC.Core.TyCo.Tidy
@@ -1963,7 +1964,7 @@ warnUnusedImportDecls gbl_env hsc_src
                              , text "Usage all user imports: " <+> ppr usageUserImports
                              , text "Usage all imports: " <+> ppr usageAllImports])
 
-       ; mapM_ (warnUnusedImport rdr_env) usageUserImports
+       ; mapM_ (warnUnusedImport rb rdr_env) usageUserImports
 
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports hsc_src usageAllImports }
@@ -2035,7 +2036,7 @@ findImportUsage rebindable_known_key_names imports used_gres
           -- Then don't warn about an unused import.
           -- See (UI2) in Note [Unused imports]
           | rebindable_known_key_names
-          , isKnownKeyName n
+          , isKnownKeyName n || nameOccName n `elemOccSet` allKnownOccs
           = acc
 
           | otherwise
@@ -2207,8 +2208,9 @@ lookupImportMap (L srcSpan ImportDecl{ideclName = L _ modName}) importMap =
       GeneratedSrcSpan{} -> modName `Map.lookup` im_generatedImports importMap
       _ -> Nothing
 
-warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
-warnUnusedImport rdr_env (L loc decl, used, unused, unused_wcs)
+warnUnusedImport :: Bool -> GlobalRdrEnv -> ImportDeclUsage -> RnM ()
+warnUnusedImport rebindable_known_key_names rdr_env
+                 (L loc decl, used, unused, unused_wcs)
 
   -- Do not warn for 'import M()'
   | Just (Exactly, _) <- ideclImportList decl
@@ -2222,7 +2224,10 @@ warnUnusedImport rdr_env (L loc decl, used, unused, unused_wcs)
   = return ()
 
   -- Nothing used; drop entire declaration
+  -- Exception: if -frebindable-known-key-names is on, don't complain
+  --   about an unused import; it might be needed.
   | null used
+  , not rebindable_known_key_names
   = addDiagnosticAt (locA loc) (TcRnUnusedImport decl UnusedImportNone)
 
   -- Everything imported is used; nop

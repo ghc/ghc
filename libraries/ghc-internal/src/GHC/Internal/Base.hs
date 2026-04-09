@@ -356,6 +356,7 @@ data constructor, which lives in GHC.Tuple.
 When bootstrapping GHC, it is important that we do not attempt to
 compile any such reference to GHC.Tuple before GHC.Tuple itself has
 been built, otherwise compilation will fail with an error like this one:
+
     Failed to load interface for ‘GHC.Tuple’.
     There are files missing in the ‘ghc-prim-0.10.0’ package,
     try running 'ghc-pkg check'.
@@ -367,8 +368,7 @@ imports of X must include Y.
 
 Such implicit dependencies can be introduced in at least the following ways:
 
-W1:
-  Common awkward dependencies:
+(W1) Common awkward dependencies:
    * TypeRep metadata introduces references to GHC.Internal.Types in EVERY module.
    * A String literal introduces a reference to GHC.Internal.CString, for either
      unpackCString# or unpackCStringUtf8# depending on its contents.
@@ -394,8 +394,7 @@ W1:
 
   Improving this situation is discussed at #24520.
 
-W2:
-  Non-exhaustive pattern matches, incomplete record selectors,
+(W2) Non-exhaustive pattern matches, incomplete record selectors,
   missing record fields, and missing class instance methods all
   introduce references to GHC.Internal.Control.Exception.Base.
 
@@ -404,8 +403,7 @@ W2:
   But since they generally have bad code smell and are avoided by
   developers anyway, this restriction has not been very burdensome.
 
-W3:
-  Various "overloaded" bits of syntax:
+(W3) Various "overloaded" bits of syntax:
    * Overloaded integer literals introduce references to GHC.Internal.Num.
      * Likewise overloaded fractional literals to GHC.Internal.Real
      * Likewise overloaded string literals to GHC.Internal.Data.String
@@ -425,8 +423,7 @@ W3:
   which compiles with -XTemplateHaskell *without* requiring the user to
   import GHC.Internal.TH.Lib.
 
-W4:
-  Stock derived instances introduce references to various things.
+(W4) Stock derived instances introduce references to various things.
   Derived Eq instances can reference GHC.Magic.dataToTag#, for example.
   But since any module containing a derived Eq instance must import Eq,
   as long as the module which defines Eq imports GHC.Magic this cannot
@@ -440,14 +437,13 @@ W4:
 
 ** TODO: Fix me when the reinstallable base stuff has settled **
 
-W5:
-  If no explicit "default" declaration is present, the assumed
+(W5) If no explicit "default" declaration is present, the assumed
   "default (Integer, Double)" creates a dependency on GHC.Internal.Bignum.Integer
   for the Integer type if defaulting is ever attempted during
   type-checking.  (This doesn't apply to hs-boot files, which can't
   be given "default" declarations anyway.)
 
-W6:
+(W6)
   In the wasm backend, JSFFI imports and exports pull in a bunch of stuff;
   see Note [Desugaring JSFFI static export] and Note [Desugaring JSFFI import]
   in GHC.HsToCore.Foreign.Wasm.
@@ -464,6 +460,21 @@ are sufficient is:
 Use the ".o-boot" suffix instead of ".o" to check an hs-boot file's
 transitive imports.
 
+Wrinkles:
+
+(TD1) When compiling `ghc-internal` and `base` we use -frebindable-known-key-names,
+  so we must bring into scope any known-key or known-occ names that are needed.
+  See Note [Overview of known-key entities] in GHC.Builtin
+
+  For modules high up in the hierarchy of `base`, a convenient way to
+  do this is to say
+      import GHC.KnownKeyNames
+
+  For modules not so high up, you can say
+       import GHC.Internal.Base
+  though you may also need GHC.Internal.Num when numerics are concerned.
+
+  For `ghc-internal` modules below GHC.Internal.Base we have to be more selective.
 
 Note [Semigroup stimes cycle]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

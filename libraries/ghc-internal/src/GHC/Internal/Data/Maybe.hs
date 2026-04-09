@@ -31,11 +31,10 @@ module GHC.Internal.Data.Maybe
    , mapMaybe
    ) where
 
-import GHC.Internal.Base (build, const, foldr, id, (.))
+import GHC.Internal.Base
 import GHC.Internal.Err (error)
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Stack.Types (HasCallStack)
-import GHC.Internal.Types (Bool(..))
 
 -- $setup
 -- Allow the use of some Prelude functions in doctests.
