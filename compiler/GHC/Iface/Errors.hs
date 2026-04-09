@@ -27,7 +27,7 @@ badIfaceFile file err
   = vcat [text "Bad interface file:" <+> text file,
           nest 4 err]
 
-cannotFindInterface :: UnitState -> Maybe HomeUnit -> Profile
+cannotFindInterface :: UnitState -> HomeUnit -> Profile
                     -> ModuleName -> InstalledFindResult -> MissingInterfaceError
 cannotFindInterface us mhu p mn ifr =
   CantFindErr us FindingInterface $
@@ -35,7 +35,7 @@ cannotFindInterface us mhu p mn ifr =
 
 cantFindInstalledErr
     :: UnitState
-    -> Maybe HomeUnit
+    -> HomeUnit
     -> Profile
     -> ModuleName
     -> InstalledFindResult
@@ -52,7 +52,7 @@ cantFindInstalledErr unit_state mhome_unit profile mod_name find_result
 
             InstalledNotFound files mb_pkg
                 | Just pkg <- mb_pkg
-                , notHomeUnitId mhome_unit pkg
+                , not (isHomeUnitId mhome_unit pkg)
                 -> not_found_in_package pkg $ fmap unsafeDecodeUtf files
 
                 | null files
@@ -111,11 +111,7 @@ cantFindErr unit_env profile mod_name find_result
                      , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
                      , fr_unusables = unusables, fr_suggestions = suggest }
                 | Just pkg <- mb_pkg
-                , Nothing <- mhome_unit           -- no home-unit
-                -> not_found_in_package (toUnitId pkg) files
-
-                | Just pkg <- mb_pkg
-                , Just home_unit <- mhome_unit    -- there is a home-unit but the
+                , home_unit <- mhome_unit    -- there is a home-unit but the
                 , not (isHomeUnit home_unit pkg)  -- module isn't from it
                 -> not_found_in_package (toUnitId pkg) files
 

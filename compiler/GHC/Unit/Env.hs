@@ -214,14 +214,13 @@ preloadUnitsInfo' unit_env ids0 = all_infos
   where
     unit_state = HUG.homeUnitEnv_units (ue_currentHomeUnitEnv unit_env)
     ids      = ids0 ++ inst_ids
-    inst_ids = case ue_homeUnit unit_env of
-      Nothing -> []
-      Just home_unit
-       -- An indefinite package will have insts to HOLE,
+    home_unit = ue_homeUnit unit_env
+    inst_ids
+        -- An indefinite package will have insts to HOLE,
        -- which is not a real package. Don't look it up.
        -- Fixes #14525
-       | isHomeUnitIndefinite home_unit -> []
-       | otherwise -> map (toUnitId . moduleUnit . snd) (homeUnitInstantiations home_unit)
+      | isHomeUnitIndefinite home_unit = []
+      | otherwise = map (toUnitId . moduleUnit . snd) (homeUnitInstantiations home_unit)
     pkg_map = unitInfoMap unit_state
     preload = preloadUnits unit_state
 
@@ -302,20 +301,18 @@ ue_setFlags dflags env =
 -- Query and modify home units in HomeUnitEnv
 -- -------------------------------------------------------
 
-ue_homeUnit :: UnitEnv -> Maybe HomeUnit
+ue_homeUnit :: UnitEnv -> HomeUnit
 ue_homeUnit = HUG.homeUnitEnv_home_unit . ue_currentHomeUnitEnv
 
 ue_unsafeHomeUnit :: UnitEnv -> HomeUnit
-ue_unsafeHomeUnit ue = case ue_homeUnit ue of
-  Nothing -> panic "ue_unsafeHomeUnit: No home unit"
-  Just h  -> h
+ue_unsafeHomeUnit ue = ue_homeUnit ue
 
 ue_unitHomeUnit :: UnitId -> UnitEnv -> HomeUnit
 ue_unitHomeUnit uid = expectJust . ue_unitHomeUnit_maybe uid
 
 ue_unitHomeUnit_maybe :: UnitId -> UnitEnv -> Maybe HomeUnit
 ue_unitHomeUnit_maybe uid ue_env =
-  HUG.homeUnitEnv_home_unit =<< HUG.lookupHugUnitId uid (ue_home_unit_graph ue_env)
+  HUG.homeUnitEnv_home_unit <$> HUG.lookupHugUnitId uid (ue_home_unit_graph ue_env)
 
 -- -------------------------------------------------------
 -- Query and modify the currently active unit

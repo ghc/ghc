@@ -473,7 +473,7 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
           -- way we do the import depends on whether we're currently compiling
           -- the base package or not.
                  ++ (case home_unit of
-                        Just hu
+                        hu
                           | isHomeUnitId hu ghcInternalUnitId
                           , platformOS platform == OSMinGW32
                           -> ["-DCOMPILING_GHC_INTERNAL_PACKAGE"]

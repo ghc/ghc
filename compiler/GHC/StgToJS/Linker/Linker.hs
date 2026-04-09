@@ -489,8 +489,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
                 -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
               case ue_homeUnit unit_env of
-                Nothing -> pprPanic "getDeps: No home-unit: " (pprModule mod)
-                Just home_unit -> do
+                home_unit -> do
                     mb_stuff <- findHomeModule finder_cache finder_opts home_unit (moduleName mod)
                     case mb_stuff of
                       Found loc mod -> found loc mod

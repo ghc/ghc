@@ -459,7 +459,7 @@ addUnit u = do
           , ue_home_unit_graph =
                 HUG.unitEnv_singleton
                     (homeUnitId home_unit)
-                    (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags (ue_hpt old_unit_env) (Just home_unit))
+                    (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags (ue_hpt old_unit_env) (home_unit))
           , ue_eps       = ue_eps old_unit_env
           , ue_module_graph = ue_module_graph old_unit_env
           }

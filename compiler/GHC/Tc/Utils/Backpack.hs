@@ -285,7 +285,7 @@ implicitRequirements hsc_env normal_imports
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
         found <- findImportedModule hsc_env imp mb_pkg
         case found of
-            Found _ mod | notHomeModuleMaybe mhome_unit mod ->
+            Found _ mod | notHomeModule mhome_unit mod ->
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
   where
@@ -307,7 +307,7 @@ implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
   go (accL, accR) ((_stage, mb_pkg, L _ imp):imports) = do
     found <- findImportedModule hsc_env imp mb_pkg
     let acc' = case found of
-          Found _ mod | notHomeModuleMaybe mhome_unit mod ->
+          Found _ mod | notHomeModule mhome_unit mod ->
               case moduleUnit mod of
                   HoleUnit -> (moduleName mod : accL, accR)
                   RealUnit _ -> (accL, accR)

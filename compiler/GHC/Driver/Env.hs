@@ -117,7 +117,7 @@ runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
 hsc_home_unit :: HscEnv -> HomeUnit
 hsc_home_unit = ue_unsafeHomeUnit . hsc_unit_env
 
-hsc_home_unit_maybe :: HscEnv -> Maybe HomeUnit
+hsc_home_unit_maybe :: HscEnv -> HomeUnit
 hsc_home_unit_maybe = ue_homeUnit . hsc_unit_env
 
 hsc_units :: HasDebugCallStack => HscEnv -> UnitState
@@ -374,7 +374,7 @@ lookupIfaceByModuleHsc hsc_env mod = do
   lookupIfaceByModule (hsc_HUG hsc_env) (eps_PIT eps) mod
 
 mainModIs :: HomeUnitEnv -> Module
-mainModIs hue = mkHomeModule (expectJust $ homeUnitEnv_home_unit hue) (mainModuleNameIs (homeUnitEnv_dflags hue))
+mainModIs hue = mkHomeModule (homeUnitEnv_home_unit hue) (mainModuleNameIs (homeUnitEnv_dflags hue))
 
 -- | Retrieve the target code interpreter
 --

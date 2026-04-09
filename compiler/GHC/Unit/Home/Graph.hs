@@ -160,11 +160,11 @@ data HomeUnitEnv = HomeUnitEnv
     --
     -- (This changes a previous invariant: changed Jan 05.)
 
-  , homeUnitEnv_home_unit :: !(Maybe HomeUnit)
+  , homeUnitEnv_home_unit :: !(HomeUnit)
     -- ^ Home-unit
   }
 
-mkHomeUnitEnv :: UnitState -> Maybe [UnitDatabase UnitId] -> DynFlags -> HomePackageTable -> Maybe HomeUnit -> HomeUnitEnv
+mkHomeUnitEnv :: UnitState -> Maybe [UnitDatabase UnitId] -> DynFlags -> HomePackageTable -> HomeUnit -> HomeUnitEnv
 mkHomeUnitEnv us dbs dflags hpt home_unit = HomeUnitEnv
   { homeUnitEnv_units = us
   , homeUnitEnv_unit_dbs = dbs
@@ -383,6 +383,6 @@ pprHomeUnitEnv :: UnitId -> HomeUnitEnv -> IO SDoc
 pprHomeUnitEnv uid env = do
   hptDoc <- pprHPT $ homeUnitEnv_hpt env
   return $
-    ppr uid <+> text "(flags:" <+> ppr (homeUnitId_ $ homeUnitEnv_dflags env) <> text "," <+> ppr (fmap homeUnitId $ homeUnitEnv_home_unit env) <> text ")" <+> text "->"
+    ppr uid <+> text "(flags:" <+> ppr (homeUnitId_ $ homeUnitEnv_dflags env) <> text "," <+> ppr ( homeUnitId $ homeUnitEnv_home_unit env) <> text ")" <+> text "->"
     $$ nest 4 hptDoc
 

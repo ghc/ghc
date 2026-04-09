@@ -163,8 +163,7 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
            -- It's not in the HPT because we are in one shot mode,
            -- so use the Finder to get a ModLocation...
            case ue_homeUnit unit_env of
-            Nothing -> no_obj mod
-            Just home_unit -> do
+            home_unit -> do
 
               let fc = ldFinderCache opts
               let fopts = ldFinderOpts opts

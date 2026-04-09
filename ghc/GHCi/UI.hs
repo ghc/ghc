@@ -737,7 +737,7 @@ installInteractiveHomeUnits = do
         [ sessionUnitExposedFlag ] ++
         [ homeUnitPkgFlag uid
         | homeUnitEnv <- Foldable.toList $ hsc_HUG hsc_env
-        , Just homeUnit <- [homeUnitEnv_home_unit homeUnitEnv]
+        , let homeUnit = homeUnitEnv_home_unit homeUnitEnv
         , let uid = homeUnitId homeUnit
         ] ++
         (packageFlags dflags0)
@@ -753,7 +753,7 @@ installInteractiveHomeUnits = do
         { packageFlags =
           [ homeUnitPkgFlag uid
           | homeUnitEnv <- Foldable.toList $ hsc_HUG hsc_env
-          , Just homeUnit <- [homeUnitEnv_home_unit homeUnitEnv]
+          , let homeUnit = homeUnitEnv_home_unit homeUnitEnv
           , let uid = homeUnitId homeUnit
           ] ++
           (packageFlags dflags)
@@ -801,7 +801,7 @@ installInteractiveHomeUnits = do
       (dbs,unit_state,home_unit,_mconstants) <-
         liftIO $ initUnits logger dflags (Just cached_unit_dbs) all_home_units
       hpt <- liftIO emptyHomePackageTable
-      pure (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags hpt (Just home_unit))
+      pure (HUG.mkHomeUnitEnv unit_state (Just dbs) dflags hpt home_unit)
 
 reportError :: GhciMonad m => GhciCommandMessage -> m ()
 reportError err = do

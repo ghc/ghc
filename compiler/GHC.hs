@@ -677,7 +677,7 @@ setUnitDynFlagsNoCheck uid dflags1 = do
           { homeUnitEnv_units = unit_state
           , homeUnitEnv_unit_dbs = Just dbs
           , homeUnitEnv_dflags = updated_dflags
-          , homeUnitEnv_home_unit = Just home_unit
+          , homeUnitEnv_home_unit = home_unit
           }
 
   let unit_env = UnitEnv.ue_updateHomeUnitEnv upd uid (hsc_unit_env hsc_env)
@@ -768,7 +768,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
             , homeUnitEnv_unit_dbs = Just dbs
             , homeUnitEnv_dflags = updated_dflags
             , homeUnitEnv_hpt = old_hpt
-            , homeUnitEnv_home_unit = Just home_unit
+            , homeUnitEnv_home_unit = home_unit
             }
 
         let dflags1 = homeUnitEnv_dflags $ HUG.unitEnv_lookup (ue_currentUnit old_unit_env) home_unit_graph
@@ -892,7 +892,7 @@ setProgramHUG_ invalidate_needed new_hug0 = do
         , homeUnitEnv_unit_dbs = Just dbs
         , homeUnitEnv_dflags = updated_dflags
         , homeUnitEnv_hpt = old_hpt
-        , homeUnitEnv_home_unit = Just home_unit
+        , homeUnitEnv_home_unit = home_unit
         }
 
 -- When changing the DynFlags, we want the changes to apply to future
@@ -1691,7 +1691,7 @@ findQualifiedModule pkgqual mod_name = withSession $ \hsc_env -> do
         Nothing -> liftIO $ do
            res <- findImportedModule hsc_env mod_name pkgqual
            case res of
-             Found loc m | notHomeModuleMaybe mhome_unit m -> return m
+             Found loc m | notHomeModule mhome_unit m -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError sec $ noModError hsc_env noSrcSpan mod_name err
 

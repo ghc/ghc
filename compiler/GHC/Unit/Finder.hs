@@ -195,33 +195,29 @@ findImportedModuleNoHsc
   :: FinderCache
   -> FinderOpts
   -> UnitEnv
-  -> Maybe HomeUnit
+  -> HomeUnit
   -> ModuleName
   -> PkgQual
   -> IO FindResult
 findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
   case mb_pkg of
     NoPkgQual  -> unqual_import
-    ThisPkg uid | (homeUnitId <$> mhome_unit) == Just uid -> home_import
+    ThisPkg uid | (homeUnitId mhome_unit) == uid -> home_import
                 | Just os <- lookup uid other_fopts -> home_pkg_import (uid, os)
-                | otherwise -> pprPanic "findImportModule" (ppr mod_name $$ ppr mb_pkg $$ ppr (homeUnitId <$> mhome_unit) $$ ppr uid $$ ppr (map fst all_opts))
+                | otherwise -> pprPanic "findImportModule" (ppr mod_name $$ ppr mb_pkg $$ ppr (homeUnitId mhome_unit) $$ ppr uid $$ ppr (map fst all_opts))
     OtherPkg _ -> pkg_import
   where
-    all_opts = case mhome_unit of
-                Nothing -> other_fopts
-                Just home_unit -> (homeUnitId home_unit, fopts) : other_fopts
+    all_opts = (homeUnitId mhome_unit, fopts) : other_fopts
 
 
-    home_import = case mhome_unit of
-                   Just home_unit -> findHomeModule fc fopts home_unit mod_name
-                   Nothing -> pure $ NoPackage (panic "findImportedModule: no home-unit")
+    home_import = findHomeModule fc fopts mhome_unit mod_name
 
 
     home_pkg_import (uid, opts)
       -- If the module is reexported, then look for it as if it was from the perspective
       -- of that package which reexports it.
       | Just real_mod_name <- lookupUniqMap (finder_reexportedModules opts) mod_name =
-        findImportedModuleNoHsc fc opts ue (Just $ DefiniteHomeUnit uid Nothing) real_mod_name NoPkgQual
+        findImportedModuleNoHsc fc opts ue (DefiniteHomeUnit uid Nothing) real_mod_name NoPkgQual
       | elementOfUniqSet mod_name (finder_hiddenModules opts) =
         return (mkHomeHidden uid)
       | otherwise =
@@ -238,9 +234,7 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
                     `orIfNotFound`
                     findExposedPackageModule fc fopts units mod_name NoPkgQual
 
-    units     = case mhome_unit of
-                  Nothing -> ue_homeUnitState ue
-                  Just home_unit -> HUG.homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
+    units     = HUG.homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId mhome_unit) ue
     hpt_deps :: [UnitId]
     hpt_deps  = Set.toList (homeUnitDepends units)
     other_fopts  = map (\uid -> (uid, initFinderOpts (homeUnitEnv_dflags (ue_findHomeUnitEnv uid ue)))) hpt_deps
@@ -249,12 +243,10 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
 -- plugin.  This consults the same set of exposed packages as
 -- 'findImportedModule', unless @-hide-all-plugin-packages@ or
 -- @-plugin-package@ are specified.
-findPluginModuleNoHsc :: FinderCache -> FinderOpts -> UnitState -> Maybe HomeUnit -> ModuleName -> IO FindResult
-findPluginModuleNoHsc fc fopts units (Just home_unit) mod_name =
+findPluginModuleNoHsc :: FinderCache -> FinderOpts -> UnitState -> HomeUnit -> ModuleName -> IO FindResult
+findPluginModuleNoHsc fc fopts units home_unit mod_name =
   findHomeModule fc fopts home_unit mod_name
   `orIfNotFound`
-  findExposedPluginPackageModule fc fopts units mod_name
-findPluginModuleNoHsc fc fopts units Nothing mod_name =
   findExposedPluginPackageModule fc fopts units mod_name
 
 findPluginModule :: HscEnv -> ModuleName -> IO FindResult
@@ -267,15 +259,15 @@ findPluginModule hsc_env mod_name = do
 
 -- | A version of findExactModule which takes the exact parts of the HscEnv it needs
 -- directly.
-findExactModuleNoHsc :: FinderCache -> FinderOpts -> UnitEnvGraph FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModuleNoHsc :: FinderCache -> FinderOpts -> UnitEnvGraph FinderOpts -> UnitState -> HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
 findExactModuleNoHsc fc fopts other_fopts unit_state mhome_unit mod is_boot = do
   res <- case mhome_unit of
-    Just home_unit
+    home_unit
      | isHomeInstalledModule home_unit mod
         -> findInstalledHomeModule fc fopts (homeUnitId home_unit) (moduleName mod)
      | Just home_fopts <- HUG.unitEnv_lookup_maybe (moduleUnit mod) other_fopts
         -> findInstalledHomeModule fc home_fopts (moduleUnit mod) (moduleName mod)
-    _ -> findPackageModule fc unit_state fopts mod
+     | otherwise -> findPackageModule fc unit_state fopts mod
   case (res, is_boot) of
     (InstalledFound loc, IsBoot) -> return (InstalledFound (addBootSuffixLocn loc))
     _ -> return res

@@ -17,6 +17,7 @@ import GHC.Driver.Config.Diagnostic
 
 import GHC.Unit.Env
 import GHC.Unit (UnitId)
+import GHC.Unit.Home (GenHomeUnit(..))
 import GHC.Unit.Home.PackageTable
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.State  ( emptyUnitState )
@@ -141,7 +142,7 @@ initMulti unitArgsFiles lintDynFlagsAndSrcs = do
       , homeUnitEnv_unit_dbs = Just dbs
       , homeUnitEnv_dflags = updated_dflags
       , homeUnitEnv_hpt = emptyHpt
-      , homeUnitEnv_home_unit = Just home_unit
+      , homeUnitEnv_home_unit = home_unit
       }
 
   checkUnitCycles initial_dflags home_unit_graph
@@ -239,9 +240,7 @@ createUnitEnvFromFlags unitDflags = do
   unitEnvList <- forM unitDflags $ \dflags -> do
     emptyHpt <- emptyHomePackageTable
     let newInternalUnitEnv =
-          HUG.mkHomeUnitEnv emptyUnitState Nothing dflags emptyHpt Nothing
+          HUG.mkHomeUnitEnv emptyUnitState Nothing dflags emptyHpt (DefiniteHomeUnit (homeUnitId_ dflags) Nothing)
     return (homeUnitId_ dflags, newInternalUnitEnv)
   let activeUnit = fst $ NE.head unitEnvList
   return (HUG.hugFromList (NE.toList unitEnvList), activeUnit)
-
-
