@@ -600,7 +600,7 @@ must be relative to the location of the package environment file.
     :category:
 
     Use the package environment in ⟨file⟩, or in
-    ``$XDG_DATA_HOME/ghc/arch-os-version/environments/⟨name⟩``
+    ``$XDG_DATA_HOME/.ghc/arch-os-version/environments/⟨name⟩``
     If set to ``-`` no package environment is read.
 
 .. envvar:: GHC_ENVIRONMENT
@@ -613,13 +613,13 @@ locations:
 
 -  File ⟨file⟩ if you pass the option :ghc-flag:`-package-env ⟨file⟩|⟨name⟩`.
 
--  File ``$XDG_DATA_HOME/ghc/arch-os-version/environments/name`` if you pass the
+-  File ``$XDG_DATA_HOME/.ghc/arch-os-version/environments/name`` if you pass the
    option ``-package-env ⟨name⟩``.
 
 -  File ⟨file⟩ if the environment variable :envvar:`GHC_ENVIRONMENT` is set to
    ⟨file⟩.
 
--  File ``$XDG_DATA_HOME/ghc/arch-os-version/environments/name`` if the
+-  File ``$XDG_DATA_HOME/.ghc/arch-os-version/environments/name`` if the
    environment variable :envvar:`GHC_ENVIRONMENT` is set to ⟨name⟩.
 
 Additionally, unless ``-hide-all-packages`` is specified ``ghc`` will also
@@ -628,7 +628,7 @@ look for the package environment in the following locations:
 -  File ``.ghc.environment.arch-os-version`` if it exists in the current
    directory or any parent directory (but not the user's home directory).
 
--  File ``$XDG_DATA_HOME/ghc/arch-os-version/environments/default`` if it
+-  File ``$XDG_DATA_HOME/.ghc/arch-os-version/environments/default`` if it
    exists.
 
 Package environments can be modified by further command line arguments;
