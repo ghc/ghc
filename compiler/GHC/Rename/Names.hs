@@ -452,7 +452,7 @@ renamePkgQual :: UnitEnv -> ModuleName -> Maybe FastString -> PkgQual
 renamePkgQual unit_env mn mb_pkg = case mb_pkg of
   Nothing -> NoPkgQual
   Just pkg_fs
-    | Just uid <- homeUnitId <$> ue_homeUnit unit_env
+    | uid <- homeUnitId (ue_homeUnit unit_env)
     , pkg_fs == fsLit "this"
     -> ThisPkg uid
 

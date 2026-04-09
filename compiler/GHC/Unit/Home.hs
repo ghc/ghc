@@ -211,9 +211,8 @@ homeModuleNameInstantiation hu mod_name =
 --       the instantiating module of @r:A@ in @p[A=q[]:B]@ is @r:A@.
 --       the instantiating module of @p:A@ in @p@ is @p:A@.
 --       the instantiating module of @r:A@ in @p@ is @r:A@.
-homeModuleInstantiation :: Maybe HomeUnit -> Module -> Module
-homeModuleInstantiation mhu mod
-   | Just hu <- mhu
-   , isHomeModule hu mod = homeModuleNameInstantiation hu (moduleName mod)
+homeModuleInstantiation :: HomeUnit -> Module -> Module
+homeModuleInstantiation hu mod
+   | isHomeModule hu mod = homeModuleNameInstantiation hu (moduleName mod)
    | otherwise           = mod
 
