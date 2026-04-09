@@ -49,7 +49,7 @@ Library
             GHC.Lexeme
 
     build-depends:
-        base       >= 4.7 && < 4.23,
+        base       >= 4.7 && < 4.24,
         pretty     == 1.1.*
 
     if flag(bootstrap)

@@ -79,7 +79,7 @@ library
     build-depends: ghc-paths       ^>= 0.1.0.12
 
   -- this package typically supports only single major versions
-  build-depends: base             >= 4.16 && < 4.23
+  build-depends: base             >= 4.16 && < 4.24
                , ghc             ^>= 10.0
                , haddock-library ^>= 1.11
                , xhtml           ^>= 3000.4.0.0
