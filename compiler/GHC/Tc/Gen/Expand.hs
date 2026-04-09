@@ -17,8 +17,10 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.ErrCtxt
 
 import GHC.Types.Id.Make
+import GHC.Types.SrcLoc
 
 import GHC.Rename.Utils
+import qualified Data.List.NonEmpty as NE (map)
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -105,7 +107,8 @@ Wrinkle (TBE1)
 
 -}
 
----------------
+------------------------------------------
+-- Operator Applications
 tcExpand :: HsExpr GhcRn -> TcM (Maybe (HsExpansion GhcRn))
 tcExpand e@(OpApp _ arg1 op arg2)
   = return $ Just $
@@ -114,14 +117,18 @@ tcExpand e@(OpApp _ arg1 op arg2)
   where
     ap f a = wrapGenSpan (HsApp noExtField f a)
 
+------------------------------------------
+-- Left and Right Sections
+
 tcExpand e@(SectionR _ op expr)
+  -- See Note [Left and right sections]
   = return $ Just $
     HSE { hse_ctxt = ExprCtxt e
         , hse_exp  = wrapGenSpan $ genHsApps rightSectionName [op, expr] }
 
 tcExpand e@(SectionL _ expr op)
+  -- Note [Left and right sections]
   = do { postfix_ops <- xoptM LangExt.PostfixOperators
-                        -- Note [Left and right sections]
         ; let ds_section
                 | postfix_ops = HsApp noExtField op expr
                 | otherwise   = genHsApps leftSectionName
@@ -130,9 +137,25 @@ tcExpand e@(SectionL _ expr op)
           HSE { hse_ctxt = ExprCtxt e
               , hse_exp = wrapGenSpan ds_section } }
 
+------------------------------------------
+-- Record dot syntax
 
+tcExpand e@(HsGetField getFieldName expr f)
+ = return $ Just $
+   HSE { hse_ctxt = ExprCtxt e
+       , hse_exp = wrapGenSpan $ (mkGetField getFieldName expr (fmap (unLoc . dfoLabel) f)) }
+
+tcExpand e@(HsProjection (getFieldName, circName) fs)
+ =  return$ Just $
+    HSE { hse_ctxt = ExprCtxt e
+        , hse_exp = wrapGenSpan $ (mkProjection getFieldName circName $ NE.map (unLoc . dfoLabel) fs) }
+
+---------
 tcExpand (XExpr (ExpandedThingRn hse))
   = return (Just hse)
+
+------------------------------------------
+-- Template Haskell Splices
 
 tcExpand e@(HsUntypedSplice splice_res _)
 -- See Note [Looking through Template Haskell splices in splitHsApps]
@@ -142,3 +165,132 @@ tcExpand e@(HsUntypedSplice splice_res _)
              , hse_exp  = wrapGenSpan fun } }
 
 tcExpand _ = return Nothing
+
+
+
+
+
+
+{- Note [Left and right sections]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Dealing with left sections (x *) and right sections (* x) is
+surprisingly fiddly.  We expand like this
+     (`op` e) ==> rightSection op e
+     (e `op`) ==> leftSection  (op e)
+
+Using an auxiliary function in this way avoids the awkwardness of
+generating a lambda, esp if `e` is a redex, so we *don't* want
+to generate `(\x -> op x e)`. See Historical
+Note [Desugaring operator sections]
+
+Here are their definitions:
+   leftSection :: forall r1 r2 n (a::TYPE r1) (b::TYPE r2).
+                  (a %n-> b) -> a %n-> b
+   leftSection f x = f x
+
+   rightSection :: forall r1 r2 r3 n1 n2 (a::TYPE r1) (b::TYPE r2) (c::TYPE r3).
+                   (a %n1 -> b %n2-> c) -> b %n2-> a %n1-> c
+   rightSection f y x = f x y
+
+Note the wrinkles:
+
+* We do /not/ use lookupSyntaxName, which would make left and right
+  section fall under RebindableSyntax.  Reason: it would be a user-
+  facing change, and there are some tricky design choices (#19354).
+  Plus, infix operator applications would be trickier to make
+  rebindable, so it'd be inconsistent to do so for sections.
+
+  TL;DR: we still use the renamer-expansion mechanism for operator
+  sections, but only to eliminate special-purpose code paths in the
+  renamer and desugarer.
+
+* leftSection and rightSection must be representation-polymorphic, to allow
+  (+# 4#) and (4# +#) to work. See
+  Note [Wired-in Ids for rebindable syntax] in GHC.Types.Id.Make.
+
+* leftSection and rightSection must be multiplicity-polymorphic.
+  (Test linear/should_compile/OldList showed this up.)
+
+* Because they are representation-polymorphic, we have to define them
+  as wired-in Ids, with compulsory inlining.  See
+  GHC.Types.Id.Make.leftSectionId, rightSectionId.
+
+* leftSection is just ($) really; but unlike ($) it is
+  representation-polymorphic in the result type, so we can write
+  `(x +#)`, say.
+
+* The type of leftSection must have an arrow in its first argument,
+  because (x `ord`) should be rejected, because ord does not take two
+  arguments
+
+* It's important that we define leftSection in an eta-expanded way,
+  (i.e. not leftSection f = f), so that
+      (True `undefined`) `seq` ()
+      = (leftSection (undefined True) `seq` ())
+  evaluates to () and not undefined
+
+* If PostfixOperators is ON, then we expand a left section like this:
+      (e `op`)  ==>   op e
+  with no auxiliary function at all.  Simple!
+
+* leftSection and rightSection switch on ImpredicativeTypes locally,
+  during Quick Look; see GHC.Tc.Gen.App.wantQuickLook. Consider
+  test DeepSubsumption08:
+     type Setter st t a b = forall f. Identical f => blah
+     (.~) :: Setter s t a b -> b -> s -> t
+     clear :: Setter a a' b (Maybe b') -> a -> a'
+     clear = (.~ Nothing)
+   The expansion look like (rightSection (.~) Nothing).  So we must
+   instantiate `rightSection` first type argument to a polytype!
+   Hence the special magic in App.wantQuickLook.
+
+Historical Note [Desugaring operator sections]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note explains some historical trickiness in desugaring left and
+right sections.  That trickiness has completely disappeared now that
+we desugar to calls to 'leftSection` and `rightSection`, but I'm
+leaving it here to remind us how nice the new story is.
+
+Desugaring left sections with -XPostfixOperators is straightforward: convert
+(expr `op`) to (op expr).
+
+Without -XPostfixOperators it's a bit more tricky. At first it looks as if we
+can convert
+
+    (expr `op`)
+
+naively to
+
+    \x -> op expr x
+
+But no!  expr might be a redex, and we can lose laziness badly this
+way.  Consider
+
+    map (expr `op`) xs
+
+for example. If expr were a redex then eta-expanding naively would
+result in multiple evaluations where the user might only have expected one.
+
+So we convert instead to
+
+    let y = expr in \x -> op y x
+
+Also, note that we must do this for both right and (perhaps surprisingly) left
+sections. Why are left sections necessary? Consider the program (found in #18151),
+
+    seq (True `undefined`) ()
+
+according to the Haskell Report this should reduce to () (as it specifies
+desugaring via eta expansion). However, if we fail to eta expand we will rather
+bottom. Consequently, we must eta expand even in the case of a left section.
+
+If `expr` is actually just a variable, say, then the simplifier
+will inline `y`, eliminating the redundant `let`.
+
+Note that this works even in the case that `expr` is unlifted. In this case
+bindNonRec will automatically do the right thing, giving us:
+
+    case expr of y -> (\x -> op y x)
+
+See #18151.
+-}

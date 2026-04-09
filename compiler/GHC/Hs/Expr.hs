@@ -340,13 +340,13 @@ type instance XLHsRecUpdLabels GhcTc = DataConCantHappen
 type instance XLHsOLRecUpdLabels p = NoExtField
 
 type instance XGetField     GhcPs = NoExtField
-type instance XGetField     GhcRn = NoExtField
+type instance XGetField     GhcRn = Name
 type instance XGetField     GhcTc = DataConCantHappen
 -- HsGetField is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
 type instance XProjection     GhcPs = AnnProjection
-type instance XProjection     GhcRn = NoExtField
+type instance XProjection     GhcRn = (Name, Name)
 type instance XProjection     GhcTc = DataConCantHappen
 -- HsProjection is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].

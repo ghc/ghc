@@ -634,6 +634,7 @@ exprCtOrigin (XExpr (ExpandedThingRn (HSE o _))) = hsCtxtCtOrigin o
 exprCtOrigin (XExpr (HsRecSelRn f))  = OccurrenceOfRecSel $ L (getLoc $ foLabel f) (foExt f)
 
 hsCtxtCtOrigin :: HsCtxt -> CtOrigin
+hsCtxtCtOrigin (ExprCtxt (ExprWithTySig _ (L _ e) _)) = exprCtOrigin e
 hsCtxtCtOrigin (ExprCtxt e) = exprCtOrigin e
 hsCtxtCtOrigin (FunAppCtxt (FunAppCtxtExpr _ e) _) = exprCtOrigin e
 hsCtxtCtOrigin (StmtErrCtxt{}) = DoStmtOrigin
