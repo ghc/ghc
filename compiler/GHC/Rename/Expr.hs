@@ -72,7 +72,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import qualified Data.Foldable as Partial (maximum)
 import Data.List (unzip4)
-import Data.List.NonEmpty ( NonEmpty(..), head, init, last, nonEmpty, scanl, tail )
+import Data.List.NonEmpty ( NonEmpty(..), head, nonEmpty, scanl, tail )
 import Control.Arrow (first)
 import Data.Ord
 import Data.Array
@@ -419,19 +419,13 @@ rnExpr (HsGetField _ e f)
  = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
       ; (e, fv_e) <- rnLExpr e
       ; let f' = rnDotFieldOcc <$> f
-      ; return ( mkExpandedExpr
-                   (HsGetField noExtField e f')
-                   (mkGetField getField e (fmap (unLoc . dfoLabel) f'))
-               , fv_e `plusFN` fv_getField ) }
+      ; return (HsGetField getField e f', fv_e `plusFN` fv_getField) }
 
 rnExpr (HsProjection _ fs)
   = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
        ; circ <- lookupOccRn WL_TermVariable compose_RDR
        ; let fs' = NE.map rnDotFieldOcc fs
-       ; return ( mkExpandedExpr
-                    (HsProjection noExtField fs')
-                    (mkProjection getField circ $ NE.map (unLoc . dfoLabel) fs')
-                , unitFN circ `plusFN` fv_getField) }
+       ; return (HsProjection (getField , circ) fs', unitFN circ `plusFN` fv_getField) }
 
 ------------------------------------------
 -- Template Haskell extensions
@@ -717,14 +711,12 @@ rnSection :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeNames)
 -- Also see Note [Handling overloaded and rebindable constructs]
 
 rnSection section@(SectionR x op expr)
-  -- See Note [Left and right sections]
   = do  { (op', fvs_op)     <- rnLExpr op
         ; (expr', fvs_expr) <- rnLExpr expr
         ; checkSectionPrec InfixR section op' expr'
         ; return $ (SectionR x op' expr' , fvs_op `plusFN`  fvs_expr) }
 
 rnSection section@(SectionL x expr op)
-  -- See Note [Left and right sections]
   = do  { (expr', fvs_expr) <- rnLExpr expr
         ; (op', fvs_op)     <- rnLExpr op
         ; checkSectionPrec InfixL section op' expr'
@@ -732,129 +724,7 @@ rnSection section@(SectionL x expr op)
 
 rnSection other = pprPanic "rnSection" (ppr other)
 
-{- Note [Left and right sections]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Dealing with left sections (x *) and right sections (* x) is
-surprisingly fiddly.  We expand like this
-     (`op` e) ==> rightSection op e
-     (e `op`) ==> leftSection  (op e)
-
-Using an auxiliary function in this way avoids the awkwardness of
-generating a lambda, esp if `e` is a redex, so we *don't* want
-to generate `(\x -> op x e)`. See Historical
-Note [Desugaring operator sections]
-
-Here are their definitions:
-   leftSection :: forall r1 r2 n (a::TYPE r1) (b::TYPE r2).
-                  (a %n-> b) -> a %n-> b
-   leftSection f x = f x
-
-   rightSection :: forall r1 r2 r3 n1 n2 (a::TYPE r1) (b::TYPE r2) (c::TYPE r3).
-                   (a %n1 -> b %n2-> c) -> b %n2-> a %n1-> c
-   rightSection f y x = f x y
-
-Note the wrinkles:
-
-* We do /not/ use lookupSyntaxName, which would make left and right
-  section fall under RebindableSyntax.  Reason: it would be a user-
-  facing change, and there are some tricky design choices (#19354).
-  Plus, infix operator applications would be trickier to make
-  rebindable, so it'd be inconsistent to do so for sections.
-
-  TL;DR: we still use the renamer-expansion mechanism for operator
-  sections, but only to eliminate special-purpose code paths in the
-  renamer and desugarer.
-
-* leftSection and rightSection must be representation-polymorphic, to allow
-  (+# 4#) and (4# +#) to work. See
-  Note [Wired-in Ids for rebindable syntax] in GHC.Types.Id.Make.
-
-* leftSection and rightSection must be multiplicity-polymorphic.
-  (Test linear/should_compile/OldList showed this up.)
-
-* Because they are representation-polymorphic, we have to define them
-  as wired-in Ids, with compulsory inlining.  See
-  GHC.Types.Id.Make.leftSectionId, rightSectionId.
-
-* leftSection is just ($) really; but unlike ($) it is
-  representation-polymorphic in the result type, so we can write
-  `(x +#)`, say.
-
-* The type of leftSection must have an arrow in its first argument,
-  because (x `ord`) should be rejected, because ord does not take two
-  arguments
-
-* It's important that we define leftSection in an eta-expanded way,
-  (i.e. not leftSection f = f), so that
-      (True `undefined`) `seq` ()
-      = (leftSection (undefined True) `seq` ())
-  evaluates to () and not undefined
-
-* If PostfixOperators is ON, then we expand a left section like this:
-      (e `op`)  ==>   op e
-  with no auxiliary function at all.  Simple!
-
-* leftSection and rightSection switch on ImpredicativeTypes locally,
-  during Quick Look; see GHC.Tc.Gen.App.wantQuickLook. Consider
-  test DeepSubsumption08:
-     type Setter st t a b = forall f. Identical f => blah
-     (.~) :: Setter s t a b -> b -> s -> t
-     clear :: Setter a a' b (Maybe b') -> a -> a'
-     clear = (.~ Nothing)
-   The expansion look like (rightSection (.~) Nothing).  So we must
-   instantiate `rightSection` first type argument to a polytype!
-   Hence the special magic in App.wantQuickLook.
-
-Historical Note [Desugaring operator sections]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This Note explains some historical trickiness in desugaring left and
-right sections.  That trickiness has completely disappeared now that
-we desugar to calls to 'leftSection` and `rightSection`, but I'm
-leaving it here to remind us how nice the new story is.
-
-Desugaring left sections with -XPostfixOperators is straightforward: convert
-(expr `op`) to (op expr).
-
-Without -XPostfixOperators it's a bit more tricky. At first it looks as if we
-can convert
-
-    (expr `op`)
-
-naively to
-
-    \x -> op expr x
-
-But no!  expr might be a redex, and we can lose laziness badly this
-way.  Consider
-
-    map (expr `op`) xs
-
-for example. If expr were a redex then eta-expanding naively would
-result in multiple evaluations where the user might only have expected one.
-
-So we convert instead to
-
-    let y = expr in \x -> op y x
-
-Also, note that we must do this for both right and (perhaps surprisingly) left
-sections. Why are left sections necessary? Consider the program (found in #18151),
-
-    seq (True `undefined`) ()
-
-according to the Haskell Report this should reduce to () (as it specifies
-desugaring via eta expansion). However, if we fail to eta expand we will rather
-bottom. Consequently, we must eta expand even in the case of a left section.
-
-If `expr` is actually just a variable, say, then the simplifier
-will inline `y`, eliminating the redundant `let`.
-
-Note that this works even in the case that `expr` is unlifted. In this case
-bindNonRec will automatically do the right thing, giving us:
-
-    case expr of y -> (\x -> op y x)
-
-See #18151.
-
+{-
 Note [Reporting unbound names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Faced with an out-of-scope `RdrName` there are two courses of action
@@ -2841,64 +2711,6 @@ rnHsIf p b1 b2
                           fvs   = plusFNs [fvs_if, unitFN ite_name]
                     ; return (mkExpandedExpr rn_if ds_if, fvs) } }
 
------------------------------------------
--- Bits and pieces for RecordDotSyntax.
---
--- See Note [Overview of record dot syntax] in GHC.Hs.Expr.
-
--- mkGetField arg field calculates a get_field @field arg expression.
--- e.g. z.x = mkGetField z x = get_field @x z
-mkGetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
-mkGetField get_field arg field = unLoc (head $ mkGet get_field (arg :| []) field)
-
--- mkSetField a field b calculates a set_field @field expression.
--- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' to a on b").
--- NB: the order of aruments is specified by GHC Proposal 583: HasField redesign.
-mkSetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> LHsExpr GhcRn -> HsExpr GhcRn
-mkSetField set_field a (L _ (FieldLabelString field)) b =
-  genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit field) b) a
-
-mkGet :: Name -> NonEmpty (LHsExpr GhcRn) -> LocatedAn NoEpAnns FieldLabelString -> NonEmpty (LHsExpr GhcRn)
-mkGet get_field l@(r :| _) (L _ (FieldLabelString field)) =
-  wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) NE.<| l
-
-mkSet :: Name -> LHsExpr GhcRn -> (LocatedAn NoEpAnns FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
-mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
-
--- mkProjection fields calculates a projection.
--- e.g. .x = mkProjection [x] = getField @"x"
---      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
-mkProjection :: Name -> Name -> NonEmpty FieldLabelString -> HsExpr GhcRn
-mkProjection getFieldName circName (field :| fields) = foldl' f (proj field) fields
-  where
-    f :: HsExpr GhcRn -> FieldLabelString -> HsExpr GhcRn
-    f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
-
-    proj :: FieldLabelString -> HsExpr GhcRn
-    proj (FieldLabelString f) = genHsVar getFieldName `genAppType` genHsTyLit f
-
--- mkProjUpdateSetField calculates functions representing dot notation record updates.
--- e.g. Suppose an update like foo.bar = 1.
---      We calculate the function \a -> setField @"foo" a (setField @"bar" (getField @"foo" a) 1).
-mkProjUpdateSetField :: Name -> Name -> LHsRecProj GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
-mkProjUpdateSetField get_field set_field (L _ (HsFieldBind { hfbLHS = (L _ (FieldLabelStrings flds')), hfbRHS = arg } ))
-  = let {
-      ; flds = NE.map (fmap (unLoc . dfoLabel)) flds'
-      ; final = last flds  -- quux
-      ; fields = init flds   -- [foo, bar, baz]
-      ; getters = \a -> foldl' (mkGet get_field) (a :| []) fields  -- Ordered from deep to shallow.
-          -- [getField@"baz"(getField@"bar"(getField@"foo" a), getField@"bar"(getField@"foo" a), getField@"foo" a, a]
-      ; zips = \a -> (final, head (getters a)) : zip (reverse fields) (tail (getters a)) -- Ordered from deep to shallow.
-          -- [("quux", getField@"baz"(getField@"bar"(getField@"foo" a)), ("baz", getField@"bar"(getField@"foo" a)), ("bar", getField@"foo" a), ("foo", a)]
-      }
-    in (\a -> foldl' (mkSet set_field) arg (zips a))
-          -- setField@"foo" (a) (setField@"bar" (getField @"foo" (a))(setField@"baz" (getField @"bar" (getField @"foo" (a)))(setField@"quux" (getField @"baz" (getField @"bar" (getField @"foo" (a))))(quux))))
-
-mkRecordDotUpd :: Name -> Name -> LHsExpr GhcRn -> [LHsRecUpdProj GhcRn] -> HsExpr GhcRn
-mkRecordDotUpd get_field set_field exp updates = foldl' fieldUpdate (unLoc exp) updates
-  where
-    fieldUpdate :: HsExpr GhcRn -> LHsRecUpdProj GhcRn -> HsExpr GhcRn
-    fieldUpdate acc lpu =  unLoc $ (mkProjUpdateSetField get_field set_field lpu) (wrapGenSpan acc)
 
 rnHsUpdProjs :: [LHsRecUpdProj GhcPs] -> RnM ([LHsRecUpdProj GhcRn], FreeNames)
 rnHsUpdProjs us = do

@@ -24,6 +24,8 @@ module GHC.Rename.Utils (
         genSimpleFunBind, genFunBind,
         genHsLamDoExp, genHsCaseAltDoExp, genSimpleMatch, genHsLet,
 
+        mkGetField, mkSetField, mkProjection, mkRecordDotUpd,
+
         mkExpandedRn, mkExpandedExpr, mkExpandedStmt, mkExpandedLExpr, mkExpandedTc, mkExpandedExprTc,
 
         mkRnSyntaxExpr,
@@ -41,7 +43,7 @@ module GHC.Rename.Utils (
 where
 
 
-import GHC.Prelude
+import GHC.Prelude hiding (init, last, scanl, tail)
 
 import GHC.Core.Type
 import GHC.Hs
@@ -71,6 +73,7 @@ import GHC.Iface.Load
 import qualified GHC.LanguageExtensions as LangExt
 
 import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty ( NonEmpty(..), init, last, tail )
 import Data.Foldable (for_)
 import Data.Maybe
 
@@ -867,3 +870,63 @@ mkExpandedTc
   -> LHsExpr GhcTc           -- ^ expanded typechecked expression
   -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcTc'
 mkExpandedTc o e = XExpr (ExpandedThingTc (HSE o e))
+
+
+-----------------------------------------
+-- Bits and pieces for RecordDotSyntax.
+--
+-- See Note [Overview of record dot syntax] in GHC.Hs.Expr.
+
+-- mkGetField arg field calculates a get_field @field arg expression.
+-- e.g. z.x = mkGetField z x = get_field @x z
+mkGetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
+mkGetField get_field arg field = unLoc (NE.head $ mkGet get_field (arg :| []) field)
+
+-- mkSetField a field b calculates a set_field @field expression.
+-- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' to a on b").
+-- NB: the order of aruments is specified by GHC Proposal 583: HasField redesign.
+mkSetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> LHsExpr GhcRn -> HsExpr GhcRn
+mkSetField set_field a (L _ (FieldLabelString field)) b =
+  genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit field) b) a
+
+mkGet :: Name -> NonEmpty (LHsExpr GhcRn) -> LocatedAn NoEpAnns FieldLabelString -> NonEmpty (LHsExpr GhcRn)
+mkGet get_field l@(r :| _) (L _ (FieldLabelString field)) =
+  wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) NE.<| l
+
+mkSet :: Name -> LHsExpr GhcRn -> (LocatedAn NoEpAnns FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
+mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
+
+-- mkProjection fields calculates a projection.
+-- e.g. .x = mkProjection [x] = getField @"x"
+--      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
+mkProjection :: Name -> Name -> NonEmpty FieldLabelString -> HsExpr GhcRn
+mkProjection getFieldName circName (field :| fields) = foldl' f (proj field) fields
+  where
+    f :: HsExpr GhcRn -> FieldLabelString -> HsExpr GhcRn
+    f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
+
+    proj :: FieldLabelString -> HsExpr GhcRn
+    proj (FieldLabelString f) = genHsVar getFieldName `genAppType` genHsTyLit f
+
+-- mkProjUpdateSetField calculates functions representing dot notation record updates.
+-- e.g. Suppose an update like foo.bar = 1.
+--      We calculate the function \a -> setField @"foo" a (setField @"bar" (getField @"foo" a) 1).
+mkProjUpdateSetField :: Name -> Name -> LHsRecProj GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
+mkProjUpdateSetField get_field set_field (L _ (HsFieldBind { hfbLHS = (L _ (FieldLabelStrings flds')), hfbRHS = arg } ))
+  = let {
+      ; flds = NE.map (fmap (unLoc . dfoLabel)) flds'
+      ; final = last flds  -- quux
+      ; fields = init flds   -- [foo, bar, baz]
+      ; getters = \a -> foldl' (mkGet get_field) (a :| []) fields  -- Ordered from deep to shallow.
+          -- [getField@"baz"(getField@"bar"(getField@"foo" a), getField@"bar"(getField@"foo" a), getField@"foo" a, a]
+      ; zips = \a -> (final, NE.head (getters a)) : zip (reverse fields) (tail (getters a)) -- Ordered from deep to shallow.
+          -- [("quux", getField@"baz"(getField@"bar"(getField@"foo" a)), ("baz", getField@"bar"(getField@"foo" a)), ("bar", getField@"foo" a), ("foo", a)]
+      }
+    in (\a -> foldl' (mkSet set_field) arg (zips a))
+          -- setField@"foo" (a) (setField@"bar" (getField @"foo" (a))(setField@"baz" (getField @"bar" (getField @"foo" (a)))(setField@"quux" (getField @"baz" (getField @"bar" (getField @"foo" (a))))(quux))))
+
+mkRecordDotUpd :: Name -> Name -> LHsExpr GhcRn -> [LHsRecUpdProj GhcRn] -> HsExpr GhcRn
+mkRecordDotUpd get_field set_field exp updates = foldl' fieldUpdate (unLoc exp) updates
+  where
+    fieldUpdate :: HsExpr GhcRn -> LHsRecUpdProj GhcRn -> HsExpr GhcRn
+    fieldUpdate acc lpu =  unLoc $ (mkProjUpdateSetField get_field set_field lpu) (wrapGenSpan acc)
