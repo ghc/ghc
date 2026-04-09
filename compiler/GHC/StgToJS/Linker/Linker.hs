@@ -485,17 +485,15 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache ar_cache
   let load_info mod = do
         -- Adapted from the tangled code in GHC.Linker.Loader.getLinkDeps.
         linkable <- HUG.lookupHugByModule mod (ue_home_unit_graph unit_env) >>= \case
-          Nothing ->
+          Nothing -> do
                 -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
-              case ue_homeUnit unit_env of
-                Nothing -> pprPanic "getDeps: No home-unit: " (pprModule mod)
-                Just home_unit -> do
-                    mb_stuff <- findHomeModule finder_cache finder_opts home_unit (moduleName mod)
-                    case mb_stuff of
-                      Found loc mod -> found loc mod
-                      _ -> pprPanic "getDeps: Couldn't find home-module: " (pprModule mod)
+                mb_stuff <- findHomeModule finder_cache finder_opts home_unit (moduleName mod)
+                case mb_stuff of
+                  Found loc mod -> found loc mod
+                  _ -> pprPanic "getDeps: Couldn't find home-module: " (pprModule mod)
                 where
+                    home_unit = ue_homeUnit unit_env
                     found loc mod = do {
                       mb_lnk <- findObjectLinkableMaybe mod loc ;
                       case mb_lnk of {
