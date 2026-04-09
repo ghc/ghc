@@ -9,7 +9,6 @@ test('cmm_sink_sp', [ only_ways(['optasm']),
 
 test('T16930', normal, makefile_test, ['T16930'])
 test('T17442', normal, compile, [''])
-test('T20725', normal, compile, ['-package ghc'])
 test('T23610', normal, makefile_test, ['T23610'])
 test('T24224', [cmm_src, grep_errmsg(r'(F64.*);', [1])], compile, ['-no-hs-main -ddump-cmm -dsuppress-all -dsuppress-uniques'])
 test('T24474', cmm_src, compile, ['-optc-g3'])

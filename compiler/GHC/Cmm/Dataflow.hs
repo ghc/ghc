@@ -93,16 +93,13 @@ type RewriteFun' (n :: Extensibility -> Extensibility -> Type) f =
     Block n C C -> FactBase f -> UniqDSM (Block n C C, FactBase f)
 
 analyzeCmmBwd, analyzeCmmFwd
-    :: (NonLocal node)
-    => DataflowLattice f
-    -> TransferFun' node f
-    -> GenCmmGraph node
+    :: DataflowLattice f
+    -> TransferFun f
+    -> CmmGraph
     -> FactBase f
     -> FactBase f
 analyzeCmmBwd = analyzeCmm Bwd
 analyzeCmmFwd = analyzeCmm Fwd
-{-# SPECIALIZE analyzeCmmBwd :: DataflowLattice f -> TransferFun' CmmNode f -> GenCmmGraph CmmNode -> FactBase f -> FactBase f #-}
-{-# SPECIALIZE analyzeCmmFwd :: DataflowLattice f -> TransferFun' CmmNode f -> GenCmmGraph CmmNode -> FactBase f -> FactBase f #-}
 
 analyzeCmm
     :: (NonLocal node)
@@ -162,14 +159,12 @@ fixpointAnalysis direction lattice do_block entry blockmap = loop start
     loop _ !fbase1 = fbase1
 
 rewriteCmmBwd
-    :: (NonLocal node)
-    => DataflowLattice f
-    -> RewriteFun' node f
-    -> GenCmmGraph node
+    :: DataflowLattice f
+    -> RewriteFun f
+    -> CmmGraph
     -> FactBase f
-    -> UniqDSM (GenCmmGraph node, FactBase f)
+    -> UniqDSM (CmmGraph, FactBase f)
 rewriteCmmBwd = rewriteCmm Bwd
-{-# SPECIALIZE rewriteCmmBwd :: DataflowLattice f -> RewriteFun' CmmNode f -> GenCmmGraph CmmNode -> FactBase f -> UniqDSM (GenCmmGraph CmmNode, FactBase f) #-}
 
 rewriteCmm
     :: (NonLocal node)

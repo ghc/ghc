@@ -119,10 +119,7 @@ data GraphWithDominators node =
 -- dominator analysis of that graph (as well as a reverse postorder
 -- numbering).  The result also includes the subgraph of the original
 -- graph that contains only the reachable blocks.
-graphWithDominators :: forall node .
-       (NonLocal node, HasDebugCallStack)
-       => GenCmmGraph node
-       -> GraphWithDominators node
+graphWithDominators :: HasDebugCallStack => CmmGraph -> GraphWithDominators CmmNode
 
 -- The implementation uses the Lengauer-Tarjan algorithm from the x86
 -- back end.
@@ -131,7 +128,8 @@ graphWithDominators :: forall node .
 -- has to accomodate Word64 for other uses.
 
 graphWithDominators g = GraphWithDominators (reachable rpblocks g) dmap rpmap
-      where rpblocks = revPostorderFrom (graphMap g) (g_entry g)
+      where rpblocks :: [CmmBlock]
+            rpblocks = revPostorderFrom (graphMap g) (g_entry g)
             rplabels' = map entryLabel rpblocks
             rplabels :: Array Word64 Label
             rplabels = listArray bounds rplabels'
@@ -144,12 +142,13 @@ graphWithDominators g = GraphWithDominators (reachable rpblocks g) dmap rpmap
             labelIndex = flip findLabelIn imap
               where imap :: LabelMap Word64
                     imap = mapFromList $ zip rplabels' [0..]
+            blockIndex :: CmmBlock -> Word64
             blockIndex = labelIndex . entryLabel
 
             bounds :: (Word64, Word64)
             bounds = (0, intToWord64 (length rpblocks - 1))
 
-            ltGraph :: [Block node C C] -> LT.Graph
+            ltGraph :: [CmmBlock] -> LT.Graph
             ltGraph [] = WM.empty
             ltGraph (block:blocks) =
                 WM.insert
@@ -166,8 +165,6 @@ graphWithDominators g = GraphWithDominators (reachable rpblocks g) dmap rpmap
             doms = tabulate bounds domSet
 
             dmap = mapFromList $ zipWith (\lbl i -> (lbl, domSet i)) rplabels' [0..]
-{-# SPECIALIZE graphWithDominators :: HasDebugCallStack => GenCmmGraph CmmNode -> GraphWithDominators CmmNode #-}
-
 reachable :: NonLocal node => [Block node C C] -> GenCmmGraph node -> GenCmmGraph node
 reachable blocks g = g { g_graph = GMany NothingO blockmap NothingO }
   where blockmap = mapFromList [(entryLabel b, b) | b <- blocks]
