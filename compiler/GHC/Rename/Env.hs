@@ -1050,13 +1050,13 @@ lookup_known_occ KKNS_FromModule occ
            Nothing   -> return (Failed (MissingKnownKey3 occ)) }
 
 lookup_known_occ (KKNS_InScope gbl_rdr_env) occ
-  = case lookupGRE gbl_rdr_env (LookupOccName occ SameNameSpace) of
-       [gre] -> do { let name = greName gre
-                   ; addUsedGRE NoDeprecationWarnings gre
-                   ; traceIf $ hang (text "lookupKnownKeyOcc NoImplicitKnownKeyNames")
-                                  2 (ppr name <+> ppr occ)
-                   ; return (Succeeded name) }
-       gres  -> return (Failed (KnownKeyScopeError occ gres callStack))
+  = case lookupKnownGRE gbl_rdr_env occ of
+      Succeeded gre -> do { addUsedGRE NoDeprecationWarnings gre
+                          ; let name = greName gre
+                          ; traceIf $ hang (text "lookupKnownKeyOcc NoImplicitKnownKeyNames")
+                                         2 (ppr name <+> ppr occ)
+                          ; return (Succeeded name) }
+      Failed gres -> return (Failed (KnownKeyScopeError occ gres callStack))
 
 lookupLocatedOccRn :: WhatLooking
                    -> GenLocated (EpAnn ann) RdrName

@@ -23,7 +23,7 @@ module GHC.Iface.Load (
         KnownKeyNameSource(..),
         lookupKnownKeyThing, lookupKnownKeyName,
         lookupKnownOccThing, lookupKnownOccName,
-        loadKnownKeyOccMaps,
+        loadKnownKeyOccMaps, lookupKnownGRE,
 
         -- RnM/TcM functions
         loadModuleInterface, loadModuleInterfaces,
@@ -204,16 +204,31 @@ lookupKnownKeyName key (KKNS_InScope gbl_rdr_env)
   -- Look up the /un-qualified/ known-key OccName in the GlobalRdrEnv
   -- If we get a unique hit, use it; if not, panic.
   | Just (occ :: OccName) <- lookupUFM knownKeyUniqMap key
-  = case lookupGRE gbl_rdr_env (LookupRdrName (mkRdrUnqual occ) SameNameSpace) of
-       [gre] -> do { let name = greName gre
-                   ; traceIf $ hang (text "lookupKnownKeyName1 NoImplicitKnownKeyNames")
-                                  2 (ppr name <+> ppr key)
-                   ; return (Succeeded name) }
-       gres  -> return (Failed (KnownKeyScopeError occ gres callStack))
+  = case lookupKnownGRE gbl_rdr_env occ of
+       Succeeded gre -> do { let name = greName gre
+                           ; traceIf $ hang (text "lookupKnownKeyName1 NoImplicitKnownKeyNames")
+                                          2 (ppr name <+> ppr key)
+                           ; return (Succeeded name) }
+       Failed gres  -> return (Failed (KnownKeyScopeError occ gres callStack))
 
   | otherwise
   = pprTrace "lookup failed" (pprKnownKey key $$ callStackDoc) $
     return (Failed (MissingKnownKey2 key))
+
+lookupKnownGRE :: GlobalRdrEnv -> OccName -> MaybeErr [GlobalRdrElt] GlobalRdrElt
+lookupKnownGRE rdr_env occ
+  | [gre] <- pickQualGREs kNOWN_MOD_NAME gres
+  = Succeeded gre  -- Found qualified 'Known.occ' in scope
+  | [gre] <- pickUnqualGREs gres
+  = Succeeded gre  -- Found unqualified 'occ' in scope
+  | otherwise
+  = Failed gres
+  where
+    gres :: [GlobalRdrElt]
+    gres = lookupGRE rdr_env (LookupOccName occ SameNameSpace)
+
+kNOWN_MOD_NAME :: ModuleName
+kNOWN_MOD_NAME = mkModuleName "Known"
 
 lookupKnownOccThing :: HasDebugCallStack
                     => KnownOcc -> KnownKeyNameSource
@@ -238,12 +253,12 @@ lookupKnownOccName occ (KKNS_InScope gbl_rdr_env)
   --                   here is the top-level GlobalRdrEnv
   -- Look up the /un-qualified/ known-key OccName in the GlobalRdrEnv
   -- If we get a unique hit, use it; if not, panic.
-  = case lookupGRE gbl_rdr_env (LookupRdrName (mkRdrUnqual occ) SameNameSpace) of
-       [gre] -> do { let name = greName gre
-                   ; traceIf $ hang (text "lookupKnownKeyName2 NoImplicitKnownKeyNames")
-                                  2 (ppr name <+> ppr occ)
-                   ; return (Succeeded name) }
-       gres  -> return (Failed (KnownKeyScopeError occ gres callStack))
+  = case lookupKnownGRE gbl_rdr_env occ of
+       Succeeded gre -> do { let name = greName gre
+                           ; traceIf $ hang (text "lookupKnownKeyName2 NoImplicitKnownKeyNames")
+                                          2 (ppr name <+> ppr occ)
+                           ; return (Succeeded name) }
+       Failed gres  -> return (Failed (KnownKeyScopeError occ gres callStack))
 
 loadKnownKeyOccMaps :: IfM lcl KnownKeyNameMaps
 loadKnownKeyOccMaps

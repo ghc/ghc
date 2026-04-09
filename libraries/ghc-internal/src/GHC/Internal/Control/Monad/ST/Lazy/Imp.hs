@@ -37,18 +37,12 @@ module GHC.Internal.Control.Monad.ST.Lazy.Imp (
         unsafeIOToST
     ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Data.Tuple
-
 import qualified GHC.Internal.Control.Monad.ST.Imp as ST
-
 import qualified GHC.Internal.ST as GHC.ST
-import GHC.Internal.Base (
-    Applicative(..), Functor(..), Monad(..), Monoid(..), Semigroup(..),
-    ($), (.),
-  )
 import GHC.Internal.Magic (runRW#)
 import GHC.Internal.Prim (RealWorld, State#, noDuplicate#)
-import GHC.Internal.Types (IO)
 
 -- | The lazy @'ST'@ monad.
 -- The ST monad allows for destructive updates, but is escapable (unlike @IO@).

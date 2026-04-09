@@ -43,7 +43,7 @@ import qualified GHC.Internal.Stats as Internal
 import GHC.Generics (Generic)
 import Data.Word (Word64,Word32)
 import Data.Int (Int64)
-import Prelude( (>>=), (>>) ) -- For known-key names
+import Prelude as Known( (>>=), (>>) )
 
 -- | Time values from the RTS, using a fixed resolution of nanoseconds.
 type RtsTime = Int64

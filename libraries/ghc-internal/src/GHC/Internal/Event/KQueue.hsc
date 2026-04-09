@@ -19,7 +19,6 @@ import qualified GHC.Internal.Event.Internal as E
 #include "EventConfig.h"
 #if !defined(HAVE_KQUEUE)
 import GHC.Internal.Err (errorWithoutStackTrace)
-import GHC.Internal.Types (Bool(..), IO)
 
 new :: IO E.Backend
 new = errorWithoutStackTrace "KQueue back end not implemented for this platform"

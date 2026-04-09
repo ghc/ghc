@@ -63,8 +63,9 @@ import qualified GHC.Internal.RTS.Flags as Internal
 import GHC.Internal.IO.SubSystem (IoSubSystem(..))
 
 import Data.Word (Word32,Word64,Word)
-import Prelude( Num ) -- For -frebindable-known-key-names (used when defaulting)
-import GHC.Internal.Classes( (==) )     -- For known-key names
+
+import Prelude as Known( Num )
+import GHC.Internal.Classes as Known( (==) )
 
 -- | 'RtsTime' is defined as a @StgWord64@ in @stg/Types.h@
 --

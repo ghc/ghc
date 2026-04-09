@@ -27,7 +27,9 @@ module GHC.Internal.TH.Syntax
     , ForeignSrcLang(..)
     ) where
 
+
 #ifdef BOOTSTRAP_TH
+-- Compiling with stage0 compiler
 import Prelude
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper )
@@ -39,7 +41,8 @@ import Foreign.C.Types
 import GHC.Ptr          ( Ptr, plusPtr )
 import GHC.Generics     ( Generic )
 #else
-import GHC.Internal.Base hiding( Type, Module )
+-- Compiling with stage1 compiler
+import GHC.Internal.Base as Known
 import GHC.Internal.Data.Traversable
 import GHC.Internal.Err (error)
 import GHC.Internal.Word
@@ -57,7 +60,6 @@ import GHC.Internal.Num
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.List (dropWhile, break, replicate, reverse, last)
 import GHC.Internal.Unicode
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 #endif
 import GHC.Internal.ForeignSrcLang
 import GHC.Internal.LanguageExtensions
