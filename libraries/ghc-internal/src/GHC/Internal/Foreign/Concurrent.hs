@@ -29,7 +29,7 @@ module GHC.Internal.Foreign.Concurrent
         addForeignPtrFinalizer,
   ) where
 
-import GHC.Internal.Base  -- For known-occ things
+import GHC.Internal.Base as Rebindable  -- For known-occ things
 import GHC.Internal.IO         ( IO )
 import GHC.Internal.Ptr        ( Ptr )
 import GHC.Internal.ForeignPtr ( ForeignPtr )

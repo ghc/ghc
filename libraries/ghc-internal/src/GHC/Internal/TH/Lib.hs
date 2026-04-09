@@ -45,6 +45,7 @@ import GHC.Internal.Word
 import qualified GHC.Internal.Types as Kind (Type)
 import GHC.Internal.Num( fromInteger )  -- For known-key names
 import GHC.Internal.Enum( enumFrom )    -- For known-key names
+import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
 #endif
 
 ----------------------------------------------------------

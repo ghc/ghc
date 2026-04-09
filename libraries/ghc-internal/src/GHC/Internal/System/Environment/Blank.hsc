@@ -76,7 +76,9 @@ import GHC.Internal.System.Environment
 #if !defined(mingw32_HOST_OS)
 import qualified GHC.Internal.System.Environment as Environment
 #endif
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
+
+import qualified GHC.Internal.Base as Rebindable
+
 
 #include "HsBaseConfig.h"
 
