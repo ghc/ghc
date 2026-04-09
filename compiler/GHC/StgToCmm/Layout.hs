@@ -241,7 +241,7 @@ slowCall fun stg_args
              end_lbl <- newBlockId
 
              let correct_arity = cmmEqWord platform (funInfoArity profile fun_iptr)
-                                                    (mkIntExpr platform n_args)
+                                                    (mkIntExpr platform (toTargetInt n_args))
 
              tscope <- getTickScope
              emit (mkCbranch (cmmIsTagged platform funv)

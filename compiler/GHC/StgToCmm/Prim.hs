@@ -172,7 +172,7 @@ emitPrimOp cfg primop =
       -> inlinePrimop $ \[res] -> doNewArrayOp res (arrPtrsRep platform (fromInteger n)) mkMAP_DIRTY_infoLabel
         [ (mkIntExpr platform (fromInteger n),
            fixedHdrSize profile + pc_OFFSET_StgMutArrPtrs_ptrs (platformConstants platform))
-        , (mkIntExpr platform (nonHdrSizeW (arrPtrsRep platform (fromInteger n))),
+        , (mkIntExpr platform (toTargetInt (nonHdrSizeW (arrPtrsRep platform (fromInteger n)))),
            fixedHdrSize profile + pc_OFFSET_StgMutArrPtrs_size (platformConstants platform))
         ]
         (fromInteger n) init
@@ -2240,7 +2240,7 @@ genericWordAddCOp [res_r, res_c] [aa, bb]
                 CmmMachOp (mo_wordNot platform) [CmmReg (CmmLocal res_r)]
               ]
             ],
-            mkIntExpr platform (platformWordSizeInBits platform - 1)
+            mkIntExpr platform (toTargetInt (platformWordSizeInBits platform - 1))
           ]
         ]
 genericWordAddCOp _ _ = panic "genericWordAddCOp"
@@ -2273,7 +2273,7 @@ genericWordSubCOp [res_r, res_c] [aa, bb]
                 CmmReg (CmmLocal res_r)
               ]
             ],
-            mkIntExpr platform (platformWordSizeInBits platform - 1)
+            mkIntExpr platform (toTargetInt (platformWordSizeInBits platform - 1))
           ]
         ]
 genericWordSubCOp _ _ = panic "genericWordSubCOp"
@@ -2309,7 +2309,7 @@ genericIntAddCOp [res_r, res_c] [aa, bb]
                     CmmMachOp (mo_wordNot platform) [CmmMachOp (mo_wordXor platform) [aa,bb]],
                     CmmMachOp (mo_wordXor platform) [aa, CmmReg (CmmLocal res_r)]
                 ],
-                mkIntExpr platform (platformWordSizeInBits platform - 1)
+                mkIntExpr platform (toTargetInt (platformWordSizeInBits platform - 1))
           ]
         ]
 genericIntAddCOp _ _ = panic "genericIntAddCOp"
@@ -2334,7 +2334,7 @@ genericIntSubCOp [res_r, res_c] [aa, bb]
                     CmmMachOp (mo_wordXor platform) [aa,bb],
                     CmmMachOp (mo_wordXor platform) [aa, CmmReg (CmmLocal res_r)]
                 ],
-                mkIntExpr platform (platformWordSizeInBits platform - 1)
+                mkIntExpr platform (toTargetInt (platformWordSizeInBits platform - 1))
           ]
         ]
 genericIntSubCOp _ _ = panic "genericIntSubCOp"
@@ -2541,7 +2541,7 @@ doWritePtrArrayOp addr idx val
          cmmOffsetExpr platform
           (cmmOffsetExprW platform (cmmOffsetB platform addr hdr_size)
                          (ptrArraySize platform profile addr))
-          (CmmMachOp (mo_wordUShr platform) [idx, mkIntExpr platform (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform))])
+          (CmmMachOp (mo_wordUShr platform) [idx, mkIntExpr platform (toTargetInt (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)))])
          ) (CmmLit (CmmInt 1 W8))
 
 mkBasicIndexedRead :: Bool         -- Should this imply an acquire barrier
@@ -2922,14 +2922,14 @@ doNewByteArrayOp res_r n = do
     let info_ptr = mkLblExpr mkArrWords_infoLabel
         rep = arrWordsRep platform n
 
-    tickyAllocPrim (mkIntExpr platform (arrWordsHdrSize profile))
-        (mkIntExpr platform (nonHdrSize platform rep))
+    tickyAllocPrim (mkIntExpr platform (toTargetInt (arrWordsHdrSize profile)))
+        (mkIntExpr platform (toTargetInt (nonHdrSize platform rep)))
         (zeroExpr platform)
 
     let hdr_size = fixedHdrSize profile
 
     base <- allocHeapClosure rep info_ptr (cccsExpr platform)
-                     [ (mkIntExpr platform n,
+                     [ (mkIntExpr platform (toTargetInt n),
                         hdr_size + pc_OFFSET_StgArrBytes_bytes (platformConstants platform))
                      ]
 
@@ -3169,8 +3169,8 @@ doNewArrayOp res_r rep info payload n init = do
 
     let info_ptr = mkLblExpr info
 
-    tickyAllocPrim (mkIntExpr platform (hdrSize profile rep))
-        (mkIntExpr platform (nonHdrSize platform rep))
+    tickyAllocPrim (mkIntExpr platform (toTargetInt (hdrSize profile rep)))
+        (mkIntExpr platform (toTargetInt (nonHdrSize platform rep)))
         (zeroExpr platform)
 
     base <- allocHeapClosure rep info_ptr (cccsExpr platform) payload
@@ -3214,7 +3214,7 @@ doCopyArrayOp = emitCopyArray copy
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
         do platform <- getPlatform
-           emitCheckedMemcpyCall dst_p src_p (mkIntExpr platform bytes)
+           emitCheckedMemcpyCall dst_p src_p (mkIntExpr platform (toTargetInt bytes))
                (wordAlignment platform)
 
 
@@ -3232,9 +3232,9 @@ doCopyMutableArrayOp = emitCopyArray copy
     copy src dst dst_p src_p bytes = do
         platform <- getPlatform
         (moveCall, cpyCall) <- forkAltPair
-            (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr platform bytes)
+            (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr platform (toTargetInt bytes))
              (wordAlignment platform))
-            (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr platform bytes)
+            (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr platform (toTargetInt bytes))
              (wordAlignment platform))
         emit =<< mkCmmIfThenElse (cmmEqWord platform src dst) moveCall cpyCall
 
@@ -3257,9 +3257,9 @@ emitCopyArray copy src0 src_off dst0 dst_off0 n =
         dst_off <- assignTempE dst_off0
 
         whenCheckBounds $ do
-          emitRangeBoundsCheck src_off (mkIntExpr platform n)
+          emitRangeBoundsCheck src_off (mkIntExpr platform (toTargetInt n))
                                        (ptrArraySize platform profile src)
-          emitRangeBoundsCheck dst_off (mkIntExpr platform n)
+          emitRangeBoundsCheck dst_off (mkIntExpr platform (toTargetInt n))
                                        (ptrArraySize platform profile dst)
 
         -- Nonmoving collector write barrier
@@ -3291,7 +3291,7 @@ doCopySmallArrayOp = emitCopySmallArray copy
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
         do platform <- getPlatform
-           emitCheckedMemcpyCall dst_p src_p (mkIntExpr platform bytes)
+           emitCheckedMemcpyCall dst_p src_p (mkIntExpr platform (toTargetInt bytes))
                (wordAlignment platform)
 
 
@@ -3305,9 +3305,9 @@ doCopySmallMutableArrayOp = emitCopySmallArray copy
     copy src dst dst_p src_p bytes = do
         platform <- getPlatform
         (moveCall, cpyCall) <- forkAltPair
-            (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr platform bytes)
+            (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr platform (toTargetInt bytes))
              (wordAlignment platform))
-            (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr platform bytes)
+            (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr platform (toTargetInt bytes))
              (wordAlignment platform))
         emit =<< mkCmmIfThenElse (cmmEqWord platform src dst) moveCall cpyCall
 
@@ -3329,9 +3329,9 @@ emitCopySmallArray copy src0 src_off dst0 dst_off n =
         dst     <- assignTempE dst0
 
         whenCheckBounds $ do
-          emitRangeBoundsCheck src_off (mkIntExpr platform n)
+          emitRangeBoundsCheck src_off (mkIntExpr platform (toTargetInt n))
                                        (smallPtrArraySize platform profile src)
-          emitRangeBoundsCheck dst_off (mkIntExpr platform n)
+          emitRangeBoundsCheck dst_off (mkIntExpr platform (toTargetInt n))
                                        (smallPtrArraySize platform profile dst)
 
         -- Nonmoving collector write barrier
@@ -3361,17 +3361,17 @@ emitCloneArray info_p res_r src src_off n = do
     let info_ptr = mkLblExpr info_p
         rep = arrPtrsRep platform n
 
-    tickyAllocPrim (mkIntExpr platform (arrPtrsHdrSize profile))
-        (mkIntExpr platform (nonHdrSize platform rep))
+    tickyAllocPrim (mkIntExpr platform (toTargetInt (arrPtrsHdrSize profile)))
+        (mkIntExpr platform (toTargetInt (nonHdrSize platform rep)))
         (zeroExpr platform)
 
     let hdr_size = fixedHdrSize profile
         constants = platformConstants platform
 
     base <- allocHeapClosure rep info_ptr (cccsExpr platform)
-                     [ (mkIntExpr platform n,
+                     [ (mkIntExpr platform (toTargetInt n),
                         hdr_size + pc_OFFSET_StgMutArrPtrs_ptrs constants)
-                     , (mkIntExpr platform (nonHdrSizeW rep),
+                     , (mkIntExpr platform (toTargetInt (nonHdrSizeW rep)),
                         hdr_size + pc_OFFSET_StgMutArrPtrs_size constants)
                      ]
 
@@ -3382,9 +3382,9 @@ emitCloneArray info_p res_r src src_off n = do
              (arrPtrsHdrSize profile)
     src_p <- assignTempE $ cmmOffsetExprW platform src
              (cmmAddWord platform
-              (mkIntExpr platform (arrPtrsHdrSizeW profile)) src_off)
+              (mkIntExpr platform (toTargetInt (arrPtrsHdrSizeW profile))) src_off)
 
-    emitMemcpyCall dst_p src_p (mkIntExpr platform (wordsToBytes platform n))
+    emitMemcpyCall dst_p src_p (mkIntExpr platform (toTargetInt (wordsToBytes platform n)))
         (wordAlignment platform)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
@@ -3402,14 +3402,14 @@ emitCloneSmallArray info_p res_r src src_off n = do
     let info_ptr = mkLblExpr info_p
         rep = smallArrPtrsRep n
 
-    tickyAllocPrim (mkIntExpr platform (smallArrPtrsHdrSize profile))
-        (mkIntExpr platform (nonHdrSize platform rep))
+    tickyAllocPrim (mkIntExpr platform (toTargetInt (smallArrPtrsHdrSize profile)))
+        (mkIntExpr platform (toTargetInt (nonHdrSize platform rep)))
         (zeroExpr platform)
 
     let hdr_size = fixedHdrSize profile
 
     base <- allocHeapClosure rep info_ptr (cccsExpr platform)
-                     [ (mkIntExpr platform n,
+                     [ (mkIntExpr platform (toTargetInt n),
                         hdr_size + pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform))
                      ]
 
@@ -3420,9 +3420,9 @@ emitCloneSmallArray info_p res_r src src_off n = do
              (smallArrPtrsHdrSize profile)
     src_p <- assignTempE $ cmmOffsetExprW platform src
              (cmmAddWord platform
-              (mkIntExpr platform (smallArrPtrsHdrSizeW profile)) src_off)
+              (mkIntExpr platform (toTargetInt (smallArrPtrsHdrSizeW profile))) src_off)
 
-    emitMemcpyCall dst_p src_p (mkIntExpr platform (wordsToBytes platform n))
+    emitMemcpyCall dst_p src_p (mkIntExpr platform (toTargetInt (wordsToBytes platform n)))
         (wordAlignment platform)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
@@ -3437,7 +3437,7 @@ emitSetCards dst_start dst_cards_start n = do
     start_card <- assignTempE $ cardCmm platform dst_start
     let end_card = cardCmm platform
                    (cmmSubWord platform
-                    (cmmAddWord platform dst_start (mkIntExpr platform n))
+                    (cmmAddWord platform dst_start (mkIntExpr platform (toTargetInt n)))
                     (mkIntExpr platform 1))
     emitMemsetCall (cmmAddWord platform dst_cards_start start_card)
         (mkIntExpr platform 1)
@@ -3447,7 +3447,7 @@ emitSetCards dst_start dst_cards_start n = do
 -- Convert an element index to a card index
 cardCmm :: Platform -> CmmExpr -> CmmExpr
 cardCmm platform i =
-    cmmUShrWord platform i (mkIntExpr platform (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)))
+    cmmUShrWord platform i (mkIntExpr platform (toTargetInt (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform))))
 
 ------------------------------------------------------------------------------
 -- SmallArray PrimOp implementations
@@ -3794,10 +3794,10 @@ doByteArrayBoundsCheck idx arr idx_ty elem_ty = whenCheckBounds $ do
     platform <- getPlatform
     let elem_w = typeWidth elem_ty
         idx_w = typeWidth idx_ty
-        elem_sz = mkIntExpr platform $ widthInBytes elem_w
+        elem_sz = mkIntExpr platform $ toTargetInt (widthInBytes elem_w)
         arr_sz = byteArraySize platform profile arr
         effective_arr_sz =
-          cmmUShrWord platform arr_sz (mkIntExpr platform (widthInLog idx_w))
+          cmmUShrWord platform arr_sz (mkIntExpr platform (toTargetInt (widthInLog idx_w)))
     if elem_w == idx_w
       then emitBoundsCheck idx effective_arr_sz  -- aligned => simpler check
       else assert (idx_w == W8) (emitRangeBoundsCheck idx elem_sz arr_sz)
@@ -3839,8 +3839,8 @@ emitCopyUpdRemSetPush platform hdr_size dst dst_off n =
     lbl = mkLblExpr $ mkPrimCallLabel
           $ PrimCall (fsLit "stg_copyArray_barrier") rtsUnit
     args =
-      [ mkIntExpr platform hdr_size
+      [ mkIntExpr platform (toTargetInt hdr_size)
       , dst
       , dst_off
-      , mkIntExpr platform n
+      , mkIntExpr platform (toTargetInt n)
       ]

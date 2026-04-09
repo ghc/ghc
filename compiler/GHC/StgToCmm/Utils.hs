@@ -160,7 +160,7 @@ mkTaggedObjectLoad platform reg base offset tag
   = mkAssign (CmmLocal reg)
              (CmmLoad (cmmOffsetB platform
                                   (CmmReg (CmmLocal base))
-                                  (offset - tag))
+                                  (offset - fromDynTag tag))
                       (localRegType reg)
                       NaturallyAligned)
 

@@ -539,7 +539,7 @@ heapCheck checkStack checkYield do_gc code
                      "See https://gitlab.haskell.org/ghc/ghc/issues/4505 for details.",
                      "Suggestion: read data from a file instead of having large static data",
                      "structures in code."]
-                 | hpHw > 0  = Just (mkIntExpr platform (hpHw * (platformWordSizeInBytes platform)))
+                 | hpHw > 0  = Just (mkIntExpr platform (toTargetInt hpHw * toTargetInt (platformWordSizeInBytes platform)))
                  | otherwise = Nothing
                  where
                   constants = platformConstants platform

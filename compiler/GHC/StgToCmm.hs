@@ -303,7 +303,7 @@ cgEnumerationTyCon tycon
   = do platform <- getPlatform
        emitRODataLits (mkClosureTableLabel (tyConName tycon) NoCafRefs)
              [ CmmLabelOff (mkClosureLabel (dataConName con) NoCafRefs)
-                           (tagForCon platform con)
+                           (fromDynTag (tagForCon platform con))
              | con <- tyConDataCons tycon]
 
 cgDataCon :: ConInfoTableLocation -> DataCon -> FCode ()
@@ -342,7 +342,7 @@ cgDataCon mn data_con
                ; let node = CmmReg $ nodeReg platform
                ; ldvEnter node
                ; tickyReturnOldCon (length arg_reps)
-               ; void $ emitReturn [cmmOffsetB platform node (tagForCon platform data_con)]
+               ; void $ emitReturn [cmmOffsetB platform node (fromDynTag (tagForCon platform data_con))]
                }
                     -- The case continuation code expects a tagged pointer
         }

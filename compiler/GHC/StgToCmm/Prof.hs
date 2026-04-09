@@ -166,7 +166,7 @@ profDynAlloc rep ccs
   = ifProfiling $
     do profile <- getProfile
        let platform = profilePlatform profile
-       profAlloc (mkIntExpr platform (heapClosureSizeW profile rep)) ccs
+       profAlloc (mkIntExpr platform (toTargetInt (heapClosureSizeW profile rep))) ccs
 
 -- | Record the allocation of a closure (size is given by a CmmExpr)
 -- The size must be in words, because the allocation counter in a CCS counts
@@ -182,7 +182,7 @@ profAlloc words ccs
                        (CmmMachOp (MO_UU_Conv (wordWidth platform) (typeWidth alloc_rep))
                            -- subtract the "profiling overhead", which is the
                            -- profiling header in a closure.
-                           [CmmMachOp (mo_wordSub platform) [ words, mkIntExpr platform (profHdrSize profile)]]
+                           [CmmMachOp (mo_wordSub platform) [ words, mkIntExpr platform (toTargetInt (profHdrSize profile))]]
                        )
 
 -- -----------------------------------------------------------------------
@@ -224,7 +224,7 @@ emitCostCentreDecl :: CostCentre -> FCode ()
 emitCostCentreDecl cc = do
   { ctx      <- stgToCmmContext <$> getStgToCmmConfig
   ; platform <- getPlatform
-  ; let is_caf | isCafCC cc = mkIntCLit platform (ord 'c') -- 'c' == is a CAF
+  ; let is_caf | isCafCC cc = mkIntCLit platform (toTargetInt (ord 'c')) -- 'c' == is a CAF
                | otherwise  = zero platform
                         -- NB. bytesFS: we want the UTF-8 bytes here (#5559)
   ; label <- newByteStringCLit (bytesFS $ costCentreUserNameFS cc)
@@ -347,7 +347,7 @@ dynLdvInit :: Platform -> CmmExpr
 dynLdvInit platform =
 -- (era << LDV_SHIFT) | LDV_STATE_CREATE
   CmmMachOp (mo_wordOr platform) [
-      CmmMachOp (mo_wordShl platform) [loadEra platform, mkIntExpr platform (pc_LDV_SHIFT (platformConstants platform))],
+      CmmMachOp (mo_wordShl platform) [loadEra platform, mkIntExpr platform (toTargetInt (pc_LDV_SHIFT (platformConstants platform)))],
       CmmLit (mkWordCLit platform (pc_ILDV_STATE_CREATE (platformConstants platform)))
   ]
 
@@ -390,7 +390,7 @@ ldvEnterClosure closure_info node_reg = do
     platform <- getPlatform
     let tag = funTag platform closure_info
     -- don't forget to subtract node's tag
-    ldvEnter (cmmOffsetB platform (CmmReg node_reg) (-tag))
+    ldvEnter (cmmOffsetB platform (CmmReg node_reg) (-(fromDynTag tag)))
 
 ldvEnter :: CmmExpr -> FCode ()
 -- Argument is a closure pointer

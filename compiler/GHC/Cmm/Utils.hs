@@ -162,12 +162,16 @@ typeForeignHint = primRepForeignHint . typePrimRepU
 --
 ---------------------------------------------------
 
--- XXX: should really be Integer, since Int doesn't necessarily cover
--- the full range of target Ints.
-mkIntCLit :: Platform -> Int -> CmmLit
+-- | Make a word-width 'CmmLit' for a target 'Int' value.
+-- Uses 'TargetInt' (= 'Int64') rather than host 'Int' to avoid
+-- truncation when cross-compiling from a 32-bit host to a 64-bit target.
+-- See Note [TargetInt] in GHC.Platform.
+mkIntCLit :: Platform -> TargetInt -> CmmLit
 mkIntCLit platform i = CmmInt (toInteger i) (wordWidth platform)
 
-mkIntExpr :: Platform -> Int -> CmmExpr
+-- | Make a word-width 'CmmExpr' for a target 'Int' value.
+-- See Note [TargetInt] in GHC.Platform.
+mkIntExpr :: Platform -> TargetInt -> CmmExpr
 mkIntExpr platform i = CmmLit $! mkIntCLit platform i
 
 zeroCLit :: Platform -> CmmLit
@@ -279,7 +283,7 @@ cmmIndexExpr platform width base idx =
   cmmOffsetExpr platform base byte_off
   where
     idx_w = cmmExprWidth platform idx
-    byte_off = CmmMachOp (MO_Shl idx_w) [idx, mkIntExpr platform (widthInLog width)]
+    byte_off = CmmMachOp (MO_Shl idx_w) [idx, mkIntExpr platform (toTargetInt (widthInLog width))]
 
 cmmLoadIndex :: Platform -> CmmType -> CmmExpr -> Int -> CmmExpr
 cmmLoadIndex platform ty expr ix =

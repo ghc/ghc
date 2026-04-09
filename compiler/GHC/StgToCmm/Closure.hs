@@ -12,7 +12,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.StgToCmm.Closure (
-        DynTag,  tagForCon, isSmallFamily,
+        DynTag, tagForCon, isSmallFamily, toDynTag, fromDynTag,
 
         idPrimRep1, idPrimRepU, isGcPtrRep, addIdReps, addArgReps,
 
@@ -65,7 +65,7 @@ module GHC.StgToCmm.Closure (
 
 import GHC.Prelude
 import GHC.Platform
-import GHC.Platform.Tag (DynTag, mAX_PTR_TAG, isSmallFamily)
+import GHC.Platform.Tag (DynTag, mAX_PTR_TAG, isSmallFamily, toDynTag, fromDynTag)
 import GHC.Platform.Profile
 
 import GHC.Stg.Syntax
@@ -320,13 +320,13 @@ mkLFStringLit = LFUnlifted
 -----------------------------------------------------
 
 tagForCon :: Platform -> DataCon -> DynTag
-tagForCon platform con = min (dataConTag con) (mAX_PTR_TAG platform)
--- NB: 1-indexed
+-- NB: 1-indexed; result is clamped to mAX_PTR_TAG.
+tagForCon platform con = toDynTag platform (min (dataConTag con) (fromDynTag (mAX_PTR_TAG platform)))
 
 tagForArity :: Platform -> RepArity -> DynTag
 tagForArity platform arity
- | isSmallFamily platform arity = arity
- | otherwise                    = 0
+ | isSmallFamily platform arity = toDynTag platform arity
+ | otherwise                    = toDynTag platform 0
 
 -- | Return the tag in the low order bits of a variable bound
 -- to this LambdaForm
@@ -334,7 +334,7 @@ lfDynTag :: Platform -> LambdaFormInfo -> DynTag
 lfDynTag platform lf = case lf of
    LFCon con               -> tagForCon   platform con
    LFReEntrant _ arity _ _ -> tagForArity platform arity
-   _other                  -> 0
+   _other                  -> toDynTag platform 0
 
 
 -----------------------------------------------------------------------------

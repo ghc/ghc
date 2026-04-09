@@ -117,7 +117,7 @@ emitIpeBufferListNode this_mod ents dus0 = do
 
         ctx      = stgToCmmContext cfg
         platform = stgToCmmPlatform cfg
-        int n    = mkIntCLit platform n
+        int n    = mkIntCLit platform (toTargetInt n)
 
         ((cg_ipes, unit_id, module_name), strtab) = flip runState emptyStringTable $ do
           unit_id <- lookupStringTable $ ST.pack $ renderWithContext ctx (ppr $ moduleName this_mod)

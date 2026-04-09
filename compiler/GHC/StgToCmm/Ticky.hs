@@ -294,7 +294,7 @@ emitTickyData platform ctr_lbl arity fun_desc arg_desc json_desc info_tbl =
     -- before, but the code generator wasn't handling that
     -- properly and it led to chaos, panic and disorder.
         [ zeroCLit platform,               -- registered?
-          mkIntCLit platform arity,   -- Arity
+          mkIntCLit platform (toTargetInt arity),   -- Arity
           zeroCLit platform,               -- Heap allocated for this thing
           fun_desc,
           arg_desc,
@@ -848,7 +848,7 @@ bumpHistogram lbl n = do
 emitAddToMem :: CmmExpr -> Int -> FCode ()
 emitAddToMem lhs n = do
   platform <- getPlatform
-  emitAddToMemE lhs (mkIntExpr platform n)
+  emitAddToMemE lhs (mkIntExpr platform (toTargetInt n))
 
 emitAddToMemE :: CmmExpr -> CmmExpr -> FCode ()
 emitAddToMemE lhs n = do

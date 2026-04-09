@@ -621,7 +621,7 @@ openNursery profile tso = do
                (CmmMachOp (mo_wordMul platform)
                  [ CmmMachOp (MO_SS_Conv W32 (wordWidth platform))
                      [CmmLoad (nursery_bdescr_blocks platform cnreg) b32 NaturallyAligned]
-                 , mkIntExpr platform (pc_BLOCK_SIZE (platformConstants platform))
+                 , mkIntExpr platform (toTargetInt (pc_BLOCK_SIZE (platformConstants platform)))
                  ])
                (-1)
              )

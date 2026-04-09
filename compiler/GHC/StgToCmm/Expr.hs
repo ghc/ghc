@@ -748,7 +748,10 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
               !ptag_expr = cmmConstrTag1 platform (CmmReg bndr_reg)
               !branches' = first succ <$> branches
               !maxpt = mAX_PTR_TAG platform
-              (!via_ptr, !via_info) = partition ((< maxpt) . fst) branches'
+              -- 'maxpt' is a 'DynTag'; branch tables use host-side 'ConTagZ'
+              -- (= 'Int'), so convert via 'fromDynTag'.
+              !maxpt_i = fromDynTag maxpt :: ConTagZ
+              (!via_ptr, !via_info) = partition ((< maxpt_i) . fst) branches'
               !small = isSmallFamily platform fam_sz
 
                 -- Is the constructor tag in the node reg?
@@ -756,7 +759,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
         ; if small || null via_info
            then -- Yes, bndr_reg has constructor tag in ls bits
                emitSwitch ptag_expr branches' mb_deflt 1
-                 (if small then fam_sz else maxpt)
+                 (if small then fam_sz else maxpt_i)
 
            else -- No, the get exact tag from info table when mAX_PTR_TAG
                 -- See Note [Double switching for big families]
@@ -772,7 +775,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                   infos_lbl <- newBlockId
                   infos_scp <- getTickScope
 
-                  let spillover = (maxpt, (mkBranch infos_lbl, infos_scp))
+                  let spillover = (maxpt_i, (mkBranch infos_lbl, infos_scp))
 
                   (mb_shared_deflt, mb_shared_branch) <- case mb_deflt of
                       (Just (stmts, scp)) ->
@@ -781,13 +784,13 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                                     , Just (mkBranch lbl, scp))
                       _ -> return (Nothing, Nothing)
                   -- Switch on pointer tag
-                  emitSwitch ptag_expr (spillover : via_ptr) mb_shared_deflt 1 maxpt
+                  emitSwitch ptag_expr (spillover : via_ptr) mb_shared_deflt 1 maxpt_i
                   join_lbl <- newBlockId
                   emit (mkBranch join_lbl)
                   -- Switch on info table tag
                   emitLabel infos_lbl
                   emitSwitch itag_expr info0 mb_shared_branch
-                    (maxpt - 1) (fam_sz - 1)
+                    (maxpt_i - 1) (fam_sz - 1)
                   emitLabel join_lbl
 
         ; return AssignedDirectly }

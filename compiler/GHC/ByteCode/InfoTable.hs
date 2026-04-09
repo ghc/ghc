@@ -21,7 +21,7 @@ import GHC.Core.TyCon       ( TyCon, tyConFamilySize, isBoxedDataTyCon, tyConDat
 import GHC.Core.Multiplicity     ( scaledThing )
 
 import GHC.StgToCmm.Layout  ( mkVirtConstrSizes )
-import GHC.StgToCmm.Closure ( tagForCon )
+import GHC.StgToCmm.Closure ( tagForCon, fromDynTag )
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -58,7 +58,7 @@ make_constr_itbls profile cons =
           ptrs'
           nptrs_really
           conNo
-          (tagForCon platform dcon)
+          (fromDynTag (tagForCon platform dcon))
           descr
       )
       where

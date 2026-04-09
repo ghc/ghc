@@ -90,7 +90,7 @@ idInfoToAmode cg_info
 
 -- | A tag adds a byte offset to the pointer
 addDynTag :: Platform -> CmmExpr -> DynTag -> CmmExpr
-addDynTag = cmmOffsetB
+addDynTag platform e tag = cmmOffsetB platform e (fromDynTag tag)
 
 maybeLetNoEscape :: CgIdInfo -> Maybe (BlockId, [LocalReg])
 maybeLetNoEscape CgIdInfo { cg_loc = LneLoc blk_id args} = Just (blk_id, args)
