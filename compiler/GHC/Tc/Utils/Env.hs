@@ -173,8 +173,8 @@ lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr (Either Name IfaceMessage) 
 lookupGlobal_maybe hsc_env name
   = do  {    -- Try local envt
           let mod = icInteractiveModule (hsc_IC hsc_env)
-              mhome_unit = hsc_home_unit_maybe hsc_env
-              tcg_semantic_mod = homeModuleInstantiation mhome_unit mod
+              home_unit = hsc_home_unit hsc_env
+              tcg_semantic_mod = homeModuleInstantiation home_unit mod
 
         ; if nameIsLocalOrFrom tcg_semantic_mod name
           then return $ Failed $ Left name

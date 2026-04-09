@@ -160,22 +160,18 @@ get_link_deps opts pls maybe_normal_osuf span mods = do
       = HUG.lookupHugByModule mod (ue_home_unit_graph unit_env) >>= \case
           Just mod_info -> adjust_linkable (expectJust (homeModLinkable mod_info))
           Nothing -> do
-           -- It's not in the HPT because we are in one shot mode,
-           -- so use the Finder to get a ModLocation...
-           case ue_homeUnit unit_env of
-            Nothing -> no_obj mod
-            Just home_unit -> do
-
-              let fc = ldFinderCache opts
-              let fopts = ldFinderOpts opts
-              mb_stuff <- findHomeModule fc fopts home_unit (moduleName mod)
-              case mb_stuff of
-                Found loc _ -> do
-                  from_bc <- ldLoadByteCode opts mod loc
-                  maybe (fallback_no_bytecode home_unit mod) pure from_bc
-                _ -> fallback_no_bytecode home_unit mod
+            -- It's not in the HPT because we are in one shot mode,
+            -- so use the Finder to get a ModLocation...
+            let fc = ldFinderCache opts
+            let fopts = ldFinderOpts opts
+            mb_stuff <- findHomeModule fc fopts home_unit (moduleName mod)
+            case mb_stuff of
+              Found loc _ -> do
+                from_bc <- ldLoadByteCode opts mod loc
+                maybe (fallback_no_bytecode home_unit mod) pure from_bc
+              _ -> fallback_no_bytecode home_unit mod
         where
-
+            home_unit = ue_homeUnit unit_env
             fallback_no_bytecode home_unit mod = do
               let fc = ldFinderCache opts
               let fopts = ldFinderOpts opts
