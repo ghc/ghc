@@ -61,6 +61,7 @@ FP_PROG_FIND
 dnl ----------------------------------------------------------
 FP_SETUP_PROJECT_VERSION
 
+dnl * We need 2.70 for C11 detection
 dnl * We require autoconf version 2.69 due to
 dnl   https://bugs.ruby-lang.org/issues/8179. Also see #14910.
 dnl * We need 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE.
@@ -68,7 +69,7 @@ dnl * We need 2.52 due to the use of AS_TR_CPP and AS_TR_SH.
 dnl * Using autoconf 2.59 started to give nonsense like this
 dnl     #define SIZEOF_CHAR 0
 dnl   recently.
-AC_PREREQ([2.69])
+AC_PREREQ([2.70])
 
 # No, semi-sadly, we don't do `--srcdir'...
 if test x"$srcdir" != 'x.' ; then
