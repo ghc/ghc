@@ -68,6 +68,7 @@ module GHC.Types.Name.Reader (
         lookupGRE_FieldLabel,
         getGRE_NameQualifier_maybes,
         transformGREs, pickGREs, pickGREsModExp, pickLevelZeroGRE,
+        pickQualGREs, pickUnqualGREs,
 
         -- * GlobalRdrElts
         availFromGRE,
@@ -1628,9 +1629,12 @@ pickGREs :: RdrName -> [GlobalRdrEltX info] -> [GlobalRdrEltX info]
 -- Return each such GRE, with its ImportSpecs filtered, to reflect
 -- how it is in scope qualified or unqualified respectively.
 -- See Note [GRE filtering]
-pickGREs (Unqual {})  gres = mapMaybe pickUnqualGRE     gres
-pickGREs (Qual mod _) gres = mapMaybe (pickQualGRE mod) gres
+pickGREs (Unqual {})  gres = pickUnqualGREs   gres
+pickGREs (Qual mod _) gres = pickQualGREs mod gres
 pickGREs _            _    = []  -- I don't think this actually happens
+
+pickUnqualGREs :: [GlobalRdrEltX info] -> [GlobalRdrEltX info]
+pickUnqualGREs gres = mapMaybe pickUnqualGRE gres
 
 pickUnqualGRE :: GlobalRdrEltX info -> Maybe (GlobalRdrEltX info)
 pickUnqualGRE gre@(GRE { gre_lcl = lcl, gre_imp = iss })
@@ -1638,6 +1642,9 @@ pickUnqualGRE gre@(GRE { gre_lcl = lcl, gre_imp = iss })
   | otherwise          = Just (gre { gre_imp = iss' })
   where
     iss' = filterBag unQualSpecOK iss
+
+pickQualGREs :: ModuleName -> [GlobalRdrEltX info] -> [GlobalRdrEltX info]
+pickQualGREs mod gres = mapMaybe (pickQualGRE mod) gres
 
 pickQualGRE :: ModuleName -> GlobalRdrEltX info -> Maybe (GlobalRdrEltX info)
 pickQualGRE mod gre@(GRE { gre_lcl = lcl, gre_imp = iss })

@@ -50,12 +50,8 @@ import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, checkThLocalTyName, check
 
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.TyCon    ( isKindName )
-<<<<<<< HEAD
 import GHC.Driver.Flags
-||||||| constructed merge base
-=======
 
->>>>>>> Major patch to re-engineer known-key names
 import GHC.Hs
 
 import GHC.Rename.Env
@@ -73,32 +69,18 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env( rnLookupKnownKeyName )
 
 import GHC.Types.Name.Reader
-<<<<<<< HEAD
-import GHC.Builtin.Names
-import GHC.Builtin.Types
-||||||| constructed merge base
-import GHC.Builtin.Names
-=======
->>>>>>> Major patch to re-engineer known-key names
 import GHC.Types.Hint ( UntickedPromotedThing(..) )
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
-<<<<<<< HEAD
 import GHC.Types.SourceText
-
-import GHC.Utils.Misc
-||||||| constructed merge base
-
-import GHC.Utils.Misc
-=======
->>>>>>> Major patch to re-engineer known-key names
 import GHC.Types.Fixity ( compareFixity, negateFixity )
 import GHC.Types.Basic  ( TypeOrKind(..) )
 
 import GHC.Builtin( mkUnboundName, isUnboundName )
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Types( oneDataConName )
 
 import GHC.Unit.Module ( getModule )
 

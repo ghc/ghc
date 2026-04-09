@@ -31,5 +31,6 @@ module GHC.Internal.Control.Monad.ST (
         stToIO,
     ) where
 
+import GHC.Internal.Base   -- For known-occ things
 import GHC.Internal.Control.Monad.ST.Imp
 

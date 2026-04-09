@@ -158,27 +158,6 @@ tcDefaultDecls decls =
       -- but we must still make sure not to error if we fail to look up e.g. the 'Num'
       -- typeclass when typechecking such a default declaration. To do this, we wrap
       -- calls of 'tcLookupClass' in 'tryTc'.
-<<<<<<< HEAD
-      (True, [L _ (DefaultDecl _ _ Nothing [])]) -> do
-        h2010_dflt_clss <- foldMapM (fmap maybeToList . fmap fst . tryTc . tcLookupClass) =<< getH2010DefaultNames
-        case NE.nonEmpty h2010_dflt_clss of
-          Nothing -> return []
-          Just h2010_dflt_clss' -> toClassDefaults h2010_dflt_clss' decls
-      -- Otherwise we take apart the declaration into the class constructor and its default types.
-      _ -> do
-        h2010_dflt_clss <- getH2010DefaultClasses
-        toClassDefaults h2010_dflt_clss decls
-||||||| constructed merge base
-      (True, [L _ (DefaultDecl _ Nothing [])]) -> do
-        h2010_dflt_clss <- foldMapM (fmap maybeToList . fmap fst . tryTc . tcLookupClass) =<< getH2010DefaultNames
-        case NE.nonEmpty h2010_dflt_clss of
-          Nothing -> return []
-          Just h2010_dflt_clss' -> toClassDefaults h2010_dflt_clss' decls
-      -- Otherwise we take apart the declaration into the class constructor and its default types.
-      _ -> do
-        h2010_dflt_clss <- getH2010DefaultClasses
-        toClassDefaults h2010_dflt_clss decls
-=======
       (True, [L _ (DefaultDecl _ _ Nothing [])]) -> return []
 --        h2010_dflt_clss <- foldMapM (fmap maybeToList . fmap fst . tryTc . tcLookupKnownKeyClass)
 --                           =<< getH2010DefaultKeys
@@ -189,7 +168,6 @@ tcDefaultDecls decls =
 
       _ -> do { h2010_dflt_clss <- getH2010DefaultClasses
               ; toClassDefaults h2010_dflt_clss decls }
->>>>>>> Major patch to re-engineer known-key names
   where
     getH2010DefaultClasses :: TcM (NonEmpty Class)
     -- All the classes subject to defaulting with a Haskell 2010 default
@@ -217,20 +195,12 @@ tcDefaultDecls decls =
            ; let extra_clss_names = deflt_str ++ deflt_interactive
            ; return $ numClassKey :| extra_clss_names
            }
-<<<<<<< HEAD
-    declarationParts :: NonEmpty Class -> LDefaultDecl GhcRn -> TcM (Maybe (Maybe Class, LDefaultDecl GhcRn, [Type]))
-    declarationParts h2010_dflt_clss decl@(L locn (DefaultDecl _ _ mb_cls_name dflt_hs_tys))
-||||||| constructed merge base
-    declarationParts :: NonEmpty Class -> LDefaultDecl GhcRn -> TcM (Maybe (Maybe Class, LDefaultDecl GhcRn, [Type]))
-    declarationParts h2010_dflt_clss decl@(L locn (DefaultDecl _ mb_cls_name dflt_hs_tys))
-=======
 
     declarationParts :: NonEmpty Class -> LDefaultDecl GhcRn
                      -> TcM (Maybe (Maybe Class, LDefaultDecl GhcRn, [Type]))
     -- The outer Maybe is Nothing if the Class is unsuitable for defaulting
     -- (e.g. not unary).  In that case tcDefaultDeclClass has added an error
-    declarationParts h2010_dflt_clss decl@(L locn (DefaultDecl _ mb_cls_name dflt_hs_tys))
->>>>>>> Major patch to re-engineer known-key names
+    declarationParts h2010_dflt_clss decl@(L locn (DefaultDecl _ _ mb_cls_name dflt_hs_tys))
       = setSrcSpan (locA locn) $
           case mb_cls_name of
             -- Haskell 98 default declaration, e.g.
