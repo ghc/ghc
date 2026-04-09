@@ -26,12 +26,11 @@ module GHC.Internal.Weak (
         finalize,
     ) where
 
-import GHC.Internal.Base (($))
+import GHC.Internal.Base
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Prim (
     Weak#, deRefWeak#, finalizeWeak#, mkWeak#, mkWeakNoFinalizer#,
   )
-import GHC.Internal.Types (IO(..))
 
 {-|
 A weak pointer object with a key and a value.  The value has type @v@.

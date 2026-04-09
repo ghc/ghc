@@ -706,7 +706,7 @@ tcTypedBracket rn_expr expr res_ty
        ; let rep = getRuntimeRep expr_ty
        ; meta_ty <- tcCodeTy m_var expr_ty
        ; ps' <- readMutVar ps_var
-       ; codeco <- tcLookupId unsafeCodeCoerceName
+       ; codeco <- tcLookupKnownOccId unsafeCodeCoerceOcc
        ; bracket_ty <- mkAppTy m_var <$> tcMetaKnownOccTy expTyConOcc
        ; let brack_tc = HsBracketTc { hsb_quote = ExpBr noExtField expr, hsb_ty = bracket_ty
                                     , hsb_wrap  = Just wrapper, hsb_splices = ps' }

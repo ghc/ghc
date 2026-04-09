@@ -81,6 +81,7 @@ import GHC.Driver.Env
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.DynFlags
 
+import GHC.Builtin( isUnboundName )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types
 

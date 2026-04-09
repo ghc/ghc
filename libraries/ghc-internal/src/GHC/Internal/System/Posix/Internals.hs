@@ -35,6 +35,7 @@ module GHC.Internal.System.Posix.Internals where
 #include <ghcplatform.h>
 #include "HsBaseConfig.h"
 
+import GHC.Internal.Base
 import GHC.Internal.System.Posix.Types
 
 import GHC.Internal.Foreign.C.Error
@@ -51,15 +52,10 @@ import GHC.Internal.Err (errorWithoutStackTrace)
 #endif
 #endif
 
-import GHC.Internal.Base (
-    String, otherwise, pure, return, when, ($), (++), (>>=),
-  )
 import GHC.Internal.Bits
-import GHC.Internal.Classes (Eq(..), not, (&&), (||))
 import GHC.Internal.Num
 import GHC.Internal.Prim (yield#)
 import GHC.Internal.Real
-import GHC.Internal.Types (Bool(..))
 import GHC.Internal.Word
 import GHC.Internal.IO
 import GHC.Internal.IO.IOMode
@@ -73,12 +69,10 @@ import GHC.Internal.Int (Int64)
 
 #if !defined(mingw32_HOST_OS)
 import GHC.Internal.CString (cstringLength#)
-import GHC.Internal.Classes (Ord(..))
 import {-# SOURCE #-} GHC.Internal.IO.Encoding (getFileSystemEncoding)
 import GHC.Internal.Foreign.Marshal.Utils
 import GHC.Internal.Foreign.Storable
 import qualified GHC.Internal.Foreign.C.String.Encoding as GHC
-import GHC.Internal.Types (Int(..))
 #else
 import GHC.Internal.Int
 import GHC.Internal.Data.OldList (elem)

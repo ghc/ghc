@@ -11,13 +11,12 @@ module GHC.Internal.IO.Handle.Lock.Windows where
 
 #if !defined(mingw32_HOST_OS)
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Internal.Types ()
+import GHC.Internal.Base
 #else
 
 #include <windows.h>
 
-import GHC.Internal.Base (String, otherwise, return, (>>=))
-import GHC.Internal.Classes (Eq(..), not, (&&))
+import GHC.Internal.Base
 import GHC.Internal.Data.Bits
 import GHC.Internal.Data.Function
 import GHC.Internal.IO.Handle.Windows (handleToHANDLE)
@@ -32,7 +31,6 @@ import GHC.Internal.IO.Handle.FD
 import GHC.Internal.IO.Handle.Types (Handle)
 import GHC.Internal.IO.Handle.Lock.Common (LockMode(..))
 import GHC.Internal.IO.SubSystem
-import GHC.Internal.Types (Bool(..), IO)
 import GHC.Internal.Windows
 
 lockImpl :: Handle -> String -> LockMode -> Bool -> IO Bool

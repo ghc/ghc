@@ -56,6 +56,9 @@ import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecls, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
    , tcIfaceAnnotations, tcIfaceCompleteMatches, tcIfaceDefaults)
 
+import GHC.Hs.Extension (GhcPass)
+import GHC.Hs.Doc
+
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
 import GHC.Driver.DynFlags
@@ -83,15 +86,22 @@ import GHC.Utils.Misc( HasDebugCallStack )
 
 import GHC.Settings.Constants
 
-import GHC.Builtin.KnownKeys
 import GHC.Builtin
+import GHC.Builtin.KnownKeys
+import GHC.Builtin.PrimOps
+import GHC.Builtin.PrimOps.Ids
+import GHC.Builtin.Types.Prim
 
 import GHC.Core.Rules
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 
+import GHC.Parser.Annotation( noLocA )
+
 import GHC.Types.Annotations
+import GHC.Types.Id
+import GHC.Types.Id.Make( seqId )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
 import GHC.Types.Name.Env
@@ -104,10 +114,12 @@ import GHC.Types.SourceFile
 import GHC.Types.SafeHaskell
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
+import GHC.Types.Unique.Map( listToUniqMap )
 import GHC.Types.Unique.FM( UniqFM, listToUFM, lookupUFM )
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
 import GHC.Types.PkgQual
+import GHC.Types.SourceText
 
 import GHC.Unit.External
 import GHC.Unit.Module
@@ -120,6 +132,7 @@ import GHC.Unit.Home.PackageTable
 import GHC.Unit.Finder
 import GHC.Unit.Env
 
+import GHC.Stack( callStack )
 import GHC.Data.Maybe
 
 import Control.Monad
@@ -196,7 +209,7 @@ lookupKnownKeyName key (KKNS_InScope gbl_rdr_env)
                    ; traceIf $ hang (text "lookupKnownKeyName1 NoImplicitKnownKeyNames")
                                   2 (ppr name <+> ppr key)
                    ; return (Succeeded name) }
-       gres  -> return (Failed (KnownKeyScopeError occ gres))
+       gres  -> return (Failed (KnownKeyScopeError occ gres callStack))
 
   | otherwise
   = pprTrace "lookup failed" (pprKnownKey key $$ callStackDoc) $
@@ -230,7 +243,7 @@ lookupKnownOccName occ (KKNS_InScope gbl_rdr_env)
                    ; traceIf $ hang (text "lookupKnownKeyName2 NoImplicitKnownKeyNames")
                                   2 (ppr name <+> ppr occ)
                    ; return (Succeeded name) }
-       gres  -> return (Failed (KnownKeyScopeError occ gres))
+       gres  -> return (Failed (KnownKeyScopeError occ gres callStack))
 
 loadKnownKeyOccMaps :: IfM lcl KnownKeyNameMaps
 loadKnownKeyOccMaps
@@ -1306,6 +1319,112 @@ ghcPrimIface
   where
     empty_iface = emptyFullModIface gHC_PRIM
 
+-- | Get gHC_PRIM interface file
+--
+-- This is a helper function that takes into account the hook allowing ghc-prim
+-- interface to be extended via the ghc-api. Afaik it was introduced for GHCJS
+-- so that it can add its own primitive types.
+getGhcPrimIface :: Hooks -> ModIface
+getGhcPrimIface hooks =
+  case ghcPrimIfaceHook hooks of
+    Nothing -> ghcPrimIface
+    Just h  -> h
+
+ghcPrimExports :: [IfaceExport]
+ghcPrimExports
+ = map (Avail . idName) ghcPrimIds ++
+   map (Avail . idName) allThePrimOpIds ++
+   [ AvailTC n [n]
+   | tc <- exposedPrimTyCons, let n = tyConName tc ]
+
+ghcPrimDeclDocs :: Docs
+ghcPrimDeclDocs = emptyDocs
+  { docs_decls = listToUniqMap $ mapMaybe declDoc primOpDocs
+  , docs_structure = buildStructure primOpDocs
+  }
+  where
+    declDoc (PrimOpDecl fs doc)
+      | not (null doc)
+      , Just name <- lookupFsEnv ghcPrimNames fs
+      = Just (name, [mkHsDoc doc])
+    declDoc _ = Nothing
+
+    buildStructure [] = []
+    buildStructure (PrimOpSection title desc : rest) =
+        DsiSectionHeading 1 (mkHsDoc title)
+      : [DsiDocChunk (mkHsDoc desc) | not (null desc)]
+     ++ buildStructure rest
+    buildStructure items =
+      let (decls, rest) = span isDecl items
+          avails = mapMaybe declAvail decls
+      in  [DsiExports (DefinitelyDeterministicAvails avails) | not (null avails)]
+       ++ buildStructure rest
+
+    isDecl (PrimOpDecl {}) = True
+    isDecl _               = False
+
+    declAvail (PrimOpDecl fs _)
+      | Just name <- lookupFsEnv ghcPrimNames fs
+      = Just $ if isTyConName name
+               then AvailTC name [name]
+               else Avail name
+    declAvail _ = Nothing
+
+    mkHsDoc s = WithHsDocIdentifiers (mkGeneratedHsDocString s) []
+
+ghcPrimNames :: FastStringEnv Name
+ghcPrimNames
+  = mkFsEnv
+    [ (occNameFS $ nameOccName name, name)
+    | name <-
+        map idName ghcPrimIds ++
+        map idName allThePrimOpIds ++
+        map tyConName exposedPrimTyCons
+    ]
+
+-- See Note [GHC.Prim Deprecations]
+ghcPrimWarns :: Warnings (GhcPass p)
+ghcPrimWarns = WarnSome
+  -- declaration warnings
+  (map mk_decl_dep primOpDeprecations)
+  -- export warnings
+  []
+  where
+    mk_txt msg =
+      DeprecatedTxt NoSourceText [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText msg Nothing) []]
+    mk_decl_dep (occ, msg) = (occ, mk_txt msg)
+
+ghcPrimFixities :: [(OccName,Fixity)]
+ghcPrimFixities = fixities
+  where
+    -- The fixity listed here for @`seq`@ should match
+    -- those in primops.txt.pp (from which Haddock docs are generated).
+    fixities = (getOccName seqId, Fixity 0 InfixR)
+             : mapMaybe mkFixity allThePrimOps
+    mkFixity op = (,) (primOpOcc op) <$> primOpFixity op
+
+{-
+Note [GHC.Prim Docs]
+~~~~~~~~~~~~~~~~~~~~
+GHCi's :doc command and Haddock read from ModIface's. GHC.Prim has a wired-in
+iface whose docs are populated from primops.txt.
+
+genprimopcode --wired-in-docs generates the primOpDocs list (included as
+primop-docs.hs-incl), which contains section headers (PrimOpSection) and
+per-declaration documentation (PrimOpDecl). We use stringy names because
+mapping names to "Name"s is difficult for things like primtypes and pseudoops.
+
+Note [GHC.Prim Deprecations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Like Haddock documentation, we must record deprecation pragmas in two places:
+in the GHC.Prim source module consumed by Haddock, and in the
+declarations wired-in to GHC. To do the following we generate
+GHC.Builtin.PrimOps.primOpDeprecations, a list of (OccName, DeprecationMessage)
+pairs. We insert these deprecations into the mi_warns field of GHC.Prim's ModIface,
+as though they were written in a source module.
+-}
+
+
 {-
 *********************************************************
 *                                                      *
@@ -1485,13 +1604,3 @@ instance Outputable WhereFrom where
   ppr ImportByPlugin                       = text "{- PLUGIN -}"
 
 
--- | Get gHC_PRIM interface file
---
--- This is a helper function that takes into account the hook allowing ghc-prim
--- interface to be extended via the ghc-api. Afaik it was introduced for GHCJS
--- so that it can add its own primitive types.
-getGhcPrimIface :: Hooks -> ModIface
-getGhcPrimIface hooks =
-  case ghcPrimIfaceHook hooks of
-    Nothing -> ghcPrimIface
-    Just h  -> h

@@ -1,11 +1,14 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ExplicitNamespaces #-}
 
 -- | Selected backend
 module GHC.Internal.Bignum.Backend
    ( module Backend
    )
 where
+
+import GHC.Internal.Types
 
 #if defined(BIGNUM_CHECK)
 import GHC.Internal.Bignum.Backend.Check    as Backend

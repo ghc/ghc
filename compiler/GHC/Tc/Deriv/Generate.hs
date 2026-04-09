@@ -1526,6 +1526,10 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
             mk_lift_expr :: RdrName -> LHsExpr (GhcPass 'Parsed)
             mk_lift_expr x = nlHsApps lift_RDR [nlHsVar x]
 
+unsafeCodeCoerce_Expr :: LHsExpr GhcPs
+unsafeCodeCoerce_Expr = nlHsVar (knownOccRdrName unsafeCodeCoerceOcc)
+
+
 {-
 ************************************************************************
 *                                                                      *

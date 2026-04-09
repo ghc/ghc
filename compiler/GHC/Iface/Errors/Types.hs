@@ -30,6 +30,7 @@ import GHC.Unit.Module.Location
 
 import Language.Haskell.Syntax.Module.Name ( ModuleName )
 
+import GHC.Stack( CallStack )
 import GHC.Generics ( Generic )
 
 data IfaceMessageOpts = IfaceMessageOpts { ifaceShowTriedFiles :: !Bool -- ^ Whether to show files we tried to look for or not when printing loader errors
@@ -65,9 +66,10 @@ data IfaceMessage
      -- We looked up a known-occ, but it wasn't in
      -- the exports of GHC.KnownKeyNames
 
-   | KnownKeyScopeError KnownOcc [GlobalRdrElt]
+   | KnownKeyScopeError KnownOcc [GlobalRdrElt] CallStack
      -- We looked up a known-key in the GlobalRdrEnv,
      -- but did not find a unique hit
+     -- CallStack is so that we can get a backtrace
   deriving Generic
 
 data MissingInterfaceError

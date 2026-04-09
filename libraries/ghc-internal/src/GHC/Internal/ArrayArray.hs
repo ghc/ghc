@@ -48,10 +48,11 @@ module GHC.Internal.ArrayArray
   )
   where
 
+import GHC.Internal.Types
 import GHC.Internal.Prim
 import GHC.Internal.Prim.PtrEq ( unsafePtrEquality# )
-import GHC.Internal.Types ( Type, UnliftedType, isTrue# )
 import GHC.Internal.Unsafe.Coerce ( unsafeCoerce, unsafeCoerceUnlifted )
+
 default ()
 
 {- **********************************************************************

@@ -38,7 +38,7 @@ import GHC.Internal.ST
 import GHC.Internal.Base (($))
 import GHC.Internal.Num
 import GHC.Internal.List
-import GHC.Internal.Types (Bool, Int(..))
+import GHC.Internal.Types
 import GHC.Internal.Word
 
 -- | @lookup64 addr index@ looks up the bit stored at bit index @index@ using a

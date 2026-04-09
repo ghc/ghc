@@ -55,10 +55,10 @@ module GHC.Internal.Data.Foldable (
     find
     ) where
 
+import GHC.Internal.Base hiding( foldr )
 import GHC.Internal.Data.Either
 import GHC.Internal.Data.Functor.Utils (Max(..), Min(..), (#.))
 import qualified GHC.Internal.List as List
-import GHC.Internal.Magic ( oneShot )
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Monoid
 import GHC.Internal.Data.Ord
@@ -68,16 +68,10 @@ import GHC.Internal.Arr  ( Array(..), elems, numElements,
                   foldlElems, foldrElems,
                   foldlElems', foldrElems',
                   foldl1Elems, foldr1Elems)
-import GHC.Internal.Base (
-    Alternative(..), Applicative(..), Monad(..), MonadPlus, NonEmpty(..), build,
-    id, flip, map, ($!), (.),
-  )
-import GHC.Internal.Classes ( Eq(..), not )
 import GHC.Internal.Err ( errorWithoutStackTrace )
 import GHC.Internal.Prim ( coerce, seq )
 import GHC.Internal.Tuple (Solo (..))
 import GHC.Internal.Num  ( Num(..) )
-import GHC.Internal.Types ( Bool(..), Int )
 
 -- $setup
 -- >>> :set -XDeriveFoldable

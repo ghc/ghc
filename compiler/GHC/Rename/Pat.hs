@@ -54,6 +54,7 @@ import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
                            , wrapGenSpan, genHsApps, genLHsApp, genLHsVar, genHsIntegralLit, delLocalNames, typeAppErr )
 import GHC.Rename.HsType
 import GHC.Rename.Lit
+import GHC.Builtin       ( isUnboundName, mkUnboundName )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types (trueDataConName)
 

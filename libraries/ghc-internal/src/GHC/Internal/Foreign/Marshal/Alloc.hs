@@ -65,7 +65,7 @@ module GHC.Internal.Foreign.Marshal.Alloc (
   finalizerFree
 ) where
 
-import GHC.Internal.Classes                  ( Eq(..), not )
+import GHC.Internal.Base
 import GHC.Internal.Data.Bits                ( Bits, (.&.) )
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Err                      ( undefined )
@@ -81,9 +81,6 @@ import GHC.Internal.Prim (
 import GHC.Internal.Real
 import GHC.Internal.Show
 import GHC.Internal.Ptr
-import GHC.Internal.Base                     ( String, return, ($), (++) )
-import GHC.Internal.Types                    ( Bool, Int(..), IO(..) )
-import GHC.Internal.Base( (>>=), (>>) )      -- For known-key names
 
 -- exported functions
 -- ------------------

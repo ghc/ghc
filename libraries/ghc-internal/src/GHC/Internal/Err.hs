@@ -24,10 +24,12 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Err( absentErr, error, errorWithoutStackTrace, undefined ) where
-import GHC.Internal.Types (Char, RuntimeRep)
+
+import GHC.Internal.Types
 import GHC.Internal.Stack.Types
 import GHC.Internal.Magic
 import GHC.Internal.Prim
+
 import {-# SOURCE #-} GHC.Internal.Exception
   ( errorCallWithCallStackException
   , errorCallException )

@@ -7,7 +7,7 @@
 
 
 
--- | The @GHC.Builtin.Utils@ interface to the compiler's prelude knowledge.
+-- | The @GHC.Builtin@ interface to the compiler's prelude knowledge.
 --
 -- This module serves as the central gathering point for names which the
 -- compiler knows something about. This includes functions for,
@@ -22,24 +22,19 @@
 
 module GHC.Builtin (
         -- * Main exports
-        wiredInNames, wiredInIds, ghcPrimIds,
+        wiredInNames, wiredInIds, ghcPrimIds, allKnownOccs,
         knownKeyTable, knownKeyOccMap, knownKeyUniqMap,
         knownKeyOccName, knownKeyOccName_maybe,
-        knownKeyRdrName, knownOccRdrName, knownVarOccRdrName,
 
         -- * Known-key names
         oldIsKnownKeyName,
         oldLookupKnownKeyName,
         oldLookupKnownNameInfo,
 
-
-        ghcPrimExports,
-        ghcPrimDeclDocs,
-        ghcPrimWarns,
-        ghcPrimFixities,
-
         -- * Random other things
         maybeCharLikeCon, maybeIntLikeCon,
+        allNameStrings, allNameStringList,
+        itName, mkUnboundName, isUnboundName,
 
         -- * Class categories
         isNumericClass, isStandardClass,
@@ -50,45 +45,40 @@ module GHC.Builtin (
 
 import GHC.Prelude
 
+
 import GHC.Builtin.Uniques
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Literals ( typeNatTyCons )
 import GHC.Builtin.Types.Prim
-import GHC.Builtin.TH ( templateHaskellNames, thKnownKeyTable )
+import GHC.Builtin.TH ( templateHaskellNames, thKnownOccs )
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs( knownOccs, knownOccRdrNames )
 
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Core.TyCon
 
-import GHC.Types.Avail
 import GHC.Types.Id
-import GHC.Types.Fixity
 import GHC.Types.Name
-import GHC.Types.Name.Reader( RdrName, knownOccRdrName )
+import GHC.Types.Name.Reader( rdrNameOcc )
 import GHC.Types.Name.Env
 import GHC.Types.Id.Make
-import GHC.Types.SourceText
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Map
 import GHC.Types.TyThing
+import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Parser.Annotation
-import GHC.Hs.Doc
-import GHC.Hs.Extension (GhcPass)
-import GHC.Unit.Module.ModIface (IfaceExport)
-import GHC.Unit.Module.Warnings
 
 import GHC.Data.List.SetOps
-import GHC.Data.Maybe( orElse )
+import GHC.Data.FastString
+import qualified GHC.Data.List.Infinite as Inf
 
 import Control.Applicative ((<|>))
 import Data.Maybe
@@ -302,6 +292,7 @@ Wrinkles
   Alternative: export all wired-in entities from GHC.KnownKeyNames.  But that
   would simply bloat the interface for no good reason.
 
+(KKN4) Typeable binds early in tc
 
 Note [Recipe for adding a known-occ name]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -351,36 +342,14 @@ To make `wombat` into a known-key name, you must ensure that:
   not create a module loop!
 -}
 
--- | `knownKeyOccMap` maps the OccName of a known-key to its Unique
-knownKeyOccMap :: OccEnv KnownKey
-knownKeyOccMap = mkOccEnv knownKeyTable
-
-knownKeyUniqMap :: UniqFM KnownKey OccName
-knownKeyUniqMap = listToUFM [ (uniq, occ) | (occ, uniq) <- knownKeyTable ]
-
-knownKeyTable :: [(OccName, KnownKey)]
-knownKeyTable = basicKnownKeyTable ++
-                thKnownKeyTable
-
-knownKeyOccName :: HasDebugCallStack => KnownKey -> OccName
--- Find the OccName from the KnownKey,
--- by looking in the knownKeyUniqMap
-knownKeyOccName key
-  = knownKeyOccName_maybe key `orElse`
-    pprPanic "knownKeyOccName" (pprKnownKey key)
-
-knownKeyOccName_maybe :: HasDebugCallStack
-                      => KnownKey -> Maybe OccName
-knownKeyOccName_maybe key
-  = lookupUFM knownKeyUniqMap key
-
-knownKeyRdrName :: KnownKey -> RdrName
-knownKeyRdrName key = knownOccRdrName (knownKeyOccName key)
-
-knownVarOccRdrName :: String -> RdrName
-knownVarOccRdrName s = knownOccRdrName (mkVarOcc s)
-
-
+allKnownOccs :: OccSet
+-- Used only for
+--  (a) sanity checks
+--  (b) suppressing unused-import warnings in `ghc-internal` and `base`
+allKnownOccs
+  = mkOccSet thKnownOccs `unionOccSets`
+    mkOccSet knownOccs   `unionOccSets`
+    mkOccSet (map rdrNameOcc knownOccRdrNames)
 
 {-
 ************************************************************************
@@ -627,104 +596,39 @@ sense of them in interface pragmas. It's cool, though they all have
 {-
 ************************************************************************
 *                                                                      *
-            Export lists for pseudo-modules (GHC.Prim)
+     allNameStrings
 *                                                                      *
 ************************************************************************
 -}
 
-ghcPrimExports :: [IfaceExport]
-ghcPrimExports
- = map (Avail . idName) ghcPrimIds ++
-   map (Avail . idName) allThePrimOpIds ++
-   [ AvailTC n [n]
-   | tc <- exposedPrimTyCons, let n = tyConName tc ]
+allNameStrings :: Inf.Infinite String
+-- Infinite list of a,b,c...z, aa, ab, ac, ... etc
+allNameStrings = Inf.allListsOf ['a'..'z']
 
-ghcPrimDeclDocs :: Docs
-ghcPrimDeclDocs = emptyDocs
-  { docs_decls = listToUniqMap $ mapMaybe declDoc primOpDocs
-  , docs_structure = buildStructure primOpDocs
-  }
-  where
-    declDoc (PrimOpDecl fs doc)
-      | not (null doc)
-      , Just name <- lookupFsEnv ghcPrimNames fs
-      = Just (name, [mkHsDoc doc])
-    declDoc _ = Nothing
-
-    buildStructure [] = []
-    buildStructure (PrimOpSection title desc : rest) =
-        DsiSectionHeading 1 (mkHsDoc title)
-      : [DsiDocChunk (mkHsDoc desc) | not (null desc)]
-     ++ buildStructure rest
-    buildStructure items =
-      let (decls, rest) = span isDecl items
-          avails = mapMaybe declAvail decls
-      in  [DsiExports (DefinitelyDeterministicAvails avails) | not (null avails)]
-       ++ buildStructure rest
-
-    isDecl (PrimOpDecl {}) = True
-    isDecl _               = False
-
-    declAvail (PrimOpDecl fs _)
-      | Just name <- lookupFsEnv ghcPrimNames fs
-      = Just $ if isTyConName name
-               then AvailTC name [name]
-               else Avail name
-    declAvail _ = Nothing
-
-    mkHsDoc s = WithHsDocIdentifiers (mkGeneratedHsDocString s) []
-
-ghcPrimNames :: FastStringEnv Name
-ghcPrimNames
-  = mkFsEnv
-    [ (occNameFS $ nameOccName name, name)
-    | name <-
-        map idName ghcPrimIds ++
-        map idName allThePrimOpIds ++
-        map tyConName exposedPrimTyCons
-    ]
-
--- See Note [GHC.Prim Deprecations]
-ghcPrimWarns :: Warnings (GhcPass p)
-ghcPrimWarns = WarnSome
-  -- declaration warnings
-  (map mk_decl_dep primOpDeprecations)
-  -- export warnings
-  []
-  where
-    mk_txt msg =
-      DeprecatedTxt NoSourceText [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText msg Nothing) []]
-    mk_decl_dep (occ, msg) = (occ, mk_txt msg)
-
-ghcPrimFixities :: [(OccName,Fixity)]
-ghcPrimFixities = fixities
-  where
-    -- The fixity listed here for @`seq`@ should match
-    -- those in primops.txt.pp (from which Haddock docs are generated).
-    fixities = (getOccName seqId, Fixity 0 InfixR)
-             : mapMaybe mkFixity allThePrimOps
-    mkFixity op = (,) (primOpOcc op) <$> primOpFixity op
+allNameStringList :: [String]
+-- Infinite list of a,b,c...z, aa, ab, ac, ... etc
+allNameStringList = Inf.toList allNameStrings
 
 {-
-Note [GHC.Prim Docs]
-~~~~~~~~~~~~~~~~~~~~
-GHCi's :doc command and Haddock read from ModIface's. GHC.Prim has a wired-in
-iface whose docs are populated from primops.txt.
+************************************************************************
+*                                                                      *
+\subsection{Local Names}
+*                                                                      *
+************************************************************************
 
-genprimopcode --wired-in-docs generates the primOpDocs list (included as
-primop-docs.hs-incl), which contains section headers (PrimOpSection) and
-per-declaration documentation (PrimOpDecl). We use stringy names because
-mapping names to "Name"s is difficult for things like primtypes and pseudoops.
-
-Note [GHC.Prim Deprecations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Like Haddock documentation, we must record deprecation pragmas in two places:
-in the GHC.Prim source module consumed by Haddock, and in the
-declarations wired-in to GHC. To do the following we generate
-GHC.Builtin.PrimOps.primOpDeprecations, a list of (OccName, DeprecationMessage)
-pairs. We insert these deprecations into the mi_warns field of GHC.Prim's ModIface,
-as though they were written in a source module.
+This *local* name is used by the interactive stuff
 -}
+
+itName :: Unique -> SrcSpan -> Name
+itName uniq loc = mkInternalName uniq (mkOccNameFS varName (fsLit "it")) loc
+
+-- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
+-- during compiler debugging.
+mkUnboundName :: OccName -> Name
+mkUnboundName occ = mkInternalName unboundKey occ noSrcSpan
+
+isUnboundName :: Name -> Bool
+isUnboundName name = name `hasKey` unboundKey
 
 
 {-
@@ -740,4 +644,3 @@ ToDo: make it do the ``like'' part properly (as in 0.26 and before).
 maybeCharLikeCon, maybeIntLikeCon :: DataCon -> Bool
 maybeCharLikeCon con = con `hasKey` charDataConKey
 maybeIntLikeCon  con = con `hasKey` intDataConKey
-

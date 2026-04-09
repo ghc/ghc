@@ -11,10 +11,9 @@ module GHC.Internal.Heap.InfoTableProf
 #define PROFILING
 #include "Rts.h"
 
-import GHC.Internal.Base (return)
+import GHC.Internal.Base
 import GHC.Internal.Real
 import GHC.Internal.Enum
-import GHC.Internal.Types (Int, IO)
 
 import GHC.Internal.Heap.InfoTable.Types
 #if !defined(TABLES_NEXT_TO_CODE)
@@ -30,7 +29,6 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Num( fromInteger )    -- For known-key names
-import GHC.Internal.Base( (>>=), (>>) )   -- For known-key names
 
 -- | Read an InfoTable from the heap into a haskell type.
 -- WARNING: This code assumes it is passed a pointer to a "standard" info
