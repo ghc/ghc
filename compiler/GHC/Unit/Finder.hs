@@ -213,9 +213,9 @@ findImportedModuleNoHsc fc fopts ue home_module_map mhome_unit mod_name mb_pkg =
     ModuleNameHomeMap complete_units module_name_map = home_module_map
     module_home_units = M.findWithDefault Set.empty mod_name module_name_map
     current_unit_id = homeUnitId <$> mhome_unit
-    all_opts = case mhome_unit of
+    all_opts = case current_unit_id of
                 Nothing -> other_fopts_list
-                Just home_unit -> (homeUnitId home_unit, fopts) : other_fopts_list
+                Just home_unit_id -> (home_unit_id, fopts) : other_fopts_list
 
     other_fopts_map = M.fromList other_fopts_list
 
@@ -245,9 +245,9 @@ findImportedModuleNoHsc fc fopts ue home_module_map mhome_unit mod_name mb_pkg =
                     `orIfNotFound`
                     findExposedPackageModule fc fopts units mod_name NoPkgQual
 
-    units     = case mhome_unit of
+    units     = case current_unit_id of
                   Nothing -> ue_homeUnitState ue
-                  Just home_unit -> HUG.homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId home_unit) ue
+                  Just home_unit_id -> HUG.homeUnitEnv_units $ ue_findHomeUnitEnv home_unit_id ue
     hpt_deps :: Set.Set UnitId
     hpt_deps = homeUnitDepends units
     dep_providers = Set.intersection module_home_units hpt_deps
