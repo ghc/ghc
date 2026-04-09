@@ -67,10 +67,10 @@ module GHC.Internal.Type.Reflection
     , I.mkTrAppChecked, I.mkTrCon
 
       -- * Module names
-    , I.Module
+    , I.Module  -- Abstract
     , I.moduleName, I.modulePackage, I.rnfModule
     ) where
 
-import GHC.Internal.Types  -- For known-occ names
+import GHC.Internal.Types as Rebindable  -- For known-occ names
 import qualified GHC.Internal.Data.Typeable.Internal as I
 import GHC.Internal.Data.Type.Equality

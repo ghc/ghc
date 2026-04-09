@@ -29,6 +29,7 @@ module GHC.Internal.Desugar ((>>>), AnnotationWrapper(..), toAnnotationWrapper) 
 import GHC.Internal.Control.Arrow    (Arrow(..))
 import GHC.Internal.Control.Category ((.))
 import GHC.Internal.Data.Data        (Data)
+import GHC.Internal.Types as Rebindable
 
 -- A version of Control.Category.>>> overloaded on Arrow
 (>>>) :: forall arr. Arrow arr => forall a b c. arr a b -> arr b c -> arr a c

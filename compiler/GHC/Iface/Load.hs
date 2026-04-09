@@ -217,7 +217,7 @@ lookupKnownKeyName key (KKNS_InScope gbl_rdr_env)
 
 lookupKnownGRE :: GlobalRdrEnv -> OccName -> MaybeErr [GlobalRdrElt] GlobalRdrElt
 lookupKnownGRE rdr_env occ
-  | [gre] <- pickQualGREs kNOWN_MOD_NAME gres
+  | [gre] <- pickQualGREs rebindableModuleName gres
   = Succeeded gre  -- Found qualified 'Known.occ' in scope
   | [gre] <- pickUnqualGREs gres
   = Succeeded gre  -- Found unqualified 'occ' in scope
@@ -227,8 +227,8 @@ lookupKnownGRE rdr_env occ
     gres :: [GlobalRdrElt]
     gres = lookupGRE rdr_env (LookupOccName occ SameNameSpace)
 
-kNOWN_MOD_NAME :: ModuleName
-kNOWN_MOD_NAME = mkModuleName "Known"
+rebindableModuleName :: ModuleName
+rebindableModuleName = mkModuleName "Rebindable"
 
 lookupKnownOccThing :: HasDebugCallStack
                     => KnownOcc -> KnownKeyNameSource

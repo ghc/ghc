@@ -47,6 +47,6 @@ module GHC.Internal.Foreign.ForeignPtr (
         , mallocForeignPtrArray0
     ) where
 
-import GHC.Internal.Base -- For known-occ things
+import GHC.Internal.Base as Rebindable -- For known-occ things
 import GHC.Internal.Foreign.ForeignPtr.Imp
 

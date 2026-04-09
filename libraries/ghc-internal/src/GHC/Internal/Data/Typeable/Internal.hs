@@ -49,7 +49,7 @@ module GHC.Internal.Data.Typeable.Internal (
     withTypeable,
 
     -- * Module
-    Module,  -- Abstract
+    Module(..),
     moduleName, modulePackage, rnfModule,
 
     -- * TyCon

@@ -34,10 +34,9 @@ module GHC.Internal.InfoProv
     , peekInfoProv
     ) where
 
-import GHC.Internal.Base (fmap, ($))
+import GHC.Internal.Base
 import GHC.Internal.InfoProv.Types
 import GHC.Internal.Maybe (Maybe(..))
-import GHC.Internal.Types (IO)
 
 -- | Get information about where a value originated from.
 -- This information is stored statically in a binary when @-finfo-table-map@ is

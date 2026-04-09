@@ -170,6 +170,9 @@ Library
         GHC.Internal.Data.Type.Equality
         GHC.Internal.Data.Type.Ord
         GHC.Internal.Data.Typeable
+        GHC.Internal.Data.Typeable.Internal
+            -- GHC.Internal.Data.Typeable.Internal is exposed
+            -- so that base:GHC.KnownKeynames can see it
         GHC.Internal.Data.Unique
         GHC.Internal.Data.Version
         GHC.Internal.Data.Void
@@ -356,7 +359,6 @@ Library
         GHC.Internal.PrimopWrappers
 
     other-modules:
-        GHC.Internal.Data.Typeable.Internal
         GHC.Internal.IO.Handle.Lock.Common
         GHC.Internal.IO.Handle.Lock.Flock
         GHC.Internal.IO.Handle.Lock.LinuxOFD
