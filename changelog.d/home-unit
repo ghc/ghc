@@ -1,0 +1,26 @@
+section: compiler
+synopsis: The compiler session always requires a `HomeUnit`.
+description: {
+    We change `HomeUnitEnv` to always require a `HomeUnit` value.
+    Most parts of the compiler simply `panic` when the `HomeUnit` is missing,
+    and GHC API users are often forced to create dummy `HomeUnit` values for the API any way.
+    Thus, by demanding a `HomeUnit` in the `HomeUnitEnv`, we can avoid many sources of `panic`s, and simplify
+    multiple code paths and some APIs.
+
+    We can always create a dummy `HomeUnit` value based on the `UnitId` of the
+    `HomeUnitEnv.homeUnitEnv_dflags.homeUnitId_`.
+    This `HomeUnit` might be wrong, as we don't know exactly what kind of `HomeUnit` it is until we have called
+    `initUnits` on the `HomeUnitEnv` contents themselves.
+    Once `initUnits` is called, we store the corrected `HomeUnit` in the `HomeUnitEnv`.
+
+    From an API perspective, very little changes, since when users didn't have a real `HomeUnit` value, they needed to create
+    a dummy value already for most GHC API functions.
+
+    The reason the `HomeUnit` used to be optional is to indicate which parts of the GHC API require certain initialisation steps,
+    such as calling `initUnits` on the `HomeUnitEnv`. The `HomeUnit` is a poor reflection of this requirement, which is why
+    we decided to make it mandatory whenever there is a `HomeUnitEnv`.
+    In the future, we might want to reflect this information based on the existence of a `HomeUnitEnv`, which we should only create
+    if the compiler session actually needs it.
+}
+mrs: !15885
+issues: #27632

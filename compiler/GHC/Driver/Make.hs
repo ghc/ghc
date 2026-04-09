@@ -1672,7 +1672,7 @@ maybeRehydrateBefore hsc_env mni (Just mns) = do
 
   where
    initialise_knot_var hsc_env = liftIO $
-    let mod_name = homeModuleInstantiation (hsc_home_unit_maybe hsc_env) (moduleNodeInfoModule mni)
+    let mod_name = homeModuleInstantiation (hsc_home_unit hsc_env) (moduleNodeInfoModule mni)
     in mkModuleEnv . (:[]) . (mod_name,) <$> newIORef emptyTypeEnv
 
 rehydrateAfter :: HscEnv

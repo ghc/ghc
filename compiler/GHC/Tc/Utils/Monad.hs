@@ -371,7 +371,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
      ; let
         -- bangs to avoid leaking the env (#19356)
         !dflags = hsc_dflags hsc_env
-        !mhome_unit = hsc_home_unit_maybe hsc_env
+        !home_unit = hsc_home_unit hsc_env
         !logger = hsc_logger hsc_env
 
         maybe_rn_syntax :: forall a. a -> Maybe a ;
@@ -399,7 +399,7 @@ initTcGblEnv hsc_env hsc_src keep_rn_syntax mod loc =
           , tcg_th_docs            = th_docs_var
 
           , tcg_mod                = mod
-          , tcg_semantic_mod       = homeModuleInstantiation mhome_unit mod
+          , tcg_semantic_mod       = homeModuleInstantiation home_unit mod
           , tcg_src                = hsc_src
           , tcg_rdr_env            = emptyGlobalRdrEnv
           , tcg_fix_env            = emptyNameEnv
@@ -2574,11 +2574,11 @@ initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv
         ; hsc_env <- getTopEnv
           -- bangs to avoid leaking the envs (#19356)
-        ; let !mhome_unit = hsc_home_unit_maybe hsc_env
+        ; let !home_unit = hsc_home_unit hsc_env
               !knot_vars = tcg_knot_vars tcg_env
               -- When we are instantiating a signature,
               -- we DEFINITELY do not want to knot tie.
-              is_instantiate = fromMaybe False (isHomeUnitInstantiating <$> mhome_unit)
+              is_instantiate = isHomeUnitInstantiating home_unit
 
               if_env = IfGblEnv { if_doc = text "initIfaceTcRn"
                                 , if_rec_types = if is_instantiate

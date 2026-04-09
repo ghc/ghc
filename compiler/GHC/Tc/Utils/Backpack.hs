@@ -286,11 +286,11 @@ implicitRequirements hsc_env normal_imports
     forM normal_imports $ \e -> do
         found <- resolveImport hsc_env e
         case found of
-            Found _ mod | notHomeModuleMaybe mhome_unit mod ->
+            Found _ mod | notHomeModule home_unit mod ->
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
   where
-    mhome_unit = hsc_home_unit_maybe hsc_env
+    home_unit = hsc_home_unit hsc_env
 
 -- | Like @implicitRequirements'@, but returns the instantiated unit the
 -- imported module is from, so that that instantiated unit can be processed and
@@ -302,13 +302,13 @@ implicitRequirementsShallow
   -> IO [InstantiatedUnit]
 implicitRequirementsShallow hsc_env normal_imports = go [] normal_imports
  where
-  mhome_unit = hsc_home_unit_maybe hsc_env
+  home_unit = hsc_home_unit hsc_env
 
   go acc [] = pure acc
   go accR (e:imports) = do
     found <- resolveImport hsc_env e
     let acc' = case found of
-          Found _ mod | notHomeModuleMaybe mhome_unit mod ->
+          Found _ mod | notHomeModule home_unit mod ->
               case moduleUnit mod of
                   HoleUnit -> panic "implicitRequirementsShallow: HoleUnit is unreachable through findImportedModule!"
                   RealUnit _ -> accR
