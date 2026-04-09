@@ -80,7 +80,7 @@ library
 
   -- this package typically supports only single major versions
   build-depends: base             >= 4.16 && < 4.24
-               , ghc             ^>= 10.0
+               , ghc             ^>= 10.1
                , haddock-library ^>= 1.11
                , xhtml           ^>= 3000.4.0.0
                , parsec          ^>= 3.1.13.0
