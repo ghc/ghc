@@ -130,17 +130,11 @@ AC_DEFUN([FP_SETUP_PROJECT_VERSION],
     #
     # Just like with project version munged, we don't want to use the
     # patchlevel version which changes every day, so if using GHC HEAD, the
-    # patchlevel = 00.
-    case $VERSION_MINOR in
-      ?) ProjectVersionForLibUpperHalf=${VERSION_MAJOR}.0${VERSION_MINOR} ;;
-      ??) ProjectVersionForLibUpperHalf=${VERSION_MAJOR}.${VERSION_MINOR} ;;
-      *) AC_MSG_ERROR([bad minor version in $PACKAGE_VERSION]) ;;
-    esac
-    # GHC HEAD uses patch level version > 20000000
-    case $ProjectPatchLevel1 in
-      ?) ProjectVersionForLib=${ProjectVersionForLibUpperHalf}0${ProjectPatchLevel1} ;;
-      ??) ProjectVersionInt=${ProjectVersionForLibUpperHalf}${ProjectPatchLevel1} ;;
-      *) ProjectVersionForLib=${ProjectVersionForLibUpperHalf}00
-    esac
+    # patchlevel = 0.
+    if test "$ProjectPatchLevel1" -gt 20000000; then
+      ProjectVersionForLib=${VERSION_MAJOR}.$((VERSION_MINOR * 100))
+    else
+      ProjectVersionForLib=${VERSION_MAJOR}.$((VERSION_MINOR * 100 + ProjectPatchLevel1))
+    fi
     AC_SUBST([ProjectVersionForLib])
 ])# FP_SETUP_PROJECT_VERSION

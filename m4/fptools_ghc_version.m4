@@ -17,9 +17,9 @@ AC_DEFUN([FPTOOLS_GHC_VERSION],
   then
     fptools_version_of_ghc='unknown'
   fi
-fptools_version_of_ghc[_major]=`echo [$]fptools_version_of_ghc | sed -e 's/^\([[0-9]]\).*/\1/'`
-fptools_version_of_ghc[_minor]=`echo [$]fptools_version_of_ghc | sed -e 's/^[[0-9]]\.\([[0-9]]*\).*/\1/'`
-fptools_version_of_ghc[_pl]=`echo [$]fptools_version_of_ghc | sed -n -e 's/^[[0-9]]\.[[0-9]]*\.\([[0-9]]*\)/\1/p'`
+fptools_version_of_ghc[_major]=`echo [$]fptools_version_of_ghc | sed -e 's/^\([[0-9]][[0-9]]*\).*/\1/'`
+fptools_version_of_ghc[_minor]=`echo [$]fptools_version_of_ghc | sed -e 's/^[[0-9]][[0-9]]*\.\([[0-9]]*\).*/\1/'`
+fptools_version_of_ghc[_pl]=`echo [$]fptools_version_of_ghc | sed -n -e 's/^[[0-9]][[0-9]]*\.[[0-9]]*\.\([[0-9]]*\)/\1/p'`
 #
 if test "[$]fptools_version_of_ghc[_pl]" = ""
 then
