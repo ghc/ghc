@@ -36,16 +36,13 @@ module GHC.Internal.TopHandler (
 #include <ghcplatform.h>
 #include "HsBaseConfig.h"
 
+import GHC.Internal.Base
 import GHC.Internal.Control.Exception
 import GHC.Internal.Data.Maybe
 
-import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Foreign.C.Error
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.C.String
-import GHC.Internal.Base (
-    String, failIO, return, ($), (++), (>>),
-  )
 import GHC.Internal.Conc.Sync hiding (throwTo)
 import GHC.Internal.Prim (Weak#, seq)
 import GHC.Internal.Real
@@ -53,7 +50,6 @@ import GHC.Internal.IO
 import GHC.Internal.IO.Handle
 import GHC.Internal.IO.StdHandles
 import GHC.Internal.IO.Exception
-import GHC.Internal.Types (Int)
 import GHC.Internal.Weak
 import GHC.Internal.Weak.Finalize
 import GHC.Internal.IO.Handle.Types ()
@@ -71,15 +67,9 @@ import GHC.Internal.Data.Dynamic (toDyn)
 import GHC.Internal.Base (pure)
 #endif
 
-#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
-import GHC.Internal.Base (
-    const, otherwise,
-  )
-import GHC.Internal.Classes (Ord(..), (&&))
-#endif
 import GHC.Internal.Base( (>>=), (>>) )         -- For known-key names
 import GHC.Internal.Num( fromInteger, negate )  -- For known-key names
-import GHC.Internal.Data.Typeable( Typeable )   -- For known-key names
+import GHC.Internal.Data.Typeable.Internal as Rebindable
 
 -- Note [rts_setMainThread must be called unsafely]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

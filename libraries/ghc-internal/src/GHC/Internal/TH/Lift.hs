@@ -29,14 +29,13 @@ module GHC.Internal.TH.Lift
   )
   where
 
-import GHC.Internal.Base hiding( Type )
+import GHC.Internal.Base as Rebindable hiding( Type )
 import GHC.Internal.TH.Syntax
 import GHC.Internal.TH.Monad
 import qualified GHC.Internal.TH.Lib as Lib (litE)
 import GHC.Internal.TH.Lib hiding( InjectivityAnn, Role )
     -- For known-key names
     -- See wrinkle (W4) of Note [Tracking dependencies on primitives]
-import GHC.Internal.Base( Monad ) -- Needed for known-key lookup
 
 import GHC.Internal.Data.Either
 import GHC.Internal.CString (unpackCString#)
@@ -49,7 +48,6 @@ import GHC.Internal.Int
 import GHC.Internal.Natural
 import GHC.Internal.ForeignPtr
 import GHC.Internal.Num( fromInteger )  -- For known-key names
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 -- | A 'Lift' instance can have any of its values turned into a Template
 -- Haskell expression. This is needed when a value used within a Template

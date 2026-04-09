@@ -24,12 +24,10 @@ module GHC.Internal.GHCi.Helpers
   , evalWrapper
   ) where
 
-import GHC.Internal.Base (String)
+import GHC.Internal.Base
 import GHC.Internal.IO.Handle (BufferMode (NoBuffering), hSetBuffering, hFlush)
 import GHC.Internal.IO.StdHandles (stdin, stdout, stderr)
 import GHC.Internal.System.Environment (withProgName, withArgs)
-import GHC.Internal.Types (IO)
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 disableBuffering :: IO ()
 disableBuffering = do

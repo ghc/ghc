@@ -153,6 +153,8 @@ import qualified GHC.Internal.TH.Syntax as TH
 import GHC.Internal.Functor.ZipList (ZipList(..))
 import GHC.Internal.Exts (SpecConstrAnnotation(..))
 
+import GHC.Internal.Data.Typeable.Internal as Rebindable
+
 ------------------------------------------------------------------------------
 --
 --      The Data class

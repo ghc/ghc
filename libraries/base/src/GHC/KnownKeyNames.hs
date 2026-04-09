@@ -106,7 +106,7 @@ module GHC.KnownKeyNames
     , SomeTypeRep( SomeTypeRep ), Module( Module )
     , TyCon( TyCon ), TrName( TrNameS )
     , KindRep( KindRepTyConApp, KindRepVar, KindRepApp, KindREpFun, KindRepTYPE, KindREpTypeLitS )
-    , typeLitSort( TypeLitSymbol, TypeLitNat, TypeLitChar )
+    , TypeLitSort( TypeLitSymbol, TypeLitNat, TypeLitChar )
     , typeRep#
     , mkTrCon, mkTrAppChecked, mkTrFun
     , typeNatTypeRep, typeSymbolTypeRep, typeCharTypeRep
@@ -171,7 +171,7 @@ import GHC.Internal.Ix
 import GHC.Internal.Magic( inline )
 import GHC.Internal.Magic.Dict( WithDict )
 import GHC.Internal.Enum
-import GHC.Internal.Dynamic( toDyn )
+import GHC.Internal.Data.Dynamic( toDyn )
 import GHC.Internal.Data.Data
 import GHC.Internal.Data.String( fromString )
 import GHC.Internal.Data.Foldable( Foldable )

@@ -42,7 +42,8 @@ import GHC.Ptr          ( Ptr, plusPtr )
 import GHC.Generics     ( Generic )
 #else
 -- Compiling with stage1 compiler
-import GHC.Internal.Base as Known
+import qualified GHC.Internal.Base as Rebindable
+import GHC.Internal.Base hiding( Type, Module )
 import GHC.Internal.Data.Traversable
 import GHC.Internal.Err (error)
 import GHC.Internal.Word

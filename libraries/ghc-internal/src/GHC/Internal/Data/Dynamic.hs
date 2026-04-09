@@ -53,8 +53,9 @@ import GHC.Internal.Data.Maybe
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Show
 import GHC.Internal.Exception
-import GHC.Internal.Type.Reflection        -- For known-occ things
-import GHC.Internal.Num( fromInteger )     -- For known-key names
+
+import GHC.Internal.Data.Typeable.Internal as Rebindable
+import GHC.Internal.Num as Rebindable( fromInteger )
 
 -------------------------------------------------------------
 --

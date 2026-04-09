@@ -163,6 +163,8 @@ module GHC.Internal.Exts
         maxTupleSize,
        ) where
 
+import GHC.Internal.Base
+
 import GHC.Internal.Prim hiding ( coerce, dataToTagSmall#, dataToTagLarge#, whereFrom# )
   -- Hide dataToTagLarge# because it is expected to break for
   -- GHC-internal reasons in the near future, and shouldn't
@@ -184,7 +186,6 @@ import GHC.Internal.Prim.PtrEq (
     samePromptTag#,
   )
 
-import GHC.Internal.Classes ( Eq(..) )
 import GHC.Internal.CString (
     unpackCString#,
     unpackAppendCString#,
@@ -194,11 +195,7 @@ import GHC.Internal.CString (
     cstringLength#,
   )
 import GHC.Internal.Magic (
-    DataToTag(..),
     inline,
-    noinline,
-    lazy,
-    oneShot,
     considerAccessible,
     runRW#,
   )
@@ -341,10 +338,6 @@ import GHC.Internal.Types
   )
 import GHC.Internal.Prim.Ext
 import GHC.Internal.ArrayArray
-import GHC.Internal.Base (
-    augment, breakpoint, breakpointCond, build, iShiftL#, iShiftRA#, iShiftRL#,
-    shiftL#, shiftRL#, otherwise,
-  )
 import GHC.Internal.Err ( errorWithoutStackTrace )
 import GHC.Internal.IO ( IO, seq# )
 import GHC.Internal.Ptr

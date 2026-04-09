@@ -28,7 +28,7 @@ module GHC.Internal.Foreign.Marshal.Safe {-# DEPRECATED "Safe is now the default
         , module GHC.Internal.Foreign.Marshal.Utils
         ) where
 
-import GHC.Internal.Types  -- For known-occ things
+import GHC.Internal.Types as Rebindable  -- For known-occ things
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Marshal.Array
 import GHC.Internal.Foreign.Marshal.Error

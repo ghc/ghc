@@ -46,10 +46,9 @@ module GHC.Internal.Debug.Trace (
         traceMarkerIO,
   ) where
 
-import GHC.Internal.Classes (Eq(..), not)
+import GHC.Internal.Base
 import GHC.Internal.Foreign.C.String
 import qualified GHC.Internal.Foreign.C.String.Encoding as Enc
-import GHC.Internal.Base (Applicative(..), String, return, when, ($), (.))
 import GHC.Internal.IO.Encoding
 import GHC.Internal.IO.Unsafe
 import GHC.Internal.Prim (traceEvent#, traceMarker#)
@@ -58,8 +57,6 @@ import GHC.Internal.Show
 import GHC.Internal.Stack
 import GHC.Internal.Data.List (null, partition)
 import GHC.Internal.RTS.Flags.Test
-import GHC.Internal.Types (Bool, IO(..))
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 -- | 'userEventTracingEnabled' is True if event logging for user events (@+RTS -l@) is enabled.
 userEventTracingEnabled :: IO Bool
