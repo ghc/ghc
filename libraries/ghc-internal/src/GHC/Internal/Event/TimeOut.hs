@@ -25,6 +25,7 @@ module GHC.Internal.Event.TimeOut
     , TimeoutKey(..)
     ) where
 
+import GHC.Internal.Base   -- For known-occ things
 import GHC.Internal.IO
 import GHC.Internal.Classes (Eq, Ord)
 

@@ -6,9 +6,10 @@ module GHC.Internal.IO.Handle.Lock.Common
   , LockMode(..)
   ) where
 
+import GHC.Internal.Base -- For known-occ things
 import GHC.Internal.Exception
 import GHC.Internal.Show
-import GHC.Internal.Data.Typeable( Typeable ) -- For known-key names
+import GHC.Internal.Data.Typeable -- For known-key names
 
 -- | Exception thrown by 'hLock' on non-Windows platforms that don't support
 -- 'flock'.

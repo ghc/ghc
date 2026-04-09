@@ -52,6 +52,7 @@ import GHC.Core.Type( pattern ManyTy, mkFunTy )
 import GHC.Core.Make
 import GHC.Core.Utils
 
+import GHC.Builtin( isUnboundName )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.TH
 import GHC.Builtin.Types

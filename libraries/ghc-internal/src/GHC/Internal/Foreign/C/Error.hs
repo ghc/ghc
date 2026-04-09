@@ -90,9 +90,9 @@ module GHC.Internal.Foreign.C.Error (
 --
 #include "HsBaseConfig.h"
 
+import GHC.Internal.Base
 import GHC.Internal.Foreign.Ptr
 #if defined(javascript_HOST_ARCH)
-import GHC.Internal.Base ( (>>=) )
 #else
 import GHC.Internal.Foreign.Marshal.Alloc
 #endif
@@ -101,14 +101,10 @@ import GHC.Internal.Foreign.C.String
 import GHC.Internal.Data.Functor            ( void )
 import GHC.Internal.Data.Maybe
 
-import GHC.Internal.Classes ( Eq(..), (&&), (||) )
 import GHC.Internal.IO
 import GHC.Internal.IO.Exception
 import GHC.Internal.IO.Handle.Types
 import GHC.Internal.Num
-import GHC.Internal.Base ( String, otherwise, return, ($) )
-import GHC.Internal.Types ( Bool(..) )
-import GHC.Internal.Base( (>>=), (>>) )        -- For known-key names
 
 -- "errno" type
 -- ------------

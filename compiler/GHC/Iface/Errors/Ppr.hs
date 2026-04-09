@@ -310,11 +310,12 @@ interfaceErrorDiagnostic opts = \ case
   MissingKnownKey3 occ -> hang (text "Could not find known occurrence" <+> quotes (ppr occ))
                              2 (text "in the exports of GHC.KnownKeys")
 
-  KnownKeyScopeError occ gres
+  KnownKeyScopeError occ gres call_stack
     | null gres
     -> hang (text "Could not find known-key entity" <+> quotes (ppr occ))
           2 (vcat [ text "in the top-level global environment"
-                  , text "Consider importing it" ])
+                  , text "Consider importing it"
+                  , prettyCallStackDoc call_stack ])
     | otherwise
     -> hang (text "Known-key entity" <+> quotes (ppr occ))
           2 (text "is ambiguous in the top-level global environment")

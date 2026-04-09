@@ -74,7 +74,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 
-import GHC.Builtin.KnownKeys( mkUnboundName )
+import GHC.Builtin( mkUnboundName )
 import GHC.Unit.Module( Module, getModule )
 
 import GHC.Utils.Misc as Utils ( singleton )

@@ -7,7 +7,8 @@ module GHC.Internal.Data.List.NonEmpty
   , map
   ) where
 
-import GHC.Internal.Data.NonEmpty (NonEmpty (..), map)
+import GHC.Internal.Base hiding( map )   -- For known-occ things
+import GHC.Internal.Data.NonEmpty( map )
 import qualified GHC.Internal.Data.List as List
 
 -- | The 'zip' function takes two streams and returns a stream of

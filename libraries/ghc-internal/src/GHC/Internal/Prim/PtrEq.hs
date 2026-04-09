@@ -38,9 +38,9 @@ module GHC.Internal.Prim.PtrEq
     eqStableName#
   ) where
 
+import GHC.Internal.Base -- Also make implicit dependency known to build system
 import GHC.Internal.Prim
-import GHC.Internal.Types -- Also make implicit dependency known to build system
-  ( RuntimeRep(BoxedRep), UnliftedType )
+
 default () -- Double and Integer aren't available yet
 
 {- **********************************************************************

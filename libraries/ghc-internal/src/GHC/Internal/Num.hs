@@ -38,17 +38,13 @@ where
 import qualified GHC.Internal.Natural
 import qualified GHC.Internal.Integer
 
-import GHC.Internal.Classes (eqInt, geInt, ltInt)
-import GHC.Internal.Base (id, otherwise)
+import GHC.Internal.Base
 import GHC.Internal.Bignum.Integer
 import GHC.Internal.Bignum.Natural
 import GHC.Internal.Prim (
     int2Word#, minusWord#, negateInt#, plusWord#, timesWord#, word2Int#,
     (+#), (-#), (*#),
   )
-import GHC.Internal.Types (Int(..), Word(..))
-
-import GHC.Internal.Classes ( (==) )  -- Needed for know-key names
 
 infixl 7  *
 infixl 6  +, -

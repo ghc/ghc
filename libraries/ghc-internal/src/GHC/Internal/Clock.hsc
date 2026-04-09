@@ -7,10 +7,9 @@ module GHC.Internal.Clock
     , getMonotonicTimeNSec
     ) where
 
-import GHC.Internal.Base (return)
+import GHC.Internal.Base
 import GHC.Internal.Real
 import GHC.Internal.Word
-import GHC.Internal.Types (Double, IO)
 import GHC.Internal.Float ()           -- For Num Double instance
 import GHC.Internal.Base( (>>=) )      -- For known-key names
 import GHC.Internal.Num( fromInteger ) -- For known-key names

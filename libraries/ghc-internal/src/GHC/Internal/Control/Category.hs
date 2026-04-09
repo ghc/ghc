@@ -27,6 +27,7 @@
 
 module GHC.Internal.Control.Category where
 
+import GHC.Internal.Base hiding( id, (.) )
 import qualified GHC.Internal.Base (id,(.))
 import GHC.Internal.Data.Type.Coercion
 import GHC.Internal.Data.Type.Equality

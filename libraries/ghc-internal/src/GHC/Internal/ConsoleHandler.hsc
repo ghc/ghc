@@ -23,7 +23,8 @@ module GHC.Internal.ConsoleHandler
         where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Internal.Types ()
+import GHC.Internal.Base
+
 #else /* whole file */
         ( Handler(..)
         , installHandler
@@ -42,7 +43,7 @@ Note: this #include is inside a Haskell comment
       by GHC
 -}
 
-import GHC.Internal.Base (otherwise, return, ($), (>>))
+import GHC.Internal.Base
 import GHC.Internal.Data.Maybe (Maybe(..))
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Foreign.C.Types

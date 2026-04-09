@@ -1290,7 +1290,7 @@ dynCompileExpr expr = do
   parsed_expr <- parseExpr expr
   -- > Data.Dynamic.toDyn expr
   let loc = getLoc parsed_expr
-      to_dyn_expr = mkHsApp (L loc . mkHsVar . L (l2l loc) toDyn_RDR)
+      to_dyn_expr = mkHsApp (L loc $ mkHsVar $ L (l2l loc) toDyn_RDR)
                             parsed_expr
   hval <- compileParsedExpr to_dyn_expr
   return (unsafeCoerce hval :: Dynamic)

@@ -70,8 +70,6 @@ import GHC.Internal.Data.Type.Ord(OrderingI(..), type (<=), type (<=?))
 import GHC.Internal.Unsafe.Coerce(unsafeCoerce)
 import GHC.Internal.TypeNats.Internal(CmpNat)
 
-import GHC.Internal.Base( (>>=) )        -- For known-key names
-
 -- | A type synonym for 'Natural'.
 --
 -- Previously, this was an opaque data type, but it was changed to a type

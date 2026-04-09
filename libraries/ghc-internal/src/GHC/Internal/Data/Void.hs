@@ -20,4 +20,4 @@ module GHC.Internal.Data.Void
     , vacuous
     ) where
 
-import GHC.Internal.Base (Void, absurd, vacuous)
+import GHC.Internal.Base

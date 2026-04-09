@@ -1,3 +1,5 @@
+{-# LANGUAGE Trustworthy #-}  -- So that we can import in into Safe modules
+                              -- like GHC.Internal.System.Mem.StableName
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
              MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
              PolyKinds, NegativeLiterals, DataKinds, ScopedTypeVariables,

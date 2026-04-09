@@ -2202,6 +2202,7 @@ rightSectionId = pcRepPolyId rightSectionName ty concs info
 --------------------------------------------------------------------------------
 
 coerceId :: Id
+-- Only wired-in because of a test in LintEtaExpand.hs
 coerceId = pcRepPolyId coerceName ty concs info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
