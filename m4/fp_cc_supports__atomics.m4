@@ -6,7 +6,7 @@ AC_DEFUN([FP_CC_SUPPORTS__ATOMICS],
     AC_REQUIRE([AC_PROG_CC])
     AC_MSG_CHECKING([whether C compiler supports C11 atomics])
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
-        [[#include <stdatomic.h>;
+        [[#include <stdatomic.h>
           int x;]],
         [[atomic_load(&x); return x;]])],
     [
