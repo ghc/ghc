@@ -437,7 +437,7 @@ patchCCallTarget unit = \case
     StaticTarget sTxt label targetKind ->
       let ext = StaticTargetGhc
             { staticTargetLabel = sTxt
-            , staticTargetUnit  = TargetIsInThat unit
+            , staticTargetUnit  = CLabelTargetInUnit unit
             }
       in  StaticTarget ext label targetKind
 
