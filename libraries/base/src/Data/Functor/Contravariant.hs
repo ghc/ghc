@@ -47,6 +47,7 @@ module Data.Functor.Contravariant (
   , Op(..)
   ) where
 
+import Prelude hiding ((.), id)
 import Control.Applicative
 import GHC.Internal.Control.Category
 import GHC.Internal.Data.Function (on)
@@ -58,8 +59,8 @@ import Data.Functor.Compose
 import GHC.Internal.Data.Monoid (Alt(..), All(..))
 import GHC.Internal.Data.Proxy
 import GHC.Generics
+import qualified GHC.KnownKeyNames as Rebindable
 
-import Prelude hiding ((.), id)
 
 -- | The class of contravariant functors.
 --

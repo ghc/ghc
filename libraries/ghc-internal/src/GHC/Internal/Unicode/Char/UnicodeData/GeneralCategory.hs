@@ -21,7 +21,7 @@ where
 import GHC.Internal.Base
 import GHC.Internal.Unicode.Bits (lookupIntN)
 import GHC.Internal.Num ((-))
-import GHC.Internal.Num( fromInteger ) -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger ) -- For known-key names
 
 {-# NOINLINE lookup_bitmap #-}
 lookup_bitmap :: Int -> Int

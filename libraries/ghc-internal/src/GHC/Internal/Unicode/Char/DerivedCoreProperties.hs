@@ -19,7 +19,7 @@ where
 
 import GHC.Internal.Base
 import GHC.Internal.Unicode.Bits (lookupBit64)
-import GHC.Internal.Num( fromInteger ) -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger ) -- For known-key names
 
 {-# INLINE isUppercase #-}
 isUppercase :: Char -> Bool

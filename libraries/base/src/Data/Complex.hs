@@ -43,8 +43,8 @@ import GHC.Internal.Data.Data (Data)
 import Foreign (Storable, castPtr, peek, poke, pokeElemOff, peekElemOff, sizeOf,
                 alignment)
 import GHC.Internal.Control.Monad.Fix (MonadFix(..))
-import GHC.Internal.Data.Typeable( Typeable )
 import Control.Monad.Zip (MonadZip(..))
+import qualified GHC.KnownKeyNames as Rebindable
 
 infix  6  :+
 

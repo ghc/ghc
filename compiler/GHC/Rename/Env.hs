@@ -19,6 +19,7 @@ module GHC.Rename.Env (
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
         lookupTypeOccRn, lookupOccRnNone,
         lookupGlobalOccRn_maybe,
+        rnLookupKnownOccName,
 
         lookupExprOccRn,
         lookupRecFieldOcc,

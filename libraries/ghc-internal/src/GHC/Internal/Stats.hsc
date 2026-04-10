@@ -44,7 +44,7 @@ import GHC.Internal.IO.Exception
 import GHC.Internal.Foreign.Marshal.Alloc
 import GHC.Internal.Foreign.Storable
 import GHC.Internal.Foreign.Ptr
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 #include "Rts.h"
 

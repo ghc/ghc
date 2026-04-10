@@ -31,7 +31,6 @@ module GHC.Internal.System.Environment
   ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Classes (Eq(..))
 import GHC.Internal.Data.Maybe (maybe)
 import GHC.Internal.Ptr
 import GHC.Internal.Foreign.C.Types

@@ -814,10 +814,9 @@ tcRnHsBootDecls boot_or_sig decls
              <- tcTyClsInstDecls tycl_decls deriv_decls def_decls val_binds
         ; setGblEnv tcg_env     $ do {
 
-        -- Emit Typeable bindings
--- ToDo: why do we emit Typable bindings in a boot module?  Just duplicates!
---        ; tcg_env <- mkTypeableBinds
---        ; setGblEnv tcg_env $ do {
+        -- Emit (signatures for) Typeable bindings
+        ; tcg_env <- mkTypeableBinds
+        ; setGblEnv tcg_env $ do {
 
                 -- Typecheck value declarations
         ; traceTc "Tc5" empty
@@ -838,7 +837,7 @@ tcRnHsBootDecls boot_or_sig decls
               }
 
         ; setGlobalTypeEnv gbl_env type_env2
-   }}
+   }}}
    ; traceTc "boot" (ppr lie); return gbl_env }
 
 {-

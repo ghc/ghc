@@ -28,7 +28,7 @@ import GHC.Internal.Show
 import GHC.Internal.Read
 import GHC.Internal.Enum
 import GHC.Internal.Arr
-import GHC.Internal.Num( fromInteger)  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger)  -- For known-key names
 
 -- $setup
 -- >>> import GHC.Internal.Data.Void

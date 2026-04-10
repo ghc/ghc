@@ -74,7 +74,7 @@ import GHC.Internal.Num
 import GHC.Internal.Real
 import GHC.Internal.Data.Maybe
 import GHC.Internal.Data.Typeable
-import GHC.Internal.Control.Monad.Fail( fail )   -- For known-key names
+import GHC.Internal.Control.Monad.Fail as Rebindable( fail )   -- For known-key names
 
 
 -- ---------------------------------------------------------------------------

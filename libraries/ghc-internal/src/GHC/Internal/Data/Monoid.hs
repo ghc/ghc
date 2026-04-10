@@ -83,7 +83,6 @@ module GHC.Internal.Data.Monoid (
 
 -- Push down the module in the dependency hierarchy.
 import GHC.Internal.Base hiding( Any )
-import GHC.Internal.Classes (Eq, Ord)
 import GHC.Internal.Enum
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Num
@@ -91,7 +90,6 @@ import GHC.Internal.Read
 import GHC.Internal.Show
 import GHC.Internal.Control.Monad.Fail (MonadFail)
 import GHC.Internal.Data.Semigroup.Internal
-import GHC.Internal.Base( (>>), (>>=) )        -- For known-key names
 
 -- $MaybeExamples
 -- To implement @find@ or @findLast@ on any 'Data.Foldable.Foldable':

@@ -58,7 +58,8 @@ import GHC.Internal.Data.Coerce (Coercible, coerce)
 import Prelude
        (Maybe (..), Monad (..), Ord, Ordering (..), id, seq, ($!), ($), (.),
        (=<<), flip, const, error)
-import Prelude( Num ) -- For -frebindable-known-key-names (defaulting)
+
+import qualified GHC.KnownKeyNames as Rebindable
 
 -- $setup
 -- >>> import Prelude hiding (foldr1, foldl1, head, last, minimum, maximum)

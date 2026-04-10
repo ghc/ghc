@@ -8,20 +8,20 @@ module GHC.Fingerprint (
         getFileHash
    ) where
 
-import GHC.KnownKeyNames
+import qualified GHC.KnownKeyNames as Rebindable
 
 import GHC.Internal.Fingerprint
-
 import Data.Function (($))
 import Control.Monad (return, when)
+import Data.Bool (not, (&&))
 import Data.List ((++))
 import Data.Maybe (Maybe (Nothing, Just))
 import Data.Int (Int)
 import Data.Word (Word8)
+import Data.Eq ((/=))
 import Text.Show (show)
 import System.IO
-       (
-           IO,
+       (   IO,
            FilePath,
            IOMode (ReadMode),
            withBinaryFile,

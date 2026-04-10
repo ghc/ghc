@@ -118,7 +118,6 @@ import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
-import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 

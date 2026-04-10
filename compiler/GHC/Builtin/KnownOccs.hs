@@ -81,7 +81,13 @@ knownOccs :: [KnownOcc]
 -- Used only for sanity-checks, and for suppressing unused imports
 -- when -frebindable-known-key-names is on
 knownOccs
-  = [ rationalTyConOcc
+  = [ composeIdOcc
+    , rationalTyConOcc
+
+    -- Enum class ops
+    , enumFromClassOpOcc, enumFromThenClassOpOcc
+    , enumFromToClassOpOcc, enumFromThenToClassOpOcc
+    -- Typeable stuff
     , someTypeRepTyConOcc, someTypeRepDataConOcc, mkTrConOcc, mkTrAppCheckedOcc
     , mkTrFunOcc, typeRepIdOcc, typeNatTypeRepOcc, typeSymbolTypeRepOcc
     , typeCharTypeRepOcc, typeLitSymbolDataConOcc, typeLitNatDataConOcc
@@ -94,6 +100,16 @@ knownOccs
 
 rationalTyConOcc :: KnownOcc
 rationalTyConOcc = mkTcOcc "Rational"
+
+composeIdOcc :: KnownOcc
+composeIdOcc = mkVarOcc "."
+
+enumFromClassOpOcc, enumFromThenClassOpOcc,
+  enumFromToClassOpOcc, enumFromThenToClassOpOcc :: KnownOcc
+enumFromClassOpOcc       = mkVarOcc "enumFrom"
+enumFromThenClassOpOcc   = mkVarOcc "enumFromThen"
+enumFromToClassOpOcc     = mkVarOcc "enumFromTo"
+enumFromThenToClassOpOcc = mkVarOcc "enumFromThenTo"
 
 -- Class Typeable, and functions for constructing `Typeable` dictionaries
 someTypeRepTyConOcc
@@ -186,7 +202,7 @@ toDyn_RDR :: RdrName
 toDyn_RDR = knownVarOccRdrName "toDyn"
 
 compose_RDR :: RdrName
-compose_RDR = knownKeyRdrName composeIdKey
+compose_RDR = knownOccRdrName composeIdOcc
 
 appE_RDR, lift_RDR, liftTyped_RDR :: RdrName
 appE_RDR             = knownVarOccRdrName "appE"
@@ -194,10 +210,10 @@ lift_RDR             = knownVarOccRdrName "lift"
 liftTyped_RDR        = knownVarOccRdrName "liftTyped"
 
 enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, enumFromThenTo_RDR :: RdrName
-enumFrom_RDR       = knownKeyRdrName enumFromClassOpKey
-enumFromTo_RDR     = knownKeyRdrName enumFromToClassOpKey
-enumFromThen_RDR   = knownKeyRdrName enumFromThenClassOpKey
-enumFromThenTo_RDR = knownKeyRdrName enumFromThenToClassOpKey
+enumFrom_RDR       = knownOccRdrName enumFromClassOpOcc
+enumFromTo_RDR     = knownOccRdrName enumFromToClassOpOcc
+enumFromThen_RDR   = knownOccRdrName enumFromThenClassOpOcc
+enumFromThenTo_RDR = knownOccRdrName enumFromThenToClassOpOcc
 
 fromEnum_RDR, toEnum_RDR, toEnumError_RDR, succError_RDR,
   predError_RDR, enumIntToWord_RDR,
@@ -538,17 +554,17 @@ showParen_RDR           = varQual_RDR gHC_INTERNAL_SHOW (fsLit "showParen")
 
 a_RDR, b_RDR, c_RDR, d_RDR, f_RDR, k_RDR, z_RDR, ah_RDR, bh_RDR, ch_RDR, dh_RDR
     :: RdrName
-a_RDR           = mkVarUnqual (fsLit "a")
-b_RDR           = mkVarUnqual (fsLit "b")
-c_RDR           = mkVarUnqual (fsLit "c")
-d_RDR           = mkVarUnqual (fsLit "d")
-f_RDR           = mkVarUnqual (fsLit "f")
-k_RDR           = mkVarUnqual (fsLit "k")
-z_RDR           = mkVarUnqual (fsLit "z")
-ah_RDR          = mkVarUnqual (fsLit "a#")
-bh_RDR          = mkVarUnqual (fsLit "b#")
-ch_RDR          = mkVarUnqual (fsLit "c#")
-dh_RDR          = mkVarUnqual (fsLit "d#")
+a_RDR  = mkVarUnqual (fsLit "a")
+b_RDR  = mkVarUnqual (fsLit "b")
+c_RDR  = mkVarUnqual (fsLit "c")
+d_RDR  = mkVarUnqual (fsLit "d")
+f_RDR  = mkVarUnqual (fsLit "f")
+k_RDR  = mkVarUnqual (fsLit "k")
+z_RDR  = mkVarUnqual (fsLit "z")
+ah_RDR = mkVarUnqual (fsLit "a#")
+bh_RDR = mkVarUnqual (fsLit "b#")
+ch_RDR = mkVarUnqual (fsLit "c#")
+dh_RDR = mkVarUnqual (fsLit "d#")
 
 as_RDRsInf, bs_RDRsInf, cs_RDRsInf :: Infinite RdrName
 as_RDRsInf = [ mkVarUnqual (mkFastString ("a"++show i)) | i <- Inf.enumFrom (1::Int) ]
@@ -569,17 +585,17 @@ as_Vars = fmap nlHsVar as_RDRs
 bs_Vars = fmap nlHsVar bs_RDRs
 
 a_Expr, b_Expr, c_Expr, f_Expr, z_Expr  :: LHsExpr GhcPs
-a_Expr                = nlHsVar a_RDR
-b_Expr                = nlHsVar b_RDR
-c_Expr                = nlHsVar c_RDR
-f_Expr                = nlHsVar f_RDR
-z_Expr                = nlHsVar z_RDR
+a_Expr = nlHsVar a_RDR
+b_Expr = nlHsVar b_RDR
+c_Expr = nlHsVar c_RDR
+f_Expr = nlHsVar f_RDR
+z_Expr = nlHsVar z_RDR
 
 a_Pat, b_Pat, c_Pat, d_Pat, f_Pat, k_Pat, z_Pat :: LPat GhcPs
-a_Pat           = nlVarPat a_RDR
-b_Pat           = nlVarPat b_RDR
-c_Pat           = nlVarPat c_RDR
-d_Pat           = nlVarPat d_RDR
-f_Pat           = nlVarPat f_RDR
-k_Pat           = nlVarPat k_RDR
-z_Pat           = nlVarPat z_RDR
+a_Pat = nlVarPat a_RDR
+b_Pat = nlVarPat b_RDR
+c_Pat = nlVarPat c_RDR
+d_Pat = nlVarPat d_RDR
+f_Pat = nlVarPat f_RDR
+k_Pat = nlVarPat k_RDR
+z_Pat = nlVarPat z_RDR
