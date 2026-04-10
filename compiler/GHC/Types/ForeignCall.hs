@@ -203,6 +203,7 @@ instance Outputable CCallSpec where
                 ForeignValue    -> text "__ffi_static_ccall_value"
                 ForeignFunction -> text "__ffi_static_ccall"
               pprUnit ext = case staticTargetUnit ext of
+                CLabelTargetUnknown     -> empty
                 CLabelTargetInUnit unit -> ppr unit
               (srcTxt, pPkgId) = (staticTargetLabel ext, pprUnit ext)
           in pCallType
@@ -315,11 +316,19 @@ instance Binary CCallConv where
 -- as the target, or if the target is in a different library.
 --
 data CLabelTargetLibrary
+
+    -- | The entity (that the name\/label points to) is in an unknown shared
+    -- library. In particular it could either be in the current library (where
+    -- the label is used) or an external one. This case is used for all
+    -- user-written Haskell FFI ccall\/capi imports, because in this case we do
+    -- not know where the entity the name refers to lives.
+  = CLabelTargetUnknown
+
     -- | The entity is /known/ to live in a specific Haskell unit (package),
     -- and thus the shared library corresponding to the unit. Uses of this
     -- label within the same unit will be intra-library, and inter-library
     -- otherwise.
-  = CLabelTargetInUnit !Unit
+  | CLabelTargetInUnit !Unit
   deriving (Data, Eq)
 
 data StaticTargetGhc = StaticTargetGhc
@@ -358,13 +367,16 @@ instance NFData (Header (GhcPass p)) where
 
 instance NFData CLabelTargetLibrary where
     rnf = \case
+      CLabelTargetUnknown     -> ()
       CLabelTargetInUnit unit -> rnf unit
 
 instance Binary CLabelTargetLibrary where
     put_ bh = \case
+      CLabelTargetUnknown     -> putByte bh 0
       CLabelTargetInUnit unit -> putByte bh 1 *> put_ bh unit
 
     get bh = getByte bh >>= \case
+      0 -> pure CLabelTargetUnknown
       _ -> CLabelTargetInUnit <$> get bh
 
 instance NFData CTypeGhc where
