@@ -51,7 +51,6 @@ import GHC.Data.Maybe
 import GHC.Data.FastString (mkFastStringShortText)
 import GHC.Utils.Panic
 import GHC.Types.Unique.DSM
-import GHC.Unit.Types
 
 import GHC.Core.TyCo.Rep
 import GHC.Builtin.WiredIn.Prim
@@ -81,8 +80,8 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
                     StaticTarget _ _ ForeignValue ->
                         panic "cgForeignCall: unexpected FFI value import"
                     StaticTarget ext lbl ForeignFunction ->
-                        let labelSource = case staticTargetUnit ext of
-                              TargetIsInThat unit -> ForeignLabelInPackage $ toUnitId unit
+                        let labelSource = toForeignLabelSource
+                                            (staticTargetUnit ext)
                         in  ( unzip cmm_args
                             , CmmLit
                               (CmmLabel (mkForeignLabel

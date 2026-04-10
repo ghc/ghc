@@ -47,7 +47,7 @@ module GHC.Types.ForeignCall (
   CCallTarget(..),
   -- *** GHC extension point
   StaticTargetGhc(..),
-  CCallStaticTargetUnit(..),
+  CLabelTargetLibrary(..),
   -- *** Queries
   isDynamicTarget,
   -- ** Foreign target kind
@@ -204,7 +204,7 @@ instance Outputable CCallSpec where
                 ForeignValue    -> text "__ffi_static_ccall_value"
                 ForeignFunction -> text "__ffi_static_ccall"
               pprUnit ext = case staticTargetUnit ext of
-                TargetIsInThat unit -> ppr unit
+                CLabelTargetInUnit unit -> ppr unit
               (srcTxt, pPkgId) = (staticTargetLabel ext, pprUnit ext)
           in pCallType
                <> gc_suf
@@ -308,24 +308,25 @@ instance Binary CCallConv where
               3 -> return CApiConv
               _ -> return JavaScriptCallConv
 
--- |
--- Which compilation 'Unit' is the static target in,
--- either it is in this currently compiling compilation 'Unit',
--- or it is in /that other/, compilation 'Unit'.
-data CCallStaticTargetUnit
-  = TargetIsInThat Unit -- ^ In that other 'Unit'.
+-- | Where the entity referred to by the label lives: specifically what linker
+-- unit (i.e. executable or shared library).
+--
+-- This information is used in the code generators (on some platforms) to
+-- determine whether a use of label in some linker unit refers to a target
+-- within the same (local) linker unit or to a different (external) linker unit.
+--
+data CLabelTargetLibrary
+    -- | The entity is /known/ to live in a specific Haskell unit (package),
+    -- and thus the shared library corresponding to the unit. Uses of this
+    -- label within the same unit will be intra-library, and inter-library
+    -- otherwise.
+  = CLabelTargetInUnit !Unit
   deriving (Data, Eq)
 
 data StaticTargetGhc = StaticTargetGhc
   { staticTargetLabel :: SourceText
-  , staticTargetUnit  :: CCallStaticTargetUnit
-      -- ^ What package the function is in.
-      -- If 'TargetIsInThisUnit', then it's taken to be in the current package
-      -- Note: This information is only used for PrimCalls on Windows.
-      --       See CLabel.labelDynamic and CoreToStg.coreToStgApp
-      --       for the difference in representation between PrimCalls
-      --       and ForeignCalls. If the CCallTarget is representing
-      --       a regular ForeignCall then it's safe to set this to Nothing.
+  , staticTargetUnit  :: CLabelTargetLibrary
+    -- ^ What linker unit the target of the label is in.
   }
   deriving (Data, Eq)
 
@@ -351,16 +352,16 @@ type instance XXHeader (GhcPass p) = DataConCantHappen
 deriving instance Eq (Header (GhcPass p))
 
 
-instance NFData CCallStaticTargetUnit where
+instance NFData CLabelTargetLibrary where
     rnf = \case
-      TargetIsInThat unit -> rnf unit
+      CLabelTargetInUnit unit -> rnf unit
 
-instance Binary CCallStaticTargetUnit where
+instance Binary CLabelTargetLibrary where
     put_ bh = \case
-      TargetIsInThat unit -> putByte bh 1 *> put_ bh unit
+      CLabelTargetInUnit unit -> putByte bh 1 *> put_ bh unit
 
     get bh = getByte bh >>= \case
-      _ -> TargetIsInThat <$> get bh
+      _ -> CLabelTargetInUnit <$> get bh
 
 instance NFData CTypeGhc where
     rnf st =

@@ -201,7 +201,7 @@ dsCFExportDynamic id co0 cconv = do
           -- (probably in the RTS.)
         adjustor   = CCallSpec
                        (StaticTarget
-                         (StaticTargetGhc NoSourceText (TargetIsInThat rtsUnit))
+                         (StaticTargetGhc NoSourceText (CLabelTargetInUnit rtsUnit))
                          (packHText "createAdjustor")
                          ForeignFunction)
                        CCallConv
