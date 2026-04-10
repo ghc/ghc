@@ -22,7 +22,7 @@ module GHC.Internal.Event.EPoll
     ) where
 
 import qualified GHC.Internal.Event.Internal as E
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
+import qualified GHC.Internal.Base as Rebindable( (>>=), (>>) ) -- For known-key names
 
 #include "EventConfig.h"
 #if !defined(HAVE_EPOLL)

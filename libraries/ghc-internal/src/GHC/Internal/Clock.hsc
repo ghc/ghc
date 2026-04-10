@@ -11,8 +11,8 @@ import GHC.Internal.Base
 import GHC.Internal.Real
 import GHC.Internal.Word
 import GHC.Internal.Float ()           -- For Num Double instance
-import GHC.Internal.Base( (>>=) )      -- For known-key names
-import GHC.Internal.Num( fromInteger ) -- For known-key names
+import GHC.Internal.Base as Rebindable( (>>=) )      -- For known-key names
+import GHC.Internal.Num  as Rebindable( fromInteger ) -- For known-key names
 #if defined(javascript_HOST_ARCH)
 import GHC.Internal.Num
 #endif

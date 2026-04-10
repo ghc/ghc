@@ -52,12 +52,11 @@ module GHC.Internal.Exception.Type
 import GHC.Internal.Base
 import GHC.Internal.Data.OldList (lines, unlines, null)
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Data.Typeable (Typeable)
 import GHC.Internal.Data.Typeable as Typeable
-import GHC.Internal.Data.Typeable.Internal hiding( TypeRep )
    -- loop: GHC.Internal.Data.Typeable -> GHC.Internal.Err -> GHC.Internal.Exception
 import GHC.Internal.Show
 import GHC.Internal.Exception.Context
+import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
 
 {- |
 A constraint used to propagate 'ExceptionContext's.

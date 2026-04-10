@@ -122,7 +122,7 @@ import GHC.Internal.Base
 import GHC.Internal.Control.Exception.Base
 import GHC.Internal.Exception.Type (ExceptionWithContext(..), whileHandling)
 
-import GHC.Internal.IO (IO, interruptible)
+import GHC.Internal.IO (interruptible)
 import GHC.Internal.Maybe (Maybe(..))
 
 -- | You need this when using 'catches'.

@@ -93,7 +93,6 @@ module Text.Printf(
 ) where
 
 import Prelude
-import GHC.KnownKeyNames( build )
 import Data.Char
 
 import GHC.Internal.Int
@@ -102,6 +101,7 @@ import GHC.Internal.Word
 import GHC.Internal.Numeric
 import GHC.Internal.Numeric.Natural
 import GHC.Internal.System.IO
+import qualified GHC.KnownKeyNames as Rebindable
 
 -- $setup
 -- >>> import Prelude

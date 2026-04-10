@@ -10,7 +10,6 @@ module GHC.Internal.Heap.Constants
 
 import GHC.Internal.Base  -- For known-occ names
 import GHC.Internal.Data.Bits
-import GHC.Internal.Int
 import GHC.Internal.Num
 
 wORD_SIZE, tAG_MASK, wORD_SIZE_IN_BITS :: Int

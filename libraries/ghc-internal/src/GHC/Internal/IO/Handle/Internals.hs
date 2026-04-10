@@ -89,9 +89,7 @@ import GHC.Internal.Ptr (castPtr)
 import GHC.Internal.Data.Typeable
 import GHC.Internal.Data.Maybe
 import GHC.Internal.System.Posix.Internals hiding (FD)
-
 import GHC.Internal.Foreign.C.String
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False

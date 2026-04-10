@@ -37,9 +37,8 @@ import GHC.Internal.Base
 import GHC.Internal.Data.Either
 import GHC.Internal.Data.Function ( fix )
 import GHC.Internal.Data.Maybe
-import GHC.Internal.Data.Monoid ( Monoid, Dual(..), Sum(..), Product(..)
+import GHC.Internal.Data.Monoid ( Dual(..), Sum(..), Product(..)
                    , First(..), Last(..), Alt(..), Ap(..) )
-import GHC.Internal.Data.NonEmpty ( NonEmpty(..) )
 import GHC.Internal.Data.Ord ( Down(..) )
 import GHC.Internal.Data.Tuple ( Solo(..), fst, snd )
 import GHC.Internal.Err ( errorWithoutStackTrace )
@@ -54,7 +53,7 @@ import GHC.Internal.IO.Exception
 import GHC.Internal.TH.Monad
 import GHC.Internal.Control.Exception
 import GHC.Internal.Control.Arrow
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 -- | Monads having fixed points with a \'knot-tying\' semantics.
 -- Instances of 'MonadFix' should satisfy the following laws:

@@ -79,6 +79,7 @@ import GHC.Types.SrcLoc
 
 import GHC.Builtin.Types
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
 
 import GHC.Driver.DynFlags
@@ -793,8 +794,8 @@ tcArithSeq :: Maybe (SyntaxExpr GhcRn) -> ArithSeqInfo GhcRn -> ExpRhoType
 tcArithSeq witness seq@(From expr) res_ty
   = do { (wrap, elt_mult, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr' <-tcScalingUsage elt_mult $ tcCheckPolyExpr expr elt_ty
-       ; enum_from <- newKnownKeyMethod (ArithSeqOrigin seq)
-                              enumFromClassOpKey [elt_ty]
+       ; enum_from <- newKnownOccMethod (ArithSeqOrigin seq)
+                              enumFromClassOpOcc [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from wit' (From expr') }
 
@@ -802,8 +803,8 @@ tcArithSeq witness seq@(FromThen expr1 expr2) res_ty
   = do { (wrap, elt_mult, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr1' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr1 elt_ty
        ; expr2' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr2 elt_ty
-       ; enum_from_then <- newKnownKeyMethod (ArithSeqOrigin seq)
-                              enumFromThenClassOpKey [elt_ty]
+       ; enum_from_then <- newKnownOccMethod (ArithSeqOrigin seq)
+                              enumFromThenClassOpOcc [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from_then wit' (FromThen expr1' expr2') }
 
@@ -811,8 +812,8 @@ tcArithSeq witness seq@(FromTo expr1 expr2) res_ty
   = do { (wrap, elt_mult, elt_ty, wit') <- arithSeqEltType witness res_ty
        ; expr1' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr1 elt_ty
        ; expr2' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr2 elt_ty
-       ; enum_from_to <- newKnownKeyMethod (ArithSeqOrigin seq)
-                              enumFromToClassOpKey [elt_ty]
+       ; enum_from_to <- newKnownOccMethod (ArithSeqOrigin seq)
+                              enumFromToClassOpOcc [elt_ty]
        ; return $ mkHsWrap wrap $
          ArithSeq enum_from_to wit' (FromTo expr1' expr2') }
 
@@ -821,8 +822,8 @@ tcArithSeq witness seq@(FromThenTo expr1 expr2 expr3) res_ty
         ; expr1' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr1 elt_ty
         ; expr2' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr2 elt_ty
         ; expr3' <- tcScalingUsage elt_mult $ tcCheckPolyExpr expr3 elt_ty
-        ; eft <- newKnownKeyMethod (ArithSeqOrigin seq)
-                              enumFromThenToClassOpKey [elt_ty]
+        ; eft <- newKnownOccMethod (ArithSeqOrigin seq)
+                              enumFromThenToClassOpOcc [elt_ty]
         ; return $ mkHsWrap wrap $
           ArithSeq eft wit' (FromThenTo expr1' expr2' expr3') }
 

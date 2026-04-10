@@ -28,6 +28,7 @@ import GHC.Internal.Control.Concurrent.MVar ( MVar, newEmptyMVar, takeMVar, tryT
                           , putMVar, newMVar, tryPutMVar)
 import GHC.Internal.Control.Exception
 import GHC.Internal.Data.Maybe
+import qualified GHC.KnownKeyNames as Rebindable
 
 -- | 'QSem' is a quantity semaphore in which the resource is acquired
 -- and released in units of one. It provides guaranteed FIFO ordering

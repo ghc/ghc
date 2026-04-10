@@ -117,8 +117,8 @@ import GHC.Internal.Real         ( fromIntegral )
 import GHC.Internal.Show         ( Show(..), showParen, showString )
 import GHC.Internal.Weak
 import GHC.Internal.Word
-import GHC.Internal.Num( fromInteger, negate )  -- For known-key names
-import GHC.Internal.Base( (>>=), (>>) )         -- For known-key names
+import GHC.Internal.Num  as Rebindable( fromInteger, negate ) -- For known-key names
+import GHC.Internal.Base as Rebindable( (>>=), (>>) )         -- For known-key names
 
 infixr 0 `par`, `pseq`
 

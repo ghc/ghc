@@ -97,7 +97,6 @@ import GHC.Internal.Data.Either (Either (..))
 import GHC.Internal.Data.Type.Equality
 import GHC.Internal.Err (error, errorWithoutStackTrace)
 import GHC.Internal.List ( splitAt, foldl', elem, replicate, length )
-import GHC.Internal.Magic ( inline )
 import GHC.Internal.Magic.Dict ( WithDict(..) )
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Unicode (isDigit)
@@ -118,8 +117,7 @@ import {-# SOURCE #-} GHC.Internal.Fingerprint
    -- instances.
 -- import {-# SOURCE #-} GHC.Internal.Debug.Trace (trace)
 
-import GHC.Internal.Num( fromInteger )  -- For known-key names
-import GHC.Internal.Base( eqString )             -- For known-key names
+import qualified GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 #include "MachDeps.h"
 

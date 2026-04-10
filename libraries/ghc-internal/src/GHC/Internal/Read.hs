@@ -81,8 +81,8 @@ import GHC.Internal.List (filter)
 import GHC.Internal.Tuple (Solo (..))
 import GHC.Internal.ByteOrder
 
-import GHC.Internal.Control.Monad.Fail( fail )   -- For known-key names
-import GHC.Internal.Base( eqString )             -- For known-key names
+import GHC.Internal.Control.Monad.Fail as Rebindable( fail )   -- For known-key names
+import GHC.Internal.Base as Rebindable( eqString )             -- For known-key names
 
 -- | @'readParen' 'True' p@ parses what @p@ parses, but surrounded with
 -- parentheses.

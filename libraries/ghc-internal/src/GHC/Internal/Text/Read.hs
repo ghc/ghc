@@ -44,7 +44,6 @@ module GHC.Internal.Text.Read (
 
  ) where
 
-import GHC.Internal.Base
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Read
@@ -52,7 +51,7 @@ import GHC.Internal.Data.Either
 import GHC.Internal.Text.ParserCombinators.ReadP as P
 import GHC.Internal.Text.ParserCombinators.ReadPrec
 import qualified GHC.Internal.Text.Read.Lex as L
-import GHC.Internal.Base( (>>=), (>>) )        -- For known-key names
+import GHC.Internal.Base as Rebindable
 
 -- $setup
 -- >>> import Prelude
