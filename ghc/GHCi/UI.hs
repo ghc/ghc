@@ -78,7 +78,7 @@ import GHC.Types.SourceError ( SourceError, initSourceErrorContext )
 import GHC.Types.Name
 import GHC.Types.Var ( varType )
 import GHC.Iface.Syntax ( showToHeader )
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys( ioTyConName, ghciStepIoMName )
 import GHC.Builtin.KnownOccs( stringTyCon_RDR, compose_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName, greName, globalRdrEnvElts)
 import GHC.Types.SrcLoc as SrcLoc
