@@ -130,7 +130,7 @@ dsWasmJSDynamicExport ::
   Synchronicity ->
   Id ->
   Coercion ->
-  CCallStaticTargetUnit ->
+  CLabelTargetLibrary ->
   DsM ([Binding], CHeader, CStub, [Id])
 dsWasmJSDynamicExport sync fn_id co unitId = do
   sp_tycon <- dsLookupTyCon stablePtrTyConName
@@ -307,7 +307,7 @@ dsWasmJSStaticImport ::
   Id ->
   Coercion ->
   String ->
-  CCallStaticTargetUnit ->
+  CLabelTargetLibrary ->
   Synchronicity ->
   DsM ([Binding], CHeader, CStub)
 dsWasmJSStaticImport fn_id co js_src' unitId sync = do
@@ -398,7 +398,7 @@ uniqueCFunName = do
   mkWrapperName cfun_num "ghc_wasm_jsffi" ""
 
 importBindingRHS ::
-  CCallStaticTargetUnit ->
+  CLabelTargetLibrary ->
   FastString ->
   [TyVar] ->
   [Scaled Type] ->

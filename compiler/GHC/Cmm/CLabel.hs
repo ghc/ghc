@@ -124,6 +124,7 @@ module GHC.Cmm.CLabel (
         toEntryLbl,
         toInfoLbl,
         toProcDelimiterLbl,
+        toForeignLabelSource,
 
         -- * Pretty-printing
         LabelStyle (..),
@@ -143,7 +144,8 @@ module GHC.Cmm.CLabel (
 import GHC.Prelude
 
 import GHC.Types.Id.Info
-import GHC.Types.ForeignCall (ForeignLabelIsFunctionOrData(..))
+import GHC.Types.ForeignCall (ForeignLabelIsFunctionOrData(..),
+                              CLabelTargetLibrary(..))
 import {-# SOURCE #-} GHC.Cmm.BlockId (BlockId, mkBlockId)
 import GHC.Unit.Types
 import GHC.Types.Name
@@ -456,6 +458,27 @@ data ForeignLabelSource
    | ForeignLabelInThisPackage
 
    deriving (Eq, Ord)
+
+-- | The 'CLabelTargetLibrary' is used in the core phases, while
+-- 'ForeignLabelSource' is used in Cmm and below.
+--
+-- Apart from naming conventions, the difference is that 'ForeignLabelSource'
+-- has two extra cases:
+--
+-- 1. 'ForeignLabelInThisPackage' with an implicit \"this\". This works in
+--    the Cmm stage of the pipeline and below because there is a consistent
+--    notion of current package. In core, where unfoldings get moved across
+--    unit boundaries we must only use an explicit unit (which can be initially
+--    set to the unit where something is defined).
+--
+-- 2. 'ForeignLabelInExternalPackage'. This has a few uses in the cmm layer,
+--    but the use case does not arise in the frontend: we neve know positively
+--    that a name is in an external package without also knowing where it is
+--    from, e.g. the RTS, which then fall into the 'CLabelTargetInUnit' case.
+--
+toForeignLabelSource :: CLabelTargetLibrary -> ForeignLabelSource
+toForeignLabelSource (CLabelTargetInUnit unit) = ForeignLabelInPackage
+                                                   (toUnitId unit)
 
 
 -- | For debugging problems with the CLabel representation.
