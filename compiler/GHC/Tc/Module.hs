@@ -99,6 +99,7 @@ import GHC.Iface.Env     ( externaliseName )
 import GHC.Iface.Load
 
 import GHC.Builtin.Types ( mkListTy, anyTypeOfKind )
+import GHC.Builtin.Modules( mAIN_NAME, gHC_PRIM, rOOT_MAIN )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin
 

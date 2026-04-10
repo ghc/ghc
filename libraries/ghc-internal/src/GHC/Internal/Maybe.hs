@@ -8,9 +8,9 @@ module GHC.Internal.Maybe
 where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Internal.Types
+import GHC.Internal.Types as Rebindable
+import GHC.Internal.Magic as Rebindable( dataToTag# ) -- For derived Eq
 import GHC.Internal.Classes
-import GHC.Internal.Magic( dataToTag# ) -- For derived Eq
 
 default ()
 

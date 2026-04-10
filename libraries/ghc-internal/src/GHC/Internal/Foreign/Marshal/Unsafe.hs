@@ -20,7 +20,6 @@ module GHC.Internal.Foreign.Marshal.Unsafe (
         unsafeLocalState
     ) where
 
-import GHC.Internal.Base as Rebindable   -- For known-occ things
 import GHC.Internal.IO
 
 {- |

@@ -88,6 +88,7 @@ import GHC.Settings.Constants
 
 import GHC.Builtin
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( rEBINDABLE_MOD_NAME, kNOWN_KEY_NAMES, gHC_PRIM )
 import GHC.Builtin.PrimOps
 import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.Types.Prim
@@ -217,7 +218,7 @@ lookupKnownKeyName key (KKNS_InScope gbl_rdr_env)
 
 lookupKnownGRE :: GlobalRdrEnv -> OccName -> MaybeErr [GlobalRdrElt] GlobalRdrElt
 lookupKnownGRE rdr_env occ
-  | [gre] <- pickQualGREs rebindableModuleName gres
+  | [gre] <- pickQualGREs rEBINDABLE_MOD_NAME gres
   = Succeeded gre  -- Found qualified 'Known.occ' in scope
   | [gre] <- pickUnqualGREs gres
   = Succeeded gre  -- Found unqualified 'occ' in scope
@@ -226,9 +227,6 @@ lookupKnownGRE rdr_env occ
   where
     gres :: [GlobalRdrElt]
     gres = lookupGRE rdr_env (LookupOccName occ SameNameSpace)
-
-rebindableModuleName :: ModuleName
-rebindableModuleName = mkModuleName "Rebindable"
 
 lookupKnownOccThing :: HasDebugCallStack
                     => KnownOcc -> KnownKeyNameSource
@@ -340,13 +338,17 @@ loadGlobalName name mod
             Just get_type_env
                 -> do           -- It's defined in a module in the hs-boot loop
                 { type_env <- setLclEnv () get_type_env         -- yuk
+                ; traceIf (text "loadGlobalName1" <+> ppr name)
                 ; case lookupNameEnv type_env name of
-                    Just thing -> return (Succeeded thing)
+                    Just thing -> do { traceIf (text "loadGlobalName2" <+> ppr thing)
+                                     ; return (Succeeded thing) }
                     -- See Note [Knot-tying fallback on boot]
-                    Nothing   -> via_external
+                    Nothing   -> do { traceIf (text "loadGlobalName3" <+> ppr name)
+                                    ; via_external }
                 }
 
-            _ -> via_external }
+            _ -> do { traceIf (text "loadGlobalName4" <+> ppr name)
+                    ; via_external } }
   where
     via_external = do { hsc_env <- getTopEnv
                       ; mb_thing <- liftIO (lookupType hsc_env name)

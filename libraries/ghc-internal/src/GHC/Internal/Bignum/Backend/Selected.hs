@@ -10,8 +10,6 @@ module GHC.Internal.Bignum.Backend.Selected
    )
 where
 
-import GHC.Internal.Types
-
 #if defined(BIGNUM_NATIVE)
 import GHC.Internal.Bignum.Backend.Native as Backend
 

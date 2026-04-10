@@ -144,6 +144,8 @@ import GHC.Types.Unique
 
 import GHC.Builtin.Uniques
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( gHC_PRIM )
+
 import GHC.Utils.Misc ( changeLast )
 import GHC.Utils.Panic ( assertPpr )
 import GHC.Utils.Outputable

@@ -114,7 +114,7 @@ import System.Directory
 import System.Process
 import qualified GHC.InfoProv as InfoProv
 
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( gHC_PRIM, gHC_PRIMOPWRAPPERS )
 import GHC.Types.Name
 import qualified GHC.Unit.Home.Graph as HUG
 

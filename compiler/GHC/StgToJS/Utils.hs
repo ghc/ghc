@@ -61,6 +61,7 @@ import GHC.Stg.Syntax
 import GHC.Tc.Utils.TcType
 
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( gHC_PRIM )
 import GHC.Builtin.PrimOps (primOpIsReallyInline)
 
 import GHC.Types.RepType

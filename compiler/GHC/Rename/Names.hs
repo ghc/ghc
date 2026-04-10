@@ -48,8 +48,7 @@ import GHC.Tc.Zonk.TcType ( tcInitTidyEnv )
 import GHC.Hs
 import GHC.Iface.Load   ( loadSrcInterface )
 import GHC.Iface.Syntax ( fromIfaceWarnings )
-import GHC.Builtin( allKnownOccs )
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( pRELUDE_NAME, rEBINDABLE_MOD_NAME )
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import GHC.Core.TyCo.Tidy
 import GHC.Core.PatSyn
@@ -1955,16 +1954,15 @@ warnUnusedImportDecls gbl_env hsc_src
 
         -- We should only warn for unnecessary *user* imports, but deciding
         -- minimal imports should take generated imports into account
-       ; rb <- goptM Opt_RebindableKnownKeyNames
-       ; let usageUserImports = findImportUsage rb (excludeGenerated imports) uses
-             usageAllImports  = findImportUsage rb imports uses
+       ; let usageUserImports = findImportUsage (excludeGenerated imports) uses
+             usageAllImports  = findImportUsage imports uses
 
        ; traceRn "warnUnusedImportDecls" $
                        (vcat [ text "Uses:" <+> ppr uses
                              , text "Usage all user imports: " <+> ppr usageUserImports
                              , text "Usage all imports: " <+> ppr usageAllImports])
 
-       ; mapM_ (warnUnusedImport rb rdr_env) usageUserImports
+       ; mapM_ (warnUnusedImport rdr_env) usageUserImports
 
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports hsc_src usageAllImports }
@@ -1973,12 +1971,11 @@ warnUnusedImportDecls gbl_env hsc_src
 excludeGenerated :: [LImportDecl GhcRn] -> [LImportDecl GhcRn]
 excludeGenerated = filterOut (ideclGenerated . ideclExt . unLoc)
 
-findImportUsage :: Bool     -- True <=> Opt_RebindableKnownKeyNames is on
-                -> [LImportDecl GhcRn]
+findImportUsage :: [LImportDecl GhcRn]
                 -> [GlobalRdrElt]
                 -> [ImportDeclUsage]
 
-findImportUsage rebindable_known_key_names imports used_gres
+findImportUsage imports used_gres
   = map unused_decl imports
   where
     import_usage :: ImportMap
@@ -2032,13 +2029,14 @@ findImportUsage rebindable_known_key_names imports used_gres
           | used
           = acc
 
+{-  ToDo: delete this
           -- -frebindable-known-key-names is on, and `n` is a known-key name
           -- Then don't warn about an unused import.
           -- See (UI2) in Note [Unused imports]
           | rebindable_known_key_names
           , isKnownKeyName n || nameOccName n `elemOccSet` allKnownOccs
           = acc
-
+-}
           | otherwise
           = UnusedNames (acc_ns `extendNameSet` n) acc_wcs acc_fs
           where
@@ -2208,9 +2206,8 @@ lookupImportMap (L srcSpan ImportDecl{ideclName = L _ modName}) importMap =
       GeneratedSrcSpan{} -> modName `Map.lookup` im_generatedImports importMap
       _ -> Nothing
 
-warnUnusedImport :: Bool -> GlobalRdrEnv -> ImportDeclUsage -> RnM ()
-warnUnusedImport rebindable_known_key_names rdr_env
-                 (L loc decl, used, unused, unused_wcs)
+warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
+warnUnusedImport rdr_env (L loc decl, used, unused, unused_wcs)
 
   -- Do not warn for 'import M()'
   | Just (Exactly, _) <- ideclImportList decl
@@ -2223,11 +2220,15 @@ warnUnusedImport rebindable_known_key_names rdr_env
   , pRELUDE_NAME == unLoc (ideclName decl)
   = return ()
 
+  -- Do not warn about import X as Rebindable
+  -- See Note [Overview of known-key entities]
+  -- ToDo: write wrinkle
+  | Just (L _ mod) <- ideclAs decl
+  , mod == rEBINDABLE_MOD_NAME
+  = return ()
+
   -- Nothing used; drop entire declaration
-  -- Exception: if -frebindable-known-key-names is on, don't complain
-  --   about an unused import; it might be needed.
   | null used
-  , not rebindable_known_key_names
   = addDiagnosticAt (locA loc) (TcRnUnusedImport decl UnusedImportNone)
 
   -- Everything imported is used; nop

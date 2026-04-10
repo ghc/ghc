@@ -18,7 +18,7 @@ import GHC.Core.FVs (mkRuleInfo)
 
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Uniques
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( gHC_PRIM )
 import GHC.Builtin.Types.Prim
 
 import GHC.Types.Cpr

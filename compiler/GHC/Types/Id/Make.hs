@@ -46,6 +46,7 @@ import GHC.Prelude
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( gHC_PRIM, gHC_MAGIC )
 
 import GHC.Core
 import GHC.Core.Opt.Arity( typeOneShot )

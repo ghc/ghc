@@ -68,8 +68,9 @@ import GHC.Internal.Prim (
     negateInt#, uncheckedIShiftL#, uncheckedIShiftRA#, uncheckedIShiftRL#,
     (+#), (-#), (<#), (>#), (-##), (==##), (<##) )
 
-import GHC.Internal.Num( fromInteger, negate ) -- For known-key names
-                                               -- and instance Num Integer
+import GHC.Internal.Num as Rebindable
+            ( fromInteger, negate ) -- For known-key names
+                                    -- and instance Num Integer
 
 #if WORD_SIZE_IN_BITS < 64
 

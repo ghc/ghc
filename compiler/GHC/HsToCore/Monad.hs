@@ -636,10 +636,10 @@ dsLookupKnownKeyId uniq = tyThingId <$> dsLookupKnownKeyThing uniq
 --------------------------------------
 -- Lookups given a Name
 
-dsLookupGlobal :: Name -> DsM TyThing
+dsLookupGlobal :: HasDebugCallStack => Name -> DsM TyThing
 dsLookupGlobal name = dsToIfL (tcIfaceGlobal name)
 
-dsLookupGlobalId :: Name -> DsM Id
+dsLookupGlobalId :: HasDebugCallStack => Name -> DsM Id
 dsLookupGlobalId name = tyThingId <$> dsLookupGlobal name
 
 dsLookupTyCon :: Name -> DsM TyCon
