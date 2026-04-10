@@ -1,0 +1,10 @@
+ConflictingInlinePragmas0.hs:7:14: error: [GHC-43895]
+    Conflicting pragmas for 'f'
+    at ConflictingInlinePragmas0.hs:3:12
+       ConflictingInlinePragmas0.hs:7:14
+  |
+3 | {-# INLINE f #-}
+  |            ^
+  |
+7 | {-# NOINLINE f #-}
+  |              ^

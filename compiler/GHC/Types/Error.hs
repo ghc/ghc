@@ -66,6 +66,7 @@ module GHC.Types.Error
    , mkLocMessageWarningGroups
    , formatDiagnostic
    , getCaretDiagnostic
+   , getCaretDiagnostics
 
    , jsonDiagnostic
 
@@ -108,8 +109,8 @@ import Data.Bifunctor
 import Data.Foldable
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
-import Data.List ( intercalate )
-import Data.Maybe ( maybeToList )
+import Data.List ( intercalate, sort )
+import Data.Maybe ( mapMaybe, maybeToList )
 import Data.Typeable ( Typeable )
 import Numeric.Natural ( Natural )
 import Text.Printf ( printf )
@@ -279,6 +280,14 @@ class (Outputable (DiagnosticHint a), HasDefaultDiagnosticOpts (DiagnosticOpts a
   -- #18516 tracks our progress toward this goal.
   diagnosticCode    :: a -> Maybe DiagnosticCode
 
+  -- | Additional source spans whose source excerpts should be shown when
+  -- rendering caret diagnostics for this message.
+  --
+  -- When this returns 'Nothing', callers should fall back to the message's
+  -- primary location.
+  diagnosticSourceSpans :: a -> Maybe (NonEmpty SrcSpan)
+  diagnosticSourceSpans _ = Nothing
+
 -- | An existential wrapper around an unknown diagnostic.
 data UnknownDiagnostic opts hint where
   UnknownDiagnostic :: (Diagnostic a, Typeable a)
@@ -297,6 +306,7 @@ instance (HasDefaultDiagnosticOpts opts, Outputable hint) => Diagnostic (Unknown
   diagnosticReason       (UnknownDiagnostic _ _ diag) = diagnosticReason diag
   diagnosticHints        (UnknownDiagnostic _ f diag) = map f (diagnosticHints diag)
   diagnosticCode         (UnknownDiagnostic _ _ diag) = diagnosticCode diag
+  diagnosticSourceSpans  (UnknownDiagnostic _ _ diag) = diagnosticSourceSpans diag
 
 -- A fallback 'DiagnosticOpts' which can be used when there are no options
 -- for a particular diagnostic.
@@ -787,7 +797,25 @@ getSeverityColour severity = case severity of
   SevIgnore -> const mempty
 
 getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
-getCaretDiagnostic msg_class (RealSrcSpan span _) =
+getCaretDiagnostic msg_class span = getCaretDiagnostics msg_class (span :| [])
+
+getCaretDiagnostics :: MessageClass -> NonEmpty SrcSpan -> IO SDoc
+getCaretDiagnostics msg_class spans = do
+  let realSpans = dedupSortedRealSpans spans
+      -- Compute the max margin width across all spans so they align
+      maxMarginWidth = foldl' (\acc s -> max acc (length (show (srcSpanStartLine s)))) 0 realSpans
+  vcat <$> traverse (getSingleCaretDiagnostic msg_class maxMarginWidth) realSpans
+  where
+    dedupSortedRealSpans :: NonEmpty SrcSpan -> [RealSrcSpan]
+    dedupSortedRealSpans = go Nothing . sort . mapMaybe srcSpanToRealSrcSpan . NE.toList
+      where
+        go _ [] = []
+        go prev (span:rest)
+          | Just span == prev = go prev rest
+          | otherwise         = span : go (Just span) rest
+
+getSingleCaretDiagnostic :: MessageClass -> Int -> RealSrcSpan -> IO SDoc
+getSingleCaretDiagnostic msg_class maxMarginWidth span =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
   where
     getSrcLine fn i =
@@ -850,9 +878,9 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
             | otherwise = srcSpanEndCol span - 1
         width = max 1 (end - start)
 
-        marginWidth = length rowStr
+        marginWidth = maxMarginWidth
         marginSpace = replicate marginWidth ' ' ++ " |"
-        marginRow   = rowStr ++ " |"
+        marginRow   = replicate (marginWidth - length rowStr) ' ' ++ rowStr ++ " |"
 
         (srcLinePre,  srcLineRest) = splitAt start srcLine
         (srcLineSpan, srcLinePost) = splitAt width srcLineRest
@@ -860,7 +888,6 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
         caretEllipsis | multiline = "..."
                       | otherwise = ""
         caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
-getCaretDiagnostic _ _ = pure empty
 --
 -- Queries
 --

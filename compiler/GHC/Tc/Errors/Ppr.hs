@@ -1468,6 +1468,14 @@ instance Diagnostic TcRnMessage where
           ]
       where
         what_it_is = hsSigDoc sig
+    TcRnConflictingInlineSigDecl pairs@((L _ name, _) :| _) -> mkSimpleDecorated $
+      vcat [ text "Conflicting pragmas for" <+> quotes (ppr name)
+           , text "at" <+> vcat (map ppr conflicting_pragmas)
+           ]
+      where
+        conflicting_pragmas :: [SrcSpan]
+        conflicting_pragmas =
+          sortBy leftmost_smallest (map (getLocA . fst) (NE.toList pairs))
     TcRnMisplacedSigDecl sig -> mkSimpleDecorated $
       sep [text "Misplaced" <+> hsSigDoc sig <> colon, ppr sig]
     TcRnUnexpectedDefaultSig sig -> mkSimpleDecorated $
@@ -2479,6 +2487,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnNonStdGuards{}
       -> WarningWithoutFlag
+    TcRnConflictingInlineSigDecl{}
+      -> ErrorWithoutFlag
     TcRnDuplicateSigDecl{}
       -> ErrorWithoutFlag
     TcRnMisplacedSigDecl{}
@@ -3158,6 +3168,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnNonStdGuards{}
       -> [suggestExtension LangExt.PatternGuards]
+    TcRnConflictingInlineSigDecl{}
+      -> noHints
     TcRnDuplicateSigDecl{}
       -> noHints
     TcRnMisplacedSigDecl{}
@@ -3454,6 +3466,21 @@ instance Diagnostic TcRnMessage where
       -> noHints
 
   diagnosticCode = constructorCode @GHC
+
+  diagnosticSourceSpans = \case
+    TcRnUnknownMessage m
+      -> diagnosticSourceSpans m
+    TcRnMessageWithInfo _ (TcRnMessageDetailed _ msg')
+      -> diagnosticSourceSpans msg'
+    TcRnWithHsDocContext _ msg'
+      -> diagnosticSourceSpans msg'
+    TcRnConflictingInlineSigDecl pairs
+      -> Just $
+         NE.fromList $
+         sortBy leftmost_smallest $
+         map (getLocA . fst) (NE.toList pairs)
+    _ ->
+      Nothing
 
 pprTcRnBadlyLevelled :: LevelCheckReason -> Set.Set ThLevelIndex -> ThLevelIndex -> Maybe ErrorItem -> DecoratedSDoc
 pprTcRnBadlyLevelled reason bind_lvls use_lvl lift_attempt = mkDecorated $

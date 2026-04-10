@@ -84,7 +84,7 @@ import GHC.Prelude
 import GHC.Driver.Flags
 import GHC.Types.Error
   ( MessageClass (..), Severity (..)
-  , mkLocMessageWarningGroups,getCaretDiagnostic )
+  , mkLocMessageWarningGroups, getCaretDiagnostic, getCaretDiagnostics )
 -- import GHC.Types.Error ()
 import GHC.Types.SrcLoc
 
@@ -102,6 +102,7 @@ import System.FilePath  ( takeDirectory, (</>) )
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
 import Data.List (stripPrefix)
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Time
 import System.IO
 import Control.Monad
@@ -423,7 +424,8 @@ defaultLogActionWithHandles out err logflags msg_class srcSpan msg
       MCInfo                       -> printErrs msg
       MCFatal                      -> printErrs msg
       MCDiagnostic SevIgnore _ _   -> pure () -- suppress the message
-      MCDiagnostic _sev _rea _code -> decorateDiagnostic logflags msg_class srcSpan msg >>= printErrs
+      MCDiagnostic _sev _rea _code ->
+        decorateDiagnostic logflags msg_class srcSpan (srcSpan :| []) msg >>= printErrs
     where
       printOut   = defaultLogActionHPrintDoc  logflags False out
       printErrs  = defaultLogActionHPrintDoc  logflags False err
@@ -463,8 +465,8 @@ defaultLogActionWithHandles out err logflags msg_class srcSpan msg
 --     `defaultLogActionWithHandles`)
 --
 -- This story is tracked by #24113.
-decorateDiagnostic :: LogFlags -> MessageClass -> SrcSpan -> SDoc -> IO SDoc
-decorateDiagnostic logflags msg_class srcSpan msg = addCaret
+decorateDiagnostic :: LogFlags -> MessageClass -> SrcSpan -> NonEmpty SrcSpan -> SDoc -> IO SDoc
+decorateDiagnostic logflags msg_class srcSpan sourceSpans msg = addCaret
     where
       -- Pretty print the warning flag, if any (#10752)
       message :: SDoc
@@ -474,7 +476,7 @@ decorateDiagnostic logflags msg_class srcSpan msg = addCaret
       addCaret = do
         caretDiagnostic <-
             if log_show_caret logflags
-            then getCaretDiagnostic msg_class srcSpan
+            then getCaretDiagnostics msg_class sourceSpans
             else pure empty
         return $ getPprStyle $ \style ->
           withPprStyle (setStyleColoured True style)

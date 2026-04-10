@@ -15,6 +15,8 @@ import GHC.Utils.Json
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
+import Data.List.NonEmpty (NonEmpty(..))
+import Data.Maybe (fromMaybe)
 
 reportError :: Logger -> NamePprCtx -> DiagOpts -> SrcSpan -> SDoc -> IO ()
 reportError logger nameContext opts span doc = do
@@ -47,7 +49,7 @@ printMessages logger msg_opts opts = mapM_ (printMessage logger msg_opts opts) .
 printMessage :: forall a. (Diagnostic a) => Logger -> DiagnosticOpts a -> DiagOpts -> MsgEnvelope a -> IO ()
 printMessage logger msg_opts opts message
   | log_diags_as_json = do
-      decorated <- decorateDiagnostic logflags messageClass location doc
+      decorated <- decorateDiagnostic logflags messageClass location sourceSpans doc
       let
         rendered :: String
         rendered = renderWithContext (log_default_user_context logflags) decorated
@@ -57,7 +59,7 @@ printMessage logger msg_opts opts message
 
       logJsonMsg logger messageClass jsonMessage
 
-  | otherwise = logMsg logger messageClass location doc
+  | otherwise = logMsg (pushLogHook renderWithSourceSpans logger) messageClass location doc
   where
     logflags :: LogFlags
     logflags = logFlags logger
@@ -80,8 +82,20 @@ printMessage logger msg_opts opts message
     diagnostic :: a
     diagnostic = errMsgDiagnostic message
 
+    sourceSpans :: NonEmpty SrcSpan
+    sourceSpans = fromMaybe (location :| []) (diagnosticSourceSpans diagnostic)
+
     severity :: Severity
     severity = errMsgSeverity message
+
+    renderWithSourceSpans :: LogAction -> LogAction
+    renderWithSourceSpans fallback logflags' msg_class' srcSpan' msg' =
+      case msg_class' of
+        MCDiagnostic _ _ _ -> do
+          decorated <- decorateDiagnostic logflags' msg_class' srcSpan' sourceSpans msg'
+          fallback logflags' MCInfo noSrcSpan decorated
+        _ ->
+          fallback logflags' msg_class' srcSpan' msg'
 
     messageWithHints :: a -> SDoc
     messageWithHints e =

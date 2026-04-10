@@ -601,6 +601,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnEmptyCase"                                 = 48010
   GhcDiagnosticCode "TcRnNonStdGuards"                              = 59119
   GhcDiagnosticCode "TcRnDuplicateSigDecl"                          = 31744
+  GhcDiagnosticCode "TcRnConflictingInlineSigDecl"                  = 43895
   GhcDiagnosticCode "TcRnMisplacedSigDecl"                          = 87866
   GhcDiagnosticCode "TcRnUnexpectedDefaultSig"                      = 40700
   GhcDiagnosticCode "TcRnDuplicateMinimalSig"                       = 85346
