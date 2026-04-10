@@ -3479,6 +3479,11 @@ instance Diagnostic TcRnMessage where
          NE.fromList $
          sortBy leftmost_smallest $
          map (getLocA . fst) (NE.toList pairs)
+    TcRnBindingNameConflict _ locs
+      -> Just $
+         NE.fromList $
+         sortBy leftmost_smallest $
+         NE.toList locs
     _ ->
       Nothing
 
