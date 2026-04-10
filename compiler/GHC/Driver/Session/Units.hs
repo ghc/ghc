@@ -17,11 +17,7 @@ import GHC.Driver.Config.Diagnostic
 
 import GHC.Unit.Env
 import GHC.Unit (UnitId)
-import GHC.Unit.Home (GenHomeUnit(..))
-import GHC.Unit.Home.PackageTable
 import qualified GHC.Unit.Home.Graph as HUG
-import GHC.Unit.State  ( emptyUnitState )
-import qualified GHC.Unit.State as State
 
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
@@ -43,6 +39,7 @@ import GHC.ResponseFile (expandResponse)
 import Data.Bifunctor
 import GHC.Data.Graph.Directed
 import qualified Data.List.NonEmpty as NE
+import GHC.Driver.Main (createHomeUnitEnvFromFlags)
 
 -- Strip out any ["+RTS", ..., "-RTS"] sequences in the command string list.
 removeRTS :: [String] -> [String]
@@ -126,24 +123,7 @@ initMulti unitArgsFiles lintDynFlagsAndSrcs = do
 
   checkDuplicateUnits initial_dflags (NE.toList (NE.zip unitArgsFiles unitDflags))
 
-  (initial_home_graph, mainUnitId) <- liftIO $ createUnitEnvFromFlags unitDflags
-  let home_units = HUG.allUnits initial_home_graph
-
-  home_unit_graph <- forM initial_home_graph $ \homeUnitEnv -> do
-    let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
-        hue_flags = homeUnitEnv_dflags homeUnitEnv
-        dflags = homeUnitEnv_dflags homeUnitEnv
-    (dbs,unit_state,home_unit,mconstants) <- liftIO $ State.initUnits logger hue_flags cached_unit_dbs home_units
-
-    updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
-    emptyHpt <- liftIO $ emptyHomePackageTable
-    pure $ HomeUnitEnv
-      { homeUnitEnv_units = unit_state
-      , homeUnitEnv_unit_dbs = Just dbs
-      , homeUnitEnv_dflags = updated_dflags
-      , homeUnitEnv_hpt = emptyHpt
-      , homeUnitEnv_home_unit = home_unit
-      }
+  (home_unit_graph, mainUnitId) <- liftIO $ createHomeUnitEnvFromFlags logger unitDflags
 
   checkUnitCycles initial_dflags home_unit_graph
 
@@ -233,14 +213,3 @@ offsetDynFlags dflags =
     augment_maybe (Just f) = Just (augment f)
     augment f | isRelative f, Just offset <- workingDirectory dflags = offset </> f
               | otherwise = f
-
-
-createUnitEnvFromFlags :: NE.NonEmpty DynFlags -> IO (HomeUnitGraph, UnitId)
-createUnitEnvFromFlags unitDflags = do
-  unitEnvList <- forM unitDflags $ \dflags -> do
-    emptyHpt <- emptyHomePackageTable
-    let newInternalUnitEnv =
-          HUG.mkHomeUnitEnv emptyUnitState Nothing dflags emptyHpt (DefiniteHomeUnit (homeUnitId_ dflags) Nothing)
-    return (homeUnitId_ dflags, newInternalUnitEnv)
-  let activeUnit = fst $ NE.head unitEnvList
-  return (HUG.hugFromList (NE.toList unitEnvList), activeUnit)

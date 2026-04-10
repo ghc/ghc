@@ -38,6 +38,7 @@ module GHC.Driver.Main
       newHscEnv
     , newHscEnvWithHUG
     , initHscEnv
+    , createHomeUnitEnvFromFlags
 
     -- * Compiling complete source files
     , Messager, batchMsg, batchMultiMsg
@@ -298,6 +299,7 @@ import Data.Bifunctor
 import qualified GHC.Unit.Home.Graph as HUG
 import GHC.Unit.Home.PackageTable
 import qualified GHC.ByteCode.Serialize as ByteCode
+import qualified Data.Set as Set
 
 {- **********************************************************************
 %*                                                                      *
@@ -307,19 +309,15 @@ import qualified GHC.ByteCode.Serialize as ByteCode
 
 newHscEnv :: FilePath -> DynFlags -> IO HscEnv
 newHscEnv top_dir dflags = do
-  hpt <- emptyHomePackageTable
-  newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) (home_unit_graph hpt)
-  where
-    home_unit_graph hpt =
-        HUG.unitEnv_singleton
-          (homeUnitId_ dflags)
-          (HUG.mkHomeUnitEnv emptyUnitState Nothing dflags hpt (DefiniteHomeUnit (homeUnitId_ dflags) Nothing))
+  logger  <- initLogger
+  -- TODO: doesn't quite work, we call 'initUnits' in 'createHomeUnitEnvFromFlags'
+  (home_unit_graph, mainUnitId) <- createHomeUnitEnvFromFlags logger (NE.singleton dflags)
+  newHscEnvWithHUG logger top_dir dflags mainUnitId home_unit_graph
 
-newHscEnvWithHUG :: FilePath -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
-newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
+newHscEnvWithHUG :: Logger -> FilePath -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
+newHscEnvWithHUG logger top_dir top_dynflags cur_unit home_unit_graph = do
     nc_var  <- newNameCache
     fc_var  <- initFinderCache
-    logger  <- initLogger
     tmpfs   <- initTmpFs
     let dflags = homeUnitEnv_dflags $ HUG.unitEnv_lookup cur_unit home_unit_graph
     unit_env <- initUnitEnv cur_unit home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags)
@@ -338,6 +336,24 @@ newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
                   , hsc_tmpfs          = tmpfs
                   , hsc_llvm_config    = llvm_config
                   }
+
+createHomeUnitEnvFromFlags :: Logger -> NE.NonEmpty DynFlags -> IO (HomeUnitGraph, UnitId)
+createHomeUnitEnvFromFlags logger unitDflags = do
+  let home_units = Set.fromList (NE.toList $ NE.map homeUnitId_ unitDflags)
+
+  homeUnitEnvs <- forM (NE.toList unitDflags) $ \dflags -> do
+    let cached_unit_dbs = Nothing
+        hue_flags = dflags
+
+    (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger hue_flags cached_unit_dbs home_units
+
+    updated_dflags <- liftIO $ updatePlatformConstants dflags mconstants
+    hpt <- liftIO emptyHomePackageTable
+    pure (homeUnitId home_unit, HUG.mkHomeUnitEnv unit_state (Just dbs) updated_dflags hpt home_unit)
+
+  let activeUnit = homeUnitId_ $ NE.head unitDflags
+  let home_unit_graph = HUG.hugFromList homeUnitEnvs
+  return (home_unit_graph, activeUnit)
 
 -- | Initialize HscEnv from an optional top_dir path
 initHscEnv :: Maybe FilePath -> IO HscEnv
