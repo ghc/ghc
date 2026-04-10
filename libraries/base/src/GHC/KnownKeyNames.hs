@@ -103,9 +103,9 @@ module GHC.KnownKeyNames
     , UnsafeEquality( UnsafeRefl ), unsafeEqualityProof
 
     -- Typeable and type representations
-    , SomeTypeRep( SomeTypeRep ), Module( Module )
+    , SomeTypeRep( SomeTypeRep ), TR.Module( Module )
     , TyCon( TyCon ), TrName( TrNameS )
-    , KindRep( KindRepTyConApp, KindRepVar, KindRepApp, KindREpFun, KindRepTYPE, KindREpTypeLitS )
+    , KindRep( KindRepTyConApp, KindRepVar, KindRepApp, KindRepFun, KindRepTYPE, KindRepTypeLitS )
     , TypeLitSort( TypeLitSymbol, TypeLitNat, TypeLitChar )
     , typeRep#
     , mkTrCon, mkTrAppChecked, mkTrFun
@@ -178,6 +178,7 @@ import GHC.Internal.Data.Foldable( Foldable )
 import GHC.Internal.Data.Traversable( Traversable )
 import GHC.Internal.Float( RealFloat )
 import GHC.Internal.Real
+import GHC.Internal.IO( seq# )
 import GHC.Internal.Control.Monad( fail, guard )
 import GHC.Internal.Control.Monad.Fix( mfix, loop )
 import GHC.Internal.Control.Monad.Zip( mzip )
@@ -195,7 +196,7 @@ import GHC.Internal.StaticPtr( IsStatic(..) )
 import GHC.Internal.StaticPtr.Internal( makeStatic )
 
 import GHC.Internal.Data.Typeable( Typeable, gcast1, gcast2 )
-import GHC.Internal.Data.Typeable.Internal
+import GHC.Internal.Data.Typeable.Internal as TR
 import GHC.Internal.Generics
 
 import GHC.Internal.Bignum.BigNat

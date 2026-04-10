@@ -37,6 +37,7 @@ import GHC.Tc.Zonk.TcType
 
 import GHC.Builtin.Types
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( gHC_CLASSES )
 import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 
 import GHC.Core.Type

@@ -41,12 +41,12 @@ import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
 import GHC.Types.Unique.FM
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim  ( mkTemplateAnonTyConBinders, mkTemplateTyVars )
+import GHC.Builtin.Modules     ( gHC_INTERNAL_TYPELITS
+                               , gHC_INTERNAL_TYPELITS_INTERNAL
+                               , gHC_INTERNAL_TYPENATS
+                               , gHC_INTERNAL_TYPENATS_INTERNAL )
 import GHC.Builtin.KnownKeys
-                  ( gHC_INTERNAL_TYPELITS
-                  , gHC_INTERNAL_TYPELITS_INTERNAL
-                  , gHC_INTERNAL_TYPENATS
-                  , gHC_INTERNAL_TYPENATS_INTERNAL
-                  , typeNatAddTyFamNameKey
+                  ( typeNatAddTyFamNameKey
                   , typeNatMulTyFamNameKey
                   , typeNatExpTyFamNameKey
                   , typeNatSubTyFamNameKey

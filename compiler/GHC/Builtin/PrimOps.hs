@@ -32,7 +32,7 @@ import GHC.Prelude
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Builtin.Uniques (mkPrimOpIdUnique, mkPrimOpWrapperUnique )
-import GHC.Builtin.KnownKeys ( gHC_PRIMOPWRAPPERS )
+import GHC.Builtin.Modules ( gHC_PRIMOPWRAPPERS )
 
 import GHC.Core.TyCon    ( isPrimTyCon, isUnboxedTupleTyCon, PrimRep(..) )
 import GHC.Core.Type

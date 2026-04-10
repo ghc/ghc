@@ -8,8 +8,6 @@ module GHC.Internal.Bignum.Backend
    )
 where
 
-import GHC.Internal.Types
-
 #if defined(BIGNUM_CHECK)
 import GHC.Internal.Bignum.Backend.Check    as Backend
 #else

@@ -23,7 +23,7 @@ module GHC.Internal.ConsoleHandler
         where
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Internal.Base
+import GHC.Internal.Base as Rebindable
 
 #else /* whole file */
         ( Handler(..)
@@ -43,7 +43,6 @@ Note: this #include is inside a Haskell comment
       by GHC
 -}
 
-import GHC.Internal.Base
 import GHC.Internal.Data.Maybe (Maybe(..))
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Foreign.C.Types
@@ -54,6 +53,7 @@ import GHC.Internal.Stable
 import GHC.Internal.Conc.IO
 import GHC.Internal.Control.Concurrent.MVar
 import GHC.Internal.Types (Bool, IO)
+import GHC.Internal.Base as Rebindable
 
 data Handler
  = Default

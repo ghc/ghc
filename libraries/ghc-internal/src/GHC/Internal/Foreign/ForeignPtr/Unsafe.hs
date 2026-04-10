@@ -24,6 +24,5 @@ module GHC.Internal.Foreign.ForeignPtr.Unsafe (
         unsafeForeignPtrToPtr,
     ) where
 
-import GHC.Internal.Base as Rebindable  -- For known-occ things
 import GHC.Internal.Foreign.ForeignPtr.Imp
 

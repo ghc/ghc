@@ -27,6 +27,5 @@ module GHC.Internal.Foreign.StablePtr
         , castPtrToStablePtr
         ) where
 
-import GHC.Internal.Types as Rebindable   -- For known-occ names
 import GHC.Internal.Stable
 

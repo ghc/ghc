@@ -202,6 +202,7 @@ Library
         GHC.Builtin
         GHC.Builtin.KnownKeys
         GHC.Builtin.KnownOccs
+        GHC.Builtin.Modules
         GHC.Builtin.PrimOps
         GHC.Builtin.PrimOps.Casts
         GHC.Builtin.PrimOps.Ids

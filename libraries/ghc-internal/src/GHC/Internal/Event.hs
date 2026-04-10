@@ -46,7 +46,6 @@ import GHC.Internal.Types ()
     , unregisterTimeout
     ) where
 
-import GHC.Internal.Base as Rebindable
 import GHC.Internal.Event.Manager
 import GHC.Internal.Event.TimerManager (TimeoutCallback, TimeoutKey, registerTimeout,
                                updateTimeout, unregisterTimeout, TimerManager)

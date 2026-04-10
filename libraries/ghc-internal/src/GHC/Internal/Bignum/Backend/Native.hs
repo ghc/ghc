@@ -27,7 +27,7 @@ import GHC.Internal.Bignum.WordArray
 import GHC.Internal.Bignum.Primitives
 import GHC.Internal.Prim
 import GHC.Internal.Types
-import GHC.Internal.Base( (>>) )
+import GHC.Internal.Base as Rebindable( (>>) )
 
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
 -- (This module uses the empty tuple () and string literals.)

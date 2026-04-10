@@ -71,7 +71,6 @@ import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Var.Set
 
-import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.TH
 import GHC.Builtin.Types.Prim

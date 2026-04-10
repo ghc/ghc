@@ -66,7 +66,7 @@ import GHC.Internal.Data.Data (Data)
 
 import GHC.Internal.Functor.ZipList (ZipList(..))
 import GHC.Generics
-import GHC.Internal.Num( Num ) -- For -frebindable-known-key-names (defaulting)
+import qualified GHC.KnownKeyNames as Rebindable
 
 -- $setup
 -- >>> import Prelude

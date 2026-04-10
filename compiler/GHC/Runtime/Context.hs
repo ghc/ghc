@@ -41,7 +41,8 @@ import GHC.Types.Name.Ppr
 import GHC.Types.TyThing
 import GHC.Types.Var
 
-import GHC.Builtin.KnownKeys ( ioTyConName, printName, mkInteractiveModule )
+import GHC.Builtin.KnownKeys ( ioTyConName, printName )
+import GHC.Builtin.Modules   ( mkInteractiveModule )
 
 import GHC.Utils.Outputable
 

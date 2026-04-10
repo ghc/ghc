@@ -13,6 +13,7 @@ import Data.List
   )
 import Data.List qualified
 import Data.Maybe
+import GHC.Builtin.Modules( mkGhcInternalModule )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim

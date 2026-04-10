@@ -24,11 +24,10 @@ module GHC.Internal.ST (
         liftST, unsafeInterleaveST, unsafeDupableInterleaveST
     ) where
 
-import GHC.Internal.Base
+import GHC.Internal.Base as Rebindable
+import GHC.Internal.Num  as Rebindable( fromInteger)
 import GHC.Internal.Prim (State#, noDuplicate#)
 import GHC.Internal.Show
-
-import GHC.Internal.Num( fromInteger )  -- For known-key names
 
 default ()
 

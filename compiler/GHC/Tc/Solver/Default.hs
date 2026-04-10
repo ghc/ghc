@@ -40,10 +40,14 @@ import GHC.Types.Unique.Set
 import GHC.Types.Id
 
 import GHC.Builtin
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownKeys( unsatisfiableIdKey
+                            , isStringClassKey
+                            , emptyExceptionContextName )
+import GHC.Builtin.Modules ( gHC_INTERNAL_TYPEERROR )
 import GHC.Builtin.Types
 
 import GHC.Types.TyThing ( MonadThings(lookupId) )
+import GHC.Types.Unique
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set

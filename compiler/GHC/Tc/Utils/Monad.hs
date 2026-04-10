@@ -221,6 +221,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Error
 import GHC.Utils.Panic
+import GHC.Utils.Misc
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
 import qualified GHC.Data.Strict as Strict
@@ -2461,7 +2462,7 @@ getIfModule :: IfL Module
 getIfModule = do { env <- getLclEnv; return (if_mod env) }
 
 --------------------
-failIfM :: SDoc -> IfL a
+failIfM :: HasDebugCallStack => SDoc -> IfL a
 -- The Iface monad doesn't have a place to accumulate errors, so we
 -- just fall over fast if one happens; it "shouldn't happen".
 -- We use IfL here so that we can get context info out of the local env
@@ -2469,7 +2470,7 @@ failIfM msg = do
     env <- getLclEnv
     let full_msg = (if_loc env <> colon) $$ nest 2 msg
     logger <- getLogger
-    liftIO $ fatalErrorMsg logger full_msg
+    liftIO $ fatalErrorMsg logger (full_msg $$ callStackDoc)
     failM
 
 --------------------

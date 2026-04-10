@@ -7,7 +7,7 @@ import GHC.Prelude
 
 import GHC.Hs
 import GHC.Builtin( isUnboundName )
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs( main_RDR_Unqual )
 import GHC.Core.Class
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad

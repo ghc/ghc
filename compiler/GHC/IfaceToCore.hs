@@ -131,8 +131,8 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
 import Data.List(nub)
-import GHC.Builtin.KnownKeys ( ioTyConName
-                         , rOOT_MAIN )
+import GHC.Builtin.KnownKeys ( ioTyConName )
+import GHC.Builtin.Modules   ( rOOT_MAIN )
 import GHC.Iface.Errors.Types
 
 import Language.Haskell.Syntax.BooleanFormula (BooleanFormula)
@@ -2035,7 +2035,7 @@ tcIfaceOneShot IfaceOneShot = OneShotLam
 ************************************************************************
 -}
 
-tcIfaceGlobal :: Name -> IfL TyThing
+tcIfaceGlobal :: HasDebugCallStack => Name -> IfL TyThing
 tcIfaceGlobal name
   | Just thing <- wiredInNameTyThing_maybe name
         -- Wired-in things include TyCons, DataCons, and Ids
