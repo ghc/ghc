@@ -7,7 +7,7 @@ AC_DEFUN([FP_CC_SUPPORTS__ATOMICS],
     AC_MSG_CHECKING([whether C compiler supports C11 atomics])
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
         [[#include <stdatomic.h>
-          int x;]],
+          _Atomic int x;]],
         [[atomic_load(&x); return x;]])],
     [
         AC_MSG_RESULT(yes)
@@ -16,7 +16,7 @@ AC_DEFUN([FP_CC_SUPPORTS__ATOMICS],
         AC_MSG_CHECKING(whether -latomic is needed for sub-word-sized atomic operations)
         AC_LINK_IFELSE([AC_LANG_PROGRAM(
                 [[#include <stdatomic.h>
-                  unsigned char a;]],
+                  _Atomic unsigned char a;]],
                 [[atomic_fetch_or_explicit(&a, 1, memory_order_relaxed);]])],
         [
             AC_MSG_RESULT(no)
@@ -26,7 +26,7 @@ AC_DEFUN([FP_CC_SUPPORTS__ATOMICS],
             LIBS="-latomic"
             AC_LINK_IFELSE([AC_LANG_PROGRAM(
                 [[#include <stdatomic.h>
-                  unsigned char a;]],
+                  _Atomic unsigned char a;]],
                 [[atomic_fetch_or_explicit(&a, 1, memory_order_relaxed);]])],
             [
                 AC_MSG_RESULT(yes)
@@ -43,7 +43,7 @@ AC_DEFUN([FP_CC_SUPPORTS__ATOMICS],
             [[
             #include <inttypes.h>
             #include <stdatomic.h>
-            uint64_t a;
+            _Atomic uint64_t a;
             ]], [[atomic_fetch_or_explicit(&a, 1, memory_order_relaxed);]])],
         [
             AC_MSG_RESULT(no)
@@ -55,7 +55,7 @@ AC_DEFUN([FP_CC_SUPPORTS__ATOMICS],
                 [[
                 #include <inttypes.h>
                 #include <stdatomic.h>
-                uint64_t a;
+                _Atomic uint64_t a;
                 ]], [[atomic_fetch_or_explicit(&a, 1, memory_order_relaxed);]])],
             [
                 AC_MSG_RESULT(yes)
