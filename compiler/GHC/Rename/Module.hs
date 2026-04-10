@@ -458,12 +458,9 @@ rnHsForeignImport (CImport ext cconv@(L _ PrimCallConv) safety header spec)
                 return (CLabelTargetInUnit this)
 
 rnHsForeignImport (CImport ext cconv safety header spec)
-  = do { topEnv :: HscEnv <- getTopEnv
-       ; let target = CLabelTargetInUnit (homeUnitId (hsc_home_unit topEnv))
-       ; return (CImport ext cconv safety
-                         (renameHeader <$> header)
-                         (renameCImportSpec target spec))
-       }
+  = return (CImport ext cconv safety
+                    (renameHeader <$> header)
+                    (renameCImportSpec CLabelTargetUnknown spec))
 
 renameCImportSpec :: CLabelTargetLibrary -> CImportSpec GhcPs -> CImportSpec GhcRn
 renameCImportSpec targetLib = \case
