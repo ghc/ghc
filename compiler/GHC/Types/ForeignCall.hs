@@ -369,6 +369,10 @@ instance Binary CCallConv where
 -- determine whether a reference using the label is in the same shared library
 -- as the target, or if the target is in a different library.
 --
+-- For normal user-specified FFI imports, we do not know, which uses
+-- 'CLabelTargetUnknown'. Some internally generated labels where the target is
+-- known (e.g. the RTS) use 'CLabelTargetInUnit'.
+--
 data CLabelTargetLibrary
 
     -- | The entity (that the name\/label points to) is in an unknown shared
