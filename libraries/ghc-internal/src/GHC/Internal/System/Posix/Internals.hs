@@ -77,7 +77,7 @@ import qualified GHC.Internal.Foreign.C.String.Encoding as GHC
 import GHC.Internal.Int
 import GHC.Internal.Data.OldList (elem)
 #endif
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
+import GHC.Internal.Base as Rebindable( (>>=), (>>) ) -- For known-key names
 
 -- ---------------------------------------------------------------------------
 -- Debugging the base package

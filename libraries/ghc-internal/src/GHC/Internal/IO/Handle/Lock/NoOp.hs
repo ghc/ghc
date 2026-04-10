@@ -3,7 +3,7 @@
 module GHC.Internal.IO.Handle.Lock.NoOp where
 
 import GHC.Internal.Base
-import GHC.Internal.IO (IO, throwIO)
+import GHC.Internal.IO (throwIO)
 import GHC.Internal.IO.Handle.Lock.Common
 import GHC.Internal.IO.Handle.Types (Handle)
 

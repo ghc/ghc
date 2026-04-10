@@ -49,7 +49,6 @@ module GHC.Internal.Arr (
 import GHC.Internal.Base
 import GHC.Internal.Err (errorWithoutStackTrace)
 import GHC.Internal.Num
-import GHC.Internal.Enum( enumFromTo )  -- For known-key names
 import GHC.Internal.ST
 import GHC.Internal.List
 import GHC.Internal.Ix
@@ -59,6 +58,7 @@ import GHC.Internal.Prim (
   )
 import GHC.Internal.Prim.PtrEq (sameMutableArray#)
 import GHC.Internal.Show
+import GHC.Internal.Enum as Rebindable( enumFromTo )  -- For known-key names
 
 infixl 9  !, //
 

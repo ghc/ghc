@@ -45,6 +45,7 @@ import GHC.Rename.Pat
 
 import GHC.Driver.DynFlags
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs( composeIdOcc )
 import GHC.Builtin.Types ( nilDataConName, oneDataConName )
 import GHC.Unit.Module ( isInteractiveModule )
 
@@ -427,7 +428,7 @@ rnExpr (HsGetField _ e f)
 
 rnExpr (HsProjection _ fs)
   = do { (getField, fv_getField) <- lookupSyntaxName getFieldClassOpKey
-       ; circ <- rnLookupKnownKeyName composeIdKey
+       ; circ <- rnLookupKnownOccName composeIdOcc
        ; let fs' = NE.map rnDotFieldOcc fs
        ; return ( mkExpandedExpr
                     (HsProjection noExtField fs')

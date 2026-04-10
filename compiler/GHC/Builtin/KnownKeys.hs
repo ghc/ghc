@@ -180,9 +180,6 @@ knownKeyTable
     , (mkTcOcc "Alternative",  alternativeClassKey)
     , (mkTcOcc "Typeable",     typeableClassKey)
 
-    -- Misc
-    , (mkVarOcc ".",           composeIdKey)
-
     -- Class Eq and Ord
     , (mkTcOcc "Eq",           eqClassKey)
     , (mkTcOcc "Ord",          ordClassKey)
@@ -195,10 +192,6 @@ knownKeyTable
 
     -- Enum
     , (mkTcOcc "Enum",            enumClassKey)
-    , (mkVarOcc "enumFrom",       enumFromClassOpKey)
-    , (mkVarOcc "enumFromThen",   enumFromThenClassOpKey)
-    , (mkVarOcc "enumFromTo",     enumFromToClassOpKey)
-    , (mkVarOcc "enumFromThenTo", enumFromThenToClassOpKey)
 
     -- Numeric operations
     , (mkTcOcc "Num",               numClassKey)

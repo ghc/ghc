@@ -54,11 +54,7 @@ import GHC.Internal.Foreign.C.Types (CULLong(..))
 import GHC.Internal.Foreign.C.Error (eAGAIN, eWOULDBLOCK, eBADF)
 #endif
 
-#if defined(wasm32_HOST_ARCH)
-import GHC.Internal.Base (pure)
-#endif
-import GHC.Internal.Num( fromInteger, negate )  -- For known-key names
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger, negate )  -- For known-key names
 
 data ControlMessage = CMsgWakeup
                     | CMsgDie

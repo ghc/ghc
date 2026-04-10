@@ -63,12 +63,7 @@ import GHC.Internal.Conc.Signal
 import GHC.Internal.Data.Dynamic (toDyn)
 #endif
 
-#if !defined(HAVE_SIGNAL_H)
-import GHC.Internal.Base (pure)
-#endif
-
-import GHC.Internal.Base( (>>=), (>>) )         -- For known-key names
-import GHC.Internal.Num( fromInteger, negate )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger, negate )  -- For known-key names
 import GHC.Internal.Data.Typeable.Internal as Rebindable
 
 -- Note [rts_setMainThread must be called unsafely]

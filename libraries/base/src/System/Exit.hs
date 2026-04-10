@@ -34,7 +34,7 @@ import Data.Maybe (Maybe (Nothing))
 import Data.String (String)
 import Data.Eq ((/=))
 import System.IO (IO, hPutStrLn, stderr)
-import GHC.Internal.Num as Known( Num, fromInteger ) -- For known-key names
+import GHC.Internal.Num as Rebindable( Num, fromInteger ) -- For known-key names
 
 -- ---------------------------------------------------------------------------
 -- exitWith

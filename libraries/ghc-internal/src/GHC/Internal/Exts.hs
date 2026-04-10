@@ -194,11 +194,6 @@ import GHC.Internal.CString (
     unpackNBytes#,
     cstringLength#,
   )
-import GHC.Internal.Magic (
-    inline,
-    considerAccessible,
-    runRW#,
-  )
 import GHC.Internal.Magic.Dict (WithDict(..))
 import GHC.Internal.Types
   hiding ( IO   -- Exported from "GHC.IO"
@@ -339,7 +334,7 @@ import GHC.Internal.Types
 import GHC.Internal.Prim.Ext
 import GHC.Internal.ArrayArray
 import GHC.Internal.Err ( errorWithoutStackTrace )
-import GHC.Internal.IO ( IO, seq# )
+import GHC.Internal.IO ( seq# )
 import GHC.Internal.Ptr
 import GHC.Internal.Stack
 import GHC.Internal.IsList (IsList(..)) -- for re-export

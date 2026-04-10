@@ -38,7 +38,6 @@ import GHC.Internal.Ptr
 import GHC.Internal.Num
 import GHC.Internal.IO
 import {-# SOURCE #-} GHC.Internal.IO.Exception ( unsupportedOperation )
-import GHC.Internal.Classes( (==) )   -- For known-key names
 
 -- | A low-level I/O provider where the data is bytes in memory.
 --   The Word64 offsets currently have no effect on POSIX system or consoles

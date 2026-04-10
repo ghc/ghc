@@ -49,12 +49,13 @@ module Data.Bifoldable
   , bifind
   ) where
 
+import Prelude
 import Control.Applicative
 import GHC.Internal.Data.Functor.Utils (Max(..), Min(..), (#.))
 import GHC.Internal.Data.Maybe (fromMaybe)
 import GHC.Internal.Data.Monoid
 import GHC.Generics (K1(..))
-import Prelude
+import qualified GHC.KnownKeyNames as Rebindable
 
 -- $setup
 -- >>> import Prelude

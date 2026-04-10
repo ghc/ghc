@@ -66,8 +66,6 @@ import qualified GHC.Internal.List as List
 import GHC.Internal.Read
 import GHC.Internal.Show
 
-import GHC.Internal.Base( (>>), (>>=) )   -- For known-key names
-
 -- $setup
 -- >>> import Prelude
 -- >>> import GHC.Internal.Word

@@ -26,7 +26,6 @@ module GHC.Internal.IO.Encoding.Failure (
   ) where
 
 import GHC.Internal.Base
-import GHC.Internal.IO
 import GHC.Internal.IO.Buffer
 import GHC.Internal.IO.Exception
 import GHC.Internal.Char

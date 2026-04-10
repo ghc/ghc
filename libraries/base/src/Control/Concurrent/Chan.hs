@@ -40,6 +40,7 @@ import Prelude
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import GHC.Internal.Control.Concurrent.MVar
 import GHC.Internal.Control.Exception (mask_)
+import qualified GHC.KnownKeyNames as Rebindable
 
 #define _UPK_(x) {-# UNPACK #-} !(x)
 

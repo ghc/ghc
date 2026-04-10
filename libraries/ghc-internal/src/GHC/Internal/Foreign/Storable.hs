@@ -49,7 +49,6 @@ import GHC.Internal.Fingerprint.Type
 import GHC.Internal.Foreign.C.ConstPtr
 import GHC.Internal.Data.Bits
 import GHC.Internal.Real
-import GHC.Internal.Base( (>>), (>>=) )        -- For known-key names
 
 {- |
 The member functions of this class facilitate writing values of

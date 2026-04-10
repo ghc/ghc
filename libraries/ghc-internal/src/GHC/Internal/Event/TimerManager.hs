@@ -70,7 +70,6 @@ import GHC.Internal.System.Posix.Types (Fd)
 
 import qualified GHC.Internal.Event.Internal as I
 import qualified GHC.Internal.Event.PSQ as Q
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
 
 #if defined(HAVE_POLL)
 import qualified GHC.Internal.Event.Poll   as Poll

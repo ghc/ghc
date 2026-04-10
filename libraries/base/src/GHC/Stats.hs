@@ -37,13 +37,11 @@ module GHC.Stats
 
 
 import Prelude (Bool,IO,Read,Show,(<$>))
-import GHC.KnownKeyNames -- For -frebindable-known-key-names (defaulting)
-
 import qualified GHC.Internal.Stats as Internal
 import GHC.Generics (Generic)
 import Data.Word (Word64,Word32)
 import Data.Int (Int64)
-import Prelude as Known( (>>=), (>>) )
+import qualified GHC.KnownKeyNames as Rebindable
 
 -- | Time values from the RTS, using a fixed resolution of nanoseconds.
 type RtsTime = Int64

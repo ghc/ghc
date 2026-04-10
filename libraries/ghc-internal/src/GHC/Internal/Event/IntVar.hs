@@ -15,7 +15,7 @@ import GHC.Internal.Prim (
     MutableByteArray#, RealWorld, newByteArray#, readIntArray#, writeIntArray#,
   )
 
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 data IntVar = IntVar (MutableByteArray# RealWorld)
 

@@ -29,7 +29,7 @@ import Data.Data hiding (Fixity(..))
 import Data.IORef
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad.IO.Class (MonadIO (..))
-import System.IO (FilePath, hPutStrLn, stderr)
+import System.IO (hPutStrLn, stderr)
 import qualified Data.Kind as Kind (Type)
 import GHC.Types (TYPE, RuntimeRep(..))
 #else
@@ -37,7 +37,7 @@ import GHC.Internal.Base hiding( Type, Module, sequence )
 import GHC.Internal.Data.Data hiding (Fixity(..))
 import GHC.Internal.Data.Traversable
 import GHC.Internal.IORef
-import GHC.Internal.IO (IO, FilePath)
+import GHC.Internal.IO (FilePath)
 import GHC.Internal.IO.Handle.Text (hPutStrLn)
 import GHC.Internal.IO.StdHandles (stderr)
 import GHC.Internal.Data.Foldable

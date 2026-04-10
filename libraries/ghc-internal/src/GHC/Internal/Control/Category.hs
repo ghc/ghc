@@ -27,11 +27,11 @@
 
 module GHC.Internal.Control.Category where
 
-import GHC.Internal.Base hiding( id, (.) )
-import qualified GHC.Internal.Base (id,(.))
+import qualified GHC.Internal.Base
 import GHC.Internal.Data.Type.Coercion
 import GHC.Internal.Data.Type.Equality
 import GHC.Internal.Data.Coerce (coerce)
+import qualified GHC.Internal.Base as Rebindable
 
 infixr 9 .
 infixr 1 >>>, <<<

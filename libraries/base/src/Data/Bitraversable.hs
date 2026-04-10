@@ -28,6 +28,7 @@ module Data.Bitraversable
   , bifoldMapDefault
   ) where
 
+import Prelude
 import Control.Applicative
 import Data.Bifunctor
 import Data.Bifoldable
@@ -35,7 +36,7 @@ import GHC.Internal.Data.Coerce
 import GHC.Internal.Data.Functor.Identity (Identity(..))
 import GHC.Internal.Data.Functor.Utils (StateL(..), StateR(..))
 import GHC.Generics (K1(..))
-import Prelude
+import qualified GHC.KnownKeyNames as Rebindable
 
 -- $setup
 -- >>> import Prelude

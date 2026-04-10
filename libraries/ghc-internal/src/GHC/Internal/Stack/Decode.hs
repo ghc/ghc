@@ -76,7 +76,7 @@ import GHC.Internal.Stack.ConstantsProf ()
 #endif
 import GHC.Internal.Stack.CloneStack
 import GHC.Internal.InfoProv.Types (InfoProv (..), ipLoc, lookupIPE)
-import GHC.Internal.Enum( enumFrom, enumFromTo ) -- For known-key names
+import GHC.Internal.Enum as Rebindable( enumFrom, enumFromTo ) -- For known-key names
 
 {- Note [Decoding the stack]
    ~~~~~~~~~~~~~~~~~~~~~~~~~

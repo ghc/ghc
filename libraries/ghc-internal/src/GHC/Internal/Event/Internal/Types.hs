@@ -41,7 +41,7 @@ import GHC.Internal.Data.Semigroup.Internal (stimesMonoid)
 import GHC.Internal.Base
 import GHC.Internal.Show (Show(..))
 import GHC.Internal.Word (Word64)
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 -- | An I\/O event.
 newtype Event = Event Int

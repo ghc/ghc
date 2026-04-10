@@ -47,7 +47,7 @@ import GHC.Internal.Word
 import GHC.Internal.Int
 import GHC.Internal.Natural
 import GHC.Internal.ForeignPtr
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 -- | A 'Lift' instance can have any of its values turned into a Template
 -- Haskell expression. This is needed when a value used within a Template

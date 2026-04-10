@@ -121,9 +121,9 @@ import           GHC.Internal.Data.Traversable
 import           GHC.Internal.Data.Semigroup.Internal
 import           GHC.Internal.Control.Monad.Fix
 import           GHC.Internal.Data.Data
-import           GHC.Internal.Data.Typeable( Typeable )
 import           GHC.Generics
 import qualified GHC.Internal.List as List
+import qualified GHC.KnownKeyNames as Rebindable
 
 -- $setup
 -- >>> import Prelude

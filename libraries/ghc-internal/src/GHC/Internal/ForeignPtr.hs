@@ -69,7 +69,7 @@ import GHC.Internal.Prim (
 import GHC.Internal.STRef        ( STRef(..) )
 import GHC.Internal.Ptr          ( Ptr(..), FunPtr(..) )
 import GHC.Internal.Unsafe.Coerce    ( unsafeCoerce )
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 -- |The type 'ForeignPtr' represents references to objects that are
 -- maintained in a foreign language, i.e., that are not part of the

@@ -59,7 +59,7 @@ module GHC.KnownKeyNames
     , dataToTag#
 
     -- Numbers
-    , Num, Integral, Real, Fractional, RealFloat
+    , Num, Integral, Real, Fractional, RealFloat, RealFrac
     , (+), (-), (*), negate, fromInteger
     , divInt#, modInt#
 
@@ -94,6 +94,9 @@ module GHC.KnownKeyNames
 
     -- Static pointers
     , IsStatic( fromStaticPtr ), makeStatic
+
+    -- Dynamic
+    , toDyn
 
     -- Names that have BuiltinRules
     , CS.unpackFoldrCString#, CS.unpackFoldrCStringUtf8#, CS.unpackAppendCString#
@@ -161,14 +164,13 @@ module GHC.KnownKeyNames
     , Clause, clause
     ) where
 
+import GHC.Internal.Base
 import GHC.Internal.Show
 import GHC.Internal.Read
 import GHC.Internal.Num
 import GHC.Internal.Real
 import Data.String( IsString )
-import GHC.Internal.Base
 import GHC.Internal.Ix
-import GHC.Internal.Magic( inline )
 import GHC.Internal.Magic.Dict( WithDict )
 import GHC.Internal.Enum
 import GHC.Internal.Data.Dynamic( toDyn )
@@ -177,7 +179,6 @@ import GHC.Internal.Data.String( fromString )
 import GHC.Internal.Data.Foldable( Foldable )
 import GHC.Internal.Data.Traversable( Traversable )
 import GHC.Internal.Float( RealFloat )
-import GHC.Internal.Real
 import GHC.Internal.IO( seq# )
 import GHC.Internal.Control.Monad( fail, guard )
 import GHC.Internal.Control.Monad.Fix( mfix, loop )
@@ -195,7 +196,7 @@ import GHC.Internal.Unsafe.Coerce( UnsafeEquality(..), unsafeEqualityProof )
 import GHC.Internal.StaticPtr( IsStatic(..) )
 import GHC.Internal.StaticPtr.Internal( makeStatic )
 
-import GHC.Internal.Data.Typeable( Typeable, gcast1, gcast2 )
+import GHC.Internal.Data.Typeable( gcast1, gcast2 )
 import GHC.Internal.Data.Typeable.Internal as TR
 import GHC.Internal.Generics
 

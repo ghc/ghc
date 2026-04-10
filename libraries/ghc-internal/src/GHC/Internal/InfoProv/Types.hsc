@@ -31,9 +31,7 @@ import GHC.Internal.IO.Encoding (utf8)
 import GHC.Internal.Foreign.Storable (peekByteOff)
 import GHC.Internal.ClosureTypes
 import GHC.Internal.Prim (whereFrom##)
-import GHC.Internal.Num( fromInteger )  -- For known-key names
-import GHC.Internal.Base( (>>=), (>>) ) -- For known-key names
-import GHC.Internal.Classes( (==) )     -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 data InfoProv = InfoProv {
   ipName :: String,

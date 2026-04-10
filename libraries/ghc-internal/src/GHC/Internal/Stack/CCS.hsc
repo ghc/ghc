@@ -45,7 +45,7 @@ import GHC.Internal.Prim ( clearCCS##, getCCSOf##, getCurrentCCS## )
 import GHC.Internal.Ptr
 import GHC.Internal.IO.Encoding
 import GHC.Internal.List ( concatMap, reverse )
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 #define PROFILING
 #include "Rts.h"

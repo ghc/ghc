@@ -110,10 +110,10 @@ import GHC.Internal.Data.Proxy
 import GHC.Internal.Err (error)
 import GHC.Internal.Fingerprint.Type
 import GHC.Internal.Show
+import GHC.Internal.Data.Typeable.Internal( Typeable )
 
-import GHC.Internal.Data.Typeable.Internal( Typeable, typeRep#, mkTrAppChecked, mkTrCon
-                                          , SomeTypeRep(SomeTypeRep) )
-    -- For known-occ names
+import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
+
 
 -- | A quantified type representation.
 type TypeRep = I.SomeTypeRep

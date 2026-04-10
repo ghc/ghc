@@ -75,9 +75,7 @@ import {-# SOURCE #-} GHC.Internal.Stack (prettyCallStackLines, prettyCallStack,
 import {-# SOURCE #-} GHC.Internal.Exception.Backtrace (collectExceptionAnnotation)
 import GHC.Internal.Exception.Context (SomeExceptionAnnotation(..))
 import GHC.Internal.Exception.Type
-import GHC.Internal.Base( (>>=) )        -- For known-key names
-import GHC.Internal.Classes( (==) )      -- For known-key names
-import GHC.Internal.Data.Typeable        -- For known-key names
+import GHC.Internal.Data.Typeable as Rebindable        -- For known-key names
 
 -- | Throw an exception.  Exceptions may be thrown from purely
 -- functional code, but may only be caught within the 'IO' monad.

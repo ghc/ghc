@@ -62,7 +62,7 @@ import GHC.Internal.Fingerprint     (Fingerprint(..))
 import GHC.Internal.Real
 import GHC.Internal.Word            (Word64(..))
 import GHC.Internal.Text.Show
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 
 -- | A reference to a value of type @a@.

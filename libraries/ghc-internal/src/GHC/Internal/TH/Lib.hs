@@ -43,8 +43,8 @@ import GHC.Internal.List (zip)
 import GHC.Internal.Real
 import GHC.Internal.Word
 import qualified GHC.Internal.Types as Kind (Type)
-import GHC.Internal.Num( fromInteger )  -- For known-key names
-import GHC.Internal.Enum( enumFrom )    -- For known-key names
+import GHC.Internal.Num  as Rebindable( fromInteger )  -- For known-key names
+import GHC.Internal.Enum as Rebindable( enumFrom )    -- For known-key names
 import qualified GHC.Internal.Data.Typeable.Internal as Rebindable
 #endif
 
