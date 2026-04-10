@@ -73,7 +73,7 @@ import GHC.Rename.Unbound
 import GHC.Rename.Utils
 
 import GHC.Builtin.Types
-import GHC.Builtin.KnownKeys( rOOT_MAIN )
+import GHC.Builtin.Modules( rOOT_MAIN )
 import GHC.Builtin( knownKeyOccMap, knownKeyOccName )
 
 import GHC.Unit.Module

@@ -33,7 +33,7 @@ import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer
 
 import GHC.Hs
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( mAIN_NAME, kNOWN_KEY_NAMES, pRELUDE_NAME )
 
 import GHC.Types.Error
 import GHC.Types.SrcLoc

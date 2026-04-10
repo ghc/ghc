@@ -39,5 +39,4 @@ module GHC.Internal.System.Mem.StableName (
   eqStableName
   ) where
 
-import GHC.Internal.Types
 import GHC.Internal.StableName

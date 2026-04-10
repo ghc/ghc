@@ -7,8 +7,7 @@ module GHC.Internal.Data.List.NonEmpty
   , map
   ) where
 
-import GHC.Internal.Base as Rebindable hiding( map )
-import GHC.Internal.Data.NonEmpty( map )
+import GHC.Internal.Data.NonEmpty
 import qualified GHC.Internal.Data.List as List
 
 

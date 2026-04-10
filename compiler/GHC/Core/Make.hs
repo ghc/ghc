@@ -73,6 +73,7 @@ import GHC.Core.Multiplicity
 
 import GHC.Builtin.Types
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules
 import GHC.Builtin.Types.Prim
 
 import GHC.Utils.Outputable

@@ -174,6 +174,7 @@ import {-# SOURCE #-} GHC.Types.Id.Make ( mkDataConWorkId, mkDictSelId )
 
 -- friends:
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Uniques
 

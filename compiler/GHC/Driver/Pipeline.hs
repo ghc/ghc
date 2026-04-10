@@ -45,7 +45,7 @@ module GHC.Driver.Pipeline (
 
 
 import GHC.Prelude
-import GHC.Builtin.KnownKeys
+import GHC.Builtin.Modules( gHC_PRIM )
 
 import GHC.Platform
 

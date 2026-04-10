@@ -11,12 +11,11 @@ module GHC.Internal.IO.Handle.Lock.Windows where
 
 #if !defined(mingw32_HOST_OS)
 -- See W1 of Note [Tracking dependencies on primitives] in GHC.Internal.Base
-import GHC.Internal.Base
+import GHC.Internal.Base as Rebindable
 #else
 
 #include <windows.h>
 
-import GHC.Internal.Base
 import GHC.Internal.Data.Bits
 import GHC.Internal.Data.Function
 import GHC.Internal.IO.Handle.Windows (handleToHANDLE)

@@ -21,6 +21,7 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Iface.Env( newGlobalBinder )
 
+import GHC.Builtin.Modules( gHC_TYPES, gHC_PRIM )
 import GHC.Builtin.KnownKeys
 import GHC.Builtin.KnownOccs
 import GHC.Builtin.Types.Prim ( primTyCons )
@@ -148,6 +149,14 @@ There are many wrinkles:
          logic back to the solver since the performance hit we take in doing
          this at type-definition time is non-trivial and Typeable isn't very
          widely used. This is discussed in #13261.
+
+  (GPT8) If the module has no data type declarations, we will don't need /any/
+         typeable declarations -- not even for
+             $trModule = Module "pkg" "modname"
+         That's saves work; and it's very good in `base` because it means we
+         often don't need to tiresomely bring
+             `GHC.Internal.Data.Typeable.Internal.Module`
+         into scope (for -frebindable-known-key-names) for tiny shim modules.
 -}
 
 {- Note [NOINLINE on generated Typeable bindings]
@@ -315,8 +324,12 @@ mkTypeableBinds
              tycons_that_need = filter tc_needs_typeable (tcg_tcs tcg_env)
                -- These tycons will need some typeable bindings
 
+       -- Stop now if we don't need any typable bindings
+       -- See (GPT8) in Note [Grand plan for Typeable]
        ; if no_typeable_binds_needed dflags this_mod tycons_that_need
-         then getGblEnv else do
+         then do { traceTc "No Typeable bindings needed" empty
+                 ; getGblEnv }
+         else do
 
        { -- Create a binding for $trModule.
          -- Do this before processing any data type declarations,
@@ -336,9 +349,9 @@ mkTypeableBinds
        } } }
   where
     no_typeable_binds_needed dflags mod tycons_that_need
-      | not (gopt Opt_NoTypeableBinds dflags) = True
-      | mod == gHC_TYPES                      = False
-      | otherwise                             = null tycons_that_need
+      | gopt Opt_NoTypeableBinds dflags = True
+      | mod == gHC_TYPES                = False
+      | otherwise                       = null tycons_that_need
 
     tc_needs_typeable :: TyCon -> Bool
     tc_needs_typeable tc

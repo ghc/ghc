@@ -24,7 +24,6 @@ module GHC.Internal.IO.StdHandles
     withFile, withBinaryFile, withFileBlocking
   ) where
 
-import GHC.Internal.Base as Rebindable
 import GHC.Internal.IO
 import GHC.Internal.IO.IOMode
 import GHC.Internal.IO.Handle.Types

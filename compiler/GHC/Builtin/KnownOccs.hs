@@ -17,12 +17,14 @@ import GHC.Hs
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types  -- A bunch of wired-in TyCons and DataCons
 import GHC.Builtin.PrimOps.Ids (primOpId)
+import GHC.Builtin.Modules
 import GHC.Builtin.KnownKeys
 
 import GHC.Types.Name( KnownOcc )
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader( RdrName, mkVarUnqual, getRdrName
-                            , nameRdrName, knownOccRdrName )
+                            , nameRdrName, knownOccRdrName, mkOrig, mkUnqual )
+import GHC.Unit.Types( Module )
 
 import GHC.Data.List.Infinite (Infinite (..))
 import qualified GHC.Data.List.Infinite as Inf
@@ -54,6 +56,19 @@ mechanisms:
 
 knownVarOccRdrName :: String -> RdrName
 knownVarOccRdrName s = knownOccRdrName (mkVarOcc s)
+
+----------------------
+-- ToDo: these functions should disappear
+
+varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR
+    :: Module -> FastString -> RdrName
+varQual_RDR  mod str = mkOrig mod (mkOccNameFS varName str)
+tcQual_RDR   mod str = mkOrig mod (mkOccNameFS tcName str)
+clsQual_RDR  mod str = mkOrig mod (mkOccNameFS clsName str)
+dataQual_RDR mod str = mkOrig mod (mkOccNameFS dataName str)
+
+fieldQual_RDR :: Module -> FastString -> FastString -> RdrName
+fieldQual_RDR mod con str = mkOrig mod (mkOccNameFS (fieldName con) str)
 
 
 {- *********************************************************************
@@ -157,6 +172,15 @@ knownOccRdrNames
     , times_RDR, plus_RDR, and_RDR, not_RDR, range_RDR, inRange_RDR, index_RDR
     , unsafeIndex_RDR, unsafeRangeSize_RDR
     ]
+
+main_RDR_Unqual    :: RdrName
+main_RDR_Unqual = mkUnqual varName (fsLit "main")
+        -- We definitely don't want an Orig RdrName, because
+        -- main might, in principle, be imported into module Main
+
+
+error_RDR :: RdrName
+error_RDR = varQual_RDR gHC_INTERNAL_ERR (fsLit "error")
 
 toDyn_RDR :: RdrName
 toDyn_RDR = knownVarOccRdrName "toDyn"

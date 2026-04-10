@@ -18,6 +18,5 @@ module GHC.Internal.Data.STRef.Strict (
         module GHC.Internal.Data.STRef
   ) where
 
-import GHC.Internal.Types as Rebindable   -- For known-occ names
 import GHC.Internal.Data.STRef
 
