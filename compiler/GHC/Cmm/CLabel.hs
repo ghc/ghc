@@ -493,6 +493,7 @@ data ForeignLabelSource
 --    from, e.g. the RTS, which then fall into the 'CLabelTargetInUnit' case.
 --
 toForeignLabelSource :: CLabelTargetLibrary -> ForeignLabelSource
+toForeignLabelSource CLabelTargetUnknown       = ForeignLabelInUnknownPackage
 toForeignLabelSource (CLabelTargetInUnit unit) = ForeignLabelInPackage unit
 
 
