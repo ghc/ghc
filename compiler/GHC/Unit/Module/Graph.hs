@@ -219,22 +219,18 @@ mkHomeModuleMap nodes = ModuleNameHomeMap completeUnits providerMap where
     providerMap
         = Map.fromListWith Set.union $
           [
-              (ms_mod_name modSummary, Set.singleton (ms_unitid modSummary)) |
-                  ModuleNode _ (ModuleNodeCompile modSummary) <- nodes
+              (moduleName, Set.singleton unitID) |
+                  ModuleNode _ moduleNodeInfo <- nodes,
+                  let moduleName = moduleNodeInfoModuleName moduleNodeInfo,
+                  let unitID     = moduleNodeInfoUnitId moduleNodeInfo
           ]
 
     completeUnits :: Set UnitId
-    completeUnits
-        = Set.fromList $
-          [
-              ms_unitid modSummary |
-                  ModuleNode _ (ModuleNodeCompile modSummary) <- nodes
-          ]
-
-    {-NOTE:
-        The matching with `ModuleNodeCompile` results in nodes with
-        `ModuleNodeFixed` in their info being dropped.
-    -}
+    completeUnits = Set.fromList $
+                    [
+                        moduleNodeInfoUnitId moduleNodeInfo |
+                            ModuleNode _ moduleNodeInfo <- nodes
+                    ]
 
 mgHomeModuleMap :: ModuleGraph -> ModuleNameHomeMap
 mgHomeModuleMap = mg_home_map
