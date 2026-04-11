@@ -81,7 +81,7 @@ fusionElemMap
 
 A testsuite-only normalizer would need to parse Core syntax, which is fragile. Doing this in GHC:
 
-- helps humans reading dumps, not just tests
+- helps developers reading and diffing Core dumps, not just tests
 - works for all Core-dump consumers
 - tests opt in with a single flag, no ad hoc text-processing
 
