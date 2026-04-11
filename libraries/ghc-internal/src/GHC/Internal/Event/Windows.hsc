@@ -684,7 +684,11 @@ withOverlappedEx mgr fname h async offset startCB completionCB = do
                              -- can go into an unbounded alertable wait.
                              delay <- runExpiredTimeouts mgr
                              registerAlertableWait delay
-                        return $ IOFailed Nothing
+                        -- Re-throw the original exception rather than
+                        -- returning IOFailed. This ensures that async
+                        -- exceptions (e.g. Timeout from System.Timeout)
+                        -- propagate correctly to their handlers.
+                        E.throw e
         let runner = do debugIO $ (dbgMsg ":: waiting ") ++ " | "  ++ show lpol
                         res <- readMVar signal `catch` cancel
                         debugIO $ dbgMsg ":: signaled "
