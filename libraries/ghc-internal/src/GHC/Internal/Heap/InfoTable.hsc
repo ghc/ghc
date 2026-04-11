@@ -24,7 +24,7 @@ import GHC.Internal.Maybe (Maybe(..))
 #endif
 import GHC.Internal.Foreign.Ptr
 import GHC.Internal.Foreign.Storable
-import GHC.Internal.Num( fromInteger )   -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )   -- For known-key names
 
 -------------------------------------------------------------------------
 -- Profiling specific code

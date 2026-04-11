@@ -23,7 +23,7 @@ import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Prim (
     Int64#, RealWorld, State#, ThreadId#, setOtherThreadAllocationCounter#,
   )
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 
 {-# NOINLINE allocationLimitHandler #-}

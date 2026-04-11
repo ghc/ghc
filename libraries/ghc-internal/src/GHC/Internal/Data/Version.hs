@@ -37,7 +37,7 @@ module GHC.Internal.Data.Version (
   ) where
 
 import GHC.Internal.Base hiding( many )
-import GHC.Internal.Data.List        ( map, sort, concat, concatMap, intersperse )
+import GHC.Internal.Data.List        ( sort, concat, concatMap, intersperse )
 import GHC.Internal.Unicode          ( isDigit, isAlphaNum )
 import GHC.Internal.Read
 import GHC.Internal.Show

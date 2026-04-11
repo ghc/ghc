@@ -36,7 +36,7 @@ import GHC.Internal.Real (Fractional, Integral, Real, RealFrac)
 import GHC.Internal.Read (Read(readsPrec), readParen, lex)
 import GHC.Internal.Show (Show(showsPrec), showParen, showString)
 
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 -- | The 'Const' functor.
 --

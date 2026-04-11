@@ -32,8 +32,8 @@ module GHC.Internal.Conc.Bound
     ) where
 
 import GHC.Internal.Base
-import GHC.Internal.Num( fromInteger )  -- For known-key names
 import GHC.Internal.Data.Typeable.Internal as Rebindable
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 -- JavaScript platform doesn't support bound threads
 #if !defined(javascript_HOST_ARCH)

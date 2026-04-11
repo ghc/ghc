@@ -28,7 +28,7 @@ import GHC.Prelude hiding (head, init, last, scanl, tail)
 import GHC.Hs
 
 import GHC.Tc.Errors.Types
-import GHC.Tc.Utils.Env ( isBrackLevel, rnLookupKnownKeyName )
+import GHC.Tc.Utils.Env ( isBrackLevel )
 import GHC.Tc.Utils.Monad
 
 import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS

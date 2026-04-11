@@ -26,8 +26,6 @@ module GHC.Internal.Event.TimeOut
     ) where
 
 import GHC.Internal.Base as Rebindable   -- For known-occ things
-import GHC.Internal.IO
-import GHC.Internal.Classes (Eq, Ord)
 
 import qualified GHC.Internal.Event.PSQ as Q
 import GHC.Internal.Event.Unique (Unique)

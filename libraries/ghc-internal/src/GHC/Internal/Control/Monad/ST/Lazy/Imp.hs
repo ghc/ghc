@@ -41,7 +41,6 @@ import GHC.Internal.Base
 import GHC.Internal.Data.Tuple
 import qualified GHC.Internal.Control.Monad.ST.Imp as ST
 import qualified GHC.Internal.ST as GHC.ST
-import GHC.Internal.Magic (runRW#)
 import GHC.Internal.Prim (RealWorld, State#, noDuplicate#)
 
 -- | The lazy @'ST'@ monad.

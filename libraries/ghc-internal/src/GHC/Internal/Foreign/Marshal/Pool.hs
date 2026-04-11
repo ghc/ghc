@@ -49,7 +49,7 @@ module GHC.Internal.Foreign.Marshal.Pool (
 import GHC.Internal.Base
 import GHC.Internal.Err               ( undefined )
 import GHC.Internal.Exception         ( throw )
-import GHC.Internal.IO                ( IO, mask, catchAny )
+import GHC.Internal.IO                ( mask, catchAny )
 import GHC.Internal.List              ( length )
 import GHC.Internal.Num               ( Num(..) )
 import GHC.Internal.Real              ( fromIntegral )

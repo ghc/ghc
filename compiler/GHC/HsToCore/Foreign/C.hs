@@ -52,6 +52,7 @@ import GHC.Cmm.Utils
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 
 import GHC.Data.FastString
 
@@ -181,7 +182,7 @@ dsCFExportDynamic id co0 cconv = do
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
         export_ty     = mkVisFunTyMany stable_ptr_ty arg_ty
-    bindIOId <- dsLookupKnownKeyId bindIOIdKey
+    bindIOId <- dsLookupKnownOccId bindIOIdOcc
     stbl_value <- newSysLocalMDs stable_ptr_ty
     (h_code, c_code, typestring) <- dsCFExport id (mkRepReflCo export_ty) fe_nm cconv ExportIsDynamic
     let
