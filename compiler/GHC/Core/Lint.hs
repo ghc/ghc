@@ -1067,7 +1067,13 @@ lintIdOcc in_id nargs
           checkL (idName in_id /= makeStaticName) $
           text "Found makeStatic nested in an expression"
 
-        ; checkDeadIdOcc in_id
+        -- Occurrences of an Id should never be dead....
+        -- except in a couple of special cases
+        -- See Note [Dead occurrences]
+        ; flags <- getLintFlags
+        ; checkL (not (isDeadOcc (idOccInfo in_id))
+                  || lf_allow_dead_occs flags)
+                 (text "Occurrence of a dead Id" <+> ppr in_id)
 
         ; case isDataConId_maybe in_id of
              Nothing -> return ()
@@ -1078,7 +1084,17 @@ lintIdOcc in_id nargs
 
         ; return (out_ty, usage) }
 
+{- Note [Dead occurrences]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+An occurrence of an Id whose binder is marked as dead is usually
+a mistake.  But
+  * For the RULE   forall a b. f [a,b] = g a
+    we mark `b` as dead because it is unused in the body, even though
+    it is of course used in the patterns
+  * For case patterns... I don't really understand, but it dates back a long way
 
+We permit these dead occurrences by setting the flag `lf_allow_dead_occs`
+-}
 
 lintCoreFun :: CoreExpr
             -> Int                          -- Number of arguments (type or val) being passed
@@ -1104,17 +1120,6 @@ lintLambda var lintBody =
     do { (body_ty, ue) <- lintBody
        ; ue' <- checkLinearity ue var'
        ; return (mkLamType var' body_ty, ue') }
-------------------
-checkDeadIdOcc :: Id -> LintM ()
--- Occurrences of an Id should never be dead....
--- except when we are checking a case pattern
-checkDeadIdOcc id
-  | isDeadOcc (idOccInfo id)
-  = do { in_case <- inCasePat
-       ; checkL in_case
-                (text "Occurrence of a dead Id" <+> ppr id) }
-  | otherwise
-  = return ()
 
 ------------------
 lintJoinBndrType :: OutType -- Type of the body
@@ -1740,7 +1745,8 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
         -- And now bring the new binders into scope
     ; lintBinders CasePatBind args $ \ args' -> do
       { rhs_ue <- lintAltExpr rhs alt_ty
-      ; rhs_ue' <- addLoc (CasePat alt) $
+      ; rhs_ue' <- allowDeadOccs $  -- See Note [Dead occurrences]
+                   addLoc (CasePat alt) $
                    lintAltBinders rhs_ue case_bndr scrut_ty con_payload_ty
                                   (zipEqual multiplicities  args')
       ; return $ deleteUE rhs_ue' case_bndr
@@ -2224,7 +2230,8 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
   = noMultiplicityChecks $ -- Skip linearity checking for rules
                            -- See Note [Linting linearity]
     lintBinders LambdaBind bndrs $ \ _ ->
-    do { (lhs_ty, _) <- lintCoreArgs (fun_ty, zeroUE) args
+    do { (lhs_ty, _) <- allowDeadOccs $  -- See Note [Dead occurrences]
+                        lintCoreArgs (fun_ty, zeroUE) args
        ; (rhs_ty, _) <- case idJoinPointHood fun of
                      JoinPoint join_arity
                        -> do { checkL (args `lengthIs` join_arity) $
@@ -3011,7 +3018,8 @@ data LintFlags
        , lf_check_linearity :: Bool    -- ^ See Note [Linting linearity]
        , lf_check_fixed_rep :: Bool    -- ^ See Note [Checking for representation polymorphism]
        , lf_check_rubbish_lits :: Bool -- ^ See Note [Checking for rubbish literals]
-       , lf_allow_weak_joins :: Bool -- ^ See Note [Linting join points with casts or ticks]
+       , lf_allow_weak_joins :: Bool   -- ^ See Note [Linting join points with casts or ticks]
+       , lf_allow_dead_occs  :: Bool   -- ^ See Note [Dead occurrences]
     }
 
 -- See Note [Checking StaticPtrs]
@@ -3380,6 +3388,10 @@ noMultiplicityChecks :: LintM a -> LintM a
 noMultiplicityChecks =
   updLintFlags $ \ flags -> flags { lf_check_linearity = False }
 
+allowDeadOccs :: LintM a -> LintM a
+allowDeadOccs =
+  updLintFlags $ \ flags -> flags { lf_allow_dead_occs = True }
+
 getLintFlags :: LintM LintFlags
 getLintFlags = LintM $ \ env errs -> fromBoxedLResult (Just (le_flags env), errs)
 
@@ -3442,12 +3454,6 @@ addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m
   = LintM $ \ env errs ->
     unLintM m (env { le_loc = extra_loc : le_loc env }) errs
-
-inCasePat :: LintM Bool         -- A slight hack; see the unique call site
-inCasePat = LintM $ \ env errs -> fromBoxedLResult (Just (is_case_pat env), errs)
-  where
-    is_case_pat (LE { le_loc = CasePat {} : _ }) = True
-    is_case_pat _other                           = False
 
 addInScopeId :: InId -> OutType -> (OutId -> LintM a) -> LintM a
 -- Unlike addInScopeTyCoVar, this function does no cloning; Ids never get cloned

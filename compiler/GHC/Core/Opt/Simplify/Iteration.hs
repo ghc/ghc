@@ -1873,9 +1873,6 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
             , not (needsCaseBindingL arg_levity arg)
               -- Ok to test arg::InExpr in needsCaseBinding because
               -- exprOkForSpeculation is stable under simplification
-            , not ( isSimplified dup &&  -- See (SR2) in Note [Avoiding simplifying repeatedly]
-                    not (exprIsTrivial arg) &&
-                    not (isDeadOcc (idOccInfo bndr)) )
             -> do { simplTrace "SimplBindr:inline-uncond3" (ppr bndr <+> text ":=" <+> ppr arg $$ ppr (seIdSubst env)) $
                     tick (PreInlineUnconditionally bndr)
                   ; simplLam env' body cont }
@@ -2055,6 +2052,8 @@ Wrinkles:
    expression is trivial, or it is dead (the binder doesn't occur), then there
    is no danger of simplifying repeatedly. But there is a benefit: it can save
    a simplifier iteration.  So we check for that.
+
+  ToDo: I have improved this via simplOutExpr
 
 
 ************************************************************************

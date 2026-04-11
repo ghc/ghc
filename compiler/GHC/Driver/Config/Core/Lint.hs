@@ -116,7 +116,8 @@ perPassFlags dflags pass
                , lf_check_static_ptrs          = check_static_ptrs
                , lf_check_linearity            = check_linearity
                , lf_check_rubbish_lits         = check_rubbish
-               , lf_allow_weak_joins           = allow_weak_joins }
+               , lf_allow_weak_joins           = allow_weak_joins
+               , lf_allow_dead_occs            = False }
   where
     -- See Note [Checking for global Ids]
     check_globals = case pass of
@@ -175,4 +176,5 @@ defaultLintFlags dflags = LF { lf_check_global_ids = False
                              , lf_check_fixed_rep = True
                              , lf_check_rubbish_lits = True
                              , lf_allow_weak_joins = False
+                             , lf_allow_dead_occs  = False
                              }
