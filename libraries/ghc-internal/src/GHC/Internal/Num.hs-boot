@@ -9,6 +9,7 @@ module GHC.Internal.Num (Num (..)) where
 -- See Note [Semigroup stimes cycle] in GHC.Internal.Base
 
 import GHC.Internal.Bignum.Integer (Integer, integerZero)
+import GHC.Internal.Types as Rebindable
 
 infixl 7  *
 infixl 6  +, -

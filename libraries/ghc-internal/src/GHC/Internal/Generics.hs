@@ -746,9 +746,7 @@ import GHC.Internal.Ix  -- For deriving
 import GHC.Internal.Enum  -- For deriving
 
 -- Needed for instances
-import GHC.Internal.Ix      ( Ix )
 import GHC.Internal.Err (errorWithoutStackTrace)
-import GHC.Internal.Enum    ( Bounded, Enum )
 import GHC.Internal.Prim    ( coerce )
 import GHC.Internal.Read    ( Read(..) )
 import GHC.Internal.Show    ( Show(..), showString, showChar, showParen, appPrec )
@@ -771,7 +769,7 @@ import GHC.Internal.Data.Functor.Identity
 import GHC.Internal.Data.Proxy   ( Proxy(..) )
 import GHC.Internal.TypeLits ( KnownSymbol, KnownNat, Nat, symbolVal, natVal )
 
-import GHC.Internal.Num( fromInteger )     -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )     -- For known-key names
 
 --------------------------------------------------------------------------------
 -- Representation types

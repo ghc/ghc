@@ -16,8 +16,8 @@ module GHC.Internal.Unicode.Version
 (unicodeVersion)
 where
 
-import GHC.Internal.Base                -- For known-key names
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Base as Rebindable                 -- For known-key names
+import GHC.Internal.Num  as Rebindable( fromInteger )  -- For known-key names
 import GHC.Internal.Data.Version
 
 -- | Version of Unicode standard used by @base@:

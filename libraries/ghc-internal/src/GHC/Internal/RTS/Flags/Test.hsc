@@ -20,7 +20,7 @@ import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.Foreign.C.Types
 import GHC.Internal.Foreign.Marshal.Utils
 #endif
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 #include "Rts.h"
 #include "rts/Flags.h"

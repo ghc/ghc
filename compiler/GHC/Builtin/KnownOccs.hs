@@ -87,6 +87,10 @@ knownOccs
     -- Enum class ops
     , enumFromClassOpOcc, enumFromThenClassOpOcc
     , enumFromToClassOpOcc, enumFromThenToClassOpOcc
+
+    -- Static
+    , fromStaticPtrClassOpOcc 
+
     -- Typeable stuff
     , someTypeRepTyConOcc, someTypeRepDataConOcc, mkTrConOcc, mkTrAppCheckedOcc
     , mkTrFunOcc, typeRepIdOcc, typeNatTypeRepOcc, typeSymbolTypeRepOcc
@@ -103,6 +107,15 @@ rationalTyConOcc = mkTcOcc "Rational"
 
 composeIdOcc :: KnownOcc
 composeIdOcc = mkVarOcc "."
+
+fromStaticPtrClassOpOcc :: KnownOcc
+fromStaticPtrClassOpOcc = mkVarOcc "fromStaticPtr"
+
+returnIOIdOcc, bindIOIdOcc, thenIOIdOcc, printIdOcc :: KnownOcc
+returnIOIdOcc = mkVarOcc "returnIO"
+bindIOIdOcc   = mkVarOcc "bindIO"
+thenIOIdOcc   = mkVarOcc "thenIO"
+printIdOcc    = mkVarOcc "print"
 
 enumFromClassOpOcc, enumFromThenClassOpOcc,
   enumFromToClassOpOcc, enumFromThenToClassOpOcc :: KnownOcc

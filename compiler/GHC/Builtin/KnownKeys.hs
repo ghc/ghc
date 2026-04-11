@@ -276,18 +276,11 @@ knownKeyTable
     , (mkVarOcc "|||",        choiceAIdKey)
     , (mkVarOcc "loop",       loopAIdKey)
 
-    -- IO monad
-    , (mkVarOcc "thenIO",   thenIOIdKey)
-    , (mkVarOcc "bindIO",   bindIOIdKey)
-    , (mkVarOcc "returnIO", returnIOIdKey)
-    , (mkVarOcc "print",    printIdKey)
-
     -- Generics
     , (mkTcOcc "Generic",   genClassKey)
     , (mkTcOcc "Generic1",  gen1ClassKey)
 
     -- Static pointers
-    , (mkVarOcc "fromStaticPtr", fromStaticPtrClassOpKey)
     , (mkVarOcc "makeStatic",    makeStaticKey)
 
     -- WithDict

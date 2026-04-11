@@ -27,7 +27,7 @@ import GHC.Internal.IOArray (IOArray, boundsIOArray, newIOArray,
 import GHC.Internal.Maybe (Maybe(..))
 import GHC.Internal.Real (fromIntegral)
 import GHC.Internal.Word (Word8)
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 ------------------------------------------------------------------------
 -- Signal handling

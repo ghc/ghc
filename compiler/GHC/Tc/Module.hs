@@ -101,6 +101,7 @@ import GHC.Iface.Load
 import GHC.Builtin.Types ( mkListTy, anyTypeOfKind )
 import GHC.Builtin.Modules( mAIN_NAME, gHC_PRIM, rOOT_MAIN )
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs
 import GHC.Builtin
 
 import GHC.Hs hiding ( FunDep(..) )
@@ -2304,8 +2305,8 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
         ; uniq <- newUnique
         ; let loc' = noAnnSrcSpan $ locA loc
         ; interPrintName <- getInteractivePrintName
-        ; bindIOName     <- rnLookupKnownKeyName bindIOIdKey
-        ; thenIOName     <- rnLookupKnownKeyName thenIOIdKey
+        ; bindIOName     <- rnLookupKnownOccName bindIOIdOcc
+        ; thenIOName     <- rnLookupKnownOccName thenIOIdOcc
         ; let fresh_it  = itName uniq (locA loc)
               matches   = [mkMatch (mkPrefixFunRhs (L loc' fresh_it) noAnn) (noLocA []) rn_expr
                                    emptyLocalBinds]
@@ -2464,8 +2465,8 @@ tcUserStmt rdr_stmt@(L loc _)
 
        ; opt_pr_flag <- goptM Opt_PrintBindResult
        ; ghciStep   <- getGhciStepIO
-       ; printName  <- rnLookupKnownKeyName printIdKey
-       ; thenIOName <- rnLookupKnownKeyName thenIOIdKey
+       ; printName  <- rnLookupKnownOccName printIdOcc
+       ; thenIOName <- rnLookupKnownOccName thenIOIdOcc
        ; let gi_stmt | (L loc (BindStmt x pat expr)) <- rn_stmt
                      = L loc $ BindStmt x pat (nlHsApp ghciStep expr)
                      | otherwise
@@ -2523,7 +2524,7 @@ any_lifted = anyTypeOfKind liftedTypeKind
 tcGhciStmts :: [GhciLStmt GhcRn] -> TcM PlanResult
 tcGhciStmts stmts
  = do { ioTyCon <- tcLookupKnownKeyTyCon ioTyConKey
-      ; ret_id  <- tcLookupKnownKeyId returnIOIdKey             -- return @ IO
+      ; ret_id  <- tcLookupKnownOccId returnIOIdOcc             -- return @ IO
       ; let ret_ty      = mkListTy any_lifted
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty]
             tc_io_stmts = tcStmtsAndThen (HsDoStmt GhciStmtCtxt) tcDoStmt stmts
