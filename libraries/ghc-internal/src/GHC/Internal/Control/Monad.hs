@@ -91,7 +91,7 @@ import GHC.Internal.List ( zipWith, unzip )
 import GHC.Internal.Maybe ( Maybe )
 import GHC.Internal.Num  ( (-) )
 import GHC.Internal.Prim ( seq )
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 -- $setup
 -- >>> import Prelude

@@ -46,7 +46,7 @@ import GHC.Internal.Num (Num)
 import GHC.Internal.Read (Read(..), lex, readParen)
 import GHC.Internal.Real (Fractional, Integral, Real, RealFrac)
 import GHC.Internal.Show (Show(..), showParen, showString)
-import GHC.Internal.Num( fromInteger )  -- For known-key names
+import GHC.Internal.Num as Rebindable( fromInteger )  -- For known-key names
 
 -- | Identity functor and monad. (a non-strict monad)
 --

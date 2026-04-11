@@ -627,8 +627,8 @@ tcExpr (HsStatic _ expr) res_ty
         --   fromStaticPtr :: forall p. (IsStatic p) =>
         --                    forall a. (Typeable a) =>
         --                    StaticPtr a -> p a
-        ; fromStaticPtr <- newKnownKeyMethod StaticOrigin
-                                    fromStaticPtrClassOpKey [p_ty]
+        ; fromStaticPtr <- newKnownOccMethod StaticOrigin
+                                    fromStaticPtrClassOpOcc [p_ty]
         ; static_ptr_ty_con <- tcLookupTyCon staticPtrTyConName
         ; let wrap = mkWpEvVarApps [typeable_ev] <.> mkWpTyApps [expr_ty]
               static_expr_ty = mkTyConApp static_ptr_ty_con [expr_ty]

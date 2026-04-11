@@ -10,8 +10,9 @@ module GHC.Internal.Real (Integral (..)) where
 
 import GHC.Internal.Classes (Ord)
 import GHC.Internal.Bignum.Integer (Integer)
+import GHC.Internal.Types as Rebindable
 
-import {-# SOURCE #-} GHC.Internal.Num (Num, fromInteger)
+import {-# SOURCE #-} GHC.Internal.Num
   -- fromInteger needed for the "1" literal
 import {-# SOURCE #-} GHC.Internal.Enum (Enum)
 

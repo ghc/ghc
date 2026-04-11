@@ -15,6 +15,7 @@ import Data.List qualified
 import Data.Maybe
 import GHC.Builtin.Modules( mkGhcInternalModule )
 import GHC.Builtin.KnownKeys
+import GHC.Builtin.KnownOccs( bindIOIdOcc, returnIOIdOcc )
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Core
@@ -342,8 +343,8 @@ dsWasmJSStaticImport fn_id co js_src' unitId sync = do
       jsval_ty <-
         mkTyConTy
           <$> lookupGhcInternalTyCon "GHC.Internal.Wasm.Prim.Types" "JSVal"
-      bindIO_id   <- dsLookupKnownKeyId bindIOIdKey
-      returnIO_id <- dsLookupKnownKeyId returnIOIdKey
+      bindIO_id   <- dsLookupKnownOccId bindIOIdOcc
+      returnIO_id <- dsLookupKnownOccId returnIOIdOcc
       promise_id <- newSysLocalMDs jsval_ty
       blockPromise_id <-
         lookupGhcInternalVarId
