@@ -28,7 +28,7 @@ fusionElemMap
 
 The semantics are identical, but the golden file test fails.
 
-This affects tests in `libraries/base/tests/perf`, `codeGen`, `deSugar`, `arityanal`, `dmdanal` and elsewhere.
+This affects tests in `libraries/base/tests/perf`, `codeGen`, `deSugar`, `arityanal`, `dmdanal` and elsewhere. See also the discussion on !15812 where this fragility was raised as a concern.
 
 ## Proposal
 
