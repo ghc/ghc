@@ -67,8 +67,8 @@ module GHC.Unit.Module.Graph
    , mgLookupModule
    , mgLookupModuleName
    , mgHasHoles
-   , ModuleNameHomeMap (ModuleNameHomeMap)
-   , mgHomeModuleMap
+   , CompleteUnits (CompleteUnits, cu_inventory, cu_providers)
+   , mgCompleteUnits
    , showModMsg
 
     -- ** Reachability queries
@@ -205,18 +205,21 @@ data ModuleGraph = ModuleGraph
   -- Cached computation, whether any of the ModuleGraphNode are isHoleModule,
   -- This is only used for a hack in GHC.Iface.Load to do with backpack, please
   -- remove this at the earliest opportunity.
-  , mg_home_map :: ModuleNameHomeMap
+  , mg_complete_units :: CompleteUnits
     -- ^ For each module name, which home unit UnitIds define it together with the set of units for which the listing is complete.
   }
 
-data ModuleNameHomeMap = ModuleNameHomeMap !(Set UnitId)
-                                           !(Map ModuleName (Set UnitId))
+data CompleteUnits = CompleteUnits
+                     {
+                         cu_inventory :: !(Set UnitId),
+                         cu_providers :: !(Map ModuleName (Set UnitId))
+                     }
 
-mkHomeModuleMap :: [ModuleGraphNode] -> ModuleNameHomeMap
-mkHomeModuleMap nodes = ModuleNameHomeMap completeUnits providerMap where
+mkCompleteUnits :: [ModuleGraphNode] -> CompleteUnits
+mkCompleteUnits nodes = CompleteUnits inventory providers where
 
-    providerMap :: Map ModuleName (Set UnitId)
-    providerMap
+    providers :: Map ModuleName (Set UnitId)
+    providers
         = Map.fromListWith Set.union $
           [
               (moduleName, Set.singleton unitID) |
@@ -225,11 +228,11 @@ mkHomeModuleMap nodes = ModuleNameHomeMap completeUnits providerMap where
                   let unitID     = moduleNodeInfoUnitId moduleNodeInfo
           ]
 
-    completeUnits :: Set UnitId
-    completeUnits = Set.unions (Map.elems providerMap)
+    inventory :: Set UnitId
+    inventory = Set.unions (Map.elems providers)
 
-mgHomeModuleMap :: ModuleGraph -> ModuleNameHomeMap
-mgHomeModuleMap = mg_home_map
+mgCompleteUnits :: ModuleGraph -> CompleteUnits
+mgCompleteUnits = mg_complete_units
 
 -- | Why do we ever need to construct empty graphs? Is it because of one shot mode?
 emptyMG :: ModuleGraph
@@ -237,7 +240,7 @@ emptyMG = ModuleGraph [] (graphReachability emptyGraph, const Nothing)
                          (graphReachability emptyGraph, const Nothing)
                          (graphReachability emptyGraph, const Nothing)
                          False
-                         (ModuleNameHomeMap Set.empty Map.empty)
+                         (CompleteUnits Set.empty Map.empty)
 
 -- | Construct a module graph. This function should be the only entry point for
 -- building a 'ModuleGraph', since it is supposed to be built once and never modified.
@@ -513,7 +516,7 @@ isEmptyMG = null . mg_mss
 mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
 mapMG f mg@ModuleGraph{..} = mg
   { mg_mss = new_mss
-  , mg_home_map = mkHomeModuleMap new_mss
+  , mg_complete_units = mkCompleteUnits new_mss
   }
   where
     new_mss =
@@ -1086,7 +1089,7 @@ extendMG ModuleGraph{..} node =
     , mg_loop_graph = mkTransLoopDeps new_mss
     , mg_zero_graph = mkTransZeroDeps new_mss
     , mg_has_holes = mg_has_holes || maybe False isHsigFile (moduleNodeInfoHscSource =<< mgNodeIsModule node)
-    , mg_home_map = mkHomeModuleMap new_mss
+    , mg_complete_units = mkCompleteUnits new_mss
     }
   where
     new_mss = node : mg_mss
