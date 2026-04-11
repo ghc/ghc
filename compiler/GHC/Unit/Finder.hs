@@ -206,7 +206,7 @@ findImportedModuleNoHsc fc fopts ue home_module_map mhome_unit mod_name mb_pkg =
   case mb_pkg of
     NoPkgQual  -> unqual_import
     ThisPkg uid | (homeUnitId <$> mhome_unit) == Just uid -> home_import
-                | Just os <- M.lookup uid other_fopts_map -> home_pkg_import (uid, os)
+                | Just os <- lookup uid other_fopts -> home_pkg_import (uid, os)
                 | otherwise -> pprPanic "findImportModule" (ppr mod_name $$ ppr mb_pkg $$ ppr (homeUnitId <$> mhome_unit) $$ ppr uid $$ ppr (map fst all_opts))
     OtherPkg _ -> pkg_import
   where
@@ -214,10 +214,8 @@ findImportedModuleNoHsc fc fopts ue home_module_map mhome_unit mod_name mb_pkg =
     module_home_units = M.findWithDefault Set.empty mod_name module_name_map
     current_unit_id = homeUnitId <$> mhome_unit
     all_opts = case current_unit_id of
-                Nothing -> other_fopts_list
-                Just home_unit_id -> (home_unit_id, fopts) : other_fopts_list
-
-    other_fopts_map = M.fromList other_fopts_list
+                Nothing -> other_fopts
+                Just home_unit_id -> (home_unit_id, fopts) : other_fopts
 
     home_import = case mhome_unit of
                    Just home_unit -> findHomeModule fc fopts home_unit mod_name
@@ -237,7 +235,7 @@ findImportedModuleNoHsc fc fopts ue home_module_map mhome_unit mod_name mb_pkg =
     -- Do not be smart and change this to `foldr orIfNotFound home_import hs` as
     -- that is not the same!! home_import is first because we need to look within ourselves
     -- first before looking at the packages in order.
-    any_home_import = foldr1 orIfNotFound (home_import :| map home_pkg_import other_fopts_list)
+    any_home_import = foldr1 orIfNotFound (home_import :| map home_pkg_import other_fopts)
 
     pkg_import    = findExposedPackageModule fc fopts units  mod_name mb_pkg
 
@@ -259,7 +257,7 @@ findImportedModuleNoHsc fc fopts ue home_module_map mhome_unit mod_name mb_pkg =
           excluded = maybe dep_providers (\u -> Set.insert u dep_providers) current_unit_id
       in Set.toList (Set.difference candidates excluded)
     other_home_uids = known_other_uids ++ unknown_units
-    other_fopts_list =
+    other_fopts =
       [ (uid, initFinderOpts (homeUnitEnv_dflags (ue_findHomeUnitEnv uid ue)))
       | uid <- other_home_uids
       ]
